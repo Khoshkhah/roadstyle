@@ -39,6 +39,28 @@ def _truthy(v) -> bool:
     return str(v).strip().lower() in {"yes", "true", "1"} if v is not None else False
 
 
+def _arrays_from_frame(rf, theme, which):
+    """Build (colors, widths) numpy arrays from a ResolvedFrame (the data-driven path)."""
+    import numpy as np
+
+    from .themes import get_theme as _gt
+    dark = _gt(theme).casing == "dark"
+    colors, widths = [], []
+    n = len(rf)
+    for i in range(n):
+        if which == "casing":
+            casing = rf.casing_dark[i] if dark else rf.casing_light[i]
+            if not casing or rf.casing_width[i] <= 0:
+                colors.append([0, 0, 0, 0]); widths.append(0.0)
+            else:
+                colors.append(_hex_to_rgb(casing, int(255 * rf.casing_opacity[i])))
+                widths.append(rf.casing_width[i])
+        else:
+            colors.append(_hex_to_rgb(rf.fill[i], int(255 * rf.opacity[i])))
+            widths.append(rf.width[i])
+    return np.array(colors, dtype="uint8"), np.array(widths, dtype="float32")
+
+
 def render(
     gdf,
     palette: str = "highsat",
@@ -47,6 +69,7 @@ def render(
     tunnel_col: str | None = "tunnel",
     bridge_col: str | None = "bridge",
     basemap: str | None = None,
+    styler=None,
     **kwargs,
 ):
     from lonboard import Map, PathLayer
@@ -65,11 +88,16 @@ def render(
         carto_style = None
 
     g = gdf.to_crs(4326)
-    tunnel_col = tunnel_col if (tunnel_col and tunnel_col in g.columns) else None
-    bridge_col = bridge_col if (bridge_col and bridge_col in g.columns) else None
 
-    c_col, c_w = _arrays(g, palette, theme, highway_col, tunnel_col, bridge_col, "casing")
-    f_col, f_w = _arrays(g, palette, theme, highway_col, tunnel_col, bridge_col, "fill")
+    if styler is None:
+        tunnel_col = tunnel_col if (tunnel_col and tunnel_col in g.columns) else None
+        bridge_col = bridge_col if (bridge_col and bridge_col in g.columns) else None
+        c_col, c_w = _arrays(g, palette, theme, highway_col, tunnel_col, bridge_col, "casing")
+        f_col, f_w = _arrays(g, palette, theme, highway_col, tunnel_col, bridge_col, "fill")
+    else:
+        rf = styler.resolve_frame(g, theme)
+        c_col, c_w = _arrays_from_frame(rf, theme, "casing")
+        f_col, f_w = _arrays_from_frame(rf, theme, "fill")
 
     casing = PathLayer.from_geopandas(g, get_color=c_col, get_width=c_w,
                                       width_units="pixels", width_min_pixels=0)

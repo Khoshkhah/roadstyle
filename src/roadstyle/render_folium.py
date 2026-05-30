@@ -7,6 +7,8 @@ The road layers are always on (no toggle). Base maps use a thumbnail *switcher* 
 """
 from __future__ import annotations
 
+import json
+
 from .basemaps import DEFAULT_SWITCHER, get_basemap
 from .controls import BaseLayerSwitcher
 from .interactive import InteractiveRoads
@@ -38,6 +40,47 @@ def _add_base(m, folium, th, basemap, basemaps):
     m.add_child(BaseLayerSwitcher(keys, default_key))
 
 
+def _add_styled_layers(m, folium, g, styler, theme, fields):
+    """Data-driven path: resolve per-edge styles and draw the casing+fill geometry sandwich.
+
+    Each feature carries precomputed ``__rs_*`` properties; two GeoJson layers (casing under,
+    fill over) read them via a style_function, so any styling mode renders the same way.
+    """
+    rf = styler.resolve_frame(g, theme)
+    th = get_theme(theme)
+    dark = th.casing == "dark"
+
+    gj = json.loads(g.to_json())
+    feats = gj.get("features", [])
+    for i, feat in enumerate(feats):
+        props = feat.setdefault("properties", {})
+        casing = rf.casing_dark[i] if dark else rf.casing_light[i]
+        props["__rs_fill"] = rf.fill[i]
+        props["__rs_w"] = rf.width[i]
+        props["__rs_op"] = rf.opacity[i]
+        props["__rs_dash"] = rf.dash[i]
+        props["__rs_casing"] = casing
+        props["__rs_cw"] = rf.casing_width[i]
+        props["__rs_cop"] = rf.casing_opacity[i]
+
+    def casing_style(feat):
+        p = feat["properties"]
+        if not p.get("__rs_casing") or not p.get("__rs_cw"):
+            return {"opacity": 0, "weight": 0}
+        return {"color": p["__rs_casing"], "weight": p["__rs_cw"],
+                "opacity": p["__rs_cop"], "lineCap": "round", "lineJoin": "round"}
+
+    def fill_style(feat):
+        p = feat["properties"]
+        return {"color": p["__rs_fill"], "weight": p["__rs_w"], "opacity": p["__rs_op"],
+                "dashArray": p.get("__rs_dash"), "lineCap": "round", "lineJoin": "round"}
+
+    folium.GeoJson(gj, name="casing", control=False, style_function=casing_style).add_to(m)
+    tip = folium.GeoJsonTooltip(fields=fields) if fields else None
+    folium.GeoJson(gj, name="roads", control=False, style_function=fill_style,
+                   tooltip=tip).add_to(m)
+
+
 def render(
     gdf,
     palette: str = "highsat",
@@ -51,6 +94,7 @@ def render(
     basemap: str | None = None,
     basemaps: list[str] | None = None,
     filter_control: bool = True,
+    styler=None,
     **map_kwargs,
 ):
     import folium
@@ -65,12 +109,16 @@ def render(
     fields = [f for f in fields if f in g.columns]
     initial_dark = _shown_basemap(th, basemap, basemaps).is_dark
 
-    # interactive road layer: dynamic casing (re-styles on base-map change), hover
-    # highlight (edge -> white), and an in-map highway-type filter panel.
-    m.add_child(InteractiveRoads(
-        g.to_json(), palette=palette, highway_col=highway_col,
-        tooltip=fields, initial_dark=initial_dark, show_filter=filter_control,
-    ))
+    if styler is None:
+        # classic OSM path (unchanged): interactive road layer with dynamic casing,
+        # hover highlight (edge -> white), and an in-map highway-type filter panel.
+        m.add_child(InteractiveRoads(
+            g.to_json(), palette=palette, highway_col=highway_col,
+            tooltip=fields, initial_dark=initial_dark, show_filter=filter_control,
+        ))
+    else:
+        # data-driven path: resolve per-edge styles, draw the casing+fill sandwich.
+        _add_styled_layers(m, folium, g, styler, theme, fields)
 
     # selected edges (neon-violet glow / casing / core, stacked on top)
     if selected is not None and len(selected):
