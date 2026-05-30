@@ -13,6 +13,7 @@ from .config import StyleConfig
 from .controls import BaseLayerSwitcher
 from .edges import RoadEdges, as_edges, load_edges, normalize_edges
 from .filters import filter_edges, highway_types
+from .legend import make_legend
 from .palettes import (
     CARTO,
     HIGHSAT,
@@ -59,4 +60,6 @@ __all__ = [
     "color_by", "color_by_value", "color_by_class",
     # canonical input (Phase 3a)
     "RoadEdges", "normalize_edges", "load_edges", "as_edges",
+    # legends (Phase 3)
+    "make_legend",
 ]

@@ -70,6 +70,8 @@ def render(
     bridge_col: str | None = "bridge",
     basemap: str | None = None,
     styler=None,
+    legend: bool = True,            # accepted for API parity; lonboard legend not yet supported
+    legend_position: str = "bottomleft",
     **kwargs,
 ):
     from lonboard import Map, PathLayer

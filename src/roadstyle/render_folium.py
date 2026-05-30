@@ -79,6 +79,16 @@ def _add_styled_layers(m, folium, g, styler, theme, fields):
     tip = folium.GeoJsonTooltip(fields=fields) if fields else None
     folium.GeoJson(gj, name="roads", control=False, style_function=fill_style,
                    tooltip=tip).add_to(m)
+    return rf
+
+
+def _add_legend(m, rf, position="bottomleft"):
+    """Add a legend for a data-driven ResolvedFrame, if it carries legend metadata."""
+    from .legend import make_legend
+
+    leg = make_legend(getattr(rf, "legend", None), position=position)
+    if leg is not None:
+        m.add_child(leg)
 
 
 def render(
@@ -95,6 +105,8 @@ def render(
     basemaps: list[str] | None = None,
     filter_control: bool = True,
     styler=None,
+    legend: bool = True,
+    legend_position: str = "bottomleft",
     **map_kwargs,
 ):
     import folium
@@ -118,7 +130,9 @@ def render(
         ))
     else:
         # data-driven path: resolve per-edge styles, draw the casing+fill sandwich.
-        _add_styled_layers(m, folium, g, styler, theme, fields)
+        rf = _add_styled_layers(m, folium, g, styler, theme, fields)
+        if legend:
+            _add_legend(m, rf, position=legend_position)
 
     # selected edges (neon-violet glow / casing / core, stacked on top)
     if selected is not None and len(selected):

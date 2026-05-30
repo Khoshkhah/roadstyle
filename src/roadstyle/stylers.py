@@ -209,11 +209,17 @@ class CategoricalStyler:
         casing_width = [self.casing_width if self.casing else 0.0] * n
         klass = [_keystr(v) for v in values]
 
-        return ResolvedFrame(
+        rf = ResolvedFrame(
             fill, width, casing_light, casing_dark, casing_width,
             [dash] * n, [self.opacity] * n, [self.casing_opacity] * n, klass,
             theme_aware_casing=self.theme_aware_casing,
         )
+        # legend = the value->colour entries actually present in the data, in mapping order
+        present = {k for k in klass}
+        entries = [(label, hexc) for label, hexc in self.colors.items()
+                   if _keystr(label) in present]
+        rf.legend = {"kind": "categorical", "title": self.column, "entries": entries}
+        return rf
 
 
 @dataclass
