@@ -12,7 +12,18 @@ from .basemaps import BASEMAPS, Basemap, get_basemap, register_basemap
 from .config import StyleConfig
 from .controls import BaseLayerSwitcher
 from .filters import filter_edges, highway_types
-from .palettes import CARTO, HIGHSAT, PALETTES, SELECTION, RoadStyle, register_palette
+from .palettes import (
+    CARTO,
+    HIGHSAT,
+    PALETTES,
+    SELECTION,
+    RoadStyle,
+    load_palette,
+    palette_from_dict,
+    palette_to_dict,
+    register_palette,
+    save_palette,
+)
 from .render import render_edges
 from .style import base_style, normalize_highway, resolve, selection_style
 from .stylers import ClassStyler, ResolvedFrame, Styler
@@ -30,4 +41,6 @@ __all__ = [
     "StyleConfig", "register_palette", "register_theme", "register_basemap",
     # styler abstraction (Phase 1)
     "Styler", "ClassStyler", "ResolvedFrame",
+    # palette JSON I/O (Phase 2a)
+    "load_palette", "save_palette", "palette_to_dict", "palette_from_dict",
 ]

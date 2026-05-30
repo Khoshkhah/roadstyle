@@ -26,6 +26,39 @@ class RoadStyle:
     dash: tuple[int, int] | None = None  # dash pattern (on, off) in px
     opacity: float = 1.0
 
+    def to_dict(self) -> dict:
+        """Serialise to a plain JSON-ready dict (``dash`` tuple becomes a list)."""
+        return {
+            "fill": self.fill,
+            "width": self.width,
+            "casing_width": self.casing_width,
+            "casing_light": self.casing_light,
+            "casing_dark": self.casing_dark,
+            "dash": list(self.dash) if self.dash else None,
+            "opacity": self.opacity,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "RoadStyle":
+        """Build a RoadStyle from a dict (e.g. parsed JSON). Unknown keys are ignored.
+
+        Only ``fill``/``width``/``casing_width`` are required; the rest fall back to the
+        dataclass defaults, so a minimal ``{"fill": "#fff", "width": 2, "casing_width": 4}`` works.
+        """
+        missing = [k for k in ("fill", "width", "casing_width") if k not in d]
+        if missing:
+            raise ValueError(f"RoadStyle dict is missing required keys: {missing}")
+        dash = d.get("dash")
+        return cls(
+            fill=d["fill"],
+            width=float(d["width"]),
+            casing_width=float(d["casing_width"]),
+            casing_light=d.get("casing_light"),
+            casing_dark=d.get("casing_dark", "#000000"),
+            dash=tuple(dash) if dash else None,
+            opacity=float(d.get("opacity", 1.0)),
+        )
+
 
 # Importance order (low -> high). Used for the casing/fill "geometry sandwich" z-order.
 ORDER = [
@@ -94,6 +127,57 @@ def register_palette(name: str, table: dict[str, RoadStyle]) -> None:
                 f"palette entry {key!r} must be a RoadStyle, got {type(value).__name__}"
             )
     PALETTES[name] = dict(table)
+
+
+def palette_to_dict(palette: str | dict[str, RoadStyle]) -> dict[str, dict]:
+    """Return ``{class: roadstyle_dict}`` for a registered palette name or a palette mapping."""
+    table = PALETTES[palette] if isinstance(palette, str) else palette
+    return {cls: rs.to_dict() for cls, rs in table.items()}
+
+
+def palette_from_dict(roads: dict[str, dict]) -> dict[str, RoadStyle]:
+    """Build a palette mapping ``{class: RoadStyle}`` from ``{class: roadstyle_dict}``."""
+    return {cls: RoadStyle.from_dict(d) for cls, d in roads.items()}
+
+
+def save_palette(palette: str | dict[str, RoadStyle], path, *, name: str | None = None) -> None:
+    """Write a palette to a JSON file as ``{"name": ..., "roads": {class: {...}}}``.
+
+    ``palette`` may be a registered name (e.g. ``"highsat"``) or a ``{class: RoadStyle}`` mapping.
+    The JSON is human-editable and can be reloaded with :func:`load_palette` — or read directly by
+    a web frontend, so Python and the browser share one source of truth for colours.
+    """
+    import json
+
+    if name is None:
+        name = palette if isinstance(palette, str) else "palette"
+    payload = {"name": name, "roads": palette_to_dict(palette)}
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=2)
+
+
+def load_palette(path, *, register: bool = True) -> dict[str, RoadStyle]:
+    """Load a palette from a JSON file written by :func:`save_palette`.
+
+    Accepts either the full ``{"name", "roads"}`` form or a bare ``{class: {...}}`` mapping.
+    If ``register`` is True and a name is present, the palette is added to :data:`PALETTES` so
+    ``render_edges(palette=name)`` can use it.
+    """
+    import json
+
+    with open(path, encoding="utf-8") as fh:
+        data = json.load(fh)
+    if "roads" in data:                 # full {name, roads} form
+        name = data.get("name")
+        roads = data["roads"]
+    else:                               # bare {class: {...}} mapping
+        name = None
+        roads = data
+    table = palette_from_dict(roads)
+    if register and name:
+        register_palette(name, table)
+    return table
+
 
 # Neon-violet selected-edge profile (selected_edge_color.md).
 SELECTION = {
