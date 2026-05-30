@@ -33,6 +33,13 @@ palette JSON file.
 > road a clean edge. `casing_light`/`casing_dark` exist so the border can switch colour to suit
 > a light vs dark base map.
 
+> **Units & zoom (known limitation).** `width` and `casing_width` are **fixed screen pixels** —
+> a road keeps the same on-screen thickness at every zoom level. This looks right at city scale
+> (roadstyle's main use). It is *not* yet zoom-dependent: when zoomed far out, fixed-pixel roads
+> can blob together; when zoomed far in they don't thicken. Professional vector maps instead vary
+> width with zoom (a Mapbox-style `interpolate` curve) or use ground-meter widths with min/max
+> pixel clamps. A zoom→width curve is a planned opt-in; fixed pixels will remain the default.
+
 Example (one entry from the `highsat` palette):
 ```json
 "motorway": {
