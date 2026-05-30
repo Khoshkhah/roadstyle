@@ -21,6 +21,13 @@ byte-for-byte unchanged; everything new is additive.
 - Canonical input layer: `RoadEdges` + `normalize_edges`/`load_edges` (normalize-at-boundary).
 - Input validation with clear error messages; configurable `StyleConfig`; registries for custom
   palettes/themes/basemaps; palette JSON I/O (`save_palette`/`load_palette`).
+- Docs: parameter reference, embedding guide, frontend-integration guide (baked HTML / JSON API /
+  JS port), comparison vs `.explore()`/prettymaps, and a runnable example notebook.
+
+### Verified by adoption
+- `sweden-road-data` (`nvdb_acquirer.viz.aadt_map`): renders NVDB vehicle edges coloured by AADT
+  traffic volume via `render_edges(color_by="aadt", cmap="YlOrRd", width_by=…)` — confirmed on
+  927 real Nacka edges (AADT 1–37,828), both folium & lonboard.
 
 ### Changed
 - Repositioned as an opinionated OSM road-cartography layer that **reuses** mature libraries —
