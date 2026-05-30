@@ -11,6 +11,10 @@ styling library that can also be embedded in a website. The existing OSM styling
 byte-for-byte unchanged; everything new is additive.
 
 ### Added
+- Interactive selection that **returns the result**: clicking a road in `roadstyle.js` fires
+  `onSelect(feature, layer)` (and `onDeselect`) with the edge's GeoJSON feature — geometry +
+  properties incl. `__rs_class` — plus a `getSelection()` query method, so a custom page UI can
+  react (single-select; click again / the map background to deselect). See `docs/embedding.md`.
 - Canonical browser renderer: `static/roadstyle.js` (+ `roadstyle.css`) — one drop-in
   `RoadStyleMap` class (headless core: `load`/`setFilter`/`highlightRoad`/`getRoadClasses`, geometry
   sandwich, hover/selection; plus opt-in legend & road-type filter widgets). `to_html` now **inlines

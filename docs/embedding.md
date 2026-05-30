@@ -164,3 +164,26 @@ fetch("roads.json").then(r => r.json()).then(spec => {
 - **You use vector tiles / want GPU rendering / lots of data** → **Option 3 (MapLibre)**.
 - **A React/Vue app** → fetch the spec and feed `spec.geojson` to your map component using the
   same `__rs_*` accessors shown above.
+
+
+## Reacting to a selection (click → your code)
+
+`roadstyle.js` hands clicks back to your page so a custom UI can react. Register handlers in
+JavaScript (an `interaction_config.json` can't carry functions):
+
+```js
+const m = new RoadStyleMap("map");
+m.on("select", (feature, layer) => {
+  // feature.properties carries __rs_class plus your original data columns
+  console.log("selected", feature.properties);
+});
+m.on("deselect", (prevFeature) => console.log("cleared"));
+await m.load("map_data.json");
+
+// or poll instead of using callbacks:
+const current = m.getSelection();   // the selected feature, or null
+```
+
+Selection is **single** — clicking another road replaces it; click the same road again, or click
+the map background, to deselect (each fires `onDeselect`). You can also pass the handlers up front:
+`new RoadStyleMap("map", { onSelect, onDeselect })`.

@@ -43,6 +43,10 @@
     // Leaflet map toggles
     doubleClickZoom: true,
     zoomControl: true,
+    // Selection-result callbacks. Set these in JS (an interaction_config.json can't carry
+    // functions) via the constructor options or `.on("select"/"deselect", fn)`.
+    onSelect: null, // function(feature, layer) — fired when an edge is selected
+    onDeselect: null, // function(prevFeature)   — fired when the selection is cleared
     // Optional built-in UI widgets (opt-in — no front-end code required to get a usable map).
     widgets: {
       legend: true, // render the spec's legend (if present)
@@ -80,6 +84,7 @@
     this.fillLayer = null;
     this.highlightLayer = null;
     this.selectedLayer = null; // the fill sub-layer currently selected (null = none)
+    this.selected = null; // the selected GeoJSON feature (null = none)
     this.activeFilters = null; // null = show all
   }
 
@@ -225,20 +230,37 @@
     this.map.on("click", function () { self.clearSelection(); });
   };
 
-  // Select an edge: draw the highlight over it and remember which sub-layer is active.
+  // Select an edge: draw the highlight, remember it, and hand the feature back to the host page.
   RoadStyleMap.prototype.selectFeature = function (layer, feature) {
-    this.clearSelection();
+    this.clearSelection(); // deselects any previous edge (fires onDeselect for it)
     this.selectedLayer = layer || null;
+    this.selected = feature || null;
     this.highlightRoad(feature);
+    if (typeof this.options.onSelect === "function") this.options.onSelect(feature, layer);
   };
 
-  // Remove any active selection highlight.
+  // Remove any active selection highlight, notifying the host page if something was selected.
   RoadStyleMap.prototype.clearSelection = function () {
+    var prev = this.selected || null;
     if (this.highlightLayer) {
       this.map.removeLayer(this.highlightLayer);
       this.highlightLayer = null;
     }
     this.selectedLayer = null;
+    this.selected = null;
+    if (prev && typeof this.options.onDeselect === "function") this.options.onDeselect(prev);
+  };
+
+  // The currently selected GeoJSON feature (its geometry + properties incl. __rs_class), or null.
+  RoadStyleMap.prototype.getSelection = function () {
+    return this.selected || null;
+  };
+
+  // Register a selection handler after construction: .on("select", fn) / .on("deselect", fn).
+  RoadStyleMap.prototype.on = function (event, fn) {
+    if (event === "select") this.options.onSelect = fn;
+    else if (event === "deselect") this.options.onDeselect = fn;
+    return this; // chainable
   };
 
   // 3-layer neon glow on a selected feature, sized to always sit ON TOP of the edge it covers

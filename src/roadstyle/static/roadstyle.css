@@ -54,3 +54,23 @@
   font-weight: 500;
   color: #aeb8c2;
 }
+
+.rs-detail {
+  margin-top: 14px;
+  font: 500 12px/1.5 system-ui, sans-serif;
+  color: #cfd6dd;
+}
+.rs-detail h4 {
+  margin: 0 0 6px;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  color: #9fb0bf;
+  text-transform: uppercase;
+}
+.rs-detail div {
+  padding: 1px 0;
+}
+.rs-detail b {
+  color: #9fb0bf;
+  font-weight: 600;
+}

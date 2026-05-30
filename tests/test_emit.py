@@ -122,6 +122,7 @@ def test_to_html_inlines_canonical_renderer():
 
     js = _asset("roadstyle.js")
     assert "RoadStyleMap" in js
+    assert "onSelect" in js and "getSelection" in js   # selection-result API present
     html = to_html(_edges())
     assert js in html                      # the exact canonical renderer is inlined
     assert "new RoadStyleMap(" in html     # bootstrapped against the embedded spec
