@@ -103,7 +103,12 @@ def test_save_html(tmp_path):
 
 def test_spec_html_is_lighter_than_folium():
     # the stack-agnostic spec page should be no heavier than folium's full output
-    g = _edges()
+    n = 400
+    g = gpd.GeoDataFrame(
+        {"highway": ["primary"] * n, "aadt": list(range(n))},
+        geometry=[LineString([(17.9 + i * 1e-4, 59.3), (17.9 + i * 1e-4, 59.31)]) for i in range(n)],
+        crs=4326,
+    )
     spec_html = to_html(g, color_by="aadt", cmap="viridis")
     from roadstyle import render_edges
     folium_html = render_edges(g, color_by="aadt", cmap="viridis").get_root().render()

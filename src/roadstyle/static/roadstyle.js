@@ -33,7 +33,8 @@
     hoverColor: "#FFFFFF",
     hoverExtraWidth: 2,
     hoverOpacity: 1.0,
-    // Click selection — 3-layer neon-violet glow (glow under, casing, white core on top)
+    // Click selection — 3-layer neon-violet glow (glow under, casing, white core on top).
+    // The widths below are minimums; the highlight always grows to sit over the edge it covers.
     selectionStyle: {
       glow: { color: "#FF00FF", width: 12, opacity: 0.4 },
       casing: { color: "#000000", width: 7, opacity: 1.0 },
@@ -78,6 +79,7 @@
     this.casingLayer = null;
     this.fillLayer = null;
     this.highlightLayer = null;
+    this.selectedLayer = null; // the fill sub-layer currently selected (null = none)
     this.activeFilters = null; // null = show all
   }
 
@@ -127,6 +129,11 @@
     this.activeFilters = allowedClasses && allowedClasses.length ? allowedClasses : null;
     if (this.casingLayer) this.casingLayer.setStyle(this._casingStyle.bind(this));
     if (this.fillLayer) this.fillLayer.setStyle(this._fillStyle.bind(this));
+    // A hidden road shouldn't keep its selection highlight.
+    if (this.selectedLayer && this.selectedLayer.feature &&
+        !this._visible(this.selectedLayer.feature.properties)) {
+      this.clearSelection();
+    }
   };
 
   RoadStyleMap.prototype._visible = function (p) {
@@ -191,6 +198,7 @@
         }
         layer.on("mouseover", function (e) {
           if (!self._visible(ft.properties)) return;
+          if (self.selectedLayer === layer) return; // don't fight the selection highlight
           e.target.setStyle({
             color: self.options.hoverColor,
             weight: ft.properties.__rs_w + self.options.hoverExtraWidth,
@@ -201,23 +209,63 @@
         layer.on("mouseout", function (e) {
           self.fillLayer.resetStyle(e.target);
         });
-        layer.on("click", function () {
-          self.highlightRoad(ft);
+        // Click toggles selection: click an edge to select it, click it again to deselect.
+        layer.on("click", function (e) {
+          if (L.DomEvent) L.DomEvent.stopPropagation(e); // don't let the map-click clear it
+          if (self.selectedLayer === layer) {
+            self.clearSelection();
+          } else {
+            self.selectFeature(layer, ft);
+          }
         });
       },
     }).addTo(this.map);
+
+    // Clicking the map background (not a road) clears the selection.
+    this.map.on("click", function () { self.clearSelection(); });
   };
 
-  // 3-layer neon-violet glow on a selected feature.
+  // Select an edge: draw the highlight over it and remember which sub-layer is active.
+  RoadStyleMap.prototype.selectFeature = function (layer, feature) {
+    this.clearSelection();
+    this.selectedLayer = layer || null;
+    this.highlightRoad(feature);
+  };
+
+  // Remove any active selection highlight.
+  RoadStyleMap.prototype.clearSelection = function () {
+    if (this.highlightLayer) {
+      this.map.removeLayer(this.highlightLayer);
+      this.highlightLayer = null;
+    }
+    this.selectedLayer = null;
+  };
+
+  // 3-layer neon glow on a selected feature, sized to always sit ON TOP of the edge it covers
+  // (so the colour visibly changes even on wide roads). The overlay is non-interactive so a
+  // second click on the same edge still reaches it and toggles the selection off.
   RoadStyleMap.prototype.highlightRoad = function (feature) {
     if (this.highlightLayer) this.map.removeLayer(this.highlightLayer);
     var s = this.options.selectionStyle;
-    function lyr(part) {
+    var w = (feature && feature.properties && feature.properties.__rs_w) || 4;
+    function lyr(part, weight) {
       return L.geoJSON(feature, {
-        style: { color: part.color, weight: part.width, opacity: part.opacity, lineCap: "round" },
+        interactive: false,
+        style: {
+          color: part.color,
+          weight: weight,
+          opacity: part.opacity,
+          lineCap: "round",
+          lineJoin: "round",
+        },
       });
     }
-    this.highlightLayer = L.layerGroup([lyr(s.glow), lyr(s.casing), lyr(s.core)]).addTo(this.map);
+    this.highlightLayer = L.layerGroup([
+      lyr(s.glow, Math.max(s.glow.width, w + 10)),
+      lyr(s.casing, Math.max(s.casing.width, w + 5)),
+      lyr(s.core, Math.max(s.core.width, w + 2)),
+    ]).addTo(this.map);
+    this.highlightLayer.bringToFront();
   };
 
   // ── Optional built-in widgets ────────────────────────────────────────────────

@@ -34,6 +34,12 @@ byte-for-byte unchanged; everything new is additive.
   traffic volume via `render_edges(color_by="aadt", cmap="YlOrRd", width_by=…)` — confirmed on
   927 real Nacka edges (AADT 1–37,828), both folium & lonboard.
 
+### Fixed
+- `roadstyle.js` edge selection now works: clicking a road visibly highlights it (the
+  glow is sized to cover the edge, so the colour changes even on wide roads), clicking it again
+  or clicking the map background deselects it, and a filtered-out edge drops its selection. The
+  highlight overlay is non-interactive so repeat clicks reach the road underneath.
+
 ### Changed
 - Repositioned as an opinionated OSM road-cartography layer that **reuses** mature libraries —
   `branca` (colormaps + legends), `mapclassify` (numeric classification), `xyzservices` (basemaps) —
