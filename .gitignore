@@ -1,11 +1,19 @@
+# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
 .ipynb_checkpoints/
 .venv/
-site/                  # mkdocs build output
-examples/*.html        # generated example maps
-notebooks/output/      # generated maps from the example notebook
-.ipynb_checkpoints/
+
+# mkdocs build output
+site/
+
+# generated example maps
+examples/*.html
+
+# generated maps from the example notebook
+notebooks/output/
+
+# OS
 .DS_Store

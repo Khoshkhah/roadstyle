@@ -15,6 +15,7 @@ dependencies:
   - mypy
   - jupyterlab        # run the example notebooks in notebooks/
   - nbclient          # execute notebooks programmatically (CI / make examples)
+  - pyarrow           # required by lonboard (WebGL backend)
   - pip
   - pip:
       - lonboard          # WebGL backend (optional extra: lonboard)
