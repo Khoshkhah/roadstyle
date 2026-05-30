@@ -41,10 +41,10 @@ docs = ["mkdocs-material"]
 dev = ["pytest", "ruff", "mypy", "lonboard", "mapclassify", "matplotlib", "xyzservices"]
 
 [project.urls]
-Homepage = "https://github.com/kaveh/roadstyle"
-Documentation = "https://github.com/kaveh/roadstyle"
-Source = "https://github.com/kaveh/roadstyle"
-Changelog = "https://github.com/kaveh/roadstyle/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/Khoshkhah/roadstyle"
+Documentation = "https://github.com/Khoshkhah/roadstyle"
+Source = "https://github.com/Khoshkhah/roadstyle"
+Changelog = "https://github.com/Khoshkhah/roadstyle/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -15,6 +15,7 @@ from .filters import filter_edges, highway_types
 from .palettes import CARTO, HIGHSAT, PALETTES, SELECTION, RoadStyle, register_palette
 from .render import render_edges
 from .style import base_style, normalize_highway, resolve, selection_style
+from .stylers import ClassStyler, ResolvedFrame, Styler
 from .themes import THEMES, Theme, get_theme, register_theme
 
 __version__ = "0.2.0.dev0"
@@ -27,4 +28,6 @@ __all__ = [
     "BASEMAPS", "Basemap", "get_basemap", "BaseLayerSwitcher",
     # generalization additions (Phase 0)
     "StyleConfig", "register_palette", "register_theme", "register_basemap",
+    # styler abstraction (Phase 1)
+    "Styler", "ClassStyler", "ResolvedFrame",
 ]
