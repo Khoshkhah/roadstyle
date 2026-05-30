@@ -1,87 +1,87 @@
 # Usage
 
-## `render_edges`
+## Install
 
-```python
-render_edges(
-    gdf, *,
-    backend="folium",     # "folium" (portable HTML) | "lonboard" (WebGL)
-    palette="highsat",    # "highsat" | "carto"
-    theme="dark",         # "light" | "dark" | "satellite"
-    highway_col="highway",
-    include=None,         # keep only these highway types (str or iterable)
-    exclude=None,         # drop these types
-    match_links=True,     # treat primary_link as primary, etc.
-    # folium-only extras:
-    tooltip=None,         # list of columns for hover (default: all non-geometry)
-    selected=None,        # a GeoDataFrame subset to highlight (neon-violet)
-    tunnel_col="tunnel",  # bool/'yes' column -> tunnel styling (ignored if absent)
-    bridge_col="bridge",
-    name="roads",
-)
+```bash
+pip install -e .                    # from the repo root (src layout)
+# optional extras:
+pip install -e ".[lonboard]"        # WebGL backend
+pip install -e ".[numeric]"         # numeric styling (mapclassify + matplotlib colormaps)
+pip install -e ".[basemaps]"        # any xyzservices tile provider as a base map
 ```
 
-Input: any GeoDataFrame with a `highway` column (any CRS — it's reprojected to 4326 for
-display). Returns a `folium.Map` (call `.save("map.html")`) or a `lonboard.Map`.
+Or, with conda: `conda env create -f environment.yml && conda activate roadstyle`.
 
-The folium map is **interactive**:
+## Input — what roadstyle expects
 
-- **Dynamic casing** — the road casing re-styles when you switch base maps (coloured casing
-  on light tiles, black on dark/satellite), like the OSM project's website.
-- **Hover highlight** — hovering an edge turns it white and brings it to front.
-- **Type filter panel** (top-right) — checkboxes per `highway` type, plus *All*/*None*, to
-  show/hide road classes live. Disable with `filter_control=False`.
-- **Base-map switcher** (bottom-right) — thumbnail cards; see [Themes › Base maps](themes.md#base-maps).
+roadstyle styles **road edges**: a `GeoDataFrame` (or a `RoadEdges`) with **line geometry**
+(LineString/MultiLineString) and at least one column to style by. You load your data however you
+like; roadstyle normalises it (reproject to EPSG:4326, drop non-line rows, optionally rename your
+class column):
+
+```python
+import geopandas as gpd
+import roadstyle as rs
+
+raw = gpd.read_file("edges.gpkg")              # GeoPackage / GeoJSON / Shapefile / PostGIS / …
+edges = rs.normalize_edges(raw, class_col="highway", rename={"vagtyp": "highway"})
+```
+
+`render_edges` (and `to_spec`, etc.) also accept a plain GeoDataFrame and normalise it for you.
+
+## Quick start
+
+```python
+edges = gpd.read_file("edges.gpkg")            # needs a `highway` column
+rs.render_edges(edges, theme="dark").save("roads.html")
+```
+
+`render_edges` returns a `folium.Map` (or a `lonboard.Map` with `backend="lonboard"`), so you can
+keep customising it, `.save()` it, or display it inline in a notebook.
 
 ## Recipes
 
 ```python
-# high-saturation, dark base
-render_edges(edges, theme="dark").save("dark.html")
+# Themes, palettes, filtering, satellite, selection
+rs.render_edges(edges, palette="carto", theme="light",
+                include=["motorway", "trunk", "primary"])
+rs.render_edges(edges, theme="satellite", basemap="satellite")
+rs.render_edges(edges, selected=picked_edges)          # neon-violet highlight
 
-# OSM Carto, light base
-render_edges(edges, palette="carto", theme="light").save("carto.html")
+# Data-driven: categorical (e.g. congestion levels)
+rs.render_edges(edges, color_by="congestion",
+                colors={"low": "#11D68F", "moderate": "#FFCF43",
+                        "heavy": "#F24E42", "severe": "#A92727"}, legend=True)
 
-# satellite, only the major network
-render_edges(edges, theme="satellite",
-             include=["motorway", "trunk", "primary", "secondary"]).save("major.html")
+# Data-driven: numeric (e.g. traffic volume) with a width ramp + gradient legend
+rs.render_edges(edges, color_by="aadt", cmap="viridis",
+                vmin=0, vmax=20000, width_by=(1, 8), legend=True)
 
-# drop service roads + alleys
-render_edges(edges, exclude=["service", "footway", "path"]).save("drive.html")
-
-# highlight a selection (e.g. a matched/queried subset)
-sel = edges[edges.name == "Rissneleden"]
-render_edges(edges, selected=sel).save("selected.html")
-
-# big data -> GPU
-render_edges(edges, backend="lonboard", theme="dark")
-
-# choose a base map, or offer several toggleable ones (see Themes > Base maps)
-render_edges(edges, theme="dark", basemap="voyager").save("voyager.html")
-render_edges(edges, theme="dark",
-             basemaps=["dark_matter", "positron", "satellite"]).save("switch.html")
+# GPU backend for very large edge sets
+rs.render_edges(big_edges, backend="lonboard", color_by="aadt", cmap="magma")
 ```
 
-## Filtering on its own
+## Custom (non-OSM) road classes
 
 ```python
-from roadstyle import filter_edges, highway_types
-
-highway_types(edges)                       # ['motorway', 'residential', 'service', ...]
-major = filter_edges(edges, include=["motorway", "trunk", "primary"])
-no_service = filter_edges(edges, exclude="service")
+from roadstyle import register_palette, RoadStyle, color_by_class
+register_palette("nvdb", {"0": RoadStyle("#00E5FF", 6, 8),
+                          "1": RoadStyle("#FF9100", 4.5, 6.5)})
+rs.render_edges(edges, style=color_by_class("functional_road_class",
+                                            palette="nvdb", normalize_links=False))
 ```
 
-## Inspecting / reusing the style
+Palettes can also be saved/loaded as JSON (`save_palette` / `load_palette`) so a non-coder can
+edit colours, or a web frontend can share the same colour source.
+
+## Web output
 
 ```python
-from roadstyle import resolve, base_style, selection_style
-
-resolve("primary", palette="highsat", theme="dark")
-# ResolvedStyle(fill='#FF9100', width=4.5, casing='#000000', casing_width=7.5, dash=None, opacity=1.0)
-
-base_style("motorway", "carto").fill        # '#e892a2'
-selection_style("dark", base_width=4.0)     # {'glow': {...}, 'casing': {...}, 'core': {...}}
+spec = rs.to_spec(edges, color_by="aadt", cmap="viridis")  # canonical JSON dict
+rs.save_spec(edges, "roads.json", color_by="aadt", cmap="viridis")
+rs.save(edges, "roads.html", color_by="aadt", cmap="viridis")   # standalone HTML
+html = rs.to_iframe(edges, color_by="aadt", cmap="viridis")     # <iframe> string
 ```
 
-Use `resolve()` to drive any other renderer (Mapbox GL, QGIS, deck.gl) from the same palette.
+See **[Embedding in a website](embedding.md)** for the JSON spec and frontend snippets, and the
+**[Parameter reference](parameters.md)** for every parameter.

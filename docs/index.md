@@ -1,34 +1,38 @@
 # roadstyle
 
-OSM-theme **road/edge map styling** for `folium` and `lonboard`.
-
-Give it a GeoDataFrame with a `highway` column and it renders a styled interactive map:
-the proper **casing + fill "geometry sandwich"**, **light / dark / satellite** themes,
-**highway-type filtering**, and a neon-violet **selected-edge** style.
+**roadstyle** turns a GeoDataFrame of road edges into a beautifully styled interactive map —
+an OSM-style "geometry sandwich" (coloured fills over casings) with palettes, themes, and base
+maps — and can colour roads by **your own data**, on **folium** / **lonboard**, or as a
+**stack-agnostic JSON spec** you embed in any website.
 
 ```python
 import geopandas as gpd
 from roadstyle import render_edges
 
-edges = gpd.read_file("edges.gpkg")          # needs a `highway` column
-render_edges(edges, theme="dark").save("map.html")
+edges = gpd.read_file("edges.gpkg")            # any CRS; needs a road-class column
+render_edges(edges, theme="dark").save("roads.html")          # classic OSM styling
+
+render_edges(edges, color_by="aadt", cmap="viridis",          # colour by a data value
+             width_by=(1, 6), legend=True).save("traffic.html")
 ```
 
-## Concepts
+## Why roadstyle?
 
-- **Palette** — the colour set keyed by `highway` tag. Two ship in the box:
-  [`highsat`](palettes.md#highsat) (high-saturation) and [`carto`](palettes.md#carto) (OSM Carto).
-- **Theme** — the base map + casing variant: `light`, `dark`, `satellite`
-  (see [Themes](themes.md)).
-- **Geometry sandwich** — all road *casings* are drawn first (one layer), then all *fills*
-  on top, so borders never slice through higher-importance roads.
-- **Overrides** — `*_link` render narrower; `tunnel` fades + dashes; `bridge` forces a black
-  casing; `footway`/`path`/`cycleway`/`track` get dashed styles.
-- **Selection** — a neon-violet glow/casing/core stack highlights selected edges.
+- **Geometry sandwich** — every road is a coloured fill over a wider casing, so junctions and
+  overlaps read cleanly (just like the OSM "Standard" style).
+- **Class styling** — built-in `highsat` (high-saturation) and `carto` (classic OSM) palettes;
+  bring your own vocabulary with `register_palette` / palette JSON.
+- **Data-driven styling** — colour/size roads by any **categorical** column (`color_by`+`colors`)
+  or **numeric** column (`color_by`+`cmap`+`width_by`), with automatic legends.
+- **Themes & base maps** — light / dark / satellite, with a thumbnail base-map switcher.
+- **Backends + web output** — folium (portable HTML), lonboard (WebGL), and `to_spec`/`to_html`/
+  `to_iframe` for embedding in your own site (Leaflet / MapLibre / iframe).
+- **Canonical input** — `normalize_edges` reprojects, drops non-lines, and maps your column names.
 
-## Design source
+## Where to next
 
-The palettes, casing widths, theme casing-swap and selection profile are transcribed from the
-cartographic spec docs (`map_road_color.md`, `osm_highway_styles.md`, `selected_edge_color.md`).
-
-See [Usage](usage.md) for the full API and recipes.
+- **[Usage](usage.md)** — install, quick start, recipes.
+- **[Parameter reference](parameters.md)** — every parameter explained.
+- **[Embedding in a website](embedding.md)** — the JSON spec + Leaflet/MapLibre/iframe snippets.
+- **[Palettes](palettes.md)** / **[Themes](themes.md)** — styling reference.
+- **[Comparison](comparison.md)** — roadstyle vs geopandas `.explore()` / prettymaps.

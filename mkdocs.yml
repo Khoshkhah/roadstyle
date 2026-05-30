@@ -17,6 +17,7 @@ nav:
   - Palettes: palettes.md
   - Themes: themes.md
   - API: api.md
+  - Comparison: comparison.md
 markdown_extensions:
   - admonition
   - tables

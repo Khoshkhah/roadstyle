@@ -1,42 +1,60 @@
-# API
+# API reference
 
-## `render_edges(gdf, *, …)`
-Filter (by `include`/`exclude`) then render. Returns a `folium.Map` or `lonboard.Map`.
-See [Usage](usage.md) for all parameters.
+A map of the public API. For every parameter and its meaning, see the
+**[Parameter reference](parameters.md)**.
 
-## Filtering — `roadstyle.filters`
-- `filter_edges(gdf, include=None, exclude=None, highway_col="highway", match_links=True)` —
-  subset by highway type. `include` applied before `exclude`. Returns a copy.
-- `highway_types(gdf, highway_col="highway", normalize=True)` — sorted unique types present.
+## Rendering
 
-## Style resolution — `roadstyle.style`
-- `resolve(highway, palette="highsat", theme="dark", tunnel=False, bridge=False) -> ResolvedStyle`
-  — the concrete style for one edge.
-- `base_style(highway, palette="highsat") -> RoadStyle` — the palette entry (before theme/overrides).
-- `normalize_highway(highway) -> (base_class, is_link)`.
-- `selection_style(theme="dark", base_width=4.0) -> dict` — `{"glow", "casing", "core"}` layers.
+| Function | Returns | Purpose |
+|---|---|---|
+| `render_edges(gdf, ...)` | `folium.Map` / `lonboard.Map` | the main entry point — render a styled map |
 
-```python
-@dataclass
-class ResolvedStyle:
-    fill: str
-    width: float
-    casing: str | None
-    casing_width: float
-    dash: tuple[int, int] | None
-    opacity: float
-```
+Key kwargs: `backend`, `palette`, `theme`, `highway_col`, `include`/`exclude`, `selected`,
+`tooltip`, `basemap`/`basemaps`, and the data-driven set `style` / `color_by` / `colors` /
+`cmap` / `vmin` / `vmax` / `width_by` / `legend`.
 
-## Palettes & themes
-- `PALETTES: dict[str, dict[str, RoadStyle]]` — `"highsat"` and `"carto"`.
-- `HIGHSAT`, `CARTO` — the individual palette dicts.
-- `SELECTION` — neon-violet selection colours/widths.
-- `RoadStyle` — `(fill, width, casing_width, casing_light, casing_dark, dash, opacity)`.
-- `THEMES: dict[str, Theme]`, `Theme`, `get_theme(name)`.
-- `BASEMAPS: dict[str, Basemap]`, `Basemap`, `get_basemap(key)` — tile providers
-  (`positron`, `dark_matter`, `voyager`, `osm`, `esri_gray`, `satellite`). Use via
-  `render_edges(..., basemap=...)` or `basemaps=[...]` (folium toggleable layers).
+## Web / JSON output
 
-## Renderers (called via `render_edges`)
-- `roadstyle.render_folium.render(gdf, palette, theme, highway_col, tunnel_col, bridge_col, tooltip, selected, name, **map_kwargs)`
-- `roadstyle.render_lonboard.render(gdf, palette, theme, highway_col, tunnel_col, bridge_col, **map_kwargs)`
+| Function | Returns | Purpose |
+|---|---|---|
+| `to_spec(gdf, ...)` | `dict` | canonical JSON: data + baked-in style + legend + metadata |
+| `to_geojson(gdf, ...)` | `dict` | the styled `FeatureCollection` only |
+| `to_html(gdf, full=…)` | `str` | full HTML page or embeddable `<div>+<script>` fragment |
+| `to_iframe(gdf, ...)` | `str` | self-contained `<iframe srcdoc=…>` |
+| `save(gdf, path, ...)` | — | write a standalone HTML map |
+| `save_spec` / `load_spec` | — / `dict` | round-trip the spec to a `.json` file |
+
+## Stylers (how colours are chosen)
+
+| Object | Purpose |
+|---|---|
+| `Styler` | protocol: `resolve_frame(gdf, theme) -> ResolvedFrame` |
+| `ClassStyler` | colour by road class via a palette (the OSM default) |
+| `CategoricalStyler` | colour by a discrete column + `{value: colour}` map |
+| `NumericStyler` | colour by a numeric column via a continuous ramp |
+| `color_by_class` / `color_by` / `color_by_value` | convenience constructors |
+| `build_styler(...)` | pick the right styler from kwargs (used internally by `render_edges`) |
+| `ResolvedFrame` | per-edge resolved style arrays (the renderer's input contract) |
+
+## Input, palettes, themes, base maps
+
+| Object | Purpose |
+|---|---|
+| `RoadEdges`, `normalize_edges`, `load_edges`, `as_edges` | canonical input (EPSG:4326, lines) |
+| `RoadStyle`, `PALETTES`, `HIGHSAT`, `CARTO` | palette data |
+| `register_palette`, `save_palette`, `load_palette`, `palette_to_dict`, `palette_from_dict` | palette extensibility + JSON I/O |
+| `Theme`, `THEMES`, `get_theme`, `register_theme` | themes |
+| `Basemap`, `BASEMAPS`, `get_basemap`, `register_basemap`, `BaseLayerSwitcher` | base maps |
+| `StyleConfig` | global opacity/width knobs |
+
+## Style introspection & helpers
+
+| Function | Returns | Purpose |
+|---|---|---|
+| `resolve(highway, palette, theme, tunnel, bridge)` | `ResolvedStyle` | one edge's resolved style |
+| `base_style(highway, palette)` | `RoadStyle` | the palette entry for a class |
+| `selection_style(theme)` | `dict` | the neon-violet selection profile |
+| `filter_edges(gdf, include, exclude, ...)` | `GeoDataFrame` | filter by class |
+| `highway_types(gdf)` | `list` | distinct classes present |
+| `normalize_highway(value)` | `(base, is_link)` | OSM `_link` normalisation |
+| `make_legend(spec)` | folium `MacroElement` | build a legend from a legend spec |

@@ -3,12 +3,8 @@
 Every parameter roadstyle uses, grouped by where it appears. Types, defaults, allowed
 values, and what each one does. Use this as a lookup; for tutorials see [usage](usage.md).
 
-Jump to:
-[RoadStyle](#1-roadstyle-one-roads-look) ·
-[render_edges](#2-render_edges-the-main-entry-point) ·
-[Stylers](#3-stylers-how-colours-are-chosen) ·
-[Theme](#4-theme) · [Basemap](#5-basemap) · [StyleConfig](#6-styleconfig) ·
-[Palette JSON](#7-palette-json-file)
+Sections: RoadStyle · render_edges · Stylers · Theme · Basemap · StyleConfig · Palette JSON
+(use your browser's find, or the page's table-of-contents sidebar).
 
 ---
 
