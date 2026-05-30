@@ -12,8 +12,9 @@ site/
 # generated example maps
 examples/*.html
 
-# generated maps from the example notebook
+# generated maps from the example notebooks
 notebooks/output/
+notebooks/outputs_guide_out/
 
 # OS
 .DS_Store
