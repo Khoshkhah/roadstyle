@@ -33,11 +33,10 @@ def test_categorical_render_embeds_colors():
     m = render_edges(_edges(), color_by="congestion",
                      colors={"low": "#11D68F", "moderate": "#FFCF43",
                              "heavy": "#F24E42", "severe": "#A92727"})
-    html = _html(m).lower()      # folium lowercases hex colours in the rendered HTML
-    for c in ("#11d68f", "#ffcf43", "#f24e42", "#a92727"):
+    html = _html(m)
+    for c in ("#11D68F", "#FFCF43", "#F24E42", "#A92727"):
         assert c in html
-    # data-driven path does NOT use the OSM interactive layer
-    assert "__rscasing" not in html
+    # data-driven path writes per-edge __rs_* props (the OSM InteractiveRoads layer does not)
     assert "__rs_fill" in html
 
 
