@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <style>.leaflet-tile-pane{filter:saturate(.8) brightness(.9)}</style>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_b65b3fa14c0d95b2dc28bb0ce1aa469c {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+        
+    
+<style>
+.rs-filter{background:rgba(20,24,30,.82);backdrop-filter:blur(6px);border-radius:12px;
+  padding:8px 10px;box-shadow:0 3px 14px rgba(0,0,0,.45);font:600 11px/1.5 system-ui,sans-serif;
+  color:#cfd6dd;max-height:60vh;overflow:auto;}
+.rs-filter h4{margin:0 0 6px;font-size:11px;letter-spacing:.3px;color:#9fb0bf;text-transform:uppercase;}
+.rs-filter label{display:flex;align-items:center;gap:7px;cursor:pointer;padding:2px 0;white-space:nowrap;}
+.rs-filter input{accent-color:#00E5FF;}
+.rs-sw{width:14px;height:4px;border-radius:2px;display:inline-block;}
+.rs-filter .rs-all{margin-top:6px;border-top:1px solid rgba(255,255,255,.12);padding-top:6px;
+  display:flex;gap:8px;}
+.rs-filter .rs-all button{flex:1;background:rgba(255,255,255,.08);border:none;color:#cfd6dd;
+  border-radius:6px;padding:3px 0;cursor:pointer;font:inherit;}
+</style>
+</head>
+<body>
+    
+    
+            <div class="folium-map" id="map_b65b3fa14c0d95b2dc28bb0ce1aa469c" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_b65b3fa14c0d95b2dc28bb0ce1aa469c = L.map(
+                "map_b65b3fa14c0d95b2dc28bb0ce1aa469c",
+                {
+                    center: [0.0, 0.0],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 1,
+  "zoomControl": true,
+  "preferCanvas": false,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_2686dcde65329be3edef43eeab11d946 = L.tileLayer(
+                "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                {
+  "minZoom": 0,
+  "maxZoom": 20,
+  "maxNativeZoom": 20,
+  "noWrap": false,
+  "attribution": "Tiles \u00a9 Esri",
+  "subdomains": "abc",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_2686dcde65329be3edef43eeab11d946.addTo(map_b65b3fa14c0d95b2dc28bb0ce1aa469c);
+        
+    
+(function(){
+  var map = map_b65b3fa14c0d95b2dc28bb0ce1aa469c;
+  var DATA = {"type": "FeatureCollection", "features": [{"id": "2", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.9406202, 59.3816599], [17.939926800000002, 59.38171500000001], [17.939413300000002, 59.38176910000001], [17.9393309, 59.381787900000006], [17.9392386, 59.3818033], [17.939156500000003, 59.3818306], [17.939056400000002, 59.381863800000005]]}}, {"id": "3", "type": "Feature", "properties": {"highway": "primary_link", "name": null, "oneway": "yes", "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.9290516, 59.375868800000006], [17.9287077, 59.3757591], [17.9285712, 59.3757457], [17.9284015, 59.3757546], [17.9282369, 59.3757876], [17.9280897, 59.3758241]]}}, {"id": "98", "type": "Feature", "properties": {"highway": "secondary", "name": null, "oneway": null, "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.938984700000002, 59.381887600000006], [17.9389204, 59.381925300000006], [17.9388525, 59.381954300000004]]}}, {"id": "119", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9768119, 59.3811168], [17.9772302, 59.381037500000005], [17.9775634, 59.3809617], [17.977797600000002, 59.380903700000005], [17.9780309, 59.38083640000001], [17.978355800000003, 59.3807357], [17.9787377, 59.38059930000001], [17.979051000000002, 59.38048070000001], [17.9791113, 59.3804571]]}}, {"id": "120", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9717767, 59.3809874], [17.9721118, 59.3810622], [17.972541200000002, 59.381139700000006], [17.972951300000002, 59.381202900000005], [17.9733708, 59.3812476], [17.973735100000003, 59.38127600000001], [17.9741566, 59.381296600000006]]}}, {"id": "138", "type": "Feature", "properties": {"highway": "secondary_link", "name": null, "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.976718700000003, 59.3812566], [17.976615300000002, 59.381321500000006], [17.9765541, 59.3813772], [17.9765111, 59.3814416], [17.976497900000002, 59.3815103]]}}, {"id": "206", "type": "Feature", "properties": {"highway": "secondary_link", "name": null, "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9541855, 59.3799629], [17.954161300000003, 59.379854800000004]]}}, {"id": "217", "type": "Feature", "properties": {"highway": "secondary", "name": null, "oneway": null, "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.9389463, 59.3816664], [17.9390007, 59.381705200000006], [17.939033300000002, 59.381750000000004], [17.939041500000002, 59.381797600000006], [17.939025, 59.38184450000001], [17.938984700000002, 59.381887600000006]]}}, {"id": "267", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.943024100000002, 59.3815109], [17.9406202, 59.3816599]]}}, {"id": "284", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.969919100000002, 59.380667200000005], [17.9697496, 59.380625]]}}, {"id": "285", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.969324500000003, 59.380383300000005], [17.969703900000003, 59.38047830000001], [17.9698549, 59.3805143]]}}, {"id": "355", "type": "Feature", "properties": {"highway": "secondary", "name": null, "oneway": null, "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.93843, 59.381666800000005], [17.9384999, 59.3816373]]}}, {"id": "394", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9760595, 59.3813448], [17.9755548, 59.38138360000001], [17.9750713, 59.3814131], [17.9745969, 59.3814197], [17.9742333, 59.3814147], [17.973689800000002, 59.38138970000001]]}}, {"id": "397", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.9449918, 59.381348100000004], [17.944538100000003, 59.3814001], [17.9443939, 59.3814154], [17.943024100000002, 59.3815109]]}}, {"id": "398", "type": "Feature", "properties": {"highway": "primary_link", "name": "J\u00e4rnv\u00e4gsgatan", "oneway": "yes", "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.9400146, 59.370968500000004], [17.939689400000002, 59.371149800000005], [17.9396504, 59.371191800000005], [17.9396397, 59.371245200000004], [17.9396662, 59.371294400000004], [17.9397296, 59.371324800000004], [17.9398257, 59.371351600000004], [17.9399292, 59.3713653], [17.940062, 59.3713727], [17.9401997, 59.37136280000001], [17.9403252, 59.371330500000006], [17.9404226, 59.371293300000005], [17.9405116, 59.371241700000006], [17.9406447, 59.371138800000004]]}}, {"id": "399", "type": "Feature", "properties": {"highway": "primary_link", "name": "Sundbybergskopplet", "oneway": "yes", "maxspeed": "70.0"}, "geometry": {"type": "LineString", "coordinates": [[17.942071000000002, 59.369362200000005], [17.9423809, 59.36942320000001], [17.9425858, 59.369478300000004], [17.9427758, 59.369540900000004], [17.9429932, 59.3696263], [17.9431683, 59.3697042], [17.9433334, 59.369791500000005], [17.9435048, 59.36990410000001], [17.9435787, 59.3699645]]}}, {"id": "424", "type": "Feature", "properties": {"highway": "primary_link", "name": "J\u00e4rnv\u00e4gsgatan", "oneway": "yes", "maxspeed": "70.0"}, "geometry": {"type": "LineString", "coordinates": [[17.9417569, 59.37079610000001], [17.9415883, 59.37081310000001]]}}, {"id": "474", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9555449, 59.379801400000005], [17.954632, 59.379904800000006], [17.9545156, 59.3799185], [17.9543244, 59.379945000000006]]}}, {"id": "489", "type": "Feature", "properties": {"highway": "secondary_link", "name": null, "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9542998, 59.3798364], [17.9543244, 59.379945000000006]]}}, {"id": "496", "type": "Feature", "properties": {"highway": "secondary_link", "name": null, "oneway": "yes", "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.970314000000002, 59.38028130000001], [17.9702734, 59.380390500000004], [17.970270000000003, 59.380436], [17.970274, 59.380475600000004], [17.970293100000003, 59.380531600000005], [17.9703582, 59.3805963], [17.9704586, 59.3806628]]}}, {"id": "547", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9698549, 59.3805143], [17.9700288, 59.380557]]}}, {"id": "548", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.961990200000002, 59.3795075], [17.9613443, 59.379492000000006]]}}, {"id": "663", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9741566, 59.381296600000006], [17.974375300000002, 59.3813022], [17.9747372, 59.381303100000004], [17.975105000000003, 59.381294000000004], [17.975540600000002, 59.38126930000001], [17.9757935, 59.3812487], [17.9760239, 59.381224800000005]]}}, {"id": "664", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.973689800000002, 59.38138970000001], [17.9732756, 59.3813583]]}}, {"id": "736", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9522575, 59.380106700000006], [17.952607, 59.380057900000004], [17.953951200000002, 59.379881100000006], [17.954161300000003, 59.379854800000004]]}}, {"id": "744", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.9389463, 59.3816664], [17.9391059, 59.3816514], [17.9392839, 59.38164930000001], [17.939619500000003, 59.381632700000004]]}}, {"id": "804", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9613443, 59.379492000000006], [17.9596914, 59.379504000000004], [17.9582638, 59.379567], [17.9567979, 59.3796716], [17.9555449, 59.379801400000005]]}}, {"id": "889", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9543244, 59.379945000000006], [17.9541855, 59.3799629]]}}, {"id": "928", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9458939, 59.381212600000005], [17.9453429, 59.3812993], [17.9452949, 59.3813071], [17.9451419, 59.381329300000004]]}}, {"id": "929", "type": "Feature", "properties": {"highway": "primary_link", "name": null, "oneway": "yes", "maxspeed": "30"}, "geometry": {"type": "LineString", "coordinates": [[17.9290516, 59.375868800000006], [17.928618500000002, 59.375670400000004], [17.9285384, 59.375624800000004]]}}, {"id": "930", "type": "Feature", "properties": {"highway": "primary_link", "name": "J\u00e4rnv\u00e4gsgatan", "oneway": "yes", "maxspeed": "70.0"}, "geometry": {"type": "LineString", "coordinates": [[17.9415883, 59.37081310000001], [17.9414497, 59.37082710000001], [17.941273000000002, 59.3708699], [17.941119500000003, 59.3709246], [17.9409782, 59.371001500000006], [17.940832, 59.37109340000001], [17.940641900000003, 59.3712479], [17.9405457, 59.3713168], [17.940456700000002, 59.37136220000001], [17.9403398, 59.3713994], [17.9402021, 59.3714261], [17.9400815, 59.3714366], [17.939964500000002, 59.371436], [17.9398293, 59.371418600000005], [17.9397063, 59.3713927], [17.9394038, 59.3713034], [17.939267400000002, 59.3712747], [17.939151900000002, 59.371269700000006], [17.9389362, 59.371284]]}}, {"id": "989", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9704586, 59.3806628], [17.971335200000002, 59.380881900000006], [17.9717767, 59.3809874]]}}, {"id": "1060", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.939619500000003, 59.381632700000004], [17.9397896, 59.38161830000001], [17.9406046, 59.3815394]]}}, {"id": "1092", "type": "Feature", "properties": {"highway": "secondary_link", "name": null, "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9763981, 59.3809472], [17.976441700000002, 59.38101150000001], [17.9764927, 59.3810518], [17.9765698, 59.381081], [17.9766598, 59.381097000000004], [17.9768119, 59.3811168]]}}, {"id": "1096", "type": "Feature", "properties": {"highway": "secondary_link", "name": null, "oneway": "yes", "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.969324500000003, 59.380383300000005], [17.9695171, 59.380400900000005], [17.9696316, 59.3804061], [17.969739800000003, 59.3804031], [17.9698384, 59.3803958], [17.969988400000002, 59.380362500000004]]}}, {"id": "1178", "type": "Feature", "properties": {"highway": "secondary", "name": null, "oneway": null, "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.9385283, 59.381954900000004], [17.9384534, 59.381897900000006], [17.938391900000003, 59.3818111], [17.9384015, 59.3817377], [17.93843, 59.381666800000005]]}}, {"id": "1183", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.954161300000003, 59.379854800000004], [17.9542998, 59.3798364]]}}, {"id": "1187", "type": "Feature", "properties": {"highway": "secondary", "name": null, "oneway": null, "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.9389019, 59.381646100000005], [17.9389463, 59.3816664]]}}, {"id": "1188", "type": "Feature", "properties": {"highway": "secondary", "name": null, "oneway": null, "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.938639900000002, 59.3816113], [17.9387323, 59.381610900000005], [17.9388216, 59.3816228], [17.9389019, 59.381646100000005]]}}, {"id": "1209", "type": "Feature", "properties": {"highway": "primary_link", "name": null, "oneway": "yes", "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.929346300000002, 59.3759498], [17.9290516, 59.375868800000006]]}}, {"id": "1232", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.976718700000003, 59.3812566], [17.9764085, 59.3813016], [17.9760595, 59.3813448]]}}, {"id": "1259", "type": "Feature", "properties": {"highway": "secondary_link", "name": null, "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9760239, 59.381224800000005], [17.976219200000003, 59.3811455], [17.9762849, 59.381104300000004], [17.9763355, 59.381051500000005], [17.9763981, 59.3809472]]}}, {"id": "1309", "type": "Feature", "properties": {"highway": "secondary_link", "name": null, "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9450286, 59.381215700000006], [17.9451419, 59.381329300000004]]}}, {"id": "1362", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9732756, 59.3813583], [17.9728277, 59.38130580000001], [17.9724849, 59.3812544], [17.972046000000002, 59.3811778], [17.971546500000002, 59.3810708]]}}, {"id": "1364", "type": "Feature", "properties": {"highway": "primary_link", "name": null, "oneway": "yes", "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.9285961, 59.37557820000001], [17.928713300000002, 59.3756247], [17.9290367, 59.37575820000001], [17.9293307, 59.3758527], [17.929428700000003, 59.37588100000001]]}}, {"id": "1454", "type": "Feature", "properties": {"highway": "secondary", "name": null, "oneway": null, "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.9388525, 59.381954300000004], [17.938739400000003, 59.3819676], [17.9386362, 59.3819675], [17.9385283, 59.381954900000004]]}}, {"id": "1500", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.978864100000003, 59.3806985], [17.978584700000003, 59.3808], [17.978259, 59.38090510000001], [17.977933500000002, 59.3809989], [17.9775683, 59.381087400000006], [17.977234900000003, 59.3811607], [17.976718700000003, 59.3812566]]}}, {"id": "1503", "type": "Feature", "properties": {"highway": "primary_link", "name": "Sundbybergskopplet", "oneway": "yes", "maxspeed": "40"}, "geometry": {"type": "LineString", "coordinates": [[17.9435787, 59.3699645], [17.9436526, 59.370024900000004], [17.9437569, 59.3701433], [17.9439348, 59.3703858], [17.943974100000002, 59.370456600000004]]}}, {"id": "1633", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.939056400000002, 59.381863800000005], [17.938984700000002, 59.381887600000006]]}}, {"id": "1651", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.985164700000002, 59.379235200000004], [17.9844118, 59.3792301], [17.983997900000002, 59.379239000000005], [17.9836034, 59.37925860000001], [17.9832424, 59.37929690000001], [17.982871600000003, 59.37934920000001], [17.982555100000003, 59.3794059], [17.9822037, 59.379484100000006], [17.9818776, 59.379570400000006], [17.9816115, 59.3796547], [17.9812793, 59.3797706], [17.9807785, 59.379963000000004], [17.978864100000003, 59.3806985]]}}, {"id": "1656", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9697496, 59.380625], [17.9686083, 59.38033480000001]]}}, {"id": "1657", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9541855, 59.3799629], [17.9514543, 59.3803435], [17.9497742, 59.38058470000001], [17.9458939, 59.381212600000005]]}}, {"id": "1659", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9406046, 59.3815394], [17.9427799, 59.3814068], [17.943618100000002, 59.3813551], [17.944697100000003, 59.381264800000004], [17.9450286, 59.381215700000006]]}}, {"id": "1660", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9450286, 59.381215700000006], [17.9452286, 59.3811844], [17.946355500000003, 59.3810106], [17.9495495, 59.3805051], [17.9513269, 59.380236700000005], [17.9522575, 59.380106700000006]]}}, {"id": "1661", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9542998, 59.3798364], [17.9544749, 59.379812900000005], [17.9554605, 59.379695600000005], [17.956103600000002, 59.379628200000006], [17.9566966, 59.3795725], [17.957346700000002, 59.3795225], [17.958183000000002, 59.3794704], [17.958911500000003, 59.379432800000004], [17.9596509, 59.3794082], [17.9603219, 59.379393], [17.960935900000003, 59.37938750000001], [17.9616969, 59.37939], [17.9621353, 59.379398300000005], [17.962696, 59.379415900000005], [17.963307800000003, 59.3794485], [17.9639206, 59.379493000000004], [17.9644325, 59.379536300000005], [17.964865800000002, 59.379581400000006], [17.965461400000002, 59.3796503], [17.9659029, 59.37971], [17.966428800000003, 59.379786800000005], [17.966924900000002, 59.3798699], [17.967448100000002, 59.379963700000005], [17.96791, 59.3800511], [17.968341000000002, 59.3801477], [17.9686948, 59.3802305], [17.969324500000003, 59.380383300000005]]}}, {"id": "1662", "type": "Feature", "properties": {"highway": "primary_link", "name": "Sundbybergskopplet", "oneway": "yes", "maxspeed": "70.0"}, "geometry": {"type": "LineString", "coordinates": [[17.943828200000002, 59.370474900000005], [17.9436837, 59.3702546], [17.943586800000002, 59.370131900000004], [17.943434, 59.369987], [17.9432511, 59.3698472], [17.943042300000002, 59.369740300000004], [17.9428392, 59.369652300000006], [17.9425995, 59.3695681], [17.9422953, 59.3694855], [17.942025400000002, 59.3694331]]}}, {"id": "1665", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9760239, 59.381224800000005], [17.9763217, 59.38119090000001], [17.976566000000002, 59.381157200000004], [17.9768119, 59.3811168]]}}, {"id": "1672", "type": "Feature", "properties": {"highway": "secondary_link", "name": null, "oneway": "yes", "maxspeed": "30"}, "geometry": {"type": "LineString", "coordinates": [[17.9458939, 59.381212600000005], [17.945557100000002, 59.38132040000001], [17.9453842, 59.3813972], [17.945374400000002, 59.3814051], [17.9452801, 59.3814811], [17.945181400000003, 59.3816342]]}}, {"id": "1680", "type": "Feature", "properties": {"highway": "secondary_link", "name": null, "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.976497900000002, 59.3815103], [17.97641, 59.38144810000001], [17.976324, 59.3814081], [17.976274800000002, 59.381393700000004], [17.9762051, 59.3813734], [17.9760595, 59.3813448]]}}, {"id": "1693", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9700288, 59.380557], [17.9704586, 59.3806628]]}}, {"id": "1738", "type": "Feature", "properties": {"highway": "secondary", "name": null, "oneway": "yes", "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.935892900000002, 59.382035], [17.9362315, 59.38205000000001], [17.936467800000003, 59.38205490000001], [17.936687000000003, 59.382046700000004], [17.9369176, 59.382027300000004], [17.937963200000002, 59.381879700000006], [17.9382014, 59.38179830000001], [17.93843, 59.381666800000005]]}}, {"id": "1755", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9451419, 59.381329300000004], [17.9449918, 59.381348100000004]]}}, {"id": "1799", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.971546500000002, 59.3810708], [17.970243, 59.380746800000004], [17.969919100000002, 59.380667200000005]]}}, {"id": "1877", "type": "Feature", "properties": {"highway": "secondary", "name": null, "oneway": "yes", "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.9385283, 59.381954900000004], [17.9372875, 59.3820599], [17.9369965, 59.382110100000006], [17.9366595, 59.38215400000001], [17.936483000000003, 59.38219410000001], [17.9363682, 59.3822327], [17.9362828, 59.3822641], [17.9361786, 59.38232850000001]]}}, {"id": "1943", "type": "Feature", "properties": {"highway": "primary_link", "name": "J\u00e4rnv\u00e4gsgatan", "oneway": "yes", "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.9406447, 59.371138800000004], [17.9407979, 59.371009], [17.94098, 59.370892700000006], [17.9411054, 59.3708413], [17.941252300000002, 59.37079550000001], [17.9414388, 59.3707525], [17.9416394, 59.370725]]}}, {"id": "2028", "type": "Feature", "properties": {"highway": "secondary", "name": null, "oneway": null, "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.9384999, 59.3816373], [17.9385672, 59.381620500000004], [17.938639900000002, 59.3816113]]}}, {"id": "2065", "type": "Feature", "properties": {"highway": "secondary", "name": "Enk\u00f6pingsv\u00e4gen", "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9686083, 59.38033480000001], [17.967706500000002, 59.3801319], [17.966799, 59.3799641], [17.965904000000002, 59.379822100000005], [17.965099600000002, 59.379715700000006], [17.9639785, 59.3796011], [17.962770300000003, 59.3795262], [17.961990200000002, 59.3795075]]}}, {"id": "2132", "type": "Feature", "properties": {"highway": "secondary_link", "name": null, "oneway": "yes", "maxspeed": "60"}, "geometry": {"type": "LineString", "coordinates": [[17.9449918, 59.381348100000004], [17.9450286, 59.381215700000006]]}}, {"id": "2301", "type": "Feature", "properties": {"highway": "secondary", "name": null, "oneway": null, "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.9388525, 59.381954300000004], [17.9389204, 59.381925300000006], [17.938984700000002, 59.381887600000006]]}}, {"id": "2401", "type": "Feature", "properties": {"highway": "secondary", "name": null, "oneway": null, "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.938984700000002, 59.381887600000006], [17.939025, 59.38184450000001], [17.939041500000002, 59.381797600000006], [17.939033300000002, 59.381750000000004], [17.9390007, 59.381705200000006], [17.9389463, 59.3816664]]}}, {"id": "2513", "type": "Feature", "properties": {"highway": "secondary", "name": null, "oneway": null, "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.9384999, 59.3816373], [17.93843, 59.381666800000005]]}}, {"id": "3185", "type": "Feature", "properties": {"highway": "secondary", "name": null, "oneway": null, "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.93843, 59.381666800000005], [17.9384015, 59.3817377], [17.938391900000003, 59.3818111], [17.9384534, 59.381897900000006], [17.9385283, 59.381954900000004]]}}, {"id": "3193", "type": "Feature", "properties": {"highway": "secondary", "name": null, "oneway": null, "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.9389463, 59.3816664], [17.9389019, 59.381646100000005]]}}, {"id": "3194", "type": "Feature", "properties": {"highway": "secondary", "name": null, "oneway": null, "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.9389019, 59.381646100000005], [17.9388216, 59.3816228], [17.9387323, 59.381610900000005], [17.938639900000002, 59.3816113]]}}, {"id": "3416", "type": "Feature", "properties": {"highway": "secondary", "name": null, "oneway": null, "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.9385283, 59.381954900000004], [17.9386362, 59.3819675], [17.938739400000003, 59.3819676], [17.9388525, 59.381954300000004]]}}, {"id": "3877", "type": "Feature", "properties": {"highway": "secondary", "name": null, "oneway": null, "maxspeed": "50"}, "geometry": {"type": "LineString", "coordinates": [[17.938639900000002, 59.3816113], [17.9385672, 59.381620500000004], [17.9384999, 59.3816373]]}}]};
+  var PAL  = {"cycleway": {"cd": null, "cl": null, "cw": 0.0, "dash": "6,4", "fill": "#2980B9", "w": 1.5}, "footway": {"cd": null, "cl": null, "cw": 0.0, "dash": "4,4", "fill": "#C0392B", "w": 1.5}, "living_street": {"cd": null, "cl": null, "cw": 0.0, "dash": null, "fill": "#DDDDDD", "w": 2.0}, "motorway": {"cd": "#000000", "cl": "#007785", "cw": 8.0, "dash": null, "fill": "#00E5FF", "w": 6.0}, "path": {"cd": null, "cl": null, "cw": 0.0, "dash": "4,4", "fill": "#C0392B", "w": 1.5}, "pedestrian": {"cd": null, "cl": null, "cw": 0.0, "dash": null, "fill": "#DDDDDD", "w": 1.5}, "primary": {"cd": "#000000", "cl": "#A86000", "cw": 6.5, "dash": null, "fill": "#FF9100", "w": 4.5}, "residential": {"cd": "#000000", "cl": "#999999", "cw": 4.0, "dash": null, "fill": "#FFFFFF", "w": 2.0}, "secondary": {"cd": "#000000", "cl": "#A39600", "cw": 5.5, "dash": null, "fill": "#FFEA00", "w": 3.5}, "service": {"cd": null, "cl": null, "cw": 0.0, "dash": null, "fill": "#A6A6A6", "w": 1.0}, "tertiary": {"cd": "#000000", "cl": "#007A3E", "cw": 4.5, "dash": null, "fill": "#00E676", "w": 2.5}, "track": {"cd": null, "cl": null, "cw": 0.0, "dash": null, "fill": "#9E7B54", "w": 1.5}, "trunk": {"cd": "#000000", "cl": "#9E004F", "cw": 7.5, "dash": null, "fill": "#FF007F", "w": 5.5}, "unclassified": {"cd": "#000000", "cl": "#999999", "cw": 4.0, "dash": null, "fill": "#FFFFFF", "w": 2.0}};
+  var HCOL = "highway";
+  var TIP  = ["highway", "name", "oneway", "maxspeed"];
+  var FILLOP = 0.9, CASOP = 0.75, LINK = 0.7;
+  var FALLBACK = "unclassified";
+  var ORDER = ["motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "living_street", "service", "track", "cycleway", "footway", "path"];      // road types by importance (most important first)
+  var IS_DARK = true;
+  var disabled = {};
+  var OIDX = {}; ORDER.forEach(function(t,i){ OIDX[t]=i; });
+
+  function norm(hw){ hw=(hw==null?'':String(hw)).trim().toLowerCase();
+    var link=hw.slice(-5)==='_link'; if(link) hw=hw.slice(0,-5); return [hw,link]; }
+  function pal(hw){ return PAL[norm(hw)[0]] || PAL[FALLBACK]; }
+  function on(hw){ return !disabled[norm(hw)[0]]; }
+
+  function styleFill(f){
+    var hw=f.properties[HCOL], p=pal(hw), link=norm(hw)[1];
+    return {color:p.fill, weight:p.w*(link?LINK:1), opacity: on(hw)?FILLOP:0,
+            dashArray:p.dash, lineCap:'round', lineJoin:'round', interactive:on(hw)};
+  }
+  function styleCasing(f){
+    var hw=f.properties[HCOL], p=pal(hw), link=norm(hw)[1];
+    var c = IS_DARK ? p.cd : p.cl;
+    if(p.cw<=0 || c==null) return {opacity:0, weight:0};
+    return {color:c, weight:p.cw*(link?LINK:1), opacity: on(hw)?CASOP:0,
+            lineCap:'round', lineJoin:'round'};
+  }
+
+  var casingLayer = L.geoJSON(DATA, {style: styleCasing}).addTo(map);
+  var fillLayer = L.geoJSON(DATA, {style: styleFill, onEachFeature: function(feat, layer){
+    if(TIP.length){
+      var html = TIP.map(function(k){ return '<b>'+k+'</b>: '+(feat.properties[k]==null?'':feat.properties[k]); }).join('<br>');
+      layer.bindTooltip(html, {sticky:true});
+    }
+    layer.on('mouseover', function(e){
+      var hw=feat.properties[HCOL], p=pal(hw), link=norm(hw)[1];
+      if(!on(hw)) return;
+      e.target.setStyle({color:'#ffffff', weight:p.w*(link?LINK:1)+2, opacity:1});
+      e.target.bringToFront();
+    });
+    layer.on('mouseout', function(e){ fillLayer.resetStyle(e.target); });
+  }}).addTo(map);
+
+  // dynamic casing on base-map change (called by the base switcher)
+  window.__rsCasing = function(isDark){ IS_DARK = !!isDark; casingLayer.setStyle(styleCasing); };
+
+  // ── highway-type filter panel ──────────────────────────────────────────────
+  var types = {};
+  DATA.features.forEach(function(f){ types[norm(f.properties[HCOL])[0]] = true; });
+  types = Object.keys(types).sort(function(a,b){
+    var ia=(a in OIDX)?OIDX[a]:999, ib=(b in OIDX)?OIDX[b]:999;
+    return ia-ib || (a<b?-1:(a>b?1:0));            // by importance, then alphabetical
+  });
+  function refresh(){ casingLayer.setStyle(styleCasing); fillLayer.setStyle(styleFill); }
+  var Filter = L.Control.extend({ options:{position:'topright'}, onAdd:function(){
+    var d=L.DomUtil.create('div','rs-filter');
+    d.innerHTML='<h4>Road types</h4>';
+    types.forEach(function(t){
+      var p=PAL[t]||PAL[FALLBACK];
+      var row=L.DomUtil.create('label','',d);
+      var cb=document.createElement('input'); cb.type='checkbox'; cb.checked=true; cb.dataset.t=t;
+      cb.onchange=function(){ if(cb.checked) delete disabled[t]; else disabled[t]=1; refresh(); };
+      var sw=document.createElement('span'); sw.className='rs-sw'; sw.style.background=p.fill;
+      var tx=document.createElement('span'); tx.textContent=t;
+      row.appendChild(cb); row.appendChild(sw); row.appendChild(tx);
+    });
+    var bar=L.DomUtil.create('div','rs-all',d);
+    var ba=document.createElement('button'); ba.textContent='All';
+    var bn=document.createElement('button'); bn.textContent='None';
+    ba.onclick=function(){ disabled={}; d.querySelectorAll('input').forEach(function(c){c.checked=true;}); refresh(); };
+    bn.onclick=function(){ types.forEach(function(t){disabled[t]=1;}); d.querySelectorAll('input').forEach(function(c){c.checked=false;}); refresh(); };
+    bar.appendChild(ba); bar.appendChild(bn);
+    L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d);
+    return d;
+  }});
+  map.addControl(new Filter());
+
+  // fit to data
+  try { map.fitBounds(fillLayer.getBounds(), {padding:[20,20]}); } catch(e){}
+})();
+    
+            map_b65b3fa14c0d95b2dc28bb0ce1aa469c.fitBounds(
+                [[59.369362200000005, 17.9280897], [59.38232850000001, 17.985164700000002]],
+                {}
+            );
+        
+</script>
+</html>
