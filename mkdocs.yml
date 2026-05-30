@@ -20,7 +20,6 @@ nav:
   - Themes: themes.md
   - API: api.md
   - Comparison: comparison.md
-  - Future Roadmap: roadmap.md
 markdown_extensions:
   - admonition
   - tables

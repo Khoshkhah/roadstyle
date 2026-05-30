@@ -15,7 +15,7 @@ byte-for-byte unchanged; everything new is additive.
   `RoadStyleMap` class (headless core: `load`/`setFilter`/`highlightRoad`/`getRoadClasses`, geometry
   sandwich, hover/selection; plus opt-in legend & road-type filter widgets). `to_html` now **inlines
   this same file** instead of a hand-written copy, so the embedded and standalone renderers can't
-  drift (enforced by a test). Shipped as package data; documented in `docs/roadmap.md`.
+  drift (enforced by a test). Shipped as package data; documented in `ROADMAP.md`.
 - Packaging/quality: MIT `LICENSE`, `py.typed` marker, richer `pyproject.toml` metadata
   (classifiers, keywords, URLs), optional extras (`numeric`, `basemaps`), and `ruff`/`mypy` config.
 - Data-driven styling: color/size roads by any **categorical** (`color_by`+`colors`) or
