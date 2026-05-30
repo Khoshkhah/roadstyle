@@ -1,0 +1,92 @@
+"""Render styled edges to an interactive folium (Leaflet) map.
+
+Implements the "geometry sandwich": all casings are drawn first (one layer), then all
+fills on top (second layer), so road borders never slice through higher-importance roads.
+The road layers are always on (no toggle). Base maps use a thumbnail *switcher* control
+(see controls.BaseLayerSwitcher), not the default Leaflet layer box.
+"""
+from __future__ import annotations
+
+from .basemaps import DEFAULT_SWITCHER, get_basemap
+from .controls import BaseLayerSwitcher
+from .interactive import InteractiveRoads
+from .style import selection_style
+from .themes import get_theme
+
+
+def _shown_basemap(th, basemap, basemaps):
+    """Which base map is shown initially (drives initial casing darkness)."""
+    if basemap and not basemaps:
+        return get_basemap(basemap)
+    keys = list(basemaps) if basemaps else list(DEFAULT_SWITCHER)
+    key = th.default_basemap if th.default_basemap in keys else keys[0]
+    return get_basemap(key)
+
+
+def _add_base(m, folium, th, basemap, basemaps):
+    """Single fixed base map (``basemap=``) or a thumbnail switcher (default / ``basemaps=``)."""
+    if basemap and not basemaps:
+        bm = get_basemap(basemap)
+        folium.TileLayer(tiles=bm.url, attr=bm.attr, name=bm.label, control=False,
+                         subdomains=bm.subdomains, max_zoom=20).add_to(m)
+        if bm.satellite:
+            m.get_root().header.add_child(folium.Element(
+                "<style>.leaflet-tile-pane{filter:saturate(.8) brightness(.9)}</style>"))
+        return
+    keys = list(basemaps) if basemaps else list(DEFAULT_SWITCHER)
+    default_key = th.default_basemap if th.default_basemap in keys else keys[0]
+    m.add_child(BaseLayerSwitcher(keys, default_key))
+
+
+def render(
+    gdf,
+    palette: str = "highsat",
+    theme: str = "dark",
+    highway_col: str = "highway",
+    tunnel_col: str | None = "tunnel",
+    bridge_col: str | None = "bridge",
+    tooltip: list[str] | None = None,
+    selected=None,
+    name: str = "roads",
+    basemap: str | None = None,
+    basemaps: list[str] | None = None,
+    filter_control: bool = True,
+    **map_kwargs,
+):
+    import folium
+
+    th = get_theme(theme)
+    g = gdf.to_crs(4326)
+
+    m = folium.Map(tiles=None, **map_kwargs)
+    _add_base(m, folium, th, basemap, basemaps)
+
+    fields = tooltip if tooltip is not None else [c for c in g.columns if c != g.geometry.name]
+    fields = [f for f in fields if f in g.columns]
+    initial_dark = _shown_basemap(th, basemap, basemaps).is_dark
+
+    # interactive road layer: dynamic casing (re-styles on base-map change), hover
+    # highlight (edge -> white), and an in-map highway-type filter panel.
+    m.add_child(InteractiveRoads(
+        g.to_json(), palette=palette, highway_col=highway_col,
+        tooltip=fields, initial_dark=initial_dark, show_filter=filter_control,
+    ))
+
+    # selected edges (neon-violet glow / casing / core, stacked on top)
+    if selected is not None and len(selected):
+        sel = selected.to_crs(4326).to_json()
+        sty = selection_style(theme)
+        for layer in ("glow", "casing", "core"):
+            s = sty[layer]
+            folium.GeoJson(
+                sel, name=f"selected {layer}", control=False,
+                style_function=(lambda c, w, o: (lambda f: {"color": c, "weight": w, "opacity": o}))(
+                    s["color"], s["width"], s["opacity"]),
+            ).add_to(m)
+
+    try:
+        b = g.total_bounds
+        m.fit_bounds([[b[1], b[0]], [b[3], b[2]]])
+    except Exception:
+        pass
+    return m

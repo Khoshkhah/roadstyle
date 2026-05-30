@@ -1,0 +1,22 @@
+site_name: roadstyle
+site_description: OSM-theme road/edge map styling for folium & lonboard
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: black
+      accent: cyan
+  features:
+    - navigation.sections
+    - content.code.copy
+nav:
+  - Home: index.md
+  - Usage: usage.md
+  - Palettes: palettes.md
+  - Themes: themes.md
+  - API: api.md
+markdown_extensions:
+  - admonition
+  - tables
+  - pymdownx.highlight
+  - pymdownx.superfences

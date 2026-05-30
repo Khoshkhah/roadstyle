@@ -1,0 +1,13 @@
+name: roadstyle
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - geopandas
+  - shapely
+  - folium
+  - pytest
+  - pip
+  - pip:
+      - lonboard          # WebGL backend
+      - mkdocs-material   # docs site

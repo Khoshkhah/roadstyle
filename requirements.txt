@@ -1,0 +1,10 @@
+# roadstyle runtime dependencies (pip).
+# Core (folium backend):
+geopandas
+shapely
+folium
+# Optional WebGL backend:
+lonboard
+# Dev / docs (optional):
+pytest
+mkdocs-material

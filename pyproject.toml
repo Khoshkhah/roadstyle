@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "roadstyle"
+version = "0.1.0"
+description = "OSM-theme road/edge map styling for folium & lonboard (high-contrast + OSM Carto palettes)"
+requires-python = ">=3.10"
+dependencies = [
+    "geopandas",
+    "shapely",
+    "folium",
+]
+
+[project.optional-dependencies]
+lonboard = ["lonboard"]
+docs = ["mkdocs-material"]
+dev = ["pytest", "lonboard"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
