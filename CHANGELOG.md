@@ -13,11 +13,14 @@ byte-for-byte unchanged; everything new is additive.
 ### Added
 - Packaging/quality: MIT `LICENSE`, `py.typed` marker, richer `pyproject.toml` metadata
   (classifiers, keywords, URLs), optional extras (`numeric`, `basemaps`), and `ruff`/`mypy` config.
-- _(in progress)_ Data-driven styling: color/size roads by any **categorical** or **numeric** column.
-- _(in progress)_ Stack-agnostic JSON output (`to_spec`) plus HTML-fragment / iframe emit helpers
-  for embedding maps in an existing website.
-- _(in progress)_ Input validation with clear error messages; configurable `StyleConfig`;
-  registries for custom palettes/themes/basemaps.
+- Data-driven styling: color/size roads by any **categorical** (`color_by`+`colors`) or
+  **numeric** (`color_by`+`cmap`+`width_by`) column, with auto legends; both folium & lonboard.
+- Stack-agnostic JSON output: `to_spec` (canonical data + baked-in style + legend), `to_geojson`,
+  `to_html(full=…)`, `to_iframe`, `save`, `save_spec`/`load_spec` — embed maps in any website
+  (Leaflet / MapLibre / iframe; see `docs/embedding.md`).
+- Canonical input layer: `RoadEdges` + `normalize_edges`/`load_edges` (normalize-at-boundary).
+- Input validation with clear error messages; configurable `StyleConfig`; registries for custom
+  palettes/themes/basemaps; palette JSON I/O (`save_palette`/`load_palette`).
 
 ### Changed
 - Repositioned as an opinionated OSM road-cartography layer that **reuses** mature libraries —

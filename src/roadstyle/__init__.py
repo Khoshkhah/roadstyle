@@ -12,6 +12,15 @@ from .basemaps import BASEMAPS, Basemap, get_basemap, register_basemap
 from .config import StyleConfig
 from .controls import BaseLayerSwitcher
 from .edges import RoadEdges, as_edges, load_edges, normalize_edges
+from .emit import (
+    load_spec,
+    save,
+    save_spec,
+    to_geojson,
+    to_html,
+    to_iframe,
+    to_spec,
+)
 from .filters import filter_edges, highway_types
 from .legend import make_legend
 from .palettes import (
@@ -62,4 +71,6 @@ __all__ = [
     "RoadEdges", "normalize_edges", "load_edges", "as_edges",
     # legends (Phase 3)
     "make_legend",
+    # web / JSON output (Phase 4)
+    "to_spec", "to_geojson", "to_html", "to_iframe", "save", "save_spec", "load_spec",
 ]
