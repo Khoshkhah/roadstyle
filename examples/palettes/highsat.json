@@ -1,0 +1,140 @@
+{
+  "name": "highsat",
+  "roads": {
+    "motorway": {
+      "fill": "#00E5FF",
+      "width": 6.0,
+      "casing_width": 8.0,
+      "casing_light": "#007785",
+      "casing_dark": "#000000",
+      "dash": null,
+      "opacity": 1.0
+    },
+    "trunk": {
+      "fill": "#FF007F",
+      "width": 5.5,
+      "casing_width": 7.5,
+      "casing_light": "#9E004F",
+      "casing_dark": "#000000",
+      "dash": null,
+      "opacity": 1.0
+    },
+    "primary": {
+      "fill": "#FF9100",
+      "width": 4.5,
+      "casing_width": 6.5,
+      "casing_light": "#A86000",
+      "casing_dark": "#000000",
+      "dash": null,
+      "opacity": 1.0
+    },
+    "secondary": {
+      "fill": "#FFEA00",
+      "width": 3.5,
+      "casing_width": 5.5,
+      "casing_light": "#A39600",
+      "casing_dark": "#000000",
+      "dash": null,
+      "opacity": 1.0
+    },
+    "tertiary": {
+      "fill": "#00E676",
+      "width": 2.5,
+      "casing_width": 4.5,
+      "casing_light": "#007A3E",
+      "casing_dark": "#000000",
+      "dash": null,
+      "opacity": 1.0
+    },
+    "unclassified": {
+      "fill": "#FFFFFF",
+      "width": 2.0,
+      "casing_width": 4.0,
+      "casing_light": "#999999",
+      "casing_dark": "#000000",
+      "dash": null,
+      "opacity": 1.0
+    },
+    "residential": {
+      "fill": "#FFFFFF",
+      "width": 2.0,
+      "casing_width": 4.0,
+      "casing_light": "#999999",
+      "casing_dark": "#000000",
+      "dash": null,
+      "opacity": 1.0
+    },
+    "living_street": {
+      "fill": "#DDDDDD",
+      "width": 2.0,
+      "casing_width": 0.0,
+      "casing_light": null,
+      "casing_dark": null,
+      "dash": null,
+      "opacity": 1.0
+    },
+    "pedestrian": {
+      "fill": "#DDDDDD",
+      "width": 1.5,
+      "casing_width": 0.0,
+      "casing_light": null,
+      "casing_dark": null,
+      "dash": null,
+      "opacity": 1.0
+    },
+    "service": {
+      "fill": "#A6A6A6",
+      "width": 1.0,
+      "casing_width": 0.0,
+      "casing_light": null,
+      "casing_dark": null,
+      "dash": null,
+      "opacity": 1.0
+    },
+    "track": {
+      "fill": "#9E7B54",
+      "width": 1.5,
+      "casing_width": 0.0,
+      "casing_light": null,
+      "casing_dark": null,
+      "dash": null,
+      "opacity": 1.0
+    },
+    "cycleway": {
+      "fill": "#2980B9",
+      "width": 1.5,
+      "casing_width": 0.0,
+      "casing_light": null,
+      "casing_dark": null,
+      "dash": [
+        6,
+        4
+      ],
+      "opacity": 1.0
+    },
+    "footway": {
+      "fill": "#C0392B",
+      "width": 1.5,
+      "casing_width": 0.0,
+      "casing_light": null,
+      "casing_dark": null,
+      "dash": [
+        4,
+        4
+      ],
+      "opacity": 1.0
+    },
+    "path": {
+      "fill": "#C0392B",
+      "width": 1.5,
+      "casing_width": 0.0,
+      "casing_light": null,
+      "casing_dark": null,
+      "dash": [
+        4,
+        4
+      ],
+      "opacity": 1.0
+    }
+  }
+}

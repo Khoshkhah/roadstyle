@@ -148,3 +148,187 @@ class ClassStyler:
             fill, width, casing_light, casing_dark, casing_width, dash,
             opacity, casing_opacity, klass, theme_aware_casing=self.theme_aware_casing,
         )
+
+
+def _keystr(v) -> str:
+    """Normalise a categorical value to a lookup key (str, stripped, lower-cased)."""
+    return ("" if v is None else str(v)).strip().lower()
+
+
+def _as_float(v):
+    """Best-effort float conversion; return None for missing/NaN/non-numeric."""
+    if v is None:
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return None if f != f else f
+
+
+def _clamp01(t: float) -> float:
+    return 0.0 if t < 0 else 1.0 if t > 1 else t
+
+
+@dataclass
+class CategoricalStyler:
+    """Colour each edge by a discrete value in any column, via a ``{value: colour}`` map.
+
+    Serves data like traffic congestion levels (``low``/``moderate``/``heavy``/``severe``).
+    Unmapped values (and missing data) get ``fallback_color``. Casing is off by default (these
+    overlays usually sit on top of a base map without road borders), but a constant casing colour
+    can be set. ``width`` is a constant, or the name of a numeric column to read per edge.
+    """
+    column: str = ""
+    colors: Mapping[str, str] = field(default_factory=dict)
+    fallback_color: str = "#cccccc"
+    width: float | str = 2.0           # constant px, or a column name to read width from
+    casing: str | None = None          # constant casing colour, or None for no casing
+    casing_width: float = 0.0
+    opacity: float = 0.9
+    casing_opacity: float = 0.75
+    dash: tuple[int, int] | None = None
+    theme_aware_casing: bool = False
+
+    def resolve_frame(self, gdf, theme: str | Theme = "dark") -> ResolvedFrame:
+        get_theme(theme)
+        values = gdf[self.column].tolist()
+        widths_col = (gdf[self.width].tolist()
+                      if isinstance(self.width, str) and self.width in gdf.columns else None)
+        dash = _dash_str(self.dash)
+        n = len(values)
+
+        fill = [self.colors.get(_keystr(v), self.fallback_color) for v in values]
+        if widths_col is not None:
+            width = [float(w) if w is not None and w == w else 0.0 for w in widths_col]
+        else:
+            const_w = float(self.width) if not isinstance(self.width, str) else 2.0
+            width = [const_w] * n
+        casing_light = [self.casing] * n
+        casing_dark = [self.casing] * n
+        casing_width = [self.casing_width if self.casing else 0.0] * n
+        klass = [_keystr(v) for v in values]
+
+        return ResolvedFrame(
+            fill, width, casing_light, casing_dark, casing_width,
+            [dash] * n, [self.opacity] * n, [self.casing_opacity] * n, klass,
+            theme_aware_casing=self.theme_aware_casing,
+        )
+
+
+@dataclass
+class NumericStyler:
+    """Colour each edge by a *numeric* column via a continuous colour ramp.
+
+    Serves data like traffic volume (``aadt``) or speed (``maxspeed_kmh``). ``vmin``/``vmax``
+    default to the data's min/max. Optionally vary line width with the same (or another) numeric
+    column via ``width_by=(min_px, max_px)``. Backed by :class:`roadstyle.colors.ColorRamp`.
+    """
+    column: str = ""
+    cmap: object = "viridis"           # branca scheme name, matplotlib name, or list of hex stops
+    vmin: float | None = None
+    vmax: float | None = None
+    width: float = 2.0                 # constant width unless width_by is given
+    width_by: tuple[float, float] | None = None   # (min_px, max_px) ramp over [vmin, vmax]
+    width_column: str | None = None    # column driving the width ramp (defaults to `column`)
+    opacity: float = 0.9
+    casing: str | None = None
+    casing_width: float = 0.0
+    casing_opacity: float = 0.75
+    nan_color: str = "#cccccc"
+    theme_aware_casing: bool = False
+
+    def resolve_frame(self, gdf, theme: str | Theme = "dark") -> ResolvedFrame:
+        from .colors import ColorRamp
+
+        get_theme(theme)
+        raw = gdf[self.column].tolist()
+        nums = [_as_float(v) for v in raw]
+        present = [v for v in nums if v is not None]
+        vmin = self.vmin if self.vmin is not None else (min(present) if present else 0.0)
+        vmax = self.vmax if self.vmax is not None else (max(present) if present else 1.0)
+
+        ramp = ColorRamp(self.cmap, vmin=vmin, vmax=vmax)
+        fill = [ramp(v, nan_color=self.nan_color) for v in nums]
+        n = len(nums)
+
+        if self.width_by is not None:
+            wcol = self.width_column or self.column
+            wraw = [_as_float(v) for v in gdf[wcol].tolist()] if wcol in gdf.columns else nums
+            wpresent = [v for v in wraw if v is not None]
+            wmin, wmax = (min(wpresent), max(wpresent)) if wpresent else (0.0, 1.0)
+            lo, hi = self.width_by
+            span = (wmax - wmin) or 1.0
+            width = [lo + (hi - lo) * _clamp01((v - wmin) / span) if v is not None else lo
+                     for v in wraw]
+        else:
+            width = [float(self.width)] * n
+
+        casing_light = [self.casing] * n
+        casing_dark = [self.casing] * n
+        casing_width = [self.casing_width if self.casing else 0.0] * n
+        klass = [None] * n   # continuous — no discrete class
+
+        rf = ResolvedFrame(
+            fill, width, casing_light, casing_dark, casing_width,
+            [None] * n, [self.opacity] * n, [self.casing_opacity] * n, klass,
+            theme_aware_casing=self.theme_aware_casing,
+        )
+        # stash ramp metadata so a legend (Phase 3) can draw the gradient
+        rf.legend = {"kind": "continuous", "title": self.column,
+                     "vmin": vmin, "vmax": vmax, "ramp": ramp.stops(9)}
+        return rf
+
+
+# ── convenience constructors (so users build a styler without importing the classes) ──────────
+
+def color_by_class(column: str = "highway", palette="highsat", **kw) -> ClassStyler:
+    """Style by a road-class column through a palette (OSM by default)."""
+    return ClassStyler(column=column, palette=palette, **kw)
+
+
+def color_by(column: str, colors: Mapping[str, str], **kw) -> CategoricalStyler:
+    """Style by a discrete column using an explicit ``{value: colour}`` map."""
+    return CategoricalStyler(column=column, colors=colors, **kw)
+
+
+def color_by_value(column: str, cmap="viridis", **kw) -> NumericStyler:
+    """Style by a numeric column using a continuous colour ramp."""
+    return NumericStyler(column=column, cmap=cmap, **kw)
+
+
+def build_styler(
+    *,
+    style=None,
+    palette="highsat",
+    highway_col: str = "highway",
+    color_by: str | None = None,        # noqa: F811 - shadow is intentional (kwarg name)
+    colors: Mapping[str, str] | None = None,
+    cmap=None,
+    vmin: float | None = None,
+    vmax: float | None = None,
+    width_by: tuple[float, float] | None = None,
+    tunnel_col: str | None = None,
+    bridge_col: str | None = None,
+    config=None,
+) -> "Styler":
+    """Pick the right styler from ``render_edges`` keyword arguments.
+
+    Resolution order (keeps the legacy OSM call byte-identical when no new args are given):
+    1. explicit ``style=`` (a Styler) wins;
+    2. ``color_by`` + ``colors`` → :class:`CategoricalStyler`;
+    3. ``color_by`` + (``cmap`` or numeric intent) → :class:`NumericStyler`;
+    4. otherwise → :class:`ClassStyler` (the original behaviour).
+    """
+    if style is not None:
+        return style
+    if color_by is not None:
+        if colors is not None:
+            return CategoricalStyler(column=color_by, colors=colors)
+        return NumericStyler(column=color_by, cmap=cmap or "viridis",
+                             vmin=vmin, vmax=vmax, width_by=width_by)
+    extra = {}
+    if config is not None:
+        extra["config"] = config
+    return ClassStyler(column=highway_col, palette=palette,
+                       tunnel_col=tunnel_col, bridge_col=bridge_col, **extra)

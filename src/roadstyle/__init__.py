@@ -26,7 +26,17 @@ from .palettes import (
 )
 from .render import render_edges
 from .style import base_style, normalize_highway, resolve, selection_style
-from .stylers import ClassStyler, ResolvedFrame, Styler
+from .stylers import (
+    CategoricalStyler,
+    ClassStyler,
+    NumericStyler,
+    ResolvedFrame,
+    Styler,
+    build_styler,
+    color_by,
+    color_by_class,
+    color_by_value,
+)
 from .themes import THEMES, Theme, get_theme, register_theme
 
 __version__ = "0.2.0.dev0"
@@ -43,4 +53,7 @@ __all__ = [
     "Styler", "ClassStyler", "ResolvedFrame",
     # palette JSON I/O (Phase 2a)
     "load_palette", "save_palette", "palette_to_dict", "palette_from_dict",
+    # data-driven styling (Phase 2)
+    "CategoricalStyler", "NumericStyler", "build_styler",
+    "color_by", "color_by_value", "color_by_class",
 ]
