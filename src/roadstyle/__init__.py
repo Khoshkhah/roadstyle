@@ -11,6 +11,7 @@
 from .basemaps import BASEMAPS, Basemap, get_basemap, register_basemap
 from .config import StyleConfig
 from .controls import BaseLayerSwitcher
+from .edges import RoadEdges, as_edges, load_edges, normalize_edges
 from .filters import filter_edges, highway_types
 from .palettes import (
     CARTO,
@@ -56,4 +57,6 @@ __all__ = [
     # data-driven styling (Phase 2)
     "CategoricalStyler", "NumericStyler", "build_styler",
     "color_by", "color_by_value", "color_by_class",
+    # canonical input (Phase 3a)
+    "RoadEdges", "normalize_edges", "load_edges", "as_edges",
 ]
