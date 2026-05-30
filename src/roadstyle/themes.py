@@ -25,3 +25,10 @@ def get_theme(theme: str | Theme) -> Theme:
         return THEMES[theme]
     except KeyError:
         raise ValueError(f"unknown theme {theme!r}; choose from {list(THEMES)}")
+
+
+def register_theme(theme: Theme) -> None:
+    """Register (or replace) a theme, keyed by its ``name``."""
+    if not isinstance(theme, Theme):
+        raise TypeError(f"expected a Theme, got {type(theme).__name__}")
+    THEMES[theme.name] = theme

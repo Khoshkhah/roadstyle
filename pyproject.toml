@@ -4,23 +4,66 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "roadstyle"
-version = "0.1.0"
-description = "OSM-theme road/edge map styling for folium & lonboard (high-contrast + OSM Carto palettes)"
+version = "0.2.0.dev0"
+description = "Opinionated OSM-theme road/edge map styling for folium, lonboard & the web (data-driven palettes, casing, themes)"
+readme = "README.md"
 requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Kaveh" }]
+keywords = [
+    "openstreetmap", "osm", "roads", "cartography", "map", "visualization",
+    "folium", "lonboard", "geopandas", "leaflet", "maplibre",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: GIS",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
 dependencies = [
     "geopandas",
     "shapely",
     "folium",
+    "branca",
 ]
 
 [project.optional-dependencies]
-lonboard = ["lonboard"]
+numeric = ["mapclassify", "matplotlib"]   # numeric/continuous styling: classification + colormaps
+basemaps = ["xyzservices"]                # use any XYZ tile provider as a base map
+lonboard = ["lonboard"]                   # WebGL (deck.gl) backend for very large edge sets
 docs = ["mkdocs-material"]
-dev = ["pytest", "lonboard"]
+dev = ["pytest", "ruff", "mypy", "lonboard", "mapclassify", "matplotlib", "xyzservices"]
+
+[project.urls]
+Homepage = "https://github.com/kaveh/roadstyle"
+Documentation = "https://github.com/kaveh/roadstyle"
+Source = "https://github.com/kaveh/roadstyle"
+Changelog = "https://github.com/kaveh/roadstyle/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+roadstyle = ["py.typed"]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = true

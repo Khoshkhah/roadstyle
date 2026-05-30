@@ -77,6 +77,24 @@ CARTO: dict[str, RoadStyle] = {
 PALETTES: dict[str, dict[str, RoadStyle]] = {"highsat": HIGHSAT, "carto": CARTO}
 FALLBACK = "unclassified"   # used for unknown highway tags
 
+
+def register_palette(name: str, table: dict[str, RoadStyle]) -> None:
+    """Register (or replace) a named palette so ``render_edges(palette=name)`` can use it.
+
+    ``table`` maps a class value (e.g. an OSM ``highway`` tag, or your own road class) to a
+    :class:`RoadStyle`. This is how non-OSM vocabularies are supported without forking.
+    """
+    if not isinstance(name, str) or not name:
+        raise ValueError("palette name must be a non-empty string")
+    if not table:
+        raise ValueError("palette table must be a non-empty mapping of class -> RoadStyle")
+    for key, value in table.items():
+        if not isinstance(value, RoadStyle):
+            raise TypeError(
+                f"palette entry {key!r} must be a RoadStyle, got {type(value).__name__}"
+            )
+    PALETTES[name] = dict(table)
+
 # Neon-violet selected-edge profile (selected_edge_color.md).
 SELECTION = {
     "core": "#EE00FF",

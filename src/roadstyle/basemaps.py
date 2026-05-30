@@ -58,10 +58,45 @@ BASEMAPS: dict[str, Basemap] = {
 DEFAULT_SWITCHER = ["voyager", "positron", "dark_matter", "osm", "satellite"]
 
 
+def register_basemap(bm: Basemap) -> None:
+    """Register (or replace) a base map, keyed by its ``key``."""
+    if not isinstance(bm, Basemap):
+        raise TypeError(f"expected a Basemap, got {type(bm).__name__}")
+    BASEMAPS[bm.key] = bm
+
+
+def _basemap_from_provider(tp) -> Basemap:
+    """Convert an ``xyzservices.TileProvider`` (duck-typed) into a :class:`Basemap`.
+
+    Lets any of the hundreds of xyzservices tile sources be used directly, e.g.
+    ``render_edges(edges, basemap=xyzservices.providers.CartoDB.Positron)``.
+    """
+    name = getattr(tp, "name", None) or (tp.get("name", "custom") if hasattr(tp, "get") else "custom")
+    try:
+        url = tp.build_url()              # leaflet-style template with {z}/{x}/{y}
+    except Exception:
+        url = tp.get("url", "") if hasattr(tp, "get") else ""
+    attr = ""
+    if hasattr(tp, "get"):
+        attr = tp.get("attribution", "") or tp.get("html_attribution", "") or ""
+    is_dark = "dark" in str(name).lower()
+    return Basemap(key=str(name), label=str(name).replace("_", " "), url=url, attr=attr,
+                   is_dark=is_dark)
+
+
 def get_basemap(key: str | Basemap) -> Basemap:
+    """Resolve a base map from a registered key, a :class:`Basemap`, or an
+    ``xyzservices.TileProvider`` (duck-typed via its ``build_url`` method)."""
     if isinstance(key, Basemap):
         return key
-    try:
-        return BASEMAPS[key]
-    except KeyError:
-        raise ValueError(f"unknown basemap {key!r}; choose from {list(BASEMAPS)}")
+    if isinstance(key, str):
+        try:
+            return BASEMAPS[key]
+        except KeyError:
+            raise ValueError(f"unknown basemap {key!r}; choose from {list(BASEMAPS)}")
+    if hasattr(key, "build_url"):         # xyzservices.TileProvider
+        return _basemap_from_provider(key)
+    raise TypeError(
+        f"basemap must be a key, Basemap, or xyzservices.TileProvider, "
+        f"got {type(key).__name__}"
+    )

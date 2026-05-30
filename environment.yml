@@ -6,8 +6,14 @@ dependencies:
   - geopandas
   - shapely
   - folium
+  - branca
+  - mapclassify       # numeric classification (optional extra: numeric)
+  - matplotlib        # colormaps (optional extra: numeric)
+  - xyzservices       # basemap provider registry (optional extra: basemaps)
   - pytest
+  - ruff
+  - mypy
   - pip
   - pip:
-      - lonboard          # WebGL backend
-      - mkdocs-material   # docs site
+      - lonboard          # WebGL backend (optional extra: lonboard)
+      - mkdocs-material   # docs site (optional extra: docs)
