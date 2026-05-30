@@ -2,7 +2,6 @@
 import json
 
 import geopandas as gpd
-import pytest
 from shapely.geometry import LineString
 
 from roadstyle import (
@@ -109,3 +108,15 @@ def test_spec_html_is_lighter_than_folium():
     from roadstyle import render_edges
     folium_html = render_edges(g, color_by="aadt", cmap="viridis").get_root().render()
     assert len(spec_html) <= len(folium_html)
+
+
+def test_to_html_inlines_canonical_renderer():
+    # Single source of truth: to_html must inline the bundled static/roadstyle.js (the same file
+    # used for standalone embeds), not a hand-written copy of the rendering logic.
+    from roadstyle.emit import _asset
+
+    js = _asset("roadstyle.js")
+    assert "RoadStyleMap" in js
+    html = to_html(_edges())
+    assert js in html                      # the exact canonical renderer is inlined
+    assert "new RoadStyleMap(" in html     # bootstrapped against the embedded spec

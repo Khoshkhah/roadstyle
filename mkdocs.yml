@@ -12,6 +12,7 @@ theme:
 nav:
   - Home: index.md
   - Usage: usage.md
+  - Examples: examples.md
   - Parameter reference: parameters.md
   - Embedding in a website: embedding.md
   - Frontend integration: frontend.md
@@ -19,6 +20,7 @@ nav:
   - Themes: themes.md
   - API: api.md
   - Comparison: comparison.md
+  - Future Roadmap: roadmap.md
 markdown_extensions:
   - admonition
   - tables

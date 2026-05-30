@@ -1,0 +1,56 @@
+/*!
+ * roadstyle.css — styling for roadstyle.js built-in widgets (legend + filter panel).
+ * Inlined by roadstyle.emit.to_html; also usable standalone alongside roadstyle.js.
+ */
+.rs-legend,
+.rs-filter {
+  position: absolute;
+  z-index: 9999;
+  background: rgba(20, 24, 30, 0.82);
+  border-radius: 12px;
+  padding: 9px 11px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.45);
+  font: 600 11px/1.4 system-ui, sans-serif;
+  color: #cfd6dd;
+}
+.rs-legend h4,
+.rs-filter h4 {
+  margin: 0 0 6px;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  color: #9fb0bf;
+  text-transform: uppercase;
+}
+.rs-legend .rs-row,
+.rs-filter .rs-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 1px 0;
+  white-space: nowrap;
+}
+.rs-filter .rs-row {
+  cursor: pointer;
+}
+.rs-filter input {
+  accent-color: #38bdf8;
+  margin: 0;
+}
+.rs-legend .rs-sw {
+  width: 16px;
+  height: 6px;
+  border-radius: 2px;
+  display: inline-block;
+  flex: none;
+}
+.rs-legend .rs-bar {
+  height: 10px;
+  border-radius: 3px;
+  margin: 2px 0 3px;
+}
+.rs-legend .rs-ends {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 500;
+  color: #aeb8c2;
+}
