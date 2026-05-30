@@ -13,6 +13,8 @@ dependencies:
   - pytest
   - ruff
   - mypy
+  - jupyterlab        # run the example notebooks in notebooks/
+  - nbclient          # execute notebooks programmatically (CI / make examples)
   - pip
   - pip:
       - lonboard          # WebGL backend (optional extra: lonboard)

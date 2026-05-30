@@ -4,6 +4,8 @@ __pycache__/
 .pytest_cache/
 .ipynb_checkpoints/
 .venv/
-site/            # mkdocs build output
-examples/*.html  # generated example maps
+site/                  # mkdocs build output
+examples/*.html        # generated example maps
+notebooks/output/      # generated maps from the example notebook
+.ipynb_checkpoints/
 .DS_Store
