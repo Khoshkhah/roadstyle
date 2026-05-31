@@ -1,10 +1,16 @@
 """Style resolution, palettes, and filtering."""
 import geopandas as gpd
-import pytest
 from shapely.geometry import LineString
 
-from roadstyle import (PALETTES, base_style, filter_edges, highway_types,
-                       normalize_highway, resolve, selection_style)
+from roadstyle import (
+    PALETTES,
+    base_style,
+    filter_edges,
+    highway_types,
+    normalize_highway,
+    resolve,
+    selection_style,
+)
 
 
 def test_both_palettes_present():
@@ -67,7 +73,10 @@ def _edges():
 
 def test_filter_include_exclude():
     g = _edges()
-    assert set(filter_edges(g, include=["motorway", "residential"])["highway"]) == {"motorway", "residential"}
+    assert set(filter_edges(g, include=["motorway", "residential"])["highway"]) == {
+        "motorway",
+        "residential",
+    }
     assert "service" not in set(filter_edges(g, exclude="service")["highway"])
     # primary_link matches primary when match_links=True
     assert len(filter_edges(g, include="primary", match_links=True)) == 1

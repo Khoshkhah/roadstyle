@@ -23,8 +23,8 @@ def get_theme(theme: str | Theme) -> Theme:
         return theme
     try:
         return THEMES[theme]
-    except KeyError:
-        raise ValueError(f"unknown theme {theme!r}; choose from {list(THEMES)}")
+    except KeyError as err:
+        raise ValueError(f"unknown theme {theme!r}; choose from {list(THEMES)}") from err
 
 
 def register_theme(theme: Theme) -> None:

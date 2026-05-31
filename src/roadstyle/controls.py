@@ -46,7 +46,8 @@ _TEMPLATE = Template("""
   var defs = {{ this.defs|tojson }};
   var layers = {};
   defs.forEach(function(d){
-    layers[d.key] = L.tileLayer(d.url, {attribution:d.attr||'', maxZoom:20, subdomains:d.sub||'abc'});
+    layers[d.key] = L.tileLayer(d.url,
+      {attribution:d.attr||'', maxZoom:20, subdomains:d.sub||'abc'});
   });
   var container = map.getContainer();
 
@@ -57,7 +58,8 @@ _TEMPLATE = Template("""
     container.classList.toggle('rs-sat', !!(d && d.sat));
     if(window.__rsCasing) window.__rsCasing(!!(d && d.is_dark));   // dynamic road casing
     var pop = document.getElementById('{{ this.cid }}');
-    if(pop) pop.querySelectorAll('.rs-card').forEach(function(c){ c.classList.toggle('active', c.dataset.key===key); });
+    if(pop) pop.querySelectorAll('.rs-card').forEach(
+      function(c){ c.classList.toggle('active', c.dataset.key===key); });
   }
 
   var Ctl = L.Control.extend({
@@ -73,16 +75,21 @@ _TEMPLATE = Template("""
         card.innerHTML =
           '<div class="rs-prev" style="background:'+d.bg+'">'+
           '<svg viewBox="0 0 80 40" preserveAspectRatio="none">'+
-          '<path d="M0 22 Q20 12 40 22 T80 18" stroke="'+d.roads[0]+'" stroke-width="3" fill="none" stroke-linecap="round"/>'+
-          '<path d="M16 0 L30 40" stroke="'+d.roads[1]+'" stroke-width="2.2" fill="none" stroke-linecap="round"/>'+
-          '<path d="M52 4 L66 40" stroke="'+d.roads[2]+'" stroke-width="2" fill="none" stroke-linecap="round"/>'+
+          '<path d="M0 22 Q20 12 40 22 T80 18" stroke="'+d.roads[0]+
+            '" stroke-width="3" fill="none" stroke-linecap="round"/>'+
+          '<path d="M16 0 L30 40" stroke="'+d.roads[1]+
+            '" stroke-width="2.2" fill="none" stroke-linecap="round"/>'+
+          '<path d="M52 4 L66 40" stroke="'+d.roads[2]+
+            '" stroke-width="2" fill="none" stroke-linecap="round"/>'+
           '</svg></div><div class="rs-label">'+d.label+'</div>';
-        card.onclick = function(){ switchTo(d.key); pop.classList.add('hidden'); fab.classList.remove('active'); };
+        card.onclick = function(){
+          switchTo(d.key); pop.classList.add('hidden'); fab.classList.remove('active'); };
       });
       fab.onclick = function(e){ e.stopPropagation();
         var hidden = pop.classList.toggle('hidden'); fab.classList.toggle('active', !hidden); };
       document.addEventListener('click', function(e){
-        if(!wrap.contains(e.target)){ pop.classList.add('hidden'); fab.classList.remove('active'); } });
+        if(!wrap.contains(e.target)){
+          pop.classList.add('hidden'); fab.classList.remove('active'); } });
       L.DomEvent.disableClickPropagation(wrap);
       L.DomEvent.disableScrollPropagation(wrap);
       return wrap;

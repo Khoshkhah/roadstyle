@@ -142,8 +142,9 @@ def render(
             s = sty[layer]
             folium.GeoJson(
                 sel, name=f"selected {layer}", control=False,
-                style_function=(lambda c, w, o: (lambda f: {"color": c, "weight": w, "opacity": o}))(
-                    s["color"], s["width"], s["opacity"]),
+                style_function=(
+                    lambda c, w, o: (lambda f: {"color": c, "weight": w, "opacity": o})
+                )(s["color"], s["width"], s["opacity"]),
             ).add_to(m)
 
     try:

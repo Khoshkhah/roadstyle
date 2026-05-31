@@ -10,8 +10,9 @@ colours themselves, so all three backends and all styling modes share one code p
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Mapping, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from .config import DEFAULT, StyleConfig
 from .palettes import FALLBACK, PALETTES, RoadStyle
@@ -94,10 +95,10 @@ class ClassStyler:
         if isinstance(self.palette, str):
             try:
                 return PALETTES[self.palette]
-            except KeyError:
+            except KeyError as err:
                 raise ValueError(
                     f"unknown palette {self.palette!r}; choose from {list(PALETTES)}"
-                )
+                ) from err
         return self.palette
 
     def resolve_frame(self, gdf, theme: str | Theme = "dark") -> ResolvedFrame:
@@ -317,7 +318,7 @@ def build_styler(
     tunnel_col: str | None = None,
     bridge_col: str | None = None,
     config=None,
-) -> "Styler":
+) -> Styler:
     """Pick the right styler from ``render_edges`` keyword arguments.
 
     Resolution order (keeps the legacy OSM call byte-identical when no new args are given):

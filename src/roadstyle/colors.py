@@ -7,7 +7,7 @@ This module just turns a user's ``cmap=``/``scheme=`` request into concrete per-
 """
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 
 def _branca_linear(cmap):

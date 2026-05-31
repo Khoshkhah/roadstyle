@@ -25,7 +25,8 @@ def _arrays(gdf, palette, theme, highway_col, tunnel_col, bridge_col, which):
         )
         if which == "casing":
             if rs.casing is None or rs.casing_width <= 0:
-                colors.append([0, 0, 0, 0]); widths.append(0.0)       # invisible
+                colors.append([0, 0, 0, 0])       # invisible
+                widths.append(0.0)
             else:
                 colors.append(_hex_to_rgb(rs.casing, int(255 * rs.casing_opacity)))
                 widths.append(rs.casing_width)
@@ -51,7 +52,8 @@ def _arrays_from_frame(rf, theme, which):
         if which == "casing":
             casing = rf.casing_dark[i] if dark else rf.casing_light[i]
             if not casing or rf.casing_width[i] <= 0:
-                colors.append([0, 0, 0, 0]); widths.append(0.0)
+                colors.append([0, 0, 0, 0])
+                widths.append(0.0)
             else:
                 colors.append(_hex_to_rgb(casing, int(255 * rf.casing_opacity[i])))
                 widths.append(rf.casing_width[i])

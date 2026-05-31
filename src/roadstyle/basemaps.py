@@ -1,7 +1,7 @@
 """Base-map (tile) providers + thumbnail metadata for the switcher control."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 _CARTO_ATTR = "© OpenStreetMap contributors © CARTO"
 _OSM_ATTR = "© OpenStreetMap contributors"
@@ -71,7 +71,9 @@ def _basemap_from_provider(tp) -> Basemap:
     Lets any of the hundreds of xyzservices tile sources be used directly, e.g.
     ``render_edges(edges, basemap=xyzservices.providers.CartoDB.Positron)``.
     """
-    name = getattr(tp, "name", None) or (tp.get("name", "custom") if hasattr(tp, "get") else "custom")
+    name = getattr(tp, "name", None) or (
+        tp.get("name", "custom") if hasattr(tp, "get") else "custom"
+    )
     try:
         url = tp.build_url()              # leaflet-style template with {z}/{x}/{y}
     except Exception:
@@ -92,8 +94,10 @@ def get_basemap(key: str | Basemap) -> Basemap:
     if isinstance(key, str):
         try:
             return BASEMAPS[key]
-        except KeyError:
-            raise ValueError(f"unknown basemap {key!r}; choose from {list(BASEMAPS)}")
+        except KeyError as err:
+            raise ValueError(
+                f"unknown basemap {key!r}; choose from {list(BASEMAPS)}"
+            ) from err
     if hasattr(key, "build_url"):         # xyzservices.TileProvider
         return _basemap_from_provider(key)
     raise TypeError(

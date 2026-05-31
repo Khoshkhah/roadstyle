@@ -7,8 +7,6 @@ checkbox panel. Mirrors the osm-traffic-enrichment web renderer.
 """
 from __future__ import annotations
 
-import json
-
 from branca.element import MacroElement
 from jinja2 import Template
 
@@ -33,8 +31,10 @@ _TEMPLATE = Template("""
 .rs-filter{background:rgba(20,24,30,.82);backdrop-filter:blur(6px);border-radius:12px;
   padding:8px 10px;box-shadow:0 3px 14px rgba(0,0,0,.45);font:600 11px/1.5 system-ui,sans-serif;
   color:#cfd6dd;max-height:60vh;overflow:auto;}
-.rs-filter h4{margin:0 0 6px;font-size:11px;letter-spacing:.3px;color:#9fb0bf;text-transform:uppercase;}
-.rs-filter label{display:flex;align-items:center;gap:7px;cursor:pointer;padding:2px 0;white-space:nowrap;}
+.rs-filter h4{margin:0 0 6px;font-size:11px;letter-spacing:.3px;color:#9fb0bf;
+  text-transform:uppercase;}
+.rs-filter label{display:flex;align-items:center;gap:7px;cursor:pointer;padding:2px 0;
+  white-space:nowrap;}
 .rs-filter input{accent-color:#00E5FF;}
 .rs-sw{width:14px;height:4px;border-radius:2px;display:inline-block;}
 .rs-filter .rs-all{margin-top:6px;border-top:1px solid rgba(255,255,255,.12);padding-top:6px;
@@ -78,7 +78,8 @@ _TEMPLATE = Template("""
   var casingLayer = L.geoJSON(DATA, {style: styleCasing}).addTo(map);
   var fillLayer = L.geoJSON(DATA, {style: styleFill, onEachFeature: function(feat, layer){
     if(TIP.length){
-      var html = TIP.map(function(k){ return '<b>'+k+'</b>: '+(feat.properties[k]==null?'':feat.properties[k]); }).join('<br>');
+      var html = TIP.map(function(k){
+        return '<b>'+k+'</b>: '+(feat.properties[k]==null?'':feat.properties[k]); }).join('<br>');
       layer.bindTooltip(html, {sticky:true});
     }
     layer.on('mouseover', function(e){
@@ -91,7 +92,8 @@ _TEMPLATE = Template("""
   }}).addTo(map);
 
   // dynamic casing on base-map change (called by the base switcher)
-  window.{{ this.hook }} = function(isDark){ IS_DARK = !!isDark; casingLayer.setStyle(styleCasing); };
+  window.{{ this.hook }} = function(isDark){
+    IS_DARK = !!isDark; casingLayer.setStyle(styleCasing); };
 
   // ── highway-type filter panel ──────────────────────────────────────────────
   var types = {};
@@ -116,8 +118,10 @@ _TEMPLATE = Template("""
     var bar=L.DomUtil.create('div','rs-all',d);
     var ba=document.createElement('button'); ba.textContent='All';
     var bn=document.createElement('button'); bn.textContent='None';
-    ba.onclick=function(){ disabled={}; d.querySelectorAll('input').forEach(function(c){c.checked=true;}); refresh(); };
-    bn.onclick=function(){ types.forEach(function(t){disabled[t]=1;}); d.querySelectorAll('input').forEach(function(c){c.checked=false;}); refresh(); };
+    ba.onclick=function(){ disabled={};
+      d.querySelectorAll('input').forEach(function(c){c.checked=true;}); refresh(); };
+    bn.onclick=function(){ types.forEach(function(t){disabled[t]=1;});
+      d.querySelectorAll('input').forEach(function(c){c.checked=false;}); refresh(); };
     bar.appendChild(ba); bar.appendChild(bn);
     L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d);
     return d;

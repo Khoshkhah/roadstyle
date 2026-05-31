@@ -46,6 +46,7 @@ def test_render_with_selection():
 
 def test_basemap_override_and_toggleable_basemaps():
     import folium
+
     from roadstyle import BASEMAPS
     assert {"positron", "dark_matter", "satellite", "voyager", "osm"} <= set(BASEMAPS)
     # single override

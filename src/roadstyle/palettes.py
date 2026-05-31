@@ -39,7 +39,7 @@ class RoadStyle:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "RoadStyle":
+    def from_dict(cls, d: dict) -> RoadStyle:
         """Build a RoadStyle from a dict (e.g. parsed JSON). Unknown keys are ignored.
 
         Only ``fill``/``width``/``casing_width`` are required; the rest fall back to the
