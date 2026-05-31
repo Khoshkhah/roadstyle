@@ -4,7 +4,15 @@ import pandas as pd
 import pytest
 from shapely.geometry import LineString, Point
 
-from roadstyle import RoadEdges, as_edges, normalize_edges, render_edges
+from roadstyle import (
+    RoadEdges,
+    as_edges,
+    from_arrow,
+    from_duckdb,
+    from_geojson,
+    normalize_edges,
+    render_edges,
+)
 
 
 def _raw(crs=3857):
@@ -61,3 +69,60 @@ def test_empty_raises_clear_error():
     g = _raw(4326).iloc[0:0]
     with pytest.raises(ValueError):
         normalize_edges(g)
+
+
+# ── wider inputs (Lever 1): path / GeoJSON / Arrow / DuckDB all reach the canonical shape ──────
+
+def _named():  # a 4326 gdf whose class column is already "highway"
+    return normalize_edges(_raw(4326), rename={"vagtyp": "highway"}).gdf
+
+
+def test_as_edges_from_file_path(tmp_path):
+    p = tmp_path / "edges.geojson"
+    _named().to_file(p, driver="GeoJSON")
+    e = as_edges(str(p))
+    assert isinstance(e, RoadEdges) and len(e) == 2 and e.gdf.crs.to_epsg() == 4326
+
+
+def test_as_edges_from_geojson_dict():
+    import json
+
+    fc = json.loads(_named().to_json())
+    e = as_edges(fc)
+    assert isinstance(e, RoadEdges) and len(e) == 2 and "highway" in e.columns
+
+
+def test_from_geojson_accepts_a_spec_dict():
+    from roadstyle import to_spec
+
+    e = from_geojson(to_spec(_named()))     # a roadstyle to_spec() dict round-trips back in
+    assert isinstance(e, RoadEdges) and len(e) == 2
+
+
+def test_from_arrow_decodes_wkb():
+    pa = pytest.importorskip("pyarrow")
+    g = _named()
+    table = pa.table({
+        "highway": g["highway"].tolist(),
+        "aadt": g["aadt"].tolist(),
+        "geometry": [geom.wkb for geom in g.geometry],
+    })
+    e = from_arrow(table, geometry="geometry", crs=4326)
+    assert isinstance(e, RoadEdges) and len(e) == 2 and "highway" in e.columns
+
+
+def test_from_duckdb_wkb():
+    duckdb = pytest.importorskip("duckdb")
+    g = _named()
+    con = duckdb.connect()
+    con.execute("CREATE TABLE roads (highway VARCHAR, aadt INTEGER, geom BLOB)")
+    for _, row in g.iterrows():
+        con.execute("INSERT INTO roads VALUES (?, ?, ?)",
+                    [row["highway"], int(row["aadt"]), row.geometry.wkb])
+    e = from_duckdb(con, "SELECT highway, aadt, geom FROM roads", geometry="geom", crs=4326)
+    assert isinstance(e, RoadEdges) and len(e) == 2 and "highway" in e.columns
+
+
+def test_as_edges_unsupported_input_raises():
+    with pytest.raises(TypeError):
+        as_edges(12345)

@@ -37,8 +37,10 @@ dependencies = [
 numeric = ["mapclassify", "matplotlib"]   # numeric/continuous styling: classification + colormaps
 basemaps = ["xyzservices"]                # use any XYZ tile provider as a base map
 lonboard = ["lonboard"]                   # WebGL (deck.gl) backend for very large edge sets
+duckdb = ["duckdb"]                        # read edges straight from a DuckDB relation / query
+arrow = ["pyarrow"]                        # read edges from a pyarrow Table
 docs = ["mkdocs-material"]
-dev = ["pytest", "ruff", "mypy", "lonboard", "mapclassify", "matplotlib", "xyzservices"]
+dev = ["pytest", "ruff", "mypy", "lonboard", "mapclassify", "matplotlib", "xyzservices", "duckdb", "pyarrow"]
 
 [project.urls]
 Homepage = "https://github.com/Khoshkhah/roadstyle"

@@ -85,3 +85,32 @@ html = rs.to_iframe(edges, color_by="aadt", cmap="viridis")     # <iframe> strin
 
 See **[Embedding in a website](embedding.md)** for the JSON spec and frontend snippets, and the
 **[Parameter reference](parameters.md)** for every parameter.
+
+## Input formats (what `render_edges` / `to_spec` accept)
+
+Everything funnels through `as_edges`, so the entry points take more than a GeoDataFrame — pass
+whichever you already have and roadstyle normalises it (to EPSG:4326 line geometry):
+
+```python
+import roadstyle as rs
+
+rs.render_edges(gdf)                       # a GeoDataFrame
+rs.render_edges("roads.gpkg")             # a file path (GeoPackage / GeoJSON / Shapefile / …)
+rs.render_edges(feature_collection)        # a GeoJSON mapping / a to_spec() dict / __geo_interface__
+rs.render_edges(arrow_table)               # a pyarrow Table
+```
+
+For **DuckDB** (and to control the geometry column / source CRS), use the matching helper and pass
+its result on — select the geometry as WKB or WKT so it round-trips:
+
+```python
+edges = rs.from_duckdb(
+    con,
+    "SELECT highway, aadt, ST_AsWKB(geom) AS geom FROM roads",
+    geometry="geom", crs=3006,             # DuckDB carries no CRS; say what the coords are in
+)
+rs.render_edges(edges, color_by="aadt", cmap="YlOrRd")
+```
+
+`from_geojson` / `from_arrow` / `from_duckdb` / `load_edges` all return a `RoadEdges`; install the
+optional `duckdb` / `arrow` extras (`pip install roadstyle[duckdb,arrow]`) as needed.
