@@ -133,7 +133,9 @@ def _table_to_gdf(df, *, geometry=None, crs=None):
     nonnull = s.dropna()
     sample = nonnull.iloc[0] if len(nonnull) else None
     if isinstance(sample, (bytes, bytearray, memoryview)):
-        geom = gpd.GeoSeries.from_wkb(list(s), index=df.index, crs=crs)
+        # shapely.from_wkb wants bytes/str; DuckDB BLOBs arrive as bytearray/memoryview
+        wkb = [bytes(v) if isinstance(v, (bytearray, memoryview)) else v for v in s]
+        geom = gpd.GeoSeries.from_wkb(wkb, index=df.index, crs=crs)
     elif isinstance(sample, str):
         geom = gpd.GeoSeries.from_wkt(list(s), index=df.index, crs=crs)
     elif sample is None or isinstance(sample, BaseGeometry):
