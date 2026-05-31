@@ -1,5 +1,8 @@
 # Examples
 
+Prefer reading in the browser? The **[Tutorial](tutorial.md)** walks through everything below on one
+page. The notebooks here are the same material, runnable.
+
 A set of small, focused, runnable notebooks in [`notebooks/`](https://github.com/Khoshkhah/roadstyle/tree/main/notebooks).
 Each teaches one topic and is self-contained — open it in Jupyter and run top to bottom. They use the
 bundled sample data (`notebooks/data/sundbyberg_edges.gpkg`, ~4,000 real road edges) and write any
