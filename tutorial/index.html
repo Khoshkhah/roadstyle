@@ -1,0 +1,1265 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="OSM-theme road/edge map styling for folium & lonboard">
+      
+      
+      
+      
+        <link rel="prev" href="../usage/">
+      
+      
+        <link rel="next" href="../examples/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Tutorial - roadstyle</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="cyan">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#tutorial" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="roadstyle" class="md-header__button md-logo" aria-label="roadstyle" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            roadstyle
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Tutorial
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="cyan"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="roadstyle" class="md-nav__button md-logo" aria-label="roadstyle" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    roadstyle
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-quickstart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1 · Quickstart
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-themes-palettes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2 · Themes &amp; palettes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-colour-roads-by-your-own-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3 · Colour roads by your own data
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3 · Colour roads by your own data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#categorical-color_by-colors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Categorical (color_by + colors)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#numeric-color_by-cmap-width_by" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Numeric (color_by + cmap + width_by)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-filtering-highlighting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4 · Filtering &amp; highlighting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-customizing-the-look" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5 · Customizing the look
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5 · Customizing the look">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#base-maps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Base maps
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#your-own-colour-vocabulary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your own colour vocabulary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-large-datasets-gpu-lonboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6 · Large datasets (GPU / lonboard)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-loading-data-every-input-roadstyle-accepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7 · Loading data — every input roadstyle accepts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-outputs-for-the-web" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8 · Outputs for the web
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-embed-in-your-own-page-roadstylejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9 · Embed in your own page (roadstyle.js)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to next
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../parameters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parameter reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../embedding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embedding in a website
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../palettes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Palettes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../themes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Themes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-quickstart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1 · Quickstart
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-themes-palettes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2 · Themes &amp; palettes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-colour-roads-by-your-own-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3 · Colour roads by your own data
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3 · Colour roads by your own data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#categorical-color_by-colors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Categorical (color_by + colors)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#numeric-color_by-cmap-width_by" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Numeric (color_by + cmap + width_by)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-filtering-highlighting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4 · Filtering &amp; highlighting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-customizing-the-look" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5 · Customizing the look
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5 · Customizing the look">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#base-maps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Base maps
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#your-own-colour-vocabulary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your own colour vocabulary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-large-datasets-gpu-lonboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6 · Large datasets (GPU / lonboard)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-loading-data-every-input-roadstyle-accepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7 · Loading data — every input roadstyle accepts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-outputs-for-the-web" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8 · Outputs for the web
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-embed-in-your-own-page-roadstylejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9 · Embed in your own page (roadstyle.js)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to next
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="tutorial">Tutorial</h1>
+<p>A guided, read-it-top-to-bottom walkthrough of roadstyle — the same ground the
+<a href="../examples/">example notebooks</a> cover, but on one page so you can learn it in the browser without
+opening Jupyter. Every snippet is copy-paste runnable; they all use a <code>GeoDataFrame</code> of road edges
+called <code>edges</code> (any road dataset with line geometry and a road-class column works).</p>
+<div class="admonition tip">
+<p class="admonition-title">How to follow along</p>
+<p>Install with <code>pip install -e ".[numeric,basemaps]"</code> and load any road dataset. The notebooks
+ship a sample (<code>notebooks/data/sundbyberg_edges.gpkg</code>, ~4,000 real edges); to reproduce a step
+exactly, open the matching notebook listed under each section.</p>
+</div>
+<hr />
+<h2 id="1-quickstart">1 · Quickstart</h2>
+<p>roadstyle turns a <code>GeoDataFrame</code> of roads into a styled, interactive map — an OSM-style <em>geometry
+sandwich</em> (a coloured fill drawn over a wider casing) so junctions and overlaps read cleanly. You
+need just two things: a <strong>road-class column</strong> (default <code>highway</code>) and <strong>line geometry</strong>.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">geopandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">roadstyle</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rs</span>
+
+<span class="n">edges</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="s2">&quot;edges.gpkg&quot;</span><span class="p">)</span>        <span class="c1"># any CRS; reprojected to EPSG:4326 for you</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">edges</span><span class="p">)</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2"> edges, CRS </span><span class="si">{</span><span class="n">edges</span><span class="o">.</span><span class="n">crs</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>One call renders it. In a notebook the returned <code>folium.Map</code> displays inline; anywhere else,
+<code>.save()</code> it:</p>
+<div class="highlight"><pre><span></span><code><span class="n">m</span> <span class="o">=</span> <span class="n">rs</span><span class="o">.</span><span class="n">render_edges</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="n">theme</span><span class="o">=</span><span class="s2">&quot;dark&quot;</span><span class="p">)</span>   <span class="c1"># high-saturation palette on a dark base map</span>
+<span class="n">m</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;roads.html&quot;</span><span class="p">)</span>                        <span class="c1"># a standalone, self-contained page</span>
+</code></pre></div>
+<p>That's the whole loop: <strong>load → <code>render_edges</code> → <code>.save</code></strong>. Everything below adds colour, filtering,
+and web output on top of it.</p>
+<blockquote>
+<p>Notebook: <strong>01 · Quickstart</strong></p>
+</blockquote>
+<hr />
+<h2 id="2-themes-palettes">2 · Themes &amp; palettes</h2>
+<p>Two palettes — <code>highsat</code> (high-contrast) and <code>carto</code> (classic OSM) — and three themes: <code>light</code>,
+<code>dark</code>, and <code>satellite</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="n">rs</span><span class="o">.</span><span class="n">render_edges</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="n">palette</span><span class="o">=</span><span class="s2">&quot;carto&quot;</span><span class="p">,</span> <span class="n">theme</span><span class="o">=</span><span class="s2">&quot;light&quot;</span><span class="p">)</span>
+<span class="n">rs</span><span class="o">.</span><span class="n">render_edges</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="n">palette</span><span class="o">=</span><span class="s2">&quot;highsat&quot;</span><span class="p">,</span> <span class="n">theme</span><span class="o">=</span><span class="s2">&quot;dark&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>Themes set the base map and casing colours; palettes set the per-road-class colours. See
+<a href="../palettes/">Palettes</a> and <a href="../themes/">Themes</a> for the full reference.</p>
+<blockquote>
+<p>Notebook: <strong>01 · Quickstart</strong>, <strong>06 · Customizing the look</strong></p>
+</blockquote>
+<hr />
+<h2 id="3-colour-roads-by-your-own-data">3 · Colour roads by your own data</h2>
+<p>Beyond road class, you can colour and size edges by <strong>any</strong> column — categorical or numeric — with
+automatic legends.</p>
+<h3 id="categorical-color_by-colors">Categorical (<code>color_by</code> + <code>colors</code>)</h3>
+<p>Give each category an explicit colour. Here we derive an importance class from the <code>highway</code> tag:</p>
+<div class="highlight"><pre><span></span><code><span class="n">major</span>  <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;motorway&quot;</span><span class="p">,</span> <span class="s2">&quot;trunk&quot;</span><span class="p">,</span> <span class="s2">&quot;primary&quot;</span><span class="p">,</span> <span class="s2">&quot;motorway_link&quot;</span><span class="p">,</span> <span class="s2">&quot;trunk_link&quot;</span><span class="p">,</span> <span class="s2">&quot;primary_link&quot;</span><span class="p">}</span>
+<span class="n">medium</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;secondary&quot;</span><span class="p">,</span> <span class="s2">&quot;tertiary&quot;</span><span class="p">,</span> <span class="s2">&quot;secondary_link&quot;</span><span class="p">,</span> <span class="s2">&quot;tertiary_link&quot;</span><span class="p">}</span>
+<span class="n">edges</span><span class="p">[</span><span class="s2">&quot;importance&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">edges</span><span class="p">[</span><span class="s2">&quot;highway&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span>
+    <span class="k">lambda</span> <span class="n">h</span><span class="p">:</span> <span class="s2">&quot;major&quot;</span> <span class="k">if</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">major</span> <span class="k">else</span> <span class="s2">&quot;medium&quot;</span> <span class="k">if</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">medium</span> <span class="k">else</span> <span class="s2">&quot;minor&quot;</span>
+<span class="p">)</span>
+
+<span class="n">rs</span><span class="o">.</span><span class="n">render_edges</span><span class="p">(</span>
+    <span class="n">edges</span><span class="p">,</span>
+    <span class="n">color_by</span><span class="o">=</span><span class="s2">&quot;importance&quot;</span><span class="p">,</span>
+    <span class="n">colors</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;major&quot;</span><span class="p">:</span> <span class="s2">&quot;#ef4444&quot;</span><span class="p">,</span> <span class="s2">&quot;medium&quot;</span><span class="p">:</span> <span class="s2">&quot;#f59e0b&quot;</span><span class="p">,</span> <span class="s2">&quot;minor&quot;</span><span class="p">:</span> <span class="s2">&quot;#64748b&quot;</span><span class="p">},</span>
+    <span class="n">legend</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<h3 id="numeric-color_by-cmap-width_by">Numeric (<code>color_by</code> + <code>cmap</code> + <code>width_by</code>)</h3>
+<p>Map a number to a colour ramp <strong>and</strong> a line-width ramp. Any branca/matplotlib colormap name works
+for <code>cmap</code>; <code>vmin</code>/<code>vmax</code> clamp the colour range; <code>width_by=(min, max)</code> scales width with the value.</p>
+<div class="highlight"><pre><span></span><code><span class="n">edges</span><span class="p">[</span><span class="s2">&quot;length_m&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">edges</span><span class="o">.</span><span class="n">to_crs</span><span class="p">(</span><span class="mi">3006</span><span class="p">)</span><span class="o">.</span><span class="n">length</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>   <span class="c1"># metres, via a projected CRS</span>
+
+<span class="n">rs</span><span class="o">.</span><span class="n">render_edges</span><span class="p">(</span>
+    <span class="n">edges</span><span class="p">,</span>
+    <span class="n">color_by</span><span class="o">=</span><span class="s2">&quot;length_m&quot;</span><span class="p">,</span>
+    <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;viridis&quot;</span><span class="p">,</span>
+    <span class="n">width_by</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span>        <span class="c1"># thinnest .. thickest pixel width across the value range</span>
+    <span class="n">vmin</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span>
+    <span class="n">legend</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Numeric styling needs an extra</p>
+<p><code>cmap</code>/numeric classification uses <code>mapclassify</code> + <code>matplotlib</code>: <code>pip install "roadstyle[numeric]"</code>.</p>
+</div>
+<blockquote>
+<p>Notebook: <strong>02 · Data-driven styling</strong></p>
+</blockquote>
+<hr />
+<h2 id="4-filtering-highlighting">4 · Filtering &amp; highlighting</h2>
+<p>Show only the road types you care about, and highlight a selection on top of the map.</p>
+<div class="highlight"><pre><span></span><code><span class="nb">sorted</span><span class="p">(</span><span class="n">rs</span><span class="o">.</span><span class="n">highway_types</span><span class="p">(</span><span class="n">edges</span><span class="p">))</span>                       <span class="c1"># what classes are present?</span>
+
+<span class="c1"># keep or drop types — match_links=True (default) keeps *_link ramps with their parent</span>
+<span class="n">rs</span><span class="o">.</span><span class="n">render_edges</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="n">include</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;motorway&quot;</span><span class="p">,</span> <span class="s2">&quot;trunk&quot;</span><span class="p">,</span> <span class="s2">&quot;primary&quot;</span><span class="p">],</span> <span class="n">theme</span><span class="o">=</span><span class="s2">&quot;dark&quot;</span><span class="p">)</span>
+<span class="n">rs</span><span class="o">.</span><span class="n">render_edges</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="n">exclude</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;service&quot;</span><span class="p">,</span> <span class="s2">&quot;footway&quot;</span><span class="p">,</span> <span class="s2">&quot;path&quot;</span><span class="p">,</span> <span class="s2">&quot;cycleway&quot;</span><span class="p">],</span> <span class="n">theme</span><span class="o">=</span><span class="s2">&quot;light&quot;</span><span class="p">)</span>
+
+<span class="c1"># highlight a sub-selection with a neon overlay</span>
+<span class="n">sel</span> <span class="o">=</span> <span class="n">edges</span><span class="p">[</span><span class="n">edges</span><span class="p">[</span><span class="s2">&quot;highway&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;secondary&quot;</span><span class="p">]</span>
+<span class="n">rs</span><span class="o">.</span><span class="n">render_edges</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="n">theme</span><span class="o">=</span><span class="s2">&quot;dark&quot;</span><span class="p">,</span> <span class="n">selected</span><span class="o">=</span><span class="n">sel</span><span class="p">)</span>
+</code></pre></div>
+<blockquote>
+<p>Notebook: <strong>03 · Filtering &amp; highlighting</strong></p>
+</blockquote>
+<hr />
+<h2 id="5-customizing-the-look">5 · Customizing the look</h2>
+<h3 id="base-maps">Base maps</h3>
+<p>Override the theme's default tiles with any key in <code>rs.BASEMAPS</code>, or offer several as a switcher:</p>
+<div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;available base maps:&quot;</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">rs</span><span class="o">.</span><span class="n">BASEMAPS</span><span class="p">))</span>
+<span class="n">rs</span><span class="o">.</span><span class="n">render_edges</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="n">theme</span><span class="o">=</span><span class="s2">&quot;light&quot;</span><span class="p">,</span> <span class="n">basemap</span><span class="o">=</span><span class="s2">&quot;positron&quot;</span><span class="p">)</span>
+
+<span class="c1"># a thumbnail base-layer switcher on the map (folium)</span>
+<span class="n">rs</span><span class="o">.</span><span class="n">render_edges</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="n">theme</span><span class="o">=</span><span class="s2">&quot;dark&quot;</span><span class="p">,</span> <span class="n">basemaps</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;dark_matter&quot;</span><span class="p">,</span> <span class="s2">&quot;positron&quot;</span><span class="p">,</span> <span class="s2">&quot;satellite&quot;</span><span class="p">])</span>
+</code></pre></div>
+<p>Any <a href="https://xyzservices.readthedocs.io/">xyzservices</a> provider also works directly as <code>basemap=</code>
+(install <code>pip install "roadstyle[basemaps]"</code>).</p>
+<h3 id="your-own-colour-vocabulary">Your own colour vocabulary</h3>
+<p><code>color_by</code> + <code>colors</code> defines exactly what each category looks like, with nothing to register:</p>
+<div class="highlight"><pre><span></span><code><span class="n">rs</span><span class="o">.</span><span class="n">render_edges</span><span class="p">(</span>
+    <span class="n">edges</span><span class="p">,</span> <span class="n">theme</span><span class="o">=</span><span class="s2">&quot;dark&quot;</span><span class="p">,</span>
+    <span class="n">color_by</span><span class="o">=</span><span class="s2">&quot;congestion&quot;</span><span class="p">,</span>
+    <span class="n">colors</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;free&quot;</span><span class="p">:</span> <span class="s2">&quot;#22c55e&quot;</span><span class="p">,</span> <span class="s2">&quot;slow&quot;</span><span class="p">:</span> <span class="s2">&quot;#f59e0b&quot;</span><span class="p">,</span> <span class="s2">&quot;jam&quot;</span><span class="p">:</span> <span class="s2">&quot;#ef4444&quot;</span><span class="p">},</span>
+    <span class="n">legend</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>For <em>reusable</em> palettes shared across projects there's a registry + JSON I/O
+(<code>register_palette</code>, <code>save_palette</code>, <code>load_palette</code>) — see <a href="../palettes/">Palettes</a>.</p>
+<blockquote>
+<p>Notebook: <strong>06 · Customizing the look</strong></p>
+</blockquote>
+<hr />
+<h2 id="6-large-datasets-gpu-lonboard">6 · Large datasets (GPU / lonboard)</h2>
+<p>For very large edge sets, switch the backend to <strong>lonboard</strong> (deck.gl / WebGL). Same call, same
+styling — it just renders on the GPU. lonboard is optional: <code>pip install "roadstyle[lonboard]"</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="n">rs</span><span class="o">.</span><span class="n">render_edges</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;lonboard&quot;</span><span class="p">,</span> <span class="n">theme</span><span class="o">=</span><span class="s2">&quot;dark&quot;</span><span class="p">)</span>
+<span class="n">rs</span><span class="o">.</span><span class="n">render_edges</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;lonboard&quot;</span><span class="p">,</span> <span class="n">color_by</span><span class="o">=</span><span class="s2">&quot;length_m&quot;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;magma&quot;</span><span class="p">,</span> <span class="n">width_by</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+</code></pre></div>
+<p>Use <strong>folium</strong> for portable, self-contained HTML and rich interactions; <strong>lonboard</strong> when edge
+counts get large enough that Leaflet feels heavy.</p>
+<blockquote>
+<p>Notebook: <strong>07 · Large datasets (lonboard)</strong></p>
+</blockquote>
+<hr />
+<h2 id="7-loading-data-every-input-roadstyle-accepts">7 · Loading data — every input roadstyle accepts</h2>
+<p><code>render_edges</code> / <code>to_spec</code> don't only take a <code>GeoDataFrame</code>. Everything funnels through <code>as_edges</code>,
+which normalises <strong>any</strong> of the sources below to the one canonical shape (EPSG:4326 line geometry +
+a class column). Hand roadstyle whatever you already have:</p>
+<div class="highlight"><pre><span></span><code><span class="n">rs</span><span class="o">.</span><span class="n">render_edges</span><span class="p">(</span><span class="n">gdf</span><span class="p">)</span>                 <span class="c1"># a GeoDataFrame</span>
+<span class="n">rs</span><span class="o">.</span><span class="n">render_edges</span><span class="p">(</span><span class="s2">&quot;roads.gpkg&quot;</span><span class="p">)</span>        <span class="c1"># a file path: GeoPackage / GeoJSON / Shapefile / …</span>
+<span class="n">rs</span><span class="o">.</span><span class="n">render_edges</span><span class="p">(</span><span class="n">feature_collection</span><span class="p">)</span>  <span class="c1"># a GeoJSON mapping, a to_spec() dict, or __geo_interface__</span>
+<span class="n">rs</span><span class="o">.</span><span class="n">render_edges</span><span class="p">(</span><span class="n">arrow_table</span><span class="p">)</span>         <span class="c1"># a pyarrow Table (GeoArrow works directly)</span>
+</code></pre></div>
+<p>For a plain WKB/WKT geometry column, or to set the source CRS, use the matching <code>from_*</code> helper and
+pass its result on:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># pyarrow with a WKB column</span>
+<span class="n">table</span> <span class="o">=</span> <span class="n">pa</span><span class="o">.</span><span class="n">table</span><span class="p">({</span>
+    <span class="s2">&quot;highway&quot;</span><span class="p">:</span> <span class="n">edges</span><span class="p">[</span><span class="s2">&quot;highway&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
+    <span class="s2">&quot;geometry&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">g</span><span class="o">.</span><span class="n">wkb</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">edges</span><span class="o">.</span><span class="n">geometry</span><span class="p">],</span>
+<span class="p">})</span>
+<span class="n">rs</span><span class="o">.</span><span class="n">render_edges</span><span class="p">(</span><span class="n">rs</span><span class="o">.</span><span class="n">from_arrow</span><span class="p">(</span><span class="n">table</span><span class="p">,</span> <span class="n">geometry</span><span class="o">=</span><span class="s2">&quot;geometry&quot;</span><span class="p">,</span> <span class="n">crs</span><span class="o">=</span><span class="mi">4326</span><span class="p">))</span>
+
+<span class="c1"># DuckDB — select geometry as WKB (ST_AsWKB) or WKT (ST_AsText) so it round-trips.</span>
+<span class="c1"># DuckDB carries no CRS, so crs= says what the coordinates are in.</span>
+<span class="n">e</span> <span class="o">=</span> <span class="n">rs</span><span class="o">.</span><span class="n">from_duckdb</span><span class="p">(</span><span class="n">con</span><span class="p">,</span> <span class="s2">&quot;SELECT highway, aadt, ST_AsWKB(geom) AS geom FROM roads&quot;</span><span class="p">,</span>
+                   <span class="n">geometry</span><span class="o">=</span><span class="s2">&quot;geom&quot;</span><span class="p">,</span> <span class="n">crs</span><span class="o">=</span><span class="mi">3006</span><span class="p">)</span>
+<span class="n">rs</span><span class="o">.</span><span class="n">render_edges</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">color_by</span><span class="o">=</span><span class="s2">&quot;aadt&quot;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;YlOrRd&quot;</span><span class="p">)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>You have…</th>
+<th>Just pass it</th>
+<th>For options use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GeoDataFrame / <code>RoadEdges</code></td>
+<td><code>render_edges(gdf)</code></td>
+<td><code>normalize_edges</code></td>
+</tr>
+<tr>
+<td>a file</td>
+<td><code>render_edges("roads.gpkg")</code></td>
+<td><code>load_edges</code></td>
+</tr>
+<tr>
+<td>GeoJSON / spec</td>
+<td><code>render_edges(fc)</code></td>
+<td><code>from_geojson</code></td>
+</tr>
+<tr>
+<td>pyarrow Table</td>
+<td><code>render_edges(table)</code></td>
+<td><code>from_arrow</code></td>
+</tr>
+<tr>
+<td>DuckDB</td>
+<td>—</td>
+<td><code>from_duckdb</code></td>
+</tr>
+</tbody>
+</table>
+<p>Install the optional extras as needed: <code>pip install "roadstyle[duckdb,arrow]"</code>.</p>
+<blockquote>
+<p>Notebook: <strong>08 · Loading data</strong></p>
+</blockquote>
+<hr />
+<h2 id="8-outputs-for-the-web">8 · Outputs for the web</h2>
+<p>The same styled map can leave roadstyle in several shapes. The heart of it is the <strong>canonical JSON
+spec</strong> (<code>spec/1</code>): your data plus the <em>baked-in</em> per-edge style, ready for any frontend to draw.</p>
+<div class="highlight"><pre><span></span><code><span class="n">spec</span> <span class="o">=</span> <span class="n">rs</span><span class="o">.</span><span class="n">to_spec</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="n">theme</span><span class="o">=</span><span class="s2">&quot;dark&quot;</span><span class="p">,</span> <span class="n">color_by</span><span class="o">=</span><span class="s2">&quot;highway&quot;</span><span class="p">)</span>   <span class="c1"># canonical JSON dict</span>
+<span class="n">rs</span><span class="o">.</span><span class="n">save_spec</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="s2">&quot;map_data.json&quot;</span><span class="p">)</span>                          <span class="c1"># round-trips with load_spec()</span>
+
+<span class="n">gj</span> <span class="o">=</span> <span class="n">rs</span><span class="o">.</span><span class="n">to_geojson</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="n">color_by</span><span class="o">=</span><span class="s2">&quot;highway&quot;</span><span class="p">)</span>                <span class="c1"># just the styled features</span>
+
+<span class="n">rs</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="s2">&quot;standalone.html&quot;</span><span class="p">,</span> <span class="n">theme</span><span class="o">=</span><span class="s2">&quot;dark&quot;</span><span class="p">)</span>              <span class="c1"># a finished HTML file</span>
+<span class="n">html</span> <span class="o">=</span> <span class="n">rs</span><span class="o">.</span><span class="n">to_iframe</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="n">theme</span><span class="o">=</span><span class="s2">&quot;dark&quot;</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="s2">&quot;360px&quot;</span><span class="p">)</span>     <span class="c1"># an &lt;iframe&gt; string, zero JS</span>
+</code></pre></div>
+<p>Each feature in the spec carries reserved <code>__rs_*</code> properties (<code>__rs_fill</code>, <code>__rs_w</code>, <code>__rs_casing</code>,
+…), so the browser never needs roadstyle's styling logic — it just reads them. See
+<a href="../embedding/">Embedding in a website</a> for the property contract and Leaflet / MapLibre snippets.</p>
+<blockquote>
+<p>Notebook: <strong>04 · Outputs for the web</strong></p>
+</blockquote>
+<hr />
+<h2 id="9-embed-in-your-own-page-roadstylejs">9 · Embed in your own page (<code>roadstyle.js</code>)</h2>
+<p>The decoupled path: <strong>Python computes the styling once</strong> (a JSON spec), and the bundled, reusable
+<strong><code>roadstyle.js</code></strong> draws it in the browser with your own UI on top. No Python at runtime, and you
+don't write the renderer — it ships inside the package.</p>
+<p>Copy the renderer next to your spec:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">importlib.resources</span><span class="w"> </span><span class="kn">import</span> <span class="n">files</span>
+
+<span class="n">spec</span> <span class="o">=</span> <span class="n">rs</span><span class="o">.</span><span class="n">to_spec</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="n">theme</span><span class="o">=</span><span class="s2">&quot;dark&quot;</span><span class="p">,</span> <span class="n">palette</span><span class="o">=</span><span class="s2">&quot;highsat&quot;</span><span class="p">)</span>
+<span class="n">rs</span><span class="o">.</span><span class="n">save_spec</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="s2">&quot;web/map_data.json&quot;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">asset</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;roadstyle.js&quot;</span><span class="p">,</span> <span class="s2">&quot;roadstyle.css&quot;</span><span class="p">):</span>
+    <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">files</span><span class="p">(</span><span class="s2">&quot;roadstyle&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="s2">&quot;static&quot;</span> <span class="o">/</span> <span class="n">asset</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;web/</span><span class="si">{</span><span class="n">asset</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>Then a minimal page wires it up. <code>RoadStyleMap</code> is headless — it exposes <code>getRoadClasses()</code>,
+<code>setFilter()</code>, and selection events you react to:</p>
+<div class="highlight"><pre><span></span><code><span class="p">&lt;</span><span class="nt">link</span> <span class="na">rel</span><span class="o">=</span><span class="s">&quot;stylesheet&quot;</span> <span class="na">href</span><span class="o">=</span><span class="s">&quot;./roadstyle.css&quot;</span><span class="p">/&gt;</span>
+<span class="p">&lt;</span><span class="nt">div</span> <span class="na">id</span><span class="o">=</span><span class="s">&quot;map&quot;</span> <span class="na">style</span><span class="o">=</span><span class="s">&quot;height:100vh&quot;</span><span class="p">&gt;&lt;/</span><span class="nt">div</span><span class="p">&gt;</span>
+<span class="p">&lt;</span><span class="nt">script</span> <span class="na">src</span><span class="o">=</span><span class="s">&quot;https://unpkg.com/leaflet@1.9.4/dist/leaflet.js&quot;</span><span class="p">&gt;&lt;/</span><span class="nt">script</span><span class="p">&gt;</span>
+<span class="p">&lt;</span><span class="nt">script</span> <span class="na">src</span><span class="o">=</span><span class="s">&quot;./roadstyle.js&quot;</span><span class="p">&gt;&lt;/</span><span class="nt">script</span><span class="p">&gt;</span>
+<span class="p">&lt;</span><span class="nt">script</span><span class="p">&gt;</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">m</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">RoadStyleMap</span><span class="p">(</span><span class="s2">&quot;map&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">widgets</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">legend</span><span class="o">:</span><span class="w"> </span><span class="kc">true</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">});</span>
+<span class="w">  </span><span class="nx">m</span><span class="p">.</span><span class="nx">load</span><span class="p">(</span><span class="s2">&quot;./map_data.json&quot;</span><span class="p">).</span><span class="nx">then</span><span class="p">(()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// build a filter UI from the classes present</span>
+<span class="w">    </span><span class="nx">m</span><span class="p">.</span><span class="nx">getRoadClasses</span><span class="p">().</span><span class="nx">forEach</span><span class="p">(</span><span class="nx">cls</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* add a checkbox, then m.setFilter([...on]) */</span><span class="w"> </span><span class="p">});</span>
+
+<span class="w">    </span><span class="c1">// react to clicks — feature.properties carries __rs_class + your original columns</span>
+<span class="w">    </span><span class="nx">m</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s2">&quot;select&quot;</span><span class="p">,</span><span class="w">   </span><span class="nx">f</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;selected&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">f</span><span class="p">.</span><span class="nx">properties</span><span class="p">));</span>
+<span class="w">    </span><span class="nx">m</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s2">&quot;deselect&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;cleared&quot;</span><span class="p">));</span>
+<span class="w">  </span><span class="p">});</span>
+<span class="p">&lt;/</span><span class="nt">script</span><span class="p">&gt;</span>
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title"><code>file://</code> and <code>fetch()</code></p>
+<p>Browsers block <code>fetch()</code> from <code>file://</code>, so loading <code>map_data.json</code> by URL only works when the
+folder is <em>served</em> (<code>python -m http.server</code>). To make a page that opens with a double-click,
+inline the spec instead — <code>load()</code> takes a URL <strong>or</strong> an object. Notebook 05 shows the inlined
+pattern end to end.</p>
+</div>
+<p>Selection is <strong>single</strong>: clicking another road replaces it; click the same road again, or the map
+background, to deselect. Full callback details are in
+<a href="../embedding/#reacting-to-a-selection-click-your-code">Embedding → Reacting to a selection</a>.</p>
+<blockquote>
+<p>Notebook: <strong>05 · Embedding with <code>roadstyle.js</code></strong></p>
+</blockquote>
+<hr />
+<h2 id="where-to-next">Where to next</h2>
+<ul>
+<li><strong><a href="../parameters/">Parameter reference</a></strong> — every parameter of <code>render_edges</code> / <code>to_spec</code>.</li>
+<li><strong><a href="../embedding/">Embedding in a website</a></strong> — the JSON spec contract + Leaflet / MapLibre / iframe.</li>
+<li><strong><a href="../frontend/">Frontend integration</a></strong> — choosing baked HTML vs a JSON API vs <code>roadstyle.js</code>.</li>
+<li><strong><a href="../examples/">Examples</a></strong> — the runnable notebooks behind every section above.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

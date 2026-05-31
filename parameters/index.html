@@ -1,0 +1,1474 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="OSM-theme road/edge map styling for folium & lonboard">
+      
+      
+      
+      
+        <link rel="prev" href="../examples/">
+      
+      
+        <link rel="next" href="../embedding/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Parameter reference - roadstyle</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="cyan">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#parameter-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="roadstyle" class="md-header__button md-logo" aria-label="roadstyle" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            roadstyle
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Parameter reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="cyan"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="roadstyle" class="md-nav__button md-logo" aria-label="roadstyle" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    roadstyle
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorial/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parameter reference
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parameter reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-roadstyle-one-roads-look" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. RoadStyle — one road's look
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-render_edges-the-main-entry-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. render_edges — the main entry point
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-stylers-how-colours-are-chosen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Stylers — how colours are chosen
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Stylers — how colours are chosen">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#classstyler-colour-by-road-class-the-osm-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ClassStyler — colour by road class (the OSM default)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#categoricalstyler-colour-by-a-discrete-column" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CategoricalStyler — colour by a discrete column
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#numericstyler-colour-by-a-numeric-column" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NumericStyler — colour by a numeric column
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-theme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Theme
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-basemap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Basemap
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-styleconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. StyleConfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-palette-json-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Palette JSON file
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../embedding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embedding in a website
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../palettes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Palettes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../themes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Themes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-roadstyle-one-roads-look" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. RoadStyle — one road's look
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-render_edges-the-main-entry-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. render_edges — the main entry point
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-stylers-how-colours-are-chosen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Stylers — how colours are chosen
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Stylers — how colours are chosen">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#classstyler-colour-by-road-class-the-osm-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ClassStyler — colour by road class (the OSM default)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#categoricalstyler-colour-by-a-discrete-column" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CategoricalStyler — colour by a discrete column
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#numericstyler-colour-by-a-numeric-column" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NumericStyler — colour by a numeric column
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-theme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Theme
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-basemap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Basemap
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-styleconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. StyleConfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-palette-json-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Palette JSON file
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="parameter-reference">Parameter reference</h1>
+<p>Every parameter roadstyle uses, grouped by where it appears. Types, defaults, allowed
+values, and what each one does. Use this as a lookup; for tutorials see <a href="../usage/">usage</a>.</p>
+<p>Sections: RoadStyle · render_edges · Stylers · Theme · Basemap · StyleConfig · Palette JSON
+(use your browser's find, or the page's table-of-contents sidebar).</p>
+<hr />
+<h2 id="1-roadstyle-one-roads-look">1. <code>RoadStyle</code> — one road's look</h2>
+<p>A <code>RoadStyle</code> describes how a <strong>single road class</strong> (e.g. <code>motorway</code>) is drawn. A <em>palette</em>
+is a dictionary of these, one per class. These are also the fields you see in an exported
+palette JSON file.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fill</code></td>
+<td>hex colour string</td>
+<td><em>required</em></td>
+<td>The road's main (centre) line colour, e.g. <code>"#FF0000"</code>. The colour you actually see.</td>
+</tr>
+<tr>
+<td><code>width</code></td>
+<td>number (px)</td>
+<td><em>required</em></td>
+<td>Thickness of the fill line in pixels, e.g. <code>6</code>. Bigger = more important road.</td>
+</tr>
+<tr>
+<td><code>casing_width</code></td>
+<td>number (px)</td>
+<td><em>required</em></td>
+<td>Thickness of the <strong>casing</strong> (the outline drawn <em>under</em> the fill), e.g. <code>8</code>. Usually <code>width + 2</code>. Set <code>0</code> for no casing.</td>
+</tr>
+<tr>
+<td><code>casing_light</code></td>
+<td>hex string or <code>null</code></td>
+<td><code>null</code></td>
+<td>Casing colour on <strong>light</strong> base maps, e.g. <code>"#007785"</code>. <code>null</code> = no casing on light maps.</td>
+</tr>
+<tr>
+<td><code>casing_dark</code></td>
+<td>hex string</td>
+<td><code>"#000000"</code></td>
+<td>Casing colour on <strong>dark/satellite</strong> base maps. Usually black so roads pop on a dark canvas.</td>
+</tr>
+<tr>
+<td><code>dash</code></td>
+<td><code>[on, off]</code> or <code>null</code></td>
+<td><code>null</code></td>
+<td>Dash pattern in px, e.g. <code>[4, 4]</code> = 4px line, 4px gap (used for footpaths/cycleways). <code>null</code> = solid line.</td>
+</tr>
+<tr>
+<td><code>opacity</code></td>
+<td>number 0–1</td>
+<td><code>1.0</code></td>
+<td>Transparency of the fill. <code>1</code> = solid, <code>0</code> = invisible. (The renderer multiplies this by the theme's fill opacity.)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Casing?</strong> A road is drawn as two stacked lines: a wider <strong>casing</strong> underneath (the border)
+and a narrower <strong>fill</strong> on top (the colour). This is the "geometry sandwich" — it gives every
+road a clean edge. <code>casing_light</code>/<code>casing_dark</code> exist so the border can switch colour to suit
+a light vs dark base map.</p>
+<p><strong>Units &amp; zoom (known limitation).</strong> <code>width</code> and <code>casing_width</code> are <strong>fixed screen pixels</strong> —
+a road keeps the same on-screen thickness at every zoom level. This looks right at city scale
+(roadstyle's main use). It is <em>not</em> yet zoom-dependent: when zoomed far out, fixed-pixel roads
+can blob together; when zoomed far in they don't thicken. Professional vector maps instead vary
+width with zoom (a Mapbox-style <code>interpolate</code> curve) or use ground-meter widths with min/max
+pixel clamps. A zoom→width curve is a planned opt-in; fixed pixels will remain the default.</p>
+</blockquote>
+<p>Example (one entry from the <code>highsat</code> palette):
+<div class="highlight"><pre><span></span><code><span class="nt">&quot;motorway&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;fill&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#00E5FF&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;width&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">6.0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;casing_width&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">8.0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;casing_light&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#007785&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;casing_dark&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#000000&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;dash&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;opacity&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span>
+<span class="p">}</span>
+</code></pre></div></p>
+<hr />
+<h2 id="2-render_edges-the-main-entry-point">2. <code>render_edges</code> — the main entry point</h2>
+<p><code>render_edges(gdf, ...)</code> builds the map. <code>gdf</code> is your road data (a <code>RoadEdges</code> or a
+GeoDataFrame with line geometry + a class column).</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gdf</code></td>
+<td><code>RoadEdges</code> / GeoDataFrame</td>
+<td><em>required</em></td>
+<td>The road edges to draw. A plain GeoDataFrame is normalised for you (→ EPSG:4326, lines).</td>
+</tr>
+<tr>
+<td><code>backend</code></td>
+<td><code>"folium"</code> / <code>"lonboard"</code></td>
+<td><code>"folium"</code></td>
+<td>Renderer. <code>folium</code> = portable interactive HTML (Leaflet). <code>lonboard</code> = GPU/WebGL, for very large data.</td>
+</tr>
+<tr>
+<td><code>palette</code></td>
+<td>str or dict</td>
+<td><code>"highsat"</code></td>
+<td>Which colour palette for <strong>class</strong> styling. Built-ins: <code>"highsat"</code>, <code>"carto"</code>. Ignored if you use <code>color_by</code>/<code>style</code>.</td>
+</tr>
+<tr>
+<td><code>theme</code></td>
+<td><code>"light"</code>/<code>"dark"</code>/<code>"satellite"</code></td>
+<td><code>"dark"</code></td>
+<td>Visual theme: sets the default base map and which casing colour (light/dark) is used.</td>
+</tr>
+<tr>
+<td><code>highway_col</code></td>
+<td>str</td>
+<td><code>"highway"</code></td>
+<td>Which column holds the road class. Set this if your class column has a different name.</td>
+</tr>
+<tr>
+<td><code>include</code></td>
+<td>str / list / <code>None</code></td>
+<td><code>None</code></td>
+<td>Keep <strong>only</strong> these road classes (e.g. <code>["motorway","primary"]</code>).</td>
+</tr>
+<tr>
+<td><code>exclude</code></td>
+<td>str / list / <code>None</code></td>
+<td><code>None</code></td>
+<td>Drop these road classes. Applied after <code>include</code>.</td>
+</tr>
+<tr>
+<td><code>match_links</code></td>
+<td>bool</td>
+<td><code>True</code></td>
+<td>If true, <code>primary</code> also matches <code>primary_link</code> (OSM link variants).</td>
+</tr>
+<tr>
+<td><code>color_by</code></td>
+<td>str / <code>None</code></td>
+<td><code>None</code></td>
+<td>Colour by a <strong>data column</strong> instead of road class. With <code>colors</code> → categorical; with <code>cmap</code> → numeric.</td>
+</tr>
+<tr>
+<td><code>colors</code></td>
+<td>dict / <code>None</code></td>
+<td><code>None</code></td>
+<td>For categorical <code>color_by</code>: a <code>{value: hexcolour}</code> map, e.g. <code>{"low":"#11D68F"}</code>.</td>
+</tr>
+<tr>
+<td><code>cmap</code></td>
+<td>str / list / <code>None</code></td>
+<td><code>None</code></td>
+<td>For numeric <code>color_by</code>: a colour ramp name (<code>"viridis"</code>, <code>"YlOrRd"</code>, …) or list of hex stops.</td>
+</tr>
+<tr>
+<td><code>vmin</code>, <code>vmax</code></td>
+<td>number / <code>None</code></td>
+<td><code>None</code></td>
+<td>Value range for the numeric ramp. Default = the column's min/max.</td>
+</tr>
+<tr>
+<td><code>width_by</code></td>
+<td><code>(min_px, max_px)</code> / <code>None</code></td>
+<td><code>None</code></td>
+<td>For numeric styling: scale line width with the value, from <code>min_px</code> (low) to <code>max_px</code> (high).</td>
+</tr>
+<tr>
+<td><code>style</code></td>
+<td><code>Styler</code> / <code>None</code></td>
+<td><code>None</code></td>
+<td>Pass a styler object directly (advanced). Overrides <code>palette</code>/<code>color_by</code>.</td>
+</tr>
+<tr>
+<td><code>tooltip</code></td>
+<td>list / <code>None</code></td>
+<td><code>None</code></td>
+<td>Which columns to show on hover. <code>None</code> = all columns.</td>
+</tr>
+<tr>
+<td><code>selected</code></td>
+<td>GeoDataFrame / <code>None</code></td>
+<td><code>None</code></td>
+<td>Highlight these edges with a neon-violet overlay.</td>
+</tr>
+<tr>
+<td><code>basemap</code></td>
+<td>str / <code>None</code></td>
+<td><code>None</code></td>
+<td>Use a single fixed base map (a key in <code>BASEMAPS</code>), instead of the theme default + switcher.</td>
+</tr>
+<tr>
+<td><code>basemaps</code></td>
+<td>list / <code>None</code></td>
+<td><code>None</code></td>
+<td>(folium) The set of base maps offered in the switcher control.</td>
+</tr>
+<tr>
+<td><code>filter_control</code></td>
+<td>bool</td>
+<td><code>True</code></td>
+<td>(folium) Show the in-map road-type filter panel (checkboxes).</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>str</td>
+<td><code>"roads"</code></td>
+<td>Layer name.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> a <code>folium.Map</code> (default) or a <code>lonboard.Map</code>. Save with <code>.save("map.html")</code> (folium)
+or <code>.to_html("map.html")</code> (lonboard); both also display inline in a notebook.</p>
+<hr />
+<h2 id="3-stylers-how-colours-are-chosen">3. Stylers — how colours are chosen</h2>
+<p>A <strong>Styler</strong> decides each edge's colour/width. <code>render_edges</code> builds one for you from the
+arguments above, but you can construct them directly for full control.</p>
+<h3 id="classstyler-colour-by-road-class-the-osm-default"><code>ClassStyler</code> — colour by road class (the OSM default)</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>column</code></td>
+<td>str</td>
+<td><code>"highway"</code></td>
+<td>Column holding the road class.</td>
+</tr>
+<tr>
+<td><code>palette</code></td>
+<td>str or dict</td>
+<td><code>"highsat"</code></td>
+<td>Palette name, or a <code>{class: RoadStyle}</code> dict.</td>
+</tr>
+<tr>
+<td><code>normalize_links</code></td>
+<td>bool</td>
+<td><code>True</code></td>
+<td>Strip the OSM <code>_link</code> suffix (<code>primary_link</code>→<code>primary</code>) and render links narrower. Turn off for non-OSM data.</td>
+</tr>
+<tr>
+<td><code>fallback</code></td>
+<td>str</td>
+<td><code>"unclassified"</code></td>
+<td>Class used when a value isn't in the palette.</td>
+</tr>
+<tr>
+<td><code>tunnel_col</code></td>
+<td>str / <code>None</code></td>
+<td><code>None</code></td>
+<td>Column marking tunnels (faded + dashed).</td>
+</tr>
+<tr>
+<td><code>bridge_col</code></td>
+<td>str / <code>None</code></td>
+<td><code>None</code></td>
+<td>Column marking bridges (solid black casing, a bit wider).</td>
+</tr>
+<tr>
+<td><code>config</code></td>
+<td><code>StyleConfig</code></td>
+<td>defaults</td>
+<td>Opacity/width knobs (see §6).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="categoricalstyler-colour-by-a-discrete-column"><code>CategoricalStyler</code> — colour by a discrete column</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>column</code></td>
+<td>str</td>
+<td>—</td>
+<td>The column to read the category from (e.g. <code>"congestion"</code>).</td>
+</tr>
+<tr>
+<td><code>colors</code></td>
+<td>dict</td>
+<td><code>{}</code></td>
+<td><code>{value: hexcolour}</code> map, e.g. <code>{"low":"#11D68F","heavy":"#F24E42"}</code>.</td>
+</tr>
+<tr>
+<td><code>fallback_color</code></td>
+<td>hex str</td>
+<td><code>"#cccccc"</code></td>
+<td>Colour for values not in <code>colors</code> (and missing data).</td>
+</tr>
+<tr>
+<td><code>width</code></td>
+<td>number or str</td>
+<td><code>2.0</code></td>
+<td>Constant line width, or the name of a column to read width from.</td>
+</tr>
+<tr>
+<td><code>casing</code></td>
+<td>hex str / <code>None</code></td>
+<td><code>None</code></td>
+<td>Optional constant casing colour.</td>
+</tr>
+<tr>
+<td><code>opacity</code></td>
+<td>0–1</td>
+<td><code>0.9</code></td>
+<td>Line opacity.</td>
+</tr>
+<tr>
+<td><code>dash</code></td>
+<td><code>(on, off)</code> / <code>None</code></td>
+<td><code>None</code></td>
+<td>Optional dash pattern.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="numericstyler-colour-by-a-numeric-column"><code>NumericStyler</code> — colour by a numeric column</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>column</code></td>
+<td>str</td>
+<td>—</td>
+<td>The numeric column (e.g. <code>"aadt"</code>, <code>"maxspeed_kmh"</code>).</td>
+</tr>
+<tr>
+<td><code>cmap</code></td>
+<td>str / list</td>
+<td><code>"viridis"</code></td>
+<td>Colour ramp: a name (<code>"viridis"</code>, <code>"magma"</code>, <code>"YlOrRd"</code>, …) or a list of hex stops.</td>
+</tr>
+<tr>
+<td><code>vmin</code>, <code>vmax</code></td>
+<td>number / <code>None</code></td>
+<td><code>None</code></td>
+<td>Value range mapped across the ramp. Default = data min/max.</td>
+</tr>
+<tr>
+<td><code>width</code></td>
+<td>number</td>
+<td><code>2.0</code></td>
+<td>Constant width (when <code>width_by</code> is not set).</td>
+</tr>
+<tr>
+<td><code>width_by</code></td>
+<td><code>(min_px, max_px)</code> / <code>None</code></td>
+<td><code>None</code></td>
+<td>Scale width with the value.</td>
+</tr>
+<tr>
+<td><code>width_column</code></td>
+<td>str / <code>None</code></td>
+<td><code>None</code></td>
+<td>Column driving the width ramp (defaults to <code>column</code>).</td>
+</tr>
+<tr>
+<td><code>opacity</code></td>
+<td>0–1</td>
+<td><code>0.9</code></td>
+<td>Line opacity.</td>
+</tr>
+<tr>
+<td><code>nan_color</code></td>
+<td>hex str</td>
+<td><code>"#cccccc"</code></td>
+<td>Colour for missing/non-numeric values.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4-theme">4. <code>Theme</code></h2>
+<p>A theme bundles the casing variant + a default base map.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>str</td>
+<td>Theme name (<code>"light"</code>, <code>"dark"</code>, <code>"satellite"</code>).</td>
+</tr>
+<tr>
+<td><code>casing</code></td>
+<td><code>"light"</code> / <code>"dark"</code></td>
+<td>Which casing colour to use (<code>casing_light</code> vs <code>casing_dark</code>).</td>
+</tr>
+<tr>
+<td><code>default_basemap</code></td>
+<td>str</td>
+<td>Base map shown by default for this theme.</td>
+</tr>
+</tbody>
+</table>
+<p>Built-ins: <code>light</code> (Positron base), <code>dark</code> (Dark Matter base), <code>satellite</code> (Esri imagery).</p>
+<hr />
+<h2 id="5-basemap">5. <code>Basemap</code></h2>
+<p>A tile provider (the background map under the roads).</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>key</code></td>
+<td>str</td>
+<td>—</td>
+<td>Short id, e.g. <code>"dark_matter"</code>.</td>
+</tr>
+<tr>
+<td><code>label</code></td>
+<td>str</td>
+<td>—</td>
+<td>Human name shown in the switcher.</td>
+</tr>
+<tr>
+<td><code>url</code></td>
+<td>str</td>
+<td>—</td>
+<td>Leaflet tile-URL template (<code>{z}/{x}/{y}</code>).</td>
+</tr>
+<tr>
+<td><code>attr</code></td>
+<td>str</td>
+<td>—</td>
+<td>Attribution text (credit the tile source).</td>
+</tr>
+<tr>
+<td><code>is_dark</code></td>
+<td>bool</td>
+<td><code>False</code></td>
+<td>Dark canvas? Drives which casing colour is used.</td>
+</tr>
+<tr>
+<td><code>satellite</code></td>
+<td>bool</td>
+<td><code>False</code></td>
+<td>Apply the satellite saturation/brightness filter.</td>
+</tr>
+<tr>
+<td><code>lonboard</code></td>
+<td>str / <code>None</code></td>
+<td><code>None</code></td>
+<td>Matching basemap name for the lonboard backend.</td>
+</tr>
+<tr>
+<td><code>bg</code>, <code>preview</code>, <code>subdomains</code></td>
+<td>—</td>
+<td>Thumbnail styling + tile subdomains for the switcher.</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Built-ins: <code>voyager</code>, <code>positron</code>, <code>dark_matter</code>, <code>osm</code>, <code>esri_gray</code>, <code>satellite</code>.</p>
+<hr />
+<h2 id="6-styleconfig">6. <code>StyleConfig</code></h2>
+<p>Global styling knobs. Defaults reproduce the calibrated v0.1 look — change them only to tweak
+the overall feel. Pass via <code>ClassStyler(config=StyleConfig(...))</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fill_opacity</code></td>
+<td>0–1</td>
+<td><code>0.9</code></td>
+<td>Base opacity of every fill line.</td>
+</tr>
+<tr>
+<td><code>casing_opacity</code></td>
+<td>0–1</td>
+<td><code>0.75</code></td>
+<td>Base opacity of every casing line.</td>
+</tr>
+<tr>
+<td><code>casing_extra</code></td>
+<td>px</td>
+<td><code>2.0</code></td>
+<td>Reserved: casing = fill + this (palettes currently set casing widths directly).</td>
+</tr>
+<tr>
+<td><code>link_scale</code></td>
+<td>0–1</td>
+<td><code>0.7</code></td>
+<td>How much narrower <code>_link</code> roads are vs their parent.</td>
+</tr>
+<tr>
+<td><code>tunnel_opacity_scale</code></td>
+<td>0–1</td>
+<td><code>0.45</code></td>
+<td>Tunnels fade to this fraction of opacity.</td>
+</tr>
+<tr>
+<td><code>bridge_casing_extra</code></td>
+<td>px</td>
+<td><code>1.5</code></td>
+<td>Bridges get a casing this many px wider.</td>
+</tr>
+<tr>
+<td><code>minor_no_casing</code></td>
+<td>set of str</td>
+<td>service, living_street, …</td>
+<td>Classes drawn fill-only (no casing).</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="7-palette-json-file">7. Palette JSON file</h2>
+<p>What <code>save_palette()</code> writes / <code>load_palette()</code> reads. One file fully describes a palette and
+can be hand-edited or read by a web frontend.</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;highsat&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;roads&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;motorway&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;fill&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#00E5FF&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;width&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">6.0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;casing_width&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">8.0</span><span class="p">,</span>
+<span class="w">                  </span><span class="nt">&quot;casing_light&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#007785&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;casing_dark&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#000000&quot;</span><span class="p">,</span>
+<span class="w">                  </span><span class="nt">&quot;dash&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;opacity&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;primary&quot;</span><span class="p">:</span><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;fill&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#FF9100&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;width&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">4.5</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;casing_width&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">6.5</span><span class="p">,</span>
+<span class="w">                  </span><span class="nt">&quot;casing_light&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#A86000&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;casing_dark&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#000000&quot;</span><span class="p">,</span>
+<span class="w">                  </span><span class="nt">&quot;dash&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;opacity&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span><span class="w"> </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Palette name. On load it's registered under this name, so <code>render_edges(palette=name)</code> works.</td>
+</tr>
+<tr>
+<td><code>roads</code></td>
+<td>A map of <code>class → RoadStyle fields</code> (see §1 for each field).</td>
+</tr>
+</tbody>
+</table>
+<p>A minimal entry needs only <code>fill</code>, <code>width</code>, <code>casing_width</code>; the rest fall back to defaults.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,1038 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="OSM-theme road/edge map styling for folium & lonboard">
+      
+      
+      
+      
+        <link rel="prev" href="../parameters/">
+      
+      
+        <link rel="next" href="../frontend/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Embedding in a website - roadstyle</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="cyan">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#embedding-maps-in-a-website" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="roadstyle" class="md-header__button md-logo" aria-label="roadstyle" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            roadstyle
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Embedding in a website
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="cyan"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="roadstyle" class="md-nav__button md-logo" aria-label="roadstyle" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    roadstyle
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorial/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../parameters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parameter reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embedding in a website
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embedding in a website
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-outputs-are" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the outputs are
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-canonical-json-spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The canonical JSON spec
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#option-1-iframe-no-front-end-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 1 — iframe (no front-end code)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#option-2-leaflet-your-own-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 2 — Leaflet (your own map)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#option-3-maplibre-gl-vector-webgl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 3 — MapLibre GL (vector / WebGL)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#which-option-for-you" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which option for you?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reacting-to-a-selection-click-your-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reacting to a selection (click → your code)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../palettes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Palettes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../themes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Themes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-outputs-are" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the outputs are
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-canonical-json-spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The canonical JSON spec
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#option-1-iframe-no-front-end-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 1 — iframe (no front-end code)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#option-2-leaflet-your-own-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 2 — Leaflet (your own map)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#option-3-maplibre-gl-vector-webgl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 3 — MapLibre GL (vector / WebGL)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#which-option-for-you" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which option for you?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reacting-to-a-selection-click-your-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reacting to a selection (click → your code)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="embedding-maps-in-a-website">Embedding maps in a website</h1>
+<p>roadstyle can output a <strong>stack-agnostic JSON spec</strong> (<code>to_spec</code>) plus ready-to-use HTML, so you
+can put a styled road map into any web page — from "drop in an iframe, write zero code" to
+"feed the JSON to my own Leaflet / MapLibre frontend".</p>
+<h2 id="what-the-outputs-are">What the outputs are</h2>
+<table>
+<thead>
+<tr>
+<th>Call</th>
+<th>Returns</th>
+<th>Use when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>to_spec(gdf, ...)</code></td>
+<td><code>dict</code> (JSON)</td>
+<td>you (or a frontend dev) will render it yourself</td>
+</tr>
+<tr>
+<td><code>to_geojson(gdf, ...)</code></td>
+<td><code>dict</code> (FeatureCollection)</td>
+<td>you only need the styled GeoJSON</td>
+</tr>
+<tr>
+<td><code>to_html(gdf, full=True)</code></td>
+<td><code>str</code> (full page)</td>
+<td>you want a complete <code>.html</code> page</td>
+</tr>
+<tr>
+<td><code>to_html(gdf, full=False)</code></td>
+<td><code>str</code> (<code>&lt;div&gt;+&lt;script&gt;</code>)</td>
+<td>you want to inject a map into an existing page</td>
+</tr>
+<tr>
+<td><code>to_iframe(gdf)</code></td>
+<td><code>str</code> (<code>&lt;iframe srcdoc=…&gt;</code>)</td>
+<td><strong>easiest — no front-end code at all</strong></td>
+</tr>
+<tr>
+<td><code>save(gdf, "map.html", ...)</code></td>
+<td>writes a file</td>
+<td>a standalone interactive map file</td>
+</tr>
+<tr>
+<td><code>save_spec(gdf, "map.json", ...)</code></td>
+<td>writes a file</td>
+<td>the JSON for a frontend / API</td>
+</tr>
+</tbody>
+</table>
+<p>All of them take the same styling arguments as
+<a href="../parameters/#2-render_edges-the-main-entry-point"><code>render_edges</code></a> (<code>color_by</code>, <code>cmap</code>,
+<code>colors</code>, <code>width_by</code>, <code>theme</code>, …).</p>
+<h2 id="the-canonical-json-spec">The canonical JSON spec</h2>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">roadstyle</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rs</span>
+<span class="n">spec</span> <span class="o">=</span> <span class="n">rs</span><span class="o">.</span><span class="n">to_spec</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="n">color_by</span><span class="o">=</span><span class="s2">&quot;aadt&quot;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;viridis&quot;</span><span class="p">,</span> <span class="n">theme</span><span class="o">=</span><span class="s2">&quot;dark&quot;</span><span class="p">)</span>
+<span class="n">rs</span><span class="o">.</span><span class="n">save_spec</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="s2">&quot;roads.json&quot;</span><span class="p">,</span> <span class="n">color_by</span><span class="o">=</span><span class="s2">&quot;aadt&quot;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;viridis&quot;</span><span class="p">)</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>{
+  &quot;roadstyle&quot;: &quot;spec/1&quot;,
+  &quot;crs&quot;: &quot;EPSG:4326&quot;,
+  &quot;theme&quot;: &quot;dark&quot;,
+  &quot;bounds&quot;: [[minLat, minLon], [maxLat, maxLon]],
+  &quot;render&quot;: { &quot;sandwich&quot;: true, &quot;line_cap&quot;: &quot;round&quot;, &quot;line_join&quot;: &quot;round&quot; },
+  &quot;basemap&quot;: { &quot;key&quot;: &quot;dark_matter&quot;, &quot;url&quot;: &quot;...&quot;, &quot;attr&quot;: &quot;...&quot;, &quot;is_dark&quot;: true },
+  &quot;tooltip&quot;: [&quot;name&quot;, &quot;aadt&quot;],
+  &quot;legend&quot;: { &quot;kind&quot;: &quot;continuous&quot;, &quot;title&quot;: &quot;aadt&quot;, &quot;vmin&quot;: 0, &quot;vmax&quot;: 25000, &quot;ramp&quot;: [&quot;#440154&quot;, ...] },
+  &quot;geojson&quot;: { &quot;type&quot;: &quot;FeatureCollection&quot;, &quot;features&quot;: [ /* each feature.properties carries: */ ] }
+}
+</code></pre></div>
+<p>Each feature's <code>properties</code> carry the <strong>baked-in resolved style</strong> — your frontend just reads them,
+it doesn't need roadstyle's logic:</p>
+<table>
+<thead>
+<tr>
+<th>property</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>__rs_fill</code></td>
+<td>fill (centre-line) colour</td>
+</tr>
+<tr>
+<td><code>__rs_w</code></td>
+<td>fill width (px)</td>
+</tr>
+<tr>
+<td><code>__rs_op</code></td>
+<td>fill opacity</td>
+</tr>
+<tr>
+<td><code>__rs_dash</code></td>
+<td>dash pattern (or null)</td>
+</tr>
+<tr>
+<td><code>__rs_casing</code></td>
+<td>casing colour for this theme (or null)</td>
+</tr>
+<tr>
+<td><code>__rs_cw</code></td>
+<td>casing width (px)</td>
+</tr>
+<tr>
+<td><code>__rs_cop</code></td>
+<td>casing opacity</td>
+</tr>
+<tr>
+<td><code>__rs_class</code></td>
+<td>road class / category</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Render order = the geometry sandwich.</strong> Draw a casing layer first (using <code>__rs_casing</code>/<code>__rs_cw</code>),
+then the fill layer on top (<code>__rs_fill</code>/<code>__rs_w</code>). That keeps road borders from slicing through
+higher roads.</p>
+</blockquote>
+<hr />
+<h2 id="option-1-iframe-no-front-end-code">Option 1 — iframe (no front-end code)</h2>
+<p>The simplest path. <code>to_iframe</code> returns a self-contained <code>&lt;iframe&gt;</code> you paste anywhere.</p>
+<div class="highlight"><pre><span></span><code><span class="n">html</span> <span class="o">=</span> <span class="n">rs</span><span class="o">.</span><span class="n">to_iframe</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="n">color_by</span><span class="o">=</span><span class="s2">&quot;aadt&quot;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;viridis&quot;</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="s2">&quot;600px&quot;</span><span class="p">)</span>
+<span class="c1"># paste `html` into your page, or write it to a template</span>
+</code></pre></div>
+<p>Or save a standalone file and point an <code>&lt;iframe&gt;</code> at it:</p>
+<p><div class="highlight"><pre><span></span><code><span class="n">rs</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="s2">&quot;roads.html&quot;</span><span class="p">,</span> <span class="n">color_by</span><span class="o">=</span><span class="s2">&quot;aadt&quot;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;viridis&quot;</span><span class="p">)</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="p">&lt;</span><span class="nt">iframe</span> <span class="na">src</span><span class="o">=</span><span class="s">&quot;roads.html&quot;</span> <span class="na">style</span><span class="o">=</span><span class="s">&quot;width:100%;height:600px;border:0;&quot;</span><span class="p">&gt;&lt;/</span><span class="nt">iframe</span><span class="p">&gt;</span>
+</code></pre></div></p>
+<h2 id="option-2-leaflet-your-own-map">Option 2 — Leaflet (your own map)</h2>
+<p>Serve the spec JSON, then style each feature from its <code>__rs_*</code> props:</p>
+<div class="highlight"><pre><span></span><code><span class="p">&lt;</span><span class="nt">link</span> <span class="na">rel</span><span class="o">=</span><span class="s">&quot;stylesheet&quot;</span> <span class="na">href</span><span class="o">=</span><span class="s">&quot;https://unpkg.com/leaflet@1.9.4/dist/leaflet.css&quot;</span><span class="p">/&gt;</span>
+<span class="p">&lt;</span><span class="nt">script</span> <span class="na">src</span><span class="o">=</span><span class="s">&quot;https://unpkg.com/leaflet@1.9.4/dist/leaflet.js&quot;</span><span class="p">&gt;&lt;/</span><span class="nt">script</span><span class="p">&gt;</span>
+<span class="p">&lt;</span><span class="nt">div</span> <span class="na">id</span><span class="o">=</span><span class="s">&quot;map&quot;</span> <span class="na">style</span><span class="o">=</span><span class="s">&quot;height:600px&quot;</span><span class="p">&gt;&lt;/</span><span class="nt">div</span><span class="p">&gt;</span>
+<span class="p">&lt;</span><span class="nt">script</span><span class="p">&gt;</span>
+<span class="nx">fetch</span><span class="p">(</span><span class="s2">&quot;roads.json&quot;</span><span class="p">).</span><span class="nx">then</span><span class="p">(</span><span class="nx">r</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">r</span><span class="p">.</span><span class="nx">json</span><span class="p">()).</span><span class="nx">then</span><span class="p">(</span><span class="nx">spec</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">map</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">L</span><span class="p">.</span><span class="nx">map</span><span class="p">(</span><span class="s2">&quot;map&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">bm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">spec</span><span class="p">.</span><span class="nx">basemap</span><span class="p">;</span>
+<span class="w">  </span><span class="nx">L</span><span class="p">.</span><span class="nx">tileLayer</span><span class="p">(</span><span class="nx">bm</span><span class="p">.</span><span class="nx">url</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="nx">attribution</span><span class="o">:</span><span class="w"> </span><span class="nx">bm</span><span class="p">.</span><span class="nx">attr</span><span class="p">,</span><span class="w"> </span><span class="nx">subdomains</span><span class="o">:</span><span class="w"> </span><span class="nx">bm</span><span class="p">.</span><span class="nx">subdomains</span><span class="p">,</span><span class="w"> </span><span class="nx">maxZoom</span><span class="o">:</span><span class="w"> </span><span class="mf">20</span><span class="p">}).</span><span class="nx">addTo</span><span class="p">(</span><span class="nx">map</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// casing under …</span>
+<span class="w">  </span><span class="nx">L</span><span class="p">.</span><span class="nx">geoJSON</span><span class="p">(</span><span class="nx">spec</span><span class="p">.</span><span class="nx">geojson</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="nx">style</span><span class="o">:</span><span class="w"> </span><span class="nx">f</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">f</span><span class="p">.</span><span class="nx">properties</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">p</span><span class="p">.</span><span class="nx">__rs_casing</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nx">p</span><span class="p">.</span><span class="nx">__rs_cw</span>
+<span class="w">      </span><span class="o">?</span><span class="w"> </span><span class="p">{</span><span class="nx">color</span><span class="o">:</span><span class="w"> </span><span class="nx">p</span><span class="p">.</span><span class="nx">__rs_casing</span><span class="p">,</span><span class="w"> </span><span class="nx">weight</span><span class="o">:</span><span class="w"> </span><span class="nx">p</span><span class="p">.</span><span class="nx">__rs_cw</span><span class="p">,</span><span class="w"> </span><span class="nx">opacity</span><span class="o">:</span><span class="w"> </span><span class="nx">p</span><span class="p">.</span><span class="nx">__rs_cop</span><span class="p">,</span><span class="w"> </span><span class="nx">lineCap</span><span class="o">:</span><span class="s2">&quot;round&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">lineJoin</span><span class="o">:</span><span class="s2">&quot;round&quot;</span><span class="p">}</span>
+<span class="w">      </span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="nx">opacity</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="nx">weight</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">};</span>
+<span class="w">  </span><span class="p">}}).</span><span class="nx">addTo</span><span class="p">(</span><span class="nx">map</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// … fill over (the geometry sandwich)</span>
+<span class="w">  </span><span class="nx">L</span><span class="p">.</span><span class="nx">geoJSON</span><span class="p">(</span><span class="nx">spec</span><span class="p">.</span><span class="nx">geojson</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="nx">style</span><span class="o">:</span><span class="w"> </span><span class="nx">f</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">f</span><span class="p">.</span><span class="nx">properties</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="nx">color</span><span class="o">:</span><span class="w"> </span><span class="nx">p</span><span class="p">.</span><span class="nx">__rs_fill</span><span class="p">,</span><span class="w"> </span><span class="nx">weight</span><span class="o">:</span><span class="w"> </span><span class="nx">p</span><span class="p">.</span><span class="nx">__rs_w</span><span class="p">,</span><span class="w"> </span><span class="nx">opacity</span><span class="o">:</span><span class="w"> </span><span class="nx">p</span><span class="p">.</span><span class="nx">__rs_op</span><span class="p">,</span>
+<span class="w">            </span><span class="nx">dashArray</span><span class="o">:</span><span class="w"> </span><span class="nx">p</span><span class="p">.</span><span class="nx">__rs_dash</span><span class="p">,</span><span class="w"> </span><span class="nx">lineCap</span><span class="o">:</span><span class="s2">&quot;round&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">lineJoin</span><span class="o">:</span><span class="s2">&quot;round&quot;</span><span class="p">};</span>
+<span class="w">  </span><span class="p">}}).</span><span class="nx">addTo</span><span class="p">(</span><span class="nx">map</span><span class="p">);</span>
+
+<span class="w">  </span><span class="nx">map</span><span class="p">.</span><span class="nx">fitBounds</span><span class="p">(</span><span class="nx">spec</span><span class="p">.</span><span class="nx">bounds</span><span class="p">);</span>
+<span class="p">});</span>
+<span class="p">&lt;/</span><span class="nt">script</span><span class="p">&gt;</span>
+</code></pre></div>
+<h2 id="option-3-maplibre-gl-vector-webgl">Option 3 — MapLibre GL (vector / WebGL)</h2>
+<p>Add the spec's GeoJSON as a source and two line layers reading the <code>__rs_*</code> props via
+<code>["get", ...]</code> expressions:</p>
+<div class="highlight"><pre><span></span><code><span class="p">&lt;</span><span class="nt">link</span> <span class="na">rel</span><span class="o">=</span><span class="s">&quot;stylesheet&quot;</span> <span class="na">href</span><span class="o">=</span><span class="s">&quot;https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css&quot;</span><span class="p">/&gt;</span>
+<span class="p">&lt;</span><span class="nt">script</span> <span class="na">src</span><span class="o">=</span><span class="s">&quot;https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js&quot;</span><span class="p">&gt;&lt;/</span><span class="nt">script</span><span class="p">&gt;</span>
+<span class="p">&lt;</span><span class="nt">div</span> <span class="na">id</span><span class="o">=</span><span class="s">&quot;map&quot;</span> <span class="na">style</span><span class="o">=</span><span class="s">&quot;height:600px&quot;</span><span class="p">&gt;&lt;/</span><span class="nt">div</span><span class="p">&gt;</span>
+<span class="p">&lt;</span><span class="nt">script</span><span class="p">&gt;</span>
+<span class="nx">fetch</span><span class="p">(</span><span class="s2">&quot;roads.json&quot;</span><span class="p">).</span><span class="nx">then</span><span class="p">(</span><span class="nx">r</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">r</span><span class="p">.</span><span class="nx">json</span><span class="p">()).</span><span class="nx">then</span><span class="p">(</span><span class="nx">spec</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">bm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">spec</span><span class="p">.</span><span class="nx">basemap</span><span class="p">;</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">map</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">maplibregl</span><span class="p">.</span><span class="nb">Map</span><span class="p">({</span>
+<span class="w">    </span><span class="nx">container</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;map&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">style</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w">                       </span><span class="c1">// a minimal raster basemap from the spec</span>
+<span class="w">      </span><span class="nx">version</span><span class="o">:</span><span class="w"> </span><span class="mf">8</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">sources</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">bg</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;raster&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">tiles</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="nx">bm</span><span class="p">.</span><span class="nx">url</span><span class="p">.</span><span class="nx">replace</span><span class="p">(</span><span class="s2">&quot;{s}&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;a&quot;</span><span class="p">)],</span><span class="w"> </span><span class="nx">tileSize</span><span class="o">:</span><span class="w"> </span><span class="mf">256</span><span class="p">,</span><span class="w"> </span><span class="nx">attribution</span><span class="o">:</span><span class="w"> </span><span class="nx">bm</span><span class="p">.</span><span class="nx">attr</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">},</span>
+<span class="w">      </span><span class="nx">layers</span><span class="o">:</span><span class="w"> </span><span class="p">[{</span><span class="w"> </span><span class="nx">id</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;bg&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;raster&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">source</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;bg&quot;</span><span class="w"> </span><span class="p">}]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">});</span>
+<span class="w">  </span><span class="nx">map</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s2">&quot;load&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">map</span><span class="p">.</span><span class="nx">addSource</span><span class="p">(</span><span class="s2">&quot;roads&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;geojson&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">data</span><span class="o">:</span><span class="w"> </span><span class="nx">spec</span><span class="p">.</span><span class="nx">geojson</span><span class="w"> </span><span class="p">});</span>
+<span class="w">    </span><span class="nx">map</span><span class="p">.</span><span class="nx">addLayer</span><span class="p">({</span><span class="w"> </span><span class="nx">id</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;casing&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;line&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">source</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;roads&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">paint</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s2">&quot;line-color&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;get&quot;</span><span class="p">,</span><span class="s2">&quot;__rs_casing&quot;</span><span class="p">],</span><span class="w"> </span><span class="s2">&quot;line-width&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;get&quot;</span><span class="p">,</span><span class="s2">&quot;__rs_cw&quot;</span><span class="p">],</span>
+<span class="w">               </span><span class="s2">&quot;line-opacity&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;get&quot;</span><span class="p">,</span><span class="s2">&quot;__rs_cop&quot;</span><span class="p">]</span><span class="w"> </span><span class="p">},</span>
+<span class="w">      </span><span class="nx">layout</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s2">&quot;line-cap&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;round&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;line-join&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;round&quot;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">});</span>
+<span class="w">    </span><span class="nx">map</span><span class="p">.</span><span class="nx">addLayer</span><span class="p">({</span><span class="w"> </span><span class="nx">id</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;fill&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;line&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">source</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;roads&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">paint</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s2">&quot;line-color&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;get&quot;</span><span class="p">,</span><span class="s2">&quot;__rs_fill&quot;</span><span class="p">],</span><span class="w"> </span><span class="s2">&quot;line-width&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;get&quot;</span><span class="p">,</span><span class="s2">&quot;__rs_w&quot;</span><span class="p">],</span>
+<span class="w">               </span><span class="s2">&quot;line-opacity&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;get&quot;</span><span class="p">,</span><span class="s2">&quot;__rs_op&quot;</span><span class="p">]</span><span class="w"> </span><span class="p">},</span>
+<span class="w">      </span><span class="nx">layout</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s2">&quot;line-cap&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;round&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;line-join&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;round&quot;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">});</span>
+<span class="w">    </span><span class="nx">map</span><span class="p">.</span><span class="nx">fitBounds</span><span class="p">([</span><span class="nx">spec</span><span class="p">.</span><span class="nx">bounds</span><span class="p">[</span><span class="mf">0</span><span class="p">].</span><span class="nx">slice</span><span class="p">().</span><span class="nx">reverse</span><span class="p">(),</span><span class="w"> </span><span class="nx">spec</span><span class="p">.</span><span class="nx">bounds</span><span class="p">[</span><span class="mf">1</span><span class="p">].</span><span class="nx">slice</span><span class="p">().</span><span class="nx">reverse</span><span class="p">()]);</span>
+<span class="w">  </span><span class="p">});</span>
+<span class="p">});</span>
+<span class="p">&lt;/</span><span class="nt">script</span><span class="p">&gt;</span>
+</code></pre></div>
+<blockquote>
+<p>MapLibre wants <code>[lon, lat]</code>; the spec's <code>bounds</code> are <code>[lat, lon]</code> (Leaflet order), hence the
+<code>.reverse()</code>. A future roadstyle option may emit a zoom→width curve as a MapLibre
+<code>["interpolate", ["linear"], ["zoom"], …]</code> expression for <code>line-width</code> (see
+<a href="../parameters/">parameters</a> — widths are fixed pixels today).</p>
+</blockquote>
+<hr />
+<h2 id="which-option-for-you">Which option for you?</h2>
+<ul>
+<li><strong>No front-end experience / just need it on a page</strong> → <strong>Option 1 (iframe)</strong>.</li>
+<li><strong>You already have a Leaflet map</strong> → <strong>Option 2</strong>.</li>
+<li><strong>You use vector tiles / want GPU rendering / lots of data</strong> → <strong>Option 3 (MapLibre)</strong>.</li>
+<li><strong>A React/Vue app</strong> → fetch the spec and feed <code>spec.geojson</code> to your map component using the
+  same <code>__rs_*</code> accessors shown above.</li>
+</ul>
+<h2 id="reacting-to-a-selection-click-your-code">Reacting to a selection (click → your code)</h2>
+<p><code>roadstyle.js</code> hands clicks back to your page so a custom UI can react. Register handlers in
+JavaScript (an <code>interaction_config.json</code> can't carry functions):</p>
+<div class="highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">m</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">RoadStyleMap</span><span class="p">(</span><span class="s2">&quot;map&quot;</span><span class="p">);</span>
+<span class="nx">m</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s2">&quot;select&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="nx">feature</span><span class="p">,</span><span class="w"> </span><span class="nx">layer</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// feature.properties carries __rs_class plus your original data columns</span>
+<span class="w">  </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;selected&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">feature</span><span class="p">.</span><span class="nx">properties</span><span class="p">);</span>
+<span class="p">});</span>
+<span class="nx">m</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s2">&quot;deselect&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="nx">prevFeature</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;cleared&quot;</span><span class="p">));</span>
+<span class="k">await</span><span class="w"> </span><span class="nx">m</span><span class="p">.</span><span class="nx">load</span><span class="p">(</span><span class="s2">&quot;map_data.json&quot;</span><span class="p">);</span>
+
+<span class="c1">// or poll instead of using callbacks:</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">current</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">m</span><span class="p">.</span><span class="nx">getSelection</span><span class="p">();</span><span class="w">   </span><span class="c1">// the selected feature, or null</span>
+</code></pre></div>
+<p>Selection is <strong>single</strong> — clicking another road replaces it; click the same road again, or click
+the map background, to deselect (each fires <code>onDeselect</code>). You can also pass the handlers up front:
+<code>new RoadStyleMap("map", { onSelect, onDeselect })</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
