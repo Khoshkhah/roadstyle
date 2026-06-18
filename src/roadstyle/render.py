@@ -50,6 +50,9 @@ def render_edges(
       - ``basemap`` : override the theme's base map (a key in ``roadstyle.BASEMAPS``).
       - ``basemaps``: (folium) a list of base-map keys offered as toggleable radio layers.
       - ``tooltip`` / ``selected`` / ``name``.
+      - ``arrows`` : (folium) overlay source->target direction chevrons. ``arrow_col`` restricts
+        them to edges where that column is truthy (e.g. ``"oneway"``); ``arrow_color`` (gray),
+        ``arrow_size_m`` (~2.8 m) and ``arrow_min_zoom`` (18; ``None`` = always show) tune them.
     """
     edges = as_edges(gdf, class_col=highway_col)   # canonical: RoadEdges (EPSG:4326, lines)
     g = edges.gdf

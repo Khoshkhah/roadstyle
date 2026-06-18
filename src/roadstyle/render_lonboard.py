@@ -80,6 +80,15 @@ def render(
 
     from .basemaps import get_basemap
 
+    # Direction arrows are a folium-only overlay; drop the kwargs so they never reach lonboard.Map.
+    if kwargs.get("arrows") or any(k in kwargs for k in
+                                   ("arrow_col", "arrow_color", "arrow_size_m", "arrow_min_zoom")):
+        import warnings
+        warnings.warn("arrows= is only supported on the folium backend; ignored for lonboard.",
+                      stacklevel=2)
+    for _k in ("arrows", "arrow_col", "arrow_color", "arrow_size_m", "arrow_min_zoom"):
+        kwargs.pop(_k, None)
+
     th = get_theme(theme)
     bm = get_basemap(basemap or th.default_basemap)
     carto_style = None
