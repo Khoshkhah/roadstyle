@@ -5,8 +5,9 @@ Reads the **driving** road network straight out of the duckOSM project's ``soder
 ``roadstyle.from_duckdb`` input path.
 
 The geometry is a native DuckDB ``GEOMETRY`` column, so we select it as WKB with ``ST_AsWKB`` (after
-``LOAD spatial``) for a clean round-trip. The graph is directed — each street appears once forward
-and once reversed — so ``WHERE NOT is_reverse`` keeps one line per street.
+``LOAD spatial``) for a clean round-trip. The graph is directed — a street can appear as a forward
+and a reverse half-edge — and we render **every** edge as-is (no dedup, no direction filter), so
+nothing is dropped (both halves of a pair and both carriageways of a divided road are drawn).
 
 Run inside the project env (created from ``environment.yml``)::
 
@@ -24,24 +25,20 @@ import duckdb
 import roadstyle as rs
 
 # The driving-network DuckDB built by the duckOSM project (read-only — we never mutate it).
-SODERMALM_DB = Path("/home/kaveh/projects/duckOSM/data/db/sodermalm.duckdb")
+SODERMALM_DB = Path("/home/kaveh/projects/duckOSM/data/db/sodermalm_new.duckdb")
 
 HERE = Path(__file__).resolve().parent   # write generated maps next to this script (gitignored)
 
 
 def load_driving_edges(db: Path) -> rs.RoadEdges:
-    """Read the driving edges from ``driving.edges`` into canonical :class:`roadstyle.RoadEdges`."""
+    """Read every edge from ``driving.edges`` into canonical :class:`roadstyle.RoadEdges`."""
     con = duckdb.connect(str(db), read_only=True)
     con.execute("LOAD spatial;")                       # geometry is a native GEOMETRY → ST_AsWKB
-    # The graph is directed: each street can appear as a forward and/or a reverse half-edge, each
-    # with its own geometry. Dedup on the *undirected* identity (same OSM way + node pair, either
-    # direction) so we draw one line per street — and never drop a street that exists only as a
-    # reverse edge (a plain `WHERE NOT is_reverse` silently loses ~1500 one-way streets here).
+    # Render every edge as-is — no dedup, no direction filter — so both halves of a directed pair
+    # and both carriageways of a divided road are drawn, and nothing is silently dropped.
     query = (
-        "SELECT DISTINCT ON (osm_id, LEAST(source, target), GREATEST(source, target)) "
-        "       highway, name, maxspeed_kmh, length_m, ST_AsWKB(geometry) AS geom "
-        "FROM driving.edges "
-        "ORDER BY osm_id, LEAST(source, target), GREATEST(source, target), is_reverse"
+        "SELECT highway, name, maxspeed_kmh, length_m, ST_AsWKB(geometry) AS geom "
+        "FROM driving.edges"
     )
     # DuckDB carries no CRS; the data is OSM lon/lat, so crs=4326. Pass connection + query.
     return rs.from_duckdb(con, query, geometry="geom", crs=4326)
