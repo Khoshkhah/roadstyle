@@ -16,6 +16,13 @@ render_edges(edges, color_by="aadt", cmap="viridis",          # colour by a data
              width_by=(1, 6), legend=True).save("traffic.html")
 ```
 
+…or straight from the shell — no Python needed:
+
+```bash
+roadstyle edges.gpkg -o roads.html --theme dark
+roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by your data
+```
+
 ## Why roadstyle?
 
 - **Geometry sandwich** — every road is a coloured fill over a wider casing, so junctions and
@@ -28,10 +35,11 @@ render_edges(edges, color_by="aadt", cmap="viridis",          # colour by a data
 - **Backends + web output** — folium (portable HTML), lonboard (WebGL), and `to_spec`/`to_html`/
   `to_iframe` for embedding in your own site (Leaflet / MapLibre / iframe).
 - **Canonical input** — `normalize_edges` reprojects, drops non-lines, and maps your column names.
+- **Command line** — the `roadstyle` CLI renders any road file from the shell, no Python required.
 
 ## Where to next
 
-- **[Usage](usage.md)** — install, quick start, recipes.
+- **[Usage](usage.md)** — install, the command line, quick start, recipes.
 - **[Parameter reference](parameters.md)** — every parameter explained.
 - **[Embedding in a website](embedding.md)** — the JSON spec + Leaflet/MapLibre/iframe snippets.
 - **[Palettes](palettes.md)** / **[Themes](themes.md)** — styling reference.
