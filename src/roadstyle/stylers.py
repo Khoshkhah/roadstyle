@@ -287,6 +287,30 @@ class NumericStyler:
         return rf
 
 
+def bake_props(gj: dict, rf: ResolvedFrame, dark: bool) -> dict:
+    """Bake the per-edge ``__rs_*`` style props onto a GeoJSON FeatureCollection, in place.
+
+    The single source of truth for the stable per-feature props every renderer reads — the browser
+    ``roadstyle.js`` and the folium ``InteractiveRoads`` layer both consume these, so the two can
+    never drift. Both casing variants are baked so a light↔dark base-map switch re-picks casing
+    client-side; ``__rs_class`` carries the per-edge category used for filtering and legends.
+    """
+    feats = gj.get("features", [])
+    for i, feat in enumerate(feats):
+        p = feat.setdefault("properties", {})
+        p["__rs_fill"] = rf.fill[i]
+        p["__rs_w"] = rf.width[i]
+        p["__rs_op"] = rf.opacity[i]
+        p["__rs_dash"] = rf.dash[i]
+        p["__rs_casing"] = rf.casing_dark[i] if dark else rf.casing_light[i]
+        p["__rs_casing_light"] = rf.casing_light[i]
+        p["__rs_casing_dark"] = rf.casing_dark[i]
+        p["__rs_cw"] = rf.casing_width[i]
+        p["__rs_cop"] = rf.casing_opacity[i]
+        p["__rs_class"] = rf.klass[i]
+    return gj
+
+
 # ── convenience constructors (so users build a styler without importing the classes) ──────────
 
 def color_by_class(column: str = "highway", palette="highsat", **kw) -> ClassStyler:

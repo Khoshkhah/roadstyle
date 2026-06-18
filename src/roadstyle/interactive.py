@@ -1,29 +1,18 @@
-"""Interactive JS road layer for folium — dynamic casing, hover highlight, live filter.
+"""Interactive JS road layer for folium — the single folium rendering path.
 
-Builds the casing + fill GeoJSON layers in the browser (Leaflet) from an embedded palette,
-so we can: re-style casing when the base map changes (light casing on light maps, black on
-dark/satellite), highlight an edge white on hover, and toggle highway types on/off via a
-checkbox panel. Mirrors the osm-traffic-enrichment web renderer.
+Draws the casing + fill geometry sandwich in the browser (Leaflet) from per-edge ``__rs_*`` style
+props baked in Python (see :func:`roadstyle.stylers.bake_props`) — the *exact same* props the
+canonical web renderer ``roadstyle.js`` reads, so the folium and web backends can't drift. Because
+the styling is baked, this one layer serves every styling mode (road class, categorical, numeric):
+it re-styles casing on a light↔dark base-map change, highlights an edge white on hover, pins a
+tooltip on click (with copy-to-clipboard), and — for class styling — toggles types via a filter.
 """
 from __future__ import annotations
 
 from branca.element import MacroElement
 from jinja2 import Template
 
-from .palettes import FALLBACK, ORDER, PALETTES
-from .style import CASING_OPACITY, FILL_OPACITY, LINK_SCALE
-
-
-def _palette_js(palette: str) -> dict:
-    out = {}
-    for hw, rs in PALETTES[palette].items():
-        out[hw] = {
-            "fill": rs.fill, "w": rs.width, "cw": rs.casing_width,
-            "cl": rs.casing_light, "cd": rs.casing_dark,
-            "dash": ",".join(map(str, rs.dash)) if rs.dash else None,
-        }
-    return out
-
+from .palettes import ORDER
 
 _TEMPLATE = Template("""
 {% macro header(this, kwargs) %}
@@ -51,37 +40,30 @@ _TEMPLATE = Template("""
 {% macro script(this, kwargs) %}
 (function(){
   var map = {{ this._parent.get_name() }};
-  var DATA = {{ this.data }};
-  var PAL  = {{ this.palette|tojson }};
-  var HCOL = {{ this.highway_col|tojson }};
+  var DATA = {{ this.data }};                // GeoJSON whose features carry baked __rs_* props
   var TIP  = {{ this.tooltip|tojson }};
-  var FILLOP = {{ this.fill_op }}, CASOP = {{ this.casing_op }}, LINK = {{ this.link }};
-  var FALLBACK = {{ this.fallback|tojson }};
-  var ORDER = {{ this.order|tojson }};      // road types by importance (most important first)
+  var COPY = {{ this.copy_field|tojson }};
+  var ORDER = {{ this.order|tojson }};       // road classes by importance (most important first)
   var IS_DARK = {{ 'true' if this.initial_dark else 'false' }};
   var disabled = {};
   var OIDX = {}; ORDER.forEach(function(t,i){ OIDX[t]=i; });
 
-  function norm(hw){ hw=(hw==null?'':String(hw)).trim().toLowerCase();
-    var link=hw.slice(-5)==='_link'; if(link) hw=hw.slice(0,-5); return [hw,link]; }
-  function pal(hw){ return PAL[norm(hw)[0]] || PAL[FALLBACK]; }
-  function on(hw){ return !disabled[norm(hw)[0]]; }
+  function cls(f){ return f.properties.__rs_class; }
+  function on(f){ var c=cls(f); return c==null || !disabled[c]; }   // null class = always visible
 
   function styleFill(f){
-    var hw=f.properties[HCOL], p=pal(hw), link=norm(hw)[1];
-    return {color:p.fill, weight:p.w*(link?LINK:1), opacity: on(hw)?FILLOP:0,
-            dashArray:p.dash, lineCap:'round', lineJoin:'round', interactive:on(hw)};
+    var p=f.properties;
+    return {color:p.__rs_fill, weight:p.__rs_w, opacity: on(f)?p.__rs_op:0,
+            dashArray:p.__rs_dash, lineCap:'round', lineJoin:'round', interactive:on(f)};
   }
   function styleCasing(f){
-    var hw=f.properties[HCOL], p=pal(hw), link=norm(hw)[1];
-    var c = IS_DARK ? p.cd : p.cl;
-    if(p.cw<=0 || c==null) return {opacity:0, weight:0};
-    return {color:c, weight:p.cw*(link?LINK:1), opacity: on(hw)?CASOP:0,
+    var p=f.properties, c = IS_DARK ? p.__rs_casing_dark : p.__rs_casing_light;
+    if(c==null || !(p.__rs_cw>0)) return {opacity:0, weight:0};
+    return {color:c, weight:p.__rs_cw, opacity: on(f)?p.__rs_cop:0,
             lineCap:'round', lineJoin:'round'};
   }
 
   // ── click-to-copy a field (default edge_id) to the clipboard ────────────────
-  var COPY = {{ this.copy_field|tojson }};
   function rsExec(t){var a=document.createElement('textarea');a.value=t;a.style.position='fixed';
     a.style.opacity='0';document.body.appendChild(a);a.select();
     try{document.execCommand('copy');}catch(e){}document.body.removeChild(a);}
@@ -122,10 +104,9 @@ _TEMPLATE = Template("""
       layer.bindTooltip(html, {sticky:true});
     }
     layer.on('mouseover', function(e){
-      var hw=feat.properties[HCOL], p=pal(hw), link=norm(hw)[1];
-      if(!on(hw)) return;
+      if(!on(feat)) return;
       if(pinnedLayer===layer){ e.target.closeTooltip(); return; }   // pinned: don't stack hover tip
-      e.target.setStyle({color:'#ffffff', weight:p.w*(link?LINK:1)+2, opacity:1});
+      e.target.setStyle({color:'#ffffff', weight:feat.properties.__rs_w+2, opacity:1});
       e.target.bringToFront();
     });
     layer.on('mouseout', function(e){ fillLayer.resetStyle(e.target); });
@@ -142,9 +123,11 @@ _TEMPLATE = Template("""
   window.{{ this.hook }} = function(isDark){
     IS_DARK = !!isDark; casingLayer.setStyle(styleCasing); };
 
-  // ── highway-type filter panel ──────────────────────────────────────────────
-  var types = {};
-  DATA.features.forEach(function(f){ types[norm(f.properties[HCOL])[0]] = true; });
+  // ── highway-type filter panel (class styling only) ─────────────────────────
+  {% if this.show_filter %}
+  var swatch = {}, types = {};               // class -> a representative fill colour
+  DATA.features.forEach(function(f){ var c=f.properties.__rs_class;
+    if(c!=null){ types[c]=true; if(!(c in swatch)) swatch[c]=f.properties.__rs_fill; } });
   types = Object.keys(types).sort(function(a,b){
     var ia=(a in OIDX)?OIDX[a]:999, ib=(b in OIDX)?OIDX[b]:999;
     return ia-ib || (a<b?-1:(a>b?1:0));            // by importance, then alphabetical
@@ -154,11 +137,11 @@ _TEMPLATE = Template("""
     var d=L.DomUtil.create('div','rs-filter');
     d.innerHTML='<h4>Road types</h4>';
     types.forEach(function(t){
-      var p=PAL[t]||PAL[FALLBACK];
       var row=L.DomUtil.create('label','',d);
       var cb=document.createElement('input'); cb.type='checkbox'; cb.checked=true; cb.dataset.t=t;
       cb.onchange=function(){ if(cb.checked) delete disabled[t]; else disabled[t]=1; refresh(); };
-      var sw=document.createElement('span'); sw.className='rs-sw'; sw.style.background=p.fill;
+      var sw=document.createElement('span'); sw.className='rs-sw';
+      sw.style.background=swatch[t]||'#888';
       var tx=document.createElement('span'); tx.textContent=t;
       row.appendChild(cb); row.appendChild(sw); row.appendChild(tx);
     });
@@ -173,7 +156,8 @@ _TEMPLATE = Template("""
     L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d);
     return d;
   }});
-  {% if this.show_filter %}map.addControl(new Filter());{% endif %}
+  if(types.length) map.addControl(new Filter());
+  {% endif %}
 
   // fit to data
   try { map.fitBounds(fillLayer.getBounds(), {padding:[20,20]}); } catch(e){}
@@ -183,21 +167,21 @@ _TEMPLATE = Template("""
 
 
 class InteractiveRoads(MacroElement):
-    def __init__(self, geojson_str, palette="highsat", highway_col="highway",
-                 tooltip=None, initial_dark=True, show_filter=True, hook="__rsCasing",
-                 copy_field=None):
+    """Single folium road layer: reads baked ``__rs_*`` props; hover/pin/copy/filter/dynamic casing.
+
+    ``geojson_str`` is a GeoJSON string whose features already carry the per-edge ``__rs_*`` style
+    props (from :func:`roadstyle.stylers.bake_props`). ``show_filter`` adds the road-type filter
+    panel (meaningful only for class styling — data-driven maps carry a legend instead).
+    """
+
+    def __init__(self, geojson_str, tooltip=None, initial_dark=True, show_filter=True,
+                 hook="__rsCasing", copy_field=None, order=None):
         super().__init__()
         self._name = "InteractiveRoads"
-        self.data = geojson_str                  # raw GeoJSON string (inserted as JS literal)
-        self.palette = _palette_js(palette)
-        self.highway_col = highway_col
+        self.data = geojson_str                  # baked GeoJSON string (inserted as a JS literal)
         self.tooltip = tooltip or []
         self.copy_field = copy_field             # click an edge -> copy this field (None = off)
-        self.fill_op = FILL_OPACITY
-        self.casing_op = CASING_OPACITY
-        self.link = LINK_SCALE
-        self.fallback = FALLBACK
-        self.order = list(reversed(ORDER))       # most important first
+        self.order = order if order is not None else list(reversed(ORDER))
         self.initial_dark = initial_dark
         self.show_filter = show_filter
         self.hook = hook

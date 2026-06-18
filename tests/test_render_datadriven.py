@@ -18,15 +18,16 @@ def _html(m):
     return m.get_root().render()
 
 
-def test_classic_path_unchanged():
+def test_classic_path_renders_baked_props():
     import folium
     m = render_edges(_edges(), theme="dark")
     assert isinstance(m, folium.Map)
     html = _html(m)
-    # OSM interactive layer is used when no data-driven args are given:
-    # its dynamic-casing hook is present, and the data-driven __rs_* props are not.
+    # One folium path: the OSM class styling now also bakes per-edge __rs_* props (read by the
+    # single InteractiveRoads layer), and its dynamic-casing hook is present.
     assert "__rsCasing" in html
-    assert "__rs_fill" not in html
+    assert "__rs_fill" in html
+    assert "__rs_class" in html        # class baked → drives the road-type filter panel
 
 
 def test_categorical_render_embeds_colors():

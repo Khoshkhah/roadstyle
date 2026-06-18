@@ -22,7 +22,7 @@ from functools import cache
 from importlib.resources import files
 
 from .edges import as_edges
-from .stylers import build_styler
+from .stylers import bake_props, build_styler
 from .themes import get_theme
 
 SPEC_VERSION = "1"
@@ -79,22 +79,8 @@ def to_spec(
     th = get_theme(theme)
     dark = th.casing == "dark"
 
-    gj = json.loads(g.to_json())
-    feats = gj.get("features", [])
-    for i, feat in enumerate(feats):
-        props = feat.setdefault("properties", {})
-        props["__rs_fill"] = rf.fill[i]
-        props["__rs_w"] = rf.width[i]
-        props["__rs_op"] = rf.opacity[i]
-        props["__rs_dash"] = rf.dash[i]
-        # active casing for this spec's theme, plus both variants so the in-map base-layer
-        # switcher can re-pick light/dark casing without rebuilding the spec.
-        props["__rs_casing"] = rf.casing_dark[i] if dark else rf.casing_light[i]
-        props["__rs_casing_light"] = rf.casing_light[i]
-        props["__rs_casing_dark"] = rf.casing_dark[i]
-        props["__rs_cw"] = rf.casing_width[i]
-        props["__rs_cop"] = rf.casing_opacity[i]
-        props["__rs_class"] = rf.klass[i]
+    # bake the per-edge __rs_* props (both casing variants for the in-map base-layer switcher)
+    gj = bake_props(json.loads(g.to_json()), rf, dark)
 
     b = list(g.total_bounds)   # [minx, miny, maxx, maxy]
     bounds = [[b[1], b[0]], [b[3], b[2]]]   # [[S,W],[N,E]] (Leaflet order)

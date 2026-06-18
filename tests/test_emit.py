@@ -134,8 +134,11 @@ def test_save_html(tmp_path):
     assert "<!DOCTYPE" in p.read_text()
 
 
-def test_spec_html_is_lighter_than_folium():
-    # the stack-agnostic spec page should be no heavier than folium's full output
+def test_spec_html_comparable_weight_to_folium():
+    # Neither output double-embeds the geometry, so the stack-agnostic spec page — which inlines the
+    # full roadstyle.js renderer (legend + filter + basemap switcher + selection) — stays within a
+    # small factor of folium's full output (the folium InteractiveRoads layer embeds the GeoJSON
+    # once, same as the spec). A regression that double-embedded would blow past ~2x.
     n = 400
     g = gpd.GeoDataFrame(
         {"highway": ["primary"] * n, "aadt": list(range(n))},
@@ -147,7 +150,7 @@ def test_spec_html_is_lighter_than_folium():
     spec_html = to_html(g, color_by="aadt", cmap="viridis")
     from roadstyle import render_edges
     folium_html = render_edges(g, color_by="aadt", cmap="viridis").get_root().render()
-    assert len(spec_html) <= len(folium_html)
+    assert len(spec_html) <= len(folium_html) * 1.2
 
 
 def test_to_html_inlines_canonical_renderer():
