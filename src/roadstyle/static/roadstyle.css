@@ -78,3 +78,25 @@
   color: #9fb0bf;
   font-weight: 600;
 }
+
+/* A tooltip pinned open by clicking an edge (click it again, or the map, to unpin). Dark to match
+   the theme, with an accent border so it reads as "stuck" rather than a transient hover tip. It is
+   interactive: text is selectable and the copy button lifts the fields to the clipboard. */
+.leaflet-tooltip.rs-tip-pinned {
+  background: rgba(20, 24, 30, 0.92);
+  color: #e6edf3;
+  border: 1px solid #38bdf8;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.5);
+  font: 600 11px/1.4 system-ui, sans-serif;
+  pointer-events: auto; /* Leaflet tooltips are pointer-events:none — re-enable select + click */
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: auto;
+}
+.leaflet-tooltip.rs-tip-pinned b {
+  color: #9fb0bf;
+}
+/* match the little pointer to the dark pinned box */
+.leaflet-tooltip-top.rs-tip-pinned::before {
+  border-top-color: rgba(20, 24, 30, 0.92);
+}

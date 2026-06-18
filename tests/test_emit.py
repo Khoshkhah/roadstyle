@@ -158,6 +158,7 @@ def test_to_html_inlines_canonical_renderer():
     js = _asset("roadstyle.js")
     assert "RoadStyleMap" in js
     assert "onSelect" in js and "getSelection" in js   # selection-result API present
+    assert "_pinTooltip" in js                         # click-to-pin tooltip behaviour present
     html = to_html(_edges())
     # the exact canonical renderer is inlined, with any literal </script> neutralised (see below)
     assert js.replace("</script", "<\\/script") in html

@@ -213,6 +213,17 @@
     if (c && c.classList) c.classList.toggle("rs-satellite", !!(bm && bm.satellite));
   };
 
+  // Build the tooltip HTML for a feature from the spec's `tooltip` field list. Shared by the
+  // hover tooltip and the pinned (click-to-pin) tooltip so the two can never drift.
+  RoadStyleMap.prototype._tooltipHtml = function (props) {
+    var tip = (this.spec && this.spec.tooltip) || [];
+    return tip
+      .map(function (k) {
+        return "<b>" + k + "</b>: " + (props[k] == null ? "" : props[k]);
+      })
+      .join("<br>");
+  };
+
   RoadStyleMap.prototype._renderRoads = function () {
     var self = this;
     var gj = this.spec.geojson;
@@ -224,18 +235,14 @@
       style: this._fillStyle.bind(this),
       onEachFeature: function (ft, layer) {
         if (tip.length) {
-          layer.bindTooltip(
-            tip
-              .map(function (k) {
-                return "<b>" + k + "</b>: " + (ft.properties[k] == null ? "" : ft.properties[k]);
-              })
-              .join("<br>"),
-            { sticky: true }
-          );
+          layer.bindTooltip(self._tooltipHtml(ft.properties), { sticky: true });
         }
         layer.on("mouseover", function (e) {
           if (!self._visible(ft.properties)) return;
-          if (self.selectedLayer === layer) return; // don't fight the selection highlight
+          if (self.selectedLayer === layer) {
+            e.target.closeTooltip(); // this edge is pinned — don't stack the hover tooltip on it
+            return; // and don't fight the selection highlight
+          }
           e.target.setStyle({
             color: self.options.hoverColor,
             weight: ft.properties.__rs_w + self.options.hoverExtraWidth,
@@ -246,13 +253,14 @@
         layer.on("mouseout", function (e) {
           self.fillLayer.resetStyle(e.target);
         });
-        // Click toggles selection: click an edge to select it, click it again to deselect.
+        // Click toggles selection AND pins the tooltip: click an edge to select + pin it, click it
+        // again (or click the map background) to deselect and unpin.
         layer.on("click", function (e) {
           if (L.DomEvent) L.DomEvent.stopPropagation(e); // don't let the map-click clear it
           if (self.selectedLayer === layer) {
             self.clearSelection();
           } else {
-            self.selectFeature(layer, ft);
+            self.selectFeature(layer, ft, e.latlng);
           }
         });
       },
@@ -262,13 +270,42 @@
     this.map.on("click", function () { self.clearSelection(); });
   };
 
-  // Select an edge: draw the highlight, remember it, and hand the feature back to the host page.
-  RoadStyleMap.prototype.selectFeature = function (layer, feature) {
+  // Select an edge: draw the highlight, pin its tooltip open, remember it, and hand the feature
+  // back to the host page. `latlng` (the click point) anchors the pinned tooltip; when absent
+  // (programmatic selection) it falls back to the edge's centre.
+  RoadStyleMap.prototype.selectFeature = function (layer, feature, latlng) {
     this.clearSelection(); // deselects any previous edge (fires onDeselect for it)
     this.selectedLayer = layer || null;
     this.selected = feature || null;
     this.highlightRoad(feature);
+    if (layer && layer.closeTooltip) layer.closeTooltip(); // drop the hover tooltip; pin instead
+    this._pinTooltip(feature, layer, latlng);
     if (typeof this.options.onSelect === "function") this.options.onSelect(feature, layer);
+  };
+
+  // Pin the tooltip open at `latlng` (or the edge centre) so it survives mouseout — the hover
+  // tooltip otherwise vanishes the moment the cursor leaves. The pinned tooltip is interactive so
+  // its text stays selectable (copy the road's details straight out of it). Removed by
+  // clearSelection() (click the edge again or the map background to unpin).
+  RoadStyleMap.prototype._pinTooltip = function (feature, layer, latlng) {
+    var html = this._tooltipHtml((feature && feature.properties) || {});
+    if (!html) return; // no tooltip fields configured → nothing to pin
+    var at = latlng || (layer && layer.getBounds && layer.getBounds().getCenter());
+    if (!at) return;
+    this.pinnedTooltip = L.tooltip({
+      permanent: true,
+      interactive: true, // keep the text selectable so it can be copied out
+      direction: "top",
+      offset: [0, -4],
+      className: "rs-tip-pinned",
+    })
+      .setLatLng(at)
+      .setContent("📌 " + html)
+      .addTo(this.map);
+
+    // Keep clicks/selection inside the tooltip from reaching the map (which would unpin it).
+    var el = this.pinnedTooltip.getElement();
+    if (el && L.DomEvent) L.DomEvent.disableClickPropagation(el);
   };
 
   // Remove any active selection highlight, notifying the host page if something was selected.
@@ -277,6 +314,10 @@
     if (this.highlightLayer) {
       this.map.removeLayer(this.highlightLayer);
       this.highlightLayer = null;
+    }
+    if (this.pinnedTooltip) {
+      this.pinnedTooltip.remove(); // unpin the tooltip
+      this.pinnedTooltip = null;
     }
     this.selectedLayer = null;
     this.selected = null;
@@ -314,7 +355,9 @@
         },
       });
     }
-    this.highlightLayer = L.layerGroup([
+    // featureGroup (not layerGroup) — only FeatureGroup has bringToFront(); a plain layerGroup
+    // throws there, which would abort selectFeature before the tooltip gets pinned.
+    this.highlightLayer = L.featureGroup([
       lyr(s.glow, Math.max(s.glow.width, w + 10)),
       lyr(s.casing, Math.max(s.casing.width, w + 5)),
       lyr(s.core, Math.max(s.core.width, w + 2)),
