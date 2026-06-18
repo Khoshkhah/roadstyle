@@ -5,6 +5,10 @@ __pycache__/
 .pytest_cache/
 .ipynb_checkpoints/
 .venv/
+build/
+
+# Editor
+.vscode/
 
 # mkdocs build output
 site/
