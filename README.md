@@ -13,16 +13,40 @@ Two palettes:
 ## Install
 
 ```bash
-# into an existing env
-pip install -e /home/kaveh/projects/roadstyle
-# or a standalone dev env
-conda env create -f environment.yml && conda activate roadstyle && pip install -e .
+pip install git+https://github.com/Khoshkhah/roadstyle.git
 ```
 
-Requirements are in [`requirements.txt`](requirements.txt) / [`environment.yml`](environment.yml).
-`folium` is the only hard renderer dependency; `lonboard` is optional (WebGL backend).
+`folium` is the only hard renderer dependency. Optional extras pull in heavier backends/inputs as
+you need them — `lonboard` (WebGL), `numeric` (continuous data-driven styling), `basemaps`,
+`duckdb`, `arrow`:
 
-## Quickstart
+```bash
+pip install "roadstyle[numeric,duckdb] @ git+https://github.com/Khoshkhah/roadstyle.git"
+```
+
+**Develop locally** (editable install + dev tools):
+
+```bash
+git clone https://github.com/Khoshkhah/roadstyle.git && cd roadstyle
+pip install -e ".[dev]"
+# or a conda env: conda env create -f environment.yml && conda activate roadstyle && pip install -e ".[dev]"
+```
+
+## Command line
+
+No Python required — point the `roadstyle` command at any road file (GPKG, GeoJSON, Shapefile, …):
+
+```bash
+roadstyle edges.gpkg -o map.html --theme dark               # styled interactive map
+roadstyle edges.gpkg --include motorway trunk primary       # keep only major roads
+roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by your data
+roadstyle edges.gpkg -f spec -o map_data.json               # JSON spec for your own frontend
+```
+
+`-f/--format` picks the output: `folium` (default), `web` (standalone roadstyle.js page), `spec`
+(JSON), or `geojson`. Run `roadstyle --help` for every flag — each mirrors a `render_edges` keyword.
+
+## Quickstart (Python)
 
 ```python
 import geopandas as gpd

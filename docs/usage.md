@@ -3,14 +3,34 @@
 ## Install
 
 ```bash
-pip install -e .                    # from the repo root (src layout)
-# optional extras:
-pip install -e ".[lonboard]"        # WebGL backend
-pip install -e ".[numeric]"         # numeric styling (mapclassify + matplotlib colormaps)
-pip install -e ".[basemaps]"        # any xyzservices tile provider as a base map
+pip install git+https://github.com/Khoshkhah/roadstyle.git
 ```
 
-Or, with conda: `conda env create -f environment.yml && conda activate roadstyle`.
+Optional extras pull in heavier backends/inputs only when you ask for them:
+
+```bash
+pip install "roadstyle[lonboard] @ git+https://github.com/Khoshkhah/roadstyle.git"   # WebGL backend
+# numeric  — continuous data-driven styling (mapclassify + matplotlib colormaps)
+# basemaps — any xyzservices tile provider as a base map
+# duckdb / arrow — read edges straight from a DuckDB query or an Arrow table
+```
+
+**Develop locally** (editable, from the repo root — a src layout): `pip install -e ".[dev]"`, or with
+conda `conda env create -f environment.yml && conda activate roadstyle && pip install -e ".[dev]"`.
+
+## Command line
+
+No Python needed — `roadstyle` renders any road file straight from the shell:
+
+```bash
+roadstyle edges.gpkg -o map.html --theme dark               # styled interactive map
+roadstyle edges.gpkg --include motorway trunk primary       # keep only major roads
+roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by your data
+roadstyle edges.gpkg -f spec -o map_data.json               # JSON spec for your own frontend
+```
+
+`-f/--format` is one of `folium` (default), `web`, `spec`, `geojson`; every other flag mirrors a
+`render_edges` keyword. See `roadstyle --help`.
 
 ## Input — what roadstyle expects
 

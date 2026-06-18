@@ -11,6 +11,10 @@ styling library that can also be embedded in a website. The existing OSM styling
 byte-for-byte unchanged; everything new is additive.
 
 ### Added
+- Command-line interface: a `roadstyle` console script (`roadstyle.cli`) renders any road file
+  from the shell — `roadstyle edges.gpkg -o map.html --theme dark`, with `--include/--exclude`
+  filtering, data-driven `--color-by/--cmap/--width-by`, and `-f folium|web|spec|geojson` output.
+  Every flag mirrors a `render_edges` keyword. No Python required to make a styled map.
 - Interactive selection that **returns the result**: clicking a road in `roadstyle.js` fires
   `onSelect(feature, layer)` (and `onDeselect`) with the edge's GeoJSON feature — geometry +
   properties incl. `__rs_class` — plus a `getSelection()` query method, so a custom page UI can

@@ -42,6 +42,9 @@ arrow = ["pyarrow"]                        # read edges from a pyarrow Table
 docs = ["mkdocs-material"]
 dev = ["pytest", "ruff", "mypy", "lonboard", "mapclassify", "matplotlib", "xyzservices", "duckdb", "pyarrow"]
 
+[project.scripts]
+roadstyle = "roadstyle.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/Khoshkhah/roadstyle"
 Documentation = "https://github.com/Khoshkhah/roadstyle"
