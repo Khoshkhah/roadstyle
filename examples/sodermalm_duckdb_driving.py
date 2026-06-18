@@ -36,8 +36,11 @@ def load_driving_edges(db: Path) -> rs.RoadEdges:
     con.execute("LOAD spatial;")                       # geometry is a native GEOMETRY → ST_AsWKB
     # Render every edge as-is — no dedup, no direction filter — so both halves of a directed pair
     # and both carriageways of a divided road are drawn, and nothing is silently dropped.
+    # edge_id is a 64-bit hash > 2**53, so cast it to text: a JS Number (double) can't hold it and
+    # would silently corrupt the value in the browser. osm_id is small enough to stay numeric.
     query = (
-        "SELECT highway, name, maxspeed_kmh, length_m, ST_AsWKB(geometry) AS geom "
+        "SELECT CAST(edge_id AS VARCHAR) AS edge_id, osm_id, "
+        "       highway, name, maxspeed_kmh, length_m, ST_AsWKB(geometry) AS geom "
         "FROM driving.edges"
     )
     # DuckDB carries no CRS; the data is OSM lon/lat, so crs=4326. Pass connection + query.
@@ -51,7 +54,7 @@ def main() -> None:
     edges = load_driving_edges(SODERMALM_DB)
     print(f"from_duckdb → {len(edges):,} driving edges from {SODERMALM_DB.name}")
 
-    tooltip = ["highway", "name", "maxspeed_kmh"]
+    tooltip = ["edge_id", "osm_id", "highway", "name", "maxspeed_kmh"]
     folium_out = HERE / "sodermalm_driving.html"
     web_out = HERE / "sodermalm_driving_web.html"
 
