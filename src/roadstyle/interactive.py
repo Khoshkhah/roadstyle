@@ -41,6 +41,11 @@ _TEMPLATE = Template("""
   display:flex;gap:8px;}
 .rs-filter .rs-all button{flex:1;background:rgba(255,255,255,.08);border:none;color:#cfd6dd;
   border-radius:6px;padding:3px 0;cursor:pointer;font:inherit;}
+.leaflet-tooltip.rs-tip-pinned{background:rgba(20,24,30,.92);color:#e6edf3;border:1px solid #38bdf8;
+  box-shadow:0 3px 14px rgba(0,0,0,.5);font:600 11px/1.4 system-ui,sans-serif;
+  pointer-events:auto;user-select:text;-webkit-user-select:text;cursor:auto;}
+.leaflet-tooltip.rs-tip-pinned b{color:#9fb0bf;}
+.leaflet-tooltip-top.rs-tip-pinned::before{border-top-color:rgba(20,24,30,.92);}
 </style>
 {% endmacro %}
 {% macro script(this, kwargs) %}
@@ -91,25 +96,46 @@ _TEMPLATE = Template("""
     el.textContent=msg;el.style.opacity='1';clearTimeout(window.__rsToastT);
     window.__rsToastT=setTimeout(function(){el.style.opacity='0';},1300);}
 
+  // ── click-to-pin a tooltip open (survives mouseout; click again / the map to unpin) ──────────
+  function tipHtml(props){
+    return TIP.map(function(k){
+      return '<b>'+k+'</b>: '+(props[k]==null?'':props[k]); }).join('<br>');
+  }
+  var pinned=null, pinnedLayer=null;
+  function rsUnpin(){ if(pinned){ map.removeLayer(pinned); pinned=null; } pinnedLayer=null; }
+  function rsPin(layer, props, latlng){
+    rsUnpin();
+    if(!TIP.length || !latlng) return;
+    pinnedLayer=layer;
+    pinned=L.tooltip({permanent:true, interactive:true, direction:'top', offset:[0,-4],
+                      className:'rs-tip-pinned'})
+           .setLatLng(latlng).setContent('📌 '+tipHtml(props)).addTo(map);
+    var el=pinned.getElement(); if(el && L.DomEvent) L.DomEvent.disableClickPropagation(el);
+  }
+  map.on('click', function(){ rsUnpin(); });   // click the map background to unpin
+
   var casingLayer = L.geoJSON(DATA, {style: styleCasing}).addTo(map);
   var fillLayer = L.geoJSON(DATA, {style: styleFill, onEachFeature: function(feat, layer){
     if(TIP.length){
-      var html = TIP.map(function(k){
-        return '<b>'+k+'</b>: '+(feat.properties[k]==null?'':feat.properties[k]); }).join('<br>');
+      var html = tipHtml(feat.properties);
       if(COPY) html += '<br><i>click to copy '+COPY+'</i>';
       layer.bindTooltip(html, {sticky:true});
     }
     layer.on('mouseover', function(e){
       var hw=feat.properties[HCOL], p=pal(hw), link=norm(hw)[1];
       if(!on(hw)) return;
+      if(pinnedLayer===layer){ e.target.closeTooltip(); return; }   // pinned: don't stack hover tip
       e.target.setStyle({color:'#ffffff', weight:p.w*(link?LINK:1)+2, opacity:1});
       e.target.bringToFront();
     });
     layer.on('mouseout', function(e){ fillLayer.resetStyle(e.target); });
-    if(COPY){ layer.on('click', function(){
-      var v=feat.properties[COPY];
-      if(v!=null){ rsCopy(String(v)); rsToast('copied '+COPY+' '+v); }
-    }); }
+    layer.on('click', function(e){
+      if(L.DomEvent) L.DomEvent.stopPropagation(e);    // keep the map-click handler from unpinning
+      if(pinnedLayer===layer){ rsUnpin(); }            // click the pinned edge again -> unpin
+      else { rsPin(layer, feat.properties, e.latlng); }
+      if(COPY){ var v=feat.properties[COPY];
+        if(v!=null){ rsCopy(String(v)); rsToast('copied '+COPY+' '+v); } }
+    });
   }}).addTo(map);
 
   // dynamic casing on base-map change (called by the base switcher)
