@@ -59,6 +59,23 @@ def test_missing_color_by_column_raises():
         render_edges(_edges(), color_by="nope", colors={"x": "#fff"})
 
 
+def test_folium_pin_inlined_in_both_styling_modes():
+    # The single folium path always wires up click-to-pin, regardless of styling mode.
+    for kw in ({}, {"color_by": "aadt", "cmap": "viridis"}):
+        html = _html(render_edges(_edges(), **kw))
+        assert "rsPin" in html               # the pin handler
+        assert "rs-tip-pinned" in html       # the pinned-tooltip class
+
+
+def test_folium_filter_for_class_legend_for_data_driven():
+    # Through the one InteractiveRoads layer: class styling shows the road-type filter (no legend);
+    # a data-driven map shows a legend instead (no filter panel).
+    class_html = _html(render_edges(_edges(), theme="dark"))
+    assert "Road types" in class_html and "rs-legend" not in class_html
+    num_html = _html(render_edges(_edges(), color_by="aadt", cmap="viridis"))
+    assert "rs-legend" in num_html and "Road types" not in num_html
+
+
 def test_lonboard_data_driven():
     lonboard = pytest.importorskip("lonboard")
     m = render_edges(_edges(), backend="lonboard", color_by="aadt", cmap="magma")
