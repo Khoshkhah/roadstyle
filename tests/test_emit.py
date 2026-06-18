@@ -159,5 +159,18 @@ def test_to_html_inlines_canonical_renderer():
     assert "RoadStyleMap" in js
     assert "onSelect" in js and "getSelection" in js   # selection-result API present
     html = to_html(_edges())
-    assert js in html                      # the exact canonical renderer is inlined
+    # the exact canonical renderer is inlined, with any literal </script> neutralised (see below)
+    assert js.replace("</script", "<\\/script") in html
     assert "new RoadStyleMap(" in html     # bootstrapped against the embedded spec
+
+
+def test_to_html_neutralises_nested_script_close():
+    # roadstyle.js's header has a usage example containing </script>; inlined raw it closes the
+    # page's <script> early and the renderer spills onto the page as text (blank/broken map).
+    from roadstyle.emit import _asset
+
+    js = _asset("roadstyle.js")
+    assert 'roadstyle.js"></script>' in js                 # the hazardous sequence is real
+    html = to_html(_edges())
+    assert 'roadstyle.js"></script>' not in html           # ...and is neutralised on inlining
+    assert 'roadstyle.js"><\\/script>' in html             # escaped form present (renderer runs)

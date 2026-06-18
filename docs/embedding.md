@@ -87,8 +87,8 @@ rs.save(edges, "roads.html", color_by="aadt", cmap="viridis")
 Serve the spec JSON, then style each feature from its `__rs_*` props:
 
 ```html
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <div id="map" style="height:600px"></div>
 <script>
 fetch("roads.json").then(r => r.json()).then(spec => {

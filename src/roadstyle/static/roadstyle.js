@@ -4,7 +4,7 @@
  * Single source of truth: the Python library (`roadstyle.emit.to_html`) inlines THIS exact file,
  * and you can also drop it into any page on its own:
  *
- *     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+ *     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
  *     <script src="roadstyle.js"></script>
  *     <script>
  *       const m = new RoadStyleMap("map");

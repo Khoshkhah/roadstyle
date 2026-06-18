@@ -273,7 +273,7 @@ Then a minimal page wires it up. `RoadStyleMap` is headless — it exposes `getR
 ```html
 <link rel="stylesheet" href="./roadstyle.css"/>
 <div id="map" style="height:100vh"></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="./roadstyle.js"></script>
 <script>
   // built-in widgets: legend, a road-type filter panel, and a base-layer switcher

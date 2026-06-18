@@ -156,8 +156,20 @@ def _is_spec(obj) -> bool:
 # ``static/roadstyle.css``) — the exact same file you can drop into a page on its own. There is no
 # second, hand-written copy of the rendering logic here, so the two can never drift.
 
-_LEAFLET_CSS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-_LEAFLET_JS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+# jsDelivr (npm mirror) — the same Leaflet CDN folium uses; unpkg is more often blocked/unreachable.
+_LEAFLET_CSS = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
+_LEAFLET_JS = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"
+
+
+def _inline_script(content: str) -> str:
+    """Wrap JS in a ``<script>`` tag, neutralising any literal ``</script>`` inside it.
+
+    The inlined ``roadstyle.js`` header carries a usage example containing ``</script>`` (and, in
+    principle, string data in the embedded spec could too). Left raw, that sequence closes the
+    page's inline ``<script>`` early — the rest of the renderer then spills onto the page as text
+    and never runs. ``<\\/script`` is the standard escape: valid JS, inert to the HTML parser.
+    """
+    return "<script>" + content.replace("</script", "<\\/script") + "</script>\n"
 
 
 def _fragment_html(spec: dict, div_id: str, width: str, height: str) -> str:
@@ -180,8 +192,8 @@ def _fragment_html(spec: dict, div_id: str, width: str, height: str) -> str:
     return (
         '<div id="' + div_id + '" style="width:' + width + ";height:" + height + ';"></div>\n'
         "<style>" + _asset("roadstyle.css") + "</style>\n"
-        "<script>" + _asset("roadstyle.js") + "</script>\n"
-        "<script>" + boot + "</script>\n"
+        + _inline_script(_asset("roadstyle.js"))
+        + _inline_script(boot)
     )
 
 
