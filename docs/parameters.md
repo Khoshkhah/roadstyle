@@ -74,9 +74,22 @@ GeoDataFrame with line geometry + a class column).
 | `basemaps` | list / `None` | `None` | (folium) The set of base maps offered in the switcher control. |
 | `filter_control` | bool | `True` | (folium) Show the in-map road-type filter panel (checkboxes). |
 | `name` | str | `"roads"` | Layer name. |
+| `arrows` | bool | `False` | (folium) Overlay a small **direction chevron** (`>`) at each edge's midpoint, pointing along the geometry's `source → target` order. |
+| `arrow_col` | str / `None` | `None` | Restrict arrows to edges where this column is truthy (e.g. `"oneway"`). Missing column / `None` ⇒ every edge is arrowed. |
+| `arrow_color` | hex str | `"#555555"` | Arrow colour (gray). |
+| `arrow_size_m` | number | `2.8` | Chevron barb length in **metres** — a fixed geographic size, so arrows scale with zoom. |
+| `arrow_min_zoom` | int / `None` | `18` | Render arrows only at zoom ≥ this (keeps the zoomed-out view clean and light). `None` = always show. |
 
 **Returns:** a `folium.Map` (default) or a `lonboard.Map`. Save with `.save("map.html")` (folium)
 or `.to_html("map.html")` (lonboard); both also display inline in a notebook.
+
+> **Direction arrows.** `arrows=True` adds the chevrons as one lightweight GeoJSON line layer
+> (plain SVG paths — they don't use a per-edge text-path plugin, which doesn't scale to thousands
+> of edges). They're a **folium-only** overlay; on the lonboard backend the `arrow_*` kwargs are
+> ignored with a warning. Geometry direction is the edge's coordinate order, so on a directed
+> routing graph each one-way edge points the legal way; a two-way street drawn as a
+> forward+reverse pair gets a chevron per direction. Use `arrow_col="oneway"` to arrow one-way
+> edges only.
 
 ---
 

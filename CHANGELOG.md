@@ -4,13 +4,19 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — 0.2.0.dev0
+## [Unreleased] — 0.2.0.dev1
 
 Goal: generalize roadstyle from an OSM-only tool into a reusable, data-driven road-map
 styling library that can also be embedded in a website. The existing OSM styling stays
 byte-for-byte unchanged; everything new is additive.
 
 ### Added
+- Direction arrows: `render_edges(..., arrows=True)` overlays a small chevron (`>`) at each edge's
+  midpoint pointing along the geometry's `source → target` order (folium backend). Drawn as one
+  lightweight GeoJSON line layer — not a per-edge text-path plugin, which doesn't scale. Tunable
+  via `arrow_col` (restrict to truthy edges, e.g. `"oneway"`), `arrow_color`, `arrow_size_m`, and
+  `arrow_min_zoom` (zoom-gate; defaults: gray, ~2.8 m, shown at zoom ≥ 18). Ignored (with a
+  warning) on the lonboard backend.
 - Command-line interface: a `roadstyle` console script (`roadstyle.cli`) renders any road file
   from the shell — `roadstyle edges.gpkg -o map.html --theme dark`, with `--include/--exclude`
   filtering, data-driven `--color-by/--cmap/--width-by`, and `-f folium|web|spec|geojson` output.
