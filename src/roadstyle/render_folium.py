@@ -40,11 +40,45 @@ def _add_base(m, folium, th, basemap, basemaps):
     m.add_child(BaseLayerSwitcher(keys, default_key))
 
 
-def _add_styled_layers(m, folium, g, styler, theme, fields):
+def _add_copy_on_click(m, folium, layer_name, field):
+    """Click an edge -> copy ``feature.properties[field]`` to the clipboard, with a toast.
+
+    Uses the async Clipboard API when available (https/localhost) and falls back to
+    execCommand('copy') for ``file://`` maps where the Clipboard API is blocked.
+    """
+    js = """
+    (function(){
+      function rsExec(t){var a=document.createElement('textarea');a.value=t;a.style.position='fixed';
+        a.style.opacity='0';document.body.appendChild(a);a.select();
+        try{document.execCommand('copy');}catch(e){}document.body.removeChild(a);}
+      function rsCopy(t){if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(t).catch(function(){rsExec(t);});}else{rsExec(t);}}
+      function rsToast(msg){var el=document.getElementById('rs-toast');
+        if(!el){el=document.createElement('div');el.id='rs-toast';el.style.cssText=
+          'position:fixed;z-index:9999;left:50%;bottom:20px;transform:translateX(-50%);'+
+          'background:rgba(0,0,0,.82);color:#fff;font:12px system-ui;padding:6px 13px;'+
+          'border-radius:14px;pointer-events:none;opacity:0;transition:opacity .15s';
+          document.body.appendChild(el);}
+        el.textContent=msg;el.style.opacity='1';clearTimeout(window.__rsToastT);
+        window.__rsToastT=setTimeout(function(){el.style.opacity='0';},1300);}
+      function bind(){ if(typeof __LAYER__==='undefined'){return setTimeout(bind,120);}
+        __LAYER__.on('click',function(e){
+          var p=e.layer&&e.layer.feature?e.layer.feature.properties:null;
+          var v=p?p['__FIELD__']:null;
+          if(v!=null){rsCopy(String(v));rsToast('copied __FIELD__ '+v);}
+        });}
+      bind();
+    })();
+    """.replace("__LAYER__", layer_name).replace("__FIELD__", field)
+    m.get_root().script.add_child(folium.Element(js))
+
+
+def _add_styled_layers(m, folium, g, styler, theme, fields, copy_field=None):
     """Data-driven path: resolve per-edge styles and draw the casing+fill geometry sandwich.
 
     Each feature carries precomputed ``__rs_*`` properties; two GeoJson layers (casing under,
     fill over) read them via a style_function, so any styling mode renders the same way.
+    Clicking an edge copies ``copy_field`` (e.g. ``edge_id``) to the clipboard.
     """
     rf = styler.resolve_frame(g, theme)
     th = get_theme(theme)
@@ -77,8 +111,10 @@ def _add_styled_layers(m, folium, g, styler, theme, fields):
 
     folium.GeoJson(gj, name="casing", control=False, style_function=casing_style).add_to(m)
     tip = folium.GeoJsonTooltip(fields=fields) if fields else None
-    folium.GeoJson(gj, name="roads", control=False, style_function=fill_style,
-                   tooltip=tip).add_to(m)
+    fill = folium.GeoJson(gj, name="roads", control=False, style_function=fill_style, tooltip=tip)
+    fill.add_to(m)
+    if copy_field and copy_field in g.columns:
+        _add_copy_on_click(m, folium, fill.get_name(), copy_field)
     return rf
 
 
@@ -107,6 +143,7 @@ def render(
     styler=None,
     legend: bool = True,
     legend_position: str = "bottomleft",
+    copy_field: str | None = "edge_id",
     **map_kwargs,
 ):
     import folium
@@ -127,10 +164,11 @@ def render(
         m.add_child(InteractiveRoads(
             g.to_json(), palette=palette, highway_col=highway_col,
             tooltip=fields, initial_dark=initial_dark, show_filter=filter_control,
+            copy_field=(copy_field if copy_field and copy_field in g.columns else None),
         ))
     else:
         # data-driven path: resolve per-edge styles, draw the casing+fill sandwich.
-        rf = _add_styled_layers(m, folium, g, styler, theme, fields)
+        rf = _add_styled_layers(m, folium, g, styler, theme, fields, copy_field=copy_field)
         if legend:
             _add_legend(m, rf, position=legend_position)
 

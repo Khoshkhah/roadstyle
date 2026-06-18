@@ -75,11 +75,28 @@ _TEMPLATE = Template("""
             lineCap:'round', lineJoin:'round'};
   }
 
+  // ── click-to-copy a field (default edge_id) to the clipboard ────────────────
+  var COPY = {{ this.copy_field|tojson }};
+  function rsExec(t){var a=document.createElement('textarea');a.value=t;a.style.position='fixed';
+    a.style.opacity='0';document.body.appendChild(a);a.select();
+    try{document.execCommand('copy');}catch(e){}document.body.removeChild(a);}
+  function rsCopy(t){if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).catch(function(){rsExec(t);});}else{rsExec(t);}}
+  function rsToast(msg){var el=document.getElementById('rs-toast');
+    if(!el){el=document.createElement('div');el.id='rs-toast';el.style.cssText=
+      'position:fixed;z-index:9999;left:50%;bottom:20px;transform:translateX(-50%);'+
+      'background:rgba(0,0,0,.82);color:#fff;font:12px system-ui;padding:6px 13px;'+
+      'border-radius:14px;pointer-events:none;opacity:0;transition:opacity .15s';
+      document.body.appendChild(el);}
+    el.textContent=msg;el.style.opacity='1';clearTimeout(window.__rsToastT);
+    window.__rsToastT=setTimeout(function(){el.style.opacity='0';},1300);}
+
   var casingLayer = L.geoJSON(DATA, {style: styleCasing}).addTo(map);
   var fillLayer = L.geoJSON(DATA, {style: styleFill, onEachFeature: function(feat, layer){
     if(TIP.length){
       var html = TIP.map(function(k){
         return '<b>'+k+'</b>: '+(feat.properties[k]==null?'':feat.properties[k]); }).join('<br>');
+      if(COPY) html += '<br><i>click to copy '+COPY+'</i>';
       layer.bindTooltip(html, {sticky:true});
     }
     layer.on('mouseover', function(e){
@@ -89,6 +106,10 @@ _TEMPLATE = Template("""
       e.target.bringToFront();
     });
     layer.on('mouseout', function(e){ fillLayer.resetStyle(e.target); });
+    if(COPY){ layer.on('click', function(){
+      var v=feat.properties[COPY];
+      if(v!=null){ rsCopy(String(v)); rsToast('copied '+COPY+' '+v); }
+    }); }
   }}).addTo(map);
 
   // dynamic casing on base-map change (called by the base switcher)
@@ -137,13 +158,15 @@ _TEMPLATE = Template("""
 
 class InteractiveRoads(MacroElement):
     def __init__(self, geojson_str, palette="highsat", highway_col="highway",
-                 tooltip=None, initial_dark=True, show_filter=True, hook="__rsCasing"):
+                 tooltip=None, initial_dark=True, show_filter=True, hook="__rsCasing",
+                 copy_field=None):
         super().__init__()
         self._name = "InteractiveRoads"
         self.data = geojson_str                  # raw GeoJSON string (inserted as JS literal)
         self.palette = _palette_js(palette)
         self.highway_col = highway_col
         self.tooltip = tooltip or []
+        self.copy_field = copy_field             # click an edge -> copy this field (None = off)
         self.fill_op = FILL_OPACITY
         self.casing_op = CASING_OPACITY
         self.link = LINK_SCALE
