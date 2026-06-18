@@ -149,7 +149,8 @@ def _fragment_html(spec: dict, div_id: str, width: str, height: str) -> str:
     spec_json = json.dumps(spec)
     boot = (
         "(function(){var spec=" + spec_json + ";"
-        'function start(){new RoadStyleMap("' + div_id + '",{widgets:{legend:true}}).load(spec);}'
+        'function start(){'
+        'new RoadStyleMap("' + div_id + '",{widgets:{legend:true,filter:true}}).load(spec);}'
         "if(window.L){start();}else{"
         'var c=document.createElement("link");c.rel="stylesheet";c.href="' + _LEAFLET_CSS
         + '";document.head.appendChild(c);'
