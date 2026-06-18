@@ -45,6 +45,39 @@ def test_spec_features_carry_rs_props():
     assert p["__rs_class"] == "motorway"
 
 
+def test_spec_carries_basemap_switcher_set():
+    spec = to_spec(_edges(), theme="dark")
+    # active base map + the full selectable set for the in-map switcher
+    assert spec["basemap"]["key"] == "dark_matter"
+    keys = [b["key"] for b in spec["basemaps"]]
+    assert len(keys) > 1 and spec["basemap"]["key"] in keys
+    assert all({"key", "label", "url", "is_dark"} <= set(b) for b in spec["basemaps"])
+
+
+def test_spec_explicit_basemaps_include_active():
+    # an explicit set that omits the active base map still gets it (prepended), so the switcher
+    # can always show what's currently rendered
+    spec = to_spec(_edges(), theme="dark", basemaps=["positron", "osm"])
+    keys = [b["key"] for b in spec["basemaps"]]
+    assert keys[0] == "dark_matter"            # active, prepended
+    assert "positron" in keys and "osm" in keys
+
+
+def test_spec_bakes_both_casings():
+    # both light/dark casings are baked so the switcher can re-pick without rebuilding the spec
+    spec = to_spec(_edges(), theme="dark")
+    p = spec["geojson"]["features"][0]["properties"]   # motorway, highsat
+    assert p["__rs_casing_light"] == "#007785"
+    assert p["__rs_casing_dark"] == "#000000"
+    assert p["__rs_casing"] == p["__rs_casing_dark"]   # active = dark theme's casing
+
+
+def test_to_html_enables_basemap_switcher():
+    html = to_html(_edges())
+    assert "basemap:true" in html                      # widget on by default
+    assert "_renderBaseMapSwitcher" in html and "L.control.layers" in html
+
+
 def test_spec_numeric_legend():
     spec = to_spec(_edges(), color_by="aadt", cmap="viridis", vmin=0, vmax=25000)
     lg = spec["legend"]

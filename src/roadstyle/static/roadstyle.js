@@ -51,7 +51,7 @@
     widgets: {
       legend: true, // render the spec's legend (if present)
       filter: false, // a road-class checkbox panel
-      basemap: false, // reserved: a base-map switcher (spec carries a single basemap today)
+      basemap: false, // a base-layer switcher over the spec's `basemaps` (re-picks casing on change)
     },
   };
 
@@ -147,9 +147,13 @@
 
   RoadStyleMap.prototype._casingStyle = function (f) {
     var p = f.properties;
-    if (!p.__rs_casing || !p.__rs_cw) return { opacity: 0, weight: 0 };
+    // Re-pick casing for the active base map's darkness when both variants are baked; older specs
+    // carry only __rs_casing. A null variant means "no casing on this base map" (minor roads).
+    var casing =
+      "__rs_casing_light" in p ? (this.isDark ? p.__rs_casing_dark : p.__rs_casing_light) : p.__rs_casing;
+    if (!casing || !p.__rs_cw) return { opacity: 0, weight: 0 };
     return {
-      color: p.__rs_casing,
+      color: casing,
       weight: p.__rs_cw,
       opacity: this._visible(p) ? p.__rs_cop : 0,
       lineCap: "round",
@@ -169,16 +173,44 @@
     };
   };
 
+  RoadStyleMap.prototype._tileLayer = function (bm) {
+    return L.tileLayer(bm.url, {
+      attribution: bm.attr || "",
+      subdomains: bm.subdomains || "abc",
+      maxZoom: 20,
+    });
+  };
+
   RoadStyleMap.prototype._renderBaseMap = function () {
-    var bm = (this.spec && this.spec.basemap) || {};
-    if (bm.url) {
-      L.tileLayer(bm.url, {
-        attribution: bm.attr || "",
-        subdomains: bm.subdomains || "abc",
-        maxZoom: 20,
-      }).addTo(this.map);
+    var self = this;
+    var active = (this.spec && this.spec.basemap) || {};
+    // The full selectable set (for the switcher); fall back to just the active base map.
+    var list =
+      this.spec && this.spec.basemaps && this.spec.basemaps.length
+        ? this.spec.basemaps
+        : active.url
+        ? [active]
+        : [];
+    this.baseLayers = {}; // label -> Leaflet layer  (consumed by the basemap switcher widget)
+    this.baseMeta = {}; // label -> basemap meta (darkness / satellite flags)
+    list.forEach(function (bm) {
+      if (!bm.url) return;
+      self.baseLayers[bm.label] = self._tileLayer(bm);
+      self.baseMeta[bm.label] = bm;
+    });
+    this.isDark = !!active.is_dark; // drives which baked casing (__rs_casing_light/_dark) is used
+    var current = this.baseLayers[active.label] || this.baseLayers[Object.keys(this.baseLayers)[0]];
+    if (current) {
+      current.addTo(this.map);
+      this._applyBaseMapFx(this.baseMeta[active.label] || active);
     }
     if (this.spec && this.spec.bounds) this.map.fitBounds(this.spec.bounds);
+  };
+
+  // Visual tweaks tied to the active base map (e.g. dim/saturate satellite imagery).
+  RoadStyleMap.prototype._applyBaseMapFx = function (bm) {
+    var c = this.map.getContainer();
+    if (c && c.classList) c.classList.toggle("rs-satellite", !!(bm && bm.satellite));
   };
 
   RoadStyleMap.prototype._renderRoads = function () {
@@ -295,6 +327,22 @@
     var w = this.options.widgets || {};
     if (w.legend) this._renderLegend();
     if (w.filter) this._renderFilterPanel();
+    if (w.basemap) this._renderBaseMapSwitcher();
+  };
+
+  RoadStyleMap.prototype._renderBaseMapSwitcher = function () {
+    var self = this;
+    var labels = Object.keys(this.baseLayers || {});
+    if (labels.length < 2) return; // nothing to switch between
+    L.control.layers(this.baseLayers, null, { collapsed: true, position: "topleft" }).addTo(this.map);
+    this.map.on("baselayerchange", function (e) {
+      var bm = self.baseMeta[e.name];
+      if (!bm) return;
+      self.isDark = !!bm.is_dark;
+      self._applyBaseMapFx(bm);
+      // casing colour depends on base-map darkness; re-style the casing layer in place.
+      if (self.casingLayer) self.casingLayer.setStyle(self._casingStyle.bind(self));
+    });
   };
 
   RoadStyleMap.prototype._renderLegend = function () {

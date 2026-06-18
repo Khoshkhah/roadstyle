@@ -36,6 +36,7 @@ rs.save_spec(edges, "roads.json", color_by="aadt", cmap="viridis")
   "bounds": [[minLat, minLon], [maxLat, maxLon]],
   "render": { "sandwich": true, "line_cap": "round", "line_join": "round" },
   "basemap": { "key": "dark_matter", "url": "...", "attr": "...", "is_dark": true },
+  "basemaps": [ /* the same shape — base maps offered to the in-map switcher */ ],
   "tooltip": ["name", "aadt"],
   "legend": { "kind": "continuous", "title": "aadt", "vmin": 0, "vmax": 25000, "ramp": ["#440154", ...] },
   "geojson": { "type": "FeatureCollection", "features": [ /* each feature.properties carries: */ ] }
@@ -52,6 +53,7 @@ it doesn't need roadstyle's logic:
 | `__rs_op` | fill opacity |
 | `__rs_dash` | dash pattern (or null) |
 | `__rs_casing` | casing colour for this theme (or null) |
+| `__rs_casing_light` / `__rs_casing_dark` | casing colour for a light / dark base map (lets the switcher re-pick; either may be null) |
 | `__rs_cw` | casing width (px) |
 | `__rs_cop` | casing opacity |
 | `__rs_class` | road class / category |

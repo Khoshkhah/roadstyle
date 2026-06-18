@@ -276,7 +276,8 @@ Then a minimal page wires it up. `RoadStyleMap` is headless — it exposes `getR
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="./roadstyle.js"></script>
 <script>
-  const m = new RoadStyleMap("map", { widgets: { legend: true } });
+  // built-in widgets: legend, a road-type filter panel, and a base-layer switcher
+  const m = new RoadStyleMap("map", { widgets: { legend: true, filter: true, basemap: true } });
   m.load("./map_data.json").then(() => {
     // build a filter UI from the classes present
     m.getRoadClasses().forEach(cls => { /* add a checkbox, then m.setFilter([...on]) */ });

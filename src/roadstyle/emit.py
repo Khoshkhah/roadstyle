@@ -52,14 +52,19 @@ def to_spec(
     vmax: float | None = None,
     width_by=None,
     basemap: str | None = None,
+    basemaps: list[str] | None = None,
     tooltip: list[str] | None = None,
 ) -> dict:
     """Build the canonical JSON spec (data + baked-in resolved style + legend + metadata).
 
     Returns a plain ``dict`` ready for ``json.dump``. The styling arguments mirror
     :func:`roadstyle.render_edges`; the default (no data-driven args) bakes the OSM class style.
+
+    ``basemap`` picks the *active* base map (else the theme default); ``basemaps`` is the list of
+    keys offered to the in-map base-layer switcher (default :data:`DEFAULT_SWITCHER`). Both casing
+    colours are baked per edge, so a light/dark base-map switch re-picks the casing client-side.
     """
-    from .basemaps import get_basemap
+    from .basemaps import DEFAULT_SWITCHER, get_basemap
 
     edges = as_edges(gdf, class_col=highway_col)
     g = edges.gdf
@@ -78,12 +83,15 @@ def to_spec(
     feats = gj.get("features", [])
     for i, feat in enumerate(feats):
         props = feat.setdefault("properties", {})
-        casing = rf.casing_dark[i] if dark else rf.casing_light[i]
         props["__rs_fill"] = rf.fill[i]
         props["__rs_w"] = rf.width[i]
         props["__rs_op"] = rf.opacity[i]
         props["__rs_dash"] = rf.dash[i]
-        props["__rs_casing"] = casing
+        # active casing for this spec's theme, plus both variants so the in-map base-layer
+        # switcher can re-pick light/dark casing without rebuilding the spec.
+        props["__rs_casing"] = rf.casing_dark[i] if dark else rf.casing_light[i]
+        props["__rs_casing_light"] = rf.casing_light[i]
+        props["__rs_casing_dark"] = rf.casing_dark[i]
         props["__rs_cw"] = rf.casing_width[i]
         props["__rs_cop"] = rf.casing_opacity[i]
         props["__rs_class"] = rf.klass[i]
@@ -92,6 +100,12 @@ def to_spec(
     bounds = [[b[1], b[0]], [b[3], b[2]]]   # [[S,W],[N,E]] (Leaflet order)
 
     bm = get_basemap(basemap or th.default_basemap)
+    # Selectable base layers for the in-map switcher; the active `bm` is always present and first.
+    keys = list(basemaps) if basemaps else list(DEFAULT_SWITCHER)
+    if bm.key not in keys:
+        keys = [bm.key, *keys]
+    options = [_basemap_dict(get_basemap(k)) for k in keys]
+
     fields = tooltip if tooltip is not None else [c for c in g.columns if c != g.geometry.name]
     fields = [f for f in fields if f in g.columns]
 
@@ -101,12 +115,18 @@ def to_spec(
         "theme": th.name,
         "bounds": bounds,
         "render": {"sandwich": True, "line_cap": "round", "line_join": "round"},
-        "basemap": {"key": bm.key, "label": bm.label, "url": bm.url, "attr": bm.attr,
-                    "is_dark": bm.is_dark, "subdomains": bm.subdomains},
+        "basemap": _basemap_dict(bm),       # the active base map
+        "basemaps": options,                # all base maps offered to the switcher
         "tooltip": fields,
         "legend": getattr(rf, "legend", None),
         "geojson": gj,
     }
+
+
+def _basemap_dict(bm) -> dict:
+    """Serialise a :class:`roadstyle.Basemap` to the spec JSON shape read by ``roadstyle.js``."""
+    return {"key": bm.key, "label": bm.label, "url": bm.url, "attr": bm.attr,
+            "is_dark": bm.is_dark, "satellite": bm.satellite, "subdomains": bm.subdomains}
 
 
 def to_geojson(gdf, **kw) -> dict:
@@ -149,8 +169,8 @@ def _fragment_html(spec: dict, div_id: str, width: str, height: str) -> str:
     spec_json = json.dumps(spec)
     boot = (
         "(function(){var spec=" + spec_json + ";"
-        'function start(){'
-        'new RoadStyleMap("' + div_id + '",{widgets:{legend:true,filter:true}}).load(spec);}'
+        "var opts={widgets:{legend:true,filter:true,basemap:true}};"
+        'function start(){new RoadStyleMap("' + div_id + '",opts).load(spec);}'
         "if(window.L){start();}else{"
         'var c=document.createElement("link");c.rel="stylesheet";c.href="' + _LEAFLET_CSS
         + '";document.head.appendChild(c);'

@@ -1,7 +1,11 @@
 /*!
- * roadstyle.css — styling for roadstyle.js built-in widgets (legend + filter panel).
+ * roadstyle.css — styling for roadstyle.js built-in widgets (legend + filter + basemap switcher).
  * Inlined by roadstyle.emit.to_html; also usable standalone alongside roadstyle.js.
  */
+/* dim/saturate satellite imagery so road colours read over it (matches the folium backend) */
+.rs-satellite .leaflet-tile-pane {
+  filter: saturate(0.8) brightness(0.9);
+}
 .rs-legend,
 .rs-filter {
   position: absolute;
