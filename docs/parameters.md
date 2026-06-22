@@ -63,7 +63,10 @@ GeoDataFrame with line geometry + a class column).
 | `exclude` | str / list / `None` | `None` | Drop these road classes. Applied after `include`. |
 | `match_links` | bool | `True` | If true, `primary` also matches `primary_link` (OSM link variants). |
 | `color_by` | str / `None` | `None` | Colour by a **data column** instead of road class. With `colors` → categorical; with `cmap` → numeric. |
-| `colors` | dict / `None` | `None` | For categorical `color_by`: a `{value: hexcolour}` map, e.g. `{"low":"#11D68F"}`. |
+| `colors` | dict / `"self"` / `None` | `None` | For categorical `color_by`: a `{value: hexcolour}` map, e.g. `{"low":"#11D68F"}`. `"self"` = use the column's value as the **literal** colour (gray fallback for blank/invalid). |
+| `color_table` | dict / Series / DataFrame / `None` | `None` | Per-edge colour keyed by `color_key`: a `{id: colour}` dict, a `Series`, or a DataFrame with `color_key` + `color_col`. Edges not in it get a **gray** fallback; class widths + casing are kept. |
+| `color_key` | str | `"edge_id"` | The edges column joined against `color_table`'s keys. |
+| `color_col` | str | `"color"` | The colour column name, when `color_table` is a DataFrame. |
 | `cmap` | str / list / `None` | `None` | For numeric `color_by`: a colour ramp name (`"viridis"`, `"YlOrRd"`, …) or list of hex stops. |
 | `vmin`, `vmax` | number / `None` | `None` | Value range for the numeric ramp. Default = the column's min/max. |
 | `width_by` | `(min_px, max_px)` / `None` | `None` | For numeric styling: scale line width with the value, from `min_px` (low) to `max_px` (high). |

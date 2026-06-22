@@ -48,6 +48,7 @@ from .style import base_style, normalize_highway, resolve, selection_style
 from .stylers import (
     CategoricalStyler,
     ClassStyler,
+    ColorTableStyler,
     NumericStyler,
     ResolvedFrame,
     Styler,
@@ -73,7 +74,7 @@ __all__ = [
     # palette JSON I/O (Phase 2a)
     "load_palette", "save_palette", "palette_to_dict", "palette_from_dict",
     # data-driven styling (Phase 2)
-    "CategoricalStyler", "NumericStyler", "build_styler",
+    "CategoricalStyler", "NumericStyler", "ColorTableStyler", "build_styler",
     "color_by", "color_by_value", "color_by_class",
     # canonical input (Phase 3a)
     "RoadEdges", "normalize_edges", "load_edges", "as_edges",

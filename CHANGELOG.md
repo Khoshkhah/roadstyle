@@ -11,6 +11,11 @@ styling library that can also be embedded in a website. The existing OSM styling
 byte-for-byte unchanged; everything new is additive.
 
 ### Added
+- **Per-edge colour table**: `render_edges(edges, color_table={edge_id: colour})` paints each edge
+  from your own map (dict / `Series` / DataFrame with `color_key`+`color_col`) instead of by road
+  class — for clusters, routes, metrics, etc. Edges not in the table get a **gray** fallback; class
+  widths + casing are kept so the network still reads as roads. `colors="self"` does the same from
+  a colour column already on the data. New `ColorTableStyler`; works on every backend.
 - **MapLibre `web` backend is now the default** (`render_edges` `backend="web"`); the CLI's `-f web`
   emits it too and is the default format. The old `-f web` roadstyle.js page moved to **`-f rsjs`**
   (resolving the name clash). Folium-specific features (legends, filter panel) stay on

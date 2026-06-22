@@ -80,6 +80,10 @@ rs.render_edges(edges, color_by="congestion",
 rs.render_edges(edges, color_by="aadt", cmap="viridis",
                 vmin=0, vmax=20000, width_by=(1, 8), legend=True)
 
+# Per-edge colour from your own edge_id -> colour table (gray fallback for misses)
+rs.render_edges(edges, color_table={"4897…": "#e6194B", "5193…": "#3cb44b"})
+rs.render_edges(edges, color_by="color", colors="self")   # colour already a column
+
 # GPU backend for very large edge sets
 rs.render_edges(big_edges, backend="lonboard", color_by="aadt", cmap="magma")
 

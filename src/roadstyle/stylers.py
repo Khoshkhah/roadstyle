@@ -287,6 +287,44 @@ class NumericStyler:
         return rf
 
 
+def _color_or(v, fallback: str) -> str:
+    """A per-edge literal colour: the value if it's a non-empty colour string (hex or CSS name),
+    else ``fallback`` — so missing edges (NaN/None/blank) and non-string values fall back to gray."""
+    return v.strip() if isinstance(v, str) and v.strip() else fallback
+
+
+@dataclass
+class ColorTableStyler:
+    """Colour each edge by a **per-edge colour** held in ``color_column`` (literal hex / CSS name),
+    while keeping the class-based **widths + casing** so roads still read as roads. Edges with no
+    (or blank) colour get ``fallback_color`` (gray). This is the styler behind ``color_table=`` and
+    ``colors="self"`` — use it to paint a network by your own per-edge data (clusters, paths,
+    metrics) rather than by road class. No legend (the colours are arbitrary per edge).
+    """
+    color_column: str
+    highway_col: str = "highway"
+    palette: str | Mapping[str, RoadStyle] = "highsat"
+    fallback_color: str = "#bbbbbb"
+    column: str | None = None        # the class column (Styler protocol / filtering)
+
+    def __post_init__(self):
+        self.column = self.highway_col
+
+    def resolve_frame(self, gdf, theme: str | Theme = "dark") -> ResolvedFrame:
+        n = len(gdf)
+        if self.highway_col in gdf.columns:
+            # borrow per-class widths + (theme-aware) casing, then override the fill
+            rf = ClassStyler(column=self.highway_col, palette=self.palette).resolve_frame(gdf, theme)
+        else:
+            rf = ResolvedFrame([self.fallback_color] * n, [2.0] * n, ["#000000"] * n,
+                               ["#000000"] * n, [3.0] * n, [None] * n, [0.9] * n, [0.75] * n,
+                               [None] * n, theme_aware_casing=False)
+        colors = gdf[self.color_column].tolist() if self.color_column in gdf.columns else [None] * n
+        rf.fill = [_color_or(c, self.fallback_color) for c in colors]
+        rf.legend = None             # arbitrary per-edge colours -> no categorical legend
+        return rf
+
+
 def bake_props(gj: dict, rf: ResolvedFrame, dark: bool) -> dict:
     """Bake the per-edge ``__rs_*`` style props onto a GeoJSON FeatureCollection, in place.
 
@@ -347,13 +385,16 @@ def build_styler(
 
     Resolution order (keeps the legacy OSM call byte-identical when no new args are given):
     1. explicit ``style=`` (a Styler) wins;
-    2. ``color_by`` + ``colors`` → :class:`CategoricalStyler`;
-    3. ``color_by`` + (``cmap`` or numeric intent) → :class:`NumericStyler`;
-    4. otherwise → :class:`ClassStyler` (the original behaviour).
+    2. ``color_by`` + ``colors="self"`` → :class:`ColorTableStyler` (literal per-edge colours);
+    3. ``color_by`` + ``colors`` (a map) → :class:`CategoricalStyler`;
+    4. ``color_by`` + (``cmap`` or numeric intent) → :class:`NumericStyler`;
+    5. otherwise → :class:`ClassStyler` (the original behaviour).
     """
     if style is not None:
         return style
     if color_by is not None:
+        if isinstance(colors, str) and colors == "self":
+            return ColorTableStyler(color_column=color_by, highway_col=highway_col, palette=palette)
         if colors is not None:
             return CategoricalStyler(column=color_by, colors=colors)
         return NumericStyler(column=color_by, cmap=cmap or "viridis",

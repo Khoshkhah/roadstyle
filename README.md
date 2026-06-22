@@ -79,6 +79,20 @@ render_edges(edges, backend="lonboard", theme="dark")
 render_edges(edges, backend="web", theme="dark").save("roads.html")
 ```
 
+### Colour each edge from your own table
+
+Instead of colouring by road class, paint each edge by a per-edge colour — a `{edge_id: colour}`
+table (dict, `Series`, or a DataFrame with `edge_id` + `color` columns). Edges not in the table get
+a **gray** fallback; class widths + casing are kept, so the network still reads as roads.
+
+```python
+colors = {"4897…": "#e6194B", "5193…": "#3cb44b", ...}     # e.g. cluster / path / metric per edge
+render_edges(edges, color_table=colors).save("by_edge.html")
+
+# or, if the colour is already a column in your data, use it literally:
+render_edges(edges, color_by="color", colors="self").save("by_edge.html")
+```
+
 ## API at a glance
 
 | Function | Purpose |
