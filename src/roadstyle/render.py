@@ -78,6 +78,8 @@ def render_edges(
         from .render_folium import render
     elif backend == "lonboard":
         from .render_lonboard import render
+    elif backend == "web":
+        from .render_web import render
     else:
-        raise ValueError(f"unknown backend {backend!r}; use 'folium' or 'lonboard'")
+        raise ValueError(f"unknown backend {backend!r}; use 'folium', 'lonboard', or 'web'")
     return render(g, palette=palette, theme=theme, highway_col=col, styler=styler, **kwargs)
