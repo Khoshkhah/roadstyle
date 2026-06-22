@@ -1,18 +1,24 @@
 """Tunable styling constants, gathered into one place.
 
 Historically these lived as module-level constants in :mod:`roadstyle.style`
-(``FILL_OPACITY``, ``CASING_OPACITY``, ``LINK_SCALE``). Bundling them into a single
-:class:`StyleConfig` lets a caller adjust the look without editing the library, while the
-defaults reproduce the original, web-renderer-calibrated values exactly.
+(``FILL_OPACITY``, ``CASING_OPACITY``, ``LINK_SCALE``), then as a hardcoded
+:class:`StyleConfig`. The values now live in a JSON data file shipped with the package
+(``roadstyle/data/style.json`` → ``"config"``) and are loaded at import via
+:mod:`roadstyle._settings`, which also applies user overrides — so a caller can adjust the
+look without editing the library, while the defaults reproduce the original,
+web-renderer-calibrated values exactly.
 
 ``minor_no_casing`` lists the OSM classes that intentionally render *fill only* (no casing),
 matching the website: service / living_street / pedestrian / track / cycleway / footway / path.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 
-# default OSM classes that carry no casing (fill only) — matches the web renderer
+from . import _settings
+
+# default OSM classes that carry no casing (fill only) — matches the web renderer. Used as the
+# in-code fallback when the data file omits the key.
 _MINOR_NO_CASING = frozenset(
     {"service", "living_street", "pedestrian", "track", "cycleway", "footway", "path"}
 )
@@ -31,5 +37,19 @@ class StyleConfig:
     minor_no_casing: frozenset[str] = field(default_factory=lambda: _MINOR_NO_CASING)
 
 
-#: The default configuration (the calibrated values used everywhere unless overridden).
-DEFAULT = StyleConfig()
+def _default_config() -> StyleConfig:
+    """Build the default :class:`StyleConfig` from ``data/style.json`` (+ user overrides).
+
+    Unknown keys are ignored (so a stray override field can't crash import) and the JSON list
+    ``minor_no_casing`` is coerced back to a frozenset. Any field the data omits keeps the
+    dataclass default.
+    """
+    raw = dict(_settings.style()["config"])
+    if raw.get("minor_no_casing") is not None:
+        raw["minor_no_casing"] = frozenset(raw["minor_no_casing"])
+    known = {f.name for f in fields(StyleConfig)}
+    return StyleConfig(**{k: v for k, v in raw.items() if k in known})
+
+
+#: The default configuration (bundled calibrated values + any user override).
+DEFAULT = _default_config()

@@ -56,7 +56,7 @@ GeoDataFrame with line geometry + a class column).
 |---|---|---|---|
 | `gdf` | `RoadEdges` / GeoDataFrame | *required* | The road edges to draw. A plain GeoDataFrame is normalised for you (→ EPSG:4326, lines). |
 | `backend` | `"web"` / `"folium"` / `"lonboard"` | `"web"` | Renderer. **`web` (default)** = self-contained **MapLibre (vector)** map with per-zoom widths, two-way lanes, arrows/names, hover/select & tunnel/bridge grade separation (see [web backend](web-backend.md)). `folium` = portable interactive HTML (Leaflet) with legends + filter panel. `lonboard` = GPU/WebGL, for very large data. |
-| `palette` | str or dict | `"highsat"` | Which colour palette for **class** styling. Built-ins: `"highsat"`, `"carto"`. Ignored if you use `color_by`/`style`. |
+| `palette` | str or dict | `"highsat"` | Which colour palette for **class** styling. Built-ins: `"highsat"`, `"carto"`, `"mono"` (grayscale). Add your own via a [data file or override](palettes.md#customising-data-files--overrides). Ignored if you use `color_by`/`style`. |
 | `theme` | `"light"`/`"dark"`/`"satellite"` | `"dark"` | Visual theme: sets the default base map and which casing colour (light/dark) is used. |
 | `highway_col` | str | `"highway"` | Which column holds the road class. Set this if your class column has a different name. |
 | `include` | str / list / `None` | `None` | Keep **only** these road classes (e.g. `["motorway","primary"]`). |
