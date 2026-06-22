@@ -1,0 +1,26 @@
+{
+  "config": {
+    "fill_opacity": 0.9,
+    "casing_opacity": 0.75,
+    "casing_extra": 2.0,
+    "link_scale": 0.7,
+    "tunnel_opacity_scale": 0.45,
+    "bridge_casing_extra": 1.5,
+    "minor_no_casing": [
+      "cycleway",
+      "footway",
+      "living_street",
+      "path",
+      "pedestrian",
+      "service",
+      "track"
+    ]
+  },
+  "selection": {
+    "core": "#EE00FF",
+    "casing_light": "#220033",
+    "casing_dark": "#000000",
+    "glow": "#D000FF",
+    "glow_opacity": 0.35
+  }
+}

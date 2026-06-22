@@ -11,10 +11,12 @@ The **`web` backend** (`backend="web"`) goes further, matching the *openstreetma
 **boundary overlay** — all in one **offline, self-contained HTML** file (MapLibre and the data
 bundled in; no server needed). See [`docs/web-backend.md`](docs/web-backend.md).
 
-Two palettes:
+Three palettes (data files you can [override](#customising-palettes--config-data-files-no-code-edit)):
 - **`highsat`** — custom high-saturation theme (cyan motorway, pink trunk, orange primary…)
   with theme-dependent casing. Maximum legibility over any base map.
 - **`carto`** — the classic **OSM Carto** palette (muted warm tones).
+- **`mono`** — neutral grayscale (no hues); importance by shade + width. Good for print or as a
+  quiet backdrop for data overlays.
 
 ## Install
 
@@ -92,6 +94,32 @@ render_edges(edges, color_table=colors).save("by_edge.html")
 # or, if the colour is already a column in your data, use it literally:
 render_edges(edges, color_by="color", colors="self").save("by_edge.html")
 ```
+
+## Customising palettes & config (data files, no code edit)
+
+The built-in palettes and styling knobs are **data, not code** — JSON files shipped in the
+package (`roadstyle/data/palettes/*.json` and `roadstyle/data/style.json`). To change a colour or
+a knob, edit those files, or — without touching the package — drop a `roadstyle.json` override
+that is read at import time. Override sources, lowest precedence first (later wins):
+
+1. `~/.config/roadstyle/roadstyle.json` (or `$XDG_CONFIG_HOME/roadstyle/roadstyle.json`)
+2. `./roadstyle.json` (project-local, current working dir)
+3. `$ROADSTYLE_CONFIG` (explicit file path)
+
+```jsonc
+{
+  "palettes": {
+    "highsat": { "service": { "fill": "#E0E0E0" } },   // retint one class; rest is inherited
+    "mytheme": { "roads": { "motorway": { "fill": "#f00", "width": 6, "casing_width": 8 } } }
+  },
+  "config":    { "fill_opacity": 0.95 },
+  "selection": { "core": "#FF0000" }
+}
+```
+
+Palette overrides are deep-merged **per road class** (change just `service.fill` and keep its
+width/casing); `config`/`selection` override individual keys. Programmatic paths still work too:
+`register_palette(name, table)`, `load_palette(path)`, or `render_edges(palette=…)`.
 
 ## API at a glance
 
