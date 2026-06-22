@@ -29,12 +29,12 @@ palette JSON file.
 > road a clean edge. `casing_light`/`casing_dark` exist so the border can switch colour to suit
 > a light vs dark base map.
 
-> **Units & zoom (known limitation).** `width` and `casing_width` are **fixed screen pixels** —
-> a road keeps the same on-screen thickness at every zoom level. This looks right at city scale
-> (roadstyle's main use). It is *not* yet zoom-dependent: when zoomed far out, fixed-pixel roads
-> can blob together; when zoomed far in they don't thicken. Professional vector maps instead vary
-> width with zoom (a Mapbox-style `interpolate` curve) or use ground-meter widths with min/max
-> pixel clamps. A zoom→width curve is a planned opt-in; fixed pixels will remain the default.
+> **Units & zoom.** `width` and `casing_width` are **fixed screen pixels** on the `folium` and
+> `lonboard` backends — a road keeps the same on-screen thickness at every zoom level. This looks
+> right at city scale (roadstyle's main use), but when zoomed far out fixed-pixel roads can blob
+> together, and when zoomed far in they don't thicken. The **`web` (MapLibre) backend** instead
+> varies width with zoom (the osm-carto width-by-zoom curve), so roads widen smoothly as you zoom
+> in — use it when you need zoom-correct widths. See [web backend](web-backend.md).
 
 Example (one entry from the `highsat` palette):
 ```json
@@ -55,7 +55,7 @@ GeoDataFrame with line geometry + a class column).
 | Parameter | Type | Default | Meaning |
 |---|---|---|---|
 | `gdf` | `RoadEdges` / GeoDataFrame | *required* | The road edges to draw. A plain GeoDataFrame is normalised for you (→ EPSG:4326, lines). |
-| `backend` | `"folium"` / `"lonboard"` | `"folium"` | Renderer. `folium` = portable interactive HTML (Leaflet). `lonboard` = GPU/WebGL, for very large data. |
+| `backend` | `"web"` / `"folium"` / `"lonboard"` | `"web"` | Renderer. **`web` (default)** = self-contained **MapLibre (vector)** map with per-zoom widths, two-way lanes, arrows/names, hover/select & tunnel/bridge grade separation (see [web backend](web-backend.md)). `folium` = portable interactive HTML (Leaflet) with legends + filter panel. `lonboard` = GPU/WebGL, for very large data. |
 | `palette` | str or dict | `"highsat"` | Which colour palette for **class** styling. Built-ins: `"highsat"`, `"carto"`. Ignored if you use `color_by`/`style`. |
 | `theme` | `"light"`/`"dark"`/`"satellite"` | `"dark"` | Visual theme: sets the default base map and which casing colour (light/dark) is used. |
 | `highway_col` | str | `"highway"` | Which column holds the road class. Set this if your class column has a different name. |
@@ -72,24 +72,39 @@ GeoDataFrame with line geometry + a class column).
 | `selected` | GeoDataFrame / `None` | `None` | Highlight these edges with a neon-violet overlay. |
 | `basemap` | str / `None` | `None` | Use a single fixed base map (a key in `BASEMAPS`), instead of the theme default + switcher. |
 | `basemaps` | list / `None` | `None` | (folium) The set of base maps offered in the switcher control. |
-| `filter_control` | bool | `True` | (folium) Show the in-map road-type filter panel (checkboxes). |
+| `filter_control` | bool | `True` | Show the in-map road-type filter panel (checkboxes). On `folium` and the `web` backend. |
 | `name` | str | `"roads"` | Layer name. |
-| `arrows` | bool | `False` | (folium) Overlay a small **direction chevron** (`>`) at each edge's midpoint, pointing along the geometry's `source → target` order. |
-| `arrow_col` | str / `None` | `None` | Restrict arrows to edges where this column is truthy (e.g. `"oneway"`). Missing column / `None` ⇒ every edge is arrowed. |
-| `arrow_color` | hex str | `"#555555"` | Arrow colour (gray). |
-| `arrow_size_m` | number | `2.8` | Chevron barb length in **metres** — a fixed geographic size, so arrows scale with zoom. |
-| `arrow_min_zoom` | int / `None` | `18` | Render arrows only at zoom ≥ this (keeps the zoomed-out view clean and light). `None` = always show. |
 
-**Returns:** a `folium.Map` (default) or a `lonboard.Map`. Save with `.save("map.html")` (folium)
-or `.to_html("map.html")` (lonboard); both also display inline in a notebook.
+**Returns:** a `WebMap` (default, `backend="web"`), a `folium.Map` (`backend="folium"`), or a
+`lonboard.Map` (`backend="lonboard"`). Save with `.save("map.html")` (web / folium) or
+`.to_html("map.html")` (lonboard); all three also display inline in a notebook.
 
-> **Direction arrows.** `arrows=True` adds the chevrons as one lightweight GeoJSON line layer
-> (plain SVG paths — they don't use a per-edge text-path plugin, which doesn't scale to thousands
-> of edges). They're a **folium-only** overlay; on the lonboard backend the `arrow_*` kwargs are
-> ignored with a warning. Geometry direction is the edge's coordinate order, so on a directed
-> routing graph each one-way edge points the legal way; a two-way street drawn as a
-> forward+reverse pair gets a chevron per direction. Use `arrow_col="oneway"` to arrow one-way
-> edges only.
+> **Legends & the default backend.** Data-driven **legends** and the in-map **filter panel** are
+> drawn by the `folium` (and JSON) outputs, *not* the MapLibre `web` backend. So
+> `render_edges(color_by=…, cmap=…, legend=True)` only shows a legend on `backend="folium"` (or via
+> `to_html`/`to_spec`). Use `backend="folium"` when you need the legend; use the default `web`
+> backend for the zoom-correct interactive map.
+
+### `backend="web"` — extra parameters
+
+Only used by the MapLibre web backend; ignored by the others. See [web backend](web-backend.md).
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `arrows` | bool | `True` | Show one-way direction chevrons (CLI: `--no-arrows`). |
+| `labels` | bool | `True` | Show curved street-name labels (CLI: `--no-labels`). |
+| `filter_control` | bool | `True` | Show the collapsible road-class filter panel (CLI: `--no-filter`). |
+| `basemap_switcher` | bool | `True` | Show the in-map base-layer dropdown (CLI: `--no-basemap-switcher`). |
+| `offset_frac` | float | `0.28` | Two-way lane offset as a fraction of the road's **pixel** width (constant overlap at every zoom). `0` = no lane split. |
+| `width_frac` | float | `0.6` | Each two-way lane's width as a fraction of the full width once the directions fan apart (a little over `0.5` so the lanes overlap rather than gap). |
+| `offset_zoom` | int | `15` | Zoom at which the two directions start fanning into parallel lanes (ramped over ~2 levels; coincident below). |
+| `tunnel_col` | str | `"tunnel"` | Column marking tunnels — drawn underneath, dashed + faded. |
+| `bridge_col` | str | `"bridge"` | Column marking bridges — drawn on top with a heavier, square-capped casing. |
+| `layer_col` | str | `"layer"` | OSM `layer` tag column; its sign sets elevation when `tunnel`/`bridge` are absent. |
+
+> **Direction arrows.** `arrows=True` (web backend) places one-way chevrons along each one-way edge
+> using a native MapLibre symbol layer (`symbol-placement: line`). Geometry direction is the edge's
+> coordinate order, so on a directed routing graph each one-way edge points the legal way.
 
 ---
 

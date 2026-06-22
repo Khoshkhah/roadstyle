@@ -11,12 +11,24 @@ styling library that can also be embedded in a website. The existing OSM styling
 byte-for-byte unchanged; everything new is additive.
 
 ### Added
-- Direction arrows: `render_edges(..., arrows=True)` overlays a small chevron (`>`) at each edge's
-  midpoint pointing along the geometry's `source → target` order (folium backend). Drawn as one
-  lightweight GeoJSON line layer — not a per-edge text-path plugin, which doesn't scale. Tunable
-  via `arrow_col` (restrict to truthy edges, e.g. `"oneway"`), `arrow_color`, `arrow_size_m`, and
-  `arrow_min_zoom` (zoom-gate; defaults: gray, ~2.8 m, shown at zoom ≥ 18). Ignored (with a
-  warning) on the lonboard backend.
+- **MapLibre `web` backend is now the default** (`render_edges` `backend="web"`); the CLI's `-f web`
+  emits it too and is the default format. The old `-f web` roadstyle.js page moved to **`-f rsjs`**
+  (resolving the name clash). Folium-specific features (legends, filter panel) stay on
+  `backend="folium"` / `-f folium`.
+- **Web-backend UI toggles**: `arrows`, `labels`, `filter_control` (a new collapsible **road-class
+  filter panel** — a checkbox per class present, hides that class across every road layer), and
+  `basemap_switcher` (the in-map base-layer dropdown). All default `True`; CLI flags `--no-arrows`,
+  `--no-labels`, `--no-filter`, `--no-basemap-switcher`.
+- **MapLibre `web` backend** (`render_edges(backend="web")` → a `WebMap` with `.save()`): a
+  self-contained, **zoom-correct** vector map matching openstreetmap-carto. Per-zoom road widths
+  (osm-carto width-by-zoom curve) instead of fixed pixels; **two-way directional lanes** via a
+  pixel-proportional `line-offset` (`offset_frac`/`width_frac`/`offset_zoom`); direction **arrows**
+  and curved **street names** (native symbol layers); **hover/select** via `feature-state`; an
+  in-map **base-layer switcher**; class-based **draw order**; and **tunnel/bridge grade
+  separation** — one baked `lvl` (from optional `tunnel`/`bridge`/`layer` columns) orders tunnels
+  underneath (dashed + faded) and bridges on top (heavier, square-capped casing). The saved HTML
+  **bundles MapLibre inline and inlines the data**, so it opens offline from disk with no server.
+  Distinct from `save`/`-f rsjs` (the roadstyle.js spec page). See `docs/web-backend.md`.
 - Command-line interface: a `roadstyle` console script (`roadstyle.cli`) renders any road file
   from the shell — `roadstyle edges.gpkg -o map.html --theme dark`, with `--include/--exclude`
   filtering, data-driven `--color-by/--cmap/--width-by`, and `-f folium|web|spec|geojson` output.

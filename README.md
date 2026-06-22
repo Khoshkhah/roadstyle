@@ -1,9 +1,15 @@
 # roadstyle
 
-OSM-theme **road/edge map styling** for `folium` and `lonboard`. Turns a GeoDataFrame with a
-`highway` column into a styled interactive map — with the proper **casing + fill
-"geometry sandwich"**, **light / dark / satellite** themes, **highway-type filtering**, and a
-neon-violet **selected-edge** style.
+OSM-theme **road/edge map styling** for `folium`, `lonboard`, and a self-contained **MapLibre
+(vector)** backend. Turns a GeoDataFrame with a `highway` column into a styled interactive map —
+with the proper **casing + fill "geometry sandwich"**, **light / dark / satellite** themes,
+**highway-type filtering**, and a neon-violet **selected-edge** style.
+
+The **`web` backend** (`backend="web"`) goes further, matching the *openstreetmap-carto* look with
+**per-zoom widths**, **two-way directional lanes**, direction **arrows**, curved **street names**,
+**hover/select**, a base-layer switcher, and **tunnel/bridge grade separation** — all in one
+**offline, self-contained HTML** file (MapLibre and the data bundled in; no server needed). See
+[`docs/web-backend.md`](docs/web-backend.md).
 
 Two palettes:
 - **`highsat`** — custom high-saturation theme (cyan motorway, pink trunk, orange primary…)
@@ -43,8 +49,10 @@ roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by
 roadstyle edges.gpkg -f spec -o map_data.json               # JSON spec for your own frontend
 ```
 
-`-f/--format` picks the output: `folium` (default), `web` (standalone roadstyle.js page), `spec`
-(JSON), or `geojson`. Run `roadstyle --help` for every flag — each mirrors a `render_edges` keyword.
+`-f/--format` picks the output: `web` (self-contained MapLibre map, **default**), `folium`
+(interactive folium HTML), `rsjs` (standalone roadstyle.js page), `spec` (JSON), or `geojson`. The
+`web` map takes `--no-arrows` / `--no-labels` / `--no-filter` / `--no-basemap-switcher`. Run
+`roadstyle --help` for every flag — each mirrors a `render_edges` keyword.
 
 ## Quickstart (Python)
 
@@ -65,6 +73,10 @@ render_edges(edges, theme="satellite",
 
 # big data: GPU backend
 render_edges(edges, backend="lonboard", theme="dark")
+
+# self-contained MapLibre map: per-zoom widths, two-way lanes, arrows, names,
+# hover/select, base switcher, tunnel/bridge grade separation — opens offline, no server
+render_edges(edges, backend="web", theme="dark").save("roads.html")
 ```
 
 ## API at a glance

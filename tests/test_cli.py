@@ -22,7 +22,7 @@ def test_missing_input_returns_2(tmp_path):
     assert main([str(tmp_path / "nope.gpkg"), "-o", str(tmp_path / "out.html")]) == 2
 
 
-@pytest.mark.parametrize("fmt", ["folium", "web", "spec", "geojson"])
+@pytest.mark.parametrize("fmt", ["web", "folium", "rsjs", "spec", "geojson"])
 def test_each_format_writes_a_file(tmp_path, fmt):
     out = tmp_path / f"map_{fmt}"
     assert main([str(SAMPLE), "-o", str(out), "-f", fmt, "--theme", "dark"]) == 0

@@ -55,7 +55,7 @@ Changelog = "https://github.com/Khoshkhah/roadstyle/blob/main/CHANGELOG.md"
 where = ["src"]
 
 [tool.setuptools.package-data]
-roadstyle = ["py.typed", "static/*.js", "static/*.css"]
+roadstyle = ["py.typed", "static/*.js", "static/*.css", "vendor/*.js", "vendor/*.css"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

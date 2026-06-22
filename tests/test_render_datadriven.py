@@ -3,7 +3,14 @@ import geopandas as gpd
 import pytest
 from shapely.geometry import LineString
 
-from roadstyle import color_by_value, render_edges
+from functools import partial as _partial
+
+from roadstyle import color_by_value
+from roadstyle import render_edges as _render_edges
+
+# Folium-backend tests (baked-prop HTML, legends, get_root()). Default backend is now "web";
+# pin folium here. Explicit backend= (e.g. the lonboard test) still overrides.
+render_edges = _partial(_render_edges, backend="folium")
 
 
 def _edges():

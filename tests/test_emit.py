@@ -149,7 +149,7 @@ def test_spec_html_comparable_weight_to_folium():
     )
     spec_html = to_html(g, color_by="aadt", cmap="viridis")
     from roadstyle import render_edges
-    folium_html = render_edges(g, color_by="aadt", cmap="viridis").get_root().render()
+    folium_html = render_edges(g, color_by="aadt", cmap="viridis", backend="folium").get_root().render()
     assert len(spec_html) <= len(folium_html) * 1.2
 
 

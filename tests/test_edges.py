@@ -58,11 +58,12 @@ def test_as_edges_passthrough_and_coerce():
 
 
 def test_render_accepts_roadedges_and_gdf():
-    import folium
+    from roadstyle.render_web import WebMap
 
     e = normalize_edges(_raw(), rename={"vagtyp": "highway"})
-    assert isinstance(render_edges(e), folium.Map)
-    assert isinstance(render_edges(e.gdf), folium.Map)
+    # default backend is now "web" (MapLibre) -> a WebMap; both input kinds are accepted
+    assert isinstance(render_edges(e), WebMap)
+    assert isinstance(render_edges(e.gdf), WebMap)
 
 
 def test_empty_raises_clear_error():

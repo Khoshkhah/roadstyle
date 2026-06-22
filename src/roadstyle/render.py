@@ -10,7 +10,7 @@ from .validate import validate_edges
 def render_edges(
     gdf,
     *,
-    backend: str = "folium",
+    backend: str = "web",
     palette: str = "highsat",
     theme: str = "dark",
     highway_col: str = "highway",
@@ -48,11 +48,10 @@ def render_edges(
 
     Extra kwargs pass through to the backend renderer, e.g.:
       - ``basemap`` : override the theme's base map (a key in ``roadstyle.BASEMAPS``).
-      - ``basemaps``: (folium) a list of base-map keys offered as toggleable radio layers.
+      - ``basemaps``: a list of base-map keys offered as toggleable layers / a switcher.
       - ``tooltip`` / ``selected`` / ``name``.
-      - ``arrows`` : (folium) overlay source->target direction chevrons. ``arrow_col`` restricts
-        them to edges where that column is truthy (e.g. ``"oneway"``); ``arrow_color`` (gray),
-        ``arrow_size_m`` (~2.8 m) and ``arrow_min_zoom`` (18; ``None`` = always show) tune them.
+      - ``arrows`` / ``labels`` / ``filter_control`` / ``basemap_switcher`` : (web backend) toggle
+        the one-way arrows, street-name labels, road-class filter panel, and base-layer dropdown.
     """
     edges = as_edges(gdf, class_col=highway_col)   # canonical: RoadEdges (EPSG:4326, lines)
     g = edges.gdf

@@ -8,7 +8,7 @@ the right one.
 
 | Tool | Interactive? | Road **casing** + per-class widths | Colour by **data** | Web-embeddable output | Best for |
 |---|---|---|---|---|---|
-| **roadstyle** | ✅ folium + lonboard | ✅ built-in (geometry sandwich) | ✅ categorical + numeric | ✅ JSON spec / HTML / iframe | correct interactive road maps, out of the box |
+| **roadstyle** | ✅ folium + lonboard + MapLibre (`web`) | ✅ built-in (geometry sandwich; per-zoom widths on `web`) | ✅ categorical + numeric | ✅ JSON spec / HTML / iframe | correct interactive road maps, out of the box |
 | geopandas `.explore()` | ✅ folium | ❌ single line, no casing/z-order | ✅ (`column`, `cmap`, `scheme`) | ⚠️ folium HTML only | quick data exploration of any geometry |
 | prettymaps | ❌ static PNG/SVG | ✅ per-class widths | ❌ class only | ❌ image | poster-quality static art maps |
 | osmnx `plot_graph` | ❌ mostly static | ⚠️ basic | ⚠️ manual | ❌ | street-network analysis |
@@ -46,6 +46,8 @@ and lets your existing knowledge of those libraries carry over.
 
 ## Known limitations
 
-- **Widths are fixed pixels**, not zoom-scaled — great at city scale, can blob at very wide zoom
-  (see [parameters](parameters.md)). A zoom→width curve is planned for the MapLibre/JSON output.
+- **Fixed-pixel widths on folium/lonboard** — great at city scale, can blob at very wide zoom
+  (see [parameters](parameters.md)). The **`web` (MapLibre) backend** is zoom-scaled (osm-carto
+  width curve), so reach for it when you need zoom-correct widths — it also adds two-way lanes and
+  tunnel/bridge grade separation (see [web backend](web-backend.md)).
 - **lonboard legends** aren't rendered yet (folium + the JSON/HTML outputs have them).

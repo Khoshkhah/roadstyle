@@ -29,8 +29,10 @@ roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by
 roadstyle edges.gpkg -f spec -o map_data.json               # JSON spec for your own frontend
 ```
 
-`-f/--format` is one of `folium` (default), `web`, `spec`, `geojson`; every other flag mirrors a
-`render_edges` keyword. See `roadstyle --help`.
+`-f/--format` is one of `web` (self-contained MapLibre map, **default**), `folium`, `rsjs`
+(roadstyle.js page), `spec`, `geojson`; every other flag mirrors a `render_edges` keyword (the
+`web` map also takes `--no-arrows`/`--no-labels`/`--no-filter`/`--no-basemap-switcher`). See
+`roadstyle --help`.
 
 ## Input — what roadstyle expects
 
@@ -56,8 +58,9 @@ edges = gpd.read_file("edges.gpkg")            # needs a `highway` column
 rs.render_edges(edges, theme="dark").save("roads.html")
 ```
 
-`render_edges` returns a `folium.Map` (or a `lonboard.Map` with `backend="lonboard"`), so you can
-keep customising it, `.save()` it, or display it inline in a notebook.
+`render_edges` returns a `WebMap` by default (the MapLibre `web` backend), or a `folium.Map` with
+`backend="folium"`, or a `lonboard.Map` with `backend="lonboard"` — so you can keep customising it,
+`.save()` it, or display it inline in a notebook.
 
 ## Recipes
 
@@ -79,7 +82,28 @@ rs.render_edges(edges, color_by="aadt", cmap="viridis",
 
 # GPU backend for very large edge sets
 rs.render_edges(big_edges, backend="lonboard", color_by="aadt", cmap="magma")
+
+# self-contained MapLibre map (per-zoom widths, two-way lanes, arrows, names,
+# hover/select, base switcher, tunnel/bridge grade separation) — opens offline, no server
+rs.render_edges(edges, backend="web", theme="dark").save("roads.html")
 ```
+
+## MapLibre web backend
+
+`backend="web"` renders a finished, **zoom-correct** MapLibre vector map as one **self-contained**
+HTML file (MapLibre + data bundled in — opens from disk with no server, no internet). It adds
+two-way directional lanes, direction arrows, curved street names, hover/select, a base-layer
+switcher, and **tunnel/bridge grade separation** (reads optional `tunnel`/`bridge`/`layer`
+columns). It returns a `WebMap` with `.save(path)`.
+
+```python
+rs.render_edges(edges, backend="web", theme="dark",
+                offset_frac=0.28, width_frac=0.6, offset_zoom=15).save("roads.html")
+```
+
+Toggle the UI with `arrows` / `labels` / `filter_control` / `basemap_switcher` (all default `True`).
+See **[MapLibre web backend](web-backend.md)** for the full feature list and parameters. (This is
+distinct from `rs.save` / `-f rsjs`, which writes the roadstyle.js *spec page* for embedding.)
 
 ## Custom (non-OSM) road classes
 

@@ -15,6 +15,7 @@ nav:
   - Tutorial: tutorial.md
   - Examples: examples.md
   - Parameter reference: parameters.md
+  - MapLibre web backend: web-backend.md
   - Embedding in a website: embedding.md
   - Frontend integration: frontend.md
   - Palettes: palettes.md

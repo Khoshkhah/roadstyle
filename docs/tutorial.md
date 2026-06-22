@@ -26,8 +26,9 @@ edges = gpd.read_file("edges.gpkg")        # any CRS; reprojected to EPSG:4326 f
 print(f"{len(edges):,} edges, CRS {edges.crs}")
 ```
 
-One call renders it. In a notebook the returned `folium.Map` displays inline; anywhere else,
-`.save()` it:
+One call renders it. The default backend is `web` (a self-contained MapLibre map); in a notebook
+the returned map (`WebMap`, or `folium.Map` with `backend="folium"`) displays inline; anywhere
+else, `.save()` it:
 
 ```python
 m = rs.render_edges(edges, theme="dark")   # high-saturation palette on a dark base map

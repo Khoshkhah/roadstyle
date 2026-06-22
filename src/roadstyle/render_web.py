@@ -19,10 +19,20 @@ from __future__ import annotations
 import collections
 import html as _html
 import json
+import os
 
 from .basemaps import DEFAULT_SWITCHER, get_basemap
 from .stylers import bake_props, build_styler
 from .themes import get_theme
+
+_VENDOR = os.path.join(os.path.dirname(__file__), "vendor")
+
+
+def _asset(fname):
+    """Read a vendored front-end asset (the MapLibre js/css) to inline into the saved HTML, so the
+    page needs no CDN — it opens offline, straight from disk, with no web server."""
+    with open(os.path.join(_VENDOR, fname), encoding="utf-8") as fh:
+        return fh.read()
 
 # --- openstreetmap-carto width model (px by zoom, per width-group) -----------------------------
 WIDTH = {
@@ -95,21 +105,25 @@ def _gwidth(t, hi, z):
     return t[ks[-1]]
 
 
-def _width_expr(col, casing=False, split_zoom=15, split_frac=0.6):
+def _width_expr(col, casing=False, split_zoom=15, split_frac=0.6, scale=1.0):
     """interpolate(zoom) of match(class -> width). Two-way lanes shrink to ``split_frac`` of the
     full width once the directions have fanned apart (ramped from full at split_zoom to split_frac
-    at split_zoom+2), so the two lanes together read as one road of the right width."""
+    at split_zoom+2), so the two lanes together read as one road of the right width.
+
+    ``scale`` multiplies every output width (e.g. 1.25 for a heavier bridge casing). It scales the
+    per-stop *values*, not the whole expression, because MapLibre forbids a ``zoom`` interpolate
+    nested inside ``["*", ...]`` — the zoom input must stay top-level."""
     e = ["interpolate", ["linear"], ["zoom"]]
     for z in _ZSTOPS:
         m = ["match", ["get", col]]
         for c in _CLASSES:
             b, lk = _base(c)
             g = ROAD_GROUP.get(b, "residential")
-            w = _gwidth(WIDTH[g], HI_RATE[g], z) * (CASING_RATIO[g] if casing else 1)
+            w = _gwidth(WIDTH[g], HI_RATE[g], z) * (CASING_RATIO[g] if casing else 1) * scale
             if lk:
                 w *= 0.6
             m += [c, round(w, 2)]
-        dw = _gwidth(WIDTH["residential"], HI_RATE["residential"], z) * (CASING_RATIO["residential"] if casing else 1)
+        dw = _gwidth(WIDTH["residential"], HI_RATE["residential"], z) * (CASING_RATIO["residential"] if casing else 1) * scale
         m.append(round(dw, 2))
         f = 1.0 if z <= split_zoom else (split_frac if z >= split_zoom + 2 else 1.0 - (1 - split_frac) * (z - split_zoom) / 2.0)
         if f < 1.0:
@@ -195,12 +209,18 @@ def _basemap_style(bm):
 _HTML = """<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <title>__TITLE__</title>
 <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"/>
-<script src="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js"></script>
-<link href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" rel="stylesheet"/>
+<style>__MAPLIBRE_CSS__</style>
+<script>__MAPLIBRE_JS__</script>
 <style>html,body{margin:0;height:100%}#map{position:absolute;inset:0}
 .bm-ctrl{position:absolute;top:10px;left:10px;z-index:2;background:#fff;border-radius:5px;
 box-shadow:0 1px 4px rgba(0,0,0,.3);padding:4px 7px;font:13px system-ui,sans-serif}
 .bm-ctrl select{font:inherit;border:0;background:transparent;cursor:pointer;outline:none}
+.flt-ctrl{position:absolute;top:48px;left:10px;z-index:2;background:#fff;border-radius:5px;
+box-shadow:0 1px 4px rgba(0,0,0,.3);font:13px system-ui,sans-serif;max-height:70%;overflow:auto}
+.flt-ctrl .flt-hd{padding:5px 9px;cursor:pointer;font-weight:600;user-select:none}
+.flt-ctrl .flt-body{padding:0 9px 7px;display:flex;flex-direction:column;gap:2px}
+.flt-ctrl.collapsed .flt-body{display:none}
+.flt-ctrl label{cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px}
 </style></head><body>
 <div id="map"></div><script>
 const style = __STYLE__, BASEMAPS = __BASEMAPS__;
@@ -213,6 +233,33 @@ if(BASEMAPS.length > 1){
   BASEMAPS.forEach((b,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=b.label; sel.appendChild(o); });
   sel.onchange = ()=>{ const s=map.getSource("bm"); if(s) s.setTiles(BASEMAPS[sel.value].tiles); };
   const w=document.createElement("div"); w.className="bm-ctrl"; w.appendChild(sel); document.body.appendChild(w);
+}
+// road-class filter panel (collapsible): checkboxes hide/show each class across every road layer
+const FILTER = __FILTER__;
+if(FILTER.on){
+  const box=document.createElement("div"); box.className="flt-ctrl";
+  const hd=document.createElement("div"); hd.className="flt-hd"; hd.textContent="Roads ▾";
+  const body=document.createElement("div"); body.className="flt-body";
+  hd.onclick=()=>{ const c=box.classList.toggle("collapsed"); hd.textContent="Roads "+(c?"▸":"▾"); };
+  box.appendChild(hd); box.appendChild(body);
+  const cbs={};
+  const baseF={};
+  const roadIds=()=>map.getStyle().layers.filter(l=>l.id.indexOf("roads")===0).map(l=>l.id);
+  function applyFilter(){
+    const hidden=FILTER.classes.filter(c=>!cbs[c].checked);
+    roadIds().forEach(id=>{
+      let f=baseF[id]||null;
+      if(hidden.length){ const cf=["!",["in",["get",FILTER.col],["literal",hidden]]]; f=f?["all",f,cf]:cf; }
+      try{ map.setFilter(id,f); }catch(e){}
+    });
+  }
+  FILTER.classes.forEach(c=>{
+    const lab=document.createElement("label");
+    const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=true; cb.onchange=applyFilter;
+    cbs[c]=cb; lab.appendChild(cb); lab.appendChild(document.createTextNode(" "+c)); body.appendChild(lab);
+  });
+  document.body.appendChild(box);
+  map.on("load",()=>{ roadIds().forEach(id=>{ baseF[id]=map.getFilter(id)||null; }); });
 }
 // oneway direction-arrow icon (openstreetmap-carto)
 function addArrow(){
@@ -273,12 +320,19 @@ def render(gdf, palette: str = "highsat", theme: str = "dark", highway_col: str 
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
-           **_ignore):
+           arrows: bool = True, labels: bool = True, filter_control: bool = True,
+           basemap_switcher: bool = True, **_ignore):
     """Build a self-contained MapLibre map of the styled edges.
 
     If the data carries ``tunnel`` / ``bridge`` / ``layer`` columns (named via ``tunnel_col`` /
     ``bridge_col`` / ``layer_col``), grade-separated roads are ordered by elevation so tunnels draw
-    underneath and bridges on top — otherwise every edge is treated as ground level."""
+    underneath and bridges on top — otherwise every edge is treated as ground level.
+
+    UI toggles (all on by default):
+      - ``arrows`` — one-way direction chevrons along each one-way edge;
+      - ``labels`` — curved street-name labels (from the ``name`` column);
+      - ``filter_control`` — a collapsible checkbox panel to show/hide each road class;
+      - ``basemap_switcher`` — the in-map base-layer dropdown (uses ``basemap`` / ``basemaps``)."""
     th = get_theme(theme)
     g = gdf.to_crs(4326)
     if styler is None:
@@ -294,6 +348,8 @@ def render(gdf, palette: str = "highsat", theme: str = "dark", highway_col: str 
     if isinstance(active, str):
         bkeys = [active] + [k for k in bkeys if k != active]
     bms = [{"label": get_basemap(k).label, "tiles": _tiles(get_basemap(k))} for k in bkeys]
+    if not basemap_switcher:
+        bms = bms[:1]                                     # one entry -> the JS hides the dropdown
     style = _basemap_style(get_basemap(active))
     style["sources"]["roads"] = {"type": "geojson", "data": geo, "generateId": True}
     lay = {"line-cap": "round", "line-join": "round", "line-sort-key": _sort_key(highway_col)}
@@ -306,7 +362,7 @@ def render(gdf, palette: str = "highsat", theme: str = "dark", highway_col: str 
     bridge = [">", ["coalesce", ["get", "lvl"], 0], 0]    # lvl == +1
     cw = _width_expr(highway_col, casing=True, **sw)      # casing width expr (reused across layers)
     fw = _width_expr(highway_col, **sw)                   # fill width expr
-    bcw = ["*", _width_expr(highway_col, casing=True, **sw), 1.25]  # heavier bridge casing ("wings")
+    bcw = _width_expr(highway_col, casing=True, scale=1.25, **sw)   # heavier bridge casing ("wings")
     style["layers"] += [
         # Tunnels first, so the surface roads above paint over them at crossings. The dashed casing +
         # faded fill make a tunnel read as "underground" even where nothing crosses it (osm-carto look).
@@ -341,27 +397,44 @@ def render(gdf, palette: str = "highsat", theme: str = "dark", highway_col: str 
              "line-width": fw, "line-offset": off}},
     ]
     # oneway direction arrows (on edges with no reverse twin) + line-placed street names, on top
-    style["glyphs"] = "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"
-    style["layers"] += [
-        {"id": "roads-arrows", "type": "symbol", "source": "roads", "minzoom": 15,
-         "filter": ["!", ["to-boolean", ["get", "twoway"]]],   # one-way edge = no reverse twin
-         "layout": {"symbol-placement": "line", "icon-image": "oneway", "symbol-spacing": 120,
-                    "icon-rotation-alignment": "map", "icon-allow-overlap": True,
-                    "icon-ignore-placement": True,
-                    "icon-size": ["interpolate", ["linear"], ["zoom"], 15, 0.5, 19, 1.0]},
-         "paint": {"icon-opacity": 0.7}},
-        {"id": "roads-labels", "type": "symbol", "source": "roads", "minzoom": 14,
-         "filter": ["to-boolean", ["get", "name"]],
-         "layout": {"symbol-placement": "line", "text-field": ["get", "name"],
-                    "text-font": ["Noto Sans Regular"], "symbol-spacing": 250,
-                    "text-size": ["interpolate", ["linear"], ["zoom"], 14, 10, 18, 14],
-                    "text-max-angle": 40, "text-padding": 2},
-         "paint": {"text-color": "#33332e", "text-halo-color": "#ffffff", "text-halo-width": 1.2}},
-    ]
+    if arrows:
+        style["layers"].append(
+            {"id": "roads-arrows", "type": "symbol", "source": "roads", "minzoom": 15,
+             "filter": ["!", ["to-boolean", ["get", "twoway"]]],   # one-way edge = no reverse twin
+             "layout": {"symbol-placement": "line", "icon-image": "oneway", "symbol-spacing": 120,
+                        "icon-rotation-alignment": "map", "icon-allow-overlap": True,
+                        "icon-ignore-placement": True,
+                        "icon-size": ["interpolate", ["linear"], ["zoom"], 15, 0.5, 19, 1.0]},
+             "paint": {"icon-opacity": 0.7}})
+    if labels:
+        style["glyphs"] = "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"
+        style["layers"].append(
+            {"id": "roads-labels", "type": "symbol", "source": "roads", "minzoom": 14,
+             "filter": ["to-boolean", ["get", "name"]],
+             "layout": {"symbol-placement": "line", "text-field": ["get", "name"],
+                        "text-font": ["Noto Sans Regular"], "symbol-spacing": 250,
+                        "text-size": ["interpolate", ["linear"], ["zoom"], 14, 10, 18, 14],
+                        "text-max-angle": 40, "text-padding": 2},
+             "paint": {"text-color": "#33332e", "text-halo-color": "#ffffff", "text-halo-width": 1.2}})
+
+    # road-class filter panel: the distinct classes present, most important first
+    classes, seen = [], set()
+    for ft in geo["features"]:
+        c = ft.get("properties", {}).get(highway_col)
+        if c and c not in seen:
+            seen.add(c)
+            classes.append(c)
+    classes.sort(key=lambda c: (-ROAD_Z.get(_base(c)[0], 4), c))
+    flt = {"on": bool(filter_control and classes), "col": highway_col, "classes": classes}
+
     minx, miny, maxx, maxy = (float(v) for v in g.total_bounds)
     html = (_HTML.replace("__TITLE__", _html.escape(name))
             .replace("__STYLE__", json.dumps(style))
             .replace("__BASEMAPS__", json.dumps(bms))
+            .replace("__FILTER__", json.dumps(flt))
             .replace("__CENTER__", json.dumps([(minx + maxx) / 2, (miny + maxy) / 2]))
-            .replace("__BOUNDS__", json.dumps([[minx, miny], [maxx, maxy]])))
+            .replace("__BOUNDS__", json.dumps([[minx, miny], [maxx, maxy]]))
+            # inject MapLibre last so its 800 KB blob isn't scanned for the other placeholders
+            .replace("__MAPLIBRE_CSS__", _asset("maplibre-gl.css"))
+            .replace("__MAPLIBRE_JS__", _asset("maplibre-gl.js").replace("</script>", "<\\/script>")))
     return WebMap(html)

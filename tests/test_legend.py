@@ -2,7 +2,14 @@
 import geopandas as gpd
 from shapely.geometry import LineString
 
-from roadstyle import make_legend, render_edges
+from functools import partial as _partial
+
+from roadstyle import make_legend
+from roadstyle import render_edges as _render_edges
+
+# Legends render on the folium/JSON outputs, not the MapLibre "web" backend (now the default);
+# pin folium here so these legend tests target the backend that draws them.
+render_edges = _partial(_render_edges, backend="folium")
 
 
 def _edges():

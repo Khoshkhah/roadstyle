@@ -67,14 +67,14 @@ def render(
     legend: bool = True,
     legend_position: str = "bottomleft",
     copy_field: str | None = "edge_id",
-    arrows: bool = False,
-    arrow_col: str | None = None,
-    arrow_color: str = "#555555",     # gray
-    arrow_size_m: float = 2.8,        # ~chevron barb length in metres (small, sits in-road)
-    arrow_min_zoom: int | None = 18,  # zoom-gate: only render arrows at street-level zoom
     **map_kwargs,
 ):
     import folium
+
+    # web-backend-only UI kwargs may arrive via render_edges(**kwargs); drop them so they don't
+    # reach folium.Map() (folium has its own filter_control / legend).
+    for _k in ("arrows", "labels", "basemap_switcher"):
+        map_kwargs.pop(_k, None)
 
     th = get_theme(theme)
     g = gdf.to_crs(4326)
@@ -116,44 +116,9 @@ def render(
                 )(s["color"], s["width"], s["opacity"]),
             ).add_to(m)
 
-    # direction arrows (source->target chevrons), drawn as one cheap GeoJSON line layer
-    if arrows:
-        from .arrows import chevron_features
-
-        fc = chevron_features(g, where_col=arrow_col, size_m=arrow_size_m)
-        if fc["features"]:
-            gj = folium.GeoJson(
-                fc, name="direction", control=False,
-                style_function=(lambda c: (lambda f: {"color": c, "weight": 2, "opacity": 0.9}))(arrow_color),
-            )
-            gj.add_to(m)
-            if arrow_min_zoom is not None:
-                _zoom_gate(m, gj, int(arrow_min_zoom))
-
     try:
         b = g.total_bounds
         m.fit_bounds([[b[1], b[0]], [b[3], b[2]]])
     except Exception:
         pass
     return m
-
-
-def _zoom_gate(m, layer, min_zoom):
-    """Show `layer` only at map zoom >= min_zoom (keeps the zoomed-out view clean and light)."""
-    from branca.element import MacroElement
-    from jinja2 import Template
-
-    el = MacroElement()
-    el._template = Template(
-        "{% macro script(this, kwargs) %}\n"
-        "  var _zmap = {{ this._parent.get_name() }};\n"
-        "  var _zlyr = " + layer.get_name() + ";\n"
-        "  function _zvis() {\n"
-        "    if (_zmap.getZoom() >= " + str(min_zoom) + ") {\n"
-        "      if (!_zmap.hasLayer(_zlyr)) _zmap.addLayer(_zlyr);\n"
-        "    } else if (_zmap.hasLayer(_zlyr)) { _zmap.removeLayer(_zlyr); }\n"
-        "  }\n"
-        "  _zmap.on('zoomend', _zvis); _zvis();\n"
-        "{% endmacro %}"
-    )
-    m.add_child(el)

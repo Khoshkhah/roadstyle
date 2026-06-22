@@ -2,8 +2,8 @@
 
 **roadstyle** turns a GeoDataFrame of road edges into a beautifully styled interactive map —
 an OSM-style "geometry sandwich" (coloured fills over casings) with palettes, themes, and base
-maps — and can colour roads by **your own data**, on **folium** / **lonboard**, or as a
-**stack-agnostic JSON spec** you embed in any website.
+maps — and can colour roads by **your own data**, on **folium** / **lonboard** / a self-contained
+**MapLibre (vector)** backend, or as a **stack-agnostic JSON spec** you embed in any website.
 
 ```python
 import geopandas as gpd
@@ -32,8 +32,10 @@ roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by
 - **Data-driven styling** — colour/size roads by any **categorical** column (`color_by`+`colors`)
   or **numeric** column (`color_by`+`cmap`+`width_by`), with automatic legends.
 - **Themes & base maps** — light / dark / satellite, with a thumbnail base-map switcher.
-- **Backends + web output** — folium (portable HTML), lonboard (WebGL), and `to_spec`/`to_html`/
-  `to_iframe` for embedding in your own site (Leaflet / MapLibre / iframe).
+- **Backends + web output** — folium (portable HTML), lonboard (WebGL), a self-contained
+  **MapLibre `web` backend** (per-zoom widths, two-way lanes, arrows/names, hover/select,
+  tunnel/bridge grade separation — offline, no server; see [web backend](web-backend.md)), and
+  `to_spec`/`to_html`/`to_iframe` for embedding in your own site (Leaflet / MapLibre / iframe).
 - **Canonical input** — `normalize_edges` reprojects, drops non-lines, and maps your column names.
 - **Command line** — the `roadstyle` CLI renders any road file from the shell, no Python required.
 
@@ -41,6 +43,8 @@ roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by
 
 - **[Usage](usage.md)** — install, the command line, quick start, recipes.
 - **[Parameter reference](parameters.md)** — every parameter explained.
+- **[MapLibre web backend](web-backend.md)** — the self-contained, zoom-correct vector map
+  (two-way lanes, grade separation, offline).
 - **[Embedding in a website](embedding.md)** — the JSON spec + Leaflet/MapLibre/iframe snippets.
 - **[Palettes](palettes.md)** / **[Themes](themes.md)** — styling reference.
 - **[Comparison](comparison.md)** — roadstyle vs geopandas `.explore()` / prettymaps.

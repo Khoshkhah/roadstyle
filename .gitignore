@@ -15,6 +15,7 @@ site/
 
 # generated example maps
 examples/*.html
+/sodermalm_*.html
 
 # generated maps from the example notebooks
 notebooks/output/

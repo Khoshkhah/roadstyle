@@ -4,9 +4,10 @@
     roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6 -f web
     roadstyle edges.gpkg --include motorway trunk primary -o major.html
 
-A thin wrapper over :func:`roadstyle.render_edges` (folium) and :func:`roadstyle.save` /
-:func:`roadstyle.save_spec` / :func:`roadstyle.to_geojson` (the web / JSON outputs). Every styling
-flag mirrors the Python keyword of the same name, so the CLI and the library stay in lock-step.
+A thin wrapper over :func:`roadstyle.render_edges` (the ``web`` MapLibre backend — the default — and
+``folium``) and :func:`roadstyle.save` / :func:`roadstyle.save_spec` / :func:`roadstyle.to_geojson`
+(the ``rsjs`` roadstyle.js page / JSON outputs). Every styling flag mirrors the Python keyword of
+the same name, so the CLI and the library stay in lock-step.
 """
 from __future__ import annotations
 
@@ -18,7 +19,7 @@ from pathlib import Path
 from . import __version__
 
 # output format → default file extension for the derived output name
-_EXT = {"folium": ".html", "web": ".html", "spec": ".json", "geojson": ".geojson"}
+_EXT = {"web": ".html", "folium": ".html", "rsjs": ".html", "spec": ".json", "geojson": ".geojson"}
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -37,10 +38,11 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("input", help="road-data file with a road-class column (any CRS).")
     p.add_argument("-o", "--output",
                    help="output path (default: input name with the format's extension).")
-    p.add_argument("-f", "--format", default="folium",
-                   choices=["folium", "web", "spec", "geojson"],
-                   help="folium = interactive folium HTML (default); web = standalone roadstyle.js "
-                        "page; spec = JSON spec; geojson = styled GeoJSON.")
+    p.add_argument("-f", "--format", default="web",
+                   choices=["web", "folium", "rsjs", "spec", "geojson"],
+                   help="web = self-contained MapLibre map (default); folium = interactive folium "
+                        "HTML; rsjs = standalone roadstyle.js page; spec = JSON spec; "
+                        "geojson = styled GeoJSON.")
     p.add_argument("--version", action="version", version=f"roadstyle {__version__}")
 
     style = p.add_argument_group("styling")
@@ -66,6 +68,13 @@ def _build_parser() -> argparse.ArgumentParser:
     dd.add_argument("--vmax", type=float, help="upper bound of the numeric colour ramp.")
     dd.add_argument("--width-by", nargs=2, type=float, metavar=("MIN", "MAX"),
                     help="scale line width between MIN and MAX px by the numeric --color-by.")
+
+    web = p.add_argument_group("web backend (-f web)")
+    web.add_argument("--no-arrows", action="store_true", help="hide one-way direction arrows.")
+    web.add_argument("--no-labels", action="store_true", help="hide street-name labels.")
+    web.add_argument("--no-filter", action="store_true", help="hide the road-class filter panel.")
+    web.add_argument("--no-basemap-switcher", action="store_true",
+                     help="hide the in-map base-layer dropdown.")
 
     src = p.add_argument_group("input")
     src.add_argument("--highway-col", default="highway",
@@ -118,9 +127,14 @@ def main(argv: list[str] | None = None) -> int:
         }
         style_kw = {k: v for k, v in style_kw.items() if v is not None}
 
-        if args.format == "folium":
+        if args.format == "web":
+            web_kw = {"arrows": not args.no_arrows, "labels": not args.no_labels,
+                      "filter_control": not args.no_filter,
+                      "basemap_switcher": not args.no_basemap_switcher}
+            render_edges(g, backend="web", **style_kw, **web_kw).save(str(out_path))
+        elif args.format == "folium":
             render_edges(g, backend="folium", **style_kw).save(str(out_path))
-        elif args.format == "web":
+        elif args.format == "rsjs":
             save(g, str(out_path), **style_kw)
         elif args.format == "spec":
             save_spec(g, str(out_path), **style_kw)
