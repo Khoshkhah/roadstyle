@@ -104,6 +104,7 @@ Only used by the MapLibre web backend; ignored by the others. See [web backend](
 | `tunnel_col` | str | `"tunnel"` | Column marking tunnels — drawn underneath, dashed + faded. |
 | `bridge_col` | str | `"bridge"` | Column marking bridges — drawn on top with a heavier, square-capped casing. |
 | `layer_col` | str | `"layer"` | OSM `layer` tag column; its sign sets elevation when `tunnel`/`bridge` are absent. |
+| `boundary` | geometry / GeoDataFrame / GeoJSON | `None` | Overlay a dashed outline on top of the roads (e.g. the area the network was clipped to). Accepts a shapely geometry, a `GeoSeries`/`GeoDataFrame` (reprojected to EPSG:4326), or a GeoJSON mapping (assumed lon/lat). `None` = no overlay. |
 
 > **Direction arrows.** `arrows=True` (web backend) places one-way chevrons along each one-way edge
 > using a native MapLibre symbol layer (`symbol-placement: line`). Geometry direction is the edge's

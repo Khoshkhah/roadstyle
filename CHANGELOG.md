@@ -24,6 +24,11 @@ byte-for-byte unchanged; everything new is additive.
   filter panel** — a checkbox per class present, hides that class across every road layer), and
   `basemap_switcher` (the in-map base-layer dropdown). All default `True`; CLI flags `--no-arrows`,
   `--no-labels`, `--no-filter`, `--no-basemap-switcher`.
+- **Web-backend boundary overlay**: `render_edges(edges, backend="web", boundary=…)` draws a dashed
+  outline on top of the roads (e.g. the area the network was clipped to). Accepts a shapely
+  geometry, a `GeoSeries`/`GeoDataFrame` (reprojected to EPSG:4326), or a GeoJSON mapping; `None`
+  (default) draws nothing. Rendered as its own `boundary` layer, so it is excluded from the
+  road-class filter and from hover/click picking.
 - **MapLibre `web` backend** (`render_edges(backend="web")` → a `WebMap` with `.save()`): a
   self-contained, **zoom-correct** vector map matching openstreetmap-carto. Per-zoom road widths
   (osm-carto width-by-zoom curve) instead of fixed pixels; **two-way directional lanes** via a
