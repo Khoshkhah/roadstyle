@@ -36,6 +36,7 @@ From the command line this backend is `-f web` (the default): `roadstyle edges.g
 | **Base-layer switcher** | An in-map dropdown to switch the background (dark / light / voyager / satellite / OSM). |
 | **Road z-order** | Higher-class roads draw over lower ones at junctions (a motorway over a residential), with `_link` ramps tucked just under their through road. |
 | **Tunnel / bridge grade separation** | Tunnels draw *underneath* (dashed + faded), bridges draw *on top* (heavier, square-capped casing) — see below. |
+| **Boundary overlay** | An optional dashed outline (e.g. the clip area) drawn on top of the roads via `boundary=` — see [below](#boundary-overlay). |
 
 ## Grade separation (tunnels & bridges)
 
@@ -84,8 +85,28 @@ backend adds:
 | `tunnel_col` | str | `"tunnel"` | Column marking tunnels (used for `lvl`). |
 | `bridge_col` | str | `"bridge"` | Column marking bridges. |
 | `layer_col` | str | `"layer"` | OSM `layer` tag column (signed elevation when tunnel/bridge are absent). |
+| `boundary` | geometry / GeoDataFrame / GeoJSON / `None` | `None` | Optional outline drawn on top of the roads — see [Boundary overlay](#boundary-overlay). |
 
 From the CLI these map to `--no-arrows` / `--no-labels` / `--no-filter` / `--no-basemap-switcher`.
+
+## Boundary overlay
+
+Pass `boundary=` to trace an area outline **on top of the roads** — typically the polygon the
+network was clipped to, so the map shows its extent. It renders as a dashed violet line layer
+(id `boundary`), separate from the road layers, so it is excluded from the road-class filter panel
+and from hover/click picking.
+
+It accepts whatever you have on hand and normalises it to a GeoJSON `FeatureCollection` in
+EPSG:4326: a **shapely geometry**, a **`GeoSeries`/`GeoDataFrame`** (reprojected for you), or a
+**GeoJSON mapping** (a geometry, `Feature`, or `FeatureCollection` — assumed already lon/lat). A
+polygon's rings are stroked as lines. `None` (the default) draws nothing.
+
+```python
+from shapely.geometry import box
+
+clip = box(18.04, 59.30, 18.10, 59.33)         # or a GeoDataFrame / GeoJSON dict
+rs.render_edges(edges, backend="web", boundary=clip).save("clipped.html")
+```
 
 ## Offline / self-contained
 

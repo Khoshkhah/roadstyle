@@ -192,6 +192,25 @@ def _mark_lvl(geo, tunnel_col, bridge_col, layer_col):
         p["lvl"] = lvl
 
 
+def _boundary_fc(boundary):
+    """Normalise a boundary overlay into a GeoJSON FeatureCollection in EPSG:4326. Accepts a shapely
+    geometry, a GeoSeries / GeoDataFrame (reprojected to 4326), or a GeoJSON mapping (geometry,
+    Feature, or FeatureCollection — assumed already lon/lat)."""
+    if hasattr(boundary, "to_crs"):                          # GeoSeries / GeoDataFrame
+        try:
+            boundary = boundary.to_crs(4326)
+        except Exception:
+            pass
+    gj = boundary.__geo_interface__ if hasattr(boundary, "__geo_interface__") else boundary
+    t = (gj or {}).get("type")
+    if t == "FeatureCollection":
+        return gj
+    if t == "Feature":
+        return {"type": "FeatureCollection", "features": [gj]}
+    return {"type": "FeatureCollection",
+            "features": [{"type": "Feature", "properties": {}, "geometry": gj}]}
+
+
 def _tiles(bm):
     """Leaflet {s}/{r} tile template -> a MapLibre raster `tiles` list (expand subdomains, drop @2x)."""
     if "{s}" in bm.url:
@@ -321,7 +340,7 @@ def render(gdf, palette: str = "highsat", theme: str = "dark", highway_col: str 
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
-           basemap_switcher: bool = True, **_ignore):
+           basemap_switcher: bool = True, boundary=None, **_ignore):
     """Build a self-contained MapLibre map of the styled edges.
 
     If the data carries ``tunnel`` / ``bridge`` / ``layer`` columns (named via ``tunnel_col`` /
@@ -332,7 +351,11 @@ def render(gdf, palette: str = "highsat", theme: str = "dark", highway_col: str 
       - ``arrows`` — one-way direction chevrons along each one-way edge;
       - ``labels`` — curved street-name labels (from the ``name`` column);
       - ``filter_control`` — a collapsible checkbox panel to show/hide each road class;
-      - ``basemap_switcher`` — the in-map base-layer dropdown (uses ``basemap`` / ``basemaps``)."""
+      - ``basemap_switcher`` — the in-map base-layer dropdown (uses ``basemap`` / ``basemaps``).
+
+    ``boundary`` (optional) overlays a dashed outline — a shapely geometry, a GeoSeries /
+    GeoDataFrame, or a GeoJSON mapping (assumed lon/lat) — e.g. the area the network was clipped
+    to."""
     th = get_theme(theme)
     g = gdf.to_crs(4326)
     if styler is None:
@@ -416,6 +439,15 @@ def render(gdf, palette: str = "highsat", theme: str = "dark", highway_col: str 
                         "text-size": ["interpolate", ["linear"], ["zoom"], 14, 10, 18, 14],
                         "text-max-angle": 40, "text-padding": 2},
              "paint": {"text-color": "#33332e", "text-halo-color": "#ffffff", "text-halo-width": 1.2}})
+
+    # clip/area boundary outline, drawn on top of the roads (a dashed line tracing the polygon rings)
+    if boundary is not None:
+        style["sources"]["boundary"] = {"type": "geojson", "data": _boundary_fc(boundary)}
+        style["layers"].append(
+            {"id": "boundary", "type": "line", "source": "boundary",
+             "layout": {"line-cap": "round", "line-join": "round"},
+             "paint": {"line-color": "#6a0dad", "line-width": 2.5, "line-opacity": 0.9,
+                       "line-dasharray": [3, 2]}})
 
     # road-class filter panel: the distinct classes present, most important first
     classes, seen = [], set()

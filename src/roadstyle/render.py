@@ -79,6 +79,8 @@ def render_edges(
       - ``tooltip`` / ``selected`` / ``name``.
       - ``arrows`` / ``labels`` / ``filter_control`` / ``basemap_switcher`` : (web backend) toggle
         the one-way arrows, street-name labels, road-class filter panel, and base-layer dropdown.
+      - ``boundary`` : (web backend) a shapely geometry / GeoDataFrame / GeoJSON mapping drawn as a
+        dashed outline on top of the roads (e.g. the area the network was clipped to).
     """
     edges = as_edges(gdf, class_col=highway_col)   # canonical: RoadEdges (EPSG:4326, lines)
     g = edges.gdf

@@ -7,9 +7,9 @@ with the proper **casing + fill "geometry sandwich"**, **light / dark / satellit
 
 The **`web` backend** (`backend="web"`) goes further, matching the *openstreetmap-carto* look with
 **per-zoom widths**, **two-way directional lanes**, direction **arrows**, curved **street names**,
-**hover/select**, a base-layer switcher, and **tunnel/bridge grade separation** — all in one
-**offline, self-contained HTML** file (MapLibre and the data bundled in; no server needed). See
-[`docs/web-backend.md`](docs/web-backend.md).
+**hover/select**, a base-layer switcher, **tunnel/bridge grade separation**, and an optional
+**boundary overlay** — all in one **offline, self-contained HTML** file (MapLibre and the data
+bundled in; no server needed). See [`docs/web-backend.md`](docs/web-backend.md).
 
 Two palettes:
 - **`highsat`** — custom high-saturation theme (cyan motorway, pink trunk, orange primary…)
