@@ -3,11 +3,12 @@ site_description: OSM-theme road/edge map styling for folium & lonboard
 theme:
   name: material
   palette:
-    - scheme: slate
-      primary: black
-      accent: cyan
+    - scheme: default
+      primary: indigo
+      accent: indigo
   features:
-    - navigation.sections
+    - navigation.tabs
+    - navigation.top
     - content.code.copy
 nav:
   - Home: index.md
