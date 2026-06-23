@@ -1,5 +1,7 @@
 site_name: roadstyle
 site_description: OSM-theme road/edge map styling for folium & lonboard
+repo_url: https://github.com/Khoshkhah/roadstyle
+repo_name: Khoshkhah/roadstyle
 theme:
   name: material
   palette:
