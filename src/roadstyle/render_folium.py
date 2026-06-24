@@ -53,7 +53,7 @@ def _add_legend(m, rf, position="bottomleft"):
 def render(
     gdf,
     palette: str = "highsat",
-    theme: str = "dark",
+    theme: str = "light",
     highway_col: str = "highway",
     tunnel_col: str | None = "tunnel",
     bridge_col: str | None = "bridge",

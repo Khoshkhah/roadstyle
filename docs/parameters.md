@@ -57,7 +57,7 @@ GeoDataFrame with line geometry + a class column).
 | `gdf` | `RoadEdges` / GeoDataFrame | *required* | The road edges to draw. A plain GeoDataFrame is normalised for you (→ EPSG:4326, lines). |
 | `backend` | `"web"` / `"folium"` / `"lonboard"` | `"web"` | Renderer. **`web` (default)** = self-contained **MapLibre (vector)** map with per-zoom widths, two-way lanes, arrows/names, hover/select & tunnel/bridge grade separation (see [web backend](web-backend.md)). `folium` = portable interactive HTML (Leaflet) with legends + filter panel. `lonboard` = GPU/WebGL, for very large data. |
 | `palette` | str or dict | `"highsat"` | Which colour palette for **class** styling. Built-ins: `"highsat"`, `"carto"`, `"mono"` (grayscale). Add your own via a [data file or override](palettes.md#customising-data-files-and-overrides). Ignored if you use `color_by`/`style`. |
-| `theme` | `"light"`/`"dark"`/`"satellite"` | `"dark"` | Visual theme: sets the default base map and which casing colour (light/dark) is used. |
+| `theme` | `"light"`/`"dark"`/`"satellite"` | `"light"` | Visual theme: sets the default base map and which casing colour (light/dark) is used. `light` opens on the Voyager base. |
 | `highway_col` | str | `"highway"` | Which column holds the road class. Set this if your class column has a different name. |
 | `include` | str / list / `None` | `None` | Keep **only** these road classes (e.g. `["motorway","primary"]`). |
 | `exclude` | str / list / `None` | `None` | Drop these road classes. Applied after `include`. |
@@ -165,7 +165,7 @@ A theme bundles the casing variant + a default base map.
 | `casing` | `"light"` / `"dark"` | Which casing colour to use (`casing_light` vs `casing_dark`). |
 | `default_basemap` | str | Base map shown by default for this theme. |
 
-Built-ins: `light` (Positron base), `dark` (Dark Matter base), `satellite` (Esri imagery).
+Built-ins: `light` (**Voyager** base, the default theme), `dark` (Dark Matter base), `satellite` (Esri imagery).
 
 ---
 

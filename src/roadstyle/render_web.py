@@ -480,7 +480,7 @@ class WebMap:
                 'style="width:100%;height:640px;border:0;border-radius:6px"></iframe>')
 
 
-def render(gdf, palette: str = "highsat", theme: str = "dark", highway_col: str = "highway",
+def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str = "highway",
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",

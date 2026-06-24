@@ -42,7 +42,7 @@ def _asset(name: str) -> str:
 def to_spec(
     gdf,
     *,
-    theme: str = "dark",
+    theme: str = "light",
     palette: str = "highsat",
     highway_col: str = "highway",
     style=None,

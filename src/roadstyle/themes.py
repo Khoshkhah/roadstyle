@@ -12,7 +12,7 @@ class Theme:
 
 
 THEMES: dict[str, Theme] = {
-    "light": Theme("light", "light", "positron"),
+    "light": Theme("light", "light", "voyager"),
     "dark": Theme("dark", "dark", "dark_matter"),
     "satellite": Theme("satellite", "dark", "satellite"),
 }

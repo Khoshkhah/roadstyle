@@ -28,12 +28,12 @@ random.seed(7)
 g["aadt"] = [random.randint(200, 24000) for _ in range(len(g))]
 g["speed_kph"] = [random.choice([30, 40, 50, 60, 70]) for _ in range(len(g))]
 
-# 1 — a first map: the default web backend, classic OSM class styling
-rs.render_edges(g, backend="web", theme="dark", name="roadstyle — first map").save(OUT / "first_map.html")
+# 1 — a first map: the default web backend (default theme: light + Voyager base)
+rs.render_edges(g, backend="web", name="roadstyle — first map").save(OUT / "first_map.html")
 
 # 2 — dynamic recolour: a neutral mono base + a "Colour by" picker (Class / AADT / Speed)
 rs.render_edges(
-    g, backend="web", theme="dark", palette="mono",
+    g, backend="web", palette="mono",
     color_options={
         "Class": {},
         "AADT": {"color_by": "aadt", "cmap": "viridis"},
@@ -60,7 +60,7 @@ pois = gpd.GeoDataFrame(
       "geometry": Point(random.uniform(minx, maxx), random.uniform(miny, maxy))} for i in range(6)],
     crs=4326)
 rs.render_edges(
-    g, backend="web", theme="dark", palette="mono",
+    g, backend="web", palette="mono",
     overlays=[
         rs.Overlay(taz, kind="fill", placement="under", color="#6aa9ff", opacity=0.14,
                    outline="#6aa9ff", label="TAZ zones", popup=["taz_id", "name", "weight"]),

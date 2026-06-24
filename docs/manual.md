@@ -21,11 +21,12 @@ import geopandas as gpd
 import roadstyle as rs
 
 edges = gpd.read_file("sundbyberg_edges.gpkg")        # has a `highway` column
-rs.render_edges(edges, theme="dark").save("first_map.html")
+rs.render_edges(edges).save("first_map.html")         # default theme: light + the Voyager base
 ```
 
 You get the OSM "geometry sandwich" (coloured fills over casings), per-zoom widths, two-way lanes,
-one-way arrows, street-name labels, hover/click, and a base-layer switcher — try them in the map:
+one-way arrows, street-name labels, hover/click, and a base-layer switcher — try them in the map.
+Prefer a dark canvas? Pass `theme="dark"` (Dark Matter) or `theme="satellite"`.
 
 <iframe src="../maps/first_map.html" loading="lazy" title="A first roadstyle map"
         style="width:100%;height:480px;border:0;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.18)"></iframe>

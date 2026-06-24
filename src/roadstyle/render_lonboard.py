@@ -66,7 +66,7 @@ def _arrays_from_frame(rf, theme, which):
 def render(
     gdf,
     palette: str = "highsat",
-    theme: str = "dark",
+    theme: str = "light",
     highway_col: str = "highway",
     tunnel_col: str | None = "tunnel",
     bridge_col: str | None = "bridge",

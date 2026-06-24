@@ -4,8 +4,8 @@
     from roadstyle import render_edges
 
     edges = gpd.read_file(...)                       # needs a `highway` column
-    render_edges(edges, theme="dark").save("map.html")
-    render_edges(edges, palette="carto", theme="light",
+    render_edges(edges).save("map.html")             # default theme: light + the Voyager base
+    render_edges(edges, theme="dark",
                  include=["motorway", "trunk", "primary"]).save("major.html")
 """
 from .basemaps import BASEMAPS, Basemap, get_basemap, register_basemap

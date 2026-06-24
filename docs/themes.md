@@ -1,10 +1,11 @@
 # Themes
 
 A theme sets the **base map** and which **casing** variant the `highsat` palette uses.
+`light` is the **default**.
 
 | theme | base map | casing used | notes |
 |---|---|---|---|
-| `light` | CartoDB Positron | light casing (coloured) | for white/light canvases |
+| `light` (default) | CartoDB Voyager | light casing (coloured) | for white/light canvases |
 | `dark` | CartoDB Dark Matter | dark casing (`#000000`) | for dark canvases |
 | `satellite` | Esri World Imagery | dark casing (`#000000`) | high-contrast over imagery |
 

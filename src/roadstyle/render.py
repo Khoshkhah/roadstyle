@@ -29,7 +29,7 @@ def render_edges(
     *,
     backend: str = "web",
     palette: str = "highsat",
-    theme: str = "dark",
+    theme: str = "light",
     highway_col: str = "highway",
     include=None,
     exclude=None,

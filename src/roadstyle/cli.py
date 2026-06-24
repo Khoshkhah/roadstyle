@@ -48,8 +48,8 @@ def _build_parser() -> argparse.ArgumentParser:
     style = p.add_argument_group("styling")
     style.add_argument("--palette", default="highsat", choices=["highsat", "carto"],
                        help="class palette (default: highsat).")
-    style.add_argument("--theme", default="dark", choices=["light", "dark", "satellite"],
-                       help="base theme (default: dark).")
+    style.add_argument("--theme", default="light", choices=["light", "dark", "satellite"],
+                       help="base theme (default: light).")
     style.add_argument("--basemap", help="override the theme's base map (a key in BASEMAPS).")
     style.add_argument("--tooltip", nargs="+", metavar="COL",
                        help="columns to show in the hover tooltip.")
