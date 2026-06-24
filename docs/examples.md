@@ -1,7 +1,8 @@
 # Examples
 
-Prefer reading in the browser? The **[Tutorial](tutorial.md)** walks through everything below on one
-page. The notebooks here are the same material, runnable.
+Prefer reading in the browser? The **[Manual](manual.md)** walks through the core workflow with the
+**live map embedded after each step**, and the **[Tutorial](tutorial.md)** covers everything below on
+one page. The notebooks here are the same material, runnable.
 
 A set of small, focused, runnable notebooks in [`notebooks/`](https://github.com/Khoshkhah/roadstyle/tree/main/notebooks).
 Each teaches one topic and is self-contained — open it in Jupyter and run top to bottom. They use the
@@ -20,3 +21,18 @@ output to `notebooks/output/` (git-ignored).
 | **08 · Loading data** | Every input `render_edges`/`to_spec` accept: GeoDataFrame, file path, GeoJSON (+ spec), pyarrow Table, DuckDB. |
 
 Start at **01** if you're new; jump to **05** if your goal is embedding a roadstyle map in a website.
+
+## Example scripts
+
+Self-contained scripts in [`examples/`](https://github.com/Khoshkhah/roadstyle/tree/main/examples) —
+run any of them to write an HTML file you can open. They use the same bundled sample edges (with a
+couple of seeded columns where the demo needs data).
+
+| Script | What it shows |
+|---|---|
+| **`recolor_web_backend.py`** | Switchable data-driven colouring on the **`web` backend** (`color_options` + a *Colour by* dropdown), plus a **custom panel** wired through `window.rsSetColorField` / the `rs:colorchange` event. |
+| **`overlays_web.py`** | Extra **overlay layers** — synthetic TAZ zones (under the roads) + POI circles (on top), both clickable, with a *Layers* toggle. |
+| **`recolor_custom_panel.py`** | The same switchable colouring on the **roadstyle.js spec page**, driven by a custom `addPanel` + the `setColorField` / event-bus API. |
+
+The generated pages used in the [Manual](manual.md) are built by
+[`docs/build_maps.py`](https://github.com/Khoshkhah/roadstyle/blob/main/docs/build_maps.py).

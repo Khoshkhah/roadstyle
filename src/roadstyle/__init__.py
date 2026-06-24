@@ -31,6 +31,7 @@ from .emit import (
 )
 from .filters import filter_edges, highway_types
 from .legend import make_legend
+from .overlays import Overlay
 from .palettes import (
     CARTO,
     HIGHSAT,
@@ -81,6 +82,8 @@ __all__ = [
     "from_geojson", "from_arrow", "from_duckdb",
     # legends (Phase 3)
     "make_legend",
+    # extra overlay layers (zones / POIs / any geometry)
+    "Overlay",
     # web / JSON output (Phase 4)
     "to_spec", "to_geojson", "to_html", "to_iframe", "save", "save_spec", "load_spec",
 ]

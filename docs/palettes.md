@@ -6,7 +6,7 @@ casing width, casing colour for light vs dark/satellite, optional dash). Choose 
 
 The built-in palettes are **data, not code**: they live as JSON files shipped in the package
 (`roadstyle/data/palettes/*.json`) and are loaded at import, so you can retint a class — or add a
-whole palette — by editing a data file or dropping a [user override](#customising-data-files--overrides),
+whole palette — by editing a data file or dropping a [user override](#customising-data-files-and-overrides),
 with no code change. The styling knobs (opacities, link scale, tunnel/bridge factors, selection
 colours) likewise live in `roadstyle/data/style.json`.
 
@@ -75,7 +75,7 @@ Casing is theme-independent (like `carto`).
 - **`bridge`** — casing forced to pure black, +1.5 px wider.
 - **Unknown tags** — fall back to `unclassified`.
 
-## Customising (data files + overrides)
+## Customising data files and overrides
 
 Palettes and the style config are **data files** shipped in the package
 (`roadstyle/data/palettes/*.json`, `roadstyle/data/style.json`), loaded at import. Three ways to

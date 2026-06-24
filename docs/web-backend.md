@@ -36,6 +36,8 @@ From the command line this backend is `-f web` (the default): `roadstyle edges.g
 | **Base-layer switcher** | An in-map dropdown to switch the background (dark / light / voyager / satellite / OSM). |
 | **Road z-order** | Higher-class roads draw over lower ones at junctions (a motorway over a residential), with `_link` ramps tucked just under their through road. |
 | **Tunnel / bridge grade separation** | Tunnels draw *underneath* (dashed + faded), bridges draw *on top* (heavier, square-capped casing) — see below. |
+| **Dynamic recolouring** | Bake several "colour by" options with `color_options=` and switch between them client-side from a **Colour by** dropdown — no re-render, no server. See [below](#dynamic-recolouring-color_options). |
+| **Overlay layers** | Bring your own geometry (zone polygons, POI circles, any lines) via `overlays=` — drawn under/over the roads, clickable, toggled from a **Layers** control. See [below](#overlay-layers-overlays). |
 | **Boundary overlay** | An optional dashed outline (e.g. the clip area) drawn on top of the roads via `boundary=` — see [below](#boundary-overlay). |
 
 ## Grade separation (tunnels & bridges)
@@ -86,8 +88,70 @@ backend adds:
 | `bridge_col` | str | `"bridge"` | Column marking bridges. |
 | `layer_col` | str | `"layer"` | OSM `layer` tag column (signed elevation when tunnel/bridge are absent). |
 | `boundary` | geometry / GeoDataFrame / GeoJSON / `None` | `None` | Optional outline drawn on top of the roads — see [Boundary overlay](#boundary-overlay). |
+| `color_options` | mapping / list / `None` | `None` | "Colour by" options baked for client-side recolouring + a dropdown — see [Dynamic recolouring](#dynamic-recolouring-color_options). |
+| `overlays` | list of `Overlay` / `None` | `None` | Extra layers the caller brings (zones / POIs / lines) — see [Overlay layers](#overlay-layers-overlays). |
 
 From the CLI these map to `--no-arrows` / `--no-labels` / `--no-filter` / `--no-basemap-switcher`.
+
+## Dynamic recolouring (`color_options`)
+
+Bake **several pre-resolved "colour by" fill sets** into the one map and switch between them in the
+browser — no re-render, no server round-trip. Pass `color_options`, an ordered mapping
+`{name: {styler kwargs}}` (or a list of `{"name": ..., **kwargs}`), and the backend adds a **Colour
+by** dropdown plus a legend that follows the active option. Each road keeps its width / casing /
+lanes; only the **fill** swaps (via `setPaintProperty`). A neutral base reads best, so pair the
+class option with `palette="mono"`:
+
+```python
+rs.render_edges(edges, backend="web", palette="mono",
+    color_options={
+        "Class": {},                                       # neutral mono base
+        "AADT":  {"color_by": "aadt",  "cmap": "viridis"},
+        "Speed": {"color_by": "speed_kph", "cmap": "magma"},
+    },
+).save("recolor.html")
+```
+
+Each option's value is the same data-driven kwargs you'd pass to `render_edges` (`color_by`,
+`colors`, `cmap`, `vmin`, `vmax`, `width_by`, `palette`, `style`); an empty `{}` is the class style
+on the base `palette`. The **first** option is active and drives the shared width/casing.
+
+- **Blank edges keep the base colour.** Where a data option has no value for an edge (NaN /
+  unmapped), that edge falls back to the **base option's fill** — so on a `mono` base, "no data"
+  roads keep their neutral mono colour instead of a flat grey.
+- **Drive it from your own UI.** The page exposes `window.RS_COLOR_OPTIONS` (the baked options) and
+  `window.rsSetColorField(name|index)` (recolour), and fires a `rs:colorchange` event on every
+  switch — so a custom control can drive and follow the recolour. A worked custom-panel page is in
+  [`examples/recolor_web_backend.py`](https://github.com/Khoshkhah/roadstyle/blob/main/examples/recolor_web_backend.py).
+
+> The same `color_options` work on the [roadstyle.js spec page](embedding.md) (`to_spec` / `save` /
+> `to_html`), where the richer `RoadStyleMap` API exposes `setColorField` / `getColorOptions` and a
+> `colorchange` event.
+
+## Overlay layers (`overlays`)
+
+Bring extra geometry the caller owns — zone polygons, POI points, any lines — as a list of
+[`Overlay`](parameters.md#8-overlay-extra-layers). Each becomes its own MapLibre source + layer(s),
+placed **under** or **over** the roads, clickable for a popup of the fields you list, and toggled
+from a **Layers** control. Overlays are passthrough data: *your* geometry with *your* style — they
+do **not** go through roadstyle's road-styling compiler.
+
+```python
+rs.render_edges(edges, backend="web", palette="mono",
+    overlays=[
+        rs.Overlay(zones, kind="fill",   placement="under", color="#6aa9ff",
+                   opacity=0.14, label="TAZ zones", popup=["taz_id", "name", "weight"]),
+        rs.Overlay(pois,  kind="circle", placement="over",  color="#ff5d5d",
+                   radius=7, label="POIs", popup=["name", "type"]),
+    ],
+).save("overlays.html")
+```
+
+`kind` is auto-detected from the geometry (polygon → `fill`+outline, point → `circle`, line →
+`line`) but can be forced. `placement="under"` draws beneath the roads (e.g. zone fills), `"over"`
+on top (e.g. POIs). Setting `popup` makes the overlay clickable (those fields show in the popup; an
+empty list = decoration only). **Road clicks take precedence** — an overlay popup fires only where
+the click misses every road. See [`Overlay`](parameters.md#8-overlay-extra-layers) for every field.
 
 ## Boundary overlay
 

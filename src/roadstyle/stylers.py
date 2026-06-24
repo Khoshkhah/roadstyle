@@ -59,6 +59,8 @@ class ResolvedFrame:
     klass: list[str | None]
     theme_aware_casing: bool = True   # True only when casing differs by light/dark base map
     legend: object | None = None      # a Legend (Phase 3) describing how to read the colours
+    missing: list[bool] | None = None  # True where a data styler had no value for the edge (NaN /
+    #                                    unmapped) — lets colour options fall back to the base fill
 
     def __len__(self) -> int:
         return len(self.fill)
@@ -220,6 +222,9 @@ class CategoricalStyler:
         entries = [(label, hexc) for label, hexc in self.colors.items()
                    if _keystr(label) in present]
         rf.legend = {"kind": "categorical", "title": self.column, "entries": entries}
+        # flag unmapped / missing values (got fallback_color) so colour options can fall back
+        cmap_keys = {_keystr(k) for k in self.colors}
+        rf.missing = [_keystr(v) not in cmap_keys for v in values]
         return rf
 
 
@@ -284,6 +289,7 @@ class NumericStyler:
         # stash ramp metadata so a legend (Phase 3) can draw the gradient
         rf.legend = {"kind": "continuous", "title": self.column,
                      "vmin": vmin, "vmax": vmax, "ramp": ramp.stops(9)}
+        rf.missing = [v is None for v in nums]   # NaN / non-numeric — colour options fall back
         return rf
 
 
@@ -322,6 +328,7 @@ class ColorTableStyler:
         colors = gdf[self.color_column].tolist() if self.color_column in gdf.columns else [None] * n
         rf.fill = [_color_or(c, self.fallback_color) for c in colors]
         rf.legend = None             # arbitrary per-edge colours -> no categorical legend
+        rf.missing = [not (isinstance(c, str) and c.strip()) for c in colors]
         return rf
 
 
@@ -349,6 +356,50 @@ def bake_props(gj: dict, rf: ResolvedFrame, dark: bool) -> dict:
     return gj
 
 
+def bake_fill_variant(gj: dict, rf: ResolvedFrame, prop: str) -> dict:
+    """Bake **only** the per-edge fill colour of ``rf`` onto an already-baked FeatureCollection,
+    under the property name ``prop`` (e.g. ``"__rs_fill__1"``), in place.
+
+    Used for client-side recolouring: the same geometry carries several pre-resolved fill sets, one
+    per "colour by" option, and the browser (``roadstyle.js`` ``setColorField``) swaps which
+    ``prop`` the fill style reads — so the map recolours with no server round-trip. Width, casing
+    and class stay as baked by :func:`bake_props` from the active option (only the colour changes).
+    """
+    feats = gj.get("features", [])
+    for i, feat in enumerate(feats):
+        feat.setdefault("properties", {})[prop] = rf.fill[i]
+    return gj
+
+
+def bake_color_options(gj: dict, frames, dark: bool):
+    """Bake a set of "colour by" options onto a GeoJSON FeatureCollection, in place.
+
+    ``frames`` is an ordered list of ``(name, ResolvedFrame)``. Option 0 is the **active/base**: its
+    full per-edge style (width/casing/class + ``__rs_fill``) is baked via :func:`bake_props`. Every
+    other option bakes *only* its fill, under ``__rs_fill__<i>`` — and where that option has **no
+    colour for an edge** (missing/NaN/unmapped data, flagged by :attr:`ResolvedFrame.missing`), the
+    edge falls back to the **base option's fill**, so blank edges keep the neutral base look (e.g.
+    the ``mono`` palette colour for that road class) instead of a flat grey.
+
+    Returns ``(gj, options_meta)`` where each meta entry is ``{name, prop, legend}`` — the contract
+    the browser reads to build the "Colour by" picker and to swap fills client-side.
+    """
+    base_rf = frames[0][1]
+    gj = bake_props(gj, base_rf, dark)
+    base_fill = base_rf.fill
+    feats = gj.get("features", [])
+    meta = []
+    for idx, (name, frame) in enumerate(frames):
+        prop = "__rs_fill" if idx == 0 else f"__rs_fill__{idx}"
+        if idx != 0:
+            fills, miss = frame.fill, frame.missing
+            for i, feat in enumerate(feats):
+                f = base_fill[i] if (miss is not None and miss[i]) else fills[i]
+                feat.setdefault("properties", {})[prop] = f
+        meta.append({"name": name, "prop": prop, "legend": getattr(frame, "legend", None)})
+    return gj, meta
+
+
 # ── convenience constructors (so users build a styler without importing the classes) ──────────
 
 def color_by_class(column: str = "highway", palette="highsat", **kw) -> ClassStyler:
@@ -364,6 +415,26 @@ def color_by(column: str, colors: Mapping[str, str], **kw) -> CategoricalStyler:
 def color_by_value(column: str, cmap="viridis", **kw) -> NumericStyler:
     """Style by a numeric column using a continuous colour ramp."""
     return NumericStyler(column=column, cmap=cmap, **kw)
+
+
+def option_styler(highway_col: str, base_palette: str, opts) -> Styler:
+    """Build the styler for one ``color_options`` entry (shared by the spec and web backends).
+
+    ``opts`` is the per-option kwargs dict (``color_by`` / ``colors`` / ``cmap`` / ``vmin`` /
+    ``vmax`` / ``width_by`` / ``palette`` / ``style``); an empty dict gives the class style on
+    ``base_palette`` — use ``palette="mono"`` for a neutral base that lets the data ramps stand out.
+    """
+    return build_styler(
+        style=opts.get("style"),
+        palette=opts.get("palette", base_palette),
+        highway_col=highway_col,
+        color_by=opts.get("color_by"),
+        colors=opts.get("colors"),
+        cmap=opts.get("cmap"),
+        vmin=opts.get("vmin"),
+        vmax=opts.get("vmax"),
+        width_by=opts.get("width_by"),
+    )
 
 
 def build_styler(

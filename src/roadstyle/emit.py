@@ -18,11 +18,12 @@ Each styled feature carries reserved properties: ``__rs_fill``, ``__rs_w`` (widt
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from functools import cache
 from importlib.resources import files
 
 from .edges import as_edges
-from .stylers import bake_props, build_styler
+from .stylers import bake_color_options, bake_props, build_styler, option_styler
 from .themes import get_theme
 
 SPEC_VERSION = "1"
@@ -54,6 +55,7 @@ def to_spec(
     basemap: str | None = None,
     basemaps: list[str] | None = None,
     tooltip: list[str] | None = None,
+    color_options=None,
 ) -> dict:
     """Build the canonical JSON spec (data + baked-in resolved style + legend + metadata).
 
@@ -63,24 +65,44 @@ def to_spec(
     ``basemap`` picks the *active* base map (else the theme default); ``basemaps`` is the list of
     keys offered to the in-map base-layer switcher (default :data:`DEFAULT_SWITCHER`). Both casing
     colours are baked per edge, so a light/dark base-map switch re-picks the casing client-side.
+
+    ``color_options`` enables **client-side recolouring**: pass an ordered mapping of
+    ``{name: {styler kwargs}}`` (or a list of ``{"name": ..., **kwargs}``) and each option's fill
+    is pre-resolved and baked as a separate per-edge prop. The first option is the active one (it
+    also drives the shared width/casing/class), and the browser swaps colours between them with no
+    re-render. A neutral base reads best — pair the class option with ``palette="mono"`` so the
+    data ramps stand out, e.g.::
+
+        color_options={"Class": {}, "AADT": {"color_by": "aadt", "cmap": "viridis"}}, palette="mono"
     """
     from .basemaps import DEFAULT_SWITCHER, get_basemap
 
     edges = as_edges(gdf, class_col=highway_col)
     g = edges.gdf
     col = edges.class_col
-
-    styler = build_styler(
-        style=style, palette=palette, highway_col=col,
-        color_by=color_by, colors=colors, cmap=cmap,
-        vmin=vmin, vmax=vmax, width_by=width_by,
-    )
-    rf = styler.resolve_frame(g, theme)
     th = get_theme(theme)
     dark = th.casing == "dark"
 
-    # bake the per-edge __rs_* props (both casing variants for the in-map base-layer switcher)
-    gj = bake_props(json.loads(g.to_json()), rf, dark)
+    color_opts_meta = None
+    if color_options:
+        # one pre-resolved fill set per "colour by" option; option 0 is active (drives the shared
+        # width/casing/class via bake_props), the rest bake only their fill under __rs_fill__<i>.
+        items = (list(color_options.items()) if isinstance(color_options, Mapping)
+                 else [(o["name"], {k: v for k, v in o.items() if k != "name"})
+                       for o in color_options])
+        frames = [(name, option_styler(col, palette, opts).resolve_frame(g, theme))
+                  for name, opts in items]
+        rf = frames[0][1]                                  # active option drives spec["legend"]
+        gj, color_opts_meta = bake_color_options(json.loads(g.to_json()), frames, dark)
+    else:
+        styler = build_styler(
+            style=style, palette=palette, highway_col=col,
+            color_by=color_by, colors=colors, cmap=cmap,
+            vmin=vmin, vmax=vmax, width_by=width_by,
+        )
+        rf = styler.resolve_frame(g, theme)
+        # bake the per-edge __rs_* props (both casing variants for the in-map base-layer switcher)
+        gj = bake_props(json.loads(g.to_json()), rf, dark)
 
     b = list(g.total_bounds)   # [minx, miny, maxx, maxy]
     bounds = [[b[1], b[0]], [b[3], b[2]]]   # [[S,W],[N,E]] (Leaflet order)
@@ -95,7 +117,7 @@ def to_spec(
     fields = tooltip if tooltip is not None else [c for c in g.columns if c != g.geometry.name]
     fields = [f for f in fields if f in g.columns]
 
-    return {
+    spec = {
         "roadstyle": f"spec/{SPEC_VERSION}",
         "crs": "EPSG:4326",
         "theme": th.name,
@@ -107,6 +129,10 @@ def to_spec(
         "legend": getattr(rf, "legend", None),
         "geojson": gj,
     }
+    if color_opts_meta is not None:
+        spec["color_options"] = color_opts_meta   # client-side recolour: name/prop/legend per option
+        spec["color_active"] = 0
+    return spec
 
 
 def _basemap_dict(bm) -> dict:
@@ -165,9 +191,14 @@ def _fragment_html(spec: dict, div_id: str, width: str, height: str) -> str:
     of literal ``{``/``}`` braces.
     """
     spec_json = json.dumps(spec)
+    # With recolour options present, offer the "colour by" picker (and drop the class filter, which
+    # shares the top-right corner); otherwise keep the default class filter.
+    has_co = bool(spec.get("color_options"))
+    widgets = ("{legend:true,filter:%s,basemap:true,colors:%s}"
+               % ("false" if has_co else "true", "true" if has_co else "false"))
     boot = (
         "(function(){var spec=" + spec_json + ";"
-        "var opts={widgets:{legend:true,filter:true,basemap:true}};"
+        "var opts={widgets:" + widgets + "};"
         'function start(){new RoadStyleMap("' + div_id + '",opts).load(spec);}'
         "if(window.L){start();}else{"
         'var c=document.createElement("link");c.rel="stylesheet";c.href="' + _LEAFLET_CSS

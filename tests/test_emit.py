@@ -93,6 +93,53 @@ def test_spec_categorical_legend():
     assert "low" in labels and "heavy" in labels
 
 
+def test_color_options_bakes_a_fill_variant_per_option():
+    # client-side recolouring: each "colour by" option pre-resolves its own fill, baked under a
+    # distinct prop; option 0 is active and owns the canonical __rs_fill (+ shared width/casing).
+    spec = to_spec(_edges(), palette="mono", color_options={
+        "Class": {},
+        "AADT": {"color_by": "aadt", "cmap": "viridis"},
+        "Speed": {"color_by": "aadt", "cmap": "magma"},
+    })
+    co = spec["color_options"]
+    assert spec["color_active"] == 0
+    assert [o["name"] for o in co] == ["Class", "AADT", "Speed"]
+    assert [o["prop"] for o in co] == ["__rs_fill", "__rs_fill__1", "__rs_fill__2"]
+    # the data options carry their own legend; the class option carries none
+    assert co[0]["legend"] is None
+    assert co[1]["legend"]["kind"] == "continuous"
+    p = spec["geojson"]["features"][0]["properties"]
+    assert all(o["prop"] in p for o in co)          # every variant baked per feature
+    assert p["__rs_fill"] != p["__rs_fill__1"]       # mono base differs from the viridis ramp
+    json.dumps(spec)                                 # still fully serialisable
+
+
+def test_color_options_absent_by_default():
+    spec = to_spec(_edges())
+    assert "color_options" not in spec and "color_active" not in spec
+
+
+def test_color_options_missing_value_falls_back_to_base_fill():
+    # an edge with no value for a data option keeps the neutral base (mono) colour, not a flat grey
+    import numpy as np
+    from shapely.geometry import LineString
+    g = gpd.GeoDataFrame(
+        {"highway": ["primary", "residential"], "aadt": [12000, np.nan]},
+        geometry=[LineString([(0, 0), (1, 1)]), LineString([(1, 1), (2, 2)])], crs=4326)
+    spec = to_spec(g, palette="mono",
+                   color_options={"Class": {}, "AADT": {"color_by": "aadt", "cmap": "viridis"}})
+    p = [f["properties"] for f in spec["geojson"]["features"]]
+    assert p[1]["__rs_fill__1"] == p[1]["__rs_fill"]   # NaN edge -> base mono fill
+    assert p[0]["__rs_fill__1"] != p[0]["__rs_fill"]   # edge with data -> the viridis ramp
+
+
+def test_to_html_enables_color_picker_with_options():
+    html = to_html(_edges(), palette="mono",
+                   color_options={"Class": {}, "AADT": {"color_by": "aadt"}})
+    assert "colors:true" in html and "filter:false" in html   # picker on, class filter off
+    assert "setColorField" in html and '"color_options"' in html
+
+
 def test_to_geojson():
     gj = to_geojson(_edges(), color_by="aadt", cmap="magma")
     assert gj["type"] == "FeatureCollection"

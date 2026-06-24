@@ -52,6 +52,7 @@
       legend: true, // render the spec's legend (if present)
       filter: false, // a road-class checkbox panel
       basemap: false, // a base-layer switcher over the spec's `basemaps` (re-picks casing on change)
+      colors: false, // a "colour by" picker over the spec's `color_options` (recolours client-side)
     },
   };
 
@@ -86,6 +87,11 @@
     this.selectedLayer = null; // the fill sub-layer currently selected (null = none)
     this.selected = null; // the selected GeoJSON feature (null = none)
     this.activeFilters = null; // null = show all
+    this._handlers = {}; // event bus: { eventName: [fn, …] } (see on/off/emit)
+    this._panelStacks = {}; // corner -> stack container for addPanel() panels
+    this._colorProp = "__rs_fill"; // the per-edge fill prop the fill style reads (see setColorField)
+    this._colorActiveIndex = 0; // index into spec.color_options of the active "colour by" option
+    this._activeLegend = null; // the legend currently shown (swaps with the colour option)
   }
 
   RoadStyleMap.version = VERSION;
@@ -98,11 +104,13 @@
       : Promise.resolve(specOrUrl);
     return specP.then(function (spec) {
       self.spec = spec;
+      self._initColorState();
       var cfgP = configOrUrl ? self.loadInteractionConfig(configOrUrl) : Promise.resolve();
       return cfgP.then(function () {
         self._renderBaseMap();
         self._renderRoads();
         self._renderWidgets();
+        self.emit("ready", self, spec);
         return self;
       });
     });
@@ -163,8 +171,11 @@
 
   RoadStyleMap.prototype._fillStyle = function (f) {
     var p = f.properties;
+    // The active "colour by" option swaps which baked fill prop is read (default __rs_fill); fall
+    // back to __rs_fill if a variant prop is missing on some feature.
+    var fill = p[this._colorProp];
     return {
-      color: p.__rs_fill,
+      color: fill != null ? fill : p.__rs_fill,
       weight: p.__rs_w,
       opacity: this._visible(p) ? p.__rs_op : 0,
       dashArray: p.__rs_dash,
@@ -281,6 +292,7 @@
     if (layer && layer.closeTooltip) layer.closeTooltip(); // drop the hover tooltip; pin instead
     this._pinTooltip(feature, layer, latlng);
     if (typeof this.options.onSelect === "function") this.options.onSelect(feature, layer);
+    this.emit("select", feature, layer);
   };
 
   // Pin the tooltip open at `latlng` (or the edge centre) so it survives mouseout — the hover
@@ -322,6 +334,7 @@
     this.selectedLayer = null;
     this.selected = null;
     if (prev && typeof this.options.onDeselect === "function") this.options.onDeselect(prev);
+    if (prev) this.emit("deselect", prev);
   };
 
   // The currently selected GeoJSON feature (its geometry + properties incl. __rs_class), or null.
@@ -329,11 +342,115 @@
     return this.selected || null;
   };
 
-  // Register a selection handler after construction: .on("select", fn) / .on("deselect", fn).
+  // ── Event bus ────────────────────────────────────────────────────────────────
+  // Subscribe to a map event: "ready" (map, spec), "select" (feature, layer),
+  // "deselect" (prevFeature), "colorchange" (option). Chainable; call several times to add
+  // several listeners for the same event (unlike the legacy single onSelect/onDeselect options,
+  // which still fire alongside these).
   RoadStyleMap.prototype.on = function (event, fn) {
-    if (event === "select") this.options.onSelect = fn;
-    else if (event === "deselect") this.options.onDeselect = fn;
+    (this._handlers[event] || (this._handlers[event] = [])).push(fn);
     return this; // chainable
+  };
+
+  // Unsubscribe. With no `fn`, drops every listener for that event.
+  RoadStyleMap.prototype.off = function (event, fn) {
+    var hs = this._handlers[event];
+    if (!hs) return this;
+    if (!fn) delete this._handlers[event];
+    else this._handlers[event] = hs.filter(function (h) { return h !== fn; });
+    return this;
+  };
+
+  // Fire an event to all subscribers (one throwing listener doesn't stop the others).
+  RoadStyleMap.prototype.emit = function (event) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    (this._handlers[event] || []).forEach(function (h) {
+      try { h.apply(null, args); }
+      catch (e) { if (typeof console !== "undefined") console.error("[roadstyle] " + event + " handler:", e); }
+    });
+    return this;
+  };
+
+  // ── Client-side recolouring ("colour by" options) ─────────────────────────────
+  // The "colour by" options baked into the spec (each: {name, prop, legend}); [] if none.
+  RoadStyleMap.prototype.getColorOptions = function () {
+    return (this.spec && this.spec.color_options) || [];
+  };
+
+  // The active option's index (into getColorOptions()).
+  RoadStyleMap.prototype.getColorField = function () {
+    return this._colorActiveIndex;
+  };
+
+  // Recolour the roads to a "colour by" option — by name or by index — with no re-render: the
+  // option's baked fill prop is swapped in, the legend follows, and a "colorchange" event fires.
+  RoadStyleMap.prototype.setColorField = function (nameOrIndex) {
+    var opts = this.getColorOptions();
+    if (!opts.length) return this;
+    var idx = typeof nameOrIndex === "number"
+      ? nameOrIndex
+      : opts.map(function (o) { return o.name; }).indexOf(nameOrIndex);
+    var opt = opts[idx];
+    if (!opt) return this;
+    this._colorActiveIndex = idx;
+    this._colorProp = opt.prop || "__rs_fill";
+    this._activeLegend = opt.legend || null;
+    if (this.fillLayer) this.fillLayer.setStyle(this._fillStyle.bind(this));
+    this._refreshLegend();
+    this.emit("colorchange", opt, idx);
+    return this;
+  };
+
+  // Pick the initial active colour option from the spec (called by load() before rendering).
+  RoadStyleMap.prototype._initColorState = function () {
+    var opts = this.getColorOptions();
+    if (opts.length) {
+      var i = (this.spec && this.spec.color_active) || 0;
+      if (i < 0 || i >= opts.length) i = 0;
+      this._colorActiveIndex = i;
+      this._colorProp = opts[i].prop || "__rs_fill";
+      this._activeLegend = opts[i].legend || (this.spec && this.spec.legend) || null;
+    } else {
+      this._colorActiveIndex = 0;
+      this._colorProp = "__rs_fill";
+      this._activeLegend = (this.spec && this.spec.legend) || null;
+    }
+  };
+
+  // ── Custom panels ─────────────────────────────────────────────────────────────
+  // Add a styled, positioned panel and let the caller fill it. `spec`:
+  //   { position?: "topleft"|"topright"|"bottomleft"|"bottomright" (default "topright"),
+  //     title?, className?, render?(body, map) }
+  // Panels sharing a corner stack vertically. Returns { el, body, remove() }.
+  RoadStyleMap.prototype.addPanel = function (spec) {
+    spec = spec || {};
+    var d = L.DomUtil.create("div", "rs-panel" + (spec.className ? " " + spec.className : ""));
+    if (spec.title) {
+      var h = L.DomUtil.create("h4", "rs-panel-hd", d);
+      h.textContent = spec.title;
+    }
+    var body = L.DomUtil.create("div", "rs-panel-body", d);
+    if (L.DomEvent) {
+      L.DomEvent.disableClickPropagation(d);
+      L.DomEvent.disableScrollPropagation(d);
+    }
+    this._panelStack(spec.position || "topright").appendChild(d);
+    var handle = {
+      el: d,
+      body: body,
+      remove: function () { if (d.parentNode) d.parentNode.removeChild(d); },
+    };
+    if (typeof spec.render === "function") spec.render(body, this);
+    return handle;
+  };
+
+  // The flex stack container for a corner (created on first use), so panels never overlap.
+  RoadStyleMap.prototype._panelStack = function (position) {
+    if (this._panelStacks[position]) return this._panelStacks[position];
+    var s = L.DomUtil.create("div", "rs-stack rs-stack-" + position);
+    this.map.getContainer().appendChild(s);
+    this._panelStacks[position] = s;
+    return s;
   };
 
   // 3-layer neon glow on a selected feature, sized to always sit ON TOP of the edge it covers
@@ -368,9 +485,12 @@
   // ── Optional built-in widgets ────────────────────────────────────────────────
   RoadStyleMap.prototype._renderWidgets = function () {
     var w = this.options.widgets || {};
-    if (w.legend) this._renderLegend();
+    // Render the legend container if any colour option (or the base spec) carries a legend — so a
+    // class→numeric colour switch can reveal a ramp legend that wasn't there at first.
+    if (w.legend && this._hasAnyLegend()) this._renderLegend();
     if (w.filter) this._renderFilterPanel();
     if (w.basemap) this._renderBaseMapSwitcher();
+    if (w.colors) this._renderColorPicker();
   };
 
   RoadStyleMap.prototype._renderBaseMapSwitcher = function () {
@@ -388,12 +508,15 @@
     });
   };
 
-  RoadStyleMap.prototype._renderLegend = function () {
-    var lg = this.spec && this.spec.legend;
-    if (!lg) return;
-    var d = L.DomUtil.create("div", "rs-legend");
-    d.style.left = "14px";
-    d.style.bottom = "22px";
+  // Is there any legend to show — the base spec's, or one carried by a colour option?
+  RoadStyleMap.prototype._hasAnyLegend = function () {
+    if (this.spec && this.spec.legend) return true;
+    return this.getColorOptions().some(function (o) { return !!o.legend; });
+  };
+
+  // Build the inner HTML for a legend object (categorical entries or a continuous ramp).
+  RoadStyleMap.prototype._legendHtml = function (lg) {
+    if (!lg) return "";
     var html = lg.title ? "<h4>" + lg.title + "</h4>" : "";
     if (lg.kind === "categorical") {
       (lg.entries || []).forEach(function (e) {
@@ -409,8 +532,52 @@
         lg.vmax +
         "</span></div>";
     }
-    d.innerHTML = html;
-    this.map.getContainer().appendChild(d);
+    return html;
+  };
+
+  RoadStyleMap.prototype._renderLegend = function () {
+    this._legendEl = L.DomUtil.create("div", "rs-legend");
+    this._legendEl.style.left = "14px";
+    this._legendEl.style.bottom = "22px";
+    this.map.getContainer().appendChild(this._legendEl);
+    this._refreshLegend();
+  };
+
+  // Repaint the legend for the active colour option (hidden when that option has no legend, e.g.
+  // class styling). Called on construction and on every setColorField().
+  RoadStyleMap.prototype._refreshLegend = function () {
+    if (!this._legendEl) return;
+    var lg = this._activeLegend || (this.spec && this.spec.legend);
+    var html = this._legendHtml(lg);
+    this._legendEl.innerHTML = html;
+    this._legendEl.style.display = html ? "" : "none";
+  };
+
+  // "Colour by" picker: a dropdown over the spec's color_options that recolours the map client-side.
+  RoadStyleMap.prototype._renderColorPicker = function () {
+    var self = this;
+    var opts = this.getColorOptions();
+    if (opts.length < 2) return; // nothing to switch between
+    this.addPanel({
+      position: "topright",
+      title: "Colour by",
+      className: "rs-colorpicker",
+      render: function (body) {
+        var sel = L.DomUtil.create("select", "rs-select", body);
+        opts.forEach(function (o, i) {
+          var op = document.createElement("option");
+          op.value = String(i);
+          op.textContent = o.name;
+          sel.appendChild(op);
+        });
+        sel.value = String(self._colorActiveIndex);
+        sel.addEventListener("change", function () {
+          self.setColorField(parseInt(sel.value, 10));
+        });
+        // keep the dropdown in sync if the colour option is changed programmatically
+        self.on("colorchange", function (opt, idx) { sel.value = String(idx); });
+      },
+    });
   };
 
   RoadStyleMap.prototype._renderFilterPanel = function () {

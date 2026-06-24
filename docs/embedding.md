@@ -39,6 +39,10 @@ rs.save_spec(edges, "roads.json", color_by="aadt", cmap="viridis")
   "basemaps": [ /* the same shape — base maps offered to the in-map switcher */ ],
   "tooltip": ["name", "aadt"],
   "legend": { "kind": "continuous", "title": "aadt", "vmin": 0, "vmax": 25000, "ramp": ["#440154", ...] },
+  "color_options": [ /* present only with color_options= : one entry per "colour by" option */
+    { "name": "Class", "prop": "__rs_fill",    "legend": null },
+    { "name": "AADT",  "prop": "__rs_fill__1", "legend": { "kind": "continuous", ... } } ],
+  "color_active": 0,
   "geojson": { "type": "FeatureCollection", "features": [ /* each feature.properties carries: */ ] }
 }
 ```
@@ -57,6 +61,7 @@ it doesn't need roadstyle's logic:
 | `__rs_cw` | casing width (px) |
 | `__rs_cop` | casing opacity |
 | `__rs_class` | road class / category |
+| `__rs_fill__1`, `__rs_fill__2`, … | extra fill colours, one per `color_options` entry (the renderer swaps which one the fill reads) |
 
 > **Render order = the geometry sandwich.** Draw a casing layer first (using `__rs_casing`/`__rs_cw`),
 > then the fill layer on top (`__rs_fill`/`__rs_w`). That keeps road borders from slicing through
@@ -189,3 +194,55 @@ const current = m.getSelection();   // the selected feature, or null
 Selection is **single** — clicking another road replaces it; click the same road again, or click
 the map background, to deselect (each fires `onDeselect`). You can also pass the handlers up front:
 `new RoadStyleMap("map", { onSelect, onDeselect })`.
+
+## The `RoadStyleMap` JS API (events, recolour, custom panels)
+
+`roadstyle.js` is more than a renderer — it's a small API your page can drive. The built-in widgets
+are opt-in via `widgets`, but you can also build your **own** UI on top.
+
+**Event bus.** `on(event, fn)` / `off(event, fn)` subscribe to map events; several listeners per
+event are fine (the legacy `onSelect`/`onDeselect` options still fire alongside them):
+
+| event | fired with | when |
+|---|---|---|
+| `ready` | `(map, spec)` | after the map has loaded and rendered |
+| `select` / `deselect` | `(feature, layer)` / `(prevFeature)` | a road is selected / the selection cleared |
+| `colorchange` | `(option, index)` | the active "colour by" option changed |
+
+**Switchable colouring.** Bake the options in Python with
+[`color_options`](web-backend.md#dynamic-recolouring-color_options) (works on `to_spec` / `save` /
+`to_html` too), then drive them client-side:
+
+```js
+m.getColorOptions();        // [{name, prop, legend}, …] baked into the spec
+m.setColorField("AADT");    // recolour by name or index — no re-render; swaps the legend
+m.getColorField();          // the active option's index
+```
+
+Turn the built-in picker on with `widgets: { colors: true }`, or build your own and call
+`setColorField`.
+
+**Custom panels.** `addPanel` gives you styled, auto-stacking chrome in any corner; fill it and wire
+it to the API:
+
+```js
+const m = RoadStyle.create("map", spec, { widgets: { colors: false } });
+m.on("ready", map => {
+  map.addPanel({ title: "Colour by", position: "topright", render(body, map) {
+    map.getColorOptions().forEach((o, i) => {
+      const b = document.createElement("button");
+      b.textContent = o.name; b.onclick = () => map.setColorField(i);
+      body.appendChild(b);
+    });
+    map.on("colorchange", (opt, idx) => { /* keep your buttons in sync */ });
+  }});
+});
+```
+
+`addPanel({ position, title, collapsible, render(body, map) })` returns `{ el, body, remove() }`.
+A worked page is in
+[`examples/recolor_custom_panel.py`](https://github.com/Khoshkhah/roadstyle/blob/main/examples/recolor_custom_panel.py).
+
+> On the **`web` (MapLibre) backend** the panel hook is different — that page is a template, not a
+> `RoadStyleMap`, so it exposes `window.rsSetColorField(name|index)` + a `rs:colorchange` event
+> instead. See [web backend](web-backend.md#dynamic-recolouring-color_options).

@@ -56,7 +56,7 @@ GeoDataFrame with line geometry + a class column).
 |---|---|---|---|
 | `gdf` | `RoadEdges` / GeoDataFrame | *required* | The road edges to draw. A plain GeoDataFrame is normalised for you (→ EPSG:4326, lines). |
 | `backend` | `"web"` / `"folium"` / `"lonboard"` | `"web"` | Renderer. **`web` (default)** = self-contained **MapLibre (vector)** map with per-zoom widths, two-way lanes, arrows/names, hover/select & tunnel/bridge grade separation (see [web backend](web-backend.md)). `folium` = portable interactive HTML (Leaflet) with legends + filter panel. `lonboard` = GPU/WebGL, for very large data. |
-| `palette` | str or dict | `"highsat"` | Which colour palette for **class** styling. Built-ins: `"highsat"`, `"carto"`, `"mono"` (grayscale). Add your own via a [data file or override](palettes.md#customising-data-files--overrides). Ignored if you use `color_by`/`style`. |
+| `palette` | str or dict | `"highsat"` | Which colour palette for **class** styling. Built-ins: `"highsat"`, `"carto"`, `"mono"` (grayscale). Add your own via a [data file or override](palettes.md#customising-data-files-and-overrides). Ignored if you use `color_by`/`style`. |
 | `theme` | `"light"`/`"dark"`/`"satellite"` | `"dark"` | Visual theme: sets the default base map and which casing colour (light/dark) is used. |
 | `highway_col` | str | `"highway"` | Which column holds the road class. Set this if your class column has a different name. |
 | `include` | str / list / `None` | `None` | Keep **only** these road classes (e.g. `["motorway","primary"]`). |
@@ -105,6 +105,8 @@ Only used by the MapLibre web backend; ignored by the others. See [web backend](
 | `bridge_col` | str | `"bridge"` | Column marking bridges — drawn on top with a heavier, square-capped casing. |
 | `layer_col` | str | `"layer"` | OSM `layer` tag column; its sign sets elevation when `tunnel`/`bridge` are absent. |
 | `boundary` | geometry / GeoDataFrame / GeoJSON | `None` | Overlay a dashed outline on top of the roads (e.g. the area the network was clipped to). Accepts a shapely geometry, a `GeoSeries`/`GeoDataFrame` (reprojected to EPSG:4326), or a GeoJSON mapping (assumed lon/lat). `None` = no overlay. |
+| `color_options` | mapping / list / `None` | `None` | Bake several **"colour by" options** + a *Colour by* dropdown that recolours client-side (no re-render). An ordered `{name: {styler kwargs}}` mapping (or list of `{"name": ..., **kwargs}`); option 0 is active. Blank edges fall back to the base fill. See [web backend](web-backend.md#dynamic-recolouring-color_options). |
+| `overlays` | list of `Overlay` / `None` | `None` | Extra layers the caller brings — zone polygons, POI circles, any geometry — drawn under/over the roads, clickable, with a *Layers* toggle. See [`Overlay`](#8-overlay-extra-layers). |
 
 > **Direction arrows.** `arrows=True` (web backend) places one-way chevrons along each one-way edge
 > using a native MapLibre symbol layer (`symbol-placement: line`). Geometry direction is the edge's
@@ -133,7 +135,7 @@ arguments above, but you can construct them directly for full control.
 |---|---|---|---|
 | `column` | str | — | The column to read the category from (e.g. `"congestion"`). |
 | `colors` | dict | `{}` | `{value: hexcolour}` map, e.g. `{"low":"#11D68F","heavy":"#F24E42"}`. |
-| `fallback_color` | hex str | `"#cccccc"` | Colour for values not in `colors` (and missing data). |
+| `fallback_color` | hex str | `"#cccccc"` | Colour for values not in `colors` (and missing data). Inside `color_options`, unmapped edges fall back to the **base option's fill** instead, not this colour. |
 | `width` | number or str | `2.0` | Constant line width, or the name of a column to read width from. |
 | `casing` | hex str / `None` | `None` | Optional constant casing colour. |
 | `opacity` | 0–1 | `0.9` | Line opacity. |
@@ -149,7 +151,7 @@ arguments above, but you can construct them directly for full control.
 | `width_by` | `(min_px, max_px)` / `None` | `None` | Scale width with the value. |
 | `width_column` | str / `None` | `None` | Column driving the width ramp (defaults to `column`). |
 | `opacity` | 0–1 | `0.9` | Line opacity. |
-| `nan_color` | hex str | `"#cccccc"` | Colour for missing/non-numeric values. |
+| `nan_color` | hex str | `"#cccccc"` | Colour for missing/non-numeric values. Inside `color_options`, missing edges fall back to the **base option's fill** instead. |
 
 ---
 
@@ -228,3 +230,34 @@ can be hand-edited or read by a web frontend.
 | `roads` | A map of `class → RoadStyle fields` (see §1 for each field). |
 
 A minimal entry needs only `fill`, `width`, `casing_width`; the rest fall back to defaults.
+
+---
+
+## 8. `Overlay` — extra layers
+
+Extra geometry the caller brings — zone polygons, POI circles, any lines — drawn alongside the
+roads on the **`web` backend** via `render_edges(..., overlays=[Overlay(...), ...])`. Each `Overlay`
+is *passthrough* data (your geometry, your style); it does **not** go through the road-styling
+compiler. See [web backend → Overlay layers](web-backend.md#overlay-layers-overlays).
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `data` | GeoDataFrame / GeoSeries / GeoJSON | *required* | The overlay geometry (any CRS → EPSG:4326). Feature `properties` are kept and shown in the click popup. |
+| `kind` | `"fill"` / `"line"` / `"circle"` / `None` | `None` | Draw kind. `None` = auto-detect (polygon → `fill`, line → `line`, point → `circle`). |
+| `placement` | `"under"` / `"over"` | `"over"` | Draw beneath the roads (e.g. zone fills) or on top (e.g. POIs). |
+| `color` | hex str | `"#6aa9ff"` | Paint colour (fill / circle / line). |
+| `opacity` | 0–1 / `None` | `None` | Layer opacity; `None` = a kind-appropriate default (fill `0.15`, circle `0.85`, line `0.9`). |
+| `outline` | hex str / `None` | `None` | Polygon outline colour (`fill` only; default = `color`). |
+| `radius` | px | `6.0` | Circle radius (`circle` only). |
+| `width` | px | `2.0` | Line / fill-outline width. |
+| `label` | str / `None` | `None` | Name shown in the *Layers* toggle (default `"Layer N"`). |
+| `popup` | list / `None` | `None` | Fields shown when a feature is clicked (makes the layer interactive). `None` = show all fields; `[]` = non-interactive (decoration only). |
+
+```python
+from shapely.geometry import box
+zones = gpd.GeoDataFrame({"taz_id": ["Z0"], "weight": [0.7]},
+                         geometry=[box(18.04, 59.31, 18.07, 59.33)], crs=4326)
+rs.render_edges(edges, backend="web",
+    overlays=[rs.Overlay(zones, placement="under", color="#6aa9ff",
+                         opacity=0.14, label="Zones", popup=["taz_id", "weight"])])
+```

@@ -36,11 +36,17 @@ roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by
   **MapLibre `web` backend** (per-zoom widths, two-way lanes, arrows/names, hover/select,
   tunnel/bridge grade separation — offline, no server; see [web backend](web-backend.md)), and
   `to_spec`/`to_html`/`to_iframe` for embedding in your own site (Leaflet / MapLibre / iframe).
+- **Switchable colouring** — bake several "colour by" options with `color_options` and switch
+  between them in the browser (a **Colour by** dropdown), no re-render; blank edges keep the base
+  colour.
+- **Overlay layers** — bring your own geometry (zones, POIs, any lines) as `Overlay`s, drawn
+  under/over the roads, clickable, with a **Layers** toggle.
 - **Canonical input** — `normalize_edges` reprojects, drops non-lines, and maps your column names.
 - **Command line** — the `roadstyle` CLI renders any road file from the shell, no Python required.
 
 ## Where to next
 
+- **[Manual](manual.md)** — a hands-on walk-through with the **live map embedded after each step**.
 - **[Usage](usage.md)** — install, the command line, quick start, recipes.
 - **[Parameter reference](parameters.md)** — every parameter explained.
 - **[MapLibre web backend](web-backend.md)** — the self-contained, zoom-correct vector map

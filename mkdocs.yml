@@ -15,6 +15,7 @@ theme:
 nav:
   - Home: index.md
   - Usage: usage.md
+  - Manual (live maps): manual.md
   - Tutorial: tutorial.md
   - Examples: examples.md
   - Parameter reference: parameters.md

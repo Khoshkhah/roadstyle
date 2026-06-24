@@ -20,9 +20,11 @@ import collections
 import html as _html
 import json
 import os
+from collections.abc import Mapping
 
 from .basemaps import DEFAULT_SWITCHER, get_basemap
-from .stylers import bake_props, build_styler
+from .overlays import Overlay, detect_kind, to_fc
+from .stylers import bake_color_options, bake_props, build_styler, option_styler
 from .themes import get_theme
 
 _VENDOR = os.path.join(os.path.dirname(__file__), "vendor")
@@ -225,6 +227,49 @@ def _basemap_style(bm):
             "layers": [{"id": "basemap", "type": "raster", "source": "bm"}]}
 
 
+def _overlay_layers(sid, ov, kind):
+    """The MapLibre layer spec(s) for one overlay source: a fill (+ outline), a circle, or a line."""
+    op = ov.opacity
+    if kind == "fill":
+        return [
+            {"id": f"{sid}-fill", "type": "fill", "source": sid,
+             "paint": {"fill-color": ov.color, "fill-opacity": 0.15 if op is None else op}},
+            {"id": f"{sid}-outline", "type": "line", "source": sid,
+             "paint": {"line-color": ov.outline or ov.color, "line-width": ov.width,
+                       "line-opacity": 0.9}},
+        ]
+    if kind == "circle":
+        return [{"id": f"{sid}-circle", "type": "circle", "source": sid,
+                 "paint": {"circle-radius": ov.radius, "circle-color": ov.color,
+                           "circle-opacity": 0.85 if op is None else op,
+                           "circle-stroke-color": "#ffffff", "circle-stroke-width": 1}}]
+    return [{"id": f"{sid}-line", "type": "line", "source": sid,
+             "paint": {"line-color": ov.color, "line-width": ov.width,
+                       "line-opacity": 0.9 if op is None else op}}]
+
+
+def _build_overlays(style, overlays):
+    """Add each overlay as its own source + layer(s) to ``style``. Returns ``(under, over, meta)``:
+    the layer specs to splice below / above the roads, and the JS metadata (label / clickable layer
+    ids / popup fields) the page reads to wire popups and the Layers toggle."""
+    under, over, meta = [], [], []
+    for i, item in enumerate(overlays or []):
+        ov = item if isinstance(item, Overlay) else Overlay(data=item)
+        fc = to_fc(ov.data)
+        kind = ov.kind or detect_kind(fc)
+        sid = f"ov{i}"
+        style["sources"][sid] = {"type": "geojson", "data": fc}
+        layers = _overlay_layers(sid, ov, kind)
+        (under if ov.placement == "under" else over).extend(layers)
+        # the topmost layer is the click target (fill body / circle / line)
+        meta.append({"label": ov.label or f"Layer {i + 1}",
+                     "layers": [lyr["id"] for lyr in layers],
+                     "hit": layers[0]["id"],
+                     "popup": list(ov.popup) if ov.popup is not None else None,
+                     "interactive": ov.popup is None or bool(ov.popup)})
+    return under, over, meta
+
+
 _HTML = """<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <title>__TITLE__</title>
 <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"/>
@@ -240,6 +285,22 @@ box-shadow:0 1px 4px rgba(0,0,0,.3);font:13px system-ui,sans-serif;max-height:70
 .flt-ctrl .flt-body{padding:0 9px 7px;display:flex;flex-direction:column;gap:2px}
 .flt-ctrl.collapsed .flt-body{display:none}
 .flt-ctrl label{cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px}
+.co-ctrl{position:absolute;top:10px;right:10px;z-index:2;background:#fff;border-radius:5px;
+box-shadow:0 1px 4px rgba(0,0,0,.3);padding:4px 7px;font:13px system-ui,sans-serif;color:#555}
+.co-ctrl select{font:inherit;border:0;background:transparent;cursor:pointer;outline:none;color:#111}
+.co-lg{position:absolute;left:10px;bottom:24px;z-index:2;background:rgba(255,255,255,.94);
+border-radius:5px;box-shadow:0 1px 4px rgba(0,0,0,.3);padding:6px 9px;font:12px system-ui,sans-serif;color:#222}
+.co-lg .lg-title{font-weight:600;margin-bottom:4px}
+.co-lg .lg-row{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.co-lg .lg-sw{width:14px;height:8px;border-radius:2px;display:inline-block}
+.co-lg .lg-bar{height:10px;width:150px;border-radius:3px;margin:2px 0}
+.co-lg .lg-ends{display:flex;justify-content:space-between;color:#555}
+.ov-ctrl{position:absolute;bottom:24px;right:10px;z-index:2;background:#fff;border-radius:5px;
+box-shadow:0 1px 4px rgba(0,0,0,.3);font:13px system-ui,sans-serif;color:#222}
+.ov-ctrl .ov-hd{padding:5px 9px;font-weight:600}
+.ov-ctrl .ov-body{padding:0 9px 7px;display:flex;flex-direction:column;gap:2px}
+.ov-ctrl label{display:flex;align-items:center;gap:5px;white-space:nowrap;cursor:pointer}
+.ov-ctrl .ov-sw{width:12px;height:12px;border-radius:3px;display:inline-block;flex:none}
 </style></head><body>
 <div id="map"></div><script>
 const style = __STYLE__, BASEMAPS = __BASEMAPS__;
@@ -280,6 +341,89 @@ if(FILTER.on){
   document.body.appendChild(box);
   map.on("load",()=>{ roadIds().forEach(id=>{ baseF[id]=map.getFilter(id)||null; }); });
 }
+// "colour by" recolouring: swap which baked fill prop the road layers read (no re-render). Each
+// option's fill is baked per edge (__rs_fill / __rs_fill__1 …); setPaintProperty repoints the
+// road-fill layers' line-color at the chosen prop. window.rsSetColorField drives it from your UI.
+const COLOR_OPTIONS = __COLOR_OPTIONS__;
+const RS_FILL_LAYERS = ["roads-fill","roads-tunnel-fill","roads-bridge-fill"];
+let _coActive = 0, _coLegendEl = null;
+function coLegendHtml(lg){
+  if(!lg) return "";
+  let h = lg.title ? '<div class="lg-title">'+lg.title+'</div>' : "";
+  if(lg.kind==="categorical"){ (lg.entries||[]).forEach(e=>{
+    h+='<div class="lg-row"><span class="lg-sw" style="background:'+e[1]+'"></span>'+e[0]+'</div>'; }); }
+  else if(lg.kind==="continuous"){
+    h+='<div class="lg-bar" style="background:linear-gradient(90deg,'+(lg.ramp||[]).join(",")+')"></div>'
+      +'<div class="lg-ends"><span>'+lg.vmin+'</span><span>'+lg.vmax+'</span></div>'; }
+  return h;
+}
+function coUpdateLegend(){
+  if(!_coLegendEl) return;
+  const h = coLegendHtml((COLOR_OPTIONS[_coActive]||{}).legend);
+  _coLegendEl.innerHTML = h; _coLegendEl.style.display = h ? "" : "none";
+}
+function rsSetColorField(nameOrIdx){
+  let idx = typeof nameOrIdx==="number" ? nameOrIdx : COLOR_OPTIONS.map(o=>o.name).indexOf(nameOrIdx);
+  const o = COLOR_OPTIONS[idx]; if(!o) return;
+  _coActive = idx;
+  RS_FILL_LAYERS.forEach(id=>{ if(map.getLayer(id))
+    map.setPaintProperty(id,"line-color",["coalesce",["get",o.prop],"#888888"]); });
+  const sel=document.getElementById("co-select"); if(sel) sel.value=String(idx);
+  coUpdateLegend();
+  document.dispatchEvent(new CustomEvent("rs:colorchange",{detail:{option:o,index:idx}}));
+}
+window.rsSetColorField = rsSetColorField;
+window.RS_COLOR_OPTIONS = COLOR_OPTIONS;
+if(COLOR_OPTIONS.length > 1){
+  const w=document.createElement("div"); w.className="co-ctrl";
+  w.appendChild(document.createTextNode("Colour by "));
+  const sel=document.createElement("select"); sel.id="co-select";
+  COLOR_OPTIONS.forEach((o,i)=>{ const op=document.createElement("option");
+    op.value=i; op.textContent=o.name; sel.appendChild(op); });
+  sel.onchange=()=> rsSetColorField(parseInt(sel.value,10));
+  w.appendChild(sel); document.body.appendChild(w);
+}
+if(COLOR_OPTIONS.some(o=>o.legend)){
+  _coLegendEl=document.createElement("div"); _coLegendEl.className="co-lg";
+  document.body.appendChild(_coLegendEl); coUpdateLegend();
+}
+// extra overlay layers (zones / POIs / lines): click an interactive overlay -> popup of its
+// fields; a Layers control toggles each overlay's visibility. Road clicks take precedence (an
+// overlay is only consulted when the click misses every road).
+const OVERLAYS = __OVERLAYS__;
+function handleOverlayClick(e){
+  for(const ov of OVERLAYS){
+    if(!ov.interactive) continue;
+    const ids = ov.layers.filter(id=>map.getLayer(id));
+    const hits = ids.length ? map.queryRenderedFeatures(e.point, {layers:ids}) : [];
+    if(hits.length){
+      const p = hits[0].properties||{};
+      const fields = ov.popup && ov.popup.length ? ov.popup : Object.keys(p);
+      const rows = fields.filter(k=>p[k]!=null && p[k]!=="").map(k=>"<b>"+k+"</b>: "+p[k]);
+      new maplibregl.Popup({closeButton:true,maxWidth:"260px"})
+        .setLngLat(e.lngLat).setHTML(rows.join("<br>")||"(no data)").addTo(map);
+      return true;
+    }
+  }
+  return false;
+}
+OVERLAYS.forEach(ov=>{ if(!ov.interactive) return; ov.layers.forEach(id=>{
+  map.on("mouseenter", id, ()=>{ map.getCanvas().style.cursor="pointer"; });
+  map.on("mouseleave", id, ()=>{ map.getCanvas().style.cursor=""; });
+}); });
+if(OVERLAYS.length){
+  const box=document.createElement("div"); box.className="ov-ctrl";
+  const hd=document.createElement("div"); hd.className="ov-hd"; hd.textContent="Layers";
+  const body=document.createElement("div"); body.className="ov-body"; box.appendChild(hd); box.appendChild(body);
+  OVERLAYS.forEach(ov=>{
+    const lab=document.createElement("label");
+    const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=true;
+    cb.onchange=()=>{ ov.layers.forEach(id=>{ if(map.getLayer(id))
+      map.setLayoutProperty(id,"visibility", cb.checked?"visible":"none"); }); };
+    lab.appendChild(cb); lab.appendChild(document.createTextNode(" "+ov.label)); body.appendChild(lab);
+  });
+  document.body.appendChild(box);
+}
 // oneway direction-arrow icon (openstreetmap-carto)
 function addArrow(){
   if(map.hasImage("oneway")) return;
@@ -306,7 +450,8 @@ map.on("mousemove", e=>{ _pt=e.point; if(!_raf) _raf=requestAnimationFrame(hover
 map.on("mouseout", ()=>{ _pt=null; if(_raf){cancelAnimationFrame(_raf);_raf=0;} setS(_hov,{hover:false}); _hov=null; });
 let _sel=null;
 map.on("click", e=>{ const f = pick(e.point);
-  if(!f){ if(_sel!=null){ setS(_sel,{select:false}); _sel=null; } return; }   // click empty -> deselect (restore colour)
+  if(!f){ if(handleOverlayClick(e)) return;   // no road under the cursor -> try the overlays
+    if(_sel!=null){ setS(_sel,{select:false}); _sel=null; } return; }   // click empty -> deselect (restore colour)
   if(_sel!=null) setS(_sel,{select:false}); _sel=f.id; setS(_sel,{select:true});
   const p = f.properties||{}, r = ["<b>"+(p.name||"(unnamed)")+"</b>"];
   for(const k in p){ if(k[0]==="_"||k==="twoway"||k==="name") continue;
@@ -340,7 +485,8 @@ def render(gdf, palette: str = "highsat", theme: str = "dark", highway_col: str 
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
-           basemap_switcher: bool = True, boundary=None, **_ignore):
+           basemap_switcher: bool = True, boundary=None, color_options=None,
+           overlays=None, **_ignore):
     """Build a self-contained MapLibre map of the styled edges.
 
     If the data carries ``tunnel`` / ``bridge`` / ``layer`` columns (named via ``tunnel_col`` /
@@ -355,13 +501,37 @@ def render(gdf, palette: str = "highsat", theme: str = "dark", highway_col: str 
 
     ``boundary`` (optional) overlays a dashed outline — a shapely geometry, a GeoSeries /
     GeoDataFrame, or a GeoJSON mapping (assumed lon/lat) — e.g. the area the network was clipped
-    to."""
+    to.
+
+    ``color_options`` (optional) bakes several "colour by" fill sets — an ordered mapping
+    ``{name: {styler kwargs}}`` (or a list of ``{"name": ..., **kwargs}``) — and adds a *Colour by*
+    dropdown that recolours the roads client-side with no re-render (each road keeps its width /
+    casing / lanes; only the fill swaps). A neutral base reads best — pair the class option with
+    ``palette="mono"``. ``window.rsSetColorField(name|index)`` drives the same swap from your own
+    UI.
+
+    ``overlays`` (optional) draws extra layers the caller brings — a list of :class:`Overlay`
+    (zone polygons, POI circles, any geometry). Each becomes its own source + layer(s), placed
+    ``under`` or ``over`` the roads, clickable for a popup of its fields, and toggled from a
+    *Layers* control."""
     th = get_theme(theme)
     g = gdf.to_crs(4326)
-    if styler is None:
-        styler = build_styler(palette=palette, highway_col=highway_col)
-    rf = styler.resolve_frame(g, theme)
-    geo = bake_props(json.loads(g.to_json()), rf, th.casing == "dark")   # per-edge __rs_fill/__rs_casing
+
+    color_opts_meta = None
+    if color_options:
+        # one pre-resolved fill set per "colour by" option; option 0 is active (drives the shared
+        # width/casing via bake_props), the rest bake only their fill under __rs_fill__<i>.
+        items = (list(color_options.items()) if isinstance(color_options, Mapping)
+                 else [(o["name"], {k: v for k, v in o.items() if k != "name"})
+                       for o in color_options])
+        frames = [(name, option_styler(highway_col, palette, opts).resolve_frame(g, theme))
+                  for name, opts in items]
+        geo, color_opts_meta = bake_color_options(json.loads(g.to_json()), frames, th.casing == "dark")
+    else:
+        if styler is None:
+            styler = build_styler(palette=palette, highway_col=highway_col)
+        rf = styler.resolve_frame(g, theme)
+        geo = bake_props(json.loads(g.to_json()), rf, th.casing == "dark")   # per-edge __rs_fill/__rs_casing
     _mark_twoway(geo)
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
 
@@ -375,6 +545,11 @@ def render(gdf, palette: str = "highsat", theme: str = "dark", highway_col: str 
         bms = bms[:1]                                     # one entry -> the JS hides the dropdown
     style = _basemap_style(get_basemap(active))
     style["sources"]["roads"] = {"type": "geojson", "data": geo, "generateId": True}
+
+    # extra overlay layers (zones / POIs / any geometry the caller brings); each gets its own source
+    # + paint layer(s), placed under or over the roads, and (if `popup` is set) clickable.
+    under_layers, over_layers, ov_meta = _build_overlays(style, overlays)
+
     lay = {"line-cap": "round", "line-join": "round", "line-sort-key": _sort_key(highway_col)}
     tlay = {**lay, "line-cap": "butt"}                    # butt cap -> clean dash ticks on tunnel casing
     blay = {**lay, "line-cap": "butt"}                    # butt cap -> square bridge deck ends
@@ -386,6 +561,7 @@ def render(gdf, palette: str = "highsat", theme: str = "dark", highway_col: str 
     cw = _width_expr(highway_col, casing=True, **sw)      # casing width expr (reused across layers)
     fw = _width_expr(highway_col, **sw)                   # fill width expr
     bcw = _width_expr(highway_col, casing=True, scale=1.25, **sw)   # heavier bridge casing ("wings")
+    style["layers"] += under_layers            # caller overlays drawn beneath the roads (e.g. zones)
     style["layers"] += [
         # Tunnels first, so the surface roads above paint over them at crossings. The dashed casing +
         # faded fill make a tunnel read as "underground" even where nothing crosses it (osm-carto look).
@@ -449,6 +625,8 @@ def render(gdf, palette: str = "highsat", theme: str = "dark", highway_col: str 
              "paint": {"line-color": "#6a0dad", "line-width": 2.5, "line-opacity": 0.9,
                        "line-dasharray": [3, 2]}})
 
+    style["layers"] += over_layers             # caller overlays drawn on top of the roads (e.g. POIs)
+
     # road-class filter panel: the distinct classes present, most important first
     classes, seen = [], set()
     for ft in geo["features"]:
@@ -466,6 +644,8 @@ def render(gdf, palette: str = "highsat", theme: str = "dark", highway_col: str 
             .replace("__FILTER__", json.dumps(flt))
             .replace("__CENTER__", json.dumps([(minx + maxx) / 2, (miny + maxy) / 2]))
             .replace("__BOUNDS__", json.dumps([[minx, miny], [maxx, maxy]]))
+            .replace("__COLOR_OPTIONS__", json.dumps(color_opts_meta or []))
+            .replace("__OVERLAYS__", json.dumps(ov_meta))
             # inject MapLibre last so its 800 KB blob isn't scanned for the other placeholders
             .replace("__MAPLIBRE_CSS__", _asset("maplibre-gl.css"))
             .replace("__MAPLIBRE_JS__", _asset("maplibre-gl.js").replace("</script>", "<\\/script>")))

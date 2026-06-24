@@ -7,17 +7,18 @@ A map of the public API. For every parameter and its meaning, see the
 
 | Function | Returns | Purpose |
 |---|---|---|
-| `render_edges(gdf, ...)` | `folium.Map` / `lonboard.Map` | the main entry point — render a styled map |
+| `render_edges(gdf, ...)` | `WebMap` / `folium.Map` / `lonboard.Map` | the main entry point — render a styled map (default backend `"web"`) |
 
 Key kwargs: `backend`, `palette`, `theme`, `highway_col`, `include`/`exclude`, `selected`,
-`tooltip`, `basemap`/`basemaps`, and the data-driven set `style` / `color_by` / `colors` /
-`cmap` / `vmin` / `vmax` / `width_by` / `legend`.
+`tooltip`, `basemap`/`basemaps`, the data-driven set `style` / `color_by` / `colors` / `cmap` /
+`vmin` / `vmax` / `width_by` / `legend`, and (web backend) `color_options` (switchable colouring)
+and `overlays` (extra layers).
 
 ## Web / JSON output
 
 | Function | Returns | Purpose |
 |---|---|---|
-| `to_spec(gdf, ...)` | `dict` | canonical JSON: data + baked-in style + legend + metadata |
+| `to_spec(gdf, ...)` | `dict` | canonical JSON: data + baked-in style + legend + metadata (`color_options` → switchable colouring) |
 | `to_geojson(gdf, ...)` | `dict` | the styled `FeatureCollection` only |
 | `to_html(gdf, full=…)` | `str` | full HTML page or embeddable `<div>+<script>` fragment |
 | `to_iframe(gdf, ...)` | `str` | self-contained `<iframe srcdoc=…>` |
@@ -35,6 +36,12 @@ Key kwargs: `backend`, `palette`, `theme`, `highway_col`, `include`/`exclude`, `
 | `color_by_class` / `color_by` / `color_by_value` | convenience constructors |
 | `build_styler(...)` | pick the right styler from kwargs (used internally by `render_edges`) |
 | `ResolvedFrame` | per-edge resolved style arrays (the renderer's input contract) |
+
+## Overlays (extra layers)
+
+| Object | Purpose |
+|---|---|
+| `Overlay` | an extra layer the caller brings (zone polygons, POI circles, any geometry) — drawn under/over the roads on the `web` backend via `render_edges(..., overlays=[...])`. See [parameters §8](parameters.md#8-overlay-extra-layers). |
 
 ## Input, palettes, themes, base maps
 

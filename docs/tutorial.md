@@ -45,7 +45,7 @@ and web output on top of it.
 ## 2 · Themes & palettes
 
 Three palettes — `highsat` (high-contrast), `carto` (classic OSM), and `mono` (grayscale) — and
-three themes: `light`, `dark`, and `satellite`. Palettes are [data files you can override](palettes.md#customising-data-files--overrides).
+three themes: `light`, `dark`, and `satellite`. Palettes are [data files you can override](palettes.md#customising-data-files-and-overrides).
 
 ```python
 rs.render_edges(edges, palette="carto", theme="light")

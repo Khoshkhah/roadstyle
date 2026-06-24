@@ -76,7 +76,14 @@ and roadstyle stays the single source of truth for the cartography.
 
 ---
 
-## Path 3 — `roadstyle.js` (a true JavaScript port)
+## Path 3 — a true JavaScript *styling* port
+
+> **Not to be confused with the bundled `roadstyle.js`.** roadstyle already ships a
+> `roadstyle.js` — the renderer that `to_html` / `save` inline — but it *reads the baked `__rs_*`
+> props* (it does **not** recompute styling), and it exposes a real JS API (`RoadStyleMap`: events,
+> `setColorField`, `addPanel`). That's part of **Path 1** — see
+> [Embedding → the RoadStyleMap JS API](embedding.md#the-roadstylemap-js-api-events-recolour-custom-panels).
+> *This* Path 3 is the heavier, hypothetical thing below: porting the **styling logic** itself.
 
 Reimplement the styling *logic* (palettes, the geometry sandwich, class→colour / numeric ramp
 resolution) in JavaScript, so the browser computes styles itself with **no Python at runtime**.

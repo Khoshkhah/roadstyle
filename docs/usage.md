@@ -109,6 +109,25 @@ Toggle the UI with `arrows` / `labels` / `filter_control` / `basemap_switcher` (
 See **[MapLibre web backend](web-backend.md)** for the full feature list and parameters. (This is
 distinct from `rs.save` / `-f rsjs`, which writes the roadstyle.js *spec page* for embedding.)
 
+```python
+# Switchable data-driven colouring: a neutral mono base + a "Colour by" dropdown that
+# recolours client-side (no re-render). Blank edges keep the base colour, not a flat grey.
+rs.render_edges(edges, backend="web", palette="mono",
+    color_options={"Class": {}, "AADT": {"color_by": "aadt", "cmap": "viridis"},
+                   "Speed": {"color_by": "speed_kph", "cmap": "magma"}}).save("recolor.html")
+
+# Extra overlay layers you bring (zones / POIs / any geometry): drawn under/over the roads,
+# clickable, toggled from a Layers control.
+rs.render_edges(edges, backend="web",
+    overlays=[rs.Overlay(zones, kind="fill", placement="under", color="#6aa9ff",
+                         opacity=0.14, label="Zones", popup=["taz_id", "weight"]),
+              rs.Overlay(pois, kind="circle", placement="over", color="#ff5d5d",
+                         radius=7, label="POIs", popup=["name", "type"])]).save("overlays.html")
+```
+
+Prefer to **see** these working? The **[Manual](manual.md)** walks through them with the live map
+embedded after each step.
+
 ## Custom (non-OSM) road classes
 
 ```python
