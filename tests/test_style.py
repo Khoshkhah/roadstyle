@@ -43,9 +43,13 @@ def test_links_normalize_and_render_narrower():
 
 
 def test_theme_swaps_casing():
-    assert resolve("tertiary", theme="light").casing == "#007A3E"
+    from roadstyle import Theme
+    # a theme's casing variant selects casing_light vs casing_dark
+    assert resolve("tertiary", theme=Theme("x", "light", "voyager")).casing == "#007A3E"
     assert resolve("tertiary", theme="dark").casing == "#000000"
     assert resolve("tertiary", theme="satellite").casing == "#000000"
+    # the built-in light theme uses black casing (light canvas, standard OSM outlines)
+    assert resolve("tertiary", theme="light").casing == "#000000"
 
 
 def test_tunnel_and_bridge_overrides():
