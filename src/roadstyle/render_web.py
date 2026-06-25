@@ -453,10 +453,12 @@ map.on("click", e=>{ const f = pick(e.point);
   if(!f){ if(handleOverlayClick(e)) return;   // no road under the cursor -> try the overlays
     if(_sel!=null){ setS(_sel,{select:false}); _sel=null; } return; }   // click empty -> deselect (restore colour)
   if(_sel!=null) setS(_sel,{select:false}); _sel=f.id; setS(_sel,{select:true});
-  const p = f.properties||{}, r = ["<b>"+(p.name||"(unnamed)")+"</b>"];
-  for(const k in p){ if(k[0]==="_"||k==="twoway"||k==="name") continue;
-    if(p[k]!=null && p[k]!=="") r.push(k+": "+p[k]); }
-  new maplibregl.Popup({closeButton:true, maxWidth:"260px"}).setLngLat(e.lngLat).setHTML(r.join("<br>")).addTo(map);
+  if(__ROAD_POPUP__){
+    const p = f.properties||{}, r = ["<b>"+(p.name||"(unnamed)")+"</b>"];
+    for(const k in p){ if(k[0]==="_"||k==="twoway"||k==="name") continue;
+      if(p[k]!=null && p[k]!=="") r.push(k+": "+p[k]); }
+    new maplibregl.Popup({closeButton:true, maxWidth:"260px"}).setLngLat(e.lngLat).setHTML(r.join("<br>")).addTo(map);
+  }
 });
 map.on("load", ()=>{ try{ map.fitBounds(__BOUNDS__, {padding:30, duration:0}); }catch(e){} });
 window.map = map;
@@ -485,8 +487,9 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
-           basemap_switcher: bool = True, boundary=None, color_options=None,
-           overlays=None, **_ignore):
+           basemap_switcher: bool = True, road_popup: bool = True,
+           hover_color: str = "#ffd000", select_color: str = "#ff6600", boundary=None,
+           color_options=None, overlays=None, **_ignore):
     """Build a self-contained MapLibre map of the styled edges.
 
     If the data carries ``tunnel`` / ``bridge`` / ``layer`` columns (named via ``tunnel_col`` /
@@ -497,7 +500,11 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
       - ``arrows`` — one-way direction chevrons along each one-way edge;
       - ``labels`` — curved street-name labels (from the ``name`` column);
       - ``filter_control`` — a collapsible checkbox panel to show/hide each road class;
-      - ``basemap_switcher`` — the in-map base-layer dropdown (uses ``basemap`` / ``basemaps``).
+      - ``basemap_switcher`` — the in-map base-layer dropdown (uses ``basemap`` / ``basemaps``);
+      - ``road_popup`` — the info popup shown when a road is clicked (click-to-select is kept either
+        way). Set ``False`` to drive your own readout (e.g. a side panel) from ``window.map`` events.
+      - ``hover_color`` / ``select_color`` — the highlight colours for a hovered / selected road (the
+        ``roads-highlight`` feature-state); default yellow ``#ffd000`` / orange ``#ff6600``.
 
     ``boundary`` (optional) overlays a dashed outline — a shapely geometry, a GeoSeries /
     GeoDataFrame, or a GeoJSON mapping (assumed lon/lat) — e.g. the area the network was clipped
@@ -590,7 +597,7 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
         # hover/select highlight, driven by feature-state set from the viewer (GPU recolour, no relayout)
         {"id": "roads-highlight", "type": "line", "source": "roads", "layout": lay,
          "paint": {
-             "line-color": ["case", ["boolean", ["feature-state", "select"], False], "#ff6600", "#ffd000"],
+             "line-color": ["case", ["boolean", ["feature-state", "select"], False], select_color, hover_color],
              "line-opacity": ["case", ["any", ["boolean", ["feature-state", "hover"], False],
                                        ["boolean", ["feature-state", "select"], False]], 0.85, 0],
              "line-width": fw, "line-offset": off}},
@@ -646,6 +653,7 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
             .replace("__BOUNDS__", json.dumps([[minx, miny], [maxx, maxy]]))
             .replace("__COLOR_OPTIONS__", json.dumps(color_opts_meta or []))
             .replace("__OVERLAYS__", json.dumps(ov_meta))
+            .replace("__ROAD_POPUP__", "true" if road_popup else "false")
             # inject MapLibre last so its 800 KB blob isn't scanned for the other placeholders
             .replace("__MAPLIBRE_CSS__", _asset("maplibre-gl.css"))
             .replace("__MAPLIBRE_JS__", _asset("maplibre-gl.js").replace("</script>", "<\\/script>")))
