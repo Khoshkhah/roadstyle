@@ -57,7 +57,9 @@ _TEMPLATE = Template("""
             dashArray:p.__rs_dash, lineCap:'round', lineJoin:'round', interactive:on(f)};
   }
   function styleCasing(f){
-    var p=f.properties, c = IS_DARK ? p.__rs_casing_dark : p.__rs_casing_light;
+    // Casing is theme-driven (baked __rs_casing), consistent with the web backend — it does not
+    // re-pick by base-map darkness, so the theme's casing holds on every base.
+    var p=f.properties, c = p.__rs_casing;
     if(c==null || !(p.__rs_cw>0)) return {opacity:0, weight:0};
     return {color:c, weight:p.__rs_cw, opacity: on(f)?p.__rs_cop:0,
             lineCap:'round', lineJoin:'round'};

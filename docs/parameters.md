@@ -26,8 +26,9 @@ palette JSON file.
 
 > **Casing?** A road is drawn as two stacked lines: a wider **casing** underneath (the border)
 > and a narrower **fill** on top (the colour). This is the "geometry sandwich" — it gives every
-> road a clean edge. `casing_light`/`casing_dark` exist so the border can switch colour to suit
-> a light vs dark base map.
+> road a clean edge. `casing_light`/`casing_dark` are the two variants; the **theme** picks one
+> (`casing="light"`/`"dark"`), and every backend draws that — casing is theme-driven and stays put
+> when you switch the base map. The built-in themes all use the dark (black) casing.
 
 > **Units & zoom.** `width` and `casing_width` are **fixed screen pixels** on the `folium` and
 > `lonboard` backends — a road keeps the same on-screen thickness at every zoom level. This looks

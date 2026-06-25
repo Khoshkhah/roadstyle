@@ -56,8 +56,8 @@ it doesn't need roadstyle's logic:
 | `__rs_w` | fill width (px) |
 | `__rs_op` | fill opacity |
 | `__rs_dash` | dash pattern (or null) |
-| `__rs_casing` | casing colour for this theme (or null) |
-| `__rs_casing_light` / `__rs_casing_dark` | casing colour for a light / dark base map (lets the switcher re-pick; either may be null) |
+| `__rs_casing` | casing colour for this theme (or null) — **what every backend draws** |
+| `__rs_casing_light` / `__rs_casing_dark` | the two palette casing variants, baked for reference (a custom theme picks one via its `casing`); the renderers draw `__rs_casing`, so casing is theme-driven and does not change when you switch the base map |
 | `__rs_cw` | casing width (px) |
 | `__rs_cop` | casing opacity |
 | `__rs_class` | road class / category |

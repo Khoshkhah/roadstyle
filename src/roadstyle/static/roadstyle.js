@@ -155,10 +155,10 @@
 
   RoadStyleMap.prototype._casingStyle = function (f) {
     var p = f.properties;
-    // Re-pick casing for the active base map's darkness when both variants are baked; older specs
-    // carry only __rs_casing. A null variant means "no casing on this base map" (minor roads).
-    var casing =
-      "__rs_casing_light" in p ? (this.isDark ? p.__rs_casing_dark : p.__rs_casing_light) : p.__rs_casing;
+    // Casing is theme-driven (the baked __rs_casing), consistent with the web/folium backends — it
+    // does not re-pick by base-map darkness, so the theme's casing holds on every base. A null
+    // __rs_casing means "no casing" (minor roads).
+    var casing = p.__rs_casing;
     if (!casing || !p.__rs_cw) return { opacity: 0, weight: 0 };
     return {
       color: casing,
