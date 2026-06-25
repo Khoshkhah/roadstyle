@@ -488,7 +488,7 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
            basemap_switcher: bool = True, road_popup: bool = True,
-           hover_color: str = "#ffd000", select_color: str = "#ff6600", boundary=None,
+           hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
            color_options=None, overlays=None, **_ignore):
     """Build a self-contained MapLibre map of the styled edges.
 
@@ -504,7 +504,7 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
       - ``road_popup`` — the info popup shown when a road is clicked (click-to-select is kept either
         way). Set ``False`` to drive your own readout (e.g. a side panel) from ``window.map`` events.
       - ``hover_color`` / ``select_color`` — the highlight colours for a hovered / selected road (the
-        ``roads-highlight`` feature-state); default yellow ``#ffd000`` / orange ``#ff6600``.
+        ``roads-highlight`` feature-state); default light-violet ``#b388ff`` / violet ``#7c4dff``.
 
     ``boundary`` (optional) overlays a dashed outline — a shapely geometry, a GeoSeries /
     GeoDataFrame, or a GeoJSON mapping (assumed lon/lat) — e.g. the area the network was clipped
