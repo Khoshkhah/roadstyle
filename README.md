@@ -81,6 +81,27 @@ render_edges(edges, backend="lonboard", theme="dark")
 render_edges(edges, backend="web", theme="dark").save("roads.html")
 ```
 
+### Input columns
+
+`render_edges` takes a GeoDataFrame (any CRS — reprojected to WGS84 internally). Only two columns are
+required; the rest unlock extra rendering:
+
+| column | required? | used for |
+|---|---|---|
+| **geometry** | **yes** | one `LineString` per edge |
+| **`highway`** | **yes** | road-class styling (`motorway`, `residential`, …); rename via `highway_col=` |
+| `name` | no | curved street-name labels (`web` backend, `labels=True`) |
+| `tunnel` / `bridge` / `layer` | no | grade separation — tunnels drawn under, bridges over; omit → all ground level |
+| `edge_id` | no | key for `color_table=` / `color_by=`; rename via `color_key=` |
+| *(any data column)* | no | paint by it with `color_by="col"` |
+
+**Two-way streets — feed both directed edges.** The `web` backend infers direction from geometry: it
+pairs each edge with its **reverse-geometry twin** (same shape, opposite direction) and fans the pair
+into two lanes with **no** one-way arrow, while an edge that has **no** twin is drawn one-way (with a
+direction arrow). So a two-way street must be supplied as its *two directed edges* — collapsing it to
+a single line makes it render as a one-way road. roadstyle derives this from the geometry pair, so a
+separate `oneway` column is **not** needed.
+
 ### Colour each edge from your own table
 
 Instead of colouring by road class, paint each edge by a per-edge colour — a `{edge_id: colour}`

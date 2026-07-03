@@ -40,6 +40,18 @@ From the command line this backend is `-f web` (the default): `roadstyle edges.g
 | **Overlay layers** | Bring your own geometry (zone polygons, POI circles, any lines) via `overlays=` — drawn under/over the roads, clickable, toggled from a **Layers** control. See [below](#overlay-layers-overlays). |
 | **Boundary overlay** | An optional dashed outline (e.g. the clip area) drawn on top of the roads via `boundary=` — see [below](#boundary-overlay). |
 
+### Input columns
+
+Required: a `LineString` **geometry** and a **`highway`** class column (rename via `highway_col=`).
+Optional: `name` (labels), `tunnel` / `bridge` / `layer` (grade separation), `edge_id`
+(`color_table=` / `color_by=` key, rename via `color_key=`), and any column named in `color_by=`.
+
+> **Two-way streets — feed both directed edges.** Two-way rendering is inferred from **geometry**:
+> the backend pairs each edge with its **reverse-geometry twin** (same shape, opposite direction),
+> fans the pair into two lanes, and suppresses the one-way arrow; an edge with **no** twin is drawn
+> one-way (arrowed). So supply a two-way street as its *two directed edges* — collapsing it to a
+> single line renders it as a one-way road. A separate `oneway` column is **not** read.
+
 ## Grade separation (tunnels & bridges)
 
 If your data carries `tunnel`, `bridge`, and/or `layer` columns, the backend orders
