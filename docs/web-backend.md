@@ -46,11 +46,17 @@ Required: a `LineString` **geometry** and a **`highway`** class column (rename v
 Optional: `name` (labels), `tunnel` / `bridge` / `layer` (grade separation), `edge_id`
 (`color_table=` / `color_by=` key, rename via `color_key=`), and any column named in `color_by=`.
 
-> **Two-way streets — feed both directed edges.** Two-way rendering is inferred from **geometry**:
-> the backend pairs each edge with its **reverse-geometry twin** (same shape, opposite direction),
-> fans the pair into two lanes, and suppresses the one-way arrow; an edge with **no** twin is drawn
-> one-way (arrowed). So supply a two-way street as its *two directed edges* — collapsing it to a
-> single line renders it as a one-way road. A separate `oneway` column is **not** read.
+> **Two-way streets — feed both directed edges.** A two-way street is the **two directed edges of one
+> road** (same `osm_id`, opposite direction); a one-way street is a single edge. The backend fans a
+> two-way pair into two lanes with **no** arrow and draws a lone edge one-way (arrowed). So supply a
+> two-way street as its *two directed edges* (routable networks like duckOSM do — the reverse edge
+> exists exactly when `oneway=no`); collapsing it to a single line renders it one-way.
+>
+> How it decides: it pairs each edge with its **reverse-geometry twin** by matching endpoints, so no
+> explicit `oneway` / `osm_id` column is read. **Caveat:** because the match is geometric, two
+> *different* one-way roads meeting at the same two nodes can be mis-paired as two-way. Where a
+> reliable `oneway` (+ `osm_id`) exists it is the robust signal — a two-way edge is one whose
+> same-`osm_id` reverse twin is present; feeding both directed edges is exactly what encodes that.
 
 ## Grade separation (tunnels & bridges)
 

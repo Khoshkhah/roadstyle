@@ -95,12 +95,18 @@ required; the rest unlock extra rendering:
 | `edge_id` | no | key for `color_table=` / `color_by=`; rename via `color_key=` |
 | *(any data column)* | no | paint by it with `color_by="col"` |
 
-**Two-way streets — feed both directed edges.** The `web` backend infers direction from geometry: it
-pairs each edge with its **reverse-geometry twin** (same shape, opposite direction) and fans the pair
-into two lanes with **no** one-way arrow, while an edge that has **no** twin is drawn one-way (with a
-direction arrow). So a two-way street must be supplied as its *two directed edges* — collapsing it to
-a single line makes it render as a one-way road. roadstyle derives this from the geometry pair, so a
-separate `oneway` column is **not** needed.
+**Two-way streets — feed both directed edges.** A two-way street is the **two directed edges of one
+road** (same `osm_id`, opposite direction); a one-way street is a single edge. The `web` backend fans
+a two-way pair into two lanes with **no** arrow, and draws a lone edge one-way (with a direction
+arrow). So supply a two-way street as its *two directed edges* (routable networks like duckOSM already
+do — the reverse edge exists exactly when `oneway=no`); collapsing it to a single line makes it render
+one-way.
+
+How it decides: roadstyle pairs each edge with its **reverse-geometry twin** by matching endpoints —
+so no explicit `oneway`/`osm_id` column is read. Caveat: because the match is geometric, two *different*
+one-way roads that meet at the same two nodes can be mis-paired as "two-way". If your data carries a
+reliable `oneway` (and `osm_id`), that's the robust signal — a two-way edge is one whose same-`osm_id`
+reverse twin is present; feeding both directed edges is exactly what encodes it.
 
 ### Colour each edge from your own table
 
