@@ -71,6 +71,10 @@ byte-for-byte unchanged; everything new is additive.
   927 real Nacka edges (AADT 1–37,828), both folium & lonboard.
 
 ### Fixed
+- **Internal `lvl` is hidden from web popups/tooltips.** The web backend injects `lvl` (grade-
+  separation elevation, -1/0/+1) for draw ordering; like `twoway` it's now skipped in the default
+  popup/tooltip (still present in the feature data for z-ordering). Data columns such as `lanes`
+  and `edge_ref` keep showing.
 - **Large integer ids no longer round in web popups/tooltips.** Property integers past
   `Number.MAX_SAFE_INTEGER` (2^53) — e.g. a content-hash `edge_id` — were inlined as JSON numbers
   and silently rounded by the browser's `JSON.parse` (last digits changed). They're now emitted as

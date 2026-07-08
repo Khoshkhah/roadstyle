@@ -499,7 +499,7 @@ function setS(id, st){ if(id!=null) map.setFeatureState({source:"roads", id:id},
 let _hov=null, _pt=null, _raf=0;
 function _rfields(p, only){ const r=["<b>"+(p.name||"(unnamed)")+"</b>"];
   const ks = (only && only.length) ? only : Object.keys(p);
-  for(const k of ks){ if(k[0]==="_"||k==="twoway"||k==="name") continue;
+  for(const k of ks){ if(k[0]==="_"||k==="twoway"||k==="lvl"||k==="name") continue;  // lvl/twoway are roadstyle-injected internals
     if(p[k]!=null && p[k]!=="") r.push(k+": "+p[k]); } return r.join("<br>"); }
 const _ttip = __ROAD_TOOLTIP__, _ttipOnly = Array.isArray(_ttip) ? _ttip : null;  // false | true | [fields]
 const _tip = _ttip ? new maplibregl.Popup(
