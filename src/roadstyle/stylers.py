@@ -201,7 +201,8 @@ class CategoricalStyler:
         dash = _dash_str(self.dash)
         n = len(values)
 
-        fill = [self.colors.get(_keystr(v), self.fallback_color) for v in values]
+        cmap = {_keystr(k): v for k, v in self.colors.items()}   # normalise keys to match _keystr(v)
+        fill = [cmap.get(_keystr(v), self.fallback_color) for v in values]
         if widths_col is not None:
             width = [float(w) if w is not None and w == w else 0.0 for w in widths_col]
         else:
