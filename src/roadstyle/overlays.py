@@ -44,6 +44,7 @@ class Overlay:
     width: float = 2.0
     label: str | None = None
     popup: list[str] | None = None
+    visible: bool = True               # initial visibility (the Layers toggle starts checked/unchecked to match)
 
 
 def to_fc(data) -> dict:
