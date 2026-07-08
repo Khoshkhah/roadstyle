@@ -71,6 +71,11 @@ byte-for-byte unchanged; everything new is additive.
   927 real Nacka edges (AADT 1–37,828), both folium & lonboard.
 
 ### Fixed
+- **Large integer ids no longer round in web popups/tooltips.** Property integers past
+  `Number.MAX_SAFE_INTEGER` (2^53) — e.g. a content-hash `edge_id` — were inlined as JSON numbers
+  and silently rounded by the browser's `JSON.parse` (last digits changed). They're now emitted as
+  JSON **strings**, so they display exactly. Display-only: feature ids are MapLibre-generated
+  (`generateId`), so styling / filtering / feature-state / `color_options` are unaffected.
 - **`tooltip=` now works on the `web` backend.** The shared `tooltip=` argument (and CLI
   `--tooltip`) was silently swallowed by the web backend, which only read its own `road_tooltip` —
   so the default backend produced no hover tooltip. `tooltip=` is now accepted as an alias that
