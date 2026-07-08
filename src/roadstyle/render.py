@@ -76,7 +76,9 @@ def render_edges(
     Extra kwargs pass through to the backend renderer, e.g.:
       - ``basemap`` : override the theme's base map (a key in ``roadstyle.BASEMAPS``).
       - ``basemaps``: a list of base-map keys offered as toggleable layers / a switcher.
-      - ``tooltip`` / ``selected`` / ``name``.
+      - ``selected`` / ``name`` : edges to highlight / the map title.
+      - ``tooltip`` : hover fields (list of columns), on every backend. On **web** it aliases
+        ``road_tooltip`` (the web-native name); ``road_popup`` is the separate click popup.
       - ``arrows`` / ``labels`` / ``filter_control`` / ``basemap_switcher`` : (web backend) toggle
         the one-way arrows, street-name labels, road-class filter panel, and base-layer dropdown.
       - ``boundary`` : (web backend) a shapely geometry / GeoDataFrame / GeoJSON mapping drawn as a

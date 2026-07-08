@@ -48,6 +48,7 @@ No Python required — point the `roadstyle` command at any road file (GPKG, Geo
 roadstyle edges.gpkg -o map.html --theme dark               # styled interactive map
 roadstyle edges.gpkg --include motorway trunk primary       # keep only major roads
 roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by your data
+roadstyle edges.gpkg --tooltip name highway maxspeed         # hover tooltip fields (all backends)
 roadstyle edges.gpkg -f spec -o map_data.json               # JSON spec for your own frontend
 ```
 

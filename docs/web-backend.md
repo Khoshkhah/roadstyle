@@ -81,6 +81,8 @@ backend adds:
 | `labels` | bool | `True` | Show curved street-name labels (from the `name` column). |
 | `filter_control` | bool | `True` | Show the collapsible **road-class filter panel** (a checkbox per class present; unchecking hides that class across every road layer). |
 | `basemap_switcher` | bool | `True` | Show the in-map **base-layer dropdown** (its options come from `basemap` / `basemaps`). |
+| `road_popup` | bool | `True` | Info popup shown when a road is **clicked** (lists the feature's attributes). Click-to-select works either way; set `False` to drive your own readout from `window.map` events. |
+| `road_tooltip` | bool / list of cols | `False` | **Hover** tooltip: `True` = all attributes, a list of column names = only those, `False` = off. The shared `tooltip=` arg (folium backend / CLI `--tooltip`) is accepted as an **alias** — when given and `road_tooltip` is unset it drives this, so the same `tooltip=` / `--tooltip` call works on every backend. `road_tooltip` is the web-native name and wins if both are set. |
 | `offset_frac` | float | `0.28` | Two-way lane offset as a fraction of the road's **pixel** width (pixel-proportional ⇒ constant overlap at every zoom). `0` = no lane split. |
 | `width_frac` | float | `0.6` | Each two-way lane's width as a fraction of the full road width once the directions have fanned apart (a little over `0.5` so the two lanes overlap rather than leave a centre gap). |
 | `offset_zoom` | int | `15` | Zoom at which lanes start fanning apart / splitting (ramped in over ~2 zoom levels). Below this the two directions stay coincident. |
@@ -116,6 +118,25 @@ Each option's value is the same data-driven kwargs you'd pass to `render_edges` 
 `colors`, `cmap`, `vmin`, `vmax`, `width_by`, `palette`, `style`); an empty `{}` is the class style
 on the base `palette`. The **first** option is active and drives the shared width/casing.
 
+**Categorical option** — colour by a discrete field with an explicit `colors={value: hex}` map
+instead of a `cmap` (values not in the map fall back to the base fill). Mixing continuous and
+categorical options in one map is fine:
+
+```python
+rs.render_edges(edges, backend="web", palette="mono",
+    color_options={
+        "Class": {},                                                            # neutral mono base
+        "Cover": {"color_by": "cover", "cmap": "RdYlGn", "vmin": 0, "vmax": 1},  # continuous ramp
+        "State": {"color_by": "state",                                          # categorical
+                  "colors": {"good": "#1baf7a", "mid": "#eda100", "weak": "#e34948"}},
+    },
+).save("recolor.html")
+```
+
+- **`cmap` accepts** any [branca](https://python-visualization.github.io/branca/) scheme name
+  (`"viridis"`, `"YlOrRd"`, … — matched case-insensitively), any **matplotlib** colormap name
+  including reversed `"_r"` variants (e.g. `"RdYlGn_r"`; the matplotlib fallback needs the `numeric`
+  extra), or an explicit list of hex stops (`["#000", "#fff"]`). Set the numeric span with `vmin` / `vmax`.
 - **Blank edges keep the base colour.** Where a data option has no value for an edge (NaN /
   unmapped), that edge falls back to the **base option's fill** — so on a `mono` base, "no data"
   roads keep their neutral mono colour instead of a flat grey.
@@ -152,6 +173,12 @@ rs.render_edges(edges, backend="web", palette="mono",
 on top (e.g. POIs). Setting `popup` makes the overlay clickable (those fields show in the popup; an
 empty list = decoration only). **Road clicks take precedence** — an overlay popup fires only where
 the click misses every road. See [`Overlay`](parameters.md#8-overlay-extra-layers) for every field.
+
+> **Overlays are single-colour.** An `Overlay` paints every feature with its one `color` — there is
+> no per-feature `color_by` / `cmap` for overlay data. To colour features *by a value*, put that
+> data on the **road edges** and use [`color_options`](#dynamic-recolouring-color_options);
+> overlays are for bring-your-own geometry drawn in a flat colour. (For data-driven *points/lines*
+> that aren't road edges, split them into one `Overlay` per colour bucket.)
 
 ## Boundary overlay
 

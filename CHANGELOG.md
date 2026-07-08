@@ -71,6 +71,10 @@ byte-for-byte unchanged; everything new is additive.
   927 real Nacka edges (AADT 1–37,828), both folium & lonboard.
 
 ### Fixed
+- **`tooltip=` now works on the `web` backend.** The shared `tooltip=` argument (and CLI
+  `--tooltip`) was silently swallowed by the web backend, which only read its own `road_tooltip` —
+  so the default backend produced no hover tooltip. `tooltip=` is now accepted as an alias that
+  fills `road_tooltip` when unset, so the same call works across `web` / `folium` / CLI.
 - `roadstyle.js` edge selection now works: clicking a road visibly highlights it (the
   glow is sized to cover the edge, so the colour changes even on wide roads), clicking it again
   or clicking the map background deselects it, and a filtered-out edge drops its selection. The

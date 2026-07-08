@@ -227,44 +227,66 @@ def _basemap_style(bm):
             "layers": [{"id": "basemap", "type": "raster", "source": "bm"}]}
 
 
-def _overlay_layers(sid, ov, kind):
-    """The MapLibre layer spec(s) for one overlay source: a fill (+ outline), a circle, or a line."""
+def _ov_hl(base, hc, sc, interactive):
+    """An overlay paint colour that brightens to ``hc`` on hover / ``sc`` on select (feature-state),
+    falling back to ``base``. Static ``base`` for non-interactive overlays (no feature-state)."""
+    if not interactive:
+        return base
+    return ["case",
+            ["boolean", ["feature-state", "select"], False], sc,
+            ["boolean", ["feature-state", "hover"], False], hc,
+            base]
+
+
+def _overlay_layers(sid, ov, kind, hover_color="#b388ff", select_color="#7c4dff"):
+    """The MapLibre layer spec(s) for one overlay source: a fill (+ outline), a circle, or a line.
+
+    Interactive overlays (those with a popup) recolour on hover / select via feature-state, the same
+    way roads do, so the hovered / clicked feature highlights."""
     op = ov.opacity
+    interactive = ov.popup is None or bool(ov.popup)
+    col = _ov_hl(ov.color, hover_color, select_color, interactive)
+    lay = {"visibility": "visible" if getattr(ov, "visible", True) else "none"}
     if kind == "fill":
         return [
-            {"id": f"{sid}-fill", "type": "fill", "source": sid,
-             "paint": {"fill-color": ov.color, "fill-opacity": 0.15 if op is None else op}},
-            {"id": f"{sid}-outline", "type": "line", "source": sid,
+            {"id": f"{sid}-fill", "type": "fill", "source": sid, "layout": dict(lay),
+             "paint": {"fill-color": col, "fill-opacity": 0.15 if op is None else op}},
+            {"id": f"{sid}-outline", "type": "line", "source": sid, "layout": dict(lay),
              "paint": {"line-color": ov.outline or ov.color, "line-width": ov.width,
                        "line-opacity": 0.9}},
         ]
     if kind == "circle":
-        return [{"id": f"{sid}-circle", "type": "circle", "source": sid,
-                 "paint": {"circle-radius": ov.radius, "circle-color": ov.color,
+        return [{"id": f"{sid}-circle", "type": "circle", "source": sid, "layout": dict(lay),
+                 "paint": {"circle-radius": ov.radius, "circle-color": col,
                            "circle-opacity": 0.85 if op is None else op,
                            "circle-stroke-color": "#ffffff", "circle-stroke-width": 1}}]
     return [{"id": f"{sid}-line", "type": "line", "source": sid,
-             "paint": {"line-color": ov.color, "line-width": ov.width,
+             "layout": {**lay, "line-cap": "round"},
+             "paint": {"line-color": col, "line-width": ov.width,
                        "line-opacity": 0.9 if op is None else op}}]
 
 
-def _build_overlays(style, overlays):
+def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4dff"):
     """Add each overlay as its own source + layer(s) to ``style``. Returns ``(under, over, meta)``:
-    the layer specs to splice below / above the roads, and the JS metadata (label / clickable layer
-    ids / popup fields) the page reads to wire popups and the Layers toggle."""
+    the layer specs to splice below / above the roads, and the JS metadata (label / source / clickable
+    layer ids / popup fields) the page reads to wire popups, hover/select highlight, and the Layers
+    toggle. Overlay sources carry ``generateId`` so interactive features can take feature-state."""
     under, over, meta = [], [], []
     for i, item in enumerate(overlays or []):
         ov = item if isinstance(item, Overlay) else Overlay(data=item)
         fc = to_fc(ov.data)
         kind = ov.kind or detect_kind(fc)
         sid = f"ov{i}"
-        style["sources"][sid] = {"type": "geojson", "data": fc}
-        layers = _overlay_layers(sid, ov, kind)
+        style["sources"][sid] = {"type": "geojson", "data": fc, "generateId": True}
+        layers = _overlay_layers(sid, ov, kind, hover_color, select_color)
         (under if ov.placement == "under" else over).extend(layers)
         # the topmost layer is the click target (fill body / circle / line)
         meta.append({"label": ov.label or f"Layer {i + 1}",
+                     "source": sid,
                      "layers": [lyr["id"] for lyr in layers],
                      "hit": layers[0]["id"],
+                     "visible": getattr(ov, "visible", True),
+                     "color": ov.color,
                      "popup": list(ov.popup) if ov.popup is not None else None,
                      "interactive": ov.popup is None or bool(ov.popup)})
     return under, over, meta
@@ -346,7 +368,7 @@ if(FILTER.on){
 // road-fill layers' line-color at the chosen prop. window.rsSetColorField drives it from your UI.
 const COLOR_OPTIONS = __COLOR_OPTIONS__;
 const RS_FILL_LAYERS = ["roads-fill","roads-tunnel-fill","roads-bridge-fill"];
-let _coActive = 0, _coLegendEl = null;
+let _coActive = __CO_ACTIVE__, _coLegendEl = null;
 function coLegendHtml(lg){
   if(!lg) return "";
   let h = lg.title ? '<div class="lg-title">'+lg.title+'</div>' : "";
@@ -383,6 +405,8 @@ if(COLOR_OPTIONS.length > 1){
   sel.onchange=()=> rsSetColorField(parseInt(sel.value,10));
   w.appendChild(sel); document.body.appendChild(w);
 }
+if(_coActive){ const _ap=()=>rsSetColorField(_coActive);   // display the requested option on load
+  if(map.isStyleLoaded && map.isStyleLoaded()) _ap(); else map.on("load", _ap); }
 if(COLOR_OPTIONS.some(o=>o.legend)){
   _coLegendEl=document.createElement("div"); _coLegendEl.className="co-lg";
   document.body.appendChild(_coLegendEl); coUpdateLegend();
@@ -391,25 +415,34 @@ if(COLOR_OPTIONS.some(o=>o.legend)){
 // fields; a Layers control toggles each overlay's visibility. Road clicks take precedence (an
 // overlay is only consulted when the click misses every road).
 const OVERLAYS = __OVERLAYS__;
-function handleOverlayClick(e){
+let _ovSel=null, _ovHov=null;                              // {source,id} of the selected / hovered overlay feature
+function _ovState(ref, st){ if(ref) map.setFeatureState({source:ref.source, id:ref.id}, st); }
+function clearOvSel(){ _ovState(_ovSel,{select:false}); _ovSel=null; }
+function handleOverlayClick(e){                            // info popup only on SELECT (click), not hover
   for(const ov of OVERLAYS){
     if(!ov.interactive) continue;
     const ids = ov.layers.filter(id=>map.getLayer(id));
     const hits = ids.length ? map.queryRenderedFeatures(e.point, {layers:ids}) : [];
     if(hits.length){
-      const p = hits[0].properties||{};
+      const f = hits[0], p = f.properties||{};
+      _ovState(_ovSel,{select:false}); _ovSel={source:ov.source, id:f.id}; _ovState(_ovSel,{select:true});
       const fields = ov.popup && ov.popup.length ? ov.popup : Object.keys(p);
       const rows = fields.filter(k=>p[k]!=null && p[k]!=="").map(k=>"<b>"+k+"</b>: "+p[k]);
       new maplibregl.Popup({closeButton:true,maxWidth:"260px"})
-        .setLngLat(e.lngLat).setHTML(rows.join("<br>")||"(no data)").addTo(map);
+        .setLngLat(e.lngLat).setHTML(rows.join("<br>")||"(no data)").addTo(map)
+        .on("close", clearOvSel);
       return true;
     }
   }
   return false;
 }
 OVERLAYS.forEach(ov=>{ if(!ov.interactive) return; ov.layers.forEach(id=>{
-  map.on("mouseenter", id, ()=>{ map.getCanvas().style.cursor="pointer"; });
-  map.on("mouseleave", id, ()=>{ map.getCanvas().style.cursor=""; });
+  map.on("mousemove", id, e=>{ map.getCanvas().style.cursor="pointer";   // hover -> recolour (no popup)
+    const f = e.features && e.features[0]; if(!f) return;
+    if(_ovHov && !(_ovHov.source===ov.source && _ovHov.id===f.id)) _ovState(_ovHov,{hover:false});
+    _ovHov={source:ov.source, id:f.id}; _ovState(_ovHov,{hover:true}); });
+  map.on("mouseleave", id, ()=>{ map.getCanvas().style.cursor="";
+    _ovState(_ovHov,{hover:false}); _ovHov=null; });
 }); });
 if(OVERLAYS.length){
   const box=document.createElement("div"); box.className="ov-ctrl";
@@ -417,10 +450,13 @@ if(OVERLAYS.length){
   const body=document.createElement("div"); body.className="ov-body"; box.appendChild(hd); box.appendChild(body);
   OVERLAYS.forEach(ov=>{
     const lab=document.createElement("label");
-    const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=true;
+    const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=ov.visible!==false;
     cb.onchange=()=>{ ov.layers.forEach(id=>{ if(map.getLayer(id))
       map.setLayoutProperty(id,"visibility", cb.checked?"visible":"none"); }); };
-    lab.appendChild(cb); lab.appendChild(document.createTextNode(" "+ov.label)); body.appendChild(lab);
+    lab.appendChild(cb);
+    if(ov.color){ const sw=document.createElement("span"); sw.className="ov-sw";
+      sw.style.background=ov.color; lab.appendChild(sw); }
+    lab.appendChild(document.createTextNode(" "+ov.label)); body.appendChild(lab);
   });
   document.body.appendChild(box);
 }
@@ -441,23 +477,32 @@ function box(p){ return [[p.x-HIT,p.y-HIT],[p.x+HIT,p.y+HIT]]; }
 function pick(p){ const l = map.queryRenderedFeatures(box(p), {layers:["roads-fill","roads-tunnel-fill","roads-bridge-fill"]}); return l.length ? l[0] : null; }
 function setS(id, st){ if(id!=null) map.setFeatureState({source:"roads", id:id}, st); }
 let _hov=null, _pt=null, _raf=0;
+function _rfields(p, only){ const r=["<b>"+(p.name||"(unnamed)")+"</b>"];
+  const ks = (only && only.length) ? only : Object.keys(p);
+  for(const k of ks){ if(k[0]==="_"||k==="twoway"||k==="name") continue;
+    if(p[k]!=null && p[k]!=="") r.push(k+": "+p[k]); } return r.join("<br>"); }
+const _ttip = __ROAD_TOOLTIP__, _ttipOnly = Array.isArray(_ttip) ? _ttip : null;  // false | true | [fields]
+const _tip = _ttip ? new maplibregl.Popup(
+  {closeButton:false, closeOnClick:false, maxWidth:"260px", offset:10, className:"rs-tip"}) : null;
 function hoverFrame(){ _raf=0; if(!_pt) return;
   const f = pick(_pt); map.getCanvas().style.cursor = f ? "pointer" : "";
   const id = f ? f.id : null;
   if(id !== _hov){ setS(_hov,{hover:false}); _hov=id; setS(_hov,{hover:true}); }
+  if(_tip){ if(f){ _tip.setLngLat(map.unproject(_pt)).setHTML(_rfields(f.properties||{}, _ttipOnly));
+      if(!_tip.isOpen()) _tip.addTo(map); } else if(_tip.isOpen()) _tip.remove(); }
 }
 map.on("mousemove", e=>{ _pt=e.point; if(!_raf) _raf=requestAnimationFrame(hoverFrame); });
-map.on("mouseout", ()=>{ _pt=null; if(_raf){cancelAnimationFrame(_raf);_raf=0;} setS(_hov,{hover:false}); _hov=null; });
+map.on("mouseout", ()=>{ _pt=null; if(_raf){cancelAnimationFrame(_raf);_raf=0;} setS(_hov,{hover:false}); _hov=null; if(_tip) _tip.remove(); });
 let _sel=null;
-map.on("click", e=>{ const f = pick(e.point);
-  if(!f){ if(handleOverlayClick(e)) return;   // no road under the cursor -> try the overlays
-    if(_sel!=null){ setS(_sel,{select:false}); _sel=null; } return; }   // click empty -> deselect (restore colour)
+map.on("click", e=>{
+  if(handleOverlayClick(e)){ if(_sel!=null){ setS(_sel,{select:false}); _sel=null; } return; }  // visible "over" overlay (front) wins
+  const f = pick(e.point);
+  if(!f){ if(_sel!=null){ setS(_sel,{select:false}); _sel=null; } return; }   // click empty -> deselect (restore colour)
+  clearOvSel();
   if(_sel!=null) setS(_sel,{select:false}); _sel=f.id; setS(_sel,{select:true});
   if(__ROAD_POPUP__){
-    const p = f.properties||{}, r = ["<b>"+(p.name||"(unnamed)")+"</b>"];
-    for(const k in p){ if(k[0]==="_"||k==="twoway"||k==="name") continue;
-      if(p[k]!=null && p[k]!=="") r.push(k+": "+p[k]); }
-    new maplibregl.Popup({closeButton:true, maxWidth:"260px"}).setLngLat(e.lngLat).setHTML(r.join("<br>")).addTo(map);
+    new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
+      .setLngLat(e.lngLat).setHTML(_rfields(f.properties||{})).addTo(map);
   }
 });
 map.on("load", ()=>{ try{ map.fitBounds(__BOUNDS__, {padding:30, duration:0}); }catch(e){} });
@@ -487,9 +532,9 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
-           basemap_switcher: bool = True, road_popup: bool = True,
-           hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
-           color_options=None, overlays=None, **_ignore):
+           basemap_switcher: bool = True, road_popup: bool = True, road_tooltip=False,
+           tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
+           color_options=None, color_active=0, overlays=None, **_ignore):
     """Build a self-contained MapLibre map of the styled edges.
 
     If the data carries ``tunnel`` / ``bridge`` / ``layer`` columns (named via ``tunnel_col`` /
@@ -520,7 +565,15 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
     ``overlays`` (optional) draws extra layers the caller brings — a list of :class:`Overlay`
     (zone polygons, POI circles, any geometry). Each becomes its own source + layer(s), placed
     ``under`` or ``over`` the roads, clickable for a popup of its fields, and toggled from a
-    *Layers* control."""
+    *Layers* control.
+
+    ``tooltip`` is a convenience alias for the shared backend arg (folium / CLI ``--tooltip``): when
+    given and ``road_tooltip`` is unset, its value drives the hover tooltip here too, so the same
+    call works across backends."""
+    # `tooltip=` is the folium/CLI hover arg; the web backend's own name is `road_tooltip`. Alias it
+    # through so a shared `tooltip=`/`--tooltip` works on the web backend instead of being ignored.
+    if tooltip is not None and not road_tooltip:
+        road_tooltip = tooltip
     th = get_theme(theme)
     g = gdf.to_crs(4326)
 
@@ -534,7 +587,11 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
         frames = [(name, option_styler(highway_col, palette, opts).resolve_frame(g, theme))
                   for name, opts in items]
         geo, color_opts_meta = bake_color_options(json.loads(g.to_json()), frames, th.casing == "dark")
+        _names = [n for n, _ in items]
+        _active = (color_active if isinstance(color_active, int)
+                   else _names.index(color_active) if color_active in _names else 0)
     else:
+        _active = 0
         if styler is None:
             styler = build_styler(palette=palette, highway_col=highway_col)
         rf = styler.resolve_frame(g, theme)
@@ -652,8 +709,10 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
             .replace("__CENTER__", json.dumps([(minx + maxx) / 2, (miny + maxy) / 2]))
             .replace("__BOUNDS__", json.dumps([[minx, miny], [maxx, maxy]]))
             .replace("__COLOR_OPTIONS__", json.dumps(color_opts_meta or []))
+            .replace("__CO_ACTIVE__", str(_active))
             .replace("__OVERLAYS__", json.dumps(ov_meta))
             .replace("__ROAD_POPUP__", "true" if road_popup else "false")
+            .replace("__ROAD_TOOLTIP__", json.dumps(road_tooltip))
             # inject MapLibre last so its 800 KB blob isn't scanned for the other placeholders
             .replace("__MAPLIBRE_CSS__", _asset("maplibre-gl.css"))
             .replace("__MAPLIBRE_JS__", _asset("maplibre-gl.js").replace("</script>", "<\\/script>")))
