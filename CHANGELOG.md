@@ -11,6 +11,11 @@ styling library that can also be embedded in a website. The existing OSM styling
 byte-for-byte unchanged; everything new is additive.
 
 ### Added
+- **Curated default road popup**: `road_popup=True` (default) now shows a concise field set
+  (`DEFAULT_ROAD_POPUP` = name, edge_id, edge_ref, highway, lanes, bridge, tunnel) instead of every
+  column — `name` as the bold title (no label), `bridge`/`tunnel` only when the road actually is one,
+  and blank / `nan` values dropped. Pass `road_popup=[fields]` for a custom set or `road_popup="all"`
+  for every column; `road_popup=False` still disables it.
 - **Per-edge colour table**: `render_edges(edges, color_table={edge_id: colour})` paints each edge
   from your own map (dict / `Series` / DataFrame with `color_key`+`color_col`) instead of by road
   class — for clusters, routes, metrics, etc. Edges not in the table get a **gray** fallback; class

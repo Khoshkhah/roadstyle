@@ -196,6 +196,13 @@ def _mark_lvl(geo, tunnel_col, bridge_col, layer_col):
 
 _JS_MAX_SAFE_INT = 2 ** 53 - 1
 
+# Curated default fields for the road click-popup (used when road_popup=True), instead of every
+# column. `name` renders as the bold title (no label); every other field shows as "key: value".
+# Blank / "nan" values are dropped, and `bridge`/`tunnel` show only when the road actually is one.
+# `edge_id` stays a string (see _stringify_unsafe_ints) so oversized content-hash ids are exact.
+# Override per call: road_popup=<list> for specific fields, road_popup="all" for every column.
+DEFAULT_ROAD_POPUP = ["name", "edge_id", "edge_ref", "highway", "lanes", "bridge", "tunnel"]
+
 
 def _stringify_unsafe_ints(geo):
     """Emit oversized integer properties (``|v| > 2**53``) as JSON strings.
@@ -497,10 +504,15 @@ function box(p){ return [[p.x-HIT,p.y-HIT],[p.x+HIT,p.y+HIT]]; }
 function pick(p){ const l = map.queryRenderedFeatures(box(p), {layers:["roads-fill","roads-tunnel-fill","roads-bridge-fill"]}); return l.length ? l[0] : null; }
 function setS(id, st){ if(id!=null) map.setFeatureState({source:"roads", id:id}, st); }
 let _hov=null, _pt=null, _raf=0;
-function _rfields(p, only){ const r=["<b>"+(p.name||"(unnamed)")+"</b>"];
+function _rfields(p, only){ const r=[];
+  if(p.name!=null && (""+p.name)!=="" && (""+p.name).toLowerCase()!=="nan") r.push("<b>"+p.name+"</b>");  // name on top, bold, no label
   const ks = (only && only.length) ? only : Object.keys(p);
   for(const k of ks){ if(k[0]==="_"||k==="twoway"||k==="lvl"||k==="name") continue;  // lvl/twoway are roadstyle-injected internals
-    if(p[k]!=null && p[k]!=="") r.push(k+": "+p[k]); } return r.join("<br>"); }
+    var v=p[k]; if(v==null) continue; var s=""+v, sl=s.toLowerCase();
+    if(s===""||sl==="nan"||sl==="none") continue;
+    if((k==="bridge"||k==="tunnel") && (sl==="no"||sl==="0"||sl==="false")) continue;  // bridge/tunnel only when it IS one
+    r.push(k+": "+s); } return r.join("<br>"); }
+const _popupFields = __ROAD_POPUP_FIELDS__;   // curated field list, or null => all columns
 const _ttip = __ROAD_TOOLTIP__, _ttipOnly = Array.isArray(_ttip) ? _ttip : null;  // false | true | [fields]
 const _tip = _ttip ? new maplibregl.Popup(
   {closeButton:false, closeOnClick:false, maxWidth:"260px", offset:10, className:"rs-tip"}) : null;
@@ -522,7 +534,7 @@ map.on("click", e=>{
   if(_sel!=null) setS(_sel,{select:false}); _sel=f.id; setS(_sel,{select:true});
   if(__ROAD_POPUP__){
     new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
-      .setLngLat(e.lngLat).setHTML(_rfields(f.properties||{})).addTo(map);
+      .setLngLat(e.lngLat).setHTML(_rfields(f.properties||{}, _popupFields)).addTo(map);
   }
 });
 map.on("load", ()=>{ try{ map.fitBounds(__BOUNDS__, {padding:30, duration:0}); }catch(e){} });
@@ -552,7 +564,7 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
-           basemap_switcher: bool = True, road_popup: bool = True, road_tooltip=False,
+           basemap_switcher: bool = True, road_popup=True, road_tooltip=False,
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
            color_options=None, color_active=0, overlays=None, **_ignore):
     """Build a self-contained MapLibre map of the styled edges.
@@ -567,7 +579,10 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
       - ``filter_control`` — a collapsible checkbox panel to show/hide each road class;
       - ``basemap_switcher`` — the in-map base-layer dropdown (uses ``basemap`` / ``basemaps``);
       - ``road_popup`` — the info popup shown when a road is clicked (click-to-select is kept either
-        way). Set ``False`` to drive your own readout (e.g. a side panel) from ``window.map`` events.
+        way). ``True`` (default) shows the curated :data:`DEFAULT_ROAD_POPUP` fields; pass a list of
+        field names for a custom set, ``"all"`` for every column, or ``False`` to disable and drive
+        your own readout from ``window.map`` events. ``name`` is the bold title; ``bridge`` /
+        ``tunnel`` appear only when the road is one.
       - ``hover_color`` / ``select_color`` — the highlight colours for a hovered / selected road (the
         ``roads-highlight`` feature-state); default light-violet ``#b388ff`` / violet ``#7c4dff``.
 
@@ -594,6 +609,16 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
     # through so a shared `tooltip=`/`--tooltip` works on the web backend instead of being ignored.
     if tooltip is not None and not road_tooltip:
         road_tooltip = tooltip
+    # road_popup: True -> curated DEFAULT_ROAD_POPUP; a list/tuple -> those fields; "all" -> every
+    # column; False -> no popup. Baked into the page as (enabled flag, field list-or-null).
+    if road_popup is False:
+        popup_on, popup_fields = False, None
+    elif road_popup is True:
+        popup_on, popup_fields = True, list(DEFAULT_ROAD_POPUP)
+    elif isinstance(road_popup, str):
+        popup_on, popup_fields = True, None
+    else:
+        popup_on, popup_fields = True, list(road_popup)
     th = get_theme(theme)
     g = gdf.to_crs(4326)
 
@@ -732,7 +757,8 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
             .replace("__COLOR_OPTIONS__", json.dumps(color_opts_meta or []))
             .replace("__CO_ACTIVE__", str(_active))
             .replace("__OVERLAYS__", json.dumps(ov_meta))
-            .replace("__ROAD_POPUP__", "true" if road_popup else "false")
+            .replace("__ROAD_POPUP__", "true" if popup_on else "false")
+            .replace("__ROAD_POPUP_FIELDS__", json.dumps(popup_fields))
             .replace("__ROAD_TOOLTIP__", json.dumps(road_tooltip))
             # inject MapLibre last so its 800 KB blob isn't scanned for the other placeholders
             .replace("__MAPLIBRE_CSS__", _asset("maplibre-gl.css"))
