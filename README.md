@@ -96,6 +96,18 @@ render_edges(edges, color_table=colors).save("by_edge.html")
 render_edges(edges, color_by="color", colors="self").save("by_edge.html")
 ```
 
+### Filter by a different class than you style by
+
+By default the web **road-type filter panel** lists whatever column drives styling (`highway_col`).
+When width/casing should follow one scheme but the filter should list *another*, source-native
+class, set `filter_col` — e.g. size roads by an OSM-highway proxy while the panel filters by the
+source's own road class:
+
+```python
+render_edges(edges, highway_col="highway",       # widths/casing from the OSM-highway proxy
+             filter_col="road_class").save("m.html")   # filter panel lists the source's real classes
+```
+
 ## Customising palettes & config (data files, no code edit)
 
 The built-in palettes and styling knobs are **data, not code** — JSON files shipped in the
