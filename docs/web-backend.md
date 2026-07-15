@@ -80,6 +80,7 @@ backend adds:
 | `arrows` | bool | `True` | Show one-way direction chevrons along each one-way edge. |
 | `labels` | bool | `True` | Show curved street-name labels (from the `name` column). |
 | `filter_control` | bool | `True` | Show the collapsible **road-class filter panel** (a checkbox per class present; unchecking hides that class across every road layer). |
+| `filter_col` | str | `None` | Column the filter panel lists/filters by, when it should differ from the styling `highway_col`. Default `None` = filter by the styling column. Set it to filter by a **source-native class** while widths/casing follow a different (e.g. OSM-highway proxy) column — the panel reads this raw property directly, so no restyle is needed. |
 | `basemap_switcher` | bool | `True` | Show the in-map **base-layer dropdown** (its options come from `basemap` / `basemaps`). |
 | `road_popup` | bool | `True` | Info popup shown when a road is **clicked** (lists the feature's attributes). Click-to-select works either way; set `False` to drive your own readout from `window.map` events. |
 | `road_tooltip` | bool / list of cols | `False` | **Hover** tooltip: `True` = all attributes, a list of column names = only those, `False` = off. The shared `tooltip=` arg (folium backend / CLI `--tooltip`) is accepted as an **alias** — when given and `road_tooltip` is unset it drives this, so the same `tooltip=` / `--tooltip` call works on every backend. `road_tooltip` is the web-native name and wins if both are set. |

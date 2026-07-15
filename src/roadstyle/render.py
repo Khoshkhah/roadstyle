@@ -81,6 +81,9 @@ def render_edges(
         ``road_tooltip`` (the web-native name); ``road_popup`` is the separate click popup.
       - ``arrows`` / ``labels`` / ``filter_control`` / ``basemap_switcher`` : (web backend) toggle
         the one-way arrows, street-name labels, road-class filter panel, and base-layer dropdown.
+      - ``filter_col`` : (web backend) column the filter panel lists/filters by, when it should
+        differ from the styling ``highway_col`` — e.g. width/casing follow an OSM-highway proxy
+        while the filter lists the source's own road class. Default ``None`` = filter by ``highway_col``.
       - ``boundary`` : (web backend) a shapely geometry / GeoDataFrame / GeoJSON mapping drawn as a
         dashed outline on top of the roads (e.g. the area the network was clipped to).
     """

@@ -560,6 +560,7 @@ class WebMap:
 
 
 def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str = "highway",
+           filter_col: str = None,
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
@@ -737,15 +738,19 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
 
     style["layers"] += over_layers             # caller overlays drawn on top of the roads (e.g. POIs)
 
-    # road-class filter panel: the distinct classes present, most important first
+    # road-class filter panel: the distinct classes present, most important first. `filter_col`
+    # (optional) drives the filter from a different column than the styling `highway_col` — e.g. a
+    # source's own road class while widths/casing follow an OSM-highway proxy. The web filter reads
+    # this raw property directly (["get", col]), so no re-bake is needed.
+    fcol = filter_col or highway_col
     classes, seen = [], set()
     for ft in geo["features"]:
-        c = ft.get("properties", {}).get(highway_col)
+        c = ft.get("properties", {}).get(fcol)
         if c and c not in seen:
             seen.add(c)
             classes.append(c)
     classes.sort(key=lambda c: (-ROAD_Z.get(_base(c)[0], 4), c))
-    flt = {"on": bool(filter_control and classes), "col": highway_col, "classes": classes}
+    flt = {"on": bool(filter_control and classes), "col": fcol, "classes": classes}
 
     minx, miny, maxx, maxy = (float(v) for v in g.total_bounds)
     html = (_HTML.replace("__TITLE__", _html.escape(name))

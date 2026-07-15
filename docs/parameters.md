@@ -59,7 +59,8 @@ GeoDataFrame with line geometry + a class column).
 | `backend` | `"web"` / `"folium"` / `"lonboard"` | `"web"` | Renderer. **`web` (default)** = self-contained **MapLibre (vector)** map with per-zoom widths, two-way lanes, arrows/names, hover/select & tunnel/bridge grade separation (see [web backend](web-backend.md)). `folium` = portable interactive HTML (Leaflet) with legends + filter panel. `lonboard` = GPU/WebGL, for very large data. |
 | `palette` | str or dict | `"highsat"` | Which colour palette for **class** styling. Built-ins: `"highsat"`, `"carto"`, `"mono"` (grayscale). Add your own via a [data file or override](palettes.md#customising-data-files-and-overrides). Ignored if you use `color_by`/`style`. |
 | `theme` | `"light"`/`"dark"`/`"satellite"` | `"light"` | Visual theme: sets the default base map and which casing colour (light/dark) is used. `light` opens on the Voyager base. |
-| `highway_col` | str | `"highway"` | Which column holds the road class. Set this if your class column has a different name. |
+| `highway_col` | str | `"highway"` | Which column holds the road class **used for styling** (widths, casing, z-order). Set this if your class column has a different name. |
+| `filter_col` | str | `None` | *(web backend)* Which column drives the **road-type filter panel**, when it should differ from `highway_col`. Default `None` = filter by the styling column. Use it when width/casing follow one scheme (e.g. an OSM-highway proxy `highway_col`) but the filter should list a **different, source-native class** (e.g. `road_class`). |
 | `include` | str / list / `None` | `None` | Keep **only** these road classes (e.g. `["motorway","primary"]`). |
 | `exclude` | str / list / `None` | `None` | Drop these road classes. Applied after `include`. |
 | `match_links` | bool | `True` | If true, `primary` also matches `primary_link` (OSM link variants). |
