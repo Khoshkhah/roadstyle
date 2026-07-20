@@ -23,6 +23,7 @@ import os
 from collections.abc import Mapping
 
 from .basemaps import DEFAULT_SWITCHER, get_basemap
+from .config import DEFAULT as CONFIG
 from .overlays import Overlay, detect_kind, to_fc
 from .stylers import bake_color_options, bake_props, build_styler, option_styler
 from .themes import get_theme
@@ -268,6 +269,21 @@ _INFLATE_JS = """
 })();
 </script>
 """
+
+
+def _minzoom_filter(col, table):
+    """A filter clause keeping a feature only at/above its class's minzoom.
+
+    MapLibre allows ``["zoom"]`` inside ``filter`` (evaluated at integer zoom levels), so this rides
+    the EXISTING road layers — no extra layers, no layer-id changes, nothing downstream to update.
+    A class the table omits gets 0, i.e. always drawn: the table is a list of things to *hide early*,
+    never a whitelist, so an unknown class can never silently vanish.
+    """
+    match = ["match", ["coalesce", ["get", col], ""]]
+    for cls, z in sorted(table.items()):
+        match += [cls, float(z)]
+    match += [0.0]
+    return [">=", ["zoom"], match]
 
 
 def _compress_sources(style, min_bytes: int = 262144):
@@ -638,7 +654,8 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
            basemap_switcher: bool = True, road_popup=True, road_tooltip=False,
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
-           color_options=None, color_active=0, overlays=None, compress: bool = False, **_ignore):
+           color_options=None, color_active=0, overlays=None, compress: bool = False,
+           minzoom=None, **_ignore):
     """Build a self-contained MapLibre map of the styled edges.
 
     If the data carries ``tunnel`` / ``bridge`` / ``layer`` columns (named via ``tunnel_col`` /
@@ -740,6 +757,13 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
     surface = ["==", ["coalesce", ["get", "lvl"], 0], 0]  # lvl == 0
     tunnel = ["<", ["coalesce", ["get", "lvl"], 0], 0]    # lvl == -1
     bridge = [">", ["coalesce", ["get", "lvl"], 0], 0]    # lvl == +1
+    # minzoom: hide minor classes when zoomed out (config.DEFAULT.minzoom, or a caller override).
+    # AND-ed onto each road filter rather than given its own layers, so layer ids are untouched.
+    mz = ({**CONFIG.minzoom} if minzoom is True else
+          {**CONFIG.minzoom, **minzoom} if isinstance(minzoom, dict) else None)
+    if mz:
+        _z = _minzoom_filter(highway_col, mz)
+        surface, tunnel, bridge = (["all", _z, surface], ["all", _z, tunnel], ["all", _z, bridge])
     cw = _width_expr(highway_col, casing=True, **sw)      # casing width expr (reused across layers)
     fw = _width_expr(highway_col, **sw)                   # fill width expr
     bcw = _width_expr(highway_col, casing=True, scale=1.25, **sw)   # heavier bridge casing ("wings")
