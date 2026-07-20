@@ -95,3 +95,75 @@ def test_web_overlay_kind_autodetected():
 def test_web_no_overlays_is_inert():
     wm = render_edges(_edges(), backend="web")
     assert "const OVERLAYS = [];" in wm.html
+
+
+# --- compress: gzip the source data, inflate in the browser -------------------------------------
+
+def _many_edges(n=4000):
+    """Enough features that the road source clears the compression threshold."""
+    import geopandas as gpd
+    from shapely.geometry import LineString
+    return gpd.GeoDataFrame(
+        {"highway": ["residential"] * n, "name": [f"Street {i}" for i in range(n)],
+         "some_long_property_name": ["a value that repeats"] * n},
+        geometry=[LineString([(i * 1e-3, 0), (i * 1e-3, 1e-3)]) for i in range(n)], crs=4326)
+
+
+def _style_of(html):
+    """The style object the page was built with — parsed from `const style = {...}`."""
+    import json as _json
+    i = html.index("const style = ") + len("const style = ")
+    return _json.JSONDecoder().raw_decode(html, i)[0]
+
+
+def test_compress_off_by_default_leaves_data_inline():
+    from roadstyle.render_web import render
+    html = render(_many_edges()).html
+    assert "rs-gz" not in html
+    assert _style_of(html)["sources"]["roads"]["data"]["features"]
+
+
+def test_compress_empties_the_source_and_emits_a_blob():
+    import base64
+    import gzip
+    import json as _json
+    from roadstyle.render_web import render
+
+    g = _many_edges()
+    html = render(g, compress=True).html
+    assert _style_of(html)["sources"]["roads"]["data"] == {"type": "FeatureCollection", "features": []}
+    blobs = _json.loads(html.split('id="rs-gz" type="application/json">')[1].split("</script>")[0])
+    assert set(blobs) == {"roads"}                      # boundary-sized sources stay inline
+    fc = _json.loads(gzip.decompress(base64.b64decode(blobs["roads"])))
+    assert len(fc["features"]) == len(g)                # lossless
+
+
+def test_compress_is_smaller_and_otherwise_identical():
+    """The page must differ ONLY in where the data lives — same layers, filters, popup wiring."""
+    from roadstyle.render_web import render
+
+    g = _many_edges()
+    plain, small = render(g).html, render(g, compress=True).html
+    assert len(small) < len(plain)
+    a, b = _style_of(plain), _style_of(small)
+    assert [l["id"] for l in a["layers"]] == [l["id"] for l in b["layers"]]
+    for k in ("__FILTER__", "__COLOR_OPTIONS__"):       # placeholders are gone; compare the results
+        assert k not in plain and k not in small
+    # the filter panel's class list is baked from the features either way
+    assert '"classes": ["residential"]' in plain.replace("'", '"')
+    assert '"classes": ["residential"]' in small.replace("'", '"')
+
+
+def test_a_small_source_is_left_inline():
+    """A boundary polygon is a few hundred bytes — not worth a round trip."""
+    from roadstyle.render_web import _compress_sources
+
+    style = {"sources": {"roads": {"type": "geojson", "data": {"type": "FeatureCollection",
+                                                               "features": [{"x": "y" * 500000}]}},
+                         "boundary": {"type": "geojson", "data": {"type": "FeatureCollection",
+                                                                  "features": [{"a": 1}]}},
+                         "basemap": {"type": "raster", "tiles": ["http://x/{z}/{x}/{y}.png"]}}}
+    blobs = _compress_sources(style)
+    assert set(blobs) == {"roads"}
+    assert style["sources"]["boundary"]["data"]["features"] == [{"a": 1}]
+    assert style["sources"]["basemap"]["tiles"]                      # raster untouched
