@@ -221,6 +221,77 @@ def _stringify_unsafe_ints(geo):
                 p[k] = str(v)
 
 
+# Inflated in the browser from a gzipped base64 blob, one per GeoJSON source. A styled road network
+# is enormously repetitive — every property KEY is spelled out on every feature — so the page is
+# dominated by its data, not its geometry (measured on a 100k-edge map: properties 40 MB,
+# coordinates 7 MB) and gzip takes it down ~13x.
+#
+# Safe because nothing in the page reads FEATURES at load: the style, colour options, filter classes,
+# legend and fitBounds bounds are all computed here in Python and baked in, and popup/tooltip read
+# `feature.properties` only on user interaction, long after the data lands.
+_INFLATE_JS = """
+<script id="rs-gz" type="application/json">__RS_GZ__</script>
+<script>
+(async function(){
+  var el=document.getElementById("rs-gz");
+  var blobs=JSON.parse(el.textContent);
+  var data={};
+  try{
+    for(var sid in blobs){
+      var res=await fetch("data:application/gzip;base64,"+blobs[sid]);
+      data[sid]=await new Response(res.body.pipeThrough(new DecompressionStream("gzip"))).json();
+    }
+    el.textContent="";                                   // release the base64 copies
+  }catch(e){
+    window.__rs_gz={ok:false, stage:"inflate", error:String(e)};
+    document.body.insertAdjacentHTML("afterbegin",
+      '<div style="position:fixed;z-index:9999;top:0;left:0;right:0;padding:10px;background:#c00;'+
+      'color:#fff;font:13px sans-serif">Could not decompress the map data: '+e+
+      ' \u2014 this page needs a browser with DecompressionStream.</div>');
+    return;
+  }
+  // `window.map` is the CONTAINER DIV until MapLibre finishes constructing (an element id
+  // auto-creates a global), so a handle grabbed too early has no getSource and the data is silently
+  // never attached. Poll for the real Map; never call through an unchecked handle.
+  var tries=0;
+  (function fill(){
+    var m=window.map, sids=Object.keys(data);
+    if(!(m && typeof m.getSource==="function") || !sids.every(function(s){return m.getSource(s);})){
+      if(++tries>600){ window.__rs_gz={ok:false, stage:"attach", error:"map never appeared"}; return; }
+      return setTimeout(fill,100);
+    }
+    var n=0;
+    sids.forEach(function(s){ m.getSource(s).setData(data[s]); n+=data[s].features.length; });
+    window.__rs_gz={ok:true, sources:sids, features:n};
+    data=null;
+  })();
+})();
+</script>
+"""
+
+
+def _compress_sources(style, min_bytes: int = 262144):
+    """Move every GeoJSON source's data out of ``style`` into gzipped base64 blobs.
+
+    Returns ``{source_id: base64}``; ``style`` is mutated so each moved source starts EMPTY and is
+    filled at load. Sources below ``min_bytes`` are left inline — a boundary polygon is a few hundred
+    bytes and not worth a round trip.
+    """
+    import base64
+    import gzip
+
+    blobs = {}
+    for sid, src in style.get("sources", {}).items():
+        if src.get("type") != "geojson" or not isinstance(src.get("data"), dict):
+            continue
+        raw = json.dumps(src["data"], separators=(",", ":")).encode()
+        if len(raw) < min_bytes:
+            continue
+        blobs[sid] = base64.b64encode(gzip.compress(raw, 6)).decode()
+        src["data"] = {"type": "FeatureCollection", "features": []}
+    return blobs
+
+
 def _boundary_fc(boundary):
     """Normalise a boundary overlay into a GeoJSON FeatureCollection in EPSG:4326. Accepts a shapely
     geometry, a GeoSeries / GeoDataFrame (reprojected to 4326), or a GeoJSON mapping (geometry,
@@ -567,7 +638,7 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
            basemap_switcher: bool = True, road_popup=True, road_tooltip=False,
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
-           color_options=None, color_active=0, overlays=None, **_ignore):
+           color_options=None, color_active=0, overlays=None, compress: bool = False, **_ignore):
     """Build a self-contained MapLibre map of the styled edges.
 
     If the data carries ``tunnel`` / ``bridge`` / ``layer`` columns (named via ``tunnel_col`` /
@@ -753,6 +824,8 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
     flt = {"on": bool(filter_control and classes), "col": fcol, "classes": classes}
 
     minx, miny, maxx, maxy = (float(v) for v in g.total_bounds)
+    # after every style/filter/bounds decision above — those read the features, the browser never does
+    gz = _compress_sources(style) if compress else {}
     html = (_HTML.replace("__TITLE__", _html.escape(name))
             .replace("__STYLE__", json.dumps(style))
             .replace("__BASEMAPS__", json.dumps(bms))
@@ -768,4 +841,6 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
             # inject MapLibre last so its 800 KB blob isn't scanned for the other placeholders
             .replace("__MAPLIBRE_CSS__", _asset("maplibre-gl.css"))
             .replace("__MAPLIBRE_JS__", _asset("maplibre-gl.js").replace("</script>", "<\\/script>")))
+    if gz:
+        html = html.replace("</body>", _INFLATE_JS.replace("__RS_GZ__", json.dumps(gz)) + "</body>", 1)
     return WebMap(html)
