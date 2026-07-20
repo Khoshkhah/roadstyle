@@ -167,3 +167,58 @@ def test_a_small_source_is_left_inline():
     assert set(blobs) == {"roads"}
     assert style["sources"]["boundary"]["data"]["features"] == [{"a": 1}]
     assert style["sources"]["basemap"]["tiles"]                      # raster untouched
+
+
+# --- minzoom: hide minor classes when zoomed out --------------------------------------------------
+
+def _road_filters(html):
+    return {l["id"]: l.get("filter") for l in _style_of(html)["layers"]
+            if l["id"] in ("roads-fill", "roads-casing", "roads-tunnel-fill", "roads-bridge-fill")}
+
+
+def test_minzoom_off_by_default():
+    """Existing maps must be byte-identical — `track` is a width channel for some callers, and
+    hiding it by class would make their data disappear."""
+    from roadstyle.render_web import render
+    for f in _road_filters(render(_many_edges(20)).html).values():
+        assert "zoom" not in json.dumps(f)
+
+
+def test_minzoom_true_uses_the_config_table():
+    from roadstyle.config import DEFAULT
+    from roadstyle.render_web import render
+
+    fs = _road_filters(render(_many_edges(20), minzoom=True).html)
+    assert fs, "expected road layers"
+    for f in fs.values():
+        blob = json.dumps(f)
+        assert '"zoom"' in blob
+        assert f'"residential", {float(DEFAULT.minzoom["residential"])}' in blob
+
+
+def test_minzoom_dict_overrides_only_what_it_names():
+    from roadstyle.config import DEFAULT
+    from roadstyle.render_web import render
+
+    blob = json.dumps(_road_filters(render(_many_edges(20), minzoom={"residential": 9}).html))
+    assert '"residential", 9.0' in blob
+    assert f'"service", {float(DEFAULT.minzoom["service"])}' in blob   # untouched key survives
+
+
+def test_unknown_class_is_always_drawn():
+    """The table hides things early; it is never a whitelist. An unlisted class must default to 0."""
+    from roadstyle.render_web import _minzoom_filter
+
+    expr = _minzoom_filter("highway", {"service": 15})
+    assert expr[0] == ">=" and expr[1] == ["zoom"]
+    assert expr[2][-1] == 0.0                     # the `match` default
+
+
+def test_minzoom_keeps_the_grade_separation_filters_intact():
+    """The clause is AND-ed on; tunnel/surface/bridge must still be distinguished, or grade
+    separation collapses into one layer."""
+    from roadstyle.render_web import render
+
+    fs = _road_filters(render(_many_edges(20), minzoom=True).html)
+    assert "lvl" in json.dumps(fs["roads-fill"])
+    assert fs["roads-fill"] != fs["roads-tunnel-fill"] != fs["roads-bridge-fill"]

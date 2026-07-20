@@ -10,6 +10,12 @@ web-renderer-calibrated values exactly.
 
 ``minor_no_casing`` lists the OSM classes that intentionally render *fill only* (no casing),
 matching the website: service / living_street / pedestrian / track / cycleway / footway / path.
+
+``minzoom`` maps a road class to the zoom below which it is not drawn — the standard basemap
+behaviour (zoom out far enough and residential streets disappear, motorways stay). It is a
+**performance** knob as much as a cartographic one: at city scale most minor roads land on a
+sub-pixel of screen, and skipping them removes work you cannot see the result of. Opt-in — pass
+``minzoom=True`` to the web renderer to apply this table, or a dict to override parts of it.
 """
 from __future__ import annotations
 
@@ -35,6 +41,8 @@ class StyleConfig:
     tunnel_opacity_scale: float = 0.45  # tunnels fade to 45 % and gain a dash
     bridge_casing_extra: float = 1.5   # bridges: solid black casing, a touch wider
     minor_no_casing: frozenset[str] = field(default_factory=lambda: _MINOR_NO_CASING)
+    #: class -> zoom below which it is hidden. Consulted only when the caller opts in.
+    minzoom: dict = field(default_factory=dict)
 
 
 def _default_config() -> StyleConfig:
