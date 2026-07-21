@@ -9,24 +9,15 @@ from __future__ import annotations
 
 import json
 
+from .config import DEFAULT as CONFIG
 from .basemaps import DEFAULT_SWITCHER, get_basemap
 from .controls import BaseLayerSwitcher
 from .interactive import InteractiveRoads
 from .style import selection_style
 from .stylers import bake_props, build_styler
-from .themes import get_theme
 
 
-def _shown_basemap(th, basemap, basemaps):
-    """Which base map is shown initially (drives initial casing darkness)."""
-    if basemap and not basemaps:
-        return get_basemap(basemap)
-    keys = list(basemaps) if basemaps else list(DEFAULT_SWITCHER)
-    key = th.default_basemap if th.default_basemap in keys else keys[0]
-    return get_basemap(key)
-
-
-def _add_base(m, folium, th, basemap, basemaps):
+def _add_base(m, folium, basemap, basemaps):
     """Single fixed base map (``basemap=``) or a thumbnail switcher (default / ``basemaps=``)."""
     if basemap and not basemaps:
         bm = get_basemap(basemap)
@@ -37,7 +28,7 @@ def _add_base(m, folium, th, basemap, basemaps):
                 "<style>.leaflet-tile-pane{filter:saturate(.8) brightness(.9)}</style>"))
         return
     keys = list(basemaps) if basemaps else list(DEFAULT_SWITCHER)
-    default_key = th.default_basemap if th.default_basemap in keys else keys[0]
+    default_key = CONFIG.basemap if CONFIG.basemap in keys else keys[0]
     m.add_child(BaseLayerSwitcher(keys, default_key))
 
 
@@ -53,7 +44,6 @@ def _add_legend(m, rf, position="bottomleft"):
 def render(
     gdf,
     palette: str = "highsat",
-    theme: str = "light",
     highway_col: str = "highway",
     tunnel_col: str | None = "tunnel",
     bridge_col: str | None = "bridge",
@@ -76,15 +66,13 @@ def render(
     for _k in ("arrows", "labels", "basemap_switcher"):
         map_kwargs.pop(_k, None)
 
-    th = get_theme(theme)
     g = gdf.to_crs(4326)
 
     m = folium.Map(tiles=None, **map_kwargs)
-    _add_base(m, folium, th, basemap, basemaps)
+    _add_base(m, folium, basemap, basemaps)
 
     fields = tooltip if tooltip is not None else [c for c in g.columns if c != g.geometry.name]
     fields = [f for f in fields if f in g.columns]
-    initial_dark = _shown_basemap(th, basemap, basemaps).is_dark
 
     # One folium path: resolve a styler (default = OSM class styling) → bake the per-edge __rs_*
     # props → a single InteractiveRoads layer that reads them (dynamic casing, hover highlight,
@@ -92,11 +80,11 @@ def render(
     # panel; categorical / numeric stylers carry a legend instead.
     if styler is None:
         styler = build_styler(palette=palette, highway_col=highway_col)
-    rf = styler.resolve_frame(g, theme)
-    gj = bake_props(json.loads(g.to_json()), rf, th.casing == "dark")
+    rf = styler.resolve_frame(g)
+    gj = bake_props(json.loads(g.to_json()), rf)
     has_legend = getattr(rf, "legend", None) is not None
     m.add_child(InteractiveRoads(
-        json.dumps(gj), tooltip=fields, initial_dark=initial_dark,
+        json.dumps(gj), tooltip=fields,
         show_filter=filter_control and not has_legend,
         copy_field=(copy_field if copy_field and copy_field in g.columns else None),
     ))
@@ -106,7 +94,7 @@ def render(
     # selected edges (neon-violet glow / casing / core, stacked on top)
     if selected is not None and len(selected):
         sel = selected.to_crs(4326).to_json()
-        sty = selection_style(theme)
+        sty = selection_style()
         for layer in ("glow", "casing", "core"):
             s = sty[layer]
             folium.GeoJson(

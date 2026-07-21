@@ -5,130 +5,117 @@
         "fill": "#e892a2",
         "width": 6.0,
         "casing_width": 8.0,
-        "casing_light": "#dc2a48",
-        "casing_dark": "#dc2a48",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#dc2a48"
       },
       "trunk": {
         "fill": "#f9b29c",
         "width": 5.5,
         "casing_width": 7.5,
-        "casing_light": "#c84e2f",
-        "casing_dark": "#c84e2f",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#c84e2f"
       },
       "primary": {
         "fill": "#fcd6a4",
         "width": 4.5,
         "casing_width": 6.5,
-        "casing_light": "#a06b00",
-        "casing_dark": "#a06b00",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#a06b00"
       },
       "secondary": {
         "fill": "#f7fabf",
         "width": 3.5,
         "casing_width": 5.5,
-        "casing_light": "#707d00",
-        "casing_dark": "#707d00",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#707d00"
       },
       "tertiary": {
         "fill": "#ffffff",
         "width": 2.5,
         "casing_width": 4.0,
-        "casing_light": "#bcbcbc",
-        "casing_dark": "#bcbcbc",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#bcbcbc"
       },
       "unclassified": {
         "fill": "#ffffff",
         "width": 2.0,
         "casing_width": 3.5,
-        "casing_light": "#bcbcbc",
-        "casing_dark": "#bcbcbc",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#bcbcbc"
       },
       "residential": {
         "fill": "#ffffff",
         "width": 2.0,
         "casing_width": 3.5,
-        "casing_light": "#bcbcbc",
-        "casing_dark": "#bcbcbc",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#bcbcbc"
       },
       "living_street": {
         "fill": "#ededed",
         "width": 1.8,
         "casing_width": 3.0,
-        "casing_light": "#cccccc",
-        "casing_dark": "#cccccc",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#cccccc"
       },
       "service": {
         "fill": "#ffffff",
         "width": 1.2,
         "casing_width": 2.2,
-        "casing_light": "#d4d4d4",
-        "casing_dark": "#d4d4d4",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#d4d4d4"
       },
       "track": {
         "fill": "#9e7b54",
         "width": 1.5,
         "casing_width": 1.5,
-        "casing_light": "#9e7b54",
-        "casing_dark": "#9e7b54",
         "dash": [
           4,
           4
         ],
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#9e7b54"
       },
       "cycleway": {
         "fill": "#5c7cb6",
         "width": 1.2,
         "casing_width": 1.2,
-        "casing_light": "#5c7cb6",
-        "casing_dark": "#5c7cb6",
         "dash": [
           3,
           3
         ],
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#5c7cb6"
       },
       "footway": {
         "fill": "#9e5b5b",
         "width": 1.2,
         "casing_width": 1.2,
-        "casing_light": "#9e5b5b",
-        "casing_dark": "#9e5b5b",
         "dash": [
           4,
           4
         ],
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#9e5b5b"
       },
       "path": {
         "fill": "#9e5b5b",
         "width": 1.2,
         "casing_width": 1.2,
-        "casing_light": "#9e5b5b",
-        "casing_dark": "#9e5b5b",
         "dash": [
           2,
           5
         ],
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#9e5b5b"
       }
     },
     "highsat": {
@@ -136,136 +123,122 @@
         "fill": "#00E5FF",
         "width": 6.0,
         "casing_width": 8.0,
-        "casing_light": "#007785",
-        "casing_dark": "#000000",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#bcbcbc"
       },
       "trunk": {
         "fill": "#FF007F",
         "width": 5.5,
         "casing_width": 7.5,
-        "casing_light": "#9E004F",
-        "casing_dark": "#000000",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#bcbcbc"
       },
       "primary": {
         "fill": "#FF9100",
         "width": 4.5,
         "casing_width": 6.5,
-        "casing_light": "#A86000",
-        "casing_dark": "#000000",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#bcbcbc"
       },
       "secondary": {
         "fill": "#FFEA00",
         "width": 3.5,
         "casing_width": 5.5,
-        "casing_light": "#A39600",
-        "casing_dark": "#000000",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#bcbcbc"
       },
       "tertiary": {
         "fill": "#00E676",
         "width": 2.5,
         "casing_width": 4.5,
-        "casing_light": "#007A3E",
-        "casing_dark": "#000000",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#bcbcbc"
       },
       "unclassified": {
         "fill": "#FFFFFF",
         "width": 2.0,
         "casing_width": 4.0,
-        "casing_light": "#999999",
-        "casing_dark": "#000000",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#bcbcbc"
       },
       "residential": {
         "fill": "#FFFFFF",
         "width": 2.0,
         "casing_width": 4.0,
-        "casing_light": "#999999",
-        "casing_dark": "#000000",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#bcbcbc"
       },
       "living_street": {
         "fill": "#DDDDDD",
         "width": 2.0,
         "casing_width": 0.0,
-        "casing_light": null,
-        "casing_dark": null,
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": null
       },
       "pedestrian": {
         "fill": "#DDDDDD",
         "width": 1.5,
         "casing_width": 0.0,
-        "casing_light": null,
-        "casing_dark": null,
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": null
       },
       "service": {
         "fill": "#F0F0F0",
         "width": 1.0,
         "casing_width": 0.0,
-        "casing_light": null,
-        "casing_dark": null,
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": null
       },
       "track": {
         "fill": "#9E7B54",
         "width": 1.5,
         "casing_width": 0.0,
-        "casing_light": null,
-        "casing_dark": null,
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": null
       },
       "cycleway": {
         "fill": "#2980B9",
         "width": 1.5,
         "casing_width": 0.0,
-        "casing_light": null,
-        "casing_dark": null,
         "dash": [
           6,
           4
         ],
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": null
       },
       "footway": {
         "fill": "#C0392B",
         "width": 1.5,
         "casing_width": 0.0,
-        "casing_light": null,
-        "casing_dark": null,
         "dash": [
           4,
           4
         ],
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": null
       },
       "path": {
         "fill": "#C0392B",
         "width": 1.5,
         "casing_width": 0.0,
-        "casing_light": null,
-        "casing_dark": null,
         "dash": [
           4,
           4
         ],
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": null
       }
     },
     "mono": {
@@ -273,130 +246,117 @@
         "fill": "#707070",
         "width": 6.0,
         "casing_width": 8.0,
-        "casing_light": "#3c3c3c",
-        "casing_dark": "#3c3c3c",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#3c3c3c"
       },
       "trunk": {
         "fill": "#7a7a7a",
         "width": 5.5,
         "casing_width": 7.5,
-        "casing_light": "#444444",
-        "casing_dark": "#444444",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#444444"
       },
       "primary": {
         "fill": "#8a8a8a",
         "width": 4.5,
         "casing_width": 6.5,
-        "casing_light": "#4f4f4f",
-        "casing_dark": "#4f4f4f",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#4f4f4f"
       },
       "secondary": {
         "fill": "#9c9c9c",
         "width": 3.5,
         "casing_width": 5.5,
-        "casing_light": "#5c5c5c",
-        "casing_dark": "#5c5c5c",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#5c5c5c"
       },
       "tertiary": {
         "fill": "#b0b0b0",
         "width": 2.5,
         "casing_width": 4.0,
-        "casing_light": "#6e6e6e",
-        "casing_dark": "#6e6e6e",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#6e6e6e"
       },
       "unclassified": {
         "fill": "#c4c4c4",
         "width": 2.0,
         "casing_width": 3.5,
-        "casing_light": "#828282",
-        "casing_dark": "#828282",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#828282"
       },
       "residential": {
         "fill": "#c4c4c4",
         "width": 2.0,
         "casing_width": 3.5,
-        "casing_light": "#828282",
-        "casing_dark": "#828282",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#828282"
       },
       "living_street": {
         "fill": "#d4d4d4",
         "width": 1.8,
         "casing_width": 3.0,
-        "casing_light": "#9a9a9a",
-        "casing_dark": "#9a9a9a",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#9a9a9a"
       },
       "service": {
         "fill": "#e4e4e4",
         "width": 1.2,
         "casing_width": 2.2,
-        "casing_light": "#bcbcbc",
-        "casing_dark": "#bcbcbc",
         "dash": null,
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#bcbcbc"
       },
       "track": {
         "fill": "#9a9a9a",
         "width": 1.5,
         "casing_width": 1.5,
-        "casing_light": "#9a9a9a",
-        "casing_dark": "#9a9a9a",
         "dash": [
           4,
           4
         ],
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#9a9a9a"
       },
       "cycleway": {
         "fill": "#888888",
         "width": 1.2,
         "casing_width": 1.2,
-        "casing_light": "#888888",
-        "casing_dark": "#888888",
         "dash": [
           3,
           3
         ],
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#888888"
       },
       "footway": {
         "fill": "#888888",
         "width": 1.2,
         "casing_width": 1.2,
-        "casing_light": "#888888",
-        "casing_dark": "#888888",
         "dash": [
           4,
           4
         ],
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#888888"
       },
       "path": {
         "fill": "#888888",
         "width": 1.2,
         "casing_width": 1.2,
-        "casing_light": "#888888",
-        "casing_dark": "#888888",
         "dash": [
           2,
           5
         ],
-        "opacity": 1.0
+        "opacity": 1.0,
+        "casing": "#888888"
       }
     }
   },
@@ -446,14 +406,14 @@
       "color": "#5b5b5b",
       "spacing": 120,
       "opacity": 0.7
-    }
+    },
+    "basemap": "voyager"
   },
   "selection": {
     "core": "#EE00FF",
-    "casing_light": "#220033",
-    "casing_dark": "#000000",
     "glow": "#D000FF",
-    "glow_opacity": 0.35
+    "glow_opacity": 0.35,
+    "casing": "#000000"
   },
   "roads": {
     "width": {

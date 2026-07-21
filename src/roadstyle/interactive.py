@@ -4,8 +4,8 @@ Draws the casing + fill geometry sandwich in the browser (Leaflet) from per-edge
 props baked in Python (see :func:`roadstyle.stylers.bake_props`) — the *exact same* props the
 canonical web renderer ``roadstyle.js`` reads, so the folium and web backends can't drift. Because
 the styling is baked, this one layer serves every styling mode (road class, categorical, numeric):
-it re-styles casing on a light↔dark base-map change, highlights an edge white on hover, pins a
-tooltip on click (with copy-to-clipboard), and — for class styling — toggles types via a filter.
+it highlights an edge white on hover, pins a tooltip on click (with copy-to-clipboard), and —
+for class styling — toggles types via a filter.
 """
 from __future__ import annotations
 
@@ -44,7 +44,6 @@ _TEMPLATE = Template("""
   var TIP  = {{ this.tooltip|tojson }};
   var COPY = {{ this.copy_field|tojson }};
   var ORDER = {{ this.order|tojson }};       // road classes by importance (most important first)
-  var IS_DARK = {{ 'true' if this.initial_dark else 'false' }};
   var disabled = {};
   var OIDX = {}; ORDER.forEach(function(t,i){ OIDX[t]=i; });
 
@@ -57,8 +56,7 @@ _TEMPLATE = Template("""
             dashArray:p.__rs_dash, lineCap:'round', lineJoin:'round', interactive:on(f)};
   }
   function styleCasing(f){
-    // Casing is theme-driven (baked __rs_casing), consistent with the web backend — it does not
-    // re-pick by base-map darkness, so the theme's casing holds on every base.
+    // One casing colour per edge (baked __rs_casing), constant on every base map.
     var p=f.properties, c = p.__rs_casing;
     if(c==null || !(p.__rs_cw>0)) return {opacity:0, weight:0};
     return {color:c, weight:p.__rs_cw, opacity: on(f)?p.__rs_cop:0,
@@ -121,9 +119,8 @@ _TEMPLATE = Template("""
     });
   }}).addTo(map);
 
-  // dynamic casing on base-map change (called by the base switcher)
-  window.{{ this.hook }} = function(isDark){
-    IS_DARK = !!isDark; casingLayer.setStyle(styleCasing); };
+  // base-switcher hook (kept for the switcher's call; casing is constant per edge now)
+  window.{{ this.hook }} = function(isDark){};
 
   // ── highway-type filter panel (class styling only) ─────────────────────────
   {% if this.show_filter %}
@@ -176,7 +173,7 @@ class InteractiveRoads(MacroElement):
     panel (meaningful only for class styling — data-driven maps carry a legend instead).
     """
 
-    def __init__(self, geojson_str, tooltip=None, initial_dark=True, show_filter=True,
+    def __init__(self, geojson_str, tooltip=None, show_filter=True,
                  hook="__rsCasing", copy_field=None, order=None):
         super().__init__()
         self._name = "InteractiveRoads"
@@ -184,7 +181,6 @@ class InteractiveRoads(MacroElement):
         self.tooltip = tooltip or []
         self.copy_field = copy_field             # click an edge -> copy this field (None = off)
         self.order = order if order is not None else list(reversed(ORDER))
-        self.initial_dark = initial_dark
         self.show_filter = show_filter
         self.hook = hook
         self._template = _TEMPLATE

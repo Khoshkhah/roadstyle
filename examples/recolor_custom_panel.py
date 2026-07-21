@@ -37,7 +37,7 @@ g["speed_kph"] = [random.choice([30, 40, 50, 60, 70]) for _ in range(len(g))]
 
 # 2. spec — mono base so the data ramps stand out; three "colour by" options
 spec = rs.to_spec(
-    g, theme="dark", palette="mono",
+    g, basemap="dark_matter", palette="mono",
     color_options={
         "Class": {},
         "AADT": {"color_by": "aadt", "cmap": "viridis"},

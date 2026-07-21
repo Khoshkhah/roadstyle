@@ -51,7 +51,7 @@
     widgets: {
       legend: true, // render the spec's legend (if present)
       filter: false, // a road-class checkbox panel
-      basemap: false, // a base-layer switcher over the spec's `basemaps` (re-picks casing on change)
+      basemap: false, // a base-layer switcher over the spec's `basemaps`
       colors: false, // a "colour by" picker over the spec's `color_options` (recolours client-side)
     },
   };
@@ -155,8 +155,7 @@
 
   RoadStyleMap.prototype._casingStyle = function (f) {
     var p = f.properties;
-    // Casing is theme-driven (the baked __rs_casing), consistent with the web/folium backends — it
-    // does not re-pick by base-map darkness, so the theme's casing holds on every base. A null
+    // One casing colour per edge (the baked __rs_casing), constant on every base map. A null
     // __rs_casing means "no casing" (minor roads).
     var casing = p.__rs_casing;
     if (!casing || !p.__rs_cw) return { opacity: 0, weight: 0 };
@@ -209,7 +208,6 @@
       self.baseLayers[bm.label] = self._tileLayer(bm);
       self.baseMeta[bm.label] = bm;
     });
-    this.isDark = !!active.is_dark; // drives which baked casing (__rs_casing_light/_dark) is used
     var current = this.baseLayers[active.label] || this.baseLayers[Object.keys(this.baseLayers)[0]];
     if (current) {
       current.addTo(this.map);
@@ -501,10 +499,7 @@
     this.map.on("baselayerchange", function (e) {
       var bm = self.baseMeta[e.name];
       if (!bm) return;
-      self.isDark = !!bm.is_dark;
       self._applyBaseMapFx(bm);
-      // casing colour depends on base-map darkness; re-style the casing layer in place.
-      if (self.casingLayer) self.casingLayer.setStyle(self._casingStyle.bind(self));
     });
   };
 

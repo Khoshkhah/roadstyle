@@ -34,7 +34,7 @@ g["speed_kph"] = [random.choice([30, 40, 50, 60, 70]) for _ in range(len(g))]
 # 2. render on the web (MapLibre) backend — mono base so the data ramps stand out; arrows + labels
 #    on (street names) by default; three "colour by" options baked in.
 wm = rs.render_edges(
-    g, backend="web", theme="dark", palette="mono",
+    g, backend="web", basemap="dark_matter", palette="mono",
     arrows=True, labels=True,           # one-way arrows + curved street-name labels
     color_options={
         "Class": {},

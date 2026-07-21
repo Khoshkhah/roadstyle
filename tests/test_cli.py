@@ -25,7 +25,7 @@ def test_missing_input_returns_2(tmp_path):
 @pytest.mark.parametrize("fmt", ["web", "folium", "rsjs", "spec", "geojson"])
 def test_each_format_writes_a_file(tmp_path, fmt):
     out = tmp_path / f"map_{fmt}"
-    assert main([str(SAMPLE), "-o", str(out), "-f", fmt, "--theme", "dark"]) == 0
+    assert main([str(SAMPLE), "-o", str(out), "-f", fmt, "--basemap", "dark_matter"]) == 0
     assert out.exists() and out.stat().st_size > 0
 
 

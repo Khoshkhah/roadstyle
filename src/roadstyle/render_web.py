@@ -10,7 +10,7 @@ zoom expressions, matching the openstreetmap-carto look:
     offsetting both to the same side puts them on opposite sides. The offset is a fraction of the
     *pixel* width, so the overlap is constant at every zoom (no gap, no merge).
 
-Road *colours* come from roadstyle's palette/theme (the resolved per-edge ``__rs_fill`` /
+Road *colours* come from roadstyle's palette (the resolved per-edge ``__rs_fill`` /
 ``__rs_casing``). Data is **inlined** into the HTML, so the file opens with no web server (MapLibre
 GL JS is loaded from CDN). Returns a :class:`WebMap` with ``.save(path)`` and notebook display.
 """
@@ -27,7 +27,6 @@ from .basemaps import DEFAULT_SWITCHER, get_basemap
 from .config import DEFAULT as CONFIG
 from .overlays import Overlay, detect_kind, to_fc
 from .stylers import bake_color_options, bake_props, build_styler, option_styler
-from .themes import get_theme
 
 _VENDOR = os.path.join(os.path.dirname(__file__), "vendor")
 
@@ -635,7 +634,7 @@ class WebMap:
                 'style="width:100%;height:640px;border:0;border-radius:6px"></iframe>')
 
 
-def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str = "highway",
+def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            filter_col: str = None,
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
@@ -697,7 +696,6 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
         popup_on, popup_fields = True, None
     else:
         popup_on, popup_fields = True, list(road_popup)
-    th = get_theme(theme)
     g = gdf.to_crs(4326)
 
     color_opts_meta = None
@@ -707,9 +705,9 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
         items = (list(color_options.items()) if isinstance(color_options, Mapping)
                  else [(o["name"], {k: v for k, v in o.items() if k != "name"})
                        for o in color_options])
-        frames = [(name, option_styler(highway_col, palette, opts).resolve_frame(g, theme))
+        frames = [(name, option_styler(highway_col, palette, opts).resolve_frame(g))
                   for name, opts in items]
-        geo, color_opts_meta = bake_color_options(json.loads(g.to_json()), frames, th.casing == "dark")
+        geo, color_opts_meta = bake_color_options(json.loads(g.to_json()), frames)
         _names = [n for n, _ in items]
         _active = (color_active if isinstance(color_active, int)
                    else _names.index(color_active) if color_active in _names else 0)
@@ -717,14 +715,16 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
         _active = 0
         if styler is None:
             styler = build_styler(palette=palette, highway_col=highway_col)
-        rf = styler.resolve_frame(g, theme)
-        geo = bake_props(json.loads(g.to_json()), rf, th.casing == "dark")   # per-edge __rs_fill/__rs_casing
+        rf = styler.resolve_frame(g)
+        geo = bake_props(json.loads(g.to_json()), rf)   # per-edge __rs_fill/__rs_casing
     _mark_twoway(geo)
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
     _stringify_unsafe_ints(geo)   # BIGINT ids (e.g. edge_id) -> string so JS doesn't round them
 
     # active base map + the set offered to the in-map switcher (active shown first)
-    active = basemap or th.default_basemap
+    # the primary base map layer is a *setting* (config.basemap, defaults.json), overridable
+    # per call with `basemap=`
+    active = basemap or CONFIG.basemap
     bkeys = list(basemaps) if basemaps else list(DEFAULT_SWITCHER)
     if isinstance(active, str):
         bkeys = [active] + [k for k in bkeys if k != active]

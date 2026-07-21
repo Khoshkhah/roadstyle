@@ -27,10 +27,9 @@ def _edges():
 
 
 def test_to_spec_shape_and_json_serialisable():
-    spec = to_spec(_edges(), theme="dark")
+    spec = to_spec(_edges(), basemap="dark_matter")
     assert spec["roadstyle"].startswith("spec/")
     assert spec["crs"] == "EPSG:4326"
-    assert spec["theme"] == "dark"
     assert spec["geojson"]["type"] == "FeatureCollection"
     assert len(spec["geojson"]["features"]) == 3
     json.dumps(spec)   # must be fully serialisable (raises if not)
@@ -46,7 +45,7 @@ def test_spec_features_carry_rs_props():
 
 
 def test_spec_carries_basemap_switcher_set():
-    spec = to_spec(_edges(), theme="dark")
+    spec = to_spec(_edges(), basemap="dark_matter")
     # active base map + the full selectable set for the in-map switcher
     assert spec["basemap"]["key"] == "dark_matter"
     keys = [b["key"] for b in spec["basemaps"]]
@@ -57,19 +56,18 @@ def test_spec_carries_basemap_switcher_set():
 def test_spec_explicit_basemaps_include_active():
     # an explicit set that omits the active base map still gets it (prepended), so the switcher
     # can always show what's currently rendered
-    spec = to_spec(_edges(), theme="dark", basemaps=["positron", "osm"])
+    spec = to_spec(_edges(), basemap="dark_matter", basemaps=["positron", "osm"])
     keys = [b["key"] for b in spec["basemaps"]]
     assert keys[0] == "dark_matter"            # active, prepended
     assert "positron" in keys and "osm" in keys
 
 
-def test_spec_bakes_both_casings():
-    # both light/dark casings are baked so the switcher can re-pick without rebuilding the spec
-    spec = to_spec(_edges(), theme="dark")
+def test_spec_bakes_single_casing():
+    # one casing colour per edge, constant on every base map (default: light grey)
+    spec = to_spec(_edges())
     p = spec["geojson"]["features"][0]["properties"]   # motorway, highsat
-    assert p["__rs_casing_light"] == "#007785"
-    assert p["__rs_casing_dark"] == "#000000"
-    assert p["__rs_casing"] == p["__rs_casing_dark"]   # active = dark theme's casing
+    assert p["__rs_casing"] == "#bcbcbc"
+    assert "__rs_casing_light" not in p and "__rs_casing_dark" not in p
 
 
 def test_to_html_enables_basemap_switcher():
@@ -170,7 +168,7 @@ def test_save_and_load_spec_roundtrip(tmp_path):
     spec = to_spec(_edges())
     p2 = tmp_path / "spec2.json"
     save_spec(spec, p2)
-    assert load_spec(p2)["theme"] == spec["theme"]
+    assert load_spec(p2)["basemap"] == spec["basemap"]
 
 
 def test_save_html(tmp_path):

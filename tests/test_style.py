@@ -37,31 +37,27 @@ def test_unknown_highway_falls_back():
 def test_links_normalize_and_render_narrower():
     base, is_link = normalize_highway("primary_link")
     assert base == "primary" and is_link
-    full = resolve("primary", theme="dark")
-    link = resolve("primary_link", theme="dark")
+    full = resolve("primary")
+    link = resolve("primary_link")
     assert link.width < full.width and link.fill == full.fill
 
 
-def test_theme_swaps_casing():
-    from roadstyle import Theme
-    # a theme's casing variant selects casing_light vs casing_dark
-    assert resolve("tertiary", theme=Theme("x", "light", "voyager")).casing == "#007A3E"
-    assert resolve("tertiary", theme="dark").casing == "#000000"
-    assert resolve("tertiary", theme="satellite").casing == "#000000"
-    # the built-in light theme uses black casing (light canvas, standard OSM outlines)
-    assert resolve("tertiary", theme="light").casing == "#000000"
+def test_default_casing_is_light_grey():
+    # one casing colour per class; the old black default is now light grey
+    assert resolve("tertiary").casing == "#bcbcbc"
+    assert resolve("motorway").casing == "#bcbcbc"
 
 
 def test_tunnel_and_bridge_overrides():
-    base = resolve("primary", theme="dark")
-    tun = resolve("primary", theme="dark", tunnel=True)
-    bri = resolve("primary", theme="dark", bridge=True)
+    base = resolve("primary")
+    tun = resolve("primary", tunnel=True)
+    bri = resolve("primary", bridge=True)
     assert tun.opacity < base.opacity and tun.dash is not None
     assert bri.casing == "#000000" and bri.casing_width == base.casing_width + 1.5
 
 
 def test_selection_style_three_layers():
-    s = selection_style("dark", base_width=4.0)
+    s = selection_style(base_width=4.0)
     assert set(s) == {"glow", "casing", "core"}
     assert s["core"]["color"] == "#EE00FF"
     assert s["glow"]["width"] == 12.0

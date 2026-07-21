@@ -29,7 +29,6 @@ def render_edges(
     *,
     backend: str = "web",
     palette: str = "highsat",
-    theme: str = "light",
     highway_col: str = "highway",
     include=None,
     exclude=None,
@@ -58,7 +57,6 @@ def render_edges(
     backend : ``"web"`` (self-contained MapLibre, default), ``"folium"`` (portable HTML), or
         ``"lonboard"`` (WebGL).
     palette : ``"highsat"`` (high-saturation) or ``"carto"`` (OSM Carto).
-    theme   : ``"light"`` | ``"dark"`` | ``"satellite"``.
     include / exclude : highway types to keep / drop (str or iterable) — see filter_edges.
 
     Data-driven styling (optional — when omitted, the classic OSM class styling is unchanged):
@@ -74,7 +72,7 @@ def render_edges(
       - ``style``    : pass a built :class:`roadstyle.Styler` directly (overrides the above).
 
     Extra kwargs pass through to the backend renderer, e.g.:
-      - ``basemap`` : override the theme's base map (a key in ``roadstyle.BASEMAPS``).
+      - ``basemap`` : override the primary base map setting (a key in ``roadstyle.BASEMAPS``).
       - ``basemaps``: a list of base-map keys offered as toggleable layers / a switcher.
       - ``selected`` / ``name`` : edges to highlight / the map title.
       - ``tooltip`` : hover fields (list of columns), on every backend. On **web** it aliases
@@ -124,4 +122,4 @@ def render_edges(
         from .render_web import render
     else:
         raise ValueError(f"unknown backend {backend!r}; use 'folium', 'lonboard', or 'web'")
-    return render(g, palette=palette, theme=theme, highway_col=col, styler=styler, **kwargs)
+    return render(g, palette=palette, highway_col=col, styler=styler, **kwargs)

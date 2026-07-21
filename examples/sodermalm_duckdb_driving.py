@@ -58,10 +58,10 @@ def main() -> None:
     folium_out = HERE / "sodermalm_driving.html"
     web_out = HERE / "sodermalm_driving_web.html"
 
-    # high-saturation dark theme; hover tooltips from the data columns
-    rs.render_edges(edges, theme="dark", tooltip=tooltip).save(str(folium_out))
+    # high-saturation palette on the dark base map; hover tooltips from the data columns
+    rs.render_edges(edges, basemap="dark_matter", tooltip=tooltip).save(str(folium_out))
     # the portable web spec — legend + filter + base-layer switcher baked into the page by to_html
-    rs.save(edges, str(web_out), theme="dark", tooltip=tooltip)
+    rs.save(edges, str(web_out), basemap="dark_matter", tooltip=tooltip)
 
     print(f"wrote {folium_out.name} (folium) and {web_out.name} (roadstyle.js) in {HERE}")
 

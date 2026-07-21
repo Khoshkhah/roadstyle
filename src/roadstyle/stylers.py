@@ -17,7 +17,6 @@ from typing import Protocol, runtime_checkable
 from .config import DEFAULT, StyleConfig
 from .palettes import FALLBACK, PALETTES, RoadStyle
 from .style import _apply, normalize_highway
-from .themes import Theme, get_theme
 
 _TRUE = {"yes", "true", "1", "y", "t"}
 
@@ -44,20 +43,17 @@ def _dash_str(dash) -> str | None:
 class ResolvedFrame:
     """Per-edge resolved style arrays — the contract every renderer consumes.
 
-    Every list has length ``len(gdf)``. ``casing_light``/``casing_dark`` are both kept so the
-    interactive folium layer can swap casing on a light↔dark base-map change. ``klass`` carries
-    the per-edge category value (road class / bin label) used for filtering and legends.
+    Every list has length ``len(gdf)``. ``klass`` carries the per-edge category value
+    (road class / bin label) used for filtering and legends.
     """
     fill: list[str]
     width: list[float]
-    casing_light: list[str | None]
-    casing_dark: list[str | None]
+    casing: list[str | None]
     casing_width: list[float]
     dash: list[str | None]
     opacity: list[float]
     casing_opacity: list[float]
     klass: list[str | None]
-    theme_aware_casing: bool = True   # True only when casing differs by light/dark base map
     legend: object | None = None      # a Legend (Phase 3) describing how to read the colours
     missing: list[bool] | None = None  # True where a data styler had no value for the edge (NaN /
     #                                    unmapped) — lets colour options fall back to the base fill
@@ -68,11 +64,11 @@ class ResolvedFrame:
 
 @runtime_checkable
 class Styler(Protocol):
-    """Anything with a ``resolve_frame(gdf, theme)`` returning a :class:`ResolvedFrame`."""
+    """Anything with a ``resolve_frame(gdf)`` returning a :class:`ResolvedFrame`."""
 
     column: str | None
 
-    def resolve_frame(self, gdf, theme: str | Theme) -> ResolvedFrame: ...
+    def resolve_frame(self, gdf) -> ResolvedFrame: ...
 
 
 @dataclass
@@ -91,7 +87,6 @@ class ClassStyler:
     tunnel_col: str | None = None
     bridge_col: str | None = None
     config: StyleConfig = field(default_factory=lambda: DEFAULT)
-    theme_aware_casing: bool = True
 
     def _table(self) -> Mapping[str, RoadStyle]:
         if isinstance(self.palette, str):
@@ -103,8 +98,7 @@ class ClassStyler:
                 ) from err
         return self.palette
 
-    def resolve_frame(self, gdf, theme: str | Theme = "dark") -> ResolvedFrame:
-        get_theme(theme)  # validate the theme name early (raises a clear error)
+    def resolve_frame(self, gdf) -> ResolvedFrame:
         table = self._table()
         fallback_style = table.get(self.fallback) or next(iter(table.values()))
 
@@ -117,8 +111,7 @@ class ClassStyler:
         n = len(values)
         fill: list[str] = []
         width: list[float] = []
-        casing_light: list[str | None] = []
-        casing_dark: list[str | None] = []
+        casing: list[str | None] = []
         casing_width: list[float] = []
         dash: list[str | None] = []
         opacity: list[float] = []
@@ -139,8 +132,7 @@ class ClassStyler:
 
             fill.append(p.fill)
             width.append(p.width)
-            casing_light.append(p.casing_light)
-            casing_dark.append(p.casing_dark)
+            casing.append(p.casing)
             casing_width.append(p.casing_width)
             dash.append(_dash_str(p.dash))
             opacity.append(p.opacity)
@@ -148,8 +140,7 @@ class ClassStyler:
             klass.append(base)
 
         return ResolvedFrame(
-            fill, width, casing_light, casing_dark, casing_width, dash,
-            opacity, casing_opacity, klass, theme_aware_casing=self.theme_aware_casing,
+            fill, width, casing, casing_width, dash, opacity, casing_opacity, klass,
         )
 
 
@@ -193,10 +184,8 @@ class CategoricalStyler:
     opacity: float = 0.9
     casing_opacity: float = 0.75
     dash: tuple[int, int] | None = None
-    theme_aware_casing: bool = False
 
-    def resolve_frame(self, gdf, theme: str | Theme = "dark") -> ResolvedFrame:
-        get_theme(theme)
+    def resolve_frame(self, gdf) -> ResolvedFrame:
         values = gdf[self.column].tolist()
         widths_col = (gdf[self.width].tolist()
                       if isinstance(self.width, str) and self.width in gdf.columns else None)
@@ -210,15 +199,13 @@ class CategoricalStyler:
         else:
             const_w = float(self.width) if not isinstance(self.width, str) else 2.0
             width = [const_w] * n
-        casing_light = [self.casing] * n
-        casing_dark = [self.casing] * n
+        casing = [self.casing] * n
         casing_width = [self.casing_width if self.casing else 0.0] * n
         klass = [_keystr(v) for v in values]
 
         rf = ResolvedFrame(
-            fill, width, casing_light, casing_dark, casing_width,
+            fill, width, casing, casing_width,
             [dash] * n, [self.opacity] * n, [self.casing_opacity] * n, klass,
-            theme_aware_casing=self.theme_aware_casing,
         )
         # legend = the value->colour entries actually present in the data, in mapping order
         present = {k for k in klass}
@@ -252,15 +239,13 @@ class NumericStyler:
     casing_width: float = 0.0
     casing_opacity: float = 0.75
     nan_color: str = "#cccccc"
-    theme_aware_casing: bool = False
     missing: str = "base"              # what NaN edges wear as a colour OPTION: "base" = the base
                                        # option's fill (neutral-base maps); "self" = this nan_color —
                                        # use when the base palette is loud and would fake a data value
 
-    def resolve_frame(self, gdf, theme: str | Theme = "dark") -> ResolvedFrame:
+    def resolve_frame(self, gdf) -> ResolvedFrame:
         from .colors import ColorRamp
 
-        get_theme(theme)
         raw = gdf[self.column].tolist()
         nums = [_as_float(v) for v in raw]
         present = [v for v in nums if v is not None]
@@ -283,15 +268,13 @@ class NumericStyler:
         else:
             width = [float(self.width)] * n
 
-        casing_light = [self.casing] * n
-        casing_dark = [self.casing] * n
+        casing = [self.casing] * n
         casing_width = [self.casing_width if self.casing else 0.0] * n
         klass = [None] * n   # continuous — no discrete class
 
         rf = ResolvedFrame(
-            fill, width, casing_light, casing_dark, casing_width,
+            fill, width, casing, casing_width,
             [None] * n, [self.opacity] * n, [self.casing_opacity] * n, klass,
-            theme_aware_casing=self.theme_aware_casing,
         )
         # stash ramp metadata so a legend (Phase 3) can draw the gradient
         rf.legend = {"kind": "continuous", "title": self.column,
@@ -324,15 +307,14 @@ class ColorTableStyler:
     def __post_init__(self):
         self.column = self.highway_col
 
-    def resolve_frame(self, gdf, theme: str | Theme = "dark") -> ResolvedFrame:
+    def resolve_frame(self, gdf) -> ResolvedFrame:
         n = len(gdf)
         if self.highway_col in gdf.columns:
-            # borrow per-class widths + (theme-aware) casing, then override the fill
-            rf = ClassStyler(column=self.highway_col, palette=self.palette).resolve_frame(gdf, theme)
+            # borrow per-class widths + casing, then override the fill
+            rf = ClassStyler(column=self.highway_col, palette=self.palette).resolve_frame(gdf)
         else:
-            rf = ResolvedFrame([self.fallback_color] * n, [2.0] * n, ["#000000"] * n,
-                               ["#000000"] * n, [3.0] * n, [None] * n, [0.9] * n, [0.75] * n,
-                               [None] * n, theme_aware_casing=False)
+            rf = ResolvedFrame([self.fallback_color] * n, [2.0] * n, ["#bcbcbc"] * n,
+                               [3.0] * n, [None] * n, [0.9] * n, [0.75] * n, [None] * n)
         colors = gdf[self.color_column].tolist() if self.color_column in gdf.columns else [None] * n
         rf.fill = [_color_or(c, self.fallback_color) for c in colors]
         rf.legend = None             # arbitrary per-edge colours -> no categorical legend
@@ -340,13 +322,12 @@ class ColorTableStyler:
         return rf
 
 
-def bake_props(gj: dict, rf: ResolvedFrame, dark: bool) -> dict:
+def bake_props(gj: dict, rf: ResolvedFrame) -> dict:
     """Bake the per-edge ``__rs_*`` style props onto a GeoJSON FeatureCollection, in place.
 
     The single source of truth for the stable per-feature props every renderer reads — the browser
     ``roadstyle.js`` and the folium ``InteractiveRoads`` layer both consume these, so the two can
-    never drift. Both casing variants are baked so a light↔dark base-map switch re-picks casing
-    client-side; ``__rs_class`` carries the per-edge category used for filtering and legends.
+    never drift. ``__rs_class`` carries the per-edge category used for filtering and legends.
     """
     feats = gj.get("features", [])
     for i, feat in enumerate(feats):
@@ -355,9 +336,7 @@ def bake_props(gj: dict, rf: ResolvedFrame, dark: bool) -> dict:
         p["__rs_w"] = rf.width[i]
         p["__rs_op"] = rf.opacity[i]
         p["__rs_dash"] = rf.dash[i]
-        p["__rs_casing"] = rf.casing_dark[i] if dark else rf.casing_light[i]
-        p["__rs_casing_light"] = rf.casing_light[i]
-        p["__rs_casing_dark"] = rf.casing_dark[i]
+        p["__rs_casing"] = rf.casing[i]
         p["__rs_cw"] = rf.casing_width[i]
         p["__rs_cop"] = rf.casing_opacity[i]
         p["__rs_class"] = rf.klass[i]
@@ -379,7 +358,7 @@ def bake_fill_variant(gj: dict, rf: ResolvedFrame, prop: str) -> dict:
     return gj
 
 
-def bake_color_options(gj: dict, frames, dark: bool):
+def bake_color_options(gj: dict, frames):
     """Bake a set of "colour by" options onto a GeoJSON FeatureCollection, in place.
 
     ``frames`` is an ordered list of ``(name, ResolvedFrame)``. Option 0 is the **active/base**: its
@@ -396,7 +375,7 @@ def bake_color_options(gj: dict, frames, dark: bool):
     the browser reads to build the "Colour by" picker and to swap fills client-side.
     """
     base_rf = frames[0][1]
-    gj = bake_props(gj, base_rf, dark)
+    gj = bake_props(gj, base_rf)
     base_fill = base_rf.fill
     feats = gj.get("features", [])
     meta = []

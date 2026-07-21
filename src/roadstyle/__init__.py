@@ -58,7 +58,6 @@ from .stylers import (
     color_by_class,
     color_by_value,
 )
-from .themes import THEMES, Theme, get_theme, register_theme
 
 
 def use_settings(source=None) -> None:
@@ -95,10 +94,9 @@ __all__ = [
     "render_edges", "filter_edges", "highway_types", "use_settings",
     "resolve", "base_style", "selection_style", "normalize_highway",
     "PALETTES", "HIGHSAT", "CARTO", "SELECTION", "RoadStyle",
-    "THEMES", "Theme", "get_theme",
     "BASEMAPS", "Basemap", "get_basemap", "BaseLayerSwitcher",
     # generalization additions (Phase 0)
-    "StyleConfig", "register_palette", "register_theme", "register_basemap",
+    "StyleConfig", "register_palette", "register_basemap",
     # styler abstraction (Phase 1)
     "Styler", "ClassStyler", "ResolvedFrame",
     # palette JSON I/O (Phase 2a)

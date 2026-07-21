@@ -13,7 +13,7 @@ from roadstyle import (
 
 
 def test_roadstyle_dict_round_trip():
-    rs = RoadStyle("#00E5FF", 6.0, 8.0, "#007785", "#000000", dash=(4, 4), opacity=0.9)
+    rs = RoadStyle("#00E5FF", 6.0, 8.0, "#007785", dash=(4, 4), opacity=0.9)
     assert RoadStyle.from_dict(rs.to_dict()) == rs
 
 
@@ -25,7 +25,14 @@ def test_roadstyle_dash_becomes_list_in_dict():
 
 def test_roadstyle_from_minimal_dict():
     rs = RoadStyle.from_dict({"fill": "#abcdef", "width": 3, "casing_width": 5})
-    assert rs.fill == "#abcdef" and rs.casing_dark == "#000000" and rs.dash is None
+    assert rs.fill == "#abcdef" and rs.casing == "#bcbcbc" and rs.dash is None
+
+
+def test_from_dict_accepts_legacy_casing_dark():
+    # old palette files carried casing_light/casing_dark; the dark one maps onto `casing`
+    rs = RoadStyle.from_dict({"fill": "#abcdef", "width": 3, "casing_width": 5,
+                              "casing_dark": "#112233", "casing_light": "#ffffff"})
+    assert rs.casing == "#112233"
 
 
 def test_from_dict_missing_required_keys_raises():

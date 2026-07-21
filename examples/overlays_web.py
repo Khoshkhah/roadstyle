@@ -50,7 +50,7 @@ pois = gpd.GeoDataFrame(
 
 # 3. render with both overlays — zones under the roads, POIs on top
 wm = rs.render_edges(
-    g, backend="web", theme="dark", palette="mono",
+    g, backend="web", basemap="dark_matter", palette="mono",
     arrows=True, labels=True,
     overlays=[
         rs.Overlay(taz, kind="fill", placement="under", color="#6aa9ff", opacity=0.14,

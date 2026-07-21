@@ -9,14 +9,12 @@ override-file locations and format). This module owns the palette *machinery*: t
 
 Built-in palettes:
 
-- ``highsat`` — the custom **high-saturation** theme (cyan motorway, pink trunk, …) with
-  theme-dependent casing (light vs dark/satellite). Best legibility over any base map.
-- ``carto``   — the classic **OSM Carto** palette (muted warm tones), with its own coloured
-  casing constant across themes.
+- ``highsat`` — the custom **high-saturation** palette (cyan motorway, pink trunk, …) with a
+  light-grey casing. Best legibility over any base map.
+- ``carto``   — the classic **OSM Carto** palette (muted warm tones) with its own per-class
+  coloured casing.
 
-Each entry is a :class:`RoadStyle` (fill colour, line widths, casing colour per theme, optional
-dash). ``casing_light``/``casing_dark`` let the renderer swap the casing to suit a light vs
-dark/satellite base map (the high-saturation theme uses pure black on dark/sat).
+Each entry is a :class:`RoadStyle` (fill colour, line widths, one casing colour, optional dash).
 """
 from __future__ import annotations
 
@@ -30,8 +28,7 @@ class RoadStyle:
     fill: str
     width: float
     casing_width: float
-    casing_light: str | None = None      # casing colour on a light base map (None = no casing)
-    casing_dark: str = "#000000"         # casing colour on a dark/satellite base map
+    casing: str | None = "#bcbcbc"       # casing colour (None = no casing); default light grey
     dash: tuple[int, int] | None = None  # dash pattern (on, off) in px
     opacity: float = 1.0
 
@@ -41,8 +38,7 @@ class RoadStyle:
             "fill": self.fill,
             "width": self.width,
             "casing_width": self.casing_width,
-            "casing_light": self.casing_light,
-            "casing_dark": self.casing_dark,
+            "casing": self.casing,
             "dash": list(self.dash) if self.dash else None,
             "opacity": self.opacity,
         }
@@ -58,12 +54,14 @@ class RoadStyle:
         if missing:
             raise ValueError(f"RoadStyle dict is missing required keys: {missing}")
         dash = d.get("dash")
+        # legacy palette files carried casing_light/casing_dark; the dark variant (the one every
+        # built-in theme actually used) maps onto the single ``casing``
+        casing = d.get("casing", d.get("casing_dark", "#bcbcbc"))
         return cls(
             fill=d["fill"],
             width=float(d["width"]),
             casing_width=float(d["casing_width"]),
-            casing_light=d.get("casing_light"),
-            casing_dark=d.get("casing_dark", "#000000"),
+            casing=casing,
             dash=tuple(dash) if dash else None,
             opacity=float(d.get("opacity", 1.0)),
         )

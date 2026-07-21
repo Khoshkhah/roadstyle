@@ -22,9 +22,9 @@ from collections.abc import Mapping
 from functools import cache
 from importlib.resources import files
 
+from .config import DEFAULT as CONFIG
 from .edges import as_edges
 from .stylers import bake_color_options, bake_props, build_styler, option_styler
-from .themes import get_theme
 
 SPEC_VERSION = "1"
 
@@ -42,7 +42,6 @@ def _asset(name: str) -> str:
 def to_spec(
     gdf,
     *,
-    theme: str = "light",
     palette: str = "highsat",
     highway_col: str = "highway",
     style=None,
@@ -62,9 +61,9 @@ def to_spec(
     Returns a plain ``dict`` ready for ``json.dump``. The styling arguments mirror
     :func:`roadstyle.render_edges`; the default (no data-driven args) bakes the OSM class style.
 
-    ``basemap`` picks the *active* base map (else the theme default); ``basemaps`` is the list of
-    keys offered to the in-map base-layer switcher (default :data:`DEFAULT_SWITCHER`). Both casing
-    colours are baked per edge, so a light/dark base-map switch re-picks the casing client-side.
+    ``basemap`` picks the *active* base map (else the ``config.basemap`` setting); ``basemaps``
+    is the list of keys offered to the in-map base-layer switcher (default
+    :data:`DEFAULT_SWITCHER`).
 
     ``color_options`` enables **client-side recolouring**: pass an ordered mapping of
     ``{name: {styler kwargs}}`` (or a list of ``{"name": ..., **kwargs}``) and each option's fill
@@ -80,8 +79,6 @@ def to_spec(
     edges = as_edges(gdf, class_col=highway_col)
     g = edges.gdf
     col = edges.class_col
-    th = get_theme(theme)
-    dark = th.casing == "dark"
 
     color_opts_meta = None
     if color_options:
@@ -90,24 +87,23 @@ def to_spec(
         items = (list(color_options.items()) if isinstance(color_options, Mapping)
                  else [(o["name"], {k: v for k, v in o.items() if k != "name"})
                        for o in color_options])
-        frames = [(name, option_styler(col, palette, opts).resolve_frame(g, theme))
+        frames = [(name, option_styler(col, palette, opts).resolve_frame(g))
                   for name, opts in items]
         rf = frames[0][1]                                  # active option drives spec["legend"]
-        gj, color_opts_meta = bake_color_options(json.loads(g.to_json()), frames, dark)
+        gj, color_opts_meta = bake_color_options(json.loads(g.to_json()), frames)
     else:
         styler = build_styler(
             style=style, palette=palette, highway_col=col,
             color_by=color_by, colors=colors, cmap=cmap,
             vmin=vmin, vmax=vmax, width_by=width_by,
         )
-        rf = styler.resolve_frame(g, theme)
-        # bake the per-edge __rs_* props (both casing variants for the in-map base-layer switcher)
-        gj = bake_props(json.loads(g.to_json()), rf, dark)
+        rf = styler.resolve_frame(g)
+        gj = bake_props(json.loads(g.to_json()), rf)   # per-edge __rs_* props
 
     b = list(g.total_bounds)   # [minx, miny, maxx, maxy]
     bounds = [[b[1], b[0]], [b[3], b[2]]]   # [[S,W],[N,E]] (Leaflet order)
 
-    bm = get_basemap(basemap or th.default_basemap)
+    bm = get_basemap(basemap or CONFIG.basemap)
     # Selectable base layers for the in-map switcher; the active `bm` is always present and first.
     keys = list(basemaps) if basemaps else list(DEFAULT_SWITCHER)
     if bm.key not in keys:
@@ -120,7 +116,6 @@ def to_spec(
     spec = {
         "roadstyle": f"spec/{SPEC_VERSION}",
         "crs": "EPSG:4326",
-        "theme": th.name,
         "bounds": bounds,
         "render": {"sandwich": True, "line_cap": "round", "line_join": "round"},
         "basemap": _basemap_dict(bm),       # the active base map

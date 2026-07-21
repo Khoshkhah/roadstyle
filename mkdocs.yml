@@ -23,7 +23,6 @@ nav:
   - Embedding in a website: embedding.md
   - Frontend integration: frontend.md
   - Palettes: palettes.md
-  - Themes: themes.md
   - API: api.md
   - Comparison: comparison.md
 markdown_extensions:

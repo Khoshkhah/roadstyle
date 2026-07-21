@@ -5,7 +5,7 @@ Two PathLayers (casing under, fill over) mirror the folium "geometry sandwich".
 from __future__ import annotations
 
 from .style import resolve
-from .themes import get_theme
+from .config import DEFAULT as CONFIG
 
 
 def _hex_to_rgb(h, alpha=255):
@@ -13,13 +13,13 @@ def _hex_to_rgb(h, alpha=255):
     return [int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), alpha]
 
 
-def _arrays(gdf, palette, theme, highway_col, tunnel_col, bridge_col, which):
+def _arrays(gdf, palette, highway_col, tunnel_col, bridge_col, which):
     import numpy as np
 
     colors, widths = [], []
     for _, row in gdf.iterrows():
         rs = resolve(
-            row.get(highway_col), palette=palette, theme=theme,
+            row.get(highway_col), palette=palette,
             tunnel=_truthy(row.get(tunnel_col)) if tunnel_col else False,
             bridge=_truthy(row.get(bridge_col)) if bridge_col else False,
         )
@@ -40,17 +40,15 @@ def _truthy(v) -> bool:
     return str(v).strip().lower() in {"yes", "true", "1"} if v is not None else False
 
 
-def _arrays_from_frame(rf, theme, which):
+def _arrays_from_frame(rf, which):
     """Build (colors, widths) numpy arrays from a ResolvedFrame (the data-driven path)."""
     import numpy as np
 
-    from .themes import get_theme as _gt
-    dark = _gt(theme).casing == "dark"
     colors, widths = [], []
     n = len(rf)
     for i in range(n):
         if which == "casing":
-            casing = rf.casing_dark[i] if dark else rf.casing_light[i]
+            casing = rf.casing[i]
             if not casing or rf.casing_width[i] <= 0:
                 colors.append([0, 0, 0, 0])
                 widths.append(0.0)
@@ -66,7 +64,6 @@ def _arrays_from_frame(rf, theme, which):
 def render(
     gdf,
     palette: str = "highsat",
-    theme: str = "light",
     highway_col: str = "highway",
     tunnel_col: str | None = "tunnel",
     bridge_col: str | None = "bridge",
@@ -85,8 +82,7 @@ def render(
     for _k in ("arrows", "labels", "filter_control", "basemap_switcher"):
         kwargs.pop(_k, None)
 
-    th = get_theme(theme)
-    bm = get_basemap(basemap or th.default_basemap)
+    bm = get_basemap(basemap or CONFIG.basemap)
     carto_style = None
     try:
         from lonboard.basemap import CartoBasemap
@@ -101,12 +97,12 @@ def render(
     if styler is None:
         tunnel_col = tunnel_col if (tunnel_col and tunnel_col in g.columns) else None
         bridge_col = bridge_col if (bridge_col and bridge_col in g.columns) else None
-        c_col, c_w = _arrays(g, palette, theme, highway_col, tunnel_col, bridge_col, "casing")
-        f_col, f_w = _arrays(g, palette, theme, highway_col, tunnel_col, bridge_col, "fill")
+        c_col, c_w = _arrays(g, palette, highway_col, tunnel_col, bridge_col, "casing")
+        f_col, f_w = _arrays(g, palette, highway_col, tunnel_col, bridge_col, "fill")
     else:
-        rf = styler.resolve_frame(g, theme)
-        c_col, c_w = _arrays_from_frame(rf, theme, "casing")
-        f_col, f_w = _arrays_from_frame(rf, theme, "fill")
+        rf = styler.resolve_frame(g)
+        c_col, c_w = _arrays_from_frame(rf, "casing")
+        f_col, f_w = _arrays_from_frame(rf, "fill")
 
     casing = PathLayer.from_geopandas(g, get_color=c_col, get_width=c_w,
                                       width_units="pixels", width_min_pixels=0)

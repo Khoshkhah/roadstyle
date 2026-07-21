@@ -1,6 +1,6 @@
 """``roadstyle`` command-line interface — turn a road file into a styled map without writing Python.
 
-    roadstyle edges.gpkg -o map.html --theme dark
+    roadstyle edges.gpkg -o map.html --basemap dark_matter
     roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6 -f web
     roadstyle edges.gpkg --include motorway trunk primary -o major.html
 
@@ -28,8 +28,8 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Render a road-edge file (GPKG, GeoJSON, Shapefile, …) into a styled "
                     "interactive map or a portable JSON spec.",
         epilog="examples:\n"
-               "  roadstyle edges.gpkg -o map.html --theme dark\n"
-               "  roadstyle edges.gpkg --palette carto --theme light\n"
+               "  roadstyle edges.gpkg -o map.html --basemap dark_matter\n"
+               "  roadstyle edges.gpkg --palette carto --basemap positron\n"
                "  roadstyle edges.gpkg --include motorway trunk primary -o major.html\n"
                "  roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6 -f web\n"
                "  roadstyle edges.gpkg -f spec -o map_data.json   # JSON for your own frontend",
@@ -48,9 +48,8 @@ def _build_parser() -> argparse.ArgumentParser:
     style = p.add_argument_group("styling")
     style.add_argument("--palette", default="highsat", choices=["highsat", "carto"],
                        help="class palette (default: highsat).")
-    style.add_argument("--theme", default="light", choices=["light", "dark", "satellite"],
-                       help="base theme (default: light).")
-    style.add_argument("--basemap", help="override the theme's base map (a key in BASEMAPS).")
+    style.add_argument("--basemap", help="the primary base map layer (a key in BASEMAPS; "
+                       "default from settings: voyager).")
     style.add_argument("--tooltip", nargs="+", metavar="COL",
                        help="columns to show in the hover tooltip.")
 
@@ -119,7 +118,7 @@ def main(argv: list[str] | None = None) -> int:
         # Styling keywords shared by every output path; drop the ones the user didn't set so each
         # function keeps its own defaults.
         style_kw = {
-            "palette": args.palette, "theme": args.theme, "highway_col": col,
+            "palette": args.palette, "highway_col": col,
             "color_by": args.color_by, "colors": colors, "cmap": args.cmap,
             "vmin": args.vmin, "vmax": args.vmax,
             "width_by": tuple(args.width_by) if args.width_by else None,

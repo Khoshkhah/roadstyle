@@ -28,12 +28,12 @@ def _edges():
 
 def test_class_styler_matches_resolve():
     g = _edges()
-    rf = ClassStyler().resolve_frame(g, theme="dark")
+    rf = ClassStyler().resolve_frame(g)
     for i, hw in enumerate(g["highway"]):
-        r = resolve(hw, palette="highsat", theme="dark")
+        r = resolve(hw, palette="highsat")
         assert rf.fill[i] == r.fill
         assert abs(rf.width[i] - r.width) < 1e-9
-        assert rf.casing_dark[i] == r.casing
+        assert rf.casing[i] == r.casing
 
 
 def test_categorical_styler_maps_and_falls_back():
@@ -44,7 +44,7 @@ def test_categorical_styler_maps_and_falls_back():
         fallback_color="#cccccc",
     ).resolve_frame(g)
     assert rf.fill == ["#11D68F", "#FFCF43", "#F24E42", "#cccccc"]
-    assert rf.theme_aware_casing is False
+    assert rf.casing == [None] * 4          # data overlays carry no casing by default
 
 
 def test_numeric_styler_ramp_endpoints_and_nan():

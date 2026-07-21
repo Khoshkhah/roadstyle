@@ -25,15 +25,15 @@ def _edges():
 
 def test_folium_render_returns_map():
     import folium
-    m = render_edges(_edges(), backend="folium", theme="dark")
+    m = render_edges(_edges(), backend="folium", basemap="dark_matter")
     assert isinstance(m, folium.Map)
 
 
-def test_folium_render_all_themes_and_palettes():
+def test_folium_render_all_basemaps_and_palettes():
     import folium
-    for theme in ("light", "dark", "satellite"):
+    for basemap in ("voyager", "dark_matter", "satellite"):
         for palette in ("highsat", "carto"):
-            m = render_edges(_edges(), theme=theme, palette=palette)
+            m = render_edges(_edges(), basemap=basemap, palette=palette)
             assert isinstance(m, folium.Map)
 
 
