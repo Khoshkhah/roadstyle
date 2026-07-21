@@ -98,3 +98,24 @@ def test_user_override_roads_tables_deep_merge(tmp_path, monkeypatch, fresh):
     assert r["width"]["service"]["18"] == 8.0
     assert r["width"]["service"]["15"] == 2        # untouched zoom stops survive
     assert r["group"]["motorway"] == "major"       # untouched tables survive
+
+
+def test_use_settings_overrides_from_code_and_resets(fresh):
+    """rs.use_settings(dict|path) is the in-process roadstyle.json: it must reach the already-
+    imported tables (config, palettes, web road model) and a plain call must undo it."""
+    import roadstyle as rs
+    from roadstyle import render_web
+    from roadstyle.palettes import HIGHSAT
+
+    try:
+        rs.use_settings({"config": {"labels": {"color": "#ff00aa"}},
+                         "roads": {"z_order": {"service": 9}},
+                         "palettes": {"highsat": {"service": {"fill": "#0000ff"}}}})
+        assert render_web.CONFIG.labels == {"color": "#ff00aa"}
+        assert render_web.ROAD_Z["service"] == 9
+        assert HIGHSAT["service"].fill == "#0000ff"
+    finally:
+        rs.use_settings()
+    assert render_web.ROAD_Z["service"] == 3           # back to bundled defaults
+    assert HIGHSAT["service"].fill != "#0000ff"
+    assert render_web.CONFIG.labels["color"] == "#5b5b5b"

@@ -86,14 +86,29 @@ def _norm_roads(value):
     return value.get("roads", value) if isinstance(value, dict) else value
 
 
+#: programmatic override sources set via :func:`roadstyle.use_settings` — paths or dicts,
+#: applied AFTER the discovered files (highest precedence)
+_EXTRA: list = []
+
+
+def set_extra(*sources) -> None:
+    """Replace the programmatic override sources (the :func:`roadstyle.use_settings` backing) and
+    drop caches so the next access sees them. ``None`` entries are ignored (reset with no args)."""
+    _EXTRA[:] = [s for s in sources if s is not None]
+    refresh()
+
+
 def _merged_overrides() -> dict:
-    """Merge every override file into one ``{"palettes", "config", "selection", "roads"}`` dict."""
+    """Merge every override source into one ``{"palettes", "config", "selection", "roads"}`` dict."""
     merged: dict = {"palettes": {}, "config": {}, "selection": {}, "roads": {}}
-    for path in override_files():
-        try:
-            data = _read_json(path)
-        except (OSError, ValueError):          # unreadable / malformed JSON → skip, don't crash
-            continue
+    for src in list(override_files()) + list(_EXTRA):
+        if isinstance(src, dict):
+            data = src
+        else:
+            try:
+                data = _read_json(Path(src))
+            except (OSError, ValueError):      # unreadable / malformed JSON → skip, don't crash
+                continue
         for name, value in (data.get("palettes") or {}).items():
             dst = merged["palettes"].setdefault(name, {})
             for cls, fields in (_norm_roads(value) or {}).items():

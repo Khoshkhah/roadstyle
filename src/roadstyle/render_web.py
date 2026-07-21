@@ -40,20 +40,25 @@ def _asset(fname):
 
 # --- openstreetmap-carto road model — loaded from data/defaults.json "roads" (+ any user
 # roadstyle.json override), like every other styling table. Edit the JSON, not this file.
-_ROADS = _settings.roads()
-#: px width by zoom, per width-group
-WIDTH = {g: {int(z): w for z, w in t.items()} for g, t in _ROADS["width"].items()}
-#: per-group growth rate per zoom past the last stop
-HI_RATE = dict(_ROADS["width_zoom_rate"])
-#: casing width = fill width * ratio, per group
-CASING_RATIO = dict(_ROADS["casing_ratio"])
-#: highway class -> width-group
-ROAD_GROUP = dict(_ROADS["group"])
-_LINKS = list(_ROADS["links"])
-_CLASSES = list(ROAD_GROUP) + _LINKS
-_ZSTOPS = list(_ROADS["zoom_stops"])
-#: draw priority (OSM z_order): higher = on top, so a motorway draws over a residential
-ROAD_Z = dict(_ROADS["z_order"])
+def _load_road_model() -> None:
+    """(Re)build the module road tables from :func:`_settings.roads`.
+
+    Runs at import and again from :func:`roadstyle.use_settings` after a programmatic override —
+    every expression builder below reads these module globals at call time, so a rebuild is all a
+    new setting set needs."""
+    global WIDTH, HI_RATE, CASING_RATIO, ROAD_GROUP, _LINKS, _CLASSES, _ZSTOPS, ROAD_Z
+    r = _settings.roads()
+    WIDTH = {g: {int(z): w for z, w in t.items()} for g, t in r["width"].items()}   # px by zoom, per group
+    HI_RATE = dict(r["width_zoom_rate"])       # per-group growth rate per zoom past the last stop
+    CASING_RATIO = dict(r["casing_ratio"])     # casing width = fill width * ratio, per group
+    ROAD_GROUP = dict(r["group"])              # highway class -> width-group
+    _LINKS = list(r["links"])
+    _CLASSES = list(ROAD_GROUP) + _LINKS
+    _ZSTOPS = list(r["zoom_stops"])
+    ROAD_Z = dict(r["z_order"])                # draw priority: higher = on top at a junction
+
+
+_load_road_model()
 
 
 def _sort_key(col):

@@ -156,5 +156,19 @@ PALETTES: dict[str, dict[str, RoadStyle]] = {
 HIGHSAT: dict[str, RoadStyle] = PALETTES["highsat"]
 CARTO: dict[str, RoadStyle] = PALETTES["carto"]
 
+
+def _reload() -> None:
+    """Rebuild PALETTES / SELECTION **in place** from :mod:`roadstyle._settings` (called by
+    :func:`roadstyle.use_settings`). In place, so aliases already imported elsewhere (HIGHSAT,
+    CARTO, a ``from roadstyle import PALETTES``) see the new values. Palettes registered at
+    runtime via :func:`register_palette` are left alone."""
+    fresh = {name: palette_from_dict(roads) for name, roads in _settings.palettes().items()}
+    for name, table in fresh.items():
+        dst = PALETTES.setdefault(name, {})
+        dst.clear()
+        dst.update(table)
+    SELECTION.clear()
+    SELECTION.update(_settings.style()["selection"])
+
 # Neon-violet selected-edge profile (data/style.json → "selection").
 SELECTION: dict = dict(_settings.style()["selection"])

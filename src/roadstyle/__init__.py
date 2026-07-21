@@ -60,10 +60,39 @@ from .stylers import (
 )
 from .themes import THEMES, Theme, get_theme, register_theme
 
+
+def use_settings(source=None) -> None:
+    """Apply a settings override from code — the in-process equivalent of a ``roadstyle.json``.
+
+    ``source`` is a path to a JSON file or a dict, in the same
+    ``{"palettes", "config", "selection", "roads"}`` layout as an override file (state only what
+    changes; everything else keeps the bundled defaults + any discovered override files, which
+    this source outranks). Call with no argument to drop the programmatic override again.
+
+    Safe to call at any point before rendering — already-imported styling tables (palettes,
+    ``StyleConfig``, the web renderer's road model) are rebuilt in place::
+
+        import roadstyle as rs
+        rs.use_settings("styles/dark-flow.json")     # or a dict
+        rs.render_edges(edges, backend="web").save("map.html")
+
+    Two setting sets in one process = call it again between renders. Note the handful of legacy
+    class-level defaults (:class:`roadstyle.style.RoadStyle` field defaults) resolve at import and
+    are unaffected — palette entries always restate them, so rendering is unaffected too.
+    """
+    from . import _settings, config, palettes, render_web, style, stylers
+
+    _settings.set_extra(source)
+    config.DEFAULT = config._default_config()
+    style.DEFAULT = stylers.DEFAULT = render_web.CONFIG = config.DEFAULT
+    palettes._reload()
+    render_web._load_road_model()
+
+
 __version__ = "0.2.0.dev0"
 
 __all__ = [
-    "render_edges", "filter_edges", "highway_types",
+    "render_edges", "filter_edges", "highway_types", "use_settings",
     "resolve", "base_style", "selection_style", "normalize_highway",
     "PALETTES", "HIGHSAT", "CARTO", "SELECTION", "RoadStyle",
     "THEMES", "Theme", "get_theme",
