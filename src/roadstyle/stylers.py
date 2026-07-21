@@ -340,6 +340,34 @@ class ColorTableStyler:
         return rf
 
 
+def _mark_dead(feats) -> None:
+    """``__rs_dead`` = 1 on edges touching a dead-end node (no other edge continues there).
+
+    Renderers cut those ends flat (butt cap) while every other edge keeps round caps: flat street
+    ends without the notch that butt caps open at bends/junctions — there a neighbour's round cap
+    seals the seam. Endpoints are matched rounded, twin directions collapse to one undirected key.
+    """
+    import collections
+
+    incident = collections.defaultdict(set)          # node -> undirected edge keys
+    ends = []
+    for f in feats:
+        g = f.get("geometry") or {}
+        c = g.get("coordinates") or []
+        if g.get("type") == "LineString" and len(c) >= 2:
+            a = (round(c[0][0], 6), round(c[0][1], 6))
+            z = (round(c[-1][0], 6), round(c[-1][1], 6))
+            k = (a, z) if a <= z else (z, a)
+            ends.append((a, z))
+            incident[a].add(k)
+            incident[z].add(k)
+        else:
+            ends.append(None)
+    for f, e in zip(feats, ends):
+        dead = bool(e) and (len(incident[e[0]]) == 1 or len(incident[e[1]]) == 1)
+        f.setdefault("properties", {})["__rs_dead"] = 1 if dead else 0
+
+
 def bake_props(gj: dict, rf: ResolvedFrame, dark: bool) -> dict:
     """Bake the per-edge ``__rs_*`` style props onto a GeoJSON FeatureCollection, in place.
 
@@ -349,6 +377,7 @@ def bake_props(gj: dict, rf: ResolvedFrame, dark: bool) -> dict:
     client-side; ``__rs_class`` carries the per-edge category used for filtering and legends.
     """
     feats = gj.get("features", [])
+    _mark_dead(feats)
     for i, feat in enumerate(feats):
         p = feat.setdefault("properties", {})
         p["__rs_fill"] = rf.fill[i]

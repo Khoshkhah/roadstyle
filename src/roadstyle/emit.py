@@ -122,7 +122,7 @@ def to_spec(
         "crs": "EPSG:4326",
         "theme": th.name,
         "bounds": bounds,
-        "render": {"sandwich": True, "line_cap": "butt", "line_join": "round"},
+        "render": {"sandwich": True, "line_cap": "round", "line_join": "round", "deadend_cap": "butt"},
         "basemap": _basemap_dict(bm),       # the active base map
         "basemaps": options,                # all base maps offered to the switcher
         "tooltip": fields,

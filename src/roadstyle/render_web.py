@@ -481,7 +481,7 @@ if(FILTER.on){
 // option's fill is baked per edge (__rs_fill / __rs_fill__1 …); setPaintProperty repoints the
 // road-fill layers' line-color at the chosen prop. window.rsSetColorField drives it from your UI.
 const COLOR_OPTIONS = __COLOR_OPTIONS__;
-const RS_FILL_LAYERS = ["roads-fill","roads-tunnel-fill","roads-bridge-fill"];
+const RS_FILL_LAYERS = ["roads-fill","roads-fill-end","roads-tunnel-fill","roads-bridge-fill"];
 let _coActive = __CO_ACTIVE__, _coLegendEl = null;
 function coLegendHtml(lg){
   if(!lg) return "";
@@ -588,7 +588,7 @@ map.on("styleimagemissing", e=>{ if(e.id==="oneway") addArrow(); });
 // hover + click-to-select + info popup (feature-state, tolerance box, throttled to one query/frame)
 const HIT = 4;
 function box(p){ return [[p.x-HIT,p.y-HIT],[p.x+HIT,p.y+HIT]]; }
-function pick(p){ const l = map.queryRenderedFeatures(box(p), {layers:["roads-fill","roads-tunnel-fill","roads-bridge-fill"]}); return l.length ? l[0] : null; }
+function pick(p){ const l = map.queryRenderedFeatures(box(p), {layers:["roads-fill","roads-fill-end","roads-tunnel-fill","roads-bridge-fill"]}); return l.length ? l[0] : null; }
 function setS(id, st){ if(id!=null) map.setFeatureState({source:"roads", id:id}, st); }
 let _hov=null, _pt=null, _raf=0;
 function _rfields(p, only){ const r=[];
@@ -749,17 +749,20 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
     # + paint layer(s), placed under or over the roads, and (if `popup` is set) clickable.
     under_layers, over_layers, ov_meta = _build_overlays(style, overlays)
 
-    # butt caps everywhere: fanned direction-lanes end flush instead of each growing its own round
-    # blob at dead ends. Joins stay round (they seal bends *within* an edge); the seam between two
-    # consecutive edges of a bending street shows as a small notch — accepted trade-off.
-    lay = {"line-cap": "butt", "line-join": "round", "line-sort-key": _sort_key(highway_col)}
-    tlay = dict(lay)                                      # butt cap -> clean dash ticks on tunnel casing
-    blay = dict(lay)                                      # butt cap -> square bridge deck ends
+    # Hybrid caps: round everywhere except edges touching a dead-end node (__rs_dead), which get
+    # their own butt-capped layer pair. Round seals the seam where edges meet at bends/junctions
+    # (butt opens a notch there); butt cuts true street ends flat (round grows a blob per
+    # direction-lane). line-cap isn't data-drivable, hence the split layers.
+    lay = {"line-cap": "round", "line-join": "round", "line-sort-key": _sort_key(highway_col)}
+    elay = {**lay, "line-cap": "butt"}                    # dead-end edges: flat ends
+    tlay = {**lay, "line-cap": "butt"}                    # butt cap -> clean dash ticks on tunnel casing
+    blay = {**lay, "line-cap": "butt"}                    # butt cap -> square bridge deck ends
     off = _offset_expr(highway_col, offset_frac, offset_zoom)
     sw = dict(split_zoom=offset_zoom, split_frac=width_frac)
     surface = ["==", ["coalesce", ["get", "lvl"], 0], 0]  # lvl == 0
     tunnel = ["<", ["coalesce", ["get", "lvl"], 0], 0]    # lvl == -1
     bridge = [">", ["coalesce", ["get", "lvl"], 0], 0]    # lvl == +1
+    dead = ["==", ["coalesce", ["get", "__rs_dead"], 0], 1]   # edge touches a dead-end node
     # minzoom: hide minor classes when zoomed out (config.DEFAULT.minzoom, or a caller override).
     # AND-ed onto each road filter rather than given its own layers, so layer ids are untouched.
     mz = ({**CONFIG.minzoom} if minzoom is True else
@@ -782,10 +785,20 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
          "filter": tunnel,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
                    "line-width": fw, "line-offset": off, "line-opacity": 0.72}},
-        {"id": "roads-casing", "type": "line", "source": "roads", "layout": lay, "filter": surface,
+        {"id": "roads-casing", "type": "line", "source": "roads", "layout": lay,
+         "filter": ["all", surface, ["!", dead]],
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
                    "line-width": cw, "line-offset": off}},
-        {"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, "filter": surface,
+        {"id": "roads-casing-end", "type": "line", "source": "roads", "layout": elay,
+         "filter": ["all", surface, dead],
+         "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
+                   "line-width": cw, "line-offset": off}},
+        {"id": "roads-fill", "type": "line", "source": "roads", "layout": lay,
+         "filter": ["all", surface, ["!", dead]],
+         "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
+                   "line-width": fw, "line-offset": off}},
+        {"id": "roads-fill-end", "type": "line", "source": "roads", "layout": elay,
+         "filter": ["all", surface, dead],
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
                    "line-width": fw, "line-offset": off}},
         # Bridges last (on top): a heavier, square-capped casing reads as a deck spanning what's below.
