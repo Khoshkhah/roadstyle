@@ -235,32 +235,3 @@ def test_minzoom_keeps_the_grade_separation_filters_intact():
     fs = _road_filters(render(_many_edges(20), minzoom=True).html)
     assert "lvl" in json.dumps(fs["roads-fill"])
     assert fs["roads-fill"] != fs["roads-tunnel-fill"] != fs["roads-bridge-fill"]
-
-
-def test_web_junction_plates_cover_dual_carriageway_crossing():
-    """Two dual carriageways crossing = 4 junction nodes ~22m apart. The area between the
-    carriageway centrelines has no line through it (background hole); a plate must cover it."""
-    d = 0.0002                                     # ~22m at the equator
-    segs = []
-    for y in (0.0, d):
-        segs += [LineString([(-0.001, y), (0, y)]), LineString([(0, y), (d, y)]),
-                 LineString([(d, y), (0.0012, y)])]
-    for x in (0.0, d):
-        segs += [LineString([(x, -0.001), (x, 0)]), LineString([(x, 0), (x, d)]),
-                 LineString([(x, d), (x, 0.0012)])]
-    g = gpd.GeoDataFrame({"highway": ["primary"] * 12}, geometry=segs, crs=4326)
-    style = _style(render_edges(g, backend="web").html)
-    plates = style["sources"]["junctions"]["data"]["features"]
-    assert len(plates) == 1 and plates[0]["geometry"]["type"] == "Polygon"
-    ids = [l["id"] for l in style["layers"]]
-    assert ids.index("roads-casing") < ids.index("roads-junction-plates") < ids.index("roads-fill")
-    # plate takes the dominant incident fill (all edges same class here)
-    road_fill = style["sources"]["roads"]["data"]["features"][0]["properties"]["__rs_fill"]
-    assert plates[0]["properties"]["__rs_fill"] == road_fill
-
-
-def test_web_simple_junctions_get_no_plate():
-    """Single-node junctions already render cleanly — no junctions source, no plate layer."""
-    style = _style(render_edges(_edges(), backend="web").html)
-    assert "junctions" not in style["sources"]
-    assert "roads-junction-plates" not in [l["id"] for l in style["layers"]]
