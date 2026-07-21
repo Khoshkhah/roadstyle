@@ -38,9 +38,12 @@ def load_driving_edges(db: Path) -> rs.RoadEdges:
     # and both carriageways of a divided road are drawn, and nothing is silently dropped.
     # edge_id is a 64-bit hash > 2**53, so cast it to text: a JS Number (double) can't hold it and
     # would silently corrupt the value in the browser. osm_id is small enough to stay numeric.
+    # tunnel/bridge/layer drive grade separation (tunnels dashed+faded below, bridges on top) —
+    # omit them and every edge renders at ground level.
     query = (
-        "SELECT CAST(edge_id AS VARCHAR) AS edge_id, osm_id, "
-        "       highway, name, maxspeed_kmh, length_m, ST_AsWKB(geometry) AS geom "
+        "SELECT CAST(edge_id AS VARCHAR) AS edge_id, osm_id, edge_ref, "
+        "       highway, name, lanes, maxspeed_kmh, length_m, "
+        "       tunnel, bridge, layer, ST_AsWKB(geometry) AS geom "
         "FROM driving.edges"
     )
     # DuckDB carries no CRS; the data is OSM lon/lat, so crs=4326. Pass connection + query.
