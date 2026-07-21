@@ -164,8 +164,7 @@
       color: casing,
       weight: p.__rs_cw,
       opacity: this._visible(p) ? p.__rs_cop : 0,
-      // butt only on dead-end edges: flat street ends, while round seals bend/junction seams
-      lineCap: p.__rs_dead ? "butt" : "round",
+      lineCap: "round",
       lineJoin: "round",
     };
   };
@@ -180,7 +179,7 @@
       weight: p.__rs_w,
       opacity: this._visible(p) ? p.__rs_op : 0,
       dashArray: p.__rs_dash,
-      lineCap: p.__rs_dead ? "butt" : "round",
+      lineCap: "round",
       lineJoin: "round",
     };
   };

@@ -236,14 +236,10 @@ def test_minzoom_keeps_the_grade_separation_filters_intact():
     assert "lvl" in json.dumps(fs["roads-fill"])
     assert fs["roads-fill"] != fs["roads-tunnel-fill"] != fs["roads-bridge-fill"]
 
-def test_web_hybrid_caps_split_deadend_edges():
-    """Chain A-B-C-D: the outer edges touch a dead-end node (__rs_dead=1, butt layer), the middle
-    edge doesn't (round layer). Round seals bend/junction seams; butt cuts true ends flat."""
+def test_web_round_caps_seal_edge_connections():
+    """Consecutive edges are separate LineStrings; round caps are the only rendering primitive
+    that seals the seam where they connect. Network continuity outranks end-cap shape."""
     style = _style(render_edges(_edges(), backend="web").html)
-    deads = [f["properties"]["__rs_dead"] for f in style["sources"]["roads"]["data"]["features"]]
-    assert deads == [1, 0, 1]
     lay = {l["id"]: l for l in style["layers"]}
     assert lay["roads-fill"]["layout"]["line-cap"] == "round"
-    assert lay["roads-fill-end"]["layout"]["line-cap"] == "butt"
-    assert lay["roads-casing-end"]["layout"]["line-cap"] == "butt"
-    assert "__rs_dead" in json.dumps(lay["roads-fill-end"]["filter"])
+    assert lay["roads-casing"]["layout"]["line-cap"] == "round"
