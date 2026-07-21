@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import collections
 import html as _html
+import math
 import json
 import os
 from collections.abc import Mapping
@@ -193,6 +194,74 @@ def _mark_lvl(geo, tunnel_col, bridge_col, layer_col):
             except (TypeError, ValueError):
                 lvl = 0
         p["lvl"] = lvl
+
+
+def _junction_plates(geo, max_link_m=30.0, max_diam_m=60.0):
+    """Junction plates: where separately-drawn one-way carriageways cross, no line passes through
+    the middle of the junction, so the map background shows as a hole framed by casings. Cover it:
+    cluster surface junction nodes joined by short edges (the stubs between carriageways), take the
+    convex hull, and paint it in the dominant incident fill colour. The plate layer sits between
+    casing and fill, so road fills still paint over its rim. Returns a FeatureCollection (possibly
+    empty). Ordinary single-node junctions already render cleanly and get no plate."""
+    from shapely.geometry import MultiPoint          # lazy: shapely ships with geopandas
+
+    nodes = collections.defaultdict(set)             # node -> undirected edge keys
+    fills = collections.defaultdict(list)            # node -> incident feature properties
+    edges = {}                                       # undirected edge key -> (node_a, node_b)
+    for ft in geo["features"]:
+        g, p = ft.get("geometry") or {}, ft.get("properties", {})
+        c = g.get("coordinates") or []
+        if g.get("type") != "LineString" or len(c) < 2 or p.get("lvl", 0) != 0:
+            continue
+        a = (round(c[0][0], 6), round(c[0][1], 6))
+        z = (round(c[-1][0], 6), round(c[-1][1], 6))
+        k = (a, z) if a <= z else (z, a)
+        edges[k] = (a, z)
+        for n in (a, z):
+            nodes[n].add(k)
+            fills[n].append(p)
+
+    junction = {n for n, ks in nodes.items() if len(ks) >= 3}
+    kx = 111320.0 * math.cos(math.radians(next(iter(junction))[1])) if junction else 1.0
+
+    def dist_m(a, b):
+        return math.hypot((a[0] - b[0]) * kx, (a[1] - b[1]) * 111320.0)
+
+    parent = {n: n for n in junction}                # union-find over short links between junctions
+
+    def find(n):
+        while parent[n] != n:
+            parent[n] = parent[parent[n]]
+            n = parent[n]
+        return n
+
+    for a, z in edges.values():
+        if a in junction and z in junction and dist_m(a, z) <= max_link_m:
+            parent[find(a)] = find(z)
+    clusters = collections.defaultdict(list)
+    for n in junction:
+        clusters[find(n)].append(n)
+
+    feats = []
+    for members in clusters.values():
+        if len(members) < 3:                         # ponytail: 2-node medians look OK unplated
+            continue
+        hull = MultiPoint(members).convex_hull
+        if hull.geom_type != "Polygon":
+            continue
+        x0, y0, x1, y1 = hull.bounds
+        if dist_m((x0, y0), (x1, y1)) > max_diam_m:  # ponytail: skip runaway chains (ramp gores)
+            continue
+        props = {}
+        inc = [p for n in members for p in fills[n]]
+        for key in {k for p in inc for k in p if k.startswith("__rs_fill")}:
+            vals = [p[key] for p in inc if p.get(key)]
+            if vals:                                 # dominant incident colour, deterministic tie
+                props[key] = collections.Counter(sorted(vals)).most_common(1)[0][0]
+        feats.append({"type": "Feature", "properties": props,
+                      "geometry": {"type": "Polygon",
+                                   "coordinates": [[list(pt) for pt in hull.exterior.coords]]}})
+    return {"type": "FeatureCollection", "features": feats}
 
 
 _JS_MAX_SAFE_INT = 2 ** 53 - 1
@@ -504,6 +573,8 @@ function rsSetColorField(nameOrIdx){
   _coActive = idx;
   RS_FILL_LAYERS.forEach(id=>{ if(map.getLayer(id))
     map.setPaintProperty(id,"line-color",["coalesce",["get",o.prop],"#888888"]); });
+  if(map.getLayer("roads-junction-plates"))
+    map.setPaintProperty("roads-junction-plates","fill-color",["coalesce",["get",o.prop],"#888888"]);
   const sel=document.getElementById("co-select"); if(sel) sel.value=String(idx);
   coUpdateLegend();
   document.dispatchEvent(new CustomEvent("rs:colorchange",{detail:{option:o,index:idx}}));
@@ -744,14 +815,20 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
         bms = bms[:1]                                     # one entry -> the JS hides the dropdown
     style = _basemap_style(get_basemap(active))
     style["sources"]["roads"] = {"type": "geojson", "data": geo, "generateId": True}
+    plates = _junction_plates(geo)
+    if plates["features"]:
+        style["sources"]["junctions"] = {"type": "geojson", "data": plates}
 
     # extra overlay layers (zones / POIs / any geometry the caller brings); each gets its own source
     # + paint layer(s), placed under or over the roads, and (if `popup` is set) clickable.
     under_layers, over_layers, ov_meta = _build_overlays(style, overlays)
 
-    lay = {"line-cap": "round", "line-join": "round", "line-sort-key": _sort_key(highway_col)}
-    tlay = {**lay, "line-cap": "butt"}                    # butt cap -> clean dash ticks on tunnel casing
-    blay = {**lay, "line-cap": "butt"}                    # butt cap -> square bridge deck ends
+    # butt caps everywhere: fanned direction-lanes end flush instead of each growing its own round
+    # blob at dead ends. Joins stay round (they seal bends *within* an edge); the seam between two
+    # consecutive edges of a bending street shows as a small notch — accepted trade-off.
+    lay = {"line-cap": "butt", "line-join": "round", "line-sort-key": _sort_key(highway_col)}
+    tlay = dict(lay)                                      # butt cap -> clean dash ticks on tunnel casing
+    blay = dict(lay)                                      # butt cap -> square bridge deck ends
     off = _offset_expr(highway_col, offset_frac, offset_zoom)
     sw = dict(split_zoom=offset_zoom, split_frac=width_frac)
     surface = ["==", ["coalesce", ["get", "lvl"], 0], 0]  # lvl == 0
@@ -782,6 +859,11 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
         {"id": "roads-casing", "type": "line", "source": "roads", "layout": lay, "filter": surface,
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
                    "line-width": cw, "line-offset": off}},
+        # junction plates: paved area over multi-node junction clusters (dual-carriageway
+        # crossings), under the fills so the roads still paint over the plate rim
+        *([{"id": "roads-junction-plates", "type": "fill", "source": "junctions",
+            "paint": {"fill-color": ["coalesce", ["get", "__rs_fill"], "#888888"]}}]
+          if plates["features"] else []),
         {"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, "filter": surface,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
                    "line-width": fw, "line-offset": off}},
