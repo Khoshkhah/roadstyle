@@ -67,8 +67,8 @@ def _apply(
         opacity *= config.tunnel_opacity_scale
         casing_opacity *= config.tunnel_opacity_scale
         dash = dash or (4, 4)
-    if bridge:                       # bridges: solid black casing, a touch wider (deck marker)
-        casing = "#000000"
+    if bridge:                       # bridges: solid dark casing, a touch wider (deck marker)
+        casing = config.bridge_casing_color
         casing_width = (casing_width or width) + config.bridge_casing_extra
 
     return ResolvedStyle(rs.fill, width, casing, casing_width, dash, opacity, casing_opacity)

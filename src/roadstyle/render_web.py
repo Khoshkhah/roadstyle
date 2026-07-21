@@ -778,10 +778,11 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         {"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, "filter": surface,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
                    "line-width": fw, "line-offset": off}},
-        # Bridges last (on top): a heavier, square-capped casing reads as a deck spanning what's below.
+        # Bridges last (on top): a heavier, square-capped casing in the configured deck colour
+        # (black by default) reads as a deck spanning what's below.
         {"id": "roads-bridge-casing", "type": "line", "source": "roads", "layout": blay,
          "filter": bridge,
-         "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
+         "paint": {"line-color": CONFIG.bridge_casing_color,
                    "line-width": bcw, "line-offset": off}},
         {"id": "roads-bridge-fill", "type": "line", "source": "roads", "layout": lay, "filter": bridge,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
@@ -798,14 +799,19 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     # Both read their cosmetics from data/style.json "config" (labels / arrows blocks), so a user
     # roadstyle.json can restyle them without touching the library; missing keys keep the bundled
     # defaults (a partial override dict is fine).
-    arw = {"color": "#5b5b5b", "spacing": 120, "opacity": 0.7, **(CONFIG.arrows or {})}
+    arw = {"color": "#5b5b5b", "spacing": 120, "opacity": 0.7, "minzoom": 16,
+           **(CONFIG.arrows or {})}
     lbl = {"color": "#5b5b5b", "halo_color": None, "halo_width": 0, **(CONFIG.labels or {})}
     if arrows:
+        amz = arw["minzoom"]
         style["layers"].append(
-            {"id": "roads-arrows", "type": "symbol", "source": "roads", "minzoom": 15,
+            {"id": "roads-arrows", "type": "symbol", "source": "roads", "minzoom": amz,
              "filter": ["!", ["to-boolean", ["get", "twoway"]]],   # one-way edge = no reverse twin
+             # spacing opens up 3x when zoomed out, tightening to the configured value by z19 —
+             # zoomed-out views show a few orienting arrows, not one per short edge
              "layout": {"symbol-placement": "line", "icon-image": "oneway",
-                        "symbol-spacing": arw["spacing"],
+                        "symbol-spacing": ["interpolate", ["linear"], ["zoom"],
+                                           amz, arw["spacing"] * 3, 19, arw["spacing"]],
                         "icon-rotation-alignment": "map", "icon-allow-overlap": True,
                         "icon-ignore-placement": True,
                         "icon-size": ["interpolate", ["linear"], ["zoom"], 15, 0.5, 19, 1.0]},

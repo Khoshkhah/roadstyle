@@ -405,9 +405,11 @@
     "arrows": {
       "color": "#5b5b5b",
       "spacing": 120,
-      "opacity": 0.7
+      "opacity": 0.7,
+      "minzoom": 16
     },
-    "basemap": "voyager"
+    "basemap": "voyager",
+    "bridge_casing_color": "#000000"
   },
   "selection": {
     "core": "#EE00FF",

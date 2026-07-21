@@ -281,5 +281,15 @@ def test_web_labels_and_arrows_read_style_config(monkeypatch):
     paint = next(l for l in style["layers"] if l["id"] == "roads-labels")["paint"]
     assert paint == {"text-color": "#ff0000", "text-halo-color": "#000000", "text-halo-width": 2}
     arrow = next(l for l in style["layers"] if l["id"] == "roads-arrows")
-    assert arrow["layout"]["symbol-spacing"] == 60 and arrow["paint"]["icon-opacity"] == 0.5
+    # spacing opens to 3x at the arrows' minzoom (default 16), tightening to the value by z19
+    assert arrow["layout"]["symbol-spacing"] == ["interpolate", ["linear"], ["zoom"], 16, 180, 19, 60]
+    assert arrow["minzoom"] == 16 and arrow["paint"]["icon-opacity"] == 0.5
     assert 'fill="#123456"' in wm.html               # the chevron SVG itself is retinted
+
+
+def test_web_bridge_casing_is_config_colour():
+    """Bridge decks keep a solid dark casing (config.bridge_casing_color, black by default) even
+    though the regular road casing defaults to light grey."""
+    style = _style(render_edges(_edges(), backend="web").html)
+    bc = next(l for l in style["layers"] if l["id"] == "roads-bridge-casing")
+    assert bc["paint"]["line-color"] == "#000000"
