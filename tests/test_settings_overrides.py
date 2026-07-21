@@ -79,3 +79,22 @@ def test_override_propagates_into_reloaded_modules(tmp_path, monkeypatch, fresh)
         monkeypatch.delenv("ROADSTYLE_CONFIG", raising=False)
         _settings.refresh()
         importlib.reload(palettes)        # restore the unmodified module for later tests
+
+
+def test_user_override_roads_tables_deep_merge(tmp_path, monkeypatch, fresh):
+    """One defaults.json carries EVERY setting; an override restates only what changes. A roads
+    override merges per table entry (and per zoom stop inside a width row) — nothing restated."""
+    override = tmp_path / "roadstyle.json"
+    override.write_text(json.dumps({"roads": {
+        "z_order": {"service": 9},                 # lift one class's draw priority
+        "width": {"service": {"18": 8.0}},         # widen one zoom stop of one group
+    }}))
+    monkeypatch.setenv("ROADSTYLE_CONFIG", str(override))
+    _settings.refresh()
+
+    r = _settings.roads()
+    assert r["z_order"]["service"] == 9
+    assert r["z_order"]["motorway"] == 9           # untouched entries survive
+    assert r["width"]["service"]["18"] == 8.0
+    assert r["width"]["service"]["15"] == 2        # untouched zoom stops survive
+    assert r["group"]["motorway"] == "major"       # untouched tables survive

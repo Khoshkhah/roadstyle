@@ -22,6 +22,7 @@ import json
 import os
 from collections.abc import Mapping
 
+from . import _settings
 from .basemaps import DEFAULT_SWITCHER, get_basemap
 from .config import DEFAULT as CONFIG
 from .overlays import Overlay, detect_kind, to_fc
@@ -37,44 +38,22 @@ def _asset(fname):
     with open(os.path.join(_VENDOR, fname), encoding="utf-8") as fh:
         return fh.read()
 
-# --- openstreetmap-carto width model (px by zoom, per width-group) -----------------------------
-WIDTH = {
-    "major":         {8: 0.8, 10: 1.3, 12: 3.5, 13: 6, 14: 8, 15: 10, 16: 13, 17: 17, 18: 22},
-    "primary":       {8: 0.7, 10: 1.2, 12: 3.5, 13: 5, 14: 7, 15: 9, 16: 12, 17: 15, 18: 19},
-    "secondary":     {10: 0.8, 12: 2.5, 13: 4, 14: 6, 15: 8, 16: 10, 17: 13, 18: 17},
-    "tertiary":      {12: 2, 13: 3, 14: 4.5, 15: 6, 16: 8, 17: 11, 18: 14},
-    "residential":   {12: 0.5, 13: 1.5, 14: 2.5, 15: 4, 16: 6, 17: 9, 18: 13},
-    "living_street": {13: 2, 14: 2.5, 15: 4, 16: 6, 17: 9, 18: 13},
-    "service":       {13: 0.8, 14: 1.2, 15: 2, 16: 2.8, 17: 4, 18: 5},
-    "pedestrian":    {13: 2, 14: 3, 15: 4, 16: 6, 17: 9, 18: 13},
-    "path":          {12: 0.4, 13: 0.6, 14: 0.8, 15: 1, 16: 1.4, 17: 2, 18: 2.6, 19: 3},
-}
-HI_RATE = {"major": 2.0, "primary": 2.0, "secondary": 2.0, "tertiary": 1.95, "residential": 1.9,
-           "living_street": 1.9, "service": 1.9, "pedestrian": 1.85, "path": 1.3}
-CASING_RATIO = {"major": 1.17, "primary": 1.18, "secondary": 1.19, "tertiary": 1.21,
-                "residential": 1.24, "living_street": 1.24, "service": 1.27, "pedestrian": 1.21,
-                "path": 1.0}
-# highway class -> width-group
-ROAD_GROUP = {
-    "motorway": "major", "trunk": "major", "primary": "primary", "secondary": "secondary",
-    "tertiary": "tertiary", "unclassified": "residential", "residential": "residential",
-    "road": "residential", "busway": "residential", "raceway": "tertiary",
-    "living_street": "living_street", "service": "service", "pedestrian": "pedestrian",
-    "footway": "path", "path": "path", "cycleway": "path", "steps": "path", "bridleway": "path",
-    "track": "path", "corridor": "path", "construction": "path",
-}
-_LINKS = ["motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"]
+# --- openstreetmap-carto road model — loaded from data/defaults.json "roads" (+ any user
+# roadstyle.json override), like every other styling table. Edit the JSON, not this file.
+_ROADS = _settings.roads()
+#: px width by zoom, per width-group
+WIDTH = {g: {int(z): w for z, w in t.items()} for g, t in _ROADS["width"].items()}
+#: per-group growth rate per zoom past the last stop
+HI_RATE = dict(_ROADS["width_zoom_rate"])
+#: casing width = fill width * ratio, per group
+CASING_RATIO = dict(_ROADS["casing_ratio"])
+#: highway class -> width-group
+ROAD_GROUP = dict(_ROADS["group"])
+_LINKS = list(_ROADS["links"])
 _CLASSES = list(ROAD_GROUP) + _LINKS
-_ZSTOPS = [12, 13, 14, 15, 16, 17, 18, 19, 20]
-
-# draw priority (OSM z_order): higher = on top, so a motorway draws over a residential at a junction
-ROAD_Z = {
-    "motorway": 9, "trunk": 8, "primary": 7, "secondary": 6, "tertiary": 5,
-    "unclassified": 4, "residential": 4, "road": 4, "busway": 4, "raceway": 5,
-    "living_street": 3, "service": 3, "pedestrian": 2,
-    "footway": 1, "path": 1, "cycleway": 1, "steps": 1, "bridleway": 1, "track": 1,
-    "corridor": 1, "construction": 0,
-}
+_ZSTOPS = list(_ROADS["zoom_stops"])
+#: draw priority (OSM z_order): higher = on top, so a motorway draws over a residential
+ROAD_Z = dict(_ROADS["z_order"])
 
 
 def _sort_key(col):

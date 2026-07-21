@@ -3,7 +3,7 @@
 Historically these lived as module-level constants in :mod:`roadstyle.style`
 (``FILL_OPACITY``, ``CASING_OPACITY``, ``LINK_SCALE``), then as a hardcoded
 :class:`StyleConfig`. The values now live in a JSON data file shipped with the package
-(``roadstyle/data/style.json`` → ``"config"``) and are loaded at import via
+(``roadstyle/data/defaults.json`` → ``"config"``) and are loaded at import via
 :mod:`roadstyle._settings`, which also applies user overrides — so a caller can adjust the
 look without editing the library, while the defaults reproduce the original,
 web-renderer-calibrated values exactly.
@@ -52,7 +52,7 @@ class StyleConfig:
 
 
 def _default_config() -> StyleConfig:
-    """Build the default :class:`StyleConfig` from ``data/style.json`` (+ user overrides).
+    """Build the default :class:`StyleConfig` from ``data/defaults.json`` (+ user overrides).
 
     Unknown keys are ignored (so a stray override field can't crash import) and the JSON list
     ``minor_no_casing`` is coerced back to a frozenset. Any field the data omits keeps the

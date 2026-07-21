@@ -8,7 +8,7 @@ The built-in palettes are **data, not code**: they live as JSON files shipped in
 (`roadstyle/data/palettes/*.json`) and are loaded at import, so you can retint a class — or add a
 whole palette — by editing a data file or dropping a [user override](#customising-data-files-and-overrides),
 with no code change. The styling knobs (opacities, link scale, tunnel/bridge factors, selection
-colours) likewise live in `roadstyle/data/style.json`.
+colours) likewise live in `roadstyle/data/defaults.json`.
 
 ## highsat
 
@@ -78,7 +78,8 @@ Casing is theme-independent (like `carto`).
 ## Customising data files and overrides
 
 Palettes and the style config are **data files** shipped in the package
-(`roadstyle/data/palettes/*.json`, `roadstyle/data/style.json`), loaded at import. Three ways to
+(one bundled `roadstyle/data/defaults.json` holding palettes, config, selection and the road
+width/draw-order model), loaded at import. Three ways to
 change them, lowest-effort first.
 
 **1. A `roadstyle.json` override** — no code, no package edit; read at import. Sources, lowest
