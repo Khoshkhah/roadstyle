@@ -583,7 +583,7 @@ if(OVERLAYS.length){
 function addArrow(){
   if(map.hasImage("oneway")) return;
   const svg='<svg xmlns="http://www.w3.org/2000/svg" width="24" height="10" viewBox="0 0 12 5">'
-    +'<path d="M 0,2 7,2 7,0 12,2.5 7,5 7,3 0,3 z" fill="#5b5b5b"/></svg>';
+    +'<path d="M 0,2 7,2 7,0 12,2.5 7,5 7,3 0,3 z" fill="__ARROW_COLOR__"/></svg>';
   const img=new Image(24,10);
   img.onload=()=>{ if(!map.hasImage("oneway")) map.addImage("oneway",img,{pixelRatio:2}); };
   img.src="data:image/svg+xml;base64,"+btoa(svg);
@@ -810,17 +810,27 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
                                        ["boolean", ["feature-state", "select"], False]], 0.85, 0],
              "line-width": fw, "line-offset": off}},
     ]
-    # oneway direction arrows (on edges with no reverse twin) + line-placed street names, on top
+    # oneway direction arrows (on edges with no reverse twin) + line-placed street names, on top.
+    # Both read their cosmetics from data/style.json "config" (labels / arrows blocks), so a user
+    # roadstyle.json can restyle them without touching the library; missing keys keep the bundled
+    # defaults (a partial override dict is fine).
+    arw = {"color": "#5b5b5b", "spacing": 120, "opacity": 0.7, **(CONFIG.arrows or {})}
+    lbl = {"color": "#5b5b5b", "halo_color": None, "halo_width": 0, **(CONFIG.labels or {})}
     if arrows:
         style["layers"].append(
             {"id": "roads-arrows", "type": "symbol", "source": "roads", "minzoom": 15,
              "filter": ["!", ["to-boolean", ["get", "twoway"]]],   # one-way edge = no reverse twin
-             "layout": {"symbol-placement": "line", "icon-image": "oneway", "symbol-spacing": 120,
+             "layout": {"symbol-placement": "line", "icon-image": "oneway",
+                        "symbol-spacing": arw["spacing"],
                         "icon-rotation-alignment": "map", "icon-allow-overlap": True,
                         "icon-ignore-placement": True,
                         "icon-size": ["interpolate", ["linear"], ["zoom"], 15, 0.5, 19, 1.0]},
-             "paint": {"icon-opacity": 0.7}})
+             "paint": {"icon-opacity": arw["opacity"]}})
     if labels:
+        lpaint = {"text-color": lbl["color"]}
+        if lbl["halo_color"] and lbl["halo_width"]:
+            lpaint["text-halo-color"] = lbl["halo_color"]
+            lpaint["text-halo-width"] = lbl["halo_width"]
         style["glyphs"] = "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"
         style["layers"].append(
             {"id": "roads-labels", "type": "symbol", "source": "roads", "minzoom": 14,
@@ -829,7 +839,7 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
                         "text-font": ["Noto Sans Regular"], "symbol-spacing": 250,
                         "text-size": ["interpolate", ["linear"], ["zoom"], 14, 10, 18, 14],
                         "text-max-angle": 40, "text-padding": 2},
-             "paint": {"text-color": "#5b5b5b"}})   # matches the oneway-arrow grey; no halo
+             "paint": lpaint})
 
     # clip/area boundary outline, drawn on top of the roads (a dashed line tracing the polygon rings)
     if boundary is not None:
@@ -860,6 +870,7 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
     # after every style/filter/bounds decision above — those read the features, the browser never does
     gz = _compress_sources(style) if compress else {}
     html = (_HTML.replace("__TITLE__", _html.escape(name))
+            .replace("__ARROW_COLOR__", str(arw["color"]))
             .replace("__STYLE__", json.dumps(style))
             .replace("__BASEMAPS__", json.dumps(bms))
             .replace("__FILTER__", json.dumps(flt))

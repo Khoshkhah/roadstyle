@@ -264,3 +264,22 @@ def test_twoway_requires_a_reverse_twin_not_just_shared_endpoints():
     style = _style(render_edges(g, backend="web").html)
     tw = [f["properties"]["twoway"] for f in style["sources"]["roads"]["data"]["features"]]
     assert tw == [False, False, True, True]
+
+
+def test_web_labels_and_arrows_read_style_config(monkeypatch):
+    """Label paint and arrow cosmetics come from StyleConfig (data/style.json "config" +
+    roadstyle.json overrides), not hardcoded paint — a partial override dict keeps the rest."""
+    import dataclasses
+    import roadstyle.render_web as rw
+
+    cfg = dataclasses.replace(rw.CONFIG,
+                              labels={"color": "#ff0000", "halo_color": "#000000", "halo_width": 2},
+                              arrows={"color": "#123456", "spacing": 60, "opacity": 0.5})
+    monkeypatch.setattr(rw, "CONFIG", cfg)
+    wm = render_edges(_edges(), backend="web", arrows=True, labels=True)
+    style = _style(wm.html)
+    paint = next(l for l in style["layers"] if l["id"] == "roads-labels")["paint"]
+    assert paint == {"text-color": "#ff0000", "text-halo-color": "#000000", "text-halo-width": 2}
+    arrow = next(l for l in style["layers"] if l["id"] == "roads-arrows")
+    assert arrow["layout"]["symbol-spacing"] == 60 and arrow["paint"]["icon-opacity"] == 0.5
+    assert 'fill="#123456"' in wm.html               # the chevron SVG itself is retinted

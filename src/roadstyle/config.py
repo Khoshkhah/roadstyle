@@ -43,6 +43,12 @@ class StyleConfig:
     minor_no_casing: frozenset[str] = field(default_factory=lambda: _MINOR_NO_CASING)
     #: class -> zoom below which it is hidden. Consulted only when the caller opts in.
     minzoom: dict = field(default_factory=dict)
+    #: street-name label paint (web backend): color, halo_color, halo_width (0/None = no halo)
+    labels: dict = field(default_factory=lambda: {"color": "#5b5b5b", "halo_color": None,
+                                                 "halo_width": 0})
+    #: oneway-arrow chevrons (web backend): color, spacing (px along the line), opacity
+    arrows: dict = field(default_factory=lambda: {"color": "#5b5b5b", "spacing": 120,
+                                                  "opacity": 0.7})
 
 
 def _default_config() -> StyleConfig:

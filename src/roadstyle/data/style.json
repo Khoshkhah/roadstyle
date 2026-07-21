@@ -1,47 +1,57 @@
 {
- "config": {
-  "fill_opacity": 0.9,
-  "casing_opacity": 0.75,
-  "casing_extra": 2.0,
-  "link_scale": 0.7,
-  "tunnel_opacity_scale": 0.45,
-  "bridge_casing_extra": 1.5,
-  "minor_no_casing": [
-   "cycleway",
-   "footway",
-   "living_street",
-   "path",
-   "pedestrian",
-   "service",
-   "track"
-  ],
-  "minzoom": {
-   "motorway": 4,
-   "motorway_link": 11,
-   "trunk": 5,
-   "trunk_link": 11,
-   "primary": 7,
-   "primary_link": 11,
-   "secondary": 9,
-   "secondary_link": 12,
-   "tertiary": 11,
-   "tertiary_link": 12,
-   "residential": 13,
-   "unclassified": 13,
-   "living_street": 14,
-   "service": 15,
-   "track": 14,
-   "cycleway": 14,
-   "footway": 15,
-   "path": 15,
-   "pedestrian": 14
+  "config": {
+    "fill_opacity": 0.9,
+    "casing_opacity": 0.75,
+    "casing_extra": 2.0,
+    "link_scale": 0.7,
+    "tunnel_opacity_scale": 0.45,
+    "bridge_casing_extra": 1.5,
+    "minor_no_casing": [
+      "cycleway",
+      "footway",
+      "living_street",
+      "path",
+      "pedestrian",
+      "service",
+      "track"
+    ],
+    "minzoom": {
+      "motorway": 4,
+      "motorway_link": 11,
+      "trunk": 5,
+      "trunk_link": 11,
+      "primary": 7,
+      "primary_link": 11,
+      "secondary": 9,
+      "secondary_link": 12,
+      "tertiary": 11,
+      "tertiary_link": 12,
+      "residential": 13,
+      "unclassified": 13,
+      "living_street": 14,
+      "service": 15,
+      "track": 14,
+      "cycleway": 14,
+      "footway": 15,
+      "path": 15,
+      "pedestrian": 14
+    },
+    "labels": {
+      "color": "#5b5b5b",
+      "halo_color": null,
+      "halo_width": 0
+    },
+    "arrows": {
+      "color": "#5b5b5b",
+      "spacing": 120,
+      "opacity": 0.7
+    }
+  },
+  "selection": {
+    "core": "#EE00FF",
+    "casing_light": "#220033",
+    "casing_dark": "#000000",
+    "glow": "#D000FF",
+    "glow_opacity": 0.35
   }
- },
- "selection": {
-  "core": "#EE00FF",
-  "casing_light": "#220033",
-  "casing_dark": "#000000",
-  "glow": "#D000FF",
-  "glow_opacity": 0.35
- }
 }
