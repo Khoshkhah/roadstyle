@@ -65,8 +65,13 @@ def test_web_no_color_options_is_unchanged():
 
 def test_web_arrows_and_labels_layers_present():
     wm = render_edges(_edges(), backend="web", arrows=True, labels=True)
-    ids = [layer["id"] for layer in _style(wm.html)["layers"]]
+    style = _style(wm.html)
+    ids = [layer["id"] for layer in style["layers"]]
     assert "roads-arrows" in ids and "roads-labels" in ids
+    # Kaveh's standing default: label text matches the oneway-arrow grey, and NO halo
+    paint = next(l for l in style["layers"] if l["id"] == "roads-labels")["paint"]
+    assert paint["text-color"] == "#5b5b5b"
+    assert "text-halo-color" not in paint and "text-halo-width" not in paint
 
 
 def _zone():

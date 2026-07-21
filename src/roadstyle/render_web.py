@@ -829,7 +829,7 @@ def render(gdf, palette: str = "highsat", theme: str = "light", highway_col: str
                         "text-font": ["Noto Sans Regular"], "symbol-spacing": 250,
                         "text-size": ["interpolate", ["linear"], ["zoom"], 14, 10, 18, 14],
                         "text-max-angle": 40, "text-padding": 2},
-             "paint": {"text-color": "#33332e", "text-halo-color": "#ffffff", "text-halo-width": 1.2}})
+             "paint": {"text-color": "#5b5b5b"}})   # matches the oneway-arrow grey; no halo
 
     # clip/area boundary outline, drawn on top of the roads (a dashed line tracing the polygon rings)
     if boundary is not None:
