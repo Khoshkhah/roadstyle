@@ -243,3 +243,19 @@ def test_web_round_caps_seal_edge_connections():
     lay = {l["id"]: l for l in style["layers"]}
     assert lay["roads-fill"]["layout"]["line-cap"] == "round"
     assert lay["roads-casing"]["layout"]["line-cap"] == "round"
+
+
+def test_twoway_requires_a_reverse_twin_not_just_shared_endpoints():
+    """Two same-direction edges between one node pair (a street split into parallel one-way
+    carriageways, e.g. Brännkyrkagatan) must NOT read as a two-way pair — that suppressed their
+    arrows. Only a genuine end->start twin fans into lanes."""
+    a, b = (18.063, 59.3195), (18.065, 59.3198)
+    g = gpd.GeoDataFrame({"highway": ["residential"] * 4},
+                         geometry=[LineString([a, (18.064, 59.3199), b]),   # A->B, northern split
+                                   LineString([a, (18.064, 59.3194), b]),   # A->B, southern split
+                                   LineString([b, (18.066, 59.3202)]),      # B->C
+                                   LineString([(18.066, 59.3202), b])],     # C->B (real twin)
+                         crs=4326)
+    style = _style(render_edges(g, backend="web").html)
+    tw = [f["properties"]["twoway"] for f in style["sources"]["roads"]["data"]["features"]]
+    assert tw == [False, False, True, True]

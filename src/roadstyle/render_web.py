@@ -154,8 +154,10 @@ def _offset_expr(col, offset_frac=0.28, offset_zoom=15):
 
 
 def _mark_twoway(geo):
-    """Flag each edge that has a reverse-geometry twin (i.e. a two-way street's other direction),
-    so the style fans those into two lanes. Endpoints only — robust to vertex order."""
+    """Flag each edge that has a reverse twin (i.e. a two-way street's other direction), so the
+    style fans those into two lanes and drops the one-way arrows. The match is DIRECTED — the twin
+    must run end->start. Two same-direction edges between one node pair (a street split into
+    parallel one-way carriageways) are siblings, not a pair: each keeps its arrows."""
     cnt, keys = collections.Counter(), []
     for ft in geo["features"]:
         g = ft.get("geometry") or {}
@@ -163,13 +165,16 @@ def _mark_twoway(geo):
         if g.get("type") == "LineString" and len(c) >= 2:
             a = (round(c[0][0], 6), round(c[0][1], 6))
             z = (round(c[-1][0], 6), round(c[-1][1], 6))
-            k = (a, z) if a <= z else (z, a)
+            k = (a, z)
         else:
-            k = id(ft)
+            k = (id(ft), None)
         keys.append(k)
         cnt[k] += 1
     for ft, k in zip(geo["features"], keys):
-        ft.setdefault("properties", {})["twoway"] = cnt[k] >= 2
+        rev = (k[1], k[0])
+        n = cnt.get(rev, 0)
+        # a loop edge (start == end) is its own reverse key; it needs a second feature to pair up
+        ft.setdefault("properties", {})["twoway"] = n >= 2 if rev == k else n >= 1
 
 
 def _truthy(v):
