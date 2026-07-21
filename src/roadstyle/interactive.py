@@ -54,7 +54,7 @@ _TEMPLATE = Template("""
   function styleFill(f){
     var p=f.properties;
     return {color:p.__rs_fill, weight:p.__rs_w, opacity: on(f)?p.__rs_op:0,
-            dashArray:p.__rs_dash, lineCap:'round', lineJoin:'round', interactive:on(f)};
+            dashArray:p.__rs_dash, lineCap:'butt', lineJoin:'round', interactive:on(f)};
   }
   function styleCasing(f){
     // Casing is theme-driven (baked __rs_casing), consistent with the web backend — it does not
@@ -62,7 +62,7 @@ _TEMPLATE = Template("""
     var p=f.properties, c = p.__rs_casing;
     if(c==null || !(p.__rs_cw>0)) return {opacity:0, weight:0};
     return {color:c, weight:p.__rs_cw, opacity: on(f)?p.__rs_cop:0,
-            lineCap:'round', lineJoin:'round'};
+            lineCap:'butt', lineJoin:'round'};
   }
 
   // ── click-to-copy a field (default edge_id) to the clipboard ────────────────
