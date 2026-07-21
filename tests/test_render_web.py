@@ -42,6 +42,19 @@ def test_web_color_options_bake_variants_and_wire_recolour():
     assert '"AADT"' in wm.html and '"prop": "__rs_fill__1"' in wm.html
 
 
+def test_web_color_option_missing_self_keeps_nan_color():
+    g = _edges()
+    g.loc[2, "aadt"] = None                       # a NaN in the numeric option's column
+    base = {"Class": {}, "AADT": {"color_by": "aadt", "cmap": "viridis"}}
+    inherit = _style(render_edges(g, backend="web", palette="mono", color_options=base).html)
+    p_i = inherit["sources"]["roads"]["data"]["features"][2]["properties"]
+    assert p_i["__rs_fill__1"] == p_i["__rs_fill"]      # default: NaN inherits the base fill
+    base["AADT"]["missing"] = "self"
+    own = _style(render_edges(g, backend="web", palette="mono", color_options=base).html)
+    p_s = own["sources"]["roads"]["data"]["features"][2]["properties"]
+    assert p_s["__rs_fill__1"] == "#cccccc"             # "self": NaN keeps the styler's nan_color
+
+
 def test_web_no_color_options_is_unchanged():
     wm = render_edges(_edges(), backend="web")
     style = _style(wm.html)

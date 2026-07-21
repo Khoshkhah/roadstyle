@@ -185,6 +185,8 @@ class CategoricalStyler:
     column: str = ""
     colors: Mapping[str, str] = field(default_factory=dict)
     fallback_color: str = "#cccccc"
+    missing: str = "base"              # unmapped edges as a colour OPTION: "base" = the base option's
+                                       # fill; "self" = this fallback_color (for loud base palettes)
     width: float | str = 2.0           # constant px, or a column name to read width from
     casing: str | None = None          # constant casing colour, or None for no casing
     casing_width: float = 0.0
@@ -226,6 +228,7 @@ class CategoricalStyler:
         # flag unmapped / missing values (got fallback_color) so colour options can fall back
         cmap_keys = {_keystr(k) for k in self.colors}
         rf.missing = [_keystr(v) not in cmap_keys for v in values]
+        rf.missing_mode = self.missing
         return rf
 
 
@@ -250,6 +253,9 @@ class NumericStyler:
     casing_opacity: float = 0.75
     nan_color: str = "#cccccc"
     theme_aware_casing: bool = False
+    missing: str = "base"              # what NaN edges wear as a colour OPTION: "base" = the base
+                                       # option's fill (neutral-base maps); "self" = this nan_color —
+                                       # use when the base palette is loud and would fake a data value
 
     def resolve_frame(self, gdf, theme: str | Theme = "dark") -> ResolvedFrame:
         from .colors import ColorRamp
@@ -291,6 +297,7 @@ class NumericStyler:
         rf.legend = {"kind": "continuous", "title": self.column,
                      "vmin": vmin, "vmax": vmax, "ramp": ramp.stops(9)}
         rf.missing = [v is None for v in nums]   # NaN / non-numeric — colour options fall back
+        rf.missing_mode = self.missing
         return rf
 
 
@@ -380,7 +387,10 @@ def bake_color_options(gj: dict, frames, dark: bool):
     other option bakes *only* its fill, under ``__rs_fill__<i>`` — and where that option has **no
     colour for an edge** (missing/NaN/unmapped data, flagged by :attr:`ResolvedFrame.missing`), the
     edge falls back to the **base option's fill**, so blank edges keep the neutral base look (e.g.
-    the ``mono`` palette colour for that road class) instead of a flat grey.
+    the ``mono`` palette colour for that road class) instead of a flat grey. That fallback assumes a
+    *neutral* base: when the base is itself a loud data ramp, inheriting it would fake a data value,
+    so an option may set ``missing="self"`` (Categorical/NumericStyler) to keep its own
+    nan/fallback colour instead.
 
     Returns ``(gj, options_meta)`` where each meta entry is ``{name, prop, legend}`` — the contract
     the browser reads to build the "Colour by" picker and to swap fills client-side.
@@ -394,6 +404,8 @@ def bake_color_options(gj: dict, frames, dark: bool):
         prop = "__rs_fill" if idx == 0 else f"__rs_fill__{idx}"
         if idx != 0:
             fills, miss = frame.fill, frame.missing
+            if getattr(frame, "missing_mode", "base") == "self":
+                miss = None                      # keep the styler's own nan/fallback colour
             for i, feat in enumerate(feats):
                 f = base_fill[i] if (miss is not None and miss[i]) else fills[i]
                 feat.setdefault("properties", {})[prop] = f
@@ -435,6 +447,7 @@ def option_styler(highway_col: str, base_palette: str, opts) -> Styler:
         vmin=opts.get("vmin"),
         vmax=opts.get("vmax"),
         width_by=opts.get("width_by"),
+        missing=opts.get("missing"),
     )
 
 
@@ -452,6 +465,7 @@ def build_styler(
     tunnel_col: str | None = None,
     bridge_col: str | None = None,
     config=None,
+    missing: str | None = None,
 ) -> Styler:
     """Pick the right styler from ``render_edges`` keyword arguments.
 
@@ -468,9 +482,10 @@ def build_styler(
         if isinstance(colors, str) and colors == "self":
             return ColorTableStyler(color_column=color_by, highway_col=highway_col, palette=palette)
         if colors is not None:
-            return CategoricalStyler(column=color_by, colors=colors)
-        return NumericStyler(column=color_by, cmap=cmap or "viridis",
-                             vmin=vmin, vmax=vmax, width_by=width_by)
+            return CategoricalStyler(column=color_by, colors=colors,
+                                     **({"missing": missing} if missing else {}))
+        return NumericStyler(column=color_by, cmap=cmap or "viridis", vmin=vmin, vmax=vmax,
+                             width_by=width_by, **({"missing": missing} if missing else {}))
     extra = {}
     if config is not None:
         extra["config"] = config
