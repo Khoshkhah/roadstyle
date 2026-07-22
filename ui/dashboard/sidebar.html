@@ -4,6 +4,7 @@
      piece is safe to rip out, restyle, or extend. Build with:  python build.py  -->
 <style>
 #map{right:320px}
+.co-ctrl{display:none}  /* the sidebar owns the Colour-by select; hide the built-in one */
 #sb{position:fixed;top:0;right:0;bottom:0;width:320px;box-sizing:border-box;overflow:auto;
   background:#fff;border-left:1px solid #ddd;padding:14px;font:13px system-ui,sans-serif}
 #sb h2{margin:0 0 10px;font-size:15px}
@@ -27,6 +28,9 @@
 
   <label>Base map</label>
   <select id="bm"></select>
+
+  <label>Colour by</label>
+  <select id="co"></select>
 
   <label>Query — a WHERE clause over your columns (JS)</label>
   <input id="q" value="p.maxspeed_kmh >= 50" spellcheck="false">
@@ -56,6 +60,15 @@ const bsel = document.getElementById("bm");
 RS_BASEMAPS.forEach(b => bsel.add(new Option(b.label, b.key)));
 bsel.onchange = () => rsSetBasemap(bsel.value);
 document.addEventListener("rs:basemapchange", e => { bsel.value = e.detail.basemap; });
+
+// colour-by select: the options were baked by render_edges(color_options=...) in build.py;
+// RS_COLOR_OPTIONS lists them and rsSetColorField switches (the legend follows by itself)
+const cosel = document.getElementById("co");
+RS_COLOR_OPTIONS.forEach((o, i) => cosel.add(new Option(o.name, i)));
+if (!RS_COLOR_OPTIONS.length){ cosel.add(new Option("(none baked)", "")); cosel.disabled = true; }
+cosel.onchange = () => rsSetColorField(+cosel.value);
+document.addEventListener("rs:colorchange", e => {
+  if (e.detail.index != null) cosel.value = String(e.detail.index); });
 
 function runQuery(){
   let fn;

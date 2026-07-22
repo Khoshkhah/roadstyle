@@ -31,8 +31,13 @@ def main() -> None:
     # entries addressable for the sidebar's own select (rsSetBasemap). view_3d bakes the
     # extruded bridge decks (needs a `bridge` column) and opens tilted; the sidebar's 2D/3D
     # button (rsSetView3D) switches views.
+    # color_options are BAKED here (Python precomputes each option's per-edge colours);
+    # the sidebar's "Colour by" select just switches between them. Adjust to your columns.
     m = rs.render_edges(edges, backend="web", basemap="voyager", view_3d=True,
                         basemaps=["voyager", "positron", "dark_matter", "satellite", "blank"],
+                        color_options={"Class": {},
+                                       "Speed": {"color_by": "maxspeed_kmh", "cmap": "plasma"},
+                                       "Lanes": {"color_by": "lanes", "cmap": "viridis"}},
                         basemap_switcher=False, filter_control=False, road_popup=False,
                         name="Roads dashboard")
     ui = (HERE / "sidebar.html").read_text()
