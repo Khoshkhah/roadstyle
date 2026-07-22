@@ -6,7 +6,7 @@ import pytest
 
 from roadstyle.cli import main
 
-SAMPLE = Path(__file__).resolve().parent.parent / "notebooks" / "data" / "sundbyberg_edges.gpkg"
+SAMPLE = Path(__file__).resolve().parent.parent / "notebooks" / "data" / "sodermalm_edges.gpkg"
 
 pytestmark = pytest.mark.skipif(not SAMPLE.exists(), reason="sample gpkg not present")
 

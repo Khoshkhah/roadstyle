@@ -30,7 +30,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 
 # 1. data — the repo's example edges + seeded AADT/speed so the ramps look real
-g = gpd.read_file(REPO / "notebooks" / "data" / "sundbyberg_edges.gpkg")
+g = gpd.read_file(REPO / "notebooks" / "data" / "sodermalm_edges.gpkg")
 random.seed(7)
 g["aadt"] = [random.randint(200, 24000) for _ in range(len(g))]
 g["speed_kph"] = [random.choice([30, 40, 50, 60, 70]) for _ in range(len(g))]

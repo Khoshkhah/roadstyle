@@ -7,7 +7,7 @@ called `edges` (any road dataset with line geometry and a road-class column work
 
 !!! tip "How to follow along"
     Install with `pip install -e ".[numeric,basemaps]"` and load any road dataset. The notebooks
-    ship a sample (`notebooks/data/sundbyberg_edges.gpkg`, ~4,000 real edges); to reproduce a step
+    ship a sample (`notebooks/data/sodermalm_edges.gpkg`, ~4,600 real edges); to reproduce a step
     exactly, open the matching notebook listed under each section.
 
 ---

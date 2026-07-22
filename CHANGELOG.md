@@ -6,6 +6,26 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased] — 0.2.0.dev1
 
+### Added (2026-07 wave)
+- **One settings file** for every styling default (`data/defaults.json`) with the override
+  ladder: `~/.config/roadstyle/roadstyle.json` → `./roadstyle.json` → `$ROADSTYLE_CONFIG` →
+  `rs.use_settings(...)` → per-call `render_edges(..., settings=...)`. The theme system was
+  removed (single light-grey casing; black on bridges; primary base map is a setting).
+- **JavaScript API**: `window.rsSetBasemap/rsSetClasses/rsSetColorField/rsSetOverlay/
+  rsSetView3D/rsSelect/rsDeselect` — every in-map control scriptable and event-emitting
+  (`rs:*` CustomEvents) — plus **id-set queries**: `rsQuery(predicate[, layer])` returns ids;
+  `rsFilter/rsColor/rsHighlight/rsGetProps/rsFocus` act on the set, on roads or any overlay.
+- **UI templates** (`ui/`): the sidebar dashboard (query box with SQL-style syntax, verb
+  buttons, clickable results table → select + fly-to, detail panel, base-map/colour-by selects).
+- **3D bridges**: ramped extruded decks with whole-structure hover/select, black side-strip
+  casing (`bridge_decks.casing_px`), width trimmed by `bridge_decks.width_scale`, and a 2D LOD —
+  flat cased lines below `bridge_decks.flat_below` (default 16) so bridges stay road-width and
+  visible at overview zooms.
+- **Tile-less base maps** `blank` / `blank_dark` (plain background colour; saved maps make zero
+  network requests); `from_duckosm()`; `rs.snapshot()` (headless-browser PNGs); annotation
+  slots (alternating names/arrows); `minzoom` class hiding; scale bar + zoom read-out;
+  `road_popup="panel"`; overlay styling defaults in settings; compress; the docs gallery.
+
 Goal: generalize roadstyle from an OSM-only tool into a reusable, data-driven road-map
 styling library that can also be embedded in a website. The existing OSM styling stays
 byte-for-byte unchanged; everything new is additive.

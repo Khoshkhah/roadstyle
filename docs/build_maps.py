@@ -6,7 +6,7 @@ Run from the repo root::
 
 These are committed so the GitHub Pages build (which does **not** run roadstyle) can serve them.
 Each is a self-contained map the manual embeds in an ``<iframe>``. They use the bundled sample
-edges (``notebooks/data/sundbyberg_edges.gpkg``) with a couple of seeded columns so the data-driven
+edges (``notebooks/data/sodermalm_edges.gpkg``) with a couple of seeded columns so the data-driven
 demos look real.
 """
 from __future__ import annotations
@@ -23,12 +23,12 @@ REPO = Path(__file__).resolve().parent.parent
 OUT = Path(__file__).resolve().parent / "maps"
 OUT.mkdir(exist_ok=True)
 
-g = gpd.read_file(REPO / "notebooks" / "data" / "sundbyberg_edges.gpkg").to_crs(4326)
+g = gpd.read_file(REPO / "notebooks" / "data" / "sodermalm_edges.gpkg").to_crs(4326)
 random.seed(7)
 g["aadt"] = [random.randint(200, 24000) for _ in range(len(g))]
 g["speed_kph"] = [random.choice([30, 40, 50, 60, 70]) for _ in range(len(g))]
 
-# 1 — a first map: the default web backend (default theme: light + Voyager base)
+# 1 — a first map: the default web backend (Voyager base, the settings default)
 rs.render_edges(g, backend="web", name="roadstyle — first map").save(OUT / "first_map.html")
 
 # 2 — dynamic recolour: a neutral mono base + a "Colour by" picker (Class / AADT / Speed)

@@ -1,11 +1,11 @@
-"""roadstyle — OSM-theme road/edge map styling for folium & lonboard.
+"""roadstyle — OSM-style road/edge map styling; self-contained MapLibre maps (plus folium & lonboard).
 
     import geopandas as gpd
     from roadstyle import render_edges
 
     edges = gpd.read_file(...)                       # needs a `highway` column
-    render_edges(edges).save("map.html")             # default theme: light + the Voyager base
-    render_edges(edges, theme="dark",
+    render_edges(edges).save("map.html")             # web backend, Voyager base (settings default)
+    render_edges(edges, basemap="dark_matter",
                  include=["motorway", "trunk", "primary"]).save("major.html")
 """
 from .basemaps import BASEMAPS, Basemap, get_basemap, register_basemap

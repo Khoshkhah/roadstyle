@@ -23,7 +23,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 
 # roads
-g = gpd.read_file(REPO / "notebooks" / "data" / "sundbyberg_edges.gpkg").to_crs(4326)
+g = gpd.read_file(REPO / "notebooks" / "data" / "sodermalm_edges.gpkg").to_crs(4326)
 minx, miny, maxx, maxy = g.total_bounds
 
 # 1. synthetic TAZ zones — a 2x2 grid of boxes over the network extent, each with some attributes
