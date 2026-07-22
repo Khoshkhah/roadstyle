@@ -418,6 +418,24 @@ def _bridge_decks(geo, dk):
             props["__rs_edges"] = edges_s   # road feature ids of the whole chain (both twins)
             feats.append({"type": "Feature", "properties": props,
                           "geometry": {"type": "Polygon", "coordinates": [coords]}})
+            # casing slab: a ring around the deck body, topping out just below the deck top —
+            # reads as the black rim that line casing gives the 2D bridges (extrusions have no
+            # stroke). A ring (not a slab under the body) so the translucent body keeps its hue.
+            if dk.get("casing_px"):
+                ring = part.buffer(half + dk["casing_px"] * mpp, cap_style=2,
+                                   join_style=2).difference(poly)
+                geoms = ([ring] if ring.geom_type == "Polygon" else
+                         list(ring.geoms) if ring.geom_type == "MultiPolygon" else [])
+                for gp in geoms:
+                    rings = [gp.exterior.coords] + [i.coords for i in gp.interiors]
+                    cc = [[[round(x / kx + lon0, 6), round(y / 111320.0 + lat0, 6)]
+                           for x, y in r] for r in rings]
+                    feats.append({"type": "Feature", "properties": {
+                        "highway": pp.get("highway"), "__rs_chain": chain_i,
+                        "__rs_casing_slab": 1,
+                        "__rs_base": round(max(base_m * t - 0.5, 0.0), 2),
+                        "__rs_height": round(base_m * t + thick * 0.35, 2)},
+                        "geometry": {"type": "Polygon", "coordinates": cc}})
     return {"type": "FeatureCollection", "features": feats}
 
 
@@ -1382,7 +1400,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         surface, tunnel, bridge = (["all", _z, surface], ["all", _z, tunnel], ["all", _z, bridge])
     dk = {"base_m": 5.0, "thickness_m": 1.0, "ramp_m": 40.0, "step_m": 2.5,
           "match_zoom": 18.0, "opacity": 0.7, "width_scale": 0.6, "flat_below": 16.0,
-          **(CONFIG.bridge_decks or {})}
+          "casing_px": 2.0, **(CONFIG.bridge_decks or {})}
     # ONE deck geometry (width anchored at match_zoom, trimmed by width_scale). A fixed polygon
     # can't track the stylized px road widths across zooms — multi-width band variants were
     # tried and looked worse (double-deck halos / width pops), so slightly-narrow-when-zoomed-
@@ -1448,10 +1466,18 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                      "filter": [">", ["coalesce", ["get", "lvl"], 0], 0]})
                 break
         # extruded bridge decks: physical ribbons floating base_m above ground — in the tilted
-        # view you look UNDER a bridge and see the roads passing beneath it
+        # view you look UNDER a bridge and see the roads passing beneath it. The casing ring
+        # draws first (below), the body over it.
+        style["layers"].append(
+            {"id": "roads-deck-casing", "type": "fill-extrusion", "source": "decks",
+             "minzoom": _fb, "filter": ["has", "__rs_casing_slab"],
+             "paint": {"fill-extrusion-color": CONFIG.bridge_casing_color,
+                       "fill-extrusion-base": ["get", "__rs_base"],
+                       "fill-extrusion-height": ["get", "__rs_height"],
+                       "fill-extrusion-opacity": dk["opacity"]}})
         style["layers"].append(
             {"id": "roads-bridge-decks", "type": "fill-extrusion", "source": "decks",
-             "minzoom": _fb,
+             "minzoom": _fb, "filter": ["!", ["has", "__rs_casing_slab"]],
              "paint": {"fill-extrusion-color":
                            ["case", ["boolean", ["feature-state", "select"], False], select_color,
                             ["boolean", ["feature-state", "hover"], False], hover_color,

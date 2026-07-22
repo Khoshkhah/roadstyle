@@ -425,7 +425,8 @@
       "match_zoom": 18.0,
       "opacity": 0.7,
       "width_scale": 0.6,
-      "flat_below": 16.0
+      "flat_below": 16.0,
+      "casing_px": 2.0
     },
     "overlays": {
       "color": "#6aa9ff",

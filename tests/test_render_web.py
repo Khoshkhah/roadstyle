@@ -558,9 +558,14 @@ def test_deck_slices_carry_their_chain_road_ids():
     g = _edges().assign(bridge=["yes", None, None])
     wm = render_edges(g, backend="web", view_3d=True)
     style = _style(wm.html)
-    slices = style["sources"]["decks"]["data"]["features"]
+    feats = style["sources"]["decks"]["data"]["features"]
+    slices = [f for f in feats if "__rs_casing_slab" not in f["properties"]]
     assert slices and all("__rs_edges" in s["properties"] for s in slices)
     assert "0" in slices[0]["properties"]["__rs_edges"].split(",")  # edge 0 is the bridge
+    # the black casing ring: slab features + a casing-colour extrusion layer under the body
+    assert any("__rs_casing_slab" in f["properties"] for f in feats)
+    cas = next(l for l in style["layers"] if l["id"] == "roads-deck-casing")
+    assert cas["paint"]["fill-extrusion-color"] == "#000000"
 
 
 def test_query_verbs_accept_overlay_layer_arg():
