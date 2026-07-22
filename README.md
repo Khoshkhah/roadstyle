@@ -187,6 +187,31 @@ when present (and is simply skipped when absent):
 
 `rs.from_duckosm(db)` selects exactly this set from a duckOSM database.
 
+### Hover tooltip vs. click popup — what shows where
+
+Two different read-outs, configured independently:
+
+- **Click popup** (`road_popup`, web backend) — opens when you click an edge (or a 3D bridge
+  deck). **On by default** with a curated field set: `name` (bold title), `edge_id`, `edge_ref`,
+  `highway`, `lanes`, `bridge`, `tunnel`. Blank/NaN values are dropped, and `bridge`/`tunnel`
+  rows appear only when the road actually is one.
+- **Hover tooltip** (`tooltip`, every backend) — follows the mouse. **Off by default** on the web
+  backend (hover just highlights); pass a field list to enable it. On the folium backend it's on
+  by default (all columns), and clicking **pins** it + copies `edge_id` to the clipboard.
+
+```python
+render_edges(
+    edges,
+    road_popup=["name", "highway", "maxspeed_kmh", "aadt"],  # your click fields
+    tooltip=["name", "aadt"],                                # hover read-out (any backend)
+)
+render_edges(edges, road_popup="all")     # click shows every column
+render_edges(edges, road_popup=False)     # no popup (click still selects/highlights)
+```
+
+Internal `__rs_*`/`twoway`/`lvl` fields never show. Anything you select into the GeoDataFrame is
+available — the popup/tooltip read the columns of *your* data.
+
 ## All options at a glance
 
 Every keyword of `render_edges` (full reference: [`docs/parameters.md`](docs/parameters.md)):
