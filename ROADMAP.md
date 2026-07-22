@@ -20,7 +20,8 @@ what's next.
   query verbs (`rsQuery` → `rsFilter`/`rsColor`/`rsHighlight`/`rsGetProps`/`rsFocus`), on roads
   and overlays alike, with `rs:*` events throughout.
 - **UI templates** (`ui/`): copyable HTML scaffolding over the JS API — first: the sidebar
-  dashboard.
+  dashboard — plus **roadstyle studio** (`ui/studio`, Streamlit): the library behind eight
+  knobs, generating the equivalent `render_edges` code live.
 - **Tooling**: `rs.snapshot()` (headless-browser PNGs), the screenshot-verified test loop,
   the docs gallery (`docs/build_gallery.py`).
 
