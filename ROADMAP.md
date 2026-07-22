@@ -30,13 +30,15 @@ what's next.
 1. **URL hash camera state** — shareable links to an exact view (`hash: true` + a setting).
 2. **Find-street box** — search the baked `name` column → `rsSelect` + `rsFocus` (template or
    built-in control).
-3. **PyPI release** — version tag, `python -m build`, publish; then the sibling projects
-   (fetching-sweden-data, traffic_tube) can depend on a pinned release instead of an editable
-   install.
+3. **PyPI release** — prepared (version 0.2.0, tag-triggered `release.yml` via trusted
+   publishing, test CI on 3.10–3.13 + a browser smoke job). Remaining: add the trusted
+   publisher on pypi.org, push the `v0.2.0` tag; then the sibling projects
+   (fetching-sweden-data, traffic_tube) can depend on a pinned release.
 4. **Traffic integration demo** — a dashboard fed by the matched Stockholm flow data
    (`color_options` = flow/speed, queries over flow, sensor overlays). The real end-to-end test
    of the whole stack.
-5. **mkdocs site deploy** — publish `docs/` to gh-pages via a `build-site` script.
+5. ~~mkdocs site deploy~~ — done: `.github/workflows/docs.yml` publishes to GitHub Pages on
+   every docs change.
 
 Speculative / parked: a deck.gl hybrid for richer 3D, vector-tile output for city-scale data,
 generalizing the engine to full base maps (that's the **mapstyle** project's job).
