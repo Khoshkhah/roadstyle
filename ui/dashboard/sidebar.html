@@ -33,7 +33,10 @@
   <div style="margin-top:6px">
     <button onclick="runQuery()"><b>Run</b></button>
     <button onclick="rsFilter(IDS)">Filter</button>
-    <button onclick="rsColor(IDS, '#ff00aa')">Colour</button>
+    <button onclick="rsColor(IDS, document.getElementById('col').value)">Colour</button>
+    <input type="color" id="col" value="#ff00aa" title="colour for the query set"
+      style="width:26px;height:26px;padding:1px;border:1px solid #ccc;border-radius:4px;
+      vertical-align:middle;cursor:pointer">
     <button onclick="rsHighlight(IDS)">Highlight</button>
     <button onclick="resetAll()">Reset</button>
     <button onclick="rsSetView3D(map.getPitch() < 5)">2D/3D</button>
