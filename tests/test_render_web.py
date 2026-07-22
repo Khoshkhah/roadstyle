@@ -353,10 +353,13 @@ def test_web_3d_bridge_decks():
     assert "roads-bridge-casing" not in ids and "roads-bridge-fill" not in ids
     deck = next(l for l in td["layers"] if l["id"] == "roads-bridge-decks")
     assert deck["type"] == "fill-extrusion"
-    assert deck["paint"]["fill-extrusion-base"] == ["get", "base"]
+    assert deck["paint"]["fill-extrusion-base"] == ["get", "__rs_base"]
+    assert td["sources"]["decks"].get("generateId") is True     # hover/select feature-state
     slices = td["sources"]["decks"]["data"]["features"]
     assert all(f["geometry"]["type"] == "Polygon" for f in slices)
-    bases = [f["properties"]["base"] for f in slices]
+    # popup parity: slices carry the full edge properties, not just fills
+    assert "maxspeed_kmh" in slices[0]["properties"] or "aadt" in slices[0]["properties"]
+    bases = [f["properties"]["__rs_base"] for f in slices]
     # the deck RAMPS: grounded at the ends (connects to the road), full height mid-span
     assert min(bases) < 1.0 and max(bases) == 5.0
     flat = _style(render_edges(g, backend="web").html)
@@ -382,9 +385,9 @@ def test_web_bridge_forks_stay_elevated():
     import collections
     ends = collections.defaultdict(list)
     for f in slices:
-        ends[f["properties"]["base"]].append(f)
+        ends[f["properties"]["__rs_base"]].append(f)
     assert 5.0 in ends                       # plateaus exist
-    grounded = [f for f in slices if f["properties"]["base"] < 0.5]
+    grounded = [f for f in slices if f["properties"]["__rs_base"] < 0.5]
     assert grounded                          # the true ends still ramp to ground
     # no slice adjacent to the fork node is grounded: check min distance of grounded slices to B
     bx, by = 18.01, 59.305

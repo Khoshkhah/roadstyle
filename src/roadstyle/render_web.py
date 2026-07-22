@@ -392,10 +392,9 @@ def _bridge_decks(geo, dk):
             #                                           deck body -> reads as a continuous ramp
             coords = [[round(x / kx + lon0, 6), round(y / 111320.0 + lat0, 6)]
                       for x, y in poly.exterior.coords]
-            props = {k2: v for k2, v in pp.items()
-                     if k2.startswith("__rs_fill") or k2 in ("highway", "name")}
-            props["base"] = round(base_m * t, 2)
-            props["height"] = round(base_m * t + thick, 2)
+            props = dict(pp)
+            props["__rs_base"] = round(base_m * t, 2)
+            props["__rs_height"] = round(base_m * t + thick, 2)
             feats.append({"type": "Feature", "properties": props,
                           "geometry": {"type": "Polygon", "coordinates": [coords]}})
     return {"type": "FeatureCollection", "features": feats}
@@ -753,7 +752,9 @@ function rsSetColorField(nameOrIdx){
     map.setPaintProperty(id,"line-color",["coalesce",["get",o.prop],"#888888"]); });
   if(map.getLayer("roads-bridge-decks"))
     map.setPaintProperty("roads-bridge-decks","fill-extrusion-color",
-                         ["coalesce",["get",o.prop],"#888888"]);
+      ["case",["boolean",["feature-state","select"],false],__SELECT_COLOR__,
+       ["boolean",["feature-state","hover"],false],__HOVER_COLOR__,
+       ["coalesce",["get",o.prop],"#888888"]]);
   const sel=document.getElementById("co-select"); if(sel) sel.value=String(idx);
   coUpdateLegend();
   document.dispatchEvent(new CustomEvent("rs:colorchange",{detail:{option:o,index:idx}}));
@@ -859,7 +860,8 @@ const PICK_LAYERS = ["roads-fill","roads-tunnel-fill","roads-bridge-fill","roads
 function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id));
   const l = ids.length ? map.queryRenderedFeatures(box(p), {layers:ids}) : [];
   return l.length ? l[0] : null; }
-function setS(id, st){ if(id!=null) map.setFeatureState({source:"roads", id:id}, st); }
+function srcOf(f){ return f && f.layer && f.layer.id === "roads-bridge-decks" ? "decks" : "roads"; }
+function setS(h, st){ if(h && h.id!=null) map.setFeatureState({source:h.s, id:h.id}, st); }
 let _hov=null, _pt=null, _raf=0;
 function _rfields(p, only){ const r=[];
   if(p.name!=null && (""+p.name)!=="" && (""+p.name).toLowerCase()!=="nan") r.push("<b>"+p.name+"</b>");  // name on top, bold, no label
@@ -875,8 +877,9 @@ const _tip = _ttip ? new maplibregl.Popup(
   {closeButton:false, closeOnClick:false, maxWidth:"260px", offset:10, className:"rs-tip"}) : null;
 function hoverFrame(){ _raf=0; if(!_pt) return;
   const f = pick(_pt); map.getCanvas().style.cursor = f ? "pointer" : "";
-  const id = f ? f.id : null;
-  if(id !== _hov){ setS(_hov,{hover:false}); _hov=id; setS(_hov,{hover:true}); }
+  const h = (f && f.id!=null) ? {s:srcOf(f), id:f.id} : null;
+  if(!_hov || !h || h.s!==_hov.s || h.id!==_hov.id){
+    setS(_hov,{hover:false}); _hov=h; setS(_hov,{hover:true}); }
   if(_tip){ if(f){ _tip.setLngLat(map.unproject(_pt)).setHTML(_rfields(f.properties||{}, _ttipOnly));
       if(!_tip.isOpen()) _tip.addTo(map); } else if(_tip.isOpen()) _tip.remove(); }
 }
@@ -884,11 +887,12 @@ map.on("mousemove", e=>{ _pt=e.point; if(!_raf) _raf=requestAnimationFrame(hover
 map.on("mouseout", ()=>{ _pt=null; if(_raf){cancelAnimationFrame(_raf);_raf=0;} setS(_hov,{hover:false}); _hov=null; if(_tip) _tip.remove(); });
 let _sel=null;
 map.on("click", e=>{
-  if(handleOverlayClick(e)){ if(_sel!=null){ setS(_sel,{select:false}); _sel=null; } return; }  // visible "over" overlay (front) wins
+  if(handleOverlayClick(e)){ if(_sel){ setS(_sel,{select:false}); _sel=null; } return; }  // visible "over" overlay (front) wins
   const f = pick(e.point);
-  if(!f){ if(_sel!=null){ setS(_sel,{select:false}); _sel=null; } return; }   // click empty -> deselect (restore colour)
+  if(!f){ if(_sel){ setS(_sel,{select:false}); _sel=null; } return; }   // click empty -> deselect (restore colour)
   clearOvSel();
-  if(_sel!=null) setS(_sel,{select:false}); _sel=f.id; setS(_sel,{select:true});
+  if(_sel) setS(_sel,{select:false});
+  _sel = (f.id!=null) ? {s:srcOf(f), id:f.id} : null; setS(_sel,{select:true});
   if(__ROAD_POPUP__){
     new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
       .setLngLat(e.lngLat).setHTML(_rfields(f.properties||{}, _popupFields)).addTo(map);
@@ -1067,10 +1071,10 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         _z = _minzoom_filter(highway_col, mz)
         surface, tunnel, bridge = (["all", _z, surface], ["all", _z, tunnel], ["all", _z, bridge])
     dk = {"base_m": 5.0, "thickness_m": 1.0, "ramp_m": 40.0, "step_m": 2.5,
-          "match_zoom": 16.0, **(CONFIG.bridge_decks or {})}
+          "match_zoom": 17.0, **(CONFIG.bridge_decks or {})}
     decks = _bridge_decks(geo, dk) if view_3d else {"features": []}
     if decks["features"]:
-        style["sources"]["decks"] = {"type": "geojson", "data": decks}
+        style["sources"]["decks"] = {"type": "geojson", "data": decks, "generateId": True}
     cw = _width_expr(highway_col, casing=True, **sw)      # casing width expr (reused across layers)
     fw = _width_expr(highway_col, **sw)                   # fill width expr
     bcw = _width_expr(highway_col, casing=True, scale=1.25, **sw)   # heavier bridge casing ("wings")
@@ -1116,9 +1120,12 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         # view you look UNDER a bridge and see the roads passing beneath it
         style["layers"].append(
             {"id": "roads-bridge-decks", "type": "fill-extrusion", "source": "decks",
-             "paint": {"fill-extrusion-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
-                       "fill-extrusion-base": ["get", "base"],
-                       "fill-extrusion-height": ["get", "height"],
+             "paint": {"fill-extrusion-color":
+                           ["case", ["boolean", ["feature-state", "select"], False], select_color,
+                            ["boolean", ["feature-state", "hover"], False], hover_color,
+                            ["coalesce", ["get", "__rs_fill"], "#888888"]],
+                       "fill-extrusion-base": ["get", "__rs_base"],
+                       "fill-extrusion-height": ["get", "__rs_height"],
                        "fill-extrusion-opacity": 0.95}})
 
     # oneway direction arrows (on edges with no reverse twin) + line-placed street names, on top.
@@ -1205,6 +1212,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__FILTER__", json.dumps(flt))
             .replace("__CENTER__", json.dumps([(minx + maxx) / 2, (miny + maxy) / 2]))
             .replace("__PITCH3D__", json.dumps(cam["pitch_3d"]))
+            .replace("__HOVER_COLOR__", json.dumps(hover_color))
+            .replace("__SELECT_COLOR__", json.dumps(select_color))
             .replace("__PITCH__", json.dumps(cam["pitch"]))
             .replace("__BEARING__", json.dumps(cam["bearing"]))
             .replace("__BOUNDS__", json.dumps([[minx, miny], [maxx, maxy]]))
