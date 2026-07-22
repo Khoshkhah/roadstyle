@@ -303,3 +303,13 @@ def test_web_bridge_casing_is_config_colour():
     style = _style(render_edges(_edges(), backend="web").html)
     bc = next(l for l in style["layers"] if l["id"] == "roads-bridge-casing")
     assert bc["paint"]["line-color"] == "#000000"
+
+
+def test_webmap_notebook_repr_is_slim_but_saved_file_is_offline():
+    """The inline notebook preview swaps MapLibre for CDN tags (output-size limits in notebook
+    frontends were silently blanking the map); .html / .save keep the vendored copy inlined."""
+    wm = render_edges(_edges(), backend="web")
+    r = wm._repr_html_()
+    assert "cdn.jsdelivr.net/npm/maplibre-gl" in r
+    assert len(r) < len(wm.html)                      # the 800 KB vendored blob stays out
+    assert "__MAPLIBRE_JS__" not in wm.html and "cdn.jsdelivr" not in wm.html

@@ -714,12 +714,24 @@ window.map = map;
 </script></body></html>"""
 
 
+_MAPLIBRE_CDN = "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist"   # == the vendored version
+
+
 class WebMap:
-    """A self-contained MapLibre HTML map. ``.save(path)`` writes the file; displays inline in a
-    notebook (as an iframe). No web server needed — the data is inlined."""
+    """A self-contained MapLibre HTML map. ``.save(path)`` / ``.html`` inline the vendored
+    MapLibre (the file opens offline, no CDN); the notebook display swaps in CDN tags instead —
+    an inline output must stay small enough for notebook frontends' output limits, and the
+    preview needs the network for its basemap tiles anyway."""
 
     def __init__(self, html: str):
-        self.html = html
+        self._tpl = html                     # full page, MapLibre still a placeholder
+
+    @property
+    def html(self) -> str:
+        """The complete self-contained page (vendored MapLibre inlined)."""
+        return (self._tpl
+                .replace("__MAPLIBRE_CSS__", _asset("maplibre-gl.css"))
+                .replace("__MAPLIBRE_JS__", _asset("maplibre-gl.js").replace("</script>", "<\\/script>")))
 
     def save(self, path):
         from pathlib import Path
@@ -727,7 +739,12 @@ class WebMap:
         return path
 
     def _repr_html_(self):
-        return (f'<iframe srcdoc="{_html.escape(self.html, quote=True)}" '
+        slim = (self._tpl
+                .replace("<style>__MAPLIBRE_CSS__</style>",
+                         f'<link rel="stylesheet" href="{_MAPLIBRE_CDN}/maplibre-gl.css"/>')
+                .replace("<script>__MAPLIBRE_JS__</script>",
+                         f'<script src="{_MAPLIBRE_CDN}/maplibre-gl.js"></script>'))
+        return (f'<iframe srcdoc="{_html.escape(slim, quote=True)}" '
                 'style="width:100%;height:640px;border:0;border-radius:6px"></iframe>')
 
 
@@ -974,10 +991,9 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__OVERLAYS__", json.dumps(ov_meta))
             .replace("__ROAD_POPUP__", "true" if popup_on else "false")
             .replace("__ROAD_POPUP_FIELDS__", json.dumps(popup_fields))
-            .replace("__ROAD_TOOLTIP__", json.dumps(road_tooltip))
-            # inject MapLibre last so its 800 KB blob isn't scanned for the other placeholders
-            .replace("__MAPLIBRE_CSS__", _asset("maplibre-gl.css"))
-            .replace("__MAPLIBRE_JS__", _asset("maplibre-gl.js").replace("</script>", "<\\/script>")))
+            .replace("__ROAD_TOOLTIP__", json.dumps(road_tooltip)))
     if gz:
         html = html.replace("</body>", _INFLATE_JS.replace("__RS_GZ__", json.dumps(gz)) + "</body>", 1)
+    # MapLibre stays a placeholder here: WebMap inlines the vendored copy on save (offline file)
+    # and swaps in CDN tags for the notebook preview (small enough for notebook output limits).
     return WebMap(html)
