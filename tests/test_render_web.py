@@ -392,3 +392,11 @@ def test_web_bridge_forks_stay_elevated():
         cs = f["geometry"]["coordinates"][0]
         dmin = min(((x - bx) ** 2 + (y - by) ** 2) ** 0.5 for x, y in cs)
         assert dmin > 0.001                  # ~110 m: grounded slices are far from the junction
+
+
+def test_web_pick_survives_missing_layers():
+    """The 3D view removes roads-bridge-fill (decks replace it); the picker must filter its layer
+    list to existing layers or every hover/click errors out and nothing is selectable."""
+    html = render_edges(_edges(), backend="web", view_3d=True).html
+    assert "PICK_LAYERS.filter(id=>map.getLayer(id))" in html
+    assert '"roads-bridge-decks"' in html.split("PICK_LAYERS")[1][:120]

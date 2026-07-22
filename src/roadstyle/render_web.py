@@ -853,7 +853,12 @@ map.on("styleimagemissing", e=>{ if(e.id==="oneway") addArrow(); });
 // hover + click-to-select + info popup (feature-state, tolerance box, throttled to one query/frame)
 const HIT = 4;
 function box(p){ return [[p.x-HIT,p.y-HIT],[p.x+HIT,p.y+HIT]]; }
-function pick(p){ const l = map.queryRenderedFeatures(box(p), {layers:["roads-fill","roads-tunnel-fill","roads-bridge-fill"]}); return l.length ? l[0] : null; }
+// query only layers that EXIST: the 3D view swaps roads-bridge-fill for the deck extrusions,
+// and MapLibre errors out (killing hover+click) when asked to query a missing layer id.
+const PICK_LAYERS = ["roads-fill","roads-tunnel-fill","roads-bridge-fill","roads-bridge-decks"];
+function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id));
+  const l = ids.length ? map.queryRenderedFeatures(box(p), {layers:ids}) : [];
+  return l.length ? l[0] : null; }
 function setS(id, st){ if(id!=null) map.setFeatureState({source:"roads", id:id}, st); }
 let _hov=null, _pt=null, _raf=0;
 function _rfields(p, only){ const r=[];
