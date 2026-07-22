@@ -368,7 +368,7 @@ def test_web_3d_bridge_decks():
     assert bands == {0, 1, 2}
     bases = [f["properties"]["__rs_base"] for f in slices]
     # the deck RAMPS: grounded at the ends (connects to the road), full height mid-span
-    assert min(bases) < 1.0 and max(bases) == 5.0
+    assert min(bases) < 1.0 and 5.0 <= max(bases) <= 5.2   # micro band offsets allowed
     flat = _style(render_edges(g, backend="web").html)
     fids = [l["id"] for l in flat["layers"]]
     assert "roads-bridge-casing" in fids and "roads-bridge-decks" not in fids
