@@ -562,9 +562,9 @@ def test_focus_hook_is_baked():
     assert "window.rsFocus" in wm.html and "fitBounds" in wm.html
 
 
-def test_deck_slices_carry_their_chain_road_ids():
-    """Every 3D deck slice bakes __rs_edges (the road feature ids of its chain), the link
-    rsSelect/rsHighlight use to glow the deck instead of the flat 2D line."""
+def test_deck_slices_carry_their_road_id():
+    """Every 3D deck slice bakes __rs_edges (its OWN directed edge's road feature id), the link
+    rsSelect/rsHighlight/hover use to glow the deck instead of the flat 2D line."""
     g = _edges().assign(bridge=["yes", None, None])
     wm = render_edges(g, backend="web", view_3d=True)
     style = _style(wm.html)
@@ -576,6 +576,22 @@ def test_deck_slices_carry_their_chain_road_ids():
     assert any("__rs_casing_slab" in f["properties"] for f in feats)
     cas = next(l for l in style["layers"] if l["id"] == "roads-deck-casing")
     assert cas["paint"]["fill-extrusion-color"] == "#000000"
+
+
+def test_twoway_bridge_decks_split_per_directed_edge():
+    """A two-way bridge gets TWO side-by-side half ribbons — one per directed twin — each baked
+    with __rs_edges = its own road feature id, so hover/select separates the directions instead
+    of lighting the whole structure."""
+    a, b = (18.00, 59.30), (18.01, 59.305)
+    g = gpd.GeoDataFrame(
+        {"highway": ["primary", "primary"], "bridge": ["yes", "yes"]},
+        geometry=[LineString([a, b]), LineString([b, a])], crs=4326)
+    html = render_edges(g, backend="web", view_3d=True).html
+    slices = [f for f in _style(html)["sources"]["decks"]["data"]["features"]
+              if "__rs_casing_slab" not in f["properties"]]
+    owners = {s["properties"]["__rs_edges"] for s in slices}
+    assert owners == {"0", "1"}                    # both directions present, separately owned
+    assert 'key:"e"+e' in html                     # deck hover keys on the edge, not the chain
 
 
 def test_query_verbs_accept_overlay_layer_arg():

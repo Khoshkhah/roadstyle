@@ -266,21 +266,22 @@ def _annotation_slots(geo, slot_m):
 def _bridge_decks(geo, dk):
     """Bridge chains (lvl +1) as RAMPED deck ribbons for the 3D view's extrusions.
 
-    Connected bridge edges are walked into chains, sliced every ``step_m`` metres, and each slice
-    is buffered into a polygon carrying its own ``base``/``height``: 0 at the chain ends, rising
-    over ``ramp_m`` to ``base_m`` mid-span — the deck takes off from the connecting ground road
-    instead of floating disconnected above it. Slices inherit the fills of the edge under their
-    midpoint (colour options included) plus highway/name; a two-way bridge's reverse twin is
-    skipped so decks don't double-stack. Ribbon width = the road's own class width (the px-by-zoom
-    table) converted to metres at ``match_zoom``, so a deck is exactly as wide as the flat road of
-    its class at that zoom.
+    Connected bridge edges are walked into chains — ONLY to shape the ramp profile (0 at the
+    chain ends, rising over ``ramp_m`` to ``base_m`` mid-span, so the deck takes off from the
+    connecting ground road instead of floating disconnected above it). The emitted ribbons stay
+    per directed edge: every slice carries its own edge's props/fills and ``__rs_edges`` = that
+    single road feature id, and a two-way bridge splits into two half-width ribbons side by side
+    (one per twin, each on its travel side) — hover/select works per edge, never per whole
+    structure. Total ribbon width = the road's own class width (the px-by-zoom table) converted
+    to metres at ``match_zoom``, so a deck is exactly as wide as the flat road of its class at
+    that zoom.
     """
     from shapely.geometry import LineString
     from shapely.ops import substring
 
     reps = []
-    # endpoint pair -> ALL bridge feature indices there (both twins of a two-way), so a deck
-    # chain can be found from any of its road edges (__rs_edges, used by rsSelect/rsHighlight)
+    # endpoint pair -> ALL bridge feature indices there (both twins of a two-way), so every
+    # deck ribbon can be tied to its OWN directed edge (__rs_edges: the hover/select unit)
     pair_edges = collections.defaultdict(list)
     for fi, ft in enumerate(geo["features"]):
         g, p = ft.get("geometry") or {}, ft.get("properties", {})
@@ -292,26 +293,34 @@ def _bridge_decks(geo, dk):
         pair_edges[min((a, z), (z, a))].append(fi)
         if p.get("twoway") and (z, a) < (a, z):
             continue
-        reps.append((a, z, c, p))
+        reps.append((a, z, c, p, fi))
+
+    def twin_of(fi, a, z):
+        for f in pair_edges[min((a, z), (z, a))]:
+            if f != fi:
+                return f
+        return None
 
     n = len(reps)
     used = [False] * n
     at = collections.defaultdict(list)
-    for i, (a, z, _, _) in enumerate(reps):
+    for i, (a, z, *_) in enumerate(reps):
         at[a].append(i)
         at[z].append(i)
 
     def walk(start_i):
-        """Undirected chain of connected bridge edges through degree-2 nodes.
-        Returns (coords, spans, ramp_head, ramp_tail): spans = [(end_index, props), ...] and the
-        ramp flags say whether each chain end is a TRUE ground end (no other bridge edge
-        continues there). At a bridge fork/junction the structure carries on, so that end stays
-        at full deck height instead of dipping to the ground mid-structure."""
-        a, z, c, p = reps[start_i]
+        """Undirected chain of connected bridge edges through degree-2 nodes — the chain exists
+        ONLY to shape the ramp profile (grounded at true structure ends, level in between); the
+        emitted ribbons stay per directed edge. spans = [(end_index, props, fwd_fi, rev_fi)]
+        where fwd_fi is the road feature id of the edge running WITH the chain direction and
+        rev_fi its reverse twin (None when one-way). The ramp flags say whether each chain end
+        is a TRUE ground end (no other bridge edge continues there); at a bridge fork/junction
+        the structure carries on, so that end stays at full deck height instead of dipping to
+        the ground mid-structure."""
+        a, z, c, p, fi = reps[start_i]
         used[start_i] = True
-        members = [start_i]
         chain = list(c)
-        spans = [[len(chain) - 1, p]]
+        spans = [[len(chain) - 1, p, fi, twin_of(fi, a, z)]]
         ends = {}
         for prepend in (False, True):
             node = a if prepend else z
@@ -320,23 +329,25 @@ def _bridge_decks(geo, dk):
                 if len(at[node]) != 2 or len(cand) != 1:
                     break
                 j = cand[0]
-                ja, jz, jc, jp = reps[j]
+                ja, jz, jc, jp, jfi = reps[j]
+                jt = twin_of(jfi, ja, jz)
                 used[j] = True
-                members.append(j)
                 if prepend:
+                    fwd, rev = (jfi, jt) if jz == node else (jt, jfi)
                     seg = jc if jz == node else jc[::-1]
                     chain = seg[:-1] + chain
                     grown = len(seg) - 1
-                    spans = [[e + grown, pp] for e, pp in spans]
-                    spans.insert(0, [grown, jp])
+                    spans = [[e + grown, pp, ff, rr] for e, pp, ff, rr in spans]
+                    spans.insert(0, [grown, jp, fwd, rev])
                     node = ja if jz == node else jz
                 else:
+                    fwd, rev = (jfi, jt) if ja == node else (jt, jfi)
                     seg = jc if ja == node else jc[::-1]
                     chain = chain + seg[1:]
-                    spans.append([len(chain) - 1, jp])
+                    spans.append([len(chain) - 1, jp, fwd, rev])
                     node = jz if ja == node else ja
             ends[prepend] = len(at[node]) == 1     # sole incident bridge edge = ground end
-        return chain, spans, ends[True], ends[False], members
+        return chain, spans, ends[True], ends[False]
 
     feats = []
     chain_i = 0
@@ -345,11 +356,8 @@ def _bridge_decks(geo, dk):
     for i in range(n):
         if used[i]:
             continue
-        chain, spans, ramp_head, ramp_tail, members = walk(i)
+        chain, spans, ramp_head, ramp_tail = walk(i)
         chain_i += 1
-        edges_s = ",".join(map(str, sorted({
-            fi for m in members
-            for fi in pair_edges[min((reps[m][0], reps[m][1]), (reps[m][1], reps[m][0]))]})))
         lon0, lat0 = chain[0]
         kx = 111320.0 * math.cos(math.radians(lat0))
         mpp = 156543.03392 * math.cos(math.radians(lat0)) / (2 ** dk["match_zoom"])
@@ -362,13 +370,13 @@ def _bridge_decks(geo, dk):
             dx = pts[k][0] - pts[k - 1][0]
             dy = pts[k][1] - pts[k - 1][1]
             cum.append(cum[-1] + (dx * dx + dy * dy) ** 0.5)
-        bounds = [(cum[e], pp) for e, pp in spans]
+        bounds = [(cum[e], pp, ff, rr) for e, pp, ff, rr in spans]
 
         def props_at(d):
-            for b, pp in bounds:
+            for b, pp, ff, rr in bounds:
                 if d <= b + 1e-6:
-                    return pp
-            return bounds[-1][1]
+                    return pp, ff, rr
+            return bounds[-1][1], bounds[-1][2], bounds[-1][3]
 
 
         # slice ONLY where the ramp changes height (and only at true ground ends); the level
@@ -386,22 +394,19 @@ def _bridge_decks(geo, dk):
             d += step
         cuts.add(rh)
         cuts.add(L - rt)
-        cuts.update(b for b, _ in bounds if rh < b < L - rt)
+        cuts.update(b for b, *_ in bounds if rh < b < L - rt)
         cuts = sorted(cuts)
         for d0, d1 in zip(cuts, cuts[1:]):
             part = substring(local, d0, d1)
             if part.geom_type != "LineString" or part.length <= 0:
                 continue
             mid = (d0 + d1) / 2
-            pp = props_at(mid)
+            pp, ffi, rfi = props_at(mid)
             grp = ROAD_GROUP.get(str(pp.get("highway", "")), "residential")
             px = _gwidth(WIDTH[grp], HI_RATE[grp], dk["match_zoom"])
             # width_scale trims the ribbon: at a tilted camera the extruded side walls (and a
             # dual carriageway's second chain) add apparent width, so 1.0 reads too fat
             half = max(px * mpp / 2.0, 2.0) * dk.get("width_scale", 1.0)
-            poly = part.buffer(half, cap_style=2, join_style=2)
-            if poly.geom_type != "Polygon":
-                continue
             up = mid / ramp if ramp_head else 1.0     # 0 only at TRUE ground ends -> 1 mid-span
             dn = (L - mid) / ramp if ramp_tail else 1.0
             t = min(up, dn, 1.0)
@@ -409,15 +414,38 @@ def _bridge_decks(geo, dk):
             #                                           with step_m << thickness the ~0.1-0.3 m
             #                                           per-slice height delta hides inside the
             #                                           deck body -> reads as a continuous ramp
-            coords = [[round(x / kx + lon0, 6), round(y / 111320.0 + lat0, 6)]
-                      for x, y in poly.exterior.coords]
-            props = dict(pp)
-            props["__rs_base"] = round(base_m * t, 2)
-            props["__rs_height"] = round(base_m * t + thick, 2)
-            props["__rs_chain"] = chain_i
-            props["__rs_edges"] = edges_s   # road feature ids of the whole chain (both twins)
-            feats.append({"type": "Feature", "properties": props,
-                          "geometry": {"type": "Polygon", "coordinates": [coords]}})
+            # one ribbon per DIRECTED edge: a two-way bridge splits into two half-width ribbons
+            # side by side (each on its travel side, like the flat two-way offset) so hover and
+            # select work per edge id, never per whole structure. shapely offset_curve positive
+            # = LEFT of the line direction; the with-chain edge drives on the right.
+            ribbons = []
+            if pp.get("twoway") and ffi is not None and rfi is not None:
+                for dlt, fdir in ((-1.0, ffi), (1.0, rfi)):
+                    try:
+                        ol = part.offset_curve(dlt * half / 2.0)
+                    except Exception:
+                        continue
+                    for ln in ([ol] if ol.geom_type == "LineString" else
+                               list(ol.geoms) if ol.geom_type == "MultiLineString" else []):
+                        if ln.length > 0:
+                            ribbons.append(
+                                (ln.buffer(half / 2.0, cap_style=2, join_style=2), fdir))
+            else:
+                fdir = ffi if ffi is not None else rfi
+                ribbons.append((part.buffer(half, cap_style=2, join_style=2), fdir))
+            for poly, fdir in ribbons:
+                if poly.geom_type != "Polygon":
+                    continue
+                coords = [[round(x / kx + lon0, 6), round(y / 111320.0 + lat0, 6)]
+                          for x, y in poly.exterior.coords]
+                props = dict((geo["features"][fdir].get("properties") or pp)
+                             if fdir is not None else pp)
+                props["__rs_base"] = round(base_m * t, 2)
+                props["__rs_height"] = round(base_m * t + thick, 2)
+                props["__rs_chain"] = chain_i
+                props["__rs_edges"] = str(fdir)   # the ONE directed edge this ribbon belongs to
+                feats.append({"type": "Feature", "properties": props,
+                              "geometry": {"type": "Polygon", "coordinates": [coords]}})
             # casing: two strips along the deck's LONG sides, topping out just below the deck
             # top — the black rim line casing gives the 2D bridges (extrusions have no stroke).
             # Side strips, NOT a ring around the slice: a ring's transverse ends would draw
@@ -1129,13 +1157,10 @@ function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id));
   const l = ids.length ? map.queryRenderedFeatures(box(p), {layers:ids}) : [];
   return l.length ? l[0] : null; }
 function srcOf(f){ return f && f.layer && f.layer.id.indexOf("roads-bridge-decks")===0 ? "decks" : "roads"; }
-function deckIds(chain){ const ids=new Set();
-  (map.querySourceFeatures("decks")||[]).forEach(f=>{
-    if(f.properties && f.properties.__rs_chain===chain && f.id!=null) ids.add(f.id); });
-  return Array.from(ids); }
 function hitOf(f){ if(!f || f.id==null) return null;
-  if(srcOf(f)==="decks"){ const c=f.properties.__rs_chain;
-    return {s:"decks", key:"c"+c, ids:deckIds(c)}; }        // whole bridge = one hover
+  if(srcOf(f)==="decks"){ const e=f.properties && f.properties.__rs_edges;
+    if(e==null) return null;                                   // casing slab: not a road
+    return {s:"decks", key:"e"+e, ids:_deckIdsForRoad(+e)}; }  // one directed edge = one hover
   return {s:"roads", key:"r"+f.id, ids:[f.id]}; }
 function setS(h, st){ if(h) h.ids.forEach(id=>map.setFeatureState({source:h.s, id:id}, st)); }
 let _hov=null, _pt=null, _raf=0;

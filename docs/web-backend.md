@@ -120,7 +120,7 @@ dispatches a CustomEvent on `document`:
 `layer` is optional on all of these: omitted → the roads; an overlay's **label** (or index) →
 that overlay is the queried table. Each layer is its own id space — never mix ids across layers.
 | `rsFocus(ids, opt?, layer?)` | fly the camera to fit an id (or id set); `opt` merges into MapLibre's `fitBounds` (`padding` 80, `maxZoom` 17) | — |
-| `rsSelect(id)` / `rsDeselect()` | select one edge exactly like a click (glow + popup/panel; a 3D bridge glows as its whole deck chain) / clear | `rs:select` / `rs:deselect` |
+| `rsSelect(id)` / `rsDeselect()` | select one edge exactly like a click (glow + popup/panel; a 3D bridge glows as that edge's own deck ribbon) / clear | `rs:select` / `rs:deselect` |
 | `rsSetView3D(on)` | tilt to the settings' `camera.pitch_3d` / back to flat north-up | `rs:viewchange` |
 
 The id sets use the roads source's generated feature ids — the same id space as `rs:select`
@@ -270,9 +270,11 @@ rs.render_edges(edges, pitch=55, bearing=-25)     # open tilted/rotated
 rs.render_edges(edges, view_3d=True)              # tilted + extruded bridge decks
 ```
 
-`view_3d=True` renders every bridge chain as a ramped 3D deck (`fill-extrusion`): connected
-bridge edges are walked into one structure, ramps rise from the ground over `ramp_m`, forks stay
-at full height. Ribbon width follows the road width model at `bridge_decks.match_zoom`, trimmed
+`view_3d=True` renders bridges as ramped 3D decks (`fill-extrusion`): connected bridge edges
+are walked into one structure only to shape the ramps (rising from the ground over `ramp_m`,
+forks staying at full height), but every deck ribbon belongs to a single **directed edge** — a
+two-way bridge splits into two side-by-side half ribbons, one per direction — so hover, click
+and `rsSelect` light one edge, never the whole structure. Ribbon width follows the road width model at `bridge_decks.match_zoom`, trimmed
 by `bridge_decks.width_scale` (default `0.6` — at a tilted camera the extruded side walls add
 apparent width, so a 1:1 ribbon reads too fat). A fixed polygon can't track the stylized px road
 widths across zooms, so decks read slightly narrow when zoomed far out — tune `width_scale` /
