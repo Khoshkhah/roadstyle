@@ -70,6 +70,23 @@ class RoadEdges:
         validate_edges(gdf)                       # type / non-empty / has geometry
         g = gdf.rename(columns=dict(rename)) if rename else gdf
 
+        # drop unusable geometry regardless of kind: missing, empty, or with non-finite
+        # coordinates (a NaN vertex makes length NaN and breaks every renderer downstream).
+        # shapely.length, not GeoSeries.length: same NaN signal, no geographic-CRS warning
+        import numpy as np
+        import shapely
+
+        mask = (g.geometry.notna() & ~g.geometry.is_empty
+                & np.isfinite(shapely.length(g.geometry.values)))
+        dropped = int((~mask).sum())
+        if dropped:
+            warnings.warn(
+                f"RoadEdges dropped {dropped} invalid geometr{'y' if dropped == 1 else 'ies'} "
+                "(missing/empty/non-finite coordinates).",
+                stacklevel=2,
+            )
+            g = g[mask]
+
         if not keep_non_lines:
             mask = g.geom_type.isin(_LINE)
             dropped = int((~mask).sum())
@@ -257,10 +274,13 @@ def from_duckosm(db, schema: str = "driving", *, class_col: str = "highway") -> 
     """Build :class:`RoadEdges` straight from a **duckOSM** database — the canonical bridge
     between the two projects (duckOSM builds the routable network, roadstyle draws it)::
 
-        edges = rs.from_duckosm("sodermalm.duckdb")            # schema "driving" by default
+        edges = rs.from_duckosm("sodermalm.duckdb")                    # driving network
+        edges = rs.from_duckosm("sodermalm.duckdb", schema="walking")  # or "cycling"
         rs.render_edges(edges, basemap="dark_matter").save("map.html")
 
     ``db`` is a path to the ``.duckdb`` file (opened read-only) or an open DuckDB connection.
+    ``schema`` picks which of duckOSM's per-mode networks to load — ``"driving"`` (default),
+    ``"walking"`` or ``"cycling"``.
     The canonical column set (grade separation, oneway, lanes, names, the text-cast ``edge_id``)
     is selected automatically — intersected with what the database actually has, so older duckOSM
     builds without some columns still load. For arbitrary queries use :func:`from_duckdb`.

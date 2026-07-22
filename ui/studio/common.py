@@ -14,13 +14,13 @@ OV_COLORS = ["#7c4dff", "#00bcd4", "#ff9800", "#e91e63"]
 
 
 @st.cache_data(show_spinner="Loading edges…")
-def load_edges(path: str, blob: bytes | None, blob_name: str | None):
+def load_edges(path: str, blob: bytes | None, blob_name: str | None, mode: str = "driving"):
     if blob is not None:
         with tempfile.NamedTemporaryFile(suffix=Path(blob_name).suffix, delete=False) as t:
             t.write(blob)
             path = t.name
     if str(path).endswith(".duckdb"):
-        return rs.from_duckosm(path).gdf     # the normalised GeoDataFrame inside RoadEdges
+        return rs.from_duckosm(path, schema=mode).gdf   # the GeoDataFrame inside RoadEdges
     import geopandas as gpd
     return gpd.read_file(path)
 
@@ -32,14 +32,18 @@ def data_section():
     up = st.file_uploader("Road file (.gpkg / .geojson)", type=["gpkg", "geojson", "json"])
     path = st.text_input("…or a path (.duckdb / .gpkg)", value=DEFAULT_DB,
                          disabled=up is not None)
+    is_db = str(path).endswith(".duckdb") and up is None
+    mode = st.selectbox("Mode (duckOSM network)", ["driving", "walking", "cycling"]) \
+        if is_db else "driving"
     try:
-        edges = load_edges(path, up.getvalue() if up else None, up.name if up else None)
+        edges = load_edges(path, up.getvalue() if up else None,
+                           up.name if up else None, mode)
     except Exception as e:
         st.error(f"Could not load edges: {e}")
         st.stop()
     st.caption(f"{len(edges):,} edges loaded")
-    loader = (f'edges = rs.from_duckosm("{path}")'
-              if str(path).endswith(".duckdb") and up is None
+    marg = "" if mode == "driving" else f", schema={mode!r}"
+    loader = (f'edges = rs.from_duckosm("{path}"{marg})' if is_db
               else f'edges = gpd.read_file("{up.name if up else path}")')
     return edges, loader
 

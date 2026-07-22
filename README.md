@@ -392,7 +392,7 @@ roadstyle edges.gpkg -f spec -o map_data.json               # JSON spec for your
 | Function | Purpose |
 |---|---|
 | `render_edges(gdf, *, backend, palette, basemap, view_3d, include/exclude, …)` | filter + render |
-| `from_duckosm(db)` | load a duckOSM driving network with the full data contract |
+| `from_duckosm(db, schema="driving")` | load a duckOSM network with the full data contract — `schema` picks the mode: `driving` / `walking` / `cycling` |
 | `filter_edges(gdf, include, exclude, …)` / `highway_types(gdf)` | type filtering |
 | `resolve(highway, palette, tunnel, bridge)` | resolve one edge's concrete style |
 | `selection_style(base_width)` | neon-violet selected-edge layers |

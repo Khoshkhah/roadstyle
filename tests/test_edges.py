@@ -50,6 +50,18 @@ def test_normalize_drops_non_line_geometry():
     assert len(e) == 2
 
 
+def test_normalize_drops_invalid_geometry():
+    g = _raw(4326)
+    nan_line = LineString([(5, 5), (6, 6), (float("nan"), float("nan"))])
+    bad = gpd.GeoDataFrame({"vagtyp": ["x", "y"], "aadt": [0, 0]},
+                           geometry=[nan_line, None], crs=4326)
+    g = pd.concat([g, bad]).pipe(gpd.GeoDataFrame, crs=4326)
+    with pytest.warns(UserWarning, match="invalid geometr"):
+        e = normalize_edges(g)
+    assert len(e) == 2
+    assert e.gdf.geometry.length.notna().all()
+
+
 def test_as_edges_passthrough_and_coerce():
     g = _raw(4326)
     e = normalize_edges(g)

@@ -19,7 +19,7 @@ and `compress`.
 
 | Function | Returns | Purpose |
 |---|---|---|
-| `from_duckosm(db, schema="driving")` | `RoadEdges` | load a duckOSM driving network with the full data contract (grade tags, oneway, text-safe `edge_id`) |
+| `from_duckosm(db, schema="driving")` | `RoadEdges` | load a duckOSM network with the full data contract (grade tags, oneway, text-safe `edge_id`); `schema` picks the mode — `"driving"` / `"walking"` / `"cycling"` |
 | `use_settings(path_or_dict, ...)` | — | apply a settings override at runtime (`use_settings()` drops it) |
 | `snapshot(map_or_html, out_png, *, center, zoom, pitch, bearing, ...)` | path | static PNG via headless Chromium (optional `playwright` dependency) |
 
