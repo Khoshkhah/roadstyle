@@ -418,24 +418,35 @@ def _bridge_decks(geo, dk):
             props["__rs_edges"] = edges_s   # road feature ids of the whole chain (both twins)
             feats.append({"type": "Feature", "properties": props,
                           "geometry": {"type": "Polygon", "coordinates": [coords]}})
-            # casing slab: a ring around the deck body, topping out just below the deck top —
-            # reads as the black rim that line casing gives the 2D bridges (extrusions have no
-            # stroke). A ring (not a slab under the body) so the translucent body keeps its hue.
+            # casing: two strips along the deck's LONG sides, topping out just below the deck
+            # top — the black rim line casing gives the 2D bridges (extrusions have no stroke).
+            # Side strips, NOT a ring around the slice: a ring's transverse ends would draw
+            # black cross-bars over the deck at every slice cut (ramps are cut every step_m).
             if dk.get("casing_px"):
-                ring = part.buffer(half + dk["casing_px"] * mpp, cap_style=2,
-                                   join_style=2).difference(poly)
-                geoms = ([ring] if ring.geom_type == "Polygon" else
-                         list(ring.geoms) if ring.geom_type == "MultiPolygon" else [])
-                for gp in geoms:
-                    rings = [gp.exterior.coords] + [i.coords for i in gp.interiors]
-                    cc = [[[round(x / kx + lon0, 6), round(y / 111320.0 + lat0, 6)]
-                           for x, y in r] for r in rings]
-                    feats.append({"type": "Feature", "properties": {
-                        "highway": pp.get("highway"), "__rs_chain": chain_i,
-                        "__rs_casing_slab": 1,
-                        "__rs_base": round(max(base_m * t - 0.5, 0.0), 2),
-                        "__rs_height": round(base_m * t + thick * 0.35, 2)},
-                        "geometry": {"type": "Polygon", "coordinates": cc}})
+                cw = dk["casing_px"] * mpp
+                for sgn in (1.0, -1.0):
+                    try:
+                        sline = part.offset_curve(sgn * (half + cw / 2.0))
+                    except Exception:
+                        continue
+                    parts_ = ([sline] if sline.geom_type == "LineString"
+                              else list(sline.geoms) if sline.geom_type == "MultiLineString"
+                              else [])
+                    for sl in parts_:
+                        if sl.length <= 0:
+                            continue
+                        sp = sl.buffer(cw / 2.0, cap_style=2, join_style=2)
+                        for gp in ([sp] if sp.geom_type == "Polygon" else
+                                   list(sp.geoms) if sp.geom_type == "MultiPolygon" else []):
+                            rings = [gp.exterior.coords] + [i.coords for i in gp.interiors]
+                            cc = [[[round(x / kx + lon0, 6), round(y / 111320.0 + lat0, 6)]
+                                   for x, y in r] for r in rings]
+                            feats.append({"type": "Feature", "properties": {
+                                "highway": pp.get("highway"), "__rs_chain": chain_i,
+                                "__rs_casing_slab": 1,
+                                "__rs_base": round(max(base_m * t - 0.5, 0.0), 2),
+                                "__rs_height": round(base_m * t + thick * 0.35, 2)},
+                                "geometry": {"type": "Polygon", "coordinates": cc}})
     return {"type": "FeatureCollection", "features": feats}
 
 
