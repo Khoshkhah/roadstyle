@@ -1,7 +1,8 @@
 """roadstyle studio — the whole library behind eight knobs.
 
 A Streamlit workbench: point it at a road file, click through the looks, and it renders the real
-map next to the exact ``render_edges`` code for the current state — copy the code out (or
+map next to the exact ``render_edges`` code for the current state — each sidebar section also
+shows the code fragment *it* contributes, so the UI doubles as a tutorial. Copy the code out (or
 download the self-contained HTML) when you outgrow the knobs. Run::
 
     streamlit run ui/studio/app.py
@@ -35,7 +36,12 @@ def load_edges(path: str, blob: bytes | None, blob_name: str | None):
     return gpd.read_file(path)
 
 
-# ---------------------------------------------------------------- sidebar: the eight knobs
+def frag(d: dict) -> str:
+    """kwargs dict → the ``k=v`` code fragment it adds to render_edges."""
+    return ", ".join(f"{k}={v!r}" for k, v in d.items())
+
+
+# ------------------------------------------- sidebar: the knobs, each with the code it writes
 with st.sidebar:
     st.title("roadstyle studio")
 
@@ -49,40 +55,43 @@ with st.sidebar:
         st.error(f"Could not load edges: {e}")
         st.stop()
     st.caption(f"{len(edges):,} edges loaded")
+    loader = (f'edges = rs.from_duckosm("{path}")'
+              if str(path).endswith(".duckdb") and up is None
+              else f'edges = gpd.read_file("{up.name if up else path}")')
+    st.code(loader, language="python")
 
     st.subheader("Look")
     palette = st.selectbox("Palette", ["highsat", "carto", "mono"])
     basemap = st.selectbox("Base map", list(rs.BASEMAPS), index=0)
     view_3d = st.checkbox("3D bridges (tilted view)", value=False)
+    kw = {"palette": palette, "basemap": basemap}
+    if view_3d:
+        kw["view_3d"] = True
+    st.code(frag(kw), language="python")
 
     st.subheader("Colour by data")
     cols = [c for c in edges.columns if c != edges.geometry.name]
     color_by = st.selectbox("Column", ["(road class)"] + cols)
     cmap = st.selectbox("Colormap", CMAPS) if color_by != "(road class)" else None
+    f = {"color_by": color_by, "cmap": cmap, "legend": True} if cmap else {}
+    kw.update(f)
+    st.code(frag(f) or "# default: colour by road class", language="python")
 
     st.subheader("Filter")
     classes = sorted(rs.highway_types(edges))
     keep = st.multiselect("Road classes", classes, default=classes)
+    f = {"include": keep} if set(keep) != set(classes) else {}
+    kw.update(f)
+    st.code(frag(f) or "# default: all classes", language="python")
 
     st.subheader("Decorations")
     labels = st.checkbox("Street names", value=True)
     arrows = st.checkbox("One-way arrows", value=True)
+    f = {**({} if labels else {"labels": False}), **({} if arrows else {"arrows": False})}
+    kw.update(f)
+    st.code(frag(f) or "# default: labels + arrows on", language="python")
 
 # ---------------------------------------------------------------- render + the code, in sync
-kw = {"palette": palette, "basemap": basemap}
-if view_3d:
-    kw["view_3d"] = True
-if color_by != "(road class)":
-    kw["color_by"], kw["cmap"], kw["legend"] = color_by, cmap, True
-if set(keep) != set(classes):
-    kw["include"] = keep
-if not labels:
-    kw["labels"] = False
-if not arrows:
-    kw["arrows"] = False
-
-loader = (f'edges = rs.from_duckosm("{path}")' if str(path).endswith(".duckdb") and up is None
-          else f'edges = gpd.read_file("{up.name if up else path}")')
 args = "".join(f",\n                     {k}={v!r}" for k, v in kw.items())
 code = (f"import roadstyle as rs\n\n{loader}\n"
         f"wm = rs.render_edges(edges{args})\n"
