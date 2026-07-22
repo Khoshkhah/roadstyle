@@ -1,0 +1,7 @@
+{"type": "FeatureCollection", "features": [
+{"type": "Feature", "properties": {"sensor": "S1", "street": "Hornsgatan", "flow_veh_min": 14}, "geometry": {"type": "Point", "coordinates": [18.0605, 59.3170]}},
+{"type": "Feature", "properties": {"sensor": "S2", "street": "Ringvägen", "flow_veh_min": 9}, "geometry": {"type": "Point", "coordinates": [18.0700, 59.3065]}},
+{"type": "Feature", "properties": {"sensor": "S3", "street": "Folkungagatan", "flow_veh_min": 11}, "geometry": {"type": "Point", "coordinates": [18.0800, 59.3145]}},
+{"type": "Feature", "properties": {"sensor": "S4", "street": "Götgatan", "flow_veh_min": 17}, "geometry": {"type": "Point", "coordinates": [18.0725, 59.3120]}},
+{"type": "Feature", "properties": {"sensor": "S5", "street": "Långholmsgatan", "flow_veh_min": 21}, "geometry": {"type": "Point", "coordinates": [18.0330, 59.3155]}}
+]}

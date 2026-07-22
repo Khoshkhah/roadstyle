@@ -52,19 +52,29 @@ def load_overlay(blob: bytes, name: str):
     return gpd.read_file(t.name)
 
 
+SAMPLES_DIR = Path(__file__).resolve().parent / "samples"
+
+
 def overlay_section():
-    """The sidebar "Overlays" block: each uploaded file becomes one :class:`rs.Overlay`.
-    Returns ``(overlays, code_lines)`` — the objects and the ``ovN = rs.Overlay(...)`` lines."""
+    """The sidebar "Overlays" block: each uploaded (or sample) file becomes one
+    :class:`rs.Overlay`. Returns ``(overlays, code_lines)`` — the objects and the
+    ``ovN = rs.Overlay(...)`` lines."""
     st.subheader("Overlays")
     ups = st.file_uploader("Zones / POIs / lines (.gpkg / .geojson)",
                            type=["gpkg", "geojson", "json"],
                            accept_multiple_files=True, key="ov_files")
+    samples = {p.stem: p for p in sorted(SAMPLES_DIR.glob("*.geojson"))}
+    picks = st.multiselect("…or sample overlays", list(samples), key="ov_samples")
+    # (display name, bytes, the path the generated code should read)
+    files = ([(u.name, u.getvalue(), u.name) for u in (ups or [])]
+             + [(samples[k].name, samples[k].read_bytes(), f"ui/studio/samples/{k}.geojson")
+                for k in picks])
     overlays, lines = [], []
-    for i, u in enumerate(ups or []):
-        gdf = load_overlay(u.getvalue(), u.name)
-        with st.expander(u.name, expanded=True):
+    for i, (fname, blob, code_path) in enumerate(files):
+        gdf = load_overlay(blob, fname)
+        with st.expander(fname, expanded=True):
             c1, c2 = st.columns([3, 1])
-            label = c1.text_input("Label", value=Path(u.name).stem, key=f"ov_l{i}")
+            label = c1.text_input("Label", value=Path(fname).stem, key=f"ov_l{i}")
             color = c2.color_picker("Colour", value=OV_COLORS[i % len(OV_COLORS)],
                                     key=f"ov_c{i}")
             under = st.checkbox("Under the roads", key=f"ov_u{i}",
@@ -74,6 +84,6 @@ def overlay_section():
         popup = [c for c in gdf.columns if c != gdf.geometry.name] if click else []
         place = "under" if under else "over"
         overlays.append(rs.Overlay(gdf, label=label, color=color, placement=place, popup=popup))
-        lines.append(f'ov{i} = rs.Overlay(gpd.read_file("{u.name}"), label={label!r}, '
+        lines.append(f'ov{i} = rs.Overlay(gpd.read_file("{code_path}"), label={label!r}, '
                      f'color={color!r}, placement={place!r}, popup={popup!r})')
     return overlays, lines

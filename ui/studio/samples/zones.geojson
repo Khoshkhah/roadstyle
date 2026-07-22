@@ -1,0 +1,6 @@
+{"type": "FeatureCollection", "features": [
+{"type": "Feature", "properties": {"zone_id": 1, "name": "Hornstull"},
+ "geometry": {"type": "Polygon", "coordinates": [[[18.022, 59.311], [18.048, 59.311], [18.048, 59.318], [18.022, 59.318], [18.022, 59.311]]]}},
+{"type": "Feature", "properties": {"zone_id": 2, "name": "SoFo"},
+ "geometry": {"type": "Polygon", "coordinates": [[[18.070, 59.307], [18.090, 59.307], [18.090, 59.314], [18.070, 59.314], [18.070, 59.307]]]}}
+]}
