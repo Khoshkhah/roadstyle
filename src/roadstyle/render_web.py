@@ -265,7 +265,9 @@ def _bridge_decks(geo, dk):
     over ``ramp_m`` to ``base_m`` mid-span — the deck takes off from the connecting ground road
     instead of floating disconnected above it. Slices inherit the fills of the edge under their
     midpoint (colour options included) plus highway/name; a two-way bridge's reverse twin is
-    skipped so decks don't double-stack.
+    skipped so decks don't double-stack. Ribbon width = the road's own class width (the px-by-zoom
+    table) converted to metres at ``match_zoom``, so a deck is exactly as wide as the flat road of
+    its class at that zoom.
     """
     from shapely.geometry import LineString
     from shapely.ops import substring
@@ -333,6 +335,7 @@ def _bridge_decks(geo, dk):
         chain, spans, ramp_head, ramp_tail = walk(i)
         lon0, lat0 = chain[0]
         kx = 111320.0 * math.cos(math.radians(lat0))
+        mpp = 156543.03392 * math.cos(math.radians(lat0)) / (2 ** dk["match_zoom"])
         pts = [((x - lon0) * kx, (y - lat0) * 111320.0) for x, y in chain]
         local = LineString(pts)
         L = local.length
@@ -350,11 +353,6 @@ def _bridge_decks(geo, dk):
                     return pp
             return bounds[-1][1]
 
-        def lanes_of(pp):
-            try:
-                return max(int(float(pp.get("lanes"))), 1)
-            except (TypeError, ValueError):
-                return 2
 
         # slice ONLY where the ramp changes height (and only at true ground ends); the level
         # spans stay whole, split just at edge-span boundaries so per-edge colours survive
@@ -379,7 +377,9 @@ def _bridge_decks(geo, dk):
                 continue
             mid = (d0 + d1) / 2
             pp = props_at(mid)
-            half = max(dk["lane_m"] * lanes_of(pp) / 2.0, 2.5)
+            grp = ROAD_GROUP.get(str(pp.get("highway", "")), "residential")
+            px = _gwidth(WIDTH[grp], HI_RATE[grp], dk["match_zoom"])
+            half = max(px * mpp / 2.0, 2.0)
             poly = part.buffer(half, cap_style=2, join_style=2)
             if poly.geom_type != "Polygon":
                 continue
@@ -1066,8 +1066,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     if mz:
         _z = _minzoom_filter(highway_col, mz)
         surface, tunnel, bridge = (["all", _z, surface], ["all", _z, tunnel], ["all", _z, bridge])
-    dk = {"base_m": 5.0, "thickness_m": 1.0, "lane_m": 3.5, "ramp_m": 40.0, "step_m": 2.5,
-          **(CONFIG.bridge_decks or {})}
+    dk = {"base_m": 5.0, "thickness_m": 1.0, "ramp_m": 40.0, "step_m": 2.5,
+          "match_zoom": 16.0, **(CONFIG.bridge_decks or {})}
     decks = _bridge_decks(geo, dk) if view_3d else {"features": []}
     if decks["features"]:
         style["sources"]["decks"] = {"type": "geojson", "data": decks}
