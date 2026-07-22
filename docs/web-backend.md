@@ -108,6 +108,15 @@ dispatches a CustomEvent on `document`:
 | `rsSetClasses(list)` | show exactly these road classes, hide the rest | `rs:filterchange` |
 | `rsSetColorField(nameOrIdx)` | switch the active `color_options` entry | `rs:colorchange` |
 | `rsSetOverlay(labelOrIdx, on)` | show/hide one overlay | `rs:overlaychange` |
+| `rsQuery(p => …)` | evaluate a predicate over every edge's columns → **id set** | — |
+| `rsFilter(ids)` | show only these edges (`null` resets); ANDs with the class filter | `rs:filterchange` |
+| `rsColor(ids, "#hex")` | paint the set one colour, layered over the active colour option (`null` resets) | `rs:colorchange` |
+| `rsHighlight(ids)` | selection glow on the set (`[]` clears) | `rs:highlightchange` |
+| `rsGetProps(ids)` | the rows behind the ids, internal fields stripped — table-ready | — |
+
+The id sets use the roads source's generated feature ids — the same id space as `rs:select`
+events. Labels, arrows and 3D deck ribbons sit on merged helper sources, so `rsFilter` prunes
+road geometry but not those decorations (the class filter prunes everything).
 
 Plus: `window.map` (the MapLibre `Map` — camera via `map.easeTo({pitch, bearing, ...})`),
 click selection events `rs:select` / `rs:deselect`, and the registries `RS_BASEMAPS`,

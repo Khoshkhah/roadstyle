@@ -273,6 +273,24 @@ document.addEventListener("rs:basemapchange", e => console.log(e.detail.basemap)
 document.addEventListener("rs:filterchange",  e => console.log(e.detail.visible));
 ```
 
+And the baked features are a **queryable table**: `rsQuery` takes a predicate over your data's
+columns (a WHERE clause, written in JS) and returns an **id set** — then independent verbs act
+on that set, composably:
+
+```js
+const ids = rsQuery(p => p.lanes >= 2 && p.maxspeed_kmh > 30);   // → [7, 12, 95, …]
+rsFilter(ids);                 // show only these edges (rsFilter(null) resets)  → rs:filterchange
+rsColor(ids, "#ff00aa");       // paint the set one colour (rsColor(null) resets) → rs:colorchange
+rsHighlight(ids);              // selection glow (rsHighlight([]) clears)      → rs:highlightchange
+rsGetProps(ids);               // → the rows behind the ids (internals stripped) — table-ready
+```
+
+The ids are the same id space as `rs:select` events (`e.detail.id`), so click-selection and
+queries interoperate. `rsColor` layers *over* the active `color_options` choice and survives
+switching it. One ceiling: street-name labels, arrows, and 3D bridge deck ribbons live on merged
+helper sources, so `rsFilter` prunes the road geometry but not those decorations (the class
+filter from `rsSetClasses` prunes everything).
+
 What's available to enumerate: `RS_BASEMAPS` (key/label per entry), `RS_CLASSES` (road classes in
 the data), `RS_COLOR_OPTIONS`, `RS_OVERLAYS`. Selection events are above (`rs:select` /
 `rs:deselect`). The setters work **even with the built-in control hidden** — e.g.

@@ -523,3 +523,11 @@ def test_switcher_off_with_explicit_basemaps_keeps_them_addressable():
     wm2 = render_edges(_edges(), backend="web", basemap_switcher=False)
     m2 = re.search(r"BASEMAPS = (\[.*?\]);", wm2.html, re.S)
     assert len(json.loads(m2.group(1))) == 1
+
+
+def test_query_id_verbs_are_baked():
+    """rsQuery -> id set, then rsFilter / rsColor / rsHighlight / rsGetProps act on it."""
+    wm = render_edges(_edges(), backend="web")
+    for needle in ("window.rsQuery", "window.rsFilter", "window.rsColor",
+                   "window.rsHighlight", "window.rsGetProps", "rs:highlightchange"):
+        assert needle in wm.html, needle

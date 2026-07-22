@@ -754,26 +754,64 @@ if(BM_SWITCHER && BASEMAPS.length > 1){
   const w=document.createElement("div"); w.className="bm-ctrl"; w.appendChild(sel); document.body.appendChild(w);
 }
 // road-class filtering: window.rsSetClasses([...]) shows exactly those classes and hides the
-// rest across every road layer; the collapsible checkbox panel is just UI over it.
+// rest across every road layer; the collapsible checkbox panel is just UI over it. The class
+// filter composes (AND) with the id filter from rsFilter below.
 const FILTER = __FILTER__;
 const _fltCbs={}, _fltBase={};
-const _fltIds=()=>map.getStyle().layers.filter(l=>l.id.indexOf("roads")===0).map(l=>l.id);
-map.on("load",()=>{ _fltIds().forEach(id=>{ if(!(id in _fltBase)) _fltBase[id]=map.getFilter(id)||null; }); });
-function rsSetClasses(visible){
-  const vis=new Set(visible);
-  const hidden=FILTER.classes.filter(c=>!vis.has(c));
-  _fltIds().forEach(id=>{
-    if(!(id in _fltBase)) _fltBase[id]=map.getFilter(id)||null;
-    let f=_fltBase[id];
+let _fltVis=null;   // Set of visible classes; null = all
+let _qIds=null;     // id-set filter from rsFilter; null = off
+const _fltLayers=()=>map.getStyle().layers.filter(l=>l.id.indexOf("roads")===0);
+map.on("load",()=>{ _fltLayers().forEach(l=>{ if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null; }); });
+function _applyRoadFilters(){
+  const hidden = _fltVis===null ? [] : FILTER.classes.filter(c=>!_fltVis.has(c));
+  _fltLayers().forEach(l=>{
+    if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null;
+    let f=_fltBase[l.id];
     if(hidden.length){ const cf=["!",["in",["get",FILTER.col],["literal",hidden]]]; f=f?["all",f,cf]:cf; }
-    try{ map.setFilter(id,f); }catch(e){}
+    // ids exist only in the roads source — slots (labels/arrows) and decks (3D ribbons) have
+    // their own id spaces, so those layers take just the class filter
+    if(_qIds && l.source==="roads"){ const qf=["in",["id"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
+    try{ map.setFilter(l.id,f); }catch(e){}
   });
-  FILTER.classes.forEach(c=>{ if(_fltCbs[c]) _fltCbs[c].checked=vis.has(c); });
+  return hidden;
+}
+function rsSetClasses(visible){
+  _fltVis=new Set(visible);
+  const hidden=_applyRoadFilters();
+  FILTER.classes.forEach(c=>{ if(_fltCbs[c]) _fltCbs[c].checked=_fltVis.has(c); });
   document.dispatchEvent(new CustomEvent("rs:filterchange",
-    {detail:{visible:FILTER.classes.filter(c=>vis.has(c)), hidden:hidden}}));
+    {detail:{visible:FILTER.classes.filter(c=>_fltVis.has(c)), hidden:hidden}}));
 }
 window.rsSetClasses = rsSetClasses;
 window.RS_CLASSES = FILTER.classes;
+// id-set queries: the baked features are a queryable table. rsQuery(p => …) returns the ids of
+// the matching edges (generateId: a feature's id is its index in the source array); the verbs
+// below act on any id set — filter to it, read it back as rows, or highlight it.
+function _feats(){ const s=map.getSource("roads"); return (s && s._data && s._data.features)||[]; }
+function rsQuery(test){
+  const out=[]; _feats().forEach((f,i)=>{ try{ if(test(f.properties||{})) out.push(i); }catch(e){} });
+  return out;
+}
+function rsFilter(ids){   // show only these edges; rsFilter(null) resets
+  _qIds = ids==null ? null : Array.from(ids);
+  _applyRoadFilters();
+  document.dispatchEvent(new CustomEvent("rs:filterchange",{detail:{ids:_qIds}}));
+}
+function rsGetProps(ids){ // the rows behind an id set (internal fields stripped) — table-ready
+  const fs=_feats();
+  return Array.from(ids||[]).map(i=>{ const p=(fs[i]&&fs[i].properties)||{}; const r={};
+    for(const k in p){ if(k[0]!=="_" && k!=="twoway" && k!=="lvl") r[k]=p[k]; }
+    return r; });
+}
+let _qHl=[];
+function rsHighlight(ids){ // selection glow on an id set; rsHighlight([]) clears
+  _qHl.forEach(i=>map.setFeatureState({source:"roads",id:i},{select:false}));
+  _qHl = ids==null ? [] : Array.from(ids);
+  _qHl.forEach(i=>map.setFeatureState({source:"roads",id:i},{select:true}));
+  document.dispatchEvent(new CustomEvent("rs:highlightchange",{detail:{ids:_qHl.slice()}}));
+}
+window.rsQuery = rsQuery; window.rsFilter = rsFilter;
+window.rsGetProps = rsGetProps; window.rsHighlight = rsHighlight;
 if(FILTER.on){
   const box=document.createElement("div"); box.className="flt-ctrl";
   const hd=document.createElement("div"); hd.className="flt-hd"; hd.textContent="Roads ▾";
@@ -812,22 +850,40 @@ function coUpdateLegend(){
   const h = coLegendHtml((COLOR_OPTIONS[_coActive]||{}).legend);
   _coLegendEl.innerHTML = h; _coLegendEl.style.display = h ? "" : "none";
 }
-function rsSetColorField(nameOrIdx){
-  let idx = typeof nameOrIdx==="number" ? nameOrIdx : COLOR_OPTIONS.map(o=>o.name).indexOf(nameOrIdx);
-  const o = COLOR_OPTIONS[idx]; if(!o) return;
-  _coActive = idx;
-  RS_FILL_LAYERS.forEach(id=>{ if(map.getLayer(id))
-    map.setPaintProperty(id,"line-color",["coalesce",["get",o.prop],"#888888"]); });
+let _qColor=null;   // {ids, color} recolour of an id set, layered over the active option
+function _fillExpr(){
+  const prop=(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill";
+  let e=["coalesce",["get",prop],"#888888"];
+  if(_qColor) e=["case",["in",["id"],["literal",_qColor.ids]],_qColor.color,e];
+  return e;
+}
+function _applyFill(){
+  const e=_fillExpr();
+  RS_FILL_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"line-color",e); });
+  // decks keep the base colour: their slice ids are a different id space than the road edges
   if(map.getLayer("roads-bridge-decks"))
     map.setPaintProperty("roads-bridge-decks","fill-extrusion-color",
       ["case",["boolean",["feature-state","select"],false],__SELECT_COLOR__,
        ["boolean",["feature-state","hover"],false],__HOVER_COLOR__,
-       ["coalesce",["get",o.prop],"#888888"]]);
+       ["coalesce",["get",(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill"],"#888888"]]);
+}
+function rsSetColorField(nameOrIdx){
+  let idx = typeof nameOrIdx==="number" ? nameOrIdx : COLOR_OPTIONS.map(o=>o.name).indexOf(nameOrIdx);
+  const o = COLOR_OPTIONS[idx]; if(!o) return;
+  _coActive = idx;
+  _applyFill();
   const sel=document.getElementById("co-select"); if(sel) sel.value=String(idx);
   coUpdateLegend();
   document.dispatchEvent(new CustomEvent("rs:colorchange",{detail:{option:o,index:idx}}));
 }
+function rsColor(ids, color){   // paint an id set one colour; rsColor(null) resets
+  _qColor = (ids==null || !color) ? null : {ids:Array.from(ids), color:color};
+  _applyFill();
+  document.dispatchEvent(new CustomEvent("rs:colorchange",
+    {detail:{ids:_qColor && _qColor.ids, color:_qColor && _qColor.color}}));
+}
 window.rsSetColorField = rsSetColorField;
+window.rsColor = rsColor;
 window.RS_COLOR_OPTIONS = COLOR_OPTIONS;
 if(COLOR_OPTIONS.length > 1){
   const w=document.createElement("div"); w.className="co-ctrl";
