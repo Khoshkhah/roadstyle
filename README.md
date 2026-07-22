@@ -157,6 +157,17 @@ render_edges(edges, highway_col="highway",       # widths/casing from the OSM-hi
              filter_col="road_class").save("m.html")   # filter panel lists the source's real classes
 ```
 
+### Static images for papers & reports
+
+`rs.snapshot` renders any map to a PNG through a real headless browser (so tiles, labels, 3D
+decks — everything — look exactly as on screen). Optional dependency:
+`pip install playwright && playwright install chromium`.
+
+```python
+wm = render_edges(edges, basemap="dark_matter", view_3d=True)
+rs.snapshot(wm, "skanstull.png", center=(18.076, 59.303), zoom=16, pitch=60, bearing=-25)
+```
+
 ## All options at a glance
 
 Every keyword of `render_edges` (full reference: [`docs/parameters.md`](docs/parameters.md)):
@@ -212,6 +223,7 @@ width/casing); `config`/`selection` override individual keys. Programmatic paths
 | `selection_style(base_width)` | neon-violet selected-edge layers |
 | `PALETTES`, `BASEMAPS` | the palette / base-map tables |
 | `use_settings(path_or_dict)` | apply a settings override from code |
+| `snapshot(map_or_html, "fig.png", center=…, zoom=…, pitch=…)` | static PNG via headless browser (optional `playwright`) |
 
 Full docs: see [`docs/`](docs/index.md) (MkDocs — `mkdocs serve`). Styling spec is transcribed
 from the cartographic design docs in the `osm-traffic-enrichment` project.

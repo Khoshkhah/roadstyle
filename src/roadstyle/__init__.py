@@ -46,6 +46,7 @@ from .palettes import (
     save_palette,
 )
 from .render import render_edges
+from .snapshot import snapshot
 from .style import base_style, normalize_highway, resolve, selection_style
 from .stylers import (
     CategoricalStyler,
@@ -92,7 +93,7 @@ def use_settings(source=None) -> None:
 __version__ = "0.2.0.dev0"
 
 __all__ = [
-    "render_edges", "filter_edges", "highway_types", "use_settings",
+    "render_edges", "filter_edges", "highway_types", "use_settings", "snapshot",
     "resolve", "base_style", "selection_style", "normalize_highway",
     "PALETTES", "HIGHSAT", "CARTO", "SELECTION", "RoadStyle",
     "BASEMAPS", "Basemap", "get_basemap", "BaseLayerSwitcher",

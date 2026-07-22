@@ -411,3 +411,14 @@ def test_web_camera_max_pitch():
     """The tilt limit is a setting (camera.max_pitch, default 85) — MapLibre's default 60 made
     the camera stop partway when tilting interactively."""
     assert "maxPitch:85" in render_edges(_edges(), backend="web").html
+
+
+def test_snapshot_writes_png(tmp_path):
+    """rs.snapshot: WebMap -> PNG through headless Chromium, honouring the camera args."""
+    import roadstyle as rs
+
+    wm = render_edges(_edges(), backend="web")
+    out = tmp_path / "shot.png"
+    rs.snapshot(wm, out, zoom=13, width=500, height=400, settle=1.5)
+    data = out.read_bytes()
+    assert data[:8] == b"\x89PNG\r\n\x1a\n" and len(data) > 10_000

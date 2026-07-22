@@ -654,6 +654,8 @@ box-shadow:0 1px 4px rgba(0,0,0,.3);padding:4px 7px;font:13px system-ui,sans-ser
 box-shadow:0 1px 4px rgba(0,0,0,.3);font:13px system-ui,sans-serif;max-height:70%;overflow:auto}
 .flt-ctrl .flt-hd{padding:5px 9px;cursor:pointer;font-weight:600;user-select:none}
 .flt-ctrl .flt-body{padding:0 9px 7px;display:flex;flex-direction:column;gap:2px}
+.flt-sw{display:inline-block;width:16px;height:5px;border-radius:2px;margin:0 2px 0 5px;
+  vertical-align:middle;border:1px solid rgba(0,0,0,.25)}
 .flt-ctrl.collapsed .flt-body{display:none}
 .flt-ctrl label{cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px}
 .co-ctrl{position:absolute;top:10px;right:10px;z-index:2;background:#fff;border-radius:5px;
@@ -679,6 +681,7 @@ const map = new maplibregl.Map({container:"map", style:style, center:__CENTER__,
   pitch:__PITCH__, bearing:__BEARING__, maxPitch:__MAX_PITCH__,
   attributionControl:{compact:true}});
 map.addControl(new maplibregl.NavigationControl({visualizePitch:true}));
+map.addControl(new maplibregl.ScaleControl({maxWidth:120, unit:"metric"}), "bottom-left");
 // 2D/3D camera toggle: tilting hides behind right-drag otherwise. Shows the view it will
 // switch TO; 2D also squares the bearing back to north.
 const PITCH3D = __PITCH3D__;
@@ -722,7 +725,10 @@ if(FILTER.on){
   FILTER.classes.forEach(c=>{
     const lab=document.createElement("label");
     const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=true; cb.onchange=applyFilter;
-    cbs[c]=cb; lab.appendChild(cb); lab.appendChild(document.createTextNode(" "+c)); body.appendChild(lab);
+    cbs[c]=cb; lab.appendChild(cb);
+    const sw=document.createElement("span"); sw.className="flt-sw";
+    sw.style.background=(FILTER.swatches||{})[c]||"#888"; lab.appendChild(sw);
+    lab.appendChild(document.createTextNode(" "+c)); body.appendChild(lab);
   });
   document.body.appendChild(box);
   map.on("load",()=>{ roadIds().forEach(id=>{ baseF[id]=map.getFilter(id)||null; }); });
@@ -1205,14 +1211,17 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     # source's own road class while widths/casing follow an OSM-highway proxy. The web filter reads
     # this raw property directly (["get", col]), so no re-bake is needed.
     fcol = filter_col or highway_col
-    classes, seen = [], set()
+    classes, seen, swatches = [], set(), {}
     for ft in geo["features"]:
-        c = ft.get("properties", {}).get(fcol)
+        p_ = ft.get("properties", {})
+        c = p_.get(fcol)
         if c and c not in seen:
             seen.add(c)
             classes.append(c)
+            swatches[c] = p_.get("__rs_fill") or "#888888"
     classes.sort(key=lambda c: (-ROAD_Z.get(_base(c)[0], 4), c))
-    flt = {"on": bool(filter_control and classes), "col": fcol, "classes": classes}
+    flt = {"on": bool(filter_control and classes), "col": fcol, "classes": classes,
+           "swatches": swatches}
 
     minx, miny, maxx, maxy = (float(v) for v in g.total_bounds)
     # after every style/filter/bounds decision above — those read the features, the browser never does
