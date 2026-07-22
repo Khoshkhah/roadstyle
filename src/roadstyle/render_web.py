@@ -716,17 +716,22 @@ const map = new maplibregl.Map({container:"map", style:style, center:__CENTER__,
   attributionControl:{compact:true}});
 map.addControl(new maplibregl.NavigationControl({visualizePitch:true}));
 map.addControl(new maplibregl.ScaleControl({maxWidth:120, unit:"metric"}), "bottom-left");
-// 2D/3D camera toggle: tilting hides behind right-drag otherwise. Shows the view it will
-// switch TO; 2D also squares the bearing back to north.
+// 2D/3D camera: window.rsSetView3D(on) tilts to the configured camera.pitch_3d (2D also
+// squares the bearing back to north); the toggle button is UI over it and follows any pitch
+// change — its label shows the view it will switch TO.
 const PITCH3D = __PITCH3D__;
+function rsSetView3D(on){
+  on ? map.easeTo({pitch:PITCH3D, duration:600}) : map.easeTo({pitch:0, bearing:0, duration:600});
+  document.dispatchEvent(new CustomEvent("rs:viewchange",{detail:{view3d:!!on}}));
+}
+window.rsSetView3D = rsSetView3D;
 map.addControl({onAdd(m){
   const d=document.createElement("div"); d.className="maplibregl-ctrl maplibregl-ctrl-group";
   const b=document.createElement("button"); b.type="button";
   b.style.cssText="font:700 11px/1 system-ui;letter-spacing:.03em";
   const upd=()=>{ b.textContent = m.getPitch()<5 ? "3D" : "2D";
                   b.title = m.getPitch()<5 ? "Tilt the view" : "Back to flat"; };
-  b.onclick=()=>{ m.getPitch()<5 ? m.easeTo({pitch:PITCH3D, duration:600})
-                                 : m.easeTo({pitch:0, bearing:0, duration:600}); };
+  b.onclick=()=>{ rsSetView3D(m.getPitch()<5); };
   m.on("pitchend", upd); m.on("pitch", upd); upd();
   d.appendChild(b); return d;
 }, onRemove(){}});
@@ -1033,6 +1038,29 @@ function rsDeselect(){
   rsInfoClear();
   document.dispatchEvent(new CustomEvent("rs:deselect"));
 }
+window.rsDeselect = rsDeselect;
+// programmatic selection by id (same id space as rsQuery / rs:select): highlight + popup/panel
+// + rs:select, exactly like a click. The floating popup anchors at the edge's midpoint.
+function _midOf(g){ if(!g) return null;
+  const cs = g.type==="LineString" ? g.coordinates :
+             g.type==="MultiLineString" ? g.coordinates[0] : null;
+  return cs && cs.length ? cs[Math.floor(cs.length/2)] : null; }
+function rsSelect(id){
+  const f=_feats()[id]; if(!f) return;
+  clearOvSel();
+  if(_sel) setS(_sel,{select:false});
+  _sel={s:"roads", key:"r"+id, ids:[id]}; setS(_sel,{select:true});
+  document.dispatchEvent(new CustomEvent("rs:select",
+    {detail:{id:id, layer:null, properties:f.properties || {}}}));
+  if(__ROAD_POPUP__){
+    const html=_rfields(f.properties||{}, _popupFields);
+    if(_popupMode === "panel"){ rsInfoShow(html); }
+    else{ const c=_midOf(f.geometry);
+      if(c) new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
+        .setLngLat(c).setHTML(html).addTo(map); }
+  }
+}
+window.rsSelect = rsSelect;
 const _ttip = __ROAD_TOOLTIP__, _ttipOnly = Array.isArray(_ttip) ? _ttip : null;  // false | true | [fields]
 const _tip = _ttip ? new maplibregl.Popup(
   {closeButton:false, closeOnClick:false, maxWidth:"260px", offset:10, className:"rs-tip"}) : null;

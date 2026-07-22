@@ -267,6 +267,8 @@ rsSetBasemap("dark_matter");                // by key, label, or index   → rs:
 rsSetClasses(["primary", "secondary"]);     // show exactly these classes → rs:filterchange
 rsSetColorField("Traffic");                 // switch the colour layer    → rs:colorchange
 rsSetOverlay("Zones", false);               // hide/show one overlay      → rs:overlaychange
+rsSetView3D(true);                          // tilt to the settings' 3D pitch → rs:viewchange
+rsSelect(id); rsDeselect();                 // select an edge like a click (popup/panel + glow)
 map.easeTo({pitch: 60, bearing: 30});       // camera: window.map is the MapLibre Map itself
 
 document.addEventListener("rs:basemapchange", e => console.log(e.detail.basemap));

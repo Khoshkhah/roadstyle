@@ -531,3 +531,12 @@ def test_query_id_verbs_are_baked():
     for needle in ("window.rsQuery", "window.rsFilter", "window.rsColor",
                    "window.rsHighlight", "window.rsGetProps", "rs:highlightchange"):
         assert needle in wm.html, needle
+
+
+def test_view3d_and_select_hooks_are_baked():
+    """rsSetView3D / rsSelect / rsDeselect complete the API: every interaction has a
+    programmatic twin."""
+    wm = render_edges(_edges(), backend="web")
+    for needle in ("window.rsSetView3D", "window.rsSelect", "window.rsDeselect",
+                   "rs:viewchange"):
+        assert needle in wm.html, needle

@@ -113,6 +113,8 @@ dispatches a CustomEvent on `document`:
 | `rsColor(ids, "#hex")` | paint the set one colour, layered over the active colour option (`null` resets) | `rs:colorchange` |
 | `rsHighlight(ids)` | selection glow on the set (`[]` clears) | `rs:highlightchange` |
 | `rsGetProps(ids)` | the rows behind the ids, internal fields stripped — table-ready | — |
+| `rsSelect(id)` / `rsDeselect()` | select one edge exactly like a click (glow + popup/panel) / clear | `rs:select` / `rs:deselect` |
+| `rsSetView3D(on)` | tilt to the settings' `camera.pitch_3d` / back to flat north-up | `rs:viewchange` |
 
 The id sets use the roads source's generated feature ids — the same id space as `rs:select`
 events. Labels, arrows and 3D deck ribbons sit on merged helper sources, so `rsFilter` prunes
