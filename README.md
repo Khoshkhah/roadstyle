@@ -14,7 +14,8 @@ The **`web` backend** (`backend="web"`) goes further, matching the *openstreetma
 **3D view** (`view_3d=True`: tilted camera, extruded ramped **bridge decks**, an on-map 2D/3D
 toggle), and an optional **boundary overlay** — all in one **offline, self-contained HTML** file
 (MapLibre and the data bundled in; no server needed). See
-[`docs/web-backend.md`](docs/web-backend.md).
+[`docs/web-backend.md`](docs/web-backend.md), and **[the gallery](docs/gallery.md)** for one
+screenshot + recipe per look.
 
 Three palettes (data files you can [override](#customising-palettes--config-data-files-no-code-edit)):
 - **`highsat`** — custom high-saturation palette (cyan motorway, pink trunk, orange primary…)

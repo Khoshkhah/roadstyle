@@ -18,6 +18,7 @@ nav:
   - Manual (live maps): manual.md
   - Tutorial: tutorial.md
   - Examples: examples.md
+  - Gallery: gallery.md
   - Parameter reference: parameters.md
   - MapLibre web backend: web-backend.md
   - Embedding in a website: embedding.md
