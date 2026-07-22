@@ -733,7 +733,11 @@ window.map = map;
 </script></body></html>"""
 
 
-_MAPLIBRE_CDN = "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist"   # == the vendored version
+# Notebook previews pin MapLibre v3: v4+ silently never finishes style loading inside Jupyter
+# Notebook 7's page (data lands, zero features render) — reproduced against a live server; v3
+# renders the identical style JSON fine. Saved files keep the vendored 4.7.1 (unaffected in a
+# normal browser tab).
+_MAPLIBRE_CDN = "https://cdn.jsdelivr.net/npm/maplibre-gl@3.6.2/dist"
 
 
 class WebMap:
