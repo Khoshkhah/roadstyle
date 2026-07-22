@@ -272,7 +272,8 @@ The file layout mirrors `defaults.json` — four sections, all optional, merged 
     "labels": { "color": "#8899aa" },                  // street-name paint
     "camera": { "pitch_3d": 65, "max_pitch": 85 },     // 3D tilt targets
     "bridge_decks": { "opacity": 0.6, "step_m": 0.5 }, // 3D deck look
-    "annotations": { "slot_m": 120 }                   // name/arrow slot length
+    "annotations": { "slot_m": 120 },                  // name/arrow slot length
+    "overlays": { "color": "#2d6cdf", "radius": 8 }    // overlay layer defaults
   },
   "selection": { "core": "#FF0000" },                  // click-highlight colours
   "roads": {

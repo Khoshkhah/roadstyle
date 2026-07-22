@@ -598,27 +598,33 @@ def _overlay_layers(sid, ov, kind, hover_color="#b388ff", select_color="#7c4dff"
 
     Interactive overlays (those with a popup) recolour on hover / select via feature-state, the same
     way roads do, so the hovered / clicked feature highlights."""
+    C = {"color": "#6aa9ff", "radius": 6.0, "width": 2.0, "fill_opacity": 0.15,
+         "circle_opacity": 0.85, "line_opacity": 0.9, "outline_opacity": 0.9,
+         "circle_stroke": "#ffffff", **(CONFIG.overlays or {})}
+    base = ov.color or C["color"]                     # per-Overlay value wins over the setting
+    width = C["width"] if ov.width is None else ov.width
+    radius = C["radius"] if ov.radius is None else ov.radius
     op = ov.opacity
     interactive = ov.popup is None or bool(ov.popup)
-    col = _ov_hl(ov.color, hover_color, select_color, interactive)
+    col = _ov_hl(base, hover_color, select_color, interactive)
     lay = {"visibility": "visible" if getattr(ov, "visible", True) else "none"}
     if kind == "fill":
         return [
             {"id": f"{sid}-fill", "type": "fill", "source": sid, "layout": dict(lay),
-             "paint": {"fill-color": col, "fill-opacity": 0.15 if op is None else op}},
+             "paint": {"fill-color": col, "fill-opacity": C["fill_opacity"] if op is None else op}},
             {"id": f"{sid}-outline", "type": "line", "source": sid, "layout": dict(lay),
-             "paint": {"line-color": ov.outline or ov.color, "line-width": ov.width,
-                       "line-opacity": 0.9}},
+             "paint": {"line-color": ov.outline or base, "line-width": width,
+                       "line-opacity": C["outline_opacity"]}},
         ]
     if kind == "circle":
         return [{"id": f"{sid}-circle", "type": "circle", "source": sid, "layout": dict(lay),
-                 "paint": {"circle-radius": ov.radius, "circle-color": col,
-                           "circle-opacity": 0.85 if op is None else op,
-                           "circle-stroke-color": "#ffffff", "circle-stroke-width": 1}}]
+                 "paint": {"circle-radius": radius, "circle-color": col,
+                           "circle-opacity": C["circle_opacity"] if op is None else op,
+                           "circle-stroke-color": C["circle_stroke"], "circle-stroke-width": 1}}]
     return [{"id": f"{sid}-line", "type": "line", "source": sid,
              "layout": {**lay, "line-cap": "round"},
-             "paint": {"line-color": col, "line-width": ov.width,
-                       "line-opacity": 0.9 if op is None else op}}]
+             "paint": {"line-color": col, "line-width": width,
+                       "line-opacity": C["line_opacity"] if op is None else op}}]
 
 
 def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4dff"):

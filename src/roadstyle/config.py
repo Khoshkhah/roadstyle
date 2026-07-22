@@ -63,6 +63,12 @@ class StyleConfig:
     bridge_decks: dict = field(default_factory=lambda: {"base_m": 5.0, "thickness_m": 1.0,
                                                         "ramp_m": 40.0, "step_m": 2.5,
                                                         "match_zoom": 18.0, "opacity": 0.7})
+    #: overlay layer defaults (web backend): colour, circle radius, line/outline width, the
+    #: per-kind opacities, and the circle stroke. A per-Overlay value always wins.
+    overlays: dict = field(default_factory=lambda: {
+        "color": "#6aa9ff", "radius": 6.0, "width": 2.0, "fill_opacity": 0.15,
+        "circle_opacity": 0.85, "line_opacity": 0.9, "outline_opacity": 0.9,
+        "circle_stroke": "#ffffff"})
     #: annotation slots (web backend): each road chain is divided into equal slot_m-metre pieces;
     #: names take even slots, oneway arrows odd ones — alternating, never stacked. Text/icon zoom
     #: ramps and collision culling handle density automatically; unnamed name-slots stay empty.

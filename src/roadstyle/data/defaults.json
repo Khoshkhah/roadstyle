@@ -424,6 +424,16 @@
       "step_m": 2.5,
       "match_zoom": 18.0,
       "opacity": 0.7
+    },
+    "overlays": {
+      "color": "#6aa9ff",
+      "radius": 6.0,
+      "width": 2.0,
+      "fill_opacity": 0.15,
+      "circle_opacity": 0.85,
+      "line_opacity": 0.9,
+      "outline_opacity": 0.9,
+      "circle_stroke": "#ffffff"
     }
   },
   "selection": {

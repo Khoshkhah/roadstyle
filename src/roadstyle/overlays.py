@@ -37,11 +37,11 @@ class Overlay:
     data: object
     kind: str | None = None
     placement: str = "over"
-    color: str = "#6aa9ff"
+    color: str | None = None           # None = the `overlays` settings default
     opacity: float | None = None
     outline: str | None = None
-    radius: float = 6.0
-    width: float = 2.0
+    radius: float | None = None
+    width: float | None = None
     label: str | None = None
     popup: list[str] | None = None
     visible: bool = True               # initial visibility (the Layers toggle starts checked/unchecked to match)

@@ -463,3 +463,15 @@ def test_render_edges_scoped_settings():
     assert '"text-color": "#123123"' in styled
     plain = render_edges(_edges(), backend="web").html
     assert '"text-color": "#5b5b5b"' in plain      # fully restored afterwards
+
+
+def test_overlay_defaults_come_from_settings():
+    """Overlay styling defaults live in the `overlays` settings block (per-Overlay values win)."""
+    from roadstyle import Overlay
+    styled = render_edges(_edges(), backend="web", overlays=[Overlay(_pois())],
+                          settings={"config": {"overlays": {"color": "#112233", "radius": 11}}}).html
+    assert "#112233" in styled and '"circle-radius": 11' in styled
+    explicit = render_edges(_edges(), backend="web",
+                            overlays=[Overlay(_pois(), color="#ffd166")],
+                            settings={"config": {"overlays": {"color": "#112233"}}}).html
+    assert "#ffd166" in explicit                     # per-Overlay value wins over the setting
