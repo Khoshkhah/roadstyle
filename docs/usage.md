@@ -50,6 +50,8 @@ edges = rs.normalize_edges(raw, class_col="highway", rename={"vagtyp": "highway"
 ```
 
 `render_edges` (and `to_spec`, etc.) also accept a plain GeoDataFrame and normalise it for you.
+From a **duckOSM** database, skip the manual query — `rs.from_duckosm("area.duckdb")` selects
+the full data contract (road class, name, oneway, grade tags, a JavaScript-safe `edge_id`).
 
 ## Quick start
 
@@ -65,7 +67,7 @@ rs.render_edges(edges, basemap="dark_matter").save("roads.html")
 ## Recipes
 
 ```python
-# Themes, palettes, filtering, satellite, selection
+# Palettes, base maps, filtering, selection
 rs.render_edges(edges, palette="carto",
                 include=["motorway", "trunk", "primary"])
 rs.render_edges(edges, basemap="satellite")
@@ -127,6 +129,15 @@ rs.render_edges(edges, backend="web",
 
 Prefer to **see** these working? The **[Manual](manual.md)** walks through them with the live map
 embedded after each step.
+
+## Settings & the JavaScript API
+
+Every styling default lives in one settings file with a 5-level override ladder — see
+[Palettes → settings](palettes.md#customising-data-files-and-overrides); per-call:
+`render_edges(edges, settings={...})`. And every in-map control is scriptable from JS
+(`rsSetBasemap`, `rsQuery` id-set verbs, `rs:*` events) — see
+[the JS API](web-backend.md#the-javascript-api-windowrs) and the copyable
+[`ui/` templates](https://github.com/Khoshkhah/roadstyle/tree/main/ui).
 
 ## Custom (non-OSM) road classes
 

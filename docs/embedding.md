@@ -18,7 +18,7 @@ can put a styled road map into any web page — from "drop in an iframe, write z
 
 All of them take the same styling arguments as
 [`render_edges`](parameters.md#2-render_edges-the-main-entry-point) (`color_by`, `cmap`,
-`colors`, `width_by`, `theme`, …).
+`colors`, `width_by`, …).
 
 ## The canonical JSON spec
 
@@ -55,7 +55,7 @@ it doesn't need roadstyle's logic:
 | `__rs_w` | fill width (px) |
 | `__rs_op` | fill opacity |
 | `__rs_dash` | dash pattern (or null) |
-| `__rs_casing` | casing colour for this theme (or null) — **what every backend draws** |
+| `__rs_casing` | resolved casing colour (or null) — **what every backend draws** |
 | `__rs_casing` | the casing colour (one per edge, constant on every base map) |
 | `__rs_cw` | casing width (px) |
 | `__rs_cop` | casing opacity |

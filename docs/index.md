@@ -31,7 +31,15 @@ roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by
   bring your own vocabulary with `register_palette` / palette JSON.
 - **Data-driven styling** — colour/size roads by any **categorical** column (`color_by`+`colors`)
   or **numeric** column (`color_by`+`cmap`+`width_by`), with automatic legends.
-- **Themes & base maps** — light / dark / satellite, with a thumbnail base-map switcher.
+- **Base maps** — voyager / positron / dark matter / OSM / satellite, plus the tile-less
+  `blank` canvas (zero network requests — fully offline), with an in-map switcher.
+- **3D view** — `view_3d=True`: tilted camera, extruded ramped **bridge decks** with black
+  casing, an on-map 2D/3D toggle.
+- **Scriptable** — every control has a `window.rs*` JavaScript twin, plus id-set queries
+  (`rsQuery` → filter / colour / highlight / table / fly-to) and `rs:*` events; copyable UI
+  templates live in `ui/`.
+- **One settings file** — every styling default in `data/defaults.json`, overridable via
+  `roadstyle.json`, `rs.use_settings(...)`, or a per-call `settings=`.
 - **Backends + web output** — folium (portable HTML), lonboard (WebGL), a self-contained
   **MapLibre `web` backend** (per-zoom widths, two-way lanes, arrows/names, hover/select,
   tunnel/bridge grade separation — offline, no server; see [web backend](web-backend.md)), and
@@ -46,6 +54,7 @@ roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by
 
 ## Where to next
 
+- **[Gallery](gallery.md)** — one screenshot + recipe per look.
 - **[Manual](manual.md)** — a hands-on walk-through with the **live map embedded after each step**.
 - **[Usage](usage.md)** — install, the command line, quick start, recipes.
 - **[Parameter reference](parameters.md)** — every parameter explained.

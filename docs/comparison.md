@@ -24,7 +24,7 @@ the right one.
   read cleanly (`.explore()` draws a single flat line);
 - **per-class cartographic widths** (motorway wider than residential) and OSM treatments
   (tunnel fade, bridge casing, `_link` narrowing, dashed paths);
-- **theme-aware casing** (light vs dark/satellite) and a thumbnail base-map switcher;
+- proper **casing + fill** styling over any base map, and an in-map base-map switcher;
 - a **stack-agnostic JSON spec** for embedding in a non-folium website.
 
 Use `.explore()` for a fast look at arbitrary geometry; use roadstyle when the output is a

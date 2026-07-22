@@ -34,6 +34,7 @@ From the command line this backend is `-f web` (the default): `roadstyle edges.g
 | **Street-name labels** | Names are placed along the road (curved), from the `name` column. |
 | **Hover / select** | Hovering highlights the road under the cursor; clicking selects it and shows its attributes; clicking the background deselects (restoring the original colour). Driven by MapLibre `feature-state` — a GPU recolour, no re-layout. |
 | **Base-layer switcher** | An in-map dropdown to switch the background (dark / light / voyager / satellite / OSM / a tile-less `blank` canvas). |
+| **Scale bar + zoom read-out** | A metric scale bar bottom-left with a live `z 16.4` badge beside it. |
 | **Road z-order** | Higher-class roads draw over lower ones at junctions (a motorway over a residential), with `_link` ramps tucked just under their through road. |
 | **Tunnel / bridge grade separation** | Tunnels draw *underneath* (dashed + faded), bridges draw *on top* (heavier, square-capped casing) — see below. |
 | **Dynamic recolouring** | Bake several "colour by" options with `color_options=` and switch between them client-side from a **Colour by** dropdown — no re-render, no server. See [below](#dynamic-recolouring-color_options). |
@@ -277,6 +278,12 @@ by `bridge_decks.width_scale` (default `0.6` — at a tilted camera the extruded
 apparent width, so a 1:1 ribbon reads too fat). A fixed polygon can't track the stylized px road
 widths across zooms, so decks read slightly narrow when zoomed far out — tune `width_scale` /
 `match_zoom` in settings if your typical viewing zoom differs.
+Each deck also carries a **black casing**: side strips in `bridge_casing_color`, `casing_px`
+(default 2) wide, topping out just below the deck surface — the 3D equivalent of the 2D bridges'
+line casing (`bridge_decks.casing_px: 0` disables). Below **`bridge_decks.flat_below`**
+(default 16) bridges render as the classic flat cased lines instead — full stylized width,
+matching the roads — and the decks take over from that zoom up; selection glows on whichever
+representation is showing.
 Decks are semi-transparent (`bridge_decks.opacity`), hover/select as ONE structure, and show the
 same popup fields as flat edges. Every map also carries an on-map **2D/3D toggle** button and a
 pitch-aware compass; no terrain/elevation data is used — the deck height is cartographic.

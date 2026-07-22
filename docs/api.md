@@ -9,10 +9,19 @@ A map of the public API. For every parameter and its meaning, see the
 |---|---|---|
 | `render_edges(gdf, ...)` | `WebMap` / `folium.Map` / `lonboard.Map` | the main entry point — render a styled map (default backend `"web"`) |
 
-Key kwargs: `backend`, `palette`, `theme`, `highway_col`, `include`/`exclude`, `selected`,
-`tooltip`, `basemap`/`basemaps`, the data-driven set `style` / `color_by` / `colors` / `cmap` /
-`vmin` / `vmax` / `width_by` / `legend`, and (web backend) `color_options` (switchable colouring)
-and `overlays` (extra layers).
+Key kwargs: `backend`, `palette`, `highway_col`, `include`/`exclude`, `selected`, `tooltip`,
+`basemap`/`basemaps`, `view_3d` / `pitch` / `bearing`, `settings` (per-call override), the
+data-driven set `style` / `color_by` / `colors` / `cmap` / `vmin` / `vmax` / `width_by` /
+`legend`, and (web backend) `color_options` (switchable colouring), `overlays` (extra layers)
+and `compress`.
+
+## Loading & tooling
+
+| Function | Returns | Purpose |
+|---|---|---|
+| `from_duckosm(db, schema="driving")` | `RoadEdges` | load a duckOSM driving network with the full data contract (grade tags, oneway, text-safe `edge_id`) |
+| `use_settings(path_or_dict, ...)` | — | apply a settings override at runtime (`use_settings()` drops it) |
+| `snapshot(map_or_html, out_png, *, center, zoom, pitch, bearing, ...)` | path | static PNG via headless Chromium (optional `playwright` dependency) |
 
 ## Web / JSON output
 
@@ -29,7 +38,7 @@ and `overlays` (extra layers).
 
 | Object | Purpose |
 |---|---|
-| `Styler` | protocol: `resolve_frame(gdf, theme) -> ResolvedFrame` |
+| `Styler` | protocol: `resolve_frame(gdf) -> ResolvedFrame` |
 | `ClassStyler` | colour by road class via a palette (the OSM default) |
 | `CategoricalStyler` | colour by a discrete column + `{value: colour}` map |
 | `NumericStyler` | colour by a numeric column via a continuous ramp |
@@ -43,14 +52,13 @@ and `overlays` (extra layers).
 |---|---|
 | `Overlay` | an extra layer the caller brings (zone polygons, POI circles, any geometry) — drawn under/over the roads on the `web` backend via `render_edges(..., overlays=[...])`. See [parameters §8](parameters.md#8-overlay-extra-layers). |
 
-## Input, palettes, themes, base maps
+## Input, palettes, base maps
 
 | Object | Purpose |
 |---|---|
 | `RoadEdges`, `normalize_edges`, `load_edges`, `as_edges` | canonical input (EPSG:4326, lines) |
 | `RoadStyle`, `PALETTES`, `HIGHSAT`, `CARTO` | palette data |
 | `register_palette`, `save_palette`, `load_palette`, `palette_to_dict`, `palette_from_dict` | palette extensibility + JSON I/O |
-| `Theme`, `THEMES`, `get_theme`, `register_theme` | themes |
 | `Basemap`, `BASEMAPS`, `get_basemap`, `register_basemap`, `BaseLayerSwitcher` | base maps |
 | `StyleConfig` | global opacity/width knobs |
 
@@ -58,9 +66,9 @@ and `overlays` (extra layers).
 
 | Function | Returns | Purpose |
 |---|---|---|
-| `resolve(highway, palette, theme, tunnel, bridge)` | `ResolvedStyle` | one edge's resolved style |
+| `resolve(highway, palette, tunnel, bridge)` | `ResolvedStyle` | one edge's resolved style |
 | `base_style(highway, palette)` | `RoadStyle` | the palette entry for a class |
-| `selection_style(theme)` | `dict` | the neon-violet selection profile |
+| `selection_style(base_width)` | `dict` | the neon-violet selection profile |
 | `filter_edges(gdf, include, exclude, ...)` | `GeoDataFrame` | filter by class |
 | `highway_types(gdf)` | `list` | distinct classes present |
 | `normalize_highway(value)` | `(base, is_link)` | OSM `_link` normalisation |

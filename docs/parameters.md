@@ -75,7 +75,8 @@ GeoDataFrame with line geometry + a class column).
 | `selected` | GeoDataFrame / `None` | `None` | Highlight these edges with a neon-violet overlay. |
 | `basemap` | str / `None` | `None` | The primary base map (a key in `BASEMAPS`); default from the `basemap` setting (`voyager`). |
 | `pitch` / `bearing` | number / `None` | settings | Starting camera tilt / rotation (`camera` settings block). |
-| `view_3d` | bool | `False` | 3D view: tilted camera + extruded, ramped bridge decks (`bridge_decks` settings block). |
+| `view_3d` | bool | `False` | 3D view: tilted camera + extruded, ramped, cased bridge decks (`bridge_decks` settings block: `base_m`, `ramp_m`, `opacity`, `match_zoom`, `width_scale`, `casing_px`, and `flat_below` — below that zoom bridges draw as classic flat cased lines). |
+| `compress` | bool | `False` | Gzip the inlined GeoJSON sources (typically 3–4× smaller files; the page inflates them on load — also keeps inline notebook previews under output-size limits). |
 | `settings` | dict / path / `None` | `None` | Per-call settings override (same layout as `roadstyle.json`); applied for this render only, restored after. |
 | `basemaps` | list / `None` | `None` | (folium) The set of base maps offered in the switcher control. |
 | `filter_control` | bool | `True` | Show the in-map road-type filter panel (checkboxes). On `folium` and the `web` backend. |
