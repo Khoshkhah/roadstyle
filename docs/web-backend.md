@@ -246,3 +246,24 @@ Each road chain is divided into equal `annotations.slot_m`-metre slots: street n
 even slots, one-way arrows the odd ones — alternating along the road, never stacked. Unnamed
 roads leave their name slots empty. Text/icon zoom ramps plus MapLibre's collision culling handle
 density automatically; label/arrow colours live in the `labels` / `arrows` settings blocks.
+
+
+## Roads vs. overlays — the architecture
+
+The **road layer is the subject; overlays are annotations.** Both take their default styling
+from the settings file, but they are entirely different machinery:
+
+| | Roads (main layer) | Overlays |
+|---|---|---|
+| Styling | the full cartographic engine: palettes per class, zoom-scaled width curves, casing sandwich, draw-order ranks | one flat paint each — a single colour, opacity, width/radius |
+| Structure | grade separation (tunnels faded below, bridges on top, 3D decks), two-way lane fanning, junction-sealed caps | none — a fill, a line, or circles |
+| Annotations | street-name labels + one-way arrows in alternating slots | none |
+| Data-driven colour | `color_by` ramps, `color_table`, the *Colour by* dropdown with legends | constant colour per overlay |
+| Interaction | hover highlight, whole-bridge selection, popup/panel, `rs:select` events, class filter panel | hover tint + popup, visibility checkbox in the Layers toggle |
+| Settings footprint | most of `defaults.json` (palettes, `roads` model, labels, arrows, slots, decks, camera) | the small `overlays` defaults block |
+| Data contract | `highway` + the optional columns (see the README data contract) | any geometry; properties feed the popup only |
+
+An overlay never grows casings or labels — by design, so the roads stay visually dominant and
+overlays read as context. If a *second linear network* deserves road-grade treatment (e.g. NVDB
+next to OSM), don't overlay it: render it **as** the main layer with a custom class vocabulary
+(`highway_col=` + a registered palette).

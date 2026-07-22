@@ -126,6 +126,12 @@ render_edges(
 ).save("with_layers.html")
 ```
 
+**Roads vs. overlays:** the road layer is the *subject* (full cartographic engine — widths,
+casing, labels, arrows, grade separation, data-driven colour); overlays are *annotations* (one
+flat paint each, popup + Layers toggle). An overlay never grows casings or labels — if a second
+linear network deserves road-grade treatment, render it **as** the main layer with a custom
+class vocabulary instead. Full comparison: [`docs/web-backend.md`](docs/web-backend.md#roads-vs-overlays--the-architecture).
+
 ### Several colour layers on one map (client-side switch)
 
 `color_options` bakes **multiple fill sets** into a single map and adds a *Colour by* dropdown —
