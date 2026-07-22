@@ -241,32 +241,46 @@ Every keyword of `render_edges` (full reference: [`docs/parameters.md`](docs/par
 Everything *stylistic* (colours, widths, casing, labels, arrows, annotation slots, camera
 defaults, bridge decks…) is not a keyword but a **setting** — see the next section.
 
-## Customising palettes & config (data files, no code edit)
+## Giving the library your settings
 
-The built-in palettes and styling knobs are **data, not code** — one JSON file shipped in the
-package (`roadstyle/data/defaults.json`: palettes, config, selection, and the road width/draw-order
-model). To change a colour or
-a knob, edit those files, or — without touching the package — drop a `roadstyle.json` override
-that is read at import time. Override sources, lowest precedence first (later wins):
+EVERY styling default — palettes, opacities, casing, the width/draw-order model, base map,
+camera, labels, arrows, annotation slots, bridge decks — ships in **one file**,
+`roadstyle/data/defaults.json`. You never edit it: you hand roadstyle a **settings override**
+stating only what changes, in any of four ways (later wins):
 
-1. `~/.config/roadstyle/roadstyle.json` (or `$XDG_CONFIG_HOME/roadstyle/roadstyle.json`)
-2. `./roadstyle.json` (project-local, current working dir)
-3. `$ROADSTYLE_CONFIG` (explicit file path)
+1. `~/.config/roadstyle/roadstyle.json` — your personal defaults, every project
+2. `./roadstyle.json` — project-local (next to where you run)
+3. `$ROADSTYLE_CONFIG=/path/to/file.json` — explicit, per run
+4. **from code, at any time**: `rs.use_settings("my.json")` or `rs.use_settings({...})` —
+   highest precedence, applies immediately (no restart), and `rs.use_settings()` with no
+   argument drops it again. Two looks in one script = call it between renders.
+
+The file layout mirrors `defaults.json` — four sections, all optional, merged per entry
+(a single zoom stop of one width row is a valid complete override):
 
 ```jsonc
 {
   "palettes": {
-    "highsat": { "service": { "fill": "#E0E0E0" } },   // retint one class; rest is inherited
-    "mytheme": { "roads": { "motorway": { "fill": "#f00", "width": 6, "casing_width": 8 } } }
+    "highsat": { "service": { "fill": "#E0E0E0" } }    // retint one class; rest inherited
   },
-  "config":    { "fill_opacity": 0.95 },
-  "selection": { "core": "#FF0000" }
+  "config": {
+    "basemap": "dark_matter",                          // the primary base map layer
+    "labels": { "color": "#8899aa" },                  // street-name paint
+    "camera": { "pitch_3d": 65, "max_pitch": 85 },     // 3D tilt targets
+    "bridge_decks": { "opacity": 0.6, "step_m": 0.5 }, // 3D deck look
+    "annotations": { "slot_m": 120 }                   // name/arrow slot length
+  },
+  "selection": { "core": "#FF0000" },                  // click-highlight colours
+  "roads": {
+    "z_order": { "service": 5 },                       // draw priority of one class
+    "width":   { "secondary": { "18": 14 } }           // one zoom stop of one width row
+  }
 }
 ```
 
-Palette overrides are deep-merged **per road class** (change just `service.fill` and keep its
-width/casing); `config`/`selection` override individual keys. Programmatic paths still work too:
-`register_palette(name, table)`, `load_palette(path)`, or `render_edges(palette=…)`.
+Files 1–3 are read **at import** (exist before `import roadstyle`); `use_settings` is the
+**runtime** path and also rebuilds the already-loaded tables, so it works mid-notebook.
+Programmatic palette APIs still exist too: `register_palette(name, table)`, `load_palette(path)`.
 
 ## API at a glance
 
