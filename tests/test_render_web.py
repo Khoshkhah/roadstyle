@@ -405,3 +405,9 @@ def test_web_pick_survives_missing_layers():
     html = render_edges(_edges(), backend="web", view_3d=True).html
     assert "PICK_LAYERS.filter(id=>map.getLayer(id))" in html
     assert '"roads-bridge-decks"' in html.split("PICK_LAYERS")[1][:120]
+
+
+def test_web_camera_max_pitch():
+    """The tilt limit is a setting (camera.max_pitch, default 85) — MapLibre's default 60 made
+    the camera stop partway when tilting interactively."""
+    assert "maxPitch:85" in render_edges(_edges(), backend="web").html

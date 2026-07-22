@@ -676,7 +676,8 @@ box-shadow:0 1px 4px rgba(0,0,0,.3);font:13px system-ui,sans-serif;color:#222}
 <div id="map"></div><script>
 const style = __STYLE__, BASEMAPS = __BASEMAPS__;
 const map = new maplibregl.Map({container:"map", style:style, center:__CENTER__, zoom:13,
-  pitch:__PITCH__, bearing:__BEARING__, attributionControl:{compact:true}});
+  pitch:__PITCH__, bearing:__BEARING__, maxPitch:__MAX_PITCH__,
+  attributionControl:{compact:true}});
 map.addControl(new maplibregl.NavigationControl({visualizePitch:true}));
 // 2D/3D camera toggle: tilting hides behind right-drag otherwise. Shows the view it will
 // switch TO; 2D also squares the bearing back to north.
@@ -1143,7 +1144,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     # Both read their cosmetics from data/style.json "config" (labels / arrows blocks), so a user
     # roadstyle.json can restyle them without touching the library; missing keys keep the bundled
     # defaults (a partial override dict is fine).
-    cam = {"pitch": 0, "bearing": 0, "pitch_3d": 55, **(CONFIG.camera or {})}
+    cam = {"pitch": 0, "bearing": 0, "pitch_3d": 55, "max_pitch": 85, **(CONFIG.camera or {})}
     if view_3d:
         cam["pitch"] = cam["pitch_3d"]     # perspective camera only — no terrain data added
     if pitch is not None:
@@ -1223,6 +1224,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__FILTER__", json.dumps(flt))
             .replace("__CENTER__", json.dumps([(minx + maxx) / 2, (miny + maxy) / 2]))
             .replace("__PITCH3D__", json.dumps(cam["pitch_3d"]))
+            .replace("__MAX_PITCH__", json.dumps(cam["max_pitch"]))
             .replace("__HOVER_COLOR__", json.dumps(hover_color))
             .replace("__SELECT_COLOR__", json.dumps(select_color))
             .replace("__PITCH__", json.dumps(cam["pitch"]))
