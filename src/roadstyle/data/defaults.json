@@ -413,15 +413,8 @@
     },
     "camera": {
       "pitch": 0,
-      "bearing": 0
-    },
-    "terrain": {
-      "tiles": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
-      "encoding": "terrarium",
-      "max_zoom": 15,
-      "exaggeration": 1.3,
-      "pitch": 55,
-      "hillshade": true
+      "bearing": 0,
+      "pitch_3d": 55
     }
   },
   "selection": {

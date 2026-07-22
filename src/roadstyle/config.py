@@ -51,15 +51,10 @@ class StyleConfig:
                                                  "halo_width": 0})
     #: oneway-arrow chevrons (web backend): color, opacity
     arrows: dict = field(default_factory=lambda: {"color": "#5b5b5b", "opacity": 0.7})
-    #: starting camera (web backend): pitch (0-85 deg tilt) and bearing (deg clockwise from N);
-    #: per-call `pitch=` / `bearing=` override. Tilt/rotate stay interactive either way.
-    camera: dict = field(default_factory=lambda: {"pitch": 0, "bearing": 0})
-    #: 3D view (web backend, `view_3d=True`): DEM tile source (default: the free, keyless AWS
-    #: terrarium tiles), vertical exaggeration, the starting tilt, and an optional hillshade layer
-    terrain: dict = field(default_factory=lambda: {
-        "tiles": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
-        "encoding": "terrarium", "max_zoom": 15, "exaggeration": 1.3, "pitch": 55,
-        "hillshade": True})
+    #: camera (web backend): starting pitch (0-85 deg tilt) and bearing (deg clockwise from N),
+    #: plus pitch_3d — the tilt `view_3d=True` and the on-map 2D/3D toggle ease to.
+    #: Per-call `pitch=` / `bearing=` override; tilt/rotate stay interactive either way.
+    camera: dict = field(default_factory=lambda: {"pitch": 0, "bearing": 0, "pitch_3d": 55})
     #: annotation slots (web backend): each road chain is divided into equal slot_m-metre pieces;
     #: names take even slots, oneway arrows odd ones — alternating, never stacked. Text/icon zoom
     #: ramps and collision culling handle density automatically; unnamed name-slots stay empty.

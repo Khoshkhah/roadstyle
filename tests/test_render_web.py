@@ -326,17 +326,15 @@ def test_web_camera_pitch_and_bearing():
 
 
 def test_web_view_3d_flag():
-    """view_3d=True drapes the map on a DEM (style.terrain + raster-dem source + hillshade under
-    the roads) and starts tilted (terrain settings pitch); off by default."""
-    style = _style(render_edges(_edges(), backend="web", view_3d=True).html)
-    assert style["terrain"]["source"] == "dem"
-    assert style["sources"]["dem"]["type"] == "raster-dem"
-    ids = [l["id"] for l in style["layers"]]
-    assert ids.index("hillshade") < ids.index("roads-fill")
-    html = render_edges(_edges(), backend="web", view_3d=True).html
-    assert "pitch:55" in html
-    flat = _style(render_edges(_edges(), backend="web").html)
-    assert "terrain" not in flat and "dem" not in flat["sources"]
+    """view_3d=True is a perspective camera (camera settings pitch_3d) — NO terrain data: no DEM
+    source, no style.terrain, no hillshade layer. Off by default."""
+    wm = render_edges(_edges(), backend="web", view_3d=True)
+    style = _style(wm.html)
+    assert "terrain" not in style and "dem" not in style["sources"]
+    assert "hillshade" not in [l["id"] for l in style["layers"]]
+    assert "pitch:55" in wm.html
+    flat = render_edges(_edges(), backend="web").html
+    assert "pitch:0" in flat
 
 
 def test_web_camera_toggle_control():

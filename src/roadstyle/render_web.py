@@ -952,22 +952,9 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     # Both read their cosmetics from data/style.json "config" (labels / arrows blocks), so a user
     # roadstyle.json can restyle them without touching the library; missing keys keep the bundled
     # defaults (a partial override dict is fine).
-    cam = {"pitch": 0, "bearing": 0, **(CONFIG.camera or {})}
-    ter = {"tiles": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
-           "encoding": "terrarium", "max_zoom": 15, "exaggeration": 1.3, "pitch": 55,
-           "hillshade": True, **(CONFIG.terrain or {})}
+    cam = {"pitch": 0, "bearing": 0, "pitch_3d": 55, **(CONFIG.camera or {})}
     if view_3d:
-        # 3D view: drape everything over real elevation; free keyless DEM (AWS terrarium tiles)
-        style["sources"]["dem"] = {"type": "raster-dem", "tiles": [ter["tiles"]],
-                                   "tileSize": 256, "encoding": ter["encoding"],
-                                   "maxzoom": ter["max_zoom"],
-                                   "attribution": "Terrain: Mapzen/AWS Open Data"}
-        style["terrain"] = {"source": "dem", "exaggeration": ter["exaggeration"]}
-        if ter["hillshade"]:
-            # directly above the basemap raster, under every road layer
-            style["layers"].insert(1, {"id": "hillshade", "type": "hillshade", "source": "dem",
-                                       "paint": {"hillshade-exaggeration": 0.35}})
-        cam["pitch"] = ter["pitch"]
+        cam["pitch"] = cam["pitch_3d"]     # perspective camera only — no terrain data added
     if pitch is not None:
         cam["pitch"] = pitch
     if bearing is not None:
@@ -1044,7 +1031,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__BASEMAPS__", json.dumps(bms))
             .replace("__FILTER__", json.dumps(flt))
             .replace("__CENTER__", json.dumps([(minx + maxx) / 2, (miny + maxy) / 2]))
-            .replace("__PITCH3D__", json.dumps(ter["pitch"]))
+            .replace("__PITCH3D__", json.dumps(cam["pitch_3d"]))
             .replace("__PITCH__", json.dumps(cam["pitch"]))
             .replace("__BEARING__", json.dumps(cam["bearing"]))
             .replace("__BOUNDS__", json.dumps([[minx, miny], [maxx, maxy]]))
