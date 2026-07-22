@@ -291,11 +291,15 @@ def _bridge_decks(geo, dk):
 
     def walk(start_i):
         """Undirected chain of connected bridge edges through degree-2 nodes.
-        Returns (coords, spans) where spans = [(end_index_in_coords, props), ...]."""
+        Returns (coords, spans, ramp_head, ramp_tail): spans = [(end_index, props), ...] and the
+        ramp flags say whether each chain end is a TRUE ground end (no other bridge edge
+        continues there). At a bridge fork/junction the structure carries on, so that end stays
+        at full deck height instead of dipping to the ground mid-structure."""
         a, z, c, p = reps[start_i]
         used[start_i] = True
         chain = list(c)
         spans = [[len(chain) - 1, p]]
+        ends = {}
         for prepend in (False, True):
             node = a if prepend else z
             while True:
@@ -317,7 +321,8 @@ def _bridge_decks(geo, dk):
                     chain = chain + seg[1:]
                     spans.append([len(chain) - 1, jp])
                     node = jz if ja == node else ja
-        return chain, spans
+            ends[prepend] = len(at[node]) == 1     # sole incident bridge edge = ground end
+        return chain, spans, ends[True], ends[False]
 
     feats = []
     base_m, thick = dk["base_m"], dk["thickness_m"]
@@ -325,7 +330,7 @@ def _bridge_decks(geo, dk):
     for i in range(n):
         if used[i]:
             continue
-        chain, spans = walk(i)
+        chain, spans, ramp_head, ramp_tail = walk(i)
         lon0, lat0 = chain[0]
         kx = 111320.0 * math.cos(math.radians(lat0))
         pts = [((x - lon0) * kx, (y - lat0) * 111320.0) for x, y in chain]
@@ -351,19 +356,22 @@ def _bridge_decks(geo, dk):
             except (TypeError, ValueError):
                 return 2
 
-        # slice ONLY the ramp zones (where height changes); the level mid-span stays whole,
-        # split just at edge-span boundaries so per-edge colours survive
-        half_l = L / 2.0
+        # slice ONLY where the ramp changes height (and only at true ground ends); the level
+        # spans stay whole, split just at edge-span boundaries so per-edge colours survive
+        rh = min(ramp, L) if ramp_head else 0.0
+        rt = min(ramp, L - rh) if ramp_tail else 0.0
         cuts = {0.0, L}
         d = step
-        while d < min(ramp, half_l):
+        while d < rh:
             cuts.add(d)
+            d += step
+        d = step
+        while d < rt:
             cuts.add(L - d)
             d += step
-        if ramp < half_l:
-            cuts.add(ramp)
-            cuts.add(L - ramp)
-            cuts.update(b for b, _ in bounds if ramp < b < L - ramp)
+        cuts.add(rh)
+        cuts.add(L - rt)
+        cuts.update(b for b, _ in bounds if rh < b < L - rt)
         cuts = sorted(cuts)
         for d0, d1 in zip(cuts, cuts[1:]):
             part = substring(local, d0, d1)
@@ -375,7 +383,9 @@ def _bridge_decks(geo, dk):
             poly = part.buffer(half, cap_style=2, join_style=2)
             if poly.geom_type != "Polygon":
                 continue
-            t = min(mid, L - mid, ramp) / ramp        # 0 at the ends -> 1 mid-span
+            up = mid / ramp if ramp_head else 1.0     # 0 only at TRUE ground ends -> 1 mid-span
+            dn = (L - mid) / ramp if ramp_tail else 1.0
+            t = min(up, dn, 1.0)
             t = t * t * (3 - 2 * t)                   # smoothstep: gentle takeoff + level-off;
             #                                           with step_m << thickness the ~0.1-0.3 m
             #                                           per-slice height delta hides inside the

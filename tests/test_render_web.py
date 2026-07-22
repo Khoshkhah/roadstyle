@@ -364,3 +364,31 @@ def test_web_3d_bridge_decks():
     assert "roads-bridge-casing" in fids and "roads-bridge-decks" not in fids
     # zoom smoothing: near-zero source simplification
     assert flat["sources"]["roads"]["tolerance"] == 0.05
+
+
+def test_web_bridge_forks_stay_elevated():
+    """Where bridge sections meet (a fork node), the structure is ONE bridge: no chain may ramp
+    to the ground at the shared junction — only true ground ends descend."""
+    a, b = (18.00, 59.30), (18.01, 59.305)
+    g = gpd.GeoDataFrame(
+        {"highway": ["primary"] * 3, "bridge": ["yes"] * 3},
+        geometry=[LineString([a, b]),                       # A-B
+                  LineString([b, (18.02, 59.31)]),          # B-C
+                  LineString([b, (18.02, 59.30)])],         # B-D  -> B is a bridge fork
+        crs=4326)
+    style = _style(render_edges(g, backend="web", view_3d=True).html)
+    slices = style["sources"]["decks"]["data"]["features"]
+    # every chain touching the fork keeps full height there; grounds exist only at A/C/D
+    import collections
+    ends = collections.defaultdict(list)
+    for f in slices:
+        ends[f["properties"]["base"]].append(f)
+    assert 5.0 in ends                       # plateaus exist
+    grounded = [f for f in slices if f["properties"]["base"] < 0.5]
+    assert grounded                          # the true ends still ramp to ground
+    # no slice adjacent to the fork node is grounded: check min distance of grounded slices to B
+    bx, by = 18.01, 59.305
+    for f in grounded:
+        cs = f["geometry"]["coordinates"][0]
+        dmin = min(((x - bx) ** 2 + (y - by) ** 2) ** 0.5 for x, y in cs)
+        assert dmin > 0.001                  # ~110 m: grounded slices are far from the junction
