@@ -455,9 +455,12 @@ def _truthy(v):
 
 
 def _mark_lvl(geo, tunnel_col, bridge_col, layer_col):
-    """Elevation per edge: bridge -> +1 (drawn on top), tunnel -> -1 (drawn underneath), else the
-    sign of the OSM `layer` tag, else 0. Lets the sort key keep grade-separated roads from looking
-    connected. Defaults to 0 when the columns aren't present (no tunnel/bridge info)."""
+    """Elevation per edge: bridge -> +1 (drawn on top), tunnel -> -1 (drawn underneath), else a
+    negative OSM `layer` tag -> -1, else 0. Lets the sort key keep grade-separated roads from
+    looking connected. Defaults to 0 when the columns aren't present (no tunnel/bridge info).
+
+    A positive `layer` alone does NOT promote to bridge level: only the bridge column earns the
+    bridge treatment (2D deck styling, 3D extrusions) — a `layer=1` embankment isn't a bridge."""
     for ft in geo["features"]:
         p = ft.setdefault("properties", {})
         if _truthy(p.get(bridge_col)):
@@ -466,8 +469,7 @@ def _mark_lvl(geo, tunnel_col, bridge_col, layer_col):
             lvl = -1
         else:
             try:
-                l = int(float(p.get(layer_col)))
-                lvl = 1 if l > 0 else (-1 if l < 0 else 0)
+                lvl = -1 if int(float(p.get(layer_col))) < 0 else 0
             except (TypeError, ValueError):
                 lvl = 0
         p["lvl"] = lvl

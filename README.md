@@ -96,7 +96,7 @@ when present (and is simply skipped when absent):
 | `name` | text | street-name **labels** along the road + the popup title |
 | `oneway` | `True`/`False` (or `yes`/`no`) | direction **arrows** on one-way edges. Without this column, one-way is inferred: an edge with no reverse-geometry twin (directed networks, e.g. duckOSM) |
 | `bridge` / `tunnel` | truthy | **grade separation** — tunnels draw faded + dashed *below*, bridges on top with a black deck casing, and as extruded 3D decks in `view_3d` (column names via `bridge_col` / `tunnel_col`) |
-| `layer` | int | grade fallback where `bridge`/`tunnel` are absent (sign decides above/below) |
+| `layer` | int | below-ground fallback where `tunnel` is absent (negative → under); only `bridge` earns the bridge treatment |
 | `lanes`, `maxspeed_kmh`, `edge_ref`, … | anything | shown in the click **popup** (curated set by default; `road_popup="all"` for every column) |
 | `edge_id` | id (64-bit safe) | popups + click-to-copy; values > 2⁵³ should be strings so JavaScript can't corrupt them (`from_duckosm` handles this) |
 

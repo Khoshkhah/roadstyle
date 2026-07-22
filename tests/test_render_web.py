@@ -253,6 +253,16 @@ def test_minzoom_keeps_the_grade_separation_filters_intact():
     assert "lvl" in json.dumps(fs["roads-fill"])
     assert fs["roads-fill"] != fs["roads-tunnel-fill"] != fs["roads-bridge-fill"]
 
+def test_bridge_level_from_bridge_column_only():
+    """A positive `layer` tag alone must NOT earn the bridge treatment (2D deck styling, 3D
+    extrusions) — only the bridge column does. Negative layer still marks below-ground."""
+    g = _edges().assign(bridge=[True, False, False], layer=[1, 2, -1])
+    style = _style(render_edges(g, backend="web").html)
+    lvls = [f["properties"]["lvl"]
+            for f in style["sources"]["roads"]["data"]["features"]]
+    assert lvls == [1, 0, -1]
+
+
 def test_web_round_caps_seal_edge_connections():
     """Consecutive edges are separate LineStrings; round caps are the only rendering primitive
     that seals the seam where they connect. Network continuity outranks end-cap shape."""

@@ -49,7 +49,9 @@ to it, and a bridge reads as a deck spanning what's below.
 
 One baked integer per edge, `lvl`, drives everything:
 
-- `bridge` truthy → `+1`, `tunnel` truthy → `-1`, else the sign of the `layer` tag, else `0`.
+- `bridge` truthy → `+1`, `tunnel` truthy → `-1`, else a negative `layer` tag → `-1`, else `0`.
+  A positive `layer` alone is **not** a bridge — only the `bridge` column earns the bridge
+  treatment (2D deck styling, 3D extrusions).
 - `lvl` feeds the **draw order** (`lvl*1000 + class_rank` in `line-sort-key`, so every tunnel is
   below every surface road and every bridge above), the **layer an edge lands in**, and its
   **per-grade style**:
