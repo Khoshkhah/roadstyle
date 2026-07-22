@@ -32,8 +32,9 @@
   <label>Colour by</label>
   <select id="co"></select>
 
-  <label>Query — a WHERE clause over your columns (JS)</label>
-  <input id="q" value="p.maxspeed_kmh >= 50" spellcheck="false">
+  <label>Query — a WHERE clause over your columns</label>
+  <input id="q" value="p.maxspeed_kmh >= 50 AND p.oneway = True" spellcheck="false"
+    title="SQL-style (AND / OR / NOT / = / True) or plain JS (&& / || / ! / === / true)">
   <div style="margin-top:6px">
     <button onclick="runQuery()"><b>Run</b></button>
     <button onclick="rsFilter(IDS)">Filter</button>
@@ -70,9 +71,15 @@ cosel.onchange = () => rsSetColorField(+cosel.value);
 document.addEventListener("rs:colorchange", e => {
   if (e.detail.index != null) cosel.value = String(e.detail.index); });
 
+// let SQL habits work: AND/OR/NOT, True/False, and a single = become their JS equivalents
+function sqlish(s){
+  return s.replace(/\bAND\b/gi, " && ").replace(/\bOR\b/gi, " || ").replace(/\bNOT\b/gi, " !")
+          .replace(/\bTrue\b/g, "true").replace(/\bFalse\b/g, "false")
+          .replace(/([^=!<>&|])=([^=])/g, "$1==$2");   // p.oneway = True  ->  ==  (>=, <=, == untouched)
+}
 function runQuery(){
   let fn;
-  try { fn = new Function("p", "return (" + document.getElementById("q").value + ")"); }
+  try { fn = new Function("p", "return (" + sqlish(document.getElementById("q").value) + ")"); }
   catch(e){ document.getElementById("count").textContent = "bad query: " + e.message; return; }
   IDS = rsQuery(p => { try { return fn(p); } catch(e){ return false; } });
   document.getElementById("count").textContent = IDS.length + " edges match";
