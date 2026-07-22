@@ -359,6 +359,8 @@ def test_web_3d_bridge_decks():
     assert all(f["geometry"]["type"] == "Polygon" for f in slices)
     # popup parity: slices carry the full edge properties, not just fills
     assert "maxspeed_kmh" in slices[0]["properties"] or "aadt" in slices[0]["properties"]
+    assert all("__rs_chain" in f["properties"] for f in slices)   # whole-bridge hover unit
+    assert deck["paint"]["fill-extrusion-opacity"] == 0.7        # settings-driven transparency
     bases = [f["properties"]["__rs_base"] for f in slices]
     # the deck RAMPS: grounded at the ends (connects to the road), full height mid-span
     assert min(bases) < 1.0 and max(bases) == 5.0

@@ -61,7 +61,7 @@ class StyleConfig:
     #: match_zoom — decks and flat roads render equally wide at that zoom
     bridge_decks: dict = field(default_factory=lambda: {"base_m": 5.0, "thickness_m": 1.0,
                                                         "ramp_m": 40.0, "step_m": 2.5,
-                                                        "match_zoom": 17.0})
+                                                        "match_zoom": 18.0, "opacity": 0.7})
     #: annotation slots (web backend): each road chain is divided into equal slot_m-metre pieces;
     #: names take even slots, oneway arrows odd ones — alternating, never stacked. Text/icon zoom
     #: ramps and collision culling handle density automatically; unnamed name-slots stay empty.
