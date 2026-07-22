@@ -17,6 +17,7 @@ from pathlib import Path
 import streamlit as st
 
 import roadstyle as rs
+from roadstyle.render_web import DEFAULT_ROAD_POPUP
 
 st.set_page_config(page_title="roadstyle studio", page_icon="🛣️", layout="wide")
 
@@ -90,6 +91,21 @@ with st.sidebar:
     f = {**({} if labels else {"labels": False}), **({} if arrows else {"arrows": False})}
     kw.update(f)
     st.code(frag(f) or "# default: labels + arrows on", language="python")
+
+    st.subheader("Popup & hover")
+    popup_mode = st.selectbox("Click popup", ["curated fields", "choose columns", "side panel",
+                                              "all columns", "off"])
+    f = {}
+    if popup_mode == "choose columns":
+        f["road_popup"] = st.multiselect("Popup columns", cols,
+                                         default=[c for c in DEFAULT_ROAD_POPUP if c in cols])
+    elif popup_mode != "curated fields":
+        f["road_popup"] = {"side panel": "panel", "all columns": "all", "off": False}[popup_mode]
+    hover = st.multiselect("Hover tooltip columns", cols)
+    if hover:
+        f["tooltip"] = hover
+    kw.update(f)
+    st.code(frag(f) or "# default: curated click popup, no hover tooltip", language="python")
 
 # ---------------------------------------------------------------- render + the code, in sync
 args = "".join(f",\n                     {k}={v!r}" for k, v in kw.items())
