@@ -422,3 +422,23 @@ def test_snapshot_writes_png(tmp_path):
     rs.snapshot(wm, out, zoom=13, width=500, height=400, settle=1.5)
     data = out.read_bytes()
     assert data[:8] == b"\x89PNG\r\n\x1a\n" and len(data) > 10_000
+
+
+def test_oneway_column_drives_arrows():
+    """The data contract: an explicit `oneway` column controls the arrows (undirected networks
+    included); without the column, one-way = an edge with no reverse twin."""
+    a, b, c = (18.0, 59.30), (18.01, 59.305), (18.02, 59.31)
+    g = gpd.GeoDataFrame(
+        {"highway": ["residential"] * 2, "oneway": [True, False]},
+        geometry=[LineString([a, b]), LineString([b, c])], crs=4326)
+    style = _style(render_edges(g, backend="web").html)
+    flags = [f["properties"]["__rs_oneway"] for f in style["sources"]["roads"]["data"]["features"]]
+    assert flags == [True, False]          # column wins; no arrows on the two-way street
+    slot_oneway = {f["properties"]["oneway"]
+                   for f in style["sources"]["slots"]["data"]["features"]}
+    assert slot_oneway == {0, 1}           # arrow slots exist only on the oneway=True chain
+    # without the column: twin inference (no twin -> one-way)
+    g2 = g.drop(columns="oneway")
+    style2 = _style(render_edges(g2, backend="web").html)
+    flags2 = [f["properties"]["__rs_oneway"] for f in style2["sources"]["roads"]["data"]["features"]]
+    assert flags2 == [True, True]

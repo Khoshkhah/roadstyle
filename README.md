@@ -169,6 +169,24 @@ wm = render_edges(edges, basemap="dark_matter", view_3d=True)
 rs.snapshot(wm, "skanstull.png", center=(18.076, 59.303), zoom=16, pitch=60, bearing=-25)
 ```
 
+## Data contract — which column powers what
+
+roadstyle reads plain columns; only two things are required. Everything else lights up a feature
+when present (and is simply skipped when absent):
+
+| Column | Values | Powers |
+|---|---|---|
+| *geometry* | LineString (any CRS) | **required** — the edges themselves |
+| `highway` | OSM class (`motorway`…`service`) | **required** — colour, width, casing, draw order, minzoom (another column via `highway_col`) |
+| `name` | text | street-name **labels** along the road + the popup title |
+| `oneway` | `True`/`False` (or `yes`/`no`) | direction **arrows** on one-way edges. Without this column, one-way is inferred: an edge with no reverse-geometry twin (directed networks, e.g. duckOSM) |
+| `bridge` / `tunnel` | truthy | **grade separation** — tunnels draw faded + dashed *below*, bridges on top with a black deck casing, and as extruded 3D decks in `view_3d` (column names via `bridge_col` / `tunnel_col`) |
+| `layer` | int | grade fallback where `bridge`/`tunnel` are absent (sign decides above/below) |
+| `lanes`, `maxspeed_kmh`, `edge_ref`, … | anything | shown in the click **popup** (curated set by default; `road_popup="all"` for every column) |
+| `edge_id` | id (64-bit safe) | popups + click-to-copy; values > 2⁵³ should be strings so JavaScript can't corrupt them (`from_duckosm` handles this) |
+
+`rs.from_duckosm(db)` selects exactly this set from a duckOSM database.
+
 ## All options at a glance
 
 Every keyword of `render_edges` (full reference: [`docs/parameters.md`](docs/parameters.md)):

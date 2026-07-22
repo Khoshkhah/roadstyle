@@ -158,7 +158,12 @@ def _mark_twoway(geo):
         rev = (k[1], k[0])
         n = cnt.get(rev, 0)
         # a loop edge (start == end) is its own reverse key; it needs a second feature to pair up
-        ft.setdefault("properties", {})["twoway"] = n >= 2 if rev == k else n >= 1
+        p = ft.setdefault("properties", {})
+        p["twoway"] = n >= 2 if rev == k else n >= 1
+        # arrows follow an EXPLICIT `oneway` column when the data has one (undirected networks
+        # included); otherwise a one-way edge = an edge with no reverse twin
+        ow = p.get("oneway")
+        p["__rs_oneway"] = _truthy(ow) if ow is not None else not p["twoway"]
 
 
 def _annotation_slots(geo, slot_m):
@@ -189,7 +194,8 @@ def _annotation_slots(geo, slot_m):
     groups = collections.defaultdict(list)       # (name, lvl, oneway) -> edge list
     for e in reps:
         p = e[3]
-        groups[(p.get("name") or None, p.get("lvl", 0), 0 if p.get("twoway") else 1)].append(e)
+        groups[(p.get("name") or None, p.get("lvl", 0),
+                1 if p.get("__rs_oneway") else 0)].append(e)
 
     feats = []
     for (name, lvl, oneway), edges in groups.items():
