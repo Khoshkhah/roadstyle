@@ -32,8 +32,7 @@ jobs:
       - name: Tests
         run: pytest -q
 
-  # The one test that runs a saved map in a real browser (skipped in the matrix above,
-  # where playwright isn't installed).
+  # Full suite with playwright installed — runs the browser tests the matrix above skips.
   browser-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -51,5 +50,5 @@ jobs:
           pip install -e ".[dev]" playwright
           playwright install --with-deps chromium
 
-      - name: Browser smoke test
-        run: pytest -q tests/test_web_smoke.py
+      - name: Tests (incl. browser)
+        run: pytest -q

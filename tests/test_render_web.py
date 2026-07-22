@@ -435,6 +435,8 @@ def test_web_camera_max_pitch():
 
 def test_snapshot_writes_png(tmp_path):
     """rs.snapshot: WebMap -> PNG through headless Chromium, honouring the camera args."""
+    import pytest
+    pytest.importorskip("playwright.sync_api")   # optional dep; the browser CI job runs this
     import roadstyle as rs
 
     wm = render_edges(_edges(), backend="web")
