@@ -13,7 +13,7 @@ import streamlit as st
 
 import roadstyle as rs
 
-from common import CMAPS, data_section
+from common import CMAPS, data_section, overlay_section
 
 SIDEBAR = (Path(__file__).resolve().parent.parent / "dashboard" / "sidebar.html").read_text()
 
@@ -41,12 +41,25 @@ with st.sidebar:
                           key=f"cm_{c}")
         color_options[c] = {"color_by": c, "cmap": cm}
 
+    overlays, ov_lines = overlay_section()
+
 # built-in controls off — the injected sidebar IS the UI (see ui/dashboard/build.py)
 kw = {"basemap": basemap, "view_3d": view_3d, "basemaps": bms or None,
       "color_options": color_options, "basemap_switcher": False, "filter_control": False,
       "road_popup": False, "name": title}
+if overlays:
+    kw["overlays"] = overlays
 
-args = "".join(f",\n                    {k}={v!r}" for k, v in kw.items())
+ovs = "[" + ", ".join(f"ov{i}" for i in range(len(overlays))) + "]"
+
+
+def _fmt(k, v):
+    return ovs if k == "overlays" else repr(v)
+
+
+args = "".join(f",\n                    {k}={_fmt(k, v)}" for k, v in kw.items())
+loader = loader if not overlays else (
+    "import geopandas as gpd\n\n" + loader + "\n" + "\n".join(ov_lines))
 code = (f"import roadstyle as rs\n\n{loader}\n"
         f'm = rs.render_edges(edges, backend="web"{args})\n'
         f'sidebar = open("ui/dashboard/sidebar.html").read()\n'

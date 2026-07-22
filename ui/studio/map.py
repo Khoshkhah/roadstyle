@@ -11,7 +11,7 @@ import streamlit as st
 import roadstyle as rs
 from roadstyle.render_web import DEFAULT_ROAD_POPUP
 
-from common import CMAPS, data_section
+from common import CMAPS, data_section, overlay_section
 
 # ---------------------------------------------------------------- sidebar: the knobs
 with st.sidebar:
@@ -60,9 +60,22 @@ with st.sidebar:
     if hover:
         kw["tooltip"] = hover
 
+    overlays, ov_lines = overlay_section()
+    if overlays:
+        kw["overlays"] = overlays
+
 # ---------------------------------------------------------------- render + the code, in sync
-args = "".join(f",\n                     {k}={v!r}" for k, v in kw.items())
-code = (f"import roadstyle as rs\n\n{loader}\n"
+ovs = "[" + ", ".join(f"ov{i}" for i in range(len(overlays))) + "]"
+
+
+def _fmt(k, v):
+    return ovs if k == "overlays" else repr(v)
+
+
+args = "".join(f",\n                     {k}={_fmt(k, v)}" for k, v in kw.items())
+prelude = loader if not overlays else (
+    "import geopandas as gpd\n\n" + loader + "\n" + "\n".join(ov_lines))
+code = (f"import roadstyle as rs\n\n{prelude}\n"
         f"wm = rs.render_edges(edges{args})\n"
         f'wm.save("map.html")')
 
