@@ -52,10 +52,17 @@ BASEMAPS: dict[str, Basemap] = {
         _ESRI_ATTR, is_dark=True, satellite=True,
         bg="linear-gradient(140deg,#2d3823,#4a3a2a,#2a2820)",
         preview=("#ffe8a0", "#ffd84d", "#fffdf2")),
+    # tile-less base maps: url="" means no tile layer at all — just a plain canvas colour (bg).
+    # Zero network requests, so a saved map with one of these is fully offline.
+    "blank": Basemap(
+        "blank", "Blank", "", "", bg="#efede8", preview=("#888", "#bbb", "#888")),
+    "blank_dark": Basemap(
+        "blank_dark", "Blank dark", "", "", is_dark=True, bg="#14181d",
+        preview=("#22d3a3", "#9ec5fe", "#5b6573")),
 }
 
 # default set offered by the switcher when the caller doesn't specify one
-DEFAULT_SWITCHER = ["voyager", "positron", "dark_matter", "osm", "satellite"]
+DEFAULT_SWITCHER = ["voyager", "positron", "dark_matter", "osm", "satellite", "blank"]
 
 
 def register_basemap(bm: Basemap) -> None:

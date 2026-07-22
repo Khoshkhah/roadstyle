@@ -475,3 +475,28 @@ def test_overlay_defaults_come_from_settings():
                             overlays=[Overlay(_pois(), color="#ffd166")],
                             settings={"config": {"overlays": {"color": "#112233"}}}).html
     assert "#ffd166" in explicit                     # per-Overlay value wins over the setting
+
+
+def test_blank_basemap_is_tile_free_and_offline():
+    """basemap="blank" renders on a plain background colour: no raster source at all when the
+    switcher is off — a saved file makes zero network requests."""
+    wm = render_edges(_edges(), backend="web", basemap="blank", basemap_switcher=False)
+    style = _style(wm.html)
+    assert style["layers"][0] == {"id": "bg", "type": "background",
+                                  "paint": {"background-color": "#efede8"}}
+    assert "bm" not in style["sources"]
+    assert "cartocdn" not in wm.html and "arcgisonline" not in wm.html
+
+
+def test_blank_basemap_with_switcher_precreates_hidden_raster():
+    """blank active + tiled maps offered: the raster layer exists but starts hidden, so the
+    dropdown can flip visibility without adding sources at runtime."""
+    wm = render_edges(_edges(), backend="web", basemap="blank",
+                      basemaps=["blank", "voyager"])
+    style = _style(wm.html)
+    raster = next(l for l in style["layers"] if l["id"] == "basemap")
+    assert raster["layout"] == {"visibility": "none"}
+    assert style["sources"]["bm"]["tiles"]           # voyager tiles, ready to show
+    m = re.search(r"BASEMAPS = (\[.*?\]);", wm.html, re.S)
+    entries = json.loads(m.group(1))
+    assert entries[0]["tiles"] == [] and entries[0]["bg"] == "#efede8"

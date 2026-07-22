@@ -33,7 +33,7 @@ From the command line this backend is `-f web` (the default): `roadstyle edges.g
 | **Direction arrows** | One-way edges get chevrons placed along the line (native `symbol-placement: line`). |
 | **Street-name labels** | Names are placed along the road (curved), from the `name` column. |
 | **Hover / select** | Hovering highlights the road under the cursor; clicking selects it and shows its attributes; clicking the background deselects (restoring the original colour). Driven by MapLibre `feature-state` — a GPU recolour, no re-layout. |
-| **Base-layer switcher** | An in-map dropdown to switch the background (dark / light / voyager / satellite / OSM). |
+| **Base-layer switcher** | An in-map dropdown to switch the background (dark / light / voyager / satellite / OSM / a tile-less `blank` canvas). |
 | **Road z-order** | Higher-class roads draw over lower ones at junctions (a motorway over a residential), with `_link` ramps tucked just under their through road. |
 | **Tunnel / bridge grade separation** | Tunnels draw *underneath* (dashed + faded), bridges draw *on top* (heavier, square-capped casing) — see below. |
 | **Dynamic recolouring** | Bake several "colour by" options with `color_options=` and switch between them client-side from a **Colour by** dropdown — no re-render, no server. See [below](#dynamic-recolouring-color_options). |

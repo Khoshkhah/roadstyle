@@ -570,16 +570,31 @@ def _boundary_fc(boundary):
 
 def _tiles(bm):
     """Leaflet {s}/{r} tile template -> a MapLibre raster `tiles` list (expand subdomains, drop @2x)."""
+    if not bm.url:                                  # tile-less base map (blank / blank_dark)
+        return []
     if "{s}" in bm.url:
         return [bm.url.replace("{s}", s).replace("{r}", "") for s in (bm.subdomains or "a")]
     return [bm.url.replace("{r}", "")]
 
 
+def _bg_color(bm):
+    """The plain canvas colour behind (or instead of) the tiles: ``bm.bg`` when it's a flat
+    colour; the thumbnail gradients of the tiled built-ins fall back to a light/dark neutral."""
+    return bm.bg if bm.bg.startswith("#") else ("#0e1113" if bm.is_dark else "#e8e6e1")
+
+
 def _basemap_style(bm):
-    """A minimal MapLibre style wrapping a raster base map."""
-    return {"version": 8, "sources": {"bm": {"type": "raster", "tiles": _tiles(bm), "tileSize": 256,
-                                             "attribution": bm.attr}},
-            "layers": [{"id": "basemap", "type": "raster", "source": "bm"}]}
+    """A minimal MapLibre style wrapping a raster base map — or, for a tile-less base map
+    (``blank`` / ``blank_dark``), just a background colour: no tile requests, fully offline."""
+    style = {"version": 8, "sources": {},
+             "layers": [{"id": "bg", "type": "background",
+                         "paint": {"background-color": _bg_color(bm)}}]}
+    tiles = _tiles(bm)
+    if tiles:
+        style["sources"]["bm"] = {"type": "raster", "tiles": tiles, "tileSize": 256,
+                                  "attribution": bm.attr}
+        style["layers"].append({"id": "basemap", "type": "raster", "source": "bm"})
+    return style
 
 
 def _ov_hl(base, hc, sc, interactive):
@@ -715,11 +730,15 @@ map.addControl({onAdd(m){
   m.on("pitchend", upd); m.on("pitch", upd); upd();
   d.appendChild(b); return d;
 }, onRemove(){}});
-// base-layer switcher (swaps the raster source's tiles; the road layers stay put)
+// base-layer switcher (swaps the raster source's tiles; the road layers stay put).
+// A tile-less entry (blank) hides the raster layer and shows the plain background colour.
 if(BASEMAPS.length > 1){
   const sel = document.createElement("select");
   BASEMAPS.forEach((b,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=b.label; sel.appendChild(o); });
-  sel.onchange = ()=>{ const s=map.getSource("bm"); if(s) s.setTiles(BASEMAPS[sel.value].tiles); };
+  sel.onchange = ()=>{ const b=BASEMAPS[sel.value], s=map.getSource("bm");
+    if(b.tiles.length && s) s.setTiles(b.tiles);
+    if(map.getLayer("basemap")) map.setLayoutProperty("basemap","visibility", b.tiles.length ? "visible" : "none");
+    map.setPaintProperty("bg","background-color", b.bg); };
   const w=document.createElement("div"); w.className="bm-ctrl"; w.appendChild(sel); document.body.appendChild(w);
 }
 // road-class filter panel (collapsible): checkboxes hide/show each class across every road layer
@@ -1098,10 +1117,19 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     bkeys = list(basemaps) if basemaps else list(DEFAULT_SWITCHER)
     if isinstance(active, str):
         bkeys = [active] + [k for k in bkeys if k != active]
-    bms = [{"label": get_basemap(k).label, "tiles": _tiles(get_basemap(k))} for k in bkeys]
+    bms = [{"label": b.label, "tiles": _tiles(b), "bg": _bg_color(b)}
+           for b in (get_basemap(k) for k in bkeys)]
     if not basemap_switcher:
         bms = bms[:1]                                     # one entry -> the JS hides the dropdown
     style = _basemap_style(get_basemap(active))
+    if "bm" not in style["sources"]:
+        # a blank base map is active but the switcher offers tiled ones: pre-create the raster
+        # layer hidden, so switching is a visibility flip (hidden layers fetch no tiles)
+        _t = next((b["tiles"] for b in bms if b["tiles"]), None)
+        if _t:
+            style["sources"]["bm"] = {"type": "raster", "tiles": _t, "tileSize": 256}
+            style["layers"].append({"id": "basemap", "type": "raster", "source": "bm",
+                                    "layout": {"visibility": "none"}})
     # tolerance 0.05 (default 0.375): the source re-tiles at every integer zoom and re-simplifies
     # the geometry — at the default tolerance the roads visibly ripple ("wave") on each zoom
     # crossing. Near-zero simplification keeps zooming smooth; ~5k features can afford it.

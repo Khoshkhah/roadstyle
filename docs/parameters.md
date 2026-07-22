@@ -183,7 +183,9 @@ A tile provider (the background map under the roads).
 | `lonboard` | str / `None` | `None` | Matching basemap name for the lonboard backend. |
 | `bg`, `preview`, `subdomains` | — | Thumbnail styling + tile subdomains for the switcher. |
 
-Built-ins: `voyager`, `positron`, `dark_matter`, `osm`, `esri_gray`, `satellite`.
+Built-ins: `voyager`, `positron`, `dark_matter`, `osm`, `esri_gray`, `satellite`, and two
+tile-less ones — `blank` / `blank_dark` (`url=""`): no tile layer, just a plain background
+colour, so the saved map is fully offline.
 
 ---
 

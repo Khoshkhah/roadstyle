@@ -21,6 +21,10 @@ def _add_base(m, folium, basemap, basemaps):
     """Single fixed base map (``basemap=``) or a thumbnail switcher (default / ``basemaps=``)."""
     if basemap and not basemaps:
         bm = get_basemap(basemap)
+        if not bm.url:                # tile-less (blank): just a plain canvas colour
+            m.get_root().header.add_child(folium.Element(
+                f"<style>.leaflet-container{{background:{bm.bg}}}</style>"))
+            return
         folium.TileLayer(tiles=bm.url, attr=bm.attr, name=bm.label, control=False,
                          subdomains=bm.subdomains, max_zoom=20).add_to(m)
         if bm.satellite:

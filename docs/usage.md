@@ -68,7 +68,7 @@ rs.render_edges(edges, basemap="dark_matter").save("roads.html")
 # Themes, palettes, filtering, satellite, selection
 rs.render_edges(edges, palette="carto",
                 include=["motorway", "trunk", "primary"])
-rs.render_edges(edges, basemap="satellite", basemap="satellite")
+rs.render_edges(edges, basemap="satellite")
 rs.render_edges(edges, selected=picked_edges)          # neon-violet highlight
 
 # Data-driven: categorical (e.g. congestion levels)

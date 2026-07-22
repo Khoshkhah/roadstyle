@@ -46,8 +46,9 @@ _TEMPLATE = Template("""
   var defs = {{ this.defs|tojson }};
   var layers = {};
   defs.forEach(function(d){
-    layers[d.key] = L.tileLayer(d.url,
-      {attribution:d.attr||'', maxZoom:20, subdomains:d.sub||'abc'});
+    layers[d.key] = d.url ? L.tileLayer(d.url,
+      {attribution:d.attr||'', maxZoom:20, subdomains:d.sub||'abc'})
+      : L.layerGroup();   // tile-less (blank): nothing to draw, bg colour set in switchTo
   });
   var container = map.getContainer();
 
@@ -56,6 +57,7 @@ _TEMPLATE = Template("""
     layers[key].addTo(map);
     var d = defs.find(function(x){return x.key===key;});
     container.classList.toggle('rs-sat', !!(d && d.sat));
+    container.style.background = (d && !d.url) ? d.bg : '';
     if(window.__rsCasing) window.__rsCasing(!!(d && d.is_dark));   // dynamic road casing
     var pop = document.getElementById('{{ this.cid }}');
     if(pop) pop.querySelectorAll('.rs-card').forEach(

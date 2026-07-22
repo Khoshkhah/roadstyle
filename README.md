@@ -123,10 +123,15 @@ register_basemap(Basemap(key="lantmateriet", label="Lantmäteriet",
 render_edges(edges, basemaps=["dark_matter", "lantmateriet"])
 ```
 
-Built-ins: `voyager` (the settings default), `positron`, `dark_matter`, `osm`, `satellite`.
-Switching is purely client-side — the baked road styling never changes. Disable with
-`basemap_switcher=False` (CLI: `--no-basemap-switcher`); the box also hides itself when only one
-base map is offered.
+Built-ins: `voyager` (the settings default), `positron`, `dark_matter`, `osm`, `satellite`,
+plus two **tile-less** ones — `blank` and `blank_dark` — that draw no base layer at all, just a
+plain background colour. A map saved with `basemap="blank"` makes **zero network requests**
+(fully offline) and gives a distraction-free canvas for print/figures.
+Switching is purely client-side — the baked road styling never changes.
+
+- **Turn the box off** (single fixed backdrop): `basemap_switcher=False` in Python,
+  `--no-basemap-switcher` on the CLI.
+- The box also hides itself automatically when only one base map is offered.
 
 ### Add extra layers (zones, POIs, any geometry)
 
