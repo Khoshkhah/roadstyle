@@ -565,3 +565,15 @@ def test_query_verbs_accept_overlay_layer_arg():
                    "function rsColor(ids, color, layer)", "function rsHighlight(ids, layer)",
                    "function rsGetProps(ids, layer)", "function rsFocus(ids, opt, layer)"):
         assert needle in wm.html, needle
+
+
+def test_bridge_deck_width_scale_setting():
+    """bridge_decks.width_scale (settings) trims the 3D ribbon width."""
+    g = _edges().assign(bridge=["yes", None, None])
+    def deck_w(scale):
+        wm = render_edges(g, backend="web", view_3d=True,
+                          settings={"config": {"bridge_decks": {"width_scale": scale}}})
+        ring = _style(wm.html)["sources"]["decks"]["data"]["features"][0]["geometry"]["coordinates"][0]
+        xs = [c[0] for c in ring]; ys = [c[1] for c in ring]
+        return (max(xs) - min(xs)) + (max(ys) - min(ys))
+    assert deck_w(0.5) < deck_w(1.0) * 0.75

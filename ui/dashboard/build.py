@@ -34,7 +34,8 @@ def main() -> None:
     # color_options are BAKED here (Python precomputes each option's per-edge colours);
     # the sidebar's "Colour by" select just switches between them. Adjust to your columns.
     m = rs.render_edges(edges, backend="web", basemap="voyager", view_3d=True,
-                        basemaps=["voyager", "positron", "dark_matter", "satellite", "blank"],
+                        basemaps=["voyager", "positron", "dark_matter", "osm", "satellite",
+                                  "blank"],
                         color_options={"Class": {},
                                        "Speed": {"color_by": "maxspeed_kmh", "cmap": "plasma"},
                                        "Lanes": {"color_by": "lanes", "cmap": "viridis"}},

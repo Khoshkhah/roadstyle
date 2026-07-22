@@ -396,7 +396,9 @@ def _bridge_decks(geo, dk):
             pp = props_at(mid)
             grp = ROAD_GROUP.get(str(pp.get("highway", "")), "residential")
             px = _gwidth(WIDTH[grp], HI_RATE[grp], dk["match_zoom"])
-            half = max(px * mpp / 2.0, 2.0)
+            # width_scale trims the ribbon: at a tilted camera the extruded side walls (and a
+            # dual carriageway's second chain) add apparent width, so 1.0 reads too fat
+            half = max(px * mpp / 2.0, 2.0) * dk.get("width_scale", 1.0)
             poly = part.buffer(half, cap_style=2, join_style=2)
             if poly.geom_type != "Polygon":
                 continue
@@ -1369,7 +1371,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         _z = _minzoom_filter(highway_col, mz)
         surface, tunnel, bridge = (["all", _z, surface], ["all", _z, tunnel], ["all", _z, bridge])
     dk = {"base_m": 5.0, "thickness_m": 1.0, "ramp_m": 40.0, "step_m": 2.5,
-          "match_zoom": 18.0, "opacity": 0.7, **(CONFIG.bridge_decks or {})}
+          "match_zoom": 18.0, "opacity": 0.7, "width_scale": 0.6,
+          **(CONFIG.bridge_decks or {})}
     decks = _bridge_decks(geo, dk) if view_3d else {"features": []}
     if decks["features"]:
         style["sources"]["decks"] = {"type": "geojson", "data": decks, "generateId": True}
