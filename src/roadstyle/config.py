@@ -58,7 +58,8 @@ class StyleConfig:
     #: 3D bridge decks (web backend, view_3d): extruded ribbon height above ground, deck
     #: thickness, and metres per lane for the ribbon width
     bridge_decks: dict = field(default_factory=lambda: {"base_m": 5.0, "thickness_m": 1.0,
-                                                        "lane_m": 3.5})
+                                                        "lane_m": 3.5, "ramp_m": 40.0,
+                                                        "step_m": 8.0})
     #: annotation slots (web backend): each road chain is divided into equal slot_m-metre pieces;
     #: names take even slots, oneway arrows odd ones — alternating, never stacked. Text/icon zoom
     #: ramps and collision culling handle density automatically; unnamed name-slots stay empty.

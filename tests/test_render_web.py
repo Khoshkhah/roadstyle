@@ -352,8 +352,13 @@ def test_web_3d_bridge_decks():
     assert "roads-bridge-decks" in ids
     assert "roads-bridge-casing" not in ids and "roads-bridge-fill" not in ids
     deck = next(l for l in td["layers"] if l["id"] == "roads-bridge-decks")
-    assert deck["type"] == "fill-extrusion" and deck["paint"]["fill-extrusion-base"] == 5.0
-    assert td["sources"]["decks"]["data"]["features"][0]["geometry"]["type"] == "Polygon"
+    assert deck["type"] == "fill-extrusion"
+    assert deck["paint"]["fill-extrusion-base"] == ["get", "base"]
+    slices = td["sources"]["decks"]["data"]["features"]
+    assert all(f["geometry"]["type"] == "Polygon" for f in slices)
+    bases = [f["properties"]["base"] for f in slices]
+    # the deck RAMPS: grounded at the ends (connects to the road), full height mid-span
+    assert min(bases) < 1.0 and max(bases) == 5.0
     flat = _style(render_edges(g, backend="web").html)
     fids = [l["id"] for l in flat["layers"]]
     assert "roads-bridge-casing" in fids and "roads-bridge-decks" not in fids

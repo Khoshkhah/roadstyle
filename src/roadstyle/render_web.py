@@ -257,16 +257,20 @@ def _annotation_slots(geo, slot_m):
     return {"type": "FeatureCollection", "features": feats}
 
 
-def _bridge_decks(geo, lane_m=3.5):
-    """Bridge edges (lvl +1) as ribbon POLYGONS for the 3D view's extruded decks.
+def _bridge_decks(geo, dk):
+    """Bridge chains (lvl +1) as RAMPED deck ribbons for the 3D view's extrusions.
 
-    Buffered in a local metre frame; ribbon width = lane_m * lanes (min one lane each side).
-    A two-way bridge's reverse twin is skipped so decks don't double-stack. Features carry the
-    baked fills (all colour options) + highway/name, so recolouring and the class filter work.
+    Connected bridge edges are walked into chains, sliced every ``step_m`` metres, and each slice
+    is buffered into a polygon carrying its own ``base``/``height``: 0 at the chain ends, rising
+    over ``ramp_m`` to ``base_m`` mid-span — the deck takes off from the connecting ground road
+    instead of floating disconnected above it. Slices inherit the fills of the edge under their
+    midpoint (colour options included) plus highway/name; a two-way bridge's reverse twin is
+    skipped so decks don't double-stack.
     """
     from shapely.geometry import LineString
+    from shapely.ops import substring
 
-    feats = []
+    reps = []
     for ft in geo["features"]:
         g, p = ft.get("geometry") or {}, ft.get("properties", {})
         c = g.get("coordinates") or []
@@ -276,23 +280,98 @@ def _bridge_decks(geo, lane_m=3.5):
         z = (round(c[-1][0], 6), round(c[-1][1], 6))
         if p.get("twoway") and (z, a) < (a, z):
             continue
-        try:
-            lanes = max(int(float(p.get("lanes"))), 1)
-        except (TypeError, ValueError):
-            lanes = 2
-        half = max(lane_m * lanes / 2.0, 2.5)
-        lon0, lat0 = c[0]
-        kx = 111320.0 * math.cos(math.radians(lat0))
-        local = LineString([((x - lon0) * kx, (y - lat0) * 111320.0) for x, y in c])
-        poly = local.buffer(half, cap_style=2, join_style=2)
-        if poly.geom_type != "Polygon":
+        reps.append((a, z, c, p))
+
+    n = len(reps)
+    used = [False] * n
+    at = collections.defaultdict(list)
+    for i, (a, z, _, _) in enumerate(reps):
+        at[a].append(i)
+        at[z].append(i)
+
+    def walk(start_i):
+        """Undirected chain of connected bridge edges through degree-2 nodes.
+        Returns (coords, spans) where spans = [(end_index_in_coords, props), ...]."""
+        a, z, c, p = reps[start_i]
+        used[start_i] = True
+        chain = list(c)
+        spans = [[len(chain) - 1, p]]
+        for prepend in (False, True):
+            node = a if prepend else z
+            while True:
+                cand = [j for j in at[node] if not used[j]]
+                if len(at[node]) != 2 or len(cand) != 1:
+                    break
+                j = cand[0]
+                ja, jz, jc, jp = reps[j]
+                used[j] = True
+                if prepend:
+                    seg = jc if jz == node else jc[::-1]
+                    chain = seg[:-1] + chain
+                    grown = len(seg) - 1
+                    spans = [[e + grown, pp] for e, pp in spans]
+                    spans.insert(0, [grown, jp])
+                    node = ja if jz == node else jz
+                else:
+                    seg = jc if ja == node else jc[::-1]
+                    chain = chain + seg[1:]
+                    spans.append([len(chain) - 1, jp])
+                    node = jz if ja == node else ja
+        return chain, spans
+
+    feats = []
+    base_m, thick = dk["base_m"], dk["thickness_m"]
+    ramp, step = max(dk["ramp_m"], 1.0), max(dk["step_m"], 2.0)
+    for i in range(n):
+        if used[i]:
             continue
-        coords = [[round(x / kx + lon0, 6), round(y / 111320.0 + lat0, 6)]
-                  for x, y in poly.exterior.coords]
-        props = {k: v for k, v in p.items()
-                 if k.startswith("__rs_fill") or k in ("highway", "name")}
-        feats.append({"type": "Feature", "properties": props,
-                      "geometry": {"type": "Polygon", "coordinates": [coords]}})
+        chain, spans = walk(i)
+        lon0, lat0 = chain[0]
+        kx = 111320.0 * math.cos(math.radians(lat0))
+        pts = [((x - lon0) * kx, (y - lat0) * 111320.0) for x, y in chain]
+        local = LineString(pts)
+        L = local.length
+        # cumulative distance at each span boundary, to give every slice its edge's props
+        cum = [0.0]
+        for k in range(1, len(pts)):
+            dx = pts[k][0] - pts[k - 1][0]
+            dy = pts[k][1] - pts[k - 1][1]
+            cum.append(cum[-1] + (dx * dx + dy * dy) ** 0.5)
+        bounds = [(cum[e], pp) for e, pp in spans]
+
+        def props_at(d):
+            for b, pp in bounds:
+                if d <= b + 1e-6:
+                    return pp
+            return bounds[-1][1]
+
+        def lanes_of(pp):
+            try:
+                return max(int(float(pp.get("lanes"))), 1)
+            except (TypeError, ValueError):
+                return 2
+
+        pieces = max(1, round(L / step))
+        for k in range(pieces):
+            d0, d1 = L * k / pieces, L * (k + 1) / pieces
+            part = substring(local, d0, d1)
+            if part.geom_type != "LineString" or part.length <= 0:
+                continue
+            mid = (d0 + d1) / 2
+            pp = props_at(mid)
+            half = max(dk["lane_m"] * lanes_of(pp) / 2.0, 2.5)
+            poly = part.buffer(half, cap_style=2, join_style=2)
+            if poly.geom_type != "Polygon":
+                continue
+            t = min(mid, L - mid, ramp) / ramp        # 0 at the ends -> 1 mid-span
+            coords = [[round(x / kx + lon0, 6), round(y / 111320.0 + lat0, 6)]
+                      for x, y in poly.exterior.coords]
+            props = {k2: v for k2, v in pp.items()
+                     if k2.startswith("__rs_fill") or k2 in ("highway", "name")}
+            props["base"] = round(base_m * t, 2)
+            props["height"] = round(base_m * t + thick, 2)
+            feats.append({"type": "Feature", "properties": props,
+                          "geometry": {"type": "Polygon", "coordinates": [coords]}})
     return {"type": "FeatureCollection", "features": feats}
 
 
@@ -957,7 +1036,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         _z = _minzoom_filter(highway_col, mz)
         surface, tunnel, bridge = (["all", _z, surface], ["all", _z, tunnel], ["all", _z, bridge])
     dk = {"base_m": 5.0, "thickness_m": 1.0, "lane_m": 3.5, **(CONFIG.bridge_decks or {})}
-    decks = _bridge_decks(geo, dk["lane_m"]) if view_3d else {"features": []}
+    decks = _bridge_decks(geo, dk) if view_3d else {"features": []}
     if decks["features"]:
         style["sources"]["decks"] = {"type": "geojson", "data": decks}
     cw = _width_expr(highway_col, casing=True, **sw)      # casing width expr (reused across layers)
@@ -1006,8 +1085,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         style["layers"].append(
             {"id": "roads-bridge-decks", "type": "fill-extrusion", "source": "decks",
              "paint": {"fill-extrusion-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
-                       "fill-extrusion-base": dk["base_m"],
-                       "fill-extrusion-height": dk["base_m"] + dk["thickness_m"],
+                       "fill-extrusion-base": ["get", "base"],
+                       "fill-extrusion-height": ["get", "height"],
                        "fill-extrusion-opacity": 0.95}})
 
     # oneway direction arrows (on edges with no reverse twin) + line-placed street names, on top.
