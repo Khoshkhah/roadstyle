@@ -664,6 +664,13 @@ box-shadow:0 1px 4px rgba(0,0,0,.3);font:13px system-ui,sans-serif;max-height:70
   vertical-align:middle;border:1px solid rgba(0,0,0,.25)}
 .flt-ctrl.collapsed .flt-body{display:none}
 .flt-ctrl label{cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px}
+.rs-info{position:absolute;right:10px;bottom:40px;z-index:2;background:#fff;border-radius:5px;
+  box-shadow:0 1px 5px rgba(0,0,0,.3);width:240px;max-height:55vh;overflow:auto;
+  font:12px/1.55 sans-serif;display:none}
+.rs-info-hd{font-weight:700;padding:7px 10px;border-bottom:1px solid #eee;
+  display:flex;justify-content:space-between;align-items:center}
+.rs-info-x{cursor:pointer;color:#888;font:700 14px/1 sans-serif;padding:0 2px}
+.rs-info-bd{padding:7px 10px}
 .co-ctrl{position:absolute;top:10px;right:10px;z-index:2;background:#fff;border-radius:5px;
 box-shadow:0 1px 4px rgba(0,0,0,.3);padding:4px 7px;font:13px system-ui,sans-serif;color:#555}
 .co-ctrl select{font:inherit;border:0;background:transparent;cursor:pointer;outline:none;color:#111}
@@ -896,6 +903,23 @@ function _rfields(p, only){ const r=[];
     if((k==="bridge"||k==="tunnel") && (sl==="no"||sl==="0"||sl==="false")) continue;  // bridge/tunnel only when it IS one
     r.push(k+": "+s); } return r.join("<br>"); }
 const _popupFields = __ROAD_POPUP_FIELDS__;   // curated field list, or null => all columns
+const _popupMode = __ROAD_POPUP_MODE__;       // "popup" (floating) or "panel" (docked read-out)
+let _info=null;
+function rsInfoClear(){ if(_info) _info.style.display="none"; }
+function rsInfoShow(html){
+  if(!_info){ _info=document.createElement("div"); _info.className="rs-info";
+    document.body.appendChild(_info); }
+  _info.innerHTML='<div class="rs-info-hd"><span>Selected road</span>'+
+    '<span class="rs-info-x" title="Clear selection">\u00d7</span></div>'+
+    '<div class="rs-info-bd">'+html+'</div>';
+  _info.style.display="block";
+  _info.querySelector(".rs-info-x").onclick=()=>{ rsDeselect(); };
+}
+function rsDeselect(){
+  if(_sel){ setS(_sel,{select:false}); _sel=null; }
+  rsInfoClear();
+  document.dispatchEvent(new CustomEvent("rs:deselect"));
+}
 const _ttip = __ROAD_TOOLTIP__, _ttipOnly = Array.isArray(_ttip) ? _ttip : null;  // false | true | [fields]
 const _tip = _ttip ? new maplibregl.Popup(
   {closeButton:false, closeOnClick:false, maxWidth:"260px", offset:10, className:"rs-tip"}) : null;
@@ -911,14 +935,18 @@ map.on("mousemove", e=>{ _pt=e.point; if(!_raf) _raf=requestAnimationFrame(hover
 map.on("mouseout", ()=>{ _pt=null; if(_raf){cancelAnimationFrame(_raf);_raf=0;} setS(_hov,{hover:false}); _hov=null; if(_tip) _tip.remove(); });
 let _sel=null;
 map.on("click", e=>{
-  if(handleOverlayClick(e)){ if(_sel){ setS(_sel,{select:false}); _sel=null; } return; }  // visible "over" overlay (front) wins
+  if(handleOverlayClick(e)){ rsDeselect(); return; }  // visible "over" overlay (front) wins
   const f = pick(e.point);
-  if(!f){ if(_sel){ setS(_sel,{select:false}); _sel=null; } return; }   // click empty -> deselect (restore colour)
+  if(!f){ rsDeselect(); return; }                     // click empty -> deselect (restore colour)
   clearOvSel();
   if(_sel) setS(_sel,{select:false});
   _sel = hitOf(f); setS(_sel,{select:true});
+  // structured click-data for host pages / dashboards (fires in every popup mode, incl. False)
+  document.dispatchEvent(new CustomEvent("rs:select",
+    {detail:{id:f.id, layer:f.layer && f.layer.id, properties:f.properties || {}}}));
   if(__ROAD_POPUP__){
-    new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
+    if(_popupMode === "panel"){ rsInfoShow(_rfields(f.properties||{}, _popupFields)); }
+    else new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
       .setLngLat(e.lngLat).setHTML(_rfields(f.properties||{}, _popupFields)).addTo(map);
   }
 });
@@ -1021,10 +1049,13 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         road_tooltip = tooltip
     # road_popup: True -> curated DEFAULT_ROAD_POPUP; a list/tuple -> those fields; "all" -> every
     # column; False -> no popup. Baked into the page as (enabled flag, field list-or-null).
+    popup_mode = "popup"
     if road_popup is False:
         popup_on, popup_fields = False, None
     elif road_popup is True:
         popup_on, popup_fields = True, list(DEFAULT_ROAD_POPUP)
+    elif road_popup == "panel":                       # docked side panel instead of a popup
+        popup_on, popup_fields, popup_mode = True, list(DEFAULT_ROAD_POPUP), "panel"
     elif isinstance(road_popup, str):
         popup_on, popup_fields = True, None
     else:
@@ -1249,6 +1280,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__CO_ACTIVE__", str(_active))
             .replace("__OVERLAYS__", json.dumps(ov_meta))
             .replace("__ROAD_POPUP__", "true" if popup_on else "false")
+            .replace("__ROAD_POPUP_MODE__", json.dumps(popup_mode))
             .replace("__ROAD_POPUP_FIELDS__", json.dumps(popup_fields))
             .replace("__ROAD_TOOLTIP__", json.dumps(road_tooltip)))
     if gz:

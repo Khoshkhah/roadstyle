@@ -206,7 +206,18 @@ render_edges(
     tooltip=["name", "aadt"],                                # hover read-out (any backend)
 )
 render_edges(edges, road_popup="all")     # click shows every column
+render_edges(edges, road_popup="panel")   # docked side PANEL instead of a floating popup
 render_edges(edges, road_popup=False)     # no popup (click still selects/highlights)
+```
+
+`road_popup="panel"` docks the read-out bottom-right — it never covers the road you clicked and
+stays put at tilted 3D angles. For your own sidebar/dashboard: every click dispatches a
+`rs:select` CustomEvent (`event.detail.properties` = the edge's columns; `rs:deselect` on clear),
+in every mode — `road_popup=False` + your own listener is a clean custom UI:
+
+```js
+document.addEventListener("rs:select",   e => showSidebar(e.detail.properties));
+document.addEventListener("rs:deselect", () => hideSidebar());
 ```
 
 Internal `__rs_*`/`twoway`/`lvl` fields never show. Anything you select into the GeoDataFrame is
@@ -222,7 +233,7 @@ Every keyword of `render_edges` (full reference: [`docs/parameters.md`](docs/par
 | **Camera & 3D** | `pitch` / `bearing` (starting camera) · `view_3d` (tilted camera + extruded ramped bridge decks + on-map 2D/3D toggle) |
 | **Colour by data** | `color_by` + `colors`/`cmap`/`vmin`/`vmax` (categorical / continuous ramps) · `width_by` (scale width by value) · `color_table` (per-edge `{edge_id: colour}`) · `color_options` (several fill sets + client-side *Colour by* dropdown) |
 | **Filtering** | `include` / `exclude` (road classes) · `filter_col` (panel filters by another column) · `minzoom` (hide minor classes when zoomed out — `True` for the built-in table, or a dict) |
-| **UI toggles (web)** | `arrows` · `labels` · `filter_control` · `basemap_switcher` · `road_popup` (`True`/field list/`"all"`/`False`) · `tooltip` (hover fields) · `hover_color` / `select_color` |
+| **UI toggles (web)** | `arrows` · `labels` · `filter_control` · `basemap_switcher` · `road_popup` (`True`/field list/`"all"`/`"panel"`/`False`) · `tooltip` (hover fields) · `hover_color` / `select_color` |
 | **Extra content** | `overlays` (your own layers, under/over the roads) · `boundary` (dashed outline of the clip area) · `selected` (pre-highlighted edges, folium backend) |
 | **Data columns** | `highway_col` (class column) · `tunnel_col` / `bridge_col` / `layer_col` (grade separation) |
 | **Output size** | `compress=True` — gzip the inlined GeoJSON (typically 3–4× smaller files; the page inflates it on load; also keeps inline notebook previews under output-size limits) |

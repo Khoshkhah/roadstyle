@@ -442,3 +442,14 @@ def test_oneway_column_drives_arrows():
     style2 = _style(render_edges(g2, backend="web").html)
     flags2 = [f["properties"]["__rs_oneway"] for f in style2["sources"]["roads"]["data"]["features"]]
     assert flags2 == [True, True]
+
+
+def test_web_panel_popup_mode_and_select_events():
+    """road_popup="panel" routes the click read-out into a docked side panel (curated fields);
+    rs:select / rs:deselect CustomEvents fire in every mode for host pages."""
+    panel = render_edges(_edges(), backend="web", road_popup="panel").html
+    assert '_popupMode = "panel"' in panel and 'className="rs-info"' in panel.replace("'", '"')
+    default = render_edges(_edges(), backend="web").html
+    assert '_popupMode = "popup"' in default
+    for html in (panel, default):
+        assert 'CustomEvent("rs:select"' in html and 'CustomEvent("rs:deselect"' in html
