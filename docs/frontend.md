@@ -36,8 +36,11 @@ html = rs.to_iframe(edges, color_by="aadt", cmap="viridis")        # <iframe> st
 Trade-off: the map is a snapshot — to reflect new data you re-run Python and regenerate the file.
 
 > **Want a finished MapLibre map instead of a spec page?** `render_edges(backend="web").save(...)`
-> writes a self-contained, zoom-correct MapLibre map (two-way lanes, grade separation, offline) —
-> also Path 1 (no server), but a rendered map rather than a `roadstyle.js` spec page. See
+> writes a self-contained, zoom-correct MapLibre map (two-way lanes, grade separation, 3D
+> bridges, offline) — also Path 1 (no server), but a rendered map rather than a `roadstyle.js`
+> spec page. Its saved page is itself scriptable: a `window.rs*` API (setters for every control,
+> id-set queries, `rs:*` events) lets your own HTML drive it, with copyable scaffolding in
+> [`ui/`](https://github.com/Khoshkhah/roadstyle/tree/main/ui). See
 > [MapLibre web backend](web-backend.md).
 
 ---

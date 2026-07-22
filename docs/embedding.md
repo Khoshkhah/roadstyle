@@ -55,8 +55,7 @@ it doesn't need roadstyle's logic:
 | `__rs_w` | fill width (px) |
 | `__rs_op` | fill opacity |
 | `__rs_dash` | dash pattern (or null) |
-| `__rs_casing` | resolved casing colour (or null) — **what every backend draws** |
-| `__rs_casing` | the casing colour (one per edge, constant on every base map) |
+| `__rs_casing` | resolved casing colour (or null; one per edge, constant on every base map) — **what every backend draws** |
 | `__rs_cw` | casing width (px) |
 | `__rs_cop` | casing opacity |
 | `__rs_class` | road class / category |
@@ -242,6 +241,9 @@ m.on("ready", map => {
 A worked page is in
 [`examples/recolor_custom_panel.py`](https://github.com/Khoshkhah/roadstyle/blob/main/examples/recolor_custom_panel.py).
 
-> On the **`web` (MapLibre) backend** the panel hook is different — that page is a template, not a
-> `RoadStyleMap`, so it exposes `window.rsSetColorField(name|index)` + a `rs:colorchange` event
-> instead. See [web backend](web-backend.md#dynamic-recolouring-color_options).
+> On the **`web` (MapLibre) backend** the page is a rendered map, not a `RoadStyleMap` — it has
+> its own, larger JS surface: `window.rs*` setters for every control (`rsSetBasemap`,
+> `rsSetClasses`, `rsSetColorField`, `rsSetOverlay`, `rsSetView3D`, `rsSelect`/`rsDeselect`),
+> the id-set query verbs (`rsQuery` → `rsFilter`/`rsColor`/`rsHighlight`/`rsGetProps`/`rsFocus`),
+> and `rs:*` CustomEvents. See [the web-backend JS API](web-backend.md#the-javascript-api-windowrs)
+> and the copyable [`ui/` templates](https://github.com/Khoshkhah/roadstyle/tree/main/ui).
