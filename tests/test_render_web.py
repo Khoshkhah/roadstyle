@@ -545,3 +545,14 @@ def test_view3d_and_select_hooks_are_baked():
 def test_focus_hook_is_baked():
     wm = render_edges(_edges(), backend="web")
     assert "window.rsFocus" in wm.html and "fitBounds" in wm.html
+
+
+def test_deck_slices_carry_their_chain_road_ids():
+    """Every 3D deck slice bakes __rs_edges (the road feature ids of its chain), the link
+    rsSelect/rsHighlight use to glow the deck instead of the flat 2D line."""
+    g = _edges().assign(bridge=["yes", None, None])
+    wm = render_edges(g, backend="web", view_3d=True)
+    style = _style(wm.html)
+    slices = style["sources"]["decks"]["data"]["features"]
+    assert slices and all("__rs_edges" in s["properties"] for s in slices)
+    assert "0" in slices[0]["properties"]["__rs_edges"].split(",")  # edge 0 is the bridge

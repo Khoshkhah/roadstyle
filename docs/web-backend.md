@@ -114,7 +114,7 @@ dispatches a CustomEvent on `document`:
 | `rsHighlight(ids)` | selection glow on the set (`[]` clears) | `rs:highlightchange` |
 | `rsGetProps(ids)` | the rows behind the ids, internal fields stripped — table-ready | — |
 | `rsFocus(ids, opt?)` | fly the camera to fit an id (or id set); `opt` merges into MapLibre's `fitBounds` (`padding` 80, `maxZoom` 17) | — |
-| `rsSelect(id)` / `rsDeselect()` | select one edge exactly like a click (glow + popup/panel) / clear | `rs:select` / `rs:deselect` |
+| `rsSelect(id)` / `rsDeselect()` | select one edge exactly like a click (glow + popup/panel; a 3D bridge glows as its whole deck chain) / clear | `rs:select` / `rs:deselect` |
 | `rsSetView3D(on)` | tilt to the settings' `camera.pitch_3d` / back to flat north-up | `rs:viewchange` |
 
 The id sets use the roads source's generated feature ids — the same id space as `rs:select`

@@ -279,13 +279,17 @@ def _bridge_decks(geo, dk):
     from shapely.ops import substring
 
     reps = []
-    for ft in geo["features"]:
+    # endpoint pair -> ALL bridge feature indices there (both twins of a two-way), so a deck
+    # chain can be found from any of its road edges (__rs_edges, used by rsSelect/rsHighlight)
+    pair_edges = collections.defaultdict(list)
+    for fi, ft in enumerate(geo["features"]):
         g, p = ft.get("geometry") or {}, ft.get("properties", {})
         c = g.get("coordinates") or []
         if p.get("lvl") != 1 or g.get("type") != "LineString" or len(c) < 2:
             continue
         a = (round(c[0][0], 6), round(c[0][1], 6))
         z = (round(c[-1][0], 6), round(c[-1][1], 6))
+        pair_edges[min((a, z), (z, a))].append(fi)
         if p.get("twoway") and (z, a) < (a, z):
             continue
         reps.append((a, z, c, p))
@@ -305,6 +309,7 @@ def _bridge_decks(geo, dk):
         at full deck height instead of dipping to the ground mid-structure."""
         a, z, c, p = reps[start_i]
         used[start_i] = True
+        members = [start_i]
         chain = list(c)
         spans = [[len(chain) - 1, p]]
         ends = {}
@@ -317,6 +322,7 @@ def _bridge_decks(geo, dk):
                 j = cand[0]
                 ja, jz, jc, jp = reps[j]
                 used[j] = True
+                members.append(j)
                 if prepend:
                     seg = jc if jz == node else jc[::-1]
                     chain = seg[:-1] + chain
@@ -330,7 +336,7 @@ def _bridge_decks(geo, dk):
                     spans.append([len(chain) - 1, jp])
                     node = jz if ja == node else ja
             ends[prepend] = len(at[node]) == 1     # sole incident bridge edge = ground end
-        return chain, spans, ends[True], ends[False]
+        return chain, spans, ends[True], ends[False], members
 
     feats = []
     chain_i = 0
@@ -339,8 +345,11 @@ def _bridge_decks(geo, dk):
     for i in range(n):
         if used[i]:
             continue
-        chain, spans, ramp_head, ramp_tail = walk(i)
+        chain, spans, ramp_head, ramp_tail, members = walk(i)
         chain_i += 1
+        edges_s = ",".join(map(str, sorted({
+            fi for m in members
+            for fi in pair_edges[min((reps[m][0], reps[m][1]), (reps[m][1], reps[m][0]))]})))
         lon0, lat0 = chain[0]
         kx = 111320.0 * math.cos(math.radians(lat0))
         mpp = 156543.03392 * math.cos(math.radians(lat0)) / (2 ** dk["match_zoom"])
@@ -404,6 +413,7 @@ def _bridge_decks(geo, dk):
             props["__rs_base"] = round(base_m * t, 2)
             props["__rs_height"] = round(base_m * t + thick, 2)
             props["__rs_chain"] = chain_i
+            props["__rs_edges"] = edges_s   # road feature ids of the whole chain (both twins)
             feats.append({"type": "Feature", "properties": props,
                           "geometry": {"type": "Polygon", "coordinates": [coords]}})
     return {"type": "FeatureCollection", "features": feats}
@@ -808,11 +818,27 @@ function rsGetProps(ids){ // the rows behind an id set (internal fields stripped
     for(const k in p){ if(k[0]!=="_" && k!=="twoway" && k!=="lvl") r[k]=p[k]; }
     return r; });
 }
-let _qHl=[];
+// bridges in 3D are deck ribbons on their own source: this maps a road id to the deck slices
+// of its whole chain (via the baked __rs_edges), so selection/highlight glows on the deck
+// instead of the flat ground-level line
+function _deckIdsForRoad(i){
+  const s=map.getSource("decks"), fs=(s && s._data && s._data.features)||[];
+  const out=[], key=","+i+",";
+  fs.forEach((f,k)=>{ const e=f.properties && f.properties.__rs_edges;
+    if(e!=null && (","+e+",").indexOf(key)>=0) out.push(k); });
+  return out;
+}
+let _qHl=[], _qHlD=[];
 function rsHighlight(ids){ // selection glow on an id set; rsHighlight([]) clears
   _qHl.forEach(i=>map.setFeatureState({source:"roads",id:i},{select:false}));
+  _qHlD.forEach(i=>map.setFeatureState({source:"decks",id:i},{select:false}));
   _qHl = ids==null ? [] : Array.from(ids);
-  _qHl.forEach(i=>map.setFeatureState({source:"roads",id:i},{select:true}));
+  const fs=_feats(), dset=new Set();
+  _qHl.forEach(i=>{ map.setFeatureState({source:"roads",id:i},{select:true});
+    const p=fs[i] && fs[i].properties;
+    if(p && p.lvl>0) _deckIdsForRoad(i).forEach(d=>dset.add(d)); });
+  _qHlD = Array.from(dset);
+  _qHlD.forEach(i=>map.setFeatureState({source:"decks",id:i},{select:true}));
   document.dispatchEvent(new CustomEvent("rs:highlightchange",{detail:{ids:_qHl.slice()}}));
 }
 function rsFocus(ids, opt){ // fly the camera to an id (or id set); opt merges into fitBounds
@@ -1063,7 +1089,12 @@ function rsSelect(id){
   const f=_feats()[id]; if(!f) return;
   clearOvSel();
   if(_sel) setS(_sel,{select:false});
-  _sel={s:"roads", key:"r"+id, ids:[id]}; setS(_sel,{select:true});
+  // a bridge drawn as 3D deck ribbons: select the deck chain (what a click on it selects),
+  // not the flat ground-level line
+  const dids = (f.properties && f.properties.lvl>0) ? _deckIdsForRoad(id) : [];
+  _sel = dids.length ? {s:"decks", key:"e"+id, ids:dids}
+                     : {s:"roads", key:"r"+id, ids:[id]};
+  setS(_sel,{select:true});
   document.dispatchEvent(new CustomEvent("rs:select",
     {detail:{id:id, layer:null, properties:f.properties || {}}}));
   if(__ROAD_POPUP__){
