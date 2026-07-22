@@ -9,6 +9,16 @@ import streamlit as st
 import roadstyle as rs
 
 CMAPS = ["viridis", "plasma", "magma", "cividis", "coolwarm", "RdYlGn_r"]
+
+
+def tiles_available() -> bool:
+    """Whether the `tiles` extra (mapbox-vector-tile + pmtiles) is installed."""
+    try:
+        import mapbox_vector_tile  # noqa: F401
+        import pmtiles  # noqa: F401
+        return True
+    except ImportError:
+        return False
 OV_COLORS = ["#7c4dff", "#00bcd4", "#ff9800", "#e91e63"]
 
 SAMPLES_DIR = Path(__file__).resolve().parent / "samples"

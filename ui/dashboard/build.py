@@ -4,7 +4,11 @@ Renders the road network with **every built-in control off** and injects ``sideb
 before ``</body>`` — the sidebar is the whole UI, wired through the public ``window.rs*``
 API. Point it at your own data::
 
-    python build.py [edges.gpkg | edges.geojson]
+    python build.py [edges.gpkg | edges.geojson] [--tiles]
+
+``--tiles`` packs the roads as an embedded-PMTiles vector tileset (big networks stay
+responsive; needs ``pip install "roadstyle[tiles]"``) — the sidebar works identically,
+it only ever talks through the ``rs*`` API.
 """
 from __future__ import annotations
 
@@ -18,7 +22,9 @@ DEFAULT = HERE.parent / "studio" / "samples" / "sodermalm_driving.geojson"
 
 
 def main() -> None:
-    src = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT
+    args = [a for a in sys.argv[1:] if a != "--tiles"]
+    tiles = "--tiles" in sys.argv[1:]
+    src = Path(args[0]) if args else DEFAULT
     if not src.exists():
         raise SystemExit(f"data source not found: {src}")
     import geopandas as gpd
@@ -37,7 +43,7 @@ def main() -> None:
                                        "Speed": {"color_by": "maxspeed_kmh", "cmap": "plasma"},
                                        "Lanes": {"color_by": "lanes", "cmap": "viridis"}},
                         basemap_switcher=False, filter_control=False, road_popup=False,
-                        name="Roads dashboard")
+                        tiles=tiles, name="Roads dashboard")
     ui = (HERE / "sidebar.html").read_text()
     out = HERE / "dashboard.html"
     out.write_text(m.html.replace("</body>", ui + "</body>", 1))

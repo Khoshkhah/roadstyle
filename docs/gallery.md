@@ -87,7 +87,7 @@ query box, verb buttons, clickable results table, detail panel. Copy it from
 [`ui/dashboard/`](https://github.com/Khoshkhah/roadstyle/tree/main/ui/dashboard).
 
 ```bash
-python ui/dashboard/build.py your_edges.gpkg
+python ui/dashboard/build.py your_edges.gpkg            # add --tiles for ~10⁵-edge networks
 ```
 
 ![dashboard](img/gallery/dashboard.png)

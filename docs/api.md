@@ -12,8 +12,8 @@ A map of the public API. For every parameter and its meaning, see the
 Key kwargs: `backend`, `palette`, `highway_col`, `include`/`exclude`, `selected`, `tooltip`,
 `basemap`/`basemaps`, `view_3d` / `pitch` / `bearing`, `settings` (per-call override), the
 data-driven set `style` / `color_by` / `colors` / `cmap` / `vmin` / `vmax` / `width_by` /
-`legend`, and (web backend) `color_options` (switchable colouring), `overlays` (extra layers)
-and `compress`.
+`legend`, and (web backend) `color_options` (switchable colouring), `overlays` (extra layers),
+`compress` and `tiles` (embedded-PMTiles vector roads for big networks).
 
 ## Loading & tooling
 

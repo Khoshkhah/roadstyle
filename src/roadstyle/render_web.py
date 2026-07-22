@@ -809,11 +809,17 @@ class WebMap:
         return path
 
     def _repr_html_(self):
-        slim = (self._tpl
-                .replace("<style>__MAPLIBRE_CSS__</style>",
-                         f'<link rel="stylesheet" href="{_MAPLIBRE_CDN}/maplibre-gl.css"/>')
-                .replace("<script>__MAPLIBRE_JS__</script>",
-                         f'<script src="{_MAPLIBRE_CDN}/maplibre-gl.js"></script>'))
+        if "const RS_TILED = true" in self._tpl:
+            # tiled maps keep the vendored MapLibre v4: the CDN v3 preview predates the
+            # promise-style addProtocol the embedded pmtiles:// protocol needs (and a tiled
+            # page is MBs of archive anyway — the inlined MapLibre no longer dominates)
+            slim = self.html
+        else:
+            slim = (self._tpl
+                    .replace("<style>__MAPLIBRE_CSS__</style>",
+                             f'<link rel="stylesheet" href="{_MAPLIBRE_CDN}/maplibre-gl.css"/>')
+                    .replace("<script>__MAPLIBRE_JS__</script>",
+                             f'<script src="{_MAPLIBRE_CDN}/maplibre-gl.js"></script>'))
         return (f'<iframe srcdoc="{_html.escape(slim, quote=True)}" '
                 'style="width:100%;height:640px;border:0;border-radius:6px"></iframe>')
 

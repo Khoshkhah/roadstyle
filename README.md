@@ -303,7 +303,8 @@ no dropdown, so your own buttons can call `rsSetBasemap("blank")`; only the no-`
 `python ui/dashboard/build.py your_edges.gpkg` produces a sidebar dashboard (query box with
 SQL-style syntax, verb buttons, clickable results table that selects and flies to the road, a
 detail panel, base-map and colour-by selects) with every built-in control replaced by plain HTML
-you own.
+you own; add `--tiles` for big networks (embedded-PMTiles roads — the API the sidebar uses is
+identical). The [studio](ui/studio) has the same *Vector tiles* toggle.
 
 ## Settings — one defaults file, your overrides on top
 

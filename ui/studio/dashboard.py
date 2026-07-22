@@ -10,10 +10,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import streamlit as st
+from common import CMAPS, data_section, overlay_section, tiles_available
 
 import roadstyle as rs
-
-from common import CMAPS, data_section, overlay_section
 
 SIDEBAR = (Path(__file__).resolve().parent.parent / "dashboard" / "sidebar.html").read_text()
 
@@ -29,6 +28,10 @@ with st.sidebar:
                                               "satellite", "blank") if b in all_bms])
     basemap = st.selectbox("Initial base map", bms or all_bms)
     view_3d = st.checkbox("3D bridges", value=True)
+    tiles = st.checkbox("Vector tiles (big networks)", value=False,
+                        disabled=not tiles_available(),
+                        help="Embedded-PMTiles tileset in the same single file — ~10⁵-edge maps "
+                             "stay responsive. Needs `pip install \"roadstyle[tiles]\"`.")
     title = st.text_input("Title", value="Roads dashboard")
 
     st.subheader("Colour-by options")
@@ -47,6 +50,8 @@ with st.sidebar:
 kw = {"basemap": basemap, "view_3d": view_3d, "basemaps": bms or None,
       "color_options": color_options, "basemap_switcher": False, "filter_control": False,
       "road_popup": False, "name": title}
+if tiles:
+    kw["tiles"] = True
 if overlays:
     kw["overlays"] = overlays
 

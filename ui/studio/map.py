@@ -7,11 +7,10 @@ HTML) when you outgrow the knobs.
 from __future__ import annotations
 
 import streamlit as st
+from common import CMAPS, data_section, overlay_section, tiles_available
 
 import roadstyle as rs
 from roadstyle.render_web import DEFAULT_ROAD_POPUP
-
-from common import CMAPS, data_section, overlay_section
 
 # ---------------------------------------------------------------- sidebar: the knobs
 with st.sidebar:
@@ -23,9 +22,15 @@ with st.sidebar:
     palette = st.selectbox("Palette", ["highsat", "carto", "mono"])
     basemap = st.selectbox("Base map", list(rs.BASEMAPS), index=0)
     view_3d = st.checkbox("3D bridges (tilted view)", value=False)
+    tiles = st.checkbox("Vector tiles (big networks)", value=False,
+                        disabled=not tiles_available(),
+                        help="Embedded-PMTiles tileset in the same single file — ~10⁵-edge maps "
+                             "stay responsive. Needs `pip install \"roadstyle[tiles]\"`.")
     kw = {"palette": palette, "basemap": basemap}
     if view_3d:
         kw["view_3d"] = True
+    if tiles:
+        kw["tiles"] = True
 
     st.subheader("Colour by data")
     cols = [c for c in edges.columns if c != edges.geometry.name]
