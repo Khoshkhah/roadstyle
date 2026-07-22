@@ -288,8 +288,13 @@ rsGetProps(ids);               // → the rows behind the ids (internals strippe
 rsFocus(ids);                  // fly the camera to fit the set (or one id) — pairs with rsSelect
 ```
 
-The ids are the same id space as `rs:select` events (`e.detail.id`), so click-selection and
-queries interoperate. `rsColor` layers *over* the active `color_options` choice and survives
+Every verb also takes an **optional layer argument** — omitted it queries the roads; an
+overlay's label treats *that* overlay as the table (`rsQuery(p => p.status === 'offline',
+"Sensors")`, then `rsHighlight(ids, "Sensors")`, `rsGetProps(ids, "Sensors")`, `rsFilter(ids,
+"Sensors")`, `rsColor(ids, "#ff1744", "Sensors")` — reset with `rsColor(null, null, "Sensors")`
+— and `rsFocus(ids, null, "Sensors")`). Each layer is its own id space: never mix ids across
+layers. The road ids are the same id space as `rs:select` events (`e.detail.id`), so
+click-selection and queries interoperate. `rsColor` layers *over* the active `color_options` choice and survives
 switching it. One ceiling: street-name labels, arrows, and 3D bridge deck ribbons live on merged
 helper sources, so `rsFilter` prunes the road geometry but not those decorations (the class
 filter from `rsSetClasses` prunes everything).

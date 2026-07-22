@@ -108,12 +108,15 @@ dispatches a CustomEvent on `document`:
 | `rsSetClasses(list)` | show exactly these road classes, hide the rest | `rs:filterchange` |
 | `rsSetColorField(nameOrIdx)` | switch the active `color_options` entry | `rs:colorchange` |
 | `rsSetOverlay(labelOrIdx, on)` | show/hide one overlay | `rs:overlaychange` |
-| `rsQuery(p => …)` | evaluate a predicate over every edge's columns → **id set** | — |
-| `rsFilter(ids)` | show only these edges (`null` resets); ANDs with the class filter | `rs:filterchange` |
-| `rsColor(ids, "#hex")` | paint the set one colour, layered over the active colour option (`null` resets) | `rs:colorchange` |
-| `rsHighlight(ids)` | selection glow on the set (`[]` clears) | `rs:highlightchange` |
-| `rsGetProps(ids)` | the rows behind the ids, internal fields stripped — table-ready | — |
-| `rsFocus(ids, opt?)` | fly the camera to fit an id (or id set); `opt` merges into MapLibre's `fitBounds` (`padding` 80, `maxZoom` 17) | — |
+| `rsQuery(p => …, layer?)` | evaluate a predicate over every feature's columns → **id set** | — |
+| `rsFilter(ids, layer?)` | show only these features (`null` resets); on roads, ANDs with the class filter | `rs:filterchange` |
+| `rsColor(ids, "#hex", layer?)` | paint the set one colour, layered over the base styling (reset: `rsColor(null)` / `rsColor(null, null, label)`) | `rs:colorchange` |
+| `rsHighlight(ids, layer?)` | selection glow on the set (`[]` clears) | `rs:highlightchange` |
+| `rsGetProps(ids, layer?)` | the rows behind the ids, internal fields stripped — table-ready | — |
+
+`layer` is optional on all of these: omitted → the roads; an overlay's **label** (or index) →
+that overlay is the queried table. Each layer is its own id space — never mix ids across layers.
+| `rsFocus(ids, opt?, layer?)` | fly the camera to fit an id (or id set); `opt` merges into MapLibre's `fitBounds` (`padding` 80, `maxZoom` 17) | — |
 | `rsSelect(id)` / `rsDeselect()` | select one edge exactly like a click (glow + popup/panel; a 3D bridge glows as its whole deck chain) / clear | `rs:select` / `rs:deselect` |
 | `rsSetView3D(on)` | tilt to the settings' `camera.pitch_3d` / back to flat north-up | `rs:viewchange` |
 

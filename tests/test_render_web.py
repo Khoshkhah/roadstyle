@@ -556,3 +556,12 @@ def test_deck_slices_carry_their_chain_road_ids():
     slices = style["sources"]["decks"]["data"]["features"]
     assert slices and all("__rs_edges" in s["properties"] for s in slices)
     assert "0" in slices[0]["properties"]["__rs_edges"].split(",")  # edge 0 is the bridge
+
+
+def test_query_verbs_accept_overlay_layer_arg():
+    """rsQuery/rsFilter/rsColor/rsHighlight/rsGetProps/rsFocus take an optional overlay label."""
+    wm = render_edges(_edges(), backend="web")
+    for needle in ("function rsQuery(test, layer)", "function rsFilter(ids, layer)",
+                   "function rsColor(ids, color, layer)", "function rsHighlight(ids, layer)",
+                   "function rsGetProps(ids, layer)", "function rsFocus(ids, opt, layer)"):
+        assert needle in wm.html, needle

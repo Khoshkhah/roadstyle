@@ -802,18 +802,37 @@ window.RS_CLASSES = FILTER.classes;
 // id-set queries: the baked features are a queryable table. rsQuery(p => …) returns the ids of
 // the matching edges (generateId: a feature's id is its index in the source array); the verbs
 // below act on any id set — filter to it, read it back as rows, or highlight it.
-function _feats(){ const s=map.getSource("roads"); return (s && s._data && s._data.features)||[]; }
-function rsQuery(test){
-  const out=[]; _feats().forEach((f,i)=>{ try{ if(test(f.properties||{})) out.push(i); }catch(e){} });
+// every verb takes an optional `layer` argument: omitted -> the roads; an overlay's label (or
+// index) -> that overlay's features. Overlay sources use generateId too, so the same id-set
+// model applies — but each layer is its OWN id space: never mix ids across layers.
+function _sfeats(src){ const s=map.getSource(src); return (s && s._data && s._data.features)||[]; }
+function _feats(){ return _sfeats("roads"); }
+function _lyr(name){   // -> {src, ov} | null; ov null = the roads
+  if(name==null) return {src:"roads", ov:null};
+  const i = typeof name==="number" ? name : OVERLAYS.findIndex(o=>o.label===name);
+  return OVERLAYS[i] ? {src:OVERLAYS[i].source, ov:OVERLAYS[i]} : null;
+}
+function rsQuery(test, layer){
+  const L=_lyr(layer); if(!L) return [];
+  const out=[]; _sfeats(L.src).forEach((f,i)=>{ try{ if(test(f.properties||{})) out.push(i); }catch(e){} });
   return out;
 }
-function rsFilter(ids){   // show only these edges; rsFilter(null) resets
+function rsFilter(ids, layer){   // show only these features; rsFilter(null) resets
+  const L=_lyr(layer); if(!L) return;
+  if(L.ov){
+    const f = ids==null ? null : ["in",["id"],["literal",Array.from(ids)]];
+    L.ov.layers.forEach(id=>{ if(map.getLayer(id)) try{ map.setFilter(id,f); }catch(e){} });
+    document.dispatchEvent(new CustomEvent("rs:filterchange",
+      {detail:{overlay:L.ov.label, ids:ids==null?null:Array.from(ids)}}));
+    return;
+  }
   _qIds = ids==null ? null : Array.from(ids);
   _applyRoadFilters();
   document.dispatchEvent(new CustomEvent("rs:filterchange",{detail:{ids:_qIds}}));
 }
-function rsGetProps(ids){ // the rows behind an id set (internal fields stripped) — table-ready
-  const fs=_feats();
+function rsGetProps(ids, layer){ // the rows behind an id set (internals stripped) — table-ready
+  const L=_lyr(layer); if(!L) return [];
+  const fs=_sfeats(L.src);
   return Array.from(ids||[]).map(i=>{ const p=(fs[i]&&fs[i].properties)||{}; const r={};
     for(const k in p){ if(k[0]!=="_" && k!=="twoway" && k!=="lvl") r[k]=p[k]; }
     return r; });
@@ -829,7 +848,18 @@ function _deckIdsForRoad(i){
   return out;
 }
 let _qHl=[], _qHlD=[];
-function rsHighlight(ids){ // selection glow on an id set; rsHighlight([]) clears
+const _qHlOv={};   // per-overlay highlighted ids
+function rsHighlight(ids, layer){ // selection glow on an id set; rsHighlight([]) clears
+  const L=_lyr(layer); if(!L) return;
+  if(L.ov){
+    (_qHlOv[L.ov.label]||[]).forEach(i=>map.setFeatureState({source:L.src,id:i},{select:false}));
+    const cur = ids==null ? [] : Array.from(ids);
+    _qHlOv[L.ov.label]=cur;
+    cur.forEach(i=>map.setFeatureState({source:L.src,id:i},{select:true}));
+    document.dispatchEvent(new CustomEvent("rs:highlightchange",
+      {detail:{overlay:L.ov.label, ids:cur.slice()}}));
+    return;
+  }
   _qHl.forEach(i=>map.setFeatureState({source:"roads",id:i},{select:false}));
   _qHlD.forEach(i=>map.setFeatureState({source:"decks",id:i},{select:false}));
   _qHl = ids==null ? [] : Array.from(ids);
@@ -841,17 +871,20 @@ function rsHighlight(ids){ // selection glow on an id set; rsHighlight([]) clear
   _qHlD.forEach(i=>map.setFeatureState({source:"decks",id:i},{select:true}));
   document.dispatchEvent(new CustomEvent("rs:highlightchange",{detail:{ids:_qHl.slice()}}));
 }
-function rsFocus(ids, opt){ // fly the camera to an id (or id set); opt merges into fitBounds
-  const fs=_feats(); let ok=false, minx=1/0, miny=1/0, maxx=-1/0, maxy=-1/0;
+function _bbExtend(c, bb){  // walk any GeoJSON coordinates nesting (Point .. MultiPolygon)
+  if(typeof c[0]==="number"){ bb.ok=true;
+    if(c[0]<bb.minx)bb.minx=c[0]; if(c[0]>bb.maxx)bb.maxx=c[0];
+    if(c[1]<bb.miny)bb.miny=c[1]; if(c[1]>bb.maxy)bb.maxy=c[1]; }
+  else c.forEach(x=>_bbExtend(x, bb));
+}
+function rsFocus(ids, opt, layer){ // fly the camera to an id (or id set); opt -> fitBounds
+  const L=_lyr(layer); if(!L) return;
+  const fs=_sfeats(L.src), bb={ok:false, minx:1/0, miny:1/0, maxx:-1/0, maxy:-1/0};
   (Array.isArray(ids)?ids:[ids]).forEach(i=>{
-    const g=fs[i] && fs[i].geometry; if(!g) return;
-    const lines = g.type==="LineString" ? [g.coordinates] :
-                  g.type==="MultiLineString" ? g.coordinates : [];
-    lines.forEach(cs=>cs.forEach(c=>{ ok=true;
-      if(c[0]<minx)minx=c[0]; if(c[0]>maxx)maxx=c[0];
-      if(c[1]<miny)miny=c[1]; if(c[1]>maxy)maxy=c[1]; }));
+    const g=fs[i] && fs[i].geometry;
+    if(g && g.coordinates) _bbExtend(g.coordinates, bb);
   });
-  if(ok) map.fitBounds([[minx,miny],[maxx,maxy]],
+  if(bb.ok) map.fitBounds([[bb.minx,bb.miny],[bb.maxx,bb.maxy]],
     {padding:80, maxZoom:17, duration:700, ...(opt||{})});
 }
 window.rsQuery = rsQuery; window.rsFilter = rsFilter;
@@ -921,7 +954,20 @@ function rsSetColorField(nameOrIdx){
   coUpdateLegend();
   document.dispatchEvent(new CustomEvent("rs:colorchange",{detail:{option:o,index:idx}}));
 }
-function rsColor(ids, color){   // paint an id set one colour; rsColor(null) resets
+const _ovBaseC={};   // overlay layer id -> its original colour paint (captured on first rsColor)
+function rsColor(ids, color, layer){   // paint an id set one colour; rsColor(null) resets
+  const L=_lyr(layer); if(!L) return;
+  if(L.ov){
+    L.ov.layers.forEach(id=>{ const l=map.getLayer(id); if(!l) return;
+      const pn=l.type+"-color";                      // circle-/line-/fill-color by layer type
+      if(!(id in _ovBaseC)) _ovBaseC[id]=map.getPaintProperty(id,pn);
+      let e=_ovBaseC[id];
+      if(ids!=null && color) e=["case",["in",["id"],["literal",Array.from(ids)]],color,e];
+      map.setPaintProperty(id,pn,e); });
+    document.dispatchEvent(new CustomEvent("rs:colorchange",
+      {detail:{overlay:L.ov.label, ids:ids==null?null:Array.from(ids), color:color||null}}));
+    return;
+  }
   _qColor = (ids==null || !color) ? null : {ids:Array.from(ids), color:color};
   _applyFill();
   document.dispatchEvent(new CustomEvent("rs:colorchange",
