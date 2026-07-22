@@ -1555,7 +1555,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     # Both read their cosmetics from data/style.json "config" (labels / arrows blocks), so a user
     # roadstyle.json can restyle them without touching the library; missing keys keep the bundled
     # defaults (a partial override dict is fine).
-    cam = {"pitch": 0, "bearing": 0, "pitch_3d": 55, "max_pitch": 85, **(CONFIG.camera or {})}
+    cam = {"pitch": 0, "bearing": 0, "pitch_3d": 55, "max_pitch": 70, **(CONFIG.camera or {})}
     if view_3d:
         cam["pitch"] = cam["pitch_3d"]     # perspective camera only — no terrain data added
     if pitch is not None:

@@ -415,7 +415,7 @@
       "pitch": 0,
       "bearing": 0,
       "pitch_3d": 55,
-      "max_pitch": 85
+      "max_pitch": 70
     },
     "bridge_decks": {
       "base_m": 5.0,

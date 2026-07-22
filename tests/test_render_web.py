@@ -423,9 +423,11 @@ def test_web_pick_survives_missing_layers():
 
 
 def test_web_camera_max_pitch():
-    """The tilt limit is a setting (camera.max_pitch, default 85) — MapLibre's default 60 made
+    """The tilt limit is a setting (camera.max_pitch, default 70: past ~72 MapLibre's horizon
+    tile cover explodes on large GeoJSON sources — roads stop rendering and hover/select dies
+    with them, so the camera is bounded to the regime that renders) — MapLibre's default 60 made
     the camera stop partway when tilting interactively."""
-    assert "maxPitch:85" in render_edges(_edges(), backend="web").html
+    assert "maxPitch:70" in render_edges(_edges(), backend="web").html
 
 
 def test_snapshot_writes_png(tmp_path):

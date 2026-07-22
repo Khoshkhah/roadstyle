@@ -51,11 +51,13 @@ class StyleConfig:
                                                  "halo_width": 0})
     #: oneway-arrow chevrons (web backend): color, opacity
     arrows: dict = field(default_factory=lambda: {"color": "#5b5b5b", "opacity": 0.7})
-    #: camera (web backend): starting pitch (0-85 deg tilt) and bearing (deg clockwise from N),
+    #: camera (web backend): starting pitch (deg tilt, capped by max_pitch — 70 by default:
+    #: past ~72 MapLibre's horizon tile cover explodes on large GeoJSON sources, roads stop
+    #: rendering and hover/select dies with them) and bearing (deg clockwise from N),
     #: plus pitch_3d — the tilt `view_3d=True` and the on-map 2D/3D toggle ease to.
     #: Per-call `pitch=` / `bearing=` override; tilt/rotate stay interactive either way.
     camera: dict = field(default_factory=lambda: {"pitch": 0, "bearing": 0, "pitch_3d": 55,
-                                                  "max_pitch": 85})
+                                                  "max_pitch": 70})
     #: 3D bridge decks (web backend, view_3d): extruded ribbon height above ground, deck
     #: thickness, and metres per lane for the ribbon width
     #: ribbon width comes from the same class width table as the roads, converted to metres at
