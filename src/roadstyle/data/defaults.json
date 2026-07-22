@@ -421,7 +421,7 @@
       "thickness_m": 1.0,
       "lane_m": 3.5,
       "ramp_m": 40.0,
-      "step_m": 8.0
+      "step_m": 2.5
     }
   },
   "selection": {

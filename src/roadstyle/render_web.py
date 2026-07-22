@@ -321,7 +321,7 @@ def _bridge_decks(geo, dk):
 
     feats = []
     base_m, thick = dk["base_m"], dk["thickness_m"]
-    ramp, step = max(dk["ramp_m"], 1.0), max(dk["step_m"], 2.0)
+    ramp, step = max(dk["ramp_m"], 1.0), max(dk["step_m"], 1.0)
     for i in range(n):
         if used[i]:
             continue
@@ -364,6 +364,10 @@ def _bridge_decks(geo, dk):
             if poly.geom_type != "Polygon":
                 continue
             t = min(mid, L - mid, ramp) / ramp        # 0 at the ends -> 1 mid-span
+            t = t * t * (3 - 2 * t)                   # smoothstep: gentle takeoff + level-off;
+            #                                           with step_m << thickness the ~0.1-0.3 m
+            #                                           per-slice height delta hides inside the
+            #                                           deck body -> reads as a continuous ramp
             coords = [[round(x / kx + lon0, 6), round(y / 111320.0 + lat0, 6)]
                       for x, y in poly.exterior.coords]
             props = {k2: v for k2, v in pp.items()
