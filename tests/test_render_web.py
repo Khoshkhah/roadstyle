@@ -540,3 +540,8 @@ def test_view3d_and_select_hooks_are_baked():
     for needle in ("window.rsSetView3D", "window.rsSelect", "window.rsDeselect",
                    "rs:viewchange"):
         assert needle in wm.html, needle
+
+
+def test_focus_hook_is_baked():
+    wm = render_edges(_edges(), backend="web")
+    assert "window.rsFocus" in wm.html and "fitBounds" in wm.html

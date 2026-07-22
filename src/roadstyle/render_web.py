@@ -815,8 +815,22 @@ function rsHighlight(ids){ // selection glow on an id set; rsHighlight([]) clear
   _qHl.forEach(i=>map.setFeatureState({source:"roads",id:i},{select:true}));
   document.dispatchEvent(new CustomEvent("rs:highlightchange",{detail:{ids:_qHl.slice()}}));
 }
+function rsFocus(ids, opt){ // fly the camera to an id (or id set); opt merges into fitBounds
+  const fs=_feats(); let ok=false, minx=1/0, miny=1/0, maxx=-1/0, maxy=-1/0;
+  (Array.isArray(ids)?ids:[ids]).forEach(i=>{
+    const g=fs[i] && fs[i].geometry; if(!g) return;
+    const lines = g.type==="LineString" ? [g.coordinates] :
+                  g.type==="MultiLineString" ? g.coordinates : [];
+    lines.forEach(cs=>cs.forEach(c=>{ ok=true;
+      if(c[0]<minx)minx=c[0]; if(c[0]>maxx)maxx=c[0];
+      if(c[1]<miny)miny=c[1]; if(c[1]>maxy)maxy=c[1]; }));
+  });
+  if(ok) map.fitBounds([[minx,miny],[maxx,maxy]],
+    {padding:80, maxZoom:17, duration:700, ...(opt||{})});
+}
 window.rsQuery = rsQuery; window.rsFilter = rsFilter;
 window.rsGetProps = rsGetProps; window.rsHighlight = rsHighlight;
+window.rsFocus = rsFocus;
 if(FILTER.on){
   const box=document.createElement("div"); box.className="flt-ctrl";
   const hd=document.createElement("div"); hd.className="flt-hd"; hd.textContent="Roads ▾";

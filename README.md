@@ -285,6 +285,7 @@ rsFilter(ids);                 // show only these edges (rsFilter(null) resets) 
 rsColor(ids, "#ff00aa");       // paint the set one colour (rsColor(null) resets) → rs:colorchange
 rsHighlight(ids);              // selection glow (rsHighlight([]) clears)      → rs:highlightchange
 rsGetProps(ids);               // → the rows behind the ids (internals stripped) — table-ready
+rsFocus(ids);                  // fly the camera to fit the set (or one id) — pairs with rsSelect
 ```
 
 The ids are the same id space as `rs:select` events (`e.detail.id`), so click-selection and

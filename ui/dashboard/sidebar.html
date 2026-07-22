@@ -89,7 +89,8 @@ function runQuery(){
   document.getElementById("tbl").innerHTML = rows.map(r =>
     '<div><a href="#" data-id="' + r.id + '">' + r.p.name + '</a></div>').join("");
   document.querySelectorAll("#tbl a").forEach(a =>
-    a.onclick = e => { e.preventDefault(); rsSelect(+a.dataset.id); });
+    a.onclick = e => { e.preventDefault();
+      rsSelect(+a.dataset.id); rsFocus(+a.dataset.id); });   // select AND fly the camera to it
 }
 
 function resetAll(){
