@@ -453,3 +453,13 @@ def test_web_panel_popup_mode_and_select_events():
     assert '_popupMode = "popup"' in default
     for html in (panel, default):
         assert 'CustomEvent("rs:select"' in html and 'CustomEvent("rs:deselect"' in html
+
+
+def test_render_edges_scoped_settings():
+    """render_edges(..., settings=...) applies a settings override for that one render only —
+    no files, no lingering global state."""
+    styled = render_edges(_edges(), backend="web",
+                          settings={"config": {"labels": {"color": "#123123"}}}).html
+    assert '"text-color": "#123123"' in styled
+    plain = render_edges(_edges(), backend="web").html
+    assert '"text-color": "#5b5b5b"' in plain      # fully restored afterwards

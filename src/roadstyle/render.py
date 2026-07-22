@@ -45,6 +45,7 @@ def render_edges(
     color_table=None,
     color_key: str = "edge_id",
     color_col: str = "color",
+    settings=None,
     **kwargs,
 ):
     """Render styled road edges on a map.
@@ -85,6 +86,21 @@ def render_edges(
       - ``boundary`` : (web backend) a shapely geometry / GeoDataFrame / GeoJSON mapping drawn as a
         dashed outline on top of the roads (e.g. the area the network was clipped to).
     """
+    if settings is not None:
+        # scoped settings: apply the override for THIS render only, then restore. Same layout as
+        # a roadstyle.json / use_settings source (dict or path); stacks on top of any overrides
+        # already active.
+        from . import _settings as _s
+        from . import use_settings as _use
+        call_args = {k: v for k, v in locals().items()
+                     if k not in ("gdf", "settings", "kwargs", "_s", "_use")}
+        prev = list(_s._EXTRA)
+        _use(*prev, settings)
+        try:
+            return render_edges(gdf, settings=None, **call_args, **kwargs)
+        finally:
+            _use(*prev)
+
     edges = as_edges(gdf, class_col=highway_col)   # canonical: RoadEdges (EPSG:4326, lines)
     g = edges.gdf
     col = edges.class_col

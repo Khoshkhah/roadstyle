@@ -229,7 +229,7 @@ Every keyword of `render_edges` (full reference: [`docs/parameters.md`](docs/par
 
 | Group | Options |
 |---|---|
-| **Rendering** | `backend` (`"web"` default / `"folium"` / `"lonboard"`) · `palette` (`highsat`/`carto`/`mono`) · `basemap` / `basemaps` (active base map / switcher set) · `name` (page title) |
+| **Rendering** | `backend` (`"web"` default / `"folium"` / `"lonboard"`) · `palette` (`highsat`/`carto`/`mono`) · `basemap` / `basemaps` (active base map / switcher set) · `name` (page title) · `settings` (per-call settings override, dict or path) |
 | **Camera & 3D** | `pitch` / `bearing` (starting camera) · `view_3d` (tilted camera + extruded ramped bridge decks + on-map 2D/3D toggle) |
 | **Colour by data** | `color_by` + `colors`/`cmap`/`vmin`/`vmax` (categorical / continuous ramps) · `width_by` (scale width by value) · `color_table` (per-edge `{edge_id: colour}`) · `color_options` (several fill sets + client-side *Colour by* dropdown) |
 | **Filtering** | `include` / `exclude` (road classes) · `filter_col` (panel filters by another column) · `minzoom` (hide minor classes when zoomed out — `True` for the built-in table, or a dict) |
@@ -253,7 +253,11 @@ stating only what changes, in any of four ways (later wins):
 3. `$ROADSTYLE_CONFIG=/path/to/file.json` — explicit, per run
 4. **from code, at any time**: `rs.use_settings("my.json")` or `rs.use_settings({...})` —
    highest precedence, applies immediately (no restart), and `rs.use_settings()` with no
-   argument drops it again. Two looks in one script = call it between renders.
+   argument drops it again.
+5. **per call** — no files, no global state:
+   `render_edges(edges, settings={"config": {"labels": {"color": "#8899aa"}}})` applies the
+   override for that one render and restores everything after. Two looks in one script is just
+   two calls with two `settings=` values.
 
 The file layout mirrors `defaults.json` — four sections, all optional, merged per entry
 (a single zoom stop of one width row is a valid complete override):

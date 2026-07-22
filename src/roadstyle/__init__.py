@@ -62,13 +62,15 @@ from .stylers import (
 )
 
 
-def use_settings(source=None) -> None:
-    """Apply a settings override from code — the in-process equivalent of a ``roadstyle.json``.
+def use_settings(*sources) -> None:
+    """Apply settings overrides from code — the in-process equivalent of a ``roadstyle.json``.
 
-    ``source`` is a path to a JSON file or a dict, in the same
+    Each source is a path to a JSON file or a dict, in the same
     ``{"palettes", "config", "selection", "roads"}`` layout as an override file (state only what
     changes; everything else keeps the bundled defaults + any discovered override files, which
-    this source outranks). Call with no argument to drop the programmatic override again.
+    these sources outrank; later sources outrank earlier ones). Call with no arguments to drop
+    the programmatic overrides again. For a single render, prefer
+    ``render_edges(..., settings=...)`` — it applies and restores automatically.
 
     Safe to call at any point before rendering — already-imported styling tables (palettes,
     ``StyleConfig``, the web renderer's road model) are rebuilt in place::
@@ -83,7 +85,7 @@ def use_settings(source=None) -> None:
     """
     from . import _settings, config, palettes, render_web, style, stylers
 
-    _settings.set_extra(source)
+    _settings.set_extra(*sources)
     config.DEFAULT = config._default_config()
     style.DEFAULT = stylers.DEFAULT = render_web.CONFIG = config.DEFAULT
     palettes._reload()
