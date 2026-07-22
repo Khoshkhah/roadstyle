@@ -345,12 +345,17 @@ def test_web_camera_toggle_control():
 
 def test_web_3d_bridge_decks():
     """view_3d renders bridges as extruded deck ribbons (polygons floating base_m above ground)
-    and drops the flat bridge line layers; flat maps keep the classic flat bridge treatment."""
+    from bridge_decks.flat_below up; below it the classic flat bridge lines draw (full stylized
+    width — a fixed deck polygon reads too narrow / vanishes zoomed out)."""
     g = _edges().assign(bridge=["yes", None, None])
     td = _style(render_edges(g, backend="web", view_3d=True).html)
     ids = [l["id"] for l in td["layers"]]
     assert "roads-bridge-decks" in ids
-    assert "roads-bridge-casing" not in ids and "roads-bridge-fill" not in ids
+    # LOD swap at flat_below: flat lines capped there, deck starts there; bridge highlight split
+    flat3d = next(l for l in td["layers"] if l["id"] == "roads-bridge-fill")
+    deck3d = next(l for l in td["layers"] if l["id"] == "roads-bridge-decks")
+    assert flat3d["maxzoom"] == 16.0 and deck3d["minzoom"] == 16.0
+    assert "roads-highlight-bridge" in ids
     deck = next(l for l in td["layers"] if l["id"] == "roads-bridge-decks")
     assert deck["type"] == "fill-extrusion"
     assert deck["paint"]["fill-extrusion-base"] == ["get", "__rs_base"]

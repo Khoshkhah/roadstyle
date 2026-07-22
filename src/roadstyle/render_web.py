@@ -1130,7 +1130,9 @@ function rsInfoShow(html){
   _info.querySelector(".rs-info-x").onclick=()=>{ rsDeselect(); };
 }
 function rsDeselect(){
-  if(_sel){ setS(_sel,{select:false}); _sel=null; }
+  if(_sel){ setS(_sel,{select:false});
+    if(_sel.road!=null) map.setFeatureState({source:"roads", id:_sel.road},{select:false});
+    _sel=null; }
   rsInfoClear();
   document.dispatchEvent(new CustomEvent("rs:deselect"));
 }
@@ -1145,12 +1147,12 @@ function rsSelect(id){
   const f=_feats()[id]; if(!f) return;
   clearOvSel();
   if(_sel) setS(_sel,{select:false});
-  // a bridge drawn as 3D deck ribbons: select the deck chain (what a click on it selects),
-  // not the flat ground-level line
+  // a bridge: glow the deck chain (shown above flat_below) AND the flat line (shown below it)
   const dids = (f.properties && f.properties.lvl>0) ? _deckIdsForRoad(id) : [];
-  _sel = dids.length ? {s:"decks", key:"e"+id, ids:dids}
+  _sel = dids.length ? {s:"decks", key:"e"+id, ids:dids, road:id}
                      : {s:"roads", key:"r"+id, ids:[id]};
   setS(_sel,{select:true});
+  if(_sel.road!=null) map.setFeatureState({source:"roads", id:_sel.road},{select:true});
   document.dispatchEvent(new CustomEvent("rs:select",
     {detail:{id:id, layer:null, properties:f.properties || {}}}));
   if(__ROAD_POPUP__){
@@ -1379,7 +1381,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         _z = _minzoom_filter(highway_col, mz)
         surface, tunnel, bridge = (["all", _z, surface], ["all", _z, tunnel], ["all", _z, bridge])
     dk = {"base_m": 5.0, "thickness_m": 1.0, "ramp_m": 40.0, "step_m": 2.5,
-          "match_zoom": 18.0, "opacity": 0.7, "width_scale": 0.6,
+          "match_zoom": 18.0, "opacity": 0.7, "width_scale": 0.6, "flat_below": 16.0,
           **(CONFIG.bridge_decks or {})}
     # ONE deck geometry (width anchored at match_zoom, trimmed by width_scale). A fixed polygon
     # can't track the stylized px road widths across zooms — multi-width band variants were
@@ -1410,16 +1412,17 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
                    "line-width": fw, "line-offset": off}},
         # Bridges last (on top). Flat view: heavier square-capped casing reads as a deck.
-        # 3D view: the flat lines are replaced by extruded deck ribbons (added after this list).
-        *([] if decks["features"] else [
-            {"id": "roads-bridge-casing", "type": "line", "source": "roads", "layout": blay,
-             "filter": bridge,
-             "paint": {"line-color": CONFIG.bridge_casing_color,
-                       "line-width": bcw, "line-offset": off}},
-            {"id": "roads-bridge-fill", "type": "line", "source": "roads", "layout": lay,
-             "filter": bridge,
-             "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
-                       "line-width": fw, "line-offset": off}}]),
+        # 3D view: below bridge_decks.flat_below the SAME flat lines draw (full stylized width,
+        # matching the roads — a fixed deck polygon reads too narrow zoomed out); from
+        # flat_below up, the extruded deck ribbons take over (added after this list).
+        {"id": "roads-bridge-casing", "type": "line", "source": "roads", "layout": blay,
+         "filter": bridge,
+         "paint": {"line-color": CONFIG.bridge_casing_color,
+                   "line-width": bcw, "line-offset": off}},
+        {"id": "roads-bridge-fill", "type": "line", "source": "roads", "layout": lay,
+         "filter": bridge,
+         "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
+                   "line-width": fw, "line-offset": off}},
         # hover/select highlight, driven by feature-state set from the viewer (GPU recolour, no relayout)
         {"id": "roads-highlight", "type": "line", "source": "roads", "layout": lay,
          "paint": {
@@ -1429,10 +1432,26 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
              "line-width": fw, "line-offset": off}},
     ]
     if decks["features"]:
+        # 2D flat bridge lines below flat_below, extruded decks from it up — one representation
+        # at a time. The flat-line layers (and the bridge slice of the highlight layer) get a
+        # maxzoom; the deck layer a matching minzoom.
+        _fb = dk["flat_below"]
+        for l in style["layers"]:
+            if l["id"] in ("roads-bridge-casing", "roads-bridge-fill"):
+                l["maxzoom"] = _fb
+            elif l["id"] == "roads-highlight":
+                # bridges glow on the flat line only while the flat line is shown; the deck
+                # carries its own feature-state glow above flat_below
+                l["filter"] = ["<", ["coalesce", ["get", "lvl"], 0], 1]
+                style["layers"].append(
+                    {**l, "id": "roads-highlight-bridge", "maxzoom": _fb,
+                     "filter": [">", ["coalesce", ["get", "lvl"], 0], 0]})
+                break
         # extruded bridge decks: physical ribbons floating base_m above ground — in the tilted
         # view you look UNDER a bridge and see the roads passing beneath it
         style["layers"].append(
             {"id": "roads-bridge-decks", "type": "fill-extrusion", "source": "decks",
+             "minzoom": _fb,
              "paint": {"fill-extrusion-color":
                            ["case", ["boolean", ["feature-state", "select"], False], select_color,
                             ["boolean", ["feature-state", "hover"], False], hover_color,
