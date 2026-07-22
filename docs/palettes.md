@@ -85,7 +85,9 @@ change them, lowest-effort first.
 **1. A `roadstyle.json` override** — no code, no package edit; read at import. Sources, lowest
 precedence first: `~/.config/roadstyle/roadstyle.json` → `./roadstyle.json` → `$ROADSTYLE_CONFIG`.
 From code, `rs.use_settings("my.json")` (or a dict in the same layout) applies the same kind of
-override at runtime — highest precedence of all; call it again (no argument) to drop it.
+override at runtime — highest precedence of all; call it again (no argument) to drop it. For a
+single map, skip the state entirely: `render_edges(edges, settings={...})` applies the override
+for that one render and restores everything after.
 
 ```jsonc
 {

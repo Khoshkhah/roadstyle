@@ -76,6 +76,7 @@ GeoDataFrame with line geometry + a class column).
 | `basemap` | str / `None` | `None` | The primary base map (a key in `BASEMAPS`); default from the `basemap` setting (`voyager`). |
 | `pitch` / `bearing` | number / `None` | settings | Starting camera tilt / rotation (`camera` settings block). |
 | `view_3d` | bool | `False` | 3D view: tilted camera + extruded, ramped bridge decks (`bridge_decks` settings block). |
+| `settings` | dict / path / `None` | `None` | Per-call settings override (same layout as `roadstyle.json`); applied for this render only, restored after. |
 | `basemaps` | list / `None` | `None` | (folium) The set of base maps offered in the switcher control. |
 | `filter_control` | bool | `True` | Show the in-map road-type filter panel (checkboxes). On `folium` and the `web` backend. |
 | `name` | str | `"roads"` | Layer name. |
