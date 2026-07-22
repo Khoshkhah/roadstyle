@@ -27,6 +27,9 @@ Three palettes (data files you can [override](#settings--one-defaults-file-your-
 - **`mono`** — neutral grayscale (no hues); importance by shade + width. Good for print or as a
   quiet backdrop for data overlays.
 
+**New to the library?** Run the **studio** — the whole library behind eight knobs, writing the
+code for you: `pip install streamlit && streamlit run ui/studio/app.py` (see [`ui/studio`](ui/studio)).
+
 **Contents:** [Install](#install) · [Quickstart](#quickstart-python) ·
 [Data contract](#data-contract--which-column-powers-what) · [Recipes](#recipes) ·
 [JavaScript API](#drive-the-map-from-javascript) ·

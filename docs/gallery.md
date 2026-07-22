@@ -89,3 +89,15 @@ python ui/dashboard/build.py your.duckdb
 ```
 
 ![dashboard](img/gallery/dashboard.png)
+
+## roadstyle studio (Streamlit workbench)
+
+The whole library behind eight knobs — live map on the right, the exact `render_edges` code for
+the current state below it, and a download button for the self-contained HTML. The gentlest
+introduction to the library.
+
+```bash
+pip install streamlit && streamlit run ui/studio/app.py
+```
+
+![roadstyle studio](img/gallery/studio.png)

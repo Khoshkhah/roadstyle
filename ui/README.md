@@ -10,6 +10,7 @@ that gets injected before `</body>` of a saved map and talks to it only through 
 | template | what it shows |
 |---|---|
 | [`dashboard/`](dashboard/) | A sidebar dashboard: query box (`rsQuery`), verb buttons (`rsFilter` / `rsColor` / `rsHighlight`), a clickable results table (`rsGetProps` + `rsSelect`), a detail panel fed by `rs:select`, and a base-map select built from `RS_BASEMAPS`. |
+| [`studio/`](studio/) | **roadstyle studio** — a Streamlit workbench (`pip install streamlit`, then `streamlit run ui/studio/app.py`): the whole library behind eight knobs, with the live map next to the exact `render_edges` code it represents and a download button for the self-contained HTML. The gentlest way to work with — and demo — the library. |
 
 ## Using a template
 
