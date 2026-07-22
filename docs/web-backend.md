@@ -72,7 +72,7 @@ rs.render_edges(edges, backend="web", basemap="dark_matter").save("city.html")
 
 ## Parameters
 
-All the shared `render_edges` arguments apply (`palette`, `theme`, `include`/`exclude`,
+All the shared `render_edges` arguments apply (`palette`, `include`/`exclude`,
 `color_by`/`cmap`/`width_by`, `style`, `highway_col`, `basemap`, `basemaps`, `name`). The
 backend adds:
 
@@ -252,13 +252,10 @@ This is what makes the output a true single-file deliverable. (The folium/lonboa
 
 ## When to use which backend
 
-- **`web`** — a finished, interactive, **zoom-correct** road map you can ship as one file. The best
-  default when you want the osm-carto look, two-way lanes, grade separation, and an offline page.
-- **`folium`** — quick portable Leaflet HTML; fixed-pixel widths; rich folium ecosystem.
-- **`lonboard`** — GPU/WebGL for very large edge sets.
-- **`to_spec` / `save` / `-f rsjs`** — when the **browser** (your own Leaflet/MapLibre/deck.gl page)
-  should draw the data and you just want roadstyle's styling baked into JSON. See
-  [Frontend integration](frontend.md).
+Short version: start with `web`; `folium` for folium-ecosystem workflows, `lonboard` for very
+large edge sets, `to_spec`/roadstyle.js when your own web app draws the map. The full decision
+guide — feature matrix, data-size guidance, and the web-vs-spec dashboard question — is
+**[Choosing an engine](engines.md)**.
 
 
 ## Camera & 3D view

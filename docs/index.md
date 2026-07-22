@@ -57,6 +57,7 @@ roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by
 - **[Gallery](gallery.md)** — one screenshot + recipe per look.
 - **[Manual](manual.md)** — a hands-on walk-through with the **live map embedded after each step**.
 - **[Usage](usage.md)** — install, the command line, quick start, recipes.
+- **[Choosing an engine](engines.md)** — web vs folium vs lonboard vs roadstyle.js, with a feature matrix.
 - **[Parameter reference](parameters.md)** — every parameter explained.
 - **[MapLibre web backend](web-backend.md)** — the self-contained, zoom-correct vector map
   (two-way lanes, grade separation, offline).
