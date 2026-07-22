@@ -54,6 +54,12 @@ class StyleConfig:
     #: starting camera (web backend): pitch (0-85 deg tilt) and bearing (deg clockwise from N);
     #: per-call `pitch=` / `bearing=` override. Tilt/rotate stay interactive either way.
     camera: dict = field(default_factory=lambda: {"pitch": 0, "bearing": 0})
+    #: 3D view (web backend, `view_3d=True`): DEM tile source (default: the free, keyless AWS
+    #: terrarium tiles), vertical exaggeration, the starting tilt, and an optional hillshade layer
+    terrain: dict = field(default_factory=lambda: {
+        "tiles": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
+        "encoding": "terrarium", "max_zoom": 15, "exaggeration": 1.3, "pitch": 55,
+        "hillshade": True})
     #: annotation slots (web backend): each road chain is divided into equal slot_m-metre pieces;
     #: names take even slots, oneway arrows odd ones — alternating, never stacked. Text/icon zoom
     #: ramps and collision culling handle density automatically; unnamed name-slots stay empty.

@@ -777,7 +777,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
-           pitch: float = None, bearing: float = None,
+           pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
            basemap_switcher: bool = True, road_popup=True, road_tooltip=False,
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
@@ -939,6 +939,21 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     # roadstyle.json can restyle them without touching the library; missing keys keep the bundled
     # defaults (a partial override dict is fine).
     cam = {"pitch": 0, "bearing": 0, **(CONFIG.camera or {})}
+    ter = {"tiles": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
+           "encoding": "terrarium", "max_zoom": 15, "exaggeration": 1.3, "pitch": 55,
+           "hillshade": True, **(CONFIG.terrain or {})}
+    if view_3d:
+        # 3D view: drape everything over real elevation; free keyless DEM (AWS terrarium tiles)
+        style["sources"]["dem"] = {"type": "raster-dem", "tiles": [ter["tiles"]],
+                                   "tileSize": 256, "encoding": ter["encoding"],
+                                   "maxzoom": ter["max_zoom"],
+                                   "attribution": "Terrain: Mapzen/AWS Open Data"}
+        style["terrain"] = {"source": "dem", "exaggeration": ter["exaggeration"]}
+        if ter["hillshade"]:
+            # directly above the basemap raster, under every road layer
+            style["layers"].insert(1, {"id": "hillshade", "type": "hillshade", "source": "dem",
+                                       "paint": {"hillshade-exaggeration": 0.35}})
+        cam["pitch"] = ter["pitch"]
     if pitch is not None:
         cam["pitch"] = pitch
     if bearing is not None:

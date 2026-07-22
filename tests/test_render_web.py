@@ -323,3 +323,17 @@ def test_web_camera_pitch_and_bearing():
     tilted = render_edges(_edges(), backend="web", pitch=55, bearing=30).html
     assert "pitch:55, bearing:30," in tilted
     assert tilted.count("pitch:55") == 2          # map init AND the fitBounds camera
+
+
+def test_web_view_3d_flag():
+    """view_3d=True drapes the map on a DEM (style.terrain + raster-dem source + hillshade under
+    the roads) and starts tilted (terrain settings pitch); off by default."""
+    style = _style(render_edges(_edges(), backend="web", view_3d=True).html)
+    assert style["terrain"]["source"] == "dem"
+    assert style["sources"]["dem"]["type"] == "raster-dem"
+    ids = [l["id"] for l in style["layers"]]
+    assert ids.index("hillshade") < ids.index("roads-fill")
+    html = render_edges(_edges(), backend="web", view_3d=True).html
+    assert "pitch:55" in html
+    flat = _style(render_edges(_edges(), backend="web").html)
+    assert "terrain" not in flat and "dem" not in flat["sources"]
