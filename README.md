@@ -71,6 +71,9 @@ from roadstyle import render_edges
 edges = gpd.read_file("edges.gpkg")          # needs a `highway` column (any CRS)
 
 render_edges(edges, basemap="dark_matter").save("map.html")                  # high-sat, dark
+
+# straight from a duckOSM database (grade separation, oneway, lanes — the right columns, always)
+# edges = rs.from_duckosm("sodermalm.duckdb")
 render_edges(edges, palette="carto").save("c.html")  # OSM Carto, light
 render_edges(edges, basemap="dark_matter", view_3d=True).save("map3d.html")  # tilted + 3D bridges
 

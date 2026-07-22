@@ -127,3 +127,48 @@ def test_from_duckdb_wkb():
 def test_as_edges_unsupported_input_raises():
     with pytest.raises(TypeError):
         as_edges(12345)
+
+
+def test_from_duckosm_canonical_and_reduced(tmp_path):
+    """from_duckosm owns the canonical duckOSM query: full column set when present, graceful
+    intersection on older builds, edge_id cast to text, clear error on a non-duckOSM db."""
+    import duckdb
+    import pytest
+
+    import roadstyle as rs
+
+    db = tmp_path / "mini.duckdb"
+    con = duckdb.connect(str(db))
+    con.execute("INSTALL spatial; LOAD spatial")
+    con.execute("CREATE SCHEMA driving")
+    con.execute("""
+        CREATE TABLE driving.edges AS SELECT
+          9223372036854775807 - 42 AS edge_id, 1 AS osm_id, '1#1f' AS edge_ref,
+          'primary' AS highway, 'Testgatan' AS name, 2 AS lanes, FALSE AS oneway,
+          50.0 AS maxspeed_kmh, 100.0 AS length_m,
+          NULL AS tunnel, 'yes' AS bridge, NULL AS layer,
+          ST_GeomFromText('LINESTRING(18.0 59.3, 18.01 59.31)') AS geometry
+    """)
+    con.close()
+
+    edges = rs.from_duckosm(db)
+    g = edges.gdf
+    assert g.loc[0, "edge_id"] == "9223372036854775765"      # text, exact
+    assert g.loc[0, "bridge"] == "yes" and g.loc[0, "highway"] == "primary"
+    assert str(g.crs).endswith("4326")
+
+    # an older build missing optional columns still loads
+    con = duckdb.connect(str(db))
+    con.execute("LOAD spatial")
+    con.execute("ALTER TABLE driving.edges DROP COLUMN oneway")
+    con.execute("ALTER TABLE driving.edges DROP COLUMN layer")
+    con.close()
+    g2 = rs.from_duckosm(db).gdf
+    assert "oneway" not in g2.columns and g2.loc[0, "name"] == "Testgatan"
+
+    # a non-duckOSM database errors clearly
+    other = tmp_path / "other.duckdb"
+    duckdb.connect(str(other)).execute("CREATE TABLE t (x INT)").close() if False else None
+    con = duckdb.connect(str(other)); con.execute("CREATE TABLE t (x INT)"); con.close()
+    with pytest.raises(ValueError, match="duckOSM"):
+        rs.from_duckosm(other)
