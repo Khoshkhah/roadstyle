@@ -28,8 +28,10 @@ def main() -> None:
         edges = gpd.read_file(src)
 
     # built-in controls off — the sidebar IS the UI; the explicit basemaps= list keeps all
-    # entries addressable for the sidebar's own select (rsSetBasemap)
-    m = rs.render_edges(edges, backend="web", basemap="voyager",
+    # entries addressable for the sidebar's own select (rsSetBasemap). view_3d bakes the
+    # extruded bridge decks (needs a `bridge` column) and opens tilted; the sidebar's 2D/3D
+    # button (rsSetView3D) switches views.
+    m = rs.render_edges(edges, backend="web", basemap="voyager", view_3d=True,
                         basemaps=["voyager", "positron", "dark_matter", "satellite", "blank"],
                         basemap_switcher=False, filter_control=False, road_popup=False,
                         name="Roads dashboard")
