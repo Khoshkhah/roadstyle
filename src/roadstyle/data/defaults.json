@@ -437,6 +437,12 @@
       "line_opacity": 0.9,
       "outline_opacity": 0.9,
       "circle_stroke": "#ffffff"
+    },
+    "tiles": {
+      "minzoom": 6,
+      "maxzoom": 15,
+      "extent": 4096,
+      "buffer_px": 80
     }
   },
   "selection": {

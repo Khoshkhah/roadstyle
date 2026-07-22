@@ -583,6 +583,39 @@ _INFLATE_JS = """
 """
 
 
+# tiles=True bootstrap, injected before the main map script: decode the embedded PMTiles
+# archive, register the pmtiles:// protocol serving it from memory (must exist before the Map
+# is constructed), and asynchronously inflate the sidecar table (full per-edge properties +
+# midpoints + bboxes) that keeps rsQuery / popups / rsFocus working without inline GeoJSON.
+_TILES_JS = """
+<script id="rs-side" type="application/json">__RS_SIDE_B64__</script>
+<script>
+window.RS_SIDE=null;
+(function(){
+  var b=atob("__RS_PMTILES_B64__"), arr=new Uint8Array(b.length);
+  for(var i=0;i<b.length;i++) arr[i]=b.charCodeAt(i);
+  var buf=arr.buffer;
+  var src={getKey:function(){return "roads";},
+           getBytes:function(o,l){return Promise.resolve({data:buf.slice(o,o+l)});}};
+  var proto=new pmtiles.Protocol();
+  proto.add(new pmtiles.PMTiles(src));
+  maplibregl.addProtocol("pmtiles", proto.tile);
+  window.__rs_tiles={ok:true, bytes:arr.length};
+  (async function(){
+    var el=document.getElementById("rs-side");
+    try{
+      var s=atob(el.textContent.trim()), a=new Uint8Array(s.length);
+      for(var i=0;i<s.length;i++) a[i]=s.charCodeAt(i);
+      window.RS_SIDE=await new Response(new Blob([a]).stream()
+        .pipeThrough(new DecompressionStream("gzip"))).json();
+      el.textContent="";
+    }catch(e){ window.__rs_tiles={ok:false, stage:"sidecar", error:String(e)}; }
+  })();
+})();
+</script>
+"""
+
+
 def _minzoom_filter(col, table):
     """A filter clause keeping a feature only at/above its class's minzoom.
 
@@ -795,6 +828,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            basemap_switcher: bool = True, road_popup=True, road_tooltip=False,
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
            color_options=None, color_active=0, overlays=None, compress: bool = True,
+           tiles: bool = False,
            minzoom=None, **_ignore):
     """Build a self-contained MapLibre map of the styled edges.
 
@@ -898,11 +932,30 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             style["sources"]["bm"] = {"type": "raster", "tiles": _t, "tileSize": 256}
             style["layers"].append({"id": "basemap", "type": "raster", "source": "bm",
                                     "layout": {"visibility": "none"}})
-    # tolerance 0.05 (default 0.375): the source re-tiles at every integer zoom and re-simplifies
-    # the geometry — at the default tolerance the roads visibly ripple ("wave") on each zoom
-    # crossing. Near-zero simplification keeps zooming smooth; ~5k features can afford it.
-    style["sources"]["roads"] = {"type": "geojson", "data": geo, "generateId": True,
-                                 "tolerance": 0.05}
+    # roads source: inline GeoJSON by default; with `tiles=True` a PMTiles archive embedded in
+    # the page instead (MapLibre parses only the tiles in view — the client-side scale path).
+    # Feature ids are the feature's index either way (generateId / baked MVT id), so
+    # feature-state, rsFilter/rsColor and the sidecar table share one id space.
+    _tiler = tc = None
+    if tiles:
+        try:
+            from . import tiles as _tiler
+        except ImportError as err:                     # pragma: no cover
+            raise ImportError(
+                'tiles=True needs the tiles extra: pip install "roadstyle[tiles]"') from err
+        tc = {"minzoom": 6, "maxzoom": 15, "extent": 4096, "buffer_px": 80,
+              **(CONFIG.tiles or {})}
+        # the archive itself is built later, once the annotation slots exist (they ride along
+        # as a second tile layer); the source just points at the embedded pmtiles:// protocol
+        style["sources"]["roads"] = {"type": "vector", "url": "pmtiles://roads",
+                                     "minzoom": tc["minzoom"], "maxzoom": tc["maxzoom"]}
+    else:
+        # tolerance 0.05 (default 0.375): the source re-tiles at every integer zoom and
+        # re-simplifies the geometry — at the default tolerance the roads visibly ripple
+        # ("wave") on each zoom crossing. Near-zero simplification keeps zooming smooth;
+        # ~5k features can afford it.
+        style["sources"]["roads"] = {"type": "geojson", "data": geo, "generateId": True,
+                                     "tolerance": 0.05}
 
     # extra overlay layers (zones / POIs / any geometry the caller brings); each gets its own source
     # + paint layer(s), placed under or over the roads, and (if `popup` is set) clickable.
@@ -1055,10 +1108,12 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     arw = {"color": "#5b5b5b", "opacity": 0.7, **(CONFIG.arrows or {})}
     lbl = {"color": "#5b5b5b", "halo_color": None, "halo_width": 0, **(CONFIG.labels or {})}
     slot_m = (CONFIG.annotations or {}).get("slot_m", 100)
+    slots = {"features": []}
     if arrows or labels:
         slots = _annotation_slots(geo, slot_m)
         if slots["features"]:
-            style["sources"]["slots"] = {"type": "geojson", "data": slots}
+            if not tiles:   # tiles=True ships the slots as a layer of the pmtiles archive
+                style["sources"]["slots"] = {"type": "geojson", "data": slots}
             lpaint = {"text-color": lbl["color"]}
             if lbl["halo_color"] and lbl["halo_width"]:
                 lpaint["text-halo-color"] = lbl["halo_color"]
@@ -1118,6 +1173,28 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     flt = {"on": bool(filter_control and classes), "col": fcol, "classes": classes,
            "swatches": swatches}
 
+    pmt = side = None
+    if tiles:
+        # labels/arrows read the "slots" layer of the same archive (an inline slots source at
+        # 100k+ edges is exactly the bottleneck tiling removes); slots only matter from their
+        # symbol minzoom (14) up
+        for lyr in style["layers"]:
+            if lyr.get("source") == "slots":
+                lyr["source"] = "roads"
+                lyr["source-layer"] = "slots"
+        # every remaining layer on the (now vector) roads source draws the "roads" tile layer
+        for lyr in style["layers"]:
+            if lyr.get("source") == "roads" and "source-layer" not in lyr:
+                lyr["source-layer"] = "roads"
+        extra = ([{"name": "slots", "fc": slots, "minzoom": 14}]
+                 if slots["features"] else None)
+        pmt = _tiler.build_pmtiles(
+            geo, class_col=highway_col,
+            keep={highway_col, filter_col or highway_col, "twoway", "lvl"},
+            minzoom_table=CONFIG.minzoom, minzoom=tc["minzoom"], maxzoom=tc["maxzoom"],
+            extent=tc["extent"], buffer_px=tc["buffer_px"], extra_layers=extra)
+        side = _tiler.sidecar(geo)
+
     minx, miny, maxx, maxy = (float(v) for v in g.total_bounds)
     # after every style/filter/bounds decision above — those read the features, the browser never does
     gz = _compress_sources(style) if compress else {}
@@ -1141,7 +1218,18 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__ROAD_POPUP__", "true" if popup_on else "false")
             .replace("__ROAD_POPUP_MODE__", json.dumps(popup_mode))
             .replace("__ROAD_POPUP_FIELDS__", json.dumps(popup_fields))
-            .replace("__ROAD_TOOLTIP__", json.dumps(road_tooltip)))
+            .replace("__ROAD_TOOLTIP__", json.dumps(road_tooltip))
+            .replace("__RS_TILED__", "true" if tiles else "false"))
+    if tiles:
+        import base64
+        setup = (_TILES_JS.replace("__RS_PMTILES_B64__", base64.b64encode(pmt).decode())
+                 .replace("__RS_SIDE_B64__", _tiler._b64gz(side)))
+        html = html.replace("<script>__RS_TILES__</script>",
+                            "<script>"
+                            + _asset("pmtiles.js").replace("</script>", "<\\/script>")
+                            + "</script>" + setup, 1)
+    else:
+        html = html.replace("<script>__RS_TILES__</script>", "", 1)
     if gz:
         html = html.replace("</body>", _INFLATE_JS.replace("__RS_GZ__", json.dumps(gz)) + "</body>", 1)
     # MapLibre stays a placeholder here: WebMap inlines the vendored copy on save (offline file)

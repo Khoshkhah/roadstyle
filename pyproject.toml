@@ -39,8 +39,9 @@ basemaps = ["xyzservices"]                # use any XYZ tile provider as a base 
 lonboard = ["lonboard"]                   # WebGL (deck.gl) backend for very large edge sets
 duckdb = ["duckdb"]                        # read edges straight from a DuckDB relation / query
 arrow = ["pyarrow"]                        # read edges from a pyarrow Table
+tiles = ["mapbox-vector-tile", "pmtiles"]  # tiles=True: embedded-PMTiles vector road tiles
 docs = ["mkdocs-material"]
-dev = ["pytest", "ruff", "mypy", "lonboard", "mapclassify", "matplotlib", "xyzservices", "duckdb", "pyarrow"]
+dev = ["pytest", "ruff", "mypy", "lonboard", "mapclassify", "matplotlib", "xyzservices", "duckdb", "pyarrow", "mapbox-vector-tile", "pmtiles"]
 
 [project.scripts]
 roadstyle = "roadstyle.cli:main"

@@ -252,6 +252,32 @@ The saved HTML bundles MapLibre's JS+CSS **inline** and inlines the road GeoJSON
 This is what makes the output a true single-file deliverable. (The folium/lonboard backends and the
 [roadstyle.js spec page](frontend.md) have their own delivery models.)
 
+## Vector tiles in the file (`tiles=True`)
+
+For big networks, `tiles=True` swaps the inline road GeoJSON for a **PMTiles vector tileset
+embedded in the same HTML file** (base64 + an in-memory `pmtiles://` protocol — the vendored
+[pmtiles.js](https://github.com/protomaps/PMTiles)). Still one file, still opens from disk; what
+changes is *how the browser consumes the roads*:
+
+- MapLibre parses **only the tiles in view** instead of every feature at load — a ~100k-edge
+  map boots in a couple of seconds instead of ~10, and stays responsive when you pan/zoom;
+- low zooms carry **simplified geometry and only the classes visible there** (the settings
+  `minzoom` table), so zoomed-out views skip work you can't see;
+- the street-name/arrow **annotation slots ride along as a second tile layer** — no giant
+  inline symbol source.
+
+Everything else is unchanged: the full JS API (`rsQuery`, `rsFilter`, `rsColor`, `rsSelect`,
+popups, `rsFocus`) works identically — full per-edge attributes travel in a small gzipped
+**sidecar table** the page inflates on load, and feature ids are the same index id space as the
+inline version. Needs the `tiles` extra (`pip install "roadstyle[tiles]"`); on the CLI it's
+`--tiles`. Tileset knobs (zoom range, extent, clip buffer) live in settings under
+`config.tiles`.
+
+Trade-offs: the file is somewhat **larger** than the gzip-inlined equivalent (geometry is
+duplicated across zoom levels) and the Python build takes longer (roughly a minute at ~100k
+edges) — the win is entirely on the *viewer's* side. Below ~10⁴ edges the default inline mode
+is simpler and just as fast.
+
 ## When to use which backend
 
 Short version: start with `web`; `folium` for folium-ecosystem workflows, `lonboard` for very

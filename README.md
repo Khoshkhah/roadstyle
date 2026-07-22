@@ -364,14 +364,18 @@ Every keyword of `render_edges` (full reference: [`docs/parameters.md`](docs/par
 | **UI toggles (web)** | `arrows` · `labels` · `filter_control` · `basemap_switcher` · `road_popup` (`True`/field list/`"all"`/`"panel"`/`False`) · `tooltip` (hover fields) · `hover_color` / `select_color` |
 | **Extra content** | `overlays` (your own layers, under/over the roads) · `boundary` (dashed outline of the clip area) · `selected` (pre-highlighted edges, folium backend) |
 | **Data columns** | `highway_col` (class column) · `tunnel_col` / `bridge_col` / `layer_col` (grade separation) |
-| **Output size** | `compress` (**on by default**) — gzip the inlined GeoJSON (typically 3–4× smaller files; the page inflates it on load; also keeps inline notebook previews under output-size limits). `compress=False` for plain-JSON output |
+| **Output size** | `compress` (**on by default**) — gzip the inlined GeoJSON (typically 3–4× smaller files; the page inflates it on load; also keeps inline notebook previews under output-size limits). `compress=False` for plain-JSON output · `tiles` — embedded-PMTiles vector tileset for ~10⁵-edge networks (see the size-ceiling note below) |
 
 Everything *stylistic* (colours, widths, casing, labels, arrows, annotation slots, camera
 defaults, bridge decks…) is not a keyword but a **setting** — see the previous section.
 
 **Practical size ceiling:** a saved `web` map carries its data inline (gzipped by default) —
-comfortable to ~10⁴–10⁵ edges (a city district). Past that, switch to `backend="lonboard"` or
-pre-filter with `include=` — see [docs/engines.md](docs/engines.md).
+comfortable to ~10⁴ edges. Past that, pass **`tiles=True`** (`pip install "roadstyle[tiles]"`):
+the roads are packed as an **embedded PMTiles vector tileset** in the same single offline file —
+MapLibre parses only the tiles in view, so ~10⁵-edge maps boot in a couple of seconds and stay
+responsive, with the whole JS API intact. Alternatives: `backend="lonboard"` or pre-filter with
+`include=` — see [docs/engines.md](docs/engines.md) and
+[docs/web-backend.md](docs/web-backend.md#vector-tiles-in-the-file-tilestrue).
 
 ## Command line
 

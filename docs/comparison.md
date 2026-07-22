@@ -67,7 +67,8 @@ and lets your existing knowledge of those libraries carry over.
   width curve), so reach for it when you need zoom-correct widths — it also adds two-way lanes and
   tunnel/bridge grade separation (see [web backend](web-backend.md)).
 - **lonboard legends** aren't rendered yet (folium + the JSON/HTML outputs have them).
-- **Everything is inlined** — a saved `web` map carries its data in the file (gzipped by
-  default). Comfortable to ~10⁴–10⁵ edges / a few tens of MB (a city district, not a county);
-  past that, use the `lonboard` backend or pre-filter with `include=`. Vector-tile output for
-  city-scale data is out of scope for now.
+- **Everything ships in one file** — a saved `web` map carries its data in the file (gzipped by
+  default; comfortable to ~10⁴ edges). For bigger networks `tiles=True` embeds a PMTiles vector
+  tileset instead — ~10⁵ edges boot in seconds ([web backend](web-backend.md#vector-tiles-in-the-file-tilestrue)).
+  A *hosted* tile server for county-scale-and-up data is still out of scope; the `lonboard`
+  backend covers raw very-large rendering.

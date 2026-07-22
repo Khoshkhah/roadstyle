@@ -75,6 +75,10 @@ class StyleConfig:
     #: names take even slots, oneway arrows odd ones — alternating, never stacked. Text/icon zoom
     #: ramps and collision culling handle density automatically; unnamed name-slots stay empty.
     annotations: dict = field(default_factory=lambda: {"slot_m": 100})
+    #: vector tiling (web backend, `tiles=True`): tileset zoom range, MVT grid extent, and the
+    #: clip buffer in extent units (bleed for strokes crossing tile edges)
+    tiles: dict = field(default_factory=lambda: {"minzoom": 6, "maxzoom": 15,
+                                                 "extent": 4096, "buffer_px": 80})
 
 
 def _default_config() -> StyleConfig:

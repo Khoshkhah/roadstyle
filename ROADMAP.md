@@ -40,5 +40,9 @@ what's next.
 5. ~~mkdocs site deploy~~ — done: `.github/workflows/docs.yml` publishes to GitHub Pages on
    every docs change.
 
-Speculative / parked: a deck.gl hybrid for richer 3D, vector-tile output for city-scale data,
-generalizing the engine to full base maps (that's the **mapstyle** project's job).
+Done since: **embedded-PMTiles vector tiling** (`tiles=True` — single-file maps that stay
+responsive at ~10⁵ edges; annotation slots ride along as a second tile layer).
+
+Speculative / parked: a deck.gl hybrid for richer 3D, a *hosted* tile server for
+county-scale-and-up data, generalizing the engine to full base maps (that's the **mapstyle**
+project's job).

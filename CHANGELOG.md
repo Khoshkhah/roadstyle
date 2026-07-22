@@ -15,6 +15,17 @@ First PyPI release.
 - Version is single-sourced from `pyproject.toml` (`roadstyle.__version__` reads the install
   metadata).
 
+### Added (vector tiles)
+- **`tiles=True` (web backend)**: pack the roads — and the street-name/arrow annotation slots —
+  as a **PMTiles vector tileset embedded in the single HTML file**, served to MapLibre from
+  memory via an in-page `pmtiles://` protocol (vendored pmtiles.js). MapLibre parses only the
+  tiles in view: ~10⁵-edge maps boot in a couple of seconds and stay responsive, still offline,
+  still one file. Low zooms carry simplified geometry and only the classes the settings
+  `minzoom` table shows there. The full JS API, popups and hover/select work unchanged — full
+  per-edge attributes travel in a gzipped sidecar table sharing the same index-id space.
+  New extra `roadstyle[tiles]` (mapbox-vector-tile + pmtiles), CLI `--tiles`, settings knobs
+  under `config.tiles` (zoom range / extent / clip buffer).
+
 ### Added (release engineering)
 - CI: lint + tests on Python 3.10–3.13, plus a headless-Chromium smoke test that boots a saved
   map and asserts the data reached MapLibre (`tests/test_web_smoke.py`).

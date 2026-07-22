@@ -78,6 +78,10 @@ def _build_parser() -> argparse.ArgumentParser:
     web.add_argument("--no-filter", action="store_true", help="hide the road-class filter panel.")
     web.add_argument("--no-basemap-switcher", action="store_true",
                      help="hide the in-map base-layer dropdown.")
+    web.add_argument("--tiles", action="store_true",
+                     help="pack the roads as an embedded-PMTiles vector tileset instead of "
+                          "inline GeoJSON (client-side scale for big networks; needs the "
+                          "'tiles' extra).")
     web.add_argument("--no-compress", action="store_true",
                      help="write the map data as plain JSON instead of gzipped blobs "
                           "(bigger files; for very old browsers without DecompressionStream).")
@@ -138,6 +142,7 @@ def main(argv: list[str] | None = None) -> int:
                       "filter_control": not args.no_filter,
                       "basemap_switcher": not args.no_basemap_switcher,
                       "compress": not args.no_compress,
+                      "tiles": args.tiles,
                       "view_3d": args.view_3d}
             if args.pitch is not None:
                 web_kw["pitch"] = args.pitch

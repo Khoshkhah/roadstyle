@@ -3,6 +3,7 @@
 <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"/>
 <style>__MAPLIBRE_CSS__</style>
 <script>__MAPLIBRE_JS__</script>
+<script>__RS_TILES__</script>
 <style>html,body{margin:0;height:100%}#map{position:absolute;inset:0}
 .rs-zoom{position:absolute;bottom:10px;left:140px;z-index:2;background:rgba(255,255,255,.85);
   padding:2px 6px;border-radius:4px;font:11px/1.5 monospace;color:#333;pointer-events:none}
@@ -43,6 +44,10 @@ box-shadow:0 1px 4px rgba(0,0,0,.3);font:13px system-ui,sans-serif;color:#222}
 </style></head><body>
 <div id="map"></div><script>
 const style = __STYLE__, BASEMAPS = __BASEMAPS__;
+// tiles=True: the roads are an embedded-PMTiles vector source (no inline features) — reads of
+// per-edge data go to the sidecar table (window.RS_SIDE), and roads feature-state needs the
+// source-layer name. RS_TILED=false leaves every code path exactly as the inline version.
+const RS_TILED = __RS_TILED__;
 const RS_DECK_LAYERS = style.layers.filter(l=>l.id.indexOf("roads-bridge-decks")===0).map(l=>l.id);
 const map = new maplibregl.Map({container:"map", style:style, center:__CENTER__, zoom:13,
   pitch:__PITCH__, bearing:__BEARING__, maxPitch:__MAX_PITCH__,
@@ -110,9 +115,11 @@ function _applyRoadFilters(){
     if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null;
     let f=_fltBase[l.id];
     if(hidden.length){ const cf=["!",["in",["get",FILTER.col],["literal",hidden]]]; f=f?["all",f,cf]:cf; }
-    // ids exist only in the roads source — slots (labels/arrows) and decks (3D ribbons) have
-    // their own id spaces, so those layers take just the class filter
-    if(_qIds && l.source==="roads"){ const qf=["in",["id"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
+    // ids exist only in the roads features — slots (labels/arrows) and decks (3D ribbons) have
+    // their own id spaces, so those layers take just the class filter. In tiles mode slots share
+    // the archive source, so the tile layer name is what separates them.
+    const isRoads = l.source==="roads" && (!RS_TILED || l["source-layer"]==="roads");
+    if(_qIds && isRoads){ const qf=["in",["id"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
     try{ map.setFilter(l.id,f); }catch(e){}
   });
   return hidden;
@@ -134,6 +141,15 @@ window.RS_CLASSES = FILTER.classes;
 // model applies — but each layer is its OWN id space: never mix ids across layers.
 function _sfeats(src){ const s=map.getSource(src); return (s && s._data && s._data.features)||[]; }
 function _feats(){ return _sfeats("roads"); }
+// tiles mode plumbing: _side() -> the sidecar table (null while it inflates / in inline mode);
+// _rprops(id) -> a road's full properties from either world; _fs() -> setFeatureState that adds
+// the source-layer tiled road refs need (decks/overlays pass through untouched).
+function _side(){ return (RS_TILED && window.RS_SIDE) || null; }
+function _rprops(i){ const s=_side(); if(s) return s.props[i]||{};
+  const f=_feats()[i]; return (f && f.properties)||{}; }
+function _fs(ref, st){
+  if(RS_TILED && ref.source==="roads") ref={source:"roads", sourceLayer:"roads", id:ref.id};
+  map.setFeatureState(ref, st); }
 function _lyr(name){   // -> {src, ov} | null; ov null = the roads
   if(name==null) return {src:"roads", ov:null};
   const i = typeof name==="number" ? name : OVERLAYS.findIndex(o=>o.label===name);
@@ -141,7 +157,10 @@ function _lyr(name){   // -> {src, ov} | null; ov null = the roads
 }
 function rsQuery(test, layer){
   const L=_lyr(layer); if(!L) return [];
-  const out=[]; _sfeats(L.src).forEach((f,i)=>{ try{ if(test(f.properties||{})) out.push(i); }catch(e){} });
+  const out=[];
+  const s = !L.ov && _side();
+  if(s){ s.props.forEach((p,i)=>{ try{ if(test(p||{})) out.push(i); }catch(e){} }); return out; }
+  _sfeats(L.src).forEach((f,i)=>{ try{ if(test(f.properties||{})) out.push(i); }catch(e){} });
   return out;
 }
 function rsFilter(ids, layer){   // show only these features; rsFilter(null) resets
@@ -159,8 +178,9 @@ function rsFilter(ids, layer){   // show only these features; rsFilter(null) res
 }
 function rsGetProps(ids, layer){ // the rows behind an id set (internals stripped) — table-ready
   const L=_lyr(layer); if(!L) return [];
-  const fs=_sfeats(L.src);
-  return Array.from(ids||[]).map(i=>{ const p=(fs[i]&&fs[i].properties)||{}; const r={};
+  const s = !L.ov && _side(), fs = s ? null : _sfeats(L.src);
+  return Array.from(ids||[]).map(i=>{
+    const p=(s ? s.props[i] : (fs[i]&&fs[i].properties))||{}; const r={};
     for(const k in p){ if(k[0]!=="_" && k!=="twoway" && k!=="lvl") r[k]=p[k]; }
     return r; });
 }
@@ -187,15 +207,15 @@ function rsHighlight(ids, layer){ // selection glow on an id set; rsHighlight([]
       {detail:{overlay:L.ov.label, ids:cur.slice()}}));
     return;
   }
-  _qHl.forEach(i=>map.setFeatureState({source:"roads",id:i},{select:false}));
-  _qHlD.forEach(i=>map.setFeatureState({source:"decks",id:i},{select:false}));
+  _qHl.forEach(i=>_fs({source:"roads",id:i},{select:false}));
+  _qHlD.forEach(i=>_fs({source:"decks",id:i},{select:false}));
   _qHl = ids==null ? [] : Array.from(ids);
-  const fs=_feats(), dset=new Set();
-  _qHl.forEach(i=>{ map.setFeatureState({source:"roads",id:i},{select:true});
-    const p=fs[i] && fs[i].properties;
+  const dset=new Set();
+  _qHl.forEach(i=>{ _fs({source:"roads",id:i},{select:true});
+    const p=_rprops(i);
     if(p && p.lvl>0) _deckIdsForRoad(i).forEach(d=>dset.add(d)); });
   _qHlD = Array.from(dset);
-  _qHlD.forEach(i=>map.setFeatureState({source:"decks",id:i},{select:true}));
+  _qHlD.forEach(i=>_fs({source:"decks",id:i},{select:true}));
   document.dispatchEvent(new CustomEvent("rs:highlightchange",{detail:{ids:_qHl.slice()}}));
 }
 function _bbExtend(c, bb){  // walk any GeoJSON coordinates nesting (Point .. MultiPolygon)
@@ -206,8 +226,11 @@ function _bbExtend(c, bb){  // walk any GeoJSON coordinates nesting (Point .. Mu
 }
 function rsFocus(ids, opt, layer){ // fly the camera to an id (or id set); opt -> fitBounds
   const L=_lyr(layer); if(!L) return;
-  const fs=_sfeats(L.src), bb={ok:false, minx:1/0, miny:1/0, maxx:-1/0, maxy:-1/0};
+  const s = !L.ov && _side();
+  const fs = s ? null : _sfeats(L.src), bb={ok:false, minx:1/0, miny:1/0, maxx:-1/0, maxy:-1/0};
   (Array.isArray(ids)?ids:[ids]).forEach(i=>{
+    if(s){ const b=s.bboxes[i];
+      if(b){ _bbExtend([[b[0],b[1]],[b[2],b[3]]], bb); } return; }
     const g=fs[i] && fs[i].geometry;
     if(g && g.coordinates) _bbExtend(g.coordinates, bb);
   });
@@ -393,18 +416,23 @@ map.on("load", addArrow);
 // Self-diagnosis: a map with zero road features is a broken page, not an empty area — say WHY
 // on the map itself (frontends like notebook webviews surface no console). Amber banner reports
 // the inflate state so a screenshot alone pinpoints the failing stage.
-map.on("load", function(){ setTimeout(function(){
+map.on("load", function(){ var tries=0; (function check(){ setTimeout(function(){
   try{
-    var src = map.getSource("roads");
-    var n = (src && src._data && src._data.features) ? src._data.features.length : 0;
+    var n;
+    if(RS_TILED){ n = map.querySourceFeatures("roads",{sourceLayer:"roads"}).length; }
+    else{ var src = map.getSource("roads");
+      n = (src && src._data && src._data.features) ? src._data.features.length : 0; }
     if(n) return;
-    var gz = window.__rs_gz ? JSON.stringify(window.__rs_gz) : "inflate script did not run";
+    if(RS_TILED && ++tries < 3) return check();          // tiles may still be decoding/loading
+    var st = RS_TILED
+      ? (window.__rs_tiles ? JSON.stringify(window.__rs_tiles) : "tiles setup did not run")
+      : (window.__rs_gz ? JSON.stringify(window.__rs_gz) : "inflate script did not run");
     document.body.insertAdjacentHTML("afterbegin",
       '<div style="position:fixed;z-index:9999;top:0;left:0;right:0;padding:8px 12px;'+
-      'background:#b45309;color:#fff;font:12px monospace">roadstyle: 0 road features — '+gz+
+      'background:#b45309;color:#fff;font:12px monospace">roadstyle: 0 road features — '+st+
       ' | DecompressionStream: '+(typeof DecompressionStream)+'</div>');
   }catch(e){}
-}, 2500); });
+}, 2500); })(); });
 map.on("styleimagemissing", e=>{ if(e.id==="oneway") addArrow(); });
 // hover + click-to-select + info popup (feature-state, tolerance box, throttled to one query/frame)
 const HIT = 4;
@@ -417,12 +445,16 @@ function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id));
   const l = ids.length ? map.queryRenderedFeatures(box(p), {layers:ids}) : [];
   return l.length ? l[0] : null; }
 function srcOf(f){ return f && f.layer && f.layer.id.indexOf("roads-bridge-decks")===0 ? "decks" : "roads"; }
+// full properties of a picked feature: tiles carry only the style props, so road hits read the
+// sidecar row behind the feature id; decks (and inline mode) keep the feature's own properties
+function _pickProps(f){ const s=_side();
+  return (s && srcOf(f)==="roads" && f.id!=null) ? (s.props[f.id]||f.properties||{}) : (f.properties||{}); }
 function hitOf(f){ if(!f || f.id==null) return null;
   if(srcOf(f)==="decks"){ const e=f.properties && f.properties.__rs_edges;
     if(e==null) return null;                                   // casing slab: not a road
     return {s:"decks", key:"e"+e, ids:_deckIdsForRoad(+e)}; }  // one directed edge = one hover
   return {s:"roads", key:"r"+f.id, ids:[f.id]}; }
-function setS(h, st){ if(h) h.ids.forEach(id=>map.setFeatureState({source:h.s, id:id}, st)); }
+function setS(h, st){ if(h) h.ids.forEach(id=>_fs({source:h.s, id:id}, st)); }
 let _hov=null, _pt=null, _raf=0;
 function _rfields(p, only){ const r=[];
   if(p.name!=null && (""+p.name)!=="" && (""+p.name).toLowerCase()!=="nan") r.push("<b>"+p.name+"</b>");  // name on top, bold, no label
@@ -447,7 +479,7 @@ function rsInfoShow(html){
 }
 function rsDeselect(){
   if(_sel){ setS(_sel,{select:false});
-    if(_sel.road!=null) map.setFeatureState({source:"roads", id:_sel.road},{select:false});
+    if(_sel.road!=null) _fs({source:"roads", id:_sel.road},{select:false});
     _sel=null; }
   rsInfoClear();
   document.dispatchEvent(new CustomEvent("rs:deselect"));
@@ -460,21 +492,23 @@ function _midOf(g){ if(!g) return null;
              g.type==="MultiLineString" ? g.coordinates[0] : null;
   return cs && cs.length ? cs[Math.floor(cs.length/2)] : null; }
 function rsSelect(id){
-  const f=_feats()[id]; if(!f) return;
+  const s=_side();
+  const props = s ? s.props[id] : (_feats()[id]||{}).properties;
+  if(props==null) return;
   clearOvSel();
   if(_sel) setS(_sel,{select:false});
   // a bridge: glow the deck chain (shown above flat_below) AND the flat line (shown below it)
-  const dids = (f.properties && f.properties.lvl>0) ? _deckIdsForRoad(id) : [];
+  const dids = (props && props.lvl>0) ? _deckIdsForRoad(id) : [];
   _sel = dids.length ? {s:"decks", key:"e"+id, ids:dids, road:id}
                      : {s:"roads", key:"r"+id, ids:[id]};
   setS(_sel,{select:true});
-  if(_sel.road!=null) map.setFeatureState({source:"roads", id:_sel.road},{select:true});
+  if(_sel.road!=null) _fs({source:"roads", id:_sel.road},{select:true});
   document.dispatchEvent(new CustomEvent("rs:select",
-    {detail:{id:id, layer:null, properties:f.properties || {}}}));
+    {detail:{id:id, layer:null, properties:props || {}}}));
   if(__ROAD_POPUP__){
-    const html=_rfields(f.properties||{}, _popupFields);
+    const html=_rfields(props||{}, _popupFields);
     if(_popupMode === "panel"){ rsInfoShow(html); }
-    else{ const c=_midOf(f.geometry);
+    else{ const c = s ? s.mids[id] : _midOf((_feats()[id]||{}).geometry);
       if(c) new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
         .setLngLat(c).setHTML(html).addTo(map); }
   }
@@ -488,7 +522,7 @@ function hoverFrame(){ _raf=0; if(!_pt) return;
   const h = hitOf(f);
   if((h && h.key) !== (_hov && _hov.key)){
     setS(_hov,{hover:false}); _hov=h; setS(_hov,{hover:true}); }
-  if(_tip){ if(f){ _tip.setLngLat(map.unproject(_pt)).setHTML(_rfields(f.properties||{}, _ttipOnly));
+  if(_tip){ if(f){ _tip.setLngLat(map.unproject(_pt)).setHTML(_rfields(_pickProps(f), _ttipOnly));
       if(!_tip.isOpen()) _tip.addTo(map); } else if(_tip.isOpen()) _tip.remove(); }
 }
 map.on("mousemove", e=>{ _pt=e.point; if(!_raf) _raf=requestAnimationFrame(hoverFrame); });
@@ -501,13 +535,14 @@ map.on("click", e=>{
   clearOvSel();
   if(_sel) setS(_sel,{select:false});
   _sel = hitOf(f); setS(_sel,{select:true});
+  const props = _pickProps(f);
   // structured click-data for host pages / dashboards (fires in every popup mode, incl. False)
   document.dispatchEvent(new CustomEvent("rs:select",
-    {detail:{id:f.id, layer:f.layer && f.layer.id, properties:f.properties || {}}}));
+    {detail:{id:f.id, layer:f.layer && f.layer.id, properties:props}}));
   if(__ROAD_POPUP__){
-    if(_popupMode === "panel"){ rsInfoShow(_rfields(f.properties||{}, _popupFields)); }
+    if(_popupMode === "panel"){ rsInfoShow(_rfields(props, _popupFields)); }
     else new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
-      .setLngLat(e.lngLat).setHTML(_rfields(f.properties||{}, _popupFields)).addTo(map);
+      .setLngLat(e.lngLat).setHTML(_rfields(props, _popupFields)).addTo(map);
   }
 });
 map.on("load", ()=>{ try{ map.fitBounds(__BOUNDS__,
