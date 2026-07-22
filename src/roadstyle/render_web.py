@@ -1152,7 +1152,8 @@ const HIT = 4;
 function box(p){ return [[p.x-HIT,p.y-HIT],[p.x+HIT,p.y+HIT]]; }
 // query only layers that EXIST: the 3D view swaps roads-bridge-fill for the deck extrusions,
 // and MapLibre errors out (killing hover+click) when asked to query a missing layer id.
-const PICK_LAYERS = ["roads-fill","roads-tunnel-fill","roads-bridge-fill"].concat(RS_DECK_LAYERS);
+const PICK_LAYERS = style.layers.map(l=>l.id)
+  .filter(id=>/^roads-(tunnel-|bridge-)?fill/.test(id)).concat(RS_DECK_LAYERS);
 function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id));
   const l = ids.length ? map.queryRenderedFeatures(box(p), {layers:ids}) : [];
   return l.length ? l[0] : null; }
@@ -1523,6 +1524,32 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                        "fill-extrusion-base": ["get", "__rs_base"],
                        "fill-extrusion-height": ["get", "__rs_height"],
                        "fill-extrusion-opacity": dk["opacity"]}})
+
+    # per-class dashed fills (footway/path/steps/cycleway …): the styling compiler bakes
+    # __rs_dash ("4,4") from the palette, but line-dasharray can't be data-driven — so every
+    # distinct dash value gets its own sibling fill layer (butt caps: round caps would seal the
+    # gaps), and dashed classes drop out of the solid fill + casing layers (a dash gap must show
+    # the ground, not a casing band).
+    dashes = sorted({(f.get("properties") or {}).get("__rs_dash")
+                     for f in geo["features"]} - {None, ""})
+    if dashes:
+        nod = ["!", ["has", "__rs_dash"]]
+        relayered = []
+        for l in style["layers"]:
+            relayered.append(l)
+            lid, base_f = l["id"], l.get("filter")
+            if lid in ("roads-fill", "roads-tunnel-fill", "roads-bridge-fill"):
+                for di, ds in enumerate(dashes):
+                    relayered.append(
+                        {**l, "id": f"{lid}-dash{di}",
+                         "layout": {**l.get("layout", {}), "line-cap": "butt"},
+                         "filter": ["all", base_f, ["==", ["get", "__rs_dash"], ds]],
+                         "paint": {**l["paint"],
+                                   "line-dasharray": [float(x) for x in ds.split(",")]}})
+                l["filter"] = ["all", base_f, nod]
+            elif lid in ("roads-casing", "roads-tunnel-casing", "roads-bridge-casing"):
+                l["filter"] = ["all", base_f, nod]
+        style["layers"] = relayered
 
     # oneway direction arrows (on edges with no reverse twin) + line-placed street names, on top.
     # Both read their cosmetics from data/style.json "config" (labels / arrows blocks), so a user

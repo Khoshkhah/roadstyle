@@ -96,7 +96,7 @@
         "casing": "#5c7cb6"
       },
       "footway": {
-        "fill": "#9e5b5b",
+        "fill": "#C59D9D",
         "width": 1.2,
         "casing_width": 1.2,
         "dash": [
@@ -104,10 +104,10 @@
           4
         ],
         "opacity": 1.0,
-        "casing": "#9e5b5b"
+        "casing": "#C59D9D"
       },
       "path": {
-        "fill": "#9e5b5b",
+        "fill": "#C59D9D",
         "width": 1.2,
         "casing_width": 1.2,
         "dash": [
@@ -115,7 +115,7 @@
           5
         ],
         "opacity": 1.0,
-        "casing": "#9e5b5b"
+        "casing": "#C59D9D"
       }
     },
     "highsat": {
@@ -219,7 +219,7 @@
         "casing": null
       },
       "footway": {
-        "fill": "#C0392B",
+        "fill": "#D98880",
         "width": 1.5,
         "casing_width": 0.0,
         "dash": [
@@ -230,7 +230,7 @@
         "casing": null
       },
       "path": {
-        "fill": "#C0392B",
+        "fill": "#D98880",
         "width": 1.5,
         "casing_width": 0.0,
         "dash": [
@@ -337,7 +337,7 @@
         "casing": "#888888"
       },
       "footway": {
-        "fill": "#888888",
+        "fill": "#ABABAB",
         "width": 1.2,
         "casing_width": 1.2,
         "dash": [
@@ -345,10 +345,10 @@
           4
         ],
         "opacity": 1.0,
-        "casing": "#888888"
+        "casing": "#ABABAB"
       },
       "path": {
-        "fill": "#888888",
+        "fill": "#ABABAB",
         "width": 1.2,
         "casing_width": 1.2,
         "dash": [
@@ -356,7 +356,7 @@
           5
         ],
         "opacity": 1.0,
-        "casing": "#888888"
+        "casing": "#ABABAB"
       }
     }
   },

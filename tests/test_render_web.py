@@ -578,6 +578,25 @@ def test_deck_slices_carry_their_road_id():
     assert cas["paint"]["fill-extrusion-color"] == "#000000"
 
 
+def test_dashed_path_classes_get_dash_layers():
+    """footway/path/steps/cycleway carry a palette dash (__rs_dash); the web backend renders
+    them as dashed sibling fill layers (butt caps — round would seal the gaps) and drops them
+    from the solid fill + casing layers so the gaps show the ground."""
+    g = gpd.GeoDataFrame(
+        {"highway": ["footway", "cycleway", "residential"]},
+        geometry=[LineString([(18.0, 59.30), (18.01, 59.305)]),
+                  LineString([(18.01, 59.305), (18.02, 59.31)]),
+                  LineString([(18.02, 59.31), (18.03, 59.315)])], crs=4326)
+    style = _style(render_edges(g, backend="web").html)
+    lay = {l["id"]: l for l in style["layers"]}
+    dash_layers = [l for i, l in lay.items() if i.startswith("roads-fill-dash")]
+    assert len(dash_layers) == 2               # highsat: footway 4,4 / cycleway 6,4
+    assert all("line-dasharray" in l["paint"] for l in dash_layers)
+    assert all(l["layout"]["line-cap"] == "butt" for l in dash_layers)
+    assert "__rs_dash" in json.dumps(lay["roads-fill"]["filter"])      # solid excludes dashed
+    assert "__rs_dash" in json.dumps(lay["roads-casing"]["filter"])    # no casing band either
+
+
 def test_twoway_bridge_decks_split_per_directed_edge():
     """A two-way bridge gets TWO side-by-side half ribbons — one per directed twin — each baked
     with __rs_edges = its own road feature id, so hover/select separates the directions instead
