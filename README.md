@@ -8,7 +8,8 @@ map — the proper **casing + fill "geometry sandwich"**, **highway-type filteri
 
 The **`web` backend** (`backend="web"`) goes further, matching the *openstreetmap-carto* look with
 **per-zoom widths**, **two-way directional lanes**, direction **arrows**, curved **street names**,
-**hover/select**, a base-layer switcher, **tunnel/bridge grade separation**, slot-based
+**hover/select**, a base-layer switcher, a **scale bar**, a road-class filter panel that
+**doubles as a colour legend**, **tunnel/bridge grade separation**, slot-based
 **street names + one-way arrows** (alternating along each road, never stacked), an optional
 **3D view** (`view_3d=True`: tilted camera, extruded ramped **bridge decks**, an on-map 2D/3D
 toggle), and an optional **boundary overlay** — all in one **offline, self-contained HTML** file

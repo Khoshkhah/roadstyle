@@ -64,7 +64,7 @@ def snapshot(map_or_html, out_path, *, center=None, zoom=None, pitch=None, beari
     if center is not None:
         cam["center"] = list(center)
 
-    try:
+    def _shoot():
         with sync_playwright() as p:
             browser = p.chromium.launch()
             page = browser.new_page(viewport={"width": width, "height": height})
@@ -80,6 +80,22 @@ def snapshot(map_or_html, out_path, *, center=None, zoom=None, pitch=None, beari
             page.wait_for_timeout(int(settle * 1000))
             page.screenshot(path=str(out_path))
             browser.close()
+
+    try:
+        # Playwright's sync API refuses to run inside a live asyncio loop (e.g. a Jupyter
+        # kernel); a worker thread has no loop, so the same code runs everywhere.
+        import asyncio
+        try:
+            asyncio.get_running_loop()
+            in_loop = True
+        except RuntimeError:
+            in_loop = False
+        if in_loop:
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=1) as ex:
+                ex.submit(_shoot).result()
+        else:
+            _shoot()
     finally:
         if tmp is not None:
             os.unlink(tmp.name)
