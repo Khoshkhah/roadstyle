@@ -50,6 +50,7 @@ No Python required — point the `roadstyle` command at any road file (GPKG, Geo
 
 ```bash
 roadstyle edges.gpkg -o map.html --basemap dark_matter               # styled interactive map
+roadstyle edges.gpkg -o map3d.html --basemap dark_matter --view-3d   # tilted camera + 3D bridges
 roadstyle edges.gpkg --include motorway trunk primary       # keep only major roads
 roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by your data
 roadstyle edges.gpkg --tooltip name highway maxspeed         # hover tooltip fields (all backends)
@@ -71,6 +72,7 @@ edges = gpd.read_file("edges.gpkg")          # needs a `highway` column (any CRS
 
 render_edges(edges, basemap="dark_matter").save("map.html")                  # high-sat, dark
 render_edges(edges, palette="carto").save("c.html")  # OSM Carto, light
+render_edges(edges, basemap="dark_matter", view_3d=True).save("map3d.html")  # tilted + 3D bridges
 
 # filter by type + satellite + highlight a selection
 sel = edges[edges.highway == "motorway"]

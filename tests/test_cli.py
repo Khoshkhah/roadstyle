@@ -26,6 +26,14 @@ def test_missing_input_returns_2(tmp_path):
 def test_each_format_writes_a_file(tmp_path, fmt):
     out = tmp_path / f"map_{fmt}"
     assert main([str(SAMPLE), "-o", str(out), "-f", fmt, "--basemap", "dark_matter"]) == 0
+
+
+def test_cli_view_3d(tmp_path):
+    from roadstyle.cli import main
+    out = tmp_path / "m3d.html"
+    assert main([str(SAMPLE), "-o", str(out), "-f", "web", "--view-3d", "--bearing", "-20"]) == 0
+    html = out.read_text()
+    assert "pitch:55" in html and "bearing:-20" in html
     assert out.exists() and out.stat().st_size > 0
 
 

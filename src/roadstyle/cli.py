@@ -69,6 +69,10 @@ def _build_parser() -> argparse.ArgumentParser:
                     help="scale line width between MIN and MAX px by the numeric --color-by.")
 
     web = p.add_argument_group("web backend (-f web)")
+    web.add_argument("--view-3d", action="store_true",
+                     help="3D view: tilted camera + extruded, ramped bridge decks.")
+    web.add_argument("--pitch", type=float, help="starting camera tilt in degrees (0-85).")
+    web.add_argument("--bearing", type=float, help="starting camera rotation in degrees.")
     web.add_argument("--no-arrows", action="store_true", help="hide one-way direction arrows.")
     web.add_argument("--no-labels", action="store_true", help="hide street-name labels.")
     web.add_argument("--no-filter", action="store_true", help="hide the road-class filter panel.")
@@ -129,7 +133,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.format == "web":
             web_kw = {"arrows": not args.no_arrows, "labels": not args.no_labels,
                       "filter_control": not args.no_filter,
-                      "basemap_switcher": not args.no_basemap_switcher}
+                      "basemap_switcher": not args.no_basemap_switcher,
+                      "view_3d": args.view_3d}
+            if args.pitch is not None:
+                web_kw["pitch"] = args.pitch
+            if args.bearing is not None:
+                web_kw["bearing"] = args.bearing
             render_edges(g, backend="web", **style_kw, **web_kw).save(str(out_path))
         elif args.format == "folium":
             render_edges(g, backend="folium", **style_kw).save(str(out_path))
