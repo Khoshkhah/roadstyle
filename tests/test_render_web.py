@@ -313,3 +313,13 @@ def test_webmap_notebook_repr_is_slim_but_saved_file_is_offline():
     assert "cdn.jsdelivr.net/npm/maplibre-gl" in r
     assert len(r) < len(wm.html)                      # the 800 KB vendored blob stays out
     assert "__MAPLIBRE_JS__" not in wm.html and "cdn.jsdelivr" not in wm.html
+
+
+def test_web_camera_pitch_and_bearing():
+    """pitch=/bearing= set the starting camera (and survive the bounds fit); defaults come from
+    the `camera` settings block (0/0)."""
+    flat = render_edges(_edges(), backend="web").html
+    assert "pitch:0, bearing:0," in flat
+    tilted = render_edges(_edges(), backend="web", pitch=55, bearing=30).html
+    assert "pitch:55, bearing:30," in tilted
+    assert tilted.count("pitch:55") == 2          # map init AND the fitBounds camera

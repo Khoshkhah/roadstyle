@@ -410,6 +410,10 @@
     "bridge_casing_color": "#000000",
     "annotations": {
       "slot_m": 100
+    },
+    "camera": {
+      "pitch": 0,
+      "bearing": 0
     }
   },
   "selection": {

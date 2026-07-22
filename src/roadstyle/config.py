@@ -51,6 +51,9 @@ class StyleConfig:
                                                  "halo_width": 0})
     #: oneway-arrow chevrons (web backend): color, opacity
     arrows: dict = field(default_factory=lambda: {"color": "#5b5b5b", "opacity": 0.7})
+    #: starting camera (web backend): pitch (0-85 deg tilt) and bearing (deg clockwise from N);
+    #: per-call `pitch=` / `bearing=` override. Tilt/rotate stay interactive either way.
+    camera: dict = field(default_factory=lambda: {"pitch": 0, "bearing": 0})
     #: annotation slots (web backend): each road chain is divided into equal slot_m-metre pieces;
     #: names take even slots, oneway arrows odd ones — alternating, never stacked. Text/icon zoom
     #: ramps and collision culling handle density automatically; unnamed name-slots stay empty.

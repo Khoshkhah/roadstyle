@@ -530,7 +530,7 @@ box-shadow:0 1px 4px rgba(0,0,0,.3);font:13px system-ui,sans-serif;color:#222}
 <div id="map"></div><script>
 const style = __STYLE__, BASEMAPS = __BASEMAPS__;
 const map = new maplibregl.Map({container:"map", style:style, center:__CENTER__, zoom:13,
-  attributionControl:{compact:true}});
+  pitch:__PITCH__, bearing:__BEARING__, attributionControl:{compact:true}});
 map.addControl(new maplibregl.NavigationControl());
 // base-layer switcher (swaps the raster source's tiles; the road layers stay put)
 if(BASEMAPS.length > 1){
@@ -728,7 +728,8 @@ map.on("click", e=>{
       .setLngLat(e.lngLat).setHTML(_rfields(f.properties||{}, _popupFields)).addTo(map);
   }
 });
-map.on("load", ()=>{ try{ map.fitBounds(__BOUNDS__, {padding:30, duration:0}); }catch(e){} });
+map.on("load", ()=>{ try{ map.fitBounds(__BOUNDS__,
+  {padding:30, duration:0, pitch:__PITCH__, bearing:__BEARING__}); }catch(e){} });
 window.map = map;
 </script></body></html>"""
 
@@ -776,6 +777,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
+           pitch: float = None, bearing: float = None,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
            basemap_switcher: bool = True, road_popup=True, road_tooltip=False,
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
@@ -936,6 +938,11 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     # Both read their cosmetics from data/style.json "config" (labels / arrows blocks), so a user
     # roadstyle.json can restyle them without touching the library; missing keys keep the bundled
     # defaults (a partial override dict is fine).
+    cam = {"pitch": 0, "bearing": 0, **(CONFIG.camera or {})}
+    if pitch is not None:
+        cam["pitch"] = pitch
+    if bearing is not None:
+        cam["bearing"] = bearing
     arw = {"color": "#5b5b5b", "opacity": 0.7, **(CONFIG.arrows or {})}
     lbl = {"color": "#5b5b5b", "halo_color": None, "halo_width": 0, **(CONFIG.labels or {})}
     slot_m = (CONFIG.annotations or {}).get("slot_m", 100)
@@ -1008,6 +1015,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__BASEMAPS__", json.dumps(bms))
             .replace("__FILTER__", json.dumps(flt))
             .replace("__CENTER__", json.dumps([(minx + maxx) / 2, (miny + maxy) / 2]))
+            .replace("__PITCH__", json.dumps(cam["pitch"]))
+            .replace("__BEARING__", json.dumps(cam["bearing"]))
             .replace("__BOUNDS__", json.dumps([[minx, miny], [maxx, maxy]]))
             .replace("__COLOR_OPTIONS__", json.dumps(color_opts_meta or []))
             .replace("__CO_ACTIVE__", str(_active))
