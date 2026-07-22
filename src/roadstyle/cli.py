@@ -78,6 +78,9 @@ def _build_parser() -> argparse.ArgumentParser:
     web.add_argument("--no-filter", action="store_true", help="hide the road-class filter panel.")
     web.add_argument("--no-basemap-switcher", action="store_true",
                      help="hide the in-map base-layer dropdown.")
+    web.add_argument("--no-compress", action="store_true",
+                     help="write the map data as plain JSON instead of gzipped blobs "
+                          "(bigger files; for very old browsers without DecompressionStream).")
 
     src = p.add_argument_group("input")
     src.add_argument("--highway-col", default="highway",
@@ -134,6 +137,7 @@ def main(argv: list[str] | None = None) -> int:
             web_kw = {"arrows": not args.no_arrows, "labels": not args.no_labels,
                       "filter_control": not args.no_filter,
                       "basemap_switcher": not args.no_basemap_switcher,
+                      "compress": not args.no_compress,
                       "view_3d": args.view_3d}
             if args.pitch is not None:
                 web_kw["pitch"] = args.pitch

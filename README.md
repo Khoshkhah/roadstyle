@@ -364,7 +364,7 @@ Every keyword of `render_edges` (full reference: [`docs/parameters.md`](docs/par
 | **UI toggles (web)** | `arrows` · `labels` · `filter_control` · `basemap_switcher` · `road_popup` (`True`/field list/`"all"`/`"panel"`/`False`) · `tooltip` (hover fields) · `hover_color` / `select_color` |
 | **Extra content** | `overlays` (your own layers, under/over the roads) · `boundary` (dashed outline of the clip area) · `selected` (pre-highlighted edges, folium backend) |
 | **Data columns** | `highway_col` (class column) · `tunnel_col` / `bridge_col` / `layer_col` (grade separation) |
-| **Output size** | `compress=True` — gzip the inlined GeoJSON (typically 3–4× smaller files; the page inflates it on load; also keeps inline notebook previews under output-size limits) |
+| **Output size** | `compress` (**on by default**) — gzip the inlined GeoJSON (typically 3–4× smaller files; the page inflates it on load; also keeps inline notebook previews under output-size limits). `compress=False` for plain-JSON output |
 
 Everything *stylistic* (colours, widths, casing, labels, arrows, annotation slots, camera
 defaults, bridge decks…) is not a keyword but a **setting** — see the previous section.

@@ -145,9 +145,10 @@ def _style_of(html):
     return _json.JSONDecoder().raw_decode(html, i)[0]
 
 
-def test_compress_off_by_default_leaves_data_inline():
+def test_compress_on_by_default_and_off_leaves_data_inline():
     from roadstyle.render_web import render
-    html = render(_many_edges()).html
+    assert "rs-gz" in render(_many_edges()).html            # default: gzipped blobs
+    html = render(_many_edges(), compress=False).html       # opt-out: plain inline JSON
     assert "rs-gz" not in html
     assert _style_of(html)["sources"]["roads"]["data"]["features"]
 
@@ -156,6 +157,7 @@ def test_compress_empties_the_source_and_emits_a_blob():
     import base64
     import gzip
     import json as _json
+
     from roadstyle.render_web import render
 
     g = _many_edges()
@@ -173,7 +175,7 @@ def test_compress_is_smaller_and_otherwise_identical():
     from roadstyle.render_web import render
 
     g = _many_edges()
-    plain, small = render(g).html, render(g, compress=True).html
+    plain, small = render(g, compress=False).html, render(g, compress=True).html
     assert len(small) < len(plain)
     a, b = _style_of(plain), _style_of(small)
     assert [l["id"] for l in a["layers"]] == [l["id"] for l in b["layers"]]
@@ -292,6 +294,7 @@ def test_web_labels_and_arrows_read_style_config(monkeypatch):
     """Label paint and arrow cosmetics come from StyleConfig (data/style.json "config" +
     roadstyle.json overrides), not hardcoded paint — a partial override dict keeps the rest."""
     import dataclasses
+
     import roadstyle.render_web as rw
 
     cfg = dataclasses.replace(rw.CONFIG,
@@ -631,6 +634,7 @@ def test_bridge_deck_width_scale_setting():
         wm = render_edges(g, backend="web", view_3d=True,
                           settings={"config": {"bridge_decks": {"width_scale": scale}}})
         ring = _style(wm.html)["sources"]["decks"]["data"]["features"][0]["geometry"]["coordinates"][0]
-        xs = [c[0] for c in ring]; ys = [c[1] for c in ring]
+        xs = [c[0] for c in ring]
+        ys = [c[1] for c in ring]
         return (max(xs) - min(xs)) + (max(ys) - min(ys))
     assert deck_w(0.5) < deck_w(1.0) * 0.75

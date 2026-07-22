@@ -27,7 +27,7 @@ where it runs**. This page is the decision guide.
 | **JavaScript API** (setters, id-set queries, events) | ✅ `window.rs*` | — | — | ✅ `RoadStyleMap` (smaller) |
 | Overlays (your zones / POIs / lines) | ✅ | via folium | — | — |
 | Offline single file (no server, no internet) | ✅ (`blank` = zero requests) | ✅ (tiles need net) | notebook only | ✅ page or served |
-| Comfortable data size | ~10⁴–10⁵ edges (use `compress`) | ~10³–10⁴ | **10⁵–10⁶+** | like `web` |
+| Comfortable data size | ~10⁴–10⁵ edges (`compress` is on by default) | ~10³–10⁴ | **10⁵–10⁶+** | like `web` |
 | Legends for data-driven colour | ✅ | ✅ | ✅ | ✅ |
 | Pre-highlighted `selected=` edges | — (click instead) | ✅ | — | — |
 

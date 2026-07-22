@@ -154,7 +154,7 @@ def _mark_twoway(geo):
             k = (id(ft), None)
         keys.append(k)
         cnt[k] += 1
-    for ft, k in zip(geo["features"], keys):
+    for ft, k in zip(geo["features"], keys, strict=False):
         rev = (k[1], k[0])
         n = cnt.get(rev, 0)
         # a loop edge (start == end) is its own reverse key; it needs a second feature to pair up
@@ -198,7 +198,7 @@ def _annotation_slots(geo, slot_m):
                 1 if p.get("__rs_oneway") else 0)].append(e)
 
     feats = []
-    for (name, lvl, oneway), edges in groups.items():
+    for (name, _lvl, oneway), edges in groups.items():
         n = len(edges)
         used = [False] * n
         at = collections.defaultdict(list)       # node -> [edge index] (either endpoint)
@@ -396,7 +396,7 @@ def _bridge_decks(geo, dk):
         cuts.add(L - rt)
         cuts.update(b for b, *_ in bounds if rh < b < L - rt)
         cuts = sorted(cuts)
-        for d0, d1 in zip(cuts, cuts[1:]):
+        for d0, d1 in zip(cuts, cuts[1:], strict=False):
             part = substring(local, d0, d1)
             if part.geom_type != "LineString" or part.length <= 0:
                 continue
@@ -794,7 +794,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
            basemap_switcher: bool = True, road_popup=True, road_tooltip=False,
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
-           color_options=None, color_active=0, overlays=None, compress: bool = False,
+           color_options=None, color_active=0, overlays=None, compress: bool = True,
            minzoom=None, **_ignore):
     """Build a self-contained MapLibre map of the styled edges.
 
