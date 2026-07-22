@@ -8,19 +8,22 @@ import streamlit as st
 
 import roadstyle as rs
 
-DEFAULT_DB = "/home/kaveh/projects/duckOSM/data/db/sodermalm.duckdb"
 CMAPS = ["viridis", "plasma", "magma", "cividis", "coolwarm", "RdYlGn_r"]
 OV_COLORS = ["#7c4dff", "#00bcd4", "#ff9800", "#e91e63"]
 
+SAMPLES_DIR = Path(__file__).resolve().parent / "samples"
+# Bundled road networks (Södermalm, Stockholm — exported with `duckosm export-gis`), one file
+# per network. Any road file with a highway-class column works the same way.
+ROAD_SAMPLES = {f"Södermalm {m}": SAMPLES_DIR / f"sodermalm_{m}.geojson"
+                for m in ("driving", "walking", "cycling")}
+
 
 @st.cache_data(show_spinner="Loading edges…")
-def load_edges(path: str, blob: bytes | None, blob_name: str | None, mode: str = "driving"):
+def load_edges(path: str, blob: bytes | None, blob_name: str | None):
     if blob is not None:
         with tempfile.NamedTemporaryFile(suffix=Path(blob_name).suffix, delete=False) as t:
             t.write(blob)
             path = t.name
-    if str(path).endswith(".duckdb"):
-        return rs.from_duckosm(path, schema=mode).gdf   # the GeoDataFrame inside RoadEdges
     import geopandas as gpd
     return gpd.read_file(path)
 
@@ -30,21 +33,19 @@ def data_section():
     line that loads it."""
     st.subheader("Data")
     up = st.file_uploader("Road file (.gpkg / .geojson)", type=["gpkg", "geojson", "json"])
-    path = st.text_input("…or a path (.duckdb / .gpkg)", value=DEFAULT_DB,
-                         disabled=up is not None)
-    is_db = str(path).endswith(".duckdb") and up is None
-    mode = st.selectbox("Mode (duckOSM network)", ["driving", "walking", "cycling"]) \
-        if is_db else "driving"
+    pick = st.selectbox("…or a sample network", list(ROAD_SAMPLES),
+                        disabled=up is not None,
+                        help="Södermalm (Stockholm), exported with `duckosm export-gis`")
+    path = str(ROAD_SAMPLES[pick])
     try:
         edges = load_edges(path, up.getvalue() if up else None,
-                           up.name if up else None, mode)
+                           up.name if up else None)
     except Exception as e:
         st.error(f"Could not load edges: {e}")
         st.stop()
     st.caption(f"{len(edges):,} edges loaded")
-    marg = "" if mode == "driving" else f", schema={mode!r}"
-    loader = (f'edges = rs.from_duckosm("{path}"{marg})' if is_db
-              else f'edges = gpd.read_file("{up.name if up else path}")')
+    loader = (f'edges = gpd.read_file("{up.name}")' if up
+              else f'edges = gpd.read_file("ui/studio/samples/{Path(path).name}")')
     return edges, loader
 
 
@@ -56,9 +57,6 @@ def load_overlay(blob: bytes, name: str):
     return gpd.read_file(t.name)
 
 
-SAMPLES_DIR = Path(__file__).resolve().parent / "samples"
-
-
 def overlay_section():
     """The sidebar "Overlays" block: each uploaded (or sample) file becomes one
     :class:`rs.Overlay`. Returns ``(overlays, code_lines)`` — the objects and the
@@ -67,7 +65,8 @@ def overlay_section():
     ups = st.file_uploader("Zones / POIs / lines (.gpkg / .geojson)",
                            type=["gpkg", "geojson", "json"],
                            accept_multiple_files=True, key="ov_files")
-    samples = {p.stem: p for p in sorted(SAMPLES_DIR.glob("*.geojson"))}
+    samples = {p.stem: p for p in sorted(SAMPLES_DIR.glob("*.geojson"))
+               if p not in ROAD_SAMPLES.values()}
     picks = st.multiselect("…or sample overlays", list(samples), key="ov_samples")
     # (display name, bytes, the path the generated code should read)
     files = ([(u.name, u.getvalue(), u.name) for u in (ups or [])]

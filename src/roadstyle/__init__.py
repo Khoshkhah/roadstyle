@@ -16,7 +16,6 @@ from .edges import (
     as_edges,
     from_arrow,
     from_duckdb,
-    from_duckosm,
     from_geojson,
     load_edges,
     normalize_edges,
@@ -110,7 +109,7 @@ __all__ = [
     "color_by", "color_by_value", "color_by_class",
     # canonical input (Phase 3a)
     "RoadEdges", "normalize_edges", "load_edges", "as_edges",
-    "from_geojson", "from_arrow", "from_duckdb", "from_duckosm",
+    "from_geojson", "from_arrow", "from_duckdb",
     # legends (Phase 3)
     "make_legend",
     # extra overlay layers (zones / POIs / any geometry)

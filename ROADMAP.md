@@ -13,8 +13,8 @@ what's next.
 - **Web backend as the flagship**: per-zoom widths, two-way lanes, oneway arrows, slot-based
   labels, grade separation, 3D ramped + cased bridge decks with a 2D LOD below
   `bridge_decks.flat_below`, base-map switcher incl. tile-less `blank`, compress, offline files.
-- **Data contract**: two required columns, everything else additive; `from_duckosm()` as the
-  canonical loader.
+- **Data contract**: two required columns, everything else additive; `from_duckdb()` for
+  DuckDB sources.
 - **JavaScript API**: every control scriptable (`rsSetBasemap`, `rsSetClasses`,
   `rsSetColorField`, `rsSetOverlay`, `rsSetView3D`, `rsSelect`/`rsDeselect`) plus the id-set
   query verbs (`rsQuery` → `rsFilter`/`rsColor`/`rsHighlight`/`rsGetProps`/`rsFocus`), on roads

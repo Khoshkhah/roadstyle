@@ -61,8 +61,9 @@ Two combinations worth knowing:
 ## The same call, four ways
 
 ```python
+import geopandas as gpd
 import roadstyle as rs
-edges = rs.from_duckosm("sodermalm.duckdb")
+edges = gpd.read_file("edges.gpkg")
 
 rs.render_edges(edges)                                   # web (default)
 rs.render_edges(edges, backend="folium")                 # folium / Leaflet

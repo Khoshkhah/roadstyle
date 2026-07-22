@@ -18,7 +18,7 @@ output to `notebooks/output/` (git-ignored).
 | **05 · Embedding with `roadstyle.js`** | The decoupled path: Python bakes a JSON spec; the bundled `roadstyle.js` draws it in your own page with a custom sidebar. Generates a self-contained `output/web/` folder. |
 | **06 · Customizing the look** | Base maps + switcher, and custom colour vocabularies via `color_by` + `colors`. |
 | **07 · Large datasets (lonboard)** | The same API on the GPU/WebGL backend for big edge sets. |
-| **08 · Loading data** | Every input `render_edges`/`to_spec` accept: GeoDataFrame, file path, GeoJSON (+ spec), pyarrow Table, DuckDB (incl. `from_duckosm`). |
+| **08 · Loading data** | Every input `render_edges`/`to_spec` accept: GeoDataFrame, file path, GeoJSON (+ spec), pyarrow Table, DuckDB (`from_duckdb`). |
 | **09 · Overlays** | Extra layers (zones / POIs / lines) with `Overlay`: placement, popups, the Layers toggle, settings-driven styling, querying from JS. |
 
 Start at **01** if you're new; jump to **05** if your goal is embedding a roadstyle map in a website.
