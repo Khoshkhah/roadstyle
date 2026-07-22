@@ -324,8 +324,12 @@ _INFLATE_JS = """
   var data={};
   try{
     for(var sid in blobs){
-      var res=await fetch("data:application/gzip;base64,"+blobs[sid]);
-      data[sid]=await new Response(res.body.pipeThrough(new DecompressionStream("gzip"))).json();
+      // atob + Blob.stream, NOT fetch("data:..."): sandboxed webviews (VS Code notebooks) ship a
+      // CSP whose connect-src blocks data: fetches — tiles load but the roads never appear.
+      var b=atob(blobs[sid]), arr=new Uint8Array(b.length);
+      for(var i=0;i<b.length;i++) arr[i]=b.charCodeAt(i);
+      data[sid]=await new Response(new Blob([arr]).stream()
+                  .pipeThrough(new DecompressionStream("gzip"))).json();
     }
     el.textContent="";                                   // release the base64 copies
   }catch(e){
