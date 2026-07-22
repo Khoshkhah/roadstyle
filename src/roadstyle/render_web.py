@@ -673,6 +673,21 @@ function addArrow(){
   img.src="data:image/svg+xml;base64,"+btoa(svg);
 }
 map.on("load", addArrow);
+// Self-diagnosis: a map with zero road features is a broken page, not an empty area — say WHY
+// on the map itself (frontends like notebook webviews surface no console). Amber banner reports
+// the inflate state so a screenshot alone pinpoints the failing stage.
+map.on("load", function(){ setTimeout(function(){
+  try{
+    var src = map.getSource("roads");
+    var n = (src && src._data && src._data.features) ? src._data.features.length : 0;
+    if(n) return;
+    var gz = window.__rs_gz ? JSON.stringify(window.__rs_gz) : "inflate script did not run";
+    document.body.insertAdjacentHTML("afterbegin",
+      '<div style="position:fixed;z-index:9999;top:0;left:0;right:0;padding:8px 12px;'+
+      'background:#b45309;color:#fff;font:12px monospace">roadstyle: 0 road features — '+gz+
+      ' | DecompressionStream: '+(typeof DecompressionStream)+'</div>');
+  }catch(e){}
+}, 2500); });
 map.on("styleimagemissing", e=>{ if(e.id==="oneway") addArrow(); });
 // hover + click-to-select + info popup (feature-state, tolerance box, throttled to one query/frame)
 const HIT = 4;
