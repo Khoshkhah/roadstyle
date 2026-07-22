@@ -1,39 +1,37 @@
 # Palettes
 
 A palette maps each OSM `highway` tag to a [`RoadStyle`](api.md) (fill colour, line width,
-casing width, casing colour for light vs dark/satellite, optional dash). Choose one with
-`palette="highsat"`, `palette="carto"`, or `palette="mono"`.
+casing width, ONE casing colour, optional dash). Choose one with `palette="highsat"`,
+`palette="carto"`, or `palette="mono"`.
 
-The built-in palettes are **data, not code**: they live as JSON files shipped in the package
-(`roadstyle/data/palettes/*.json`) and are loaded at import, so you can retint a class — or add a
-whole palette — by editing a data file or dropping a [user override](#customising-data-files-and-overrides),
+The built-in palettes are **data, not code**: they live in the bundled
+`roadstyle/data/defaults.json` (section `"palettes"`) and are loaded at import, so you can retint
+a class — or add a whole palette — via a [user override](#customising-data-files-and-overrides),
 with no code change. The styling knobs (opacities, link scale, tunnel/bridge factors, selection
-colours) likewise live in `roadstyle/data/defaults.json`.
+colours) live in the same file (section `"config"` / `"selection"`).
 
 ## highsat
 
-High-saturation, high-contrast theme. Casing swaps with the theme (a darker tone on a light
-base map, **pure black** on dark/satellite). Widths are pixel widths at city zoom.
+High-saturation, high-contrast palette; light-grey casing (`#bcbcbc`) on the major classes,
+fill-only minors. Widths are pixel widths at city zoom (the web backend scales them per zoom).
 
-| highway | fill | light casing | dark/sat casing | width | casing |
-|---|---|---|---|---|---|
-| motorway | `#00E5FF` | `#007785` | `#000000` | 6.0 | 10.0 |
-| trunk | `#FF007F` | `#9E004F` | `#000000` | 5.5 | 9.0 |
-| primary | `#FF9100` | `#A86000` | `#000000` | 4.5 | 7.5 |
-| secondary | `#FFEA00` | `#A39600` | `#000000` | 3.5 | 6.0 |
-| tertiary | `#00E676` | `#007A3E` | `#000000` | 2.5 | 4.5 |
-| unclassified | `#FFFFFF` | `#999999` | `#000000` | 2.0 | 4.0 |
-| residential | `#FFFFFF` | `#999999` | `#000000` | 2.0 | 4.0 |
-| living_street | `#EDEDED` | `#CCCCCC` | `#000000` | 2.0 | 4.0 |
-| service | `#F0F0F0` | — | — | 1.0 | — (fill only) |
-| track | `#9E7B54` | — | `#000000` | 1.5 | 2.5 · dash 4,4 |
-| cycleway | `#2980B9` | — | `#000000` | 1.5 | 2.5 · dash 3,3 |
-| footway / path | `#C0392B` | — | `#000000` | 1.5 | 2.5 · dash 1,3 |
+| highway | fill | casing | width | casing width |
+|---|---|---|---|---|
+| motorway | `#00E5FF` | `#bcbcbc` | 6.0 | 8.0 |
+| trunk | `#FF007F` | `#bcbcbc` | 5.5 | 7.5 |
+| primary | `#FF9100` | `#bcbcbc` | 4.5 | 6.5 |
+| secondary | `#FFEA00` | `#bcbcbc` | 3.5 | 5.5 |
+| tertiary | `#00E676` | `#bcbcbc` | 2.5 | 4.5 |
+| unclassified / residential | `#FFFFFF` | `#bcbcbc` | 2.0 | 4.0 |
+| living_street | `#DDDDDD` | — | 2.0 | — (fill only) |
+| service | `#F0F0F0` | — | 1.0 | — (fill only) |
+| track | `#9E7B54` | — | 1.5 | — |
+| cycleway | `#2980B9` | — | 1.5 · dash 6,4 | — |
+| footway / path | `#C0392B` | — | 1.5 · dash 4,4 | — |
 
 ## carto
 
-The classic **OSM Carto** look (muted warm tones). Casing is a fixed coloured tone per class
-(theme-independent).
+The classic **OSM Carto** look (muted warm tones), with a coloured casing tone per class.
 
 | highway | fill | casing | width | casing |
 |---|---|---|---|---|
@@ -53,7 +51,6 @@ The classic **OSM Carto** look (muted warm tones). Casing is a fixed coloured to
 
 A neutral **grayscale** palette (no hues) — road importance reads from gray shade + width, with a
 few-shades-darker casing for separation. Useful for print, or as a quiet backdrop for data overlays.
-Casing is theme-independent (like `carto`).
 
 | highway | fill | casing | width | casing |
 |---|---|---|---|---|
@@ -72,7 +69,7 @@ Casing is theme-independent (like `carto`).
 
 - **`*_link`** (e.g. `primary_link`) — same colour as the parent class, rendered ~30% narrower.
 - **`tunnel`** — opacity → ~45%, line becomes dashed.
-- **`bridge`** — casing forced to pure black, +1.5 px wider.
+- **`bridge`** — casing forced to the deck colour (`bridge_casing_color`, black by default), +1.5 px wider; extruded 3D decks in `view_3d`.
 - **Unknown tags** — fall back to `unclassified`.
 
 ## Customising data files and overrides
@@ -104,14 +101,14 @@ Palette overrides deep-merge **per road class** — change just `service.fill` a
 are inherited; `config`/`selection` override individual keys. Overrides are read at **import time**,
 so set the file (or `$ROADSTYLE_CONFIG`) before `import roadstyle`.
 
-**2. Edit a bundled data file** (`roadstyle/data/palettes/highsat.json`, …) to change the built-in
-defaults, or drop a new `data/palettes/<name>.json` — it's auto-discovered by its `"name"` field.
+**2. Edit the bundled `roadstyle/data/defaults.json`** to change the built-in defaults (all
+palettes live under its `"palettes"` section).
 
 **3. At runtime in Python** — `PALETTES` is a plain dict of `{name: {highway: RoadStyle}}`:
 
 ```python
 from roadstyle import PALETTES, RoadStyle, register_palette, load_palette
-PALETTES["highsat"]["busway"] = RoadStyle("#FF00AA", 2.0, 4.0, "#880055", "#000000")
+PALETTES["highsat"]["busway"] = RoadStyle("#FF00AA", 2.0, 4.0, "#880055")   # fill, w, cw, casing
 register_palette("mytheme", {...})     # a whole new palette
 load_palette("my_palette.json")        # from a file written by save_palette()
 ```
