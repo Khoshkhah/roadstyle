@@ -17,7 +17,7 @@ def _color_map(table, key_col: str, color_col: str) -> dict:
     if hasattr(table, "to_dict") and not hasattr(table, "columns"):   # a pandas Series
         return {str(k): v for k, v in table.to_dict().items()}
     try:                                                              # a DataFrame-like
-        return {str(k): v for k, v in zip(table[key_col], table[color_col])}
+        return {str(k): v for k, v in zip(table[key_col], table[color_col], strict=False)}
     except Exception as e:
         raise ValueError(
             f"color_table must be a dict, a Series, or a DataFrame with {key_col!r} and "

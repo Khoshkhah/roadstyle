@@ -4,8 +4,8 @@ Two PathLayers (casing under, fill over) mirror the folium "geometry sandwich".
 """
 from __future__ import annotations
 
-from .style import resolve
 from .config import DEFAULT as CONFIG
+from .style import resolve
 
 
 def _hex_to_rgb(h, alpha=255):

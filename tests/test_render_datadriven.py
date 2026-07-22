@@ -1,9 +1,9 @@
 """Data-driven rendering through render_edges (Phase 3 wiring)."""
+from functools import partial as _partial
+
 import geopandas as gpd
 import pytest
 from shapely.geometry import LineString
-
-from functools import partial as _partial
 
 from roadstyle import color_by_value
 from roadstyle import render_edges as _render_edges

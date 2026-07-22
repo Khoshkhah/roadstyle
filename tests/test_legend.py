@@ -1,8 +1,8 @@
 """Legends for data-driven maps (categorical swatches + continuous gradient)."""
+from functools import partial as _partial
+
 import geopandas as gpd
 from shapely.geometry import LineString
-
-from functools import partial as _partial
 
 from roadstyle import make_legend
 from roadstyle import render_edges as _render_edges

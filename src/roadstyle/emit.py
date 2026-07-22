@@ -189,8 +189,8 @@ def _fragment_html(spec: dict, div_id: str, width: str, height: str) -> str:
     # With recolour options present, offer the "colour by" picker (and drop the class filter, which
     # shares the top-right corner); otherwise keep the default class filter.
     has_co = bool(spec.get("color_options"))
-    widgets = ("{legend:true,filter:%s,basemap:true,colors:%s}"
-               % ("false" if has_co else "true", "true" if has_co else "false"))
+    widgets = ("{legend:true,filter:" + ("false" if has_co else "true")
+               + ",basemap:true,colors:" + ("true" if has_co else "false") + "}")
     boot = (
         "(function(){var spec=" + spec_json + ";"
         "var opts={widgets:" + widgets + "};"

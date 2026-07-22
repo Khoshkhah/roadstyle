@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import json
 
-from .config import DEFAULT as CONFIG
 from .basemaps import DEFAULT_SWITCHER, get_basemap
+from .config import DEFAULT as CONFIG
 from .controls import BaseLayerSwitcher
 from .interactive import InteractiveRoads
 from .style import selection_style

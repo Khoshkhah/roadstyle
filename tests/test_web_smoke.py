@@ -43,3 +43,31 @@ def test_saved_map_boots_and_draws_roads(tmp_path):
     assert errors == []
     assert n_source > 0          # the road data reached the map
     assert n_query == len(_edges())   # the JS API sees every edge
+
+
+def test_compressed_map_inflates_and_attaches(tmp_path):
+    """The gzip path (the default for real-size data): blobs inflate and land in the source."""
+    from roadstyle.render_web import render
+
+    path = tmp_path / "smoke_gz.html"
+    g = _edges(4000)             # clears the 256 KB compression threshold
+    render(g, basemap="blank").save(path)
+    assert 'id="rs-gz"' in path.read_text()
+
+    errors = []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.resolve().as_uri())
+        # __rs_gz.ok flips when setData is called; the source still has to re-tile before
+        # querySourceFeatures sees anything, so poll for the features too.
+        page.wait_for_function(
+            "window.__rs_gz && window.__rs_gz.ok"
+            " && window.map.querySourceFeatures('roads').length > 0", timeout=30_000)
+        inflated = page.evaluate("window.__rs_gz.features")
+        browser.close()
+
+    assert errors == []
+    # __rs_gz.features counts across every compressed source (roads + annotation slots)
+    assert inflated >= len(g)

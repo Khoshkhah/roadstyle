@@ -70,6 +70,14 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+# E501: comment/docstring overruns a few chars past 100 — tolerated house style.
+# E741: `l` for a layer/line is idiomatic throughout.
+ignore = ["E501", "E741"]
+
+[tool.ruff.lint.per-file-ignores]
+# The annotation/deck walkers define closures that are consumed inside the same loop
+# iteration (verified byte-identical output); the rule can't see that.
+"src/roadstyle/render_web.py" = ["B023"]
 
 [tool.mypy]
 python_version = "3.10"
