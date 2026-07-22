@@ -157,6 +157,24 @@ render_edges(edges, highway_col="highway",       # widths/casing from the OSM-hi
              filter_col="road_class").save("m.html")   # filter panel lists the source's real classes
 ```
 
+## All options at a glance
+
+Every keyword of `render_edges` (full reference: [`docs/parameters.md`](docs/parameters.md)):
+
+| Group | Options |
+|---|---|
+| **Rendering** | `backend` (`"web"` default / `"folium"` / `"lonboard"`) · `palette` (`highsat`/`carto`/`mono`) · `basemap` / `basemaps` (active base map / switcher set) · `name` (page title) |
+| **Camera & 3D** | `pitch` / `bearing` (starting camera) · `view_3d` (tilted camera + extruded ramped bridge decks + on-map 2D/3D toggle) |
+| **Colour by data** | `color_by` + `colors`/`cmap`/`vmin`/`vmax` (categorical / continuous ramps) · `width_by` (scale width by value) · `color_table` (per-edge `{edge_id: colour}`) · `color_options` (several fill sets + client-side *Colour by* dropdown) |
+| **Filtering** | `include` / `exclude` (road classes) · `filter_col` (panel filters by another column) · `minzoom` (hide minor classes when zoomed out — `True` for the built-in table, or a dict) |
+| **UI toggles (web)** | `arrows` · `labels` · `filter_control` · `basemap_switcher` · `road_popup` (`True`/field list/`"all"`/`False`) · `tooltip` (hover fields) · `hover_color` / `select_color` |
+| **Extra content** | `overlays` (your own layers, under/over the roads) · `boundary` (dashed outline of the clip area) · `selected` (pre-highlighted edges, folium backend) |
+| **Data columns** | `highway_col` (class column) · `tunnel_col` / `bridge_col` / `layer_col` (grade separation) |
+| **Output size** | `compress=True` — gzip the inlined GeoJSON (typically 3–4× smaller files; the page inflates it on load; also keeps inline notebook previews under output-size limits) |
+
+Everything *stylistic* (colours, widths, casing, labels, arrows, annotation slots, camera
+defaults, bridge decks…) is not a keyword but a **setting** — see the next section.
+
 ## Customising palettes & config (data files, no code edit)
 
 The built-in palettes and styling knobs are **data, not code** — one JSON file shipped in the
