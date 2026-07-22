@@ -25,3 +25,4 @@ notebooks/outputs_guide_out/
 .DS_Store
 screenshot/
 notebooks/sodermalm_*.html
+ui/dashboard/dashboard.html

@@ -1,0 +1,88 @@
+<!-- roadstyle UI template: sidebar dashboard.
+     A plain HTML/CSS/JS fragment injected before </body> of any saved roadstyle web map.
+     It talks to the map ONLY through the public window.rs* API and rs:* events, so every
+     piece is safe to rip out, restyle, or extend. Build with:  python build.py  -->
+<style>
+#map{right:320px}
+#sb{position:fixed;top:0;right:0;bottom:0;width:320px;box-sizing:border-box;overflow:auto;
+  background:#fff;border-left:1px solid #ddd;padding:14px;font:13px system-ui,sans-serif}
+#sb h2{margin:0 0 10px;font-size:15px}
+#sb label{display:block;margin:10px 0 3px;font-weight:600;font-size:11px;color:#666;
+  text-transform:uppercase;letter-spacing:.04em}
+#q{width:100%;box-sizing:border-box;padding:6px;font:12px monospace;border:1px solid #ccc;
+  border-radius:4px}
+#sb button{margin:2px 2px 2px 0;padding:5px 9px;border:1px solid #ccc;border-radius:4px;
+  background:#f7f7f7;cursor:pointer}
+#sb button:hover{background:#eee}
+#sb select{width:100%;padding:5px;border:1px solid #ccc;border-radius:4px}
+#count{color:#888;margin:8px 0 4px}
+#tbl div{padding:2px 0;border-bottom:1px solid #f0f0f0}
+#tbl a{color:#1a6bd6;text-decoration:none}
+#detail{background:#f8f8f8;border-radius:5px;padding:8px;margin-top:10px;min-height:40px;
+  color:#555}
+#detail b{color:#222}
+</style>
+<div id="sb">
+  <h2>Roads dashboard</h2>
+
+  <label>Base map</label>
+  <select id="bm"></select>
+
+  <label>Query — a WHERE clause over your columns (JS)</label>
+  <input id="q" value="p.maxspeed_kmh >= 50" spellcheck="false">
+  <div style="margin-top:6px">
+    <button onclick="runQuery()"><b>Run</b></button>
+    <button onclick="rsFilter(IDS)">Filter</button>
+    <button onclick="rsColor(IDS, '#ff00aa')">Colour</button>
+    <button onclick="rsHighlight(IDS)">Highlight</button>
+    <button onclick="resetAll()">Reset</button>
+    <button onclick="rsSetView3D(map.getPitch() < 5)">2D/3D</button>
+  </div>
+
+  <div id="count"></div>
+  <div id="tbl"></div>
+
+  <label>Selected road</label>
+  <div id="detail">Click a road, or a row above.</div>
+</div>
+<script>
+let IDS = [];
+
+// base-map select: built from the RS_BASEMAPS registry, kept in sync by rs:basemapchange
+const bsel = document.getElementById("bm");
+RS_BASEMAPS.forEach(b => bsel.add(new Option(b.label, b.key)));
+bsel.onchange = () => rsSetBasemap(bsel.value);
+document.addEventListener("rs:basemapchange", e => { bsel.value = e.detail.basemap; });
+
+function runQuery(){
+  let fn;
+  try { fn = new Function("p", "return (" + document.getElementById("q").value + ")"); }
+  catch(e){ document.getElementById("count").textContent = "bad query: " + e.message; return; }
+  IDS = rsQuery(p => { try { return fn(p); } catch(e){ return false; } });
+  document.getElementById("count").textContent = IDS.length + " edges match";
+  const props = rsGetProps(IDS), seen = new Set();
+  const rows = IDS.map((id, k) => ({id, p: props[k]}))
+    .filter(r => r.p.name && !seen.has(r.p.name) && seen.add(r.p.name)).slice(0, 30);
+  document.getElementById("tbl").innerHTML = rows.map(r =>
+    '<div><a href="#" data-id="' + r.id + '">' + r.p.name + '</a></div>').join("");
+  document.querySelectorAll("#tbl a").forEach(a =>
+    a.onclick = e => { e.preventDefault(); rsSelect(+a.dataset.id); });
+}
+
+function resetAll(){
+  rsFilter(null); rsColor(null); rsHighlight([]); rsDeselect();
+  document.getElementById("tbl").innerHTML = "";
+  document.getElementById("count").textContent = "";
+}
+
+// detail panel: fed by the selection events, whether the click came from the map or the table
+document.addEventListener("rs:select", e => {
+  const p = e.detail.properties;
+  document.getElementById("detail").innerHTML = Object.keys(p)
+    .filter(k => k[0] !== "_" && k !== "twoway" && k !== "lvl" && p[k] != null && p[k] !== "")
+    .map(k => "<b>" + k + "</b>: " + p[k]).join("<br>");
+});
+document.addEventListener("rs:deselect", () => {
+  document.getElementById("detail").textContent = "Click a road, or a row above.";
+});
+</script>

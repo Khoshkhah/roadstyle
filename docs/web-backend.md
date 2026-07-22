@@ -120,6 +120,10 @@ The id sets use the roads source's generated feature ids — the same id space a
 events. Labels, arrows and 3D deck ribbons sit on merged helper sources, so `rsFilter` prunes
 road geometry but not those decorations (the class filter prunes everything).
 
+Copyable UI templates built purely on this API live in the repo's `ui/` folder — start from
+`ui/dashboard/` (query box → clickable results table → detail panel, plus a base-map select)
+and make it yours.
+
 Plus: `window.map` (the MapLibre `Map` — camera via `map.easeTo({pitch, bearing, ...})`),
 click selection events `rs:select` / `rs:deselect`, and the registries `RS_BASEMAPS`,
 `RS_CLASSES`, `RS_COLOR_OPTIONS`, `RS_OVERLAYS` for building your own controls. All of it works

@@ -293,6 +293,11 @@ switching it. One ceiling: street-name labels, arrows, and 3D bridge deck ribbon
 helper sources, so `rsFilter` prunes the road geometry but not those decorations (the class
 filter from `rsSetClasses` prunes everything).
 
+**Ready-made scaffolding:** [`ui/`](ui/) holds copyable UI templates built purely on this API —
+`python ui/dashboard/build.py your.duckdb` produces a sidebar dashboard (query box, verb
+buttons, clickable results table, detail panel, base-map select) with every built-in control
+replaced by plain HTML you own.
+
 What's available to enumerate: `RS_BASEMAPS` (key/label per entry), `RS_CLASSES` (road classes in
 the data), `RS_COLOR_OPTIONS`, `RS_OVERLAYS`. Selection events are above (`rs:select` /
 `rs:deselect`). The setters work **even with the built-in control hidden** — e.g.
