@@ -415,6 +415,11 @@
       "pitch": 0,
       "bearing": 0,
       "pitch_3d": 55
+    },
+    "bridge_decks": {
+      "base_m": 5.0,
+      "thickness_m": 1.0,
+      "lane_m": 3.5
     }
   },
   "selection": {

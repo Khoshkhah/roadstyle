@@ -257,6 +257,45 @@ def _annotation_slots(geo, slot_m):
     return {"type": "FeatureCollection", "features": feats}
 
 
+def _bridge_decks(geo, lane_m=3.5):
+    """Bridge edges (lvl +1) as ribbon POLYGONS for the 3D view's extruded decks.
+
+    Buffered in a local metre frame; ribbon width = lane_m * lanes (min one lane each side).
+    A two-way bridge's reverse twin is skipped so decks don't double-stack. Features carry the
+    baked fills (all colour options) + highway/name, so recolouring and the class filter work.
+    """
+    from shapely.geometry import LineString
+
+    feats = []
+    for ft in geo["features"]:
+        g, p = ft.get("geometry") or {}, ft.get("properties", {})
+        c = g.get("coordinates") or []
+        if p.get("lvl") != 1 or g.get("type") != "LineString" or len(c) < 2:
+            continue
+        a = (round(c[0][0], 6), round(c[0][1], 6))
+        z = (round(c[-1][0], 6), round(c[-1][1], 6))
+        if p.get("twoway") and (z, a) < (a, z):
+            continue
+        try:
+            lanes = max(int(float(p.get("lanes"))), 1)
+        except (TypeError, ValueError):
+            lanes = 2
+        half = max(lane_m * lanes / 2.0, 2.5)
+        lon0, lat0 = c[0]
+        kx = 111320.0 * math.cos(math.radians(lat0))
+        local = LineString([((x - lon0) * kx, (y - lat0) * 111320.0) for x, y in c])
+        poly = local.buffer(half, cap_style=2, join_style=2)
+        if poly.geom_type != "Polygon":
+            continue
+        coords = [[round(x / kx + lon0, 6), round(y / 111320.0 + lat0, 6)]
+                  for x, y in poly.exterior.coords]
+        props = {k: v for k, v in p.items()
+                 if k.startswith("__rs_fill") or k in ("highway", "name")}
+        feats.append({"type": "Feature", "properties": props,
+                      "geometry": {"type": "Polygon", "coordinates": [coords]}})
+    return {"type": "FeatureCollection", "features": feats}
+
+
 def _truthy(v):
     return v not in (None, "", "no", "false", "0", 0, False)
 
@@ -607,6 +646,9 @@ function rsSetColorField(nameOrIdx){
   _coActive = idx;
   RS_FILL_LAYERS.forEach(id=>{ if(map.getLayer(id))
     map.setPaintProperty(id,"line-color",["coalesce",["get",o.prop],"#888888"]); });
+  if(map.getLayer("roads-bridge-decks"))
+    map.setPaintProperty("roads-bridge-decks","fill-extrusion-color",
+                         ["coalesce",["get",o.prop],"#888888"]);
   const sel=document.getElementById("co-select"); if(sel) sel.value=String(idx);
   coUpdateLegend();
   document.dispatchEvent(new CustomEvent("rs:colorchange",{detail:{option:o,index:idx}}));
@@ -885,7 +927,11 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     if not basemap_switcher:
         bms = bms[:1]                                     # one entry -> the JS hides the dropdown
     style = _basemap_style(get_basemap(active))
-    style["sources"]["roads"] = {"type": "geojson", "data": geo, "generateId": True}
+    # tolerance 0.05 (default 0.375): the source re-tiles at every integer zoom and re-simplifies
+    # the geometry — at the default tolerance the roads visibly ripple ("wave") on each zoom
+    # crossing. Near-zero simplification keeps zooming smooth; ~5k features can afford it.
+    style["sources"]["roads"] = {"type": "geojson", "data": geo, "generateId": True,
+                                 "tolerance": 0.05}
 
     # extra overlay layers (zones / POIs / any geometry the caller brings); each gets its own source
     # + paint layer(s), placed under or over the roads, and (if `popup` is set) clickable.
@@ -910,6 +956,10 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     if mz:
         _z = _minzoom_filter(highway_col, mz)
         surface, tunnel, bridge = (["all", _z, surface], ["all", _z, tunnel], ["all", _z, bridge])
+    dk = {"base_m": 5.0, "thickness_m": 1.0, "lane_m": 3.5, **(CONFIG.bridge_decks or {})}
+    decks = _bridge_decks(geo, dk["lane_m"]) if view_3d else {"features": []}
+    if decks["features"]:
+        style["sources"]["decks"] = {"type": "geojson", "data": decks}
     cw = _width_expr(highway_col, casing=True, **sw)      # casing width expr (reused across layers)
     fw = _width_expr(highway_col, **sw)                   # fill width expr
     bcw = _width_expr(highway_col, casing=True, scale=1.25, **sw)   # heavier bridge casing ("wings")
@@ -931,15 +981,17 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         {"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, "filter": surface,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
                    "line-width": fw, "line-offset": off}},
-        # Bridges last (on top): a heavier, square-capped casing in the configured deck colour
-        # (black by default) reads as a deck spanning what's below.
-        {"id": "roads-bridge-casing", "type": "line", "source": "roads", "layout": blay,
-         "filter": bridge,
-         "paint": {"line-color": CONFIG.bridge_casing_color,
-                   "line-width": bcw, "line-offset": off}},
-        {"id": "roads-bridge-fill", "type": "line", "source": "roads", "layout": lay, "filter": bridge,
-         "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
-                   "line-width": fw, "line-offset": off}},
+        # Bridges last (on top). Flat view: heavier square-capped casing reads as a deck.
+        # 3D view: the flat lines are replaced by extruded deck ribbons (added after this list).
+        *([] if decks["features"] else [
+            {"id": "roads-bridge-casing", "type": "line", "source": "roads", "layout": blay,
+             "filter": bridge,
+             "paint": {"line-color": CONFIG.bridge_casing_color,
+                       "line-width": bcw, "line-offset": off}},
+            {"id": "roads-bridge-fill", "type": "line", "source": "roads", "layout": lay,
+             "filter": bridge,
+             "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
+                       "line-width": fw, "line-offset": off}}]),
         # hover/select highlight, driven by feature-state set from the viewer (GPU recolour, no relayout)
         {"id": "roads-highlight", "type": "line", "source": "roads", "layout": lay,
          "paint": {
@@ -948,6 +1000,16 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                                        ["boolean", ["feature-state", "select"], False]], 0.85, 0],
              "line-width": fw, "line-offset": off}},
     ]
+    if decks["features"]:
+        # extruded bridge decks: physical ribbons floating base_m above ground — in the tilted
+        # view you look UNDER a bridge and see the roads passing beneath it
+        style["layers"].append(
+            {"id": "roads-bridge-decks", "type": "fill-extrusion", "source": "decks",
+             "paint": {"fill-extrusion-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
+                       "fill-extrusion-base": dk["base_m"],
+                       "fill-extrusion-height": dk["base_m"] + dk["thickness_m"],
+                       "fill-extrusion-opacity": 0.95}})
+
     # oneway direction arrows (on edges with no reverse twin) + line-placed street names, on top.
     # Both read their cosmetics from data/style.json "config" (labels / arrows blocks), so a user
     # roadstyle.json can restyle them without touching the library; missing keys keep the bundled

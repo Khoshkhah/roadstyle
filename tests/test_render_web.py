@@ -341,3 +341,21 @@ def test_web_camera_toggle_control():
     """Every map carries the 2D/3D toggle button; its target pitch comes from terrain settings."""
     html = render_edges(_edges(), backend="web").html
     assert "const PITCH3D = 55" in html and 'b.textContent = m.getPitch()<5 ? "3D" : "2D"' in html
+
+
+def test_web_3d_bridge_decks():
+    """view_3d renders bridges as extruded deck ribbons (polygons floating base_m above ground)
+    and drops the flat bridge line layers; flat maps keep the classic flat bridge treatment."""
+    g = _edges().assign(bridge=["yes", None, None])
+    td = _style(render_edges(g, backend="web", view_3d=True).html)
+    ids = [l["id"] for l in td["layers"]]
+    assert "roads-bridge-decks" in ids
+    assert "roads-bridge-casing" not in ids and "roads-bridge-fill" not in ids
+    deck = next(l for l in td["layers"] if l["id"] == "roads-bridge-decks")
+    assert deck["type"] == "fill-extrusion" and deck["paint"]["fill-extrusion-base"] == 5.0
+    assert td["sources"]["decks"]["data"]["features"][0]["geometry"]["type"] == "Polygon"
+    flat = _style(render_edges(g, backend="web").html)
+    fids = [l["id"] for l in flat["layers"]]
+    assert "roads-bridge-casing" in fids and "roads-bridge-decks" not in fids
+    # zoom smoothing: near-zero source simplification
+    assert flat["sources"]["roads"]["tolerance"] == 0.05
