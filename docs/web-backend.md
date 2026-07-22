@@ -272,9 +272,12 @@ rs.render_edges(edges, view_3d=True)              # tilted + extruded bridge dec
 
 `view_3d=True` renders every bridge chain as a ramped 3D deck (`fill-extrusion`): connected
 bridge edges are walked into one structure, ramps rise from the ground over `ramp_m`, forks stay
-at full height, and the ribbon width matches the road width model at `bridge_decks.match_zoom`,
-trimmed by `bridge_decks.width_scale` (default `0.6` — at a tilted camera the extruded side
-walls add apparent width, so a 1:1 ribbon reads too fat; raise/lower it in settings to taste).
+at full height. Ribbon width follows the road width model, trimmed by
+`bridge_decks.width_scale` (default `0.6` — at a tilted camera the extruded side walls add
+apparent width, so a 1:1 ribbon reads too fat). Because a fixed polygon's on-screen width halves
+per zoom step out while flat roads keep their stylized px widths, the ribbons are baked in
+**three zoom-banded width variants** (anchored at `match_zoom` −2.5 / −1 / +0.5) and crossfaded
+as you zoom, so deck width stays proportionate to the flat roads at every zoom.
 Decks are semi-transparent (`bridge_decks.opacity`), hover/select as ONE structure, and show the
 same popup fields as flat edges. Every map also carries an on-map **2D/3D toggle** button and a
 pitch-aware compass; no terrain/elevation data is used — the deck height is cartographic.

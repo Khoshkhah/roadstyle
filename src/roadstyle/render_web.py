@@ -941,11 +941,12 @@ function _applyFill(){
   const e=_fillExpr();
   RS_FILL_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"line-color",e); });
   // decks keep the base colour: their slice ids are a different id space than the road edges
-  if(map.getLayer("roads-bridge-decks"))
-    map.setPaintProperty("roads-bridge-decks","fill-extrusion-color",
-      ["case",["boolean",["feature-state","select"],false],__SELECT_COLOR__,
-       ["boolean",["feature-state","hover"],false],__HOVER_COLOR__,
-       ["coalesce",["get",(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill"],"#888888"]]);
+  ["roads-bridge-decks-far","roads-bridge-decks-mid","roads-bridge-decks"].forEach(id=>{
+    if(map.getLayer(id))
+      map.setPaintProperty(id,"fill-extrusion-color",
+        ["case",["boolean",["feature-state","select"],false],__SELECT_COLOR__,
+         ["boolean",["feature-state","hover"],false],__HOVER_COLOR__,
+         ["coalesce",["get",(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill"],"#888888"]]); });
 }
 function rsSetColorField(nameOrIdx){
   let idx = typeof nameOrIdx==="number" ? nameOrIdx : COLOR_OPTIONS.map(o=>o.name).indexOf(nameOrIdx);
@@ -1085,11 +1086,12 @@ const HIT = 4;
 function box(p){ return [[p.x-HIT,p.y-HIT],[p.x+HIT,p.y+HIT]]; }
 // query only layers that EXIST: the 3D view swaps roads-bridge-fill for the deck extrusions,
 // and MapLibre errors out (killing hover+click) when asked to query a missing layer id.
-const PICK_LAYERS = ["roads-fill","roads-tunnel-fill","roads-bridge-fill","roads-bridge-decks"];
+const PICK_LAYERS = ["roads-fill","roads-tunnel-fill","roads-bridge-fill",
+                     "roads-bridge-decks-far","roads-bridge-decks-mid","roads-bridge-decks"];
 function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id));
   const l = ids.length ? map.queryRenderedFeatures(box(p), {layers:ids}) : [];
   return l.length ? l[0] : null; }
-function srcOf(f){ return f && f.layer && f.layer.id === "roads-bridge-decks" ? "decks" : "roads"; }
+function srcOf(f){ return f && f.layer && f.layer.id.indexOf("roads-bridge-decks")===0 ? "decks" : "roads"; }
 function deckIds(chain){ const ids=new Set();
   (map.querySourceFeatures("decks")||[]).forEach(f=>{
     if(f.properties && f.properties.__rs_chain===chain && f.id!=null) ids.add(f.id); });
@@ -1373,7 +1375,21 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     dk = {"base_m": 5.0, "thickness_m": 1.0, "ramp_m": 40.0, "step_m": 2.5,
           "match_zoom": 18.0, "opacity": 0.7, "width_scale": 0.6,
           **(CONFIG.bridge_decks or {})}
-    decks = _bridge_decks(geo, dk) if view_3d else {"features": []}
+    if view_3d:
+        # A fixed polygon's on-screen width halves per zoom step out while the flat roads keep
+        # their stylized px widths — one geometry can't look right at every zoom. So the ribbons
+        # are baked at THREE widths (anchored match_zoom-2.5 / -1 / +0.5) and the layers below
+        # crossfade between the bands as you zoom, keeping deck width proportionate throughout.
+        _bands = []
+        for k, mzk in enumerate((dk["match_zoom"] - 2.5, dk["match_zoom"] - 1.0,
+                                 dk["match_zoom"] + 0.5)):
+            fc = _bridge_decks(geo, {**dk, "match_zoom": mzk})
+            for f in fc["features"]:
+                f["properties"]["__rs_band"] = k
+            _bands.extend(fc["features"])
+        decks = {"type": "FeatureCollection", "features": _bands}
+    else:
+        decks = {"features": []}
     if decks["features"]:
         style["sources"]["decks"] = {"type": "geojson", "data": decks, "generateId": True}
     cw = _width_expr(highway_col, casing=True, **sw)      # casing width expr (reused across layers)
@@ -1418,16 +1434,32 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     ]
     if decks["features"]:
         # extruded bridge decks: physical ribbons floating base_m above ground — in the tilted
-        # view you look UNDER a bridge and see the roads passing beneath it
-        style["layers"].append(
-            {"id": "roads-bridge-decks", "type": "fill-extrusion", "source": "decks",
-             "paint": {"fill-extrusion-color":
+        # view you look UNDER a bridge and see the roads passing beneath it. One layer per
+        # width band, crossfaded over ±0.35 zoom around the band boundaries.
+        op, mz0 = dk["opacity"], dk["match_zoom"]
+        b1, b2, fz = mz0 - 1.75, mz0 - 0.25, 0.35
+        _deck_paint = {"fill-extrusion-color":
                            ["case", ["boolean", ["feature-state", "select"], False], select_color,
                             ["boolean", ["feature-state", "hover"], False], hover_color,
                             ["coalesce", ["get", "__rs_fill"], "#888888"]],
                        "fill-extrusion-base": ["get", "__rs_base"],
-                       "fill-extrusion-height": ["get", "__rs_height"],
-                       "fill-extrusion-opacity": dk["opacity"]}})
+                       "fill-extrusion-height": ["get", "__rs_height"]}
+        for k, (lid, mn, mx, fop) in enumerate((
+                ("roads-bridge-decks-far", None, b1 + fz,
+                 ["interpolate", ["linear"], ["zoom"], b1 - fz, op, b1 + fz, 0]),
+                ("roads-bridge-decks-mid", b1 - fz, b2 + fz,
+                 ["interpolate", ["linear"], ["zoom"], b1 - fz, 0, b1 + fz, op,
+                  b2 - fz, op, b2 + fz, 0]),
+                ("roads-bridge-decks", b2 - fz, None,
+                 ["interpolate", ["linear"], ["zoom"], b2 - fz, 0, b2 + fz, op]))):
+            lyr = {"id": lid, "type": "fill-extrusion", "source": "decks",
+                   "filter": ["==", ["get", "__rs_band"], k],
+                   "paint": {**_deck_paint, "fill-extrusion-opacity": fop}}
+            if mn is not None:
+                lyr["minzoom"] = mn
+            if mx is not None:
+                lyr["maxzoom"] = mx
+            style["layers"].append(lyr)
 
     # oneway direction arrows (on edges with no reverse twin) + line-placed street names, on top.
     # Both read their cosmetics from data/style.json "config" (labels / arrows blocks), so a user
