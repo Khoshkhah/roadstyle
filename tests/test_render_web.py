@@ -63,15 +63,26 @@ def test_web_no_color_options_is_unchanged():
     assert "const COLOR_OPTIONS = [];" in wm.html   # picker JS present but inert (empty)
 
 
-def test_web_arrows_and_labels_layers_present():
+def test_web_annotation_slots_alternate_names_and_arrows():
+    """The annotation plan: each road chain is sliced into equal per-band slots; names take even
+    slots, oneway arrows odd ones (alternating, never stacked); unnamed roads leave their name
+    slots empty. One label + one arrow layer per zoom band."""
     wm = render_edges(_edges(), backend="web", arrows=True, labels=True)
     style = _style(wm.html)
     ids = [layer["id"] for layer in style["layers"]]
-    assert "roads-arrows" in ids and "roads-labels" in ids
+    assert "roads-labels" in ids and "roads-arrows" in ids
+    slots = style["sources"]["slots"]["data"]["features"]
+    assert slots and all({"slot", "name", "highway", "oneway"} <= set(f["properties"])
+                         for f in slots)
+    lab = next(l for l in style["layers"] if l["id"] == "roads-labels")
+    arr = next(l for l in style["layers"] if l["id"] == "roads-arrows")
+    assert ["==", ["%", ["get", "slot"], 2], 0] in lab["filter"]     # names: even slots
+    assert ["==", ["%", ["get", "slot"], 2], 1] in arr["filter"]     # arrows: odd slots
+    assert ["to-boolean", ["get", "name"]] in lab["filter"]          # unnamed -> slot stays empty
+    assert lab["layout"]["symbol-placement"] == "line-center"
     # Kaveh's standing default: label text matches the oneway-arrow grey, and NO halo
-    paint = next(l for l in style["layers"] if l["id"] == "roads-labels")["paint"]
-    assert paint["text-color"] == "#5b5b5b"
-    assert "text-halo-color" not in paint and "text-halo-width" not in paint
+    assert lab["paint"]["text-color"] == "#5b5b5b"
+    assert "text-halo-color" not in lab["paint"] and "text-halo-width" not in lab["paint"]
 
 
 def _zone():
@@ -151,7 +162,8 @@ def test_compress_empties_the_source_and_emits_a_blob():
     html = render(g, compress=True).html
     assert _style_of(html)["sources"]["roads"]["data"] == {"type": "FeatureCollection", "features": []}
     blobs = _json.loads(html.split('id="rs-gz" type="application/json">')[1].split("</script>")[0])
-    assert set(blobs) == {"roads"}                      # boundary-sized sources stay inline
+    assert "roads" in blobs                             # slots may compress too; boundary-
+    assert set(blobs) <= {"roads", "slots"}             # sized sources stay inline
     fc = _json.loads(gzip.decompress(base64.b64decode(blobs["roads"])))
     assert len(fc["features"]) == len(g)                # lossless
 
@@ -274,16 +286,14 @@ def test_web_labels_and_arrows_read_style_config(monkeypatch):
 
     cfg = dataclasses.replace(rw.CONFIG,
                               labels={"color": "#ff0000", "halo_color": "#000000", "halo_width": 2},
-                              arrows={"color": "#123456", "spacing": 60, "opacity": 0.5})
+                              arrows={"color": "#123456", "opacity": 0.5})
     monkeypatch.setattr(rw, "CONFIG", cfg)
     wm = render_edges(_edges(), backend="web", arrows=True, labels=True)
     style = _style(wm.html)
     paint = next(l for l in style["layers"] if l["id"] == "roads-labels")["paint"]
     assert paint == {"text-color": "#ff0000", "text-halo-color": "#000000", "text-halo-width": 2}
     arrow = next(l for l in style["layers"] if l["id"] == "roads-arrows")
-    # spacing opens to 3x at the arrows' minzoom (default 16), tightening to the value by z19
-    assert arrow["layout"]["symbol-spacing"] == ["interpolate", ["linear"], ["zoom"], 16, 180, 19, 60]
-    assert arrow["minzoom"] == 16 and arrow["paint"]["icon-opacity"] == 0.5
+    assert arrow["minzoom"] == 14 and arrow["paint"]["icon-opacity"] == 0.5
     assert 'fill="#123456"' in wm.html               # the chevron SVG itself is retinted
 
 

@@ -49,10 +49,12 @@ class StyleConfig:
     #: street-name label paint (web backend): color, halo_color, halo_width (0/None = no halo)
     labels: dict = field(default_factory=lambda: {"color": "#5b5b5b", "halo_color": None,
                                                  "halo_width": 0})
-    #: oneway-arrow chevrons (web backend): color, spacing (px along the line at high zoom;
-    #: 3x wider at minzoom), opacity, minzoom (arrows hidden below it)
-    arrows: dict = field(default_factory=lambda: {"color": "#5b5b5b", "spacing": 120,
-                                                  "opacity": 0.7, "minzoom": 16})
+    #: oneway-arrow chevrons (web backend): color, opacity
+    arrows: dict = field(default_factory=lambda: {"color": "#5b5b5b", "opacity": 0.7})
+    #: annotation slots (web backend): each road chain is divided into equal slot_m-metre pieces;
+    #: names take even slots, oneway arrows odd ones — alternating, never stacked. Text/icon zoom
+    #: ramps and collision culling handle density automatically; unnamed name-slots stay empty.
+    annotations: dict = field(default_factory=lambda: {"slot_m": 100})
 
 
 def _default_config() -> StyleConfig:

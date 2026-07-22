@@ -404,12 +404,13 @@
     },
     "arrows": {
       "color": "#5b5b5b",
-      "spacing": 120,
-      "opacity": 0.7,
-      "minzoom": 16
+      "opacity": 0.7
     },
     "basemap": "voyager",
-    "bridge_casing_color": "#000000"
+    "bridge_casing_color": "#000000",
+    "annotations": {
+      "slot_m": 100
+    }
   },
   "selection": {
     "core": "#EE00FF",

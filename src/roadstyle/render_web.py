@@ -19,6 +19,7 @@ from __future__ import annotations
 import collections
 import html as _html
 import json
+import math
 import os
 from collections.abc import Mapping
 
@@ -158,6 +159,102 @@ def _mark_twoway(geo):
         n = cnt.get(rev, 0)
         # a loop edge (start == end) is its own reverse key; it needs a second feature to pair up
         ft.setdefault("properties", {})["twoway"] = n >= 2 if rev == k else n >= 1
+
+
+def _annotation_slots(geo, slot_m):
+    """Divide every road chain into equal ``slot_m``-metre slots — the annotation plan.
+
+    Chains walk same-name, same-grade, same-directionness edges through degree-2 nodes (a two-way
+    street's reverse twin is skipped — its twin carries the geometry). Slots are indexed 0..
+    along the chain; street names take the even slots and one-way arrows the odd ones, so the two
+    alternate along the road and can never stack. Symbol zoom ramps + collision culling handle
+    density per zoom automatically. Unnamed roads leave their name slots empty. Returns a
+    FeatureCollection of slot pieces: {slot, name, highway, oneway}.
+    """
+    from shapely.geometry import LineString
+    from shapely.ops import substring
+
+    reps = []                                    # (start, end, coords, props), twins collapsed
+    for ft in geo["features"]:
+        g, p = ft.get("geometry") or {}, ft.get("properties", {})
+        c = g.get("coordinates") or []
+        if g.get("type") != "LineString" or len(c) < 2:
+            continue
+        a = (round(c[0][0], 6), round(c[0][1], 6))
+        z = (round(c[-1][0], 6), round(c[-1][1], 6))
+        if p.get("twoway") and (z, a) < (a, z):
+            continue
+        reps.append((a, z, c, p))
+
+    groups = collections.defaultdict(list)       # (name, lvl, oneway) -> edge list
+    for e in reps:
+        p = e[3]
+        groups[(p.get("name") or None, p.get("lvl", 0), 0 if p.get("twoway") else 1)].append(e)
+
+    feats = []
+    for (name, lvl, oneway), edges in groups.items():
+        n = len(edges)
+        used = [False] * n
+        at = collections.defaultdict(list)       # node -> [edge index] (either endpoint)
+        for i, (a, z, _, _) in enumerate(edges):
+            at[a].append(i)
+            at[z].append(i)
+
+        def walk(start):
+            """Greedy chain from edge `start` through degree-2 nodes. Two-way segments flip as
+            needed for continuity; one-way chains only extend through DIRECTED continuations, so
+            the chain (and its arrows) never reverses mid-way."""
+            a, z, c, _ = edges[start]
+            used[start] = True
+            chain = list(c)
+            for prepend in (False, True):
+                node = a if prepend else z
+                while True:
+                    cand = [j for j in at[node] if not used[j]]
+                    if len(at[node]) != 2 or len(cand) != 1:
+                        break
+                    j = cand[0]
+                    ja, jz, jc, _ = edges[j]
+                    if prepend:                  # need a segment ENDING at the chain head
+                        if jz == node:
+                            seg, nxt = jc, ja
+                        elif not oneway:
+                            seg, nxt = jc[::-1], jz
+                        else:
+                            break                # opposing one-way: not a continuation
+                        used[j] = True
+                        chain = seg[:-1] + chain
+                    else:                        # need a segment STARTING at the chain tail
+                        if ja == node:
+                            seg, nxt = jc, jz
+                        elif not oneway:
+                            seg, nxt = jc[::-1], ja
+                        else:
+                            break
+                        used[j] = True
+                        chain = chain + seg[1:]
+                    node = nxt
+            return chain
+
+        chains = [walk(i) for i in range(n) if not used[i]]
+        hw = collections.Counter(e[3].get("highway") for e in edges).most_common(1)[0][0]
+        for chain in chains:
+            lon0, lat0 = chain[0]
+            kx = 111320.0 * math.cos(math.radians(lat0))
+            local = LineString([((x - lon0) * kx, (y - lat0) * 111320.0) for x, y in chain])
+            total = local.length
+            pieces = max(1, int(total // slot_m) + (1 if total % slot_m > slot_m * 0.3 else 0))
+            for i in range(pieces):
+                part = substring(local, i * slot_m, min((i + 1) * slot_m, total))
+                if part.geom_type != "LineString" or part.length < slot_m * 0.2:
+                    continue
+                coords = [[round(x / kx + lon0, 6), round(y / 111320.0 + lat0, 6)]
+                          for x, y in part.coords]
+                feats.append({"type": "Feature",
+                              "properties": {"slot": i, "name": name,
+                                             "highway": hw, "oneway": oneway},
+                              "geometry": {"type": "LineString", "coordinates": coords}})
+    return {"type": "FeatureCollection", "features": feats}
 
 
 def _truthy(v):
@@ -799,37 +896,43 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     # Both read their cosmetics from data/style.json "config" (labels / arrows blocks), so a user
     # roadstyle.json can restyle them without touching the library; missing keys keep the bundled
     # defaults (a partial override dict is fine).
-    arw = {"color": "#5b5b5b", "spacing": 120, "opacity": 0.7, "minzoom": 16,
-           **(CONFIG.arrows or {})}
+    arw = {"color": "#5b5b5b", "opacity": 0.7, **(CONFIG.arrows or {})}
     lbl = {"color": "#5b5b5b", "halo_color": None, "halo_width": 0, **(CONFIG.labels or {})}
-    if arrows:
-        amz = arw["minzoom"]
-        style["layers"].append(
-            {"id": "roads-arrows", "type": "symbol", "source": "roads", "minzoom": amz,
-             "filter": ["!", ["to-boolean", ["get", "twoway"]]],   # one-way edge = no reverse twin
-             # spacing opens up 3x when zoomed out, tightening to the configured value by z19 —
-             # zoomed-out views show a few orienting arrows, not one per short edge
-             "layout": {"symbol-placement": "line", "icon-image": "oneway",
-                        "symbol-spacing": ["interpolate", ["linear"], ["zoom"],
-                                           amz, arw["spacing"] * 3, 19, arw["spacing"]],
-                        "icon-rotation-alignment": "map", "icon-allow-overlap": True,
-                        "icon-ignore-placement": True,
-                        "icon-size": ["interpolate", ["linear"], ["zoom"], 15, 0.5, 19, 1.0]},
-             "paint": {"icon-opacity": arw["opacity"]}})
-    if labels:
-        lpaint = {"text-color": lbl["color"]}
-        if lbl["halo_color"] and lbl["halo_width"]:
-            lpaint["text-halo-color"] = lbl["halo_color"]
-            lpaint["text-halo-width"] = lbl["halo_width"]
-        style["glyphs"] = "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"
-        style["layers"].append(
-            {"id": "roads-labels", "type": "symbol", "source": "roads", "minzoom": 14,
-             "filter": ["to-boolean", ["get", "name"]],
-             "layout": {"symbol-placement": "line", "text-field": ["get", "name"],
-                        "text-font": ["Noto Sans Regular"], "symbol-spacing": 250,
-                        "text-size": ["interpolate", ["linear"], ["zoom"], 14, 10, 18, 14],
-                        "text-max-angle": 40, "text-padding": 2},
-             "paint": lpaint})
+    slot_m = (CONFIG.annotations or {}).get("slot_m", 100)
+    if arrows or labels:
+        slots = _annotation_slots(geo, slot_m)
+        if slots["features"]:
+            style["sources"]["slots"] = {"type": "geojson", "data": slots}
+            lpaint = {"text-color": lbl["color"]}
+            if lbl["halo_color"] and lbl["halo_width"]:
+                lpaint["text-halo-color"] = lbl["halo_color"]
+                lpaint["text-halo-width"] = lbl["halo_width"]
+            # one symbol centred on each slot piece; even slots = names, odd = oneway arrows.
+            # Text/icon zoom ramps size the symbols; collision culling thins them when zoomed out
+            # (a label that outgrows its piece is dropped by MapLibre automatically).
+            if labels:
+                style["glyphs"] = "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"
+                style["layers"].append(
+                    {"id": "roads-labels", "type": "symbol", "source": "slots", "minzoom": 14,
+                     "filter": ["all", ["==", ["%", ["get", "slot"], 2], 0],
+                                ["to-boolean", ["get", "name"]]],
+                     "layout": {"symbol-placement": "line-center",
+                                "text-field": ["get", "name"],
+                                "text-font": ["Noto Sans Regular"],
+                                "text-size": ["interpolate", ["linear"], ["zoom"],
+                                              14, 10, 18, 14],
+                                "text-max-angle": 40, "text-padding": 2},
+                     "paint": lpaint})
+            if arrows:
+                style["layers"].append(
+                    {"id": "roads-arrows", "type": "symbol", "source": "slots", "minzoom": 14,
+                     "filter": ["all", ["==", ["%", ["get", "slot"], 2], 1],
+                                ["==", ["get", "oneway"], 1]],
+                     "layout": {"symbol-placement": "line-center", "icon-image": "oneway",
+                                "icon-rotation-alignment": "map",
+                                "icon-size": ["interpolate", ["linear"], ["zoom"],
+                                              15, 0.5, 19, 1.0]},
+                     "paint": {"icon-opacity": arw["opacity"]}})
 
     # clip/area boundary outline, drawn on top of the roads (a dashed line tracing the polygon rings)
     if boundary is not None:
