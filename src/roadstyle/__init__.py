@@ -91,7 +91,12 @@ def use_settings(*sources) -> None:
     render_web._load_road_model()
 
 
-__version__ = "0.2.0.dev0"
+# Single source of truth is [project] version in pyproject.toml (read from the install metadata).
+try:
+    from importlib.metadata import version as _pkg_version
+    __version__ = _pkg_version("roadstyle")
+except Exception:                                    # running from a bare source tree
+    __version__ = "0+unknown"
 
 __all__ = [
     "render_edges", "filter_edges", "highway_types", "use_settings", "snapshot",

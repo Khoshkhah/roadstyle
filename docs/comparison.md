@@ -13,6 +13,7 @@ the right one.
 | prettymaps | ❌ static PNG/SVG | ✅ per-class widths | ❌ class only | ❌ image | poster-quality static art maps |
 | osmnx `plot_graph` | ❌ mostly static | ⚠️ basic | ⚠️ manual | ❌ | street-network analysis |
 | MapLibre / Mapbox styles | ✅ | ✅ (you author it) | ✅ (you author it) | ✅ | full custom vector basemaps |
+| kepler.gl | ✅ deck.gl GUI | ❌ flat strokes | ✅ (full GUI, time playback) | ⚠️ needs the app / a token | exploring any geodata visually |
 
 ## roadstyle vs geopandas `.explore()`
 
@@ -36,6 +37,21 @@ prettymaps makes gorgeous **static** maps (osmnx + matplotlib). roadstyle is for
 web** maps and **data-driven** styling. Different jobs — use prettymaps for a print/poster, use
 roadstyle for an interactive or embedded map (and for colouring by traffic/speed/congestion).
 
+## roadstyle vs kepler.gl
+
+[kepler.gl](https://kepler.gl/) is a general-purpose geodata *exploration* GUI on deck.gl:
+drag-drop a CSV/GeoJSON, pick layers (points, arcs, lines, hexbins, trips), filter with time
+playback. It's the right tool for *"what's in this dataset?"* — and the wrong one for road
+cartography: lines are flat strokes, so no casing sandwich, no per-zoom per-class widths, no
+street labels, no one-way arrows, no tunnel/bridge grade separation. Roads in kepler.gl read as
+coloured spaghetti; roadstyle's read as a map.
+
+The data moves freely in one direction: any roadstyle input is kepler.gl-ready —
+`roadstyle edges.gpkg -f geojson` (or the GeoDataFrame straight into the
+[`keplergl`](https://docs.kepler.gl/docs/keplergl-jupyter) Jupyter widget) and drag it into
+[kepler.gl/demo](https://kepler.gl/demo). The styling doesn't transfer — that's the part
+roadstyle exists for.
+
 ## What roadstyle deliberately reuses
 
 roadstyle doesn't reinvent the wheels under it — it builds on
@@ -51,3 +67,7 @@ and lets your existing knowledge of those libraries carry over.
   width curve), so reach for it when you need zoom-correct widths — it also adds two-way lanes and
   tunnel/bridge grade separation (see [web backend](web-backend.md)).
 - **lonboard legends** aren't rendered yet (folium + the JSON/HTML outputs have them).
+- **Everything is inlined** — a saved `web` map carries its data in the file (gzipped by
+  default). Comfortable to ~10⁴–10⁵ edges / a few tens of MB (a city district, not a county);
+  past that, use the `lonboard` backend or pre-filter with `include=`. Vector-tile output for
+  city-scale data is out of scope for now.

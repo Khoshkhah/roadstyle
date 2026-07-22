@@ -369,6 +369,10 @@ Every keyword of `render_edges` (full reference: [`docs/parameters.md`](docs/par
 Everything *stylistic* (colours, widths, casing, labels, arrows, annotation slots, camera
 defaults, bridge decks…) is not a keyword but a **setting** — see the previous section.
 
+**Practical size ceiling:** a saved `web` map carries its data inline (gzipped by default) —
+comfortable to ~10⁴–10⁵ edges (a city district). Past that, switch to `backend="lonboard"` or
+pre-filter with `include=` — see [docs/engines.md](docs/engines.md).
+
 ## Command line
 
 No Python required — point the `roadstyle` command at any road file (GPKG, GeoJSON, Shapefile, …):

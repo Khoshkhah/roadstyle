@@ -4,7 +4,24 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — 0.2.0.dev1
+## [0.2.0] — 2026-07-22
+
+First PyPI release.
+
+### Changed
+- **`compress` is now on by default** for web maps (3–4× smaller files; sources under 256 KB
+  stay inline). `compress=False` / `--no-compress` writes plain JSON. Gzip blobs are stamped
+  with `mtime=0`, so the same map now renders byte-identical across runs.
+- Version is single-sourced from `pyproject.toml` (`roadstyle.__version__` reads the install
+  metadata).
+
+### Added (release engineering)
+- CI: lint + tests on Python 3.10–3.13, plus a headless-Chromium smoke test that boots a saved
+  map and asserts the data reached MapLibre (`tests/test_web_smoke.py`).
+- Tag-triggered PyPI release workflow (trusted publishing).
+- The web page template now lives in `static/web_template.html` (was an inline Python string) —
+  same output byte-for-byte.
+- Docs: kepler.gl comparison + an explicit practical size ceiling for inlined maps.
 
 ### Added (2026-07 wave)
 - **One settings file** for every styling default (`data/defaults.json`) with the override
