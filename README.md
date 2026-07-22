@@ -66,7 +66,6 @@ import geopandas as gpd
 import roadstyle as rs
 
 edges = gpd.read_file("edges.gpkg")          # needs a `highway` column (any CRS)
-# edges = rs.from_duckosm("sodermalm.duckdb")  # duckOSM: the right columns, always
 
 # self-contained MapLibre map: per-zoom widths, two-way lanes, arrows, names,
 # hover/select, base switcher, tunnel/bridge grade separation — opens offline, no server
@@ -98,9 +97,10 @@ when present (and is simply skipped when absent):
 | `bridge` / `tunnel` | truthy | **grade separation** — tunnels draw faded + dashed *below*, bridges on top with a black deck casing, and as extruded 3D decks in `view_3d` (column names via `bridge_col` / `tunnel_col`) |
 | `layer` | int | below-ground fallback where `tunnel` is absent (negative → under); only `bridge` earns the bridge treatment |
 | `lanes`, `maxspeed_kmh`, `edge_ref`, … | anything | shown in the click **popup** (curated set by default; `road_popup="all"` for every column) |
-| `edge_id` | id (64-bit safe) | popups + click-to-copy; values > 2⁵³ should be strings so JavaScript can't corrupt them (`from_duckosm` handles this) |
+| `edge_id` | id (64-bit safe) | popups + click-to-copy; values > 2⁵³ should be strings so JavaScript can't corrupt them |
 
-`rs.from_duckosm(db)` selects exactly this set from a duckOSM database.
+Networks exported by [duckOSM](https://github.com/Khoshkhah/duckOSM) (`duckosm export-gis`)
+carry exactly this column set.
 
 ### Hover tooltip vs. click popup — what shows where
 
@@ -300,7 +300,7 @@ no dropdown, so your own buttons can call `rsSetBasemap("blank")`; only the no-`
 `basemap_switcher=False` combination bakes just the one fixed backdrop.
 
 **Ready-made scaffolding:** [`ui/`](ui/) holds copyable UI templates built purely on this API —
-`python ui/dashboard/build.py your.duckdb` produces a sidebar dashboard (query box with
+`python ui/dashboard/build.py your_edges.gpkg` produces a sidebar dashboard (query box with
 SQL-style syntax, verb buttons, clickable results table that selects and flies to the road, a
 detail panel, base-map and colour-by selects) with every built-in control replaced by plain HTML
 you own.
@@ -392,7 +392,7 @@ roadstyle edges.gpkg -f spec -o map_data.json               # JSON spec for your
 | Function | Purpose |
 |---|---|
 | `render_edges(gdf, *, backend, palette, basemap, view_3d, include/exclude, …)` | filter + render |
-| `from_duckosm(db, schema="driving")` | load a duckOSM network with the full data contract — `schema` picks the mode: `driving` / `walking` / `cycling` |
+| `from_duckdb(con_or_rel, query=None, *, geometry, crs)` | load edges from any DuckDB connection / relation / query (geometry as WKB via `ST_AsWKB`) |
 | `filter_edges(gdf, include, exclude, …)` / `highway_types(gdf)` | type filtering |
 | `resolve(highway, palette, tunnel, bridge)` | resolve one edge's concrete style |
 | `selection_style(base_width)` | neon-violet selected-edge layers |

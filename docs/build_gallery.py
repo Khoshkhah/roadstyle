@@ -1,6 +1,6 @@
 """Build the gallery thumbnails (docs/img/gallery/*.png) — one screenshot per signature look.
 
-Renders the Södermalm driving network (duckOSM) in each look and snapshots it headlessly via
+Renders the bundled Södermalm driving sample in each look and snapshots it headlessly via
 :func:`rs.snapshot` (needs Playwright + Chromium). Re-run after a visual change::
 
     python docs/build_gallery.py
@@ -11,7 +11,7 @@ from pathlib import Path
 
 import roadstyle as rs
 
-DB = Path("/home/kaveh/projects/duckOSM/data/db/sodermalm.duckdb")
+EDGES = Path(__file__).resolve().parents[1] / "ui" / "studio" / "samples" / "sodermalm_driving.geojson"
 OUT = Path(__file__).resolve().parent / "img" / "gallery"
 OVERVIEW = dict(center=(18.065, 59.314), zoom=13.3)
 BRIDGE = dict(center=(18.076, 59.304), zoom=16.4, pitch=58, bearing=-25)
@@ -35,10 +35,11 @@ LOOKS = [
 
 
 def main() -> None:
-    if not DB.exists():
-        raise SystemExit(f"DuckDB not found: {DB}")
+    if not EDGES.exists():
+        raise SystemExit(f"sample not found: {EDGES}")
     OUT.mkdir(parents=True, exist_ok=True)
-    edges = rs.from_duckosm(DB)
+    import geopandas as gpd
+    edges = gpd.read_file(EDGES)
     for name, _title, kw, cam in LOOKS:
         wm = rs.render_edges(edges, backend="web", **kw)
         rs.snapshot(wm, OUT / f"{name}.png", width=960, height=640, settle=4.0, **cam)

@@ -1,12 +1,14 @@
 # Gallery
 
-Every look below is the **Södermalm driving network** straight out of a duckOSM database — one
-`rs.from_duckosm(...)` call, then `render_edges` with the keywords shown. Thumbnails are real
-`rs.snapshot()` screenshots (regenerate with `python docs/build_gallery.py`).
+Every look below is the bundled **Södermalm driving sample**
+(`ui/studio/samples/sodermalm_driving.geojson`) — one `gpd.read_file(...)` call, then
+`render_edges` with the keywords shown. Thumbnails are real `rs.snapshot()` screenshots
+(regenerate with `python docs/build_gallery.py`).
 
 ```python
+import geopandas as gpd
 import roadstyle as rs
-edges = rs.from_duckosm("sodermalm.duckdb")
+edges = gpd.read_file("ui/studio/samples/sodermalm_driving.geojson")
 ```
 
 ## The defaults
@@ -85,7 +87,7 @@ query box, verb buttons, clickable results table, detail panel. Copy it from
 [`ui/dashboard/`](https://github.com/Khoshkhah/roadstyle/tree/main/ui/dashboard).
 
 ```bash
-python ui/dashboard/build.py your.duckdb
+python ui/dashboard/build.py your_edges.gpkg
 ```
 
 ![dashboard](img/gallery/dashboard.png)

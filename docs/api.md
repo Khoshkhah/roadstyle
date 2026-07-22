@@ -19,7 +19,7 @@ and `compress`.
 
 | Function | Returns | Purpose |
 |---|---|---|
-| `from_duckosm(db, schema="driving")` | `RoadEdges` | load a duckOSM network with the full data contract (grade tags, oneway, text-safe `edge_id`); `schema` picks the mode — `"driving"` / `"walking"` / `"cycling"` |
+| `from_duckdb(con_or_rel, query=None, *, geometry, crs)` | `RoadEdges` | load edges from any DuckDB connection / relation / query — select the geometry as WKB (`ST_AsWKB(geom) AS geom`) |
 | `use_settings(path_or_dict, ...)` | — | apply a settings override at runtime (`use_settings()` drops it) |
 | `snapshot(map_or_html, out_png, *, center, zoom, pitch, bearing, ...)` | path | static PNG via headless Chromium (optional `playwright` dependency) |
 

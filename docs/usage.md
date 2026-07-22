@@ -50,8 +50,8 @@ edges = rs.normalize_edges(raw, class_col="highway", rename={"vagtyp": "highway"
 ```
 
 `render_edges` (and `to_spec`, etc.) also accept a plain GeoDataFrame and normalise it for you.
-From a **duckOSM** database, skip the manual query — `rs.from_duckosm("area.duckdb")` selects
-the full data contract (road class, name, oneway, grade tags, a JavaScript-safe `edge_id`).
+Roads already in **DuckDB**? `rs.from_duckdb(con, query)` renders straight from a SQL query
+(select the geometry as WKB with `ST_AsWKB`) — see `examples/roads_from_duckdb.py`.
 
 ## Quick start
 

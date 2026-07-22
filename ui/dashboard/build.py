@@ -4,7 +4,7 @@ Renders the road network with **every built-in control off** and injects ``sideb
 before ``</body>`` — the sidebar is the whole UI, wired through the public ``window.rs*``
 API. Point it at your own data::
 
-    python build.py [path/to/duckosm.duckdb | edges.gpkg]
+    python build.py [edges.gpkg | edges.geojson]
 """
 from __future__ import annotations
 
@@ -13,19 +13,16 @@ from pathlib import Path
 
 import roadstyle as rs
 
-DEFAULT_DB = Path("/home/kaveh/projects/duckOSM/data/db/sodermalm.duckdb")
 HERE = Path(__file__).resolve().parent
+DEFAULT = HERE.parent / "studio" / "samples" / "sodermalm_driving.geojson"
 
 
 def main() -> None:
-    src = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_DB
+    src = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT
     if not src.exists():
         raise SystemExit(f"data source not found: {src}")
-    if src.suffix == ".duckdb":
-        edges = rs.from_duckosm(src)
-    else:
-        import geopandas as gpd
-        edges = gpd.read_file(src)
+    import geopandas as gpd
+    edges = gpd.read_file(src)
 
     # built-in controls off — the sidebar IS the UI; the explicit basemaps= list keeps all
     # entries addressable for the sidebar's own select (rsSetBasemap). view_3d bakes the

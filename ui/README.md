@@ -15,7 +15,7 @@ that gets injected before `</body>` of a saved map and talks to it only through 
 ## Using a template
 
 ```bash
-python ui/dashboard/build.py path/to/your.duckdb    # or an edges .gpkg
+python ui/dashboard/build.py path/to/edges.gpkg     # default: the bundled Södermalm sample
 # -> ui/dashboard/dashboard.html — self-contained, double-click to open
 ```
 

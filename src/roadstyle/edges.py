@@ -263,52 +263,6 @@ def from_duckdb(
     return RoadEdges.from_geodataframe(gdf, class_col=class_col, rename=rename)
 
 
-#: the canonical duckOSM edge columns, in preference order. `edge_id` is a 64-bit content hash
-#: (> 2**53), cast to text so a JS Number can't silently corrupt it; tunnel/bridge/layer drive
-#: grade separation; oneway/lanes/name/edge_ref feed arrows, decks, labels and popups.
-_DUCKOSM_COLUMNS = ["osm_id", "edge_ref", "highway", "name", "lanes", "oneway",
-                    "maxspeed_kmh", "length_m", "tunnel", "bridge", "layer"]
-
-
-def from_duckosm(db, schema: str = "driving", *, class_col: str = "highway") -> RoadEdges:
-    """Build :class:`RoadEdges` straight from a **duckOSM** database — the canonical bridge
-    between the two projects (duckOSM builds the routable network, roadstyle draws it)::
-
-        edges = rs.from_duckosm("sodermalm.duckdb")                    # driving network
-        edges = rs.from_duckosm("sodermalm.duckdb", schema="walking")  # or "cycling"
-        rs.render_edges(edges, basemap="dark_matter").save("map.html")
-
-    ``db`` is a path to the ``.duckdb`` file (opened read-only) or an open DuckDB connection.
-    ``schema`` picks which of duckOSM's per-mode networks to load — ``"driving"`` (default),
-    ``"walking"`` or ``"cycling"``.
-    The canonical column set (grade separation, oneway, lanes, names, the text-cast ``edge_id``)
-    is selected automatically — intersected with what the database actually has, so older duckOSM
-    builds without some columns still load. For arbitrary queries use :func:`from_duckdb`.
-    """
-    import duckdb
-
-    con = db if hasattr(db, "execute") else duckdb.connect(str(db), read_only=True)
-    try:
-        con.execute("LOAD spatial")
-    except Exception:
-        con.execute("INSTALL spatial; LOAD spatial")
-    have = {r[0] for r in con.execute(
-        "SELECT column_name FROM information_schema.columns "
-        "WHERE table_schema = ? AND table_name = 'edges'", [schema]).fetchall()}
-    missing = {"edge_id", class_col, "geometry"} - have
-    if missing:
-        raise ValueError(
-            f"{schema}.edges is missing required column(s) {sorted(missing)} — is this a duckOSM "
-            f"database? (schemas present: "
-            f"{[r[0] for r in con.execute('SELECT DISTINCT table_schema FROM information_schema.columns').fetchall()]})")
-    cols = ["CAST(edge_id AS VARCHAR) AS edge_id"]
-    cols += [c for c in _DUCKOSM_COLUMNS if c in have and c != class_col]
-    cols.append(class_col)
-    cols.append("ST_AsWKB(geometry) AS geom")
-    query = f"SELECT {', '.join(cols)} FROM {schema}.edges"
-    return from_duckdb(con, query, geometry="geom", class_col=class_col, crs=4326)
-
-
 def as_edges(data, *, class_col: str = "highway") -> RoadEdges:
     """Coerce any supported input into canonical :class:`RoadEdges`.
 
