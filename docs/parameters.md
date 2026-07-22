@@ -100,7 +100,7 @@ Only used by the MapLibre web backend; ignored by the others. See [web backend](
 | `arrows` | bool | `True` | Show one-way direction chevrons (CLI: `--no-arrows`). |
 | `labels` | bool | `True` | Show curved street-name labels (CLI: `--no-labels`). |
 | `filter_control` | bool | `True` | Show the collapsible road-class filter panel (CLI: `--no-filter`). |
-| `basemap_switcher` | bool | `True` | Show the in-map base-layer dropdown (CLI: `--no-basemap-switcher`). |
+| `basemap_switcher` | bool | `True` | Show the in-map base-layer dropdown (CLI: `--no-basemap-switcher`). `False` + an explicit `basemaps=` list keeps the entries addressable via `window.rsSetBasemap` (custom UI). |
 | `offset_frac` | float | `0.28` | Two-way lane offset as a fraction of the road's **pixel** width (constant overlap at every zoom). `0` = no lane split. |
 | `width_frac` | float | `0.6` | Each two-way lane's width as a fraction of the full width once the directions fan apart (a little over `0.5` so the lanes overlap rather than gap). |
 | `offset_zoom` | int | `15` | Zoom at which the two directions start fanning into parallel lanes (ramped over ~2 levels; coincident below). |

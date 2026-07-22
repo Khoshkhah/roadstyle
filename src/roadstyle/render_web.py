@@ -730,46 +730,66 @@ map.addControl({onAdd(m){
   m.on("pitchend", upd); m.on("pitch", upd); upd();
   d.appendChild(b); return d;
 }, onRemove(){}});
-// base-layer switcher (swaps the raster source's tiles; the road layers stay put).
+// base-layer switching: window.rsSetBasemap(key|index) is the API (swaps the raster source's
+// tiles; the road layers stay put); the dropdown is just UI over it and stays in sync.
 // A tile-less entry (blank) hides the raster layer and shows the plain background colour.
-if(BASEMAPS.length > 1){
+const BM_SWITCHER = __BM_SWITCHER__;
+function rsSetBasemap(keyOrIdx){
+  const idx = typeof keyOrIdx==="number" ? keyOrIdx
+    : BASEMAPS.findIndex(b=>b.key===keyOrIdx || b.label===keyOrIdx);
+  const b = BASEMAPS[idx]; if(!b) return;
+  const s = map.getSource("bm");
+  if(b.tiles.length && s) s.setTiles(b.tiles);
+  if(map.getLayer("basemap")) map.setLayoutProperty("basemap","visibility", b.tiles.length ? "visible" : "none");
+  map.setPaintProperty("bg","background-color", b.bg);
+  const sel = document.querySelector(".bm-ctrl select"); if(sel) sel.value = String(idx);
+  document.dispatchEvent(new CustomEvent("rs:basemapchange",{detail:{basemap:b.key, index:idx}}));
+}
+window.rsSetBasemap = rsSetBasemap;
+window.RS_BASEMAPS = BASEMAPS;
+if(BM_SWITCHER && BASEMAPS.length > 1){
   const sel = document.createElement("select");
   BASEMAPS.forEach((b,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=b.label; sel.appendChild(o); });
-  sel.onchange = ()=>{ const b=BASEMAPS[sel.value], s=map.getSource("bm");
-    if(b.tiles.length && s) s.setTiles(b.tiles);
-    if(map.getLayer("basemap")) map.setLayoutProperty("basemap","visibility", b.tiles.length ? "visible" : "none");
-    map.setPaintProperty("bg","background-color", b.bg); };
+  sel.onchange = ()=> rsSetBasemap(parseInt(sel.value,10));
   const w=document.createElement("div"); w.className="bm-ctrl"; w.appendChild(sel); document.body.appendChild(w);
 }
-// road-class filter panel (collapsible): checkboxes hide/show each class across every road layer
+// road-class filtering: window.rsSetClasses([...]) shows exactly those classes and hides the
+// rest across every road layer; the collapsible checkbox panel is just UI over it.
 const FILTER = __FILTER__;
+const _fltCbs={}, _fltBase={};
+const _fltIds=()=>map.getStyle().layers.filter(l=>l.id.indexOf("roads")===0).map(l=>l.id);
+map.on("load",()=>{ _fltIds().forEach(id=>{ if(!(id in _fltBase)) _fltBase[id]=map.getFilter(id)||null; }); });
+function rsSetClasses(visible){
+  const vis=new Set(visible);
+  const hidden=FILTER.classes.filter(c=>!vis.has(c));
+  _fltIds().forEach(id=>{
+    if(!(id in _fltBase)) _fltBase[id]=map.getFilter(id)||null;
+    let f=_fltBase[id];
+    if(hidden.length){ const cf=["!",["in",["get",FILTER.col],["literal",hidden]]]; f=f?["all",f,cf]:cf; }
+    try{ map.setFilter(id,f); }catch(e){}
+  });
+  FILTER.classes.forEach(c=>{ if(_fltCbs[c]) _fltCbs[c].checked=vis.has(c); });
+  document.dispatchEvent(new CustomEvent("rs:filterchange",
+    {detail:{visible:FILTER.classes.filter(c=>vis.has(c)), hidden:hidden}}));
+}
+window.rsSetClasses = rsSetClasses;
+window.RS_CLASSES = FILTER.classes;
 if(FILTER.on){
   const box=document.createElement("div"); box.className="flt-ctrl";
   const hd=document.createElement("div"); hd.className="flt-hd"; hd.textContent="Roads ▾";
   const body=document.createElement("div"); body.className="flt-body";
   hd.onclick=()=>{ const c=box.classList.toggle("collapsed"); hd.textContent="Roads "+(c?"▸":"▾"); };
   box.appendChild(hd); box.appendChild(body);
-  const cbs={};
-  const baseF={};
-  const roadIds=()=>map.getStyle().layers.filter(l=>l.id.indexOf("roads")===0).map(l=>l.id);
-  function applyFilter(){
-    const hidden=FILTER.classes.filter(c=>!cbs[c].checked);
-    roadIds().forEach(id=>{
-      let f=baseF[id]||null;
-      if(hidden.length){ const cf=["!",["in",["get",FILTER.col],["literal",hidden]]]; f=f?["all",f,cf]:cf; }
-      try{ map.setFilter(id,f); }catch(e){}
-    });
-  }
   FILTER.classes.forEach(c=>{
     const lab=document.createElement("label");
-    const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=true; cb.onchange=applyFilter;
-    cbs[c]=cb; lab.appendChild(cb);
+    const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=true;
+    cb.onchange=()=> rsSetClasses(FILTER.classes.filter(k=>_fltCbs[k].checked));
+    _fltCbs[c]=cb; lab.appendChild(cb);
     const sw=document.createElement("span"); sw.className="flt-sw";
     sw.style.background=(FILTER.swatches||{})[c]||"#888"; lab.appendChild(sw);
     lab.appendChild(document.createTextNode(" "+c)); body.appendChild(lab);
   });
   document.body.appendChild(box);
-  map.on("load",()=>{ roadIds().forEach(id=>{ baseF[id]=map.getFilter(id)||null; }); });
 }
 // "colour by" recolouring: swap which baked fill prop the road layers read (no re-render). Each
 // option's fill is baked per edge (__rs_fill / __rs_fill__1 …); setPaintProperty repoints the
@@ -857,6 +877,19 @@ OVERLAYS.forEach(ov=>{ if(!ov.interactive) return; ov.layers.forEach(id=>{
   map.on("mouseleave", id, ()=>{ map.getCanvas().style.cursor="";
     _ovState(_ovHov,{hover:false}); _ovHov=null; });
 }); });
+// window.rsSetOverlay(label, on) shows/hides one overlay; the Layers control is UI over it.
+const _ovCbs={};
+function rsSetOverlay(labelOrIdx, on){
+  const i = typeof labelOrIdx==="number" ? labelOrIdx : OVERLAYS.findIndex(o=>o.label===labelOrIdx);
+  const ov = OVERLAYS[i]; if(!ov) return;
+  ov.layers.forEach(id=>{ if(map.getLayer(id))
+    map.setLayoutProperty(id,"visibility", on?"visible":"none"); });
+  ov.visible = !!on;
+  if(_ovCbs[ov.label]) _ovCbs[ov.label].checked = !!on;
+  document.dispatchEvent(new CustomEvent("rs:overlaychange",{detail:{overlay:ov.label, visible:!!on}}));
+}
+window.rsSetOverlay = rsSetOverlay;
+window.RS_OVERLAYS = OVERLAYS;
 if(OVERLAYS.length){
   const box=document.createElement("div"); box.className="ov-ctrl";
   const hd=document.createElement("div"); hd.className="ov-hd"; hd.textContent="Layers";
@@ -864,9 +897,8 @@ if(OVERLAYS.length){
   OVERLAYS.forEach(ov=>{
     const lab=document.createElement("label");
     const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=ov.visible!==false;
-    cb.onchange=()=>{ ov.layers.forEach(id=>{ if(map.getLayer(id))
-      map.setLayoutProperty(id,"visibility", cb.checked?"visible":"none"); }); };
-    lab.appendChild(cb);
+    cb.onchange=()=> rsSetOverlay(ov.label, cb.checked);
+    _ovCbs[ov.label]=cb; lab.appendChild(cb);
     if(ov.color){ const sw=document.createElement("span"); sw.className="ov-sw";
       sw.style.background=ov.color; lab.appendChild(sw); }
     lab.appendChild(document.createTextNode(" "+ov.label)); body.appendChild(lab);
@@ -1117,10 +1149,12 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     bkeys = list(basemaps) if basemaps else list(DEFAULT_SWITCHER)
     if isinstance(active, str):
         bkeys = [active] + [k for k in bkeys if k != active]
-    bms = [{"label": b.label, "tiles": _tiles(b), "bg": _bg_color(b)}
+    bms = [{"key": b.key, "label": b.label, "tiles": _tiles(b), "bg": _bg_color(b)}
            for b in (get_basemap(k) for k in bkeys)]
-    if not basemap_switcher:
-        bms = bms[:1]                                     # one entry -> the JS hides the dropdown
+    if not basemap_switcher and not basemaps:
+        # no dropdown and no explicit set -> bake only the fixed backdrop. An explicit
+        # `basemaps=` list stays fully addressable via window.rsSetBasemap (custom UI).
+        bms = bms[:1]
     style = _basemap_style(get_basemap(active))
     if "bm" not in style["sources"]:
         # a blank base map is active but the switcher offers tiled ones: pre-create the raster
@@ -1301,6 +1335,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__ARROW_COLOR__", str(arw["color"]))
             .replace("__STYLE__", json.dumps(style))
             .replace("__BASEMAPS__", json.dumps(bms))
+            .replace("__BM_SWITCHER__", json.dumps(bool(basemap_switcher)))
             .replace("__FILTER__", json.dumps(flt))
             .replace("__CENTER__", json.dumps([(minx + maxx) / 2, (miny + maxy) / 2]))
             .replace("__PITCH3D__", json.dumps(cam["pitch_3d"]))

@@ -81,7 +81,7 @@ backend adds:
 | `labels` | bool | `True` | Show curved street-name labels (from the `name` column). |
 | `filter_control` | bool | `True` | Show the collapsible **road-class filter panel** (a checkbox per class present; unchecking hides that class across every road layer). |
 | `filter_col` | str | `None` | Column the filter panel lists/filters by, when it should differ from the styling `highway_col`. Default `None` = filter by the styling column. Set it to filter by a **source-native class** while widths/casing follow a different (e.g. OSM-highway proxy) column — the panel reads this raw property directly, so no restyle is needed. |
-| `basemap_switcher` | bool | `True` | Show the in-map **base-layer dropdown** (its options come from `basemap` / `basemaps`). |
+| `basemap_switcher` | bool | `True` | Show the in-map **base-layer dropdown** (its options come from `basemap` / `basemaps`). With `False` **plus an explicit `basemaps=` list**, the entries stay baked and addressable via `window.rsSetBasemap` for a custom UI; `False` alone bakes only the fixed backdrop. |
 | `road_popup` | bool | `True` | Info popup shown when a road is **clicked** (lists the feature's attributes). Click-to-select works either way; set `False` to drive your own readout from `window.map` events. |
 | `road_tooltip` | bool / list of cols | `False` | **Hover** tooltip: `True` = all attributes, a list of column names = only those, `False` = off. The shared `tooltip=` arg (folium backend / CLI `--tooltip`) is accepted as an **alias** — when given and `road_tooltip` is unset it drives this, so the same `tooltip=` / `--tooltip` call works on every backend. `road_tooltip` is the web-native name and wins if both are set. |
 | `offset_frac` | float | `0.28` | Two-way lane offset as a fraction of the road's **pixel** width (pixel-proportional ⇒ constant overlap at every zoom). `0` = no lane split. |
@@ -95,6 +95,24 @@ backend adds:
 | `overlays` | list of `Overlay` / `None` | `None` | Extra layers the caller brings (zones / POIs / lines) — see [Overlay layers](#overlay-layers-overlays). |
 
 From the CLI these map to `--no-arrows` / `--no-labels` / `--no-filter` / `--no-basemap-switcher`.
+
+## The JavaScript API (`window.rs*`)
+
+Every in-map control is a thin UI over a global function, so custom pages can drive the map
+directly. Each setter updates the map, keeps the built-in control in sync (if present), and
+dispatches a CustomEvent on `document`:
+
+| function | does | event |
+|---|---|---|
+| `rsSetBasemap(keyOrIdx)` | switch the base map (key, label, or index into `RS_BASEMAPS`) | `rs:basemapchange` |
+| `rsSetClasses(list)` | show exactly these road classes, hide the rest | `rs:filterchange` |
+| `rsSetColorField(nameOrIdx)` | switch the active `color_options` entry | `rs:colorchange` |
+| `rsSetOverlay(labelOrIdx, on)` | show/hide one overlay | `rs:overlaychange` |
+
+Plus: `window.map` (the MapLibre `Map` — camera via `map.easeTo({pitch, bearing, ...})`),
+click selection events `rs:select` / `rs:deselect`, and the registries `RS_BASEMAPS`,
+`RS_CLASSES`, `RS_COLOR_OPTIONS`, `RS_OVERLAYS` for building your own controls. All of it works
+with the built-in controls hidden (`basemap_switcher=False`, `filter_control=False`, …).
 
 ## Dynamic recolouring (`color_options`)
 

@@ -500,3 +500,26 @@ def test_blank_basemap_with_switcher_precreates_hidden_raster():
     m = re.search(r"BASEMAPS = (\[.*?\]);", wm.html, re.S)
     entries = json.loads(m.group(1))
     assert entries[0]["tiles"] == [] and entries[0]["bg"] == "#efede8"
+
+
+def test_js_api_hooks_are_baked():
+    """Every UI control has a window.rs* setter + rs:* event, usable from outside JS."""
+    wm = render_edges(_edges(), backend="web")
+    for needle in ("window.rsSetBasemap", "window.rsSetClasses", "window.rsSetOverlay",
+                   "window.rsSetColorField", "rs:basemapchange", "rs:filterchange",
+                   "rs:overlaychange"):
+        assert needle in wm.html, needle
+
+
+def test_switcher_off_with_explicit_basemaps_keeps_them_addressable():
+    """basemap_switcher=False hides the dropdown but an explicit basemaps= list stays fully
+    baked, so window.rsSetBasemap('key') can drive a custom UI."""
+    wm = render_edges(_edges(), backend="web", basemaps=["voyager", "blank"],
+                      basemap_switcher=False)
+    m = re.search(r"BASEMAPS = (\[.*?\]);", wm.html, re.S)
+    assert [e["key"] for e in json.loads(m.group(1))] == ["voyager", "blank"]
+    assert "const BM_SWITCHER = false" in wm.html
+    # without an explicit list, only the fixed backdrop is baked (nothing to switch to)
+    wm2 = render_edges(_edges(), backend="web", basemap_switcher=False)
+    m2 = re.search(r"BASEMAPS = (\[.*?\]);", wm2.html, re.S)
+    assert len(json.loads(m2.group(1))) == 1

@@ -256,6 +256,30 @@ document.addEventListener("rs:deselect", () => hideSidebar());
 Internal `__rs_*`/`twoway`/`lvl` fields never show. Anything you select into the GeoDataFrame is
 available — the popup/tooltip read the columns of *your* data.
 
+## Drive the map from JavaScript
+
+Every in-map control is a thin UI over a `window.rs*` function — so anything you can click, your
+own HTML/JS can call. Each setter updates the map **and** keeps the built-in control in sync, and
+dispatches a `rs:*` CustomEvent on `document` so outside code can react:
+
+```js
+rsSetBasemap("dark_matter");                // by key, label, or index   → rs:basemapchange
+rsSetClasses(["primary", "secondary"]);     // show exactly these classes → rs:filterchange
+rsSetColorField("Traffic");                 // switch the colour layer    → rs:colorchange
+rsSetOverlay("Zones", false);               // hide/show one overlay      → rs:overlaychange
+map.easeTo({pitch: 60, bearing: 30});       // camera: window.map is the MapLibre Map itself
+
+document.addEventListener("rs:basemapchange", e => console.log(e.detail.basemap));
+document.addEventListener("rs:filterchange",  e => console.log(e.detail.visible));
+```
+
+What's available to enumerate: `RS_BASEMAPS` (key/label per entry), `RS_CLASSES` (road classes in
+the data), `RS_COLOR_OPTIONS`, `RS_OVERLAYS`. Selection events are above (`rs:select` /
+`rs:deselect`). The setters work **even with the built-in control hidden** — e.g.
+`basemaps=["voyager", "blank"], basemap_switcher=False` bakes both entries with no dropdown, so
+your own buttons can call `rsSetBasemap("blank")`; only the no-`basemaps=` +
+`basemap_switcher=False` combination bakes just the one fixed backdrop.
+
 ## All options at a glance
 
 Every keyword of `render_edges` (full reference: [`docs/parameters.md`](docs/parameters.md)):
