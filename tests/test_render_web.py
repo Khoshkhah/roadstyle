@@ -360,15 +360,10 @@ def test_web_3d_bridge_decks():
     # popup parity: slices carry the full edge properties, not just fills
     assert "maxspeed_kmh" in slices[0]["properties"] or "aadt" in slices[0]["properties"]
     assert all("__rs_chain" in f["properties"] for f in slices)   # whole-bridge hover unit
-    # settings-driven transparency: the zoom crossfade tops out at bridge_decks.opacity
-    assert 0.7 in deck["paint"]["fill-extrusion-opacity"]
-    # three zoom-banded width variants, crossfaded (deck width stays proportionate per zoom)
-    assert "roads-bridge-decks-far" in ids and "roads-bridge-decks-mid" in ids
-    bands = {f["properties"]["__rs_band"] for f in slices}
-    assert bands == {0, 1, 2}
+    assert deck["paint"]["fill-extrusion-opacity"] == 0.7    # settings-driven transparency
     bases = [f["properties"]["__rs_base"] for f in slices]
     # the deck RAMPS: grounded at the ends (connects to the road), full height mid-span
-    assert min(bases) < 1.0 and 5.0 <= max(bases) <= 5.2   # micro band offsets allowed
+    assert min(bases) < 1.0 and max(bases) == 5.0
     flat = _style(render_edges(g, backend="web").html)
     fids = [l["id"] for l in flat["layers"]]
     assert "roads-bridge-casing" in fids and "roads-bridge-decks" not in fids
@@ -409,7 +404,7 @@ def test_web_pick_survives_missing_layers():
     list to existing layers or every hover/click errors out and nothing is selectable."""
     html = render_edges(_edges(), backend="web", view_3d=True).html
     assert "PICK_LAYERS.filter(id=>map.getLayer(id))" in html
-    assert '"roads-bridge-decks"' in html.split("PICK_LAYERS")[1][:220]
+    assert "concat(RS_DECK_LAYERS)" in html.split("PICK_LAYERS")[1][:220]
 
 
 def test_web_camera_max_pitch():
