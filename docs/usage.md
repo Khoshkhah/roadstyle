@@ -23,7 +23,7 @@ conda `conda env create -f environment.yml && conda activate roadstyle && pip in
 No Python needed — `roadstyle` renders any road file straight from the shell:
 
 ```bash
-roadstyle edges.gpkg -o map.html --theme dark               # styled interactive map
+roadstyle edges.gpkg -o map.html --basemap dark_matter               # styled interactive map
 roadstyle edges.gpkg --include motorway trunk primary       # keep only major roads
 roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by your data
 roadstyle edges.gpkg -f spec -o map_data.json               # JSON spec for your own frontend
@@ -55,7 +55,7 @@ edges = rs.normalize_edges(raw, class_col="highway", rename={"vagtyp": "highway"
 
 ```python
 edges = gpd.read_file("edges.gpkg")            # needs a `highway` column
-rs.render_edges(edges, theme="dark").save("roads.html")
+rs.render_edges(edges, basemap="dark_matter").save("roads.html")
 ```
 
 `render_edges` returns a `WebMap` by default (the MapLibre `web` backend), or a `folium.Map` with
@@ -66,9 +66,9 @@ rs.render_edges(edges, theme="dark").save("roads.html")
 
 ```python
 # Themes, palettes, filtering, satellite, selection
-rs.render_edges(edges, palette="carto", theme="light",
+rs.render_edges(edges, palette="carto",
                 include=["motorway", "trunk", "primary"])
-rs.render_edges(edges, theme="satellite", basemap="satellite")
+rs.render_edges(edges, basemap="satellite", basemap="satellite")
 rs.render_edges(edges, selected=picked_edges)          # neon-violet highlight
 
 # Data-driven: categorical (e.g. congestion levels)
@@ -89,7 +89,7 @@ rs.render_edges(big_edges, backend="lonboard", color_by="aadt", cmap="magma")
 
 # self-contained MapLibre map (per-zoom widths, two-way lanes, arrows, names,
 # hover/select, base switcher, tunnel/bridge grade separation) — opens offline, no server
-rs.render_edges(edges, backend="web", theme="dark").save("roads.html")
+rs.render_edges(edges, backend="web", basemap="dark_matter").save("roads.html")
 ```
 
 ## MapLibre web backend
@@ -101,7 +101,7 @@ switcher, and **tunnel/bridge grade separation** (reads optional `tunnel`/`bridg
 columns). It returns a `WebMap` with `.save(path)`.
 
 ```python
-rs.render_edges(edges, backend="web", theme="dark",
+rs.render_edges(edges, backend="web", basemap="dark_matter",
                 offset_frac=0.28, width_frac=0.6, offset_zoom=15).save("roads.html")
 ```
 

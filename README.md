@@ -1,19 +1,23 @@
 # roadstyle
 
-OSM-theme **road/edge map styling** for `folium`, `lonboard`, and a self-contained **MapLibre
-(vector)** backend. Turns a GeoDataFrame with a `highway` column into a styled interactive map —
-with the proper **casing + fill "geometry sandwich"**, **light / dark / satellite** themes,
-**highway-type filtering**, and a neon-violet **selected-edge** style.
+OSM-style **road/edge map styling** for a self-contained **MapLibre (vector)** backend, plus
+`folium` and `lonboard`. Turns a GeoDataFrame with a `highway` column into a styled interactive
+map — the proper **casing + fill "geometry sandwich"**, **highway-type filtering**, a neon-violet
+**selected-edge** style, and **every styling default in one settings file**
+(`data/defaults.json`, overridable via a `roadstyle.json` or `rs.use_settings()`).
 
 The **`web` backend** (`backend="web"`) goes further, matching the *openstreetmap-carto* look with
 **per-zoom widths**, **two-way directional lanes**, direction **arrows**, curved **street names**,
-**hover/select**, a base-layer switcher, **tunnel/bridge grade separation**, and an optional
-**boundary overlay** — all in one **offline, self-contained HTML** file (MapLibre and the data
-bundled in; no server needed). See [`docs/web-backend.md`](docs/web-backend.md).
+**hover/select**, a base-layer switcher, **tunnel/bridge grade separation**, slot-based
+**street names + one-way arrows** (alternating along each road, never stacked), an optional
+**3D view** (`view_3d=True`: tilted camera, extruded ramped **bridge decks**, an on-map 2D/3D
+toggle), and an optional **boundary overlay** — all in one **offline, self-contained HTML** file
+(MapLibre and the data bundled in; no server needed). See
+[`docs/web-backend.md`](docs/web-backend.md).
 
 Three palettes (data files you can [override](#customising-palettes--config-data-files-no-code-edit)):
-- **`highsat`** — custom high-saturation theme (cyan motorway, pink trunk, orange primary…)
-  with theme-dependent casing. Maximum legibility over any base map.
+- **`highsat`** — custom high-saturation palette (cyan motorway, pink trunk, orange primary…)
+  with a light-grey casing. Maximum legibility over any base map.
 - **`carto`** — the classic **OSM Carto** palette (muted warm tones).
 - **`mono`** — neutral grayscale (no hues); importance by shade + width. Good for print or as a
   quiet backdrop for data overlays.
@@ -45,7 +49,7 @@ pip install -e ".[dev]"
 No Python required — point the `roadstyle` command at any road file (GPKG, GeoJSON, Shapefile, …):
 
 ```bash
-roadstyle edges.gpkg -o map.html --theme dark               # styled interactive map
+roadstyle edges.gpkg -o map.html --basemap dark_matter               # styled interactive map
 roadstyle edges.gpkg --include motorway trunk primary       # keep only major roads
 roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by your data
 roadstyle edges.gpkg --tooltip name highway maxspeed         # hover tooltip fields (all backends)
@@ -65,21 +69,21 @@ from roadstyle import render_edges
 
 edges = gpd.read_file("edges.gpkg")          # needs a `highway` column (any CRS)
 
-render_edges(edges, theme="dark").save("map.html")                  # high-sat, dark
-render_edges(edges, palette="carto", theme="light").save("c.html")  # OSM Carto, light
+render_edges(edges, basemap="dark_matter").save("map.html")                  # high-sat, dark
+render_edges(edges, palette="carto").save("c.html")  # OSM Carto, light
 
 # filter by type + satellite + highlight a selection
 sel = edges[edges.highway == "motorway"]
-render_edges(edges, theme="satellite",
+render_edges(edges, basemap="satellite",
              include=["motorway", "trunk", "primary"],
              selected=sel).save("major.html")
 
 # big data: GPU backend
-render_edges(edges, backend="lonboard", theme="dark")
+render_edges(edges, backend="lonboard", basemap="dark_matter")
 
 # self-contained MapLibre map: per-zoom widths, two-way lanes, arrows, names,
 # hover/select, base switcher, tunnel/bridge grade separation — opens offline, no server
-render_edges(edges, backend="web", theme="dark").save("roads.html")
+render_edges(edges, backend="web", basemap="dark_matter").save("roads.html")
 ```
 
 ### Colour each edge from your own table
@@ -138,11 +142,12 @@ width/casing); `config`/`selection` override individual keys. Programmatic paths
 
 | Function | Purpose |
 |---|---|
-| `render_edges(gdf, *, backend, palette, theme, include/exclude, selected, …)` | filter + render |
+| `render_edges(gdf, *, backend, palette, basemap, view_3d, include/exclude, …)` | filter + render |
 | `filter_edges(gdf, include, exclude, …)` / `highway_types(gdf)` | type filtering |
-| `resolve(highway, palette, theme, tunnel, bridge)` | resolve one edge's concrete style |
-| `selection_style(theme, base_width)` | neon-violet selected-edge layers |
-| `PALETTES`, `THEMES` | the palette/theme tables |
+| `resolve(highway, palette, tunnel, bridge)` | resolve one edge's concrete style |
+| `selection_style(base_width)` | neon-violet selected-edge layers |
+| `PALETTES`, `BASEMAPS` | the palette / base-map tables |
+| `use_settings(path_or_dict)` | apply a settings override from code |
 
 Full docs: see [`docs/`](docs/index.md) (MkDocs — `mkdocs serve`). Styling spec is transcribed
 from the cartographic design docs in the `osm-traffic-enrichment` project.

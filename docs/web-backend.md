@@ -9,8 +9,8 @@ you get it without passing `backend=`.
 import roadstyle as rs
 
 edges = gpd.read_file("edges.gpkg")            # needs a `highway` column (any CRS)
-rs.render_edges(edges, theme="dark").save("roads.html")            # web is the default
-rs.render_edges(edges, backend="web", theme="dark").save("r.html") # explicit, same thing
+rs.render_edges(edges, basemap="dark_matter").save("roads.html")            # web is the default
+rs.render_edges(edges, backend="web", basemap="dark_matter").save("r.html") # explicit, same thing
 ```
 
 `render_edges(..., backend="web")` returns a **`WebMap`** with `.save(path)` (and inline display
@@ -66,7 +66,7 @@ edges = rs.from_duckdb(
     "FROM driving.edges",
     geometry="geom", crs=4326,
 )
-rs.render_edges(edges, backend="web", theme="dark").save("city.html")
+rs.render_edges(edges, backend="web", basemap="dark_matter").save("city.html")
 ```
 
 ## Parameters
@@ -221,3 +221,28 @@ This is what makes the output a true single-file deliverable. (The folium/lonboa
 - **`to_spec` / `save` / `-f rsjs`** — when the **browser** (your own Leaflet/MapLibre/deck.gl page)
   should draw the data and you just want roadstyle's styling baked into JSON. See
   [Frontend integration](frontend.md).
+
+
+## Camera & 3D view
+
+The starting camera is a **setting** (`camera` block: `pitch`, `bearing`, `pitch_3d`) with
+per-call overrides:
+
+```python
+rs.render_edges(edges, pitch=55, bearing=-25)     # open tilted/rotated
+rs.render_edges(edges, view_3d=True)              # tilted + extruded bridge decks
+```
+
+`view_3d=True` renders every bridge chain as a ramped 3D deck (`fill-extrusion`): connected
+bridge edges are walked into one structure, ramps rise from the ground over `ramp_m`, forks stay
+at full height, and the ribbon width matches the road width model at `bridge_decks.match_zoom`.
+Decks are semi-transparent (`bridge_decks.opacity`), hover/select as ONE structure, and show the
+same popup fields as flat edges. Every map also carries an on-map **2D/3D toggle** button and a
+pitch-aware compass; no terrain/elevation data is used — the deck height is cartographic.
+
+## Street names & arrows (annotation slots)
+
+Each road chain is divided into equal `annotations.slot_m`-metre slots: street names take the
+even slots, one-way arrows the odd ones — alternating along the road, never stacked. Unnamed
+roads leave their name slots empty. Text/icon zoom ramps plus MapLibre's collision culling handle
+density automatically; label/arrow colours live in the `labels` / `arrows` settings blocks.

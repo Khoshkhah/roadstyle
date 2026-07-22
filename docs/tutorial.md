@@ -31,7 +31,7 @@ the returned map (`WebMap`, or `folium.Map` with `backend="folium"`) displays in
 else, `.save()` it:
 
 ```python
-m = rs.render_edges(edges, theme="dark")   # high-saturation palette on a dark base map
+m = rs.render_edges(edges, basemap="dark_matter")   # high-saturation palette on a dark base map
 m.save("roads.html")                        # a standalone, self-contained page
 ```
 
@@ -45,15 +45,15 @@ and web output on top of it.
 ## 2 · Themes & palettes
 
 Three palettes — `highsat` (high-contrast), `carto` (classic OSM), and `mono` (grayscale) — and
-three themes: `light`, `dark`, and `satellite`. Palettes are [data files you can override](palettes.md#customising-data-files-and-overrides).
+the backdrop comes from `basemap=` (any key in `rs.BASEMAPS`; default `voyager` from the settings file). Palettes are [data files you can override](palettes.md#customising-data-files-and-overrides).
 
 ```python
-rs.render_edges(edges, palette="carto", theme="light")
-rs.render_edges(edges, palette="highsat", theme="dark")
+rs.render_edges(edges, palette="carto")
+rs.render_edges(edges, palette="highsat", basemap="dark_matter")
 ```
 
 Themes set the base map and casing colours; palettes set the per-road-class colours. See
-[Palettes](palettes.md) and [Themes](themes.md) for the full reference.
+[Palettes](palettes.md) for the full reference.
 
 > Notebook: **01 · Quickstart**, **06 · Customizing the look**
 
@@ -116,12 +116,12 @@ Show only the road types you care about, and highlight a selection on top of the
 sorted(rs.highway_types(edges))                       # what classes are present?
 
 # keep or drop types — match_links=True (default) keeps *_link ramps with their parent
-rs.render_edges(edges, include=["motorway", "trunk", "primary"], theme="dark")
-rs.render_edges(edges, exclude=["service", "footway", "path", "cycleway"], theme="light")
+rs.render_edges(edges, include=["motorway", "trunk", "primary"], basemap="dark_matter")
+rs.render_edges(edges, exclude=["service", "footway", "path", "cycleway"])
 
 # highlight a sub-selection with a neon overlay
 sel = edges[edges["highway"] == "secondary"]
-rs.render_edges(edges, theme="dark", selected=sel)
+rs.render_edges(edges, basemap="dark_matter", selected=sel)
 ```
 
 > Notebook: **03 · Filtering & highlighting**
@@ -132,14 +132,14 @@ rs.render_edges(edges, theme="dark", selected=sel)
 
 ### Base maps
 
-Override the theme's default tiles with any key in `rs.BASEMAPS`, or offer several as a switcher:
+Pick the base map with any key in `rs.BASEMAPS` (the default comes from the `basemap` setting), or offer several as a switcher:
 
 ```python
 print("available base maps:", list(rs.BASEMAPS))
-rs.render_edges(edges, theme="light", basemap="positron")
+rs.render_edges(edges, basemap="positron")
 
 # a thumbnail base-layer switcher on the map (folium)
-rs.render_edges(edges, theme="dark", basemaps=["dark_matter", "positron", "satellite"])
+rs.render_edges(edges, basemap="dark_matter", basemaps=["dark_matter", "positron", "satellite"])
 ```
 
 Any [xyzservices](https://xyzservices.readthedocs.io/) provider also works directly as `basemap=`
@@ -151,7 +151,7 @@ Any [xyzservices](https://xyzservices.readthedocs.io/) provider also works direc
 
 ```python
 rs.render_edges(
-    edges, theme="dark",
+    edges, basemap="dark_matter",
     color_by="congestion",
     colors={"free": "#22c55e", "slow": "#f59e0b", "jam": "#ef4444"},
     legend=True,
@@ -171,7 +171,7 @@ For very large edge sets, switch the backend to **lonboard** (deck.gl / WebGL). 
 styling — it just renders on the GPU. lonboard is optional: `pip install "roadstyle[lonboard]"`.
 
 ```python
-rs.render_edges(edges, backend="lonboard", theme="dark")
+rs.render_edges(edges, backend="lonboard", basemap="dark_matter")
 rs.render_edges(edges, backend="lonboard", color_by="length_m", cmap="magma", width_by=(1, 5))
 ```
 
@@ -233,13 +233,13 @@ The same styled map can leave roadstyle in several shapes. The heart of it is th
 spec** (`spec/1`): your data plus the *baked-in* per-edge style, ready for any frontend to draw.
 
 ```python
-spec = rs.to_spec(edges, theme="dark", color_by="highway")   # canonical JSON dict
+spec = rs.to_spec(edges, basemap="dark_matter", color_by="highway")   # canonical JSON dict
 rs.save_spec(spec, "map_data.json")                          # round-trips with load_spec()
 
 gj = rs.to_geojson(edges, color_by="highway")                # just the styled features
 
-rs.save(edges, "standalone.html", theme="dark")              # a finished HTML file
-html = rs.to_iframe(edges, theme="dark", height="360px")     # an <iframe> string, zero JS
+rs.save(edges, "standalone.html", basemap="dark_matter")              # a finished HTML file
+html = rs.to_iframe(edges, basemap="dark_matter", height="360px")     # an <iframe> string, zero JS
 ```
 
 Each feature in the spec carries reserved `__rs_*` properties (`__rs_fill`, `__rs_w`, `__rs_casing`,
@@ -262,7 +262,7 @@ Copy the renderer next to your spec:
 import shutil
 from importlib.resources import files
 
-spec = rs.to_spec(edges, theme="dark", palette="highsat")
+spec = rs.to_spec(edges, basemap="dark_matter", palette="highsat")
 rs.save_spec(spec, "web/map_data.json")
 for asset in ("roadstyle.js", "roadstyle.css"):
     shutil.copy(files("roadstyle") / "static" / asset, f"web/{asset}")

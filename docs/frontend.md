@@ -67,7 +67,7 @@ edges = gpd.read_file("edges.gpkg")          # or load per request / from a DB
 
 @app.get("/roads.json")
 def roads(color_by: str = "aadt", cmap: str = "viridis"):
-    return rs.to_spec(edges, color_by=color_by, cmap=cmap, theme="dark")
+    return rs.to_spec(edges, color_by=color_by, cmap=cmap, basemap="dark_matter")
 ```
 
 The browser then `fetch("/roads.json")` and renders with the Leaflet or MapLibre snippet from

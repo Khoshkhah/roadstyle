@@ -24,7 +24,7 @@ All of them take the same styling arguments as
 
 ```python
 import roadstyle as rs
-spec = rs.to_spec(edges, color_by="aadt", cmap="viridis", theme="dark")
+spec = rs.to_spec(edges, color_by="aadt", cmap="viridis", basemap="dark_matter")
 rs.save_spec(edges, "roads.json", color_by="aadt", cmap="viridis")
 ```
 
@@ -32,7 +32,6 @@ rs.save_spec(edges, "roads.json", color_by="aadt", cmap="viridis")
 {
   "roadstyle": "spec/1",
   "crs": "EPSG:4326",
-  "theme": "dark",
   "bounds": [[minLat, minLon], [maxLat, maxLon]],
   "render": { "sandwich": true, "line_cap": "round", "line_join": "round" },
   "basemap": { "key": "dark_matter", "url": "...", "attr": "...", "is_dark": true },
@@ -57,7 +56,7 @@ it doesn't need roadstyle's logic:
 | `__rs_op` | fill opacity |
 | `__rs_dash` | dash pattern (or null) |
 | `__rs_casing` | casing colour for this theme (or null) — **what every backend draws** |
-| `__rs_casing_light` / `__rs_casing_dark` | the two palette casing variants, baked for reference (a custom theme picks one via its `casing`); the renderers draw `__rs_casing`, so casing is theme-driven and does not change when you switch the base map |
+| `__rs_casing` | the casing colour (one per edge, constant on every base map) |
 | `__rs_cw` | casing width (px) |
 | `__rs_cop` | casing opacity |
 | `__rs_class` | road class / category |

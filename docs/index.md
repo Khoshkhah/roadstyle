@@ -1,7 +1,7 @@
 # roadstyle
 
 **roadstyle** turns a GeoDataFrame of road edges into a beautifully styled interactive map —
-an OSM-style "geometry sandwich" (coloured fills over casings) with palettes, themes, and base
+an OSM-style "geometry sandwich" (coloured fills over casings) with palettes, settings, and base
 maps — and can colour roads by **your own data**, on **folium** / **lonboard** / a self-contained
 **MapLibre (vector)** backend, or as a **stack-agnostic JSON spec** you embed in any website.
 
@@ -10,7 +10,7 @@ import geopandas as gpd
 from roadstyle import render_edges
 
 edges = gpd.read_file("edges.gpkg")            # any CRS; needs a road-class column
-render_edges(edges, theme="dark").save("roads.html")          # classic OSM styling
+render_edges(edges, basemap="dark_matter").save("roads.html")          # classic OSM styling
 
 render_edges(edges, color_by="aadt", cmap="viridis",          # colour by a data value
              width_by=(1, 6), legend=True).save("traffic.html")
@@ -19,7 +19,7 @@ render_edges(edges, color_by="aadt", cmap="viridis",          # colour by a data
 …or straight from the shell — no Python needed:
 
 ```bash
-roadstyle edges.gpkg -o roads.html --theme dark
+roadstyle edges.gpkg -o roads.html --basemap dark_matter
 roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by your data
 ```
 
@@ -52,5 +52,5 @@ roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by
 - **[MapLibre web backend](web-backend.md)** — the self-contained, zoom-correct vector map
   (two-way lanes, grade separation, offline).
 - **[Embedding in a website](embedding.md)** — the JSON spec + Leaflet/MapLibre/iframe snippets.
-- **[Palettes](palettes.md)** / **[Themes](themes.md)** — styling reference.
+- **[Palettes](palettes.md)** — styling + settings reference.
 - **[Comparison](comparison.md)** — roadstyle vs geopandas `.explore()` / prettymaps.

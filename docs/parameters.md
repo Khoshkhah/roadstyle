@@ -19,16 +19,15 @@ palette JSON file.
 | `fill` | hex colour string | *required* | The road's main (centre) line colour, e.g. `"#FF0000"`. The colour you actually see. |
 | `width` | number (px) | *required* | Thickness of the fill line in pixels, e.g. `6`. Bigger = more important road. |
 | `casing_width` | number (px) | *required* | Thickness of the **casing** (the outline drawn *under* the fill), e.g. `8`. Usually `width + 2`. Set `0` for no casing. |
-| `casing_light` | hex string or `null` | `null` | Casing colour on **light** base maps, e.g. `"#007785"`. `null` = no casing on light maps. |
-| `casing_dark` | hex string | `"#000000"` | Casing colour on **dark/satellite** base maps. Usually black so roads pop on a dark canvas. |
+| `casing` | hex string or `null` | `"#bcbcbc"` | The casing (outline) colour; `null` = no casing. Light grey by default; legacy files with `casing_dark` still load (it maps onto `casing`). |
 | `dash` | `[on, off]` or `null` | `null` | Dash pattern in px, e.g. `[4, 4]` = 4px line, 4px gap (used for footpaths/cycleways). `null` = solid line. |
 | `opacity` | number 0–1 | `1.0` | Transparency of the fill. `1` = solid, `0` = invisible. (The renderer multiplies this by the theme's fill opacity.) |
 
 > **Casing?** A road is drawn as two stacked lines: a wider **casing** underneath (the border)
 > and a narrower **fill** on top (the colour). This is the "geometry sandwich" — it gives every
-> road a clean edge. `casing_light`/`casing_dark` are the two variants; the **theme** picks one
-> (`casing="light"`/`"dark"`), and every backend draws that — casing is theme-driven and stays put
-> when you switch the base map. The built-in themes all use the dark (black) casing.
+> road a clean edge. Each class carries ONE `casing` colour (light grey by default in
+> `highsat`; per-class hues in `carto`), constant on every base map. Bridge decks keep a solid
+> dark casing (`bridge_casing_color`).
 
 > **Units & zoom.** `width` and `casing_width` are **fixed screen pixels** on the `folium` and
 > `lonboard` backends — a road keeps the same on-screen thickness at every zoom level. This looks
@@ -41,7 +40,7 @@ Example (one entry from the `highsat` palette):
 ```json
 "motorway": {
   "fill": "#00E5FF", "width": 6.0, "casing_width": 8.0,
-  "casing_light": "#007785", "casing_dark": "#000000",
+  "casing": "#bcbcbc",
   "dash": null, "opacity": 1.0
 }
 ```
@@ -58,7 +57,6 @@ GeoDataFrame with line geometry + a class column).
 | `gdf` | `RoadEdges` / GeoDataFrame | *required* | The road edges to draw. A plain GeoDataFrame is normalised for you (→ EPSG:4326, lines). |
 | `backend` | `"web"` / `"folium"` / `"lonboard"` | `"web"` | Renderer. **`web` (default)** = self-contained **MapLibre (vector)** map with per-zoom widths, two-way lanes, arrows/names, hover/select & tunnel/bridge grade separation (see [web backend](web-backend.md)). `folium` = portable interactive HTML (Leaflet) with legends + filter panel. `lonboard` = GPU/WebGL, for very large data. |
 | `palette` | str or dict | `"highsat"` | Which colour palette for **class** styling. Built-ins: `"highsat"`, `"carto"`, `"mono"` (grayscale). Add your own via a [data file or override](palettes.md#customising-data-files-and-overrides). Ignored if you use `color_by`/`style`. |
-| `theme` | `"light"`/`"dark"`/`"satellite"` | `"light"` | Visual theme: sets the default base map and which casing colour (light/dark) is used. `light` opens on the Voyager base. |
 | `highway_col` | str | `"highway"` | Which column holds the road class **used for styling** (widths, casing, z-order). Set this if your class column has a different name. |
 | `filter_col` | str | `None` | *(web backend)* Which column drives the **road-type filter panel**, when it should differ from `highway_col`. Default `None` = filter by the styling column. Use it when width/casing follow one scheme (e.g. an OSM-highway proxy `highway_col`) but the filter should list a **different, source-native class** (e.g. `road_class`). |
 | `include` | str / list / `None` | `None` | Keep **only** these road classes (e.g. `["motorway","primary"]`). |
@@ -75,7 +73,9 @@ GeoDataFrame with line geometry + a class column).
 | `style` | `Styler` / `None` | `None` | Pass a styler object directly (advanced). Overrides `palette`/`color_by`. |
 | `tooltip` | list / `None` | `None` | Which columns to show on hover. `None` = all columns. |
 | `selected` | GeoDataFrame / `None` | `None` | Highlight these edges with a neon-violet overlay. |
-| `basemap` | str / `None` | `None` | Use a single fixed base map (a key in `BASEMAPS`), instead of the theme default + switcher. |
+| `basemap` | str / `None` | `None` | The primary base map (a key in `BASEMAPS`); default from the `basemap` setting (`voyager`). |
+| `pitch` / `bearing` | number / `None` | settings | Starting camera tilt / rotation (`camera` settings block). |
+| `view_3d` | bool | `False` | 3D view: tilted camera + extruded, ramped bridge decks (`bridge_decks` settings block). |
 | `basemaps` | list / `None` | `None` | (folium) The set of base maps offered in the switcher control. |
 | `filter_control` | bool | `True` | Show the in-map road-type filter panel (checkboxes). On `folium` and the `web` backend. |
 | `name` | str | `"roads"` | Layer name. |
@@ -157,17 +157,13 @@ arguments above, but you can construct them directly for full control.
 
 ---
 
-## 4. `Theme`
+## 4. Settings file
 
-A theme bundles the casing variant + a default base map.
-
-| Field | Type | Meaning |
-|---|---|---|
-| `name` | str | Theme name (`"light"`, `"dark"`, `"satellite"`). |
-| `casing` | `"light"` / `"dark"` | Which casing colour to use (`casing_light` vs `casing_dark`). |
-| `default_basemap` | str | Base map shown by default for this theme. |
-
-Built-ins: `light` (**Voyager** base, the default theme), `dark` (Dark Matter base), `satellite` (Esri imagery).
+EVERY styling default ships in one bundled file — `roadstyle/data/defaults.json` — with four
+sections: `palettes`, `config` (opacities, casing, minzoom, `basemap`, `camera`, `labels`,
+`arrows`, `annotations`, `bridge_decks`, …), `selection`, and `roads` (the width/draw-order
+model). A user `roadstyle.json` (or `rs.use_settings(...)` from code) overrides any part of it —
+see [Palettes](palettes.md#customising-data-files-and-overrides).
 
 ---
 
@@ -217,10 +213,10 @@ can be hand-edited or read by a web frontend.
   "name": "highsat",
   "roads": {
     "motorway": { "fill": "#00E5FF", "width": 6.0, "casing_width": 8.0,
-                  "casing_light": "#007785", "casing_dark": "#000000",
+                  "casing": "#bcbcbc",
                   "dash": null, "opacity": 1.0 },
     "primary":  { "fill": "#FF9100", "width": 4.5, "casing_width": 6.5,
-                  "casing_light": "#A86000", "casing_dark": "#000000",
+                  "casing": "#bcbcbc",
                   "dash": null, "opacity": 1.0 }
   }
 }
