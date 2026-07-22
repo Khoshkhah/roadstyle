@@ -102,6 +102,46 @@ render_edges(edges, color_table=colors).save("by_edge.html")
 render_edges(edges, color_by="color", colors="self").save("by_edge.html")
 ```
 
+### Add extra layers (zones, POIs, any geometry)
+
+Bring your own layers with `Overlay` — each one gets its own colour, a click popup, a spot in the
+in-map **Layers** toggle, and a place **under** the roads (e.g. zone fills) or **over** them
+(e.g. POIs). Geometry kind (fill / line / circle) is auto-detected:
+
+```python
+from roadstyle import Overlay
+
+render_edges(
+    edges, basemap="dark_matter",
+    overlays=[
+        Overlay(zones, placement="under", color="#2d6cdf", opacity=0.25,
+                label="Traffic zones", popup=["taz_id", "population"]),
+        Overlay(sensors, placement="over", color="#ffd166", radius=6,
+                label="Sensors", popup=["sensor_id", "status"]),
+    ],
+).save("with_layers.html")
+```
+
+### Several colour layers on one map (client-side switch)
+
+`color_options` bakes **multiple fill sets** into a single map and adds a *Colour by* dropdown —
+the viewer recolours every road (bridge decks included) instantly, with no re-render and no
+server. A neutral base palette (`mono`) lets the data ramps stand out:
+
+```python
+render_edges(
+    edges, palette="mono",
+    color_options={
+        "Road class": {},                                    # the class colours
+        "Traffic":    {"color_by": "aadt", "cmap": "viridis"},
+        "Speed":      {"color_by": "maxspeed_kmh", "cmap": "magma"},
+    },
+).save("switchable.html")
+```
+
+Each option carries its own legend; `window.rsSetColorField("Traffic")` drives the same switch
+from your own UI.
+
 ### Filter by a different class than you style by
 
 By default the web **road-type filter panel** lists whatever column drives styling (`highway_col`).
@@ -116,8 +156,9 @@ render_edges(edges, highway_col="highway",       # widths/casing from the OSM-hi
 
 ## Customising palettes & config (data files, no code edit)
 
-The built-in palettes and styling knobs are **data, not code** — JSON files shipped in the
-package (`roadstyle/data/palettes/*.json` and `roadstyle/data/style.json`). To change a colour or
+The built-in palettes and styling knobs are **data, not code** — one JSON file shipped in the
+package (`roadstyle/data/defaults.json`: palettes, config, selection, and the road width/draw-order
+model). To change a colour or
 a knob, edit those files, or — without touching the package — drop a `roadstyle.json` override
 that is read at import time. Override sources, lowest precedence first (later wins):
 
