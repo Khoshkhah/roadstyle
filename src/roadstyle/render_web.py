@@ -321,7 +321,7 @@ def _bridge_decks(geo, dk):
 
     feats = []
     base_m, thick = dk["base_m"], dk["thickness_m"]
-    ramp, step = max(dk["ramp_m"], 1.0), max(dk["step_m"], 1.0)
+    ramp, step = max(dk["ramp_m"], 1.0), max(dk["step_m"], 0.25)
     for i in range(n):
         if used[i]:
             continue
