@@ -337,3 +337,9 @@ def test_web_view_3d_flag():
     assert "pitch:55" in html
     flat = _style(render_edges(_edges(), backend="web").html)
     assert "terrain" not in flat and "dem" not in flat["sources"]
+
+
+def test_web_camera_toggle_control():
+    """Every map carries the 2D/3D toggle button; its target pitch comes from terrain settings."""
+    html = render_edges(_edges(), backend="web").html
+    assert "const PITCH3D = 55" in html and 'b.textContent = m.getPitch()<5 ? "3D" : "2D"' in html

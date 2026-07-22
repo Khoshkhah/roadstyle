@@ -532,6 +532,20 @@ const style = __STYLE__, BASEMAPS = __BASEMAPS__;
 const map = new maplibregl.Map({container:"map", style:style, center:__CENTER__, zoom:13,
   pitch:__PITCH__, bearing:__BEARING__, attributionControl:{compact:true}});
 map.addControl(new maplibregl.NavigationControl({visualizePitch:true}));
+// 2D/3D camera toggle: tilting hides behind right-drag otherwise. Shows the view it will
+// switch TO; 2D also squares the bearing back to north.
+const PITCH3D = __PITCH3D__;
+map.addControl({onAdd(m){
+  const d=document.createElement("div"); d.className="maplibregl-ctrl maplibregl-ctrl-group";
+  const b=document.createElement("button"); b.type="button";
+  b.style.cssText="font:700 11px/1 system-ui;letter-spacing:.03em";
+  const upd=()=>{ b.textContent = m.getPitch()<5 ? "3D" : "2D";
+                  b.title = m.getPitch()<5 ? "Tilt the view" : "Back to flat"; };
+  b.onclick=()=>{ m.getPitch()<5 ? m.easeTo({pitch:PITCH3D, duration:600})
+                                 : m.easeTo({pitch:0, bearing:0, duration:600}); };
+  m.on("pitchend", upd); m.on("pitch", upd); upd();
+  d.appendChild(b); return d;
+}, onRemove(){}});
 // base-layer switcher (swaps the raster source's tiles; the road layers stay put)
 if(BASEMAPS.length > 1){
   const sel = document.createElement("select");
@@ -1030,6 +1044,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__BASEMAPS__", json.dumps(bms))
             .replace("__FILTER__", json.dumps(flt))
             .replace("__CENTER__", json.dumps([(minx + maxx) / 2, (miny + maxy) / 2]))
+            .replace("__PITCH3D__", json.dumps(ter["pitch"]))
             .replace("__PITCH__", json.dumps(cam["pitch"]))
             .replace("__BEARING__", json.dumps(cam["bearing"]))
             .replace("__BOUNDS__", json.dumps([[minx, miny], [maxx, maxy]]))
