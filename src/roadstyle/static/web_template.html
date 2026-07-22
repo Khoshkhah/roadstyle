@@ -1,0 +1,516 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<title>__TITLE__</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<style>__MAPLIBRE_CSS__</style>
+<script>__MAPLIBRE_JS__</script>
+<style>html,body{margin:0;height:100%}#map{position:absolute;inset:0}
+.rs-zoom{position:absolute;bottom:10px;left:140px;z-index:2;background:rgba(255,255,255,.85);
+  padding:2px 6px;border-radius:4px;font:11px/1.5 monospace;color:#333;pointer-events:none}
+.bm-ctrl{position:absolute;top:10px;left:10px;z-index:2;background:#fff;border-radius:5px;
+box-shadow:0 1px 4px rgba(0,0,0,.3);padding:4px 7px;font:13px system-ui,sans-serif}
+.bm-ctrl select{font:inherit;border:0;background:transparent;cursor:pointer;outline:none}
+.flt-ctrl{position:absolute;top:48px;left:10px;z-index:2;background:#fff;border-radius:5px;
+box-shadow:0 1px 4px rgba(0,0,0,.3);font:13px system-ui,sans-serif;max-height:70%;overflow:auto}
+.flt-ctrl .flt-hd{padding:5px 9px;cursor:pointer;font-weight:600;user-select:none}
+.flt-ctrl .flt-body{padding:0 9px 7px;display:flex;flex-direction:column;gap:2px}
+.flt-sw{display:inline-block;width:16px;height:5px;border-radius:2px;margin:0 2px 0 5px;
+  vertical-align:middle;border:1px solid rgba(0,0,0,.25)}
+.flt-ctrl.collapsed .flt-body{display:none}
+.flt-ctrl label{cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px}
+.rs-info{position:absolute;right:10px;bottom:40px;z-index:2;background:#fff;border-radius:5px;
+  box-shadow:0 1px 5px rgba(0,0,0,.3);width:240px;max-height:55vh;overflow:auto;
+  font:12px/1.55 sans-serif;display:none}
+.rs-info-hd{font-weight:700;padding:7px 10px;border-bottom:1px solid #eee;
+  display:flex;justify-content:space-between;align-items:center}
+.rs-info-x{cursor:pointer;color:#888;font:700 14px/1 sans-serif;padding:0 2px}
+.rs-info-bd{padding:7px 10px}
+.co-ctrl{position:absolute;top:10px;right:10px;z-index:2;background:#fff;border-radius:5px;
+box-shadow:0 1px 4px rgba(0,0,0,.3);padding:4px 7px;font:13px system-ui,sans-serif;color:#555}
+.co-ctrl select{font:inherit;border:0;background:transparent;cursor:pointer;outline:none;color:#111}
+.co-lg{position:absolute;left:10px;bottom:24px;z-index:2;background:rgba(255,255,255,.94);
+border-radius:5px;box-shadow:0 1px 4px rgba(0,0,0,.3);padding:6px 9px;font:12px system-ui,sans-serif;color:#222}
+.co-lg .lg-title{font-weight:600;margin-bottom:4px}
+.co-lg .lg-row{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.co-lg .lg-sw{width:14px;height:8px;border-radius:2px;display:inline-block}
+.co-lg .lg-bar{height:10px;width:150px;border-radius:3px;margin:2px 0}
+.co-lg .lg-ends{display:flex;justify-content:space-between;color:#555}
+.ov-ctrl{position:absolute;bottom:24px;right:10px;z-index:2;background:#fff;border-radius:5px;
+box-shadow:0 1px 4px rgba(0,0,0,.3);font:13px system-ui,sans-serif;color:#222}
+.ov-ctrl .ov-hd{padding:5px 9px;font-weight:600}
+.ov-ctrl .ov-body{padding:0 9px 7px;display:flex;flex-direction:column;gap:2px}
+.ov-ctrl label{display:flex;align-items:center;gap:5px;white-space:nowrap;cursor:pointer}
+.ov-ctrl .ov-sw{width:12px;height:12px;border-radius:3px;display:inline-block;flex:none}
+</style></head><body>
+<div id="map"></div><script>
+const style = __STYLE__, BASEMAPS = __BASEMAPS__;
+const RS_DECK_LAYERS = style.layers.filter(l=>l.id.indexOf("roads-bridge-decks")===0).map(l=>l.id);
+const map = new maplibregl.Map({container:"map", style:style, center:__CENTER__, zoom:13,
+  pitch:__PITCH__, bearing:__BEARING__, maxPitch:__MAX_PITCH__,
+  attributionControl:{compact:true}});
+map.addControl(new maplibregl.NavigationControl({visualizePitch:true}));
+map.addControl(new maplibregl.ScaleControl({maxWidth:120, unit:"metric"}), "bottom-left");
+// zoom read-out next to the scale bar
+{ const zd=document.createElement("div"); zd.className="rs-zoom";
+  const uz=()=>{ zd.textContent="z "+map.getZoom().toFixed(1); };
+  map.on("zoom",uz); uz(); document.body.appendChild(zd); }
+// 2D/3D camera: window.rsSetView3D(on) tilts to the configured camera.pitch_3d (2D also
+// squares the bearing back to north); the toggle button is UI over it and follows any pitch
+// change — its label shows the view it will switch TO.
+const PITCH3D = __PITCH3D__;
+function rsSetView3D(on){
+  on ? map.easeTo({pitch:PITCH3D, duration:600}) : map.easeTo({pitch:0, bearing:0, duration:600});
+  document.dispatchEvent(new CustomEvent("rs:viewchange",{detail:{view3d:!!on}}));
+}
+window.rsSetView3D = rsSetView3D;
+map.addControl({onAdd(m){
+  const d=document.createElement("div"); d.className="maplibregl-ctrl maplibregl-ctrl-group";
+  const b=document.createElement("button"); b.type="button";
+  b.style.cssText="font:700 11px/1 system-ui;letter-spacing:.03em";
+  const upd=()=>{ b.textContent = m.getPitch()<5 ? "3D" : "2D";
+                  b.title = m.getPitch()<5 ? "Tilt the view" : "Back to flat"; };
+  b.onclick=()=>{ rsSetView3D(m.getPitch()<5); };
+  m.on("pitchend", upd); m.on("pitch", upd); upd();
+  d.appendChild(b); return d;
+}, onRemove(){}});
+// base-layer switching: window.rsSetBasemap(key|index) is the API (swaps the raster source's
+// tiles; the road layers stay put); the dropdown is just UI over it and stays in sync.
+// A tile-less entry (blank) hides the raster layer and shows the plain background colour.
+const BM_SWITCHER = __BM_SWITCHER__;
+function rsSetBasemap(keyOrIdx){
+  const idx = typeof keyOrIdx==="number" ? keyOrIdx
+    : BASEMAPS.findIndex(b=>b.key===keyOrIdx || b.label===keyOrIdx);
+  const b = BASEMAPS[idx]; if(!b) return;
+  const s = map.getSource("bm");
+  if(b.tiles.length && s) s.setTiles(b.tiles);
+  if(map.getLayer("basemap")) map.setLayoutProperty("basemap","visibility", b.tiles.length ? "visible" : "none");
+  map.setPaintProperty("bg","background-color", b.bg);
+  const sel = document.querySelector(".bm-ctrl select"); if(sel) sel.value = String(idx);
+  document.dispatchEvent(new CustomEvent("rs:basemapchange",{detail:{basemap:b.key, index:idx}}));
+}
+window.rsSetBasemap = rsSetBasemap;
+window.RS_BASEMAPS = BASEMAPS;
+if(BM_SWITCHER && BASEMAPS.length > 1){
+  const sel = document.createElement("select");
+  BASEMAPS.forEach((b,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=b.label; sel.appendChild(o); });
+  sel.onchange = ()=> rsSetBasemap(parseInt(sel.value,10));
+  const w=document.createElement("div"); w.className="bm-ctrl"; w.appendChild(sel); document.body.appendChild(w);
+}
+// road-class filtering: window.rsSetClasses([...]) shows exactly those classes and hides the
+// rest across every road layer; the collapsible checkbox panel is just UI over it. The class
+// filter composes (AND) with the id filter from rsFilter below.
+const FILTER = __FILTER__;
+const _fltCbs={}, _fltBase={};
+let _fltVis=null;   // Set of visible classes; null = all
+let _qIds=null;     // id-set filter from rsFilter; null = off
+const _fltLayers=()=>map.getStyle().layers.filter(l=>l.id.indexOf("roads")===0);
+map.on("load",()=>{ _fltLayers().forEach(l=>{ if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null; }); });
+function _applyRoadFilters(){
+  const hidden = _fltVis===null ? [] : FILTER.classes.filter(c=>!_fltVis.has(c));
+  _fltLayers().forEach(l=>{
+    if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null;
+    let f=_fltBase[l.id];
+    if(hidden.length){ const cf=["!",["in",["get",FILTER.col],["literal",hidden]]]; f=f?["all",f,cf]:cf; }
+    // ids exist only in the roads source — slots (labels/arrows) and decks (3D ribbons) have
+    // their own id spaces, so those layers take just the class filter
+    if(_qIds && l.source==="roads"){ const qf=["in",["id"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
+    try{ map.setFilter(l.id,f); }catch(e){}
+  });
+  return hidden;
+}
+function rsSetClasses(visible){
+  _fltVis=new Set(visible);
+  const hidden=_applyRoadFilters();
+  FILTER.classes.forEach(c=>{ if(_fltCbs[c]) _fltCbs[c].checked=_fltVis.has(c); });
+  document.dispatchEvent(new CustomEvent("rs:filterchange",
+    {detail:{visible:FILTER.classes.filter(c=>_fltVis.has(c)), hidden:hidden}}));
+}
+window.rsSetClasses = rsSetClasses;
+window.RS_CLASSES = FILTER.classes;
+// id-set queries: the baked features are a queryable table. rsQuery(p => …) returns the ids of
+// the matching edges (generateId: a feature's id is its index in the source array); the verbs
+// below act on any id set — filter to it, read it back as rows, or highlight it.
+// every verb takes an optional `layer` argument: omitted -> the roads; an overlay's label (or
+// index) -> that overlay's features. Overlay sources use generateId too, so the same id-set
+// model applies — but each layer is its OWN id space: never mix ids across layers.
+function _sfeats(src){ const s=map.getSource(src); return (s && s._data && s._data.features)||[]; }
+function _feats(){ return _sfeats("roads"); }
+function _lyr(name){   // -> {src, ov} | null; ov null = the roads
+  if(name==null) return {src:"roads", ov:null};
+  const i = typeof name==="number" ? name : OVERLAYS.findIndex(o=>o.label===name);
+  return OVERLAYS[i] ? {src:OVERLAYS[i].source, ov:OVERLAYS[i]} : null;
+}
+function rsQuery(test, layer){
+  const L=_lyr(layer); if(!L) return [];
+  const out=[]; _sfeats(L.src).forEach((f,i)=>{ try{ if(test(f.properties||{})) out.push(i); }catch(e){} });
+  return out;
+}
+function rsFilter(ids, layer){   // show only these features; rsFilter(null) resets
+  const L=_lyr(layer); if(!L) return;
+  if(L.ov){
+    const f = ids==null ? null : ["in",["id"],["literal",Array.from(ids)]];
+    L.ov.layers.forEach(id=>{ if(map.getLayer(id)) try{ map.setFilter(id,f); }catch(e){} });
+    document.dispatchEvent(new CustomEvent("rs:filterchange",
+      {detail:{overlay:L.ov.label, ids:ids==null?null:Array.from(ids)}}));
+    return;
+  }
+  _qIds = ids==null ? null : Array.from(ids);
+  _applyRoadFilters();
+  document.dispatchEvent(new CustomEvent("rs:filterchange",{detail:{ids:_qIds}}));
+}
+function rsGetProps(ids, layer){ // the rows behind an id set (internals stripped) — table-ready
+  const L=_lyr(layer); if(!L) return [];
+  const fs=_sfeats(L.src);
+  return Array.from(ids||[]).map(i=>{ const p=(fs[i]&&fs[i].properties)||{}; const r={};
+    for(const k in p){ if(k[0]!=="_" && k!=="twoway" && k!=="lvl") r[k]=p[k]; }
+    return r; });
+}
+// bridges in 3D are deck ribbons on their own source: this maps a road id to the deck slices
+// of its whole chain (via the baked __rs_edges), so selection/highlight glows on the deck
+// instead of the flat ground-level line
+function _deckIdsForRoad(i){
+  const s=map.getSource("decks"), fs=(s && s._data && s._data.features)||[];
+  const out=[], key=","+i+",";
+  fs.forEach((f,k)=>{ const e=f.properties && f.properties.__rs_edges;
+    if(e!=null && (","+e+",").indexOf(key)>=0) out.push(k); });
+  return out;
+}
+let _qHl=[], _qHlD=[];
+const _qHlOv={};   // per-overlay highlighted ids
+function rsHighlight(ids, layer){ // selection glow on an id set; rsHighlight([]) clears
+  const L=_lyr(layer); if(!L) return;
+  if(L.ov){
+    (_qHlOv[L.ov.label]||[]).forEach(i=>map.setFeatureState({source:L.src,id:i},{select:false}));
+    const cur = ids==null ? [] : Array.from(ids);
+    _qHlOv[L.ov.label]=cur;
+    cur.forEach(i=>map.setFeatureState({source:L.src,id:i},{select:true}));
+    document.dispatchEvent(new CustomEvent("rs:highlightchange",
+      {detail:{overlay:L.ov.label, ids:cur.slice()}}));
+    return;
+  }
+  _qHl.forEach(i=>map.setFeatureState({source:"roads",id:i},{select:false}));
+  _qHlD.forEach(i=>map.setFeatureState({source:"decks",id:i},{select:false}));
+  _qHl = ids==null ? [] : Array.from(ids);
+  const fs=_feats(), dset=new Set();
+  _qHl.forEach(i=>{ map.setFeatureState({source:"roads",id:i},{select:true});
+    const p=fs[i] && fs[i].properties;
+    if(p && p.lvl>0) _deckIdsForRoad(i).forEach(d=>dset.add(d)); });
+  _qHlD = Array.from(dset);
+  _qHlD.forEach(i=>map.setFeatureState({source:"decks",id:i},{select:true}));
+  document.dispatchEvent(new CustomEvent("rs:highlightchange",{detail:{ids:_qHl.slice()}}));
+}
+function _bbExtend(c, bb){  // walk any GeoJSON coordinates nesting (Point .. MultiPolygon)
+  if(typeof c[0]==="number"){ bb.ok=true;
+    if(c[0]<bb.minx)bb.minx=c[0]; if(c[0]>bb.maxx)bb.maxx=c[0];
+    if(c[1]<bb.miny)bb.miny=c[1]; if(c[1]>bb.maxy)bb.maxy=c[1]; }
+  else c.forEach(x=>_bbExtend(x, bb));
+}
+function rsFocus(ids, opt, layer){ // fly the camera to an id (or id set); opt -> fitBounds
+  const L=_lyr(layer); if(!L) return;
+  const fs=_sfeats(L.src), bb={ok:false, minx:1/0, miny:1/0, maxx:-1/0, maxy:-1/0};
+  (Array.isArray(ids)?ids:[ids]).forEach(i=>{
+    const g=fs[i] && fs[i].geometry;
+    if(g && g.coordinates) _bbExtend(g.coordinates, bb);
+  });
+  if(bb.ok) map.fitBounds([[bb.minx,bb.miny],[bb.maxx,bb.maxy]],
+    {padding:80, maxZoom:17, duration:700, ...(opt||{})});
+}
+window.rsQuery = rsQuery; window.rsFilter = rsFilter;
+window.rsGetProps = rsGetProps; window.rsHighlight = rsHighlight;
+window.rsFocus = rsFocus;
+if(FILTER.on){
+  const box=document.createElement("div"); box.className="flt-ctrl";
+  const hd=document.createElement("div"); hd.className="flt-hd"; hd.textContent="Roads ▾";
+  const body=document.createElement("div"); body.className="flt-body";
+  hd.onclick=()=>{ const c=box.classList.toggle("collapsed"); hd.textContent="Roads "+(c?"▸":"▾"); };
+  box.appendChild(hd); box.appendChild(body);
+  FILTER.classes.forEach(c=>{
+    const lab=document.createElement("label");
+    const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=true;
+    cb.onchange=()=> rsSetClasses(FILTER.classes.filter(k=>_fltCbs[k].checked));
+    _fltCbs[c]=cb; lab.appendChild(cb);
+    const sw=document.createElement("span"); sw.className="flt-sw";
+    sw.style.background=(FILTER.swatches||{})[c]||"#888"; lab.appendChild(sw);
+    lab.appendChild(document.createTextNode(" "+c)); body.appendChild(lab);
+  });
+  document.body.appendChild(box);
+}
+// "colour by" recolouring: swap which baked fill prop the road layers read (no re-render). Each
+// option's fill is baked per edge (__rs_fill / __rs_fill__1 …); setPaintProperty repoints the
+// road-fill layers' line-color at the chosen prop. window.rsSetColorField drives it from your UI.
+const COLOR_OPTIONS = __COLOR_OPTIONS__;
+const RS_FILL_LAYERS = ["roads-fill","roads-tunnel-fill","roads-bridge-fill"];
+let _coActive = __CO_ACTIVE__, _coLegendEl = null;
+function coLegendHtml(lg){
+  if(!lg) return "";
+  let h = lg.title ? '<div class="lg-title">'+lg.title+'</div>' : "";
+  if(lg.kind==="categorical"){ (lg.entries||[]).forEach(e=>{
+    h+='<div class="lg-row"><span class="lg-sw" style="background:'+e[1]+'"></span>'+e[0]+'</div>'; }); }
+  else if(lg.kind==="continuous"){
+    h+='<div class="lg-bar" style="background:linear-gradient(90deg,'+(lg.ramp||[]).join(",")+')"></div>'
+      +'<div class="lg-ends"><span>'+lg.vmin+'</span><span>'+lg.vmax+'</span></div>'; }
+  return h;
+}
+function coUpdateLegend(){
+  if(!_coLegendEl) return;
+  const h = coLegendHtml((COLOR_OPTIONS[_coActive]||{}).legend);
+  _coLegendEl.innerHTML = h; _coLegendEl.style.display = h ? "" : "none";
+}
+let _qColor=null;   // {ids, color} recolour of an id set, layered over the active option
+function _fillExpr(){
+  const prop=(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill";
+  let e=["coalesce",["get",prop],"#888888"];
+  if(_qColor) e=["case",["in",["id"],["literal",_qColor.ids]],_qColor.color,e];
+  return e;
+}
+function _applyFill(){
+  const e=_fillExpr();
+  RS_FILL_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"line-color",e); });
+  // decks keep the base colour: their slice ids are a different id space than the road edges
+  RS_DECK_LAYERS.forEach(id=>{
+    if(map.getLayer(id))
+      map.setPaintProperty(id,"fill-extrusion-color",
+        ["case",["boolean",["feature-state","select"],false],__SELECT_COLOR__,
+         ["boolean",["feature-state","hover"],false],__HOVER_COLOR__,
+         ["coalesce",["get",(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill"],"#888888"]]); });
+}
+function rsSetColorField(nameOrIdx){
+  let idx = typeof nameOrIdx==="number" ? nameOrIdx : COLOR_OPTIONS.map(o=>o.name).indexOf(nameOrIdx);
+  const o = COLOR_OPTIONS[idx]; if(!o) return;
+  _coActive = idx;
+  _applyFill();
+  const sel=document.getElementById("co-select"); if(sel) sel.value=String(idx);
+  coUpdateLegend();
+  document.dispatchEvent(new CustomEvent("rs:colorchange",{detail:{option:o,index:idx}}));
+}
+const _ovBaseC={};   // overlay layer id -> its original colour paint (captured on first rsColor)
+function rsColor(ids, color, layer){   // paint an id set one colour; rsColor(null) resets
+  const L=_lyr(layer); if(!L) return;
+  if(L.ov){
+    L.ov.layers.forEach(id=>{ const l=map.getLayer(id); if(!l) return;
+      const pn=l.type+"-color";                      // circle-/line-/fill-color by layer type
+      if(!(id in _ovBaseC)) _ovBaseC[id]=map.getPaintProperty(id,pn);
+      let e=_ovBaseC[id];
+      if(ids!=null && color) e=["case",["in",["id"],["literal",Array.from(ids)]],color,e];
+      map.setPaintProperty(id,pn,e); });
+    document.dispatchEvent(new CustomEvent("rs:colorchange",
+      {detail:{overlay:L.ov.label, ids:ids==null?null:Array.from(ids), color:color||null}}));
+    return;
+  }
+  _qColor = (ids==null || !color) ? null : {ids:Array.from(ids), color:color};
+  _applyFill();
+  document.dispatchEvent(new CustomEvent("rs:colorchange",
+    {detail:{ids:_qColor && _qColor.ids, color:_qColor && _qColor.color}}));
+}
+window.rsSetColorField = rsSetColorField;
+window.rsColor = rsColor;
+window.RS_COLOR_OPTIONS = COLOR_OPTIONS;
+if(COLOR_OPTIONS.length > 1){
+  const w=document.createElement("div"); w.className="co-ctrl";
+  w.appendChild(document.createTextNode("Colour by "));
+  const sel=document.createElement("select"); sel.id="co-select";
+  COLOR_OPTIONS.forEach((o,i)=>{ const op=document.createElement("option");
+    op.value=i; op.textContent=o.name; sel.appendChild(op); });
+  sel.onchange=()=> rsSetColorField(parseInt(sel.value,10));
+  w.appendChild(sel); document.body.appendChild(w);
+}
+if(_coActive){ const _ap=()=>rsSetColorField(_coActive);   // display the requested option on load
+  if(map.isStyleLoaded && map.isStyleLoaded()) _ap(); else map.on("load", _ap); }
+if(COLOR_OPTIONS.some(o=>o.legend)){
+  _coLegendEl=document.createElement("div"); _coLegendEl.className="co-lg";
+  document.body.appendChild(_coLegendEl); coUpdateLegend();
+}
+// extra overlay layers (zones / POIs / lines): click an interactive overlay -> popup of its
+// fields; a Layers control toggles each overlay's visibility. Road clicks take precedence (an
+// overlay is only consulted when the click misses every road).
+const OVERLAYS = __OVERLAYS__;
+let _ovSel=null, _ovHov=null;                              // {source,id} of the selected / hovered overlay feature
+function _ovState(ref, st){ if(ref) map.setFeatureState({source:ref.source, id:ref.id}, st); }
+function clearOvSel(){ _ovState(_ovSel,{select:false}); _ovSel=null; }
+function handleOverlayClick(e){                            // info popup only on SELECT (click), not hover
+  for(const ov of OVERLAYS){
+    if(!ov.interactive) continue;
+    const ids = ov.layers.filter(id=>map.getLayer(id));
+    const hits = ids.length ? map.queryRenderedFeatures(e.point, {layers:ids}) : [];
+    if(hits.length){
+      const f = hits[0], p = f.properties||{};
+      _ovState(_ovSel,{select:false}); _ovSel={source:ov.source, id:f.id}; _ovState(_ovSel,{select:true});
+      const fields = ov.popup && ov.popup.length ? ov.popup : Object.keys(p);
+      const rows = fields.filter(k=>p[k]!=null && p[k]!=="").map(k=>"<b>"+k+"</b>: "+p[k]);
+      new maplibregl.Popup({closeButton:true,maxWidth:"260px"})
+        .setLngLat(e.lngLat).setHTML(rows.join("<br>")||"(no data)").addTo(map)
+        .on("close", clearOvSel);
+      return true;
+    }
+  }
+  return false;
+}
+OVERLAYS.forEach(ov=>{ if(!ov.interactive) return; ov.layers.forEach(id=>{
+  map.on("mousemove", id, e=>{ map.getCanvas().style.cursor="pointer";   // hover -> recolour (no popup)
+    const f = e.features && e.features[0]; if(!f) return;
+    if(_ovHov && !(_ovHov.source===ov.source && _ovHov.id===f.id)) _ovState(_ovHov,{hover:false});
+    _ovHov={source:ov.source, id:f.id}; _ovState(_ovHov,{hover:true}); });
+  map.on("mouseleave", id, ()=>{ map.getCanvas().style.cursor="";
+    _ovState(_ovHov,{hover:false}); _ovHov=null; });
+}); });
+// window.rsSetOverlay(label, on) shows/hides one overlay; the Layers control is UI over it.
+const _ovCbs={};
+function rsSetOverlay(labelOrIdx, on){
+  const i = typeof labelOrIdx==="number" ? labelOrIdx : OVERLAYS.findIndex(o=>o.label===labelOrIdx);
+  const ov = OVERLAYS[i]; if(!ov) return;
+  ov.layers.forEach(id=>{ if(map.getLayer(id))
+    map.setLayoutProperty(id,"visibility", on?"visible":"none"); });
+  ov.visible = !!on;
+  if(_ovCbs[ov.label]) _ovCbs[ov.label].checked = !!on;
+  document.dispatchEvent(new CustomEvent("rs:overlaychange",{detail:{overlay:ov.label, visible:!!on}}));
+}
+window.rsSetOverlay = rsSetOverlay;
+window.RS_OVERLAYS = OVERLAYS;
+if(OVERLAYS.length){
+  const box=document.createElement("div"); box.className="ov-ctrl";
+  const hd=document.createElement("div"); hd.className="ov-hd"; hd.textContent="Layers";
+  const body=document.createElement("div"); body.className="ov-body"; box.appendChild(hd); box.appendChild(body);
+  OVERLAYS.forEach(ov=>{
+    const lab=document.createElement("label");
+    const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=ov.visible!==false;
+    cb.onchange=()=> rsSetOverlay(ov.label, cb.checked);
+    _ovCbs[ov.label]=cb; lab.appendChild(cb);
+    if(ov.color){ const sw=document.createElement("span"); sw.className="ov-sw";
+      sw.style.background=ov.color; lab.appendChild(sw); }
+    lab.appendChild(document.createTextNode(" "+ov.label)); body.appendChild(lab);
+  });
+  document.body.appendChild(box);
+}
+// oneway direction-arrow icon (openstreetmap-carto)
+function addArrow(){
+  if(map.hasImage("oneway")) return;
+  const svg='<svg xmlns="http://www.w3.org/2000/svg" width="24" height="10" viewBox="0 0 12 5">'
+    +'<path d="M 0,2 7,2 7,0 12,2.5 7,5 7,3 0,3 z" fill="__ARROW_COLOR__"/></svg>';
+  const img=new Image(24,10);
+  img.onload=()=>{ if(!map.hasImage("oneway")) map.addImage("oneway",img,{pixelRatio:2}); };
+  img.src="data:image/svg+xml;base64,"+btoa(svg);
+}
+map.on("load", addArrow);
+// Self-diagnosis: a map with zero road features is a broken page, not an empty area — say WHY
+// on the map itself (frontends like notebook webviews surface no console). Amber banner reports
+// the inflate state so a screenshot alone pinpoints the failing stage.
+map.on("load", function(){ setTimeout(function(){
+  try{
+    var src = map.getSource("roads");
+    var n = (src && src._data && src._data.features) ? src._data.features.length : 0;
+    if(n) return;
+    var gz = window.__rs_gz ? JSON.stringify(window.__rs_gz) : "inflate script did not run";
+    document.body.insertAdjacentHTML("afterbegin",
+      '<div style="position:fixed;z-index:9999;top:0;left:0;right:0;padding:8px 12px;'+
+      'background:#b45309;color:#fff;font:12px monospace">roadstyle: 0 road features — '+gz+
+      ' | DecompressionStream: '+(typeof DecompressionStream)+'</div>');
+  }catch(e){}
+}, 2500); });
+map.on("styleimagemissing", e=>{ if(e.id==="oneway") addArrow(); });
+// hover + click-to-select + info popup (feature-state, tolerance box, throttled to one query/frame)
+const HIT = 4;
+function box(p){ return [[p.x-HIT,p.y-HIT],[p.x+HIT,p.y+HIT]]; }
+// query only layers that EXIST: the 3D view swaps roads-bridge-fill for the deck extrusions,
+// and MapLibre errors out (killing hover+click) when asked to query a missing layer id.
+const PICK_LAYERS = style.layers.map(l=>l.id)
+  .filter(id=>/^roads-(tunnel-|bridge-)?fill/.test(id)).concat(RS_DECK_LAYERS);
+function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id));
+  const l = ids.length ? map.queryRenderedFeatures(box(p), {layers:ids}) : [];
+  return l.length ? l[0] : null; }
+function srcOf(f){ return f && f.layer && f.layer.id.indexOf("roads-bridge-decks")===0 ? "decks" : "roads"; }
+function hitOf(f){ if(!f || f.id==null) return null;
+  if(srcOf(f)==="decks"){ const e=f.properties && f.properties.__rs_edges;
+    if(e==null) return null;                                   // casing slab: not a road
+    return {s:"decks", key:"e"+e, ids:_deckIdsForRoad(+e)}; }  // one directed edge = one hover
+  return {s:"roads", key:"r"+f.id, ids:[f.id]}; }
+function setS(h, st){ if(h) h.ids.forEach(id=>map.setFeatureState({source:h.s, id:id}, st)); }
+let _hov=null, _pt=null, _raf=0;
+function _rfields(p, only){ const r=[];
+  if(p.name!=null && (""+p.name)!=="" && (""+p.name).toLowerCase()!=="nan") r.push("<b>"+p.name+"</b>");  // name on top, bold, no label
+  const ks = (only && only.length) ? only : Object.keys(p);
+  for(const k of ks){ if(k[0]==="_"||k==="twoway"||k==="lvl"||k==="name") continue;  // lvl/twoway are roadstyle-injected internals
+    var v=p[k]; if(v==null) continue; var s=""+v, sl=s.toLowerCase();
+    if(s===""||sl==="nan"||sl==="none") continue;
+    if((k==="bridge"||k==="tunnel") && (sl==="no"||sl==="0"||sl==="false")) continue;  // bridge/tunnel only when it IS one
+    r.push(k+": "+s); } return r.join("<br>"); }
+const _popupFields = __ROAD_POPUP_FIELDS__;   // curated field list, or null => all columns
+const _popupMode = __ROAD_POPUP_MODE__;       // "popup" (floating) or "panel" (docked read-out)
+let _info=null;
+function rsInfoClear(){ if(_info) _info.style.display="none"; }
+function rsInfoShow(html){
+  if(!_info){ _info=document.createElement("div"); _info.className="rs-info";
+    document.body.appendChild(_info); }
+  _info.innerHTML='<div class="rs-info-hd"><span>Selected road</span>'+
+    '<span class="rs-info-x" title="Clear selection">×</span></div>'+
+    '<div class="rs-info-bd">'+html+'</div>';
+  _info.style.display="block";
+  _info.querySelector(".rs-info-x").onclick=()=>{ rsDeselect(); };
+}
+function rsDeselect(){
+  if(_sel){ setS(_sel,{select:false});
+    if(_sel.road!=null) map.setFeatureState({source:"roads", id:_sel.road},{select:false});
+    _sel=null; }
+  rsInfoClear();
+  document.dispatchEvent(new CustomEvent("rs:deselect"));
+}
+window.rsDeselect = rsDeselect;
+// programmatic selection by id (same id space as rsQuery / rs:select): highlight + popup/panel
+// + rs:select, exactly like a click. The floating popup anchors at the edge's midpoint.
+function _midOf(g){ if(!g) return null;
+  const cs = g.type==="LineString" ? g.coordinates :
+             g.type==="MultiLineString" ? g.coordinates[0] : null;
+  return cs && cs.length ? cs[Math.floor(cs.length/2)] : null; }
+function rsSelect(id){
+  const f=_feats()[id]; if(!f) return;
+  clearOvSel();
+  if(_sel) setS(_sel,{select:false});
+  // a bridge: glow the deck chain (shown above flat_below) AND the flat line (shown below it)
+  const dids = (f.properties && f.properties.lvl>0) ? _deckIdsForRoad(id) : [];
+  _sel = dids.length ? {s:"decks", key:"e"+id, ids:dids, road:id}
+                     : {s:"roads", key:"r"+id, ids:[id]};
+  setS(_sel,{select:true});
+  if(_sel.road!=null) map.setFeatureState({source:"roads", id:_sel.road},{select:true});
+  document.dispatchEvent(new CustomEvent("rs:select",
+    {detail:{id:id, layer:null, properties:f.properties || {}}}));
+  if(__ROAD_POPUP__){
+    const html=_rfields(f.properties||{}, _popupFields);
+    if(_popupMode === "panel"){ rsInfoShow(html); }
+    else{ const c=_midOf(f.geometry);
+      if(c) new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
+        .setLngLat(c).setHTML(html).addTo(map); }
+  }
+}
+window.rsSelect = rsSelect;
+const _ttip = __ROAD_TOOLTIP__, _ttipOnly = Array.isArray(_ttip) ? _ttip : null;  // false | true | [fields]
+const _tip = _ttip ? new maplibregl.Popup(
+  {closeButton:false, closeOnClick:false, maxWidth:"260px", offset:10, className:"rs-tip"}) : null;
+function hoverFrame(){ _raf=0; if(!_pt) return;
+  const f = pick(_pt); map.getCanvas().style.cursor = f ? "pointer" : "";
+  const h = hitOf(f);
+  if((h && h.key) !== (_hov && _hov.key)){
+    setS(_hov,{hover:false}); _hov=h; setS(_hov,{hover:true}); }
+  if(_tip){ if(f){ _tip.setLngLat(map.unproject(_pt)).setHTML(_rfields(f.properties||{}, _ttipOnly));
+      if(!_tip.isOpen()) _tip.addTo(map); } else if(_tip.isOpen()) _tip.remove(); }
+}
+map.on("mousemove", e=>{ _pt=e.point; if(!_raf) _raf=requestAnimationFrame(hoverFrame); });
+map.on("mouseout", ()=>{ _pt=null; if(_raf){cancelAnimationFrame(_raf);_raf=0;} setS(_hov,{hover:false}); _hov=null; if(_tip) _tip.remove(); });
+let _sel=null;
+map.on("click", e=>{
+  if(handleOverlayClick(e)){ rsDeselect(); return; }  // visible "over" overlay (front) wins
+  const f = pick(e.point);
+  if(!f){ rsDeselect(); return; }                     // click empty -> deselect (restore colour)
+  clearOvSel();
+  if(_sel) setS(_sel,{select:false});
+  _sel = hitOf(f); setS(_sel,{select:true});
+  // structured click-data for host pages / dashboards (fires in every popup mode, incl. False)
+  document.dispatchEvent(new CustomEvent("rs:select",
+    {detail:{id:f.id, layer:f.layer && f.layer.id, properties:f.properties || {}}}));
+  if(__ROAD_POPUP__){
+    if(_popupMode === "panel"){ rsInfoShow(_rfields(f.properties||{}, _popupFields)); }
+    else new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
+      .setLngLat(e.lngLat).setHTML(_rfields(f.properties||{}, _popupFields)).addTo(map);
+  }
+});
+map.on("load", ()=>{ try{ map.fitBounds(__BOUNDS__,
+  {padding:30, duration:0, pitch:__PITCH__, bearing:__BEARING__}); }catch(e){} });
+window.map = map;
+</script></body></html>

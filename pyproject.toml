@@ -56,7 +56,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 roadstyle = [
-    "py.typed", "static/*.js", "static/*.css", "vendor/*.js", "vendor/*.css",
+    "py.typed", "static/*.js", "static/*.css", "static/*.html", "vendor/*.js", "vendor/*.css",
     "data/*.json", "data/palettes/*.json",   # bundled palettes + style config (see _settings.py)
 ]
 
