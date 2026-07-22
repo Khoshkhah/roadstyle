@@ -686,6 +686,8 @@ _HTML = """<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <style>__MAPLIBRE_CSS__</style>
 <script>__MAPLIBRE_JS__</script>
 <style>html,body{margin:0;height:100%}#map{position:absolute;inset:0}
+.rs-zoom{position:absolute;bottom:10px;left:140px;z-index:2;background:rgba(255,255,255,.85);
+  padding:2px 6px;border-radius:4px;font:11px/1.5 monospace;color:#333;pointer-events:none}
 .bm-ctrl{position:absolute;top:10px;left:10px;z-index:2;background:#fff;border-radius:5px;
 box-shadow:0 1px 4px rgba(0,0,0,.3);padding:4px 7px;font:13px system-ui,sans-serif}
 .bm-ctrl select{font:inherit;border:0;background:transparent;cursor:pointer;outline:none}
@@ -728,6 +730,10 @@ const map = new maplibregl.Map({container:"map", style:style, center:__CENTER__,
   attributionControl:{compact:true}});
 map.addControl(new maplibregl.NavigationControl({visualizePitch:true}));
 map.addControl(new maplibregl.ScaleControl({maxWidth:120, unit:"metric"}), "bottom-left");
+// zoom read-out next to the scale bar
+{ const zd=document.createElement("div"); zd.className="rs-zoom";
+  const uz=()=>{ zd.textContent="z "+map.getZoom().toFixed(1); };
+  map.on("zoom",uz); uz(); document.body.appendChild(zd); }
 // 2D/3D camera: window.rsSetView3D(on) tilts to the configured camera.pitch_3d (2D also
 // squares the bearing back to north); the toggle button is UI over it and follows any pitch
 // change — its label shows the view it will switch TO.
@@ -1385,7 +1391,11 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                                  dk["match_zoom"] + 0.5)):
             fc = _bridge_decks(geo, {**dk, "match_zoom": mzk})
             for f in fc["features"]:
-                f["properties"]["__rs_band"] = k
+                p = f["properties"]
+                p["__rs_band"] = k
+                if k:   # micro height offset per band: coplanar tops z-fight in the crossfade
+                    p["__rs_base"] = round(p["__rs_base"] + 0.05 * k, 2)
+                    p["__rs_height"] = round(p["__rs_height"] + 0.05 * k, 2)
             _bands.extend(fc["features"])
         decks = {"type": "FeatureCollection", "features": _bands}
     else:
