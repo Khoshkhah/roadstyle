@@ -531,7 +531,7 @@ box-shadow:0 1px 4px rgba(0,0,0,.3);font:13px system-ui,sans-serif;color:#222}
 const style = __STYLE__, BASEMAPS = __BASEMAPS__;
 const map = new maplibregl.Map({container:"map", style:style, center:__CENTER__, zoom:13,
   pitch:__PITCH__, bearing:__BEARING__, attributionControl:{compact:true}});
-map.addControl(new maplibregl.NavigationControl());
+map.addControl(new maplibregl.NavigationControl({visualizePitch:true}));
 // base-layer switcher (swaps the raster source's tiles; the road layers stay put)
 if(BASEMAPS.length > 1){
   const sel = document.createElement("select");
