@@ -351,9 +351,21 @@ def _bridge_decks(geo, dk):
             except (TypeError, ValueError):
                 return 2
 
-        pieces = max(1, round(L / step))
-        for k in range(pieces):
-            d0, d1 = L * k / pieces, L * (k + 1) / pieces
+        # slice ONLY the ramp zones (where height changes); the level mid-span stays whole,
+        # split just at edge-span boundaries so per-edge colours survive
+        half_l = L / 2.0
+        cuts = {0.0, L}
+        d = step
+        while d < min(ramp, half_l):
+            cuts.add(d)
+            cuts.add(L - d)
+            d += step
+        if ramp < half_l:
+            cuts.add(ramp)
+            cuts.add(L - ramp)
+            cuts.update(b for b, _ in bounds if ramp < b < L - ramp)
+        cuts = sorted(cuts)
+        for d0, d1 in zip(cuts, cuts[1:]):
             part = substring(local, d0, d1)
             if part.geom_type != "LineString" or part.length <= 0:
                 continue
