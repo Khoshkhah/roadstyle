@@ -24,3 +24,4 @@ notebooks/outputs_guide_out/
 # OS
 .DS_Store
 screenshot/
+notebooks/sodermalm_*.html
