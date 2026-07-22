@@ -106,6 +106,28 @@ render_edges(edges, color_table=colors).save("by_edge.html")
 render_edges(edges, color_by="color", colors="self").save("by_edge.html")
 ```
 
+### Base maps & the layer selection box
+
+Every web map carries a **base-layer dropdown** (top-left) by default. You pick what it offers,
+which one starts active, and you can register your own tile source:
+
+```python
+render_edges(edges,
+             basemap="dark_matter",                                        # active
+             basemaps=["dark_matter", "positron", "voyager", "satellite"]) # the dropdown
+
+from roadstyle import Basemap, register_basemap
+register_basemap(Basemap(key="lantmateriet", label="Lantmäteriet",
+                         url="https://tiles.example.se/{z}/{x}/{y}.png",
+                         attr="© Lantmäteriet"))
+render_edges(edges, basemaps=["dark_matter", "lantmateriet"])
+```
+
+Built-ins: `voyager` (the settings default), `positron`, `dark_matter`, `osm`, `satellite`.
+Switching is purely client-side — the baked road styling never changes. Disable with
+`basemap_switcher=False` (CLI: `--no-basemap-switcher`); the box also hides itself when only one
+base map is offered.
+
 ### Add extra layers (zones, POIs, any geometry)
 
 Bring your own layers with `Overlay` — each one gets its own colour, a click popup, a spot in the
