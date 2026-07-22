@@ -1051,7 +1051,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     if mz:
         _z = _minzoom_filter(highway_col, mz)
         surface, tunnel, bridge = (["all", _z, surface], ["all", _z, tunnel], ["all", _z, bridge])
-    dk = {"base_m": 5.0, "thickness_m": 1.0, "lane_m": 3.5, **(CONFIG.bridge_decks or {})}
+    dk = {"base_m": 5.0, "thickness_m": 1.0, "lane_m": 3.5, "ramp_m": 40.0, "step_m": 2.5,
+          **(CONFIG.bridge_decks or {})}
     decks = _bridge_decks(geo, dk) if view_3d else {"features": []}
     if decks["features"]:
         style["sources"]["decks"] = {"type": "geojson", "data": decks}
