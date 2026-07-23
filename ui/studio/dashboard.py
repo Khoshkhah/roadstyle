@@ -32,6 +32,9 @@ with st.sidebar:
                         disabled=not tiles_available(),
                         help="Embedded-PMTiles tileset in the same single file — ~10⁵-edge maps "
                              "stay responsive. Needs `pip install \"roadstyle[tiles]\"`.")
+    minzoom = st.checkbox("Hide minor roads when zoomed out", value=False,
+                          help="The built-in per-class `minzoom` table — residential/service "
+                               "appear as you zoom in (thins low-zoom tiles too).")
     title = st.text_input("Title", value="Roads dashboard")
 
     st.subheader("Colour-by options")
@@ -52,6 +55,8 @@ kw = {"basemap": basemap, "view_3d": view_3d, "basemaps": bms or None,
       "road_popup": False, "name": title}
 if tiles:
     kw["tiles"] = True
+if minzoom:
+    kw["minzoom"] = True
 if overlays:
     kw["overlays"] = overlays
 

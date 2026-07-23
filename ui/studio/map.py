@@ -44,6 +44,10 @@ with st.sidebar:
     keep = st.multiselect("Road classes", classes, default=classes)
     if set(keep) != set(classes):
         kw["include"] = keep
+    if st.checkbox("Hide minor roads when zoomed out", value=False,
+                   help="The built-in per-class `minzoom` table — residential/service appear "
+                        "as you zoom in (with Vector tiles on, low-zoom tiles thin out too)."):
+        kw["minzoom"] = True
 
     st.subheader("Decorations")
     labels = st.checkbox("Street names", value=True)
