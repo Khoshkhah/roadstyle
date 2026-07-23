@@ -75,14 +75,12 @@ m = rs.render_edges(edges, backend="web", compress=True, **kw)
 # (_repr_html_, CDN MapLibre 3.x) and the download (.html, vendored) carry the sidebar
 m._tpl = m._tpl.replace("</body>", SIDEBAR + "</body>", 1)
 
+# always the CDN-v3 preview variant: vendored MapLibre v4 stalls any roads source in
+# sandboxed iframes; pmtiles' Protocol is v3-compatible so tiled previews work under v3
+st.components.v1.html(m._repr_html_(), height=660)
 if tiles:
-    # tiled pages need the vendored MapLibre v4 and can't survive _repr_html_'s srcdoc
-    # wrapping inside Streamlit's component iframe — embed the real page directly
-    st.components.v1.html(m.html, height=660)
     st.caption(f"✓ roads served from **embedded vector tiles** — {len(m.html) // 1024:,} KB "
-               "self-contained page (the download is this exact file)")
-else:
-    st.components.v1.html(m._repr_html_(), height=660)
+               "self-contained page (the download carries the same tileset)")
 
 left, right = st.columns([3, 1])
 with left:

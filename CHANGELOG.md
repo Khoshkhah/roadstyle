@@ -42,8 +42,10 @@ First PyPI release.
   cycleway / path bridges, with a solid underlay (the class's light casing colour) beneath the
   dashes — the osm-carto footbridge look. Previously a path bridge drew as bare floating
   dashes, letting whatever passed underneath show through the gaps.
-- Studio: tiled maps preview correctly (embedded directly — the srcdoc-iframe wrapper died
-  inside Streamlit's component iframe) and show an "embedded vector tiles" badge.
+- Studio: tiled maps preview correctly and show an "embedded vector tiles" badge. Vendored
+  MapLibre v4 stalls ANY roads source (GeoJSON or vector) inside sandboxed iframes, so tiled
+  previews go through the same CDN v3 slim variant as inline ones — pmtiles.js's Protocol is
+  v3-compatible. Verified in a live Streamlit session.
 
 ### Added (release engineering)
 - CI: lint + tests on Python 3.10–3.13, plus a headless-Chromium smoke test that boots a saved

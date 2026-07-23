@@ -86,17 +86,13 @@ code = (f"import roadstyle as rs\n\n{prelude}\n"
 
 wm = rs.render_edges(edges, backend="web", compress=True, **kw)
 
+# always the notebook-preview variant (CDN MapLibre 3.x): the vendored-4.x page stalls ANY
+# roads source (GeoJSON or vector tiles) inside sandboxed iframes; pmtiles' Protocol is
+# v3-compatible, so the embedded-tiles pipeline previews fine under v3
+st.components.v1.html(wm._repr_html_(), height=640)
 if kw.get("tiles"):
-    # a tiled page goes in DIRECTLY: it needs the vendored MapLibre v4 (the CDN v3 preview
-    # predates promise-style addProtocol), and _repr_html_'s srcdoc-iframe wrapping of a
-    # multi-MB page dies inside Streamlit's own component iframe
-    st.components.v1.html(wm.html, height=640)
     st.caption(f"✓ roads served from **embedded vector tiles** — {len(wm.html) // 1024:,} KB "
-               "self-contained page (the download is this exact file)")
-else:
-    # inline maps embed the notebook-preview variant (CDN MapLibre 3.x): the full vendored-4.x
-    # page stalls its GeoJSON source inside sandboxed iframes — the Notebook 7 stall
-    st.components.v1.html(wm._repr_html_(), height=640)
+               "self-contained page (the download carries the same tileset)")
 
 left, right = st.columns([3, 1])
 with left:
