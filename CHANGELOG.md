@@ -44,6 +44,14 @@ First PyPI release.
   cycleway / path bridges, with a solid underlay (the class's light casing colour) beneath the
   dashes — the osm-carto footbridge look. Previously a path bridge drew as bare floating
   dashes, letting whatever passed underneath show through the gaps.
+- **Draw-priority review for walking/cycling classes** (aligned with osm-carto's z_order):
+  `service` moved BELOW `pedestrian`/`living_street` (was above — a parking alley could cover
+  a plaza), `track` slots just above `footway`, `steps` just below (ties used to break
+  arbitrarily), and `platform` gets an explicit bottom-of-stack entry (unknown classes default
+  to residential priority — railway platforms were drawing at street level). Dashed classes
+  (footway/cycleway/path) keep rendering above all solid fills at the same grade — deliberate:
+  the subject network of a walking/cycling map stays legible, and a thin dash over a wide fill
+  loses nothing.
 - Studio: tiled maps preview correctly and show an "embedded vector tiles" badge. Vendored
   MapLibre v4 stalls ANY roads source (GeoJSON or vector) inside sandboxed iframes, so tiled
   previews go through the same CDN v3 slim variant as inline ones — pmtiles.js's Protocol is

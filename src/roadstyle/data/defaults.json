@@ -613,15 +613,16 @@
       "busway": 4,
       "raceway": 5,
       "living_street": 3,
-      "service": 3,
       "pedestrian": 2,
+      "service": 1.5,
+      "track": 1.1,
       "footway": 1,
       "path": 1,
       "cycleway": 1,
-      "steps": 1,
       "bridleway": 1,
-      "track": 1,
       "corridor": 1,
+      "steps": 0.9,
+      "platform": 0.5,
       "construction": 0
     }
   }

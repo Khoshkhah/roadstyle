@@ -116,6 +116,6 @@ def test_use_settings_overrides_from_code_and_resets(fresh):
         assert HIGHSAT["service"].fill == "#0000ff"
     finally:
         rs.use_settings()
-    assert render_web.ROAD_Z["service"] == 3           # back to bundled defaults
+    assert render_web.ROAD_Z["service"] == 1.5         # back to bundled defaults
     assert HIGHSAT["service"].fill != "#0000ff"
     assert render_web.CONFIG.labels["color"] == "#5b5b5b"
