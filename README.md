@@ -1,15 +1,15 @@
 # roadstyle
 
 [![Tests](https://github.com/Khoshkhah/roadstyle/actions/workflows/test.yml/badge.svg)](https://github.com/Khoshkhah/roadstyle/actions/workflows/test.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Khoshkhah/roadstyle/blob/main/LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://pypi.org/project/roadstyle/)
 
 Turn a GeoDataFrame of road edges into a **styled, interactive, self-contained map** — proper
 road cartography (the casing + fill "geometry sandwich", per-zoom widths, street names, one-way
 arrows, tunnel/bridge grade separation, optional 3D bridge decks) in one offline HTML file, with
 a scriptable JavaScript API.
 
-![3D bridges over Södermalm](docs/img/gallery/bridges_3d.png)
+![3D bridges over Södermalm](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/bridges_3d.png)
 
 **Contents:**
 [Features](#features) ·
@@ -118,7 +118,7 @@ pip install roadstyle streamlit
 streamlit run ui/studio/app.py
 ```
 
-![roadstyle studio](docs/img/gallery/studio.png)
+![roadstyle studio](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/studio.png)
 
 Two pages, same idea — every knob updates the live map **and** the exact Python code that
 reproduces it:
@@ -134,7 +134,7 @@ reproduces it:
 ## Rendering parameters
 
 The keywords of `rs.render_edges(gdf, ...)` — the ones you'll actually reach for. Full
-reference with every type and edge case: [docs/parameters.md](docs/parameters.md).
+reference with every type and edge case: [docs/parameters.md](https://khoshkhah.github.io/roadstyle/parameters/).
 
 **Core**
 
@@ -262,7 +262,7 @@ rs.snapshot(rs.render_edges(edges, view_3d=True), "fig.png",
 edges = rs.from_duckdb(con, "SELECT edge_id, highway, name, ST_AsWKB(geom) AS geometry FROM edges")
 ```
 
-More: [the gallery](docs/gallery.md) — one screenshot + recipe per look.
+More: [the gallery](https://khoshkhah.github.io/roadstyle/gallery/) — one screenshot + recipe per look.
 
 ## Drive the map from JavaScript
 
@@ -285,8 +285,8 @@ document.addEventListener("rs:select", e => showSidebar(e.detail.properties));
 ```
 
 Everything works the same on overlays (pass the overlay's label as the last argument) and on
-tiled maps. Full API table: [docs/web-backend.md](docs/web-backend.md#the-javascript-api-windowrs).
-Ready-made scaffolding: [`ui/`](ui/) — `python ui/dashboard/build.py your_edges.gpkg [--tiles]`
+tiled maps. Full API table: [docs/web-backend.md](https://khoshkhah.github.io/roadstyle/web-backend/#the-javascript-api-windowrs).
+Ready-made scaffolding: [`ui/`](https://github.com/Khoshkhah/roadstyle/tree/main/ui) — `python ui/dashboard/build.py your_edges.gpkg [--tiles]`
 builds a complete sidebar dashboard on this API.
 
 ## Settings — one defaults file, your overrides on top
@@ -309,7 +309,7 @@ never edit it; you state only what changes, at any of five levels (later wins):
 }
 ```
 
-Details: [docs/palettes.md](docs/palettes.md).
+Details: [docs/palettes.md](https://khoshkhah.github.io/roadstyle/palettes/).
 
 ## Command line
 
@@ -329,20 +329,20 @@ Every flag mirrors a `render_edges` keyword; `roadstyle --help` lists them all.
 
 | | |
 |---|---|
-| [Gallery](docs/gallery.md) | one screenshot + recipe per look |
-| [Parameter reference](docs/parameters.md) | every keyword, type, and default |
-| [Web backend](docs/web-backend.md) | grade separation, 3D, vector tiles, colour options, the full JS API |
-| [Choosing an engine](docs/engines.md) | web vs folium vs lonboard, data-size guidance |
-| [Palettes & settings](docs/palettes.md) | the built-in palettes and the override system |
-| [When to use roadstyle](docs/comparison.md) | vs `.explore()`, prettymaps, kepler.gl, raw MapLibre |
-| [Notebooks](notebooks/) | a runnable manual, one topic per notebook |
-| [UI templates](ui/) | the dashboard scaffolding + the studio |
+| [Gallery](https://khoshkhah.github.io/roadstyle/gallery/) | one screenshot + recipe per look |
+| [Parameter reference](https://khoshkhah.github.io/roadstyle/parameters/) | every keyword, type, and default |
+| [Web backend](https://khoshkhah.github.io/roadstyle/web-backend/) | grade separation, 3D, vector tiles, colour options, the full JS API |
+| [Choosing an engine](https://khoshkhah.github.io/roadstyle/engines/) | web vs folium vs lonboard, data-size guidance |
+| [Palettes & settings](https://khoshkhah.github.io/roadstyle/palettes/) | the built-in palettes and the override system |
+| [When to use roadstyle](https://khoshkhah.github.io/roadstyle/comparison/) | vs `.explore()`, prettymaps, kepler.gl, raw MapLibre |
+| [Notebooks](https://github.com/Khoshkhah/roadstyle/tree/main/notebooks) | a runnable manual, one topic per notebook |
+| [UI templates](https://github.com/Khoshkhah/roadstyle/tree/main/ui) | the dashboard scaffolding + the studio |
 
 Full MkDocs site: [khoshkhah.github.io/roadstyle](https://khoshkhah.github.io/roadstyle/)
 (`mkdocs serve` locally).
 
 ## License
 
-[MIT](LICENSE). Base-map tiles are third-party services (CARTO, OSM, Esri) with their own
+[MIT](https://github.com/Khoshkhah/roadstyle/blob/main/LICENSE). Base-map tiles are third-party services (CARTO, OSM, Esri) with their own
 attribution and terms; the styling spec is transcribed from the cartographic design docs in the
 osm-traffic-enrichment project.
