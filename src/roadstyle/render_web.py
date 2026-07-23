@@ -1217,7 +1217,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         pmt = _tiler.build_pmtiles(
             geo, class_col=highway_col,
             keep={highway_col, filter_col or highway_col, "twoway", "lvl"},
-            minzoom_table=CONFIG.minzoom, minzoom=tc["minzoom"], maxzoom=tc["maxzoom"],
+            minzoom_table=mz, minzoom=tc["minzoom"], maxzoom=tc["maxzoom"],
             extent=tc["extent"], buffer_px=tc["buffer_px"], extra_layers=extra)
         side = _tiler.sidecar(geo)
 

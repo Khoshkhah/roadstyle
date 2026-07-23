@@ -106,6 +106,38 @@ def test_render_tiles_swaps_source_and_embeds_archive():
     assert "pmtiles.Protocol" in html                   # vendored pmtiles.js + setup
 
 
+def _archive_of(html):
+    import base64
+    return base64.b64decode(html.split('atob("')[1].split('")')[0])
+
+
+def _tile_classes(data, z, lon=18.03, lat=59.301):
+    import math
+
+    import mapbox_vector_tile
+    from pmtiles.reader import MemorySource, Reader
+    n = 1 << z
+    x = int((lon + 180) / 360 * n)
+    y = int((1 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2 * n)
+    raw = Reader(MemorySource(data)).get(z, x, y)
+    if not raw:
+        return set()
+    t = mapbox_vector_tile.decode(gzip.decompress(raw))
+    return {f["properties"].get("highway") for f in t.get("roads", {}).get("features", [])}
+
+
+def test_tile_class_gating_follows_the_minzoom_parameter():
+    """Default render: NO class thinning in the tiles (same look as inline — residential shows
+    at every zoom). minzoom=True opts into the settings table, thinning low-zoom tiles too."""
+    from roadstyle.render_web import render
+    g = _edges()
+    plain = _archive_of(render(g, basemap="blank", tiles=True).html)
+    assert "service" in _tile_classes(plain, 10)               # everything, even at z10
+    thin = _archive_of(render(g, basemap="blank", tiles=True, minzoom=True).html)
+    assert "service" not in _tile_classes(thin, 10)            # service minzoom is 14
+    assert "primary" in _tile_classes(thin, 10)
+
+
 def test_render_without_tiles_is_unchanged():
     from roadstyle.render_web import render
     html = render(_edges(), basemap="blank").html

@@ -261,8 +261,11 @@ changes is *how the browser consumes the roads*:
 
 - MapLibre parses **only the tiles in view** instead of every feature at load — a ~100k-edge
   map boots in a couple of seconds instead of ~10, and stays responsive when you pan/zoom;
-- low zooms carry **simplified geometry and only the classes visible there** (the settings
-  `minzoom` table), so zoomed-out views skip work you can't see;
+- low zooms carry **simplified geometry** (and sub-pixel pieces drop out naturally), so
+  zoomed-out views skip work you can't see. Class thinning follows the **`minzoom` parameter**,
+  exactly like the inline version: by default every class is in every tile (residential shows
+  at the opening view); pass `minzoom=True` (or a dict) to also thin minor classes out of the
+  low-zoom tiles;
 - the street-name/arrow **annotation slots ride along as a second tile layer** — no giant
   inline symbol source.
 

@@ -24,7 +24,9 @@ First PyPI release.
   `minzoom` table shows there. The full JS API, popups and hover/select work unchanged — full
   per-edge attributes travel in a gzipped sidecar table sharing the same index-id space.
   New extra `roadstyle[tiles]` (mapbox-vector-tile + pmtiles), CLI `--tiles`, settings knobs
-  under `config.tiles` (zoom range / extent / clip buffer). The dashboard builder
+  under `config.tiles` (zoom range / extent / clip buffer). Class thinning in the tiles
+  follows the `minzoom` parameter exactly like the inline version — off by default
+  (residential visible at the opening zoom), opt-in with `minzoom=True`. The dashboard builder
   (`ui/dashboard/build.py --tiles`) and both studio pages (a *Vector tiles* toggle) expose it,
   and notebook/studio previews of tiled maps keep the vendored MapLibre v4 (the CDN v3 preview
   predates promise-style `addProtocol`).

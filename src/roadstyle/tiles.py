@@ -3,8 +3,9 @@
 The archive is embedded base64 into the saved HTML and served to MapLibre from memory via the
 vendored ``pmtiles.js`` (``addProtocol``), so the single-file / open-from-disk property is kept.
 The win over inline GeoJSON is client-side scale: MapLibre parses only the tiles in view, and
-low zooms carry simplified geometry and only the classes visible there (the settings
-``roads.minzoom`` table), instead of every vertex of every service road.
+low zooms carry simplified geometry (sub-pixel pieces drop out) instead of every vertex of
+every service road. Class thinning is opt-in via the render ``minzoom`` parameter — the
+default tiles carry every class at every zoom, matching the inline look.
 
 Tiles carry ONLY the properties the style expressions read (``__rs_*`` paints, the class/filter
 columns, ``twoway``, ``lvl``) plus the feature ``id`` (= the feature's index, the same id space
