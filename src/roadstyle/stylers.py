@@ -358,36 +358,39 @@ def bake_fill_variant(gj: dict, rf: ResolvedFrame, prop: str) -> dict:
     return gj
 
 
-def bake_color_options(gj: dict, frames):
+def bake_color_options(gj: dict, frames, style_rf: ResolvedFrame = None):
     """Bake a set of "colour by" options onto a GeoJSON FeatureCollection, in place.
 
-    ``frames`` is an ordered list of ``(name, ResolvedFrame)``. Option 0 is the **active/base**: its
-    full per-edge style (width/casing/class + ``__rs_fill``) is baked via :func:`bake_props`. Every
-    other option bakes *only* its fill, under ``__rs_fill__<i>`` — and where that option has **no
-    colour for an edge** (missing/NaN/unmapped data, flagged by :attr:`ResolvedFrame.missing`), the
-    edge falls back to the **base option's fill**, so blank edges keep the neutral base look (e.g.
-    the ``mono`` palette colour for that road class) instead of a flat grey. That fallback assumes a
-    *neutral* base: when the base is itself a loud data ramp, inheriting it would fake a data value,
-    so an option may set ``missing="self"`` (Categorical/NumericStyler) to keep its own
-    nan/fallback colour instead.
+    ``frames`` is an ordered list of ``(name, ResolvedFrame)``. Option 0 is the **active/base**;
+    every option bakes *only* its fill (``__rs_fill`` for option 0, ``__rs_fill__<i>`` for the
+    rest). The shared per-edge style — width, **casing**, dash, opacity, class — comes from
+    ``style_rf`` when given: the *road palette's* resolved frame, so a map coloured by data keeps
+    the palette's plate casing and widths (a data styler has none of its own). Without ``style_rf``
+    it falls back to option 0's frame, the historical behaviour.
+
+    Where a non-base option has **no colour for an edge** (missing/NaN/unmapped data, flagged by
+    :attr:`ResolvedFrame.missing`), the edge falls back to the **base option's fill**, so blank
+    edges keep the neutral base look instead of a flat grey. That fallback assumes a *neutral*
+    base: when the base is itself a loud data ramp, inheriting it would fake a data value, so an
+    option may set ``missing="self"`` (Categorical/NumericStyler) to keep its own nan/fallback
+    colour instead.
 
     Returns ``(gj, options_meta)`` where each meta entry is ``{name, prop, legend}`` — the contract
     the browser reads to build the "Colour by" picker and to swap fills client-side.
     """
     base_rf = frames[0][1]
-    gj = bake_props(gj, base_rf)
+    gj = bake_props(gj, style_rf if style_rf is not None else base_rf)
     base_fill = base_rf.fill
     feats = gj.get("features", [])
     meta = []
     for idx, (name, frame) in enumerate(frames):
         prop = "__rs_fill" if idx == 0 else f"__rs_fill__{idx}"
-        if idx != 0:
-            fills, miss = frame.fill, frame.missing
-            if getattr(frame, "missing_mode", "base") == "self":
-                miss = None                      # keep the styler's own nan/fallback colour
-            for i, feat in enumerate(feats):
-                f = base_fill[i] if (miss is not None and miss[i]) else fills[i]
-                feat.setdefault("properties", {})[prop] = f
+        fills, miss = frame.fill, frame.missing
+        if idx == 0 or getattr(frame, "missing_mode", "base") == "self":
+            miss = None                          # keep the styler's own nan/fallback colour
+        for i, feat in enumerate(feats):
+            f = base_fill[i] if (miss is not None and miss[i]) else fills[i]
+            feat.setdefault("properties", {})[prop] = f
         meta.append({"name": name, "prop": prop, "legend": getattr(frame, "legend", None)})
     return gj, meta
 

@@ -189,6 +189,7 @@ const FILTER = __FILTER__;
 const _fltCbs={}, _fltBase={};
 let _fltVis=null;   // Set of visible classes; null = all
 let _qIds=null;     // id-set filter from rsFilter; null = off
+let _bridgesOn=true;   // rsSetBridges: hide every elevated (lvl>0) road and its 3D deck ribbons
 const _fltLayers=()=>map.getStyle().layers.filter(l=>l.id.indexOf("roads")===0);
 map.on("load",()=>{ _fltLayers().forEach(l=>{ if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null; }); });
 function _applyRoadFilters(){
@@ -197,6 +198,12 @@ function _applyRoadFilters(){
     if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null;
     let f=_fltBase[l.id];
     if(hidden.length){ const cf=["!",["in",["get",FILTER.col],["literal",hidden]]]; f=f?["all",f,cf]:cf; }
+    if(!_bridgesOn){
+      // decks hold nothing but bridge ribbons (and prop-less casing slabs) -> hide wholesale;
+      // everything else keeps lvl<1, so ground roads and tunnels stay
+      const bf = l.source==="decks" ? ["boolean",false] : ["<",["coalesce",["get","lvl"],0],1];
+      f = f?["all",f,bf]:bf;
+    }
     // ids exist only in the roads features — slots (labels/arrows) and decks (3D ribbons) have
     // their own id spaces, so those layers take just the class filter. In tiles mode slots share
     // the archive source, so the tile layer name is what separates them.
@@ -215,6 +222,12 @@ function rsSetClasses(visible){
 }
 window.rsSetClasses = rsSetClasses;
 window.RS_CLASSES = FILTER.classes;
+function rsSetBridges(on){
+  _bridgesOn=!!on; _applyRoadFilters();
+  const cb=document.getElementById("rs-flt-br"); if(cb) cb.checked=_bridgesOn;
+  document.dispatchEvent(new CustomEvent("rs:filterchange",{detail:{bridges:_bridgesOn}}));
+}
+window.rsSetBridges = rsSetBridges;
 // id-set queries: the baked features are a queryable table. rsQuery(p => …) returns the ids of
 // the matching edges (generateId: a feature's id is its index in the source array); the verbs
 // below act on any id set — filter to it, read it back as rows, or highlight it.
@@ -337,6 +350,14 @@ if(FILTER.on){
     sw.style.background=(FILTER.swatches||{})[c]||"#888"; lab.appendChild(sw);
     lab.appendChild(document.createTextNode(" "+c)); body.appendChild(lab);
   });
+  if(FILTER.bridges){                          // grade-separated data: offer a Bridges on/off row
+    const lab=document.createElement("label");
+    lab.style.cssText="margin-top:4px;padding-top:4px;border-top:1px solid #ddd";
+    const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=true; cb.id="rs-flt-br";
+    cb.onchange=()=> rsSetBridges(cb.checked);
+    lab.appendChild(cb); lab.appendChild(document.createTextNode(" Bridges"));
+    body.appendChild(lab);
+  }
   (_sideCtl||document.body).appendChild(box);
 }
 // "colour by" recolouring: swap which baked fill prop the road layers read (no re-render). Each

@@ -901,14 +901,16 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
 
     color_opts_meta = None
     if color_options:
-        # one pre-resolved fill set per "colour by" option; option 0 is active (drives the shared
-        # width/casing via bake_props), the rest bake only their fill under __rs_fill__<i>.
+        # one pre-resolved fill set per "colour by" option — options bake only their FILLS; the
+        # shared width/casing/dash comes from the road palette's own styler, so a data-coloured
+        # map keeps the palette's plate casing (a data styler has none of its own).
         items = (list(color_options.items()) if isinstance(color_options, Mapping)
                  else [(o["name"], {k: v for k, v in o.items() if k != "name"})
                        for o in color_options])
         frames = [(name, option_styler(highway_col, palette, opts).resolve_frame(g))
                   for name, opts in items]
-        geo, color_opts_meta = bake_color_options(json.loads(g.to_json()), frames)
+        style_rf = (styler or build_styler(palette=palette, highway_col=highway_col)).resolve_frame(g)
+        geo, color_opts_meta = bake_color_options(json.loads(g.to_json()), frames, style_rf=style_rf)
         _names = [n for n, _ in items]
         _active = (color_active if isinstance(color_active, int)
                    else _names.index(color_active) if color_active in _names else 0)
@@ -1213,7 +1215,10 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             swatches[c] = p_.get("__rs_fill") or "#888888"
     classes.sort(key=lambda c: (-ROAD_Z.get(_base(c)[0], 4), c))
     flt = {"on": bool(filter_control and classes), "col": fcol, "classes": classes,
-           "swatches": swatches}
+           "swatches": swatches,
+           # any elevated feature ⇒ the panel offers a Bridges on/off row (rsSetBridges)
+           "bridges": any((f.get("properties") or {}).get("lvl", 0) > 0
+                          for f in geo.get("features", []))}
 
     pmt = side = None
     if tiles:
