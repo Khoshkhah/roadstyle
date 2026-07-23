@@ -1,423 +1,344 @@
 # roadstyle
 
-OSM-style **road/edge map styling**: turn a GeoDataFrame with a `highway` column into a styled,
-interactive, **self-contained MapLibre map** (plus `folium` and `lonboard` backends) — the proper
-**casing + fill "geometry sandwich"**, per-zoom widths, street names, one-way arrows,
-tunnel/bridge **grade separation**, an optional **3D view** with extruded cased bridge decks, a
-scriptable **JavaScript API**, and **every styling default in one settings file**.
+[![Tests](https://github.com/Khoshkhah/roadstyle/actions/workflows/test.yml/badge.svg)](https://github.com/Khoshkhah/roadstyle/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+
+Turn a GeoDataFrame of road edges into a **styled, interactive, self-contained map** — proper
+road cartography (the casing + fill "geometry sandwich", per-zoom widths, street names, one-way
+arrows, tunnel/bridge grade separation, optional 3D bridge decks) in one offline HTML file, with
+a scriptable JavaScript API.
 
 ![3D bridges over Södermalm](docs/img/gallery/bridges_3d.png)
 
-*One screenshot + recipe per look: **[the gallery](docs/gallery.md)**.*
-
-The **`web` backend** (the default) matches the *openstreetmap-carto* look with **per-zoom
-widths**, **two-way directional lanes**, direction **arrows**, curved **street names**,
-**hover/select**, a base-layer switcher, a **scale bar** and zoom read-out, a road-class filter
-panel that **doubles as a colour legend**, **tunnel/bridge grade separation**, slot-based
-**names + arrows** (alternating along each road, never stacked), an optional **3D view**
-(`view_3d=True`: tilted camera, extruded ramped cased **bridge decks**, an on-map 2D/3D toggle),
-and an optional **boundary overlay** — all in one **offline, self-contained HTML** file (MapLibre
-and the data bundled in; no server needed).
-
-Three palettes (data files you can [override](#settings--one-defaults-file-your-overrides-on-top)):
-
-- **`highsat`** — custom high-saturation palette (cyan motorway, pink trunk, orange primary…)
-  with a light-grey casing. Maximum legibility over any base map.
-- **`carto`** — the classic **OSM Carto** palette (muted warm tones).
-- **`mono`** — neutral grayscale (no hues); importance by shade + width. Good for print or as a
-  quiet backdrop for data overlays.
-
-**New to the library?** Run the **studio** — the whole library behind eight knobs, writing the
-code for you: `pip install streamlit && streamlit run ui/studio/app.py` (see [`ui/studio`](ui/studio)).
-
-**Contents:** [Install](#install) · [Quickstart](#quickstart-python) ·
-[Data contract](#data-contract--which-column-powers-what) · [Recipes](#recipes) ·
+**Contents:**
+[Features](#features) ·
+[Installation](#installation) ·
+[Quickstart](#quickstart) ·
+[The studio (no code)](#the-studio--the-library-behind-knobs-no-code) ·
+[Rendering parameters](#rendering-parameters) ·
+[Data contract](#data-contract--which-column-powers-what) ·
+[Recipes](#recipes) ·
 [JavaScript API](#drive-the-map-from-javascript) ·
 [Settings](#settings--one-defaults-file-your-overrides-on-top) ·
-[Options](#all-options-at-a-glance) · [CLI](#command-line) · [API](#api-at-a-glance) ·
-[Docs](#documentation)
+[Command line](#command-line) ·
+[Documentation](#documentation)
 
-## Install
+## Features
+
+- **Real road cartography** — casing + fill sandwich, importance-ordered junctions, per-zoom
+  widths (openstreetmap-carto model), two-way lanes, curved street names, one-way arrows.
+- **Grade separation** — tunnels faded + dashed underneath, bridges on decks on top (stacked
+  structures ordered by their OSM `layer`), and an optional **3D view** with extruded bridge decks.
+- **One offline file** — MapLibre and the data are bundled into the saved HTML; it opens by
+  double-click, no server, no internet (with the `blank` basemap: zero network requests).
+- **Data-driven styling** — colour/width by any column (categorical or numeric ramps), per-edge
+  colour tables, and multiple colour layers switchable client-side.
+- **Big networks** — `tiles=True` packs the roads as an embedded vector tileset (PMTiles):
+  ~10⁵-edge maps open in seconds and stay responsive, still one offline file.
+- **A JavaScript API** — every control is scriptable (`rsQuery`, `rsFilter`, `rsColor`,
+  `rsSelect`, …) with `rs:*` events, so the saved map can power your own dashboard.
+- **Three backends** — `web` (MapLibre, the flagship), `folium` (Leaflet, legends), `lonboard`
+  (GPU, millions of edges).
+
+## Installation
+
+Python ≥ 3.10. Core dependencies (`geopandas`, `shapely`, `folium`, `branca`) install
+automatically.
 
 ```bash
-pip install git+https://github.com/Khoshkhah/roadstyle.git
+pip install roadstyle                # from PyPI (v0.2.0+)
+
+# or the latest development state straight from GitHub:
+pip install "roadstyle @ git+https://github.com/Khoshkhah/roadstyle.git"
 ```
 
-`folium` is the only hard renderer dependency. Optional extras pull in heavier backends/inputs as
-you need them — `lonboard` (WebGL), `numeric` (continuous data-driven styling), `basemaps`,
-`duckdb`, `arrow`:
+Optional features are extras — install only what you need:
+
+| Extra | Enables | Pulls in |
+|---|---|---|
+| `numeric` | continuous colour ramps + classification (`color_by` on numbers) | mapclassify, matplotlib |
+| `tiles` | `tiles=True` — embedded vector tiles for big networks | mapbox-vector-tile, pmtiles |
+| `lonboard` | the GPU backend for very large edge sets | lonboard |
+| `duckdb` | `from_duckdb()` — read edges straight from DuckDB | duckdb |
+| `arrow` | read edges from a pyarrow Table | pyarrow |
+| `basemaps` | any XYZ provider from the xyzservices registry | xyzservices |
 
 ```bash
-pip install "roadstyle[numeric,duckdb] @ git+https://github.com/Khoshkhah/roadstyle.git"
+pip install "roadstyle[numeric,tiles]"
 ```
 
-**Develop locally** (editable install + dev tools):
+**Development install** (clone + editable + test tools):
 
 ```bash
 git clone https://github.com/Khoshkhah/roadstyle.git && cd roadstyle
 pip install -e ".[dev]"
-# or a conda env: conda env create -f environment.yml && conda activate roadstyle && pip install -e ".[dev]"
+# or with conda: conda env create -f environment.yml && conda activate roadstyle && pip install -e ".[dev]"
+pytest                               # 160 tests; browser tests need `pip install playwright`
 ```
 
-## Quickstart (Python)
+## Quickstart
 
 ```python
 import geopandas as gpd
 import roadstyle as rs
 
-edges = gpd.read_file("edges.gpkg")          # needs a `highway` column (any CRS)
+edges = gpd.read_file("edges.gpkg")          # any CRS; needs a `highway` class column
 
-# self-contained MapLibre map: per-zoom widths, two-way lanes, arrows, names,
-# hover/select, base switcher, tunnel/bridge grade separation — opens offline, no server
-rs.render_edges(edges, basemap="dark_matter").save("map.html")
-
-rs.render_edges(edges, palette="carto").save("c.html")                          # OSM Carto, light
-rs.render_edges(edges, basemap="dark_matter", view_3d=True).save("map3d.html")  # tilted + 3D bridges
-
-# filter by type + satellite + highlight a selection
-sel = edges[edges.highway == "motorway"]
-rs.render_edges(edges, basemap="satellite",
-                include=["motorway", "trunk", "primary"],
-                selected=sel).save("major.html")
-
-rs.render_edges(edges, backend="lonboard", basemap="dark_matter")   # big data: GPU backend
+rs.render_edges(edges).save("map.html")                          # done — open map.html
 ```
+
+That one line gives you the full treatment: per-zoom widths, two-way lanes, arrows, street
+names, hover/select with popups, a base-map switcher, a class filter panel, grade separation.
+Common variations:
+
+```python
+rs.render_edges(edges, basemap="dark_matter", view_3d=True).save("map3d.html")   # dark + 3D bridges
+rs.render_edges(edges, palette="carto", basemap="positron").save("carto.html")   # the classic OSM look
+rs.render_edges(edges, include=["motorway", "trunk", "primary"]).save("major.html")
+rs.render_edges(edges, color_by="aadt", cmap="viridis").save("traffic.html")     # colour by your data
+rs.render_edges(edges, tiles=True).save("big.html")                              # 10⁵-edge networks
+```
+
+Palettes: **`highsat`** (high-saturation, maximum legibility), **`carto`** (the muted
+openstreetmap-carto look), **`mono`** (grayscale — quiet backdrop for data overlays).
+
+## The studio — the library behind knobs, no code
+
+The gentlest way in. The studio is a small Streamlit app bundled in the repo (not part of the
+pip package):
+
+```bash
+git clone https://github.com/Khoshkhah/roadstyle.git && cd roadstyle
+pip install roadstyle streamlit
+streamlit run ui/studio/app.py
+```
+
+![roadstyle studio](docs/img/gallery/studio.png)
+
+Two pages, same idea — every knob updates the live map **and** the exact Python code that
+reproduces it:
+
+- **Map** — upload a road file (`.gpkg` / `.geojson`) or pick a bundled Södermalm sample, then
+  click through palette, base map, 3D, vector tiles, colour-by-data, class filter, minzoom,
+  labels/arrows, popups and overlays. Copy the generated `render_edges(...)` code out, or
+  download the self-contained `map.html`.
+- **Dashboard** — the same knobs, but the product is a **sidebar dashboard** (query box, verb
+  buttons, results table, detail panel) built on the JavaScript API. Preview it live, download
+  `dashboard.html`.
+
+## Rendering parameters
+
+The keywords of `rs.render_edges(gdf, ...)` — the ones you'll actually reach for. Full
+reference with every type and edge case: [docs/parameters.md](docs/parameters.md).
+
+**Core**
+
+| Parameter | Default | What it does |
+|---|---|---|
+| `backend` | `"web"` | `"web"` (MapLibre, the flagship) / `"folium"` (Leaflet + legends) / `"lonboard"` (GPU) |
+| `palette` | `"highsat"` | Class colour palette: `"highsat"` / `"carto"` / `"mono"`, or your own |
+| `basemap` | `"voyager"` | Background map: `voyager`, `positron`, `dark_matter`, `osm`, `satellite`, `blank`, `blank_dark` |
+| `basemaps` | all built-ins | The set offered in the in-map base-layer dropdown |
+| `name` | `"roadstyle"` | Page / layer title |
+| `settings` | `None` | Per-call settings override (dict or path) — see [Settings](#settings--one-defaults-file-your-overrides-on-top) |
+
+**Filtering**
+
+| Parameter | Default | What it does |
+|---|---|---|
+| `include` / `exclude` | `None` | Keep / drop road classes (`include=["motorway","primary"]`); `_link` variants follow automatically |
+| `filter_col` | `None` | Let the filter panel list a different column than the one that drives styling |
+| `minzoom` | `None` (off) | Hide minor classes when zoomed out: `True` for the built-in table, or a `{class: zoom}` dict. Applies to the vector tiles too |
+
+**Colour by data**
+
+| Parameter | Default | What it does |
+|---|---|---|
+| `color_by` | `None` | Colour by a column instead of road class |
+| `colors` | `None` | Categorical `{value: "#hex"}` map, or `"self"` to use the column's value as the literal colour |
+| `cmap` / `vmin` / `vmax` | `None` | Numeric colour ramp (`"viridis"`, …) and its value range |
+| `width_by` | `None` | `(min_px, max_px)` — scale line width with the numeric value |
+| `color_table` | `None` | Per-edge colours: `{edge_id: "#hex"}` dict / Series / DataFrame (gray fallback, class widths kept) |
+| `color_options` | `None` | Bake **several** colour layers + a client-side *Colour by* dropdown: `{"Traffic": {"color_by": "aadt", "cmap": "viridis"}, ...}` |
+
+**Camera & 3D** (web backend)
+
+| Parameter | Default | What it does |
+|---|---|---|
+| `view_3d` | `False` | Tilted camera + extruded, ramped, cased 3D bridge decks + an on-map 2D/3D toggle |
+| `pitch` / `bearing` | settings | Starting camera tilt / rotation |
+
+**UI toggles** (web backend)
+
+| Parameter | Default | What it does |
+|---|---|---|
+| `arrows` | `True` | One-way direction chevrons |
+| `labels` | `True` | Curved street-name labels |
+| `filter_control` | `True` | The collapsible road-class filter panel (doubles as a colour legend) |
+| `basemap_switcher` | `True` | The base-layer dropdown |
+| `road_popup` | `True` | Click popup: `True` (curated fields) / `[fields]` / `"all"` / `"panel"` (docked read-out) / `False` |
+| `tooltip` | `None` (off) | Hover tooltip fields (list of columns) |
+| `hover_color` / `select_color` | violet | Highlight colours for hovered / selected roads |
+
+**Extra content** (web backend)
+
+| Parameter | Default | What it does |
+|---|---|---|
+| `overlays` | `None` | Your own layers (`Overlay(...)`) — zones under the roads, POIs on top, clickable, with a Layers toggle |
+| `boundary` | `None` | Dashed outline of the clip area, drawn on top |
+| `selected` | `None` | Pre-highlighted edges (folium backend) |
+
+**Output & scale**
+
+| Parameter | Default | What it does |
+|---|---|---|
+| `compress` | `True` | Gzip the inlined data (3–4× smaller files; `compress=False` for plain JSON) |
+| `tiles` | `False` | Embedded-PMTiles vector tileset — for ~10⁵-edge networks (needs the `tiles` extra) |
+
+**Column mapping**
+
+| Parameter | Default | What it does |
+|---|---|---|
+| `highway_col` | `"highway"` | The road-class column that drives styling |
+| `tunnel_col` / `bridge_col` / `layer_col` | `"tunnel"` / `"bridge"` / `"layer"` | Grade-separation columns |
+
+Everything *stylistic* — the actual colours, widths, casing, label/arrow cosmetics, camera
+defaults, bridge-deck geometry — is deliberately **not** a keyword but a
+[setting](#settings--one-defaults-file-your-overrides-on-top).
 
 ## Data contract — which column powers what
 
-roadstyle reads plain columns; only two things are required. Everything else lights up a feature
-when present (and is simply skipped when absent):
+Only two things are required; every other column lights up a feature when present and is
+skipped when absent:
 
 | Column | Values | Powers |
 |---|---|---|
 | *geometry* | LineString (any CRS) | **required** — the edges themselves |
-| `highway` | OSM class (`motorway`…`service`) | **required** — colour, width, casing, draw order, minzoom (another column via `highway_col`) |
-| `name` | text | street-name **labels** along the road + the popup title |
-| `oneway` | `True`/`False` (or `yes`/`no`) | direction **arrows** on one-way edges. Without this column, one-way is inferred: an edge with no reverse-geometry twin (directed networks, e.g. duckOSM) |
-| `bridge` / `tunnel` | truthy | **grade separation** — tunnels draw faded + dashed *below*, bridges on top with a black deck casing, and as extruded 3D decks in `view_3d` (column names via `bridge_col` / `tunnel_col`) |
-| `layer` | int | below-ground fallback where `tunnel` is absent (negative → under); only `bridge` earns the bridge treatment |
-| `lanes`, `maxspeed_kmh`, `edge_ref`, … | anything | shown in the click **popup** (curated set by default; `road_popup="all"` for every column) |
-| `edge_id` | id (64-bit safe) | popups + click-to-copy; values > 2⁵³ should be strings so JavaScript can't corrupt them |
+| `highway` | OSM class (`motorway`…`service`) | **required** — colour, width, casing, draw order |
+| `name` | text | street-name labels + the popup title |
+| `oneway` | `True`/`False` / `yes`/`no` | direction arrows (without it, one-way is inferred from reverse-geometry twins) |
+| `bridge` / `tunnel` | truthy | grade separation: tunnels below, bridges on decks above, 3D decks in `view_3d` |
+| `layer` | int | stacking order of bridges/tunnels; negative → below ground even without `tunnel` |
+| `edge_id` | id (64-bit safe) | popups + click-to-copy; ids > 2⁵³ are kept exact as strings |
+| anything else | anything | shown in the click popup / hover tooltip, queryable from JavaScript |
 
 Networks exported by [duckOSM](https://github.com/Khoshkhah/duckOSM) (`duckosm export-gis`)
 carry exactly this column set.
 
-### Hover tooltip vs. click popup — what shows where
-
-Two different read-outs, configured independently:
-
-- **Click popup** (`road_popup`, web backend) — opens when you click an edge (or a 3D bridge
-  deck). **On by default** with a curated field set: `name` (bold title), `edge_id`, `edge_ref`,
-  `highway`, `lanes`, `bridge`, `tunnel`. Blank/NaN values are dropped, and `bridge`/`tunnel`
-  rows appear only when the road actually is one.
-- **Hover tooltip** (`tooltip`, every backend) — follows the mouse. **Off by default** on the web
-  backend (hover just highlights); pass a field list to enable it. On the folium backend it's on
-  by default (all columns), and clicking **pins** it + copies `edge_id` to the clipboard.
-
-```python
-rs.render_edges(
-    edges,
-    road_popup=["name", "highway", "maxspeed_kmh", "aadt"],  # your click fields
-    tooltip=["name", "aadt"],                                # hover read-out (any backend)
-)
-rs.render_edges(edges, road_popup="all")     # click shows every column
-rs.render_edges(edges, road_popup="panel")   # docked side PANEL instead of a floating popup
-rs.render_edges(edges, road_popup=False)     # no popup (click still selects/highlights)
-```
-
-`road_popup="panel"` docks the read-out bottom-right — it never covers the road you clicked and
-stays put at tilted 3D angles. For your own sidebar/dashboard: every click dispatches a
-`rs:select` CustomEvent (`event.detail.properties` = the edge's columns; `rs:deselect` on clear),
-in every mode — `road_popup=False` + your own listener is a clean custom UI:
-
-```js
-document.addEventListener("rs:select",   e => showSidebar(e.detail.properties));
-document.addEventListener("rs:deselect", () => hideSidebar());
-```
-
-Internal `__rs_*`/`twoway`/`lvl` fields never show. Anything you select into the GeoDataFrame is
-available — the popup/tooltip read the columns of *your* data.
-
 ## Recipes
 
-### Colour each edge from your own table
-
-Instead of colouring by road class, paint each edge by a per-edge colour — a `{edge_id: colour}`
-table (dict, `Series`, or a DataFrame with `edge_id` + `color` columns). Edges not in the table get
-a **gray** fallback; class widths + casing are kept, so the network still reads as roads.
+Each of these is one call — details behind the links.
 
 ```python
-colors = {"4897…": "#e6194B", "5193…": "#3cb44b", ...}     # e.g. cluster / path / metric per edge
-rs.render_edges(edges, color_table=colors).save("by_edge.html")
+# colour each edge from your own table (cluster / route / metric per edge)
+rs.render_edges(edges, color_table={"4897…": "#e6194B", "5193…": "#3cb44b"})
 
-# or, if the colour is already a column in your data, use it literally:
-rs.render_edges(edges, color_by="color", colors="self").save("by_edge.html")
+# several colour layers in one map, switchable client-side (no re-render)
+rs.render_edges(edges, palette="mono", color_options={
+    "Road class": {},
+    "Traffic":    {"color_by": "aadt", "cmap": "viridis"},
+    "Speed":      {"color_by": "maxspeed_kmh", "cmap": "magma"}})
+
+# your own layers under/over the roads
+rs.render_edges(edges, overlays=[
+    rs.Overlay(zones,   placement="under", color="#2d6cdf", opacity=0.25, label="Zones",
+               popup=["taz_id", "population"]),
+    rs.Overlay(sensors, placement="over",  color="#ffd166", radius=6, label="Sensors")])
+
+# your own tile server as a base map
+rs.register_basemap(rs.Basemap(key="lm", label="Lantmäteriet",
+                               url="https://tiles.example.se/{z}/{x}/{y}.png", attr="© LM"))
+
+# a static PNG for a paper, through a real headless browser (pip install playwright)
+rs.snapshot(rs.render_edges(edges, view_3d=True), "fig.png",
+            center=(18.076, 59.303), zoom=16, pitch=60)
+
+# roads straight from DuckDB
+edges = rs.from_duckdb(con, "SELECT edge_id, highway, name, ST_AsWKB(geom) AS geometry FROM edges")
 ```
 
-### Several colour layers on one map (client-side switch)
-
-`color_options` bakes **multiple fill sets** into a single map and adds a *Colour by* dropdown —
-the viewer recolours every road (bridge decks included) instantly, with no re-render and no
-server. A neutral base palette (`mono`) lets the data ramps stand out:
-
-```python
-rs.render_edges(
-    edges, palette="mono",
-    color_options={
-        "Road class": {},                                    # the class colours
-        "Traffic":    {"color_by": "aadt", "cmap": "viridis"},
-        "Speed":      {"color_by": "maxspeed_kmh", "cmap": "magma"},
-    },
-).save("switchable.html")
-```
-
-Each option carries its own legend; `window.rsSetColorField("Traffic")` drives the same switch
-from your own UI.
-
-### Base maps & the layer selection box
-
-Every web map carries a **base-layer dropdown** (top-left) by default. You pick what it offers,
-which one starts active, and you can register your own tile source:
-
-```python
-rs.render_edges(edges,
-                basemap="dark_matter",                                        # active
-                basemaps=["dark_matter", "positron", "voyager", "satellite"]) # the dropdown
-
-from roadstyle import Basemap, register_basemap
-register_basemap(Basemap(key="lantmateriet", label="Lantmäteriet",
-                         url="https://tiles.example.se/{z}/{x}/{y}.png",
-                         attr="© Lantmäteriet"))
-rs.render_edges(edges, basemaps=["dark_matter", "lantmateriet"])
-```
-
-Built-ins: `voyager` (the settings default), `positron`, `dark_matter`, `osm`, `satellite`,
-plus two **tile-less** ones — `blank` and `blank_dark` — that draw no base layer at all, just a
-plain background colour. A map saved with `basemap="blank"` makes **zero network requests**
-(fully offline) and gives a distraction-free canvas for print/figures.
-Switching is purely client-side — the baked road styling never changes.
-
-- **Turn the box off** (single fixed backdrop): `basemap_switcher=False` in Python,
-  `--no-basemap-switcher` on the CLI.
-- The box also hides itself automatically when only one base map is offered.
-
-### Add extra layers (zones, POIs, any geometry)
-
-Bring your own layers with `Overlay` — each one gets its own colour, a click popup, a spot in the
-in-map **Layers** toggle, and a place **under** the roads (e.g. zone fills) or **over** them
-(e.g. POIs). Geometry kind (fill / line / circle) is auto-detected:
-
-```python
-from roadstyle import Overlay
-
-rs.render_edges(
-    edges, basemap="dark_matter",
-    overlays=[
-        Overlay(zones, placement="under", color="#2d6cdf", opacity=0.25,
-                label="Traffic zones", popup=["taz_id", "population"]),
-        Overlay(sensors, placement="over", color="#ffd166", radius=6,
-                label="Sensors", popup=["sensor_id", "status"]),
-    ],
-).save("with_layers.html")
-```
-
-**Roads vs. overlays:** the road layer is the *subject* (full cartographic engine — widths,
-casing, labels, arrows, grade separation, data-driven colour); overlays are *annotations* (one
-flat paint each, popup + Layers toggle). An overlay never grows casings or labels — if a second
-linear network deserves road-grade treatment, render it **as** the main layer with a custom
-class vocabulary instead. Full comparison: [`docs/web-backend.md`](docs/web-backend.md#roads-vs-overlays--the-architecture).
-
-### Filter by a different class than you style by
-
-By default the web **road-type filter panel** lists whatever column drives styling (`highway_col`).
-When width/casing should follow one scheme but the filter should list *another*, source-native
-class, set `filter_col` — e.g. size roads by an OSM-highway proxy while the panel filters by the
-source's own road class:
-
-```python
-rs.render_edges(edges, highway_col="highway",       # widths/casing from the OSM-highway proxy
-                filter_col="road_class").save("m.html")   # filter panel lists the source's real classes
-```
-
-### Static images for papers & reports
-
-`rs.snapshot` renders any map to a PNG through a real headless browser (so tiles, labels, 3D
-decks — everything — look exactly as on screen). Optional dependency:
-`pip install playwright && playwright install chromium`.
-
-```python
-wm = rs.render_edges(edges, basemap="dark_matter", view_3d=True)
-rs.snapshot(wm, "skanstull.png", center=(18.076, 59.303), zoom=16, pitch=60, bearing=-25)
-```
+More: [the gallery](docs/gallery.md) — one screenshot + recipe per look.
 
 ## Drive the map from JavaScript
 
-Every in-map control is a thin UI over a `window.rs*` function — so anything you can click, your
-own HTML/JS can call. Each setter updates the map **and** keeps the built-in control in sync, and
-dispatches a `rs:*` CustomEvent on `document` so outside code can react:
+Every in-map control is a thin UI over a `window.rs*` function, and the baked features are a
+queryable table — so a saved map can power your own dashboard with plain HTML:
 
 ```js
-rsSetBasemap("dark_matter");                // by key, label, or index   → rs:basemapchange
-rsSetClasses(["primary", "secondary"]);     // show exactly these classes → rs:filterchange
-rsSetColorField("Traffic");                 // switch the colour layer    → rs:colorchange
-rsSetOverlay("Zones", false);               // hide/show one overlay      → rs:overlaychange
-rsSetView3D(true);                          // tilt to the settings' 3D pitch → rs:viewchange
-rsSelect(id); rsDeselect();                 // select an edge like a click (popup/panel + glow)
-map.easeTo({pitch: 60, bearing: 30});       // camera: window.map is the MapLibre Map itself
+const ids = rsQuery(p => p.lanes >= 2 && p.maxspeed_kmh > 30);   // WHERE clause → id set
+rsFilter(ids);                 // show only these         rsFilter(null) resets
+rsColor(ids, "#ff00aa");       // paint them one colour   rsColor(null) resets
+rsHighlight(ids);              // selection glow
+rsGetProps(ids);               // the rows behind the ids — table-ready
+rsFocus(ids);                  // fly the camera to fit them
+rsSelect(id);                  // select + popup, like a click
 
-document.addEventListener("rs:basemapchange", e => console.log(e.detail.basemap));
-document.addEventListener("rs:filterchange",  e => console.log(e.detail.visible));
+rsSetBasemap("dark_matter");   rsSetClasses(["primary","secondary"]);
+rsSetColorField("Traffic");    rsSetOverlay("Zones", false);      rsSetView3D(true);
+
+document.addEventListener("rs:select", e => showSidebar(e.detail.properties));
 ```
 
-And the baked features are a **queryable table**: `rsQuery` takes a predicate over your data's
-columns (a WHERE clause, written in JS) and returns an **id set** — then independent verbs act
-on that set, composably:
-
-```js
-const ids = rsQuery(p => p.lanes >= 2 && p.maxspeed_kmh > 30);   // → [7, 12, 95, …]
-rsFilter(ids);                 // show only these edges (rsFilter(null) resets)  → rs:filterchange
-rsColor(ids, "#ff00aa");       // paint the set one colour (rsColor(null) resets) → rs:colorchange
-rsHighlight(ids);              // selection glow (rsHighlight([]) clears)      → rs:highlightchange
-rsGetProps(ids);               // → the rows behind the ids (internals stripped) — table-ready
-rsFocus(ids);                  // fly the camera to fit the set (or one id) — pairs with rsSelect
-```
-
-Every verb also takes an **optional layer argument** — omitted it queries the roads; an
-overlay's label treats *that* overlay as the table (`rsQuery(p => p.status === 'offline',
-"Sensors")`, then `rsHighlight(ids, "Sensors")`, `rsGetProps(ids, "Sensors")`, `rsFilter(ids,
-"Sensors")`, `rsColor(ids, "#ff1744", "Sensors")` — reset with `rsColor(null, null, "Sensors")`
-— and `rsFocus(ids, null, "Sensors")`). Each layer is its own id space: never mix ids across
-layers. The road ids are the same id space as `rs:select` events (`e.detail.id`), so
-click-selection and queries interoperate. `rsColor` layers *over* the active `color_options`
-choice and survives switching it. One ceiling: street-name labels, arrows, and 3D bridge deck
-ribbons live on merged helper sources, so `rsFilter` prunes the road geometry but not those
-decorations (the class filter from `rsSetClasses` prunes everything).
-
-What's available to enumerate: `RS_BASEMAPS` (key/label per entry), `RS_CLASSES` (road classes in
-the data), `RS_COLOR_OPTIONS`, `RS_OVERLAYS`. The setters work **even with the built-in control
-hidden** — e.g. `basemaps=["voyager", "blank"], basemap_switcher=False` bakes both entries with
-no dropdown, so your own buttons can call `rsSetBasemap("blank")`; only the no-`basemaps=` +
-`basemap_switcher=False` combination bakes just the one fixed backdrop.
-
-**Ready-made scaffolding:** [`ui/`](ui/) holds copyable UI templates built purely on this API —
-`python ui/dashboard/build.py your_edges.gpkg` produces a sidebar dashboard (query box with
-SQL-style syntax, verb buttons, clickable results table that selects and flies to the road, a
-detail panel, base-map and colour-by selects) with every built-in control replaced by plain HTML
-you own; add `--tiles` for big networks (embedded-PMTiles roads — the API the sidebar uses is
-identical). The [studio](ui/studio) has the same *Vector tiles* toggle.
+Everything works the same on overlays (pass the overlay's label as the last argument) and on
+tiled maps. Full API table: [docs/web-backend.md](docs/web-backend.md#the-javascript-api-windowrs).
+Ready-made scaffolding: [`ui/`](ui/) — `python ui/dashboard/build.py your_edges.gpkg [--tiles]`
+builds a complete sidebar dashboard on this API.
 
 ## Settings — one defaults file, your overrides on top
 
 EVERY styling default — palettes, opacities, casing, the width/draw-order model, base map,
-camera, labels, arrows, annotation slots, bridge decks — ships in **one file**,
-`roadstyle/data/defaults.json`. You never edit it: you hand roadstyle a **settings override**
-stating only what changes, in any of five ways (later wins):
+camera, labels, arrows, bridge decks — ships in one file, `roadstyle/data/defaults.json`. You
+never edit it; you state only what changes, at any of five levels (later wins):
 
-1. `~/.config/roadstyle/roadstyle.json` — your personal defaults, every project
-2. `./roadstyle.json` — project-local (next to where you run)
-3. `$ROADSTYLE_CONFIG=/path/to/file.json` — explicit, per run
-4. **from code, at any time**: `rs.use_settings("my.json")` or `rs.use_settings({...})` —
-   highest precedence, applies immediately (no restart), and `rs.use_settings()` with no
-   argument drops it again.
-5. **per call** — no files, no global state:
-   `render_edges(edges, settings={"config": {"labels": {"color": "#8899aa"}}})` applies the
-   override for that one render and restores everything after. Two looks in one script is just
-   two calls with two `settings=` values.
-
-The file layout mirrors `defaults.json` — four sections, all optional, merged per entry
-(a single zoom stop of one width row is a valid complete override):
+1. `~/.config/roadstyle/roadstyle.json` — personal defaults
+2. `./roadstyle.json` — project-local
+3. `$ROADSTYLE_CONFIG=/path/to/file.json` — per run
+4. `rs.use_settings({...})` — from code, applies immediately
+5. `render_edges(..., settings={...})` — this one call only
 
 ```jsonc
 {
-  "palettes": {
-    "highsat": { "service": { "fill": "#E0E0E0" } }    // retint one class; rest inherited
-  },
-  "config": {
-    "basemap": "dark_matter",                          // the primary base map layer
-    "labels": { "color": "#8899aa" },                  // street-name paint
-    "camera": { "pitch_3d": 65, "max_pitch": 85 },     // 3D tilt targets
-    "bridge_decks": { "opacity": 0.6, "flat_below": 15 }, // 3D deck look / LOD
-    "annotations": { "slot_m": 120 },                  // name/arrow slot length
-    "overlays": { "color": "#2d6cdf", "radius": 8 }    // overlay layer defaults
-  },
-  "selection": { "core": "#FF0000" },                  // click-highlight colours
-  "roads": {
-    "z_order": { "service": 5 },                       // draw priority of one class
-    "width":   { "secondary": { "18": 14 } }           // one zoom stop of one width row
-  }
+  "palettes":  { "highsat": { "service": { "fill": "#E0E0E0" } } },   // retint one class
+  "config":    { "basemap": "dark_matter", "labels": { "color": "#8899aa" } },
+  "roads":     { "z_order": { "service": 5 }, "width": { "secondary": { "18": 14 } } }
 }
 ```
 
-Files 1–3 are read **at import** (exist before `import roadstyle`); `use_settings` is the
-**runtime** path and also rebuilds the already-loaded tables, so it works mid-notebook.
-Programmatic palette APIs still exist too: `register_palette(name, table)`, `load_palette(path)`.
-
-## All options at a glance
-
-Every keyword of `render_edges` (full reference: [`docs/parameters.md`](docs/parameters.md)):
-
-| Group | Options |
-|---|---|
-| **Rendering** | `backend` (`"web"` default / `"folium"` / `"lonboard"`) · `palette` (`highsat`/`carto`/`mono`) · `basemap` / `basemaps` (active base map / switcher set) · `name` (page title) · `settings` (per-call settings override, dict or path) |
-| **Camera & 3D** | `pitch` / `bearing` (starting camera) · `view_3d` (tilted camera + extruded ramped bridge decks + on-map 2D/3D toggle) |
-| **Colour by data** | `color_by` + `colors`/`cmap`/`vmin`/`vmax` (categorical / continuous ramps) · `width_by` (scale width by value) · `color_table` (per-edge `{edge_id: colour}`) · `color_options` (several fill sets + client-side *Colour by* dropdown) |
-| **Filtering** | `include` / `exclude` (road classes) · `filter_col` (panel filters by another column) · `minzoom` (hide minor classes when zoomed out — `True` for the built-in table, or a dict) |
-| **UI toggles (web)** | `arrows` · `labels` · `filter_control` · `basemap_switcher` · `road_popup` (`True`/field list/`"all"`/`"panel"`/`False`) · `tooltip` (hover fields) · `hover_color` / `select_color` |
-| **Extra content** | `overlays` (your own layers, under/over the roads) · `boundary` (dashed outline of the clip area) · `selected` (pre-highlighted edges, folium backend) |
-| **Data columns** | `highway_col` (class column) · `tunnel_col` / `bridge_col` / `layer_col` (grade separation) |
-| **Output size** | `compress` (**on by default**) — gzip the inlined GeoJSON (typically 3–4× smaller files; the page inflates it on load; also keeps inline notebook previews under output-size limits). `compress=False` for plain-JSON output · `tiles` — embedded-PMTiles vector tileset for ~10⁵-edge networks (see the size-ceiling note below) |
-
-Everything *stylistic* (colours, widths, casing, labels, arrows, annotation slots, camera
-defaults, bridge decks…) is not a keyword but a **setting** — see the previous section.
-
-**Practical size ceiling:** a saved `web` map carries its data inline (gzipped by default) —
-comfortable to ~10⁴ edges. Past that, pass **`tiles=True`** (`pip install "roadstyle[tiles]"`):
-the roads are packed as an **embedded PMTiles vector tileset** in the same single offline file —
-MapLibre parses only the tiles in view, so ~10⁵-edge maps boot in a couple of seconds and stay
-responsive, with the whole JS API intact. Alternatives: `backend="lonboard"` or pre-filter with
-`include=` — see [docs/engines.md](docs/engines.md) and
-[docs/web-backend.md](docs/web-backend.md#vector-tiles-in-the-file-tilestrue).
+Details: [docs/palettes.md](docs/palettes.md).
 
 ## Command line
 
-No Python required — point the `roadstyle` command at any road file (GPKG, GeoJSON, Shapefile, …):
+No Python required — point the `roadstyle` command at any road file:
 
 ```bash
-roadstyle edges.gpkg -o map.html --basemap dark_matter               # styled interactive map
-roadstyle edges.gpkg -o map3d.html --basemap dark_matter --view-3d   # tilted camera + 3D bridges
-roadstyle edges.gpkg --include motorway trunk primary       # keep only major roads
-roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by your data
-roadstyle edges.gpkg --tooltip name highway maxspeed         # hover tooltip fields (all backends)
-roadstyle edges.gpkg -f spec -o map_data.json               # JSON spec for your own frontend
+roadstyle edges.gpkg -o map.html --basemap dark_matter        # styled interactive map
+roadstyle edges.gpkg --view-3d --tiles                        # 3D + embedded vector tiles
+roadstyle edges.gpkg --include motorway trunk primary
+roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6
+roadstyle edges.gpkg -f spec -o map_data.json                 # JSON spec for your own frontend
 ```
 
-`-f/--format` picks the output: `web` (self-contained MapLibre map, **default**), `folium`
-(interactive folium HTML), `rsjs` (standalone roadstyle.js page), `spec` (JSON), or `geojson`. The
-`web` map takes `--no-arrows` / `--no-labels` / `--no-filter` / `--no-basemap-switcher`. Run
-`roadstyle --help` for every flag — each mirrors a `render_edges` keyword.
-
-## API at a glance
-
-| Function | Purpose |
-|---|---|
-| `render_edges(gdf, *, backend, palette, basemap, view_3d, include/exclude, …)` | filter + render |
-| `from_duckdb(con_or_rel, query=None, *, geometry, crs)` | load edges from any DuckDB connection / relation / query (geometry as WKB via `ST_AsWKB`) |
-| `filter_edges(gdf, include, exclude, …)` / `highway_types(gdf)` | type filtering |
-| `resolve(highway, palette, tunnel, bridge)` | resolve one edge's concrete style |
-| `selection_style(base_width)` | neon-violet selected-edge layers |
-| `PALETTES`, `BASEMAPS` | the palette / base-map tables |
-| `use_settings(path_or_dict)` | apply a settings override from code |
-| `snapshot(map_or_html, "fig.png", center=…, zoom=…, pitch=…)` | static PNG via headless browser (optional `playwright`) |
+Every flag mirrors a `render_edges` keyword; `roadstyle --help` lists them all.
 
 ## Documentation
 
-- **[Gallery](docs/gallery.md)** — one screenshot + recipe per look
-- **[Web backend](docs/web-backend.md)** — the flagship renderer: grade separation, 3D decks, colour options, overlays, the full JS API table
-- **[Parameter reference](docs/parameters.md)** — every keyword
-- **[Palettes](docs/palettes.md)** — the built-in palettes and how to override them
-- **[Notebooks](notebooks/)** — a runnable manual, one topic per notebook (see [docs/examples.md](docs/examples.md))
-- **[UI templates](ui/)** — copyable scaffolding over the JS API (sidebar dashboard)
-- Full MkDocs site: [`docs/`](docs/index.md) (`mkdocs serve`)
+| | |
+|---|---|
+| [Gallery](docs/gallery.md) | one screenshot + recipe per look |
+| [Parameter reference](docs/parameters.md) | every keyword, type, and default |
+| [Web backend](docs/web-backend.md) | grade separation, 3D, vector tiles, colour options, the full JS API |
+| [Choosing an engine](docs/engines.md) | web vs folium vs lonboard, data-size guidance |
+| [Palettes & settings](docs/palettes.md) | the built-in palettes and the override system |
+| [When to use roadstyle](docs/comparison.md) | vs `.explore()`, prettymaps, kepler.gl, raw MapLibre |
+| [Notebooks](notebooks/) | a runnable manual, one topic per notebook |
+| [UI templates](ui/) | the dashboard scaffolding + the studio |
 
-Styling spec is transcribed from the cartographic design docs in the `osm-traffic-enrichment`
-project.
+Full MkDocs site: [khoshkhah.github.io/roadstyle](https://khoshkhah.github.io/roadstyle/)
+(`mkdocs serve` locally).
+
+## License
+
+[MIT](LICENSE). Base-map tiles are third-party services (CARTO, OSM, Esri) with their own
+attribution and terms; the styling spec is transcribed from the cartographic design docs in the
+osm-traffic-enrichment project.
