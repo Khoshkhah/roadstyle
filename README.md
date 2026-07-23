@@ -77,6 +77,10 @@ pip install -e ".[dev]"
 pytest                               # 160 tests; browser tests need `pip install playwright`
 ```
 
+**Uninstall:** `pip uninstall roadstyle`. Your personal settings overrides
+(`~/.config/roadstyle/roadstyle.json`, project-local `roadstyle.json`) are your files — pip
+leaves them in place; delete them yourself if you want a clean slate.
+
 ## Quickstart
 
 ```python
