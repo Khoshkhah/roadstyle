@@ -286,7 +286,8 @@ def _bridge_decks(geo, dk):
     for fi, ft in enumerate(geo["features"]):
         g, p = ft.get("geometry") or {}, ft.get("properties", {})
         c = g.get("coordinates") or []
-        if p.get("lvl") != 1 or g.get("type") != "LineString" or len(c) < 2:
+        # any bridge level (lvl carries the OSM layer: 1, 2, 3…) earns a deck ribbon
+        if (p.get("lvl") or 0) < 1 or g.get("type") != "LineString" or len(c) < 2:
             continue
         a = (round(c[0][0], 6), round(c[0][1], 6))
         z = (round(c[-1][0], 6), round(c[-1][1], 6))
@@ -483,23 +484,26 @@ def _truthy(v):
 
 
 def _mark_lvl(geo, tunnel_col, bridge_col, layer_col):
-    """Elevation per edge: bridge -> +1 (drawn on top), tunnel -> -1 (drawn underneath), else a
-    negative OSM `layer` tag -> -1, else 0. Lets the sort key keep grade-separated roads from
-    looking connected. Defaults to 0 when the columns aren't present (no tunnel/bridge info).
+    """Elevation per edge: bridge -> its OSM ``layer`` (min +1, drawn on top), tunnel -> its
+    ``layer`` (max -1, drawn underneath), else a negative ``layer`` alone -> that value, else 0.
+    Carrying the actual layer number (not just ±1) lets the sort key order STACKED structures —
+    a viaduct at layer=3 draws over a footbridge at layer=1, not by class importance.
+    Defaults to 0 when the columns aren't present (no tunnel/bridge info).
 
     A positive `layer` alone does NOT promote to bridge level: only the bridge column earns the
     bridge treatment (2D deck styling, 3D extrusions) — a `layer=1` embankment isn't a bridge."""
     for ft in geo["features"]:
         p = ft.setdefault("properties", {})
+        try:
+            ly = int(float(p.get(layer_col)))
+        except (TypeError, ValueError):
+            ly = 0
         if _truthy(p.get(bridge_col)):
-            lvl = 1
+            lvl = max(1, ly)
         elif _truthy(p.get(tunnel_col)):
-            lvl = -1
+            lvl = min(-1, ly)
         else:
-            try:
-                lvl = -1 if int(float(p.get(layer_col))) < 0 else 0
-            except (TypeError, ValueError):
-                lvl = 0
+            lvl = min(ly, 0)
         p["lvl"] = lvl
 
 
@@ -1082,13 +1086,29 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     dashes = sorted({(f.get("properties") or {}).get("__rs_dash")
                      for f in geo["features"]} - {None, ""})
     if dashes:
-        nod = ["!", ["has", "__rs_dash"]]
+        # NOT-dashed. Null-safe on purpose: __rs_dash is baked as null on solid edges, and
+        # MapLibre's ["has"] counts a present-null as true — an ["!",["has",…]] filter silently
+        # dropped every solid road from the fill/casing layers of any map with dashed classes.
+        nod = ["!", ["to-boolean", ["get", "__rs_dash"]]]
         relayered = []
         for l in style["layers"]:
             relayered.append(l)
             lid, base_f = l["id"], l.get("filter")
             if lid in ("roads-fill", "roads-tunnel-fill", "roads-bridge-fill"):
                 for di, ds in enumerate(dashes):
+                    if lid == "roads-bridge-fill":
+                        # a dashed BRIDGE still needs a deck: solid underlay in the class's own
+                        # (light) casing colour beneath the dashes — with the black bridge
+                        # casing kept below, that's the osm-carto footbridge sandwich. Without
+                        # it the ground shows through the gaps and a path crossing UNDER the
+                        # bridge reads as if it ran over it.
+                        relayered.append(
+                            {**l, "id": f"{lid}-deck{di}",
+                             "layout": {**l.get("layout", {}), "line-cap": "butt"},
+                             "filter": ["all", base_f, ["==", ["get", "__rs_dash"], ds]],
+                             "paint": {**l["paint"],
+                                       "line-color": ["coalesce", ["get", "__rs_casing"],
+                                                      "#f2f2f2"]}})
                     relayered.append(
                         {**l, "id": f"{lid}-dash{di}",
                          "layout": {**l.get("layout", {}), "line-cap": "butt"},
@@ -1096,7 +1116,9 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                          "paint": {**l["paint"],
                                    "line-dasharray": [float(x) for x in ds.split(",")]}})
                 l["filter"] = ["all", base_f, nod]
-            elif lid in ("roads-casing", "roads-tunnel-casing", "roads-bridge-casing"):
+            elif lid in ("roads-casing", "roads-tunnel-casing"):
+                # surface/tunnel dashed classes stay casing-less (gaps show the ground); the
+                # BRIDGE casing deliberately keeps them — the deck edge is what says "bridge"
                 l["filter"] = ["all", base_f, nod]
         style["layers"] = relayered
 

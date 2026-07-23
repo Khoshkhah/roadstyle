@@ -29,6 +29,22 @@ First PyPI release.
   and notebook/studio previews of tiled maps keep the vendored MapLibre v4 (the CDN v3 preview
   predates promise-style `addProtocol`).
 
+### Fixed (grade separation on walking/cycling networks)
+- **Solid roads vanished from maps with dashed classes**: `__rs_dash` is baked as null on
+  non-dashed edges and MapLibre's `["has"]` counts a present-null as true — the not-dashed
+  exclusion filter silently dropped every solid-class road from the fill/casing layers, so
+  walking/cycling maps showed the *basemap's* streets instead of roadstyle's (and stacking
+  around bridges looked wrong). The filter is now null-safe (`to-boolean`).
+- **Stacked structures order by OSM `layer`**: `lvl` now carries the layer value (bridge ≥ +1,
+  tunnel ≤ −1), so a layer=3 viaduct draws above a layer=1 footbridge instead of falling back
+  to class importance.
+- **Dashed-class bridges get a real deck**: the black bridge casing now includes footway /
+  cycleway / path bridges, with a solid underlay (the class's light casing colour) beneath the
+  dashes — the osm-carto footbridge look. Previously a path bridge drew as bare floating
+  dashes, letting whatever passed underneath show through the gaps.
+- Studio: tiled maps preview correctly (embedded directly — the srcdoc-iframe wrapper died
+  inside Streamlit's component iframe) and show an "embedded vector tiles" badge.
+
 ### Added (release engineering)
 - CI: lint + tests on Python 3.10–3.13, plus a headless-Chromium smoke test that boots a saved
   map and asserts the data reached MapLibre (`tests/test_web_smoke.py`).

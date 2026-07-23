@@ -604,6 +604,43 @@ def test_dashed_path_classes_get_dash_layers():
     assert "__rs_dash" in json.dumps(lay["roads-casing"]["filter"])    # no casing band either
 
 
+def test_dashed_bridge_gets_deck_underlay_and_casing():
+    """A footway/cycleway BRIDGE still reads as a bridge: the black bridge casing keeps dashed
+    classes, and a solid underlay (the class's light casing colour) sits beneath the dashes —
+    so a path crossing UNDER it can't show through the gaps (the osm-carto footbridge look)."""
+    g = gpd.GeoDataFrame(
+        {"highway": ["footway", "residential"], "bridge": ["yes", None]},
+        geometry=[LineString([(18.0, 59.30), (18.01, 59.305)]),
+                  LineString([(18.0, 59.305), (18.01, 59.30)])], crs=4326)
+    style = _style(render_edges(g, backend="web").html)
+    lay = {l["id"]: l for l in style["layers"]}
+    ids = [l["id"] for l in style["layers"]]
+    assert "__rs_dash" not in json.dumps(lay["roads-bridge-casing"]["filter"])  # casing kept
+    deck = lay["roads-bridge-fill-deck0"]
+    dash = lay["roads-bridge-fill-dash0"]
+    assert "__rs_casing" in json.dumps(deck["paint"]["line-color"])    # solid deck underlay
+    assert "line-dasharray" not in deck["paint"]
+    assert ids.index("roads-bridge-fill-deck0") < ids.index("roads-bridge-fill-dash0")
+    assert "line-dasharray" in dash["paint"]
+
+
+def test_stacked_bridges_order_by_osm_layer():
+    """Bridges carry their OSM `layer` in lvl (min 1), so a layer=3 viaduct sorts above a
+    layer=1 footbridge instead of falling back to class importance; tunnels mirror it (max -1),
+    and a positive layer alone still isn't a bridge."""
+    g = gpd.GeoDataFrame(
+        {"highway": ["footway", "residential", "residential", "residential"],
+         "bridge": ["yes", "yes", None, None],
+         "tunnel": [None, None, "yes", None],
+         "layer": ["1", "3", "-2", "1"]},
+        geometry=[LineString([(18.0 + i * 0.01, 59.30), (18.0 + i * 0.01, 59.31)])
+                  for i in range(4)], crs=4326)
+    style = _style(render_edges(g, backend="web").html)
+    lvls = {f["properties"]["highway"] + str(i): f["properties"]["lvl"]
+            for i, f in enumerate(style["sources"]["roads"]["data"]["features"])}
+    assert list(lvls.values()) == [1, 3, -2, 0]
+
+
 def test_twoway_bridge_decks_split_per_directed_edge():
     """A two-way bridge gets TWO side-by-side half ribbons — one per directed twin — each baked
     with __rs_edges = its own road feature id, so hover/select separates the directions instead
