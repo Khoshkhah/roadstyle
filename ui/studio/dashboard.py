@@ -21,31 +21,31 @@ with st.sidebar:
 
     edges, loader = data_section()
 
-    st.subheader("Look")
-    all_bms = list(rs.BASEMAPS)
-    bms = st.multiselect("Base maps offered", all_bms,
-                         default=[b for b in ("voyager", "positron", "dark_matter", "osm",
-                                              "satellite", "blank") if b in all_bms])
-    basemap = st.selectbox("Initial base map", bms or all_bms)
-    view_3d = st.checkbox("3D bridges", value=True)
-    tiles = st.checkbox("Vector tiles (big networks)", value=False,
-                        disabled=not tiles_available(),
-                        help="Embedded-PMTiles tileset in the same single file — ~10⁵-edge maps "
-                             "stay responsive. Needs `pip install \"roadstyle[tiles]\"`.")
-    minzoom = st.checkbox("Hide minor roads when zoomed out", value=False,
-                          help="The built-in per-class `minzoom` table — residential/service "
-                               "appear as you zoom in (thins low-zoom tiles too).")
-    title = st.text_input("Title", value="Roads dashboard")
+    with st.expander("Look", expanded=True):
+        all_bms = list(rs.BASEMAPS)
+        bms = st.multiselect("Base maps offered", all_bms,
+                             default=[b for b in ("voyager", "positron", "dark_matter", "osm",
+                                                  "satellite", "blank") if b in all_bms])
+        basemap = st.selectbox("Initial base map", bms or all_bms)
+        view_3d = st.checkbox("3D bridges", value=True)
+        tiles = st.checkbox("Vector tiles (big networks)", value=False,
+                            disabled=not tiles_available(),
+                            help="Embedded-PMTiles tileset in the same single file — ~10⁵-edge "
+                                 "maps stay responsive. Needs `pip install \"roadstyle[tiles]\"`.")
+        minzoom = st.checkbox("Hide minor roads when zoomed out", value=False,
+                              help="The built-in per-class `minzoom` table — residential/service "
+                                   "appear as you zoom in (thins low-zoom tiles too).")
+        title = st.text_input("Title", value="Roads dashboard")
 
-    st.subheader("Colour-by options")
-    num_cols = list(edges.select_dtypes("number").columns)
-    co_cols = st.multiselect("Columns (besides road class)", num_cols,
-                             default=[c for c in ("maxspeed_kmh", "lanes") if c in num_cols])
-    color_options = {"Class": {}}
-    for i, c in enumerate(co_cols):
-        cm = st.selectbox(f"↳ colormap for {c}", CMAPS, index=(i + 1) % len(CMAPS),
-                          key=f"cm_{c}")
-        color_options[c] = {"color_by": c, "cmap": cm}
+    with st.expander("Colour-by options", expanded=False):
+        num_cols = list(edges.select_dtypes("number").columns)
+        co_cols = st.multiselect("Columns (besides road class)", num_cols,
+                                 default=[c for c in ("maxspeed_kmh", "lanes") if c in num_cols])
+        color_options = {"Class": {}}
+        for i, c in enumerate(co_cols):
+            cm = st.selectbox(f"↳ colormap for {c}", CMAPS, index=(i + 1) % len(CMAPS),
+                              key=f"cm_{c}")
+            color_options[c] = {"color_by": c, "cmap": cm}
 
     overlays, ov_lines = overlay_section()
 

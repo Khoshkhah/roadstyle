@@ -33,6 +33,8 @@ class Overlay:
     label : the name shown in the *Layers* toggle (defaults to ``"Layer N"``).
     popup : property fields to show when a feature is clicked; if set, the layer is interactive.
         Pass ``[]`` for a non-interactive overlay (decoration only).
+    tooltip : property fields to show in a HOVER tooltip (independent of ``popup``, exactly like
+        the road layer's ``tooltip`` vs ``road_popup``). ``None``/``[]`` = hover only highlights.
     """
     data: object
     kind: str | None = None
@@ -44,6 +46,7 @@ class Overlay:
     width: float | None = None
     label: str | None = None
     popup: list[str] | None = None
+    tooltip: list[str] | None = None
     visible: bool = True               # initial visibility (the Layers toggle starts checked/unchecked to match)
 
 

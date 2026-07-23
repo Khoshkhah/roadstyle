@@ -39,21 +39,21 @@ def load_edges(path: str, blob: bytes | None, blob_name: str | None):
 
 
 def data_section():
-    """The sidebar "Data" block. Returns ``(edges, loader)`` — the GeoDataFrame and the code
-    line that loads it."""
-    st.subheader("Data")
-    up = st.file_uploader("Road file (.gpkg / .geojson)", type=["gpkg", "geojson", "json"])
-    pick = st.selectbox("…or a sample network", list(ROAD_SAMPLES),
-                        disabled=up is not None,
-                        help="Södermalm (Stockholm), exported with `duckosm export-gis`")
-    path = str(ROAD_SAMPLES[pick])
-    try:
-        edges = load_edges(path, up.getvalue() if up else None,
-                           up.name if up else None)
-    except Exception as e:
-        st.error(f"Could not load edges: {e}")
-        st.stop()
-    st.caption(f"{len(edges):,} edges loaded")
+    """The sidebar "Data" block (collapsible). Returns ``(edges, loader)`` — the GeoDataFrame
+    and the code line that loads it."""
+    with st.expander("Data", expanded=True):
+        up = st.file_uploader("Road file (.gpkg / .geojson)", type=["gpkg", "geojson", "json"])
+        pick = st.selectbox("…or a sample network", list(ROAD_SAMPLES),
+                            disabled=up is not None,
+                            help="Södermalm (Stockholm), exported with `duckosm export-gis`")
+        path = str(ROAD_SAMPLES[pick])
+        try:
+            edges = load_edges(path, up.getvalue() if up else None,
+                               up.name if up else None)
+        except Exception as e:
+            st.error(f"Could not load edges: {e}")
+            st.stop()
+        st.caption(f"{len(edges):,} edges loaded")
     loader = (f'edges = gpd.read_file("{up.name}")' if up
               else f'edges = gpd.read_file("ui/studio/samples/{Path(path).name}")')
     return edges, loader
@@ -71,13 +71,14 @@ def overlay_section():
     """The sidebar "Overlays" block: each uploaded (or sample) file becomes one
     :class:`rs.Overlay`. Returns ``(overlays, code_lines)`` — the objects and the
     ``ovN = rs.Overlay(...)`` lines."""
-    st.subheader("Overlays")
-    ups = st.file_uploader("Zones / POIs / lines (.gpkg / .geojson)",
-                           type=["gpkg", "geojson", "json"],
-                           accept_multiple_files=True, key="ov_files")
-    samples = {p.stem: p for p in sorted(SAMPLES_DIR.glob("*.geojson"))
-               if p not in ROAD_SAMPLES.values()}
-    picks = st.multiselect("…or sample overlays", list(samples), key="ov_samples")
+    exp = st.expander("Overlays", expanded=False)
+    with exp:
+        ups = st.file_uploader("Zones / POIs / lines (.gpkg / .geojson)",
+                               type=["gpkg", "geojson", "json"],
+                               accept_multiple_files=True, key="ov_files")
+        samples = {p.stem: p for p in sorted(SAMPLES_DIR.glob("*.geojson"))
+                   if p not in ROAD_SAMPLES.values()}
+        picks = st.multiselect("…or sample overlays", list(samples), key="ov_samples")
     # (display name, bytes, the path the generated code should read)
     files = ([(u.name, u.getvalue(), u.name) for u in (ups or [])]
              + [(samples[k].name, samples[k].read_bytes(), f"ui/studio/samples/{k}.geojson")
@@ -85,7 +86,8 @@ def overlay_section():
     overlays, lines = [], []
     for i, (fname, blob, code_path) in enumerate(files):
         gdf = load_overlay(blob, fname)
-        with st.expander(fname, expanded=True):
+        with exp:                       # expanders can't nest: flat group per file, with a rule
+            st.markdown(("---\n" if i else "") + f"**{fname}**")
             c1, c2 = st.columns([3, 1])
             label = c1.text_input("Label", value=Path(fname).stem, key=f"ov_l{i}")
             color = c2.color_picker("Colour", value=OV_COLORS[i % len(OV_COLORS)],
@@ -93,10 +95,19 @@ def overlay_section():
             under = st.checkbox("Under the roads", key=f"ov_u{i}",
                                 value=bool(len(gdf)) and "Polygon" in gdf.geom_type.iloc[0],
                                 help="zones go under, POIs go over")
-            click = st.checkbox("Clickable (popup of its fields)", value=True, key=f"ov_p{i}")
-        popup = [c for c in gdf.columns if c != gdf.geometry.name] if click else []
+            cols = [c for c in gdf.columns if c != gdf.geometry.name]
+            # same split the road layer has: click popup fields vs hover tooltip fields
+            popup = st.multiselect("Click popup columns", cols, default=cols, key=f"ov_p{i}",
+                                   help="Shown on click (popup + the dashboard sidebar). "
+                                        "Empty = not clickable.")
+            tooltip = st.multiselect("Hover tooltip columns", cols, default=[], key=f"ov_t{i}",
+                                     help="Follows the mouse. Empty = hover only highlights.")
         place = "under" if under else "over"
-        overlays.append(rs.Overlay(gdf, label=label, color=color, placement=place, popup=popup))
-        lines.append(f'ov{i} = rs.Overlay(gpd.read_file("{code_path}"), label={label!r}, '
-                     f'color={color!r}, placement={place!r}, popup={popup!r})')
+        kw = dict(label=label, color=color, placement=place, popup=popup)
+        arg = (f'label={label!r}, color={color!r}, placement={place!r}, popup={popup!r}')
+        if tooltip:
+            kw["tooltip"] = tooltip
+            arg += f", tooltip={tooltip!r}"
+        overlays.append(rs.Overlay(gdf, **kw))
+        lines.append(f'ov{i} = rs.Overlay(gpd.read_file("{code_path}"), {arg})')
     return overlays, lines

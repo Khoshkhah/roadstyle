@@ -108,7 +108,10 @@ function fieldRows(p, only){
   return ks.map(k => "<b>" + k + "</b>: " + p[k]).join("<br>");
 }
 document.addEventListener("rs:select", e => {
-  let h = fieldRows(e.detail.properties);
+  let h = "";
+  if (e.detail.overlay)                       // an overlay feature (sensor/zone) was clicked
+    h += '<span style="color:#888">' + e.detail.overlay + '</span><br>';
+  h += fieldRows(e.detail.properties, e.detail.fields);
   (e.detail.overlays || []).forEach(o => {
     h += '<hr style="border:none;border-top:1px solid #e2e2e2;margin:6px 0">' +
          '<span style="color:#888">' + o.label + '</span><br>' + fieldRows(o.properties, o.fields);

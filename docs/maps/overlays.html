@@ -406,7 +406,7 @@ if(COLOR_OPTIONS.some(o=>o.legend)){
 // visual stacking: "over" overlays (in front of the roads) win, then roads, then "under"
 // overlays (zone fills) — and a selected road also reports the interactive overlays under the
 // click (rs:select detail.overlays), so a sidebar can show the road AND its zone together.
-const OVERLAYS = [{"label": "TAZ zones", "source": "ov0", "layers": ["ov0-fill", "ov0-outline"], "hit": "ov0-fill", "visible": true, "color": "#6aa9ff", "popup": ["taz_id", "name", "weight"], "under": true, "interactive": true}, {"label": "POIs", "source": "ov1", "layers": ["ov1-circle"], "hit": "ov1-circle", "visible": true, "color": "#ff5d5d", "popup": ["name", "type"], "under": false, "interactive": true}];
+const OVERLAYS = [{"label": "TAZ zones", "source": "ov0", "layers": ["ov0-fill", "ov0-outline"], "hit": "ov0-fill", "visible": true, "color": "#6aa9ff", "popup": ["taz_id", "name", "weight"], "tooltip": null, "under": true, "interactive": true}, {"label": "POIs", "source": "ov1", "layers": ["ov1-circle"], "hit": "ov1-circle", "visible": true, "color": "#ff5d5d", "popup": ["name", "type"], "tooltip": null, "under": false, "interactive": true}];
 let _ovSel=null, _ovHov=null;                              // {source,id} of the selected / hovered overlay feature
 function _ovState(ref, st){ if(ref) map.setFeatureState({source:ref.source, id:ref.id}, st); }
 function clearOvSel(){ _ovState(_ovSel,{select:false}); _ovSel=null; }
@@ -435,24 +435,38 @@ function handleOverlayClick(e, tier){                      // info popup only on
     const hits = ids.length ? map.queryRenderedFeatures(e.point, {layers:ids}) : [];
     if(hits.length){
       const f = hits[0], p = f.properties||{};
+      rsDeselect();                                        // road selection yields to the overlay
       _ovState(_ovSel,{select:false}); _ovSel={source:ov.source, id:f.id}; _ovState(_ovSel,{select:true});
       const fields = ov.popup && ov.popup.length ? ov.popup : Object.keys(p);
       const rows = fields.filter(k=>p[k]!=null && p[k]!=="").map(k=>"<b>"+k+"</b>: "+p[k]);
       new maplibregl.Popup({closeButton:true,maxWidth:"260px"})
         .setLngLat(e.lngLat).setHTML(rows.join("<br>")||"(no data)").addTo(map)
         .on("close", clearOvSel);
+      // overlay clicks feed dashboards exactly like road clicks: rs:select with the overlay's
+      // label + popup fields, so a sidebar shows sensor/zone info without extra wiring
+      document.dispatchEvent(new CustomEvent("rs:select",
+        {detail:{id:f.id, layer:ov.label, overlay:ov.label, fields:fields, properties:p}}));
       return true;
     }
   }
   return false;
 }
-OVERLAYS.forEach(ov=>{ if(!ov.interactive) return; ov.layers.forEach(id=>{
-  map.on("mousemove", id, e=>{ map.getCanvas().style.cursor="pointer";   // hover -> recolour (no popup)
+// one shared hover tooltip for every overlay that asked for one (Overlay(tooltip=[...]))
+const _ovTip = OVERLAYS.some(o=>o.tooltip && o.tooltip.length)
+  ? new maplibregl.Popup({closeButton:false, closeOnClick:false, maxWidth:"260px",
+                          offset:10, className:"rs-tip"}) : null;
+OVERLAYS.forEach(ov=>{ if(!(ov.interactive || (ov.tooltip && ov.tooltip.length))) return;
+ ov.layers.forEach(id=>{
+  map.on("mousemove", id, e=>{ map.getCanvas().style.cursor="pointer";   // hover -> recolour
     const f = e.features && e.features[0]; if(!f) return;
     if(_ovHov && !(_ovHov.source===ov.source && _ovHov.id===f.id)) _ovState(_ovHov,{hover:false});
-    _ovHov={source:ov.source, id:f.id}; _ovState(_ovHov,{hover:true}); });
+    _ovHov={source:ov.source, id:f.id}; _ovState(_ovHov,{hover:true});
+    if(_ovTip && ov.tooltip && ov.tooltip.length){
+      _ovTip.setLngLat(e.lngLat).setHTML(_rfields(f.properties||{}, ov.tooltip));
+      if(!_ovTip.isOpen()) _ovTip.addTo(map); } });
   map.on("mouseleave", id, ()=>{ map.getCanvas().style.cursor="";
-    _ovState(_ovHov,{hover:false}); _ovHov=null; });
+    _ovState(_ovHov,{hover:false}); _ovHov=null;
+    if(_ovTip) _ovTip.remove(); });
 }); });
 // window.rsSetOverlay(label, on) shows/hides one overlay; the Layers control is UI over it.
 const _ovCbs={};
@@ -613,9 +627,11 @@ map.on("click", e=>{
   // visual stacking decides the click: an "over" overlay (POIs, in front of the roads) wins;
   // then the roads; an "under" overlay (zone fills) only when the click missed every road —
   // so a road inside a zone stays selectable and still feeds rs:select / the sidebar.
-  if(handleOverlayClick(e, "over")){ rsDeselect(); return; }
+  // (handleOverlayClick deselects the road itself BEFORE dispatching the overlay's rs:select,
+  // so the sidebar isn't wiped by a trailing rs:deselect.)
+  if(handleOverlayClick(e, "over")) return;
   const f = pick(e.point);
-  if(!f){ handleOverlayClick(e, "under"); rsDeselect(); return; }
+  if(!f){ if(!handleOverlayClick(e, "under")) rsDeselect(); return; }
   clearOvSel();
   if(_sel) setS(_sel,{select:false});
   _sel = hitOf(f); setS(_sel,{select:true});

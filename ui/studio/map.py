@@ -18,54 +18,58 @@ with st.sidebar:
 
     edges, loader = data_section()
 
-    st.subheader("Look")
-    palette = st.selectbox("Palette", ["highsat", "carto", "mono"])
-    basemap = st.selectbox("Base map", list(rs.BASEMAPS), index=0)
-    view_3d = st.checkbox("3D bridges (tilted view)", value=False)
-    tiles = st.checkbox("Vector tiles (big networks)", value=False,
-                        disabled=not tiles_available(),
-                        help="Embedded-PMTiles tileset in the same single file — ~10⁵-edge maps "
-                             "stay responsive. Needs `pip install \"roadstyle[tiles]\"`.")
+    with st.expander("Look", expanded=True):
+        palette = st.selectbox("Palette", ["highsat", "carto", "mono"])
+        basemap = st.selectbox("Base map", list(rs.BASEMAPS), index=0)
+        view_3d = st.checkbox("3D bridges (tilted view)", value=False)
+        tiles = st.checkbox("Vector tiles (big networks)", value=False,
+                            disabled=not tiles_available(),
+                            help="Embedded-PMTiles tileset in the same single file — ~10⁵-edge "
+                                 "maps stay responsive. Needs `pip install \"roadstyle[tiles]\"`.")
     kw = {"palette": palette, "basemap": basemap}
     if view_3d:
         kw["view_3d"] = True
     if tiles:
         kw["tiles"] = True
 
-    st.subheader("Colour by data")
-    cols = [c for c in edges.columns if c != edges.geometry.name]
-    color_by = st.selectbox("Column", ["(road class)"] + cols)
-    cmap = st.selectbox("Colormap", CMAPS) if color_by != "(road class)" else None
+    with st.expander("Colour by data", expanded=False):
+        cols = [c for c in edges.columns if c != edges.geometry.name]
+        color_by = st.selectbox("Column", ["(road class)"] + cols)
+        cmap = st.selectbox("Colormap", CMAPS) if color_by != "(road class)" else None
     if cmap:
         kw.update({"color_by": color_by, "cmap": cmap, "legend": True})
 
-    st.subheader("Filter")
-    classes = sorted(rs.highway_types(edges))
-    keep = st.multiselect("Road classes", classes, default=classes)
+    with st.expander("Filter", expanded=False):
+        classes = sorted(rs.highway_types(edges))
+        keep = st.multiselect("Road classes", classes, default=classes)
+        minzoom = st.checkbox("Hide minor roads when zoomed out", value=False,
+                              help="The built-in per-class `minzoom` table — residential/service "
+                                   "appear as you zoom in (with Vector tiles on, low-zoom tiles "
+                                   "thin out too).")
     if set(keep) != set(classes):
         kw["include"] = keep
-    if st.checkbox("Hide minor roads when zoomed out", value=False,
-                   help="The built-in per-class `minzoom` table — residential/service appear "
-                        "as you zoom in (with Vector tiles on, low-zoom tiles thin out too)."):
+    if minzoom:
         kw["minzoom"] = True
 
-    st.subheader("Decorations")
-    labels = st.checkbox("Street names", value=True)
-    arrows = st.checkbox("One-way arrows", value=True)
+    with st.expander("Decorations", expanded=False):
+        labels = st.checkbox("Street names", value=True)
+        arrows = st.checkbox("One-way arrows", value=True)
     if not labels:
         kw["labels"] = False
     if not arrows:
         kw["arrows"] = False
 
-    st.subheader("Popup & hover")
-    popup_mode = st.selectbox("Click popup", ["curated fields", "choose columns", "side panel",
-                                              "all columns", "off"])
-    if popup_mode == "choose columns":
-        kw["road_popup"] = st.multiselect("Popup columns", cols,
-                                          default=[c for c in DEFAULT_ROAD_POPUP if c in cols])
-    elif popup_mode != "curated fields":
-        kw["road_popup"] = {"side panel": "panel", "all columns": "all", "off": False}[popup_mode]
-    hover = st.multiselect("Hover tooltip columns", cols)
+    with st.expander("Popup & hover", expanded=False):
+        popup_mode = st.selectbox("Click popup", ["curated fields", "choose columns",
+                                                  "side panel", "all columns", "off"])
+        if popup_mode == "choose columns":
+            kw["road_popup"] = st.multiselect(
+                "Popup columns", cols,
+                default=[c for c in DEFAULT_ROAD_POPUP if c in cols])
+        elif popup_mode != "curated fields":
+            kw["road_popup"] = {"side panel": "panel", "all columns": "all",
+                                "off": False}[popup_mode]
+        hover = st.multiselect("Hover tooltip columns", cols)
     if hover:
         kw["tooltip"] = hover
 

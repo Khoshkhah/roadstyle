@@ -61,6 +61,13 @@ First PyPI release.
   overlays under the click — the popup/panel appends a section per overlay, `rs:select`
   carries `detail.overlays` (`[{label, fields, properties}]`), and the dashboard sidebar
   renders road + zone together.
+- **Overlay hover tooltips** (`Overlay(tooltip=[...])`): overlays get the same split the road
+  layer has — `popup` fields on click, `tooltip` fields following the mouse. Direct clicks on
+  ANY interactive overlay (sensors/POIs included, not just zones under a road) now dispatch
+  `rs:select` (`detail.overlay` = its label), so dashboard sidebars show overlay info without
+  extra wiring.
+- Studio: every sidebar section is a collapsible expander (Data and Look start open); each
+  overlay gets "Click popup columns" and "Hover tooltip columns" pickers.
 - Studio: tiled maps preview correctly and show an "embedded vector tiles" badge. Vendored
   MapLibre v4 stalls ANY roads source (GeoJSON or vector) inside sandboxed iframes, so tiled
   previews go through the same CDN v3 slim variant as inline ones — pmtiles.js's Protocol is

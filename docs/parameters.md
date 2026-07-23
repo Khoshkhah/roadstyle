@@ -255,6 +255,7 @@ compiler. See [web backend → Overlay layers](web-backend.md#overlay-layers-ove
 | `width` | px | `2.0` | Line / fill-outline width. |
 | `label` | str / `None` | `None` | Name shown in the *Layers* toggle (default `"Layer N"`). |
 | `popup` | list / `None` | `None` | Fields shown when a feature is clicked (makes the layer interactive). `None` = show all fields; `[]` = non-interactive (decoration only). |
+| `tooltip` | list / `None` | `None` | Fields shown in a **hover** tooltip that follows the mouse — independent of `popup`, exactly like the road layer's `tooltip` vs `road_popup`. `None`/`[]` = hover only highlights. |
 
 ```python
 from shapely.geometry import box
