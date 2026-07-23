@@ -37,6 +37,17 @@ body.rs-panel #map{right:320px}
   font-size:11px;letter-spacing:.6px;text-transform:uppercase}
 .rs-side-x,.rs-side-min{cursor:pointer;color:#999;font:700 16px/1 sans-serif;padding:0 3px}
 .rs-side-x:hover,.rs-side-min:hover{color:#333}
+.rs-side-q{padding:9px 14px;border-bottom:1px solid #ececec}
+.rs-side-q input{width:100%;box-sizing:border-box;padding:6px 9px;border:1px solid #ddd;
+  border-radius:5px;font:12.5px system-ui,sans-serif;outline:none}
+.rs-side-q input:focus{border-color:#7c4dff}
+.rs-side-q-res{max-height:200px;overflow:auto}
+.rs-qrow{padding:4px 2px;border-bottom:1px solid #f3f3f3;cursor:pointer;display:flex;
+  justify-content:space-between;gap:10px;font-variant-numeric:tabular-nums}
+.rs-qrow:hover{background:#f7f5ff}
+.rs-qrow b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rs-qrow span{color:#8a8a8a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:58%}
+.rs-qmore{color:#9a9a9a;padding:5px 2px;font-size:12px}
 /* a slot for host-page controls (filters, toggles) pinned above the record */
 .rs-side-tools{padding:9px 14px;border-bottom:1px solid #ececec;display:none}
 .rs-side-tools:not(:empty){display:block}
@@ -105,6 +116,8 @@ function _sideInit(){
   const sd=document.createElement("div"); sd.className="rs-side";
   sd.innerHTML='<div class="rs-side-hd"><span>'+(document.title||"Map")+'</span>'+
     '<span class="rs-side-min" title="Hide panel">&raquo;</span></div>'+
+    '<div class="rs-side-q"><input type="search" placeholder="Search roads\u2026" spellcheck="false">'+
+    '<div class="rs-side-q-res"></div></div>'+
     '<div class="rs-side-ctl"></div><div class="rs-side-tools"></div>'+
     '<div class="rs-side-hd rs-side-hd2"><span>Selected road</span>'+
     '<span class="rs-side-x" title="Clear selection">×</span></div>'+
@@ -114,6 +127,33 @@ function _sideInit(){
   sd.querySelector(".rs-side-min").onclick=()=>{ rsPanelShow(false); };
   _sideBd=sd.querySelector(".rs-side-bd");
   _sideCtl=sd.querySelector(".rs-side-ctl");
+  // search: substring over the curated popup fields (or every public prop), 30 rows max;
+  // clicking a row selects the road (record + highlight, exactly like a map click) and flies to it
+  const qin=sd.querySelector(".rs-side-q input"), qres=sd.querySelector(".rs-side-q-res");
+  function _sideSearch(q){
+    q=(q||"").trim().toLowerCase();
+    if(q.length<2){ qres.innerHTML=""; return; }
+    const only=(_popupFields&&_popupFields.length)?_popupFields:null, info=[];
+    const ids=rsQuery(function(p){
+      const ks=only||Object.keys(p);
+      for(const k of ks){ if(k[0]==="_"||k==="twoway"||k==="lvl") continue;
+        const v=p[k]; if(v==null) continue; const t=(""+v).toLowerCase();
+        if(t!==""&&t!=="nan"&&t.indexOf(q)>=0){ info.push([k, ""+v, p.name!=null?""+p.name:""]); return true; } }
+      return false;
+    });
+    const n=Math.min(ids.length,30); let h="";
+    for(let i=0;i<n;i++){ const k=info[i][0], v=info[i][1], nm=info[i][2];
+      const lab=(nm&&nm.toLowerCase()!=="nan")?nm:v;
+      h+='<div class="rs-qrow" data-id="'+ids[i]+'"><b>'+lab+'</b><span>'+k+': '+v+'</span></div>'; }
+    if(!ids.length) h='<div class="rs-qmore">no match</div>';
+    else if(ids.length>n) h+='<div class="rs-qmore">'+ids.length+' matches \u2014 showing '+n+'</div>';
+    qres.innerHTML=h;
+    qres.querySelectorAll(".rs-qrow").forEach(function(r){
+      r.onclick=function(){ const id=+r.dataset.id; rsSelect(id); rsFocus(id); }; });
+  }
+  let _qt=0;
+  qin.oninput=function(){ clearTimeout(_qt); _qt=setTimeout(function(){ _sideSearch(qin.value); },250); };
+  qin.onkeydown=function(e){ if(e.key==="Escape"){ qin.value=""; _sideSearch(""); } };
   rsInfoClear();
   try{ map.resize(); }catch(e){}               // #map just lost 320px to the panel
 }
