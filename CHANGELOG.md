@@ -54,6 +54,13 @@ First PyPI release.
   they used to ride above everything as a side effect of the sibling-layer construction).
   Bridge-bucket dashes keep their deck sandwich on top: a footbridge is a structure, not a
   surface marking.
+- **Overlay click precedence follows the visual stacking**: an `"over"` overlay (POIs) wins
+  the click, then the roads, then `"under"` overlays (zone fills) — previously ANY clickable
+  overlay ate the click, so a road inside a clickable zone could never be selected and
+  dashboards got no `rs:select` for it. A selected road now also reports the interactive
+  overlays under the click — the popup/panel appends a section per overlay, `rs:select`
+  carries `detail.overlays` (`[{label, fields, properties}]`), and the dashboard sidebar
+  renders road + zone together.
 - Studio: tiled maps preview correctly and show an "embedded vector tiles" badge. Vendored
   MapLibre v4 stalls ANY roads source (GeoJSON or vector) inside sandboxed iframes, so tiled
   previews go through the same CDN v3 slim variant as inline ones — pmtiles.js's Protocol is

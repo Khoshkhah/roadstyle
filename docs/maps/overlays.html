@@ -402,15 +402,35 @@ if(COLOR_OPTIONS.some(o=>o.legend)){
   document.body.appendChild(_coLegendEl); coUpdateLegend();
 }
 // extra overlay layers (zones / POIs / lines): click an interactive overlay -> popup of its
-// fields; a Layers control toggles each overlay's visibility. Road clicks take precedence (an
-// overlay is only consulted when the click misses every road).
-const OVERLAYS = [{"label": "TAZ zones", "source": "ov0", "layers": ["ov0-fill", "ov0-outline"], "hit": "ov0-fill", "visible": true, "color": "#6aa9ff", "popup": ["taz_id", "name", "weight"], "interactive": true}, {"label": "POIs", "source": "ov1", "layers": ["ov1-circle"], "hit": "ov1-circle", "visible": true, "color": "#ff5d5d", "popup": ["name", "type"], "interactive": true}];
+// fields; a Layers control toggles each overlay's visibility. Click precedence follows the
+// visual stacking: "over" overlays (in front of the roads) win, then roads, then "under"
+// overlays (zone fills) — and a selected road also reports the interactive overlays under the
+// click (rs:select detail.overlays), so a sidebar can show the road AND its zone together.
+const OVERLAYS = [{"label": "TAZ zones", "source": "ov0", "layers": ["ov0-fill", "ov0-outline"], "hit": "ov0-fill", "visible": true, "color": "#6aa9ff", "popup": ["taz_id", "name", "weight"], "under": true, "interactive": true}, {"label": "POIs", "source": "ov1", "layers": ["ov1-circle"], "hit": "ov1-circle", "visible": true, "color": "#ff5d5d", "popup": ["name", "type"], "under": false, "interactive": true}];
 let _ovSel=null, _ovHov=null;                              // {source,id} of the selected / hovered overlay feature
 function _ovState(ref, st){ if(ref) map.setFeatureState({source:ref.source, id:ref.id}, st); }
 function clearOvSel(){ _ovState(_ovSel,{select:false}); _ovSel=null; }
-function handleOverlayClick(e){                            // info popup only on SELECT (click), not hover
+// the interactive overlay features at a screen point: [{label, fields, properties}] — one entry
+// per overlay (its topmost hit). Feeds rs:select's `overlays` payload and the popup/panel.
+function _ovAt(pt){
+  const out=[];
   for(const ov of OVERLAYS){
     if(!ov.interactive) continue;
+    const ids = ov.layers.filter(id=>map.getLayer(id));
+    const hits = ids.length ? map.queryRenderedFeatures(pt, {layers:ids}) : [];
+    if(hits.length) out.push({label:ov.label, fields:ov.popup, properties:hits[0].properties||{}});
+  }
+  return out;
+}
+function _ovSections(ovs){                                 // extra popup/panel rows per overlay hit
+  return (ovs||[]).map(o =>
+    '<hr style="border:none;border-top:1px solid #dedede;margin:6px 0">'+
+    '<span style="color:#777">'+o.label+'</span><br>'+_rfields(o.properties, o.fields)).join("");
+}
+function handleOverlayClick(e, tier){                      // info popup only on SELECT (click), not hover
+  for(const ov of OVERLAYS){
+    if(!ov.interactive) continue;
+    if(tier && (tier==="under") !== !!ov.under) continue;  // consult only the requested tier
     const ids = ov.layers.filter(id=>map.getLayer(id));
     const hits = ids.length ? map.queryRenderedFeatures(e.point, {layers:ids}) : [];
     if(hits.length){
@@ -562,14 +582,16 @@ function rsSelect(id){
                      : {s:"roads", key:"r"+id, ids:[id]};
   setS(_sel,{select:true});
   if(_sel.road!=null) _fs({source:"roads", id:_sel.road},{select:true});
+  // best effort for programmatic selection: overlays at the edge's midpoint (when on screen)
+  const c = s ? s.mids[id] : _midOf((_feats()[id]||{}).geometry);
+  let ovs=[]; if(c){ try{ ovs=_ovAt(map.project({lng:c[0], lat:c[1]})); }catch(err){} }
   document.dispatchEvent(new CustomEvent("rs:select",
-    {detail:{id:id, layer:null, properties:props || {}}}));
+    {detail:{id:id, layer:null, properties:props || {}, overlays:ovs}}));
   if(true){
-    const html=_rfields(props||{}, _popupFields);
+    const html=_rfields(props||{}, _popupFields) + _ovSections(ovs);
     if(_popupMode === "panel"){ rsInfoShow(html); }
-    else{ const c = s ? s.mids[id] : _midOf((_feats()[id]||{}).geometry);
-      if(c) new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
-        .setLngLat(c).setHTML(html).addTo(map); }
+    else if(c) new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
+      .setLngLat(c).setHTML(html).addTo(map);
   }
 }
 window.rsSelect = rsSelect;
@@ -588,20 +610,25 @@ map.on("mousemove", e=>{ _pt=e.point; if(!_raf) _raf=requestAnimationFrame(hover
 map.on("mouseout", ()=>{ _pt=null; if(_raf){cancelAnimationFrame(_raf);_raf=0;} setS(_hov,{hover:false}); _hov=null; if(_tip) _tip.remove(); });
 let _sel=null;
 map.on("click", e=>{
-  if(handleOverlayClick(e)){ rsDeselect(); return; }  // visible "over" overlay (front) wins
+  // visual stacking decides the click: an "over" overlay (POIs, in front of the roads) wins;
+  // then the roads; an "under" overlay (zone fills) only when the click missed every road —
+  // so a road inside a zone stays selectable and still feeds rs:select / the sidebar.
+  if(handleOverlayClick(e, "over")){ rsDeselect(); return; }
   const f = pick(e.point);
-  if(!f){ rsDeselect(); return; }                     // click empty -> deselect (restore colour)
+  if(!f){ handleOverlayClick(e, "under"); rsDeselect(); return; }
   clearOvSel();
   if(_sel) setS(_sel,{select:false});
   _sel = hitOf(f); setS(_sel,{select:true});
   const props = _pickProps(f);
+  const ovs = _ovAt(e.point);          // interactive overlays under the click (e.g. the zone)
   // structured click-data for host pages / dashboards (fires in every popup mode, incl. False)
   document.dispatchEvent(new CustomEvent("rs:select",
-    {detail:{id:f.id, layer:f.layer && f.layer.id, properties:props}}));
+    {detail:{id:f.id, layer:f.layer && f.layer.id, properties:props, overlays:ovs}}));
   if(true){
-    if(_popupMode === "panel"){ rsInfoShow(_rfields(props, _popupFields)); }
+    const html = _rfields(props, _popupFields) + _ovSections(ovs);
+    if(_popupMode === "panel"){ rsInfoShow(html); }
     else new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
-      .setLngLat(e.lngLat).setHTML(_rfields(props, _popupFields)).addTo(map);
+      .setLngLat(e.lngLat).setHTML(html).addTo(map);
   }
 });
 map.on("load", ()=>{ try{ map.fitBounds([[18.0244041, 59.3013592], [18.106223800000002, 59.3267523]],

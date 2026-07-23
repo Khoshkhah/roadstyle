@@ -110,6 +110,9 @@ def test_web_overlays_place_under_and_over_roads():
     assert "ov0" in style["sources"] and "ov1" in style["sources"]
     # popup fields + toggle wiring present; overlay props preserved for the popup
     assert "handleOverlayClick" in wm.html and "ov-ctrl" in wm.html
+    # placement is baked into the JS meta: click precedence follows the visual stacking
+    meta = json.loads(wm.html.split("const OVERLAYS = ")[1].split(";\n")[0])
+    assert [m["under"] for m in meta] == [True, False]
     z = style["sources"]["ov0"]["data"]["features"][0]["properties"]
     assert z["taz_id"] == "Z0" and z["weight"] == 0.5
 

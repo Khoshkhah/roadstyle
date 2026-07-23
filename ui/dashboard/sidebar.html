@@ -99,12 +99,21 @@ function resetAll(){
   document.getElementById("count").textContent = "";
 }
 
-// detail panel: fed by the selection events, whether the click came from the map or the table
+// detail panel: fed by the selection events, whether the click came from the map or the table.
+// A map click also reports the interactive overlays under it (e.detail.overlays) — e.g. the
+// zone a road lies in — so the panel shows the road AND its overlay context together.
+function fieldRows(p, only){
+  const ks = (only && only.length ? only : Object.keys(p))
+    .filter(k => k[0] !== "_" && k !== "twoway" && k !== "lvl" && p[k] != null && p[k] !== "");
+  return ks.map(k => "<b>" + k + "</b>: " + p[k]).join("<br>");
+}
 document.addEventListener("rs:select", e => {
-  const p = e.detail.properties;
-  document.getElementById("detail").innerHTML = Object.keys(p)
-    .filter(k => k[0] !== "_" && k !== "twoway" && k !== "lvl" && p[k] != null && p[k] !== "")
-    .map(k => "<b>" + k + "</b>: " + p[k]).join("<br>");
+  let h = fieldRows(e.detail.properties);
+  (e.detail.overlays || []).forEach(o => {
+    h += '<hr style="border:none;border-top:1px solid #e2e2e2;margin:6px 0">' +
+         '<span style="color:#888">' + o.label + '</span><br>' + fieldRows(o.properties, o.fields);
+  });
+  document.getElementById("detail").innerHTML = h;
 });
 document.addEventListener("rs:deselect", () => {
   document.getElementById("detail").textContent = "Click a road, or a row above.";

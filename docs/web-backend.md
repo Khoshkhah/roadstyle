@@ -212,8 +212,13 @@ rs.render_edges(edges, backend="web", palette="mono",
 `kind` is auto-detected from the geometry (polygon → `fill`+outline, point → `circle`, line →
 `line`) but can be forced. `placement="under"` draws beneath the roads (e.g. zone fills), `"over"`
 on top (e.g. POIs). Setting `popup` makes the overlay clickable (those fields show in the popup; an
-empty list = decoration only). **Road clicks take precedence** — an overlay popup fires only where
-the click misses every road. See [`Overlay`](parameters.md#8-overlay-extra-layers) for every field.
+empty list = decoration only). **Click precedence follows the visual stacking:** an `"over"`
+overlay in front of the roads wins the click; then the roads; an `"under"` overlay only where the
+click misses every road — so a road inside a clickable zone stays selectable. A selected road also
+reports the interactive overlays under the click: its popup/panel appends a section per overlay,
+and `rs:select` carries them as `event.detail.overlays` (`[{label, fields, properties}]`) so a
+sidebar can show the road **and** its zone together. See
+[`Overlay`](parameters.md#8-overlay-extra-layers) for every field.
 
 > **Overlays are single-colour.** An `Overlay` paints every feature with its one `color` — there is
 > no per-feature `color_by` / `cmap` for overlay data. To colour features *by a value*, put that

@@ -773,6 +773,7 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
                      "visible": getattr(ov, "visible", True),
                      "color": ov.color,
                      "popup": list(ov.popup) if ov.popup is not None else None,
+                     "under": ov.placement == "under",
                      "interactive": ov.popup is None or bool(ov.popup)})
     return under, over, meta
 
