@@ -49,9 +49,11 @@ First PyPI release.
   a plaza), `track` slots just above `footway`, `steps` just below (ties used to break
   arbitrarily), and `platform` gets an explicit bottom-of-stack entry (unknown classes default
   to residential priority — railway platforms were drawing at street level). Dashed classes
-  (footway/cycleway/path) keep rendering above all solid fills at the same grade — deliberate:
-  the subject network of a walking/cycling map stays legible, and a thin dash over a wide fill
-  loses nothing.
+  (footway/cycleway/path) now honour the table too: their layers draw UNDER the solid
+  casing+fill of the same grade, so a street covers a footpath crossing it (osm-carto order —
+  they used to ride above everything as a side effect of the sibling-layer construction).
+  Bridge-bucket dashes keep their deck sandwich on top: a footbridge is a structure, not a
+  surface marking.
 - Studio: tiled maps preview correctly and show an "embedded vector tiles" badge. Vendored
   MapLibre v4 stalls ANY roads source (GeoJSON or vector) inside sandboxed iframes, so tiled
   previews go through the same CDN v3 slim variant as inline ones — pmtiles.js's Protocol is

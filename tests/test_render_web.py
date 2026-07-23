@@ -602,6 +602,11 @@ def test_dashed_path_classes_get_dash_layers():
     assert all(l["layout"]["line-cap"] == "butt" for l in dash_layers)
     assert "__rs_dash" in json.dumps(lay["roads-fill"]["filter"])      # solid excludes dashed
     assert "__rs_dash" in json.dumps(lay["roads-casing"]["filter"])    # no casing band either
+    # z-order: dashed classes sit at the bottom of the table, so their layers draw UNDER the
+    # solid casing+fill — a residential street covers a footway crossing it (osm-carto order)
+    ids = [l["id"] for l in style["layers"]]
+    for dl in dash_layers:
+        assert ids.index(dl["id"]) < ids.index("roads-casing") < ids.index("roads-fill")
 
 
 def test_dashed_bridge_gets_deck_underlay_and_casing():

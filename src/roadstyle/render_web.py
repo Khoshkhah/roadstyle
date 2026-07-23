@@ -1118,6 +1118,18 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                 # surface/tunnel dashed classes stay casing-less (gaps show the ground); the
                 # BRIDGE casing deliberately keeps them — the deck edge is what says "bridge"
                 l["filter"] = ["all", base_f, nod]
+        # Dashed classes sit at the BOTTOM of the z_order table (footway/path/cycleway ≈ 1),
+        # so their layers must draw UNDER the solid casing+fill of the same grade — a street
+        # covers a footpath crossing it, exactly as osm-carto orders it. (Bridge-bucket dashes
+        # keep their deck sandwich above the solid bridge fill: a footbridge's deck is a
+        # structure, not a surface marking.)
+        for casing_id, dash_prefix in (("roads-tunnel-casing", "roads-tunnel-fill-dash"),
+                                       ("roads-casing", "roads-fill-dash")):
+            moved = [l for l in relayered if l["id"].startswith(dash_prefix)]
+            if moved:
+                rest = [l for l in relayered if not l["id"].startswith(dash_prefix)]
+                at = next(i for i, l in enumerate(rest) if l["id"] == casing_id)
+                relayered = rest[:at] + moved + rest[at:]
         style["layers"] = relayered
 
     # oneway direction arrows (on edges with no reverse twin) + line-placed street names, on top.
