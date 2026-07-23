@@ -470,10 +470,13 @@ def test_oneway_column_drives_arrows():
 
 
 def test_web_panel_popup_mode_and_select_events():
-    """road_popup="panel" routes the click read-out into a docked side panel (curated fields);
-    rs:select / rs:deselect CustomEvents fire in every mode for host pages."""
+    """road_popup="panel" routes the click read-out into the full-height side panel (curated
+    fields); popup_mode="panel" does the same while keeping a custom field list; rs:select /
+    rs:deselect CustomEvents fire in every mode for host pages."""
     panel = render_edges(_edges(), backend="web", road_popup="panel").html
-    assert '_popupMode = "panel"' in panel and 'className="rs-info"' in panel.replace("'", '"')
+    assert '_popupMode = "panel"' in panel and 'className="rs-side"' in panel.replace("'", '"')
+    custom = render_edges(_edges(), backend="web", road_popup=["name"], popup_mode="panel").html
+    assert '_popupMode = "panel"' in custom and '["name"]' in custom
     default = render_edges(_edges(), backend="web").html
     assert '_popupMode = "popup"' in default
     for html in (panel, default):

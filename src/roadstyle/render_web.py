@@ -835,7 +835,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
            pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
-           basemap_switcher: bool = True, road_popup=True, road_tooltip=False,
+           basemap_switcher: bool = True, road_popup=True, road_tooltip=False, popup_mode: str = None,
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
            color_options=None, color_active=0, overlays=None, compress: bool = True,
            tiles: bool = False,
@@ -884,13 +884,15 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         road_tooltip = tooltip
     # road_popup: True -> curated DEFAULT_ROAD_POPUP; a list/tuple -> those fields; "all" -> every
     # column; False -> no popup. Baked into the page as (enabled flag, field list-or-null).
-    popup_mode = "popup"
+    # popup_mode="panel" docks the read-out as a side panel and combines with ANY field spec;
+    # road_popup="panel" stays as shorthand for panel mode with the default fields.
+    mode = popup_mode or "popup"
     if road_popup is False:
         popup_on, popup_fields = False, None
     elif road_popup is True:
         popup_on, popup_fields = True, list(DEFAULT_ROAD_POPUP)
     elif road_popup == "panel":                       # docked side panel instead of a popup
-        popup_on, popup_fields, popup_mode = True, list(DEFAULT_ROAD_POPUP), "panel"
+        popup_on, popup_fields, mode = True, list(DEFAULT_ROAD_POPUP), "panel"
     elif isinstance(road_popup, str):
         popup_on, popup_fields = True, None
     else:
@@ -1256,7 +1258,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__CO_ACTIVE__", str(_active))
             .replace("__OVERLAYS__", json.dumps(ov_meta))
             .replace("__ROAD_POPUP__", "true" if popup_on else "false")
-            .replace("__ROAD_POPUP_MODE__", json.dumps(popup_mode))
+            .replace("__ROAD_POPUP_MODE__", json.dumps(mode))
             .replace("__ROAD_POPUP_FIELDS__", json.dumps(popup_fields))
             .replace("__ROAD_TOOLTIP__", json.dumps(road_tooltip))
             .replace("__RS_TILED__", "true" if tiles else "false"))

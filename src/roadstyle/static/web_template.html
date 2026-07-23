@@ -7,9 +7,16 @@
 <style>html,body{margin:0;height:100%}#map{position:absolute;inset:0}
 .rs-zoom{position:absolute;bottom:10px;left:140px;z-index:2;background:rgba(255,255,255,.85);
   padding:2px 6px;border-radius:4px;font:11px/1.5 monospace;color:#333;pointer-events:none}
-.bm-ctrl{position:absolute;top:10px;left:10px;z-index:2;background:#fff;border-radius:5px;
-box-shadow:0 1px 4px rgba(0,0,0,.3);padding:4px 7px;font:13px system-ui,sans-serif}
-.bm-ctrl select{font:inherit;border:0;background:transparent;cursor:pointer;outline:none}
+.bm-icon{position:absolute;bottom:44px;right:calc(10px + var(--rs-side,0px));z-index:2;width:34px;
+  height:34px;background:#fff;border-radius:5px;box-shadow:0 1px 4px rgba(0,0,0,.3);cursor:pointer;
+  display:grid;place-items:center;font:17px/1 system-ui,sans-serif;color:#444;user-select:none}
+.bm-icon:hover{color:#111}
+.bm-menu{position:absolute;bottom:84px;right:calc(10px + var(--rs-side,0px));z-index:3;background:#fff;
+  border-radius:5px;box-shadow:0 1px 5px rgba(0,0,0,.3);font:13px system-ui,sans-serif;display:none;overflow:hidden}
+.bm-menu.open{display:block}
+.bm-menu div{padding:6px 14px;cursor:pointer;white-space:nowrap}
+.bm-menu div:hover{background:#f2f2f2}
+.bm-menu div.on{font-weight:700;color:#0b62c1}
 .flt-ctrl{position:absolute;top:48px;left:10px;z-index:2;background:#fff;border-radius:5px;
 box-shadow:0 1px 4px rgba(0,0,0,.3);font:13px system-ui,sans-serif;max-height:70%;overflow:auto}
 .flt-ctrl .flt-hd{padding:5px 9px;cursor:pointer;font-weight:600;user-select:none}
@@ -18,13 +25,40 @@ box-shadow:0 1px 4px rgba(0,0,0,.3);font:13px system-ui,sans-serif;max-height:70
   vertical-align:middle;border:1px solid rgba(0,0,0,.25)}
 .flt-ctrl.collapsed .flt-body{display:none}
 .flt-ctrl label{cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px}
-.rs-info{position:absolute;right:10px;bottom:40px;z-index:2;background:#fff;border-radius:5px;
-  box-shadow:0 1px 5px rgba(0,0,0,.3);width:240px;max-height:55vh;overflow:auto;
-  font:12px/1.55 sans-serif;display:none}
-.rs-info-hd{font-weight:700;padding:7px 10px;border-bottom:1px solid #eee;
-  display:flex;justify-content:space-between;align-items:center}
-.rs-info-x{cursor:pointer;color:#888;font:700 14px/1 sans-serif;padding:0 2px}
-.rs-info-bd{padding:7px 10px}
+/* panel mode: a full-height side panel; the map (and every right-anchored control) shifts left.
+   --rs-side is set on <body> so host-page controls can offset themselves the same way. */
+body.rs-panel{--rs-side:320px}
+body.rs-panel #map{right:320px}
+.rs-side{position:absolute;top:0;right:0;bottom:0;width:320px;z-index:3;background:#fff;
+  border-left:1px solid #e4e4e4;box-shadow:-2px 0 10px rgba(0,0,0,.07);
+  display:flex;flex-direction:column;font:13px/1.6 system-ui,sans-serif;color:#222}
+.rs-side-hd{padding:11px 14px;border-bottom:1px solid #ececec;display:flex;
+  justify-content:space-between;align-items:center;color:#666;font-weight:700;
+  font-size:11px;letter-spacing:.6px;text-transform:uppercase}
+.rs-side-x,.rs-side-min{cursor:pointer;color:#999;font:700 16px/1 sans-serif;padding:0 3px}
+.rs-side-x:hover,.rs-side-min:hover{color:#333}
+/* a slot for host-page controls (filters, toggles) pinned above the record */
+.rs-side-tools{padding:9px 14px;border-bottom:1px solid #ececec;display:none}
+.rs-side-tools:not(:empty){display:block}
+.rs-side-bd{flex:1;overflow:auto;padding:12px 14px}
+.rs-side-hd2{border-top:1px solid #ececec}
+/* the map's own controls, docked: static block cards instead of floating boxes */
+.rs-side-ctl{flex:0 1 auto;min-height:0;max-height:55%;overflow:auto}
+.rs-side .co-ctrl,.rs-side .flt-ctrl,.rs-side .co-lg{position:static;box-shadow:none;border-radius:0;
+  max-height:none;background:#fff;border-bottom:1px solid #f0f0f0;padding:8px 14px}
+.rs-side .flt-ctrl .flt-hd{padding:0 0 4px}
+.rs-side .flt-ctrl .flt-body{padding:0}
+/* hidden panel: the map takes the page back; the reopen button lives in the map's own
+   top-right control stack (below 2D/3D), so no extra positioning is needed */
+body.rs-side-hidden .rs-side{display:none}
+body.rs-side-hidden #map{right:0}
+body.rs-side-hidden{--rs-side:0px}
+.rs-side .rs-empty{color:#9a9a9a;text-align:center;padding:30px 12px;font-size:12.5px}
+.rs-name{font-size:17px;font-weight:700;margin:0 0 10px;line-height:1.3}
+.rs-kv{display:flex;justify-content:space-between;gap:12px;padding:4px 0;
+  border-bottom:1px solid #f3f3f3;font-variant-numeric:tabular-nums}
+.rs-kv span{color:#8a8a8a;flex:0 0 auto}
+.rs-kv b{font-weight:600;text-align:right;word-break:break-all;min-width:0}
 .co-ctrl{position:absolute;top:10px;right:10px;z-index:2;background:#fff;border-radius:5px;
 box-shadow:0 1px 4px rgba(0,0,0,.3);padding:4px 7px;font:13px system-ui,sans-serif;color:#555}
 .co-ctrl select{font:inherit;border:0;background:transparent;cursor:pointer;outline:none;color:#111}
@@ -54,6 +88,36 @@ const map = new maplibregl.Map({container:"map", style:style, center:__CENTER__,
   attributionControl:{compact:true}});
 map.addControl(new maplibregl.NavigationControl({visualizePitch:true}));
 map.addControl(new maplibregl.ScaleControl({maxWidth:120, unit:"metric"}), "bottom-left");
+// panel mode: a full-height side panel hosts the map controls (colour-by, road filter, legend,
+// host tools) and the selected road's record. Built BEFORE the controls, so they mount into it.
+const _popupMode = __ROAD_POPUP_MODE__;       // "popup" (floating) or "panel" (full-height side panel)
+let _sideBd=null, _sideTab=null, _sideCtl=null;
+function rsPanelShow(on){                      // hide/unhide the whole panel; the map takes the space
+  if(!_sideBd) return;
+  document.body.classList.toggle("rs-side-hidden", !on);
+  if(_sideTab) _sideTab.style.display = on ? "none" : "block";
+  try{ map.resize(); }catch(e){}
+}
+window.rsPanelShow = rsPanelShow;
+function _sideInit(){
+  if(_sideBd || _popupMode!=="panel") return;
+  document.body.classList.add("rs-panel");
+  const sd=document.createElement("div"); sd.className="rs-side";
+  sd.innerHTML='<div class="rs-side-hd"><span>'+(document.title||"Map")+'</span>'+
+    '<span class="rs-side-min" title="Hide panel">&raquo;</span></div>'+
+    '<div class="rs-side-ctl"></div><div class="rs-side-tools"></div>'+
+    '<div class="rs-side-hd rs-side-hd2"><span>Selected road</span>'+
+    '<span class="rs-side-x" title="Clear selection">×</span></div>'+
+    '<div class="rs-side-bd"></div>';
+  document.body.appendChild(sd);
+  sd.querySelector(".rs-side-x").onclick=()=>{ rsDeselect(); };
+  sd.querySelector(".rs-side-min").onclick=()=>{ rsPanelShow(false); };
+  _sideBd=sd.querySelector(".rs-side-bd");
+  _sideCtl=sd.querySelector(".rs-side-ctl");
+  rsInfoClear();
+  try{ map.resize(); }catch(e){}               // #map just lost 320px to the panel
+}
+_sideInit();
 // zoom read-out next to the scale bar
 { const zd=document.createElement("div"); zd.className="rs-zoom";
   const uz=()=>{ zd.textContent="z "+map.getZoom().toFixed(1); };
@@ -77,6 +141,17 @@ map.addControl({onAdd(m){
   m.on("pitchend", upd); m.on("pitch", upd); upd();
   d.appendChild(b); return d;
 }, onRemove(){}});
+if(_popupMode==="panel"){    // panel-reopen button: same chrome as 2D, right below it in the stack
+  map.addControl({onAdd(){
+    const d=document.createElement("div"); d.className="maplibregl-ctrl maplibregl-ctrl-group";
+    const b=document.createElement("button"); b.type="button";
+    b.style.cssText="font:700 14px/1 system-ui";
+    b.textContent="\u00ab"; b.title="Show panel";
+    b.onclick=()=>{ rsPanelShow(true); };
+    _sideTab=d; d.style.display="none";
+    d.appendChild(b); return d;
+  }, onRemove(){}});
+}
 // base-layer switching: window.rsSetBasemap(key|index) is the API (swaps the raster source's
 // tiles; the road layers stay put); the dropdown is just UI over it and stays in sync.
 // A tile-less entry (blank) hides the raster layer and shows the plain background colour.
@@ -89,16 +164,23 @@ function rsSetBasemap(keyOrIdx){
   if(b.tiles.length && s) s.setTiles(b.tiles);
   if(map.getLayer("basemap")) map.setLayoutProperty("basemap","visibility", b.tiles.length ? "visible" : "none");
   map.setPaintProperty("bg","background-color", b.bg);
-  const sel = document.querySelector(".bm-ctrl select"); if(sel) sel.value = String(idx);
+  const m = document.querySelector(".bm-menu");
+  if(m) Array.from(m.children).forEach((el,i)=>el.classList.toggle("on", i===idx));
   document.dispatchEvent(new CustomEvent("rs:basemapchange",{detail:{basemap:b.key, index:idx}}));
 }
 window.rsSetBasemap = rsSetBasemap;
 window.RS_BASEMAPS = BASEMAPS;
 if(BM_SWITCHER && BASEMAPS.length > 1){
-  const sel = document.createElement("select");
-  BASEMAPS.forEach((b,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=b.label; sel.appendChild(o); });
-  sel.onchange = ()=> rsSetBasemap(parseInt(sel.value,10));
-  const w=document.createElement("div"); w.className="bm-ctrl"; w.appendChild(sel); document.body.appendChild(w);
+  const menu=document.createElement("div"); menu.className="bm-menu";
+  BASEMAPS.forEach((b,i)=>{ const o=document.createElement("div"); o.textContent=b.label;
+    if(i===0) o.className="on";
+    o.onclick=()=>{ rsSetBasemap(i); menu.classList.remove("open"); };
+    menu.appendChild(o); });
+  const w=document.createElement("div"); w.className="bm-icon"; w.title="Base map";
+  w.innerHTML="&#9638;";
+  w.onclick=(e)=>{ e.stopPropagation(); menu.classList.toggle("open"); };
+  document.addEventListener("click", ()=>menu.classList.remove("open"));
+  document.body.appendChild(menu); document.body.appendChild(w);
 }
 // road-class filtering: window.rsSetClasses([...]) shows exactly those classes and hides the
 // rest across every road layer; the collapsible checkbox panel is just UI over it. The class
@@ -255,7 +337,7 @@ if(FILTER.on){
     sw.style.background=(FILTER.swatches||{})[c]||"#888"; lab.appendChild(sw);
     lab.appendChild(document.createTextNode(" "+c)); body.appendChild(lab);
   });
-  document.body.appendChild(box);
+  (_sideCtl||document.body).appendChild(box);
 }
 // "colour by" recolouring: swap which baked fill prop the road layers read (no re-render). Each
 // option's fill is baked per edge (__rs_fill / __rs_fill__1 …); setPaintProperty repoints the
@@ -334,13 +416,13 @@ if(COLOR_OPTIONS.length > 1){
   COLOR_OPTIONS.forEach((o,i)=>{ const op=document.createElement("option");
     op.value=i; op.textContent=o.name; sel.appendChild(op); });
   sel.onchange=()=> rsSetColorField(parseInt(sel.value,10));
-  w.appendChild(sel); document.body.appendChild(w);
+  w.appendChild(sel); (_sideCtl||document.body).appendChild(w);
 }
 if(_coActive){ const _ap=()=>rsSetColorField(_coActive);   // display the requested option on load
   if(map.isStyleLoaded && map.isStyleLoaded()) _ap(); else map.on("load", _ap); }
 if(COLOR_OPTIONS.some(o=>o.legend)){
   _coLegendEl=document.createElement("div"); _coLegendEl.className="co-lg";
-  document.body.appendChild(_coLegendEl); coUpdateLegend();
+  (_sideCtl||document.body).appendChild(_coLegendEl); coUpdateLegend();
 }
 // extra overlay layers (zones / POIs / lines): click an interactive overlay -> popup of its
 // fields; a Layers control toggles each overlay's visibility. Click precedence follows the
@@ -490,27 +572,25 @@ function hitOf(f){ if(!f || f.id==null) return null;
   return {s:"roads", key:"r"+f.id, ids:[f.id]}; }
 function setS(h, st){ if(h) h.ids.forEach(id=>_fs({source:h.s, id:id}, st)); }
 let _hov=null, _pt=null, _raf=0;
-function _rfields(p, only){ const r=[];
-  if(p.name!=null && (""+p.name)!=="" && (""+p.name).toLowerCase()!=="nan") r.push("<b>"+p.name+"</b>");  // name on top, bold, no label
-  const ks = (only && only.length) ? only : Object.keys(p);
+function _rpairs(p, only){  // shared field filter: [nameOrNull, [[k, v], ...]]
+  let name=null;
+  if(p.name!=null && (""+p.name)!=="" && (""+p.name).toLowerCase()!=="nan") name=""+p.name;
+  const ks = (only && only.length) ? only : Object.keys(p), out=[];
   for(const k of ks){ if(k[0]==="_"||k==="twoway"||k==="lvl"||k==="name") continue;  // lvl/twoway are roadstyle-injected internals
     var v=p[k]; if(v==null) continue; var s=""+v, sl=s.toLowerCase();
     if(s===""||sl==="nan"||sl==="none") continue;
     if((k==="bridge"||k==="tunnel") && (sl==="no"||sl==="0"||sl==="false")) continue;  // bridge/tunnel only when it IS one
-    r.push(k+": "+s); } return r.join("<br>"); }
+    out.push([k, s]); }
+  return [name, out]; }
+function _rfields(p, only){ const [name, kv]=_rpairs(p, only);
+  return (name ? ["<b>"+name+"</b>"] : []).concat(kv.map(([k,s])=>k+": "+s)).join("<br>"); }
+function _rrows(p, only){   // the side panel's layout: big name, then aligned key/value rows
+  const [name, kv]=_rpairs(p, only);
+  return (name ? '<div class="rs-name">'+name+'</div>' : "")+
+    kv.map(([k,s])=>'<div class="rs-kv"><span>'+k+'</span><b>'+s+'</b></div>').join(""); }
 const _popupFields = __ROAD_POPUP_FIELDS__;   // curated field list, or null => all columns
-const _popupMode = __ROAD_POPUP_MODE__;       // "popup" (floating) or "panel" (docked read-out)
-let _info=null;
-function rsInfoClear(){ if(_info) _info.style.display="none"; }
-function rsInfoShow(html){
-  if(!_info){ _info=document.createElement("div"); _info.className="rs-info";
-    document.body.appendChild(_info); }
-  _info.innerHTML='<div class="rs-info-hd"><span>Selected road</span>'+
-    '<span class="rs-info-x" title="Clear selection">×</span></div>'+
-    '<div class="rs-info-bd">'+html+'</div>';
-  _info.style.display="block";
-  _info.querySelector(".rs-info-x").onclick=()=>{ rsDeselect(); };
-}
+function rsInfoClear(){ if(_sideBd) _sideBd.innerHTML='<div class="rs-empty">Click a road to see its full record here.</div>'; }
+function rsInfoShow(html){ if(_sideBd) _sideBd.innerHTML=html; }
 function rsDeselect(){
   if(_sel){ setS(_sel,{select:false});
     if(_sel.road!=null) _fs({source:"roads", id:_sel.road},{select:false});
@@ -543,10 +623,9 @@ function rsSelect(id){
   document.dispatchEvent(new CustomEvent("rs:select",
     {detail:{id:id, layer:null, properties:props || {}, overlays:ovs}}));
   if(__ROAD_POPUP__){
-    const html=_rfields(props||{}, _popupFields) + _ovSections(ovs);
-    if(_popupMode === "panel"){ rsInfoShow(html); }
+    if(_popupMode === "panel"){ rsInfoShow(_rrows(props||{}, _popupFields) + _ovSections(ovs)); }
     else if(c) new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
-      .setLngLat(c).setHTML(html).addTo(map);
+      .setLngLat(c).setHTML(_rfields(props||{}, _popupFields) + _ovSections(ovs)).addTo(map);
   }
 }
 window.rsSelect = rsSelect;
@@ -582,10 +661,9 @@ map.on("click", e=>{
   document.dispatchEvent(new CustomEvent("rs:select",
     {detail:{id:f.id, layer:f.layer && f.layer.id, properties:props, overlays:ovs}}));
   if(__ROAD_POPUP__){
-    const html = _rfields(props, _popupFields) + _ovSections(ovs);
-    if(_popupMode === "panel"){ rsInfoShow(html); }
+    if(_popupMode === "panel"){ rsInfoShow(_rrows(props, _popupFields) + _ovSections(ovs)); }
     else new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
-      .setLngLat(e.lngLat).setHTML(html).addTo(map);
+      .setLngLat(e.lngLat).setHTML(_rfields(props, _popupFields) + _ovSections(ovs)).addTo(map);
   }
 });
 map.on("load", ()=>{ try{ map.fitBounds(__BOUNDS__,
