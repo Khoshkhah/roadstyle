@@ -63,6 +63,21 @@ def test_web_no_color_options_is_unchanged():
     assert "const COLOR_OPTIONS = [];" in wm.html   # picker JS present but inert (empty)
 
 
+def _copts(html):
+    return re.search(r"const COLOR_OPTIONS = (.+?);", html).group(1)
+
+
+def test_web_color_by_bakes_its_legend():
+    # the plain color_by/cmap path renders the styler's legend on the web backend (no dropdown —
+    # one legend-only entry). legend=True is the default, matching folium.
+    on = _copts(render_edges(_edges(), backend="web", color_by="aadt", cmap="viridis").html)
+    assert '"legend"' in on and '"kind": "continuous"' in on   # continuous ramp legend baked
+    # legend=False opts out
+    off = _copts(render_edges(_edges(), backend="web", color_by="aadt", cmap="viridis",
+                              legend=False).html)
+    assert off == "[]"
+
+
 def test_web_annotation_slots_alternate_names_and_arrows():
     """The annotation plan: each road chain is sliced into equal per-band slots; names take even
     slots, oneway arrows odd ones (alternating, never stacked); unnamed roads leave their name

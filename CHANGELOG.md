@@ -4,6 +4,15 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **Web backend honours `legend=`.** `render_edges(backend="web", color_by=…, cmap=…)` (and the CLI
+  `--color-by … -f web`) now render the data styler's legend — a continuous ramp or categorical key,
+  drawn as a single legend-only entry (no *Colour by* dropdown) — matching the folium backend.
+  Previously a data-coloured web map showed no key unless you used `color_options`. `legend=False`
+  opts out; class-styled maps are unchanged (they carry the road-type filter, no legend).
+
 ## [0.3.0] — 2026-07-24
 
 ### Added

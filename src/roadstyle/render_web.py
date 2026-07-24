@@ -839,7 +839,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
            color_options=None, color_active=0, overlays=None, compress: bool = True,
            tiles: bool = False,
-           minzoom=None, **_ignore):
+           minzoom=None, legend: bool = True, **_ignore):
     """Build a self-contained MapLibre map of the styled edges.
 
     If the data carries ``tunnel`` / ``bridge`` / ``layer`` columns (named via ``tunnel_col`` /
@@ -920,6 +920,13 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             styler = build_styler(palette=palette, highway_col=highway_col)
         rf = styler.resolve_frame(g)
         geo = bake_props(json.loads(g.to_json()), rf)   # per-edge __rs_fill/__rs_casing
+        if legend and getattr(rf, "legend", None):
+            # a data styler (color_by / cmap / colors) stashes legend metadata on its resolved
+            # frame; surface it as a single legend-only "colour by" entry so the page draws the
+            # legend (one entry ⇒ no dropdown, just the key). Class styling carries none, and
+            # legend=False opts out — matching the folium backend's `legend` arg.
+            color_opts_meta = [{"name": rf.legend.get("title") or "data",
+                                "prop": "__rs_fill", "legend": rf.legend}]
     _mark_twoway(geo)
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
     _stringify_unsafe_ints(geo)   # BIGINT ids (e.g. edge_id) -> string so JS doesn't round them
