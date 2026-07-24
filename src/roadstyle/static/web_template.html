@@ -130,8 +130,10 @@ function _sideInit(){
   sd.querySelector(".rs-side-min").onclick=()=>{ rsPanelShow(false); };
   _sideBd=sd.querySelector(".rs-side-bd");
   _sideCtl=sd.querySelector(".rs-side-ctl");
-  // search: substring over the curated popup fields (or every public prop), 30 rows max;
-  // clicking a row selects the road (record + highlight, exactly like a map click) and flies to it
+  // search: substring over the curated popup fields (or every public prop) — matched against each
+  // field's VALUE, or its column NAME when the field is set, so "bridge" finds bridge=yes roads (no
+  // value literally contains "bridge"), likewise tunnel/oneway. 30 rows max; clicking a row selects
+  // the road (record + highlight, exactly like a map click) and flies to it.
   const qin=sd.querySelector(".rs-side-q input"), qres=sd.querySelector(".rs-side-q-res");
   function _sideSearch(q){
     q=(q||"").trim().toLowerCase();
@@ -141,7 +143,8 @@ function _sideInit(){
       const ks=only||Object.keys(p);
       for(const k of ks){ if(k[0]==="_"||k==="twoway"||k==="lvl") continue;
         const v=p[k]; if(v==null) continue; const t=(""+v).toLowerCase();
-        if(t!==""&&t!=="nan"&&t.indexOf(q)>=0){ info.push([k, ""+v, p.name!=null?""+p.name:""]); return true; } }
+        const set=t&&t!=="nan"&&t!=="no"&&t!=="false"&&t!=="none"&&t!=="0";
+        if((t!=="nan"&&t.indexOf(q)>=0)||(k.toLowerCase().indexOf(q)>=0&&set)){ info.push([k, ""+v, p.name!=null?""+p.name:""]); return true; } }
       return false;
     });
     const n=Math.min(ids.length,30); let h="";
