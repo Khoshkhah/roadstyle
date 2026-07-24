@@ -66,8 +66,9 @@ or take everything at once with `pip install "roadstyle[all]"`:
 | `basemaps` | any XYZ provider from the xyzservices registry | xyzservices |
 | `all` | every extra above in one go | all of the above |
 
-To try the latest unreleased state — still no clone:
-`pip install "roadstyle @ git+https://github.com/Khoshkhah/roadstyle.git"`
+To try the latest unreleased state — still no clone, extras combine the same way:
+`pip install "roadstyle[all] @ git+https://github.com/Khoshkhah/roadstyle.git"` (or `[studio]`, …;
+bare `roadstyle @ git+…` is core only)
 
 ### Developing on it (clone + editable install)
 

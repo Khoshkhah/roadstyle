@@ -22,8 +22,9 @@ Optional extras pull in heavier backends/inputs only when you ask for them
 # all      — every extra above in one go: pip install "roadstyle[all]"
 ```
 
-The latest unreleased state, still without cloning:
-`pip install "roadstyle @ git+https://github.com/Khoshkhah/roadstyle.git"`.
+The latest unreleased state, still without cloning — extras combine the same way
+(bare `roadstyle @ git+…` is core only):
+`pip install "roadstyle[all] @ git+https://github.com/Khoshkhah/roadstyle.git"`.
 
 **Developing on it** (clone + editable, from the repo root — a src layout): `pip install -e ".[dev]"`, or with
 conda `conda env create -f environment.yml && conda activate roadstyle && pip install -e ".[dev]"`.
