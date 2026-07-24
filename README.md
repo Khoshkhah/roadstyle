@@ -74,13 +74,13 @@ bare `roadstyle @ git+…` is core only)
 
 ```bash
 git clone https://github.com/Khoshkhah/roadstyle.git && cd roadstyle
-pip install -e ".[dev]"              # editable + test/lint tools (pytest, ruff, mypy, all backends)
+pip install -e ".[dev]"              # editable — every extra (incl. the studio) + pytest/ruff/mypy
 # or with conda: conda env create -f environment.yml && conda activate roadstyle && pip install -e ".[dev]"
 pytest                               # the full suite; browser tests need `pip install playwright`
 ```
 
-From a checkout the studio runs against your working tree (`roadstyle studio`, needs
-`pip install streamlit`) and uses the repo's sample data in `ui/studio/samples/` directly.
+From a checkout the studio runs against your working tree (`roadstyle studio` — streamlit comes
+with `[dev]`) and uses the repo's sample data in `ui/studio/samples/` directly.
 
 **Uninstall:** `pip uninstall roadstyle`. Your personal settings overrides
 (`~/.config/roadstyle/roadstyle.json`, project-local `roadstyle.json`) are your files — pip

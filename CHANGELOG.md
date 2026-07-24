@@ -15,6 +15,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   checkout. The `ui/studio/` tree keeps only the shared `samples/`.
 - **`roadstyle[all]`** — one extra that pulls every user-facing extra
   (`numeric`, `basemaps`, `lonboard`, `duckdb`, `arrow`, `tiles`, `studio`).
+  `[dev]` now builds on it (`roadstyle[all]` + pytest/ruff/mypy) instead of
+  hand-listing packages — so it gains `streamlit` and can't drift.
 
 ### Fixed
 - **Web backend honours `legend=`.** `render_edges(backend="web", color_by=…, cmap=…)` (and the CLI
