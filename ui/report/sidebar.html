@@ -37,6 +37,7 @@
 #rp summary::-webkit-details-marker{display:none}
 #rp summary::before{content:"▸ ";color:var(--mut)}
 #rp details[open]>summary::before{content:"▾ "}
+#rp .rp-sec{border-top:1px solid var(--line);margin-top:12px;padding-top:8px;font-weight:600;font-size:12px}
 /* colour-by legend */
 #rp-legend{margin-top:6px}
 .rp-lgrow{display:flex;align-items:center;gap:7px;font-size:12px;white-space:nowrap;padding:1px 0}
@@ -72,12 +73,12 @@
     <div id="rp-ovs"></div>
     <div id="rp-cls"></div></details>
 
-  <details><summary>Search roads</summary>
-    <input id="rp-q" type="search" placeholder="name, class, id…" spellcheck="false">
-    <div id="rp-res"></div></details>
+  <div class="rp-sec">Search roads</div>
+  <input id="rp-q" type="search" placeholder="name, class, id…" spellcheck="false">
+  <div id="rp-res"></div>
 
-  <details open><summary>Selected road</summary>
-    <div id="rp-detail">Click a road, or a search result.</div></details>
+  <div class="rp-sec">Selected road</div>
+  <div id="rp-detail">Click a road, or a search result.</div>
 </div>
 <button id="rp-show" title="Show panel">&laquo;</button>
 <script>
