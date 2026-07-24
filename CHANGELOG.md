@@ -4,6 +4,26 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] — 2026-07-24
+
+### Changed
+- **In-map controls restyled** (web backend, `web_template.html`) — the road-class filter,
+  colour-by dropdown, legend, base-map menu and overlay control now share one look: muted
+  uppercase headers, an accent for the active/hover state, soft shadows and hairline borders. The
+  colour-by dropdown and filter are grouped into a single anchored top-left stack, fixing a stray
+  top gap and an overlap with the native zoom controls.
+- **Popup and hover tooltip are now translucent**, with a backdrop blur that keeps text legible
+  over busy maps.
+
+### Added
+- Studio (repo tooling, not on PyPI): the **Map** page gains a multi-column colour-by with an
+  in-map dropdown + legend, and a shared `colour_by_section` across Map / Dashboard / Report offers
+  numeric **and** low-cardinality categorical columns (`bridge`, `oneway`, `layer`, …), drops
+  id/key columns, and picks a discrete `min(5, n)` categorical scale or a continuous p2–p98 ramp
+  per column (unmapped edges stay neutral). The **dashboard sidebar** is restyled to match the
+  report and gains a road-class legend; Dashboard and Report gain a *Decorations* (labels / arrows)
+  section.
+
 ## [0.2.1] — 2026-07-23
 
 ### Added
