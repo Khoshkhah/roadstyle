@@ -94,9 +94,10 @@ python ui/dashboard/build.py your_edges.gpkg            # add --tiles for ~10⁵
 
 ## roadstyle studio (Streamlit workbench)
 
-The whole library behind eight knobs — live map on the right, the exact `render_edges` code for
-the current state below it, and a download button for the self-contained HTML. The gentlest
-introduction to the library.
+The whole library behind a few knobs — live map on the right, the exact `render_edges` code for
+the current state below it, and a download button for the self-contained HTML. Three pages — **Map**,
+**Dashboard**, **Report** — the gentlest introduction to the library. See the
+[Studio](studio.md) page for the full walkthrough.
 
 ```bash
 pip install streamlit && streamlit run ui/studio/app.py

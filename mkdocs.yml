@@ -21,6 +21,7 @@ nav:
   - Tutorial: tutorial.md
   - Examples: examples.md
   - Gallery: gallery.md
+  - Studio (Streamlit): studio.md
   - Parameter reference: parameters.md
   - MapLibre web backend: web-backend.md
   - Embedding in a website: embedding.md
