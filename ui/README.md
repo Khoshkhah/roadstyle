@@ -9,8 +9,9 @@ that gets injected before `</body>` of a saved map and talks to it only through 
 
 | template | what it shows |
 |---|---|
-| [`dashboard/`](dashboard/) | A sidebar dashboard: query box (`rsQuery`), verb buttons (`rsFilter` / `rsColor` / `rsHighlight`), a clickable results table (`rsGetProps` + `rsSelect`), a detail panel fed by `rs:select`, and a base-map select built from `RS_BASEMAPS`. |
-| [`studio/`](studio/) | **roadstyle studio** — a Streamlit workbench (`pip install streamlit`, then `streamlit run ui/studio/app.py`), two pages: **Map** (the whole library behind a few knobs, with the live map next to the exact `render_edges` code it represents) and **Dashboard** (the same knobs, but the product is the `dashboard/` sidebar page — pick the base maps and colour-by columns, preview it live, download `dashboard.html`). Both have a download button for the self-contained HTML and a **Vector tiles** toggle (embedded-PMTiles roads for big networks, when the `tiles` extra is installed). The gentlest way to work with — and demo — the library. |
+| [`dashboard/`](dashboard/) | A **query** sidebar: query box (`rsQuery`), verb buttons (`rsFilter` / `rsColor` / `rsHighlight`), a clickable results table (`rsGetProps` + `rsSelect`), a detail panel fed by `rs:select`, and a base-map select built from `RS_BASEMAPS`. |
+| [`report/`](report/) | A **report** sidebar: headline KPI cards (edges / classes / named roads / length), a by-class breakdown bar list (`RS_CLASSES` / `RS_CLASS_COL` / `RS_CLASS_COLORS`, click a class to show/hide it), a search box, a selected-road read-out (`rs:select`), and a light/dark toggle. Source-agnostic — every number is computed client-side from the baked edges. |
+| [`studio/`](studio/) | **roadstyle studio** — a Streamlit workbench (`pip install streamlit`, then `streamlit run ui/studio/app.py`), three pages: **Map** (the whole library behind a few knobs, with the live map next to the exact `render_edges` code it represents), **Dashboard** (the same knobs, but the product is the `dashboard/` query-sidebar page), and **Report** (the `report/` stats-sidebar page). Each builder previews live and downloads the self-contained HTML, with a **Vector tiles** toggle (embedded-PMTiles roads for big networks, when the `tiles` extra is installed). The gentlest way to work with — and demo — the library. |
 
 ## Using a template
 
@@ -18,6 +19,7 @@ that gets injected before `</body>` of a saved map and talks to it only through 
 python ui/dashboard/build.py path/to/edges.gpkg     # default: the bundled Södermalm sample
 # -> ui/dashboard/dashboard.html — self-contained, double-click to open
 python ui/dashboard/build.py big_network.gpkg --tiles   # ~10⁵ edges: embedded-PMTiles roads
+python ui/report/build.py path/to/edges.gpkg        # the stats sidebar instead -> ui/report/report.html
 ```
 
 `--tiles` needs `pip install "roadstyle[tiles]"`; the sidebar is unchanged — it only talks

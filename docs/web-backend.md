@@ -128,13 +128,27 @@ events. Labels, arrows and 3D deck ribbons sit on merged helper sources, so `rsF
 road geometry but not those decorations (the class filter prunes everything).
 
 Copyable UI templates built purely on this API live in the repo's `ui/` folder — start from
-`ui/dashboard/` (query box → clickable results table → detail panel, plus a base-map select)
-and make it yours.
+`ui/dashboard/` (a query sidebar: query box → results table → detail panel) or `ui/report/`
+(a stats sidebar: KPI cards, a by-class breakdown, search, and a selected-road read-out) and
+make it yours.
 
 Plus: `window.map` (the MapLibre `Map` — camera via `map.easeTo({pitch, bearing, ...})`),
 click selection events `rs:select` / `rs:deselect`, and the registries `RS_BASEMAPS`,
-`RS_CLASSES`, `RS_COLOR_OPTIONS`, `RS_OVERLAYS` for building your own controls. All of it works
-with the built-in controls hidden (`basemap_switcher=False`, `filter_control=False`, …).
+`RS_CLASSES` (with `RS_CLASS_COL` — the column they came from — and `RS_CLASS_COLORS` — each
+class's baked fill colour), `RS_COLOR_OPTIONS`, `RS_OVERLAYS` for building your own controls.
+All of it works with the built-in controls hidden (`basemap_switcher=False`, `filter_control=False`, …).
+
+### Built-in search (panel mode)
+
+In **panel mode** (`popup_mode="panel"`, or `road_popup="panel"`) the docked side panel carries a
+**Search roads** box. It is a case-insensitive **substring** search over each road's popup fields
+(or every public property when none are curated), skipping internal fields and empty / `nan` values —
+so it matches on *any* attribute, not just the name: a street name, a class, an `edge_ref`, or an id
+all resolve. Type ≥ 2 characters (debounced 250 ms, `Esc` clears); it lists up to **30** rows, each
+showing the road's name (or the matched value) with the matched `field: value` beneath. Clicking a
+row calls `rsSelect` + `rsFocus` — it selects the road exactly like a map click **and** flies the
+camera to it. It is built entirely on the public API (`rsQuery` → `rsSelect` / `rsFocus`), so a
+custom sidebar can offer the same search (both `ui/` templates do).
 
 ## Dynamic recolouring (`color_options`)
 

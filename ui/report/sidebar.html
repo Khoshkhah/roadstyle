@@ -1,0 +1,178 @@
+<!-- roadstyle UI template: report sidebar.
+     A stats-forward panel injected before </body> of any saved roadstyle web map — headline
+     counts, a by-class breakdown, search, and a selected-road read-out. Source-agnostic: it
+     computes everything client-side from the baked edges and talks to the map ONLY through the
+     public window.rs* API + rs:* events (plus RS_CLASSES / RS_CLASS_COL / RS_CLASS_COLORS).
+     Every piece is safe to rip out, restyle, or extend. Build with:  python build.py  -->
+<style>
+#map{right:340px}
+.co-ctrl,.co-lg{display:none}          /* the report sidebar owns colour-by; no floating leftovers */
+#rp{position:fixed;top:0;right:0;bottom:0;width:340px;box-sizing:border-box;overflow:auto;
+  padding:14px 15px;font:13px/1.5 system-ui,-apple-system,sans-serif;
+  --bg:#fff;--ink:#16181d;--mut:#767c88;--line:#e6e8ec;--card:#f7f8fa;--accent:#1a6bd6;
+  background:var(--bg);color:var(--ink);border-left:1px solid var(--line)}
+#rp[data-theme=dark]{--bg:#14171c;--ink:#e9ecf1;--mut:#8b93a1;--line:#272b33;--card:#1c2026;--accent:#5aa9f8}
+.rp-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.rp-top h2{margin:0;font-size:15px}
+#rp-th{background:none;border:1px solid var(--line);border-radius:99px;color:var(--mut);
+  cursor:pointer;font-size:13px;width:26px;height:26px;line-height:1}
+#rp-th:hover{color:var(--accent);border-color:var(--accent)}
+.rp-kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.rp-kpi{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.rp-kv{font-size:19px;font-weight:660;letter-spacing:-.3px}
+.rp-kl{font-size:11px;color:var(--mut)}
+#rp label{display:block;margin:10px 0 3px;font-weight:600;font-size:11px;color:var(--mut);
+  text-transform:uppercase;letter-spacing:.04em}
+#rp select,#rp-q{width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);
+  border-radius:5px;background:var(--bg);color:var(--ink);font:inherit}
+#rp details{border-top:1px solid var(--line);margin-top:12px;padding-top:8px}
+#rp summary{cursor:pointer;font-weight:600;font-size:12px;list-style:none;user-select:none}
+#rp summary::-webkit-details-marker{display:none}
+#rp summary::before{content:"▸ ";color:var(--mut)}
+#rp details[open]>summary::before{content:"▾ "}
+.rp-bar{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center;cursor:pointer;
+  padding:3px 0}
+.rp-bar.off{opacity:.4}
+.rp-bl{display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.rp-bl i{width:10px;height:10px;border-radius:2px;flex:none}
+.rp-bn{font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums}
+.rp-bt{grid-column:1/3;background:var(--card);border-radius:3px;height:6px;overflow:hidden}
+.rp-bt>span{display:block;height:100%}
+#rp-res{margin-top:6px;max-height:220px;overflow:auto}
+.rp-row{padding:4px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.rp-row:hover{color:var(--accent)}
+.rp-row span{display:block;font-size:11px;color:var(--mut)}
+.rp-none,.rp-more{color:var(--mut);font-size:11px;padding:4px 0}
+#rp-detail{background:var(--card);border-radius:6px;padding:8px;min-height:36px;color:var(--mut)}
+#rp-detail b{color:var(--ink)}
+</style>
+<div id="rp" data-theme="light">
+  <div class="rp-top"><h2 id="rp-title">Report</h2>
+    <button id="rp-th" title="Light / dark">◐</button></div>
+
+  <div class="rp-kpis" id="rp-kpis"></div>
+
+  <label>Base map</label><select id="rp-bm"></select>
+  <label>Colour by</label><select id="rp-co"></select>
+
+  <details open><summary>By class</summary><div id="rp-bars"></div>
+    <div class="rp-more" id="rp-barnote"></div></details>
+
+  <details><summary>Search roads</summary>
+    <input id="rp-q" type="search" placeholder="name, class, id…" spellcheck="false">
+    <div id="rp-res"></div></details>
+
+  <details open><summary>Selected road</summary>
+    <div id="rp-detail">Click a road, a bar, or a search result.</div></details>
+</div>
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const esc = s => (""+s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const fmt = n => (+n).toLocaleString();
+
+  // theme toggle (sidebar chrome only)
+  const rp = $("rp");
+  $("rp-th").onclick = () => rp.dataset.theme = rp.dataset.theme === "dark" ? "light" : "dark";
+
+  // base-map + colour-by selects, kept in sync with the map's events
+  const bm = $("rp-bm");
+  (window.RS_BASEMAPS || []).forEach(b => bm.add(new Option(b.label, b.key)));
+  bm.onchange = () => rsSetBasemap(bm.value);
+  document.addEventListener("rs:basemapchange", e => { bm.value = e.detail.basemap; });
+  const co = $("rp-co");
+  (window.RS_COLOR_OPTIONS || []).forEach((o, i) => co.add(new Option(o.name, i)));
+  if (!(window.RS_COLOR_OPTIONS || []).length) { co.add(new Option("(none)", "")); co.disabled = true; }
+  co.onchange = () => rsSetColorField(+co.value);
+  document.addEventListener("rs:colorchange", e => { if (e.detail.index != null) co.value = String(e.detail.index); });
+
+  function kpi(v, l){ const d = document.createElement("div"); d.className = "rp-kpi";
+    d.innerHTML = '<div class="rp-kv">' + esc(v) + '</div><div class="rp-kl">' + esc(l) + '</div>';
+    $("rp-kpis").appendChild(d); }
+
+  // ── stats: computed once from every baked edge (rsQuery sees them all — sidecar or inline) ──
+  function build(ids){
+    const props = rsGetProps(ids);
+    const col = window.RS_CLASS_COL, classes = window.RS_CLASSES || [];
+    // named roads (distinct non-empty `name`)
+    const names = new Set();
+    props.forEach(p => { const n = p.name; if (n != null && (""+n).trim() && (""+n).toLowerCase() !== "nan") names.add(""+n); });
+    // length: sum the first length-ish numeric column, if any
+    const lenKey = Object.keys(props[0] || {}).find(k => /^(length|len|dist)/i.test(k) && typeof props[0][k] === "number");
+    let len = null;
+    if (lenKey){ len = 0; props.forEach(p => { const v = +p[lenKey]; if (isFinite(v)) len += v; }); }
+
+    kpi(fmt(ids.length), "edges");
+    kpi(fmt(classes.length), "classes");
+    kpi(fmt(names.size), "named roads");
+    if (len != null) kpi(len >= 1000 ? (len/1000).toFixed(1) + " km" : Math.round(len) + " m", "total length");
+
+    // ── by-class breakdown: count per class, coloured by the baked class fill; click to filter ──
+    const cnt = {};
+    props.forEach(p => { const c = p[col]; if (c != null && c !== "") cnt[c] = (cnt[c] || 0) + 1; });
+    const rows = classes.map(c => [c, cnt[c] || 0]).filter(r => r[1]).sort((a, b) => b[1] - a[1]);
+    const mx = Math.max(1, ...rows.map(r => r[1])), cols = window.RS_CLASS_COLORS || {};
+    const bars = $("rp-bars");
+    bars.innerHTML = rows.map(([c, n]) => {
+      const clr = cols[c] || "#888";
+      return '<div class="rp-bar" data-c="' + esc(c) + '"><span class="rp-bl"><i style="background:'
+        + clr + '"></i>' + esc(c) + '</span><span class="rp-bn">' + fmt(n) + '</span>'
+        + '<span class="rp-bt"><span style="width:' + (100*n/mx).toFixed(1) + '%;background:' + clr + '"></span></span></div>';
+    }).join("");
+    // click a bar to toggle its class; the visible set drives rsSetClasses
+    bars.querySelectorAll(".rp-bar").forEach(el => el.onclick = () => {
+      el.classList.toggle("off");
+      const vis = [...bars.querySelectorAll(".rp-bar:not(.off)")].map(x => x.dataset.c);
+      rsSetClasses(vis.length === rows.length ? null : vis);
+    });
+    $("rp-barnote").textContent = "click a class to show / hide it";
+  }
+  // rsQuery is empty until the (tiles) sidecar inflates — poll briefly, then compute once
+  (function ready(n){ const ids = rsQuery(() => true);
+    if (ids.length){ build(ids); return; }
+    if (n > 0) setTimeout(() => ready(n - 1), 200);
+  })(30);
+
+  // ── search: substring over the popup fields (or every public prop), 30 rows; click = select+fly ──
+  const q = $("rp-q"), res = $("rp-res");
+  let qt = 0;
+  function search(s){ s = (s || "").trim().toLowerCase();
+    if (s.length < 2){ res.innerHTML = ""; return; }
+    const info = [];
+    const ids = rsQuery(p => { for (const k in p){ if (k[0] === "_" || k === "twoway" || k === "lvl") continue;
+      const v = p[k]; if (v == null) continue; const t = (""+v).toLowerCase();
+      if (t && t !== "nan" && t.indexOf(s) >= 0){ info.push([k, ""+v, p.name != null ? ""+p.name : ""]); return true; } }
+      return false; });
+    const n = Math.min(ids.length, 30);
+    res.innerHTML = "";
+    if (!ids.length){ res.innerHTML = '<div class="rp-none">no match</div>'; return; }
+    for (let i = 0; i < n; i++){ const nm = info[i][2], lab = (nm && nm.toLowerCase() !== "nan") ? nm : info[i][1];
+      const d = document.createElement("div"); d.className = "rp-row";
+      d.innerHTML = "<b>" + esc(lab) + "</b><span>" + esc(info[i][0]) + ": " + esc(info[i][1]) + "</span>";
+      d.onclick = () => { rsSelect(ids[i]); rsFocus(ids[i]); }; res.appendChild(d); }
+    if (ids.length > n){ const m = document.createElement("div"); m.className = "rp-more";
+      m.textContent = ids.length + " matches — showing " + n; res.appendChild(m); }
+  }
+  q.oninput = () => { clearTimeout(qt); qt = setTimeout(() => search(q.value), 250); };
+  q.onkeydown = e => { if (e.key === "Escape"){ q.value = ""; search(""); } };
+
+  // ── selected-road detail: fed by rs:select whether the click came from the map, a bar, or search ──
+  function fieldRows(p, only){
+    const ks = (only && only.length ? only : Object.keys(p))
+      .filter(k => k[0] !== "_" && k !== "twoway" && k !== "lvl" && p[k] != null && p[k] !== "");
+    return ks.map(k => "<b>" + esc(k) + "</b>: " + esc(p[k])).join("<br>");
+  }
+  document.addEventListener("rs:select", e => {
+    let h = "";
+    if (e.detail.overlay) h += '<span style="color:var(--mut)">' + esc(e.detail.overlay) + '</span><br>';
+    h += fieldRows(e.detail.properties, e.detail.fields);
+    (e.detail.overlays || []).forEach(o => { h += '<hr style="border:none;border-top:1px solid var(--line);margin:6px 0">'
+      + '<span style="color:var(--mut)">' + esc(o.label) + '</span><br>' + fieldRows(o.properties, o.fields); });
+    $("rp-detail").innerHTML = h;
+  });
+  document.addEventListener("rs:deselect", () => {
+    $("rp-detail").textContent = "Click a road, a bar, or a search result.";
+  });
+})();
+</script>

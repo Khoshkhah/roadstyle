@@ -265,6 +265,8 @@ function rsSetClasses(visible){
 }
 window.rsSetClasses = rsSetClasses;
 window.RS_CLASSES = FILTER.classes;
+window.RS_CLASS_COL = FILTER.col;          // the column RS_CLASSES came from (for custom UIs / stats)
+window.RS_CLASS_COLORS = FILTER.swatches || {};   // class -> its baked fill colour
 function rsSetBridges(on){
   _bridgesOn=!!on; _applyRoadFilters();
   const cb=document.getElementById("rs-flt-br"); if(cb) cb.checked=_bridgesOn;
