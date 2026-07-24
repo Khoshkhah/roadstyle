@@ -7,6 +7,7 @@
      the map's own on-map switcher (build with basemap_switcher=True). Build:  python build.py  -->
 <style>
 #map{right:340px}
+body{--rs-side:340px}   /* shift the map's right-anchored controls (base-map icon) left of the panel */
 .co-ctrl,.co-lg,.ov-ctrl{display:none}   /* the sidebar owns colour-by, the legend, and the layer filter */
 #rp{position:fixed;top:0;right:0;bottom:0;width:340px;box-sizing:border-box;overflow:auto;
   padding:14px 15px;font:13px/1.5 system-ui,-apple-system,sans-serif;
@@ -95,6 +96,7 @@
     rp.classList.toggle("hidden", !show);
     $("rp-show").style.display = show ? "none" : "block";
     const mp = $("map"); if (mp) mp.style.right = show ? "340px" : "0";
+    document.body.style.setProperty("--rs-side", show ? "340px" : "0px");   // move the base-map icon with the panel
     try { map.resize(); } catch (e) {}
   }
   $("rp-hide").onclick = () => panel(false);
