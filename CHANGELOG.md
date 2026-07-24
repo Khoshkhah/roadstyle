@@ -4,6 +4,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **`name=` shows as the page heading.** `render_dashboard` / `render_report` (and the studio's
+  *Title* knob) now put the name in the sidebar's `<h2>` as well as the browser-tab `<title>`;
+  before, the heading was stuck on the template's hardcoded text.
+
 ## [0.4.0] — 2026-07-24
 
 ### Added

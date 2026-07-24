@@ -36,6 +36,14 @@ def test_render_report_injects_sidebar():
     assert h.count("</body>") == 1
 
 
+def test_name_shows_as_sidebar_heading():
+    # name= is the visible page title, not just the <title> tag (escaped, so markup can't inject)
+    h = rs.render_dashboard(_edges(), name="Södermalm <traffic>").html
+    assert "<h2>Södermalm &lt;traffic&gt;</h2>" in h
+    assert "<h2>Roads dashboard</h2>" not in h
+    assert "<h2>Roads report</h2>" in rs.render_report(_edges()).html   # default still shows
+
+
 def test_pages_are_web_only():
     # backend= is ignored (these are MapLibre-only); still yields a saveable page with the sidebar
     m = rs.render_dashboard(_edges(), backend="folium")

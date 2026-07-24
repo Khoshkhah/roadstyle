@@ -34,9 +34,15 @@ def _page(gdf, template: str, *, defaults: dict, **kw):
     for k, v in defaults.items():
         kw.setdefault(k, v)
     m = render_edges(gdf, backend="web", **kw)
+    # `name=` is the page title: besides the <title> tag (via render_edges), show it as the
+    # sidebar's <h2> heading — the template ships with a placeholder heading.
+    import html
+    import re
+    frag = re.sub(r"<h2>.*?</h2>", f"<h2>{html.escape(str(kw['name']))}</h2>",
+                  sidebar_html(template), count=1)
     # inject before the MapLibre placeholders resolve, so BOTH .html (the saved page) and the
     # notebook preview (_repr_html_) carry the sidebar
-    m._tpl = m._tpl.replace("</body>", sidebar_html(template) + "</body>", 1)
+    m._tpl = m._tpl.replace("</body>", frag + "</body>", 1)
     return m
 
 
