@@ -32,6 +32,7 @@ from .emit import (
 from .filters import filter_edges, highway_types
 from .legend import make_legend
 from .overlays import Overlay
+from .pages import render_dashboard, render_report, sidebar_html
 from .palettes import (
     CARTO,
     HIGHSAT,
@@ -44,7 +45,6 @@ from .palettes import (
     register_palette,
     save_palette,
 )
-from .pages import render_dashboard, render_report, sidebar_html
 from .render import render_edges
 from .snapshot import snapshot
 from .style import base_style, normalize_highway, resolve, selection_style
