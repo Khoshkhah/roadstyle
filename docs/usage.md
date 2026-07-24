@@ -19,6 +19,7 @@ Optional extras pull in heavier backends/inputs only when you ask for them
 # lonboard — the WebGL backend for very large edge sets
 # basemaps — any xyzservices tile provider as a base map
 # duckdb / arrow — read edges straight from a DuckDB query or an Arrow table
+# all      — every extra above in one go: pip install "roadstyle[all]"
 ```
 
 The latest unreleased state, still without cloning:

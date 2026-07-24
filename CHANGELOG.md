@@ -13,6 +13,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `roadstyle studio --server.port 8502` behaves as usual. Sample networks download on first use
   (cached under `~/.cache/roadstyle`), or are read straight from the repo when run from a source
   checkout. The `ui/studio/` tree keeps only the shared `samples/`.
+- **`roadstyle[all]`** — one extra that pulls every user-facing extra
+  (`numeric`, `basemaps`, `lonboard`, `duckdb`, `arrow`, `tiles`, `studio`).
 
 ### Fixed
 - **Web backend honours `legend=`.** `render_edges(backend="web", color_by=…, cmap=…)` (and the CLI

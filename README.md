@@ -52,7 +52,8 @@ pip install roadstyle                 # the library — geopandas, shapely, foli
 pip install "roadstyle[studio]"       # + the no-code Streamlit workbench: `roadstyle studio`
 ```
 
-Every optional feature is an extra — combine what you need, e.g. `pip install "roadstyle[numeric,tiles]"`:
+Every optional feature is an extra — combine what you need (e.g. `pip install "roadstyle[numeric,tiles]"`),
+or take everything at once with `pip install "roadstyle[all]"`:
 
 | Extra | Enables | Pulls in |
 |---|---|---|
@@ -63,6 +64,7 @@ Every optional feature is an extra — combine what you need, e.g. `pip install 
 | `duckdb` | `from_duckdb()` — read edges straight from DuckDB | duckdb |
 | `arrow` | read edges from a pyarrow Table | pyarrow |
 | `basemaps` | any XYZ provider from the xyzservices registry | xyzservices |
+| `all` | every extra above in one go | all of the above |
 
 To try the latest unreleased state — still no clone:
 `pip install "roadstyle @ git+https://github.com/Khoshkhah/roadstyle.git"`
