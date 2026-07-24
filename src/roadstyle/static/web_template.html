@@ -8,23 +8,33 @@
 .rs-zoom{position:absolute;bottom:10px;left:140px;z-index:2;background:rgba(255,255,255,.85);
   padding:2px 6px;border-radius:4px;font:11px/1.5 monospace;color:#333;pointer-events:none}
 .bm-icon{position:absolute;bottom:44px;right:calc(10px + var(--rs-side,0px));z-index:2;width:34px;
-  height:34px;background:#fff;border-radius:5px;box-shadow:0 1px 4px rgba(0,0,0,.3);cursor:pointer;
-  display:grid;place-items:center;font:17px/1 system-ui,sans-serif;color:#444;user-select:none}
-.bm-icon:hover{color:#111}
+  height:34px;background:#fff;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);cursor:pointer;
+  display:grid;place-items:center;font:17px/1 system-ui,sans-serif;color:#5b616b;user-select:none}
+.bm-icon:hover{color:#16181d}
 .bm-menu{position:absolute;bottom:84px;right:calc(10px + var(--rs-side,0px));z-index:3;background:#fff;
-  border-radius:5px;box-shadow:0 1px 5px rgba(0,0,0,.3);font:13px system-ui,sans-serif;display:none;overflow:hidden}
+  border-radius:8px;border:1px solid rgba(0,0,0,.06);box-shadow:0 4px 16px rgba(0,0,0,.14);
+  font:13px system-ui,sans-serif;display:none;overflow:hidden;padding:4px}
 .bm-menu.open{display:block}
-.bm-menu div{padding:6px 14px;cursor:pointer;white-space:nowrap}
-.bm-menu div:hover{background:#f2f2f2}
-.bm-menu div.on{font-weight:700;color:#0b62c1}
-.flt-ctrl{position:absolute;top:48px;left:10px;z-index:2;background:#fff;border-radius:5px;
-box-shadow:0 1px 4px rgba(0,0,0,.3);font:13px system-ui,sans-serif;max-height:70%;overflow:auto}
-.flt-ctrl .flt-hd{padding:5px 9px;cursor:pointer;font-weight:600;user-select:none}
-.flt-ctrl .flt-body{padding:0 9px 7px;display:flex;flex-direction:column;gap:2px}
+.bm-menu div{padding:6px 12px;cursor:pointer;white-space:nowrap;border-radius:5px}
+.bm-menu div:hover{background:#f2f4f7}
+.bm-menu div.on{font-weight:700;color:#1a6bd6}
+/* non-panel: the map's own colour-by + filter cards share one anchored top-left stack, clear of
+   the native zoom controls (top-right) and the scale bar (bottom-left). Panel mode docks them. */
+.rs-tl{position:absolute;top:10px;left:10px;z-index:2;display:flex;flex-direction:column;
+  gap:8px;align-items:flex-start;max-height:calc(100% - 20px)}
+.rs-tl .co-ctrl,.rs-tl .flt-ctrl{position:static;max-height:none}
+.rs-tl .flt-ctrl{overflow:auto;min-height:0}   /* long class lists scroll inside the stack */
+.flt-ctrl{position:absolute;top:10px;left:10px;z-index:2;background:#fff;border-radius:8px;
+box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);
+font:13px system-ui,sans-serif;color:#16181d;max-height:70%;overflow:auto}
+.flt-ctrl .flt-hd{padding:8px 11px 6px;cursor:pointer;user-select:none;
+  font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#767c88}
+.flt-ctrl .flt-body{padding:0 11px 8px;display:flex;flex-direction:column;gap:3px}
 .flt-sw{display:inline-block;width:16px;height:5px;border-radius:2px;margin:0 2px 0 5px;
-  vertical-align:middle;border:1px solid rgba(0,0,0,.25)}
+  vertical-align:middle;border:1px solid rgba(0,0,0,.15)}
 .flt-ctrl.collapsed .flt-body{display:none}
-.flt-ctrl label{cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px}
+.flt-ctrl label{cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.flt-ctrl label:hover{color:#1a6bd6}
 /* panel mode: a full-height side panel; the map (and every right-anchored control) shifts left.
    --rs-side is set on <body> so host-page controls can offset themselves the same way. */
 body.rs-panel{--rs-side:320px}
@@ -39,7 +49,7 @@ body.rs-panel #map{right:320px}
 .rs-side-x:hover,.rs-side-min:hover{color:#333}
 .rs-side-q{padding:9px 14px;border-bottom:1px solid #ececec}
 .rs-side-q input{width:100%;box-sizing:border-box;padding:6px 9px;border:1px solid #ddd;
-  border-radius:5px;font:12.5px system-ui,sans-serif;outline:none}
+  border-radius:7px;font:12.5px system-ui,sans-serif;outline:none}
 .rs-side-q input:focus{border-color:#7c4dff}
 .rs-side-q-res{max-height:200px;overflow:auto}
 .rs-qrow{padding:4px 2px;border-bottom:1px solid #f3f3f3;cursor:pointer;display:flex;
@@ -70,25 +80,43 @@ body.rs-side-hidden{--rs-side:0px}
   border-bottom:1px solid #f3f3f3;font-variant-numeric:tabular-nums}
 .rs-kv span{color:#8a8a8a;flex:0 0 auto}
 .rs-kv b{font-weight:600;text-align:right;word-break:break-all;min-width:0}
-.co-ctrl{position:absolute;top:10px;right:10px;z-index:2;background:#fff;border-radius:5px;
-box-shadow:0 1px 4px rgba(0,0,0,.3);padding:4px 7px;font:13px system-ui,sans-serif;color:#555}
-.co-ctrl select{font:inherit;border:0;background:transparent;cursor:pointer;outline:none;color:#111}
-.co-lg{position:absolute;left:10px;bottom:24px;z-index:2;background:rgba(255,255,255,.94);
-border-radius:5px;box-shadow:0 1px 4px rgba(0,0,0,.3);padding:6px 9px;font:12px system-ui,sans-serif;color:#222}
-.co-lg .lg-title{font-weight:600;margin-bottom:4px}
-.co-lg .lg-row{display:flex;align-items:center;gap:6px;white-space:nowrap}
-.co-lg .lg-sw{width:14px;height:8px;border-radius:2px;display:inline-block}
-.co-lg .lg-bar{height:10px;width:150px;border-radius:3px;margin:2px 0}
-.co-lg .lg-ends{display:flex;justify-content:space-between;color:#555}
-.co-lg .co-lg-hd{cursor:pointer;font-weight:600;user-select:none;padding-bottom:4px}
+.co-ctrl{position:absolute;top:10px;right:10px;z-index:2;background:#fff;border-radius:8px;
+box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);padding:6px 10px;
+font:11px system-ui,sans-serif;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#767c88}
+.co-ctrl select{font:13px system-ui,sans-serif;font-weight:600;text-transform:none;letter-spacing:0;
+  border:0;background:transparent;cursor:pointer;outline:none;color:#16181d;margin-left:3px}
+.co-lg{position:absolute;left:10px;bottom:24px;z-index:2;background:rgba(255,255,255,.96);
+border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);
+padding:8px 11px;font:12px system-ui,sans-serif;color:#16181d}
+.co-lg .lg-title{font-weight:600;margin-bottom:5px;color:#16181d}
+.co-lg .lg-row{display:flex;align-items:center;gap:7px;white-space:nowrap;padding:1px 0}
+.co-lg .lg-sw{width:14px;height:8px;border-radius:2px;display:inline-block;flex:none}
+.co-lg .lg-bar{height:10px;width:150px;border-radius:3px;margin:3px 0}
+.co-lg .lg-ends{display:flex;justify-content:space-between;color:#767c88;font-size:11px}
+.co-lg .co-lg-hd{cursor:pointer;user-select:none;padding-bottom:5px;
+  font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#767c88}
 .co-lg.collapsed .co-lg-body{display:none}
-.co-lg.collapsed{padding-bottom:6px}
-.ov-ctrl{position:absolute;bottom:24px;right:10px;z-index:2;background:#fff;border-radius:5px;
-box-shadow:0 1px 4px rgba(0,0,0,.3);font:13px system-ui,sans-serif;color:#222}
-.ov-ctrl .ov-hd{padding:5px 9px;font-weight:600}
-.ov-ctrl .ov-body{padding:0 9px 7px;display:flex;flex-direction:column;gap:2px}
-.ov-ctrl label{display:flex;align-items:center;gap:5px;white-space:nowrap;cursor:pointer}
+.co-lg.collapsed{padding-bottom:8px}
+.ov-ctrl{position:absolute;bottom:24px;right:10px;z-index:2;background:#fff;border-radius:8px;
+box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px system-ui,sans-serif;color:#16181d}
+.ov-ctrl .ov-hd{padding:8px 11px 6px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#767c88}
+.ov-ctrl .ov-body{padding:0 11px 8px;display:flex;flex-direction:column;gap:3px}
+.ov-ctrl label{display:flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer}
+.ov-ctrl label:hover{color:#1a6bd6}
 .ov-ctrl .ov-sw{width:12px;height:12px;border-radius:3px;display:inline-block;flex:none}
+/* translucent click popup + hover tooltip (a backdrop blur keeps text legible over busy maps) */
+.maplibregl-popup-content{background:rgba(255,255,255,.58);backdrop-filter:blur(5px);
+  -webkit-backdrop-filter:blur(5px);border:1px solid rgba(0,0,0,.06);box-shadow:0 2px 10px rgba(0,0,0,.12)}
+.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.maplibregl-popup-anchor-top-right .maplibregl-popup-tip{border-bottom-color:rgba(255,255,255,.58)}
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip{border-top-color:rgba(255,255,255,.58)}
+.maplibregl-popup-anchor-left .maplibregl-popup-tip{border-right-color:rgba(255,255,255,.58)}
+.maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color:rgba(255,255,255,.58)}
+.rs-tip .maplibregl-popup-content{background:rgba(255,255,255,.42)}
+.rs-tip .maplibregl-popup-tip{display:none}   /* a following tooltip needs no pointer */
 </style></head><body>
 <div id="map"></div><script>
 const style = __STYLE__, BASEMAPS = __BASEMAPS__;
@@ -383,6 +411,13 @@ function rsFocus(ids, opt, layer){ // fly the camera to an id (or id set); opt -
 window.rsQuery = rsQuery; window.rsFilter = rsFilter;
 window.rsGetProps = rsGetProps; window.rsHighlight = rsHighlight;
 window.rsFocus = rsFocus;
+// non-panel: one top-left stack hosts the colour-by + filter cards (panel mode docks them instead)
+function _tlHost(){
+  if(_sideCtl) return _sideCtl;
+  let h=document.getElementById("rs-tl");
+  if(!h){ h=document.createElement("div"); h.className="rs-tl"; h.id="rs-tl"; document.body.appendChild(h); }
+  return h;
+}
 if(FILTER.on){
   const box=document.createElement("div"); box.className="flt-ctrl";
   const hd=document.createElement("div"); hd.className="flt-hd"; hd.textContent="Roads ▾";
@@ -407,7 +442,7 @@ if(FILTER.on){
     lab.appendChild(cb); lab.appendChild(document.createTextNode(" Bridges"));
     body.appendChild(lab);
   }
-  (_sideCtl||document.body).appendChild(box);
+  _tlHost().appendChild(box);
 }
 // "colour by" recolouring: swap which baked fill prop the road layers read (no re-render). Each
 // option's fill is baked per edge (__rs_fill / __rs_fill__1 …); setPaintProperty repoints the
@@ -487,7 +522,7 @@ if(COLOR_OPTIONS.length > 1){
   COLOR_OPTIONS.forEach((o,i)=>{ const op=document.createElement("option");
     op.value=i; op.textContent=o.name; sel.appendChild(op); });
   sel.onchange=()=> rsSetColorField(parseInt(sel.value,10));
-  w.appendChild(sel); (_sideCtl||document.body).appendChild(w);
+  w.appendChild(sel); _tlHost().prepend(w);   // colour-by sits above the filter in the stack
 }
 if(_coActive){ const _ap=()=>rsSetColorField(_coActive);   // display the requested option on load
   if(map.isStyleLoaded && map.isStyleLoaded()) _ap(); else map.on("load", _ap); }

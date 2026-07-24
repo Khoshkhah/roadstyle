@@ -7,8 +7,67 @@ from pathlib import Path
 import streamlit as st
 
 import roadstyle as rs
+from roadstyle.colors import ColorRamp
 
 CMAPS = ["viridis", "plasma", "magma", "cividis", "coolwarm", "RdYlGn_r"]
+
+
+def _colour_opt(edges, num_cols, col, cmap):
+    """One ``color_options`` entry for ``col``: a continuous ramp for a many-valued numeric column,
+    else discrete ``min(5, #values)`` stepped colours (categorical legend). ``None`` if all-NaN.
+
+    ``missing="self"``: unmapped / NaN edges (e.g. non-bridges when colouring by ``bridge``) keep
+    the styler's own neutral grey instead of inheriting the loud "Class" base fill (see
+    ``bake_color_options``' base-fallback)."""
+    vals = sorted(edges[col].dropna().unique().tolist())   # native ints/floats/strs
+    n = len(vals)
+    if col in num_cols and n > 12:
+        # continuous numeric: robust range — clip vmin/vmax to p2–p98 so one outlier edge can't
+        # stretch the ramp and flatten every other road (the ramp clamps out-of-range to its ends).
+        vlo, vhi = edges[col].quantile([0.02, 0.98])
+        return {"color_by": col, "cmap": cmap, "vmin": float(vlo), "vmax": float(vhi),
+                "missing": "self"}
+    if n:
+        # discrete — few numeric values (lanes) OR a categorical (bridge/oneway/layer). min(5, n)
+        # stepped colours → a categorical legend, one swatch per value; >5 values split into 5 even
+        # groups so the top values share the top colour.
+        k = min(5, n)
+        stops = ColorRamp(cmap).stops(k)
+        groups = [vals[i * n // k:(i + 1) * n // k] for i in range(k)]
+        return {"color_by": col, "missing": "self",
+                "colors": {v: stops[i] for i, g in enumerate(groups) for v in g}}
+    return None
+
+
+def colour_by_section(edges, *, default=()):
+    """Shared sidebar "Colour by data" block for all three studio pages.
+
+    Renders a multiselect of colourable columns — numeric plus low-cardinality categoricals
+    (bridge, tunnel, oneway, layer…); id/key columns and high-cardinality text (street ``name``)
+    are dropped — each with its own colormap. Returns the ``color_options`` mapping
+    (``{"Class": {}, col: {...}, …}``); every picked column becomes an entry in the in-map
+    "Colour by" dropdown, routed to a discrete or continuous scale by its data."""
+    with st.expander("Colour by data", expanded=False):
+        cols = [c for c in edges.columns if c != edges.geometry.name]
+        # id/key columns (edge_id, osm_id…) are meaningless to colour by
+        ids = {c for c in cols if c.lower() in {"id", "fid", "gid", "uid", "objectid"}
+               or c.lower().endswith("_id")}
+        num_cols = [c for c in edges.select_dtypes("number").columns if c not in ids]
+        # low-cardinality categoricals colour via the discrete branch; skip text like `name`
+        cat_cols = [c for c in cols if c not in num_cols and c not in ids
+                    and 0 < edges[c].nunique() <= 12]
+        avail = num_cols + cat_cols
+        pick = st.multiselect("Columns (besides road class)", avail,
+                              default=[c for c in default if c in avail])
+        cmaps = {c: st.selectbox(f"↳ colormap for {c}", CMAPS, index=(i + 1) % len(CMAPS),
+                                 key=f"cm_{c}")
+                 for i, c in enumerate(pick)}
+    co = {"Class": {}}                       # Class first = the neutral base / toggle-back option
+    for c in pick:
+        o = _colour_opt(edges, num_cols, c, cmaps[c])
+        if o:
+            co[c] = o
+    return co
 
 
 def tiles_available() -> bool:

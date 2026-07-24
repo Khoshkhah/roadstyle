@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import streamlit as st
-from common import CMAPS, data_section, overlay_section, tiles_available
+from common import colour_by_section, data_section, overlay_section, tiles_available
 
 import roadstyle as rs
 
@@ -37,20 +37,16 @@ with st.sidebar:
                                    "appear as you zoom in (thins low-zoom tiles too).")
         title = st.text_input("Title", value="Roads dashboard")
 
-    with st.expander("Colour-by options", expanded=False):
-        num_cols = list(edges.select_dtypes("number").columns)
-        co_cols = st.multiselect("Columns (besides road class)", num_cols,
-                                 default=[c for c in ("maxspeed_kmh", "lanes") if c in num_cols])
-        color_options = {"Class": {}}
-        for i, c in enumerate(co_cols):
-            cm = st.selectbox(f"↳ colormap for {c}", CMAPS, index=(i + 1) % len(CMAPS),
-                              key=f"cm_{c}")
-            color_options[c] = {"color_by": c, "cmap": cm}
+    color_options = colour_by_section(edges, default=("maxspeed_kmh", "lanes"))
 
     with st.expander("Hover tooltip", expanded=False):
         hover = st.multiselect("Columns shown on hover",
                                [c for c in edges.columns if c != edges.geometry.name],
                                help="A tooltip that follows the mouse over a road. Empty = off.")
+
+    with st.expander("Decorations", expanded=False):
+        labels = st.checkbox("Street names", value=True)
+        arrows = st.checkbox("One-way arrows", value=True)
 
     overlays, ov_lines = overlay_section()
 
@@ -64,6 +60,10 @@ if minzoom:
     kw["minzoom"] = True
 if hover:
     kw["tooltip"] = hover
+if not labels:
+    kw["labels"] = False
+if not arrows:
+    kw["arrows"] = False
 if overlays:
     kw["overlays"] = overlays
 

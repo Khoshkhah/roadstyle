@@ -1,50 +1,77 @@
 <!-- roadstyle UI template: sidebar dashboard.
      A plain HTML/CSS/JS fragment injected before </body> of any saved roadstyle web map.
      It talks to the map ONLY through the public window.rs* API and rs:* events, so every
-     piece is safe to rip out, restyle, or extend. Build with:  python build.py  -->
+     piece is safe to rip out, restyle, or extend. Shares the report sidebar's design tokens
+     (--bg / --ink / --mut / --line / --card / --accent + a light/dark toggle). Build:  python build.py  -->
 <style>
-#map{right:320px}
-.co-ctrl{display:none}  /* the sidebar owns the Colour-by select; hide the built-in one */
-#sb{position:fixed;top:0;right:0;bottom:0;width:320px;box-sizing:border-box;overflow:auto;
-  background:#fff;border-left:1px solid #ddd;padding:14px;font:13px system-ui,sans-serif}
-#sb h2{margin:0 0 10px;font-size:15px}
-#sb label{display:block;margin:10px 0 3px;font-weight:600;font-size:11px;color:#666;
+#map{right:340px}
+body{--rs-side:340px}   /* shift the map's right-anchored controls left of the panel */
+.co-ctrl,.co-lg{display:none}  /* the sidebar owns the colour-by select + legend; hide the built-in ones */
+#sb{position:fixed;top:0;right:0;bottom:0;width:340px;box-sizing:border-box;overflow:auto;
+  padding:14px 15px;font:13px/1.5 system-ui,-apple-system,sans-serif;
+  --bg:#fff;--ink:#16181d;--mut:#767c88;--line:#e6e8ec;--card:#f7f8fa;--accent:#1a6bd6;
+  background:var(--bg);color:var(--ink);border-left:1px solid var(--line)}
+#sb[data-theme=dark]{--bg:#14171c;--ink:#e9ecf1;--mut:#8b93a1;--line:#272b33;--card:#1c2026;--accent:#5aa9f8}
+.sb-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.sb-top h2{margin:0;font-size:15px}
+#sb-th,#sb-hide{background:none;border:1px solid var(--line);border-radius:99px;color:var(--mut);
+  cursor:pointer;font-size:13px;width:26px;height:26px;line-height:1}
+#sb-hide{margin-left:6px;font-size:14px}
+#sb-th:hover,#sb-hide:hover{color:var(--accent);border-color:var(--accent)}
+#sb.hidden{display:none}
+#sb-show{position:fixed;top:10px;right:10px;z-index:3;display:none;background:#fff;color:#333;
+  border:1px solid #ccc;border-radius:5px;width:30px;height:30px;cursor:pointer;font-size:16px;
+  line-height:1;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+#sb label{display:block;margin:11px 0 3px;font-weight:600;font-size:11px;color:var(--mut);
   text-transform:uppercase;letter-spacing:.04em}
-#q{width:100%;box-sizing:border-box;padding:6px;font:12px monospace;border:1px solid #ccc;
-  border-radius:4px}
-#sb button{margin:2px 2px 2px 0;padding:5px 9px;border:1px solid #ccc;border-radius:4px;
-  background:#f7f7f7;cursor:pointer}
-#sb button:hover{background:#eee}
-#sb select{width:100%;padding:5px;border:1px solid #ccc;border-radius:4px}
-#count{color:#888;margin:8px 0 4px}
-#tbl div{padding:2px 0;border-bottom:1px solid #f0f0f0}
-#tbl a{color:#1a6bd6;text-decoration:none}
-#detail{background:#f8f8f8;border-radius:5px;padding:8px;margin-top:10px;min-height:40px;
-  color:#555}
-#detail b{color:#222}
+#sb select,#q{width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);
+  border-radius:5px;background:var(--bg);color:var(--ink);font:inherit;outline:none}
+#q{font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+#sb select:focus,#q:focus{border-color:var(--accent)}
+.sb-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
+#sb button{padding:5px 11px;border:1px solid var(--line);border-radius:6px;
+  background:var(--card);color:var(--ink);cursor:pointer;font:inherit}
+#sb button:hover{border-color:var(--accent);color:var(--accent)}
+#sb button.sb-primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+#sb button.sb-primary:hover{filter:brightness(1.08);color:#fff}
+#col{width:28px;height:28px;padding:1px;border:1px solid var(--line);border-radius:6px;
+  vertical-align:middle;cursor:pointer;background:var(--bg)}
+#count{color:var(--mut);font-size:12px;margin:10px 0 2px;font-variant-numeric:tabular-nums}
+#tbl{max-height:230px;overflow:auto}
+#tbl div{padding:4px 0;border-bottom:1px solid var(--line)}
+#tbl a{color:var(--accent);text-decoration:none}
+#tbl a:hover{text-decoration:underline}
+#detail{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:8px;
+  margin-top:6px;min-height:38px;color:var(--mut)}
+#detail b{color:var(--ink)}
+#sb-legend{margin-top:5px}
+.sb-lgrow{display:flex;align-items:center;gap:7px;font-size:12px;white-space:nowrap;padding:1px 0}
+.sb-lgrow i{width:14px;height:8px;border-radius:2px;flex:none}
+.sb-lgbar{height:10px;border-radius:3px;margin:3px 0}
+.sb-lgends{display:flex;justify-content:space-between;font-size:11px;color:var(--mut)}
+.sb-none{color:var(--mut);font-size:11px}
 </style>
-<div id="sb">
-  <h2>Roads dashboard</h2>
+<div id="sb" data-theme="light">
+  <div class="sb-top"><h2>Roads dashboard</h2>
+    <span><button id="sb-th" title="Light / dark">◐</button><button id="sb-hide" title="Hide panel">»</button></span></div>
 
   <label>Base map</label>
   <select id="bm"></select>
 
   <label>Colour by</label>
   <select id="co"></select>
+  <label>Legend</label>
+  <div id="sb-legend"></div>
 
   <label>Query — a WHERE clause over your columns</label>
   <input id="q" value="p.maxspeed_kmh >= 50 AND p.oneway = True" spellcheck="false"
     title="SQL-style (AND / OR / NOT / = / True) or plain JS (&& / || / ! / === / true)">
-  <div style="margin-top:6px">
-    <button onclick="runQuery()"><b>Run</b></button>
+  <div class="sb-actions">
+    <button class="sb-primary" onclick="runQuery()">Run</button>
     <button onclick="rsFilter(IDS)">Filter</button>
     <button onclick="rsColor(IDS, document.getElementById('col').value)">Colour</button>
-    <input type="color" id="col" value="#ff00aa" title="colour for the query set"
-      style="width:26px;height:26px;padding:1px;border:1px solid #ccc;border-radius:4px;
-      vertical-align:middle;cursor:pointer">
-    <button onclick="rsHighlight(IDS)">Highlight</button>
+    <input type="color" id="col" value="#7c4dff" title="colour for the query set">
     <button onclick="resetAll()">Reset</button>
-    <button onclick="rsSetView3D(map.getPitch() < 5)">2D/3D</button>
   </div>
 
   <div id="count"></div>
@@ -53,8 +80,23 @@
   <label>Selected road</label>
   <div id="detail">Click a road, or a row above.</div>
 </div>
+<button id="sb-show" title="Show panel">&laquo;</button>
 <script>
 let IDS = [];
+const esc = s => (""+s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// ── panel chrome: light/dark toggle + hide/show (the map takes the space back) ──
+const sb = document.getElementById("sb");
+document.getElementById("sb-th").onclick = () => sb.dataset.theme = sb.dataset.theme === "dark" ? "light" : "dark";
+function panel(show){
+  sb.classList.toggle("hidden", !show);
+  document.getElementById("sb-show").style.display = show ? "none" : "block";
+  const mp = document.getElementById("map"); if (mp) mp.style.right = show ? "340px" : "0";
+  document.body.style.setProperty("--rs-side", show ? "340px" : "0px");
+  try { map.resize(); } catch (e) {}
+}
+document.getElementById("sb-hide").onclick = () => panel(false);
+document.getElementById("sb-show").onclick = () => panel(true);
 
 // base-map select: built from the RS_BASEMAPS registry, kept in sync by rs:basemapchange
 const bsel = document.getElementById("bm");
@@ -64,12 +106,27 @@ document.addEventListener("rs:basemapchange", e => { bsel.value = e.detail.basem
 
 // colour-by select: the options were baked by render_edges(color_options=...) in build.py;
 // RS_COLOR_OPTIONS lists them and rsSetColorField switches (the legend follows by itself)
-const cosel = document.getElementById("co");
-RS_COLOR_OPTIONS.forEach((o, i) => cosel.add(new Option(o.name, i)));
-if (!RS_COLOR_OPTIONS.length){ cosel.add(new Option("(none baked)", "")); cosel.disabled = true; }
-cosel.onchange = () => rsSetColorField(+cosel.value);
+const cosel = document.getElementById("co"), COPTS = window.RS_COLOR_OPTIONS || [];
+COPTS.forEach((o, i) => cosel.add(new Option(o.name, i)));
+if (!COPTS.length){ cosel.add(new Option("(none baked)", "")); cosel.disabled = true; }
+// legend for the active colour option — its baked ramp/categories, or (for the class option, which
+// bakes none) synthesised from the road-class colours the template exposes
+function legendHtml(o){
+  const lg = o && o.legend;
+  if (lg && lg.kind === "continuous")
+    return '<div class="sb-lgbar" style="background:linear-gradient(90deg,' + (lg.ramp || []).join(",") + ')"></div>'
+      + '<div class="sb-lgends"><span>' + esc(lg.vmin) + '</span><span>' + esc(lg.vmax) + '</span></div>';
+  if (lg && lg.kind === "categorical" && (lg.entries || []).length)
+    return lg.entries.map(e => '<div class="sb-lgrow"><i style="background:' + e[1] + '"></i>' + esc(e[0]) + '</div>').join("");
+  const cls = window.RS_CLASSES || [], cols = window.RS_CLASS_COLORS || {};
+  return cls.length ? cls.map(c => '<div class="sb-lgrow"><i style="background:' + (cols[c] || "#888") + '"></i>' + esc(c) + '</div>').join("")
+    : '<span class="sb-none">no legend</span>';
+}
+const showLegend = i => document.getElementById("sb-legend").innerHTML = legendHtml(COPTS[i]);
+cosel.onchange = () => { rsSetColorField(+cosel.value); showLegend(+cosel.value); };
 document.addEventListener("rs:colorchange", e => {
-  if (e.detail.index != null) cosel.value = String(e.detail.index); });
+  if (e.detail.index != null){ cosel.value = String(e.detail.index); showLegend(e.detail.index); } });
+showLegend(+(cosel.value || 0));
 
 // let SQL habits work: AND/OR/NOT, True/False, and a single = become their JS equivalents
 function sqlish(s){
@@ -87,7 +144,7 @@ function runQuery(){
   const rows = IDS.map((id, k) => ({id, p: props[k]}))
     .filter(r => r.p.name && !seen.has(r.p.name) && seen.add(r.p.name)).slice(0, 30);
   document.getElementById("tbl").innerHTML = rows.map(r =>
-    '<div><a href="#" data-id="' + r.id + '">' + r.p.name + '</a></div>').join("");
+    '<div><a href="#" data-id="' + r.id + '">' + esc(r.p.name) + '</a></div>').join("");
   document.querySelectorAll("#tbl a").forEach(a =>
     a.onclick = e => { e.preventDefault();
       rsSelect(+a.dataset.id); rsFocus(+a.dataset.id); });   // select AND fly the camera to it
@@ -105,16 +162,16 @@ function resetAll(){
 function fieldRows(p, only){
   const ks = (only && only.length ? only : Object.keys(p))
     .filter(k => k[0] !== "_" && k !== "twoway" && k !== "lvl" && p[k] != null && p[k] !== "");
-  return ks.map(k => "<b>" + k + "</b>: " + p[k]).join("<br>");
+  return ks.map(k => "<b>" + esc(k) + "</b>: " + esc(p[k])).join("<br>");
 }
 document.addEventListener("rs:select", e => {
   let h = "";
   if (e.detail.overlay)                       // an overlay feature (sensor/zone) was clicked
-    h += '<span style="color:#888">' + e.detail.overlay + '</span><br>';
+    h += '<span style="color:var(--mut)">' + esc(e.detail.overlay) + '</span><br>';
   h += fieldRows(e.detail.properties, e.detail.fields);
   (e.detail.overlays || []).forEach(o => {
-    h += '<hr style="border:none;border-top:1px solid #e2e2e2;margin:6px 0">' +
-         '<span style="color:#888">' + o.label + '</span><br>' + fieldRows(o.properties, o.fields);
+    h += '<hr style="border:none;border-top:1px solid var(--line);margin:6px 0">' +
+         '<span style="color:var(--mut)">' + esc(o.label) + '</span><br>' + fieldRows(o.properties, o.fields);
   });
   document.getElementById("detail").innerHTML = h;
 });

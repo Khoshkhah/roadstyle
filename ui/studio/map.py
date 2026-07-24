@@ -7,10 +7,11 @@ HTML) when you outgrow the knobs.
 from __future__ import annotations
 
 import streamlit as st
-from common import CMAPS, data_section, overlay_section, tiles_available
+from common import colour_by_section, data_section, overlay_section, tiles_available
 
 import roadstyle as rs
 from roadstyle.render_web import DEFAULT_ROAD_POPUP
+
 
 # ---------------------------------------------------------------- sidebar: the knobs
 with st.sidebar:
@@ -32,12 +33,9 @@ with st.sidebar:
     if tiles:
         kw["tiles"] = True
 
-    with st.expander("Colour by data", expanded=False):
-        cols = [c for c in edges.columns if c != edges.geometry.name]
-        color_by = st.selectbox("Column", ["(road class)"] + cols)
-        cmap = st.selectbox("Colormap", CMAPS) if color_by != "(road class)" else None
-    if cmap:
-        kw.update({"color_by": color_by, "cmap": cmap, "legend": True})
+    co = colour_by_section(edges)   # shared "Colour by data" block (built-in in-map dropdown + legend)
+    if len(co) > 1:
+        kw["color_options"] = co
 
     with st.expander("Filter", expanded=False):
         classes = sorted(rs.highway_types(edges))
@@ -60,6 +58,7 @@ with st.sidebar:
         kw["arrows"] = False
 
     with st.expander("Popup & hover", expanded=False):
+        cols = [c for c in edges.columns if c != edges.geometry.name]
         popup_mode = st.selectbox("Click popup", ["curated fields", "choose columns",
                                                   "side panel", "all columns", "off"])
         if popup_mode == "choose columns":
