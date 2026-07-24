@@ -34,9 +34,11 @@ you outgrow the knobs, or download `map.html`.
 
 The same knobs, but the product is the **query sidebar**
 ([`ui/dashboard`](https://github.com/Khoshkhah/roadstyle/tree/main/ui/dashboard)): the map rendered
-with the built-in controls off and the sidebar injected — a query box, filter / colour / highlight
-buttons, a results table, and a detail panel, all driven through the public `window.rs*` API. Pick
-the base maps, colour-by columns and hover tooltip, preview it live, and download `dashboard.html`.
+with the built-in controls off and the sidebar injected — a query box, filter / colour buttons, a
+results table, and a detail panel, all driven through the public `window.rs*` API. Pick the base
+maps, colour-by columns and hover tooltip, preview it live, and download `dashboard.html`. The
+generated code is a single call — [`rs.render_dashboard(edges, ...)`](api.md#rendering) — which
+ships with the library, so the page needs no repo checkout to rebuild.
 
 ## Report
 
@@ -45,11 +47,13 @@ The same again, but the product is the **report sidebar**
 classes / named roads / length), the active colour-by legend, a checkbox filter (overlay layers +
 road types), a search box, and a selected-road read-out — a stats-forward panel whose every number
 is computed client-side from the baked edges. The base map keeps the map's on-map switcher icon.
-Download `report.html`.
+Download `report.html`, or reproduce it with the shipped [`rs.render_report(edges, ...)`](api.md#rendering).
 
 ![The report sidebar — KPI cards, colour-by legend, and a layer / road-type filter over a live map](img/gallery/report.png)
 
 !!! tip "The sidebar pages are authoring tools"
-    Dashboard and Report just pick the knobs and inject one of the copyable
-    [`ui/` templates](frontend.md); the HTML / CSS / JS fragment is yours to reshape. Everything the
-    sidebars do goes through the documented [`window.rs*` API](web-backend.md#the-javascript-api-windowrs).
+    Dashboard and Report just pick the knobs and call the shipped
+    [`render_dashboard` / `render_report`](api.md#rendering), which inject a bundled sidebar template;
+    the HTML / CSS / JS fragment (`rs.sidebar_html(...)`, also in [`ui/`](frontend.md)) is yours to
+    reshape. Everything the sidebars do goes through the documented
+    [`window.rs*` API](web-backend.md#the-javascript-api-windowrs).

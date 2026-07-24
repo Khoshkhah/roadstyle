@@ -8,6 +8,13 @@ A map of the public API. For every parameter and its meaning, see the
 | Function | Returns | Purpose |
 |---|---|---|
 | `render_edges(gdf, ...)` | `WebMap` / `folium.Map` / `lonboard.Map` | the main entry point — render a styled map (default backend `"web"`) |
+| `render_dashboard(gdf, ...)` | `WebMap` | one-call **dashboard** page — the map with built-in controls off + the bundled dashboard sidebar (query box, colour-by, class filter + legend, table) injected |
+| `render_report(gdf, ...)` | `WebMap` | one-call **report** page — the map + the bundled stats sidebar (KPI cards, colour-by legend, filter, search, selected-road read-out) |
+| `sidebar_html(name)` | `str` | the bundled sidebar fragment (`"dashboard"` / `"report"`) — copy it out to reshape and re-inject |
+
+`render_dashboard` / `render_report` are web-only and accept every `render_edges` keyword
+(`color_options=` populates the sidebar's *Colour by* picker). The templates ship in the package,
+so they need no repo checkout.
 
 Key kwargs: `backend`, `palette`, `highway_col`, `include`/`exclude`, `selected`, `tooltip`,
 `basemap`/`basemaps`, `view_3d` / `pitch` / `bearing`, `settings` (per-call override), the

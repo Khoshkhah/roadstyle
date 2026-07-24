@@ -102,6 +102,9 @@ rs.render_edges(edges, palette="carto", basemap="positron").save("carto.html")  
 rs.render_edges(edges, include=["motorway", "trunk", "primary"]).save("major.html")
 rs.render_edges(edges, color_by="aadt", cmap="viridis").save("traffic.html")     # colour by your data
 rs.render_edges(edges, tiles=True).save("big.html")                              # 10⁵-edge networks
+
+rs.render_dashboard(edges).save("dashboard.html")   # a full query-sidebar dashboard page, one call
+rs.render_report(edges).save("report.html")         # a stats-sidebar report page
 ```
 
 Palettes: **`highsat`** (high-saturation, maximum legibility), **`carto`** (the muted
@@ -120,7 +123,7 @@ streamlit run ui/studio/app.py
 
 ![roadstyle studio](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/studio.png)
 
-Two pages, same idea — every knob updates the live map **and** the exact Python code that
+Three pages, same idea — every knob updates the live map **and** the exact Python code that
 reproduces it:
 
 - **Map** — upload a road file (`.gpkg` / `.geojson`) or pick a bundled Södermalm sample, then
@@ -129,7 +132,12 @@ reproduces it:
   download the self-contained `map.html`.
 - **Dashboard** — the same knobs, but the product is a **sidebar dashboard** (query box, verb
   buttons, results table, detail panel) built on the JavaScript API. Preview it live, download
-  `dashboard.html`.
+  `dashboard.html`. The generated code is a one-liner: `rs.render_dashboard(edges, ...)`.
+- **Report** — a **stats sidebar** instead (KPI cards, the colour-by legend, a checkbox filter,
+  search, a selected-road read-out). Generated as `rs.render_report(edges, ...)`.
+
+Both sidebar pages are shipped in the library — `rs.render_dashboard(edges).save("dashboard.html")`
+and `rs.render_report(edges)` build them in one call, no repo checkout needed (see below).
 
 ## Rendering parameters
 
@@ -286,8 +294,18 @@ document.addEventListener("rs:select", e => showSidebar(e.detail.properties));
 
 Everything works the same on overlays (pass the overlay's label as the last argument) and on
 tiled maps. Full API table: [docs/web-backend.md](https://khoshkhah.github.io/roadstyle/web-backend/#the-javascript-api-windowrs).
-Ready-made scaffolding: [`ui/`](https://github.com/Khoshkhah/roadstyle/tree/main/ui) — `python ui/dashboard/build.py your_edges.gpkg [--tiles]`
-builds a complete sidebar dashboard on this API.
+
+Two ready-made sidebars ship **inside the package**, built entirely on this API — one call each:
+
+```python
+rs.render_dashboard(edges).save("dashboard.html")   # query box, colour-by, class filter + legend, table
+rs.render_report(edges).save("report.html")          # KPI cards, colour-by legend, filter, search
+```
+
+`color_options={...}` populates their *Colour by* picker; every `render_edges` keyword passes
+through. To reshape one, `rs.sidebar_html("dashboard")` (or `"report"`) returns the HTML/CSS/JS
+fragment — edit it and re-inject before `</body>`. The same fragments live in
+[`ui/`](https://github.com/Khoshkhah/roadstyle/tree/main/ui) with a `build.py` per template.
 
 ## Settings — one defaults file, your overrides on top
 

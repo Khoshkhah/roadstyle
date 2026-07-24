@@ -127,10 +127,19 @@ The id sets use the roads source's generated feature ids — the same id space a
 events. Labels, arrows and 3D deck ribbons sit on merged helper sources, so `rsFilter` prunes
 road geometry but not those decorations (the class filter prunes everything).
 
-Copyable UI templates built purely on this API live in the repo's `ui/` folder — start from
-`ui/dashboard/` (a query sidebar: query box → results table → detail panel) or `ui/report/`
-(a stats sidebar: KPI cards, a by-class breakdown, search, and a selected-road read-out) and
-make it yours.
+Two sidebars built purely on this API **ship with the package** — one call each:
+
+```python
+rs.render_dashboard(edges).save("dashboard.html")   # query box → results table → detail panel
+rs.render_report(edges).save("report.html")          # KPI cards, by-class legend, search, read-out
+```
+
+Both render the map with the built-in controls off and inject the bundled sidebar, returning a
+`WebMap`; `color_options={...}` populates the *Colour by* picker and every `render_edges` keyword
+passes through. To reshape one, `rs.sidebar_html("dashboard")` (or `"report"`) returns the
+HTML/CSS/JS fragment — edit it and re-inject before `</body>`. The same fragments live in the repo's
+[`ui/`](https://github.com/Khoshkhah/roadstyle/tree/main/ui) folder (`ui/dashboard/`, `ui/report/`),
+each with a `build.py`, to fork wholesale.
 
 Plus: `window.map` (the MapLibre `Map` — camera via `map.easeTo({pitch, bearing, ...})`),
 click selection events `rs:select` / `rs:deselect`, and the registries `RS_BASEMAPS`,
