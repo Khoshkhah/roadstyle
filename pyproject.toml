@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "roadstyle"
-version = "0.2.0.post1"
+version = "0.2.1"
 description = "Opinionated OSM-theme road/edge map styling for folium, lonboard & the web (data-driven palettes, casing, themes)"
 readme = "README.md"
 requires-python = ">=3.10"

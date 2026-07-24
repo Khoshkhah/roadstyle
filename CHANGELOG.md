@@ -4,6 +4,27 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] — 2026-07-23
+
+### Added
+- **Report sidebar UI template** (`ui/report/`) — a stats-forward panel over any web map: KPI
+  cards (edges / classes / named roads / length), the active colour-by legend, a checkbox filter
+  for overlay layers and road types, search, and a selected-road read-out. Wired entirely through
+  the public `window.rs*` API; a matching **Report** page joins the studio.
+- **`RS_CLASS_COL` / `RS_CLASS_COLORS` JS globals** (web backend) — the column `RS_CLASSES` came
+  from, and each class's baked fill colour, so a custom UI can build a by-class legend or filter.
+- Studio **Dashboard** and **Report** pages gain a *Hover tooltip* section (`tooltip=`).
+
+### Changed
+- **Panel legend and road-class filter collapse by default** in panel mode (`popup_mode="panel"`),
+  reclaiming the space above the record read-out; floating maps are unchanged.
+
+### Fixed
+- **Panel search matches column names too.** Bridges are `bridge=yes` (no *value* contains the
+  string "bridge"), so a value-only search found nothing; the built-in `_sideSearch` and the report
+  sidebar now also match the query against the column name when that field is set, so `bridge`,
+  `tunnel`, `oneway`, … resolve.
+
 ## [0.2.0] — 2026-07-22
 
 First PyPI release.
