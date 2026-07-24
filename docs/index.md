@@ -21,6 +21,7 @@ render_edges(edges, color_by="aadt", cmap="viridis",          # colour by a data
 ```bash
 roadstyle edges.gpkg -o roads.html --basemap dark_matter
 roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by your data
+roadstyle studio                                                    # or click through it — the Streamlit workbench
 ```
 
 ## Why roadstyle?

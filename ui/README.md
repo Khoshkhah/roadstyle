@@ -2,7 +2,9 @@
 
 Copyable starting points for building your own frontend over a roadstyle web map. The library
 keeps **data and logic** (the baked features, the `window.rs*` API, the `rs:*` events); the UI
-layer is deliberately yours — these templates are scaffolding, not part of the package.
+layer is deliberately yours — the `dashboard/` and `report/` templates are scaffolding, not part
+of the package. (The studio is the exception: it ships inside the package — `roadstyle studio` —
+and this dir keeps only its `samples/`.)
 
 Each template is a plain **HTML/CSS/JS fragment** (no frameworks, no build step, no server)
 that gets injected before `</body>` of a saved map and talks to it only through the public API:
@@ -11,7 +13,7 @@ that gets injected before `</body>` of a saved map and talks to it only through 
 |---|---|
 | [`dashboard/`](dashboard/) | A **query** sidebar: query box (`rsQuery`), verb buttons (`rsFilter` / `rsColor` / `rsHighlight`), a clickable results table (`rsGetProps` + `rsSelect`), a detail panel fed by `rs:select`, and a base-map select built from `RS_BASEMAPS`. |
 | [`report/`](report/) | A **report** sidebar: headline KPI cards (edges / classes / named roads / length), a by-class breakdown bar list (`RS_CLASSES` / `RS_CLASS_COL` / `RS_CLASS_COLORS`, click a class to show/hide it), a search box, a selected-road read-out (`rs:select`), and a light/dark toggle. Source-agnostic — every number is computed client-side from the baked edges. |
-| [`studio/`](studio/) | **roadstyle studio** — a Streamlit workbench (`pip install streamlit`, then `streamlit run ui/studio/app.py`), three pages: **Map** (the whole library behind a few knobs, with the live map next to the exact `render_edges` code it represents), **Dashboard** (the same knobs, but the product is the `dashboard/` query-sidebar page), and **Report** (the `report/` stats-sidebar page). Each builder previews live and downloads the self-contained HTML, with a **Vector tiles** toggle (embedded-PMTiles roads for big networks, when the `tiles` extra is installed). The gentlest way to work with — and demo — the library. |
+| [`studio/`](studio/) | **roadstyle studio** — a Streamlit workbench (`pip install "roadstyle[studio]"`, then `roadstyle studio`; source now lives in `src/roadstyle/studio/`, this dir keeps only the shared `samples/`), three pages: **Map** (the whole library behind a few knobs, with the live map next to the exact `render_edges` code it represents), **Dashboard** (the same knobs, but the product is the `dashboard/` query-sidebar page), and **Report** (the `report/` stats-sidebar page). Each builder previews live and downloads the self-contained HTML, with a **Vector tiles** toggle (embedded-PMTiles roads for big networks, when the `tiles` extra is installed). The gentlest way to work with — and demo — the library. |
 
 ## Using a template
 

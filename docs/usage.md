@@ -27,12 +27,16 @@ roadstyle edges.gpkg -o map.html --basemap dark_matter               # styled in
 roadstyle edges.gpkg --include motorway trunk primary       # keep only major roads
 roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by your data
 roadstyle edges.gpkg -f spec -o map_data.json               # JSON spec for your own frontend
+
+roadstyle studio                                            # the interactive Streamlit workbench
+roadstyle studio --server.port 8502                         # extra args are forwarded to streamlit
 ```
 
 `-f/--format` is one of `web` (self-contained MapLibre map, **default**), `folium`, `rsjs`
 (roadstyle.js page), `spec`, `geojson`; every other flag mirrors a `render_edges` keyword (the
 `web` map also takes `--no-arrows`/`--no-labels`/`--no-filter`/`--no-basemap-switcher`). See
-`roadstyle --help`.
+`roadstyle --help`. `roadstyle studio` (from the `studio` extra) launches the
+[workbench](studio.md) and forwards any extra arguments to `streamlit run`.
 
 ## Input — what roadstyle expects
 

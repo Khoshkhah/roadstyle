@@ -6,6 +6,14 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **`roadstyle studio`** — the Streamlit workbench now ships inside the package (`roadstyle/studio/`)
+  and launches from one command: `pip install "roadstyle[studio]"`, then `roadstyle studio` (no repo
+  checkout). The subcommand forwards every extra argument to `streamlit run`, so
+  `roadstyle studio --server.port 8502` behaves as usual. Sample networks download on first use
+  (cached under `~/.cache/roadstyle`), or are read straight from the repo when run from a source
+  checkout. The `ui/studio/` tree keeps only the shared `samples/`.
+
 ### Fixed
 - **Web backend honours `legend=`.** `render_edges(backend="web", color_by=…, cmap=…)` (and the CLI
   `--color-by … -f web`) now render the data styler's legend — a continuous ramp or categorical key,

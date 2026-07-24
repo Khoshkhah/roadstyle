@@ -12,7 +12,6 @@ from common import colour_by_section, data_section, overlay_section, tiles_avail
 import roadstyle as rs
 from roadstyle.render_web import DEFAULT_ROAD_POPUP
 
-
 # ---------------------------------------------------------------- sidebar: the knobs
 with st.sidebar:
     st.title("roadstyle studio")

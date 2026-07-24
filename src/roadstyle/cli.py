@@ -32,7 +32,8 @@ def _build_parser() -> argparse.ArgumentParser:
                "  roadstyle edges.gpkg --palette carto --basemap positron\n"
                "  roadstyle edges.gpkg --include motorway trunk primary -o major.html\n"
                "  roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6 -f web\n"
-               "  roadstyle edges.gpkg -f spec -o map_data.json   # JSON for your own frontend",
+               "  roadstyle edges.gpkg -f spec -o map_data.json   # JSON for your own frontend\n"
+               "  roadstyle studio [--server.port 8502 …]         # launch the Streamlit workbench",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument("input", help="road-data file with a road-class column (any CRS).")
@@ -93,8 +94,30 @@ def _build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _studio(rest: list[str]) -> int:
+    """``roadstyle studio [streamlit args…]`` — launch the bundled Streamlit workbench.
+
+    Everything after ``studio`` is forwarded verbatim to ``streamlit run``, so e.g.
+    ``roadstyle studio --server.port 8502`` behaves exactly like the equivalent ``streamlit run``.
+    """
+    import importlib.resources
+    import subprocess
+
+    try:
+        import streamlit  # noqa: F401
+    except ImportError:
+        print('roadstyle studio needs streamlit — `pip install "roadstyle[studio]"`',
+              file=sys.stderr)
+        return 1
+    app = importlib.resources.files("roadstyle.studio") / "app.py"
+    return subprocess.call([sys.executable, "-m", "streamlit", "run", str(app), *rest])
+
+
 def main(argv: list[str] | None = None) -> int:
     """Entry point for the ``roadstyle`` console script. Returns a process exit code."""
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] == "studio":            # forward everything after `studio` to streamlit
+        return _studio(argv[1:])
     args = _build_parser().parse_args(argv)
 
     in_path = Path(args.input)

@@ -40,6 +40,7 @@ lonboard = ["lonboard"]                   # WebGL (deck.gl) backend for very lar
 duckdb = ["duckdb"]                        # read edges straight from a DuckDB relation / query
 arrow = ["pyarrow"]                        # read edges from a pyarrow Table
 tiles = ["mapbox-vector-tile", "pmtiles"]  # tiles=True: embedded-PMTiles vector road tiles
+studio = ["streamlit"]                     # the `roadstyle studio` Streamlit workbench
 docs = ["mkdocs-material"]
 dev = ["pytest", "ruff", "mypy", "lonboard", "mapclassify", "matplotlib", "xyzservices", "duckdb", "pyarrow", "mapbox-vector-tile", "pmtiles"]
 

@@ -5,12 +5,14 @@ file, click through the knobs, and watch the live map update next to the **exact
 that produces it. Every page has a download button for the self-contained HTML.
 
 ```bash
-pip install streamlit          # the studio's only extra dependency
-streamlit run ui/studio/app.py
+pip install "roadstyle[studio]"   # adds streamlit; sample networks (~12 MB) download on first run
+roadstyle studio                  # forwards streamlit args, e.g. roadstyle studio --server.port 8502
 ```
 
-The map itself is plain roadstyle; Streamlit only draws the knobs. It opens on the **Map** page and
-carries a page switcher for three products — **Map**, **Dashboard**, **Report**.
+The map itself is plain roadstyle; Streamlit only draws the knobs. No clone needed — the studio
+ships inside the package, and `roadstyle studio` is a thin wrapper over `streamlit run`, so any
+Streamlit flag (`--server.port`, `--server.address`, …) is forwarded. It opens on the **Map** page
+and carries a page switcher for three products — **Map**, **Dashboard**, **Report**.
 
 ![roadstyle studio — knobs on the left, the live map and the exact render_edges code on the right](img/gallery/studio.png)
 

@@ -5,9 +5,9 @@ looks, get the map + the exact ``render_edges`` code), **Dashboard** (the same, 
 is the ``ui/dashboard`` query-sidebar page), and **Report** (the ``ui/report`` stats-sidebar
 page: headline counts, a by-class breakdown, search, and a selected-road read-out). Run::
 
-    streamlit run ui/studio/app.py
+    roadstyle studio                 # or: streamlit run <this file> [streamlit args…]
 
-Needs ``pip install streamlit`` (the map itself is plain roadstyle).
+Needs the ``studio`` extra — ``pip install "roadstyle[studio]"`` (the map itself is plain roadstyle).
 """
 import streamlit as st
 

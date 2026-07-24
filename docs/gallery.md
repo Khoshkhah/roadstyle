@@ -100,7 +100,7 @@ the current state below it, and a download button for the self-contained HTML. T
 [Studio](studio.md) page for the full walkthrough.
 
 ```bash
-pip install streamlit && streamlit run ui/studio/app.py
+pip install "roadstyle[studio]" && roadstyle studio
 ```
 
 ![roadstyle studio](img/gallery/studio.png)

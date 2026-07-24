@@ -1,7 +1,9 @@
 """Shared pieces of the studio pages: data loading and the sidebar Data section."""
 from __future__ import annotations
 
+import os
 import tempfile
+import urllib.request
 from pathlib import Path
 
 import streamlit as st
@@ -80,11 +82,42 @@ def tiles_available() -> bool:
         return False
 OV_COLORS = ["#7c4dff", "#00bcd4", "#ff9800", "#e91e63"]
 
-SAMPLES_DIR = Path(__file__).resolve().parent / "samples"
-# Bundled road networks (Södermalm, Stockholm — exported with `duckosm export-gis`), one file
-# per network. Any road file with a highway-class column works the same way.
-ROAD_SAMPLES = {f"Södermalm {m}": SAMPLES_DIR / f"sodermalm_{m}.geojson"
+# Sample networks + overlays live in the repo (ui/studio/samples/), not the wheel — the studio
+# downloads the full sample set into a local cache on first use, so `pip install roadstyle` stays
+# tiny. ponytail: cache dir is XDG (~/.cache); Windows lands there too, good enough.
+_RAW = "https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/ui/studio/samples/"
+_CACHE = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "roadstyle" / "samples"
+# In a source checkout (git clone / editable install) the samples sit in the repo; use them
+# directly — no download, works offline, respects local edits. Empty/absent in a wheel install.
+_REPO_SAMPLES = Path(__file__).resolve().parents[3] / "ui" / "studio" / "samples"
+
+# Road networks (Södermalm — exported with `duckosm export-gis`); any road file with a
+# highway-class column works the same. Overlays: point/zone samples. display name → filename.
+ROAD_SAMPLES = {f"Södermalm {m}": f"sodermalm_{m}.geojson"
                 for m in ("driving", "walking", "cycling")}
+OVERLAY_SAMPLES = {"sensors": "sensors.geojson", "zones": "zones.geojson"}
+ALL_SAMPLES = list(ROAD_SAMPLES.values()) + list(OVERLAY_SAMPLES.values())
+
+
+def _ensure_samples() -> None:
+    """Download the full sample set (all networks + overlays) into the cache; skips what's cached."""
+    missing = [fn for fn in ALL_SAMPLES if not (_CACHE / fn).exists()]
+    if not missing:
+        return
+    _CACHE.mkdir(parents=True, exist_ok=True)
+    with st.spinner(f"Downloading sample data ({len(missing)} files)…"):
+        for fn in missing:
+            urllib.request.urlretrieve(_RAW + fn, _CACHE / fn)
+
+
+def sample_path(fname: str) -> Path:
+    """Local path to a sample. From a source checkout, the repo copy; from a wheel install, the
+    full sample set downloads to the cache on first use, then it's all local."""
+    local = _REPO_SAMPLES / fname
+    if local.exists():          # clone / editable — no network needed
+        return local
+    _ensure_samples()           # installed from a wheel — pull the whole set into the cache
+    return _CACHE / fname
 
 
 @st.cache_data(show_spinner="Loading edges…")
@@ -104,8 +137,9 @@ def data_section():
         up = st.file_uploader("Road file (.gpkg / .geojson)", type=["gpkg", "geojson", "json"])
         pick = st.selectbox("…or a sample network", list(ROAD_SAMPLES),
                             disabled=up is not None,
-                            help="Södermalm (Stockholm), exported with `duckosm export-gis`")
-        path = str(ROAD_SAMPLES[pick])
+                            help="Södermalm (Stockholm), exported with `duckosm export-gis` — "
+                                 "downloaded on first use")
+        path = str(sample_path(ROAD_SAMPLES[pick]))
         try:
             edges = load_edges(path, up.getvalue() if up else None,
                                up.name if up else None)
@@ -135,13 +169,12 @@ def overlay_section():
         ups = st.file_uploader("Zones / POIs / lines (.gpkg / .geojson)",
                                type=["gpkg", "geojson", "json"],
                                accept_multiple_files=True, key="ov_files")
-        samples = {p.stem: p for p in sorted(SAMPLES_DIR.glob("*.geojson"))
-                   if p not in ROAD_SAMPLES.values()}
-        picks = st.multiselect("…or sample overlays", list(samples), key="ov_samples")
+        picks = st.multiselect("…or sample overlays", list(OVERLAY_SAMPLES), key="ov_samples")
     # (display name, bytes, the path the generated code should read)
-    files = ([(u.name, u.getvalue(), u.name) for u in (ups or [])]
-             + [(samples[k].name, samples[k].read_bytes(), f"ui/studio/samples/{k}.geojson")
-                for k in picks])
+    files = [(u.name, u.getvalue(), u.name) for u in (ups or [])]
+    for k in picks:
+        fn = OVERLAY_SAMPLES[k]
+        files.append((fn, sample_path(fn).read_bytes(), f"ui/studio/samples/{fn}"))
     overlays, lines = [], []
     for i, (fname, blob, code_path) in enumerate(files):
         gdf = load_overlay(blob, fname)

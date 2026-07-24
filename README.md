@@ -63,6 +63,7 @@ Optional features are extras — install only what you need:
 | `duckdb` | `from_duckdb()` — read edges straight from DuckDB | duckdb |
 | `arrow` | read edges from a pyarrow Table | pyarrow |
 | `basemaps` | any XYZ provider from the xyzservices registry | xyzservices |
+| `studio` | `roadstyle studio` — the interactive Streamlit workbench | streamlit |
 
 ```bash
 pip install "roadstyle[numeric,tiles]"
@@ -112,13 +113,12 @@ openstreetmap-carto look), **`mono`** (grayscale — quiet backdrop for data ove
 
 ## The studio — the library behind knobs, no code
 
-The gentlest way in. The studio is a small Streamlit app bundled in the repo (not part of the
-pip package):
+The gentlest way in. The studio is a small Streamlit app that ships with the package — install the
+`studio` extra and run it (the sample networks, ~12 MB, download on first run):
 
 ```bash
-git clone https://github.com/Khoshkhah/roadstyle.git && cd roadstyle
-pip install roadstyle streamlit
-streamlit run ui/studio/app.py
+pip install "roadstyle[studio]"
+roadstyle studio                 # add streamlit args as usual: roadstyle studio --server.port 8502
 ```
 
 ![roadstyle studio](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/studio.png)
@@ -339,9 +339,14 @@ roadstyle edges.gpkg --view-3d --tiles                        # 3D + embedded ve
 roadstyle edges.gpkg --include motorway trunk primary
 roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6
 roadstyle edges.gpkg -f spec -o map_data.json                 # JSON spec for your own frontend
+
+roadstyle studio                                              # the interactive workbench (needs the studio extra)
+roadstyle studio --server.port 8502                           # any streamlit flag is forwarded
 ```
 
-Every flag mirrors a `render_edges` keyword; `roadstyle --help` lists them all.
+Every flag mirrors a `render_edges` keyword; `roadstyle --help` lists them all. `roadstyle studio`
+launches the [Streamlit workbench](#the-studio--the-library-behind-knobs-no-code) (install it with
+`pip install "roadstyle[studio]"`) and passes any extra arguments straight to `streamlit run`.
 
 ## Documentation
 
@@ -354,7 +359,7 @@ Every flag mirrors a `render_edges` keyword; `roadstyle --help` lists them all.
 | [Palettes & settings](https://khoshkhah.github.io/roadstyle/palettes/) | the built-in palettes and the override system |
 | [When to use roadstyle](https://khoshkhah.github.io/roadstyle/comparison/) | vs `.explore()`, prettymaps, kepler.gl, raw MapLibre |
 | [Notebooks](https://github.com/Khoshkhah/roadstyle/tree/main/notebooks) | a runnable manual, one topic per notebook |
-| [UI templates](https://github.com/Khoshkhah/roadstyle/tree/main/ui) | the dashboard scaffolding + the studio |
+| [UI templates](https://github.com/Khoshkhah/roadstyle/tree/main/ui) | the dashboard / report scaffolding + the studio's sample data (the studio itself ships in the package — `roadstyle studio`) |
 
 Full MkDocs site: [khoshkhah.github.io/roadstyle](https://khoshkhah.github.io/roadstyle/)
 (`mkdocs serve` locally).
