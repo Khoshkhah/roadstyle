@@ -47,6 +47,11 @@ with st.sidebar:
                               key=f"cm_{c}")
             color_options[c] = {"color_by": c, "cmap": cm}
 
+    with st.expander("Hover tooltip", expanded=False):
+        hover = st.multiselect("Columns shown on hover",
+                               [c for c in edges.columns if c != edges.geometry.name],
+                               help="A tooltip that follows the mouse over a road. Empty = off.")
+
     overlays, ov_lines = overlay_section()
 
 # built-in controls off — the injected sidebar IS the UI (see ui/dashboard/build.py)
@@ -57,6 +62,8 @@ if tiles:
     kw["tiles"] = True
 if minzoom:
     kw["minzoom"] = True
+if hover:
+    kw["tooltip"] = hover
 if overlays:
     kw["overlays"] = overlays
 
