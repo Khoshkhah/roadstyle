@@ -80,6 +80,9 @@ border-radius:5px;box-shadow:0 1px 4px rgba(0,0,0,.3);padding:6px 9px;font:12px 
 .co-lg .lg-sw{width:14px;height:8px;border-radius:2px;display:inline-block}
 .co-lg .lg-bar{height:10px;width:150px;border-radius:3px;margin:2px 0}
 .co-lg .lg-ends{display:flex;justify-content:space-between;color:#555}
+.co-lg .co-lg-hd{cursor:pointer;font-weight:600;user-select:none;padding-bottom:4px}
+.co-lg.collapsed .co-lg-body{display:none}
+.co-lg.collapsed{padding-bottom:6px}
 .ov-ctrl{position:absolute;bottom:24px;right:10px;z-index:2;background:#fff;border-radius:5px;
 box-shadow:0 1px 4px rgba(0,0,0,.3);font:13px system-ui,sans-serif;color:#222}
 .ov-ctrl .ov-hd{padding:5px 9px;font-weight:600}
@@ -380,6 +383,7 @@ if(FILTER.on){
   const hd=document.createElement("div"); hd.className="flt-hd"; hd.textContent="Roads ▾";
   const body=document.createElement("div"); body.className="flt-body";
   hd.onclick=()=>{ const c=box.classList.toggle("collapsed"); hd.textContent="Roads "+(c?"▸":"▾"); };
+  if(_popupMode==="panel"){ box.classList.add("collapsed"); hd.textContent="Roads ▸"; }  // panel: collapse to save space
   box.appendChild(hd); box.appendChild(body);
   FILTER.classes.forEach(c=>{
     const lab=document.createElement("label");
@@ -405,7 +409,7 @@ if(FILTER.on){
 // road-fill layers' line-color at the chosen prop. window.rsSetColorField drives it from your UI.
 const COLOR_OPTIONS = __COLOR_OPTIONS__;
 const RS_FILL_LAYERS = ["roads-fill","roads-tunnel-fill","roads-bridge-fill"];
-let _coActive = __CO_ACTIVE__, _coLegendEl = null;
+let _coActive = __CO_ACTIVE__, _coLegendEl = null, _coLegendBox = null;
 function coLegendHtml(lg){
   if(!lg) return "";
   let h = lg.title ? '<div class="lg-title">'+lg.title+'</div>' : "";
@@ -419,7 +423,8 @@ function coLegendHtml(lg){
 function coUpdateLegend(){
   if(!_coLegendEl) return;
   const h = coLegendHtml((COLOR_OPTIONS[_coActive]||{}).legend);
-  _coLegendEl.innerHTML = h; _coLegendEl.style.display = h ? "" : "none";
+  _coLegendEl.innerHTML = h;
+  if(_coLegendBox) _coLegendBox.style.display = h ? "" : "none";
 }
 let _qColor=null;   // {ids, color} recolour of an id set, layered over the active option
 function _fillExpr(){
@@ -482,8 +487,13 @@ if(COLOR_OPTIONS.length > 1){
 if(_coActive){ const _ap=()=>rsSetColorField(_coActive);   // display the requested option on load
   if(map.isStyleLoaded && map.isStyleLoaded()) _ap(); else map.on("load", _ap); }
 if(COLOR_OPTIONS.some(o=>o.legend)){
-  _coLegendEl=document.createElement("div"); _coLegendEl.className="co-lg";
-  (_sideCtl||document.body).appendChild(_coLegendEl); coUpdateLegend();
+  _coLegendBox=document.createElement("div"); _coLegendBox.className="co-lg";
+  const hd=document.createElement("div"); hd.className="co-lg-hd"; hd.textContent="Legend ▾";
+  hd.onclick=()=>{ const c=_coLegendBox.classList.toggle("collapsed"); hd.textContent="Legend "+(c?"▸":"▾"); };
+  _coLegendEl=document.createElement("div"); _coLegendEl.className="co-lg-body";
+  _coLegendBox.appendChild(hd); _coLegendBox.appendChild(_coLegendEl);
+  if(_popupMode==="panel"){ _coLegendBox.classList.add("collapsed"); hd.textContent="Legend ▸"; }  // panel: collapse to save space
+  (_sideCtl||document.body).appendChild(_coLegendBox); coUpdateLegend();
 }
 // extra overlay layers (zones / POIs / lines): click an interactive overlay -> popup of its
 // fields; a Layers control toggles each overlay's visibility. Click precedence follows the
