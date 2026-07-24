@@ -44,11 +44,14 @@ def main() -> None:
         wm = rs.render_edges(edges, backend="web", **kw)
         rs.snapshot(wm, OUT / f"{name}.png", width=960, height=640, settle=4.0, **cam)
         print("wrote", name)
-    # the sidebar-dashboard template (ui/dashboard) — shot as a page, not a WebMap
-    dash = Path(__file__).resolve().parents[1] / "ui" / "dashboard" / "dashboard.html"
-    if dash.exists():
-        rs.snapshot(dash, OUT / "dashboard.png", width=960, height=640, settle=4.0)
-        print("wrote dashboard")
+    # the sidebar templates (ui/dashboard, ui/report) — shot as pages, not WebMaps. Build them
+    # first (their build.py writes the .html) so the shots reflect the current sidebars.
+    root = Path(__file__).resolve().parents[1]
+    for tmpl, png in (("dashboard", "dashboard"), ("report", "report")):
+        page = root / "ui" / tmpl / f"{tmpl}.html"
+        if page.exists():
+            rs.snapshot(page, OUT / f"{png}.png", width=960, height=640, settle=4.0)
+            print("wrote", png)
 
 
 if __name__ == "__main__":

@@ -45,6 +45,8 @@ road types), a search box, and a selected-road read-out — a stats-forward pane
 is computed client-side from the baked edges. The base map keeps the map's on-map switcher icon.
 Download `report.html`.
 
+![The report sidebar — KPI cards, colour-by legend, and a layer / road-type filter over a live map](img/gallery/report.png)
+
 !!! tip "The sidebar pages are authoring tools"
     Dashboard and Report just pick the knobs and inject one of the copyable
     [`ui/` templates](frontend.md); the HTML / CSS / JS fragment is yours to reshape. Everything the
