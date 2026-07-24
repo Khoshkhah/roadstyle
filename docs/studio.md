@@ -12,6 +12,8 @@ streamlit run ui/studio/app.py
 The map itself is plain roadstyle; Streamlit only draws the knobs. It opens on the **Map** page and
 carries a page switcher for three products — **Map**, **Dashboard**, **Report**.
 
+![roadstyle studio — knobs on the left, the live map and the exact render_edges code on the right](img/gallery/studio.png)
+
 ## Map
 
 The whole library behind a few knobs. Load a road file (or a bundled Södermalm sample), then set:
