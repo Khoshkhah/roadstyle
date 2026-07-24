@@ -51,9 +51,10 @@ with st.sidebar:
 
     overlays, ov_lines = overlay_section()
 
-# built-in controls off — the injected report sidebar IS the UI (see ui/report/build.py)
+# the sidebar owns colour-by / legend / filter; the base map keeps the map's on-map switcher
+# icon (basemap_switcher=True). See ui/report/build.py.
 kw = {"basemap": basemap, "view_3d": view_3d, "basemaps": bms or None,
-      "color_options": color_options, "basemap_switcher": False, "filter_control": False,
+      "color_options": color_options, "basemap_switcher": True, "filter_control": False,
       "road_popup": False, "name": title}
 if tiles:
     kw["tiles"] = True

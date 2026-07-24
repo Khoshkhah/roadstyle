@@ -31,16 +31,18 @@ def main() -> None:
     import geopandas as gpd
     edges = gpd.read_file(src)
 
-    # built-in controls off — the sidebar IS the UI. color_options are BAKED here (Python
-    # precomputes each option's per-edge colours); the sidebar's "Colour by" select switches
-    # between them, and its by-class bars read RS_CLASSES / RS_CLASS_COL / RS_CLASS_COLORS.
+    # The sidebar owns colour-by, the legend, and the layer/road-type filter, so those built-in
+    # controls stay off — but the base map keeps the map's own on-map switcher icon
+    # (basemap_switcher=True). color_options are BAKED here (Python precomputes each option's
+    # per-edge colours); the sidebar's "Colour by" select switches between them and shows the
+    # active legend, and its filter reads RS_CLASSES / RS_CLASS_COL / RS_CLASS_COLORS / RS_OVERLAYS.
     m = rs.render_edges(edges, backend="web", basemap="voyager", view_3d=True,
                         basemaps=["voyager", "positron", "dark_matter", "osm", "satellite",
                                   "blank"],
                         color_options={"Class": {},
                                        "Speed": {"color_by": "maxspeed_kmh", "cmap": "plasma"},
                                        "Lanes": {"color_by": "lanes", "cmap": "viridis"}},
-                        basemap_switcher=False, filter_control=False, road_popup=False,
+                        basemap_switcher=True, filter_control=False, road_popup=False,
                         tiles=tiles, name="Roads report")
     ui = (HERE / "sidebar.html").read_text()
     out = HERE / "report.html"

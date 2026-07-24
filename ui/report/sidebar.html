@@ -1,12 +1,13 @@
 <!-- roadstyle UI template: report sidebar.
      A stats-forward panel injected before </body> of any saved roadstyle web map — headline
-     counts, a by-class breakdown, search, and a selected-road read-out. Source-agnostic: it
-     computes everything client-side from the baked edges and talks to the map ONLY through the
-     public window.rs* API + rs:* events (plus RS_CLASSES / RS_CLASS_COL / RS_CLASS_COLORS).
-     Every piece is safe to rip out, restyle, or extend. Build with:  python build.py  -->
+     counts, the active colour-by legend, a checkbox filter (overlay layers + road types),
+     search, and a selected-road read-out. Source-agnostic: it computes everything client-side
+     from the baked edges and talks to the map ONLY through the public window.rs* API + rs:*
+     events (plus RS_CLASSES / RS_CLASS_COL / RS_CLASS_COLORS / RS_OVERLAYS). The base map is
+     the map's own on-map switcher (build with basemap_switcher=True). Build:  python build.py  -->
 <style>
 #map{right:340px}
-.co-ctrl,.co-lg{display:none}          /* the report sidebar owns colour-by; no floating leftovers */
+.co-ctrl,.co-lg,.ov-ctrl{display:none}   /* the sidebar owns colour-by, the legend, and the layer filter */
 #rp{position:fixed;top:0;right:0;bottom:0;width:340px;box-sizing:border-box;overflow:auto;
   padding:14px 15px;font:13px/1.5 system-ui,-apple-system,sans-serif;
   --bg:#fff;--ink:#16181d;--mut:#767c88;--line:#e6e8ec;--card:#f7f8fa;--accent:#1a6bd6;
@@ -16,12 +17,18 @@
 .rp-top h2{margin:0;font-size:15px}
 #rp-th{background:none;border:1px solid var(--line);border-radius:99px;color:var(--mut);
   cursor:pointer;font-size:13px;width:26px;height:26px;line-height:1}
-#rp-th:hover{color:var(--accent);border-color:var(--accent)}
+#rp-th:hover,#rp-hide:hover{color:var(--accent);border-color:var(--accent)}
+#rp-hide{background:none;border:1px solid var(--line);border-radius:99px;color:var(--mut);cursor:pointer;
+  font-size:14px;width:26px;height:26px;line-height:1;margin-left:6px}
+#rp.hidden{display:none}
+#rp-show{position:fixed;top:10px;right:10px;z-index:3;display:none;background:#fff;color:#333;
+  border:1px solid #ccc;border-radius:5px;width:30px;height:30px;cursor:pointer;font-size:16px;
+  line-height:1;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .rp-kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
 .rp-kpi{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
 .rp-kv{font-size:19px;font-weight:660;letter-spacing:-.3px}
 .rp-kl{font-size:11px;color:var(--mut)}
-#rp label{display:block;margin:10px 0 3px;font-weight:600;font-size:11px;color:var(--mut);
+#rp label.rp-lb{display:block;margin:10px 0 3px;font-weight:600;font-size:11px;color:var(--mut);
   text-transform:uppercase;letter-spacing:.04em}
 #rp select,#rp-q{width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);
   border-radius:5px;background:var(--bg);color:var(--ink);font:inherit}
@@ -30,15 +37,19 @@
 #rp summary::-webkit-details-marker{display:none}
 #rp summary::before{content:"▸ ";color:var(--mut)}
 #rp details[open]>summary::before{content:"▾ "}
-.rp-bar{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center;cursor:pointer;
-  padding:3px 0}
-.rp-bar.off{opacity:.4}
-.rp-bl{display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap;overflow:hidden;
-  text-overflow:ellipsis}
-.rp-bl i{width:10px;height:10px;border-radius:2px;flex:none}
-.rp-bn{font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums}
-.rp-bt{grid-column:1/3;background:var(--card);border-radius:3px;height:6px;overflow:hidden}
-.rp-bt>span{display:block;height:100%}
+/* colour-by legend */
+#rp-legend{margin-top:6px}
+.rp-lgrow{display:flex;align-items:center;gap:7px;font-size:12px;white-space:nowrap;padding:1px 0}
+.rp-lgrow i{width:14px;height:8px;border-radius:2px;flex:none}
+.rp-lgbar{height:10px;border-radius:3px;margin:3px 0}
+.rp-lgends{display:flex;justify-content:space-between;font-size:11px;color:var(--mut)}
+/* checkbox filter (overlay layers + road types) */
+.rp-grp{font-size:10px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;
+  margin:8px 0 3px}
+.rp-chk{display:flex;align-items:center;gap:6px;cursor:pointer;padding:2px 0;font-size:12px;
+  white-space:nowrap}
+.rp-chk i{width:11px;height:11px;border-radius:3px;flex:none}
+.rp-chk .rp-ct{margin-left:auto;color:var(--mut);font-variant-numeric:tabular-nums}
 #rp-res{margin-top:6px;max-height:220px;overflow:auto}
 .rp-row{padding:4px 0;border-bottom:1px solid var(--line);cursor:pointer}
 .rp-row:hover{color:var(--accent)}
@@ -48,85 +59,113 @@
 #rp-detail b{color:var(--ink)}
 </style>
 <div id="rp" data-theme="light">
-  <div class="rp-top"><h2 id="rp-title">Report</h2>
-    <button id="rp-th" title="Light / dark">◐</button></div>
+  <div class="rp-top"><h2>Report</h2>
+    <span><button id="rp-th" title="Light / dark">◐</button><button id="rp-hide" title="Hide panel">»</button></span></div>
 
-  <div class="rp-kpis" id="rp-kpis"></div>
+  <details open><summary>Summary</summary>
+    <div class="rp-kpis" id="rp-kpis"></div></details>
 
-  <label>Base map</label><select id="rp-bm"></select>
-  <label>Colour by</label><select id="rp-co"></select>
+  <label class="rp-lb">Colour by</label><select id="rp-co"></select>
+  <div id="rp-legend"></div>
 
-  <details open><summary>By class</summary><div id="rp-bars"></div>
-    <div class="rp-more" id="rp-barnote"></div></details>
+  <details open><summary>Filter</summary>
+    <div id="rp-ovs"></div>
+    <div id="rp-cls"></div></details>
 
   <details><summary>Search roads</summary>
     <input id="rp-q" type="search" placeholder="name, class, id…" spellcheck="false">
     <div id="rp-res"></div></details>
 
   <details open><summary>Selected road</summary>
-    <div id="rp-detail">Click a road, a bar, or a search result.</div></details>
+    <div id="rp-detail">Click a road, or a search result.</div></details>
 </div>
+<button id="rp-show" title="Show panel">&laquo;</button>
 <script>
 (function(){
   const $ = id => document.getElementById(id);
   const esc = s => (""+s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
   const fmt = n => (+n).toLocaleString();
 
-  // theme toggle (sidebar chrome only)
   const rp = $("rp");
   $("rp-th").onclick = () => rp.dataset.theme = rp.dataset.theme === "dark" ? "light" : "dark";
 
-  // base-map + colour-by selects, kept in sync with the map's events
-  const bm = $("rp-bm");
-  (window.RS_BASEMAPS || []).forEach(b => bm.add(new Option(b.label, b.key)));
-  bm.onchange = () => rsSetBasemap(bm.value);
-  document.addEventListener("rs:basemapchange", e => { bm.value = e.detail.basemap; });
-  const co = $("rp-co");
-  (window.RS_COLOR_OPTIONS || []).forEach((o, i) => co.add(new Option(o.name, i)));
-  if (!(window.RS_COLOR_OPTIONS || []).length) { co.add(new Option("(none)", "")); co.disabled = true; }
-  co.onchange = () => rsSetColorField(+co.value);
-  document.addEventListener("rs:colorchange", e => { if (e.detail.index != null) co.value = String(e.detail.index); });
+  // hide / unhide the panel — the map takes the space back, a reopen button appears (like map.resize)
+  function panel(show){
+    rp.classList.toggle("hidden", !show);
+    $("rp-show").style.display = show ? "none" : "block";
+    const mp = $("map"); if (mp) mp.style.right = show ? "340px" : "0";
+    try { map.resize(); } catch (e) {}
+  }
+  $("rp-hide").onclick = () => panel(false);
+  $("rp-show").onclick = () => panel(true);
+
+  // ── Colour by + its legend (the base map is the map's own on-map switcher) ──
+  const co = $("rp-co"), OPTS = window.RS_COLOR_OPTIONS || [];
+  OPTS.forEach((o, i) => co.add(new Option(o.name, i)));
+  if (!OPTS.length) { co.add(new Option("(none)", "")); co.disabled = true; }
+  function legendHtml(o){
+    const lg = o && o.legend;
+    if (lg && lg.kind === "continuous")
+      return '<div class="rp-lgbar" style="background:linear-gradient(90deg,' + (lg.ramp || []).join(",") + ')"></div>'
+        + '<div class="rp-lgends"><span>' + esc(lg.vmin) + '</span><span>' + esc(lg.vmax) + '</span></div>';
+    if (lg && lg.kind === "categorical" && (lg.entries || []).length)
+      return lg.entries.map(e => '<div class="rp-lgrow"><i style="background:' + e[1] + '"></i>' + esc(e[0]) + '</div>').join("");
+    // no baked legend ⇒ the base styling is by road class: synthesize from RS_CLASSES / RS_CLASS_COLORS
+    const cls = window.RS_CLASSES || [], cols = window.RS_CLASS_COLORS || {};
+    return cls.length ? cls.map(c => '<div class="rp-lgrow"><i style="background:' + (cols[c] || "#888") + '"></i>' + esc(c) + '</div>').join("")
+      : '<span class="rp-none">no legend</span>';
+  }
+  const showLegend = i => $("rp-legend").innerHTML = legendHtml(OPTS[i]);
+  co.onchange = () => { rsSetColorField(+co.value); showLegend(+co.value); };
+  document.addEventListener("rs:colorchange", e => { if (e.detail.index != null){ co.value = String(e.detail.index); showLegend(e.detail.index); } });
+  showLegend(+(co.value || 0));
+
+  // ── Filter: overlay layers (rsSetOverlay) then road types (rsSetClasses) ──
+  const ovs = window.RS_OVERLAYS || [];
+  if (ovs.length){
+    const wrap = $("rp-ovs"); wrap.innerHTML = '<div class="rp-grp">Layers</div>';
+    ovs.forEach(ov => {
+      const lab = document.createElement("label"); lab.className = "rp-chk";
+      const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = ov.visible !== false;
+      cb.onchange = () => rsSetOverlay(ov.label, cb.checked); lab.appendChild(cb);
+      if (ov.color){ const i = document.createElement("i"); i.style.background = ov.color; lab.appendChild(i); }
+      lab.appendChild(document.createTextNode(" " + ov.label)); wrap.appendChild(lab);
+      document.addEventListener("rs:overlaychange", e => { if (e.detail.overlay === ov.label) cb.checked = e.detail.visible; });
+    });
+  }
 
   function kpi(v, l){ const d = document.createElement("div"); d.className = "rp-kpi";
     d.innerHTML = '<div class="rp-kv">' + esc(v) + '</div><div class="rp-kl">' + esc(l) + '</div>';
     $("rp-kpis").appendChild(d); }
 
-  // ── stats: computed once from every baked edge (rsQuery sees them all — sidecar or inline) ──
+  // ── stats + road-type filter: computed once from every baked edge (rsQuery sees them all) ──
   function build(ids){
-    const props = rsGetProps(ids);
-    const col = window.RS_CLASS_COL, classes = window.RS_CLASSES || [];
-    // named roads (distinct non-empty `name`)
+    const props = rsGetProps(ids), col = window.RS_CLASS_COL, classes = window.RS_CLASSES || [];
     const names = new Set();
     props.forEach(p => { const n = p.name; if (n != null && (""+n).trim() && (""+n).toLowerCase() !== "nan") names.add(""+n); });
-    // length: sum the first length-ish numeric column, if any
     const lenKey = Object.keys(props[0] || {}).find(k => /^(length|len|dist)/i.test(k) && typeof props[0][k] === "number");
     let len = null;
     if (lenKey){ len = 0; props.forEach(p => { const v = +p[lenKey]; if (isFinite(v)) len += v; }); }
-
     kpi(fmt(ids.length), "edges");
     kpi(fmt(classes.length), "classes");
     kpi(fmt(names.size), "named roads");
     if (len != null) kpi(len >= 1000 ? (len/1000).toFixed(1) + " km" : Math.round(len) + " m", "total length");
 
-    // ── by-class breakdown: count per class, coloured by the baked class fill; click to filter ──
     const cnt = {};
     props.forEach(p => { const c = p[col]; if (c != null && c !== "") cnt[c] = (cnt[c] || 0) + 1; });
-    const rows = classes.map(c => [c, cnt[c] || 0]).filter(r => r[1]).sort((a, b) => b[1] - a[1]);
-    const mx = Math.max(1, ...rows.map(r => r[1])), cols = window.RS_CLASS_COLORS || {};
-    const bars = $("rp-bars");
-    bars.innerHTML = rows.map(([c, n]) => {
-      const clr = cols[c] || "#888";
-      return '<div class="rp-bar" data-c="' + esc(c) + '"><span class="rp-bl"><i style="background:'
-        + clr + '"></i>' + esc(c) + '</span><span class="rp-bn">' + fmt(n) + '</span>'
-        + '<span class="rp-bt"><span style="width:' + (100*n/mx).toFixed(1) + '%;background:' + clr + '"></span></span></div>';
-    }).join("");
-    // click a bar to toggle its class; the visible set drives rsSetClasses
-    bars.querySelectorAll(".rp-bar").forEach(el => el.onclick = () => {
-      el.classList.toggle("off");
-      const vis = [...bars.querySelectorAll(".rp-bar:not(.off)")].map(x => x.dataset.c);
-      rsSetClasses(vis.length === rows.length ? null : vis);
+    const cols = window.RS_CLASS_COLORS || {}, cbs = {};
+    const apply = () => { const vis = classes.filter(c => cbs[c].checked);
+      rsSetClasses(vis.length === classes.length ? null : vis); };
+    const wrap = $("rp-cls");
+    wrap.innerHTML = '<div class="rp-grp">Road type</div>';
+    classes.forEach(c => {
+      const lab = document.createElement("label"); lab.className = "rp-chk";
+      const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = true; cb.onchange = apply; cbs[c] = cb;
+      const sw = document.createElement("i"); sw.style.background = cols[c] || "#888";
+      const ct = document.createElement("span"); ct.className = "rp-ct"; ct.textContent = fmt(cnt[c] || 0);
+      lab.appendChild(cb); lab.appendChild(sw); lab.appendChild(document.createTextNode(" " + c)); lab.appendChild(ct);
+      wrap.appendChild(lab);
     });
-    $("rp-barnote").textContent = "click a class to show / hide it";
   }
   // rsQuery is empty until the (tiles) sidecar inflates — poll briefly, then compute once
   (function ready(n){ const ids = rsQuery(() => true);
@@ -157,7 +196,7 @@
   q.oninput = () => { clearTimeout(qt); qt = setTimeout(() => search(q.value), 250); };
   q.onkeydown = e => { if (e.key === "Escape"){ q.value = ""; search(""); } };
 
-  // ── selected-road detail: fed by rs:select whether the click came from the map, a bar, or search ──
+  // ── selected-road detail: fed by rs:select whether the click came from the map or search ──
   function fieldRows(p, only){
     const ks = (only && only.length ? only : Object.keys(p))
       .filter(k => k[0] !== "_" && k !== "twoway" && k !== "lvl" && p[k] != null && p[k] !== "");
@@ -172,7 +211,7 @@
     $("rp-detail").innerHTML = h;
   });
   document.addEventListener("rs:deselect", () => {
-    $("rp-detail").textContent = "Click a road, a bar, or a search result.";
+    $("rp-detail").textContent = "Click a road, or a search result.";
   });
 })();
 </script>
