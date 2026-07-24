@@ -1,9 +1,8 @@
-"""Build the report-sidebar template into a working page.
+"""Build a working report page.
 
-Renders the road network with **every built-in control off** and injects ``sidebar.html``
-before ``</body>`` — a stats-forward sidebar (headline counts, a by-class breakdown, search,
-and a selected-road read-out) wired entirely through the public ``window.rs*`` API. Point it
-at your own data::
+Thin wrapper over the packaged :func:`roadstyle.render_report` — the map with a stats-forward
+sidebar (headline counts, a by-class breakdown + legend, search, and a selected-road read-out)
+injected, wired entirely through the public ``window.rs*`` API. Point it at your own data::
 
     python build.py [edges.gpkg | edges.geojson] [--tiles]
 
@@ -31,22 +30,20 @@ def main() -> None:
     import geopandas as gpd
     edges = gpd.read_file(src)
 
-    # The sidebar owns colour-by, the legend, and the layer/road-type filter, so those built-in
-    # controls stay off — but the base map keeps the map's own on-map switcher icon
-    # (basemap_switcher=True). color_options are BAKED here (Python precomputes each option's
-    # per-edge colours); the sidebar's "Colour by" select switches between them and shows the
-    # active legend, and its filter reads RS_CLASSES / RS_CLASS_COL / RS_CLASS_COLORS / RS_OVERLAYS.
-    m = rs.render_edges(edges, backend="web", basemap="voyager", view_3d=True,
-                        basemaps=["voyager", "positron", "dark_matter", "osm", "satellite",
-                                  "blank"],
-                        color_options={"Class": {},
-                                       "Speed": {"color_by": "maxspeed_kmh", "cmap": "plasma"},
-                                       "Lanes": {"color_by": "lanes", "cmap": "viridis"}},
-                        basemap_switcher=True, filter_control=False, road_popup=False,
-                        tiles=tiles, name="Roads report")
-    ui = (HERE / "sidebar.html").read_text()
+    # render_report injects the packaged report sidebar (which owns colour-by, the legend, and the
+    # layer/road-type filter); the base map keeps its own on-map switcher (basemap_switcher=True by
+    # default). color_options are BAKED (Python precomputes each option's per-edge colours); the
+    # sidebar's "Colour by" select switches between them and shows the active legend, and its filter
+    # reads RS_CLASSES / RS_CLASS_COL / RS_CLASS_COLORS / RS_OVERLAYS.
+    m = rs.render_report(
+        edges, basemap="voyager", view_3d=True,
+        basemaps=["voyager", "positron", "dark_matter", "osm", "satellite", "blank"],
+        color_options={"Class": {},
+                       "Speed": {"color_by": "maxspeed_kmh", "cmap": "plasma"},
+                       "Lanes": {"color_by": "lanes", "cmap": "viridis"}},
+        tiles=tiles)
     out = HERE / "report.html"
-    out.write_text(m.html.replace("</body>", ui + "</body>", 1))
+    m.save(out)
     print(f"wrote {out} — open it in a browser (no server needed)")
 
 

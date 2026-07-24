@@ -44,6 +44,7 @@ from .palettes import (
     register_palette,
     save_palette,
 )
+from .pages import render_dashboard, render_report, sidebar_html
 from .render import render_edges
 from .snapshot import snapshot
 from .style import base_style, normalize_highway, resolve, selection_style
@@ -99,7 +100,8 @@ except Exception:                                    # running from a bare sourc
     __version__ = "0+unknown"
 
 __all__ = [
-    "render_edges", "filter_edges", "highway_types", "use_settings", "snapshot",
+    "render_edges", "render_dashboard", "render_report", "sidebar_html",
+    "filter_edges", "highway_types", "use_settings", "snapshot",
     "resolve", "base_style", "selection_style", "normalize_highway",
     "PALETTES", "HIGHSAT", "CARTO", "SELECTION", "RoadStyle",
     "BASEMAPS", "Basemap", "get_basemap", "BaseLayerSwitcher",

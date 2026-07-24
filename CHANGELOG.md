@@ -4,6 +4,21 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] — 2026-07-24
+
+### Added
+- **`render_dashboard()` / `render_report()`** — one call renders a self-contained page: the styled
+  map with the built-in controls off and a bundled sidebar injected (the dashboard's query /
+  colour-by / class-filter + legend / table UI, or the report's stats panel), wired through the
+  public `window.rs*` API. Returns a `WebMap` (`.save("dashboard.html")`). The sidebar templates now
+  **ship inside the package** (`roadstyle/templates/`), so `pip install roadstyle` builds these pages
+  with no repo checkout; `sidebar_html("dashboard" | "report")` returns the fragment to copy and
+  reshape.
+
+### Changed
+- `ui/dashboard/build.py`, `ui/report/build.py` and the studio Dashboard / Report pages now wrap the
+  packaged `render_dashboard` / `render_report` — one source of truth for the sidebars.
+
 ## [0.2.2] — 2026-07-24
 
 ### Changed

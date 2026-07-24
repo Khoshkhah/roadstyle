@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "roadstyle"
-version = "0.2.2"
+version = "0.3.0"
 description = "Opinionated OSM-theme road/edge map styling for folium, lonboard & the web (data-driven palettes, casing, themes)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -58,6 +58,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 roadstyle = [
     "py.typed", "static/*.js", "static/*.css", "static/*.html", "vendor/*.js", "vendor/*.css",
+    "templates/*.html",                       # bundled dashboard/report sidebars (see pages.py)
     "data/*.json", "data/palettes/*.json",   # bundled palettes + style config (see _settings.py)
 ]
 

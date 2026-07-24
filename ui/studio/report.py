@@ -1,22 +1,18 @@
-"""Report builder — the ``ui/report`` template, behind knobs.
+"""Report builder — the packaged ``render_report`` page, behind knobs.
 
-Same knobs as the Dashboard page, but the product is the **report sidebar**
-(``ui/report/sidebar.html`` — headline counts, a by-class breakdown, search, and a
-selected-road read-out) injected on top of a controls-off map, wired through the public
-``window.rs*`` API. Download ``report.html`` or copy the code (it mirrors ``ui/report/build.py``).
+Same knobs as the Dashboard page, but the product is the **report sidebar** (headline counts, a
+by-class breakdown + legend, search, and a selected-road read-out) — :func:`roadstyle.render_report`
+injects the bundled sidebar on top of a controls-off map, wired through the public ``window.rs*``
+API. Download ``report.html`` or copy the code (it mirrors ``ui/report/build.py``).
 
 Deliberately parallels ``dashboard.py`` — same rendering path, different injected sidebar.
 """
 from __future__ import annotations
 
-from pathlib import Path
-
 import streamlit as st
 from common import colour_by_section, data_section, overlay_section, tiles_available
 
 import roadstyle as rs
-
-SIDEBAR = (Path(__file__).resolve().parent.parent / "report" / "sidebar.html").read_text()
 
 with st.sidebar:
     st.title("report builder")
@@ -52,11 +48,10 @@ with st.sidebar:
 
     overlays, ov_lines = overlay_section()
 
-# the sidebar owns colour-by / legend / filter; the base map keeps the map's on-map switcher
-# icon (basemap_switcher=True). See ui/report/build.py.
+# render_report injects the bundled report sidebar and keeps the base map's on-map switcher; the
+# studio just passes the look/data knobs through.
 kw = {"basemap": basemap, "view_3d": view_3d, "basemaps": bms or None,
-      "color_options": color_options, "basemap_switcher": True, "filter_control": False,
-      "road_popup": False, "name": title}
+      "color_options": color_options, "name": title}
 if tiles:
     kw["tiles"] = True
 if minzoom:
@@ -77,18 +72,14 @@ def _fmt(k, v):
     return ovs if k == "overlays" else repr(v)
 
 
-args = "".join(f",\n                    {k}={_fmt(k, v)}" for k, v in kw.items())
+args = "".join(f",\n                     {k}={_fmt(k, v)}" for k, v in kw.items())
 loader = loader if not overlays else (
     "import geopandas as gpd\n\n" + loader + "\n" + "\n".join(ov_lines))
 code = (f"import roadstyle as rs\n\n{loader}\n"
-        f'm = rs.render_edges(edges, backend="web"{args})\n'
-        f'sidebar = open("ui/report/sidebar.html").read()\n'
-        f'open("report.html", "w").write(m.html.replace("</body>", sidebar + "</body>", 1))')
+        f"m = rs.render_report(edges{args})\n"
+        f'm.save("report.html")')
 
-m = rs.render_edges(edges, backend="web", compress=True, **kw)
-# inject before the MapLibre placeholders are substituted, so BOTH the iframe-safe preview
-# (_repr_html_, CDN MapLibre 3.x) and the download (.html, vendored) carry the sidebar
-m._tpl = m._tpl.replace("</body>", SIDEBAR + "</body>", 1)
+m = rs.render_report(edges, compress=True, **kw)
 
 # always the CDN-v3 preview variant: vendored MapLibre v4 stalls any roads source in
 # sandboxed iframes; pmtiles' Protocol is v3-compatible so tiled previews work under v3
@@ -103,5 +94,5 @@ with left:
 with right:
     st.download_button("⬇ download report.html", m.html, file_name="report.html",
                        mime="text/html", use_container_width=True)
-    st.caption("Self-contained — opens anywhere, no server. The sidebar is plain HTML over "
-               "the `window.rs*` API — copy `ui/report/sidebar.html` and reshape it.")
+    st.caption("Self-contained — opens anywhere, no server. The sidebar ships with roadstyle "
+               "(`rs.sidebar_html('report')`) — copy it and reshape the plain HTML/`window.rs*` code.")

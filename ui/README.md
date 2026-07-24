@@ -25,13 +25,17 @@ python ui/report/build.py path/to/edges.gpkg        # the stats sidebar instead 
 `--tiles` needs `pip install "roadstyle[tiles]"`; the sidebar is unchanged — it only talks
 through the `rs*` API, which works identically over inline or tiled roads.
 
-Or inject the fragment yourself around any map you render:
+Both wrap the packaged one-call helpers — no repo checkout needed after `pip install roadstyle`:
 
 ```python
-m = rs.render_edges(edges, basemap_switcher=False, filter_control=False, road_popup=False)
-page = m.html.replace("</body>", open("ui/dashboard/sidebar.html").read() + "</body>", 1)
+rs.render_dashboard(edges, color_options={"Class": {},
+                                          "Speed": {"color_by": "maxspeed_kmh", "cmap": "plasma"}}
+                   ).save("dashboard.html")
+rs.render_report(edges).save("report.html")
 ```
 
-The fragment file is the template — edit its CSS/HTML freely; as long as you only call the
-documented `rs*` functions and listen to `rs:*` events, library upgrades won't break it.
+The sidebars ship inside the package. Grab one to reshape — `rs.sidebar_html("dashboard")` (or
+`"report"`) returns the fragment; edit its CSS/HTML freely and re-inject before `</body>`. As long
+as you only call the documented `rs*` functions and listen to `rs:*` events, library upgrades
+won't break it.
 The full API reference lives in [`docs/web-backend.md`](../docs/web-backend.md).

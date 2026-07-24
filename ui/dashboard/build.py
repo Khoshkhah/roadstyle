@@ -1,8 +1,8 @@
-"""Build the sidebar-dashboard template into a working page.
+"""Build a working dashboard page.
 
-Renders the road network with **every built-in control off** and injects ``sidebar.html``
-before ``</body>`` — the sidebar is the whole UI, wired through the public ``window.rs*``
-API. Point it at your own data::
+Thin wrapper over the packaged :func:`roadstyle.render_dashboard` — the map with every built-in
+control off and the bundled dashboard sidebar (query box, colour-by, class filter + legend, table)
+injected, wired through the public ``window.rs*`` API. Point it at your own data::
 
     python build.py [edges.gpkg | edges.geojson] [--tiles]
 
@@ -30,23 +30,20 @@ def main() -> None:
     import geopandas as gpd
     edges = gpd.read_file(src)
 
-    # built-in controls off — the sidebar IS the UI; the explicit basemaps= list keeps all
-    # entries addressable for the sidebar's own select (rsSetBasemap). view_3d bakes the
-    # extruded bridge decks (needs a `bridge` column) and opens tilted; the sidebar's 2D/3D
-    # button (rsSetView3D) switches views.
-    # color_options are BAKED here (Python precomputes each option's per-edge colours);
-    # the sidebar's "Colour by" select just switches between them. Adjust to your columns.
-    m = rs.render_edges(edges, backend="web", basemap="voyager", view_3d=True,
-                        basemaps=["voyager", "positron", "dark_matter", "osm", "satellite",
-                                  "blank"],
-                        color_options={"Class": {},
-                                       "Speed": {"color_by": "maxspeed_kmh", "cmap": "plasma"},
-                                       "Lanes": {"color_by": "lanes", "cmap": "viridis"}},
-                        basemap_switcher=False, filter_control=False, road_popup=False,
-                        tiles=tiles, name="Roads dashboard")
-    ui = (HERE / "sidebar.html").read_text()
+    # render_dashboard turns the built-in controls off and injects the packaged sidebar; the
+    # explicit basemaps= list keeps all entries addressable for the sidebar's own base-map select
+    # (rsSetBasemap). view_3d bakes the extruded bridge decks (needs a `bridge` column) and opens
+    # tilted. color_options are BAKED (Python precomputes each option's per-edge colours); the
+    # sidebar's "Colour by" select switches between them. Adjust to your columns.
+    m = rs.render_dashboard(
+        edges, basemap="voyager", view_3d=True,
+        basemaps=["voyager", "positron", "dark_matter", "osm", "satellite", "blank"],
+        color_options={"Class": {},
+                       "Speed": {"color_by": "maxspeed_kmh", "cmap": "plasma"},
+                       "Lanes": {"color_by": "lanes", "cmap": "viridis"}},
+        tiles=tiles)
     out = HERE / "dashboard.html"
-    out.write_text(m.html.replace("</body>", ui + "</body>", 1))
+    m.save(out)
     print(f"wrote {out} — open it in a browser (no server needed)")
 
 

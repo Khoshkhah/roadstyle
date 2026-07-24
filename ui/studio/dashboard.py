@@ -1,20 +1,16 @@
-"""Dashboard builder — the ``ui/dashboard`` template, behind knobs.
+"""Dashboard builder — the packaged ``render_dashboard`` page, behind knobs.
 
-Same idea as the map page, but the product is a *dashboard*: the map rendered with every
-built-in control off and the sidebar UI (``ui/dashboard/sidebar.html`` — query box, colour-by,
-class filter, table, 2D/3D) injected on top, wired through the public ``window.rs*`` API.
+Same idea as the map page, but the product is a *dashboard*: :func:`roadstyle.render_dashboard`
+renders the map with every built-in control off and injects the bundled dashboard sidebar (query
+box, colour-by, class filter + legend, table) — wired through the public ``window.rs*`` API.
 Download ``dashboard.html`` or copy the code (it mirrors ``ui/dashboard/build.py``).
 """
 from __future__ import annotations
-
-from pathlib import Path
 
 import streamlit as st
 from common import colour_by_section, data_section, overlay_section, tiles_available
 
 import roadstyle as rs
-
-SIDEBAR = (Path(__file__).resolve().parent.parent / "dashboard" / "sidebar.html").read_text()
 
 with st.sidebar:
     st.title("dashboard builder")
@@ -50,10 +46,10 @@ with st.sidebar:
 
     overlays, ov_lines = overlay_section()
 
-# built-in controls off — the injected sidebar IS the UI (see ui/dashboard/build.py)
+# render_dashboard turns the built-in controls off and injects the bundled sidebar; the studio just
+# passes the look/data knobs through.
 kw = {"basemap": basemap, "view_3d": view_3d, "basemaps": bms or None,
-      "color_options": color_options, "basemap_switcher": False, "filter_control": False,
-      "road_popup": False, "name": title}
+      "color_options": color_options, "name": title}
 if tiles:
     kw["tiles"] = True
 if minzoom:
@@ -74,18 +70,14 @@ def _fmt(k, v):
     return ovs if k == "overlays" else repr(v)
 
 
-args = "".join(f",\n                    {k}={_fmt(k, v)}" for k, v in kw.items())
+args = "".join(f",\n                        {k}={_fmt(k, v)}" for k, v in kw.items())
 loader = loader if not overlays else (
     "import geopandas as gpd\n\n" + loader + "\n" + "\n".join(ov_lines))
 code = (f"import roadstyle as rs\n\n{loader}\n"
-        f'm = rs.render_edges(edges, backend="web"{args})\n'
-        f'sidebar = open("ui/dashboard/sidebar.html").read()\n'
-        f'open("dashboard.html", "w").write(m.html.replace("</body>", sidebar + "</body>", 1))')
+        f"m = rs.render_dashboard(edges{args})\n"
+        f'm.save("dashboard.html")')
 
-m = rs.render_edges(edges, backend="web", compress=True, **kw)
-# inject before the MapLibre placeholders are substituted, so BOTH the iframe-safe preview
-# (_repr_html_, CDN MapLibre 3.x) and the download (.html, vendored) carry the sidebar
-m._tpl = m._tpl.replace("</body>", SIDEBAR + "</body>", 1)
+m = rs.render_dashboard(edges, compress=True, **kw)
 
 # always the CDN-v3 preview variant: vendored MapLibre v4 stalls any roads source in
 # sandboxed iframes; pmtiles' Protocol is v3-compatible so tiled previews work under v3
@@ -100,5 +92,5 @@ with left:
 with right:
     st.download_button("⬇ download dashboard.html", m.html, file_name="dashboard.html",
                        mime="text/html", use_container_width=True)
-    st.caption("Self-contained — opens anywhere, no server. The sidebar is plain HTML over "
-               "the `window.rs*` API — copy `ui/dashboard/sidebar.html` and reshape it.")
+    st.caption("Self-contained — opens anywhere, no server. The sidebar ships with roadstyle "
+               "(`rs.sidebar_html('dashboard')`) — copy it and reshape the plain HTML/`window.rs*` code.")
