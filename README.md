@@ -43,40 +43,41 @@ a scriptable JavaScript API.
 
 ## Installation
 
-Python ≥ 3.10. Core dependencies (`geopandas`, `shapely`, `folium`, `branca`) install
-automatically.
+Python ≥ 3.10. Two ways in, depending on who you are:
+
+### Using the library (pip, no clone)
 
 ```bash
-pip install roadstyle                # from PyPI (v0.2.0+)
-
-# or the latest development state straight from GitHub:
-pip install "roadstyle @ git+https://github.com/Khoshkhah/roadstyle.git"
+pip install roadstyle                 # the library — geopandas, shapely, folium, branca come along
+pip install "roadstyle[studio]"       # + the no-code Streamlit workbench: `roadstyle studio`
 ```
 
-Optional features are extras — install only what you need:
+Every optional feature is an extra — combine what you need, e.g. `pip install "roadstyle[numeric,tiles]"`:
 
 | Extra | Enables | Pulls in |
 |---|---|---|
+| `studio` | `roadstyle studio` — the interactive Streamlit workbench | streamlit |
 | `numeric` | continuous colour ramps + classification (`color_by` on numbers) | mapclassify, matplotlib |
 | `tiles` | `tiles=True` — embedded vector tiles for big networks | mapbox-vector-tile, pmtiles |
 | `lonboard` | the GPU backend for very large edge sets | lonboard |
 | `duckdb` | `from_duckdb()` — read edges straight from DuckDB | duckdb |
 | `arrow` | read edges from a pyarrow Table | pyarrow |
 | `basemaps` | any XYZ provider from the xyzservices registry | xyzservices |
-| `studio` | `roadstyle studio` — the interactive Streamlit workbench | streamlit |
 
-```bash
-pip install "roadstyle[numeric,tiles]"
-```
+To try the latest unreleased state — still no clone:
+`pip install "roadstyle @ git+https://github.com/Khoshkhah/roadstyle.git"`
 
-**Development install** (clone + editable + test tools):
+### Developing on it (clone + editable install)
 
 ```bash
 git clone https://github.com/Khoshkhah/roadstyle.git && cd roadstyle
-pip install -e ".[dev]"
+pip install -e ".[dev]"              # editable + test/lint tools (pytest, ruff, mypy, all backends)
 # or with conda: conda env create -f environment.yml && conda activate roadstyle && pip install -e ".[dev]"
-pytest                               # 160 tests; browser tests need `pip install playwright`
+pytest                               # the full suite; browser tests need `pip install playwright`
 ```
+
+From a checkout the studio runs against your working tree (`roadstyle studio`, needs
+`pip install streamlit`) and uses the repo's sample data in `ui/studio/samples/` directly.
 
 **Uninstall:** `pip uninstall roadstyle`. Your personal settings overrides
 (`~/.config/roadstyle/roadstyle.json`, project-local `roadstyle.json`) are your files — pip

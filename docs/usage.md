@@ -2,20 +2,29 @@
 
 ## Install
 
+**Using the library** — from PyPI, no clone:
+
 ```bash
-pip install git+https://github.com/Khoshkhah/roadstyle.git
+pip install roadstyle
+pip install "roadstyle[studio]"      # + the no-code workbench: `roadstyle studio`
 ```
 
-Optional extras pull in heavier backends/inputs only when you ask for them:
+Optional extras pull in heavier backends/inputs only when you ask for them
+(combine freely, e.g. `"roadstyle[numeric,tiles]"`):
 
 ```bash
-pip install "roadstyle[lonboard] @ git+https://github.com/Khoshkhah/roadstyle.git"   # WebGL backend
+# studio   — the interactive Streamlit workbench (roadstyle studio)
 # numeric  — continuous data-driven styling (mapclassify + matplotlib colormaps)
+# tiles    — tiles=True: embedded vector tiles for big networks
+# lonboard — the WebGL backend for very large edge sets
 # basemaps — any xyzservices tile provider as a base map
 # duckdb / arrow — read edges straight from a DuckDB query or an Arrow table
 ```
 
-**Develop locally** (editable, from the repo root — a src layout): `pip install -e ".[dev]"`, or with
+The latest unreleased state, still without cloning:
+`pip install "roadstyle @ git+https://github.com/Khoshkhah/roadstyle.git"`.
+
+**Developing on it** (clone + editable, from the repo root — a src layout): `pip install -e ".[dev]"`, or with
 conda `conda env create -f environment.yml && conda activate roadstyle && pip install -e ".[dev]"`.
 
 ## Command line
