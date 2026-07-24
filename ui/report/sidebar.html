@@ -74,7 +74,7 @@
     <div id="rp-cls"></div></details>
 
   <div class="rp-sec">Search roads</div>
-  <input id="rp-q" type="search" placeholder="name, class, id…" spellcheck="false">
+  <input id="rp-q" type="search" placeholder="name, class, bridge, id…" spellcheck="false">
   <div id="rp-res"></div>
 
   <div class="rp-sec">Selected road</div>
@@ -174,15 +174,22 @@
     if (n > 0) setTimeout(() => ready(n - 1), 200);
   })(30);
 
-  // ── search: substring over the popup fields (or every public prop), 30 rows; click = select+fly ──
+  // ── search: substring over each edge's fields (30 rows; click = select+fly) ──
   const q = $("rp-q"), res = $("rp-res");
   let qt = 0;
+  // a field counts as "set" when its value isn't a null-ish flag — so a column-NAME match only
+  // fires on roads that actually have it (bridge=yes, not bridge=None)
+  const isSet = v => { const t = (""+v).trim().toLowerCase();
+    return t && t !== "nan" && t !== "no" && t !== "false" && t !== "none" && t !== "0"; };
   function search(s){ s = (s || "").trim().toLowerCase();
     if (s.length < 2){ res.innerHTML = ""; return; }
     const info = [];
     const ids = rsQuery(p => { for (const k in p){ if (k[0] === "_" || k === "twoway" || k === "lvl") continue;
       const v = p[k]; if (v == null) continue; const t = (""+v).toLowerCase();
-      if (t && t !== "nan" && t.indexOf(s) >= 0){ info.push([k, ""+v, p.name != null ? ""+p.name : ""]); return true; } }
+      // match the VALUE as a substring, OR the column NAME when the field is set — "bridge" finds
+      // bridge=yes roads (no value literally contains "bridge"), likewise tunnel / oneway / …
+      if ((t !== "nan" && t.indexOf(s) >= 0) || (k.toLowerCase().indexOf(s) >= 0 && isSet(v))){
+        info.push([k, ""+v, p.name != null ? ""+p.name : ""]); return true; } }
       return false; });
     const n = Math.min(ids.length, 30);
     res.innerHTML = "";
