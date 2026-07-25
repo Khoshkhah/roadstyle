@@ -11,6 +11,7 @@ import json
 
 from .basemaps import DEFAULT_SWITCHER, get_basemap
 from .config import DEFAULT as CONFIG
+from .fastjson import fc_dict
 from .controls import BaseLayerSwitcher
 from .interactive import InteractiveRoads
 from .style import selection_style
@@ -85,7 +86,7 @@ def render(
     if styler is None:
         styler = build_styler(palette=palette, highway_col=highway_col)
     rf = styler.resolve_frame(g)
-    gj = bake_props(json.loads(g.to_json()), rf)
+    gj = bake_props(fc_dict(g), rf)
     has_legend = getattr(rf, "legend", None) is not None
     m.add_child(InteractiveRoads(
         json.dumps(gj), tooltip=fields,
