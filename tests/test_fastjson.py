@@ -51,6 +51,17 @@ def test_matches_on_mixed_geometry_types():
     assert fc_dict(g) == json.loads(g.to_json())
 
 
+def test_empty_and_missing_geometries_emit_null():
+    """GeoPandas emits "geometry": null for EMPTY and missing geometries alike — duckmap
+    building layers simplify some polygons to empty, which is how this was caught."""
+    g = gpd.GeoDataFrame({"k": ["empty", "none", "ok"]},
+                         geometry=[Polygon(), None, Point(1, 2)], crs=4326)
+    new = fc_dict(g)
+    assert new == json.loads(g.to_json())
+    assert new["features"][0]["geometry"] is None
+    assert new["features"][1]["geometry"] is None
+
+
 def test_empty_frame():
     g = _tricky_gdf().iloc[0:0]
     assert fc_dict(g) == json.loads(g.to_json())
