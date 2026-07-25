@@ -26,6 +26,7 @@ from collections.abc import Mapping
 from . import _settings
 from .basemaps import DEFAULT_SWITCHER, get_basemap
 from .config import DEFAULT as CONFIG
+from .fastjson import fc_dict
 from .overlays import Overlay, detect_kind, to_fc
 from .stylers import bake_color_options, bake_props, build_styler, option_styler
 
@@ -910,7 +911,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         frames = [(name, option_styler(highway_col, palette, opts).resolve_frame(g))
                   for name, opts in items]
         style_rf = (styler or build_styler(palette=palette, highway_col=highway_col)).resolve_frame(g)
-        geo, color_opts_meta = bake_color_options(json.loads(g.to_json()), frames, style_rf=style_rf)
+        geo, color_opts_meta = bake_color_options(fc_dict(g), frames, style_rf=style_rf)
         _names = [n for n, _ in items]
         _active = (color_active if isinstance(color_active, int)
                    else _names.index(color_active) if color_active in _names else 0)
@@ -919,7 +920,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         if styler is None:
             styler = build_styler(palette=palette, highway_col=highway_col)
         rf = styler.resolve_frame(g)
-        geo = bake_props(json.loads(g.to_json()), rf)   # per-edge __rs_fill/__rs_casing
+        geo = bake_props(fc_dict(g), rf)   # per-edge __rs_fill/__rs_casing
         if legend and getattr(rf, "legend", None):
             # a data styler (color_by / cmap / colors) stashes legend metadata on its resolved
             # frame; surface it as a single legend-only "colour by" entry so the page draws the

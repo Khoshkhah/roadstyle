@@ -24,6 +24,7 @@ from importlib.resources import files
 
 from .config import DEFAULT as CONFIG
 from .edges import as_edges
+from .fastjson import fc_dict
 from .stylers import bake_color_options, bake_props, build_styler, option_styler
 
 SPEC_VERSION = "1"
@@ -90,7 +91,7 @@ def to_spec(
         frames = [(name, option_styler(col, palette, opts).resolve_frame(g))
                   for name, opts in items]
         rf = frames[0][1]                                  # active option drives spec["legend"]
-        gj, color_opts_meta = bake_color_options(json.loads(g.to_json()), frames)
+        gj, color_opts_meta = bake_color_options(fc_dict(g), frames)
     else:
         styler = build_styler(
             style=style, palette=palette, highway_col=col,
@@ -98,7 +99,7 @@ def to_spec(
             vmin=vmin, vmax=vmax, width_by=width_by,
         )
         rf = styler.resolve_frame(g)
-        gj = bake_props(json.loads(g.to_json()), rf)   # per-edge __rs_* props
+        gj = bake_props(fc_dict(g), rf)   # per-edge __rs_* props
 
     b = list(g.total_bounds)   # [minx, miny, maxx, maxy]
     bounds = [[b[1], b[0]], [b[3], b[2]]]   # [[S,W],[N,E]] (Leaflet order)
