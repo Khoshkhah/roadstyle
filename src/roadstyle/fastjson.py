@@ -67,7 +67,14 @@ def _duckdb_fc(gdf) -> dict:
         # 94.19999694824219); DuckDB would print the shorter REAL repr and parse different.
         if str(df[c].dtype) == "float32":
             df[c] = df[c].astype("float64")
-    df["__rs_fc_wkb"] = gdf.geometry.to_wkb()
+    wkb = gdf.geometry.to_wkb()
+    # GeoPandas emits "geometry": null for missing AND empty geometries; ST_AsGeoJSON would
+    # write {"type":...,"coordinates":[]} for empty ones — null the WKB so COALESCE below
+    # lands on JSON null for both (surfaced by duckmap building layers that simplify to empty).
+    empty = gdf.geometry.is_empty | gdf.geometry.isna()
+    if empty.any():
+        wkb = wkb.where(~empty, None)
+    df["__rs_fc_wkb"] = wkb
     df["__rs_fc_id"] = gdf.index.astype(str)               # to_json: feature id = str(index)
     df["__rs_fc_i"] = range(len(df))
 
@@ -80,7 +87,8 @@ def _duckdb_fc(gdf) -> dict:
                 'id', "__rs_fc_id",
                 'type', 'Feature',
                 'properties', json_object({props}),
-                'geometry', CAST(ST_AsGeoJSON(ST_GeomFromWKB("__rs_fc_wkb")) AS JSON)
+                'geometry', COALESCE(CAST(ST_AsGeoJSON(ST_GeomFromWKB("__rs_fc_wkb")) AS JSON),
+                                     CAST('null' AS JSON))
             ) AS VARCHAR)
             FROM __rs_fc_frame ORDER BY "__rs_fc_i"
         """).fetchall()
