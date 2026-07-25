@@ -14,26 +14,40 @@ def _hex_to_rgb(h, alpha=255):
 
 
 def _arrays(gdf, palette, highway_col, tunnel_col, bridge_col, which):
+    """(colors, widths) for one sandwich half — resolved once per DISTINCT style key.
+
+    ``resolve()`` depends only on (highway, tunnel, bridge) for a fixed palette, and a real
+    network carries only a handful of distinct combinations (Stockholm county: 44 across
+    456k edges) — so resolve each combination once and broadcast by numpy indexing instead
+    of calling it per row.
+    """
     import numpy as np
 
-    colors, widths = [], []
-    for _, row in gdf.iterrows():
-        rs = resolve(
-            row.get(highway_col), palette=palette,
-            tunnel=_truthy(row.get(tunnel_col)) if tunnel_col else False,
-            bridge=_truthy(row.get(bridge_col)) if bridge_col else False,
-        )
+    n = len(gdf)
+    hw = gdf[highway_col].tolist() if highway_col and highway_col in gdf.columns else [None] * n
+    tn = ([_truthy(v) for v in gdf[tunnel_col]]
+          if tunnel_col and tunnel_col in gdf.columns else [False] * n)
+    br = ([_truthy(v) for v in gdf[bridge_col]]
+          if bridge_col and bridge_col in gdf.columns else [False] * n)
+    keys = list(zip(hw, tn, br))
+
+    lut = {}                                       # key -> (rgba, width)
+    for key in set(keys):
+        rs = resolve(key[0], palette=palette, tunnel=key[1], bridge=key[2])
         if which == "casing":
             if rs.casing is None or rs.casing_width <= 0:
-                colors.append([0, 0, 0, 0])       # invisible
-                widths.append(0.0)
+                lut[key] = ([0, 0, 0, 0], 0.0)     # invisible
             else:
-                colors.append(_hex_to_rgb(rs.casing, int(255 * rs.casing_opacity)))
-                widths.append(rs.casing_width)
+                lut[key] = (_hex_to_rgb(rs.casing, int(255 * rs.casing_opacity)),
+                            rs.casing_width)
         else:
-            colors.append(_hex_to_rgb(rs.fill, int(255 * rs.opacity)))
-            widths.append(rs.width)
-    return np.array(colors, dtype="uint8"), np.array(widths, dtype="float32")
+            lut[key] = (_hex_to_rgb(rs.fill, int(255 * rs.opacity)), rs.width)
+
+    codes = {k: i for i, k in enumerate(lut)}
+    colors_lut = np.array([c for c, _ in lut.values()], dtype="uint8")
+    widths_lut = np.array([w for _, w in lut.values()], dtype="float32")
+    idx = np.fromiter((codes[k] for k in keys), dtype=np.intp, count=n)
+    return colors_lut[idx], widths_lut[idx]
 
 
 def _truthy(v) -> bool:
@@ -41,24 +55,34 @@ def _truthy(v) -> bool:
 
 
 def _arrays_from_frame(rf, which):
-    """Build (colors, widths) numpy arrays from a ResolvedFrame (the data-driven path)."""
+    """Build (colors, widths) numpy arrays from a ResolvedFrame (the data-driven path).
+
+    Values here can differ per edge (continuous colormaps), so there is no small key space
+    to resolve over — instead the hex→RGBA conversion is cached per distinct (colour,
+    opacity) pair and written into preallocated arrays. Categorical styling collapses to a
+    handful of cache entries; a fully continuous ramp degrades gracefully to one per edge.
+    """
     import numpy as np
 
-    colors, widths = [], []
     n = len(rf)
-    for i in range(n):
-        if which == "casing":
-            casing = rf.casing[i]
-            if not casing or rf.casing_width[i] <= 0:
-                colors.append([0, 0, 0, 0])
-                widths.append(0.0)
-            else:
-                colors.append(_hex_to_rgb(casing, int(255 * rf.casing_opacity[i])))
-                widths.append(rf.casing_width[i])
-        else:
-            colors.append(_hex_to_rgb(rf.fill[i], int(255 * rf.opacity[i])))
-            widths.append(rf.width[i])
-    return np.array(colors, dtype="uint8"), np.array(widths, dtype="float32")
+    colors = np.empty((n, 4), dtype="uint8")
+    widths = np.empty(n, dtype="float32")
+    cache = {}
+    if which == "casing":
+        rows = zip(rf.casing, rf.casing_opacity, rf.casing_width)
+    else:
+        rows = zip(rf.fill, rf.opacity, rf.width)
+    for i, (col, op, w) in enumerate(rows):
+        if which == "casing" and (not col or w <= 0):
+            colors[i] = 0
+            widths[i] = 0.0
+            continue
+        rgba = cache.get((col, op))
+        if rgba is None:
+            rgba = cache[(col, op)] = _hex_to_rgb(col, int(255 * op))
+        colors[i] = rgba
+        widths[i] = w
+    return colors, widths
 
 
 def render(
