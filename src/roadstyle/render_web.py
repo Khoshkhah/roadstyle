@@ -167,7 +167,7 @@ def _mark_twoway(geo):
         p["__rs_oneway"] = _truthy(ow) if ow is not None else not p["__rs_twoway"]
 
 
-def _annotation_slots(geo, slot_m):
+def _annotation_slots(geo, slot_m, class_col="highway"):
     """Divide every road chain into equal ``slot_m``-metre slots — the annotation plan.
 
     Chains walk same-name, same-grade, same-directionness edges through degree-2 nodes (a two-way
@@ -192,14 +192,18 @@ def _annotation_slots(geo, slot_m):
             continue
         reps.append((a, z, c, p))
 
-    groups = collections.defaultdict(list)       # (name, lvl, oneway) -> edge list
+    # class is part of the key: a cycleway running along "Götgatan" carries the street's name
+    # too, and without the class it chained INTO the roadway's group — slots then labelled the
+    # street's class onto the cycleway's geometry and vice versa, so names and arrows appeared
+    # to sit on the wrong line.
+    groups = collections.defaultdict(list)       # (name, lvl, oneway, class) -> edge list
     for e in reps:
         p = e[3]
         groups[(p.get("name") or None, p.get("lvl", 0),
-                1 if p.get("__rs_oneway") else 0)].append(e)
+                1 if p.get("__rs_oneway") else 0, p.get(class_col))].append(e)
 
     feats = []
-    for (name, _lvl, oneway), edges in groups.items():
+    for (name, lvl, oneway, _cls), edges in groups.items():
         n = len(edges)
         used = [False] * n
         at = collections.defaultdict(list)       # node -> [edge index] (either endpoint)
@@ -244,12 +248,17 @@ def _annotation_slots(geo, slot_m):
             return chain
 
         chains = [walk(i) for i in range(n) if not used[i]]
-        hw = collections.Counter(e[3].get("highway") for e in edges).most_common(1)[0][0]
+        # the caller's class column ("highway" only by convention — e.g. Overture data styles by
+        # "class"); stored under the slots' own fixed "highway" key either way, which is what the
+        # arrow/label minzoom filters and sort keys read. Hardcoding the lookup dropped the
+        # property entirely on non-"highway" data (None is stripped), silently disabling both.
+        hw = collections.Counter(e[3].get(class_col) for e in edges).most_common(1)[0][0]
         for chain in chains:
             lon0, lat0 = chain[0]
             kx = 111320.0 * math.cos(math.radians(lat0))
             local = LineString([((x - lon0) * kx, (y - lat0) * 111320.0) for x, y in chain])
             total = local.length
+
             pieces = max(1, int(total // slot_m) + (1 if total % slot_m > slot_m * 0.3 else 0))
             for i in range(pieces):
                 part = substring(local, i * slot_m, min((i + 1) * slot_m, total))
@@ -258,8 +267,8 @@ def _annotation_slots(geo, slot_m):
                 coords = [[round(x / kx + lon0, 6), round(y / 111320.0 + lat0, 6)]
                           for x, y in part.coords]
                 feats.append({"type": "Feature",
-                              "properties": {"slot": i, "name": name,
-                                             "highway": hw, "oneway": oneway},
+                              "properties": {"slot": i, "name": name, "highway": hw,
+                                             "oneway": oneway, "lvl": lvl},
                               "geometry": {"type": "LineString", "coordinates": coords}})
     return {"type": "FeatureCollection", "features": feats}
 
@@ -1162,40 +1171,118 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     slot_m = (CONFIG.annotations or {}).get("slot_m", 100)
     slots = {"features": []}
     if arrows or labels:
-        slots = _annotation_slots(geo, slot_m)
+        slots = _annotation_slots(geo, slot_m, highway_col)
         if slots["features"]:
             if not tiles:   # tiles=True ships the slots as a layer of the pmtiles archive
                 style["sources"]["slots"] = {"type": "geojson", "data": slots}
-            lpaint = {"text-color": lbl["color"]}
+            # labels take the ARROWS' opacity by default: both are #5b5b5b, but full-opacity
+            # text reads near-black next to 70%-opacity icons — "same colour" must mean same
+            # rendered colour, not same hex. labels.opacity in settings overrides.
+            lpaint = {"text-color": lbl["color"],
+                      "text-opacity": lbl.get("opacity", arw["opacity"])}
             if lbl["halo_color"] and lbl["halo_width"]:
                 lpaint["text-halo-color"] = lbl["halo_color"]
                 lpaint["text-halo-width"] = lbl["halo_width"]
             # one symbol centred on each slot piece; even slots = names, odd = oneway arrows.
             # Text/icon zoom ramps size the symbols; collision culling thins them when zoomed out
             # (a label that outgrows its piece is dropped by MapLibre automatically).
+            # ARROWS BEFORE LABELS on purpose: MapLibre resolves symbol collisions in favour of
+            # the LATER style layer, so the layer order is the culling priority. With arrows
+            # repeating every 170 px they must lose to street names, or one-way roads go
+            # nameless — which is exactly what happened when this block sat after the labels.
+            _MINOR = ["footway", "cycleway", "path", "steps",
+                      "service", "track", "pedestrian"]
+            if arrows:
+                # Every one-way slot, repeated along the line — not one arrow per odd slot
+                # (line-center on odd slots put ONE arrow per 200 m of chain, so at street zoom
+                # a road's only arrow was usually outside the viewport and one-way streets read
+                # as unmarked). One arrow layer PER GRADE TIER, each inserted right beside its
+                # road tier, so a bridge covers the arrows of the road it crosses instead of
+                # every arrow floating above everything.
+                def _arrow_layer(lid, cmp):
+                    # class-aware like the roads themselves: the minzoom table thins arrows
+                    # with their road (no arrow floating where the class is still hidden), and
+                    # the negated road sort key decides collisions — symbol-sort-key places
+                    # LOWER keys first and first-placed wins, so a trunk's arrow beats a
+                    # service road's instead of tile order deciding.
+                    #
+                    # Minor classes wait until z16: below that, a cycleway or service road
+                    # running beside a wider road sits INSIDE its stroke — the line loses the
+                    # draw order, but its arrows would still paint on top of the big road
+                    # (symbols cannot be occluded by lines within a tier). By z16 parallel
+                    # lines have separated on screen and the arrows land on their own road.
+                    f = ["all", ["==", ["get", "oneway"], 1],
+                         [cmp, ["coalesce", ["get", "lvl"], 0], 0],
+                         ["any", ["!", ["match", ["get", "highway"], _MINOR, True, False]],
+                          [">=", ["zoom"], 16]]]
+                    if mz:
+                        f.append(_minzoom_filter("highway", mz))
+                    # minzoom 15, not 14: arrows are a street-scale affordance — at z14 they
+                    # were hundreds of unreadable specks (labels start there because names
+                    # thin themselves via collision; line-placed icons do not)
+                    return {"id": lid, "type": "symbol", "source": "slots", "minzoom": 15,
+                            "filter": f,
+                            "layout": {"symbol-placement": "line",
+                                       # spacing WIDENS with zoom: constant px spacing turned
+                                       # huge z18+ roads into arrow conveyor belts
+                                       "symbol-spacing": ["interpolate", ["linear"], ["zoom"],
+                                                          15, 200, 18, 320, 22, 900],
+                                       "icon-image": "oneway",
+                                       "icon-rotation-alignment": "map",
+                                       "symbol-sort-key": ["*", -1, _sort_key("highway")],
+                                       # gentle growth, sized like a lane marking, not a
+                                       # banner: flat sizes read as "arrows don't scale" but
+                                       # tracking road widths 1:1 (~2x/zoom past 18) overshot
+                                       # the other way. The narrow classes take 60% so a
+                                       # cycleway's arrow does not dwarf its own line. (The
+                                       # class factor sits inside the stops: MapLibre only
+                                       # allows ["zoom"] in a TOP-LEVEL interpolate.)
+                                       "icon-size": ["interpolate", ["exponential", 1.8],
+                                                     ["zoom"]] + [
+                                           part for z, base in ((15, 0.5), (18, 0.9),
+                                                                (22, 3.0))
+                                           for part in (z, ["*", base,
+                                               ["match", ["get", "highway"],
+                                                _MINOR, 0.6, 1.0]])]},
+                            "paint": {"icon-opacity": arw["opacity"]}}
+                # insert after the LAST layer of the tier's fill family, not after the first
+                # "-fill": tiled multi-level bridges append deck sub-layers (roads-bridge-
+                # fill-deck0/1, -dash0/1) after roads-bridge-fill, and an arrow inserted before
+                # them ends up under its own road's deck — a level-3 cycleway on Skanstullsbron
+                # rendered arrowless exactly that way.
+                fams = (("roads-arrows-tunnel", "<",
+                         lambda i: i.startswith("roads-tunnel-")),
+                        ("roads-arrows", "==",
+                         lambda i: i in ("roads-casing", "roads-fill")
+                         or i.startswith("roads-fill-")),
+                        ("roads-arrows-bridge", ">",
+                         lambda i: i.startswith("roads-bridge-")))
+                for lid, cmp, fam in fams:
+                    idx = max(i for i, l in enumerate(style["layers"]) if fam(l["id"]))
+                    style["layers"].insert(idx + 1, _arrow_layer(lid, cmp))
             if labels:
                 style["glyphs"] = "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"
+                lf = ["all", ["==", ["%", ["get", "slot"], 2], 0],
+                      ["to-boolean", ["get", "name"]],
+                      # minor classes wait for z16, like their arrows: a cycleway named after
+                      # the street it runs beside would duplicate the street's name onto a
+                      # line still hugging the roadway's stroke
+                      ["any", ["!", ["match", ["get", "highway"], _MINOR, True, False]],
+                       [">=", ["zoom"], 16]]]
+                if mz:   # a hidden class must not keep its street name floating either
+                    lf.append(_minzoom_filter("highway", mz))
                 style["layers"].append(
                     {"id": "roads-labels", "type": "symbol", "source": "slots", "minzoom": 14,
-                     "filter": ["all", ["==", ["%", ["get", "slot"], 2], 0],
-                                ["to-boolean", ["get", "name"]]],
+                     "filter": lf,
                      "layout": {"symbol-placement": "line-center",
                                 "text-field": ["get", "name"],
                                 "text-font": ["Noto Sans Regular"],
                                 "text-size": ["interpolate", ["linear"], ["zoom"],
                                               14, 10, 18, 14],
-                                "text-max-angle": 40, "text-padding": 2},
+                                "text-max-angle": 40, "text-padding": 2,
+                                # major streets' names win label-vs-label collisions too
+                                "symbol-sort-key": ["*", -1, _sort_key("highway")]},
                      "paint": lpaint})
-            if arrows:
-                style["layers"].append(
-                    {"id": "roads-arrows", "type": "symbol", "source": "slots", "minzoom": 14,
-                     "filter": ["all", ["==", ["%", ["get", "slot"], 2], 1],
-                                ["==", ["get", "oneway"], 1]],
-                     "layout": {"symbol-placement": "line-center", "icon-image": "oneway",
-                                "icon-rotation-alignment": "map",
-                                "icon-size": ["interpolate", ["linear"], ["zoom"],
-                                              15, 0.5, 19, 1.0]},
-                     "paint": {"icon-opacity": arw["opacity"]}})
 
     # clip/area boundary outline, drawn on top of the roads (a dashed line tracing the polygon rings)
     if boundary is not None:
