@@ -186,7 +186,7 @@ body{--rs-side:340px}   /* shift the map's right-anchored controls (base-map ico
   function search(s){ s = (s || "").trim().toLowerCase();
     if (s.length < 2){ res.innerHTML = ""; return; }
     const info = [];
-    const ids = rsQuery(p => { for (const k in p){ if (k[0] === "_" || k === "twoway" || k === "lvl") continue;
+    const ids = rsQuery(p => { for (const k in p){ if (k[0] === "_" || k === "lvl") continue;
       const v = p[k]; if (v == null) continue; const t = (""+v).toLowerCase();
       // match the VALUE as a substring, OR the column NAME when the field is set — "bridge" finds
       // bridge=yes roads (no value literally contains "bridge"), likewise tunnel / oneway / …
@@ -209,7 +209,7 @@ body{--rs-side:340px}   /* shift the map's right-anchored controls (base-map ico
   // ── selected-road detail: fed by rs:select whether the click came from the map or search ──
   function fieldRows(p, only){
     const ks = (only && only.length ? only : Object.keys(p))
-      .filter(k => k[0] !== "_" && k !== "twoway" && k !== "lvl" && p[k] != null && p[k] !== "");
+      .filter(k => k[0] !== "_" && k !== "lvl" && p[k] != null && p[k] !== "");
     return ks.map(k => "<b>" + esc(k) + "</b>: " + esc(p[k])).join("<br>");
   }
   document.addEventListener("rs:select", e => {

@@ -115,7 +115,7 @@ def _width_expr(col, casing=False, split_zoom=15, split_frac=0.6, scale=1.0):
         m.append(round(dw, 2))
         f = 1.0 if z <= split_zoom else (split_frac if z >= split_zoom + 2 else 1.0 - (1 - split_frac) * (z - split_zoom) / 2.0)
         if f < 1.0:
-            m = ["*", m, ["case", ["to-boolean", ["get", "twoway"]], round(f, 3), 1]]
+            m = ["*", m, ["case", ["to-boolean", ["get", "__rs_twoway"]], round(f, 3), 1]]
         e += [z, m]
     return e
 
@@ -134,7 +134,7 @@ def _offset_expr(col, offset_frac=0.28, offset_zoom=15):
             m += [c, round(w * offset_frac * ramp, 3)]
         dw = _gwidth(WIDTH["residential"], HI_RATE["residential"], z)
         m.append(round(dw * offset_frac * ramp, 3))
-        e += [z, ["case", ["to-boolean", ["get", "twoway"]], m, 0]]
+        e += [z, ["case", ["to-boolean", ["get", "__rs_twoway"]], m, 0]]
     return e
 
 
@@ -160,11 +160,11 @@ def _mark_twoway(geo):
         n = cnt.get(rev, 0)
         # a loop edge (start == end) is its own reverse key; it needs a second feature to pair up
         p = ft.setdefault("properties", {})
-        p["twoway"] = n >= 2 if rev == k else n >= 1
+        p["__rs_twoway"] = n >= 2 if rev == k else n >= 1
         # arrows follow an EXPLICIT `oneway` column when the data has one (undirected networks
         # included); otherwise a one-way edge = an edge with no reverse twin
         ow = p.get("oneway")
-        p["__rs_oneway"] = _truthy(ow) if ow is not None else not p["twoway"]
+        p["__rs_oneway"] = _truthy(ow) if ow is not None else not p["__rs_twoway"]
 
 
 def _annotation_slots(geo, slot_m):
@@ -188,7 +188,7 @@ def _annotation_slots(geo, slot_m):
             continue
         a = (round(c[0][0], 6), round(c[0][1], 6))
         z = (round(c[-1][0], 6), round(c[-1][1], 6))
-        if p.get("twoway") and (z, a) < (a, z):
+        if p.get("__rs_twoway") and (z, a) < (a, z):
             continue
         reps.append((a, z, c, p))
 
@@ -293,7 +293,7 @@ def _bridge_decks(geo, dk):
         a = (round(c[0][0], 6), round(c[0][1], 6))
         z = (round(c[-1][0], 6), round(c[-1][1], 6))
         pair_edges[min((a, z), (z, a))].append(fi)
-        if p.get("twoway") and (z, a) < (a, z):
+        if p.get("__rs_twoway") and (z, a) < (a, z):
             continue
         reps.append((a, z, c, p, fi))
 
@@ -421,7 +421,7 @@ def _bridge_decks(geo, dk):
             # select work per edge id, never per whole structure. shapely offset_curve positive
             # = LEFT of the line direction; the with-chain edge drives on the right.
             ribbons = []
-            if pp.get("twoway") and ffi is not None and rfi is not None:
+            if pp.get("__rs_twoway") and ffi is not None and rfi is not None:
                 for dlt, fdir in ((-1.0, ffi), (1.0, rfi)):
                     try:
                         ol = part.offset_curve(dlt * half / 2.0)
@@ -1245,7 +1245,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                  if slots["features"] else None)
         pmt = _tiler.build_pmtiles(
             geo, class_col=highway_col,
-            keep={highway_col, filter_col or highway_col, "twoway", "lvl"},
+            keep={highway_col, filter_col or highway_col, "__rs_twoway", "lvl"},
             minzoom_table=mz, minzoom=tc["minzoom"], maxzoom=tc["maxzoom"],
             extent=tc["extent"], buffer_px=tc["buffer_px"], extra_layers=extra)
         side = _tiler.sidecar(geo)

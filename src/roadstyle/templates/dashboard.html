@@ -161,7 +161,7 @@ function resetAll(){
 // zone a road lies in — so the panel shows the road AND its overlay context together.
 function fieldRows(p, only){
   const ks = (only && only.length ? only : Object.keys(p))
-    .filter(k => k[0] !== "_" && k !== "twoway" && k !== "lvl" && p[k] != null && p[k] !== "");
+    .filter(k => k[0] !== "_" && k !== "lvl" && p[k] != null && p[k] !== "");
   return ks.map(k => "<b>" + esc(k) + "</b>: " + esc(p[k])).join("<br>");
 }
 document.addEventListener("rs:select", e => {

@@ -8,7 +8,7 @@ every service road. Class thinning is opt-in via the render ``minzoom`` paramete
 default tiles carry every class at every zoom, matching the inline look.
 
 Tiles carry ONLY the properties the style expressions read (``__rs_*`` paints, the class/filter
-columns, ``twoway``, ``lvl``) plus the feature ``id`` (= the feature's index, the same id space
+columns, ``__rs_twoway``, ``lvl``) plus the feature ``id`` (= the feature's index, the same id space
 as ``generateId`` today). Everything else — full attributes for popups/`rsQuery`, per-edge
 midpoints and bboxes for `rsSelect`/`rsFocus` — travels in a small gzipped sidecar table the
 page inflates separately (see render_web).

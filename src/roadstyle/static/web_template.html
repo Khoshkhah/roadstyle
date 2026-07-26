@@ -169,7 +169,7 @@ function _sideInit(){
     const only=(_popupFields&&_popupFields.length)?_popupFields:null, info=[];
     const ids=rsQuery(function(p){
       const ks=only||Object.keys(p);
-      for(const k of ks){ if(k[0]==="_"||k==="twoway"||k==="lvl") continue;
+      for(const k of ks){ if(k[0]==="_"||k==="lvl") continue;
         const v=p[k]; if(v==null) continue; const t=(""+v).toLowerCase();
         const set=t&&t!=="nan"&&t!=="no"&&t!=="false"&&t!=="none"&&t!=="0";
         if((t!=="nan"&&t.indexOf(q)>=0)||(k.toLowerCase().indexOf(q)>=0&&set)){ info.push([k, ""+v, p.name!=null?""+p.name:""]); return true; } }
@@ -352,7 +352,7 @@ function rsGetProps(ids, layer){ // the rows behind an id set (internals strippe
   const s = !L.ov && _side(), fs = s ? null : _sfeats(L.src);
   return Array.from(ids||[]).map(i=>{
     const p=(s ? s.props[i] : (fs[i]&&fs[i].properties))||{}; const r={};
-    for(const k in p){ if(k[0]!=="_" && k!=="twoway" && k!=="lvl") r[k]=p[k]; }
+    for(const k in p){ if(k[0]!=="_" && k!=="lvl") r[k]=p[k]; }
     return r; });
 }
 // bridges in 3D are deck ribbons on their own source: this maps a road id to the deck slices
@@ -687,7 +687,7 @@ function _rpairs(p, only){  // shared field filter: [nameOrNull, [[k, v], ...]]
   let name=null;
   if(p.name!=null && (""+p.name)!=="" && (""+p.name).toLowerCase()!=="nan") name=""+p.name;
   const ks = (only && only.length) ? only : Object.keys(p), out=[];
-  for(const k of ks){ if(k[0]==="_"||k==="twoway"||k==="lvl"||k==="name") continue;  // lvl/twoway are roadstyle-injected internals
+  for(const k of ks){ if(k[0]==="_"||k==="lvl"||k==="name") continue;  // lvl is a roadstyle-injected internal (__rs_* are already skipped above)
     var v=p[k]; if(v==null) continue; var s=""+v, sl=s.toLowerCase();
     if(s===""||sl==="nan"||sl==="none") continue;
     if((k==="bridge"||k==="tunnel") && (sl==="no"||sl==="0"||sl==="false")) continue;  // bridge/tunnel only when it IS one

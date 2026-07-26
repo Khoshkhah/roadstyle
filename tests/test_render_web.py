@@ -304,7 +304,7 @@ def test_twoway_requires_a_reverse_twin_not_just_shared_endpoints():
                                    LineString([(18.066, 59.3202), b])],     # C->B (real twin)
                          crs=4326)
     style = _style(render_edges(g, backend="web").html)
-    tw = [f["properties"]["twoway"] for f in style["sources"]["roads"]["data"]["features"]]
+    tw = [f["properties"]["__rs_twoway"] for f in style["sources"]["roads"]["data"]["features"]]
     assert tw == [False, False, True, True]
 
 
