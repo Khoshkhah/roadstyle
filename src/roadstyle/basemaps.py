@@ -28,6 +28,13 @@ BASEMAPS: dict[str, Basemap] = {
         "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", _CARTO_ATTR,
         lonboard="Voyager", bg="linear-gradient(180deg,#e8eef0,#d8e0e5)",
         preview=("#ff9933", "#e8ecef", "#9ec5fe")),
+    "voyager_nolabels": Basemap(
+        # no basemap street names: the map's own labels (arrow-grey, class-aware) are the only
+        # ones — otherwise CARTO's dark names show wherever ours don't place (and below z14)
+        "voyager_nolabels", "Voyager (no labels)",
+        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png",
+        _CARTO_ATTR, lonboard="Voyager", bg="linear-gradient(180deg,#e8eef0,#d8e0e5)",
+        preview=("#ff9933", "#e8ecef", "#9ec5fe")),
     "positron": Basemap(
         "positron", "Positron",
         "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", _CARTO_ATTR,

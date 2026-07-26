@@ -92,7 +92,15 @@ def test_web_annotation_slots_alternate_names_and_arrows():
     lab = next(l for l in style["layers"] if l["id"] == "roads-labels")
     arr = next(l for l in style["layers"] if l["id"] == "roads-arrows")
     assert ["==", ["%", ["get", "slot"], 2], 0] in lab["filter"]     # names: even slots
-    assert ["==", ["%", ["get", "slot"], 2], 1] in arr["filter"]     # arrows: odd slots
+    # arrows: every one-way slot, repeated along the line (odd-slots-only left short
+    # one-way chains — most of a city grid — with no arrow in the viewport)
+    assert ["==", ["get", "oneway"], 1] in arr["filter"]
+    assert arr["layout"]["symbol-placement"] == "line" and arr["layout"]["symbol-spacing"]
+    # one arrow layer per grade tier, each right beside its road tier — a bridge must cover
+    # the arrows of the road it crosses, not have them float above everything
+    assert ids.index("roads-arrows") == ids.index("roads-fill") + 1
+    assert ids.index("roads-arrows-tunnel") == ids.index("roads-tunnel-fill") + 1
+    assert ids.index("roads-arrows-bridge") == ids.index("roads-bridge-fill") + 1
     assert ["to-boolean", ["get", "name"]] in lab["filter"]          # unnamed -> slot stays empty
     assert lab["layout"]["symbol-placement"] == "line-center"
     # Kaveh's standing default: label text matches the oneway-arrow grey, and NO halo
@@ -304,7 +312,7 @@ def test_twoway_requires_a_reverse_twin_not_just_shared_endpoints():
                                    LineString([(18.066, 59.3202), b])],     # C->B (real twin)
                          crs=4326)
     style = _style(render_edges(g, backend="web").html)
-    tw = [f["properties"]["twoway"] for f in style["sources"]["roads"]["data"]["features"]]
+    tw = [f["properties"]["__rs_twoway"] for f in style["sources"]["roads"]["data"]["features"]]
     assert tw == [False, False, True, True]
 
 
@@ -322,9 +330,12 @@ def test_web_labels_and_arrows_read_style_config(monkeypatch):
     wm = render_edges(_edges(), backend="web", arrows=True, labels=True)
     style = _style(wm.html)
     paint = next(l for l in style["layers"] if l["id"] == "roads-labels")["paint"]
-    assert paint == {"text-color": "#ff0000", "text-halo-color": "#000000", "text-halo-width": 2}
+    # labels inherit the arrows' opacity (same rendered grey, not just same hex);
+    # a labels.opacity settings key would override it
+    assert paint == {"text-color": "#ff0000", "text-halo-color": "#000000",
+                     "text-halo-width": 2, "text-opacity": 0.5}
     arrow = next(l for l in style["layers"] if l["id"] == "roads-arrows")
-    assert arrow["minzoom"] == 14 and arrow["paint"]["icon-opacity"] == 0.5
+    assert arrow["minzoom"] == 15 and arrow["paint"]["icon-opacity"] == 0.5
     assert 'fill="#123456"' in wm.html               # the chevron SVG itself is retinted
 
 

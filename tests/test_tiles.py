@@ -33,7 +33,7 @@ def test_build_pmtiles_round_trip():
 
     from roadstyle.tiles import build_pmtiles
     fc = _fc(_edges())
-    data = build_pmtiles(fc, class_col="highway", keep={"highway", "twoway", "lvl"},
+    data = build_pmtiles(fc, class_col="highway", keep={"highway", "__rs_twoway", "lvl"},
                          minzoom_table={"service": 13}, minzoom=8, maxzoom=14)
     r = Reader(MemorySource(data))
     h = r.header()
@@ -50,7 +50,7 @@ def test_build_pmtiles_round_trip():
     top = layers_at(14)["roads"]["features"]
     assert {f["properties"]["highway"] for f in top} == {"primary", "service"}
     assert all(isinstance(f["id"], int) for f in top)          # id = feature index
-    assert all(set(f["properties"]) <= {"highway", "twoway", "lvl", "__rs_fill"} for f in top)
+    assert all(set(f["properties"]) <= {"highway", "__rs_twoway", "lvl", "__rs_fill"} for f in top)
     low = layers_at(10)["roads"]["features"]
     assert {f["properties"]["highway"] for f in low} == {"primary"}   # service below its minzoom
 

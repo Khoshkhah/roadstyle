@@ -169,7 +169,7 @@ function _sideInit(){
     const only=(_popupFields&&_popupFields.length)?_popupFields:null, info=[];
     const ids=rsQuery(function(p){
       const ks=only||Object.keys(p);
-      for(const k of ks){ if(k[0]==="_"||k==="twoway"||k==="lvl") continue;
+      for(const k of ks){ if(k[0]==="_"||k==="lvl") continue;
         const v=p[k]; if(v==null) continue; const t=(""+v).toLowerCase();
         const set=t&&t!=="nan"&&t!=="no"&&t!=="false"&&t!=="none"&&t!=="0";
         if((t!=="nan"&&t.indexOf(q)>=0)||(k.toLowerCase().indexOf(q)>=0&&set)){ info.push([k, ""+v, p.name!=null?""+p.name:""]); return true; } }
@@ -352,7 +352,7 @@ function rsGetProps(ids, layer){ // the rows behind an id set (internals strippe
   const s = !L.ov && _side(), fs = s ? null : _sfeats(L.src);
   return Array.from(ids||[]).map(i=>{
     const p=(s ? s.props[i] : (fs[i]&&fs[i].properties))||{}; const r={};
-    for(const k in p){ if(k[0]!=="_" && k!=="twoway" && k!=="lvl") r[k]=p[k]; }
+    for(const k in p){ if(k[0]!=="_" && k!=="lvl") r[k]=p[k]; }
     return r; });
 }
 // bridges in 3D are deck ribbons on their own source: this maps a road id to the deck slices
@@ -466,11 +466,12 @@ function coUpdateLegend(){
   _coLegendEl.innerHTML = h;
   if(_coLegendBox) _coLegendBox.style.display = h ? "" : "none";
 }
-let _qColor=null;   // {ids, color} recolour of an id set, layered over the active option
+let _qColor=null;   // [{ids, color}, ...] recolour groups, layered over the active option
 function _fillExpr(){
   const prop=(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill";
   let e=["coalesce",["get",prop],"#888888"];
-  if(_qColor) e=["case",["in",["id"],["literal",_qColor.ids]],_qColor.color,e];
+  if(_qColor) for(let i=_qColor.length-1;i>=0;i--)   // group 0 outermost -> wins overlaps
+    e=["case",["in",["id"],["literal",_qColor[i].ids]],_qColor[i].color,e];
   return e;
 }
 function _applyFill(){
@@ -507,10 +508,19 @@ function rsColor(ids, color, layer){   // paint an id set one colour; rsColor(nu
       {detail:{overlay:L.ov.label, ids:ids==null?null:Array.from(ids), color:color||null}}));
     return;
   }
-  _qColor = (ids==null || !color) ? null : {ids:Array.from(ids), color:color};
+  // one set + colour, or several sets in one call — rsColor([[idsA,"#f80"],[idsB,"#08f"]]);
+  // group order decides overlaps (earlier wins). rsColor(null) resets either form.
+  if(ids==null) _qColor=null;
+  else if(color) _qColor=[{ids:Array.from(ids), color:color}];
+  else if(Array.isArray(ids)) _qColor=ids.filter(g=>g&&g[0]!=null&&g[1])
+    .map(g=>({ids:Array.from(g[0]), color:g[1]}));
+  else _qColor=null;
+  if(_qColor && !_qColor.length) _qColor=null;
   _applyFill();
   document.dispatchEvent(new CustomEvent("rs:colorchange",
-    {detail:{ids:_qColor && _qColor.ids, color:_qColor && _qColor.color}}));
+    {detail:(!_qColor || _qColor.length===1)
+      ? {ids:_qColor && _qColor[0].ids, color:_qColor && _qColor[0].color}
+      : {groups:_qColor.map(g=>({ids:g.ids, color:g.color}))}}));
 }
 window.rsSetColorField = rsSetColorField;
 window.rsColor = rsColor;
@@ -572,10 +582,14 @@ function handleOverlayClick(e, tier){                      // info popup only on
       rsDeselect();                                        // road selection yields to the overlay
       _ovState(_ovSel,{select:false}); _ovSel={source:ov.source, id:f.id}; _ovState(_ovSel,{select:true});
       const fields = ov.popup && ov.popup.length ? ov.popup : Object.keys(p);
-      const rows = fields.filter(k=>p[k]!=null && p[k]!=="").map(k=>"<b>"+k+"</b>: "+p[k]);
-      new maplibregl.Popup({closeButton:true,maxWidth:"260px"})
-        .setLngLat(e.lngLat).setHTML(rows.join("<br>")||"(no data)").addTo(map)
-        .on("close", clearOvSel);
+      if(_popupMode==="panel"){   // panel mode: dock the read-out like a road's, no floating popup
+        rsInfoShow('<div class="rs-name">'+ov.label+'</div>'+_rrows(p, fields));
+      }else{
+        const rows = fields.filter(k=>p[k]!=null && p[k]!=="").map(k=>"<b>"+k+"</b>: "+p[k]);
+        new maplibregl.Popup({closeButton:true,maxWidth:"260px"})
+          .setLngLat(e.lngLat).setHTML(rows.join("<br>")||"(no data)").addTo(map)
+          .on("close", clearOvSel);
+      }
       // overlay clicks feed dashboards exactly like road clicks: rs:select with the overlay's
       // label + popup fields, so a sidebar shows sensor/zone info without extra wiring
       document.dispatchEvent(new CustomEvent("rs:select",
@@ -615,28 +629,45 @@ function rsSetOverlay(labelOrIdx, on){
 }
 window.rsSetOverlay = rsSetOverlay;
 window.RS_OVERLAYS = OVERLAYS;
+function _ovRow(ov){
+  const lab=document.createElement("label");
+  const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=ov.visible!==false;
+  cb.onchange=()=> rsSetOverlay(ov.label, cb.checked);
+  _ovCbs[ov.label]=cb; lab.appendChild(cb);
+  if(ov.color){ const sw=document.createElement("span"); sw.className="ov-sw";
+    sw.style.background=ov.color; lab.appendChild(sw); }
+  lab.appendChild(document.createTextNode(" "+ov.label));
+  return lab;
+}
 if(OVERLAYS.length){
-  const box=document.createElement("div"); box.className="ov-ctrl";
-  const hd=document.createElement("div"); hd.className="ov-hd"; hd.textContent="Layers";
-  const body=document.createElement("div"); body.className="ov-body"; box.appendChild(hd); box.appendChild(body);
-  OVERLAYS.forEach(ov=>{
-    const lab=document.createElement("label");
-    const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=ov.visible!==false;
-    cb.onchange=()=> rsSetOverlay(ov.label, cb.checked);
-    _ovCbs[ov.label]=cb; lab.appendChild(cb);
-    if(ov.color){ const sw=document.createElement("span"); sw.className="ov-sw";
-      sw.style.background=ov.color; lab.appendChild(sw); }
-    lab.appendChild(document.createTextNode(" "+ov.label)); body.appendChild(lab);
-  });
-  document.body.appendChild(box);
+  // panel mode: overlay toggles join the panel's Roads card, right after its Bridges row — a
+  // second floating "Layers" box on the map competes with the panel that hosts everything else.
+  // Non-panel keeps the standalone Layers control.
+  const host=_popupMode==="panel" ? document.querySelector(".flt-ctrl .flt-body") : null;
+  if(host){
+    OVERLAYS.forEach((ov,i)=>{
+      const lab=_ovRow(ov);
+      if(i===0) lab.style.cssText="margin-top:4px;padding-top:4px;border-top:1px solid #ddd";
+      host.appendChild(lab);
+    });
+  } else {
+    const box=document.createElement("div"); box.className="ov-ctrl";
+    const hd=document.createElement("div"); hd.className="ov-hd"; hd.textContent="Layers";
+    const body=document.createElement("div"); body.className="ov-body";
+    box.appendChild(hd); box.appendChild(body);
+    OVERLAYS.forEach(ov=> body.appendChild(_ovRow(ov)));
+    document.body.appendChild(box);
+  }
 }
 // oneway direction-arrow icon (openstreetmap-carto)
 function addArrow(){
   if(map.hasImage("oneway")) return;
-  const svg='<svg xmlns="http://www.w3.org/2000/svg" width="24" height="10" viewBox="0 0 12 5">'
+  // rasterised at 4x (96x40 for a 24x10-CSS icon): the high-zoom size ramp scales the icon
+  // up to ~10x, and a 2x raster turns to mush past ~2x
+  const svg='<svg xmlns="http://www.w3.org/2000/svg" width="96" height="40" viewBox="0 0 12 5">'
     +'<path d="M 0,2 7,2 7,0 12,2.5 7,5 7,3 0,3 z" fill="__ARROW_COLOR__"/></svg>';
-  const img=new Image(24,10);
-  img.onload=()=>{ if(!map.hasImage("oneway")) map.addImage("oneway",img,{pixelRatio:2}); };
+  const img=new Image(96,40);
+  img.onload=()=>{ if(!map.hasImage("oneway")) map.addImage("oneway",img,{pixelRatio:4}); };
   img.src="data:image/svg+xml;base64,"+btoa(svg);
 }
 map.on("load", addArrow);
@@ -687,7 +718,7 @@ function _rpairs(p, only){  // shared field filter: [nameOrNull, [[k, v], ...]]
   let name=null;
   if(p.name!=null && (""+p.name)!=="" && (""+p.name).toLowerCase()!=="nan") name=""+p.name;
   const ks = (only && only.length) ? only : Object.keys(p), out=[];
-  for(const k of ks){ if(k[0]==="_"||k==="twoway"||k==="lvl"||k==="name") continue;  // lvl/twoway are roadstyle-injected internals
+  for(const k of ks){ if(k[0]==="_"||k==="lvl"||k==="name") continue;  // lvl is a roadstyle-injected internal (__rs_* are already skipped above)
     var v=p[k]; if(v==null) continue; var s=""+v, sl=s.toLowerCase();
     if(s===""||sl==="nan"||sl==="none") continue;
     if((k==="bridge"||k==="tunnel") && (sl==="no"||sl==="0"||sl==="false")) continue;  // bridge/tunnel only when it IS one
