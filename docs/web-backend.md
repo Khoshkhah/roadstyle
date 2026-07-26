@@ -113,7 +113,7 @@ dispatches a CustomEvent on `document`:
 | `rsSetOverlay(labelOrIdx, on)` | show/hide one overlay | `rs:overlaychange` |
 | `rsQuery(p => …, layer?)` | evaluate a predicate over every feature's columns → **id set** | — |
 | `rsFilter(ids, layer?)` | show only these features (`null` resets); on roads, ANDs with the class filter | `rs:filterchange` |
-| `rsColor(ids, "#hex", layer?)` | paint the set one colour, layered over the base styling (reset: `rsColor(null)` / `rsColor(null, null, label)`) | `rs:colorchange` |
+| `rsColor(ids, "#hex", layer?)` | paint the set one colour, layered over the base styling; or several sets at once — `rsColor([[idsA, "#f80"], [idsB, "#08f"]])`, earlier pairs winning overlaps (roads only). Reset: `rsColor(null)` / `rsColor(null, null, label)` | `rs:colorchange` |
 | `rsHighlight(ids, layer?)` | selection glow on the set (`[]` clears) | `rs:highlightchange` |
 | `rsGetProps(ids, layer?)` | the rows behind the ids, internal fields stripped — table-ready | — |
 
@@ -218,8 +218,10 @@ rs.render_edges(edges, backend="web", palette="mono",
 Bring extra geometry the caller owns — zone polygons, POI points, any lines — as a list of
 [`Overlay`](parameters.md#8-overlay-extra-layers). Each becomes its own MapLibre source + layer(s),
 placed **under** or **over** the roads, clickable for a popup of the fields you list, and toggled
-from a **Layers** control. Overlays are passthrough data: *your* geometry with *your* style — they
-do **not** go through roadstyle's road-styling compiler.
+from a **Layers** control. In **panel mode** (`popup_mode="panel"`) an overlay click docks its
+read-out into the side panel exactly like a road's — titled with the overlay's `label` — instead
+of opening a floating popup. Overlays are passthrough data: *your* geometry with *your* style —
+they do **not** go through roadstyle's road-styling compiler.
 
 ```python
 rs.render_edges(edges, backend="web", palette="mono",
