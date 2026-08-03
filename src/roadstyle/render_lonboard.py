@@ -29,7 +29,7 @@ def _arrays(gdf, palette, highway_col, tunnel_col, bridge_col, which):
           if tunnel_col and tunnel_col in gdf.columns else [False] * n)
     br = ([_truthy(v) for v in gdf[bridge_col]]
           if bridge_col and bridge_col in gdf.columns else [False] * n)
-    keys = list(zip(hw, tn, br))
+    keys = list(zip(hw, tn, br, strict=True))
 
     lut = {}                                       # key -> (rgba, width)
     for key in set(keys):
@@ -69,9 +69,9 @@ def _arrays_from_frame(rf, which):
     widths = np.empty(n, dtype="float32")
     cache = {}
     if which == "casing":
-        rows = zip(rf.casing, rf.casing_opacity, rf.casing_width)
+        rows = zip(rf.casing, rf.casing_opacity, rf.casing_width, strict=True)
     else:
-        rows = zip(rf.fill, rf.opacity, rf.width)
+        rows = zip(rf.fill, rf.opacity, rf.width, strict=True)
     for i, (col, op, w) in enumerate(rows):
         if which == "casing" and (not col or w <= 0):
             colors[i] = 0

@@ -11,8 +11,8 @@ import json
 
 from .basemaps import DEFAULT_SWITCHER, get_basemap
 from .config import DEFAULT as CONFIG
-from .fastjson import fc_dict
 from .controls import BaseLayerSwitcher
+from .fastjson import fc_dict
 from .interactive import InteractiveRoads
 from .style import selection_style
 from .stylers import bake_props, build_styler
