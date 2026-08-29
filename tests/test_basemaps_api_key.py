@@ -60,16 +60,16 @@ def test_get_api_key_from_env(monkeypatch):
 def test_carto_basemap_api_key_injection(monkeypatch):
     # Without key: returns standard url
     bm = get_basemap("voyager")
-    assert "api_key=" not in bm.url
+    assert "key=" not in bm.url
 
-    # With explicit key: appends ?api_key=...
+    # With explicit key: appends ?key=... for CARTO
     bm_keyed = get_basemap("voyager", api_key="my_carto_key")
-    assert "api_key=my_carto_key" in bm_keyed.url
+    assert "key=my_carto_key" in bm_keyed.url
 
     # With env var: CARTO_API_KEY
     monkeypatch.setenv("CARTO_API_KEY", "env_carto_key")
     bm_env = get_basemap("voyager")
-    assert "api_key=env_carto_key" in bm_env.url
+    assert "key=env_carto_key" in bm_env.url
 
 
 def test_get_basemap_custom_url_with_placeholder():

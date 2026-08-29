@@ -101,8 +101,9 @@ def _inject_token(url: str, token: str) -> str:
         return url
     if any(p in url for p in ("{api_key}", "{accessToken}", "{apikey}", "{apiKey}", "{token}", "{key}", "{access_token}")):
         return _replace_token_placeholders(url, token)
+    param_name = "key" if "cartocdn.com" in url else "api_key"
     sep = "&" if "?" in url else "?"
-    return f"{url}{sep}api_key={token}"
+    return f"{url}{sep}{param_name}={token}"
 
 
 @dataclass(frozen=True)
