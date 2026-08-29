@@ -4,7 +4,16 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.4.1] — 2026-08-29
+
+### Added
+- **Base map API key resolution & third-party provider support**:
+  - Full API key resolution for commercial tile providers (CARTO, Mapbox, Stadia, Thunderforest, Jawg, MapTiler, etc.).
+  - Added `roadstyle.set_api_key(key, provider=None)` and `roadstyle.get_api_key(provider=None)` for session management.
+  - Added `api_key` parameter across all rendering backends (`render_edges`, `render_web`, `render_folium`, `render_lonboard`, and `to_spec`).
+  - Automatic environment variable resolution (`CARTO_API_KEY`, `MAPBOX_API_KEY`, `STADIA_API_KEY`, `THUNDERFOREST_API_KEY`, `ROADSTYLE_API_KEY`).
+  - Persistent config file support in `~/.config/roadstyle/roadstyle.json` and `./roadstyle.json`.
+  - Automatic injection of `?key=` parameter for CARTO basemaps to prevent "API KEY REQUIRED" watermark.
 
 ### Fixed
 - **`name=` shows as the page heading.** `render_dashboard` / `render_report` (and the studio's
