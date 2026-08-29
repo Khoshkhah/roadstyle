@@ -46,6 +46,7 @@ def render_edges(
     color_key: str = "edge_id",
     color_col: str = "color",
     settings=None,
+    api_key: str | None = None,
     **kwargs,
 ):
     """Render styled road edges on a map.
@@ -138,4 +139,4 @@ def render_edges(
         from .render_web import render
     else:
         raise ValueError(f"unknown backend {backend!r}; use 'folium', 'lonboard', or 'web'")
-    return render(g, palette=palette, highway_col=col, styler=styler, **kwargs)
+    return render(g, palette=palette, highway_col=col, styler=styler, api_key=api_key, **kwargs)

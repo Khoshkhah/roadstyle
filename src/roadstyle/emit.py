@@ -56,6 +56,7 @@ def to_spec(
     basemaps: list[str] | None = None,
     tooltip: list[str] | None = None,
     color_options=None,
+    api_key: str | None = None,
 ) -> dict:
     """Build the canonical JSON spec (data + baked-in resolved style + legend + metadata).
 
@@ -104,12 +105,11 @@ def to_spec(
     b = list(g.total_bounds)   # [minx, miny, maxx, maxy]
     bounds = [[b[1], b[0]], [b[3], b[2]]]   # [[S,W],[N,E]] (Leaflet order)
 
-    bm = get_basemap(basemap or CONFIG.basemap)
+    bm = get_basemap(basemap or CONFIG.basemap, api_key=api_key)
     # Selectable base layers for the in-map switcher; the active `bm` is always present and first.
     keys = list(basemaps) if basemaps else list(DEFAULT_SWITCHER)
-    if bm.key not in keys:
-        keys = [bm.key, *keys]
-    options = [_basemap_dict(get_basemap(k)) for k in keys]
+    bms = [bm] + [get_basemap(k, api_key=api_key) for k in keys if k != bm.key and k != basemap]
+    options = [_basemap_dict(b) for b in bms]
 
     fields = tooltip if tooltip is not None else [c for c in g.columns if c != g.geometry.name]
     fields = [f for f in fields if f in g.columns]

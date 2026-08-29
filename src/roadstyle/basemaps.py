@@ -1,11 +1,108 @@
 """Base-map (tile) providers + thumbnail metadata for the switcher control."""
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 _CARTO_ATTR = "© OpenStreetMap contributors © CARTO"
 _OSM_ATTR = "© OpenStreetMap contributors"
 _ESRI_ATTR = "Tiles © Esri"
+
+# In-memory session store for API keys: {"default": "...", "mapbox": "...", ...}
+_SESSION_API_KEYS: dict[str, str] = {}
+_TOKEN_KEYWORDS = ("api_key", "accessToken", "apikey", "apiKey", "token", "key", "access_token")
+
+
+def set_api_key(api_key: str, provider: str | None = None) -> None:
+    """Set an API key / access token globally for the current Python session.
+
+    Parameters
+    ----------
+    api_key : str
+        The token/API key string.
+    provider : str, optional
+        Provider name (e.g. "mapbox", "stadia", "maptiler", "thunderforest", "jawg").
+        If omitted (None), sets the default key used for any provider without a provider-specific key.
+    """
+    key_name = provider.lower().strip() if provider else "default"
+    _SESSION_API_KEYS[key_name] = api_key
+
+
+def get_api_key(provider: str | None = None) -> str | None:
+    """Resolve an API key from session storage, StyleConfig / roadstyle.json, or environment variables.
+
+    Precedence order (highest to lowest):
+    1. Provider-specific key set via ``set_api_key(..., provider="...")``
+    2. Default key set via ``set_api_key(...)``
+    3. ``StyleConfig.api_keys[provider]`` or ``StyleConfig.api_key`` (from ``roadstyle.json``)
+    4. Provider-specific environment variable (e.g. ``MAPBOX_API_KEY``, ``MAPBOX_ACCESS_TOKEN``, ``STADIA_API_KEY``)
+    5. ``ROADSTYLE_API_KEY`` environment variable
+    """
+    p_norm = provider.lower().replace("-", "_").strip() if provider else None
+
+    # 1. Session store (provider-specific, then default)
+    if p_norm and p_norm in _SESSION_API_KEYS:
+        return _SESSION_API_KEYS[p_norm]
+    if "default" in _SESSION_API_KEYS:
+        return _SESSION_API_KEYS["default"]
+
+    # 2. Config / roadstyle.json
+    try:
+        from . import _settings
+        cfg = _settings.style().get("config", {})
+        if p_norm:
+            api_keys = cfg.get("api_keys", {})
+            if isinstance(api_keys, dict) and p_norm in api_keys:
+                return api_keys[p_norm]
+        if cfg.get("api_key"):
+            return cfg["api_key"]
+    except Exception:
+        pass
+
+    # 3. Environment variables
+    if p_norm:
+        p_upper = p_norm.upper()
+        candidates = [
+            f"{p_upper}_API_KEY",
+            f"{p_upper}_ACCESS_TOKEN",
+            f"{p_upper}_TOKEN",
+            f"{p_upper}_KEY",
+        ]
+        for env_var in candidates:
+            if val := os.environ.get(env_var):
+                return val
+
+    if val := os.environ.get("ROADSTYLE_API_KEY"):
+        return val
+
+    return None
+
+
+def _detect_token_key(tp) -> str | None:
+    """Find the keyword argument name used by an xyzservices.TileProvider for its access token."""
+    if hasattr(tp, "keys"):
+        for k in tp.keys():
+            val = str(tp.get(k, ""))
+            if val.startswith("<insert") or k in _TOKEN_KEYWORDS:
+                return k
+    return None
+
+
+def _replace_token_placeholders(url: str, token: str) -> str:
+    """Replace common token/key placeholders in a URL template."""
+    for placeholder in ("{api_key}", "{accessToken}", "{apikey}", "{apiKey}", "{token}", "{key}", "{access_token}"):
+        url = url.replace(placeholder, token)
+    return url
+
+
+def _inject_token(url: str, token: str) -> str:
+    """Inject a token into a URL template, either by replacing placeholders or appending as query param."""
+    if not url or not token:
+        return url
+    if any(p in url for p in ("{api_key}", "{accessToken}", "{apikey}", "{apiKey}", "{token}", "{key}", "{access_token}")):
+        return _replace_token_placeholders(url, token)
+    sep = "&" if "?" in url else "?"
+    return f"{url}{sep}api_key={token}"
 
 
 @dataclass(frozen=True)
@@ -79,7 +176,7 @@ def register_basemap(bm: Basemap) -> None:
     BASEMAPS[bm.key] = bm
 
 
-def _basemap_from_provider(tp) -> Basemap:
+def _basemap_from_provider(tp, api_key: str | None = None) -> Basemap:
     """Convert an ``xyzservices.TileProvider`` (duck-typed) into a :class:`Basemap`.
 
     Lets any of the hundreds of xyzservices tile sources be used directly, e.g.
@@ -88,10 +185,44 @@ def _basemap_from_provider(tp) -> Basemap:
     name = getattr(tp, "name", None) or (
         tp.get("name", "custom") if hasattr(tp, "get") else "custom"
     )
-    try:
-        url = tp.build_url()              # leaflet-style template with {z}/{x}/{y}
-    except Exception:
-        url = tp.get("url", "") if hasattr(tp, "get") else ""
+    provider_root = str(name).split(".")[0].lower()
+    resolved_key = api_key or get_api_key(provider_root)
+
+    requires_tok = getattr(tp, "requires_token", lambda: False)()
+    if requires_tok and not resolved_key:
+        env_hint = f"{provider_root.upper()}_API_KEY"
+        raise ValueError(
+            f"Basemap provider {name!r} requires an API key or access token.\n"
+            f"Provide one via:\n"
+            f"  • Pass explicitly: roadstyle.render_edges(..., api_key='YOUR_KEY')\n"
+            f"  • Set globally: roadstyle.set_api_key('YOUR_KEY', provider={provider_root!r})\n"
+            f"  • Environment variable: export {env_hint}='YOUR_KEY' or export ROADSTYLE_API_KEY='YOUR_KEY'\n"
+            f"  • Add to roadstyle.json config: {{\"config\": {{\"api_keys\": {{{provider_root!r}: 'YOUR_KEY'}}}}}}"
+        )
+
+    url = ""
+    if hasattr(tp, "build_url"):
+        t_key = _detect_token_key(tp)
+        if resolved_key:
+            kwargs = {t_key: resolved_key} if t_key else {"api_key": resolved_key, "accessToken": resolved_key}
+            try:
+                url = tp.build_url(**kwargs)
+            except Exception:
+                try:
+                    url = tp.build_url()
+                except Exception:
+                    url = tp.get("url", "") if hasattr(tp, "get") else ""
+        else:
+            try:
+                url = tp.build_url()
+            except Exception:
+                url = tp.get("url", "") if hasattr(tp, "get") else ""
+    elif hasattr(tp, "get"):
+        url = tp.get("url", "")
+
+    if resolved_key and url:
+        url = _inject_token(url, resolved_key)
+
     attr = ""
     if hasattr(tp, "get"):
         attr = tp.get("attribution", "") or tp.get("html_attribution", "") or ""
@@ -100,20 +231,43 @@ def _basemap_from_provider(tp) -> Basemap:
                    is_dark=is_dark)
 
 
-def get_basemap(key: str | Basemap) -> Basemap:
+def get_basemap(key: str | Basemap, api_key: str | None = None) -> Basemap:
     """Resolve a base map from a registered key, a :class:`Basemap`, or an
     ``xyzservices.TileProvider`` (duck-typed via its ``build_url`` method)."""
     if isinstance(key, Basemap):
+        resolved_key = api_key or get_api_key(key.key) or get_api_key("carto" if "cartocdn.com" in key.url else None)
+        if resolved_key and key.url:
+            new_url = _inject_token(key.url, resolved_key)
+            if new_url != key.url:
+                return Basemap(
+                    key=key.key, label=key.label, url=new_url, attr=key.attr,
+                    is_dark=key.is_dark, satellite=key.satellite, lonboard=key.lonboard,
+                    bg=key.bg, preview=key.preview, subdomains=key.subdomains
+                )
         return key
     if isinstance(key, str):
-        try:
-            return BASEMAPS[key]
-        except KeyError as err:
-            raise ValueError(
-                f"unknown basemap {key!r}; choose from {list(BASEMAPS)}"
-            ) from err
+        if key in BASEMAPS:
+            bm = BASEMAPS[key]
+            provider = "carto" if "cartocdn.com" in bm.url else key
+            resolved_key = api_key or get_api_key(provider) or get_api_key(key) or get_api_key()
+            if resolved_key and bm.url:
+                new_url = _inject_token(bm.url, resolved_key)
+                if new_url != bm.url:
+                    return Basemap(
+                        key=bm.key, label=bm.label, url=new_url, attr=bm.attr,
+                        is_dark=bm.is_dark, satellite=bm.satellite, lonboard=bm.lonboard,
+                        bg=bm.bg, preview=bm.preview, subdomains=bm.subdomains
+                    )
+            return bm
+        if "{z}" in key and "{x}" in key and "{y}" in key:
+            resolved_key = api_key or get_api_key()
+            url = _inject_token(key, resolved_key) if resolved_key else key
+            return Basemap(key="custom", label="Custom Basemap", url=url, attr="")
+        raise ValueError(
+            f"unknown basemap {key!r}; choose from {list(BASEMAPS)}"
+        )
     if hasattr(key, "build_url"):         # xyzservices.TileProvider
-        return _basemap_from_provider(key)
+        return _basemap_from_provider(key, api_key=api_key)
     raise TypeError(
         f"basemap must be a key, Basemap, or xyzservices.TileProvider, "
         f"got {type(key).__name__}"

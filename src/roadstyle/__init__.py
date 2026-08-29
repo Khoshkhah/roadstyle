@@ -8,7 +8,14 @@
     render_edges(edges, basemap="dark_matter",
                  include=["motorway", "trunk", "primary"]).save("major.html")
 """
-from .basemaps import BASEMAPS, Basemap, get_basemap, register_basemap
+from .basemaps import (
+    BASEMAPS,
+    Basemap,
+    get_api_key,
+    get_basemap,
+    register_basemap,
+    set_api_key,
+)
 from .config import StyleConfig
 from .controls import BaseLayerSwitcher
 from .edges import (
@@ -104,7 +111,7 @@ __all__ = [
     "filter_edges", "highway_types", "use_settings", "snapshot",
     "resolve", "base_style", "selection_style", "normalize_highway",
     "PALETTES", "HIGHSAT", "CARTO", "SELECTION", "RoadStyle",
-    "BASEMAPS", "Basemap", "get_basemap", "BaseLayerSwitcher",
+    "BASEMAPS", "Basemap", "get_basemap", "BaseLayerSwitcher", "set_api_key", "get_api_key",
     # generalization additions (Phase 0)
     "StyleConfig", "register_palette", "register_basemap",
     # styler abstraction (Phase 1)

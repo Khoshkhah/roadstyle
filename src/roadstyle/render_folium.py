@@ -18,10 +18,10 @@ from .style import selection_style
 from .stylers import bake_props, build_styler
 
 
-def _add_base(m, folium, basemap, basemaps):
+def _add_base(m, folium, basemap, basemaps, api_key: str | None = None):
     """Single fixed base map (``basemap=``) or a thumbnail switcher (default / ``basemaps=``)."""
     if basemap and not basemaps:
-        bm = get_basemap(basemap)
+        bm = get_basemap(basemap, api_key=api_key)
         if not bm.url:                # tile-less (blank): just a plain canvas colour
             m.get_root().header.add_child(folium.Element(
                 f"<style>.leaflet-container{{background:{bm.bg}}}</style>"))
@@ -34,7 +34,7 @@ def _add_base(m, folium, basemap, basemaps):
         return
     keys = list(basemaps) if basemaps else list(DEFAULT_SWITCHER)
     default_key = CONFIG.basemap if CONFIG.basemap in keys else keys[0]
-    m.add_child(BaseLayerSwitcher(keys, default_key))
+    m.add_child(BaseLayerSwitcher(keys, default_key, api_key=api_key))
 
 
 def _add_legend(m, rf, position="bottomleft"):
@@ -62,6 +62,7 @@ def render(
     legend: bool = True,
     legend_position: str = "bottomleft",
     copy_field: str | None = "edge_id",
+    api_key: str | None = None,
     **map_kwargs,
 ):
     import folium
@@ -74,7 +75,7 @@ def render(
     g = gdf.to_crs(4326)
 
     m = folium.Map(tiles=None, **map_kwargs)
-    _add_base(m, folium, basemap, basemaps)
+    _add_base(m, folium, basemap, basemaps, api_key=api_key)
 
     fields = tooltip if tooltip is not None else [c for c in g.columns if c != g.geometry.name]
     fields = [f for f in fields if f in g.columns]

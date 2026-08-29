@@ -79,7 +79,8 @@ GeoDataFrame with line geometry + a class column).
 | `tiles` | bool | `False` | Pack the roads (and annotation slots) as an embedded-PMTiles vector tileset instead of inline GeoJSON — MapLibre parses only the tiles in view, so ~10⁵-edge maps boot in seconds and stay responsive. Same single offline file, same JS API (a gzipped sidecar carries the full attributes). Needs the `tiles` extra; knobs in settings `config.tiles`. |
 | `compress` | bool | `True` | Gzip the inlined GeoJSON sources (typically 3–4× smaller files; the page inflates them on load — also keeps inline notebook previews under output-size limits). Sources under 256 KB stay inline either way; `compress=False` writes everything as plain JSON (for very old browsers without `DecompressionStream`, or to read the data out of the file). |
 | `settings` | dict / path / `None` | `None` | Per-call settings override (same layout as `roadstyle.json`); applied for this render only, restored after. |
-| `basemaps` | list / `None` | `None` | (folium) The set of base maps offered in the switcher control. |
+| `api_key` | str / `None` | `None` | API key / access token for third-party basemap providers (Mapbox, Stadia, MapTiler, etc.). |
+| `basemaps` | list / `None` | `None` | The set of base maps offered in the in-map switcher control. |
 | `filter_control` | bool | `True` | Show the in-map road-type filter panel (checkboxes). On `folium` and the `web` backend. |
 | `name` | str | `"roads"` | Layer name. |
 

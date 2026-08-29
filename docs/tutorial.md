@@ -145,6 +145,19 @@ rs.render_edges(edges, basemap="dark_matter", basemaps=["dark_matter", "positron
 Any [xyzservices](https://xyzservices.readthedocs.io/) provider also works directly as `basemap=`
 (install `pip install "roadstyle[basemaps]"`).
 
+For providers that require an API key or access token (e.g. Mapbox, Stadia, Thunderforest, MapTiler, Jawg):
+
+```python
+# Option 1: Pass explicitly per render
+rs.render_edges(edges, basemap=xyz.MapBox, api_key="YOUR_KEY")
+
+# Option 2: Set once globally for your session
+rs.set_api_key("YOUR_KEY", provider="mapbox")
+rs.render_edges(edges, basemap=xyz.MapBox)
+
+# Option 3: Set an environment variable (ROADSTYLE_API_KEY, MAPBOX_API_KEY, STADIA_API_KEY, etc.)
+```
+
 ### Your own colour vocabulary
 
 `color_by` + `colors` defines exactly what each category looks like, with nothing to register:

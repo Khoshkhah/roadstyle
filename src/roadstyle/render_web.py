@@ -849,7 +849,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
            color_options=None, color_active=0, overlays=None, compress: bool = True,
            tiles: bool = False,
-           minzoom=None, legend: bool = True, **_ignore):
+           minzoom=None, legend: bool = True,
+           api_key: str | None = None, **_ignore):
     """Build a self-contained MapLibre map of the styled edges.
 
     If the data carries ``tunnel`` / ``bridge`` / ``layer`` columns (named via ``tunnel_col`` /
@@ -945,16 +946,16 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     # the primary base map layer is a *setting* (config.basemap, defaults.json), overridable
     # per call with `basemap=`
     active = basemap or CONFIG.basemap
+    active_bm = get_basemap(active, api_key=api_key)
     bkeys = list(basemaps) if basemaps else list(DEFAULT_SWITCHER)
-    if isinstance(active, str):
-        bkeys = [active] + [k for k in bkeys if k != active]
+    bms_list = [active_bm] + [get_basemap(k, api_key=api_key) for k in bkeys if k != active_bm.key and k != active]
     bms = [{"key": b.key, "label": b.label, "tiles": _tiles(b), "bg": _bg_color(b)}
-           for b in (get_basemap(k) for k in bkeys)]
+           for b in bms_list]
     if not basemap_switcher and not basemaps:
         # no dropdown and no explicit set -> bake only the fixed backdrop. An explicit
         # `basemaps=` list stays fully addressable via window.rsSetBasemap (custom UI).
         bms = bms[:1]
-    style = _basemap_style(get_basemap(active))
+    style = _basemap_style(active_bm)
     if "bm" not in style["sources"]:
         # a blank base map is active but the switcher offers tiled ones: pre-create the raster
         # layer hidden, so switching is a visibility flip (hidden layers fetch no tiles)

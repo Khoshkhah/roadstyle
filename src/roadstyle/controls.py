@@ -108,7 +108,7 @@ class BaseLayerSwitcher(MacroElement):
     """Layers FAB + thumbnail-card popover; switches base tiles and toggles the satellite
     filter + dynamic road casing (via ``window.__rsCasing``)."""
 
-    def __init__(self, keys, default_key, position="bottomright"):
+    def __init__(self, keys, default_key, position="bottomright", api_key: str | None = None):
         super().__init__()
         self._name = "BaseLayerSwitcher"
         self.position = position
@@ -117,7 +117,7 @@ class BaseLayerSwitcher(MacroElement):
         self.cid = f"rs-pop-{id(self)}"
         self.defs = []
         for k in keys:
-            b = get_basemap(k)
+            b = get_basemap(k, api_key=api_key)
             self.defs.append({
                 "key": b.key, "label": b.label, "url": b.url, "attr": b.attr,
                 "sat": b.satellite, "is_dark": b.is_dark, "bg": b.bg,

@@ -95,6 +95,7 @@ def render(
     styler=None,
     legend: bool = True,            # accepted for API parity; lonboard legend not yet supported
     legend_position: str = "bottomleft",
+    api_key: str | None = None,
     **kwargs,
 ):
     from lonboard import Map, PathLayer
@@ -106,7 +107,7 @@ def render(
     for _k in ("arrows", "labels", "filter_control", "basemap_switcher"):
         kwargs.pop(_k, None)
 
-    bm = get_basemap(basemap or CONFIG.basemap)
+    bm = get_basemap(basemap or CONFIG.basemap, api_key=api_key)
     carto_style = None
     try:
         from lonboard.basemap import CartoBasemap

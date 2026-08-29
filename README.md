@@ -154,8 +154,9 @@ reference with every type and edge case: [docs/parameters.md](https://khoshkhah.
 |---|---|---|
 | `backend` | `"web"` | `"web"` (MapLibre, the flagship) / `"folium"` (Leaflet + legends) / `"lonboard"` (GPU) |
 | `palette` | `"highsat"` | Class colour palette: `"highsat"` / `"carto"` / `"mono"`, or your own |
-| `basemap` | `"voyager"` | Background map: `voyager`, `positron`, `dark_matter`, `osm`, `satellite`, `blank`, `blank_dark` |
+| `basemap` | `"voyager"` | Background map: `voyager`, `positron`, `dark_matter`, `osm`, `satellite`, `blank`, `blank_dark`, or any `xyzservices` provider / custom URL |
 | `basemaps` | all built-ins | The set offered in the in-map base-layer dropdown |
+| `api_key` | `None` | API key / access token for third-party basemaps (e.g. Mapbox, Stadia, MapTiler, Thunderforest) |
 | `name` | `"roadstyle"` | Page / layer title |
 | `settings` | `None` | Per-call settings override (dict or path) — see [Settings](#settings--one-defaults-file-your-overrides-on-top) |
 
@@ -223,6 +224,85 @@ Everything *stylistic* — the actual colours, widths, casing, label/arrow cosme
 defaults, bridge-deck geometry — is deliberately **not** a keyword but a
 [setting](#settings--one-defaults-file-your-overrides-on-top).
 
+## Base maps & API keys
+
+`roadstyle` includes built-in base maps (`"voyager"`, `"positron"`, `"dark_matter"`, `"osm"`, `"esri_gray"`, `"satellite"`, `"blank"`, `"blank_dark"`):
+
+```python
+rs.render_edges(edges, basemap="dark_matter")
+```
+
+> **CARTO API Key:** CARTO basemaps (`voyager`, `positron`, `dark_matter`) display an *"API KEY REQUIRED"* watermark unless a free key (from [carto.com/basemaps/apikey](https://carto.com/basemaps/apikey)) is supplied. Setting your key with `rs.set_api_key("YOUR_KEY")` or `export CARTO_API_KEY="YOUR_KEY"` automatically attaches it to all CARTO tile requests to remove the watermark.
+
+### Using third-party base maps (CARTO, Mapbox, Stadia, MapTiler, Thunderforest, Jawg, etc.)
+
+You can use any base map from the [xyzservices](https://xyzservices.readthedocs.io/) registry (install `pip install "roadstyle[basemaps]"`) or any custom tile URL template.
+
+If the tile provider requires an API key or access token, you can configure it in four ways:
+
+#### 1. Per-call argument
+Pass `api_key` directly to `render_edges`, `render_web`, `render_folium`, `render_lonboard`, or `to_spec`:
+```python
+import xyzservices.providers as xyz
+import roadstyle as rs
+
+# For Mapbox:
+rs.render_edges(edges, basemap=xyz.MapBox, api_key="pk.your_mapbox_token")
+
+# For CARTO:
+rs.render_edges(edges, basemap="voyager", api_key="your_carto_key")
+```
+
+#### 2. Session configuration (Python)
+Set the key once at the start of your script or Jupyter notebook:
+```python
+import roadstyle as rs
+
+# Provider-specific key (e.g. "carto", "mapbox", "stadia", "maptiler", "thunderforest", "jawg")
+rs.set_api_key("your_carto_key", provider="carto")
+rs.set_api_key("pk.your_mapbox_token", provider="mapbox")
+
+# Or a global default key for any provider:
+rs.set_api_key("your_api_key")
+```
+
+#### 3. Environment variables (Terminal / Cloud / CI)
+Set an environment variable before running your code — `roadstyle` resolves it automatically:
+```bash
+# Provider-specific variables:
+export CARTO_API_KEY="your_carto_key"
+export MAPBOX_API_KEY="pk.your_mapbox_token"
+export STADIA_API_KEY="your_stadia_key"
+export THUNDERFOREST_API_KEY="your_thunderforest_key"
+
+# Or general roadstyle variable:
+export ROADSTYLE_API_KEY="your_api_key"
+```
+
+#### 4. Persistent config file (`roadstyle.json`)
+Add keys to `~/.config/roadstyle/roadstyle.json` or project-local `./roadstyle.json` without hardcoding them in source code:
+```json
+{
+  "config": {
+    "api_key": "your_default_key",
+    "api_keys": {
+      "mapbox": "pk.your_mapbox_token",
+      "stadia": "your_stadia_key"
+    }
+  }
+}
+```
+
+#### Custom tile URL templates with API key placeholders
+You can also pass raw tile URLs containing `{api_key}` or `{accessToken}` placeholders:
+```python
+rs.render_edges(
+    edges,
+    basemap="https://tiles.example.com/{z}/{x}/{y}.png?api_key={api_key}",
+    api_key="your_api_key",
+)
+```
+
 ## Data contract — which column powers what
 
 Only two things are required; every other column lights up a feature when present and is
@@ -265,6 +345,11 @@ rs.render_edges(edges, overlays=[
 # your own tile server as a base map
 rs.register_basemap(rs.Basemap(key="lm", label="Lantmäteriet",
                                url="https://tiles.example.se/{z}/{x}/{y}.png", attr="© LM"))
+
+# third-party basemaps requiring an API key (Mapbox, Stadia, MapTiler, etc.)
+# (or set globally: rs.set_api_key("YOUR_KEY") or export MAPBOX_API_KEY="YOUR_KEY")
+import xyzservices.providers as xyz
+rs.render_edges(edges, basemap=xyz.MapBox, api_key="pk.your_token")
 
 # a static PNG for a paper, through a real headless browser (pip install playwright)
 rs.snapshot(rs.render_edges(edges, view_3d=True), "fig.png",

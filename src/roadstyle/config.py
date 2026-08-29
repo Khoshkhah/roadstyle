@@ -79,6 +79,10 @@ class StyleConfig:
     #: clip buffer in extent units (bleed for strokes crossing tile edges)
     tiles: dict = field(default_factory=lambda: {"minzoom": 6, "maxzoom": 15,
                                                  "extent": 4096, "buffer_px": 80})
+    #: default API key / access token for basemaps (e.g. Mapbox, Stadia, MapTiler)
+    api_key: str | None = None
+    #: provider-specific API keys: {"mapbox": "...", "stadia": "...", ...}
+    api_keys: dict = field(default_factory=dict)
 
 
 def _default_config() -> StyleConfig:
