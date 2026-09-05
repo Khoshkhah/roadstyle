@@ -1,4 +1,4 @@
-# roadstyle
+![roadstyle — opinionated road cartography and interactive map styling for Python](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/assets/roadstyle-banner.svg)
 
 [![Tests](https://github.com/Khoshkhah/roadstyle/actions/workflows/test.yml/badge.svg)](https://github.com/Khoshkhah/roadstyle/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Khoshkhah/roadstyle/blob/main/LICENSE)
@@ -40,6 +40,8 @@ a scriptable JavaScript API.
   `rsSelect`, …) with `rs:*` events, so the saved map can power your own dashboard.
 - **Three backends** — `web` (MapLibre, the flagship), `folium` (Leaflet, legends), `lonboard`
   (GPU, millions of edges).
+
+![The geometry sandwich: a dark casing layer, the data-driven fill on top of it, then 3D bridge decks above both](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/assets/roadstyle-sandwich.svg)
 
 ## Installation
 
