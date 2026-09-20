@@ -120,6 +120,11 @@ class Basemap:
     subdomains: str = "abc"
 
 
+# NOTE: every basemaps.cartocdn.com entry below (voyager, voyager_nolabels, positron,
+# dark_matter) is now served WATERMARKED — a keyless tile comes back stamped "API KEY
+# REQUIRED", unconditionally: the response is byte-identical with or without a browser
+# Referer. They need a CARTO API key to render clean. The esri_* and osm entries are
+# keyless and unstamped; esri_street / esri_dark_gray are the drop-in replacements.
 BASEMAPS: dict[str, Basemap] = {
     "voyager": Basemap(
         "voyager", "Voyager",
@@ -151,6 +156,18 @@ BASEMAPS: dict[str, Basemap] = {
         "esri_gray", "Light Gray",
         "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
         _ESRI_ATTR, bg="linear-gradient(180deg,#eceff1,#d8dde1)", preview=("#9aa", "#ccc", "#9aa")),
+    "esri_street": Basemap(
+        # the keyless stand-in for CARTO's voyager: coloured, labelled, street-level
+        "esri_street", "Streets",
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+        _ESRI_ATTR, bg="linear-gradient(180deg,#f2efe9,#e8e4db)",
+        preview=("#e8a33d", "#f4f1ea", "#a8c8e8")),
+    "esri_dark_gray": Basemap(
+        # the keyless stand-in for dark_matter
+        "esri_dark_gray", "Dark Gray",
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+        _ESRI_ATTR, is_dark=True, bg="linear-gradient(180deg,#3a3f45,#25292e)",
+        preview=("#22d3a3", "#9ec5fe", "#5b6573")),
     "satellite": Basemap(
         "satellite", "Satellite",
         "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
@@ -232,11 +249,35 @@ def _basemap_from_provider(tp, api_key: str | None = None) -> Basemap:
                    is_dark=is_dark)
 
 
+def _warn_unkeyed(url: str, resolved_key: str | None) -> None:
+    """Say so when a CARTO base map is about to render watermarked.
+
+    CARTO stamps a keyless tile "API KEY REQUIRED" and still answers 200, so nothing downstream
+    can tell: the request succeeds, the image arrives, the map looks built. A page published that
+    way is wrong in the one way nobody checks, and it stayed wrong for a day on a site whose
+    nightly job reported success throughout.
+
+    A warning and not an exception, deliberately. The map still draws, and a deployment that fails
+    its whole night over a watermark is worse than one that says the watermark is there. It goes
+    to stderr, which is where a nightly job's health is read from.
+    """
+    if resolved_key or "cartocdn.com" not in (url or ""):
+        return
+    import warnings
+    warnings.warn(
+        "CARTO base map requested with no API key: the tiles will come back stamped "
+        "'API KEY REQUIRED'. Set one in roadstyle.json, or use a keyless base map "
+        "(esri_street, esri_dark_gray, osm).",
+        stacklevel=3,
+    )
+
+
 def get_basemap(key: str | Basemap, api_key: str | None = None) -> Basemap:
     """Resolve a base map from a registered key, a :class:`Basemap`, or an
     ``xyzservices.TileProvider`` (duck-typed via its ``build_url`` method)."""
     if isinstance(key, Basemap):
         resolved_key = api_key or get_api_key(key.key) or get_api_key("carto" if "cartocdn.com" in key.url else None)
+        _warn_unkeyed(key.url, resolved_key)
         if resolved_key and key.url:
             new_url = _inject_token(key.url, resolved_key)
             if new_url != key.url:
@@ -251,6 +292,7 @@ def get_basemap(key: str | Basemap, api_key: str | None = None) -> Basemap:
             bm = BASEMAPS[key]
             provider = "carto" if "cartocdn.com" in bm.url else key
             resolved_key = api_key or get_api_key(provider) or get_api_key(key) or get_api_key()
+            _warn_unkeyed(bm.url, resolved_key)
             if resolved_key and bm.url:
                 new_url = _inject_token(bm.url, resolved_key)
                 if new_url != bm.url:
