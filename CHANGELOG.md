@@ -6,6 +6,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-09-26
+
 ### Added
 - **`rs.render_street_view(edges)`**: a page with the map and Google Street View side by side.
   Click a road and Street View shows it, looking the way the edge runs (no new window, no API
