@@ -25,7 +25,7 @@ rs.render_edges(edges, palette="mono",                   # colour by your own co
   "colour by" options in one map.
 - **Google Street View**: click a road to see it, looking along it, in a floating window from the
   map's Street View button (default), or on a side-by-side page (`rs.render_street_view`);
-  see [Street View](web-backend.md#google-street-view).
+  see [Street View](street-view.md).
 - **Scriptable**: every control has a `window.rs*` twin, plus `rsQuery` id sets and `rs:*` events.
 - **Other outputs**: folium, lonboard (GPU, millions of edges), or a JSON spec for your own frontend.
 - **No code needed**: the `roadstyle` CLI and the `roadstyle studio` workbench.

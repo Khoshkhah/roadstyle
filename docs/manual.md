@@ -14,8 +14,9 @@ Install first ([Home](index.md#install)); every keyword is in the [Parameter ref
 
 ## 1. Your first map
 
-Load road edges and render. `backend="web"` is the default: a self-contained MapLibre map you can
-ship as one file, opening from disk with no server and no internet.
+Load road edges and render. The result is a self-contained MapLibre map you can ship as one file:
+it opens from disk with no server (only Google Street View needs the page served), and with the
+`blank` base map it needs no internet either.
 
 ```python
 import geopandas as gpd
@@ -26,7 +27,7 @@ rs.render_edges(edges).save("first_map.html")         # web backend, Voyager bas
 ```
 
 You get the OSM "geometry sandwich" (coloured fills over casings), per-zoom widths, two-way lanes,
-one-way arrows, street-name labels, hover/click, a [Street View button](web-backend.md#google-street-view) that shows the clicked road in a floating window, and a base-layer switcher — try them in the map.
+one-way arrows, street-name labels, hover/click, a [Street View button](street-view.md) that shows the clicked road in a floating window, and a base-layer switcher — try them in the map.
 Prefer a dark canvas? Pass `basemap="dark_matter"` (Dark Matter) or `basemap="satellite"`.
 
 <iframe src="../maps/first_map.html" loading="lazy" title="A first roadstyle map"
@@ -110,11 +111,11 @@ roadstyle adds a **Colour by** dropdown. A neutral base reads best, so pair it w
 `palette="mono"`:
 
 ```python
-rs.render_edges(edges, backend="web", palette="mono",
-    color_options={
-        "Class": {},                                       # neutral mono base
+rs.render_edges(edges, palette="mono",
+    color_options={                                        # the first one shows on open
         "AADT":  {"color_by": "aadt",  "cmap": "viridis"},
         "Speed": {"color_by": "speed_kph", "cmap": "magma"},
+        "Class": {},                                       # the neutral mono base
     },
 ).save("recolor.html")
 ```
@@ -122,7 +123,7 @@ rs.render_edges(edges, backend="web", palette="mono",
 <iframe src="../maps/recolor.html" loading="lazy" title="Switchable data-driven colouring"
         style="width:100%;height:480px;border:0;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.18)"></iframe>
 
-*Use the **Colour by** dropdown (top-right) to switch between road class, AADT, and speed. The legend
+*Use the **Colour by** dropdown (top-left) to switch between AADT, speed and road class. The legend
 (bottom-left) follows the active option. Roads keep their width/casing/lanes — only the fill swaps.*
 
 Two things worth knowing:
@@ -169,7 +170,7 @@ the road-styling compiler.
 from shapely.geometry import box, Point
 
 # (here: synthetic zones + POIs — in practice your own GeoDataFrames)
-rs.render_edges(edges, backend="web", palette="mono",
+rs.render_edges(edges, palette="mono",
     overlays=[
         rs.Overlay(taz,  kind="fill",   placement="under", color="#6aa9ff",
                    opacity=0.14, label="TAZ zones", popup=["taz_id", "name", "weight"]),
@@ -183,7 +184,7 @@ rs.render_edges(edges, backend="web", palette="mono",
         style="width:100%;height:480px;border:0;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.18)"></iframe>
 
 *Translucent **TAZ zones** sit under the roads; red **POIs** sit on top. Click a zone or a POI for
-its popup; use the **Layers** control (bottom-right) to toggle each overlay. (What's drawn on top wins
+its popup; use the **Layers** control (bottom-right, above the base-map button) to toggle each overlay. (What's drawn on top wins
 the click: a POI (`placement="over"`) before the roads, the roads before a zone underneath.)*
 
 `kind` is auto-detected from the geometry (polygon → `fill`, point → `circle`, line → `line`) but can
@@ -195,7 +196,7 @@ be forced. See [`Overlay`](parameters.md#overlay-extra-layers) for every field.
 
 Both web outputs let you build a **custom panel** instead of (or alongside) the built-in controls.
 
-**Web backend (`render_edges(backend="web")`).** The page exposes `window.rs*` globals you can call
+**The web map (`render_edges`).** The page exposes `window.rs*` globals you can call
 from any HTML you add to it (`m.html` is the page as a string; append before `</body>`):
 
 ```html

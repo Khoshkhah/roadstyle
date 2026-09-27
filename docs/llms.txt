@@ -21,6 +21,7 @@ Edges are directed: a two-way road is two edges with reversed geometry. JS calls
 - [Manual](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/manual.md): the walk-through, from the first map to colouring by data, overlays, loading data and web output
 - [Embedding](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/embedding.md): iframe, the JSON spec, roadstyle.js, Leaflet and MapLibre
 - [Choosing an engine](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/engines.md): web vs folium vs lonboard, and vs .explore(), prettymaps, kepler.gl
+- [Street View](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/street-view.md): the floating window (every map) and the side-by-side page (beside or below the map)
 - [Gallery](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/gallery.md): one screenshot and recipe per look
 
 ## Optional

@@ -40,6 +40,7 @@ nav:
   - Home: index.md
   - Manual: manual.md
   - Gallery: gallery.md
+  - Street View: street-view.md
   - Studio: studio.md
   - Web:
       - Web backend & JS API: web-backend.md

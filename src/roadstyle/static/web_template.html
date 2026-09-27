@@ -97,7 +97,8 @@ padding:8px 11px;font:12px system-ui,sans-serif;color:#16181d}
   font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#767c88}
 .co-lg.collapsed .co-lg-body{display:none}
 .co-lg.collapsed{padding-bottom:8px}
-.ov-ctrl{position:absolute;bottom:24px;right:10px;z-index:2;background:#fff;border-radius:8px;
+.ov-ctrl{position:absolute;bottom:88px;right:calc(10px + var(--rs-side,0px));z-index:2;   /* above the base-map button */
+background:#fff;border-radius:8px;
 box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px system-ui,sans-serif;color:#16181d}
 .ov-ctrl .ov-hd{padding:8px 11px 6px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#767c88}
 .ov-ctrl .ov-body{padding:0 11px 8px;display:flex;flex-direction:column;gap:3px}
@@ -135,7 +136,7 @@ box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px
 .rs-svw.rs-drag iframe{pointer-events:none}
 .maplibregl-ctrl-group button.rs-on{background:#dfe9ff}
 .rs-svm{pointer-events:none}
-@media (max-width:700px){.rs-svw{left:0!important;right:0!important;top:auto!important;bottom:0!important;
+@media (max-width:520px){.rs-svw{   /* phones only: a docs column is ~690 px */left:0!important;right:0!important;top:auto!important;bottom:0!important;
   width:auto!important;height:45%!important;border-radius:10px 10px 0 0;resize:none}}
 </style></head><body>
 <div id="map"></div><script>
@@ -313,7 +314,7 @@ if(_svWindow){
     if(!last) return; last.url=e.detail.streetView; ends(e.detail.atStart, e.detail.atEnd); show();
   });
   rsSetStreetView=function(on){
-    w.hidden=!on; if(on && innerWidth>700) place(); rsSetStreetViewMarker(!!on);
+    w.hidden=!on; if(on && innerWidth>520) place(); rsSetStreetViewMarker(!!on);
     st.open=!!on; save(); if(btn) btn.classList.toggle("rs-on", !!on); show();
     document.dispatchEvent(new CustomEvent("rs:streetviewchange", {detail:{open:!!on}}));
   };
@@ -329,7 +330,7 @@ if(_svWindow){
     bar.addEventListener("pointerup", ()=>{ bar.removeEventListener("pointermove", mv);
       w.classList.remove("rs-drag"); save(); }, {once:true});
   });
-  new ResizeObserver(()=>{ if(!w.hidden && innerWidth>700){ st.w=w.offsetWidth; st.h=w.offsetHeight; save(); } }).observe(w);
+  new ResizeObserver(()=>{ if(!w.hidden && innerWidth>520){ st.w=w.offsetWidth; st.h=w.offsetHeight; save(); } }).observe(w);
   map.addControl({onAdd(){
     const d=document.createElement("div"); d.className="maplibregl-ctrl maplibregl-ctrl-group";
     btn=document.createElement("button"); btn.type="button"; btn.title="Street View";

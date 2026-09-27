@@ -71,10 +71,12 @@ def test_street_view_width_and_divider_are_options():
         rs.render_street_view(_edges(), panel_width=95)
 
 
-def test_street_view_vertical_layout():
+def test_street_view_below_layout():
     import pytest
-    h = rs.render_street_view(_edges(), layout="vertical").html
-    assert '<div id="sv" data-layout="vertical">' in h and "body.sv-vertical #sv" in h
-    assert '<div id="sv" data-layout="horizontal">' in rs.render_street_view(_edges()).html
+    h = rs.render_street_view(_edges(), layout="below").html
+    assert '<div id="sv" data-layout="below">' in h and "body.sv-below #sv" in h
+    assert '<div id="sv" data-layout="beside">' in rs.render_street_view(_edges()).html
+    # the phone layout only on phones: a docs text column (~690 px) keeps the side-by-side page
+    assert "@media (max-width: 520px)" in h
     with pytest.raises(ValueError):
         rs.render_street_view(_edges(), layout="diagonal")

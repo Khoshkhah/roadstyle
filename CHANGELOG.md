@@ -7,12 +7,22 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
-- **`rs.render_street_view(..., layout="vertical")`** (CLI `--layout vertical`): the map on top and
+- **`rs.render_street_view(..., layout="below")`** (CLI `--layout below`): the map on top and
   Street View under it, with a divider dragged up and down; `panel_width` is then its share of the
-  height. `"horizontal"` (beside the map) stays the default.
+  height. `"beside"` (next to the map) stays the default.
 
 ### Changed
 - The side-by-side page's header is one compact row (title · road name, then ◀ ▶) instead of two.
+- The Street View pages switch to their phone layout only under 520 px (was 700): a docs page's
+  text column (~690 px on a laptop) showed the side-by-side page stacked, without its divider, and
+  the floating window as a full-width sheet.
+- Docs: a **Street View** page with a live demo of each version (the floating window, beside the
+  map, below the map); the Manual's colour-by demo opens on the data, its samples drop the
+  default `backend="web"`.
+
+### Fixed (layout)
+- The overlay **Layers** control sat on top of the base-map button; it now sits above it (and
+  follows a host page's side panel like the button).
 
 ### Fixed
 - Stepping Street View along a road (◀ ▶) pans the map when the marker nears its edge, so the

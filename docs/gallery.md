@@ -96,7 +96,7 @@ rs.render_edges(edges)                     # the button is the default: street_v
 ## Map and Street View side by side
 
 A page with Street View beside the map, following the clicked road; drag the divider to share the
-width. [Live demo and details](web-backend.md#map-and-street-view-side-by-side).
+width. [Live demos and details](street-view.md#2-side-by-side).
 
 ```python
 rs.render_street_view(edges)               # CLI: roadstyle edges.gpkg --page street-view
@@ -107,10 +107,10 @@ rs.render_street_view(edges)               # CLI: roadstyle edges.gpkg --page st
 Or with Street View under the map:
 
 ```python
-rs.render_street_view(edges, layout="vertical")   # CLI: --page street-view --layout vertical
+rs.render_street_view(edges, layout="below")   # CLI: --page street-view --layout below
 ```
 
-![map with street view under it](img/gallery/street_view_vertical.png)
+![map with street view under it](img/gallery/street_view_below.png)
 
 ## The sidebar dashboard (UI template)
 

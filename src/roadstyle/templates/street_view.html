@@ -16,7 +16,7 @@
   .sv-step { border: 1px solid #ccc; background: #fff; border-radius: 4px; padding: 1px 7px; cursor: pointer; }
   .sv-step:disabled { opacity: .35; cursor: default; }
   #sv [hidden] { display: none !important; }
-  /* the divider: drag it to share the width (or, vertical, the height) between map and Street View */
+  /* the divider: drag it to share the width (or, below, the height) between map and Street View */
   #sv-drag { position: fixed; top: 0; bottom: 0; right: var(--sv-w); width: 10px; margin-right: -5px;
              cursor: col-resize; z-index: 5; touch-action: none; }
   #sv-drag::after { content: ""; position: absolute; top: 50%; left: 3px; width: 4px; height: 40px;
@@ -29,20 +29,21 @@
               justify-content: center; gap: 8px; color: #777; background: #f4f4f4;
               padding: 20px; text-align: center; }
   #sv-empty code { background: #e6e6e6; padding: 2px 5px; border-radius: 3px; color: #333; }
-  /* layout="vertical": the map on top, Street View under it, the divider between them */
-  body.sv-vertical { --rs-side: 0px; }
-  body.sv-vertical #map { right: 0; bottom: var(--sv-w); }
-  body.sv-vertical .bm-icon { bottom: calc(var(--sv-w) + 44px); }
-  body.sv-vertical .bm-menu { bottom: calc(var(--sv-w) + 84px); }
-  body.sv-vertical .rs-zoom { bottom: calc(var(--sv-w) + 10px); }
-  body.sv-vertical .rs-tl { max-height: calc(100% - var(--sv-w) - 20px); }  /* the filter stays on the map */
-  body.sv-vertical #sv { top: auto; left: 0; width: auto; height: var(--sv-w);
+  /* layout="below": the map on top, Street View under it, the divider between them */
+  body.sv-below { --rs-side: 0px; }
+  body.sv-below #map { right: 0; bottom: var(--sv-w); }
+  body.sv-below .bm-icon { bottom: calc(var(--sv-w) + 44px); }
+  body.sv-below .bm-menu { bottom: calc(var(--sv-w) + 84px); }
+  body.sv-below .rs-zoom { bottom: calc(var(--sv-w) + 10px); }
+  body.sv-below .rs-tl { max-height: calc(100% - var(--sv-w) - 20px); }  /* the filter stays on the map */
+  body.sv-below #sv { top: auto; left: 0; width: auto; height: var(--sv-w);
                          border-left: 0; border-top: 1px solid #ddd; }
-  body.sv-vertical #sv-drag { top: auto; left: 0; right: 0; bottom: var(--sv-w); width: auto;
+  body.sv-below #sv-drag { top: auto; left: 0; right: 0; bottom: var(--sv-w); width: auto;
                               height: 10px; margin: 0 0 -5px 0; cursor: row-resize; }
-  body.sv-vertical #sv-drag::after { top: 3px; left: 50%; width: 40px; height: 4px; margin: 0 0 0 -20px; }
-  body.sv-vertical.sv-dragging { cursor: row-resize; }
-  @media (max-width: 700px) {          /* phones: Street View under the map, not beside it */
+  body.sv-below #sv-drag::after { top: 3px; left: 50%; width: 40px; height: 4px; margin: 0 0 0 -20px; }
+  body.sv-below.sv-dragging { cursor: row-resize; }
+  @media (max-width: 520px) {          /* phones only: Street View under the map, not beside it.
+                                          Not 700: a docs page's text column is ~690 px */
     #map { right: 0; bottom: 45%; }
     body { --rs-side: 0px; }
     .bm-icon { bottom: calc(45% + 44px); }
@@ -54,7 +55,7 @@
   }
 </style>
 <div id="sv-drag" title="Drag to resize"></div>
-<div id="sv" data-layout="horizontal">
+<div id="sv" data-layout="beside">
   <div id="sv-bar"><h2>Roads and Street View</h2><span id="sv-road">Click a road to see it in Street View.</span>
     <button type="button" class="sv-step" data-step="-15" title="Back 15 m along the road" disabled>&#9664;</button>
     <button type="button" class="sv-step" data-step="15" title="Forward 15 m along the road" disabled>&#9654;</button></div>
@@ -69,8 +70,8 @@
   //   "https://www.google.com/maps/embed/v1/streetview?key=KEY&location=" + lat + "," + lng + "&heading=" + h
   const embed = (lat, lng, h) =>
     "https://www.google.com/maps/embed?pb=!6m7!1m6!2m2!1d" + lat + "!2d" + lng + "!3f" + h + "!4f0!5f1";
-  const vertical = document.getElementById("sv").dataset.layout === "vertical";
-  if (vertical) document.body.classList.add("sv-vertical");
+  const below = document.getElementById("sv").dataset.layout === "below";
+  if (below) document.body.classList.add("sv-below");
   const road = document.getElementById("sv-road"), frame = document.getElementById("sv-frame"),
         empty = document.getElementById("sv-empty");
   // Google's embed stays grey in a page opened from disk (file://): say how to serve it instead
@@ -117,7 +118,7 @@
 
   // the divider (resizable=False removes it): the panel width follows the pointer, 20%..80% of
   // the window, and is remembered in this browser
-  const KEY = "rs-street-view-width" + (vertical ? "-v" : ""), drag = document.getElementById("sv-drag");
+  const KEY = "rs-street-view-width" + (below ? "-below" : ""), drag = document.getElementById("sv-drag");
   if (drag) {
   const setW = pct => {
     pct = Math.min(80, Math.max(20, pct));
@@ -129,7 +130,7 @@
   });
   drag.addEventListener("pointermove", e => {
     if (drag.hasPointerCapture(e.pointerId))
-      setW((1 - (vertical ? e.clientY / window.innerHeight : e.clientX / window.innerWidth)) * 100);
+      setW((1 - (below ? e.clientY / window.innerHeight : e.clientX / window.innerWidth)) * 100);
   });
   drag.addEventListener("pointerup", e => {
     drag.releasePointerCapture(e.pointerId); document.body.classList.remove("sv-dragging");

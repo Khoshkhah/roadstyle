@@ -35,10 +35,10 @@ rs.render_edges(g, backend="web", name="roadstyle — first map").save(OUT / "fi
 # 2 — dynamic recolour: a neutral mono base + a "Colour by" picker (Class / AADT / Speed)
 rs.render_edges(
     g, backend="web", palette="mono",
-    color_options={
-        "Class": {},
+    color_options={                      # the first one shows on open: the data, not grey
         "AADT": {"color_by": "aadt", "cmap": "viridis"},
         "Speed": {"color_by": "speed_kph", "cmap": "magma"},
+        "Class": {},
     },
     name="roadstyle — colour by your data",
 ).save(OUT / "recolor.html")
@@ -81,8 +81,13 @@ OPEN_ON = """<script>(function () {
 })();</script>"""
 html = rs.render_street_view(g, name="Roads and Street View").html
 (OUT / "street_view.html").write_text(html.replace("</body>", OPEN_ON + "</body>", 1), encoding="utf-8")
-html = rs.render_street_view(g, name="Roads and Street View", layout="vertical").html
-(OUT / "street_view_vertical.html").write_text(html.replace("</body>", OPEN_ON + "</body>", 1),
+# the floating window on an ordinary map, opened on Götgatan (the demo of street_view="window")
+OPEN_WINDOW = OPEN_ON.replace("rsFocus(id, {maxZoom: 16}); }", "rsFocus(id, {maxZoom: 16}); rsSetStreetView(true); }")
+html = rs.render_edges(g, name="roadstyle: the Street View window", road_popup=False).html
+(OUT / "street_view_window.html").write_text(html.replace("</body>", OPEN_WINDOW + "</body>", 1),
+                                             encoding="utf-8")
+html = rs.render_street_view(g, name="Roads and Street View", layout="below").html
+(OUT / "street_view_below.html").write_text(html.replace("</body>", OPEN_ON + "</body>", 1),
                                                encoding="utf-8")
 
 for f in sorted(OUT.glob("*.html")):

@@ -20,7 +20,7 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | `render_edges(gdf, ...)` | `WebMap` / `folium.Map` / `lonboard.Map` | the main entry point — every keyword [below](#render_edges) |
 | `render_dashboard(gdf, **kw)` | `WebMap` | **dashboard** page: the map with built-in controls off + the bundled sidebar (query box, colour-by, class filter + legend, results table, read-out) |
 | `render_report(gdf, **kw)` | `WebMap` | **report** page: the map + a stats sidebar (KPI cards, colour-by legend, filter, search, selected-road read-out) |
-| `render_street_view(gdf, *, panel_width=42, resizable=True, layout="horizontal", **kw)` | `WebMap` | **map + Google Street View** page: click a road, Street View beside the map (or under it: `layout="vertical"`) looks along it; a draggable divider unless `resizable=False` ([details](web-backend.md#map-and-street-view-side-by-side)) |
+| `render_street_view(gdf, *, panel_width=42, resizable=True, layout="beside", **kw)` | `WebMap` | **map + Google Street View** page: click a road, Street View beside the map (or under it: `layout="below"`) looks along it; a draggable divider unless `resizable=False` ([details](street-view.md#2-side-by-side)) |
 | `sidebar_html(name)` | `str` | the bundled sidebar fragment (`"dashboard"` / `"report"` / `"street_view"`) — reshape it and re-inject before `</body>` |
 | `snapshot(map_or_html, out_path, *, center, zoom, pitch, bearing, width=1200, height=800, scale=1, settle=2.5, timeout=40)` | path | static PNG via headless Chromium (needs `playwright`) |
 
@@ -153,7 +153,7 @@ Every keyword after `gdf` is keyword-only. **On** says which backends read it: *
 | `popup_mode` | `None` / `"popup"` / `"panel"` | `None` | web | `"panel"` docks the read-out as a full-height side panel (with [search](web-backend.md#built-in-search-panel-mode)) and combines with any `road_popup` field spec; `None` = `"popup"` (floating). |
 | `road_tooltip` | bool / list | `False` | web | **Hover** tooltip: `True` = every column, a list = those columns, `False` = off. |
 | `tooltip` | list / `None` | `None` | web, folium | Hover columns, the cross-backend name. Web: an alias for `road_tooltip` (used when that is unset); `None` = no tooltip. Folium: `None` = **all** columns. |
-| `street_view` | `"window"` / bool | `"window"` | web | Google Street View of the clicked road, facing the edge's direction (no API key). `"window"`: a map button opening a floating window that follows the clicked road; `True`: a plain link in the read-out instead; `False`: none. The URL is also sent as `rs:select`'s `detail.streetView`. See [Street View](web-backend.md#google-street-view). |
+| `street_view` | `"window"` / bool | `"window"` | web | Google Street View of the clicked road, facing the edge's direction (no API key). `"window"`: a map button opening a floating window that follows the clicked road; `True`: a plain link in the read-out instead; `False`: none. The URL is also sent as `rs:select`'s `detail.streetView`. See [Street View](street-view.md). |
 | `hover_color` / `select_color` | hex str | `"#b388ff"` / `"#7c4dff"` | web | Highlight colour of the hovered / selected road. |
 | `selected` | GeoDataFrame / `None` | `None` | folium | Edges to highlight with a neon-violet overlay. On web use `rsHighlight` / `rsColor` or a `color_options` entry. |
 | `legend_position` | str | `"bottomleft"` | folium | Legend corner. |
