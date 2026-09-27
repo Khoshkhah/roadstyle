@@ -29,6 +29,15 @@ def test_folium_render_returns_map():
     assert isinstance(m, folium.Map)
 
 
+def test_folium_ignores_web_only_keywords():
+    """A web-only keyword (tiles=True clashed with folium.Map's own `tiles`) is dropped, not
+    forwarded, so one call can switch backends."""
+    import folium
+    m = render_edges(_edges(), tiles=True, view_3d=True, street_view=False, hover_color="#f00",
+                     color_options={"Class": {}}, compress=False)
+    assert isinstance(m, folium.Map)
+
+
 def test_folium_render_all_basemaps_and_palettes():
     import folium
     for basemap in ("voyager", "dark_matter", "satellite"):

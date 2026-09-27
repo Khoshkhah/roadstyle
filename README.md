@@ -18,7 +18,7 @@ pip install roadstyle              # core
 pip install "roadstyle[all]"       # + studio, numeric ramps, vector tiles, lonboard, DuckDB, …
 ```
 
-Python ≥ 3.10. Individual extras and the dev setup: [Usage → Install](https://khoshkhah.github.io/roadstyle/usage/#install).
+Python ≥ 3.10. Individual extras and the dev setup: [Install](https://khoshkhah.github.io/roadstyle/#install).
 
 ## Quickstart
 
@@ -91,9 +91,9 @@ Full API: [web backend → JavaScript API](https://khoshkhah.github.io/roadstyle
 [every parameter](https://khoshkhah.github.io/roadstyle/parameters/) ·
 [web backend & JS API](https://khoshkhah.github.io/roadstyle/web-backend/) ·
 [palettes & settings](https://khoshkhah.github.io/roadstyle/palettes/) ·
-[base maps & API keys](https://khoshkhah.github.io/roadstyle/usage/#base-maps-api-keys) ·
+[base maps & API keys](https://khoshkhah.github.io/roadstyle/palettes/#base-maps-api-keys) ·
 [web vs folium vs lonboard](https://khoshkhah.github.io/roadstyle/engines/) ·
-[vs .explore() / kepler.gl](https://khoshkhah.github.io/roadstyle/comparison/) ·
+[vs .explore() / kepler.gl](https://khoshkhah.github.io/roadstyle/engines/#roadstyle-vs-other-tools) ·
 [changelog](https://github.com/Khoshkhah/roadstyle/blob/main/CHANGELOG.md)
 
 ## License

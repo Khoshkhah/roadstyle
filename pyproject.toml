@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "roadstyle"
 version = "0.4.1"
-description = "Opinionated OSM-theme road/edge map styling for folium, lonboard & the web (data-driven palettes, casing, themes)"
+description = "Road cartography for Python: turn road edges into styled, interactive, offline HTML maps (MapLibre) with a JavaScript API"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -42,7 +42,7 @@ arrow = ["pyarrow"]                        # read edges from a pyarrow Table
 tiles = ["mapbox-vector-tile", "pmtiles"]  # tiles=True: embedded-PMTiles vector road tiles
 studio = ["streamlit"]                     # the `roadstyle studio` Streamlit workbench
 all = ["roadstyle[numeric,basemaps,lonboard,duckdb,arrow,tiles,studio]"]  # every user-facing extra
-docs = ["mkdocs-material"]
+docs = ["mkdocs-material", "mkdocs-redirects"]
 dev = ["roadstyle[all]", "pytest", "ruff", "mypy"]  # everything a user can get + test/lint tools
 
 [project.scripts]

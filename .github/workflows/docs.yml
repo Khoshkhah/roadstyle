@@ -40,7 +40,7 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: Install docs dependencies
-        run: pip install mkdocs-material
+        run: pip install mkdocs-material mkdocs-redirects
 
       # First run flips the Pages source from the gh-pages branch to GitHub
       # Actions; subsequent runs are a no-op.

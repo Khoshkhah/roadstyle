@@ -1,24 +1,49 @@
 # Embedding maps in a website
 
-roadstyle can output a **stack-agnostic JSON spec** (`to_spec`) plus ready-to-use HTML, so you
-can put a styled road map into any web page — from "drop in an iframe, write zero code" to
-"feed the JSON to my own Leaflet / MapLibre frontend".
+roadstyle is a **Python library**: it runs in Python and produces maps or JSON. There are three
+ways to get one of its maps onto a web page:
+
+| Path | Who computes the style | Python at runtime? | Effort | Use when |
+|---|---|---|---|---|
+| **1. Baked HTML / iframe** | Python, once, ahead of time | No (a pre-generated file) | none | a static site, a report, a quick embed |
+| **2. JSON API** | Python, per request | Yes (a server) | small | a live app whose data changes; your own Leaflet / MapLibre map draws it |
+| **3. roadstyle.js spec page** | Python, baked into the spec | No (or a server for fresh specs) | small | roadstyle's own renderer inside your page, driven from your JavaScript |
+
+In every path the browser never needs roadstyle's styling logic: each road's resolved style is
+baked into per-feature `__rs_*` properties ([the JSON spec](#the-canonical-json-spec)), and the
+browser only reads them.
+
+**Which to use:**
+
+- **No front-end code / just need it on a page** → Path 1. Prefer the `web` map
+  (`render_edges(...).save(...)`): zoom-correct widths, two-way lanes, grade separation, 3D,
+  offline. Its saved page is scriptable too (`window.rs*`), so a dashboard can be plain HTML
+  built *around* it — see [the web-backend JS API](web-backend.md#the-javascript-api-windowrs) and
+  the copyable [`ui/` templates](https://github.com/Khoshkhah/roadstyle/tree/main/ui).
+- **A live app, data changes** → Path 2: a small endpoint returns `to_spec(...)`. Already have a
+  Leaflet map → [the Leaflet snippet](#leaflet-your-own-map); vector tiles / GPU / lots of data →
+  [the MapLibre snippet](#maplibre-gl-vector-webgl); a React/Vue app → feed `spec.geojson` to
+  your map component with the same `__rs_*` accessors.
+- **You want roadstyle's renderer but your own UI around it** (click handlers, a custom colour
+  picker, side panels) → Path 3, the [`RoadStyleMap` API](#the-roadstylemap-js-api-events-recolour-custom-panels).
+
+[Choosing an engine](engines.md) has the full feature matrix.
 
 ## What the outputs are
 
 | Call | Returns | Use when |
 |---|---|---|
+| `render_edges(gdf).save("map.html")` | writes a file | the finished MapLibre (`web`) map — Path 1 |
 | `to_spec(gdf, ...)` | `dict` (JSON) | you (or a frontend dev) will render it yourself |
 | `to_geojson(gdf, ...)` | `dict` (FeatureCollection) | you only need the styled GeoJSON |
-| `to_html(gdf, full=True)` | `str` (full page) | you want a complete `.html` page |
-| `to_html(gdf, full=False)` | `str` (`<div>+<script>`) | you want to inject a map into an existing page |
+| `to_html(gdf, full=True)` | `str` (full page) | a complete roadstyle.js page |
+| `to_html(gdf, full=False)` | `str` (`<div>+<script>`) | inject a roadstyle.js map into an existing page |
 | `to_iframe(gdf)` | `str` (`<iframe srcdoc=…>`) | **easiest — no front-end code at all** |
-| `save(gdf, "map.html", ...)` | writes a file | a standalone interactive map file |
+| `save(gdf, "map.html", ...)` | writes a file | a standalone roadstyle.js map file |
 | `save_spec(gdf, "map.json", ...)` | writes a file | the JSON for a frontend / API |
 
-All of them take the same styling arguments as
-[`render_edges`](parameters.md#2-render_edges-the-main-entry-point) (`color_by`, `cmap`,
-`colors`, `width_by`, …).
+All of them take the same styling arguments as [`render_edges`](parameters.md) (`color_by`,
+`cmap`, `colors`, `width_by`, …).
 
 ## The canonical JSON spec
 
@@ -67,27 +92,60 @@ it doesn't need roadstyle's logic:
 
 ---
 
-## Option 1 — iframe (no front-end code)
+## Path 1 — baked HTML / iframe
 
-The simplest path. `to_iframe` returns a self-contained `<iframe>` you paste anywhere.
+Python writes a finished, self-contained map; you drop it into a page. No frontend code, no
+server. `to_iframe` returns an `<iframe>` you paste anywhere:
 
 ```python
 html = rs.to_iframe(edges, color_by="aadt", cmap="viridis", height="600px")
-# paste `html` into your page, or write it to a template
 ```
 
-Or save a standalone file and point an `<iframe>` at it:
+Or save a file and point an `<iframe>` at it — the `web` map or a roadstyle.js page:
 
 ```python
-rs.save(edges, "roads.html", color_by="aadt", cmap="viridis")
+rs.render_edges(edges, color_by="aadt", cmap="viridis").save("roads.html")   # web (MapLibre)
+rs.save(edges, "roads.html", color_by="aadt", cmap="viridis")                # roadstyle.js page
 ```
 ```html
 <iframe src="roads.html" style="width:100%;height:600px;border:0;"></iframe>
 ```
 
-## Option 2 — Leaflet (your own map)
+Trade-off: the map is a snapshot — to show new data, re-run Python and regenerate the file.
 
-Serve the spec JSON, then style each feature from its `__rs_*` props:
+## Path 2 — JSON API (Python serves, JavaScript draws)
+
+A small endpoint calls `to_spec()` and returns the styled JSON; your browser map fetches and
+draws it. Python still computes the styling, so roadstyle stays the single source of truth for
+the cartography. Usually the most practical path for a live app (filters, uploads, fresh traffic).
+
+```
+Browser  ──GET /roads.json──▶  Python API  ──▶  roadstyle.to_spec(edges, ...)
+Browser  ◀──── styled JSON ───  (a dict with geojson + __rs_* props + legend + basemap)
+Leaflet / MapLibre / deck.gl draws it
+```
+
+With FastAPI (Flask / Django are equivalent — return the dict as JSON):
+
+```python
+# server.py
+from fastapi import FastAPI
+import geopandas as gpd
+import roadstyle as rs
+
+app = FastAPI()
+edges = gpd.read_file("edges.gpkg")          # or load per request / from a DB
+
+@app.get("/roads.json")
+def roads(color_by: str = "aadt", cmap: str = "viridis"):
+    return rs.to_spec(edges, color_by=color_by, cmap=cmap, basemap="dark_matter")
+```
+
+A static page can load a `save_spec` file the same way, with no server.
+
+### Leaflet (your own map)
+
+Fetch the spec, then style each feature from its `__rs_*` props:
 
 ```html
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
@@ -119,7 +177,7 @@ fetch("roads.json").then(r => r.json()).then(spec => {
 </script>
 ```
 
-## Option 3 — MapLibre GL (vector / WebGL)
+### MapLibre GL (vector / WebGL)
 
 Add the spec's GeoJSON as a source and two line layers reading the `__rs_*` props via
 `["get", ...]` expressions:
@@ -156,22 +214,15 @@ fetch("roads.json").then(r => r.json()).then(spec => {
 ```
 
 > MapLibre wants `[lon, lat]`; the spec's `bounds` are `[lat, lon]` (Leaflet order), hence the
-> `.reverse()`. A future roadstyle option may emit a zoom→width curve as a MapLibre
-> `["interpolate", ["linear"], ["zoom"], …]` expression for `line-width` (see
-> [parameters](parameters.md) — widths are fixed pixels today).
+> `.reverse()`. Spec widths are fixed pixels; only the `web` backend scales widths per zoom.
 
----
+## Path 3 — the roadstyle.js spec page
 
-## Which option for you?
+`to_html` / `save` / `to_iframe` inline a small renderer, `roadstyle.js`, that draws a spec. It
+reads the baked `__rs_*` props (it does not recompute styling) and exposes a JavaScript API,
+`RoadStyleMap`, so your page can react to it and drive it.
 
-- **No front-end experience / just need it on a page** → **Option 1 (iframe)**.
-- **You already have a Leaflet map** → **Option 2**.
-- **You use vector tiles / want GPU rendering / lots of data** → **Option 3 (MapLibre)**.
-- **A React/Vue app** → fetch the spec and feed `spec.geojson` to your map component using the
-  same `__rs_*` accessors shown above.
-
-
-## Reacting to a selection (click → your code)
+### Reacting to a selection (click → your code)
 
 `roadstyle.js` hands clicks back to your page so a custom UI can react. Register handlers in
 JavaScript (an `interaction_config.json` can't carry functions):
@@ -193,10 +244,9 @@ Selection is **single** — clicking another road replaces it; click the same ro
 the map background, to deselect (each fires `onDeselect`). You can also pass the handlers up front:
 `new RoadStyleMap("map", { onSelect, onDeselect })`.
 
-## The `RoadStyleMap` JS API (events, recolour, custom panels)
+### The `RoadStyleMap` JS API (events, recolour, custom panels)
 
-`roadstyle.js` is more than a renderer — it's a small API your page can drive. The built-in widgets
-are opt-in via `widgets`, but you can also build your **own** UI on top.
+The built-in widgets are opt-in via `widgets`, but you can also build your **own** UI on top.
 
 **Event bus.** `on(event, fn)` / `off(event, fn)` subscribe to map events; several listeners per
 event are fine (the legacy `onSelect`/`onDeselect` options still fire alongside them):
@@ -241,9 +291,16 @@ m.on("ready", map => {
 A worked page is in
 [`examples/recolor_custom_panel.py`](https://github.com/Khoshkhah/roadstyle/blob/main/examples/recolor_custom_panel.py).
 
-> On the **`web` (MapLibre) backend** the page is a rendered map, not a `RoadStyleMap` — it has
-> its own, larger JS surface: `window.rs*` setters for every control (`rsSetBasemap`,
-> `rsSetClasses`, `rsSetColorField`, `rsSetOverlay`, `rsSetView3D`, `rsSelect`/`rsDeselect`),
-> the id-set query verbs (`rsQuery` → `rsFilter`/`rsColor`/`rsHighlight`/`rsGetProps`/`rsFocus`),
-> and `rs:*` CustomEvents. See [the web-backend JS API](web-backend.md#the-javascript-api-windowrs)
-> and the copyable [`ui/` templates](https://github.com/Khoshkhah/roadstyle/tree/main/ui).
+> The **`web` (MapLibre) map** is not a `RoadStyleMap` — it has its own, larger JS surface:
+> `window.rs*` setters for every control (`rsSetBasemap`, `rsSetClasses`, `rsSetColorField`,
+> `rsSetOverlay`, `rsSetView3D`, `rsSelect`/`rsDeselect`), the id-set query verbs
+> (`rsQuery` → `rsFilter`/`rsColor`/`rsHighlight`/`rsGetProps`/`rsFocus`), and `rs:*`
+> CustomEvents. See [the web-backend JS API](web-backend.md#the-javascript-api-windowrs).
+
+## Not planned: a JavaScript styling port
+
+A browser-only roadstyle — the styling *logic* (palettes, the geometry sandwich, class → colour and
+numeric ramps) reimplemented in JavaScript, with no Python anywhere — would be a separate project
+(e.g. an npm package), not something this library emits. The groundwork exists: palette JSON
+(`save_palette`) is language-neutral and the `spec/1` / `__rs_*` contract is stable. It is only
+worth building if a JS-only runtime is a hard requirement; paths 1–3 cover everything else.

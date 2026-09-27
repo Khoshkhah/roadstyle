@@ -18,11 +18,17 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Changed
 - Field names in the click popup and the hover tooltip are **bold**, values plain.
+- Docs site merged from 15 pages to 9 (Home, Manual, Gallery, Studio, Web backend, Embedding,
+  Parameters & API, Palettes/base maps/settings, Engines); the old URLs redirect. Parameters &
+  API is now the one complete keyword reference, per backend.
+- PyPI summary rewritten; the CLI's `--palette` accepts `mono`.
 - README cut to a one-screen overview with a sharp 2x hero image (`docs/build_gallery.py`);
   the parameter tables live in the docs, base maps & API keys moved to `docs/usage.md`.
 
 ### Fixed
 - `rs.snapshot(html_string, ...)` raised `OSError: File name too long` instead of rendering it.
+- `render_edges(backend="folium", tiles=True)` (or `view_3d`, `street_view`, … any web-only
+  keyword) raised a `TypeError` from `folium.Map`; web-only keywords are now dropped on folium.
 
 ## [0.4.1] — 2026-08-29
 

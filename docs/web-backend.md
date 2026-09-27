@@ -21,7 +21,7 @@ From the command line this backend is `-f web` (the default): `roadstyle edges.g
 
 > **Not the same as the roadstyle.js page.** `rs.save(...)` / the CLI's `-f rsjs` write the
 > *roadstyle.js spec page* (a `__rs_*`-baked page for embedding — see
-> [Frontend integration](frontend.md)). This page is about the **render backend**
+> [Embedding](embedding.md)). This page is about the **render backend**
 > `render_edges(backend="web")` / `-f web`, a finished MapLibre map, not a spec.
 
 ## What it does that folium/lonboard don't
@@ -74,31 +74,10 @@ rs.render_edges(edges, backend="web", basemap="dark_matter").save("city.html")
 
 ## Parameters
 
-All the shared `render_edges` arguments apply (`palette`, `include`/`exclude`,
-`color_by`/`cmap`/`width_by`, `style`, `highway_col`, `basemap`, `basemaps`, `name`). The
-backend adds:
-
-| Parameter | Type | Default | Meaning |
-|---|---|---|---|
-| `arrows` | bool | `True` | Show one-way direction chevrons along each one-way edge. |
-| `labels` | bool | `True` | Show curved street-name labels (from the `name` column). |
-| `filter_control` | bool | `True` | Show the collapsible **road-class filter panel** (a checkbox per class present; unchecking hides that class across every road layer). |
-| `filter_col` | str | `None` | Column the filter panel lists/filters by, when it should differ from the styling `highway_col`. Default `None` = filter by the styling column. Set it to filter by a **source-native class** while widths/casing follow a different (e.g. OSM-highway proxy) column — the panel reads this raw property directly, so no restyle is needed. |
-| `basemap_switcher` | bool | `True` | Show the in-map **base-layer dropdown** (its options come from `basemap` / `basemaps`). With `False` **plus an explicit `basemaps=` list**, the entries stay baked and addressable via `window.rsSetBasemap` for a custom UI; `False` alone bakes only the fixed backdrop. |
-| `road_popup` | bool / list / `"all"` / `"panel"` | `True` | Info popup shown when a road is **clicked**: `True` = curated fields, a list = those columns, `"all"`, or `"panel"` = a docked side read-out. Click-to-select works either way; set `False` to drive your own readout from `window.map` events. |
-| `road_tooltip` | bool / list of cols | `False` | **Hover** tooltip: `True` = all attributes, a list of column names = only those, `False` = off. The shared `tooltip=` arg (folium backend / CLI `--tooltip`) is accepted as an **alias** — when given and `road_tooltip` is unset it drives this, so the same `tooltip=` / `--tooltip` call works on every backend. `road_tooltip` is the web-native name and wins if both are set. |
-| `street_view` | bool | `True` | A **Google Street View** link in the road read-out (popup or panel), at the clicked point and facing the way the clicked edge runs — the heading comes from the edge segment nearest the click, so a road's two directions open the same spot looking opposite ways. A plain `google.com/maps` URL: no API key. The same URL is sent as `event.detail.streetView` on `rs:select` (or `null`), for a host page that turns the popup off and shows its own panel. Field names in the popup and the hover tooltip are bold. |
-| `offset_frac` | float | `0.28` | Two-way lane offset as a fraction of the road's **pixel** width (pixel-proportional ⇒ constant overlap at every zoom). `0` = no lane split. |
-| `width_frac` | float | `0.6` | Each two-way lane's width as a fraction of the full road width once the directions have fanned apart (a little over `0.5` so the two lanes overlap rather than leave a centre gap). |
-| `offset_zoom` | int | `15` | Zoom at which lanes start fanning apart / splitting (ramped in over ~2 zoom levels). Below this the two directions stay coincident. |
-| `tunnel_col` | str | `"tunnel"` | Column marking tunnels (used for `lvl`). |
-| `bridge_col` | str | `"bridge"` | Column marking bridges. |
-| `layer_col` | str | `"layer"` | OSM `layer` tag column (signed elevation when tunnel/bridge are absent). |
-| `boundary` | geometry / GeoDataFrame / GeoJSON / `None` | `None` | Optional outline drawn on top of the roads — see [Boundary overlay](#boundary-overlay). |
-| `color_options` | mapping / list / `None` | `None` | "Colour by" options baked for client-side recolouring + a dropdown — see [Dynamic recolouring](#dynamic-recolouring-color_options). |
-| `overlays` | list of `Overlay` / `None` | `None` | Extra layers the caller brings (zones / POIs / lines) — see [Overlay layers](#overlay-layers-overlays). |
-
-From the CLI these map to `--no-arrows` / `--no-labels` / `--no-filter` / `--no-basemap-switcher`.
+Every `render_edges` keyword — the shared ones and the web-only ones (arrows, labels, popup,
+tooltip, Street View, lanes, grade-separation columns, camera, `tiles`, `compress`, …) — with its
+default is in **[Parameters & API](parameters.md#render_edges)**. On the CLI the toggles are
+`--no-arrows` / `--no-labels` / `--no-filter` / `--no-basemap-switcher`.
 
 ## The JavaScript API (`window.rs*`)
 
@@ -120,6 +99,8 @@ dispatches a CustomEvent on `document`:
 | `rsFocus(ids, opt?, layer?)` | fly the camera to fit an id (or id set); `opt` merges into MapLibre's `fitBounds` (`padding` 80, `maxZoom` 17) | — |
 | `rsSelect(id)` / `rsDeselect()` | select one edge exactly like a click (glow + popup/panel; a 3D bridge glows as that edge's own deck ribbon) / clear | `rs:select` / `rs:deselect` |
 | `rsSetView3D(on)` | tilt to the settings' `camera.pitch_3d` / back to flat north-up | `rs:viewchange` |
+| `rsSetBridges(on)` | show / hide every bridge (elevated road and its 3D deck ribbons); ANDs with the class and id filters — the filter panel's *Bridges* row | `rs:filterchange` (`detail.bridges`) |
+| `rsPanelShow(on)` | panel mode only: hide / unhide the docked side panel (the map takes the space; a tab brings it back) | — |
 
 `layer` is optional on all of these: omitted → the roads; an overlay's **label** (or index) →
 that overlay is the queried table. Each layer is its own id space — never mix ids across layers.
@@ -217,7 +198,7 @@ rs.render_edges(edges, backend="web", palette="mono",
 ## Overlay layers (`overlays`)
 
 Bring extra geometry the caller owns — zone polygons, POI points, any lines — as a list of
-[`Overlay`](parameters.md#8-overlay-extra-layers). Each becomes its own MapLibre source + layer(s),
+[`Overlay`](parameters.md#overlay-extra-layers). Each becomes its own MapLibre source + layer(s),
 placed **under** or **over** the roads, clickable for a popup of the fields you list, and toggled
 from a **Layers** control. In **panel mode** (`popup_mode="panel"`) an overlay click docks its
 read-out into the side panel exactly like a road's — titled with the overlay's `label` — instead
@@ -244,7 +225,7 @@ click misses every road — so a road inside a clickable zone stays selectable. 
 reports the interactive overlays under the click: its popup/panel appends a section per overlay,
 and `rs:select` carries them as `event.detail.overlays` (`[{label, fields, properties}]`) so a
 sidebar can show the road **and** its zone together. See
-[`Overlay`](parameters.md#8-overlay-extra-layers) for every field.
+[`Overlay`](parameters.md#overlay-extra-layers) for every field.
 
 > **Overlays are single-colour.** An `Overlay` paints every feature with its one `color` — there is
 > no per-feature `color_by` / `cmap` for overlay data. To colour features *by a value*, put that
@@ -281,7 +262,7 @@ The saved HTML bundles MapLibre's JS+CSS **inline** and inlines the road GeoJSON
   don't draw (blank background, no labels), but the roads still do.
 
 This is what makes the output a true single-file deliverable. (The folium/lonboard backends and the
-[roadstyle.js spec page](frontend.md) have their own delivery models.)
+[roadstyle.js spec page](embedding.md) have their own delivery models.)
 
 ## Vector tiles in the file (`tiles=True`)
 

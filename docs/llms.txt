@@ -11,21 +11,19 @@ Edges are directed: a two-way road is two edges with reversed geometry. JS calls
 
 ## Reference
 
-- [Parameters](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/parameters.md): every keyword of render_edges, stylers, settings, Overlay
-- [Web backend](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/web-backend.md): grade separation, 3D, vector tiles, color_options, overlays, the JavaScript API and events
-- [Python API](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/api.md): every public function and class
-- [Palettes & settings](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/palettes.md): the built-in palettes and the override files
-- [Usage](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/usage.md): install extras, CLI, base maps and API keys, input formats
+- [Parameters & API](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/parameters.md): every public function and class, every keyword of render_edges (per backend), StyleConfig, Overlay
+- [Web backend & JS API](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/web-backend.md): grade separation, 3D, vector tiles, color_options, overlays, the JavaScript API and events
+- [Palettes, base maps & settings](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/palettes.md): the built-in palettes, base maps and API keys, the settings override files
 
 ## Guides
 
-- [Embedding](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/embedding.md): the JSON spec, iframe, Leaflet and MapLibre snippets
-- [Choosing an engine](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/engines.md): web vs folium vs lonboard
+- [Home](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/index.md): install, extras, command line
+- [Manual](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/manual.md): the walk-through, from the first map to colouring by data, overlays, loading data and web output
+- [Embedding](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/embedding.md): iframe, the JSON spec, roadstyle.js, Leaflet and MapLibre
+- [Choosing an engine](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/engines.md): web vs folium vs lonboard, and vs .explore(), prettymaps, kepler.gl
 - [Gallery](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/gallery.md): one screenshot and recipe per look
 
 ## Optional
 
-- [Tutorial](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/tutorial.md)
-- [Manual](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/manual.md)
-- [Comparison](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/comparison.md): vs geopandas .explore(), prettymaps, kepler.gl
+- [Studio](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/studio.md): the no-code Streamlit workbench
 - [Changelog](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/CHANGELOG.md)

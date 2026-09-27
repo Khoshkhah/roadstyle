@@ -1,67 +1,104 @@
 # roadstyle
 
-**roadstyle** turns a GeoDataFrame of road edges into a beautifully styled interactive map —
-an OSM-style "geometry sandwich" (coloured fills over casings) with palettes, settings, and base
-maps — and can colour roads by **your own data**, on **folium** / **lonboard** / a self-contained
-**MapLibre (vector)** backend, or as a **stack-agnostic JSON spec** you embed in any website.
+**roadstyle** turns a GeoDataFrame of road edges into one styled, interactive HTML map: OSM-style
+road cartography (coloured fills over casings, two-way lanes, arrows, bridges over tunnels), your
+own data as colour, and a `window.rs*` JavaScript API. The file is self-contained (MapLibre and the
+data inlined), so it opens offline with no server.
+
+![A roadstyle map of Södermalm](img/hero.jpg)
 
 ```python
 import geopandas as gpd
-from roadstyle import render_edges
+import roadstyle as rs
 
-edges = gpd.read_file("edges.gpkg")            # any CRS; needs a road-class column
-render_edges(edges, basemap="dark_matter").save("roads.html")          # classic OSM styling
+edges = gpd.read_file("edges.gpkg")                      # any CRS; needs a `highway` column
+rs.render_edges(edges).save("roads.html")                # classic road styling, done
 
-render_edges(edges, color_by="aadt", cmap="viridis",          # colour by a data value
-             width_by=(1, 6), legend=True).save("traffic.html")
+rs.render_edges(edges, palette="mono",                   # colour by your own column
+                color_by="aadt", cmap="viridis", width_by=(1, 6)).save("traffic.html")
 ```
 
-…or straight from the shell — no Python needed:
+- **Real road cartography**: per-zoom widths, directed two-way lanes, street names, tunnel/bridge
+  grade separation, a 3D view (`view_3d=True`).
+- **Your data as colour**: categorical or numeric columns, legends, and several switchable
+  "colour by" options in one map.
+- **Scriptable**: every control has a `window.rs*` twin, plus `rsQuery` id sets and `rs:*` events.
+- **Other outputs**: folium, lonboard (GPU, millions of edges), or a JSON spec for your own frontend.
+- **No code needed**: the `roadstyle` CLI and the `roadstyle studio` workbench.
+
+## Install
+
+Python ≥ 3.10.
 
 ```bash
-roadstyle edges.gpkg -o roads.html --basemap dark_matter
-roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by your data
-roadstyle studio                                                    # or click through it — the Streamlit workbench
+pip install roadstyle                 # geopandas, shapely, folium, branca come along
+pip install "roadstyle[studio]"       # + the no-code workbench: `roadstyle studio`
 ```
 
-## Why roadstyle?
+Every optional feature is an extra; combine what you need (`pip install "roadstyle[numeric,tiles]"`)
+or take them all with `pip install "roadstyle[all]"`.
 
-- **Geometry sandwich** — every road is a coloured fill over a wider casing, so junctions and
-  overlaps read cleanly (just like the OSM "Standard" style).
-- **Class styling** — built-in `highsat` (high-saturation) and `carto` (classic OSM) palettes;
-  bring your own vocabulary with `register_palette` / palette JSON.
-- **Data-driven styling** — colour/size roads by any **categorical** column (`color_by`+`colors`)
-  or **numeric** column (`color_by`+`cmap`+`width_by`), with automatic legends.
-- **Base maps** — voyager / positron / dark matter / OSM / satellite, plus the tile-less
-  `blank` canvas (zero network requests — fully offline), with an in-map switcher.
-- **3D view** — `view_3d=True`: tilted camera, extruded ramped **bridge decks** with black
-  casing, an on-map 2D/3D toggle.
-- **Scriptable** — every control has a `window.rs*` JavaScript twin, plus id-set queries
-  (`rsQuery` → filter / colour / highlight / table / fly-to) and `rs:*` events; copyable UI
-  templates live in `ui/`.
-- **One settings file** — every styling default in `data/defaults.json`, overridable via
-  `roadstyle.json`, `rs.use_settings(...)`, or a per-call `settings=`.
-- **Backends + web output** — folium (portable HTML), lonboard (WebGL), a self-contained
-  **MapLibre `web` backend** (per-zoom widths, two-way lanes, arrows/names, hover/select,
-  tunnel/bridge grade separation — offline, no server; see [web backend](web-backend.md)), and
-  `to_spec`/`to_html`/`to_iframe` for embedding in your own site (Leaflet / MapLibre / iframe).
-- **Switchable colouring** — bake several "colour by" options with `color_options` and switch
-  between them in the browser (a **Colour by** dropdown), no re-render; blank edges keep the base
-  colour.
-- **Overlay layers** — bring your own geometry (zones, POIs, any lines) as `Overlay`s, drawn
-  under/over the roads, clickable, with a **Layers** toggle.
-- **Canonical input** — `normalize_edges` reprojects, drops non-lines, and maps your column names.
-- **Command line** — the `roadstyle` CLI renders any road file from the shell, no Python required.
+| Extra | Enables | Pulls in |
+|---|---|---|
+| `studio` | `roadstyle studio`, the interactive Streamlit workbench | streamlit |
+| `numeric` | continuous colour ramps + classification (`color_by` on numbers, `cmap`) | mapclassify, matplotlib |
+| `tiles` | `tiles=True`, embedded vector tiles for big networks | mapbox-vector-tile, pmtiles |
+| `lonboard` | the GPU (WebGL) backend for very large edge sets | lonboard |
+| `duckdb` | `from_duckdb()`, edges straight from a DuckDB query | duckdb |
+| `arrow` | edges from a pyarrow Table | pyarrow |
+| `basemaps` | any xyzservices tile provider as a base map | xyzservices |
+| `all` | every extra above | all of the above |
+
+The latest unreleased state, still without cloning (extras combine the same way; bare
+`roadstyle @ git+…` is core only):
+
+```bash
+pip install "roadstyle[all] @ git+https://github.com/Khoshkhah/roadstyle.git"
+```
+
+**Developing on it** (clone + editable, a src layout):
+
+```bash
+git clone https://github.com/Khoshkhah/roadstyle.git && cd roadstyle
+pip install -e ".[dev]"              # every extra (incl. the studio) + pytest/ruff/mypy
+# or: conda env create -f environment.yml && conda activate roadstyle && pip install -e ".[dev]"
+pytest                               # browser tests need `pip install playwright`
+```
+
+From a checkout the studio runs against your working tree and uses the sample data in
+`ui/studio/samples/` directly.
+
+**Uninstall:** `pip uninstall roadstyle`. Your settings overrides (`~/.config/roadstyle/roadstyle.json`,
+a project-local `roadstyle.json`) are your files; pip leaves them in place.
+
+## Command line
+
+No Python needed: `roadstyle` renders any road file straight from the shell.
+
+```bash
+roadstyle edges.gpkg -o map.html --basemap dark_matter               # styled interactive map
+roadstyle edges.gpkg --palette carto --basemap positron              # palette: highsat | carto | mono
+roadstyle edges.gpkg --include motorway trunk primary                # keep only major roads
+roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6   # colour by your data
+roadstyle edges.gpkg -f spec -o map_data.json                        # JSON spec for your own frontend
+
+roadstyle studio                                                     # the Streamlit workbench
+roadstyle studio --server.port 8502                                  # extra args go to streamlit
+```
+
+`-f/--format` is one of `web` (self-contained MapLibre map, the default), `folium`, `rsjs`
+(roadstyle.js page), `spec`, `geojson`. Every other flag mirrors a `render_edges` keyword; the `web`
+map also takes `--no-arrows` / `--no-labels` / `--no-filter` / `--no-basemap-switcher`. See
+`roadstyle --help`. `roadstyle studio` needs the `studio` extra and forwards extra arguments to
+`streamlit run`.
 
 ## Where to next
 
-- **[Gallery](gallery.md)** — one screenshot + recipe per look.
-- **[Manual](manual.md)** — a hands-on walk-through with the **live map embedded after each step**.
-- **[Usage](usage.md)** — install, the command line, quick start, recipes.
-- **[Choosing an engine](engines.md)** — web vs folium vs lonboard vs roadstyle.js, with a feature matrix.
-- **[Parameter reference](parameters.md)** — every parameter explained.
-- **[MapLibre web backend](web-backend.md)** — the self-contained, zoom-correct vector map
-  (two-way lanes, grade separation, offline).
-- **[Embedding in a website](embedding.md)** — the JSON spec + Leaflet/MapLibre/iframe snippets.
-- **[Palettes](palettes.md)** — styling + settings reference.
-- **[Comparison](comparison.md)** — roadstyle vs geopandas `.explore()` / prettymaps.
+- **[Manual](manual.md)**: the walk-through, with live maps, notebooks and example scripts.
+- **[Gallery](gallery.md)**: one screenshot + recipe per look.
+- **[Studio](studio.md)**: the no-code Streamlit workbench.
+- **[Web backend](web-backend.md)**: the MapLibre map in full, and its JavaScript API.
+- **[Embedding](embedding.md)**: iframe, JSON spec, `roadstyle.js`, your own frontend.
+- **[Engines](engines.md)**: web vs folium vs lonboard, and roadstyle vs other tools.
+- **[Parameters](parameters.md)**: every keyword and public function.
+- **[Palettes](palettes.md)**: palettes, settings, base maps and API keys.

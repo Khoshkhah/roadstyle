@@ -65,11 +65,16 @@ def render(
     api_key: str | None = None,
     **map_kwargs,
 ):
+    import inspect
+
     import folium
 
-    # web-backend-only UI kwargs may arrive via render_edges(**kwargs); drop them so they don't
-    # reach folium.Map() (folium has its own filter_control / legend).
-    for _k in ("arrows", "labels", "basemap_switcher"):
+    from .render_web import render as _web_render
+
+    # web-backend-only kwargs may arrive via render_edges(**kwargs); drop them so they don't
+    # reach folium.Map() (tiles=True, view_3d=True, ... would raise there). Derived from the web
+    # renderer's signature so a new web option can't slip through.
+    for _k in inspect.signature(_web_render).parameters.keys() - inspect.signature(render).parameters.keys():
         map_kwargs.pop(_k, None)
 
     g = gdf.to_crs(4326)

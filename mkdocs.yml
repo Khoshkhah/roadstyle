@@ -38,24 +38,28 @@ theme:
 
 nav:
   - Home: index.md
-  - Get started:
-      - Usage: usage.md
-      - Choosing an engine: engines.md
-      - Tutorial: tutorial.md
-  - Guides:
-      - Manual (live maps): manual.md
-      - Examples: examples.md
-      - Gallery: gallery.md
-      - Studio: studio.md
-  - Web & frontend:
-      - MapLibre web backend: web-backend.md
+  - Manual: manual.md
+  - Gallery: gallery.md
+  - Studio: studio.md
+  - Web:
+      - Web backend & JS API: web-backend.md
       - Embedding in a website: embedding.md
-      - Frontend integration: frontend.md
   - Reference:
-      - Parameter reference: parameters.md
-      - Palettes: palettes.md
-      - API: api.md
-      - Comparison: comparison.md
+      - Parameters & API: parameters.md
+      - Palettes, base maps & settings: palettes.md
+      - Choosing an engine: engines.md
+
+# Old pages, merged in the 15 -> 9 restructure; keep their URLs working.
+plugins:
+  - search
+  - redirects:
+      redirect_maps:
+        usage.md: index.md
+        tutorial.md: manual.md
+        examples.md: manual.md
+        frontend.md: embedding.md
+        comparison.md: engines.md
+        api.md: parameters.md
 
 markdown_extensions:
   - admonition

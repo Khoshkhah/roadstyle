@@ -1,14 +1,14 @@
-# Palettes
+# Palettes, base maps & settings
 
-A palette maps each OSM `highway` tag to a [`RoadStyle`](api.md) (fill colour, line width,
-casing width, ONE casing colour, optional dash). Choose one with `palette="highsat"`,
-`palette="carto"`, or `palette="mono"`.
+A palette maps each OSM `highway` tag to a [`RoadStyle`](parameters.md#public-api) (fill colour,
+line width, casing width, ONE casing colour, optional dash). Choose one with `palette="highsat"`,
+`palette="carto"`, or `palette="mono"`. The base map under the roads is `basemap=`; every other
+styling default (opacities, label colour, camera, …) is a [setting](#customising-data-files-and-overrides).
 
 The built-in palettes are **data, not code**: they live in the bundled
 `roadstyle/data/defaults.json` (section `"palettes"`) and are loaded at import, so you can retint
 a class — or add a whole palette — via a [user override](#customising-data-files-and-overrides),
-with no code change. The styling knobs (opacities, link scale, tunnel/bridge factors, selection
-colours) live in the same file (section `"config"` / `"selection"`).
+with no code change.
 
 ## highsat
 
@@ -67,26 +67,70 @@ few-shades-darker casing for separation. Useful for print, or as a quiet backdro
 | cycleway | `#888888` | — | 1.2 · dash | |
 | footway / path | `#ABABAB` | — | 1.2 · dash | |
 
-## Overrides
+## Links, tunnels, bridges & unknown tags
 
 - **`*_link`** (e.g. `primary_link`) — same colour as the parent class, rendered ~30% narrower.
 - **`tunnel`** — opacity → ~45%, line becomes dashed.
 - **`bridge`** — casing forced to the deck colour (`bridge_casing_color`, black by default), +1.5 px wider; extruded 3D decks in `view_3d`.
 - **Unknown tags** — fall back to `unclassified`.
 
+## Base maps & API keys
+
+`basemap=` picks the base map; the default is `voyager` (the `config.basemap` setting). Built in:
+
+| key | what |
+|---|---|
+| `voyager` · `voyager_nolabels` · `positron` · `dark_matter` | CARTO (need a key, see below) |
+| `osm` | OpenStreetMap standard tiles |
+| `esri_gray` · `esri_street` · `esri_dark_gray` | Esri light grey / streets / dark grey — keyless; `esri_street` and `esri_dark_gray` stand in for `voyager` and `dark_matter` |
+| `satellite` | Esri World Imagery |
+| `blank` · `blank_dark` | no tiles, a plain canvas: zero network requests, so the saved map is fully offline |
+
+`rs.BASEMAPS` holds them all. Any [xyzservices](https://xyzservices.readthedocs.io/) provider
+(`pip install "roadstyle[basemaps]"`) or a tile URL template works too. Register your own — it
+then works as `basemap="mytiles"` and in the switcher — with a [`Basemap`](parameters.md):
+
+```python
+rs.register_basemap(rs.Basemap("mytiles", "My tiles",
+                               "https://tiles.example.com/{z}/{x}/{y}.png", "© My tiles"))
+```
+
+!!! note "CARTO watermark"
+    CARTO base maps (`voyager`, `voyager_nolabels`, `positron`, `dark_matter`) come back stamped
+    *"API KEY REQUIRED"* unless a free key from
+    [carto.com/basemaps/apikey](https://carto.com/basemaps/apikey) is set. The tiles still load,
+    so nothing fails; roadstyle warns at render time instead. Keyless alternatives: `esri_street`,
+    `esri_dark_gray`, `osm`, `blank`.
+
+A provider that needs a key (CARTO, Mapbox, Stadia, MapTiler, Thunderforest, Jawg, …) takes the
+first one found, in this order:
+
+1. the call: `rs.render_edges(edges, basemap=xyz.MapBox, api_key="pk.…")`
+2. the session: `rs.set_api_key("pk.…", provider="mapbox")` (no `provider` = any provider)
+3. the [settings](#customising-data-files-and-overrides), which keep keys out of your code:
+   `{"config": {"api_key": "…", "api_keys": {"mapbox": "pk.…"}}}`
+4. the environment: `<PROVIDER>_API_KEY` (e.g. `CARTO_API_KEY`, `MAPBOX_API_KEY`; also
+   `_ACCESS_TOKEN`, `_TOKEN`, `_KEY`), then `ROADSTYLE_API_KEY` for any provider
+
+A custom tile URL may carry an `{api_key}` or `{accessToken}` placeholder:
+`basemap="https://tiles.example.com/{z}/{x}/{y}.png?api_key={api_key}"`.
+
 ## Customising data files and overrides
 
-Palettes and the style config are **data files** shipped in the package
-(one bundled `roadstyle/data/defaults.json` holding palettes, config, selection and the road
-width/draw-order model), loaded at import. Three ways to
-change them, lowest-effort first.
+Every styling default ships in one bundled data file, `roadstyle/data/defaults.json`, with four
+sections: `palettes`, `config` (opacities, link scale, tunnel/bridge factors, label colour,
+`basemap`, camera, API keys, …), `selection` (the highlight colours) and `roads` (the `web`
+renderer's width / draw-order model). Three ways to change it, lowest-effort first.
 
-**1. A `roadstyle.json` override** — no code, no package edit; read at import. Sources, lowest
-precedence first: `~/.config/roadstyle/roadstyle.json` → `./roadstyle.json` → `$ROADSTYLE_CONFIG`.
-From code, `rs.use_settings("my.json")` (or a dict in the same layout) applies the same kind of
-override at runtime — highest precedence of all; call it again (no argument) to drop it. For a
-single map, skip the state entirely: `render_edges(edges, settings={...})` applies the override
-for that one render and restores everything after.
+**1. Settings overrides** — a JSON file (or dict) in the same layout, restating only what
+changes. Levels, later wins:
+
+1. `~/.config/roadstyle/roadstyle.json` (or `$XDG_CONFIG_HOME/roadstyle/roadstyle.json`)
+2. `./roadstyle.json` (the working directory)
+3. the file named by `$ROADSTYLE_CONFIG`
+4. `rs.use_settings("my.json")` (or a dict; several sources allowed) — from code, for the rest
+   of the process; call it with no argument to drop it
+5. `rs.render_edges(edges, settings={...})` — this one render only, restored afterwards
 
 ```jsonc
 {
@@ -94,14 +138,16 @@ for that one render and restores everything after.
     "highsat": { "service": { "fill": "#E0E0E0" } },   // retint one class; rest inherited
     "mytheme": { "roads": { "motorway": { "fill": "#f00", "width": 6, "casing_width": 8 } } }
   },
-  "config":    { "fill_opacity": 0.95 },
-  "selection": { "core": "#FF0000" }
+  "config":    { "fill_opacity": 0.95, "labels": { "color": "#8899aa" } },
+  "selection": { "core": "#FF0000" },
+  "roads":     { "z_order": { "service": 5 } }
 }
 ```
 
-Palette overrides deep-merge **per road class** — change just `service.fill` and its widths/casing
-are inherited; `config`/`selection` override individual keys. Overrides are read at **import time**,
-so set the file (or `$ROADSTYLE_CONFIG`) before `import roadstyle`.
+Palette overrides deep-merge **per road class** — change just `service.fill` and its
+widths/casing are inherited; `roads` tables merge per entry; `config`/`selection` override
+individual keys. The three files are read at **import time**, so create them (or set
+`$ROADSTYLE_CONFIG`) before `import roadstyle`; `use_settings` and `settings=` work at any point.
 
 **2. Edit the bundled `roadstyle/data/defaults.json`** to change the built-in defaults (all
 palettes live under its `"palettes"` section).
