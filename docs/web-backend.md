@@ -161,6 +161,32 @@ document.addEventListener("rs:select", e => {
 
 `street_view=False` removes the link and sends `streetView: null`.
 
+#### Map and Street View side by side
+
+Google won't show its Maps pages inside an iframe, so to keep Street View *in* the page, next to
+the map, turn the event's point and heading into Google's embeddable Street View URL. Click a road:
+
+<iframe src="../maps/street_view.html" loading="lazy" title="The map and Google Street View side by side"
+        style="width:100%;height:520px;border:0;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.18)"></iframe>
+
+The whole page is [`examples/street_view_side_by_side.py`](https://github.com/Khoshkhah/roadstyle/blob/main/examples/street_view_side_by_side.py):
+`render_edges(edges, road_popup=False)` plus a panel injected before `</body>`. The core:
+
+```js
+document.addEventListener("rs:select", e => {
+  if (e.detail.layer != null || !e.detail.streetView) return;   // roads only
+  const u = new URL(e.detail.streetView);
+  const [lat, lng] = u.searchParams.get("viewpoint").split(",");
+  const h = u.searchParams.get("heading") || 0;
+  frame.src = `https://maps.google.com/maps?layer=c&cbll=${lat},${lng}&cbp=11,${h},0,0,0&output=svembed`;
+});
+```
+
+`output=svembed` needs no key but is not a documented Google API, so it could stop working.
+The official embed needs a Google **Maps Embed API** key:
+`https://www.google.com/maps/embed/v1/streetview?key=KEY&location=${lat},${lng}&heading=${h}`.
+Street View imagery is Google's, under Google's terms.
+
 ## Dynamic recolouring (`color_options`)
 
 Bake **several pre-resolved "colour by" fill sets** into the one map and switch between them in the

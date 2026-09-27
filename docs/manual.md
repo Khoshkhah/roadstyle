@@ -378,4 +378,5 @@ needs data):
 | **`recolor_web_backend.py`** | Switchable data-driven colouring on the **`web` backend** (`color_options` + a *Colour by* dropdown), plus a **custom panel** wired through `window.rsSetColorField` / the `rs:colorchange` event. |
 | **`overlays_web.py`** | Extra **overlay layers** — synthetic TAZ zones (under the roads) + POI circles (on top), both clickable, with a *Layers* toggle. |
 | **`recolor_custom_panel.py`** | The same switchable colouring on the **roadstyle.js spec page**, driven by a custom `addPanel` + the `setColorField` / event-bus API. |
+| **`street_view_side_by_side.py`** | The map and **Google Street View side by side** in one page: click a road, Street View on the right looks along it. See [the live demo](web-backend.md#map-and-street-view-side-by-side). |
 | **`roads_from_duckdb.py`** | Roads straight from a **DuckDB** SQL query (`from_duckdb`, geometry via `ST_AsWKB`), rendered as a web map and a roadstyle.js page. Needs the `duckdb` extra. |

@@ -6,6 +6,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **`examples/street_view_side_by_side.py`**: the map and Google Street View side by side in one
+  page (click a road; no new window, no API key), with a live demo in the web-backend docs.
+
 ## [0.4.2] — 2026-09-26
 
 ### Added

@@ -13,6 +13,7 @@ demos look real.
 from __future__ import annotations
 
 import random
+import runpy
 from pathlib import Path
 
 import geopandas as gpd
@@ -70,6 +71,10 @@ rs.render_edges(
     ],
     name="roadstyle — overlay layers",
 ).save(OUT / "overlays.html")
+
+# the map and Google Street View side by side: the example script's own page
+street_view_page = runpy.run_path(str(REPO / "examples" / "street_view_side_by_side.py"))["page"]
+(OUT / "street_view.html").write_text(street_view_page(g), encoding="utf-8")
 
 for f in sorted(OUT.glob("*.html")):
     print(f"wrote {f.relative_to(REPO)} ({f.stat().st_size // 1024} KB)")
