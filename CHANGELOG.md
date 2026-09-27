@@ -25,7 +25,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - The Street View link (and `rs:select`'s `detail.streetView`) now points at the nearest spot on the
   clicked edge's own geometry, the road's centre line, instead of the raw click. Clicks on a
   drawn lane, or at an overview zoom, landed metres off the road, so Google often picked a
-  nearby indoor photo (a shop interior) instead of the road's Street View imagery.
+  nearby indoor photo (a shop interior) instead of the road's Street View imagery. A two-way
+  road's twin edges (one line) then each step 2.5 m right, into the middle of their own lane,
+  so the two directions no longer share one spot.
 
 ## [0.4.2] — 2026-09-26
 

@@ -744,4 +744,6 @@ def test_web_street_view_link():
     assert on.count("streetView:_svUrl(") == 2
     # the point goes onto the edge's own geometry (the road centre line), not the raw click on a
     # drawn lane, which can sit nearer an indoor photo than the road's Street View imagery
-    assert "const sn = _svSnap(g, ll), p = sn || ll;" in on
+    assert "const sn = _svSnap(f, ll), p = sn || ll;" in on
+    # ...and a two-way edge moves into its own lane, so the two directions stand apart
+    assert "const _SV_LANE_M = 2.5;" in on and "f.properties.__rs_twoway" in on

@@ -835,10 +835,15 @@ const _popupFields = __ROAD_POPUP_FIELDS__;   // curated field list, or null => 
 // directed, so a road's two directions get the same spot and opposite headings. A plain maps URL,
 // no API key. The heading is the clicked edge's segment nearest the point; none without geometry.
 const _streetView = __STREET_VIEW__;
-function _svSnap(g, ll){
+// a two-way road's direction stands in the middle of its own lane: this far (metres) right of
+// the centre line, the side its twin is drawn on (MapLibre's line-offset: right-hand traffic)
+const _SV_LANE_M = 2.5;
+function _svSnap(f, ll){
   // the point on the clicked edge's own geometry nearest the click, and that segment's heading.
-  // The drawn two-way lanes sit offset from the centre line, toward the kerb and the shops, so
-  // the raw click point can land nearer an indoor photo than the road's Street View imagery.
+  // The drawn lanes sit offset from the centre line by a pixel amount (tens of metres when zoomed
+  // out), so the raw click point can land nearer an indoor photo than the road's Street View
+  // imagery; a two-way edge then moves a fixed _SV_LANE_M into its own lane.
+  const g = f && f.geometry;
   const lines = !g ? [] : g.type==="LineString" ? [g.coordinates] :
                 g.type==="MultiLineString" ? g.coordinates : [];
   const k = Math.cos(ll.lat*Math.PI/180); let best=null, bd=Infinity;
@@ -847,18 +852,21 @@ function _svSnap(g, ll){
     const px=(ll.lng-cs[i][0])*k, py=ll.lat-cs[i][1];
     const t=Math.max(0, Math.min(1, (px*dx+py*dy)/((dx*dx+dy*dy)||1)));
     const d=(px-t*dx)**2+(py-t*dy)**2;
-    if(d<bd){ bd=d; best={h:(Math.atan2(dx,dy)*180/Math.PI+360)%360,
+    if(d<bd){ bd=d; best={h:(Math.atan2(dx,dy)*180/Math.PI+360)%360, dx:dx, dy:dy,
       lng:cs[i][0]+t*(cs[i+1][0]-cs[i][0]), lat:cs[i][1]+t*(cs[i+1][1]-cs[i][1])}; } } });
+  if(best && f.properties && f.properties.__rs_twoway){   // (dy,-dx) points right of travel
+    const n=Math.hypot(best.dx, best.dy)||1, m=_SV_LANE_M/110540;   // metres -> degrees of latitude
+    best.lng += best.dy/n*m/k; best.lat -= best.dx/n*m; }
   return best; }
 // the URL on its own: also sent as `detail.streetView` on rs:select, for host pages whose own
 // panel replaces the popup (road_popup=False)
-function _svUrl(ll, g){
+function _svUrl(ll, f){
   if(!_streetView || !ll) return null;
-  const sn = _svSnap(g, ll), p = sn || ll;
+  const sn = _svSnap(f, ll), p = sn || ll;
   return 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+
     p.lat.toFixed(6)+','+p.lng.toFixed(6)+(sn ? '&heading='+Math.round(sn.h) : ''); }
-function _sv(ll, g){
-  const u = _svUrl(ll, g);
+function _sv(ll, f){
+  const u = _svUrl(ll, f);
   if(u && _svWindow)                          // the window mode opens its window, not a new tab
     return '<div class="rs-sv" style="margin-top:4px"><a href="#" onclick="rsSetStreetView(true);return false">Street View</a></div>';
   return !u ? "" : '<div class="rs-sv" style="margin-top:4px"><a target="_blank" rel="noopener" href="'+
@@ -894,10 +902,10 @@ function rsSelect(id){
   // best effort for programmatic selection: overlays at the edge's midpoint (when on screen)
   const c = s ? s.mids[id] : _midOf((_feats()[id]||{}).geometry);
   let ovs=[]; if(c){ try{ ovs=_ovAt(map.project({lng:c[0], lat:c[1]})); }catch(err){} }
-  const cll = c ? {lng:c[0], lat:c[1]} : null, cg = (_feats()[id]||{}).geometry;
+  const cll = c ? {lng:c[0], lat:c[1]} : null;
   document.dispatchEvent(new CustomEvent("rs:select",
-    {detail:{id:id, layer:null, properties:props || {}, overlays:ovs, streetView:_svUrl(cll, cg)}}));
-  const sv = _sv(cll, cg);
+    {detail:{id:id, layer:null, properties:props || {}, overlays:ovs, streetView:_svUrl(cll, _feats()[id])}}));
+  const sv = _sv(cll, _feats()[id]);
   if(__ROAD_POPUP__){
     if(_popupMode === "panel"){ rsInfoShow(_rrows(props||{}, _popupFields) + sv + _ovSections(ovs)); }
     else if(c) new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
@@ -936,8 +944,8 @@ map.on("click", e=>{
   // structured click-data for host pages / dashboards (fires in every popup mode, incl. False)
   document.dispatchEvent(new CustomEvent("rs:select",
     {detail:{id:f.id, layer:f.layer && f.layer.id, properties:props, overlays:ovs,
-             streetView:_svUrl(e.lngLat, f.geometry)}}));
-  const sv = _sv(e.lngLat, f.geometry);
+             streetView:_svUrl(e.lngLat, f)}}));
+  const sv = _sv(e.lngLat, f);
   if(__ROAD_POPUP__){
     if(_popupMode === "panel"){ rsInfoShow(_rrows(props, _popupFields) + sv + _ovSections(ovs)); }
     else new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
