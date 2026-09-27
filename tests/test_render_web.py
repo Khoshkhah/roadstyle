@@ -479,13 +479,14 @@ def test_snapshot_writes_png(tmp_path):
 
 
 def test_web_street_view_window():
-    """street_view="window": a map button opens a floating Street View window that follows the
-    clicked road; the popup link opens that window instead of a new tab. Off by default."""
+    """street_view="window" (the default): a map button opens a floating Street View window that
+    follows the clicked road; the popup link opens that window instead of a new tab."""
     import pytest
-    win = render_edges(_edges(), backend="web", street_view="window").html
+    win = render_edges(_edges(), backend="web").html                     # the default
     assert "const _svWindow = true;" in win and "const _streetView = true;" in win
     assert "window.rsSetStreetView = rsSetStreetView;" in win and "maps/embed?pb=" in win
-    assert "const _svWindow = false;" in render_edges(_edges(), backend="web").html
+    link = render_edges(_edges(), backend="web", street_view=True).html  # the plain link instead
+    assert "const _svWindow = false;" in link and "const _streetView = true;" in link
     assert "__SV_WINDOW__" not in win
     with pytest.raises(ValueError):
         render_edges(_edges(), backend="web", street_view="windows")

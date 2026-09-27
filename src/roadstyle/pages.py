@@ -93,4 +93,5 @@ def render_street_view(gdf, *, panel_width: float = 42, resizable: bool = True, 
             frag = frag.replace('<div id="sv-drag" title="Drag to resize"></div>\n', "", 1)
         return frag
     return _page(gdf, "street_view", edit=edit,
-                 defaults=dict(name="Roads and Street View", road_popup=False), **kw)
+                 # the panel IS the Street View; the map's own button would be a second one
+                 defaults=dict(name="Roads and Street View", road_popup=False, street_view=True), **kw)

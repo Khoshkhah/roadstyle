@@ -6,6 +6,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **The Street View window is the default** (`street_view="window"`): every map gets a Street View
+  button. `street_view=True` keeps the old plain link in the popup, `False` turns it off.
+  `render_street_view` pages keep only their own panel.
+
 ## [0.5.0] — 2026-09-26
 
 ### Added

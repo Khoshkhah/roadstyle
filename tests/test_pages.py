@@ -58,6 +58,7 @@ def test_render_street_view_injects_panel():
     assert h.count("</body>") == 1
     # the panel replaces the popup; the map keeps its own base-map switcher and class filter
     assert "Roads and Street View" in h
+    assert "const _svWindow = false;" in h                   # no second Street View (the map button)
 
 
 def test_street_view_width_and_divider_are_options():

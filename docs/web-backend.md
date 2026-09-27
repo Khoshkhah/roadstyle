@@ -99,7 +99,7 @@ dispatches a CustomEvent on `document`:
 | `rsFocus(ids, opt?, layer?)` | fly the camera to fit an id (or id set); `opt` merges into MapLibre's `fitBounds` (`padding` 80, `maxZoom` 17) | — |
 | `rsSelect(id)` / `rsDeselect()` | select one edge exactly like a click (glow + popup/panel; a 3D bridge glows as that edge's own deck ribbon) / clear | `rs:select` / `rs:deselect` |
 | `rsSetView3D(on)` | tilt to the settings' `camera.pitch_3d` / back to flat north-up | `rs:viewchange` |
-| `rsSetStreetView(on)` | open / close the Street View window (`street_view="window"`; a no-op otherwise) | `rs:streetviewchange` |
+| `rsSetStreetView(on)` | open / close the Street View window (the default `street_view="window"`; a no-op otherwise) | `rs:streetviewchange` |
 | `rsSetBridges(on)` | show / hide every bridge (elevated road and its 3D deck ribbons); ANDs with the class and id filters — the filter panel's *Bridges* row | `rs:filterchange` (`detail.bridges`) |
 | `rsPanelShow(on)` | panel mode only: hide / unhide the docked side panel (the map takes the space; a tab brings it back) | — |
 
@@ -144,16 +144,30 @@ custom sidebar can offer the same search (both `ui/` templates do).
 
 ### Google Street View link
 
-Clicking a road adds a **Street View ↗** link to its popup or side panel. It opens Google Street
-View on the clicked road, looking along it: the point is the spot on the edge's own geometry (the
-road's centre line) nearest the click, and the heading is that segment's direction. A two-way
-road's two edges share one line, so each then steps 2.5 m to its right, into the middle of its own
-lane (right-hand traffic, the side the map draws it on). Because edges are directed, a two-way road's two edges open at
-the same spot looking opposite ways. `rsSelect(id)` uses the edge's midpoint instead of a click.
-It is a plain `google.com/maps` URL: no API key, nothing loaded until the link is followed.
+Every map has a **Street View** button (under 3D). It opens a floating window over the map that
+shows Google Street View of the road the user clicks (or `rsSelect`s), and follows each new click.
+Drag its title bar to move it, its corner to resize it; the popup's *Street View* link opens it
+too. Nothing is loaded from Google while it is closed. Whether it was open, where, and how big are
+remembered in the viewer's browser. It opens at the map's bottom-right corner, so it respects any
+panel the page adds; on a phone it is a sheet at the bottom. `rsSetStreetView(true)` opens it from
+your own UI. It needs the page served over http(s) (see the note below). No API key.
 
-The same URL rides on the selection event, for a host page whose own panel replaces the popup
-(`road_popup=False`); it is `null` when turned off:
+```python
+rs.render_edges(edges)                      # street_view="window": the button and window (default)
+rs.render_edges(edges, street_view=True)    # a plain Street View link in the popup instead (new tab)
+rs.render_edges(edges, street_view=False)   # no Street View
+```
+
+**Where it looks.** The point is the spot on the clicked edge's own geometry (the road's centre
+line) nearest the click, and the heading is that segment's direction. A two-way road's two edges
+share one line, so each then steps 2.5 m to its right, into the middle of its own lane
+(right-hand traffic, the side the map draws it on): its two directions stand 5 m apart, looking
+opposite ways. `rsSelect(id)` uses the edge's midpoint instead of a click. Google shows the
+panorama nearest that point; where it has no car imagery, that can be a photo someone uploaded,
+such as a shop interior.
+
+The Street View URL also rides on the selection event, for a host page with its own panel; it is
+`null` with `street_view=False`:
 
 ```js
 document.addEventListener("rs:select", e => {
@@ -161,25 +175,6 @@ document.addEventListener("rs:select", e => {
   if (url) myPanel.innerHTML += `<a href="${url}" target="_blank">Street View</a>`;
 });
 ```
-
-`street_view=False` removes the link and sends `streetView: null`.
-
-#### A Street View window on any map
-
-For a dashboard that already has its own panels, keep Street View out of the way until someone
-wants it:
-
-```python
-rs.render_edges(edges, street_view="window")
-```
-
-The map gets a Street View button (under 3D). It opens a floating window over the map that follows
-every road the user clicks (or `rsSelect`s). Drag its title bar to move it, its corner to resize it;
-the popup's *Street View* link opens it too. Nothing is loaded from Google while it is closed.
-Whether it was open, where, and how big are remembered in the viewer's browser. It opens at the
-map's bottom-right corner, so it respects any panel the page adds. On a phone it is a sheet at the
-bottom. `rsSetStreetView(true)` opens it from your own UI. Like the side-by-side page, it needs the
-page served over http(s).
 
 #### Map and Street View side by side
 

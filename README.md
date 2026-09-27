@@ -7,8 +7,8 @@
 
 Turn a GeoDataFrame of road edges into **one styled, interactive, offline HTML map**, with real
 road cartography (casing and fill, per-zoom widths, street names, one-way arrows, tunnels and
-bridges, optional 3D) and a JavaScript API for your own dashboard. Click any road to see it in
-Google Street View, looking the way it runs.
+bridges, optional 3D) and a JavaScript API for your own dashboard. Every map has a Street View
+button: click any road to see it in Google Street View, looking the way it runs.
 
 ![A roadstyle map of Södermalm, Stockholm: Hornsgatan selected on the map, and the floating Street View window showing it](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/hero.jpg)
 
@@ -40,7 +40,6 @@ rs.render_edges(edges, palette="mono", color_options={                 # several
     "Speed":   {"color_by": "maxspeed_kmh", "cmap": "magma"}})
 rs.render_edges(edges, tiles=True)                                     # 100k+ edges
 rs.render_dashboard(edges).save("dashboard.html")                      # map + query sidebar
-rs.render_edges(edges, street_view="window")                           # + a floating Street View window
 rs.render_street_view(edges).save("street_view.html")                  # map and Street View side by side
 ```
 
