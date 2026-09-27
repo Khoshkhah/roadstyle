@@ -6,6 +6,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-09-26
+
 ### Added
 - **Street View marker and steps.** While Street View is shown (the window, or the side-by-side
   page), a marker on the map (a dot and a viewing cone) shows where it stands and which way it
