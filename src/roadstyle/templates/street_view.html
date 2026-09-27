@@ -19,8 +19,10 @@
   body.sv-dragging { cursor: col-resize; user-select: none; }
   body.sv-dragging #sv-frame { pointer-events: none; }  /* else the iframe swallows the drag */
   #sv-frame { flex: 1; width: 100%; border: 0; background: #eee; }
-  #sv-empty { flex: 1; display: flex; align-items: center; justify-content: center;
-              color: #777; background: #f4f4f4; padding: 20px; text-align: center; }
+  #sv-empty { flex: 1; display: flex; flex-direction: column; align-items: center;
+              justify-content: center; gap: 8px; color: #777; background: #f4f4f4;
+              padding: 20px; text-align: center; }
+  #sv-empty code { background: #e6e6e6; padding: 2px 5px; border-radius: 3px; color: #333; }
   @media (max-width: 700px) {          /* phones: Street View under the map, not beside it */
     #map { right: 0; bottom: 45%; }
     body { --rs-side: 0px; }
@@ -48,6 +50,16 @@
     "https://www.google.com/maps/embed?pb=!6m7!1m6!2m2!1d" + lat + "!2d" + lng + "!3f" + h + "!4f0!5f1";
   const road = document.getElementById("sv-road"), frame = document.getElementById("sv-frame"),
         empty = document.getElementById("sv-empty");
+  // Google's embed stays grey in a page opened from disk (file://): say how to serve it instead
+  const fromDisk = location.protocol === "file:";
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
+  const serveHelp = () => {
+    const file = esc(decodeURIComponent(location.pathname.split("/").pop()));
+    return "<b>Street View needs this page served, not opened from disk.</b>" +
+      "<span>In its folder run <code>python -m http.server</code>, then open " +
+      "<code>http://localhost:8000/" + file + "</code></span>";
+  };
+  if (fromDisk) empty.innerHTML = serveHelp();
 
   document.addEventListener("rs:select", function (e) {
     const d = e.detail, p = d.properties || {};
@@ -56,6 +68,12 @@
     if (!d.streetView) {                                 // street_view=False, or no geometry
       frame.hidden = true; empty.hidden = false;
       empty.textContent = "No Street View for this road.";
+      return;
+    }
+    if (fromDisk) {                                      // no embed from file://; a link instead
+      frame.hidden = true; empty.hidden = false;
+      empty.innerHTML = serveHelp() + '<a href="' + esc(d.streetView) +
+        '" target="_blank" rel="noopener">Or open this spot in Google Street View &#8599;</a>';
       return;
     }
     const u = new URL(d.streetView);

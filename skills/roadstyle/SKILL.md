@@ -56,7 +56,8 @@ m.save("map.html")                        # m.html is the page as a string
 - Ready-made pages: `rs.render_dashboard(edges, ...)` (query sidebar) and
   `rs.render_report(edges, ...)` (stats sidebar) and `rs.render_street_view(edges, ...)` (Google
   Street View beside the map, following the clicked road; `panel_width=42`, `resizable=True`)
-  take the same keywords. CLI: `roadstyle edges.gpkg --page street-view`.
+  take the same keywords. CLI: `roadstyle edges.gpkg --page street-view`. Street View loads only
+  when the page is served (http/https), not opened from disk: `python -m http.server`.
 - Colours, widths, casing and camera defaults are settings, not keywords:
   `rs.render_edges(..., settings={"config": {"labels": {"color": "#888"}}})`.
 - Unsure of a keyword? `help(rs.render_edges)` or the parameters page. Don't guess: an unknown

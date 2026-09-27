@@ -54,6 +54,7 @@ def test_render_street_view_injects_panel():
     h = rs.render_street_view(_edges()).html
     assert '<div id="sv"' in h and 'id="sv-frame"' in h     # the Street View panel + its iframe
     assert "maps/embed?pb=" in h                              # built from rs:select's streetView
+    assert 'location.protocol === "file:"' in h               # from disk: explain, don't show grey
     assert h.count("</body>") == 1
     # the panel replaces the popup; the map keeps its own base-map switcher and class filter
     assert "Roads and Street View" in h

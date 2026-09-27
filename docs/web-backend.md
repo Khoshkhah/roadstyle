@@ -184,6 +184,11 @@ roadstyle edges.gpkg --page street-view --panel-width 60 --no-resize
 width in their browser. On a phone, Street View sits under the map. Every `render_edges` keyword
 passes through.
 
+!!! note "Serve the page to see Street View"
+    Google's Street View embed only loads in a page served over http(s). Opened from disk
+    (`file://`, e.g. a double-click) it stays grey, so the panel says so and offers a link
+    instead. Serve the folder: `python -m http.server`, then open `http://localhost:8000/street_view.html`.
+
 Google won't show its Maps pages inside an iframe, so the panel turns the event's point and heading
 into Google's embeddable Street View URL. The panel is plain HTML/CSS/JS
 (`rs.sidebar_html("street_view")`); the core, to build your own:

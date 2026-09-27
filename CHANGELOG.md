@@ -10,7 +10,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **`rs.render_street_view(edges)`**: a page with the map and Google Street View side by side.
   Click a road and Street View shows it, looking the way the edge runs (no new window, no API
   key). A draggable divider shares the width (`panel_width=42`, `resizable=True`); on a phone,
-  Street View sits under the map. Live demo in the web-backend docs.
+  Street View sits under the map. Google's embed loads only in a served page (http/https);
+  opened from disk, the panel says how to serve it and links to Street View instead.
+  Live demo in the web-backend docs.
 - **CLI `--page dashboard | report | street-view`**: the ready-made pages from the shell, with
   `--panel-width` / `--no-resize` for the street-view one.
 
