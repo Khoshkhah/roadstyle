@@ -10,8 +10,9 @@ edge runs (a two-way road's two edges look opposite ways). No new window, no API
 How: every click fires ``rs:select`` with ``detail.streetView``, a Google Maps URL carrying the
 point (``viewpoint``) and the edge's direction (``heading``). Google refuses to show that URL in
 an iframe, so the panel turns the same point and heading into Google's embeddable Street View
-URL. That URL (``output=svembed``) needs no key but is not documented by Google; with a Google
-Maps Embed API key, use the official one instead (``SV_EMBED_OFFICIAL`` below).
+URL: the ``google.com/maps/embed?pb=...`` form Google's own "Share > Embed a map" produces. It
+needs no key, but building it by hand is not documented by Google; with a Google Maps Embed API
+key, use the official URL instead (commented next to ``SV_EMBED`` below).
 """
 from __future__ import annotations
 
@@ -41,7 +42,7 @@ PANEL = """
   // keyless, undocumented; official (needs a Maps Embed API key):
   // "https://www.google.com/maps/embed/v1/streetview?key=KEY&location=" + lat + "," + lng + "&heading=" + h
   const SV_EMBED = (lat, lng, h) =>
-    "https://maps.google.com/maps?layer=c&cbll=" + lat + "," + lng + "&cbp=11," + h + ",0,0,0&output=svembed";
+    "https://www.google.com/maps/embed?pb=!6m7!1m6!2m2!1d" + lat + "!2d" + lng + "!3f" + h + "!4f0!5f1";
   const frame = document.getElementById("sv-frame"), title = document.getElementById("sv-title");
 
   document.addEventListener("rs:select", function (e) {

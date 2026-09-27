@@ -178,11 +178,12 @@ document.addEventListener("rs:select", e => {
   const u = new URL(e.detail.streetView);
   const [lat, lng] = u.searchParams.get("viewpoint").split(",");
   const h = u.searchParams.get("heading") || 0;
-  frame.src = `https://maps.google.com/maps?layer=c&cbll=${lat},${lng}&cbp=11,${h},0,0,0&output=svembed`;
+  frame.src = `https://www.google.com/maps/embed?pb=!6m7!1m6!2m2!1d${lat}!2d${lng}!3f${h}!4f0!5f1`;
 });
 ```
 
-`output=svembed` needs no key but is not a documented Google API, so it could stop working.
+That is the URL form Google's own *Share → Embed a map* produces. It needs no key, but building it
+by hand is not a documented Google API, so it could stop working.
 The official embed needs a Google **Maps Embed API** key:
 `https://www.google.com/maps/embed/v1/streetview?key=KEY&location=${lat},${lng}&heading=${h}`.
 Street View imagery is Google's, under Google's terms.

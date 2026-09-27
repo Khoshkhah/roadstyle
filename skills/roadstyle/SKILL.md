@@ -85,7 +85,7 @@ Events on `document`: `rs:select` (`e.detail.properties`, and `e.detail.streetVi
 Street View URL facing the edge's direction, or null), `rs:deselect`, `rs:colorchange`,
 `rs:filterchange`, `rs:basemapchange`. `window.map` is the MapLibre map. Street View *inside*
 the page, beside the map: `examples/street_view_side_by_side.py` (Google blocks the
-`detail.streetView` URL in iframes; the example converts it to an embeddable one). Add your own panel by
+`detail.streetView` URL in iframes; the example converts it to a `google.com/maps/embed?pb=` one). Add your own panel by
 inserting HTML before `</body>` in `m.html`.
 
 ## Traps (each one cost a real bug)
