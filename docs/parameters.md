@@ -3,7 +3,7 @@
 Every parameter roadstyle uses, grouped by where it appears. Types, defaults, allowed
 values, and what each one does. Use this as a lookup; for tutorials see [usage](usage.md).
 
-Sections: RoadStyle · render_edges · Stylers · Theme · Basemap · StyleConfig · Palette JSON
+Sections: RoadStyle · render_edges · Stylers · Settings file · Basemap · StyleConfig · Palette JSON · Overlay
 (use your browser's find, or the page's table-of-contents sidebar).
 
 ---
@@ -21,7 +21,7 @@ palette JSON file.
 | `casing_width` | number (px) | *required* | Thickness of the **casing** (the outline drawn *under* the fill), e.g. `8`. Usually `width + 2`. Set `0` for no casing. |
 | `casing` | hex string or `null` | `"#bcbcbc"` | The casing (outline) colour; `null` = no casing. Light grey by default; legacy files with `casing_dark` still load (it maps onto `casing`). |
 | `dash` | `[on, off]` or `null` | `null` | Dash pattern in px, e.g. `[4, 4]` = 4px line, 4px gap (used for footpaths/cycleways). `null` = solid line. |
-| `opacity` | number 0–1 | `1.0` | Transparency of the fill. `1` = solid, `0` = invisible. (The renderer multiplies this by the theme's fill opacity.) |
+| `opacity` | number 0–1 | `1.0` | Transparency of the fill. `1` = solid, `0` = invisible. |
 
 > **Casing?** A road is drawn as two stacked lines: a wider **casing** underneath (the border)
 > and a narrower **fill** on top (the colour). This is the "geometry sandwich" — it gives every
@@ -71,8 +71,8 @@ GeoDataFrame with line geometry + a class column).
 | `vmin`, `vmax` | number / `None` | `None` | Value range for the numeric ramp. Default = the column's min/max. |
 | `width_by` | `(min_px, max_px)` / `None` | `None` | For numeric styling: scale line width with the value, from `min_px` (low) to `max_px` (high). |
 | `style` | `Styler` / `None` | `None` | Pass a styler object directly (advanced). Overrides `palette`/`color_by`. |
-| `tooltip` | list / `None` | `None` | Which columns to show on hover. `None` = all columns. |
-| `selected` | GeoDataFrame / `None` | `None` | Highlight these edges with a neon-violet overlay. |
+| `tooltip` | list / `None` | `None` | Which columns to show on hover. `None` = no tooltip on `web`, all columns on `folium`. |
+| `selected` | GeoDataFrame / `None` | `None` | **folium only** (ignored on `web`): highlight these edges with a neon-violet overlay. On `web`, use `rsHighlight` / `rsColor` or a `color_options` entry. |
 | `basemap` | str / `None` | `None` | The primary base map (a key in `BASEMAPS`); default from the `basemap` setting (`voyager`). |
 | `pitch` / `bearing` | number / `None` | settings | Starting camera tilt / rotation (`camera` settings block). |
 | `view_3d` | bool | `False` | 3D view: tilted camera + extruded, ramped, cased bridge decks (`bridge_decks` settings block: `base_m`, `ramp_m`, `opacity`, `match_zoom`, `width_scale`, `casing_px`, and `flat_below` — below that zoom bridges draw as classic flat cased lines). |
@@ -82,17 +82,15 @@ GeoDataFrame with line geometry + a class column).
 | `api_key` | str / `None` | `None` | API key / access token for third-party basemap providers (Mapbox, Stadia, MapTiler, etc.). |
 | `basemaps` | list / `None` | `None` | The set of base maps offered in the in-map switcher control. |
 | `filter_control` | bool | `True` | Show the in-map road-type filter panel (checkboxes). On `folium` and the `web` backend. |
-| `name` | str | `"roads"` | Layer name. |
+| `name` | str | `"roadstyle"` (`web`) | Page title / layer name. |
 
 **Returns:** a `WebMap` (default, `backend="web"`), a `folium.Map` (`backend="folium"`), or a
 `lonboard.Map` (`backend="lonboard"`). Save with `.save("map.html")` (web / folium) or
 `.to_html("map.html")` (lonboard); all three also display inline in a notebook.
 
-> **Legends & the default backend.** Data-driven **legends** and the in-map **filter panel** are
-> drawn by the `folium` (and JSON) outputs, *not* the MapLibre `web` backend. So
-> `render_edges(color_by=…, cmap=…, legend=True)` only shows a legend on `backend="folium"` (or via
-> `to_html`/`to_spec`). Use `backend="folium"` when you need the legend; use the default `web`
-> backend for the zoom-correct interactive map.
+> **Legends.** `legend=True` (the default) draws a data legend for `color_by` / `cmap` /
+> `colors` on the `web` and `folium` backends; `color_options` maps get a legend that follows the
+> *Colour by* dropdown. lonboard draws no legend.
 
 ### `backend="web"` — extra parameters
 

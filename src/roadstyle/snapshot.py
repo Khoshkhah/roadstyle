@@ -18,7 +18,8 @@ from pathlib import Path
 
 
 def snapshot(map_or_html, out_path, *, center=None, zoom=None, pitch=None, bearing=None,
-             width: int = 1200, height: int = 800, settle: float = 2.5, timeout: float = 40.0):
+             width: int = 1200, height: int = 800, scale: float = 1, settle: float = 2.5,
+             timeout: float = 40.0):
     """Render a map to a PNG via headless Chromium and return the output path.
 
     Parameters
@@ -28,7 +29,9 @@ def snapshot(map_or_html, out_path, *, center=None, zoom=None, pitch=None, beari
     out_path : the ``.png`` to write.
     center / zoom / pitch / bearing : optional camera for the shot (web backend maps); by
         default the map's own opening view (the fitted bounds) is captured.
-    width / height : viewport size in px.
+    width / height : viewport size in CSS px.
+    scale : device pixel ratio; ``scale=2`` writes a sharp ``2*width x 2*height`` PNG for
+        HiDPI screens, READMEs and print.
     settle : seconds to wait after loading for tiles/labels to finish drawing.
     timeout : seconds to wait for the map to finish loading before shooting anyway.
     """
@@ -43,10 +46,10 @@ def snapshot(map_or_html, out_path, *, center=None, zoom=None, pitch=None, beari
     tmp = None
     if html is not None:
         pass                                        # a WebMap
+    elif isinstance(map_or_html, str) and "<html" in map_or_html[:200].lower():
+        html = map_or_html                          # before is_file(): a page is too long a path
     elif isinstance(map_or_html, (str, os.PathLike)) and Path(map_or_html).is_file():
         html = None                                 # serve the existing file directly
-    elif isinstance(map_or_html, str) and "<html" in map_or_html[:200].lower():
-        html = map_or_html
     else:
         raise TypeError("snapshot: pass a WebMap, an HTML string, or a path to an HTML file")
 
@@ -67,7 +70,8 @@ def snapshot(map_or_html, out_path, *, center=None, zoom=None, pitch=None, beari
     def _shoot():
         with sync_playwright() as p:
             browser = p.chromium.launch()
-            page = browser.new_page(viewport={"width": width, "height": height})
+            page = browser.new_page(viewport={"width": width, "height": height},
+                                    device_scale_factor=scale)
             page.goto(url)
             try:                                    # web backend: wait for MapLibre to finish
                 page.wait_for_function(

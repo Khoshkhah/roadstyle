@@ -52,7 +52,7 @@ rs.render_edges(edges, palette="carto")
 rs.render_edges(edges, palette="highsat", basemap="dark_matter")
 ```
 
-Themes set the base map and casing colours; palettes set the per-road-class colours. See
+The base map sets the background; the palette sets the per-road-class colours. See
 [Palettes](palettes.md) for the full reference.
 
 > Notebook: **01 · Quickstart**, **06 · Customizing the look**
@@ -119,9 +119,9 @@ sorted(rs.highway_types(edges))                       # what classes are present
 rs.render_edges(edges, include=["motorway", "trunk", "primary"], basemap="dark_matter")
 rs.render_edges(edges, exclude=["service", "footway", "path", "cycleway"])
 
-# highlight a sub-selection with a neon overlay
+# highlight a sub-selection with a neon overlay (folium; on web use rsHighlight / rsColor)
 sel = edges[edges["highway"] == "secondary"]
-rs.render_edges(edges, basemap="dark_matter", selected=sel)
+rs.render_edges(edges, backend="folium", basemap="dark_matter", selected=sel)
 ```
 
 > Notebook: **03 · Filtering & highlighting**
@@ -138,7 +138,7 @@ Pick the base map with any key in `rs.BASEMAPS` (the default comes from the `bas
 print("available base maps:", list(rs.BASEMAPS))
 rs.render_edges(edges, basemap="positron")
 
-# a thumbnail base-layer switcher on the map (folium)
+# which base maps the in-map switcher offers
 rs.render_edges(edges, basemap="dark_matter", basemaps=["dark_matter", "positron", "satellite"])
 ```
 
@@ -188,8 +188,8 @@ rs.render_edges(edges, backend="lonboard", basemap="dark_matter")
 rs.render_edges(edges, backend="lonboard", color_by="length_m", cmap="magma", width_by=(1, 5))
 ```
 
-Use **folium** for portable, self-contained HTML and rich interactions; **lonboard** when edge
-counts get large enough that Leaflet feels heavy.
+The default **web** backend handles ~10⁵ edges with `tiles=True`; **lonboard** (GPU) takes
+millions, with fewer cartographic touches. See [Choosing an engine](engines.md).
 
 > Notebook: **07 · Large datasets (lonboard)**
 

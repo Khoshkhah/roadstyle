@@ -11,11 +11,18 @@ All notable changes to **roadstyle** are documented here. The format is based on
   the clicked point and facing the clicked edge's direction, so a road's two directions get
   opposite headings. A plain maps URL, no API key; `street_view=False` turns it off.
   The URL also rides on `rs:select` as `detail.streetView`, for host pages with their own panel.
-- **`AGENTS.md`**: a compact guide for AI coding agents (the one call, the data contract, the JS
-  API, the traps).
+- **`skills/roadstyle/SKILL.md`**: an agent skill for code that *uses* roadstyle (the one call,
+  the data contract, the JS API, the traps); **`AGENTS.md`** for agents working on the repo;
+  **`llms.txt`** at the docs site root.
+- **`rs.snapshot(..., scale=2)`**: device pixel ratio, for sharp PNGs on HiDPI screens and in print.
 
 ### Changed
 - Field names in the click popup and the hover tooltip are **bold**, values plain.
+- README cut to a one-screen overview with a sharp 2x hero image (`docs/build_gallery.py`);
+  the parameter tables live in the docs, base maps & API keys moved to `docs/usage.md`.
+
+### Fixed
+- `rs.snapshot(html_string, ...)` raised `OSError: File name too long` instead of rendering it.
 
 ## [0.4.1] — 2026-08-29
 

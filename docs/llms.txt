@@ -1,0 +1,31 @@
+# roadstyle
+
+> Python library: turn a GeoDataFrame of road edges (LineString geometry + an OSM `highway` column) into one styled, interactive, offline HTML map (MapLibre, data inlined) with road cartography (casing and fill, per-zoom widths, labels, one-way arrows, bridges and tunnels, 3D) and a `window.rs*` JavaScript API. `pip install roadstyle`; main call `rs.render_edges(gdf, ...).save("map.html")`.
+
+Edges are directed: a two-way road is two edges with reversed geometry. JS calls (rsSelect, rsColor, rsFocus) take roadstyle feature ids from `rsQuery`, never your own `edge_id`. Unknown keywords to `render_edges` are silently ignored.
+
+## Start here
+
+- [Agent skill](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/skills/roadstyle/SKILL.md): the one call, the data contract, the JS API and the traps, in one page
+- [README](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/README.md): install, quickstart, data contract
+
+## Reference
+
+- [Parameters](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/parameters.md): every keyword of render_edges, stylers, settings, Overlay
+- [Web backend](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/web-backend.md): grade separation, 3D, vector tiles, color_options, overlays, the JavaScript API and events
+- [Python API](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/api.md): every public function and class
+- [Palettes & settings](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/palettes.md): the built-in palettes and the override files
+- [Usage](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/usage.md): install extras, CLI, base maps and API keys, input formats
+
+## Guides
+
+- [Embedding](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/embedding.md): the JSON spec, iframe, Leaflet and MapLibre snippets
+- [Choosing an engine](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/engines.md): web vs folium vs lonboard
+- [Gallery](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/gallery.md): one screenshot and recipe per look
+
+## Optional
+
+- [Tutorial](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/tutorial.md)
+- [Manual](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/manual.md)
+- [Comparison](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/comparison.md): vs geopandas .explore(), prettymaps, kepler.gl
+- [Changelog](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/CHANGELOG.md)

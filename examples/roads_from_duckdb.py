@@ -40,15 +40,15 @@ def main() -> None:
     print(f"from_duckdb → {len(edges):,} driving edges from {SAMPLE.name}")
 
     tooltip = ["edge_id", "highway", "name", "maxspeed_kmh"]
-    folium_out = HERE / "sodermalm_driving.html"
-    web_out = HERE / "sodermalm_driving_web.html"
+    map_out = HERE / "sodermalm_driving.html"
+    spec_out = HERE / "sodermalm_driving_web.html"
 
-    # high-saturation palette on the dark base map; hover tooltips from the data columns
-    rs.render_edges(edges, basemap="dark_matter", tooltip=tooltip).save(str(folium_out))
-    # the portable web spec — legend + filter + base-layer switcher baked into the page by to_html
-    rs.save(edges, str(web_out), basemap="dark_matter", tooltip=tooltip)
+    # the MapLibre web map: high-saturation palette on the dark base map, hover tooltips
+    rs.render_edges(edges, basemap="dark_matter", tooltip=tooltip).save(str(map_out))
+    # the roadstyle.js spec page (JSON spec + a small renderer), for embedding
+    rs.save(edges, str(spec_out), basemap="dark_matter", tooltip=tooltip)
 
-    print(f"wrote {folium_out.name} (folium) and {web_out.name} (roadstyle.js) in {HERE}")
+    print(f"wrote {map_out.name} (web) and {spec_out.name} (roadstyle.js) in {HERE}")
 
 
 if __name__ == "__main__":

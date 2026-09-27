@@ -31,8 +31,8 @@ Prefer a dark canvas? Pass `basemap="dark_matter"` (Dark Matter) or `basemap="sa
 <iframe src="../maps/first_map.html" loading="lazy" title="A first roadstyle map"
         style="width:100%;height:480px;border:0;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.18)"></iframe>
 
-*Hover a road to highlight it; click it for its attributes; use the dropdown (top-left) to switch the
-base map.*
+*Hover a road to highlight it; click it for its attributes; use the base-map button (bottom-right)
+to switch the base map.*
 
 ---
 
@@ -95,8 +95,8 @@ rs.render_edges(edges, backend="web", palette="mono",
         style="width:100%;height:480px;border:0;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.18)"></iframe>
 
 *Translucent **TAZ zones** sit under the roads; red **POIs** sit on top. Click a zone or a POI for
-its popup; use the **Layers** control (bottom-right) to toggle each overlay. (Road clicks take
-precedence — an overlay is consulted only where the click misses every road.)*
+its popup; use the **Layers** control (bottom-right) to toggle each overlay. (What's drawn on top wins
+the click: a POI (`placement="over"`) before the roads, the roads before a zone underneath.)*
 
 `kind` is auto-detected from the geometry (polygon → `fill`, point → `circle`, line → `line`) but can
 be forced. See [`Overlay`](parameters.md#8-overlay-extra-layers) for every field.

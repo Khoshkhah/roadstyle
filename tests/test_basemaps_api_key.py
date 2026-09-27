@@ -1,15 +1,15 @@
 import os
+
+import geopandas as gpd
 import pytest
 import shapely.geometry as sg
-import geopandas as gpd
 
 import roadstyle
 from roadstyle.basemaps import (
-    Basemap,
+    _SESSION_API_KEYS,
     get_api_key,
     get_basemap,
     set_api_key,
-    _SESSION_API_KEYS,
 )
 
 

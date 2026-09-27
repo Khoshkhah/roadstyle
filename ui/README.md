@@ -2,9 +2,9 @@
 
 Copyable starting points for building your own frontend over a roadstyle web map. The library
 keeps **data and logic** (the baked features, the `window.rs*` API, the `rs:*` events); the UI
-layer is deliberately yours — the `dashboard/` and `report/` templates are scaffolding, not part
-of the package. (The studio is the exception: it ships inside the package — `roadstyle studio` —
-and this dir keeps only its `samples/`.)
+layer is deliberately yours. The `dashboard/` and `report/` templates here are the forkable source
+of the sidebars the package ships (`rs.render_dashboard` / `rs.render_report`). The studio ships
+inside the package too (`roadstyle studio`); this dir keeps only its `samples/`.
 
 Each template is a plain **HTML/CSS/JS fragment** (no frameworks, no build step, no server)
 that gets injected before `</body>` of a saved map and talks to it only through the public API:

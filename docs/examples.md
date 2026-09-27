@@ -13,7 +13,7 @@ output to `notebooks/output/` (git-ignored).
 |---|---|
 | **01 · Quickstart** | Load edges → `render_edges` → `.save()`. Base maps and palettes (`highsat`/`carto`/`mono`). |
 | **02 · Data-driven styling** | Colour roads by your own data — categorical (`color_by` + `colors`) and numeric (`color_by` + `cmap` + `width_by`) with legends. |
-| **03 · Filtering & highlighting** | `highway_types`, `include`/`exclude`, and a neon `selected=` highlight. |
+| **03 · Filtering & highlighting** | `highway_types`, `include`/`exclude`, and a neon `selected=` highlight (folium). |
 | **04 · Outputs for the web** | The canonical JSON spec (`to_spec`), `to_geojson`, `save_spec`/`load_spec`, `to_html`, `to_iframe`, `save`. |
 | **05 · Embedding with `roadstyle.js`** | The decoupled path: Python bakes a JSON spec; the bundled `roadstyle.js` draws it in your own page with a custom sidebar. Generates a self-contained `output/web/` folder. |
 | **06 · Customizing the look** | Base maps + switcher, and custom colour vocabularies via `color_by` + `colors`. |

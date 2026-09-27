@@ -85,7 +85,7 @@ backend adds:
 | `filter_control` | bool | `True` | Show the collapsible **road-class filter panel** (a checkbox per class present; unchecking hides that class across every road layer). |
 | `filter_col` | str | `None` | Column the filter panel lists/filters by, when it should differ from the styling `highway_col`. Default `None` = filter by the styling column. Set it to filter by a **source-native class** while widths/casing follow a different (e.g. OSM-highway proxy) column — the panel reads this raw property directly, so no restyle is needed. |
 | `basemap_switcher` | bool | `True` | Show the in-map **base-layer dropdown** (its options come from `basemap` / `basemaps`). With `False` **plus an explicit `basemaps=` list**, the entries stay baked and addressable via `window.rsSetBasemap` for a custom UI; `False` alone bakes only the fixed backdrop. |
-| `road_popup` | bool | `True` | Info popup shown when a road is **clicked** (lists the feature's attributes). Click-to-select works either way; set `False` to drive your own readout from `window.map` events. |
+| `road_popup` | bool / list / `"all"` / `"panel"` | `True` | Info popup shown when a road is **clicked**: `True` = curated fields, a list = those columns, `"all"`, or `"panel"` = a docked side read-out. Click-to-select works either way; set `False` to drive your own readout from `window.map` events. |
 | `road_tooltip` | bool / list of cols | `False` | **Hover** tooltip: `True` = all attributes, a list of column names = only those, `False` = off. The shared `tooltip=` arg (folium backend / CLI `--tooltip`) is accepted as an **alias** — when given and `road_tooltip` is unset it drives this, so the same `tooltip=` / `--tooltip` call works on every backend. `road_tooltip` is the web-native name and wins if both are set. |
 | `street_view` | bool | `True` | A **Google Street View** link in the road read-out (popup or panel), at the clicked point and facing the way the clicked edge runs — the heading comes from the edge segment nearest the click, so a road's two directions open the same spot looking opposite ways. A plain `google.com/maps` URL: no API key. The same URL is sent as `event.detail.streetView` on `rs:select` (or `null`), for a host page that turns the popup off and shows its own panel. Field names in the popup and the hover tooltip are bold. |
 | `offset_frac` | float | `0.28` | Two-way lane offset as a fraction of the road's **pixel** width (pixel-proportional ⇒ constant overlap at every zoom). `0` = no lane split. |
@@ -117,12 +117,12 @@ dispatches a CustomEvent on `document`:
 | `rsColor(ids, "#hex", layer?)` | paint the set one colour, layered over the base styling; or several sets at once — `rsColor([[idsA, "#f80"], [idsB, "#08f"]])`, earlier pairs winning overlaps (roads only). Reset: `rsColor(null)` / `rsColor(null, null, label)` | `rs:colorchange` |
 | `rsHighlight(ids, layer?)` | selection glow on the set (`[]` clears) | `rs:highlightchange` |
 | `rsGetProps(ids, layer?)` | the rows behind the ids, internal fields stripped — table-ready | — |
-
-`layer` is optional on all of these: omitted → the roads; an overlay's **label** (or index) →
-that overlay is the queried table. Each layer is its own id space — never mix ids across layers.
 | `rsFocus(ids, opt?, layer?)` | fly the camera to fit an id (or id set); `opt` merges into MapLibre's `fitBounds` (`padding` 80, `maxZoom` 17) | — |
 | `rsSelect(id)` / `rsDeselect()` | select one edge exactly like a click (glow + popup/panel; a 3D bridge glows as that edge's own deck ribbon) / clear | `rs:select` / `rs:deselect` |
 | `rsSetView3D(on)` | tilt to the settings' `camera.pitch_3d` / back to flat north-up | `rs:viewchange` |
+
+`layer` is optional on all of these: omitted → the roads; an overlay's **label** (or index) →
+that overlay is the queried table. Each layer is its own id space — never mix ids across layers.
 
 The id sets use the roads source's generated feature ids — the same id space as `rs:select`
 events. Labels, arrows and 3D deck ribbons sit on merged helper sources, so `rsFilter` prunes
@@ -345,7 +345,7 @@ line casing (`bridge_decks.casing_px: 0` disables). Below **`bridge_decks.flat_b
 (default 16) bridges render as the classic flat cased lines instead — full stylized width,
 matching the roads — and the decks take over from that zoom up; selection glows on whichever
 representation is showing.
-Decks are semi-transparent (`bridge_decks.opacity`), hover/select as ONE structure, and show the
+Decks are semi-transparent (`bridge_decks.opacity`), hover/select per directed edge like flat roads, and show the
 same popup fields as flat edges. Every map also carries an on-map **2D/3D toggle** button and a
 pitch-aware compass; no terrain/elevation data is used — the deck height is cartographic.
 
@@ -368,7 +368,7 @@ from the settings file, but they are entirely different machinery:
 | Structure | grade separation (tunnels faded below, bridges on top, 3D decks), two-way lane fanning, junction-sealed caps | none — a fill, a line, or circles |
 | Annotations | street-name labels + one-way arrows in alternating slots | none |
 | Data-driven colour | `color_by` ramps, `color_table`, the *Colour by* dropdown with legends | constant colour per overlay |
-| Interaction | hover highlight, whole-bridge selection, popup/panel, `rs:select` events, class filter panel | hover tint + popup, visibility checkbox in the Layers toggle |
+| Interaction | hover highlight, per-edge selection (bridges included), popup/panel, `rs:select` events, class filter panel | hover tint + popup, visibility checkbox in the Layers toggle |
 | Settings footprint | most of `defaults.json` (palettes, `roads` model, labels, arrows, slots, decks, camera) | the small `overlays` defaults block |
 | Data contract | `highway` + the optional columns (see the README data contract) | any geometry; properties feed the popup only |
 

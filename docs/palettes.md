@@ -27,7 +27,8 @@ fill-only minors. Widths are pixel widths at city zoom (the web backend scales t
 | service | `#F0F0F0` | — | 1.0 | — (fill only) |
 | track | `#9E7B54` | — | 1.5 | — |
 | cycleway | `#2980B9` | — | 1.5 · dash 6,4 | — |
-| footway / path | `#C0392B` | — | 1.5 · dash 4,4 | — |
+| footway / path | `#D98880` | — | 1.5 · dash 4,4 | — |
+| pedestrian | `#DDDDDD` | — | 1.5 | — |
 
 ## carto
 
@@ -45,7 +46,7 @@ The classic **OSM Carto** look (muted warm tones), with a coloured casing tone p
 | service | `#ffffff` | `#d4d4d4` | 1.2 | 2.2 |
 | track | `#9e7b54` | — | 1.5 · dash 4,4 | |
 | cycleway | `#5c7cb6` | — | 1.2 · dash 3,3 | |
-| footway / path | `#9e5b5b` | — | 1.2 · dash | |
+| footway / path | `#C59D9D` | — | 1.2 · dash | |
 
 ## mono
 
@@ -63,7 +64,8 @@ few-shades-darker casing for separation. Useful for print, or as a quiet backdro
 | living_street | `#d4d4d4` | `#9a9a9a` | 1.8 | 3.0 |
 | service | `#e4e4e4` | `#bcbcbc` | 1.2 | 2.2 |
 | track | `#9a9a9a` | — | 1.5 · dash 4,4 | |
-| cycleway / footway / path | `#888888` | — | 1.2 · dash | |
+| cycleway | `#888888` | — | 1.2 · dash | |
+| footway / path | `#ABABAB` | — | 1.2 · dash | |
 
 ## Overrides
 

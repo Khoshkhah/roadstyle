@@ -56,6 +56,6 @@ Download `report.html`, or reproduce it with the shipped [`rs.render_report(edge
 !!! tip "The sidebar pages are authoring tools"
     Dashboard and Report just pick the knobs and call the shipped
     [`render_dashboard` / `render_report`](api.md#rendering), which inject a bundled sidebar template;
-    the HTML / CSS / JS fragment (`rs.sidebar_html(...)`, also in [`ui/`](frontend.md)) is yours to
+    the HTML / CSS / JS fragment (`rs.sidebar_html(...)`, also in [`ui/`](https://github.com/Khoshkhah/roadstyle/tree/main/ui)) is yours to
     reshape. Everything the sidebars do goes through the documented
     [`window.rs*` API](web-backend.md#the-javascript-api-windowrs).

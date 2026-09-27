@@ -49,6 +49,30 @@ roadstyle studio --server.port 8502                         # extra args are for
 `roadstyle --help`. `roadstyle studio` (from the `studio` extra) launches the
 [workbench](studio.md) and forwards any extra arguments to `streamlit run`.
 
+## Base maps & API keys
+
+Built in: `voyager` (default), `positron`, `dark_matter`, `osm`, `esri_gray`, `satellite`, and the
+tile-less `blank` / `blank_dark` (zero network requests). Any
+[xyzservices](https://xyzservices.readthedocs.io/) provider (`pip install "roadstyle[basemaps]"`) or
+a tile URL template works too; add your own to the switcher with `rs.register_basemap(rs.Basemap(...))`.
+
+!!! note "CARTO watermark"
+    CARTO base maps (`voyager`, `positron`, `dark_matter`) show an *"API KEY REQUIRED"* watermark
+    unless a free key from [carto.com/basemaps/apikey](https://carto.com/basemaps/apikey) is set.
+
+A provider that needs a key (CARTO, Mapbox, Stadia, MapTiler, Thunderforest, Jawg, …) takes the
+first one found, in this order:
+
+1. the call: `rs.render_edges(edges, basemap=xyz.MapBox, api_key="pk.…")`
+2. the session: `rs.set_api_key("pk.…", provider="mapbox")` (no `provider` = any provider)
+3. the settings file (`~/.config/roadstyle/roadstyle.json` or `./roadstyle.json`), which keeps keys
+   out of your code: `{"config": {"api_key": "…", "api_keys": {"mapbox": "pk.…"}}}`
+4. the environment: `<PROVIDER>_API_KEY` (e.g. `CARTO_API_KEY`, `MAPBOX_API_KEY`), then
+   `ROADSTYLE_API_KEY` for any provider
+
+A custom tile URL may carry an `{api_key}` or `{accessToken}` placeholder:
+`basemap="https://tiles.example.com/{z}/{x}/{y}.png?api_key={api_key}"`.
+
 ## Input — what roadstyle expects
 
 roadstyle styles **road edges**: a `GeoDataFrame` (or a `RoadEdges`) with **line geometry**
@@ -86,7 +110,7 @@ rs.render_edges(edges, basemap="dark_matter").save("roads.html")
 rs.render_edges(edges, palette="carto",
                 include=["motorway", "trunk", "primary"])
 rs.render_edges(edges, basemap="satellite")
-rs.render_edges(edges, selected=picked_edges)          # neon-violet highlight
+rs.render_edges(edges, backend="folium", selected=picked_edges)  # neon highlight (folium only)
 
 # Data-driven: categorical (e.g. congestion levels)
 rs.render_edges(edges, color_by="congestion",

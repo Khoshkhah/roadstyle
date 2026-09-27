@@ -473,6 +473,9 @@ def test_snapshot_writes_png(tmp_path):
     rs.snapshot(wm, out, zoom=13, width=500, height=400, settle=1.5)
     data = out.read_bytes()
     assert data[:8] == b"\x89PNG\r\n\x1a\n" and len(data) > 10_000
+    rs.snapshot(wm.html, out, zoom=13, width=500, height=400, scale=2, settle=1.5)  # an HTML str
+    head = out.read_bytes()[16:24]                # IHDR: width, height as big-endian uint32
+    assert (int.from_bytes(head[:4], "big"), int.from_bytes(head[4:], "big")) == (1000, 800)
 
 
 def test_oneway_column_drives_arrows():

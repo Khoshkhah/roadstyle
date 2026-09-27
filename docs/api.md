@@ -16,7 +16,7 @@ A map of the public API. For every parameter and its meaning, see the
 (`color_options=` populates the sidebar's *Colour by* picker). The templates ship in the package,
 so they need no repo checkout.
 
-Key kwargs: `backend`, `palette`, `highway_col`, `include`/`exclude`, `selected`, `tooltip`,
+Key kwargs: `backend`, `palette`, `highway_col`, `include`/`exclude`, `selected` (folium), `tooltip`,
 `basemap`/`basemaps`, `view_3d` / `pitch` / `bearing`, `settings` (per-call override), the
 data-driven set `style` / `color_by` / `colors` / `cmap` / `vmin` / `vmax` / `width_by` /
 `legend`, and (web backend) `color_options` (switchable colouring), `overlays` (extra layers),
@@ -28,7 +28,7 @@ data-driven set `style` / `color_by` / `colors` / `cmap` / `vmin` / `vmax` / `wi
 |---|---|---|
 | `from_duckdb(con_or_rel, query=None, *, geometry, crs)` | `RoadEdges` | load edges from any DuckDB connection / relation / query — select the geometry as WKB (`ST_AsWKB(geom) AS geom`) |
 | `use_settings(path_or_dict, ...)` | — | apply a settings override at runtime (`use_settings()` drops it) |
-| `snapshot(map_or_html, out_png, *, center, zoom, pitch, bearing, ...)` | path | static PNG via headless Chromium (optional `playwright` dependency) |
+| `snapshot(map_or_html, out_png, *, center, zoom, pitch, bearing, width, height, scale, ...)` | path | static PNG via headless Chromium (optional `playwright` dependency) |
 
 ## Web / JSON output
 
