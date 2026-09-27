@@ -141,6 +141,26 @@ row calls `rsSelect` + `rsFocus` — it selects the road exactly like a map clic
 camera to it. It is built entirely on the public API (`rsQuery` → `rsSelect` / `rsFocus`), so a
 custom sidebar can offer the same search (both `ui/` templates do).
 
+### Google Street View link
+
+Clicking a road adds a **Street View ↗** link to its popup or side panel. It opens Google Street
+View at the clicked point, looking along the clicked edge: the heading is the direction of the
+edge's segment nearest the click. Because edges are directed, a two-way road's two edges open at
+the same spot looking opposite ways. `rsSelect(id)` uses the edge's midpoint instead of a click.
+It is a plain `google.com/maps` URL: no API key, nothing loaded until the link is followed.
+
+The same URL rides on the selection event, for a host page whose own panel replaces the popup
+(`road_popup=False`); it is `null` when turned off:
+
+```js
+document.addEventListener("rs:select", e => {
+  const url = e.detail.streetView;          // "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=59.31,18.07&heading=172"
+  if (url) myPanel.innerHTML += `<a href="${url}" target="_blank">Street View</a>`;
+});
+```
+
+`street_view=False` removes the link and sends `streetView: null`.
+
 ## Dynamic recolouring (`color_options`)
 
 Bake **several pre-resolved "colour by" fill sets** into the one map and switch between them in the
