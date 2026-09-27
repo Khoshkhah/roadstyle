@@ -1,9 +1,17 @@
-![roadstyle — opinionated road cartography and interactive map styling for Python](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/assets/roadstyle-banner.svg)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/assets/roadstyle-logo.svg" alt="roadstyle logo" width="96">
+</p>
 
-[![PyPI](https://img.shields.io/pypi/v/roadstyle.svg)](https://pypi.org/project/roadstyle/)
-[![Tests](https://github.com/Khoshkhah/roadstyle/actions/workflows/test.yml/badge.svg)](https://github.com/Khoshkhah/roadstyle/actions/workflows/test.yml)
-[![Docs](https://img.shields.io/badge/docs-khoshkhah.github.io%2Froadstyle-indigo.svg)](https://khoshkhah.github.io/roadstyle/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Khoshkhah/roadstyle/blob/main/LICENSE)
+<h1 align="center">roadstyle</h1>
+
+<p align="center">Road maps for Python: styled, interactive, offline HTML maps of road networks, with Google Street View.</p>
+
+<p align="center">
+  <a href="https://pypi.org/project/roadstyle/"><img src="https://img.shields.io/pypi/v/roadstyle.svg" alt="PyPI"></a>
+  <a href="https://github.com/Khoshkhah/roadstyle/actions/workflows/test.yml"><img src="https://github.com/Khoshkhah/roadstyle/actions/workflows/test.yml/badge.svg" alt="Tests"></a>
+  <a href="https://khoshkhah.github.io/roadstyle/"><img src="https://img.shields.io/badge/docs-khoshkhah.github.io%2Froadstyle-ff6b35.svg" alt="Docs"></a>
+  <a href="https://github.com/Khoshkhah/roadstyle/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+</p>
 
 Turn a GeoDataFrame of road edges into **one styled, interactive, offline HTML map**, with real
 road cartography (casing and fill, per-zoom widths, street names, one-way arrows, tunnels and
@@ -72,7 +80,7 @@ rsColor(ids, "#ff00aa");  rsFocus(ids);       // paint them, fit the camera
 document.addEventListener("rs:select", e => console.log(e.detail.properties));
 ```
 
-Full API: [web backend → JavaScript API](https://khoshkhah.github.io/roadstyle/reference/javascript/).
+Every function and event: [JavaScript API](https://khoshkhah.github.io/roadstyle/reference/javascript/).
 
 ## For AI coding agents
 
@@ -90,7 +98,7 @@ Full API: [web backend → JavaScript API](https://khoshkhah.github.io/roadstyle
 
 **[khoshkhah.github.io/roadstyle](https://khoshkhah.github.io/roadstyle/)**, with live maps on every page.
 
-| | |
+| Where | What you find |
 |---|---|
 | **[Get started](https://khoshkhah.github.io/roadstyle/get-started/)** | install, a first map, what your data needs |
 | **Guides** | [style the roads](https://khoshkhah.github.io/roadstyle/guides/style/) · [colour by your data](https://khoshkhah.github.io/roadstyle/guides/colour/) · [your own layers](https://khoshkhah.github.io/roadstyle/guides/overlays/) · [Google Street View](https://khoshkhah.github.io/roadstyle/guides/street-view/) · [big networks](https://khoshkhah.github.io/roadstyle/guides/big-networks/) · [dashboards & JavaScript](https://khoshkhah.github.io/roadstyle/guides/dashboards/) · [on a website](https://khoshkhah.github.io/roadstyle/guides/website/) |
