@@ -751,3 +751,7 @@ def test_web_street_view_link():
     # a map marker shows where Street View stands; the step buttons walk along the edge
     assert "window.rsStreetViewStep = rsStreetViewStep;" in on and '"rs:streetviewmove"' in on
     assert "rsSetStreetViewMarker(!!on);" in on and 'data-step="15"' in on
+    # the marker sits on the DRAWN lane (roads-fill's own line-offset at this zoom), not 2.5 m out,
+    # which is off the road when zoomed in; and it follows zoom / rotate / pitch
+    assert 'map.getPaintProperty("roads-fill", "line-offset")' in on
+    assert 'map.on("move", _svMarkPlace);' in on

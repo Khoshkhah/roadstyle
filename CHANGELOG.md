@@ -9,6 +9,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ### Fixed
 - Stepping Street View along a road (◀ ▶) pans the map when the marker nears its edge, so the
   marker stays in view.
+- On a two-way road the Street View marker sat 2.5 m right of the centre line, which is off the
+  drawn road when zoomed in. It now sits on its direction's lane as the map draws it (the
+  layer's own line-offset at the current zoom); Google still gets the 2.5 m lane point.
 
 ## [0.7.0] — 2026-09-26
 

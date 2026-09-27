@@ -877,7 +877,8 @@ function _svAt(f, m){                           // the spot m metres along f: {l
   const t=(m-d[i])/((d[i+1]-d[i])||1), k=Math.cos(cs[i][1]*Math.PI/180);
   const dx=(cs[i+1][0]-cs[i][0])*k, dy=cs[i+1][1]-cs[i][1];
   const p={lng:cs[i][0]+t*(cs[i+1][0]-cs[i][0]), lat:cs[i][1]+t*(cs[i+1][1]-cs[i][1]),
-           h:(Math.atan2(dx,dy)*180/Math.PI+360)%360, m:m, len:len};
+           h:(Math.atan2(dx,dy)*180/Math.PI+360)%360, m:m, len:len, a:cs[i], b:cs[i+1]};
+  p.c=[p.lng, p.lat];                           // on the centre line: where the map draws from
   if(f.properties && f.properties.__rs_twoway){ // (dy,-dx) points right of travel
     const n=Math.hypot(dx, dy)||1, o=_SV_LANE_M/_SV_R; p.lng += dy/n*o/k; p.lat -= dx/n*o; }
   return p; }
@@ -894,6 +895,32 @@ function _svPick(ll, f, id){
   return _svUrl(ll, f); }
 // the map marker: a dot where Street View stands and a cone the way it looks. Shown while a
 // Street View is on screen (the window open, or the side-by-side page); rsSetStreetViewMarker(on)
+// the drawn lane offset (px) of an edge at this zoom: roads-fill's own line-offset expression,
+// ["interpolate",["linear"],["zoom"], z, ["case", two-way?, ["match",["get",class], ..., dflt], 0], ...]
+function _svLanePx(props){
+  const e=map.getPaintProperty("roads-fill", "line-offset");
+  if(!Array.isArray(e) || e[0]!=="interpolate") return typeof e==="number" ? e : 0;
+  const val=x=>{ if(typeof x==="number") return x;
+    if(!Array.isArray(x)) return 0;
+    if(x[0]==="case") return props.__rs_twoway ? val(x[2]) : val(x[3]);
+    if(x[0]==="match"){ const v=props[x[1][1]];
+      for(let i=2;i+1<x.length;i+=2) if(x[i]===v || (Array.isArray(x[i]) && x[i].includes(v))) return val(x[i+1]);
+      return val(x[x.length-1]); }
+    return 0; };
+  const z=map.getZoom(), st=[]; for(let i=3;i+1<e.length;i+=2) st.push([e[i], e[i+1]]);
+  if(!st.length) return 0;
+  if(z<=st[0][0]) return val(st[0][1]);
+  for(let i=0;i+1<st.length;i++) if(z<=st[i+1][0]){
+    const t=(z-st[i][0])/(st[i+1][0]-st[i][0]); return val(st[i][1])+t*(val(st[i+1][1])-val(st[i][1])); }
+  return val(st[st.length-1][1]); }
+// place the marker on the centre line, shifted right of travel by the lane's drawn offset: Google
+// gets the real 2.5 m lane point, the marker sits in the lane as drawn at this zoom
+function _svMarkPlace(){
+  if(!_svMk || !_svPos) return;
+  const p=_svAt(_svPos.f, _svPos.m); if(!p) return;
+  const px=_svLanePx(_svPos.f.properties||{}), a=map.project(p.a), b=map.project(p.b);
+  const dx=b.x-a.x, dy=b.y-a.y, n=Math.hypot(dx, dy)||1;   // screen: y down, right of travel = (-dy, dx)
+  _svMk.setLngLat(p.c).setOffset([-dy/n*px, dx/n*px]); }
 function _svMark(){
   const p = _svMarkOn && _svPos ? _svAt(_svPos.f, _svPos.m) : null;
   if(!p){ if(_svMk){ _svMk.remove(); _svMk=null; } return; }
@@ -902,7 +929,8 @@ function _svMark(){
       '<path d="M0 0 L-16 -26 A31 31 0 0 1 16 -26 Z" fill="rgba(13,71,161,.45)" stroke="#fff" stroke-width="1.5"/>'+
       '<circle r="7" fill="#0d47a1" stroke="#fff" stroke-width="2.5"/></svg>';
     _svMk=new maplibregl.Marker({element:el, rotationAlignment:"map", pitchAlignment:"map"}); }
-  _svMk.setLngLat([p.lng, p.lat]).setRotation(p.h).addTo(map); }
+  _svMk.setLngLat(p.c).setRotation(p.h).addTo(map); _svMarkPlace(); }
+map.on("move", _svMarkPlace);                   // zoom / rotate / pitch change the drawn offset
 function rsSetStreetViewMarker(on){ _svMarkOn=!!on; _svMark(); }
 // move the Street View spot m metres along its edge (negative: back), still looking along it;
 // stops at the edge's ends. Fires rs:streetviewmove {id, streetView, atStart, atEnd}.
