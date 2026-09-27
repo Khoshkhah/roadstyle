@@ -2,7 +2,7 @@
 
 Every look below is the bundled **Södermalm driving sample**
 (`ui/studio/samples/sodermalm_driving.geojson`) — one `gpd.read_file(...)` call, then
-`render_edges` with the keywords shown. Thumbnails are real `rs.snapshot()` screenshots
+`render_edges` with the keywords shown. Thumbnails are real browser screenshots
 (regenerate with `python docs/build_gallery.py`).
 
 ```python
@@ -79,6 +79,29 @@ rs.render_edges(edges, view_3d=True)
 ```
 
 ![3d bridges](img/gallery/bridges_3d.png)
+
+## Street View window (every map)
+
+Every map has a Street View button (the person, under 3D). It opens a floating window that shows
+the clicked road in Google Street View, looking the way the road runs, and follows each new click.
+Drag it by its title bar, resize it by its corner. Nothing loads from Google until it is opened.
+
+```python
+rs.render_edges(edges)                     # the button is the default: street_view="window"
+```
+
+![street view window](img/gallery/street_view_window.png)
+
+## Map and Street View side by side
+
+A page with Street View beside the map, following the clicked road; drag the divider to share the
+width. [Live demo and details](web-backend.md#map-and-street-view-side-by-side).
+
+```python
+rs.render_street_view(edges)               # CLI: roadstyle edges.gpkg --page street-view
+```
+
+![map and street view side by side](img/gallery/street_view_side.png)
 
 ## The sidebar dashboard (UI template)
 
