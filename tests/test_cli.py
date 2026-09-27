@@ -28,6 +28,26 @@ def test_each_format_writes_a_file(tmp_path, fmt):
     assert main([str(SAMPLE), "-o", str(out), "-f", fmt, "--basemap", "dark_matter"]) == 0
 
 
+@pytest.mark.parametrize("page,marker", [("dashboard", '<div id="sb"'), ("report", '<div id="rp"'),
+                                         ("street-view", '<div id="sv"')])
+def test_page_writes_that_page(tmp_path, page, marker):
+    out = tmp_path / "page.html"
+    assert main([str(SAMPLE), "-o", str(out), "--page", page]) == 0
+    assert marker in out.read_text()
+
+
+def test_street_view_page_flags(tmp_path):
+    out = tmp_path / "sv.html"
+    assert main([str(SAMPLE), "-o", str(out), "--page", "street-view",
+                 "--panel-width", "55", "--no-resize"]) == 0
+    h = out.read_text()
+    assert "--sv-w: 55%;" in h and '<div id="sv-drag"' not in h
+
+
+def test_page_needs_web_format(tmp_path):
+    assert main([str(SAMPLE), "-o", str(tmp_path / "x.json"), "-f", "spec", "--page", "report"]) == 2
+
+
 def test_cli_view_3d(tmp_path):
     from roadstyle.cli import main
     out = tmp_path / "m3d.html"

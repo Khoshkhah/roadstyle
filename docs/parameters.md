@@ -20,10 +20,11 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | `render_edges(gdf, ...)` | `WebMap` / `folium.Map` / `lonboard.Map` | the main entry point — every keyword [below](#render_edges) |
 | `render_dashboard(gdf, **kw)` | `WebMap` | **dashboard** page: the map with built-in controls off + the bundled sidebar (query box, colour-by, class filter + legend, results table, read-out) |
 | `render_report(gdf, **kw)` | `WebMap` | **report** page: the map + a stats sidebar (KPI cards, colour-by legend, filter, search, selected-road read-out) |
-| `sidebar_html(name)` | `str` | the bundled sidebar fragment (`"dashboard"` / `"report"`) — reshape it and re-inject before `</body>` |
+| `render_street_view(gdf, *, panel_width=42, resizable=True, **kw)` | `WebMap` | **map + Google Street View** page: click a road, Street View beside the map looks along it; a draggable divider unless `resizable=False` ([details](web-backend.md#map-and-street-view-side-by-side)) |
+| `sidebar_html(name)` | `str` | the bundled sidebar fragment (`"dashboard"` / `"report"` / `"street_view"`) — reshape it and re-inject before `</body>` |
 | `snapshot(map_or_html, out_path, *, center, zoom, pitch, bearing, width=1200, height=800, scale=1, settle=2.5, timeout=40)` | path | static PNG via headless Chromium (needs `playwright`) |
 
-`render_dashboard` / `render_report` are web-only and take every `render_edges` keyword
+`render_dashboard` / `render_report` / `render_street_view` are web-only and take every `render_edges` keyword
 (`color_options=` fills the sidebar's *Colour by* picker). The templates ship in the package, so
 they need no repo checkout. A `WebMap` has `.html` (the page as a string) and `.save(path)`, and
 displays inline in a notebook.

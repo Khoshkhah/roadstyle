@@ -13,7 +13,6 @@ demos look real.
 from __future__ import annotations
 
 import random
-import runpy
 from pathlib import Path
 
 import geopandas as gpd
@@ -72,9 +71,16 @@ rs.render_edges(
     name="roadstyle — overlay layers",
 ).save(OUT / "overlays.html")
 
-# the map and Google Street View side by side: the example script's own page
-street_view_page = runpy.run_path(str(REPO / "examples" / "street_view_side_by_side.py"))["page"]
-(OUT / "street_view.html").write_text(street_view_page(g), encoding="utf-8")
+# the map and Google Street View side by side; the demo opens on Götgatan, zoomed in
+OPEN_ON = """<script>(function () {
+  function start() {
+    const ids = rsQuery(p => p.name === "Götgatan");
+    if (ids.length) { const id = ids[Math.floor(ids.length / 2)]; rsSelect(id); rsFocus(id, {maxZoom: 16}); }
+  }
+  if (map.loaded()) start(); else map.once("load", start);
+})();</script>"""
+html = rs.render_street_view(g, name="Roads and Street View").html
+(OUT / "street_view.html").write_text(html.replace("</body>", OPEN_ON + "</body>", 1), encoding="utf-8")
 
 for f in sorted(OUT.glob("*.html")):
     print(f"wrote {f.relative_to(REPO)} ({f.stat().st_size // 1024} KB)")

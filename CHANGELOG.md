@@ -7,8 +7,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
-- **`examples/street_view_side_by_side.py`**: the map and Google Street View side by side in one
-  page (click a road; no new window, no API key), with a live demo in the web-backend docs.
+- **`rs.render_street_view(edges)`**: a page with the map and Google Street View side by side.
+  Click a road and Street View shows it, looking the way the edge runs (no new window, no API
+  key). A draggable divider shares the width (`panel_width=42`, `resizable=True`); on a phone,
+  Street View sits under the map. Live demo in the web-backend docs.
+- **CLI `--page dashboard | report | street-view`**: the ready-made pages from the shell, with
+  `--panel-width` / `--no-resize` for the street-view one.
 
 ## [0.4.2] — 2026-09-26
 

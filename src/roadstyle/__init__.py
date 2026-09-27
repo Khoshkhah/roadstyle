@@ -39,7 +39,7 @@ from .emit import (
 from .filters import filter_edges, highway_types
 from .legend import make_legend
 from .overlays import Overlay
-from .pages import render_dashboard, render_report, sidebar_html
+from .pages import render_dashboard, render_report, render_street_view, sidebar_html
 from .palettes import (
     CARTO,
     HIGHSAT,
@@ -107,7 +107,7 @@ except Exception:                                    # running from a bare sourc
     __version__ = "0+unknown"
 
 __all__ = [
-    "render_edges", "render_dashboard", "render_report", "sidebar_html",
+    "render_edges", "render_dashboard", "render_report", "render_street_view", "sidebar_html",
     "filter_edges", "highway_types", "use_settings", "snapshot",
     "resolve", "base_style", "selection_style", "normalize_highway",
     "PALETTES", "HIGHSAT", "CARTO", "SELECTION", "RoadStyle",

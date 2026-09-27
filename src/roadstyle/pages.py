@@ -1,8 +1,8 @@
-"""One-call **dashboard** / **report** pages.
+"""One-call **dashboard** / **report** / **street view** pages.
 
 Each renders the styled road map with the built-in map controls off and a bundled sidebar template
 injected on top, wired to the map only through the public ``window.rs*`` API. The sidebars ship
-inside the package (``roadstyle/templates/{dashboard,report}.html``), so ``pip install roadstyle``
+inside the package (``roadstyle/templates/{dashboard,report,street_view}.html``), so ``pip install roadstyle``
 can build these pages with no repo checkout::
 
     import geopandas as gpd, roadstyle as rs
@@ -11,6 +11,7 @@ can build these pages with no repo checkout::
                                               "Speed": {"color_by": "maxspeed_kmh", "cmap": "plasma"}}
                        ).save("dashboard.html")
     rs.render_report(edges).save("report.html")
+    rs.render_street_view(edges).save("street_view.html")
 
 Both return a :class:`~roadstyle.render_web.WebMap` — ``.save(path)`` writes the self-contained
 page, and it previews inline in a notebook. Every :func:`~roadstyle.render_edges` keyword passes
@@ -23,13 +24,13 @@ from .render import render_edges
 
 
 def sidebar_html(name: str) -> str:
-    """The bundled sidebar template (``"dashboard"`` or ``"report"``) as an HTML string — the exact
-    fragment :func:`render_dashboard` / :func:`render_report` inject. Handy to tweak and re-inject."""
+    """The bundled sidebar template (``"dashboard"``, ``"report"`` or ``"street_view"``) as an HTML
+    string — the exact fragment the matching ``render_*`` page injects. Handy to tweak and re-inject."""
     from importlib.resources import files
     return (files("roadstyle") / "templates" / f"{name}.html").read_text(encoding="utf-8")
 
 
-def _page(gdf, template: str, *, defaults: dict, **kw):
+def _page(gdf, template: str, *, defaults: dict, edit=None, **kw):
     kw.pop("backend", None)                       # web only — the sidebars drive a MapLibre map
     for k, v in defaults.items():
         kw.setdefault(k, v)
@@ -40,6 +41,8 @@ def _page(gdf, template: str, *, defaults: dict, **kw):
     import re
     frag = re.sub(r"<h2>.*?</h2>", f"<h2>{html.escape(str(kw['name']))}</h2>",
                   sidebar_html(template), count=1)
+    if edit:
+        frag = edit(frag)
     # inject before the MapLibre placeholders resolve, so BOTH .html (the saved page) and the
     # notebook preview (_repr_html_) carry the sidebar
     m._tpl = m._tpl.replace("</body>", frag + "</body>", 1)
@@ -69,3 +72,25 @@ def render_report(gdf, **kw):
     return _page(gdf, "report",
                  defaults=dict(name="Roads report", basemap_switcher=True,
                                filter_control=False, road_popup=False), **kw)
+
+
+def render_street_view(gdf, *, panel_width: float = 42, resizable: bool = True, **kw):
+    """A self-contained **map + Google Street View** page: the styled map on the left, Street View
+    on the right (under the map on a phone). Clicking a road shows Street View at that point,
+    looking the way the clicked edge runs, so a two-way road's two edges look opposite ways. No
+    new window and no API key (it embeds Google's "Share > Embed a map" URL form).
+
+    ``panel_width`` is Street View's share of the window width in percent (20-80).
+    ``resizable=True`` adds a divider the viewer can drag to change it (their choice is remembered
+    in their browser); ``False`` fixes the width. Any :func:`render_edges` keyword passes through.
+    Returns a :class:`WebMap`; ``.save("street_view.html")`` writes the page."""
+    if not 20 <= panel_width <= 80:
+        raise ValueError(f"panel_width must be 20-80 (percent of the window), got {panel_width}")
+
+    def edit(frag):
+        frag = frag.replace("--sv-w: 42%;", f"--sv-w: {panel_width:g}%;", 1)
+        if not resizable:
+            frag = frag.replace('<div id="sv-drag" title="Drag to resize"></div>\n', "", 1)
+        return frag
+    return _page(gdf, "street_view", edit=edit,
+                 defaults=dict(name="Roads and Street View", road_popup=False), **kw)

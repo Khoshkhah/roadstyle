@@ -163,14 +163,30 @@ document.addEventListener("rs:select", e => {
 
 #### Map and Street View side by side
 
-Google won't show its Maps pages inside an iframe, so to keep Street View *in* the page, next to
-the map, turn the event's point and heading into Google's embeddable Street View URL. Click a road:
+One call builds a page with the map on one side and Street View on the other. Click a road and
+Street View shows it, looking the way the clicked edge runs; drag the divider to share the width:
+
+```python
+rs.render_street_view(edges).save("street_view.html")
+rs.render_street_view(edges, panel_width=60, resizable=False)   # fixed: Street View 60% wide
+```
+
+```bash
+roadstyle edges.gpkg --page street-view -o street_view.html
+roadstyle edges.gpkg --page street-view --panel-width 60 --no-resize
+```
 
 <iframe src="../maps/street_view.html" loading="lazy" title="The map and Google Street View side by side"
         style="width:100%;height:520px;border:0;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.18)"></iframe>
 
-The whole page is [`examples/street_view_side_by_side.py`](https://github.com/Khoshkhah/roadstyle/blob/main/examples/street_view_side_by_side.py):
-`render_edges(edges, road_popup=False)` plus a panel injected before `</body>`. The core:
+`panel_width` is Street View's share of the width in percent (20-80, default 42). With
+`resizable=True` (the default) the viewer can drag the divider, and the page remembers their
+width in their browser. On a phone, Street View sits under the map. Every `render_edges` keyword
+passes through.
+
+Google won't show its Maps pages inside an iframe, so the panel turns the event's point and heading
+into Google's embeddable Street View URL. The panel is plain HTML/CSS/JS
+(`rs.sidebar_html("street_view")`); the core, to build your own:
 
 ```js
 document.addEventListener("rs:select", e => {

@@ -48,3 +48,22 @@ def test_pages_are_web_only():
     # backend= is ignored (these are MapLibre-only); still yields a saveable page with the sidebar
     m = rs.render_dashboard(_edges(), backend="folium")
     assert '<div id="sb"' in m.html
+
+
+def test_render_street_view_injects_panel():
+    h = rs.render_street_view(_edges()).html
+    assert '<div id="sv"' in h and 'id="sv-frame"' in h     # the Street View panel + its iframe
+    assert "maps/embed?pb=" in h                              # built from rs:select's streetView
+    assert h.count("</body>") == 1
+    # the panel replaces the popup; the map keeps its own base-map switcher and class filter
+    assert "Roads and Street View" in h
+
+
+def test_street_view_width_and_divider_are_options():
+    import pytest
+    h = rs.render_street_view(_edges()).html
+    assert '<div id="sv-drag"' in h and "--sv-w: 42%;" in h      # draggable, 42% by default
+    h = rs.render_street_view(_edges(), panel_width=60, resizable=False).html
+    assert '<div id="sv-drag"' not in h and "--sv-w: 60%;" in h   # fixed at 60%
+    with pytest.raises(ValueError):
+        rs.render_street_view(_edges(), panel_width=95)

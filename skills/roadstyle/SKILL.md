@@ -54,7 +54,9 @@ m.save("map.html")                        # m.html is the page as a string
   `overlays=[rs.Overlay(gdf, placement="under"|"over", label=..., popup=[...])]`,
   `road_popup="panel"` (docked read-out instead of a popup), `arrows=`, `labels=`.
 - Ready-made pages: `rs.render_dashboard(edges, ...)` (query sidebar) and
-  `rs.render_report(edges, ...)` (stats sidebar) take the same keywords.
+  `rs.render_report(edges, ...)` (stats sidebar) and `rs.render_street_view(edges, ...)` (Google
+  Street View beside the map, following the clicked road; `panel_width=42`, `resizable=True`)
+  take the same keywords. CLI: `roadstyle edges.gpkg --page street-view`.
 - Colours, widths, casing and camera defaults are settings, not keywords:
   `rs.render_edges(..., settings={"config": {"labels": {"color": "#888"}}})`.
 - Unsure of a keyword? `help(rs.render_edges)` or the parameters page. Don't guess: an unknown
@@ -85,8 +87,8 @@ Events on `document`: `rs:select` (`e.detail.properties`, and `e.detail.streetVi
 Street View URL facing the edge's direction, or null; an overlay click sets `e.detail.overlay`,
 a road click doesn't - test that, not `e.detail.layer`, which differs between click and `rsSelect`), `rs:deselect`, `rs:colorchange`,
 `rs:filterchange`, `rs:basemapchange`. `window.map` is the MapLibre map. Street View *inside*
-the page, beside the map: `examples/street_view_side_by_side.py` (Google blocks the
-`detail.streetView` URL in iframes; the example converts it to a `google.com/maps/embed?pb=` one). Add your own panel by
+a custom page: Google blocks the `detail.streetView` URL in iframes; convert it to a
+`google.com/maps/embed?pb=` one as `rs.sidebar_html("street_view")` does. Add your own panel by
 inserting HTML before `</body>` in `m.html`.
 
 ## Traps (each one cost a real bug)

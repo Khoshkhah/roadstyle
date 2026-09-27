@@ -20,6 +20,9 @@ from . import __version__
 
 # output format → default file extension for the derived output name
 _EXT = {"web": ".html", "folium": ".html", "rsjs": ".html", "spec": ".json", "geojson": ".geojson"}
+# --page → the roadstyle.pages function that builds it
+_PAGES = {"dashboard": "render_dashboard", "report": "render_report",
+          "street-view": "render_street_view"}
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -32,6 +35,7 @@ def _build_parser() -> argparse.ArgumentParser:
                "  roadstyle edges.gpkg --palette carto --basemap positron\n"
                "  roadstyle edges.gpkg --include motorway trunk primary -o major.html\n"
                "  roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6 -f web\n"
+               "  roadstyle edges.gpkg --page street-view         # map + Google Street View\n"
                "  roadstyle edges.gpkg -f spec -o map_data.json   # JSON for your own frontend\n"
                "  roadstyle studio [--server.port 8502 …]         # launch the Streamlit workbench",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -70,6 +74,15 @@ def _build_parser() -> argparse.ArgumentParser:
                     help="scale line width between MIN and MAX px by the numeric --color-by.")
 
     web = p.add_argument_group("web backend (-f web)")
+    web.add_argument("--page", choices=sorted(_PAGES),
+                     help="a ready-made page instead of the plain map: dashboard (query "
+                          "sidebar), report (stats sidebar), street-view (Google Street View "
+                          "beside the map, following the clicked road).")
+    web.add_argument("--panel-width", type=float, metavar="PCT",
+                     help="--page street-view: Street View's share of the width, 20-80%% "
+                          "(default 42).")
+    web.add_argument("--no-resize", action="store_true",
+                     help="--page street-view: fixed width, no draggable divider.")
     web.add_argument("--view-3d", action="store_true",
                      help="3D view: tilted camera + extruded, ramped bridge decks.")
     web.add_argument("--pitch", type=float, help="starting camera tilt in degrees (0-85).")
@@ -125,6 +138,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"roadstyle: input file not found: {in_path}", file=sys.stderr)
         return 2
 
+    if args.page and args.format != "web":
+        print("roadstyle: --page needs the web format (-f web)", file=sys.stderr)
+        return 2
     out_path = Path(args.output) if args.output else in_path.with_suffix(_EXT[args.format])
 
     colors = None
@@ -161,17 +177,27 @@ def main(argv: list[str] | None = None) -> int:
         style_kw = {k: v for k, v in style_kw.items() if v is not None}
 
         if args.format == "web":
-            web_kw = {"arrows": not args.no_arrows, "labels": not args.no_labels,
-                      "filter_control": not args.no_filter,
-                      "basemap_switcher": not args.no_basemap_switcher,
-                      "compress": not args.no_compress,
-                      "tiles": args.tiles,
+            web_kw = {"compress": not args.no_compress, "tiles": args.tiles,
                       "view_3d": args.view_3d}
+            # only the controls the user turned off: a --page keeps its own control defaults
+            for flag, kw in (("no_arrows", "arrows"), ("no_labels", "labels"),
+                             ("no_filter", "filter_control"),
+                             ("no_basemap_switcher", "basemap_switcher")):
+                if getattr(args, flag):
+                    web_kw[kw] = False
             if args.pitch is not None:
                 web_kw["pitch"] = args.pitch
             if args.bearing is not None:
                 web_kw["bearing"] = args.bearing
-            render_edges(g, backend="web", **style_kw, **web_kw).save(str(out_path))
+            if args.page:
+                from . import pages
+                if args.page == "street-view":
+                    web_kw["resizable"] = not args.no_resize
+                    if args.panel_width is not None:
+                        web_kw["panel_width"] = args.panel_width
+                getattr(pages, _PAGES[args.page])(g, **style_kw, **web_kw).save(str(out_path))
+            else:
+                render_edges(g, backend="web", **style_kw, **web_kw).save(str(out_path))
         elif args.format == "folium":
             render_edges(g, backend="folium", **style_kw).save(str(out_path))
         elif args.format == "rsjs":
@@ -184,7 +210,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"roadstyle: {e}", file=sys.stderr)
         return 1
 
-    print(f"wrote {out_path}  ({len(g):,} edges, {args.format})")
+    print(f"wrote {out_path}  ({len(g):,} edges, {args.page or args.format})")
     return 0
 
 

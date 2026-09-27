@@ -1,0 +1,91 @@
+<!-- roadstyle street-view panel: Google Street View beside the map, following the clicked road.
+     Injected at the end of the page by rs.render_street_view(); talks to the map only through the public
+     API (the rs:select event). Plain HTML/CSS/JS: copy it out with rs.sidebar_html("street_view"). -->
+<style>
+  body { --sv-w: 42%; --rs-side: var(--sv-w); }  /* --rs-side shifts the map's right-anchored controls */
+  #map { right: var(--sv-w); }
+  #sv { position: fixed; top: 0; right: 0; bottom: 0; width: var(--sv-w); display: flex;
+        flex-direction: column; background: #fff; border-left: 1px solid #ddd;
+        font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: #222; }
+  #sv h2 { margin: 0; padding: 10px 12px 0; font-size: 15px; }
+  #sv-road { padding: 2px 12px 8px; color: #555; }
+  #sv [hidden] { display: none !important; }
+  /* the divider: drag it to share the width between the map and Street View */
+  #sv-drag { position: fixed; top: 0; bottom: 0; right: var(--sv-w); width: 10px; margin-right: -5px;
+             cursor: col-resize; z-index: 5; touch-action: none; }
+  #sv-drag::after { content: ""; position: absolute; top: 50%; left: 3px; width: 4px; height: 40px;
+                    margin-top: -20px; border-radius: 2px; background: #bbb; }
+  #sv-drag:hover::after, body.sv-dragging #sv-drag::after { background: #1a6bd6; }
+  body.sv-dragging { cursor: col-resize; user-select: none; }
+  body.sv-dragging #sv-frame { pointer-events: none; }  /* else the iframe swallows the drag */
+  #sv-frame { flex: 1; width: 100%; border: 0; background: #eee; }
+  #sv-empty { flex: 1; display: flex; align-items: center; justify-content: center;
+              color: #777; background: #f4f4f4; padding: 20px; text-align: center; }
+  @media (max-width: 700px) {          /* phones: Street View under the map, not beside it */
+    #map { right: 0; bottom: 45%; }
+    body { --rs-side: 0px; }
+    .bm-icon { bottom: calc(45% + 44px); }
+    .bm-menu { bottom: calc(45% + 84px); }
+    .rs-zoom { bottom: calc(45% + 10px); }
+    #sv { top: 55%; width: 100%; border-left: 0; border-top: 1px solid #ddd; }
+    #sv-drag { display: none; }
+  }
+</style>
+<div id="sv-drag" title="Drag to resize"></div>
+<div id="sv">
+  <h2>Roads and Street View</h2>
+  <div id="sv-road">Click a road to see it in Street View.</div>
+  <div id="sv-empty">Street View opens here, looking the way the clicked road runs.</div>
+  <iframe id="sv-frame" title="Google Street View" hidden allowfullscreen></iframe>
+</div>
+<script>
+(function () {
+  // Google won't frame the detail.streetView URL, so build its embeddable twin (the form of
+  // Google's own "Share > Embed a map": no key, but not a documented API). With a Maps Embed API
+  // key, the official one is:
+  //   "https://www.google.com/maps/embed/v1/streetview?key=KEY&location=" + lat + "," + lng + "&heading=" + h
+  const embed = (lat, lng, h) =>
+    "https://www.google.com/maps/embed?pb=!6m7!1m6!2m2!1d" + lat + "!2d" + lng + "!3f" + h + "!4f0!5f1";
+  const road = document.getElementById("sv-road"), frame = document.getElementById("sv-frame"),
+        empty = document.getElementById("sv-empty");
+
+  document.addEventListener("rs:select", function (e) {
+    const d = e.detail, p = d.properties || {};
+    if (d.overlay) return;                               // roads only (overlay clicks set .overlay)
+    road.textContent = p.name || p.highway || "Unnamed road";
+    if (!d.streetView) {                                 // street_view=False, or no geometry
+      frame.hidden = true; empty.hidden = false;
+      empty.textContent = "No Street View for this road.";
+      return;
+    }
+    const u = new URL(d.streetView);
+    const [lat, lng] = u.searchParams.get("viewpoint").split(",");
+    frame.src = embed(lat, lng, u.searchParams.get("heading") || 0);
+    frame.hidden = false; empty.hidden = true;
+  });
+
+  // the divider (resizable=False removes it): the panel width follows the pointer, 20%..80% of
+  // the window, and is remembered in this browser
+  const KEY = "rs-street-view-width", drag = document.getElementById("sv-drag");
+  if (drag) {
+  const setW = pct => {
+    pct = Math.min(80, Math.max(20, pct));
+    document.body.style.setProperty("--sv-w", pct + "%"); map.resize(); return pct;
+  };
+  try { const w = parseFloat(localStorage.getItem(KEY)); if (w) setW(w); } catch (err) {}
+  drag.addEventListener("pointerdown", e => {
+    drag.setPointerCapture(e.pointerId); document.body.classList.add("sv-dragging");
+  });
+  drag.addEventListener("pointermove", e => {
+    if (drag.hasPointerCapture(e.pointerId)) setW((1 - e.clientX / window.innerWidth) * 100);
+  });
+  drag.addEventListener("pointerup", e => {
+    drag.releasePointerCapture(e.pointerId); document.body.classList.remove("sv-dragging");
+    const w = parseFloat(document.body.style.getPropertyValue("--sv-w"));
+    try { if (w) localStorage.setItem(KEY, w); } catch (err) {}
+  });
+  }
+
+  map.resize();                                          // #map just gave up part of the page
+})();
+</script>

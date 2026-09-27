@@ -39,6 +39,7 @@ rs.render_edges(edges, palette="mono", color_options={                 # several
     "Speed":   {"color_by": "maxspeed_kmh", "cmap": "magma"}})
 rs.render_edges(edges, tiles=True)                                     # 100k+ edges
 rs.render_dashboard(edges).save("dashboard.html")                      # map + query sidebar
+rs.render_street_view(edges).save("street_view.html")                  # map + Google Street View
 ```
 
 No Python? `roadstyle edges.gpkg -o map.html --basemap dark_matter`, or click through it in the
