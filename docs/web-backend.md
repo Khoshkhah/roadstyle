@@ -174,7 +174,7 @@ The whole page is [`examples/street_view_side_by_side.py`](https://github.com/Kh
 
 ```js
 document.addEventListener("rs:select", e => {
-  if (e.detail.layer != null || !e.detail.streetView) return;   // roads only
+  if (e.detail.overlay || !e.detail.streetView) return;   // roads only (overlays set .overlay)
   const u = new URL(e.detail.streetView);
   const [lat, lng] = u.searchParams.get("viewpoint").split(",");
   const h = u.searchParams.get("heading") || 0;

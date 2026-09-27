@@ -47,7 +47,7 @@ PANEL = """
 
   document.addEventListener("rs:select", function (e) {
     const d = e.detail, p = d.properties || {};
-    if (d.layer != null || !d.streetView) return;        // roads only; null if street_view=False
+    if (d.overlay || !d.streetView) return;               // roads only; null if street_view=False
     const u = new URL(d.streetView);
     const [lat, lng] = u.searchParams.get("viewpoint").split(",");
     title.textContent = p.name || p.highway || "road";
