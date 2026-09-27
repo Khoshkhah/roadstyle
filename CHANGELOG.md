@@ -4,6 +4,18 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **`street_view=True`** (web backend): a Google Street View link in the road popup / panel, at
+  the clicked point and facing the clicked edge's direction, so a road's two directions get
+  opposite headings. A plain maps URL, no API key; `street_view=False` turns it off.
+- **`AGENTS.md`**: a compact guide for AI coding agents (the one call, the data contract, the JS
+  API, the traps).
+
+### Changed
+- Field names in the click popup and the hover tooltip are **bold**, values plain.
+
 ## [0.4.1] — 2026-08-29
 
 ### Added

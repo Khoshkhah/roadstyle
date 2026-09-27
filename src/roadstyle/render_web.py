@@ -846,6 +846,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
            basemap_switcher: bool = True, road_popup=True, road_tooltip=False, popup_mode: str = None,
+           street_view: bool = True,
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
            color_options=None, color_active=0, overlays=None, compress: bool = True,
            tiles: bool = False,
@@ -867,6 +868,9 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         field names for a custom set, ``"all"`` for every column, or ``False`` to disable and drive
         your own readout from ``window.map`` events. ``name`` is the bold title; ``bridge`` /
         ``tunnel`` appear only when the road is one.
+      - ``street_view`` — a Google Street View link in the road read-out, at the clicked point and
+        facing the way the clicked edge runs (a road's two directions get opposite headings). A
+        plain maps URL, no API key.
       - ``hover_color`` / ``select_color`` — the highlight colours for a hovered / selected road (the
         ``roads-highlight`` feature-state); default light-violet ``#b388ff`` / violet ``#7c4dff``.
 
@@ -1362,6 +1366,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__ROAD_POPUP_MODE__", json.dumps(mode))
             .replace("__ROAD_POPUP_FIELDS__", json.dumps(popup_fields))
             .replace("__ROAD_TOOLTIP__", json.dumps(road_tooltip))
+            .replace("__STREET_VIEW__", "true" if street_view else "false")
             .replace("__RS_TILED__", "true" if tiles else "false"))
     if tiles:
         import base64

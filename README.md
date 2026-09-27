@@ -196,8 +196,9 @@ reference with every type and edge case: [docs/parameters.md](https://khoshkhah.
 | `labels` | `True` | Curved street-name labels |
 | `filter_control` | `True` | The collapsible road-class filter panel (doubles as a colour legend) |
 | `basemap_switcher` | `True` | The base-layer dropdown |
-| `road_popup` | `True` | Click popup: `True` (curated fields) / `[fields]` / `"all"` / `"panel"` (docked read-out) / `False` |
-| `tooltip` | `None` (off) | Hover tooltip fields (list of columns) |
+| `road_popup` | `True` | Click popup: `True` (curated fields) / `[fields]` / `"all"` / `"panel"` (docked read-out) / `False`. Field names in bold |
+| `street_view` | `True` | A **Google Street View** link in the road popup, at the clicked point and facing the way the clicked edge runs — a road's two directions get opposite headings. No API key |
+| `tooltip` | `None` (off) | Hover tooltip fields (list of columns); field names in bold |
 | `hover_color` / `select_color` | violet | Highlight colours for hovered / selected roads |
 
 **Extra content** (web backend)
@@ -450,6 +451,7 @@ launches the [Streamlit workbench](#the-studio--the-library-behind-knobs-no-code
 | [Palettes & settings](https://khoshkhah.github.io/roadstyle/palettes/) | the built-in palettes and the override system |
 | [When to use roadstyle](https://khoshkhah.github.io/roadstyle/comparison/) | vs `.explore()`, prettymaps, kepler.gl, raw MapLibre |
 | [Notebooks](https://github.com/Khoshkhah/roadstyle/tree/main/notebooks) | a runnable manual, one topic per notebook |
+| [AGENTS.md](https://github.com/Khoshkhah/roadstyle/blob/main/AGENTS.md) | a compact guide for AI coding agents: the one call, the data contract, the JS API and the traps |
 | [UI templates](https://github.com/Khoshkhah/roadstyle/tree/main/ui) | the dashboard / report scaffolding + the studio's sample data (the studio itself ships in the package — `roadstyle studio`) |
 
 Full MkDocs site: [khoshkhah.github.io/roadstyle](https://khoshkhah.github.io/roadstyle/)

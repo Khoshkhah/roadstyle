@@ -725,12 +725,35 @@ function _rpairs(p, only){  // shared field filter: [nameOrNull, [[k, v], ...]]
     out.push([k, s]); }
   return [name, out]; }
 function _rfields(p, only){ const [name, kv]=_rpairs(p, only);
-  return (name ? ["<b>"+name+"</b>"] : []).concat(kv.map(([k,s])=>k+": "+s)).join("<br>"); }
+  // the field NAME in bold, its value plain - the popup and the hover tooltip both read this way
+  return (name ? ["<b>"+name+"</b>"] : []).concat(kv.map(([k,s])=>"<b>"+k+"</b>: "+s)).join("<br>"); }
 function _rrows(p, only){   // the side panel's layout: big name, then aligned key/value rows
   const [name, kv]=_rpairs(p, only);
   return (name ? '<div class="rs-name">'+name+'</div>' : "")+
     kv.map(([k,s])=>'<div class="rs-kv"><span>'+k+'</span><b>'+s+'</b></div>').join(""); }
 const _popupFields = __ROAD_POPUP_FIELDS__;   // curated field list, or null => all columns
+// A GOOGLE STREET VIEW link in the road read-out, facing the way the edge runs. An edge is
+// directed, so a road's two directions get the same spot and opposite headings. A plain maps URL,
+// no API key. The heading is the clicked edge's segment nearest the point; none without geometry.
+const _streetView = __STREET_VIEW__;
+function _svHeading(g, ll){
+  const lines = !g ? [] : g.type==="LineString" ? [g.coordinates] :
+                g.type==="MultiLineString" ? g.coordinates : [];
+  const k = Math.cos(ll.lat*Math.PI/180); let best=null, bd=Infinity;
+  lines.forEach(cs=>{ for(let i=0;i+1<cs.length;i++){
+    const dx=(cs[i+1][0]-cs[i][0])*k, dy=cs[i+1][1]-cs[i][1];
+    const px=(ll.lng-cs[i][0])*k, py=ll.lat-cs[i][1];
+    const t=Math.max(0, Math.min(1, (px*dx+py*dy)/((dx*dx+dy*dy)||1)));
+    const d=(px-t*dx)**2+(py-t*dy)**2;
+    if(d<bd){ bd=d; best=(Math.atan2(dx,dy)*180/Math.PI+360)%360; } } });
+  return best; }
+function _sv(ll, g){
+  if(!_streetView || !ll) return "";
+  const h = _svHeading(g, ll);
+  return '<div class="rs-sv" style="margin-top:4px"><a target="_blank" rel="noopener" href="'+
+    'https://www.google.com/maps/@?api=1&amp;map_action=pano&amp;viewpoint='+
+    ll.lat.toFixed(6)+','+ll.lng.toFixed(6)+(h==null ? '' : '&amp;heading='+Math.round(h))+
+    '">Street View &#8599;</a></div>'; }
 function rsInfoClear(){ if(_sideBd) _sideBd.innerHTML='<div class="rs-empty">Click a road to see its full record here.</div>'; }
 function rsInfoShow(html){ if(_sideBd) _sideBd.innerHTML=html; }
 function rsDeselect(){
@@ -764,10 +787,11 @@ function rsSelect(id){
   let ovs=[]; if(c){ try{ ovs=_ovAt(map.project({lng:c[0], lat:c[1]})); }catch(err){} }
   document.dispatchEvent(new CustomEvent("rs:select",
     {detail:{id:id, layer:null, properties:props || {}, overlays:ovs}}));
+  const sv = c ? _sv({lng:c[0], lat:c[1]}, (_feats()[id]||{}).geometry) : "";
   if(__ROAD_POPUP__){
-    if(_popupMode === "panel"){ rsInfoShow(_rrows(props||{}, _popupFields) + _ovSections(ovs)); }
+    if(_popupMode === "panel"){ rsInfoShow(_rrows(props||{}, _popupFields) + sv + _ovSections(ovs)); }
     else if(c) new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
-      .setLngLat(c).setHTML(_rfields(props||{}, _popupFields) + _ovSections(ovs)).addTo(map);
+      .setLngLat(c).setHTML(_rfields(props||{}, _popupFields) + sv + _ovSections(ovs)).addTo(map);
   }
 }
 window.rsSelect = rsSelect;
@@ -802,10 +826,11 @@ map.on("click", e=>{
   // structured click-data for host pages / dashboards (fires in every popup mode, incl. False)
   document.dispatchEvent(new CustomEvent("rs:select",
     {detail:{id:f.id, layer:f.layer && f.layer.id, properties:props, overlays:ovs}}));
+  const sv = _sv(e.lngLat, f.geometry);
   if(__ROAD_POPUP__){
-    if(_popupMode === "panel"){ rsInfoShow(_rrows(props, _popupFields) + _ovSections(ovs)); }
+    if(_popupMode === "panel"){ rsInfoShow(_rrows(props, _popupFields) + sv + _ovSections(ovs)); }
     else new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
-      .setLngLat(e.lngLat).setHTML(_rfields(props, _popupFields) + _ovSections(ovs)).addTo(map);
+      .setLngLat(e.lngLat).setHTML(_rfields(props, _popupFields) + sv + _ovSections(ovs)).addTo(map);
   }
 });
 map.on("load", ()=>{ try{ map.fitBounds(__BOUNDS__,

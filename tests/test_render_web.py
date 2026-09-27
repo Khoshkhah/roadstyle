@@ -714,3 +714,13 @@ def test_bridge_deck_width_scale_setting():
         ys = [c[1] for c in ring]
         return (max(xs) - min(xs)) + (max(ys) - min(ys))
     assert deck_w(0.5) < deck_w(1.0) * 0.75
+
+
+def test_web_street_view_link():
+    """The road read-out carries a Google Street View link by default (heading from the clicked
+    edge's direction, computed in the page); street_view=False turns it off."""
+    on = render_edges(_edges(), backend="web").html
+    assert "const _streetView = true;" in on and "map_action=pano" in on
+    off = render_edges(_edges(), backend="web", street_view=False).html
+    assert "const _streetView = false;" in off
+    assert "__STREET_VIEW__" not in on + off
