@@ -28,7 +28,7 @@ import geopandas as gpd
 import roadstyle as rs
 
 edges = gpd.read_file("edges.gpkg")        # LineStrings + a `highway` column, any CRS
-rs.render_edges(edges).save("map.html")    # open map.html, no server needed
+rs.render_edges(edges).save("map.html")    # open map.html: no server (Street View needs one)
 ```
 
 ```python

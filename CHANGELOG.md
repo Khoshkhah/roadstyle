@@ -6,9 +6,18 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- The side-by-side page's header is one compact row (title · road name, then ◀ ▶) instead of two.
+
 ### Fixed
 - Stepping Street View along a road (◀ ▶) pans the map when the marker nears its edge, so the
   marker stays in view.
+- **A map whose Street View window was left open stopped working (0.7.0).** Reopening the window
+  on load ran before the marker's state existed; the error stopped the page before any road was
+  drawn, so nothing could be selected. The window now reopens once the map has loaded.
+- The window's remembered state (open, place, size) is kept per page, not per site: a window
+  enlarged on one map no longer reopens over another page's small embedded map. A reopened
+  window is also kept to at most 60% of the map and inside it.
 - On a two-way road the Street View marker sat 2.5 m right of the centre line, which is off the
   drawn road when zoomed in. It now sits on its direction's lane as the map draws it (the
   layer's own line-offset at the current zoom); Google still gets the 2.5 m lane point.
@@ -68,7 +77,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **`skills/roadstyle/SKILL.md`**: an agent skill for code that *uses* roadstyle (the one call,
   the data contract, the JS API, the traps); **`AGENTS.md`** for agents working on the repo;
   **`llms.txt`** at the docs site root.
-- **`rs.snapshot(..., scale=2)`**: device pixel ratio, for sharp PNGs on HiDPI screens and in print.
+- **`rs.snapshot(..., scale=)`**: device pixel ratio (default 1); `scale=2` for sharp PNGs on HiDPI screens and in print.
 
 ### Changed
 - Field names in the click popup and the hover tooltip are **bold**, values plain.
@@ -77,7 +86,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   API is now the one complete keyword reference, per backend.
 - PyPI summary rewritten; the CLI's `--palette` accepts `mono`.
 - README cut to a one-screen overview with a sharp 2x hero image (`docs/build_gallery.py`);
-  the parameter tables live in the docs, base maps & API keys moved to `docs/usage.md`.
+  the parameter tables live in the docs, base maps & API keys moved into the docs (now the palettes page).
 
 ### Fixed
 - `rs.snapshot(html_string, ...)` raised `OSError: File name too long` instead of rendering it.

@@ -1,7 +1,9 @@
 """Build the gallery thumbnails (docs/img/gallery/*.png) — one screenshot per signature look.
 
 Renders the bundled Södermalm driving sample in each look and snapshots it headlessly via
-:func:`rs.snapshot` (needs Playwright + Chromium). Re-run after a visual change::
+:func:`rs.snapshot` (needs Playwright + Chromium); the hero and the two Street View shots go
+through :func:`served_shot` instead (served over http, a road selected). Re-run after a visual
+change (build ui/dashboard and ui/report first; not the studio shot, which is taken by hand)::
 
     python docs/build_gallery.py
 """

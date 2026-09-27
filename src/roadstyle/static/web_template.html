@@ -253,7 +253,9 @@ if(_popupMode==="panel"){    // panel-reopen button: same chrome as 2D, right be
 const _svWindow = __SV_WINDOW__;
 function rsSetStreetView(){}
 if(_svWindow){
-  const KEY="rs-street-view-window", fromDisk=location.protocol==="file:";
+  // per PAGE: every map on a site shares one localStorage, and a window enlarged on a big page
+  // must not reopen over a small embedded one
+  const KEY="rs-street-view-window:"+location.pathname, fromDisk=location.protocol==="file:";
   const st=(()=>{ try{ return JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ return {}; } })();
   const save=()=>{ try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(e){} };
   const w=document.createElement("div"); w.className="rs-svw"; w.hidden=true;
@@ -270,10 +272,14 @@ if(_svWindow){
   // anchor by the top-left once visible, so the corner grip grows the window toward the pointer
   // (right/bottom anchoring grows it the other way); keep a remembered spot on this screen
   const place=()=>{
+    const m=map.getContainer().getBoundingClientRect();
+    // never bigger than most of the map, so the map stays clickable beside it
+    const W=Math.min(w.offsetWidth, Math.max(220, m.width*0.6)), H=Math.min(w.offsetHeight, Math.max(150, m.height*0.6));
+    Object.assign(w.style, {width:W+"px", height:H+"px"});
     if(st.left==null){    // first open: the map's bottom-right corner, whatever panels the page adds
-      const m=map.getContainer().getBoundingClientRect();
-      st.left=m.right-w.offsetWidth-56; st.top=m.bottom-w.offsetHeight-40; }
-    st.left=Math.max(0, Math.min(innerWidth-80, st.left)); st.top=Math.max(0, Math.min(innerHeight-30, st.top));
+      st.left=m.right-W-56; st.top=m.bottom-H-40; }
+    // ...and inside the map, whatever screen it was placed on before
+    st.left=Math.max(m.left, Math.min(m.right-W, st.left)); st.top=Math.max(m.top, Math.min(m.bottom-H, st.top));
     Object.assign(w.style, {left:st.left+"px", top:st.top+"px", right:"auto", bottom:"auto"});
   };
   let last=null, btn=null;                   // the latest road selection: {name, url}
@@ -333,7 +339,9 @@ if(_svWindow){
     btn.onclick=()=>rsSetStreetView(w.hidden);
     d.appendChild(btn); return d;
   }, onRemove(){}});
-  if(st.open) rsSetStreetView(true);
+  // reopen a window left open last time only once the map is up: this code runs mid-script, before
+  // the Street View state below exists, and throwing here stopped the page before any road was drawn
+  if(st.open) map.once("load", ()=>rsSetStreetView(true));
 }
 window.rsSetStreetView = rsSetStreetView;
 // base-layer switching: window.rsSetBasemap(key|index) is the API (swaps the raster source's
@@ -842,9 +850,8 @@ function _rrows(p, only){   // the side panel's layout: big name, then aligned k
   return (name ? '<div class="rs-name">'+name+'</div>' : "")+
     kv.map(([k,s])=>'<div class="rs-kv"><span>'+k+'</span><b>'+s+'</b></div>').join(""); }
 const _popupFields = __ROAD_POPUP_FIELDS__;   // curated field list, or null => all columns
-// A GOOGLE STREET VIEW link in the road read-out, facing the way the edge runs. An edge is
-// directed, so a road's two directions get the same spot and opposite headings. A plain maps URL,
-// no API key. The heading is the clicked edge's segment nearest the point; none without geometry.
+// GOOGLE STREET VIEW of the clicked edge (the window, the side-by-side page, or a plain link),
+// looking the way the edge runs. A plain maps URL, no API key; where it stands is below.
 const _streetView = __STREET_VIEW__;
 // Street View stands at a spot ON the clicked edge: its own geometry (the road's centre line), the
 // spot nearest the click, looking along the edge. The drawn lanes sit offset from that line by a
@@ -859,6 +866,14 @@ function _svLine(f){ const g=f && f.geometry;
   return !g ? [] : g.type==="LineString" ? g.coordinates : g.type==="MultiLineString" ? [].concat(...g.coordinates) : []; }
 function _svFeat(f){ const F=_feats();       // the edge's full geometry (a picked one may be tile-clipped)
   return (f && f.id!=null && srcOf(f)==="roads" && F && F[f.id]) || f; }
+// tiles mode keeps no geometry in the page: take the edge's longest piece from the loaded tiles
+// (rsSelect of an edge whose tiles are not loaded yet gets no heading, marker or steps)
+function _svTiled(id){
+  if(!RS_TILED) return null;
+  let best=null;
+  for(const f of map.querySourceFeatures("roads", {sourceLayer:"roads"}))
+    if(f.id===id && (!best || _svLine(f).length>_svLine(best).length)) best=f;
+  return best; }
 function _svDist(cs){ const k=Math.cos(cs[0][1]*Math.PI/180), d=[0];
   for(let i=1;i<cs.length;i++) d.push(d[i-1]+Math.hypot((cs[i][0]-cs[i-1][0])*k*_SV_R, (cs[i][1]-cs[i-1][1])*_SV_R));
   return d; }
@@ -985,8 +1000,8 @@ function rsSelect(id){
   let ovs=[]; if(c){ try{ ovs=_ovAt(map.project({lng:c[0], lat:c[1]})); }catch(err){} }
   const cll = c ? {lng:c[0], lat:c[1]} : null;
   document.dispatchEvent(new CustomEvent("rs:select",
-    {detail:{id:id, layer:null, properties:props || {}, overlays:ovs, streetView:_svPick(cll, _feats()[id], id)}}));
-  const sv = _sv(cll, _feats()[id]);
+    {detail:{id:id, layer:null, properties:props || {}, overlays:ovs, streetView:_svPick(cll, _feats()[id] || _svTiled(id), id)}}));
+  const sv = _sv(cll, _feats()[id] || _svTiled(id));
   if(__ROAD_POPUP__){
     if(_popupMode === "panel"){ rsInfoShow(_rrows(props||{}, _popupFields) + sv + _ovSections(ovs)); }
     else if(c) new maplibregl.Popup({closeButton:true, maxWidth:"260px"})

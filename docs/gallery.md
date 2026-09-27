@@ -2,8 +2,9 @@
 
 Every look below is the bundled **Södermalm driving sample**
 (`ui/studio/samples/sodermalm_driving.geojson`) — one `gpd.read_file(...)` call, then
-`render_edges` with the keywords shown. Thumbnails are real browser screenshots
-(regenerate with `python docs/build_gallery.py`).
+`render_edges` with the keywords shown. Thumbnails are real browser screenshots, regenerated with
+`python docs/build_gallery.py` (the dashboard and report shots need `ui/*/build.py` first, and the
+Street View shots a CARTO key in the environment); the studio screenshot is taken by hand.
 
 ```python
 import geopandas as gpd

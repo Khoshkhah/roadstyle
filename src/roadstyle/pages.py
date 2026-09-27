@@ -13,7 +13,7 @@ can build these pages with no repo checkout::
     rs.render_report(edges).save("report.html")
     rs.render_street_view(edges).save("street_view.html")
 
-Both return a :class:`~roadstyle.render_web.WebMap` — ``.save(path)`` writes the self-contained
+All three return a :class:`~roadstyle.render_web.WebMap` — ``.save(path)`` writes the self-contained
 page, and it previews inline in a notebook. Every :func:`~roadstyle.render_edges` keyword passes
 through (``color_options=`` populates the sidebar's *Colour by* picker); the injected sidebar is
 plain HTML/CSS/JS, safe to copy out and reshape.

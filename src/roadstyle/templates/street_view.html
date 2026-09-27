@@ -7,10 +7,13 @@
   #sv { position: fixed; top: 0; right: 0; bottom: 0; width: var(--sv-w); display: flex;
         flex-direction: column; background: #fff; border-left: 1px solid #ddd;
         font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: #222; }
-  #sv h2 { margin: 0; padding: 10px 12px 0; font-size: 15px; }
-  #sv-road-row { display: flex; align-items: center; gap: 4px; padding: 2px 12px 8px; }
-  #sv-road { flex: 1; color: #555; }
-  .sv-step { border: 1px solid #ccc; background: #fff; border-radius: 4px; padding: 2px 8px; cursor: pointer; }
+  /* ONE row: title · road name, then the step buttons */
+  #sv-bar { display: flex; align-items: center; gap: 8px; padding: 5px 8px 5px 12px;
+            border-bottom: 1px solid #e5e5e5; white-space: nowrap; }
+  #sv h2 { margin: 0; font-size: 13px; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+  #sv-road { flex: 1 1 0; min-width: 0; color: #555; overflow: hidden; text-overflow: ellipsis; }
+  #sv-road::before { content: "\00b7"; margin-right: 8px; color: #aaa; }
+  .sv-step { border: 1px solid #ccc; background: #fff; border-radius: 4px; padding: 1px 7px; cursor: pointer; }
   .sv-step:disabled { opacity: .35; cursor: default; }
   #sv [hidden] { display: none !important; }
   /* the divider: drag it to share the width between the map and Street View */
@@ -38,8 +41,7 @@
 </style>
 <div id="sv-drag" title="Drag to resize"></div>
 <div id="sv">
-  <h2>Roads and Street View</h2>
-  <div id="sv-road-row"><span id="sv-road">Click a road to see it in Street View.</span>
+  <div id="sv-bar"><h2>Roads and Street View</h2><span id="sv-road">Click a road to see it in Street View.</span>
     <button type="button" class="sv-step" data-step="-15" title="Back 15 m along the road" disabled>&#9664;</button>
     <button type="button" class="sv-step" data-step="15" title="Forward 15 m along the road" disabled>&#9654;</button></div>
   <div id="sv-empty">Street View opens here, looking the way the clicked road runs.</div>

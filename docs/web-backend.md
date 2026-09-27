@@ -144,13 +144,13 @@ row calls `rsSelect` + `rsFocus` — it selects the road exactly like a map clic
 camera to it. It is built entirely on the public API (`rsQuery` → `rsSelect` / `rsFocus`), so a
 custom sidebar can offer the same search (both `ui/` templates do).
 
-### Google Street View link
+### Google Street View
 
 Every map has a **Street View** button (under 3D). It opens a floating window over the map that
 shows Google Street View of the road the user clicks (or `rsSelect`s), and follows each new click.
 Drag its title bar to move it, its corner to resize it; the popup's *Street View* link opens it
 too. While it is open, a **marker** on the map (a dot and a cone) shows where Street View stands
-and which way it looks, and the window's **◀ ▶** buttons walk 15 m back or forward along the
+and which way it looks (on a two-way road, in its direction's lane as the map draws it), and the window's **◀ ▶** buttons walk 15 m back or forward along the
 edge, so a road can be followed without clicking the map again (they stop at the edge's ends).
 Nothing is loaded from Google while it is closed. Whether it was open, where, and how big are
 remembered in the viewer's browser. It opens at the map's bottom-right corner, so it respects any
@@ -167,7 +167,8 @@ rs.render_edges(edges, street_view=False)   # no Street View
 line) nearest the click, and the heading is that segment's direction. A two-way road's two edges
 share one line, so each then steps 2.5 m to its right, into the middle of its own lane
 (right-hand traffic, the side the map draws it on): its two directions stand 5 m apart, looking
-opposite ways. `rsSelect(id)` uses the edge's midpoint instead of a click. Google shows the
+opposite ways. The map marker sits in the lane as drawn at the current zoom, which is a few
+pixels, not 2.5 m, so it stays on the road. `rsSelect(id)` uses the edge's midpoint instead of a click. Google shows the
 panorama nearest that point; where it has no car imagery, that can be a photo someone uploaded,
 such as a shop interior.
 

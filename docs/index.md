@@ -3,7 +3,8 @@
 **roadstyle** turns a GeoDataFrame of road edges into one styled, interactive HTML map: OSM-style
 road cartography (coloured fills over casings, two-way lanes, arrows, bridges over tunnels), your
 own data as colour, and a `window.rs*` JavaScript API. The file is self-contained (MapLibre and the
-data inlined), so it opens offline with no server.
+data inlined), so it opens offline with no server; only Google Street View needs the page served
+(`python -m http.server`).
 
 ![A roadstyle map of Södermalm: Hornsgatan selected, and the floating Street View window showing it](img/hero.jpg)
 
@@ -24,7 +25,7 @@ rs.render_edges(edges, palette="mono",                   # colour by your own co
   "colour by" options in one map.
 - **Google Street View**: click a road to see it, looking along it, in a floating window from the
   map's Street View button (default), or on a side-by-side page (`rs.render_street_view`);
-  see [Street View](web-backend.md#google-street-view-link).
+  see [Street View](web-backend.md#google-street-view).
 - **Scriptable**: every control has a `window.rs*` twin, plus `rsQuery` id sets and `rs:*` events.
 - **Other outputs**: folium, lonboard (GPU, millions of edges), or a JSON spec for your own frontend.
 - **No code needed**: the `roadstyle` CLI and the `roadstyle studio` workbench.
