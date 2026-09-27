@@ -127,12 +127,14 @@ box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px
   cursor:move;user-select:none;touch-action:none}
 .rs-svw-t{flex:1;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .rs-svw-bar button{border:0;background:none;color:#fff;font:14px/1 system-ui;cursor:pointer;padding:2px 5px}
+.rs-svw-bar button:disabled{opacity:.3;cursor:default}
 .rs-svw iframe{flex:1;width:100%;border:0;background:#eee}
 .rs-svw-msg{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
   padding:14px;text-align:center;color:#666;background:#f4f4f4}
 .rs-svw-msg code{background:#e6e6e6;padding:1px 4px;border-radius:3px;color:#333}
 .rs-svw.rs-drag iframe{pointer-events:none}
 .maplibregl-ctrl-group button.rs-on{background:#dfe9ff}
+.rs-svm{pointer-events:none}
 @media (max-width:700px){.rs-svw{left:0!important;right:0!important;top:auto!important;bottom:0!important;
   width:auto!important;height:45%!important;border-radius:10px 10px 0 0;resize:none}}
 </style></head><body>
@@ -256,6 +258,8 @@ if(_svWindow){
   const save=()=>{ try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(e){} };
   const w=document.createElement("div"); w.className="rs-svw"; w.hidden=true;
   w.innerHTML='<div class="rs-svw-bar"><span class="rs-svw-t">Street View</span>'+
+    '<button type="button" data-step="-15" title="Back 15 m along the road">\u25c0</button>'+
+    '<button type="button" data-step="15" title="Forward 15 m along the road">\u25b6</button>'+
     '<button type="button" title="Close">\u2715</button></div>'+
     '<div class="rs-svw-msg">Click a road to see it in Street View.</div>'+
     '<iframe title="Google Street View" allowfullscreen hidden></iframe>';
@@ -291,12 +295,19 @@ if(_svWindow){
     if(fr.getAttribute("src")!==src) fr.src=src;
     fr.hidden=false; msg.hidden=true;
   };
+  const steps=[...bar.querySelectorAll("button[data-step]")];
+  const ends=(a, z)=>{ steps[0].disabled=!!a; steps[1].disabled=!!z; };
+  steps.forEach(b=>{ b.onclick=()=>rsStreetViewStep(+b.dataset.step); });
   document.addEventListener("rs:select", e=>{
     const d=e.detail; if(d.overlay) return;  // roads only
-    const p=d.properties||{}; last={name:p.name||p.highway||"Unnamed road", url:d.streetView}; show();
+    const p=d.properties||{}; last={name:p.name||p.highway||"Unnamed road", url:d.streetView};
+    ends(false, false); show();
+  });
+  document.addEventListener("rs:streetviewmove", e=>{   // the step buttons: same road, new spot
+    if(!last) return; last.url=e.detail.streetView; ends(e.detail.atStart, e.detail.atEnd); show();
   });
   rsSetStreetView=function(on){
-    w.hidden=!on; if(on && innerWidth>700) place();
+    w.hidden=!on; if(on && innerWidth>700) place(); rsSetStreetViewMarker(!!on);
     st.open=!!on; save(); if(btn) btn.classList.toggle("rs-on", !!on); show();
     document.dispatchEvent(new CustomEvent("rs:streetviewchange", {detail:{open:!!on}}));
   };
@@ -835,36 +846,74 @@ const _popupFields = __ROAD_POPUP_FIELDS__;   // curated field list, or null => 
 // directed, so a road's two directions get the same spot and opposite headings. A plain maps URL,
 // no API key. The heading is the clicked edge's segment nearest the point; none without geometry.
 const _streetView = __STREET_VIEW__;
-// a two-way road's direction stands in the middle of its own lane: this far (metres) right of
-// the centre line, the side its twin is drawn on (MapLibre's line-offset: right-hand traffic)
-const _SV_LANE_M = 2.5;
-function _svSnap(f, ll){
-  // the point on the clicked edge's own geometry nearest the click, and that segment's heading.
-  // The drawn lanes sit offset from the centre line by a pixel amount (tens of metres when zoomed
-  // out), so the raw click point can land nearer an indoor photo than the road's Street View
-  // imagery; a two-way edge then moves a fixed _SV_LANE_M into its own lane.
-  const g = f && f.geometry;
-  const lines = !g ? [] : g.type==="LineString" ? [g.coordinates] :
-                g.type==="MultiLineString" ? g.coordinates : [];
-  const k = Math.cos(ll.lat*Math.PI/180); let best=null, bd=Infinity;
-  lines.forEach(cs=>{ for(let i=0;i+1<cs.length;i++){
-    const dx=(cs[i+1][0]-cs[i][0])*k, dy=cs[i+1][1]-cs[i][1];
-    const px=(ll.lng-cs[i][0])*k, py=ll.lat-cs[i][1];
-    const t=Math.max(0, Math.min(1, (px*dx+py*dy)/((dx*dx+dy*dy)||1)));
-    const d=(px-t*dx)**2+(py-t*dy)**2;
-    if(d<bd){ bd=d; best={h:(Math.atan2(dx,dy)*180/Math.PI+360)%360, dx:dx, dy:dy,
-      lng:cs[i][0]+t*(cs[i+1][0]-cs[i][0]), lat:cs[i][1]+t*(cs[i+1][1]-cs[i][1])}; } } });
-  if(best && f.properties && f.properties.__rs_twoway){   // (dy,-dx) points right of travel
-    const n=Math.hypot(best.dx, best.dy)||1, m=_SV_LANE_M/110540;   // metres -> degrees of latitude
-    best.lng += best.dy/n*m/k; best.lat -= best.dx/n*m; }
+// Street View stands at a spot ON the clicked edge: its own geometry (the road's centre line), the
+// spot nearest the click, looking along the edge. The drawn lanes sit offset from that line by a
+// pixel amount (tens of metres when zoomed out), so the raw click could land nearer an indoor
+// photo than the road's imagery. A two-way road's direction then steps _SV_LANE_M to its right,
+// into the middle of its own lane (MapLibre's line-offset draws it there: right-hand traffic).
+// The position is kept as {edge, metres along it}: the map marker, the step buttons
+// (rsStreetViewStep) and the URL all read it, so they cannot disagree.
+const _SV_LANE_M = 2.5, _SV_R = 110540;          // metres per degree of latitude
+let _svPos = null, _svMk = null, _svMarkOn = false;
+function _svLine(f){ const g=f && f.geometry;
+  return !g ? [] : g.type==="LineString" ? g.coordinates : g.type==="MultiLineString" ? [].concat(...g.coordinates) : []; }
+function _svFeat(f){ const F=_feats();       // the edge's full geometry (a picked one may be tile-clipped)
+  return (f && f.id!=null && srcOf(f)==="roads" && F && F[f.id]) || f; }
+function _svDist(cs){ const k=Math.cos(cs[0][1]*Math.PI/180), d=[0];
+  for(let i=1;i<cs.length;i++) d.push(d[i-1]+Math.hypot((cs[i][0]-cs[i-1][0])*k*_SV_R, (cs[i][1]-cs[i-1][1])*_SV_R));
+  return d; }
+function _svMeasure(f, ll){                     // metres along f to the spot nearest ll
+  const cs=_svLine(f); if(cs.length<2) return null;
+  const k=Math.cos(ll.lat*Math.PI/180), d=_svDist(cs); let best=0, bd=Infinity;
+  for(let i=0;i+1<cs.length;i++){
+    const dx=(cs[i+1][0]-cs[i][0])*k, dy=cs[i+1][1]-cs[i][1], px=(ll.lng-cs[i][0])*k, py=ll.lat-cs[i][1];
+    const t=Math.max(0, Math.min(1, (px*dx+py*dy)/((dx*dx+dy*dy)||1))), q=(px-t*dx)**2+(py-t*dy)**2;
+    if(q<bd){ bd=q; best=d[i]+t*(d[i+1]-d[i]); } }
   return best; }
-// the URL on its own: also sent as `detail.streetView` on rs:select, for host pages whose own
-// panel replaces the popup (road_popup=False)
+function _svAt(f, m){                           // the spot m metres along f: {lng, lat, h, m, len}
+  const cs=_svLine(f); if(cs.length<2) return null;
+  const d=_svDist(cs), len=d[d.length-1]; m=Math.max(0, Math.min(len, m));
+  let i=0; while(i<cs.length-2 && d[i+1]<m) i++;
+  const t=(m-d[i])/((d[i+1]-d[i])||1), k=Math.cos(cs[i][1]*Math.PI/180);
+  const dx=(cs[i+1][0]-cs[i][0])*k, dy=cs[i+1][1]-cs[i][1];
+  const p={lng:cs[i][0]+t*(cs[i+1][0]-cs[i][0]), lat:cs[i][1]+t*(cs[i+1][1]-cs[i][1]),
+           h:(Math.atan2(dx,dy)*180/Math.PI+360)%360, m:m, len:len};
+  if(f.properties && f.properties.__rs_twoway){ // (dy,-dx) points right of travel
+    const n=Math.hypot(dx, dy)||1, o=_SV_LANE_M/_SV_R; p.lng += dy/n*o/k; p.lat -= dx/n*o; }
+  return p; }
+function _svUrlOf(p){ return 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+
+  p.lat.toFixed(6)+','+p.lng.toFixed(6)+(p.h==null ? '' : '&heading='+Math.round(p.h)); }
 function _svUrl(ll, f){
   if(!_streetView || !ll) return null;
-  const sn = _svSnap(f, ll), p = sn || ll;
-  return 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+
-    p.lat.toFixed(6)+','+p.lng.toFixed(6)+(sn ? '&heading='+Math.round(sn.h) : ''); }
+  f=_svFeat(f); const m=_svMeasure(f, ll), p=m==null ? null : _svAt(f, m);
+  return _svUrlOf(p || ll); }
+// a selection: remember the spot (for the marker and the step buttons) and return its URL
+function _svPick(ll, f, id){
+  f=_svFeat(f); const m=(_streetView && ll) ? _svMeasure(f, ll) : null;
+  _svPos = m==null ? null : {f:f, m:m, id:id}; _svMark();
+  return _svUrl(ll, f); }
+// the map marker: a dot where Street View stands and a cone the way it looks. Shown while a
+// Street View is on screen (the window open, or the side-by-side page); rsSetStreetViewMarker(on)
+function _svMark(){
+  const p = _svMarkOn && _svPos ? _svAt(_svPos.f, _svPos.m) : null;
+  if(!p){ if(_svMk){ _svMk.remove(); _svMk=null; } return; }
+  if(!_svMk){ const el=document.createElement("div"); el.className="rs-svm";
+    el.innerHTML='<svg width="64" height="64" viewBox="-32 -32 64 64">'+
+      '<path d="M0 0 L-16 -26 A31 31 0 0 1 16 -26 Z" fill="rgba(13,71,161,.45)" stroke="#fff" stroke-width="1.5"/>'+
+      '<circle r="7" fill="#0d47a1" stroke="#fff" stroke-width="2.5"/></svg>';
+    _svMk=new maplibregl.Marker({element:el, rotationAlignment:"map", pitchAlignment:"map"}); }
+  _svMk.setLngLat([p.lng, p.lat]).setRotation(p.h).addTo(map); }
+function rsSetStreetViewMarker(on){ _svMarkOn=!!on; _svMark(); }
+// move the Street View spot m metres along its edge (negative: back), still looking along it;
+// stops at the edge's ends. Fires rs:streetviewmove {id, streetView, atStart, atEnd}.
+function rsStreetViewStep(m){
+  if(!_svPos) return null;
+  const p=_svAt(_svPos.f, _svPos.m+m); if(!p) return null;
+  _svPos.m=p.m; _svMark(); const url=_svUrlOf(p);
+  document.dispatchEvent(new CustomEvent("rs:streetviewmove",
+    {detail:{id:_svPos.id, streetView:url, atStart:p.m<=0.01, atEnd:p.m>=p.len-0.01}}));
+  return url; }
+window.rsSetStreetViewMarker = rsSetStreetViewMarker; window.rsStreetViewStep = rsStreetViewStep;
 function _sv(ll, f){
   const u = _svUrl(ll, f);
   if(u && _svWindow)                          // the window mode opens its window, not a new tab
@@ -883,10 +932,11 @@ function rsDeselect(){
 window.rsDeselect = rsDeselect;
 // programmatic selection by id (same id space as rsQuery / rs:select): highlight + popup/panel
 // + rs:select, exactly like a click. The floating popup anchors at the edge's midpoint.
-function _midOf(g){ if(!g) return null;
-  const cs = g.type==="LineString" ? g.coordinates :
-             g.type==="MultiLineString" ? g.coordinates[0] : null;
-  return cs && cs.length ? cs[Math.floor(cs.length/2)] : null; }
+function _midOf(g){                         // the middle of the length (a middle VERTEX can be an end)
+  const cs=_svLine({geometry:g}); if(cs.length<2) return cs[0]||null;
+  const d=_svDist(cs), h=d[d.length-1]/2; let i=0; while(i<cs.length-2 && d[i+1]<h) i++;
+  const t=(h-d[i])/((d[i+1]-d[i])||1);
+  return [cs[i][0]+t*(cs[i+1][0]-cs[i][0]), cs[i][1]+t*(cs[i+1][1]-cs[i][1])]; }
 function rsSelect(id){
   const s=_side();
   const props = s ? s.props[id] : (_feats()[id]||{}).properties;
@@ -904,7 +954,7 @@ function rsSelect(id){
   let ovs=[]; if(c){ try{ ovs=_ovAt(map.project({lng:c[0], lat:c[1]})); }catch(err){} }
   const cll = c ? {lng:c[0], lat:c[1]} : null;
   document.dispatchEvent(new CustomEvent("rs:select",
-    {detail:{id:id, layer:null, properties:props || {}, overlays:ovs, streetView:_svUrl(cll, _feats()[id])}}));
+    {detail:{id:id, layer:null, properties:props || {}, overlays:ovs, streetView:_svPick(cll, _feats()[id], id)}}));
   const sv = _sv(cll, _feats()[id]);
   if(__ROAD_POPUP__){
     if(_popupMode === "panel"){ rsInfoShow(_rrows(props||{}, _popupFields) + sv + _ovSections(ovs)); }
@@ -944,7 +994,7 @@ map.on("click", e=>{
   // structured click-data for host pages / dashboards (fires in every popup mode, incl. False)
   document.dispatchEvent(new CustomEvent("rs:select",
     {detail:{id:f.id, layer:f.layer && f.layer.id, properties:props, overlays:ovs,
-             streetView:_svUrl(e.lngLat, f)}}));
+             streetView:_svPick(e.lngLat, f, f.id)}}));
   const sv = _sv(e.lngLat, f);
   if(__ROAD_POPUP__){
     if(_popupMode === "panel"){ rsInfoShow(_rrows(props, _popupFields) + sv + _ovSections(ovs)); }

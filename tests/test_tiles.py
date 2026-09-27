@@ -146,3 +146,14 @@ def test_render_without_tiles_is_unchanged():
     i = html.index("const style = ") + len("const style = ")
     style = json.JSONDecoder().raw_decode(html, i)[0]
     assert style["sources"]["roads"]["type"] == "geojson"
+
+
+def test_sidecar_mid_is_half_the_length():
+    """rsSelect anchors its popup and Street View spot at `mids`: the middle of the length, not
+    the middle vertex (a two-point edge's middle vertex is its END, so stepping forward from it
+    along the edge had nowhere to go)."""
+    from roadstyle.tiles import sidecar
+    fc = {"type": "FeatureCollection", "features": [
+        {"type": "Feature", "properties": {}, "geometry": {"type": "LineString",
+                                                           "coordinates": [[18.0, 59.3], [18.02, 59.3]]}}]}
+    assert sidecar(fc)["mids"][0] == pytest.approx([18.01, 59.3])

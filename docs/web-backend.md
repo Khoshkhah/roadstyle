@@ -100,6 +100,8 @@ dispatches a CustomEvent on `document`:
 | `rsSelect(id)` / `rsDeselect()` | select one edge exactly like a click (glow + popup/panel; a 3D bridge glows as that edge's own deck ribbon) / clear | `rs:select` / `rs:deselect` |
 | `rsSetView3D(on)` | tilt to the settings' `camera.pitch_3d` / back to flat north-up | `rs:viewchange` |
 | `rsSetStreetView(on)` | open / close the Street View window (the default `street_view="window"`; a no-op otherwise) | `rs:streetviewchange` |
+| `rsStreetViewStep(m)` | move the Street View spot `m` metres along its edge (negative: back), still looking along it; stops at the ends. Returns the new Street View URL | `rs:streetviewmove` (`detail.streetView`, `atStart`, `atEnd`) |
+| `rsSetStreetViewMarker(on)` | show / hide the map marker of the Street View spot (the window and the side-by-side page drive it) | — |
 | `rsSetBridges(on)` | show / hide every bridge (elevated road and its 3D deck ribbons); ANDs with the class and id filters — the filter panel's *Bridges* row | `rs:filterchange` (`detail.bridges`) |
 | `rsPanelShow(on)` | panel mode only: hide / unhide the docked side panel (the map takes the space; a tab brings it back) | — |
 
@@ -147,7 +149,10 @@ custom sidebar can offer the same search (both `ui/` templates do).
 Every map has a **Street View** button (under 3D). It opens a floating window over the map that
 shows Google Street View of the road the user clicks (or `rsSelect`s), and follows each new click.
 Drag its title bar to move it, its corner to resize it; the popup's *Street View* link opens it
-too. Nothing is loaded from Google while it is closed. Whether it was open, where, and how big are
+too. While it is open, a **marker** on the map (a dot and a cone) shows where Street View stands
+and which way it looks, and the window's **◀ ▶** buttons walk 15 m back or forward along the
+edge, so a road can be followed without clicking the map again (they stop at the edge's ends).
+Nothing is loaded from Google while it is closed. Whether it was open, where, and how big are
 remembered in the viewer's browser. It opens at the map's bottom-right corner, so it respects any
 panel the page adds; on a phone it is a sheet at the bottom. `rsSetStreetView(true)` opens it from
 your own UI. It needs the page served over http(s) (see the note below). No API key.
@@ -194,6 +199,7 @@ roadstyle edges.gpkg --page street-view --panel-width 60 --no-resize
 <iframe src="../maps/street_view.html" loading="lazy" title="The map and Google Street View side by side"
         style="width:100%;height:520px;border:0;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.18)"></iframe>
 
+The map marks the Street View spot and ◀ ▶ step along the road, as in the window.
 `panel_width` is Street View's share of the width in percent (20-80, default 42). With
 `resizable=True` (the default) the viewer can drag the divider, and the page remembers their
 width in their browser. On a phone, Street View sits under the map. Every `render_edges` keyword

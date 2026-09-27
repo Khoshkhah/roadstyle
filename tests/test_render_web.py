@@ -742,9 +742,12 @@ def test_web_street_view_link():
     assert "const _streetView = false;" in off
     assert "__STREET_VIEW__" not in on + off
     # host pages whose own panel replaces the popup get the same URL on the click event
-    assert on.count("streetView:_svUrl(") == 2
+    assert on.count("streetView:_svPick(") == 2
     # the point goes onto the edge's own geometry (the road centre line), not the raw click on a
-    # drawn lane, which can sit nearer an indoor photo than the road's Street View imagery
-    assert "const sn = _svSnap(f, ll), p = sn || ll;" in on
+    # drawn lane, which can sit nearer an indoor photo than the road's Street View imagery...
+    assert "const m=_svMeasure(f, ll), p=m==null ? null : _svAt(f, m);" in on
     # ...and a two-way edge moves into its own lane, so the two directions stand apart
-    assert "const _SV_LANE_M = 2.5;" in on and "f.properties.__rs_twoway" in on
+    assert "const _SV_LANE_M = 2.5" in on and "f.properties.__rs_twoway" in on
+    # a map marker shows where Street View stands; the step buttons walk along the edge
+    assert "window.rsStreetViewStep = rsStreetViewStep;" in on and '"rs:streetviewmove"' in on
+    assert "rsSetStreetViewMarker(!!on);" in on and 'data-step="15"' in on

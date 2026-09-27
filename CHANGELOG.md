@@ -6,6 +6,17 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Street View marker and steps.** While Street View is shown (the window, or the side-by-side
+  page), a marker on the map (a dot and a viewing cone) shows where it stands and which way it
+  looks. **◀ ▶** buttons walk 15 m back or forward along the edge, so a road can be followed
+  without clicking the map again. JS: `rsStreetViewStep(m)` (event `rs:streetviewmove`),
+  `rsSetStreetViewMarker(on)`.
+
+### Fixed
+- `rsSelect(id)` anchored its popup (and now the Street View spot) at the edge's middle VERTEX,
+  which on a two-point edge is its end; it now uses the middle of the length (inline and tiled).
+
 ## [0.6.0] — 2026-09-26
 
 ### Changed

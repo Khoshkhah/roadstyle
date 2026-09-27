@@ -178,7 +178,10 @@ def build_pmtiles(fc: dict, *, class_col: str, keep: set, minzoom_table: dict | 
 
 def sidecar(fc: dict) -> dict:
     """The per-edge lookup the page keeps inline (gzipped): full properties for rsQuery /
-    popups, a midpoint vertex for the floating popup anchor, and a bbox for rsFocus."""
+    popups, the edge's midpoint (by length: rsSelect's popup anchor and Street View spot), and a
+    bbox for rsFocus."""
+    from shapely.geometry import LineString
+
     props, mids, bboxes = [], [], []
     for ft in fc.get("features", []):
         props.append(ft.get("properties") or {})
@@ -186,7 +189,9 @@ def sidecar(fc: dict) -> dict:
         cs = g.get("coordinates") or []
         if g.get("type") == "MultiLineString" and cs:
             cs = cs[0]
-        mids.append(list(cs[len(cs) // 2]) if cs else None)
+        # the middle of the length, not the middle vertex: a two-point edge's middle vertex is its end
+        mids.append(list(LineString(cs).interpolate(0.5, normalized=True).coords[0])
+                    if len(cs) >= 2 else (list(cs[0]) if cs else None))
         xs = [c[0] for c in (cs or [])]
         ys = [c[1] for c in (cs or [])]
         bboxes.append([min(xs), min(ys), max(xs), max(ys)] if xs else None)
