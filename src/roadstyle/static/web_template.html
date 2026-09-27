@@ -910,6 +910,9 @@ function rsStreetViewStep(m){
   if(!_svPos) return null;
   const p=_svAt(_svPos.f, _svPos.m+m); if(!p) return null;
   _svPos.m=p.m; _svMark(); const url=_svUrlOf(p);
+  // keep the marker on screen while walking: pan once it nears the map's edge
+  const q=map.project([p.lng, p.lat]), c=map.getCanvas(), pad=60;
+  if(q.x<pad || q.y<pad || q.x>c.clientWidth-pad || q.y>c.clientHeight-pad) map.easeTo({center:[p.lng, p.lat], duration:400});
   document.dispatchEvent(new CustomEvent("rs:streetviewmove",
     {detail:{id:_svPos.id, streetView:url, atStart:p.m<=0.01, atEnd:p.m>=p.len-0.01}}));
   return url; }

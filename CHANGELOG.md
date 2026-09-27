@@ -6,6 +6,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- Stepping Street View along a road (◀ ▶) pans the map when the marker nears its edge, so the
+  marker stays in view.
+
 ## [0.7.0] — 2026-09-26
 
 ### Added
