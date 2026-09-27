@@ -28,3 +28,6 @@ screenshot/
 notebooks/sodermalm_*.html
 ui/dashboard/dashboard.html
 ui/report/report.html
+
+# the Manual's live maps: built in CI with the CARTO key secret (docs.yml)
+docs/maps/

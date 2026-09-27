@@ -8,6 +8,7 @@ on:
     branches: [main]
     paths:
       - "docs/**"
+      - "src/roadstyle/**"
       - "mkdocs.yml"
       - "pyproject.toml"
       - ".github/workflows/docs.yml"
@@ -40,7 +41,18 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: Install docs dependencies
-        run: pip install mkdocs-material mkdocs-redirects
+        run: pip install mkdocs-material mkdocs-redirects ".[numeric]"
+
+      # The Manual's live maps (docs/maps/*.html) are built here, not committed: CARTO tiles
+      # need a key, which lives in the repo secret CARTO_API_KEY. It is not in git, but it is
+      # in the deployed pages (browsers send it with each tile request) - restrict the key
+      # to khoshkhah.github.io in the CARTO dashboard.
+      - name: Build the live maps
+        env:
+          CARTO_API_KEY: ${{ secrets.CARTO_API_KEY }}
+        run: |
+          test -n "$CARTO_API_KEY" || { echo "::error::repo secret CARTO_API_KEY is not set"; exit 1; }
+          python docs/build_maps.py
 
       # First run flips the Pages source from the gh-pages branch to GitHub
       # Actions; subsequent runs are a no-op.

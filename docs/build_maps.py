@@ -4,8 +4,9 @@ Run from the repo root::
 
     python docs/build_maps.py        # writes docs/maps/*.html
 
-These are committed so the GitHub Pages build (which does **not** run roadstyle) can serve them.
-Each is a self-contained map the manual embeds in an ``<iframe>``. They use the bundled sample
+They are not committed: the docs workflow (.github/workflows/docs.yml) builds them before
+``mkdocs build``, with the CARTO key from the repo secret ``CARTO_API_KEY`` so the base map carries
+no "API KEY REQUIRED" watermark. Locally, set ``CARTO_API_KEY`` first. Each is a self-contained map the manual embeds in an ``<iframe>``. They use the bundled sample
 edges (``notebooks/data/sodermalm_edges.gpkg``) with a couple of seeded columns so the data-driven
 demos look real.
 """
