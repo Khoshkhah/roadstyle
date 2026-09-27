@@ -153,7 +153,7 @@ Every keyword after `gdf` is keyword-only. **On** says which backends read it: *
 | `popup_mode` | `None` / `"popup"` / `"panel"` | `None` | web | `"panel"` docks the read-out as a full-height side panel (with [search](web-backend.md#built-in-search-panel-mode)) and combines with any `road_popup` field spec; `None` = `"popup"` (floating). |
 | `road_tooltip` | bool / list | `False` | web | **Hover** tooltip: `True` = every column, a list = those columns, `False` = off. |
 | `tooltip` | list / `None` | `None` | web, folium | Hover columns, the cross-backend name. Web: an alias for `road_tooltip` (used when that is unset); `None` = no tooltip. Folium: `None` = **all** columns. |
-| `street_view` | bool | `True` | web | A Google Street View link in the read-out, facing the clicked edge's direction (no API key); also sent as `rs:select`'s `detail.streetView`. See [Street View link](web-backend.md#google-street-view-link). |
+| `street_view` | bool / `"window"` | `True` | web | A Google Street View link in the read-out, facing the clicked edge's direction (no API key); also sent as `rs:select`'s `detail.streetView`. `"window"`: a map button opening a floating Street View window that follows the clicked road. See [Street View link](web-backend.md#google-street-view-link). |
 | `hover_color` / `select_color` | hex str | `"#b388ff"` / `"#7c4dff"` | web | Highlight colour of the hovered / selected road. |
 | `selected` | GeoDataFrame / `None` | `None` | folium | Edges to highlight with a neon-violet overlay. On web use `rsHighlight` / `rsColor` or a `color_options` entry. |
 | `legend_position` | str | `"bottomleft"` | folium | Legend corner. |

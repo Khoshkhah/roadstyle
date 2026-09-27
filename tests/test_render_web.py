@@ -478,6 +478,19 @@ def test_snapshot_writes_png(tmp_path):
     assert (int.from_bytes(head[:4], "big"), int.from_bytes(head[4:], "big")) == (1000, 800)
 
 
+def test_web_street_view_window():
+    """street_view="window": a map button opens a floating Street View window that follows the
+    clicked road; the popup link opens that window instead of a new tab. Off by default."""
+    import pytest
+    win = render_edges(_edges(), backend="web", street_view="window").html
+    assert "const _svWindow = true;" in win and "const _streetView = true;" in win
+    assert "window.rsSetStreetView = rsSetStreetView;" in win and "maps/embed?pb=" in win
+    assert "const _svWindow = false;" in render_edges(_edges(), backend="web").html
+    assert "__SV_WINDOW__" not in win
+    with pytest.raises(ValueError):
+        render_edges(_edges(), backend="web", street_view="windows")
+
+
 def test_oneway_column_drives_arrows():
     """The data contract: an explicit `oneway` column controls the arrows (undirected networks
     included); without the column, one-way = an edge with no reverse twin."""

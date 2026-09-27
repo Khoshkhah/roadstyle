@@ -117,6 +117,24 @@ box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px
 .maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color:rgba(255,255,255,.58)}
 .rs-tip .maplibregl-popup-content{background:rgba(255,255,255,.42)}
 .rs-tip .maplibregl-popup-tip{display:none}   /* a following tooltip needs no pointer */
+/* Street View window (street_view="window"): floats over the map, drag by the bar, resize by the corner */
+.rs-svw{position:absolute;right:calc(56px + var(--rs-side,0px));bottom:40px;width:380px;height:260px;
+  min-width:220px;min-height:150px;z-index:4;display:flex;flex-direction:column;overflow:hidden;
+  resize:both;background:#fff;border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,.3);
+  font:12px/1.4 system-ui,-apple-system,sans-serif}
+.rs-svw[hidden],.rs-svw [hidden]{display:none!important}
+.rs-svw-bar{display:flex;align-items:center;gap:6px;padding:5px 6px 5px 10px;background:#23262d;color:#fff;
+  cursor:move;user-select:none;touch-action:none}
+.rs-svw-t{flex:1;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.rs-svw-bar button{border:0;background:none;color:#fff;font:14px/1 system-ui;cursor:pointer;padding:2px 5px}
+.rs-svw iframe{flex:1;width:100%;border:0;background:#eee}
+.rs-svw-msg{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  padding:14px;text-align:center;color:#666;background:#f4f4f4}
+.rs-svw-msg code{background:#e6e6e6;padding:1px 4px;border-radius:3px;color:#333}
+.rs-svw.rs-drag iframe{pointer-events:none}
+.maplibregl-ctrl-group button.rs-on{background:#dfe9ff}
+@media (max-width:700px){.rs-svw{left:0!important;right:0!important;top:auto!important;bottom:0!important;
+  width:auto!important;height:45%!important;border-radius:10px 10px 0 0;resize:none}}
 </style></head><body>
 <div id="map"></div><script>
 const style = __STYLE__, BASEMAPS = __BASEMAPS__;
@@ -226,6 +244,87 @@ if(_popupMode==="panel"){    // panel-reopen button: same chrome as 2D, right be
     d.appendChild(b); return d;
   }, onRemove(){}});
 }
+// Street View window (street_view="window"): hidden until the map button (or
+// rsSetStreetView(true)) opens it; then a draggable, resizable window over the map that follows
+// every road selection. Nothing is loaded from Google while it is closed. Whether it is open, its
+// position and its size are remembered in this browser.
+const _svWindow = __SV_WINDOW__;
+function rsSetStreetView(){}
+if(_svWindow){
+  const KEY="rs-street-view-window", fromDisk=location.protocol==="file:";
+  const st=(()=>{ try{ return JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ return {}; } })();
+  const save=()=>{ try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(e){} };
+  const w=document.createElement("div"); w.className="rs-svw"; w.hidden=true;
+  w.innerHTML='<div class="rs-svw-bar"><span class="rs-svw-t">Street View</span>'+
+    '<button type="button" title="Close">\u2715</button></div>'+
+    '<div class="rs-svw-msg">Click a road to see it in Street View.</div>'+
+    '<iframe title="Google Street View" allowfullscreen hidden></iframe>';
+  document.body.appendChild(w);
+  const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"),
+        fr=w.querySelector("iframe");
+  if(st.w) Object.assign(w.style, {width:st.w+"px", height:st.h+"px"});
+  // anchor by the top-left once visible, so the corner grip grows the window toward the pointer
+  // (right/bottom anchoring grows it the other way); keep a remembered spot on this screen
+  const place=()=>{
+    if(st.left==null){    // first open: the map's bottom-right corner, whatever panels the page adds
+      const m=map.getContainer().getBoundingClientRect();
+      st.left=m.right-w.offsetWidth-56; st.top=m.bottom-w.offsetHeight-40; }
+    st.left=Math.max(0, Math.min(innerWidth-80, st.left)); st.top=Math.max(0, Math.min(innerHeight-30, st.top));
+    Object.assign(w.style, {left:st.left+"px", top:st.top+"px", right:"auto", bottom:"auto"});
+  };
+  let last=null, btn=null;                   // the latest road selection: {name, url}
+  const esc=t=>String(t).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);
+  const show=()=>{
+    if(w.hidden || !last) return;
+    ttl.textContent=last.name;
+    if(!last.url || fromDisk){               // Google's embed stays grey in a file:// page
+      fr.hidden=true; msg.hidden=false;
+      msg.innerHTML = !last.url ? "No Street View for this road." :
+        "<b>Street View needs this page served, not opened from disk.</b>"+
+        "<span>Run <code>python -m http.server</code> in its folder and open it from localhost.</span>"+
+        '<a href="'+esc(last.url)+'" target="_blank" rel="noopener">Open this spot in Google Maps \u2197</a>';
+      return; }
+    // Google won't frame last.url; this is its embeddable twin (Google's "Share > Embed a map" form)
+    const u=new URL(last.url), vp=u.searchParams.get("viewpoint").split(",");
+    const src="https://www.google.com/maps/embed?pb=!6m7!1m6!2m2!1d"+vp[0]+"!2d"+vp[1]+
+              "!3f"+(u.searchParams.get("heading")||0)+"!4f0!5f1";
+    if(fr.getAttribute("src")!==src) fr.src=src;
+    fr.hidden=false; msg.hidden=true;
+  };
+  document.addEventListener("rs:select", e=>{
+    const d=e.detail; if(d.overlay) return;  // roads only
+    const p=d.properties||{}; last={name:p.name||p.highway||"Unnamed road", url:d.streetView}; show();
+  });
+  rsSetStreetView=function(on){
+    w.hidden=!on; if(on && innerWidth>700) place();
+    st.open=!!on; save(); if(btn) btn.classList.toggle("rs-on", !!on); show();
+    document.dispatchEvent(new CustomEvent("rs:streetviewchange", {detail:{open:!!on}}));
+  };
+  bar.lastChild.onclick=()=>rsSetStreetView(false);
+  bar.addEventListener("pointerdown", e=>{    // drag by the title bar
+    if(e.target.tagName==="BUTTON") return;
+    const r=w.getBoundingClientRect(), dx=e.clientX-r.left, dy=e.clientY-r.top;
+    bar.setPointerCapture(e.pointerId); w.classList.add("rs-drag");   // the iframe mustn't swallow it
+    const mv=ev=>{ st.left=Math.max(0, Math.min(innerWidth-80, ev.clientX-dx));
+                   st.top=Math.max(0, Math.min(innerHeight-30, ev.clientY-dy));
+                   Object.assign(w.style, {left:st.left+"px", top:st.top+"px", right:"auto", bottom:"auto"}); };
+    bar.addEventListener("pointermove", mv);
+    bar.addEventListener("pointerup", ()=>{ bar.removeEventListener("pointermove", mv);
+      w.classList.remove("rs-drag"); save(); }, {once:true});
+  });
+  new ResizeObserver(()=>{ if(!w.hidden && innerWidth>700){ st.w=w.offsetWidth; st.h=w.offsetHeight; save(); } }).observe(w);
+  map.addControl({onAdd(){
+    const d=document.createElement("div"); d.className="maplibregl-ctrl maplibregl-ctrl-group";
+    btn=document.createElement("button"); btn.type="button"; btn.title="Street View";
+    btn.innerHTML='<svg viewBox="0 0 24 24" width="17" height="17" style="display:block;margin:auto">'+
+      '<circle cx="12" cy="4.5" r="3" fill="currentColor"/>'+
+      '<path d="M8.5 9h7l-1.2 7h-1.8l-.6 6.5h-1.8L9.5 16H7.7z" fill="currentColor"/></svg>';
+    btn.onclick=()=>rsSetStreetView(w.hidden);
+    d.appendChild(btn); return d;
+  }, onRemove(){}});
+  if(st.open) rsSetStreetView(true);
+}
+window.rsSetStreetView = rsSetStreetView;
 // base-layer switching: window.rsSetBasemap(key|index) is the API (swaps the raster source's
 // tiles; the road layers stay put); the dropdown is just UI over it and stays in sync.
 // A tile-less entry (blank) hides the raster layer and shows the plain background colour.
@@ -760,6 +859,8 @@ function _svUrl(ll, g){
     p.lat.toFixed(6)+','+p.lng.toFixed(6)+(sn ? '&heading='+Math.round(sn.h) : ''); }
 function _sv(ll, g){
   const u = _svUrl(ll, g);
+  if(u && _svWindow)                          // the window mode opens its window, not a new tab
+    return '<div class="rs-sv" style="margin-top:4px"><a href="#" onclick="rsSetStreetView(true);return false">Street View</a></div>';
   return !u ? "" : '<div class="rs-sv" style="margin-top:4px"><a target="_blank" rel="noopener" href="'+
     u.replace(/&/g, "&amp;")+'">Street View &#8599;</a></div>'; }
 function rsInfoClear(){ if(_sideBd) _sideBd.innerHTML='<div class="rs-empty">Click a road to see its full record here.</div>'; }

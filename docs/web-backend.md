@@ -99,6 +99,7 @@ dispatches a CustomEvent on `document`:
 | `rsFocus(ids, opt?, layer?)` | fly the camera to fit an id (or id set); `opt` merges into MapLibre's `fitBounds` (`padding` 80, `maxZoom` 17) | — |
 | `rsSelect(id)` / `rsDeselect()` | select one edge exactly like a click (glow + popup/panel; a 3D bridge glows as that edge's own deck ribbon) / clear | `rs:select` / `rs:deselect` |
 | `rsSetView3D(on)` | tilt to the settings' `camera.pitch_3d` / back to flat north-up | `rs:viewchange` |
+| `rsSetStreetView(on)` | open / close the Street View window (`street_view="window"`; a no-op otherwise) | `rs:streetviewchange` |
 | `rsSetBridges(on)` | show / hide every bridge (elevated road and its 3D deck ribbons); ANDs with the class and id filters — the filter panel's *Bridges* row | `rs:filterchange` (`detail.bridges`) |
 | `rsPanelShow(on)` | panel mode only: hide / unhide the docked side panel (the map takes the space; a tab brings it back) | — |
 
@@ -160,6 +161,23 @@ document.addEventListener("rs:select", e => {
 ```
 
 `street_view=False` removes the link and sends `streetView: null`.
+
+#### A Street View window on any map
+
+For a dashboard that already has its own panels, keep Street View out of the way until someone
+wants it:
+
+```python
+rs.render_edges(edges, street_view="window")
+```
+
+The map gets a Street View button (under 3D). It opens a floating window over the map that follows
+every road the user clicks (or `rsSelect`s). Drag its title bar to move it, its corner to resize it;
+the popup's *Street View* link opens it too. Nothing is loaded from Google while it is closed.
+Whether it was open, where, and how big are remembered in the viewer's browser. It opens at the
+map's bottom-right corner, so it respects any panel the page adds. On a phone it is a sheet at the
+bottom. `rsSetStreetView(true)` opens it from your own UI. Like the side-by-side page, it needs the
+page served over http(s).
 
 #### Map and Street View side by side
 

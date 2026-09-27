@@ -13,6 +13,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   Street View sits under the map. Google's embed loads only in a served page (http/https);
   opened from disk, the panel says how to serve it and links to Street View instead.
   Live demo in the web-backend docs.
+- **`street_view="window"`** (web backend): a Street View button on the map opening a floating
+  window that follows each clicked road: drag it by its title bar, resize it by its corner; it
+  opens at the map's corner (clear of the host page's own panels) and remembers open state,
+  place and size per browser. Nothing is loaded from Google while it is closed. The popup link
+  opens it instead of a new tab. JS: `rsSetStreetView(on)`, event `rs:streetviewchange`.
 - **CLI `--page dashboard | report | street-view`**: the ready-made pages from the shell, with
   `--panel-width` / `--no-resize` for the street-view one.
 
