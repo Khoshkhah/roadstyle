@@ -6,6 +6,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-09-26
+
 ### Added
 - **`street_view=True`** (web backend): a Google Street View link in the road popup / panel, at
   the clicked point and facing the clicked edge's direction, so a road's two directions get
