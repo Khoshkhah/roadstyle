@@ -6,6 +6,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-09-27
+
 ### Added
 - **`rs.render_street_view(..., layout="below")`** (CLI `--layout below`): the map on top and
   Street View under it, with a divider dragged up and down; `panel_width` is then its share of the
