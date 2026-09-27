@@ -69,3 +69,12 @@ def test_street_view_width_and_divider_are_options():
     assert '<div id="sv-drag"' not in h and "--sv-w: 60%;" in h   # fixed at 60%
     with pytest.raises(ValueError):
         rs.render_street_view(_edges(), panel_width=95)
+
+
+def test_street_view_vertical_layout():
+    import pytest
+    h = rs.render_street_view(_edges(), layout="vertical").html
+    assert '<div id="sv" data-layout="vertical">' in h and "body.sv-vertical #sv" in h
+    assert '<div id="sv" data-layout="horizontal">' in rs.render_street_view(_edges()).html
+    with pytest.raises(ValueError):
+        rs.render_street_view(_edges(), layout="diagonal")

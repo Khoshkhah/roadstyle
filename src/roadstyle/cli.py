@@ -83,6 +83,9 @@ def _build_parser() -> argparse.ArgumentParser:
                           "(default 42).")
     web.add_argument("--no-resize", action="store_true",
                      help="--page street-view: fixed width, no draggable divider.")
+    web.add_argument("--layout", choices=["horizontal", "vertical"],
+                     help="--page street-view: Street View beside the map (horizontal, default) "
+                          "or under it (vertical).")
     web.add_argument("--view-3d", action="store_true",
                      help="3D view: tilted camera + extruded, ramped bridge decks.")
     web.add_argument("--pitch", type=float, help="starting camera tilt in degrees (0-85).")
@@ -195,6 +198,8 @@ def main(argv: list[str] | None = None) -> int:
                     web_kw["resizable"] = not args.no_resize
                     if args.panel_width is not None:
                         web_kw["panel_width"] = args.panel_width
+                    if args.layout:
+                        web_kw["layout"] = args.layout
                 getattr(pages, _PAGES[args.page])(g, **style_kw, **web_kw).save(str(out_path))
             else:
                 render_edges(g, backend="web", **style_kw, **web_kw).save(str(out_path))

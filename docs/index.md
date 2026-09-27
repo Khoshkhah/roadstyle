@@ -94,7 +94,7 @@ roadstyle studio --server.port 8502                                  # extra arg
 `-f/--format` is one of `web` (self-contained MapLibre map, the default), `folium`, `rsjs`
 (roadstyle.js page), `spec`, `geojson`. Every other flag mirrors a `render_edges` keyword; the `web`
 map also takes `--no-arrows` / `--no-labels` / `--no-filter` / `--no-basemap-switcher`, and
-`--page dashboard | report | street-view` for a ready-made page (`--panel-width`, `--no-resize` for
+`--page dashboard | report | street-view` for a ready-made page (`--layout`, `--panel-width`, `--no-resize` for
 the street-view one). See
 `roadstyle --help`. `roadstyle studio` needs the `studio` extra and forwards extra arguments to
 `streamlit run`.

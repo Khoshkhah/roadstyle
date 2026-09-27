@@ -126,6 +126,9 @@ def street_view_shots(edges) -> None:
                 SELECT + """rsSetStreetView(true);
         Object.assign(document.querySelector(".rs-svw").style,
                       {left: "400px", top: "250px", width: "500px", height: "330px"});""", 960, 640)
+    served_shot(rs.render_street_view(edges, resizable=False, layout="vertical").html,
+                OUT / "street_view_vertical.png", SELECT, 960, 640,
+                camera="map.jumpTo({center: [18.0495, 59.3169], zoom: 15.6});")
     served_shot(rs.render_street_view(edges, resizable=False).html, OUT / "street_view_side.png",
                 SELECT, 960, 640, camera="map.jumpTo({center: [18.0495, 59.3169], zoom: 15.6});")
 

@@ -55,7 +55,8 @@ m.save("map.html")                        # m.html is the page as a string
   `road_popup="panel"` (docked read-out instead of a popup), `arrows=`, `labels=`.
 - Ready-made pages: `rs.render_dashboard(edges, ...)` (query sidebar) and
   `rs.render_report(edges, ...)` (stats sidebar) and `rs.render_street_view(edges, ...)` (Google
-  Street View beside the map, following the clicked road; `panel_width=42`, `resizable=True`)
+  Street View beside the map, or under it with `layout="vertical"`, following the clicked road;
+  `panel_width=42`, `resizable=True`)
   take the same keywords. CLI: `roadstyle edges.gpkg --page street-view`. Every map has a Street
   View button by default (`street_view="window"`): a floating, draggable, resizable window that
   follows the clicked road (`rsSetStreetView(on)`), a map marker (dot + cone) where it stands,

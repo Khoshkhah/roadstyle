@@ -6,6 +6,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **`rs.render_street_view(..., layout="vertical")`** (CLI `--layout vertical`): the map on top and
+  Street View under it, with a divider dragged up and down; `panel_width` is then its share of the
+  height. `"horizontal"` (beside the map) stays the default.
+
 ### Changed
 - The side-by-side page's header is one compact row (title · road name, then ◀ ▶) instead of two.
 

@@ -74,21 +74,28 @@ def render_report(gdf, **kw):
                                filter_control=False, road_popup=False), **kw)
 
 
-def render_street_view(gdf, *, panel_width: float = 42, resizable: bool = True, **kw):
+def render_street_view(gdf, *, panel_width: float = 42, resizable: bool = True,
+                       layout: str = "horizontal", **kw):
     """A self-contained **map + Google Street View** page: the styled map on the left, Street View
     on the right (under the map on a phone). Clicking a road shows Street View at that point,
     looking the way the clicked edge runs, so a two-way road's two edges look opposite ways. No
     new window and no API key (it embeds Google's "Share > Embed a map" URL form).
 
-    ``panel_width`` is Street View's share of the window width in percent (20-80).
+    ``layout="horizontal"`` puts Street View beside the map (right), ``"vertical"`` under it.
+    ``panel_width`` is Street View's share of the window in percent (20-80): of its width, or of
+    its height when vertical.
     ``resizable=True`` adds a divider the viewer can drag to change it (their choice is remembered
     in their browser); ``False`` fixes the width. Any :func:`render_edges` keyword passes through.
     Returns a :class:`WebMap`; ``.save("street_view.html")`` writes the page."""
+    if layout not in ("horizontal", "vertical"):
+        raise ValueError(f'layout must be "horizontal" or "vertical", got {layout!r}')
     if not 20 <= panel_width <= 80:
         raise ValueError(f"panel_width must be 20-80 (percent of the window), got {panel_width}")
 
     def edit(frag):
         frag = frag.replace("--sv-w: 42%;", f"--sv-w: {panel_width:g}%;", 1)
+        if layout == "vertical":
+            frag = frag.replace('<div id="sv" data-layout="horizontal">', '<div id="sv" data-layout="vertical">', 1)
         if not resizable:
             frag = frag.replace('<div id="sv-drag" title="Drag to resize"></div>\n', "", 1)
         return frag

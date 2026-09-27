@@ -185,23 +185,35 @@ document.addEventListener("rs:select", e => {
 #### Map and Street View side by side
 
 One call builds a page with the map on one side and Street View on the other. Click a road and
-Street View shows it, looking the way the clicked edge runs; drag the divider to share the width:
+Street View shows it, looking the way the clicked edge runs; drag the divider to share the space.
+Street View sits beside the map (`layout="horizontal"`, the default) or under it
+(`layout="vertical"`):
 
 ```python
 rs.render_street_view(edges).save("street_view.html")
+rs.render_street_view(edges, layout="vertical")                 # the map on top, Street View under it
 rs.render_street_view(edges, panel_width=60, resizable=False)   # fixed: Street View 60% wide
 ```
 
 ```bash
 roadstyle edges.gpkg --page street-view -o street_view.html
+roadstyle edges.gpkg --page street-view --layout vertical
 roadstyle edges.gpkg --page street-view --panel-width 60 --no-resize
 ```
+
+Horizontal:
 
 <iframe src="../maps/street_view.html" loading="lazy" title="The map and Google Street View side by side"
         style="width:100%;height:520px;border:0;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.18)"></iframe>
 
+Vertical:
+
+<iframe src="../maps/street_view_vertical.html" loading="lazy" title="The map with Google Street View under it"
+        style="width:100%;height:640px;border:0;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.18)"></iframe>
+
 The map marks the Street View spot and ◀ ▶ step along the road, as in the window.
-`panel_width` is Street View's share of the width in percent (20-80, default 42). With
+`panel_width` is Street View's share of the width (vertical: the height) in percent (20-80,
+default 42). With
 `resizable=True` (the default) the viewer can drag the divider, and the page remembers their
 width in their browser. On a phone, Street View sits under the map. Every `render_edges` keyword
 passes through.

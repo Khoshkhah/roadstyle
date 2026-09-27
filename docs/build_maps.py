@@ -81,6 +81,9 @@ OPEN_ON = """<script>(function () {
 })();</script>"""
 html = rs.render_street_view(g, name="Roads and Street View").html
 (OUT / "street_view.html").write_text(html.replace("</body>", OPEN_ON + "</body>", 1), encoding="utf-8")
+html = rs.render_street_view(g, name="Roads and Street View", layout="vertical").html
+(OUT / "street_view_vertical.html").write_text(html.replace("</body>", OPEN_ON + "</body>", 1),
+                                               encoding="utf-8")
 
 for f in sorted(OUT.glob("*.html")):
     print(f"wrote {f.relative_to(REPO)} ({f.stat().st_size // 1024} KB)")

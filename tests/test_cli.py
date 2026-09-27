@@ -42,6 +42,8 @@ def test_street_view_page_flags(tmp_path):
                  "--panel-width", "55", "--no-resize"]) == 0
     h = out.read_text()
     assert "--sv-w: 55%;" in h and '<div id="sv-drag"' not in h
+    assert main([str(SAMPLE), "-o", str(out), "--page", "street-view", "--layout", "vertical"]) == 0
+    assert 'data-layout="vertical"' in out.read_text()
 
 
 def test_page_needs_web_format(tmp_path):

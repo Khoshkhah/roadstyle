@@ -104,6 +104,14 @@ rs.render_street_view(edges)               # CLI: roadstyle edges.gpkg --page st
 
 ![map and street view side by side](img/gallery/street_view_side.png)
 
+Or with Street View under the map:
+
+```python
+rs.render_street_view(edges, layout="vertical")   # CLI: --page street-view --layout vertical
+```
+
+![map with street view under it](img/gallery/street_view_vertical.png)
+
 ## The sidebar dashboard (UI template)
 
 Every built-in control replaced by plain HTML driving the [JS API](web-backend.md#the-javascript-api-windowrs) —
