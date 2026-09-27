@@ -144,8 +144,8 @@ custom sidebar can offer the same search (both `ui/` templates do).
 ### Google Street View link
 
 Clicking a road adds a **Street View ↗** link to its popup or side panel. It opens Google Street
-View at the clicked point, looking along the clicked edge: the heading is the direction of the
-edge's segment nearest the click. Because edges are directed, a two-way road's two edges open at
+View on the clicked road, looking along it: the point is the spot on the edge's own geometry (the
+road's centre line) nearest the click, and the heading is that segment's direction. Because edges are directed, a two-way road's two edges open at
 the same spot looking opposite ways. `rsSelect(id)` uses the edge's midpoint instead of a click.
 It is a plain `google.com/maps` URL: no API key, nothing loaded until the link is followed.
 

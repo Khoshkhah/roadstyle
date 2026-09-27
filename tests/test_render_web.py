@@ -729,3 +729,6 @@ def test_web_street_view_link():
     assert "__STREET_VIEW__" not in on + off
     # host pages whose own panel replaces the popup get the same URL on the click event
     assert on.count("streetView:_svUrl(") == 2
+    # the point goes onto the edge's own geometry (the road centre line), not the raw click on a
+    # drawn lane, which can sit nearer an indoor photo than the road's Street View imagery
+    assert "const sn = _svSnap(g, ll), p = sn || ll;" in on

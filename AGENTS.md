@@ -27,7 +27,7 @@ A consumer project that does not install it runs with `PYTHONPATH=<this repo>/sr
 - `render_edges` takes `**kwargs`, so a misspelt keyword is silently ignored: grep the template
   for its placeholder when a new option seems to do nothing.
 - The road popup and hover tooltip text: `_rfields` (popup/tooltip) and `_rrows` (docked panel)
-  in the template; the Street View link: `_sv` / `_svHeading`.
+  in the template; the Street View link: `_sv` / `_svUrl` / `_svSnap` (point snapped onto the edge).
 - The JS side has no unit tests. Check a rendering change in a real browser: `rs.snapshot(m,
   "x.png")` and look at the PNG, or drive the page with Playwright.
 - Gallery and README images: `python docs/build_gallery.py`.

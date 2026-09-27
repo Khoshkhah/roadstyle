@@ -736,7 +736,10 @@ const _popupFields = __ROAD_POPUP_FIELDS__;   // curated field list, or null => 
 // directed, so a road's two directions get the same spot and opposite headings. A plain maps URL,
 // no API key. The heading is the clicked edge's segment nearest the point; none without geometry.
 const _streetView = __STREET_VIEW__;
-function _svHeading(g, ll){
+function _svSnap(g, ll){
+  // the point on the clicked edge's own geometry nearest the click, and that segment's heading.
+  // The drawn two-way lanes sit offset from the centre line, toward the kerb and the shops, so
+  // the raw click point can land nearer an indoor photo than the road's Street View imagery.
   const lines = !g ? [] : g.type==="LineString" ? [g.coordinates] :
                 g.type==="MultiLineString" ? g.coordinates : [];
   const k = Math.cos(ll.lat*Math.PI/180); let best=null, bd=Infinity;
@@ -745,15 +748,16 @@ function _svHeading(g, ll){
     const px=(ll.lng-cs[i][0])*k, py=ll.lat-cs[i][1];
     const t=Math.max(0, Math.min(1, (px*dx+py*dy)/((dx*dx+dy*dy)||1)));
     const d=(px-t*dx)**2+(py-t*dy)**2;
-    if(d<bd){ bd=d; best=(Math.atan2(dx,dy)*180/Math.PI+360)%360; } } });
+    if(d<bd){ bd=d; best={h:(Math.atan2(dx,dy)*180/Math.PI+360)%360,
+      lng:cs[i][0]+t*(cs[i+1][0]-cs[i][0]), lat:cs[i][1]+t*(cs[i+1][1]-cs[i][1])}; } } });
   return best; }
 // the URL on its own: also sent as `detail.streetView` on rs:select, for host pages whose own
 // panel replaces the popup (road_popup=False)
 function _svUrl(ll, g){
   if(!_streetView || !ll) return null;
-  const h = _svHeading(g, ll);
+  const sn = _svSnap(g, ll), p = sn || ll;
   return 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+
-    ll.lat.toFixed(6)+','+ll.lng.toFixed(6)+(h==null ? '' : '&heading='+Math.round(h)); }
+    p.lat.toFixed(6)+','+p.lng.toFixed(6)+(sn ? '&heading='+Math.round(sn.h) : ''); }
 function _sv(ll, g){
   const u = _svUrl(ll, g);
   return !u ? "" : '<div class="rs-sv" style="margin-top:4px"><a target="_blank" rel="noopener" href="'+
