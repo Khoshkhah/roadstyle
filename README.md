@@ -10,7 +10,7 @@ road cartography (casing and fill, per-zoom widths, street names, one-way arrows
 bridges, optional 3D) and a JavaScript API for your own dashboard. Click any road to see it in
 Google Street View, looking the way it runs.
 
-![A roadstyle map of Södermalm, Stockholm, in 3D: bridge decks lifted above the streets, roads coloured by class](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/hero.jpg)
+![A roadstyle map of Södermalm, Stockholm: Hornsgatan selected on the map, and the floating Street View window showing it](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/hero.jpg)
 
 ## Install
 

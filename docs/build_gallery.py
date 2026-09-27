@@ -44,16 +44,7 @@ def main() -> None:
         wm = rs.render_edges(edges, backend="web", **kw)
         rs.snapshot(wm, OUT / f"{name}.png", width=960, height=640, settle=4.0, **cam)
         print("wrote", name)
-    # the README hero: 2x pixel density, panels and buttons off (attribution stays: licence)
-    hero = rs.render_edges(edges, view_3d=True, filter_control=False, basemap_switcher=False)
-    hide = ("<style>.maplibregl-ctrl-top-right,.maplibregl-ctrl-bottom-left,.rs-zoom"
-            "{display:none!important}</style></head>")
-    png = OUT / "hero.png"
-    rs.snapshot(hero.html.replace("</head>", hide, 1), png, width=1200, height=600, scale=2,
-                settle=5.0, center=(18.074, 59.306), zoom=15.4, pitch=60, bearing=-20)
-    from PIL import Image  # a JPEG is ~5x smaller than the PNG
-    Image.open(png).convert("RGB").save(OUT.parent / "hero.jpg", quality=85, optimize=True)
-    png.unlink()
+    hero(edges)
     print("wrote hero")
     # the sidebar templates (ui/dashboard, ui/report) — shot as pages, not WebMaps. Build them
     # first (their build.py writes the .html) so the shots reflect the current sidebars.
@@ -63,6 +54,53 @@ def main() -> None:
         if page.exists():
             rs.snapshot(page, OUT / f"{png}.png", width=960, height=640, settle=4.0)
             print("wrote", png)
+
+
+def hero(edges) -> None:
+    """The README hero: the map with the floating Street View window open on Hornsgatan, at 2x.
+
+    Not rs.snapshot: Street View loads only in a page served over http(s), and the shot needs
+    clicks (select a road, open the window). ANGLE/SwiftShader because the default software GL of
+    a GPU-less machine paints Google's WebGL panorama a second time, displaced, as a white box.
+    Attribution (OSM, CARTO, Google) stays visible: their terms. Needs a CARTO key in the env.
+    """
+    import functools
+    import http.server
+    import tempfile
+    import threading
+
+    from PIL import Image
+    from playwright.sync_api import sync_playwright
+
+    hide = "<style>.maplibregl-ctrl-bottom-left,.rs-zoom{display:none!important}</style></head>"
+    page = rs.render_edges(edges, street_view="window", filter_control=False,
+                           basemap_switcher=False, road_popup=False).html.replace("</head>", hide, 1)
+    with tempfile.TemporaryDirectory() as tmp:
+        Path(tmp, "hero.html").write_text(page, encoding="utf-8")
+        handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=tmp)
+        srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            with sync_playwright() as p:
+                b = p.chromium.launch(channel="chromium", args=[
+                    "--use-angle=swiftshader", "--use-gl=angle", "--enable-unsafe-swiftshader"])
+                pg = b.new_page(viewport={"width": 1200, "height": 600}, device_scale_factor=2)
+                pg.goto(f"http://127.0.0.1:{srv.server_port}/hero.html")
+                pg.wait_for_function("window.map && map.loaded()", timeout=40000)
+                pg.evaluate("map.jumpTo({center: [18.0520, 59.3172], zoom: 15.6})")
+                pg.wait_for_timeout(1500)
+                pg.evaluate("""() => { const ids = rsQuery(p => p.name === "Hornsgatan");
+                                       rsSelect(ids[30 % ids.length]); rsSetStreetView(true);
+                                       Object.assign(document.querySelector(".rs-svw").style,
+                                         {left: "610px", top: "215px", width: "560px", height: "355px"}); }""")
+                pg.wait_for_timeout(8000)                 # the panorama and its tiles
+                png = OUT / "hero.png"
+                pg.screenshot(path=str(png))
+                b.close()
+        finally:
+            srv.shutdown()
+    Image.open(png).convert("RGB").save(OUT.parent / "hero.jpg", quality=85, optimize=True)
+    png.unlink()
 
 
 if __name__ == "__main__":

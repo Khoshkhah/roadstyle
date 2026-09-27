@@ -5,7 +5,7 @@ road cartography (coloured fills over casings, two-way lanes, arrows, bridges ov
 own data as colour, and a `window.rs*` JavaScript API. The file is self-contained (MapLibre and the
 data inlined), so it opens offline with no server.
 
-![A roadstyle map of Södermalm](img/hero.jpg)
+![A roadstyle map of Södermalm: Hornsgatan selected, and the floating Street View window showing it](img/hero.jpg)
 
 ```python
 import geopandas as gpd
