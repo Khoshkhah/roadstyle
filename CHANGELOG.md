@@ -16,6 +16,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **CLI `--page dashboard | report | street-view`**: the ready-made pages from the shell, with
   `--panel-width` / `--no-resize` for the street-view one.
 
+### Changed
+- The Street View link (and `rs:select`'s `detail.streetView`) now points at the nearest spot on the
+  clicked edge's own geometry, the road's centre line, instead of the raw click. Clicks on a
+  drawn lane, or at an overview zoom, landed metres off the road, so Google often picked a
+  nearby indoor photo (a shop interior) instead of the road's Street View imagery.
+
 ## [0.4.2] — 2026-09-26
 
 ### Added
@@ -29,10 +35,6 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **`rs.snapshot(..., scale=2)`**: device pixel ratio, for sharp PNGs on HiDPI screens and in print.
 
 ### Changed
-- The Street View link (and `rs:select`'s `detail.streetView`) now points at the nearest spot on the
-  clicked edge's own geometry, the road's centre line, instead of the raw click. Clicks on a
-  drawn lane, or at an overview zoom, landed metres off the road, so Google often picked a
-  nearby indoor photo (a shop interior) instead of the road's Street View imagery.
 - Field names in the click popup and the hover tooltip are **bold**, values plain.
 - Docs site merged from 15 pages to 9 (Home, Manual, Gallery, Studio, Web backend, Embedding,
   Parameters & API, Palettes/base maps/settings, Engines); the old URLs redirect. Parameters &
