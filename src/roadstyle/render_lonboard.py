@@ -98,13 +98,16 @@ def render(
     api_key: str | None = None,
     **kwargs,
 ):
+    import inspect
+
     from lonboard import Map, PathLayer
 
     from .basemaps import get_basemap
+    from .render_web import render as _web_render
 
-    # Arrows / labels / filter panel / base-layer switcher are web-backend UI; drop the kwargs so
-    # they never reach lonboard.Map.
-    for _k in ("arrows", "labels", "filter_control", "basemap_switcher"):
+    # web-only keywords (arrows, view_3d, tiles, street_view, ...) would reach lonboard.Map() and
+    # raise; the set comes from the web renderer's signature, so a new web option cannot slip through
+    for _k in inspect.signature(_web_render).parameters.keys() - inspect.signature(render).parameters.keys():
         kwargs.pop(_k, None)
 
     bm = get_basemap(basemap or CONFIG.basemap, api_key=api_key)

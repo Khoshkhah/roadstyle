@@ -11,18 +11,22 @@ Edges are directed: a two-way road is two edges with reversed geometry. JS calls
 
 ## Reference
 
-- [Parameters & API](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/parameters.md): every public function and class, every keyword of render_edges (per backend), StyleConfig, Overlay
-- [Web backend & JS API](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/web-backend.md): grade separation, 3D, vector tiles, color_options, overlays, the JavaScript API and events
-- [Palettes, base maps & settings](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/palettes.md): the built-in palettes, base maps and API keys, the settings override files
+- [Every parameter](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/reference/parameters.md): every public function and class, every keyword of render_edges per backend, the pages, stylers, Overlay, StyleConfig
+- [JavaScript API](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/reference/javascript.md): every window.rs* function, every rs:* event, the registries
+- [Settings & palettes](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/reference/settings.md): the settings files, the palettes, base maps and API keys
+- [Command line](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/reference/cli.md): every flag of `roadstyle`, --page, roadstyle studio
 
 ## Guides
 
-- [Home](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/index.md): install, extras, command line
-- [Manual](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/manual.md): the walk-through, from the first map to colouring by data, overlays, loading data and web output
-- [Embedding](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/embedding.md): iframe, the JSON spec, roadstyle.js, Leaflet and MapLibre
-- [Choosing an engine](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/engines.md): web vs folium vs lonboard, and vs .explore(), prettymaps, kepler.gl
-- [Street View](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/street-view.md): the floating window (every map) and the side-by-side page (beside or below the map)
-- [Gallery](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/gallery.md): one screenshot and recipe per look
+- [Get started](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/get-started.md): install, a first map, what your data needs, loading data
+- [Style the roads](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/style.md): palettes, base maps, labels, arrows, 3D bridges, filtering
+- [Colour by your data](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/colour.md): color_by, color_table, several colourings with a menu
+- [Add your own layers](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/overlays.md): Overlay zones, points, lines
+- [Google Street View](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/street-view.md): the floating window (default) and the side-by-side page (beside / below)
+- [Big networks](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/big-networks.md): tiles=True, lonboard, choosing a backend
+- [Dashboards & JavaScript](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/dashboards.md): ready-made pages, driving the map from your own page
+- [Put it on a website](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/website.md): iframe, the JSON spec, roadstyle.js
+- [Gallery](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/gallery.md): one screenshot and the code for each look
 
 ## Optional
 

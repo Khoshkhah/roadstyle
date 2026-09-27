@@ -1,0 +1,105 @@
+# JavaScript API
+
+<p class="lead">Every <code>window.rs*</code> function, every <code>rs:*</code> event and every registry in a saved web map.</p>
+
+Each built-in control is a thin UI over one of these functions, so a host page can drive the map
+with the controls hidden. How to use them together: [Dashboards & JavaScript](../guides/dashboards.md).
+
+## Functions
+
+`layer?` is optional; see [the `layer` argument](#the-layer-argument).
+
+| function | does | fires |
+|---|---|---|
+| **Query and act on id sets** | | |
+| `rsQuery(p => bool, layer?)` | the ids of the features whose properties match | |
+| `rsGetProps(ids, layer?)` | the rows behind the ids, internal fields removed | |
+| `rsFilter(ids, layer?)` | show only these features; `null` resets. On roads it combines with the class filter | `rs:filterchange` |
+| `rsColor(ids, "#hex", layer?)` | paint the set one colour over the base colours | `rs:colorchange` |
+| `rsColor([[idsA, "#f80"], [idsB, "#08f"]])` | several sets at once, earlier pairs win overlaps (roads only) | `rs:colorchange` |
+| `rsColor(null)` / `rsColor(null, null, layer)` | reset | `rs:colorchange` |
+| `rsHighlight(ids, layer?)` | selection glow on the set; `[]` clears | `rs:highlightchange` |
+| `rsFocus(ids, opt?, layer?)` | fit the camera to one id or a set; `opt` goes to MapLibre `fitBounds` (default `padding` 80, `maxZoom` 17) | |
+| **Selection** | | |
+| `rsSelect(id)` | select one road exactly like a click: glow, popup or panel | `rs:select` |
+| `rsDeselect()` | clear the selection | `rs:deselect` |
+| **Built-in controls** | | |
+| `rsSetBasemap(keyOrIndex)` | switch the base map (key, label or index into `RS_BASEMAPS`) | `rs:basemapchange` |
+| `rsSetClasses(list)` | show exactly these road classes | `rs:filterchange` |
+| `rsSetBridges(on)` | show / hide every bridge and its 3D deck (the filter panel's *Bridges* row) | `rs:filterchange` |
+| `rsSetColorField(nameOrIndex)` | switch the active `color_options` entry | `rs:colorchange` |
+| `rsSetOverlay(labelOrIndex, on)` | show / hide one overlay | `rs:overlaychange` |
+| `rsSetView3D(on)` | tilt to `camera.pitch_3d`, or back to flat and north-up | `rs:viewchange` |
+| `rsPanelShow(on)` | panel mode only: hide / show the docked side panel | |
+| **Street View** | | |
+| `rsSetStreetView(on)` | open / close the Street View window (`street_view="window"` only; otherwise does nothing) | `rs:streetviewchange` |
+| `rsStreetViewStep(m)` | move the Street View spot `m` metres along the edge (negative = back), stopping at its ends; returns the new URL | `rs:streetviewmove` |
+| `rsSetStreetViewMarker(on)` | show / hide the map marker at the Street View spot | |
+
+## Events
+
+All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
+
+| event | when | `e.detail` |
+|---|---|---|
+| `rs:select` | a road is clicked or `rsSelect` runs | `id`, `layer` (`null` from `rsSelect`, the MapLibre layer id from a click), `properties`, `overlays` (`[{label, fields, properties}]` of clickable overlays under the point), `streetView` (URL or `null`) |
+| `rs:select` | an overlay feature is clicked | `id`, `layer` and `overlay` (both the overlay label), `fields`, `properties` |
+| `rs:deselect` | a click on empty map, or `rsDeselect` | none |
+| `rs:filterchange` | `rsSetClasses` | `visible`, `hidden` (class lists) |
+| | `rsSetBridges` | `bridges` |
+| | `rsFilter` on roads / an overlay | `ids` / `overlay`, `ids` |
+| `rs:colorchange` | `rsSetColorField` | `option` (the `RS_COLOR_OPTIONS` entry), `index` |
+| | `rsColor` with one set / several | `ids`, `color` / `groups: [{ids, color}]` |
+| | `rsColor` on an overlay | `overlay`, `ids`, `color` |
+| `rs:highlightchange` | `rsHighlight` | `ids` (plus `overlay` on an overlay) |
+| `rs:basemapchange` | `rsSetBasemap` | `basemap` (key), `index` |
+| `rs:overlaychange` | `rsSetOverlay` | `overlay` (label), `visible` |
+| `rs:viewchange` | `rsSetView3D` | `view3d` |
+| `rs:streetviewchange` | `rsSetStreetView` | `open` |
+| `rs:streetviewmove` | `rsStreetViewStep` | `id`, `streetView`, `atStart`, `atEnd` |
+
+```js
+document.addEventListener("rs:select", e => {
+  if (e.detail.overlay) return;                 // an overlay click, not a road
+  console.log(e.detail.properties.name, e.detail.streetView);
+});
+```
+
+## Registries
+
+Read-only globals for building your own controls.
+
+| global | holds |
+|---|---|
+| `window.map` | the MapLibre `Map` (camera: `map.easeTo({pitch, bearing})`) |
+| `RS_BASEMAPS` | `[{key, label, tiles, bg}]`, the switcher's base maps |
+| `RS_CLASSES` | the road classes in the filter, in order |
+| `RS_CLASS_COL` | the column `RS_CLASSES` came from |
+| `RS_CLASS_COLORS` | `{class: fill colour}` |
+| `RS_COLOR_OPTIONS` | `[{name, prop, legend}]`, the `color_options` entries |
+| `RS_OVERLAYS` | `[{label, source, layers, visible, color, popup, tooltip, under, interactive, …}]` |
+
+## The `layer` argument
+
+- Omitted or `null`: the roads.
+- An overlay's `label` (or its index in `RS_OVERLAYS`): that overlay.
+- Each layer has its own ids. Never pass ids from one layer to another.
+- Street labels, arrows and 3D decks are separate sources: `rsFilter` hides road lines but not
+  their labels (the class filter hides both).
+
+## Ids past 2**53
+
+!!! warning "Use roadstyle's ids, not your `edge_id`"
+    `rsSelect`, `rsColor`, `rsFocus` and the other functions take roadstyle's **feature ids**
+    (the same ids as in `rs:select`), never your `edge_id`. A 64-bit `edge_id` does not fit a
+    JavaScript number, so roadstyle stores big ids as strings. Look ids up by string:
+
+    ```js
+    const ids = rsQuery(p => String(p.edge_id) === "8121729169906061189");
+    rsSelect(ids[0]); rsFocus(ids);
+    ```
+
+    Or add a small integer column in Python (`pidx = 0..n-1`) and query on it. In pandas, a column
+    that mixes big ints and `None` turns into float64 and rounds the ids: use `dtype="Int64"`.
+
+**See also:** [Dashboards & JavaScript](../guides/dashboards.md) · [Every parameter](parameters.md) · [Put it on a website](../guides/website.md)

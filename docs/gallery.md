@@ -1,10 +1,8 @@
 # Gallery
 
-Every look below is the bundled **Södermalm driving sample**
-(`ui/studio/samples/sodermalm_driving.geojson`) — one `gpd.read_file(...)` call, then
-`render_edges` with the keywords shown. Thumbnails are real browser screenshots, regenerated with
-`python docs/build_gallery.py` (the dashboard and report shots need `ui/*/build.py` first, and the
-Street View shots a CARTO key in the environment); the studio screenshot is taken by hand.
+<p class="lead">One look per entry: the keywords that make it, and a real screenshot.</p>
+
+Every entry uses the bundled Södermalm sample:
 
 ```python
 import geopandas as gpd
@@ -14,17 +12,13 @@ edges = gpd.read_file("ui/studio/samples/sodermalm_driving.geojson")
 
 ## The defaults
 
-`highsat` palette on the Voyager base — what you get with no arguments.
-
 ```python
-rs.render_edges(edges)
+rs.render_edges(edges)                # highsat palette on Voyager
 ```
 
 ![highsat on voyager](img/gallery/highsat_voyager.png)
 
 ## OSM-Carto on Positron
-
-The classic muted openstreetmap-carto tones.
 
 ```python
 rs.render_edges(edges, palette="carto", basemap="positron")
@@ -42,8 +36,6 @@ rs.render_edges(edges, basemap="dark_matter")
 
 ## Blank canvas (offline)
 
-`mono` palette on the tile-less `blank` base map — zero network requests, print-clean.
-
 ```python
 rs.render_edges(edges, palette="mono", basemap="blank", basemap_switcher=False)
 ```
@@ -58,22 +50,17 @@ rs.render_edges(edges, basemap="satellite")
 
 ![satellite](img/gallery/satellite.png)
 
-## Data-driven colour
-
-Any numeric column → a colormap + legend (categorical mappings work too, see
-[Palettes](palettes.md)).
+## Colour by data
 
 ```python
-rs.render_edges(edges, color_by="maxspeed_kmh", cmap="plasma", legend=True, basemap="positron")
+rs.render_edges(edges, color_by="maxspeed_kmh", cmap="plasma", basemap="positron")
 ```
 
 ![coloured by maxspeed](img/gallery/speed_datadriven.png)
 
-## 3D bridges
+More in [Colour by your data](guides/colour.md).
 
-`view_3d=True`: tilted camera and extruded, ramped, black-cased bridge decks — look *under* a
-bridge and see the roads passing beneath. Below zoom 16 bridges draw as classic flat cased lines
-(`bridge_decks.flat_below`).
+## 3D bridges
 
 ```python
 rs.render_edges(edges, view_3d=True)
@@ -81,58 +68,48 @@ rs.render_edges(edges, view_3d=True)
 
 ![3d bridges](img/gallery/bridges_3d.png)
 
-## Street View window (every map)
-
-Every map has a Street View button (the person, under 3D). It opens a floating window that shows
-the clicked road in Google Street View, looking the way the road runs, and follows each new click.
-Drag it by its title bar, resize it by its corner. Nothing loads from Google until it is opened.
+## Street View window
 
 ```python
-rs.render_edges(edges)                     # the button is the default: street_view="window"
+rs.render_edges(edges)                # the Street View button is on by default
 ```
 
 ![street view window](img/gallery/street_view_window.png)
 
-## Map and Street View side by side
-
-A page with Street View beside the map, following the clicked road; drag the divider to share the
-width. [Live demos and details](street-view.md#2-side-by-side).
+## Street View beside the map
 
 ```python
-rs.render_street_view(edges)               # CLI: roadstyle edges.gpkg --page street-view
+rs.render_street_view(edges)          # CLI: roadstyle edges.gpkg --page street-view
 ```
 
 ![map and street view side by side](img/gallery/street_view_side.png)
 
-Or with Street View under the map:
+## Street View below the map
 
 ```python
-rs.render_street_view(edges, layout="below")   # CLI: --page street-view --layout below
+rs.render_street_view(edges, layout="below")
 ```
 
 ![map with street view under it](img/gallery/street_view_below.png)
 
-## The sidebar dashboard (UI template)
+More in [Google Street View](guides/street-view.md).
 
-Every built-in control replaced by plain HTML driving the [JS API](web-backend.md#the-javascript-api-windowrs) —
-query box, verb buttons, clickable results table, detail panel. Copy it from
-[`ui/dashboard/`](https://github.com/Khoshkhah/roadstyle/tree/main/ui/dashboard).
+## Dashboard
 
-```bash
-python ui/dashboard/build.py your_edges.gpkg            # add --tiles for ~10⁵-edge networks
+```python
+rs.render_dashboard(edges).save("dashboard.html")   # CLI: --page dashboard
 ```
 
 ![dashboard](img/gallery/dashboard.png)
 
-## roadstyle studio (Streamlit workbench)
+More in [Dashboards & JavaScript](guides/dashboards.md).
 
-The whole library behind a few knobs — live map on the right, the exact `render_edges` code for
-the current state below it, and a download button for the self-contained HTML. Three pages — **Map**,
-**Dashboard**, **Report** — the gentlest introduction to the library. See the
-[Studio](studio.md) page for the full walkthrough.
+## Studio
 
 ```bash
 pip install "roadstyle[studio]" && roadstyle studio
 ```
 
 ![roadstyle studio](img/gallery/studio.png)
+
+More in [Studio](studio.md).

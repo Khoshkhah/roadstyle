@@ -5,8 +5,8 @@ roadstyle turns a GeoDataFrame of road edges into one self-contained, interactiv
 
 **Using the library** (the one call, the data contract, the JS API, the traps):
 [skills/roadstyle/SKILL.md](skills/roadstyle/SKILL.md). Read it before writing code that calls
-roadstyle. Every keyword with its default: `docs/parameters.md`; the full JS API:
-`docs/web-backend.md`. This file covers working *on* the repo.
+roadstyle. Every keyword with its default: `docs/reference/parameters.md`; the full JS API:
+`docs/reference/javascript.md`. This file covers working *on* the repo.
 
 ## Setup and tests
 
@@ -22,7 +22,7 @@ A consumer project that does not install it runs with `PYTHONPATH=<this repo>/sr
 - `src/roadstyle/render_web.py` — `render(...)`: Python keywords become `__PLACEHOLDER__`
   replacements in `src/roadstyle/static/web_template.html` (one `.replace` chain near the end).
 - A new web option = the keyword + its `.replace` + a `const` in the template + a test in
-  `tests/test_render_web.py` + a row in `docs/parameters.md` and `docs/web-backend.md` +
+  `tests/test_render_web.py` + a row in `docs/reference/parameters.md` and `docs/reference/javascript.md` +
   CHANGELOG. If agents calling the library need to know it, also `skills/roadstyle/SKILL.md`.
 - `render_edges` takes `**kwargs`, so a misspelt keyword is silently ignored: grep the template
   for its placeholder when a new option seems to do nothing.

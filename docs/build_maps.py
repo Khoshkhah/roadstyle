@@ -1,4 +1,4 @@
-"""Generate the live demo maps embedded in the docs **manual** (docs/manual.md).
+"""Generate the live demo maps embedded in the docs (get-started.md and the guides).
 
 Run from the repo root::
 

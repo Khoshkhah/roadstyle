@@ -19,7 +19,7 @@ pip install roadstyle              # core
 pip install "roadstyle[all]"       # + studio, numeric ramps, vector tiles, lonboard, DuckDB, …
 ```
 
-Python ≥ 3.10. Individual extras and the dev setup: [Install](https://khoshkhah.github.io/roadstyle/#install).
+Python ≥ 3.10. Individual extras and the dev setup: [Install](https://khoshkhah.github.io/roadstyle/get-started/#install).
 
 ## Quickstart
 
@@ -72,7 +72,7 @@ rsColor(ids, "#ff00aa");  rsFocus(ids);       // paint them, fit the camera
 document.addEventListener("rs:select", e => console.log(e.detail.properties));
 ```
 
-Full API: [web backend → JavaScript API](https://khoshkhah.github.io/roadstyle/web-backend/#the-javascript-api-windowrs).
+Full API: [web backend → JavaScript API](https://khoshkhah.github.io/roadstyle/reference/javascript/).
 
 ## For AI coding agents
 
@@ -88,15 +88,15 @@ Full API: [web backend → JavaScript API](https://khoshkhah.github.io/roadstyle
 
 ## Documentation
 
-**[khoshkhah.github.io/roadstyle](https://khoshkhah.github.io/roadstyle/)**:
-[gallery](https://khoshkhah.github.io/roadstyle/gallery/) ·
-[every parameter](https://khoshkhah.github.io/roadstyle/parameters/) ·
-[web backend & JS API](https://khoshkhah.github.io/roadstyle/web-backend/) ·
-[palettes & settings](https://khoshkhah.github.io/roadstyle/palettes/) ·
-[base maps & API keys](https://khoshkhah.github.io/roadstyle/palettes/#base-maps-api-keys) ·
-[web vs folium vs lonboard](https://khoshkhah.github.io/roadstyle/engines/) ·
-[vs .explore() / kepler.gl](https://khoshkhah.github.io/roadstyle/engines/#roadstyle-vs-other-tools) ·
-[changelog](https://github.com/Khoshkhah/roadstyle/blob/main/CHANGELOG.md)
+**[khoshkhah.github.io/roadstyle](https://khoshkhah.github.io/roadstyle/)**, with live maps on every page.
+
+| | |
+|---|---|
+| **[Get started](https://khoshkhah.github.io/roadstyle/get-started/)** | install, a first map, what your data needs |
+| **Guides** | [style the roads](https://khoshkhah.github.io/roadstyle/guides/style/) · [colour by your data](https://khoshkhah.github.io/roadstyle/guides/colour/) · [your own layers](https://khoshkhah.github.io/roadstyle/guides/overlays/) · [Google Street View](https://khoshkhah.github.io/roadstyle/guides/street-view/) · [big networks](https://khoshkhah.github.io/roadstyle/guides/big-networks/) · [dashboards & JavaScript](https://khoshkhah.github.io/roadstyle/guides/dashboards/) · [on a website](https://khoshkhah.github.io/roadstyle/guides/website/) |
+| **[Gallery](https://khoshkhah.github.io/roadstyle/gallery/)** | a picture and one line of code per look |
+| **Reference** | [every parameter](https://khoshkhah.github.io/roadstyle/reference/parameters/) · [JavaScript API](https://khoshkhah.github.io/roadstyle/reference/javascript/) · [settings & base maps](https://khoshkhah.github.io/roadstyle/reference/settings/) · [command line](https://khoshkhah.github.io/roadstyle/reference/cli/) |
+| **[Changelog](https://github.com/Khoshkhah/roadstyle/blob/main/CHANGELOG.md)** | what changed in each release |
 
 ## License
 

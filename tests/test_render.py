@@ -38,6 +38,16 @@ def test_folium_ignores_web_only_keywords():
     assert isinstance(m, folium.Map)
 
 
+def test_lonboard_ignores_web_only_keywords():
+    """Same as folium: a web-only keyword (view_3d, tiles, street_view) is dropped, not passed to
+    lonboard.Map (which raised TypeError)."""
+    import pytest
+    pytest.importorskip("lonboard")
+    m = _render_edges(_edges(), backend="lonboard", view_3d=True, tiles=True, street_view=False,
+                      color_options={"Class": {}})
+    assert m is not None
+
+
 def test_folium_render_all_basemaps_and_palettes():
     import folium
     for basemap in ("voyager", "dark_matter", "satellite"):

@@ -1,66 +1,85 @@
 site_name: roadstyle
-site_description: OSM-style road/edge map styling — self-contained MapLibre, folium & lonboard maps
+site_description: Road maps for Python - styled, interactive, offline HTML maps of road networks, with Google Street View and a JavaScript API
 site_url: https://khoshkhah.github.io/roadstyle/
 repo_url: https://github.com/Khoshkhah/roadstyle
 repo_name: Khoshkhah/roadstyle
 
 theme:
   name: material
+  logo: img/logo.svg
+  favicon: img/logo.svg
   icon:
     repo: fontawesome/brands/github
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: indigo
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
         icon: material/weather-night
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: indigo
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
         icon: material/weather-sunny
         name: Switch to light mode
   features:
     - navigation.tabs
     - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.indexes
     - navigation.top
     - navigation.tracking
-    - navigation.indexes
     - navigation.footer
     - toc.follow
     - search.suggest
     - search.highlight
     - content.code.copy
-    - content.code.annotate
+    - content.tabs.link
+
+extra_css:
+  - stylesheets/extra.css
 
 nav:
   - Home: index.md
-  - Manual: manual.md
+  - Get started: get-started.md
+  - Guides:
+      - guides/index.md
+      - Style the roads: guides/style.md
+      - Colour by your data: guides/colour.md
+      - Add your own layers: guides/overlays.md
+      - Google Street View: guides/street-view.md
+      - Big networks: guides/big-networks.md
+      - Dashboards & JavaScript: guides/dashboards.md
+      - Put it on a website: guides/website.md
   - Gallery: gallery.md
-  - Street View: street-view.md
-  - Studio: studio.md
-  - Web:
-      - Web backend & JS API: web-backend.md
-      - Embedding in a website: embedding.md
   - Reference:
-      - Parameters & API: parameters.md
-      - Palettes, base maps & settings: palettes.md
-      - Choosing an engine: engines.md
+      - Every parameter: reference/parameters.md
+      - JavaScript API: reference/javascript.md
+      - Settings & palettes: reference/settings.md
+      - Command line: reference/cli.md
+  - Studio: studio.md
 
-# Old pages, merged in the 15 -> 9 restructure; keep their URLs working.
+# Old pages; keep their URLs working.
 plugins:
   - search
   - redirects:
       redirect_maps:
-        usage.md: index.md
-        tutorial.md: manual.md
-        examples.md: manual.md
-        frontend.md: embedding.md
-        comparison.md: engines.md
-        api.md: parameters.md
+        usage.md: get-started.md
+        tutorial.md: get-started.md
+        examples.md: get-started.md
+        manual.md: get-started.md
+        frontend.md: guides/website.md
+        embedding.md: guides/website.md
+        comparison.md: index.md
+        engines.md: guides/big-networks.md
+        api.md: reference/parameters.md
+        parameters.md: reference/parameters.md
+        web-backend.md: reference/javascript.md
+        palettes.md: reference/settings.md
+        street-view.md: guides/street-view.md
 
 markdown_extensions:
   - admonition
@@ -74,3 +93,8 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.superfences
   - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg

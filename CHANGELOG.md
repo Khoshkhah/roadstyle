@@ -20,7 +20,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
   map, below the map); the Manual's colour-by demo opens on the data, its samples drop the
   default `backend="web"`.
 
+- **Docs redesigned**: by task (Get started; seven short guides, each one screen with a live map;
+  Gallery; Reference tables; Studio), roadstyle's colours and logo, cards and tabs. Old URLs
+  redirect.
+
 ### Fixed (layout)
+- `render_edges(backend="lonboard", view_3d=True)` (any web-only keyword) raised a TypeError from
+  `lonboard.Map`; web-only keywords are now dropped, as on folium.
 - The overlay **Layers** control sat on top of the base-map button; it now sits above it (and
   follows a host page's side panel like the button).
 

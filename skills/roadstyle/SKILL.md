@@ -7,7 +7,7 @@ description: Render road networks (a GeoDataFrame of edges with a `highway` colu
 
 Turns a GeoDataFrame of road edges into one self-contained HTML map (MapLibre, data inlined,
 works offline) with real road cartography and a `window.rs*` JavaScript API.
-Docs: https://khoshkhah.github.io/roadstyle/ (every keyword: `/parameters/`, JS API: `/web-backend/`).
+Docs: https://khoshkhah.github.io/roadstyle/ (every keyword: `/reference/parameters/`, JS API: `/reference/javascript/`, Street View: `/guides/street-view/`).
 
 ## Install
 
