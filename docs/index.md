@@ -22,6 +22,9 @@ rs.render_edges(edges, palette="mono",                   # colour by your own co
   grade separation, a 3D view (`view_3d=True`).
 - **Your data as colour**: categorical or numeric columns, legends, and several switchable
   "colour by" options in one map.
+- **Google Street View**: click a road to see it, looking along it. A link in the popup (default),
+  a floating window (`street_view="window"`), or a side-by-side page (`rs.render_street_view`);
+  see [Street View](web-backend.md#google-street-view-link).
 - **Scriptable**: every control has a `window.rs*` twin, plus `rsQuery` id sets and `rs:*` events.
 - **Other outputs**: folium, lonboard (GPU, millions of edges), or a JSON spec for your own frontend.
 - **No code needed**: the `roadstyle` CLI and the `roadstyle studio` workbench.

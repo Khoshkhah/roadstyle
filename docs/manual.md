@@ -26,7 +26,7 @@ rs.render_edges(edges).save("first_map.html")         # web backend, Voyager bas
 ```
 
 You get the OSM "geometry sandwich" (coloured fills over casings), per-zoom widths, two-way lanes,
-one-way arrows, street-name labels, hover/click (with a [Google Street View link](web-backend.md#google-street-view-link) facing the road's direction), and a base-layer switcher — try them in the map.
+one-way arrows, street-name labels, hover/click (with a [Google Street View link](web-backend.md#google-street-view-link) facing the road's direction; `street_view="window"` opens it in a floating window instead, `rs.render_street_view` beside the map), and a base-layer switcher — try them in the map.
 Prefer a dark canvas? Pass `basemap="dark_matter"` (Dark Matter) or `basemap="satellite"`.
 
 <iframe src="../maps/first_map.html" loading="lazy" title="A first roadstyle map"
