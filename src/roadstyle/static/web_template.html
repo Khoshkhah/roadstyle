@@ -747,13 +747,17 @@ function _svHeading(g, ll){
     const d=(px-t*dx)**2+(py-t*dy)**2;
     if(d<bd){ bd=d; best=(Math.atan2(dx,dy)*180/Math.PI+360)%360; } } });
   return best; }
-function _sv(ll, g){
-  if(!_streetView || !ll) return "";
+// the URL on its own: also sent as `detail.streetView` on rs:select, for host pages whose own
+// panel replaces the popup (road_popup=False)
+function _svUrl(ll, g){
+  if(!_streetView || !ll) return null;
   const h = _svHeading(g, ll);
-  return '<div class="rs-sv" style="margin-top:4px"><a target="_blank" rel="noopener" href="'+
-    'https://www.google.com/maps/@?api=1&amp;map_action=pano&amp;viewpoint='+
-    ll.lat.toFixed(6)+','+ll.lng.toFixed(6)+(h==null ? '' : '&amp;heading='+Math.round(h))+
-    '">Street View &#8599;</a></div>'; }
+  return 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+
+    ll.lat.toFixed(6)+','+ll.lng.toFixed(6)+(h==null ? '' : '&heading='+Math.round(h)); }
+function _sv(ll, g){
+  const u = _svUrl(ll, g);
+  return !u ? "" : '<div class="rs-sv" style="margin-top:4px"><a target="_blank" rel="noopener" href="'+
+    u.replace(/&/g, "&amp;")+'">Street View &#8599;</a></div>'; }
 function rsInfoClear(){ if(_sideBd) _sideBd.innerHTML='<div class="rs-empty">Click a road to see its full record here.</div>'; }
 function rsInfoShow(html){ if(_sideBd) _sideBd.innerHTML=html; }
 function rsDeselect(){
@@ -785,9 +789,10 @@ function rsSelect(id){
   // best effort for programmatic selection: overlays at the edge's midpoint (when on screen)
   const c = s ? s.mids[id] : _midOf((_feats()[id]||{}).geometry);
   let ovs=[]; if(c){ try{ ovs=_ovAt(map.project({lng:c[0], lat:c[1]})); }catch(err){} }
+  const cll = c ? {lng:c[0], lat:c[1]} : null, cg = (_feats()[id]||{}).geometry;
   document.dispatchEvent(new CustomEvent("rs:select",
-    {detail:{id:id, layer:null, properties:props || {}, overlays:ovs}}));
-  const sv = c ? _sv({lng:c[0], lat:c[1]}, (_feats()[id]||{}).geometry) : "";
+    {detail:{id:id, layer:null, properties:props || {}, overlays:ovs, streetView:_svUrl(cll, cg)}}));
+  const sv = _sv(cll, cg);
   if(__ROAD_POPUP__){
     if(_popupMode === "panel"){ rsInfoShow(_rrows(props||{}, _popupFields) + sv + _ovSections(ovs)); }
     else if(c) new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
@@ -825,7 +830,8 @@ map.on("click", e=>{
   const ovs = _ovAt(e.point);          // interactive overlays under the click (e.g. the zone)
   // structured click-data for host pages / dashboards (fires in every popup mode, incl. False)
   document.dispatchEvent(new CustomEvent("rs:select",
-    {detail:{id:f.id, layer:f.layer && f.layer.id, properties:props, overlays:ovs}}));
+    {detail:{id:f.id, layer:f.layer && f.layer.id, properties:props, overlays:ovs,
+             streetView:_svUrl(e.lngLat, f.geometry)}}));
   const sv = _sv(e.lngLat, f.geometry);
   if(__ROAD_POPUP__){
     if(_popupMode === "panel"){ rsInfoShow(_rrows(props, _popupFields) + sv + _ovSections(ovs)); }

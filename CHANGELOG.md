@@ -10,6 +10,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **`street_view=True`** (web backend): a Google Street View link in the road popup / panel, at
   the clicked point and facing the clicked edge's direction, so a road's two directions get
   opposite headings. A plain maps URL, no API key; `street_view=False` turns it off.
+  The URL also rides on `rs:select` as `detail.streetView`, for host pages with their own panel.
 - **`AGENTS.md`**: a compact guide for AI coding agents (the one call, the data contract, the JS
   API, the traps).
 

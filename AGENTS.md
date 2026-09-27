@@ -47,7 +47,8 @@ a two-way road is two edges with reversed geometry (drawn side by side).
 | `rsFilter(ids)`, `rsGetProps(ids)` | show only these / their rows |
 | `rsSetBasemap`, `rsSetClasses`, `rsSetColorField`, `rsSetOverlay`, `rsSetView3D` | drive the built-in controls |
 
-Events on `document`: `rs:select` (`e.detail.properties`), `rs:deselect`, `rs:colorchange`, …
+Events on `document`: `rs:select` (`e.detail.properties`, and `e.detail.streetView` - a Google
+Street View URL facing the clicked edge's direction, or null), `rs:deselect`, `rs:colorchange`, …
 Full table: `docs/web-backend.md`.
 
 ## Traps (each one cost a real bug)

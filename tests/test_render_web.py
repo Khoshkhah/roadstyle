@@ -724,3 +724,5 @@ def test_web_street_view_link():
     off = render_edges(_edges(), backend="web", street_view=False).html
     assert "const _streetView = false;" in off
     assert "__STREET_VIEW__" not in on + off
+    # host pages whose own panel replaces the popup get the same URL on the click event
+    assert on.count("streetView:_svUrl(") == 2
