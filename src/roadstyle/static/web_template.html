@@ -966,6 +966,7 @@ function _svPick(ll, f, id){
   f=_svFeat(f); const m=(_streetView && ll) ? _svMeasure(f, ll) : null;
   _svFree = null; _svLast = null;
   _svPos = m==null ? null : {f:f, m:m, id:id}; _svMark();
+  queueMicrotask(_svSpotEvent);                 // after the rs:select this pick is part of
   return _svUrl(ll, f); }
 // the map marker: a dot where Street View stands and a cone the way it looks. Shown while a
 // Street View is on screen (the window open, or the side-by-side page); rsSetStreetViewMarker(on)
@@ -1024,7 +1025,7 @@ function _svOnEdge(f, ll){                      // {f, m, d metres from its cent
   const k=Math.cos(ll.lat*Math.PI/180), h=(Math.atan2((cs[i+1][0]-cs[i][0])*k, cs[i+1][1]-cs[i][1])*180/Math.PI+360)%360;
   return {f:f, m:m, d:Math.hypot((ll.lng-x)*k*_SV_R, (ll.lat-y)*_SV_R), h:h}; }
 function rsSetStreetViewMarkerAt(lng, lat, heading){
-  if(lng==null){ _svFree=null; _svLast=null; _svMark(); return; }
+  if(lng==null){ _svFree=null; _svLast=null; _svMark(); _svSpotEvent(); return; }
   const ll={lng:+lng, lat:+lat}, look=+heading||0, k=Math.cos(ll.lat*Math.PI/180);
   const moved=_svLast ? Math.hypot((ll.lng-_svLast.lng)*k*_SV_R, (ll.lat-_svLast.lat)*_SV_R) : 0;
   const walk=moved>2 ? (Math.atan2((ll.lng-_svLast.lng)*k, ll.lat-_svLast.lat)*180/Math.PI+360)%360 : null;
@@ -1045,9 +1046,10 @@ function rsSetStreetViewMarkerAt(lng, lat, heading){
     cand.sort((a, b)=>score(a)-score(b));
     if(cand.length) best=cand[0];
   }
-  if(best && best.d<=_SV_SNAP_M){ _svPos={f:best.f, m:best.m, id:best.f.id}; _svFree={h:look}; }
+  // a road id is its index (generateId); a full-geometry feature may carry it as a string
+  if(best && best.d<=_SV_SNAP_M){ _svPos={f:best.f, m:best.m, id:Number(best.f.id)}; _svFree={h:look}; }
   else _svFree={c:[ll.lng, ll.lat], h:look};
-  _svMark();
+  _svMark(); _svSpotEvent();
   if(_svMarkOn){ const c=_svFree.c || _svAt(_svPos.f, _svPos.m).c; _svKeepInView(c[0], c[1]); } }
 window.rsSetStreetViewMarkerAt = rsSetStreetViewMarkerAt;
 map.on("move", _svMarkPlace);                   // zoom / rotate / pitch change the drawn offset
@@ -1061,7 +1063,27 @@ function rsStreetViewStep(m){
   _svKeepInView(p.lng, p.lat);                  // keep the marker on screen while walking
   document.dispatchEvent(new CustomEvent("rs:streetviewmove",
     {detail:{id:_svPos.id, streetView:url, atStart:p.m<=0.01, atEnd:p.m>=p.len-0.01}}));
+  _svSpotEvent();
   return url; }
+// WHERE THE STREET VIEW SPOT IS, for placing something at an exact spot and direction:
+// {id, properties, m, len, lng, lat, heading, roadHeading, onRoad, source} or null.
+// source "panorama": a Street View that reports its moves put it there (Linked) - current.
+// source "map": a click or a step put it there - in the keyless embed (Classic) the viewer may
+// have walked on since, and nothing tells the page. lng/lat: the lane point Google is asked for
+// (on a road), else where the panorama stands; m: metres along the edge's drawn line from its
+// start; heading: where the viewer looks (the road's direction until a panorama reports one).
+function rsGetStreetViewSpot(){
+  if(_svFree && _svFree.c)
+    return {id:null, properties:null, m:null, len:null, lng:_svFree.c[0], lat:_svFree.c[1],
+            heading:_svFree.h, roadHeading:null, onRoad:false, source:"panorama"};
+  if(!_svPos) return null;
+  const p=_svAt(_svPos.f, _svPos.m); if(!p) return null;
+  return {id:_svPos.id, properties:_svPos.f.properties||{}, m:p.m, len:p.len, lng:p.lng, lat:p.lat,
+          heading:_svFree ? _svFree.h : p.h, roadHeading:p.h, onRoad:true, source:_svFree ? "panorama" : "map"}; }
+// the same, as an event on every change: a pick, a step, a walk or turn in the panorama
+function _svSpotEvent(){
+  document.dispatchEvent(new CustomEvent("rs:streetviewspot", {detail:rsGetStreetViewSpot()})); }
+window.rsGetStreetViewSpot = rsGetStreetViewSpot;
 window.rsSetStreetViewMarker = rsSetStreetViewMarker; window.rsStreetViewStep = rsStreetViewStep;
 function _sv(ll, f){
   const u = _svUrl(ll, f);

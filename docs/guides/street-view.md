@@ -112,4 +112,37 @@ clicked). The request carries only the position and the heading.
 From your own page: `rsSetStreetView(true)` opens the window, `rsStreetViewStep(15)` steps, and
 the `rs:select` event carries the Street View URL. See the [JavaScript API](../reference/javascript.md).
 
+## Where the spot is: position and direction
+
+To place something at an exact spot and facing an exact way (a sensor, a sign, a camera), walk
+there in Street View and read the spot back:
+
+```js
+const s = rsGetStreetViewSpot();
+// {id, properties, m, len, lng, lat, heading, roadHeading, onRoad, source}
+document.addEventListener("rs:streetviewspot", e => console.log(e.detail));   // on every change
+```
+
+| field | what |
+|---|---|
+| `id`, `properties` | the edge the spot is on (`properties.edge_id` etc.) |
+| `m`, `len` | metres along the edge from its start, and its length |
+| `lng`, `lat` | the point: in the lane on a two-way road, else where the panorama stands |
+| `heading` | where the viewer looks, in degrees from north |
+| `roadHeading` | the edge's own direction at that point |
+| `onRoad` | `false` when the viewer walked off every drawn road: then only `lng`, `lat`, `heading` |
+| `source` | `"panorama"` or `"map"`: see below |
+
+**Which version tells you what.** Linked (with `street_view_key=`) reports every step and turn, so
+the spot is always current and `source` is `"panorama"`. Classic, the keyless embed, is Google's page
+in a sealed frame: it cannot tell the map when the viewer walks or turns inside it. There the spot is
+the one set from the map, by a click or the ◀ ▶ steps, and `source` is `"map"`. Take a position
+from Classic only if you have not moved inside the picture since.
+
+| | Linked | Classic |
+|---|---|---|
+| edge, metres along it, point | current | the clicked or stepped spot |
+| heading | where the viewer looks | the road's direction there |
+| walking or turning in the picture | updates the spot | not seen |
+
 **See also:** [Every parameter](../reference/parameters.md) · [Command line](../reference/cli.md) · [Dashboards & JavaScript](dashboards.md)

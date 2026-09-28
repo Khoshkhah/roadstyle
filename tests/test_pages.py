@@ -100,3 +100,9 @@ def test_street_view_window_takes_the_key_too():
     assert "const _svKey = \"\";" in h
     h = rs.render_edges(_edges(), backend="web", street_view="window", street_view_key="AIzaTEST").html
     assert 'const _svKey = "AIzaTEST";' in h and "__rsSvwReady" in h and 'class="rs-svw-mode"' in h
+
+
+def test_street_view_spot_is_readable():
+    """The spot - edge, metres along it, point, heading - is exposed as a getter and an event."""
+    h = rs.render_edges(_edges(), backend="web").html
+    assert "window.rsGetStreetViewSpot = rsGetStreetViewSpot" in h and '"rs:streetviewspot"' in h

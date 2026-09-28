@@ -6,6 +6,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **`rsGetStreetViewSpot()` and the `rs:streetviewspot` event: where the Street View spot is, exactly.**
+  The edge (`id`, `properties`), metres along it (`m`) and its length, the point (`lng`, `lat`), where
+  the viewer looks (`heading`) and the road's own direction (`roadHeading`) - for placing something
+  at a precise spot and direction. `source` says whether it is current: `"panorama"` when Linked put it
+  there, `"map"` after a click or step (Classic cannot report the viewer's walk).
+
 ## [0.8.3] — 2026-09-28
 
 ### Added

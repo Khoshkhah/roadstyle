@@ -61,7 +61,9 @@ m.save("map.html")                        # m.html is the page as a string
   View button by default (`street_view="window"`): a floating, draggable, resizable window that
   follows the clicked road (`rsSetStreetView(on)`), a map marker (dot + cone) where it stands,
   and ◀ ▶ buttons stepping 15 m along the edge (`rsStreetViewStep(m)`, event
-  `rs:streetviewmove`); `street_view=True` = a plain popup link, `False` = none. Street View loads only
+  `rs:streetviewmove`); `rsGetStreetViewSpot()` / event `rs:streetviewspot` read the spot back
+  (edge `id`, metres `m` along it, `lng`/`lat`, `heading`, `source`: `"panorama"` = current, only
+  with `street_view_key=`; `"map"` = the clicked or stepped spot); `street_view=True` = a plain popup link, `False` = none. Street View loads only
   when the page is served (http/https), not opened from disk: `python -m http.server`.
 - Colours, widths, casing and camera defaults are settings, not keywords:
   `rs.render_edges(..., settings={"config": {"labels": {"color": "#888"}}})`.
