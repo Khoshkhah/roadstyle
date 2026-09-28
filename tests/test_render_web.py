@@ -755,3 +755,17 @@ def test_web_street_view_link():
     # which is off the road when zoomed in; and it follows zoom / rotate / pitch
     assert 'map.getPaintProperty("roads-fill", "line-offset")' in on
     assert 'map.on("move", _svMarkPlace);' in on
+
+
+def test_basemap_button_is_a_map_control_in_the_top_right_column():
+    html = render_edges(_edges(), backend="web", basemaps=["positron", "osm"]).html
+    # added with map.addControl like 2D/3D and Street View, not appended to <body>
+    assert "bm-ctrl" in html and "maplibregl-ctrl maplibregl-ctrl-group bm-ctrl" in html
+    assert "document.body.appendChild(menu)" not in html
+    # its placement outranks a host page's old `.bm-icon{right:...}` workaround
+    assert ".maplibregl-ctrl .bm-menu{position:absolute !important" in html
+
+
+def test_zoom_readout_is_on_by_default_and_can_be_turned_off():
+    assert "if(true){ const zd=" in render_edges(_edges(), backend="web").html
+    assert "if(false){ const zd=" in render_edges(_edges(), backend="web", zoom_readout=False).html

@@ -74,8 +74,8 @@ open("host.html", "w").write(m.html.replace("</body>", panel + "</body>"))
 !!! warning "Two traps"
     - **Ids past 2**53.** `rsSelect`, `rsColor` and `rsFocus` take roadstyle's ids, not your
       `edge_id`. Find them with `rsQuery(p => String(p.edge_id) === "8121729169906061189")`.
-    - **A fixed side panel covers the base-map button.** Inset the map and move the controls
-      with it: `#map{right:400px!important} body{--rs-side:400px}`.
+    - **A fixed side panel covers the map.** Inset it: `#map{right:400px!important}
+      body{--rs-side:400px}`. The map's controls, the base-map button among them, move with it.
 
 To show a set of edges, recolour them with `rsColor`; don't draw extra lines over the roads.
 Pick a highlight colour that no `color_options` entry already uses.

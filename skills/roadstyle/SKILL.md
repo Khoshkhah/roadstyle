@@ -103,9 +103,10 @@ inserting HTML before `</body>` in `m.html`.
   your `edge_id`. Get them with `rsQuery(p => String(p.edge_id) === "8121729169906061189")`, or
   add a small integer column (e.g. `pidx = 0..n-1`) and query on that. In Python, a column mixing
   big ints and `None` becomes float64 and silently rounds the ids: use `dtype="Int64"`.
-- **A host side panel covers the map controls.** roadstyle puts the base-map button and menu on
-  `<body>`, positioned against the viewport. With a fixed side panel, inset the map and move them:
-  `#map{right:400px!important} .bm-icon{right:410px} .bm-menu{right:410px}`.
+- **A host side panel covers the map.** Inset it: `#map{right:400px!important}
+  body{--rs-side:400px}`. Every map control - zoom, 2D/3D, Street View and, since 0.8.0, the
+  base-map button - lives in the map's own top-right column and moves with it; `--rs-side` shifts
+  the rest (overlay toggle, Street View window). No `.bm-icon`/`.bm-menu` rules are needed any more.
 - **Highlight by recolouring, not by drawing.** Use `rsColor` or a `color_options` entry. Extra
   lines drawn over the roads double them and hide the road's own styling.
 - **A selection in the base colour shows nothing.** Pick a highlight colour no `color_options`

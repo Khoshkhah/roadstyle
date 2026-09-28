@@ -6,6 +6,18 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-09-27
+
+### Changed
+- **The base-map button is a map control**, last in the top-right column after zoom, 2D/3D and
+  Street View, with their size and look; its menu opens to its left. It used to sit on `<body>` at
+  the bottom right, so a host page with a side panel had to move it by hand
+  (`.bm-icon{right:...}`); now it moves with an inset `#map` like the other controls, and those
+  old host rules are outranked and do nothing.
+
+### Added
+- **`zoom_readout=`** (default `True`): `False` leaves out the "z 13.2" read-out beside the scale bar.
+
 ## [0.7.1] — 2026-09-27
 
 ### Added

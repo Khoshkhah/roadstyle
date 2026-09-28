@@ -7,13 +7,17 @@
 <style>html,body{margin:0;height:100%}#map{position:absolute;inset:0}
 .rs-zoom{position:absolute;bottom:10px;left:140px;z-index:2;background:rgba(255,255,255,.85);
   padding:2px 6px;border-radius:4px;font:11px/1.5 monospace;color:#333;pointer-events:none}
-.bm-icon{position:absolute;bottom:44px;right:calc(10px + var(--rs-side,0px));z-index:2;width:34px;
-  height:34px;background:#fff;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);cursor:pointer;
-  display:grid;place-items:center;font:17px/1 system-ui,sans-serif;color:#5b616b;user-select:none}
-.bm-icon:hover{color:#16181d}
-.bm-menu{position:absolute;bottom:84px;right:calc(10px + var(--rs-side,0px));z-index:3;background:#fff;
-  border-radius:8px;border:1px solid rgba(0,0,0,.06);box-shadow:0 4px 16px rgba(0,0,0,.14);
-  font:13px system-ui,sans-serif;display:none;overflow:hidden;padding:4px}
+/* the base-map button is a MAP CONTROL in the top-right column (zoom, 2D/3D, Street View), so it
+   has their size and moves with #map when a host insets it; its menu opens to the button's left.
+   The placement rules outrank a host page's old `.bm-icon{right:..}` workarounds, which were for
+   the button's former home on <body> and would now only misplace it. */
+.maplibregl-ctrl.bm-ctrl{position:relative;overflow:visible}
+.maplibregl-ctrl .bm-icon{font:16px/1 system-ui,sans-serif;color:#5b616b;cursor:pointer;
+  position:static !important;top:auto !important;right:auto !important;bottom:auto !important;left:auto !important}
+.maplibregl-ctrl .bm-icon:hover{color:#16181d}
+.maplibregl-ctrl .bm-menu{position:absolute !important;top:0 !important;right:36px !important;bottom:auto !important;left:auto !important;
+  z-index:3;background:#fff;border-radius:8px;border:1px solid rgba(0,0,0,.06);box-shadow:0 4px 16px rgba(0,0,0,.14);
+  font:13px system-ui,sans-serif;display:none;overflow:hidden;padding:4px;text-align:left}
 .bm-menu.open{display:block}
 .bm-menu div{padding:6px 12px;cursor:pointer;white-space:nowrap;border-radius:5px}
 .bm-menu div:hover{background:#f2f4f7}
@@ -213,8 +217,8 @@ function _sideInit(){
   try{ map.resize(); }catch(e){}               // #map just lost 320px to the panel
 }
 _sideInit();
-// zoom read-out next to the scale bar
-{ const zd=document.createElement("div"); zd.className="rs-zoom";
+// zoom read-out next to the scale bar (zoom_readout=False leaves it out)
+if(__ZOOM_READOUT__){ const zd=document.createElement("div"); zd.className="rs-zoom";
   const uz=()=>{ zd.textContent="z "+map.getZoom().toFixed(1); };
   map.on("zoom",uz); uz(); document.body.appendChild(zd); }
 // 2D/3D camera: window.rsSetView3D(on) tilts to the configured camera.pitch_3d (2D also
@@ -369,11 +373,16 @@ if(BM_SWITCHER && BASEMAPS.length > 1){
     if(i===0) o.className="on";
     o.onclick=()=>{ rsSetBasemap(i); menu.classList.remove("open"); };
     menu.appendChild(o); });
-  const w=document.createElement("div"); w.className="bm-icon"; w.title="Base map";
-  w.innerHTML="&#9638;";
-  w.onclick=(e)=>{ e.stopPropagation(); menu.classList.toggle("open"); };
+  menu.addEventListener("click", (e)=>e.stopPropagation());
   document.addEventListener("click", ()=>menu.classList.remove("open"));
-  document.body.appendChild(menu); document.body.appendChild(w);
+  // a control like 2D/3D and Street View, last in the top-right column
+  map.addControl({onAdd(){
+    const d=document.createElement("div"); d.className="maplibregl-ctrl maplibregl-ctrl-group bm-ctrl";
+    const w=document.createElement("button"); w.type="button"; w.className="bm-icon"; w.title="Base map";
+    w.innerHTML="&#9638;";
+    w.onclick=(e)=>{ e.stopPropagation(); menu.classList.toggle("open"); };
+    d.appendChild(w); d.appendChild(menu); return d;
+  }, onRemove(){}});
 }
 // road-class filtering: window.rsSetClasses([...]) shows exactly those classes and hides the
 // rest across every road layer; the collapsible checkbox panel is just UI over it. The class

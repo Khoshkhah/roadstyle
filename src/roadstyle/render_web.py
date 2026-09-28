@@ -845,7 +845,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
            pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
-           basemap_switcher: bool = True, road_popup=True, road_tooltip=False, popup_mode: str = None,
+           basemap_switcher: bool = True, zoom_readout: bool = True,
+           road_popup=True, road_tooltip=False, popup_mode: str = None,
            street_view: bool | str = "window",
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
            color_options=None, color_active=0, overlays=None, compress: bool = True,
@@ -862,6 +863,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
       - ``arrows`` — one-way direction chevrons along each one-way edge;
       - ``labels`` — curved street-name labels (from the ``name`` column);
       - ``filter_control`` — a collapsible checkbox panel to show/hide each road class;
+      - ``zoom_readout`` — the small "z 13.2" zoom level beside the scale bar (default on);
       - ``basemap_switcher`` — the in-map base-layer dropdown (uses ``basemap`` / ``basemaps``);
       - ``road_popup`` — the info popup shown when a road is clicked (click-to-select is kept either
         way). ``True`` (default) shows the curated :data:`DEFAULT_ROAD_POPUP` fields; pass a list of
@@ -1354,6 +1356,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__STYLE__", json.dumps(style))
             .replace("__BASEMAPS__", json.dumps(bms))
             .replace("__BM_SWITCHER__", json.dumps(bool(basemap_switcher)))
+            .replace("__ZOOM_READOUT__", json.dumps(bool(zoom_readout)))
             .replace("__FILTER__", json.dumps(flt))
             .replace("__CENTER__", json.dumps([(minx + maxx) / 2, (miny + maxy) / 2]))
             .replace("__PITCH3D__", json.dumps(cam["pitch_3d"]))
