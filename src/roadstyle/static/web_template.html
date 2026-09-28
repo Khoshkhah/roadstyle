@@ -296,7 +296,7 @@ if(_svWindow){
     flip.querySelectorAll("button").forEach(b=>b.onclick=()=>{
       if(b.dataset.m===mode) return;
       mode=b.dataset.m; mark(); try{ localStorage.setItem(MODE_KEY, mode); }catch(e){}
-      if(mode==="classic"){ pdiv.hidden=true; rsSetStreetViewMarkerAt(null); }
+      if(mode==="classic"){ hideP(); rsSetStreetViewMarkerAt(null); }
       // the same spot in the other panel: where the viewer has walked to, where the marker stands
       if(!rsStreetViewStep(0)) show();
     }); }
@@ -304,21 +304,25 @@ if(_svWindow){
     window.__rsSvwReady=ok; const s=document.createElement("script");
     s.src="https://maps.googleapis.com/maps/api/js?key="+encodeURIComponent(_svKey)+"&v=weekly&loading=async&callback=__rsSvwReady";
     s.async=true; s.onerror=no; document.head.appendChild(s); }));
+  // THE PANORAMA EXISTS ONLY WHILE IT IS ON SCREEN. One that sat hidden - Classic showing, or the
+  // window closed - came back black with a single tile in a corner, and showing it again first did
+  // not cure that in a real browser. So hiding it drops it, and the next Linked view builds a new one
+  // inside a box that is already visible: every return is a first load, and a first load works.
+  const hideP=()=>{ pdiv.hidden=true;
+    if(pano){ google.maps.event.clearInstanceListeners(pano); pano.setVisible(false); pano=null; pdiv.textContent=""; } };
   const panoAt=(lat, lng, h)=>gload().then(()=>{
-    const g=google.maps;
-    if(!pano){
-      pano=new g.StreetViewPanorama(pdiv, {motionTracking:false, addressControl:false, fullscreenControl:true});
-      svc=new g.StreetViewService();
-      const report=()=>{ const p=pano.getPosition(); if(p && mode==="linked" && !w.hidden) rsSetStreetViewMarkerAt(p.lng(), p.lat(), pano.getPov().heading); };
-      pano.addListener("position_changed", report); pano.addListener("pov_changed", report); }
+    const g=google.maps; svc=svc || new g.StreetViewService();
     return svc.getPanorama({location:{lat:+lat, lng:+lng}, radius:50, preference:g.StreetViewPreference.NEAREST,
                             sources:[g.StreetViewSource.GOOGLE]}).then(r=>{
-      // ON SCREEN FIRST: a panorama set while its box is hidden (Classic was showing) draws at 0x0,
-      // a black panel with one tile in the corner
-      pdiv.hidden=false; msg.hidden=true;
-      pano.setPano(r.data.location.pano); pano.setPov({heading:+h||0, pitch:0}); pano.setVisible(true);
-      g.event.trigger(pano, "resize"); },
-      ()=>{ pdiv.hidden=true; msg.hidden=false; msg.textContent="No street photos within 50 m of this spot."; }); });
+      if(mode!=="linked" || w.hidden) return;   // flipped to Classic or closed while it was asked for
+      const id=r.data.location.pano, pov={heading:+h||0, pitch:0};
+      fr.hidden=true; msg.hidden=true; pdiv.hidden=false;
+      if(pano){ pano.setPano(id); pano.setPov(pov); return; }
+      pano=new g.StreetViewPanorama(pdiv, {pano:id, pov:pov, visible:true,
+                                           motionTracking:false, addressControl:false, fullscreenControl:true});
+      const report=()=>{ const p=pano && pano.getPosition(); if(p) rsSetStreetViewMarkerAt(p.lng(), p.lat(), pano.getPov().heading); };
+      pano.addListener("position_changed", report); pano.addListener("pov_changed", report); },
+      ()=>{ hideP(); msg.hidden=false; msg.textContent="No street photos within 50 m of this spot."; }); });
   if(st.w) Object.assign(w.style, {width:st.w+"px", height:st.h+"px"});
   // anchor by the top-left once visible, so the corner grip grows the window toward the pointer
   // (right/bottom anchoring grows it the other way); keep a remembered spot on this screen
@@ -339,7 +343,7 @@ if(_svWindow){
     if(w.hidden || !last) return;
     ttl.textContent=last.name;
     if(!last.url || fromDisk){               // Google's embed stays grey in a file:// page
-      fr.hidden=true; pdiv.hidden=true; msg.hidden=false;
+      fr.hidden=true; hideP(); msg.hidden=false;
       msg.innerHTML = !last.url ? "No Street View for this road." :
         "<b>Street View needs this page served, not opened from disk.</b>"+
         "<span>Run <code>python -m http.server</code> in its folder and open it from localhost.</span>"+
@@ -349,7 +353,7 @@ if(_svWindow){
     const u=new URL(last.url), vp=u.searchParams.get("viewpoint").split(",");
     const src="https://www.google.com/maps/embed?pb=!6m7!1m6!2m2!1d"+vp[0]+"!2d"+vp[1]+
               "!3f"+(u.searchParams.get("heading")||0)+"!4f0!5f1";
-    const embed=()=>{ if(fr.getAttribute("src")!==src) fr.src=src; fr.hidden=false; msg.hidden=true; pdiv.hidden=true; };
+    const embed=()=>{ if(fr.getAttribute("src")!==src) fr.src=src; fr.hidden=false; msg.hidden=true; hideP(); };
     if(_svKey && mode==="linked"){ fr.hidden=true; panoAt(vp[0], vp[1], u.searchParams.get("heading")||0).catch(e=>{ console.warn("rs street view:", e); embed(); }); return; }
     embed();
   };
@@ -365,6 +369,7 @@ if(_svWindow){
     if(!last) return; last.url=e.detail.streetView; ends(e.detail.atStart, e.detail.atEnd); show();
   });
   rsSetStreetView=function(on){
+    if(!on) hideP();                           // closed: drop the panorama (see hideP)
     w.hidden=!on; if(on && innerWidth>520) place(); rsSetStreetViewMarker(!!on);
     st.open=!!on; save(); if(btn) btn.classList.toggle("rs-on", !!on); show();
     document.dispatchEvent(new CustomEvent("rs:streetviewchange", {detail:{open:!!on}}));
