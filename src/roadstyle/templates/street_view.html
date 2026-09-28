@@ -23,8 +23,8 @@
                     margin-top: -20px; border-radius: 2px; background: #bbb; }
   #sv-drag:hover::after, body.sv-dragging #sv-drag::after { background: #1a6bd6; }
   body.sv-dragging { cursor: col-resize; user-select: none; }
-  body.sv-dragging #sv-frame { pointer-events: none; }  /* else the iframe swallows the drag */
-  #sv-frame { flex: 1; width: 100%; border: 0; background: #eee; }
+  body.sv-dragging #sv-frame, body.sv-dragging #sv-pano { pointer-events: none; }  /* else the panel swallows the drag */
+  #sv-frame, #sv-pano { flex: 1; width: 100%; border: 0; background: #eee; }
   #sv-empty { flex: 1; display: flex; flex-direction: column; align-items: center;
               justify-content: center; gap: 8px; color: #777; background: #f4f4f4;
               padding: 20px; text-align: center; }
@@ -61,6 +61,7 @@
     <button type="button" class="sv-step" data-step="15" title="Forward 15 m along the road" disabled>&#9654;</button></div>
   <div id="sv-empty">Street View opens here, looking the way the clicked road runs.</div>
   <iframe id="sv-frame" title="Google Street View" hidden allowfullscreen></iframe>
+  <div id="sv-pano" hidden></div>
 </div>
 <script>
 (function () {
@@ -70,6 +71,34 @@
   //   "https://www.google.com/maps/embed/v1/streetview?key=KEY&location=" + lat + "," + lng + "&heading=" + h
   const embed = (lat, lng, h) =>
     "https://www.google.com/maps/embed?pb=!6m7!1m6!2m2!1d" + lat + "!2d" + lng + "!3f" + h + "!4f0!5f1";
+  // WITH A MAPS JAVASCRIPT API KEY (street_view_key=) the panel is a real panorama instead of the
+  // embed: it reports every step and turn, so the map marker walks and turns with the viewer, and
+  // it asks for Google's own street imagery only - the embed also shows people's indoor photos
+  const GKEY = __SV_KEY__;
+  let pano = null, svc = null, loading = null;
+  const pdiv = document.getElementById("sv-pano");
+  const gload = () => loading || (loading = new Promise((ok, no) => {
+    window.__rsSvReady = ok;
+    const s = document.createElement("script");
+    s.src = "https://maps.googleapis.com/maps/api/js?key=" + encodeURIComponent(GKEY) + "&v=weekly&loading=async&callback=__rsSvReady";
+    s.async = true; s.onerror = no; document.head.appendChild(s);
+  }));
+  function panoAt(lat, lng, h) {
+    return gload().then(() => {
+      const g = google.maps;
+      if (!pano) {
+        pano = new g.StreetViewPanorama(pdiv, {motionTracking: false, addressControl: true, fullscreenControl: true});
+        svc = new g.StreetViewService();
+        const report = () => { const p = pano.getPosition(); if (p) rsSetStreetViewMarkerAt(p.lng(), p.lat(), pano.getPov().heading); };
+        pano.addListener("position_changed", report); pano.addListener("pov_changed", report);
+      }
+      return svc.getPanorama({location: {lat: +lat, lng: +lng}, radius: 50, preference: g.StreetViewPreference.NEAREST,
+                              sources: [g.StreetViewSource.GOOGLE]}).then(r => {
+        pano.setPano(r.data.location.pano); pano.setPov({heading: +h || 0, pitch: 0}); pano.setVisible(true);
+        pdiv.hidden = false; empty.hidden = true;
+      }, () => { pdiv.hidden = true; empty.hidden = false; empty.textContent = "No street photos within 50 m of this spot."; });
+    });
+  }
   const below = document.getElementById("sv").dataset.layout === "below";
   if (below) document.body.classList.add("sv-below");
   const road = document.getElementById("sv-road"), frame = document.getElementById("sv-frame"),
@@ -112,6 +141,11 @@
     }
     const u = new URL(d.streetView);
     const [lat, lng] = u.searchParams.get("viewpoint").split(",");
+    if (GKEY) {                                          // the panorama; the embed if the API fails to load
+      panoAt(lat, lng, u.searchParams.get("heading") || 0).catch(() => {
+        frame.src = embed(lat, lng, u.searchParams.get("heading") || 0); frame.hidden = false; pdiv.hidden = true; empty.hidden = true; });
+      return;
+    }
     frame.src = embed(lat, lng, u.searchParams.get("heading") || 0);
     frame.hidden = false; empty.hidden = true;
   }

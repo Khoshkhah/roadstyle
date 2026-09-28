@@ -35,6 +35,7 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rsSetStreetView(on)` | open / close the Street View window (`street_view="window"` only; otherwise does nothing) | `rs:streetviewchange` |
 | `rsStreetViewStep(m)` | move the Street View spot `m` metres along the edge (negative = back), stopping at its ends; returns the new URL | `rs:streetviewmove` |
 | `rsSetStreetViewMarker(on)` | show / hide the map marker at the Street View spot | |
+| `rsSetStreetViewMarkerAt(lng, lat, heading)` | put the marker where a panorama stands, looking `heading` degrees, off the clicked edge if need be (for a Street View that reports its own moves); `null` goes back to the edge spot. The next selection or step clears it | |
 
 ## Events
 

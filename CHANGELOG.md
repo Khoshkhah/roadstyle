@@ -6,6 +6,15 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **`street_view_key=` on `render_street_view`: the map marker walks with the viewer.** With a
+  Google Maps JavaScript API key the panel is a real panorama instead of the keyless embed: every
+  step and turn inside it moves the marker (and pans the map to keep it in view), and only Google's
+  own street imagery is shown - the embed also offered people's indoor photos. Without a key the
+  page is unchanged.
+- **`rsSetStreetViewMarkerAt(lng, lat, heading)`**: the marker at any spot, off the clicked edge if
+  need be; the next selection or step returns it to the edge.
+
 ## [0.8.1] — 2026-09-28
 
 ### Changed

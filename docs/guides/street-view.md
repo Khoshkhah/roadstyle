@@ -73,8 +73,20 @@ A page of its own: the map and Street View share the screen. Click a road and St
 | `layout` | `"beside"` | `"beside"` or `"below"` the map | `--layout below` |
 | `panel_width` | `42` | Street View's share of the width (of the height when below), 20-80 % | `--panel-width 60` |
 | `resizable` | `True` | a divider the viewer can drag; `False` fixes the size | `--no-resize` |
+| `street_view_key` | `None` | a Google **Maps JavaScript API** key (below) | |
 
 Every `render_edges` keyword also works here. On a phone, Street View sits under the map.
+
+### With a key: the marker walks with you
+
+Without a key the panel is Google's keyless embed. It is a closed box: when the viewer walks inside
+it with Google's own arrows, the page never hears where they went, so the map marker stays behind,
+and it also offers people's indoor photos. With `street_view_key=` the panel is a real panorama
+(the Maps JavaScript API): every step and turn moves the marker on the map, which pans to keep it in
+view, and only Google's own street imagery is shown. The page's own step buttons still walk along
+the clicked road. The key is written into the page, as every browser key is: in the Google Cloud
+console restrict it to your site's addresses ("Websites") and to the Maps JavaScript API. Google
+bills Dynamic Street View per panorama beyond a monthly free allowance.
 
 ## Where it looks
 

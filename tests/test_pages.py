@@ -80,3 +80,13 @@ def test_street_view_below_layout():
     assert "@media (max-width: 520px)" in h
     with pytest.raises(ValueError):
         rs.render_street_view(_edges(), layout="diagonal")
+
+
+def test_street_view_key_turns_the_embed_into_a_panorama_that_reports_its_moves():
+    """Without a key: the keyless embed, no Maps script. With one: the key in the page, the panorama
+    that moves the map marker, Google's own imagery only."""
+    h = rs.render_street_view(_edges()).html
+    assert "const GKEY = \"\";" in h and "rsSetStreetViewMarkerAt" in h
+    h = rs.render_street_view(_edges(), street_view_key="AIzaTEST").html
+    assert 'const GKEY = "AIzaTEST";' in h
+    assert "StreetViewSource.GOOGLE" in h and "position_changed" in h and "rsSetStreetViewMarkerAt(p.lng()" in h

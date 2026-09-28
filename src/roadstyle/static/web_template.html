@@ -877,6 +877,9 @@ const _streetView = __STREET_VIEW__;
 // (rsStreetViewStep) and the URL all read it, so they cannot disagree.
 const _SV_LANE_M = 2.5, _SV_R = 110540;          // metres per degree of latitude
 let _svPos = null, _svMk = null, _svMarkOn = false;
+// a FREE spot, set by a Street View that reports where the viewer walked (rsSetStreetViewMarkerAt);
+// it wins over the edge spot until the next selection or step
+let _svFree = null;
 function _svLine(f){ const g=f && f.geometry;
   return !g ? [] : g.type==="LineString" ? g.coordinates : g.type==="MultiLineString" ? [].concat(...g.coordinates) : []; }
 function _svFeat(f){ const F=_feats();       // the edge's full geometry (a picked one may be tile-clipped)
@@ -921,6 +924,7 @@ function _svUrl(ll, f){
 // a selection: remember the spot (for the marker and the step buttons) and return its URL
 function _svPick(ll, f, id){
   f=_svFeat(f); const m=(_streetView && ll) ? _svMeasure(f, ll) : null;
+  _svFree = null;
   _svPos = m==null ? null : {f:f, m:m, id:id}; _svMark();
   return _svUrl(ll, f); }
 // the map marker: a dot where Street View stands and a cone the way it looks. Shown while a
@@ -946,20 +950,31 @@ function _svLanePx(props){
 // place the marker on the centre line, shifted right of travel by the lane's drawn offset: Google
 // gets the real 2.5 m lane point, the marker sits in the lane as drawn at this zoom
 function _svMarkPlace(){
-  if(!_svMk || !_svPos) return;
+  if(!_svMk || !_svPos || _svFree) return;
   const p=_svAt(_svPos.f, _svPos.m); if(!p) return;
   const px=_svLanePx(_svPos.f.properties||{}), a=map.project(p.a), b=map.project(p.b);
   const dx=b.x-a.x, dy=b.y-a.y, n=Math.hypot(dx, dy)||1;   // screen: y down, right of travel = (-dy, dx)
   _svMk.setLngLat(p.c).setOffset([-dy/n*px, dx/n*px]); }
 function _svMark(){
-  const p = _svMarkOn && _svPos ? _svAt(_svPos.f, _svPos.m) : null;
+  const p = !_svMarkOn ? null : _svFree ? {c:_svFree.c, h:_svFree.h} : _svPos ? _svAt(_svPos.f, _svPos.m) : null;
   if(!p){ if(_svMk){ _svMk.remove(); _svMk=null; } return; }
   if(!_svMk){ const el=document.createElement("div"); el.className="rs-svm";
     el.innerHTML='<svg width="64" height="64" viewBox="-32 -32 64 64">'+
       '<path d="M0 0 L-16 -26 A31 31 0 0 1 16 -26 Z" fill="rgba(13,71,161,.45)" stroke="#fff" stroke-width="1.5"/>'+
       '<circle r="7" fill="#0d47a1" stroke="#fff" stroke-width="2.5"/></svg>';
     _svMk=new maplibregl.Marker({element:el, rotationAlignment:"map", pitchAlignment:"map"}); }
-  _svMk.setLngLat(p.c).setRotation(p.h).addTo(map); _svMarkPlace(); }
+  _svMk.setLngLat(p.c).setRotation(p.h||0).addTo(map);
+  if(_svFree) _svMk.setOffset([0, 0]); else _svMarkPlace(); }
+// keep a point on screen: pan once it nears the map's edge (walking, by step or in the panorama)
+function _svKeepInView(lng, lat){
+  const q=map.project([lng, lat]), c=map.getCanvas(), pad=60;
+  if(q.x<pad || q.y<pad || q.x>c.clientWidth-pad || q.y>c.clientHeight-pad) map.easeTo({center:[lng, lat], duration:400}); }
+// the marker where a Street View panorama stands and the way it looks - for a Street View that
+// reports its own moves (the Maps JavaScript API does; the keyless embed cannot). null clears it.
+function rsSetStreetViewMarkerAt(lng, lat, heading){
+  _svFree = lng==null ? null : {c:[+lng, +lat], h:+heading||0}; _svMark();
+  if(_svFree && _svMarkOn) _svKeepInView(_svFree.c[0], _svFree.c[1]); }
+window.rsSetStreetViewMarkerAt = rsSetStreetViewMarkerAt;
 map.on("move", _svMarkPlace);                   // zoom / rotate / pitch change the drawn offset
 function rsSetStreetViewMarker(on){ _svMarkOn=!!on; _svMark(); }
 // move the Street View spot m metres along its edge (negative: back), still looking along it;
@@ -967,10 +982,8 @@ function rsSetStreetViewMarker(on){ _svMarkOn=!!on; _svMark(); }
 function rsStreetViewStep(m){
   if(!_svPos) return null;
   const p=_svAt(_svPos.f, _svPos.m+m); if(!p) return null;
-  _svPos.m=p.m; _svMark(); const url=_svUrlOf(p);
-  // keep the marker on screen while walking: pan once it nears the map's edge
-  const q=map.project([p.lng, p.lat]), c=map.getCanvas(), pad=60;
-  if(q.x<pad || q.y<pad || q.x>c.clientWidth-pad || q.y>c.clientHeight-pad) map.easeTo({center:[p.lng, p.lat], duration:400});
+  _svFree=null; _svPos.m=p.m; _svMark(); const url=_svUrlOf(p);
+  _svKeepInView(p.lng, p.lat);                  // keep the marker on screen while walking
   document.dispatchEvent(new CustomEvent("rs:streetviewmove",
     {detail:{id:_svPos.id, streetView:url, atStart:p.m<=0.01, atEnd:p.m>=p.len-0.01}}));
   return url; }

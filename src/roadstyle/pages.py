@@ -20,6 +20,8 @@ plain HTML/CSS/JS, safe to copy out and reshape.
 """
 from __future__ import annotations
 
+import json
+
 from .render import render_edges
 
 
@@ -75,7 +77,7 @@ def render_report(gdf, **kw):
 
 
 def render_street_view(gdf, *, panel_width: float = 42, resizable: bool = True,
-                       layout: str = "beside", **kw):
+                       layout: str = "beside", street_view_key: str | None = None, **kw):
     """A self-contained **map + Google Street View** page: the styled map on the left, Street View
     on the right (under the map on a phone). Clicking a road shows Street View at that point,
     looking the way the clicked edge runs, so a two-way road's two edges look opposite ways. No
@@ -84,6 +86,11 @@ def render_street_view(gdf, *, panel_width: float = 42, resizable: bool = True,
     ``layout="beside"`` puts Street View next to the map (right), ``"below"`` under it; both have
     the draggable divider. ``panel_width`` is Street View's share of the window in percent (20-80):
     of its width, or of its height when below.
+    ``street_view_key`` is a Google **Maps JavaScript API** key. Without it the panel is Google's
+    keyless embed, which cannot say where the viewer walks. With it the panel is a real panorama:
+    the map marker follows every step and turn inside it, and it shows Google's own street imagery
+    only (the embed also shows people's indoor photos). The key is written into the page, as every
+    browser key is - restrict it to your site's addresses in the Google Cloud console.
     ``resizable=True`` adds a divider the viewer can drag to change it (their choice is remembered
     in their browser); ``False`` fixes the width. Any :func:`render_edges` keyword passes through.
     Returns a :class:`WebMap`; ``.save("street_view.html")`` writes the page."""
@@ -94,6 +101,7 @@ def render_street_view(gdf, *, panel_width: float = 42, resizable: bool = True,
 
     def edit(frag):
         frag = frag.replace("--sv-w: 42%;", f"--sv-w: {panel_width:g}%;", 1)
+        frag = frag.replace("__SV_KEY__", json.dumps(street_view_key or ""), 1)
         if layout == "below":
             frag = frag.replace('<div id="sv" data-layout="beside">', '<div id="sv" data-layout="below">', 1)
         if not resizable:

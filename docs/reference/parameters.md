@@ -179,6 +179,7 @@ change the defaults below.
 | `layout` | `"beside"` | `"beside"` = Street View right of the map, `"below"` = under it |
 | `panel_width` | `42` | Street View's share of the window, 20-80 % (of the height when below) |
 | `resizable` | `True` | a divider the viewer can drag; the choice is remembered in their browser |
+| `street_view_key` | `None` | a Google Maps JavaScript API key: the panel becomes a real panorama, the map marker walks and turns with the viewer, and it shows Google's own street imagery only. Written into the page; restrict it to your site's addresses |
 
 ## Stylers
 
