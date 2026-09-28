@@ -92,3 +92,11 @@ def test_street_view_key_turns_the_embed_into_a_panorama_that_reports_its_moves(
     assert "StreetViewSource.GOOGLE" in h and "position_changed" in h and "rsSetStreetViewMarkerAt(p.lng()" in h
     # both versions on the page, the viewer flips between them (shown only with a key)
     assert 'data-m="linked"' in h and 'data-m="classic"' in h and "rs-street-view-mode" in h
+
+
+def test_street_view_window_takes_the_key_too():
+    """The floating window every dashboard uses: the same Linked / Classic switch with a key."""
+    h = rs.render_edges(_edges(), backend="web", street_view="window").html
+    assert "const _svKey = \"\";" in h
+    h = rs.render_edges(_edges(), backend="web", street_view="window", street_view_key="AIzaTEST").html
+    assert 'const _svKey = "AIzaTEST";' in h and "__rsSvwReady" in h and 'class="rs-svw-mode"' in h

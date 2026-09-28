@@ -40,7 +40,12 @@ remembers whether it was open, and where.
 rs.render_edges(edges)                       # street_view="window": the button and window (default)
 rs.render_edges(edges, street_view=True)     # a Street View link in the road popup instead
 rs.render_edges(edges, street_view=False)    # no Street View
+rs.render_edges(edges, street_view_key=KEY)  # the window with Linked / Classic (see below)
 ```
+
+With a Google Maps JavaScript API key the window's bar has the same **Linked / Classic** switch as
+the side-by-side page: Linked is a real panorama and the map marker walks with you, Classic is the
+keyless embed.
 
 ## Side by side
 

@@ -138,11 +138,14 @@ box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px
 .rs-svw-t{flex:1;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .rs-svw-bar button{border:0;background:none;color:#fff;font:14px/1 system-ui;cursor:pointer;padding:2px 5px}
 .rs-svw-bar button:disabled{opacity:.3;cursor:default}
-.rs-svw iframe{flex:1;width:100%;border:0;background:#eee}
+.rs-svw iframe,.rs-svw-pano{flex:1;width:100%;border:0;background:#eee}
+.rs-svw-mode{display:inline-flex;border:1px solid #555;border-radius:4px;overflow:hidden;cursor:default}
+.rs-svw-bar .rs-svw-mode button{font:11px/1 system-ui;padding:3px 7px;color:#cbd5e1}
+.rs-svw-bar .rs-svw-mode button.on{background:#0E7F91;color:#fff}
 .rs-svw-msg{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
   padding:14px;text-align:center;color:#666;background:#f4f4f4}
 .rs-svw-msg code{background:#e6e6e6;padding:1px 4px;border-radius:3px;color:#333}
-.rs-svw.rs-drag iframe{pointer-events:none}
+.rs-svw.rs-drag iframe,.rs-svw.rs-drag .rs-svw-pano{pointer-events:none}
 .maplibregl-ctrl-group button.rs-on{background:#dfe9ff}
 .rs-svm{pointer-events:none}
 @media (max-width:520px){.rs-svw{   /* phones only: a docs column is ~690 px */left:0!important;right:0!important;top:auto!important;bottom:0!important;
@@ -261,6 +264,9 @@ if(_popupMode==="panel"){    // panel-reopen button: same chrome as 2D, right be
 // every road selection. Nothing is loaded from Google while it is closed. Whether it is open, its
 // position and its size are remembered in this browser.
 const _svWindow = __SV_WINDOW__;
+// with a Maps JavaScript API key (street_view_key=) the window offers Linked - a real panorama that
+// reports every step and turn, so the map marker walks with the viewer - beside Classic, the embed
+const _svKey = __SV_WINDOW_KEY__;
 function rsSetStreetView(){}
 if(_svWindow){
   // per PAGE: every map on a site shares one localStorage, and a window enlarged on a big page
@@ -270,14 +276,46 @@ if(_svWindow){
   const save=()=>{ try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(e){} };
   const w=document.createElement("div"); w.className="rs-svw"; w.hidden=true;
   w.innerHTML='<div class="rs-svw-bar"><span class="rs-svw-t">Street View</span>'+
+    '<span class="rs-svw-mode" hidden><button type="button" data-m="linked" title="The map marker walks and turns with you; Google\'s street photos only">Linked</button>'+
+    '<button type="button" data-m="classic" title="Google\'s plain Street View: the marker stays where you clicked">Classic</button></span>'+
     '<button type="button" data-step="-15" title="Back 15 m along the road">\u25c0</button>'+
     '<button type="button" data-step="15" title="Forward 15 m along the road">\u25b6</button>'+
     '<button type="button" title="Close">\u2715</button></div>'+
     '<div class="rs-svw-msg">Click a road to see it in Street View.</div>'+
-    '<iframe title="Google Street View" allowfullscreen hidden></iframe>';
+    '<iframe title="Google Street View" allowfullscreen hidden></iframe><div class="rs-svw-pano" hidden></div>';
   document.body.appendChild(w);
   const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"),
-        fr=w.querySelector("iframe");
+        fr=w.querySelector("iframe"), pdiv=w.querySelector(".rs-svw-pano"), flip=w.querySelector(".rs-svw-mode");
+  // Linked or Classic, remembered in this browser (the same choice as the Street View page's)
+  const MODE_KEY="rs-street-view-mode";
+  let mode="classic", pano=null, svc=null, loading=null;
+  if(_svKey){ mode="linked"; try{ mode=localStorage.getItem(MODE_KEY)||"linked"; }catch(e){}
+    flip.hidden=false;
+    const mark=()=>flip.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.m===mode));
+    mark();
+    flip.querySelectorAll("button").forEach(b=>b.onclick=()=>{
+      if(b.dataset.m===mode) return;
+      mode=b.dataset.m; mark(); try{ localStorage.setItem(MODE_KEY, mode); }catch(e){}
+      if(mode==="classic"){ pdiv.hidden=true; rsSetStreetViewMarkerAt(null); }
+      // the same spot in the other panel: where the viewer has walked to, where the marker stands
+      if(!rsStreetViewStep(0)) show();
+    }); }
+  const gload=()=>loading || (loading=new Promise((ok, no)=>{
+    window.__rsSvwReady=ok; const s=document.createElement("script");
+    s.src="https://maps.googleapis.com/maps/api/js?key="+encodeURIComponent(_svKey)+"&v=weekly&loading=async&callback=__rsSvwReady";
+    s.async=true; s.onerror=no; document.head.appendChild(s); }));
+  const panoAt=(lat, lng, h)=>gload().then(()=>{
+    const g=google.maps;
+    if(!pano){
+      pano=new g.StreetViewPanorama(pdiv, {motionTracking:false, addressControl:false, fullscreenControl:true});
+      svc=new g.StreetViewService();
+      const report=()=>{ const p=pano.getPosition(); if(p && mode==="linked" && !w.hidden) rsSetStreetViewMarkerAt(p.lng(), p.lat(), pano.getPov().heading); };
+      pano.addListener("position_changed", report); pano.addListener("pov_changed", report); }
+    return svc.getPanorama({location:{lat:+lat, lng:+lng}, radius:50, preference:g.StreetViewPreference.NEAREST,
+                            sources:[g.StreetViewSource.GOOGLE]}).then(r=>{
+      pano.setPano(r.data.location.pano); pano.setPov({heading:+h||0, pitch:0}); pano.setVisible(true);
+      pdiv.hidden=false; msg.hidden=true; },
+      ()=>{ pdiv.hidden=true; msg.hidden=false; msg.textContent="No street photos within 50 m of this spot."; }); });
   if(st.w) Object.assign(w.style, {width:st.w+"px", height:st.h+"px"});
   // anchor by the top-left once visible, so the corner grip grows the window toward the pointer
   // (right/bottom anchoring grows it the other way); keep a remembered spot on this screen
@@ -298,7 +336,7 @@ if(_svWindow){
     if(w.hidden || !last) return;
     ttl.textContent=last.name;
     if(!last.url || fromDisk){               // Google's embed stays grey in a file:// page
-      fr.hidden=true; msg.hidden=false;
+      fr.hidden=true; pdiv.hidden=true; msg.hidden=false;
       msg.innerHTML = !last.url ? "No Street View for this road." :
         "<b>Street View needs this page served, not opened from disk.</b>"+
         "<span>Run <code>python -m http.server</code> in its folder and open it from localhost.</span>"+
@@ -308,8 +346,9 @@ if(_svWindow){
     const u=new URL(last.url), vp=u.searchParams.get("viewpoint").split(",");
     const src="https://www.google.com/maps/embed?pb=!6m7!1m6!2m2!1d"+vp[0]+"!2d"+vp[1]+
               "!3f"+(u.searchParams.get("heading")||0)+"!4f0!5f1";
-    if(fr.getAttribute("src")!==src) fr.src=src;
-    fr.hidden=false; msg.hidden=true;
+    const embed=()=>{ if(fr.getAttribute("src")!==src) fr.src=src; fr.hidden=false; msg.hidden=true; pdiv.hidden=true; };
+    if(_svKey && mode==="linked"){ fr.hidden=true; panoAt(vp[0], vp[1], u.searchParams.get("heading")||0).catch(e=>{ console.warn("rs street view:", e); embed(); }); return; }
+    embed();
   };
   const steps=[...bar.querySelectorAll("button[data-step]")];
   const ends=(a, z)=>{ steps[0].disabled=!!a; steps[1].disabled=!!z; };

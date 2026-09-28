@@ -6,6 +6,14 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.8.3] — 2026-09-28
+
+### Added
+- **`street_view_key=` on every map's floating Street View window**, not only on
+  `render_street_view`: with a Google Maps JavaScript API key the window's bar offers the same
+  **Linked** (a panorama; the map marker walks with the viewer) / **Classic** (the keyless embed)
+  switch, remembered in the browser. Without a key the window is unchanged.
+
 ## [0.8.2] — 2026-09-28
 
 ### Added

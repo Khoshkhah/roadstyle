@@ -54,6 +54,50 @@ rs.render_street_view(edges).save("street_view.html")                  # map and
 No Python? `roadstyle edges.gpkg -o map.html --basemap dark_matter`, or click through it in the
 workbench: `pip install "roadstyle[studio]" && roadstyle studio`.
 
+## API keys
+
+Both keys are optional. roadstyle works without them, just with less.
+
+**CARTO, for the base map.** The default base map (`voyager`) and `positron` and `dark_matter` come
+from CARTO. Without a key, their tiles are stamped *API KEY REQUIRED*. Get a free key at
+[carto.com/basemaps/apikey](https://carto.com/basemaps/apikey), then use any one of these:
+
+```bash
+export CARTO_API_KEY="…"                                          # environment variable
+```
+```json
+{ "config": { "api_keys": { "carto": "…" } } }
+```
+Save that JSON as `~/.config/roadstyle/roadstyle.json`, or as `roadstyle.json` in the folder you run
+from. In Python you can pass `rs.render_edges(edges, api_key="…")` instead. With no key at all, use
+a keyless base map: `esri_street`, `esri_dark_gray`, `osm` or `blank`.
+
+**Google Maps, for Street View.** Street View works with no key: the keyless Google embed. With a
+Google **Maps JavaScript API** key, the Street View panel and window get a **Linked / Classic**
+switch. Linked is a real panorama: the map marker walks and turns with you, and only Google's own
+street photos are shown. Classic is the keyless embed. To get a key:
+
+1. In the [Google Cloud console](https://console.cloud.google.com/), create a project and enable
+   **Maps JavaScript API** (Google asks for a billing account on the project).
+2. Under *APIs & Services > Credentials*, create an **API key**.
+3. Restrict it: *Application restrictions* = **Websites**, listing your site's addresses
+   (e.g. `https://example.com/*`); *API restrictions* = **Maps JavaScript API** only.
+
+Then pass it in:
+
+```python
+rs.render_edges(edges, street_view_key="AIza…")         # the floating Street View window
+rs.render_street_view(edges, street_view_key="AIza…")   # the side-by-side page
+```
+
+The key is written into the page, as every browser key is, so the site restriction in step 3 is
+what protects it. It also means Linked works only on the addresses you listed: to try it on
+`localhost`, add `http://localhost:*/*` to the list. Keep the key out of git, for example in an
+environment variable.
+
+More: [settings & base maps](https://khoshkhah.github.io/roadstyle/reference/settings/#base-maps-api-keys) ·
+[Google Street View](https://khoshkhah.github.io/roadstyle/guides/street-view/).
+
 ## What goes in
 
 Only `geometry` and `highway` are required. Other columns switch features on:

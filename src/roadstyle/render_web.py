@@ -847,7 +847,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
            basemap_switcher: bool = True, zoom_readout: bool = True,
            road_popup=True, road_tooltip=False, popup_mode: str = None,
-           street_view: bool | str = "window",
+           street_view: bool | str = "window", street_view_key: str | None = None,
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
            color_options=None, color_active=0, overlays=None, compress: bool = True,
            tiles: bool = False,
@@ -875,6 +875,10 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         a Street View button on the map opening a floating, draggable, resizable window that
         follows each clicked road (nothing is loaded from Google while it is closed). ``True``: a
         plain link in the road read-out instead (opens Google Maps in a new tab). ``False``: none.
+      - ``street_view_key`` — a Google Maps JavaScript API key for the ``"window"``: its bar then
+        offers Linked (a real panorama; the map marker walks and turns with the viewer, street
+        imagery only) and Classic (the keyless embed), as on :func:`render_street_view`. The key
+        is written into the page - restrict it to your site's addresses. Without it, unchanged.
       - ``hover_color`` / ``select_color`` — the highlight colours for a hovered / selected road (the
         ``roads-highlight`` feature-state); default light-violet ``#b388ff`` / violet ``#7c4dff``.
 
@@ -1375,6 +1379,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__ROAD_TOOLTIP__", json.dumps(road_tooltip))
             .replace("__STREET_VIEW__", "true" if street_view else "false")
             .replace("__SV_WINDOW__", "true" if street_view == "window" else "false")
+            .replace("__SV_WINDOW_KEY__", json.dumps(street_view_key or ""))
             .replace("__RS_TILED__", "true" if tiles else "false"))
     if tiles:
         import base64

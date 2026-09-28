@@ -130,6 +130,7 @@ Each `color_options` value takes `color_by`, `colors`, `cmap`, `vmin`, `vmax`, `
 | keyword | default | backends | what |
 |---|---|---|---|
 | `street_view` | `"window"` | web | `"window"` = a map button and a floating window that follows the clicked road; `True` = a link in the popup; `False` = none. Needs the page served over http(s) ([guide](../guides/street-view.md)) |
+| `street_view_key` | `None` | web | a Google Maps JavaScript API key for the window: its bar offers Linked (a panorama; the map marker walks with the viewer) and Classic (the embed). Written into the page; restrict it to your site's addresses |
 
 ### Camera & 3D
 
