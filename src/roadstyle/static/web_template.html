@@ -877,9 +877,10 @@ const _streetView = __STREET_VIEW__;
 // (rsStreetViewStep) and the URL all read it, so they cannot disagree.
 const _SV_LANE_M = 2.5, _SV_R = 110540;          // metres per degree of latitude
 let _svPos = null, _svMk = null, _svMarkOn = false;
-// a FREE spot, set by a Street View that reports where the viewer walked (rsSetStreetViewMarkerAt);
-// it wins over the edge spot until the next selection or step
-let _svFree = null;
+// where a Street View that reports its moves says the viewer is (rsSetStreetViewMarkerAt): the
+// heading they look, and - only when no drawn road is near - a free spot {c}. Cleared by the next
+// selection or step.
+let _svFree = null, _svLast = null;
 function _svLine(f){ const g=f && f.geometry;
   return !g ? [] : g.type==="LineString" ? g.coordinates : g.type==="MultiLineString" ? [].concat(...g.coordinates) : []; }
 function _svFeat(f){ const F=_feats();       // the edge's full geometry (a picked one may be tile-clipped)
@@ -924,7 +925,7 @@ function _svUrl(ll, f){
 // a selection: remember the spot (for the marker and the step buttons) and return its URL
 function _svPick(ll, f, id){
   f=_svFeat(f); const m=(_streetView && ll) ? _svMeasure(f, ll) : null;
-  _svFree = null;
+  _svFree = null; _svLast = null;
   _svPos = m==null ? null : {f:f, m:m, id:id}; _svMark();
   return _svUrl(ll, f); }
 // the map marker: a dot where Street View stands and a cone the way it looks. Shown while a
@@ -950,30 +951,65 @@ function _svLanePx(props){
 // place the marker on the centre line, shifted right of travel by the lane's drawn offset: Google
 // gets the real 2.5 m lane point, the marker sits in the lane as drawn at this zoom
 function _svMarkPlace(){
-  if(!_svMk || !_svPos || _svFree) return;
+  if(!_svMk || !_svPos || (_svFree && _svFree.c)) return;
   const p=_svAt(_svPos.f, _svPos.m); if(!p) return;
   const px=_svLanePx(_svPos.f.properties||{}), a=map.project(p.a), b=map.project(p.b);
   const dx=b.x-a.x, dy=b.y-a.y, n=Math.hypot(dx, dy)||1;   // screen: y down, right of travel = (-dy, dx)
   _svMk.setLngLat(p.c).setOffset([-dy/n*px, dx/n*px]); }
 function _svMark(){
-  const p = !_svMarkOn ? null : _svFree ? {c:_svFree.c, h:_svFree.h} : _svPos ? _svAt(_svPos.f, _svPos.m) : null;
+  const p = !_svMarkOn ? null : _svFree && _svFree.c ? {c:_svFree.c, h:_svFree.h} : _svPos ? _svAt(_svPos.f, _svPos.m) : null;
   if(!p){ if(_svMk){ _svMk.remove(); _svMk=null; } return; }
   if(!_svMk){ const el=document.createElement("div"); el.className="rs-svm";
     el.innerHTML='<svg width="64" height="64" viewBox="-32 -32 64 64">'+
       '<path d="M0 0 L-16 -26 A31 31 0 0 1 16 -26 Z" fill="rgba(13,71,161,.45)" stroke="#fff" stroke-width="1.5"/>'+
       '<circle r="7" fill="#0d47a1" stroke="#fff" stroke-width="2.5"/></svg>';
     _svMk=new maplibregl.Marker({element:el, rotationAlignment:"map", pitchAlignment:"map"}); }
-  _svMk.setLngLat(p.c).setRotation(p.h||0).addTo(map);
-  if(_svFree) _svMk.setOffset([0, 0]); else _svMarkPlace(); }
+  _svMk.setLngLat(p.c).setRotation(_svFree ? _svFree.h : (p.h||0)).addTo(map);
+  if(_svFree && _svFree.c) _svMk.setOffset([0, 0]); else _svMarkPlace(); }
 // keep a point on screen: pan once it nears the map's edge (walking, by step or in the panorama)
 function _svKeepInView(lng, lat){
   const q=map.project([lng, lat]), c=map.getCanvas(), pad=60;
   if(q.x<pad || q.y<pad || q.x>c.clientWidth-pad || q.y>c.clientHeight-pad) map.easeTo({center:[lng, lat], duration:400}); }
 // the marker where a Street View panorama stands and the way it looks - for a Street View that
 // reports its own moves (the Maps JavaScript API does; the keyless embed cannot). null clears it.
+// ON THE ROAD AS DRAWN: a panorama stands where the camera car drove - between the drawn lanes of a
+// two-way road - so the spot is snapped onto a drawn edge and the marker sits in its lane like a
+// clicked one. The current edge while the viewer is still on it (looking round never switches
+// lanes); off it, the nearest road drawn on screen, the direction they walked. Free only when no
+// road is within _SV_SNAP_M.
+const _SV_SNAP_M = 20;
+function _svOnEdge(f, ll){                      // {f, m, d metres from its centre line, h} | null
+  f=_svFeat(f); const m=_svMeasure(f, ll); if(m==null) return null;
+  const cs=_svLine(f), d=_svDist(cs); let i=0; while(i<cs.length-2 && d[i+1]<m) i++;
+  const t=(m-d[i])/((d[i+1]-d[i])||1), x=cs[i][0]+t*(cs[i+1][0]-cs[i][0]), y=cs[i][1]+t*(cs[i+1][1]-cs[i][1]);
+  const k=Math.cos(ll.lat*Math.PI/180), h=(Math.atan2((cs[i+1][0]-cs[i][0])*k, cs[i+1][1]-cs[i][1])*180/Math.PI+360)%360;
+  return {f:f, m:m, d:Math.hypot((ll.lng-x)*k*_SV_R, (ll.lat-y)*_SV_R), h:h}; }
 function rsSetStreetViewMarkerAt(lng, lat, heading){
-  _svFree = lng==null ? null : {c:[+lng, +lat], h:+heading||0}; _svMark();
-  if(_svFree && _svMarkOn) _svKeepInView(_svFree.c[0], _svFree.c[1]); }
+  if(lng==null){ _svFree=null; _svLast=null; _svMark(); return; }
+  const ll={lng:+lng, lat:+lat}, look=+heading||0, k=Math.cos(ll.lat*Math.PI/180);
+  const moved=_svLast ? Math.hypot((ll.lng-_svLast.lng)*k*_SV_R, (ll.lat-_svLast.lat)*_SV_R) : 0;
+  const walk=moved>2 ? (Math.atan2((ll.lng-_svLast.lng)*k, ll.lat-_svLast.lat)*180/Math.PI+360)%360 : null;
+  _svLast=ll;
+  const off=(a, b)=>{ const x=Math.abs(a-b)%360; return x>180 ? 360-x : x; };
+  let best=_svPos ? _svOnEdge(_svPos.f, ll) : null;
+  if(!best || best.d>_SV_LANE_M+6 || best.m<=0.01 || best.m>=_svAt(best.f, 1e9).len-0.01){
+    const q=map.project([ll.lng, ll.lat]), r=40, lays=RS_FILL_LAYERS.filter(id=>map.getLayer(id)), cand=[];
+    map.queryRenderedFeatures([[q.x-r, q.y-r], [q.x+r, q.y+r]], {layers:lays}).forEach(f=>{
+      if(f.id==null || cand.some(c=>c.f.id===f.id)) return;
+      const o=_svOnEdge(f, ll); if(o) cand.push(o); });
+    // the direction they walked (else look) first, then the nearest: a divided road's other
+    // carriageway can be nearer the camera than its own, but it runs the wrong way
+    const dir=walk!=null ? walk : look;
+    // and at a crossing the road that goes on the way they walked, not the one across it:
+    // every 10 degrees off that way weighs like 2 m further
+    const score=c=>c.d+off(c.h, dir)/5+(off(c.h, dir)>100 ? 1000 : 0);
+    cand.sort((a, b)=>score(a)-score(b));
+    if(cand.length) best=cand[0];
+  }
+  if(best && best.d<=_SV_SNAP_M){ _svPos={f:best.f, m:best.m, id:best.f.id}; _svFree={h:look}; }
+  else _svFree={c:[ll.lng, ll.lat], h:look};
+  _svMark();
+  if(_svMarkOn){ const c=_svFree.c || _svAt(_svPos.f, _svPos.m).c; _svKeepInView(c[0], c[1]); } }
 window.rsSetStreetViewMarkerAt = rsSetStreetViewMarkerAt;
 map.on("move", _svMarkPlace);                   // zoom / rotate / pitch change the drawn offset
 function rsSetStreetViewMarker(on){ _svMarkOn=!!on; _svMark(); }
@@ -982,7 +1018,7 @@ function rsSetStreetViewMarker(on){ _svMarkOn=!!on; _svMark(); }
 function rsStreetViewStep(m){
   if(!_svPos) return null;
   const p=_svAt(_svPos.f, _svPos.m+m); if(!p) return null;
-  _svFree=null; _svPos.m=p.m; _svMark(); const url=_svUrlOf(p);
+  _svFree=null; _svLast=null; _svPos.m=p.m; _svMark(); const url=_svUrlOf(p);
   _svKeepInView(p.lng, p.lat);                  // keep the marker on screen while walking
   document.dispatchEvent(new CustomEvent("rs:streetviewmove",
     {detail:{id:_svPos.id, streetView:url, atStart:p.m<=0.01, atEnd:p.m>=p.len-0.01}}));
