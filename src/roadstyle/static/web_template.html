@@ -379,14 +379,20 @@ if(_svWindow){
     if(e.target.tagName==="BUTTON") return;
     const r=w.getBoundingClientRect(), dx=e.clientX-r.left, dy=e.clientY-r.top;
     bar.setPointerCapture(e.pointerId); w.classList.add("rs-drag");   // the iframe mustn't swallow it
-    const mv=ev=>{ st.left=Math.max(0, Math.min(innerWidth-80, ev.clientX-dx));
-                   st.top=Math.max(0, Math.min(innerHeight-30, ev.clientY-dy));
+    // inside the MAP, not the browser window: a page's side panel covers the rest, and a window
+    // dragged under it could not be reached again
+    const mv=ev=>{ const m=map.getContainer().getBoundingClientRect();
+                   st.left=Math.max(m.left, Math.min(m.right-w.offsetWidth, ev.clientX-dx));
+                   st.top=Math.max(m.top, Math.min(m.bottom-30, ev.clientY-dy));
                    Object.assign(w.style, {left:st.left+"px", top:st.top+"px", right:"auto", bottom:"auto"}); };
     bar.addEventListener("pointermove", mv);
     bar.addEventListener("pointerup", ()=>{ bar.removeEventListener("pointermove", mv);
       w.classList.remove("rs-drag"); save(); }, {once:true});
   });
   new ResizeObserver(()=>{ if(!w.hidden && innerWidth>520){ st.w=w.offsetWidth; st.h=w.offsetHeight; save(); } }).observe(w);
+  // THE MAP CHANGED SIZE (a side panel shown again, the browser narrowed): pull the window back
+  // inside it, or it sits under the panel where no one can reach it
+  map.on("resize", ()=>{ if(!w.hidden && innerWidth>520){ place(); save(); } });
   map.addControl({onAdd(){
     const d=document.createElement("div"); d.className="maplibregl-ctrl maplibregl-ctrl-group";
     btn=document.createElement("button"); btn.type="button"; btn.title="Street View";
