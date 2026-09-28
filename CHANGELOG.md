@@ -6,6 +6,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **Classic -> Linked showed a black Street View panel** (one tile in the corner), on the window
+  and on the side-by-side page: the panorama was set while its box was still hidden, so it drew at
+  0x0. The box is shown first now, then the panorama is set and told its size.
+
 ### Added
 - **`rsGetStreetViewSpot()` and the `rs:streetviewspot` event: where the Street View spot is, exactly.**
   The edge (`id`, `properties`), metres along it (`m`) and its length, the point (`lng`, `lat`), where

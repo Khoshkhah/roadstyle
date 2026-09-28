@@ -313,8 +313,11 @@ if(_svWindow){
       pano.addListener("position_changed", report); pano.addListener("pov_changed", report); }
     return svc.getPanorama({location:{lat:+lat, lng:+lng}, radius:50, preference:g.StreetViewPreference.NEAREST,
                             sources:[g.StreetViewSource.GOOGLE]}).then(r=>{
+      // ON SCREEN FIRST: a panorama set while its box is hidden (Classic was showing) draws at 0x0,
+      // a black panel with one tile in the corner
+      pdiv.hidden=false; msg.hidden=true;
       pano.setPano(r.data.location.pano); pano.setPov({heading:+h||0, pitch:0}); pano.setVisible(true);
-      pdiv.hidden=false; msg.hidden=true; },
+      g.event.trigger(pano, "resize"); },
       ()=>{ pdiv.hidden=true; msg.hidden=false; msg.textContent="No street photos within 50 m of this spot."; }); });
   if(st.w) Object.assign(w.style, {width:st.w+"px", height:st.h+"px"});
   // anchor by the top-left once visible, so the corner grip grows the window toward the pointer

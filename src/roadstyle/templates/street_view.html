@@ -117,8 +117,11 @@
       }
       return svc.getPanorama({location: {lat: +lat, lng: +lng}, radius: 50, preference: g.StreetViewPreference.NEAREST,
                               sources: [g.StreetViewSource.GOOGLE]}).then(r => {
+        // on screen first: a panorama set while its box is hidden (Classic was showing) draws at
+        // 0x0 - a black panel with one tile in the corner
+        pdiv.hidden = false; empty.hidden = true; frame.hidden = true;
         pano.setPano(r.data.location.pano); pano.setPov({heading: +h || 0, pitch: 0}); pano.setVisible(true);
-        pdiv.hidden = false; empty.hidden = true;
+        g.event.trigger(pano, "resize");
       }, () => { pdiv.hidden = true; empty.hidden = false; empty.textContent = "No street photos within 50 m of this spot."; });
     });
   }
