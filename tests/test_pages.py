@@ -90,3 +90,5 @@ def test_street_view_key_turns_the_embed_into_a_panorama_that_reports_its_moves(
     h = rs.render_street_view(_edges(), street_view_key="AIzaTEST").html
     assert 'const GKEY = "AIzaTEST";' in h
     assert "StreetViewSource.GOOGLE" in h and "position_changed" in h and "rsSetStreetViewMarkerAt(p.lng()" in h
+    # both versions on the page, the viewer flips between them (shown only with a key)
+    assert 'data-m="linked"' in h and 'data-m="classic"' in h and "rs-street-view-mode" in h

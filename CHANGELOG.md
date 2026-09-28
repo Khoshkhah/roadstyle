@@ -11,7 +11,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   Google Maps JavaScript API key the panel is a real panorama instead of the keyless embed: every
   step and turn inside it moves the marker (and pans the map to keep it in view), and only Google's
   own street imagery is shown - the embed also offered people's indoor photos. Without a key the
-  page is unchanged.
+  page is unchanged. **Both versions stay on the page:** a switch in the panel's bar flips between
+  **Linked** (the panorama) and **Classic** (the embed) at the spot the viewer is at, remembered in
+  their browser. The walking marker is snapped onto the road as drawn, in its lane.
 - **`rsSetStreetViewMarkerAt(lng, lat, heading)`**: the marker at any spot, off the clicked edge if
   need be; the next selection or step returns it to the edge.
 

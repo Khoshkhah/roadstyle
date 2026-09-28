@@ -15,6 +15,10 @@
   #sv-road::before { content: "\00b7"; margin-right: 8px; color: #aaa; }
   .sv-step { border: 1px solid #ccc; background: #fff; border-radius: 4px; padding: 1px 7px; cursor: pointer; }
   .sv-step:disabled { opacity: .35; cursor: default; }
+  /* the flip, with a key only: Linked (the marker walks with the viewer) or Classic (the embed) */
+  .sv-mode { display: inline-flex; border: 1px solid #ccc; border-radius: 4px; overflow: hidden; flex: 0 0 auto; }
+  .sv-mode button { border: 0; background: #fff; padding: 1px 8px; cursor: pointer; font: inherit; font-size: 12px; color: #475569; }
+  .sv-mode button.on { background: #0E7F91; color: #fff; }
   #sv [hidden] { display: none !important; }
   /* the divider: drag it to share the width (or, below, the height) between map and Street View */
   #sv-drag { position: fixed; top: 0; bottom: 0; right: var(--sv-w); width: 10px; margin-right: -5px;
@@ -57,6 +61,7 @@
 <div id="sv-drag" title="Drag to resize"></div>
 <div id="sv" data-layout="beside">
   <div id="sv-bar"><h2>Roads and Street View</h2><span id="sv-road">Click a road to see it in Street View.</span>
+    <span class="sv-mode" hidden><button type="button" data-m="linked" title="The map marker walks and turns with you; Google's street photos only">Linked</button><button type="button" data-m="classic" title="Google's plain Street View: the marker stays where you clicked">Classic</button></span>
     <button type="button" class="sv-step" data-step="-15" title="Back 15 m along the road" disabled>&#9664;</button>
     <button type="button" class="sv-step" data-step="15" title="Forward 15 m along the road" disabled>&#9654;</button></div>
   <div id="sv-empty">Street View opens here, looking the way the clicked road runs.</div>
@@ -75,7 +80,25 @@
   // embed: it reports every step and turn, so the map marker walks and turns with the viewer, and
   // it asks for Google's own street imagery only - the embed also shows people's indoor photos
   const GKEY = __SV_KEY__;
-  let pano = null, svc = null, loading = null;
+  let pano = null, svc = null, loading = null, lastUrl = null, lastAt = {atStart: false, atEnd: false};
+  const MODE_KEY = "rs-street-view-mode";
+  let mode = "classic";
+  if (GKEY) { mode = "linked"; try { mode = localStorage.getItem(MODE_KEY) || "linked"; } catch (err) {} }
+  const flip = document.querySelector(".sv-mode");
+  if (GKEY) {
+    flip.hidden = false;
+    const mark = () => flip.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.m === mode));
+    mark();
+    flip.querySelectorAll("button").forEach(b => b.onclick = () => {
+      if (b.dataset.m === mode) return;
+      mode = b.dataset.m; mark();
+      try { localStorage.setItem(MODE_KEY, mode); } catch (err) {}
+      if (mode === "classic") { document.getElementById("sv-pano").hidden = true; rsSetStreetViewMarkerAt(null); }
+      // THE SAME SPOT in the other panel - where the viewer has walked to, which is where the
+      // marker stands: a zero step re-reads it and shows it (rs:streetviewmove)
+      if (!rsStreetViewStep(0) && lastUrl) show(lastUrl, lastAt);
+    });
+  }
   const pdiv = document.getElementById("sv-pano");
   const gload = () => loading || (loading = new Promise((ok, no) => {
     window.__rsSvReady = ok;
@@ -126,6 +149,7 @@
     show(d.streetView, {atStart: false, atEnd: false});
   });
   function show(url, at) {
+    lastUrl = url; lastAt = at;
     ends(!url || at.atStart, !url || at.atEnd);
     const d = {streetView: url};
     if (!d.streetView) {                                 // street_view=False, or no geometry
@@ -141,13 +165,14 @@
     }
     const u = new URL(d.streetView);
     const [lat, lng] = u.searchParams.get("viewpoint").split(",");
-    if (GKEY) {                                          // the panorama; the embed if the API fails to load
+    if (GKEY && mode === "linked") {                     // the panorama; the embed if the API fails to load
+      frame.hidden = true;
       panoAt(lat, lng, u.searchParams.get("heading") || 0).catch(() => {
         frame.src = embed(lat, lng, u.searchParams.get("heading") || 0); frame.hidden = false; pdiv.hidden = true; empty.hidden = true; });
       return;
     }
     frame.src = embed(lat, lng, u.searchParams.get("heading") || 0);
-    frame.hidden = false; empty.hidden = true;
+    frame.hidden = false; empty.hidden = true; document.getElementById("sv-pano").hidden = true;
   }
 
   // the divider (resizable=False removes it): the panel width follows the pointer, 20%..80% of
