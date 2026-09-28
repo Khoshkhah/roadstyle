@@ -6,6 +6,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.8.6] — 2026-09-28
+
 ### Fixed
 - **The Street View window stays inside the map.** It could be dragged anywhere in the browser
   window, so on a page with a side panel it could end up under the panel - most easily by moving it
