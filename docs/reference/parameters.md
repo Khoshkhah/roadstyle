@@ -70,7 +70,7 @@ ignore it.
 | `backend` | `"web"` | | `"web"` (MapLibre, one offline file), `"folium"`, `"lonboard"` ([Big networks](../guides/big-networks.md)) |
 | `palette` | `"highsat"` | all | `"highsat"`, `"carto"`, `"mono"` or a registered palette |
 | `basemap` | the `basemap` setting (`"voyager"`) | all | a `BASEMAPS` key, a `Basemap`, a `{z}/{x}/{y}` URL or an xyzservices provider |
-| `basemaps` | web: `voyager`, `positron`, `dark_matter`, `osm`, `satellite`, `blank` | web, folium | the base maps offered in the switcher |
+| `basemaps` | web: `esri_gray`, `positron`, `osm`, `satellite`, `voyager`, `dark_matter`, `blank` | web, folium | the base maps offered in the switcher |
 | `basemap_switcher` | `True` | web | the base-map button (a map control, last in the top-right column) and its menu; `False` with a `basemaps=` list keeps them for `rsSetBasemap` |
 | `zoom_readout` | `True` | web | the small "z 13.2" zoom level beside the scale bar; `False` leaves it out |
 | `api_key` | `None` | all | key for a keyed tile provider ([order](settings.md#base-maps-api-keys)) |

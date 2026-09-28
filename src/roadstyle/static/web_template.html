@@ -14,7 +14,7 @@
 .maplibregl-ctrl.bm-ctrl{position:relative;overflow:visible}
 .maplibregl-ctrl .bm-icon{font:16px/1 system-ui,sans-serif;color:#5b616b;cursor:pointer;
   position:static !important;top:auto !important;right:auto !important;bottom:auto !important;left:auto !important}
-.maplibregl-ctrl .bm-icon:hover{color:#16181d}
+.maplibregl-ctrl .bm-icon:hover{color:#334155}
 .maplibregl-ctrl .bm-menu{position:absolute !important;top:0 !important;right:36px !important;bottom:auto !important;left:auto !important;
   z-index:3;background:#fff;border-radius:8px;border:1px solid rgba(0,0,0,.06);box-shadow:0 4px 16px rgba(0,0,0,.14);
   font:13px system-ui,sans-serif;display:none;overflow:hidden;padding:4px;text-align:left}
@@ -30,7 +30,7 @@
 .rs-tl .flt-ctrl{overflow:auto;min-height:0}   /* long class lists scroll inside the stack */
 .flt-ctrl{position:absolute;top:10px;left:10px;z-index:2;background:#fff;border-radius:8px;
 box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);
-font:13px system-ui,sans-serif;color:#16181d;max-height:70%;overflow:auto}
+font:13px system-ui,sans-serif;color:#334155;max-height:70%;overflow:auto}
 .flt-ctrl .flt-hd{padding:8px 11px 6px;cursor:pointer;user-select:none;
   font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#767c88}
 .flt-ctrl .flt-body{padding:0 11px 8px;display:flex;flex-direction:column;gap:3px}
@@ -88,11 +88,11 @@ body.rs-side-hidden{--rs-side:0px}
 box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);padding:6px 10px;
 font:11px system-ui,sans-serif;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#767c88}
 .co-ctrl select{font:13px system-ui,sans-serif;font-weight:600;text-transform:none;letter-spacing:0;
-  border:0;background:transparent;cursor:pointer;outline:none;color:#16181d;margin-left:3px}
+  border:0;background:transparent;cursor:pointer;outline:none;color:#334155;margin-left:3px}
 .co-lg{position:absolute;left:10px;bottom:24px;z-index:2;background:rgba(255,255,255,.96);
 border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);
-padding:8px 11px;font:12px system-ui,sans-serif;color:#16181d}
-.co-lg .lg-title{font-weight:600;margin-bottom:5px;color:#16181d}
+padding:8px 11px;font:12px system-ui,sans-serif;color:#334155}
+.co-lg .lg-title{font-weight:600;margin-bottom:5px;color:#334155}
 .co-lg .lg-row{display:flex;align-items:center;gap:7px;white-space:nowrap;padding:1px 0}
 .co-lg .lg-sw{width:14px;height:8px;border-radius:2px;display:inline-block;flex:none}
 .co-lg .lg-bar{height:10px;width:150px;border-radius:3px;margin:3px 0}
@@ -103,12 +103,17 @@ padding:8px 11px;font:12px system-ui,sans-serif;color:#16181d}
 .co-lg.collapsed{padding-bottom:8px}
 .ov-ctrl{position:absolute;bottom:88px;right:calc(10px + var(--rs-side,0px));z-index:2;   /* above the base-map button */
 background:#fff;border-radius:8px;
-box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px system-ui,sans-serif;color:#16181d}
+box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px system-ui,sans-serif;color:#334155}
 .ov-ctrl .ov-hd{padding:8px 11px 6px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#767c88}
 .ov-ctrl .ov-body{padding:0 11px 8px;display:flex;flex-direction:column;gap:3px}
 .ov-ctrl label{display:flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer}
 .ov-ctrl label:hover{color:#1a6bd6}
 .ov-ctrl .ov-sw{width:12px;height:12px;border-radius:3px;display:inline-block;flex:none}
+/* text: soft slate, never black - popups, the map's own buttons, the scale and attribution */
+.maplibregl-popup-content{color:#334155}
+.maplibregl-ctrl-group button{color:#334155}
+.maplibregl-ctrl-scale{color:#475569}
+.maplibregl-ctrl.maplibregl-ctrl-attrib,.maplibregl-ctrl-attrib-inner,.maplibregl-ctrl.maplibregl-ctrl-attrib a{color:#475569}
 /* translucent click popup + hover tooltip (a backdrop blur keeps text legible over busy maps) */
 .maplibregl-popup-content{background:rgba(255,255,255,.58);backdrop-filter:blur(5px);
   -webkit-backdrop-filter:blur(5px);border:1px solid rgba(0,0,0,.06);box-shadow:0 2px 10px rgba(0,0,0,.12)}

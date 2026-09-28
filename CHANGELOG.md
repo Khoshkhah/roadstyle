@@ -6,6 +6,15 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-09-28
+
+### Changed
+- **The switcher offers Light Gray first, and always a blank map.** The default `basemaps` list is
+  `esri_gray`, `positron`, `osm`, `satellite`, `voyager`, `dark_matter`, `blank`.
+- **No black text on the web map.** The legend, the filter control, the base-map menu, popups and
+  hover tooltips, the map's own buttons (2D/3D, Street View), the scale bar and the attribution use
+  soft slate (`#334155`, `#475569`) instead of `#16181d` or the browser's black.
+
 ## [0.8.0] — 2026-09-27
 
 ### Changed

@@ -184,7 +184,7 @@ BASEMAPS: dict[str, Basemap] = {
 }
 
 # default set offered by the switcher when the caller doesn't specify one
-DEFAULT_SWITCHER = ["voyager", "positron", "dark_matter", "osm", "satellite", "blank"]
+DEFAULT_SWITCHER = ["esri_gray", "positron", "osm", "satellite", "voyager", "dark_matter", "blank"]
 
 
 def register_basemap(bm: Basemap) -> None:
