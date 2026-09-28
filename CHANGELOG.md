@@ -6,6 +6,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.8.2] — 2026-09-28
+
 ### Added
 - **`street_view_key=` on `render_street_view`: the map marker walks with the viewer.** With a
   Google Maps JavaScript API key the panel is a real panorama instead of the keyless embed: every
