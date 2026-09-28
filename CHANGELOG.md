@@ -6,6 +6,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.8.4] — 2026-09-28
+
 ### Fixed
 - **Classic -> Linked showed a black Street View panel** (one tile in the corner), on the window
   and on the side-by-side page: the panorama was set while its box was still hidden, so it drew at
