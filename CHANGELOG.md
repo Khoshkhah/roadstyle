@@ -6,6 +6,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.8.5] — 2026-09-28
+
 ### Fixed
 - **Classic -> Linked still showed a small panorama in a corner in a real browser** (0.8.4's fix held
   only headless). A panorama now exists only while it is on screen: hiding it (Classic, the window
