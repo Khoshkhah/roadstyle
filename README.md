@@ -142,7 +142,7 @@ without writing code: `render_place("Tartu, Estonia")`, `render_file("roads.gpkg
 Each saves an HTML map and returns its path plus a PNG preview the agent can look at.
 
 ```bash
-claude mcp add roadstyle -- uvx --from "roadstyle[mcp]" roadstyle-mcp
+claude mcp add roadstyle -- uvx roadstyle-mcp
 ```
 
 <details>
@@ -151,13 +151,20 @@ claude mcp add roadstyle -- uvx --from "roadstyle[mcp]" roadstyle-mcp
 In `claude_desktop_config.json`:
 
 ```json
-{"mcpServers": {"roadstyle": {"command": "uvx", "args": ["--from", "roadstyle[mcp]", "roadstyle-mcp"]}}}
+{"mcpServers": {"roadstyle": {"command": "uvx", "args": ["roadstyle-mcp"]}}}
 ```
 
 Maps are saved in `~/roadstyle-maps/`. The PNG preview needs Chromium, once:
-`uvx --from "roadstyle[mcp]" playwright install chromium`.
+`uvx --from roadstyle-mcp playwright install chromium`.
 
 </details>
+
+**Claude Code plugin.** The MCP server and the skill below in one install:
+
+```text
+/plugin marketplace add Khoshkhah/roadstyle
+/plugin install roadstyle@roadstyle
+```
 
 **For agents that write code:**
 
