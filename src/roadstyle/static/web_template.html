@@ -415,9 +415,16 @@ function rsSetBasemap(keyOrIdx){
   const idx = typeof keyOrIdx==="number" ? keyOrIdx
     : BASEMAPS.findIndex(b=>b.key===keyOrIdx || b.label===keyOrIdx);
   const b = BASEMAPS[idx]; if(!b) return;
-  const s = map.getSource("bm");
-  if(b.tiles.length && s) s.setTiles(b.tiles);
-  if(map.getLayer("basemap")) map.setLayoutProperty("basemap","visibility", b.tiles.length ? "visible" : "none");
+  if(b.tiles.length && map.getLayer("basemap")){
+    // rebuild the source, not setTiles: a raster source's maxzoom (past it the last level is
+    // scaled up) and its attribution are fixed when it is created. Same ids, same place in the
+    // layer order: back under the layer that followed it in the page's style.
+    const def = style.layers.find(l=>l.id==="basemap");
+    const after = style.layers.slice(style.layers.indexOf(def)+1).map(l=>l.id).find(id=>map.getLayer(id));
+    map.removeLayer("basemap"); map.removeSource("bm");
+    map.addSource("bm", {type:"raster", tiles:b.tiles, tileSize:256, maxzoom:b.maxzoom||19, attribution:b.attr||""});
+    map.addLayer({...def, layout:{...(def.layout||{}), visibility:"visible"}}, after);
+  } else if(map.getLayer("basemap")) map.setLayoutProperty("basemap","visibility","none");
   map.setPaintProperty("bg","background-color", b.bg);
   const m = document.querySelector(".bm-menu");
   if(m) Array.from(m.children).forEach((el,i)=>el.classList.toggle("on", i===idx));
@@ -872,7 +879,7 @@ map.on("load", function(){ var tries=0; (function check(){ setTimeout(function()
       ? (window.__rs_tiles ? JSON.stringify(window.__rs_tiles) : "tiles setup did not run")
       : (window.__rs_gz ? JSON.stringify(window.__rs_gz) : "inflate script did not run");
     document.body.insertAdjacentHTML("afterbegin",
-      '<div style="position:fixed;z-index:9999;top:0;left:0;right:0;padding:8px 12px;'+
+      '<div id="rs-diag" style="position:fixed;z-index:9999;top:0;left:0;right:0;padding:8px 12px;'+
       'background:#b45309;color:#fff;font:12px monospace">roadstyle: 0 road features — '+st+
       ' | DecompressionStream: '+(typeof DecompressionStream)+'</div>');
   }catch(e){}

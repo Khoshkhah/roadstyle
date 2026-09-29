@@ -149,7 +149,8 @@ Other sources:
 
 ```python
 rs.register_basemap(rs.Basemap("mytiles", "My tiles",
-                               "https://tiles.example.com/{z}/{x}/{y}.png", "© My tiles"))
+                               "https://tiles.example.com/{z}/{x}/{y}.png", "© My tiles",
+                               maxzoom=18))   # its last zoom level with tiles (default 19)
 ```
 
 !!! warning "CARTO watermark"

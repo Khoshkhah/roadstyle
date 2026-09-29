@@ -248,6 +248,7 @@ Built-ins: [Settings & palettes](settings.md#base-maps-api-keys).
 | `satellite` | `False` | apply the satellite colour filter |
 | `lonboard` | `None` | the matching lonboard base map name |
 | `bg`, `preview`, `subdomains` | `"#444"`, three greys, `"abc"` | switcher thumbnail, tile subdomains |
+| `maxzoom` | `19` | the provider's last zoom level with real tiles; zoomed in further, the map scales that level up instead of showing missing tiles. Built-ins: Esri grey maps 16, CARTO 20, the rest 19; xyzservices providers bring their own `max_zoom` |
 
 ## StyleConfig
 

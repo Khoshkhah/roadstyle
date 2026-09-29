@@ -6,6 +6,20 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **Base maps no longer go blank when you zoom in far.** Every base map has a last zoom level with
+  real tiles: 16 for Esri's Light Gray and Dark Gray, 19 for Esri Streets, Satellite and
+  OpenStreetMap, 20 for CARTO. Past it the map showed grey "Map data not yet available" squares
+  (Esri answers with a real image, so nothing could tell) or nothing at all. Each base map now
+  carries its `maxzoom`, and the map scales its last level up instead. New `Basemap.maxzoom` field
+  (default 19); xyzservices providers bring their own.
+- **Switching base maps updates the attribution.** It kept the first map's credit ("© CARTO" on
+  an Esri map). Switching now rebuilds the base-map source, in the same place under the roads.
+- **Roads appear even when the map starts late.** A map opened off screen (a background tab, a
+  notebook output scrolled out of view) builds its sources only once it is shown; the inline data
+  loader stopped waiting after 60 s and the map stayed empty. It now keeps waiting, and clears the
+  self-check banner if the roads arrive after it appeared.
+
 ## [0.9.0] — 2026-09-29
 
 ### Added

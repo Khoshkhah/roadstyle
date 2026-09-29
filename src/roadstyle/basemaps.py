@@ -1,6 +1,7 @@
 """Base-map (tile) providers + thumbnail metadata for the switcher control."""
 from __future__ import annotations
 
+import dataclasses
 import os
 from dataclasses import dataclass
 
@@ -118,6 +119,10 @@ class Basemap:
     bg: str = "#444"               # thumbnail background (CSS)
     preview: tuple[str, str, str] = ("#888", "#bbb", "#888")  # 3 preview road colours
     subdomains: str = "abc"
+    #: the provider's last zoom level with real tiles; past it MapLibre scales that level up. Esri
+    #: answers beyond its levels with HTTP 200 and a "Map data not yet available" image, so the
+    #: browser can't tell a tile is missing: without this the map goes grey (measured 2026-09-29)
+    maxzoom: int = 19
 
 
 # NOTE: every basemaps.cartocdn.com entry below (voyager, voyager_nolabels, positron,
@@ -130,24 +135,24 @@ BASEMAPS: dict[str, Basemap] = {
         "voyager", "Voyager",
         "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", _CARTO_ATTR,
         lonboard="Voyager", bg="linear-gradient(180deg,#e8eef0,#d8e0e5)",
-        preview=("#ff9933", "#e8ecef", "#9ec5fe")),
+        preview=("#ff9933", "#e8ecef", "#9ec5fe"), maxzoom=20),
     "voyager_nolabels": Basemap(
         # no basemap street names: the map's own labels (arrow-grey, class-aware) are the only
         # ones — otherwise CARTO's dark names show wherever ours don't place (and below z14)
         "voyager_nolabels", "Voyager (no labels)",
         "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png",
         _CARTO_ATTR, lonboard="Voyager", bg="linear-gradient(180deg,#e8eef0,#d8e0e5)",
-        preview=("#ff9933", "#e8ecef", "#9ec5fe")),
+        preview=("#ff9933", "#e8ecef", "#9ec5fe"), maxzoom=20),
     "positron": Basemap(
         "positron", "Positron",
         "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", _CARTO_ATTR,
         lonboard="Positron", bg="linear-gradient(180deg,#f3f5f7,#e3e8ed)",
-        preview=("#888", "#bbb", "#888")),
+        preview=("#888", "#bbb", "#888"), maxzoom=20),
     "dark_matter": Basemap(
         "dark_matter", "Dark Matter",
         "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", _CARTO_ATTR,
         is_dark=True, lonboard="DarkMatter", bg="radial-gradient(circle,#18222e,#0b1014)",
-        preview=("#22d3a3", "#9ec5fe", "#5b6573")),
+        preview=("#22d3a3", "#9ec5fe", "#5b6573"), maxzoom=20),
     "osm": Basemap(
         "osm", "OpenStreetMap",
         "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", _OSM_ATTR,
@@ -155,7 +160,7 @@ BASEMAPS: dict[str, Basemap] = {
     "esri_gray": Basemap(
         "esri_gray", "Light Gray",
         "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-        _ESRI_ATTR, bg="linear-gradient(180deg,#eceff1,#d8dde1)", preview=("#9aa", "#ccc", "#9aa")),
+        _ESRI_ATTR, bg="linear-gradient(180deg,#eceff1,#d8dde1)", preview=("#9aa", "#ccc", "#9aa"), maxzoom=16),
     "esri_street": Basemap(
         # the keyless stand-in for CARTO's voyager: coloured, labelled, street-level
         "esri_street", "Streets",
@@ -167,7 +172,7 @@ BASEMAPS: dict[str, Basemap] = {
         "esri_dark_gray", "Dark Gray",
         "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
         _ESRI_ATTR, is_dark=True, bg="linear-gradient(180deg,#3a3f45,#25292e)",
-        preview=("#22d3a3", "#9ec5fe", "#5b6573")),
+        preview=("#22d3a3", "#9ec5fe", "#5b6573"), maxzoom=16),
     "satellite": Basemap(
         "satellite", "Satellite",
         "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
@@ -245,8 +250,9 @@ def _basemap_from_provider(tp, api_key: str | None = None) -> Basemap:
     if hasattr(tp, "get"):
         attr = tp.get("attribution", "") or tp.get("html_attribution", "") or ""
     is_dark = "dark" in str(name).lower()
+    maxzoom = int(tp.get("max_zoom", 19) or 19) if hasattr(tp, "get") else 19
     return Basemap(key=str(name), label=str(name).replace("_", " "), url=url, attr=attr,
-                   is_dark=is_dark)
+                   is_dark=is_dark, maxzoom=maxzoom)
 
 
 def _warn_unkeyed(url: str, resolved_key: str | None) -> None:
@@ -281,11 +287,7 @@ def get_basemap(key: str | Basemap, api_key: str | None = None) -> Basemap:
         if resolved_key and key.url:
             new_url = _inject_token(key.url, resolved_key)
             if new_url != key.url:
-                return Basemap(
-                    key=key.key, label=key.label, url=new_url, attr=key.attr,
-                    is_dark=key.is_dark, satellite=key.satellite, lonboard=key.lonboard,
-                    bg=key.bg, preview=key.preview, subdomains=key.subdomains
-                )
+                return dataclasses.replace(key, url=new_url)
         return key
     if isinstance(key, str):
         if key in BASEMAPS:
@@ -296,11 +298,7 @@ def get_basemap(key: str | Basemap, api_key: str | None = None) -> Basemap:
             if resolved_key and bm.url:
                 new_url = _inject_token(bm.url, resolved_key)
                 if new_url != bm.url:
-                    return Basemap(
-                        key=bm.key, label=bm.label, url=new_url, attr=bm.attr,
-                        is_dark=bm.is_dark, satellite=bm.satellite, lonboard=bm.lonboard,
-                        bg=bm.bg, preview=bm.preview, subdomains=bm.subdomains
-                    )
+                    return dataclasses.replace(bm, url=new_url)
             return bm
         if "{z}" in key and "{x}" in key and "{y}" in key:
             resolved_key = api_key or get_api_key()
