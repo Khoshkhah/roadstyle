@@ -2,7 +2,9 @@ name: Release to PyPI
 
 # Publish on a version tag (v0.2.0, …) via PyPI trusted publishing — no API token stored.
 # One-time setup on pypi.org: add a "trusted publisher" for this repo/workflow
-# (project: roadstyle, owner: Khoshkhah, workflow: release.yml, environment: pypi).
+# (project: roadstyle, owner: Khoshkhah, workflow: release.yml, environment: pypi), and the same
+# for the project roadstyle-mcp (packages/roadstyle-mcp, released with roadstyle).
+# Then the MCP server is listed in the MCP Registry (server.json) via GitHub OIDC.
 on:
   push:
     tags: ["v*"]
@@ -18,10 +20,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Build sdist + wheel
+      - name: Build sdist + wheel (roadstyle and roadstyle-mcp)
         run: |
           pip install build
           python -m build
+          python -m build packages/roadstyle-mcp --outdir dist/
 
       - uses: actions/upload-artifact@v4
         with:
@@ -42,3 +45,29 @@ jobs:
           path: dist/
 
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  mcp-registry:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      id-token: write   # OIDC login to the MCP Registry as io.github.Khoshkhah
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for roadstyle-mcp on PyPI
+        # the registry checks the PyPI description for "mcp-name: io.github.Khoshkhah/roadstyle"
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          for i in $(seq 1 30); do
+            curl -sf "https://pypi.org/pypi/roadstyle-mcp/$v/json" >/dev/null && exit 0
+            sleep 20
+          done
+          echo "roadstyle-mcp $v never appeared on PyPI" && exit 1
+
+      - name: Publish server.json
+        run: |
+          curl -sL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish

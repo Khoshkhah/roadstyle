@@ -6,6 +6,19 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **`roadstyle-mcp` on PyPI.** The MCP server under its own name, so the install is
+  `claude mcp add roadstyle -- uvx roadstyle-mcp`. It has no code of its own: it installs
+  `roadstyle[mcp]` (same version) and provides the command. Released together with roadstyle.
+- **A Claude Code plugin.** `/plugin marketplace add Khoshkhah/roadstyle`, then
+  `/plugin install roadstyle@roadstyle`: the MCP server and the agent skill in one install.
+- **Listed in the MCP Registry** as `io.github.Khoshkhah/roadstyle`, published by the release
+  workflow.
+
+### Changed
+- The license is declared as an SPDX expression (`license = "MIT"`), which setuptools requires
+  from February 2027.
+
 ### Fixed
 - **Base maps no longer go blank when you zoom in far.** Every base map has a last zoom level with
   real tiles: 16 for Esri's Light Gray and Dark Gray, 19 for Esri Streets, Satellite and

@@ -1,0 +1,29 @@
+{
+  "name": "roadstyle",
+  "version": "0.9.0",
+  "description": "Draw road networks as styled, interactive, offline HTML maps: a skill for writing roadstyle code and an MCP server (render_place, render_file, snapshot).",
+  "author": {
+    "name": "Kaveh",
+    "url": "https://github.com/Khoshkhah"
+  },
+  "homepage": "https://khoshkhah.github.io/roadstyle/",
+  "repository": "https://github.com/Khoshkhah/roadstyle",
+  "license": "MIT",
+  "keywords": [
+    "maps",
+    "roads",
+    "openstreetmap",
+    "osmnx",
+    "gis",
+    "mcp",
+    "skill"
+  ],
+  "mcpServers": {
+    "roadstyle": {
+      "command": "uvx",
+      "args": [
+        "roadstyle-mcp"
+      ]
+    }
+  }
+}

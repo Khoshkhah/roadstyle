@@ -1,0 +1,15 @@
+{
+  "name": "roadstyle",
+  "description": "Styled, interactive road maps from Python: the roadstyle agent skill and MCP server.",
+  "owner": {
+    "name": "Kaveh",
+    "url": "https://github.com/Khoshkhah"
+  },
+  "plugins": [
+    {
+      "name": "roadstyle",
+      "source": "./",
+      "description": "Draw road networks as styled, interactive, offline HTML maps: a skill for writing roadstyle code and an MCP server (render_place, render_file, snapshot)."
+    }
+  ]
+}

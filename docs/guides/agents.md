@@ -9,13 +9,13 @@ Lets any MCP-capable AI app (Claude Code, Claude Desktop, Cursor, …) draw road
 without writing code: `render_place("Tartu, Estonia")`, `render_file("roads.gpkg")` and `snapshot`.
 Each saves an HTML map and returns its path plus a PNG preview the agent can look at.
 ```bash
-claude mcp add roadstyle -- uvx --from "roadstyle[mcp]" roadstyle-mcp
+claude mcp add roadstyle -- uvx roadstyle-mcp
 ```
 Claude Desktop (`claude_desktop_config.json`):
 ```json
-{"mcpServers": {"roadstyle": {"command": "uvx", "args": ["--from", "roadstyle[mcp]", "roadstyle-mcp"]}}}
+{"mcpServers": {"roadstyle": {"command": "uvx", "args": ["roadstyle-mcp"]}}}
 ```
-Maps go to `~/roadstyle-maps/`. The preview needs Chromium once: `uvx --from "roadstyle[mcp]" playwright install chromium`.
+Maps go to `~/roadstyle-maps/`. The preview needs Chromium once: `uvx --from roadstyle-mcp playwright install chromium`.
 
 | Tool | Does |
 |---|---|
@@ -26,6 +26,13 @@ Maps go to `~/roadstyle-maps/`. The preview needs Chromium once: `uvx --from "ro
 `options` takes any [`render_edges` keyword](../reference/parameters.md), such as
 `{"color_by": "maxspeed", "legend": true}`. A misspelt one is an error naming the closest valid
 keyword. Without a CARTO key the map uses the keyless `esri_street` base map.
+
+**Claude Code plugin.** The MCP server and the skill in one install:
+
+```text
+/plugin marketplace add Khoshkhah/roadstyle
+/plugin install roadstyle@roadstyle
+```
 
 ## Code: the agent skill
 
