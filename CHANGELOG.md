@@ -6,6 +6,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-09-29
+
 ### Added
 - **`roadstyle-mcp` on PyPI.** The MCP server under its own name, so the install is
   `claude mcp add roadstyle -- uvx roadstyle-mcp`. It has no code of its own: it installs
