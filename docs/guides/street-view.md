@@ -31,8 +31,9 @@
 ## The floating window
 
 Press the **Street View** button (the person, under the 3D button) and click a road. The window
-follows each new click. Drag its title bar to move it and its corner to resize it. The page
-remembers whether it was open, and where.
+follows each new click. Drag its title bar to move it and its corner to resize it. It stays inside
+the map, and comes back inside when the map shrinks (a side panel opening, a smaller browser
+window). The page remembers whether it was open, and where.
 
 <iframe src="../../maps/street_view_window.html" loading="lazy" title="A map with the Street View window open" class="rs-demo"></iframe>
 
@@ -110,7 +111,10 @@ uploaded.
 clicked). The request carries only the position and the heading.
 
 From your own page: `rsSetStreetView(true)` opens the window, `rsStreetViewStep(15)` steps, and
-the `rs:select` event carries the Street View URL. See the [JavaScript API](../reference/javascript.md).
+the `rs:select` event carries the Street View URL. The marker is yours to drive too:
+`rsSetStreetViewMarker(false)` hides it, and `rsSetStreetViewMarkerAt(lng, lat, heading)` puts it
+where your own Street View stands, snapped onto the road in its lane. See the
+[JavaScript API](../reference/javascript.md).
 
 ## Where the spot is: position and direction
 
