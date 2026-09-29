@@ -6,6 +6,22 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **osmnx edges render as they are.** `rs.render_edges(ox.graph_to_gdfs(G, nodes=False))` used to
+  fail with `TypeError: unhashable type: 'list'`: osmnx keeps every differing tag of the OSM ways it
+  merged as a list (`name=['Götgatan', 'Ringvägen']`). Each list now becomes its first present value
+  (a merged `tunnel=[nan, 'yes']` stays a tunnel), and the `(u, v, key)` index becomes columns. New
+  notebook `notebooks/10_osmnx.ipynb`.
+- **An MCP server: roadstyle as tools for AI agents.** `pip install "roadstyle[mcp]"`, then
+  `roadstyle-mcp` (stdio). Tools: `render_place` (any place name, roads downloaded with osmnx),
+  `render_file` and `snapshot`. Each saves the map and returns its path, a summary and a PNG
+  preview. A misspelt option is an error naming the closest valid keyword, errors reach the agent
+  with their message, a download falls back to a second Overpass server, and without a CARTO key
+  the map uses the keyless `esri_street` base map instead of watermarked tiles.
+- **A warning for edges tagged both bridge and tunnel.** They are drawn as bridges; the usual cause
+  is osmnx merging a tunnel with the bridge next to it. The warning names the osmnx setting that
+  keeps them apart.
+
 ## [0.8.6] — 2026-09-28
 
 ### Fixed

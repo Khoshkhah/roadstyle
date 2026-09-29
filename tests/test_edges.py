@@ -141,3 +141,41 @@ def test_as_edges_unsupported_input_raises():
         as_edges(12345)
 
 
+
+
+def _osmnx_like():
+    """What ox.graph_to_gdfs(G, nodes=False) returns: a (u, v, key) MultiIndex and list cells
+    where osmnx merged OSM ways, including a tunnel merged with the bridge next to it."""
+    idx = pd.MultiIndex.from_tuples([(1, 2, 0), (2, 3, 0), (3, 4, 0)], names=["u", "v", "key"])
+    return gpd.GeoDataFrame(
+        {"highway": [["trunk", "trunk_link"], "residential", "trunk"],
+         "name": [["Söderledstunneln", "Centralbron"], "Götgatan", None],
+         "tunnel": ["yes", float("nan"), [float("nan"), "yes"]],
+         "bridge": ["yes", float("nan"), float("nan")]},
+        geometry=[LineString([(18.07, 59.31), (18.07, 59.32)]),
+                  LineString([(18.07, 59.32), (18.08, 59.32)]),
+                  LineString([(18.08, 59.32), (18.08, 59.33)])],
+        crs=4326, index=idx,
+    )
+
+
+def test_osmnx_edges_are_flattened():
+    with pytest.warns(UserWarning, match="1 edge is tagged both bridge and tunnel"):
+        g = normalize_edges(_osmnx_like()).gdf
+    assert {"u", "v", "key"} <= set(g.columns) and not isinstance(g.index, pd.MultiIndex)
+    assert list(g["highway"]) == ["trunk", "residential", "trunk"]
+    assert g["name"].iloc[0] == "Söderledstunneln"
+    assert g["tunnel"].iloc[2] == "yes"            # first PRESENT item, not the leading NaN
+
+
+def test_osmnx_edges_render():
+    # 0.8.6 raised TypeError: unhashable type: 'list' (street names grouped for label slots)
+    with pytest.warns(UserWarning, match="bridge and tunnel"):
+        assert render_edges(_osmnx_like()).html
+
+
+def test_osmnx_flatten_leaves_input_alone():
+    g = _osmnx_like()
+    with pytest.warns(UserWarning):
+        normalize_edges(g)
+    assert isinstance(g.index, pd.MultiIndex) and g["highway"].iloc[0] == ["trunk", "trunk_link"]

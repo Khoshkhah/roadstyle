@@ -26,6 +26,10 @@ Docs: https://khoshkhah.github.io/roadstyle/ (every keyword: `/reference/paramet
   reversed geometry, drawn side by side. Don't dissolve or dedupe the twins.
 - Input may also be a file path, a GeoJSON dict, a pyarrow Table, or
   `rs.from_duckdb(con, "SELECT ..., ST_AsWKB(geom) AS geom FROM edges", geometry="geom", crs=4326)`.
+- **osmnx edges go in as they are** (0.9+): `rs.render_edges(ox.graph_to_gdfs(G, nodes=False))`.
+  Keep the graph directed. Build it with `simplify=False`, then
+  `ox.simplify_graph(G, edge_attrs_differ=["bridge", "tunnel"])`: default simplification merges a
+  tunnel with the bridge next to it, and the whole tunnel is then drawn as a bridge (roadstyle warns).
 
 ## The one call
 

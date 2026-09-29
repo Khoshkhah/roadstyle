@@ -20,6 +20,7 @@ examples/*.html
 
 # generated maps from the example notebooks
 notebooks/output/
+notebooks/cache/
 notebooks/outputs_guide_out/
 
 # OS

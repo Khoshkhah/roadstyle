@@ -80,11 +80,16 @@ reversed geometry, drawn side by side, so do not merge them.
 
 ## Loading data
 
-`render_edges` takes a GeoDataFrame, a file path, a GeoJSON mapping or a pyarrow Table. For a WKB
-geometry column or a DuckDB query, use a helper:
+`render_edges` takes a GeoDataFrame, a file path, a GeoJSON mapping, a pyarrow Table or osmnx edges.
+For a WKB geometry column or a DuckDB query, use a helper:
 
 ```python
 rs.render_edges("roads.gpkg")                            # GeoPackage, GeoJSON, Shapefile, ...
+
+import osmnx as ox                                       # pip install osmnx
+G = ox.graph_from_place("Tartu, Estonia", network_type="drive", simplify=False)
+G = ox.simplify_graph(G, edge_attrs_differ=["bridge", "tunnel"])   # else a tunnel merged with
+rs.render_edges(ox.graph_to_gdfs(G, nodes=False))                   # its bridge draws as a bridge
 
 import duckdb                                            # needs the duckdb extra
 con = duckdb.connect("roads.duckdb")
@@ -98,6 +103,8 @@ table = pa.table({"highway": edges["highway"].astype(str).tolist(),
                   "geometry": [g.wkb for g in edges.geometry]})
 rs.render_edges(rs.from_arrow(table, geometry="geometry", crs=edges.crs))
 ```
+
+More on osmnx, from choosing the area to failed downloads: [Roads from OpenStreetMap](guides/osmnx.md).
 
 ## Next steps
 

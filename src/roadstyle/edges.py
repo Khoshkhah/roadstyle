@@ -69,6 +69,8 @@ class RoadEdges:
             return gdf
         validate_edges(gdf)                       # type / non-empty / has geometry
         g = gdf.rename(columns=dict(rename)) if rename else gdf
+        g = _flatten_osmnx(g)
+        _warn_bridge_and_tunnel(g)
 
         # drop unusable geometry regardless of kind: missing, empty, or with non-finite
         # coordinates (a NaN vertex makes length NaN and breaks every renderer downstream).
@@ -111,6 +113,67 @@ class RoadEdges:
 
         gdf = gpd.read_file(path, layer=layer) if layer is not None else gpd.read_file(path)
         return cls.from_geodataframe(gdf, class_col=class_col, rename=rename)
+
+
+def _first_present(values):
+    """First item of a list that isn't None/NaN (a merged tunnel can be ``[nan, 'yes']``)."""
+    import pandas as pd
+    return next((v for v in values if not pd.isna(v)), None)
+
+
+def _flatten_osmnx(g):
+    """osmnx edges → one value per cell and a plain index.
+
+    osmnx merges OSM ways when it simplifies a graph and keeps every differing tag value as a list
+    (``name=['Götgatan', 'Ringvägen']``), and indexes edges by a ``(u, v, key)`` MultiIndex. Lists
+    break grouping and serialisation downstream, so each one becomes its first present item, and
+    the index levels become ordinary columns. Frames without either come back untouched.
+    """
+    import numpy as np
+    import pandas as pd
+
+    if isinstance(g.index, pd.MultiIndex):
+        try:
+            g = g.reset_index()
+        except ValueError:                        # a level name is already a column
+            g = g.reset_index(drop=True)
+    copied = False
+    for col in g.columns:
+        s = g[col]
+        if s.dtype != object or col == g.geometry.name:
+            continue
+        is_list = np.fromiter((type(v) is list for v in s.values), bool, len(s))
+        if is_list.any():
+            if not copied:
+                g, copied = g.copy(), True
+            vals = s.to_numpy(dtype=object, copy=True)
+            for i in np.flatnonzero(is_list):     # positional: safe with duplicate index labels
+                vals[i] = _first_present(vals[i])
+            g[col] = vals
+    return g
+
+
+def _warn_bridge_and_tunnel(g):
+    """Say so when edges are tagged both bridge and tunnel: they will be drawn as bridges.
+
+    Real OSM ways are one or the other; a mixed edge is almost always osmnx merging a tunnel with
+    the bridge next to it. Which part is which is lost, so warn with the osmnx fix, don't guess.
+    """
+    if "bridge" not in g.columns or "tunnel" not in g.columns:
+        return
+
+    def flag(s):
+        return s.notna() & ~s.astype(str).str.strip().str.lower().isin(["", "no", "false", "0"])
+
+    n = int((flag(g["bridge"]) & flag(g["tunnel"])).sum())
+    if n:
+        warnings.warn(
+            f"{n} edge{'s are' if n > 1 else ' is'} tagged both bridge and tunnel and will be "
+            "drawn as bridges. This usually comes from osmnx merging a tunnel with the bridge next "
+            "to it; build the graph with simplify=False, then "
+            "ox.simplify_graph(G, edge_attrs_differ=['bridge', 'tunnel']).",
+            stacklevel=4,
+        )
 
 
 def normalize_edges(gdf, *, class_col: str = "highway", rename=None) -> RoadEdges:

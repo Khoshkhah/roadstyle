@@ -20,6 +20,14 @@
 
     [:octicons-arrow-right-24: Colour by your data](colour.md)
 
+-   :material-map-search-outline:{ .lg .middle } **Roads from OpenStreetMap**
+
+    ---
+
+    No data of your own? Download any place with osmnx and draw it.
+
+    [:octicons-arrow-right-24: Roads from OpenStreetMap](osmnx.md)
+
 -   :material-layers-outline:{ .lg .middle } **Add your own layers**
 
     ---
@@ -59,5 +67,13 @@
     An iframe, a JSON spec for your own Leaflet or MapLibre map, or roadstyle.js.
 
     [:octicons-arrow-right-24: Put it on a website](website.md)
+
+-   :material-robot-outline:{ .lg .middle } **AI agents**
+
+    ---
+
+    The MCP server (maps from a place name, no code) and the skill for agents that write code.
+
+    [:octicons-arrow-right-24: AI agents](agents.md)
 
 </div>
