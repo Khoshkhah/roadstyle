@@ -21,6 +21,7 @@ Edges are directed: a two-way road is two edges with reversed geometry. JS calls
 - [Get started](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/get-started.md): install, a first map, what your data needs, loading data
 - [Style the roads](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/style.md): palettes, base maps, labels, arrows, 3D bridges, filtering
 - [Colour by your data](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/colour.md): color_by, color_table, several colourings with a menu
+- [Roads from OpenStreetMap](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/osmnx.md): osmnx download → render_edges, area and network_type, bridge/tunnel-safe simplification, Overpass failures
 - [Add your own layers](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/overlays.md): Overlay zones, points, lines
 - [Google Street View](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/street-view.md): the floating window (default) and the side-by-side page (beside / below)
 - [Big networks](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/big-networks.md): tiles=True, lonboard, choosing a backend

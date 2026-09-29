@@ -104,6 +104,8 @@ table = pa.table({"highway": edges["highway"].astype(str).tolist(),
 rs.render_edges(rs.from_arrow(table, geometry="geometry", crs=edges.crs))
 ```
 
+More on osmnx, from choosing the area to failed downloads: [Roads from OpenStreetMap](guides/osmnx.md).
+
 ## Next steps
 
 - [Style the roads](guides/style.md): palettes, base maps, labels, 3D bridges.

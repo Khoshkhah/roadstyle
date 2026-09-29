@@ -49,6 +49,7 @@ nav:
       - guides/index.md
       - Style the roads: guides/style.md
       - Colour by your data: guides/colour.md
+      - Roads from OpenStreetMap: guides/osmnx.md
       - Add your own layers: guides/overlays.md
       - Google Street View: guides/street-view.md
       - Big networks: guides/big-networks.md

@@ -20,6 +20,14 @@
 
     [:octicons-arrow-right-24: Colour by your data](colour.md)
 
+-   :material-map-search-outline:{ .lg .middle } **Roads from OpenStreetMap**
+
+    ---
+
+    No data of your own? Download any place with osmnx and draw it.
+
+    [:octicons-arrow-right-24: Roads from OpenStreetMap](osmnx.md)
+
 -   :material-layers-outline:{ .lg .middle } **Add your own layers**
 
     ---
