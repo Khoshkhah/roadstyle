@@ -579,17 +579,21 @@ _INFLATE_JS = """
   }
   // `window.map` is the CONTAINER DIV until MapLibre finishes constructing (an element id
   // auto-creates a global), so a handle grabbed too early has no getSource and the data is silently
-  // never attached. Poll for the real Map; never call through an unchecked handle.
+  // never attached. Poll for the real Map; never call through an unchecked handle. Never give up:
+  // MapLibre builds its sources on an animation frame, and browsers pause those while a page is
+  // off screen (a background tab, a notebook output scrolled away), so the sources can appear
+  // minutes late. After the first minute keep checking once a second, and tell the banner.
   var tries=0;
   (function fill(){
     var m=window.map, sids=Object.keys(data);
     if(!(m && typeof m.getSource==="function") || !sids.every(function(s){return m.getSource(s);})){
-      if(++tries>600){ window.__rs_gz={ok:false, stage:"attach", error:"map never appeared"}; return; }
-      return setTimeout(fill,100);
+      if(++tries>600) window.__rs_gz={ok:false, stage:"attach", waiting:true, error:"still waiting for the map"};
+      return setTimeout(fill, tries>600 ? 1000 : 100);
     }
     var n=0;
     sids.forEach(function(s){ m.getSource(s).setData(data[s]); n+=data[s].features.length; });
     window.__rs_gz={ok:true, sources:sids, features:n};
+    var banner=document.getElementById("rs-diag"); if(banner) banner.remove();   // late, but here
     data=null;
   })();
 })();
@@ -711,7 +715,7 @@ def _basemap_style(bm):
     tiles = _tiles(bm)
     if tiles:
         style["sources"]["bm"] = {"type": "raster", "tiles": tiles, "tileSize": 256,
-                                  "attribution": bm.attr}
+                                  "maxzoom": bm.maxzoom, "attribution": bm.attr}
         style["layers"].append({"id": "basemap", "type": "raster", "source": "bm"})
     return style
 
@@ -963,7 +967,9 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     active_bm = get_basemap(active, api_key=api_key)
     bkeys = list(basemaps) if basemaps else list(DEFAULT_SWITCHER)
     bms_list = [active_bm] + [get_basemap(k, api_key=api_key) for k in bkeys if k != active_bm.key and k != active]
-    bms = [{"key": b.key, "label": b.label, "tiles": _tiles(b), "bg": _bg_color(b)}
+    # maxzoom + attr: switching rebuilds the raster source, whose maxzoom is fixed at creation
+    bms = [{"key": b.key, "label": b.label, "tiles": _tiles(b), "bg": _bg_color(b),
+            "maxzoom": b.maxzoom, "attr": b.attr}
            for b in bms_list]
     if not basemap_switcher and not basemaps:
         # no dropdown and no explicit set -> bake only the fixed backdrop. An explicit
@@ -973,9 +979,10 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     if "bm" not in style["sources"]:
         # a blank base map is active but the switcher offers tiled ones: pre-create the raster
         # layer hidden, so switching is a visibility flip (hidden layers fetch no tiles)
-        _t = next((b["tiles"] for b in bms if b["tiles"]), None)
-        if _t:
-            style["sources"]["bm"] = {"type": "raster", "tiles": _t, "tileSize": 256}
+        _b = next((b for b in bms if b["tiles"]), None)
+        if _b:
+            style["sources"]["bm"] = {"type": "raster", "tiles": _b["tiles"], "tileSize": 256,
+                                      "maxzoom": _b["maxzoom"], "attribution": _b["attr"]}
             style["layers"].append({"id": "basemap", "type": "raster", "source": "bm",
                                     "layout": {"visibility": "none"}})
     # roads source: inline GeoJSON by default; with `tiles=True` a PMTiles archive embedded in

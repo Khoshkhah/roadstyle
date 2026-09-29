@@ -5,6 +5,8 @@ catching the class of bug a string assertion can't (a JS syntax error, the templ
 wire the data). Needs ``playwright`` + ``playwright install chromium`` (dev-only, optional) —
 skipped when absent.
 """
+import time
+
 import pytest
 
 pw = pytest.importorskip("playwright.sync_api")
@@ -130,3 +132,79 @@ def test_map_boots_with_street_view_window_left_open(tmp_path):
     assert errors == []
     assert n_query == len(_edges())
     assert reopened
+
+
+def test_basemap_switch_rebuilds_source_with_its_maxzoom(tmp_path):
+    """rsSetBasemap rebuilds the raster source (maxzoom and attribution are fixed at creation) and
+    puts the layer back in the same place, under the roads."""
+    from roadstyle.render_web import render
+
+    path = tmp_path / "bm.html"
+    render(_edges(), basemap="osm", basemaps=["osm", "esri_gray", "blank"]).save(path)
+    order = "window.map.getStyle().layers.map(l => l.id).indexOf('basemap')"
+    errors = []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && window.map.getSource && window.map.getSource('bm')",
+                               timeout=30_000)
+        before = page.evaluate(order)
+        page.evaluate("rsSetBasemap('esri_gray')")
+        # a rebuilt raster source reports MapLibre's default (22) until it has loaded its options
+        page.wait_for_function("window.map.getSource('bm').maxzoom === 16", timeout=10_000)
+        gray = page.evaluate("[window.map.getSource('bm').maxzoom, window.map.getSource('bm').attribution]")
+        gray_at = page.evaluate(order)
+        page.wait_for_function("document.querySelector('.maplibregl-ctrl-attrib-inner')"
+                               ".textContent.includes('Esri')", timeout=10_000)
+        page.evaluate("rsSetBasemap('blank')")
+        blank_vis = page.evaluate("window.map.getLayoutProperty('basemap', 'visibility')")
+        page.evaluate("rsSetBasemap('osm')")
+        page.wait_for_function("window.map.getSource('bm').maxzoom === 19", timeout=10_000)
+        osm = page.evaluate("[window.map.getSource('bm').maxzoom, "
+                            "window.map.getLayoutProperty('basemap', 'visibility')]")
+        browser.close()
+
+    assert errors == []
+    assert gray[0] == 16 and "Esri" in gray[1]
+    assert gray_at == before                     # still directly above the background
+    assert blank_vis == "none" and osm == [19, "visible"]
+
+
+def test_map_that_starts_late_still_gets_its_roads(tmp_path):
+    """MapLibre builds its sources on an animation frame; browsers pause those off screen (a
+    notebook output scrolled away). The data loader used to stop looking after 60 s, leaving a map
+    with no roads. Fake 61 s of timers with frames withheld, then release them."""
+    from roadstyle.render_web import render
+
+    path = tmp_path / "late.html"
+    render(_edges(4000), basemap="blank").save(path)   # big enough for the compressed path
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.clock.install()
+        page.add_init_script("""
+            const later = [], raf = window.requestAnimationFrame.bind(window);
+            window.requestAnimationFrame = cb => later.push(cb);
+            window.__releaseFrames = () => {
+              window.requestAnimationFrame = raf; later.splice(0).forEach(cb => raf(cb)); };""")
+        page.goto(path.resolve().as_uri())
+        # decompression runs in real time; the loader empties its data element once it is done.
+        # (wait_for_function would poll on the faked clock, so poll from here)
+        for _ in range(100):
+            if page.evaluate("document.getElementById('rs-gz').textContent === ''"):
+                break
+            time.sleep(0.1)
+        page.clock.run_for(61_000)
+        waiting = page.evaluate("window.__rs_gz")
+        page.evaluate("window.__releaseFrames()")
+        page.clock.run_for(5_000)
+        attached = page.evaluate("window.__rs_gz")
+        banner = page.evaluate("!!document.getElementById('rs-diag')")
+        browser.close()
+
+    assert waiting["stage"] == "attach" and waiting["waiting"]
+    assert attached["ok"] and attached["features"] >= 4000
+    assert not banner
+

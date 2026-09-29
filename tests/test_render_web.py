@@ -573,6 +573,27 @@ def test_blank_basemap_with_switcher_precreates_hidden_raster():
     assert entries[0]["tiles"] == [] and entries[0]["bg"] == "#efede8"
 
 
+def test_basemap_maxzoom_reaches_the_page():
+    """Past a provider's last level MapLibre must scale that level up. Esri's grey maps end at 16
+    and answer beyond it with HTTP 200 and a placeholder image, so without maxzoom the map went
+    grey from zoom 17. Switching rebuilds the source, so every switcher entry carries its own."""
+    wm = render_edges(_edges(), backend="web", basemap="esri_gray",
+                      basemaps=["esri_gray", "osm", "blank"])
+    assert _style(wm.html)["sources"]["bm"]["maxzoom"] == 16
+    entries = json.loads(re.search(r"BASEMAPS = (\[.*?\]);", wm.html, re.S).group(1))
+    assert {e["key"]: e["maxzoom"] for e in entries} == {"esri_gray": 16, "osm": 19, "blank": 19}
+    assert "Esri" in entries[0]["attr"] and "OpenStreetMap" in entries[1]["attr"]
+
+
+def test_keyed_basemap_keeps_every_field():
+    """Injecting an API key copies the base map; the copy used to re-list fields by hand."""
+    from roadstyle.basemaps import BASEMAPS, get_basemap
+    keyed = get_basemap("voyager", api_key="k")
+    assert "key=k" in keyed.url and keyed.maxzoom == 20
+    assert (keyed.bg, keyed.preview, keyed.lonboard) == (
+        BASEMAPS["voyager"].bg, BASEMAPS["voyager"].preview, BASEMAPS["voyager"].lonboard)
+
+
 def test_js_api_hooks_are_baked():
     """Every UI control has a window.rs* setter + rs:* event, usable from outside JS."""
     wm = render_edges(_edges(), backend="web")
