@@ -1,6 +1,6 @@
 # Agent tools: osmnx input and an MCP server
 
-Status: Parts 1 and 2 **implemented** 2026-09-29 (unreleased); Part 3 open.
+Status: Parts 1 and 2 **released** in 0.9.0 (2026-09-29); Part 3 implemented for 0.9.1.
 
 Changes from the proposal, all found by running it:
 
@@ -138,6 +138,18 @@ it needs the network.
   the registry verifies ownership with an `mcp-name:` line in the README. Check the current
   registry docs when publishing.
 - Submit a PR to the awesome-mcp-servers lists.
+
+### Part 3 as built: a `roadstyle-mcp` package after all
+
+The MCP Registry and MCP clients start a PyPI server as `uvx <package>`, running the package's own
+command. roadstyle's command is the map CLI, and its server needs the `mcp` extra, which `uvx
+roadstyle` would not install. So `packages/roadstyle-mcp/` holds a package with no code: it depends
+on `roadstyle[mcp]==<same version>` and maps the `roadstyle-mcp` command to
+`roadstyle.mcp_server:main`. This is not the separate repository rejected below: it lives here, is
+built and published by the same release workflow, and `tests/test_release_files.py` keeps its
+version, its pin, `server.json` and the plugin manifest equal to roadstyle's. The README of that
+package carries the `mcp-name: io.github.Khoshkhah/roadstyle` line the registry uses to verify
+ownership; the registry step waits until PyPI has the new version, then publishes via GitHub OIDC.
 
 ## Rejected
 
