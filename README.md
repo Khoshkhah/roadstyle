@@ -126,7 +126,21 @@ document.addEventListener("rs:select", e => console.log(e.detail.properties));
 
 Every function and event: [JavaScript API](https://khoshkhah.github.io/roadstyle/reference/javascript/).
 
-## For AI coding agents
+## For AI agents
+
+**MCP server.** Lets any MCP-capable AI app (Claude Code, Claude Desktop, Cursor, …) draw road maps
+without writing code: `render_place("Tartu, Estonia")`, `render_file("roads.gpkg")` and `snapshot`.
+Each saves an HTML map and returns its path plus a PNG preview the agent can look at.
+```bash
+claude mcp add roadstyle -- uvx --from "roadstyle[mcp]" roadstyle-mcp
+```
+Claude Desktop (`claude_desktop_config.json`):
+```json
+{"mcpServers": {"roadstyle": {"command": "uvx", "args": ["--from", "roadstyle[mcp]", "roadstyle-mcp"]}}}
+```
+Maps go to `~/roadstyle-maps/`. The preview needs Chromium once: `uvx --from "roadstyle[mcp]" playwright install chromium`.
+
+**For agents that write code:**
 
 - [`skills/roadstyle/SKILL.md`](https://github.com/Khoshkhah/roadstyle/blob/main/skills/roadstyle/SKILL.md): a
   skill for agents that *use* roadstyle (the one call, the data contract, the JS API, the traps).

@@ -41,12 +41,14 @@ duckdb = ["duckdb"]                        # read edges straight from a DuckDB r
 arrow = ["pyarrow"]                        # read edges from a pyarrow Table
 tiles = ["mapbox-vector-tile", "pmtiles"]  # tiles=True: embedded-PMTiles vector road tiles
 studio = ["streamlit"]                     # the `roadstyle studio` Streamlit workbench
+mcp = ["mcp>=2.2,<3", "osmnx", "playwright"]  # `roadstyle-mcp`: tools for AI agents (+ playwright install chromium)
 all = ["roadstyle[numeric,basemaps,lonboard,duckdb,arrow,tiles,studio]"]  # every user-facing extra
 docs = ["mkdocs-material", "mkdocs-redirects"]
 dev = ["roadstyle[all]", "pytest", "ruff", "mypy"]  # everything a user can get + test/lint tools
 
 [project.scripts]
 roadstyle = "roadstyle.cli:main"
+roadstyle-mcp = "roadstyle.mcp_server:main"
 
 [project.urls]
 Homepage = "https://github.com/Khoshkhah/roadstyle"
