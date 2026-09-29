@@ -6,6 +6,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-09-29
+
 ### Added
 - **osmnx edges render as they are.** `rs.render_edges(ox.graph_to_gdfs(G, nodes=False))` used to
   fail with `TypeError: unhashable type: 'list'`: osmnx keeps every differing tag of the OSM ways it
