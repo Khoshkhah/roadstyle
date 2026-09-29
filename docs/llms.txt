@@ -1,6 +1,6 @@
 # roadstyle
 
-> Python library: turn a GeoDataFrame of road edges (LineString geometry + an OSM `highway` column) into one styled, interactive, offline HTML map (MapLibre, data inlined) with road cartography (casing and fill, per-zoom widths, labels, one-way arrows, bridges and tunnels, 3D), Google Street View for the clicked road (a Street View button and floating window by default; `street_view=True` for a plain popup link, `False` for none; `rs.render_street_view` for a side-by-side page), and a `window.rs*` JavaScript API. `pip install roadstyle`; main call `rs.render_edges(gdf, ...).save("map.html")`.
+> Python library: turn a GeoDataFrame of road edges (LineString geometry + an OSM `highway` column) into one styled, interactive, offline HTML map (MapLibre, data inlined) with road cartography (casing and fill, per-zoom widths, labels, one-way arrows, bridges and tunnels, 3D), Google Street View for the clicked road (a Street View button and floating window by default; `street_view=True` for a plain popup link, `False` for none; `rs.render_street_view` for a side-by-side page), and a `window.rs*` JavaScript API. `pip install roadstyle`; main call `rs.render_edges(gdf, ...).save("map.html")`. osmnx edges work as they are; `pip install "roadstyle[mcp]"` adds `roadstyle-mcp`, an MCP server for AI agents.
 
 Edges are directed: a two-way road is two edges with reversed geometry. JS calls (rsSelect, rsColor, rsFocus) take roadstyle feature ids from `rsQuery`, never your own `edge_id`. Unknown keywords to `render_edges` are silently ignored.
 
@@ -25,6 +25,7 @@ Edges are directed: a two-way road is two edges with reversed geometry. JS calls
 - [Google Street View](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/street-view.md): the floating window (default) and the side-by-side page (beside / below)
 - [Big networks](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/big-networks.md): tiles=True, lonboard, choosing a backend
 - [Dashboards & JavaScript](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/dashboards.md): ready-made pages, driving the map from your own page
+- [AI agents](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/agents.md): the MCP server (render_place, render_file, snapshot) and the agent skill
 - [Put it on a website](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/website.md): iframe, the JSON spec, roadstyle.js
 - [Gallery](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/gallery.md): one screenshot and the code for each look
 

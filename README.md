@@ -39,6 +39,15 @@ edges = gpd.read_file("edges.gpkg")        # LineStrings + a `highway` column, a
 rs.render_edges(edges).save("map.html")    # open map.html: no server (Street View needs one)
 ```
 
+No data? Any place from OpenStreetMap, with [osmnx](https://osmnx.readthedocs.io/) (`pip install osmnx`):
+
+```python
+import osmnx as ox
+G = ox.graph_from_place("Tartu, Estonia", network_type="drive", simplify=False)
+G = ox.simplify_graph(G, edge_attrs_differ=["bridge", "tunnel"])   # keep tunnels and bridges apart
+rs.render_edges(ox.graph_to_gdfs(G, nodes=False)).save("tartu.html")
+```
+
 ```python
 rs.render_edges(edges, basemap="dark_matter", view_3d=True)            # dark, 3D bridge decks
 rs.render_edges(edges, palette="carto", basemap="positron")            # the classic OSM look
@@ -112,7 +121,8 @@ Only `geometry` and `highway` are required. Other columns switch features on:
 | `edge_id` | popups; 64-bit ids stay exact |
 | anything else | shown in the popup, queryable from JavaScript |
 
-[duckOSM](https://github.com/Khoshkhah/duckOSM) (`duckosm export-gis`) exports exactly this.
+[duckOSM](https://github.com/Khoshkhah/duckOSM) (`duckosm export-gis`) exports exactly this, and
+[osmnx](https://osmnx.readthedocs.io/) edges work as they are: `rs.render_edges(ox.graph_to_gdfs(G, nodes=False))`.
 
 ## Drive it from JavaScript
 

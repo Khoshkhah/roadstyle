@@ -54,6 +54,7 @@ nav:
       - Big networks: guides/big-networks.md
       - Dashboards & JavaScript: guides/dashboards.md
       - Put it on a website: guides/website.md
+      - AI agents: guides/agents.md
   - Gallery: gallery.md
   - Reference:
       - Every parameter: reference/parameters.md
