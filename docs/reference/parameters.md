@@ -158,6 +158,7 @@ Returns a `WebMap` (web, `.save()`), a `folium.Map` (`.save()`) or a `lonboard.M
 | `layer_col` | `"layer"` | web | OSM `layer`; negative sinks an edge when there is no tunnel/bridge column |
 | `band_col` | `None` | web | a column of -1 / 0 / 1: draw the edge (casing included) under (-1) or over (1) the ground roads, e.g. a sidewalk under its street, a crossing over it; tunnels and bridges keep their band; null = by level |
 | `order_col` | `None` | web | a numeric column: the edge's order inside its band instead of its class's `z_order` (clamped to -400 … 400; `rsColor` still lifts over it); null = by class |
+| `twoway_col` | `None` | web | a column that can say an edge is **not** a two-way road's lane (false), though a reverse edge exists (e.g. a one-way street's walking-only reverse direction): drawn centred and full width; true / null = the geometry rule |
 
 ### Overlays & boundary
 

@@ -92,6 +92,25 @@ lanes stay exactly as they are, both clickable.
    - to be measured on Tartu before sign-off of the implementation.
 8. **A setting to turn it off:** `config.twin_end_caps` (default `true`).
 
+## Follow-up (Kaveh, 2026-09-30): lanes only for real two-way roads, and tunnel mouths
+
+Seen at Rue du Castelleretto (Monaco, edges 441704187184649227 / 5990211243552773545 and
+4146834466225551101 / 7910395095814073287):
+
+- **A one-way street drawn as two lanes.** Twins are found by geometry: same line, reverse
+  direction. duckOSM's walking network has both directions of every street, so a street one-way for
+  cars gets a walking-only reverse edge, and roadstyle draws it as a two-way road. That is 666 of
+  Monaco's 1,578 road pairs, and every footpath too.
+  - **Fix:** an optional `twoway_col` (per edge: true / false; null = the geometry rule) says
+    whether an edge is a two-way road's lane. A false edge is drawn centred at full width, like a
+    one-way road, with no end caps; arrows still follow `oneway`.
+  - mapstyle sets it true only when both directions are open to cars or bikes. The walking-only
+    reverse edge stays on the map, on top of the one-way edge, so data and routing don't change.
+- **"Bump, dip, bump" at a tunnel mouth.** Where a lower band meets the end, the cap was skipped, so
+  the two lanes' own round ends and casings showed across the mouth.
+  - **Fix:** there the cap is **fill only**. It fills the dip and draws no casing ring across the
+    lower road (`__rs_nocase`: the casing circles skip it).
+
 ## Checks
 
 - Tests:

@@ -20,7 +20,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   both directions stay separately clickable. A cap draws only where both lanes share a colour, so
   maps coloured per direction keep their ends as before. It follows the class filter, the bridge
   and tunnel toggles, `rsFilter`, `rsColor` and the colour options. Setting: `twin_end_caps`
-  (default `true`). Adds about 8–11 % to a page. Design: `docs/design/twin_ends.md`.
+  (default `true`). Adds about 8–11 % to a page. Design: `docs/design/twin_ends.md`. Where a road
+  in a lower band meets the end (a tunnel mouth), the cap is fill only: no ring across that road.
+- **`twoway_col`: say an edge is not a two-way road's lane.** Two-way roads are found by geometry
+  (the same line, reversed), so a one-way street with a walking-only reverse edge was drawn as two
+  lanes. A false value draws the edge centred and full width, like a one-way road; true / null keep
+  the geometry rule.
 
 ### Fixed
 - **Roads in the low / high bands can be clicked and hovered again.** Since 0.9.2 a road with a

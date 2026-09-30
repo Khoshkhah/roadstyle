@@ -166,7 +166,7 @@ def _offset_expr(col, offset_frac=0.28, offset_zoom=15):
     return e
 
 
-def _mark_twoway(geo):
+def _mark_twoway(geo, twoway_col=None):
     """Flag each edge that has a reverse twin (i.e. a two-way street's other direction), so the
     style fans those into two lanes and drops the one-way arrows. The match is DIRECTED — the twin
     must run end->start. Two same-direction edges between one node pair (a street split into
@@ -189,6 +189,11 @@ def _mark_twoway(geo):
         # a loop edge (start == end) is its own reverse key; it needs a second feature to pair up
         p = ft.setdefault("properties", {})
         p["__rs_twoway"] = n >= 2 if rev == k else n >= 1
+        # a caller's twoway_col can only say "not a lane pair" (a one-way street whose reverse
+        # edge is walking-only): true or null keeps the geometry rule, so no lane is ever drawn
+        # shifted without its twin (docs/design/twin_ends.md)
+        if twoway_col and p.get(twoway_col) is not None and not _truthy(p.get(twoway_col)):
+            p["__rs_twoway"] = False
         # arrows follow an EXPLICIT `oneway` column when the data has one (undirected networks
         # included); otherwise a one-way edge = an edge with no reverse twin
         ow = p.get("oneway")
@@ -571,9 +576,9 @@ def _twin_ends(geo, cols):
     twins' feature ids (``__rs_road`` / ``__rs_road2``) for recolouring and id filters. Every fill
     prop comes twice, the first twin's and the second's (``<prop>__b``): a cap draws only where the
     two lanes have the same colour, so a map coloured per direction never shows one direction's
-    colour at a street's end. No cap at an end point where another road is drawn in a lower band
-    (a tunnel, a plain low road, a sidewalk moved by band_col): the cap would paint its casing
-    ring across that road, which draws under it (Kaveh's Monaco screenshot)."""
+    colour at a street's end. Where another road is drawn in a lower band at the end point (a
+    tunnel mouth, a plain low road, a sidewalk moved by band_col) the cap is fill only
+    (``__rs_nocase``): its casing ring would cross that road, which draws under it."""
 
     def rank(p):   # the drawing band: tunnel < low < ground < high < bridge
         if p.get("__rs_tunnel"):
@@ -603,7 +608,8 @@ def _twin_ends(geo, cols):
         if (i in used or k is None or not p.get("__rs_twoway") or p.get("__rs_bridge")
                 or p.get("__rs_tunnel") or p.get("__rs_dash")):
             continue
-        j = next((j for j in where.get((k[1], k[0]), []) if j != i and j not in used), None)
+        j = next((j for j in where.get((k[1], k[0]), []) if j != i and j not in used
+                  and geo["features"][j]["properties"].get("__rs_twoway")), None)
         if j is None:
             continue
         used.update((i, j))
@@ -614,9 +620,8 @@ def _twin_ends(geo, cols):
         props.update(__rs_road=i, __rs_road2=j)
         c, own = ft["geometry"]["coordinates"], rank(p)
         for pt, kp in ((c[0], k[0]), (c[-1], k[1])):
-            if any(rank(geo["features"][n]["properties"]) < own for n in at[kp] if n not in (i, j)):
-                continue
-            out.append({"type": "Feature", "properties": dict(props),
+            low = any(rank(geo["features"][n]["properties"]) < own for n in at[kp] if n not in (i, j))
+            out.append({"type": "Feature", "properties": {**props, **({"__rs_nocase": True} if low else {})},
                         "geometry": {"type": "Point", "coordinates": list(pt[:2])}})
     return out
 
@@ -1049,7 +1054,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
-           order_col: str = None, band_col: str = None,
+           order_col: str = None, band_col: str = None, twoway_col: str = None,
            pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
            basemap_switcher: bool = True, zoom_readout: bool = True,
@@ -1071,6 +1076,10 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     ground roads, casing included (a sidewalk under its street, a crossing over it); tunnels and
     bridges keep their own band. ``order_col`` names a numeric column: the edge's order inside its
     band instead of its class's ``z_order`` (clamped to -400 … 400). Null = the class / level rule.
+
+    ``twoway_col`` names a column that can say an edge is **not** a two-way road's lane (false),
+    though a reverse edge exists (e.g. a one-way street's walking-only reverse direction): it is
+    then drawn centred, full width, like a one-way road. True / null = the geometry rule.
 
     UI toggles (all on by default):
       - ``arrows`` — one-way direction chevrons along each one-way edge;
@@ -1165,7 +1174,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             # legend=False opts out — matching the folium backend's `legend` arg.
             color_opts_meta = [{"name": rf.legend.get("title") or "data",
                                 "prop": "__rs_fill", "legend": rf.legend}]
-    _mark_twoway(geo)
+    _mark_twoway(geo, twoway_col)
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
     _mark_order(geo, order_col, band_col)
     _mark_tunnel_dash(geo, CONFIG.tunnel_gap_shade, CONFIG.tunnel_dash_shade)
@@ -1356,6 +1365,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
 
         def _end(lid, flt, casing):
             col = ["coalesce", ["get", "__rs_casing" if casing else "__rs_fill"], "#000000" if casing else "#888888"]
+            if casing:     # no ring where a lower band meets the end (__rs_nocase, _twin_ends)
+                flt = ["all", flt, ["!", ["to-boolean", ["get", "__rs_nocase"]]]]
             return {"id": lid, "type": "circle", "source": "ends", "filter": flt,
                     "paint": {"circle-color": ["case", same, col, "rgba(0,0,0,0)"],
                               "circle-radius": rad[casing], "circle-pitch-alignment": "map"}}

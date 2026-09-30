@@ -1108,15 +1108,39 @@ def test_end_caps_hide_where_the_two_directions_differ():
     assert same["__rs_fill"] == same["__rs_fill__b"]
 
 
-def test_no_end_cap_where_a_road_in_a_lower_band_meets():
+def test_fill_only_end_cap_where_a_road_in_a_lower_band_meets():
     """A cap's casing ring would cross a road drawn under it (a plain layer=-1 road, a tunnel, a
-    sidewalk moved by band_col), so that end gets no cap; the other end still does (Kaveh's
-    screenshot: a ring across the continuing road)."""
+    sidewalk moved by band_col), so that end gets a fill-only cap (__rs_nocase: no casing circle);
+    the other end keeps its full cap (Kaveh's screenshots: a ring across the continuing road, then
+    the lanes' bump-dip-bump at a tunnel mouth)."""
     a, b, c = (18.00, 59.30), (18.00, 59.31), (18.01, 59.32)
     g = gpd.GeoDataFrame({"highway": ["secondary"] * 3, "layer": [None, None, "-1"]},
                          geometry=[LineString([a, b]), LineString([b, a]), LineString([b, c])], crs=4326)
-    pts = _style(render_edges(g, backend="web").html)["sources"]["ends"]["data"]["features"]
-    assert [tuple(p["geometry"]["coordinates"]) for p in pts] == [a]
-    # a road in a HIGHER band (layer=1) covers the cap anyway: both ends keep theirs
+    style = _style(render_edges(g, backend="web").html)
+    pts = {tuple(p["geometry"]["coordinates"]): p["properties"] for p in style["sources"]["ends"]["data"]["features"]}
+    assert set(pts) == {a, b} and pts[b].get("__rs_nocase") and not pts[a].get("__rs_nocase")
+    lay = {l["id"]: l for l in style["layers"]}
+    assert not _eval(lay["roads-ends-casing"]["filter"], pts[b])     # no ring across the lower road
+    assert _eval(lay["roads-ends-casing"]["filter"], pts[a])
+    assert _eval(lay["roads-ends-fill"]["filter"], pts[b])           # but the dip is still filled
+    # a road in a HIGHER band (layer=1) covers the cap anyway: both ends keep a full cap
     g.loc[2, "layer"] = "1"
-    assert len(_style(render_edges(g, backend="web").html)["sources"]["ends"]["data"]["features"]) == 2
+    assert not any(p["properties"].get("__rs_nocase")
+                   for p in _style(render_edges(g, backend="web").html)["sources"]["ends"]["data"]["features"])
+
+
+def test_twoway_col_false_draws_a_reverse_pair_as_one_way_roads():
+    """A one-way street with a walking-only reverse edge is not a two-way road: twoway_col false
+    draws both centred and full width (no lane offset, no end caps); true / null keeps the geometry
+    rule, and a lone "true" never shifts an edge without its twin."""
+    a, b = (18.00, 59.30), (18.00, 59.31)
+    g = gpd.GeoDataFrame({"highway": ["residential"] * 2, "twoway": [False, False]},
+                         geometry=[LineString([a, b]), LineString([b, a])], crs=4326)
+    style = _style(render_edges(g, backend="web", twoway_col="twoway").html)
+    assert [f["properties"]["__rs_twoway"] for f in style["sources"]["roads"]["data"]["features"]] == [False, False]
+    assert "ends" not in style["sources"]
+    g["twoway"] = [None, None]
+    style = _style(render_edges(g, backend="web", twoway_col="twoway").html)
+    assert [f["properties"]["__rs_twoway"] for f in style["sources"]["roads"]["data"]["features"]] == [True, True]
+    lone = gpd.GeoDataFrame({"highway": ["residential"], "twoway": [True]}, geometry=[LineString([a, b])], crs=4326)
+    assert not _style(render_edges(lone, backend="web", twoway_col="twoway").html)["sources"]["roads"]["data"]["features"][0]["properties"]["__rs_twoway"]
