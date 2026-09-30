@@ -6,6 +6,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **Roads in the low / high bands can be clicked and hovered again.** Since 0.9.2 a road with a
+  non-zero `layer` and no bridge / tunnel tag (a raised walkway) draws in `roads-high-*` /
+  `roads-low-*`, and so do edges moved by `band_col`; those layers were missing from the pick
+  pattern, so the road couldn't be selected.
+
 ### Changed
 - **Link roads draw below every street, as in every established map style.** A `*_link` used to
   sort just under its parent class, so a `primary_link` covered the residential street it meets.

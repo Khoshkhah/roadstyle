@@ -1011,3 +1011,22 @@ def test_links_draw_below_every_street_like_osm_carto():
         assert render_web._sort_key("highway")[2][render_web._sort_key("highway")[2].index("trunk_link") + 1] == 7.5
     finally:
         render_web._load_road_model()
+
+
+def test_every_road_fill_layer_is_clickable():
+    """A road in the low / high bands (a raised walkway with layer=1 and no bridge tag, a sidewalk
+    or crossing moved by band_col) must be clickable and hoverable like any other: every road fill
+    layer, dashed siblings included, matches the page's pick pattern (Kaveh: footway
+    5552170400133534207 in Monaco could not be selected)."""
+    g = gpd.GeoDataFrame(
+        {"highway": ["residential", "footway", "residential", "residential", "residential"],
+         "layer": [None, "1", "-1", None, None], "bridge": [None, None, None, "yes", None],
+         "tunnel": [None, None, None, None, "yes"]},
+        geometry=[LineString([(18.0 + i * 0.01, 59.30), (18.0 + i * 0.01, 59.31)]) for i in range(5)],
+        crs=4326)
+    html = render_edges(g, backend="web").html
+    pattern = re.search(r"\.filter\(id=>/(\^roads-[^/]+)/\.test\(id\)\)", html).group(1)
+    fills = [l["id"] for l in _style(html)["layers"]
+             if re.match(r"roads-(tunnel-|low-|high-|bridge-)?fill", l["id"])]
+    assert {"roads-low-fill", "roads-high-fill", "roads-high-fill-dash0"} <= set(fills)
+    assert [f for f in fills if not re.match(pattern, f)] == []
