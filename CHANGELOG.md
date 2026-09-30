@@ -6,6 +6,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **Tunnels have a solid casing.** The dashed casing left gaps where you couldn't tell whether two
+  tunnel pieces connect. Tunnels still read as underground from their faded fill. The dash is a
+  setting: `tunnel_casing_dash` (e.g. `[2, 2]`, the osm-carto look).
+
 ### Fixed
 - **A road running into a tunnel no longer looks cut off.** Tunnels draw under the surface roads,
   so at a tunnel mouth the surface road's casing and round end were painted across the tunnel's

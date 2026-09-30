@@ -409,6 +409,7 @@
     "basemap": "voyager",
     "bridge_casing_color": "#000000",
     "tunnel_portal_m": 8.0,
+    "tunnel_casing_dash": null,
     "annotations": {
       "slot_m": 100
     },

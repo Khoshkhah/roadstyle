@@ -843,3 +843,16 @@ def test_tunnel_portal_skipped_when_the_tunnel_passes_under_a_street_right_away(
     xs = [q[0] for q in _style(render_edges(g2, backend="web").html)
           ["sources"]["portals"]["data"]["features"][0]["geometry"]["coordinates"]]
     assert 7.5 < (max(xs) - 18.001) * k < 8.5
+
+
+def test_tunnel_casing_solid_by_default_dash_as_a_setting():
+    """A dashed tunnel casing leaves gaps where you can't tell whether two tunnel pieces connect,
+    so it's solid by default; tunnel_casing_dash brings the osm-carto dash back."""
+    g = gpd.GeoDataFrame({"highway": ["primary"], "tunnel": ["yes"]},
+                         geometry=[LineString([(18.0, 59.30), (18.01, 59.30)])], crs=4326)
+    lay = {l["id"]: l for l in _style(render_edges(g, backend="web").html)["layers"]}
+    assert "line-dasharray" not in lay["roads-tunnel-casing"]["paint"]
+    assert lay["roads-tunnel-casing"]["layout"]["line-cap"] == "round"
+    dashed = render_edges(g, backend="web", settings={"config": {"tunnel_casing_dash": [2, 2]}})
+    lay = {l["id"]: l for l in _style(dashed.html)["layers"]}
+    assert lay["roads-tunnel-casing"]["paint"]["line-dasharray"] == [2, 2]

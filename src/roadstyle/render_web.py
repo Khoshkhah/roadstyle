@@ -1116,12 +1116,15 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     bcw = _width_expr(highway_col, casing=True, scale=1.25, **sw)   # heavier bridge casing ("wings")
     style["layers"] += under_layers            # caller overlays drawn beneath the roads (e.g. zones)
     style["layers"] += [
-        # Tunnels first, so the surface roads above paint over them at crossings. The dashed casing +
-        # faded fill make a tunnel read as "underground" even where nothing crosses it (osm-carto look).
-        {"id": "roads-tunnel-casing", "type": "line", "source": "roads", "layout": tlay,
-         "filter": tunnel,
+        # Tunnels first, so the surface roads above paint over them at crossings. The faded fill makes
+        # a tunnel read as "underground" even where nothing crosses it. The casing is solid by
+        # default: a dashed one (osm-carto, `tunnel_casing_dash`) leaves gaps where you can't tell
+        # whether two tunnel pieces connect.
+        {"id": "roads-tunnel-casing", "type": "line", "source": "roads",
+         "layout": tlay if CONFIG.tunnel_casing_dash else lay, "filter": tunnel,
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
-                   "line-width": cw, "line-offset": off, "line-dasharray": [2, 2]}},
+                   "line-width": cw, "line-offset": off,
+                   **({"line-dasharray": list(CONFIG.tunnel_casing_dash)} if CONFIG.tunnel_casing_dash else {})}},
         {"id": "roads-tunnel-fill", "type": "line", "source": "roads", "layout": lay,
          "filter": tunnel,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],

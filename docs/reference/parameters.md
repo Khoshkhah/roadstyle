@@ -154,7 +154,7 @@ Returns a `WebMap` (web, `.save()`), a `folium.Map` (`.save()`) or a `lonboard.M
 | keyword | default | backends | what |
 |---|---|---|---|
 | `highway_col` | `"highway"` | all | the road-class column (widths, casing, draw order) |
-| `tunnel_col` / `bridge_col` | `"tunnel"` / `"bridge"` | all | tunnels draw under (dashed, faded), bridges on top |
+| `tunnel_col` / `bridge_col` | `"tunnel"` / `"bridge"` | all | tunnels draw under (faded), bridges on top |
 | `layer_col` | `"layer"` | web | OSM `layer`; negative sinks an edge when there is no tunnel/bridge column |
 
 ### Overlays & boundary
@@ -260,6 +260,7 @@ The `config` block of the settings. Change it in a [settings override](settings.
 | `casing_extra` | `2.0` | reserved (palettes set casing widths) |
 | `link_scale` | `0.7` | `*_link` width relative to the parent |
 | `tunnel_opacity_scale` | `0.45` | tunnel fade |
+| `tunnel_casing_dash` | `null` (solid) | tunnel casing dash, e.g. `[2, 2]` for the osm-carto look |
 | `tunnel_portal_m` | `8.0` | metres of a tunnel drawn at street level where it meets a surface road, so the road runs into it (`0` = off) |
 | `bridge_casing_extra` / `bridge_casing_color` | `1.5` / `"#000000"` | bridge casing, px wider / colour |
 | `minor_no_casing` | cycleway, footway, living_street, path, pedestrian, service, track | classes drawn without casing |
