@@ -297,7 +297,7 @@ def _bridge_decks(geo, dk):
         g, p = ft.get("geometry") or {}, ft.get("properties", {})
         c = g.get("coordinates") or []
         # any bridge level (lvl carries the OSM layer: 1, 2, 3…) earns a deck ribbon
-        if (p.get("lvl") or 0) < 1 or g.get("type") != "LineString" or len(c) < 2:
+        if not p.get("__rs_bridge") or (p.get("lvl") or 0) < 1 or g.get("type") != "LineString" or len(c) < 2:
             continue
         a = (round(c[0][0], 6), round(c[0][1], 6))
         z = (round(c[-1][0], 6), round(c[-1][1], 6))
@@ -494,27 +494,122 @@ def _truthy(v):
 
 
 def _mark_lvl(geo, tunnel_col, bridge_col, layer_col):
-    """Elevation per edge: bridge -> its OSM ``layer`` (min +1, drawn on top), tunnel -> its
-    ``layer`` (max -1, drawn underneath), else a negative ``layer`` alone -> that value, else 0.
-    Carrying the actual layer number (not just ±1) lets the sort key order STACKED structures —
-    a viaduct at layer=3 draws over a footbridge at layer=1, not by class importance.
-    Defaults to 0 when the columns aren't present (no tunnel/bridge info).
+    """Draw order per edge (``lvl``), from the OSM ``layer`` tag, OSM's own vertical order where ways
+    cross: a tagged non-zero ``layer`` is the level; untagged (or 0), a bridge is 1, a tunnel -1,
+    anything else 0. Carrying the layer number (not just ±1) lets the sort key order STACKED
+    structures: a viaduct at layer=3 draws over a footbridge at layer=1.
 
-    A positive `layer` alone does NOT promote to bridge level: only the bridge column earns the
-    bridge treatment (2D deck styling, 3D extrusions) — a `layer=1` embankment isn't a bridge."""
+    The LOOK comes from the tags, separately: ``__rs_bridge`` / ``__rs_tunnel`` pick the deck and
+    tunnel styling (and 3D decks). A raised walkway (``layer=1``, no bridge tag) is drawn above
+    the street it crosses, in the plain look; a road with a negative layer and no tunnel tag is
+    drawn below, plain. Defaults to 0 when the columns aren't present."""
     for ft in geo["features"]:
         p = ft.setdefault("properties", {})
         try:
             ly = int(float(p.get(layer_col)))
         except (TypeError, ValueError):
             ly = 0
-        if _truthy(p.get(bridge_col)):
-            lvl = max(1, ly)
-        elif _truthy(p.get(tunnel_col)):
-            lvl = min(-1, ly)
-        else:
-            lvl = min(ly, 0)
-        p["lvl"] = lvl
+        br, tu = _truthy(p.get(bridge_col)), _truthy(p.get(tunnel_col))
+        p["lvl"] = ly or (1 if br else -1 if tu else 0)
+        p["__rs_bridge"], p["__rs_tunnel"] = br, tu
+
+
+def _rgb(hex_color):
+    """``#rgb`` / ``#rrggbb`` -> [r, g, b]; None for anything else (a named or rgba() colour)."""
+    h = (hex_color or "").lstrip("#")
+    h = "".join(ch * 2 for ch in h) if len(h) == 3 else h
+    try:
+        return [int(h[i:i + 2], 16) for i in (0, 2, 4)] if len(h) == 6 else None
+    except ValueError:
+        return None
+
+
+def _is_light(hex_color):
+    rgb = _rgb(hex_color)
+    return rgb is not None and sum(rgb) / 3 > 110
+
+
+def _darker(hex_color, amount):
+    """``hex_color`` darkened by ``amount`` (0..1); None when it isn't ``#rgb`` / ``#rrggbb``."""
+    rgb = _rgb(hex_color)
+    return None if rgb is None else "#" + "".join(f"{round(v * (1 - amount)):02x}" for v in rgb)
+
+
+def _mark_tunnel_dash(geo, gap, dash):
+    """A tunnel edge's (lvl < 0) casing in two dark tones, from its own casing: ``__rs_casing_gap``
+    (solid, darkened by ``gap``) and ``__rs_casing_dash`` (the dashes on it, darkened by ``dash``),
+    so the casing is two-toned, never gapped. A casing that is already dark (mono) stays as it is
+    under the dashes."""
+    for ft in geo["features"]:
+        p = ft.get("properties") or {}
+        if (p.get("lvl") or 0) < 0:
+            c = p.get("__rs_casing")
+            p["__rs_casing_gap"] = _darker(c, gap) if _is_light(c) else c
+            p["__rs_casing_dash"] = _darker(c, dash)
+
+
+_PORTAL_CLEAR_M = 4.0   # no mouth piece when the tunnel passes under a street this close past it
+
+
+def _tunnel_portals(geo, portal_m):
+    """Tunnel mouths: the first / last ``portal_m`` metres of every tunnel edge (lvl < 0) whose end
+    point is also a surface edge's (lvl 0) end point, as features for the ``portals`` source.
+
+    Tunnels draw under the surface band, so at a mouth the surface road's casing and round cap
+    paint across the tunnel's start like a wall. These pieces draw at street level (fill only,
+    between the surface casing and fill), so the road visibly runs into the tunnel. A tunnel that
+    passes under a street (crosses it without a shared node) within ``portal_m +
+    _PORTAL_CLEAR_M`` of its mouth gets no piece: a piece would cut into that street's casing, and
+    drawn widths grow with zoom, so no fixed length clears it at every zoom. Streets that only run
+    close by (a roundabout at the mouth) don't count. Each carries its edge's
+    properties (class, baked fills, two-way offset) plus ``__rs_road``, the edge's feature id (its
+    index), so recolouring and id filters reach it; direction is kept, so the two-way lane offset
+    lands on the same side. LineStrings only."""
+    from shapely import STRtree
+    from shapely.geometry import LineString, box
+    from shapely.ops import substring
+
+    if not portal_m:
+        return []
+    key = lambda c: (round(c[0], 6), round(c[1], 6))  # noqa: E731
+    lines = [(i, ft) for i, ft in enumerate(geo["features"])
+             if (ft.get("geometry") or {}).get("type") == "LineString"
+             and len(ft["geometry"].get("coordinates") or []) >= 2]
+    ground = [ft["geometry"]["coordinates"] for _, ft in lines if (ft["properties"].get("lvl") or 0) == 0]
+    surface = {key(c[j]) for c in ground for j in (0, -1)}
+    tree = STRtree([LineString(c) for c in ground]) if ground else None
+    out = []
+    for i, ft in lines:
+        p, c = ft["properties"], ft["geometry"]["coordinates"]
+        if (p.get("lvl") or 0) >= 0:
+            continue
+        lon0, lat0 = c[0]
+        kx = 111320.0 * math.cos(math.radians(lat0))
+        to_local = lambda cs: LineString([((x - lon0) * kx, (y - lat0) * 111320.0) for x, y in cs])  # noqa: E731
+        local = to_local(c)
+        for at_start in (True, False):
+            mouth = key(c[0] if at_start else c[-1])
+            if mouth not in surface:
+                continue
+            # the piece plus the clearance, from the mouth in: a street it crosses there is one the
+            # tunnel passes under right after its mouth -> no piece
+            reach = min(portal_m + _PORTAL_CLEAR_M, local.length)
+            ahead = substring(local, 0, reach) if at_start else substring(local, local.length - reach, local.length)
+            x0, y0 = c[0] if at_start else c[-1]
+            pad = reach / 111320.0 * 2
+            near = box(x0 - pad, y0 - pad, x0 + pad, y0 + pad)
+            if any(mouth not in (key(g[0]), key(g[-1])) and ahead.intersects(to_local(g))
+                   for g in (ground[j] for j in tree.query(near))):
+                continue
+            m = min(portal_m, local.length)
+            part = substring(local, 0, m) if at_start else substring(local, local.length - m, local.length)
+            if part.geom_type != "LineString":
+                continue
+            out.append({"type": "Feature", "properties": {**p, "__rs_road": i},
+                        "geometry": {"type": "LineString",
+                                     "coordinates": [[x / kx + lon0, y / 111320.0 + lat0]
+                                                     for x, y in part.coords]}})
+    return out
 
 
 _JS_MAX_SAFE_INT = 2 ** 53 - 1
@@ -958,6 +1053,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                                 "prop": "__rs_fill", "legend": rf.legend}]
     _mark_twoway(geo)
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
+    _mark_tunnel_dash(geo, CONFIG.tunnel_gap_shade, CONFIG.tunnel_dash_shade)
     _stringify_unsafe_ints(geo)   # BIGINT ids (e.g. edge_id) -> string so JS doesn't round them
 
     # active base map + the set offered to the in-map switcher (active shown first)
@@ -1009,6 +1105,10 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         # ~5k features can afford it.
         style["sources"]["roads"] = {"type": "geojson", "data": geo, "generateId": True,
                                      "tolerance": 0.05}
+    portals = _tunnel_portals(geo, CONFIG.tunnel_portal_m)
+    if portals:
+        style["sources"]["portals"] = {"type": "geojson", "tolerance": 0.05,
+                                       "data": {"type": "FeatureCollection", "features": portals}}
 
     # extra overlay layers (zones / POIs / any geometry the caller brings); each gets its own source
     # + paint layer(s), placed under or over the roads, and (if `popup` is set) clickable.
@@ -1023,16 +1123,22 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     blay = {**lay, "line-cap": "butt"}                    # butt cap -> square bridge deck ends
     off = _offset_expr(highway_col, offset_frac, offset_zoom)
     sw = dict(split_zoom=offset_zoom, split_frac=width_frac)
-    surface = ["==", ["coalesce", ["get", "lvl"], 0], 0]  # lvl == 0
-    tunnel = ["<", ["coalesce", ["get", "lvl"], 0], 0]    # lvl == -1
-    bridge = [">", ["coalesce", ["get", "lvl"], 0], 0]    # lvl == +1
+    # three bands by draw order (lvl: below ground, ground, above), and in the outer two, the
+    # structure look (tunnel / bridge, from the tags) or the plain one (_mark_lvl)
+    lv = ["coalesce", ["get", "lvl"], 0]
+    is_t, is_b = ["to-boolean", ["get", "__rs_tunnel"]], ["to-boolean", ["get", "__rs_bridge"]]
+    surface = ["==", lv, 0]
+    tunnel = ["all", ["<", lv, 0], is_t]
+    low = ["all", ["<", lv, 0], ["!", is_t]]
+    bridge = ["all", [">", lv, 0], is_b]
+    high = ["all", [">", lv, 0], ["!", is_b]]
     # minzoom: hide minor classes when zoomed out (config.DEFAULT.minzoom, or a caller override).
     # AND-ed onto each road filter rather than given its own layers, so layer ids are untouched.
     mz = ({**CONFIG.minzoom} if minzoom is True else
           {**CONFIG.minzoom, **minzoom} if isinstance(minzoom, dict) else None)
     if mz:
         _z = _minzoom_filter(highway_col, mz)
-        surface, tunnel, bridge = (["all", _z, surface], ["all", _z, tunnel], ["all", _z, bridge])
+        surface, tunnel, low, bridge, high = (["all", _z, f] for f in (surface, tunnel, low, bridge, high))
     dk = {"base_m": 5.0, "thickness_m": 1.0, "ramp_m": 40.0, "step_m": 2.5,
           "match_zoom": 18.0, "opacity": 0.7, "width_scale": 0.6, "flat_below": 16.0,
           "casing_px": 2.0, **(CONFIG.bridge_decks or {})}
@@ -1048,20 +1154,49 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     bcw = _width_expr(highway_col, casing=True, scale=1.25, **sw)   # heavier bridge casing ("wings")
     style["layers"] += under_layers            # caller overlays drawn beneath the roads (e.g. zones)
     style["layers"] += [
-        # Tunnels first, so the surface roads above paint over them at crossings. The dashed casing +
-        # faded fill make a tunnel read as "underground" even where nothing crosses it (osm-carto look).
-        {"id": "roads-tunnel-casing", "type": "line", "source": "roads", "layout": tlay,
+        # Tunnels first, so the surface roads above paint over them at crossings. A tunnel reads as
+        # one from its casing in two dark tones, both shades of the road's own casing: a solid one
+        # with darker dashes on top (_mark_tunnel_dash). The casing is never missing, so connected
+        # tunnel pieces look connected (a dash with empty gaps didn't show it); the dash and the
+        # faded fill say "tunnel". Settings: tunnel_casing_dash, tunnel_gap_shade, tunnel_dash_shade.
+        {"id": "roads-tunnel-casing", "type": "line", "source": "roads", "layout": lay,
          "filter": tunnel,
-         "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
-                   "line-width": cw, "line-offset": off, "line-dasharray": [2, 2]}},
+         "paint": {"line-color": ["coalesce", ["get", "__rs_casing_gap"], "#8d8d8d"],
+                   "line-width": cw, "line-offset": off}},
+        {"id": "roads-tunnel-casing-dash", "type": "line", "source": "roads", "layout": tlay,
+         "filter": tunnel,
+         "paint": {"line-color": ["coalesce", ["get", "__rs_casing_dash"], "#5e5e5e"],
+                   "line-width": cw, "line-offset": off,
+                   "line-dasharray": list(CONFIG.tunnel_casing_dash or [2, 2])}},
         {"id": "roads-tunnel-fill", "type": "line", "source": "roads", "layout": lay,
          "filter": tunnel,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
                    "line-width": fw, "line-offset": off, "line-opacity": 0.72}},
+        # below ground, not a tunnel (a negative layer alone): plain look, under the ground roads
+        {"id": "roads-low-casing", "type": "line", "source": "roads", "layout": lay, "filter": low,
+         "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
+                   "line-width": cw, "line-offset": off}},
+        {"id": "roads-low-fill", "type": "line", "source": "roads", "layout": lay, "filter": low,
+         "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
+                   "line-width": fw, "line-offset": off}},
         {"id": "roads-casing", "type": "line", "source": "roads", "layout": lay, "filter": surface,
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
                    "line-width": cw, "line-offset": off}},
+        # tunnel mouths at street level (fill only): they cover the surface casing where a tunnel
+        # starts, so the road runs into it instead of hitting a wall (_tunnel_portals)
+        *([{"id": "roads-portal-fill", "type": "line", "source": "portals", "layout": lay,
+            **({"filter": _z} if mz else {}),
+            "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
+                      "line-width": fw, "line-offset": off}}] if portals else []),
         {"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, "filter": surface,
+         "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
+                   "line-width": fw, "line-offset": off}},
+        # above ground, not a bridge (a positive layer alone: a raised walkway): plain look, over
+        # the ground roads it crosses
+        {"id": "roads-high-casing", "type": "line", "source": "roads", "layout": lay, "filter": high,
+         "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
+                   "line-width": cw, "line-offset": off}},
+        {"id": "roads-high-fill", "type": "line", "source": "roads", "layout": lay, "filter": high,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
                    "line-width": fw, "line-offset": off}},
         # Bridges last (on top). Flat view: heavier square-capped casing reads as a deck.
@@ -1095,10 +1230,9 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             elif l["id"] == "roads-highlight":
                 # bridges glow on the flat line only while the flat line is shown; the deck
                 # carries its own feature-state glow above flat_below
-                l["filter"] = ["<", ["coalesce", ["get", "lvl"], 0], 1]
+                l["filter"] = ["!", bridge]
                 style["layers"].append(
-                    {**l, "id": "roads-highlight-bridge", "maxzoom": _fb,
-                     "filter": [">", ["coalesce", ["get", "lvl"], 0], 0]})
+                    {**l, "id": "roads-highlight-bridge", "maxzoom": _fb, "filter": bridge})
                 break
         # extruded bridge decks: physical ribbons floating base_m above ground — in the tilted
         # view you look UNDER a bridge and see the roads passing beneath it. The casing ring
@@ -1137,7 +1271,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         for l in style["layers"]:
             relayered.append(l)
             lid, base_f = l["id"], l.get("filter")
-            if lid in ("roads-fill", "roads-tunnel-fill", "roads-bridge-fill"):
+            if lid in ("roads-fill", "roads-tunnel-fill", "roads-low-fill", "roads-high-fill", "roads-bridge-fill"):
                 for di, ds in enumerate(dashes):
                     if lid == "roads-bridge-fill":
                         # a dashed BRIDGE still needs a deck: solid underlay in the class's own
@@ -1159,7 +1293,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                          "paint": {**l["paint"],
                                    "line-dasharray": [float(x) for x in ds.split(",")]}})
                 l["filter"] = ["all", base_f, nod]
-            elif lid in ("roads-casing", "roads-tunnel-casing"):
+            elif lid in ("roads-casing", "roads-tunnel-casing", "roads-tunnel-casing-dash",
+                         "roads-low-casing", "roads-high-casing"):
                 # surface/tunnel dashed classes stay casing-less (gaps show the ground); the
                 # BRIDGE casing deliberately keeps them — the deck edge is what says "bridge"
                 l["filter"] = ["all", base_f, nod]
@@ -1169,6 +1304,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         # keep their deck sandwich above the solid bridge fill: a footbridge's deck is a
         # structure, not a surface marking.)
         for casing_id, dash_prefix in (("roads-tunnel-casing", "roads-tunnel-fill-dash"),
+                                       ("roads-low-casing", "roads-low-fill-dash"),
+                                       ("roads-high-casing", "roads-high-fill-dash"),
                                        ("roads-casing", "roads-fill-dash")):
             moved = [l for l in relayered if l["id"].startswith(dash_prefix)]
             if moved:
@@ -1273,12 +1410,12 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                 # them ends up under its own road's deck — a level-3 cycleway on Skanstullsbron
                 # rendered arrowless exactly that way.
                 fams = (("roads-arrows-tunnel", "<",
-                         lambda i: i.startswith("roads-tunnel-")),
+                         lambda i: i.startswith(("roads-tunnel-", "roads-low-"))),
                         ("roads-arrows", "==",
                          lambda i: i in ("roads-casing", "roads-fill")
                          or i.startswith("roads-fill-")),
                         ("roads-arrows-bridge", ">",
-                         lambda i: i.startswith("roads-bridge-")))
+                         lambda i: i.startswith(("roads-high-", "roads-bridge-"))))
                 for lid, cmp, fam in fams:
                     idx = max(i for i, l in enumerate(style["layers"]) if fam(l["id"]))
                     style["layers"].insert(idx + 1, _arrow_layer(lid, cmp))

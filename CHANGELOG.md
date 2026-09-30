@@ -6,6 +6,36 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **`rsColor` raises the roads it paints to the top of their level.** A highlighted route is no
+  longer covered by a street it crosses: its line-sort-key goes up by 500 (levels are 1000
+  apart), so a bridge above it still passes over it. `rsColor(null)` puts the order back.
+- **Draw order follows the OSM `layer` tag.** Where roads cross, a tagged `layer` now decides
+  which one is drawn on top (untagged: a bridge is 1, a tunnel -1, anything else 0). Before, a
+  positive `layer` without a `bridge` tag counted as ground level, so a raised walkway was drawn
+  under the street it passes over. The look still comes from the tags: deck styling and 3D decks
+  only for `bridge`, the tunnel casing only for `tunnel`. Raised roads that aren't bridges draw
+  plain in new layers `roads-high-*` (above the ground roads, below the bridges); lowered roads
+  that aren't tunnels in `roads-low-*` (after the tunnels). A negative `layer` without a `tunnel`
+  tag no longer gets the tunnel look.
+- **Tunnel casings in two tones, never with empty gaps.** The dashed tunnel casing (osm-carto)
+  left gaps where you couldn't tell whether two tunnel pieces connect. Now the casing is two dark
+  shades of the road's own casing, a solid one with darker dashes on top (new layer
+  `roads-tunnel-casing-dash` on top of `roads-tunnel-casing`): it is continuous, and the dash
+  still says "tunnel". Settings: `tunnel_casing_dash` (default `[2, 2]`), `tunnel_gap_shade`
+  (`0.25`) and `tunnel_dash_shade` (`0.5`): how much darker than the road's casing (an already
+  dark casing, as in `mono`, keeps its own tone under the dashes).
+
+### Fixed
+- **A road running into a tunnel no longer looks cut off.** Tunnels draw under the surface roads,
+  so at a tunnel mouth the surface road's casing and round end were painted across the tunnel's
+  start like a wall. Now the first metres of the tunnel draw at street level (a new `portals`
+  source and `roads-portal-fill` layer), and the road visibly runs into it. Recolouring
+  (`rsColor`, `color_options`) and `rsFilter` reach those pieces too. Length: the
+  `tunnel_portal_m` setting (default 8 m; `0` turns it off). A tunnel that passes under a street
+  within 12 m of its mouth gets no piece, so that street stays whole. Feature ids and the JS API
+  are unchanged.
+
 ## [0.9.1] — 2026-09-29
 
 ### Added

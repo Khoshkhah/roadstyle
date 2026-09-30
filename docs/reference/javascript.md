@@ -15,7 +15,7 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rsQuery(p => bool, layer?)` | the ids of the features whose properties match | |
 | `rsGetProps(ids, layer?)` | the rows behind the ids, internal fields removed | |
 | `rsFilter(ids, layer?)` | show only these features; `null` resets. On roads it combines with the class filter | `rs:filterchange` |
-| `rsColor(ids, "#hex", layer?)` | paint the set one colour over the base colours | `rs:colorchange` |
+| `rsColor(ids, "#hex", layer?)` | paint the set one colour over the base colours, and draw it on top of the other roads on its level | `rs:colorchange` |
 | `rsColor([[idsA, "#f80"], [idsB, "#08f"]])` | several sets at once, earlier pairs win overlaps (roads only) | `rs:colorchange` |
 | `rsColor(null)` / `rsColor(null, null, layer)` | reset | `rs:colorchange` |
 | `rsHighlight(ids, layer?)` | selection glow on the set; `[]` clears | `rs:highlightchange` |

@@ -476,6 +476,7 @@ function _applyRoadFilters(){
     // the archive source, so the tile layer name is what separates them.
     const isRoads = l.source==="roads" && (!RS_TILED || l["source-layer"]==="roads");
     if(_qIds && isRoads){ const qf=["in",["id"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
+    if(_qIds && l.source==="portals"){ const qf=["in",["get","__rs_road"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
     try{ map.setFilter(l.id,f); }catch(e){}
   });
   return hidden;
@@ -641,7 +642,8 @@ if(FILTER.on){
 // option's fill is baked per edge (__rs_fill / __rs_fill__1 …); setPaintProperty repoints the
 // road-fill layers' line-color at the chosen prop. window.rsSetColorField drives it from your UI.
 const COLOR_OPTIONS = __COLOR_OPTIONS__;
-const RS_FILL_LAYERS = ["roads-fill","roads-tunnel-fill","roads-bridge-fill"];
+const RS_FILL_LAYERS = ["roads-fill","roads-tunnel-fill","roads-low-fill","roads-high-fill","roads-bridge-fill"];
+const RS_PORTAL_LAYERS = ["roads-portal-fill"];   // tunnel mouths: their road's id is __rs_road
 let _coActive = __CO_ACTIVE__, _coLegendEl = null, _coLegendBox = null;
 function coLegendHtml(lg){
   if(!lg) return "";
@@ -660,16 +662,18 @@ function coUpdateLegend(){
   if(_coLegendBox) _coLegendBox.style.display = h ? "" : "none";
 }
 let _qColor=null;   // [{ids, color}, ...] recolour groups, layered over the active option
-function _fillExpr(){
+function _fillExpr(idE){
   const prop=(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill";
   let e=["coalesce",["get",prop],"#888888"];
   if(_qColor) for(let i=_qColor.length-1;i>=0;i--)   // group 0 outermost -> wins overlaps
-    e=["case",["in",["id"],["literal",_qColor[i].ids]],_qColor[i].color,e];
+    e=["case",["in",idE||["id"],["literal",_qColor[i].ids]],_qColor[i].color,e];
   return e;
 }
 function _applyFill(){
   const e=_fillExpr();
   RS_FILL_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"line-color",e); });
+  const pe=_fillExpr(["get","__rs_road"]);
+  RS_PORTAL_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"line-color",pe); });
   // decks keep the base colour: their slice ids are a different id space than the road edges
   RS_DECK_LAYERS.forEach(id=>{
     if(map.getLayer(id))
@@ -677,6 +681,21 @@ function _applyFill(){
         ["case",["boolean",["feature-state","select"],false],__SELECT_COLOR__,
          ["boolean",["feature-state","hover"],false],__HOVER_COLOR__,
          ["coalesce",["get",(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill"],"#888888"]]); });
+}
+// rsColor also raises the painted roads to the top of their level: their line-sort-key gets +500.
+// Levels are 1000 apart, so a bridge still passes over a painted street and a painted tunnel stays
+// under the streets above it; at a crossing on the same level, the painted road is on top.
+const _sortBase={};
+function _applySort(){
+  const all = _qColor ? [].concat(..._qColor.map(g=>g.ids)) : null;
+  map.getStyle().layers.forEach(l=>{
+    if(l.type!=="line" || (l.source!=="roads" && l.source!=="portals")) return;
+    if(!(l.id in _sortBase)) _sortBase[l.id]=map.getLayoutProperty(l.id,"line-sort-key");
+    const base=_sortBase[l.id]; if(base==null) return;
+    const idE = l.source==="portals" ? ["get","__rs_road"] : ["id"];
+    map.setLayoutProperty(l.id,"line-sort-key",
+      all ? ["+", base, ["case",["in",idE,["literal",all]],500,0]] : base);
+  });
 }
 function rsSetColorField(nameOrIdx){
   let idx = typeof nameOrIdx==="number" ? nameOrIdx : COLOR_OPTIONS.map(o=>o.name).indexOf(nameOrIdx);
@@ -710,6 +729,7 @@ function rsColor(ids, color, layer){   // paint an id set one colour; rsColor(nu
   else _qColor=null;
   if(_qColor && !_qColor.length) _qColor=null;
   _applyFill();
+  _applySort();
   document.dispatchEvent(new CustomEvent("rs:colorchange",
     {detail:(!_qColor || _qColor.length===1)
       ? {ids:_qColor && _qColor[0].ids, color:_qColor && _qColor[0].color}

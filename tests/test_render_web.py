@@ -1,5 +1,6 @@
 """Web (MapLibre) backend: client-side recolouring via color_options + the recolour hooks."""
 import json
+import math
 import re
 
 import geopandas as gpd
@@ -99,7 +100,7 @@ def test_web_annotation_slots_alternate_names_and_arrows():
     # one arrow layer per grade tier, each right beside its road tier — a bridge must cover
     # the arrows of the road it crosses, not have them float above everything
     assert ids.index("roads-arrows") == ids.index("roads-fill") + 1
-    assert ids.index("roads-arrows-tunnel") == ids.index("roads-tunnel-fill") + 1
+    assert ids.index("roads-arrows-tunnel") == ids.index("roads-low-fill") + 1     # after the below-ground band
     assert ids.index("roads-arrows-bridge") == ids.index("roads-bridge-fill") + 1
     assert ["to-boolean", ["get", "name"]] in lab["filter"]          # unnamed -> slot stays empty
     assert lab["layout"]["symbol-placement"] == "line-center"
@@ -281,14 +282,16 @@ def test_minzoom_keeps_the_grade_separation_filters_intact():
     assert "lvl" in json.dumps(fs["roads-fill"])
     assert fs["roads-fill"] != fs["roads-tunnel-fill"] != fs["roads-bridge-fill"]
 
-def test_bridge_level_from_bridge_column_only():
-    """A positive `layer` tag alone must NOT earn the bridge treatment (2D deck styling, 3D
-    extrusions) — only the bridge column does. Negative layer still marks below-ground."""
+def test_draw_order_from_layer_look_from_bridge_column():
+    """The OSM `layer` decides the draw order (a layer=2 road without a bridge tag is drawn above
+    the ground roads), but only the bridge column earns the bridge look (deck styling, 3D
+    extrusions); a negative layer alone is below ground, not a tunnel."""
     g = _edges().assign(bridge=[True, False, False], layer=[1, 2, -1])
     style = _style(render_edges(g, backend="web").html)
-    lvls = [f["properties"]["lvl"]
-            for f in style["sources"]["roads"]["data"]["features"]]
-    assert lvls == [1, 0, -1]
+    ps = [f["properties"] for f in style["sources"]["roads"]["data"]["features"]]
+    assert [p["lvl"] for p in ps] == [1, 2, -1]
+    assert [p["__rs_bridge"] for p in ps] == [True, False, False]
+    assert [p["__rs_tunnel"] for p in ps] == [False, False, False]
 
 
 def test_web_round_caps_seal_edge_connections():
@@ -713,7 +716,7 @@ def test_stacked_bridges_order_by_osm_layer():
     style = _style(render_edges(g, backend="web").html)
     lvls = {f["properties"]["highway"] + str(i): f["properties"]["lvl"]
             for i, f in enumerate(style["sources"]["roads"]["data"]["features"])}
-    assert list(lvls.values()) == [1, 3, -2, 0]
+    assert list(lvls.values()) == [1, 3, -2, 1]     # the plain layer=1 road: above ground too
 
 
 def test_twoway_bridge_decks_split_per_directed_edge():
@@ -790,3 +793,108 @@ def test_basemap_button_is_a_map_control_in_the_top_right_column():
 def test_zoom_readout_is_on_by_default_and_can_be_turned_off():
     assert "if(true){ const zd=" in render_edges(_edges(), backend="web").html
     assert "if(false){ const zd=" in render_edges(_edges(), backend="web", zoom_readout=False).html
+
+
+def test_tunnel_portals_draw_the_mouth_at_street_level():
+    """A tunnel end shared with a surface road gets a short piece at street level (the `portals`
+    source), drawn between the surface casing and fill, so the road runs into the tunnel instead
+    of meeting the surface casing like a wall. Tunnel-tunnel ends get none; tunnel_portal_m=0
+    turns it off."""
+    a, b, c, d = (18.000, 59.30), (18.002, 59.30), (18.004, 59.30), (18.006, 59.30)
+    g = gpd.GeoDataFrame(
+        {"highway": ["primary", "primary", "primary"], "tunnel": [None, "yes", "yes"]},
+        geometry=[LineString([a, b]), LineString([b, c]), LineString([c, d])], crs=4326)
+    style = _style(render_edges(g, backend="web").html)
+    pieces = style["sources"]["portals"]["data"]["features"]
+    assert [f["properties"]["__rs_road"] for f in pieces] == [1]      # only the mouth at b
+    xs = [x for x, _ in pieces[0]["geometry"]["coordinates"]]
+    assert xs[0] == 18.002 and 18.002 < xs[-1] < 18.0022              # ~8 m in from the mouth
+    ids = [l["id"] for l in style["layers"]]
+    assert ids.index("roads-casing") < ids.index("roads-portal-fill") < ids.index("roads-fill")
+
+    off = _style(render_edges(g, backend="web", settings={"config": {"tunnel_portal_m": 0}}).html)
+    assert "portals" not in off["sources"]
+    assert "roads-portal-fill" not in [l["id"] for l in off["layers"]]
+
+
+def test_tunnel_portals_follow_recolour_and_id_filter():
+    """rsColor / rsFilter reach a mouth piece through its road's id (__rs_road)."""
+    html = render_edges(_edges(), backend="web").html
+    assert 'RS_PORTAL_LAYERS = ["roads-portal-fill"]' in html
+    assert '_fillExpr(["get","__rs_road"])' in html
+    assert 'l.source==="portals"' in html
+
+
+def test_tunnel_portal_skipped_when_the_tunnel_passes_under_a_street_right_away():
+    """A tunnel that dives under a street right after its mouth gets no mouth piece: the piece
+    would cut into that street's casing (drawn widths grow with zoom, no fixed length clears it)."""
+    a, b, c = (18.000, 59.30), (18.001, 59.30), (18.004, 59.30)
+    k = 111320.0 * math.cos(math.radians(59.30))
+    x = 18.001 + 6 / k                                         # a street crossing 6 m into the tunnel
+    g = gpd.GeoDataFrame(
+        {"highway": ["service", "service", "secondary"], "tunnel": [None, "yes", None]},
+        geometry=[LineString([a, b]), LineString([b, c]),
+                  LineString([(x, 59.2995), (x, 59.3005)])], crs=4326)
+    assert "portals" not in _style(render_edges(g, backend="web").html)["sources"]
+
+    # a street that only runs close by (3 m to the side, never crossed) doesn't shorten it
+    y = 59.30 + 3 / 111320.0
+    g2 = gpd.GeoDataFrame(
+        {"highway": ["service", "service", "secondary"], "tunnel": [None, "yes", None]},
+        geometry=[LineString([a, b]), LineString([b, c]), LineString([(18.0015, y), (18.004, y)])], crs=4326)
+    xs = [q[0] for q in _style(render_edges(g2, backend="web").html)
+          ["sources"]["portals"]["data"]["features"][0]["geometry"]["coordinates"]]
+    assert 7.5 < (max(xs) - 18.001) * k < 8.5
+
+
+def test_tunnel_casing_in_two_tones():
+    """A tunnel's casing is never missing: two dark shades of the road's own casing, a solid one
+    with darker dashes on top, so connected tunnel pieces look connected (empty dash gaps hid it)
+    while the dash says "tunnel"."""
+    g = gpd.GeoDataFrame({"highway": ["primary", "primary"], "tunnel": ["yes", None]},
+                         geometry=[LineString([(18.0, 59.30), (18.01, 59.30)]),
+                                   LineString([(18.01, 59.30), (18.02, 59.30)])], crs=4326)
+    style = _style(render_edges(g, backend="web").html)          # highsat: primary casing #bcbcbc
+    lay = {l["id"]: l for l in style["layers"]}
+    ids = list(lay)
+    assert ids.index("roads-tunnel-casing") < ids.index("roads-tunnel-casing-dash") < ids.index("roads-tunnel-fill")
+    assert "__rs_casing_gap" in json.dumps(lay["roads-tunnel-casing"]["paint"]["line-color"])
+    assert lay["roads-tunnel-casing-dash"]["paint"]["line-dasharray"] == [2, 2]
+    tun, street = (f["properties"] for f in style["sources"]["roads"]["data"]["features"])
+    assert tun["__rs_casing"] == "#bcbcbc"
+    assert tun["__rs_casing_gap"] == "#8d8d8d" and tun["__rs_casing_dash"] == "#5e5e5e"  # 25 / 50 % darker
+    assert "__rs_casing_dash" not in street and "__rs_casing_gap" not in street
+    mono = _style(render_edges(g, backend="web", palette="mono").html)["sources"]["roads"]["data"]
+    tun = mono["features"][0]["properties"]                     # mono primary casing #4f4f4f
+    assert tun["__rs_casing_gap"] == "#4f4f4f" and tun["__rs_casing_dash"] == "#282828"  # dark, darker
+
+
+def test_raised_and_lowered_roads_without_a_structure_tag():
+    """A raised walkway (layer=1, no bridge tag) draws in the above-ground band with the plain
+    look (roads-high-*, before the bridges); a road with a negative layer and no tunnel tag in the
+    below-ground band, plain (roads-low-*, after the tunnels). Untagged bridges / tunnels default
+    to 1 / -1; a tunnel tagged layer=1 goes above ground."""
+    g = gpd.GeoDataFrame(
+        {"highway": ["footway", "service", "primary", "primary", "service", "residential"],
+         "layer": ["1", "-1", None, None, "1", None],
+         "bridge": [None, None, "yes", None, None, None],
+         "tunnel": [None, None, None, "yes", "yes", None]},
+        geometry=[LineString([(18.0 + i * 0.01, 59.30), (18.0 + i * 0.01, 59.31)]) for i in range(6)],
+        crs=4326)
+    style = _style(render_edges(g, backend="web").html)
+    assert [f["properties"]["lvl"] for f in style["sources"]["roads"]["data"]["features"]] == [1, -1, 1, -1, 1, 0]
+    ids = [l["id"] for l in style["layers"]]
+    order = ["roads-tunnel-fill", "roads-low-casing", "roads-low-fill", "roads-casing", "roads-fill",
+             "roads-high-casing", "roads-high-fill", "roads-bridge-casing", "roads-bridge-fill"]
+    assert [ids.index(i) for i in order] == sorted(ids.index(i) for i in order)
+    lay = {l["id"]: l for l in style["layers"]}
+    assert "__rs_bridge" in json.dumps(lay["roads-high-fill"]["filter"])      # not a bridge
+    assert "__rs_tunnel" in json.dumps(lay["roads-low-fill"]["filter"])       # not a tunnel
+
+
+def test_rscolor_raises_painted_roads_within_their_level():
+    """rsColor lifts the painted roads to the top of their level (line-sort-key +500, levels are
+    1000 apart): over a street they cross, still under a bridge above them."""
+    html = render_edges(_edges(), backend="web").html
+    assert "function _applySort()" in html and '["case",["in",idE,["literal",all]],500,0]' in html
+    assert html.index("_applyFill();\n  _applySort();") > html.index("function rsColor(")

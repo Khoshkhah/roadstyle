@@ -109,7 +109,8 @@ three palettes: `opacity` 1.0.
 In every palette:
 
 - `*_link` roads take the parent's colour, 0.7 × the width (`link_scale`).
-- Tunnels fade to 0.45 × opacity and turn dashed. Bridges get a black casing 1.5 px wider.
+- Tunnels: faded and dashed. On the web map the casing is two dark shades of the road's casing
+  (`tunnel_gap_shade`, `tunnel_dash_shade`): darker dashes on a solid casing, never empty gaps. Bridges get a black casing 1.5 px wider.
 - An unknown class draws as `unclassified`.
 
 ## Custom palettes
