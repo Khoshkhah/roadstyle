@@ -532,7 +532,7 @@ def _is_light(hex_color):
 def _darker(hex_color, amount):
     """``hex_color`` darkened by ``amount`` (0..1); None when it isn't ``#rgb`` / ``#rrggbb``."""
     rgb = _rgb(hex_color)
-    return None if rgb is None else "#%02x%02x%02x" % tuple(round(v * (1 - amount)) for v in rgb)
+    return None if rgb is None else "#" + "".join(f"{round(v * (1 - amount)):02x}" for v in rgb)
 
 
 def _mark_tunnel_dash(geo, gap, dash):
