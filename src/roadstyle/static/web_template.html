@@ -682,6 +682,21 @@ function _applyFill(){
          ["boolean",["feature-state","hover"],false],__HOVER_COLOR__,
          ["coalesce",["get",(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill"],"#888888"]]); });
 }
+// rsColor also raises the painted roads to the top of their level: their line-sort-key gets +500.
+// Levels are 1000 apart, so a bridge still passes over a painted street and a painted tunnel stays
+// under the streets above it; at a crossing on the same level, the painted road is on top.
+const _sortBase={};
+function _applySort(){
+  const all = _qColor ? [].concat(..._qColor.map(g=>g.ids)) : null;
+  map.getStyle().layers.forEach(l=>{
+    if(l.type!=="line" || (l.source!=="roads" && l.source!=="portals")) return;
+    if(!(l.id in _sortBase)) _sortBase[l.id]=map.getLayoutProperty(l.id,"line-sort-key");
+    const base=_sortBase[l.id]; if(base==null) return;
+    const idE = l.source==="portals" ? ["get","__rs_road"] : ["id"];
+    map.setLayoutProperty(l.id,"line-sort-key",
+      all ? ["+", base, ["case",["in",idE,["literal",all]],500,0]] : base);
+  });
+}
 function rsSetColorField(nameOrIdx){
   let idx = typeof nameOrIdx==="number" ? nameOrIdx : COLOR_OPTIONS.map(o=>o.name).indexOf(nameOrIdx);
   const o = COLOR_OPTIONS[idx]; if(!o) return;
@@ -714,6 +729,7 @@ function rsColor(ids, color, layer){   // paint an id set one colour; rsColor(nu
   else _qColor=null;
   if(_qColor && !_qColor.length) _qColor=null;
   _applyFill();
+  _applySort();
   document.dispatchEvent(new CustomEvent("rs:colorchange",
     {detail:(!_qColor || _qColor.length===1)
       ? {ids:_qColor && _qColor[0].ids, color:_qColor && _qColor[0].color}

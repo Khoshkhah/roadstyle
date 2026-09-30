@@ -7,6 +7,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **`rsColor` raises the roads it paints to the top of their level.** A highlighted route is no
+  longer covered by a street it crosses: its line-sort-key goes up by 500 (levels are 1000
+  apart), so a bridge above it still passes over it. `rsColor(null)` puts the order back.
 - **Draw order follows the OSM `layer` tag.** Where roads cross, a tagged `layer` now decides
   which one is drawn on top (untagged: a bridge is 1, a tunnel -1, anything else 0). Before, a
   positive `layer` without a `bridge` tag counted as ground level, so a raised walkway was drawn

@@ -890,3 +890,11 @@ def test_raised_and_lowered_roads_without_a_structure_tag():
     lay = {l["id"]: l for l in style["layers"]}
     assert "__rs_bridge" in json.dumps(lay["roads-high-fill"]["filter"])      # not a bridge
     assert "__rs_tunnel" in json.dumps(lay["roads-low-fill"]["filter"])       # not a tunnel
+
+
+def test_rscolor_raises_painted_roads_within_their_level():
+    """rsColor lifts the painted roads to the top of their level (line-sort-key +500, levels are
+    1000 apart): over a street they cross, still under a bridge above them."""
+    html = render_edges(_edges(), backend="web").html
+    assert "function _applySort()" in html and '["case",["in",idE,["literal",all]],500,0]' in html
+    assert html.index("_applyFill();\n  _applySort();") > html.index("function rsColor(")
