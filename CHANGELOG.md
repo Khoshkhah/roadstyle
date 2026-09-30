@@ -12,10 +12,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   start like a wall. Now the first metres of the tunnel draw at street level (a new `portals`
   source and `roads-portal-fill` layer), and the road visibly runs into it. Recolouring
   (`rsColor`, `color_options`) and `rsFilter` reach those pieces too. Length: the
-  `tunnel_portal_m` setting (default 8 m; `0` turns it off); a piece stops 4 m before any other
-  street, so a tunnel that dives under a street right after its mouth leaves that street whole.
-  Feature ids and the JS API are
-  unchanged.
+  `tunnel_portal_m` setting (default 8 m; `0` turns it off). A tunnel that passes under a street
+  within 12 m of its mouth gets no piece, so that street stays whole. Feature ids and the JS API
+  are unchanged.
 
 ## [0.9.1] — 2026-09-29
 

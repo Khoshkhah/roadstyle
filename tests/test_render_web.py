@@ -823,9 +823,9 @@ def test_tunnel_portals_follow_recolour_and_id_filter():
     assert 'l.source==="portals"' in html
 
 
-def test_tunnel_portal_stops_before_another_street():
-    """A tunnel that dives under a street right after its mouth: the mouth piece stops short of
-    that street, so it never cuts into the street's casing."""
+def test_tunnel_portal_skipped_when_the_tunnel_passes_under_a_street_right_away():
+    """A tunnel that dives under a street right after its mouth gets no mouth piece: the piece
+    would cut into that street's casing (drawn widths grow with zoom, no fixed length clears it)."""
     a, b, c = (18.000, 59.30), (18.001, 59.30), (18.004, 59.30)
     k = 111320.0 * math.cos(math.radians(59.30))
     x = 18.001 + 6 / k                                         # a street crossing 6 m into the tunnel
@@ -833,7 +833,13 @@ def test_tunnel_portal_stops_before_another_street():
         {"highway": ["service", "service", "secondary"], "tunnel": [None, "yes", None]},
         geometry=[LineString([a, b]), LineString([b, c]),
                   LineString([(x, 59.2995), (x, 59.3005)])], crs=4326)
-    style = _style(render_edges(g, backend="web").html)
-    xs = [q[0] for q in style["sources"]["portals"]["data"]["features"][0]["geometry"]["coordinates"]]
-    metres = (max(xs) - 18.001) * k
-    assert 1.0 < metres < 2.5                                  # 6 m - 4 m clearance, not 8 m
+    assert "portals" not in _style(render_edges(g, backend="web").html)["sources"]
+
+    # a street that only runs close by (3 m to the side, never crossed) doesn't shorten it
+    y = 59.30 + 3 / 111320.0
+    g2 = gpd.GeoDataFrame(
+        {"highway": ["service", "service", "secondary"], "tunnel": [None, "yes", None]},
+        geometry=[LineString([a, b]), LineString([b, c]), LineString([(18.0015, y), (18.004, y)])], crs=4326)
+    xs = [q[0] for q in _style(render_edges(g2, backend="web").html)
+          ["sources"]["portals"]["data"]["features"][0]["geometry"]["coordinates"]]
+    assert 7.5 < (max(xs) - 18.001) * k < 8.5

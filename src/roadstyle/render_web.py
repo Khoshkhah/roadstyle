@@ -517,7 +517,7 @@ def _mark_lvl(geo, tunnel_col, bridge_col, layer_col):
         p["lvl"] = lvl
 
 
-_PORTAL_CLEAR_M = 4.0   # a mouth piece stops this far before any other surface road
+_PORTAL_CLEAR_M = 4.0   # no mouth piece when the tunnel passes under a street this close past it
 
 
 def _tunnel_portals(geo, portal_m):
@@ -526,14 +526,16 @@ def _tunnel_portals(geo, portal_m):
 
     Tunnels draw under the surface band, so at a mouth the surface road's casing and round cap
     paint across the tunnel's start like a wall. These pieces draw at street level (fill only,
-    between the surface casing and fill), so the road visibly runs into the tunnel. A piece stops
-    ``_PORTAL_CLEAR_M`` before any other surface road (a tunnel that dives under a street right
-    after its mouth), so it never cuts into that street's casing. Each carries its edge's
+    between the surface casing and fill), so the road visibly runs into the tunnel. A tunnel that
+    passes under a street (crosses it without a shared node) within ``portal_m +
+    _PORTAL_CLEAR_M`` of its mouth gets no piece: a piece would cut into that street's casing, and
+    drawn widths grow with zoom, so no fixed length clears it at every zoom. Streets that only run
+    close by (a roundabout at the mouth) don't count. Each carries its edge's
     properties (class, baked fills, two-way offset) plus ``__rs_road``, the edge's feature id (its
     index), so recolouring and id filters reach it; direction is kept, so the two-way lane offset
     lands on the same side. LineStrings only."""
     from shapely import STRtree
-    from shapely.geometry import LineString, Point, box
+    from shapely.geometry import LineString, box
     from shapely.ops import substring
 
     if not portal_m:
@@ -558,23 +560,17 @@ def _tunnel_portals(geo, portal_m):
             mouth = key(c[0] if at_start else c[-1])
             if mouth not in surface:
                 continue
+            # the piece plus the clearance, from the mouth in: a street it crosses there is one the
+            # tunnel passes under right after its mouth -> no piece
+            reach = min(portal_m + _PORTAL_CLEAR_M, local.length)
+            ahead = substring(local, 0, reach) if at_start else substring(local, local.length - reach, local.length)
+            x0, y0 = c[0] if at_start else c[-1]
+            pad = reach / 111320.0 * 2
+            near = box(x0 - pad, y0 - pad, x0 + pad, y0 + pad)
+            if any(mouth not in (key(g[0]), key(g[-1])) and ahead.intersects(to_local(g))
+                   for g in (ground[j] for j in tree.query(near))):
+                continue
             m = min(portal_m, local.length)
-            part = substring(local, 0, m) if at_start else substring(local, local.length - m, local.length)
-            if part.geom_type != "LineString":
-                continue
-            out_of = part if at_start else LineString(part.coords[::-1])     # runs from the mouth in
-            # other streets near the piece (not the ones meeting at the mouth): stop short of them
-            pad = portal_m + _PORTAL_CLEAR_M
-            x, y = c[0] if at_start else c[-1]
-            near = box(x - pad / kx, y - pad / 111320.0, x + pad / kx, y + pad / 111320.0)
-            for g in (ground[j] for j in tree.query(near)):
-                if mouth in (key(g[0]), key(g[-1])):
-                    continue
-                hit = out_of.intersection(to_local(g).buffer(_PORTAL_CLEAR_M))
-                if not hit.is_empty:
-                    m = min(m, min(out_of.project(Point(q)) for q in _coords(hit)))
-            if m < 0.5:
-                continue
             part = substring(local, 0, m) if at_start else substring(local, local.length - m, local.length)
             if part.geom_type != "LineString":
                 continue
@@ -583,13 +579,6 @@ def _tunnel_portals(geo, portal_m):
                                      "coordinates": [[x / kx + lon0, y / 111320.0 + lat0]
                                                      for x, y in part.coords]}})
     return out
-
-
-def _coords(g):
-    """Every vertex of a shapely geometry (any type, collections included)."""
-    if hasattr(g, "geoms"):
-        return [q for p in g.geoms for q in _coords(p)]
-    return list(g.coords)
 
 
 _JS_MAX_SAFE_INT = 2 ** 53 - 1

@@ -38,6 +38,11 @@ few metres, **at street level**, as fill only:
   highlighted or hidden tunnel is highlighted or hidden at its mouth too. The class filter and
   `minzoom` apply as to the roads.
 - Not clickable: a click there hits the surface road or the tunnel next to it.
+- **Tunnels that pass under a street right after the mouth** (crossing it without a shared node
+  within `portal_m` + 4 m) get no piece: roads are drawn wider than they are when zoomed in, so a
+  piece of any fixed length would cut into that street's casing at some zoom. Found in Monaco at
+  edges 5522189458485441601 / 8106181161262786971 (a service tunnel under Rue de la Colle); streets
+  that only run close by, like a roundabout at Tunnel Pasteur's mouth, don't count.
 
 ## Not chosen
 
