@@ -863,4 +863,5 @@ def test_tunnel_casing_in_two_tones():
     assert tun["__rs_casing_gap"] == "#8d8d8d" and tun["__rs_casing_dash"] == "#5e5e5e"  # 25 / 50 % darker
     assert "__rs_casing_dash" not in street and "__rs_casing_gap" not in street
     mono = _style(render_edges(g, backend="web", palette="mono").html)["sources"]["roads"]["data"]
-    assert mono["features"][0]["properties"]["__rs_casing_dash"] > "#4f4f4f"   # dark casing: lighter
+    tun = mono["features"][0]["properties"]                     # mono primary casing #4f4f4f
+    assert tun["__rs_casing_gap"] == "#4f4f4f" and tun["__rs_casing_dash"] == "#282828"  # dark, darker

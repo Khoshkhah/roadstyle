@@ -532,30 +532,23 @@ def _is_light(hex_color):
     return rgb is not None and sum(rgb) / 3 > 110
 
 
-def _shade(hex_color, amount):
-    """A darker shade of a light colour, a lighter one of a dark colour (by ``amount``, 0..1), so it
-    stands out on either. None when the colour isn't ``#rgb`` / ``#rrggbb``."""
+def _darker(hex_color, amount):
+    """``hex_color`` darkened by ``amount`` (0..1); None when it isn't ``#rgb`` / ``#rrggbb``."""
     rgb = _rgb(hex_color)
-    if rgb is None:
-        return None
-    if _is_light(hex_color):
-        rgb = [round(v * (1 - amount)) for v in rgb]
-    else:
-        rgb = [round(v + (255 - v) * amount) for v in rgb]
-    return "#%02x%02x%02x" % tuple(rgb)
+    return None if rgb is None else "#%02x%02x%02x" % tuple(round(v * (1 - amount)) for v in rgb)
 
 
 def _mark_tunnel_dash(geo, gap, dash):
     """A tunnel edge's (lvl < 0) casing in two dark tones, from its own casing: ``__rs_casing_gap``
-    (solid, shaded by ``gap``) and ``__rs_casing_dash`` (the dashes on it, shaded by ``dash``), so
-    the casing is two-toned, never gapped. A dark casing (mono) stays as it is under the dashes,
-    and the dashes go lighter."""
+    (solid, darkened by ``gap``) and ``__rs_casing_dash`` (the dashes on it, darkened by ``dash``),
+    so the casing is two-toned, never gapped. A casing that is already dark (mono) stays as it is
+    under the dashes."""
     for ft in geo["features"]:
         p = ft.get("properties") or {}
         if (p.get("lvl") or 0) < 0:
             c = p.get("__rs_casing")
-            p["__rs_casing_gap"] = _shade(c, gap) if _is_light(c) else c
-            p["__rs_casing_dash"] = _shade(c, dash)
+            p["__rs_casing_gap"] = _darker(c, gap) if _is_light(c) else c
+            p["__rs_casing_dash"] = _darker(c, dash)
 
 
 _PORTAL_CLEAR_M = 4.0   # no mouth piece when the tunnel passes under a street this close past it

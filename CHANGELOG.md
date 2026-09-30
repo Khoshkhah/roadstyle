@@ -12,8 +12,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   shades of the road's own casing, a solid one with darker dashes on top (new layer
   `roads-tunnel-casing-dash` on top of `roads-tunnel-casing`): it is continuous, and the dash
   still says "tunnel". Settings: `tunnel_casing_dash` (default `[2, 2]`), `tunnel_gap_shade`
-  (`0.25`) and `tunnel_dash_shade` (`0.5`): how much darker than the road's casing (on a dark
-  casing, the dashes go lighter).
+  (`0.25`) and `tunnel_dash_shade` (`0.5`): how much darker than the road's casing (an already
+  dark casing, as in `mono`, keeps its own tone under the dashes).
 
 ### Fixed
 - **A road running into a tunnel no longer looks cut off.** Tunnels draw under the surface roads,
