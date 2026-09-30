@@ -100,7 +100,7 @@ def test_web_annotation_slots_alternate_names_and_arrows():
     # one arrow layer per grade tier, each right beside its road tier — a bridge must cover
     # the arrows of the road it crosses, not have them float above everything
     assert ids.index("roads-arrows") == ids.index("roads-fill") + 1
-    assert ids.index("roads-arrows-tunnel") == ids.index("roads-tunnel-fill") + 1
+    assert ids.index("roads-arrows-tunnel") == ids.index("roads-tunnel-centre") + 1
     assert ids.index("roads-arrows-bridge") == ids.index("roads-bridge-fill") + 1
     assert ["to-boolean", ["get", "name"]] in lab["filter"]          # unnamed -> slot stays empty
     assert lab["layout"]["symbol-placement"] == "line-center"
@@ -853,6 +853,10 @@ def test_tunnel_casing_solid_by_default_dash_as_a_setting():
     lay = {l["id"]: l for l in _style(render_edges(g, backend="web").html)["layers"]}
     assert "line-dasharray" not in lay["roads-tunnel-casing"]["paint"]
     assert lay["roads-tunnel-casing"]["layout"]["line-cap"] == "round"
+    # what says "tunnel" instead: a pale fill over a white base, and a dashed centre line on top
+    ids = list(lay)
+    assert ids.index("roads-tunnel-base") < ids.index("roads-tunnel-fill") < ids.index("roads-tunnel-centre")
+    assert lay["roads-tunnel-centre"]["paint"]["line-dasharray"]
     dashed = render_edges(g, backend="web", settings={"config": {"tunnel_casing_dash": [2, 2]}})
     lay = {l["id"]: l for l in _style(dashed.html)["layers"]}
     assert lay["roads-tunnel-casing"]["paint"]["line-dasharray"] == [2, 2]

@@ -154,7 +154,7 @@ Returns a `WebMap` (web, `.save()`), a `folium.Map` (`.save()`) or a `lonboard.M
 | keyword | default | backends | what |
 |---|---|---|---|
 | `highway_col` | `"highway"` | all | the road-class column (widths, casing, draw order) |
-| `tunnel_col` / `bridge_col` | `"tunnel"` / `"bridge"` | all | tunnels draw under (faded), bridges on top |
+| `tunnel_col` / `bridge_col` | `"tunnel"` / `"bridge"` | all | tunnels draw under (web: pale, dashed centre line), bridges on top |
 | `layer_col` | `"layer"` | web | OSM `layer`; negative sinks an edge when there is no tunnel/bridge column |
 
 ### Overlays & boundary

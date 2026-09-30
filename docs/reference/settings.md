@@ -109,8 +109,9 @@ three palettes: `opacity` 1.0.
 In every palette:
 
 - `*_link` roads take the parent's colour, 0.7 × the width (`link_scale`).
-- Tunnels fade (0.45 × opacity in folium / lonboard, where they are also dashed; a faded fill and a
-  solid casing on the web map, dashed with `tunnel_casing_dash`). Bridges get a black casing 1.5 px wider.
+- Tunnels: on the web map a pale fill, a dashed centre line and a solid casing (dashed with
+  `tunnel_casing_dash`); in folium / lonboard, 0.45 × opacity and dashed. Bridges get a black
+  casing 1.5 px wider.
 - An unknown class draws as `unclassified`.
 
 ## Custom palettes

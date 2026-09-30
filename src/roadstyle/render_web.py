@@ -1116,19 +1116,28 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     bcw = _width_expr(highway_col, casing=True, scale=1.25, **sw)   # heavier bridge casing ("wings")
     style["layers"] += under_layers            # caller overlays drawn beneath the roads (e.g. zones)
     style["layers"] += [
-        # Tunnels first, so the surface roads above paint over them at crossings. The faded fill makes
-        # a tunnel read as "underground" even where nothing crosses it. The casing is solid by
-        # default: a dashed one (osm-carto, `tunnel_casing_dash`) leaves gaps where you can't tell
-        # whether two tunnel pieces connect.
+        # Tunnels first, so the surface roads above paint over them at crossings. A tunnel reads as
+        # one: a pale fill (the fill at half opacity over a white base, so the casing doesn't tint
+        # it) and a thin dashed centre line. The casing is solid by default: a dashed one
+        # (osm-carto, `tunnel_casing_dash`) leaves gaps where you can't tell whether two tunnel
+        # pieces connect.
         {"id": "roads-tunnel-casing", "type": "line", "source": "roads",
          "layout": tlay if CONFIG.tunnel_casing_dash else lay, "filter": tunnel,
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
                    "line-width": cw, "line-offset": off,
                    **({"line-dasharray": list(CONFIG.tunnel_casing_dash)} if CONFIG.tunnel_casing_dash else {})}},
+        {"id": "roads-tunnel-base", "type": "line", "source": "roads", "layout": lay,
+         "filter": tunnel,
+         "paint": {"line-color": "#ffffff", "line-width": fw, "line-offset": off}},
         {"id": "roads-tunnel-fill", "type": "line", "source": "roads", "layout": lay,
          "filter": tunnel,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
-                   "line-width": fw, "line-offset": off, "line-opacity": 0.72}},
+                   "line-width": fw, "line-offset": off, "line-opacity": 0.5}},
+        {"id": "roads-tunnel-centre", "type": "line", "source": "roads", "layout": tlay,
+         "filter": tunnel,
+         "paint": {"line-color": "#555555", "line-opacity": 0.8, "line-offset": off,
+                   "line-width": ["interpolate", ["linear"], ["zoom"], 14, 0.6, 18, 1.4],
+                   "line-dasharray": [4, 3]}},
         {"id": "roads-casing", "type": "line", "source": "roads", "layout": lay, "filter": surface,
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
                    "line-width": cw, "line-offset": off}},
