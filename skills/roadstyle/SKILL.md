@@ -20,6 +20,8 @@ Docs: https://khoshkhah.github.io/roadstyle/ (every keyword: `/reference/paramet
 - Required: LineString `geometry` (any CRS, reprojected for you) and `highway` (OSM class).
 - Optional columns switch features on: `name` (labels, popup title), `oneway` (arrows),
   `bridge` / `tunnel` / `layer` (grade separation), `edge_id` (kept exact past 2**53).
+- Real widths: `width_m_col="width_m"` draws each line exactly that many metres wide from
+  `width_m_zoom` (16) on, casing `casing_m` (0.15) inside it; null = the class width.
 - Draw order beyond class and level: `band_col="band"` (-1 / 1: an edge entirely under / over the
   ground roads, casing included) and `order_col="order"` (a number: the order inside its band);
   both per edge, null = the default rule.
