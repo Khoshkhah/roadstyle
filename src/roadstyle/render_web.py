@@ -517,32 +517,45 @@ def _mark_lvl(geo, tunnel_col, bridge_col, layer_col):
         p["lvl"] = lvl
 
 
-def _shade(hex_color, amount):
-    """A darker shade of a light ``#rrggbb`` colour, a lighter one of a dark colour (by ``amount``,
-    0..1), so the dash stands out on any casing. None for anything that isn't ``#rgb`` / ``#rrggbb``."""
+def _rgb(hex_color):
+    """``#rgb`` / ``#rrggbb`` -> [r, g, b]; None for anything else (a named or rgba() colour)."""
     h = (hex_color or "").lstrip("#")
-    if len(h) == 3:
-        h = "".join(ch * 2 for ch in h)
-    if len(h) != 6:
-        return None
+    h = "".join(ch * 2 for ch in h) if len(h) == 3 else h
     try:
-        rgb = [int(h[i:i + 2], 16) for i in (0, 2, 4)]
+        return [int(h[i:i + 2], 16) for i in (0, 2, 4)] if len(h) == 6 else None
     except ValueError:
         return None
-    if sum(rgb) / 3 > 110:
+
+
+def _is_light(hex_color):
+    rgb = _rgb(hex_color)
+    return rgb is not None and sum(rgb) / 3 > 110
+
+
+def _shade(hex_color, amount):
+    """A darker shade of a light colour, a lighter one of a dark colour (by ``amount``, 0..1), so it
+    stands out on either. None when the colour isn't ``#rgb`` / ``#rrggbb``."""
+    rgb = _rgb(hex_color)
+    if rgb is None:
+        return None
+    if _is_light(hex_color):
         rgb = [round(v * (1 - amount)) for v in rgb]
     else:
         rgb = [round(v + (255 - v) * amount) for v in rgb]
     return "#%02x%02x%02x" % tuple(rgb)
 
 
-def _mark_tunnel_dash(geo, amount):
-    """``__rs_casing_dash`` on every tunnel edge (lvl < 0): a shade of its own casing for the
-    dashes, drawn over the solid casing so a tunnel's casing is two-toned, never gapped."""
+def _mark_tunnel_dash(geo, gap, dash):
+    """A tunnel edge's (lvl < 0) casing in two dark tones, from its own casing: ``__rs_casing_gap``
+    (solid, shaded by ``gap``) and ``__rs_casing_dash`` (the dashes on it, shaded by ``dash``), so
+    the casing is two-toned, never gapped. A dark casing (mono) stays as it is under the dashes,
+    and the dashes go lighter."""
     for ft in geo["features"]:
         p = ft.get("properties") or {}
         if (p.get("lvl") or 0) < 0:
-            p["__rs_casing_dash"] = _shade(p.get("__rs_casing"), amount)
+            c = p.get("__rs_casing")
+            p["__rs_casing_gap"] = _shade(c, gap) if _is_light(c) else c
+            p["__rs_casing_dash"] = _shade(c, dash)
 
 
 _PORTAL_CLEAR_M = 4.0   # no mouth piece when the tunnel passes under a street this close past it
@@ -1050,7 +1063,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                                 "prop": "__rs_fill", "legend": rf.legend}]
     _mark_twoway(geo)
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
-    _mark_tunnel_dash(geo, CONFIG.tunnel_dash_shade)
+    _mark_tunnel_dash(geo, CONFIG.tunnel_gap_shade, CONFIG.tunnel_dash_shade)
     _stringify_unsafe_ints(geo)   # BIGINT ids (e.g. edge_id) -> string so JS doesn't round them
 
     # active base map + the set offered to the in-map switcher (active shown first)
@@ -1146,17 +1159,17 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     style["layers"] += under_layers            # caller overlays drawn beneath the roads (e.g. zones)
     style["layers"] += [
         # Tunnels first, so the surface roads above paint over them at crossings. A tunnel reads as
-        # one from its casing in two tones: the road's own casing, solid, with dashes of a shade of
-        # it on top (_mark_tunnel_dash). The casing is never missing, so connected tunnel pieces
-        # look connected (a dash with empty gaps didn't show it); the dash and the faded fill say
-        # "tunnel". `tunnel_casing_dash` sets the dash, `tunnel_dash_shade` how different it is.
+        # one from its casing in two dark tones, both shades of the road's own casing: a solid one
+        # with darker dashes on top (_mark_tunnel_dash). The casing is never missing, so connected
+        # tunnel pieces look connected (a dash with empty gaps didn't show it); the dash and the
+        # faded fill say "tunnel". Settings: tunnel_casing_dash, tunnel_gap_shade, tunnel_dash_shade.
         {"id": "roads-tunnel-casing", "type": "line", "source": "roads", "layout": lay,
          "filter": tunnel,
-         "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#9a9a9a"],
+         "paint": {"line-color": ["coalesce", ["get", "__rs_casing_gap"], "#8d8d8d"],
                    "line-width": cw, "line-offset": off}},
         {"id": "roads-tunnel-casing-dash", "type": "line", "source": "roads", "layout": tlay,
          "filter": tunnel,
-         "paint": {"line-color": ["coalesce", ["get", "__rs_casing_dash"], "#5a5a5a"],
+         "paint": {"line-color": ["coalesce", ["get", "__rs_casing_dash"], "#5e5e5e"],
                    "line-width": cw, "line-offset": off,
                    "line-dasharray": list(CONFIG.tunnel_casing_dash or [2, 2])}},
         {"id": "roads-tunnel-fill", "type": "line", "source": "roads", "layout": lay,

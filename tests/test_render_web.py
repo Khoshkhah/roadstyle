@@ -846,9 +846,9 @@ def test_tunnel_portal_skipped_when_the_tunnel_passes_under_a_street_right_away(
 
 
 def test_tunnel_casing_in_two_tones():
-    """A tunnel's casing is never missing: the road's own casing, solid, with dashes of a shade of
-    it on top, so connected tunnel pieces look connected (empty dash gaps hid it) while the dash
-    says "tunnel"."""
+    """A tunnel's casing is never missing: two dark shades of the road's own casing, a solid one
+    with darker dashes on top, so connected tunnel pieces look connected (empty dash gaps hid it)
+    while the dash says "tunnel"."""
     g = gpd.GeoDataFrame({"highway": ["primary", "primary"], "tunnel": ["yes", None]},
                          geometry=[LineString([(18.0, 59.30), (18.01, 59.30)]),
                                    LineString([(18.01, 59.30), (18.02, 59.30)])], crs=4326)
@@ -856,10 +856,11 @@ def test_tunnel_casing_in_two_tones():
     lay = {l["id"]: l for l in style["layers"]}
     ids = list(lay)
     assert ids.index("roads-tunnel-casing") < ids.index("roads-tunnel-casing-dash") < ids.index("roads-tunnel-fill")
-    assert "__rs_casing" in json.dumps(lay["roads-tunnel-casing"]["paint"]["line-color"])
+    assert "__rs_casing_gap" in json.dumps(lay["roads-tunnel-casing"]["paint"]["line-color"])
     assert lay["roads-tunnel-casing-dash"]["paint"]["line-dasharray"] == [2, 2]
     tun, street = (f["properties"] for f in style["sources"]["roads"]["data"]["features"])
-    assert tun["__rs_casing"] == "#bcbcbc" and tun["__rs_casing_dash"] == "#7a7a7a"   # 35 % darker
-    assert "__rs_casing_dash" not in street
+    assert tun["__rs_casing"] == "#bcbcbc"
+    assert tun["__rs_casing_gap"] == "#8d8d8d" and tun["__rs_casing_dash"] == "#5e5e5e"  # 25 / 50 % darker
+    assert "__rs_casing_dash" not in street and "__rs_casing_gap" not in street
     mono = _style(render_edges(g, backend="web", palette="mono").html)["sources"]["roads"]["data"]
     assert mono["features"][0]["properties"]["__rs_casing_dash"] > "#4f4f4f"   # dark casing: lighter

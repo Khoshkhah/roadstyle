@@ -260,7 +260,7 @@ The `config` block of the settings. Change it in a [settings override](settings.
 | `casing_extra` | `2.0` | reserved (palettes set casing widths) |
 | `link_scale` | `0.7` | `*_link` width relative to the parent |
 | `tunnel_opacity_scale` | `0.45` | tunnel fade |
-| `tunnel_casing_dash` / `tunnel_dash_shade` | `[2, 2]` / `0.35` | the tunnel casing dash, and how much darker than the road's casing it is (lighter on a dark casing); the road's own casing shows between the dashes |
+| `tunnel_casing_dash` / `tunnel_gap_shade` / `tunnel_dash_shade` | `[2, 2]` / `0.25` / `0.5` | the tunnel casing: its dash, and how much darker than the road's casing the solid casing and the dashes are (on a dark casing the dashes go lighter) |
 | `tunnel_portal_m` | `8.0` | metres of a tunnel drawn at street level where it meets a surface road, so the road runs into it (`0` = off) |
 | `bridge_casing_extra` / `bridge_casing_color` | `1.5` / `"#000000"` | bridge casing, px wider / colour |
 | `minor_no_casing` | cycleway, footway, living_street, path, pedestrian, service, track | classes drawn without casing |
