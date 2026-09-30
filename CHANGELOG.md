@@ -6,6 +6,14 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **Link roads draw below every street, as in every established map style.** A `*_link` used to
+  sort just under its parent class, so a `primary_link` covered the residential street it meets.
+  Links now sort below every non-link street and above `service`, in their parents' order
+  (`roads.z_order`: motorway_link 1.9 … tertiary_link 1.7), as openstreetmap-carto, OpenMapTiles,
+  Mapbox Streets and OSM Americana do. A link the table doesn't list still sits just under its
+  parent; settings can override any value. Design: `docs/design/junction_order.md`.
+
 ## [0.9.3] — 2026-09-30
 
 ### Added

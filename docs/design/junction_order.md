@@ -56,7 +56,7 @@ Established styles were read in their source.
 
 ## Plan, in four steps (each its own commit, checked before the next)
 
-### 1. Class order like every established style (`roads.z_order`)
+### 1. Class order like every established style (`roads.z_order`) — done
 
 Links move below every non-link road, in their parents' order, between `pedestrian` (2) and
 `service` (1.5): motorway_link 1.9, trunk_link 1.85, primary_link 1.8, secondary_link 1.75,

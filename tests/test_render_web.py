@@ -993,3 +993,21 @@ def test_tunnels_toggle_like_bridges():
     assert '[">=",["coalesce",["get","lvl"],0],0]' in html
     plain = render_edges(_edges(), backend="web").html
     assert '"tunnels": false' in plain
+
+
+def test_links_draw_below_every_street_like_osm_carto():
+    """Every *_link sorts below every non-link street (residential included) and above service,
+    in its parent's order: a primary_link no longer covers the residential street it meets
+    (docs/design/junction_order.md, step 1). A link the table doesn't list stays under its parent."""
+    from roadstyle import render_web
+    key = render_web._sort_key("highway")[2]                # ["match", ["get", col], c, z, ..., default]
+    z = dict(zip(key[2:-1:2], key[3:-1:2]))
+    links = ["motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"]
+    assert all(z["pedestrian"] > z[l] > z["service"] for l in links)
+    assert [z[l] for l in links] == sorted((z[l] for l in links), reverse=True)
+    assert z["primary_link"] < z["residential"]
+    render_web.ROAD_Z.pop("trunk_link")
+    try:
+        assert render_web._sort_key("highway")[2][render_web._sort_key("highway")[2].index("trunk_link") + 1] == 7.5
+    finally:
+        render_web._load_road_model()

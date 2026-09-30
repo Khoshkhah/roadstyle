@@ -68,11 +68,13 @@ def _sort_key(col, order=False):
 
     ``lvl*1000`` puts every tunnel (lvl -1) below every surface road and every bridge (lvl +1)
     above, so a tunnel passing *under* a street no longer looks connected to it; within a grade,
-    higher-class roads still draw on top (links just under their through road)."""
+    higher-class roads still draw on top. Links come from the z_order table too: every link below
+    every non-link street, as in openstreetmap-carto and every established style
+    (docs/design/junction_order.md); a link the table doesn't list sits just under its parent."""
     m = ["match", ["get", col]]
     for c in _CLASSES:
         b, lk = _base(c)
-        m += [c, ROAD_Z.get(b, 4) - (0.5 if lk else 0)]
+        m += [c, ROAD_Z[c] if c in ROAD_Z else ROAD_Z.get(b, 4) - (0.5 if lk else 0)]
     m.append(4)
     if order:
         m = ["coalesce", ["get", "__rs_order"], m]
