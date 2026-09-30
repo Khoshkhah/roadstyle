@@ -517,6 +517,34 @@ def _mark_lvl(geo, tunnel_col, bridge_col, layer_col):
         p["lvl"] = lvl
 
 
+def _shade(hex_color, amount):
+    """A darker shade of a light ``#rrggbb`` colour, a lighter one of a dark colour (by ``amount``,
+    0..1), so the dash stands out on any casing. None for anything that isn't ``#rgb`` / ``#rrggbb``."""
+    h = (hex_color or "").lstrip("#")
+    if len(h) == 3:
+        h = "".join(ch * 2 for ch in h)
+    if len(h) != 6:
+        return None
+    try:
+        rgb = [int(h[i:i + 2], 16) for i in (0, 2, 4)]
+    except ValueError:
+        return None
+    if sum(rgb) / 3 > 110:
+        rgb = [round(v * (1 - amount)) for v in rgb]
+    else:
+        rgb = [round(v + (255 - v) * amount) for v in rgb]
+    return "#%02x%02x%02x" % tuple(rgb)
+
+
+def _mark_tunnel_dash(geo, amount):
+    """``__rs_casing_dash`` on every tunnel edge (lvl < 0): a shade of its own casing for the
+    dashes, drawn over the solid casing so a tunnel's casing is two-toned, never gapped."""
+    for ft in geo["features"]:
+        p = ft.get("properties") or {}
+        if (p.get("lvl") or 0) < 0:
+            p["__rs_casing_dash"] = _shade(p.get("__rs_casing"), amount)
+
+
 _PORTAL_CLEAR_M = 4.0   # no mouth piece when the tunnel passes under a street this close past it
 
 
@@ -1022,6 +1050,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                                 "prop": "__rs_fill", "legend": rf.legend}]
     _mark_twoway(geo)
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
+    _mark_tunnel_dash(geo, CONFIG.tunnel_dash_shade)
     _stringify_unsafe_ints(geo)   # BIGINT ids (e.g. edge_id) -> string so JS doesn't round them
 
     # active base map + the set offered to the in-map switcher (active shown first)
@@ -1117,16 +1146,17 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     style["layers"] += under_layers            # caller overlays drawn beneath the roads (e.g. zones)
     style["layers"] += [
         # Tunnels first, so the surface roads above paint over them at crossings. A tunnel reads as
-        # one from its casing in two tones: a solid mid-grey casing, with the dashed casing
-        # (osm-carto) on top. The casing is never missing, so connected tunnel pieces look
-        # connected (a dash with empty gaps didn't show it); the dash and the faded fill say
-        # "tunnel". `tunnel_casing_dash` sets the dash, `tunnel_casing_gap` the light tone.
+        # one from its casing in two tones: the road's own casing, solid, with dashes of a shade of
+        # it on top (_mark_tunnel_dash). The casing is never missing, so connected tunnel pieces
+        # look connected (a dash with empty gaps didn't show it); the dash and the faded fill say
+        # "tunnel". `tunnel_casing_dash` sets the dash, `tunnel_dash_shade` how different it is.
         {"id": "roads-tunnel-casing", "type": "line", "source": "roads", "layout": lay,
          "filter": tunnel,
-         "paint": {"line-color": CONFIG.tunnel_casing_gap, "line-width": cw, "line-offset": off}},
+         "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#9a9a9a"],
+                   "line-width": cw, "line-offset": off}},
         {"id": "roads-tunnel-casing-dash", "type": "line", "source": "roads", "layout": tlay,
          "filter": tunnel,
-         "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
+         "paint": {"line-color": ["coalesce", ["get", "__rs_casing_dash"], "#5a5a5a"],
                    "line-width": cw, "line-offset": off,
                    "line-dasharray": list(CONFIG.tunnel_casing_dash or [2, 2])}},
         {"id": "roads-tunnel-fill", "type": "line", "source": "roads", "layout": lay,

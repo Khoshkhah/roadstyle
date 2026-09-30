@@ -8,10 +8,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Changed
 - **Tunnel casings in two tones, never with empty gaps.** The dashed tunnel casing (osm-carto)
-  left gaps where you couldn't tell whether two tunnel pieces connect. Now a solid mid-grey
-  casing runs under the dashes (new layer `roads-tunnel-casing-dash` on top of
-  `roads-tunnel-casing`), so the casing is continuous and the dash still says "tunnel". Settings:
-  `tunnel_casing_gap` (default `#9a9a9a`) and `tunnel_casing_dash` (default `[2, 2]`).
+  left gaps where you couldn't tell whether two tunnel pieces connect. Now the road's own casing
+  runs solid under the dashes, and the dashes are a shade of it (new layer
+  `roads-tunnel-casing-dash` on top of `roads-tunnel-casing`): the casing looks like any road's and
+  is continuous, and the dash still says "tunnel". Settings: `tunnel_casing_dash` (default
+  `[2, 2]`) and `tunnel_dash_shade` (default `0.35`: that much darker, or lighter on a dark casing).
 
 ### Fixed
 - **A road running into a tunnel no longer looks cut off.** Tunnels draw under the surface roads,

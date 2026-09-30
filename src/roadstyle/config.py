@@ -43,7 +43,7 @@ class StyleConfig:
     bridge_casing_color: str = "#000000"   # bridge deck casing colour (black by default)
     tunnel_portal_m: float = 8.0       # metres of a tunnel drawn at street level at its mouth (0 = off)
     tunnel_casing_dash: list = field(default_factory=lambda: [2, 2])   # the tunnel casing dash (osm-carto)
-    tunnel_casing_gap: str = "#9a9a9a"   # the casing tone between the tunnel dashes (never an empty gap)
+    tunnel_dash_shade: float = 0.35      # tunnel dashes: this much darker (lighter on a dark casing) than the casing
     minor_no_casing: frozenset[str] = field(default_factory=lambda: _MINOR_NO_CASING)
     #: class -> zoom below which it is hidden. Consulted only when the caller opts in.
     minzoom: dict = field(default_factory=dict)
