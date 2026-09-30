@@ -517,6 +517,49 @@ def _mark_lvl(geo, tunnel_col, bridge_col, layer_col):
         p["lvl"] = lvl
 
 
+def _tunnel_portals(geo, portal_m):
+    """Tunnel mouths: the first / last ``portal_m`` metres of every tunnel edge (lvl < 0) whose end
+    point is also a surface edge's (lvl 0) end point, as features for the ``portals`` source.
+
+    Tunnels draw under the surface band, so at a mouth the surface road's casing and round cap
+    paint across the tunnel's start like a wall. These pieces draw at street level (fill only,
+    between the surface casing and fill), so the road visibly runs into the tunnel. Each carries
+    its edge's properties (class, baked fills, two-way offset) plus ``__rs_road``, the edge's
+    feature id (its index), so recolouring and id filters reach it; direction is kept, so the
+    two-way lane offset lands on the same side. LineStrings only."""
+    from shapely.geometry import LineString
+    from shapely.ops import substring
+
+    if not portal_m:
+        return []
+    key = lambda c: (round(c[0], 6), round(c[1], 6))  # noqa: E731
+    lines = [(i, ft) for i, ft in enumerate(geo["features"])
+             if (ft.get("geometry") or {}).get("type") == "LineString"
+             and len(ft["geometry"].get("coordinates") or []) >= 2]
+    surface = {key(ft["geometry"]["coordinates"][j]) for _, ft in lines
+               if (ft["properties"].get("lvl") or 0) == 0 for j in (0, -1)}
+    out = []
+    for i, ft in lines:
+        p, c = ft["properties"], ft["geometry"]["coordinates"]
+        if (p.get("lvl") or 0) >= 0:
+            continue
+        lon0, lat0 = c[0]
+        kx = 111320.0 * math.cos(math.radians(lat0))
+        local = LineString([((x - lon0) * kx, (y - lat0) * 111320.0) for x, y in c])
+        m = min(portal_m, local.length)
+        for at_start in (True, False):
+            if key(c[0] if at_start else c[-1]) not in surface:
+                continue
+            part = substring(local, 0, m) if at_start else substring(local, local.length - m, local.length)
+            if part.geom_type != "LineString":
+                continue
+            out.append({"type": "Feature", "properties": {**p, "__rs_road": i},
+                        "geometry": {"type": "LineString",
+                                     "coordinates": [[x / kx + lon0, y / 111320.0 + lat0]
+                                                     for x, y in part.coords]}})
+    return out
+
+
 _JS_MAX_SAFE_INT = 2 ** 53 - 1
 
 # Curated default fields for the road click-popup (used when road_popup=True), instead of every
@@ -1009,6 +1052,10 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         # ~5k features can afford it.
         style["sources"]["roads"] = {"type": "geojson", "data": geo, "generateId": True,
                                      "tolerance": 0.05}
+    portals = _tunnel_portals(geo, CONFIG.tunnel_portal_m)
+    if portals:
+        style["sources"]["portals"] = {"type": "geojson", "tolerance": 0.05,
+                                       "data": {"type": "FeatureCollection", "features": portals}}
 
     # extra overlay layers (zones / POIs / any geometry the caller brings); each gets its own source
     # + paint layer(s), placed under or over the roads, and (if `popup` is set) clickable.
@@ -1061,6 +1108,12 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         {"id": "roads-casing", "type": "line", "source": "roads", "layout": lay, "filter": surface,
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
                    "line-width": cw, "line-offset": off}},
+        # tunnel mouths at street level (fill only): they cover the surface casing where a tunnel
+        # starts, so the road runs into it instead of hitting a wall (_tunnel_portals)
+        *([{"id": "roads-portal-fill", "type": "line", "source": "portals", "layout": lay,
+            **({"filter": _z} if mz else {}),
+            "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
+                      "line-width": fw, "line-offset": off}}] if portals else []),
         {"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, "filter": surface,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
                    "line-width": fw, "line-offset": off}},

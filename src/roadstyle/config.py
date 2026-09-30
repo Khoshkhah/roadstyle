@@ -41,6 +41,7 @@ class StyleConfig:
     tunnel_opacity_scale: float = 0.45  # tunnels fade to 45 % and gain a dash
     bridge_casing_extra: float = 1.5   # bridges: casing a touch wider (the deck "wings")
     bridge_casing_color: str = "#000000"   # bridge deck casing colour (black by default)
+    tunnel_portal_m: float = 8.0       # metres of a tunnel drawn at street level at its mouth (0 = off)
     minor_no_casing: frozenset[str] = field(default_factory=lambda: _MINOR_NO_CASING)
     #: class -> zoom below which it is hidden. Consulted only when the caller opts in.
     minzoom: dict = field(default_factory=dict)

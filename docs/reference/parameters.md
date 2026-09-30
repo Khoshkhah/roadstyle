@@ -260,6 +260,7 @@ The `config` block of the settings. Change it in a [settings override](settings.
 | `casing_extra` | `2.0` | reserved (palettes set casing widths) |
 | `link_scale` | `0.7` | `*_link` width relative to the parent |
 | `tunnel_opacity_scale` | `0.45` | tunnel fade |
+| `tunnel_portal_m` | `8.0` | metres of a tunnel drawn at street level where it meets a surface road, so the road runs into it (`0` = off) |
 | `bridge_casing_extra` / `bridge_casing_color` | `1.5` / `"#000000"` | bridge casing, px wider / colour |
 | `minor_no_casing` | cycleway, footway, living_street, path, pedestrian, service, track | classes drawn without casing |
 | `minzoom` | motorway 4 … residential 13 … footway 15 | class → hidden below this zoom, with `minzoom=True` |

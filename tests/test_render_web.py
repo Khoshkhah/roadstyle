@@ -790,3 +790,33 @@ def test_basemap_button_is_a_map_control_in_the_top_right_column():
 def test_zoom_readout_is_on_by_default_and_can_be_turned_off():
     assert "if(true){ const zd=" in render_edges(_edges(), backend="web").html
     assert "if(false){ const zd=" in render_edges(_edges(), backend="web", zoom_readout=False).html
+
+
+def test_tunnel_portals_draw_the_mouth_at_street_level():
+    """A tunnel end shared with a surface road gets a short piece at street level (the `portals`
+    source), drawn between the surface casing and fill, so the road runs into the tunnel instead
+    of meeting the surface casing like a wall. Tunnel-tunnel ends get none; tunnel_portal_m=0
+    turns it off."""
+    a, b, c, d = (18.000, 59.30), (18.002, 59.30), (18.004, 59.30), (18.006, 59.30)
+    g = gpd.GeoDataFrame(
+        {"highway": ["primary", "primary", "primary"], "tunnel": [None, "yes", "yes"]},
+        geometry=[LineString([a, b]), LineString([b, c]), LineString([c, d])], crs=4326)
+    style = _style(render_edges(g, backend="web").html)
+    pieces = style["sources"]["portals"]["data"]["features"]
+    assert [f["properties"]["__rs_road"] for f in pieces] == [1]      # only the mouth at b
+    xs = [x for x, _ in pieces[0]["geometry"]["coordinates"]]
+    assert xs[0] == 18.002 and 18.002 < xs[-1] < 18.0022              # ~8 m in from the mouth
+    ids = [l["id"] for l in style["layers"]]
+    assert ids.index("roads-casing") < ids.index("roads-portal-fill") < ids.index("roads-fill")
+
+    off = _style(render_edges(g, backend="web", settings={"config": {"tunnel_portal_m": 0}}).html)
+    assert "portals" not in off["sources"]
+    assert "roads-portal-fill" not in [l["id"] for l in off["layers"]]
+
+
+def test_tunnel_portals_follow_recolour_and_id_filter():
+    """rsColor / rsFilter reach a mouth piece through its road's id (__rs_road)."""
+    html = render_edges(_edges(), backend="web").html
+    assert 'RS_PORTAL_LAYERS = ["roads-portal-fill"]' in html
+    assert '_fillExpr(["get","__rs_road"])' in html
+    assert 'l.source==="portals"' in html

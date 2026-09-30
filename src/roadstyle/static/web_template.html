@@ -476,6 +476,7 @@ function _applyRoadFilters(){
     // the archive source, so the tile layer name is what separates them.
     const isRoads = l.source==="roads" && (!RS_TILED || l["source-layer"]==="roads");
     if(_qIds && isRoads){ const qf=["in",["id"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
+    if(_qIds && l.source==="portals"){ const qf=["in",["get","__rs_road"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
     try{ map.setFilter(l.id,f); }catch(e){}
   });
   return hidden;
@@ -642,6 +643,7 @@ if(FILTER.on){
 // road-fill layers' line-color at the chosen prop. window.rsSetColorField drives it from your UI.
 const COLOR_OPTIONS = __COLOR_OPTIONS__;
 const RS_FILL_LAYERS = ["roads-fill","roads-tunnel-fill","roads-bridge-fill"];
+const RS_PORTAL_LAYERS = ["roads-portal-fill"];   // tunnel mouths: their road's id is __rs_road
 let _coActive = __CO_ACTIVE__, _coLegendEl = null, _coLegendBox = null;
 function coLegendHtml(lg){
   if(!lg) return "";
@@ -660,16 +662,18 @@ function coUpdateLegend(){
   if(_coLegendBox) _coLegendBox.style.display = h ? "" : "none";
 }
 let _qColor=null;   // [{ids, color}, ...] recolour groups, layered over the active option
-function _fillExpr(){
+function _fillExpr(idE){
   const prop=(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill";
   let e=["coalesce",["get",prop],"#888888"];
   if(_qColor) for(let i=_qColor.length-1;i>=0;i--)   // group 0 outermost -> wins overlaps
-    e=["case",["in",["id"],["literal",_qColor[i].ids]],_qColor[i].color,e];
+    e=["case",["in",idE||["id"],["literal",_qColor[i].ids]],_qColor[i].color,e];
   return e;
 }
 function _applyFill(){
   const e=_fillExpr();
   RS_FILL_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"line-color",e); });
+  const pe=_fillExpr(["get","__rs_road"]);
+  RS_PORTAL_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"line-color",pe); });
   // decks keep the base colour: their slice ids are a different id space than the road edges
   RS_DECK_LAYERS.forEach(id=>{
     if(map.getLayer(id))
