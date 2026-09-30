@@ -12,8 +12,6 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **A Tunnels row in the roads filter panel**, next to Bridges: switch every tunnel off and on, with
   its street names, arrows and mouth. From your own page: `rsSetTunnels(on)`. Shown only when the
   data has tunnels.
-
-### Added
 - **Draw order per edge: `band_col` and `order_col`.** Which road draws over which no longer has
   to come from its class and level alone. `band_col` names a column of -1 / 0 / 1 that puts an
   edge, casing included, under (`roads-low-*`) or over (`roads-high-*`) the ground roads: a

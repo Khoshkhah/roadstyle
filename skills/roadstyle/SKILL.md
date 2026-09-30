@@ -20,6 +20,9 @@ Docs: https://khoshkhah.github.io/roadstyle/ (every keyword: `/reference/paramet
 - Required: LineString `geometry` (any CRS, reprojected for you) and `highway` (OSM class).
 - Optional columns switch features on: `name` (labels, popup title), `oneway` (arrows),
   `bridge` / `tunnel` / `layer` (grade separation), `edge_id` (kept exact past 2**53).
+- Draw order beyond class and level: `band_col="band"` (-1 / 1: an edge entirely under / over the
+  ground roads, casing included) and `order_col="order"` (a number: the order inside its band);
+  both per edge, null = the default rule.
 - Every other column shows in the popup and is queryable from JavaScript, so join your data
   onto the edges as columns before rendering.
 - An edge is DIRECTED: its geometry runs the way traffic flows; a two-way road is two edges with

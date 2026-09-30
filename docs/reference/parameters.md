@@ -156,6 +156,8 @@ Returns a `WebMap` (web, `.save()`), a `folium.Map` (`.save()`) or a `lonboard.M
 | `highway_col` | `"highway"` | all | the road-class column (widths, casing, draw order) |
 | `tunnel_col` / `bridge_col` | `"tunnel"` / `"bridge"` | all | tunnels draw under (faded, two-tone dashed casing), bridges on top |
 | `layer_col` | `"layer"` | web | OSM `layer`; negative sinks an edge when there is no tunnel/bridge column |
+| `band_col` | `None` | web | a column of -1 / 0 / 1: draw the edge (casing included) under (-1) or over (1) the ground roads, e.g. a sidewalk under its street, a crossing over it; tunnels and bridges keep their band; null = by level |
+| `order_col` | `None` | web | a numeric column: the edge's order inside its band instead of its class's `z_order` (clamped to -400 … 400; `rsColor` still lifts over it); null = by class |
 
 ### Overlays & boundary
 
