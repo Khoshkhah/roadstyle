@@ -62,8 +62,9 @@ def _load_road_model() -> None:
 _load_road_model()
 
 
-def _sort_key(col):
-    """line-sort-key: grade (tunnel/bridge) dominates, then road class.
+def _sort_key(col, order=False):
+    """line-sort-key: grade (tunnel/bridge) dominates, then road class; with ``order``, a caller's
+    per-edge ``__rs_order`` (order_col) replaces the class's where set.
 
     ``lvl*1000`` puts every tunnel (lvl -1) below every surface road and every bridge (lvl +1)
     above, so a tunnel passing *under* a street no longer looks connected to it; within a grade,
@@ -73,6 +74,8 @@ def _sort_key(col):
         b, lk = _base(c)
         m += [c, ROAD_Z.get(b, 4) - (0.5 if lk else 0)]
     m.append(4)
+    if order:
+        m = ["coalesce", ["get", "__rs_order"], m]
     return ["+", ["*", ["coalesce", ["get", "lvl"], 0], 1000], m]
 
 
@@ -514,6 +517,27 @@ def _mark_lvl(geo, tunnel_col, bridge_col, layer_col):
         p["__rs_bridge"], p["__rs_tunnel"] = br, tu
 
 
+def _mark_order(geo, order_col, band_col):
+    """A caller's draw order per edge (docs/design/draw_order_per_edge.md): ``__rs_band`` (-1 / 1:
+    the plain band under / over every ground road; a tunnel or bridge keeps its own) and
+    ``__rs_order`` (the order inside the band instead of the class's z_order, clamped to -400 … 400
+    so levels stay 1000 apart and rsColor's +500 still lifts). Nothing baked for a null value."""
+    def num(v):
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            return None
+        return None if math.isnan(v) else v
+    for ft in geo["features"]:
+        p = ft["properties"]
+        b = num(p.get(band_col)) if band_col else None
+        if b is not None and not (p["__rs_bridge"] or p["__rs_tunnel"]):
+            p["__rs_band"] = (b > 0) - (b < 0)
+        o = num(p.get(order_col)) if order_col else None
+        if o is not None:
+            p["__rs_order"] = max(-400.0, min(400.0, o))
+
+
 def _rgb(hex_color):
     """``#rgb`` / ``#rrggbb`` -> [r, g, b]; None for anything else (a named or rgba() colour)."""
     h = (hex_color or "").lstrip("#")
@@ -942,6 +966,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
+           order_col: str = None, band_col: str = None,
            pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
            basemap_switcher: bool = True, zoom_readout: bool = True,
@@ -957,6 +982,12 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     If the data carries ``tunnel`` / ``bridge`` / ``layer`` columns (named via ``tunnel_col`` /
     ``bridge_col`` / ``layer_col``), grade-separated roads are ordered by elevation so tunnels draw
     underneath and bridges on top — otherwise every edge is treated as ground level.
+
+    A caller's own draw order, per edge (both optional, docs/design/draw_order_per_edge.md):
+    ``band_col`` names a column of -1 / 0 / 1: draw the edge entirely under (-1) or over (1) the
+    ground roads, casing included (a sidewalk under its street, a crossing over it); tunnels and
+    bridges keep their own band. ``order_col`` names a numeric column: the edge's order inside its
+    band instead of its class's ``z_order`` (clamped to -400 … 400). Null = the class / level rule.
 
     UI toggles (all on by default):
       - ``arrows`` — one-way direction chevrons along each one-way edge;
@@ -1053,6 +1084,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                                 "prop": "__rs_fill", "legend": rf.legend}]
     _mark_twoway(geo)
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
+    _mark_order(geo, order_col, band_col)
     _mark_tunnel_dash(geo, CONFIG.tunnel_gap_shade, CONFIG.tunnel_dash_shade)
     _stringify_unsafe_ints(geo)   # BIGINT ids (e.g. edge_id) -> string so JS doesn't round them
 
@@ -1118,7 +1150,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     # the only rendering primitive that seals the seam where two of them connect (line-join only
     # works *within* a feature). Network continuity outranks end-cap shape — a round blob at a
     # dead end is cosmetic, a notch at a connection or junction is a break in the network.
-    lay = {"line-cap": "round", "line-join": "round", "line-sort-key": _sort_key(highway_col)}
+    lay = {"line-cap": "round", "line-join": "round",
+           "line-sort-key": _sort_key(highway_col, order=bool(order_col))}
     tlay = {**lay, "line-cap": "butt"}                    # butt cap -> clean dash ticks on tunnel casing
     blay = {**lay, "line-cap": "butt"}                    # butt cap -> square bridge deck ends
     off = _offset_expr(highway_col, offset_frac, offset_zoom)
@@ -1127,11 +1160,14 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     # structure look (tunnel / bridge, from the tags) or the plain one (_mark_lvl)
     lv = ["coalesce", ["get", "lvl"], 0]
     is_t, is_b = ["to-boolean", ["get", "__rs_tunnel"]], ["to-boolean", ["get", "__rs_bridge"]]
-    surface = ["==", lv, 0]
+    # a caller's band_col moves a plain edge between the low / ground / high bands (_mark_order);
+    # without it the expressions stay exactly as they were
+    bd = ["coalesce", ["get", "__rs_band"], ["case", ["<", lv, 0], -1, [">", lv, 0], 1, 0]] if band_col else lv
+    surface = ["==", bd, 0]
     tunnel = ["all", ["<", lv, 0], is_t]
-    low = ["all", ["<", lv, 0], ["!", is_t]]
+    low = ["all", ["<", bd, 0], ["!", is_t]]
     bridge = ["all", [">", lv, 0], is_b]
-    high = ["all", [">", lv, 0], ["!", is_b]]
+    high = ["all", [">", bd, 0], ["!", is_b]]
     # minzoom: hide minor classes when zoomed out (config.DEFAULT.minzoom, or a caller override).
     # AND-ed onto each road filter rather than given its own layers, so layer ids are untouched.
     mz = ({**CONFIG.minzoom} if minzoom is True else
@@ -1470,8 +1506,11 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     classes.sort(key=lambda c: (-ROAD_Z.get(_base(c)[0], 4), c))
     flt = {"on": bool(filter_control and classes), "col": fcol, "classes": classes,
            "swatches": swatches,
-           # any elevated feature ⇒ the panel offers a Bridges on/off row (rsSetBridges)
+           # any elevated / below-ground feature ⇒ the panel offers a Bridges / Tunnels on/off row
+           # (rsSetBridges / rsSetTunnels)
            "bridges": any((f.get("properties") or {}).get("lvl", 0) > 0
+                          for f in geo.get("features", [])),
+           "tunnels": any((f.get("properties") or {}).get("lvl", 0) < 0
                           for f in geo.get("features", []))}
 
     pmt = side = None

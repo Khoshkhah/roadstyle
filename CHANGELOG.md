@@ -6,6 +6,21 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **A Tunnels row in the roads filter panel**, next to Bridges: switch every tunnel off and on, with
+  its street names, arrows and mouth. From your own page: `rsSetTunnels(on)`. Shown only when the
+  data has tunnels.
+
+### Added
+- **Draw order per edge: `band_col` and `order_col`.** Which road draws over which no longer has
+  to come from its class and level alone. `band_col` names a column of -1 / 0 / 1 that puts an
+  edge, casing included, under (`roads-low-*`) or over (`roads-high-*`) the ground roads: a
+  sidewalk under its street, a zebra crossing over it; tunnels and bridges keep their band.
+  `order_col` names a numeric column that orders edges inside their band instead of the class's
+  `z_order` (clamped to -400 … 400, so `rsColor` still lifts a route over everything on its level).
+  Both optional and per edge; without them the style is unchanged. Design:
+  `docs/design/draw_order_per_edge.md`.
+
 ## [0.9.2] — 2026-09-30
 
 ### Changed
