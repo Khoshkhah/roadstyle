@@ -100,7 +100,7 @@ def test_web_annotation_slots_alternate_names_and_arrows():
     # one arrow layer per grade tier, each right beside its road tier — a bridge must cover
     # the arrows of the road it crosses, not have them float above everything
     assert ids.index("roads-arrows") == ids.index("roads-fill") + 1
-    assert ids.index("roads-arrows-tunnel") == ids.index("roads-tunnel-centre") + 1
+    assert ids.index("roads-arrows-tunnel") == ids.index("roads-tunnel-fill") + 1
     assert ids.index("roads-arrows-bridge") == ids.index("roads-bridge-fill") + 1
     assert ["to-boolean", ["get", "name"]] in lab["filter"]          # unnamed -> slot stays empty
     assert lab["layout"]["symbol-placement"] == "line-center"
@@ -845,18 +845,19 @@ def test_tunnel_portal_skipped_when_the_tunnel_passes_under_a_street_right_away(
     assert 7.5 < (max(xs) - 18.001) * k < 8.5
 
 
-def test_tunnel_casing_solid_by_default_dash_as_a_setting():
-    """A dashed tunnel casing leaves gaps where you can't tell whether two tunnel pieces connect,
-    so it's solid by default; tunnel_casing_dash brings the osm-carto dash back."""
+def test_tunnel_casing_in_two_tones():
+    """A tunnel's casing is never missing: a solid light casing with the dashed casing on top, so
+    connected tunnel pieces look connected (empty dash gaps hid it) while the dash says "tunnel"."""
     g = gpd.GeoDataFrame({"highway": ["primary"], "tunnel": ["yes"]},
                          geometry=[LineString([(18.0, 59.30), (18.01, 59.30)])], crs=4326)
     lay = {l["id"]: l for l in _style(render_edges(g, backend="web").html)["layers"]}
-    assert "line-dasharray" not in lay["roads-tunnel-casing"]["paint"]
-    assert lay["roads-tunnel-casing"]["layout"]["line-cap"] == "round"
-    # what says "tunnel" instead: a pale fill over a white base, and a dashed centre line on top
     ids = list(lay)
-    assert ids.index("roads-tunnel-base") < ids.index("roads-tunnel-fill") < ids.index("roads-tunnel-centre")
-    assert lay["roads-tunnel-centre"]["paint"]["line-dasharray"]
-    dashed = render_edges(g, backend="web", settings={"config": {"tunnel_casing_dash": [2, 2]}})
-    lay = {l["id"]: l for l in _style(dashed.html)["layers"]}
-    assert lay["roads-tunnel-casing"]["paint"]["line-dasharray"] == [2, 2]
+    assert ids.index("roads-tunnel-casing") < ids.index("roads-tunnel-casing-dash") < ids.index("roads-tunnel-fill")
+    assert "line-dasharray" not in lay["roads-tunnel-casing"]["paint"]
+    assert lay["roads-tunnel-casing"]["paint"]["line-color"] == "#9a9a9a"
+    assert lay["roads-tunnel-casing-dash"]["paint"]["line-dasharray"] == [2, 2]
+    set_ = render_edges(g, backend="web", settings={"config": {"tunnel_casing_gap": "#dddddd",
+                                                                "tunnel_casing_dash": [3, 1]}})
+    lay = {l["id"]: l for l in _style(set_.html)["layers"]}
+    assert lay["roads-tunnel-casing"]["paint"]["line-color"] == "#dddddd"
+    assert lay["roads-tunnel-casing-dash"]["paint"]["line-dasharray"] == [3, 1]
