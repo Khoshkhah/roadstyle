@@ -6,6 +6,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.9.2] — 2026-09-30
+
 ### Changed
 - **`rsColor` raises the roads it paints to the top of their level.** A highlighted route is no
   longer covered by a street it crosses: its line-sort-key goes up by 500 (levels are 1000

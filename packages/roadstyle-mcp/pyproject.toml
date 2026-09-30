@@ -8,14 +8,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "roadstyle-mcp"
-version = "0.9.1"
+version = "0.9.2"
 description = "MCP server for roadstyle: AI agents draw styled, interactive road maps of any place or road file"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [{ name = "Kaveh" }]
 keywords = ["mcp", "model-context-protocol", "openstreetmap", "osmnx", "roads", "map", "ai-agents"]
-dependencies = ["roadstyle[mcp]==0.9.1"]
+dependencies = ["roadstyle[mcp]==0.9.2"]
 
 [project.scripts]
 roadstyle-mcp = "roadstyle.mcp_server:main"
