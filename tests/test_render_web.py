@@ -1106,3 +1106,17 @@ def test_end_caps_hide_where_the_two_directions_differ():
     assert fill[-1] == "rgba(0,0,0,0)"
     same = _style(render_edges(_pairs().iloc[:2], backend="web").html)["sources"]["ends"]["data"]["features"][0]["properties"]
     assert same["__rs_fill"] == same["__rs_fill__b"]
+
+
+def test_no_end_cap_where_a_road_in_a_lower_band_meets():
+    """A cap's casing ring would cross a road drawn under it (a plain layer=-1 road, a tunnel, a
+    sidewalk moved by band_col), so that end gets no cap; the other end still does (Kaveh's
+    screenshot: a ring across the continuing road)."""
+    a, b, c = (18.00, 59.30), (18.00, 59.31), (18.01, 59.32)
+    g = gpd.GeoDataFrame({"highway": ["secondary"] * 3, "layer": [None, None, "-1"]},
+                         geometry=[LineString([a, b]), LineString([b, a]), LineString([b, c])], crs=4326)
+    pts = _style(render_edges(g, backend="web").html)["sources"]["ends"]["data"]["features"]
+    assert [tuple(p["geometry"]["coordinates"]) for p in pts] == [a]
+    # a road in a HIGHER band (layer=1) covers the cap anyway: both ends keep theirs
+    g.loc[2, "layer"] = "1"
+    assert len(_style(render_edges(g, backend="web").html)["sources"]["ends"]["data"]["features"]) == 2

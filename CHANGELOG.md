@@ -10,7 +10,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **Two-way roads end like one road.** A two-way road is drawn as two lanes side by side, each
   with its own round end, so every dead end and junction showed two bumps with a dip between
   them. Now each end of a two-way pair gets one round cap as wide as the whole road, under the two
-  lanes (new source `ends`, layers `roads-ends-*` per plain band). The lanes are unchanged, so
+  lanes (new source `ends`, layers `roads-ends-*` per plain band), except where a road drawn in a
+  lower band meets that end (a tunnel mouth: the cap's ring would cross it). The lanes are unchanged, so
   both directions stay separately clickable. A cap draws only where both lanes share a colour, so
   maps coloured per direction keep their ends as before. It follows the class filter, the bridge
   and tunnel toggles, `rsFilter`, `rsColor` and the colour options. Setting: `twin_end_caps`

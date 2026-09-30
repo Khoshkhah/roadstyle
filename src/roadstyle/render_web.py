@@ -571,8 +571,20 @@ def _twin_ends(geo, cols):
     twins' feature ids (``__rs_road`` / ``__rs_road2``) for recolouring and id filters. Every fill
     prop comes twice, the first twin's and the second's (``<prop>__b``): a cap draws only where the
     two lanes have the same colour, so a map coloured per direction never shows one direction's
-    colour at a street's end."""
-    keys, where = [], collections.defaultdict(list)
+    colour at a street's end. No cap at an end point where another road is drawn in a lower band
+    (a tunnel, a plain low road, a sidewalk moved by band_col): the cap would paint its casing
+    ring across that road, which draws under it (Kaveh's Monaco screenshot)."""
+
+    def rank(p):   # the drawing band: tunnel < low < ground < high < bridge
+        if p.get("__rs_tunnel"):
+            return -2
+        if p.get("__rs_bridge"):
+            return 2
+        b = p.get("__rs_band")
+        if b is None:
+            b = p.get("lvl") or 0
+        return (b > 0) - (b < 0)
+    keys, where, at = [], collections.defaultdict(list), collections.defaultdict(list)
     for i, ft in enumerate(geo["features"]):
         g = ft.get("geometry") or {}
         c = g.get("coordinates") or []
@@ -581,6 +593,8 @@ def _twin_ends(geo, cols):
             k = ((round(c[0][0], 6), round(c[0][1], 6)), (round(c[-1][0], 6), round(c[-1][1], 6)))
             if k[0] != k[1]:
                 where[k].append(i)
+            for pt in k:
+                at[pt].append(i)
         keys.append(k)
     keep = [c for c in cols if c] + ["lvl", "__rs_band"]
     used, out = set(), []
@@ -598,8 +612,10 @@ def _twin_ends(geo, cols):
         q = geo["features"][j]["properties"]
         props.update({c + "__b": q.get(c) for c in list(props) if c.startswith("__rs_fill")})
         props.update(__rs_road=i, __rs_road2=j)
-        c = ft["geometry"]["coordinates"]
-        for pt in (c[0], c[-1]):
+        c, own = ft["geometry"]["coordinates"], rank(p)
+        for pt, kp in ((c[0], k[0]), (c[-1], k[1])):
+            if any(rank(geo["features"][n]["properties"]) < own for n in at[kp] if n not in (i, j)):
+                continue
             out.append({"type": "Feature", "properties": dict(props),
                         "geometry": {"type": "Point", "coordinates": list(pt[:2])}})
     return out

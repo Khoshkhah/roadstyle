@@ -4,6 +4,11 @@
 doesn't make another issue"). A roadstyle change asked for by Kaveh, who noticed it on every
 two-way road of duckOSM's Monaco maps.
 
+**Found by Kaveh after the first version, fixed:** a cap at a point where another road draws in a
+lower band (a tunnel mouth, a plain `layer=-1` road, a sidewalk moved by `band_col`) painted its
+casing ring across that road (Monaco: Boulevard Louis II's tunnel mouths). Such an end now gets no
+cap and keeps its old look (1,578 ends in Monaco meet a road in another band).
+
 **Found while checking for new issues, and handled:** on a map coloured per direction (SonoFlow's
 flows), a cap in one twin's colour would show that direction's colour at the street's end, so a
 cap draws only where both lanes share a colour (each fill prop is carried twice, `<prop>__b`).
