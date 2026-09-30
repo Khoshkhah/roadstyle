@@ -457,6 +457,7 @@ const _fltCbs={}, _fltBase={};
 let _fltVis=null;   // Set of visible classes; null = all
 let _qIds=null;     // id-set filter from rsFilter; null = off
 let _bridgesOn=true;   // rsSetBridges: hide every elevated (lvl>0) road and its 3D deck ribbons
+let _tunnelsOn=true;   // rsSetTunnels: hide every below-ground (lvl<0) road, its names, arrows and mouth
 const _fltLayers=()=>map.getStyle().layers.filter(l=>l.id.indexOf("roads")===0);
 map.on("load",()=>{ _fltLayers().forEach(l=>{ if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null; }); });
 function _applyRoadFilters(){
@@ -470,6 +471,10 @@ function _applyRoadFilters(){
       // everything else keeps lvl<1, so ground roads and tunnels stay
       const bf = l.source==="decks" ? ["boolean",false] : ["<",["coalesce",["get","lvl"],0],1];
       f = f?["all",f,bf]:bf;
+    }
+    if(!_tunnelsOn && l.source!=="decks"){   // decks are bridges only; everything else carries lvl
+      const tf=[">=",["coalesce",["get","lvl"],0],0];
+      f = f?["all",f,tf]:tf;
     }
     // ids exist only in the roads features — slots (labels/arrows) and decks (3D ribbons) have
     // their own id spaces, so those layers take just the class filter. In tiles mode slots share
@@ -498,6 +503,12 @@ function rsSetBridges(on){
   document.dispatchEvent(new CustomEvent("rs:filterchange",{detail:{bridges:_bridgesOn}}));
 }
 window.rsSetBridges = rsSetBridges;
+function rsSetTunnels(on){
+  _tunnelsOn=!!on; _applyRoadFilters();
+  const cb=document.getElementById("rs-flt-tn"); if(cb) cb.checked=_tunnelsOn;
+  document.dispatchEvent(new CustomEvent("rs:filterchange",{detail:{tunnels:_tunnelsOn}}));
+}
+window.rsSetTunnels = rsSetTunnels;
 // id-set queries: the baked features are a queryable table. rsQuery(p => …) returns the ids of
 // the matching edges (generateId: a feature's id is its index in the source array); the verbs
 // below act on any id set — filter to it, read it back as rows, or highlight it.
@@ -628,14 +639,16 @@ if(FILTER.on){
     sw.style.background=(FILTER.swatches||{})[c]||"#888"; lab.appendChild(sw);
     lab.appendChild(document.createTextNode(" "+c)); body.appendChild(lab);
   });
-  if(FILTER.bridges){                          // grade-separated data: offer a Bridges on/off row
-    const lab=document.createElement("label");
-    lab.style.cssText="margin-top:4px;padding-top:4px;border-top:1px solid #ddd";
-    const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=true; cb.id="rs-flt-br";
-    cb.onchange=()=> rsSetBridges(cb.checked);
-    lab.appendChild(cb); lab.appendChild(document.createTextNode(" Bridges"));
-    body.appendChild(lab);
-  }
+  // grade-separated data: Bridges / Tunnels on/off rows under the classes (the first one ruled off)
+  [["bridges","rs-flt-br"," Bridges",rsSetBridges],["tunnels","rs-flt-tn"," Tunnels",rsSetTunnels]]
+    .filter(r=>FILTER[r[0]]).forEach((r,i)=>{
+      const lab=document.createElement("label"); lab.className="flt-grade";
+      if(i===0) lab.style.cssText="margin-top:4px;padding-top:4px;border-top:1px solid #ddd";
+      const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=true; cb.id=r[1];
+      cb.onchange=()=> r[3](cb.checked);
+      lab.appendChild(cb); lab.appendChild(document.createTextNode(r[2]));
+      body.appendChild(lab);
+    });
   _tlHost().appendChild(box);
 }
 // "colour by" recolouring: swap which baked fill prop the road layers read (no re-render). Each

@@ -898,3 +898,98 @@ def test_rscolor_raises_painted_roads_within_their_level():
     html = render_edges(_edges(), backend="web").html
     assert "function _applySort()" in html and '["case",["in",idE,["literal",all]],500,0]' in html
     assert html.index("_applyFill();\n  _applySort();") > html.index("function rsColor(")
+
+
+def _eval(e, p):
+    """Evaluate the few MapLibre expression operators the road band filters use, on properties p."""
+    if not isinstance(e, list):
+        return e
+    op, a = e[0], e[1:]
+    if op == "get":
+        return p.get(a[0])
+    if op == "coalesce":
+        return next((v for v in (_eval(x, p) for x in a) if v is not None), None)
+    if op == "case":
+        for i in range(0, len(a) - 1, 2):
+            if _eval(a[i], p):
+                return _eval(a[i + 1], p)
+        return _eval(a[-1], p)
+    if op == "to-boolean":
+        return bool(_eval(a[0], p))
+    if op == "!":
+        return not _eval(a[0], p)
+    if op == "all":
+        return all(_eval(x, p) for x in a)
+    x, y = _eval(a[0], p), _eval(a[1], p)
+    return {"<": x < y, ">": x > y, "==": x == y}[op]
+
+
+def test_band_col_moves_plain_edges_between_bands():
+    """band_col: -1 draws an edge (casing + fill) in the low band under the ground roads, 1 in the
+    high band over them, 0 or null as the level says; a tunnel or bridge keeps its band
+    (docs/design/draw_order_per_edge.md)."""
+    g = gpd.GeoDataFrame(
+        {"highway": ["residential", "residential", "residential", "residential", "primary", "residential"],
+         "band": [-1, 1, None, 0, 1, -1],
+         "bridge": [None, None, None, None, "yes", None],
+         "layer": [None, None, None, "1", None, None]},
+        geometry=[LineString([(18.0 + i * 0.01, 59.30), (18.0 + i * 0.01, 59.31)]) for i in range(6)],
+        crs=4326)
+    style = _style(render_edges(g, backend="web", band_col="band").html)
+    lay = {l["id"]: l for l in style["layers"]}
+    feats = style["sources"]["roads"]["data"]["features"]
+    where = []
+    for f in feats:
+        p = f["properties"]
+        hit = [b for b in ("roads-low-fill", "roads-fill", "roads-high-fill", "roads-bridge-fill")
+               if _eval(lay[b]["filter"], p)]
+        where.append(hit)
+    # (solid classes: a dashed one is drawn by the -dash sibling layers, same band filters)
+    # -1 -> low, 1 -> high, null -> ground, explicit 0 on a raised plain edge -> ground,
+    # a bridge keeps its band
+    assert where == [["roads-low-fill"], ["roads-high-fill"], ["roads-fill"], ["roads-fill"],
+                     ["roads-bridge-fill"], ["roads-low-fill"]]
+    assert "__rs_band" not in feats[4]["properties"]                 # the bridge: not moved
+    assert _eval(lay["roads-low-casing"]["filter"], feats[0]["properties"])   # casing moves too
+
+
+def test_order_col_sets_the_order_inside_a_band_and_clamps():
+    g = gpd.GeoDataFrame(
+        {"highway": ["footway", "primary", "residential"], "order": [9.5, None, 1000]},
+        geometry=[LineString([(18.0 + i * 0.01, 59.30), (18.0 + i * 0.01, 59.31)]) for i in range(3)],
+        crs=4326)
+    style = _style(render_edges(g, backend="web", order_col="order").html)
+    lay = {l["id"]: l for l in style["layers"]}
+    key = lay["roads-fill"]["layout"]["line-sort-key"]
+    ps = [f["properties"] for f in style["sources"]["roads"]["data"]["features"]]
+    assert [p.get("__rs_order") for p in ps] == [9.5, None, 400.0]      # null: class order; clamped
+    assert "__rs_order" in json.dumps(key) and key[0] == "+"            # lvl * 1000 + the order
+
+
+def test_order_and_band_change_nothing_when_not_asked():
+    """Without order_col / band_col the style is exactly today's (no __rs_band / __rs_order)."""
+    g = _edges().assign(order=[1, 2, 3], band=[1, -1, 0])
+    plain = _style(render_edges(g, backend="web").html)
+    asked_none = _style(render_edges(g, backend="web", order_col=None, band_col=None).html)
+    assert plain == asked_none
+    assert "__rs_band" not in json.dumps(plain) and "__rs_order" not in json.dumps(plain)
+
+
+def test_order_and_band_survive_tiles():
+    """The tiles keep every __rs_* property, so band / order work with tiles=True."""
+    from roadstyle.tiles import tile_props
+    props = tile_props({"highway": "footway", "__rs_band": 1, "__rs_order": 3.0, "x": 1}, {"highway"})
+    assert props == {"highway": "footway", "__rs_band": 1, "__rs_order": 3.0}
+
+
+def test_tunnels_toggle_like_bridges():
+    """A Tunnels on/off row next to Bridges (rsSetTunnels): only when the data has tunnels; it
+    hides every lvl < 0 feature (roads, names, arrows, mouths), not the bridge decks."""
+    g = gpd.GeoDataFrame({"highway": ["primary", "primary"], "tunnel": ["yes", None]},
+                         geometry=[LineString([(18.0, 59.30), (18.01, 59.30)]),
+                                   LineString([(18.01, 59.30), (18.02, 59.30)])], crs=4326)
+    html = render_edges(g, backend="web").html
+    assert '"tunnels": true' in html and "function rsSetTunnels(" in html and '"rs-flt-tn"' in html
+    assert '[">=",["coalesce",["get","lvl"],0],0]' in html
+    plain = render_edges(_edges(), backend="web").html
+    assert '"tunnels": false' in plain

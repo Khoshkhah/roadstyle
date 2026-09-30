@@ -27,6 +27,7 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rsSetBasemap(keyOrIndex)` | switch the base map (key, label or index into `RS_BASEMAPS`) | `rs:basemapchange` |
 | `rsSetClasses(list)` | show exactly these road classes | `rs:filterchange` |
 | `rsSetBridges(on)` | show / hide every bridge and its 3D deck (the filter panel's *Bridges* row) | `rs:filterchange` |
+| `rsSetTunnels(on)` | show / hide every tunnel, with its street names and arrows (the filter panel's *Tunnels* row) | `rs:filterchange` |
 | `rsSetColorField(nameOrIndex)` | switch the active `color_options` entry | `rs:colorchange` |
 | `rsSetOverlay(labelOrIndex, on)` | show / hide one overlay | `rs:overlaychange` |
 | `rsSetView3D(on)` | tilt to `camera.pitch_3d`, or back to flat and north-up | `rs:viewchange` |
@@ -49,6 +50,7 @@ All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
 | `rs:deselect` | a click on empty map, or `rsDeselect` | none |
 | `rs:filterchange` | `rsSetClasses` | `visible`, `hidden` (class lists) |
 | | `rsSetBridges` | `bridges` |
+| | `rsSetTunnels` | `tunnels` |
 | | `rsFilter` on roads / an overlay | `ids` / `overlay`, `ids` |
 | `rs:colorchange` | `rsSetColorField` | `option` (the `RS_COLOR_OPTIONS` entry), `index` |
 | | `rsColor` with one set / several | `ids`, `color` / `groups: [{ids, color}]` |
