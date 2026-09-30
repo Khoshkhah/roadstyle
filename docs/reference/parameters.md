@@ -263,7 +263,7 @@ The `config` block of the settings. Change it in a [settings override](settings.
 | `link_scale` | `0.7` | `*_link` width relative to the parent |
 | `tunnel_opacity_scale` | `0.45` | tunnel fade |
 | `tunnel_casing_dash` / `tunnel_gap_shade` / `tunnel_dash_shade` | `[2, 2]` / `0.25` / `0.5` | the tunnel casing: its dash, and how much darker than the road's casing the solid casing and the dashes are (a dark casing, as in `mono`, keeps its tone under the dashes) |
-| `tunnel_portal_m` | `8.0` | metres of a tunnel drawn at street level where it meets a surface road, so the road runs into it (`0` = off) |
+| `tunnel_portal_m` | `3.0` | metres of a tunnel drawn at street level where it meets a surface road, so the road runs into it (`0` = off) |
 | `twin_end_caps` | `true` | a two-way road ends like one road: one road-wide round cap under its two lanes at each end, where both lanes have the same colour (`false` = each lane's own round end) |
 | `bridge_casing_extra` / `bridge_casing_color` | `1.5` / `"#000000"` | bridge casing, px wider / colour |
 | `minor_no_casing` | cycleway, footway, living_street, path, pedestrian, service, track | classes drawn without casing |

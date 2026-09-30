@@ -24,7 +24,8 @@ few metres, **at street level**, as fill only:
 
 - **Found in Python** while the page is built: tunnel-edge end points (lvl < 0) that equal an end
   point of a surface edge (lvl 0), matched on rounded coordinates. The piece is cut from the
-  tunnel's own geometry (`portal_m`, default 8 m, a setting under `config`).
+  tunnel's own geometry (`portal_m`, default 3 m, a setting under `config`; 8 m until 2026-09-30,
+  when Kaveh found a short tunnel's two 8 m mouths made 40 % of it look like an ordinary road).
 - **Its own source, `portals`**, not in `roads`: one feature per edge stays the rule, so feature
   ids, `rsQuery`, `rsSelect` and the other JS calls don't change. A piece carries its tunnel's
   properties that styling needs (`highway`, `__rs_fill`, the two-way offset fields) and its road's

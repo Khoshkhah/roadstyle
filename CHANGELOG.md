@@ -6,6 +6,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **Tunnel mouth pieces are 3 m, not 8 m** (`tunnel_portal_m`). The piece of a tunnel drawn at
+  street level at its mouth, so the road runs into the tunnel, made the first and last 8 m of a
+  tunnel look like an ordinary road: 40 % of a 40 m tunnel (Monaco, Boulevard du Larvotto).
+
 ### Added
 - **Two-way roads end like one road.** A two-way road is drawn as two lanes side by side, each
   with its own round end, so every dead end and junction showed two bumps with a dip between

@@ -808,7 +808,7 @@ def test_tunnel_portals_draw_the_mouth_at_street_level():
     pieces = style["sources"]["portals"]["data"]["features"]
     assert [f["properties"]["__rs_road"] for f in pieces] == [1]      # only the mouth at b
     xs = [x for x, _ in pieces[0]["geometry"]["coordinates"]]
-    assert xs[0] == 18.002 and 18.002 < xs[-1] < 18.0022              # ~8 m in from the mouth
+    assert xs[0] == 18.002 and 18.00204 < xs[-1] < 18.00207          # 3 m in from the mouth (~5.3e-5 deg here)
     ids = [l["id"] for l in style["layers"]]
     assert ids.index("roads-casing") < ids.index("roads-portal-fill") < ids.index("roads-fill")
 
@@ -844,7 +844,7 @@ def test_tunnel_portal_skipped_when_the_tunnel_passes_under_a_street_right_away(
         geometry=[LineString([a, b]), LineString([b, c]), LineString([(18.0015, y), (18.004, y)])], crs=4326)
     xs = [q[0] for q in _style(render_edges(g2, backend="web").html)
           ["sources"]["portals"]["data"]["features"][0]["geometry"]["coordinates"]]
-    assert 7.5 < (max(xs) - 18.001) * k < 8.5
+    assert 2.5 < (max(xs) - 18.001) * k < 3.5                   # tunnel_portal_m: 3 m
 
 
 def test_tunnel_casing_in_two_tones():
