@@ -517,17 +517,23 @@ def _mark_lvl(geo, tunnel_col, bridge_col, layer_col):
         p["lvl"] = lvl
 
 
+_PORTAL_CLEAR_M = 4.0   # a mouth piece stops this far before any other surface road
+
+
 def _tunnel_portals(geo, portal_m):
     """Tunnel mouths: the first / last ``portal_m`` metres of every tunnel edge (lvl < 0) whose end
     point is also a surface edge's (lvl 0) end point, as features for the ``portals`` source.
 
     Tunnels draw under the surface band, so at a mouth the surface road's casing and round cap
     paint across the tunnel's start like a wall. These pieces draw at street level (fill only,
-    between the surface casing and fill), so the road visibly runs into the tunnel. Each carries
-    its edge's properties (class, baked fills, two-way offset) plus ``__rs_road``, the edge's
-    feature id (its index), so recolouring and id filters reach it; direction is kept, so the
-    two-way lane offset lands on the same side. LineStrings only."""
-    from shapely.geometry import LineString
+    between the surface casing and fill), so the road visibly runs into the tunnel. A piece stops
+    ``_PORTAL_CLEAR_M`` before any other surface road (a tunnel that dives under a street right
+    after its mouth), so it never cuts into that street's casing. Each carries its edge's
+    properties (class, baked fills, two-way offset) plus ``__rs_road``, the edge's feature id (its
+    index), so recolouring and id filters reach it; direction is kept, so the two-way lane offset
+    lands on the same side. LineStrings only."""
+    from shapely import STRtree
+    from shapely.geometry import LineString, Point, box
     from shapely.ops import substring
 
     if not portal_m:
@@ -536,8 +542,9 @@ def _tunnel_portals(geo, portal_m):
     lines = [(i, ft) for i, ft in enumerate(geo["features"])
              if (ft.get("geometry") or {}).get("type") == "LineString"
              and len(ft["geometry"].get("coordinates") or []) >= 2]
-    surface = {key(ft["geometry"]["coordinates"][j]) for _, ft in lines
-               if (ft["properties"].get("lvl") or 0) == 0 for j in (0, -1)}
+    ground = [ft["geometry"]["coordinates"] for _, ft in lines if (ft["properties"].get("lvl") or 0) == 0]
+    surface = {key(c[j]) for c in ground for j in (0, -1)}
+    tree = STRtree([LineString(c) for c in ground]) if ground else None
     out = []
     for i, ft in lines:
         p, c = ft["properties"], ft["geometry"]["coordinates"]
@@ -545,10 +552,28 @@ def _tunnel_portals(geo, portal_m):
             continue
         lon0, lat0 = c[0]
         kx = 111320.0 * math.cos(math.radians(lat0))
-        local = LineString([((x - lon0) * kx, (y - lat0) * 111320.0) for x, y in c])
-        m = min(portal_m, local.length)
+        to_local = lambda cs: LineString([((x - lon0) * kx, (y - lat0) * 111320.0) for x, y in cs])  # noqa: E731
+        local = to_local(c)
         for at_start in (True, False):
-            if key(c[0] if at_start else c[-1]) not in surface:
+            mouth = key(c[0] if at_start else c[-1])
+            if mouth not in surface:
+                continue
+            m = min(portal_m, local.length)
+            part = substring(local, 0, m) if at_start else substring(local, local.length - m, local.length)
+            if part.geom_type != "LineString":
+                continue
+            out_of = part if at_start else LineString(part.coords[::-1])     # runs from the mouth in
+            # other streets near the piece (not the ones meeting at the mouth): stop short of them
+            pad = portal_m + _PORTAL_CLEAR_M
+            x, y = c[0] if at_start else c[-1]
+            near = box(x - pad / kx, y - pad / 111320.0, x + pad / kx, y + pad / 111320.0)
+            for g in (ground[j] for j in tree.query(near)):
+                if mouth in (key(g[0]), key(g[-1])):
+                    continue
+                hit = out_of.intersection(to_local(g).buffer(_PORTAL_CLEAR_M))
+                if not hit.is_empty:
+                    m = min(m, min(out_of.project(Point(q)) for q in _coords(hit)))
+            if m < 0.5:
                 continue
             part = substring(local, 0, m) if at_start else substring(local, local.length - m, local.length)
             if part.geom_type != "LineString":
@@ -558,6 +583,13 @@ def _tunnel_portals(geo, portal_m):
                                      "coordinates": [[x / kx + lon0, y / 111320.0 + lat0]
                                                      for x, y in part.coords]}})
     return out
+
+
+def _coords(g):
+    """Every vertex of a shapely geometry (any type, collections included)."""
+    if hasattr(g, "geoms"):
+        return [q for p in g.geoms for q in _coords(p)]
+    return list(g.coords)
 
 
 _JS_MAX_SAFE_INT = 2 ** 53 - 1
