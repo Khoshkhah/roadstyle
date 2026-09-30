@@ -6,6 +6,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.9.3] — 2026-09-30
+
 ### Added
 - **A Tunnels row in the roads filter panel**, next to Bridges: switch every tunnel off and on, with
   its street names, arrows and mouth. From your own page: `rsSetTunnels(on)`. Shown only when the
