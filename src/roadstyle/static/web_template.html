@@ -482,6 +482,9 @@ function _applyRoadFilters(){
     const isRoads = l.source==="roads" && (!RS_TILED || l["source-layer"]==="roads");
     if(_qIds && isRoads){ const qf=["in",["id"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
     if(_qIds && l.source==="portals"){ const qf=["in",["get","__rs_road"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
+    // a two-way pair's end cap (twin_ends.md) stays while either of its two lanes is shown
+    if(_qIds && l.source==="ends"){ const L=["literal",_qIds];
+      const qf=["any",["in",["get","__rs_road"],L],["in",["get","__rs_road2"],L]]; f=f?["all",f,qf]:qf; }
     try{ map.setFilter(l.id,f); }catch(e){}
   });
   return hidden;
@@ -657,6 +660,8 @@ if(FILTER.on){
 const COLOR_OPTIONS = __COLOR_OPTIONS__;
 const RS_FILL_LAYERS = ["roads-fill","roads-tunnel-fill","roads-low-fill","roads-high-fill","roads-bridge-fill"];
 const RS_PORTAL_LAYERS = ["roads-portal-fill"];   // tunnel mouths: their road's id is __rs_road
+const RS_END_LAYERS = ["roads-ends-low-fill","roads-ends-fill","roads-ends-high-fill"];   // twin_ends.md
+const RS_END_CASING_LAYERS = ["roads-ends-low-casing","roads-ends-casing","roads-ends-high-casing"];
 let _coActive = __CO_ACTIVE__, _coLegendEl = null, _coLegendBox = null;
 function coLegendHtml(lg){
   if(!lg) return "";
@@ -687,6 +692,18 @@ function _applyFill(){
   RS_FILL_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"line-color",e); });
   const pe=_fillExpr(["get","__rs_road"]);
   RS_PORTAL_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"line-color",pe); });
+  // a two-way pair's end cap (twin_ends.md) draws only where its two lanes have one colour: both
+  // in the same recolour group, or the active option's colour equal on both (<prop>__b is the
+  // second lane's); otherwise it is transparent and the ends look as without caps
+  const prop=(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill", none="rgba(0,0,0,0)";
+  const same=["==",["get",prop],["get",prop+"__b"]], both=[];
+  let ee=["case",same,["coalesce",["get",prop],"#888888"],none];
+  if(_qColor) for(let i=_qColor.length-1;i>=0;i--){ const L=["literal",_qColor[i].ids];
+    const b=["all",["in",["get","__rs_road"],L],["in",["get","__rs_road2"],L]];
+    both.push(b); ee=["case",b,_qColor[i].color,ee]; }
+  const ec=["case",["any",same,...both],["coalesce",["get","__rs_casing"],"#000000"],none];
+  RS_END_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"circle-color",ee); });
+  RS_END_CASING_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"circle-color",ec); });
   // decks keep the base colour: their slice ids are a different id space than the road edges
   RS_DECK_LAYERS.forEach(id=>{
     if(map.getLayer(id))

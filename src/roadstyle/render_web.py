@@ -125,6 +125,29 @@ def _width_expr(col, casing=False, split_zoom=15, split_frac=0.6, scale=1.0):
     return e
 
 
+def _end_radius_expr(col, casing=False, offset_frac=0.28, offset_zoom=15, split_frac=0.6):
+    """circle-radius (px) of a two-way pair's end cap (docs/design/twin_ends.md): the pair's outer
+    half-width, i.e. the lane offset (_offset_expr) plus half a lane's width (_width_expr, split to
+    ``split_frac`` like a two-way lane), per class, at every zoom stop. So the cap is exactly as
+    wide as the two lanes together, with the lane split ramping in from ``offset_zoom``."""
+    e = ["interpolate", ["linear"], ["zoom"]]
+    for z in _ZSTOPS:
+        ramp = 0.0 if z <= offset_zoom else (1.0 if z >= offset_zoom + 2 else (z - offset_zoom) / 2.0)
+        f = 1.0 - (1 - split_frac) * ramp            # the lane width factor (_width_expr's split)
+
+        def r(g, lk):
+            w = _gwidth(WIDTH[g], HI_RATE[g], z) * (0.6 if lk else 1)
+            lane = w * (CASING_RATIO[g] if casing else 1) * f
+            return round(w * offset_frac * ramp + lane / 2, 3)
+        m = ["match", ["get", col]]
+        for c in _CLASSES:
+            b, lk = _base(c)
+            m += [c, r(ROAD_GROUP.get(b, "residential"), lk)]
+        m.append(r("residential", False))
+        e += [z, m]
+    return e
+
+
 def _offset_expr(col, offset_frac=0.28, offset_zoom=15):
     """line-offset (px) = offset_frac * the road's pixel width, for two-way edges (0 for one-way),
     ramped in from offset_zoom. Pixel-proportional -> constant overlap at every zoom."""
@@ -538,6 +561,48 @@ def _mark_order(geo, order_col, band_col):
         o = num(p.get(order_col)) if order_col else None
         if o is not None:
             p["__rs_order"] = max(-400.0, min(400.0, o))
+
+
+def _twin_ends(geo, cols):
+    """One point per end of each two-way pair (docs/design/twin_ends.md): where its two lanes end
+    side by side, a road-wide round cap under them fills the dip between the lanes' own round
+    ends. Only plain pairs: a bridge or tunnel has butt-capped casings, and a dashed class has no
+    casing and butt-capped dashes. Each point carries its pair's styling properties and both
+    twins' feature ids (``__rs_road`` / ``__rs_road2``) for recolouring and id filters. Every fill
+    prop comes twice, the first twin's and the second's (``<prop>__b``): a cap draws only where the
+    two lanes have the same colour, so a map coloured per direction never shows one direction's
+    colour at a street's end."""
+    keys, where = [], collections.defaultdict(list)
+    for i, ft in enumerate(geo["features"]):
+        g = ft.get("geometry") or {}
+        c = g.get("coordinates") or []
+        k = None
+        if g.get("type") == "LineString" and len(c) >= 2:
+            k = ((round(c[0][0], 6), round(c[0][1], 6)), (round(c[-1][0], 6), round(c[-1][1], 6)))
+            if k[0] != k[1]:
+                where[k].append(i)
+        keys.append(k)
+    keep = [c for c in cols if c] + ["lvl", "__rs_band"]
+    used, out = set(), []
+    for i, ft in enumerate(geo["features"]):
+        p, k = ft["properties"], keys[i]
+        if (i in used or k is None or not p.get("__rs_twoway") or p.get("__rs_bridge")
+                or p.get("__rs_tunnel") or p.get("__rs_dash")):
+            continue
+        j = next((j for j in where.get((k[1], k[0]), []) if j != i and j not in used), None)
+        if j is None:
+            continue
+        used.update((i, j))
+        props = {c: p[c] for c in keep if p.get(c) is not None}
+        props.update({c: v for c, v in p.items() if c.startswith("__rs_fill") or c == "__rs_casing"})
+        q = geo["features"][j]["properties"]
+        props.update({c + "__b": q.get(c) for c in list(props) if c.startswith("__rs_fill")})
+        props.update(__rs_road=i, __rs_road2=j)
+        c = ft["geometry"]["coordinates"]
+        for pt in (c[0], c[-1]):
+            out.append({"type": "Feature", "properties": dict(props),
+                        "geometry": {"type": "Point", "coordinates": list(pt[:2])}})
+    return out
 
 
 def _rgb(hex_color):
@@ -1144,6 +1209,11 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         style["sources"]["portals"] = {"type": "geojson", "tolerance": 0.05,
                                        "data": {"type": "FeatureCollection", "features": portals}}
 
+    ends = _twin_ends(geo, (highway_col, filter_col)) if CONFIG.twin_end_caps else []
+    if ends:
+        style["sources"]["ends"] = {"type": "geojson",
+                                    "data": {"type": "FeatureCollection", "features": ends}}
+
     # extra overlay layers (zones / POIs / any geometry the caller brings); each gets its own source
     # + paint layer(s), placed under or over the roads, and (if `popup` is set) clickable.
     under_layers, over_layers, ov_meta = _build_overlays(style, overlays)
@@ -1257,6 +1327,26 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                                        ["boolean", ["feature-state", "select"], False]], 0.85, 0],
              "line-width": fw, "line-offset": off}},
     ]
+    if ends:
+        # two-way pairs end like one road (_twin_ends): per plain band, a road-wide cap's casing
+        # just under the band's casings and its fill just under the band's fills, so every lane
+        # fill still covers it and a crossing road still covers it too
+        ekw = dict(offset_frac=offset_frac, offset_zoom=offset_zoom, split_frac=width_frac)
+        rad = {False: _end_radius_expr(highway_col, **ekw), True: _end_radius_expr(highway_col, casing=True, **ekw)}
+
+        # only where both lanes share a colour (a map coloured per direction keeps today's ends);
+        # the page's _applyFill rebuilds these when the colour option or a recolour changes
+        same = ["==", ["get", "__rs_fill"], ["get", "__rs_fill__b"]]
+
+        def _end(lid, flt, casing):
+            col = ["coalesce", ["get", "__rs_casing" if casing else "__rs_fill"], "#000000" if casing else "#888888"]
+            return {"id": lid, "type": "circle", "source": "ends", "filter": flt,
+                    "paint": {"circle-color": ["case", same, col, "rgba(0,0,0,0)"],
+                              "circle-radius": rad[casing], "circle-pitch-alignment": "map"}}
+        for band, flt in (("low-", low), ("", surface), ("high-", high)):
+            for part, casing in (("casing", True), ("fill", False)):
+                at = next(n for n, l in enumerate(style["layers"]) if l["id"] == f"roads-{band}{part}")
+                style["layers"].insert(at, _end(f"roads-ends-{band}{part}", flt, casing))
     if decks["features"]:
         # 2D flat bridge lines below flat_below, extruded decks from it up — one representation
         # at a time. The flat-line layers (and the bridge slice of the highlight layer) get a

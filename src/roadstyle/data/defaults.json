@@ -409,6 +409,7 @@
     "basemap": "voyager",
     "bridge_casing_color": "#000000",
     "tunnel_portal_m": 8.0,
+    "twin_end_caps": true,
     "tunnel_casing_dash": [2, 2],
     "tunnel_gap_shade": 0.25,
     "tunnel_dash_shade": 0.5,

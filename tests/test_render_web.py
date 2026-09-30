@@ -1030,3 +1030,79 @@ def test_every_road_fill_layer_is_clickable():
              if re.match(r"roads-(tunnel-|low-|high-|bridge-)?fill", l["id"])]
     assert {"roads-low-fill", "roads-high-fill", "roads-high-fill-dash0"} <= set(fills)
     assert [f for f in fills if not re.match(pattern, f)] == []
+
+
+# ---- two-way pairs end like one road (docs/design/twin_ends.md) ---------------------------------
+
+def _pairs():
+    """A two-way residential street (a twin pair), a one-way street, a two-way bridge, a two-way
+    tunnel and a two-way (dashed) footway."""
+    a, b = (18.00, 59.30), (18.00, 59.31)
+    rows = [("residential", None, None, [a, b]), ("residential", None, None, [b, a]),
+            ("residential", None, None, [(18.01, 59.30), (18.01, 59.31)]),
+            ("primary", "yes", None, [(18.02, 59.30), (18.02, 59.31)]),
+            ("primary", "yes", None, [(18.02, 59.31), (18.02, 59.30)]),
+            ("primary", None, "yes", [(18.03, 59.30), (18.03, 59.31)]),
+            ("primary", None, "yes", [(18.03, 59.31), (18.03, 59.30)]),
+            ("footway", None, None, [(18.04, 59.30), (18.04, 59.31)]),
+            ("footway", None, None, [(18.04, 59.31), (18.04, 59.30)])]
+    return gpd.GeoDataFrame({"highway": [r[0] for r in rows], "bridge": [r[1] for r in rows],
+                             "tunnel": [r[2] for r in rows]},
+                            geometry=[LineString(r[3]) for r in rows], crs=4326)
+
+
+def test_twin_pairs_get_one_end_cap_per_end():
+    style = _style(render_edges(_pairs(), backend="web").html)
+    pts = style["sources"]["ends"]["data"]["features"]
+    # only the plain, solid two-way street: two ends, both twins' ids; no one-way, bridge, tunnel,
+    # or dashed pair
+    assert len(pts) == 2
+    assert {(p["properties"]["__rs_road"], p["properties"]["__rs_road2"]) for p in pts} == {(0, 1)}
+    assert {tuple(p["geometry"]["coordinates"]) for p in pts} == {(18.0, 59.3), (18.0, 59.31)}
+    assert pts[0]["properties"]["__rs_fill"] and pts[0]["properties"]["highway"] == "residential"
+
+
+def test_end_caps_sit_under_their_band_and_match_the_lanes_width():
+    from roadstyle import render_web as rw
+    style = _style(render_edges(_pairs(), backend="web").html)
+    ids = [l["id"] for l in style["layers"]]
+    for band in ("low-", "", "high-"):
+        order = [f"roads-ends-{band}casing", f"roads-{band}casing", f"roads-ends-{band}fill", f"roads-{band}fill"]
+        assert [ids.index(i) for i in order] == sorted(ids.index(i) for i in order), band
+    lay = {l["id"]: l for l in style["layers"]}
+    assert lay["roads-ends-fill"]["paint"]["circle-pitch-alignment"] == "map"
+    # the cap's radius = the lanes' offset + half a lane, at every zoom stop (residential)
+    rad = lay["roads-ends-fill"]["paint"]["circle-radius"]
+    off, fw = rw._offset_expr("highway"), rw._width_expr("highway")
+    for k, z in enumerate(rw._ZSTOPS):
+        r = dict(zip(rad[4 + 2 * k][2:-1:2], rad[4 + 2 * k][3:-1:2]))["residential"]
+        o = off[4 + 2 * k][2]
+        o = dict(zip(o[2:-1:2], o[3:-1:2]))["residential"]
+        m = fw[4 + 2 * k]
+        m = m[1] if m[0] == "*" else m                    # the two-way split wraps the class match
+        w = dict(zip(m[2:-1:2], m[3:-1:2]))["residential"]
+        split = 1.0 if z <= 15 else (0.6 if z >= 17 else 1 - 0.4 * (z - 15) / 2)
+        assert abs(r - (o + w * split / 2)) < 0.01, z
+
+
+def test_end_caps_follow_filters_and_recolour_and_can_be_turned_off():
+    html = render_edges(_pairs(), backend="web").html
+    assert 'l.source==="ends"' in html and "__rs_road2" in html                  # id filters
+    assert 'RS_END_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"circle-color",ee)' in html
+    off = _style(render_edges(_pairs(), backend="web", settings={"config": {"twin_end_caps": False}}).html)
+    assert "ends" not in off["sources"] and not [l for l in off["layers"] if "ends" in l["id"]]
+
+
+def test_end_caps_hide_where_the_two_directions_differ():
+    """A map coloured per direction (twins with different colours) keeps today's ends: the cap is
+    transparent unless both lanes share a colour, so no direction's colour shows at a street's end."""
+    g = _pairs().iloc[:2].assign(edge_id=["a", "b"])
+    html = render_edges(g, backend="web", color_table={"a": "#ff0000", "b": "#0000ff"}).html
+    style = _style(html)
+    p = style["sources"]["ends"]["data"]["features"][0]["properties"]
+    assert p["__rs_fill"] != p["__rs_fill__b"]
+    fill = {l["id"]: l for l in style["layers"]}["roads-ends-fill"]["paint"]["circle-color"]
+    assert fill[0] == "case" and fill[1] == ["==", ["get", "__rs_fill"], ["get", "__rs_fill__b"]]
+    assert fill[-1] == "rgba(0,0,0,0)"
+    same = _style(render_edges(_pairs().iloc[:2], backend="web").html)["sources"]["ends"]["data"]["features"][0]["properties"]
+    assert same["__rs_fill"] == same["__rs_fill__b"]

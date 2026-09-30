@@ -42,6 +42,7 @@ class StyleConfig:
     bridge_casing_extra: float = 1.5   # bridges: casing a touch wider (the deck "wings")
     bridge_casing_color: str = "#000000"   # bridge deck casing colour (black by default)
     tunnel_portal_m: float = 8.0       # metres of a tunnel drawn at street level at its mouth (0 = off)
+    twin_end_caps: bool = True         # one road-wide round end under a two-way road's two lanes
     tunnel_casing_dash: list = field(default_factory=lambda: [2, 2])   # the tunnel casing dash (osm-carto)
     tunnel_gap_shade: float = 0.25       # tunnel casing between the dashes: this much darker than a light casing
     tunnel_dash_shade: float = 0.5       # tunnel dashes: this much darker than the casing
