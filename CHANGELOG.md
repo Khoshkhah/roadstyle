@@ -7,6 +7,14 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **Draw order follows the OSM `layer` tag.** Where roads cross, a tagged `layer` now decides
+  which one is drawn on top (untagged: a bridge is 1, a tunnel -1, anything else 0). Before, a
+  positive `layer` without a `bridge` tag counted as ground level, so a raised walkway was drawn
+  under the street it passes over. The look still comes from the tags: deck styling and 3D decks
+  only for `bridge`, the tunnel casing only for `tunnel`. Raised roads that aren't bridges draw
+  plain in new layers `roads-high-*` (above the ground roads, below the bridges); lowered roads
+  that aren't tunnels in `roads-low-*` (after the tunnels). A negative `layer` without a `tunnel`
+  tag no longer gets the tunnel look.
 - **Tunnel casings in two tones, never with empty gaps.** The dashed tunnel casing (osm-carto)
   left gaps where you couldn't tell whether two tunnel pieces connect. Now the casing is two dark
   shades of the road's own casing, a solid one with darker dashes on top (new layer

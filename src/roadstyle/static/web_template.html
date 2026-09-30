@@ -642,7 +642,7 @@ if(FILTER.on){
 // option's fill is baked per edge (__rs_fill / __rs_fill__1 …); setPaintProperty repoints the
 // road-fill layers' line-color at the chosen prop. window.rsSetColorField drives it from your UI.
 const COLOR_OPTIONS = __COLOR_OPTIONS__;
-const RS_FILL_LAYERS = ["roads-fill","roads-tunnel-fill","roads-bridge-fill"];
+const RS_FILL_LAYERS = ["roads-fill","roads-tunnel-fill","roads-low-fill","roads-high-fill","roads-bridge-fill"];
 const RS_PORTAL_LAYERS = ["roads-portal-fill"];   // tunnel mouths: their road's id is __rs_road
 let _coActive = __CO_ACTIVE__, _coLegendEl = null, _coLegendBox = null;
 function coLegendHtml(lg){

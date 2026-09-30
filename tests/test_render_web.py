@@ -100,7 +100,7 @@ def test_web_annotation_slots_alternate_names_and_arrows():
     # one arrow layer per grade tier, each right beside its road tier — a bridge must cover
     # the arrows of the road it crosses, not have them float above everything
     assert ids.index("roads-arrows") == ids.index("roads-fill") + 1
-    assert ids.index("roads-arrows-tunnel") == ids.index("roads-tunnel-fill") + 1
+    assert ids.index("roads-arrows-tunnel") == ids.index("roads-low-fill") + 1     # after the below-ground band
     assert ids.index("roads-arrows-bridge") == ids.index("roads-bridge-fill") + 1
     assert ["to-boolean", ["get", "name"]] in lab["filter"]          # unnamed -> slot stays empty
     assert lab["layout"]["symbol-placement"] == "line-center"
@@ -282,14 +282,16 @@ def test_minzoom_keeps_the_grade_separation_filters_intact():
     assert "lvl" in json.dumps(fs["roads-fill"])
     assert fs["roads-fill"] != fs["roads-tunnel-fill"] != fs["roads-bridge-fill"]
 
-def test_bridge_level_from_bridge_column_only():
-    """A positive `layer` tag alone must NOT earn the bridge treatment (2D deck styling, 3D
-    extrusions) — only the bridge column does. Negative layer still marks below-ground."""
+def test_draw_order_from_layer_look_from_bridge_column():
+    """The OSM `layer` decides the draw order (a layer=2 road without a bridge tag is drawn above
+    the ground roads), but only the bridge column earns the bridge look (deck styling, 3D
+    extrusions); a negative layer alone is below ground, not a tunnel."""
     g = _edges().assign(bridge=[True, False, False], layer=[1, 2, -1])
     style = _style(render_edges(g, backend="web").html)
-    lvls = [f["properties"]["lvl"]
-            for f in style["sources"]["roads"]["data"]["features"]]
-    assert lvls == [1, 0, -1]
+    ps = [f["properties"] for f in style["sources"]["roads"]["data"]["features"]]
+    assert [p["lvl"] for p in ps] == [1, 2, -1]
+    assert [p["__rs_bridge"] for p in ps] == [True, False, False]
+    assert [p["__rs_tunnel"] for p in ps] == [False, False, False]
 
 
 def test_web_round_caps_seal_edge_connections():
@@ -714,7 +716,7 @@ def test_stacked_bridges_order_by_osm_layer():
     style = _style(render_edges(g, backend="web").html)
     lvls = {f["properties"]["highway"] + str(i): f["properties"]["lvl"]
             for i, f in enumerate(style["sources"]["roads"]["data"]["features"])}
-    assert list(lvls.values()) == [1, 3, -2, 0]
+    assert list(lvls.values()) == [1, 3, -2, 1]     # the plain layer=1 road: above ground too
 
 
 def test_twoway_bridge_decks_split_per_directed_edge():
@@ -865,3 +867,26 @@ def test_tunnel_casing_in_two_tones():
     mono = _style(render_edges(g, backend="web", palette="mono").html)["sources"]["roads"]["data"]
     tun = mono["features"][0]["properties"]                     # mono primary casing #4f4f4f
     assert tun["__rs_casing_gap"] == "#4f4f4f" and tun["__rs_casing_dash"] == "#282828"  # dark, darker
+
+
+def test_raised_and_lowered_roads_without_a_structure_tag():
+    """A raised walkway (layer=1, no bridge tag) draws in the above-ground band with the plain
+    look (roads-high-*, before the bridges); a road with a negative layer and no tunnel tag in the
+    below-ground band, plain (roads-low-*, after the tunnels). Untagged bridges / tunnels default
+    to 1 / -1; a tunnel tagged layer=1 goes above ground."""
+    g = gpd.GeoDataFrame(
+        {"highway": ["footway", "service", "primary", "primary", "service", "residential"],
+         "layer": ["1", "-1", None, None, "1", None],
+         "bridge": [None, None, "yes", None, None, None],
+         "tunnel": [None, None, None, "yes", "yes", None]},
+        geometry=[LineString([(18.0 + i * 0.01, 59.30), (18.0 + i * 0.01, 59.31)]) for i in range(6)],
+        crs=4326)
+    style = _style(render_edges(g, backend="web").html)
+    assert [f["properties"]["lvl"] for f in style["sources"]["roads"]["data"]["features"]] == [1, -1, 1, -1, 1, 0]
+    ids = [l["id"] for l in style["layers"]]
+    order = ["roads-tunnel-fill", "roads-low-casing", "roads-low-fill", "roads-casing", "roads-fill",
+             "roads-high-casing", "roads-high-fill", "roads-bridge-casing", "roads-bridge-fill"]
+    assert [ids.index(i) for i in order] == sorted(ids.index(i) for i in order)
+    lay = {l["id"]: l for l in style["layers"]}
+    assert "__rs_bridge" in json.dumps(lay["roads-high-fill"]["filter"])      # not a bridge
+    assert "__rs_tunnel" in json.dumps(lay["roads-low-fill"]["filter"])       # not a tunnel
