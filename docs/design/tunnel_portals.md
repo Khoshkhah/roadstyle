@@ -1,6 +1,9 @@
 # Tunnel mouths that look connected
 
 **Status:** implemented 2026-09-30 (approved by Kaveh the same day).
+**Superseded** the same day by mapstyle's `docs/design/junctions.md`, rule 1: a tunnel is drawn with
+the ground roads except where it really passes under a road (`_stretches`); the mouth pieces and
+`tunnel_portal_m` are gone.
 
 ## Problem
 

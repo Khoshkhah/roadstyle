@@ -7,9 +7,21 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
-- **Tunnel mouth pieces are 3 m, not 8 m** (`tunnel_portal_m`). The piece of a tunnel drawn at
-  street level at its mouth, so the road runs into the tunnel, made the first and last 8 m of a
-  tunnel look like an ordinary road: 40 % of a 40 m tunnel (Monaco, Boulevard du Larvotto).
+- **A tunnel is an ordinary road with a tunnel style** (mapstyle's `docs/design/junctions.md`,
+  rule 1). A tunnel was drawn in the lower band along its whole length, so at its mouth the street's
+  round end lay across it and the street looked like a dead end. Now it goes to the lower band only
+  where it really passes under a road it doesn't join (4 m either side of the crossing; at a shallow
+  crossing, the whole stretch within 4 m of the road, but never into a mouth); the rest is drawn
+  with the ground roads, in the tunnel's colours (an opaque faded fill, the two-tone dashed casing)
+  with butt ends. A path above doesn't make an underpass. The edge stays one feature (clicks,
+  filters, `rsColor`); its stretches are drawing pieces (source `tpieces`, `__rs_road` = its id).
+  Replaces the tunnel mouth pieces: **`tunnel_portal_m` is removed** (an old settings file that
+  sets it still loads; the key is ignored).
+- **A road with only a `layer` tag acts the same, in the plain look.** One that passes over or under
+  no road is drawn with the ground roads, so a `layer=-1` tunnel approach no longer looks cut off
+  from the road it joins. One that does (a raised walkway over a street) is cut into stretches: over
+  the road (clearing its drawn width at z17) in its own band with butt ends, the rest with the
+  ground roads. A caller's `band_col` value still wins. Bridges keep their band.
 
 ### Added
 - **Line widths in metres** (`width_m_col`, `width_m_zoom=16`, `casing_m=0.15`). A column of real
@@ -25,9 +37,17 @@ All notable changes to **roadstyle** are documented here. The format is based on
   both directions stay separately clickable. A cap draws only where both lanes share a colour, so
   maps coloured per direction keep their ends as before. It follows the class filter, the bridge
   and tunnel toggles, `rsFilter`, `rsColor` and the colour options. Setting: `twin_end_caps`
-  (default `true`). Adds about 8–11 % to a page. Design: `docs/design/twin_ends.md`.
+  (default `true`). Adds about 8–11 % to a page. Design: `docs/design/twin_ends.md`. Where a road
+  in a lower band meets the end (a tunnel mouth), the cap is fill only: no ring across that road.
+- **`directed_col`: say an edge is undirected.** Two-way roads are found by geometry (the same
+  line, reversed), so a footway stored both ways, or a one-way street with a walking-only reverse
+  edge, was drawn as two lanes. A pair is now two lanes only when neither edge is false in
+  `directed_col`; otherwise it is one line, centred and full width. Null = directed (the geometry
+  rule).
 
 ### Fixed
+- **Dashed classes keep their dashes in tunnel and layer stretches** (each stretch layer gets the
+  dashed sibling layers the whole-edge layers have).
 - **Roads in the low / high bands can be clicked and hovered again.** Since 0.9.2 a road with a
   non-zero `layer` and no bridge / tunnel tag (a raised walkway) draws in `roads-high-*` /
   `roads-low-*`, and so do edges moved by `band_col`; those layers were missing from the pick

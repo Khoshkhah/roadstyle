@@ -207,7 +207,7 @@ def _offset_expr(col, offset_frac=0.28, offset_zoom=15):
     return e
 
 
-def _mark_twoway(geo):
+def _mark_twoway(geo, directed_col=None):
     """Flag each edge that has a reverse twin (i.e. a two-way street's other direction), so the
     style fans those into two lanes and drops the one-way arrows. The match is DIRECTED — the twin
     must run end->start. Two same-direction edges between one node pair (a street split into
@@ -234,6 +234,21 @@ def _mark_twoway(geo):
         # included); otherwise a one-way edge = an edge with no reverse twin
         ow = p.get("oneway")
         p["__rs_oneway"] = _truthy(ow) if ow is not None else not p["__rs_twoway"]
+    if directed_col:
+        # a pair is two lanes only when neither edge is undirected (directed_col false: a footway's
+        # other direction, a one-way street's walking-only reverse); null = directed. Checked on
+        # both edges, so no lane is ever drawn shifted without its twin (docs/design/twin_ends.md)
+        und = lambda ft: (ft.get("properties") or {}).get(directed_col) is not None and not _truthy(  # noqa: E731
+            ft["properties"][directed_col])
+        by = collections.defaultdict(list)
+        for ft, k in zip(geo["features"], keys, strict=False):
+            by[k].append(ft)
+        for ft, k in zip(geo["features"], keys, strict=False):
+            p = ft["properties"]
+            if p["__rs_twoway"] and (und(ft) or all(und(t) for t in by[(k[1], k[0])] if t is not ft)):
+                p["__rs_twoway"] = False
+                if p.get("oneway") is None:      # no `oneway` column: a directed edge with an
+                    p["__rs_oneway"] = not und(ft)   # undirected reverse is a one-way road
 
 
 def _annotation_slots(geo, slot_m, class_col="highway"):
@@ -612,13 +627,19 @@ def _twin_ends(geo, cols):
     twins' feature ids (``__rs_road`` / ``__rs_road2``) for recolouring and id filters. Every fill
     prop comes twice, the first twin's and the second's (``<prop>__b``): a cap draws only where the
     two lanes have the same colour, so a map coloured per direction never shows one direction's
-    colour at a street's end. No cap at an end point where another road is drawn in a lower band
-    (a tunnel, a plain low road, a sidewalk moved by band_col): the cap would paint its casing
-    ring across that road, which draws under it (Kaveh's Monaco screenshot)."""
+    colour at a street's end. Where another road is drawn in a lower band at the end point (a
+    tunnel mouth, a plain low road, a sidewalk moved by band_col) the cap is fill only
+    (``__rs_nocase``): its casing ring would cross that road, which draws under it."""
 
-    def rank(p):   # the drawing band: tunnel < low < ground < high < bridge
-        if p.get("__rs_tunnel"):
-            return -2
+    key = lambda c: (round(c[0], 6), round(c[1], 6))  # noqa: E731
+
+    def rank(p, kp=None, c=None):   # the drawing band: tunnel < low < ground < high < bridge
+        if p.get("__rs_tunnel") or p.get("__rs_pieced"):   # an end drawn with the ground roads
+            if c is not None and ((kp == key(c[0]) and p.get("__rs_gstart"))   # (_stretches)
+                                  or (kp == key(c[-1]) and p.get("__rs_gend"))):
+                return 0
+            if p.get("__rs_tunnel"):
+                return -2
         if p.get("__rs_bridge"):
             return 2
         b = p.get("__rs_band")
@@ -644,7 +665,8 @@ def _twin_ends(geo, cols):
         if (i in used or k is None or not p.get("__rs_twoway") or p.get("__rs_bridge")
                 or p.get("__rs_tunnel") or p.get("__rs_dash")):
             continue
-        j = next((j for j in where.get((k[1], k[0]), []) if j != i and j not in used), None)
+        j = next((j for j in where.get((k[1], k[0]), []) if j != i and j not in used
+                  and geo["features"][j]["properties"].get("__rs_twoway")), None)
         if j is None:
             continue
         used.update((i, j))
@@ -653,13 +675,56 @@ def _twin_ends(geo, cols):
         q = geo["features"][j]["properties"]
         props.update({c + "__b": q.get(c) for c in list(props) if c.startswith("__rs_fill")})
         props.update(__rs_road=i, __rs_road2=j)
-        c, own = ft["geometry"]["coordinates"], rank(p)
+        c = ft["geometry"]["coordinates"]
         for pt, kp in ((c[0], k[0]), (c[-1], k[1])):
-            if any(rank(geo["features"][n]["properties"]) < own for n in at[kp] if n not in (i, j)):
-                continue
-            out.append({"type": "Feature", "properties": dict(props),
+            own = rank(p, kp, c)
+            low = any(rank(geo["features"][n]["properties"], kp, geo["features"][n]["geometry"]["coordinates"]) < own
+                      for n in at[kp] if n not in (i, j))
+            ex = {"__rs_nocase": True} if low else {}
+            if p.get("__rs_pieced"):
+                ex["__rs_band"] = own              # the cap in its end's band
+            out.append({"type": "Feature", "properties": {**props, **ex},
                         "geometry": {"type": "Point", "coordinates": list(pt[:2])}})
     return out
+
+
+def _half_m(cls, lat, z=17):
+    """A class's drawn half casing width in metres at zoom ``z`` (z17: the widest a raised stretch
+    must clear at the zooms a junction is looked at)."""
+    b, lk = _base(str(cls or ""))
+    g = ROAD_GROUP.get(b, "residential")
+    px = _gwidth(WIDTH[g], HI_RATE[g], z) * CASING_RATIO.get(g, 1) * (0.6 if lk else 1) / 2
+    return px * 156543.03 * math.cos(math.radians(lat)) / 2 ** z
+
+
+def _plain_pieces(prefix, flt, lay, cw, fw, off, on, casing):
+    """A plain-layer edge's stretches of one band (_stretches), in the ordinary look: the casing
+    layer or the fill layer, from the ``tpieces`` source; nothing when no edge is cut. The over /
+    under stretches get butt caps (``lay``): a round end there would arc across the ground
+    stretch it continues into."""
+    if not on:
+        return []
+    if casing:
+        return [{"id": f"{prefix}-casing", "type": "line", "source": "tpieces", "layout": lay,
+                 "filter": flt, "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
+                                          "line-width": cw, "line-offset": off}}]
+    return [{"id": f"{prefix}-fill", "type": "line", "source": "tpieces", "layout": lay,
+             "filter": flt, "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
+                                      "line-width": fw, "line-offset": off}}]
+
+
+def _cut_opacity(on):
+    """A cut plain-layer edge's own fill: invisible (its stretches draw it), still what a click picks."""
+    return {"line-opacity": ["case", ["to-boolean", ["get", "__rs_pieced"]], 0, 1]} if on else {}
+
+
+def _fade(fill, bg, opacity=0.72):
+    """``fill`` at ``opacity`` over ``bg``, as one opaque colour (a tunnel's fill drawn at street
+    level must not let the road ends under it show through); the input when either isn't hex."""
+    a, b = _rgb(fill), _rgb(bg)
+    if a is None or b is None:
+        return fill
+    return "#" + "".join(f"{round(x * opacity + y * (1 - opacity)):02x}" for x, y in zip(a, b))
 
 
 def _rgb(hex_color):
@@ -696,64 +761,108 @@ def _mark_tunnel_dash(geo, gap, dash):
             p["__rs_casing_dash"] = _darker(c, dash)
 
 
-_PORTAL_CLEAR_M = 4.0   # no mouth piece when the tunnel passes under a street this close past it
 
 
-def _tunnel_portals(geo, portal_m):
-    """Tunnel mouths: the first / last ``portal_m`` metres of every tunnel edge (lvl < 0) whose end
-    point is also a surface edge's (lvl 0) end point, as features for the ``portals`` source.
+# what passes over a tunnel without making it an underpass in the drawing: a path is drawn on top of
+# the tunnel's ground stretch anyway (80 of Monaco's 109 mouths had only a footway / steps over them)
+_PATH_OVER = {"footway", "path", "cycleway", "steps", "bridleway", "corridor", "pedestrian", "platform"}
 
-    Tunnels draw under the surface band, so at a mouth the surface road's casing and round cap
-    paint across the tunnel's start like a wall. These pieces draw at street level (fill only,
-    between the surface casing and fill), so the road visibly runs into the tunnel. A tunnel that
-    passes under a street (crosses it without a shared node) within ``portal_m +
-    _PORTAL_CLEAR_M`` of its mouth gets no piece: a piece would cut into that street's casing, and
-    drawn widths grow with zoom, so no fixed length clears it at every zoom. Streets that only run
-    close by (a roundabout at the mouth) don't count. Each carries its edge's
-    properties (class, baked fills, two-way offset) plus ``__rs_road``, the edge's feature id (its
-    index), so recolouring and id filters reach it; direction is kept, so the two-way lane offset
-    lands on the same side. LineStrings only."""
+
+def _stretches(geo, clear_m=4.0, col="highway"):
+    """Every tunnel edge cut, for drawing only, into stretches (mapstyle's junctions.md, rule 1;
+    Kaveh: "a tunnel should act like an ordinary road; only the colour style differs"), and every
+    plain-layer edge (a ``layer`` tag, no bridge / tunnel tag) that passes over or under a road
+    (``__rs_pieced``), in the plain look. A plain-layer edge that passes nothing is drawn with the
+    ground roads, whole (``__rs_band`` 0). Bridges keep their band; so does an edge a caller's
+    ``band_col`` placed.
+
+    A stretch is *under* where the edge passes beneath a higher road it doesn't join (``clear_m``
+    either side of the crossing, and, at a shallow crossing, the whole stretch within ``clear_m`` of
+    that road, except where that stretch reaches a mouth: a mouth keeps its ground stretch), and
+    *ground* everywhere else. Only roads make an underpass, not paths (``_PATH_OVER``): a footway
+    over a tunnel mouth is drawn over its ground stretch anyway. A raised edge's stretch is *over*
+    the same way, where any road or path below counts (a raised walkway still shows over the
+    footpath it crosses). Ground stretches draw with the ground roads (a tunnel's in the tunnel
+    style), so an end joins like any road continuing; the others draw in the edge's own band.
+
+    Each piece carries its edge's properties plus ``__rs_road`` (the edge's feature id) and
+    ``__rs_piece`` ("ground" / "under" / "over"). Each cut edge gets ``__rs_gstart`` /
+    ``__rs_gend``: whether its first / last stretch is ground (twin end caps rank its ends by
+    that)."""
     from shapely import STRtree
-    from shapely.geometry import LineString, box
+    from shapely.geometry import LineString, Point
     from shapely.ops import substring
 
-    if not portal_m:
-        return []
     key = lambda c: (round(c[0], 6), round(c[1], 6))  # noqa: E731
-    lines = [(i, ft) for i, ft in enumerate(geo["features"])
+    feats = geo["features"]
+    lines = [i for i, ft in enumerate(feats)
              if (ft.get("geometry") or {}).get("type") == "LineString"
              and len(ft["geometry"].get("coordinates") or []) >= 2]
-    ground = [ft["geometry"]["coordinates"] for _, ft in lines if (ft["properties"].get("lvl") or 0) == 0]
-    surface = {key(c[j]) for c in ground for j in (0, -1)}
-    tree = STRtree([LineString(c) for c in ground]) if ground else None
+    geoms = {i: LineString(feats[i]["geometry"]["coordinates"]) for i in lines}
+    order = list(geoms)
+    tree = STRtree([geoms[i] for i in order])
     out = []
-    for i, ft in lines:
-        p, c = ft["properties"], ft["geometry"]["coordinates"]
-        if (p.get("lvl") or 0) >= 0:
-            continue
+    for i in lines:
+        p, c = feats[i]["properties"], feats[i]["geometry"]["coordinates"]
+        lvl, tun = p.get("lvl") or 0, p.get("__rs_tunnel")
+        if not tun and (not lvl or p.get("__rs_bridge") or p.get("__rs_band") is not None):
+            continue                  # ground, a bridge, or placed by the caller's band_col
+        ends, up = {key(c[0]), key(c[-1])}, lvl > 0
         lon0, lat0 = c[0]
         kx = 111320.0 * math.cos(math.radians(lat0))
-        to_local = lambda cs: LineString([((x - lon0) * kx, (y - lat0) * 111320.0) for x, y in cs])  # noqa: E731
-        local = to_local(c)
-        for at_start in (True, False):
-            mouth = key(c[0] if at_start else c[-1])
-            if mouth not in surface:
+        loc = lambda xy: ((xy[0] - lon0) * kx, (xy[1] - lat0) * 111320.0)  # noqa: E731
+        local = LineString([loc(xy) for xy in c])
+        L, spans = local.length, []
+        for n in tree.query(geoms[i], predicate="intersects"):
+            j = order[n]
+            q, cj = feats[j]["properties"], feats[j]["geometry"]["coordinates"]
+            ql = q.get("lvl") or 0
+            if (j == i or (ql >= lvl if up else ql <= lvl) or ends & {key(cj[0]), key(cj[-1])}
+                    or (not up and _base(str(q.get(col) or ""))[0] in _PATH_OVER)):
+                continue              # not across its level, joined to it, or a path over it
+            road = LineString([loc(xy) for xy in cj])
+            x = local.intersection(road)
+            at = [local.project(Point(xy)) for g in getattr(x, "geoms", [x]) for xy in getattr(g, "coords", [])]
+            if not at:
                 continue
-            # the piece plus the clearance, from the mouth in: a street it crosses there is one the
-            # tunnel passes under right after its mouth -> no piece
-            reach = min(portal_m + _PORTAL_CLEAR_M, local.length)
-            ahead = substring(local, 0, reach) if at_start else substring(local, local.length - reach, local.length)
-            x0, y0 = c[0] if at_start else c[-1]
-            pad = reach / 111320.0 * 2
-            near = box(x0 - pad, y0 - pad, x0 + pad, y0 + pad)
-            if any(mouth not in (key(g[0]), key(g[-1])) and ahead.intersects(to_local(g))
-                   for g in (ground[j] for j in tree.query(near))):
+            # over a road, the raised stretch must clear the road's drawn width (its ground
+            # stretch is under that road's fill); under one, clear_m (a tunnel's ground stretch
+            # is under the fill anyway, and a wider span would put more mouths under)
+            cl = max(clear_m, _half_m(q.get(col), lat0) + _half_m(p.get(col), lat0)) if up else clear_m
+            a, b = max(0.0, min(at) - cl), min(L, max(at) + cl)
+            near = local.intersection(road.buffer(cl))   # a shallow crossing: all within cl
+            for g in getattr(near, "geoms", [near]):
+                n = [local.project(Point(xy)) for xy in getattr(g, "coords", [])]
+                if n and min(n) <= b and max(n) >= a:      # the stretch around this crossing
+                    a = min(a, min(n)) if min(n) >= cl else a       # never into a mouth
+                    b = max(b, max(n)) if max(n) <= L - cl else b
+            spans.append((a, b))
+        if not tun and not spans:
+            p["__rs_band"] = 0        # a plain-layer edge across nothing: an ordinary ground road
+            continue
+        spans.sort()
+        under = []
+        for a, b in spans:
+            if under and a <= under[-1][1]:
+                under[-1][1] = max(under[-1][1], b)
+            else:
+                under.append([a, b])
+        cuts, pos = [], 0.0
+        for a, b in under:
+            if a - pos > 0.01:
+                cuts.append(("ground", pos, a))
+            cuts.append(("over" if up else "under", a, b))
+            pos = b
+        if L - pos > 0.01 or not cuts:
+            cuts.append(("ground", pos, L))
+        p["__rs_gstart"], p["__rs_gend"] = cuts[0][0] == "ground", cuts[-1][0] == "ground"
+        if not tun:
+            p["__rs_pieced"] = True
+        for kind, a, b in cuts:
+            part = local if (a <= 0 and b >= L) else substring(local, a, b)
+            if part.geom_type != "LineString" or part.length <= 0:
                 continue
-            m = min(portal_m, local.length)
-            part = substring(local, 0, m) if at_start else substring(local, local.length - m, local.length)
-            if part.geom_type != "LineString":
-                continue
-            out.append({"type": "Feature", "properties": {**p, "__rs_road": i},
+            out.append({"type": "Feature", "properties": {**p, "__rs_road": i, "__rs_piece": kind},
                         "geometry": {"type": "LineString",
                                      "coordinates": [[x / kx + lon0, y / 111320.0 + lat0]
                                                      for x, y in part.coords]}})
@@ -1090,7 +1199,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
-           order_col: str = None, band_col: str = None,
+           order_col: str = None, band_col: str = None, directed_col: str = None,
            width_m_col: str = None, width_m_zoom: float = 16, casing_m: float = 0.15,
            pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
@@ -1113,6 +1222,11 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     ground roads, casing included (a sidewalk under its street, a crossing over it); tunnels and
     bridges keep their own band. ``order_col`` names a numeric column: the edge's order inside its
     band instead of its class's ``z_order`` (clamped to -400 … 400). Null = the class / level rule.
+
+    ``directed_col`` names a column saying whether an edge is a direction of travel of its own
+    (true / null) or an undirected edge (false: a footway stored both ways, a one-way street's
+    walking-only reverse). An edge and its reverse are drawn as two lanes only when neither is
+    false; otherwise both are drawn centred, full width, as one line.
 
     ``width_m_col`` names a column of widths in metres (a lane, a road with a ``width`` tag, a
     canal): from ``width_m_zoom`` on, such a line is drawn exactly that wide, its casing
@@ -1211,7 +1325,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             # legend=False opts out — matching the folium backend's `legend` arg.
             color_opts_meta = [{"name": rf.legend.get("title") or "data",
                                 "prop": "__rs_fill", "legend": rf.legend}]
-    _mark_twoway(geo)
+    _mark_twoway(geo, directed_col)
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
     _mark_order(geo, order_col, band_col)
     _mark_tunnel_dash(geo, CONFIG.tunnel_gap_shade, CONFIG.tunnel_dash_shade)
@@ -1268,10 +1382,17 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         # ~5k features can afford it.
         style["sources"]["roads"] = {"type": "geojson", "data": geo, "generateId": True,
                                      "tolerance": 0.05}
-    portals = _tunnel_portals(geo, CONFIG.tunnel_portal_m)
-    if portals:
-        style["sources"]["portals"] = {"type": "geojson", "tolerance": 0.05,
-                                       "data": {"type": "FeatureCollection", "features": portals}}
+    # tunnels draw as stretches (_stretches): ground ones with the ground roads in the
+    # tunnel's style, under ones in the lower band; the edge itself stays in `roads` (invisible:
+    # it is what clicks, filters and recolouring address)
+    tpieces = _stretches(geo, col=highway_col)
+    if tpieces:
+        bg = _bg_color(active_bm)
+        for ft in tpieces:             # the faded tunnel fill, opaque: nothing shows through it
+            q = ft["properties"]
+            q["__rs_tfill"] = _fade(q.get("__rs_fill"), bg)
+        style["sources"]["tpieces"] = {"type": "geojson", "tolerance": 0.05,
+                                       "data": {"type": "FeatureCollection", "features": tpieces}}
 
     ends = _twin_ends(geo, (highway_col, filter_col)) if CONFIG.twin_end_caps else []
     if ends:
@@ -1298,7 +1419,10 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     is_t, is_b = ["to-boolean", ["get", "__rs_tunnel"]], ["to-boolean", ["get", "__rs_bridge"]]
     # a caller's band_col moves a plain edge between the low / ground / high bands (_mark_order);
     # without it the expressions stay exactly as they were
-    bd = ["coalesce", ["get", "__rs_band"], ["case", ["<", lv, 0], -1, [">", lv, 0], 1, 0]] if band_col else lv
+    # (and _stretches puts a plain-layer edge that passes over / under nothing in the ground band)
+    plain_cut = any(ft["properties"].get("__rs_pieced") for ft in tpieces)
+    auto = band_col or plain_cut or any(ft["properties"].get("__rs_band") is not None for ft in geo["features"])
+    bd = ["coalesce", ["get", "__rs_band"], ["case", ["<", lv, 0], -1, [">", lv, 0], 1, 0]] if auto else lv
     surface = ["==", bd, 0]
     tunnel = ["all", ["<", lv, 0], is_t]
     low = ["all", ["<", bd, 0], ["!", is_t]]
@@ -1308,9 +1432,18 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     # AND-ed onto each road filter rather than given its own layers, so layer ids are untouched.
     mz = ({**CONFIG.minzoom} if minzoom is True else
           {**CONFIG.minzoom, **minzoom} if isinstance(minzoom, dict) else None)
+    # stretches (_stretches): a tunnel's, and a plain-layer edge's in the plain look
+    piece = lambda k: ["==", ["get", "__rs_piece"], k]  # noqa: E731
+    under, ground_t = ["all", piece("under"), is_t], ["all", piece("ground"), is_t]
+    low_p, ground_p, high_p = piece("under"), piece("ground"), piece("over")
+    if plain_cut:
+        low_p, ground_p = (["all", f, ["!", is_t]] for f in (low_p, ground_p))
+    whole = ["!", ["to-boolean", ["get", "__rs_pieced"]]]   # a cut edge: drawn by its stretches
     if mz:
         _z = _minzoom_filter(highway_col, mz)
-        surface, tunnel, low, bridge, high = (["all", _z, f] for f in (surface, tunnel, low, bridge, high))
+        surface, tunnel, low, bridge, high, under, ground_t, low_p, ground_p, high_p = (
+            ["all", _z, f] for f in (surface, tunnel, low, bridge, high, under, ground_t,
+                                     low_p, ground_p, high_p))
     dk = {"base_m": 5.0, "thickness_m": 1.0, "ramp_m": 40.0, "step_m": 2.5,
           "match_zoom": 18.0, "opacity": 0.7, "width_scale": 0.6, "flat_below": 16.0,
           "casing_px": 2.0, **(CONFIG.bridge_decks or {})}
@@ -1333,46 +1466,71 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         # with darker dashes on top (_mark_tunnel_dash). The casing is never missing, so connected
         # tunnel pieces look connected (a dash with empty gaps didn't show it); the dash and the
         # faded fill say "tunnel". Settings: tunnel_casing_dash, tunnel_gap_shade, tunnel_dash_shade.
-        {"id": "roads-tunnel-casing", "type": "line", "source": "roads", "layout": lay,
-         "filter": tunnel,
+        {"id": "roads-tunnel-casing", "type": "line", "source": "tpieces" if tpieces else "roads",
+         "layout": lay, "filter": under if tpieces else tunnel,
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing_gap"], "#8d8d8d"],
                    "line-width": cw, "line-offset": off}},
-        {"id": "roads-tunnel-casing-dash", "type": "line", "source": "roads", "layout": tlay,
-         "filter": tunnel,
+        {"id": "roads-tunnel-casing-dash", "type": "line", "source": "tpieces" if tpieces else "roads",
+         "layout": tlay, "filter": under if tpieces else tunnel,
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing_dash"], "#5e5e5e"],
                    "line-width": cw, "line-offset": off,
                    "line-dasharray": list(CONFIG.tunnel_casing_dash or [2, 2])}},
+        # the tunnel edges themselves: invisible when stretches draw them, but still what a click
+        # picks and what selection / rsQuery address
         {"id": "roads-tunnel-fill", "type": "line", "source": "roads", "layout": lay,
          "filter": tunnel,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
-                   "line-width": fw, "line-offset": off, "line-opacity": 0.72}},
+                   "line-width": fw, "line-offset": off, "line-opacity": 0 if tpieces else 0.72}},
+        *([{"id": "roads-tunnel-under-fill", "type": "line", "source": "tpieces", "layout": lay,
+            "filter": under,
+            "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
+                      "line-width": fw, "line-offset": off, "line-opacity": 0.72}}] if tpieces else []),
         # below ground, not a tunnel (a negative layer alone): plain look, under the ground roads
-        {"id": "roads-low-casing", "type": "line", "source": "roads", "layout": lay, "filter": low,
+        {"id": "roads-low-casing", "type": "line", "source": "roads", "layout": lay,
+         "filter": ["all", low, whole] if plain_cut else low,
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
                    "line-width": cw, "line-offset": off}},
+        *_plain_pieces("roads-lowp", low_p, tlay, cw, fw, off, plain_cut, casing=True),
         {"id": "roads-low-fill", "type": "line", "source": "roads", "layout": lay, "filter": low,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
-                   "line-width": fw, "line-offset": off}},
+                   "line-width": fw, "line-offset": off, **_cut_opacity(plain_cut)}},
+        *_plain_pieces("roads-lowp", low_p, tlay, cw, fw, off, plain_cut, casing=False),
         {"id": "roads-casing", "type": "line", "source": "roads", "layout": lay, "filter": surface,
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
                    "line-width": cw, "line-offset": off}},
-        # tunnel mouths at street level (fill only): they cover the surface casing where a tunnel
-        # starts, so the road runs into it instead of hitting a wall (_tunnel_portals)
-        *([{"id": "roads-portal-fill", "type": "line", "source": "portals", "layout": lay,
-            **({"filter": _z} if mz else {}),
-            "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
-                      "line-width": fw, "line-offset": off}}] if portals else []),
+        # a plain-layer edge's ground stretches: an ordinary ground road (round caps)
+        *_plain_pieces("roads-plaingr", ground_p, lay, cw, fw, off, plain_cut, casing=True),
+        # a tunnel's ground stretches: with the ground roads, in the tunnel's style (two-tone
+        # dashed casing, faded fill) and butt caps, so at a mouth the road runs into the tunnel and
+        # the street's round end stays under the tunnel's casing
+        *([{"id": "roads-tunnelgr-casing", "type": "line", "source": "tpieces", "layout": tlay,
+            "filter": ground_t,
+            "paint": {"line-color": ["coalesce", ["get", "__rs_casing_gap"], "#8d8d8d"],
+                      "line-width": cw, "line-offset": off}},
+           {"id": "roads-tunnelgr-casing-dash", "type": "line", "source": "tpieces", "layout": tlay,
+            "filter": ground_t,
+            "paint": {"line-color": ["coalesce", ["get", "__rs_casing_dash"], "#5e5e5e"],
+                      "line-width": cw, "line-offset": off,
+                      "line-dasharray": list(CONFIG.tunnel_casing_dash or [2, 2])}},
+           {"id": "roads-tunnelgr-fill", "type": "line", "source": "tpieces", "layout": tlay,
+            "filter": ground_t,
+            "paint": {"line-color": ["coalesce", ["get", "__rs_tfill"], ["get", "__rs_fill"], "#888888"],
+                      "line-width": fw, "line-offset": off}}] if tpieces else []),
+        *_plain_pieces("roads-plaingr", ground_p, lay, cw, fw, off, plain_cut, casing=False),
         {"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, "filter": surface,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
                    "line-width": fw, "line-offset": off}},
         # above ground, not a bridge (a positive layer alone: a raised walkway): plain look, over
         # the ground roads it crosses
-        {"id": "roads-high-casing", "type": "line", "source": "roads", "layout": lay, "filter": high,
+        {"id": "roads-high-casing", "type": "line", "source": "roads", "layout": lay,
+         "filter": ["all", high, whole] if plain_cut else high,
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
                    "line-width": cw, "line-offset": off}},
+        *_plain_pieces("roads-highp", high_p, tlay, cw, fw, off, plain_cut, casing=True),
         {"id": "roads-high-fill", "type": "line", "source": "roads", "layout": lay, "filter": high,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
-                   "line-width": fw, "line-offset": off}},
+                   "line-width": fw, "line-offset": off, **_cut_opacity(plain_cut)}},
+        *_plain_pieces("roads-highp", high_p, tlay, cw, fw, off, plain_cut, casing=False),
         # Bridges last (on top). Flat view: heavier square-capped casing reads as a deck.
         # 3D view: below bridge_decks.flat_below the SAME flat lines draw (full stylized width,
         # matching the roads — a fixed deck polygon reads too narrow zoomed out); from
@@ -1406,6 +1564,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
 
         def _end(lid, flt, casing):
             col = ["coalesce", ["get", "__rs_casing" if casing else "__rs_fill"], "#000000" if casing else "#888888"]
+            if casing:     # no ring where a lower band meets the end (__rs_nocase, _twin_ends)
+                flt = ["all", flt, ["!", ["to-boolean", ["get", "__rs_nocase"]]]]
             return {"id": lid, "type": "circle", "source": "ends", "filter": flt,
                     "paint": {"circle-color": ["case", same, col, "rgba(0,0,0,0)"],
                               "circle-radius": rad[casing], "circle-pitch-alignment": "map"}}
@@ -1465,7 +1625,9 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         for l in style["layers"]:
             relayered.append(l)
             lid, base_f = l["id"], l.get("filter")
-            if lid in ("roads-fill", "roads-tunnel-fill", "roads-low-fill", "roads-high-fill", "roads-bridge-fill"):
+            if lid in ("roads-fill", "roads-tunnel-fill", "roads-low-fill", "roads-high-fill", "roads-bridge-fill",
+                       "roads-tunnel-under-fill", "roads-tunnelgr-fill", "roads-lowp-fill",
+                       "roads-plaingr-fill", "roads-highp-fill"):
                 for di, ds in enumerate(dashes):
                     if lid == "roads-bridge-fill":
                         # a dashed BRIDGE still needs a deck: solid underlay in the class's own
@@ -1488,7 +1650,9 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                                    "line-dasharray": [float(x) for x in ds.split(",")]}})
                 l["filter"] = ["all", base_f, nod]
             elif lid in ("roads-casing", "roads-tunnel-casing", "roads-tunnel-casing-dash",
-                         "roads-low-casing", "roads-high-casing"):
+                         "roads-low-casing", "roads-high-casing", "roads-tunnelgr-casing",
+                         "roads-tunnelgr-casing-dash", "roads-lowp-casing", "roads-plaingr-casing",
+                         "roads-highp-casing"):
                 # surface/tunnel dashed classes stay casing-less (gaps show the ground); the
                 # BRIDGE casing deliberately keeps them — the deck edge is what says "bridge"
                 l["filter"] = ["all", base_f, nod]
@@ -1498,9 +1662,14 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         # keep their deck sandwich above the solid bridge fill: a footbridge's deck is a
         # structure, not a surface marking.)
         for casing_id, dash_prefix in (("roads-tunnel-casing", "roads-tunnel-fill-dash"),
+                                       ("roads-tunnel-casing", "roads-tunnel-under-fill-dash"),
                                        ("roads-low-casing", "roads-low-fill-dash"),
+                                       ("roads-lowp-casing", "roads-lowp-fill-dash"),
                                        ("roads-high-casing", "roads-high-fill-dash"),
-                                       ("roads-casing", "roads-fill-dash")):
+                                       ("roads-highp-casing", "roads-highp-fill-dash"),
+                                       ("roads-casing", "roads-fill-dash"),
+                                       ("roads-casing", "roads-plaingr-fill-dash"),   # ground stretches:
+                                       ("roads-casing", "roads-tunnelgr-fill-dash")):  # as ground paths
             moved = [l for l in relayered if l["id"].startswith(dash_prefix)]
             if moved:
                 rest = [l for l in relayered if not l["id"].startswith(dash_prefix)]

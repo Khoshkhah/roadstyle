@@ -161,6 +161,7 @@ Returns a `WebMap` (web, `.save()`), a `folium.Map` (`.save()`) or a `lonboard.M
 | `width_m_zoom` | `16` | web | the zoom from which `width_m_col` widths apply; below it, the class widths (so a narrow line doesn't vanish zoomed out) |
 | `casing_m` | `0.15` | web | with `width_m_col`: the casing on each side, in metres, inside the width (two lines side by side show a `2 × casing_m` divider) |
 | `order_col` | `None` | web | a numeric column: the edge's order inside its band instead of its class's `z_order` (clamped to -400 … 400; `rsColor` still lifts over it); null = by class |
+| `directed_col` | `None` | web | a column: true / null = the edge is a direction of travel of its own, false = undirected (a footway stored both ways, a one-way street's walking-only reverse). An edge and its reverse are two lanes only when neither is false; otherwise one line, centred and full width |
 
 ### Overlays & boundary
 
@@ -266,7 +267,6 @@ The `config` block of the settings. Change it in a [settings override](settings.
 | `link_scale` | `0.7` | `*_link` width relative to the parent |
 | `tunnel_opacity_scale` | `0.45` | tunnel fade |
 | `tunnel_casing_dash` / `tunnel_gap_shade` / `tunnel_dash_shade` | `[2, 2]` / `0.25` / `0.5` | the tunnel casing: its dash, and how much darker than the road's casing the solid casing and the dashes are (a dark casing, as in `mono`, keeps its tone under the dashes) |
-| `tunnel_portal_m` | `3.0` | metres of a tunnel drawn at street level where it meets a surface road, so the road runs into it (`0` = off) |
 | `twin_end_caps` | `true` | a two-way road ends like one road: one road-wide round cap under its two lanes at each end, where both lanes have the same colour (`false` = each lane's own round end) |
 | `bridge_casing_extra` / `bridge_casing_color` | `1.5` / `"#000000"` | bridge casing, px wider / colour |
 | `minor_no_casing` | cycleway, footway, living_street, path, pedestrian, service, track | classes drawn without casing |
