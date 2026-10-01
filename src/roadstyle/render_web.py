@@ -696,7 +696,7 @@ def _fade(fill, bg, opacity=0.72):
     a, b = _rgb(fill), _rgb(bg)
     if a is None or b is None:
         return fill
-    return "#" + "".join(f"{round(x * opacity + y * (1 - opacity)):02x}" for x, y in zip(a, b))
+    return "#" + "".join(f"{round(x * opacity + y * (1 - opacity)):02x}" for x, y in zip(a, b, strict=True))
 
 
 def _rgb(hex_color):
