@@ -1,10 +1,10 @@
-import pandas as pd
 """Web (MapLibre) backend: client-side recolouring via color_options + the recolour hooks."""
 import json
 import math
 import re
 
 import geopandas as gpd
+import pandas as pd
 from shapely.geometry import LineString
 
 from roadstyle import render_edges
@@ -950,7 +950,7 @@ def test_links_draw_below_every_street_like_osm_carto():
     (docs/design/junction_order.md, step 1). A link the table doesn't list stays under its parent."""
     from roadstyle import render_web
     key = render_web._sort_key("highway")[2]                # ["match", ["get", col], c, z, ..., default]
-    z = dict(zip(key[2:-1:2], key[3:-1:2]))
+    z = dict(zip(key[2:-1:2], key[3:-1:2], strict=True))
     links = ["motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"]
     assert all(z["pedestrian"] > z[l] > z["service"] for l in links)
     assert [z[l] for l in links] == sorted((z[l] for l in links), reverse=True)
@@ -1024,12 +1024,12 @@ def test_end_caps_sit_under_their_band_and_match_the_lanes_width():
     rad = lay["roads-ends-fill"]["paint"]["circle-radius"]
     off, fw = rw._offset_expr("highway"), rw._width_expr("highway")
     for k, z in enumerate(rw._ZSTOPS):
-        r = dict(zip(rad[4 + 2 * k][2:-1:2], rad[4 + 2 * k][3:-1:2]))["residential"]
+        r = dict(zip(rad[4 + 2 * k][2:-1:2], rad[4 + 2 * k][3:-1:2], strict=True))["residential"]
         o = off[4 + 2 * k][2]
-        o = dict(zip(o[2:-1:2], o[3:-1:2]))["residential"]
+        o = dict(zip(o[2:-1:2], o[3:-1:2], strict=True))["residential"]
         m = fw[4 + 2 * k]
         m = m[1] if m[0] == "*" else m                    # the two-way split wraps the class match
-        w = dict(zip(m[2:-1:2], m[3:-1:2]))["residential"]
+        w = dict(zip(m[2:-1:2], m[3:-1:2], strict=True))["residential"]
         split = 1.0 if z <= 15 else (0.6 if z >= 17 else 1 - 0.4 * (z - 15) / 2)
         assert abs(r - (o + w * split / 2)) < 0.01, z
 
@@ -1205,6 +1205,23 @@ def test_dashed_classes_keep_their_dashes_in_tunnel_and_plain_stretches():
     ids = [l["id"] for l in _style(render_edges(g, backend="web", palette="highsat").html)["layers"]]   # dashed footways
     assert {"roads-tunnel-under-fill-dash0", "roads-tunnelgr-fill-dash0"} <= set(ids)
     assert ids.index("roads-tunnelgr-fill-dash0") < ids.index("roads-casing")   # under street casings
+
+
+def test_tunnels_get_light_dashes_on_their_fill_unless_turned_off():
+    """Kaveh's pick among three samples ("light dash is ok"): over the fill of both stretch kinds,
+    translucent, butt-capped; not on a dashed class; `tunnel_fill_dash: []` turns it off."""
+    st = _style(render_edges(_tunnel_world(True), backend="web").html)
+    lay = {l["id"]: l for l in st["layers"]}
+    ids = [l["id"] for l in st["layers"]]
+    for base in ("roads-tunnel-under-fill", "roads-tunnelgr-fill"):
+        pat = lay[base + "-pat"]
+        assert ids.index(pat["id"]) == ids.index(base) + 1 and pat["source"] == "tpieces"
+        assert pat["paint"]["line-dasharray"] == [1.2, 1.2] and pat["layout"]["line-cap"] == "butt"
+        assert pat["paint"]["line-color"].startswith("rgba(255,255,255")
+        assert '"__rs_dash"' in json.dumps(pat["filter"])                      # dashed classes: none
+    off = _style(render_edges(_tunnel_world(True), backend="web",
+                              settings={"config": {"tunnel_fill_dash": []}}).html)
+    assert not any(l["id"].endswith("-pat") for l in off["layers"])
 
 
 def test_tunnel_stretches_follow_ids_recolour_and_order():
