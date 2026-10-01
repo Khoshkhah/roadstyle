@@ -30,6 +30,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   ground roads. A caller's `band_col` value still wins. Bridges keep their band.
 
 ### Added
+- **Line widths in metres** (`width_m_col`, `width_m_zoom=16`, `casing_m=0.15`). A column of real
+  widths (lanes, a road's `width` tag, a canal) is drawn exactly that wide from `width_m_zoom` on,
+  at every zoom (base-2 exponential interpolation, each line at its own latitude), with its casing
+  inside the width, so lines side by side touch with a thin divider. Null widths and maps without
+  the column keep the class widths (docs/design/metre_widths.md).
 - **Two-way roads end like one road.** A two-way road is drawn as two lanes side by side, each
   with its own round end, so every dead end and junction showed two bumps with a dip between
   them. Now each end of a two-way pair gets one round cap as wide as the whole road, under the two

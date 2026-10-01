@@ -125,6 +125,48 @@ def _width_expr(col, casing=False, split_zoom=15, split_frac=0.6, scale=1.0):
     return e
 
 
+def _width_m_expr(col, kind, width_m_zoom=16, **kw):
+    """_width_expr, but a line with a metre width (``__rs_wm``, _mark_width_m) is drawn at exactly
+    that width from ``width_m_zoom`` on (docs/design/metre_widths.md). ``kind``: ``"fill"`` = width
+    - 2 casings, ``"casing"`` = the width, ``"wings"`` (bridge casing) = width + 2 casings.
+
+    Base-2 exponential interpolation, so the width is exact between stops too (pixels per metre
+    double per zoom). Lines without a metre width keep their class widths, frozen past the last
+    class stop as today; the stops go on to 22, MapLibre's max zoom."""
+    casing = kind != "fill"
+    cls = dict(zip(_ZSTOPS, _width_expr(col, casing=casing, scale=1.25 if kind == "wings" else 1.0, **kw)[4::2],
+                   strict=True))
+    k = {"fill": -2, "casing": 0, "wings": 2}[kind]
+    wm = ["max", ["+", ["get", "__rs_wm"], ["*", k, ["get", "__rs_cm"]]], 0] if k else ["get", "__rs_wm"]
+    e = ["interpolate", ["exponential", 2], ["zoom"]]
+    for z in sorted(set(_ZSTOPS) | {width_m_zoom, 22}):
+        zz = min(max(z, _ZSTOPS[0]), _ZSTOPS[-1])
+        lo, hi = max(s for s in _ZSTOPS if s <= zz), min(s for s in _ZSTOPS if s >= zz)
+        c = cls[lo] if lo == hi else ["+", ["*", cls[lo], round((hi - zz) / (hi - lo), 4)],
+                                      ["*", cls[hi], round((zz - lo) / (hi - lo), 4)]]
+        px = 512 * 2 ** z / 40075016.686                 # pixels per metre at the equator
+        e += [z, c if z < width_m_zoom else ["case", ["has", "__rs_wm"], ["*", wm, round(px, 4)], c]]
+    return e
+
+
+def _mark_width_m(geo, col, casing_m):
+    """``__rs_wm`` / ``__rs_cm``: the line's width and casing in metres over cos(latitude), at the
+    line's own mean latitude, so ``× 512·2^z / C`` is its width in pixels at zoom z. Only for a
+    finite, positive width; any other value keeps the class width."""
+    for ft in geo["features"]:
+        p, g = ft.setdefault("properties", {}), ft.get("geometry") or {}
+        try:
+            w = float(p.get(col))
+        except (TypeError, ValueError):
+            continue
+        cs = g.get("coordinates") or []
+        pts = [c for part in cs for c in part] if g.get("type") == "MultiLineString" else cs
+        if not (w > 0 and math.isfinite(w)) or not pts:
+            continue
+        sec = 1 / math.cos(math.radians(sum(c[1] for c in pts) / len(pts)))
+        p["__rs_wm"], p["__rs_cm"] = round(w * sec, 4), round(casing_m * sec, 4)
+
+
 def _end_radius_expr(col, casing=False, offset_frac=0.28, offset_zoom=15, split_frac=0.6):
     """circle-radius (px) of a two-way pair's end cap (docs/design/twin_ends.md): the pair's outer
     half-width, i.e. the lane offset (_offset_expr) plus half a lane's width (_width_expr, split to
@@ -1172,6 +1214,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
            order_col: str = None, band_col: str = None, directed_col: str = None,
+           width_m_col: str = None, width_m_zoom: float = 16, casing_m: float = 0.15,
            pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
            basemap_switcher: bool = True, zoom_readout: bool = True,
@@ -1198,6 +1241,10 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     (true / null) or an undirected edge (false: a footway stored both ways, a one-way street's
     walking-only reverse). An edge and its reverse are drawn as two lanes only when neither is
     false; otherwise both are drawn centred, full width, as one line.
+
+    ``width_m_col`` names a column of widths in metres (a lane, a road with a ``width`` tag, a
+    canal): from ``width_m_zoom`` on, such a line is drawn exactly that wide, its casing
+    ``casing_m`` metres inside each edge; null = the class width (docs/design/metre_widths.md).
 
     UI toggles (all on by default):
       - ``arrows`` — one-way direction chevrons along each one-way edge;
@@ -1296,6 +1343,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
     _mark_order(geo, order_col, band_col)
     _mark_tunnel_dash(geo, CONFIG.tunnel_gap_shade, CONFIG.tunnel_dash_shade)
+    if width_m_col:
+        _mark_width_m(geo, width_m_col, casing_m)
     _stringify_unsafe_ints(geo)   # BIGINT ids (e.g. edge_id) -> string so JS doesn't round them
 
     # active base map + the set offered to the in-map switcher (active shown first)
@@ -1422,6 +1471,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     cw = _width_expr(highway_col, casing=True, **sw)      # casing width expr (reused across layers)
     fw = _width_expr(highway_col, **sw)                   # fill width expr
     bcw = _width_expr(highway_col, casing=True, scale=1.25, **sw)   # heavier bridge casing ("wings")
+    if width_m_col:     # metre widths from width_m_zoom on (docs/design/metre_widths.md)
+        cw, fw, bcw = (_width_m_expr(highway_col, k, width_m_zoom, **sw) for k in ("casing", "fill", "wings"))
     style["layers"] += under_layers            # caller overlays drawn beneath the roads (e.g. zones)
     style["layers"] += [
         # Tunnels first, so the surface roads above paint over them at crossings. A tunnel reads as

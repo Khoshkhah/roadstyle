@@ -157,6 +157,9 @@ Returns a `WebMap` (web, `.save()`), a `folium.Map` (`.save()`) or a `lonboard.M
 | `tunnel_col` / `bridge_col` | `"tunnel"` / `"bridge"` | all | tunnels draw under (faded, two-tone dashed casing), bridges on top |
 | `layer_col` | `"layer"` | web | OSM `layer`; negative sinks an edge when there is no tunnel/bridge column |
 | `band_col` | `None` | web | a column of -1 / 0 / 1: draw the edge (casing included) under (-1) or over (1) the ground roads, e.g. a sidewalk under its street, a crossing over it; tunnels and bridges keep their band; null = by level |
+| `width_m_col` | `None` | web | a column of widths in metres (a lane, a road with a `width` tag, a canal): from `width_m_zoom` on the line is drawn exactly that wide, its casing inside; null = the class width |
+| `width_m_zoom` | `16` | web | the zoom from which `width_m_col` widths apply; below it, the class widths (so a narrow line doesn't vanish zoomed out) |
+| `casing_m` | `0.15` | web | with `width_m_col`: the casing on each side, in metres, inside the width (two lines side by side show a `2 × casing_m` divider) |
 | `order_col` | `None` | web | a numeric column: the edge's order inside its band instead of its class's `z_order` (clamped to -400 … 400; `rsColor` still lifts over it); null = by class |
 | `directed_col` | `None` | web | a column: true / null = the edge is a direction of travel of its own, false = undirected (a footway stored both ways, a one-way street's walking-only reverse). An edge and its reverse are two lanes only when neither is false; otherwise one line, centred and full width |
 

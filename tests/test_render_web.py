@@ -1258,3 +1258,51 @@ def test_a_footway_over_a_tunnel_does_not_make_it_an_underpass():
     pcs = [f["properties"]["__rs_piece"] for f in _style(render_edges(g, backend="web").html)
            ["sources"]["tpieces"]["data"]["features"] if f["properties"]["__rs_road"] == 1]
     assert pcs == ["ground"]
+
+
+def _metre_map(**kw):
+    """Two parallel lanes 3.25 m apart (one 3.25 m wide, one without a width) and a plain road."""
+    g = gpd.GeoDataFrame({"highway": ["residential"] * 3, "w": [3.25, None, 5.0]},
+                         geometry=[LineString([(18.00, 59.30), (18.01, 59.30)]),
+                                   LineString([(18.00, 59.30003), (18.01, 59.30003)]),
+                                   LineString([(18.00, 59.31), (18.01, 59.31)])], crs=4326)
+    st = _style(render_edges(g, backend="web", **kw).html)
+    width = {ly["id"]: ly["paint"]["line-width"] for ly in st["layers"] if "line-width" in ly.get("paint", {})}
+    return st["sources"]["roads"]["data"]["features"], width
+
+
+def _stop(expr, z):
+    return expr[expr.index(z, 3) + 1]
+
+
+def test_metre_width_is_exact_at_zoom_22():
+    """docs/design/metre_widths.md: the casing is the line's width in metres, the fill that minus
+    2 casings, both over cos(latitude); zoom 22 is a stop, base-2 exponential between stops."""
+    feats, width = _metre_map(width_m_col="w")
+    p = feats[0]["properties"]
+    sec = 1 / math.cos(math.radians(59.30))
+    assert abs(p["__rs_wm"] - 3.25 * sec) < 1e-3 and abs(p["__rs_cm"] - 0.15 * sec) < 1e-3
+    assert "__rs_wm" not in feats[1]["properties"]          # null width -> class width
+    px22 = 512 * 2 ** 22 / 40075016.686
+    fill, casing = _stop(width["roads-fill"], 22), _stop(width["roads-casing"], 22)
+    assert width["roads-fill"][1] == ["exponential", 2]
+    assert fill[0] == "case" and fill[1] == ["has", "__rs_wm"]
+
+    def ev(e):   # the metre width the expression multiplies: fill = width - 2 casings
+        return p["__rs_wm"] - 2 * p["__rs_cm"] if e[0] == "max" else p["__rs_wm"]
+    assert abs(ev(fill[2][1]) * fill[2][2] - (3.25 - 0.30) * sec * px22) < 0.05
+    assert abs(ev(casing[2][1]) * casing[2][2] - 3.25 * sec * px22) < 0.05
+
+
+def test_metre_width_keeps_class_widths_below_its_zoom():
+    _, plain = _metre_map()
+    _, metre = _metre_map(width_m_col="w", width_m_zoom=16)
+    for z in (12, 15):
+        assert _stop(metre["roads-fill"], z) == _stop(plain["roads-fill"], z)
+    assert _stop(metre["roads-fill"], 16)[3] == _stop(plain["roads-fill"], 16)   # the null-width branch
+    assert _stop(metre["roads-fill"], 22)[3] == _stop(plain["roads-fill"], 20)   # frozen past 20, as today
+
+
+def test_no_metre_width_column_leaves_the_style_unchanged():
+    feats, width = _metre_map()
+    assert width["roads-fill"][1] == ["linear"] and not any("__rs_wm" in f["properties"] for f in feats)
