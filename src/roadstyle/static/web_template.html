@@ -481,7 +481,8 @@ function _applyRoadFilters(){
     // the archive source, so the tile layer name is what separates them.
     const isRoads = l.source==="roads" && (!RS_TILED || l["source-layer"]==="roads");
     if(_qIds && isRoads){ const qf=["in",["id"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
-    if(_qIds && l.source==="portals"){ const qf=["in",["get","__rs_road"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
+    // a tunnel's drawing stretches (tpieces) follow their edge's id (__rs_road)
+    if(_qIds && l.source==="tpieces"){ const qf=["in",["get","__rs_road"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
     // a two-way pair's end cap (twin_ends.md) stays while either of its two lanes is shown
     if(_qIds && l.source==="ends"){ const L=["literal",_qIds];
       const qf=["any",["in",["get","__rs_road"],L],["in",["get","__rs_road2"],L]]; f=f?["all",f,qf]:qf; }
@@ -659,7 +660,7 @@ if(FILTER.on){
 // road-fill layers' line-color at the chosen prop. window.rsSetColorField drives it from your UI.
 const COLOR_OPTIONS = __COLOR_OPTIONS__;
 const RS_FILL_LAYERS = ["roads-fill","roads-tunnel-fill","roads-low-fill","roads-high-fill","roads-bridge-fill"];
-const RS_PORTAL_LAYERS = ["roads-portal-fill"];   // tunnel mouths: their road's id is __rs_road
+const RS_PIECE_LAYERS = ["roads-tunnel-under-fill","roads-lowp-fill","roads-plaingr-fill","roads-highp-fill"];   // stretches (_stretches): their road's id is __rs_road
 const RS_END_LAYERS = ["roads-ends-low-fill","roads-ends-fill","roads-ends-high-fill"];   // twin_ends.md
 const RS_END_CASING_LAYERS = ["roads-ends-low-casing","roads-ends-casing","roads-ends-high-casing"];
 let _coActive = __CO_ACTIVE__, _coLegendEl = null, _coLegendBox = null;
@@ -691,7 +692,7 @@ function _applyFill(){
   const e=_fillExpr();
   RS_FILL_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"line-color",e); });
   const pe=_fillExpr(["get","__rs_road"]);
-  RS_PORTAL_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"line-color",pe); });
+  RS_PIECE_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"line-color",pe); });
   // a two-way pair's end cap (twin_ends.md) draws only where its two lanes have one colour: both
   // in the same recolour group, or the active option's colour equal on both (<prop>__b is the
   // second lane's); otherwise it is transparent and the ends look as without caps
@@ -704,6 +705,11 @@ function _applyFill(){
   const ec=["case",["any",same,...both],["coalesce",["get","__rs_casing"],"#000000"],none];
   RS_END_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"circle-color",ee); });
   RS_END_CASING_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"circle-color",ec); });
+  // a tunnel's ground stretches keep the faded tunnel colour (__rs_tfill) under the default colouring
+  let ge=["coalesce",["get",prop==="__rs_fill" ? "__rs_tfill" : prop],["get",prop],"#888888"];
+  if(_qColor) for(let i=_qColor.length-1;i>=0;i--)
+    ge=["case",["in",["get","__rs_road"],["literal",_qColor[i].ids]],_qColor[i].color,ge];
+  if(map.getLayer("roads-tunnelgr-fill")) map.setPaintProperty("roads-tunnelgr-fill","line-color",ge);
   // decks keep the base colour: their slice ids are a different id space than the road edges
   RS_DECK_LAYERS.forEach(id=>{
     if(map.getLayer(id))
@@ -719,10 +725,10 @@ const _sortBase={};
 function _applySort(){
   const all = _qColor ? [].concat(..._qColor.map(g=>g.ids)) : null;
   map.getStyle().layers.forEach(l=>{
-    if(l.type!=="line" || (l.source!=="roads" && l.source!=="portals")) return;
+    if(l.type!=="line" || (l.source!=="roads" && l.source!=="tpieces")) return;
     if(!(l.id in _sortBase)) _sortBase[l.id]=map.getLayoutProperty(l.id,"line-sort-key");
     const base=_sortBase[l.id]; if(base==null) return;
-    const idE = l.source==="portals" ? ["get","__rs_road"] : ["id"];
+    const idE = l.source==="tpieces" ? ["get","__rs_road"] : ["id"];
     map.setLayoutProperty(l.id,"line-sort-key",
       all ? ["+", base, ["case",["in",idE,["literal",all]],500,0]] : base);
   });

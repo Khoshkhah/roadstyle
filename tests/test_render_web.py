@@ -1,3 +1,4 @@
+import pandas as pd
 """Web (MapLibre) backend: client-side recolouring via color_options + the recolour hooks."""
 import json
 import math
@@ -795,58 +796,6 @@ def test_zoom_readout_is_on_by_default_and_can_be_turned_off():
     assert "if(false){ const zd=" in render_edges(_edges(), backend="web", zoom_readout=False).html
 
 
-def test_tunnel_portals_draw_the_mouth_at_street_level():
-    """A tunnel end shared with a surface road gets a short piece at street level (the `portals`
-    source), drawn between the surface casing and fill, so the road runs into the tunnel instead
-    of meeting the surface casing like a wall. Tunnel-tunnel ends get none; tunnel_portal_m=0
-    turns it off."""
-    a, b, c, d = (18.000, 59.30), (18.002, 59.30), (18.004, 59.30), (18.006, 59.30)
-    g = gpd.GeoDataFrame(
-        {"highway": ["primary", "primary", "primary"], "tunnel": [None, "yes", "yes"]},
-        geometry=[LineString([a, b]), LineString([b, c]), LineString([c, d])], crs=4326)
-    style = _style(render_edges(g, backend="web").html)
-    pieces = style["sources"]["portals"]["data"]["features"]
-    assert [f["properties"]["__rs_road"] for f in pieces] == [1]      # only the mouth at b
-    xs = [x for x, _ in pieces[0]["geometry"]["coordinates"]]
-    assert xs[0] == 18.002 and 18.00204 < xs[-1] < 18.00207          # 3 m in from the mouth (~5.3e-5 deg here)
-    ids = [l["id"] for l in style["layers"]]
-    assert ids.index("roads-casing") < ids.index("roads-portal-fill") < ids.index("roads-fill")
-
-    off = _style(render_edges(g, backend="web", settings={"config": {"tunnel_portal_m": 0}}).html)
-    assert "portals" not in off["sources"]
-    assert "roads-portal-fill" not in [l["id"] for l in off["layers"]]
-
-
-def test_tunnel_portals_follow_recolour_and_id_filter():
-    """rsColor / rsFilter reach a mouth piece through its road's id (__rs_road)."""
-    html = render_edges(_edges(), backend="web").html
-    assert 'RS_PORTAL_LAYERS = ["roads-portal-fill"]' in html
-    assert '_fillExpr(["get","__rs_road"])' in html
-    assert 'l.source==="portals"' in html
-
-
-def test_tunnel_portal_skipped_when_the_tunnel_passes_under_a_street_right_away():
-    """A tunnel that dives under a street right after its mouth gets no mouth piece: the piece
-    would cut into that street's casing (drawn widths grow with zoom, no fixed length clears it)."""
-    a, b, c = (18.000, 59.30), (18.001, 59.30), (18.004, 59.30)
-    k = 111320.0 * math.cos(math.radians(59.30))
-    x = 18.001 + 6 / k                                         # a street crossing 6 m into the tunnel
-    g = gpd.GeoDataFrame(
-        {"highway": ["service", "service", "secondary"], "tunnel": [None, "yes", None]},
-        geometry=[LineString([a, b]), LineString([b, c]),
-                  LineString([(x, 59.2995), (x, 59.3005)])], crs=4326)
-    assert "portals" not in _style(render_edges(g, backend="web").html)["sources"]
-
-    # a street that only runs close by (3 m to the side, never crossed) doesn't shorten it
-    y = 59.30 + 3 / 111320.0
-    g2 = gpd.GeoDataFrame(
-        {"highway": ["service", "service", "secondary"], "tunnel": [None, "yes", None]},
-        geometry=[LineString([a, b]), LineString([b, c]), LineString([(18.0015, y), (18.004, y)])], crs=4326)
-    xs = [q[0] for q in _style(render_edges(g2, backend="web").html)
-          ["sources"]["portals"]["data"]["features"][0]["geometry"]["coordinates"]]
-    assert 2.5 < (max(xs) - 18.001) * k < 3.5                   # tunnel_portal_m: 3 m
-
-
 def test_tunnel_casing_in_two_tones():
     """A tunnel's casing is never missing: two dark shades of the road's own casing, a solid one
     with darker dashes on top, so connected tunnel pieces look connected (empty dash gaps hid it)
@@ -1114,33 +1063,181 @@ def test_fill_only_end_cap_where_a_road_in_a_lower_band_meets():
     the other end keeps its full cap (Kaveh's screenshots: a ring across the continuing road, then
     the lanes' bump-dip-bump at a tunnel mouth)."""
     a, b, c = (18.00, 59.30), (18.00, 59.31), (18.01, 59.32)
-    g = gpd.GeoDataFrame({"highway": ["secondary"] * 3, "layer": [None, None, "-1"]},
+    g = gpd.GeoDataFrame({"highway": ["secondary"] * 3, "layer": [None, None, "-1"], "band": [None, None, -1]},
                          geometry=[LineString([a, b]), LineString([b, a]), LineString([b, c])], crs=4326)
-    style = _style(render_edges(g, backend="web").html)
+    style = _style(render_edges(g, backend="web", band_col="band").html)
     pts = {tuple(p["geometry"]["coordinates"]): p["properties"] for p in style["sources"]["ends"]["data"]["features"]}
     assert set(pts) == {a, b} and pts[b].get("__rs_nocase") and not pts[a].get("__rs_nocase")
     lay = {l["id"]: l for l in style["layers"]}
     assert not _eval(lay["roads-ends-casing"]["filter"], pts[b])     # no ring across the lower road
     assert _eval(lay["roads-ends-casing"]["filter"], pts[a])
     assert _eval(lay["roads-ends-fill"]["filter"], pts[b])           # but the dip is still filled
+    # a layer=-1 road that passes under nothing is drawn with the ground roads (junctions.md,
+    # rule 1): a full cap
+    assert not any(p["properties"].get("__rs_nocase")
+                   for p in _style(render_edges(g, backend="web").html)["sources"]["ends"]["data"]["features"])
     # a road in a HIGHER band (layer=1) covers the cap anyway: both ends keep a full cap
     g.loc[2, "layer"] = "1"
     assert not any(p["properties"].get("__rs_nocase")
                    for p in _style(render_edges(g, backend="web").html)["sources"]["ends"]["data"]["features"])
 
 
-def test_twoway_col_false_draws_a_reverse_pair_as_one_way_roads():
-    """A one-way street with a walking-only reverse edge is not a two-way road: twoway_col false
-    draws both centred and full width (no lane offset, no end caps); true / null keeps the geometry
-    rule, and a lone "true" never shifts an edge without its twin."""
+def test_directed_col_draws_a_pair_as_two_lanes_only_when_both_edges_are_directed():
+    """``directed_col`` false = an undirected edge (a footway stored both ways, a one-way street's
+    walking-only reverse): its pair is one line, centred and full width, with no end caps.
+    True / null on both = the geometry rule (two lanes); one false edge is enough for one line."""
     a, b = (18.00, 59.30), (18.00, 59.31)
-    g = gpd.GeoDataFrame({"highway": ["residential"] * 2, "twoway": [False, False]},
-                         geometry=[LineString([a, b]), LineString([b, a])], crs=4326)
-    style = _style(render_edges(g, backend="web", twoway_col="twoway").html)
-    assert [f["properties"]["__rs_twoway"] for f in style["sources"]["roads"]["data"]["features"]] == [False, False]
-    assert "ends" not in style["sources"]
-    g["twoway"] = [None, None]
-    style = _style(render_edges(g, backend="web", twoway_col="twoway").html)
-    assert [f["properties"]["__rs_twoway"] for f in style["sources"]["roads"]["data"]["features"]] == [True, True]
-    lone = gpd.GeoDataFrame({"highway": ["residential"], "twoway": [True]}, geometry=[LineString([a, b])], crs=4326)
-    assert not _style(render_edges(lone, backend="web", twoway_col="twoway").html)["sources"]["roads"]["data"]["features"][0]["properties"]["__rs_twoway"]
+
+    def lanes(directed, oneway=None):
+        cols = {"highway": ["residential"] * 2, "is_directed": directed}
+        if oneway:
+            cols["oneway"] = oneway
+        g = gpd.GeoDataFrame(cols, geometry=[LineString([a, b]), LineString([b, a])], crs=4326)
+        st = _style(render_edges(g, backend="web", directed_col="is_directed").html)
+        ps = [f["properties"] for f in st["sources"]["roads"]["data"]["features"]]
+        return [p["__rs_twoway"] for p in ps], [p["__rs_oneway"] for p in ps], "ends" in st["sources"]
+
+    assert lanes([True, True]) == ([True, True], [False, False], True)        # a two-way street
+    assert lanes([None, None])[0] == [True, True]
+    assert lanes([False, False]) == ([False, False], [False, False], False)   # a footway: one line, no arrows
+    # a one-way street + its walking-only reverse: one line; arrows on the car edge only
+    assert lanes([True, False]) == ([False, False], [True, False], False)
+    assert lanes([True, False], oneway=[True, False])[1] == [True, False]     # `oneway` still rules arrows
+
+
+# ---- a tunnel is an ordinary road with a tunnel style (mapstyle's junctions.md, rule 1) ----------
+
+def _tunnel_world(cross):
+    """street A -- tunnel T -- street B along one line; with ``cross``, street C crosses over the
+    tunnel's middle without joining it."""
+    a, b, c, d = (18.000, 59.30), (18.002, 59.30), (18.004, 59.30), (18.006, 59.30)
+    rows = [("primary", None, [a, b]), ("primary", "yes", [b, c]), ("primary", None, [c, d])]
+    if cross:
+        rows.append(("residential", None, [(18.003, 59.299), (18.003, 59.301)]))
+    return gpd.GeoDataFrame({"highway": [r[0] for r in rows], "tunnel": [r[1] for r in rows]},
+                            geometry=[LineString(r[2]) for r in rows], crs=4326)
+
+
+def test_a_tunnel_under_nothing_is_one_ground_stretch():
+    """It draws with the ground roads in the tunnel style, so both mouths join like a road
+    continuing; the edge itself stays in `roads`, invisible, as the click / selection target."""
+    style = _style(render_edges(_tunnel_world(False), backend="web").html)
+    pcs = style["sources"]["tpieces"]["data"]["features"]
+    assert [(f["properties"]["__rs_road"], f["properties"]["__rs_piece"]) for f in pcs] == [(1, "ground")]
+    t = style["sources"]["roads"]["data"]["features"][1]["properties"]
+    assert t["__rs_gstart"] and t["__rs_gend"]
+    assert pcs[0]["properties"]["__rs_tfill"] != pcs[0]["properties"]["__rs_fill"]   # faded, opaque
+    lay = {l["id"]: l for l in style["layers"]}
+    ids = [l["id"] for l in style["layers"]]
+    assert lay["roads-tunnel-fill"]["paint"]["line-opacity"] == 0          # pick target only
+    assert (ids.index("roads-casing") < ids.index("roads-tunnelgr-casing") < ids.index("roads-tunnelgr-fill")
+            < ids.index("roads-fill"))
+    assert lay["roads-tunnelgr-fill"]["layout"]["line-cap"] == "butt"
+
+
+def test_a_tunnel_under_a_street_is_cut_into_ground_under_ground():
+    """Only the stretch under the crossing street (4 m either side) is in the lower band."""
+    style = _style(render_edges(_tunnel_world(True), backend="web").html)
+    pcs = [f for f in style["sources"]["tpieces"]["data"]["features"] if f["properties"]["__rs_road"] == 1]
+    assert [f["properties"]["__rs_piece"] for f in pcs] == ["ground", "under", "ground"]
+    xs = [f["geometry"]["coordinates"] for f in pcs]
+    k = 111320.0 * math.cos(math.radians(59.30))
+    assert abs((xs[1][-1][0] - xs[1][0][0]) * k - 8.0) < 0.5             # 4 m either side of 18.003
+    # a road joined to the tunnel at its mouth is not one it passes under
+    assert style["sources"]["roads"]["data"]["features"][1]["properties"]["__rs_gstart"]
+
+
+def test_a_shallow_crossing_keeps_the_tunnel_under_while_it_is_within_4_m():
+    """Kaveh, 2026-09-30 (Monaco 6383643885887187607 over 1494951369778192963): a street crossing a
+    tunnel at a shallow angle is near it for much longer than 4 m either side of the crossing
+    point; a ground stretch there would paint its casing over the street's."""
+    g = pd.concat([_tunnel_world(False), gpd.GeoDataFrame(
+        {"highway": ["residential"], "tunnel": [None]},
+        geometry=[LineString([(18.0024, 59.29995), (18.0036, 59.30005)])], crs=4326)],   # ~1.5 m off per 10 m
+        ignore_index=True)
+    pcs = [f for f in _style(render_edges(g, backend="web").html)["sources"]["tpieces"]["data"]["features"]
+           if f["properties"]["__rs_road"] == 1]
+    assert [f["properties"]["__rs_piece"] for f in pcs] == ["ground", "under", "ground"]
+    k = 111320.0 * math.cos(math.radians(59.30))
+    under = (pcs[1]["geometry"]["coordinates"][-1][0] - pcs[1]["geometry"]["coordinates"][0][0]) * k
+    assert under > 40                                    # the whole stretch within 4 m, not 8 m
+
+
+def test_a_plain_layer_road_acts_like_a_tunnel_with_the_plain_look():
+    """junctions.md rule 1, for a ``layer`` tag alone (Kaveh: Boulevard Charles III, a layer=-1
+    tunnel approach, looked cut off from the roundabout it joins): across nothing, it is a ground
+    road, whole; a raised walkway over a street is cut, over the street in the high band, the rest
+    with the ground roads, and its own edge stays the (invisible) click target."""
+    a, b, c = (18.000, 59.30), (18.002, 59.30), (18.004, 59.30)
+    g = gpd.GeoDataFrame({"highway": ["primary", "primary"], "layer": [None, "-1"]},
+                         geometry=[LineString([a, b]), LineString([b, c])], crs=4326)
+    st = _style(render_edges(g, backend="web").html)
+    p = st["sources"]["roads"]["data"]["features"][1]["properties"]
+    assert p["__rs_band"] == 0 and "tpieces" not in st["sources"]
+    lay = {l["id"]: l for l in st["layers"]}
+    assert _eval(lay["roads-casing"]["filter"], p) and not _eval(lay["roads-low-casing"]["filter"], p)
+
+    w = gpd.GeoDataFrame({"highway": ["footway", "footway", "residential"], "layer": [None, "1", None]},
+                         geometry=[LineString([a, b]), LineString([b, c]),
+                                   LineString([(18.003, 59.299), (18.003, 59.301)])], crs=4326)
+    st = _style(render_edges(w, backend="web").html)
+    pcs = [f["properties"]["__rs_piece"] for f in st["sources"]["tpieces"]["data"]["features"]]
+    assert pcs == ["ground", "over", "ground"]
+    p = st["sources"]["roads"]["data"]["features"][1]["properties"]
+    assert p["__rs_pieced"] and p["__rs_gstart"] and p["__rs_gend"]
+    lay = {l["id"]: l for l in st["layers"]}
+    ids = [l["id"] for l in st["layers"]]
+    assert not _eval(lay["roads-high-casing"]["filter"], p)                  # drawn by its stretches
+    assert lay["roads-high-fill"]["paint"]["line-opacity"] == ["case", ["to-boolean", ["get", "__rs_pieced"]], 0, 1]
+    assert (ids.index("roads-casing") < ids.index("roads-plaingr-casing") < ids.index("roads-plaingr-fill")
+            < ids.index("roads-fill") < ids.index("roads-highp-casing") < ids.index("roads-highp-fill"))
+    assert 'RS_PIECE_LAYERS = ["roads-tunnel-under-fill","roads-lowp-fill","roads-plaingr-fill","roads-highp-fill"]' \
+        in render_edges(w, backend="web").html
+
+
+def test_dashed_classes_keep_their_dashes_in_tunnel_and_plain_stretches():
+    """line-dasharray can't vary per feature: every stretch fill layer gets the dashed sibling
+    layers the whole-edge fills have (a dashed tunnel stretch was drawn solid, or not at all)."""
+    a, b, c = (18.000, 59.30), (18.002, 59.30), (18.004, 59.30)
+    g = gpd.GeoDataFrame({"highway": ["footway", "footway", "residential"], "tunnel": [None, "yes", None]},
+                         geometry=[LineString([a, b]), LineString([b, c]),
+                                   LineString([(18.003, 59.299), (18.003, 59.301)])], crs=4326)
+    ids = [l["id"] for l in _style(render_edges(g, backend="web", palette="highsat").html)["layers"]]   # dashed footways
+    assert {"roads-tunnel-under-fill-dash0", "roads-tunnelgr-fill-dash0"} <= set(ids)
+    assert ids.index("roads-tunnelgr-fill-dash0") < ids.index("roads-casing")   # under street casings
+
+
+def test_tunnel_stretches_follow_ids_recolour_and_order():
+    html = render_edges(_tunnel_world(True), backend="web").html
+    assert 'l.source==="tpieces"' in html and 'RS_PIECE_LAYERS = ["roads-tunnel-under-fill","roads-lowp-fill","roads-plaingr-fill","roads-highp-fill"]' in html
+    assert '"roads-tunnelgr-fill","line-color",ge' in html                # faded colour kept by default
+    plain = _style(render_edges(_edges(), backend="web").html)            # no tunnels: no stretches
+    assert "tpieces" not in plain["sources"]
+
+
+def test_end_cap_at_a_tunnel_mouth_is_full_when_the_tunnel_starts_at_ground():
+    """A two-way street meeting a tunnel whose first stretch is ground gets its full cap (the ring
+    lies under the tunnel's casing); a tunnel that dives under a road right at the mouth still
+    ranks lower there (fill-only cap)."""
+    a, b, c = (18.000, 59.30), (18.002, 59.30), (18.004, 59.30)
+    g = gpd.GeoDataFrame({"highway": ["primary"] * 3, "tunnel": [None, None, "yes"]},
+                         geometry=[LineString([a, b]), LineString([b, a]), LineString([b, c])], crs=4326)
+    pts = {tuple(p["geometry"]["coordinates"]): p["properties"]
+           for p in _style(render_edges(g, backend="web").html)["sources"]["ends"]["data"]["features"]}
+    assert not pts[b].get("__rs_nocase")
+    g2 = pd.concat([g, gpd.GeoDataFrame({"highway": ["residential"], "tunnel": [None]},
+                                        geometry=[LineString([(18.00205, 59.299), (18.00205, 59.301)])], crs=4326)],   # 2.8 m in: within the 4 m clearance
+                   ignore_index=True)
+    pts = {tuple(p["geometry"]["coordinates"]): p["properties"]
+           for p in _style(render_edges(gpd.GeoDataFrame(g2, crs=4326), backend="web").html)["sources"]["ends"]["data"]["features"]}
+    assert pts[b].get("__rs_nocase")
+
+
+def test_a_footway_over_a_tunnel_does_not_make_it_an_underpass():
+    """Only roads make a tunnel go to the lower band, not paths: a footway crossing over it is
+    drawn on top of its ground stretch (80 of Monaco's 109 'under at the mouth' cases)."""
+    g = _tunnel_world(True)
+    g.loc[3, "highway"] = "footway"
+    pcs = [f["properties"]["__rs_piece"] for f in _style(render_edges(g, backend="web").html)
+           ["sources"]["tpieces"]["data"]["features"] if f["properties"]["__rs_road"] == 1]
+    assert pcs == ["ground"]

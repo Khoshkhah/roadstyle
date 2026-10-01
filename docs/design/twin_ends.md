@@ -101,11 +101,14 @@ Seen at Rue du Castelleretto (Monaco, edges 441704187184649227 / 599021124355277
   direction. duckOSM's walking network has both directions of every street, so a street one-way for
   cars gets a walking-only reverse edge, and roadstyle draws it as a two-way road. That is 666 of
   Monaco's 1,578 road pairs, and every footpath too.
-  - **Fix:** an optional `twoway_col` (per edge: true / false; null = the geometry rule) says
-    whether an edge is a two-way road's lane. A false edge is drawn centred at full width, like a
-    one-way road, with no end caps; arrows still follow `oneway`.
-  - mapstyle sets it true only when both directions are open to cars or bikes. The walking-only
-    reverse edge stays on the map, on top of the one-way edge, so data and routing don't change.
+  - **Fix:** an optional `directed_col` (per edge: true / null = a direction of travel of its own,
+    false = undirected) says whether an edge can be a lane. A pair is two lanes only when **neither**
+    edge is false; otherwise both are drawn centred at full width, as one line, with no end caps;
+    arrows still follow `oneway`. (First named `twoway_col`; renamed by Kaveh, 2026-09-30:
+    "two-way" means two directions, which a footway has too.)
+  - mapstyle sets `is_directed` true for an edge open to cars or bikes that isn't a path. The
+    walking-only reverse edge stays on the map, on top of the one-way edge, so data and routing
+    don't change.
 - **"Bump, dip, bump" at a tunnel mouth.** Where a lower band meets the end, the cap was skipped, so
   the two lanes' own round ends and casings showed across the mouth.
   - **Fix:** there the cap is **fill only**. It fills the dip and draws no casing ring across the
