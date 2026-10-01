@@ -45,6 +45,8 @@ class StyleConfig:
     tunnel_casing_dash: list = field(default_factory=lambda: [2, 2])   # the tunnel casing dash (osm-carto)
     tunnel_gap_shade: float = 0.25       # tunnel casing between the dashes: this much darker than a light casing
     tunnel_dash_shade: float = 0.5       # tunnel dashes: this much darker than the casing
+    tunnel_fill_dash: list = field(default_factory=lambda: [1.2, 1.2])   # light dashes on the tunnel fill ([] = none)
+    tunnel_fill_dash_color: str = "rgba(255,255,255,0.55)"               # their colour, over any road colour
     minor_no_casing: frozenset[str] = field(default_factory=lambda: _MINOR_NO_CASING)
     #: class -> zoom below which it is hidden. Consulted only when the caller opts in.
     minzoom: dict = field(default_factory=dict)

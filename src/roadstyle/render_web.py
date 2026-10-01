@@ -672,6 +672,19 @@ def _plain_pieces(prefix, flt, lay, cw, fw, off, on, casing):
                                       "line-width": fw, "line-offset": off}}]
 
 
+def _tunnel_fill_dash(lid, flt, tlay, fw, off, on):
+    """Light dashes along a tunnel's fill (Kaveh, 2026-09-30, among three samples: "light dash is
+    ok"), over the fill of its stretches; a translucent colour, so it suits any road colour. A
+    dashed class keeps only its own dashes. Nothing without tunnels or with ``tunnel_fill_dash: []``."""
+    dash = list(CONFIG.tunnel_fill_dash or [])
+    if not (on and dash):
+        return []
+    return [{"id": lid, "type": "line", "source": "tpieces", "layout": tlay,
+             "filter": ["all", flt, ["!", ["to-boolean", ["get", "__rs_dash"]]]],
+             "paint": {"line-color": CONFIG.tunnel_fill_dash_color or "rgba(255,255,255,0.55)",
+                       "line-width": fw, "line-offset": off, "line-dasharray": [float(x) for x in dash]}}]
+
+
 def _cut_opacity(on):
     """A cut plain-layer edge's own fill: invisible (its stretches draw it), still what a click picks."""
     return {"line-opacity": ["case", ["to-boolean", ["get", "__rs_pieced"]], 0, 1]} if on else {}
@@ -1435,6 +1448,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             "filter": under,
             "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
                       "line-width": fw, "line-offset": off, "line-opacity": 0.72}}] if tpieces else []),
+        *_tunnel_fill_dash("roads-tunnel-under-fill-pat", under, tlay, fw, off, tpieces),
         # below ground, not a tunnel (a negative layer alone): plain look, under the ground roads
         {"id": "roads-low-casing", "type": "line", "source": "roads", "layout": lay,
          "filter": ["all", low, whole] if plain_cut else low,
@@ -1466,6 +1480,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             "filter": ground_t,
             "paint": {"line-color": ["coalesce", ["get", "__rs_tfill"], ["get", "__rs_fill"], "#888888"],
                       "line-width": fw, "line-offset": off}}] if tpieces else []),
+        *_tunnel_fill_dash("roads-tunnelgr-fill-pat", ground_t, tlay, fw, off, tpieces),
         *_plain_pieces("roads-plaingr", ground_p, lay, cw, fw, off, plain_cut, casing=False),
         {"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, "filter": surface,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],

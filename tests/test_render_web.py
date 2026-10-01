@@ -1207,6 +1207,23 @@ def test_dashed_classes_keep_their_dashes_in_tunnel_and_plain_stretches():
     assert ids.index("roads-tunnelgr-fill-dash0") < ids.index("roads-casing")   # under street casings
 
 
+def test_tunnels_get_light_dashes_on_their_fill_unless_turned_off():
+    """Kaveh's pick among three samples ("light dash is ok"): over the fill of both stretch kinds,
+    translucent, butt-capped; not on a dashed class; `tunnel_fill_dash: []` turns it off."""
+    st = _style(render_edges(_tunnel_world(True), backend="web").html)
+    lay = {l["id"]: l for l in st["layers"]}
+    ids = [l["id"] for l in st["layers"]]
+    for base in ("roads-tunnel-under-fill", "roads-tunnelgr-fill"):
+        pat = lay[base + "-pat"]
+        assert ids.index(pat["id"]) == ids.index(base) + 1 and pat["source"] == "tpieces"
+        assert pat["paint"]["line-dasharray"] == [1.2, 1.2] and pat["layout"]["line-cap"] == "butt"
+        assert pat["paint"]["line-color"].startswith("rgba(255,255,255")
+        assert '"__rs_dash"' in json.dumps(pat["filter"])                      # dashed classes: none
+    off = _style(render_edges(_tunnel_world(True), backend="web",
+                              settings={"config": {"tunnel_fill_dash": []}}).html)
+    assert not any(l["id"].endswith("-pat") for l in off["layers"])
+
+
 def test_tunnel_stretches_follow_ids_recolour_and_order():
     html = render_edges(_tunnel_world(True), backend="web").html
     assert 'l.source==="tpieces"' in html and 'RS_PIECE_LAYERS = ["roads-tunnel-under-fill","roads-lowp-fill","roads-plaingr-fill","roads-highp-fill"]' in html

@@ -7,6 +7,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **Tunnels get light dashes on their fill** (`tunnel_fill_dash`, default `[1.2, 1.2]`, and
+  `tunnel_fill_dash_color`, a translucent white that suits any road colour; `[]` turns it off), on
+  top of the dashed casing, so a tunnel reads as one at a glance. A dashed class keeps only its own
+  dashes.
 - **A tunnel is an ordinary road with a tunnel style** (mapstyle's `docs/design/junctions.md`,
   rule 1). A tunnel was drawn in the lower band along its whole length, so at its mouth the street's
   round end lay across it and the street looked like a dead end. Now it goes to the lower band only
