@@ -6,6 +6,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-09-30
+
 ### Changed
 - **Tunnels get light dashes on their fill** (`tunnel_fill_dash`, default `[1.2, 1.2]`, and
   `tunnel_fill_dash_color`, a translucent white that suits any road colour; `[]` turns it off), on
