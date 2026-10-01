@@ -134,7 +134,8 @@ def _width_m_expr(col, kind, width_m_zoom=16, **kw):
     double per zoom). Lines without a metre width keep their class widths, frozen past the last
     class stop as today; the stops go on to 22, MapLibre's max zoom."""
     casing = kind != "fill"
-    cls = dict(zip(_ZSTOPS, _width_expr(col, casing=casing, scale=1.25 if kind == "wings" else 1.0, **kw)[4::2]))
+    cls = dict(zip(_ZSTOPS, _width_expr(col, casing=casing, scale=1.25 if kind == "wings" else 1.0, **kw)[4::2],
+                   strict=True))
     k = {"fill": -2, "casing": 0, "wings": 2}[kind]
     wm = ["max", ["+", ["get", "__rs_wm"], ["*", k, ["get", "__rs_cm"]]], 0] if k else ["get", "__rs_wm"]
     e = ["interpolate", ["exponential", 2], ["zoom"]]

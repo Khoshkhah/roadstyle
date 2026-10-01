@@ -1287,7 +1287,9 @@ def test_metre_width_is_exact_at_zoom_22():
     fill, casing = _stop(width["roads-fill"], 22), _stop(width["roads-casing"], 22)
     assert width["roads-fill"][1] == ["exponential", 2]
     assert fill[0] == "case" and fill[1] == ["has", "__rs_wm"]
-    ev = lambda e: p["__rs_wm"] - 2 * p["__rs_cm"] if e[0] == "max" else p["__rs_wm"]
+
+    def ev(e):   # the metre width the expression multiplies: fill = width - 2 casings
+        return p["__rs_wm"] - 2 * p["__rs_cm"] if e[0] == "max" else p["__rs_wm"]
     assert abs(ev(fill[2][1]) * fill[2][2] - (3.25 - 0.30) * sec * px22) < 0.05
     assert abs(ev(casing[2][1]) * casing[2][2] - 3.25 * sec * px22) < 0.05
 
