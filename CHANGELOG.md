@@ -6,6 +6,21 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **One drawing rule for every road: levels and looks** (docs/design/levels_and_looks.md). A road's *level* decides its draw
+  band, nothing else: three bands, low (below ground), ground, high, from `lvl` (the OSM `layer`, else 1 for a
+  bridge, -1 for a tunnel) or a caller's `band_col` (which now also moves a tunnel). A tunnel or a bridge is only a *look* on a
+  road of its band, as sublayers and data: the tunnel's two-tone casing (`roads-low-casing-dash`), light fill dashes
+  (`roads-low-fill-pat`) and faded fill (a data-driven opacity); the bridge's deck casing and fill, drawn after the plain high
+  roads. **Removed:** the stretch cutting (`_stretches`: a tunnel, and a plain-layer road, cut into ground and under
+  stretches), the `tpieces` source and every layer made for it (`roads-tunnel-*`, `roads-tunnelgr-*`, `roads-lowp-*`,
+  `roads-plaingr-*`, `roads-highp-*`), `__rs_piece` / `__rs_pieced` / `__rs_gstart` / `__rs_gend` / `__rs_tfill`, and the page code
+  that followed a stretch to its edge. A tunnel is now drawn whole, under every ground road: at its mouth a street's round end
+  can show over the start of the tunnel's casing. The one-way arrows of a tunnel are no longer covered by its ground
+  stretches, and anything built on a map follows the band of the road it is on.
+- **Colour-by reaches the dashed layers.** A footway, path, steps ... edge is drawn by a `-dash<n>` layer; it now takes the
+  active colouring too (`rsSetColorField`, `rsColor`), so a pattern and a colour scheme work together.
+
 ## [0.11.0] — 2026-09-30
 
 ### Added

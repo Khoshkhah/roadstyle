@@ -457,7 +457,7 @@ const _fltCbs={}, _fltBase={};
 let _fltVis=null;   // Set of visible classes; null = all
 let _qIds=null;     // id-set filter from rsFilter; null = off
 let _bridgesOn=true;   // rsSetBridges: hide every elevated (lvl>0) road and its 3D deck ribbons
-let _tunnelsOn=true;   // rsSetTunnels: hide every below-ground (lvl<0) road, its names, arrows and mouth
+let _tunnelsOn=true;   // rsSetTunnels: hide every below-ground (lvl<0) road, its names and arrows
 const _fltLayers=()=>map.getStyle().layers.filter(l=>l.id.indexOf("roads")===0);
 map.on("load",()=>{ _fltLayers().forEach(l=>{ if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null; }); });
 function _applyRoadFilters(){
@@ -481,8 +481,6 @@ function _applyRoadFilters(){
     // the archive source, so the tile layer name is what separates them.
     const isRoads = l.source==="roads" && (!RS_TILED || l["source-layer"]==="roads");
     if(_qIds && isRoads){ const qf=["in",["id"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
-    // a tunnel's drawing stretches (tpieces) follow their edge's id (__rs_road)
-    if(_qIds && l.source==="tpieces"){ const qf=["in",["get","__rs_road"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
     // a two-way pair's end cap (twin_ends.md) stays while either of its two lanes is shown
     if(_qIds && l.source==="ends"){ const L=["literal",_qIds];
       const qf=["any",["in",["get","__rs_road"],L],["in",["get","__rs_road2"],L]]; f=f?["all",f,qf]:qf; }
@@ -659,8 +657,7 @@ if(FILTER.on){
 // option's fill is baked per edge (__rs_fill / __rs_fill__1 …); setPaintProperty repoints the
 // road-fill layers' line-color at the chosen prop. window.rsSetColorField drives it from your UI.
 const COLOR_OPTIONS = __COLOR_OPTIONS__;
-const RS_FILL_LAYERS = ["roads-fill","roads-tunnel-fill","roads-low-fill","roads-high-fill","roads-bridge-fill"];
-const RS_PIECE_LAYERS = ["roads-tunnel-under-fill","roads-lowp-fill","roads-plaingr-fill","roads-highp-fill"];   // stretches (_stretches): their road's id is __rs_road
+const RS_FILL_LAYERS = ["roads-fill","roads-low-fill","roads-high-fill","roads-bridge-fill"];
 const RS_END_LAYERS = ["roads-ends-low-fill","roads-ends-fill","roads-ends-high-fill"];   // twin_ends.md
 const RS_END_CASING_LAYERS = ["roads-ends-low-casing","roads-ends-casing","roads-ends-high-casing"];
 let _coActive = __CO_ACTIVE__, _coLegendEl = null, _coLegendBox = null;
@@ -691,8 +688,10 @@ function _fillExpr(idE){
 function _applyFill(){
   const e=_fillExpr();
   RS_FILL_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"line-color",e); });
-  const pe=_fillExpr(["get","__rs_road"]);
-  RS_PIECE_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"line-color",pe); });
+  // the dashed layers (<fill layer>-dash0, -dash1 ...: one per dash pattern, for footway, path, steps ...) draw the
+  // dashed classes' edges: they take the active colouring too, or such a road keeps its class colour under any "colour by"
+  const dashed=bases=>map.getStyle().layers.map(l=>l.id).filter(id=>bases.some(b=>id.startsWith(b+"-dash")));
+  dashed(RS_FILL_LAYERS).forEach(id=>map.setPaintProperty(id,"line-color",e));
   // a two-way pair's end cap (twin_ends.md) draws only where its two lanes have one colour: both
   // in the same recolour group, or the active option's colour equal on both (<prop>__b is the
   // second lane's); otherwise it is transparent and the ends look as without caps
@@ -705,11 +704,6 @@ function _applyFill(){
   const ec=["case",["any",same,...both],["coalesce",["get","__rs_casing"],"#000000"],none];
   RS_END_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"circle-color",ee); });
   RS_END_CASING_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"circle-color",ec); });
-  // a tunnel's ground stretches keep the faded tunnel colour (__rs_tfill) under the default colouring
-  let ge=["coalesce",["get",prop==="__rs_fill" ? "__rs_tfill" : prop],["get",prop],"#888888"];
-  if(_qColor) for(let i=_qColor.length-1;i>=0;i--)
-    ge=["case",["in",["get","__rs_road"],["literal",_qColor[i].ids]],_qColor[i].color,ge];
-  if(map.getLayer("roads-tunnelgr-fill")) map.setPaintProperty("roads-tunnelgr-fill","line-color",ge);
   // decks keep the base colour: their slice ids are a different id space than the road edges
   RS_DECK_LAYERS.forEach(id=>{
     if(map.getLayer(id))
@@ -725,12 +719,11 @@ const _sortBase={};
 function _applySort(){
   const all = _qColor ? [].concat(..._qColor.map(g=>g.ids)) : null;
   map.getStyle().layers.forEach(l=>{
-    if(l.type!=="line" || (l.source!=="roads" && l.source!=="tpieces")) return;
+    if(l.type!=="line" || l.source!=="roads") return;
     if(!(l.id in _sortBase)) _sortBase[l.id]=map.getLayoutProperty(l.id,"line-sort-key");
     const base=_sortBase[l.id]; if(base==null) return;
-    const idE = l.source==="tpieces" ? ["get","__rs_road"] : ["id"];
     map.setLayoutProperty(l.id,"line-sort-key",
-      all ? ["+", base, ["case",["in",idE,["literal",all]],500,0]] : base);
+      all ? ["+", base, ["case",["in",["id"],["literal",all]],500,0]] : base);
   });
 }
 function rsSetColorField(nameOrIdx){
@@ -947,7 +940,7 @@ function box(p){ return [[p.x-HIT,p.y-HIT],[p.x+HIT,p.y+HIT]]; }
 // query only layers that EXIST: the 3D view swaps roads-bridge-fill for the deck extrusions,
 // and MapLibre errors out (killing hover+click) when asked to query a missing layer id.
 const PICK_LAYERS = style.layers.map(l=>l.id)
-  .filter(id=>/^roads-(tunnel-|low-|high-|bridge-)?fill/.test(id)).concat(RS_DECK_LAYERS);
+  .filter(id=>/^roads-(low-|high-|bridge-)?fill/.test(id)).concat(RS_DECK_LAYERS);
 function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id));
   const l = ids.length ? map.queryRenderedFeatures(box(p), {layers:ids}) : [];
   return l.length ? l[0] : null; }

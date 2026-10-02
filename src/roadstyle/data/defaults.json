@@ -366,6 +366,8 @@
     "casing_extra": 2.0,
     "link_scale": 0.7,
     "tunnel_opacity_scale": 0.45,
+    "bridge_casing_m": 0.25,
+    "bridge_casing_px": 1.0,
     "bridge_casing_extra": 1.5,
     "minor_no_casing": [
       "cycleway",
