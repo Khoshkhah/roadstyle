@@ -1200,7 +1200,8 @@ def test_colour_by_recolours_the_dashed_layers_too():
     """A footway / path / steps edge is drawn by a ``-dash<n>`` layer (line-dasharray is not data-driven): it must
     follow the active colouring, or it keeps its class colour under any "colour by"."""
     html = render_edges(_tunnel_world(True), backend="web").html
-    assert 'const RS_FILL_LAYERS = ["roads-fill","roads-low-fill","roads-high-fill","roads-bridge-fill"];' in html
+    assert ('const RS_FILL_LAYERS = ["roads-fill","roads-low-fill","roads-high-fill","roads-bridge-fill",'
+            '"roads-fill-sq","roads-low-fill-sq","roads-high-fill-sq"];') in html
     assert 'dashed(RS_FILL_LAYERS).forEach(id=>map.setPaintProperty(id,"line-color",e))' in html
     assert "RS_PIECE_LAYERS" not in html and "tpieces" not in html
 
@@ -1262,3 +1263,47 @@ def test_metre_width_keeps_class_widths_below_its_zoom():
 def test_no_metre_width_column_leaves_the_style_unchanged():
     feats, width = _metre_map()
     assert width["roads-fill"][1] == ["linear"] and not any("__rs_wm" in f["properties"] for f in feats)
+
+
+def test_cap_col_gives_square_ends_to_the_edges_that_ask():
+    """cap_col (docs/design/square_ends.md): an edge with a true value is drawn by the butt-capped twin of its band's
+    casing and fill, and by no round layer; the others keep round ends. Nothing changes without the keyword."""
+    g = gpd.GeoDataFrame({"highway": ["residential"] * 3, "layer": [None, "1", None], "sq": [None, True, 0]},
+                         geometry=[LineString([(18.0 + i * 0.01, 59.30), (18.0 + i * 0.01, 59.31)]) for i in range(3)],
+                         crs=4326)
+    style = _style(render_edges(g, backend="web", cap_col="sq").html)
+    lay = {l["id"]: l for l in style["layers"]}
+    ids = [l["id"] for l in style["layers"]]
+    ps = [f["properties"] for f in style["sources"]["roads"]["data"]["features"]]
+    assert [p.get("__rs_cap") for p in ps] == [None, True, None]
+    assert lay["roads-fill-sq"]["layout"]["line-cap"] == "butt" and lay["roads-fill"]["layout"]["line-cap"] == "round"
+    for fid, sqid, p, own in ((0, "roads-fill", ps[0], "roads-fill"), (1, "roads-high-fill", ps[1], "roads-high-fill")):
+        assert _eval(lay[own]["filter"], p) is not None
+    assert [bool(_eval(lay["roads-fill"]["filter"], p)) for p in ps] == [True, False, True]       # round: not the capped edge
+    assert [bool(_eval(lay["roads-high-fill"]["filter"], p)) for p in ps] == [False, False, False]
+    assert [bool(_eval(lay["roads-high-fill-sq"]["filter"], p)) for p in ps] == [False, True, False]
+    assert [bool(_eval(lay["roads-fill-sq"]["filter"], p)) for p in ps] == [False, False, False]
+    # a band's casings stay under its fills: round casing, square casing, then the fills
+    assert ids.index("roads-casing") < ids.index("roads-casing-sq") < ids.index("roads-fill") < ids.index("roads-fill-sq")
+    plain = _style(render_edges(g.drop(columns="sq"), backend="web").html)
+    assert not [l for l in plain["layers"] if l["id"].endswith("-sq")]
+    assert "__rs_cap" not in json.dumps(plain["sources"]["roads"])
+
+
+def test_a_tunnel_keeps_its_look_in_the_band_a_caller_puts_it_in():
+    """band_col 0 draws a tunnel at ground level (a stretch near its mouth): the two-tone casing dashes, the light fill
+    dashes and the faded fill follow it into that band. Without such a tunnel there are no such layers."""
+    a, b = (18.000, 59.30), (18.002, 59.30)
+    g = gpd.GeoDataFrame({"highway": ["primary", "primary"], "tunnel": ["yes", "yes"], "band": [0, None]},
+                         geometry=[LineString([a, b]), LineString([b, (18.004, 59.30)])], crs=4326)
+    style = _style(render_edges(g, backend="web", band_col="band").html)
+    lay = {l["id"]: l for l in style["layers"]}
+    ps = [f["properties"] for f in style["sources"]["roads"]["data"]["features"]]
+    assert [bool(_eval(lay["roads-casing-dash"]["filter"], p)) for p in ps] == [True, False]
+    assert [bool(_eval(lay["roads-fill-pat"]["filter"], p)) for p in ps] == [True, False]
+    assert "__rs_tunnel" in json.dumps(lay["roads-fill"]["paint"]["line-opacity"])
+    ids = [l["id"] for l in style["layers"]]
+    assert ids.index("roads-casing") < ids.index("roads-casing-dash") < ids.index("roads-fill") < ids.index("roads-fill-pat")
+    assert ids.index("roads-low-casing-dash") < ids.index("roads-low-fill")                  # the low band's, as before
+    plain = _style(render_edges(_tunnel_world(True), backend="web").html)
+    assert not [l for l in plain["layers"] if l["id"] in ("roads-casing-dash", "roads-fill-pat", "roads-high-casing-dash")]

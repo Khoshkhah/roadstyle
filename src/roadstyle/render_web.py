@@ -604,7 +604,7 @@ def _mark_lvl(geo, tunnel_col, bridge_col, layer_col):
         p["__rs_bridge"], p["__rs_tunnel"] = br, tu
 
 
-def _mark_order(geo, order_col, band_col):
+def _mark_order(geo, order_col, band_col, cap_col=None):
     """A caller's draw order per edge (docs/design/draw_order_per_edge.md): ``__rs_band`` (-1 / 1:
     the band under / over every ground road; a bridge keeps its own) and
     ``__rs_order`` (the order inside the band instead of the class's z_order, clamped to -400 … 400
@@ -623,6 +623,8 @@ def _mark_order(geo, order_col, band_col):
         o = num(p.get(order_col)) if order_col else None
         if o is not None:
             p["__rs_order"] = max(-400.0, min(400.0, o))
+        if cap_col and _truthy(p.get(cap_col)):
+            p["__rs_cap"] = True
 
 
 def _twin_ends(geo, cols):
@@ -683,6 +685,14 @@ def _twin_ends(geo, cols):
             out.append({"type": "Feature", "properties": {**props, **ex},
                         "geometry": {"type": "Point", "coordinates": list(pt[:2])}})
     return out
+
+
+def _tunnel_casing_dash(lid, flt, tlay, cw, off, on):
+    """The dashes of a tunnel's two-tone casing, a sublayer on the band's casing (``on``: the band has a tunnel)."""
+    return [{"id": lid, "type": "line", "source": "roads", "layout": tlay, "filter": flt,
+             "paint": {"line-color": ["coalesce", ["get", "__rs_casing_dash"], "#5e5e5e"],
+                       "line-width": cw, "line-offset": off,
+                       "line-dasharray": list(CONFIG.tunnel_casing_dash or [2, 2])}}] if on else []
 
 
 def _tunnel_fill_dash(lid, flt, tlay, fw, off, on):
@@ -1068,7 +1078,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
-           order_col: str = None, band_col: str = None, directed_col: str = None,
+           order_col: str = None, band_col: str = None, cap_col: str = None, directed_col: str = None,
            width_m_col: str = None, width_m_zoom: float = 16, casing_m: float = 0.15,
            pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
@@ -1091,6 +1101,9 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     ground roads, casing included (a sidewalk under its street, a crossing over it); a tunnel too, and
     bridges keep their own band. ``order_col`` names a numeric column: the edge's order inside its
     band instead of its class's ``z_order`` (clamped to -400 … 400). Null = the class / level rule.
+    ``cap_col`` names a column: a true value draws that edge's casing and fill with **square** ends
+    (butt caps) instead of round ones, where an edge is one piece of a longer road and meets its
+    other piece (docs/design/square_ends.md). Null / false = round ends, as always.
 
     ``directed_col`` names a column saying whether an edge is a direction of travel of its own
     (true / null) or an undirected edge (false: a footway stored both ways, a one-way street's
@@ -1196,7 +1209,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                                 "prop": "__rs_fill", "legend": rf.legend}]
     _mark_twoway(geo, directed_col)
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
-    _mark_order(geo, order_col, band_col)
+    _mark_order(geo, order_col, band_col, cap_col)
     _mark_tunnel_dash(geo, CONFIG.tunnel_gap_shade, CONFIG.tunnel_dash_shade)
     if width_m_col:
         _mark_width_m(geo, width_m_col, casing_m)
@@ -1289,9 +1302,19 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     mz = ({**CONFIG.minzoom} if minzoom is True else
           {**CONFIG.minzoom, **minzoom} if isinstance(minzoom, dict) else None)
     tunnel = ["all", low, is_t]                     # the tunnel look, inside the low band
+    # a tunnel drawn in another band (a caller's band_col: a stretch of it at ground level) keeps its look
+    tunnel_g, tunnel_h = ["all", surface, is_t], ["all", high, is_t]
     if mz:
         _z = _minzoom_filter(highway_col, mz)
-        surface, low, bridge, high, tunnel = (["all", _z, f] for f in (surface, low, bridge, high, tunnel))
+        surface, low, bridge, high, tunnel, tunnel_g, tunnel_h = (
+            ["all", _z, f] for f in (surface, low, bridge, high, tunnel, tunnel_g, tunnel_h))
+    def _band_of(p):
+        b = p.get("__rs_band")
+        if b is None:
+            b = p.get("lvl") or 0
+        return (b > 0) - (b < 0)
+    tun_band = {_band_of(ft["properties"]) for ft in geo["features"] if ft["properties"].get("__rs_tunnel")}
+    tun_g, tun_h = 0 in tun_band, 1 in tun_band
     dk = {"base_m": 5.0, "thickness_m": 1.0, "ramp_m": 40.0, "step_m": 2.5,
           "match_zoom": 18.0, "opacity": 0.7, "width_scale": 0.6, "flat_below": 16.0,
           "casing_px": 2.0, **(CONFIG.bridge_decks or {})}
@@ -1318,10 +1341,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         {"id": "roads-low-casing", "type": "line", "source": "roads", "layout": lay, "filter": low,
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
                    "line-width": cw, "line-offset": off}},
-        *([{"id": "roads-low-casing-dash", "type": "line", "source": "roads", "layout": tlay, "filter": tunnel,
-            "paint": {"line-color": ["coalesce", ["get", "__rs_casing_dash"], "#5e5e5e"],
-                      "line-width": cw, "line-offset": off,
-                      "line-dasharray": list(CONFIG.tunnel_casing_dash or [2, 2])}}] if any_tunnel else []),
+        *_tunnel_casing_dash("roads-low-casing-dash", tunnel, tlay, cw, off, any_tunnel),
         {"id": "roads-low-fill", "type": "line", "source": "roads", "layout": lay, "filter": low,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
                    "line-width": fw, "line-offset": off,
@@ -1330,16 +1350,22 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         {"id": "roads-casing", "type": "line", "source": "roads", "layout": lay, "filter": surface,
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
                    "line-width": cw, "line-offset": off}},
+        *_tunnel_casing_dash("roads-casing-dash", tunnel_g, tlay, cw, off, tun_g),
         {"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, "filter": surface,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
-                   "line-width": fw, "line-offset": off}},
+                   "line-width": fw, "line-offset": off,
+                   **({"line-opacity": ["case", is_t, 0.72, 1]} if tun_g else {})}},
+        *_tunnel_fill_dash("roads-fill-pat", tunnel_g, tlay, fw, off, tun_g),
         # above ground, not a bridge (a positive layer alone: a raised walkway): over the ground roads it crosses
         {"id": "roads-high-casing", "type": "line", "source": "roads", "layout": lay, "filter": high,
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
                    "line-width": cw, "line-offset": off}},
+        *_tunnel_casing_dash("roads-high-casing-dash", tunnel_h, tlay, cw, off, tun_h),
         {"id": "roads-high-fill", "type": "line", "source": "roads", "layout": lay, "filter": high,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
-                   "line-width": fw, "line-offset": off}},
+                   "line-width": fw, "line-offset": off,
+                   **({"line-opacity": ["case", is_t, 0.72, 1]} if tun_h else {})}},
+        *_tunnel_fill_dash("roads-high-fill-pat", tunnel_h, tlay, fw, off, tun_h),
         # The bridge LOOK, last (on top). Flat view: heavier square-capped casing reads as a deck.
         # 3D view: below bridge_decks.flat_below the SAME flat lines draw (full stylized width,
         # matching the roads — a fixed deck polygon reads too narrow zoomed out); from
@@ -1456,7 +1482,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                          "paint": {**l["paint"],
                                    "line-dasharray": [float(x) for x in ds.split(",")]}})
                 l["filter"] = ["all", base_f, nod]
-            elif lid in ("roads-casing", "roads-low-casing", "roads-low-casing-dash", "roads-high-casing"):
+            elif lid in ("roads-casing", "roads-casing-dash", "roads-low-casing", "roads-low-casing-dash", "roads-high-casing",
+                         "roads-high-casing-dash"):
                 # surface/tunnel dashed classes stay casing-less (gaps show the ground); the
                 # BRIDGE casing deliberately keeps them — the deck edge is what says "bridge"
                 l["filter"] = ["all", base_f, nod]
@@ -1474,6 +1501,22 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                 at = next(i for i, l in enumerate(rest) if l["id"] == casing_id)
                 relayered = rest[:at] + moved + rest[at:]
         style["layers"] = relayered
+
+    # square ends (cap_col, docs/design/square_ends.md): MapLibre sets line-cap per layer, not per feature, so
+    # each band's casing and fill get a butt-capped twin for the edges that ask for it, drawn right after the
+    # round layer (a band's casings stay under its fills). Dashed classes draw butt-capped already.
+    if any(ft["properties"].get("__rs_cap") for ft in geo["features"]):
+        sq = ["to-boolean", ["get", "__rs_cap"]]
+        capped = []
+        for l in style["layers"]:
+            if l["id"] in ("roads-low-casing", "roads-low-fill", "roads-casing", "roads-fill",
+                           "roads-high-casing", "roads-high-fill"):
+                capped.append({**l, "filter": ["all", l["filter"], ["!", sq]]})
+                capped.append({**l, "id": l["id"] + "-sq", "layout": {**l["layout"], "line-cap": "butt"},
+                               "filter": ["all", l["filter"], sq]})
+            else:
+                capped.append(l)
+        style["layers"] = capped
 
     # oneway direction arrows (on edges with no reverse twin) + line-placed street names, on top.
     # Both read their cosmetics from data/style.json "config" (labels / arrows blocks), so a user
@@ -1573,7 +1616,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                 fams = (("roads-arrows-tunnel", "<",       # the low band's: a tunnel's too, above its fill
                          lambda i: i.startswith("roads-low-")),
                         ("roads-arrows", "==",
-                         lambda i: i in ("roads-casing", "roads-fill")
+                         lambda i: i in ("roads-casing", "roads-casing-sq", "roads-fill")
                          or i.startswith("roads-fill-")),
                         ("roads-arrows-bridge", ">",
                          lambda i: i.startswith(("roads-high-", "roads-bridge-"))))

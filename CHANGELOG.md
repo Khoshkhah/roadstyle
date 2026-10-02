@@ -6,6 +6,15 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **`cap_col`: square ends per edge** (docs/design/square_ends.md). A column of true / false: an edge with a true value is
+  drawn with butt caps (casing and fill) instead of round ones, by a `-sq` twin of each band's casing and fill layer
+  (`roads-casing-sq`, `roads-fill-sq`, `roads-low-*-sq`, `roads-high-*-sq`), because MapLibre sets `line-cap` per layer. For a road
+  drawn in pieces (a stretch at another level), so the pieces meet without a ring. Nothing changes without the keyword.
+- **A tunnel keeps its look in any band.** With `band_col`, a tunnel put at ground level (or high) now draws its two-tone casing
+  dashes (`roads-casing-dash`, `roads-high-casing-dash`), light fill dashes (`roads-fill-pat`, `roads-high-fill-pat`) and faded
+  fill there too, as in the low band. Without such a tunnel there are no such layers.
+
 ### Changed
 - **One drawing rule for every road: levels and looks** (docs/design/levels_and_looks.md). A road's *level* decides its draw
   band, nothing else: three bands, low (below ground), ground, high, from `lvl` (the OSM `layer`, else 1 for a
