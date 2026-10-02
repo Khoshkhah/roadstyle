@@ -1307,3 +1307,21 @@ def test_a_tunnel_keeps_its_look_in_the_band_a_caller_puts_it_in():
     assert ids.index("roads-low-casing-dash") < ids.index("roads-low-fill")                  # the low band's, as before
     plain = _style(render_edges(_tunnel_world(True), backend="web").html)
     assert not [l for l in plain["layers"] if l["id"] in ("roads-casing-dash", "roads-fill-pat", "roads-high-casing-dash")]
+
+
+def test_a_tunnel_fill_has_an_opaque_underlay_so_the_casing_does_not_show_through():
+    """The tunnel's fill is translucent (a faded colour); an underlay in the canvas colour sits under it in every band that
+    has a tunnel, so the casing and a street's round end under it do not show through (the tunnel keeps its look)."""
+    style = _style(render_edges(_tunnel_world(True), backend="web").html)
+    ids = [l["id"] for l in style["layers"]]
+    lay = {l["id"]: l for l in style["layers"]}
+    assert ids.index("roads-low-casing-dash") < ids.index("roads-low-fill-under") < ids.index("roads-low-fill")
+    assert lay["roads-low-fill-under"]["paint"]["line-color"].startswith("#") and lay["roads-low-fill-under"]["layout"]["line-cap"] == "butt"
+    assert "roads-fill-under" not in ids and "roads-high-fill-under" not in ids         # no tunnel in those bands
+    a, b = (18.000, 59.30), (18.002, 59.30)
+    g = gpd.GeoDataFrame({"highway": ["primary"], "tunnel": ["yes"], "band": [0]}, geometry=[LineString([a, b])], crs=4326)
+    ground = [l["id"] for l in _style(render_edges(g, backend="web", band_col="band").html)["layers"]]
+    assert ground.index("roads-casing-dash") < ground.index("roads-fill-under") < ground.index("roads-fill")
+    plain = [l["id"] for l in _style(render_edges(gpd.GeoDataFrame({"highway": ["primary"]}, geometry=[LineString([a, b])], crs=4326),
+                                                  backend="web").html)["layers"]]
+    assert not [i for i in plain if i.endswith("-under")]

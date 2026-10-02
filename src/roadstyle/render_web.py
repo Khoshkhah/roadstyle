@@ -687,6 +687,17 @@ def _twin_ends(geo, cols):
     return out
 
 
+def _tunnel_fill_under(lid, flt, fw, off, bg, on):
+    """An opaque underlay in the canvas colour under a tunnel's translucent fill: nothing under the tunnel (its own casing, a
+    street's round end) shows through, so the fill reads as the faded colour, as a tunnel always looked. Not for a dashed
+    class, which has gaps of its own."""
+    if not (on and _rgb(bg)):
+        return []
+    return [{"id": lid, "type": "line", "source": "roads", "layout": {"line-cap": "butt", "line-join": "round"},
+             "filter": ["all", flt, ["!", ["to-boolean", ["get", "__rs_dash"]]]],
+             "paint": {"line-color": bg, "line-width": fw, "line-offset": off}}]
+
+
 def _tunnel_casing_dash(lid, flt, tlay, cw, off, on):
     """The dashes of a tunnel's two-tone casing, a sublayer on the band's casing (``on``: the band has a tunnel)."""
     return [{"id": lid, "type": "line", "source": "roads", "layout": tlay, "filter": flt,
@@ -1342,6 +1353,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
                    "line-width": cw, "line-offset": off}},
         *_tunnel_casing_dash("roads-low-casing-dash", tunnel, tlay, cw, off, any_tunnel),
+        *_tunnel_fill_under("roads-low-fill-under", tunnel, fw, off, _bg_color(active_bm), any_tunnel),
         {"id": "roads-low-fill", "type": "line", "source": "roads", "layout": lay, "filter": low,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
                    "line-width": fw, "line-offset": off,
@@ -1351,6 +1363,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
                    "line-width": cw, "line-offset": off}},
         *_tunnel_casing_dash("roads-casing-dash", tunnel_g, tlay, cw, off, tun_g),
+        *_tunnel_fill_under("roads-fill-under", tunnel_g, fw, off, _bg_color(active_bm), tun_g),
         {"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, "filter": surface,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
                    "line-width": fw, "line-offset": off,
@@ -1361,6 +1374,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
                    "line-width": cw, "line-offset": off}},
         *_tunnel_casing_dash("roads-high-casing-dash", tunnel_h, tlay, cw, off, tun_h),
+        *_tunnel_fill_under("roads-high-fill-under", tunnel_h, fw, off, _bg_color(active_bm), tun_h),
         {"id": "roads-high-fill", "type": "line", "source": "roads", "layout": lay, "filter": high,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
                    "line-width": fw, "line-offset": off,
