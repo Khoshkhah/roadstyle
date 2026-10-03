@@ -1200,8 +1200,8 @@ def test_colour_by_recolours_the_dashed_layers_too():
     """A footway / path / steps edge is drawn by a ``-dash<n>`` layer (line-dasharray is not data-driven): it must
     follow the active colouring, or it keeps its class colour under any "colour by"."""
     html = render_edges(_tunnel_world(True), backend="web").html
-    assert ('const RS_FILL_LAYERS = ["roads-fill","roads-low-fill","roads-high-fill","roads-bridge-fill",'
-            '"roads-fill-sq","roads-low-fill-sq","roads-high-fill-sq"];') in html
+    assert ('const RS_FILL_LAYERS = ["roads-fill", "roads-low-fill", "roads-high-fill", "roads-bridge-fill", '
+            '"roads-fill-sq", "roads-low-fill-sq", "roads-high-fill-sq"];') in html
     assert 'dashed(RS_FILL_LAYERS).forEach(id=>map.setPaintProperty(id,"line-color",e))' in html
     assert "RS_PIECE_LAYERS" not in html and "tpieces" not in html
 
@@ -1325,3 +1325,54 @@ def test_a_tunnel_fill_has_an_opaque_underlay_so_the_casing_does_not_show_throug
     plain = [l["id"] for l in _style(render_edges(gpd.GeoDataFrame({"highway": ["primary"]}, geometry=[LineString([a, b])], crs=4326),
                                                   backend="web").html)["layers"]]
     assert not [i for i in plain if i.endswith("-under")]
+
+
+def test_level_columns_draw_each_position_casings_then_fills():
+    """casing_level_col / fill_level_col (docs/design/level_columns.md): one casing layer and one fill layer for each position, in
+    position order; an edge's casing is in the layers of its casing position and its fill in those of its fill position."""
+    g = gpd.GeoDataFrame({"highway": ["residential"] * 4, "tunnel": [None, None, "yes", None],
+                          "cl": [0, 0, -2, -1], "fl": [0, 1, -2, 1]},
+                         geometry=[LineString([(18.0 + i * 0.01, 59.30), (18.0 + i * 0.01, 59.31)]) for i in range(4)], crs=4326)
+    style = _style(render_edges(g, backend="web", casing_level_col="cl", fill_level_col="fl").html)
+    lay = {l["id"]: l for l in style["layers"]}
+    ids = [l["id"] for l in style["layers"]]
+    ps = [f["properties"] for f in style["sources"]["roads"]["data"]["features"]]
+    assert [(p["__rs_cl"], p["__rs_fl"]) for p in ps] == [(0, 0), (0, 1), (-2, -2), (-1, 1)]
+    for level in (-2, -1, 0, 1):                                     # a casing and a fill layer per position
+        cas, fil = lay[_pos_id("roads-casing", level)], lay[_pos_id("roads-fill", level)]
+        assert [bool(_eval(cas["filter"], p)) for p in ps] == [p["__rs_cl"] == level for p in ps]
+        assert [bool(_eval(fil["filter"], p)) for p in ps] == [p["__rs_fl"] == level for p in ps]
+    # in position order, casings before fills of the same position, and position 0 keeps its ids
+    order = [_pos_id("roads-casing", l) for l in (-2, -1, 0, 1)]
+    assert ids.index(order[0]) < ids.index(_pos_id("roads-fill", -2)) < ids.index(order[1]) < ids.index(_pos_id("roads-fill", -1)) \
+        < ids.index("roads-casing") < ids.index("roads-fill") < ids.index(order[3]) < ids.index(_pos_id("roads-fill", 1))
+    # the page recolours the fill layers of every position
+    html = render_edges(g, backend="web", casing_level_col="cl", fill_level_col="fl").html
+    assert '"roads-fill-lv1"' in html and '"roads-fill-lv-2"' in html
+    # without the columns nothing changes
+    plain = _style(render_edges(g.drop(columns=["cl", "fl"]), backend="web").html)
+    assert not [l for l in plain["layers"] if "-lv" in l["id"]]
+    assert '"__rs_cl"' not in json.dumps(plain["sources"]["roads"])
+
+
+def _pos_id(root, level):
+    return root if level == 0 else f"{root}-lv{level}"
+
+
+def test_level_columns_keep_the_looks_and_the_dashed_classes():
+    """The tunnel look and the dashed classes follow the positions; tiles=True is refused (not supported yet)."""
+    g = gpd.GeoDataFrame({"highway": ["primary", "footway", "primary"], "tunnel": ["yes", None, None], "cl": [-1, 1, 0], "fl": [-1, 1, 0]},
+                         geometry=[LineString([(18.0 + i * 0.01, 59.30), (18.0 + i * 0.01, 59.31)]) for i in range(3)], crs=4326)
+    style = _style(render_edges(g, backend="web", casing_level_col="cl", fill_level_col="fl").html)
+    ids = [l["id"] for l in style["layers"]]
+    lay = {l["id"]: l for l in style["layers"]}
+    ps = [f["properties"] for f in style["sources"]["roads"]["data"]["features"]]
+    assert "roads-casing-lv-1-dash" in ids and "roads-fill-lv-1-pat" in ids and "roads-fill-lv-1-under" in ids   # the tunnel's look at -1
+    assert [bool(_eval(lay["roads-casing-lv-1-dash"]["filter"], p)) for p in ps] == [True, False, False]
+    dash = [i for i in ids if i.startswith("roads-fill-lv1-dash")]                                                  # the footway's dashes at 1
+    assert dash and '"__rs_fl"' in json.dumps(lay[dash[0]]["filter"]) and '"__rs_cl"' not in json.dumps(lay[dash[0]]["filter"])
+    try:
+        render_edges(g, backend="web", casing_level_col="cl", fill_level_col="fl", tiles=True)
+        raise AssertionError("tiles=True with level columns must be refused")
+    except ValueError:
+        pass

@@ -604,6 +604,27 @@ def _mark_lvl(geo, tunnel_col, bridge_col, layer_col):
         p["__rs_bridge"], p["__rs_tunnel"] = br, tu
 
 
+def _mark_levels(geo, casing_col, fill_col):
+    """``__rs_cl`` / ``__rs_fl``: the drawing-order positions of an edge's casing and fill (integers, null = 0), and band 0 for every
+    edge but a bridge, so the surface layers are the ones drawn per position. Returns the sorted positions that occur (0 always)."""
+    def num(v):
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            return 0
+        return 0 if math.isnan(v) else int(round(v))
+    levels = {0}
+    for ft in geo["features"]:
+        p = ft["properties"]
+        c, f = num(p.get(casing_col)) if casing_col else 0, num(p.get(fill_col)) if fill_col else 0
+        c, f = min(c, f), max(c, f)
+        p["__rs_cl"], p["__rs_fl"] = c, f
+        if not p.get("__rs_bridge"):
+            p["__rs_band"] = 0
+        levels |= {c, f}
+    return sorted(levels)
+
+
 def _mark_order(geo, order_col, band_col, cap_col=None):
     """A caller's draw order per edge (docs/design/draw_order_per_edge.md): ``__rs_band`` (-1 / 1:
     the band under / over every ground road; a bridge keeps its own) and
@@ -696,6 +717,43 @@ def _tunnel_fill_under(lid, flt, fw, off, bg, on):
     return [{"id": lid, "type": "line", "source": "roads", "layout": {"line-cap": "butt", "line-join": "round"},
              "filter": ["all", flt, ["!", ["to-boolean", ["get", "__rs_dash"]]]],
              "paint": {"line-color": bg, "line-width": fw, "line-offset": off}}]
+
+
+_CASING_FAMILY = ("roads-casing", "roads-casing-sq", "roads-casing-dash")
+_FILL_FAMILY = ("roads-fill-under", "roads-fill", "roads-fill-sq", "roads-fill-pat")
+
+
+def _fill_layer_ids(levels):
+    """The layers the page recolours (colour-by, rsColor): every road fill layer, and the fill layers of each drawing-order position."""
+    ids = ["roads-fill", "roads-low-fill", "roads-high-fill", "roads-bridge-fill", "roads-fill-sq", "roads-low-fill-sq", "roads-high-fill-sq"]
+    for level in levels or ():
+        if level != 0:
+            ids += [_level_id("roads-fill", level), _level_id("roads-fill-sq", level)]
+    return ids
+
+
+def _level_id(lid, level):
+    """The id of a ground layer for a position: unchanged for 0; else ``-lv<n>`` after the family root (roads-fill-lv2-sq)."""
+    if level == 0:
+        return lid
+    root = "roads-casing" if lid.startswith("roads-casing") else "roads-fill"
+    return f"{root}-lv{level}{lid[len(root):]}"
+
+
+def _level_layers(layers, levels):
+    block = [l for l in layers if l["id"] in _CASING_FAMILY or l["id"] in _FILL_FAMILY or l["id"].startswith("roads-fill-dash")]
+    if not block:
+        return layers
+    first = next(i for i, l in enumerate(layers) if l["id"] == block[0]["id"])
+    ids = {l["id"] for l in block}
+    rest = [l for l in layers if l["id"] not in ids]
+    groups = []
+    for level in levels:
+        for l in block:
+            key = "__rs_cl" if l["id"] in _CASING_FAMILY else "__rs_fl"
+            groups.append({**l, "id": _level_id(l["id"], level),
+                           "filter": ["all", l["filter"], ["==", ["coalesce", ["get", key], 0], level]]})
+    return rest[:first] + groups + rest[first:]
 
 
 def _tunnel_casing_dash(lid, flt, tlay, cw, off, on):
@@ -1089,7 +1147,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
-           order_col: str = None, band_col: str = None, cap_col: str = None, directed_col: str = None,
+           order_col: str = None, band_col: str = None, cap_col: str = None, casing_level_col: str = None, fill_level_col: str = None, directed_col: str = None,
            width_m_col: str = None, width_m_zoom: float = 16, casing_m: float = 0.15,
            pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
@@ -1112,6 +1170,12 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     ground roads, casing included (a sidewalk under its street, a crossing over it); a tunnel too, and
     bridges keep their own band. ``order_col`` names a numeric column: the edge's order inside its
     band instead of its class's ``z_order`` (clamped to -400 … 400). Null = the class / level rule.
+    ``casing_level_col`` / ``fill_level_col`` name two integer columns (docs/design/level_columns.md): the **position in the
+    drawing order** where each edge's casing and where its fill are drawn. At each position every casing of the position is
+    drawn first, then every fill; an edge whose two numbers are equal is an ordinary edge of that level, one whose casing
+    number is lower than its fill number has its casing with the lower position's casings and its fill with the higher
+    position's fills. Positions are free integers (0 is the ground); there is one casing layer and one fill layer for each
+    position that occurs. They replace the three bands for every edge but a bridge, which keeps its deck. Null = 0.
     ``cap_col`` names a column: a true value draws that edge's casing and fill with **square** ends
     (butt caps) instead of round ones, where an edge is one piece of a longer road and meets its
     other piece (docs/design/square_ends.md). Null / false = round ends, as always.
@@ -1221,6 +1285,9 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     _mark_twoway(geo, directed_col)
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
     _mark_order(geo, order_col, band_col, cap_col)
+    levels = _mark_levels(geo, casing_level_col, fill_level_col) if (casing_level_col or fill_level_col) else None
+    if levels and tiles:
+        raise ValueError("casing_level_col / fill_level_col do not work with tiles=True yet")
     _mark_tunnel_dash(geo, CONFIG.tunnel_gap_shade, CONFIG.tunnel_dash_shade)
     if width_m_col:
         _mark_width_m(geo, width_m_col, casing_m)
@@ -1532,6 +1599,12 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                 capped.append(l)
         style["layers"] = capped
 
+    # drawing-order positions (casing_level_col / fill_level_col, docs/design/level_columns.md): the ground band's casing layers and fill
+    # layers are repeated for each position, in position order; an edge is in the casing layers of its casing position and the
+    # fill layers of its fill position. Position 0 keeps the layer ids.
+    if levels:
+        style["layers"] = _level_layers(style["layers"], levels)
+
     # oneway direction arrows (on edges with no reverse twin) + line-placed street names, on top.
     # Both read their cosmetics from data/style.json "config" (labels / arrows blocks), so a user
     # roadstyle.json can restyle them without touching the library; missing keys keep the bundled
@@ -1635,8 +1708,9 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                         ("roads-arrows-bridge", ">",
                          lambda i: i.startswith(("roads-high-", "roads-bridge-"))))
                 for lid, cmp, fam in fams:
-                    idx = max(i for i, l in enumerate(style["layers"]) if fam(l["id"]))
-                    style["layers"].insert(idx + 1, _arrow_layer(lid, cmp))
+                    members = [i for i, l in enumerate(style["layers"]) if fam(l["id"])]
+                    if members:                                  # a position-ordered map has no low / high band layers
+                        style["layers"].insert(max(members) + 1, _arrow_layer(lid, cmp))
             if labels:
                 style["glyphs"] = "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"
                 lf = ["all", ["==", ["%", ["get", "slot"], 2], 0],
@@ -1735,6 +1809,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__PITCH__", json.dumps(cam["pitch"]))
             .replace("__BEARING__", json.dumps(cam["bearing"]))
             .replace("__BOUNDS__", json.dumps([[minx, miny], [maxx, maxy]]))
+            .replace("__RS_FILL_LAYERS__", json.dumps(_fill_layer_ids(levels)))
             .replace("__COLOR_OPTIONS__", json.dumps(color_opts_meta or []))
             .replace("__CO_ACTIVE__", str(_active))
             .replace("__OVERLAYS__", json.dumps(ov_meta))

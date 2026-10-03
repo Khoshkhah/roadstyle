@@ -157,6 +157,7 @@ Returns a `WebMap` (web, `.save()`), a `folium.Map` (`.save()`) or a `lonboard.M
 | `tunnel_col` / `bridge_col` | `"tunnel"` / `"bridge"` | all | tunnels draw under (faded, two-tone dashed casing), bridges on top |
 | `layer_col` | `"layer"` | web | OSM `layer`; negative sinks an edge when there is no tunnel/bridge column |
 | `band_col` | `None` | web | a column of -1 / 0 / 1: draw the edge (casing included) under (-1) or over (1) the ground roads, e.g. a sidewalk under its street, a crossing over it; tunnels and bridges keep their band; null = by level |
+| `casing_level_col` / `fill_level_col` | `None` | web | two integer columns: the position in the drawing order of an edge's casing and of its fill (0 = ground); at each position casings first, then fills; one layer pair per position; replaces the three bands (a bridge keeps its deck); not with `tiles=True` |
 | `cap_col` | `None` | web | a column of true / false: true draws the edge with square ends (butt caps) instead of round ones, for a road drawn in pieces that meet without a ring; null / false = round ends |
 | `width_m_col` | `None` | web | a column of widths in metres (a lane, a road with a `width` tag, a canal): from `width_m_zoom` on the line is drawn exactly that wide, its casing inside; null = the class width |
 | `width_m_zoom` | `16` | web | the zoom from which `width_m_col` widths apply; below it, the class widths (so a narrow line doesn't vanish zoomed out) |

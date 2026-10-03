@@ -7,6 +7,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`casing_level_col` / `fill_level_col`: the drawing order of each edge** (docs/design/level_columns.md). Two integer columns: the
+  position in the drawing order where an edge's casing is drawn and where its fill is drawn. At each position every casing of the
+  position is drawn first, then every fill, so edges that share a node merge cleanly and an edge drawn at a higher position is over the
+  lower one with its own casing. One casing layer and one fill layer (with the tunnel look and the dashed classes) for each position
+  that occurs, in position order; position 0 keeps the layer ids; `rsColor` / colour-by reach every fill layer. They replace the three
+  bands for every edge but a bridge. Not with `tiles=True` (refused). Without the columns nothing changes.
 - **`cap_col`: square ends per edge** (docs/design/square_ends.md). A column of true / false: an edge with a true value is
   drawn with butt caps (casing and fill) instead of round ones, by a `-sq` twin of each band's casing and fill layer
   (`roads-casing-sq`, `roads-fill-sq`, `roads-low-*-sq`, `roads-high-*-sq`), because MapLibre sets `line-cap` per layer. For a road
