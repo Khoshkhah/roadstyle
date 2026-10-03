@@ -6,6 +6,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-10-03
+
 ### Added
 - **`casing_level_col` / `fill_level_col`: the drawing order of each edge** (docs/design/level_columns.md). Two integer columns: the
   position in the drawing order where an edge's casing is drawn and where its fill is drawn. At each position every casing of the
