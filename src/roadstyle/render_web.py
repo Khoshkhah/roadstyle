@@ -264,8 +264,8 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
     density per zoom automatically. Unnamed roads leave their name slots empty. Returns a
     FeatureCollection of slot pieces: {slot, name, highway, oneway}.
     """
+    import numpy as np
     from shapely.geometry import LineString, Point
-    from shapely.ops import substring
     from shapely.strtree import STRtree
 
     reps = []                                    # (start, end, coords, props), twins collapsed
@@ -342,7 +342,7 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
             return chain
 
         chains = [walk(i) for i in range(n) if not used[i]]
-        etree = STRtree([LineString(e[2]) for e in edges])          # which edge of the group a slot lies on
+        etree = STRtree([LineString(e[2]) for e in edges]) if n > 1 else None          # which edge of the group a slot lies on (a group of one edge: that edge)
         # the caller's class column ("highway" only by convention — e.g. Overture data styles by
         # "class"); stored under the slots' own fixed "highway" key either way, which is what the
         # arrow/label minzoom filters and sort keys read. Hardcoding the lookup dropped the
@@ -351,18 +351,23 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
         for chain in chains:
             lon0, lat0 = chain[0]
             kx = 111320.0 * math.cos(math.radians(lat0))
-            local = LineString([((x - lon0) * kx, (y - lat0) * 111320.0) for x, y in chain])
-            total = local.length
+            ch = np.asarray(chain, dtype=float)
+            xy = np.column_stack([(ch[:, 0] - lon0) * kx, (ch[:, 1] - lat0) * 111320.0])
+            cum = _cum_lengths(xy)
+            total = float(cum[-1])
 
             pieces = max(1, int(total // slot_m) + (1 if total % slot_m > slot_m * 0.3 else 0))
             for i in range(pieces):
-                part = substring(local, i * slot_m, min((i + 1) * slot_m, total))
-                if part.geom_type != "LineString" or part.length < slot_m * 0.2:
+                a, b = i * slot_m, min((i + 1) * slot_m, total)
+                if b - a < slot_m * 0.2:
                     continue
-                coords = [[round(x / kx + lon0, 6), round(y / 111320.0 + lat0, 6)]
-                          for x, y in part.coords]
-                mid = part.interpolate(0.5, normalized=True)
-                road, twin = owner[id(edges[int(etree.nearest(Point(mid.x / kx + lon0, mid.y / 111320.0 + lat0)))][3])]
+                pts = _part(xy, cum, a, b)
+                coords = np.column_stack([np.round(pts[:, 0] / kx + lon0, 6), np.round(pts[:, 1] / 111320.0 + lat0, 6)]).tolist()
+                if etree is None:
+                    road, twin = owner[id(edges[0][3])]
+                else:
+                    mx, my = _at(xy, cum, (a + b) / 2)
+                    road, twin = owner[id(edges[int(etree.nearest(Point(mx / kx + lon0, my / 111320.0 + lat0)))][3])]
                 feats.append({"type": "Feature",
                               "properties": {"slot": i, "name": name, "highway": hw,
                                              "oneway": oneway, "lvl": lvl, "__rs_road": road,
@@ -635,13 +640,33 @@ def _mark_levels(geo, casing_col, fill_col, start_col=None, end_col=None):
     return sorted(levels)
 
 
+def _cum_lengths(xy):
+    """The cumulative lengths along a polyline (n x 2 array, metres), starting at 0."""
+    import numpy as np
+    return np.r_[0.0, np.cumsum(np.hypot(*np.diff(xy, axis=0).T))]
+
+
+def _at(xy, cum, d):
+    """The point of the polyline ``xy`` (cumulative lengths ``cum``) at the distance ``d``."""
+    import numpy as np
+    j = min(max(int(np.searchsorted(cum, d, side="right")) - 1, 0), len(cum) - 2)
+    w = cum[j + 1] - cum[j]
+    return xy[j] + ((d - cum[j]) / w if w > 0 else 0.0) * (xy[j + 1] - xy[j])
+
+
+def _part(xy, cum, a, b):
+    """The points of the polyline ``xy`` (cumulative lengths ``cum``) between the distances ``a`` and ``b`` (``a < b``), as an array: the cut points and the vertices
+    between them. The same line as ``shapely.ops.substring``, without building geometries (it is the slow part of the casing pieces and the annotation slots)."""
+    import numpy as np
+    return np.vstack([_at(xy, cum, a), xy[np.searchsorted(cum, a, side="right"):np.searchsorted(cum, b, side="left")], _at(xy, cum, b)])
+
+
 def _casing_parts(geo, head_m, cols):
     """The casing of every edge as pieces, for its own source (docs/design/levels_split_casing.md): an edge at least ``2 * head_m`` metres long whose
     three casing numbers (``__rs_cs`` start head, ``__rs_cl`` main, ``__rs_ce`` end head) are not all equal is cut into the first ``head_m`` metres,
     the middle and the last ``head_m`` metres, each with its own ``__rs_cl``; any other edge is one piece. A piece carries the properties the casing
     layers read (``__rs_*`` except the fills, ``cols``, ``lvl``) and ``__rs_road``, the id of its edge."""
-    from shapely.geometry import LineString
-    from shapely.ops import substring
+    import numpy as np
     keep = {c for c in cols if c} | {"lvl"}
     out = []
     for i, ft in enumerate(geo["features"]):
@@ -655,14 +680,16 @@ def _casing_parts(geo, head_m, cols):
             continue
         lon0, lat0 = c[0][0], c[0][1]
         kx, ky = 111320.0 * math.cos(math.radians(lat0)), 111320.0
-        line = LineString([((x - lon0) * kx, (y - lat0) * ky) for x, y, *_ in c])
-        n = line.length
+        xy = np.asarray([(x - lon0) * kx for x, y, *_ in c]), np.asarray([(y - lat0) * ky for x, y, *_ in c])
+        xy = np.column_stack(xy)
+        cum = _cum_lengths(xy)
+        n = float(cum[-1])
         cuts = [(0.0, n, cm)] if n < 2 * head_m else [(0.0, head_m, cs), (head_m, n - head_m, cm), (n - head_m, n, ce)]
         for k, (a, b, num) in enumerate(cuts):
-            part = substring(line, a, b)
-            if part.is_empty or part.geom_type != "LineString" or len(part.coords) < 2:
+            pts = _part(xy, cum, a, b)
+            if len(pts) < 2 or not (np.diff(pts, axis=0) != 0).any():
                 continue
-            coords = [[round(x / kx + lon0, 7), round(y / ky + lat0, 7)] for x, y in part.coords]
+            coords = np.column_stack([np.round(pts[:, 0] / kx + lon0, 7), np.round(pts[:, 1] / ky + lat0, 7)]).tolist()
             flat = {"__rs_cap": True} if len(cuts) == 3 and k == 1 else {}        # the main piece ends at two cuts: flat ends (a round end would reach into the heads)
             out.append({"type": "Feature", "properties": {**base, "__rs_cl": num, **flat}, "geometry": {"type": "LineString", "coordinates": coords}})
     return out

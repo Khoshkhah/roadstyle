@@ -1792,3 +1792,19 @@ def test_a_theme_can_be_a_file_and_an_unreadable_settings_file_is_an_error(tmp_p
         with pytest.raises(ValueError, match=name):
             render_edges(_edge_world(), backend="web", settings=str(bad))
     render_edges(_edge_world(), backend="web")                                  # and the failed calls did not leave the settings changed
+
+
+def test_the_numpy_cutter_is_shapelys_substring():
+    """_part (the casing pieces and the annotation slots) cuts a polyline exactly as shapely.ops.substring does, without building geometries."""
+    import numpy as np
+    from shapely.geometry import LineString as LS
+    from shapely.ops import substring
+
+    from roadstyle.render_web import _cum_lengths, _part
+    rng = np.random.default_rng(1)
+    for _ in range(300):
+        xy = np.cumsum(rng.normal(size=(int(rng.integers(2, 9)), 2)) * 5, axis=0)
+        cum = _cum_lengths(xy)
+        a = float(rng.uniform(0, cum[-1] * 0.7))
+        b = float(rng.uniform(a + 1e-3, cum[-1]))
+        assert np.allclose(_part(xy, cum, a, b), np.asarray(substring(LS(xy), a, b).coords), atol=1e-9)
