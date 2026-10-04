@@ -41,7 +41,9 @@ rs.render_edges(levels, casing_level_col="casing_level", fill_level_col="fill_le
                 casing_start_col="casing_start", casing_end_col="casing_end").save("map.html")
 ```
 
-`compute_levels(edges)` is this method. `method="tags"` is a closed-form rule on the tags alone, with no search. How both methods work, with every argument and the output:
+`compute_levels(edges)` is this method. Each different number is one **position**, and the page has a set of layers for each position. `compute_levels` asks for few positions by default (`min_positions=True`): the casings may lie a little farther from their fills. `min_positions=False` leaves that out.
+
+`method="tags"` is a closed-form rule on the tags alone, with no search. How both methods work, with every argument and the output:
 [Divided casing and one band](../design/levels_split_casing.md).
 
 ## Your own numbers

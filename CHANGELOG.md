@@ -4,6 +4,17 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.13.1] — 2026-10-04
+
+### Added
+- **`compute_levels(min_positions=True)`, on by default**: also minimises the span of the numbers (the highest minus the lowest), so the page has fewer positions, that is fewer layers. It has a lower priority than a stack or an order wish
+  and a higher one than compaction, so nothing more is given up; the casings may lie a little farther from their fills. Stage 0 stays a minimum-cost flow. Estonia driving: 9 positions become 5, and the solve takes half the time;
+  Vancouver walking: 6 become 5, the solve takes 4.5 times longer; on smaller networks the time is the same. `min_positions=False` leaves it out. The option is stored with the numbers (`min_positions` in `visualization.edge_levels_meta`).
+  Numbers saved by 0.13.0 were computed without it: `load_levels` stops with a message that says so, and they must be computed again (or read with `min_positions=False`). Section 7.3.1 of the design.
+
+### Changed
+- **A road with no `highway` takes no part in the class order** (`order="class"`): no wish is made for it, with any road, instead of an error. The same for a null number in an `order` column (it was 0.0).
+
 ## [0.13.0] — 2026-10-03
 
 ### Breaking (0.13.0)

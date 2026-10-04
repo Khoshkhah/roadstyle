@@ -8,13 +8,14 @@ import hashlib
 
 SCHEMA = "visualization"
 COLS = ("casing_start", "casing_level", "casing_end", "fill_level")
-_PARAMS = ("method", "head_m", "band_dist", "margin", "max_level", "band_source", "order_source")
+_PARAMS = ("method", "head_m", "band_dist", "margin", "max_level", "band_source", "order_source", "min_positions")
 
 
-def levels_params(method="solve", head_m=5.0, band_dist=10.0, margin=1.0, max_level=20, band_col=None, order=None):
+def levels_params(method="solve", head_m=5.0, band_dist=10.0, margin=1.0, max_level=20, band_col=None, order=None, min_positions=True):
     """The parameters that decide the numbers, as stored in the metadata. The names are those of ``compute_levels``; a band from the tags is ``"tags"``."""
     return {"method": method, "head_m": float(head_m), "band_dist": float(band_dist), "margin": float(margin), "max_level": int(max_level),
-            "band_source": band_col or "tags", "order_source": order}
+            "band_source": band_col or "tags", "order_source": order,
+            "min_positions": True if min_positions else None}      # None: off; a file stored before the option has no value, so it reads as off
 
 
 def _ids(frame):
@@ -54,7 +55,7 @@ def save_levels(con, levels, *, schema=SCHEMA):
 
 def load_levels(con, edges=None, *, schema=SCHEMA, **expect):
     """Read the stored numbers. ``expect`` are the parameters you expect, with the names and defaults of ``compute_levels``
-    (``method``, ``head_m``, ``band_dist``, ``margin``, ``max_level``, ``band_col``, ``order``). If the stored parameters differ, or ``edges``
+    (``method``, ``head_m``, ``band_dist``, ``margin``, ``max_level``, ``band_col``, ``order``, ``min_positions``). If the stored parameters differ, or ``edges``
     (a table with ``edge_id``) are not exactly the edges the numbers were computed for, a ``ValueError`` says what differs; nothing is recomputed.
     Returns the table ``edge_id`` + the four columns, or, with ``edges``, a copy of ``edges`` with the four columns added."""
     import pandas as pd
@@ -67,7 +68,7 @@ def load_levels(con, edges=None, *, schema=SCHEMA, **expect):
     def same(a, b):
         a = None if pd.isna(a) else a
         return a == b
-    diffs = [f"{k}: stored {stored[k]!r}, expected {want[k]!r}" for k in _PARAMS if not same(stored[k], want[k])]
+    diffs = [f"{k}: stored {stored.get(k)!r}, expected {want[k]!r}" for k in _PARAMS if not same(stored.get(k), want[k])]
     if diffs:
         raise ValueError(f"the stored levels were computed with other parameters ({'; '.join(diffs)}): compute them again and save them")
     table = con.execute(f"SELECT * FROM {schema}.edge_levels").df()

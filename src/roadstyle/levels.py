@@ -99,7 +99,7 @@ def _difference_lp(cost, A, b, hi):
     return x if x.max() <= hi + 1e-9 else None
 
 
-def _solve_intervals(metres, ends, beta, omega, limit, band_dist, head_m, max_level, margin):
+def _solve_intervals(metres, ends, beta, omega, limit, band_dist, head_m, max_level, margin, min_positions=True):
     """method="solve" on roads (one per segment, both directions together). Every road has one fill number ``b`` and a casing divided into a start head,
     a main part and an end head (one number for a road shorter than ``2 * head_m``). Returns ``(parts, given_up, info)``: ``parts[r] = (a_start, a_main, a_end, b)``.
     The model is a linear program solved on a sparse matrix with HiGHS (docs/design/levels_split_casing.md, section 7)."""
@@ -131,7 +131,7 @@ def _solve_intervals(metres, ends, beta, omega, limit, band_dist, head_m, max_le
         return zero, [], {**info, "pairs": 0, "solves": 0, "seconds": 0.0}      # no pair, no order: all zero is the optimum
     J = sorted({(x, y) for rs in at.values() for x in rs for y in rs if x < y})              # roads that share an end node
     O = [(x, y) if omega[x] > omega[y] else (y, x) for x, y in J
-         if omega is not None and beta[x] == beta[y] and omega[x] != omega[y]]
+         if omega is not None and omega[x] is not None and omega[y] is not None and beta[x] == beta[y] and omega[x] != omega[y]]
 
     # variables: b_r = column r; then the casing parts (three for a long road, one for a short road); the slacks of the stages 1-3 come after
     part, ncol, casing = [], n, []                             # part[r]: "s" / "m" / "e" -> column; casing: (road, column) of every casing part
@@ -162,6 +162,12 @@ def _solve_intervals(metres, ends, beta, omega, limit, band_dist, head_m, max_le
                 for p, node in (("s", ends[y][0]), ("e", ends[y][1])):
                     if node == v:
                         le([(part[y][p], 1.0), (x, -1.0)], 0.0)
+    if min_positions:                                          # section 7.3.1: H above and L below every number; the span H - L is in the cost
+        H, Lo, first_nv = ncol, ncol + 1, ncol
+        for v in range(first_nv):
+            le([(v, 1.0), (H, -1.0)], 0.0)                     # x_v <= H
+            le([(Lo, 1.0), (v, -1.0)], 0.0)                    # L <= x_v
+        ncol += 2
     base = len(rhs)
     for u, l in pair_list:
         le([(l, 1.0), (part[u]["m"], -1.0)], -margin)         # H3: b_l + margin <= a_(u, main)
@@ -174,6 +180,9 @@ def _solve_intervals(metres, ends, beta, omega, limit, band_dist, head_m, max_le
     for r, v in casing:
         cost[r] += 1.0
         cost[v] -= 1.0
+    if min_positions:
+        w4 = float(cost[cost > 0].sum() * 2 * max_level + 1)   # W4 > the whole range of T3
+        cost[H], cost[Lo] = w4, -w4
 
     def solve(c, A, bu, lo_hi):
         res = linprog(c, A_ub=A, b_ub=bu, bounds=lo_hi, method="highs-ipm", options={"time_limit": limit})
@@ -222,7 +231,7 @@ def _solve_intervals(metres, ends, beta, omega, limit, band_dist, head_m, max_le
 
 
 def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tunnel",
-                   method="solve", band_col=None, order=None, highway_col="highway", band_dist=10.0, head_m=5.0, max_level=20, margin=1.0, time_limit=60.0):
+                   method="solve", band_col=None, order=None, highway_col="highway", band_dist=10.0, head_m=5.0, max_level=20, margin=1.0, time_limit=60.0, min_positions=True):
     """A copy of ``edges`` with the drawing-order columns ``casing_start``, ``casing_level`` (the main part), ``casing_end`` and ``fill_level``;
     ``render_edges(casing_level_col=..., fill_level_col=...)`` draws by the last two (the heads are not drawn yet).
 
@@ -236,7 +245,8 @@ def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tu
     * ``order`` (a column of numbers, or ``"class"`` for the renderer's class order): where roads meet, the one with the higher number has the later fill
       where the other constraints allow; this is a wish, not a requirement.
     ``max_level``: the numbers are in ``[-max_level, max_level]``; ``margin``: how much later a road is painted where one must be painted after another
-    (only the order matters: it changes the scale); ``time_limit``: seconds for each LP solve.
+    (only the order matters: it changes the scale); ``time_limit``: seconds for each LP solve; ``min_positions``: also minimise the span of the numbers (fewer positions, a little
+    less compaction; section 7.3.1); False leaves it out.
     Results beyond the columns: ``result.attrs["levels_given_up"]`` = ``[(upper index, lower index)]`` (also warned about),
     ``result.attrs["levels_info"]`` = counts, order violations, solver status, seconds.
     ponytail: tags method ignores crossings without tags and band / order; solve method does not cut a road at the place where it changes level."""
@@ -278,18 +288,16 @@ def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tu
         else:
             beta = [_level(r, layer_col, bridge_col, tunnel_col) for r in head.to_dict("records")]
         omega = None
-        if order == "class":
-            if g[highway_col].isna().any():
-                raise ValueError(f"compute_levels: order='class' needs a road class in {highway_col!r}; null in rows {list(g.index[g[highway_col].isna()][:5])}")
-            z = {h: _class_order(h) for h in head[highway_col].unique()}
-            omega = head[highway_col].map(z).tolist()
+        if order == "class":                                   # a road with no class takes no part in the order: no wish for it (None)
+            z = {h: _class_order(h) for h in head[highway_col].dropna().unique()}
+            omega = [None if pd.isna(h) else z[h] for h in head[highway_col]]
         elif order:
-            omega = pd.to_numeric(head[order], errors="coerce").fillna(0.0).astype(float).tolist()
+            omega = [None if pd.isna(v) else float(v) for v in pd.to_numeric(head[order], errors="coerce")]
         gm = g.geometry
         if g.crs is not None and g.crs.is_geographic:
             gm = g.to_crs(g.estimate_utm_crs()).geometry
         rm, re_ = list(gm.iloc[first]), [ends[i] for i in first]
-        iv, given, info = _solve_intervals(rm, re_, beta, omega, time_limit, band_dist, head_m, max_level, margin)
+        iv, given, info = _solve_intervals(rm, re_, beta, omega, time_limit, band_dist, head_m, max_level, margin, min_positions)
         counts = defaultdict(int)                              # the solution can sit at any height: the main casing number most rows have becomes 0 (the ground)
         for r in rid:
             counts[iv[r][1]] += 1
@@ -306,5 +314,5 @@ def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tu
             warnings.warn(f"compute_levels: {len(given)} stack pair(s) could not be satisfied; see result.attrs['levels_given_up']", stacklevel=2)
     g["casing_start"], g["casing_level"], g["casing_end"], g["fill_level"] = ([p[i] for p in pos] for i in (0, 1, 2, 3))
     from .levels_store import levels_params
-    g.attrs["levels_params"] = levels_params(method, head_m, band_dist, margin, max_level, band_col, order)       # what the numbers were computed with (save_levels stores it)
+    g.attrs["levels_params"] = levels_params(method, head_m, band_dist, margin, max_level, band_col, order, min_positions and method == "solve")       # what the numbers were computed with (save_levels stores it)
     return g

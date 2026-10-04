@@ -1510,15 +1510,18 @@ def test_levels_are_saved_in_a_visualization_schema_and_read_back():
 
 def test_render_computes_the_positions_itself_and_refuses_what_is_gone():
     """No level columns: render_edges computes them (the solver, class order) and draws by them; order_col is refused;
-    a null road class stops the class order with a message, it is not drawn another way."""
+    a road with no class takes no part in the class order (docs/design/levels_split_casing.md, section 8)."""
     g = _tunnel_world(True)
     style = _style(render_edges(g, backend="web").html)
     assert [p["properties"]["__rs_cl"] for p in style["sources"]["roads"]["data"]["features"]][3] > [
         p["properties"]["__rs_cl"] for p in style["sources"]["roads"]["data"]["features"]][1]       # the crossing street over the tunnel
     with pytest.raises(ValueError, match="order_col"):
         render_edges(g, backend="web", order_col="o")
-    with pytest.raises(ValueError, match="road class"):
-        compute_levels(g.assign(highway=[None, "primary", "primary", "residential"]), method="solve", order="class")
+    a, b, c = (18.000, 59.30), (18.001, 59.30), (18.001, 59.301)                 # a primary and a service road meet at b: the primary road is painted later
+    pair = gpd.GeoDataFrame({"highway": ["primary", "service"]}, geometry=[LineString([a, b]), LineString([b, c])], crs=4326)
+    assert compute_levels(pair, method="solve", order="class").attrs["levels_info"]["order_pairs"] == 1
+    none = compute_levels(pair.assign(highway=["primary", None]), method="solve", order="class")      # a road with no class: no wish for it
+    assert none.attrs["levels_info"]["order_pairs"] == 0
 
 
 def test_stage_0_flow_has_the_optimum_of_the_lp():
@@ -1565,3 +1568,47 @@ def test_the_example_of_the_design_document_7_5_1():
     A = sp.csr_matrix(([1.0, -1.0, 1.0, -1.0, 1.0, -1.0], ([0, 0, 1, 1, 2, 2], [0, 1, 2, 3, 3, 0])), shape=(3, 4))      # variables a_u, b_u, a_l, b_l
     x = _difference_lp(np.array([-1.0, 1.0, -1.0, 1.0]), A, np.array([0.0, 0.0, -1.0]), 40)
     assert x.tolist() == [1.0, 1.0, 0.0, 0.0]
+
+
+def test_min_positions_keeps_the_requirements_and_never_uses_more_positions():
+    """docs/design/levels_split_casing.md, 7.3.1: the span term has a lower priority than a stack or an order wish, so nothing more is given up; the positions are never more than
+    without it; stage 0 is still a flow; the option is part of the stored parameters; the slack stages work with it."""
+    import warnings as _w
+
+    import numpy as np
+    from shapely.geometry import LineString as LS
+
+    cols = ("casing_start", "casing_level", "casing_end", "fill_level")
+    for seed in range(4):
+        r = np.random.default_rng(seed)
+        pts = r.random((60, 2)) * 0.004 + [18.0, 59.3]
+        g = gpd.GeoDataFrame({"highway": r.choice(["primary", "residential", "service", "secondary"], 60), "layer": r.choice([None, "1", "-1", "2"], 60, p=[.6, .15, .15, .1])},
+                             geometry=[LS([pts[i], pts[(i * 7 + 3) % 60]]) for i in range(60)], crs=4326)
+        a, b = compute_levels(g, order="class", min_positions=False), compute_levels(g, order="class")        # the option is on by default
+        assert len({v for c in cols for v in b[c]}) <= len({v for c in cols for v in a[c]})
+        assert b.attrs["levels_info"]["solver"] == "flow" and not b.attrs["levels_given_up"]
+        assert b.attrs["levels_info"]["order_violations"] == a.attrs["levels_info"]["order_violations"] == 0
+    assert b.attrs["levels_params"]["min_positions"] is True and a.attrs["levels_params"]["min_positions"] is None
+    assert compute_levels(g, method="tags").attrs["levels_params"]["min_positions"] is None            # it does not apply to the tags method
+    d = 0.001
+    rows = [LS([(18 - 2 * d, 59), (18 + 2 * d, 59)]), LS([(18, 58.998), (18, 59.002)]),
+            LS([(18 - 2 * d, 58.998), (18 + 2 * d, 59.002)]), LS([(18 - 2 * d, 59.002), (18 + 2 * d, 58.998)])]       # four roads crossing at one point, as in test_compute_levels_lp_stages
+    cross = gpd.GeoDataFrame({"highway": ["primary"] * 4, "band": [0, 1, 2, 3]}, geometry=rows, crs=4326)
+    assert list(compute_levels(cross, band_col="band").fill_level) == [0, 1, 2, 3]
+    with _w.catch_warnings():
+        _w.simplefilter("ignore")
+        tight = compute_levels(cross, band_col="band", max_level=1)      # the range is too small: the slack stages, with the span term in stage 3
+    assert tight.attrs["levels_info"]["solves"] == 4 and len(tight.attrs["levels_given_up"]) == 1
+
+
+def test_stored_levels_remember_min_positions(tmp_path):
+    """save_levels / load_levels with the option: the stored parameters say it, and a reader that does not expect it is refused."""
+    duckdb = pytest.importorskip("duckdb")
+    g = _tunnel_world(True).assign(edge_id=[1, 2, 3, 4])
+    out = compute_levels(g, order="class")                                  # on by default
+    con = duckdb.connect(str(tmp_path / "x.duckdb"))
+    from roadstyle import load_levels, save_levels
+    save_levels(con, out)
+    assert len(load_levels(con, g, order="class")) == 4
+    with pytest.raises(ValueError, match="min_positions"):
+        load_levels(con, g, order="class", min_positions=False)

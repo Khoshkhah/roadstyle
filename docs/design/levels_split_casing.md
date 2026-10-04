@@ -200,10 +200,30 @@ subject to
     0 ≤ b_r, a_c ≤ 2L;      s_p, t_k ≥ 0
 ```
 
-This is one objective. The weights make it a strict priority: any solution with a smaller T1 is better than any with a larger T1 whatever T2 and T3 are; with equal T1, a smaller T2 wins; then T3.
+This is one objective (`T4` and `W4` below are there unless `min_positions=False`, section 7.3.1). The weights make it a strict priority: any solution with a smaller T1 is better than any with a larger T1 whatever T2 and T3 are; with equal T1, a smaller T2 wins; then T3.
 When nothing needs to be violated, `s = t = 0` and `Z = T3`: the stage 0 of section 7.5.
 
 The weights are of the order of 10¹⁴ on a large network, too large for a floating-point solver. The code therefore gets the same optimum in stages (section 7.5): the smallest T1; then the smallest T2 with T1 held; then the smallest T3 with both held.
+
+#### 7.3.1 Fewest positions (`min_positions`, on by default)
+
+A position is a value that some casing or fill number takes; the page has a set of layers for each position. Without a term for it, the number of positions is not minimised by the model above: only `T3` is. The option `min_positions` (**on by default**) adds a fourth term, the **span** of the numbers, which is a linear stand-in for the number of positions
+(the numbers are integers, so there are at most `span + 1` distinct values):
+
+```
+minimise    Z  =  W1 · T1  +  W2 · T2  +  W4 · T4  +  T3
+
+    T4  =  H − L                                          the span: the highest number minus the lowest
+    W4  =  ( Σ of the positive cost coefficients of T3 ) · 2L + 1       W4 · (one unit of T4) is more than the whole range of T3
+
+with two more variables H and L, and the rows
+    x_v  ≤  H      and      L  ≤  x_v          for every variable x_v (every fill and casing number)
+    0 ≤ H, L ≤ 2L
+```
+
+The priority is `T1`, then `T2`, then the span `T4`, then `T3`. So the option never gives up a stack or an order wish to save a position, but it does trade compaction (`T3`) for fewer positions: the casings may lie a little farther from their fills.
+The new rows have the form `x_i − x_j ≤ 0`, like all the others, so stage 0 is still a minimum-cost flow (section 7.5.1); `H` and `L` have supplies `+W4` and `−W4`, and the cost coefficients still sum to 0. In the stages 1–3 the term `W4 · T4` is part of the cost of stage 3 (`T3` is minimised together with it).
+The two variables are linked to every other variable. That can make the flow harder or easier: the time is about the same as without the term on most networks, a few times longer on some, and shorter on a very large one. `min_positions=False` leaves the term out: the model of 7.3 with `W4 = 0`.
 
 ### 7.4 Requirements, constraints and the terms of the objective
 
@@ -332,7 +352,7 @@ rs.compute_levels(edges, method="solve", band_col=None, order=None, band_dist=10
 | `edges` | GeoDataFrame of road lines (LineString), any CRS; both directions of a road may be present | always |
 | `band_col` | name of a column of integers (null = 0): the band of each road. If not given, the band is calculated from the tag columns below | optional |
 | `layer_col`, `bridge_col`, `tunnel_col` | names of the OSM tag columns (defaults `layer`, `bridge`, `tunnel`), read only when `band_col` is not given | optional |
-| `order` | name of a column of numbers, or `"class"` (the road-class order): the higher number wins where roads meet | optional |
+| `order` | name of a column of numbers, or `"class"` (the road-class order): the higher number wins where roads meet. A road with no number (null; for `"class"`, no `highway`) takes **no part in the order**: no wish is made for it, with any road | optional |
 | `highway_col` | name of the road-class column (default `highway`), read only for `order="class"` | optional |
 
 **Settings** (how it runs):
@@ -344,6 +364,7 @@ rs.compute_levels(edges, method="solve", band_col=None, order=None, band_dist=10
 | `head_m` | 5.0 | metres: the length of each head; a road shorter than `2 · head_m` is one head |
 | `max_level` | 20 | the range of the numbers: every casing and fill number is in `[0, 2 · max_level]` before the shift to the ground. A stack deeper than `2 · max_level / margin + 1` positions cannot be satisfied: the extra pairs are given up |
 | `margin` | 1.0 | `δ`: how much later a road must be painted where one must be painted after another. Only the order of the numbers matters, so it changes the scale and nothing else (with the range: the number of positions that fit). Must be greater than 0 |
+| `min_positions` | True | the span term of 7.3.1: fewer positions (layers) in the page, a little less compaction; `False` leaves it out |
 | `time_limit` | 60 | seconds for each LP solve |
 
 ### Output
@@ -502,9 +523,9 @@ schema `visualization` holds layers computed for drawing.
 | Table | Columns | Content |
 |---|---|---|
 | `visualization.edge_levels` | `edge_id` BIGINT, `casing_start`, `casing_level`, `casing_end`, `fill_level` (INTEGER) | one row for every edge, keyed by the content hash `edge_id` |
-| `visualization.edge_levels_meta` | one row: `method`, `head_m`, `band_dist`, `margin`, `max_level`, `band_source`, `order_source`, `n_edges`, `edge_hash`, `roadstyle_version`, `created` | what the numbers were computed with |
+| `visualization.edge_levels_meta` | one row: `method`, `head_m`, `band_dist`, `margin`, `max_level`, `band_source`, `order_source`, `min_positions`, `n_edges`, `edge_hash`, `roadstyle_version`, `created` | what the numbers were computed with |
 
-`band_source` is `"tags"` or the name of the `band_col`; `order_source` is the `order` argument (a column name, `"class"`, or null).
+`band_source` is `"tags"` or the name of the `band_col`; `order_source` is the `order` argument (a column name, `"class"`, or null); `min_positions` is true, or empty when it was off.
 
 ```python
 levels = rs.compute_levels(roads, method="solve", order="class")        # roads: one row per edge_id, with the edges of all modes
@@ -534,7 +555,7 @@ table  = rs.load_levels(con, order="class")                              # witho
   separate bridge layers. A road class now acts only through `order="class"` in the solver. `band_col` stays as an *input of the solver* (section 2), not as a drawing rule. `cap_col` stays.
 - **scipy** and **ortools** are core dependencies of roadstyle (no extra).
 - **3D (`view_3d`).** The extruded decks follow the bridge tags. Below `flat_below` the bridge is its flat line, drawn at its positions; from `flat_below` up that flat line (its casing layer and the bridge edges in the position layers) is hidden and the deck is shown.
-- **Errors, no silent fallback.** A null `highway` with `order="class"` raises a `ValueError` naming the rows. If the solver finds no solution in `time_limit`, `compute_levels` raises (as in section 7.5); `render_edges` does not draw by another rule.
+- **Errors, no silent fallback.** If the solver finds no solution in `time_limit`, `compute_levels` raises (as in section 7.5); `render_edges` does not draw by another rule.
 - **`tiles=True`** works with positions (section 12.1).
 - **Time.** Computing the positions takes long on a large network. It should be computed once with `compute_levels`, saved with `save_levels`, and drawn with the columns.
 
