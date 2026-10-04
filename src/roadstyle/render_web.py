@@ -662,9 +662,9 @@ def _part(xy, cum, a, b):
 
 
 def _casing_parts(geo, head_m, cols):
-    """The casing of every edge as pieces, for its own source (docs/design/levels_split_casing.md): an edge at least ``2 * head_m`` metres long whose
+    """The casing of every edge as pieces, for its own source (docs/design/levels_split_casing.md): an edge whose
     three casing numbers (``__rs_cs`` start head, ``__rs_cl`` main, ``__rs_ce`` end head) are not all equal is cut into the first ``head_m`` metres,
-    the middle and the last ``head_m`` metres, each with its own ``__rs_cl``; any other edge is one piece. A piece carries the properties the casing
+    the middle and the last ``head_m`` metres, each with its own ``__rs_cl`` (a road shorter than ``2 * head_m``: two halves, docs/design/short_road_heads.md); any other edge is one piece. A piece carries the properties the casing
     layers read (``__rs_*`` except the fills, ``cols``, ``lvl``) and ``__rs_road``, the id of its edge."""
     import numpy as np
     keep = {c for c in cols if c} | {"lvl"}
@@ -684,13 +684,14 @@ def _casing_parts(geo, head_m, cols):
         xy = np.column_stack(xy)
         cum = _cum_lengths(xy)
         n = float(cum[-1])
-        cuts = [(0.0, n, cm)] if n < 2 * head_m else [(0.0, head_m, cs), (head_m, n - head_m, cm), (n - head_m, n, ce)]
+        h = min(head_m, n / 2)          # a short road is two halves, one at each head's number (docs/design/short_road_heads.md)
+        cuts = [(0.0, h, cs), (h, n - h, cm), (n - h, n, ce)]
         for k, (a, b, num) in enumerate(cuts):
             pts = _part(xy, cum, a, b)
             if len(pts) < 2 or not (np.diff(pts, axis=0) != 0).any():
                 continue
             coords = np.column_stack([np.round(pts[:, 0] / kx + lon0, 7), np.round(pts[:, 1] / ky + lat0, 7)]).tolist()
-            flat = {"__rs_cap": True} if len(cuts) == 3 and k == 1 else {}        # the main piece ends at two cuts: flat ends (a round end would reach into the heads)
+            flat = {"__rs_cap": True} if k == 1 else {}        # the main piece ends at two cuts: flat ends (a round end would reach into the heads)
             out.append({"type": "Feature", "properties": {**base, "__rs_cl": num, **flat}, "geometry": {"type": "LineString", "coordinates": coords}})
     return out
 

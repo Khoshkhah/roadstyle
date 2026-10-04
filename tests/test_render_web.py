@@ -1360,12 +1360,12 @@ def test_compute_levels_reversed_twin_has_its_heads_the_other_way_round():
 
 def test_divided_casing_is_drawn_as_head_and_main_pieces():
     """casing_start_col / casing_end_col / head_m: an edge >= 2 * head_m with unequal casing numbers is cut into three casing pieces (first head_m metres,
-    middle, last head_m metres), each at its own number, in their own source; the fill stays one line; a short or equal-numbered edge is one piece."""
+    middle, last head_m metres), each at its own number, in their own source; the fill stays one line; a short edge is two halves, one at each head's number; an equal-numbered edge is one piece."""
     d = 0.001
     g = gpd.GeoDataFrame({"highway": ["residential"] * 3, "cs": [-1, 0, -1], "cm": [0, 0, 0], "ce": [-2, 0, -2], "fl": [0, 0, 0]},
                          geometry=[LineString([(18, 59), (18 + d, 59)]),                    # about 57 m: long, numbers differ -> three pieces
                                    LineString([(18, 59.01), (18 + d, 59.01)]),             # long, numbers equal -> one piece
-                                   LineString([(18, 59.02), (18 + 0.00005, 59.02)])],      # about 3 m: shorter than 2 * head_m -> one piece
+                                   LineString([(18, 59.02), (18 + 0.00005, 59.02)])],      # about 3 m: shorter than 2 * head_m, numbers differ -> two halves
                          crs=4326)
     html = render_edges(g, backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0).html
     style = _style(html)
@@ -1373,7 +1373,8 @@ def test_divided_casing_is_drawn_as_head_and_main_pieces():
     by = {}
     for f in parts:
         by.setdefault(f["properties"]["__rs_road"], []).append(f)
-    assert [len(by[i]) for i in (0, 1, 2)] == [3, 1, 1]
+    assert [len(by[i]) for i in (0, 1, 2)] == [3, 1, 2]
+    assert [f["properties"]["__rs_cl"] for f in by[2]] == [-1, -2]                    # a short road keeps both heads (short_road_heads.md)
     assert [f["properties"]["__rs_cl"] for f in by[0]] == [-1, 0, -2]                 # start head, main, end head
     lengths = [LineString(f["geometry"]["coordinates"]) for f in by[0]]
     assert abs(lengths[0].length * 111320 * math.cos(math.radians(59)) - 5.0) < 0.2 and abs(lengths[2].length * 111320 * math.cos(math.radians(59)) - 5.0) < 0.2

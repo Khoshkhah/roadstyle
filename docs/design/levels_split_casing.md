@@ -418,7 +418,7 @@ The fill is **one line per edge**, in the source `roads`, at its fill number. Th
 | Edge | Casing pieces |
 |---|---|
 | a LineString of length ≥ `2 · head_m` whose three casing numbers are not all equal | **three**: the first `head_m` metres at the start number, the middle at the main number, the last `head_m` metres at the end number |
-| a LineString shorter than `2 · head_m` | **one**, the whole edge, at the main number |
+| a LineString shorter than `2 · head_m` whose three numbers are not all equal | **two**: the first half at the start number, the second half at the end number (`short_road_heads.md`) |
 | a LineString whose three numbers are equal | **one**, the whole edge |
 | any other geometry | **one**, as it is |
 
