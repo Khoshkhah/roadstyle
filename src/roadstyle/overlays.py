@@ -24,7 +24,7 @@ class Overlay:
     data : a GeoDataFrame / GeoSeries (any CRS; reprojected to EPSG:4326) or a GeoJSON mapping
         (geometry, Feature, or FeatureCollection — assumed lon/lat). Feature ``properties`` are
         kept and shown in the click popup.
-    kind : ``"fill"`` | ``"line"`` | ``"circle"`` — defaults to auto-detect from the geometry.
+    kind : ``"fill"`` | ``"line"`` | ``"circle"`` | ``"text"`` — defaults to auto-detect from the geometry (``"text"`` is never detected).
     placement : ``"under"`` (below the roads — e.g. zone fills) or ``"over"`` (on top — e.g. POIs).
     color / opacity : the layer's paint colour and (kind-dependent) default opacity.
     outline : polygon outline colour (``fill`` only; defaults to ``color``).
@@ -37,6 +37,8 @@ class Overlay:
         with the id of the feature's edge (the ids of the roads' ``edge_id_col``), ``order_col`` the property with its order (whole
         number, lower first), ``color_col`` a property with a colour per feature. Each feature is drawn at the position of its edge's
         fill number, after the fills, by order; ``placement`` is not used.
+    style / width_m / dash / min_zoom / max_zoom / text_col / text_size / text_color / text_halo : the look (docs/design/overlay_styles.md): ``style`` names a style that the caller
+        passes in ``settings=`` (``config.overlays.styles``; roadstyle ships none), the other fields are its fields as arguments, which win over the style.
     tooltip : property fields to show in a HOVER tooltip (independent of ``popup``, exactly like
         the road layer's ``tooltip`` vs ``road_popup``). ``None``/``[]`` = hover only highlights.
     """
@@ -55,6 +57,15 @@ class Overlay:
     edge_col: str | None = None        # the property with the id of the feature's edge: drawn at its edge's fill number (docs/design/edge_overlays.md)
     order_col: str | None = None       # with edge_col: the property with the feature's order (whole number, lower first; null = 0)
     color_col: str | None = None       # the property with a CSS colour per feature (null / missing: ``color``)
+    style: str | None = None           # the name of a style in the settings ``config.overlays.styles`` (docs/design/overlay_styles.md); an argument given here wins over its field
+    width_m: float | None = None       # a line's (or outline's) width in METRES, exact from ``min_zoom`` on; replaces ``width``
+    dash: list | None = None           # a line's dash pattern, in line widths: [3, 3]
+    min_zoom: float | None = None      # the zooms in which the overlay is drawn
+    max_zoom: float | None = None
+    text_col: str | None = None        # ``kind="text"``: the property that holds the text
+    text_size: float | None = None     # px
+    text_color: str | None = None
+    text_halo: str | None = None       # the halo colour (none if absent)
 
 
 def to_fc(data) -> dict:

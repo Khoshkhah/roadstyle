@@ -98,8 +98,8 @@ def render_edges(
         call_args = {k: v for k, v in locals().items()
                      if k not in ("gdf", "settings", "kwargs", "_s", "_use")}
         prev = list(_s._EXTRA)
-        _use(*prev, settings)
         try:
+            _use(*prev, settings)
             return render_edges(gdf, settings=None, **call_args, **kwargs)
         finally:
             _use(*prev)

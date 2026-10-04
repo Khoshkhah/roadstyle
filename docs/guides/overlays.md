@@ -56,6 +56,27 @@ the edge overlays by order, the one-way arrows, the street names. So a sign is o
 A feature whose edge id is not among the roads is an error that lists the ids; nothing is drawn at a default place. A click on an edge overlay wins over the roads, like an `"over"` overlay.
 Design: [Overlays attached to edges](../design/edge_overlays.md).
 
+### The look: overlay styles
+
+An overlay can name a **style**, and roadstyle applies the style it finds in the settings. roadstyle ships none: a library defines them in its own **theme** and passes them in `settings=`.
+
+```python
+settings = {"config": {"overlays": {"styles": {
+    "dashed":      {"kind": "line", "color": "#ffffff", "width_m": 0.12, "dash": [3, 3], "min_zoom": 16},
+    "street_name": {"kind": "text", "text_col": "name", "text_size": 12, "text_halo": "#ffffff", "min_zoom": 14}}}}}
+rs.render_edges(roads, settings=settings, overlays=[rs.Overlay(markings, style="dashed"), rs.Overlay(names, style="street_name")])
+```
+
+`settings=` is a dict or the **address of a JSON or YAML file** (`.yaml`, `.yml`) of the same shape (`render_edges(roads, settings="lanestyle_theme.yaml", ...)`); a file that is missing or cannot be read is an error that names it.
+
+Fields of a style (an argument given to `Overlay` wins): `kind` (`fill`, `line`, `circle`, `text`), `color`, `opacity`, `outline`, `radius`, `width` (px), **`width_m`** (a width in metres, exact from `min_zoom` on),
+**`dash`**, **`min_zoom`** / **`max_zoom`**, and for text `text_col`, `text_size`, `text_color`, `text_halo`. Design: [Overlay styles](../design/overlay_styles.md).
+
+### The road without its fill
+
+Three uses: roadstyle alone draws the casing and the fill of each road; a library that adds items (markings, signs) keeps both and attaches the items; a library that draws the fill itself (lanes, dash lines, connectors)
+draws **the casing of the road and not its fill**: `render_edges(edges, road_fill=False, overlays=[...])`. The road's own fill stays in the page, invisible, so a click or a hover still finds the road.
+
 ## The Layers control
 
 Each overlay gets a checkbox in the **Layers** control, at the bottom-right above the base-map

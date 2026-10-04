@@ -1065,8 +1065,42 @@ def _ov_hl(base, hc, sc, interactive):
             base]
 
 
-def _overlay_layers(sid, ov, kind, hover_color="#b388ff", select_color="#7c4dff"):
-    """The MapLibre layer spec(s) for one overlay source: a fill (+ outline), a circle, or a line.
+def _styled(ov):
+    """The overlay with the fields of its ``style`` (``config.overlays.styles`` of the settings) filled in where it gives none (docs/design/overlay_styles.md)."""
+    if not ov.style:
+        return ov
+    import dataclasses
+    styles = (CONFIG.overlays or {}).get("styles") or {}
+    if ov.style not in styles:
+        raise ValueError(f"overlay style {ov.style!r} is not in the settings (config.overlays.styles); known: {sorted(styles)}")
+    fields = {f.name for f in dataclasses.fields(type(ov))} - {"data", "style", "edge_col", "order_col"}
+    bad = set(styles[ov.style]) - fields
+    if bad:
+        raise ValueError(f"overlay style {ov.style!r}: unknown field(s) {sorted(bad)}; the fields are {sorted(fields)}")
+    return dataclasses.replace(ov, **{k: v for k, v in styles[ov.style].items() if getattr(ov, k) is None})
+
+
+def _wm_width_expr(min_zoom):
+    """A line width in px for the metre width baked in ``__rs_wm``: exact from ``min_zoom`` (default 0) to 22, because the width doubles with each zoom (base-2 interpolation)."""
+    e = ["interpolate", ["exponential", 2], ["zoom"]]
+    for z in sorted({max(float(min_zoom or 0), 0.0), 22.0}):
+        e += [z, ["*", ["get", "__rs_wm"], round(512 * 2 ** z / 40075016.686, 6)]]
+    return e
+
+
+def _bake_wm(fc, width_m):
+    """``__rs_wm`` on every feature: the width in metres over cos(latitude), at the feature's first point (as ``_mark_width_m`` does for the roads)."""
+    def first(c):
+        while isinstance(c, (list, tuple)) and c and isinstance(c[0], (list, tuple)):
+            c = c[0]
+        return c
+    for ft in fc["features"]:
+        pt = first((ft.get("geometry") or {}).get("coordinates") or [0, 0])
+        ft.setdefault("properties", {})["__rs_wm"] = float(width_m) / max(math.cos(math.radians(pt[1])), 0.01)
+
+
+def _overlay_layers(sid, ov, kind, hover_color="#b388ff", select_color="#7c4dff", along=True):
+    """The MapLibre layer spec(s) for one overlay source: a fill (+ outline), a circle, a line or a text (``along``: the text follows a line).
 
     Interactive overlays (those with a popup) recolour on hover / select via feature-state, the same
     way roads do, so the hovered / clicked feature highlights."""
@@ -1077,27 +1111,39 @@ def _overlay_layers(sid, ov, kind, hover_color="#b388ff", select_color="#7c4dff"
     if ov.color_col:                                  # a colour per feature (null / missing: the overlay's)
         base = ["coalesce", ["get", ov.color_col], base]
     width = C["width"] if ov.width is None else ov.width
+    if ov.width_m is not None:                        # a width in metres, baked in __rs_wm by _build_overlays
+        width = _wm_width_expr(ov.min_zoom)
     radius = C["radius"] if ov.radius is None else ov.radius
     op = ov.opacity
     interactive = ov.popup is None or bool(ov.popup)
     col = _ov_hl(base, hover_color, select_color, interactive)
     lay = {"visibility": "visible" if getattr(ov, "visible", True) else "none"}
+    dash = {"line-dasharray": [float(x) for x in ov.dash]} if ov.dash else {}
+    zooms = {**({"minzoom": float(ov.min_zoom)} if ov.min_zoom is not None else {}), **({"maxzoom": float(ov.max_zoom)} if ov.max_zoom is not None else {})}
+    if kind == "text":
+        if not ov.text_col:
+            raise ValueError("an overlay of kind 'text' needs text_col (the property that holds the text)")
+        return [{"id": f"{sid}-text", "type": "symbol", "source": sid, **zooms,
+                 "layout": {**lay, "symbol-placement": "line-center" if along else "point", "text-field": ["get", ov.text_col],
+                            "text-font": ["Noto Sans Regular"], "text-size": ov.text_size or 12, "text-max-angle": 40, "text-padding": 2},
+                 "paint": {"text-color": ov.text_color or base,
+                           **({"text-halo-color": ov.text_halo, "text-halo-width": 1.5} if ov.text_halo else {})}}]
     if kind == "fill":
         return [
-            {"id": f"{sid}-fill", "type": "fill", "source": sid, "layout": dict(lay),
+            {"id": f"{sid}-fill", "type": "fill", "source": sid, "layout": dict(lay), **zooms,
              "paint": {"fill-color": col, "fill-opacity": C["fill_opacity"] if op is None else op}},
-            {"id": f"{sid}-outline", "type": "line", "source": sid, "layout": dict(lay),
-             "paint": {"line-color": ov.outline or base, "line-width": width,
+            {"id": f"{sid}-outline", "type": "line", "source": sid, "layout": dict(lay), **zooms,
+             "paint": {"line-color": ov.outline or base, "line-width": width, **dash,
                        "line-opacity": C["outline_opacity"]}},
         ]
     if kind == "circle":
-        return [{"id": f"{sid}-circle", "type": "circle", "source": sid, "layout": dict(lay),
+        return [{"id": f"{sid}-circle", "type": "circle", "source": sid, "layout": dict(lay), **zooms,
                  "paint": {"circle-radius": radius, "circle-color": col,
                            "circle-opacity": C["circle_opacity"] if op is None else op,
                            "circle-stroke-color": C["circle_stroke"], "circle-stroke-width": 1}}]
-    return [{"id": f"{sid}-line", "type": "line", "source": sid,
-             "layout": {**lay, "line-cap": "round"},
-             "paint": {"line-color": col, "line-width": width,
+    return [{"id": f"{sid}-line", "type": "line", "source": sid, **zooms,
+             "layout": {**lay, "line-cap": "butt" if ov.dash else "round"},
+             "paint": {"line-color": col, "line-width": width, **dash,
                        "line-opacity": C["line_opacity"] if op is None else op}}]
 
 
@@ -1139,24 +1185,29 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
     so interactive features can take feature-state."""
     under, over, meta, edge = [], [], [], []
     for i, item in enumerate(overlays or []):
-        ov = item if isinstance(item, Overlay) else Overlay(data=item)
+        ov = _styled(item if isinstance(item, Overlay) else Overlay(data=item))
         fc = to_fc(ov.data)
         kind = ov.kind or detect_kind(fc)
         sid = f"ov{i}"
+        if ov.width_m is not None:
+            _bake_wm(fc, ov.width_m)
+        along = detect_kind(fc) != "circle"
+        if kind == "text":
+            style.setdefault("glyphs", "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf")
         base_filters = None
         if ov.edge_col:
             layers, base_filters = [], {}
             for pos, order in _edge_overlay(ov, fc, fills, edge_id_col):
                 flt = ["all", ["==", ["get", "__rs_fl"], pos], ["==", ["get", "__rs_ord"], order]]
                 mine = []
-                for lyr in _overlay_layers(sid, ov, kind, hover_color, select_color):
+                for lyr in _overlay_layers(sid, ov, kind, hover_color, select_color, along):
                     lyr = {**lyr, "id": f"{lyr['id']}-lv{pos}-o{order}", "filter": flt}
                     base_filters[lyr["id"]] = flt
                     mine.append(lyr)
                 edge.append((pos, order, i, mine))
                 layers += mine
         else:
-            layers = _overlay_layers(sid, ov, kind, hover_color, select_color)
+            layers = _overlay_layers(sid, ov, kind, hover_color, select_color, along)
             (under if ov.placement == "under" else over).extend(layers)
         style["sources"][sid] = {"type": "geojson", "data": fc, "generateId": True}
         # the topmost layer is the click target (fill body / circle / line)
@@ -1247,7 +1298,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
-           edge_id_col: str = "edge_id", band_col: str = None, cap_col: str = None, casing_level_col: str = None, fill_level_col: str = None, casing_start_col: str = None, casing_end_col: str = None, head_m: float = 5.0, directed_col: str = None,
+           edge_id_col: str = "edge_id", road_fill: bool = True, band_col: str = None, cap_col: str = None, casing_level_col: str = None, fill_level_col: str = None, casing_start_col: str = None, casing_end_col: str = None, head_m: float = 5.0, directed_col: str = None,
            width_m_col: str = None, width_m_zoom: float = 16, casing_m: float = 0.15,
            pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
@@ -1271,6 +1322,9 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     ``cap_col`` names a column: a true value draws that edge's casing and fill with **square** ends
     (butt caps) instead of round ones, where an edge is one piece of a longer road and meets its
     other piece (docs/design/square_ends.md). Null / false = round ends, as always.
+
+    ``road_fill=False`` draws each road's casing but not its fill: the road's own fill layers stay (so a click and a hover still find the road) but are invisible, and the things attached to
+    the roads with ``Overlay(edge_col=...)`` are the fill (docs/design/edge_overlays.md, "Three ways to use it").
 
     ``directed_col`` names a column saying whether an edge is a direction of travel of its own
     (true / null) or an undirected edge (false: a footway stored both ways, a one-way street's
@@ -1902,6 +1956,12 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
              "paint": {"line-color": "#6a0dad", "line-width": 2.5, "line-opacity": 0.9,
                        "line-dasharray": [3, 2]}})
 
+    if not road_fill:     # the casing of the road, not its fill: the fill layers stay for clicks and hovers, invisible
+        for lyr in style["layers"]:
+            if lyr["id"].startswith("roads-fill"):
+                lyr["paint"] = {**lyr["paint"], "line-opacity": 0}
+            elif lyr["id"].startswith("roads-ends-fill"):
+                lyr["paint"] = {**lyr["paint"], "circle-opacity": 0, "circle-stroke-opacity": 0}
     if edge_layers:       # the overlays attached to edges: after the fills of their position, before its arrows (docs/design/edge_overlays.md)
         style["layers"] = _place_edge_overlays(style["layers"], edge_layers, levels)
     style["layers"] += over_layers             # caller overlays drawn on top of the roads (e.g. POIs)

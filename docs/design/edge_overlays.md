@@ -8,6 +8,15 @@ the things of its own road.
 
 The roads are drawn by their casing and fill numbers, position by position. An overlay **attached to edges** is drawn at the position of its edge's **fill number**, after the fills, in the order the data gives.
 
+## Three ways to use it
+
+1. **Roadstyle alone.** No extra input: roadstyle draws the casing and the fill of each road.
+2. **A library that adds items to the roads** (mapstyle). The roads keep their casing and fill, and the extra items (`Overlay` with `edge_col`) are drawn at the place of their road, over its fill.
+3. **A library that draws the fill itself** (lanestyle). roadstyle draws the **casing** of each road, and **not its fill** (`road_fill=False`): the lanes, dash lines, connectors and other items attached to the road with `edge_col` and `order_col` are the fill.
+
+With `road_fill=False` the road's own fill layers stay in the page but are invisible (opacity 0, the end caps' fills too), so that a click or a hover still finds the road, and the tunnel and bridge looks of the road's fill are not drawn.
+The road's casing, its position and its heads are unchanged: it is a solid band under the items. A road drawn wider than its items shows the band around them.
+
 ## The data
 
 An overlay is a table of features (lines, polygons or points). Two columns make it attached to edges:

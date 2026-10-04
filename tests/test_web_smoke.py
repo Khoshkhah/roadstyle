@@ -270,3 +270,49 @@ def test_rsfilter_reaches_the_arrows_and_street_names(tmp_path):
     assert errors == []
     assert not any("__rs_road" in f for f in before) and all("__rs_road" in f for f in after)
     assert reset == before
+
+
+def test_a_road_without_its_fill_is_still_found_by_a_click(tmp_path):
+    """road_fill=False: the fill layers are invisible but still query the road, so a click and a hover find it (docs/design/edge_overlays.md)."""
+    from roadstyle.render_web import render
+
+    path = tmp_path / "nofill.html"
+    render(_edges(), basemap="blank", road_fill=False).save(path)
+    errors = []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && window.map.loaded() && window.map.querySourceFeatures('roads').length > 0", timeout=30_000)
+        found = page.evaluate("map.queryRenderedFeatures({layers: PICK_LAYERS.filter(id => map.getLayer(id))}).length")
+        browser.close()
+    assert errors == [] and found > 0
+
+
+def test_a_page_with_overlay_styles_boots(tmp_path):
+    """docs/design/overlay_styles.md: a metre-wide line, a dashed line and a text overlay, from a theme passed in settings=, boot without errors and are in the style."""
+    import geopandas as gpd
+    from shapely.geometry import LineString
+
+    from roadstyle import Overlay, render_edges
+
+    g = _edges().assign(edge_id=range(100, 140))
+    over = gpd.GeoDataFrame({"edge_id": [100, 101], "label": ["A", "B"]}, geometry=[LineString([(18.0, 59.3), (18.0, 59.3008)]), LineString([(18.001, 59.3), (18.001, 59.3008)])], crs=4326)
+    theme = {"config": {"overlays": {"styles": {
+        "divider": {"kind": "line", "color": "#ffffff", "width_m": 0.5, "min_zoom": 12},
+        "dashed": {"kind": "line", "color": "#222222", "width_m": 0.5, "dash": [3, 3], "min_zoom": 12},
+        "name": {"kind": "text", "text_col": "label", "text_size": 12}}}}}
+    path = tmp_path / "styles.html"
+    render_edges(g, backend="web", basemap="blank", settings=theme, road_fill=False,
+           overlays=[Overlay(over, edge_col="edge_id", style=s, label=s, popup=[]) for s in ("divider", "dashed", "name")]).save(path)
+    errors = []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && window.map.querySourceFeatures('roads').length > 0", timeout=30_000)
+        have = page.evaluate("RS_OVERLAYS.map(o => o.layers.filter(id => map.getLayer(id)).length)")
+        browser.close()
+    assert errors == [] and all(n > 0 for n in have)

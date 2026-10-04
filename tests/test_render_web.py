@@ -1695,3 +1695,100 @@ def test_arrows_and_street_names_belong_to_an_edge(monkeypatch):
     assert two_way and all({s["__rs_road"], s["__rs_road2"]} == {0, 1} for s in two_way)       # the pair: its two twins
     one_way = [s for s in slots if s["name"] == "Side"]
     assert one_way and all(s["__rs_road"] == 2 and "__rs_road2" not in s for s in one_way)
+
+
+def test_road_fill_false_draws_the_casing_but_not_the_fill():
+    """docs/design/edge_overlays.md, three ways to use it: road_fill=False keeps the casing layers and makes the fill layers (and the end caps' fills) invisible; the default is unchanged."""
+    g = _edge_world()
+    on = _style(render_edges(g, backend="web").html)["layers"]
+    off = _style(render_edges(g, backend="web", road_fill=False).html)["layers"]
+    assert [lyr["id"] for lyr in on] == [lyr["id"] for lyr in off]                     # the same layers: the fills stay for clicks and hovers
+    for a, b in zip(on, off, strict=True):
+        if a["id"].startswith("roads-fill"):
+            assert b["paint"]["line-opacity"] == 0 and a["paint"].get("line-opacity") != 0
+        elif a["id"].startswith("roads-ends-fill"):
+            assert b["paint"]["circle-opacity"] == 0
+        else:
+            assert a == b                                                               # the casings, arrows, names: untouched
+    with_items = _style(render_edges(g, backend="web", road_fill=False, overlays=[Overlay(_edge_features([12]), edge_col="edge_id", kind="circle")]).html)
+    assert any(lyr["id"].startswith("ov0-circle-lv") for lyr in with_items["layers"])
+
+
+_STYLES = {"config": {"overlays": {"styles": {
+    "divider": {"kind": "line", "color": "#ffffff", "width_m": 0.12, "min_zoom": 16},
+    "dashed": {"kind": "line", "color": "#eeeeee", "width_m": 0.12, "dash": [3, 3], "min_zoom": 16, "max_zoom": 21},
+    "street_name": {"kind": "text", "text_col": "label", "text_size": 13, "text_color": "#444444", "text_halo": "#ffffff", "min_zoom": 14}}}}}
+
+
+def _line_overlay_data():
+    from shapely.geometry import LineString as LS
+    return gpd.GeoDataFrame({"edge_id": [11, 12], "label": ["Main", None]}, geometry=[LS([(18.0, 59.3), (18.002, 59.3)]), LS([(18.002, 59.3), (18.004, 59.3)])], crs=4326)
+
+
+def test_overlay_styles_come_from_the_settings_and_an_argument_wins():
+    """docs/design/overlay_styles.md: a style named in the settings fills the fields the overlay does not give; an argument of the Overlay wins; an unknown style or field is an error."""
+    g = _edge_world()
+    st = _style(render_edges(g, backend="web", settings=_STYLES, overlays=[Overlay(_line_overlay_data(), style="divider", label="d"), Overlay(_line_overlay_data(), style="divider", color="#ff0000", label="e")]).html)
+    lay = {lyr["id"]: lyr for lyr in st["layers"]}
+    assert lay["ov0-line"]["paint"]["line-color"][-1] == "#ffffff" and lay["ov1-line"]["paint"]["line-color"][-1] == "#ff0000"        # the argument wins (the last branch of the hover / select case)
+    assert lay["ov0-line"]["minzoom"] == 16.0
+    with pytest.raises(ValueError, match=r"not in the settings.*divider"):
+        render_edges(g, backend="web", settings=_STYLES, overlays=[Overlay(_line_overlay_data(), style="nope")])
+    with pytest.raises(ValueError, match="not in the settings"):
+        render_edges(g, backend="web", overlays=[Overlay(_line_overlay_data(), style="divider")])                        # roadstyle ships no styles
+    bad = {"config": {"overlays": {"styles": {"x": {"colour": "#fff"}}}}}
+    with pytest.raises(ValueError, match="unknown field"):
+        render_edges(g, backend="web", settings=bad, overlays=[Overlay(_line_overlay_data(), style="x")])
+
+
+def test_overlay_metre_width_dash_zoom_range_and_text():
+    """width_m is exact in metres from min_zoom (the width doubles with each zoom); dash and the zoom range are on the layer; kind text is a symbol layer along the line that reads text_col."""
+    st = _style(render_edges(_edge_world(), backend="web", settings=_STYLES, overlays=[
+        Overlay(_line_overlay_data(), style="divider", label="a"), Overlay(_line_overlay_data(), style="dashed", label="b"),
+        Overlay(_line_overlay_data(), style="street_name", label="c")]).html)
+    lay = {lyr["id"]: lyr for lyr in st["layers"]}
+    w = lay["ov0-line"]["paint"]["line-width"]
+    assert w[:3] == ["interpolate", ["exponential", 2], ["zoom"]] and w[3] == 16.0 and w[5] == 22.0 and w[4][1] == ["get", "__rs_wm"]
+    px = lambda z: 512 * 2 ** z / 40075016.686                                    # noqa: E731
+    assert abs(w[4][2] - px(16)) < 1e-6 and abs(w[6][2] - px(22)) < 1e-6 and abs(w[6][2] / w[4][2] - 64) < 1e-3          # exact: 64 times wider after 6 zooms
+    feats = st["sources"]["ov0"]["data"]["features"]
+    assert abs(feats[0]["properties"]["__rs_wm"] - 0.12 / math.cos(math.radians(59.3))) < 1e-9
+    dashed = lay["ov1-line"]
+    assert dashed["paint"]["line-dasharray"] == [3.0, 3.0] and dashed["layout"]["line-cap"] == "butt" and dashed["minzoom"] == 16.0 and dashed["maxzoom"] == 21.0
+    text = lay["ov2-text"]
+    assert text["type"] == "symbol" and text["layout"]["text-field"] == ["get", "label"] and text["layout"]["symbol-placement"] == "line-center"
+    assert text["paint"]["text-halo-color"] == "#ffffff" and text["layout"]["text-size"] == 13 and st["glyphs"]
+    with pytest.raises(ValueError, match="text_col"):
+        render_edges(_edge_world(), backend="web", overlays=[Overlay(_line_overlay_data(), kind="text")])
+
+
+def test_overlay_styles_work_for_overlays_attached_to_edges():
+    """Attached to edges, each style is drawn at the position of its edge: a dashed line, a text and a metre-wide line each get their layers per (fill number, order)."""
+    g = _edge_world()
+    data = _line_overlay_data().assign(order=[1, 3])
+    st = _style(render_edges(g, backend="web", road_fill=False, settings=_STYLES, overlays=[
+        Overlay(data, edge_col="edge_id", order_col="order", style="dashed", label="a"), Overlay(data, edge_col="edge_id", order_col="order", style="street_name", label="b")]).html)
+    ids = [lyr["id"] for lyr in st["layers"]]
+    assert any(i.startswith("ov0-line-lv") and "-o1" in i for i in ids) and any(i.startswith("ov1-text-lv") and "-o3" in i for i in ids)
+    one = next(lyr for lyr in st["layers"] if lyr["id"].startswith("ov0-line-lv"))
+    assert one["paint"]["line-dasharray"] == [3.0, 3.0] and one["filter"][0] == "all"
+
+
+def test_a_theme_can_be_a_file_and_an_unreadable_settings_file_is_an_error(tmp_path):
+    """settings= is a dict or the address of a JSON or YAML file with the same shape; a file that is missing or cannot be read is an error that names it, not skipped, and the settings stay as they were."""
+    yaml = pytest.importorskip("yaml")
+    path = tmp_path / "theme.json"
+    path.write_text(json.dumps(_STYLES))
+    ypath = tmp_path / "theme.yaml"
+    ypath.write_text(yaml.safe_dump(_STYLES))
+    for f in (path, ypath):
+        st = _style(render_edges(_edge_world(), backend="web", settings=str(f), overlays=[Overlay(_line_overlay_data(), style="divider")]).html)
+        assert any(lyr["id"] == "ov0-line" and lyr.get("minzoom") == 16.0 for lyr in st["layers"])
+    with pytest.raises(ValueError, match="settings file"):
+        render_edges(_edge_world(), backend="web", settings=str(tmp_path / "missing.json"))
+    for name, text in (("bad.json", "{not json"), ("bad.yaml", "- a\n- list"), ("worse.yml", "a: [unclosed")):
+        bad = tmp_path / name
+        bad.write_text(text)
+        with pytest.raises(ValueError, match=name):
+            render_edges(_edge_world(), backend="web", settings=str(bad))
+    render_edges(_edge_world(), backend="web")                                  # and the failed calls did not leave the settings changed

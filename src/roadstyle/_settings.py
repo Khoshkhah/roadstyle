@@ -48,6 +48,18 @@ def _read_json(path: Path) -> dict:
         return json.load(fh)
 
 
+def _read_settings(path: Path) -> dict:
+    """A settings file: YAML (``.yaml`` / ``.yml``) or JSON (anything else), a mapping."""
+    if path.suffix.lower() in (".yaml", ".yml"):
+        import yaml
+        with open(path, encoding="utf-8") as fh:
+            data = yaml.safe_load(fh)
+        if not isinstance(data, dict):
+            raise ValueError("a settings file holds a mapping")
+        return data
+    return _read_json(path)
+
+
 @lru_cache(maxsize=1)
 def data_dir() -> Path:
     """Filesystem path to the bundled ``roadstyle/data`` directory (shipped as package data)."""
@@ -93,9 +105,16 @@ _EXTRA: list = []
 
 def set_extra(*sources) -> None:
     """Replace the programmatic override sources (the :func:`roadstyle.use_settings` backing) and
-    drop caches so the next access sees them. ``None`` entries are ignored (reset with no args)."""
+    drop caches so the next access sees them. ``None`` entries are ignored (reset with no args).
+    A source that cannot be read raises, and the sources are left as they were."""
+    old = list(_EXTRA)
     _EXTRA[:] = [s for s in sources if s is not None]
-    refresh()
+    try:
+        refresh()
+    except Exception:
+        _EXTRA[:] = old
+        refresh()
+        raise
 
 
 def _merged_overrides() -> dict:
@@ -106,9 +125,9 @@ def _merged_overrides() -> dict:
             data = src
         else:
             try:
-                data = _read_json(Path(src))
-            except (OSError, ValueError):      # unreadable / malformed JSON → skip, don't crash
-                continue
+                data = _read_settings(Path(src))
+            except Exception as e:      # missing, not JSON / YAML, not a mapping: an error that names the file, never skipped silently
+                raise ValueError(f"settings file {src}: {e}") from e
         for name, value in (data.get("palettes") or {}).items():
             dst = merged["palettes"].setdefault(name, {})
             for cls, fields in (_norm_roads(value) or {}).items():

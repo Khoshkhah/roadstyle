@@ -74,7 +74,7 @@ from .stylers import (
 def use_settings(*sources) -> None:
     """Apply settings overrides from code — the in-process equivalent of a ``roadstyle.json``.
 
-    Each source is a path to a JSON file or a dict, in the same
+    Each source is a path to a JSON or YAML file (``.yaml`` / ``.yml``) or a dict, in the same
     ``{"palettes", "config", "selection", "roads"}`` layout as an override file (state only what
     changes; everything else keeps the bundled defaults + any discovered override files, which
     these sources outrank; later sources outrank earlier ones). Call with no arguments to drop

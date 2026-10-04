@@ -61,7 +61,7 @@ m.save("map.html")                        # m.html is the page as a string
 - Per-edge colours you computed: `color_table={edge_id: "#hex"}` (dict / Series / DataFrame).
 - Other useful keywords: `include=[...]` / `exclude=[...]` (road classes), `view_3d=True`,
   `tiles=True` (above ~50k edges), `boundary=geojson` (dashed outline),
-  `overlays=[rs.Overlay(gdf, placement="under"|"over", label=..., popup=[...])]`, attached to edges: `rs.Overlay(gdf, edge_col="edge_id", order_col="order")` (drawn at its edge's fill number, by order),
+  `overlays=[rs.Overlay(gdf, placement="under"|"over", label=..., popup=[...])]`, attached to edges: `rs.Overlay(gdf, edge_col="edge_id", order_col="order")` (drawn at its edge's fill number, by order), look from a library's theme: `rs.Overlay(gdf, style="dashed")` with `settings={"config": {"overlays": {"styles": {...}}}}` (`width_m`, `dash`, `min_zoom`, kind `text`), `render_edges(road_fill=False)` (the road's casing without its fill),
   `road_popup="panel"` (docked read-out instead of a popup), `arrows=`, `labels=`.
 - Ready-made pages: `rs.render_dashboard(edges, ...)` (query sidebar) and
   `rs.render_report(edges, ...)` (stats sidebar) and `rs.render_street_view(edges, ...)` (Google

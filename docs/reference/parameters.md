@@ -84,7 +84,7 @@ ignore it.
 | `offset_frac` | `0.28` | web | two-way lane offset, fraction of the road's pixel width; `0` = no lane split |
 | `width_frac` | `0.6` | web | each lane's width, fraction of the full road width |
 | `offset_zoom` | `15` | web | zoom where the two directions start to fan apart |
-| `settings` | `None` | all | a settings override (dict or path) for this call only ([levels](settings.md#settings-levels)) |
+| `settings` | `None` | all | a settings override for this call only: a dict, or the path of a JSON or YAML file; a file that cannot be read is an error ([levels](settings.md#settings-levels)) |
 
 ### Filtering
 
@@ -158,6 +158,7 @@ Returns a `WebMap` (web, `.save()`), a `folium.Map` (`.save()`) or a `lonboard.M
 | `layer_col` | `"layer"` | web | OSM `layer`; negative sinks an edge when there is no tunnel/bridge column |
 | `band_col` | `None` | web | a column of integers, the **band** of an edge for the solver that computes the positions (a sidewalk -1 under its street, a crossing 1 over it); null = the level from the tags. Ignored when the level columns are given |
 | `casing_start_col` / `casing_end_col` / `head_m` | `None` / `None` / `5.0` | web | with the level columns: the casing is divided into a start head, a main part and an end head. The two columns hold the casing numbers of the heads (the main number is `casing_level_col`); `head_m` is the length of each head in metres. An edge at least `2 · head_m` long whose three numbers differ is drawn as three casing pieces, each at its own number; the fill stays one line ([design](../design/levels_split_casing.md#9-the-renderer)) |
+| `road_fill` | `True` | web | `False`: draw the casing of each road but not its fill (the fill layers stay, invisible, for clicks); the items attached with `Overlay(edge_col=...)` are the fill |
 | `edge_id_col` | `"edge_id"` | web | the column with the id of each edge, the ids that an overlay's `edge_col` refers to |
 | `casing_level_col` / `fill_level_col` | `None` | web | two integer columns: the position in the drawing order of an edge's casing and of its fill (0 = ground); at each position casings first, then fills; one layer pair per position; the position alone decides (a bridge too). Not given: `render_edges` computes them with `rs.compute_levels(edges, method="solve", order="class")` ([guide](../guides/levels.md)) |
 | `cap_col` | `None` | web | a column of true / false: true draws the edge with square ends (butt caps) instead of round ones, for a road drawn in pieces that meet without a ring; null / false = round ends |
@@ -244,6 +245,11 @@ the `overlays` setting. See [Add your own layers](../guides/overlays.md).
 | `edge_col` | `None` | the property with the id of the feature's edge: the overlay is attached to edges, drawn at its edge's fill number (the guide: [Overlays](../guides/overlays.md#overlays-attached-to-edges)) |
 | `order_col` | `None` | with `edge_col`: the property with the feature's order (whole number, lower first; null = 0) |
 | `color_col` | `None` | the property with a colour per feature (null: `color`) |
+| `style` | `None` | the name of a style in the settings `config.overlays.styles` (a library's theme); its fields fill what the overlay does not give |
+| `width_m` | `None` | a line's width in metres, exact from `min_zoom` on (replaces `width`) |
+| `dash` | `None` | a line's dash pattern in line widths, `[3, 3]` |
+| `min_zoom` / `max_zoom` | `None` | the zooms in which the overlay is drawn |
+| `text_col` / `text_size` / `text_color` / `text_halo` | `None` | `kind="text"`: the property with the text, its size (px), colour and halo colour |
 
 ## Basemap
 

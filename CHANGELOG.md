@@ -4,6 +4,18 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.15.0] — 2026-10-04
+
+### Added
+- **`render_edges(road_fill=False)`**: the casing of each road, not its fill (the fill layers stay in the page, invisible, for clicks and hovers). The items attached with `Overlay(edge_col=, order_col=)` are then the fill: the use of a library that draws lanes,
+  dash lines and connectors itself. Design: `docs/design/edge_overlays.md`, *Three ways to use it*.
+
+- **Overlay styles**: an `Overlay` can name a `style` that a library passes in `settings=` (`config.overlays.styles`; roadstyle ships none) and has new fields: `width_m` (a width in metres, exact from `min_zoom`), `dash`, `min_zoom` / `max_zoom`, and
+  the kind `"text"` (`text_col`, `text_size`, `text_color`, `text_halo`), a text along a line or at a point. They work for overlays attached to edges too. Design: `docs/design/overlay_styles.md`.
+
+### Changed
+- **A settings file can be YAML** (`.yaml`, `.yml`; PyYAML is now a dependency) as well as JSON. **A settings file that cannot be read is an error**: `settings=` (and `use_settings`, and the files roadstyle finds itself) with a file that is missing, not JSON / YAML or not a mapping raised nothing before and was skipped; it now raises a `ValueError` that names the file, and the settings stay as they were.
+
 ## [0.14.0] — 2026-10-04
 
 ### Added
