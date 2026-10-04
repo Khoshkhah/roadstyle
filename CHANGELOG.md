@@ -4,7 +4,45 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.13.0] — 2026-10-03
+
+### Breaking (0.13.0)
+- **Position drawing is the only way the web map draws.** `render_edges(edges)` computes the two positions of every edge itself
+  (`compute_levels(method="solve", order="class")`) and draws by them; with `casing_level_col` / `fill_level_col` it draws your own numbers. The three bands
+  (below ground, ground, above), the class order as a drawing order, `order_col` (now a `ValueError`) and the separate bridge layers are gone.
+  `band_col` stays as an input of the solver. A bridge keeps its heavier black casing, a tunnel its faded, dashed look. See `docs/design/levels_split_casing.md`, section 12.
+- **scipy and ortools are core dependencies** (the solver); there is no `levels` extra.
+- **`compute_levels(method="solve")` is 2 to 9 times faster:** stage 0 is solved as a minimum-cost flow (OR-tools) instead of an LP with HiGHS; every row of the LP is `x_i - x_j <= c`, the dual of a flow.
+  Same optimum on the five reference networks (objectives 130, 1008, 868, 1608, 4786), same number of positions; where several optima exist the numbers can differ in about 2% of the cases. Vancouver driving 29 s to 6 s, Vancouver walking 345 s to 22 s, Estonia driving (738,655 edges) 1,085 s to 352 s; the preparation of the rows is vectorised. `levels_info["solver"]` says `flow` or `highs` (stages 1-3 and an uncertified stage 0 still use HiGHS).
+- **`tiles=True` carries the positions**: the archive holds the casing pieces and the twin end caps as tile layers (`casings`, `ends`) next to `roads` and `slots`, and the page reads them
+  from the one source (docs/design/levels_split_casing.md, 12.1). Monaco: 3.3 MB tiled against 2.3 MB inline. For a big network compute the positions once (`compute_levels`, `save_levels`).
+  Measured: 75,866 edges 6 s, 249,278 edges 22 s, 738,655 edges 352 s (7, 6 and 9 positions).
+- `compute_levels(order="class")` raises a `ValueError` for a null road class.
+
+### Added
+- **`rs.save_levels(con, levels)` / `rs.load_levels(con, edges, ...)`**: the result of `compute_levels` saved in a duckOSM file, in the new schema `visualization` (`edge_levels`: one row per `edge_id`; `edge_levels_meta`:
+  the parameters, the number of edges and a hash of the ids), and read back. Both calls are explicit; reading checks the parameters and the edges and raises an error that says what differs, it never recomputes silently.
+- **`rs.compute_levels(edges)`**: the `casing_level_col` / `fill_level_col` positions of every edge. The default `method="solve"` is the optimization (real variables, a margin `margin`, a range `max_level`,
+  slack variables for Stack and the order wish; stage 0 as a minimum-cost flow, HiGHS when a wish must be given up). It takes a band (`band_col`, else the tag level), a divided casing (`head_m`) and an order (`order`, a column or `"class"`);
+  pairs that cannot be satisfied are reported, not hidden. `method="tags"` is a closed-form rule on `layer` / `bridge` / `tunnel` and the shared nodes.
+  It returns `casing_start`, `casing_level` (main), `casing_end` and `fill_level`. The specification is `docs/design/levels_split_casing.md`; the guide is *Which road is on top*.
+
+### Changed
+- **The bridge look in position mode** (with `casing_level_col` / `fill_level_col`): a bridge edge is drawn with its heavier black casing and flat ends again, in an extra casing layer of its own casing
+  position (`roads-casing-bridge`, `-lv<p>`); the other casing layers leave bridge edges to it.
+- **Twin end caps with a divided casing:** the cap's casing ring is painted at the head number of the lane that ends there (`casing_start` / `casing_end`), and is hidden where another road at the node is painted below
+  that number; a pair drawn flat with `cap_col` gets no cap.
+- **The end caps of two-way pairs follow the positions** (with `casing_level_col` / `fill_level_col`): for each position, the caps' casing is drawn right before that position's casing layers and
+  their fill right before its fill layers (they were drawn before all positions and after all positions), and a cap hides its casing where a road at the node is painted below it by position.
+- **`casing_start_col` / `casing_end_col` / `head_m`: a divided casing.** The casing of each edge can be drawn as a start head, a main part and an end head, each at its own number, from its own source of pieces;
+  the fill stays one line; the main piece ends flat (butt caps, through the `cap_col` twin layers) so that its end cannot reach into the heads, the heads stay round. `compute_levels(method="solve")` returns `casing_start`, `casing_level` (main), `casing_end` and `fill_level`, with the heads swapped for the reversed direction of a road.
+- **One-way arrows and street names follow the positions too** (with `casing_level_col` / `fill_level_col`): one layer of each per position, right after
+  that position's fill layers, instead of tiers chosen by the `layer` tag and one name layer above everything. A tunnel's arrows were drawn under all road
+  layers in this mode; they are now above their own road.
+- **With `casing_level_col` / `fill_level_col` the position alone decides the drawing order, with no exception.** The class order
+  (`z_order`), the level (`layer`), `band_col` and `order_col` no longer order anything, and a bridge is drawn at its positions like
+  any road instead of in its own deck layers (it keeps its colours; the heavier black deck casing is not drawn; the 3D decks of `view_3d` still follow the tags).
+  Without the columns nothing changes.
 
 ## [0.12.0] — 2026-10-03
 
@@ -14,7 +52,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   position is drawn first, then every fill, so edges that share a node merge cleanly and an edge drawn at a higher position is over the
   lower one with its own casing. One casing layer and one fill layer (with the tunnel look and the dashed classes) for each position
   that occurs, in position order; position 0 keeps the layer ids; `rsColor` / colour-by reach every fill layer. They replace the three
-  bands for every edge but a bridge. Not with `tiles=True` (refused). Without the columns nothing changes.
+  bands for every edge but a bridge. Without the columns nothing changes.
 - **`cap_col`: square ends per edge** (docs/design/square_ends.md). A column of true / false: an edge with a true value is
   drawn with butt caps (casing and fill) instead of round ones, by a `-sq` twin of each band's casing and fill layer
   (`roads-casing-sq`, `roads-fill-sq`, `roads-low-*-sq`, `roads-high-*-sq`), because MapLibre sets `line-cap` per layer. For a road

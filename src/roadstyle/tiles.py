@@ -83,7 +83,7 @@ def _prep(fc: dict, class_col: str | None, keep: set | None, minzoom_table: dict
 def build_pmtiles(fc: dict, *, class_col: str, keep: set, minzoom_table: dict | None = None,
                   minzoom: int = 6, maxzoom: int = 15, extent: int = 4096,
                   buffer_px: int = 80, layer: str = "roads",
-                  extra_layers: list | None = None) -> bytes:
+                  extra_layers: list | None = None, line_layers: list | None = None) -> bytes:
     """Encode GeoJSON FeatureCollections (lon/lat) into a PMTiles archive (bytes).
 
     Feature ``id`` = index in ``fc["features"]`` — the exact id space ``generateId`` gives the
@@ -97,6 +97,9 @@ def build_pmtiles(fc: dict, *, class_col: str, keep: set, minzoom_table: dict | 
     tile layers in the same archive (e.g. the annotation slots). Their features are written
     WHOLE into every tile they touch, never clipped: MapLibre renders a symbol only in the tile
     that owns its anchor, so a duplicated small feature yields exactly one label.
+
+    ``line_layers``: ``[{"name", "fc", "keep"}]`` — further tile layers made exactly like the main one
+    (simplified per zoom, clipped to the tile): the casing pieces of a divided casing.
     """
     import mapbox_vector_tile
     from pmtiles.tile import Compression, TileType, zxy_to_tileid
@@ -104,6 +107,11 @@ def build_pmtiles(fc: dict, *, class_col: str, keep: set, minzoom_table: dict | 
     from shapely import clip_by_rect
 
     feats, world = _prep(fc, class_col, keep, minzoom_table)
+    lines = [(layer, feats)]
+    for ln in (line_layers or []):
+        lf, lw = _prep(ln["fc"], class_col, ln.get("keep"), minzoom_table)
+        world = [min(world[0], lw[0]), min(world[1], lw[1]), max(world[2], lw[2]), max(world[3], lw[3])]
+        lines.append((ln["name"], lf))
     extras = []          # (name, from_zoom, prepped features)
     for ex in (extra_layers or []):
         efeats, ew = _prep(ex["fc"], None, ex.get("keep"), None)
@@ -118,26 +126,27 @@ def build_pmtiles(fc: dict, *, class_col: str, keep: set, minzoom_table: dict | 
         tol = s / extent / 2                       # ~half a tile pixel
         pad = s * buffer_px / extent
         cells = {}                                 # (x, y) -> {layer_name: [feature rows]}
-        for i, geom, b, fmz, props in feats:
-            if z < (fmz or 0):
-                continue
-            g = geom.simplify(tol) if z < maxzoom else geom
-            if g.is_empty or g.length < tol:
-                continue
-            gb = g.bounds
-            x0, x1, y0, y1 = _tile_range(b, z)
-            for tx in range(x0, x1 + 1):
-                for ty in range(y0, y1 + 1):
-                    tb = _tile_bounds(z, tx, ty)
-                    if (gb[0] >= tb[0] - pad and gb[1] >= tb[1] - pad
-                            and gb[2] <= tb[2] + pad and gb[3] <= tb[3] + pad):
-                        c = g                       # fully inside the padded tile: no clip
-                    else:
-                        c = clip_by_rect(g, tb[0] - pad, tb[1] - pad, tb[2] + pad, tb[3] + pad)
-                        if c.is_empty:
-                            continue
-                    cells.setdefault((tx, ty), {}).setdefault(layer, []).append(
-                        {"geometry": c.wkb, "properties": props, "id": i})
+        for lname, lfeats in lines:
+            for i, geom, b, fmz, props in lfeats:
+                if z < (fmz or 0):
+                    continue
+                g = geom.simplify(tol) if z < maxzoom else geom
+                if g.is_empty or g.length < tol:
+                    continue
+                gb = g.bounds
+                x0, x1, y0, y1 = _tile_range(b, z)
+                for tx in range(x0, x1 + 1):
+                    for ty in range(y0, y1 + 1):
+                        tb = _tile_bounds(z, tx, ty)
+                        if (gb[0] >= tb[0] - pad and gb[1] >= tb[1] - pad
+                                and gb[2] <= tb[2] + pad and gb[3] <= tb[3] + pad):
+                            c = g                       # fully inside the padded tile: no clip
+                        else:
+                            c = clip_by_rect(g, tb[0] - pad, tb[1] - pad, tb[2] + pad, tb[3] + pad)
+                            if c.is_empty:
+                                continue
+                        cells.setdefault((tx, ty), {}).setdefault(lname, []).append(
+                            {"geometry": c.wkb, "properties": props, "id": i})
         for name, from_zoom, efeats in extras:
             if z < from_zoom:
                 continue
@@ -171,7 +180,7 @@ def build_pmtiles(fc: dict, *, class_col: str, keep: set, minzoom_table: dict | 
          "center_zoom": (minzoom + maxzoom) // 2,
          "center_lon_e7": (lo[0] + hi[0]) // 2, "center_lat_e7": (lo[1] + hi[1]) // 2},
         {"vector_layers": [{"id": n, "fields": {}}
-                           for n in [layer] + [e[0] for e in extras]]},
+                           for n in [n for n, _ in lines] + [e[0] for e in extras]]},
     )
     return buf.getvalue()
 

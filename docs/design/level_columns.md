@@ -14,13 +14,16 @@ its fill is drawn (the casing position is the lower, if they are given the other
 - a ramp (casing position lower than its fill position) has its casing with the lower position's casings (under the roads it meets
   there) and its fill with the higher position's fills.
 
+## Position only
+
+With the columns the position alone orders the drawing: see [Divided casing and one band](levels_split_casing.md).
+
 ## How
 
 For each position that occurs (0 always) the ground band's layers are repeated, in position order: the casing layers (`roads-casing`,
 `-sq`, `-dash`) with the filter `__rs_cl == position`, the fill layers (`roads-fill-under`, `roads-fill`, `-sq`, `-pat`, the dashed classes'
 `roads-fill-dash<n>`) with `__rs_fl == position`. Position 0 keeps the layer ids; others are `roads-casing-lv<n>`, `roads-fill-lv<n>`
-(`-lv-2` for a negative position) with the usual suffix after it. Every edge but a bridge is in band 0, so the low and high band layers are empty;
-a bridge keeps its deck layers. The page recolours the fill layers of every position (`RS_FILL_LAYERS` is built from the style). The arrow tiers
+(`-lv-2` for a negative position) with the usual suffix after it. Every edge is in band 0, so the low, high and bridge layers match nothing. The page recolours the fill layers of every position (`RS_FILL_LAYERS` is built from the style). The arrow tiers
 skip a tier with no layers. `tiles=True` is refused for now.
 
 ## Checks

@@ -11,7 +11,7 @@ Docs: https://khoshkhah.github.io/roadstyle/ (every keyword: `/reference/paramet
 
 ## Install
 
-`pip install roadstyle`; extras as needed: `numeric` (`cmap` ramps), `tiles` (`tiles=True`),
+`pip install roadstyle`; extras as needed: `numeric` (`cmap` ramps), `tiles` (`tiles=True`), 
 `duckdb`, `lonboard`, `studio`, or `all`. Check the installed version with
 `python -c "import roadstyle; print(roadstyle.__version__)"` before relying on a recent keyword.
 
@@ -22,9 +22,10 @@ Docs: https://khoshkhah.github.io/roadstyle/ (every keyword: `/reference/paramet
   `bridge` / `tunnel` / `layer` (grade separation), `edge_id` (kept exact past 2**53).
 - Real widths: `width_m_col="width_m"` draws each line exactly that many metres wide from
   `width_m_zoom` (16) on, casing `casing_m` (0.15) inside it; null = the class width.
-- Draw order beyond class and level: `band_col="band"` (-1 / 1: an edge entirely under / over the
-  ground roads, casing included) and `order_col="order"` (a number: the order inside its band);
-  both per edge, null = the default rule.
+- Draw order: every edge is drawn by two positions (casing, fill), computed for you by
+  `compute_levels(method="solve", order="class")`. `band_col="band"` (integers) gives the solver the
+  band of an edge (a sidewalk -1, a crossing 1). For a big network compute once:
+  `rs.save_levels(con, rs.compute_levels(...))`, and draw with `casing_level_col=` / `fill_level_col=`.
 - Every other column shows in the popup and is queryable from JavaScript, so join your data
   onto the edges as columns before rendering.
 - An edge is DIRECTED: its geometry runs the way traffic flows; a two-way road is two edges with

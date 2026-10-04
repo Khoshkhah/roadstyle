@@ -62,9 +62,8 @@ def _load_road_model() -> None:
 _load_road_model()
 
 
-def _sort_key(col, order=False):
-    """line-sort-key: grade (tunnel/bridge) dominates, then road class; with ``order``, a caller's
-    per-edge ``__rs_order`` (order_col) replaces the class's where set.
+def _sort_key(col):
+    """symbol-sort-key of the labels: grade (tunnel/bridge) dominates, then road class.
 
     ``lvl*1000`` puts every tunnel (lvl -1) below every surface road and every bridge (lvl +1)
     above, so a tunnel passing *under* a street no longer looks connected to it; within a grade,
@@ -76,8 +75,6 @@ def _sort_key(col, order=False):
         b, lk = _base(c)
         m += [c, ROAD_Z[c] if c in ROAD_Z else ROAD_Z.get(b, 4) - (0.5 if lk else 0)]
     m.append(4)
-    if order:
-        m = ["coalesce", ["get", "__rs_order"], m]
     return ["+", ["*", ["coalesce", ["get", "lvl"], 0], 1000], m]
 
 
@@ -290,10 +287,10 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
     for e in reps:
         p = e[3]
         groups[(p.get("name") or None, p.get("lvl", 0),
-                1 if p.get("__rs_oneway") else 0, p.get(class_col))].append(e)
+                1 if p.get("__rs_oneway") else 0, p.get(class_col), p.get("__rs_fl"))].append(e)
 
     feats = []
-    for (name, lvl, oneway, _cls), edges in groups.items():
+    for (name, lvl, oneway, _cls, fl), edges in groups.items():
         n = len(edges)
         used = [False] * n
         at = collections.defaultdict(list)       # node -> [edge index] (either endpoint)
@@ -358,7 +355,8 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
                           for x, y in part.coords]
                 feats.append({"type": "Feature",
                               "properties": {"slot": i, "name": name, "highway": hw,
-                                             "oneway": oneway, "lvl": lvl},
+                                             "oneway": oneway, "lvl": lvl,
+                                             **({"fl": fl} if fl is not None else {})},
                               "geometry": {"type": "LineString", "coordinates": coords}})
     return {"type": "FeatureCollection", "features": feats}
 
@@ -604,9 +602,9 @@ def _mark_lvl(geo, tunnel_col, bridge_col, layer_col):
         p["__rs_bridge"], p["__rs_tunnel"] = br, tu
 
 
-def _mark_levels(geo, casing_col, fill_col):
+def _mark_levels(geo, casing_col, fill_col, start_col=None, end_col=None):
     """``__rs_cl`` / ``__rs_fl``: the drawing-order positions of an edge's casing and fill (integers, null = 0), and band 0 for every
-    edge but a bridge, so the surface layers are the ones drawn per position. Returns the sorted positions that occur (0 always)."""
+    edge (a bridge too), so the surface layers are the ones drawn per position. Returns the sorted positions that occur (0 always)."""
     def num(v):
         try:
             v = float(v)
@@ -618,18 +616,50 @@ def _mark_levels(geo, casing_col, fill_col):
         p = ft["properties"]
         c, f = num(p.get(casing_col)) if casing_col else 0, num(p.get(fill_col)) if fill_col else 0
         c, f = min(c, f), max(c, f)
-        p["__rs_cl"], p["__rs_fl"] = c, f
-        if not p.get("__rs_bridge"):
-            p["__rs_band"] = 0
-        levels |= {c, f}
+        cs = min(num(p.get(start_col)), f) if start_col else c          # the casing numbers of the two heads (default: the main one)
+        ce = min(num(p.get(end_col)), f) if end_col else c
+        p["__rs_cl"], p["__rs_fl"], p["__rs_cs"], p["__rs_ce"] = c, f, cs, ce
+        p["__rs_band"] = 0
+        levels |= {c, f, cs, ce}
     return sorted(levels)
 
 
-def _mark_order(geo, order_col, band_col, cap_col=None):
-    """A caller's draw order per edge (docs/design/draw_order_per_edge.md): ``__rs_band`` (-1 / 1:
-    the band under / over every ground road; a bridge keeps its own) and
-    ``__rs_order`` (the order inside the band instead of the class's z_order, clamped to -400 … 400
-    so levels stay 1000 apart and rsColor's +500 still lifts). Nothing baked for a null value."""
+def _casing_parts(geo, head_m, cols):
+    """The casing of every edge as pieces, for its own source (docs/design/levels_split_casing.md): an edge at least ``2 * head_m`` metres long whose
+    three casing numbers (``__rs_cs`` start head, ``__rs_cl`` main, ``__rs_ce`` end head) are not all equal is cut into the first ``head_m`` metres,
+    the middle and the last ``head_m`` metres, each with its own ``__rs_cl``; any other edge is one piece. A piece carries the properties the casing
+    layers read (``__rs_*`` except the fills, ``cols``, ``lvl``) and ``__rs_road``, the id of its edge."""
+    from shapely.geometry import LineString
+    from shapely.ops import substring
+    keep = {c for c in cols if c} | {"lvl"}
+    out = []
+    for i, ft in enumerate(geo["features"]):
+        p, g = ft["properties"], ft.get("geometry") or {}
+        base = {k: v for k, v in p.items() if (k in keep or k.startswith("__rs_")) and not k.startswith("__rs_fill")}
+        base["__rs_road"] = i
+        cs, cm, ce = p["__rs_cs"], p["__rs_cl"], p["__rs_ce"]
+        c = g.get("coordinates") or []
+        if g.get("type") != "LineString" or len(c) < 2 or cs == cm == ce:
+            out.append({"type": "Feature", "properties": base, "geometry": g})
+            continue
+        lon0, lat0 = c[0][0], c[0][1]
+        kx, ky = 111320.0 * math.cos(math.radians(lat0)), 111320.0
+        line = LineString([((x - lon0) * kx, (y - lat0) * ky) for x, y, *_ in c])
+        n = line.length
+        cuts = [(0.0, n, cm)] if n < 2 * head_m else [(0.0, head_m, cs), (head_m, n - head_m, cm), (n - head_m, n, ce)]
+        for k, (a, b, num) in enumerate(cuts):
+            part = substring(line, a, b)
+            if part.is_empty or part.geom_type != "LineString" or len(part.coords) < 2:
+                continue
+            coords = [[round(x / kx + lon0, 7), round(y / ky + lat0, 7)] for x, y in part.coords]
+            flat = {"__rs_cap": True} if len(cuts) == 3 and k == 1 else {}        # the main piece ends at two cuts: flat ends (a round end would reach into the heads)
+            out.append({"type": "Feature", "properties": {**base, "__rs_cl": num, **flat}, "geometry": {"type": "LineString", "coordinates": coords}})
+    return out
+
+
+def _mark_order(geo, band_col, cap_col=None):
+    """``__rs_band`` (-1 / 1, a bridge keeps its own) from the caller's ``band_col``, and ``__rs_cap`` from ``cap_col``
+    (docs/design/square_ends.md). Nothing baked for a null value."""
     def num(v):
         try:
             v = float(v)
@@ -641,9 +671,6 @@ def _mark_order(geo, order_col, band_col, cap_col=None):
         b = num(p.get(band_col)) if band_col else None
         if b is not None and not p["__rs_bridge"]:
             p["__rs_band"] = (b > 0) - (b < 0)
-        o = num(p.get(order_col)) if order_col else None
-        if o is not None:
-            p["__rs_order"] = max(-400.0, min(400.0, o))
         if cap_col and _truthy(p.get(cap_col)):
             p["__rs_cap"] = True
 
@@ -660,15 +687,6 @@ def _twin_ends(geo, cols):
     tunnel mouth, a low road, a sidewalk moved by band_col) the cap is fill only
     (``__rs_nocase``): its casing ring would cross that road, which draws under it."""
 
-    key = lambda c: (round(c[0], 6), round(c[1], 6))  # noqa: E731
-
-    def rank(p):   # the drawing band: low < ground < high < bridge
-        if p.get("__rs_bridge"):
-            return 2
-        b = p.get("__rs_band")
-        if b is None:
-            b = p.get("lvl") or 0
-        return (b > 0) - (b < 0)
     keys, where, at = [], collections.defaultdict(list), collections.defaultdict(list)
     for i, ft in enumerate(geo["features"]):
         g = ft.get("geometry") or {}
@@ -681,12 +699,14 @@ def _twin_ends(geo, cols):
             for pt in k:
                 at[pt].append(i)
         keys.append(k)
-    keep = [c for c in cols if c] + ["lvl", "__rs_band"]
+    keep = [c for c in cols if c] + ["lvl", "__rs_band", "__rs_cl", "__rs_fl"]
+    def below(q, casing):    # is road q drawn entirely below the casing ring of a pair? ``casing``: the head number at the end
+        return (q.get("__rs_fl") or 0) < casing      # q's fill is painted before the ring's casing
     used, out = set(), []
     for i, ft in enumerate(geo["features"]):
         p, k = ft["properties"], keys[i]
         if (i in used or k is None or not p.get("__rs_twoway") or p.get("__rs_bridge")
-                or p.get("__rs_tunnel") or p.get("__rs_dash")):
+                or p.get("__rs_tunnel") or p.get("__rs_dash") or p.get("__rs_cap")):
             continue
         j = next((j for j in where.get((k[1], k[0]), []) if j != i and j not in used
                   and geo["features"][j]["properties"].get("__rs_twoway")), None)
@@ -699,10 +719,13 @@ def _twin_ends(geo, cols):
         props.update({c + "__b": q.get(c) for c in list(props) if c.startswith("__rs_fill")})
         props.update(__rs_road=i, __rs_road2=j)
         c = ft["geometry"]["coordinates"]
-        for pt, kp in ((c[0], k[0]), (c[-1], k[1])):
-            own = rank(p)
-            low = any(rank(geo["features"][n]["properties"]) < own for n in at[kp] if n not in (i, j))
+        for end, (pt, kp) in enumerate(((c[0], k[0]), (c[-1], k[1]))):
+            head = p.get("__rs_cs" if end == 0 else "__rs_ce")         # the casing number of the lane's head at this end
+            if head is None:
+                head = p.get("__rs_cl") or 0
+            low = any(below(geo["features"][n]["properties"], head) for n in at[kp] if n not in (i, j))
             ex = {"__rs_nocase": True} if low else {}
+            ex["__rs_cl"] = head                                      # the cap's casing ring is painted at the head's number
             out.append({"type": "Feature", "properties": {**props, **ex},
                         "geometry": {"type": "Point", "coordinates": list(pt[:2])}})
     return out
@@ -719,13 +742,13 @@ def _tunnel_fill_under(lid, flt, fw, off, bg, on):
              "paint": {"line-color": bg, "line-width": fw, "line-offset": off}}]
 
 
-_CASING_FAMILY = ("roads-casing", "roads-casing-sq", "roads-casing-dash")
+_CASING_FAMILY = ("roads-casing", "roads-casing-sq", "roads-casing-dash", "roads-casing-bridge")
 _FILL_FAMILY = ("roads-fill-under", "roads-fill", "roads-fill-sq", "roads-fill-pat")
 
 
 def _fill_layer_ids(levels):
     """The layers the page recolours (colour-by, rsColor): every road fill layer, and the fill layers of each drawing-order position."""
-    ids = ["roads-fill", "roads-low-fill", "roads-high-fill", "roads-bridge-fill", "roads-fill-sq", "roads-low-fill-sq", "roads-high-fill-sq"]
+    ids = ["roads-fill", "roads-fill-sq"]
     for level in levels or ():
         if level != 0:
             ids += [_level_id("roads-fill", level), _level_id("roads-fill-sq", level)]
@@ -740,7 +763,7 @@ def _level_id(lid, level):
     return f"{root}-lv{level}{lid[len(root):]}"
 
 
-def _level_layers(layers, levels):
+def _level_layers(layers, levels, casing_source=None):
     block = [l for l in layers if l["id"] in _CASING_FAMILY or l["id"] in _FILL_FAMILY or l["id"].startswith("roads-fill-dash")]
     if not block:
         return layers
@@ -751,7 +774,7 @@ def _level_layers(layers, levels):
     for level in levels:
         for l in block:
             key = "__rs_cl" if l["id"] in _CASING_FAMILY else "__rs_fl"
-            groups.append({**l, "id": _level_id(l["id"], level),
+            groups.append({**l, **({"source": casing_source} if casing_source and key == "__rs_cl" else {}), "id": _level_id(l["id"], level),
                            "filter": ["all", l["filter"], ["==", ["coalesce", ["get", key], 0], level]]})
     return rest[:first] + groups + rest[first:]
 
@@ -1147,7 +1170,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
-           order_col: str = None, band_col: str = None, cap_col: str = None, casing_level_col: str = None, fill_level_col: str = None, directed_col: str = None,
+           band_col: str = None, cap_col: str = None, casing_level_col: str = None, fill_level_col: str = None, casing_start_col: str = None, casing_end_col: str = None, head_m: float = 5.0, directed_col: str = None,
            width_m_col: str = None, width_m_zoom: float = 16, casing_m: float = 0.15,
            pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
@@ -1161,21 +1184,13 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            api_key: str | None = None, **_ignore):
     """Build a self-contained MapLibre map of the styled edges.
 
-    If the data carries ``tunnel`` / ``bridge`` / ``layer`` columns (named via ``tunnel_col`` /
-    ``bridge_col`` / ``layer_col``), grade-separated roads are ordered by elevation so tunnels draw
-    underneath and bridges on top — otherwise every edge is treated as ground level.
-
-    A caller's own draw order, per edge (both optional, docs/design/draw_order_per_edge.md):
-    ``band_col`` names a column of -1 / 0 / 1: draw the edge entirely under (-1) or over (1) the
-    ground roads, casing included (a sidewalk under its street, a crossing over it); a tunnel too, and
-    bridges keep their own band. ``order_col`` names a numeric column: the edge's order inside its
-    band instead of its class's ``z_order`` (clamped to -400 … 400). Null = the class / level rule.
-    ``casing_level_col`` / ``fill_level_col`` name two integer columns (docs/design/level_columns.md): the **position in the
-    drawing order** where each edge's casing and where its fill are drawn. At each position every casing of the position is
-    drawn first, then every fill; an edge whose two numbers are equal is an ordinary edge of that level, one whose casing
-    number is lower than its fill number has its casing with the lower position's casings and its fill with the higher
-    position's fills. Positions are free integers (0 is the ground); there is one casing layer and one fill layer for each
-    position that occurs. They replace the three bands for every edge but a bridge, which keeps its deck. Null = 0.
+    Every edge is drawn by two **positions**, the number where its casing is drawn and the number where its fill is drawn
+    (docs/design/levels_split_casing.md): lowest first, at each position all casings before all fills. Without level columns
+    they are computed here by ``compute_levels(method="solve", order="class")`` from the ``tunnel`` / ``bridge`` / ``layer``
+    columns (``tunnel_col`` / ``bridge_col`` / ``layer_col``), the road class and the geometry; ``band_col`` (integers) gives the
+    solver the band of an edge instead of the tags. Needs scipy. ``casing_level_col`` / ``fill_level_col`` (and
+    ``casing_start_col`` / ``casing_end_col``, ``head_m``) name columns you computed yourself, with ``compute_levels`` or
+    anything else, and draw them as they are. Null = 0. A bridge keeps its look (heavier casing), a tunnel its look (faded, dashed).
     ``cap_col`` names a column: a true value draws that edge's casing and fill with **square** ends
     (butt caps) instead of round ones, where an edge is one piece of a longer road and meets its
     other piece (docs/design/square_ends.md). Null / false = round ends, as always.
@@ -1253,6 +1268,12 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     else:
         popup_on, popup_fields = True, list(road_popup)
     g = gdf.to_crs(4326)
+    if not (casing_level_col or fill_level_col):       # the only way of drawing: positions, computed here when not given
+        from .levels import compute_levels
+        g = compute_levels(g, layer_col=layer_col, bridge_col=bridge_col, tunnel_col=tunnel_col, method="solve",
+                           band_col=band_col, order="class", highway_col=highway_col, head_m=head_m)
+        casing_level_col, fill_level_col = "casing_level", "fill_level"
+        casing_start_col, casing_end_col = "casing_start", "casing_end"
 
     color_opts_meta = None
     if color_options:
@@ -1284,10 +1305,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                                 "prop": "__rs_fill", "legend": rf.legend}]
     _mark_twoway(geo, directed_col)
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
-    _mark_order(geo, order_col, band_col, cap_col)
-    levels = _mark_levels(geo, casing_level_col, fill_level_col) if (casing_level_col or fill_level_col) else None
-    if levels and tiles:
-        raise ValueError("casing_level_col / fill_level_col do not work with tiles=True yet")
+    _mark_order(geo, band_col, cap_col)
+    levels = _mark_levels(geo, casing_level_col, fill_level_col, casing_start_col, casing_end_col) if (casing_level_col or fill_level_col) else None
     _mark_tunnel_dash(geo, CONFIG.tunnel_gap_shade, CONFIG.tunnel_dash_shade)
     if width_m_col:
         _mark_width_m(geo, width_m_col, casing_m)
@@ -1356,7 +1375,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     # works *within* a feature). Network continuity outranks end-cap shape — a round blob at a
     # dead end is cosmetic, a notch at a connection or junction is a break in the network.
     lay = {"line-cap": "round", "line-join": "round",
-           "line-sort-key": _sort_key(highway_col, order=bool(order_col))}
+           "line-sort-key": 0}   # positions only: no class, level or order
     tlay = {**lay, "line-cap": "butt"}                    # butt cap -> clean dash ticks on tunnel casing
     blay = {**lay, "line-cap": "butt"}                    # butt cap -> square bridge deck ends
     off = _offset_expr(highway_col, offset_frac, offset_zoom)
@@ -1373,7 +1392,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     any_tunnel = any(ft["properties"].get("__rs_tunnel") for ft in geo["features"])
     surface = ["==", bd, 0]
     low = ["<", bd, 0]
-    bridge = ["all", [">", lv, 0], is_b]
+    bridge = ["!", ["to-boolean", 1]] if levels else ["all", [">", lv, 0], is_b]     # position mode: a bridge is drawn at its positions, no layers of its own
     high = ["all", [">", bd, 0], ["!", is_b]]
     # minzoom: hide minor classes when zoomed out (config.DEFAULT.minzoom, or a caller override).
     # AND-ed onto each road filter rather than given its own layers, so layer ids are untouched.
@@ -1485,7 +1504,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             return {"id": lid, "type": "circle", "source": "ends", "filter": flt,
                     "paint": {"circle-color": ["case", same, col, "rgba(0,0,0,0)"],
                               "circle-radius": rad[casing], "circle-pitch-alignment": "map"}}
-        for band, flt in (("low-", low), ("", surface), ("high-", high)):
+        for band, flt in (() if levels else (("low-", low), ("", surface), ("high-", high))):
             for part, casing in (("casing", True), ("fill", False)):
                 at = next(n for n, l in enumerate(style["layers"]) if l["id"] == f"roads-{band}{part}")
                 style["layers"].insert(at, _end(f"roads-ends-{band}{part}", flt, casing))
@@ -1584,9 +1603,11 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         style["layers"] = relayered
 
     # square ends (cap_col, docs/design/square_ends.md): MapLibre sets line-cap per layer, not per feature, so
+    divided = bool(levels and (casing_start_col or casing_end_col))
+    parts = _casing_parts(geo, head_m, (highway_col, filter_col, width_m_col)) if divided else None      # the pieces of a divided casing
     # each band's casing and fill get a butt-capped twin for the edges that ask for it, drawn right after the
     # round layer (a band's casings stay under its fills). Dashed classes draw butt-capped already.
-    if any(ft["properties"].get("__rs_cap") for ft in geo["features"]):
+    if any(ft["properties"].get("__rs_cap") for ft in geo["features"]) or (parts and any(f["properties"].get("__rs_cap") for f in parts)):
         sq = ["to-boolean", ["get", "__rs_cap"]]
         capped = []
         for l in style["layers"]:
@@ -1603,7 +1624,39 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     # layers are repeated for each position, in position order; an edge is in the casing layers of its casing position and the
     # fill layers of its fill position. Position 0 keeps the layer ids.
     if levels:
-        style["layers"] = _level_layers(style["layers"], levels)
+        style["layers"] = [l for l in style["layers"] if not l["id"].startswith(("roads-low-", "roads-high-")) and l["id"] not in ("roads-bridge-casing", "roads-bridge-fill")]   # the three bands are gone: positions only
+        if divided:       # the divided casing: its own source of pieces (one casing piece per head and for the main part)
+            style["sources"]["casings"] = {"type": "geojson", "data": {"type": "FeatureCollection", "features": parts}}
+        if any(ft["properties"].get("__rs_bridge") for ft in geo["features"]):
+            # the bridge look in position mode: a heavier black casing with flat ends, in the casing layers of the edge's position
+            # (docs/design/levels_split_casing.md, section 9); the other casing layers leave the bridge edges to it
+            layers, at = [], 0
+            for l in style["layers"]:
+                if l["id"] in ("roads-casing", "roads-casing-sq", "roads-casing-dash"):
+                    l = {**l, "filter": ["all", l["filter"], ["!", is_b]]}
+                    at = len(layers)
+                layers.append(l)
+            layers.insert(at + 1, {"id": "roads-casing-bridge", "type": "line", "source": "roads", "layout": blay, "filter": ["all", surface, is_b],
+                                   "paint": {"line-color": CONFIG.bridge_casing_color, "line-width": bcw, "line-offset": off}})
+            style["layers"] = layers
+        style["layers"] = _level_layers(style["layers"], levels, "casings" if divided else None)
+        if decks["features"]:        # 3D: the flat bridge line below flat_below, the extruded deck from it up
+            for l in style["layers"]:
+                if l["id"].endswith("-bridge") and l["id"].startswith("roads-casing"):
+                    l["maxzoom"] = dk["flat_below"]
+                elif l["id"].startswith(("roads-casing", "roads-fill")) and l.get("source") in ("roads", "casings"):
+                    l["filter"] = ["all", l["filter"], ["any", ["<", ["zoom"], dk["flat_below"]], ["!", is_b]]]
+    end_fill_ids, end_casing_ids = ["roads-ends-low-fill", "roads-ends-fill", "roads-ends-high-fill"], ["roads-ends-low-casing", "roads-ends-casing", "roads-ends-high-casing"]
+    if levels:        # position mode: a cap's casing is drawn right before its position's casing layers, its fill right before its position's fill layers
+        end_fill_ids, end_casing_ids = [], []
+        for pos in levels if ends else ():
+            for casing, key, root, ids in ((True, "__rs_cl", "roads-casing", end_casing_ids), (False, "__rs_fl", "roads-fill", end_fill_ids)):
+                lid = ("roads-ends-casing" if casing else "roads-ends-fill") + ("" if pos == 0 else f"-lv{pos}")
+                here = ["==", ["coalesce", ["get", key], 0], pos]
+                flt = ["all", _z, here] if mz else here
+                at = next(n for n, l in enumerate(style["layers"]) if l["id"] == _level_id(root, pos))
+                style["layers"].insert(at, _end(lid, flt, casing))
+                ids.append(lid)
 
     # oneway direction arrows (on edges with no reverse twin) + line-placed street names, on top.
     # Both read their cosmetics from data/style.json "config" (labels / arrows blocks), so a user
@@ -1649,7 +1702,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                 # as unmarked). One arrow layer PER GRADE TIER, each inserted right beside its
                 # road tier, so a bridge covers the arrows of the road it crosses instead of
                 # every arrow floating above everything.
-                def _arrow_layer(lid, cmp):
+                def _arrow_layer(lid, tier):
                     # class-aware like the roads themselves: the minzoom table thins arrows
                     # with their road (no arrow floating where the class is still hidden), and
                     # the negated road sort key decides collisions — symbol-sort-key places
@@ -1662,7 +1715,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                     # (symbols cannot be occluded by lines within a tier). By z16 parallel
                     # lines have separated on screen and the arrows land on their own road.
                     f = ["all", ["==", ["get", "oneway"], 1],
-                         [cmp, ["coalesce", ["get", "lvl"], 0], 0],
+                         tier,
                          ["any", ["!", ["match", ["get", "highway"], _MINOR, True, False]],
                           [">=", ["zoom"], 16]]]
                     if mz:
@@ -1707,10 +1760,20 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                          or i.startswith("roads-fill-")),
                         ("roads-arrows-bridge", ">",
                          lambda i: i.startswith(("roads-high-", "roads-bridge-"))))
-                for lid, cmp, fam in fams:
-                    members = [i for i, l in enumerate(style["layers"]) if fam(l["id"])]
-                    if members:                                  # a position-ordered map has no low / high band layers
-                        style["layers"].insert(max(members) + 1, _arrow_layer(lid, cmp))
+                if levels:        # position mode: one arrow layer per position, right after that position's fill layers
+                    for pos in levels:
+                        fam = {_level_id(x, pos) for x in _FILL_FAMILY}
+                        dash = _level_id("roads-fill", pos) + "-dash"
+                        members = [i for i, l in enumerate(style["layers"]) if l["id"] in fam or l["id"].startswith(dash)]
+                        if members:
+                            style["layers"].insert(max(members) + 1, _arrow_layer(
+                                "roads-arrows" if pos == 0 else f"roads-arrows-lv{pos}",
+                                ["==", ["coalesce", ["get", "fl"], 0], pos]))
+                else:
+                    for lid, cmp, fam in fams:
+                        members = [i for i, l in enumerate(style["layers"]) if fam(l["id"])]
+                        if members:
+                            style["layers"].insert(max(members) + 1, _arrow_layer(lid, [cmp, ["coalesce", ["get", "lvl"], 0], 0]))
             if labels:
                 style["glyphs"] = "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"
                 lf = ["all", ["==", ["%", ["get", "slot"], 2], 0],
@@ -1722,18 +1785,32 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                        [">=", ["zoom"], 16]]]
                 if mz:   # a hidden class must not keep its street name floating either
                     lf.append(_minzoom_filter("highway", mz))
-                style["layers"].append(
-                    {"id": "roads-labels", "type": "symbol", "source": "slots", "minzoom": 14,
-                     "filter": lf,
-                     "layout": {"symbol-placement": "line-center",
-                                "text-field": ["get", "name"],
-                                "text-font": ["Noto Sans Regular"],
-                                "text-size": ["interpolate", ["linear"], ["zoom"],
-                                              14, 10, 18, 14],
-                                "text-max-angle": 40, "text-padding": 2,
-                                # major streets' names win label-vs-label collisions too
-                                "symbol-sort-key": ["*", -1, _sort_key("highway")]},
-                     "paint": lpaint})
+                def _label_layer(lid, flt):
+                    return {"id": lid, "type": "symbol", "source": "slots", "minzoom": 14,
+                            "filter": flt,
+                            "layout": {"symbol-placement": "line-center",
+                                       "text-field": ["get", "name"],
+                                       "text-font": ["Noto Sans Regular"],
+                                       "text-size": ["interpolate", ["linear"], ["zoom"],
+                                                     14, 10, 18, 14],
+                                       "text-max-angle": 40, "text-padding": 2,
+                                       # major streets' names win label-vs-label collisions too
+                                       "symbol-sort-key": ["*", -1, _sort_key("highway")]},
+                            "paint": lpaint}
+                if levels:        # position mode: the names of a position sit right after its arrows (or its fill layers), so a road above covers them
+                    for pos in levels:
+                        after = "roads-arrows" if pos == 0 else f"roads-arrows-lv{pos}"
+                        ids = [l["id"] for l in style["layers"]]
+                        if after in ids:
+                            at = ids.index(after) + 1
+                        else:
+                            fam = {_level_id(x, pos) for x in _FILL_FAMILY}
+                            dash = _level_id("roads-fill", pos) + "-dash"
+                            at = max(i for i, n in enumerate(ids) if n in fam or n.startswith(dash)) + 1
+                        style["layers"].insert(at, _label_layer("roads-labels" if pos == 0 else f"roads-labels-lv{pos}",
+                                                                ["all", lf, ["==", ["coalesce", ["get", "fl"], 0], pos]]))
+                else:
+                    style["layers"].append(_label_layer("roads-labels", lf))
 
     # clip/area boundary outline, drawn on top of the roads (a dashed line tracing the polygon rings)
     if boundary is not None:
@@ -1782,13 +1859,25 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         for lyr in style["layers"]:
             if lyr.get("source") == "roads" and "source-layer" not in lyr:
                 lyr["source-layer"] = "roads"
-        extra = ([{"name": "slots", "fc": slots, "minzoom": 14}]
-                 if slots["features"] else None)
+        extra = [{"name": "slots", "fc": slots, "minzoom": 14}] if slots["features"] else []
+        keep = {highway_col, filter_col or highway_col, "__rs_twoway", "lvl", width_m_col}
+        line_layers = []
+        # the casing pieces and the twin end caps ride in the same archive (docs/design/levels_split_casing.md, 12.1)
+        for name, kind in (("casings", "line"), ("ends", "point")):
+            src = style["sources"].pop(name, None)
+            for lyr in style["layers"]:
+                if lyr.get("source") == name:
+                    lyr["source"], lyr["source-layer"] = "roads", name
+            if src and src["data"]["features"]:
+                if kind == "line":
+                    line_layers.append({"name": name, "fc": src["data"], "keep": keep})
+                else:
+                    extra.append({"name": name, "fc": src["data"], "minzoom": tc["minzoom"]})
         pmt = _tiler.build_pmtiles(
-            geo, class_col=highway_col,
-            keep={highway_col, filter_col or highway_col, "__rs_twoway", "lvl"},
+            geo, class_col=highway_col, keep=keep,
             minzoom_table=mz, minzoom=tc["minzoom"], maxzoom=tc["maxzoom"],
-            extent=tc["extent"], buffer_px=tc["buffer_px"], extra_layers=extra)
+            extent=tc["extent"], buffer_px=tc["buffer_px"], extra_layers=extra or None,
+            line_layers=line_layers or None)
         side = _tiler.sidecar(geo)
 
     minx, miny, maxx, maxy = (float(v) for v in g.total_bounds)
@@ -1810,6 +1899,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__BEARING__", json.dumps(cam["bearing"]))
             .replace("__BOUNDS__", json.dumps([[minx, miny], [maxx, maxy]]))
             .replace("__RS_FILL_LAYERS__", json.dumps(_fill_layer_ids(levels)))
+            .replace("__RS_END_LAYERS__", json.dumps(end_fill_ids)).replace("__RS_END_CASING_LAYERS__", json.dumps(end_casing_ids))
             .replace("__COLOR_OPTIONS__", json.dumps(color_opts_meta or []))
             .replace("__CO_ACTIVE__", str(_active))
             .replace("__OVERLAYS__", json.dumps(ov_meta))

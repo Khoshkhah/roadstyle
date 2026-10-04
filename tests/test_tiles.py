@@ -97,10 +97,10 @@ def test_render_tiles_swaps_source_and_embeds_archive():
     style = json.JSONDecoder().raw_decode(html, i)[0]
     assert style["sources"]["roads"]["type"] == "vector"
     assert style["sources"]["roads"]["url"] == "pmtiles://roads"
-    assert "slots" not in style["sources"]              # slots ride in the archive
+    assert "slots" not in style["sources"] and "casings" not in style["sources"] and "ends" not in style["sources"]   # they ride in the archive
     for lyr in style["layers"]:
         if lyr.get("source") == "roads":
-            assert lyr["source-layer"] in ("roads", "slots")
+            assert lyr["source-layer"] in ("roads", "slots", "casings", "ends")
     assert "const RS_TILED = true" in html
     assert 'id="rs-side"' in html                       # the sidecar blob
     assert "pmtiles.Protocol" in html                   # vendored pmtiles.js + setup
@@ -157,3 +157,27 @@ def test_sidecar_mid_is_half_the_length():
         {"type": "Feature", "properties": {}, "geometry": {"type": "LineString",
                                                            "coordinates": [[18.0, 59.3], [18.02, 59.3]]}}]}
     assert sidecar(fc)["mids"][0] == pytest.approx([18.01, 59.3])
+
+
+def test_tiles_carry_the_casing_pieces_and_the_end_caps():
+    """Position drawing in tiles (docs/design/levels_split_casing.md, 12.1): the divided casing and the twin end caps are tile layers of the archive."""
+    import math
+
+    import mapbox_vector_tile
+    from pmtiles.reader import MemorySource, Reader
+
+    from roadstyle.render_web import render
+    a, b, c = (18.0, 59.3), (18.001, 59.3), (18.002, 59.3)
+    g = gpd.GeoDataFrame({"highway": ["primary"] * 4},
+                         geometry=[LineString([a, b]), LineString([b, a]), LineString([b, c]), LineString([c, b])], crs=4326)
+    html = render(g, basemap="blank", tiles=True).html
+    style = json.JSONDecoder().raw_decode(html, html.index("const style = ") + 14)[0]
+    kinds = {l["source-layer"] for l in style["layers"] if l.get("source") == "roads"}
+    assert {"roads", "casings", "ends"} <= kinds
+    z = 15
+    n = 1 << z
+    x = int((18.001 + 180) / 360 * n)
+    y = int((1 - math.asinh(math.tan(math.radians(59.3))) / math.pi) / 2 * n)
+    t = mapbox_vector_tile.decode(gzip.decompress(Reader(MemorySource(_archive_of(html))).get(z, x, y)))
+    assert t["casings"]["features"] and t["ends"]["features"]
+    assert all("__rs_road" in f["properties"] for f in t["casings"]["features"])

@@ -38,6 +38,8 @@ from .emit import (
 )
 from .filters import filter_edges, highway_types
 from .legend import make_legend
+from .levels import compute_levels
+from .levels_store import load_levels, save_levels
 from .overlays import Overlay
 from .pages import render_dashboard, render_report, render_street_view, sidebar_html
 from .palettes import (
@@ -107,6 +109,9 @@ except Exception:                                    # running from a bare sourc
     __version__ = "0+unknown"
 
 __all__ = [
+    "compute_levels",
+    "load_levels",
+    "save_levels",
     "render_edges", "render_dashboard", "render_report", "render_street_view", "sidebar_html",
     "filter_edges", "highway_types", "use_settings", "snapshot",
     "resolve", "base_style", "selection_style", "normalize_highway",

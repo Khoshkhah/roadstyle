@@ -87,6 +87,8 @@ def render_edges(
       - ``boundary`` : (web backend) a shapely geometry / GeoDataFrame / GeoJSON mapping drawn as a
         dashed outline on top of the roads (e.g. the area the network was clipped to).
     """
+    if "order_col" in kwargs:
+        raise ValueError("order_col is removed: roadstyle draws by positions (docs/design/levels_split_casing.md, section 12)")
     if settings is not None:
         # scoped settings: apply the override for THIS render only, then restore. Same layout as
         # a roadstyle.json / use_settings source (dict or path); stacks on top of any overrides

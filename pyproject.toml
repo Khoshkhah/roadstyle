@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "roadstyle"
-version = "0.12.0"
+version = "0.13.0"
 description = "Road cartography for Python: turn road edges into styled, interactive, offline HTML maps (MapLibre) with a JavaScript API"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -32,6 +32,8 @@ dependencies = [
     "shapely",
     "folium",
     "branca",
+    "scipy",                     # the drawing order of every edge (compute_levels): stages 1-3, a sparse linear program (HiGHS)
+    "ortools",                   # stage 0 of it, as a minimum-cost flow
 ]
 
 [project.optional-dependencies]

@@ -143,7 +143,7 @@ Each `color_options` value takes `color_by`, `colors`, `cmap`, `vmin`, `vmax`, `
 
 | keyword | default | backends | what |
 |---|---|---|---|
-| `tiles` | `False` | web | pack the roads as embedded PMTiles (for ~10⁵ edges); needs `roadstyle[tiles]` |
+| `tiles` | `False` | web | pack the roads, the casing pieces and the end caps as embedded PMTiles (for ~10⁵ edges); needs `roadstyle[tiles]` |
 | `compress` | `True` | web | gzip the inlined data; `False` = plain JSON |
 | any other keyword | | folium | passed to `folium.Map(...)` (e.g. `location`, `zoom_start`) |
 
@@ -156,13 +156,13 @@ Returns a `WebMap` (web, `.save()`), a `folium.Map` (`.save()`) or a `lonboard.M
 | `highway_col` | `"highway"` | all | the road-class column (widths, casing, draw order) |
 | `tunnel_col` / `bridge_col` | `"tunnel"` / `"bridge"` | all | tunnels draw under (faded, two-tone dashed casing), bridges on top |
 | `layer_col` | `"layer"` | web | OSM `layer`; negative sinks an edge when there is no tunnel/bridge column |
-| `band_col` | `None` | web | a column of -1 / 0 / 1: draw the edge (casing included) under (-1) or over (1) the ground roads, e.g. a sidewalk under its street, a crossing over it; tunnels and bridges keep their band; null = by level |
-| `casing_level_col` / `fill_level_col` | `None` | web | two integer columns: the position in the drawing order of an edge's casing and of its fill (0 = ground); at each position casings first, then fills; one layer pair per position; replaces the three bands (a bridge keeps its deck); not with `tiles=True` |
+| `band_col` | `None` | web | a column of integers, the **band** of an edge for the solver that computes the positions (a sidewalk -1 under its street, a crossing 1 over it); null = the level from the tags. Ignored when the level columns are given |
+| `casing_start_col` / `casing_end_col` / `head_m` | `None` / `None` / `5.0` | web | with the level columns: the casing is divided into a start head, a main part and an end head. The two columns hold the casing numbers of the heads (the main number is `casing_level_col`); `head_m` is the length of each head in metres. An edge at least `2 · head_m` long whose three numbers differ is drawn as three casing pieces, each at its own number; the fill stays one line ([design](../design/levels_split_casing.md#9-the-renderer)) |
+| `casing_level_col` / `fill_level_col` | `None` | web | two integer columns: the position in the drawing order of an edge's casing and of its fill (0 = ground); at each position casings first, then fills; one layer pair per position; the position alone decides (a bridge too). Not given: `render_edges` computes them with `rs.compute_levels(edges, method="solve", order="class")` ([guide](../guides/levels.md)) |
 | `cap_col` | `None` | web | a column of true / false: true draws the edge with square ends (butt caps) instead of round ones, for a road drawn in pieces that meet without a ring; null / false = round ends |
 | `width_m_col` | `None` | web | a column of widths in metres (a lane, a road with a `width` tag, a canal): from `width_m_zoom` on the line is drawn exactly that wide, its casing inside; null = the class width |
 | `width_m_zoom` | `16` | web | the zoom from which `width_m_col` widths apply; below it, the class widths (so a narrow line doesn't vanish zoomed out) |
 | `casing_m` | `0.15` | web | with `width_m_col`: the casing on each side, in metres, inside the width (two lines side by side show a `2 × casing_m` divider) |
-| `order_col` | `None` | web | a numeric column: the edge's order inside its band instead of its class's `z_order` (clamped to -400 … 400; `rsColor` still lifts over it); null = by class |
 | `directed_col` | `None` | web | a column: true / null = the edge is a direction of travel of its own, false = undirected (a footway stored both ways, a one-way street's walking-only reverse). An edge and its reverse are two lanes only when neither is false; otherwise one line, centred and full width |
 
 ### Overlays & boundary

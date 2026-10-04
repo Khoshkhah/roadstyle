@@ -75,6 +75,8 @@ def test_compressed_map_inflates_and_attaches(tmp_path):
     assert inflated >= len(g)
 
 
+
+
 def test_tiled_map_boots_draws_and_queries(tmp_path):
     """tiles=True: embedded PMTiles serve the roads, the sidecar serves the JS API."""
     pytest.importorskip("mapbox_vector_tile")

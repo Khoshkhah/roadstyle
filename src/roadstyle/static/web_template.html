@@ -479,10 +479,13 @@ function _applyRoadFilters(){
     // ids exist only in the roads features — slots (labels/arrows) and decks (3D ribbons) have
     // their own id spaces, so those layers take just the class filter. In tiles mode slots share
     // the archive source, so the tile layer name is what separates them.
-    const isRoads = l.source==="roads" && (!RS_TILED || l["source-layer"]==="roads");
+    const kind = RS_TILED && l.source==="roads" ? l["source-layer"] : l.source;   // the layer's data: roads, casings, ends, slots, decks
+    const isRoads = kind==="roads";
     if(_qIds && isRoads){ const qf=["in",["id"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
+    // the pieces of a divided casing (levels_split_casing.md) carry their edge's id as __rs_road
+    if(_qIds && kind==="casings"){ const qf=["in",["get","__rs_road"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
     // a two-way pair's end cap (twin_ends.md) stays while either of its two lanes is shown
-    if(_qIds && l.source==="ends"){ const L=["literal",_qIds];
+    if(_qIds && kind==="ends"){ const L=["literal",_qIds];
       const qf=["any",["in",["get","__rs_road"],L],["in",["get","__rs_road2"],L]]; f=f?["all",f,qf]:qf; }
     try{ map.setFilter(l.id,f); }catch(e){}
   });
@@ -658,8 +661,8 @@ if(FILTER.on){
 // road-fill layers' line-color at the chosen prop. window.rsSetColorField drives it from your UI.
 const COLOR_OPTIONS = __COLOR_OPTIONS__;
 const RS_FILL_LAYERS = __RS_FILL_LAYERS__;
-const RS_END_LAYERS = ["roads-ends-low-fill","roads-ends-fill","roads-ends-high-fill"];   // twin_ends.md
-const RS_END_CASING_LAYERS = ["roads-ends-low-casing","roads-ends-casing","roads-ends-high-casing"];
+const RS_END_LAYERS = __RS_END_LAYERS__;   // twin_ends.md
+const RS_END_CASING_LAYERS = __RS_END_CASING_LAYERS__;
 let _coActive = __CO_ACTIVE__, _coLegendEl = null, _coLegendBox = null;
 function coLegendHtml(lg){
   if(!lg) return "";
