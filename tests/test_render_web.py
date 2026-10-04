@@ -8,7 +8,7 @@ import geopandas as gpd
 import pytest
 from shapely.geometry import LineString
 
-from roadstyle import compute_levels, render_edges
+from roadstyle import Overlay, compute_levels, render_edges
 
 
 def _edges():
@@ -1612,3 +1612,86 @@ def test_stored_levels_remember_min_positions(tmp_path):
     assert len(load_levels(con, g, order="class")) == 4
     with pytest.raises(ValueError, match="min_positions"):
         load_levels(con, g, order="class", min_positions=False)
+
+
+def _edge_world():
+    """A tunnel (edge 12) under a crossing street (edge 13), joined to two ground roads (edges 11, 14): four edges with an edge_id column."""
+    g = _tunnel_world(True)
+    return g.assign(edge_id=[11, 12, 14, 13])           # the order of _tunnel_world: ground, tunnel, ground, crossing street
+
+
+def _edge_features(ids, order=None, color=None):
+    """One small square at each edge's start, as an overlay table with edge_id (and order, color)."""
+    from shapely.geometry import Point
+    g = gpd.GeoDataFrame({"edge_id": ids}, geometry=[Point(18.0 + 0.0001 * i, 59.30) for i, _ in enumerate(ids)], crs=4326)
+    if order is not None:
+        g["order"] = order
+    if color is not None:
+        g["color"] = color
+    return g
+
+
+def test_overlays_attached_to_edges_are_drawn_at_their_edge_fill_number(monkeypatch):
+    """docs/design/edge_overlays.md: a feature is drawn at the fill number of its edge, after the fills of that position and before its arrows, by order, then by
+    the order of the overlays; a feature of an edge at a higher fill number is in a later layer."""
+    g = _edge_world()
+    pts = _edge_features([12, 13, 11, 12], order=[1, 0, 0, 0])                  # two orders at the tunnel's position, one at the crossing street's, one on the ground road
+    first = Overlay(pts, edge_col="edge_id", order_col="order", kind="circle", label="first")
+    second = Overlay(_edge_features([12]), edge_col="edge_id", kind="circle", label="second")
+    style = _style(render_edges(g, backend="web", overlays=[first, second]).html)
+    ids = [l["id"] for l in style["layers"]]
+    feats = {int(f["properties"]["edge_id"]): f["properties"] for f in style["sources"]["roads"]["data"]["features"]}
+    fl = {e: feats[e]["__rs_fl"] for e in (11, 12, 13)}
+    assert fl[12] < fl[13]                                                       # the crossing street is over the tunnel
+    mine = [i for i in ids if i.startswith("ov0-circle-lv") or i.startswith("ov1-circle-lv")]
+    expect = sorted({(fl[12], 0, 0), (fl[12], 1, 0), (fl[13], 0, 0), (fl[11], 0, 0), (fl[12], 0, 1)})          # (fill number, order, overlay): one layer for each
+    got = [(int(i.split("-lv")[1].split("-o")[0]), int(i.split("-o")[-1]), int(i[2])) for i in mine]
+    assert sorted(got) == expect and len(mine) == len(expect)
+    assert [(a, b) for a, b, c in got] == sorted(((a, b) for a, b, c in got))   # in the stack: by fill number, then order
+    for lid in mine:                                                             # after the fills of its position, before the arrows of its position
+        p = int(lid.split("-lv")[1].split("-o")[0])
+        fill = "roads-fill" if p == 0 else f"roads-fill-lv{p}"
+        arrows = "roads-arrows" if p == 0 else f"roads-arrows-lv{p}"
+        assert ids.index(fill) < ids.index(lid) and (arrows not in ids or ids.index(lid) < ids.index(arrows))
+    same = [i for i in mine if f"-lv{fl[12]}-o0" in i]                          # the same fill number and order: the overlay that comes first in the list is first
+    assert same == [f"ov0-circle-lv{fl[12]}-o0", f"ov1-circle-lv{fl[12]}-o0"]
+    lay = {l["id"]: l for l in style["layers"]}
+    one = lay[f"ov0-circle-lv{fl[13]}-o0"]
+    assert one["filter"] == ["all", ["==", ["get", "__rs_fl"], fl[13]], ["==", ["get", "__rs_ord"], 0]]
+    baked = {(f["properties"]["edge_id"], f["properties"]["__rs_fl"], f["properties"]["__rs_ord"]) for f in style["sources"]["ov0"]["data"]["features"]}
+    assert baked == {(12, fl[12], 1), (13, fl[13], 0), (11, fl[11], 0), (12, fl[12], 0)}
+    plain = _style(render_edges(g, backend="web", overlays=[Overlay(pts, kind="circle")]).html)             # without edge_col: as before, over all roads
+    pids = [l["id"] for l in plain["layers"]]
+    assert "ov0-circle" in pids and pids.index("ov0-circle") > max(n for n, i in enumerate(pids) if i.startswith("roads-fill")) and not [i for i in pids if i.startswith("ov0-circle-lv")]
+
+def test_edge_overlay_errors_and_colours():
+    """An edge id that is not among the roads is an error that says how many and which; so is a roads table without its id column; color_col is read from the property."""
+    g = _edge_world()
+    with pytest.raises(ValueError, match=r"2 feature\(s\).*not an edge"):
+        render_edges(g, backend="web", overlays=[Overlay(_edge_features([12, 99, 98]), edge_col="edge_id", kind="circle")])
+    with pytest.raises(ValueError, match="edge_id_col"):
+        render_edges(g.drop(columns="edge_id"), backend="web", overlays=[Overlay(_edge_features([12]), edge_col="edge_id", kind="circle")])
+    st = _style(render_edges(g, backend="web", overlays=[Overlay(_edge_features([12, 13], color=["#ff0000", None]), edge_col="edge_id", color_col="color", kind="circle")]).html)
+    circle = next(l for l in st["layers"] if l["id"].startswith("ov0-circle-lv"))
+    assert '["coalesce", ["get", "color"]' in json.dumps(circle["paint"]["circle-color"])
+    other = render_edges(g.assign(my_id=g.edge_id), backend="web", edge_id_col="my_id",
+                         overlays=[Overlay(_edge_features([12]).rename(columns={"edge_id": "e"}), edge_col="e", kind="circle")])      # the roads' id column is a setting
+    assert "ov0-circle-lv" in other.html
+
+
+def test_arrows_and_street_names_belong_to_an_edge(monkeypatch):
+    """docs/design/edge_overlays.md: every slot (the piece of road that carries an arrow or a name) carries the edge under its middle point (__rs_road, and __rs_road2 for the
+    twin of a two-way street) and the fill number of that edge."""
+    a, b, c = (18.000, 59.300), (18.003, 59.300), (18.003, 59.303)
+    g = gpd.GeoDataFrame({"highway": ["residential"] * 3, "name": ["Main", "Main", "Side"], "oneway": [False, False, True]},
+                         geometry=[LineString([a, b]), LineString([b, a]), LineString([b, c])], crs=4326)       # a two-way street (two twins) and a one-way street
+    style = _style(render_edges(g, backend="web", arrows=True, labels=True).html)
+    roads = [f["properties"] for f in style["sources"]["roads"]["data"]["features"]]
+    slots = [f["properties"] for f in style["sources"]["slots"]["data"]["features"]]
+    assert slots and all("__rs_road" in s for s in slots)
+    for s in slots:
+        assert 0 <= s["__rs_road"] < len(roads) and s.get("fl", 0) == roads[s["__rs_road"]]["__rs_fl"]
+    two_way = [s for s in slots if s["name"] == "Main"]
+    assert two_way and all({s["__rs_road"], s["__rs_road2"]} == {0, 1} for s in two_way)       # the pair: its two twins
+    one_way = [s for s in slots if s["name"] == "Side"]
+    assert one_way and all(s["__rs_road"] == 2 and "__rs_road2" not in s for s in one_way)

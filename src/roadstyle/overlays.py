@@ -33,6 +33,10 @@ class Overlay:
     label : the name shown in the *Layers* toggle (defaults to ``"Layer N"``).
     popup : property fields to show when a feature is clicked; if set, the layer is interactive.
         Pass ``[]`` for a non-interactive overlay (decoration only).
+    edge_col / order_col / color_col : an overlay attached to edges (docs/design/edge_overlays.md): ``edge_col`` names the property
+        with the id of the feature's edge (the ids of the roads' ``edge_id_col``), ``order_col`` the property with its order (whole
+        number, lower first), ``color_col`` a property with a colour per feature. Each feature is drawn at the position of its edge's
+        fill number, after the fills, by order; ``placement`` is not used.
     tooltip : property fields to show in a HOVER tooltip (independent of ``popup``, exactly like
         the road layer's ``tooltip`` vs ``road_popup``). ``None``/``[]`` = hover only highlights.
     """
@@ -48,6 +52,9 @@ class Overlay:
     popup: list[str] | None = None
     tooltip: list[str] | None = None
     visible: bool = True               # initial visibility (the Layers toggle starts checked/unchecked to match)
+    edge_col: str | None = None        # the property with the id of the feature's edge: drawn at its edge's fill number (docs/design/edge_overlays.md)
+    order_col: str | None = None       # with edge_col: the property with the feature's order (whole number, lower first; null = 0)
+    color_col: str | None = None       # the property with a CSS colour per feature (null / missing: ``color``)
 
 
 def to_fc(data) -> dict:

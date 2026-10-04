@@ -158,6 +158,7 @@ Returns a `WebMap` (web, `.save()`), a `folium.Map` (`.save()`) or a `lonboard.M
 | `layer_col` | `"layer"` | web | OSM `layer`; negative sinks an edge when there is no tunnel/bridge column |
 | `band_col` | `None` | web | a column of integers, the **band** of an edge for the solver that computes the positions (a sidewalk -1 under its street, a crossing 1 over it); null = the level from the tags. Ignored when the level columns are given |
 | `casing_start_col` / `casing_end_col` / `head_m` | `None` / `None` / `5.0` | web | with the level columns: the casing is divided into a start head, a main part and an end head. The two columns hold the casing numbers of the heads (the main number is `casing_level_col`); `head_m` is the length of each head in metres. An edge at least `2 · head_m` long whose three numbers differ is drawn as three casing pieces, each at its own number; the fill stays one line ([design](../design/levels_split_casing.md#9-the-renderer)) |
+| `edge_id_col` | `"edge_id"` | web | the column with the id of each edge, the ids that an overlay's `edge_col` refers to |
 | `casing_level_col` / `fill_level_col` | `None` | web | two integer columns: the position in the drawing order of an edge's casing and of its fill (0 = ground); at each position casings first, then fills; one layer pair per position; the position alone decides (a bridge too). Not given: `render_edges` computes them with `rs.compute_levels(edges, method="solve", order="class")` ([guide](../guides/levels.md)) |
 | `cap_col` | `None` | web | a column of true / false: true draws the edge with square ends (butt caps) instead of round ones, for a road drawn in pieces that meet without a ring; null / false = round ends |
 | `width_m_col` | `None` | web | a column of widths in metres (a lane, a road with a `width` tag, a canal): from `width_m_zoom` on the line is drawn exactly that wide, its casing inside; null = the class width |
@@ -240,6 +241,9 @@ the `overlays` setting. See [Add your own layers](../guides/overlays.md).
 | `popup` | `None` = all fields | fields on click; `[]` = not clickable |
 | `tooltip` | `None` | fields on hover |
 | `visible` | `True` | shown on open |
+| `edge_col` | `None` | the property with the id of the feature's edge: the overlay is attached to edges, drawn at its edge's fill number (the guide: [Overlays](../guides/overlays.md#overlays-attached-to-edges)) |
+| `order_col` | `None` | with `edge_col`: the property with the feature's order (whole number, lower first; null = 0) |
+| `color_col` | `None` | the property with a colour per feature (null: `color`) |
 
 ## Basemap
 

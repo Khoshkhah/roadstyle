@@ -484,8 +484,8 @@ function _applyRoadFilters(){
     if(_qIds && isRoads){ const qf=["in",["id"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
     // the pieces of a divided casing (levels_split_casing.md) carry their edge's id as __rs_road
     if(_qIds && kind==="casings"){ const qf=["in",["get","__rs_road"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
-    // a two-way pair's end cap (twin_ends.md) stays while either of its two lanes is shown
-    if(_qIds && kind==="ends"){ const L=["literal",_qIds];
+    // a two-way pair's end cap (twin_ends.md) and an arrow or a street name (edge_overlays.md) stay while either of their two edges is shown
+    if(_qIds && (kind==="ends" || kind==="slots")){ const L=["literal",_qIds];
       const qf=["any",["in",["get","__rs_road"],L],["in",["get","__rs_road2"],L]]; f=f?["all",f,qf]:qf; }
     try{ map.setFilter(l.id,f); }catch(e){}
   });
@@ -548,7 +548,8 @@ function rsFilter(ids, layer){   // show only these features; rsFilter(null) res
   const L=_lyr(layer); if(!L) return;
   if(L.ov){
     const f = ids==null ? null : ["in",["id"],["literal",Array.from(ids)]];
-    L.ov.layers.forEach(id=>{ if(map.getLayer(id)) try{ map.setFilter(id,f); }catch(e){} });
+    L.ov.layers.forEach(id=>{ if(map.getLayer(id)) try{   // an overlay attached to edges keeps its position and order (ov.base)
+      const b=(L.ov.base||{})[id]; map.setFilter(id, f==null ? (b||null) : (b ? ["all",b,f] : f)); }catch(e){} });
     document.dispatchEvent(new CustomEvent("rs:filterchange",
       {detail:{overlay:L.ov.label, ids:ids==null?null:Array.from(ids)}}));
     return;

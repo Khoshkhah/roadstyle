@@ -4,6 +4,15 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.14.0] — 2026-10-04
+
+### Added
+- **Overlays attached to edges**: `Overlay(edge_col=, order_col=, color_col=)` and `render_edges(edge_id_col="edge_id")`. A feature is drawn at the position of its edge's fill number, after the fills and before the arrows of that position,
+  by `order_col` (global, lower first), so a lane, a marking, a zebra crossing or a sign is over its own road and under every road above it. An edge id that is not among the roads is an error. `rsFilter` on such an overlay keeps each layer's position and order.
+  Design: `docs/design/edge_overlays.md`; guide: *Overlays*.
+- **The one-way arrows and the street names are connected to the roads**: each piece of road that carries one belongs to the edge under its middle point (`__rs_road`, and `__rs_road2` for the twin of a two-way street) and has that edge's fill number. `rsFilter` on the roads now hides the arrows and names of the edges that are not shown
+  (before, only the class filter reached them). Tiles carry the same properties.
+
 ## [0.13.1] — 2026-10-04
 
 ### Added

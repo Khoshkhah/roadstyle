@@ -22,7 +22,8 @@ it does not use the road palette.
 
 ```python
 rs.Overlay(data, kind=None, placement="over", color=None, opacity=None, outline=None,
-           radius=None, width=None, label=None, popup=None, tooltip=None, visible=True)
+           radius=None, width=None, label=None, popup=None, tooltip=None, visible=True,
+           edge_col=None, order_col=None, color_col=None)
 ```
 
 - `kind`: `"fill"`, `"line"` or `"circle"`. Left out, it follows the geometry: polygons fill,
@@ -34,6 +35,26 @@ rs.Overlay(data, kind=None, placement="over", color=None, opacity=None, outline=
 - `popup`: the fields shown when a feature is clicked. `None` shows every field; `[]` makes the
   layer not clickable.
 - `tooltip`: the fields shown on hover. `visible=False` starts the layer switched off.
+
+## Overlays attached to edges
+
+A thing that belongs to one road (a lane, a lane marking, a zebra crossing, a sign) must be drawn **at the place of its road**: over the road's fill and under every road above it, not over all roads.
+Give the overlay two columns:
+
+```python
+lanes = rs.Overlay(lane_polygons, edge_col="edge_id", order_col="order", color_col="color", kind="fill")
+rs.render_edges(edges, overlays=[lanes, markings, signs])
+```
+
+- `edge_col`: the property with the **id of the feature's edge**. The ids are the values of the roads' own id column (`edge_id_col` of `render_edges`, default `edge_id`).
+- `order_col`: the property with a whole number, the **order** of the feature: the lower is drawn first (null is 0). The order is global: it orders the features of different edges at the same position too.
+- `color_col`: a property with a colour per feature.
+
+Each road is drawn by a casing number and a fill number ([which road is on top](levels.md)). A feature takes the **fill number of its edge**. In each position the layers are: the casings, the fills,
+the edge overlays by order, the one-way arrows, the street names. So a sign is over its own road and under every road that passes above it. `placement` is not used for such an overlay.
+
+A feature whose edge id is not among the roads is an error that lists the ids; nothing is drawn at a default place. A click on an edge overlay wins over the roads, like an `"over"` overlay.
+Design: [Overlays attached to edges](../design/edge_overlays.md).
 
 ## The Layers control
 

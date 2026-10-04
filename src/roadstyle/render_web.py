@@ -264,20 +264,27 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
     density per zoom automatically. Unnamed roads leave their name slots empty. Returns a
     FeatureCollection of slot pieces: {slot, name, highway, oneway}.
     """
-    from shapely.geometry import LineString
+    from shapely.geometry import LineString, Point
     from shapely.ops import substring
+    from shapely.strtree import STRtree
 
     reps = []                                    # (start, end, coords, props), twins collapsed
-    for ft in geo["features"]:
+    by_ends, owner = {}, {}                      # (start, end) -> feature index; id(props) -> (feature index, its twin's index): the road a slot belongs to
+    lines = []
+    for i, ft in enumerate(geo["features"]):
         g, p = ft.get("geometry") or {}, ft.get("properties", {})
         c = g.get("coordinates") or []
         if g.get("type") != "LineString" or len(c) < 2:
             continue
         a = (round(c[0][0], 6), round(c[0][1], 6))
         z = (round(c[-1][0], 6), round(c[-1][1], 6))
+        by_ends[(a, z)] = i
+        lines.append((i, a, z, c, p))
+    for i, a, z, c, p in lines:
         if p.get("__rs_twoway") and (z, a) < (a, z):
             continue
         reps.append((a, z, c, p))
+        owner[id(p)] = (i, by_ends.get((z, a)) if p.get("__rs_twoway") else None)
 
     # class is part of the key: a cycleway running along "Götgatan" carries the street's name
     # too, and without the class it chained INTO the roadway's group — slots then labelled the
@@ -335,6 +342,7 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
             return chain
 
         chains = [walk(i) for i in range(n) if not used[i]]
+        etree = STRtree([LineString(e[2]) for e in edges])          # which edge of the group a slot lies on
         # the caller's class column ("highway" only by convention — e.g. Overture data styles by
         # "class"); stored under the slots' own fixed "highway" key either way, which is what the
         # arrow/label minzoom filters and sort keys read. Hardcoding the lookup dropped the
@@ -353,9 +361,12 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
                     continue
                 coords = [[round(x / kx + lon0, 6), round(y / 111320.0 + lat0, 6)]
                           for x, y in part.coords]
+                mid = part.interpolate(0.5, normalized=True)
+                road, twin = owner[id(edges[int(etree.nearest(Point(mid.x / kx + lon0, mid.y / 111320.0 + lat0)))][3])]
                 feats.append({"type": "Feature",
                               "properties": {"slot": i, "name": name, "highway": hw,
-                                             "oneway": oneway, "lvl": lvl,
+                                             "oneway": oneway, "lvl": lvl, "__rs_road": road,
+                                             **({"__rs_road2": twin} if twin is not None else {}),
                                              **({"fl": fl} if fl is not None else {})},
                               "geometry": {"type": "LineString", "coordinates": coords}})
     return {"type": "FeatureCollection", "features": feats}
@@ -1063,6 +1074,8 @@ def _overlay_layers(sid, ov, kind, hover_color="#b388ff", select_color="#7c4dff"
          "circle_opacity": 0.85, "line_opacity": 0.9, "outline_opacity": 0.9,
          "circle_stroke": "#ffffff", **(CONFIG.overlays or {})}
     base = ov.color or C["color"]                     # per-Overlay value wins over the setting
+    if ov.color_col:                                  # a colour per feature (null / missing: the overlay's)
+        base = ["coalesce", ["get", ov.color_col], base]
     width = C["width"] if ov.width is None else ov.width
     radius = C["radius"] if ov.radius is None else ov.radius
     op = ov.opacity
@@ -1088,32 +1101,96 @@ def _overlay_layers(sid, ov, kind, hover_color="#b388ff", select_color="#7c4dff"
                        "line-opacity": C["line_opacity"] if op is None else op}}]
 
 
-def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4dff"):
-    """Add each overlay as its own source + layer(s) to ``style``. Returns ``(under, over, meta)``:
-    the layer specs to splice below / above the roads, and the JS metadata (label / source / clickable
+def _eid(v):
+    """An edge id as text, the same for an int, a float with a whole value and a string, so ids past 2**53 match."""
+    if isinstance(v, float) and v.is_integer():
+        v = int(v)
+    return str(v)
+
+
+def _edge_overlay(ov, fc, fills, edge_id_col):
+    """Bake ``__rs_fl`` (the fill number of the feature's edge) and ``__rs_ord`` (its order) on the features of an overlay with ``edge_col``
+    (docs/design/edge_overlays.md). ``fills``: ``{edge id as text: fill number}`` of the roads. An edge id that is not among the roads is an error."""
+    if fills is None:
+        raise ValueError(f"an overlay with edge_col needs the roads' id column {edge_id_col!r} (edge_id_col): it is not in the edges")
+    unknown, orders = [], set()
+    for ft in fc["features"]:
+        p = ft.setdefault("properties", {}) or {}
+        ft["properties"] = p
+        e = _eid(p.get(ov.edge_col))
+        if e not in fills:
+            unknown.append(e)
+            continue
+        o = p.get(ov.order_col) if ov.order_col else 0
+        o = 0 if o is None or (isinstance(o, float) and math.isnan(o)) else int(o)
+        p["__rs_fl"], p["__rs_ord"] = fills[e], o
+        orders.add((fills[e], o))
+    if unknown:
+        raise ValueError(f"overlay {ov.label or ''}: {len(unknown)} feature(s) have an {ov.edge_col!r} that is not an edge of the roads (first: {unknown[:5]})")
+    return sorted(orders)
+
+
+def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4dff", fills=None, edge_id_col="edge_id"):
+    """Add each overlay as its own source + layer(s) to ``style``. Returns ``(under, over, meta, edge)``:
+    the layer specs to splice below / above the roads, the JS metadata (label / source / clickable
     layer ids / popup fields) the page reads to wire popups, hover/select highlight, and the Layers
-    toggle. Overlay sources carry ``generateId`` so interactive features can take feature-state."""
-    under, over, meta = [], [], []
+    toggle, and the layers of the overlays attached to edges, ``[(position, order, overlay index, [layer specs])]``, which go
+    between the fills of their position and its arrows (``_place_edge_overlays``). Overlay sources carry ``generateId``
+    so interactive features can take feature-state."""
+    under, over, meta, edge = [], [], [], []
     for i, item in enumerate(overlays or []):
         ov = item if isinstance(item, Overlay) else Overlay(data=item)
         fc = to_fc(ov.data)
         kind = ov.kind or detect_kind(fc)
         sid = f"ov{i}"
+        base_filters = None
+        if ov.edge_col:
+            layers, base_filters = [], {}
+            for pos, order in _edge_overlay(ov, fc, fills, edge_id_col):
+                flt = ["all", ["==", ["get", "__rs_fl"], pos], ["==", ["get", "__rs_ord"], order]]
+                mine = []
+                for lyr in _overlay_layers(sid, ov, kind, hover_color, select_color):
+                    lyr = {**lyr, "id": f"{lyr['id']}-lv{pos}-o{order}", "filter": flt}
+                    base_filters[lyr["id"]] = flt
+                    mine.append(lyr)
+                edge.append((pos, order, i, mine))
+                layers += mine
+        else:
+            layers = _overlay_layers(sid, ov, kind, hover_color, select_color)
+            (under if ov.placement == "under" else over).extend(layers)
         style["sources"][sid] = {"type": "geojson", "data": fc, "generateId": True}
-        layers = _overlay_layers(sid, ov, kind, hover_color, select_color)
-        (under if ov.placement == "under" else over).extend(layers)
         # the topmost layer is the click target (fill body / circle / line)
         meta.append({"label": ov.label or f"Layer {i + 1}",
                      "source": sid,
                      "layers": [lyr["id"] for lyr in layers],
-                     "hit": layers[0]["id"],
+                     "hit": layers[0]["id"] if layers else None,
                      "visible": getattr(ov, "visible", True),
                      "color": ov.color,
                      "popup": list(ov.popup) if ov.popup is not None else None,
                      "tooltip": list(ov.tooltip) if ov.tooltip else None,
-                     "under": ov.placement == "under",
+                     "under": ov.placement == "under" and not ov.edge_col,
+                     "base": base_filters,              # the layers' own filters (position and order) that rsFilter must keep
                      "interactive": ov.popup is None or bool(ov.popup)})
-    return under, over, meta
+    return under, over, meta, edge
+
+
+def _place_edge_overlays(layers, edge, levels):
+    """Splice the layers of the overlays attached to edges into ``layers``: for each position, after its fills and before its one-way arrows (else its street
+    names, else right after its fills), by order, then by the order of the overlays (docs/design/edge_overlays.md)."""
+    for pos in levels:
+        mine = [x for x in edge if x[0] == pos]
+        if not mine:
+            continue
+        ids = [l["id"] for l in layers]
+        stop = next((f for f in ("roads-arrows" if pos == 0 else f"roads-arrows-lv{pos}", "roads-labels" if pos == 0 else f"roads-labels-lv{pos}") if f in ids), None)
+        if stop:
+            at = ids.index(stop)
+        else:
+            fam = {_level_id(x, pos) for x in _FILL_FAMILY}
+            dash = _level_id("roads-fill", pos) + "-dash"
+            at = max(i for i, n in enumerate(ids) if n in fam or n.startswith(dash)) + 1
+        layers[at:at] = [lyr for _, _, _, group in sorted(mine, key=lambda x: (x[1], x[2])) for lyr in group]
+    return layers
 
 
 # The page template lives in static/web_template.html (placeholders: __TITLE__, __STYLE__, …)
@@ -1170,7 +1247,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
-           band_col: str = None, cap_col: str = None, casing_level_col: str = None, fill_level_col: str = None, casing_start_col: str = None, casing_end_col: str = None, head_m: float = 5.0, directed_col: str = None,
+           edge_id_col: str = "edge_id", band_col: str = None, cap_col: str = None, casing_level_col: str = None, fill_level_col: str = None, casing_start_col: str = None, casing_end_col: str = None, head_m: float = 5.0, directed_col: str = None,
            width_m_col: str = None, width_m_zoom: float = 16, casing_m: float = 0.15,
            pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
@@ -1368,7 +1445,11 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
 
     # extra overlay layers (zones / POIs / any geometry the caller brings); each gets its own source
     # + paint layer(s), placed under or over the roads, and (if `popup` is set) clickable.
-    under_layers, over_layers, ov_meta = _build_overlays(style, overlays)
+    fills = None
+    if overlays and any(getattr(o, "edge_col", None) for o in overlays):
+        if edge_id_col in g.columns:
+            fills = {_eid(ft["properties"].get(edge_id_col)): ft["properties"].get("__rs_fl") or 0 for ft in geo["features"]}
+    under_layers, over_layers, ov_meta, edge_layers = _build_overlays(style, overlays, fills=fills, edge_id_col=edge_id_col)
 
     # Round caps + joins everywhere: consecutive edges are separate LineStrings, and a round cap is
     # the only rendering primitive that seals the seam where two of them connect (line-join only
@@ -1821,6 +1902,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
              "paint": {"line-color": "#6a0dad", "line-width": 2.5, "line-opacity": 0.9,
                        "line-dasharray": [3, 2]}})
 
+    if edge_layers:       # the overlays attached to edges: after the fills of their position, before its arrows (docs/design/edge_overlays.md)
+        style["layers"] = _place_edge_overlays(style["layers"], edge_layers, levels)
     style["layers"] += over_layers             # caller overlays drawn on top of the roads (e.g. POIs)
 
     # road-class filter panel: the distinct classes present, most important first. `filter_col`

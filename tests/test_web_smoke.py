@@ -210,3 +210,63 @@ def test_map_that_starts_late_still_gets_its_roads(tmp_path):
     assert attached["ok"] and attached["features"] >= 4000
     assert not banner
 
+
+
+def test_edge_overlay_page_boots_and_rsfilter_keeps_position_and_order(tmp_path):
+    """docs/design/edge_overlays.md: an overlay attached to edges draws in the browser; rsFilter on it combines with the position and order of each layer and rsFilter(null) restores them."""
+    import geopandas as gpd
+    from shapely.geometry import Point
+
+    from roadstyle import Overlay
+    from roadstyle.render_web import render
+
+    g = _edges().assign(edge_id=range(100, 140))
+    pts = gpd.GeoDataFrame({"edge_id": [100, 101, 102]}, geometry=[Point(18.0 + i * 1e-3, 59.3005) for i in range(3)], crs=4326)
+    path = tmp_path / "edge_overlay.html"
+    render(g, basemap="blank", overlays=[Overlay(pts, edge_col="edge_id", kind="circle", label="signs", radius=8)]).save(path)
+    errors = []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && window.map.loaded() && window.map.querySourceFeatures('roads').length > 0", timeout=30_000)
+        ids = page.evaluate("RS_OVERLAYS[0].layers")
+        assert ids and all("-lv" in i and "-o" in i for i in ids)
+        base = page.evaluate("id => map.getFilter(id)", ids[0])
+        page.evaluate("rsFilter([0, 1], 'signs')")
+        narrowed = page.evaluate("id => map.getFilter(id)", ids[0])
+        page.evaluate("rsFilter(null, 'signs')")
+        restored = page.evaluate("id => map.getFilter(id)", ids[0])
+        drawn = page.evaluate("map.queryRenderedFeatures({layers: RS_OVERLAYS[0].layers}).length")
+        browser.close()
+    assert errors == []
+    assert narrowed[0] == "all" and base in narrowed and narrowed != base      # the position and order stay, the ids are added
+    assert restored == base
+    assert drawn > 0
+
+
+def test_rsfilter_reaches_the_arrows_and_street_names(tmp_path):
+    """docs/design/edge_overlays.md: after rsFilter(ids) on the roads, the arrow and name layers show only the slots of those edges (their __rs_road / __rs_road2)."""
+    from roadstyle.render_web import render
+
+    path = tmp_path / "slots.html"
+    render(_edges(), basemap="blank", arrows=True, labels=True).save(path)
+    errors = []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && window.map.loaded() && window.map.querySourceFeatures('roads').length > 0", timeout=30_000)
+        layers = page.evaluate("map.getStyle().layers.map(l => l.id).filter(i => i.startsWith('roads-arrows') || i.startsWith('roads-labels'))")
+        assert layers
+        before = page.evaluate("ids => ids.map(i => JSON.stringify(map.getFilter(i)))", layers)
+        page.evaluate("rsFilter([0, 1])")
+        after = page.evaluate("ids => ids.map(i => JSON.stringify(map.getFilter(i)))", layers)
+        page.evaluate("rsFilter(null)")
+        reset = page.evaluate("ids => ids.map(i => JSON.stringify(map.getFilter(i)))", layers)
+        browser.close()
+    assert errors == []
+    assert not any("__rs_road" in f for f in before) and all("__rs_road" in f for f in after)
+    assert reset == before
