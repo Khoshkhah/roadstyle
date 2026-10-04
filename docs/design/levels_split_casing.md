@@ -552,6 +552,7 @@ table  = rs.load_levels(con, order="class")                              # witho
 - A layer of the page whose source was `casings` or `ends` reads the same tile layer of the source `roads` (`source-layer`). Nothing else about the layers changes: same ids, same filters, same positions.
 - The pieces and caps carry the properties the layers read (`__rs_*`, the class column, `lvl`, the width column), and their edge's id as `__rs_road` / `__rs_road2`.
 - The page's filters (class filter, `rsFilter`, `rsColor`) pick a layer's kind by its tile layer name when tiled (`roads`, `casings`, `ends`), by its source name when not.
+- **The positions are computed for the whole network, also with tiles.** The page has one set of layers for all tiles on screen, so a number of one tile is compared with the numbers of the next tile at every border. Tiles solved one by one cannot guarantee that two roads that meet at a border have numbers in the right order: the height of a group of roads is free in each solve. So the tiles hold numbers of one solve.
 - The archive grows with the pieces: the casing layer has about three features per edge. (open point 8).
 
 ## 13. Open points
