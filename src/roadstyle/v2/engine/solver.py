@@ -8,9 +8,10 @@ optimization solver from roadstyle v1 (levels.py).
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from dataclasses import dataclass, field
-import math
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -53,8 +54,10 @@ def _compute_metric_scale(corridors: list[Corridor]) -> tuple[bool, float, float
 def solve_stacking(
     corridors: list[Corridor],
     *,
+    pair_table: list[dict[str, Any]] | str | Path | None = None,
+    pair_overrides: list[dict[str, Any]] | str | Path | None = None,
     band_dist: float = 10.0,
-    head_m: float = 5.0,
+    head_m: float = 15.0,
     max_level: int = 20,
     margin: float = 1.0,
     time_limit: float = 60.0,
@@ -66,10 +69,14 @@ def solve_stacking(
     ----------
     corridors : list[Corridor]
         The corridors to solve stacking for.
+    pair_table : rows or CSV path, optional
+        Original pair table. If omitted, the original table is discovered from geometry and tags.
+    pair_overrides : rows or CSV path, optional
+        Sparse CSV/table overrides applied to the original pair table before solving.
     band_dist : float
         Distance in meters within which corridors of differing bands are treated as grade crossings.
     head_m : float
-        Length in meters of junction casing heads (default 5.0m).
+        Length in meters of junction casing heads (default 15.0m).
     max_level : int
         Maximum absolute level range (default 20).
     margin : float
@@ -87,6 +94,13 @@ def solve_stacking(
     n = len(corridors)
     if n == 0:
         return StackingSolution(casing_levels=[], fill_levels=[], status="EMPTY")
+
+    from .pairs import (
+        _corridor_refs,
+        discover_pair_table,
+        merge_pair_overrides,
+        read_pair_table,
+    )
 
     # 1. Compute discrete node IDs from line endpoints
     geoms = np.asarray([c.geometry for c in corridors], dtype=object)
@@ -129,6 +143,62 @@ def solve_stacking(
 
     omega_arg = omega if has_omega else None
 
+    # Pair discovery is separate from optimization. Persisted tables can be edited
+    # and passed back in so an optimization rerun uses the same relationships.
+    refs = _corridor_refs(corridors)
+    if len(set(refs)) != len(refs):
+        raise ValueError("solve_stacking: corridor edge references must be unique")
+    if pair_table is None:
+        original_pairs = discover_pair_table(corridors, band_dist=band_dist)
+    elif isinstance(pair_table, (str, Path)):
+        original_pairs = read_pair_table(pair_table)
+    else:
+        original_pairs = [{str(k): str(v) for k, v in row.items()} for row in pair_table]
+    if isinstance(pair_overrides, (str, Path)):
+        override_rows = read_pair_table(pair_overrides, overrides=True)
+    else:
+        override_rows = pair_overrides or []
+    effective_pairs = merge_pair_overrides(original_pairs, override_rows)
+
+    ref_to_index = {ref: i for i, ref in enumerate(refs)}
+    node_refs = sorted({
+        f"{coord[0]:.7f},{coord[1]:.7f}"
+        for c in corridors
+        for coord in (c.geometry.coords[0], c.geometry.coords[-1])
+    })
+    node_ids = {node_ref: i for i, node_ref in enumerate(node_refs)}
+    stack_pairs: set[tuple[int, int]] = set()
+    connect_pairs: set[tuple[int, str, int, str, int]] = set()
+    order_pairs: set[tuple[int, int]] = set()
+    for row in effective_pairs:
+        if str(row.get("enabled", "true")).lower() in {"false", "0", "no"}:
+            continue
+        relation = row.get("relation")
+        if relation in {"near", "cross"}:
+            upper, lower = row.get("upper_edge_ref"), row.get("lower_edge_ref")
+            if upper not in ref_to_index or lower not in ref_to_index:
+                raise ValueError(f"pair {row.get('pair_id')!r} references an unknown upper/lower edge")
+            stack_pairs.add((ref_to_index[upper], ref_to_index[lower]))
+        elif relation == "connect":
+            edge_a, edge_b = row.get("edge_a"), row.get("edge_b")
+            if edge_a not in ref_to_index or edge_b not in ref_to_index:
+                raise ValueError(f"pair {row.get('pair_id')!r} references an unknown connected edge")
+            try:
+                node = node_ids[row["node_ref"]]
+            except KeyError:
+                raise ValueError(f"pair {row.get('pair_id')!r} has a node_ref that is not a corridor endpoint") from None
+            side_a, side_b = row.get("endpoint_a"), row.get("endpoint_b")
+            if side_a not in {"start", "end"} or side_b not in {"start", "end"}:
+                raise ValueError(f"pair {row.get('pair_id')!r} must specify start/end endpoints")
+            connect_pairs.add((ref_to_index[edge_a], side_a, ref_to_index[edge_b], side_b, node))
+        elif relation == "order":
+            upper, lower = row.get("upper_edge_ref"), row.get("lower_edge_ref")
+            if upper not in ref_to_index or lower not in ref_to_index:
+                raise ValueError(f"pair {row.get('pair_id')!r} references an unknown ordered edge")
+            order_pairs.add((ref_to_index[upper], ref_to_index[lower]))
+        else:
+            raise ValueError(f"pair {row.get('pair_id')!r} has unsupported relation {relation!r}")
+
     # Determine head_m from split_start if available
     avg_head = head_m
     if corridors:
@@ -148,6 +218,11 @@ def solve_stacking(
         max_level=max_level,
         margin=margin,
         min_positions=True,
+        pair_constraints={
+            "stack_pairs": sorted(stack_pairs),
+            "connect_pairs": sorted(connect_pairs),
+            "order_pairs": sorted(order_pairs),
+        },
     )
 
     # 4. Center ground around 0 and compress to small order-preserving integers
@@ -175,3 +250,22 @@ def solve_stacking(
         status="OPTIMAL",
         info=info,
     )
+
+
+def write_pair_tables(
+    corridors: list[Corridor],
+    original_path: str | Path,
+    override_path: str | Path,
+    *,
+    band_dist: float = 10.0,
+) -> None:
+    """Write discovered original pairs and an empty, editable override CSV."""
+    from .pairs import _corridor_refs, discover_pair_table, write_pair_table
+
+    if any(ref.startswith("@index:") for ref in _corridor_refs(corridors)):
+        raise ValueError(
+            "write_pair_tables: persistent pair tables require a stable id, edge_ref, "
+            "ref, or edge_id on every corridor"
+        )
+    write_pair_table(original_path, discover_pair_table(corridors, band_dist=band_dist))
+    write_pair_table(override_path, [], overrides=True)

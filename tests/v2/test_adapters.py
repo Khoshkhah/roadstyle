@@ -122,6 +122,8 @@ def test_osm_adapter_from_dataframe():
     assert m_cor.band == 1
     assert m_cor.casing_left_m == 0.40
     assert m_cor.fill_color == "#e11d48"
+    assert m_cor.split_start == 15.0
+    assert m_cor.split_end == 15.0
 
     # Primary roundabout: priority=100
     p_cor = corridors[1]

@@ -99,7 +99,56 @@ def _difference_lp(cost, A, b, hi):
     return x if x.max() <= hi + 1e-9 else None
 
 
-def _solve_intervals(metres, ends, beta, omega, limit, band_dist, head_m, max_level, margin, min_positions=True):
+def _discover_interval_pairs(metres, ends, beta, omega, band_dist):
+    """Discover stacking, shared-endpoint, and priority relationships by road index."""
+    from shapely import STRtree
+
+    at = defaultdict(set)
+    for road, (start, end) in enumerate(ends):
+        at[start].add(road)
+        at[end].add(road)
+
+    connect_pairs = set()
+    order_pairs = set()
+    for node, roads in at.items():
+        roads = sorted(roads)
+        for i, a in enumerate(roads):
+            for b in roads[i + 1:]:
+                for side_a, node_a in (("start", ends[a][0]), ("end", ends[a][1])):
+                    for side_b, node_b in (("start", ends[b][0]), ("end", ends[b][1])):
+                        if node_a == node and node_b == node:
+                            connect_pairs.add((a, side_a, b, side_b, node))
+                if (omega is not None and omega[a] is not None and omega[b] is not None
+                        and beta[a] == beta[b] and omega[a] != omega[b]):
+                    order_pairs.add((a, b) if omega[a] > omega[b] else (b, a))
+
+    stack_pairs = set()
+    if len(set(beta)) > 1:
+        first, second = STRtree(metres).query(metres, predicate="dwithin", distance=band_dist)
+        for a, b in zip(first.tolist(), second.tolist(), strict=True):
+            if a < b and beta[a] != beta[b]:
+                stack_pairs.add((a, b) if beta[a] > beta[b] else (b, a))
+
+    return {
+        "stack_pairs": sorted(stack_pairs),
+        "connect_pairs": sorted(connect_pairs),
+        "order_pairs": sorted(order_pairs),
+    }
+
+
+def _solve_intervals(
+    metres,
+    ends,
+    beta,
+    omega,
+    limit,
+    band_dist,
+    head_m,
+    max_level,
+    margin,
+    min_positions=True,
+    pair_constraints=None,
+):
     """method="solve" on roads (one per segment, both directions together). Every road has one fill number ``b`` and a casing divided into a start head,
     a main part and an end head (one number for a road shorter than ``2 * head_m``). Returns ``(parts, given_up, info)``: ``parts[r] = (a_start, a_main, a_end, b)``.
     The model is a linear program solved on a sparse matrix with HiGHS (docs/design/levels_split_casing.md, section 7)."""
@@ -109,29 +158,27 @@ def _solve_intervals(metres, ends, beta, omega, limit, band_dist, head_m, max_le
     import numpy as np
     import scipy.sparse as sp
     from scipy.optimize import linprog
-    from shapely import STRtree
     t0, n = time.time(), len(metres)
     zero = [(0, 0, 0, 0)] * n
     import shapely
     long_ = (shapely.length(np.asarray(metres, dtype=object)) >= 2 * head_m).tolist()
-    at = defaultdict(set)
-    for r, (s, t) in enumerate(ends):
-        at[s].add(r), at[t].add(r)
-    # stack pairs (upper, lower): roads within band_dist of each other whose bands differ (a crossing and a meeting are both at distance 0)
-    pairs = set()
-    if len(set(beta)) > 1:
-        qi, ti = STRtree(metres).query(metres, predicate="dwithin", distance=band_dist)
-        for i, j in zip(qi.tolist(), ti.tolist(), strict=True):
-            if i < j and beta[i] != beta[j]:
-                pairs.add((i, j) if beta[i] > beta[j] else (j, i))
-    pair_list = sorted(p for p in pairs if long_[p[0]])        # a short upper road has no main part: its pairs are not stack pairs (docs/design/levels_split_casing.md, section 6)
-    short_upper = len(pairs) - len(pair_list)
-    info = {"pairs": len(pair_list), "roads": n, "short_roads": long_.count(False), "short_upper_pairs": short_upper}
-    if not pair_list and omega is None:
+    discovered = pair_constraints or _discover_interval_pairs(metres, ends, beta, omega, band_dist)
+    stack_pairs = list(discovered["stack_pairs"])
+    pair_list = sorted(p for p in stack_pairs if long_[p[0]])  # short upper roads have no main casing span
+    short_upper = len(stack_pairs) - len(pair_list)
+    connect_pairs = list(discovered["connect_pairs"])
+    order_pairs = list(discovered["order_pairs"])
+    info = {
+        "pairs": len(pair_list),
+        "roads": n,
+        "short_roads": long_.count(False),
+        "short_upper_pairs": short_upper,
+        "connect_pairs": len(connect_pairs),
+        "order_pairs": len(order_pairs),
+    }
+    if not pair_list and not order_pairs:
         return zero, [], {**info, "pairs": 0, "solves": 0, "seconds": 0.0}      # no pair, no order: all zero is the optimum
-    J = sorted({(x, y) for rs in at.values() for x in rs for y in rs if x < y})              # roads that share an end node
-    O = [(x, y) if omega[x] > omega[y] else (y, x) for x, y in J
-         if omega is not None and omega[x] is not None and omega[y] is not None and beta[x] == beta[y] and omega[x] != omega[y]]
+    O = order_pairs
 
     # variables: b_r = column r; then the casing parts (three for a long road, one for a short road); the slacks of the stages 1-3 come after
     part, ncol, casing = [], n, []                             # part[r]: "s" / "m" / "e" -> column; casing: (road, column) of every casing part
@@ -152,16 +199,9 @@ def _solve_intervals(metres, ends, beta, omega, limit, band_dist, head_m, max_le
         rhs.append(c)
     for r, v in casing:
         le([(v, 1.0), (r, -1.0)], 0.0)                         # H1: a_c <= b_road(c)
-    for v, rs in at.items():                                   # H2: every pair that meets at the node v
-        rs = sorted(rs)
-        for i, x in enumerate(rs):
-            for y in rs[i + 1:]:
-                for p, node in (("s", ends[x][0]), ("e", ends[x][1])):
-                    if node == v:
-                        le([(part[x][p], 1.0), (y, -1.0)], 0.0)
-                for p, node in (("s", ends[y][0]), ("e", ends[y][1])):
-                    if node == v:
-                        le([(part[y][p], 1.0), (x, -1.0)], 0.0)
+    for x, side_x, y, side_y, _node in connect_pairs:           # H2: connected casing heads stay under the other road's fill
+        le([(part[x]["s" if side_x == "start" else "e"], 1.0), (y, -1.0)], 0.0)
+        le([(part[y]["s" if side_y == "start" else "e"], 1.0), (x, -1.0)], 0.0)
     if min_positions:                                          # section 7.3.1: H above and L below every number; the span H - L is in the cost
         H, Lo, first_nv = ncol, ncol + 1, ncol
         for v in range(first_nv):

@@ -7,6 +7,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **OSM casing heads:** increase junction head setbacks to 15 m at both ends of each OSM road; the stacking solver fallback default is also 15 m.
+- **Monaco v2 map:** road details open in a click popup and include the computed road length.
 - **Faster page building:** the casing pieces and the arrow and street-name slots are cut with a small numpy cutter instead of shapely's `substring` (the same lines), and a slot of a group of one edge no longer searches for its edge.
   A page of a city of 64,000 roads builds about 40% faster.
 
