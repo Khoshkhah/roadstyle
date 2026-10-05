@@ -70,7 +70,7 @@ generated from the same slider value so its colors stay in step.
 | Casing dash | Slate `#94a3b8` | First color in the selected casing palette |
 | Casing gap | Map background `#e2e8f0` | Second color in the selected casing palette |
 | Channel casing | Slate `#94a3b8` | Slate `#64748b` |
-| Street name | Light gray `#f1f5f9` | Cyan `#a5f3fc` |
+| Street name | Light gray `#f1f5f9` with dark halo | Blue `#0284c7` with teal halo `#164e63` |
 | Dashed markings and glyph text | Feature color, or white fallback | Cyan `#a5f3fc` |
 | Tunnel direction arrow | White | Cyan `#a5f3fc` |
 

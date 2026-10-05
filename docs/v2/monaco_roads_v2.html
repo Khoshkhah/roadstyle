@@ -477,6 +477,8 @@ return maplibregl$1;
       casing: '#64748b',
       casingGap: '#cbd5e1',
       detail: '#a5f3fc',
+      streetName: '#0284c7',
+      streetNameHalo: '#164e63',
       arrow: '#a5f3fc'
     };
     const tunnelCasingPairs = {
@@ -623,8 +625,14 @@ return maplibregl$1;
           map.setPaintProperty(lid, 'text-color', [
             'case',
             isTunnelRelated(),
-            mixExpression('#f1f5f9', tunnelStyleTargets.detail),
+            mixExpression('#f1f5f9', tunnelStyleTargets.streetName),
             '#f1f5f9'
+          ]);
+          map.setPaintProperty(lid, 'text-halo-color', [
+            'case',
+            isTunnelRelated(),
+            mixExpression('rgba(11,13,20,0.9)', tunnelStyleTargets.streetNameHalo),
+            'rgba(11,13,20,0.9)'
           ]);
         } else if (lid === 'lane-arrows-tunnel') {
           map.setPaintProperty(lid, 'icon-color', mixExpression('#ffffff', tunnelStyleTargets.arrow));
