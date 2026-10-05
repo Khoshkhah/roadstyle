@@ -71,19 +71,57 @@ return maplibregl$1;
     #map-loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 20; color: #38bdf8; font-size: 14px; font-weight: 600; background: rgba(18,20,29,0.9); padding: 10px 18px; border-radius: 8px; }
     .preset-panel {
       position: absolute;
-      top: 16px;
-      left: 16px;
+      top: 12px;
+      bottom: 12px;
+      left: 12px;
       z-index: 10;
+      width: 352px;
+      max-width: calc(100vw - 24px);
       background: rgba(18, 20, 29, 0.88);
       backdrop-filter: blur(10px);
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 10px;
-      padding: 10px 14px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      overflow: hidden;
       box-shadow: 0 4px 20px rgba(0,0,0,0.4);
     }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex: 0 0 auto;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .panel-heading { color: #f1f5f9; font-size: 13px; font-weight: 700; }
+    .panel-toggle {
+      width: 30px;
+      height: 30px;
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 6px;
+      background: rgba(255,255,255,.08);
+      color: #f1f5f9;
+      font-size: 19px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .panel-toggle:hover { background: rgba(56,189,248,.25); border-color: #38bdf8; }
+    .panel-content {
+      display: flex;
+      flex: 1 1 auto;
+      min-height: 0;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding: 10px 14px;
+    }
+    .preset-panel.collapsed { width: 52px; bottom: auto; }
+    .preset-panel.collapsed .panel-header { justify-content: center; padding: 8px; border-bottom: 0; }
+    .preset-panel.collapsed .panel-heading,
+    .preset-panel.collapsed .panel-content { display: none; }
     .preset-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #38bdf8; }
     .preset-btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
     .preset-btn {
@@ -199,6 +237,10 @@ return maplibregl$1;
       color: #94a3b8;
       margin-top: 2px;
     }
+    @media (max-width: 600px) {
+      .preset-panel { top: 8px; bottom: auto; left: 8px; width: 340px; max-width: calc(100vw - 16px); max-height: 65vh; }
+      .preset-panel.collapsed { width: 52px; max-height: none; }
+    }
   </style>
 </head>
 <body>
@@ -207,6 +249,11 @@ return maplibregl$1;
   <div id="map-error" style="display:none; position:absolute; top:20px; left:50%; transform:translateX(-50%); z-index:9999; background:rgba(220,38,38,0.92); color:#fff; padding:10px 18px; border-radius:8px; font-weight:600; font-size:13px; box-shadow:0 4px 16px rgba(0,0,0,0.5);"></div>
 
   <div class="preset-panel" id="preset-panel">
+    <div class="panel-header">
+      <div class="panel-heading">Roadstyle v2 • Monaco controls</div>
+      <button class="panel-toggle" id="panel-toggle" type="button" aria-label="Collapse dashboard panel" aria-expanded="true" aria-controls="panel-content" title="Collapse controls" onclick="toggleDashboardPanel()">‹</button>
+    </div>
+    <div class="panel-content" id="panel-content">
     <div class="preset-title">Basemap Layer</div>
     <div class="preset-btn-row" id="basemap-btn-row">
       <button class="preset-btn " id="bm-btn-dark" onclick="setBasemap('dark')">Dark Matter</button>
@@ -220,41 +267,31 @@ return maplibregl$1;
     </div>
     <div class="preset-title" style="margin-top: 8px;">🚇 Tunnel Styling (Solid Fill + Dashed Casing)</div>
     <div class="preset-btn-row" id="tunnel-btn-row">
-      <button class="preset-btn" id="btn-tun-subtle" onclick="applyTunnelPreset('subtle')">1: Subtle (75%/50%)</button>
-      <button class="preset-btn active" id="btn-tun-balanced" onclick="applyTunnelPreset('balanced')">2: Balanced (65%/60%)</button>
-      <button class="preset-btn" id="btn-tun-dark" onclick="applyTunnelPreset('dark')">3: Dark Inset</button>
-      <button class="preset-btn" id="btn-tun-orig" onclick="applyTunnelPreset('orig')">Baseline (100% White)</button>
+      <button class="preset-btn" id="btn-tun-subtle" onclick="applyTunnelPreset('subtle')">1: Subtle</button>
+      <button class="preset-btn active" id="btn-tun-balanced" onclick="applyTunnelPreset('balanced')">2: Balanced</button>
+      <button class="preset-btn" id="btn-tun-dark" onclick="applyTunnelPreset('dark')">3: Strong</button>
+      <button class="preset-btn" id="btn-tun-orig" onclick="applyTunnelPreset('orig')">Normal colors</button>
     </div>
     <div style="font-size: 11px; color: #38bdf8; margin-top: 2px; font-weight: 600; line-height: 1.3;" id="tunnel-status-label">
-      Preset 2: Balanced (Fill 65%, Slate Casing 60%)
+      Preset 2: Balanced (35% tunnel color)
+    </div>
+    <div style="margin-top: 6px; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; border: 1px solid rgba(56, 189, 248, 0.25);">
+      <div style="font-size: 11px; font-weight: 700; color: #38bdf8;">Tunnel casing dash / gap colors at full strength</div>
+      <div class="preset-btn-row" id="tunnel-pair-row">
+        <button class="preset-btn" id="pair-slate" title="#64748b / #cbd5e1" onclick="setTunnelCasingPair('slate', this)"><span style="display:inline-block;width:20px;height:8px;vertical-align:middle;background:linear-gradient(90deg,#64748b 50%,#cbd5e1 50%);"></span> Slate + ice</button>
+        <button class="preset-btn" id="pair-blue" title="#315b7d / #a9d7e8" onclick="setTunnelCasingPair('blue', this)"><span style="display:inline-block;width:20px;height:8px;vertical-align:middle;background:linear-gradient(90deg,#315b7d 50%,#a9d7e8 50%);"></span> Blue + cyan</button>
+        <button class="preset-btn" id="pair-warm" title="#806d64 / #e7c9a7" onclick="setTunnelCasingPair('warm', this)"><span style="display:inline-block;width:20px;height:8px;vertical-align:middle;background:linear-gradient(90deg,#806d64 50%,#e7c9a7 50%);"></span> Warm + sand</button>
+      </div>
+      <div style="font-size: 10px; color: #cbd5e1; line-height: 1.3;">At full strength, the first color is the dash and the second fills the usual gap. The shared slider also styles tunnel fill, names, arrows, and markings; surface roads are unchanged.</div>
     </div>
     <div style="margin-top: 6px; display: flex; flex-direction: column; gap: 5px; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; border: 1px solid rgba(56, 189, 248, 0.25);">
-      <div style="font-size: 11px; font-weight: 700; color: #38bdf8;">Junction Overlap Fix:</div>
-      <div style="display: flex; gap: 4px;">
-        <button class="preset-btn active" id="btn-mode-premix" style="flex: 1; font-size: 10px; padding: 4px 6px;" onclick="setTunnelBlendMode('premix', this)">✨ Method 1: Pre-Mix (Zero Seams)</button>
-        <button class="preset-btn" id="btn-mode-alpha" style="flex: 1; font-size: 10px; padding: 4px 6px;" onclick="setTunnelBlendMode('alpha', this)">GPU Alpha (Shows Blotches)</button>
-      </div>
-      <div id="tunnel-mode-note" style="font-size: 10.5px; color: #38bdf8; line-height: 1.3;">
-        ✨ <b>Method 1 Active:</b> 100% Solid Opacity with Pre-Mixed Color (Zero overlap blotches at joints!)
-      </div>
-      <div class="slider-row" style="margin-top: 4px;">
-        <span>Fill Opacity:</span>
-        <input type="range" id="tunnel-fill-opacity" min="20" max="100" value="65" oninput="onTunnelSliderChange()">
-        <span class="slider-val" id="fill-val">65%</span>
-      </div>
+      <div style="font-size: 11px; font-weight: 700; color: #38bdf8;">Shared tunnel color treatment</div>
       <div class="slider-row">
-        <span>Casing Opacity:</span>
-        <input type="range" id="tunnel-casing-opacity" min="20" max="100" value="60" oninput="onTunnelSliderChange()">
-        <span class="slider-val" id="casing-val">60%</span>
+        <span>Tunnel style:</span>
+        <input type="range" id="tunnel-style-strength" min="0" max="100" value="35" oninput="onTunnelSliderChange()">
+        <span class="slider-val" id="tunnel-strength-val">35%</span>
       </div>
-      <div class="slider-row" style="margin-top: 2px;">
-        <span>Casing Color:</span>
-        <div style="display: flex; gap: 4px;">
-          <button class="preset-btn" id="btn-case-white" style="font-size: 10px; padding: 2px 7px;" onclick="setTunnelCasingColor('#ffffff', this)">Soft White</button>
-          <button class="preset-btn active" id="btn-case-slate" style="font-size: 10px; padding: 2px 7px;" onclick="setTunnelCasingColor('#94a3b8', this)">Cool Slate</button>
-          <button class="preset-btn" id="btn-case-dark" style="font-size: 10px; padding: 2px 7px;" onclick="setTunnelCasingColor('#334155', this)">Dark Slate</button>
-        </div>
-      </div>
+      <div style="font-size: 10px; color: #cbd5e1; line-height: 1.3;">0% keeps normal colors; 100% applies the tunnel palette to fill, casing, street names, arrows, and markings.</div>
       <div class="slider-row" style="margin-top: 2px;">
         <span>Dash Division:</span>
         <div style="display: flex; gap: 4px;">
@@ -270,6 +307,7 @@ return maplibregl$1;
       <button class="preset-btn" style="font-size: 10px;" onclick="map.flyTo({ center: [7.416, 43.732], zoom: 17.0, duration: 1000 })">📍 Rainier III</button>
     </div>
     <div class="badge">roadstyle v2 • 60 FPS Single-Source WebGL</div>
+    </div>
   </div>
 
   <div class="info-tooltip" id="tooltip"></div>
@@ -331,6 +369,8 @@ return maplibregl$1;
       map.resize();
       const b = _dataBounds(styleSpec);
       if (b) map.fitBounds(b, { padding: 30, duration: 0 });
+      setupTunnelArrowLayer();
+      updateTunnelStyles();
     });
     window.addEventListener('resize', () => map.resize());
 
@@ -344,6 +384,17 @@ return maplibregl$1;
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 100, unit: 'metric' }), 'bottom-right');
 
     const BASEMAP_TILES = {"dark": "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png", "voyager": "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png", "esri": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"};
+
+    function toggleDashboardPanel() {
+      const panel = document.getElementById('preset-panel');
+      const button = document.getElementById('panel-toggle');
+      const collapsed = panel.classList.toggle('collapsed');
+      button.textContent = collapsed ? '›' : '‹';
+      button.setAttribute('aria-expanded', String(!collapsed));
+      button.setAttribute('aria-label', collapsed ? 'Expand dashboard panel' : 'Collapse dashboard panel');
+      button.title = collapsed ? 'Show controls' : 'Collapse controls';
+      requestAnimationFrame(() => map.resize());
+    }
 
     function setBasemap(type) {
       document.querySelectorAll('#basemap-btn-row .preset-btn').forEach(b => b.classList.remove('active'));
@@ -417,10 +468,40 @@ return maplibregl$1;
       }
     }
 
-    let currentCasingColor = '#94a3b8';
+    let currentTunnelCasingPair = 'slate';
     let currentDashArray = [3.0, 3.0];
-    let tunnelBlendMode = 'premix'; // 'premix' (Method 1) or 'alpha'
-    const bgR = 226, bgG = 232, bgB = 240;
+    let tunnelStyleStrength = 35;
+    let activeTunnelCasingPattern = null;
+    const tunnelStyleTargets = {
+      fill: '#64748b',
+      casing: '#64748b',
+      casingGap: '#cbd5e1',
+      detail: '#a5f3fc',
+      arrow: '#a5f3fc'
+    };
+    const tunnelCasingPairs = {
+      slate: ['#64748b', '#cbd5e1'],
+      blue: ['#315b7d', '#a9d7e8'],
+      warm: ['#806d64', '#e7c9a7']
+    };
+    const tunnelEdgeIds = Array.from(new Set(
+      styleSpec.sources.network.data.features
+        .filter(feature => feature.properties.tunnel === true && feature.properties.edge_id != null)
+        .map(feature => String(feature.properties.edge_id))
+    ));
+    const baseChannelCasingColors = new Map(
+      styleSpec.layers
+        .filter(layer => layer.id.startsWith('channel-casing-'))
+        .map(layer => [layer.id, layer.paint['line-color']])
+    );
+
+    function isTunnelRelated() {
+      return [
+        'any',
+        ['==', ['get', 'tunnel'], true],
+        ['in', ['to-string', ['coalesce', ['get', 'edge_id'], '']], ['literal', tunnelEdgeIds]]
+      ];
+    }
 
     function setTunnelDash(dashArr, btn) {
       currentDashArray = dashArr;
@@ -429,139 +510,187 @@ return maplibregl$1;
       updateTunnelStyles();
     }
 
-    function setTunnelBlendMode(mode, btn) {
-      tunnelBlendMode = mode;
-      document.querySelectorAll('[id^="btn-mode-"]').forEach(b => b.classList.remove('active'));
-      if (btn) btn.classList.add('active');
-      const note = document.getElementById('tunnel-mode-note');
-      if (note) {
-        if (mode === 'premix') {
-          note.innerHTML = '✨ <b>Method 1 Active:</b> 100% Solid Opacity with Pre-Mixed Color (Zero overlap blotches at joints!)';
-          note.style.color = '#38bdf8';
-        } else {
-          note.innerHTML = '⚠️ <b>Alpha Mode:</b> Translucent GPU alpha (Notice darker blotches at road connections)';
-          note.style.color = '#f59e0b';
-        }
-      }
-      updateTunnelStyles();
+    function mixTunnelColor(start, end, strength) {
+      const from = start.slice(1).match(/.{2}/g).map(channel => parseInt(channel, 16));
+      const to = end.slice(1).match(/.{2}/g).map(channel => parseInt(channel, 16));
+      const amount = strength / 100;
+      return '#' + from.map((channel, i) =>
+        Math.round(channel * (1 - amount) + to[i] * amount).toString(16).padStart(2, '0')
+      ).join('');
     }
 
-    function setTunnelCasingColor(color, btn) {
-      currentCasingColor = color;
-      if (btn) {
-        document.querySelectorAll('[id^="btn-case-"]').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
+    function mixExpression(start, target) {
+      return ['interpolate', ['linear'], tunnelStyleStrength, 0, start, 100, target];
+    }
+
+    function tunnelFeatureColor(property, fallback, target) {
+      const sourceColor = ['to-color', ['coalesce', ['get', property], fallback]];
+      return [
+        'case',
+        isTunnelRelated(),
+        mixExpression(sourceColor, target),
+        sourceColor
+      ];
+    }
+
+    function ensureTunnelCasingPattern(name) {
+      const colors = tunnelCasingPairs[name];
+      if (!colors) return null;
+      const renderedColors = [
+        mixTunnelColor('#94a3b8', colors[0], tunnelStyleStrength),
+        mixTunnelColor('#e2e8f0', colors[1], tunnelStyleStrength)
+      ];
+      const unit = 8;
+      const firstLength = Math.max(1, Math.round(currentDashArray[0] * unit));
+      const secondLength = Math.max(1, Math.round(currentDashArray[1] * unit));
+      const imageId = 'tunnel-casing-pair-' + name + '-' + currentDashArray.join('-');
+
+      const canvas = document.createElement('canvas');
+      canvas.width = firstLength + secondLength;
+      canvas.height = unit;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = renderedColors[0];
+      ctx.fillRect(0, 0, firstLength, unit);
+      ctx.fillStyle = renderedColors[1];
+      ctx.fillRect(firstLength, 0, secondLength, unit);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      if (map.hasImage(imageId)) {
+        map.updateImage(imageId, imageData);
+      } else {
+        map.addImage(imageId, imageData);
       }
-      updateTunnelStyles();
+      return imageId;
+    }
+
+    function setTunnelCasingPair(name, btn) {
+      if (!tunnelCasingPairs[name]) return;
+      currentTunnelCasingPair = name;
+      document.querySelectorAll('#tunnel-pair-row .preset-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      const strengthInput = document.getElementById('tunnel-style-strength');
+      if (strengthInput.value === '0') strengthInput.value = '35';
+      onTunnelSliderChange();
     }
 
     function onTunnelSliderChange() {
-      const fillVal = document.getElementById('tunnel-fill-opacity').value;
-      const casingVal = document.getElementById('tunnel-casing-opacity').value;
-      document.getElementById('fill-val').textContent = fillVal + '%';
-      document.getElementById('casing-val').textContent = casingVal + '%';
-      const cName = currentCasingColor === '#ffffff' ? 'White' : (currentCasingColor === '#94a3b8' ? 'Cool Slate' : 'Dark Slate');
-      const lbl = document.getElementById('tunnel-status-label');
-      if (lbl) lbl.textContent = 'Custom: Fill ' + fillVal + '%, Casing ' + casingVal + '% (' + cName + ')';
+      tunnelStyleStrength = Number(document.getElementById('tunnel-style-strength').value);
+      document.getElementById('tunnel-strength-val').textContent = tunnelStyleStrength + '%';
       document.querySelectorAll('#tunnel-btn-row .preset-btn').forEach(b => b.classList.remove('active'));
+      const labels = { 0: 'Normal tunnel colors', 20: 'Subtle tunnel treatment', 35: 'Balanced tunnel treatment', 70: 'Strong tunnel treatment' };
+      document.getElementById('tunnel-status-label').textContent =
+        labels[tunnelStyleStrength] || 'Tunnel color treatment: ' + tunnelStyleStrength + '%';
       updateTunnelStyles();
     }
 
     function updateTunnelStyles() {
-      const fillOpacity = parseFloat(document.getElementById('tunnel-fill-opacity').value) / 100.0;
-      const casingOpacity = parseFloat(document.getElementById('tunnel-casing-opacity').value) / 100.0;
       const style = map.getStyle();
       if (!style || !style.layers) return;
-
-      // Method 1: Pre-mix color expression against dark background (at 100% solid opacity)
-      const mixedColorExpr = [
-        'rgb',
-        ['+', ['*', ['at', 0, ['to-rgba', ['to-color', ['coalesce', ['get', 'fill_color'], '#38bdf8']]]], fillOpacity], Math.round((1.0 - fillOpacity) * bgR)],
-        ['+', ['*', ['at', 1, ['to-rgba', ['to-color', ['coalesce', ['get', 'fill_color'], '#38bdf8']]]], fillOpacity], Math.round((1.0 - fillOpacity) * bgG)],
-        ['+', ['*', ['at', 2, ['to-rgba', ['to-color', ['coalesce', ['get', 'fill_color'], '#38bdf8']]]], fillOpacity], Math.round((1.0 - fillOpacity) * bgB)]
-      ];
-
-      // Mixed casing color
-      const hex = currentCasingColor.replace('#', '');
-      const cR = parseInt(hex.substring(0, 2), 16);
-      const cG = parseInt(hex.substring(2, 4), 16);
-      const cB = parseInt(hex.substring(4, 6), 16);
-      const mixedCaseHex = '#' + [
-        Math.round(cR * casingOpacity + bgR * (1.0 - casingOpacity)),
-        Math.round(cG * casingOpacity + bgG * (1.0 - casingOpacity)),
-        Math.round(cB * casingOpacity + bgB * (1.0 - casingOpacity))
-      ].map(x => Math.min(255, Math.max(0, x)).toString(16).padStart(2, '0')).join('');
+      let nextTunnelCasingPattern = null;
 
       style.layers.forEach(l => {
         const lid = l.id;
         if (lid.startsWith('tunnel-fill-')) {
-          if (tunnelBlendMode === 'premix') {
-            map.setPaintProperty(lid, 'line-color', mixedColorExpr);
-            map.setPaintProperty(lid, 'line-opacity', 1.0);
+          map.setPaintProperty(lid, 'line-color', mixExpression(
+            ['to-color', ['coalesce', ['get', 'fill_color'], '#38bdf8']],
+            tunnelStyleTargets.fill
+          ));
+          map.setPaintProperty(lid, 'line-opacity', 1);
+        } else if (lid.startsWith('tunnel-casing-')) {
+          if (tunnelStyleStrength === 0) {
+            map.setPaintProperty(lid, 'line-pattern', null);
+            map.setPaintProperty(lid, 'line-color', '#94a3b8');
+            map.setPaintProperty(lid, 'line-dasharray', currentDashArray);
           } else {
-            map.setPaintProperty(lid, 'line-color', ['coalesce', ['get', 'fill_color'], '#38bdf8']);
-            map.setPaintProperty(lid, 'line-opacity', fillOpacity);
+            nextTunnelCasingPattern ||= ensureTunnelCasingPattern(currentTunnelCasingPair);
+            map.setPaintProperty(lid, 'line-dasharray', null);
+            map.setPaintProperty(lid, 'line-pattern', nextTunnelCasingPattern);
           }
-        }
-        if (lid.startsWith('tunnel-casing-')) {
-          if (tunnelBlendMode === 'premix') {
-            map.setPaintProperty(lid, 'line-color', mixedCaseHex);
-            map.setPaintProperty(lid, 'line-opacity', 1.0);
-          } else {
-            map.setPaintProperty(lid, 'line-color', currentCasingColor);
-            map.setPaintProperty(lid, 'line-opacity', casingOpacity);
-          }
-          map.setPaintProperty(lid, 'line-dasharray', currentDashArray);
+          map.setPaintProperty(lid, 'line-opacity', 1);
+        } else if (lid.startsWith('channel-casing-')) {
+          map.setPaintProperty(lid, 'line-color', [
+            'case',
+            isTunnelRelated(),
+            mixExpression('#94a3b8', tunnelStyleTargets.casing),
+            baseChannelCasingColors.get(lid)
+          ]);
+        } else if (lid.startsWith('demarcation-dashed-')) {
+          map.setPaintProperty(lid, 'line-color', tunnelFeatureColor('color', '#ffffff', tunnelStyleTargets.detail));
+        } else if (lid.startsWith('patch-under-') || lid.startsWith('patch-over-')) {
+          map.setPaintProperty(lid, 'fill-color', tunnelFeatureColor('color', '#334155', tunnelStyleTargets.fill));
+        } else if (lid.startsWith('glyph-')) {
+          map.setPaintProperty(lid, 'text-color', tunnelFeatureColor('color', '#ffffff', tunnelStyleTargets.detail));
+        } else if (lid === 'street-names') {
+          map.setPaintProperty(lid, 'text-color', [
+            'case',
+            isTunnelRelated(),
+            mixExpression('#f1f5f9', tunnelStyleTargets.detail),
+            '#f1f5f9'
+          ]);
+        } else if (lid === 'lane-arrows-tunnel') {
+          map.setPaintProperty(lid, 'icon-color', mixExpression('#ffffff', tunnelStyleTargets.arrow));
         }
       });
+      if (activeTunnelCasingPattern && activeTunnelCasingPattern !== nextTunnelCasingPattern &&
+          map.hasImage(activeTunnelCasingPattern)) {
+        map.removeImage(activeTunnelCasingPattern);
+      }
+      activeTunnelCasingPattern = nextTunnelCasingPattern;
+    }
+
+    function setupTunnelArrowLayer() {
+      if (!map.hasImage('rs-arrow-tunnel')) {
+        const size = 48;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(4, 19); ctx.lineTo(26, 19); ctx.lineTo(26, 9); ctx.lineTo(44, 24);
+        ctx.lineTo(26, 39); ctx.lineTo(26, 29); ctx.lineTo(4, 29); ctx.closePath();
+        ctx.fill();
+        map.addImage('rs-arrow-tunnel', ctx.getImageData(0, 0, size, size), { pixelRatio: 2, sdf: true });
+      }
+      if (map.getLayer('lane-arrows') && !map.getLayer('lane-arrows-tunnel')) {
+        map.setFilter('lane-arrows', [
+          'all',
+          ['==', ['get', '_type'], 'channel'],
+          ['==', ['get', 'oneway'], true],
+          ['!', isTunnelRelated()]
+        ]);
+        map.addLayer({
+          id: 'lane-arrows-tunnel',
+          type: 'symbol',
+          source: 'network',
+          minzoom: 16,
+          filter: ['all', ['==', ['get', '_type'], 'channel'], ['==', ['get', 'oneway'], true], isTunnelRelated()],
+          layout: {
+            'symbol-placement': 'line',
+            'symbol-spacing': 90,
+            'icon-image': 'rs-arrow-tunnel',
+            'icon-size': ['interpolate', ['linear'], ['zoom'], 16, 0.35, 19, 0.8],
+            'icon-rotation-alignment': 'map',
+            'icon-allow-overlap': true,
+            'icon-ignore-placement': true
+          },
+          paint: {
+            'icon-color': mixExpression('#ffffff', tunnelStyleTargets.arrow),
+            'icon-halo-color': '#0b0d14',
+            'icon-halo-width': 0.8,
+            'icon-opacity': 0.9
+          }
+        }, map.getLayer('street-names') ? 'street-names' : undefined);
+      }
     }
 
     function applyTunnelPreset(name) {
+      const strengths = { subtle: 20, balanced: 35, dark: 70, orig: 0 };
+      if (!(name in strengths)) return;
       document.querySelectorAll('#tunnel-btn-row .preset-btn').forEach(b => b.classList.remove('active'));
       const activeBtn = document.getElementById('btn-tun-' + name);
       if (activeBtn) activeBtn.classList.add('active');
-
-      const fillInput = document.getElementById('tunnel-fill-opacity');
-      const casingInput = document.getElementById('tunnel-casing-opacity');
-      const lbl = document.getElementById('tunnel-status-label');
-
-      if (name === 'subtle') {
-        fillInput.value = 75;
-        casingInput.value = 50;
-        currentCasingColor = '#ffffff';
-        document.querySelectorAll('[id^="btn-case-"]').forEach(b => b.classList.remove('active'));
-        const btn = document.getElementById('btn-case-white');
-        if (btn) btn.classList.add('active');
-        if (lbl) lbl.textContent = 'Preset 1: Subtle Fade (Fill 75%, Soft White Casing 50%)';
-      } else if (name === 'balanced') {
-        fillInput.value = 65;
-        casingInput.value = 60;
-        currentCasingColor = '#94a3b8';
-        document.querySelectorAll('[id^="btn-case-"]').forEach(b => b.classList.remove('active'));
-        const btn = document.getElementById('btn-case-slate');
-        if (btn) btn.classList.add('active');
-        if (lbl) lbl.textContent = 'Preset 2: Balanced (Fill 65%, Slate Casing 60%)';
-      } else if (name === 'dark') {
-        fillInput.value = 60;
-        casingInput.value = 75;
-        currentCasingColor = '#334155';
-        document.querySelectorAll('[id^="btn-case-"]').forEach(b => b.classList.remove('active'));
-        const btn = document.getElementById('btn-case-dark');
-        if (btn) btn.classList.add('active');
-        if (lbl) lbl.textContent = 'Preset 3: Dark Inset (Fill 60%, Dark Slate Casing 75%)';
-      } else if (name === 'orig') {
-        fillInput.value = 95;
-        casingInput.value = 100;
-        currentCasingColor = '#ffffff';
-        document.querySelectorAll('[id^="btn-case-"]').forEach(b => b.classList.remove('active'));
-        const btn = document.getElementById('btn-case-white');
-        if (btn) btn.classList.add('active');
-        if (lbl) lbl.textContent = 'Baseline: Original 100% White Dash (Competes with bridge)';
-      }
-
-      document.getElementById('fill-val').textContent = fillInput.value + '%';
-      document.getElementById('casing-val').textContent = casingInput.value + '%';
-      updateTunnelStyles();
+      document.getElementById('tunnel-style-strength').value = strengths[name];
+      onTunnelSliderChange();
     }
 
     // Hover Tooltip & Dynamic Road Highlight

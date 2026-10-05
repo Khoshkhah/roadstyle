@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Tunnel coloring in roadstyle v2</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      color: #172033;
+      background: #f3f6fa;
+      line-height: 1.6;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 36px 18px 56px; }
+    main { width: min(960px, 100%); margin: 0 auto; }
+    header, section {
+      margin: 0 0 18px;
+      padding: clamp(20px, 4vw, 34px);
+      border: 1px solid #dce4ee;
+      border-radius: 18px;
+      background: #fff;
+      box-shadow: 0 8px 28px rgba(15, 23, 42, .05);
+    }
+    h1 { margin: 0 0 8px; font-size: clamp(28px, 5vw, 42px); line-height: 1.14; letter-spacing: -.03em; }
+    h2 { margin: 0 0 12px; font-size: 21px; line-height: 1.3; }
+    h3 { margin: 22px 0 8px; font-size: 16px; }
+    p { margin: 10px 0; color: #39465a; }
+    .eyebrow { margin: 0 0 9px; color: #0369a1; font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    .lead { max-width: 740px; font-size: 17px; color: #475569; }
+    figure { margin: 20px 0 0; }
+    figure img { display: block; width: 100%; height: auto; border: 1px solid #e2e8f0; border-radius: 14px; }
+    figcaption { margin-top: 8px; color: #64748b; font-size: 13px; }
+    .control-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+    .control {
+      padding: 16px;
+      border: 1px solid #dbeafe;
+      border-radius: 12px;
+      background: #f8fbff;
+    }
+    .control strong { display: block; margin-bottom: 4px; color: #0f3b5d; }
+    .range-labels { display: flex; justify-content: space-between; margin: 14px 0 3px; font-size: 12px; font-weight: 700; color: #64748b; }
+    .range { height: 12px; border-radius: 99px; background: linear-gradient(90deg, #94a3b8, #8392a7 35%, #64748b); position: relative; }
+    .range::after { content: ""; position: absolute; left: 35%; top: 50%; width: 20px; height: 20px; border: 4px solid #0ea5e9; border-radius: 50%; background: white; transform: translate(-50%,-50%); }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+    th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid #e5eaf0; }
+    th { color: #475569; font-size: 12px; letter-spacing: .03em; text-transform: uppercase; background: #f8fafc; }
+    code { padding: 2px 5px; border-radius: 5px; background: #eef2f7; color: #263449; font-size: .92em; }
+    .swatch { display: inline-block; width: 14px; height: 14px; margin-right: 6px; border: 1px solid rgba(15,23,42,.18); border-radius: 4px; vertical-align: -2px; }
+    .note { padding: 13px 15px; border-left: 4px solid #0ea5e9; border-radius: 5px 10px 10px 5px; background: #f0f9ff; color: #334155; }
+    .formula { overflow-x: auto; padding: 14px 16px; border-radius: 10px; background: #172033; color: #e2e8f0; font: 14px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .links { display: flex; flex-wrap: wrap; gap: 10px; }
+    a { color: #0369a1; }
+    .link-button { display: inline-block; padding: 9px 13px; border: 1px solid #bfdbfe; border-radius: 9px; background: #f0f9ff; font-weight: 700; text-decoration: none; }
+    @media (max-width: 640px) {
+      body { padding: 16px 10px 34px; }
+      .control-grid { grid-template-columns: 1fr; }
+      table { font-size: 12px; }
+      th, td { padding: 8px 7px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Roadstyle v2 • Visual guide</p>
+      <h1>Tunnel coloring</h1>
+      <p class="lead">The Monaco dashboard keeps each road's normal colors as its baseline, then applies a tunnel-specific color treatment to the tunnel and features linked to its edge ID.</p>
+      <figure>
+        <img src="./tunnel-coloring.svg" alt="Tunnel road with alternating dash and gap casing colors passing below a separate orange surface road, alongside a normal-to-tunnel color blend slider.">
+        <figcaption>Conceptual plan view: the tunnel is styled independently from the surface road that crosses it.</figcaption>
+      </figure>
+    </header>
+
+    <section>
+      <h2>Two separate controls</h2>
+      <div class="control-grid">
+        <div class="control">
+          <strong>Casing palette = choose the casing colors</strong>
+          Choose the colors for the tunnel casing's dash and its usual gap. The gap is colored, not transparent, at nonzero tunnel emphasis.
+        </div>
+        <div class="control">
+          <strong>Tunnel style = choose the treatment strength</strong>
+          This is a blend-strength slider, not a hue picker and not opacity. It moves normal colors toward tunnel-specific targets while keeping colors opaque.
+        </div>
+      </div>
+      <div class="range-labels"><span>0% • normal colors</span><span>100% • tunnel targets</span></div>
+      <div class="range" aria-label="Illustration of a color blend slider at 35 percent"></div>
+      <p>At 0%, the casing returns to a normal single-color dash with a transparent gap. At 100%, the tunnel target colors are used fully. Values between the endpoints blend continuously.</p>
+    </section>
+
+    <section>
+      <h2>What the casing is</h2>
+      <p>The road <strong>fill</strong> is the broad stroke painting the pavement. The <strong>casing</strong> is a separate, narrower boundary stroke that follows the road's casing geometry and lateral offset. It is not another road fill, nor a second line painted into the space between roads.</p>
+      <p>The selected dash and gap colors alternate <strong>along the same casing stroke</strong>. Both colors use the existing casing width. The gap color replaces the casing stroke's normally transparent dash gap; it does not color the road interior. Changing the casing palette changes color only, not casing geometry or width.</p>
+      <div class="formula">along the casing:  [dash color] [gap color] [dash color] [gap color] ...</div>
+      <p>The tunnel fill, tunnel casing, and surface road crossing are separate rendered features. The color controls style the tunnel-related features without turning the casing into a second fill.</p>
+    </section>
+
+    <section>
+      <h2>Color calculation</h2>
+      <p>For each RGB channel, the dashboard blends the feature's normal color with its tunnel target:</p>
+      <div class="formula">display = round(normal × (1 − strength) + tunnel_target × strength)</div>
+      <p><code>strength</code> ranges from 0 to 1. For example, 35% keeps 65% of the normal color and blends in 35% of the tunnel target. The fill, casing, label, arrow, and marking each have their own target colors.</p>
+      <table>
+        <thead><tr><th>Feature</th><th>Normal/start</th><th>Tunnel target</th></tr></thead>
+        <tbody>
+          <tr><td>Road fill</td><td>Per-edge <code>fill_color</code></td><td><span class="swatch" style="background:#64748b"></span><code>#64748b</code></td></tr>
+          <tr><td>Casing dash</td><td><span class="swatch" style="background:#94a3b8"></span><code>#94a3b8</code></td><td>First selected palette color</td></tr>
+          <tr><td>Casing gap</td><td><span class="swatch" style="background:#e2e8f0"></span><code>#e2e8f0</code> map background</td><td>Second selected palette color</td></tr>
+          <tr><td>Channel casing</td><td><span class="swatch" style="background:#94a3b8"></span><code>#94a3b8</code></td><td><span class="swatch" style="background:#64748b"></span><code>#64748b</code></td></tr>
+          <tr><td>Street names</td><td><span class="swatch" style="background:#f1f5f9"></span><code>#f1f5f9</code></td><td><span class="swatch" style="background:#a5f3fc"></span><code>#a5f3fc</code></td></tr>
+          <tr><td>Markings and glyph text</td><td>Feature color, white fallback</td><td><span class="swatch" style="background:#a5f3fc"></span><code>#a5f3fc</code></td></tr>
+          <tr><td>Direction arrows</td><td><span class="swatch" style="background:#fff"></span><code>#ffffff</code></td><td><span class="swatch" style="background:#a5f3fc"></span><code>#a5f3fc</code></td></tr>
+        </tbody>
+      </table>
+      <h3>Casing palettes</h3>
+      <table>
+        <thead><tr><th>Choice</th><th>Dash</th><th>Colored gap</th></tr></thead>
+        <tbody>
+          <tr><td>Slate + ice</td><td><span class="swatch" style="background:#64748b"></span><code>#64748b</code></td><td><span class="swatch" style="background:#cbd5e1"></span><code>#cbd5e1</code></td></tr>
+          <tr><td>Blue + cyan</td><td><span class="swatch" style="background:#315b7d"></span><code>#315b7d</code></td><td><span class="swatch" style="background:#a9d7e8"></span><code>#a9d7e8</code></td></tr>
+          <tr><td>Warm + sand</td><td><span class="swatch" style="background:#806d64"></span><code>#806d64</code></td><td><span class="swatch" style="background:#e7c9a7"></span><code>#e7c9a7</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>How edge association works</h2>
+      <p>The dashboard collects string-normalized <code>edge_id</code> values from tunnel features. A detail is treated as tunnel-related if it has <code>tunnel: true</code> itself or its <code>edge_id</code> matches a tunnel edge. This allows linked casing, channels, markings, labels, and arrows to follow their parent tunnel even when the overlay feature does not repeat the tunnel flag.</p>
+      <p>Keep the parent tunnel's <code>edge_id</code> on edge-linked details. Unlinked annotations cannot be reliably assigned to a tunnel.</p>
+    </section>
+
+    <section>
+      <h2>Why the casing pattern is custom</h2>
+      <p>MapLibre's ordinary <code>line-dasharray</code> has one line color; its gaps are transparent. It has no native second color for the gap. Above 0% emphasis, the dashboard creates one small repeating image with the dash color followed by the gap color, then applies it as <code>line-pattern</code> to the existing tunnel casing stroke. It clears <code>line-dasharray</code> while that pattern is active, so the casing is not dashed twice or drawn as a second stroke.</p>
+      <p>At 0%, the pattern is removed and normal <code>line-dasharray</code> is restored. Only tunnel casing uses this pattern; surface casing and road fill are not recolored by the casing palette.</p>
+    </section>
+
+    <section>
+      <h2>Crossings: color is not draw order</h2>
+      <p>Tunnel and surface geometry remain separate features, with their normal levels and edge IDs. The color treatment makes the tunnel easier to recognize; it does not decide which road is above another. Correct crossing display still depends on the network's topology, stacking metadata, and compiled layer order.</p>
+      <div class="links" style="margin-top:18px">
+        <a class="link-button" href="./monaco_roads_v2.html">Open Monaco v2 dashboard</a>
+        <a class="link-button" href="./tunnel-coloring.md">Read Markdown version</a>
+        <a class="link-button" href="./engine_spec.md">Read v2 engine spec</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

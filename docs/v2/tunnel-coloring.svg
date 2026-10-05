@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="680" viewBox="0 0 1120 680" role="img" aria-labelledby="title desc">
+  <title id="title">Tunnel coloring in roadstyle v2</title>
+  <desc id="desc">A tunnel road with two-color alternating casing passes under an orange surface road. A slider blends normal feature colors toward tunnel-specific target colors.</desc>
+  <defs>
+    <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+      <path d="M 28 0 L 0 0 0 28" fill="none" stroke="#e8edf3" stroke-width="1"/>
+    </pattern>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#0f172a" flood-opacity=".1"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+  </defs>
+  <rect width="1120" height="680" rx="24" fill="#f8fafc"/>
+  <rect width="1120" height="680" rx="24" fill="url(#grid)"/>
+  <text x="48" y="58" font-family="Inter,Segoe UI,sans-serif" font-size="27" font-weight="750" fill="#0f172a">Tunnel coloring in roadstyle v2</text>
+  <text x="48" y="88" font-family="Inter,Segoe UI,sans-serif" font-size="15" fill="#475569">Feature-linked color treatment, shown at full tunnel emphasis</text>
+
+  <g filter="url(#shadow)">
+    <rect x="42" y="118" width="1036" height="332" rx="18" fill="#fff" stroke="#dbe3ed"/>
+  </g>
+  <text x="70" y="157" font-family="Inter,Segoe UI,sans-serif" font-size="15" font-weight="700" fill="#334155">PLAN VIEW • tunnel passes beneath a surface road</text>
+
+  <path d="M130 321 C300 321 410 321 525 321 S800 321 990 321" fill="none" stroke="#1e293b" stroke-width="78" stroke-linecap="round"/>
+  <path d="M130 321 C300 321 410 321 525 321 S800 321 990 321" fill="none" stroke="#64748b" stroke-width="68" stroke-linecap="round"/>
+  <path d="M130 321 C300 321 410 321 525 321 S800 321 990 321" fill="none" stroke="#64748b" stroke-width="9" stroke-linecap="butt" stroke-dasharray="28 28"/>
+  <path d="M130 321 C300 321 410 321 525 321 S800 321 990 321" fill="none" stroke="#cbd5e1" stroke-width="9" stroke-linecap="butt" stroke-dasharray="28 28" stroke-dashoffset="-28"/>
+  <path d="M590 184 C590 245 590 271 590 321 S590 389 590 428" fill="none" stroke="#1e293b" stroke-width="80" stroke-linecap="round"/>
+  <path d="M590 184 C590 245 590 271 590 321 S590 389 590 428" fill="none" stroke="#f5b95f" stroke-width="68" stroke-linecap="round"/>
+  <path d="M590 184 C590 245 590 271 590 321 S590 389 590 428" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 14"/>
+
+  <rect x="111" y="214" width="182" height="34" rx="17" fill="#e2e8f0"/>
+  <text x="202" y="236" text-anchor="middle" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="650" fill="#334155">TUNNEL EDGE • ID 42</text>
+  <path d="M262 250 L305 282" fill="none" stroke="#334155" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="711" y="190" width="220" height="34" rx="17" fill="#fef3c7"/>
+  <text x="821" y="212" text-anchor="middle" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="650" fill="#92400e">SURFACE ROAD • ID 91</text>
+  <path d="M706 218 L632 269" fill="none" stroke="#334155" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="722" y="366" width="304" height="46" rx="12" fill="#f1f5f9"/>
+  <text x="742" y="386" font-family="Inter,Segoe UI,sans-serif" font-size="12" font-weight="700" fill="#334155">Tunnel fill + casing + linked details</text>
+  <text x="742" y="402" font-family="Inter,Segoe UI,sans-serif" font-size="11" fill="#64748b">Matched by the parent tunnel edge ID</text>
+  <path d="M722 380 L674 353" fill="none" stroke="#334155" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="120" y="421" font-family="Inter,Segoe UI,sans-serif" font-size="12" fill="#475569">Same casing stroke:</text>
+  <line x1="242" y1="417" x2="269" y2="417" stroke="#64748b" stroke-width="8"/>
+  <line x1="269" y1="417" x2="296" y2="417" stroke="#cbd5e1" stroke-width="8"/>
+  <text x="307" y="421" font-family="Inter,Segoe UI,sans-serif" font-size="12" fill="#475569">dash</text>
+  <text x="356" y="421" font-family="Inter,Segoe UI,sans-serif" font-size="12" fill="#475569">colored gap</text>
+  <text x="760" y="421" font-family="Inter,Segoe UI,sans-serif" font-size="12" fill="#475569">Both colors use casing width; fill stays separate</text>
+
+  <g filter="url(#shadow)">
+    <rect x="42" y="474" width="1036" height="160" rx="18" fill="#fff" stroke="#dbe3ed"/>
+  </g>
+  <text x="70" y="510" font-family="Inter,Segoe UI,sans-serif" font-size="15" font-weight="700" fill="#334155">ONE EMPHASIS SLIDER • blend normal colors toward tunnel targets</text>
+  <text x="70" y="545" font-family="Inter,Segoe UI,sans-serif" font-size="12" font-weight="650" fill="#64748b">NORMAL COLORS</text>
+  <text x="1050" y="545" text-anchor="end" font-family="Inter,Segoe UI,sans-serif" font-size="12" font-weight="650" fill="#64748b">TUNNEL TARGET COLORS</text>
+  <defs>
+    <linearGradient id="blend" x1="0" x2="1">
+      <stop offset="0%" stop-color="#94a3b8"/>
+      <stop offset="35%" stop-color="#8392a7"/>
+      <stop offset="100%" stop-color="#64748b"/>
+    </linearGradient>
+  </defs>
+  <rect x="72" y="560" width="976" height="13" rx="6.5" fill="url(#blend)"/>
+  <circle cx="414" cy="566.5" r="12" fill="#fff" stroke="#0ea5e9" stroke-width="4"/>
+  <text x="414" y="602" text-anchor="middle" font-family="Inter,Segoe UI,sans-serif" font-size="13" font-weight="700" fill="#0369a1">35% example</text>
+  <text x="72" y="620" font-family="Inter,Segoe UI,sans-serif" font-size="11" fill="#64748b">0%: normal colors</text>
+  <text x="1048" y="620" text-anchor="end" font-family="Inter,Segoe UI,sans-serif" font-size="11" fill="#64748b">100%: tunnel treatment</text>
+</svg>

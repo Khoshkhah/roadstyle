@@ -232,6 +232,10 @@ Deterministic visual passes compiled per elevation level $L$:
 
 ## 5. Dynamic ViewPresets (Multi-Dimensional Client-Side Switching)
 
+For the Monaco dashboard's color blending, casing dash/gap pattern, and
+edge-ID-based tunnel association, see the [tunnel coloring guide](./tunnel-coloring.md)
+or its [standalone HTML version](./tunnel-coloring.html).
+
 In `roadstyle` v1, client-side switching was strictly limited to recoloring (`color_options`).
 In `roadstyle` v2, dynamic switching is generalized to **any visual channel** via `ViewPreset`.
 
@@ -330,4 +334,3 @@ A roundabout consists of a closed loop or sequence of edges $E_{\text{ring}} = \
    ensuring the arm's curb casing terminates cleanly at the outer perimeter of the circulating carriageway.
 3. **Central Island**:
    The interior of the ring is closed as a 2D `Patch` polygon ($order = -1$), providing the central island curb and landscape fill.
-
