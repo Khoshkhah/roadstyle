@@ -1,0 +1,2183 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>roadstyle v2 — Architecture & Documentation Portal</title>
+  <style>
+    :root[data-theme="dark"] {
+      --bg: #090d16;
+      --sidebar-bg: #0d1322;
+      --surface: #131c2e;
+      --surface-hover: #1e293d;
+      --border: #1e2d42;
+      --border-accent: #38bdf8;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --primary: #38bdf8;
+      --primary-glow: rgba(56, 189, 248, 0.15);
+      --success: #34d399;
+      --warning: #fbbf24;
+      --danger: #f87171;
+      --purple: #a855f7;
+      --code-bg: #080c14;
+      --tab-active: #1e293d;
+    }
+
+    :root[data-theme="light"] {
+      --bg: #f8fafc;
+      --sidebar-bg: #ffffff;
+      --surface: #ffffff;
+      --surface-hover: #f1f5f9;
+      --border: #e2e8f0;
+      --border-accent: #0284c7;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --text-dim: #94a3b8;
+      --primary: #0284c7;
+      --primary-glow: rgba(2, 132, 199, 0.12);
+      --success: #059669;
+      --warning: #d97706;
+      --danger: #dc2626;
+      --purple: #7c3aed;
+      --code-bg: #f1f5f9;
+      --tab-active: #e2e8f0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      display: flex;
+      min-height: 100vh;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    /* APP LAYOUT */
+    .app-sidebar {
+      width: 280px;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      z-index: 100;
+    }
+
+    .sidebar-header {
+      padding: 24px 20px 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      background: var(--primary-glow);
+      color: var(--primary);
+      border: 1px solid var(--border-accent);
+      margin-bottom: 8px;
+    }
+
+    .brand-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+
+    .brand-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .nav-list {
+      list-style: none;
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+
+    .nav-item:hover {
+      background: var(--surface-hover);
+      color: var(--text);
+    }
+
+    .nav-item.active {
+      background: var(--tab-active);
+      color: var(--primary);
+      border-left: 3px solid var(--primary);
+      border-radius: 0 8px 8px 0;
+    }
+
+    .sidebar-footer {
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .theme-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .theme-toggle-btn:hover {
+      background: var(--surface-hover);
+      border-color: var(--border-accent);
+    }
+
+    /* MAIN CONTENT */
+    .app-main {
+      flex: 1;
+      padding: 36px 48px 80px 48px;
+      max-width: 1060px;
+      overflow-y: auto;
+    }
+
+    .tab-pane {
+      display: none;
+      animation: fadeIn 0.25s ease;
+    }
+
+    .tab-pane.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* TYPOGRAPHY & SECTIONS */
+    .page-header {
+      margin-bottom: 28px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .page-tag {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--primary);
+      margin-bottom: 6px;
+    }
+
+    .page-title {
+      font-size: 30px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    .page-desc {
+      font-size: 15px;
+      color: var(--text-muted);
+      max-width: 800px;
+    }
+
+    .section-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 28px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+    }
+
+    .block-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .block-sub {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    /* CODE & TABLES */
+    pre code {
+      display: block;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12.5px;
+      color: var(--text);
+      overflow-x: auto;
+      margin: 12px 0;
+      line-height: 1.5;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin: 14px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .data-table th {
+      background: var(--surface-hover);
+      text-align: left;
+      padding: 10px 14px;
+      font-weight: 700;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    .data-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .tag-pill {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: var(--primary-glow);
+      color: var(--primary);
+      font-family: monospace;
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+
+    /* GRIDS & CARDS */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin: 16px 0;
+    }
+
+    .card-mini {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .card-mini h4 {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+
+    .card-mini p {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* INTERACTIVE SIMULATORS */
+    .sim-container {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+    }
+
+    .sim-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .ctrl-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 170px;
+    }
+
+    .ctrl-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .ctrl-val {
+      color: var(--primary);
+      font-family: monospace;
+      font-weight: 700;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      border-radius: 4px;
+      background: var(--border);
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--primary);
+      cursor: pointer;
+    }
+
+    .legend-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 14px;
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+    }
+
+    /* CALLOUT BOXES */
+    .callout {
+      border-left: 4px solid var(--primary);
+      background: var(--primary-glow);
+      padding: 14px 18px;
+      border-radius: 0 8px 8px 0;
+      font-size: 13.5px;
+      color: var(--text);
+      margin: 16px 0;
+    }
+
+    .callout-title {
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+
+    /* PRESET BUTTONS */
+    .p-btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .p-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .p-btn:hover, .p-btn.active {
+      background: var(--primary-glow);
+      border-color: var(--border-accent);
+      color: var(--primary);
+    }
+  </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="app-sidebar">
+  <div class="sidebar-header">
+    <div class="brand-badge">Engine v2 Portal</div>
+    <div class="brand-title">roadstyle v2</div>
+    <div class="brand-sub">Universal Network Cartography</div>
+  </div>
+
+  <ul class="nav-list">
+    <li class="nav-item active" onclick="switchTab('tab-overview')">📖 1. Architecture Overview</li>
+    <li class="nav-item" onclick="switchTab('tab-primitives')">📦 2. The 5 Primitives</li>
+    <li class="nav-item" onclick="switchTab('tab-interface')">💻 3. Library Interface & Usage</li>
+    <li class="nav-item" onclick="switchTab('tab-casing')">✂️ 4. Casing & Geometry Lab</li>
+    <li class="nav-item" onclick="switchTab('tab-solver')">🌉 5. Grade Separation (Bridges & Tunnels)</li>
+    <li class="nav-item" onclick="switchTab('tab-compiler')">⚡ 6. WebGL Compiler Deep Dive</li>
+    <li class="nav-item" onclick="switchTab('tab-presets')">🎨 7. Themes, YAML Config & Styles</li>
+    <li class="nav-item" onclick="switchTab('tab-adapters')">🔌 8. Domain Adapters</li>
+    <li class="nav-item" onclick="switchTab('tab-api')">📚 9. Python API Reference</li>
+  </ul>
+
+
+  <div class="sidebar-footer">
+    <button id="theme-toggle" class="theme-toggle-btn">
+      <span id="theme-icon">☀️</span> <span id="theme-text">Light Mode</span>
+    </button>
+    <span style="font-size: 11px; color: var(--text-dim);">v2.0.0-dev</span>
+  </div>
+</aside>
+
+<!-- MAIN CONTENT -->
+<main class="app-main">
+
+  <!-- ========================================== -->
+  <!-- TAB 1: OVERVIEW -->
+  <!-- ========================================== -->
+  <div id="tab-overview" class="tab-pane active">
+    <div class="page-header">
+      <div class="page-tag">Core Architecture</div>
+      <div class="page-title">The roadstyle v2 Blueprint</div>
+      <div class="page-desc">
+        A completely decoupled, mathematically sound cartographic engine that turns any transport network graph into 60 FPS WebGL vector maps without domain coupling.
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="block-title">🚀 The Core Shift: v1 vs. v2</div>
+      <div class="block-sub">Why we re-architected the system into a decoupled Core Engine + Adapters model.</div>
+
+      <div class="grid-2">
+        <div class="card-mini" style="border-top: 3px solid var(--danger);">
+          <h4 style="color: var(--danger);">roadstyle v1 (Legacy Monolith)</h4>
+          <p>• Coupled directly to OpenStreetMap (OSM) conventions (<code>highway="motorway"</code>).</p>
+          <p>• Fixed scalar casing width (<code>casing_m = 0.15</code>) uniform across all roads.</p>
+          <p>• Fixed split scalar <code>head_m = 5.0</code> forcing symmetric 5m cuts everywhere.</p>
+          <p>• Data duplication: Passing overlays serialized the road geometry twice (2× memory).</p>
+        </div>
+
+        <div class="card-mini" style="border-top: 3px solid var(--success);">
+          <h4 style="color: var(--success);">roadstyle v2 (Decoupled Engine)</h4>
+          <p>• Pure, domain-agnostic Core Engine operating strictly on physical & topological primitives.</p>
+          <p>• Per-row data-driven casing widths (e.g. 0.5m barrier left, 0.15m stripe right).</p>
+          <p>• Arbitrary 2-number casing cuts per row for asymmetric intersection setbacks.</p>
+          <p>• Single-Source Multi-Layer: Packaged once in WebGL, zero data duplication (50% lighter).</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="block-title">⚖️ 1D Line + Width vs. 2D Polygons</div>
+      <div class="block-sub">Why 1D line strokes were mathematically chosen for casing over 2D polygons.</div>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Evaluation Dimension</th>
+            <th>1D Line + Width (v2 Choice)</th>
+            <th>2D Polygons</th>
+            <th>Advantage</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Data Size (10,000 roads)</strong></td>
+            <td>~0.45 MB GeoJSON (2 points)</td>
+            <td>~1.20 MB GeoJSON (5 points)</td>
+            <td><span class="tag-pill">2.5× Smaller</span></td>
+          </tr>
+          <tr>
+            <td><strong>GPU Triangles</strong></td>
+            <td>2 triangles (quad strip)</td>
+            <td>2 triangles (Earcut)</td>
+            <td>Identical 60 FPS</td>
+          </tr>
+          <tr>
+            <td><strong>Intersection Portals</strong></td>
+            <td>Ends remain open; lines merge naturally</td>
+            <td>Strokes all 4 sides; blocks intersection with a wall</td>
+            <td><span class="tag-pill">Lines Win</span></td>
+          </tr>
+          <tr>
+            <td><strong>2-Point Split Math</strong></td>
+            <td>1D linear projection along polyline</td>
+            <td>Complex 2D cutting planes</td>
+            <td><span class="tag-pill">Lines Win</span></td>
+          </tr>
+          <tr>
+            <td><strong>Dynamic Zoom Scaling</strong></td>
+            <td>Clamps to 2px at low zoom (always readable)</td>
+            <td>Shrinks to 0.05px (vanishes completely)</td>
+            <td><span class="tag-pill">Lines Win</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- TAB 2: THE 5 PRIMITIVES -->
+  <!-- ========================================== -->
+  <div id="tab-primitives" class="tab-pane">
+    <div class="page-header">
+      <div class="page-tag">Data Model Specification</div>
+      <div class="page-title">The 5 Universal Primitives</div>
+      <div class="page-desc">
+        Every visual element in any transport network maps cleanly into one of these five orthogonal primitives.
+      </div>
+    </div>
+
+    <!-- CORRIDOR -->
+    <div class="section-block">
+      <div class="block-title">🛣️ 1. Corridor (Right-of-Way Container)</div>
+      <div class="block-sub">The spatial container polyline that owns the outer corridor width and curb casings.</div>
+
+      <pre><code>@dataclass(slots=True)
+class Corridor:
+    geometry: LineString                     # Reference polyline in EPSG:4326
+    width_m: float = 8.0                     # Total carriageway corridor width
+    casing_left_m: float = 0.20              # Asymmetric left curb / barrier thickness
+    casing_right_m: float = 0.20             # Asymmetric right curb / barrier thickness
+    split_mode: str = "setbacks"             # "setbacks" (h_start, h_end) or "stations"
+    split_start: float = 5.0                 # Distance from vertex 0 (m)
+    split_end: float = 5.0                   # Distance from vertex -1 (m)
+    band: int = 0                            # Grade tier (-1 tunnel, 0 surface, +1 bridge)
+    junction_priority: float = 0.0           # Relative draw rank at shared junctions
+    fill_visible: bool = True                # False when filled by child Channels (lanes)
+    interactive: bool = True                 # Enables click / popup detection</code></pre>
+    </div>
+
+    <!-- CHANNEL -->
+    <div class="section-block">
+      <div class="block-title">🚗 2. Channel (Travel Lanes & Flow Tracks)</div>
+      <div class="block-sub">Individual flow tracks running inside or across corridors (car lanes, bus lanes, cycleways, rails).</div>
+
+      <pre><code>@dataclass(slots=True)
+class Channel:
+    geometry: LineString                     # Centerline or lateral offset from Corridor
+    corridor_id: str | int | None = None     # Optional link to parent corridor
+    width_m: float = 3.50                    # Physical track width in meters
+    offset_m: float = 0.0                    # Lateral offset from reference line
+    order: int = 0                           # Relative draw order within elevation level
+    fill_color: str = "#444444"              # Asphalt / green cycleway / red bus lane
+    opacity: float = 1.0
+    interactive: bool = True</code></pre>
+    </div>
+
+    <!-- DEMARCATION -->
+    <div class="section-block">
+      <div class="block-title">〰️ 3. Demarcation (Pavement Markings)</div>
+      <div class="block-sub">Zero-area paint lines. Default <code>interactive=False</code> so clicks pass through to lanes below.</div>
+
+      <pre><code>@dataclass(slots=True)
+class Demarcation:
+    geometry: LineString
+    stroke_px: float = 2.0                   # Screen width in pixels (or stroke_m)
+    color: str = "#ffffff"                   # Paint color (white, yellow)
+    dash_array: list[float] = field(default_factory=list) # e.g. [3, 9] for divider
+    cap: str = "butt"                        # "butt", "round", "square"
+    interactive: bool = False                # Click passthrough enabled!</code></pre>
+    </div>
+
+    <!-- PATCH -->
+    <div class="section-block">
+      <div class="block-title">🔷 4. Patch (2D Planar Surfaces)</div>
+      <div class="block-sub">Planar 2D areas: curved junction corner fillets, painted traffic islands, and crosswalk zebras.</div>
+
+      <pre><code>@dataclass(slots=True)
+class Patch:
+    geometry: Polygon | MultiPolygon
+    fill_color: str = "#333333"
+    fill_opacity: float = 1.0
+    outline_color: str | None = None
+    order: int = -1                          # -1 places fillets under lane tracks
+    interactive: bool = False</code></pre>
+    </div>
+
+    <!-- GLYPH -->
+    <div class="section-block">
+      <div class="block-title">🏷️ 5. Glyph (Symbols & Annotations)</div>
+      <div class="block-sub">Oriented symbols, lane movement arrows, shields, and street name labels.</div>
+
+      <pre><code>@dataclass(slots=True)
+class Glyph:
+    geometry: Point | LineString
+    symbol: str | None = None                # Icon name (e.g. "turn-left", "bike")
+    text: str | None = None                  # Label text
+    alignment: str = "line"                  # Auto-aligns along channel flow
+    order: int = 10                          # Overlays everything else</code></pre>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- TAB 3: LIBRARY INTERFACE & USAGE -->
+  <!-- ========================================== -->
+  <div id="tab-interface" class="tab-pane">
+    <div class="page-header">
+      <div class="page-tag">Developer Experience & API Tiers</div>
+      <div class="page-title">How Users Interact with roadstyle v2</div>
+      <div class="page-desc">
+        Designed with a 3-tier architecture: from a single-line <code>render()</code> call for data scientists to domain-specific adapters and low-level declarative WebGL primitives.
+      </div>
+    </div>
+
+    <!-- TIER OVERVIEW MATRIX -->
+    <div class="section-block">
+      <div class="block-title">🧭 The 3 Usage Tiers at a Glance</div>
+      <div class="block-sub">Choose the level of abstraction that fits your workflow. Every tier compiles to the same 60 FPS WebGL pipeline.</div>
+
+      <div class="grid-3">
+        <div class="card-mini" style="border-top: 3px solid var(--accent);">
+          <span class="tag-pill" style="margin-bottom: 8px;">Tier 1 · Rapid GIS</span>
+          <h4>High-Level One-Liner</h4>
+          <p>For data scientists and planners who have a <code>GeoDataFrame</code> and want an interactive, publication-ready vector map with one function call.</p>
+          <div style="margin-top: 10px; font-family: monospace; font-size: 11px; color: var(--primary);">rs.render(roads, width="lanes")</div>
+        </div>
+
+        <div class="card-mini" style="border-top: 3px solid var(--primary);">
+          <span class="tag-pill" style="margin-bottom: 8px;">Tier 2 · Domain Ingestion</span>
+          <h4>Domain Adapters</h4>
+          <p>Automated converters for GMNS/<code>lanestyle</code> CSVs, OSM PBF/Overpass extracts, and ASAM OpenDRIVE networks. Ingests links, sub-lanes, and movements.</p>
+          <div style="margin-top: 10px; font-family: monospace; font-size: 11px; color: var(--primary);">rs.adapters.gmns.from_csv(...)</div>
+        </div>
+
+        <div class="card-mini" style="border-top: 3px solid var(--success);">
+          <span class="tag-pill" style="margin-bottom: 8px;">Tier 3 · Declarative Core</span>
+          <h4>Engine Primitives</h4>
+          <p>For simulation engine authors, cartographers, and CAD engineers building custom multi-layer networks with manual setbacks, LP solvers, and custom shaders.</p>
+          <div style="margin-top: 10px; font-family: monospace; font-size: 11px; color: var(--primary);">rs.compile_map(corridors, ...)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TIER 1 DETAILED WALKTHROUGH -->
+    <div class="section-block">
+      <div class="block-title">🚀 Tier 1: The High-Level One-Liner (GeoPandas)</div>
+      <div class="block-sub">Pass any GeoDataFrame of LineStrings or MultiLineStrings. roadstyle automatically extracts road widths, creates seamless casings, and renders an interactive WebGL canvas.</div>
+
+      <pre><code>import geopandas as gpd
+import roadstyle as rs
+
+# 1. Load any road network GeoDataFrame
+roads = gpd.read_file("san_francisco_roads.geojson")
+
+# 2. Render with zoom-adaptive meter widths and asymmetric casing
+m = rs.render(
+    roads,
+    width="lanes",                # Column name (e.g. 2, 4) or fixed scalar meters
+    lane_width_m=3.5,             # Multiplier: 3.5m per lane (or physical width column)
+    casing=0.30,                  # Curb width in meters (or column 'casing_m')
+    color="functional_class",      # Categorical or continuous column for choropleth styling
+    palette="viridis",            # Color palette name or dict {"highway": "#e74c3c", ...}
+    split_setback=6.0,            # Auto-trim 6m at intersections to keep portals open
+    tooltip=["name", "speed_kph", "lanes"],  # Interactive hover attributes
+    basemap="carto-dark",         # Basemap style: 'carto-dark', 'carto-light', 'osm', or None
+    interactive=True              # Enable vector click selection & highlight halos
+)
+
+# 3. View in Jupyter Notebook or export
+m.show()                          # Opens interactive map in default web browser
+m.save("san_francisco.html")      # Standalone HTML bundle (zero server dependencies)
+style_json = m.to_style_json()    # Pure MapLibre / Mapbox GL style JSON specification</code></pre>
+
+      <div class="callout">
+        <div class="callout-title">📓 Seamless Jupyter Notebook Integration</div>
+        <code>m</code> implements <code>_repr_html_()</code>. When executing <code>m</code> inside a Jupyter Notebook or VS Code interactive window, the full interactive MapLibre map renders directly inside the output cell with zoom, pan, pitch, and layer toggles.
+      </div>
+    </div>
+
+    <!-- TIER 2 DETAILED WALKTHROUGH -->
+    <div class="section-block">
+      <div class="block-title">🔌 Tier 2: Domain Adapters Workflow</div>
+      <div class="block-sub">Connect standard transport modeling datasets directly into the cartographic engine.</div>
+
+      <div class="grid-2">
+        <div class="card-mini">
+          <h4>GMNS & lanestyle Adapter</h4>
+          <p>Ingests GMNS <code>link.csv</code>, <code>lane.csv</code>, and <code>segment.csv</code>. Automatically maps road links to <code>Corridor</code>, sub-lanes to <code>Channel</code>, paint striping to <code>Demarcation</code>, and turn movement arrows to <code>Glyph</code>.</p>
+          <pre><code>import roadstyle as rs
+
+# Ingest full GMNS network specification
+net = rs.adapters.gmns.from_csv(
+    link_file="network/link.csv",
+    lane_file="network/lane.csv",
+    segment_file="network/segment.csv"
+)
+
+# Add multi-dimensional GPU presets
+net.add_preset(
+    name="Traffic Congestion",
+    width_by="hourly_volume",
+    color_by="v_over_c",
+    palette="turbo"
+)
+
+# Compile to interactive WebGL Map
+viz = net.compile(theme="dark")
+viz.save("traffic_model.html")</code></pre>
+        </div>
+
+        <div class="card-mini">
+          <h4>OpenStreetMap (OSM) Adapter</h4>
+          <p>Parses OpenStreetMap tags (<code>highway</code>, <code>lanes</code>, <code>width</code>, <code>cycleway</code>, <code>turn:lanes</code>) and builds physical cross-sections with realistic sidewalk curbs and bike lane demarcations.</p>
+          <pre><code>import roadstyle as rs
+
+# Query or parse OSM extracts
+net = rs.adapters.osm.from_overpass(
+    bbox=(37.77, -122.42, 37.80, -122.39)
+)
+
+# Generate multi-layer corridor + channels
+viz = net.compile(
+    include_bike_lanes=True,
+    include_crosswalks=True
+)
+viz.save("osm_corridors.html")</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- TIER 3 DETAILED WALKTHROUGH -->
+    <div class="section-block">
+      <div class="block-title">🧱 Tier 3: Core Primitives Declarative Pipeline</div>
+      <div class="block-sub">For custom network generators, autonomous driving stacks, and specialized CAD workflows requiring surgical control over geometry cuts and layer stacking.</div>
+
+      <pre><code>from roadstyle.v2.engine.primitives import (
+    Corridor, Channel, Demarcation, Patch, Glyph, ViewPreset
+)
+from roadstyle.v2.engine.compiler import compile_map
+
+# 1. Define parent road corridor with asymmetric casing & intersection setbacks
+corridor = Corridor(
+    geometry=road_linestring,
+    width_m=14.0,                 # 14m physical asphalt corridor
+    casing_left_m=0.50,           # 0.5m concrete Jersey barrier on median
+    casing_right_m=0.15,          # 0.15m white road edge curb
+    split_start=12.0,             # 12m setback at approach junction
+    split_end=4.0,                # 4m setback at departure junction
+    fill_visible=False            # Hollow corridor: acts as container for sub-channels
+)
+
+# 2. Add individual traffic channels (lanes) inside the corridor
+channels = [
+    Channel(geometry=lane_left, width_m=3.5, color="#1e2029", priority=1),
+    Channel(geometry=lane_right, width_m=3.5, color="#1e2029", priority=2),
+]
+
+# 3. Add paint demarcations (solid yellow divisor + white dashed lane line)
+demarcations = [
+    Demarcation(geometry=yellow_line, width_m=0.20, color="#f1c40f", pattern="solid"),
+    Demarcation(geometry=white_dash, width_m=0.15, color="#ffffff", pattern="dashed", dash_ratio=(3.0, 9.0))
+]
+
+# 4. Add intersection fillet patch & turn arrow glyph
+patch = Patch(geometry=corner_fillet_poly, color="#15171e", order=-1)
+glyph = Glyph(geometry=arrow_pt, symbol="turn-left", alignment="line")
+
+# 5. Compile into single-source WebGL map
+m = compile_map(
+    corridors=[corridor],
+    channels=channels,
+    demarcations=demarcations,
+    patches=[patch],
+    glyphs=[glyph]
+)
+m.save("custom_pipeline.html")</code></pre>
+    </div>
+
+    <!-- INTERACTION & UNCLICKABLE OBJECTS -->
+    <div class="section-block">
+      <div class="block-title">🎯 Interactivity & Click Passthrough Strategy</div>
+      <div class="block-sub">How roadstyle v2 prevents cosmetic stripes and fillet patches from blocking selection clicks.</div>
+
+      <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 14px;">
+        In legacy vector maps, small cosmetic lines (like a 0.15m white lane dash) often intercept mouse clicks, preventing the user from selecting the underlying road link or lane.
+        In <code>roadstyle v2</code>, every primitive has an <code>interactive: bool</code> property:
+      </p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Primitive</th>
+            <th>Default <code>interactive</code></th>
+            <th>MapLibre Query Behavior</th>
+            <th>Click Experience</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>Corridor</code></td>
+            <td><span class="tag-pill" style="background: rgba(46,213,115,0.15); color: var(--success);">True</span></td>
+            <td>Registered in <code>queryRenderedFeatures</code></td>
+            <td>Shows road name, speed, volume, and triggers corridor highlight halo.</td>
+          </tr>
+          <tr>
+            <td><code>Channel</code></td>
+            <td><span class="tag-pill" style="background: rgba(46,213,115,0.15); color: var(--success);">True</span></td>
+            <td>Registered in <code>queryRenderedFeatures</code></td>
+            <td>Selects individual lane with lane index, turn rules, and speed limit.</td>
+          </tr>
+          <tr>
+            <td><code>Demarcation</code></td>
+            <td><span class="tag-pill" style="background: rgba(255,71,87,0.15); color: var(--danger);">False</span></td>
+            <td>Excluded from interactive layer list</td>
+            <td><b>Click passes directly through</b> to the underlying lane or road!</td>
+          </tr>
+          <tr>
+            <td><code>Patch</code></td>
+            <td><span class="tag-pill" style="background: rgba(255,71,87,0.15); color: var(--danger);">False</span></td>
+            <td>Excluded from interactive layer list</td>
+            <td>Fillets and corner islands don't obstruct junction selection.</td>
+          </tr>
+          <tr>
+            <td><code>Glyph</code></td>
+            <td><span class="tag-pill">Optional</span></td>
+            <td>Configurable per glyph</td>
+            <td>Turn arrows can optionally display movement rules on click.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- OUTPUT MODES TABLE -->
+    <div class="section-block">
+      <div class="block-title">📦 Output Modes & Integration Targets</div>
+      <div class="block-sub">Export or embed your roadstyle visualizations into any platform or service.</div>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Target Output</th>
+            <th>Python API Method</th>
+            <th>Artifact Produced</th>
+            <th>Ideal For</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Standalone HTML</b></td>
+            <td><code>m.save("map.html")</code></td>
+            <td>Self-contained HTML + JS bundle with MapLibre GL runtime</td>
+            <td>Client reports, presentations, offline viewing, email attachments.</td>
+          </tr>
+          <tr>
+            <td><b>Jupyter Notebook</b></td>
+            <td><code>m</code> or <code>m.show()</code></td>
+            <td>Interactive iframe via <code>_repr_html_()</code></td>
+            <td>Exploratory data analysis, Google Colab, JupyterLab, VS Code notebooks.</td>
+          </tr>
+          <tr>
+            <td><b>MapLibre Style JSON</b></td>
+            <td><code>m.to_style_json()</code></td>
+            <td>Standard MapLibre / Mapbox GL JSON specification</td>
+            <td>Production tile servers, React/Vue frontends, mobile MapLibre SDKs.</td>
+          </tr>
+          <tr>
+            <td><b>Web API Service</b></td>
+            <td><code>m.to_geojson()</code></td>
+            <td>Single-source GeoJSON FeatureCollection</td>
+            <td>FastAPI / Flask microservices feeding custom frontend map clients.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- TAB 4: CASING LAB -->
+  <!-- ========================================== -->
+  <div id="tab-casing" class="tab-pane">
+    <div class="page-header">
+      <div class="page-tag">Geometry Math & Simulation</div>
+      <div class="page-title">2-Point Casing Splitter Lab</div>
+      <div class="page-desc">
+        Explore how two cut numbers slice a corridor into junction heads and main span with asymmetric setbacks.
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="block-title">✂️ Live Interactive Casing Simulator</div>
+      <div class="block-sub">Adjust the sliders to simulate real-world intersection setbacks and short-road collapse.</div>
+
+      <div class="sim-container">
+        <div class="sim-controls">
+          <div class="ctrl-item">
+            <div class="ctrl-label"><span>Road Length (L)</span> <span class="ctrl-val" id="val-l">60 m</span></div>
+            <input type="range" id="input-l" min="10" max="100" value="60">
+          </div>
+          <div class="ctrl-item">
+            <div class="ctrl-label"><span>Start Setback (h_start)</span> <span class="ctrl-val" id="val-h1">12 m</span></div>
+            <input type="range" id="input-h1" min="0" max="40" value="12">
+          </div>
+          <div class="ctrl-item">
+            <div class="ctrl-label"><span>End Setback (h_end)</span> <span class="ctrl-val" id="val-h2">6 m</span></div>
+            <input type="range" id="input-h2" min="0" max="40" value="6">
+          </div>
+        </div>
+
+        <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 30px 20px; display: flex; justify-content: center;">
+          <svg id="road-svg" width="100%" height="90" viewBox="0 0 600 90" style="overflow: visible;"></svg>
+        </div>
+
+        <div class="legend-row">
+          <div class="legend-item"><div class="legend-dot" style="background:#38bdf8;"></div><span>Start Head (Round Cap, Level: cs)</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#34d399;"></div><span>Main Span (Flat Butt Cap, Level: cm)</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#a855f7;"></div><span>End Head (Round Cap, Level: ce)</span></div>
+        </div>
+      </div>
+
+      <div class="callout">
+        <div class="callout-title">Why Butt Caps on the Main Span?</div>
+        If the main span had round caps, they would bleed into the junction heads by half the casing width. Using flat butt caps (<code>__rs_cap = True</code>) keeps the boundary cut razor-sharp, while the heads keep round caps to seal seamlessly at intersection nodes.
+      </div>
+    </div>
+
+    <!-- SPECIAL BOUNDARY CASES: DEAD ENDS & ROUNDABOUTS -->
+    <div class="section-block">
+      <div class="block-title">🎡 Special Topologies: Dead-End Twins & Roundabout Rings</div>
+      <div class="block-sub">How roadstyle resolves complex real-world boundary conditions where standard straight lines break down.</div>
+
+      <div class="grid-2">
+        <!-- DEAD END TWINS -->
+        <div class="card-mini" style="border-top: 3px solid var(--accent);">
+          <span class="tag-pill" style="margin-bottom: 8px;">Boundary Case A</span>
+          <h4 style="color: var(--accent);">Dead-End Twins (The "ω-Notch" Dilemma)</h4>
+          <p style="margin-bottom: 8px;">
+            In dual-carriageway models, a two-way street is stored as twin opposite edges. When fanned laterally at high zoom (z ≥ 15), each line's round cap leaves an <b>unsightly notch / dip</b> ("ω" shape) at dead ends.
+          </p>
+          <div style="background: var(--code-bg); padding: 12px; border-radius: 8px; font-size: 12.5px; line-height: 1.5; margin: 8px 0; border: 1px solid var(--border);">
+            <b>Legacy v1 Fix:</b> Added a synthetic <code>Point</code> layer (<code>twin_end_caps</code>) drawing two concentric circles (casing + fill) under the lanes to fill the dip.<br>
+            <b>v2 Architectural Fix:</b> The parent <code>Corridor</code> envelope naturally terminates with a clean outer round cap bounding both internal <code>Channel</code>s. Cul-de-sac turnaround bulbs are rendered directly as 2D <code>Patch</code> polygons.
+          </div>
+        </div>
+
+        <!-- ROUNDABOUTS -->
+        <div class="card-mini" style="border-top: 3px solid var(--success);">
+          <span class="tag-pill" style="margin-bottom: 8px;">Boundary Case B</span>
+          <h4 style="color: var(--success);">Roundabouts (Circulating Ring Dominance)</h4>
+          <p style="margin-bottom: 8px;">
+            When approach arms meet a roundabout ring of the same class or transit mode, the arm's round cap can paint <b>on top of the circulating ring</b> (the Monaco <i>"green color bled into the roundabout"</i> bug).
+          </p>
+          <div style="background: var(--code-bg); padding: 12px; border-radius: 8px; font-size: 12.5px; line-height: 1.5; margin: 8px 0; border: 1px solid var(--border);">
+            <b>1. Topological Stacking Dominance:</b> The LP solver enforces <code>fill_level(ring) &gt; fill_level(arm)</code> so the continuous ring carriageway paints over approach arms.<br>
+            <b>2. Asymmetric Setbacks:</b> Approach arms receive an entry setback (s1 ≈ 12m) stopping their curbs at the outer perimeter.<br>
+            <b>3. Central Island Patch:</b> The center island is a 2D <code>Patch</code> (order: -1) underlaying the inner curb.
+          </div>
+        </div>
+
+        <!-- BRIDGE ABUTMENTS & TUNNEL PORTALS -->
+        <div class="card-mini" style="border-top: 3px solid var(--primary); grid-column: span 2;">
+          <span class="tag-pill" style="margin-bottom: 8px;">Boundary Case C</span>
+          <h4 style="color: var(--primary);">Bridge Abutments & Tunnel Portals (Butt Caps vs Round Bleed)</h4>
+          <p style="margin-bottom: 8px;">
+            When an elevated bridge deck meets a ground approach road, or a subterranean road dives into a tunnel portal, standard round caps bleed outward by half the road width onto adjacent levels, creating fuzzy round bulbs.
+          </p>
+          <div style="background: var(--code-bg); padding: 12px; border-radius: 8px; font-size: 12.5px; line-height: 1.5; margin: 8px 0; border: 1px solid var(--border);">
+            <b>1. Abutment Butt Caps:</b> The 2-point casing splitter marks bridge deck main spans with <code>__rs_cap = True</code>, compiling to WebGL <code>line-cap: butt</code> for razor-sharp abutment joints without round spillover.<br>
+            <b>2. Portal Seamlessness:</b> Ground roads pass directly across tunnel portals at 100% opacity, while subterranean tunnels transition to dashed casing (<code>line-dasharray: [3.0, 3.0]</code>) and 50% opacity fill.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- ========================================== -->
+  <!-- TAB 5: GRADE SEPARATION (BRIDGES & TUNNELS) -->
+  <!-- ========================================== -->
+  <div id="tab-solver" class="tab-pane">
+    <div class="page-header">
+      <div class="page-tag">Topological Stacking & Elevation Cartography</div>
+      <div class="page-title">Grade Separation: Bridges & Tunnels ("Level vs. Look")</div>
+      <div class="page-desc">
+        How roadstyle v2 solves vertical grade separation, paints elevated bridges with butt-capped deck casings and ambient drop shadows, and renders translucent subterranean tunnels without geometry slicing.
+      </div>
+    </div>
+
+    <!-- LIVE INTERACTIVE BRIDGE & TUNNEL SIMULATOR -->
+    <div class="section-block">
+      <div class="block-title">🌉 Live Interactive Grade Separation Simulator: Bridge Overpass & Tunnel Underpass</div>
+      <div class="block-sub">Interactive WebGL cartographic simulation showing elevated bridges (deck casings + ambient shadow) and subterranean tunnels (translucent fill + dashed casing).</div>
+
+      <div class="p-btn-row" style="margin-bottom: 14px;">
+        <button class="p-btn active" id="btn-mode-normal" onclick="setBridgeMode('normal')">Normal WebGL View</button>
+        <button class="p-btn" id="btn-mode-exploded" onclick="setBridgeMode('exploded')">Exploded 3D Elevation Stack</button>
+        <button class="p-btn" id="btn-mode-xray" onclick="setBridgeMode('xray')">X-Ray Shader Passes</button>
+        <button class="p-btn" id="btn-mode-monaco" onclick="setBridgeMode('monaco')">Monaco Tunnel Mouth Test</button>
+      </div>
+
+      <div class="sim-container">
+        <div class="sim-controls" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+          <div class="ctrl-item">
+            <div class="ctrl-label"><span>Tunnel Fill Opacity</span> <span class="ctrl-val" id="val-tunnel-op">0.50</span></div>
+            <input type="range" id="input-tunnel-op" min="0.10" max="1.00" step="0.05" value="0.50">
+          </div>
+          <div class="ctrl-item">
+            <div class="ctrl-label"><span>Bridge Drop Shadow Blur</span> <span class="ctrl-val" id="val-shadow-blur">5 px</span></div>
+            <input type="range" id="input-shadow-blur" min="0" max="15" step="1" value="5">
+          </div>
+          <div class="ctrl-item">
+            <div class="ctrl-label"><span>Bridge Deck Abutment Cap</span></div>
+            <div style="display: flex; gap: 6px; margin-top: 4px;">
+              <button class="p-btn active" id="btn-cap-butt" onclick="setDeckCap('butt')" style="padding: 4px 8px; font-size: 11px;">Flat Butt Cap (v2)</button>
+              <button class="p-btn" id="btn-cap-round" onclick="setDeckCap('round')" style="padding: 4px 8px; font-size: 11px;">Round Cap (v1 Bug)</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px 10px; display: flex; flex-direction: column; align-items: center; position: relative;">
+          <svg id="bridge-tunnel-svg" width="100%" height="340" viewBox="0 0 720 340" style="overflow: visible;"></svg>
+          <div id="bridge-tunnel-expl" style="margin-top: 14px; font-size: 13px; color: var(--text-muted); text-align: center; max-width: 660px; line-height: 1.5;">
+            <strong>Normal WebGL View:</strong> The surface avenue (Level 0) passes uninterrupted over the subterranean tunnel (Level -1). The elevated bridge overpass (Level +1) casts an ambient drop shadow onto the surface avenue below.
+          </div>
+        </div>
+
+        <div class="legend-row">
+          <div class="legend-item"><div class="legend-dot" style="background:#0f172a; border: 1px solid #38bdf8;"></div><span>Bridge Overpass (+1: Dark Deck Casing + Butt Caps + Drop Shadow)</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#334155;"></div><span>Surface Avenue (0: Solid Casing & Fill)</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(56,189,248,0.5); border: 1px dashed #94a3b8;"></div><span>Subterranean Tunnel (-1: Faded Translucent Fill + Dashed Casing)</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- THE LEVEL VS LOOK ARCHITECTURE PRINCIPLE -->
+    <div class="section-block">
+      <div class="block-title">📐 The "Level vs. Look" Architecture Principle</div>
+      <div class="block-sub">Approved by Kaveh 2026-10-01 ("One drawing rule for every road; only the colour style differs").</div>
+
+      <div class="grid-2">
+        <div class="card-mini" style="border-top: 3px solid var(--primary);">
+          <h4 style="color: var(--primary);">1. Level = The Draw Band (Where It Is Drawn)</h4>
+          <p style="margin-bottom: 8px;">
+            A road's vertical stacking band is decided <b>strictly by topological grade</b> via the HiGHS Linear Program (LP) solver:
+          </p>
+          <ul style="margin-left: 18px; font-size: 13px; color: var(--text-muted); line-height: 1.6;">
+            <li><b>Low Band (Level &lt; 0):</b> Tunnels, underpasses, subterranean rails.</li>
+            <li><b>Ground Band (Level 0):</b> Surface streets, avenues, roundabouts, junctions.</li>
+            <li><b>High Band (Level &gt; 0):</b> Overpass bridges, flyovers, viaducts, skyways.</li>
+          </ul>
+          <p style="margin-top: 8px; font-size: 12.5px; color: var(--text-dim);">
+            Every road of a band has its casing under every fill of that band. Inside a band, the order is the LP discrete level.
+          </p>
+        </div>
+
+        <div class="card-mini" style="border-top: 3px solid var(--accent);">
+          <h4 style="color: var(--accent);">2. Look = Shader Passes on Top (How It Is Painted)</h4>
+          <p style="margin-bottom: 8px;">
+            A tunnel or bridge changes how a road is <b>painted by GPU fragment shaders</b>, never where it is stacked:
+          </p>
+          <ul style="margin-left: 18px; font-size: 13px; color: var(--text-muted); line-height: 1.6;">
+            <li><b>Bridge Look:</b> Darker deck casing (<code>#0f172a</code>), flat butt caps (<code>line-cap: butt</code>) at abutments so ends don't glow round, and an ambient drop shadow (<code>bridge-shadow</code> layer with <code>line-blur: 4.0</code>) cast onto lower roads.</li>
+            <li><b>Tunnel Look:</b> Two-tone casing, dashed outer casing overlay (<code>line-dasharray: [3.0, 3.0]</code>), data-driven fill opacity (<code>line-opacity: 0.50</code>), and light dashed centerline pattern.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout" style="margin-top: 16px;">
+        <div class="callout-title">The Fundamental Invariant</div>
+        <code>line-dasharray</code> and heavier widths cannot be data-driven in WebGL, which is why these are dedicated shader sublayers. A shader layer is <b>not a different algorithm</b>; it is the exact same road geometry painted with its specific cartographic look!
+      </div>
+    </div>
+
+    <!-- THE MONACO TUNNEL MOUTH PROBLEM -->
+    <div class="section-block">
+      <div class="block-title">🇲🇨 Case Study: The Monaco Tunnel Mouth Problem</div>
+      <div class="block-sub">How roadstyle v2 solved Monaco's 96 grade-separated junctions without geometry slicing.</div>
+
+      <div class="grid-2">
+        <div class="card-mini" style="border-top: 3px solid var(--danger);">
+          <span class="tag-pill" style="margin-bottom: 8px; background: rgba(255,71,87,0.15); color: var(--danger);">Legacy v1 Approach</span>
+          <h4 style="color: var(--danger);">The Fragile Geometry Hack (<code>_stretches</code> & <code>portals</code>)</h4>
+          <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 8px;">
+            In v1, a road going into a tunnel looked like it hit a wall because the surface road's casing painted over the tunnel start. To fix this, v1 ran <code>_stretches</code>:
+          </p>
+          <ul style="margin-left: 16px; font-size: 12.5px; color: var(--text-muted); line-height: 1.5;">
+            <li>Cut every tunnel into <i>ground stretches</i> and <i>under stretches</i> in Python.</li>
+            <li>Created a second synthetic GeoJSON source (<code>sources["portals"]</code>).</li>
+            <li>Duplicated features, broke feature IDs (<code>rsSelect(id)</code> failed), and hid one-way tunnel arrows under ground stretches!</li>
+          </ul>
+        </div>
+
+        <div class="card-mini" style="border-top: 3px solid var(--success);">
+          <span class="tag-pill" style="margin-bottom: 8px; background: rgba(46,213,115,0.15); color: var(--success);">roadstyle v2 Architecture</span>
+          <h4 style="color: var(--success);">Unified "Level vs. Look" (Zero Geometry Duplication)</h4>
+          <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 8px;">
+            In v2, one simple rule governs every road on Earth:
+          </p>
+          <ul style="margin-left: 16px; font-size: 12.5px; color: var(--text-muted); line-height: 1.5;">
+            <li><b>Drawn Whole:</b> The tunnel is drawn whole in the low band (Level &lt; 0).</li>
+            <li><b>Ground Road Naturally Dominates:</b> At a tunnel mouth, the surface road's fill and casing paint continuously over the tunnel entrance.</li>
+            <li><b>Zero Extra Sources:</b> Exactly 1 source (<code>sources["network"]</code>). Feature IDs remain 100% stable, lane models align perfectly, and execution is <b>10x faster</b>.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- THE HIGHS LP SOLVER FORMULATION -->
+    <div class="section-block">
+      <div class="block-title">📐 The HiGHS Linear Program (LP) Mathematical Formulation</div>
+      <div class="block-sub">Difference constraints guaranteed to yield deterministic, cycle-free painting ranks.</div>
+
+      <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.6; margin-bottom: 12px;">
+        When <code>auto_solve=True</code>, the engine scans the network with a spatial STRtree index to detect all intersection pairs and sets up a sparse linear program:
+      </p>
+
+      <pre><code>minimize:  sum(casing_levels) + sum(fill_levels)
+subject to:
+  # 1. Grade Crossings (Bridge strictly over Surface, Surface strictly over Tunnel)
+  fill_level[u] - fill_level[v] >= 2    for all crossing pairs with band[u] > band[v]
+
+  # 2. Roundabout Ring Flow Dominance
+  fill_level[ring] - fill_level[arm] >= 1  for all circulating ring connections
+
+  # 3. Main Span vs Casing Collars
+  casing_main[e] <= fill_level[e] <= casing_head[e]</code></pre>
+
+      <div class="callout" style="margin-top: 14px;">
+        <div class="callout-title">Solver Output Guarantee</div>
+        The HiGHS solver runs via <code>scipy.optimize.linprog(method="highs")</code> in under <b>15ms</b> for 10,000 edges, outputting exact discrete integer tuples <code>(casing_start, casing_main, casing_end)</code> and <code>fill_level</code> with zero z-fighting.
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- TAB 6: WEBGL COMPILER DEEP DIVE -->
+  <!-- ========================================== -->
+  <div id="tab-compiler" class="tab-pane">
+    <div class="page-header">
+      <div class="page-tag">GPU Shader & Vector Pipeline</div>
+      <div class="page-title">The WebGL Compiler Deep Dive</div>
+      <div class="page-desc">
+        How roadstyle v2 translates physical transport primitives into high-performance, 60 FPS WebGL shader pipelines with zero vertex duplication.
+      </div>
+    </div>
+
+    <!-- CORE PROBLEM: METERS TO PIXELS -->
+    <div class="section-block">
+      <div class="block-title">📐 The Core Challenge: Physical Meters vs. Screen Pixels</div>
+      <div class="block-sub">Bridging real-world roadway physics with GPU screen rasterization.</div>
+
+      <div class="grid-2">
+        <div>
+          <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.6;">
+            Transportation models and engineering drawings specify geometry in <b>physical meters</b>:
+            a highway lane is 3.50m, a barrier is 0.50m, and a paint stripe is 0.15m.
+            However, GPU rasterizers (WebGL, OpenGL, Metal) draw lines strictly in <b>screen device pixels</b>.
+          </p>
+          <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.6; margin-top: 10px;">
+            If you assign fixed pixel widths, a 4-lane highway looks like an enormous 200-pixel thick bar at regional zoom, and shrinks to an invisible hairline at street level.
+            If you pre-tesselate roads into 2D polygon meshes, geometry payload balloons by <b>300%</b>, and stroked borders draw curbs right across intersections!
+          </p>
+          <div class="callout" style="margin-top: 14px;">
+            <div class="callout-title">The roadstyle Solution</div>
+            Evaluate the Mercator meter-to-pixel projection formula <b>directly inside the GPU shader</b> via MapLibre exponential interpolation expressions.
+          </div>
+        </div>
+
+        <div class="card-mini" style="background: var(--surface-hover);">
+          <h4 style="color: var(--primary);">Ground Resolution Formula</h4>
+          <p style="margin-bottom: 8px;">In the Spherical Web Mercator projection (EPSG:3857), ground resolution S at latitude φ and zoom level z is:</p>
+          <pre><code>S(z, φ) = (C · cos(φ)) / (256 · 2^z)  [meters/pixel]
+
+where:
+  C = 40,075,016.686 m (equatorial circumference)
+  φ = latitude in radians
+  z = WebGL camera zoom level</code></pre>
+          <p style="margin-top: 8px; margin-bottom: 8px;">The exact pixel width W_px for a physical width W_m is therefore:</p>
+          <pre><code>W_px(z, φ) = W_m · (256 · 2^z) / (C · cos(φ))
+           = W_m · 2^(z + 8) / (C · cos(φ))</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAPLIBRE EXPRESSION COMPILATION -->
+    <div class="section-block">
+      <div class="block-title">⚡ Shader Expression Compilation & Sub-Pixel Clamping</div>
+      <div class="block-sub">How the compiler outputs exponential interpolation curves with minimum legibility clamps.</div>
+
+      <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.6;">
+        Instead of running expensive CPU recalculations on every pan/zoom frame, the compiler synthesizes a GPU-evaluated
+        <code>["interpolate", ["exponential", 2], ["zoom"], ...]</code> expression.
+        Furthermore, at regional zooms (z &lt; 12), a 3.5m lane would drop below 0.1px and vanish.
+        The compiler injects a <b>sub-pixel clamp</b> (<code>min_width_px = 1.25</code>) to guarantee network connectivity remains visible:
+      </p>
+
+      <pre><code>// Generated MapLibre GPU Style Expression for line-width
+"line-width": [
+  "max",
+  1.25,  // Sub-pixel antialiasing floor: never collapses to 0px
+  [
+    "interpolate",
+    ["exponential", 2],
+    ["zoom"],
+    10, ["*", ["get", "width_m"], 0.051],   // Regional scale
+    14, ["*", ["get", "width_m"], 0.816],   // City scale
+    17, ["*", ["get", "width_m"], 6.531],   // Neighborhood scale
+    20, ["*", ["get", "width_m"], 52.247]   // Micro-cadastral scale (1:1 physical meter accuracy)
+  ]
+]</code></pre>
+    </div>
+
+    <!-- SANDWICH CASING TECHNIQUE -->
+    <div class="section-block">
+      <div class="block-title">🥪 The Sandwich Casing Technique: Why 1D Lines Beat 2D Polygons</div>
+      <div class="block-sub">Why roadstyle v2 renders curbs and barriers using multi-pass 1D LineStrings instead of polygon buffers.</div>
+
+      <div class="grid-2">
+        <div class="card-mini" style="border-top: 3px solid var(--danger);">
+          <h4 style="color: var(--danger);">❌ The 2D Polygon Approach (Flawed)</h4>
+          <p>• <b>Closed Intersection Curbs:</b> Stroking a polygon outlines all 4 sides. The curb cuts right across crosswalks and intersection throats!</p>
+          <p>• <b>Payload Explosion:</b> A 100-node line becomes an 800-vertex polygon mesh with index buffers (3.5× larger payload).</p>
+          <p>• <b>Fixed Tessellation:</b> Geometry is baked at a fixed zoom; zooming in reveals jagged facets, zooming out produces pixel artifacts.</p>
+        </div>
+
+        <div class="card-mini" style="border-top: 3px solid var(--success);">
+          <h4 style="color: var(--success);">✅ The 1D Line Sandwich (roadstyle v2)</h4>
+          <p>• <b>Open Portals:</b> 1D lines with <code>line-cap: butt</code> terminate cleanly at intersection setbacks (s1, s2), leaving junctions wide open.</p>
+          <p>• <b>Zero Extra Points:</b> Uses the exact same coordinates for casing and fill. Zero vertex duplication.</p>
+          <p>• <b>Asymmetric Offsets:</b> When c_left ≠ c_right, a single GPU <code>line-offset</code> expression shifts the casing without computing new geometry.</p>
+        </div>
+      </div>
+
+      <div class="callout" style="margin-top: 16px;">
+        <div class="callout-title">The Sandwich Shader Passes</div>
+        <ol style="margin-left: 20px; font-size: 13px; line-height: 1.6; color: var(--text);">
+          <li><b>Underlay Pass (Casing):</b> Width = W_fill + 2 · C_casing, <code>line-cap: butt</code>, <code>line-join: round</code>, Color = Casing Color.</li>
+          <li><b>Lateral Offset:</b> If asymmetric, <code>line-offset = (casing_left - casing_right) / 2</code>.</li>
+          <li><b>Overlay Pass (Fill Surface):</b> Width = W_fill, <code>line-cap: butt</code>, Color = Asphalt Fill Color.</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- SINGLE-SOURCE MULTI-LAYER PIPELINE -->
+    <div class="section-block">
+      <div class="block-title">📦 Single-Source Multi-Layer Architecture</div>
+      <div class="block-sub">How roadstyle eliminates data duplication in GPU memory.</div>
+
+      <div class="grid-2">
+        <div>
+          <h4 style="font-size: 14px; margin-bottom: 8px;">roadstyle v1 (Legacy)</h4>
+          <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
+            In v1, passing overlays or multiple styles duplicated the GeoJSON feature collection into separate sources:
+            <code>sources["roads"]</code>, <code>sources["casing"]</code>, <code>sources["overlay_0"]</code>.
+            The browser downloaded and stored the same line coordinates 3 to 4 times, quickly exhausting mobile GPU memory on large metropolitan networks.
+          </p>
+        </div>
+
+        <div>
+          <h4 style="font-size: 14px; margin-bottom: 8px;">roadstyle v2 (Optimized)</h4>
+          <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
+            In v2, all network primitives are packed into <b>exactly one source</b> (<code>sources["network"]</code>).
+            Multiple WebGL shader layers (underlay casing, fill, lane divisions, markings, text labels) reference this single source using GPU filter expressions:
+            <code>["==", ["get", "type"], "corridor"]</code>.
+            Memory footprint is slashed by <b>50% to 75%</b>.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- THE 13-LAYER VISUAL STACKING HIERARCHY -->
+    <div class="section-block">
+      <div class="block-title">🥞 The 13-Layer Stacking Hierarchy (Per Elevation Band)</div>
+      <div class="block-sub">The deterministic visual layer order compiled into the WebGL renderer.</div>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Stack Order</th>
+            <th>Layer Role</th>
+            <th>Primitive</th>
+            <th>WebGL Type</th>
+            <th>Visual Function</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>0 (Bottom)</b></td>
+            <td>Fillet & Island Base</td>
+            <td><code>Patch</code></td>
+            <td><code>fill</code></td>
+            <td>Underlays roadbed to create smooth corner curvature (order: -1)</td>
+          </tr>
+          <tr>
+            <td><b>0b</b></td>
+            <td>Bridge Ambient Drop Shadow</td>
+            <td><code>Corridor</code></td>
+            <td><code>line</code></td>
+            <td>Projects blurred soft shadow (<code>line-blur: 4.0</code>) under bridge decks onto lower roads</td>
+          </tr>
+          <tr>
+            <td><b>1</b></td>
+            <td>Casing Start Collar</td>
+            <td><code>Corridor</code></td>
+            <td><code>line</code></td>
+            <td>Setback junction head collar at start node u (round caps)</td>
+          </tr>
+          <tr>
+            <td><b>2</b></td>
+            <td>Casing End Collar</td>
+            <td><code>Corridor</code></td>
+            <td><code>line</code></td>
+            <td>Setback junction head collar at end node v (round caps)</td>
+          </tr>
+          <tr>
+            <td><b>3</b></td>
+            <td>Casing Main Span</td>
+            <td><code>Corridor</code></td>
+            <td><code>line</code></td>
+            <td>Continuous curb or dark deck casing (<code>#0f172a</code>) with flat butt caps</td>
+          </tr>
+          <tr>
+            <td><b>3b</b></td>
+            <td>Tunnel Dashed Casing Overlay</td>
+            <td><code>Corridor</code></td>
+            <td><code>line</code></td>
+            <td>Subterranean dashed outer casing (<code>line-dasharray: [3.0, 3.0]</code>)</td>
+          </tr>
+          <tr>
+            <td><b>4</b></td>
+            <td>Corridor Pavement Fill</td>
+            <td><code>Corridor</code></td>
+            <td><code>line</code></td>
+            <td>Base asphalt surface (data-driven <code>line-opacity: 0.50</code> for tunnels, 1.0 for surface/bridges)</td>
+          </tr>
+          <tr>
+            <td><b>5</b></td>
+            <td>Channel Fill (Lanes)</td>
+            <td><code>Channel</code></td>
+            <td><code>line</code></td>
+            <td>Dedicated travel lane surfaces (bus, cycle, general traffic)</td>
+          </tr>
+          <tr>
+            <td><b>6</b></td>
+            <td>Channel Borders</td>
+            <td><code>Channel</code></td>
+            <td><code>line</code></td>
+            <td>Internal lane gutter lines & curb boundaries</td>
+          </tr>
+          <tr>
+            <td><b>7</b></td>
+            <td>White Edge Stripes</td>
+            <td><code>Demarcation</code></td>
+            <td><code>line</code></td>
+            <td>Continuous solid white road edge paint</td>
+          </tr>
+          <tr>
+            <td><b>8</b></td>
+            <td>White Dashed Dividers</td>
+            <td><code>Demarcation</code></td>
+            <td><code>line</code></td>
+            <td>Inter-lane dashed lines using <code>line-dasharray</code></td>
+          </tr>
+          <tr>
+            <td><b>9</b></td>
+            <td>Yellow Centerline Stripes</td>
+            <td><code>Demarcation</code></td>
+            <td><code>line</code></td>
+            <td>Opposing traffic median dividers (double-solid or dashed)</td>
+          </tr>
+          <tr>
+            <td><b>10</b></td>
+            <td>High-Priority Connectors</td>
+            <td><code>Channel</code></td>
+            <td><code>line</code></td>
+            <td>Junction turning paths that paint over lower-priority approaches</td>
+          </tr>
+          <tr>
+            <td><b>11</b></td>
+            <td>Glyphs (Turn Arrows & Icons)</td>
+            <td><code>Glyph</code></td>
+            <td><code>symbol</code></td>
+            <td>Flow-oriented turn arrows, bike symbols, and highway shields</td>
+          </tr>
+          <tr>
+            <td><b>12 (Top)</b></td>
+            <td>Labels & Dynamic Halos</td>
+            <td><code>Glyph</code> / State</td>
+            <td><code>symbol</code></td>
+            <td>Street names, bridge labels, and interactive selection glow</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 0MS UNIFORM SWAPPING -->
+    <div class="section-block">
+      <div class="block-title">⚡ 0-Millisecond Uniform Swapping (ViewPresets)</div>
+      <div class="block-sub">Switching between Physical Geometry and Flow Bandwidth without reloading data.</div>
+
+      <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.6;">
+        When toggling between presets (e.g. from <b>Physical Lane Widths</b> to <b>Traffic Volume Bandwidths</b>), traditional tools re-query the database, rebuild GeoJSON geometries, and upload new vertex buffers over the network.
+      </p>
+      <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.6; margin-top: 10px;">
+        In <code>roadstyle v2</code>, both physical dimensions (<code>width_m</code>) and dynamic attributes (<code>volume</code>, <code>speed</code>, <code>v_over_c</code>) are encoded into the single feature properties.
+        The compiler writes data-driven expressions that switch instantly via WebGL uniform toggles:
+      </p>
+
+      <pre><code>// Shader expression dynamically evaluates active preset
+"line-width": [
+  "case",
+  ["==", ["feature-state", "preset_mode"], "flow"],
+  ["*", ["get", "hourly_volume"], 0.005],  // Volume-proportional bandwidth
+  [
+    "interpolate", ["exponential", 2], ["zoom"],
+    14, ["*", ["get", "width_m"], 0.816],  // Physical meter scale
+    18, ["*", ["get", "width_m"], 13.12]
+  ]
+]</code></pre>
+      <div class="callout">
+        <div class="callout-title">Instantaneous 60 FPS Transition</div>
+        Calling <code>map.setFeatureState(...)</code> triggers a single uniform buffer update on the GPU. The entire metropolitan network transitions instantly in <b>0 ms</b> with zero network transfer and zero dropped frames.
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- TAB 7: THEMES, YAML CONFIG & STYLES -->
+  <!-- ========================================== -->
+  <div id="tab-presets" class="tab-pane">
+    <div class="page-header">
+      <div class="page-tag">Configuration & Styling Architecture</div>
+      <div class="page-title">Themes, YAML Config & Overlay Styles</div>
+      <div class="page-desc">
+        How roadstyle decouples domain geometry from visual styling: YAML themes (<code>config.overlays.styles</code>), geometry settings (<code>lanestyle.json</code>), and 0ms GPU ViewPresets.
+      </div>
+    </div>
+
+    <!-- THE ARCHITECTURAL SPLIT: MECHANISM VS LOOK -->
+    <div class="section-block">
+      <div class="block-title">🧩 The Architectural Split: Mechanism vs. Look</div>
+      <div class="block-sub">Why roadstyle ships zero overlay styles of its own, and how calling libraries provide themes.</div>
+
+      <div class="grid-2">
+        <div>
+          <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.6;">
+            A library that draws specialized transport networks (such as <code>lanestyle</code> for lane-level micro-simulation, or <code>mapstyle</code> for regional cartography) knows exactly how its features must <b>look</b>:
+          </p>
+          <ul style="margin-left: 18px; font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-top: 8px;">
+            <li>A lane divider is a white line 20cm wide, dashed 3m on / 9m off, appearing from zoom 17.</li>
+            <li>A painted turn arrow is a white polygon appearing from zoom 18.</li>
+            <li>A street name is white text along the centerline with a dark contrast halo, appearing from zoom 17.</li>
+          </ul>
+          <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.6; margin-top: 10px;">
+            <code>roadstyle</code> must know how to render such visuals at 60 FPS, but it <b>must not hardcode them</b>.
+          </p>
+        </div>
+
+        <div class="card-mini" style="background: var(--surface-hover); border-top: 3px solid var(--primary);">
+          <h4 style="color: var(--primary);">The Two Responsibilities</h4>
+          <p style="margin-bottom: 8px;">
+            <b>1. roadstyle provides the engine mechanism:</b> An <code>Overlay</code> names a <code>style="..."</code> token, and roadstyle compiles the exact WebGL shader passes.
+          </p>
+          <p>
+            <b>2. The library defines the styles in a YAML theme:</b> <code>lanestyle</code> defines <code>lanestyle.yaml</code> and passes it into <code>settings=</code>.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- THE YAML THEME SPECIFICATION -->
+    <div class="section-block">
+      <div class="block-title">📄 The YAML Theme Specification (<code>config.overlays.styles</code>)</div>
+      <div class="block-sub">The complete theme schema passed by downstream libraries into roadstyle.</div>
+
+      <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.6; margin-bottom: 12px;">
+        Here is the actual theme from <code>lanestyle/styles/themes/lanestyle.yaml</code> that controls all micro-cartographic rendering:
+      </p>
+
+      <pre><code>config:
+  overlays:
+    styles:
+      lane:         {kind: fill, opacity: 1, width: 0}
+      connector:    {kind: fill, opacity: 1, width: 0}
+      divider:      {kind: line, color: "#f4f4f4", width_m: 0.2, dash: [15, 45], min_zoom: 17}
+      centre:       {kind: line, color: "#f4f4f4", width_m: 0.2, min_zoom: 17}
+      zebra:        {kind: fill, color: "#f7f7f2", opacity: 1, width: 0, min_zoom: 16}
+      lane_arrow:   {kind: fill, color: "#f4f4f4", opacity: 1, width: 0, min_zoom: 18}
+      street_name:  {kind: text, text_col: name, text_size: 12, text_color: "#f4f4f4", text_halo: "#3a3a3a", min_zoom: 17}</code></pre>
+
+      <!-- FIELD REFERENCE TABLE -->
+      <h4 style="font-size: 15px; margin: 24px 0 12px 0;">Theme Field Reference</h4>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Applies To</th>
+            <th>Description & WebGL Shader Translation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>kind</code></td>
+            <td><code>str</code></td>
+            <td>All</td>
+            <td>WebGL primitive type: <code>fill</code> (polygons), <code>line</code> (strokes), <code>circle</code> (points), or <code>text</code> (labels).</td>
+          </tr>
+          <tr>
+            <td><code>color</code></td>
+            <td><code>str</code></td>
+            <td><code>fill</code>, <code>line</code>, <code>circle</code></td>
+            <td>Color hex code (e.g. <code>"#f4f4f4"</code>). Can be overridden per-feature by <code>color_col</code>.</td>
+          </tr>
+          <tr>
+            <td><code>opacity</code></td>
+            <td><code>float</code></td>
+            <td>All</td>
+            <td>Visual opacity from <code>0.0</code> (transparent) to <code>1.0</code> (fully opaque).</td>
+          </tr>
+          <tr>
+            <td><code>width</code></td>
+            <td><code>float</code></td>
+            <td><code>line</code>, <code>fill</code></td>
+            <td>Fixed screen width in device pixels.</td>
+          </tr>
+          <tr>
+            <td><code>width_m</code></td>
+            <td><code>float</code></td>
+            <td><code>line</code></td>
+            <td><b>Physical width in ground meters</b> (e.g. <code>0.20</code> for a 20cm line). Scaled dynamically by the Web Mercator zoom formula!</td>
+          </tr>
+          <tr>
+            <td><code>dash</code></td>
+            <td><code>list[float]</code></td>
+            <td><code>line</code></td>
+            <td>Dash pattern in multiples of line width (e.g. <code>[15, 45]</code> $\to$ 3m dash, 9m gap on 20cm line). Compiles to <code>line-dasharray</code>.</td>
+          </tr>
+          <tr>
+            <td><code>min_zoom</code></td>
+            <td><code>float</code></td>
+            <td>All</td>
+            <td>Camera zoom level where layer first turns on. Compiles to MapLibre <code>minzoom</code>.</td>
+          </tr>
+          <tr>
+            <td><code>max_zoom</code></td>
+            <td><code>float</code></td>
+            <td>All</td>
+            <td>Camera zoom level where layer turns off. Compiles to MapLibre <code>maxzoom</code>.</td>
+          </tr>
+          <tr>
+            <td><code>text_col</code></td>
+            <td><code>str</code></td>
+            <td><code>text</code></td>
+            <td>Feature property containing the string to display (e.g. <code>name</code> $\to$ <code>["get", "name"]</code>).</td>
+          </tr>
+          <tr>
+            <td><code>text_size</code></td>
+            <td><code>float</code></td>
+            <td><code>text</code></td>
+            <td>Font size in screen points (default: <code>12</code>).</td>
+          </tr>
+          <tr>
+            <td><code>text_color</code></td>
+            <td><code>str</code></td>
+            <td><code>text</code></td>
+            <td>Font fill color (e.g. <code>"#f4f4f4"</code> for white road markings).</td>
+          </tr>
+          <tr>
+            <td><code>text_halo</code></td>
+            <td><code>str</code></td>
+            <td><code>text</code></td>
+            <td>High-contrast outline halo around glyphs (e.g. <code>"#3a3a3a"</code> with 1.5px width) for readability on dark asphalt.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- GEOMETRY SETTINGS VS VISUAL STYLES -->
+    <div class="section-block">
+      <div class="block-title">⚖️ Geometry Settings (<code>lanestyle.json</code>) vs. Visual Styles (<code>lanestyle.yaml</code>)</div>
+      <div class="block-sub">Clear separation between physical Python spatial math and GPU rasterization rules.</div>
+
+      <div class="grid-2">
+        <div class="card-mini" style="border-top: 3px solid var(--accent);">
+          <span class="tag-pill" style="margin-bottom: 8px;">Physical / Python Space</span>
+          <h4 style="color: var(--accent);"><code>lanestyle.json</code> (Geometry Settings)</h4>
+          <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 8px;">
+            Controls coordinate generation and spatial calculations in Python:
+          </p>
+          <ul style="margin-left: 16px; font-size: 12.5px; color: var(--text-muted); line-height: 1.6;">
+            <li><b>Arrow Dimensions:</b> <code>length_m: 4</code>, <code>repeat_m: 60</code>, <code>end_m: 10</code>.</li>
+            <li><b>Street Name Clearance:</b> <code>names: {clear_m: 3}</code> (cuts the street name centerline 3 meters away from painted arrows and zebras).</li>
+            <li><b>Lane Widths:</b> <code>default_width_m: 3.25</code>, <code>walk: 2.0</code>, <code>bike: 1.5</code>.</li>
+            <li><b>Curb Casings:</b> <code>casing_m: 0.14</code>, <code>junction_trim_m: 1.0</code>.</li>
+          </ul>
+        </div>
+
+        <div class="card-mini" style="border-top: 3px solid var(--success);">
+          <span class="tag-pill" style="margin-bottom: 8px;">Screen / GPU Space</span>
+          <h4 style="color: var(--success);"><code>lanestyle.yaml</code> (Visual Theme)</h4>
+          <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 8px;">
+            Controls WebGL fragment shaders and zoom visibility on the screen:
+          </p>
+          <ul style="margin-left: 16px; font-size: 12.5px; color: var(--text-muted); line-height: 1.6;">
+            <li><b>Zoom Activation:</b> Turns street names on at <code>min_zoom: 17</code>, arrows at <code>min_zoom: 18</code>, zebras at <code>min_zoom: 16</code>.</li>
+            <li><b>Typography:</b> Font size <code>12px</code>, white text <code>#f4f4f4</code>, dark halo <code>#3a3a3a</code>.</li>
+            <li><b>Shader Placement:</b> <code>symbol-placement: "line-center"</code>.</li>
+            <li><b>Line Dashes:</b> <code>dash: [15, 45]</code> for white lane dividers.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- CALLING CONTRACT & PRECEDENCE -->
+    <div class="section-block">
+      <div class="block-title">📞 The Python Calling Contract & Precedence Rules</div>
+      <div class="block-sub">How an Overlay binds to its style and how argument overrides work.</div>
+
+      <pre><code># 1. lanestyle loads theme YAML and merges into roadstyle settings
+rs_settings = _merge(lane_theme(), _ROADSTYLE)
+
+# 2. Overlays reference style names:
+overlays = [
+    # References style="street_name" from YAML (kind: text, min_zoom: 17)
+    rs.Overlay(names, edge_col="road_id", order_col="order", style="street_name"),
+
+    # References style="lane_arrow" from YAML (kind: fill, min_zoom: 18)
+    rs.Overlay(arrows, edge_col="road_id", order_col="order", style="lane_arrow"),
+
+    # Direct override: explicit arguments win over the YAML style!
+    rs.Overlay(special_labels, edge_col="road_id", style="street_name", text_color="#f59e0b")
+]
+
+# 3. roadstyle compiles the unified MapLibre WebGL style JSON
+m = roadstyle.render_edges(roads, overlays=overlays, settings=rs_settings)</code></pre>
+
+      <div class="callout" style="margin-top: 14px;">
+        <div class="callout-title">The Precedence Hierarchy</div>
+        <b>Explicit <code>Overlay(...)</code> argument</b> &gt; <b>Theme style in YAML (<code>config.overlays.styles</code>)</b> &gt; <b>roadstyle engine default</b>.
+      </div>
+    </div>
+
+    <!-- DYNAMIC VIEWPRESET SIMULATOR -->
+    <div class="section-block">
+      <div class="block-title">🎨 Runtime ViewPreset Simulator (0ms GPU Swapping)</div>
+      <div class="block-sub">Click the buttons below to see how multiple visual channels transform client-side without reloading data.</div>
+
+      <div class="p-btn-row">
+        <button class="p-btn active" onclick="setPreset('physical')">📐 Physical Layout</button>
+        <button class="p-btn" onclick="setPreset('traffic')">🔥 Traffic Flow (Bandwidth)</button>
+        <button class="p-btn" onclick="setPreset('speed')">⚡ Speed Limits (Viridis)</button>
+        <button class="p-btn" onclick="setPreset('debug')">🛠️ Engineering Graph</button>
+      </div>
+
+      <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 36px 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 160px;">
+        <div id="demo-line" style="width: 80%; height: 16px; background: #475569; border: 2px solid #22c55e; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; transition: all 0.25s ease;">Main St</div>
+        <div id="demo-desc" style="font-size: 12.5px; color: var(--text-muted); margin-top: 18px; text-align: center;">
+          <strong>Physical Layout:</strong> 10m physical carriageway width with true curb casings and street name label.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- TAB 8: ADAPTERS -->
+  <!-- ========================================== -->
+  <div id="tab-adapters" class="tab-pane">
+    <div class="page-header">
+      <div class="page-tag">Domain Translation Layer</div>
+      <div class="page-title">Adapters & Ingestion</div>
+      <div class="page-desc">
+        How domain-specific schemas (OSM, GMNS, OpenDRIVE, GIS) map into the 5 universal primitives.
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="block-title">🔌 Multi-Domain Adapter Mapping Table</div>
+      <div class="block-sub">Adapters isolate domain nuances completely; the core engine never changes.</div>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Domain Source</th>
+            <th>Adapter</th>
+            <th>Engine Primitive</th>
+            <th>Cartographic Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>OSM</strong>: <code>highway=primary, bridge=yes</code></td>
+            <td><code>OSMAdapter</code></td>
+            <td><span class="tag-pill">Corridor</span></td>
+            <td>Carriageway with physical class width and bridge deck.</td>
+          </tr>
+          <tr>
+            <td><strong>GMNS</strong>: <code>link.csv</code> (3 lanes)</td>
+            <td><code>GMNSAdapter</code></td>
+            <td><span class="tag-pill">Corridor</span> (fill_visible=False)</td>
+            <td>Outer corridor envelope & curbs; hollow body.</td>
+          </tr>
+          <tr>
+            <td><strong>GMNS</strong>: <code>lane.csv</code> (3.5m lane)</td>
+            <td><code>GMNSAdapter</code></td>
+            <td><span class="tag-pill">Channel</span> (order=0)</td>
+            <td>Individual travel lane inside corridor.</td>
+          </tr>
+          <tr>
+            <td><strong>lanestyle</strong>: Junction corner fillet</td>
+            <td><code>GMNSAdapter</code></td>
+            <td><span class="tag-pill">Patch</span> (order=-1)</td>
+            <td>2D curved curb return polygon behind lanes.</td>
+          </tr>
+          <tr>
+            <td><strong>OpenDRIVE</strong>: Lane divider roadmarks</td>
+            <td><code>ASAMAdapter</code></td>
+            <td><span class="tag-pill">Demarcation</span></td>
+            <td>Dashed paint line; click passthrough enabled.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- TAB 9: API REFERENCE -->
+  <!-- ========================================== -->
+  <div id="tab-api" class="tab-pane">
+    <div class="page-header">
+      <div class="page-tag">Python API</div>
+      <div class="page-title">roadstyle.v2 API Reference</div>
+      <div class="page-desc">
+        Complete function signatures and usage patterns for roadstyle v2.
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="block-title">🐍 Primary Compiler Entry Point</div>
+      <div class="block-sub">Compiling primitives into a self-contained WebMap.</div>
+
+      <pre><code>from roadstyle.v2 import Corridor, Channel, Demarcation, ViewPreset, compile_map
+
+# 1. Define Corridors
+corridors = [
+    Corridor(
+        geometry=road_line,
+        width_m=10.5,
+        casing_left_m=0.30,
+        casing_right_m=0.15,
+        split_start=12.0,   # Asymmetric 12m junction setback at node u
+        split_end=4.0,      # Asymmetric 4m setback at node v
+        fill_visible=False  # Hollow container for child lanes
+    )
+]
+
+# 2. Compile Map
+map = compile_map(
+    corridors=corridors,
+    channels=lanes,
+    demarcations=markings,
+    presets=[
+        ViewPreset(name="Physical", width_mode="physical", color_by="class"),
+        ViewPreset(name="Flow", width_mode="flow", width_by="volume")
+    ]
+)
+
+# 3. Save or Serve
+map.save("network.html")</code></pre>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  // TAB NAVIGATION
+  function switchTab(tabId) {
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+
+    const targetTab = document.getElementById(tabId);
+    if (targetTab) targetTab.classList.add('active');
+
+    const activeNav = Array.from(document.querySelectorAll('.nav-item')).find(el => el.getAttribute('onclick').includes(tabId));
+    if (activeNav) activeNav.classList.add('active');
+
+    if (tabId === 'tab-casing') {
+      setTimeout(drawRoad, 20);
+    }
+    if (tabId === 'tab-solver') {
+      setTimeout(drawBridgeTunnel, 20);
+    }
+  }
+
+  // THEME SWITCHER
+  let currentTheme = localStorage.getItem('roadstyle_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', currentTheme);
+  updateThemeButton();
+
+  function toggleTheme() {
+    currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', currentTheme);
+    localStorage.setItem('roadstyle_theme', currentTheme);
+    updateThemeButton();
+    drawRoad();
+    drawBridgeTunnel();
+  }
+
+  function updateThemeButton() {
+    const icon = document.getElementById('theme-icon');
+    const text = document.getElementById('theme-text');
+    if (currentTheme === 'dark') {
+      icon.textContent = '☀️';
+      text.textContent = 'Light Mode';
+    } else {
+      icon.textContent = '🌙';
+      text.textContent = 'Dark Mode';
+    }
+  }
+
+  document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+
+  // CASING SIMULATOR
+  const inputL = document.getElementById('input-l');
+  const inputH1 = document.getElementById('input-h1');
+  const inputH2 = document.getElementById('input-h2');
+  const valL = document.getElementById('val-l');
+  const valH1 = document.getElementById('val-h1');
+  const valH2 = document.getElementById('val-h2');
+  const svg = document.getElementById('road-svg');
+
+  function drawRoad() {
+    if (!svg || !inputL) return;
+    const L = parseFloat(inputL.value);
+    const h1 = parseFloat(inputH1.value);
+    const h2 = parseFloat(inputH2.value);
+
+    valL.textContent = `${L} m`;
+    valH1.textContent = `${h1} m`;
+    valH2.textContent = `${h2} m`;
+
+    const startX = 50;
+    const endX = 550;
+    const totalW = endX - startX;
+    const cy = 45;
+    const roadThickness = 28;
+
+    let cut1, cut2;
+    if (h1 + h2 >= L) {
+      const ratio = h1 / (h1 + h2);
+      cut1 = cut2 = L * ratio;
+    } else {
+      cut1 = h1;
+      cut2 = L - h2;
+    }
+
+    const xCut1 = startX + (cut1 / L) * totalW;
+    const xCut2 = startX + (cut2 / L) * totalW;
+
+    const isShort = (h1 + h2 >= L);
+    const isDark = currentTheme === 'dark';
+    const textColor = isDark ? '#94a3b8' : '#475569';
+
+    let html = `
+      <line x1="${startX}" y1="${cy}" x2="${endX}" y2="${cy}" stroke="${isDark ? '#334155' : '#cbd5e1'}" stroke-width="2" stroke-dasharray="4,4" />
+      <line x1="${startX}" y1="${cy}" x2="${xCut1}" y2="${cy}" stroke="#38bdf8" stroke-width="${roadThickness}" stroke-linecap="round" />
+      <line x1="${xCut2}" y1="${cy}" x2="${endX}" y2="${cy}" stroke="#a855f7" stroke-width="${roadThickness}" stroke-linecap="round" />
+    `;
+
+    if (!isShort && (xCut2 - xCut1 > 2)) {
+      html += `
+        <line x1="${xCut1}" y1="${cy}" x2="${xCut2}" y2="${cy}" stroke="#34d399" stroke-width="${roadThickness}" stroke-linecap="butt" />
+      `;
+    }
+
+    html += `
+      <line x1="${xCut1}" y1="${cy - 24}" x2="${xCut1}" y2="${cy + 24}" stroke="#fff" stroke-width="2" />
+      <circle cx="${xCut1}" cy="${cy}" r="4" fill="#fff" />
+      <text x="${xCut1}" y="${cy - 28}" font-size="11" font-family="monospace" font-weight="700" fill="${textColor}" text-anchor="middle">cut_1 (${cut1.toFixed(1)}m)</text>
+
+      <line x1="${xCut2}" y1="${cy - 24}" x2="${xCut2}" y2="${cy + 24}" stroke="#fff" stroke-width="2" />
+      <circle cx="${xCut2}" cy="${cy}" r="4" fill="#fff" />
+      <text x="${xCut2}" y="${cy + 38}" font-size="11" font-family="monospace" font-weight="700" fill="${textColor}" text-anchor="middle">cut_2 (${cut2.toFixed(1)}m)</text>
+
+      <text x="${startX - 14}" y="${cy + 4}" font-size="12" font-weight="bold" fill="${textColor}" text-anchor="end">Node u</text>
+      <text x="${endX + 14}" y="${cy + 4}" font-size="12" font-weight="bold" fill="${textColor}" text-anchor="start">Node v</text>
+    `;
+
+    svg.innerHTML = html;
+  }
+
+  inputL.addEventListener('input', drawRoad);
+  inputH1.addEventListener('input', drawRoad);
+  inputH2.addEventListener('input', drawRoad);
+  drawRoad();
+
+  // GRADE SEPARATION (BRIDGES & TUNNELS) SIMULATOR
+  let bridgeMode = 'normal';
+  let deckCap = 'butt';
+  const inputTunnelOp = document.getElementById('input-tunnel-op');
+  const inputShadowBlur = document.getElementById('input-shadow-blur');
+  const valTunnelOp = document.getElementById('val-tunnel-op');
+  const valShadowBlur = document.getElementById('val-shadow-blur');
+  const bridgeSvg = document.getElementById('bridge-tunnel-svg');
+  const bridgeExpl = document.getElementById('bridge-tunnel-expl');
+
+  function setBridgeMode(mode) {
+    bridgeMode = mode;
+    ['normal', 'exploded', 'xray', 'monaco'].forEach(m => {
+      const b = document.getElementById(`btn-mode-${m}`);
+      if (b) b.classList.toggle('active', m === mode);
+    });
+
+    if (mode === 'normal') {
+      bridgeExpl.innerHTML = '<strong>Normal WebGL View:</strong> The surface avenue (Level 0) passes uninterrupted over the subterranean tunnel (Level -1). The elevated bridge overpass (Level +1) casts an ambient drop shadow onto the surface avenue below.';
+    } else if (mode === 'exploded') {
+      bridgeExpl.innerHTML = '<strong>Exploded 3D Elevation Stack:</strong> Separates the 3 vertical grade bands (+1 Bridge, 0 Surface, -1 Tunnel) along the z-axis so the independent topological planes and casing layers are clearly visible.';
+    } else if (mode === 'xray') {
+      bridgeExpl.innerHTML = '<strong>X-Ray Shader Passes:</strong> Color-codes the GPU fragment passes: Purple = Bridge Drop Shadow, Blue = Butt-Capped Deck Casing, Amber = Surface Carriageway, Pink = Tunnel Dashed Casing, Green = Translucent Fill.';
+    } else if (mode === 'monaco') {
+      bridgeExpl.innerHTML = '<strong>Monaco Tunnel Mouth Test:</strong> Shows the portal junction where the surface avenue meets the tunnel mouth. In v2, ground roads cleanly paint across the tunnel entrance with zero geometry slicing or duplicate portal sources.';
+    }
+    drawBridgeTunnel();
+  }
+
+  function setDeckCap(cap) {
+    deckCap = cap;
+    const btnButt = document.getElementById('btn-cap-butt');
+    const btnRound = document.getElementById('btn-cap-round');
+    if (btnButt) btnButt.classList.toggle('active', cap === 'butt');
+    if (btnRound) btnRound.classList.toggle('active', cap === 'round');
+    drawBridgeTunnel();
+  }
+
+  if (inputTunnelOp) {
+    inputTunnelOp.addEventListener('input', () => {
+      if (valTunnelOp) valTunnelOp.textContent = parseFloat(inputTunnelOp.value).toFixed(2);
+      drawBridgeTunnel();
+    });
+  }
+
+  if (inputShadowBlur) {
+    inputShadowBlur.addEventListener('input', () => {
+      if (valShadowBlur) valShadowBlur.textContent = `${inputShadowBlur.value} px`;
+      drawBridgeTunnel();
+    });
+  }
+
+  function drawBridgeTunnel() {
+    if (!bridgeSvg || !inputTunnelOp) return;
+    const op = parseFloat(inputTunnelOp.value);
+    const blur = parseInt(inputShadowBlur.value, 10);
+    const isDark = currentTheme === 'dark';
+
+    // Offsets for exploded mode
+    const yTunnelOffset = (bridgeMode === 'exploded') ? 48 : 0;
+    const yBridgeOffset = (bridgeMode === 'exploded') ? -48 : 0;
+
+    const textColor = isDark ? '#94a3b8' : '#475569';
+    const textBright = isDark ? '#f8fafc' : '#0f172a';
+
+    let svgContent = `
+      <defs>
+        <filter id="bridge-blur" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="${blur}" />
+        </filter>
+      </defs>
+    `;
+
+    const ty = yTunnelOffset;
+    const by = yBridgeOffset;
+
+    // 1. GUIDELINES & 3D STACK INDICATORS (when exploded)
+    if (bridgeMode === 'exploded') {
+      svgContent += `
+        <!-- Vertical Stacking Axis Lines -->
+        <line x1="60" y1="${170 + by}" x2="60" y2="${170 + ty}" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4,4" />
+        <circle cx="60" cy="${170 + by}" r="4" fill="#38bdf8" />
+        <circle cx="60" cy="170" r="4" fill="#94a3b8" />
+        <circle cx="60" cy="${170 + ty}" r="4" fill="#10b981" />
+        <text x="75" y="${170 + by + 4}" font-size="11" font-weight="700" fill="#38bdf8">Level +1: Bridge (+5.5m)</text>
+        <text x="75" y="174" font-size="11" font-weight="700" fill="${textColor}">Level 0: Surface (0.0m)</text>
+        <text x="75" y="${170 + ty + 4}" font-size="11" font-weight="700" fill="#10b981">Level -1: Tunnel (-6.0m)</text>
+      `;
+    }
+
+    // 2. LEVEL -1: SUBTERRANEAN TUNNEL
+    const tunCasingColor = (bridgeMode === 'xray') ? '#ec4899' : (isDark ? '#475569' : '#94a3b8');
+    const tunFillColor = (bridgeMode === 'xray') ? '#10b981' : (isDark ? '#0284c7' : '#38bdf8');
+    const tunD = `M 100 ${310 + ty} Q 180 ${230 + ty} 240 ${170 + ty} T 360 ${30 + ty}`;
+
+    svgContent += `
+      <!-- LEVEL -1: TUNNEL -->
+      <g id="layer-tunnel">
+        <path d="${tunD}" fill="none" stroke="${tunCasingColor}" stroke-width="32" stroke-linecap="butt" stroke-dasharray="6,6" />
+        <path d="${tunD}" fill="none" stroke="${tunFillColor}" stroke-width="24" stroke-linecap="butt" opacity="${op}" />
+        <path d="${tunD}" fill="none" stroke="${isDark ? '#e2e8f0' : '#ffffff'}" stroke-width="1.5" stroke-dasharray="4,4" opacity="${op * 0.9}" />
+
+        <circle cx="160" cy="${250 + ty}" r="6" fill="#e11d48" stroke="#fff" stroke-width="2" />
+        <text x="175" y="${254 + ty}" font-size="11" font-weight="700" fill="${textColor}">Portal (Mouth)</text>
+        <text x="280" y="${90 + ty}" font-size="11" font-weight="600" fill="${textColor}" text-anchor="middle">Subterranean Bore (Level -1)</text>
+      </g>
+    `;
+
+    // 3. LEVEL 0: SURFACE AVENUE
+    const surfCasingColor = (bridgeMode === 'xray') ? '#f59e0b' : (isDark ? '#475569' : '#94a3b8');
+    const surfFillColor = (bridgeMode === 'xray') ? '#d97706' : (isDark ? '#1e293b' : '#cbd5e1');
+
+    svgContent += `
+      <!-- LEVEL 0: SURFACE AVENUE -->
+      <g id="layer-surface">
+        <line x1="40" y1="170" x2="680" y2="170" stroke="${surfCasingColor}" stroke-width="38" stroke-linecap="round" />
+        <line x1="40" y1="170" x2="680" y2="170" stroke="${surfFillColor}" stroke-width="30" stroke-linecap="round" />
+        <line x1="50" y1="170" x2="670" y2="170" stroke="#facc15" stroke-width="2" stroke-dasharray="8,6" />
+        <text x="50" y="142" font-size="12" font-weight="700" fill="${textBright}">Surface Avenue (Level 0)</text>
+      </g>
+    `;
+
+    // 4. LEVEL +1: ELEVATED BRIDGE OVERPASS
+    const bx1 = 430, by1 = 50 + by;
+    const bx2 = 570, by2 = 290 + by;
+
+    const bridgeDeckCasingColor = (bridgeMode === 'xray') ? '#38bdf8' : (isDark ? '#0f172a' : '#1e293b');
+    const bridgeFillColor = (bridgeMode === 'xray') ? '#818cf8' : (isDark ? '#334155' : '#64748b');
+    const shadowColor = (bridgeMode === 'xray') ? 'rgba(168, 85, 247, 0.75)' : (isDark ? 'rgba(0,0,0,0.65)' : 'rgba(15,23,42,0.4)');
+
+    svgContent += `
+      <!-- LEVEL +1: ELEVATED BRIDGE -->
+      <g id="layer-bridge">
+    `;
+
+    // Ambient Drop Shadow
+    if (blur > 0) {
+      svgContent += `
+        <line x1="${bx1 + 4}" y1="${by1 + 6}" x2="${bx2 + 4}" y2="${by2 + 6}" stroke="${shadowColor}" stroke-width="38" stroke-linecap="${deckCap}" filter="url(#bridge-blur)" />
+      `;
+    }
+
+    // Bridge Deck Casing
+    svgContent += `
+        <line x1="${bx1}" y1="${by1}" x2="${bx2}" y2="${by2}" stroke="${bridgeDeckCasingColor}" stroke-width="34" stroke-linecap="${deckCap}" />
+        <line x1="${bx1}" y1="${by1}" x2="${bx2}" y2="${by2}" stroke="${bridgeFillColor}" stroke-width="26" stroke-linecap="${deckCap}" />
+        <line x1="${bx1}" y1="${by1}" x2="${bx2}" y2="${by2}" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6,6" />
+
+        <circle cx="${bx1}" cy="${by1}" r="4" fill="#38bdf8" />
+        <circle cx="${bx2}" cy="${by2}" r="4" fill="#38bdf8" />
+        <text x="${bx1 - 8}" y="${by1 - 8}" font-size="11" font-weight="700" fill="${textColor}" text-anchor="end">Abutment A1 (${deckCap} cap)</text>
+        <text x="${bx2 + 8}" y="${by2 + 16}" font-size="11" font-weight="700" fill="${textColor}">Abutment A2 (${deckCap} cap)</text>
+        <text x="${(bx1+bx2)/2 + 25}" y="${(by1+by2)/2 - 15}" font-size="12" font-weight="700" fill="${textBright}">Bridge Overpass (+1)</text>
+      </g>
+    `;
+
+    // 5. CALLOUT ANNOTATIONS FOR X-RAY OR MONACO MODES
+    if (bridgeMode === 'xray') {
+      svgContent += `
+        <rect x="20" y="270" width="220" height="56" rx="6" fill="${isDark ? 'rgba(15,23,42,0.9)' : 'rgba(255,255,255,0.9)'}" stroke="${isDark ? '#334155' : '#cbd5e1'}" />
+        <text x="30" y="290" font-size="11" font-weight="700" fill="#ec4899">Pink: tunnel-casing-dash</text>
+        <text x="30" y="310" font-size="11" font-weight="700" fill="#10b981">Green: tunnel-fill (opacity: ${op})</text>
+
+        <rect x="470" y="20" width="220" height="56" rx="6" fill="${isDark ? 'rgba(15,23,42,0.9)' : 'rgba(255,255,255,0.9)'}" stroke="${isDark ? '#334155' : '#cbd5e1'}" />
+        <text x="480" y="40" font-size="11" font-weight="700" fill="#a855f7">Purple: bridge-shadow (blur: ${blur}px)</text>
+        <text x="480" y="60" font-size="11" font-weight="700" fill="#38bdf8">Blue: bridge casing (${deckCap} cap)</text>
+      `;
+    } else if (bridgeMode === 'monaco') {
+      svgContent += `
+        <circle cx="240" cy="170" r="26" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-dasharray="4,4" />
+        <text x="240" y="130" font-size="11" font-weight="800" fill="#22c55e" text-anchor="middle">Seamless Surface Overlap (No Cut)</text>
+      `;
+    }
+
+    bridgeSvg.innerHTML = svgContent;
+  }
+
+  // PRESET SIMULATOR
+  function setPreset(type) {
+    document.querySelectorAll('.p-btn').forEach(b => b.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+
+    const line = document.getElementById('demo-line');
+    const desc = document.getElementById('demo-desc');
+
+    if (type === 'physical') {
+      line.style.width = '80%';
+      line.style.height = '16px';
+      line.style.background = '#475569';
+      line.style.border = '2px solid #22c55e';
+      line.textContent = 'Main St';
+      desc.innerHTML = '<strong>Physical Layout:</strong> 10m physical carriageway width with true curb casings and street name label.';
+    } else if (type === 'traffic') {
+      line.style.width = '80%';
+      line.style.height = '28px';
+      line.style.background = '#ef4444';
+      line.style.border = 'none';
+      line.textContent = '34,000 veh/day';
+      desc.innerHTML = '<strong>Traffic Congestion:</strong> Line thickness proportional to traffic flow bandwidth, red = congested.';
+    } else if (type === 'speed') {
+      line.style.width = '80%';
+      line.style.height = '12px';
+      line.style.background = 'linear-gradient(90deg, #3b82f6, #10b981)';
+      line.style.border = 'none';
+      line.textContent = '80 km/h';
+      desc.innerHTML = '<strong>Speed Limits:</strong> Viridis continuous colormap representing road speed category.';
+    } else if (type === 'debug') {
+      line.style.width = '80%';
+      line.style.height = '4px';
+      line.style.background = '#a855f7';
+      line.style.border = 'none';
+      line.textContent = 'link_49201 ➔';
+      desc.innerHTML = '<strong>Engineering Graph:</strong> Schematic 2px line with direction arrow and Link ID.';
+    }
+  }
+
+  // Initialize Bridge & Tunnel simulator on load
+  drawBridgeTunnel();
+</script>
+</body>
+</html>
