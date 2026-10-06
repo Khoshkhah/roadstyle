@@ -7,6 +7,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Pair editor history:** overrides already in the file show in a separate "History" list (typed confirmation to delete) apart from this session's new ones, and a selected pair shows its entries in the original table, history and new overrides. Deleting or replacing an override first writes `<name>.deleted-backup.csv`.
 - **v2 display smoothing:** `compile_map(smooth=N, smooth_corner_deg=100)` rounds corridor lines with N Chaikin passes for display only. Stored geometry, endpoints and sharp corners are unchanged. The pair override dashboard takes `--smooth N`.
 
 ### Changed

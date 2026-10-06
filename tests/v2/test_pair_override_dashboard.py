@@ -278,3 +278,14 @@ def test_delete_override_rejects_unknown_pair_id(tmp_path):
 
     with pytest.raises(ValueError, match="does not exist"):
         dashboard._delete_override("missing-pair", path)
+
+
+def test_delete_override_keeps_a_backup_of_the_previous_file(tmp_path):
+    from roadstyle.v2.engine.pairs import read_pair_table
+
+    path = tmp_path / "road_pairs_overrides.csv"
+    row = dashboard._new_pair_override("near", "road-a", "road-b")
+    dashboard.write_pair_table(path, [row], overrides=True)
+    assert dashboard._delete_override(row["pair_id"], path) == []
+    backup = tmp_path / "road_pairs_overrides.deleted-backup.csv"
+    assert [r["pair_id"] for r in read_pair_table(backup, overrides=True)] == [row["pair_id"]]

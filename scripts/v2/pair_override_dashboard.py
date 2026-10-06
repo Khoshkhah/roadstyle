@@ -114,6 +114,7 @@ def _render_editor_page(map_path: Path) -> str:
     </div>
     <div id="selected-roads" class="selected-roads"></div>
   </section>
+  <section id="pair-info" class="pair-info" hidden></section>
   <section id="relationship-form" class="relationship-form" hidden>
     <label class="field-label" for="relation">Relationship</label>
     <select id="relation">
@@ -143,10 +144,15 @@ def _render_editor_page(map_path: Path) -> str:
     <button id="save-pair" class="save-button" type="button" disabled>Save pair override</button>
   </section>
   <details class="saved-overrides" open>
-    <summary>Saved overrides <span id="override-count"></span></summary>
+    <summary>New overrides, this session <span id="override-count"></span></summary>
     <div id="override-list"></div>
-    <button id="download-overrides" class="quiet-button" type="button">Download CSV</button>
   </details>
+  <details class="saved-overrides history-overrides">
+    <summary>History overrides, saved earlier <span id="history-count"></span></summary>
+    <p class="field-hint">Kept apart from new work. Deleting one needs a typed confirmation.</p>
+    <div id="history-list"></div>
+  </details>
+  <button id="download-overrides" class="quiet-button" type="button">Download all overrides CSV</button>
   </div>
 </aside>
 <script src="/pair_override_editor.js"></script>
@@ -379,6 +385,9 @@ def _save_override(
         item["pair_id"] for item in original + overrides
     }:
         raise ValueError("This pair ID already exists; reload the editor and try again.")
+    if any(item["pair_id"] == normalized["pair_id"] for item in overrides):
+        backup = overrides_path.with_name(overrides_path.stem + ".deleted-backup.csv")
+        write_pair_table(backup, overrides, overrides=True)
     overrides = [
         item for item in overrides if item["pair_id"] != normalized["pair_id"]
     ]
@@ -416,6 +425,8 @@ def _delete_override(
     remaining = [row for row in overrides if row["pair_id"] != pair_id]
     if len(remaining) == len(overrides):
         raise ValueError(f"Override {pair_id!r} does not exist.")
+    backup = overrides_path.with_name(overrides_path.stem + ".deleted-backup.csv")
+    write_pair_table(backup, overrides, overrides=True)
     write_pair_table(overrides_path, remaining, overrides=True)
     return remaining
 

@@ -223,3 +223,10 @@
   .road-results { max-height: 90px; }
   #pair-editor.collapsed .editor-header { min-height: 32px; }
 }
+
+.history-overrides .override-row { opacity: 0.85; border-style: dashed; }
+.history-overrides .field-hint { margin: 6px 0 0; }
+.pair-info { padding: 10px 0; border-top: 1px solid #263448; color: #cbd5e1; font-size: 12px; }
+.pair-info h2 { margin: 0 0 6px; font-size: 13px; }
+.pair-info-group { margin-bottom: 8px; }
+.pair-info-row { margin: 3px 0 0; padding: 4px 6px; border-radius: 6px; background: #1a2536; overflow-wrap: anywhere; font-size: 11px; }

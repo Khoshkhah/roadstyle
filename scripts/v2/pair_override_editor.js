@@ -34,6 +34,9 @@
       "save-pair",
       "override-count",
       "override-list",
+      "history-count",
+      "history-list",
+      "pair-info",
       "saved-overrides",
       "clear-selection",
       "toggle-panel",
@@ -48,6 +51,7 @@
   let headMarkers = [];
   let selectionSource = "manual";
   let selectedOverrideId = "";
+  let historyIds = new Set();
 
   function setStatus(message, kind = "") {
     elements["editor-status"].textContent = message;
@@ -377,6 +381,7 @@
     if (selected.length === 2 && selectionSource === "manual") updateRelationshipForm();
     elements["save-pair"].disabled =
       selected.length !== 2 || selectionSource !== "manual";
+    renderPairInfo();
     updateHighlights();
     updateHeadMarkers();
   }
@@ -443,6 +448,68 @@
         `Replace ${row.pair_id} · ${row.upper_edge_ref || row.node_ref}`,
       );
     }
+  }
+
+  function pairRefs(row) {
+    const refs = row.relation === "connect"
+      ? [row.edge_a, row.edge_b]
+      : [row.upper_edge_ref || row.edge_a, row.lower_edge_ref || row.edge_b];
+    return refs.map(String);
+  }
+
+  function describeRow(row) {
+    const bits = [row.relation];
+    if (row.relation === "connect") {
+      bits.push(`${roadName(row.edge_a)} ${row.endpoint_a || "?"} ↔ ${roadName(row.edge_b)} ${row.endpoint_b || "?"}`);
+    } else {
+      bits.push(`upper ${roadName(row.upper_edge_ref)}, lower ${roadName(row.lower_edge_ref)}`);
+    }
+    if (String(row.enabled).toLowerCase() === "false") bits.push("disabled");
+    return bits.join(" · ");
+  }
+
+  function renderPairInfo() {
+    const box = elements["pair-info"];
+    box.replaceChildren();
+    if (selected.length !== 2) {
+      box.hidden = true;
+      return;
+    }
+    const matches = (resolved) => {
+      const refs = new Set(pairRefs(resolved));
+      return refs.has(selected[0]) && refs.has(selected[1]);
+    };
+    const groups = [
+      ["Original table", original.filter(matches).map((row) => ({ row }))],
+      ["History overrides", overrides.filter((row) => historyIds.has(row.pair_id) && matches(effectiveOverride(row)))
+        .map((row) => ({ row: effectiveOverride(row), action: row.action }))],
+      ["New overrides", overrides.filter((row) => !historyIds.has(row.pair_id) && matches(effectiveOverride(row)))
+        .map((row) => ({ row: effectiveOverride(row), action: row.action }))],
+    ];
+    const heading = document.createElement("h2");
+    heading.textContent = "Existing results for this pair";
+    box.append(heading);
+    for (const [title, items] of groups) {
+      const group = document.createElement("div");
+      group.className = "pair-info-group";
+      const label = document.createElement("strong");
+      label.textContent = `${title} (${items.length})`;
+      group.append(label);
+      if (!items.length) {
+        const none = document.createElement("p");
+        none.className = "empty-note";
+        none.textContent = "No entry for this pair.";
+        group.append(none);
+      }
+      for (const { row, action } of items) {
+        const line = document.createElement("p");
+        line.className = "pair-info-row";
+        line.textContent = `${action ? action.toUpperCase() + " · " : ""}${describeRow(row)} · ${row.pair_id}`;
+        group.append(line);
+      }
+      box.append(group);
+    }
+    box.hidden = false;
   }
 
   function renderEditor() {
@@ -546,9 +613,18 @@
   }
 
   function renderOverrides() {
-    elements["override-count"].textContent = `(${overrides.length})`;
-    elements["override-list"].replaceChildren();
-    for (const row of overrides) {
+    const fresh = overrides.filter((row) => !historyIds.has(row.pair_id));
+    const history = overrides.filter((row) => historyIds.has(row.pair_id));
+    elements["override-count"].textContent = `(${fresh.length})`;
+    elements["history-count"].textContent = `(${history.length})`;
+    renderOverrideList(elements["override-list"], fresh, "No new overrides yet.");
+    renderOverrideList(elements["history-list"], history, "No history overrides.");
+    renderPairInfo();
+  }
+
+  function renderOverrideList(container, rows, emptyText) {
+    container.replaceChildren();
+    for (const row of rows) {
       const card = document.createElement("div");
       card.className = "override-row";
       if (row.pair_id === selectedOverrideId) card.classList.add("is-selected");
@@ -585,19 +661,30 @@
       remove.setAttribute("aria-label", `Delete override ${row.pair_id}`);
       remove.addEventListener("click", () => deleteOverride(row.pair_id));
       card.append(select, remove);
-      elements["override-list"].append(card);
+      container.append(card);
     }
-    if (!overrides.length) {
+    if (!rows.length) {
       const empty = document.createElement("p");
       empty.className = "empty-note";
-      empty.textContent = "No saved overrides yet.";
-      elements["override-list"].append(empty);
+      empty.textContent = emptyText;
+      container.append(empty);
     }
   }
 
   async function deleteOverride(pairId) {
     const row = overrides.find((item) => item.pair_id === pairId);
-    if (!row || !window.confirm(`Delete ${row.action} override ${pairId}?`)) return;
+    if (!row) return;
+    if (historyIds.has(pairId)) {
+      const typed = window.prompt(
+        `${pairId} is a history override saved earlier. Type its pair id to delete it:`,
+      );
+      if (typed === null || typed.trim() !== pairId) {
+        setStatus("History override kept.");
+        return;
+      }
+    } else if (!window.confirm(`Delete ${row.action} override ${pairId}?`)) {
+      return;
+    }
     setStatus(`Deleting override ${pairId}…`);
     try {
       const response = await fetch("/api/overrides/delete", {
@@ -659,6 +746,7 @@
     const data = await response.json();
     original = data.original;
     overrides = data.overrides;
+    historyIds = new Set(overrides.map((row) => row.pair_id));
     renderOverrides();
     setStatus("Loading saved road levels…");
     const levelResponse = await fetch("/api/network");
