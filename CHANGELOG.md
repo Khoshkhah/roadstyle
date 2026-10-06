@@ -18,8 +18,6 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - The editor: you choose which road is on top for an order or a stack (it was always the road clicked first); changes wait in a list until *Apply and solve*,
   one solve for all, with a busy layer over the map until the new map is drawn.
 - `level_input` keeps the edges' `lanes` (shown in the editor's cards). A delete in the editor names its row as the page saw it: if edits.csv changed since, nothing is applied.
-- **A street going on over its tunnel stays over it at the mouth:** where the road at a tunnel mouth goes on into a road that crosses over
-  the tunnel, the band decides, not the priority (the tunnel cut its own street in two; 38 mouths in Monaco).
 - **Automatic head lengths and caps per road end, as an option** (`rs.auto_ends`, at zoom 18; `solve_levels.py --auto-ends`; the default stays 5 m and round:
   made for one zoom, the heads were too short at the others): heads as long as the drawings overlap at the join (before
   solving), caps round unless the round end would lie over a lower road or out of the joined roads (after solving, from the levels);

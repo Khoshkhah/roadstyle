@@ -118,7 +118,7 @@ def _relations(metres, ends, beta, omega, band_dist, mouths=True):
     ``meets``: ``(x, x_end, y, y_end)`` for every two roads whose ends ``x_end`` / ``y_end`` ("start" / "end") are one node; ``stacks``: ``(upper, lower)``
     for roads of different bands that cross or run within ``band_dist`` metres of each other away from a node they share; ``orders``: ``(higher, lower)``
     by ``omega`` for roads that meet, of one band or of different bands that only meet (Kaveh 2026-10-06: at a tunnel mouth the priority decides,
-    where roads cross the band does; at a mouth where the upper band's road goes on into a road that crosses over the lower one, the band too). ``mouths`` False: roads of different bands are always a stack pair, as when the caller gives the bands
+    where roads cross the band does). ``mouths`` False: roads of different bands are always a stack pair, as when the caller gives the bands
     (``band_col``: a zebra crossing set over its street stays over it). ``metres``: the roads' lines in metres."""
     import shapely
     from shapely import STRtree
@@ -153,16 +153,7 @@ def _relations(metres, ends, beta, omega, band_dist, mouths=True):
         stacks.append((i, j) if beta[i] > beta[j] else (j, i))
     orders = []
     if omega is not None:
-        crossing, joined = set(stacks), defaultdict(set)
-        for x, _, y, _ in meets:
-            joined[x].add(y)
-            joined[y].add(x)
         for x, y in sorted(shared):
-            if (x, y) in only_meet:                            # a mouth: the priority decides, unless the upper band's road goes on into a
-                up, down = (x, y) if beta[x] > beta[y] else (y, x)    # road that crosses over the lower one: then the band, like the rest of
-                if any((n, down) in crossing for n in joined[up] - {down}):   # its street (Kaveh 2026-10-06: the street was cut by its tunnel)
-                    orders.append((up, down))
-                    continue
             if omega[x] is None or omega[y] is None or omega[x] == omega[y]:
                 continue
             if beta[x] == beta[y] or (x, y) in only_meet:
