@@ -155,6 +155,16 @@ def _render_editor_page(map_path: Path) -> str:
     return html
 
 
+def _same_point(a: str | None, b: str) -> bool:
+    # Map geometry is stored with 6 decimals, node_ref with 7, so compare with a tolerance.
+    try:
+        ax, ay = (float(v) for v in str(a).split(","))
+        bx, by = (float(v) for v in b.split(","))
+    except ValueError:
+        return False
+    return abs(ax - bx) <= 1e-6 and abs(ay - by) <= 1e-6
+
+
 def _validate_overrides(
     original: list[dict[str, str]],
     overrides: list[dict[str, str]],
@@ -212,7 +222,7 @@ def _validate_overrides(
             ):
                 ref = row[edge_field]
                 side = row[endpoint_field]
-                if ref in endpoints and endpoints[ref].get(side) != row["node_ref"]:
+                if ref in endpoints and not _same_point(endpoints[ref].get(side), row["node_ref"]):
                     raise ValueError(
                         f"Connection {row['pair_id']} node_ref does not match "
                         f"{side} of {ref}"
