@@ -485,7 +485,7 @@ function _applyRoadFilters(){
     // the pieces of a divided casing (levels_split_casing.md) carry their edge's id as __rs_road
     if(_qIds && kind==="casings"){ const qf=["in",["get","__rs_road"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
     // a two-way pair's end cap (twin_ends.md) and an arrow or a street name (edge_overlays.md) stay while either of their two edges is shown
-    if(_qIds && (kind==="ends" || kind==="slots")){ const L=["literal",_qIds];
+    if(_qIds && (kind==="ends" || kind==="slots" || kind==="arrows")){ const L=["literal",_qIds];
       const qf=["any",["in",["get","__rs_road"],L],["in",["get","__rs_road2"],L]]; f=f?["all",f,qf]:qf; }
     try{ map.setFilter(l.id,f); }catch(e){}
   });
@@ -917,6 +917,62 @@ function addArrow(){
   img.src="data:image/svg+xml;base64,"+btoa(svg);
 }
 map.on("load", addArrow);
+// one arrow per one-way road in the window (docs/design/one_arrow_per_road.md): after every move, each one-way chain of the slots (the
+// pieces with the same "chain") gets ONE point in the middle of its part inside the window, rotated along the road, with the properties of
+// the piece it lies on (so the arrow layers' filters, rsFilter and the class / tunnel toggles treat it as before). Repeating the icon along
+// every 100 m slot crowded zoom 15 (Kaveh); one arrow per stretch (line-center) was often outside the window. An arrow STAYS where it is
+// while it is still in the window (re-centring after every pan slid it along its road); only a chain whose arrow left, or a newly
+// visible one, gets a new place.
+const _rsArrowAt = new Map();                  // chain -> its arrow feature now
+function _rsArrows(){
+  const src = map.getSource("arrows"); if(!src) return;
+  const out = [];
+  if(map.getZoom() >= 15){
+    const bb = map.getBounds(), W = bb.getWest(), E = bb.getEast(), S = bb.getSouth(), N = bb.getNorth();
+    const kx = Math.cos(map.getCenter().lat * Math.PI / 180);   // degrees of longitude to the scale of latitude, for lengths and angles
+    const vis = new Map();                                       // chain -> [{k, a, b, len, p}] its pieces' segments inside the window
+    for(const f of _sfeats("slots")){
+      const p = f.properties || {}; if(!p.oneway) continue;
+      const c = f.geometry && f.geometry.coordinates; if(!c) continue;
+      for(let i = 0; i < c.length - 1; i++){
+        let [x0, y0] = c[i], [x1, y1] = c[i + 1], t0 = 0, t1 = 1;   // Liang-Barsky: the part of the segment inside the window
+        const dx = x1 - x0, dy = y1 - y0, P = [-dx, dx, -dy, dy], Q = [x0 - W, E - x0, y0 - S, N - y0];
+        let ok = true;
+        for(let j = 0; j < 4 && ok; j++){
+          if(P[j] === 0){ if(Q[j] < 0) ok = false; }
+          else { const r = Q[j] / P[j]; if(P[j] < 0){ if(r > t1) ok = false; else if(r > t0) t0 = r; } else { if(r < t0) ok = false; else if(r < t1) t1 = r; } }
+        }
+        if(!ok || t1 <= t0) continue;
+        const a = [x0 + dx * t0, y0 + dy * t0], b = [x0 + dx * t1, y0 + dy * t1];
+        const len = Math.hypot((b[0] - a[0]) * kx, b[1] - a[1]);
+        if(len <= 0) continue;
+        if(!vis.has(p.chain)) vis.set(p.chain, []);
+        vis.get(p.chain).push({k: p.slot * 1e5 + i, a: a, b: b, len: len, p: p});
+      }
+    }
+    const inside = q => q[0] >= W && q[0] <= E && q[1] >= S && q[1] <= N;
+    for(const [chain, segs] of vis){
+      const kept = _rsArrowAt.get(chain);
+      if(kept && inside(kept.geometry.coordinates)){ out.push(kept); continue; }
+      segs.sort((u, v) => u.k - v.k);
+      let half = segs.reduce((s, g) => s + g.len, 0) / 2;
+      for(const g of segs){
+        if(half > g.len){ half -= g.len; continue; }
+        const t = half / g.len, x = g.a[0] + (g.b[0] - g.a[0]) * t, y = g.a[1] + (g.b[1] - g.a[1]) * t;
+        const ang = -Math.atan2(g.b[1] - g.a[1], (g.b[0] - g.a[0]) * kx) * 180 / Math.PI;   // the icon points east; clockwise degrees
+        const ft = {type: "Feature", properties: Object.assign({}, g.p, {b: ang}), geometry: {type: "Point", coordinates: [x, y]}};
+        _rsArrowAt.set(chain, ft); out.push(ft);
+        break;
+      }
+    }
+  }
+  if(map.getZoom() < 15) _rsArrowAt.clear();
+  src.setData({type: "FeatureCollection", features: out});
+}
+map.on("load", _rsArrows);
+map.on("moveend", _rsArrows);
+let _rsSlotsN = -1;     // the slots arrive (inflated) after load: place the arrows once they are there, not on every tile event
+map.on("sourcedata", e => { if(e.sourceId !== "slots") return; const n = _sfeats("slots").length; if(n !== _rsSlotsN){ _rsSlotsN = n; _rsArrows(); } });
 // Self-diagnosis: a map with zero road features is a broken page, not an empty area — say WHY
 // on the map itself (frontends like notebook webviews surface no console). Amber banner reports
 // the inflate state so a screenshot alone pinpoints the failing stage.

@@ -95,10 +95,11 @@ def test_web_annotation_slots_alternate_names_and_arrows():
     lab = next(l for l in style["layers"] if l["id"] == "roads-labels")
     arr = next(l for l in style["layers"] if l["id"] == "roads-arrows")
     assert json.dumps(["==", ["%", ["get", "slot"], 2], 0]) in json.dumps(lab["filter"])     # names: even slots
-    # arrows: every one-way slot, repeated along the line (odd-slots-only left short
-    # one-way chains — most of a city grid — with no arrow in the viewport)
+    # arrows: one per one-way road in the window (docs/design/one_arrow_per_road.md): points the page puts in the "arrows" source,
+    # rotated along the road; every slot piece names its chain
     assert json.dumps(["==", ["get", "oneway"], 1]) in json.dumps(arr["filter"])
-    assert arr["layout"]["symbol-placement"] == "line" and arr["layout"]["symbol-spacing"]
+    assert arr["source"] == "arrows" and arr["layout"]["symbol-placement"] == "point" and arr["layout"]["icon-rotate"] == ["get", "b"]
+    assert style["sources"]["arrows"]["data"]["features"] == [] and all("chain" in f["properties"] for f in style["sources"]["slots"]["data"]["features"])
     # one arrow layer per grade tier, each right beside its road tier — a bridge must cover
     # the arrows of the road it crosses, not have them float above everything
     assert ids.index("roads-arrows") == ids.index("roads-fill-sq") + 1
@@ -1809,3 +1810,35 @@ def test_the_numpy_cutter_is_shapelys_substring():
         a = float(rng.uniform(0, cum[-1] * 0.7))
         b = float(rng.uniform(a + 1e-3, cum[-1]))
         assert np.allclose(_part(xy, cum, a, b), np.asarray(substring(LS(xy), a, b).coords), atol=1e-9)
+
+
+def test_one_arrow_per_one_way_road_in_the_window(tmp_path):
+    """docs/design/one_arrow_per_road.md (Kaveh 2026-10-06): a one-way road in the window has one arrow, in its visible part; the arrow stays
+    where it is while it is in the window (a small pan keeps it), and a road whose arrow left the window gets one again. None below zoom 15."""
+    pw = pytest.importorskip("playwright.sync_api")
+    path = tmp_path / "arrows.html"
+    pts = [(18.0 + i * 0.001, 59.3) for i in range(41)]                       # one straight one-way street, about 2.3 km, many slots
+    g = gpd.GeoDataFrame({"highway": ["primary"], "name": ["Long St"], "oneway": [True]}, geometry=[LineString(pts)], crs=4326)
+    render_edges(g, backend="web", basemap="blank").save(path)
+    arrows = "map.getSource('arrows')._data.features.map(f => f.geometry.coordinates)"
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 800, "height": 600})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && map.loaded()", timeout=30_000)
+        def at(lon, zoom):
+            page.evaluate(f"map.jumpTo({{center: [{lon}, 59.3], zoom: {zoom}}})")
+            page.wait_for_function("map.loaded()", timeout=30_000)
+            page.wait_for_timeout(300)
+            return page.evaluate(arrows)
+        far = at(18.02, 14)
+        first = at(18.02, 16)
+        nudged = at(18.0203, 16)
+        moved = at(18.035, 16)
+        browser.close()
+    assert errors == [] and far == []
+    assert len(first) == 1 and abs(first[0][0] - 18.02) < 0.004                 # one arrow, in the middle of what is seen
+    assert nudged == first                                                        # a small pan keeps it
+    assert len(moved) == 1 and moved != first                                     # its old place left the window: a new one
