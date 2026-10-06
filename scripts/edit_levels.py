@@ -19,6 +19,7 @@ import geopandas as gpd
 import pandas as pd
 
 import roadstyle as rs
+from roadstyle import render_web
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from solve_levels import write  # noqa: E402
@@ -44,7 +45,8 @@ class Area:
             self.facts[r["road"]] = {"road": r["road"], "name": _txt(r.get("name")), "highway": _txt(r.get("highway")),
                                      "edge_ref": _txt(r.get("edge_ref")), "lanes": _txt(r.get("lanes")), "band": int(r["band"]), "priority": _num(r.get("priority")),
                                      "edges": len(r["edges"]) + len(r["reversed"]), "two_way": len(r["reversed"]) > 0, "length_m": float(m),
-                                     "look": "tunnel" if _yes(r.get("tunnel")) else "bridge" if _yes(r.get("bridge")) else "ground"}
+                                     "look": "tunnel" if _yes(r.get("tunnel")) else "bridge" if _yes(r.get("bridge")) else "ground",
+                                     "width_px": _widths(_txt(r.get("highway")))}
         self.saved = len(self.edits())                          # the edits that were in edits.csv when the editor started
         self.build(self.edits(), self.stored())
 
@@ -171,6 +173,20 @@ def _row(body):
         if row["relation"] == "order":
             row["a_end"] = ""
     return row
+
+
+def _widths(cls):
+    """The page's width of a road of class ``cls`` in pixels, fill and casing, at the zoom stops of its width expression (linear between
+    them, the end values outside): the panel shows it at the map's zoom. One line per road here, so no two-way narrowing."""
+    out = {}
+    for kind in ("fill", "casing"):
+        e = render_web._width_expr("highway", casing=kind == "casing")         # ["interpolate", ["linear"], ["zoom"], z, match, z, match, ...]
+        vals = []
+        for m in e[4::2]:
+            m = m[1] if m[0] == "*" else m                      # ["*", match, two-way case]: the match
+            vals.append(dict(zip(m[2:-1:2], m[3:-1:2], strict=True)).get(cls, m[-1]))
+        out[kind] = vals
+    return {"z": e[3::2], **out}
 
 
 def _txt(v):

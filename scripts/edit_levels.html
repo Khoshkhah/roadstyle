@@ -212,6 +212,19 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   document.addEventListener("rs:select", e => { if(e.detail.overlay || !e.detail.properties) return; pick(e.detail.properties.road); });
   document.addEventListener("keydown", e => { if(e.key === "Escape") setPair(null, null); });
   $("lv-clear").onclick = () => setPair(null, null);
+  function widthAt(w, z){                                     // the page's width expression: linear between its zoom stops
+    if(!w) return null; const s = w.z;
+    if(z <= s[0]) return w; if(z >= s[s.length - 1]) return {fill: w.fill.slice(-1), casing: w.casing.slice(-1)};
+    const i = s.findIndex((x, j) => z <= s[j + 1]), f = (z - s[i]) / (s[i + 1] - s[i]);
+    return {fill: [w.fill[i] + (w.fill[i + 1] - w.fill[i]) * f], casing: [w.casing[i] + (w.casing[i + 1] - w.casing[i]) * f]};
+  }
+  function widthText(f){
+    const z = map.getZoom(), w = widthAt(f.width_px, z); if(!w) return "–";
+    const mpp = 40075016.686 * Math.cos(map.getCenter().lat * Math.PI / 180) / (512 * 2 ** z);    // metres per pixel here
+    const px = v => `${v.toFixed(1)} px <small style="color:var(--lv-mute)">≈ ${(v * mpp).toFixed(1)} m</small>`;
+    return `fill ${px(w.fill[0])} · outer (with casing) ${px(w.casing[0])} <small style="color:var(--lv-mute)">at z${z.toFixed(1)}</small>`;
+  }
+  map.on("zoomend", () => document.querySelectorAll("#lv-cards [data-w]").forEach(el => el.innerHTML = widthText(facts[el.dataset.w] || {})));
   function card(r, k){
     const f = facts[r] || {road: r}, L = f.levels || ["–", "–", "–", "–"];
     return `<div class="card" style="--c:${C[k]}"><button class="x" data-k="${k}" title="Cancel this road">✕</button>
@@ -220,6 +233,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
       <div class="grid"><span>band</span><span>${f.band ?? "–"}</span><span>priority</span><span>${f.priority ?? "–"}</span>
         <span>length</span><span>${f.length_m != null ? f.length_m + " m" : "–"}</span><span>edges</span><span>${f.edges ?? "–"}${f.two_way ? " (two-way)" : ""}</span>
         <span>look</span><span>${esc(f.look || "–")}</span><span>lanes</span><span>${esc(f.lanes ?? "–")}</span>
+        <span>width</span><span style="grid-column:span 3" data-w="${esc(r)}">${widthText(f)}</span>
         <span>road id</span><span style="grid-column:span 3;font-size:11px">${esc(r)}</span></div>
       <div class="lvls"><div><small>start</small><b>${L[0]}</b></div><div><small>casing</small><b>${L[1]}</b></div>
         <div><small>end</small><b>${L[2]}</b></div><div><small>fill</small><b>${L[3]}</b></div></div></div>`;
