@@ -57,9 +57,12 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
 #lv .wd-x i{display:block;height:100%;background:#f1e7c8}
 #lv .caps{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12px;color:var(--lv-mute)} #lv .caps .seg{flex:1}
 #lv .caps .seg button{padding:3px 0;font-size:12px}
-#lv .heads{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:var(--lv-mute)}
-#lv .heads input{width:54px;border:1px solid #d0d5dd;border-radius:6px;padding:3px 6px;font:12px system-ui;color:var(--lv-ink);text-align:right}
-#lv .heads input:focus{outline:none;border-color:var(--lv-r2)}
+#lv .hd{margin-top:8px;padding:7px 8px 6px;border:1px solid var(--lv-line);border-radius:8px}
+#lv .hd-h{display:flex;justify-content:space-between;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
+#lv .hbar{display:flex;height:12px;border-radius:3px;overflow:hidden;margin-bottom:4px;font-size:9px;line-height:12px;color:#fff;text-align:center}
+#lv .hbar i{display:block;font-style:normal;overflow:hidden;white-space:nowrap} #lv .hbar .s,#lv .hbar .e{background:#6b7686} #lv .hbar .m{background:#c3c9d2;color:#3b4252}
+#lv .hd label{display:grid;grid-template-columns:52px 1fr 52px;align-items:center;gap:6px;font-size:12px;color:var(--lv-mute)}
+#lv .hd input[type=range]{width:100%;accent-color:var(--lv-r2)} #lv .hd label b{text-align:right;color:var(--lv-ink);font-variant-numeric:tabular-nums}
 #lv .lvls{display:flex;gap:4px;margin-top:8px} #lv .lvls div{flex:1;text-align:center;background:var(--lv-bg);border-radius:6px;padding:3px 0}
 #lv .lvls small{display:block;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em} #lv .lvls b{font-size:13px}
 #lv .num{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;
@@ -256,6 +259,24 @@ body.lv-open #lv-busy{right:var(--lv-w)}
         <div class="wd-x" title="Cross-section: the fill (${pct} % of the outer width) between its casings"><div><i style="width:${pct}%"></i></div>section</div></div>`;
   }
   map.on("zoomend", () => document.querySelectorAll("#lv-cards [data-w]").forEach(el => el.innerHTML = widthHtml(facts[el.dataset.w] || {})));
+  function headsHtml(r, f){                                   // the casing heads: two sliders that guard each other (start + end <= the road)
+    const L = f.length_m || 0;
+    let [s, e] = f.heads || [5, 5];
+    if(L > 0 && s + e > L){ const k = L / (s + e); s = Math.round(s * k * 10) / 10; e = Math.round(e * k * 10) / 10; }   // as drawn: cut in their ratio
+    return `<div class="hd" data-hroad="${esc(r)}" data-len="${L}" title="The metres at each end drawn at the head's own level; the rest is the main part. Start + end cannot be more than the road.">
+      <div class="hd-h"><span>casing heads</span><span>road ${L} m</span></div>
+      <div class="hbar"><i class="s"></i><i class="m"></i><i class="e"></i></div>
+      ${[["start", "●", s], ["end", "○", e]].map(([n, m, v]) => `<label><span>${n} ${m}</span><input type="range" min="0.5" step="0.5" data-hend="${n}" value="${v}"><b></b></label>`).join("")}
+    </div>`;
+  }
+  function headsSync(box){
+    const L = +box.dataset.len, [a, b] = box.querySelectorAll("input");
+    a.max = Math.max(0.5, L - +b.value); b.max = Math.max(0.5, L - +a.value);
+    const s = +a.value, e = +b.value, m = Math.max(0, L - s - e), pct = v => (L > 0 ? 100 * v / L : 0).toFixed(2) + "%";
+    const [is, im, ie] = box.querySelectorAll(".hbar i");
+    is.style.width = pct(s); im.style.width = pct(m); ie.style.width = pct(e); im.textContent = m >= 3 ? "main " + m.toFixed(1) + " m" : "";
+    box.querySelectorAll("label b")[0].textContent = s.toFixed(1) + " m"; box.querySelectorAll("label b")[1].textContent = e.toFixed(1) + " m";
+  }
   function card(r, k){
     const f = facts[r] || {road: r}, L = f.levels || ["–", "–", "–", "–"];
     return `<div class="card" style="--c:${C[k]}"><button class="x" data-k="${k}" title="Cancel this road">✕</button>
@@ -270,9 +291,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
         <span style="width:44px">${e} ${i ? "○" : "●"}</span>
         <div class="seg" data-cap="${esc(r)}" data-end="${e}">${[["", "round"], ["square", "square"], ["flat", "flat"]].map(([v, t]) =>
           `<button data-v="${v}" class="${((f.caps || [])[i] || "") === v ? "on" : ""}">${t}</button>`).join("")}</div></div>`).join("")}
-      <div class="heads" title="The casing heads: the metres at each end drawn at the head's own level (solver and drawing; empty = 5 m). A road shorter than its two heads has one level.">
-        <span style="width:44px">heads</span>${["start", "end"].map((e, i) => `${e} ${i ? "○" : "●"}
-        <input type="number" min="0.5" step="0.5" data-head="${esc(r)}" data-end="${e}" value="${(f.heads || [5, 5])[i]}"> m`).join(" ")}</div>
+      ${headsHtml(r, f)}
       <div class="lvls"><div><small>start</small><b>${L[0]}</b></div><div><small>casing</small><b>${L[1]}</b></div>
         <div><small>end</small><b>${L[2]}</b></div><div><small>fill</small><b>${L[3]}</b></div></div></div>`;
   }
@@ -313,11 +332,16 @@ body.lv-open #lv-busy{right:var(--lv-w)}
       if(cap === (((facts[r] || {}).caps || [])[end === "start" ? 0 : 1] || "")) return;
       stage({op: "cap", road: r, end: end, cap: cap});
     });
-    $("lv-cards").querySelectorAll("[data-head]").forEach(inp => inp.onchange = () => {
-      const r = inp.dataset.head, end = inp.dataset.end, v = inp.value.trim();
-      if(v !== "" && !(+v > 0)) return toast("A head is a positive number of metres", true);
-      if((v === "" ? 5 : +v) === ((facts[r] || {}).heads || [5, 5])[end === "start" ? 0 : 1]) return;
-      stage({op: "head", road: r, end: end, m: v});
+    $("lv-cards").querySelectorAll("[data-hroad]").forEach(box => {
+      headsSync(box);
+      box.querySelectorAll("input").forEach(inp => {
+        inp.oninput = () => headsSync(box);
+        inp.onchange = () => {                                  // both heads go to the list together, so the pair always fits the road
+          const r = box.dataset.hroad, [a, b] = box.querySelectorAll("input"), h = (facts[r] || {}).heads || [5, 5];
+          if(+a.value === h[0] && +b.value === h[1]) return;
+          stage({op: "head", road: r, end: "start", m: a.value}); stage({op: "head", road: r, end: "end", m: b.value});
+        };
+      });
     });
     $("lv-cards").querySelectorAll(".x").forEach(b => b.onclick = () => { sel[+b.dataset.k] = null; if(sel[0] == null){ sel[0] = sel[1]; sel[1] = null; } update(); });
     $("lv-add-sec").hidden = sel[1] == null; describe();

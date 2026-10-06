@@ -1924,6 +1924,9 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     assert "head_end_m" not in pd.read_csv(tmp_path / "levels.csv").columns                # drawing only: not the solver's
     with pytest.raises(ValueError):
         area.apply([{"op": "head", "road": "12", "end": "end", "m": "-3"}])
+    with pytest.raises(ValueError):                                                       # both heads together cannot be more than the road
+        L = area.facts["12"]["length_m"]
+        area.apply([{"op": "head", "road": "12", "end": "start", "m": str(L)}, {"op": "head", "road": "12", "end": "end", "m": "1"}])
 
 
 def test_edits_name_either_direction_of_a_road():

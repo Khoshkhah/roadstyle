@@ -175,6 +175,9 @@ class Area:
                 v[k] = m
                 if any(v):
                     heads[r] = tuple(v)
+                hs, he = (float(x) if x else 5.0 for x in v)
+                if all(v) and hs + he > self.facts[r]["length_m"] + 0.05:       # both set (the page sends both): they must fit the road
+                    raise ValueError(f"heads of {self.facts[r]['name'] or r}: {hs:g} + {he:g} m is more than the road's {self.facts[r]['length_m']:g} m")
         e = self.edits()
         gone = sorted({int(o["index"]) for o in ops if o["op"] == "delete"}, reverse=True)
         for o in ops:                                           # a delete names its row as the page saw it: edits.csv may have changed since
