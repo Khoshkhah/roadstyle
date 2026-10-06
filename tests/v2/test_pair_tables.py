@@ -9,7 +9,7 @@ from roadstyle.v2.engine.pairs import (
     write_pair_table,
 )
 from roadstyle.v2.engine.primitives import Corridor
-from roadstyle.v2.engine.solver import solve_stacking, write_pair_tables
+from roadstyle.v2.engine.solver import solve_stacking, write_level_table, write_pair_tables
 
 
 def _crossing_roads():
@@ -55,6 +55,38 @@ def test_override_can_reverse_pair_order_used_by_solver():
     assert sol.fill_levels[0] > sol.fill_levels[1]
 
 
+def test_connect_pair_can_link_heads_without_a_shared_node():
+    corridors = [
+        Corridor(
+            id="road-a",
+            geometry=LineString([(0, 0), (10, 0)]),
+            properties={"edge_ref": "road-a"},
+        ),
+        Corridor(
+            id="road-b",
+            geometry=LineString([(20, 0), (30, 0)]),
+            properties={"edge_ref": "road-b"},
+        ),
+    ]
+    connect_pair = {
+        "pair_id": "manual-connect",
+        "relation": "connect",
+        "edge_a": "road-a",
+        "edge_b": "road-b",
+        "node_ref": "",
+        "endpoint_a": "end",
+        "endpoint_b": "start",
+        "upper_edge_ref": "",
+        "lower_edge_ref": "",
+        "enabled": "true",
+    }
+
+    solution = solve_stacking(corridors, pair_table=[connect_pair])
+
+    assert solution.status == "OPTIMAL"
+    assert solution.info["connect_pairs"] == 1
+
+
 def test_pair_tables_round_trip_and_override_file(tmp_path):
     corridors = _crossing_roads()
     original_path = tmp_path / "road_pairs_original.csv"
@@ -83,3 +115,16 @@ def test_pair_tables_round_trip_and_override_file(tmp_path):
         head_m=5.0,
     )
     assert result.fill_levels[0] > result.fill_levels[1]
+
+
+def test_level_table_writes_one_row_per_direction(tmp_path):
+    corridors = _crossing_roads()
+    result = solve_stacking(corridors)
+    output = tmp_path / "road_levels.csv"
+
+    write_level_table(corridors, result, output)
+
+    rows = output.read_text(encoding="utf-8")
+    assert "edge_ref,physical_road_id,band,cs,cm,ce,fl" in rows
+    assert "ground" in rows
+    assert "bridge" in rows

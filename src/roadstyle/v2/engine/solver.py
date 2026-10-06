@@ -8,6 +8,7 @@ optimization solver from roadstyle v1 (levels.py).
 
 from __future__ import annotations
 
+import csv
 import math
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -30,6 +31,64 @@ class StackingSolution:
     fill_levels: list[int]                    # fl per corridor
     status: str = "OPTIMAL"
     info: dict[str, Any] = field(default_factory=dict)
+
+
+def _physical_road_id(corridor: Corridor) -> str | None:
+    """Return an explicit source identifier shared by directional road copies."""
+    for key in ("physical_road_id", "road_id", "way_id", "osm_id"):
+        value = corridor.properties.get(key)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return None
+
+
+def _direction_twin_groups(
+    corridors: list[Corridor],
+) -> tuple[list[int], list[tuple[int, bool]]]:
+    """Map exact reverse geometries with matching physical IDs to one representative."""
+    representative_indices: list[int] = []
+    mapping: list[tuple[int, bool]] = []
+    representatives: dict[tuple[str, int, tuple[tuple[float, ...], ...]], list[int]] = {}
+
+    for index, corridor in enumerate(corridors):
+        geometry = corridor.geometry
+        physical_id = _physical_road_id(corridor)
+        if not isinstance(geometry, LineString) or physical_id is None:
+            representative_indices.append(index)
+            mapping.append((len(representative_indices) - 1, False))
+            continue
+
+        coordinates = tuple(tuple(coord) for coord in geometry.coords)
+        reverse_coordinates = tuple(reversed(coordinates))
+        signature = (physical_id, corridor.band, reverse_coordinates)
+        twin_index = None
+        for candidate_index in representatives.get(signature, []):
+            candidate = corridors[representative_indices[candidate_index]]
+            if (
+                corridor.junction_priority == candidate.junction_priority
+                and corridor.split_mode == candidate.split_mode
+                and corridor.split_start == candidate.split_end
+                and corridor.split_end == candidate.split_start
+                and (
+                    corridor.junction_priority != 0
+                    or corridor.properties.get("highway") == candidate.properties.get("highway")
+                )
+            ):
+                twin_index = candidate_index
+                break
+
+        if twin_index is not None:
+            mapping.append((twin_index, True))
+            continue
+
+        representative_index = len(representative_indices)
+        representative_indices.append(index)
+        mapping.append((representative_index, False))
+        representatives.setdefault(
+            (physical_id, corridor.band, coordinates), [],
+        ).append(representative_index)
+
+    return representative_indices, mapping
 
 
 def _compute_metric_scale(corridors: list[Corridor]) -> tuple[bool, float, float, float, float]:
@@ -91,8 +150,8 @@ def solve_stacking(
     StackingSolution
         Discrete integer levels for casing start, casing main, casing end, and fill.
     """
-    n = len(corridors)
-    if n == 0:
+    original_count = len(corridors)
+    if original_count == 0:
         return StackingSolution(casing_levels=[], fill_levels=[], status="EMPTY")
 
     from .pairs import (
@@ -102,8 +161,15 @@ def solve_stacking(
         read_pair_table,
     )
 
+    refs = _corridor_refs(corridors)
+    if len(set(refs)) != len(refs):
+        raise ValueError("solve_stacking: corridor edge references must be unique")
+    representative_indices, corridor_mapping = _direction_twin_groups(corridors)
+    solve_corridors = [corridors[index] for index in representative_indices]
+    n = len(solve_corridors)
+
     # 1. Compute discrete node IDs from line endpoints
-    geoms = np.asarray([c.geometry for c in corridors], dtype=object)
+    geoms = np.asarray([c.geometry for c in solve_corridors], dtype=object)
     xy, gi = shapely.get_coordinates(geoms, return_index=True)
     cnt = np.bincount(gi, minlength=len(geoms))
     off = np.r_[0, np.cumsum(cnt)]
@@ -112,22 +178,22 @@ def solve_stacking(
     ends = list(zip(node[:len(geoms)].tolist(), node[len(geoms):].tolist(), strict=True))
 
     # 2. Metric projection for accurate metric lengths and setbacks
-    is_lonlat, lon0, lat0, kx, ky = _compute_metric_scale(corridors)
+    is_lonlat, lon0, lat0, kx, ky = _compute_metric_scale(solve_corridors)
     if is_lonlat:
         rm = [
             LineString([((x - lon0) * kx, (y - lat0) * ky) for x, y in c.geometry.coords])
             if hasattr(c.geometry, "coords") else c.geometry
-            for c in corridors
+            for c in solve_corridors
         ]
     else:
-        rm = [c.geometry for c in corridors]
+        rm = [c.geometry for c in solve_corridors]
 
-    beta = [c.band for c in corridors]
+    beta = [c.band for c in solve_corridors]
 
     # Flow priority / class order
     omega: list[float | None] = []
     has_omega = False
-    for c in corridors:
+    for c in solve_corridors:
         p = c.junction_priority
         hw = c.properties.get("highway")
         if p is not None and (p != 0.0 or hw is None):
@@ -145,9 +211,6 @@ def solve_stacking(
 
     # Pair discovery is separate from optimization. Persisted tables can be edited
     # and passed back in so an optimization rerun uses the same relationships.
-    refs = _corridor_refs(corridors)
-    if len(set(refs)) != len(refs):
-        raise ValueError("solve_stacking: corridor edge references must be unique")
     if pair_table is None:
         original_pairs = discover_pair_table(corridors, band_dist=band_dist)
     elif isinstance(pair_table, (str, Path)):
@@ -161,9 +224,12 @@ def solve_stacking(
     effective_pairs = merge_pair_overrides(original_pairs, override_rows)
 
     ref_to_index = {ref: i for i, ref in enumerate(refs)}
+    ref_to_solver_index = {
+        ref: corridor_mapping[index][0] for index, ref in enumerate(refs)
+    }
     node_refs = sorted({
         f"{coord[0]:.7f},{coord[1]:.7f}"
-        for c in corridors
+        for c in solve_corridors
         for coord in (c.geometry.coords[0], c.geometry.coords[-1])
     })
     node_ids = {node_ref: i for i, node_ref in enumerate(node_refs)}
@@ -178,31 +244,46 @@ def solve_stacking(
             upper, lower = row.get("upper_edge_ref"), row.get("lower_edge_ref")
             if upper not in ref_to_index or lower not in ref_to_index:
                 raise ValueError(f"pair {row.get('pair_id')!r} references an unknown upper/lower edge")
-            stack_pairs.add((ref_to_index[upper], ref_to_index[lower]))
+            upper_index, lower_index = ref_to_solver_index[upper], ref_to_solver_index[lower]
+            if upper_index != lower_index:
+                stack_pairs.add((upper_index, lower_index))
         elif relation == "connect":
             edge_a, edge_b = row.get("edge_a"), row.get("edge_b")
             if edge_a not in ref_to_index or edge_b not in ref_to_index:
                 raise ValueError(f"pair {row.get('pair_id')!r} references an unknown connected edge")
-            try:
-                node = node_ids[row["node_ref"]]
-            except KeyError:
-                raise ValueError(f"pair {row.get('pair_id')!r} has a node_ref that is not a corridor endpoint") from None
+            node_ref = row.get("node_ref", "")
+            if node_ref:
+                try:
+                    node = node_ids[node_ref]
+                except KeyError:
+                    raise ValueError(f"pair {row.get('pair_id')!r} has a node_ref that is not a corridor endpoint") from None
+            else:
+                # Manual connects constrain selected edge heads without a node.
+                node = -1
             side_a, side_b = row.get("endpoint_a"), row.get("endpoint_b")
             if side_a not in {"start", "end"} or side_b not in {"start", "end"}:
                 raise ValueError(f"pair {row.get('pair_id')!r} must specify start/end endpoints")
-            connect_pairs.add((ref_to_index[edge_a], side_a, ref_to_index[edge_b], side_b, node))
+            solver_a, solver_b = ref_to_solver_index[edge_a], ref_to_solver_index[edge_b]
+            if corridor_mapping[ref_to_index[edge_a]][1]:
+                side_a = "end" if side_a == "start" else "start"
+            if corridor_mapping[ref_to_index[edge_b]][1]:
+                side_b = "end" if side_b == "start" else "start"
+            if solver_a != solver_b:
+                connect_pairs.add((solver_a, side_a, solver_b, side_b, node))
         elif relation == "order":
             upper, lower = row.get("upper_edge_ref"), row.get("lower_edge_ref")
             if upper not in ref_to_index or lower not in ref_to_index:
                 raise ValueError(f"pair {row.get('pair_id')!r} references an unknown ordered edge")
-            order_pairs.add((ref_to_index[upper], ref_to_index[lower]))
+            upper_index, lower_index = ref_to_solver_index[upper], ref_to_solver_index[lower]
+            if upper_index != lower_index:
+                order_pairs.add((upper_index, lower_index))
         else:
             raise ValueError(f"pair {row.get('pair_id')!r} has unsupported relation {relation!r}")
 
     # Determine head_m from split_start if available
     avg_head = head_m
-    if corridors:
-        sample_heads = [c.split_start for c in corridors if c.split_start and c.split_start > 0]
+    if solve_corridors:
+        sample_heads = [c.split_start for c in solve_corridors if c.split_start and c.split_start > 0]
         if sample_heads:
             avg_head = float(sum(sample_heads) / len(sample_heads))
 
@@ -234,21 +315,32 @@ def solve_stacking(
     cm = _compress([v for p in iv_shifted for v in p])
     pos = [tuple(cm[x] for x in p) for p in iv_shifted]
 
-    casing_results: list[tuple[int, int, int]] = []
-    fill_results: list[int] = []
+    representative_casings: list[tuple[int, int, int]] = []
+    representative_fills: list[int] = []
     for i in range(n):
         cs, cm_lvl, ce, fl = pos[i]
-        casing_results.append((cs, cm_lvl, ce))
-        fill_results.append(fl)
+        representative_casings.append((cs, cm_lvl, ce))
+        representative_fills.append(fl)
+
+    casing_results: list[tuple[int, int, int]] = []
+    fill_results: list[int] = []
+    for corridor, (solver_index, is_reverse) in zip(corridors, corridor_mapping, strict=True):
+        cs, cm_lvl, ce = representative_casings[solver_index]
+        if is_reverse:
+            cs, ce = ce, cs
+        casing = (cs, cm_lvl, ce)
+        fill = representative_fills[solver_index]
+        casing_results.append(casing)
+        fill_results.append(fill)
         if assign:
-            corridors[i].casing_levels = (cs, cm_lvl, ce)
-            corridors[i].fill_level = fl
+            corridor.casing_levels = casing
+            corridor.fill_level = fill
 
     return StackingSolution(
         casing_levels=casing_results,
         fill_levels=fill_results,
         status="OPTIMAL",
-        info=info,
+        info={**info, "direction_twin_count": original_count - n},
     )
 
 
@@ -269,3 +361,35 @@ def write_pair_tables(
         )
     write_pair_table(original_path, discover_pair_table(corridors, band_dist=band_dist))
     write_pair_table(override_path, [], overrides=True)
+
+
+def write_level_table(
+    corridors: list[Corridor],
+    solution: StackingSolution,
+    path: str | Path,
+) -> None:
+    """Write solved levels for every corridor to a CSV file."""
+    from .pairs import _corridor_refs
+
+    if len(solution.casing_levels) != len(corridors) or len(solution.fill_levels) != len(corridors):
+        raise ValueError("write_level_table: solution must contain one result per corridor")
+    refs = _corridor_refs(corridors)
+    if len(set(refs)) != len(refs) or any(ref.startswith("@index:") for ref in refs):
+        raise ValueError("write_level_table: every corridor needs a stable, unique edge reference")
+
+    fields = ("edge_ref", "physical_road_id", "band", "cs", "cm", "ce", "fl")
+    with Path(path).open("w", newline="", encoding="utf-8") as destination:
+        writer = csv.DictWriter(destination, fieldnames=fields)
+        writer.writeheader()
+        for corridor, ref, casing, fill in zip(
+            corridors, refs, solution.casing_levels, solution.fill_levels, strict=True,
+        ):
+            writer.writerow({
+                "edge_ref": ref,
+                "physical_road_id": _physical_road_id(corridor) or "",
+                "band": corridor.band,
+                "cs": casing[0],
+                "cm": casing[1],
+                "ce": casing[2],
+                "fl": fill,
+            })

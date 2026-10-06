@@ -4,7 +4,7 @@ import pytest
 from shapely.geometry import LineString
 
 from roadstyle.v2.engine.primitives import Corridor
-from roadstyle.v2.engine.solver import StackingSolution, solve_stacking
+from roadstyle.v2.engine.solver import solve_stacking
 
 
 def test_empty_corridors():
@@ -185,3 +185,84 @@ def test_different_bands_connected_at_junction():
     # Meanwhile, the bridge ramp's main casing is stacked above ground fill
     assert cm_ramp >= ground.fill_level + 1
 
+
+def test_reverse_physical_twin_uses_one_result_and_reverses_heads():
+    forward = Corridor(
+        id="road-forward",
+        geometry=LineString([(0, 0), (100, 0)]),
+        band=0,
+        properties={"edge_ref": "road-forward", "road_id": "road-1"},
+    )
+    reverse = Corridor(
+        id="road-reverse",
+        geometry=LineString([(100, 0), (0, 0)]),
+        band=0,
+        properties={"edge_ref": "road-reverse", "road_id": "road-1"},
+    )
+    bridge = Corridor(
+        id="bridge",
+        geometry=LineString([(50, -50), (50, 50)]),
+        band=1,
+        properties={"edge_ref": "bridge"},
+    )
+    pairs = [{
+        "pair_id": "bridge-crosses-reverse-road",
+        "relation": "cross",
+        "edge_a": "bridge",
+        "edge_b": "road-reverse",
+        "node_ref": "",
+        "endpoint_a": "",
+        "endpoint_b": "",
+        "upper_edge_ref": "bridge",
+        "lower_edge_ref": "road-reverse",
+        "enabled": "true",
+    }]
+
+    solution = solve_stacking([forward, reverse, bridge], pair_table=pairs, margin=1)
+
+    assert solution.info["direction_twin_count"] == 1
+    assert solution.casing_levels[1] == tuple(reversed(solution.casing_levels[0]))
+    assert solution.fill_levels[1] == solution.fill_levels[0]
+    assert solution.casing_levels[2][1] >= solution.fill_levels[1] + 1
+
+
+@pytest.mark.parametrize(
+    ("shared_id", "reverse_geometry", "second_band"),
+    [(False, True, 0), (True, False, 0), (True, True, 1)],
+)
+def test_non_twins_stay_independent(shared_id, reverse_geometry, second_band):
+    second_coords = (
+        [(100, 0), (0, 0)] if reverse_geometry else [(0, 0), (100, 0)]
+    )
+    forward_properties = {"edge_ref": "forward"}
+    reverse_properties = {"edge_ref": "second"}
+    if shared_id:
+        forward_properties["road_id"] = "road-1"
+        reverse_properties["road_id"] = "road-1"
+    forward = Corridor(
+        geometry=LineString([(0, 0), (100, 0)]),
+        band=0,
+        properties=forward_properties,
+    )
+    reverse = Corridor(
+        geometry=LineString(second_coords),
+        band=second_band,
+        properties=reverse_properties,
+    )
+    order = [{
+        "pair_id": "keep-directions-independent",
+        "relation": "order",
+        "edge_a": "second",
+        "edge_b": "forward",
+        "node_ref": "",
+        "endpoint_a": "",
+        "endpoint_b": "",
+        "upper_edge_ref": "second",
+        "lower_edge_ref": "forward",
+        "enabled": "true",
+    }]
+
+    solution = solve_stacking([forward, reverse], pair_table=order)
+
+    assert solution.info["direction_twin_count"] == 0
+    assert solution.fill_levels[1] > solution.fill_levels[0]

@@ -1,0 +1,2 @@
+action,pair_id,relation,edge_a,edge_b,node_ref,endpoint_a,endpoint_b,upper_edge_ref,lower_edge_ref,enabled
+add,770dd1b6378a46fca05f,near,1000930347#1f,1000930347#1f,,,,1000930347#1f,1000930347#1f,true

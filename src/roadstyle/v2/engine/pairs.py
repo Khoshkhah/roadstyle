@@ -176,11 +176,18 @@ def merge_pair_overrides(
         required = {
             "near": ("upper_edge_ref", "lower_edge_ref"),
             "cross": ("upper_edge_ref", "lower_edge_ref"),
-            "connect": ("edge_a", "edge_b", "node_ref", "endpoint_a", "endpoint_b"),
+            "connect": ("edge_a", "edge_b", "endpoint_a", "endpoint_b"),
             "order": ("upper_edge_ref", "lower_edge_ref"),
         }[row["relation"]]
         if any(not row[field] for field in required):
             raise ValueError(f"pair {pair_id!r} relation {row['relation']!r} needs {', '.join(required)}")
+        if row["relation"] == "connect" and any(
+            row[field] not in {"start", "end"}
+            for field in ("endpoint_a", "endpoint_b")
+        ):
+            raise ValueError(
+                f"pair {pair_id!r} relation 'connect' endpoints must be start or end"
+            )
     return sorted(effective.values(), key=lambda row: (row["relation"], row["pair_id"]))
 
 

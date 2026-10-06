@@ -15,7 +15,7 @@ from roadstyle.v2.engine.primitives import (
     Patch,
     ViewPreset,
 )
-from roadstyle.v2.engine.solver import StackingSolution, solve_stacking
+from roadstyle.v2.engine.solver import StackingSolution, solve_stacking, write_level_table
 
 __all__ = [
     "Corridor",
@@ -26,10 +26,10 @@ __all__ = [
     "ViewPreset",
     "split_casing_geometry",
     "solve_stacking",
+    "write_level_table",
     "StackingSolution",
     "compile_map",
     "WebMap",
     "meter_to_pixel_width_expr",
     "lateral_offset_expr",
 ]
-

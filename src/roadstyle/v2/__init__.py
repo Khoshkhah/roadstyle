@@ -22,7 +22,12 @@ from roadstyle.v2.engine.primitives import (
     Patch,
     ViewPreset,
 )
-from roadstyle.v2.engine.solver import StackingSolution, solve_stacking, write_pair_tables
+from roadstyle.v2.engine.solver import (
+    StackingSolution,
+    solve_stacking,
+    write_level_table,
+    write_pair_tables,
+)
 from roadstyle.v2.render import render
 
 __all__ = [
@@ -38,6 +43,7 @@ __all__ = [
     "merge_pair_overrides",
     "read_pair_table",
     "write_pair_table",
+    "write_level_table",
     "write_pair_tables",
     "StackingSolution",
     "compile_map",
