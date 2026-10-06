@@ -400,6 +400,75 @@ def _read_pairs(pairs):
     return out
 
 
+def auto_ends(roads, pairs, zoom=18.0, highway_col="highway", min_m=0.5, step=0.25, cover=0.99, levels=None):
+    """Each road end's head length and cap from the geometry and the widths the page draws at ``zoom`` (Kaveh 2026-10-06: better than one
+    number and one cap for all). Returns a table ``road``, ``start_m``, ``end_m``, ``cap_start``, ``cap_end`` (in the road's own way):
+
+    * a head reaches as far as the road's drawing still overlaps a road joined at that end: from the node along the road until its line is
+      ``(own width + the other's) / 2`` from every joined road (a right angle: about half the other's width; a narrow merge: much more); a
+      dead end has ``min_m``; start + end never more than the road (cut in their ratio);
+    * a cap is ``"round"`` where the round end of its fill lies inside the fills of the roads joined there that are drawn at its level or
+      above (at least ``cover`` of its half disc), else ``"flat"``: a round end on top of a lower road shows as a bump on it (a road going
+      on into a lower piece, Kaveh 2026-10-06), and one reaching out of the joined roads crosses their outlines (a wide road ending on a
+      narrower one); a square end covers the round one and more, so it never helps. ``levels``: the solved roads (``road``,
+      ``fill_level``, :func:`solve_levels`); the caps need them, so they are made after solving (without: every joined road counts).
+
+    ``pairs``: :func:`level_input`'s (its ``meet`` rows say which roads join at which end). The widths are in pixels, so the metres hold for
+    ``zoom`` (street level by default); at lower zooms the roads are wider on the ground."""
+    import math
+
+    import numpy as np
+    import pandas as pd
+    import shapely
+    from shapely.ops import unary_union
+
+    from .render_web import class_width_px
+    geo = list(_metres(roads.geometry))
+    ids = list(roads["road"])
+    idx = {r: i for i, r in enumerate(ids)}
+    lat = float(roads.to_crs(4326).geometry.union_all().centroid.y) if roads.crs is not None else 0.0
+    mpp = 40075016.686 * math.cos(math.radians(lat)) / (512 * 2 ** zoom)       # metres per pixel at that zoom, here
+    cls = roads[highway_col] if highway_col in roads else [None] * len(ids)
+    w = [class_width_px(None if c is None or c != c else str(c), zoom) * mpp for c in cls]                     # whole width, casing included
+    wf = [class_width_px(None if c is None or c != c else str(c), zoom, casing=False) * mpp for c in cls]      # the fill
+    fill = None
+    if levels is not None:
+        f = dict(zip(levels["road"], levels["fill_level"], strict=True))
+        fill = [f[r] for r in ids]
+    joins = {}
+    for row in _read_pairs(pairs):
+        if row["relation"] == "meet" and row["a"] in idx and row["b"] in idx:
+            a, b = idx[row["a"]], idx[row["b"]]
+            joins.setdefault((a, row["a_end"]), set()).add(b)
+            joins.setdefault((b, row["b_end"]), set()).add(a)
+    rows = []
+    for i, g in enumerate(geo):
+        n, out = g.length, []
+        for end in ("start", "end"):
+            J = sorted(joins.get((i, end), ()))
+            if not J or n == 0:
+                out.append((min_m, "round"))
+                continue
+            line = g if end == "start" else shapely.LineString(list(g.coords)[::-1])
+            d = 0.0
+            for d in np.arange(0.0, n + step, step):           # walk from the node until the drawings part
+                p = line.interpolate(min(d, n))
+                if all(p.distance(geo[j]) >= (w[i] + w[j]) / 2 for j in J):
+                    break
+            head = max(min_m, math.ceil(min(d, n) / 0.5) * 0.5)
+            node = shapely.Point(line.coords[0])
+            beyond = node.buffer(wf[i] / 2).difference(line.buffer(wf[i] / 2, cap_style="flat"))   # the round end of the fill past the node
+            over = [j for j in J if fill is None or fill[j] >= fill[i]]                             # the joined roads drawn at its level or above
+            joined = unary_union([geo[j].buffer(wf[j] / 2) for j in over]) if over else shapely.Point()
+            out_area = beyond.difference(joined).area
+            out.append((head, "flat" if beyond.area > 0 and out_area > (1 - cover) * beyond.area else "round"))
+        (hs, cs), (he, ce) = out
+        if hs + he > n > 0:
+            hs, he = n * hs / (hs + he), n * he / (hs + he)
+        rows.append((ids[i], round(hs, 2), round(he, 2), cs, ce))
+    return pd.DataFrame(rows, columns=["road", "start_m", "end_m", "cap_start", "cap_end"])
+
+
 def casing_parts(roads, head_m=5.0, heads=None):
     """Each road's three casing parts as drawn, in metres: ``{road: (start head, main part or None, end head)}``; the heads ``head_m`` long
     or ``heads``' own (a table or CSV: ``road`` (any edge id of it), ``start_m``, ``end_m``; empty = ``head_m``), a road shorter than its two

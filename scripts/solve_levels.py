@@ -2,10 +2,12 @@
 
     python scripts/solve_levels.py OUT_DIR
 
-levels.csv has one row per edge: edge (its id), casing_start, casing_level, casing_end, fill_level; draw them with
-rs.render_edges(edges, casing_start_col=..., casing_level_col=..., casing_end_col=..., fill_level_col=...). The head lengths are the
-drawing's (render_edges' head_m, or head_start_m_col / head_end_m_col; the level editor keeps them in heads.csv); the solver only learns from
-them which main parts are empty and which parts of an upper road cross the road under it (--head-m each, or OUT_DIR/heads.csv's own).
+levels.csv has one row per edge: edge (its id), casing_start, casing_level, casing_end, fill_level, and its ends as drawn: head_start_m,
+head_end_m, cap_start, cap_end; draw them with rs.render_edges(edges, casing_start_col=..., casing_level_col=..., casing_end_col=...,
+fill_level_col=..., head_start_m_col=..., head_end_m_col=..., cap_start_col=..., cap_end_col=...). The ends are automatic (rs.auto_ends at
+zoom 18: the head lengths from the geometry before solving, the caps from the geometry and the solved levels after) with yours on top
+(heads.csv / caps.csv, an empty value: automatic; the level editor writes them). The solver only learns from the head lengths which main
+parts are empty and which parts of an upper road cross the road under it.
 """
 import argparse
 from pathlib import Path
@@ -16,21 +18,58 @@ import pandas as pd
 import roadstyle as rs
 
 
-def edge_levels(solved):
-    """One row per edge from one row per road: an edge running the other way has its two heads swapped."""
+def edge_levels(solved, ends_table):
+    """One row per edge from one row per road (and its ends as drawn): an edge running the other way has its two heads and caps swapped."""
+    e = ends_table.set_index("road")
     rows = []
     for r in solved.itertuples():
-        for e in r.edges:
-            rows.append((e, r.casing_start, r.casing_level, r.casing_end, r.fill_level))
-        for e in r.reversed:
-            rows.append((e, r.casing_end, r.casing_level, r.casing_start, r.fill_level))
-    return pd.DataFrame(rows, columns=["edge", "casing_start", "casing_level", "casing_end", "fill_level"])
+        hs, he, cs, ce = e.loc[r.road, ["start_m", "end_m", "cap_start", "cap_end"]]
+        for x in r.edges:
+            rows.append((x, r.casing_start, r.casing_level, r.casing_end, r.fill_level, hs, he, cs, ce))
+        for x in r.reversed:
+            rows.append((x, r.casing_end, r.casing_level, r.casing_start, r.fill_level, he, hs, ce, cs))
+    return pd.DataFrame(rows, columns=["edge", "casing_start", "casing_level", "casing_end", "fill_level", "head_start_m", "head_end_m", "cap_start", "cap_end"])
 
 
-def write(solved, folder):
-    """levels.csv, and levels_info.json: what the solver says about it (the editor shows it without solving again)."""
+def own(folder):
+    """Your own head lengths and caps: heads.csv / caps.csv as {road: (start, end)} ("" = the automatic one)."""
+    def read(path, cols):
+        if not path.exists():
+            return {}
+        f = pd.read_csv(path, dtype=str, keep_default_na=False)
+        if "cap" in f and "start" not in f:                     # an older caps.csv: one value for both ends
+            f["start"] = f["end"] = f["cap"]
+        if cols[0] not in f:                                    # older still: only the roads, flat
+            f[cols[0]] = f[cols[1]] = "flat"
+        return {r: (s, e) for r, s, e in zip(f["road"], f[cols[0]], f[cols[1]], strict=True)}
+    return read(Path(folder) / "heads.csv", ("start_m", "end_m")), read(Path(folder) / "caps.csv", ("start", "end"))
+
+
+def ends(auto, heads, caps):
+    """Each road end's head length and cap as drawn: ``auto`` (rs.auto_ends) with ``heads`` / ``caps`` ({road: (start, end)}) on top."""
+    t = auto.set_index("road").copy()
+    for r, (s, e) in heads.items():
+        if r in t.index:
+            t.loc[r, "start_m"], t.loc[r, "end_m"] = (float(s) if s else t.loc[r, "start_m"]), (float(e) if e else t.loc[r, "end_m"])
+    for r, (s, e) in caps.items():
+        if r in t.index:
+            t.loc[r, "cap_start"], t.loc[r, "cap_end"] = (s or t.loc[r, "cap_start"]), (e or t.loc[r, "cap_end"])
+    return t.reset_index()
+
+
+def solve(roads, pairs, edits, heads, caps, **kw):
+    """The whole step: the automatic head lengths (geometry), the solve, the automatic caps (geometry and the solved levels), your own on
+    top of both. Returns (solved, the ends as drawn, the automatic ends)."""
+    first = ends(rs.auto_ends(roads, pairs), heads, caps)
+    solved = rs.solve_levels(roads, pairs, edits=edits, parts=rs.casing_parts(roads, 5.0, first[["road", "start_m", "end_m"]]), **kw)
+    auto = rs.auto_ends(roads, pairs, levels=solved)
+    return solved, ends(auto, heads, caps), auto
+
+
+def write(solved, folder, ends_table):
+    """levels.csv (with each edge's ends as drawn), and levels_info.json: what the solver says about it (the editor shows it without solving again)."""
     import json
-    edge_levels(solved).to_csv(Path(folder) / "levels.csv", index=False)
+    edge_levels(solved, ends_table).to_csv(Path(folder) / "levels.csv", index=False)
     info = {**solved.attrs["levels_info"], "given_up": [list(p) for p in solved.attrs["levels_given_up"]],
             "given_up_parts": [list(p) for p in solved.attrs.get("levels_given_up_parts", [])],
             "near": [list(p) for p in solved.attrs.get("levels_near", [])]}
@@ -40,15 +79,13 @@ def write(solved, folder):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("out_dir", type=Path)
-    ap.add_argument("--head-m", type=float, default=5.0, help="the heads' length in the drawing, metres (default 5): a road shorter than two has an empty main part")
     ap.add_argument("--max-positions", type=int, help="at most this many drawing positions (a hard bound: wishes, then stack pairs, give way)")
     a = ap.parse_args(argv)
     roads = gpd.read_parquet(a.out_dir / "roads.parquet")
     edits = a.out_dir / "edits.csv"
-    heads = a.out_dir / "heads.csv"
-    parts = rs.casing_parts(roads, a.head_m, heads if heads.exists() else None)
-    solved = rs.solve_levels(roads, a.out_dir / "pairs.csv", edits=edits if edits.exists() else None, max_positions=a.max_positions, parts=parts)
-    write(solved, a.out_dir)
+    heads, caps = own(a.out_dir)
+    solved, drawn, _ = solve(roads, a.out_dir / "pairs.csv", edits if edits.exists() else None, heads, caps, max_positions=a.max_positions)
+    write(solved, a.out_dir, drawn)
     info = solved.attrs["levels_info"]
     print(f"{len(roads)} roads -> {a.out_dir / 'levels.csv'}: {len(solved.attrs['levels_given_up'])} stack pair(s) given up, "
           f"{len({(u, l) for u, l, _ in solved.attrs.get('levels_near', [])})} near warning(s), "

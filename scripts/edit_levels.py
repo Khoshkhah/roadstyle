@@ -22,7 +22,7 @@ import roadstyle as rs
 from roadstyle import render_web
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from solve_levels import write  # noqa: E402
+from solve_levels import ends, own, solve, write  # noqa: E402
 
 COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"]
 
@@ -33,13 +33,10 @@ class Area:
         self.roads = gpd.read_parquet(self.dir / "roads.parquet")
         self.pairs = pd.read_csv(self.dir / "pairs.csv", dtype=str, keep_default_na=False)
         self.edits_path = self.dir / "edits.csv"
-        self.caps_path = self.dir / "caps.csv"                 # road -> (start, end): "", "square" or "flat" (cap_start_col / cap_end_col): drawing only
-        t = pd.read_csv(self.caps_path, dtype=str, keep_default_na=False) if self.caps_path.exists() else pd.DataFrame(columns=["road", "start", "end"])
-        both = t["cap"] if "cap" in t else ["flat"] * len(t)   # an older file: one value (or none: flat) for both ends
-        self.heads_path = self.dir / "heads.csv"               # road -> (start_m, end_m) as text, "" = the default 5 m: the drawing's, and which mains are empty
-        t2 = pd.read_csv(self.heads_path, dtype=str, keep_default_na=False) if self.heads_path.exists() else pd.DataFrame(columns=["road", "start_m", "end_m"])
-        self.heads = {r: (s, e) for r, s, e in zip(t2["road"], t2["start_m"], t2["end_m"], strict=True)}
-        self.caps = {r: (s, e) for r, s, e in zip(t["road"], t["start"] if "start" in t else both, t["end"] if "end" in t else both, strict=True)}
+        # each road end's head length and cap: automatic (rs.auto_ends: heads before solving, caps after) under yours in heads.csv / caps.csv ("" = auto)
+        self.caps_path, self.heads_path = self.dir / "caps.csv", self.dir / "heads.csv"
+        self.heads, self.caps = own(self.dir)
+        self.auto_heads = rs.auto_ends(self.roads, self.pairs).set_index("road")         # the geometry's head lengths (the guard on the sliders)
         if not self.edits_path.exists():
             self.edits_path.write_text(",".join(COLS) + "\n")
         self.road_of = {}                                       # any edge id -> its road id
@@ -90,28 +87,35 @@ class Area:
         return pd.read_csv(self.edits_path, dtype=str, keep_default_na=False).reindex(columns=COLS, fill_value="")
 
     def solve(self, edits, heads=None):
-        heads = self.heads if heads is None else heads
-        t = pd.DataFrame([(r, *heads[r]) for r in sorted(heads)], columns=["road", "start_m", "end_m"])
-        return rs.solve_levels(self.roads, self.pairs, edits=edits if len(edits) else None, parts=rs.casing_parts(self.roads, 5.0, t))
+        return solve(self.roads, self.pairs, edits if len(edits) else None, self.heads if heads is None else heads, self.caps)[0]
 
-    def build(self, edits, solved=None):
+    def build(self, edits, solved=None, save=False):
+        """The page from ``solved`` (solved here if None): the automatic caps from its levels, yours on top; ``save``: levels.csv too."""
         if solved is None:
-            solved = self.solve(edits)
-            write(solved, self.dir)
+            solved, save = self.solve(edits), True
         self.solved = solved
+        auto = rs.auto_ends(self.roads, self.pairs, levels=solved)
+        drawn = ends(auto, self.heads, self.caps)
+        if save:
+            write(solved, self.dir, drawn)
+        auto, drawn = auto.set_index("road"), drawn.set_index("road")
         self.stats = {**solved.attrs["levels_info"], "given_up": [list(p) for p in solved.attrs["levels_given_up"]], "area": self.dir.name}
         self.broken = solved.attrs.get("levels_given_up_parts", [])
         self.near = solved.attrs.get("levels_near", [])
         for r in solved.itertuples():
-            self.facts[r.road]["caps"] = list(self.caps.get(r.road, ("", "")))
-            self.facts[r.road]["heads"] = [float(x) if x else 5.0 for x in self.heads.get(r.road, ("", ""))]
+            a, d, own_h, own_c = auto.loc[r.road], drawn.loc[r.road], self.heads.get(r.road, ("", "")), self.caps.get(r.road, ("", ""))
+            self.facts[r.road]["heads"] = [float(d.start_m), float(d.end_m)]
+            self.facts[r.road]["heads_auto"] = [float(a.start_m), float(a.end_m)]       # what auto gives; heads_own: which ends you set
+            self.facts[r.road]["heads_own"] = [bool(own_h[0]), bool(own_h[1])]
+            self.facts[r.road]["caps"] = list(own_c)                                 # "" = auto
+            self.facts[r.road]["caps_auto"] = [a.cap_start, a.cap_end]
             self.facts[r.road]["levels"] = [int(r.casing_start), int(r.casing_level), int(r.casing_end), int(r.fill_level)]
         draw = solved.drop(columns=["edges", "reversed"]).to_crs(4326)
         draw["head_start_m"], draw["head_end_m"] = ([self.facts[r]["heads"][k] for r in draw["road"]] for k in (0, 1))
-        draw["cap_start"], draw["cap_end"] = ([self.caps.get(r, ("", ""))[k] or "round" for r in draw["road"]] for k in (0, 1))
+        draw["cap_start"], draw["cap_end"] = drawn.loc[draw["road"], "cap_start"].tolist(), drawn.loc[draw["road"], "cap_end"].tolist()
         draw["oneway"] = [not f["two_way"] for f in (self.facts[r] for r in draw["road"])]      # a road with no other direction is one way
-        ends = draw.geometry.apply(lambda ln: list(ln.coords[0][:2]) + list(ln.coords[-1][:2]))
-        draw["s_lon"], draw["s_lat"], draw["e_lon"], draw["e_lat"] = zip(*ends, strict=True)
+        tips = draw.geometry.apply(lambda ln: list(ln.coords[0][:2]) + list(ln.coords[-1][:2]))
+        draw["s_lon"], draw["s_lat"], draw["e_lon"], draw["e_lat"] = zip(*tips, strict=True)
         m = rs.render_edges(draw, edge_id_col="road", road_popup=False, name=f"Level editor · {self.dir.name}",
                             select_color="rgba(0,0,0,0)",               # the panel colours the picked roads (1 orange, 2 blue): no click glow over them
                             filter_control=False, tunnel_control=False,  # the panel is the only control (Kaveh): no class filter box, no Tunnels box
@@ -139,16 +143,14 @@ class Area:
             edits.to_csv(self.edits_path, index=False)
         else:
             edits = self.edits()
-        if solved is not self.solved:
-            write(solved, self.dir)
         if saved is not None:
             self.saved = saved
-        self.build(edits, solved)
+        self.build(edits, solved, save=True)                   # levels.csv has the ends as drawn: written for a cap too
 
     def apply(self, ops):
         """Apply the changes the page collected, in one solve: ``{"op": "delete", "index": i, "row": row}`` (a row of edits.csv, as the page showed it) and ``{"op": "add",
-        "body": row}`` and ``{"op": "cap", "road": id, "end": "start" / "end", "cap": "" / "square" / "flat"}`` (one end of a road, caps.csv) and
-        ``{"op": "head", "road": id, "end": "start" / "end", "m": metres or ""}`` (a head's length, heads.csv; "" = 5 m). If any is wrong, or the solver refuses the result, nothing is saved (ValueError)."""
+        "body": row}`` and ``{"op": "cap", "road": id, "end": "start" / "end", "cap": "" (auto) / "round" / "square" / "flat"}`` (one end of a road, caps.csv) and
+        ``{"op": "head", "road": id, "end": "start" / "end", "m": metres or ""}`` (a head's length, heads.csv; "" = auto). If any is wrong, or the solver refuses the result, nothing is saved (ValueError)."""
         if not ops:
             raise ValueError("nothing to apply")
         if any(o.get("op") not in ("add", "delete", "cap", "head") for o in ops):
@@ -157,8 +159,8 @@ class Area:
         for o in ops:
             if o["op"] == "cap":
                 r, c, k = self.road_of.get(str(o["road"])), o.get("cap", ""), {"start": 0, "end": 1}.get(o.get("end"))
-                if r is None or c not in ("", "square", "flat") or k is None:
-                    raise ValueError(f"ends: {o['road']!r} is not a road, {o.get('end')!r} not start / end, or {c!r} not round (empty), square or flat")
+                if r is None or c not in ("", "round", "square", "flat") or k is None:
+                    raise ValueError(f"ends: {o['road']!r} is not a road, {o.get('end')!r} not start / end, or {c!r} not auto (empty), round, square or flat")
                 v = list(caps.pop(r, ("", "")))
                 v[k] = c
                 if any(v):
@@ -175,7 +177,7 @@ class Area:
                 v[k] = m
                 if any(v):
                     heads[r] = tuple(v)
-                hs, he = (float(x) if x else 5.0 for x in v)
+                hs, he = (float(x) if x else float(self.auto_heads.loc[r, c]) for x, c in zip(v, ("start_m", "end_m"), strict=True))
                 if all(v) and hs + he > self.facts[r]["length_m"] + 0.05:       # both set (the page sends both): they must fit the road
                     raise ValueError(f"heads of {self.facts[r]['name'] or r}: {hs:g} + {he:g} m is more than the road's {self.facts[r]['length_m']:g} m")
         e = self.edits()

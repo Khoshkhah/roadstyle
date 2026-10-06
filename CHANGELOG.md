@@ -18,6 +18,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - The editor: you choose which road is on top for an order or a stack (it was always the road clicked first); changes wait in a list until *Apply and solve*,
   one solve for all, with a busy layer over the map until the new map is drawn.
 - `level_input` keeps the edges' `lanes` (shown in the editor's cards). A delete in the editor names its row as the page saw it: if edits.csv changed since, nothing is applied.
+- **Automatic head lengths and caps per road end** (`rs.auto_ends`, at zoom 18): heads as long as the drawings overlap at the join (before
+  solving), caps round unless the round end would lie over a lower road or out of the joined roads (after solving, from the levels);
+  `heads.csv` / `caps.csv` override (empty = automatic), and `levels.csv` carries each edge's ends as drawn. `rs.class_width_px`.
 - **Three casing parts for every road; no length in the solver:** `solve_levels(empty_main=...)` (the roads whose main part is drawn with no length,
   from `rs.empty_mains(roads, head_m, heads)`) replaces its `head_m`: an empty main part is never lifted. A short road's heads count one by one,
   so given-up pairs are counted honestly (Monaco 22, was 16 undercounted). Head lengths per road end are the drawing's: `render_edges(head_start_m_col=...,

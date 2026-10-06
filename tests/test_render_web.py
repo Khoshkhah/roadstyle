@@ -1920,8 +1920,9 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     with pytest.raises(ValueError):
         area.apply([{"op": "cap", "road": "12", "end": "start", "cap": "pointy"}])
     area.apply([{"op": "head", "road": "12", "end": "end", "m": "12.5"}])                 # a head's length: heads.csv, the solver and the drawing
-    assert (tmp_path / "heads.csv").read_text().split() == ["road,start_m,end_m", "12,,12.5"] and area.facts["12"]["heads"] == [5.0, 12.5]
-    assert "head_end_m" not in pd.read_csv(tmp_path / "levels.csv").columns                # drawing only: not the solver's
+    assert (tmp_path / "heads.csv").read_text().split() == ["road,start_m,end_m", "12,,12.5"] and area.facts["12"]["heads"] == [area.facts["12"]["heads_auto"][0], 12.5]
+    lv = pd.read_csv(tmp_path / "levels.csv", dtype={"edge": str}).set_index("edge")        # levels.csv has each edge's ends as drawn
+    assert lv.loc["12", "head_end_m"] == 12.5 and set(lv["cap_start"]) <= {"round", "square", "flat"}
     with pytest.raises(ValueError):
         area.apply([{"op": "head", "road": "12", "end": "end", "m": "-3"}])
     with pytest.raises(ValueError):                                                       # both heads together cannot be more than the road
@@ -2042,3 +2043,28 @@ def test_near_rules_give_way_to_order_wishes_and_real_crossings_do_not():
     assert given == [] and info["order_violations"] == 0 and len(info["near_parts"]) == 3     # the near rule gives way: a warning
     _, given, info = _solve_intervals(*args)
     assert given == [] and info["order_violations"] == 1                                          # a real crossing is kept, the wish is not
+
+
+def test_auto_ends_fit_heads_and_caps_to_the_joins():
+    """rs.auto_ends (docs/design/level_input.md): a head reaches as far as the drawings overlap (a right angle: about the two half widths;
+    a narrow merge: longer), a dead end has the least; a wide road ending on a narrower one gets a flat end, others round."""
+    import math
+
+    import pandas as pd
+
+    import roadstyle as rs
+    m = 1 / 111320.0
+    k = 1 / (111320.0 * math.cos(math.radians(59.3)))
+    o = (18.0, 59.3)
+    P = lambda x, y: (o[0] + x * k, o[1] + y * m)                                  # noqa: E731  metres east / north of o
+    g = gpd.GeoDataFrame({"highway": ["residential", "residential", "primary", "residential"], "edge_id": [1, 2, 3, 4]},
+                         geometry=[LineString([P(-60, 0), P(0, 0)]), LineString([P(0, 0), P(60, 0)]),       # a straight street in two pieces
+                                   LineString([P(0, 60), P(0, 0)]),                                         # a primary ending on it, square on
+                                   LineString([P(60, 0), P(120, 12)])], crs=4326)                          # the street going on, a bend
+    g = pd.concat([g, gpd.GeoDataFrame({"highway": ["primary"], "edge_id": [5]}, geometry=[LineString([P(-40, -8), P(-60, 0)])], crs=4326)])
+    roads, pairs = rs.level_input(g.reset_index(drop=True))
+    e = rs.auto_ends(roads, pairs).set_index("road")
+    assert 2.5 < e.loc["3", "end_m"] < 6 and e.loc["3", "start_m"] == 0.5          # a right angle: about the two half widths; a dead end: the least
+    assert e.loc["5", "end_m"] > e.loc["3", "end_m"]                               # a narrow merge (about 22°) overlaps for longer
+    assert e.loc["5", "cap_end"] == "flat" and e.loc["3", "cap_end"] == "flat"     # a primary ending on a narrower street: its round end spills over
+    assert e.loc["1", "cap_start"] == "round" and e.loc["4", "cap_start"] == "round"  # a dead end, the street going on round a bend: round

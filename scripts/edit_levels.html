@@ -56,12 +56,12 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
 #lv .wd-x div{height:16px;border-radius:3px;background:#8c96a5;display:flex;align-items:center;justify-content:center}
 #lv .wd-x i{display:block;height:100%;background:#f1e7c8}
 #lv .caps{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12px;color:var(--lv-mute)} #lv .caps .seg{flex:1}
-#lv .caps .seg button{padding:3px 0;font-size:12px}
+#lv .caps .seg button{padding:3px 0;font-size:11.5px;white-space:nowrap}
 #lv .hd{margin-top:8px;padding:7px 8px 6px;border:1px solid var(--lv-line);border-radius:8px}
 #lv .hd-h{display:flex;justify-content:space-between;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
 #lv .hbar{display:flex;height:12px;border-radius:3px;overflow:hidden;margin-bottom:4px;font-size:9px;line-height:12px;color:#fff;text-align:center}
 #lv .hbar i{display:block;font-style:normal;overflow:hidden;white-space:nowrap} #lv .hbar .s,#lv .hbar .e{background:#6b7686} #lv .hbar .m{background:#c3c9d2;color:#3b4252}
-#lv .hd label{display:grid;grid-template-columns:52px 1fr 52px;align-items:center;gap:6px;font-size:12px;color:var(--lv-mute)}
+#lv .hd label{display:grid;grid-template-columns:52px 1fr 52px;row-gap:0;align-items:center;gap:6px;font-size:12px;color:var(--lv-mute)}
 #lv .hd input[type=range]{width:100%;accent-color:var(--lv-r2)} #lv .hd label b{text-align:right;color:var(--lv-ink);font-variant-numeric:tabular-nums}
 #lv .lvls{display:flex;gap:4px;margin-top:8px} #lv .lvls div{flex:1;text-align:center;background:var(--lv-bg);border-radius:6px;padding:3px 0}
 #lv .lvls small{display:block;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em} #lv .lvls b{font-size:13px}
@@ -264,9 +264,10 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     let [s, e] = f.heads || [5, 5];
     if(L > 0 && s + e > L){ const k = L / (s + e); s = Math.round(s * k * 10) / 10; e = Math.round(e * k * 10) / 10; }   // as drawn: cut in their ratio
     return `<div class="hd" data-hroad="${esc(r)}" data-len="${L}" title="The metres at each end drawn at the head's own level; the rest is the main part. Start + end cannot be more than the road.">
-      <div class="hd-h"><span>casing heads</span><span>road ${L} m</span></div>
+      <div class="hd-h"><span>casing heads ${(f.heads_own || []).some(Boolean) ? `<button class="link" data-hauto title="Back to the automatic lengths (${(f.heads_auto || []).map(v => v + " m").join(" / ")})">auto</button>` : ""}</span><span>road ${L} m</span></div>
       <div class="hbar"><i class="s"></i><i class="m"></i><i class="e"></i></div>
-      ${[["start", "●", s], ["end", "○", e]].map(([n, m, v]) => `<label><span>${n} ${m}</span><input type="range" min="0.5" step="0.5" data-hend="${n}" value="${v}"><b></b></label>`).join("")}
+      ${[["start", "●", s], ["end", "○", e]].map(([n, m, v], k) => `<label><span>${n} ${m}</span><input type="range" min="0.5" step="0.5" data-hend="${n}" value="${v}"><b></b>
+        <small style="grid-column:2/4;margin:-3px 0 2px;font-size:10px">${(f.heads_own || [])[k] ? "set by you" : "auto"}</small></label>`).join("")}
     </div>`;
   }
   function headsSync(box){
@@ -287,9 +288,9 @@ body.lv-open #lv-busy{right:var(--lv-w)}
         <span>look</span><span>${esc(f.look || "–")}</span><span>lanes</span><span>${esc(f.lanes ?? "–")}</span>
         <span>road id</span><span style="grid-column:span 3;font-size:11px">${esc(r)}</span></div>
       <div class="wd" data-w="${esc(r)}">${widthHtml(f)}</div>
-      ${["start", "end"].map((e, i) => `<div class="caps" title="This end of the road (caps.csv, drawing only): round (the default); square = flat, as long as round; flat = stops at the end point (shorter by half its width), for an end that would reach across a narrower road">
+      ${["start", "end"].map((e, i) => `<div class="caps" title="This end of the road (caps.csv, drawing only). auto: round, or flat where a round end would reach over the roads it joins (at zoom 18); round; square = flat, as long as round; flat = stops at the end point">
         <span style="width:44px">${e} ${i ? "○" : "●"}</span>
-        <div class="seg" data-cap="${esc(r)}" data-end="${e}">${[["", "round"], ["square", "square"], ["flat", "flat"]].map(([v, t]) =>
+        <div class="seg" data-cap="${esc(r)}" data-end="${e}">${[["", "auto · " + ((f.caps_auto || [])[i] || "round")], ["round", "round"], ["square", "square"], ["flat", "flat"]].map(([v, t]) =>
           `<button data-v="${v}" class="${((f.caps || [])[i] || "") === v ? "on" : ""}">${t}</button>`).join("")}</div></div>`).join("")}
       ${headsHtml(r, f)}
       <div class="lvls"><div><small>start</small><b>${L[0]}</b></div><div><small>casing</small><b>${L[1]}</b></div>
@@ -334,6 +335,8 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     });
     $("lv-cards").querySelectorAll("[data-hroad]").forEach(box => {
       headsSync(box);
+      const back = box.querySelector("[data-hauto]");
+      if(back) back.onclick = () => { stage({op: "head", road: box.dataset.hroad, end: "start", m: ""}); stage({op: "head", road: box.dataset.hroad, end: "end", m: ""}); };
       box.querySelectorAll("input").forEach(inp => {
         inp.oninput = () => headsSync(box);
         inp.onchange = () => {                                  // both heads go to the list together, so the pair always fits the road
@@ -406,8 +409,8 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   function stage(q){
     if(q.op === "delete" && queue.some(x => x.op === "delete" && x.index === q.index)) return toast("Already in the list");
     if(q.op === "cap" || q.op === "head") queue = queue.filter(x => !(x.op === q.op && x.road === q.road && x.end === q.end));   // the last choice for an end counts
-    q.text = q.op === "delete" ? "delete edit: " + plain(q.row) : q.op === "cap" ? `${q.end} ${q.end === "start" ? "●" : "○"} ${q.cap || "round"} · ${name(q.road)}`
-      : q.op === "head" ? `${q.end} head ${q.end === "start" ? "●" : "○"} ${q.m || 5} m · ${name(q.road)}`
+    q.text = q.op === "delete" ? "delete edit: " + plain(q.row) : q.op === "cap" ? `${q.end} ${q.end === "start" ? "●" : "○"} ${q.cap || "auto"} · ${name(q.road)}`
+      : q.op === "head" ? `${q.end} head ${q.end === "start" ? "●" : "○"} ${q.m ? q.m + " m" : "auto"} · ${name(q.road)}`
       : `${q.body.relation} · ${plain(q.body)}`;
     queue.push(q); showQueue(); toast("In the list · apply when ready");
   }

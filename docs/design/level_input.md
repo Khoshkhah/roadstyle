@@ -45,6 +45,19 @@ rule that broke is a **warning** (`attrs["levels_near"]`), shown apart in the ed
 wishes not kept (was 47), 15 positions (was 10); with the near rules above the order wishes instead it would be 0 / 22 / 47 / 10.
 Before, every rule counted as a crossing: 22 given up, 20 of them near-only and the 2 others a head 7 and 18 m from the crossing.
 
+**Automatic heads and caps** (`rs.auto_ends`, Kaveh 2026-10-06: better than one number and one cap for all), for the widths the page
+draws at zoom 18 (street level; widths are pixels, so lower zooms are wider on the ground):
+
+- *head length* (before solving, geometry only): from the node along the road until its line is `(own width + the other's) / 2` from every
+  road joined at that end, so as far as the two drawings overlap (a right angle: 2-3 m; a narrow merge: 10 m and more); a dead end 0.5 m;
+  start + end never more than the road.
+- *cap* (after solving, geometry and levels): round where the round end of the fill lies inside the fills of the joined roads drawn at its
+  level or above, else flat: a road going on into a lower piece would show its round end as a bump on it, and a wide road ending on a
+  narrower one would cross its outline (Tunnel Aureglia into Rue Grimaldi). Square never helps there (it covers the round end and more).
+
+Yours in `heads.csv` / `caps.csv` go on top (empty: automatic); `levels.csv` has the ends as drawn. On Monaco the caps matched 5 of the 6
+flat ends set by hand (the sixth is under a road drawn above it); the head lengths come out a little shorter than the ones set by hand.
+
 **One part of A** (an edit): a `stack` edit may name a part of A's casing in `a_end`: `start`, `main` or `end` (empty: the whole road, the
 rule above). Added, that part comes after B's fill even where its head joins B (a junction the rule leaves out). Switched off
 (`enabled=false`), only that part is left out of a found whole pair; the rest of the pair stays. A part named on an edge that runs against its
@@ -57,9 +70,9 @@ road is turned to the road's way, as a meet's end is.
 | `roads.parquet` | one row per road (both directions of a segment together): `road` (the id of its first edge), `edges` / `reversed` (the ids of its edges running its way / the other way), `band`, `priority`, the line | `scripts/level_input.py` (`rs.level_input`), every run |
 | `pairs.csv` | one row per relation: `relation`, `a`, `b`, `a_end`, `b_end` (below) | `scripts/level_input.py`, every run |
 | `edits.csv` | your changes to the pairs, same columns plus `enabled`: `false` switches a pair off, anything else adds one; `a` / `b` may name either direction of a road | created empty once; you, or `scripts/edit_levels.py`; never overwritten by the input step |
-| `caps.csv` | each road's two ends (`road`, `start`, `end`: empty = round, `square`, `flat`), for `render_edges(cap_start_col=..., cap_end_col=...)` (`docs/design/square_ends.md`): drawing only, the solver does not read it | `scripts/edit_levels.py` (the *start* / *end* choices in a road's card) |
-| `heads.csv` | head lengths per road (`road`, `start_m`, `end_m`; empty = 5 m): the solver's input (a road shorter than its two heads has one casing number) and the drawing's | `scripts/edit_levels.py` (the *heads* inputs in a road's card) |
-| `levels.csv` | the result, one row per edge: `edge`, `casing_start`, `casing_level`, `casing_end`, `fill_level`, `head_start_m`, `head_end_m` (draw with `head_start_m_col` / `head_end_m_col`) | `scripts/solve_levels.py` (`rs.solve_levels`) |
+| `caps.csv` | your caps per road end (`road`, `start`, `end`: empty = automatic, `round`, `square`, `flat`) | `scripts/edit_levels.py` (the *start* / *end* choices in a road's card) |
+| `heads.csv` | your head lengths per road end (`road`, `start_m`, `end_m`; empty = automatic) | `scripts/edit_levels.py` (the *heads* sliders in a road's card) |
+| `levels.csv` | the result, one row per edge: `edge`, `casing_start`, `casing_level`, `casing_end`, `fill_level`, and its ends as drawn: `head_start_m`, `head_end_m`, `cap_start`, `cap_end` (render_edges' `head_start_m_col` / `head_end_m_col` / `cap_start_col` / `cap_end_col`) | `scripts/solve_levels.py` |
 
 Relations: `meet` (the end `a_end` of `a` is the end `b_end` of `b`: each head is under the other road's fill), `stack` (`a` is over `b`) and
 `order` (`a`'s fill after `b`'s where they meet, a wish the solver may give up). A manual `meet` row joins two roads that do not share a point.

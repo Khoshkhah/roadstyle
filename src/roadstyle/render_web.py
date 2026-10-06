@@ -95,6 +95,23 @@ def _gwidth(t, hi, z):
     return t[ks[-1]]
 
 
+def class_width_px(cls, zoom, casing=True):
+    """The width a road of class ``cls`` is drawn with at ``zoom``, in pixels: its whole width with the casing (``casing``), or its fill.
+    The page's width expression, read at one zoom (linear between its stops, the end values outside); one line per road, no two-way narrowing."""
+    e = _width_expr("highway", casing=casing)
+    zs, ms = e[3::2], e[4::2]
+    def at(m):
+        m = m[1] if m[0] == "*" else m                          # ["*", match, two-way case]: the match
+        return dict(zip(m[2:-1:2], m[3:-1:2], strict=True)).get(cls, m[-1])
+    if zoom <= zs[0]:
+        return float(at(ms[0]))
+    if zoom >= zs[-1]:
+        return float(at(ms[-1]))
+    i = max(k for k in range(len(zs)) if zs[k] <= zoom)
+    f = (zoom - zs[i]) / (zs[i + 1] - zs[i])
+    return float(at(ms[i]) + (at(ms[i + 1]) - at(ms[i])) * f)
+
+
 def _width_expr(col, casing=False, split_zoom=15, split_frac=0.6, scale=1.0):
     """interpolate(zoom) of match(class -> width). Two-way lanes shrink to ``split_frac`` of the
     full width once the directions have fanned apart (ramped from full at split_zoom to split_frac
