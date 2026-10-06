@@ -65,6 +65,7 @@ def build(
         pair_overrides=override_rows,
         band_dist=band_dist,
         head_m=head_m,
+        priority_tiers=True,
     )
     write_level_table(corridors, solution, levels)
 
@@ -135,6 +136,7 @@ class RoadLevelModel:
             pair_overrides=overrides,
             band_dist=self.band_dist,
             head_m=self.head_m,
+            priority_tiers=True,
         )
         if levels_path is not None:
             write_level_table(self.corridors, solution, levels_path)

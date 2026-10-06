@@ -110,6 +110,36 @@ def _compute_metric_scale(corridors: list[Corridor]) -> tuple[bool, float, float
     return False, 0.0, 0.0, 1.0, 1.0
 
 
+def _is_roundabout(corridor: Corridor) -> bool:
+    junction = str(corridor.properties.get("junction") or "").lower()
+    return junction in {"roundabout", "circular"} or corridor.junction_priority >= 100.0
+
+
+def _apply_priority_tiers(
+    corridors: list[Corridor], pos: list[tuple[int, int, int, int]],
+) -> list[tuple[int, int, int, int]]:
+    """Draw order by level, not band: roundabouts above tunnels above every other road.
+
+    Each tier is lifted as a block above the tiers below it, so the solved order inside a tier
+    is kept. Levels are compacted afterwards.
+    """
+    tier = [2 if _is_roundabout(c) else 1 if (c.tunnel or c.band < 0) else 0 for c in corridors]
+    shifted = list(pos)
+    top = max((max(p) for p, t in zip(pos, tier, strict=True) if t == 0), default=None)
+    for level in (1, 2):
+        members = [i for i, t in enumerate(tier) if t == level]
+        if not members:
+            continue
+        if top is None:
+            top = -1
+        lift = top + 1 - min(min(pos[i]) for i in members)
+        for i in members:
+            shifted[i] = tuple(x + lift for x in pos[i])
+        top = max(max(shifted[i]) for i in members)
+    compact = _compress([v for p in shifted for v in p])
+    return [tuple(compact[x] for x in p) for p in shifted]
+
+
 def solve_stacking(
     corridors: list[Corridor],
     *,
@@ -121,6 +151,7 @@ def solve_stacking(
     margin: float = 1.0,
     time_limit: float = 60.0,
     assign: bool = True,
+    priority_tiers: bool = False,
 ) -> StackingSolution:
     """Solve drawing order for corridors using the proven optimization solver.
 
@@ -142,6 +173,8 @@ def solve_stacking(
         Minimum level separation between stacked layers (default 1.0).
     time_limit : float
         Maximum seconds for LP solve (default 60.0).
+    priority_tiers : bool
+        Draw roundabouts above tunnels, and tunnels above all other roads, regardless of band.
     assign : bool
         If True, writes the computed levels directly onto corridor.casing_levels and corridor.fill_level.
 
@@ -314,6 +347,8 @@ def solve_stacking(
     iv_shifted = [tuple(x - ground for x in p) for p in iv]
     cm = _compress([v for p in iv_shifted for v in p])
     pos = [tuple(cm[x] for x in p) for p in iv_shifted]
+    if priority_tiers:
+        pos = _apply_priority_tiers(solve_corridors, pos)
 
     representative_casings: list[tuple[int, int, int]] = []
     representative_fills: list[int] = []

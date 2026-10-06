@@ -250,3 +250,10 @@ The columns are `edge_ref`, `physical_road_id`, `band`, `cs`, `cm`, `ce`, and
 `fl`. The generated Monaco output is stored at
 [`data/v2/road_levels.csv`](../../data/v2/road_levels.csv). Its 2,765 rows
 include both directions of the 807 grouped exact-reverse pairs.
+
+## Priority tiers (draw order by level)
+
+`solve_stacking(..., priority_tiers=True)` (used by `build_road_levels.py` and the pair
+override dashboard) lifts whole tiers above each other after the solve, ignoring band:
+roundabouts on top, then tunnels, then every other road. Solved order inside a tier is
+kept, and levels are compacted afterwards.

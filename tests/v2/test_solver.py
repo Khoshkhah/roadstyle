@@ -266,3 +266,21 @@ def test_non_twins_stay_independent(shared_id, reverse_geometry, second_band):
 
     assert solution.info["direction_twin_count"] == 0
     assert solution.fill_levels[1] > solution.fill_levels[0]
+
+
+def test_priority_tiers_put_roundabout_over_tunnel_over_other_roads():
+    def road(coords, **kw):
+        return Corridor(geometry=LineString(coords), width_m=10.0, split_start=5.0, split_end=5.0, **kw)
+
+    tunnel = road([(-50, 0), (50, 0)], band=-1, tunnel=True)
+    surface = road([(0, -50), (0, 50)])
+    bridge = road([(-40, -40), (40, 40)], band=1, bridge_deck=True)
+    ring = road([(-30, 20), (30, 20)], band=-1, tunnel=True, junction_priority=100.0)
+
+    solve_stacking([tunnel, surface, bridge, ring], margin=1.0, priority_tiers=True)
+
+    def lowest(c):
+        return min((*c.casing_levels, c.fill_level))
+
+    assert lowest(tunnel) > max(*surface.casing_levels, surface.fill_level, *bridge.casing_levels, bridge.fill_level)
+    assert lowest(ring) > max(*tunnel.casing_levels, tunnel.fill_level)
