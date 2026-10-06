@@ -2,6 +2,7 @@
 :root{--lv-w:400px;--lv-bg:#f6f7f9;--lv-card:#fff;--lv-line:#e4e7ec;--lv-ink:#1d2433;--lv-mute:#6b7280;--lv-r1:#e8590c;--lv-r2:#1971c2;
   --lv-found:#868e96;--lv-saved:#7048e8;--lv-new:#2f9e44;--lv-bad:#e03131}
 body.lv-open #map{right:var(--lv-w)}
+#lv [hidden],#lv-busy[hidden]{display:none!important}           /* a display rule below must not show a hidden part */
 #map{transition:right .2s ease}
 #lv{position:fixed;top:0;right:0;bottom:0;width:var(--lv-w);z-index:6;background:var(--lv-bg);border-left:1px solid var(--lv-line);
   display:flex;flex-direction:column;font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--lv-ink);transition:transform .2s ease}
