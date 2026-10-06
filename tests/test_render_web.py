@@ -1876,12 +1876,15 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     roads.to_parquet(tmp_path / "roads.parquet")
     pairs.to_csv(tmp_path / "pairs.csv", index=False)
     area = Area(tmp_path)
-    got = area.between("12", "11")
-    assert {(r["relation"], r["a"], r["b"]) for r in got["found"]} >= {("order", "12", "11")} and got["edits"] == []
+    got = area.relations("12", "11")
+    assert {(r["relation"], r["a"], r["b"]) for r in got["rows"] if r["section"] == "found"} >= {("order", "12", "11")}
+    assert not [r for r in got["rows"] if r["section"] != "found"] and set(got["roads"]) >= {"11", "12"}
     before = (tmp_path / "edits.csv").read_text()
     with pytest.raises(ValueError):
         area.change(pd.DataFrame([{"relation": "stack", "a": "999", "b": "11", "a_end": "", "b_end": "", "enabled": "true"}]))
     assert (tmp_path / "edits.csv").read_text() == before
     area.change(pd.DataFrame([{"relation": "order", "a": "12", "b": "11", "a_end": "", "b_end": "", "enabled": "false"}]))
     assert "false" in (tmp_path / "edits.csv").read_text() and (tmp_path / "edits.csv.bak").read_text() == before
-    assert len(area.between("11", "12")["edits"]) == 1 and (tmp_path / "levels.csv").exists()
+    new = [r for r in area.relations("11", "12")["rows"] if r["section"] == "new"]
+    assert len(new) == 1 and (tmp_path / "levels.csv").exists()                  # added in this session: "new", not "saved"
+    assert len(area.relations("12")["rows"]) >= 3                                # one road: everything about it, in both tables

@@ -37,6 +37,13 @@ class Area:
         for r in self.roads.itertuples():
             for e in [r.road, *list(r.edges), *list(r.reversed)]:
                 self.road_of[str(e)] = r.road
+        length = _metres(self.roads.geometry).length.round(1)
+        self.facts = {}                                         # road id -> what the panel shows about it
+        for (_, r), m in zip(self.roads.iterrows(), length, strict=True):
+            self.facts[r["road"]] = {"road": r["road"], "name": _txt(r.get("name")), "highway": _txt(r.get("highway")),
+                                     "edge_ref": _txt(r.get("edge_ref")), "band": int(r["band"]), "priority": _num(r.get("priority")),
+                                     "edges": len(r["edges"]) + len(r["reversed"]), "two_way": len(r["reversed"]) > 0, "length_m": float(m)}
+        self.saved = len(self.edits())                          # the edits that were in edits.csv when the editor started
         self.build(self.edits())
 
     def edits(self):
@@ -48,36 +55,62 @@ class Area:
     def build(self, edits, solved=None):
         solved = self.solve(edits) if solved is None else solved
         edge_levels(solved).to_csv(self.dir / "levels.csv", index=False)
-        self.info = {**solved.attrs["levels_info"], "given_up": [list(p) for p in solved.attrs["levels_given_up"]]}
+        self.stats = {**solved.attrs["levels_info"], "given_up": [list(p) for p in solved.attrs["levels_given_up"]], "area": self.dir.name}
+        for r in solved.itertuples():
+            self.facts[r.road]["levels"] = [int(r.casing_start), int(r.casing_level), int(r.casing_end), int(r.fill_level)]
         draw = solved.drop(columns=["edges", "reversed"]).to_crs(4326)
+        draw["oneway"] = [not f["two_way"] for f in (self.facts[r] for r in draw["road"])]      # a road with no other direction is one way
         ends = draw.geometry.apply(lambda ln: list(ln.coords[0][:2]) + list(ln.coords[-1][:2]))
         draw["s_lon"], draw["s_lat"], draw["e_lon"], draw["e_lat"] = zip(*ends, strict=True)
-        shown = [c for c in ("name", "highway", "edge_ref", "road", "band", "priority", "casing_start", "casing_level", "casing_end", "fill_level")
-                 if c in draw.columns]
-        m = rs.render_edges(draw, edge_id_col="road", arrows=False, name=f"Level edits · {self.dir.name}", road_popup=shown,
+        m = rs.render_edges(draw, edge_id_col="road", road_popup=False, name=f"Level editor · {self.dir.name}",
                             casing_start_col="casing_start", casing_level_col="casing_level", casing_end_col="casing_end",
                             fill_level_col="fill_level")
         page = m.html if hasattr(m, "html") else str(m)
-        tail = _EDITOR.replace("__INFO__", json.dumps(self.info, default=str))
-        self.page = page.replace("</body>", tail + "</body>", 1)
+        self.page = page.replace("</body>", _EDITOR.replace("__STATS__", json.dumps(self.stats, default=str)) + "</body>", 1)
 
-    def change(self, edits):
+    def change(self, edits, saved=None):
         """Solve with ``edits``; save them only if the solver takes them."""
         solved = self.solve(edits)                              # raises ValueError: nothing written
         self.edits_path.with_name("edits.csv.bak").write_text(self.edits_path.read_text())
         edits.to_csv(self.edits_path, index=False)
+        if saved is not None:
+            self.saved = saved
         self.build(edits, solved)
 
-    def between(self, a, b):
-        ra, rb = self.road_of.get(a), self.road_of.get(b)
-        if ra is None or rb is None:
-            raise ValueError("pick two roads")
-        same = lambda t: ((t["a"] == ra) & (t["b"] == rb)) | ((t["a"] == rb) & (t["b"] == ra))          # noqa: E731
-        found = self.pairs[same(self.pairs)].to_dict("records")
-        e = self.edits()
-        e["index"] = range(len(e))
-        mapped = e.assign(a=[self.road_of.get(v, v) for v in e["a"]], b=[self.road_of.get(v, v) for v in e["b"]])
-        return {"a": ra, "b": rb, "found": found, "edits": e[same(mapped)].to_dict("records")}
+    def rows(self):
+        """Every edit, with its index, its section (saved before this session / added now) and its two roads."""
+        out = []
+        for i, r in enumerate(self.edits().to_dict("records")):
+            ra, rb = self.road_of.get(r["a"], r["a"]), self.road_of.get(r["b"], r["b"])
+            out.append({**r, "index": i, "section": "saved" if i < self.saved else "new", "ra": ra, "rb": rb})
+        return out
+
+    def relations(self, a, b=None):
+        """What the two tables have about road ``a`` (and ``b``): the found pairs and the edits, each with its two roads."""
+        ra, rb = self.road_of.get(a), self.road_of.get(b) if b else None
+        if ra is None or (b and rb is None):
+            raise ValueError("unknown road")
+        mine = lambda x, y: (x == ra and (rb is None or y == rb)) or (y == ra and (rb is None or x == rb))   # noqa: E731
+        found = [{**r, "section": "found", "ra": r["a"], "rb": r["b"]} for r in self.pairs.to_dict("records") if mine(r["a"], r["b"])]
+        edits = [r for r in self.rows() if mine(r["ra"], r["rb"])]
+        roads = {x for r in found + edits for x in (r["ra"], r["rb"])} | {ra} | ({rb} if rb else set())
+        return {"a": ra, "b": rb, "rows": found + edits, "roads": {x: self.facts.get(x, {"road": x}) for x in roads}}
+
+
+def _txt(v):
+    return None if v is None or (isinstance(v, float) and v != v) else str(v)
+
+
+def _num(v):
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return None
+    return None if v != v else round(v, 2)
+
+
+def _metres(geoseries):
+    return geoseries.to_crs(geoseries.estimate_utm_crs()) if geoseries.crs is not None and geoseries.crs.is_geographic else geoseries
 
 
 def _handler(area):
@@ -101,10 +134,10 @@ def _handler(area):
                 if u.path == "/":
                     return self._send(200, area.page, "text/html; charset=utf-8")
                 if u.path == "/api/edits":
-                    e = area.edits()
-                    return self._send(200, [{**r, "index": i} for i, r in enumerate(e.to_dict("records"))])
-                if u.path == "/api/pairs":
-                    return self._send(200, area.between(q.get("a", ""), q.get("b", "")))
+                    rows = area.rows()
+                    return self._send(200, {"rows": rows, "roads": {x: area.facts.get(x, {"road": x}) for r in rows for x in (r["ra"], r["rb"])}})
+                if u.path == "/api/relations":
+                    return self._send(200, area.relations(q.get("a", ""), q.get("b") or None))
             except ValueError as err:
                 return self._send(400, {"error": str(err)})
             self._send(404, {"error": "not found"})
@@ -123,133 +156,17 @@ def _handler(area):
                         row["a_end"] = row["b_end"] = ""
                     area.change(pd.concat([e, pd.DataFrame([row])], ignore_index=True))
                 elif self.path == "/api/delete":
-                    area.change(e.drop(index=int(body["index"])).reset_index(drop=True))
+                    i = int(body["index"])
+                    area.change(e.drop(index=i).reset_index(drop=True), saved=area.saved - (i < area.saved))
                 else:
                     return self._send(404, {"error": "not found"})
             except (ValueError, KeyError) as err:
                 return self._send(400, {"error": str(err)})
-            self._send(200, {"ok": True, "info": area.info})
+            self._send(200, {"ok": True})
     return H
 
 
-_EDITOR = r"""
-<style>
-#lv-ed{position:fixed;top:10px;right:60px;z-index:5;width:330px;max-height:calc(100vh - 20px);overflow:auto;background:#fff;border-radius:8px;
-  box-shadow:0 2px 12px rgba(0,0,0,.18);font:13px system-ui,sans-serif;color:#222;padding:10px 12px}
-#lv-ed h3{margin:0 0 6px;font-size:14px} #lv-ed h4{margin:10px 0 4px;font-size:12px;color:#555;text-transform:uppercase;letter-spacing:.04em}
-#lv-ed .road{display:flex;gap:6px;align-items:center;margin:3px 0} #lv-ed .sw{width:10px;height:10px;border-radius:50%;flex:none}
-#lv-ed .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} #lv-ed button{font:12px system-ui;cursor:pointer}
-#lv-ed .row{display:flex;gap:6px;align-items:center;justify-content:space-between;border-top:1px solid #eee;padding:3px 0}
-#lv-ed .msg{color:#c92a2a;margin:4px 0;min-height:1em} #lv-ed .ok{color:#2b8a3e} #lv-ed small{color:#666}
-#lv-ed ol{margin:0;padding-left:18px} #lv-ed li{cursor:pointer} #lv-ed li:hover{background:#f1f3f5}
-</style>
-<div id="lv-ed">
-  <h3>Level edits</h3>
-  <small id="lv-info"></small>
-  <div class="road"><span class="sw" style="background:#e8590c"></span><span class="nm" id="lv-n1">click road 1</span>
-    <label><input type="radio" name="lv-e1" value="start" checked>start</label><label><input type="radio" name="lv-e1" value="end">end</label></div>
-  <div class="road"><span class="sw" style="background:#1971c2"></span><span class="nm" id="lv-n2">click road 2</span>
-    <label><input type="radio" name="lv-e2" value="start" checked>start</label><label><input type="radio" name="lv-e2" value="end">end</label></div>
-  <small>● start &nbsp;○ end of each picked road (for a meet)</small>
-  <div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap">
-    <select id="lv-rel"><option value="order">order: road 1's fill after road 2's</option><option value="stack">stack: road 1 over road 2</option>
-      <option value="meet">meet: the chosen ends join</option></select>
-    <button id="lv-add">Add</button><button id="lv-swap" title="swap road 1 and road 2">⇄</button><button id="lv-clear">Clear</button>
-  </div>
-  <div class="msg" id="lv-msg"></div>
-  <h4>Pairs between them</h4><div id="lv-pairs"><small>pick two roads</small></div>
-  <h4>Your edits (edits.csv)</h4><ol id="lv-list"></ol>
-</div>
-<script>
-(function(){
-  const INFO = __INFO__;
-  const sel = [null, null], C = ["#e8590c", "#1971c2"];          // [{id, road, props}]
-  const $ = id => document.getElementById(id);
-  $("lv-info").textContent = `${INFO.roads} roads · ${INFO.given_up.length} stack pair(s) given up · ${INFO.order_violations || 0} order wish(es) not kept`;
-  const label = p => (p.name || p.highway || "road") + " · " + (p.edge_ref || p.road);
-  function msg(t, ok){ const m = $("lv-msg"); m.textContent = t || ""; m.className = "msg" + (ok ? " ok" : ""); }
-  function ends(){
-    const f = [];
-    sel.forEach((s, k) => { if(!s) return; const p = s.props;
-      f.push({type:"Feature", properties:{c:C[k], open:0}, geometry:{type:"Point", coordinates:[p.s_lon, p.s_lat]}});
-      f.push({type:"Feature", properties:{c:C[k], open:1}, geometry:{type:"Point", coordinates:[p.e_lon, p.e_lat]}}); });
-    const src = map.getSource("lv-ends"), fc = {type:"FeatureCollection", features:f};
-    if(src) src.setData(fc);
-    else { map.addSource("lv-ends", {type:"geojson", data:fc});
-      map.addLayer({id:"lv-ends", type:"circle", source:"lv-ends", paint:{"circle-radius":6, "circle-stroke-width":2.5,
-        "circle-stroke-color":["get","c"], "circle-color":["case",["==",["get","open"],1],"#ffffff",["get","c"]]}}); }
-  }
-  function show(){
-    $("lv-n1").textContent = sel[0] ? label(sel[0].props) : "click road 1";
-    $("lv-n2").textContent = sel[1] ? label(sel[1].props) : "click road 2";
-    const g = sel.map((s, k) => s && [[s.id], C[k]]).filter(Boolean);
-    rsColor(g.length ? g : null); ends(); pairs();
-  }
-  function pick(ids){ return ids.length ? {id: ids[0], road: String(rsGetProps([ids[0]])[0].road), props: rsGetProps([ids[0]])[0]} : null; }
-  document.addEventListener("rs:select", e => {
-    if(e.detail.overlay || e.detail.id == null) return;
-    const s = {id: e.detail.id, road: String(e.detail.properties.road), props: e.detail.properties};
-    if(sel[0] && sel[0].road === s.road) return;
-    if(!sel[0] || (sel[0] && sel[1])) { sel[0] = s; sel[1] = null; } else sel[1] = s;
-    show();
-  });
-  async function api(path, body){
-    const r = await fetch(path, body ? {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)} : {});
-    const j = await r.json(); if(!r.ok) throw new Error(j.error || r.statusText); return j;
-  }
-  function reload(){                                              // keep the camera and the picked roads over the reload
-    sessionStorage.setItem("lv-view", JSON.stringify({c: map.getCenter(), z: map.getZoom(), b: map.getBearing(), p: map.getPitch(),
-                                                     sel: sel.map(s => s && s.road)}));
-    location.reload();
-  }
-  async function change(path, body){ msg("solving …", true); try { await api(path, body); reload(); } catch(err){ msg(err.message); } }
-  async function pairs(){
-    const box = $("lv-pairs");
-    if(!(sel[0] && sel[1])) { box.innerHTML = "<small>pick two roads</small>"; return; }
-    try {
-      const j = await api(`/api/pairs?a=${encodeURIComponent(sel[0].road)}&b=${encodeURIComponent(sel[1].road)}`);
-      const who = r => r === sel[0].road ? "1" : "2";
-      const txt = r => r.relation === "meet" ? `meet: ${who(r.a)} ${r.a_end} = ${who(r.b)} ${r.b_end}` : `${r.relation}: ${who(r.a)} over ${who(r.b)}`;
-      box.innerHTML = "";
-      j.found.forEach(r => { const d = document.createElement("div"); d.className = "row";
-        d.innerHTML = `<span>${txt(r)} <small>found</small></span>`; const b = document.createElement("button"); b.textContent = "switch off";
-        b.onclick = () => change("/api/add", {...r, enabled: "false"}); d.appendChild(b); box.appendChild(d); });
-      j.edits.forEach(r => { const d = document.createElement("div"); d.className = "row";
-        d.innerHTML = `<span>${r.enabled === "false" ? "off: " : ""}${txt(r)} <small>edit #${r.index + 1}</small></span>`;
-        const b = document.createElement("button"); b.textContent = "delete"; b.onclick = () => change("/api/delete", {index: r.index});
-        d.appendChild(b); box.appendChild(d); });
-      if(!j.found.length && !j.edits.length) box.innerHTML = "<small>none: they neither meet nor stack</small>";
-    } catch(err){ box.innerHTML = `<small>${err.message}</small>`; }
-  }
-  async function list(){
-    const ol = $("lv-list"); ol.innerHTML = "";
-    const rows = await api("/api/edits");
-    if(!rows.length){ ol.innerHTML = "<small>none yet</small>"; return; }
-    rows.forEach(r => { const li = document.createElement("li");
-      li.textContent = `${r.enabled === "false" ? "switch off " : ""}${r.relation} ${r.a} ${r.a_end || ""} · ${r.b} ${r.b_end || ""}`;
-      li.title = "show these two roads";
-      li.onclick = () => { const a = rsQuery(p => String(p.road) === r.a || (p.edge_ref && p.edge_ref === r.a));
-        const b = rsQuery(p => String(p.road) === r.b || (p.edge_ref && p.edge_ref === r.b));
-        sel[0] = pick(a); sel[1] = pick(b); show(); rsFocus([...a, ...b]); };
-      ol.appendChild(li); });
-  }
-  $("lv-add").onclick = () => {
-    if(!(sel[0] && sel[1])) return msg("pick two roads first");
-    const rel = $("lv-rel").value, e1 = document.querySelector("input[name=lv-e1]:checked").value, e2 = document.querySelector("input[name=lv-e2]:checked").value;
-    change("/api/add", {relation: rel, a: sel[0].road, b: sel[1].road, a_end: rel === "meet" ? e1 : "", b_end: rel === "meet" ? e2 : "", enabled: "true"});
-  };
-  $("lv-swap").onclick = () => { sel.reverse(); show(); };
-  $("lv-clear").onclick = () => { sel[0] = sel[1] = null; show(); msg(""); };
-  function start(){
-    const v = JSON.parse(sessionStorage.getItem("lv-view") || "null");
-    if(v){ map.jumpTo({center: v.c, zoom: v.z, bearing: v.b, pitch: v.p});
-      v.sel.forEach((r, k) => { if(r) sel[k] = pick(rsQuery(p => String(p.road) === r)); }); sessionStorage.removeItem("lv-view"); }
-    show(); list();
-  }
-  if(map.loaded()) start(); else map.once("load", start);
-})();
-</script>
-"""
+_EDITOR = (Path(__file__).resolve().parent / "edit_levels.html").read_text()
 
 
 def main(argv=None):

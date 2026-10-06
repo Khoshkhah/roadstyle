@@ -1,0 +1,256 @@
+<style>
+:root{--lv-w:400px;--lv-bg:#f6f7f9;--lv-card:#fff;--lv-line:#e4e7ec;--lv-ink:#1d2433;--lv-mute:#6b7280;--lv-r1:#e8590c;--lv-r2:#1971c2;
+  --lv-found:#868e96;--lv-saved:#7048e8;--lv-new:#2f9e44;--lv-bad:#e03131}
+body.lv-open #map{right:var(--lv-w)}
+#map{transition:right .2s ease}
+#lv{position:fixed;top:0;right:0;bottom:0;width:var(--lv-w);z-index:6;background:var(--lv-bg);border-left:1px solid var(--lv-line);
+  display:flex;flex-direction:column;font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--lv-ink);transition:transform .2s ease}
+body:not(.lv-open) #lv{transform:translateX(100%)}
+#lv-toggle{position:absolute;left:-30px;top:12px;width:30px;height:40px;border:1px solid var(--lv-line);border-right:none;border-radius:8px 0 0 8px;
+  background:var(--lv-bg);cursor:pointer;font-size:16px;color:var(--lv-mute);box-shadow:-2px 2px 6px rgba(0,0,0,.06)}
+#lv-toggle:hover{color:var(--lv-ink)}
+#lv header{padding:14px 16px 12px;background:#fff;border-bottom:1px solid var(--lv-line)}
+#lv .t{font-size:15px;font-weight:650;letter-spacing:-.01em} #lv .area{color:var(--lv-mute);font-size:12px;margin-top:1px}
+#lv .stats{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+#lv .stat{background:var(--lv-bg);border:1px solid var(--lv-line);border-radius:999px;padding:1px 9px;font-size:11.5px;color:#3b4252}
+#lv .stat b{font-weight:650}
+#lv .scroll{flex:1;overflow:auto;padding:4px 0 24px}
+#lv .tabs{display:flex;gap:2px;padding:0 12px;background:#fff;border-bottom:1px solid var(--lv-line)}
+#lv .tabs button{border:none;background:none;padding:9px 10px 8px;font:600 12.5px system-ui;color:var(--lv-mute);cursor:pointer;border-bottom:2px solid transparent;
+  margin-bottom:-1px}
+#lv .tabs button.on{color:var(--lv-ink);border-bottom-color:var(--lv-ink)} #lv .tabs button:hover{color:var(--lv-ink)}
+#lv .tabs .cnt{display:inline-block;min-width:16px;margin-left:4px;padding:0 5px;border-radius:999px;background:#eef1f6;font-size:11px;color:#3b4252}
+#lv [data-tab][hidden]{display:none}
+#lv section{padding:12px 16px 4px}
+#lv h2{display:flex;align-items:center;justify-content:space-between;margin:0 0 8px;font-size:11.5px;font-weight:650;color:var(--lv-mute);
+  text-transform:uppercase;letter-spacing:.06em}
+#lv h3{display:flex;align-items:center;gap:6px;margin:12px 0 6px;font-size:12px;font-weight:600;color:#3b4252}
+#lv .link{font:inherit;text-transform:none;letter-spacing:0;background:none;border:none;color:var(--lv-r2);cursor:pointer;padding:0;font-size:12px}
+#lv .link:hover{text-decoration:underline}
+#lv .empty{color:var(--lv-mute);background:#fff;border:1px dashed var(--lv-line);border-radius:10px;padding:14px;text-align:center;font-size:12.5px}
+#lv .card{position:relative;background:var(--lv-card);border:1px solid var(--lv-line);border-radius:10px;padding:10px 12px 10px 16px;margin-bottom:8px;
+  box-shadow:0 1px 2px rgba(16,24,40,.04)}
+#lv .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;border-radius:10px 0 0 10px;background:var(--c)}
+#lv .card .nm{font-weight:620;font-size:13.5px;padding-right:22px} #lv .card .sub{color:var(--lv-mute);font-size:12px}
+#lv .card .x{position:absolute;right:8px;top:7px;border:none;background:none;color:var(--lv-mute);cursor:pointer;font-size:15px;line-height:1}
+#lv .card .x:hover{color:var(--lv-bad)}
+#lv .grid{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:2px 10px;margin-top:8px;font-size:12px}
+#lv .grid span:nth-child(odd){color:var(--lv-mute)} #lv .grid span:nth-child(even){font-variant-numeric:tabular-nums}
+#lv .lvls{display:flex;gap:4px;margin-top:8px} #lv .lvls div{flex:1;text-align:center;background:var(--lv-bg);border-radius:6px;padding:3px 0}
+#lv .lvls small{display:block;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em} #lv .lvls b{font-size:13px}
+#lv .num{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;
+  background:var(--c);vertical-align:1px;margin-right:2px}
+#lv .rows{background:#fff;border:1px solid var(--lv-line);border-radius:10px;overflow:hidden}
+#lv .row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-top:1px solid var(--lv-line);cursor:pointer}
+#lv .row:first-child{border-top:none} #lv .row:hover{background:#f1f5ff}
+#lv .row .what{flex:1;min-width:0} #lv .row .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#lv .row .off{text-decoration:line-through;color:var(--lv-mute)}
+#lv .chip{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:5px;padding:1px 6px;background:#eef1f6;color:#3b4252}
+#lv .tag{font-size:10.5px;font-weight:600;border-radius:999px;padding:0 7px;color:#fff;background:var(--c)}
+#lv .act{flex:none;font:12px system-ui;border:1px solid var(--lv-line);background:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;color:#3b4252}
+#lv .act:hover{border-color:var(--lv-bad);color:var(--lv-bad)}
+#lv .seg{display:flex;background:#eef1f6;border-radius:8px;padding:3px;gap:3px}
+#lv .seg button{flex:1;border:none;background:none;border-radius:6px;padding:5px 0;font:600 12.5px system-ui;color:#3b4252;cursor:pointer}
+#lv .seg button.on{background:#fff;box-shadow:0 1px 3px rgba(16,24,40,.12);color:var(--lv-ink)}
+#lv .desc{margin:8px 2px;color:#3b4252;font-size:12.5px}
+#lv .ends{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+#lv .ends label{display:block;font-size:11px;color:var(--lv-mute);margin-bottom:3px}
+#lv .ends .seg button{padding:3px 0;font-size:12px}
+#lv .go{width:100%;border:none;border-radius:8px;padding:8px 0;background:var(--lv-ink);color:#fff;font:600 13px system-ui;cursor:pointer;margin-top:4px}
+#lv .go:hover{background:#000} #lv .go:disabled{opacity:.5;cursor:default}
+#lv-toast{position:absolute;left:16px;right:16px;bottom:14px;padding:9px 12px;border-radius:8px;font-size:12.5px;color:#fff;background:var(--lv-ink);
+  box-shadow:0 4px 14px rgba(0,0,0,.18);opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none}
+#lv-toast.show{opacity:1;transform:none} #lv-toast.bad{background:var(--lv-bad)}
+</style>
+<aside id="lv">
+  <button id="lv-toggle" title="Hide the panel">›</button>
+  <header><div class="t">Level editor</div><div class="area" id="lv-area"></div><div class="stats" id="lv-stats"></div></header>
+  <nav class="tabs" id="lv-tabs"><button data-t="edit" class="on">Edit</button><button data-t="history">History<span class="cnt" id="lv-hist-n">0</span></button></nav>
+  <div class="scroll" data-tab="edit">
+    <section><h2>Selection <button class="link" id="lv-clear" title="Esc">clear</button></h2><div id="lv-cards"></div></section>
+    <section id="lv-rel-sec" hidden><h2 id="lv-rel-title">In the tables</h2><div id="lv-rel"></div></section>
+    <section id="lv-add-sec" hidden><h2>Add a relation</h2>
+      <div class="seg" id="lv-kind"><button data-k="order" class="on">Order</button><button data-k="stack">Stack</button><button data-k="meet">Meet</button></div>
+      <div class="desc" id="lv-desc"></div>
+      <div class="ends" id="lv-ends" hidden>
+        <div><label><span class="num" style="--c:var(--lv-r1)">1</span> end of road 1</label><div class="seg" data-e="1"><button data-v="start" class="on">start</button><button data-v="end">end</button></div></div>
+        <div><label><span class="num" style="--c:var(--lv-r2)">2</span> end of road 2</label><div class="seg" data-e="2"><button data-v="start" class="on">start</button><button data-v="end">end</button></div></div>
+      </div>
+      <button class="go" id="lv-add">Add and solve</button>
+    </section>
+    <section><h2>Added now <span style="text-transform:none;letter-spacing:0;font-weight:500">this session, in edits.csv</span></h2><div id="lv-new"></div></section>
+  </div>
+  <div class="scroll" data-tab="history" hidden>
+    <section><h2>Already in edits.csv <span style="text-transform:none;letter-spacing:0;font-weight:500">before this session</span></h2>
+      <div class="desc" style="margin-top:0">Click a row to show its two roads; deleting one asks first.</div><div id="lv-saved"></div></section>
+  </div>
+  <div id="lv-toast"></div>
+</aside>
+<script>
+(function(){
+  const STATS = __STATS__, $ = id => document.getElementById(id), C = ["#e8590c", "#1971c2"];
+  const sel = [null, null], facts = {};                       // sel: road ids; facts: road id -> what the server knows
+  let kind = "order", end1 = "start", end2 = "start";
+  const SRC = {found: ["found", "var(--lv-found)", "found in pairs.csv"], saved: ["saved", "var(--lv-saved)", "already in edits.csv"],
+               new: ["new", "var(--lv-new)", "added now"]};
+  const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+  const name = r => { const f = facts[r] || {}; return f.name || f.highway || "road " + r; };
+  const ref = r => (facts[r] || {}).edge_ref || r;
+  const badge = r => { const k = sel.indexOf(r); return k >= 0 ? `<span class="num" style="--c:${C[k]}">${k + 1}</span>` : ""; };
+  const who = r => `${badge(r)}${esc(name(r))}`;
+  // --- the panel: open / closed, the map beside it
+  document.body.classList.add("lv-open");
+  const resize = () => setTimeout(() => map.resize(), 220);
+  $("lv-toggle").onclick = () => { const open = document.body.classList.toggle("lv-open");
+    $("lv-toggle").textContent = open ? "›" : "‹"; $("lv-toggle").title = open ? "Hide the panel" : "Show the panel"; resize(); };
+  resize();
+  $("lv-area").textContent = STATS.area + " · " + STATS.roads + " roads";
+  function tab(t){ document.querySelectorAll("#lv-tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === t));
+    document.querySelectorAll("#lv [data-tab]").forEach(d => d.hidden = d.dataset.tab !== t); }
+  document.querySelectorAll("#lv-tabs button").forEach(b => b.onclick = () => tab(b.dataset.t));
+  $("lv-stats").innerHTML = [["order wishes", STATS.order_pairs], ["not kept", STATS.order_violations || 0], ["stack pairs", (STATS.pairs || 0) + (STATS.short_upper_pairs || 0)],
+    ["given up", STATS.given_up.length]].map(([k, v]) => `<span class="stat"><b>${v}</b> ${k}</span>`).join("");
+  function toast(t, bad){ const e = $("lv-toast"); e.textContent = t; e.className = "show" + (bad ? " bad" : ""); clearTimeout(e._t);
+    e._t = setTimeout(() => e.className = "", bad ? 6000 : 2600); }
+  async function api(path, body){
+    const r = await fetch(path, body ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)} : {});
+    const j = await r.json(); if(!r.ok) throw new Error(j.error || r.statusText); return j;
+  }
+  // --- the map: the picked roads coloured, their ends marked
+  const idOf = r => rsQuery(p => String(p.road) === String(r))[0];
+  function paint(){
+    const g = sel.map((r, k) => r != null && idOf(r) != null ? [[idOf(r)], C[k]] : null).filter(Boolean);
+    rsColor(g.length ? g : null);
+    const f = [];
+    sel.forEach((r, k) => { if(r == null) return; const id = idOf(r); if(id == null) return; const p = rsGetProps([id])[0];
+      f.push({type: "Feature", properties: {c: C[k], open: 0}, geometry: {type: "Point", coordinates: [p.s_lon, p.s_lat]}});
+      f.push({type: "Feature", properties: {c: C[k], open: 1}, geometry: {type: "Point", coordinates: [p.e_lon, p.e_lat]}}); });
+    const fc = {type: "FeatureCollection", features: f}, src = map.getSource("lv-ends");
+    if(src) src.setData(fc);
+    else { map.addSource("lv-ends", {type: "geojson", data: fc});
+      map.addLayer({id: "lv-ends", type: "circle", source: "lv-ends", paint: {"circle-radius": 6, "circle-stroke-width": 2.5,
+        "circle-stroke-color": ["get", "c"], "circle-color": ["case", ["==", ["get", "open"], 1], "#ffffff", ["get", "c"]]}}); }
+  }
+  function focus(roads){ const ids = roads.map(idOf).filter(i => i != null); if(ids.length) rsFocus(ids, {padding: 90, maxZoom: 18}); }
+  // --- selection
+  function pick(r){
+    r = String(r);
+    const k = sel.indexOf(r);
+    if(k >= 0) sel[k] = null;                                  // a picked road clicked again: cancelled
+    else if(sel[0] == null) sel[0] = r;
+    else if(sel[1] == null) sel[1] = r;
+    else { sel[0] = r; sel[1] = null; }
+    if(sel[0] == null && sel[1] != null){ sel[0] = sel[1]; sel[1] = null; }
+    update();
+  }
+  function setPair(a, b, zoom){ sel[0] = a == null ? null : String(a); sel[1] = b == null ? null : String(b); update(); if(zoom) focus(sel.filter(x => x != null)); }
+  document.addEventListener("rs:select", e => { if(e.detail.overlay || !e.detail.properties) return; pick(e.detail.properties.road); });
+  document.addEventListener("keydown", e => { if(e.key === "Escape") setPair(null, null); });
+  $("lv-clear").onclick = () => setPair(null, null);
+  function card(r, k){
+    const f = facts[r] || {road: r}, L = f.levels || ["–", "–", "–", "–"];
+    return `<div class="card" style="--c:${C[k]}"><button class="x" data-k="${k}" title="Cancel this road">✕</button>
+      <div class="nm"><span class="num" style="--c:${C[k]}">${k + 1}</span>${esc(f.name || f.highway || "road")}</div>
+      <div class="sub">${esc([f.highway, f.edge_ref].filter(Boolean).join(" · "))}</div>
+      <div class="grid"><span>band</span><span>${f.band ?? "–"}</span><span>priority</span><span>${f.priority ?? "–"}</span>
+        <span>length</span><span>${f.length_m != null ? f.length_m + " m" : "–"}</span><span>edges</span><span>${f.edges ?? "–"}${f.two_way ? " (two-way)" : ""}</span>
+        <span>road id</span><span style="grid-column:span 3;font-size:11px">${esc(r)}</span></div>
+      <div class="lvls"><div><small>start</small><b>${L[0]}</b></div><div><small>casing</small><b>${L[1]}</b></div>
+        <div><small>end</small><b>${L[2]}</b></div><div><small>fill</small><b>${L[3]}</b></div></div></div>`;
+  }
+  function relText(r){
+    if(r.relation === "meet") return `${who(r.ra)} <small>${esc(r.a_end)}</small> = ${who(r.rb)} <small>${esc(r.b_end)}</small>`;
+    if(r.relation === "stack") return `${who(r.ra)} over ${who(r.rb)}`;
+    return `${who(r.ra)} after ${who(r.rb)}`;
+  }
+  function rowHtml(r){
+    const [t, c, title] = SRC[r.section], off = r.enabled === "false";
+    const act = r.section === "found" ? `<button class="act" data-a="off">switch off</button>` : `<button class="act" data-a="del">delete</button>`;
+    return `<div class="row" data-i="${r.section === "found" ? "" : r.index}" data-ra="${esc(r.ra)}" data-rb="${esc(r.rb)}" title="Show on the map">
+      <span class="tag" style="--c:${c}" title="${title}">${t}</span><span class="chip">${esc(r.relation)}</span>
+      <span class="what"><div class="txt${off ? " off" : ""}">${off ? "switch off: " : ""}${relText(r)}</div></span>${act}</div>`;
+  }
+  function wire(box, rows){
+    box.querySelectorAll(".row").forEach((el, n) => {
+      const r = rows[n];
+      el.onclick = ev => { if(ev.target.closest(".act")) return; tab("edit"); setPair(r.ra, r.rb, true); };
+      const b = el.querySelector(".act");
+      b.onclick = () => r.section === "found" ? change("/api/add", {relation: r.relation, a: r.a, b: r.b, a_end: r.a_end, b_end: r.b_end, enabled: "false"},
+                                                       `Switched off: ${r.relation}`)
+        : (r.section === "new" || confirm("This edit was in edits.csv before this session. Delete it?"))
+          && change("/api/delete", {index: r.index}, `Deleted: ${r.relation}`);
+    });
+  }
+  async function update(){
+    paint();
+    const picked = sel.filter(r => r != null);
+    if(picked.length){ try { const j = await api(`/api/relations?a=${encodeURIComponent(picked[0])}` + (picked[1] ? `&b=${encodeURIComponent(picked[1])}` : ""));
+        Object.assign(facts, j.roads); showRel(j.rows, picked.length); } catch(err){ toast(err.message, true); } }
+    else { $("lv-rel-sec").hidden = true; }
+    $("lv-cards").innerHTML = picked.length ? sel.map((r, k) => r != null ? card(r, k) : "").join("")
+      + (sel[1] == null ? `<div class="empty">Click a second road to see what is between them</div>` : "")
+      : `<div class="empty">Click a road on the map<br><small>a second one for the pair · click again or ✕ to cancel · Esc clears</small></div>`;
+    $("lv-cards").querySelectorAll(".x").forEach(b => b.onclick = () => { sel[+b.dataset.k] = null; if(sel[0] == null){ sel[0] = sel[1]; sel[1] = null; } update(); });
+    $("lv-add-sec").hidden = sel[1] == null; describe();
+  }
+  function showRel(rows, n){
+    $("lv-rel-sec").hidden = false;
+    $("lv-rel-title").textContent = n === 2 ? "Between these two roads" : "Everything about this road";
+    const box = $("lv-rel"); box.innerHTML = "";
+    for(const s of ["found", "saved", "new"]){
+      const part = rows.filter(r => r.section === s);
+      const h = document.createElement("h3"); h.innerHTML = `<span class="tag" style="--c:${SRC[s][1]}">${SRC[s][0]}</span> ${SRC[s][2]} <small style="color:var(--lv-mute)">${part.length}</small>`;
+      box.appendChild(h);
+      const d = document.createElement("div");
+      if(part.length){ d.className = "rows"; d.innerHTML = part.map(rowHtml).join(""); wire(d, part); }
+      else d.innerHTML = `<div class="empty" style="padding:8px">none</div>`;
+      box.appendChild(d);
+    }
+  }
+  // --- adding a relation
+  function segs(box, on){ box.querySelectorAll("button").forEach(b => b.onclick = () => {
+    box.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); on(b.dataset.k || b.dataset.v); describe(); }); }
+  segs($("lv-kind"), v => kind = v);
+  segs(document.querySelector('#lv-ends .seg[data-e="1"]'), v => end1 = v);
+  segs(document.querySelector('#lv-ends .seg[data-e="2"]'), v => end2 = v);
+  function describe(){
+    if(sel[1] == null) return;
+    const [a, b] = sel;
+    $("lv-ends").hidden = kind !== "meet";
+    $("lv-desc").innerHTML = kind === "order" ? `Where they meet, ${who(a)}'s fill is drawn after ${who(b)}'s (a wish the solver keeps when it can).`
+      : kind === "stack" ? `${who(a)} is drawn over ${who(b)}, outline included, where they come near each other.`
+      : `The ${end1} of ${who(a)} joins the ${end2} of ${who(b)}: each road's head there is drawn under the other's fill. ● start ○ end on the map.`;
+  }
+  $("lv-add").onclick = () => {
+    if(sel[1] == null) return toast("Pick two roads first", true);
+    change("/api/add", {relation: kind, a: sel[0], b: sel[1], a_end: kind === "meet" ? end1 : "", b_end: kind === "meet" ? end2 : "", enabled: "true"},
+           `Added: ${kind}`);
+  };
+  // --- every change: solved by the server, then the page again, with the same view and selection
+  async function change(path, body, said){
+    $("lv-add").disabled = true; toast("Solving …");
+    try { await api(path, body);
+      sessionStorage.setItem("lv-view", JSON.stringify({c: map.getCenter(), z: map.getZoom(), b: map.getBearing(), p: map.getPitch(), sel: sel, said: said,
+        open: document.body.classList.contains("lv-open")}));
+      location.reload();
+    } catch(err){ toast(err.message, true); $("lv-add").disabled = false; }
+  }
+  async function lists(){
+    const j = await api("/api/edits"); Object.assign(facts, j.roads);
+    $("lv-hist-n").textContent = j.rows.filter(r => r.section === "saved").length;
+    for(const s of ["new", "saved"]){
+      const rows = j.rows.filter(r => r.section === s), box = $("lv-" + s);
+      if(rows.length){ box.className = "rows"; box.innerHTML = rows.map(rowHtml).join(""); wire(box, rows); }
+      else { box.className = ""; box.innerHTML = `<div class="empty" style="padding:8px">${s === "new" ? "nothing added yet" : "none"}</div>`; }
+    }
+  }
+  function start(){
+    const v = JSON.parse(sessionStorage.getItem("lv-view") || "null");
+    if(v){ sessionStorage.removeItem("lv-view"); map.jumpTo({center: v.c, zoom: v.z, bearing: v.b, pitch: v.p});
+      sel[0] = v.sel[0]; sel[1] = v.sel[1]; if(v.said) toast(v.said + " · solved");
+      if(!v.open){ document.body.classList.remove("lv-open"); $("lv-toggle").textContent = "‹"; resize(); } }
+    update(); lists();
+  }
+  if(map.loaded()) start(); else map.once("load", start);
+})();
+</script>
