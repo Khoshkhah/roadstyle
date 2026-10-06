@@ -45,6 +45,16 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
 #lv .card .x:hover{color:var(--lv-bad)}
 #lv .grid{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:2px 10px;margin-top:8px;font-size:12px}
 #lv .grid span:nth-child(odd){color:var(--lv-mute)} #lv .grid span:nth-child(even){font-variant-numeric:tabular-nums}
+#lv .wd{margin-top:8px;padding:7px 8px 8px;border:1px solid var(--lv-line);border-radius:8px}
+#lv .wd-h{display:flex;justify-content:space-between;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
+#lv .wd-row{display:grid;grid-template-columns:1fr 1fr 64px;gap:6px;align-items:stretch}
+#lv .wd-box{background:var(--lv-bg);border-radius:6px;padding:4px 8px;line-height:1.25}
+#lv .wd-box small{display:block;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em}
+#lv .wd-box b{font-size:14px;font-variant-numeric:tabular-nums} #lv .wd-box b span{font-size:11px;font-weight:500;color:var(--lv-mute)}
+#lv .wd-box em{display:block;font-style:normal;font-size:11px;color:var(--lv-mute);font-variant-numeric:tabular-nums}
+#lv .wd-x{display:flex;flex-direction:column;justify-content:center;gap:3px;font-size:9.5px;color:var(--lv-mute);text-align:center}
+#lv .wd-x div{height:16px;border-radius:3px;background:#8c96a5;display:flex;align-items:center;justify-content:center}
+#lv .wd-x i{display:block;height:100%;background:#f1e7c8}
 #lv .lvls{display:flex;gap:4px;margin-top:8px} #lv .lvls div{flex:1;text-align:center;background:var(--lv-bg);border-radius:6px;padding:3px 0}
 #lv .lvls small{display:block;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em} #lv .lvls b{font-size:13px}
 #lv .num{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;
@@ -218,13 +228,16 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     const i = s.findIndex((x, j) => z <= s[j + 1]), f = (z - s[i]) / (s[i + 1] - s[i]);
     return {fill: [w.fill[i] + (w.fill[i + 1] - w.fill[i]) * f], casing: [w.casing[i] + (w.casing[i + 1] - w.casing[i]) * f]};
   }
-  function widthText(f){
-    const z = map.getZoom(), w = widthAt(f.width_px, z); if(!w) return "–";
+  function widthHtml(f){                                      // the drawn width at the map's zoom: fill, outer (casing included), a cross-section
+    const z = map.getZoom(), w = widthAt(f.width_px, z); if(!w) return `<div class="wd-h"><span>width</span><span>–</span></div>`;
     const mpp = 40075016.686 * Math.cos(map.getCenter().lat * Math.PI / 180) / (512 * 2 ** z);    // metres per pixel here
-    const px = v => `${v.toFixed(1)} px <small style="color:var(--lv-mute)">≈ ${(v * mpp).toFixed(1)} m</small>`;
-    return `fill ${px(w.fill[0])} · outer (with casing) ${px(w.casing[0])} <small style="color:var(--lv-mute)">at z${z.toFixed(1)}</small>`;
+    const box = (k, v) => `<div class="wd-box"><small>${k}</small><b>${v.toFixed(1)}<span> px</span></b><em>≈ ${(v * mpp).toFixed(1)} m</em></div>`;
+    const pct = (100 * w.fill[0] / w.casing[0]).toFixed(1);
+    return `<div class="wd-h"><span>drawn width</span><span>at z${z.toFixed(1)}</span></div>
+      <div class="wd-row">${box("fill", w.fill[0])}${box("outer", w.casing[0])}
+        <div class="wd-x" title="Cross-section: the fill (${pct} % of the outer width) between its casings"><div><i style="width:${pct}%"></i></div>section</div></div>`;
   }
-  map.on("zoomend", () => document.querySelectorAll("#lv-cards [data-w]").forEach(el => el.innerHTML = widthText(facts[el.dataset.w] || {})));
+  map.on("zoomend", () => document.querySelectorAll("#lv-cards [data-w]").forEach(el => el.innerHTML = widthHtml(facts[el.dataset.w] || {})));
   function card(r, k){
     const f = facts[r] || {road: r}, L = f.levels || ["–", "–", "–", "–"];
     return `<div class="card" style="--c:${C[k]}"><button class="x" data-k="${k}" title="Cancel this road">✕</button>
@@ -233,8 +246,8 @@ body.lv-open #lv-busy{right:var(--lv-w)}
       <div class="grid"><span>band</span><span>${f.band ?? "–"}</span><span>priority</span><span>${f.priority ?? "–"}</span>
         <span>length</span><span>${f.length_m != null ? f.length_m + " m" : "–"}</span><span>edges</span><span>${f.edges ?? "–"}${f.two_way ? " (two-way)" : ""}</span>
         <span>look</span><span>${esc(f.look || "–")}</span><span>lanes</span><span>${esc(f.lanes ?? "–")}</span>
-        <span>width</span><span style="grid-column:span 3" data-w="${esc(r)}">${widthText(f)}</span>
         <span>road id</span><span style="grid-column:span 3;font-size:11px">${esc(r)}</span></div>
+      <div class="wd" data-w="${esc(r)}">${widthHtml(f)}</div>
       <div class="lvls"><div><small>start</small><b>${L[0]}</b></div><div><small>casing</small><b>${L[1]}</b></div>
         <div><small>end</small><b>${L[2]}</b></div><div><small>fill</small><b>${L[3]}</b></div></div></div>`;
   }
