@@ -1093,11 +1093,11 @@ def test_the_tunnel_look_fades_toward_the_background_and_the_palette():
     style, conf = _style(html), _tunnel_conf(html)
     lay = {l["id"]: l for l in style["layers"]}
     assert not [i for i in lay if i.endswith("-under")] and "line-opacity" not in lay["roads-fill-lv-1"]["paint"]
-    assert conf["fade"] == 0.3 and conf["palette"] == "Slate + ice" and conf["control"] is True
+    assert conf["fade"] == 0.35 and conf["palette"] == "Slate + ice" and conf["control"] is True
     dash, gap = conf["palettes"]["Slate + ice"]
-    for lid, kind, toward in (("roads-fill-lv-1", "bg", conf["bg"]), ("roads-casing-lv-1", "gap", gap), ("roads-casing-lv-1-dash", "dash", dash)):
+    for lid, kind, toward in (("roads-fill-lv-1", "fill", conf["fill_to"]), ("roads-casing-lv-1", "gap", gap), ("roads-casing-lv-1-dash", "dash", dash)):
         k, base, got = conf["layers"][lid]
-        assert got == kind and lay[lid]["paint"][k] == _tun_mix(base, toward, 0.3)
+        assert got == kind and lay[lid]["paint"][k] == _tun_mix(base, toward, 0.35)
     items = style["sources"]["ov0"]["data"]["features"]
     assert [f["properties"].get("__rs_tunnel") for f in items] == [True, None]           # edge 12 is the tunnel
     item_layers = [i for i in conf["layers"] if i.startswith("ov0-")]
@@ -1111,7 +1111,7 @@ def test_the_tunnel_look_fades_toward_the_background_and_the_palette():
 
 def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
     """The Tunnels box and rsSetTunnelStyle in a real page: the slider and the palette change every tunnel layer, Colour by keeps the fade,
-    and a new base map moves the fade toward its background."""
+    and a new base map keeps it (a road fill moves toward tunnel_fill_to)."""
     pw = pytest.importorskip("playwright.sync_api")
     path = tmp_path / "tunnels.html"
     g = _edge_world().assign(aadt=[1, 2, 3, 4])
@@ -1133,13 +1133,12 @@ def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
         coloured = page.evaluate(get)
         page.evaluate("rsSetBasemap('blank_dark')")
         dark = page.evaluate(get)
-        bgs = page.evaluate("RS_BASEMAPS.map(b => b.bg)")
         browser.close()
     assert errors == []
     assert "0.6" in moved["fill"] and "#806d64" in moved["dash"] and moved["slider"] == "60" and moved["pal"] == "Warm + sand"
     assert ev == {"fade": 0.6, "palette": "Warm + sand"}
     assert "__rs_fill__1" in coloured["fill"] and "interpolate" in coloured["fill"] and "0.6" in coloured["fill"]   # Colour by keeps the fade
-    assert bgs[1] in dark["fill"] and bgs[0] not in dark["fill"]
+    assert "#64748b" in dark["fill"]                                              # a road's fill moves toward tunnel_fill_to, whatever the base map
 
 
 def test_level_columns_draw_each_position_casings_then_fills():

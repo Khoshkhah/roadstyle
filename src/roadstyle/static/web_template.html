@@ -696,7 +696,7 @@ function _fillExpr(idE){
   return e;
 }
 function _applyFill(){
-  const e=_tunOn ? _tunMix(_fillExpr(), TUNNEL.bg) : _fillExpr();
+  const e=_tunOn ? _tunMix(_fillExpr(), TUNNEL.fill_to) : _fillExpr();
   RS_FILL_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"line-color",e); });
   // the dashed layers (<fill layer>-dash0, -dash1 ...: one per dash pattern, for footway, path, steps ...) draw the
   // dashed classes' edges: they take the active colouring too, or such a road keeps its class colour under any "colour by"
@@ -917,7 +917,7 @@ function rsSetTunnelStyle(o){
   o = o || {};
   if(o.fade != null) TUNNEL.fade = Math.max(0, Math.min(1, +o.fade));
   if(o.palette != null && TUNNEL.palettes[o.palette]) TUNNEL.palette = o.palette;
-  const [dash, gap] = TUNNEL.palettes[TUNNEL.palette], to = {bg: TUNNEL.bg, gap: gap, dash: dash};
+  const [dash, gap] = TUNNEL.palettes[TUNNEL.palette], to = {fill: TUNNEL.fill_to, bg: TUNNEL.bg, gap: gap, dash: dash};
   for(const id in TUNNEL.layers){ const [k, base, kind] = TUNNEL.layers[id];
     if(map.getLayer(id)) map.setPaintProperty(id, k, _tunMix(base, to[kind])); }
   _applyFill();                                   // the roads' fills: with the active colour-by
@@ -934,7 +934,9 @@ if(TUNNEL.control){
   w.appendChild(document.createTextNode("Tunnels"));
   const r=document.createElement("input"); r.type="range"; r.id="tn-fade"; r.min=0; r.max=100; r.value=Math.round(TUNNEL.fade*100);
   r.title="How far a tunnel fades toward the background, and its casing toward the palette";
-  r.oninput=()=> rsSetTunnelStyle({fade: r.value/100});
+  let _tnNext=null;                               // a drag fires many inputs: apply only the newest, once per frame
+  r.oninput=()=>{ const go=_tnNext===null; _tnNext=r.value/100;
+    if(go) requestAnimationFrame(()=>{ const v=_tnNext; _tnNext=null; rsSetTunnelStyle({fade: v}); }); };
   const s=document.createElement("select"); s.id="tn-pal";
   Object.keys(TUNNEL.palettes).forEach(n=>{ const op=document.createElement("option"); op.value=n; op.textContent=n; s.appendChild(op); });
   s.value=TUNNEL.palette; s.onchange=()=> rsSetTunnelStyle({palette: s.value});

@@ -6,11 +6,11 @@ position like any road; only its look differs.
 
 ## What a tunnel looks like
 
-One number, the **fade** (0 to 1, setting `tunnel_fade`, default 0.3), moves three things together:
+One number, the **fade** (0 to 1, setting `tunnel_fade`, default 0.35, as v2), moves three things together:
 
 | part | at fade 0 | as the fade grows |
 |---|---|---|
-| the fill | the road's own colour | moves toward the base map's background colour. **Opaque**: no see-through fill and no underlay, so overlapping pieces never show darker joints |
+| the fill | the road's own colour | moves toward `tunnel_fill_to` (v2's slate, `#64748b`). **Opaque**: no see-through fill and no underlay, so overlapping pieces never show darker joints |
 | the casing | the two tones of the road's casing (`tunnel_gap_shade`, `tunnel_dash_shade`) | the solid tone moves toward the palette's gap colour, the dashes toward its dash colour |
 | the items attached to the tunnel (`Overlay(edge_col=...)`: lanes, lines, arrows, names) | their own colours | move toward the background with the fill. They keep their own colour: no tunnel colour replaces it (Kaveh) |
 

@@ -779,10 +779,10 @@ def _tun_mix(expr, toward, s):
 _TUN_PAINT = ("line-color", "fill-color", "circle-color", "text-color")
 
 
-def _tunnel_look(layers, edge_ids, bg, fade, palette):
-    """The tunnel look on the finished layer list (docs/design/tunnel_look.md): the roads' fills and the items attached to edges move toward the
-    background ``bg``, the casing's solid tone toward the palette's gap colour and its dashes toward the dash colour, all by ``fade``.
-    Returns ``{layer id: [paint property, its colour without the look, "bg" | "gap" | "dash"]}`` for the page."""
+def _tunnel_look(layers, edge_ids, bg, fade, palette, fill_to):
+    """The tunnel look on the finished layer list (docs/design/tunnel_look.md): the roads' fills move toward ``fill_to``, the items attached to
+    edges toward the background ``bg``, the casing's solid tone toward the palette's gap colour and its dashes toward the dash colour, all by ``fade``.
+    Returns ``{layer id: [paint property, its colour without the look, "fill" | "bg" | "gap" | "dash"]}`` for the page."""
     dash, gap = palette
     out = {}
     for l in layers:
@@ -792,7 +792,7 @@ def _tunnel_look(layers, edge_ids, bg, fade, palette):
         if lid.startswith("roads-casing") and "-bridge" not in lid:
             kind = "dash" if lid.endswith("-dash") else "gap"
         elif lid.startswith("roads-fill") and not lid.endswith("-pat"):
-            kind = "bg"
+            kind = "fill"
         elif lid in edge_ids:
             kind = "bg"
         else:
@@ -800,7 +800,7 @@ def _tunnel_look(layers, edge_ids, bg, fade, palette):
         for k in _TUN_PAINT:
             if k in paint:                       # a new paint: the copies of a layer for each position share theirs
                 out[lid] = [k, paint[k], kind]
-                l["paint"] = {**paint, k: _tun_mix(paint[k], {"bg": bg, "gap": gap, "dash": dash}[kind], fade)}
+                l["paint"] = {**paint, k: _tun_mix(paint[k], {"fill": fill_to, "bg": bg, "gap": gap, "dash": dash}[kind], fade)}
     return out
 
 
@@ -2022,7 +2022,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         if CONFIG.tunnel_palette not in CONFIG.tunnel_palettes:
             raise ValueError(f"tunnel_palette {CONFIG.tunnel_palette!r} is not in tunnel_palettes {list(CONFIG.tunnel_palettes)}")
         tun_paint = _tunnel_look(style["layers"], {l["id"] for _, _, _, grp in edge_layers for l in grp}, _bg_color(active_bm),
-                                 float(CONFIG.tunnel_fade), CONFIG.tunnel_palettes[CONFIG.tunnel_palette])
+                                 float(CONFIG.tunnel_fade), CONFIG.tunnel_palettes[CONFIG.tunnel_palette], CONFIG.tunnel_fill_to)
 
     # road-class filter panel: the distinct classes present, most important first. `filter_col`
     # (optional) drives the filter from a different column than the styling `highway_col` — e.g. a
@@ -2105,7 +2105,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__CO_ACTIVE__", str(_active))
             .replace("__OVERLAYS__", json.dumps(ov_meta))
             .replace("__TUNNEL__", json.dumps({"layers": tun_paint, "fade": float(CONFIG.tunnel_fade), "palette": CONFIG.tunnel_palette,
-                                               "palettes": CONFIG.tunnel_palettes, "bg": _bg_color(active_bm), "control": bool(tunnel_control and tun_paint)}))
+                                               "palettes": CONFIG.tunnel_palettes, "bg": _bg_color(active_bm), "fill_to": CONFIG.tunnel_fill_to, "control": bool(tunnel_control and tun_paint)}))
             .replace("__ROAD_POPUP__", "true" if popup_on else "false")
             .replace("__ROAD_POPUP_MODE__", json.dumps(mode))
             .replace("__ROAD_POPUP_FIELDS__", json.dumps(popup_fields))
