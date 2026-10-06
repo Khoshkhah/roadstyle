@@ -1914,6 +1914,11 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     assert (tmp_path / "caps.csv").read_text().split() == ["road,start,end"] and area.facts["12"]["caps"] == ["", ""]
     with pytest.raises(ValueError):
         area.apply([{"op": "cap", "road": "12", "end": "start", "cap": "pointy"}])
+    area.apply([{"op": "head", "road": "12", "end": "end", "m": "12.5"}])                 # a head's length: heads.csv, the solver and the drawing
+    assert (tmp_path / "heads.csv").read_text().split() == ["road,start_m,end_m", "12,,12.5"] and area.facts["12"]["heads"] == [5.0, 12.5]
+    assert pd.read_csv(tmp_path / "levels.csv", dtype={"edge": str}).set_index("edge").loc["12", "head_end_m"] == 12.5
+    with pytest.raises(ValueError):
+        area.apply([{"op": "head", "road": "12", "end": "end", "m": "-3"}])
 
 
 def test_edits_name_either_direction_of_a_road():
@@ -1997,3 +2002,22 @@ def test_cap_start_and_end_cols_set_one_end_each():
     assert [h.get("__rs_cap") for h in heads] == [True, True, None]                              # start head flat, main flat (cut), end head round
     auto = _style(render_edges(g.drop(columns=["cl", "fl"]), backend="web", cap_start_col="s", cap_end_col="e").html)     # levels computed here
     assert len(auto["sources"]["halves"]["data"]["features"]) == 2
+
+
+def test_head_metre_cols_set_where_the_casing_is_cut():
+    """head_start_m_col / head_end_m_col: an edge's own head lengths (null = head_m); a road shorter than its two heads is cut in their ratio."""
+    import numpy as np
+    m = 1 / 111320.0                                                                     # a degree of latitude in metres, near enough
+    g = gpd.GeoDataFrame({"highway": ["residential"] * 2, "cs": [-1, -1], "cl": [0, 0], "ce": [-1, -1], "fl": [0, 0], "hs": [20.0, 9.0], "he": [None, 3.0]},
+                         geometry=[LineString([(18.0, 59.30), (18.0, 59.30 + 100 * m)]), LineString([(18.01, 59.30), (18.01, 59.30 + 8 * m)])], crs=4326)
+    style = _style(render_edges(g, backend="web", casing_start_col="cs", casing_level_col="cl", casing_end_col="ce", fill_level_col="fl",
+                                head_start_m_col="hs", head_end_m_col="he").html)
+    def lengths(road):
+        out = []
+        for f in style["sources"]["casings"]["data"]["features"]:
+            if f["properties"]["__rs_road"] == road:
+                c = np.asarray(f["geometry"]["coordinates"])
+                out.append(round(float(np.abs(np.diff(c[:, 1])).sum() / m), 1))
+        return out
+    assert lengths(0) == [20.0, 75.0, 5.0]                                                # 20 m start head, the default 5 m end head
+    assert lengths(1) == [6.0, 2.0]                                                       # 8 m < 9 + 3: cut 3 : 1

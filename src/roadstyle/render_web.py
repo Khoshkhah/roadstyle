@@ -685,8 +685,10 @@ def _casing_parts(geo, head_m, cols):
         xy = np.column_stack(xy)
         cum = _cum_lengths(xy)
         n = float(cum[-1])
-        h = min(head_m, n / 2)          # a short road is two halves, one at each head's number (docs/design/short_road_heads.md)
-        cuts = [(0.0, h, cs), (h, n - h, cm), (n - h, n, ce)]
+        h0, h1 = p.get("__rs_hs", head_m), p.get("__rs_he", head_m)       # this edge's head lengths (head_start_m_col / head_end_m_col)
+        if h0 + h1 >= n:                # a short road is two pieces, one at each head's number, cut in the heads' ratio (docs/design/short_road_heads.md)
+            h0, h1 = n * h0 / (h0 + h1), n * h1 / (h0 + h1)
+        cuts = [(0.0, h0, cs), (h0, n - h1, cm), (n - h1, n, ce)]
         for k, (a, b, num) in enumerate(cuts):
             pts = _part(xy, cum, a, b)
             if len(pts) < 2 or not (np.diff(pts, axis=0) != 0).any():
@@ -1364,7 +1366,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
-           edge_id_col: str = "edge_id", road_fill: bool = True, cap_col: str = None, cap_start_col: str = None, cap_end_col: str = None, casing_level_col: str = None, fill_level_col: str = None, casing_start_col: str = None, casing_end_col: str = None, head_m: float = 5.0, directed_col: str = None,
+           edge_id_col: str = "edge_id", road_fill: bool = True, cap_col: str = None, cap_start_col: str = None, cap_end_col: str = None, casing_level_col: str = None, fill_level_col: str = None, casing_start_col: str = None, casing_end_col: str = None, head_m: float = 5.0, head_start_m_col: str = None, head_end_m_col: str = None, directed_col: str = None,
            width_m_col: str = None, width_m_zoom: float = 16, casing_m: float = 0.15,
            pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
@@ -1385,7 +1387,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     first (``compute_levels(edges, band_col=..., order=...)``, or ``level_input`` + ``solve_levels``) and pass the columns. Needs scipy.
     ``casing_level_col`` / ``fill_level_col`` (and
     ``casing_start_col`` / ``casing_end_col``, ``head_m``) name columns you computed yourself, with ``compute_levels`` or
-    anything else, and draw them as they are. Null = 0. A bridge keeps its look (heavier casing), a tunnel its look (faded, dashed).
+    anything else, and draw them as they are. ``head_start_m_col`` / ``head_end_m_col``: an edge's own head lengths in metres
+    (``solve_levels``' ``head_start_m`` / ``head_end_m``; null = ``head_m``). Null = 0. A bridge keeps its look (heavier casing), a tunnel its look (faded, dashed).
     ``cap_col`` names a column: a true value draws that edge's casing and fill with **square** ends
     (butt caps) instead of round ones, where an edge is one piece of a longer road and meets its
     other piece (docs/design/square_ends.md). The value ``"square"`` draws a flat end that reaches as
@@ -1512,6 +1515,12 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     _mark_twoway(geo, directed_col)
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
     _mark_caps(geo, cap_col, cap_start_col, cap_end_col)
+    for ft in geo["features"] if (head_start_m_col or head_end_m_col) else ():          # this edge's head lengths (null: head_m)
+        p = ft["properties"]
+        for col, k in ((head_start_m_col, "__rs_hs"), (head_end_m_col, "__rs_he")):
+            v = p.get(col) if col else None
+            if v is not None and v == v and float(v) > 0:
+                p[k] = float(v)
     levels = _mark_levels(geo, casing_level_col, fill_level_col, casing_start_col, casing_end_col) if (casing_level_col or fill_level_col) else None
     _mark_tunnel_dash(geo, CONFIG.tunnel_gap_shade, CONFIG.tunnel_dash_shade)
     if width_m_col:

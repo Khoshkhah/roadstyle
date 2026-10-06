@@ -43,7 +43,8 @@ road is turned to the road's way, as a meet's end is.
 | `pairs.csv` | one row per relation: `relation`, `a`, `b`, `a_end`, `b_end` (below) | `scripts/level_input.py`, every run |
 | `edits.csv` | your changes to the pairs, same columns plus `enabled`: `false` switches a pair off, anything else adds one; `a` / `b` may name either direction of a road | created empty once; you, or `scripts/edit_levels.py`; never overwritten by the input step |
 | `caps.csv` | each road's two ends (`road`, `start`, `end`: empty = round, `square`, `flat`), for `render_edges(cap_start_col=..., cap_end_col=...)` (`docs/design/square_ends.md`): drawing only, the solver does not read it | `scripts/edit_levels.py` (the *start* / *end* choices in a road's card) |
-| `levels.csv` | the result, one row per edge: `edge`, `casing_start`, `casing_level`, `casing_end`, `fill_level` | `scripts/solve_levels.py` (`rs.solve_levels`) |
+| `heads.csv` | head lengths per road (`road`, `start_m`, `end_m`; empty = 5 m): the solver's input (a road shorter than its two heads has one casing number) and the drawing's | `scripts/edit_levels.py` (the *heads* inputs in a road's card) |
+| `levels.csv` | the result, one row per edge: `edge`, `casing_start`, `casing_level`, `casing_end`, `fill_level`, `head_start_m`, `head_end_m` (draw with `head_start_m_col` / `head_end_m_col`) | `scripts/solve_levels.py` (`rs.solve_levels`) |
 
 Relations: `meet` (the end `a_end` of `a` is the end `b_end` of `b`: each head is under the other road's fill), `stack` (`a` is over `b`) and
 `order` (`a`'s fill after `b`'s where they meet, a wish the solver may give up). A manual `meet` row joins two roads that do not share a point.
@@ -63,7 +64,8 @@ list (kept over a reload of the page) until you press *Apply and solve*: then th
 working, and the page reloads with the new levels, keeping the view and the picked roads; `levels.csv` is written too. If one change is
 wrong or the solver refuses them (an unknown
 road, nothing to switch off), nothing is saved, the list stays, and the panel says why. The `edits.csv` before each apply is kept as `edits.csv.bak`. A road's card also has *start* / *end*: round / square / flat for
-each end (`caps.csv`); flat is for an end whose round end reaches across a narrower road it ends on, square keeps the drawn length. The list of
+each end (`caps.csv`); flat is for an end whose round end reaches across a narrower road it ends on, square keeps the drawn length.
+And *heads*: each end's head length in metres (`heads.csv`, solved with the rest). The list of
 your edits shows each one's two roads when clicked. It is written for this page alone (the roadstyle map and its `rs*` API); the v2 test's
 pair editor is not used.
 

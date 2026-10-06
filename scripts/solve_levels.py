@@ -2,8 +2,9 @@
 
     python scripts/solve_levels.py OUT_DIR
 
-levels.csv has one row per edge: edge (its id), casing_start, casing_level, casing_end, fill_level; draw them with
-rs.render_edges(edges, casing_start_col=..., casing_level_col=..., casing_end_col=..., fill_level_col=...).
+levels.csv has one row per edge: edge (its id), casing_start, casing_level, casing_end, fill_level, head_start_m, head_end_m; draw them with
+rs.render_edges(edges, casing_start_col=..., casing_level_col=..., casing_end_col=..., fill_level_col=..., head_start_m_col=..., head_end_m_col=...).
+OUT_DIR/heads.csv (road, start_m, end_m), if there, sets the head lengths of those roads (the level editor writes it).
 """
 import argparse
 from pathlib import Path
@@ -19,10 +20,10 @@ def edge_levels(solved):
     rows = []
     for r in solved.itertuples():
         for e in r.edges:
-            rows.append((e, r.casing_start, r.casing_level, r.casing_end, r.fill_level))
+            rows.append((e, r.casing_start, r.casing_level, r.casing_end, r.fill_level, r.head_start_m, r.head_end_m))
         for e in r.reversed:
-            rows.append((e, r.casing_end, r.casing_level, r.casing_start, r.fill_level))
-    return pd.DataFrame(rows, columns=["edge", "casing_start", "casing_level", "casing_end", "fill_level"])
+            rows.append((e, r.casing_end, r.casing_level, r.casing_start, r.fill_level, r.head_end_m, r.head_start_m))
+    return pd.DataFrame(rows, columns=["edge", "casing_start", "casing_level", "casing_end", "fill_level", "head_start_m", "head_end_m"])
 
 
 def write(solved, folder):
@@ -41,8 +42,9 @@ def main(argv=None):
     a = ap.parse_args(argv)
     roads = gpd.read_parquet(a.out_dir / "roads.parquet")
     edits = a.out_dir / "edits.csv"
+    heads = a.out_dir / "heads.csv"
     solved = rs.solve_levels(roads, a.out_dir / "pairs.csv", edits=edits if edits.exists() else None, head_m=a.head_m,
-                             max_positions=a.max_positions)
+                             max_positions=a.max_positions, heads=heads if heads.exists() else None)
     write(solved, a.out_dir)
     info = solved.attrs["levels_info"]
     print(f"{len(roads)} roads -> {a.out_dir / 'levels.csv'}: {len(solved.attrs['levels_given_up'])} stack pair(s) given up, "

@@ -57,6 +57,9 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
 #lv .wd-x i{display:block;height:100%;background:#f1e7c8}
 #lv .caps{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12px;color:var(--lv-mute)} #lv .caps .seg{flex:1}
 #lv .caps .seg button{padding:3px 0;font-size:12px}
+#lv .heads{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:var(--lv-mute)}
+#lv .heads input{width:54px;border:1px solid #d0d5dd;border-radius:6px;padding:3px 6px;font:12px system-ui;color:var(--lv-ink);text-align:right}
+#lv .heads input:focus{outline:none;border-color:var(--lv-r2)}
 #lv .lvls{display:flex;gap:4px;margin-top:8px} #lv .lvls div{flex:1;text-align:center;background:var(--lv-bg);border-radius:6px;padding:3px 0}
 #lv .lvls small{display:block;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em} #lv .lvls b{font-size:13px}
 #lv .num{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;
@@ -254,6 +257,9 @@ body.lv-open #lv-busy{right:var(--lv-w)}
         <span style="width:44px">${e} ${i ? "○" : "●"}</span>
         <div class="seg" data-cap="${esc(r)}" data-end="${e}">${[["", "round"], ["square", "square"], ["flat", "flat"]].map(([v, t]) =>
           `<button data-v="${v}" class="${((f.caps || [])[i] || "") === v ? "on" : ""}">${t}</button>`).join("")}</div></div>`).join("")}
+      <div class="heads" title="The casing heads: the metres at each end drawn at the head's own level (solver and drawing; empty = 5 m). A road shorter than its two heads has one level.">
+        <span style="width:44px">heads</span>${["start", "end"].map((e, i) => `${e} ${i ? "○" : "●"}
+        <input type="number" min="0.5" step="0.5" data-head="${esc(r)}" data-end="${e}" value="${(f.heads || [5, 5])[i]}"> m`).join(" ")}</div>
       <div class="lvls"><div><small>start</small><b>${L[0]}</b></div><div><small>casing</small><b>${L[1]}</b></div>
         <div><small>end</small><b>${L[2]}</b></div><div><small>fill</small><b>${L[3]}</b></div></div></div>`;
   }
@@ -293,6 +299,12 @@ body.lv-open #lv-busy{right:var(--lv-w)}
       const box = b.closest("[data-cap]"), r = box.dataset.cap, end = box.dataset.end, cap = b.dataset.v;
       if(cap === (((facts[r] || {}).caps || [])[end === "start" ? 0 : 1] || "")) return;
       stage({op: "cap", road: r, end: end, cap: cap});
+    });
+    $("lv-cards").querySelectorAll("[data-head]").forEach(inp => inp.onchange = () => {
+      const r = inp.dataset.head, end = inp.dataset.end, v = inp.value.trim();
+      if(v !== "" && !(+v > 0)) return toast("A head is a positive number of metres", true);
+      if((v === "" ? 5 : +v) === ((facts[r] || {}).heads || [5, 5])[end === "start" ? 0 : 1]) return;
+      stage({op: "head", road: r, end: end, m: v});
     });
     $("lv-cards").querySelectorAll(".x").forEach(b => b.onclick = () => { sel[+b.dataset.k] = null; if(sel[0] == null){ sel[0] = sel[1]; sel[1] = null; } update(); });
     $("lv-add-sec").hidden = sel[1] == null; describe();
@@ -356,8 +368,9 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     : b.relation === "stack" ? `${b.a_end ? "(" + PART[b.a_end] + ") " : ""}over ${name(b.b)}` : `after ${name(b.b)}`}`;
   function stage(q){
     if(q.op === "delete" && queue.some(x => x.op === "delete" && x.index === q.index)) return toast("Already in the list");
-    if(q.op === "cap") queue = queue.filter(x => !(x.op === "cap" && x.road === q.road && x.end === q.end));   // the last choice for an end counts
+    if(q.op === "cap" || q.op === "head") queue = queue.filter(x => !(x.op === q.op && x.road === q.road && x.end === q.end));   // the last choice for an end counts
     q.text = q.op === "delete" ? "delete edit: " + plain(q.row) : q.op === "cap" ? `${q.end} ${q.end === "start" ? "●" : "○"} ${q.cap || "round"} · ${name(q.road)}`
+      : q.op === "head" ? `${q.end} head ${q.end === "start" ? "●" : "○"} ${q.m || 5} m · ${name(q.road)}`
       : `${q.body.relation} · ${plain(q.body)}`;
     queue.push(q); showQueue(); toast("In the list · apply when ready");
   }
@@ -373,7 +386,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   $("lv-apply").onclick = async () => {
     if(!queue.length) return;
     $("lv-apply").disabled = true; busy(`Solving the levels with ${queue.length} change${queue.length > 1 ? "s" : ""} …`);
-    try { await api("/api/apply", {ops: queue.map(q => q.op === "cap" ? {op: "cap", road: q.road, end: q.end, cap: q.cap} : q.op === "delete" ? {op: "delete", index: q.index, row: q.raw} : {op: "add", body: q.body})});
+    try { await api("/api/apply", {ops: queue.map(q => q.op === "cap" ? {op: "cap", road: q.road, end: q.end, cap: q.cap} : q.op === "head" ? {op: "head", road: q.road, end: q.end, m: q.m} : q.op === "delete" ? {op: "delete", index: q.index, row: q.raw} : {op: "add", body: q.body})});
       const said = `Applied ${queue.length} change${queue.length > 1 ? "s" : ""}`;
       queue = []; showQueue(); busy("Drawing the new map …");
       sessionStorage.setItem("lv-view", JSON.stringify({c: map.getCenter(), z: map.getZoom(), b: map.getBearing(), p: map.getPitch(), sel: sel, said: said,

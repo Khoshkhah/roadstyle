@@ -161,7 +161,7 @@ def _relations(metres, ends, beta, omega, band_dist, mouths=True):
     return meets, stacks, orders
 
 
-def _solve_intervals(metres, meets, stacks, orders, limit, head_m, max_level, margin, min_positions=True, max_positions=None, forced=(), off=()):
+def _solve_intervals(metres, meets, stacks, orders, limit, head_m, max_level, margin, min_positions=True, max_positions=None, forced=(), off=(), heads=None):
     """The solver on roads (one per segment, both directions together) and their relations (:func:`_relations`, or a pairs table). Every road has
     one fill number ``b`` and a casing divided into a start head, a main part and an end head (one number for a road shorter than ``2 * head_m``).
     Returns ``(parts, given_up, info)``: ``parts[r] = (a_start, a_main, a_end, b)``. The model is a linear program solved on a sparse matrix with
@@ -174,7 +174,8 @@ def _solve_intervals(metres, meets, stacks, orders, limit, head_m, max_level, ma
     t0, n = time.time(), len(metres)
     zero = [(0, 0, 0, 0)] * n
     import shapely
-    long_ = (shapely.length(np.asarray(metres, dtype=object)) >= 2 * head_m).tolist()
+    heads = heads or [(head_m, head_m)] * n                   # per road: the metres of its start head and end head
+    long_ = [bool(m >= hs + he) for m, (hs, he) in zip(shapely.length(np.asarray(metres, dtype=object)), heads, strict=True)]
     whole = set(stacks)                                        # the stack pairs of the whole road (the rule below); forced / off: (A, B, "s" / "m" / "e")
     pair_list = sorted(whole | {(u, l) for u, l, _ in forced})
     short_upper = sum(not long_[u] for u, _ in pair_list)
@@ -397,7 +398,7 @@ def _read_pairs(pairs):
     return out
 
 
-def solve_levels(roads, pairs, edits=None, head_m=5.0, max_level=20, margin=1.0, time_limit=60.0, min_positions=True, max_positions=None):
+def solve_levels(roads, pairs, edits=None, head_m=5.0, max_level=20, margin=1.0, time_limit=60.0, min_positions=True, max_positions=None, heads=None):
     """Solve the drawing levels of ``roads`` from their ``pairs`` (both from :func:`level_input`, or read back from ``roads.parquet`` /
     ``pairs.csv``) and the caller's ``edits`` (a table or a CSV with the columns of ``pairs`` and ``enabled``: a row with ``enabled`` false
     switches off the same relation of ``pairs``, any other row is added; ``a`` / ``b`` may name any edge of a road, and a ``meet`` naming the
@@ -405,7 +406,9 @@ def solve_levels(roads, pairs, edits=None, head_m=5.0, max_level=20, margin=1.0,
     a part of A in ``a_end``: ``start`` / ``main`` / ``end`` (empty: the whole road, the rule with its junction exceptions). Added, that part is after
     B's fill even at a junction; switched off, only that part of the found pair is left out. Returns ``roads`` with
     ``casing_start``, ``casing_level``, ``casing_end`` and ``fill_level`` (in the road's own direction); ``attrs["levels_given_up"]`` (the
-    stack pairs that could not be kept, as road ids) and ``attrs["levels_info"]``."""
+    stack pairs that could not be kept, as road ids) and ``attrs["levels_info"]``. ``heads``: a table (or CSV) ``road`` (any edge id of it),
+    ``start_m``, ``end_m``: that road's head lengths instead of ``head_m`` (empty: ``head_m``; named by an edge running against its road, the
+    two swap); a road shorter than its two heads has one casing number. The result has ``head_start_m`` / ``head_end_m`` too."""
     of, back = {}, set()                                       # any edge id -> its road's row; the ids of the edges that run against their road
     for i, r in enumerate(roads.itertuples()):
         for e in [r.road, *list(r.edges), *list(r.reversed)]:
@@ -445,8 +448,26 @@ def solve_levels(roads, pairs, edits=None, head_m=5.0, max_level=20, margin=1.0,
     forced = [(idx[r["a"]], idx[r["b"]], short[r["a_end"]]) for r in rel.values() if r["relation"] == "stack" and r["a_end"]]
     off = [(idx[a], idx[b], short[h]) for a, b, h in off]
     orders = [(idx[r["a"]], idx[r["b"]]) for r in rel.values() if r["relation"] == "order"]
+    hl = [[float(head_m)] * 2 for _ in range(len(roads))]
+    if heads is not None:
+        import pandas as pd
+        ht = pd.read_csv(heads, dtype=str, keep_default_na=False) if isinstance(heads, (str, bytes)) or hasattr(heads, "__fspath__") else heads
+        for row in ht.to_dict("records"):
+            e = str(row["road"])
+            if e not in of:
+                raise ValueError(f"heads: {e!r} is not an edge of the roads")
+            v = []
+            for c in ("start_m", "end_m"):
+                x = row.get(c)
+                x = None if x is None or (isinstance(x, float) and x != x) or str(x).strip() == "" else float(x)
+                if x is not None and not x > 0:
+                    raise ValueError(f"heads: {c} of {e} must be a positive number of metres, not {row.get(c)!r}")
+                v.append(x)
+            if e in back:                                      # named by the edge that runs the other way: its start is the road's end
+                v = v[::-1]
+            hl[of[e]] = [x if x is not None else float(head_m) for x in v]
     iv, given, info = _solve_intervals(list(_metres(roads.geometry)), meets, stacks, orders, time_limit, head_m, max_level, margin, min_positions,
-                                       max_positions, forced, off)
+                                       max_positions, forced, off, heads=[tuple(h) for h in hl])
     counts = defaultdict(int)                                  # the solution can sit at any height: the main casing number most edges have becomes 0 (the ground)
     for r, row in enumerate(roads.itertuples()):
         counts[iv[r][1]] += len(row.edges) + len(row.reversed)
@@ -455,6 +476,7 @@ def solve_levels(roads, pairs, edits=None, head_m=5.0, max_level=20, margin=1.0,
     cm = _compress([v for p in iv for v in p])
     out = roads.copy()
     out["casing_start"], out["casing_level"], out["casing_end"], out["fill_level"] = ([cm[p[k]] for p in iv] for k in range(4))
+    out["head_start_m"], out["head_end_m"] = [h[0] for h in hl], [h[1] for h in hl]
     out.attrs["levels_given_up"] = [(roads["road"].iat[u], roads["road"].iat[l]) for u, l in given]
     out.attrs["levels_info"] = info
     return out

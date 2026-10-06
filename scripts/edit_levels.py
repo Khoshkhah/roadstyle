@@ -36,6 +36,9 @@ class Area:
         self.caps_path = self.dir / "caps.csv"                 # road -> (start, end): "", "square" or "flat" (cap_start_col / cap_end_col): drawing only
         t = pd.read_csv(self.caps_path, dtype=str, keep_default_na=False) if self.caps_path.exists() else pd.DataFrame(columns=["road", "start", "end"])
         both = t["cap"] if "cap" in t else ["flat"] * len(t)   # an older file: one value (or none: flat) for both ends
+        self.heads_path = self.dir / "heads.csv"               # road -> (start_m, end_m) as text, "" = the default 5 m: the solver's input too
+        t2 = pd.read_csv(self.heads_path, dtype=str, keep_default_na=False) if self.heads_path.exists() else pd.DataFrame(columns=["road", "start_m", "end_m"])
+        self.heads = {r: (s, e) for r, s, e in zip(t2["road"], t2["start_m"], t2["end_m"], strict=True)}
         self.caps = {r: (s, e) for r, s, e in zip(t["road"], t["start"] if "start" in t else both, t["end"] if "end" in t else both, strict=True)}
         if not self.edits_path.exists():
             self.edits_path.write_text(",".join(COLS) + "\n")
@@ -47,7 +50,7 @@ class Area:
         self.facts = {}                                         # road id -> what the panel shows about it
         for (_, r), m in zip(self.roads.iterrows(), length, strict=True):
             self.facts[r["road"]] = {"road": r["road"], "name": _txt(r.get("name")), "highway": _txt(r.get("highway")),
-                                     "edge_ref": _txt(r.get("edge_ref")), "lanes": _txt(r.get("lanes")), "caps": ["", ""], "band": int(r["band"]), "priority": _num(r.get("priority")),
+                                     "edge_ref": _txt(r.get("edge_ref")), "lanes": _txt(r.get("lanes")), "caps": ["", ""], "heads": [5.0, 5.0], "band": int(r["band"]), "priority": _num(r.get("priority")),
                                      "edges": len(r["edges"]) + len(r["reversed"]), "two_way": len(r["reversed"]) > 0, "length_m": float(m),
                                      "look": "tunnel" if _yes(r.get("tunnel")) else "bridge" if _yes(r.get("bridge")) else "ground",
                                      "width_px": _widths(_txt(r.get("highway")))}
@@ -57,7 +60,7 @@ class Area:
     def stored(self):
         """The levels of levels.csv (the map starts from the tables as they are), or None when it is missing or older than an input."""
         lv, info = self.dir / "levels.csv", self.dir / "levels_info.json"
-        inputs = [self.dir / "roads.parquet", self.dir / "pairs.csv", self.edits_path]
+        inputs = [self.dir / "roads.parquet", self.dir / "pairs.csv", self.edits_path] + ([self.heads_path] if self.heads_path.exists() else [])
         if not (lv.exists() and info.exists()) or lv.stat().st_mtime < max(p.stat().st_mtime for p in inputs):
             print("levels.csv is missing or older than roads.parquet / pairs.csv / edits.csv: solved again", flush=True)
             return None
@@ -84,8 +87,10 @@ class Area:
     def edits(self):
         return pd.read_csv(self.edits_path, dtype=str, keep_default_na=False).reindex(columns=COLS, fill_value="")
 
-    def solve(self, edits):
-        return rs.solve_levels(self.roads, self.pairs, edits=edits if len(edits) else None)
+    def solve(self, edits, heads=None):
+        heads = self.heads if heads is None else heads
+        t = pd.DataFrame([(r, *heads[r]) for r in sorted(heads)], columns=["road", "start_m", "end_m"])
+        return rs.solve_levels(self.roads, self.pairs, edits=edits if len(edits) else None, heads=t if len(t) else None)
 
     def build(self, edits, solved=None):
         if solved is None:
@@ -94,8 +99,10 @@ class Area:
         self.stats = {**solved.attrs["levels_info"], "given_up": [list(p) for p in solved.attrs["levels_given_up"]], "area": self.dir.name}
         for r in solved.itertuples():
             self.facts[r.road]["caps"] = list(self.caps.get(r.road, ("", "")))
+            self.facts[r.road]["heads"] = [float(x) if x else 5.0 for x in self.heads.get(r.road, ("", ""))]
             self.facts[r.road]["levels"] = [int(r.casing_start), int(r.casing_level), int(r.casing_end), int(r.fill_level)]
         draw = solved.drop(columns=["edges", "reversed"]).to_crs(4326)
+        draw["head_start_m"], draw["head_end_m"] = ([self.facts[r]["heads"][k] for r in draw["road"]] for k in (0, 1))
         draw["cap_start"], draw["cap_end"] = ([self.caps.get(r, ("", ""))[k] or "round" for r in draw["road"]] for k in (0, 1))
         draw["oneway"] = [not f["two_way"] for f in (self.facts[r] for r in draw["road"])]      # a road with no other direction is one way
         ends = draw.geometry.apply(lambda ln: list(ln.coords[0][:2]) + list(ln.coords[-1][:2]))
@@ -104,13 +111,18 @@ class Area:
                             select_color="rgba(0,0,0,0)",               # the panel colours the picked roads (1 orange, 2 blue): no click glow over them
                             filter_control=False, tunnel_control=False,  # the panel is the only control (Kaveh): no class filter box, no Tunnels box
                             casing_start_col="casing_start", casing_level_col="casing_level", casing_end_col="casing_end",
-                            fill_level_col="fill_level", cap_start_col="cap_start", cap_end_col="cap_end")
+                            fill_level_col="fill_level", cap_start_col="cap_start", cap_end_col="cap_end",
+                            head_start_m_col="head_start_m", head_end_m_col="head_end_m")
         page = m.html if hasattr(m, "html") else str(m)
         self.page = page.replace("</body>", _EDITOR.replace("__STATS__", json.dumps(self.stats, default=str)) + "</body>", 1)
 
-    def change(self, edits, saved=None, caps=None):
-        """Solve with ``edits``; save them (and ``caps``, road -> (start, end) of "" / "square" / "flat") only if the solver takes them."""
-        solved = self.solve(edits)                              # raises ValueError: nothing written
+    def change(self, edits, saved=None, caps=None, heads=None):
+        """Solve with ``edits`` (and ``heads``, road -> (start_m, end_m)); save them (and ``caps``, road -> (start, end) of "" / "square" /
+        "flat") only if the solver takes them."""
+        solved = self.solve(edits, heads)                       # raises ValueError: nothing written
+        if heads is not None:
+            pd.DataFrame([(r, *heads[r]) for r in sorted(heads)], columns=["road", "start_m", "end_m"]).to_csv(self.heads_path, index=False)
+            self.heads = dict(heads)
         if caps is not None:
             pd.DataFrame([(r, *caps[r]) for r in sorted(caps)], columns=["road", "start", "end"]).to_csv(self.caps_path, index=False)
             self.caps = dict(caps)
@@ -123,12 +135,13 @@ class Area:
 
     def apply(self, ops):
         """Apply the changes the page collected, in one solve: ``{"op": "delete", "index": i, "row": row}`` (a row of edits.csv, as the page showed it) and ``{"op": "add",
-        "body": row}`` and ``{"op": "cap", "road": id, "end": "start" / "end", "cap": "" / "square" / "flat"}`` (one end of a road, caps.csv). If any is wrong, or the solver refuses the result, nothing is saved (ValueError)."""
+        "body": row}`` and ``{"op": "cap", "road": id, "end": "start" / "end", "cap": "" / "square" / "flat"}`` (one end of a road, caps.csv) and
+        ``{"op": "head", "road": id, "end": "start" / "end", "m": metres or ""}`` (a head's length, heads.csv; "" = 5 m). If any is wrong, or the solver refuses the result, nothing is saved (ValueError)."""
         if not ops:
             raise ValueError("nothing to apply")
-        if any(o.get("op") not in ("add", "delete", "cap") for o in ops):
-            raise ValueError("a change is add, delete or cap")
-        caps = dict(self.caps)
+        if any(o.get("op") not in ("add", "delete", "cap", "head") for o in ops):
+            raise ValueError("a change is add, delete, cap or head")
+        caps, heads = dict(self.caps), dict(self.heads)
         for o in ops:
             if o["op"] == "cap":
                 r, c, k = self.road_of.get(str(o["road"])), o.get("cap", ""), {"start": 0, "end": 1}.get(o.get("end"))
@@ -138,6 +151,18 @@ class Area:
                 v[k] = c
                 if any(v):
                     caps[r] = tuple(v)
+            elif o["op"] == "head":
+                r, m, k = self.road_of.get(str(o["road"])), str(o.get("m", "") or "").strip(), {"start": 0, "end": 1}.get(o.get("end"))
+                try:
+                    ok = m == "" or float(m) > 0
+                except ValueError:
+                    ok = False
+                if r is None or k is None or not ok:
+                    raise ValueError(f"heads: {o['road']!r} is not a road, {o.get('end')!r} not start / end, or {m!r} not a positive number of metres")
+                v = list(heads.pop(r, ("", "")))
+                v[k] = m
+                if any(v):
+                    heads[r] = tuple(v)
         e = self.edits()
         gone = sorted({int(o["index"]) for o in ops if o["op"] == "delete"}, reverse=True)
         for o in ops:                                           # a delete names its row as the page saw it: edits.csv may have changed since
@@ -145,7 +170,8 @@ class Area:
             if i is not None and not (0 <= i < len(e) and all(str(e.iat[i, e.columns.get_loc(c)]) == str(o["row"].get(c, "") or "") for c in COLS)):
                 raise ValueError("an edit to delete is not in edits.csv as the page showed it (changed since): reload the page")
         new = pd.DataFrame([_row(o["body"]) for o in ops if o["op"] == "add"], columns=COLS)
-        self.change(pd.concat([e.drop(index=gone), new], ignore_index=True), saved=self.saved - sum(i < self.saved for i in gone), caps=caps)
+        self.change(pd.concat([e.drop(index=gone), new], ignore_index=True), saved=self.saved - sum(i < self.saved for i in gone), caps=caps,
+                    heads=heads)
 
     def find(self, q, limit=20):
         """The roads for a search: an exact edge id (either direction of a road), else the edge_refs that hold ``q`` (an exact one first)."""
