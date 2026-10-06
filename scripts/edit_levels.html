@@ -72,6 +72,7 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
 #lv-busy{position:fixed;left:0;top:0;bottom:0;right:0;z-index:5;display:flex;align-items:center;justify-content:center;
   background:rgba(246,247,249,.55);backdrop-filter:blur(1.5px);transition:right .2s ease}
 body.lv-open #lv-busy{right:var(--lv-w)}
+#lv-busy.solid{background:var(--lv-bg);backdrop-filter:none}  /* after an apply: the map is drawn once at its own view, then at yours; neither is shown */
 #lv-busy .box{display:flex;align-items:center;gap:12px;padding:14px 20px;border-radius:12px;background:#fff;box-shadow:0 8px 28px rgba(16,24,40,.18);
   font:600 14px system-ui;color:var(--lv-ink)}
 #lv-busy .spin{width:22px;height:22px;border-radius:50%;border:3px solid #dbe4f0;border-top-color:var(--lv-r2);animation:lv-spin .8s linear infinite}
@@ -125,7 +126,9 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   const STATS = __STATS__, $ = id => document.getElementById(id), C = ["#e8590c", "#1971c2"];
   const sel = [null, null], facts = {};                       // sel: road ids; facts: road id -> what the server knows
   let pairRows = [];                                          // what the two tables have between the two picked roads
-  let kind = "order", end1 = "start", end2 = "start", part = "", top = 0;   // top: which picked road (0 / 1) is on top for an order or a stack
+  let kind = "order", end1 = "start", end2 = "start", part = "", top = null, pairKey = "";   // top: which picked road (0 / 1) is on top for an order or a stack: none until chosen, for each new pair
+  if(/"said":/.test(sessionStorage.getItem("lv-view") || "")){                 // the page again after an apply: covered until drawn at your view
+    $("lv-busy").classList.add("solid"); $("lv-busy").hidden = false; $("lv-busy-t").textContent = "Drawing the new map …"; }
   let queue = []; try { queue = JSON.parse(sessionStorage.getItem("lv-queue") || "[]"); } catch(e){}     // the changes waiting to be applied
   const PART = {start: "start head", main: "main", end: "end head"};
   const SRC = {found: ["found", "var(--lv-found)", "found in pairs.csv"], saved: ["saved", "var(--lv-saved)", "already in edits.csv"],
@@ -284,11 +287,14 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   }
   function describe(){
     if(sel[1] == null) return;
-    const [a, b] = kind === "meet" ? sel : [sel[top], sel[1 - top]];
+    if(sel.join() !== pairKey){ pairKey = sel.join(); top = null; }
     $("lv-top").hidden = kind === "meet";
     $("lv-top-seg").innerHTML = sel.map((r, k) => `<button class="${k === top ? "on" : ""}" data-v="${k}">${who(r)}</button>`).join("");
     $("lv-top-seg").querySelectorAll("button").forEach(x => x.onclick = () => { top = +x.dataset.v; describe(); });
     $("lv-ends").hidden = kind !== "meet"; $("lv-part").hidden = kind !== "stack"; $("lv-off").hidden = kind !== "stack" || !part;
+    $("lv-add").disabled = $("lv-off").disabled = kind !== "meet" && top == null;
+    if(kind !== "meet" && top == null){ $("lv-desc").innerHTML = `<div class="warn">Choose which road is on top.</div>`; return; }
+    const [a, b] = kind === "meet" ? sel : [sel[top], sel[1 - top]];
     $("lv-desc").innerHTML = kind === "order" ? `Where they meet, ${who(a)}'s fill is drawn after ${who(b)}'s (a wish the solver keeps when it can).`
       : kind === "stack" && !part ? `${who(a)} is drawn over ${who(b)}, outline included, where they come near each other (not its heads where it joins ${who(b)}).`
       : kind === "stack" ? `${who(a)}'s ${PART[part]} casing is drawn after ${who(b)}'s fill, even where it joins ${who(b)}. ● start ○ end on the map.
@@ -347,7 +353,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     const v = JSON.parse(sessionStorage.getItem("lv-view") || "null");
     if(v){ sessionStorage.removeItem("lv-view"); map.jumpTo({center: v.c, zoom: v.z, bearing: v.b, pitch: v.p});
       sel[0] = v.sel[0]; sel[1] = v.sel[1];
-      if(v.said){ busy("Drawing the new map …"); map.once("idle", () => { busy(null); toast(v.said + " · solved"); }); }
+      if(v.said) map.once("idle", () => { busy(null); $("lv-busy").classList.remove("solid"); toast(v.said + " · solved"); });
       if(!v.open){ document.body.classList.remove("lv-open"); $("lv-toggle").textContent = "‹"; resize(); } }
     update(); lists(); showQueue();
   }
