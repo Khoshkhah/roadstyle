@@ -1,0 +1,8 @@
+{
+  "name": "realistic",
+  "extends": "map",
+  "width_sources": ["width", "lanes", "class"],
+  "lane_width_m": 3.5,
+  "lane_width_by_class": {"motorway": 3.75, "trunk": 3.65, "service": 3.0, "living_street": 3.0, "residential": 3.2},
+  "casing_m": {"default": [0.15, 0.15], "motorway": [0.15, 0.4], "trunk": [0.15, 0.4]}
+}

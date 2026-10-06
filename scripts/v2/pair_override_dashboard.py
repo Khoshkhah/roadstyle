@@ -579,7 +579,7 @@ def main() -> None:
     parser.add_argument("--levels", type=Path, default=DEFAULT_LEVELS)
     parser.add_argument("--database", type=Path, default=DEFAULT_DATABASE)
     parser.add_argument("--head-m", type=float, default=15.0)
-    parser.add_argument("--style", default=None, help="v2 style profile: bundled name (default, compact) or JSON path")
+    parser.add_argument("--style", default="map", help="v2 style profile: bundled name (map, default, compact, night, realistic) or JSON path")
     parser.add_argument("--smooth", type=int, default=0, help="Display-only smoothing iterations (0 = off)")
     args = parser.parse_args()
     features = _load_map_features(args.map_html)
@@ -594,7 +594,6 @@ def main() -> None:
             _load_all_features(args.map_html),
             head_m=args.head_m,
             smooth=args.smooth,
-            map_colors=args.style is None,
         )
     else:
         print(f"No DuckOSM database at {database}: showing the map's own levels.")

@@ -47,3 +47,21 @@ def test_bad_profiles_fail_clearly():
         load_profile("nope")
     with pytest.raises(ValueError):
         load_profile({"width_sources": ["lanez"]})
+
+
+def test_extends_chains_and_map_profile_has_palette():
+    from roadstyle.v2.profile import load_profile
+
+    compact = load_profile("compact")
+    assert compact.lane_width("service") == 3.0
+    assert compact.color("primary") == "#f5b95f"  # inherited from "map"
+    assert compact["casing_color"] == "#1e293b"
+    assert load_profile({"extends": "map", "lane_width_m": 3.0}).color("service") == "#6b7686"
+
+
+def test_every_bundled_profile_loads():
+    from roadstyle.v2.profile import bundled_profiles, load_profile
+
+    assert {"default", "map", "compact", "night", "realistic"} <= set(bundled_profiles())
+    for name in bundled_profiles():
+        load_profile(name).color("primary")

@@ -1,0 +1,11 @@
+{
+  "name": "night",
+  "extends": "map",
+  "casing_color": "#05070a",
+  "colors": {
+    "motorway": "#ff7a59", "trunk": "#ff9f43", "primary": "#ffc857", "primary_link": "#ffc857",
+    "secondary": "#7bdff2", "secondary_link": "#7bdff2", "tertiary": "#b2f7ef", "tertiary_link": "#b2f7ef",
+    "residential": "#9aa5b8", "unclassified": "#9aa5b8", "service": "#6c768a", "living_street": "#c3a6ff"
+  },
+  "default_color": "#9aa5b8"
+}

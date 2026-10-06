@@ -72,12 +72,12 @@ def build(
 
 _LEVEL_KEYS = {"_type", "part", "level", "casing_start", "casing_level", "casing_end", "fill_level", "band"}
 _CASING_KEYS = ("casing_m", "casing_left_m", "casing_right_m", "casing_color")
-# widths and casings always come from the loaded corridors (their style profile), never the saved map
-_PROFILE_KEYS = {"width_m", *_CASING_KEYS}
+# the look (widths, casings, colours) comes only from the style profile of the loaded corridors
+_PROFILE_KEYS = {"width_m", "fill_color", *_CASING_KEYS}
 
 
-def _style_by_edge(base_features: list[dict[str, Any]], map_colors: bool = True) -> dict[str, dict[str, Any]]:
-    """Visual properties of each road in the original map, so a re-solve keeps its look."""
+def _style_by_edge(base_features: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Tags carried by each road in the original map; its look is not copied (the style profile owns that)."""
     styles: dict[str, dict[str, Any]] = {}
     for feature in base_features:
         props = feature.get("properties", {})
@@ -86,7 +86,7 @@ def _style_by_edge(base_features: list[dict[str, Any]], map_colors: bool = True)
             continue
         style = styles.setdefault(str(ref), {})
         if props.get("_type") == "corridor_fill":
-            style.update({k: v for k, v in props.items() if k not in _LEVEL_KEYS | _PROFILE_KEYS and (map_colors or k != "fill_color")})
+            style.update({k: v for k, v in props.items() if k not in _LEVEL_KEYS | _PROFILE_KEYS})
     return styles
 
 
@@ -102,12 +102,11 @@ class RoadLevelModel:
         band_dist: float = 10.0,
         head_m: float = 15.0,
         smooth: int = 0,
-        map_colors: bool = True,
     ) -> None:
         self.smooth = smooth
         self.corridors = corridors
         self.original_rows = read_pair_table(original)
-        self.styles = _style_by_edge(base_features, map_colors)
+        self.styles = _style_by_edge(base_features)
         self.band_dist = band_dist
         self.head_m = head_m
 

@@ -41,5 +41,6 @@ def test_model_returns_features_carrying_solved_levels(tmp_path):
     result = RoadLevelModel(corridors, original, base).recalculate([], tmp_path / "levels.csv")
     fills = [f for f in result["features"] if f["properties"]["_type"] == "corridor_fill"]
     assert {f["properties"]["edge_ref"] for f in fills} == {"a", "b"}
-    assert next(f for f in fills if f["properties"]["edge_ref"] == "a")["properties"]["fill_color"] == "#123456"
+    # the look comes from the corridors' style profile, never from the saved map
+    assert next(f for f in fills if f["properties"]["edge_ref"] == "a")["properties"]["fill_color"] != "#123456"
     assert result["summary"]["roads"] == 2

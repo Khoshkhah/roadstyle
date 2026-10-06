@@ -1,0 +1,32 @@
+{
+  "name": "map",
+  "extends": "default",
+  "casing_m": {
+    "default": [
+      0.25,
+      0.25
+    ],
+    "motorway": [
+      0.25,
+      0.25
+    ],
+    "trunk": [
+      0.25,
+      0.25
+    ]
+  },
+  "casing_color": "#1e293b",
+  "colors": {
+    "primary": "#f5b95f",
+    "primary_link": "#f5b95f",
+    "secondary": "#e9d77a",
+    "secondary_link": "#e9d77a",
+    "tertiary": "#d6dde6",
+    "tertiary_link": "#d6dde6",
+    "residential": "#a3adbb",
+    "unclassified": "#a3adbb",
+    "service": "#6b7686",
+    "living_street": "#8e99a8"
+  },
+  "default_color": "#a3adbb"
+}

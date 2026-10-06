@@ -5,6 +5,8 @@ from the bundled ``default`` profile. Pick one per visualization: a bundled name
 ``compact``), a path to your own file, or a dict. Keys:
 
     name                   free text
+    extends                a bundled profile name or a file path to start from (default: ``default``)
+    casing_color           casing colour
     lane_width_m           metres per lane when a way has ``lanes`` but no ``width`` tag
     lane_width_by_class    per-highway override of ``lane_width_m``, e.g. {"service": 3.0}
     width_sources          order tried to size a road: "width" (OSM tag), "lanes", "class"
@@ -74,20 +76,30 @@ class StyleProfile:
         return str(self.data["colors"].get(highway, self.data["default_color"]))
 
 
+def _resolve(profile: str | Path | dict[str, Any], seen: tuple[str, ...] = ()) -> dict[str, Any]:
+    """The profile merged over whatever it ``extends`` (the bundled ``default`` at the root)."""
+    if isinstance(profile, dict):
+        data, label = profile, "<dict>"
+    else:
+        path = Path(profile)
+        if not path.suffix and not path.exists():
+            path = PROFILE_DIR / f"{profile}.json"
+        if not path.exists():
+            raise FileNotFoundError(
+                f"style profile {str(profile)!r} is neither a file nor one of {bundled_profiles()}"
+            )
+        data, label = _read(path), str(path.resolve())
+    if label in seen:
+        raise ValueError(f"style profile 'extends' loops back to {label}")
+    parent = data.get("extends")
+    if parent is None and label != str((PROFILE_DIR / "default.json").resolve()):
+        parent = "default"
+    base = _resolve(parent, (*seen, label)) if parent else {}
+    return _merge(base, {k: v for k, v in data.items() if k != "extends"})
+
+
 def load_profile(profile: str | Path | dict[str, Any] | StyleProfile | None = None) -> StyleProfile:
-    """Resolve ``profile`` (None, bundled name, JSON path or dict) over the bundled default."""
+    """Resolve ``profile`` (None, bundled name, JSON path or dict) over what it extends."""
     if isinstance(profile, StyleProfile):
         return profile
-    base = _read(PROFILE_DIR / "default.json")
-    if profile is None:
-        return StyleProfile(base)
-    if isinstance(profile, dict):
-        return StyleProfile(_merge(base, profile))
-    path = Path(profile)
-    if not path.suffix and not path.exists():
-        path = PROFILE_DIR / f"{profile}.json"
-    if not path.exists():
-        raise FileNotFoundError(
-            f"style profile {str(profile)!r} is neither a file nor one of {bundled_profiles()}"
-        )
-    return StyleProfile(_merge(base, _read(path)))
+    return StyleProfile(_resolve("default" if profile is None else profile))

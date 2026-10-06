@@ -1,5 +1,6 @@
 {
   "name": "compact",
+  "extends": "map",
   "lane_width_by_class": {
     "service": 3.0,
     "living_street": 3.0,

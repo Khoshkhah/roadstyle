@@ -33,3 +33,14 @@ table only applies to roads without `lanes`. Put `class` first to size by class 
 
 Widths do not change the solved levels (they depend on geometry and pair tables), so a profile can
 be switched without rebuilding `road_levels.csv`.
+
+## One source of truth
+
+Width, casing and colour come **only** from the style profile. The saved map HTML
+(`--map-html`) contributes just its non-visual tags (`name`, `lanes`, `layer`, ...); its
+`width_m`, `fill_color` and casing values are ignored, so the profile is never mixed with a second style.
+
+A profile may set `"extends": "<bundled name or path>"` and override only what differs
+(default: `default`). Bundled: `default` (the generic palette), `map` (the palette and
+0.25 m casing of the saved Monaco map; the dashboard default) and `compact`
+(`map` with narrower service and residential lanes), `night` (bright palette for dark basemaps) and `realistic` (real-world lane widths per class, thin casings, wider left casing on motorways). The profile also takes `casing_color`.
