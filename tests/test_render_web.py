@@ -785,12 +785,15 @@ def test_tunnel_casing_is_the_dash_layer_alone():
     assert ids.index("roads-casing") < ids.index("roads-casing-dash") < ids.index("roads-fill")
     assert lay["roads-casing-dash"]["paint"]["line-color"] == "#94a3b8" and lay["roads-casing-dash"]["paint"]["line-dasharray"] == [1, 1]
     from roadstyle.render_web import _plus_px
-    assert lay["roads-casing-dash"]["paint"]["line-width"] == _plus_px(lay["roads-casing"]["paint"]["line-width"], 3)   # as v2: wider
+
     assert _plus_px(["interpolate", ["linear"], ["zoom"], 12, 1, 18, ["get", "w"]], 3) == ["interpolate", ["linear"], ["zoom"], 12, ["+", 1, 3], 18, ["+", ["get", "w"], 3]]
     assert "__rs_tunnel" in json.dumps(lay["roads-casing-dash"]["filter"])      # only the tunnel look
     tun, street = (f["properties"] for f in style["sources"]["roads"]["data"]["features"])
     assert _eval(lay["roads-casing"]["paint"]["line-color"], tun) == "rgba(0,0,0,0)"
     assert _eval(lay["roads-casing"]["paint"]["line-color"], street) == street["__rs_casing"]
+    for stop in (4, 6):                                       # the casing layer (the gap colour) is as wide as the dash layer for a tunnel only
+        dash_w, case_w = lay["roads-casing-dash"]["paint"]["line-width"][stop], lay["roads-casing"]["paint"]["line-width"][stop]
+        assert case_w == ["case", ["to-boolean", ["get", "__rs_tunnel"]], dash_w, dash_w[1]]      # dash: ["+", w, 3]
 
 
 def test_rscolor_raises_painted_roads_within_their_level():
@@ -1111,8 +1114,9 @@ def test_the_tunnel_look_is_v2s_slider():
 
 
 def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
-    """The Tunnels box and rsSetTunnelStyle in a real page: the strength moves every tunnel colour, the casing too; a two-colour palette puts
-    a pattern on the casing dash layers at any strength, One colour keeps plain dashes (their colour moved toward slate); Colour by keeps the look."""
+    """The Tunnels box and rsSetTunnelStyle in a real page: the strength moves every tunnel colour, the casing too. The casing is two layers with
+    MapLibre's dash, no image: a palette's gap colour on the position's casing layer (transparent for One colour) and its dash colour on the
+    dash layer, both moved toward slate; Colour by keeps the look."""
     pw = pytest.importorskip("playwright.sync_api")
     path = tmp_path / "tunnels.html"
     g = _edge_world().assign(aadt=[1, 2, 3, 4])
@@ -1120,6 +1124,8 @@ def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
     get = """() => ({fill: JSON.stringify(map.getPaintProperty("roads-fill-lv-1", "line-color")),
                     pattern: map.getPaintProperty("roads-casing-lv-1-dash", "line-pattern") || null,
                     dash: map.getPaintProperty("roads-casing-lv-1-dash", "line-dasharray") || null,
+                    dash_color: map.getPaintProperty("roads-casing-lv-1-dash", "line-color"),
+                    gap: JSON.stringify(map.getPaintProperty("roads-casing-lv-1", "line-color")),
                     slider: document.getElementById("tn-str").value, pal: document.getElementById("tn-pal").value})"""
     errors = []
     with pw.sync_playwright() as p:
@@ -1139,15 +1145,17 @@ def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
         zero = page.evaluate(get)
         page.evaluate("rsSetTunnelStyle({palette: 'One colour', strength: 100})")
         one = page.evaluate(get)
-        one_colour = page.evaluate("map.getPaintProperty('roads-casing-lv-1-dash', 'line-color')")
         browser.close()
     assert errors == []
     assert opened["pattern"] is None and opened["dash"] == [1, 1] and opened["slider"] == "35" and opened["pal"] == "One colour"
-    assert "70" in moved["fill"] and moved["pattern"] == "rs-tunnel-casing-Tealmint_4-3_70" and moved["pal"] == "Teal + mint"
+    assert "rgba(0,0,0,0)" in opened["gap"]                                               # One colour: empty gaps
+    assert "70" in moved["fill"] and moved["pal"] == "Teal + mint" and moved["dash"] == [4, 3] and moved["pattern"] is None
+    teal70, mint70 = "#547384", "#76919f"                                                 # #2f6f73, #9fd3cf 70 % toward #64748b (JS rounds .5 up)
+    assert moved["dash_color"] == teal70 and mint70 in moved["gap"]
     assert ev == {"strength": 70, "palette": "Teal + mint", "ratio": [4, 3]}
     assert "__rs_fill__1" in coloured["fill"] and "interpolate" in coloured["fill"]          # Colour by keeps the look
-    assert zero["pattern"] == "rs-tunnel-casing-Tealmint_4-3_0"                      # a palette shows at 0 too, as it is; a new image name
-    assert one["pattern"] is None and one["dash"] == [4, 3] and one_colour == "#64748b"   # One colour at 100: slate dashes
+    assert zero["dash_color"] == "#2f6f73" and "#9fd3cf" in zero["gap"]                  # at 0 the palette as it is
+    assert one["dash_color"] == "#64748b" and "rgba(0,0,0,0)" in one["gap"]               # One colour at 100: slate dashes, empty gaps
 
 
 def test_level_columns_draw_each_position_casings_then_fills():

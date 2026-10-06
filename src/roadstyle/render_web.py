@@ -784,10 +784,12 @@ def _tun_mix(expr, toward, s):
 
 def _tunnel_look(layers, edge_ids, s, arrow_color):
     """The tunnel look on the finished layer list (docs/design/tunnel_look.md), at slider ``s``: everything on a tunnel (its fill, its street
-    names, its arrows, every item attached to it) moves toward the same slate; its casing is drawn by the dash layers only (the other casing
-    layers leave a tunnel out). Returns ``(colours, dash layers)``:
-    ``{layer id: [[paint property, its colour without the look, target key], ...]}`` and the ids of the dash layers, for the page."""
-    out, dash = {}, []
+    names, its arrows, every item attached to it) moves toward the same slate. Its casing is two layers, both 3 px wider than a casing: the
+    position's casing layer draws the gap colour (transparent for One colour), the dash layer the dashes on top. Returns
+    ``(colours, dash layers, casing layers)``: ``{layer id: [[paint property, its colour without the look, target key], ...]}``, the ids of
+    the dash layers and ``{casing layer id: its colour without the look}``, for the page."""
+    out, dash, casing = {}, [], {}
+    tun = ["to-boolean", ["get", "__rs_tunnel"]]
     clear = "rgba(0,0,0,0)"
 
     def mix(l, k, base, to):
@@ -802,7 +804,9 @@ def _tunnel_look(layers, edge_ids, s, arrow_color):
         if lid.startswith("roads-casing") and lid.endswith("-dash"):
             dash.append(lid)
         elif lid.startswith("roads-casing") and "-bridge" not in lid:
-            l["paint"]["line-color"] = ["case", ["to-boolean", ["get", "__rs_tunnel"]], clear, l["paint"]["line-color"]]
+            casing[lid] = l["paint"]["line-color"]
+            l["paint"]["line-color"] = ["case", tun, clear, l["paint"]["line-color"]]     # One colour: empty gaps; the page sets a palette's gap colour
+            l["paint"]["line-width"] = _plus_px(l["paint"]["line-width"], 3, tun)          # as wide as the dash layer
         elif lid.startswith("roads-fill") and not lid.endswith("-pat"):
             mix(l, "line-color", l["paint"]["line-color"], "fill")
         elif lid.startswith("roads-labels"):
@@ -813,7 +817,7 @@ def _tunnel_look(layers, edge_ids, s, arrow_color):
             for k in ("fill-color", "line-color", "circle-color", "text-color"):
                 if k in l["paint"]:
                     mix(l, k, l["paint"][k], "fill")
-    return out, dash
+    return out, dash, casing
 
 
 _CASING_FAMILY = ("roads-casing", "roads-casing-sq", "roads-casing-dash", "roads-casing-bridge")
@@ -853,12 +857,14 @@ def _level_layers(layers, levels, casing_source=None):
     return rest[:first] + groups + rest[first:]
 
 
-def _plus_px(expr, px):
-    """A width expression ``px`` pixels wider: inside each stop of a top-level zoom curve (MapLibre allows ``["zoom"]`` only there)."""
+def _plus_px(expr, px, when=None):
+    """A width expression ``px`` pixels wider (only for the features where ``when`` holds, if given): inside each stop of a top-level zoom
+    curve (MapLibre allows ``["zoom"]`` only there)."""
+    wider = (lambda v: ["+", v, px]) if when is None else (lambda v: ["case", when, ["+", v, px], v])
     if isinstance(expr, list) and expr and expr[0] in ("interpolate", "step"):
         first = 4 if expr[0] == "interpolate" else 2
-        return [*expr[:first], *[["+", v, px] if (i - first) % 2 == 0 else v for i, v in enumerate(expr[first:], first)]]
-    return ["+", expr, px]
+        return [*expr[:first], *[wider(v) if (i - first) % 2 == 0 else v for i, v in enumerate(expr[first:], first)]]
+    return wider(expr)
 
 
 def _tunnel_casing_dash(lid, flt, tlay, cw, off, on):
@@ -2021,11 +2027,11 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     if edge_layers:       # the overlays attached to edges: after the fills of their position, before its arrows (docs/design/edge_overlays.md)
         style["layers"] = _place_edge_overlays(style["layers"], edge_layers, levels)
     style["layers"] += over_layers             # caller overlays drawn on top of the roads (e.g. POIs)
-    tun_paint, tun_dash = {}, []
+    tun_paint, tun_dash, tun_casing = {}, [], {}
     if any(ft["properties"].get("__rs_tunnel") for ft in geo["features"]):      # the tunnel look (docs/design/tunnel_look.md)
         if CONFIG.tunnel_palette not in CONFIG.tunnel_palettes:
             raise ValueError(f"tunnel_palette {CONFIG.tunnel_palette!r} is not in tunnel_palettes {list(CONFIG.tunnel_palettes)}")
-        tun_paint, tun_dash = _tunnel_look(style["layers"], {l["id"] for _, _, _, grp in edge_layers for l in grp},
+        tun_paint, tun_dash, tun_casing = _tunnel_look(style["layers"], {l["id"] for _, _, _, grp in edge_layers for l in grp},
                                            float(CONFIG.tunnel_strength), arw["color"])
 
     # road-class filter panel: the distinct classes present, most important first. `filter_col`
@@ -2108,7 +2114,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__COLOR_OPTIONS__", json.dumps(color_opts_meta or []))
             .replace("__CO_ACTIVE__", str(_active))
             .replace("__OVERLAYS__", json.dumps(ov_meta))
-            .replace("__TUNNEL__", json.dumps({"layers": tun_paint, "dash": tun_dash, "strength": float(CONFIG.tunnel_strength),
+            .replace("__TUNNEL__", json.dumps({"layers": tun_paint, "dash": tun_dash, "casing": tun_casing, "strength": float(CONFIG.tunnel_strength),
                                                "palette": CONFIG.tunnel_palette, "palettes": CONFIG.tunnel_palettes,
                                                "ratio": list(CONFIG.tunnel_casing_dash or [1, 1]), "bg": _bg_color(active_bm),
                                                "to": _TUN_TO, "control": bool(tunnel_control and tun_paint)}))

@@ -23,8 +23,8 @@ The casing follows the slider like everything on a tunnel (Kaveh 2026-10-06): it
 - **One colour** (`tunnel_palette`, the default; two colours are not decided yet): dashes with empty gaps, `#94a3b8` at 0, moved toward slate.
   Why a second colour exists (Kaveh): with empty gaps, where a tunnel passes under a road it looks connected to it; a solid second colour
   closes the gaps. So the default should become a pair once one is chosen.
-- **A two-colour palette**: the dash layer draws a pattern image of the palette's two colours, dash and gap, at any strength: as they are at
-  0, each moved toward slate as the strength rises. (v2 blended the gap up from the background; at 35 % the second colour was hard to see.) v2's
+- **A two-colour palette**: the palette's two colours, dash and gap, at any strength: as they are at 0, each moved toward slate as the
+  strength rises. (v2 blended the gap up from the background; at 35 % the second colour was hard to see.) v2's
   `Slate + ice`, `Blue + cyan`, `Warm + sand`, and three more to try with stronger second colours: `Graphite + silver`, `Indigo + lavender`,
   `Teal + mint` (`tunnel_palettes`, `name: [dash, gap]`).
 - The dash ratio (`tunnel_casing_dash`, in line widths, so a 1 is as long as the casing line is wide): **1:1** (the default, Kaveh 2026-10-06:
@@ -42,8 +42,10 @@ look. While the slider is dragged, only its newest value is applied (once per fr
 Each colour that takes the look is a MapLibre expression: for a feature with `__rs_tunnel`,
 `["interpolate", ["linear"], strength, 0, <colour>, 100, "#64748b"]`, else the colour (`_tun_mix` in Python, `_tunMix` in the page). The page
 keeps each layer's colours without the look (`TUNNEL.layers`) and builds the expressions again when the slider moves; no data is baked per
-value. A two-colour casing is a pattern image with its own name for each palette, ratio and strength (an image updated in place under the
-same name is not redrawn by the browser). The street-name and arrow slots carry `__rs_tunnel` from their road; on a map with tunnels the arrow icon is an SDF one, coloured by
+value. A two-colour casing is two layers with MapLibre's own dash, no image: the position's casing layer draws the tunnel's gap colour
+(transparent for One colour) and the dash layer the dash colour on top, both 3 px wider than a casing. v2 drew a pattern image instead;
+measured on Monaco both take the same time per slider step (about 325 ms headless, no tile reload) and look the same, and the two layers
+need no image to keep in step (2026-10-06). The street-name and arrow slots carry `__rs_tunnel` from their road; on a map with tunnels the arrow icon is an SDF one, coloured by
 `icon-color` (one symbol layer cannot mix SDF and plain icons). An item gets `__rs_tunnel` from its edge when the overlay is attached (`_edge_overlay`).
 
 ## Limits

@@ -913,26 +913,12 @@ if(OVERLAYS.length){
   }
 }
 // window.rsSetTunnelStyle({strength, palette, ratio}) moves the tunnel look (strength 0-100; palette a name of RS_TUNNEL_PALETTES;
-// ratio [dash, gap] in line widths); the Tunnels box is UI over it. The casing follows the slider like everything on a tunnel (Kaveh):
-// a two-colour palette is a pattern of its two colours, each moved toward slate by the strength (at 0 the palette as it is; v2 blended the
-// gap up from the background and the second colour was hard to see); "One colour" is dashes with empty gaps, moved toward slate the same way.
+// ratio [dash, gap] in line widths); the Tunnels box is UI over it. The casing follows the slider like everything on a tunnel (Kaveh): its
+// two colours, each moved toward slate by the strength, are two layers with MapLibre's own dash (crisp, and only paint changes: no image,
+// no tile reload): the position's casing layer draws the gap colour (transparent for "One colour"), the dash layer the dashes on top.
 function _tunHex(a, b, t){                       // a -> b by t (0-1), "#rrggbb"
   const p=c=>c.slice(1).match(/.{2}/g).map(x=>parseInt(x,16)), A=p(a), B=p(b);
   return "#"+A.map((x,i)=>Math.round(x*(1-t)+B[i]*t).toString(16).padStart(2,"0")).join("");
-}
-function _tunPattern(){
-  const [c1, c2] = TUNNEL.palettes[TUNNEL.palette], t = TUNNEL.strength/100, u = 8;
-  // one image per palette, ratio and strength, never changed in place: a browser does not redraw a line pattern whose image is
-  // updated under the same name (Kaveh: picking a palette changed nothing). ponytail: images are kept (each about 16x8 px)
-  const id = "rs-tunnel-casing-"+[TUNNEL.palette, TUNNEL.ratio.join("-"), Math.round(TUNNEL.strength)].join("_").replace(/[^A-Za-z0-9_-]/g, "");
-  if(map.hasImage(id)) return id;
-  const d = Math.max(1, Math.round(TUNNEL.ratio[0]*u)), g = Math.max(1, Math.round(TUNNEL.ratio[1]*u));
-  const cv = document.createElement("canvas"); cv.width = d+g; cv.height = u;
-  const x = cv.getContext("2d");
-  x.fillStyle = _tunHex(c1, TUNNEL.to.fill, t); x.fillRect(0, 0, d, u);
-  x.fillStyle = _tunHex(c2, TUNNEL.to.fill, t); x.fillRect(d, 0, g, u);
-  map.addImage(id, x.getImageData(0, 0, cv.width, cv.height));
-  return id;
 }
 function rsSetTunnelStyle(o){
   if(!_tunOn) return;
@@ -942,12 +928,12 @@ function rsSetTunnelStyle(o){
   if(o.ratio != null) TUNNEL.ratio = o.ratio.map(Number);
   for(const id in TUNNEL.layers) if(map.getLayer(id))
     TUNNEL.layers[id].forEach(([k, base, to])=> map.setPaintProperty(id, k, _tunMix(base, TUNNEL.to[to])));
-  const pat = TUNNEL.palettes[TUNNEL.palette] ? _tunPattern() : null;   // "One colour": plain dashes
+  const pair = TUNNEL.palettes[TUNNEL.palette], k = TUNNEL.strength/100, tun = ["to-boolean",["get","__rs_tunnel"]];
+  const gap = pair ? _tunHex(pair[1], TUNNEL.to.fill, k) : "rgba(0,0,0,0)";          // "One colour": empty gaps
+  for(const id in TUNNEL.casing) if(map.getLayer(id)) map.setPaintProperty(id, "line-color", ["case", tun, gap, TUNNEL.casing[id]]);
   TUNNEL.dash.forEach(id=>{ if(!map.getLayer(id)) return;
-    if(pat){ map.setPaintProperty(id, "line-dasharray", null); map.setPaintProperty(id, "line-pattern", pat); }
-    else { map.setPaintProperty(id, "line-pattern", null);
-           map.setPaintProperty(id, "line-color", _tunHex(TUNNEL.to.dash, TUNNEL.to.fill, TUNNEL.strength/100));
-           map.setPaintProperty(id, "line-dasharray", TUNNEL.ratio); } });
+    map.setPaintProperty(id, "line-color", _tunHex(pair ? pair[0] : TUNNEL.to.dash, TUNNEL.to.fill, k));
+    map.setPaintProperty(id, "line-dasharray", TUNNEL.ratio); });
   _applyFill();                                   // the roads' fills: with the active colour-by
   const r=document.getElementById("tn-str"), v=document.getElementById("tn-val"), s=document.getElementById("tn-pal"),
         q=document.getElementById("tn-ratio"), pr=document.getElementById("tn-pre");
