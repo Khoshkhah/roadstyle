@@ -8,6 +8,7 @@ the user-owned overrides CSV, which is read and never written.
 from __future__ import annotations
 
 import argparse
+import csv
 import sys
 from pathlib import Path
 from typing import Any
@@ -99,12 +100,31 @@ class RoadLevelModel:
         *,
         band_dist: float = 10.0,
         head_m: float = 15.0,
+        smooth: int = 0,
     ) -> None:
+        self.smooth = smooth
         self.corridors = corridors
         self.original_rows = read_pair_table(original)
         self.styles = _style_by_edge(base_features)
         self.band_dist = band_dist
         self.head_m = head_m
+
+    def from_saved(self, levels_path: Path) -> dict[str, Any] | None:
+        """Features styled with the levels already saved in the CSV, without solving."""
+        from roadstyle.v2.engine.pairs import _corridor_refs
+
+        if not levels_path.is_file():
+            return None
+        with levels_path.open(newline="", encoding="utf-8") as source:
+            saved = {row["edge_ref"]: row for row in csv.DictReader(source)}
+        refs = _corridor_refs(self.corridors)
+        if any(ref not in saved for ref in refs):
+            return None
+        for corridor, ref in zip(self.corridors, refs, strict=True):
+            row = saved[ref]
+            corridor.casing_levels = (int(row["cs"]), int(row["cm"]), int(row["ce"]))
+            corridor.fill_level = int(row["fl"])
+        return self._features(self.original_rows)
 
     def recalculate(
         self, overrides: list[dict[str, str]], levels_path: Path | None = None
@@ -123,19 +143,21 @@ class RoadLevelModel:
         ):
             corridor.casing_levels = tuple(casing)
             corridor.fill_level = fill
-        style = compile_map(corridors=self.corridors, auto_solve=False, basemap=None).style
+        return self._features(merge_pair_overrides(self.original_rows, overrides))
+
+    def _features(self, active: list[dict[str, str]]) -> dict[str, Any]:
+        style = compile_map(corridors=self.corridors, auto_solve=False, basemap=None, smooth=self.smooth).style
         features = style["sources"]["network"]["data"]["features"]
         for feature in features:
             props = feature["properties"]
             props.update(self.styles.get(str(props.get("edge_ref")), {}))
-        active = merge_pair_overrides(self.original_rows, overrides)
         return {
             "type": "FeatureCollection",
             "features": features,
             "summary": {
                 "roads": len(self.corridors),
                 "pairs": sum(r["enabled"].lower() in {"true", "1", "yes"} for r in active),
-                "levels": sorted({int(level) for level in solution.fill_levels}),
+                "levels": sorted({int(c.fill_level) for c in self.corridors}),
             },
         }
 

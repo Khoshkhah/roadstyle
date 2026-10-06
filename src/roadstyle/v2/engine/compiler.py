@@ -925,6 +925,50 @@ def _round_coords(coords: Any, precision: int = 6) -> Any:
     return coords
 
 
+def smooth_coords(
+    coords: list[Any], iterations: int = 2, corner_deg: float = 100.0
+) -> list[tuple[float, ...]]:
+    """Chaikin corner-cutting for display. Endpoints and turns sharper than ``corner_deg`` stay put."""
+    import math
+
+    pts = [tuple(c) for c in coords]
+    if iterations <= 0 or len(pts) < 3:
+        return pts
+    cos_lat = math.cos(math.radians(pts[0][1]))
+
+    def turn(a: Any, b: Any, c: Any) -> float:
+        v1 = ((b[0] - a[0]) * cos_lat, b[1] - a[1])
+        v2 = ((c[0] - b[0]) * cos_lat, c[1] - b[1])
+        n = math.hypot(*v1) * math.hypot(*v2)
+        if n == 0:
+            return 0.0
+        dot = max(-1.0, min(1.0, (v1[0] * v2[0] + v1[1] * v2[1]) / n))
+        return math.degrees(math.acos(dot))
+
+    fixed = [i in (0, len(pts) - 1) or turn(pts[i - 1], pts[i], pts[i + 1]) > corner_deg
+             for i in range(len(pts))]
+    for _ in range(iterations):
+        out: list[tuple[float, ...]] = []
+        out_fixed: list[bool] = []
+        for i in range(len(pts) - 1):
+            a, b = pts[i], pts[i + 1]
+            if fixed[i]:
+                out.append(a)
+                out_fixed.append(True)
+            else:
+                out.append(tuple(0.75 * x + 0.25 * y for x, y in zip(a, b)))
+                out_fixed.append(False)
+            if fixed[i + 1]:
+                if i + 1 == len(pts) - 1:
+                    out.append(b)
+                    out_fixed.append(True)
+            else:
+                out.append(tuple(0.25 * x + 0.75 * y for x, y in zip(a, b)))
+                out_fixed.append(False)
+        pts, fixed = out, out_fixed
+    return pts
+
+
 def _to_geojson_geom(geom: Any, precision: int = 6) -> dict[str, Any]:
     """Safely convert geometry object (or dict) to GeoJSON geometry mapping."""
     if isinstance(geom, dict):
@@ -954,6 +998,8 @@ def compile_map(
     zoom: float | None = None,
     auto_solve: bool = True,
     theme: str = "dark",
+    smooth: int = 0,
+    smooth_corner_deg: float = 100.0,
 ) -> WebMap:
     """Compile network cartographic primitives into a self-contained WebMap instance.
 
@@ -1007,6 +1053,8 @@ def compile_map(
 
         # 2-Point Casing Split (using split_casing_geometry)
         coords = list(c.geometry.coords) if hasattr(c.geometry, "coords") else []
+        if smooth > 0:
+            coords = smooth_coords(coords, smooth, smooth_corner_deg)
         cs, cm, ce = c.casing_levels if c.casing_levels is not None else (fl, fl, fl)
         all_levels.update([cs, cm, ce])
 
@@ -1090,7 +1138,10 @@ def compile_map(
             })
             features.append({
                 "type": "Feature",
-                "geometry": _to_geojson_geom(c.geometry),
+                "geometry": _to_geojson_geom(
+                    {"type": "LineString", "coordinates": coords} if smooth > 0 and len(coords) >= 2
+                    else c.geometry
+                ),
                 "properties": fill_props,
             })
 

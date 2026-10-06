@@ -204,3 +204,15 @@ def test_bridge_and_tunnel_compilation():
     assert len(bridge_features) > 0
     assert len(tunnel_features) > 0
 
+
+
+def test_smooth_coords_keeps_endpoints_and_sharp_corners():
+    from roadstyle.v2.engine.compiler import smooth_coords
+
+    line = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0)]
+    out = smooth_coords(line, 2, corner_deg=100.0)
+    assert out[0] == line[0] and out[-1] == line[-1]
+    assert len(out) > len(line) and (1.0, 0.0) not in out
+    assert smooth_coords(line, 2, corner_deg=45.0).count((1.0, 0.0)) == 1
+    assert smooth_coords(line, 0) == line
+    assert smooth_coords(line[::-1], 2) == smooth_coords(line, 2)[::-1]

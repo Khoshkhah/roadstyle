@@ -446,6 +446,13 @@ class PairEditorServer(ThreadingHTTPServer):
         }
 
 
+    def saved_network(self) -> dict[str, Any] | None:
+        """The map with the levels already saved in the CSV; falls back to solving."""
+        if self.model is None:
+            return None
+        saved = self.model.from_saved(self.levels_path) if self.levels_path else None
+        return saved if saved is not None else self.recalculate()
+
     def recalculate(self) -> dict[str, Any] | None:
         """Solve original + saved overrides, rewrite the level CSV, return the map features."""
         if self.model is None:
@@ -471,7 +478,7 @@ class PairEditorHandler(BaseHTTPRequestHandler):
             self._send(200, json.dumps(data), "application/json; charset=utf-8")
         elif route == "/api/network":
             try:
-                self._send(200, json.dumps(self.server.recalculate()), "application/json; charset=utf-8")
+                self._send(200, json.dumps(self.server.saved_network()), "application/json; charset=utf-8")
             except (OSError, ValueError, RuntimeError) as error:
                 self._send(500, json.dumps({"error": str(error)}), "application/json; charset=utf-8")
         elif route == "/pair_override_editor.js":
@@ -561,6 +568,7 @@ def main() -> None:
     parser.add_argument("--levels", type=Path, default=DEFAULT_LEVELS)
     parser.add_argument("--database", type=Path, default=DEFAULT_DATABASE)
     parser.add_argument("--head-m", type=float, default=15.0)
+    parser.add_argument("--smooth", type=int, default=0, help="Display-only smoothing iterations (0 = off)")
     args = parser.parse_args()
     features = _load_map_features(args.map_html)
     model = None
@@ -573,6 +581,7 @@ def main() -> None:
             args.original.expanduser(),
             _load_all_features(args.map_html),
             head_m=args.head_m,
+            smooth=args.smooth,
         )
     else:
         print(f"No DuckOSM database at {database}: showing the map's own levels.")

@@ -6,6 +6,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **v2 display smoothing:** `compile_map(smooth=N, smooth_corner_deg=100)` rounds corridor lines with N Chaikin passes for display only. Stored geometry, endpoints and sharp corners are unchanged. The pair override dashboard takes `--smooth N`.
+
 ### Changed
 - **OSM casing heads:** increase junction head setbacks to 15 m at both ends of each OSM road; the stacking solver fallback default is also 15 m.
 - **Monaco v2 map:** road details open in a click popup and include the computed road length.
