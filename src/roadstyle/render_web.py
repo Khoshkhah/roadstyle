@@ -1858,8 +1858,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             # (a label that outgrows its piece is dropped by MapLibre automatically).
             # ARROWS BEFORE LABELS on purpose: MapLibre resolves symbol collisions in favour of
             # the LATER style layer, so the layer order is the culling priority and names are placed
-            # first. The arrows (one per road, placed by the page between two names) are drawn even
-            # where they touch a name (icon-allow-overlap): docs/design/arrows_and_names.md.
+            # first. An arrow (one per road, placed by the page between two names) that would still touch
+            # a name is left out: docs/design/arrows_and_names.md.
             _MINOR = ["footway", "cycleway", "path", "steps",
                       "service", "track", "pedestrian"]
             if arrows:
@@ -1898,7 +1898,9 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                                                             "symbol-spacing": ["interpolate", ["linear"], ["zoom"], 15, 200, 18, 320, 22, 900]}}
                              if tiles else
                              {"source": "arrows", "layout": {"symbol-placement": "point", "icon-rotate": ["get", "b"],
-                                                             "icon-allow-overlap": True}})
+                                                             # where it would touch a name the arrow is left out (Kaveh 2026-10-06): the names are
+                                                             # placed first (a later layer), and an arrow never pushes a name away
+                                                             "icon-allow-overlap": False, "icon-ignore-placement": True}})
                     return {"id": lid, "type": "symbol", "source": where["source"], "minzoom": 15,
                             "filter": f,
                             "layout": {**where["layout"],

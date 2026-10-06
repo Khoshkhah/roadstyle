@@ -1870,3 +1870,15 @@ def test_arrows_are_thinned(tmp_path):
         browser.close()
     assert side16 == [] and side17 == ["Side"]                                  # residential: from zoom 17
     assert len(mains16) == 1                                                       # 5 m apart: one arrow
+
+
+def test_an_arrow_that_would_touch_a_name_is_left_out():
+    """docs/design/arrows_and_names.md (Kaveh 2026-10-06): the page's arrows collide with the names (placed first, a later layer) and are
+    dropped where they would touch one; they never push a name away."""
+    g = gpd.GeoDataFrame({"highway": ["primary"], "name": ["Long St"], "oneway": [True]},
+                         geometry=[LineString([(18.0, 59.3), (18.01, 59.3)])], crs=4326)
+    style = _style(render_edges(g, backend="web", basemap="blank").html)
+    arrows = [l for l in style["layers"] if l["id"].startswith("roads-arrows")]
+    assert arrows and all(l["layout"]["icon-allow-overlap"] is False and l["layout"]["icon-ignore-placement"] is True for l in arrows)
+    ids = [l["id"] for l in style["layers"]]
+    assert ids.index("roads-arrows") < ids.index("roads-labels")                      # names placed first

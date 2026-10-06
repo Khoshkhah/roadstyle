@@ -60,8 +60,9 @@ The page places them (`_rsArrows`), after every move and once the slots are load
   The numbers are `_RS_ARROW` in the page (also the 14 px gap beside a name and the 10 px from the window's edge).
 - **Drawn.** Each arrow is a point in the page's `arrows` source with the properties of the slot piece it lies on, so the arrow layers keep
   their filters (one-way, drawing position, class, minzoom) and everything that hides a road hides its arrow. One arrow layer per drawing
-  position, right after that position's fill layers: a road drawn above covers the arrows below it. The icon is drawn even where it touches
-  a name (`icon-allow-overlap`): a road's only arrow is never dropped.
+  position, right after that position's fill layers: a road drawn above covers the arrows below it. Where the arrow would still touch a
+  name (the page's estimate of the name's width fell short), the arrow is left out: MapLibre places the names first and drops an arrow
+  that collides with one (`icon-allow-overlap: false`), and an arrow never pushes a name away (`icon-ignore-placement`) (Kaveh 2026-10-06).
 
 **Before (until 2026-10-06):** the icon was repeated along every one-way slot (`symbol-placement: line`, about every 200 px at zoom 15). At
 zoom 15 a 100 m slot is about 20 px, so long roads carried many arrows; and an earlier version with one arrow per chain (`line-center`) often
