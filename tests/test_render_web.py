@@ -1888,6 +1888,10 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     new = [r for r in area.relations("11", "12")["rows"] if r["section"] == "new"]
     assert len(new) == 1 and (tmp_path / "levels.csv").exists()                  # added in this session: "new", not "saved"
     assert len(area.relations("12")["rows"]) >= 3                                # one road: everything about it, in both tables
+    area.add({"relation": "stack", "a": "11", "b": "14", "a_end": "start", "b_end": "end", "enabled": "true"})     # a stack keeps its part
+    assert area.edits().iloc[-1][["a_end", "b_end"]].tolist() == ["start", ""]
+    with pytest.raises(ValueError):
+        area.add({"relation": "stack", "a": "11", "b": "14", "a_end": "middle", "enabled": "true"})
 
 
 def test_edits_name_either_direction_of_a_road():
@@ -1927,3 +1931,24 @@ def test_every_part_of_the_upper_casing_is_after_the_lower_fill():
     assert out.loc["1", "casing_start"] > out.loc["2", "fill_level"]                                    # A's start head over B's fill
     assert min(out.loc["1", ["casing_start", "casing_level", "casing_end", "fill_level"]]) > out.loc["2", "fill_level"]
     assert out.attrs["levels_given_up"] == []                                                           # the wish gave way, not the stack pair
+
+
+def test_stack_edits_can_name_a_part_of_the_upper_road():
+    """solve_levels: a stack edit's a_end names a part of A (start / main / end). Added, that casing part is after B's fill; switched off, only
+    that part of a found whole pair is left out; naming A's other direction turns start and end; switching off a part of no pair is an error."""
+    pytest.importorskip("scipy")
+    import pandas as pd
+
+    import roadstyle as rs
+    g = _edge_world()                                  # ground 11 - tunnel 12 - ground 14 in a line, street 13 crossing over the tunnel's middle
+    roads, pairs = rs.level_input(g)
+    row = lambda **k: pd.DataFrame([{"relation": "stack", "a_end": "", "b_end": "", "enabled": "true", **k}])     # noqa: E731
+    out = rs.solve_levels(roads, pairs, edits=row(a="11", b="14", a_end="start")).set_index("road")
+    assert out.loc["11", "casing_start"] > out.loc["14", "fill_level"]                      # an added part: that head over B's fill
+    out = rs.solve_levels(roads, pairs, edits=row(a="11", b="14", a_end="end")).set_index("road")
+    assert out.loc["11", "casing_end"] > out.loc["14", "fill_level"]
+    rs.solve_levels(roads, pairs, edits=row(a="13", b="12", a_end="start", enabled="false"))   # one part of the found pair 13 over 12: switched off
+    with pytest.raises(ValueError):
+        rs.solve_levels(roads, pairs, edits=row(a="11", b="14", a_end="start", enabled="false"))   # no pair 11 over 14 to take a part from
+    with pytest.raises(ValueError):
+        rs.solve_levels(roads, pairs, edits=row(a="11", b="14", a_end="middle"))

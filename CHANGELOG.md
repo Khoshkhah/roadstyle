@@ -12,6 +12,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   an `edits.csv` you own, and `levels.csv`. `compute_levels` is the two in one call.
 - **The level editor** (`scripts/edit_levels.py AREA_DIR`): a local page to write `edits.csv`: pick two roads, see their pairs, switch one off or add one;
   every change is solved at once and shown, an edit the solver refuses is not saved.
+- **A stack edit on one part of A** (`a_end` = `start` / `main` / `end`): added, that part of A's casing is after B's fill even at a junction; switched off,
+  only that part of a found pair is left out. The editor has the part chooser.
 
 ### Changed
 - **Meet or cross:** roads of different bands that only meet (a tunnel mouth, a bridge end) follow the priority order; roads that cross keep the band. With `band_col`

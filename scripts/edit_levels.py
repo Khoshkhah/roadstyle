@@ -3,7 +3,7 @@
     python scripts/edit_levels.py AREA_DIR [--port 8780]
 
 AREA_DIR holds roads.parquet and pairs.csv (scripts/level_input.py). Click two roads, see every pair between them (the found ones and
-your edits), switch a found one off or add one (order / stack: road 1 over road 2; meet: an end of each). Every change is solved at once
+your edits), switch a found one off or add one (order / stack: road 1 over road 2, a stack on one part of road 1 if you like; meet: an end of each). Every change is solved at once
 and the page reloads with the new levels (levels.csv is written too); an edit the solver refuses is not saved. The edits.csv before each
 change is kept as edits.csv.bak.
 """
@@ -109,6 +109,21 @@ class Area:
             self.saved = saved
         self.build(edits, solved)
 
+    def add(self, body):
+        """Add one edit from the page's form (an edit the solver refuses raises ValueError and is not saved)."""
+        row = {c: str(body.get(c, "") or "") for c in COLS}
+        if row["relation"] not in ("meet", "stack", "order"):
+            raise ValueError("relation must be meet, stack or order")
+        if row["relation"] == "meet" and not (row["a_end"] in ("start", "end") and row["b_end"] in ("start", "end")):
+            raise ValueError("a meet needs an end of each road (start / end)")
+        if row["relation"] == "stack" and row["a_end"] not in ("", "start", "main", "end"):
+            raise ValueError("a stack's part of road 1 is start, main, end or empty (the whole road)")
+        if row["relation"] != "meet":                           # a stack keeps its part of road 1 (a_end)
+            row["b_end"] = ""
+            if row["relation"] == "order":
+                row["a_end"] = ""
+        self.change(pd.concat([self.edits(), pd.DataFrame([row])], ignore_index=True))
+
     def rows(self):
         """Every edit, with its index, its section (saved before this session / added now) and its two roads."""
         out = []
@@ -183,14 +198,7 @@ def _handler(area):
             e = area.edits()
             try:
                 if self.path == "/api/add":
-                    row = {c: str(body.get(c, "") or "") for c in COLS}
-                    if row["relation"] not in ("meet", "stack", "order"):
-                        raise ValueError("relation must be meet, stack or order")
-                    if row["relation"] == "meet" and not (row["a_end"] in ("start", "end") and row["b_end"] in ("start", "end")):
-                        raise ValueError("a meet needs an end of each road (start / end)")
-                    if row["relation"] != "meet":
-                        row["a_end"] = row["b_end"] = ""
-                    area.change(pd.concat([e, pd.DataFrame([row])], ignore_index=True))
+                    area.add(body)
                 elif self.path == "/api/delete":
                     i = int(body["index"])
                     area.change(e.drop(index=i).reset_index(drop=True), saved=area.saved - (i < area.saved))

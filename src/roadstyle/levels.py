@@ -161,7 +161,7 @@ def _relations(metres, ends, beta, omega, band_dist, mouths=True):
     return meets, stacks, orders
 
 
-def _solve_intervals(metres, meets, stacks, orders, limit, head_m, max_level, margin, min_positions=True, max_positions=None):
+def _solve_intervals(metres, meets, stacks, orders, limit, head_m, max_level, margin, min_positions=True, max_positions=None, forced=(), off=()):
     """The solver on roads (one per segment, both directions together) and their relations (:func:`_relations`, or a pairs table). Every road has
     one fill number ``b`` and a casing divided into a start head, a main part and an end head (one number for a road shorter than ``2 * head_m``).
     Returns ``(parts, given_up, info)``: ``parts[r] = (a_start, a_main, a_end, b)``. The model is a linear program solved on a sparse matrix with
@@ -175,7 +175,8 @@ def _solve_intervals(metres, meets, stacks, orders, limit, head_m, max_level, ma
     zero = [(0, 0, 0, 0)] * n
     import shapely
     long_ = (shapely.length(np.asarray(metres, dtype=object)) >= 2 * head_m).tolist()
-    pair_list = sorted(set(stacks))
+    whole = set(stacks)                                        # the stack pairs of the whole road (the rule below); forced / off: (A, B, "s" / "m" / "e")
+    pair_list = sorted(whole | {(u, l) for u, l, _ in forced})
     short_upper = sum(not long_[u] for u, _ in pair_list)
     info = {"pairs": len(pair_list) - short_upper, "roads": n, "short_roads": long_.count(False), "short_upper_pairs": short_upper, "meets": len(meets)}
     O = sorted(set(orders))
@@ -229,12 +230,16 @@ def _solve_intervals(metres, meets, stacks, orders, limit, head_m, max_level, ma
     def junction(u, heads, l):
         return any(l in at_head[(u, h)] or at_head[(u, h)] & touching[l] for h in heads)
     stack_rows = []                                            # (pair index, the casing column it lifts)
+    off, forced = set(off), set(forced)
     for k, (u, l) in enumerate(pair_list):
-        if long_[u]:
-            lift = [part[u]["m"]] + [part[u][h] for h in ("s", "e") if not junction(u, (h,), l)]
-        else:
-            lift = [] if junction(u, ("s", "e"), l) else [part[u]["s"]]
-        stack_rows += [(k, c) for c in lift]
+        lift = []
+        if (u, l) in whole:
+            if long_[u]:
+                lift = [part[u][h] for h in ("m", "s", "e") if (h == "m" or not junction(u, (h,), l)) and (u, l, h) not in off]
+            elif not junction(u, ("s", "e"), l) and not off & {(u, l, h) for h in "sme"}:
+                lift = [part[u]["s"]]
+        lift += [part[u][h] for (a, b, h) in forced if (a, b) == (u, l)]          # an edit's part: lifted even at a junction
+        stack_rows += [(k, c) for c in dict.fromkeys(lift)]
     for k, c in stack_rows:
         le([(pair_list[k][1], 1.0), (c, -1.0)], -margin)
     for x, y in O:
@@ -381,21 +386,26 @@ def level_input(edges, id_col="edge_id", layer_col="layer", bridge_col="bridge",
 
 
 def _read_pairs(pairs):
+    """The rows of a pairs / edits table (or CSV) as dicts, an empty a / b / a_end / b_end as None."""
     import pandas as pd
-    t = pd.read_csv(pairs, dtype=str, keep_default_na=False) if isinstance(pairs, (str, bytes)) or hasattr(pairs, "__fspath__") else pairs.copy()
-    for c in ("a", "b", "a_end", "b_end"):
-        t[c] = [None if v is None or (isinstance(v, float) and v != v) or v == "" else str(v) for v in t[c]] if c in t else None
-    return t
+    t = pd.read_csv(pairs, dtype=str, keep_default_na=False) if isinstance(pairs, (str, bytes)) or hasattr(pairs, "__fspath__") else pairs
+    out = t.to_dict("records")
+    for row in out:
+        for c in ("a", "b", "a_end", "b_end"):
+            v = row.get(c)
+            row[c] = None if v is None or (isinstance(v, float) and v != v) or v == "" else str(v)
+    return out
 
 
 def solve_levels(roads, pairs, edits=None, head_m=5.0, max_level=20, margin=1.0, time_limit=60.0, min_positions=True, max_positions=None):
     """Solve the drawing levels of ``roads`` from their ``pairs`` (both from :func:`level_input`, or read back from ``roads.parquet`` /
     ``pairs.csv``) and the caller's ``edits`` (a table or a CSV with the columns of ``pairs`` and ``enabled``: a row with ``enabled`` false
     switches off the same relation of ``pairs``, any other row is added; ``a`` / ``b`` may name any edge of a road, and a ``meet`` naming the
-    edge that runs the other way has its end (start / end) turned to the road's way; a ``meet`` is the same in either order). Returns ``roads`` with
+    edge that runs the other way has its end (start / end) turned to the road's way; a ``meet`` is the same in either order). A ``stack`` edit may name
+    a part of A in ``a_end``: ``start`` / ``main`` / ``end`` (empty: the whole road, the rule with its junction exceptions). Added, that part is after
+    B's fill even at a junction; switched off, only that part of the found pair is left out. Returns ``roads`` with
     ``casing_start``, ``casing_level``, ``casing_end`` and ``fill_level`` (in the road's own direction); ``attrs["levels_given_up"]`` (the
     stack pairs that could not be kept, as road ids) and ``attrs["levels_info"]``."""
-    t = _read_pairs(pairs)
     of, back = {}, set()                                       # any edge id -> its road's row; the ids of the edges that run against their road
     for i, r in enumerate(roads.itertuples()):
         for e in [r.road, *list(r.edges), *list(r.reversed)]:
@@ -404,27 +414,39 @@ def solve_levels(roads, pairs, edits=None, head_m=5.0, max_level=20, margin=1.0,
     def key(row):
         if row["relation"] == "meet":                          # no direction: the same pair whichever road is named first
             return ("meet", *sorted([(row["a"], row["a_end"]), (row["b"], row["b_end"])]))
+        if row["relation"] == "stack":                         # a part of A, or the whole road ("")
+            return ("stack", row["a"], row["b"], row["a_end"] or "")
         return (row["relation"], row["a"], row["b"])
-    rel = {key(row): row for row in t.to_dict("records")}
+    off = set()                                                # (A, B, part): switched off in a found whole pair
+    rel = {key(row): row for row in _read_pairs(pairs)}
     if edits is not None:
-        for row in _read_pairs(edits).to_dict("records"):
+        for row in _read_pairs(edits):
+            if row["relation"] == "stack" and (row["a_end"] or "") not in ("", "start", "main", "end"):
+                raise ValueError(f"edits: a stack's part (a_end) is start, main, end or empty, not {row['a_end']!r}")
             for c in ("a", "b"):
                 if row[c] not in of:
                     raise ValueError(f"edits: {row[c]!r} is not an edge of the roads")
-                if row["relation"] == "meet" and row[c] in back:                # that edge's start is its road's end
+                if (row["relation"] == "meet" or (row["relation"] == "stack" and c == "a")) and row[c] in back:     # that edge's start is its road's end
                     row[c + "_end"] = {"start": "end", "end": "start"}.get(row[c + "_end"], row[c + "_end"])
                 row[c] = roads["road"].iat[of[row[c]]]
             if str(row.get("enabled", "")).strip().lower() in ("false", "0", "no"):
-                if rel.pop(key(row), None) is None:
-                    raise ValueError(f"edits: no {row['relation']} pair {row['a']} {row['b']} to switch off")
+                k = key(row)
+                if rel.pop(k, None) is None:
+                    if k[0] == "stack" and k[3] and ("stack", k[1], k[2], "") in rel:        # one part of a found whole pair
+                        off.add((k[1], k[2], k[3]))
+                    else:
+                        raise ValueError(f"edits: no {row['relation']} pair {row['a']} {row['b']} {k[3] if k[0] == 'stack' else ''} to switch off".rstrip())
             else:
                 rel[key(row)] = row
     idx = {r: i for i, r in enumerate(roads["road"])}
     meets = [(idx[r["a"]], r["a_end"], idx[r["b"]], r["b_end"]) for r in rel.values() if r["relation"] == "meet"]
-    stacks = [(idx[r["a"]], idx[r["b"]]) for r in rel.values() if r["relation"] == "stack"]
+    stacks = [(idx[r["a"]], idx[r["b"]]) for r in rel.values() if r["relation"] == "stack" and not r["a_end"]]
+    short = {"start": "s", "main": "m", "end": "e"}
+    forced = [(idx[r["a"]], idx[r["b"]], short[r["a_end"]]) for r in rel.values() if r["relation"] == "stack" and r["a_end"]]
+    off = [(idx[a], idx[b], short[h]) for a, b, h in off]
     orders = [(idx[r["a"]], idx[r["b"]]) for r in rel.values() if r["relation"] == "order"]
     iv, given, info = _solve_intervals(list(_metres(roads.geometry)), meets, stacks, orders, time_limit, head_m, max_level, margin, min_positions,
-                                       max_positions)
+                                       max_positions, forced, off)
     counts = defaultdict(int)                                  # the solution can sit at any height: the main casing number most edges have becomes 0 (the ground)
     for r, row in enumerate(roads.itertuples()):
         counts[iv[r][1]] += len(row.edges) + len(row.reversed)

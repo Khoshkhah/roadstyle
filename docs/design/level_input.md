@@ -30,6 +30,11 @@ B's fill. Before, only A's main part did: where B passed under A close to one of
 is left out: it is a junction, where the head is under the fills it joins. Two ramps, each over one tube of a tunnel and joining the other
 tube, still make a loop of four rules no order keeps; the solver gives one of their pairs up and reports it (Monaco 16, Södermalm 27).
 
+**One part of A** (an edit): a `stack` edit may name a part of A's casing in `a_end`: `start`, `main` or `end` (empty: the whole road, the
+rule above). Added, that part comes after B's fill even where its head joins B (a junction the rule leaves out). Switched off
+(`enabled=false`), only that part is left out of a found whole pair; the rest of the pair stays. A part named on an edge that runs against its
+road is turned to the road's way, as a meet's end is.
+
 ## Files (one folder per area)
 
 | file | what | written by |
@@ -50,7 +55,8 @@ python scripts/solve_levels.py out/monaco
 
 **The editor** (`python scripts/edit_levels.py out/monaco`, a local page at http://localhost:8780/) writes `edits.csv`: click two roads (road 1
 orange, road 2 blue; their start and end points are marked), see every pair between them (the found ones, with *switch off*, and your edits,
-with *delete*), and add one (`order` or `stack`: road 1 over road 2; `meet`: the chosen end of each). Every change is solved at once and the
+with *delete*), and add one (`order` or `stack`: road 1 over road 2, a stack on the whole road or one part of it, which can also switch
+that part off in a found pair; `meet`: the chosen end of each). Every change is solved at once and the
 page reloads with the new levels, keeping the view and the picked roads; `levels.csv` is written too. An edit the solver refuses (an unknown
 road, nothing to switch off) is not saved, and the panel says why. The `edits.csv` before each change is kept as `edits.csv.bak`. The list of
 your edits shows each one's two roads when clicked. It is written for this page alone (the roadstyle map and its `rs*` API); the v2 test's
