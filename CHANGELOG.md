@@ -18,6 +18,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - The editor: you choose which road is on top for an order or a stack (it was always the road clicked first); changes wait in a list until *Apply and solve*,
   one solve for all, with a busy layer over the map until the new map is drawn.
 - `level_input` keeps the edges' `lanes` (shown in the editor's cards). A delete in the editor names its row as the page saw it: if edits.csv changed since, nothing is applied.
+- The editor: *ends: round / flat* per road (saved in `caps.csv`, drawn with the existing `cap_col`), and the road's drawn width and lanes in its card.
 - The editor has a search box: an edge id (either direction of a road) or an edge_ref, or a part of one; a hit is picked and shown.
 
 ### Changed

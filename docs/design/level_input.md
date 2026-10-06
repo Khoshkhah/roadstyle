@@ -42,6 +42,7 @@ road is turned to the road's way, as a meet's end is.
 | `roads.parquet` | one row per road (both directions of a segment together): `road` (the id of its first edge), `edges` / `reversed` (the ids of its edges running its way / the other way), `band`, `priority`, the line | `scripts/level_input.py` (`rs.level_input`), every run |
 | `pairs.csv` | one row per relation: `relation`, `a`, `b`, `a_end`, `b_end` (below) | `scripts/level_input.py`, every run |
 | `edits.csv` | your changes to the pairs, same columns plus `enabled`: `false` switches a pair off, anything else adds one; `a` / `b` may name either direction of a road | created empty once; you, or `scripts/edit_levels.py`; never overwritten by the input step |
+| `caps.csv` | the roads drawn with flat ends (`road`), for `render_edges(cap_col=...)` (`docs/design/square_ends.md`): drawing only, the solver does not read it | `scripts/edit_levels.py` (the *ends* toggle in a road's card) |
 | `levels.csv` | the result, one row per edge: `edge`, `casing_start`, `casing_level`, `casing_end`, `fill_level` | `scripts/solve_levels.py` (`rs.solve_levels`) |
 
 Relations: `meet` (the end `a_end` of `a` is the end `b_end` of `b`: each head is under the other road's fill), `stack` (`a` is over `b`) and
@@ -61,7 +62,8 @@ given up, since a stack outranks an order: the panel warns before you add it and
 list (kept over a reload of the page) until you press *Apply and solve*: then they are solved together while the map shows that it is
 working, and the page reloads with the new levels, keeping the view and the picked roads; `levels.csv` is written too. If one change is
 wrong or the solver refuses them (an unknown
-road, nothing to switch off), nothing is saved, the list stays, and the panel says why. The `edits.csv` before each apply is kept as `edits.csv.bak`. The list of
+road, nothing to switch off), nothing is saved, the list stays, and the panel says why. The `edits.csv` before each apply is kept as `edits.csv.bak`. A road's card also has *ends: round / flat*
+(both ends of the road; `caps.csv`), for a wide road whose round end reaches across a narrower road it ends on. The list of
 your edits shows each one's two roads when clicked. It is written for this page alone (the roadstyle map and its `rs*` API); the v2 test's
 pair editor is not used.
 

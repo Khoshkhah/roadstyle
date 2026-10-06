@@ -55,6 +55,8 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
 #lv .wd-x{display:flex;flex-direction:column;justify-content:center;gap:3px;font-size:9.5px;color:var(--lv-mute);text-align:center}
 #lv .wd-x div{height:16px;border-radius:3px;background:#8c96a5;display:flex;align-items:center;justify-content:center}
 #lv .wd-x i{display:block;height:100%;background:#f1e7c8}
+#lv .caps{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12px;color:var(--lv-mute)} #lv .caps .seg{flex:1}
+#lv .caps .seg button{padding:3px 0;font-size:12px}
 #lv .lvls{display:flex;gap:4px;margin-top:8px} #lv .lvls div{flex:1;text-align:center;background:var(--lv-bg);border-radius:6px;padding:3px 0}
 #lv .lvls small{display:block;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em} #lv .lvls b{font-size:13px}
 #lv .num{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;
@@ -248,6 +250,8 @@ body.lv-open #lv-busy{right:var(--lv-w)}
         <span>look</span><span>${esc(f.look || "–")}</span><span>lanes</span><span>${esc(f.lanes ?? "–")}</span>
         <span>road id</span><span style="grid-column:span 3;font-size:11px">${esc(r)}</span></div>
       <div class="wd" data-w="${esc(r)}">${widthHtml(f)}</div>
+      <div class="caps" title="The road's two ends: round (the default) or flat, where a round end would reach across a narrower road (caps.csv, drawing only)">ends
+        <div class="seg" data-cap="${esc(r)}"><button data-v="0" class="${f.flat ? "" : "on"}">round</button><button data-v="1" class="${f.flat ? "on" : ""}">flat</button></div></div>
       <div class="lvls"><div><small>start</small><b>${L[0]}</b></div><div><small>casing</small><b>${L[1]}</b></div>
         <div><small>end</small><b>${L[2]}</b></div><div><small>fill</small><b>${L[3]}</b></div></div></div>`;
   }
@@ -283,6 +287,11 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     $("lv-cards").innerHTML = picked.length ? sel.map((r, k) => r != null ? card(r, k) : "").join("")
       + (sel[1] == null ? `<div class="empty">Click a second road to see what is between them</div>` : "")
       : `<div class="empty">Click a road on the map<br><small>a second one for the pair · click again or ✕ to cancel · Esc clears</small></div>`;
+    $("lv-cards").querySelectorAll("[data-cap] button").forEach(b => b.onclick = () => {
+      const r = b.closest("[data-cap]").dataset.cap, on = b.dataset.v === "1";
+      if(on === !!(facts[r] || {}).flat) return;
+      stage({op: "flat", road: r, on: on});
+    });
     $("lv-cards").querySelectorAll(".x").forEach(b => b.onclick = () => { sel[+b.dataset.k] = null; if(sel[0] == null){ sel[0] = sel[1]; sel[1] = null; } update(); });
     $("lv-add-sec").hidden = sel[1] == null; describe();
   }
@@ -345,7 +354,9 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     : b.relation === "stack" ? `${b.a_end ? "(" + PART[b.a_end] + ") " : ""}over ${name(b.b)}` : `after ${name(b.b)}`}`;
   function stage(q){
     if(q.op === "delete" && queue.some(x => x.op === "delete" && x.index === q.index)) return toast("Already in the list");
-    q.text = q.op === "delete" ? "delete edit: " + plain(q.row) : `${q.body.relation} · ${plain(q.body)}`;
+    if(q.op === "flat") queue = queue.filter(x => !(x.op === "flat" && x.road === q.road));     // the last choice for a road counts
+    q.text = q.op === "delete" ? "delete edit: " + plain(q.row) : q.op === "flat" ? `${q.on ? "flat" : "round"} ends · ${name(q.road)}`
+      : `${q.body.relation} · ${plain(q.body)}`;
     queue.push(q); showQueue(); toast("In the list · apply when ready");
   }
   function showQueue(){
@@ -360,7 +371,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   $("lv-apply").onclick = async () => {
     if(!queue.length) return;
     $("lv-apply").disabled = true; busy(`Solving the levels with ${queue.length} change${queue.length > 1 ? "s" : ""} …`);
-    try { await api("/api/apply", {ops: queue.map(q => q.op === "delete" ? {op: "delete", index: q.index, row: q.raw} : {op: "add", body: q.body})});
+    try { await api("/api/apply", {ops: queue.map(q => q.op === "flat" ? {op: "flat", road: q.road, on: q.on} : q.op === "delete" ? {op: "delete", index: q.index, row: q.raw} : {op: "add", body: q.body})});
       const said = `Applied ${queue.length} change${queue.length > 1 ? "s" : ""}`;
       queue = []; showQueue(); busy("Drawing the new map …");
       sessionStorage.setItem("lv-view", JSON.stringify({c: map.getCenter(), z: map.getZoom(), b: map.getBearing(), p: map.getPitch(), sel: sel, said: said,

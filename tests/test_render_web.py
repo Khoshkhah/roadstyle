@@ -1901,6 +1901,10 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
         with pytest.raises(ValueError):
             area.apply(bad)
     assert len(area.edits()) == 1                                                 # nothing saved
+    area.apply([{"op": "flat", "road": "12", "on": True}])                       # flat ends: caps.csv, drawn with cap_col
+    assert (tmp_path / "caps.csv").read_text().split() == ["road", "12"] and area.facts["12"]["flat"]
+    area.apply([{"op": "flat", "road": "12", "on": False}])
+    assert (tmp_path / "caps.csv").read_text().split() == ["road"] and not area.facts["12"]["flat"]
 
 
 def test_edits_name_either_direction_of_a_road():
