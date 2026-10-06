@@ -922,13 +922,16 @@ function _tunHex(a, b, t){                       // a -> b by t (0-1), "#rrggbb"
 }
 function _tunPattern(){
   const [c1, c2] = TUNNEL.palettes[TUNNEL.palette], t = TUNNEL.strength/100, u = 8;
+  // one image per palette, ratio and strength, never changed in place: a browser does not redraw a line pattern whose image is
+  // updated under the same name (Kaveh: picking a palette changed nothing). ponytail: images are kept (each about 16x8 px)
+  const id = "rs-tunnel-casing-"+[TUNNEL.palette, TUNNEL.ratio.join("-"), Math.round(TUNNEL.strength)].join("_").replace(/[^A-Za-z0-9_-]/g, "");
+  if(map.hasImage(id)) return id;
   const d = Math.max(1, Math.round(TUNNEL.ratio[0]*u)), g = Math.max(1, Math.round(TUNNEL.ratio[1]*u));
   const cv = document.createElement("canvas"); cv.width = d+g; cv.height = u;
   const x = cv.getContext("2d");
   x.fillStyle = _tunHex(c1, TUNNEL.to.fill, t); x.fillRect(0, 0, d, u);
   x.fillStyle = _tunHex(c2, TUNNEL.to.fill, t); x.fillRect(d, 0, g, u);
-  const id = "rs-tunnel-casing-"+TUNNEL.ratio.join("-"), data = x.getImageData(0, 0, cv.width, cv.height);
-  if(map.hasImage(id)) map.updateImage(id, data); else map.addImage(id, data);     // one small image per dash ratio, kept (tiles may still use it)
+  map.addImage(id, x.getImageData(0, 0, cv.width, cv.height));
   return id;
 }
 function rsSetTunnelStyle(o){

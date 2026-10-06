@@ -42,7 +42,8 @@ look. While the slider is dragged, only its newest value is applied (once per fr
 Each colour that takes the look is a MapLibre expression: for a feature with `__rs_tunnel`,
 `["interpolate", ["linear"], strength, 0, <colour>, 100, "#64748b"]`, else the colour (`_tun_mix` in Python, `_tunMix` in the page). The page
 keeps each layer's colours without the look (`TUNNEL.layers`) and builds the expressions again when the slider moves; no data is baked per
-value. The street-name and arrow slots carry `__rs_tunnel` from their road; on a map with tunnels the arrow icon is an SDF one, coloured by
+value. A two-colour casing is a pattern image with its own name for each palette, ratio and strength (an image updated in place under the
+same name is not redrawn by the browser). The street-name and arrow slots carry `__rs_tunnel` from their road; on a map with tunnels the arrow icon is an SDF one, coloured by
 `icon-color` (one symbol layer cannot mix SDF and plain icons). An item gets `__rs_tunnel` from its edge when the overlay is attached (`_edge_overlay`).
 
 ## Limits

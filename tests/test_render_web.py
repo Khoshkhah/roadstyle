@@ -1143,10 +1143,10 @@ def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
         browser.close()
     assert errors == []
     assert opened["pattern"] is None and opened["dash"] == [1, 1] and opened["slider"] == "35" and opened["pal"] == "One colour"
-    assert "70" in moved["fill"] and moved["pattern"] == "rs-tunnel-casing-4-3" and moved["pal"] == "Teal + mint"
+    assert "70" in moved["fill"] and moved["pattern"] == "rs-tunnel-casing-Tealmint_4-3_70" and moved["pal"] == "Teal + mint"
     assert ev == {"strength": 70, "palette": "Teal + mint", "ratio": [4, 3]}
     assert "__rs_fill__1" in coloured["fill"] and "interpolate" in coloured["fill"]          # Colour by keeps the look
-    assert zero["pattern"] == "rs-tunnel-casing-4-3"                                 # a palette shows at 0 too, as it is
+    assert zero["pattern"] == "rs-tunnel-casing-Tealmint_4-3_0"                      # a palette shows at 0 too, as it is; a new image name
     assert one["pattern"] is None and one["dash"] == [4, 3] and one_colour == "#64748b"   # One colour at 100: slate dashes
 
 
