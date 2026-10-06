@@ -43,9 +43,12 @@ The pieces are the `slots` source of the page (inline GeoJSON; with `tiles=True`
 
 The page places them (`_rsArrows`), after every move and once the slots are loaded. **A one-way road in the window has at most one arrow.**
 
-- **Where.** On the visible **odd** slot nearest the middle of the chain's visible part, in the middle of that slot's visible part, so it
-  lands between two names. With no odd slot in view, a named road gets its arrow a quarter along its visible part (away from the centred
-  name), an unnamed one in the middle. The arrow is rotated along the road.
+- **Where.** Never on a name (Kaveh: arrows overlapped the names). The pieces of the chain are laid end to end, and a name is taken to
+  cover the middle of its even piece, as wide as its letters at the current text size (about 0.6 em a letter). The places an arrow may go
+  are the middle of every odd piece and just past either end of every name (14 px gap); an unnamed road may take the middle of its visible
+  part. Of these, the one inside the window (10 px from its edge) and nearest the middle of the road's visible part is taken. If none is
+  in the window, the road is too short there for its name and an arrow: **the name wins and the road has no arrow.** The arrow is rotated
+  along the road.
 - **It stays.** While an arrow is still in the window it keeps its place; only a road whose arrow has left the window, or a road that has
   just come into view, gets a new place (re-centring after each pan made it slide along the road).
 - **Thinned** (Kaveh, after trying one per road: still too many):
@@ -54,7 +57,7 @@ The page places them (`_rsArrows`), after every move and once the slots are load
   - no arrow on a road whose visible part is shorter than 100 px;
   - arrows at least 150 px apart: an arrow already shown keeps its place first (no jumps while panning), then the higher class (`rank`),
     then the longer road.
-  The numbers are `_RS_ARROW` in the page.
+  The numbers are `_RS_ARROW` in the page (also the 14 px gap beside a name and the 10 px from the window's edge).
 - **Drawn.** Each arrow is a point in the page's `arrows` source with the properties of the slot piece it lies on, so the arrow layers keep
   their filters (one-way, drawing position, class, minzoom) and everything that hides a road hides its arrow. One arrow layer per drawing
   position, right after that position's fill layers: a road drawn above covers the arrows below it. The icon is drawn even where it touches
@@ -73,4 +76,5 @@ slot pieces carry `__rs_tunnel` from their road.
 
 - A map from a tile archive (`tiles=True`) has no slot geometry in the page: its arrows are still repeated along the slots.
 - A street whose chain is split (a class, level, position or name change half-way) is two roads: two arrows, two sets of names.
-- A very long name on a short road can still reach the arrow placed a quarter along it.
+- The name's width is an estimate (letters × 0.6 em): a name of unusually wide letters can still touch its arrow.
+- A one-way road too short for its name and an arrow side by side shows the name and no arrow.
