@@ -9,10 +9,10 @@ override-file locations and format). This module owns the palette *machinery*: t
 
 Built-in palettes:
 
+- ``carto``   — the classic **OSM Carto** palette (muted warm tones) with its own per-class
+  coloured casing. The default (``DEFAULT_PALETTE``).
 - ``highsat`` — the custom **high-saturation** palette (cyan motorway, pink trunk, …) with a
   light-grey casing. Best legibility over any base map.
-- ``carto``   — the classic **OSM Carto** palette (muted warm tones) with its own per-class
-  coloured casing.
 
 Each entry is a :class:`RoadStyle` (fill colour, line widths, one casing colour, optional dash).
 """
@@ -152,6 +152,7 @@ PALETTES: dict[str, dict[str, RoadStyle]] = {
     name: palette_from_dict(roads) for name, roads in _settings.palettes().items()
 }
 HIGHSAT: dict[str, RoadStyle] = PALETTES["highsat"]
+DEFAULT_PALETTE = "carto"      # the palette when none is given: soft OSM Carto tones (Kaveh 2026-10-06: highsat was too sharp)
 CARTO: dict[str, RoadStyle] = PALETTES["carto"]
 
 

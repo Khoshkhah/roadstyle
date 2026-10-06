@@ -5,6 +5,7 @@ from collections.abc import Mapping
 
 from .edges import as_edges
 from .filters import filter_edges
+from .palettes import DEFAULT_PALETTE
 from .stylers import build_styler
 from .validate import validate_edges
 
@@ -28,7 +29,7 @@ def render_edges(
     gdf,
     *,
     backend: str = "web",
-    palette: str = "highsat",
+    palette: str = DEFAULT_PALETTE,
     highway_col: str = "highway",
     include=None,
     exclude=None,
@@ -58,7 +59,7 @@ def render_edges(
         coerced to ``RoadEdges`` for you.
     backend : ``"web"`` (self-contained MapLibre, default), ``"folium"`` (portable HTML), or
         ``"lonboard"`` (WebGL).
-    palette : ``"highsat"`` (high-saturation) or ``"carto"`` (OSM Carto).
+    palette : ``"carto"`` (OSM Carto, the default), ``"highsat"`` (high-saturation) or ``"mono"``.
     include / exclude : highway types to keep / drop (str or iterable) — see filter_edges.
 
     Data-driven styling (optional — when omitted, the classic OSM class styling is unchanged):

@@ -7,6 +7,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **The default palette is `carto`** (`palettes.DEFAULT_PALETTE`), the soft OpenStreetMap Carto tones, in place of `highsat` (too sharp, Kaveh). `palette="highsat"` keeps the old look.
 - **Faster page building:** the casing pieces and the arrow and street-name slots are cut with a small numpy cutter instead of shapely's `substring` (the same lines), and a slot of a group of one edge no longer searches for its edge.
   A page of a city of 64,000 roads builds about 40% faster.
 

@@ -30,7 +30,7 @@ def test_class_styler_matches_resolve():
     g = _edges()
     rf = ClassStyler().resolve_frame(g)
     for i, hw in enumerate(g["highway"]):
-        r = resolve(hw, palette="highsat")
+        r = resolve(hw)                    # both with the default palette
         assert rf.fill[i] == r.fill
         assert abs(rf.width[i] - r.width) < 1e-9
         assert rf.casing[i] == r.casing

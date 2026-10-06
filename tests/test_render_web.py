@@ -780,7 +780,7 @@ def test_tunnel_casing_in_two_tones():
     g = gpd.GeoDataFrame({"highway": ["primary", "primary"], "tunnel": ["yes", None]},
                          geometry=[LineString([(18.0, 59.30), (18.01, 59.30)]),
                                    LineString([(18.01, 59.30), (18.02, 59.30)])], crs=4326)
-    style = _style(render_edges(g, backend="web").html)          # highsat: primary casing #bcbcbc
+    style = _style(render_edges(g, backend="web", palette="highsat").html)          # highsat: primary casing #bcbcbc
     lay = {l["id"]: l for l in style["layers"]}
     ids = list(lay)
     assert ids.index("roads-casing") < ids.index("roads-casing-dash") < ids.index("roads-fill")
