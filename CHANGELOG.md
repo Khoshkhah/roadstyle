@@ -26,7 +26,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   from its casing heads and two fill halves). The editor: *start* / *end* round / square / flat per road (`caps.csv`), and the road's drawn width and lanes in its card.
 - **Near rules last:** a stack rule whose part of A does not cross B (only near) is kept after the order wishes and, broken, is a warning
   (`attrs["levels_near"]`), not a given-up pair; `rs.casing_parts` gives the parts (replaces `empty_mains`), `solve_levels(parts=...)`.
-- The editor has a **Given up** tab: the crossing pairs the solver could not keep, A's parts under B's fill in red, each clickable.
+- The editor has an **Issues** tab (given up in red, near warnings in amber): the crossing pairs the solver could not keep, A's parts under B's fill in red, each clickable.
 - The editor has a search box: an edge id (either direction of a road) or an edge_ref, or a part of one; a hit is picked and shown.
 
 ### Changed

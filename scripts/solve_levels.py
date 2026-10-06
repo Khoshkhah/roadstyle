@@ -51,7 +51,7 @@ def main(argv=None):
     write(solved, a.out_dir)
     info = solved.attrs["levels_info"]
     print(f"{len(roads)} roads -> {a.out_dir / 'levels.csv'}: {len(solved.attrs['levels_given_up'])} stack pair(s) given up, "
-          f"{len(solved.attrs.get('levels_near', []))} near warning(s), "
+          f"{len({(u, l) for u, l, _ in solved.attrs.get('levels_near', [])})} near warning(s), "
           f"{info.get('order_violations', 0)} order wish(es) not kept, {info.get('seconds')} s")
 
 

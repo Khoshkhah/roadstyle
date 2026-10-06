@@ -109,7 +109,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   <button id="lv-toggle" title="Hide the panel">›</button>
   <header><div class="t">Level editor</div><div class="area" id="lv-area"></div><div class="stats" id="lv-stats"></div>
     <div class="find"><input id="lv-find" type="search" placeholder="Find a road: edge id or edge_ref" autocomplete="off"><div id="lv-hits" hidden></div></div></header>
-  <nav class="tabs" id="lv-tabs"><button data-t="edit" class="on">Edit</button><button data-t="history">History<span class="cnt" id="lv-hist-n">0</span></button><button data-t="given">Given up<span class="cnt" id="lv-gu-n" style="background:var(--lv-bad);color:#fff">0</span></button></nav>
+  <nav class="tabs" id="lv-tabs"><button data-t="edit" class="on">Edit</button><button data-t="history">History<span class="cnt" id="lv-hist-n">0</span></button><button data-t="given" title="Given up (a real crossing broke) · near warnings">Issues<span class="cnt" id="lv-gu-n" style="background:var(--lv-bad);color:#fff">0</span><span class="cnt" id="lv-nr-n" style="background:#fff4e6;color:#b35c00">0</span></button></nav>
   <div class="scroll" data-tab="edit">
     <section id="lv-queue-sec" hidden><h2>Waiting to apply <span style="text-transform:none;letter-spacing:0;font-weight:500">not solved, not saved yet</span></h2>
       <div id="lv-queue"></div>
@@ -176,8 +176,8 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     document.querySelectorAll("#lv [data-tab]").forEach(d => d.hidden = d.dataset.tab !== t); }
   document.querySelectorAll("#lv-tabs button").forEach(b => b.onclick = () => tab(b.dataset.t));
   $("lv-stats").innerHTML = [["order wishes", STATS.order_pairs], ["not kept", STATS.order_violations || 0], ["stack pairs", STATS.pairs || 0],
-    ["given up", STATS.given_up.length], ["near warnings", STATS.near_warnings || 0]].map(([k, v]) => `<span class="stat"${k === "given up" ? ` style="cursor:pointer" title="Show the list" id="lv-gu-stat"` : ""}><b>${v}</b> ${k}</span>`).join("");
-  $("lv-gu-stat").onclick = () => tab("given");
+    ["given up", STATS.given_up.length], ["near warnings", STATS.near_warnings || 0]].map(([k, v]) => `<span class="stat"${k === "given up" || k === "near warnings" ? ` style="cursor:pointer" title="Show the list" data-gu="1"` : ""}${k === "given up" ? ` id="lv-gu-stat"` : ""}><b>${v}</b> ${k}</span>`).join("");
+  document.querySelectorAll("#lv-stats [data-gu]").forEach(e => e.onclick = () => tab("given"));
   function toast(t, bad){ const e = $("lv-toast"); e.textContent = t; e.className = "show" + (bad ? " bad" : ""); clearTimeout(e._t);
     e._t = setTimeout(() => e.className = "", bad ? 6000 : 2600); }
   async function api(path, body){
@@ -409,7 +409,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   };
   async function givenUp(){
     const j = await api("/api/given_up"); Object.assign(facts, j.roads);
-    $("lv-gu-n").textContent = j.rows.length;
+    $("lv-gu-n").textContent = j.rows.length; $("lv-nr-n").textContent = j.near.length;
     const list = (box, rows, cls, none) => {
       if(!rows.length){ box.className = ""; box.innerHTML = `<div class="empty" style="padding:8px">${none}</div>`; return; }
       box.className = "rows";
