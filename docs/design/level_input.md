@@ -24,8 +24,11 @@ Two roads with **different bands** (a tunnel and a street, a bridge and the road
 With an explicit `band_col` the caller's bands decide over and under everywhere, also where roads only meet: a zebra crossing set over its
 street stays over it (lanestyle, mapstyle).
 
-A **short** road on top (shorter than `2 * head_m`, one casing number that meets the roads at both its ends) keeps its pair on its **fill**:
-its fill is after the lower road's fill. Before, its pair was dropped, and short ground pieces over a tunnel could be drawn level with it.
+**A over B** (Kaveh 2026-10-06): every part of A's casing (start head, main part, end head; a short road's one number) and its fill come after
+B's fill. Before, only A's main part did: where B passed under A close to one of its ends, B's fill hid A's outline there (Monaco: the bridge
+95449780#1f over 4229327#1f). A head that **joins** B, or joins a road that joins B (the next piece of the tunnel A runs into at its mouth),
+is left out: it is a junction, where the head is under the fills it joins. Two ramps, each over one tube of a tunnel and joining the other
+tube, still make a loop of four rules no order keeps; the solver gives one of their pairs up and reports it (Monaco 16, Södermalm 27).
 
 ## Files (one folder per area)
 

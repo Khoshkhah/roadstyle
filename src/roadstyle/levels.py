@@ -176,8 +176,6 @@ def _solve_intervals(metres, meets, stacks, orders, limit, head_m, max_level, ma
     import shapely
     long_ = (shapely.length(np.asarray(metres, dtype=object)) >= 2 * head_m).tolist()
     pair_list = sorted(set(stacks))
-    # a short upper road has no main part, its one casing number meets the roads at both ends (docs/design/levels_split_casing.md, section 6): its
-    # pair puts its FILL after the lower road's fill, not its casing (Kaveh 2026-10-06: short ground pieces over a tunnel were drawn level with it)
     short_upper = sum(not long_[u] for u, _ in pair_list)
     info = {"pairs": len(pair_list) - short_upper, "roads": n, "short_roads": long_.count(False), "short_upper_pairs": short_upper, "meets": len(meets)}
     O = sorted(set(orders))
@@ -215,11 +213,33 @@ def _solve_intervals(metres, meets, stacks, orders, limit, head_m, max_level, ma
         if max_positions:                                      # at most max_positions numbers: H - L <= (max_positions - 1) steps (a hard bound;
             le([(H, 1.0), (Lo, -1.0)], (max_positions - 1) * margin)   # the stack pairs and the order wishes give way to it)
     base = len(rhs)
-    for u, l in pair_list:
-        le([(l, 1.0), (part[u]["m"] if long_[u] else u, -1.0)], -margin)    # H3: b_l + margin <= a_(u, main); a short upper road: <= b_u
+    # H3, A over B (Kaveh 2026-10-06): every part of A's casing (start head, main part, end head; a short road's one number), and so its fill (H1),
+    # after B's fill: b_B + margin <= a_(A, part). Left out: a head of A that joins B, or joins a road that joins B (the next piece of the tunnel
+    # A runs into at its mouth): a junction, where the head is under the fills it joins (H2); without it such a head and the head of a street
+    # over that next piece made a loop no order can keep. Two ramps, each over one tube of a tunnel and joining the other tube, still make one:
+    # the solver gives one of their pairs up and says so (Monaco: 16).
+    touching = defaultdict(set)                                # road -> the roads it shares a node with
+    for x, _, y, _ in meets:
+        touching[x].add(y)
+        touching[y].add(x)
+    at_head = defaultdict(set)                                 # (road, "s" / "e") -> the roads that head joins
+    for x, ex, y, ey in meets:
+        at_head[(x, "s" if ex == "start" else "e")].add(y)
+        at_head[(y, "s" if ey == "start" else "e")].add(x)
+    def junction(u, heads, l):
+        return any(l in at_head[(u, h)] or at_head[(u, h)] & touching[l] for h in heads)
+    stack_rows = []                                            # (pair index, the casing column it lifts)
+    for k, (u, l) in enumerate(pair_list):
+        if long_[u]:
+            lift = [part[u]["m"]] + [part[u][h] for h in ("s", "e") if not junction(u, (h,), l)]
+        else:
+            lift = [] if junction(u, ("s", "e"), l) else [part[u]["s"]]
+        stack_rows += [(k, c) for c in lift]
+    for k, c in stack_rows:
+        le([(pair_list[k][1], 1.0), (c, -1.0)], -margin)
     for x, y in O:
         le([(y, 1.0), (x, -1.0)], -margin)                     # H4: b_y + margin <= b_x
-    nrow, nP, nO = len(rhs), len(pair_list), len(O)
+    nrow, nP, nO = len(rhs), len(stack_rows), len(O)
     A0 = sp.csr_matrix((vals, (rows, cols)), shape=(nrow, ncol))
     b_ub = np.array(rhs)
     cost = np.zeros(ncol)                                      # T3: the sum of (b_road(c) - a_c)
@@ -280,7 +300,7 @@ def _solve_intervals(metres, meets, stacks, orders, limit, head_m, max_level, ma
     integral = bool(np.all(np.abs(x - np.round(x)) < 1e-6))
     val = (lambda v: int(round(v))) if integral else (lambda v: float(v))             # integers in practice: the constraints are x - y <= c with integer c
     parts = [(val(x[part[r]["s"]]), val(x[part[r]["m"]]), val(x[part[r]["e"]]), val(x[r])) for r in range(n)]
-    gu = [pair_list[i] for i in range(nP) if slack[i] >= margin * (1 - 1e-6)]          # the upper casing is not after the lower fill
+    gu = sorted({pair_list[stack_rows[i][0]] for i in range(nP) if slack[i] >= margin * (1 - 1e-6)})   # a part of the upper casing is not after the lower fill
     violated = int((slack[nP:] >= margin * (1 - 1e-6)).sum())
     return parts, gu, {**info, "order_pairs": nO, "order_violations": violated, "solves": solves, "solver": how, "status": "OPTIMAL", "seconds": round(time.time() - t0, 1)}
 
