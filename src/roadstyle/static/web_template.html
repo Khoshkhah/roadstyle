@@ -87,7 +87,8 @@ body.rs-side-hidden{--rs-side:0px}
 .co-ctrl,.tn-ctrl{position:absolute;top:10px;right:10px;z-index:2;background:#fff;border-radius:8px;
 box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);padding:6px 10px;
 font:11px system-ui,sans-serif;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#767c88}
-.tn-ctrl input{vertical-align:middle;width:110px;margin:0 4px}
+.tn-ctrl input{vertical-align:middle;width:120px;margin:0 6px 0 0}
+.tn-row{display:flex;align-items:center;gap:6px;margin:3px 0}
 .co-ctrl select,.tn-ctrl select{font:13px system-ui,sans-serif;font-weight:600;text-transform:none;letter-spacing:0;
   border:0;background:transparent;cursor:pointer;outline:none;color:#334155;margin-left:3px}
 .co-lg{position:absolute;left:10px;bottom:24px;z-index:2;background:rgba(255,255,255,.96);
@@ -662,10 +663,10 @@ if(FILTER.on){
 // option's fill is baked per edge (__rs_fill / __rs_fill__1 …); setPaintProperty repoints the
 // road-fill layers' line-color at the chosen prop. window.rsSetColorField drives it from your UI.
 const COLOR_OPTIONS = __COLOR_OPTIONS__;
-// the tunnel look (docs/design/tunnel_look.md): a tunnel's fill and its items move toward the background, its casing toward the palette,
-// by TUNNEL.fade; TUNNEL.layers = {layer id: [paint property, colour without the look, "bg" | "gap" | "dash"]}
+// the tunnel look, v2's slider (docs/design/tunnel_look.md): TUNNEL.strength 0-100 moves a tunnel's colours toward TUNNEL.to;
+// TUNNEL.layers = {layer id: [[paint property, colour without the look, key of TUNNEL.to], ...]}, TUNNEL.dash = the casing dash layers
 const TUNNEL = __TUNNEL__;
-function _tunMix(e, toward){ return ["case",["to-boolean",["get","__rs_tunnel"]],["interpolate",["linear"],TUNNEL.fade,0,e,1,toward],e]; }
+function _tunMix(e, toward){ return ["case",["to-boolean",["get","__rs_tunnel"]],["interpolate",["linear"],TUNNEL.strength,0,e,100,toward],e]; }
 const _tunOn = Object.keys(TUNNEL.layers).length > 0;
 const RS_FILL_LAYERS = __RS_FILL_LAYERS__;
 const RS_END_LAYERS = __RS_END_LAYERS__;   // twin_ends.md
@@ -696,7 +697,7 @@ function _fillExpr(idE){
   return e;
 }
 function _applyFill(){
-  const e=_tunOn ? _tunMix(_fillExpr(), TUNNEL.fill_to) : _fillExpr();
+  const e=_tunOn ? _tunMix(_fillExpr(), TUNNEL.to.fill) : _fillExpr();
   RS_FILL_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"line-color",e); });
   // the dashed layers (<fill layer>-dash0, -dash1 ...: one per dash pattern, for footway, path, steps ...) draw the
   // dashed classes' edges: they take the active colouring too, or such a road keeps its class colour under any "colour by"
@@ -911,36 +912,74 @@ if(OVERLAYS.length){
     document.body.appendChild(box);
   }
 }
-// window.rsSetTunnelStyle({fade, palette}) moves the tunnel look (fade 0-1; palette a name of RS_TUNNEL_PALETTES); the Tunnels box is UI over it
+// window.rsSetTunnelStyle({strength, palette, ratio}) moves the tunnel look (strength 0-100; palette a name of RS_TUNNEL_PALETTES;
+// ratio [dash, gap] in line widths); the Tunnels box is UI over it. As v2: at 0 the casing is slate dashes with empty gaps; above 0 it is
+// a two-colour pattern, the dash moving toward the palette's first colour and the gap from the background toward its second.
+function _tunHex(a, b, t){                       // a -> b by t (0-1), "#rrggbb"
+  const p=c=>c.slice(1).match(/.{2}/g).map(x=>parseInt(x,16)), A=p(a), B=p(b);
+  return "#"+A.map((x,i)=>Math.round(x*(1-t)+B[i]*t).toString(16).padStart(2,"0")).join("");
+}
+let _tunImg=null;
+function _tunPattern(){
+  const [c1, c2] = TUNNEL.palettes[TUNNEL.palette], t = TUNNEL.strength/100, u = 8;
+  const d = Math.max(1, Math.round(TUNNEL.ratio[0]*u)), g = Math.max(1, Math.round(TUNNEL.ratio[1]*u));
+  const cv = document.createElement("canvas"); cv.width = d+g; cv.height = u;
+  const x = cv.getContext("2d");
+  x.fillStyle = _tunHex(TUNNEL.to.dash, c1, t); x.fillRect(0, 0, d, u);
+  x.fillStyle = _tunHex(TUNNEL.bg, c2, t); x.fillRect(d, 0, g, u);
+  const id = "rs-tunnel-casing-"+TUNNEL.ratio.join("-"), data = x.getImageData(0, 0, cv.width, cv.height);
+  if(map.hasImage(id)) map.updateImage(id, data); else map.addImage(id, data);
+  if(_tunImg && _tunImg !== id && map.hasImage(_tunImg)) setTimeout((old => () => { if(map.hasImage(old)) map.removeImage(old); })(_tunImg), 0);
+  return _tunImg = id;
+}
 function rsSetTunnelStyle(o){
   if(!_tunOn) return;
   o = o || {};
-  if(o.fade != null) TUNNEL.fade = Math.max(0, Math.min(1, +o.fade));
-  if(o.palette != null && TUNNEL.palettes[o.palette]) TUNNEL.palette = o.palette;
-  const [dash, gap] = TUNNEL.palettes[TUNNEL.palette], to = {fill: TUNNEL.fill_to, bg: TUNNEL.bg, gap: gap, dash: dash};
-  for(const id in TUNNEL.layers){ const [k, base, kind] = TUNNEL.layers[id];
-    if(map.getLayer(id)) map.setPaintProperty(id, k, _tunMix(base, to[kind])); }
+  if(o.strength != null) TUNNEL.strength = Math.max(0, Math.min(100, +o.strength));
+  if(o.palette != null && o.palette in TUNNEL.palettes) TUNNEL.palette = o.palette;
+  if(o.ratio != null) TUNNEL.ratio = o.ratio.map(Number);
+  for(const id in TUNNEL.layers) if(map.getLayer(id))
+    TUNNEL.layers[id].forEach(([k, base, to])=> map.setPaintProperty(id, k, _tunMix(base, TUNNEL.to[to])));
+  const pat = TUNNEL.strength > 0 && TUNNEL.palettes[TUNNEL.palette] ? _tunPattern() : null;   // "One colour": plain dashes
+  TUNNEL.dash.forEach(id=>{ if(!map.getLayer(id)) return;
+    if(pat){ map.setPaintProperty(id, "line-dasharray", null); map.setPaintProperty(id, "line-pattern", pat); }
+    else { map.setPaintProperty(id, "line-pattern", null); map.setPaintProperty(id, "line-color", TUNNEL.to.dash);
+           map.setPaintProperty(id, "line-dasharray", TUNNEL.ratio); } });
   _applyFill();                                   // the roads' fills: with the active colour-by
-  const r=document.getElementById("tn-fade"), s=document.getElementById("tn-pal");
-  if(r) r.value = Math.round(TUNNEL.fade * 100); if(s) s.value = TUNNEL.palette;
-  document.dispatchEvent(new CustomEvent("rs:tunnelchange",{detail:{fade:TUNNEL.fade, palette:TUNNEL.palette}}));
+  const r=document.getElementById("tn-str"), v=document.getElementById("tn-val"), s=document.getElementById("tn-pal"),
+        q=document.getElementById("tn-ratio"), pr=document.getElementById("tn-pre");
+  if(r) r.value = TUNNEL.strength; if(v) v.textContent = Math.round(TUNNEL.strength)+"%"; if(s) s.value = TUNNEL.palette;
+  if(q) q.value = TUNNEL.ratio.join(":"); if(pr) pr.value = String(TUNNEL.strength);
+  document.dispatchEvent(new CustomEvent("rs:tunnelchange",{detail:{strength:TUNNEL.strength, palette:TUNNEL.palette, ratio:TUNNEL.ratio}}));
 }
 window.rsSetTunnelStyle = rsSetTunnelStyle;
 window.RS_TUNNEL_PALETTES = TUNNEL.palettes;
-document.addEventListener("rs:basemapchange", e => {           // the fade goes toward the new background
+document.addEventListener("rs:basemapchange", e => {           // the casing gap starts from the new background
   const b = BASEMAPS[e.detail.index]; if(_tunOn && b && b.bg){ TUNNEL.bg = b.bg; rsSetTunnelStyle(); } });
+if(_tunOn){ if(map.isStyleLoaded && map.isStyleLoaded()) rsSetTunnelStyle(); else map.on("load", ()=>rsSetTunnelStyle()); }
 if(TUNNEL.control){
   const w=document.createElement("div"); w.className="tn-ctrl";
-  w.appendChild(document.createTextNode("Tunnels"));
-  const r=document.createElement("input"); r.type="range"; r.id="tn-fade"; r.min=0; r.max=100; r.value=Math.round(TUNNEL.fade*100);
-  r.title="How far a tunnel fades toward the background, and its casing toward the palette";
+  const sel=(id, opts, val, on)=>{ const e=document.createElement("select"); e.id=id;
+    opts.forEach(([v, t])=>{ const op=document.createElement("option"); op.value=v; op.textContent=t; e.appendChild(op); });
+    e.value=val; e.onchange=()=>on(e.value); return e; };
+  const row=()=>{ const d=document.createElement("div"); d.className="tn-row"; w.appendChild(d); return d; };
+  const r1=row(); r1.appendChild(document.createTextNode("Tunnels"));
+  r1.appendChild(sel("tn-pre", [["0","Normal colors"],["20","Subtle"],["35","Balanced"],["70","Strong"]], String(TUNNEL.strength),
+                     v=>rsSetTunnelStyle({strength:+v})));
+  const r2=row();
+  const r=document.createElement("input"); r.type="range"; r.id="tn-str"; r.min=0; r.max=100; r.value=TUNNEL.strength;
+  r.title="Tunnel style: 0 keeps the normal colours, 100 applies the tunnel colours";
   let _tnNext=null;                               // a drag fires many inputs: apply only the newest, once per frame
-  r.oninput=()=>{ const go=_tnNext===null; _tnNext=r.value/100;
-    if(go) requestAnimationFrame(()=>{ const v=_tnNext; _tnNext=null; rsSetTunnelStyle({fade: v}); }); };
-  const s=document.createElement("select"); s.id="tn-pal";
-  Object.keys(TUNNEL.palettes).forEach(n=>{ const op=document.createElement("option"); op.value=n; op.textContent=n; s.appendChild(op); });
-  s.value=TUNNEL.palette; s.onchange=()=> rsSetTunnelStyle({palette: s.value});
-  w.appendChild(r); w.appendChild(s); _tlHost().appendChild(w);
+  r.oninput=()=>{ const go=_tnNext===null; _tnNext=+r.value;
+    if(go) requestAnimationFrame(()=>{ const v=_tnNext; _tnNext=null; rsSetTunnelStyle({strength: v}); }); };
+  const val=document.createElement("span"); val.id="tn-val"; val.textContent=Math.round(TUNNEL.strength)+"%";
+  r2.appendChild(r); r2.appendChild(val);
+  const r3=row();
+  r3.appendChild(sel("tn-pal", Object.keys(TUNNEL.palettes).map(n=>[n, n]), TUNNEL.palette, v=>{
+    rsSetTunnelStyle({palette:v, ...(TUNNEL.strength === 0 && TUNNEL.palettes[v] ? {strength:35} : {})}); }));   // as v2: a palette at 0 % starts at 35 %
+  r3.appendChild(sel("tn-ratio", [["3:3","3:3"],["4:4","4:4"],["2:2","2:2"],["4:3","4:3"]], TUNNEL.ratio.join(":"),
+                     v=>rsSetTunnelStyle({ratio:v.split(":")})));
+  _tlHost().appendChild(w);
 }
 // oneway direction-arrow icon (openstreetmap-carto)
 function addArrow(){
@@ -952,6 +991,11 @@ function addArrow(){
   const img=new Image(96,40);
   img.onload=()=>{ if(!map.hasImage("oneway")) map.addImage("oneway",img,{pixelRatio:4}); };
   img.src="data:image/svg+xml;base64,"+btoa(svg);
+  if(_tunOn){                                     // a tunnel's arrow: the same shape as an SDF icon, so the slider can colour it (icon-color)
+    const sdf=new Image(96,40);
+    sdf.onload=()=>{ if(!map.hasImage("oneway-sdf")) map.addImage("oneway-sdf",sdf,{pixelRatio:4, sdf:true}); };
+    sdf.src="data:image/svg+xml;base64,"+btoa(svg.replace('fill="__ARROW_COLOR__"', 'fill="#ffffff"'));
+  }
 }
 map.on("load", addArrow);
 // Self-diagnosis: a map with zero road features is a broken page, not an empty area — say WHY

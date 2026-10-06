@@ -44,16 +44,16 @@ class StyleConfig:
     bridge_casing_px: float = 1.0      # ... and never thinner than this many pixels each side at any zoom (metres are sub-pixel zoomed out)
     bridge_casing_color: str = "#000000"   # bridge deck casing colour (black by default)
     twin_end_caps: bool = True         # one road-wide round end under a two-way road's two lanes
-    tunnel_casing_dash: list = field(default_factory=lambda: [2, 2])   # the tunnel casing dash (osm-carto)
-    tunnel_gap_shade: float = 0.25       # tunnel casing between the dashes: this much darker than a light casing
-    tunnel_dash_shade: float = 0.5       # tunnel dashes: this much darker than the casing
+    tunnel_casing_dash: list = field(default_factory=lambda: [3, 3])   # the tunnel casing: dash and gap, in line widths (v2's 3:3)
     tunnel_fill_dash: list = field(default_factory=lambda: [1.2, 1.2])   # light dashes on the tunnel fill ([] = none)
     tunnel_fill_dash_color: str = "rgba(255,255,255,0.55)"               # their colour, over any road colour
-    tunnel_fade: float = 0.35            # the tunnel look (docs/design/tunnel_look.md): how far (0-1) a tunnel's fill moves toward tunnel_fill_to, its casing toward the palette, its items toward the background
-    tunnel_fill_to: str = "#64748b"      # the colour a tunnel's fill moves toward (v2's slate)
-    tunnel_palette: str = "Slate + ice"  # the casing palette of a tunnel, a name in tunnel_palettes
-    tunnel_palettes: dict = field(default_factory=lambda: {"Slate + ice": ["#64748b", "#cbd5e1"], "Blue + cyan": ["#315b7d", "#a9d7e8"],
-                                                           "Warm + sand": ["#806d64", "#e7c9a7"]})      # name -> [dash, gap]
+    tunnel_strength: float = 35          # the tunnel look (docs/design/tunnel_look.md), v2's slider: 0 = normal colours, 100 = the full tunnel colours
+    tunnel_palette: str = "One colour"   # the casing of a tunnel, a name in tunnel_palettes (two colours: not decided yet, Kaveh 2026-10-06)
+    tunnel_palettes: dict = field(default_factory=lambda: {"One colour": None, "Slate + ice": ["#64748b", "#cbd5e1"],
+                                                           "Blue + cyan": ["#315b7d", "#a9d7e8"], "Warm + sand": ["#806d64", "#e7c9a7"],
+                                                           "Graphite + white": ["#4b5563", "#f8fafc"], "Indigo + lavender": ["#4c5c96", "#dfe3f5"],
+                                                           "Teal + mint": ["#2f6f73", "#cfe8e6"]})
+    # name -> [dash, gap] (v2's two-colour pattern), or None: slate dashes with empty gaps
     minor_no_casing: frozenset[str] = field(default_factory=lambda: _MINOR_NO_CASING)
     #: class -> zoom below which it is hidden. Consulted only when the caller opts in.
     minzoom: dict = field(default_factory=dict)

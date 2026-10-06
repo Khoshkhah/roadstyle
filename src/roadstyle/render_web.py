@@ -294,10 +294,10 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
     for e in reps:
         p = e[3]
         groups[(p.get("name") or None, p.get("lvl", 0),
-                1 if p.get("__rs_oneway") else 0, p.get(class_col), p.get("__rs_fl"))].append(e)
+                1 if p.get("__rs_oneway") else 0, p.get(class_col), p.get("__rs_fl"), bool(p.get("__rs_tunnel")))].append(e)
 
     feats = []
-    for (name, lvl, oneway, _cls, fl), edges in groups.items():
+    for (name, lvl, oneway, _cls, fl, tun), edges in groups.items():
         n = len(edges)
         used = [False] * n
         at = collections.defaultdict(list)       # node -> [edge index] (either endpoint)
@@ -372,7 +372,8 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
                               "properties": {"slot": i, "name": name, "highway": hw,
                                              "oneway": oneway, "lvl": lvl, "__rs_road": road,
                                              **({"__rs_road2": twin} if twin is not None else {}),
-                                             **({"fl": fl} if fl is not None else {})},
+                                             **({"fl": fl} if fl is not None else {}),
+                                             **({"__rs_tunnel": True} if tun else {})},
                               "geometry": {"type": "LineString", "coordinates": coords}})
     return {"type": "FeatureCollection", "features": feats}
 
@@ -770,38 +771,50 @@ def _twin_ends(geo, cols):
     return out
 
 
+# the tunnel look (docs/design/tunnel_look.md): everything on a tunnel moves toward one colour as the slider rises, v2's slate (Kaveh: the
+# fade is the same for every item, however it was added); the casing dashes start from v2's lighter slate
+_TUN_TO = {"fill": "#64748b", "dash": "#94a3b8"}
+
+
 def _tun_mix(expr, toward, s):
-    """A tunnel feature's colour: ``expr`` moved toward ``toward`` by ``s`` (0..1), opaque; any other feature keeps ``expr``
+    """A tunnel feature's colour: ``expr`` moved toward ``toward`` by the slider ``s`` (0-100); any other feature keeps ``expr``
     (docs/design/tunnel_look.md). The page builds the same expression again when the slider moves (_tunMix)."""
-    return ["case", ["to-boolean", ["get", "__rs_tunnel"]], ["interpolate", ["linear"], s, 0, expr, 1, toward], expr]
+    return ["case", ["to-boolean", ["get", "__rs_tunnel"]], ["interpolate", ["linear"], s, 0, expr, 100, toward], expr]
 
 
-_TUN_PAINT = ("line-color", "fill-color", "circle-color", "text-color")
+def _tunnel_look(layers, edge_ids, s, arrow_color):
+    """The tunnel look on the finished layer list (docs/design/tunnel_look.md), at slider ``s``: everything on a tunnel (its fill, its street
+    names, its arrows, every item attached to it) moves toward the same slate; its casing is drawn by the dash layers only (the other casing
+    layers leave a tunnel out). Returns ``(colours, dash layers)``:
+    ``{layer id: [[paint property, its colour without the look, target key], ...]}`` and the ids of the dash layers, for the page."""
+    out, dash = {}, []
+    clear = "rgba(0,0,0,0)"
 
+    def mix(l, k, base, to):
+        out.setdefault(l["id"], []).append([k, base, to])
+        l["paint"][k] = _tun_mix(base, _TUN_TO[to], s)
 
-def _tunnel_look(layers, edge_ids, bg, fade, palette, fill_to):
-    """The tunnel look on the finished layer list (docs/design/tunnel_look.md): the roads' fills move toward ``fill_to``, the items attached to
-    edges toward the background ``bg``, the casing's solid tone toward the palette's gap colour and its dashes toward the dash colour, all by ``fade``.
-    Returns ``{layer id: [paint property, its colour without the look, "fill" | "bg" | "gap" | "dash"]}`` for the page."""
-    dash, gap = palette
-    out = {}
     for l in layers:
-        lid, paint = l["id"], l.get("paint") or {}
-        if l.get("source") not in ("roads", "casings") and lid not in edge_ids:
+        lid = l["id"]
+        if l.get("source") not in ("roads", "casings", "slots") and lid not in edge_ids:
             continue
-        if lid.startswith("roads-casing") and "-bridge" not in lid:
-            kind = "dash" if lid.endswith("-dash") else "gap"
+        l["paint"] = dict(l.get("paint") or {})           # a new paint: the copies of a layer for each position share theirs
+        if lid.startswith("roads-casing") and lid.endswith("-dash"):
+            dash.append(lid)
+        elif lid.startswith("roads-casing") and "-bridge" not in lid:
+            l["paint"]["line-color"] = ["case", ["to-boolean", ["get", "__rs_tunnel"]], clear, l["paint"]["line-color"]]
         elif lid.startswith("roads-fill") and not lid.endswith("-pat"):
-            kind = "fill"
+            mix(l, "line-color", l["paint"]["line-color"], "fill")
+        elif lid.startswith("roads-labels"):
+            mix(l, "text-color", l["paint"]["text-color"], "fill")
+        elif lid.startswith("roads-arrows"):
+            l["layout"] = {**l["layout"], "icon-image": ["case", ["to-boolean", ["get", "__rs_tunnel"]], "oneway-sdf", l["layout"]["icon-image"]]}
+            mix(l, "icon-color", arrow_color, "fill")    # only the tunnel's arrow is an SDF icon: the others ignore icon-color
         elif lid in edge_ids:
-            kind = "bg"
-        else:
-            continue
-        for k in _TUN_PAINT:
-            if k in paint:                       # a new paint: the copies of a layer for each position share theirs
-                out[lid] = [k, paint[k], kind]
-                l["paint"] = {**paint, k: _tun_mix(paint[k], {"fill": fill_to, "bg": bg, "gap": gap, "dash": dash}[kind], fade)}
-    return out
+            for k in ("fill-color", "line-color", "circle-color", "text-color"):
+                if k in l["paint"]:
+                    mix(l, k, l["paint"][k], "fill")
+    return out, dash
 
 
 _CASING_FAMILY = ("roads-casing", "roads-casing-sq", "roads-casing-dash", "roads-casing-bridge")
@@ -844,9 +857,8 @@ def _level_layers(layers, levels, casing_source=None):
 def _tunnel_casing_dash(lid, flt, tlay, cw, off, on):
     """The dashes of a tunnel's two-tone casing, a sublayer on the band's casing (``on``: the band has a tunnel)."""
     return [{"id": lid, "type": "line", "source": "roads", "layout": tlay, "filter": flt,
-             "paint": {"line-color": ["coalesce", ["get", "__rs_casing_dash"], "#5e5e5e"],
-                       "line-width": cw, "line-offset": off,
-                       "line-dasharray": list(CONFIG.tunnel_casing_dash or [2, 2])}}] if on else []
+             "paint": {"line-color": _TUN_TO["dash"], "line-width": cw, "line-offset": off,
+                       "line-dasharray": list(CONFIG.tunnel_casing_dash or [3, 3])}}] if on else []
 
 
 def _tunnel_fill_dash(lid, flt, tlay, fw, off, on):
@@ -881,20 +893,6 @@ def _darker(hex_color, amount):
     """``hex_color`` darkened by ``amount`` (0..1); None when it isn't ``#rgb`` / ``#rrggbb``."""
     rgb = _rgb(hex_color)
     return None if rgb is None else "#" + "".join(f"{round(v * (1 - amount)):02x}" for v in rgb)
-
-
-def _mark_tunnel_dash(geo, gap, dash):
-    """A tunnel edge's (lvl < 0) casing in two dark tones, from its own casing: ``__rs_casing_gap``
-    (solid, darkened by ``gap``) and ``__rs_casing_dash`` (the dashes on it, darkened by ``dash``),
-    so the casing is two-toned, never gapped. A casing that is already dark (mono) stays as it is
-    under the dashes."""
-    for ft in geo["features"]:
-        p = ft.get("properties") or {}
-        if p.get("__rs_tunnel"):
-            c = p.get("__rs_casing")
-            p["__rs_casing_gap"] = _darker(c, gap) if _is_light(c) else c
-            p["__rs_casing_dash"] = _darker(c, dash)
-            p["__rs_casing"] = p["__rs_casing_gap"]      # the solid tone: the look is data on the low band's casing
 
 
 
@@ -1422,9 +1420,10 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     ``palette="mono"``. ``window.rsSetColorField(name|index)`` drives the same swap from your own
     UI.
 
-    ``tunnel_control`` (default True): on a map with tunnels, a *Tunnels* box with the look's slider (how far a tunnel's fill and items fade
-    toward the background, and its casing toward the palette) and the casing palette; ``window.rsSetTunnelStyle({fade, palette})`` does
-    the same from your own UI. The starting values are the settings ``tunnel_fade`` and ``tunnel_palette`` (docs/design/tunnel_look.md).
+    ``tunnel_control`` (default True): on a map with tunnels, a *Tunnels* box with v2's tunnel slider (0 = normal colours, 100 = the full
+    tunnel colours), its presets, the casing palette and the dash ratio; ``window.rsSetTunnelStyle({strength, palette, ratio})`` does the
+    same from your own UI. The starting values are the settings ``tunnel_strength``, ``tunnel_palette`` and ``tunnel_casing_dash``
+    (docs/design/tunnel_look.md).
 
     ``overlays`` (optional) draws extra layers the caller brings — a list of :class:`Overlay`
     (zone polygons, POI circles, any geometry). Each becomes its own source + layer(s), placed
@@ -1495,7 +1494,6 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
     _mark_order(geo, band_col, cap_col)
     levels = _mark_levels(geo, casing_level_col, fill_level_col, casing_start_col, casing_end_col) if (casing_level_col or fill_level_col) else None
-    _mark_tunnel_dash(geo, CONFIG.tunnel_gap_shade, CONFIG.tunnel_dash_shade)
     if width_m_col:
         _mark_width_m(geo, width_m_col, casing_m)
     _stringify_unsafe_ints(geo)   # BIGINT ids (e.g. edge_id) -> string so JS doesn't round them
@@ -1625,9 +1623,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     style["layers"] += under_layers            # caller overlays drawn beneath the roads (e.g. zones)
     style["layers"] += [
         # The low band first, so the ground roads above paint over it at crossings. A tunnel is a road of this band with the
-        # tunnel LOOK: a casing in two dark tones (the solid one is the road's own casing colour, baked per edge by
-        # _mark_tunnel_dash, and the dashes on top are a sublayer), light dashes on the fill (a sublayer) and a faded
-        # fill (a data-driven opacity). The casing is never missing, so connected tunnels look connected.
+        # tunnel LOOK: its casing drawn by the dash sublayer alone, light dashes on the fill (a sublayer), and the colours of
+        # v2's tunnel slider (_tunnel_look, docs/design/tunnel_look.md).
         {"id": "roads-low-casing", "type": "line", "source": "roads", "layout": lay, "filter": low,
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
                    "line-width": cw, "line-offset": off}},
@@ -2017,12 +2014,12 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     if edge_layers:       # the overlays attached to edges: after the fills of their position, before its arrows (docs/design/edge_overlays.md)
         style["layers"] = _place_edge_overlays(style["layers"], edge_layers, levels)
     style["layers"] += over_layers             # caller overlays drawn on top of the roads (e.g. POIs)
-    tun_paint = {}
+    tun_paint, tun_dash = {}, []
     if any(ft["properties"].get("__rs_tunnel") for ft in geo["features"]):      # the tunnel look (docs/design/tunnel_look.md)
         if CONFIG.tunnel_palette not in CONFIG.tunnel_palettes:
             raise ValueError(f"tunnel_palette {CONFIG.tunnel_palette!r} is not in tunnel_palettes {list(CONFIG.tunnel_palettes)}")
-        tun_paint = _tunnel_look(style["layers"], {l["id"] for _, _, _, grp in edge_layers for l in grp}, _bg_color(active_bm),
-                                 float(CONFIG.tunnel_fade), CONFIG.tunnel_palettes[CONFIG.tunnel_palette], CONFIG.tunnel_fill_to)
+        tun_paint, tun_dash = _tunnel_look(style["layers"], {l["id"] for _, _, _, grp in edge_layers for l in grp},
+                                           float(CONFIG.tunnel_strength), arw["color"])
 
     # road-class filter panel: the distinct classes present, most important first. `filter_col`
     # (optional) drives the filter from a different column than the styling `highway_col` — e.g. a
@@ -2104,8 +2101,10 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__COLOR_OPTIONS__", json.dumps(color_opts_meta or []))
             .replace("__CO_ACTIVE__", str(_active))
             .replace("__OVERLAYS__", json.dumps(ov_meta))
-            .replace("__TUNNEL__", json.dumps({"layers": tun_paint, "fade": float(CONFIG.tunnel_fade), "palette": CONFIG.tunnel_palette,
-                                               "palettes": CONFIG.tunnel_palettes, "bg": _bg_color(active_bm), "fill_to": CONFIG.tunnel_fill_to, "control": bool(tunnel_control and tun_paint)}))
+            .replace("__TUNNEL__", json.dumps({"layers": tun_paint, "dash": tun_dash, "strength": float(CONFIG.tunnel_strength),
+                                               "palette": CONFIG.tunnel_palette, "palettes": CONFIG.tunnel_palettes,
+                                               "ratio": list(CONFIG.tunnel_casing_dash or [3, 3]), "bg": _bg_color(active_bm),
+                                               "to": _TUN_TO, "control": bool(tunnel_control and tun_paint)}))
             .replace("__ROAD_POPUP__", "true" if popup_on else "false")
             .replace("__ROAD_POPUP_MODE__", json.dumps(mode))
             .replace("__ROAD_POPUP_FIELDS__", json.dumps(popup_fields))
