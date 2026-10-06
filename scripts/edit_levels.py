@@ -42,7 +42,7 @@ class Area:
         self.facts = {}                                         # road id -> what the panel shows about it
         for (_, r), m in zip(self.roads.iterrows(), length, strict=True):
             self.facts[r["road"]] = {"road": r["road"], "name": _txt(r.get("name")), "highway": _txt(r.get("highway")),
-                                     "edge_ref": _txt(r.get("edge_ref")), "band": int(r["band"]), "priority": _num(r.get("priority")),
+                                     "edge_ref": _txt(r.get("edge_ref")), "lanes": _txt(r.get("lanes")), "band": int(r["band"]), "priority": _num(r.get("priority")),
                                      "edges": len(r["edges"]) + len(r["reversed"]), "two_way": len(r["reversed"]) > 0, "length_m": float(m),
                                      "look": "tunnel" if _yes(r.get("tunnel")) else "bridge" if _yes(r.get("bridge")) else "ground"}
         self.saved = len(self.edits())                          # the edits that were in edits.csv when the editor started
@@ -111,7 +111,7 @@ class Area:
         self.build(edits, solved)
 
     def apply(self, ops):
-        """Apply the changes the page collected, in one solve: ``{"op": "delete", "index": i}`` (a row of edits.csv) and ``{"op": "add",
+        """Apply the changes the page collected, in one solve: ``{"op": "delete", "index": i, "row": row}`` (a row of edits.csv, as the page showed it) and ``{"op": "add",
         "body": row}``. If any is wrong, or the solver refuses the result, nothing is saved (ValueError)."""
         if not ops:
             raise ValueError("nothing to apply")
@@ -119,8 +119,10 @@ class Area:
             raise ValueError("a change is add or delete")
         e = self.edits()
         gone = sorted({int(o["index"]) for o in ops if o["op"] == "delete"}, reverse=True)
-        if any(not 0 <= i < len(e) for i in gone):
-            raise ValueError("an edit to delete is no longer in edits.csv")
+        for o in ops:                                           # a delete names its row as the page saw it: edits.csv may have changed since
+            i = int(o["index"]) if o["op"] == "delete" else None
+            if i is not None and not (0 <= i < len(e) and all(str(e.iat[i, e.columns.get_loc(c)]) == str(o["row"].get(c, "") or "") for c in COLS)):
+                raise ValueError("an edit to delete is not in edits.csv as the page showed it (changed since): reload the page")
         new = pd.DataFrame([_row(o["body"]) for o in ops if o["op"] == "add"], columns=COLS)
         self.change(pd.concat([e.drop(index=gone), new], ignore_index=True), saved=self.saved - sum(i < self.saved for i in gone))
 

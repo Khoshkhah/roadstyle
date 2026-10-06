@@ -219,7 +219,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
       <div class="sub">${esc([f.highway, f.edge_ref].filter(Boolean).join(" · "))}</div>
       <div class="grid"><span>band</span><span>${f.band ?? "–"}</span><span>priority</span><span>${f.priority ?? "–"}</span>
         <span>length</span><span>${f.length_m != null ? f.length_m + " m" : "–"}</span><span>edges</span><span>${f.edges ?? "–"}${f.two_way ? " (two-way)" : ""}</span>
-        <span>look</span><span>${esc(f.look || "–")}</span><span></span><span></span>
+        <span>look</span><span>${esc(f.look || "–")}</span><span>lanes</span><span>${esc(f.lanes ?? "–")}</span>
         <span>road id</span><span style="grid-column:span 3;font-size:11px">${esc(r)}</span></div>
       <div class="lvls"><div><small>start</small><b>${L[0]}</b></div><div><small>casing</small><b>${L[1]}</b></div>
         <div><small>end</small><b>${L[2]}</b></div><div><small>fill</small><b>${L[3]}</b></div></div></div>`;
@@ -243,7 +243,8 @@ body.lv-open #lv-busy{right:var(--lv-w)}
       const b = el.querySelector(".act");
       b.onclick = () => r.section === "found"
         ? stage({op: "add", body: {relation: r.relation, a: r.a, b: r.b, a_end: r.a_end || "", b_end: r.b_end || "", enabled: "false"}})
-        : stage({op: "delete", index: r.index, row: {relation: r.relation, a: r.ra, b: r.rb, a_end: r.a_end, b_end: r.b_end, enabled: r.enabled}});
+        : stage({op: "delete", index: r.index, row: {relation: r.relation, a: r.ra, b: r.rb, a_end: r.a_end, b_end: r.b_end, enabled: r.enabled},
+                 raw: {relation: r.relation, a: r.a, b: r.b, a_end: r.a_end, b_end: r.b_end, enabled: r.enabled}});
     });
   }
   async function update(){
@@ -332,7 +333,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   $("lv-apply").onclick = async () => {
     if(!queue.length) return;
     $("lv-apply").disabled = true; busy(`Solving the levels with ${queue.length} change${queue.length > 1 ? "s" : ""} …`);
-    try { await api("/api/apply", {ops: queue.map(q => q.op === "delete" ? {op: "delete", index: q.index} : {op: "add", body: q.body})});
+    try { await api("/api/apply", {ops: queue.map(q => q.op === "delete" ? {op: "delete", index: q.index, row: q.raw} : {op: "add", body: q.body})});
       const said = `Applied ${queue.length} change${queue.length > 1 ? "s" : ""}`;
       queue = []; showQueue(); busy("Drawing the new map …");
       sessionStorage.setItem("lv-view", JSON.stringify({c: map.getCenter(), z: map.getZoom(), b: map.getBearing(), p: map.getPitch(), sel: sel, said: said,

@@ -17,6 +17,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - The editor warns when a new order (road 1 after road 2) meets an active stack of road 2 over road 1: the stack outranks it, so the order would be given up.
 - The editor: you choose which road is on top for an order or a stack (it was always the road clicked first); changes wait in a list until *Apply and solve*,
   one solve for all, with a busy layer over the map until the new map is drawn.
+- `level_input` keeps the edges' `lanes` (shown in the editor's cards). A delete in the editor names its row as the page saw it: if edits.csv changed since, nothing is applied.
 - The editor has a search box: an edge id (either direction of a road) or an edge_ref, or a part of one; a hit is picked and shown.
 
 ### Changed
