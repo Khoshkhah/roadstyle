@@ -30,3 +30,15 @@ Before, `band_col` moved the tunnel's casing and fill but dropped its look subla
 
 Tests: twin layers and filters, order inside a band, nothing without the keyword, the tunnel look in the ground band and
 nothing extra without such a tunnel.
+
+## Square, and one end at a time (Kaveh 2026-10-06)
+
+Found in the level editor: a wide road ending on a narrower one at a narrow angle, its round end reaching across the other road
+(Tunnel Aureglia into Rue Grimaldi, Monaco). A flat end there fixes it, but a flat end on both ends makes the road look shorter by
+half its width at each end, which confused. So:
+
+- `cap_col` value `"square"`: MapLibre's square cap, flat but as far past the end point as a round end; twin layers `-sx`.
+- `cap_start_col` / `cap_end_col`: one end each (`"round"`, `"square"`, flat = any other true value; null = `cap_col`'s). An edge
+  whose two ends differ (`__rs_split`) is left out of the whole-edge fill layers and drawn from a `halves` source: the fill cut at
+  the middle, each half with its end's cap (`roads-fill-h` / `-hsq` / `-hsx`, per position). Its casing is always cut into heads
+  (the divided casing), each head with its end's cap. At the middle cut the halves overlap or meet in the same colour.

@@ -675,7 +675,8 @@ def _casing_parts(geo, head_m, cols):
         base["__rs_road"] = i
         cs, cm, ce = p["__rs_cs"], p["__rs_cl"], p["__rs_ce"]
         c = g.get("coordinates") or []
-        if g.get("type") != "LineString" or len(c) < 2 or cs == cm == ce:
+        split = p.get("__rs_split")
+        if g.get("type") != "LineString" or len(c) < 2 or (cs == cm == ce and not split):
             out.append({"type": "Feature", "properties": base, "geometry": g})
             continue
         lon0, lat0 = c[0][0], c[0][1]
@@ -692,16 +693,62 @@ def _casing_parts(geo, head_m, cols):
                 continue
             coords = np.column_stack([np.round(pts[:, 0] / kx + lon0, 7), np.round(pts[:, 1] / ky + lat0, 7)]).tolist()
             flat = {"__rs_cap": True} if k == 1 else {}        # the main piece ends at two cuts: flat ends (a round end would reach into the heads)
-            out.append({"type": "Feature", "properties": {**base, "__rs_cl": num, **flat}, "geometry": {"type": "LineString", "coordinates": coords}})
+            if split and k != 1:                                # a head of an edge with two different ends: that end's cap
+                flat = {"__rs_cap": p["__rs_cap0" if k == 0 else "__rs_cap1"]}
+            q = {**base, "__rs_cl": num, **flat}
+            if q.get("__rs_cap") is None:
+                q.pop("__rs_cap", None)
+            out.append({"type": "Feature", "properties": q, "geometry": {"type": "LineString", "coordinates": coords}})
     return out
 
 
-def _mark_caps(geo, cap_col=None):
-    """``__rs_cap`` from ``cap_col`` (docs/design/square_ends.md). Nothing baked for a null value."""
+def _cap_value(v):
+    """One end's cap from a column value: "square" (flat, as long as a round end), True (flat, at the end point) or None (round)."""
+    if isinstance(v, str) and v.strip().lower() in ("square", "round"):
+        return "square" if v.strip().lower() == "square" else None
+    return True if _truthy(v) and not (isinstance(v, float) and v != v) else None
+
+
+def _mark_caps(geo, cap_col=None, start_col=None, end_col=None):
+    """``__rs_cap`` from ``cap_col`` (docs/design/square_ends.md): ``"square"`` -> "square" (a flat end as long as a round one), any other
+    true value -> True (flat, at the end point). ``start_col`` / ``end_col`` set one end each (null: ``cap_col``'s); an edge whose two ends
+    differ gets ``__rs_cap0`` / ``__rs_cap1`` and ``__rs_split`` instead (drawn in two halves, :func:`_halves`). Nothing baked for round."""
     for ft in geo["features"]:
         p = ft["properties"]
-        if cap_col and _truthy(p.get(cap_col)):
-            p["__rs_cap"] = True
+        whole = _cap_value(p.get(cap_col)) if cap_col else None
+        s0 = _cap_value(p[start_col]) if start_col and p.get(start_col) is not None and p.get(start_col) == p.get(start_col) else whole
+        s1 = _cap_value(p[end_col]) if end_col and p.get(end_col) is not None and p.get(end_col) == p.get(end_col) else whole
+        if s0 == s1:
+            if s0 is not None:
+                p["__rs_cap"] = s0
+        else:
+            p["__rs_cap0"], p["__rs_cap1"], p["__rs_split"] = s0, s1, True
+
+
+def _halves(geo):
+    """The fill of every edge with two different ends (``__rs_split``) as two halves cut at the middle, each with its end's ``__rs_cap``
+    and all the edge's properties: MapLibre sets line-cap per layer, so each end shape needs its own piece (docs/design/square_ends.md).
+    At the cut the two halves overlap or meet in the same colour."""
+    import numpy as np
+    out = []
+    for ft in geo["features"]:
+        p, g = ft["properties"], ft.get("geometry") or {}
+        c = g.get("coordinates") or []
+        if not p.get("__rs_split") or g.get("type") != "LineString" or len(c) < 2:
+            continue
+        lon0, lat0 = c[0][0], c[0][1]
+        kx, ky = 111320.0 * math.cos(math.radians(lat0)), 111320.0
+        xy = np.column_stack([np.asarray([(x - lon0) * kx for x, y, *_ in c]), np.asarray([(y - lat0) * ky for x, y, *_ in c])])
+        cum = _cum_lengths(xy)
+        n = float(cum[-1])
+        for k, (a, b) in enumerate([(0.0, n / 2), (n / 2, n)]):
+            pts = _part(xy, cum, a, b)
+            coords = np.column_stack([np.round(pts[:, 0] / kx + lon0, 7), np.round(pts[:, 1] / ky + lat0, 7)]).tolist()
+            q = {kk: v for kk, v in p.items() if kk not in ("__rs_cap0", "__rs_cap1", "__rs_split")}
+            if p[f"__rs_cap{k}"] is not None:
+                q["__rs_cap"] = p[f"__rs_cap{k}"]
+            out.append({"type": "Feature", "properties": q, "geometry": {"type": "LineString", "coordinates": coords}})
+    return out
 
 
 def _twin_ends(geo, cols):
@@ -735,7 +782,7 @@ def _twin_ends(geo, cols):
     for i, ft in enumerate(geo["features"]):
         p, k = ft["properties"], keys[i]
         if (i in used or k is None or not p.get("__rs_twoway") or p.get("__rs_bridge")
-                or p.get("__rs_tunnel") or p.get("__rs_dash") or p.get("__rs_cap")):
+                or p.get("__rs_tunnel") or p.get("__rs_dash") or p.get("__rs_cap") or p.get("__rs_split")):
             continue
         j = next((j for j in where.get((k[1], k[0]), []) if j != i and j not in used
                   and geo["features"][j]["properties"].get("__rs_twoway")), None)
@@ -771,16 +818,17 @@ def _tunnel_fill_under(lid, flt, fw, off, bg, on):
              "paint": {"line-color": bg, "line-width": fw, "line-offset": off}}]
 
 
-_CASING_FAMILY = ("roads-casing", "roads-casing-sq", "roads-casing-dash", "roads-casing-bridge")
-_FILL_FAMILY = ("roads-fill-under", "roads-fill", "roads-fill-sq", "roads-fill-pat")
+_CASING_FAMILY = ("roads-casing", "roads-casing-sq", "roads-casing-sx", "roads-casing-dash", "roads-casing-bridge")
+_FILL_FAMILY = ("roads-fill-under", "roads-fill", "roads-fill-sq", "roads-fill-sx", "roads-fill-h", "roads-fill-hsq", "roads-fill-hsx", "roads-fill-pat")
 
 
 def _fill_layer_ids(levels):
     """The layers the page recolours (colour-by, rsColor): every road fill layer, and the fill layers of each drawing-order position."""
-    ids = ["roads-fill", "roads-fill-sq"]
+    fills = ("roads-fill", "roads-fill-sq", "roads-fill-sx", "roads-fill-h", "roads-fill-hsq", "roads-fill-hsx")
+    ids = list(fills)
     for level in levels or ():
         if level != 0:
-            ids += [_level_id("roads-fill", level), _level_id("roads-fill-sq", level)]
+            ids += [_level_id(i, level) for i in fills]
     return ids
 
 
@@ -1316,7 +1364,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
-           edge_id_col: str = "edge_id", road_fill: bool = True, cap_col: str = None, casing_level_col: str = None, fill_level_col: str = None, casing_start_col: str = None, casing_end_col: str = None, head_m: float = 5.0, directed_col: str = None,
+           edge_id_col: str = "edge_id", road_fill: bool = True, cap_col: str = None, cap_start_col: str = None, cap_end_col: str = None, casing_level_col: str = None, fill_level_col: str = None, casing_start_col: str = None, casing_end_col: str = None, head_m: float = 5.0, directed_col: str = None,
            width_m_col: str = None, width_m_zoom: float = 16, casing_m: float = 0.15,
            pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
@@ -1340,7 +1388,11 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     anything else, and draw them as they are. Null = 0. A bridge keeps its look (heavier casing), a tunnel its look (faded, dashed).
     ``cap_col`` names a column: a true value draws that edge's casing and fill with **square** ends
     (butt caps) instead of round ones, where an edge is one piece of a longer road and meets its
-    other piece (docs/design/square_ends.md). Null / false = round ends, as always.
+    other piece (docs/design/square_ends.md). The value ``"square"`` draws a flat end that reaches as
+    far past the end point as a round one (MapLibre's square cap): the road keeps its drawn length.
+    Null / false = round ends, as always. ``cap_start_col`` / ``cap_end_col`` set one end each, with the
+    same values (``"round"`` too); null = ``cap_col``'s. An edge whose two ends differ is drawn from its
+    casing heads and two fill halves; needs the level columns.
 
     ``road_fill=False`` draws each road's casing but not its fill: the road's own fill layers stay (so a click and a hover still find the road) but are invisible, and the things attached to
     the roads with ``Overlay(edge_col=...)`` are the fill (docs/design/edge_overlays.md, "Three ways to use it").
@@ -1459,7 +1511,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                                 "prop": "__rs_fill", "legend": rf.legend}]
     _mark_twoway(geo, directed_col)
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
-    _mark_caps(geo, cap_col)
+    _mark_caps(geo, cap_col, cap_start_col, cap_end_col)
     levels = _mark_levels(geo, casing_level_col, fill_level_col, casing_start_col, casing_end_col) if (casing_level_col or fill_level_col) else None
     _mark_tunnel_dash(geo, CONFIG.tunnel_gap_shade, CONFIG.tunnel_dash_shade)
     if width_m_col:
@@ -1760,19 +1812,38 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         style["layers"] = relayered
 
     # square ends (cap_col, docs/design/square_ends.md): MapLibre sets line-cap per layer, not per feature, so
-    divided = bool(levels and (casing_start_col or casing_end_col))
+    splits = any(ft["properties"].get("__rs_split") for ft in geo["features"])      # an edge with two different ends (cap_start_col / cap_end_col)
+    if splits and not levels:
+        raise ValueError("cap_start_col / cap_end_col need the level columns (casing_level_col / fill_level_col): one end at a time is drawn from the casing heads")
+    divided = bool(levels and (casing_start_col or casing_end_col or splits))
     parts = _casing_parts(geo, head_m, (highway_col, filter_col, width_m_col)) if divided else None      # the pieces of a divided casing
     # each band's casing and fill get a butt-capped twin for the edges that ask for it, drawn right after the
     # round layer (a band's casings stay under its fills). Dashed classes draw butt-capped already.
-    if any(ft["properties"].get("__rs_cap") for ft in geo["features"]) or (parts and any(f["properties"].get("__rs_cap") for f in parts)):
+    # A "square" value gets a square-capped twin (-sx): flat, but as far past the end point as a round end.
+    # An edge with two different ends draws its fill from "halves" (two pieces, -h / -hsq / -hsx twins of roads-fill) and its casing
+    # from the heads; the whole-edge fill layers leave it out.
+    if splits or any(ft["properties"].get("__rs_cap") for ft in geo["features"]) or (parts and any(f["properties"].get("__rs_cap") for f in parts)):
         sq = ["to-boolean", ["get", "__rs_cap"]]
+        sx = ["==", ["get", "__rs_cap"], "square"]
+        squares = any("square" in (p.get("__rs_cap"), p.get("__rs_cap0"), p.get("__rs_cap1")) for p in (ft["properties"] for ft in geo["features"]))
+        whole = ["!", ["to-boolean", ["get", "__rs_split"]]]
+        if splits:
+            style["sources"]["halves"] = {"type": "geojson", "data": {"type": "FeatureCollection", "features": _halves(geo)}}
         capped = []
         for l in style["layers"]:
             if l["id"] in ("roads-low-casing", "roads-low-fill", "roads-casing", "roads-fill",
                            "roads-high-casing", "roads-high-fill"):
-                capped.append({**l, "filter": ["all", l["filter"], ["!", sq]]})
+                own = [whole] if splits and l["id"] == "roads-fill" else []
+                capped.append({**l, "filter": ["all", l["filter"], ["!", sq], *own]})
                 capped.append({**l, "id": l["id"] + "-sq", "layout": {**l["layout"], "line-cap": "butt"},
-                               "filter": ["all", l["filter"], sq]})
+                               "filter": ["all", l["filter"], sq, ["!", sx], *own]})
+                if squares:
+                    capped.append({**l, "id": l["id"] + "-sx", "layout": {**l["layout"], "line-cap": "square"},
+                                   "filter": ["all", l["filter"], sx, *own]})
+                if splits and l["id"] == "roads-fill":
+                    for sfx, cap, f in (("-h", "round", ["!", sq]), ("-hsq", "butt", ["all", sq, ["!", sx]]), ("-hsx", "square", sx)):
+                        capped.append({**l, "id": l["id"] + sfx, "source": "halves", "layout": {**l["layout"], "line-cap": cap},
+                                       "filter": ["all", l["filter"], f]})
             else:
                 capped.append(l)
         style["layers"] = capped
@@ -1789,7 +1860,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             # (docs/design/levels_split_casing.md, section 9); the other casing layers leave the bridge edges to it
             layers, at = [], 0
             for l in style["layers"]:
-                if l["id"] in ("roads-casing", "roads-casing-sq", "roads-casing-dash"):
+                if l["id"] in ("roads-casing", "roads-casing-sq", "roads-casing-sx", "roads-casing-dash"):
                     l = {**l, "filter": ["all", l["filter"], ["!", is_b]]}
                     at = len(layers)
                 layers.append(l)
@@ -1913,7 +1984,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                 fams = (("roads-arrows-tunnel", "<",       # the low band's: a tunnel's too, above its fill
                          lambda i: i.startswith("roads-low-")),
                         ("roads-arrows", "==",
-                         lambda i: i in ("roads-casing", "roads-casing-sq", "roads-fill")
+                         lambda i: i in ("roads-casing", "roads-casing-sq", "roads-casing-sx", "roads-fill")
                          or i.startswith("roads-fill-")),
                         ("roads-arrows-bridge", ">",
                          lambda i: i.startswith(("roads-high-", "roads-bridge-"))))

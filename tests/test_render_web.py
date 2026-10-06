@@ -829,7 +829,7 @@ def _eval(e, p):
     if op == "all":
         return all(_eval(x, p) for x in a)
     x, y = _eval(a[0], p), _eval(a[1], p)
-    return {"<": x < y, ">": x > y, "==": x == y}[op]
+    return x == y if op == "==" else (x < y if op == "<" else x > y)
 
 
 
@@ -1004,7 +1004,7 @@ def test_colour_by_recolours_the_dashed_layers_too():
     """A footway / path / steps edge is drawn by a ``-dash<n>`` layer (line-dasharray is not data-driven): it must
     follow the active colouring, or it keeps its class colour under any "colour by"."""
     html = render_edges(_tunnel_world(True), backend="web").html
-    assert 'const RS_FILL_LAYERS = ["roads-fill", "roads-fill-sq", "roads-fill-lv1"' in html          # the tunnel at position 1: over the streets it joins
+    assert 'const RS_FILL_LAYERS = ["roads-fill", "roads-fill-sq", "roads-fill-sx", "roads-fill-h", "roads-fill-hsq", "roads-fill-hsx", "roads-fill-lv1"' in html          # the tunnel at position 1: over the streets it joins
     assert 'dashed(RS_FILL_LAYERS).forEach(id=>map.setPaintProperty(id,"line-color",e))' in html
     assert "RS_PIECE_LAYERS" not in html and "tpieces" not in html
 
@@ -1074,6 +1074,13 @@ def test_cap_col_gives_square_ends_to_the_edges_that_ask():
     assert [bool(_eval(lay["roads-fill"]["filter"], p)) for p in ps] == [True, False, True]       # round: not the capped edge
     assert [bool(_eval(lay["roads-fill-sq"]["filter"], p)) for p in ps] == [False, True, False]
     assert ids.index("roads-casing") < ids.index("roads-casing-sq") < ids.index("roads-fill") < ids.index("roads-fill-sq")
+    assert "roads-fill-sx" not in lay                                                              # no "square" value: no square twin
+    sx = _style(render_edges(g.assign(sq=[None, True, "square"]), backend="web", cap_col="sq").html)     # "square": flat, as long as round
+    lay = {l["id"]: l for l in sx["layers"]}
+    ps = [f["properties"] for f in sx["sources"]["roads"]["data"]["features"]]
+    assert lay["roads-fill-sx"]["layout"]["line-cap"] == "square"
+    assert [[bool(_eval(lay[i]["filter"], p)) for p in ps] for i in ("roads-fill", "roads-fill-sq", "roads-fill-sx")] == \
+        [[True, False, False], [False, True, False], [False, False, True]]                         # each edge in exactly one
     plain = _style(render_edges(g.drop(columns="sq"), backend="web").html)
     assert not [l for l in plain["layers"] if l["id"].endswith("-sq")]
     assert "__rs_cap" not in json.dumps(plain["sources"]["roads"])
@@ -1901,10 +1908,12 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
         with pytest.raises(ValueError):
             area.apply(bad)
     assert len(area.edits()) == 1                                                 # nothing saved
-    area.apply([{"op": "flat", "road": "12", "on": True}])                       # flat ends: caps.csv, drawn with cap_col
-    assert (tmp_path / "caps.csv").read_text().split() == ["road", "12"] and area.facts["12"]["flat"]
-    area.apply([{"op": "flat", "road": "12", "on": False}])
-    assert (tmp_path / "caps.csv").read_text().split() == ["road"] and not area.facts["12"]["flat"]
+    area.apply([{"op": "cap", "road": "12", "end": "start", "cap": "flat"}, {"op": "cap", "road": "12", "end": "end", "cap": "square"}])   # caps.csv
+    assert (tmp_path / "caps.csv").read_text().split() == ["road,start,end", "12,flat,square"] and area.facts["12"]["caps"] == ["flat", "square"]
+    area.apply([{"op": "cap", "road": "12", "end": "start", "cap": ""}, {"op": "cap", "road": "12", "end": "end", "cap": ""}])     # round again
+    assert (tmp_path / "caps.csv").read_text().split() == ["road,start,end"] and area.facts["12"]["caps"] == ["", ""]
+    with pytest.raises(ValueError):
+        area.apply([{"op": "cap", "road": "12", "end": "start", "cap": "pointy"}])
 
 
 def test_edits_name_either_direction_of_a_road():
@@ -1965,3 +1974,26 @@ def test_stack_edits_can_name_a_part_of_the_upper_road():
         rs.solve_levels(roads, pairs, edits=row(a="11", b="14", a_end="start", enabled="false"))   # no pair 11 over 14 to take a part from
     with pytest.raises(ValueError):
         rs.solve_levels(roads, pairs, edits=row(a="11", b="14", a_end="middle"))
+
+
+def test_cap_start_and_end_cols_set_one_end_each():
+    """cap_start_col / cap_end_col (docs/design/square_ends.md): an edge whose two ends differ is left out of the whole-edge fill layers and
+    drawn as two fill halves (source "halves"), each with its end's cap, and its casing heads take their end's cap; equal ends stay one
+    edge; without level columns too (render_edges computes them)."""
+    g = gpd.GeoDataFrame({"highway": ["residential"] * 2, "cl": [0, 0], "fl": [0, 0], "s": ["flat", "square"], "e": [None, "square"]},
+                         geometry=[LineString([(18.0 + i * 0.01, 59.30), (18.0 + i * 0.01, 59.31)]) for i in range(2)], crs=4326)
+    kw = dict(casing_level_col="cl", fill_level_col="fl", cap_start_col="s", cap_end_col="e")
+    style = _style(render_edges(g, backend="web", **kw).html)
+    lay = {l["id"]: l for l in style["layers"]}
+    ps = [f["properties"] for f in style["sources"]["roads"]["data"]["features"]]
+    assert ps[0].get("__rs_split") and ps[1].get("__rs_cap") == "square"                       # flat / round differ; square / square: one edge
+    halves = [f["properties"] for f in style["sources"]["halves"]["data"]["features"]]
+    assert [h.get("__rs_cap") for h in halves] == [True, None]                                   # start half flat, end half round
+    assert [bool(_eval(lay["roads-fill"]["filter"], p)) for p in ps] == [False, False]           # the split edge: not in the whole fill
+    assert [bool(_eval(lay["roads-fill-sx"]["filter"], p)) for p in ps] == [False, True]
+    assert [[bool(_eval(lay[i]["filter"], h)) for h in halves] for i in ("roads-fill-hsq", "roads-fill-h")] == [[True, False], [False, True]]
+    assert lay["roads-fill-hsq"]["layout"]["line-cap"] == "butt" and lay["roads-fill-h"]["source"] == "halves"
+    heads = [f["properties"] for f in style["sources"]["casings"]["data"]["features"] if f["properties"]["__rs_road"] == 0]
+    assert [h.get("__rs_cap") for h in heads] == [True, True, None]                              # start head flat, main flat (cut), end head round
+    auto = _style(render_edges(g.drop(columns=["cl", "fl"]), backend="web", cap_start_col="s", cap_end_col="e").html)     # levels computed here
+    assert len(auto["sources"]["halves"]["data"]["features"]) == 2
