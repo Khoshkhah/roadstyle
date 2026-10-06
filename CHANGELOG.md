@@ -7,7 +7,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
-- **The tunnel look, one slider** (`docs/design/tunnel_look.md`): a tunnel's fill is opaque, its colour moved toward the background by `tunnel_fade` (0.3); its casing's two tones
+- **The tunnel look, one slider** (`docs/design/tunnel_look.md`): a tunnel's fill is opaque, its colour moved toward slate (`tunnel_fill_to`) by `tunnel_fade` (0.35, as v2); its casing's two tones
   move toward a palette (`tunnel_palette`: `Slate + ice`, `Blue + cyan`, `Warm + sand`); the items attached to a tunnel fade with it. Replaces the 72 % see-through fill and its underlay.
   A *Tunnels* box (`tunnel_control`) and `rsSetTunnelStyle({fade, palette})` move it in the page; Colour by keeps it.
 - **Faster page building:** the casing pieces and the arrow and street-name slots are cut with a small numpy cutter instead of shapely's `substring` (the same lines), and a slot of a group of one edge no longer searches for its edge.
