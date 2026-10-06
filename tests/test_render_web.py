@@ -1859,3 +1859,29 @@ def test_render_edges_takes_no_band_or_order():
     for k, v in (("band_col", "band"), ("order", "class")):
         with pytest.raises(ValueError, match="compute the levels first"):
             render_edges(_edges(), backend="web", **{k: v})
+
+
+def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
+    """scripts/edit_levels.py: the pairs between two roads (by any edge id), an edit the solver refuses is not written, a taken one is written
+    with the file before it kept as edits.csv.bak, and levels.csv follows."""
+    pytest.importorskip("scipy")
+    import sys
+
+    import pandas as pd
+
+    import roadstyle as rs
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    from edit_levels import Area
+    roads, pairs = rs.level_input(_edge_world())
+    roads.to_parquet(tmp_path / "roads.parquet")
+    pairs.to_csv(tmp_path / "pairs.csv", index=False)
+    area = Area(tmp_path)
+    got = area.between("12", "11")
+    assert {(r["relation"], r["a"], r["b"]) for r in got["found"]} >= {("order", "12", "11")} and got["edits"] == []
+    before = (tmp_path / "edits.csv").read_text()
+    with pytest.raises(ValueError):
+        area.change(pd.DataFrame([{"relation": "stack", "a": "999", "b": "11", "a_end": "", "b_end": "", "enabled": "true"}]))
+    assert (tmp_path / "edits.csv").read_text() == before
+    area.change(pd.DataFrame([{"relation": "order", "a": "12", "b": "11", "a_end": "", "b_end": "", "enabled": "false"}]))
+    assert "false" in (tmp_path / "edits.csv").read_text() and (tmp_path / "edits.csv.bak").read_text() == before
+    assert len(area.between("11", "12")["edits"]) == 1 and (tmp_path / "levels.csv").exists()
