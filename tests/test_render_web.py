@@ -2069,3 +2069,20 @@ def test_auto_ends_fit_heads_and_caps_to_the_joins():
     assert e.loc["5", "end_m"] > e.loc["3", "end_m"]                               # a narrow merge (about 22°) overlaps for longer
     assert e.loc["5", "cap_end"] == "flat" and e.loc["3", "cap_end"] == "flat"     # a primary ending on a narrower street: its round end spills over
     assert e.loc["1", "cap_start"] == "round" and e.loc["4", "cap_start"] == "round"  # a dead end, the street going on round a bend: round
+
+
+def test_a_street_going_on_over_its_tunnel_stays_over_it_at_the_mouth():
+    """level_input (docs/design/level_input.md, Kaveh 2026-10-06): at a tunnel mouth the priority decides (the tunnel's fill over the road it
+    meets), unless that road goes on into a road that crosses over the tunnel: then the band, or the tunnel cuts its own street in two."""
+    pytest.importorskip("scipy")
+    import roadstyle as rs
+    x0, y0 = 674000.0, 6580000.0
+    P = lambda x, y: (x0 + x, y0 + y)                                                  # noqa: E731
+    g = gpd.GeoDataFrame({"highway": ["secondary"] * 3, "tunnel": [None, None, "yes"], "edge_id": [1, 2, 3]},
+                         geometry=[LineString([P(0, 0), P(50, 0)]), LineString([P(50, 0), P(58, 0)]),          # the street: A, then B (short)
+                                   LineString([P(58, 0), P(40, -6), P(20, 6)])], crs=3006)                    # the tunnel from B's end, back under A
+    roads, pairs = rs.level_input(g)
+    rel = {(r.relation, r.a, r.b) for r in pairs.itertuples()}
+    assert ("stack", "1", "3") in rel and ("order", "2", "3") in rel and ("order", "3", "2") not in rel
+    out = rs.solve_levels(roads, pairs).set_index("road")
+    assert out.loc["2", "fill_level"] > out.loc["3", "fill_level"] and out.loc["1", "fill_level"] > out.loc["3", "fill_level"]

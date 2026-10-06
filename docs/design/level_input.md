@@ -21,6 +21,11 @@ Two roads with **different bands** (a tunnel and a street, a bridge and the road
 - if they **only meet** at a node (a tunnel mouth, a bridge end), the **priority** decides, as for two roads of one band: roundabout, then
   tunnel, then bridge, then the road class (an `order` wish).
 
+**A street going on over its tunnel** (Kaveh 2026-10-06): at a mouth where the road of the upper band goes on into a road that crosses
+over the tunnel (the tunnel runs back under its own street), the band decides there too: the street over its tunnel. With the
+priority the short piece at the mouth went under the tunnel, and the tunnel, drawn between the street's pieces, cut the street in two
+(Monaco 4227164#2f and 93091315#1f; 38 such mouths in Monaco).
+
 With an explicit `band_col` the caller's bands decide over and under everywhere, also where roads only meet: a zebra crossing set over its
 street stays over it (lanestyle, mapstyle).
 
