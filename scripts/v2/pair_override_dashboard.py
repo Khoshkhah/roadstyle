@@ -594,6 +594,7 @@ def main() -> None:
             _load_all_features(args.map_html),
             head_m=args.head_m,
             smooth=args.smooth,
+            map_colors=args.style is None,
         )
     else:
         print(f"No DuckOSM database at {database}: showing the map's own levels.")
