@@ -36,7 +36,7 @@ class Area:
         self.caps_path = self.dir / "caps.csv"                 # road -> (start, end): "", "square" or "flat" (cap_start_col / cap_end_col): drawing only
         t = pd.read_csv(self.caps_path, dtype=str, keep_default_na=False) if self.caps_path.exists() else pd.DataFrame(columns=["road", "start", "end"])
         both = t["cap"] if "cap" in t else ["flat"] * len(t)   # an older file: one value (or none: flat) for both ends
-        self.heads_path = self.dir / "heads.csv"               # road -> (start_m, end_m) as text, "" = the default 5 m: the solver's input too
+        self.heads_path = self.dir / "heads.csv"               # road -> (start_m, end_m) as text, "" = the default 5 m: the drawing's, and which mains are empty
         t2 = pd.read_csv(self.heads_path, dtype=str, keep_default_na=False) if self.heads_path.exists() else pd.DataFrame(columns=["road", "start_m", "end_m"])
         self.heads = {r: (s, e) for r, s, e in zip(t2["road"], t2["start_m"], t2["end_m"], strict=True)}
         self.caps = {r: (s, e) for r, s, e in zip(t["road"], t["start"] if "start" in t else both, t["end"] if "end" in t else both, strict=True)}
@@ -90,12 +90,13 @@ class Area:
     def solve(self, edits, heads=None):
         heads = self.heads if heads is None else heads
         t = pd.DataFrame([(r, *heads[r]) for r in sorted(heads)], columns=["road", "start_m", "end_m"])
-        return rs.solve_levels(self.roads, self.pairs, edits=edits if len(edits) else None, heads=t if len(t) else None)
+        return rs.solve_levels(self.roads, self.pairs, edits=edits if len(edits) else None, empty_main=rs.empty_mains(self.roads, 5.0, t))
 
     def build(self, edits, solved=None):
         if solved is None:
             solved = self.solve(edits)
             write(solved, self.dir)
+        self.solved = solved
         self.stats = {**solved.attrs["levels_info"], "given_up": [list(p) for p in solved.attrs["levels_given_up"]], "area": self.dir.name}
         for r in solved.itertuples():
             self.facts[r.road]["caps"] = list(self.caps.get(r.road, ("", "")))
@@ -117,18 +118,25 @@ class Area:
         self.page = page.replace("</body>", _EDITOR.replace("__STATS__", json.dumps(self.stats, default=str)) + "</body>", 1)
 
     def change(self, edits, saved=None, caps=None, heads=None):
-        """Solve with ``edits`` (and ``heads``, road -> (start_m, end_m)); save them (and ``caps``, road -> (start, end) of "" / "square" /
-        "flat") only if the solver takes them."""
-        solved = self.solve(edits, heads)                       # raises ValueError: nothing written
+        """Solve with ``edits``; save them (and the drawing's ``caps``, road -> (start, end) of "" / "square" / "flat", and ``heads``, road ->
+        (start_m, end_m), which tell the solver the empty mains) only if the solver takes them. Only caps changed: no solve."""
+        if edits is None and heads == self.heads:              # only the ends' shapes changed: the levels as they are
+            solved = self.solved
+        else:
+            solved = self.solve(self.edits() if edits is None else edits, heads)          # raises ValueError: nothing written
         if heads is not None:
             pd.DataFrame([(r, *heads[r]) for r in sorted(heads)], columns=["road", "start_m", "end_m"]).to_csv(self.heads_path, index=False)
             self.heads = dict(heads)
         if caps is not None:
             pd.DataFrame([(r, *caps[r]) for r in sorted(caps)], columns=["road", "start", "end"]).to_csv(self.caps_path, index=False)
             self.caps = dict(caps)
-        self.edits_path.with_name("edits.csv.bak").write_text(self.edits_path.read_text())
-        edits.to_csv(self.edits_path, index=False)
-        write(solved, self.dir)
+        if edits is not None:
+            self.edits_path.with_name("edits.csv.bak").write_text(self.edits_path.read_text())
+            edits.to_csv(self.edits_path, index=False)
+        else:
+            edits = self.edits()
+        if solved is not self.solved:
+            write(solved, self.dir)
         if saved is not None:
             self.saved = saved
         self.build(edits, solved)
@@ -170,8 +178,8 @@ class Area:
             if i is not None and not (0 <= i < len(e) and all(str(e.iat[i, e.columns.get_loc(c)]) == str(o["row"].get(c, "") or "") for c in COLS)):
                 raise ValueError("an edit to delete is not in edits.csv as the page showed it (changed since): reload the page")
         new = pd.DataFrame([_row(o["body"]) for o in ops if o["op"] == "add"], columns=COLS)
-        self.change(pd.concat([e.drop(index=gone), new], ignore_index=True), saved=self.saved - sum(i < self.saved for i in gone), caps=caps,
-                    heads=heads)
+        edits = pd.concat([e.drop(index=gone), new], ignore_index=True) if any(o["op"] in ("add", "delete") for o in ops) else None
+        self.change(edits, saved=self.saved - sum(i < self.saved for i in gone), caps=caps, heads=heads)
 
     def find(self, q, limit=20):
         """The roads for a search: an exact edge id (either direction of a road), else the edge_refs that hold ``q`` (an exact one first)."""

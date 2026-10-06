@@ -163,7 +163,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   function tab(t){ document.querySelectorAll("#lv-tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === t));
     document.querySelectorAll("#lv [data-tab]").forEach(d => d.hidden = d.dataset.tab !== t); }
   document.querySelectorAll("#lv-tabs button").forEach(b => b.onclick = () => tab(b.dataset.t));
-  $("lv-stats").innerHTML = [["order wishes", STATS.order_pairs], ["not kept", STATS.order_violations || 0], ["stack pairs", (STATS.pairs || 0) + (STATS.short_upper_pairs || 0)],
+  $("lv-stats").innerHTML = [["order wishes", STATS.order_pairs], ["not kept", STATS.order_violations || 0], ["stack pairs", STATS.pairs || 0],
     ["given up", STATS.given_up.length]].map(([k, v]) => `<span class="stat"><b>${v}</b> ${k}</span>`).join("");
   function toast(t, bad){ const e = $("lv-toast"); e.textContent = t; e.className = "show" + (bad ? " bad" : ""); clearTimeout(e._t);
     e._t = setTimeout(() => e.className = "", bad ? 6000 : 2600); }

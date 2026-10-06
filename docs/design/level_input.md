@@ -24,11 +24,22 @@ Two roads with **different bands** (a tunnel and a street, a bridge and the road
 With an explicit `band_col` the caller's bands decide over and under everywhere, also where roads only meet: a zebra crossing set over its
 street stays over it (lanestyle, mapstyle).
 
-**A over B** (Kaveh 2026-10-06): every part of A's casing (start head, main part, end head; a short road's one number) and its fill come after
+**A over B** (Kaveh 2026-10-06): every part of A's casing (start head, main part, end head) and its fill come after
 B's fill. Before, only A's main part did: where B passed under A close to one of its ends, B's fill hid A's outline there (Monaco: the bridge
 95449780#1f over 4229327#1f). A head that **joins** B, or joins a road that joins B (the next piece of the tunnel A runs into at its mouth),
 is left out: it is a junction, where the head is under the fills it joins. Two ramps, each over one tube of a tunnel and joining the other
-tube, still make a loop of four rules no order keeps; the solver gives one of their pairs up and reports it (Monaco 16, Södermalm 27).
+tube, still make a loop of four rules no order keeps; the solver gives one of their pairs up and reports it.
+
+**Three parts for every road, no length in the solver** (Kaveh 2026-10-06). Every road has a start head, a main part and an end head,
+whatever its length; the drawing gives them their metres (`head_m`, or a road's own in `heads.csv` / `head_start_m_col` /
+`head_end_m_col`), and a road shorter than its two heads has a main part of no length. The solver takes no metres, only which roads
+have an empty main part (`rs.empty_mains(roads, head_m, heads)` -> `solve_levels(empty_main=...)`): a stack never lifts an empty main
+part, since a rule on a part nobody sees would cost real ones (without it Monaco gave up 23 pairs, 7 of them for invisible parts).
+
+A **given-up** pair is a stack pair with at least one required part (the main part unless empty, each head not at a junction with B)
+not above B's fill: a flaw on the map. Before, a road shorter than `2 · head_m` had one casing number and, at a junction, no required
+part at all, so it could lie wholly under B and count as kept. Monaco now 22 given up (was counted 16; 5 of the 6 more were already
+wrong on the old map), 47 order wishes not kept (41), 10 positions; the Södermalm sample 30 (27).
 
 **One part of A** (an edit): a `stack` edit may name a part of A's casing in `a_end`: `start`, `main` or `end` (empty: the whole road, the
 rule above). Added, that part comes after B's fill even where its head joins B (a junction the rule leaves out). Switched off

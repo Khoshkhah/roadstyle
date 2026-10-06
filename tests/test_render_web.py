@@ -1273,10 +1273,10 @@ def test_compute_levels_on_the_bundled_sample():
     pytest.importorskip("scipy")
     s = rs.compute_levels(g, method="solve")
     info = s.attrs["levels_info"]
-    assert (info["pairs"], info["short_upper_pairs"]) == (245, 23)                  # 268 stack pairs, 23 of them with an upper road shorter than 2 * head_m (docs/design/level_input.md: roads of different bands that only meet take the order)
+    assert info["pairs"] == 268                                                     # stack pairs (docs/design/level_input.md: roads of different bands that only meet take the order)
     under = [944, 4251, 2082, 2363]
     assert all(s.casing_level[207] > s.fill_level[i] for i in under)                # the bridge is over them, outline included
-    assert len(s.attrs["levels_given_up"]) == 27                                    # each a loop of 4 rules no order keeps: two ramps, each over one tube of a tunnel and joining the other (docs/design/level_input.md)
+    assert len(s.attrs["levels_given_up"]) == 30                                    # loops no order keeps (two ramps, each over one tube of a tunnel and joining the other), and short roads whose heads count one by one (docs/design/level_input.md)
 
 
 def test_level_columns_put_each_positions_arrows_after_its_fill_layers():
@@ -1916,7 +1916,7 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
         area.apply([{"op": "cap", "road": "12", "end": "start", "cap": "pointy"}])
     area.apply([{"op": "head", "road": "12", "end": "end", "m": "12.5"}])                 # a head's length: heads.csv, the solver and the drawing
     assert (tmp_path / "heads.csv").read_text().split() == ["road,start_m,end_m", "12,,12.5"] and area.facts["12"]["heads"] == [5.0, 12.5]
-    assert pd.read_csv(tmp_path / "levels.csv", dtype={"edge": str}).set_index("edge").loc["12", "head_end_m"] == 12.5
+    assert "head_end_m" not in pd.read_csv(tmp_path / "levels.csv").columns                # drawing only: not the solver's
     with pytest.raises(ValueError):
         area.apply([{"op": "head", "road": "12", "end": "end", "m": "-3"}])
 
