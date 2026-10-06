@@ -95,7 +95,7 @@ def test_web_annotation_slots_alternate_names_and_arrows():
     lab = next(l for l in style["layers"] if l["id"] == "roads-labels")
     arr = next(l for l in style["layers"] if l["id"] == "roads-arrows")
     assert json.dumps(["==", ["%", ["get", "slot"], 2], 0]) in json.dumps(lab["filter"])     # names: even slots
-    # arrows: one per one-way road in the window (docs/design/one_arrow_per_road.md): points the page puts in the "arrows" source,
+    # arrows: one per one-way road in the window (docs/design/arrows_and_names.md): points the page puts in the "arrows" source,
     # rotated along the road; every slot piece names its chain
     assert json.dumps(["==", ["get", "oneway"], 1]) in json.dumps(arr["filter"])
     assert arr["source"] == "arrows" and arr["layout"]["symbol-placement"] == "point" and arr["layout"]["icon-rotate"] == ["get", "b"]
@@ -1813,7 +1813,7 @@ def test_the_numpy_cutter_is_shapelys_substring():
 
 
 def test_one_arrow_per_one_way_road_in_the_window(tmp_path):
-    """docs/design/one_arrow_per_road.md (Kaveh 2026-10-06): a one-way road in the window has one arrow, in its visible part; the arrow stays
+    """docs/design/arrows_and_names.md (Kaveh 2026-10-06): a one-way road in the window has one arrow, in its visible part; the arrow stays
     where it is while it is in the window (a small pan keeps it), and a road whose arrow left the window gets one again. None below zoom 15."""
     pw = pytest.importorskip("playwright.sync_api")
     path = tmp_path / "arrows.html"
@@ -1847,7 +1847,7 @@ def test_one_arrow_per_one_way_road_in_the_window(tmp_path):
 
 
 def test_arrows_are_thinned(tmp_path):
-    """docs/design/one_arrow_per_road.md, thinning (Kaveh 2026-10-06): below zoom 17 only the main classes get an arrow; arrows stay 150 px
+    """docs/design/arrows_and_names.md, thinning (Kaveh 2026-10-06): below zoom 17 only the main classes get an arrow; arrows stay 150 px
     apart (two parallel one-way roads a few metres apart show one)."""
     pw = pytest.importorskip("playwright.sync_api")
     path = tmp_path / "thin.html"

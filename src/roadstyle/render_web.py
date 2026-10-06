@@ -263,7 +263,7 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
     alternate along the road and can never stack. Symbol zoom ramps + collision culling handle
     density per zoom automatically. Unnamed roads leave their name slots empty. Returns a
     FeatureCollection of slot pieces: {slot, chain, name, highway, oneway}; ``chain`` numbers the chain a piece is part of (the page
-    puts one arrow on the visible part of each one-way chain, docs/design/one_arrow_per_road.md).
+    puts one arrow on the visible part of each one-way chain, docs/design/arrows_and_names.md).
     """
     import numpy as np
     from shapely.geometry import LineString, Point
@@ -1857,9 +1857,9 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             # Text/icon zoom ramps size the symbols; collision culling thins them when zoomed out
             # (a label that outgrows its piece is dropped by MapLibre automatically).
             # ARROWS BEFORE LABELS on purpose: MapLibre resolves symbol collisions in favour of
-            # the LATER style layer, so the layer order is the culling priority. With arrows
-            # repeating every 170 px they must lose to street names, or one-way roads go
-            # nameless — which is exactly what happened when this block sat after the labels.
+            # the LATER style layer, so the layer order is the culling priority and names are placed
+            # first. The arrows (one per road, placed by the page between two names) are drawn even
+            # where they touch a name (icon-allow-overlap): docs/design/arrows_and_names.md.
             _MINOR = ["footway", "cycleway", "path", "steps",
                       "service", "track", "pedestrian"]
             if arrows:
@@ -1890,7 +1890,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                     # minzoom 15, not 14: arrows are a street-scale affordance — at z14 they
                     # were hundreds of unreadable specks (labels start there because names
                     # thin themselves via collision; line-placed icons do not)
-                    # one arrow per one-way road in the window (Kaveh 2026-10-06, docs/design/one_arrow_per_road.md): the page
+                    # one arrow per one-way road in the window (Kaveh 2026-10-06, docs/design/arrows_and_names.md): the page
                     # puts a point in the middle of each chain's visible part into the "arrows" source after every move,
                     # rotated along the road. ponytail: a tiled map (tiles=True) has no slot geometry in the page and keeps the
                     # arrows repeated along every slot; give it the chains' lines too if one arrow per road matters there
