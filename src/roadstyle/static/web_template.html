@@ -964,7 +964,15 @@ function _rsArrows(){
       const kept = _rsArrowAt.get(chain);
       if(kept && inside(kept.geometry.coordinates)){ cand.push({ft: kept, chain: chain, kept: 1, rank: kept.properties.rank || 0, len: total}); continue; }
       segs.sort((u, v) => u.k - v.k);
-      let half = total / 2;
+      // where along the visible part: the middle of the visible ODD slot nearest the middle (names sit on the even slots, so the arrow lands
+      // between two names, Kaveh: arrows overlapped the names); no odd slot in view: a named road a quarter along, away from its centred
+      // name, an unnamed one the middle
+      const odd = new Map();                                     // odd slot -> [from, to] along the visible part
+      let at = 0;
+      for(const g of segs){ if(g.p.slot % 2){ const r = odd.get(g.p.slot) || [at, at]; r[1] = at + g.len; odd.set(g.p.slot, r); } at += g.len; }
+      let half = segs[0].p.name ? total / 4 : total / 2;
+      if(odd.size){ let best = Infinity;
+        for(const [lo, hi] of odd.values()){ const m = (lo + hi) / 2; if(Math.abs(m - total / 2) < best){ best = Math.abs(m - total / 2); half = m; } } }
       for(const g of segs){
         if(half > g.len){ half -= g.len; continue; }
         const t = half / g.len, x = g.a[0] + (g.b[0] - g.a[0]) * t, y = g.a[1] + (g.b[1] - g.a[1]) * t;

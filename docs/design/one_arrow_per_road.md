@@ -13,7 +13,9 @@ carried many arrows. An older version put one arrow per chain (`line-center`), b
 
 The page places the arrows (`_rsArrows`, after every move and once the slots are loaded):
 
-- every one-way chain that is in the window gets **one** arrow, in the middle of the part of it inside the window, rotated along the road;
+- every one-way chain that is in the window gets **one** arrow, rotated along the road, on the visible **odd** slot nearest the middle of
+  its visible part: names sit on the even slots, so the arrow lands between two names (Kaveh: arrows overlapped the names). With no odd
+  slot in view, a named road gets it a quarter along its visible part (away from the centred name), an unnamed one in the middle;
 - the arrow **stays** where it is while it is still in the window: re-centring after each pan made it slide along the road; only a chain
   whose arrow left the window, or a newly visible chain, gets a new place;
 - none below zoom 15 (as before); the minor classes from zoom 16 (as before).

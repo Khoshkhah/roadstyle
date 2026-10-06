@@ -1835,11 +1835,13 @@ def test_one_arrow_per_one_way_road_in_the_window(tmp_path):
             return page.evaluate(arrows)
         far = at(18.02, 14)
         first = at(18.02, 16)
+        odd = page.evaluate("map.getSource('arrows')._data.features.map(f => f.properties.slot % 2)")
         nudged = at(18.0203, 16)
         moved = at(18.035, 16)
         browser.close()
     assert errors == [] and far == []
     assert len(first) == 1 and abs(first[0][0] - 18.02) < 0.004                 # one arrow, in the middle of what is seen
+    assert odd == [1]                                                             # on an odd slot: between two street names
     assert nudged == first                                                        # a small pan keeps it
     assert len(moved) == 1 and moved != first                                     # its old place left the window: a new one
 
