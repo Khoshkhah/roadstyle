@@ -67,7 +67,7 @@ where = ["src"]
 roadstyle = [
     "py.typed", "static/*.js", "static/*.css", "static/*.html", "vendor/*.js", "vendor/*.css",
     "templates/*.html",                       # bundled dashboard/report sidebars (see pages.py)
-    "data/*.json", "data/palettes/*.json",   # bundled palettes + style config (see _settings.py)
+    "data/*.json", "data/palettes/*.json", "v2/profiles/*.json",   # bundled palettes + style config (see _settings.py)
 ]
 
 [tool.pytest.ini_options]

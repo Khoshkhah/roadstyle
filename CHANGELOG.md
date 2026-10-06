@@ -7,6 +7,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **v2 style profiles:** widths, casings and colours of the OSM adapter now come from a JSON profile (`--style compact`, a file path, or `profile=` in `OSMAdapter.from_dataframe`) that restates only what it changes. Bundled `default` reproduces the previous values; `compact` narrows service, living-street and residential lanes. See `docs/v2/style-profiles.md`.
 - **Pair editor history:** overrides already in the file show in a separate "History" list (typed confirmation to delete) apart from this session's new ones, and a selected pair shows its entries in the original table, history and new overrides. Deleting or replacing an override first writes `<name>.deleted-backup.csv`.
 - **v2 display smoothing:** `compile_map(smooth=N, smooth_corner_deg=100)` rounds corridor lines with N Chaikin passes for display only. Stored geometry, endpoints and sharp corners are unchanged. The pair override dashboard takes `--smooth N`.
 

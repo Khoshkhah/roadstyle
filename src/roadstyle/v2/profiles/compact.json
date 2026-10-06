@@ -1,0 +1,8 @@
+{
+  "name": "compact",
+  "lane_width_by_class": {
+    "service": 3.0,
+    "living_street": 3.0,
+    "residential": 3.2
+  }
+}

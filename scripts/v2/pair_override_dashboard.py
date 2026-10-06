@@ -579,6 +579,7 @@ def main() -> None:
     parser.add_argument("--levels", type=Path, default=DEFAULT_LEVELS)
     parser.add_argument("--database", type=Path, default=DEFAULT_DATABASE)
     parser.add_argument("--head-m", type=float, default=15.0)
+    parser.add_argument("--style", default=None, help="v2 style profile: bundled name (default, compact) or JSON path")
     parser.add_argument("--smooth", type=int, default=0, help="Display-only smoothing iterations (0 = off)")
     args = parser.parse_args()
     features = _load_map_features(args.map_html)
@@ -588,7 +589,7 @@ def main() -> None:
         from build_road_levels import RoadLevelModel, load_driving_corridors
 
         model = RoadLevelModel(
-            load_driving_corridors(database, args.head_m),
+            load_driving_corridors(database, args.head_m, args.style),
             args.original.expanduser(),
             _load_all_features(args.map_html),
             head_m=args.head_m,

@@ -1,0 +1,68 @@
+{
+  "name": "default",
+  "lane_width_m": 3.5,
+  "lane_width_by_class": {},
+  "width_sources": [
+    "width",
+    "lanes",
+    "class"
+  ],
+  "class_width_m": {
+    "motorway": 14.0,
+    "motorway_link": 7.0,
+    "trunk": 12.0,
+    "trunk_link": 7.0,
+    "primary": 10.5,
+    "primary_link": 6.5,
+    "secondary": 8.0,
+    "secondary_link": 6.0,
+    "tertiary": 7.0,
+    "tertiary_link": 5.5,
+    "residential": 6.5,
+    "living_street": 5.5,
+    "unclassified": 6.0,
+    "service": 4.5,
+    "cycleway": 2.5,
+    "footway": 2.0,
+    "pedestrian": 4.0,
+    "path": 2.0
+  },
+  "default_width_m": 6.5,
+  "casing_m": {
+    "default": [
+      0.2,
+      0.2
+    ],
+    "motorway": [
+      0.4,
+      0.2
+    ],
+    "trunk": [
+      0.4,
+      0.2
+    ]
+  },
+  "colors": {
+    "motorway": "#e11d48",
+    "motorway_link": "#e11d48",
+    "trunk": "#f97316",
+    "trunk_link": "#f97316",
+    "primary": "#f59e0b",
+    "primary_link": "#f59e0b",
+    "secondary": "#10b981",
+    "secondary_link": "#10b981",
+    "tertiary": "#06b6d4",
+    "tertiary_link": "#06b6d4",
+    "residential": "#64748b",
+    "living_street": "#94a3b8",
+    "unclassified": "#64748b",
+    "service": "#475569",
+    "cycleway": "#16a34a",
+    "footway": "#ea580c",
+    "pedestrian": "#d97706",
+    "path": "#78716c"
+  },
+  "default_color": "#64748b",
+  "roundabout_priority": 100.0,
+  "split_m": 15.0
+}

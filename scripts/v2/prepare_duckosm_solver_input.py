@@ -123,11 +123,13 @@ def load_duckosm_corridors(
     *,
     only_modes: tuple[str, ...] | None = None,
     plain_refs: bool = False,
+    profile: Any = None,
 ) -> tuple[list[Corridor], list[str]]:
     """Read the available modes' edges tables into one solver input list.
 
     ``plain_refs`` keeps the bare ``edge_ref`` column value (as the rendered map does)
     instead of ``mode:column:value``; use it with a single mode.
+    ``profile`` is a v2 style profile (name, JSON path or dict) for widths, casings and colours.
     """
     schemas = {
         str(row[0])
@@ -184,7 +186,7 @@ def load_duckosm_corridors(
                 adapter_record["layer"] = adapter_record["band"]
             adapter_records.append(adapter_record)
 
-        mode_corridors = OSMAdapter.from_dataframe(adapter_records)
+        mode_corridors = OSMAdapter.from_dataframe(adapter_records, profile=profile)
         if len(mode_corridors) != len(road_records):
             raise ValueError(f"{schema}.edges contains rows that cannot be converted to corridors")
         for corridor, _record, ref, physical_ref in zip(

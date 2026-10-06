@@ -32,13 +32,13 @@ DEFAULT_DATABASE = ROOT.parent / "duckOSM" / "monaco.duckdb"
 DEFAULT_DIR = ROOT / "data" / "v2"
 
 
-def load_driving_corridors(database: Path, head_m: float) -> list[Any]:
+def load_driving_corridors(database: Path, head_m: float, profile: Any = None) -> list[Any]:
     import duckdb
 
     with duckdb.connect(str(database), read_only=True) as connection:
         connection.execute("LOAD spatial")
         corridors, _ = load_duckosm_corridors(
-            connection, only_modes=("driving",), plain_refs=True
+            connection, only_modes=("driving",), plain_refs=True, profile=profile
         )
     for corridor in corridors:
         corridor.split_start = corridor.split_end = head_m
@@ -172,8 +172,9 @@ def main() -> None:
     parser.add_argument("--levels", type=Path, default=DEFAULT_DIR / "road_levels.csv")
     parser.add_argument("--band-dist", type=float, default=10.0)
     parser.add_argument("--head-m", type=float, default=15.0)
+    parser.add_argument("--style", default=None, help="v2 style profile: bundled name or JSON path")
     args = parser.parse_args()
-    corridors = load_driving_corridors(args.database, args.head_m)
+    corridors = load_driving_corridors(args.database, args.head_m, args.style)
     build(
         corridors, args.original, args.overrides, args.levels,
         band_dist=args.band_dist, head_m=args.head_m,
