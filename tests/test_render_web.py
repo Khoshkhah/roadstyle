@@ -1111,8 +1111,8 @@ def test_the_tunnel_look_is_v2s_slider():
 
 
 def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
-    """The Tunnels box and rsSetTunnelStyle in a real page, as v2: the strength moves every tunnel colour, a two-colour palette puts a pattern
-    on the casing dash layers (One colour keeps plain dashes), strength 0 gives plain dashes back, and Colour by keeps the look."""
+    """The Tunnels box and rsSetTunnelStyle in a real page: the strength moves every tunnel colour, the casing too; a two-colour palette puts
+    a pattern on the casing dash layers at any strength, One colour keeps plain dashes (their colour moved toward slate); Colour by keeps the look."""
     pw = pytest.importorskip("playwright.sync_api")
     path = tmp_path / "tunnels.html"
     g = _edge_world().assign(aadt=[1, 2, 3, 4])
@@ -1137,13 +1137,17 @@ def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
         coloured = page.evaluate(get)
         page.evaluate("rsSetTunnelStyle({strength: 0})")
         zero = page.evaluate(get)
+        page.evaluate("rsSetTunnelStyle({palette: 'One colour', strength: 100})")
+        one = page.evaluate(get)
+        one_colour = page.evaluate("map.getPaintProperty('roads-casing-lv-1-dash', 'line-color')")
         browser.close()
     assert errors == []
     assert opened["pattern"] is None and opened["dash"] == [3, 3] and opened["slider"] == "35" and opened["pal"] == "One colour"
     assert "70" in moved["fill"] and moved["pattern"] == "rs-tunnel-casing-4-3" and moved["pal"] == "Teal + mint"
     assert ev == {"strength": 70, "palette": "Teal + mint", "ratio": [4, 3]}
     assert "__rs_fill__1" in coloured["fill"] and "interpolate" in coloured["fill"]          # Colour by keeps the look
-    assert zero["pattern"] is None and zero["dash"] == [4, 3]
+    assert zero["pattern"] == "rs-tunnel-casing-4-3"                                 # a palette shows at 0 too, as it is
+    assert one["pattern"] is None and one["dash"] == [4, 3] and one_colour == "#64748b"   # One colour at 100: slate dashes
 
 
 def test_level_columns_draw_each_position_casings_then_fills():

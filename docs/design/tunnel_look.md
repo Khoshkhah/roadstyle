@@ -18,11 +18,13 @@ The fill is **opaque**: no see-through fill and no underlay, so overlapping piec
 As v2, a tunnel's casing is drawn by its dash layer alone (the other casing layers leave a tunnel out), 3 px wider than a casing
 (1.5 px each side) so its colours show:
 
-- **One colour** (`tunnel_palette`, the default; two colours are not decided yet): slate dashes `#94a3b8` with empty gaps, at any strength.
+The casing follows the slider like everything on a tunnel (Kaveh 2026-10-06): its colours move toward the same slate `#64748b`.
+
+- **One colour** (`tunnel_palette`, the default; two colours are not decided yet): dashes with empty gaps, `#94a3b8` at 0, moved toward slate.
   Why a second colour exists (Kaveh): with empty gaps, where a tunnel passes under a road it looks connected to it; a solid second colour
   closes the gaps. So the default should become a pair once one is chosen.
-- **A two-colour palette**: above 0 the dash layer draws a pattern image of the palette's two colours **as they are**, dash and gap. (v2
-  blended them from slate and from the background by the strength; at 35 % the second colour was hard to see, Kaveh 2026-10-06.) v2's
+- **A two-colour palette**: the dash layer draws a pattern image of the palette's two colours, dash and gap, at any strength: as they are at
+  0, each moved toward slate as the strength rises. (v2 blended the gap up from the background; at 35 % the second colour was hard to see.) v2's
   `Slate + ice`, `Blue + cyan`, `Warm + sand`, and three more to try with stronger second colours: `Graphite + silver`, `Indigo + lavender`,
   `Teal + mint` (`tunnel_palettes`, `name: [dash, gap]`).
 - The dash ratio (`tunnel_casing_dash`, in line widths): 3:3 (default, as v2), 1:1 (Kaveh: maybe better than 2:2 or 4:3), 4:4, 2:2, 4:3.
