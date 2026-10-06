@@ -10,6 +10,14 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
   background:var(--lv-bg);cursor:pointer;font-size:16px;color:var(--lv-mute);box-shadow:-2px 2px 6px rgba(0,0,0,.06)}
 #lv-toggle:hover{color:var(--lv-ink)}
 #lv header{padding:14px 16px 12px;background:#fff;border-bottom:1px solid var(--lv-line)}
+#lv .find{position:relative;margin-top:10px}
+#lv .find input{width:100%;box-sizing:border-box;border:1px solid #d0d5dd;border-radius:8px;padding:7px 10px 7px 30px;font:13px system-ui;color:var(--lv-ink);
+  background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Ccircle cx='6' cy='6' r='4.5'/%3E%3Cpath d='m9.5 9.5 3.5 3.5'/%3E%3C/svg%3E") no-repeat 10px 50%}
+#lv .find input:focus{outline:none;border-color:var(--lv-r2);box-shadow:0 0 0 3px rgba(25,113,194,.15)}
+#lv-hits{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:2;background:#fff;border:1px solid var(--lv-line);border-radius:8px;
+  box-shadow:0 8px 24px rgba(16,24,40,.14);max-height:320px;overflow:auto}
+#lv-hits div{padding:7px 10px;cursor:pointer;border-bottom:1px solid #f0f2f5} #lv-hits div:last-child{border-bottom:none}
+#lv-hits div:hover,#lv-hits div.on{background:#f2f6fc} #lv-hits b{font-weight:600} #lv-hits small{color:var(--lv-mute)}
 #lv .t{font-size:15px;font-weight:650;letter-spacing:-.01em} #lv .area{color:var(--lv-mute);font-size:12px;margin-top:1px}
 #lv .stats{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 #lv .stat{background:var(--lv-bg);border:1px solid var(--lv-line);border-radius:999px;padding:1px 9px;font-size:11.5px;color:#3b4252}
@@ -66,7 +74,8 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
 </style>
 <aside id="lv">
   <button id="lv-toggle" title="Hide the panel">›</button>
-  <header><div class="t">Level editor</div><div class="area" id="lv-area"></div><div class="stats" id="lv-stats"></div></header>
+  <header><div class="t">Level editor</div><div class="area" id="lv-area"></div><div class="stats" id="lv-stats"></div>
+    <div class="find"><input id="lv-find" type="search" placeholder="Find a road: edge id or edge_ref" autocomplete="off"><div id="lv-hits" hidden></div></div></header>
   <nav class="tabs" id="lv-tabs"><button data-t="edit" class="on">Edit</button><button data-t="history">History<span class="cnt" id="lv-hist-n">0</span></button></nav>
   <div class="scroll" data-tab="edit">
     <section><h2>Selection <button class="link" id="lv-clear" title="Esc">clear</button></h2><div id="lv-cards"></div></section>
@@ -151,6 +160,31 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
     if(sel[0] == null && sel[1] != null){ sel[0] = sel[1]; sel[1] = null; }
     update();
   }
+  // --- search: an edge id (exact) or an edge_ref (or a part of one); a hit is picked like a click on the map, and shown
+  let hits = [], hitOn = 0, findT;
+  function showHits(){
+    const box = $("lv-hits");
+    box.hidden = !$("lv-find").value.trim();
+    box.innerHTML = hits.length ? hits.map((f, i) => `<div data-i="${i}" class="${i === hitOn ? "on" : ""}"><b>${esc(f.edge_ref || f.road)}</b>
+      <small>· ${esc(f.highway || "")}${f.name ? " · " + esc(f.name) : ""} · ${esc(f.look)} · ${f.length_m} m</small></div>`).join("")
+      : `<div class="empty" style="cursor:default">no road with that edge id or edge_ref</div>`;
+    box.querySelectorAll("[data-i]").forEach(d => d.onmousedown = ev => { ev.preventDefault(); choose(hits[+d.dataset.i]); });
+  }
+  function choose(f){
+    if(!f) return;
+    Object.assign(facts, {[f.road]: f}); $("lv-find").value = ""; $("lv-hits").hidden = true; hits = [];
+    tab("edit"); if(!sel.includes(String(f.road))) pick(f.road); focus([String(f.road)]);
+  }
+  $("lv-find").oninput = () => { clearTimeout(findT); findT = setTimeout(async () => {
+    const q = $("lv-find").value.trim();
+    try { hits = q ? await api(`/api/find?q=${encodeURIComponent(q)}`) : []; } catch(err){ return toast(err.message, true); }
+    hitOn = 0; showHits(); }, 150); };
+  $("lv-find").onkeydown = ev => {
+    if(ev.key === "ArrowDown" || ev.key === "ArrowUp"){ ev.preventDefault(); if(hits.length){ hitOn = (hitOn + (ev.key === "ArrowDown" ? 1 : hits.length - 1)) % hits.length; showHits(); } }
+    else if(ev.key === "Enter"){ ev.preventDefault(); choose(hits[hitOn]); }
+    else if(ev.key === "Escape"){ ev.stopPropagation(); $("lv-find").value = ""; $("lv-hits").hidden = true; }
+  };
+  $("lv-find").onblur = () => setTimeout(() => $("lv-hits").hidden = true, 100);
   function setPair(a, b, zoom){ sel[0] = a == null ? null : String(a); sel[1] = b == null ? null : String(b); update(); if(zoom) focus(sel.filter(x => x != null)); }
   document.addEventListener("rs:select", e => { if(e.detail.overlay || !e.detail.properties) return; pick(e.detail.properties.road); });
   document.addEventListener("keydown", e => { if(e.key === "Escape") setPair(null, null); });

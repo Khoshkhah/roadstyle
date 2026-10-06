@@ -1888,6 +1888,9 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     new = [r for r in area.relations("11", "12")["rows"] if r["section"] == "new"]
     assert len(new) == 1 and (tmp_path / "levels.csv").exists()                  # added in this session: "new", not "saved"
     assert len(area.relations("12")["rows"]) >= 3                                # one road: everything about it, in both tables
+    assert [f["road"] for f in area.find(" 12 ")] == ["12"] and area.find("") == []                 # search: an edge id ...
+    ref = area.facts["12"]["edge_ref"] = "120113158#1f"
+    assert area.find(ref.upper())[0]["road"] == "12" and area.find("0113158")[0]["road"] == "12"   # ... or (a part of) an edge_ref
     area.add({"relation": "stack", "a": "11", "b": "14", "a_end": "start", "b_end": "end", "enabled": "true"})     # a stack keeps its part
     assert area.edits().iloc[-1][["a_end", "b_end"]].tolist() == ["start", ""]
     with pytest.raises(ValueError):

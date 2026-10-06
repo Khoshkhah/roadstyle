@@ -2,7 +2,7 @@
 
     python scripts/edit_levels.py AREA_DIR [--port 8780]
 
-AREA_DIR holds roads.parquet and pairs.csv (scripts/level_input.py). Click two roads, see every pair between them (the found ones and
+AREA_DIR holds roads.parquet and pairs.csv (scripts/level_input.py). Click two roads (or find them by edge id / edge_ref), see every pair between them (the found ones and
 your edits), switch a found one off or add one (order / stack: road 1 over road 2, a stack on one part of road 1 if you like; meet: an end of each). Every change is solved at once
 and the page reloads with the new levels (levels.csv is written too); an edit the solver refuses is not saved. The edits.csv before each
 change is kept as edits.csv.bak.
@@ -124,6 +124,17 @@ class Area:
                 row["a_end"] = ""
         self.change(pd.concat([self.edits(), pd.DataFrame([row])], ignore_index=True))
 
+    def find(self, q, limit=20):
+        """The roads for a search: an exact edge id (either direction of a road), else the edge_refs that hold ``q`` (an exact one first)."""
+        q = q.strip()
+        if not q:
+            return []
+        if q in self.road_of:
+            return [self.facts[self.road_of[q]]]
+        low = q.lower()
+        hits = [f for f in self.facts.values() if f["edge_ref"] and low in f["edge_ref"].lower()]
+        return sorted(hits, key=lambda f: (f["edge_ref"].lower() != low, f["edge_ref"]))[:limit]
+
     def rows(self):
         """Every edit, with its index, its section (saved before this session / added now) and its two roads."""
         out = []
@@ -187,6 +198,8 @@ def _handler(area):
                 if u.path == "/api/edits":
                     rows = area.rows()
                     return self._send(200, {"rows": rows, "roads": {x: area.facts.get(x, {"road": x}) for r in rows for x in (r["ra"], r["rb"])}})
+                if u.path == "/api/find":
+                    return self._send(200, area.find(q.get("q", "")))
                 if u.path == "/api/relations":
                     return self._send(200, area.relations(q.get("a", ""), q.get("b") or None))
             except ValueError as err:
