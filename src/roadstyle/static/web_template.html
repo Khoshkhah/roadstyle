@@ -919,7 +919,6 @@ function _tunHex(a, b, t){                       // a -> b by t (0-1), "#rrggbb"
   const p=c=>c.slice(1).match(/.{2}/g).map(x=>parseInt(x,16)), A=p(a), B=p(b);
   return "#"+A.map((x,i)=>Math.round(x*(1-t)+B[i]*t).toString(16).padStart(2,"0")).join("");
 }
-let _tunImg=null;
 function _tunPattern(){
   const [c1, c2] = TUNNEL.palettes[TUNNEL.palette], t = TUNNEL.strength/100, u = 8;
   const d = Math.max(1, Math.round(TUNNEL.ratio[0]*u)), g = Math.max(1, Math.round(TUNNEL.ratio[1]*u));
@@ -928,9 +927,8 @@ function _tunPattern(){
   x.fillStyle = _tunHex(TUNNEL.to.dash, c1, t); x.fillRect(0, 0, d, u);
   x.fillStyle = _tunHex(TUNNEL.bg, c2, t); x.fillRect(d, 0, g, u);
   const id = "rs-tunnel-casing-"+TUNNEL.ratio.join("-"), data = x.getImageData(0, 0, cv.width, cv.height);
-  if(map.hasImage(id)) map.updateImage(id, data); else map.addImage(id, data);
-  if(_tunImg && _tunImg !== id && map.hasImage(_tunImg)) setTimeout((old => () => { if(map.hasImage(old)) map.removeImage(old); })(_tunImg), 0);
-  return _tunImg = id;
+  if(map.hasImage(id)) map.updateImage(id, data); else map.addImage(id, data);     // one small image per dash ratio, kept (tiles may still use it)
+  return id;
 }
 function rsSetTunnelStyle(o){
   if(!_tunOn) return;
