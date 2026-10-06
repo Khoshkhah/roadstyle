@@ -27,7 +27,9 @@ The casing follows the slider like everything on a tunnel (Kaveh 2026-10-06): it
   0, each moved toward slate as the strength rises. (v2 blended the gap up from the background; at 35 % the second colour was hard to see.) v2's
   `Slate + ice`, `Blue + cyan`, `Warm + sand`, and three more to try with stronger second colours: `Graphite + silver`, `Indigo + lavender`,
   `Teal + mint` (`tunnel_palettes`, `name: [dash, gap]`).
-- The dash ratio (`tunnel_casing_dash`, in line widths): 3:3 (default, as v2), 1:1 (Kaveh: maybe better than 2:2 or 4:3), 4:4, 2:2, 4:3.
+- The dash ratio (`tunnel_casing_dash`, in line widths, so a 1 is as long as the casing line is wide): **1:1** (the default, Kaveh 2026-10-06:
+  both colours equal, short pieces, so a crossing never lands in one long dash or gap), 2:2, 3:3 (v2's), 4:4, 2:1, 3:2, 4:3 (longer dashes:
+  with One colour, shorter empty gaps), 1:2.
 
 ## In the page
 

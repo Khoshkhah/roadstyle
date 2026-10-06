@@ -279,7 +279,7 @@ The `config` block of the settings. Change it in a [settings override](settings.
 | `casing_extra` | `2.0` | reserved (palettes set casing widths) |
 | `link_scale` | `0.7` | `*_link` width relative to the parent |
 | `tunnel_opacity_scale` | `0.45` | tunnel fade |
-| `tunnel_casing_dash` | `[3, 3]` | the tunnel casing's dash and gap, in line widths (v2's 3:3); a tunnel's casing is its dash layer alone |
+| `tunnel_casing_dash` | `[1, 1]` | the tunnel casing's dash and gap, in line widths; a tunnel's casing is its dash layer alone |
 | `tunnel_strength` | `35` | the tunnel look, v2's slider (0-100): everything on a tunnel (fill, names, arrows, attached items) moves toward slate `#64748b`. Opaque, no see-through |
 | `tunnel_palette` / `tunnel_palettes` | `One colour` / seven | the tunnel casing: `One colour` (slate dashes, empty gaps) or a pattern of two colours as they are, `name: [dash, gap]` (`Slate + ice`, `Blue + cyan`, `Warm + sand`, `Graphite + silver`, `Indigo + lavender`, `Teal + mint`); an unknown name is an error |
 | `tunnel_fill_dash` / `tunnel_fill_dash_color` | `[1.2, 1.2]` / `rgba(255,255,255,0.55)` | light dashes along a tunnel's fill, over any road colour (`[]` = none); a dashed class (steps, a dashed path) keeps only its own dashes |

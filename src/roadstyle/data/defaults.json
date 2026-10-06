@@ -411,7 +411,7 @@
     "basemap": "voyager",
     "bridge_casing_color": "#000000",
     "twin_end_caps": true,
-    "tunnel_casing_dash": [3, 3],
+    "tunnel_casing_dash": [1, 1],
     "tunnel_fill_dash": [1.2, 1.2],
     "tunnel_fill_dash_color": "rgba(255,255,255,0.55)",
     "tunnel_strength": 35,

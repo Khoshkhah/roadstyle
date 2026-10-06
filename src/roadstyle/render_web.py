@@ -865,7 +865,7 @@ def _tunnel_casing_dash(lid, flt, tlay, cw, off, on):
     """The dashes of a tunnel's two-tone casing, a sublayer on the band's casing (``on``: the band has a tunnel)."""
     return [{"id": lid, "type": "line", "source": "roads", "layout": tlay, "filter": flt,
              "paint": {"line-color": _TUN_TO["dash"], "line-width": _plus_px(cw, 3), "line-offset": off,      # as v2: 1.5 px wider each side, so its colours show
-                       "line-dasharray": list(CONFIG.tunnel_casing_dash or [3, 3])}}] if on else []
+                       "line-dasharray": list(CONFIG.tunnel_casing_dash or [1, 1])}}] if on else []
 
 
 def _tunnel_fill_dash(lid, flt, tlay, fw, off, on):
@@ -2110,7 +2110,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__OVERLAYS__", json.dumps(ov_meta))
             .replace("__TUNNEL__", json.dumps({"layers": tun_paint, "dash": tun_dash, "strength": float(CONFIG.tunnel_strength),
                                                "palette": CONFIG.tunnel_palette, "palettes": CONFIG.tunnel_palettes,
-                                               "ratio": list(CONFIG.tunnel_casing_dash or [3, 3]), "bg": _bg_color(active_bm),
+                                               "ratio": list(CONFIG.tunnel_casing_dash or [1, 1]), "bg": _bg_color(active_bm),
                                                "to": _TUN_TO, "control": bool(tunnel_control and tun_paint)}))
             .replace("__ROAD_POPUP__", "true" if popup_on else "false")
             .replace("__ROAD_POPUP_MODE__", json.dumps(mode))

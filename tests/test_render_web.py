@@ -774,7 +774,7 @@ def test_zoom_readout_is_on_by_default_and_can_be_turned_off():
 
 
 def test_tunnel_casing_is_the_dash_layer_alone():
-    """docs/design/tunnel_look.md, as v2: a tunnel's casing is drawn by the dash sublayer only, slate dashes (#94a3b8, 3:3) with empty gaps;
+    """docs/design/tunnel_look.md, as v2: a tunnel's casing is drawn by the dash sublayer only, slate dashes (#94a3b8, 1:1) with empty gaps;
     the other casing layers leave the tunnel out (transparent), so the gaps are empty. A street's casing is unchanged."""
     g = gpd.GeoDataFrame({"highway": ["primary", "primary"], "tunnel": ["yes", None]},
                          geometry=[LineString([(18.0, 59.30), (18.01, 59.30)]),
@@ -783,7 +783,7 @@ def test_tunnel_casing_is_the_dash_layer_alone():
     lay = {l["id"]: l for l in style["layers"]}
     ids = list(lay)
     assert ids.index("roads-casing") < ids.index("roads-casing-dash") < ids.index("roads-fill")
-    assert lay["roads-casing-dash"]["paint"]["line-color"] == "#94a3b8" and lay["roads-casing-dash"]["paint"]["line-dasharray"] == [3, 3]
+    assert lay["roads-casing-dash"]["paint"]["line-color"] == "#94a3b8" and lay["roads-casing-dash"]["paint"]["line-dasharray"] == [1, 1]
     from roadstyle.render_web import _plus_px
     assert lay["roads-casing-dash"]["paint"]["line-width"] == _plus_px(lay["roads-casing"]["paint"]["line-width"], 3)   # as v2: wider
     assert _plus_px(["interpolate", ["linear"], ["zoom"], 12, 1, 18, ["get", "w"]], 3) == ["interpolate", ["linear"], ["zoom"], 12, ["+", 1, 3], 18, ["+", ["get", "w"], 3]]
@@ -1087,7 +1087,7 @@ def test_the_tunnel_look_is_v2s_slider():
     html = render_edges(_edge_world().assign(name=["A", "T", "B", "C"]), backend="web", basemap="blank", overlays=[ov]).html
     style, conf = _style(html), _tunnel_conf(html)
     lay = {l["id"]: l for l in style["layers"]}
-    assert conf["strength"] == 35 and conf["palette"] == "One colour" and conf["control"] is True and conf["ratio"] == [3, 3]
+    assert conf["strength"] == 35 and conf["palette"] == "One colour" and conf["control"] is True and conf["ratio"] == [1, 1]
     assert conf["dash"] and all(i.startswith("roads-casing") and i.endswith("-dash") for i in conf["dash"])
     for lid, entries in conf["layers"].items():
         for k, base, to in entries:
@@ -1142,7 +1142,7 @@ def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
         one_colour = page.evaluate("map.getPaintProperty('roads-casing-lv-1-dash', 'line-color')")
         browser.close()
     assert errors == []
-    assert opened["pattern"] is None and opened["dash"] == [3, 3] and opened["slider"] == "35" and opened["pal"] == "One colour"
+    assert opened["pattern"] is None and opened["dash"] == [1, 1] and opened["slider"] == "35" and opened["pal"] == "One colour"
     assert "70" in moved["fill"] and moved["pattern"] == "rs-tunnel-casing-4-3" and moved["pal"] == "Teal + mint"
     assert ev == {"strength": 70, "palette": "Teal + mint", "ratio": [4, 3]}
     assert "__rs_fill__1" in coloured["fill"] and "interpolate" in coloured["fill"]          # Colour by keeps the look

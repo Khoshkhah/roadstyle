@@ -44,7 +44,7 @@ class StyleConfig:
     bridge_casing_px: float = 1.0      # ... and never thinner than this many pixels each side at any zoom (metres are sub-pixel zoomed out)
     bridge_casing_color: str = "#000000"   # bridge deck casing colour (black by default)
     twin_end_caps: bool = True         # one road-wide round end under a two-way road's two lanes
-    tunnel_casing_dash: list = field(default_factory=lambda: [3, 3])   # the tunnel casing: dash and gap, in line widths (v2's 3:3)
+    tunnel_casing_dash: list = field(default_factory=lambda: [1, 1])   # the tunnel casing: dash and gap, in line widths (1:1, Kaveh 2026-10-06)
     tunnel_fill_dash: list = field(default_factory=lambda: [1.2, 1.2])   # light dashes on the tunnel fill ([] = none)
     tunnel_fill_dash_color: str = "rgba(255,255,255,0.55)"               # their colour, over any road colour
     tunnel_strength: float = 35          # the tunnel look (docs/design/tunnel_look.md), v2's slider: 0 = normal colours, 100 = the full tunnel colours
