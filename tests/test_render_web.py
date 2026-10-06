@@ -1705,7 +1705,9 @@ def test_road_fill_false_draws_the_casing_but_not_the_fill():
     off = _style(render_edges(g, backend="web", road_fill=False).html)["layers"]
     assert [lyr["id"] for lyr in on] == [lyr["id"] for lyr in off]                     # the same layers: the fills stay for clicks and hovers
     for a, b in zip(on, off, strict=True):
-        if a["id"].startswith("roads-fill"):
+        if a["id"].endswith("-pat"):
+            assert a == b                                                               # the tunnel pattern stays visible, over the items
+        elif a["id"].startswith("roads-fill"):
             assert b["paint"]["line-opacity"] == 0 and a["paint"].get("line-opacity") != 0
         elif a["id"].startswith("roads-ends-fill"):
             assert b["paint"]["circle-opacity"] == 0

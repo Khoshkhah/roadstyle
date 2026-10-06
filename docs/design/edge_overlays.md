@@ -14,7 +14,7 @@ The roads are drawn by their casing and fill numbers, position by position. An o
 2. **A library that adds items to the roads** (mapstyle). The roads keep their casing and fill, and the extra items (`Overlay` with `edge_col`) are drawn at the place of their road, over its fill.
 3. **A library that draws the fill itself** (lanestyle). roadstyle draws the **casing** of each road, and **not its fill** (`road_fill=False`): the lanes, dash lines, connectors and other items attached to the road with `edge_col` and `order_col` are the fill.
 
-With `road_fill=False` the road's own fill layers stay in the page but are invisible (opacity 0, the end caps' fills too), so that a click or a hover still finds the road, and the tunnel and bridge looks of the road's fill are not drawn.
+With `road_fill=False` the road's own fill layers stay in the page but are invisible (opacity 0, the end caps' fills too), so that a click or a hover still finds the road. The tunnel's **pattern** (the light dashes along the fill) is kept: it is drawn at the road's width **over** the items of its position, so a tunnel reads as a tunnel on the lanes. The rest of the road's fill look is not drawn.
 The road's casing, its position and its heads are unchanged: it is a solid band under the items. A road drawn wider than its items shows the band around them.
 
 ## The data

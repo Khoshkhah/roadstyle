@@ -1253,9 +1253,10 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
     return under, over, meta, edge
 
 
-def _place_edge_overlays(layers, edge, levels):
+def _place_edge_overlays(layers, edge, levels, pat_over=False):
     """Splice the layers of the overlays attached to edges into ``layers``: for each position, after its fills and before its one-way arrows (else its street
-    names, else right after its fills), by order, then by the order of the overlays (docs/design/edge_overlays.md)."""
+    names, else right after its fills), by order, then by the order of the overlays (docs/design/edge_overlays.md).
+    ``pat_over``: the tunnel pattern of a position (its ``-pat`` fill layer) is drawn after the overlays of the position, over them."""
     for pos in levels:
         mine = [x for x in edge if x[0] == pos]
         if not mine:
@@ -1268,7 +1269,14 @@ def _place_edge_overlays(layers, edge, levels):
             fam = {_level_id(x, pos) for x in _FILL_FAMILY}
             dash = _level_id("roads-fill", pos) + "-dash"
             at = max(i for i, n in enumerate(ids) if n in fam or n.startswith(dash)) + 1
-        layers[at:at] = [lyr for _, _, _, group in sorted(mine, key=lambda x: (x[1], x[2])) for lyr in group]
+        group = [lyr for _, _, _, group in sorted(mine, key=lambda x: (x[1], x[2])) for lyr in group]
+        layers[at:at] = group
+        if pat_over:
+            pid = _level_id("roads-fill-pat", pos)
+            pats = [l for l in layers if l["id"] == pid]
+            layers[:] = [l for l in layers if l["id"] != pid]
+            at = max(i for i, l in enumerate(layers) if l is group[-1]) + 1
+            layers[at:at] = pats
     return layers
 
 
@@ -1986,12 +1994,12 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
 
     if not road_fill:     # the casing of the road, not its fill: the fill layers stay for clicks and hovers, invisible
         for lyr in style["layers"]:
-            if lyr["id"].startswith("roads-fill"):
+            if lyr["id"].startswith("roads-fill") and not lyr["id"].endswith("-pat"):      # the tunnel pattern stays: over the items (_place_edge_overlays)
                 lyr["paint"] = {**lyr["paint"], "line-opacity": 0}
             elif lyr["id"].startswith("roads-ends-fill"):
                 lyr["paint"] = {**lyr["paint"], "circle-opacity": 0, "circle-stroke-opacity": 0}
     if edge_layers:       # the overlays attached to edges: after the fills of their position, before its arrows (docs/design/edge_overlays.md)
-        style["layers"] = _place_edge_overlays(style["layers"], edge_layers, levels)
+        style["layers"] = _place_edge_overlays(style["layers"], edge_layers, levels, pat_over=not road_fill)
     style["layers"] += over_layers             # caller overlays drawn on top of the roads (e.g. POIs)
 
     # road-class filter panel: the distinct classes present, most important first. `filter_col`

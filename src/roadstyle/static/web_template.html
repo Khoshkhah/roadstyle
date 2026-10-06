@@ -1212,7 +1212,8 @@ const _ttip = __ROAD_TOOLTIP__, _ttipOnly = Array.isArray(_ttip) ? _ttip : null;
 const _tip = _ttip ? new maplibregl.Popup(
   {closeButton:false, closeOnClick:false, maxWidth:"260px", offset:10, className:"rs-tip"}) : null;
 function hoverFrame(){ _raf=0; if(!_pt) return;
-  const f = pick(_pt); map.getCanvas().style.cursor = f ? "pointer" : "";
+  const ovHit = _ovHov && !(OVERLAYS.find(o=>o.source===_ovHov.source)||{}).under;   // an interactive overlay under the cursor wins over the road, as for a click
+  const f = ovHit ? null : pick(_pt); map.getCanvas().style.cursor = (f || ovHit) ? "pointer" : "";
   const h = hitOf(f);
   if((h && h.key) !== (_hov && _hov.key)){
     setS(_hov,{hover:false}); _hov=h; setS(_hov,{hover:true}); }
