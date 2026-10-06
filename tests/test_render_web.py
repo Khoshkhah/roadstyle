@@ -1842,3 +1842,29 @@ def test_one_arrow_per_one_way_road_in_the_window(tmp_path):
     assert len(first) == 1 and abs(first[0][0] - 18.02) < 0.004                 # one arrow, in the middle of what is seen
     assert nudged == first                                                        # a small pan keeps it
     assert len(moved) == 1 and moved != first                                     # its old place left the window: a new one
+
+
+def test_arrows_are_thinned(tmp_path):
+    """docs/design/one_arrow_per_road.md, thinning (Kaveh 2026-10-06): below zoom 17 only the main classes get an arrow; arrows stay 150 px
+    apart (two parallel one-way roads a few metres apart show one)."""
+    pw = pytest.importorskip("playwright.sync_api")
+    path = tmp_path / "thin.html"
+    row = lambda y: [(18.0 + i * 0.001, y) for i in range(41)]                 # noqa: E731
+    g = gpd.GeoDataFrame({"highway": ["residential", "primary", "primary"], "name": ["Side", "Main N", "Main S"], "oneway": [True] * 3},
+                         geometry=[LineString(row(59.31)), LineString(row(59.3)), LineString(row(59.30005))], crs=4326)
+    render_edges(g, backend="web", basemap="blank").save(path)
+    names = "map.getSource('arrows')._data.features.map(f => f.properties.name).sort()"
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 800, "height": 600})
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && map.loaded()", timeout=30_000)
+        def at(lat, zoom):
+            page.evaluate(f"map.jumpTo({{center: [18.02, {lat}], zoom: {zoom}}})")
+            page.wait_for_function("map.loaded()", timeout=30_000)
+            page.wait_for_timeout(300)
+            return page.evaluate(names)
+        side16, side17, mains16 = at(59.31, 16), at(59.31, 17), at(59.3, 16)
+        browser.close()
+    assert side16 == [] and side17 == ["Side"]                                  # residential: from zoom 17
+    assert len(mains16) == 1                                                       # 5 m apart: one arrow

@@ -922,17 +922,23 @@ map.on("load", addArrow);
 // the piece it lies on (so the arrow layers' filters, rsFilter and the class / tunnel toggles treat it as before). Repeating the icon along
 // every 100 m slot crowded zoom 15 (Kaveh); one arrow per stretch (line-center) was often outside the window. An arrow STAYS where it is
 // while it is still in the window (re-centring after every pan slid it along its road); only a chain whose arrow left, or a newly
-// visible one, gets a new place.
+// visible one, gets a new place. Thinned (Kaveh, 2026-10-06): below zoom 17 only the main classes; a road whose visible part is shorter
+// than 100 px gets none; arrows stay 150 px apart (an arrow already shown keeps its place, then the higher class wins).
 const _rsArrowAt = new Map();                  // chain -> its arrow feature now
+const _RS_ARROW = {mainBelow: 17, minLenPx: 100, minGapPx: 150,
+                   main: new Set(["motorway", "trunk", "primary", "secondary", "tertiary"])};
 function _rsArrows(){
   const src = map.getSource("arrows"); if(!src) return;
   const out = [];
   if(map.getZoom() >= 15){
     const bb = map.getBounds(), W = bb.getWest(), E = bb.getEast(), S = bb.getSouth(), N = bb.getNorth();
-    const kx = Math.cos(map.getCenter().lat * Math.PI / 180);   // degrees of longitude to the scale of latitude, for lengths and angles
+    const ctr = map.getCenter(), kx = Math.cos(ctr.lat * Math.PI / 180);   // degrees of longitude to the scale of latitude
+    const pxPerDeg = Math.abs(map.project([ctr.lng, ctr.lat + 0.01]).y - map.project(ctr).y) / 0.01;
+    const mainOnly = map.getZoom() < _RS_ARROW.mainBelow;
     const vis = new Map();                                       // chain -> [{k, a, b, len, p}] its pieces' segments inside the window
     for(const f of _sfeats("slots")){
       const p = f.properties || {}; if(!p.oneway) continue;
+      if(mainOnly && !_RS_ARROW.main.has(String(p.highway || "").replace(/_link$/, ""))) continue;
       const c = f.geometry && f.geometry.coordinates; if(!c) continue;
       for(let i = 0; i < c.length - 1; i++){
         let [x0, y0] = c[i], [x1, y1] = c[i + 1], t0 = 0, t1 = 1;   // Liang-Barsky: the part of the segment inside the window
@@ -951,19 +957,32 @@ function _rsArrows(){
       }
     }
     const inside = q => q[0] >= W && q[0] <= E && q[1] >= S && q[1] <= N;
+    const cand = [];                                             // {ft, chain, kept, rank, len}
     for(const [chain, segs] of vis){
+      const total = segs.reduce((s, g) => s + g.len, 0);
+      if(total * pxPerDeg < _RS_ARROW.minLenPx) continue;        // too short on screen
       const kept = _rsArrowAt.get(chain);
-      if(kept && inside(kept.geometry.coordinates)){ out.push(kept); continue; }
+      if(kept && inside(kept.geometry.coordinates)){ cand.push({ft: kept, chain: chain, kept: 1, rank: kept.properties.rank || 0, len: total}); continue; }
       segs.sort((u, v) => u.k - v.k);
-      let half = segs.reduce((s, g) => s + g.len, 0) / 2;
+      let half = total / 2;
       for(const g of segs){
         if(half > g.len){ half -= g.len; continue; }
         const t = half / g.len, x = g.a[0] + (g.b[0] - g.a[0]) * t, y = g.a[1] + (g.b[1] - g.a[1]) * t;
         const ang = -Math.atan2(g.b[1] - g.a[1], (g.b[0] - g.a[0]) * kx) * 180 / Math.PI;   // the icon points east; clockwise degrees
         const ft = {type: "Feature", properties: Object.assign({}, g.p, {b: ang}), geometry: {type: "Point", coordinates: [x, y]}};
-        _rsArrowAt.set(chain, ft); out.push(ft);
+        cand.push({ft: ft, chain: chain, kept: 0, rank: g.p.rank || 0, len: total});
         break;
       }
+    }
+    // at least minGapPx apart: an arrow already shown first (no jumps while panning), then the higher class, then the longer road
+    // ponytail: O(arrows^2) on the few hundred arrows of a window; a screen grid if a window ever holds thousands
+    cand.sort((u, v) => (v.kept - u.kept) || (v.rank - u.rank) || (v.len - u.len));
+    const shown = [], gap2 = _RS_ARROW.minGapPx * _RS_ARROW.minGapPx;
+    _rsArrowAt.clear();
+    for(const c of cand){
+      const q = map.project(c.ft.geometry.coordinates);
+      if(shown.some(s => (s.x - q.x) ** 2 + (s.y - q.y) ** 2 < gap2)) continue;
+      shown.push(q); out.push(c.ft); _rsArrowAt.set(c.chain, c.ft);
     }
   }
   if(map.getZoom() < 15) _rsArrowAt.clear();

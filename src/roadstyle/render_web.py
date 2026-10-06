@@ -371,7 +371,7 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
                     mx, my = _at(xy, cum, (a + b) / 2)
                     road, twin = owner[id(edges[int(etree.nearest(Point(mx / kx + lon0, my / 111320.0 + lat0)))][3])]
                 feats.append({"type": "Feature",
-                              "properties": {"slot": i, "chain": cid, "name": name, "highway": hw,
+                              "properties": {"slot": i, "chain": cid, "rank": ROAD_Z.get(hw, 0), "name": name, "highway": hw,
                                              "oneway": oneway, "lvl": lvl, "__rs_road": road,
                                              **({"__rs_road2": twin} if twin is not None else {}),
                                              **({"fl": fl} if fl is not None else {})},

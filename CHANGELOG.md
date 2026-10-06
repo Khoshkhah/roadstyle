@@ -8,7 +8,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Changed
 - **One arrow per one-way road in the window** (`docs/design/one_arrow_per_road.md`): the page puts one arrow in the middle of each one-way road's visible part,
-  and keeps it there while it stays in the window; the arrows no longer repeat along every 100 m slot (they crowded zoom 15). A tiled map keeps the old arrows.
+  and keeps it there while it stays in the window; below zoom 17 only the main classes, none on a road shorter than 100 px on screen, and 150 px between arrows; the arrows no longer repeat along every 100 m slot (they crowded zoom 15). A tiled map keeps the old arrows.
 - **Faster page building:** the casing pieces and the arrow and street-name slots are cut with a small numpy cutter instead of shapely's `substring` (the same lines), and a slot of a group of one edge no longer searches for its edge.
   A page of a city of 64,000 roads builds about 40% faster.
 
