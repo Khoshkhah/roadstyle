@@ -53,6 +53,7 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
 #lv .seg button{flex:1;border:none;background:none;border-radius:6px;padding:5px 0;font:600 12.5px system-ui;color:#3b4252;cursor:pointer}
 #lv .seg button.on{background:#fff;box-shadow:0 1px 3px rgba(16,24,40,.12);color:var(--lv-ink)}
 #lv .desc{margin:8px 2px;color:#3b4252;font-size:12.5px}
+#lv .warn{margin:8px 0;padding:8px 10px;border-radius:8px;background:#fff4e6;border:1px solid #ffc078;color:#7a3e00;font-size:12.5px}
 #lv .ends{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
 #lv .ends label{display:block;font-size:11px;color:var(--lv-mute);margin-bottom:3px}
 #lv .ends .seg button{padding:3px 0;font-size:12px}
@@ -95,6 +96,7 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
 (function(){
   const STATS = __STATS__, $ = id => document.getElementById(id), C = ["#e8590c", "#1971c2"];
   const sel = [null, null], facts = {};                       // sel: road ids; facts: road id -> what the server knows
+  let pairRows = [];                                          // what the two tables have between the two picked roads
   let kind = "order", end1 = "start", end2 = "start", part = "";
   const PART = {start: "start head", main: "main", end: "end head"};
   const SRC = {found: ["found", "var(--lv-found)", "found in pairs.csv"], saved: ["saved", "var(--lv-saved)", "already in edits.csv"],
@@ -201,6 +203,7 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
     $("lv-add-sec").hidden = sel[1] == null; describe();
   }
   function showRel(rows, n){
+    pairRows = n === 2 ? rows : [];
     $("lv-rel-sec").hidden = false;
     $("lv-rel-title").textContent = n === 2 ? "Between these two roads" : "Everything about this road";
     const box = $("lv-rel"); box.innerHTML = "";
@@ -221,6 +224,11 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
   segs(document.querySelector('#lv-ends .seg[data-e="1"]'), v => end1 = v);
   segs(document.querySelector('#lv-ends .seg[data-e="2"]'), v => end2 = v);
   segs(document.querySelector("#lv-part .seg"), v => part = v);
+  function stacksOver(up, low){    // the active stacks with up's casing over low's fill: an order "low after up" cannot be kept against them
+    const st = pairRows.filter(r => r.relation === "stack" && r.ra === up && r.rb === low);
+    const off = st.some(r => r.section !== "found" && r.enabled === "false" && !r.a_end);   // the found whole pair switched off
+    return st.filter(r => r.enabled !== "false" && !(r.section === "found" && off));
+  }
   function describe(){
     if(sel[1] == null) return;
     const [a, b] = sel;
@@ -230,6 +238,10 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
       : kind === "stack" ? `${who(a)}'s ${PART[part]} casing is drawn after ${who(b)}'s fill, even where it joins ${who(b)}. ● start ○ end on the map.
         Switch off: leave only this part out of a found ${who(a)} over ${who(b)}.`
       : `The ${end1} of ${who(a)} joins the ${end2} of ${who(b)}: each road's head there is drawn under the other's fill. ● start ○ end on the map.`;
+    const over = kind === "order" ? stacksOver(b, a) : [];
+    if(over.length) $("lv-desc").innerHTML += `<div class="warn">⚠ ${over.map(r => `${r.section === "found" ? "A found" : "Your"} stack (${relText(r)})`).join(", ")}
+      keeps ${who(b)}'s casing over ${who(a)}'s fill. A stack outranks an order, so this order would be given up and nothing changes.
+      Switch that stack off first (its row above).</div>`;
   }
   $("lv-add").onclick = () => {
     if(sel[1] == null) return toast("Pick two roads first", true);
