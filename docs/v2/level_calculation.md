@@ -254,6 +254,7 @@ include both directions of the 807 grouped exact-reverse pairs.
 ## Priority tiers (draw order by level)
 
 `solve_stacking(..., priority_tiers=True)` (used by `build_road_levels.py` and the pair
-override dashboard) lifts whole tiers above each other after the solve, ignoring band:
-roundabouts on top, then tunnels, then every other road. Solved order inside a tier is
-kept, and levels are compacted afterwards.
+override dashboard) lifts whole tiers above each other after the solve, independently of band.
+The style profile's `priority_order` sets the tiers (highest first); the default is roundabouts,
+then tunnels, then other roads. Highway class order is kept within the road tier, and levels are
+compacted afterwards.

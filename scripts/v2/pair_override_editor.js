@@ -570,6 +570,7 @@
     const source = map.getSource("network");
     if (!source) return;
     networkFeatures = network.features;
+    ensureNetworkLevelLayers(network.features);
     for (const feature of network.features) {
       const props = feature.properties ?? {};
       if (props._type === "corridor_fill" && props.edge_ref) {
@@ -580,6 +581,76 @@
     updateHighlights();
     const { roads: roadCount, pairs, levels } = network.summary;
     levelSummary = `${roadCount.toLocaleString()} roads · ${pairs.toLocaleString()} active relationships · solved levels ${levels.join(", ")}`;
+  }
+
+  function ensureNetworkLevelLayers(features) {
+    // The saved map can predate the current solved levels. Reuse its layer styling
+    // for every level present in the replacement network so higher roads are drawn.
+    const levelOf = (layer) => {
+      const find = (value) => {
+        if (!Array.isArray(value)) return null;
+        if (
+          value[0] === "==" &&
+          Array.isArray(value[1]) && value[1][0] === "get" && value[1][1] === "level" &&
+          Number.isFinite(value[2])
+        ) return value[2];
+        for (const child of value) {
+          const found = find(child);
+          if (found !== null) return found;
+        }
+        return null;
+      };
+      return find(layer.filter);
+    };
+    const retarget = (value, from, to) => {
+      if (!Array.isArray(value)) return value;
+      if (
+        value[0] === "==" &&
+        Array.isArray(value[1]) && value[1][0] === "get" && value[1][1] === "level" &&
+        value[2] === from
+      ) return ["==", ["get", "level"], to];
+      return value.map((child) => retarget(child, from, to));
+    };
+    const templates = new Map();
+    for (const layer of map.getStyle().layers) {
+      if (layer.source !== "network") continue;
+      const level = levelOf(layer);
+      if (level === null) continue;
+      if (!templates.has(level)) templates.set(level, []);
+      templates.get(level).push(layer);
+    }
+    if (!templates.size) return;
+
+    const needed = new Set(
+      features.map((feature) => Number(feature.properties?.level)).filter(Number.isFinite),
+    );
+    for (const level of [...needed].sort((a, b) => a - b)) {
+      if (templates.has(level)) continue;
+      const sourceLevel = [...templates.keys()].sort(
+        (a, b) => Math.abs(a - level) - Math.abs(b - level),
+      )[0];
+      const copies = templates.get(sourceLevel).map((template) => {
+        const layer = JSON.parse(JSON.stringify(template));
+        layer.id = layer.id.replace(/lvn?\d+$/, `lv${level < 0 ? `n${-level}` : level}`);
+        layer.filter = retarget(layer.filter, sourceLevel, level);
+        return layer;
+      });
+      for (const layer of copies) {
+        const layers = map.getStyle().layers;
+        const nextHigher = layers.find((candidate) => {
+          const candidateLevel = candidate.source === "network" ? levelOf(candidate) : null;
+          return candidateLevel !== null && candidateLevel > level;
+        });
+        const levelLayers = layers.filter(
+          (candidate) => candidate.source === "network" && levelOf(candidate) !== null,
+        );
+        const last = levelLayers.at(-1);
+        const lastIndex = last ? layers.findIndex((candidate) => candidate.id === last.id) : -1;
+        const next = lastIndex >= 0 ? layers[lastIndex + 1] : null;
+        map.addLayer(layer, nextHigher?.id ?? next?.id);
+      }
+      templates.set(level, copies);
+    }
   }
 
   async function savePair() {
@@ -752,7 +823,7 @@
     const levelResponse = await fetch("/api/network");
     if (levelResponse.ok) {
       const network = await levelResponse.json();
-      if (!map.getSource("network")) await new Promise((resolve) => map.once("load", resolve));
+      if (!map.loaded()) await new Promise((resolve) => map.once("load", resolve));
       applyNetwork(network);
     }
     setStatus(

@@ -36,6 +36,19 @@ def test_profile_file_overrides_only_what_it_states(tmp_path):
     assert load_profile(path).color("primary") == load_profile().color("primary")
 
 
+def test_profile_extends_relative_file_from_profile_directory(tmp_path, monkeypatch):
+    profile_dir = tmp_path / "styles"
+    profile_dir.mkdir()
+    (profile_dir / "base.json").write_text(json.dumps({"lane_width_m": 2.8}))
+    custom = profile_dir / "custom.json"
+    custom.write_text(json.dumps({"extends": "base.json", "default_color": "#123456"}))
+    monkeypatch.chdir(tmp_path)
+
+    profile = load_profile(custom)
+    assert profile["lane_width_m"] == 2.8
+    assert profile.color("unknown-road") == "#123456"
+
+
 def test_width_sources_order_and_width_tag():
     rows = _service(width="2.4 m")
     assert OSMAdapter.from_dataframe(rows)[0].width_m == 2.4

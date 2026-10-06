@@ -42,6 +42,7 @@ class Corridor:
     # Interaction
     interactive: bool = True
     properties: dict[str, Any] = field(default_factory=dict)
+    priority_order: tuple[str, ...] = ("roundabout", "tunnel", "highway")
 
     @property
     def casing_m(self) -> float:
@@ -173,4 +174,3 @@ class ViewPreset:
     # 5. Camera View Position
     center: tuple[float, float] | None = None
     zoom: float | None = None
-

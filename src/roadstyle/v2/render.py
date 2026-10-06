@@ -83,6 +83,7 @@ def render(
     auto_solve: bool = True,
     theme: str = "dark",
     interactive: bool = True,
+    smooth: int = 2,
 ) -> WebMap:
     """One-line high-level entry point to render road networks into a 60 FPS WebGL map.
 
@@ -127,6 +128,8 @@ def render(
         Theme mode ("dark" or "light").
     interactive : bool
         Enable hover tooltips and interactive selection halos.
+    smooth : int
+        Display-only Chaikin smoothing passes for road geometry (default 2; 0 disables it).
 
     Returns
     -------
@@ -414,4 +417,5 @@ def render(
         zoom=zoom,
         auto_solve=auto_solve,
         theme=theme,
+        smooth=smooth,
     )

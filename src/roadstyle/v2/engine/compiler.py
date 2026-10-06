@@ -998,7 +998,7 @@ def compile_map(
     zoom: float | None = None,
     auto_solve: bool = True,
     theme: str = "dark",
-    smooth: int = 0,
+    smooth: int = 2,
     smooth_corner_deg: float = 100.0,
 ) -> WebMap:
     """Compile network cartographic primitives into a self-contained WebMap instance.
@@ -1027,6 +1027,8 @@ def compile_map(
         If True and corridors lack casing_levels, solves LP stacking automatically.
     theme : str
         Default color theme ("dark" or "light").
+    smooth : int
+        Display-only Chaikin smoothing passes for corridor geometry (default 2; 0 disables it).
     """
     cor_list = corridors or []
     chan_list = channels or []

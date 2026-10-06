@@ -64,6 +64,7 @@
   },
   "default_color": "#64748b",
   "roundabout_priority": 100.0,
+  "priority_order": ["roundabout", "tunnel", "highway"],
   "split_m": 15.0,
   "casing_color": "#222222"
 }

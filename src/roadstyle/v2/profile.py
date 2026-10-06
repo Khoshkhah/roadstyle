@@ -16,6 +16,7 @@ from the bundled ``default`` profile. Pick one per visualization: a bundled name
     colors                 fill colour by highway class
     default_color          fill colour of a class missing from ``colors``
     roundabout_priority    junction priority given to roundabout ways
+    priority_order         draw priority, highest first: roundabout, tunnel, highway
     split_m                length of the casing head at each road end
 """
 from __future__ import annotations
@@ -27,6 +28,7 @@ from typing import Any
 
 PROFILE_DIR = Path(__file__).with_name("profiles")
 _SOURCES = {"width", "lanes", "class"}
+_PRIORITY_CATEGORIES = {"roundabout", "tunnel", "highway"}
 
 
 def _merge(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
@@ -55,8 +57,20 @@ class StyleProfile:
         unknown = set(data["width_sources"]) - _SOURCES
         if unknown:
             raise ValueError(f"width_sources has unknown entries {sorted(unknown)}; use {sorted(_SOURCES)}")
+        priority_order = data.get("priority_order", ["roundabout", "tunnel", "highway"])
+        if (
+            not isinstance(priority_order, list)
+            or len(priority_order) != len(_PRIORITY_CATEGORIES)
+            or any(not isinstance(category, str) for category in priority_order)
+            or set(priority_order) != _PRIORITY_CATEGORIES
+        ):
+            raise ValueError(
+                "priority_order must list roundabout, tunnel, and highway exactly once "
+                "(highest priority first)"
+            )
         self.data = data
         self.name: str = data.get("name", "")
+        self.priority_order: tuple[str, ...] = tuple(priority_order)
 
     def __getitem__(self, key: str) -> Any:
         return self.data[key]
@@ -76,12 +90,20 @@ class StyleProfile:
         return str(self.data["colors"].get(highway, self.data["default_color"]))
 
 
-def _resolve(profile: str | Path | dict[str, Any], seen: tuple[str, ...] = ()) -> dict[str, Any]:
+def _resolve(
+    profile: str | Path | dict[str, Any],
+    seen: tuple[str, ...] = (),
+    relative_to: Path | None = None,
+) -> dict[str, Any]:
     """The profile merged over whatever it ``extends`` (the bundled ``default`` at the root)."""
     if isinstance(profile, dict):
         data, label = profile, "<dict>"
     else:
-        path = Path(profile)
+        path = Path(profile).expanduser()
+        if not path.is_absolute() and relative_to is not None:
+            sibling = relative_to / path
+            if sibling.exists():
+                path = sibling
         if not path.suffix and not path.exists():
             path = PROFILE_DIR / f"{profile}.json"
         if not path.exists():
@@ -94,7 +116,11 @@ def _resolve(profile: str | Path | dict[str, Any], seen: tuple[str, ...] = ()) -
     parent = data.get("extends")
     if parent is None and label != str((PROFILE_DIR / "default.json").resolve()):
         parent = "default"
-    base = _resolve(parent, (*seen, label)) if parent else {}
+    base = _resolve(
+        parent,
+        (*seen, label),
+        relative_to=Path(label).parent if label != "<dict>" else relative_to,
+    ) if parent else {}
     return _merge(base, {k: v for k, v in data.items() if k != "extends"})
 
 

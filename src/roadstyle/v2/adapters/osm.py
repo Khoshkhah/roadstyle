@@ -122,6 +122,7 @@ class OSMAdapter:
                     junction_priority=p_val,
                     fill_color=color,
                     casing_color=str(style["casing_color"]),
+                    priority_order=style.priority_order,
                     bridge_deck=is_bridge,
                     tunnel=is_tunnel,
                     interactive=True,

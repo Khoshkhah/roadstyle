@@ -1,6 +1,8 @@
 {
   "name": "map",
   "extends": "default",
+  "priority_order": ["roundabout", "tunnel", "highway"],
+  "roundabout_priority": 100.0,
   "casing_m": {
     "default": [
       0.25,

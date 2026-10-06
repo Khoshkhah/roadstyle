@@ -66,6 +66,7 @@ def _direction_twin_groups(
             candidate = corridors[representative_indices[candidate_index]]
             if (
                 corridor.junction_priority == candidate.junction_priority
+                and corridor.priority_order == candidate.priority_order
                 and corridor.split_mode == candidate.split_mode
                 and corridor.split_start == candidate.split_end
                 and corridor.split_end == candidate.split_start
@@ -115,18 +116,41 @@ def _is_roundabout(corridor: Corridor) -> bool:
     return junction in {"roundabout", "circular"} or corridor.junction_priority >= 100.0
 
 
+def _priority_category(corridor: Corridor) -> str:
+    if _is_roundabout(corridor):
+        return "roundabout"
+    if corridor.tunnel or corridor.band < 0:
+        return "tunnel"
+    return "highway"
+
+
 def _apply_priority_tiers(
     corridors: list[Corridor], pos: list[tuple[int, int, int, int]],
 ) -> list[tuple[int, int, int, int]]:
-    """Draw order by level, not band: roundabouts above tunnels above every other road.
+    """Apply the profile's draw order by level, independently of input band.
 
     Each tier is lifted as a block above the tiers below it, so the solved order inside a tier
     is kept. Levels are compacted afterwards.
     """
-    tier = [2 if _is_roundabout(c) else 1 if (c.tunnel or c.band < 0) else 0 for c in corridors]
+    priority_order = corridors[0].priority_order
+    if (
+        len(priority_order) != 3
+        or set(priority_order) != {"roundabout", "tunnel", "highway"}
+    ):
+        raise ValueError("priority_order must contain roundabout, tunnel, and highway exactly once")
+    if any(c.priority_order != priority_order for c in corridors):
+        raise ValueError("all corridors in one solve must use the same priority_order profile")
+    tier_by_category = {
+        category: len(priority_order) - index - 1
+        for index, category in enumerate(priority_order)
+    }
+    tier = [tier_by_category[_priority_category(c)] for c in corridors]
     shifted = list(pos)
-    top = max((max(p) for p, t in zip(pos, tier, strict=True) if t == 0), default=None)
-    for level in (1, 2):
+    top = max(
+        (max(p) for p, t in zip(pos, tier, strict=True) if t == 0),
+        default=None,
+    )
+    for level in range(1, len(priority_order)):
         members = [i for i, t in enumerate(tier) if t == level]
         if not members:
             continue

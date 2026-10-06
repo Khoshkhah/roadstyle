@@ -101,7 +101,7 @@ within the same mode can be grouped by the solver.
 Launch the local MapLibre pair editor from the repository root:
 
 ```bash
-python scripts/v2/pair_override_dashboard.py            # add --smooth 2 to round road lines (display only)
+python scripts/v2/pair_override_dashboard.py            # smooth road lines by default; use --smooth 0 to disable
 ```
 
 Open the printed local URL to see the Monaco MapLibre map. Click two roads

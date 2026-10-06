@@ -26,7 +26,11 @@ from roadstyle.v2.engine.pairs import (  # noqa: E402
 )
 from roadstyle.v2.engine.compiler import compile_map  # noqa: E402
 from roadstyle.v2.engine.pairs import merge_pair_overrides  # noqa: E402
-from roadstyle.v2.engine.solver import solve_stacking, write_level_table  # noqa: E402
+from roadstyle.v2.engine.solver import (  # noqa: E402
+    _priority_category,
+    solve_stacking,
+    write_level_table,
+)
 
 DEFAULT_DATABASE = ROOT.parent / "duckOSM" / "monaco.duckdb"
 DEFAULT_DIR = ROOT / "data" / "v2"
@@ -72,12 +76,13 @@ def build(
 
 _LEVEL_KEYS = {"_type", "part", "level", "casing_start", "casing_level", "casing_end", "fill_level", "band"}
 _CASING_KEYS = ("casing_m", "casing_left_m", "casing_right_m", "casing_color")
-# the look (widths, casings, colours) comes only from the style profile of the loaded corridors
 _PROFILE_KEYS = {"width_m", "fill_color", *_CASING_KEYS}
 
 
-def _style_by_edge(base_features: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    """Tags carried by each road in the original map; its look is not copied (the style profile owns that)."""
+def _style_by_edge(
+    base_features: list[dict[str, Any]], *, use_map_style: bool = False
+) -> dict[str, dict[str, Any]]:
+    """Keep the map's tags, and optionally its visual properties when no profile was selected."""
     styles: dict[str, dict[str, Any]] = {}
     for feature in base_features:
         props = feature.get("properties", {})
@@ -86,7 +91,12 @@ def _style_by_edge(base_features: list[dict[str, Any]]) -> dict[str, dict[str, A
             continue
         style = styles.setdefault(str(ref), {})
         if props.get("_type") == "corridor_fill":
-            style.update({k: v for k, v in props.items() if k not in _LEVEL_KEYS | _PROFILE_KEYS})
+            style.update({
+                k: v for k, v in props.items()
+                if k not in _LEVEL_KEYS and (use_map_style or k not in _PROFILE_KEYS)
+            })
+        elif use_map_style:
+            style.update({k: props[k] for k in _CASING_KEYS if k in props})
     return styles
 
 
@@ -101,12 +111,13 @@ class RoadLevelModel:
         *,
         band_dist: float = 10.0,
         head_m: float = 15.0,
-        smooth: int = 0,
+        smooth: int = 2,
+        use_map_style: bool = False,
     ) -> None:
         self.smooth = smooth
         self.corridors = corridors
         self.original_rows = read_pair_table(original)
-        self.styles = _style_by_edge(base_features)
+        self.styles = _style_by_edge(base_features, use_map_style=use_map_style)
         self.band_dist = band_dist
         self.head_m = head_m
 
@@ -121,6 +132,23 @@ class RoadLevelModel:
         refs = _corridor_refs(self.corridors)
         if any(ref not in saved for ref in refs):
             return None
+        values_by_category: dict[str, list[int]] = {}
+        for corridor, ref in zip(self.corridors, refs, strict=True):
+            row = saved[ref]
+            category = _priority_category(corridor)
+            values_by_category.setdefault(category, []).extend(
+                int(row[key]) for key in ("cs", "cm", "ce", "fl")
+            )
+        order = self.corridors[0].priority_order if self.corridors else ()
+        for high_index, higher in enumerate(order):
+            if higher not in values_by_category:
+                continue
+            for lower in order[high_index + 1:]:
+                if (
+                    lower in values_by_category
+                    and min(values_by_category[higher]) <= max(values_by_category[lower])
+                ):
+                    return None
         for corridor, ref in zip(self.corridors, refs, strict=True):
             row = saved[ref]
             corridor.casing_levels = (int(row["cs"]), int(row["cm"]), int(row["ce"]))
