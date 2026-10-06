@@ -19,6 +19,8 @@ As v2, a tunnel's casing is drawn by its dash layer alone (the other casing laye
 (1.5 px each side) so its colours show:
 
 - **One colour** (`tunnel_palette`, the default; two colours are not decided yet): slate dashes `#94a3b8` with empty gaps, at any strength.
+  Why a second colour exists (Kaveh): with empty gaps, where a tunnel passes under a road it looks connected to it; a solid second colour
+  closes the gaps. So the default should become a pair once one is chosen.
 - **A two-colour palette**: above 0 the dash layer draws a pattern image of the palette's two colours **as they are**, dash and gap. (v2
   blended them from slate and from the background by the strength; at 35 % the second colour was hard to see, Kaveh 2026-10-06.) v2's
   `Slate + ice`, `Blue + cyan`, `Warm + sand`, and three more to try with stronger second colours: `Graphite + silver`, `Indigo + lavender`,
