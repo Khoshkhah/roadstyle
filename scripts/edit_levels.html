@@ -264,10 +264,10 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     let [s, e] = f.heads || [5, 5];
     if(L > 0 && s + e > L){ const k = L / (s + e); s = Math.round(s * k * 10) / 10; e = Math.round(e * k * 10) / 10; }   // as drawn: cut in their ratio
     return `<div class="hd" data-hroad="${esc(r)}" data-len="${L}" title="The metres at each end drawn at the head's own level; the rest is the main part. Start + end cannot be more than the road.">
-      <div class="hd-h"><span>casing heads ${(f.heads_own || []).some(Boolean) ? `<button class="link" data-hauto title="Back to the automatic lengths (${(f.heads_auto || []).map(v => v + " m").join(" / ")})">auto</button>` : ""}</span><span>road ${L} m</span></div>
+      <div class="hd-h"><span>casing heads ${(f.heads_own || []).some(Boolean) ? `<button class="link" data-hauto title="Back to the default lengths (${(f.heads_auto || []).map(v => v + " m").join(" / ")})">default</button>` : ""}</span><span>road ${L} m</span></div>
       <div class="hbar"><i class="s"></i><i class="m"></i><i class="e"></i></div>
       ${[["start", "●", s], ["end", "○", e]].map(([n, m, v], k) => `<label><span>${n} ${m}</span><input type="range" min="0.5" step="0.5" data-hend="${n}" value="${v}"><b></b>
-        <small style="grid-column:2/4;margin:-3px 0 2px;font-size:10px">${(f.heads_own || [])[k] ? "set by you" : "auto"}</small></label>`).join("")}
+        <small style="grid-column:2/4;margin:-3px 0 2px;font-size:10px">${(f.heads_own || [])[k] ? "set by you" : "default"}</small></label>`).join("")}
     </div>`;
   }
   function headsSync(box){
@@ -288,9 +288,9 @@ body.lv-open #lv-busy{right:var(--lv-w)}
         <span>look</span><span>${esc(f.look || "–")}</span><span>lanes</span><span>${esc(f.lanes ?? "–")}</span>
         <span>road id</span><span style="grid-column:span 3;font-size:11px">${esc(r)}</span></div>
       <div class="wd" data-w="${esc(r)}">${widthHtml(f)}</div>
-      ${["start", "end"].map((e, i) => `<div class="caps" title="This end of the road (caps.csv, drawing only). auto: round, or flat where a round end would reach over the roads it joins (at zoom 18); round; square = flat, as long as round; flat = stops at the end point">
+      ${["start", "end"].map((e, i) => `<div class="caps" title="This end of the road (caps.csv, drawing only). default: round; square = flat, as long as round; flat = stops at the end point">
         <span style="width:44px">${e} ${i ? "○" : "●"}</span>
-        <div class="seg" data-cap="${esc(r)}" data-end="${e}">${[["", "auto · " + ((f.caps_auto || [])[i] || "round")], ["round", "round"], ["square", "square"], ["flat", "flat"]].map(([v, t]) =>
+        <div class="seg" data-cap="${esc(r)}" data-end="${e}">${[["", "default · " + ((f.caps_auto || [])[i] || "round")], ["round", "round"], ["square", "square"], ["flat", "flat"]].map(([v, t]) =>
           `<button data-v="${v}" class="${((f.caps || [])[i] || "") === v ? "on" : ""}">${t}</button>`).join("")}</div></div>`).join("")}
       ${headsHtml(r, f)}
       <div class="lvls"><div><small>start</small><b>${L[0]}</b></div><div><small>casing</small><b>${L[1]}</b></div>
@@ -409,8 +409,8 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   function stage(q){
     if(q.op === "delete" && queue.some(x => x.op === "delete" && x.index === q.index)) return toast("Already in the list");
     if(q.op === "cap" || q.op === "head") queue = queue.filter(x => !(x.op === q.op && x.road === q.road && x.end === q.end));   // the last choice for an end counts
-    q.text = q.op === "delete" ? "delete edit: " + plain(q.row) : q.op === "cap" ? `${q.end} ${q.end === "start" ? "●" : "○"} ${q.cap || "auto"} · ${name(q.road)}`
-      : q.op === "head" ? `${q.end} head ${q.end === "start" ? "●" : "○"} ${q.m ? q.m + " m" : "auto"} · ${name(q.road)}`
+    q.text = q.op === "delete" ? "delete edit: " + plain(q.row) : q.op === "cap" ? `${q.end} ${q.end === "start" ? "●" : "○"} ${q.cap || "default"} · ${name(q.road)}`
+      : q.op === "head" ? `${q.end} head ${q.end === "start" ? "●" : "○"} ${q.m ? q.m + " m" : "default"} · ${name(q.road)}`
       : `${q.body.relation} · ${plain(q.body)}`;
     queue.push(q); showQueue(); toast("In the list · apply when ready");
   }

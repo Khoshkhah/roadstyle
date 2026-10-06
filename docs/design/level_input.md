@@ -60,7 +60,10 @@ draws at zoom 18 (street level; widths are pixels, so lower zooms are wider on t
   level or above, else flat: a road going on into a lower piece would show its round end as a bump on it, and a wide road ending on a
   narrower one would cross its outline (Tunnel Aureglia into Rue Grimaldi). Square never helps there (it covers the round end and more).
 
-Yours in `heads.csv` / `caps.csv` go on top (empty: automatic); `levels.csv` has the ends as drawn. On Monaco the caps matched 5 of the 6
+**Not the default** (Kaveh 2026-10-06): heads made for zoom 18 were too short at lower zooms, where the roads are wider on the ground,
+and the main casing (a higher level) showed in the joined roads' fills everywhere. The default is back to 5 m heads and round caps
+(`scripts/solve_levels.py --auto-ends` for the automatic ones). Yours in `heads.csv` / `caps.csv` go on top (empty: the default);
+`levels.csv` has the ends as drawn. On Monaco the caps matched 5 of the 6
 flat ends set by hand (the sixth is under a road drawn above it); the head lengths come out a little shorter than the ones set by hand.
 
 **One part of A** (an edit): a `stack` edit may name a part of A's casing in `a_end`: `start`, `main` or `end` (empty: the whole road, the

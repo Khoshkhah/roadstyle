@@ -22,7 +22,7 @@ import roadstyle as rs
 from roadstyle import render_web
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from solve_levels import ends, own, solve, write  # noqa: E402
+from solve_levels import defaults, ends, own, solve, write  # noqa: E402
 
 COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"]
 
@@ -33,10 +33,10 @@ class Area:
         self.roads = gpd.read_parquet(self.dir / "roads.parquet")
         self.pairs = pd.read_csv(self.dir / "pairs.csv", dtype=str, keep_default_na=False)
         self.edits_path = self.dir / "edits.csv"
-        # each road end's head length and cap: automatic (rs.auto_ends: heads before solving, caps after) under yours in heads.csv / caps.csv ("" = auto)
+        # each road end's head length and cap: 5 m and round (solve_levels.defaults) under yours in heads.csv / caps.csv ("" = the default)
         self.caps_path, self.heads_path = self.dir / "caps.csv", self.dir / "heads.csv"
         self.heads, self.caps = own(self.dir)
-        self.auto_heads = rs.auto_ends(self.roads, self.pairs).set_index("road")         # the geometry's head lengths (the guard on the sliders)
+        self.auto_heads = defaults(self.roads).set_index("road")                         # the default head lengths (an empty value)
         if not self.edits_path.exists():
             self.edits_path.write_text(",".join(COLS) + "\n")
         self.road_of = {}                                       # any edge id -> its road id
@@ -94,7 +94,7 @@ class Area:
         if solved is None:
             solved, save = self.solve(edits), True
         self.solved = solved
-        auto = rs.auto_ends(self.roads, self.pairs, levels=solved)
+        auto = defaults(self.roads)
         drawn = ends(auto, self.heads, self.caps)
         if save:
             write(solved, self.dir, drawn)

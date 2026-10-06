@@ -4,9 +4,9 @@
 
 levels.csv has one row per edge: edge (its id), casing_start, casing_level, casing_end, fill_level, and its ends as drawn: head_start_m,
 head_end_m, cap_start, cap_end; draw them with rs.render_edges(edges, casing_start_col=..., casing_level_col=..., casing_end_col=...,
-fill_level_col=..., head_start_m_col=..., head_end_m_col=..., cap_start_col=..., cap_end_col=...). The ends are automatic (rs.auto_ends at
-zoom 18: the head lengths from the geometry before solving, the caps from the geometry and the solved levels after) with yours on top
-(heads.csv / caps.csv, an empty value: automatic; the level editor writes them). The solver only learns from the head lengths which main
+fill_level_col=..., head_start_m_col=..., head_end_m_col=..., cap_start_col=..., cap_end_col=...). The ends are 5 m heads and round caps
+(or with --auto-ends rs.auto_ends' at zoom 18) with yours on top (heads.csv / caps.csv, an empty value: the default; the level editor
+writes them). The solver only learns from the head lengths which main
 parts are empty and which parts of an upper road cross the road under it.
 """
 import argparse
@@ -57,13 +57,21 @@ def ends(auto, heads, caps):
     return t.reset_index()
 
 
-def solve(roads, pairs, edits, heads, caps, **kw):
-    """The whole step: the automatic head lengths (geometry), the solve, the automatic caps (geometry and the solved levels), your own on
-    top of both. Returns (solved, the ends as drawn, the automatic ends)."""
-    first = ends(rs.auto_ends(roads, pairs), heads, caps)
+def defaults(roads, head_m=5.0):
+    """Every road end as drawn unless you set it: ``head_m`` long heads and round caps (Kaveh 2026-10-06: the automatic ones, made for one
+    zoom, were too short at the others and let the main casing show in the joined roads' fills)."""
+    return pd.DataFrame({"road": list(roads["road"]), "start_m": head_m, "end_m": head_m, "cap_start": "round", "cap_end": "round"})
+
+
+def solve(roads, pairs, edits, heads, caps, auto=False, **kw):
+    """The whole step: the defaults (or ``auto``: rs.auto_ends' head lengths before solving and caps after), the solve, your own on top.
+    Returns (solved, the ends as drawn, the ends without yours)."""
+    base = rs.auto_ends(roads, pairs) if auto else defaults(roads)
+    first = ends(base, heads, caps)
     solved = rs.solve_levels(roads, pairs, edits=edits, parts=rs.casing_parts(roads, 5.0, first[["road", "start_m", "end_m"]]), **kw)
-    auto = rs.auto_ends(roads, pairs, levels=solved)
-    return solved, ends(auto, heads, caps), auto
+    if auto:
+        base = rs.auto_ends(roads, pairs, levels=solved)
+    return solved, ends(base, heads, caps), base
 
 
 def write(solved, folder, ends_table):
@@ -79,12 +87,14 @@ def write(solved, folder, ends_table):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("out_dir", type=Path)
+    ap.add_argument("--auto-ends", action="store_true", help="head lengths and caps from rs.auto_ends (at zoom 18) instead of 5 m and round")
     ap.add_argument("--max-positions", type=int, help="at most this many drawing positions (a hard bound: wishes, then stack pairs, give way)")
     a = ap.parse_args(argv)
     roads = gpd.read_parquet(a.out_dir / "roads.parquet")
     edits = a.out_dir / "edits.csv"
     heads, caps = own(a.out_dir)
-    solved, drawn, _ = solve(roads, a.out_dir / "pairs.csv", edits if edits.exists() else None, heads, caps, max_positions=a.max_positions)
+    solved, drawn, _ = solve(roads, a.out_dir / "pairs.csv", edits if edits.exists() else None, heads, caps, auto=a.auto_ends,
+                             max_positions=a.max_positions)
     write(solved, a.out_dir, drawn)
     info = solved.attrs["levels_info"]
     print(f"{len(roads)} roads -> {a.out_dir / 'levels.csv'}: {len(solved.attrs['levels_given_up'])} stack pair(s) given up, "
