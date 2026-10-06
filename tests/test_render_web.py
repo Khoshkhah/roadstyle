@@ -1277,6 +1277,10 @@ def test_compute_levels_on_the_bundled_sample():
     under = [944, 4251, 2082, 2363]
     assert all(s.casing_level[207] > s.fill_level[i] for i in under)                # the bridge is over them, outline included
     assert len(s.attrs["levels_given_up"]) == 30                                    # loops no order keeps (two ramps, each over one tube of a tunnel and joining the other), and short roads whose heads count one by one (docs/design/level_input.md)
+    parts = s.attrs["levels_given_up_parts"]                                        # which part broke: named for every given-up pair, and truly at or under
+    assert {(u, l) for u, l, _ in parts} == set(s.attrs["levels_given_up"])
+    col = {"start": "casing_start", "main": "casing_level", "end": "casing_end"}
+    assert all(s[col[h]][u] <= s.fill_level[l] for u, l, h in parts)
 
 
 def test_level_columns_put_each_positions_arrows_after_its_fill_layers():
@@ -1895,7 +1899,7 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     new = [r for r in area.relations("11", "12")["rows"] if r["section"] == "new"]
     assert len(new) == 1 and (tmp_path / "levels.csv").exists()                  # added in this session: "new", not "saved"
     assert len(area.relations("12")["rows"]) >= 3                                # one road: everything about it, in both tables
-    gu = area.given_up()                                                          # the solver's given-up pairs, with A's parts under B's fill
+    gu = area.given_up()                                                          # the solver's given-up pairs, with the parts that broke
     assert [(r["a"], r["b"]) for r in gu["rows"]] == [tuple(p) for p in area.stats["given_up"]] and set(gu["roads"]) >= {x for r in gu["rows"] for x in (r["a"], r["b"])}
     assert [f["road"] for f in area.find(" 12 ")] == ["12"] and area.find("") == []                 # search: an edge id ...
     ref = area.facts["12"]["edge_ref"] = "120113158#1f"

@@ -31,7 +31,8 @@ def write(solved, folder):
     """levels.csv, and levels_info.json: what the solver says about it (the editor shows it without solving again)."""
     import json
     edge_levels(solved).to_csv(Path(folder) / "levels.csv", index=False)
-    info = {**solved.attrs["levels_info"], "given_up": [list(p) for p in solved.attrs["levels_given_up"]]}
+    info = {**solved.attrs["levels_info"], "given_up": [list(p) for p in solved.attrs["levels_given_up"]],
+            "given_up_parts": [list(p) for p in solved.attrs.get("levels_given_up_parts", [])]}
     (Path(folder) / "levels_info.json").write_text(json.dumps(info, default=str))
 
 

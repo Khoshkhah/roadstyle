@@ -299,6 +299,9 @@ def _solve_intervals(metres, meets, stacks, orders, limit, max_level, margin, mi
     parts = [(val(x[part[r]["s"]]), val(x[part[r]["m"]]), val(x[part[r]["e"]]), val(x[r])) for r in range(n)]
     gu = sorted({pair_list[stack_rows[i][0]] for i in range(nP) if slack[i] >= margin * (1 - 1e-6)})   # a part of the upper casing is not after the lower fill
     violated = int((slack[nP:] >= margin * (1 - 1e-6)).sum())
+    name = {c: (r, h) for r in range(n) for h, c in part[r].items()}
+    info["given_up_parts"] = sorted({(*pair_list[stack_rows[i][0]], {"s": "start", "m": "main", "e": "end"}[name[stack_rows[i][1]][1]])
+                                     for i in range(nP) if slack[i] >= margin * (1 - 1e-6)})      # the parts that broke: (upper, lower, part)
     return parts, gu, {**info, "order_pairs": nO, "order_violations": violated, "solves": solves, "solver": how, "status": "OPTIMAL", "seconds": round(time.time() - t0, 1)}
 
 
@@ -473,6 +476,7 @@ def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=
     out = roads.copy()
     out["casing_start"], out["casing_level"], out["casing_end"], out["fill_level"] = ([cm[p[k]] for p in iv] for k in range(4))
     out.attrs["levels_given_up"] = [(roads["road"].iat[u], roads["road"].iat[l]) for u, l in given]
+    out.attrs["levels_given_up_parts"] = [(roads["road"].iat[u], roads["road"].iat[l], h) for u, l, h in info.pop("given_up_parts", [])]
     out.attrs["levels_info"] = info
     return out
 
@@ -495,7 +499,8 @@ def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tu
     ``max_level``: the numbers are in ``[-max_level, max_level]``; ``margin``: how much later a road is painted where one must be painted after another
     (only the order matters: it changes the scale); ``time_limit``: seconds for each LP solve; ``min_positions``: also minimise the span of the numbers (fewer positions, a little
     less compaction; section 7.3.1); False leaves it out.
-    Results beyond the columns: ``result.attrs["levels_given_up"]`` = ``[(upper index, lower index)]`` (also warned about),
+    Results beyond the columns: ``result.attrs["levels_given_up"]`` = ``[(upper index, lower index)]`` (also warned about;
+    ``attrs["levels_given_up_parts"]``: ``(upper, lower, "start" / "main" / "end")``, the parts that broke),
     ``result.attrs["levels_info"]`` = counts, order violations, solver status, seconds.
     ponytail: tags method ignores crossings without tags and band / order; solve method does not cut a road at the place where it changes level."""
     if method not in ("tags", "solve"):
@@ -517,6 +522,7 @@ def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tu
         pos = [tuple(lv[r]) if same[i] else (lv[r][2], lv[r][1], lv[r][0], lv[r][3]) for i, r in enumerate(rid)]   # the other direction: heads swapped
         given = out.attrs["levels_given_up"]
         g.attrs["levels_given_up"] = [(int(u), int(l)) for u, l in given]
+        g.attrs["levels_given_up_parts"] = [(int(u), int(l), h) for u, l, h in out.attrs["levels_given_up_parts"]]
         g.attrs["levels_info"] = out.attrs["levels_info"]
         if given:
             warnings.warn(f"compute_levels: {len(given)} stack pair(s) could not be satisfied; see result.attrs['levels_given_up']", stacklevel=2)

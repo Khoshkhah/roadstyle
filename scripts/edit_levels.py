@@ -79,7 +79,8 @@ class Area:
                 s, m, e, f = t.loc[str(r.reversed[0]), cols].tolist()
                 v = [e, m, s, f]
             solved.iloc[i, [solved.columns.get_loc(c) for c in cols]] = v
-        solved.attrs["levels_info"] = {k: v for k, v in json.loads(info.read_text()).items() if k != "given_up"}
+        solved.attrs["levels_info"] = {k: v for k, v in json.loads(info.read_text()).items() if k not in ("given_up", "given_up_parts")}
+        solved.attrs["levels_given_up_parts"] = [tuple(p) for p in json.loads(info.read_text()).get("given_up_parts", [])]
         solved.attrs["levels_given_up"] = [tuple(p) for p in json.loads(info.read_text()).get("given_up", [])]
         print(f"drawn from {lv} (not solved again)", flush=True)
         return solved
@@ -98,6 +99,7 @@ class Area:
             write(solved, self.dir)
         self.solved = solved
         self.stats = {**solved.attrs["levels_info"], "given_up": [list(p) for p in solved.attrs["levels_given_up"]], "area": self.dir.name}
+        self.broken = solved.attrs.get("levels_given_up_parts", [])
         for r in solved.itertuples():
             self.facts[r.road]["caps"] = list(self.caps.get(r.road, ("", "")))
             self.facts[r.road]["heads"] = [float(x) if x else 5.0 for x in self.heads.get(r.road, ("", ""))]
@@ -182,13 +184,13 @@ class Area:
         self.change(edits, saved=self.saved - sum(i < self.saved for i in gone), caps=caps, heads=heads)
 
     def given_up(self):
-        """The stack pairs the solver could not keep (A over B), each with the parts of A's casing at or under B's fill and whether A's fill
-        is too: flaws on the map, to fix by hand."""
+        """The stack pairs the solver could not keep (A over B), each with the parts of A's casing the solver could not put after B's fill
+        and whether A's fill is under B's too: flaws on the map, to fix by hand."""
         rows = []
         for u, l in self.stats["given_up"]:
             lv, under = self.facts[u]["levels"], self.facts[l]["levels"][3]
             rows.append({"a": u, "b": l, "levels": lv, "b_fill": under, "fill_under": lv[3] <= under,
-                         "parts": [n for n, v in zip(("start", "main", "end"), lv[:3], strict=True) if v <= under]})
+                         "parts": [h for a, b, h in self.broken if (a, b) == (u, l)]})
         return {"rows": rows, "roads": {x: self.facts[x] for r in rows for x in (r["a"], r["b"])}}
 
     def find(self, q, limit=20):
