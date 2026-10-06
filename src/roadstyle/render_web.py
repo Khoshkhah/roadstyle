@@ -770,19 +770,42 @@ def _twin_ends(geo, cols):
     return out
 
 
-def _tunnel_fill_under(lid, flt, fw, off, bg, on):
-    """An opaque underlay in the canvas colour under a tunnel's translucent fill: nothing under the tunnel (its own casing, a
-    street's round end) shows through, so the fill reads as the faded colour, as a tunnel always looked. Not for a dashed
-    class, which has gaps of its own."""
-    if not (on and _rgb(bg)):
-        return []
-    return [{"id": lid, "type": "line", "source": "roads", "layout": {"line-cap": "butt", "line-join": "round"},
-             "filter": ["all", flt, ["!", ["to-boolean", ["get", "__rs_dash"]]]],
-             "paint": {"line-color": bg, "line-width": fw, "line-offset": off}}]
+def _tun_mix(expr, toward, s):
+    """A tunnel feature's colour: ``expr`` moved toward ``toward`` by ``s`` (0..1), opaque; any other feature keeps ``expr``
+    (docs/design/tunnel_look.md). The page builds the same expression again when the slider moves (_tunMix)."""
+    return ["case", ["to-boolean", ["get", "__rs_tunnel"]], ["interpolate", ["linear"], s, 0, expr, 1, toward], expr]
+
+
+_TUN_PAINT = ("line-color", "fill-color", "circle-color", "text-color")
+
+
+def _tunnel_look(layers, edge_ids, bg, fade, palette):
+    """The tunnel look on the finished layer list (docs/design/tunnel_look.md): the roads' fills and the items attached to edges move toward the
+    background ``bg``, the casing's solid tone toward the palette's gap colour and its dashes toward the dash colour, all by ``fade``.
+    Returns ``{layer id: [paint property, its colour without the look, "bg" | "gap" | "dash"]}`` for the page."""
+    dash, gap = palette
+    out = {}
+    for l in layers:
+        lid, paint = l["id"], l.get("paint") or {}
+        if l.get("source") not in ("roads", "casings") and lid not in edge_ids:
+            continue
+        if lid.startswith("roads-casing") and "-bridge" not in lid:
+            kind = "dash" if lid.endswith("-dash") else "gap"
+        elif lid.startswith("roads-fill") and not lid.endswith("-pat"):
+            kind = "bg"
+        elif lid in edge_ids:
+            kind = "bg"
+        else:
+            continue
+        for k in _TUN_PAINT:
+            if k in paint:                       # a new paint: the copies of a layer for each position share theirs
+                out[lid] = [k, paint[k], kind]
+                l["paint"] = {**paint, k: _tun_mix(paint[k], {"bg": bg, "gap": gap, "dash": dash}[kind], fade)}
+    return out
 
 
 _CASING_FAMILY = ("roads-casing", "roads-casing-sq", "roads-casing-dash", "roads-casing-bridge")
-_FILL_FAMILY = ("roads-fill-under", "roads-fill", "roads-fill-sq", "roads-fill-pat")
+_FILL_FAMILY = ("roads-fill", "roads-fill-sq", "roads-fill-pat")
 
 
 def _fill_layer_ids(levels):
@@ -1182,7 +1205,7 @@ def _eid(v):
     return str(v)
 
 
-def _edge_overlay(ov, fc, fills, edge_id_col):
+def _edge_overlay(ov, fc, fills, edge_id_col, tunnels=()):
     """Bake ``__rs_fl`` (the fill number of the feature's edge) and ``__rs_ord`` (its order) on the features of an overlay with ``edge_col``
     (docs/design/edge_overlays.md). ``fills``: ``{edge id as text: fill number}`` of the roads. An edge id that is not among the roads is an error."""
     if fills is None:
@@ -1198,13 +1221,15 @@ def _edge_overlay(ov, fc, fills, edge_id_col):
         o = p.get(ov.order_col) if ov.order_col else 0
         o = 0 if o is None or (isinstance(o, float) and math.isnan(o)) else int(o)
         p["__rs_fl"], p["__rs_ord"] = fills[e], o
+        if e in tunnels:
+            p["__rs_tunnel"] = True          # the item of a tunnel takes its look (docs/design/tunnel_look.md)
         orders.add((fills[e], o))
     if unknown:
         raise ValueError(f"overlay {ov.label or ''}: {len(unknown)} feature(s) have an {ov.edge_col!r} that is not an edge of the roads (first: {unknown[:5]})")
     return sorted(orders)
 
 
-def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4dff", fills=None, edge_id_col="edge_id"):
+def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4dff", fills=None, edge_id_col="edge_id", tunnels=()):
     """Add each overlay as its own source + layer(s) to ``style``. Returns ``(under, over, meta, edge)``:
     the layer specs to splice below / above the roads, the JS metadata (label / source / clickable
     layer ids / popup fields) the page reads to wire popups, hover/select highlight, and the Layers
@@ -1225,7 +1250,7 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
         base_filters = None
         if ov.edge_col:
             layers, base_filters = [], {}
-            for pos, order in _edge_overlay(ov, fc, fills, edge_id_col):
+            for pos, order in _edge_overlay(ov, fc, fills, edge_id_col, tunnels):
                 flt = ["all", ["==", ["get", "__rs_fl"], pos], ["==", ["get", "__rs_ord"], order]]
                 mine = []
                 for lyr in _overlay_layers(sid, ov, kind, hover_color, select_color, along):
@@ -1334,7 +1359,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            road_popup=True, road_tooltip=False, popup_mode: str = None,
            street_view: bool | str = "window", street_view_key: str | None = None,
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
-           color_options=None, color_active=0, overlays=None, compress: bool = True,
+           color_options=None, color_active=0, overlays=None, compress: bool = True, tunnel_control: bool = True,
            tiles: bool = False,
            minzoom=None, legend: bool = True,
            api_key: str | None = None, **_ignore):
@@ -1396,6 +1421,10 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     casing / lanes; only the fill swaps). A neutral base reads best — pair the class option with
     ``palette="mono"``. ``window.rsSetColorField(name|index)`` drives the same swap from your own
     UI.
+
+    ``tunnel_control`` (default True): on a map with tunnels, a *Tunnels* box with the look's slider (how far a tunnel's fill and items fade
+    toward the background, and its casing toward the palette) and the casing palette; ``window.rsSetTunnelStyle({fade, palette})`` does
+    the same from your own UI. The starting values are the settings ``tunnel_fade`` and ``tunnel_palette`` (docs/design/tunnel_look.md).
 
     ``overlays`` (optional) draws extra layers the caller brings — a list of :class:`Overlay`
     (zone polygons, POI circles, any geometry). Each becomes its own source + layer(s), placed
@@ -1527,11 +1556,12 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
 
     # extra overlay layers (zones / POIs / any geometry the caller brings); each gets its own source
     # + paint layer(s), placed under or over the roads, and (if `popup` is set) clickable.
-    fills = None
+    fills, tunnels = None, set()
     if overlays and any(getattr(o, "edge_col", None) for o in overlays):
         if edge_id_col in g.columns:
             fills = {_eid(ft["properties"].get(edge_id_col)): ft["properties"].get("__rs_fl") or 0 for ft in geo["features"]}
-    under_layers, over_layers, ov_meta, edge_layers = _build_overlays(style, overlays, fills=fills, edge_id_col=edge_id_col)
+            tunnels = {_eid(ft["properties"].get(edge_id_col)) for ft in geo["features"] if ft["properties"].get("__rs_tunnel")}
+    under_layers, over_layers, ov_meta, edge_layers = _build_overlays(style, overlays, fills=fills, edge_id_col=edge_id_col, tunnels=tunnels)
 
     # Round caps + joins everywhere: consecutive edges are separate LineStrings, and a round cap is
     # the only rendering primitive that seals the seam where two of them connect (line-join only
@@ -1602,32 +1632,26 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
                    "line-width": cw, "line-offset": off}},
         *_tunnel_casing_dash("roads-low-casing-dash", tunnel, tlay, cw, off, any_tunnel),
-        *_tunnel_fill_under("roads-low-fill-under", tunnel, fw, off, _bg_color(active_bm), any_tunnel),
         {"id": "roads-low-fill", "type": "line", "source": "roads", "layout": lay, "filter": low,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
-                   "line-width": fw, "line-offset": off,
-                   **({"line-opacity": ["case", is_t, 0.72, 1]} if any_tunnel else {})}},
+                   "line-width": fw, "line-offset": off}},
         *_tunnel_fill_dash("roads-low-fill-pat", tunnel, tlay, fw, off, any_tunnel),
         {"id": "roads-casing", "type": "line", "source": "roads", "layout": lay, "filter": surface,
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
                    "line-width": cw, "line-offset": off}},
         *_tunnel_casing_dash("roads-casing-dash", tunnel_g, tlay, cw, off, tun_g),
-        *_tunnel_fill_under("roads-fill-under", tunnel_g, fw, off, _bg_color(active_bm), tun_g),
         {"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, "filter": surface,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
-                   "line-width": fw, "line-offset": off,
-                   **({"line-opacity": ["case", is_t, 0.72, 1]} if tun_g else {})}},
+                   "line-width": fw, "line-offset": off}},
         *_tunnel_fill_dash("roads-fill-pat", tunnel_g, tlay, fw, off, tun_g),
         # above ground, not a bridge (a positive layer alone: a raised walkway): over the ground roads it crosses
         {"id": "roads-high-casing", "type": "line", "source": "roads", "layout": lay, "filter": high,
          "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
                    "line-width": cw, "line-offset": off}},
         *_tunnel_casing_dash("roads-high-casing-dash", tunnel_h, tlay, cw, off, tun_h),
-        *_tunnel_fill_under("roads-high-fill-under", tunnel_h, fw, off, _bg_color(active_bm), tun_h),
         {"id": "roads-high-fill", "type": "line", "source": "roads", "layout": lay, "filter": high,
          "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
-                   "line-width": fw, "line-offset": off,
-                   **({"line-opacity": ["case", is_t, 0.72, 1]} if tun_h else {})}},
+                   "line-width": fw, "line-offset": off}},
         *_tunnel_fill_dash("roads-high-fill-pat", tunnel_h, tlay, fw, off, tun_h),
         # The bridge LOOK, last (on top). Flat view: heavier square-capped casing reads as a deck.
         # 3D view: below bridge_decks.flat_below the SAME flat lines draw (full stylized width,
@@ -1993,6 +2017,12 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     if edge_layers:       # the overlays attached to edges: after the fills of their position, before its arrows (docs/design/edge_overlays.md)
         style["layers"] = _place_edge_overlays(style["layers"], edge_layers, levels)
     style["layers"] += over_layers             # caller overlays drawn on top of the roads (e.g. POIs)
+    tun_paint = {}
+    if any(ft["properties"].get("__rs_tunnel") for ft in geo["features"]):      # the tunnel look (docs/design/tunnel_look.md)
+        if CONFIG.tunnel_palette not in CONFIG.tunnel_palettes:
+            raise ValueError(f"tunnel_palette {CONFIG.tunnel_palette!r} is not in tunnel_palettes {list(CONFIG.tunnel_palettes)}")
+        tun_paint = _tunnel_look(style["layers"], {l["id"] for _, _, _, grp in edge_layers for l in grp}, _bg_color(active_bm),
+                                 float(CONFIG.tunnel_fade), CONFIG.tunnel_palettes[CONFIG.tunnel_palette])
 
     # road-class filter panel: the distinct classes present, most important first. `filter_col`
     # (optional) drives the filter from a different column than the styling `highway_col` — e.g. a
@@ -2074,6 +2104,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             .replace("__COLOR_OPTIONS__", json.dumps(color_opts_meta or []))
             .replace("__CO_ACTIVE__", str(_active))
             .replace("__OVERLAYS__", json.dumps(ov_meta))
+            .replace("__TUNNEL__", json.dumps({"layers": tun_paint, "fade": float(CONFIG.tunnel_fade), "palette": CONFIG.tunnel_palette,
+                                               "palettes": CONFIG.tunnel_palettes, "bg": _bg_color(active_bm), "control": bool(tunnel_control and tun_paint)}))
             .replace("__ROAD_POPUP__", "true" if popup_on else "false")
             .replace("__ROAD_POPUP_MODE__", json.dumps(mode))
             .replace("__ROAD_POPUP_FIELDS__", json.dumps(popup_fields))

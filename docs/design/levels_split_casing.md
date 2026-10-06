@@ -443,7 +443,7 @@ For every position `p`, in ascending order, the page has these layers, in this o
 |---|---|---|---|---|
 | 1 | blob casing `roads-ends-casing` (`-lv<p>` for `p ≠ 0`) | `ends` | the round casing at the ends of two-way pairs | `__rs_cl == p` |
 | 2 | casing layers `roads-casing`, `-sq`, `-dash`, and `roads-casing-bridge` for bridges (`-lv<p>`) | **`casings`** | the casing pieces; `-sq` (flat ends) draws the main pieces, the others are round | `__rs_cl == p` |
-| 3 | fill layers `roads-fill-under`, `roads-fill`, `-sq`, `-pat`, `-dash<n>` (`-lv<p>`); the blob fill `roads-ends-fill` just before `roads-fill` | `roads`, `ends` | the fills | `__rs_fl == p` |
+| 3 | fill layers `roads-fill`, `-sq`, `-pat`, `-dash<n>` (`-lv<p>`); the blob fill `roads-ends-fill` just before `roads-fill` | `roads`, `ends` | the fills | `__rs_fl == p` |
 | 4 | arrows `roads-arrows` (`-lv<p>`) | `slots` | one-way arrows | `fl == p` |
 | 5 | names `roads-labels` (`-lv<p>`) | `slots` | street names | `fl == p` |
 

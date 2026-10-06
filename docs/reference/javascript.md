@@ -29,6 +29,7 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rsSetBridges(on)` | show / hide every bridge and its 3D deck (the filter panel's *Bridges* row) | `rs:filterchange` |
 | `rsSetTunnels(on)` | show / hide every tunnel, with its street names and arrows (the filter panel's *Tunnels* row) | `rs:filterchange` |
 | `rsSetColorField(nameOrIndex)` | switch the active `color_options` entry | `rs:colorchange` |
+| `rsSetTunnelStyle({fade, palette})` | move the tunnel look: `fade` 0-1, `palette` a name of `RS_TUNNEL_PALETTES` (either may be left out) | `rs:tunnelchange` |
 | `rsSetOverlay(labelOrIndex, on)` | show / hide one overlay | `rs:overlaychange` |
 | `rsSetView3D(on)` | tilt to `camera.pitch_3d`, or back to flat and north-up | `rs:viewchange` |
 | `rsPanelShow(on)` | panel mode only: hide / show the docked side panel | |
@@ -59,6 +60,7 @@ All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
 | `rs:basemapchange` | `rsSetBasemap` | `basemap` (key), `index` |
 | `rs:overlaychange` | `rsSetOverlay` | `overlay` (label), `visible` |
 | `rs:viewchange` | `rsSetView3D` | `view3d` |
+| `rs:tunnelchange` | `rsSetTunnelStyle` | `fade`, `palette` |
 | `rs:streetviewchange` | `rsSetStreetView` | `open` |
 | `rs:streetviewmove` | `rsStreetViewStep` | `id`, `streetView`, `atStart`, `atEnd` |
 | `rs:streetviewspot` | a pick, a step, a walk or turn in the panorama | the `rsGetStreetViewSpot()` object (or `null`) |
@@ -82,6 +84,7 @@ Read-only globals for building your own controls.
 | `RS_CLASS_COL` | the column `RS_CLASSES` came from |
 | `RS_CLASS_COLORS` | `{class: fill colour}` |
 | `RS_COLOR_OPTIONS` | `[{name, prop, legend}]`, the `color_options` entries |
+| `RS_TUNNEL_PALETTES` | `{name: [dash, gap]}`, the tunnel casing palettes |
 | `RS_OVERLAYS` | `[{label, source, layers, visible, color, popup, tooltip, under, interactive, …}]` |
 
 ## The `layer` argument

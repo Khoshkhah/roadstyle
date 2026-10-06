@@ -26,7 +26,7 @@
    the native zoom controls (top-right) and the scale bar (bottom-left). Panel mode docks them. */
 .rs-tl{position:absolute;top:10px;left:10px;z-index:2;display:flex;flex-direction:column;
   gap:8px;align-items:flex-start;max-height:calc(100% - 20px)}
-.rs-tl .co-ctrl,.rs-tl .flt-ctrl{position:static;max-height:none}
+.rs-tl .co-ctrl,.rs-tl .tn-ctrl,.rs-tl .flt-ctrl{position:static;max-height:none}
 .rs-tl .flt-ctrl{overflow:auto;min-height:0}   /* long class lists scroll inside the stack */
 .flt-ctrl{position:absolute;top:10px;left:10px;z-index:2;background:#fff;border-radius:8px;
 box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);
@@ -69,7 +69,7 @@ body.rs-panel #map{right:320px}
 .rs-side-hd2{border-top:1px solid #ececec}
 /* the map's own controls, docked: static block cards instead of floating boxes */
 .rs-side-ctl{flex:0 1 auto;min-height:0;max-height:55%;overflow:auto}
-.rs-side .co-ctrl,.rs-side .flt-ctrl,.rs-side .co-lg{position:static;box-shadow:none;border-radius:0;
+.rs-side .co-ctrl,.rs-side .tn-ctrl,.rs-side .flt-ctrl,.rs-side .co-lg{position:static;box-shadow:none;border-radius:0;
   max-height:none;background:#fff;border-bottom:1px solid #f0f0f0;padding:8px 14px}
 .rs-side .flt-ctrl .flt-hd{padding:0 0 4px}
 .rs-side .flt-ctrl .flt-body{padding:0}
@@ -84,10 +84,11 @@ body.rs-side-hidden{--rs-side:0px}
   border-bottom:1px solid #f3f3f3;font-variant-numeric:tabular-nums}
 .rs-kv span{color:#8a8a8a;flex:0 0 auto}
 .rs-kv b{font-weight:600;text-align:right;word-break:break-all;min-width:0}
-.co-ctrl{position:absolute;top:10px;right:10px;z-index:2;background:#fff;border-radius:8px;
+.co-ctrl,.tn-ctrl{position:absolute;top:10px;right:10px;z-index:2;background:#fff;border-radius:8px;
 box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);padding:6px 10px;
 font:11px system-ui,sans-serif;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#767c88}
-.co-ctrl select{font:13px system-ui,sans-serif;font-weight:600;text-transform:none;letter-spacing:0;
+.tn-ctrl input{vertical-align:middle;width:110px;margin:0 4px}
+.co-ctrl select,.tn-ctrl select{font:13px system-ui,sans-serif;font-weight:600;text-transform:none;letter-spacing:0;
   border:0;background:transparent;cursor:pointer;outline:none;color:#334155;margin-left:3px}
 .co-lg{position:absolute;left:10px;bottom:24px;z-index:2;background:rgba(255,255,255,.96);
 border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);
@@ -661,6 +662,11 @@ if(FILTER.on){
 // option's fill is baked per edge (__rs_fill / __rs_fill__1 …); setPaintProperty repoints the
 // road-fill layers' line-color at the chosen prop. window.rsSetColorField drives it from your UI.
 const COLOR_OPTIONS = __COLOR_OPTIONS__;
+// the tunnel look (docs/design/tunnel_look.md): a tunnel's fill and its items move toward the background, its casing toward the palette,
+// by TUNNEL.fade; TUNNEL.layers = {layer id: [paint property, colour without the look, "bg" | "gap" | "dash"]}
+const TUNNEL = __TUNNEL__;
+function _tunMix(e, toward){ return ["case",["to-boolean",["get","__rs_tunnel"]],["interpolate",["linear"],TUNNEL.fade,0,e,1,toward],e]; }
+const _tunOn = Object.keys(TUNNEL.layers).length > 0;
 const RS_FILL_LAYERS = __RS_FILL_LAYERS__;
 const RS_END_LAYERS = __RS_END_LAYERS__;   // twin_ends.md
 const RS_END_CASING_LAYERS = __RS_END_CASING_LAYERS__;
@@ -690,7 +696,7 @@ function _fillExpr(idE){
   return e;
 }
 function _applyFill(){
-  const e=_fillExpr();
+  const e=_tunOn ? _tunMix(_fillExpr(), TUNNEL.bg) : _fillExpr();
   RS_FILL_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"line-color",e); });
   // the dashed layers (<fill layer>-dash0, -dash1 ...: one per dash pattern, for footway, path, steps ...) draw the
   // dashed classes' edges: they take the active colouring too, or such a road keeps its class colour under any "colour by"
@@ -904,6 +910,35 @@ if(OVERLAYS.length){
     OVERLAYS.forEach(ov=> body.appendChild(_ovRow(ov)));
     document.body.appendChild(box);
   }
+}
+// window.rsSetTunnelStyle({fade, palette}) moves the tunnel look (fade 0-1; palette a name of RS_TUNNEL_PALETTES); the Tunnels box is UI over it
+function rsSetTunnelStyle(o){
+  if(!_tunOn) return;
+  o = o || {};
+  if(o.fade != null) TUNNEL.fade = Math.max(0, Math.min(1, +o.fade));
+  if(o.palette != null && TUNNEL.palettes[o.palette]) TUNNEL.palette = o.palette;
+  const [dash, gap] = TUNNEL.palettes[TUNNEL.palette], to = {bg: TUNNEL.bg, gap: gap, dash: dash};
+  for(const id in TUNNEL.layers){ const [k, base, kind] = TUNNEL.layers[id];
+    if(map.getLayer(id)) map.setPaintProperty(id, k, _tunMix(base, to[kind])); }
+  _applyFill();                                   // the roads' fills: with the active colour-by
+  const r=document.getElementById("tn-fade"), s=document.getElementById("tn-pal");
+  if(r) r.value = Math.round(TUNNEL.fade * 100); if(s) s.value = TUNNEL.palette;
+  document.dispatchEvent(new CustomEvent("rs:tunnelchange",{detail:{fade:TUNNEL.fade, palette:TUNNEL.palette}}));
+}
+window.rsSetTunnelStyle = rsSetTunnelStyle;
+window.RS_TUNNEL_PALETTES = TUNNEL.palettes;
+document.addEventListener("rs:basemapchange", e => {           // the fade goes toward the new background
+  const b = BASEMAPS[e.detail.index]; if(_tunOn && b && b.bg){ TUNNEL.bg = b.bg; rsSetTunnelStyle(); } });
+if(TUNNEL.control){
+  const w=document.createElement("div"); w.className="tn-ctrl";
+  w.appendChild(document.createTextNode("Tunnels"));
+  const r=document.createElement("input"); r.type="range"; r.id="tn-fade"; r.min=0; r.max=100; r.value=Math.round(TUNNEL.fade*100);
+  r.title="How far a tunnel fades toward the background, and its casing toward the palette";
+  r.oninput=()=> rsSetTunnelStyle({fade: r.value/100});
+  const s=document.createElement("select"); s.id="tn-pal";
+  Object.keys(TUNNEL.palettes).forEach(n=>{ const op=document.createElement("option"); op.value=n; op.textContent=n; s.appendChild(op); });
+  s.value=TUNNEL.palette; s.onchange=()=> rsSetTunnelStyle({palette: s.value});
+  w.appendChild(r); w.appendChild(s); _tlHost().appendChild(w);
 }
 // oneway direction-arrow icon (openstreetmap-carto)
 function addArrow(){
