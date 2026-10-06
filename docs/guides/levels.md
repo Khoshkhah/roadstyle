@@ -28,15 +28,21 @@ position are drawn in no set order.
 
 ## Where the positions come from
 
-`render_edges(edges)` calls `rs.compute_levels(edges, method="solve", order="priority")`: a minimum-cost flow (OR-tools; HiGHS through scipy when a wish must be given up)
-over the `layer`, `bridge` and `tunnel` tags, overpasses found from the geometry, and at junctions the priority order: where roads of one band meet,
-a roundabout (`junction=roundabout`) is over a tunnel, a tunnel over a bridge, and a bridge over the road class. `order="class"` is the road class alone. To give the solver
-your own band per edge (a sidewalk -1 under its street, a crossing 1 over it), pass `band_col="band"`.
+The positions come from the **level step**, not from the renderer ([design](../design/level_input.md)). `render_edges(edges)` without level
+columns calls `rs.compute_levels(edges)` with its defaults: a minimum-cost flow (OR-tools; HiGHS through scipy when a wish must be given up)
+over the `layer`, `bridge` and `tunnel` tags and the geometry. Roads of different bands that **cross** follow the band (the higher one over
+the lower one); roads that **only meet** (two streets at a junction, a tunnel mouth, a bridge end) follow the priority order: a roundabout
+(`junction=roundabout`) over a tunnel, a tunnel over a bridge, a bridge over the road class. `order="class"` is the road class alone. To
+give your own band per edge (a sidewalk -1 under its street, a crossing 1 over it), compute the levels with `band_col="band"`: your bands
+then decide over and under everywhere. `render_edges` takes no band and no order.
+
+The two halves of the step, with files you can read and edit (`roads.parquet`, `pairs.csv`, `edits.csv`, `levels.csv`):
+`rs.level_input(edges)` / `scripts/level_input.py`, then `rs.solve_levels(roads, pairs, edits=...)` / `scripts/solve_levels.py`.
 
 Computing takes seconds for a district and longer for a big network. Compute it once, and draw with the columns:
 
 ```python
-levels = rs.compute_levels(edges, method="solve", order="priority")
+levels = rs.compute_levels(edges)                     # band_col=..., order=... go here, not to render_edges
 rs.save_levels(con, levels)                # duckOSM file, schema visualization; rs.load_levels reads it back
 rs.render_edges(levels, casing_level_col="casing_level", fill_level_col="fill_level",
                 casing_start_col="casing_start", casing_end_col="casing_end").save("map.html")

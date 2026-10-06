@@ -23,8 +23,8 @@ Docs: https://khoshkhah.github.io/roadstyle/ (every keyword: `/reference/paramet
 - Real widths: `width_m_col="width_m"` draws each line exactly that many metres wide from
   `width_m_zoom` (16) on, casing `casing_m` (0.15) inside it; null = the class width.
 - Draw order: every edge is drawn by two positions (casing, fill), computed for you by
-  `compute_levels(method="solve", order="class")`. `band_col="band"` (integers) gives the solver the
-  band of an edge (a sidewalk -1, a crossing 1). For a big network compute once:
+  `compute_levels(edges)` (the level step; `render_edges` takes no band or order). `compute_levels(edges,
+  band_col="band")` (integers) sets the band of an edge (a sidewalk -1, a crossing 1). For a big network compute once:
   `rs.save_levels(con, rs.compute_levels(...))`, and draw with `casing_level_col=` / `fill_level_col=`.
 - Every other column shows in the popup and is queryable from JavaScript, so join your data
   onto the edges as columns before rendering.

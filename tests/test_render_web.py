@@ -991,8 +991,8 @@ def test_tunnels_get_light_dashes_on_their_fill_unless_turned_off():
     st = _style(render_edges(_tunnel_world(True), backend="web").html)
     lay = {l["id"]: l for l in st["layers"]}
     ids = [l["id"] for l in st["layers"]]
-    pat = lay["roads-fill-lv-1-pat"]
-    assert ids.index(pat["id"]) > ids.index("roads-fill-lv-1") and pat["source"] == "roads"
+    pat = lay["roads-fill-lv1-pat"]                 # the tunnel's position: over the streets it joins, under the one crossing it (docs/design/level_input.md)
+    assert ids.index(pat["id"]) > ids.index("roads-fill-lv1") and pat["source"] == "roads"
     assert pat["paint"]["line-dasharray"] == [1.2, 1.2] and pat["layout"]["line-cap"] == "butt"
     assert pat["paint"]["line-color"].startswith("rgba(255,255,255")
     assert '"__rs_dash"' in json.dumps(pat["filter"]) and "__rs_tunnel" in json.dumps(pat["filter"])
@@ -1004,7 +1004,7 @@ def test_colour_by_recolours_the_dashed_layers_too():
     """A footway / path / steps edge is drawn by a ``-dash<n>`` layer (line-dasharray is not data-driven): it must
     follow the active colouring, or it keeps its class colour under any "colour by"."""
     html = render_edges(_tunnel_world(True), backend="web").html
-    assert 'const RS_FILL_LAYERS = ["roads-fill", "roads-fill-sq", "roads-fill-lv-1"' in html
+    assert 'const RS_FILL_LAYERS = ["roads-fill", "roads-fill-sq", "roads-fill-lv1"' in html          # the tunnel at position 1: over the streets it joins
     assert 'dashed(RS_FILL_LAYERS).forEach(id=>map.setPaintProperty(id,"line-color",e))' in html
     assert "RS_PIECE_LAYERS" not in html and "tpieces" not in html
 
@@ -1085,8 +1085,8 @@ def test_a_tunnel_fill_has_an_opaque_underlay_so_the_casing_does_not_show_throug
     style = _style(render_edges(_tunnel_world(True), backend="web").html)
     ids = [l["id"] for l in style["layers"]]
     lay = {l["id"]: l for l in style["layers"]}
-    assert ids.index("roads-casing-lv-1-dash") < ids.index("roads-fill-lv-1-under") < ids.index("roads-fill-lv-1")
-    assert lay["roads-fill-lv-1-under"]["paint"]["line-color"].startswith("#") and lay["roads-fill-lv-1-under"]["layout"]["line-cap"] == "butt"
+    assert ids.index("roads-casing-lv1-dash") < ids.index("roads-fill-lv1-under") < ids.index("roads-fill-lv1")     # the tunnel's position: 1
+    assert lay["roads-fill-lv1-under"]["paint"]["line-color"].startswith("#") and lay["roads-fill-lv1-under"]["layout"]["line-cap"] == "butt"
     a, b = (18.000, 59.30), (18.002, 59.30)
     plain = [l["id"] for l in _style(render_edges(gpd.GeoDataFrame({"highway": ["primary"]}, geometry=[LineString([a, b])], crs=4326),
                                                   backend="web").html)["layers"]]
@@ -1266,7 +1266,7 @@ def test_compute_levels_on_the_bundled_sample():
     pytest.importorskip("scipy")
     s = rs.compute_levels(g, method="solve")
     info = s.attrs["levels_info"]
-    assert (info["pairs"], info["short_upper_pairs"]) == (336, 54)                  # 390 near pairs, 54 of them with an upper road shorter than 2 * head_m: not stack pairs
+    assert (info["pairs"], info["short_upper_pairs"]) == (245, 23)                  # 268 stack pairs, 23 of them with an upper road shorter than 2 * head_m (docs/design/level_input.md: roads of different bands that only meet take the order)
     under = [944, 4251, 2082, 2363]
     assert all(s.casing_level[207] > s.fill_level[i] for i in under)                # the bridge is over them, outline included
     assert s.attrs["levels_given_up"] == []                                         # nothing the solver tried is given up
@@ -1366,9 +1366,9 @@ def test_compute_levels_reversed_twin_has_its_heads_the_other_way_round():
     rows = [ground((18, 59), (18 + 2 * d, 59)), ground((18 + 2 * d, 59), (18, 59)),             # the road, both directions
             ground((18 - d, 59), (18, 59)),                                                      # a ground road meeting its start
             ground((18 + 2 * d, 59), (18 + 3 * d, 59))]                                          # a tunnel meeting its end
-    g = gpd.GeoDataFrame({"highway": ["residential"] * 4, "layer": [None, None, None, -1], "tunnel": [None, None, None, "yes"]},
-                         geometry=rows, crs=4326)
-    out = rs.compute_levels(g, method="solve")
+    g = gpd.GeoDataFrame({"highway": ["residential"] * 4, "layer": [None, None, None, -1], "tunnel": [None, None, None, "yes"],
+                          "band": [0, 0, 0, -1]}, geometry=rows, crs=4326)
+    out = rs.compute_levels(g, method="solve", band_col="band")             # the caller's bands: under its end even where they only meet
     assert (out.casing_start[0], out.casing_end[0]) == (0, -1)               # the road's end head meets the tunnel, so it is lower than its start head
     assert (out.casing_start[1], out.casing_end[1]) == (-1, 0)               # the reversed twin starts where the road ends: swapped
     assert out.casing_level[0] == out.casing_level[1] and out.fill_level[0] == out.fill_level[1]
@@ -1825,3 +1825,37 @@ def test_the_numpy_cutter_is_shapelys_substring():
         a = float(rng.uniform(0, cum[-1] * 0.7))
         b = float(rng.uniform(a + 1e-3, cum[-1]))
         assert np.allclose(_part(xy, cum, a, b), np.asarray(substring(LS(xy), a, b).coords), atol=1e-9)
+
+
+def test_level_input_and_solve_levels():
+    """docs/design/level_input.md (Kaveh 2026-10-06): roads of different bands that only meet (a tunnel mouth) take the priority order, roads
+    that cross take the band; with band_col the caller's bands decide everywhere; edits switch a pair off or add one; ids may name either
+    direction of a road."""
+    pytest.importorskip("scipy")
+    import pandas as pd
+
+    import roadstyle as rs
+    g = _edge_world()                                  # ground 11 - tunnel 12 - ground 14 in a line, street 13 crossing over the tunnel's middle
+    roads, pairs = rs.level_input(g)
+    assert list(roads["road"]) == ["11", "12", "14", "13"] and list(roads["band"]) == [0, -1, 0, 0]
+    rel = {(r.relation, r.a, r.b) for r in pairs.itertuples()}
+    assert {("order", "12", "11"), ("order", "12", "14"), ("stack", "13", "12")} <= rel           # mouths: priority; the crossing: band
+    assert not {("stack", "11", "12"), ("stack", "14", "12")} & rel
+    fl = dict(zip(roads["road"], rs.solve_levels(roads, pairs)["fill_level"], strict=True))
+    assert fl["12"] > fl["11"] and fl["12"] > fl["14"] and fl["13"] > fl["12"]                   # the tunnel over its mouths, under the crossing street
+    edits = pd.DataFrame([{"relation": "order", "a": "12", "b": "11", "enabled": "false"},           # switch the mouth's wish off ...
+                          {"relation": "stack", "a": "11", "b": "12", "enabled": "true"}])          # ... and put the ground road over the tunnel there
+    fl2 = dict(zip(roads["road"], rs.solve_levels(roads, pairs, edits=edits)["fill_level"], strict=True))
+    assert fl2["11"] > fl2["12"]
+    with pytest.raises(ValueError):
+        rs.solve_levels(roads, pairs, edits=pd.DataFrame([{"relation": "order", "a": "99", "b": "11", "enabled": "false"}]))
+    _, kept = rs.level_input(g.assign(band=[0, -1, 0, 0]), band_col="band")                          # the caller's bands: over / under everywhere
+    assert {("stack", "11", "12"), ("stack", "14", "12")} <= {(r.relation, r.a, r.b) for r in kept.itertuples()}
+
+
+def test_render_edges_takes_no_band_or_order():
+    """docs/design/level_input.md: the band and the order are inputs of the level step; the renderer only draws the levels it is given (or
+    computes them with the level step's defaults). Passing them is an error, not a silently ignored keyword."""
+    for k, v in (("band_col", "band"), ("order", "class")):
+        with pytest.raises(ValueError, match="compute the levels first"):
+            render_edges(_edges(), backend="web", **{k: v})

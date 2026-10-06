@@ -6,7 +6,16 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **The level step on its own** (`docs/design/level_input.md`): `rs.level_input(edges)` (the solver's input from any edges: `roads`, one row per road, and `pairs`,
+  `meet` / `stack` / `order`), `rs.solve_levels(roads, pairs, edits=...)`, and `scripts/level_input.py` / `scripts/solve_levels.py` writing `roads.parquet`, `pairs.csv`,
+  an `edits.csv` you own, and `levels.csv`. `compute_levels` is the two in one call.
+
 ### Changed
+- **Meet or cross:** roads of different bands that only meet (a tunnel mouth, a bridge end) follow the priority order; roads that cross keep the band. With `band_col`
+  the caller's bands decide everywhere. A short road on top keeps its pair on its fill (it was dropped). Monaco: tunnels on top at 223 of 350 mouths, every crossing right.
+- **`render_edges` takes no `band_col` and no `order`** (an error says to compute the levels first); without level columns it calls `compute_levels` with its defaults.
+  `compute_levels(order=...)` defaults to `"priority"`.
 - **The order where roads meet:** `compute_levels(order="priority")`, now the default of `render_edges`: where roads of one band meet, a roundabout's fill is over a tunnel's,
   a tunnel's over a bridge's, a bridge's over the road class (`junction_col`, default `junction`: `roundabout` or `circular`). The band is unchanged, so a road that crosses over a tunnel
   still covers it. `order="class"` keeps the road class alone.

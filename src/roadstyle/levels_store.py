@@ -11,7 +11,7 @@ COLS = ("casing_start", "casing_level", "casing_end", "fill_level")
 _PARAMS = ("method", "head_m", "band_dist", "margin", "max_level", "band_source", "order_source", "min_positions")
 
 
-def levels_params(method="solve", head_m=5.0, band_dist=10.0, margin=1.0, max_level=20, band_col=None, order=None, min_positions=True):
+def levels_params(method="solve", head_m=5.0, band_dist=10.0, margin=1.0, max_level=20, band_col=None, order="priority", min_positions=True):
     """The parameters that decide the numbers, as stored in the metadata. The names are those of ``compute_levels``; a band from the tags is ``"tags"``."""
     return {"method": method, "head_m": float(head_m), "band_dist": float(band_dist), "margin": float(margin), "max_level": int(max_level),
             "band_source": band_col or "tags", "order_source": order,

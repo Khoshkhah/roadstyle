@@ -113,39 +113,77 @@ def _difference_lp(cost, A, b, hi):
     return x if x.max() <= hi + 1e-9 else None
 
 
-def _solve_intervals(metres, ends, beta, omega, limit, band_dist, head_m, max_level, margin, min_positions=True):
-    """method="solve" on roads (one per segment, both directions together). Every road has one fill number ``b`` and a casing divided into a start head,
-    a main part and an end head (one number for a road shorter than ``2 * head_m``). Returns ``(parts, given_up, info)``: ``parts[r] = (a_start, a_main, a_end, b)``.
-    The model is a linear program solved on a sparse matrix with HiGHS (docs/design/levels_split_casing.md, section 7)."""
+def _relations(metres, ends, beta, omega, band_dist, mouths=True):
+    """The relations of the roads (docs/design/level_input.md): ``(meets, stacks, orders)``.
+    ``meets``: ``(x, x_end, y, y_end)`` for every two roads whose ends ``x_end`` / ``y_end`` ("start" / "end") are one node; ``stacks``: ``(upper, lower)``
+    for roads of different bands that cross or run within ``band_dist`` metres of each other away from a node they share; ``orders``: ``(higher, lower)``
+    by ``omega`` for roads that meet, of one band or of different bands that only meet (Kaveh 2026-10-06: at a tunnel mouth the priority decides,
+    where roads cross the band does). ``mouths`` False: roads of different bands are always a stack pair, as when the caller gives the bands
+    (``band_col``: a zebra crossing set over its street stays over it). ``metres``: the roads' lines in metres."""
+    import shapely
+    from shapely import STRtree
+
+    at = defaultdict(list)                                     # node -> [(road, end)]
+    for r, (s, t) in enumerate(ends):
+        at[s].append((r, "start"))
+        at[t].append((r, "end"))
+    meets, shared = [], defaultdict(set)                        # shared[(x, y)]: the nodes the two roads share
+    for v, here in at.items():
+        for i, (x, ex) in enumerate(here):
+            for y, ey in here[i + 1:]:
+                if x != y:
+                    meets.append((x, ex, y, ey) if x < y else (y, ey, x, ex))
+                    shared[(min(x, y), max(x, y))].add(v)
+    node_at = {}
+    for r, (s, t) in enumerate(ends):
+        node_at.setdefault(s, shapely.get_point(metres[r], 0))
+        node_at.setdefault(t, shapely.get_point(metres[r], -1))
+    near = set()
+    if len(set(beta)) > 1:
+        qi, ti = STRtree(metres).query(metres, predicate="dwithin", distance=band_dist)
+        near = {(i, j) for i, j in zip(qi.tolist(), ti.tolist(), strict=True) if i < j and beta[i] != beta[j]}
+    stacks, only_meet = [], set()
+    for i, j in sorted(near):
+        if mouths and (i, j) in shared:                        # they meet: a stack pair only if they are near away from the junction(s)
+            hole = shapely.union_all([node_at[v].buffer(band_dist) for v in shared[(i, j)]])
+            a, b = metres[i].difference(hole), metres[j].difference(hole)
+            if a.is_empty or b.is_empty or a.distance(b) > band_dist:
+                only_meet.add((i, j))
+                continue
+        stacks.append((i, j) if beta[i] > beta[j] else (j, i))
+    orders = []
+    if omega is not None:
+        for x, y in sorted(shared):
+            if omega[x] is None or omega[y] is None or omega[x] == omega[y]:
+                continue
+            if beta[x] == beta[y] or (x, y) in only_meet:
+                orders.append((x, y) if omega[x] > omega[y] else (y, x))
+    return meets, stacks, orders
+
+
+def _solve_intervals(metres, meets, stacks, orders, limit, head_m, max_level, margin, min_positions=True):
+    """The solver on roads (one per segment, both directions together) and their relations (:func:`_relations`, or a pairs table). Every road has
+    one fill number ``b`` and a casing divided into a start head, a main part and an end head (one number for a road shorter than ``2 * head_m``).
+    Returns ``(parts, given_up, info)``: ``parts[r] = (a_start, a_main, a_end, b)``. The model is a linear program solved on a sparse matrix with
+    HiGHS (docs/design/levels_split_casing.md, section 7)."""
     import time
     from types import SimpleNamespace
 
     import numpy as np
     import scipy.sparse as sp
     from scipy.optimize import linprog
-    from shapely import STRtree
     t0, n = time.time(), len(metres)
     zero = [(0, 0, 0, 0)] * n
     import shapely
     long_ = (shapely.length(np.asarray(metres, dtype=object)) >= 2 * head_m).tolist()
-    at = defaultdict(set)
-    for r, (s, t) in enumerate(ends):
-        at[s].add(r), at[t].add(r)
-    # stack pairs (upper, lower): roads within band_dist of each other whose bands differ (a crossing and a meeting are both at distance 0)
-    pairs = set()
-    if len(set(beta)) > 1:
-        qi, ti = STRtree(metres).query(metres, predicate="dwithin", distance=band_dist)
-        for i, j in zip(qi.tolist(), ti.tolist(), strict=True):
-            if i < j and beta[i] != beta[j]:
-                pairs.add((i, j) if beta[i] > beta[j] else (j, i))
-    pair_list = sorted(p for p in pairs if long_[p[0]])        # a short upper road has no main part: its pairs are not stack pairs (docs/design/levels_split_casing.md, section 6)
-    short_upper = len(pairs) - len(pair_list)
-    info = {"pairs": len(pair_list), "roads": n, "short_roads": long_.count(False), "short_upper_pairs": short_upper}
-    if not pair_list and omega is None:
-        return zero, [], {**info, "pairs": 0, "solves": 0, "seconds": 0.0}      # no pair, no order: all zero is the optimum
-    J = sorted({(x, y) for rs in at.values() for x in rs for y in rs if x < y})              # roads that share an end node
-    O = [(x, y) if omega[x] > omega[y] else (y, x) for x, y in J
-         if omega is not None and omega[x] is not None and omega[y] is not None and beta[x] == beta[y] and omega[x] != omega[y]]
+    pair_list = sorted(set(stacks))
+    # a short upper road has no main part, its one casing number meets the roads at both ends (docs/design/levels_split_casing.md, section 6): its
+    # pair puts its FILL after the lower road's fill, not its casing (Kaveh 2026-10-06: short ground pieces over a tunnel were drawn level with it)
+    short_upper = sum(not long_[u] for u, _ in pair_list)
+    info = {"pairs": len(pair_list) - short_upper, "roads": n, "short_roads": long_.count(False), "short_upper_pairs": short_upper, "meets": len(meets)}
+    O = sorted(set(orders))
+    if not pair_list and not O:
+        return zero, [], {**info, "pairs": 0, "order_pairs": 0, "order_violations": 0, "solves": 0, "seconds": 0.0}      # no pair, no order: all zero is the optimum
 
     # variables: b_r = column r; then the casing parts (three for a long road, one for a short road); the slacks of the stages 1-3 come after
     part, ncol, casing = [], n, []                             # part[r]: "s" / "m" / "e" -> column; casing: (road, column) of every casing part
@@ -166,16 +204,9 @@ def _solve_intervals(metres, ends, beta, omega, limit, band_dist, head_m, max_le
         rhs.append(c)
     for r, v in casing:
         le([(v, 1.0), (r, -1.0)], 0.0)                         # H1: a_c <= b_road(c)
-    for v, rs in at.items():                                   # H2: every pair that meets at the node v
-        rs = sorted(rs)
-        for i, x in enumerate(rs):
-            for y in rs[i + 1:]:
-                for p, node in (("s", ends[x][0]), ("e", ends[x][1])):
-                    if node == v:
-                        le([(part[x][p], 1.0), (y, -1.0)], 0.0)
-                for p, node in (("s", ends[y][0]), ("e", ends[y][1])):
-                    if node == v:
-                        le([(part[y][p], 1.0), (x, -1.0)], 0.0)
+    for x, ex, y, ey in meets:                                 # H2: the heads of two roads that meet are each under the other's fill
+        le([(part[x]["s" if ex == "start" else "e"], 1.0), (y, -1.0)], 0.0)
+        le([(part[y]["s" if ey == "start" else "e"], 1.0), (x, -1.0)], 0.0)
     if min_positions:                                          # section 7.3.1: H above and L below every number; the span H - L is in the cost
         H, Lo, first_nv = ncol, ncol + 1, ncol
         for v in range(first_nv):
@@ -184,7 +215,7 @@ def _solve_intervals(metres, ends, beta, omega, limit, band_dist, head_m, max_le
         ncol += 2
     base = len(rhs)
     for u, l in pair_list:
-        le([(l, 1.0), (part[u]["m"], -1.0)], -margin)         # H3: b_l + margin <= a_(u, main)
+        le([(l, 1.0), (part[u]["m"] if long_[u] else u, -1.0)], -margin)    # H3: b_l + margin <= a_(u, main); a short upper road: <= b_u
     for x, y in O:
         le([(y, 1.0), (x, -1.0)], -margin)                     # H4: b_y + margin <= b_x
     nrow, nP, nO = len(rhs), len(pair_list), len(O)
@@ -244,8 +275,132 @@ def _solve_intervals(metres, ends, beta, omega, limit, band_dist, head_m, max_le
     return parts, gu, {**info, "order_pairs": nO, "order_violations": violated, "solves": solves, "solver": how, "status": "OPTIMAL", "seconds": round(time.time() - t0, 1)}
 
 
+def _road_split(g):
+    """Both directions of a segment are one road: ``(ends, first, rid, same)``: the end nodes of every row (exact equality of the end points),
+    the first row of every road, the road of every row, and whether a row runs the same way as its road's first row."""
+    import numpy as np
+    import shapely
+    geoms = np.asarray(g.geometry.values, dtype=object)
+    xy, gi = shapely.get_coordinates(geoms, return_index=True)
+    cnt = np.bincount(gi, minlength=len(geoms))
+    if (cnt < 2).any():
+        raise ValueError(f"compute_levels: every edge needs a line of at least two points; rows {list(g.index[cnt < 2][:5])} have not")
+    off = np.r_[0, np.cumsum(cnt)]
+    _, node = np.unique(np.vstack([xy[off[:-1]], xy[off[1:] - 1]]), axis=0, return_inverse=True)
+    node = node.ravel()
+    ends = list(zip(node[:len(geoms)].tolist(), node[len(geoms):].tolist(), strict=True))
+    fwd = [xy[off[i]:off[i + 1]].tobytes() for i in range(len(geoms))]
+    rev = [xy[off[i]:off[i + 1]][::-1].tobytes() for i in range(len(geoms))]
+    road, first = {}, []
+    for i, k in enumerate((frozenset(e), min(f, r)) for e, f, r in zip(ends, fwd, rev, strict=True)):
+        if k not in road:
+            road[k] = len(first)
+            first.append(i)
+    rid = [road[(frozenset(e), min(f, r))] for e, f, r in zip(ends, fwd, rev, strict=True)]
+    same = [fwd[i] == fwd[first[rid[i]]] for i in range(len(geoms))]
+    return ends, first, rid, same
+
+
+def _metres(geoseries):
+    return geoseries.to_crs(geoseries.estimate_utm_crs()) if geoseries.crs is not None and geoseries.crs.is_geographic else geoseries
+
+
+def level_input(edges, id_col="edge_id", layer_col="layer", bridge_col="bridge", tunnel_col="tunnel", band_col=None, order="priority",
+                highway_col="highway", junction_col="junction", band_dist=10.0):
+    """The solver's input (docs/design/level_input.md), from any edges roadstyle draws: ``(roads, pairs)``.
+
+    ``roads``: one row per road (both directions of a segment together): ``road`` (the ``id_col`` of its first edge, as text; the row number
+    without ``id_col``), ``edges`` / ``reversed`` (the ids of its edges in its own direction / the other way), ``band`` (``band_col``, else the
+    level from the tags), ``priority`` (the ``order``: ``"priority"``, ``"class"``, a column of numbers, or None) and the geometry of its first
+    edge. ``pairs``: one row per relation, ``relation`` / ``a`` / ``b`` / ``a_end`` / ``b_end``: ``meet`` (the end ``a_end`` of ``a`` is the end
+    ``b_end`` of ``b``), ``stack`` (``a`` is over ``b``: different bands, crossing or near away from a shared node) and ``order`` (``a``'s fill
+    after ``b``'s where they meet: one band, or different bands that only meet). With ``band_col`` the caller's bands decide over and under
+    everywhere: roads of different bands are a stack pair even where they only meet (a zebra crossing set over its street stays over it)."""
+    import geopandas as gpd
+    import pandas as pd
+    g = edges
+    ends, first, rid, same = _road_split(g)
+    ids = [str(v) for v in g[id_col]] if id_col and id_col in g.columns else [str(i) for i in range(len(g))]
+    head = g.iloc[first]
+    if band_col:
+        beta = pd.to_numeric(head[band_col], errors="coerce").fillna(0).round().astype(int).tolist()
+    else:
+        beta = [_level(r, layer_col, bridge_col, tunnel_col) for r in head.to_dict("records")]
+    omega = None
+    if order in ("class", "priority"):                         # a road with no class takes no part in the order: no wish for it (None)
+        z = {h: _class_order(h) for h in head[highway_col].dropna().unique()}
+        omega = [None if pd.isna(h) else z[h] for h in head[highway_col]]
+        if order == "priority":
+            omega = [None if w is None else w + _TIER * _tier(r, junction_col, bridge_col, tunnel_col)
+                     for w, r in zip(omega, head.to_dict("records"), strict=True)]
+    elif order:
+        omega = [None if pd.isna(v) else float(v) for v in pd.to_numeric(head[order], errors="coerce")]
+    re_ = [ends[i] for i in first]
+    meets, stacks, orders = _relations(list(_metres(head.geometry)), re_, beta, omega, band_dist, mouths=not band_col)
+    name = [ids[i] for i in first]
+    mine = [[] for _ in first], [[] for _ in first]
+    for i, r in enumerate(rid):
+        mine[0 if same[i] else 1][r].append(ids[i])
+    roads = gpd.GeoDataFrame({"road": name, "edges": mine[0], "reversed": mine[1], "band": beta,
+                              "priority": omega if omega is not None else [None] * len(first)}, geometry=list(head.geometry), crs=g.crs)
+    rows = ([("meet", name[x], name[y], ex, ey) for x, ex, y, ey in meets] + [("stack", name[u], name[l], None, None) for u, l in stacks]
+            + [("order", name[x], name[y], None, None) for x, y in orders])
+    return roads, pd.DataFrame(rows, columns=["relation", "a", "b", "a_end", "b_end"])
+
+
+def _read_pairs(pairs):
+    import pandas as pd
+    t = pd.read_csv(pairs, dtype=str, keep_default_na=False) if isinstance(pairs, (str, bytes)) or hasattr(pairs, "__fspath__") else pairs.copy()
+    for c in ("a", "b", "a_end", "b_end"):
+        t[c] = [None if v is None or (isinstance(v, float) and v != v) or v == "" else str(v) for v in t[c]] if c in t else None
+    return t
+
+
+def solve_levels(roads, pairs, edits=None, head_m=5.0, max_level=20, margin=1.0, time_limit=60.0, min_positions=True):
+    """Solve the drawing levels of ``roads`` from their ``pairs`` (both from :func:`level_input`, or read back from ``roads.parquet`` /
+    ``pairs.csv``) and the caller's ``edits`` (a table or a CSV with the columns of ``pairs`` and ``enabled``: a row with ``enabled`` false
+    switches off the same relation of ``pairs``, any other row is added; ``a`` / ``b`` may name any edge of a road). Returns ``roads`` with
+    ``casing_start``, ``casing_level``, ``casing_end`` and ``fill_level`` (in the road's own direction); ``attrs["levels_given_up"]`` (the
+    stack pairs that could not be kept, as road ids) and ``attrs["levels_info"]``."""
+    t = _read_pairs(pairs)
+    of = {}
+    for i, r in enumerate(roads.itertuples()):
+        for e in [r.road, *list(r.edges), *list(r.reversed)]:
+            of[str(e)] = i
+    def key(row):
+        return (row["relation"], row["a"], row["b"], row["a_end"] if row["relation"] == "meet" else None, row["b_end"] if row["relation"] == "meet" else None)
+    rel = {key(row): row for row in t.to_dict("records")}
+    if edits is not None:
+        for row in _read_pairs(edits).to_dict("records"):
+            for c in ("a", "b"):
+                if row[c] not in of:
+                    raise ValueError(f"edits: {row[c]!r} is not an edge of the roads")
+                row[c] = roads["road"].iat[of[row[c]]]
+            if str(row.get("enabled", "")).strip().lower() in ("false", "0", "no"):
+                if rel.pop(key(row), None) is None:
+                    raise ValueError(f"edits: no {row['relation']} pair {row['a']} {row['b']} to switch off")
+            else:
+                rel[key(row)] = row
+    idx = {r: i for i, r in enumerate(roads["road"])}
+    meets = [(idx[r["a"]], r["a_end"], idx[r["b"]], r["b_end"]) for r in rel.values() if r["relation"] == "meet"]
+    stacks = [(idx[r["a"]], idx[r["b"]]) for r in rel.values() if r["relation"] == "stack"]
+    orders = [(idx[r["a"]], idx[r["b"]]) for r in rel.values() if r["relation"] == "order"]
+    iv, given, info = _solve_intervals(list(_metres(roads.geometry)), meets, stacks, orders, time_limit, head_m, max_level, margin, min_positions)
+    counts = defaultdict(int)                                  # the solution can sit at any height: the main casing number most edges have becomes 0 (the ground)
+    for r, row in enumerate(roads.itertuples()):
+        counts[iv[r][1]] += len(row.edges) + len(row.reversed)
+    ground = max(counts, key=lambda v: (counts[v], -v))
+    iv = [tuple(x - ground for x in p) for p in iv]
+    cm = _compress([v for p in iv for v in p])
+    out = roads.copy()
+    out["casing_start"], out["casing_level"], out["casing_end"], out["fill_level"] = ([cm[p[k]] for p in iv] for k in range(4))
+    out.attrs["levels_given_up"] = [(roads["road"].iat[u], roads["road"].iat[l]) for u, l in given]
+    out.attrs["levels_info"] = info
+    return out
+
+
 def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tunnel",
-                   method="solve", band_col=None, order=None, highway_col="highway", junction_col="junction", band_dist=10.0, head_m=5.0, max_level=20, margin=1.0, time_limit=60.0, min_positions=True):
+                   method="solve", band_col=None, order="priority", highway_col="highway", junction_col="junction", band_dist=10.0, head_m=5.0, max_level=20, margin=1.0, time_limit=60.0, min_positions=True):
     """A copy of ``edges`` with the drawing-order columns ``casing_start``, ``casing_level`` (the main part), ``casing_end`` and ``fill_level``;
     ``render_edges(casing_level_col=..., fill_level_col=...)`` draws by the last two (the heads are not drawn yet).
 
@@ -267,67 +422,24 @@ def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tu
     ponytail: tags method ignores crossings without tags and band / order; solve method does not cut a road at the place where it changes level."""
     if method not in ("tags", "solve"):
         raise ValueError(f"compute_levels: method must be 'tags' or 'solve', not {method!r}")
-    if method == "tags" and (band_col or order):
+    if method == "tags" and (band_col or order not in (None, "priority")):           # the default order is no request: tags has none
         raise ValueError("compute_levels: band_col and order are part of the optimization problem; use method='solve'")
     if method == "solve" and not (margin > 0 and max_level > 0):
         raise ValueError(f"compute_levels: margin and max_level must be greater than 0, not {margin!r} and {max_level!r}")
-    import numpy as np
-    import shapely
     g = edges.copy()
-    geoms = np.asarray(g.geometry.values, dtype=object)
-    xy, gi = shapely.get_coordinates(geoms, return_index=True)
-    cnt = np.bincount(gi, minlength=len(geoms))
-    if (cnt < 2).any():
-        raise ValueError(f"compute_levels: every edge needs a line of at least two points; rows {list(g.index[cnt < 2][:5])} have not")
-    off = np.r_[0, np.cumsum(cnt)]
-    _, node = np.unique(np.vstack([xy[off[:-1]], xy[off[1:] - 1]]), axis=0, return_inverse=True)      # the end points of every edge, by exact equality, as node numbers
-    node = node.ravel()
-    ends = list(zip(node[:len(geoms)].tolist(), node[len(geoms):].tolist(), strict=True))
+    ends, _, rid, same = _road_split(g)
     if method == "tags":
         lv = [_level(r, layer_col, bridge_col, tunnel_col) for r in g.to_dict("records")]
         pos = [(c, c, c, f) for c, f in _tag_intervals(ends, lv)]
     else:
-        import pandas as pd
-        fwd = [xy[off[i]:off[i + 1]].tobytes() for i in range(len(geoms))]
-        rev = [xy[off[i]:off[i + 1]][::-1].tobytes() for i in range(len(geoms))]
-        key = [(frozenset(e), min(f, r)) for e, f, r in zip(ends, fwd, rev, strict=True)]     # both directions of a segment are one road
-        road, first = {}, []
-        for i, k in enumerate(key):
-            if k not in road:
-                road[k] = len(first)
-                first.append(i)
-        rid = [road[k] for k in key]
-        head = g.iloc[first]
-        if band_col:
-            beta = pd.to_numeric(head[band_col], errors="coerce").fillna(0).round().astype(int).tolist()
-        else:
-            beta = [_level(r, layer_col, bridge_col, tunnel_col) for r in head.to_dict("records")]
-        omega = None
-        if order in ("class", "priority"):                     # a road with no class takes no part in the order: no wish for it (None)
-            z = {h: _class_order(h) for h in head[highway_col].dropna().unique()}
-            omega = [None if pd.isna(h) else z[h] for h in head[highway_col]]
-            if order == "priority":
-                omega = [None if w is None else w + _TIER * _tier(r, junction_col, bridge_col, tunnel_col)
-                         for w, r in zip(omega, head.to_dict("records"), strict=True)]
-        elif order:
-            omega = [None if pd.isna(v) else float(v) for v in pd.to_numeric(head[order], errors="coerce")]
-        gm = g.geometry
-        if g.crs is not None and g.crs.is_geographic:
-            gm = g.to_crs(g.estimate_utm_crs()).geometry
-        rm, re_ = list(gm.iloc[first]), [ends[i] for i in first]
-        iv, given, info = _solve_intervals(rm, re_, beta, omega, time_limit, band_dist, head_m, max_level, margin, min_positions)
-        counts = defaultdict(int)                              # the solution can sit at any height: the main casing number most rows have becomes 0 (the ground)
-        for r in rid:
-            counts[iv[r][1]] += 1
-        ground = max(counts, key=lambda v: (counts[v], -v))
-        iv = [tuple(x - ground for x in p) for p in iv]
-        cm = _compress([v for p in iv for v in p])
-        pos = [tuple(cm[x] for x in iv[r]) for r in rid]
-        for i in range(len(pos)):                              # the numbers belong to the road's first edge: the reversed direction has its heads the other way round
-            if fwd[i] != fwd[first[rid[i]]]:
-                pos[i] = (pos[i][2], pos[i][1], pos[i][0], pos[i][3])
-        g.attrs["levels_given_up"] = [(first[u], first[l]) for u, l in given]
-        g.attrs["levels_info"] = info
+        roads, pairs = level_input(g, id_col=None, layer_col=layer_col, bridge_col=bridge_col, tunnel_col=tunnel_col, band_col=band_col,
+                                   order=order, highway_col=highway_col, junction_col=junction_col, band_dist=band_dist)
+        out = solve_levels(roads, pairs, head_m=head_m, max_level=max_level, margin=margin, time_limit=time_limit, min_positions=min_positions)
+        lv = out[["casing_start", "casing_level", "casing_end", "fill_level"]].to_numpy().tolist()
+        pos = [tuple(lv[r]) if same[i] else (lv[r][2], lv[r][1], lv[r][0], lv[r][3]) for i, r in enumerate(rid)]   # the other direction: heads swapped
+        given = out.attrs["levels_given_up"]
+        g.attrs["levels_given_up"] = [(int(u), int(l)) for u, l in given]
+        g.attrs["levels_info"] = out.attrs["levels_info"]
         if given:
             warnings.warn(f"compute_levels: {len(given)} stack pair(s) could not be satisfied; see result.attrs['levels_given_up']", stacklevel=2)
     g["casing_start"], g["casing_level"], g["casing_end"], g["fill_level"] = ([p[i] for p in pos] for i in (0, 1, 2, 3))

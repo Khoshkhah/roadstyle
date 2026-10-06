@@ -49,6 +49,9 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | `use_settings(*sources)` | | apply settings (path or dict) for the process; no argument drops them |
 | `Overlay` | | an extra layer for the web backend ([below](#overlay)) |
 | **Helpers** | | |
+| `compute_levels(edges, band_col=None, order="priority", ...)` | edges + 4 columns | the level step in one call: `casing_start`, `casing_level`, `casing_end`, `fill_level` ([design](../design/level_input.md)) |
+| `level_input(edges, id_col="edge_id", ...)` | `(roads, pairs)` | the solver's input from any edges: one row per road, one row per relation (`meet`, `stack`, `order`) |
+| `solve_levels(roads, pairs, edits=None, ...)` | roads + 4 columns | the solver; `edits` switch pairs off or add them |
 | `resolve(highway, palette, tunnel, bridge)` | `ResolvedStyle` | one edge's resolved style |
 | `base_style(highway, palette="highsat")` | `RoadStyle` | the palette entry for a class |
 | `selection_style(base_width=4.0)` | `dict` | the selection profile scaled to a width |
@@ -156,11 +159,10 @@ Returns a `WebMap` (web, `.save()`), a `folium.Map` (`.save()`) or a `lonboard.M
 | `highway_col` | `"highway"` | all | the road-class column (widths, casing, draw order) |
 | `tunnel_col` / `bridge_col` | `"tunnel"` / `"bridge"` | all | tunnels draw under (faded, two-tone dashed casing), bridges on top |
 | `layer_col` | `"layer"` | web | OSM `layer`; negative sinks an edge when there is no tunnel/bridge column |
-| `band_col` | `None` | web | a column of integers, the **band** of an edge for the solver that computes the positions (a sidewalk -1 under its street, a crossing 1 over it); null = the level from the tags. Ignored when the level columns are given |
 | `casing_start_col` / `casing_end_col` / `head_m` | `None` / `None` / `5.0` | web | with the level columns: the casing is divided into a start head, a main part and an end head. The two columns hold the casing numbers of the heads (the main number is `casing_level_col`); `head_m` is the length of each head in metres. An edge at least `2 · head_m` long whose three numbers differ is drawn as three casing pieces, each at its own number; the fill stays one line ([design](../design/levels_split_casing.md#9-the-renderer)) |
 | `road_fill` | `True` | web | `False`: draw the casing of each road but not its fill (the fill layers stay, invisible, for clicks); the items attached with `Overlay(edge_col=...)` are the fill |
 | `edge_id_col` | `"edge_id"` | web | the column with the id of each edge, the ids that an overlay's `edge_col` refers to |
-| `casing_level_col` / `fill_level_col` | `None` | web | two integer columns: the position in the drawing order of an edge's casing and of its fill (0 = ground); at each position casings first, then fills; one layer pair per position; the position alone decides (a bridge too). Not given: `render_edges` computes them with `rs.compute_levels(edges, method="solve", order="priority")` (where roads of one band meet: roundabouts over tunnels over bridges over the class order) ([guide](../guides/levels.md)) |
+| `casing_level_col` / `fill_level_col` | `None` | web | two integer columns: the position in the drawing order of an edge's casing and of its fill (0 = ground); at each position casings first, then fills; one layer pair per position; the position alone decides (a bridge too). Not given: `render_edges` computes them with `rs.compute_levels(edges)` and its defaults; `render_edges` takes no `band_col` or `order` (the level step: [guide](../guides/levels.md), [design](../design/level_input.md)) |
 | `cap_col` | `None` | web | a column of true / false: true draws the edge with square ends (butt caps) instead of round ones, for a road drawn in pieces that meet without a ring; null / false = round ends |
 | `width_m_col` | `None` | web | a column of widths in metres (a lane, a road with a `width` tag, a canal): from `width_m_zoom` on the line is drawn exactly that wide, its casing inside; null = the class width |
 | `width_m_zoom` | `16` | web | the zoom from which `width_m_col` widths apply; below it, the class widths (so a narrow line doesn't vanish zoomed out) |

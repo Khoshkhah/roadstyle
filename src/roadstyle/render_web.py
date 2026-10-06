@@ -696,20 +696,10 @@ def _casing_parts(geo, head_m, cols):
     return out
 
 
-def _mark_order(geo, band_col, cap_col=None):
-    """``__rs_band`` (-1 / 1, a bridge keeps its own) from the caller's ``band_col``, and ``__rs_cap`` from ``cap_col``
-    (docs/design/square_ends.md). Nothing baked for a null value."""
-    def num(v):
-        try:
-            v = float(v)
-        except (TypeError, ValueError):
-            return None
-        return None if math.isnan(v) else v
+def _mark_caps(geo, cap_col=None):
+    """``__rs_cap`` from ``cap_col`` (docs/design/square_ends.md). Nothing baked for a null value."""
     for ft in geo["features"]:
         p = ft["properties"]
-        b = num(p.get(band_col)) if band_col else None
-        if b is not None and not p["__rs_bridge"]:
-            p["__rs_band"] = (b > 0) - (b < 0)
         if cap_col and _truthy(p.get(cap_col)):
             p["__rs_cap"] = True
 
@@ -723,7 +713,7 @@ def _twin_ends(geo, cols):
     prop comes twice, the first twin's and the second's (``<prop>__b``): a cap draws only where the
     two lanes have the same colour, so a map coloured per direction never shows one direction's
     colour at a street's end. Where another road is drawn in a lower band at the end point (a
-    tunnel mouth, a low road, a sidewalk moved by band_col) the cap is fill only
+    tunnel mouth, a low road, a sidewalk moved by its band) the cap is fill only
     (``__rs_nocase``): its casing ring would cross that road, which draws under it."""
 
     keys, where, at = [], collections.defaultdict(list), collections.defaultdict(list)
@@ -1326,7 +1316,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
-           edge_id_col: str = "edge_id", road_fill: bool = True, band_col: str = None, cap_col: str = None, casing_level_col: str = None, fill_level_col: str = None, casing_start_col: str = None, casing_end_col: str = None, head_m: float = 5.0, directed_col: str = None,
+           edge_id_col: str = "edge_id", road_fill: bool = True, cap_col: str = None, casing_level_col: str = None, fill_level_col: str = None, casing_start_col: str = None, casing_end_col: str = None, head_m: float = 5.0, directed_col: str = None,
            width_m_col: str = None, width_m_zoom: float = 16, casing_m: float = 0.15,
            pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
@@ -1342,9 +1332,10 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
 
     Every edge is drawn by two **positions**, the number where its casing is drawn and the number where its fill is drawn
     (docs/design/levels_split_casing.md): lowest first, at each position all casings before all fills. Without level columns
-    they are computed here by ``compute_levels(method="solve", order="priority")`` from the ``tunnel`` / ``bridge`` / ``layer``
-    columns (``tunnel_col`` / ``bridge_col`` / ``layer_col``), the road class and the geometry; ``band_col`` (integers) gives the
-    solver the band of an edge instead of the tags. Needs scipy. ``casing_level_col`` / ``fill_level_col`` (and
+    they are computed here by ``compute_levels(method="solve")`` with its defaults (bands from the ``tunnel`` / ``bridge`` / ``layer``
+    columns, the priority order). The renderer takes no band and no order (docs/design/level_input.md): to give them, compute the levels
+    first (``compute_levels(edges, band_col=..., order=...)``, or ``level_input`` + ``solve_levels``) and pass the columns. Needs scipy.
+    ``casing_level_col`` / ``fill_level_col`` (and
     ``casing_start_col`` / ``casing_end_col``, ``head_m``) name columns you computed yourself, with ``compute_levels`` or
     anything else, and draw them as they are. Null = 0. A bridge keeps its look (heavier casing), a tunnel its look (faded, dashed).
     ``cap_col`` names a column: a true value draws that edge's casing and fill with **square** ends
@@ -1426,11 +1417,15 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         popup_on, popup_fields = True, None
     else:
         popup_on, popup_fields = True, list(road_popup)
+    for k in ("band_col", "order"):                     # inputs of the level step, not of the drawing (docs/design/level_input.md)
+        if k in _ignore:
+            raise ValueError(f"render_edges takes no {k}: compute the levels first (rs.compute_levels(edges, {k}=...), or rs.level_input + "
+                             "rs.solve_levels) and pass casing_level_col / fill_level_col / casing_start_col / casing_end_col")
     g = gdf.to_crs(4326)
-    if not (casing_level_col or fill_level_col):       # the only way of drawing: positions, computed here when not given
+    if not (casing_level_col or fill_level_col):       # the only way of drawing: positions, computed here with the level step's defaults
         from .levels import compute_levels
         g = compute_levels(g, layer_col=layer_col, bridge_col=bridge_col, tunnel_col=tunnel_col, method="solve",
-                           band_col=band_col, order="priority", highway_col=highway_col, head_m=head_m)
+                           highway_col=highway_col, head_m=head_m)
         casing_level_col, fill_level_col = "casing_level", "fill_level"
         casing_start_col, casing_end_col = "casing_start", "casing_end"
 
@@ -1464,7 +1459,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                                 "prop": "__rs_fill", "legend": rf.legend}]
     _mark_twoway(geo, directed_col)
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
-    _mark_order(geo, band_col, cap_col)
+    _mark_caps(geo, cap_col)
     levels = _mark_levels(geo, casing_level_col, fill_level_col, casing_start_col, casing_end_col) if (casing_level_col or fill_level_col) else None
     _mark_tunnel_dash(geo, CONFIG.tunnel_gap_shade, CONFIG.tunnel_dash_shade)
     if width_m_col:
@@ -1548,9 +1543,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     # sublayers and data (the tunnel's two-tone casing and light dashes, the bridge's deck casing), never another rule.
     lv = ["coalesce", ["get", "lvl"], 0]
     is_t, is_b = ["to-boolean", ["get", "__rs_tunnel"]], ["to-boolean", ["get", "__rs_bridge"]]
-    # a caller's band_col moves an edge between the low / ground / high bands (_mark_order);
-    # without it the expressions stay exactly as they were
-    auto = band_col or any(ft["properties"].get("__rs_band") is not None for ft in geo["features"])
+    # the bands come from the levels (position mode bakes __rs_band 0); the renderer takes no band_col (docs/design/level_input.md)
+    auto = any(ft["properties"].get("__rs_band") is not None for ft in geo["features"])
     bd = ["coalesce", ["get", "__rs_band"], ["case", ["<", lv, 0], -1, [">", lv, 0], 1, 0]] if auto else lv
     any_tunnel = any(ft["properties"].get("__rs_tunnel") for ft in geo["features"])
     surface = ["==", bd, 0]
