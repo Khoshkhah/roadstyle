@@ -70,6 +70,9 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
 #lv .row .what{flex:1;min-width:0} #lv .row .txt{overflow-wrap:anywhere}
 #lv .row .off{text-decoration:line-through;color:var(--lv-mute)}
 #lv .chip{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:5px;padding:1px 6px;background:#eef1f6;color:#3b4252}
+#lv .gu-parts{display:flex;gap:3px;margin-top:3px;font-size:11px;color:var(--lv-mute);align-items:center;flex-wrap:wrap}
+#lv .gu-parts b{font-weight:600;border-radius:4px;padding:0 5px;background:#eef1f6;color:#3b4252;font-variant-numeric:tabular-nums}
+#lv .gu-parts b.bad{background:#ffe3e3;color:var(--lv-bad)}
 #lv .tag{font-size:10.5px;font-weight:600;border-radius:999px;padding:0 7px;color:#fff;background:var(--c)}
 #lv .act{flex:none;font:12px system-ui;border:1px solid var(--lv-line);background:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;color:#3b4252}
 #lv .act:hover{border-color:var(--lv-bad);color:var(--lv-bad)}
@@ -105,7 +108,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   <button id="lv-toggle" title="Hide the panel">›</button>
   <header><div class="t">Level editor</div><div class="area" id="lv-area"></div><div class="stats" id="lv-stats"></div>
     <div class="find"><input id="lv-find" type="search" placeholder="Find a road: edge id or edge_ref" autocomplete="off"><div id="lv-hits" hidden></div></div></header>
-  <nav class="tabs" id="lv-tabs"><button data-t="edit" class="on">Edit</button><button data-t="history">History<span class="cnt" id="lv-hist-n">0</span></button></nav>
+  <nav class="tabs" id="lv-tabs"><button data-t="edit" class="on">Edit</button><button data-t="history">History<span class="cnt" id="lv-hist-n">0</span></button><button data-t="given">Given up<span class="cnt" id="lv-gu-n" style="background:var(--lv-bad);color:#fff">0</span></button></nav>
   <div class="scroll" data-tab="edit">
     <section id="lv-queue-sec" hidden><h2>Waiting to apply <span style="text-transform:none;letter-spacing:0;font-weight:500">not solved, not saved yet</span></h2>
       <div id="lv-queue"></div>
@@ -132,6 +135,11 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   <div class="scroll" data-tab="history" hidden>
     <section><h2>Already in edits.csv <span style="text-transform:none;letter-spacing:0;font-weight:500">before this session</span></h2>
       <div class="desc" style="margin-top:0">Click a row to show its two roads; delete puts it in the list to apply.</div><div id="lv-saved"></div></section>
+  </div>
+  <div class="scroll" data-tab="given" hidden>
+    <section><h2>Given up by the solver <span style="text-transform:none;letter-spacing:0;font-weight:500">a flaw on the map each</span></h2>
+      <div class="desc" style="margin-top:0">Crossing pairs (A over B) the solver could not keep, because of the joins around them: the parts of A's casing
+        at or under B's fill are red. Click one to open the pair, then switch off or add a part, or change a join nearby.</div><div id="lv-given"></div></section>
   </div>
   <div id="lv-toast"></div>
 </aside>
@@ -164,7 +172,8 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     document.querySelectorAll("#lv [data-tab]").forEach(d => d.hidden = d.dataset.tab !== t); }
   document.querySelectorAll("#lv-tabs button").forEach(b => b.onclick = () => tab(b.dataset.t));
   $("lv-stats").innerHTML = [["order wishes", STATS.order_pairs], ["not kept", STATS.order_violations || 0], ["stack pairs", STATS.pairs || 0],
-    ["given up", STATS.given_up.length]].map(([k, v]) => `<span class="stat"><b>${v}</b> ${k}</span>`).join("");
+    ["given up", STATS.given_up.length]].map(([k, v]) => `<span class="stat"${k === "given up" ? ` style="cursor:pointer" title="Show the list" id="lv-gu-stat"` : ""}><b>${v}</b> ${k}</span>`).join("");
+  $("lv-gu-stat").onclick = () => tab("given");
   function toast(t, bad){ const e = $("lv-toast"); e.textContent = t; e.className = "show" + (bad ? " bad" : ""); clearTimeout(e._t);
     e._t = setTimeout(() => e.className = "", bad ? 6000 : 2600); }
   async function api(path, body){
@@ -394,6 +403,21 @@ body.lv-open #lv-busy{right:var(--lv-w)}
       location.reload();
     } catch(err){ busy(null); toast(err.message + " · nothing saved", true); $("lv-apply").disabled = false; }
   };
+  async function givenUp(){
+    const j = await api("/api/given_up"); Object.assign(facts, j.roads);
+    $("lv-gu-n").textContent = j.rows.length;
+    const box = $("lv-given");
+    if(!j.rows.length){ box.className = ""; box.innerHTML = `<div class="empty" style="padding:8px">none: every crossing is kept</div>`; return; }
+    box.className = "rows";
+    box.innerHTML = j.rows.map(r => {
+      const part = (n, i) => `<b class="${r.parts.includes(n) ? "bad" : ""}" title="${n} casing ${r.levels[i]}">${n} ${r.levels[i]}</b>`;
+      return `<div class="row" title="Show on the map"><span class="what"><div class="txt">${esc(name(r.a))} <small>${esc(ref(r.a))}</small>
+        over ${esc(name(r.b))} <small>${esc(ref(r.b))}</small>${r.fill_under ? ` <span class="tag" style="--c:var(--lv-bad)">fill under too</span>` : ""}</div>
+        <div class="gu-parts">A ${["start", "main", "end"].map(part).join("")} <b class="${r.fill_under ? "bad" : ""}">fill ${r.levels[3]}</b>
+          &nbsp;·&nbsp; B fill <b>${r.b_fill}</b></div></span></div>`;
+    }).join("");
+    box.querySelectorAll(".row").forEach((el, n) => el.onclick = () => { tab("edit"); setPair(j.rows[n].a, j.rows[n].b, true); });
+  }
   async function lists(){
     const j = await api("/api/edits"); Object.assign(facts, j.roads);
     $("lv-hist-n").textContent = j.rows.filter(r => r.section === "saved").length;
@@ -409,7 +433,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
       sel[0] = v.sel[0]; sel[1] = v.sel[1];
       if(v.said) map.once("idle", () => { busy(null); $("lv-busy").classList.remove("solid"); toast(v.said + " · solved"); });
       if(!v.open){ document.body.classList.remove("lv-open"); $("lv-toggle").textContent = "‹"; resize(); } }
-    update(); lists(); showQueue();
+    update(); lists(); givenUp(); showQueue();
   }
   if(map.loaded()) start(); else map.once("load", start);
 })();

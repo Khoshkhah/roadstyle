@@ -76,7 +76,9 @@ working, and the page reloads with the new levels, keeping the view and the pick
 wrong or the solver refuses them (an unknown
 road, nothing to switch off), nothing is saved, the list stays, and the panel says why. The `edits.csv` before each apply is kept as `edits.csv.bak`. A road's card also has *start* / *end*: round / square / flat for
 each end (`caps.csv`); flat is for an end whose round end reaches across a narrower road it ends on, square keeps the drawn length.
-And *heads*: each end's head length in metres (`heads.csv`, solved with the rest). The list of
+And *heads*: each end's head length in metres (`heads.csv`, solved with the rest).
+The *Given up* tab lists the crossing pairs the solver could not keep, with A's parts at or under B's fill in red; a
+row opens the pair, to fix by hand. The list of
 your edits shows each one's two roads when clicked. It is written for this page alone (the roadstyle map and its `rs*` API); the v2 test's
 pair editor is not used.
 

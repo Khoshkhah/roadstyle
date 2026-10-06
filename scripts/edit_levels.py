@@ -181,6 +181,16 @@ class Area:
         edits = pd.concat([e.drop(index=gone), new], ignore_index=True) if any(o["op"] in ("add", "delete") for o in ops) else None
         self.change(edits, saved=self.saved - sum(i < self.saved for i in gone), caps=caps, heads=heads)
 
+    def given_up(self):
+        """The stack pairs the solver could not keep (A over B), each with the parts of A's casing at or under B's fill and whether A's fill
+        is too: flaws on the map, to fix by hand."""
+        rows = []
+        for u, l in self.stats["given_up"]:
+            lv, under = self.facts[u]["levels"], self.facts[l]["levels"][3]
+            rows.append({"a": u, "b": l, "levels": lv, "b_fill": under, "fill_under": lv[3] <= under,
+                         "parts": [n for n, v in zip(("start", "main", "end"), lv[:3], strict=True) if v <= under]})
+        return {"rows": rows, "roads": {x: self.facts[x] for r in rows for x in (r["a"], r["b"])}}
+
     def find(self, q, limit=20):
         """The roads for a search: an exact edge id (either direction of a road), else the edge_refs that hold ``q`` (an exact one first)."""
         q = q.strip()
@@ -285,6 +295,8 @@ def _handler(area):
                 if u.path == "/api/edits":
                     rows = area.rows()
                     return self._send(200, {"rows": rows, "roads": {x: area.facts.get(x, {"road": x}) for r in rows for x in (r["ra"], r["rb"])}})
+                if u.path == "/api/given_up":
+                    return self._send(200, area.given_up())
                 if u.path == "/api/find":
                     return self._send(200, area.find(q.get("q", "")))
                 if u.path == "/api/relations":

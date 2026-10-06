@@ -1895,6 +1895,8 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     new = [r for r in area.relations("11", "12")["rows"] if r["section"] == "new"]
     assert len(new) == 1 and (tmp_path / "levels.csv").exists()                  # added in this session: "new", not "saved"
     assert len(area.relations("12")["rows"]) >= 3                                # one road: everything about it, in both tables
+    gu = area.given_up()                                                          # the solver's given-up pairs, with A's parts under B's fill
+    assert [(r["a"], r["b"]) for r in gu["rows"]] == [tuple(p) for p in area.stats["given_up"]] and set(gu["roads"]) >= {x for r in gu["rows"] for x in (r["a"], r["b"])}
     assert [f["road"] for f in area.find(" 12 ")] == ["12"] and area.find("") == []                 # search: an edge id ...
     ref = area.facts["12"]["edge_ref"] = "120113158#1f"
     assert area.find(ref.upper())[0]["road"] == "12" and area.find("0113158")[0]["road"] == "12"   # ... or (a part of) an edge_ref
