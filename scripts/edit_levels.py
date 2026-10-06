@@ -162,7 +162,7 @@ class Area:
                 if r is None or c not in ("", "round", "square", "flat") or k is None:
                     raise ValueError(f"ends: {o['road']!r} is not a road, {o.get('end')!r} not start / end, or {c!r} not auto (empty), round, square or flat")
                 v = list(caps.pop(r, ("", "")))
-                v[k] = c
+                v[k] = "" if c == "round" else c                # round is every end's shape unless you set another: caps.csv keeps only those
                 if any(v):
                     caps[r] = tuple(v)
             elif o["op"] == "head":

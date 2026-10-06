@@ -288,10 +288,10 @@ body.lv-open #lv-busy{right:var(--lv-w)}
         <span>look</span><span>${esc(f.look || "–")}</span><span>lanes</span><span>${esc(f.lanes ?? "–")}</span>
         <span>road id</span><span style="grid-column:span 3;font-size:11px">${esc(r)}</span></div>
       <div class="wd" data-w="${esc(r)}">${widthHtml(f)}</div>
-      ${["start", "end"].map((e, i) => `<div class="caps" title="This end of the road (caps.csv, drawing only). default: round; square = flat, as long as round; flat = stops at the end point">
+      ${["start", "end"].map((e, i) => `<div class="caps" title="The shape of this end of the road (caps.csv, drawing only): round (as every end starts), square = flat but as long as round, flat = stops at the end point">
         <span style="width:44px">${e} ${i ? "○" : "●"}</span>
-        <div class="seg" data-cap="${esc(r)}" data-end="${e}">${[["", "default · " + ((f.caps_auto || [])[i] || "round")], ["round", "round"], ["square", "square"], ["flat", "flat"]].map(([v, t]) =>
-          `<button data-v="${v}" class="${((f.caps || [])[i] || "") === v ? "on" : ""}">${t}</button>`).join("")}</div></div>`).join("")}
+        <div class="seg" data-cap="${esc(r)}" data-end="${e}">${["round", "square", "flat"].map(v =>
+          `<button data-v="${v}" class="${(((f.caps || [])[i] || (f.caps_auto || [])[i] || "round") === v) ? "on" : ""}">${v}</button>`).join("")}</div></div>`).join("")}
       ${headsHtml(r, f)}
       <div class="lvls"><div><small>start</small><b>${L[0]}</b></div><div><small>casing</small><b>${L[1]}</b></div>
         <div><small>end</small><b>${L[2]}</b></div><div><small>fill</small><b>${L[3]}</b></div></div></div>`;
@@ -330,7 +330,8 @@ body.lv-open #lv-busy{right:var(--lv-w)}
       : `<div class="empty">Click a road on the map<br><small>a second one for the pair · click again or ✕ to cancel · Esc clears</small></div>`;
     $("lv-cards").querySelectorAll("[data-cap] button").forEach(b => b.onclick = () => {
       const box = b.closest("[data-cap]"), r = box.dataset.cap, end = box.dataset.end, cap = b.dataset.v;
-      if(cap === (((facts[r] || {}).caps || [])[end === "start" ? 0 : 1] || "")) return;
+      const f = facts[r] || {}, k = end === "start" ? 0 : 1;
+      if(cap === ((f.caps || [])[k] || (f.caps_auto || [])[k] || "round")) return;           // already this shape
       stage({op: "cap", road: r, end: end, cap: cap});
     });
     $("lv-cards").querySelectorAll("[data-hroad]").forEach(box => {
@@ -409,7 +410,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   function stage(q){
     if(q.op === "delete" && queue.some(x => x.op === "delete" && x.index === q.index)) return toast("Already in the list");
     if(q.op === "cap" || q.op === "head") queue = queue.filter(x => !(x.op === q.op && x.road === q.road && x.end === q.end));   // the last choice for an end counts
-    q.text = q.op === "delete" ? "delete edit: " + plain(q.row) : q.op === "cap" ? `${q.end} ${q.end === "start" ? "●" : "○"} ${q.cap || "default"} · ${name(q.road)}`
+    q.text = q.op === "delete" ? "delete edit: " + plain(q.row) : q.op === "cap" ? `${q.end} ${q.end === "start" ? "●" : "○"} ${q.cap} · ${name(q.road)}`
       : q.op === "head" ? `${q.end} head ${q.end === "start" ? "●" : "○"} ${q.m ? q.m + " m" : "default"} · ${name(q.road)}`
       : `${q.body.relation} · ${plain(q.body)}`;
     queue.push(q); showQueue(); toast("In the list · apply when ready");
