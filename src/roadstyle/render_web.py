@@ -1342,7 +1342,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
 
     Every edge is drawn by two **positions**, the number where its casing is drawn and the number where its fill is drawn
     (docs/design/levels_split_casing.md): lowest first, at each position all casings before all fills. Without level columns
-    they are computed here by ``compute_levels(method="solve", order="class")`` from the ``tunnel`` / ``bridge`` / ``layer``
+    they are computed here by ``compute_levels(method="solve", order="priority")`` from the ``tunnel`` / ``bridge`` / ``layer``
     columns (``tunnel_col`` / ``bridge_col`` / ``layer_col``), the road class and the geometry; ``band_col`` (integers) gives the
     solver the band of an edge instead of the tags. Needs scipy. ``casing_level_col`` / ``fill_level_col`` (and
     ``casing_start_col`` / ``casing_end_col``, ``head_m``) name columns you computed yourself, with ``compute_levels`` or
@@ -1430,7 +1430,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     if not (casing_level_col or fill_level_col):       # the only way of drawing: positions, computed here when not given
         from .levels import compute_levels
         g = compute_levels(g, layer_col=layer_col, bridge_col=bridge_col, tunnel_col=tunnel_col, method="solve",
-                           band_col=band_col, order="class", highway_col=highway_col, head_m=head_m)
+                           band_col=band_col, order="priority", highway_col=highway_col, head_m=head_m)
         casing_level_col, fill_level_col = "casing_level", "fill_level"
         casing_start_col, casing_end_col = "casing_start", "casing_end"
 

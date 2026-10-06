@@ -16,7 +16,7 @@ and output, the renderer, and the simple `tags` method.
 | **near** | two roads are near when they are within `band_dist` metres. Roads that meet, and roads that cross, are near (distance 0) |
 | **level** | the integer from the tags of a road: the `layer` number, else bridge 1, tunnel −1, else 0 |
 | **band** | the integer of a road that decides over and under: a higher band is over a lower band. It is the column `band_col`, or the level when `band_col` is not given |
-| **order** | the number of a road (the column `order`, or the road-class order): where roads meet, the road with the higher order should have the later fill |
+| **order** | the number of a road (the column `order`, the road-class order, or the priority order: roundabout, tunnel, bridge, then class): where roads meet, the road with the higher order should have the later fill |
 
 **Painting**
 
@@ -351,9 +351,10 @@ rs.compute_levels(edges, method="solve", band_col=None, order=None, band_dist=10
 |---|---|---|
 | `edges` | GeoDataFrame of road lines (LineString), any CRS; both directions of a road may be present | always |
 | `band_col` | name of a column of integers (null = 0): the band of each road. If not given, the band is calculated from the tag columns below | optional |
-| `layer_col`, `bridge_col`, `tunnel_col` | names of the OSM tag columns (defaults `layer`, `bridge`, `tunnel`), read only when `band_col` is not given | optional |
-| `order` | name of a column of numbers, or `"class"` (the road-class order): the higher number wins where roads meet. A road with no number (null; for `"class"`, no `highway`) takes **no part in the order**: no wish is made for it, with any road | optional |
-| `highway_col` | name of the road-class column (default `highway`), read only for `order="class"` | optional |
+| `layer_col`, `bridge_col`, `tunnel_col` | names of the OSM tag columns (defaults `layer`, `bridge`, `tunnel`), read for the band when `band_col` is not given, and for `order="priority"` | optional |
+| `order` | name of a column of numbers, `"class"` (the road-class order), or `"priority"` (roundabouts, then tunnels, then bridges, then the road-class order; the default of `render_edges`): the higher number wins where roads meet. A road with no number (null; for `"class"`, no `highway`) takes **no part in the order**: no wish is made for it, with any road | optional |
+| `highway_col` | name of the road-class column (default `highway`), read only for `order="class"` and `"priority"` | optional |
+| `junction_col` | name of the OSM `junction` column (default `junction`), read only for `order="priority"`: `roundabout` or `circular` is a roundabout. A missing column means no roundabouts | optional |
 
 **Settings** (how it runs):
 

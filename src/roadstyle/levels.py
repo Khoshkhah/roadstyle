@@ -18,6 +18,20 @@ def _level(row, layer_col, bridge_col, tunnel_col):
     return ly or (1 if _truthy(row.get(bridge_col)) else -1 if _truthy(row.get(tunnel_col)) else 0)
 
 
+_TIER = 100      # order="priority": each tier is over every class (the class orders are 0 to 9)
+
+
+def _tier(row, junction_col, bridge_col, tunnel_col):
+    """order="priority": roundabout 3, tunnel 2, bridge 1, any other road 0 (Kaveh, 2026-10-06)."""
+    import pandas as pd
+
+    from .render_web import _truthy
+    row = {k: (None if pd.isna(v) else v) for k, v in row.items() if k in (junction_col, bridge_col, tunnel_col)}
+    if str(row.get(junction_col) or "").lower() in ("roundabout", "circular"):
+        return 3
+    return 2 if _truthy(row.get(tunnel_col)) else 1 if _truthy(row.get(bridge_col)) else 0
+
+
 def _tag_intervals(ends, lv):
     """method="tags": c = min(N(s), N(t), L), f = max(...), N(v) the point of [min S(v), max S(v)] nearest 0."""
     at = defaultdict(set)
@@ -231,7 +245,7 @@ def _solve_intervals(metres, ends, beta, omega, limit, band_dist, head_m, max_le
 
 
 def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tunnel",
-                   method="solve", band_col=None, order=None, highway_col="highway", band_dist=10.0, head_m=5.0, max_level=20, margin=1.0, time_limit=60.0, min_positions=True):
+                   method="solve", band_col=None, order=None, highway_col="highway", junction_col="junction", band_dist=10.0, head_m=5.0, max_level=20, margin=1.0, time_limit=60.0, min_positions=True):
     """A copy of ``edges`` with the drawing-order columns ``casing_start``, ``casing_level`` (the main part), ``casing_end`` and ``fill_level``;
     ``render_edges(casing_level_col=..., fill_level_col=...)`` draws by the last two (the heads are not drawn yet).
 
@@ -242,8 +256,9 @@ def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tu
       two roads within ``band_dist`` metres with different bands are a stack pair (the higher band is over the lower one), a crossing included;
     * every road's casing is divided into two heads of ``head_m`` metres (at its nodes) and a main part; the heads merge with the roads that meet there, the main
       part is stacked; a road shorter than ``2 * head_m`` is one head;
-    * ``order`` (a column of numbers, or ``"class"`` for the renderer's class order): where roads meet, the one with the higher number has the later fill
-      where the other constraints allow; this is a wish, not a requirement.
+    * ``order`` (a column of numbers, ``"class"`` for the renderer's class order, or ``"priority"``: roundabouts (``junction_col`` is ``roundabout`` or
+      ``circular``), then tunnels, then bridges, then the class order): where roads of one band meet, the one with the higher number has the later fill
+      where the other constraints allow; this is a wish, not a requirement. A road with no class takes no part in ``"class"`` or ``"priority"``.
     ``max_level``: the numbers are in ``[-max_level, max_level]``; ``margin``: how much later a road is painted where one must be painted after another
     (only the order matters: it changes the scale); ``time_limit``: seconds for each LP solve; ``min_positions``: also minimise the span of the numbers (fewer positions, a little
     less compaction; section 7.3.1); False leaves it out.
@@ -288,9 +303,12 @@ def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tu
         else:
             beta = [_level(r, layer_col, bridge_col, tunnel_col) for r in head.to_dict("records")]
         omega = None
-        if order == "class":                                   # a road with no class takes no part in the order: no wish for it (None)
+        if order in ("class", "priority"):                     # a road with no class takes no part in the order: no wish for it (None)
             z = {h: _class_order(h) for h in head[highway_col].dropna().unique()}
             omega = [None if pd.isna(h) else z[h] for h in head[highway_col]]
+            if order == "priority":
+                omega = [None if w is None else w + _TIER * _tier(r, junction_col, bridge_col, tunnel_col)
+                         for w, r in zip(omega, head.to_dict("records"), strict=True)]
         elif order:
             omega = [None if pd.isna(v) else float(v) for v in pd.to_numeric(head[order], errors="coerce")]
         gm = g.geometry

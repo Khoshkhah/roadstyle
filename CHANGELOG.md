@@ -7,6 +7,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **The order where roads meet:** `compute_levels(order="priority")`, now the default of `render_edges`: where roads of one band meet, a roundabout's fill is over a tunnel's,
+  a tunnel's over a bridge's, a bridge's over the road class (`junction_col`, default `junction`: `roundabout` or `circular`). The band is unchanged, so a road that crosses over a tunnel
+  still covers it. `order="class"` keeps the road class alone.
 - **Faster page building:** the casing pieces and the arrow and street-name slots are cut with a small numpy cutter instead of shapely's `substring` (the same lines), and a slot of a group of one edge no longer searches for its edge.
   A page of a city of 64,000 roads builds about 40% faster.
 

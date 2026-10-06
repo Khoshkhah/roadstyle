@@ -9,7 +9,7 @@
 
     rs.render_edges(edges).save("map.html")               # up to ~10⁴ edges
     rs.render_edges(edges, tiles=True).save("map.html")   # ~10⁵ edges, still one file
-    levels = rs.compute_levels(edges, method="solve", order="class")      # the drawing order, once
+    levels = rs.compute_levels(edges, method="solve", order="priority")      # the drawing order, once
     rs.render_edges(levels, tiles=True, casing_level_col="casing_level", fill_level_col="fill_level",
                     casing_start_col="casing_start", casing_end_col="casing_end").save("map.html")
     rs.render_edges(edges, backend="lonboard",            # millions, in a notebook

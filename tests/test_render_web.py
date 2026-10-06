@@ -1234,6 +1234,22 @@ def test_compute_levels_solve_band_and_order_are_in_the_optimization():
         pass
 
 
+def test_compute_levels_priority_order():
+    """order="priority" (Kaveh, 2026-10-06): where roads of one band meet, a roundabout's fill is over a tunnel's, a tunnel's over a bridge's, a bridge's
+    over the class order; "class" keeps the class order alone. The band is not changed: all five are in band 0 here."""
+    pytest.importorskip("scipy")
+    d = 0.001
+    ends = [(d, 0), (-d, 0), (0, d), (0, -d), (d, d)]
+    g = gpd.GeoDataFrame({"highway": ["residential", "residential", "residential", "primary", "residential"],
+                          "junction": ["roundabout", None, None, None, None], "tunnel": [None, "yes", None, None, None],
+                          "bridge": [None, None, "yes", None, None], "band": [0] * 5},
+                         geometry=[LineString([(18, 59), (18 + x, 59 + y)]) for x, y in ends], crs=4326)
+    ring, tunnel, bridge, primary, plain = compute_levels(g, method="solve", band_col="band", order="priority").fill_level
+    assert ring > tunnel > bridge > primary > plain
+    cls = compute_levels(g, method="solve", band_col="band", order="class").fill_level
+    assert cls[3] > cls[0] == cls[1] == cls[2] == cls[4]                                  # primary over the residential roads, whatever their tags
+
+
 def test_compute_levels_on_the_bundled_sample():
     """docs/design/levels_split_casing.md, section 10, examples on the bundled Södermalm sample: the Centralbron chain (tags) and Skanstullsbron (tags and solve)."""
     import pytest
