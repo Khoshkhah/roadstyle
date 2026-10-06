@@ -124,8 +124,8 @@ def test_connection_must_use_the_selected_road_endpoints():
         "connect", "road-a", "road-b",
         node_ref="0.0000000,0.0000000", endpoint_a="end", endpoint_b="start",
     )
-    with pytest.raises(ValueError, match="does not match"):
-        dashboard._validate_overrides(original, [bad], features=features)
+    warnings = dashboard._validate_overrides(original, [bad], features=features)
+    assert len(warnings) == 2 and all("does not match" in item for item in warnings)
 
 
 def test_coordinate_free_connection_allows_different_geometry_endpoints():

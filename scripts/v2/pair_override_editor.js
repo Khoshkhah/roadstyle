@@ -533,7 +533,12 @@
       selectedOverrideId = "";
       renderEditor();
       renderOverrides();
-      setStatus(`Override saved. ${levelSummary}`, "success");
+      const warnings = payload.warnings ?? [];
+      if (warnings.length) {
+        setStatus(`Override saved with warning: ${warnings.join(" ")}`, "warning");
+      } else {
+        setStatus(`Override saved. ${levelSummary}`, "success");
+      }
     } catch (error) {
       setStatus(error.message, "error");
       elements["save-pair"].disabled = selected.length !== 2;

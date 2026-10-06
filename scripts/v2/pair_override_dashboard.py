@@ -171,7 +171,9 @@ def _validate_overrides(
     *,
     known_refs: set[str] | None = None,
     features: list[dict[str, Any]] | None = None,
-) -> None:
+) -> list[str]:
+    """Raise for unknown roads; return warnings for suspicious but saveable rows."""
+    warnings: list[str] = []
     effective = merge_pair_overrides(original, overrides)
     for row in effective:
         refs = {
@@ -223,10 +225,11 @@ def _validate_overrides(
                 ref = row[edge_field]
                 side = row[endpoint_field]
                 if ref in endpoints and not _same_point(endpoints[ref].get(side), row["node_ref"]):
-                    raise ValueError(
-                        f"Connection {row['pair_id']} node_ref does not match "
-                        f"{side} of {ref}"
+                    warnings.append(
+                        f"Connection {row['pair_id']}: node_ref does not match "
+                        f"{side} of {ref}."
                     )
+    return warnings
 
 
 def _new_pair_override(
@@ -346,6 +349,7 @@ def _save_override(
     overrides_path: Path,
     known_refs: set[str],
     features: list[dict[str, Any]],
+    warnings: list[str] | None = None,
 ) -> list[dict[str, str]]:
     action = str(row.get("action", "")).strip().lower()
     if action not in {"add", "replace"}:
@@ -379,12 +383,22 @@ def _save_override(
         item for item in overrides if item["pair_id"] != normalized["pair_id"]
     ]
     overrides.append(normalized)
-    _validate_overrides(
+    found = _validate_overrides(
         original,
         overrides,
         known_refs=known_refs,
         features=features,
     )
+    if action == "add":
+        pair = {normalized["edge_a"], normalized["edge_b"]}
+        for item in original:
+            if {item["edge_a"], item["edge_b"]} == pair:
+                found.append(
+                    f"The original table already has a {item['relation']} pair for these "
+                    f"roads ({item['pair_id']}); this override adds a second relationship."
+                )
+    if warnings is not None:
+        warnings.extend(found)
     overrides_path.parent.mkdir(parents=True, exist_ok=True)
     write_pair_table(overrides_path, overrides, overrides=True)
     return overrides
@@ -472,6 +486,7 @@ class PairEditorHandler(BaseHTTPRequestHandler):
         if route not in {"/api/overrides", "/api/overrides/delete"}:
             self._send(404, "Not found", "text/plain; charset=utf-8")
             return
+        warnings: list[str] = []
         try:
             size = int(self.headers.get("Content-Length", "0"))
             if size <= 0 or size > 64_000:
@@ -493,6 +508,7 @@ class PairEditorHandler(BaseHTTPRequestHandler):
                     self.server.overrides_path,
                     self.server.known_refs,
                     self.server.features,
+                    warnings,
                 )
         except (OSError, ValueError, json.JSONDecodeError) as error:
             self._send(400, json.dumps({"error": str(error)}), "application/json; charset=utf-8")
@@ -505,7 +521,7 @@ class PairEditorHandler(BaseHTTPRequestHandler):
             return
         self._send(
             200,
-            json.dumps({"overrides": overrides, "network": network}),
+            json.dumps({"overrides": overrides, "network": network, "warnings": warnings}),
             "application/json; charset=utf-8",
         )
 
