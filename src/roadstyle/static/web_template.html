@@ -977,7 +977,7 @@ if(TUNNEL.control){
   const r3=row();
   r3.appendChild(sel("tn-pal", Object.keys(TUNNEL.palettes).map(n=>[n, n]), TUNNEL.palette, v=>{
     rsSetTunnelStyle({palette:v, ...(TUNNEL.strength === 0 && TUNNEL.palettes[v] ? {strength:35} : {})}); }));   // as v2: a palette at 0 % starts at 35 %
-  r3.appendChild(sel("tn-ratio", [["3:3","3:3"],["4:4","4:4"],["2:2","2:2"],["4:3","4:3"]], TUNNEL.ratio.join(":"),
+  r3.appendChild(sel("tn-ratio", [["1:1","1:1"],["3:3","3:3"],["4:4","4:4"],["2:2","2:2"],["4:3","4:3"]], TUNNEL.ratio.join(":"),
                      v=>rsSetTunnelStyle({ratio:v.split(":")})));
   _tlHost().appendChild(w);
 }
@@ -989,13 +989,10 @@ function addArrow(){
   const svg='<svg xmlns="http://www.w3.org/2000/svg" width="96" height="40" viewBox="0 0 12 5">'
     +'<path d="M 0,2 7,2 7,0 12,2.5 7,5 7,3 0,3 z" fill="__ARROW_COLOR__"/></svg>';
   const img=new Image(96,40);
-  img.onload=()=>{ if(!map.hasImage("oneway")) map.addImage("oneway",img,{pixelRatio:4}); };
-  img.src="data:image/svg+xml;base64,"+btoa(svg);
-  if(_tunOn){                                     // a tunnel's arrow: the same shape as an SDF icon, so the slider can colour it (icon-color)
-    const sdf=new Image(96,40);
-    sdf.onload=()=>{ if(!map.hasImage("oneway-sdf")) map.addImage("oneway-sdf",sdf,{pixelRatio:4, sdf:true}); };
-    sdf.src="data:image/svg+xml;base64,"+btoa(svg.replace('fill="__ARROW_COLOR__"', 'fill="#ffffff"'));
-  }
+  // a map with tunnels: an SDF icon (white), coloured by the arrow layers' icon-color, so the tunnel slider can fade a tunnel's arrows
+  // (one symbol layer cannot mix SDF and plain icons)
+  img.onload=()=>{ if(!map.hasImage("oneway")) map.addImage("oneway",img,{pixelRatio:4, sdf:_tunOn}); };
+  img.src="data:image/svg+xml;base64,"+btoa(_tunOn ? svg.replace(/fill="[^"]*"/, 'fill="#ffffff"') : svg);
 }
 map.on("load", addArrow);
 // Self-diagnosis: a map with zero road features is a broken page, not an empty area — say WHY

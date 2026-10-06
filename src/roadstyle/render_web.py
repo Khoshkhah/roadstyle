@@ -808,8 +808,7 @@ def _tunnel_look(layers, edge_ids, s, arrow_color):
         elif lid.startswith("roads-labels"):
             mix(l, "text-color", l["paint"]["text-color"], "fill")
         elif lid.startswith("roads-arrows"):
-            l["layout"] = {**l["layout"], "icon-image": ["case", ["to-boolean", ["get", "__rs_tunnel"]], "oneway-sdf", l["layout"]["icon-image"]]}
-            mix(l, "icon-color", arrow_color, "fill")    # only the tunnel's arrow is an SDF icon: the others ignore icon-color
+            mix(l, "icon-color", arrow_color, "fill")    # on a map with tunnels the arrow icon is an SDF one (addArrow): coloured here
         elif lid in edge_ids:
             for k in ("fill-color", "line-color", "circle-color", "text-color"):
                 if k in l["paint"]:
@@ -854,10 +853,18 @@ def _level_layers(layers, levels, casing_source=None):
     return rest[:first] + groups + rest[first:]
 
 
+def _plus_px(expr, px):
+    """A width expression ``px`` pixels wider: inside each stop of a top-level zoom curve (MapLibre allows ``["zoom"]`` only there)."""
+    if isinstance(expr, list) and expr and expr[0] in ("interpolate", "step"):
+        first = 4 if expr[0] == "interpolate" else 2
+        return [*expr[:first], *[["+", v, px] if (i - first) % 2 == 0 else v for i, v in enumerate(expr[first:], first)]]
+    return ["+", expr, px]
+
+
 def _tunnel_casing_dash(lid, flt, tlay, cw, off, on):
     """The dashes of a tunnel's two-tone casing, a sublayer on the band's casing (``on``: the band has a tunnel)."""
     return [{"id": lid, "type": "line", "source": "roads", "layout": tlay, "filter": flt,
-             "paint": {"line-color": _TUN_TO["dash"], "line-width": cw, "line-offset": off,
+             "paint": {"line-color": _TUN_TO["dash"], "line-width": _plus_px(cw, 3), "line-offset": off,      # as v2: 1.5 px wider each side, so its colours show
                        "line-dasharray": list(CONFIG.tunnel_casing_dash or [3, 3])}}] if on else []
 
 

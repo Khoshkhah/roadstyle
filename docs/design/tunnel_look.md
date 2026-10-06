@@ -15,13 +15,14 @@ The fill is **opaque**: no see-through fill and no underlay, so overlapping piec
 
 ## The casing
 
-As v2, a tunnel's casing is drawn by its dash layer alone (the other casing layers leave a tunnel out):
+As v2, a tunnel's casing is drawn by its dash layer alone (the other casing layers leave a tunnel out), 3 px wider than a casing
+(1.5 px each side) so its colours show:
 
 - **One colour** (`tunnel_palette`, the default; two colours are not decided yet): slate dashes `#94a3b8` with empty gaps, at any strength.
 - **A two-colour palette**: above 0 the dash layer draws a pattern image; the dash moves from `#94a3b8` toward the palette's first colour,
   the gap from the background toward its second, by the strength. v2's `Slate + ice`, `Blue + cyan`, `Warm + sand`, and three more to try:
   `Graphite + white`, `Indigo + lavender`, `Teal + mint` (`tunnel_palettes`, `name: [dash, gap]`).
-- The dash ratio (`tunnel_casing_dash`, in line widths): 3:3 (default, as v2), 4:4, 2:2, 4:3.
+- The dash ratio (`tunnel_casing_dash`, in line widths): 3:3 (default, as v2), 1:1 (Kaveh: maybe better than 2:2 or 4:3), 4:4, 2:2, 4:3.
 
 ## In the page
 
@@ -34,8 +35,8 @@ look. While the slider is dragged, only its newest value is applied (once per fr
 Each colour that takes the look is a MapLibre expression: for a feature with `__rs_tunnel`,
 `["interpolate", ["linear"], strength, 0, <colour>, 100, "#64748b"]`, else the colour (`_tun_mix` in Python, `_tunMix` in the page). The page
 keeps each layer's colours without the look (`TUNNEL.layers`) and builds the expressions again when the slider moves; no data is baked per
-value. The street-name and arrow slots carry `__rs_tunnel` from their road; a tunnel's arrow is an SDF copy of the arrow icon so it can be
-coloured. An item gets `__rs_tunnel` from its edge when the overlay is attached (`_edge_overlay`).
+value. The street-name and arrow slots carry `__rs_tunnel` from their road; on a map with tunnels the arrow icon is an SDF one, coloured by
+`icon-color` (one symbol layer cannot mix SDF and plain icons). An item gets `__rs_tunnel` from its edge when the overlay is attached (`_edge_overlay`).
 
 ## Limits
 

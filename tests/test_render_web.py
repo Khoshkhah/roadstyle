@@ -784,6 +784,9 @@ def test_tunnel_casing_is_the_dash_layer_alone():
     ids = list(lay)
     assert ids.index("roads-casing") < ids.index("roads-casing-dash") < ids.index("roads-fill")
     assert lay["roads-casing-dash"]["paint"]["line-color"] == "#94a3b8" and lay["roads-casing-dash"]["paint"]["line-dasharray"] == [3, 3]
+    from roadstyle.render_web import _plus_px
+    assert lay["roads-casing-dash"]["paint"]["line-width"] == _plus_px(lay["roads-casing"]["paint"]["line-width"], 3)   # as v2: wider
+    assert _plus_px(["interpolate", ["linear"], ["zoom"], 12, 1, 18, ["get", "w"]], 3) == ["interpolate", ["linear"], ["zoom"], 12, ["+", 1, 3], 18, ["+", ["get", "w"], 3]]
     assert "__rs_tunnel" in json.dumps(lay["roads-casing-dash"]["filter"])      # only the tunnel look
     tun, street = (f["properties"] for f in style["sources"]["roads"]["data"]["features"])
     assert _eval(lay["roads-casing"]["paint"]["line-color"], tun) == "rgba(0,0,0,0)"
@@ -1094,7 +1097,7 @@ def test_the_tunnel_look_is_v2s_slider():
             ("roads-arrows", "icon-color", "fill")} <= {(a.replace("-tunnel", "").replace("-bridge", ""), b, c) for a, b, c in kinds}
     assert {to for entries in conf["layers"].values() for _, _, to in entries} == {"fill"}       # one target for everything
     arrows = [l for l in style["layers"] if l["id"].startswith("roads-arrows")]
-    assert arrows and all("oneway-sdf" in json.dumps(l["layout"]["icon-image"]) for l in arrows)
+    assert arrows and all(l["layout"]["icon-image"] == "oneway" and "icon-color" in l["paint"] for l in arrows)
     slots = style["sources"]["slots"]["data"]["features"]
     assert any(f["properties"].get("__rs_tunnel") for f in slots) and not all(f["properties"].get("__rs_tunnel") for f in slots)
     items = style["sources"]["ov0"]["data"]["features"]
@@ -1123,7 +1126,7 @@ def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
         browser = p.chromium.launch()
         page = browser.new_page()
         page.on("pageerror", lambda e: errors.append(str(e)))
-        page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+        page.on("console", lambda m: errors.append(m.text) if m.type == "error" or "Cannot mix SDF" in m.text else None)
         page.goto(path.resolve().as_uri())
         page.wait_for_function("window.map && map.loaded() && document.getElementById('tn-str')", timeout=30_000)
         page.evaluate("document.addEventListener('rs:tunnelchange', e => window._ev = e.detail)")
