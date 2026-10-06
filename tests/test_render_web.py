@@ -1089,7 +1089,7 @@ def test_the_tunnel_look_is_v2s_slider():
     html = render_edges(_edge_world().assign(name=["A", "T", "B", "C"]), backend="web", basemap="blank", overlays=[ov]).html
     style, conf = _style(html), _tunnel_conf(html)
     lay = {l["id"]: l for l in style["layers"]}
-    assert conf["strength"] == 35 and conf["palette"] == "One colour" and conf["control"] is True and conf["ratio"] == [1, 1]
+    assert conf["strength"] == 35 and conf["palette"] == "Graphite + silver" and conf["control"] is True and conf["ratio"] == [1, 1]
     assert conf["dash"] and all(i.startswith("roads-casing") and i.endswith("-dash") for i in conf["dash"])
     for lid, entries in conf["layers"].items():
         for k, base, to in entries:
@@ -1150,8 +1150,8 @@ def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
         one = page.evaluate(get)
         browser.close()
     assert errors == []
-    assert opened["pattern"] is None and opened["dash"] == [1, 1] and opened["slider"] == "35" and opened["pal"] == "One colour"
-    assert "rgba(0,0,0,0)" in opened["gap"]                                               # One colour: empty gaps
+    assert opened["pattern"] is None and opened["dash"] == [1, 1] and opened["slider"] == "35" and opened["pal"] == "Graphite + silver"
+    assert "rgba(0,0,0,0)" not in opened["gap"]                                           # two colours by default: the gaps are the second colour
     assert "70" in moved["fill"] and moved["pal"] == "Teal + mint" and moved["dash"] == [4, 3] and moved["pattern"] is None
     teal70, mint70 = "#547384", "#76919f"                                                 # #2f6f73, #9fd3cf 70 % toward #64748b (JS rounds .5 up)
     assert moved["dash_color"] == teal70 and mint70 in moved["gap"]

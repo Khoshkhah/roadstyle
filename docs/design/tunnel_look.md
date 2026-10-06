@@ -20,7 +20,7 @@ As v2, a tunnel's casing is drawn by its dash layer alone (the other casing laye
 
 The casing follows the slider like everything on a tunnel (Kaveh 2026-10-06): its colours move toward the same slate `#64748b`.
 
-- **One colour** (`tunnel_palette`, the default; two colours are not decided yet): dashes with empty gaps, `#94a3b8` at 0, moved toward slate.
+- **One colour** (`tunnel_palette`; the default is two colours, `Graphite + silver`, Kaveh 2026-10-06): dashes with empty gaps, `#94a3b8` at 0, moved toward slate.
   Why a second colour exists (Kaveh): with empty gaps, where a tunnel passes under a road it looks connected to it; a solid second colour
   closes the gaps. So the default should become a pair once one is chosen.
 - **A two-colour palette**: the palette's two colours, dash and gap, at any strength: as they are at 0, each moved toward slate as the

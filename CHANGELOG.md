@@ -9,7 +9,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ### Changed
 - **The tunnel look, v2's slider** (`docs/design/tunnel_look.md`): `tunnel_strength` (0-100, 35) moves everything on a tunnel, its fill, street names,
   arrows and attached items, toward slate, opaque (replaces the 72 % see-through fill and its underlay). The casing is two layers with MapLibre's dash, 3 px wider:
-  slate dashes with empty gaps (`One colour`, the default) or a palette's two colours, dash on gap (`tunnel_palette`), moved toward slate with the rest; dash ratio 1:1 (`tunnel_casing_dash`). The two-tone casing
+  a palette's two colours, dash on gap (`tunnel_palette`, default `Graphite + silver`), or slate dashes with empty gaps (`One colour`), moved toward slate with the rest; dash ratio 1:1 (`tunnel_casing_dash`). The two-tone casing
   (`tunnel_gap_shade`, `tunnel_dash_shade`) is gone. A *Tunnels* box (`tunnel_control`) and `rsSetTunnelStyle({strength, palette, ratio})` move it in the page.
 - **No light dashes on a tunnel's fill by default** (`tunnel_fill_dash: []`, v2's look); `[1.2, 1.2]` brings them back.
 - **Faster page building:** the casing pieces and the arrow and street-name slots are cut with a small numpy cutter instead of shapely's `substring` (the same lines), and a slot of a group of one edge no longer searches for its edge.
