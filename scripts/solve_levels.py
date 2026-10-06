@@ -29,10 +29,12 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("out_dir", type=Path)
     ap.add_argument("--head-m", type=float, default=5.0, help="metres of casing head at each end of a road (default 5)")
+    ap.add_argument("--max-positions", type=int, help="at most this many drawing positions (a hard bound: wishes, then stack pairs, give way)")
     a = ap.parse_args(argv)
     roads = gpd.read_parquet(a.out_dir / "roads.parquet")
     edits = a.out_dir / "edits.csv"
-    solved = rs.solve_levels(roads, a.out_dir / "pairs.csv", edits=edits if edits.exists() else None, head_m=a.head_m)
+    solved = rs.solve_levels(roads, a.out_dir / "pairs.csv", edits=edits if edits.exists() else None, head_m=a.head_m,
+                             max_positions=a.max_positions)
     edge_levels(solved).to_csv(a.out_dir / "levels.csv", index=False)
     info = solved.attrs["levels_info"]
     print(f"{len(roads)} roads -> {a.out_dir / 'levels.csv'}: {len(solved.attrs['levels_given_up'])} stack pair(s) given up, "

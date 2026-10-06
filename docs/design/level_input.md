@@ -53,7 +53,7 @@ one call and returns the edges with the four columns.
 | | v1, class order | v1, priority | v2 test (tiers) | this |
 |---|---|---|---|---|
 | seconds | 0.3 | 0.2 | 1.1 | 1.3 |
-| drawing positions | 6 | 6 | 13 | 15 |
+| drawing positions | 6 | 6 | 13 | 9 |
 | roundabout on top where it meets a road | 147 / 354 | 350 / 354 | 354 / 354 | 354 / 354 |
 | tunnel on top at its mouth | 0 / 350 | 0 / 350 | 267 / 350 | 223 / 350 |
 | crossings drawn the wrong way round | 0 / 129 | 0 / 129 | 114 / 129 | 0 / 129 |
@@ -61,7 +61,24 @@ one call and returns the edges with the four columns.
 v2's tiers lifted every tunnel above every other road across the map, so a street crossing over a tunnel was drawn under it. Here a
 crossing keeps the band. 33 order wishes are not kept (they conflict with over and under); no stack pair is given up.
 
+## Whole numbers, and a bound on the positions
+
+The numbers are whole multiples of `margin` (integer programming, HiGHS through `scipy.optimize.milp`). When every wish can be kept the
+problem is pure difference rows and a flow gives whole numbers anyway; when some must be given up, the stages (slacks, and rows that hold
+each stage's result) have fractional corners, and the LP returned values between two numbers, each one more drawing position (Monaco: 15
+numbers in a span of 9). `solve_levels(max_positions=K)` (`--max-positions`) bounds the positions: a hard bound, the wishes give way first,
+then the stack pairs. Monaco:
+
+| bound | positions | stack given up | wishes not kept | tunnel on top at its mouth |
+|---|---|---|---|---|
+| none | 9 | 0 | 33 | 223 / 350 |
+| 8 | 8 | 0 | 34 | 222 / 350 |
+| 6 | 6 | 0 | 38 | 212 / 350 |
+| 4 | 4 | 2 | 66 | 188 / 350 |
+
+A bound at or above the minimum changes nothing.
+
 ## Limits
 
-- More positions (15 against 6 on Monaco): more layers in the page.
+- More positions (9 against 6 on Monaco): more layers in the page.
 - A mouth where the roads also run near each other beyond the junction (a ramp diverging at a small angle) is a stack pair: the band decides there.

@@ -161,7 +161,7 @@ def _relations(metres, ends, beta, omega, band_dist, mouths=True):
     return meets, stacks, orders
 
 
-def _solve_intervals(metres, meets, stacks, orders, limit, head_m, max_level, margin, min_positions=True):
+def _solve_intervals(metres, meets, stacks, orders, limit, head_m, max_level, margin, min_positions=True, max_positions=None):
     """The solver on roads (one per segment, both directions together) and their relations (:func:`_relations`, or a pairs table). Every road has
     one fill number ``b`` and a casing divided into a start head, a main part and an end head (one number for a road shorter than ``2 * head_m``).
     Returns ``(parts, given_up, info)``: ``parts[r] = (a_start, a_main, a_end, b)``. The model is a linear program solved on a sparse matrix with
@@ -171,7 +171,6 @@ def _solve_intervals(metres, meets, stacks, orders, limit, head_m, max_level, ma
 
     import numpy as np
     import scipy.sparse as sp
-    from scipy.optimize import linprog
     t0, n = time.time(), len(metres)
     zero = [(0, 0, 0, 0)] * n
     import shapely
@@ -207,12 +206,14 @@ def _solve_intervals(metres, meets, stacks, orders, limit, head_m, max_level, ma
     for x, ex, y, ey in meets:                                 # H2: the heads of two roads that meet are each under the other's fill
         le([(part[x]["s" if ex == "start" else "e"], 1.0), (y, -1.0)], 0.0)
         le([(part[y]["s" if ey == "start" else "e"], 1.0), (x, -1.0)], 0.0)
-    if min_positions:                                          # section 7.3.1: H above and L below every number; the span H - L is in the cost
+    if min_positions or max_positions:                         # section 7.3.1: H above and L below every number; the span H - L is in the cost
         H, Lo, first_nv = ncol, ncol + 1, ncol
         for v in range(first_nv):
             le([(v, 1.0), (H, -1.0)], 0.0)                     # x_v <= H
             le([(Lo, 1.0), (v, -1.0)], 0.0)                    # L <= x_v
         ncol += 2
+        if max_positions:                                      # at most max_positions numbers: H - L <= (max_positions - 1) steps (a hard bound;
+            le([(H, 1.0), (Lo, -1.0)], (max_positions - 1) * margin)   # the stack pairs and the order wishes give way to it)
     base = len(rhs)
     for u, l in pair_list:
         le([(l, 1.0), (part[u]["m"] if long_[u] else u, -1.0)], -margin)    # H3: b_l + margin <= a_(u, main); a short upper road: <= b_u
@@ -225,13 +226,22 @@ def _solve_intervals(metres, meets, stacks, orders, limit, head_m, max_level, ma
     for r, v in casing:
         cost[r] += 1.0
         cost[v] -= 1.0
-    if min_positions:
+    if min_positions or max_positions:
         w4 = float(cost[cost > 0].sum() * 2 * max_level + 1)   # W4 > the whole range of T3
         cost[H], cost[Lo] = w4, -w4
 
     def solve(c, A, bu, lo_hi):
-        res = linprog(c, A_ub=A, b_ub=bu, bounds=lo_hi, method="highs-ipm", options={"time_limit": limit})
-        return res
+        # whole numbers (HiGHS MILP): a staged problem (its "keep the stage before" rows) has fractional corners, and every fraction was
+        # one more drawing position (Monaco: 15 numbers in a span of 9)
+        from scipy.optimize import Bounds, LinearConstraint, milp
+        lo_hi = [lo_hi] * len(c) if isinstance(lo_hi, tuple) else lo_hi
+        lo = np.array([b[0] if b[0] is not None else -np.inf for b in lo_hi], dtype=float)
+        hi = np.array([b[1] if b[1] is not None else np.inf for b in lo_hi], dtype=float)
+        # in steps of the margin: whole multiples of it (the margin is the step of every constraint; it only scales the numbers)
+        r = milp(c, constraints=LinearConstraint(A, -np.inf, np.asarray(bu, dtype=float) / margin), bounds=Bounds(lo / margin, hi / margin),
+                 integrality=np.ones(len(c)), options={"time_limit": limit})
+        x = None if r.x is None else r.x * margin
+        return SimpleNamespace(status={0: 0, 2: 2}.get(r.status, r.status), x=x, fun=None if r.fun is None else r.fun * margin, message=r.message)
     box = (0, 2 * max_level)                                  # non-negative: the lowest number is pinned at 0; the shift to the ground comes afterwards
     solves = 1
     x0 = _difference_lp(cost, A0, b_ub, box[1])                # stage 0: nothing violated; a min-cost flow
@@ -356,7 +366,7 @@ def _read_pairs(pairs):
     return t
 
 
-def solve_levels(roads, pairs, edits=None, head_m=5.0, max_level=20, margin=1.0, time_limit=60.0, min_positions=True):
+def solve_levels(roads, pairs, edits=None, head_m=5.0, max_level=20, margin=1.0, time_limit=60.0, min_positions=True, max_positions=None):
     """Solve the drawing levels of ``roads`` from their ``pairs`` (both from :func:`level_input`, or read back from ``roads.parquet`` /
     ``pairs.csv``) and the caller's ``edits`` (a table or a CSV with the columns of ``pairs`` and ``enabled``: a row with ``enabled`` false
     switches off the same relation of ``pairs``, any other row is added; ``a`` / ``b`` may name any edge of a road). Returns ``roads`` with
@@ -385,7 +395,8 @@ def solve_levels(roads, pairs, edits=None, head_m=5.0, max_level=20, margin=1.0,
     meets = [(idx[r["a"]], r["a_end"], idx[r["b"]], r["b_end"]) for r in rel.values() if r["relation"] == "meet"]
     stacks = [(idx[r["a"]], idx[r["b"]]) for r in rel.values() if r["relation"] == "stack"]
     orders = [(idx[r["a"]], idx[r["b"]]) for r in rel.values() if r["relation"] == "order"]
-    iv, given, info = _solve_intervals(list(_metres(roads.geometry)), meets, stacks, orders, time_limit, head_m, max_level, margin, min_positions)
+    iv, given, info = _solve_intervals(list(_metres(roads.geometry)), meets, stacks, orders, time_limit, head_m, max_level, margin, min_positions,
+                                       max_positions)
     counts = defaultdict(int)                                  # the solution can sit at any height: the main casing number most edges have becomes 0 (the ground)
     for r, row in enumerate(roads.itertuples()):
         counts[iv[r][1]] += len(row.edges) + len(row.reversed)
