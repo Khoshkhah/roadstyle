@@ -1120,13 +1120,17 @@ def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
     pw = pytest.importorskip("playwright.sync_api")
     path = tmp_path / "tunnels.html"
     g = _edge_world().assign(aadt=[1, 2, 3, 4])
+    from roadstyle import compute_levels
+    from roadstyle.render_web import _level_id
+    lv = compute_levels(g)                                                       # the tunnel (row 1)'s positions, as the page computes them
+    fill, casing = _level_id("roads-fill", int(lv.fill_level[1])), _level_id("roads-casing", int(lv.casing_level[1]))
     render_edges(g, backend="web", basemap="blank", color_options={"Class": {}, "AADT": {"color_by": "aadt", "cmap": "viridis"}}).save(path)
-    get = """() => ({fill: JSON.stringify(map.getPaintProperty("roads-fill-lv-1", "line-color")),
-                    pattern: map.getPaintProperty("roads-casing-lv-1-dash", "line-pattern") || null,
-                    dash: map.getPaintProperty("roads-casing-lv-1-dash", "line-dasharray") || null,
-                    dash_color: map.getPaintProperty("roads-casing-lv-1-dash", "line-color"),
-                    gap: JSON.stringify(map.getPaintProperty("roads-casing-lv-1", "line-color")),
-                    slider: document.getElementById("tn-str").value, pal: document.getElementById("tn-pal").value})"""
+    get = f"""() => ({{fill: JSON.stringify(map.getPaintProperty("{fill}", "line-color")),
+                    pattern: map.getPaintProperty("{casing}-dash", "line-pattern") || null,
+                    dash: map.getPaintProperty("{casing}-dash", "line-dasharray") || null,
+                    dash_color: map.getPaintProperty("{casing}-dash", "line-color"),
+                    gap: JSON.stringify(map.getPaintProperty("{casing}", "line-color")),
+                    slider: document.getElementById("tn-str").value, pal: document.getElementById("tn-pal").value}})"""
     errors = []
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
