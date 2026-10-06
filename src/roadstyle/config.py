@@ -51,8 +51,8 @@ class StyleConfig:
     tunnel_palette: str = "One colour"   # the casing of a tunnel, a name in tunnel_palettes (two colours: not decided yet, Kaveh 2026-10-06)
     tunnel_palettes: dict = field(default_factory=lambda: {"One colour": None, "Slate + ice": ["#64748b", "#cbd5e1"],
                                                            "Blue + cyan": ["#315b7d", "#a9d7e8"], "Warm + sand": ["#806d64", "#e7c9a7"],
-                                                           "Graphite + white": ["#4b5563", "#f8fafc"], "Indigo + lavender": ["#4c5c96", "#dfe3f5"],
-                                                           "Teal + mint": ["#2f6f73", "#cfe8e6"]})
+                                                           "Graphite + silver": ["#4b5563", "#b8bec7"], "Indigo + lavender": ["#4c5c96", "#b9c2ea"],
+                                                           "Teal + mint": ["#2f6f73", "#9fd3cf"]})
     # name -> [dash, gap] (v2's two-colour pattern), or None: slate dashes with empty gaps
     minor_no_casing: frozenset[str] = field(default_factory=lambda: _MINOR_NO_CASING)
     #: class -> zoom below which it is hidden. Consulted only when the caller opts in.

@@ -913,19 +913,15 @@ if(OVERLAYS.length){
   }
 }
 // window.rsSetTunnelStyle({strength, palette, ratio}) moves the tunnel look (strength 0-100; palette a name of RS_TUNNEL_PALETTES;
-// ratio [dash, gap] in line widths); the Tunnels box is UI over it. As v2: at 0 the casing is slate dashes with empty gaps; above 0 it is
-// a two-colour pattern, the dash moving toward the palette's first colour and the gap from the background toward its second.
-function _tunHex(a, b, t){                       // a -> b by t (0-1), "#rrggbb"
-  const p=c=>c.slice(1).match(/.{2}/g).map(x=>parseInt(x,16)), A=p(a), B=p(b);
-  return "#"+A.map((x,i)=>Math.round(x*(1-t)+B[i]*t).toString(16).padStart(2,"0")).join("");
-}
+// ratio [dash, gap] in line widths); the Tunnels box is UI over it. At 0 the casing is slate dashes with empty gaps; above 0 a two-colour
+// palette is a pattern of its two colours as they are (Kaveh: blended from the background, as v2, the second colour was hard to see).
 function _tunPattern(){
-  const [c1, c2] = TUNNEL.palettes[TUNNEL.palette], t = TUNNEL.strength/100, u = 8;
+  const [c1, c2] = TUNNEL.palettes[TUNNEL.palette], u = 8;
   const d = Math.max(1, Math.round(TUNNEL.ratio[0]*u)), g = Math.max(1, Math.round(TUNNEL.ratio[1]*u));
   const cv = document.createElement("canvas"); cv.width = d+g; cv.height = u;
   const x = cv.getContext("2d");
-  x.fillStyle = _tunHex(TUNNEL.to.dash, c1, t); x.fillRect(0, 0, d, u);
-  x.fillStyle = _tunHex(TUNNEL.bg, c2, t); x.fillRect(d, 0, g, u);
+  x.fillStyle = c1; x.fillRect(0, 0, d, u);
+  x.fillStyle = c2; x.fillRect(d, 0, g, u);
   const id = "rs-tunnel-casing-"+TUNNEL.ratio.join("-"), data = x.getImageData(0, 0, cv.width, cv.height);
   if(map.hasImage(id)) map.updateImage(id, data); else map.addImage(id, data);     // one small image per dash ratio, kept (tiles may still use it)
   return id;
@@ -952,8 +948,6 @@ function rsSetTunnelStyle(o){
 }
 window.rsSetTunnelStyle = rsSetTunnelStyle;
 window.RS_TUNNEL_PALETTES = TUNNEL.palettes;
-document.addEventListener("rs:basemapchange", e => {           // the casing gap starts from the new background
-  const b = BASEMAPS[e.detail.index]; if(_tunOn && b && b.bg){ TUNNEL.bg = b.bg; rsSetTunnelStyle(); } });
 if(_tunOn){ if(map.isStyleLoaded && map.isStyleLoaded()) rsSetTunnelStyle(); else map.on("load", ()=>rsSetTunnelStyle()); }
 if(TUNNEL.control){
   const w=document.createElement("div"); w.className="tn-ctrl";

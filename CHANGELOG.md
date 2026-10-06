@@ -9,7 +9,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ### Changed
 - **The tunnel look, v2's slider** (`docs/design/tunnel_look.md`): `tunnel_strength` (0-100, 35) moves everything on a tunnel, its fill, street names,
   arrows and attached items, toward slate, opaque (replaces the 72 % see-through fill and its underlay). The casing is the dash layer alone: slate dashes with
-  empty gaps (`One colour`, the default) or a two-colour pattern (`tunnel_palette`); dash ratio 3:3 (`tunnel_casing_dash`). The two-tone casing
+  empty gaps (`One colour`, the default) or a pattern of a palette's two colours as they are (`tunnel_palette`); dash ratio 3:3 (`tunnel_casing_dash`). The two-tone casing
   (`tunnel_gap_shade`, `tunnel_dash_shade`) is gone. A *Tunnels* box (`tunnel_control`) and `rsSetTunnelStyle({strength, palette, ratio})` move it in the page.
 - **Faster page building:** the casing pieces and the arrow and street-name slots are cut with a small numpy cutter instead of shapely's `substring` (the same lines), and a slot of a group of one edge no longer searches for its edge.
   A page of a city of 64,000 roads builds about 40% faster.

@@ -19,9 +19,10 @@ As v2, a tunnel's casing is drawn by its dash layer alone (the other casing laye
 (1.5 px each side) so its colours show:
 
 - **One colour** (`tunnel_palette`, the default; two colours are not decided yet): slate dashes `#94a3b8` with empty gaps, at any strength.
-- **A two-colour palette**: above 0 the dash layer draws a pattern image; the dash moves from `#94a3b8` toward the palette's first colour,
-  the gap from the background toward its second, by the strength. v2's `Slate + ice`, `Blue + cyan`, `Warm + sand`, and three more to try:
-  `Graphite + white`, `Indigo + lavender`, `Teal + mint` (`tunnel_palettes`, `name: [dash, gap]`).
+- **A two-colour palette**: above 0 the dash layer draws a pattern image of the palette's two colours **as they are**, dash and gap. (v2
+  blended them from slate and from the background by the strength; at 35 % the second colour was hard to see, Kaveh 2026-10-06.) v2's
+  `Slate + ice`, `Blue + cyan`, `Warm + sand`, and three more to try with stronger second colours: `Graphite + silver`, `Indigo + lavender`,
+  `Teal + mint` (`tunnel_palettes`, `name: [dash, gap]`).
 - The dash ratio (`tunnel_casing_dash`, in line widths): 3:3 (default, as v2), 1:1 (Kaveh: maybe better than 2:2 or 4:3), 4:4, 2:2, 4:3.
 
 ## In the page
