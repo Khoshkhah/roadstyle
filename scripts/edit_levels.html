@@ -6,7 +6,7 @@ body.lv-open #map{right:var(--lv-w)}
 #lv{position:fixed;top:0;right:0;bottom:0;width:var(--lv-w);z-index:6;background:var(--lv-bg);border-left:1px solid var(--lv-line);
   display:flex;flex-direction:column;font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--lv-ink);transition:transform .2s ease}
 body:not(.lv-open) #lv{transform:translateX(100%)}
-#lv-toggle{position:absolute;left:-30px;top:12px;width:30px;height:40px;border:1px solid var(--lv-line);border-right:none;border-radius:8px 0 0 8px;
+#lv-toggle{position:absolute;left:-30px;top:calc(50% - 20px);width:30px;height:40px;border:1px solid var(--lv-line);border-right:none;border-radius:8px 0 0 8px;
   background:var(--lv-bg);cursor:pointer;font-size:16px;color:var(--lv-mute);box-shadow:-2px 2px 6px rgba(0,0,0,.06)}
 #lv-toggle:hover{color:var(--lv-ink)}
 #lv header{padding:14px 16px 12px;background:#fff;border-bottom:1px solid var(--lv-line)}
@@ -43,7 +43,7 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
 #lv .rows{background:#fff;border:1px solid var(--lv-line);border-radius:10px;overflow:hidden}
 #lv .row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-top:1px solid var(--lv-line);cursor:pointer}
 #lv .row:first-child{border-top:none} #lv .row:hover{background:#f1f5ff}
-#lv .row .what{flex:1;min-width:0} #lv .row .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#lv .row .what{flex:1;min-width:0} #lv .row .txt{overflow-wrap:anywhere}
 #lv .row .off{text-decoration:line-through;color:var(--lv-mute)}
 #lv .chip{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:5px;padding:1px 6px;background:#eef1f6;color:#3b4252}
 #lv .tag{font-size:10.5px;font-weight:600;border-radius:999px;padding:0 7px;color:#fff;background:var(--c)}

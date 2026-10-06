@@ -63,6 +63,7 @@ class Area:
         ends = draw.geometry.apply(lambda ln: list(ln.coords[0][:2]) + list(ln.coords[-1][:2]))
         draw["s_lon"], draw["s_lat"], draw["e_lon"], draw["e_lat"] = zip(*ends, strict=True)
         m = rs.render_edges(draw, edge_id_col="road", road_popup=False, name=f"Level editor · {self.dir.name}",
+                            select_color="rgba(0,0,0,0)",               # the panel colours the picked roads (1 orange, 2 blue): no click glow over them
                             casing_start_col="casing_start", casing_level_col="casing_level", casing_end_col="casing_end",
                             fill_level_col="fill_level")
         page = m.html if hasattr(m, "html") else str(m)
