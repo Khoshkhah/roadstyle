@@ -982,10 +982,11 @@ def test_a_bridge_deck_casing_shows_with_metre_widths_and_no_casing():
 
 
 
-def test_tunnels_get_light_dashes_on_their_fill_unless_turned_off():
-    """Kaveh's pick among three samples ("light dash is ok"): over the tunnel's fill, translucent, butt-capped; not on
-    a dashed class; `tunnel_fill_dash: []` turns it off."""
-    st = _style(render_edges(_tunnel_world(True), backend="web").html)
+def test_tunnels_get_light_dashes_on_their_fill_only_when_asked():
+    """Light dashes on a tunnel's fill: off by default since v2's tunnel look (Kaveh 2026-10-06); `tunnel_fill_dash: [1.2, 1.2]` (his pick of
+    2026-09-30 among three samples) draws them over the fill, translucent, butt-capped, not on a dashed class."""
+    assert not any(l["id"].endswith("-pat") for l in _style(render_edges(_tunnel_world(True), backend="web").html)["layers"])
+    st = _style(render_edges(_tunnel_world(True), backend="web", settings={"config": {"tunnel_fill_dash": [1.2, 1.2]}}).html)
     lay = {l["id"]: l for l in st["layers"]}
     ids = [l["id"] for l in st["layers"]]
     pat = lay["roads-fill-lv-1-pat"]
@@ -993,8 +994,6 @@ def test_tunnels_get_light_dashes_on_their_fill_unless_turned_off():
     assert pat["paint"]["line-dasharray"] == [1.2, 1.2] and pat["layout"]["line-cap"] == "butt"
     assert pat["paint"]["line-color"].startswith("rgba(255,255,255")
     assert '"__rs_dash"' in json.dumps(pat["filter"]) and "__rs_tunnel" in json.dumps(pat["filter"])
-    off = _style(render_edges(_tunnel_world(True), backend="web", settings={"config": {"tunnel_fill_dash": []}}).html)
-    assert not any(l["id"].endswith("-pat") for l in off["layers"])
 
 
 def test_colour_by_recolours_the_dashed_layers_too():
@@ -1198,7 +1197,7 @@ def test_level_columns_keep_the_looks_and_the_dashed_classes():
     ids = [l["id"] for l in style["layers"]]
     lay = {l["id"]: l for l in style["layers"]}
     ps = [f["properties"] for f in style["sources"]["roads"]["data"]["features"]]
-    assert "roads-casing-lv-1-dash" in ids and "roads-fill-lv-1-pat" in ids and "roads-fill-lv-1-under" not in ids   # the tunnel's look at -1 (no underlay: an opaque fill, docs/design/tunnel_look.md)
+    assert "roads-casing-lv-1-dash" in ids and "roads-fill-lv-1-pat" not in ids and "roads-fill-lv-1-under" not in ids   # no light fill dashes by default   # the tunnel's look at -1 (no underlay: an opaque fill, docs/design/tunnel_look.md)
     assert [bool(_eval(lay["roads-casing-lv-1-dash"]["filter"], p)) for p in ps] == [True, False, False]
     dash = [i for i in ids if i.startswith("roads-fill-lv1-dash")]                                                  # the footway's dashes at 1
     assert dash and '"__rs_fl"' in json.dumps(lay[dash[0]]["filter"]) and '"__rs_cl"' not in json.dumps(lay[dash[0]]["filter"])

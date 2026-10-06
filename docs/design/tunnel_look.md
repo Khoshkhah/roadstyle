@@ -31,6 +31,8 @@ The casing follows the slider like everything on a tunnel (Kaveh 2026-10-06): it
   both colours equal, short pieces, so a crossing never lands in one long dash or gap), 2:2, 3:3 (v2's), 4:4, 2:1, 3:2, 4:3 (longer dashes:
   with One colour, shorter empty gaps), 1:2.
 
+The light dashes on the fill (`tunnel_fill_dash`) are off by default, as in v2's look (Kaveh 2026-10-06); `[1.2, 1.2]` turns them on.
+
 ## In the page
 
 A **Tunnels** box (on a map with tunnels; `tunnel_control=False` leaves it out): the preset menu, the slider, the palette and the dash ratio.
