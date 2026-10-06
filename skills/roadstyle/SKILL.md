@@ -59,6 +59,8 @@ m.save("map.html")                        # m.html is the page as a string
 - One colouring only: `color_by="flow", cmap="viridis"` (numeric, needs `numeric` extra) or
   `color_by="level", colors={...}` (categorical). `width_by=(1, 6)` scales width by the value.
 - Per-edge colours you computed: `color_table={edge_id: "#hex"}` (dict / Series / DataFrame).
+- Several things switched at once (colour, road fill, overlays, classes, base map, 3D): `views={"Flow": {"color": "Flow",
+  "overlays": {"lanes": False}}, ...}`, a *View* menu next to *Colour by*; `rsSetView(name)` from a host page.
 - Other useful keywords: `include=[...]` / `exclude=[...]` (road classes), `view_3d=True`,
   `tiles=True` (above ~50k edges), `boundary=geojson` (dashed outline),
   `overlays=[rs.Overlay(gdf, placement="under"|"over", label=..., popup=[...])]`, attached to edges: `rs.Overlay(gdf, edge_col="edge_id", order_col="order")` (drawn at its edge's fill number, by order), look from a library's theme: `rs.Overlay(gdf, style="dashed")` with `settings={"config": {"overlays": {"styles": {...}}}}` (`width_m`, `dash`, `min_zoom`, kind `text`), `render_edges(road_fill=False)` (the road's casing without its fill),

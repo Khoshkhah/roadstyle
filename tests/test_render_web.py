@@ -1717,6 +1717,65 @@ def test_road_fill_false_draws_the_casing_but_not_the_fill():
     assert any(lyr["id"].startswith("ov0-circle-lv") for lyr in with_items["layers"])
 
 
+_CO = {"Class": {}, "AADT": {"color_by": "aadt", "cmap": "viridis"}}
+
+
+def _marks():
+    return gpd.GeoDataFrame({"n": [1]}, geometry=[LineString([(17.9, 59.37), (17.91, 59.38)]).centroid], crs=4326)
+
+
+def test_views_are_baked_and_checked():
+    """docs/design/core_model_and_views.md, views: each view is baked with its settings; a setting that is not known, or that names something
+    the page does not have, is an error (no view is silently half applied)."""
+    html = render_edges(_edges(), backend="web", color_options=_CO, overlays=[Overlay(_marks(), label="marks")],
+                        views={"Flow": {"color": "AADT", "overlays": {"marks": False}}, "Casing": {"road_fill": False}}).html
+    views = json.loads(re.search(r"const VIEWS = (\[.*?\]);\n", html).group(1))
+    assert views == [{"name": "Flow", "set": {"color": "AADT", "overlays": {"marks": False}}},
+                     {"name": "Casing", "set": {"road_fill": False}}]
+    fill = json.loads(re.search(r"const RS_ROAD_FILL = (\{.*?\});\n", html).group(1))
+    assert fill["on"] is True and "roads-fill" in fill["paint"] and not any(k.endswith("-pat") for k in fill["paint"])
+    assert "const VIEWS = [];" in render_edges(_edges(), backend="web").html                 # no views: no menu
+    for bad in ({"colour": "AADT"}, {"color": "Speed"}, {"road_fill": 1}, {"overlays": {"lanes": True}},
+                {"classes": ["trunk"]}, {"basemap": "nowhere"}):
+        with pytest.raises(ValueError):
+            render_edges(_edges(), backend="web", color_options=_CO, views={"V": bad})
+
+
+def test_views_switch_in_the_browser(tmp_path):
+    """The View menu and rsSetView in a real page: the first view on open, then each view sets the colour option, the road fill and the
+    overlays it names, and leaves the rest as it is."""
+    pw = pytest.importorskip("playwright.sync_api")
+    path = tmp_path / "views.html"
+    render_edges(_edges(), backend="web", basemap="blank", color_options=_CO, road_fill=False,
+                 overlays=[Overlay(_marks(), label="marks")],
+                 views={"Roads": {"color": "Class", "road_fill": True, "overlays": {"marks": False}},
+                        "Flow": {"color": "AADT"},
+                        "Casing": {"road_fill": False, "overlays": {"marks": True}}}).save(path)
+    state = """() => ({opacity: map.getPaintProperty("roads-fill", "line-opacity"), color: JSON.stringify(map.getPaintProperty("roads-fill", "line-color")),
+                       marks: map.getLayoutProperty(RS_OVERLAYS[0].layers[0], "visibility"), menu: document.getElementById("vw-select").value,
+                       colour_menu: document.getElementById("co-select").value})"""
+    errors, events = [], []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && map.loaded() && document.getElementById('vw-select')", timeout=30_000)
+        page.evaluate("document.addEventListener('rs:viewselect', e => window._ev = e.detail.view)")
+        opened = page.evaluate(state)
+        page.evaluate("rsSetView('Flow')")
+        flow = page.evaluate(state)
+        events.append(page.evaluate("window._ev"))
+        page.evaluate("rsSetView(2)")
+        casing = page.evaluate(state)
+        browser.close()
+    assert errors == []
+    assert opened["opacity"] is None and opened["marks"] == "none" and "__rs_fill\"" in opened["color"] and opened["menu"] == "0"   # Roads, on open
+    assert flow["opacity"] is None and flow["marks"] == "none" and "__rs_fill__1" in flow["color"]                                # only the colour changed
+    assert flow["menu"] == "1" and flow["colour_menu"] == "1" and events == ["Flow"]
+    assert casing["opacity"] == 0 and casing["marks"] == "visible" and "__rs_fill__1" in casing["color"] and casing["menu"] == "2"
+
+
 _STYLES = {"config": {"overlays": {"styles": {
     "divider": {"kind": "line", "color": "#ffffff", "width_m": 0.12, "min_zoom": 16},
     "dashed": {"kind": "line", "color": "#eeeeee", "width_m": 0.12, "dash": [3, 3], "min_zoom": 16, "max_zoom": 21},

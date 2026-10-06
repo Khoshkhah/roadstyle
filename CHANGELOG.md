@@ -6,7 +6,14 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **`views=`**: a *View* menu next to *Colour by*. A view is a name and a set of settings applied together: the colour option, the road fill, which overlays show, the road classes,
+  bridges, tunnels, 3D and the base map (`{"Lanes": {"road_fill": False, "overlays": {"lanes": True}}}`). The page opens with the first view; `rsSetView(name)` applies one from a host page.
+  An unknown setting, or a name the page does not have, is an error. Design: `docs/design/core_model_and_views.md`.
+- **`rsSetRoadFill(on)`**: the roads' own fill on or off in the page; with `road_fill=False` it can now be shown again.
+
 ### Changed
+- **`road_fill=False`**: the tunnel pattern is drawn over the items of its position, so a tunnel reads as a tunnel on the lanes; a hovered interactive overlay wins over the road under it.
 - **Faster page building:** the casing pieces and the arrow and street-name slots are cut with a small numpy cutter instead of shapely's `substring` (the same lines), and a slot of a group of one edge no longer searches for its edge.
   A page of a city of 64,000 roads builds about 40% faster.
 
