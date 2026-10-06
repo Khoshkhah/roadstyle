@@ -52,11 +52,11 @@ class Area:
         lv, info = self.dir / "levels.csv", self.dir / "levels_info.json"
         inputs = [self.dir / "roads.parquet", self.dir / "pairs.csv", self.edits_path]
         if not (lv.exists() and info.exists()) or lv.stat().st_mtime < max(p.stat().st_mtime for p in inputs):
-            print("levels.csv is missing or older than roads.parquet / pairs.csv / edits.csv: solved again")
+            print("levels.csv is missing or older than roads.parquet / pairs.csv / edits.csv: solved again", flush=True)
             return None
         t = pd.read_csv(lv, dtype={"edge": str}).set_index("edge")
         if not t.index.is_unique or not set(self.road_of) <= set(t.index):             # every edge of the roads, once
-            print("levels.csv does not match roads.parquet: solved again")
+            print("levels.csv does not match roads.parquet: solved again", flush=True)
             return None
         solved = self.roads.copy()
         cols = ["casing_start", "casing_level", "casing_end", "fill_level"]
@@ -71,7 +71,7 @@ class Area:
             solved.iloc[i, [solved.columns.get_loc(c) for c in cols]] = v
         solved.attrs["levels_info"] = {k: v for k, v in json.loads(info.read_text()).items() if k != "given_up"}
         solved.attrs["levels_given_up"] = [tuple(p) for p in json.loads(info.read_text()).get("given_up", [])]
-        print(f"drawn from {lv} (not solved again)")
+        print(f"drawn from {lv} (not solved again)", flush=True)
         return solved
 
     def edits(self):
@@ -211,7 +211,7 @@ def main(argv=None):
     ap.add_argument("--port", type=int, default=8780)
     a = ap.parse_args(argv)
     area = Area(a.area_dir)
-    print(f"level editor: http://localhost:{a.port}/  ({a.area_dir}; Ctrl+C to stop)")
+    print(f"level editor: http://localhost:{a.port}/  ({a.area_dir}; Ctrl+C to stop)", flush=True)
     ThreadingHTTPServer(("127.0.0.1", a.port), _handler(area)).serve_forever()
 
 
