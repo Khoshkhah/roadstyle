@@ -33,7 +33,7 @@ its fill is after the lower road's fill. Before, its pair was dropped, and short
 |---|---|---|
 | `roads.parquet` | one row per road (both directions of a segment together): `road` (the id of its first edge), `edges` / `reversed` (the ids of its edges running its way / the other way), `band`, `priority`, the line | `scripts/level_input.py` (`rs.level_input`), every run |
 | `pairs.csv` | one row per relation: `relation`, `a`, `b`, `a_end`, `b_end` (below) | `scripts/level_input.py`, every run |
-| `edits.csv` | your changes to the pairs, same columns plus `enabled`: `false` switches a pair off, anything else adds one; `a` / `b` may name either direction of a road | created empty once; you or a pair editor, never overwritten |
+| `edits.csv` | your changes to the pairs, same columns plus `enabled`: `false` switches a pair off, anything else adds one; `a` / `b` may name either direction of a road | created empty once; you, or `scripts/edit_levels.py`; never overwritten by the input step |
 | `levels.csv` | the result, one row per edge: `edge`, `casing_start`, `casing_level`, `casing_end`, `fill_level` | `scripts/solve_levels.py` (`rs.solve_levels`) |
 
 Relations: `meet` (the end `a_end` of `a` is the end `b_end` of `b`: each head is under the other road's fill), `stack` (`a` is over `b`) and
@@ -44,6 +44,14 @@ python scripts/level_input.py edges.gpkg out/monaco                          # a
 python scripts/level_input.py monaco.duckdb out/monaco --query "SELECT * EXCLUDE (geometry), ST_AsWKB(geometry) AS geometry FROM driving.edges"
 python scripts/solve_levels.py out/monaco
 ```
+
+**The editor** (`python scripts/edit_levels.py out/monaco`, a local page at http://localhost:8780/) writes `edits.csv`: click two roads (road 1
+orange, road 2 blue; their start and end points are marked), see every pair between them (the found ones, with *switch off*, and your edits,
+with *delete*), and add one (`order` or `stack`: road 1 over road 2; `meet`: the chosen end of each). Every change is solved at once and the
+page reloads with the new levels, keeping the view and the picked roads; `levels.csv` is written too. An edit the solver refuses (an unknown
+road, nothing to switch off) is not saved, and the panel says why. The `edits.csv` before each change is kept as `edits.csv.bak`. The list of
+your edits shows each one's two roads when clicked. It is written for this page alone (the roadstyle map and its `rs*` API); the v2 test's
+pair editor is not used.
 
 In Python: `roads, pairs = rs.level_input(edges)`, `solved = rs.solve_levels(roads, pairs, edits=...)`; `rs.compute_levels(edges)` is both in
 one call and returns the edges with the four columns.

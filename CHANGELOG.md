@@ -10,6 +10,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **The level step on its own** (`docs/design/level_input.md`): `rs.level_input(edges)` (the solver's input from any edges: `roads`, one row per road, and `pairs`,
   `meet` / `stack` / `order`), `rs.solve_levels(roads, pairs, edits=...)`, and `scripts/level_input.py` / `scripts/solve_levels.py` writing `roads.parquet`, `pairs.csv`,
   an `edits.csv` you own, and `levels.csv`. `compute_levels` is the two in one call.
+- **The level editor** (`scripts/edit_levels.py AREA_DIR`): a local page to write `edits.csv`: pick two roads, see their pairs, switch one off or add one;
+  every change is solved at once and shown, an edit the solver refuses is not saved.
 
 ### Changed
 - **Meet or cross:** roads of different bands that only meet (a tunnel mouth, a bridge end) follow the priority order; roads that cross keep the band. With `band_col`
