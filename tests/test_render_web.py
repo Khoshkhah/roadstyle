@@ -2003,6 +2003,7 @@ def test_cap_start_and_end_cols_set_one_end_each():
     assert ps[0].get("__rs_split") and ps[1].get("__rs_cap") == "square"                       # flat / round differ; square / square: one edge
     halves = [f["properties"] for f in style["sources"]["halves"]["data"]["features"]]
     assert [h.get("__rs_cap") for h in halves] == [True, None]                                   # start half flat, end half round
+    assert [h["__rs_road"] for h in halves] == [0, 0]                                            # its edge's id, for the recolouring
     assert [bool(_eval(lay["roads-fill"]["filter"], p)) for p in ps] == [False, False]           # the split edge: not in the whole fill
     assert [bool(_eval(lay["roads-fill-sx"]["filter"], p)) for p in ps] == [False, True]
     assert [[bool(_eval(lay[i]["filter"], h)) for h in halves] for i in ("roads-fill-hsq", "roads-fill-h")] == [[True, False], [False, True]]

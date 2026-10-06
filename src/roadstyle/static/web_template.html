@@ -691,7 +691,10 @@ function _fillExpr(idE){
 }
 function _applyFill(){
   const e=_fillExpr();
-  RS_FILL_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"line-color",e); });
+  // the fill halves of an edge with two different ends (square_ends.md) have no feature id: they name their edge in __rs_road
+  // (without it a recolouring could not evaluate on them and MapLibre drew them black)
+  const eh=_fillExpr(["get","__rs_road"]);
+  RS_FILL_LAYERS.forEach(id=>{ const l=map.getLayer(id); if(l) map.setPaintProperty(id,"line-color",l.source==="halves"?eh:e); });
   // the dashed layers (<fill layer>-dash0, -dash1 ...: one per dash pattern, for footway, path, steps ...) draw the
   // dashed classes' edges: they take the active colouring too, or such a road keeps its class colour under any "colour by"
   const dashed=bases=>map.getStyle().layers.map(l=>l.id).filter(id=>bases.some(b=>id.startsWith(b+"-dash")));

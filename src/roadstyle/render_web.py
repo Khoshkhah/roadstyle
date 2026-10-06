@@ -747,10 +747,11 @@ def _mark_caps(geo, cap_col=None, start_col=None, end_col=None):
 def _halves(geo):
     """The fill of every edge with two different ends (``__rs_split``) as two halves cut at the middle, each with its end's ``__rs_cap``
     and all the edge's properties: MapLibre sets line-cap per layer, so each end shape needs its own piece (docs/design/square_ends.md).
-    At the cut the two halves overlap or meet in the same colour."""
+    At the cut the two halves overlap or meet in the same colour. A half carries ``__rs_road``, its edge's feature id (the "roads" source's
+    generated one), for the page's recolouring: the halves source has no id of its own."""
     import numpy as np
     out = []
-    for ft in geo["features"]:
+    for i, ft in enumerate(geo["features"]):
         p, g = ft["properties"], ft.get("geometry") or {}
         c = g.get("coordinates") or []
         if not p.get("__rs_split") or g.get("type") != "LineString" or len(c) < 2:
@@ -764,6 +765,7 @@ def _halves(geo):
             pts = _part(xy, cum, a, b)
             coords = np.column_stack([np.round(pts[:, 0] / kx + lon0, 7), np.round(pts[:, 1] / ky + lat0, 7)]).tolist()
             q = {kk: v for kk, v in p.items() if kk not in ("__rs_cap0", "__rs_cap1", "__rs_split")}
+            q["__rs_road"] = i
             if p[f"__rs_cap{k}"] is not None:
                 q["__rs_cap"] = p[f"__rs_cap{k}"]
             out.append({"type": "Feature", "properties": q, "geometry": {"type": "LineString", "coordinates": coords}})
