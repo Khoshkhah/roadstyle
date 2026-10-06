@@ -703,7 +703,7 @@ def _casing_parts(geo, head_m, cols):
         cum = _cum_lengths(xy)
         n = float(cum[-1])
         h0, h1 = p.get("__rs_hs", head_m), p.get("__rs_he", head_m)       # this edge's head lengths (head_start_m_col / head_end_m_col)
-        if h0 + h1 >= n:                # a short road is two pieces, one at each head's number, cut in the heads' ratio (docs/design/short_road_heads.md)
+        if h0 + h1 >= n - 0.05:         # a short road (or main part under 5 cm) is two pieces, one at each head's number, cut in the heads' ratio (docs/design/short_road_heads.md)
             h0, h1 = n * h0 / (h0 + h1), n * h1 / (h0 + h1)
         cuts = [(0.0, h0, cs), (h0, n - h1, cm), (n - h1, n, ce)]
         for k, (a, b, num) in enumerate(cuts):

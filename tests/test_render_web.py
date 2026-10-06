@@ -2069,3 +2069,15 @@ def test_auto_ends_fit_heads_and_caps_to_the_joins():
     assert e.loc["5", "end_m"] > e.loc["3", "end_m"]                               # a narrow merge (about 22°) overlaps for longer
     assert e.loc["5", "cap_end"] == "flat" and e.loc["3", "cap_end"] == "flat"     # a primary ending on a narrower street: its round end spills over
     assert e.loc["1", "cap_start"] == "round" and e.loc["4", "cap_start"] == "round"  # a dead end, the street going on round a bend: round
+
+
+def test_heads_over_the_whole_road_leave_no_main_part():
+    """casing_parts: heads that cover the road (to within 5 cm, as the editor's "no main part" sets them) leave no main part."""
+    import pandas as pd
+
+    import roadstyle as rs
+    g = gpd.GeoDataFrame({"highway": ["residential"], "edge_id": [1]}, geometry=[LineString([(674000, 6580000), (674010, 6580000)])], crs=3006)
+    roads, _ = rs.level_input(g)
+    heads = lambda s, e: pd.DataFrame([{"road": "1", "start_m": s, "end_m": e}])          # noqa: E731
+    assert rs.casing_parts(roads, 5.0, heads("6", "3.97"))["1"][1] is None
+    assert rs.casing_parts(roads, 5.0, heads("6", "3.8"))["1"][1] is not None

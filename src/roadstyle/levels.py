@@ -498,7 +498,7 @@ def casing_parts(roads, head_m=5.0, heads=None):
         n, (h0, h1) = g.length, hl[r]
         if h0 + h1 >= n:
             h0, h1 = n * h0 / (h0 + h1), n * h1 / (h0 + h1)
-        out[r] = (substring(g, 0, h0), substring(g, h0, n - h1) if n - h1 > h0 else None, substring(g, n - h1, n))
+        out[r] = (substring(g, 0, h0), substring(g, h0, n - h1) if n - h1 - h0 > 0.05 else None, substring(g, n - h1, n))   # under 5 cm: no main part
     return out
 
 
