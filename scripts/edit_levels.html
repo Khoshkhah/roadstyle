@@ -73,6 +73,7 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
 #lv .gu-parts{display:flex;gap:3px;margin-top:3px;font-size:11px;color:var(--lv-mute);align-items:center;flex-wrap:wrap}
 #lv .gu-parts b{font-weight:600;border-radius:4px;padding:0 5px;background:#eef1f6;color:#3b4252;font-variant-numeric:tabular-nums}
 #lv .gu-parts b.bad{background:#ffe3e3;color:var(--lv-bad)}
+#lv .gu-parts b.warn{background:#fff4e6;color:#b35c00}
 #lv .tag{font-size:10.5px;font-weight:600;border-radius:999px;padding:0 7px;color:#fff;background:var(--c)}
 #lv .act{flex:none;font:12px system-ui;border:1px solid var(--lv-line);background:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;color:#3b4252}
 #lv .act:hover{border-color:var(--lv-bad);color:var(--lv-bad)}
@@ -138,8 +139,11 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   </div>
   <div class="scroll" data-tab="given" hidden>
     <section><h2>Given up by the solver <span style="text-transform:none;letter-spacing:0;font-weight:500">a flaw on the map each</span></h2>
-      <div class="desc" style="margin-top:0">Crossing pairs (A over B) the solver could not keep, because of the joins around them: the parts of A's casing
-        at or under B's fill are red. Click one to open the pair, then switch off or add a part, or change a join nearby.</div><div id="lv-given"></div></section>
+      <div class="desc" style="margin-top:0">Crossings (A over B) the solver could not keep, because of the joins around them: the part of A's casing
+        that crosses B and is drawn under B's fill is red. Click one to open the pair, then switch off or add a part, or change a join nearby.</div><div id="lv-given"></div></section>
+    <section><h2>Near: warnings <span style="text-transform:none;letter-spacing:0;font-weight:500">not crossing, kept last</span></h2>
+      <div class="desc" style="margin-top:0">Parts of A that only come near B (they do not cross it), drawn under B's fill: the solver keeps these last, after
+        every crossing and order wish. Worth a look only where the two roads overlap on the map.</div><div id="lv-near"></div></section>
   </div>
   <div id="lv-toast"></div>
 </aside>
@@ -172,7 +176,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     document.querySelectorAll("#lv [data-tab]").forEach(d => d.hidden = d.dataset.tab !== t); }
   document.querySelectorAll("#lv-tabs button").forEach(b => b.onclick = () => tab(b.dataset.t));
   $("lv-stats").innerHTML = [["order wishes", STATS.order_pairs], ["not kept", STATS.order_violations || 0], ["stack pairs", STATS.pairs || 0],
-    ["given up", STATS.given_up.length]].map(([k, v]) => `<span class="stat"${k === "given up" ? ` style="cursor:pointer" title="Show the list" id="lv-gu-stat"` : ""}><b>${v}</b> ${k}</span>`).join("");
+    ["given up", STATS.given_up.length], ["near warnings", STATS.near_warnings || 0]].map(([k, v]) => `<span class="stat"${k === "given up" ? ` style="cursor:pointer" title="Show the list" id="lv-gu-stat"` : ""}><b>${v}</b> ${k}</span>`).join("");
   $("lv-gu-stat").onclick = () => tab("given");
   function toast(t, bad){ const e = $("lv-toast"); e.textContent = t; e.className = "show" + (bad ? " bad" : ""); clearTimeout(e._t);
     e._t = setTimeout(() => e.className = "", bad ? 6000 : 2600); }
@@ -406,17 +410,19 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   async function givenUp(){
     const j = await api("/api/given_up"); Object.assign(facts, j.roads);
     $("lv-gu-n").textContent = j.rows.length;
-    const box = $("lv-given");
-    if(!j.rows.length){ box.className = ""; box.innerHTML = `<div class="empty" style="padding:8px">none: every crossing is kept</div>`; return; }
-    box.className = "rows";
-    box.innerHTML = j.rows.map(r => {
-      const part = (n, i) => `<b class="${r.parts.includes(n) ? "bad" : ""}" title="${n} casing ${r.levels[i]}">${n} ${r.levels[i]}</b>`;
-      return `<div class="row" title="Show on the map"><span class="what"><div class="txt">${esc(name(r.a))} <small>${esc(ref(r.a))}</small>
-        over ${esc(name(r.b))} <small>${esc(ref(r.b))}</small>${r.fill_under ? ` <span class="tag" style="--c:var(--lv-bad)">fill under too</span>` : ""}</div>
-        <div class="gu-parts">A ${["start", "main", "end"].map(part).join("")} <b class="${r.fill_under ? "bad" : ""}">fill ${r.levels[3]}</b>
-          &nbsp;·&nbsp; B fill <b>${r.b_fill}</b></div></span></div>`;
-    }).join("");
-    box.querySelectorAll(".row").forEach((el, n) => el.onclick = () => { tab("edit"); setPair(j.rows[n].a, j.rows[n].b, true); });
+    const list = (box, rows, cls, none) => {
+      if(!rows.length){ box.className = ""; box.innerHTML = `<div class="empty" style="padding:8px">${none}</div>`; return; }
+      box.className = "rows";
+      box.innerHTML = rows.map(r => {
+        const part = (n, i) => `<b class="${r.parts.includes(n) ? cls : ""}" title="${n} casing ${r.levels[i]}">${n} ${r.levels[i]}</b>`;
+        return `<div class="row" title="Show on the map"><span class="what"><div class="txt">${esc(name(r.a))} <small>${esc(ref(r.a))}</small>
+          over ${esc(name(r.b))} <small>${esc(ref(r.b))}</small>${r.fill_under && cls === "bad" ? ` <span class="tag" style="--c:var(--lv-bad)">fill under too</span>` : ""}</div>
+          <div class="gu-parts">A ${["start", "main", "end"].map(part).join("")} <b>fill ${r.levels[3]}</b> &nbsp;·&nbsp; B fill <b>${r.b_fill}</b></div></span></div>`;
+      }).join("");
+      box.querySelectorAll(".row").forEach((el, n) => el.onclick = () => { tab("edit"); setPair(rows[n].a, rows[n].b, true); });
+    };
+    list($("lv-given"), j.rows, "bad", "none: every crossing is kept");
+    list($("lv-near"), j.near, "warn", "none");
   }
   async function lists(){
     const j = await api("/api/edits"); Object.assign(facts, j.roads);

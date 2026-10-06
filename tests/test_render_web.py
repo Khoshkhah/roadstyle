@@ -1276,11 +1276,10 @@ def test_compute_levels_on_the_bundled_sample():
     assert info["pairs"] == 268                                                     # stack pairs (docs/design/level_input.md: roads of different bands that only meet take the order)
     under = [944, 4251, 2082, 2363]
     assert all(s.casing_level[207] > s.fill_level[i] for i in under)                # the bridge is over them, outline included
-    assert len(s.attrs["levels_given_up"]) == 30                                    # loops no order keeps (two ramps, each over one tube of a tunnel and joining the other), and short roads whose heads count one by one (docs/design/level_input.md)
-    parts = s.attrs["levels_given_up_parts"]                                        # which part broke: named for every given-up pair, and truly at or under
-    assert {(u, l) for u, l, _ in parts} == set(s.attrs["levels_given_up"])
+    assert s.attrs["levels_given_up"] == []                                         # every real crossing kept (docs/design/level_input.md)
+    near = s.attrs["levels_near"]                                                     # rules on parts that only come near: last, a warning when broken
     col = {"start": "casing_start", "main": "casing_level", "end": "casing_end"}
-    assert all(s[col[h]][u] <= s.fill_level[l] for u, l, h in parts)
+    assert near and all(s[col[h]][u] <= s.fill_level[l] for u, l, h in near)
 
 
 def test_level_columns_put_each_positions_arrows_after_its_fill_layers():
@@ -2027,3 +2026,16 @@ def test_head_metre_cols_set_where_the_casing_is_cut():
         return out
     assert lengths(0) == [20.0, 75.0, 5.0]                                                # 20 m start head, the default 5 m end head
     assert lengths(1) == [6.0, 2.0]                                                       # 8 m < 9 + 3: cut 3 : 1
+
+
+def test_near_rules_give_way_to_order_wishes_and_real_crossings_do_not():
+    """A stack rule on a part that only comes near the lower road is kept last (after the order wishes) and reported as a warning, not a
+    given-up pair; the same rule on a crossing part is kept before the wishes (docs/design/level_input.md)."""
+    pytest.importorskip("scipy")
+    from roadstyle.levels import _solve_intervals
+    lines = [LineString([(0, 0), (40, 0)]), LineString([(0, 5), (40, 5)])]
+    args = (lines, [], [(0, 1)], [(1, 0)], 30, 20, 1.0)                 # road 0 over road 1, but a wish: road 1's fill after road 0's
+    _, given, info = _solve_intervals(*args, near={(0, 1, h) for h in "sme"})
+    assert given == [] and info["order_violations"] == 0 and len(info["near_parts"]) == 3     # the near rule gives way: a warning
+    _, given, info = _solve_intervals(*args)
+    assert given == [] and info["order_violations"] == 1                                          # a real crossing is kept, the wish is not

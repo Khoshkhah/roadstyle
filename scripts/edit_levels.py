@@ -79,7 +79,8 @@ class Area:
                 s, m, e, f = t.loc[str(r.reversed[0]), cols].tolist()
                 v = [e, m, s, f]
             solved.iloc[i, [solved.columns.get_loc(c) for c in cols]] = v
-        solved.attrs["levels_info"] = {k: v for k, v in json.loads(info.read_text()).items() if k not in ("given_up", "given_up_parts")}
+        solved.attrs["levels_info"] = {k: v for k, v in json.loads(info.read_text()).items() if k not in ("given_up", "given_up_parts", "near")}
+        solved.attrs["levels_near"] = [tuple(p) for p in json.loads(info.read_text()).get("near", [])]
         solved.attrs["levels_given_up_parts"] = [tuple(p) for p in json.loads(info.read_text()).get("given_up_parts", [])]
         solved.attrs["levels_given_up"] = [tuple(p) for p in json.loads(info.read_text()).get("given_up", [])]
         print(f"drawn from {lv} (not solved again)", flush=True)
@@ -91,7 +92,7 @@ class Area:
     def solve(self, edits, heads=None):
         heads = self.heads if heads is None else heads
         t = pd.DataFrame([(r, *heads[r]) for r in sorted(heads)], columns=["road", "start_m", "end_m"])
-        return rs.solve_levels(self.roads, self.pairs, edits=edits if len(edits) else None, empty_main=rs.empty_mains(self.roads, 5.0, t))
+        return rs.solve_levels(self.roads, self.pairs, edits=edits if len(edits) else None, parts=rs.casing_parts(self.roads, 5.0, t))
 
     def build(self, edits, solved=None):
         if solved is None:
@@ -100,6 +101,7 @@ class Area:
         self.solved = solved
         self.stats = {**solved.attrs["levels_info"], "given_up": [list(p) for p in solved.attrs["levels_given_up"]], "area": self.dir.name}
         self.broken = solved.attrs.get("levels_given_up_parts", [])
+        self.near = solved.attrs.get("levels_near", [])
         for r in solved.itertuples():
             self.facts[r.road]["caps"] = list(self.caps.get(r.road, ("", "")))
             self.facts[r.road]["heads"] = [float(x) if x else 5.0 for x in self.heads.get(r.road, ("", ""))]
@@ -186,12 +188,12 @@ class Area:
     def given_up(self):
         """The stack pairs the solver could not keep (A over B), each with the parts of A's casing the solver could not put after B's fill
         and whether A's fill is under B's too: flaws on the map, to fix by hand."""
-        rows = []
-        for u, l in self.stats["given_up"]:
+        def row(u, l, broken):
             lv, under = self.facts[u]["levels"], self.facts[l]["levels"][3]
-            rows.append({"a": u, "b": l, "levels": lv, "b_fill": under, "fill_under": lv[3] <= under,
-                         "parts": [h for a, b, h in self.broken if (a, b) == (u, l)]})
-        return {"rows": rows, "roads": {x: self.facts[x] for r in rows for x in (r["a"], r["b"])}}
+            return {"a": u, "b": l, "levels": lv, "b_fill": under, "fill_under": lv[3] <= under, "parts": [h for a, b, h in broken if (a, b) == (u, l)]}
+        rows = [row(u, l, self.broken) for u, l in self.stats["given_up"]]
+        near = [row(u, l, self.near) for u, l in dict.fromkeys((a, b) for a, b, _ in self.near)]      # warnings: parts that only come near
+        return {"rows": rows, "near": near, "roads": {x: self.facts[x] for r in rows + near for x in (r["a"], r["b"])}}
 
     def find(self, q, limit=20):
         """The roads for a search: an exact edge id (either direction of a road), else the edge_refs that hold ``q`` (an exact one first)."""

@@ -5,7 +5,7 @@
 levels.csv has one row per edge: edge (its id), casing_start, casing_level, casing_end, fill_level; draw them with
 rs.render_edges(edges, casing_start_col=..., casing_level_col=..., casing_end_col=..., fill_level_col=...). The head lengths are the
 drawing's (render_edges' head_m, or head_start_m_col / head_end_m_col; the level editor keeps them in heads.csv); the solver only learns from
-them which roads have an empty main part (shorter than their two heads: --head-m each, or OUT_DIR/heads.csv's own).
+them which main parts are empty and which parts of an upper road cross the road under it (--head-m each, or OUT_DIR/heads.csv's own).
 """
 import argparse
 from pathlib import Path
@@ -32,7 +32,8 @@ def write(solved, folder):
     import json
     edge_levels(solved).to_csv(Path(folder) / "levels.csv", index=False)
     info = {**solved.attrs["levels_info"], "given_up": [list(p) for p in solved.attrs["levels_given_up"]],
-            "given_up_parts": [list(p) for p in solved.attrs.get("levels_given_up_parts", [])]}
+            "given_up_parts": [list(p) for p in solved.attrs.get("levels_given_up_parts", [])],
+            "near": [list(p) for p in solved.attrs.get("levels_near", [])]}
     (Path(folder) / "levels_info.json").write_text(json.dumps(info, default=str))
 
 
@@ -45,11 +46,12 @@ def main(argv=None):
     roads = gpd.read_parquet(a.out_dir / "roads.parquet")
     edits = a.out_dir / "edits.csv"
     heads = a.out_dir / "heads.csv"
-    empty = rs.empty_mains(roads, a.head_m, heads if heads.exists() else None)
-    solved = rs.solve_levels(roads, a.out_dir / "pairs.csv", edits=edits if edits.exists() else None, max_positions=a.max_positions, empty_main=empty)
+    parts = rs.casing_parts(roads, a.head_m, heads if heads.exists() else None)
+    solved = rs.solve_levels(roads, a.out_dir / "pairs.csv", edits=edits if edits.exists() else None, max_positions=a.max_positions, parts=parts)
     write(solved, a.out_dir)
     info = solved.attrs["levels_info"]
     print(f"{len(roads)} roads -> {a.out_dir / 'levels.csv'}: {len(solved.attrs['levels_given_up'])} stack pair(s) given up, "
+          f"{len(solved.attrs.get('levels_near', []))} near warning(s), "
           f"{info.get('order_violations', 0)} order wish(es) not kept, {info.get('seconds')} s")
 
 

@@ -36,10 +36,14 @@ whatever its length; the drawing gives them their metres (`head_m`, or a road's 
 have an empty main part (`rs.empty_mains(roads, head_m, heads)` -> `solve_levels(empty_main=...)`): a stack never lifts an empty main
 part, since a rule on a part nobody sees would cost real ones (without it Monaco gave up 23 pairs, 7 of them for invisible parts).
 
-A **given-up** pair is a stack pair with at least one required part (the main part unless empty, each head not at a junction with B)
-not above B's fill: a flaw on the map. Before, a road shorter than `2 · head_m` had one casing number and, at a junction, no required
-part at all, so it could lie wholly under B and count as kept. Monaco now 22 given up (was counted 16; 5 of the 6 more were already
-wrong on the old map), 47 order wishes not kept (41), 10 positions; the Södermalm sample 30 (27).
+A stack rule is **real** when that part of A crosses B (they meet at a point that is not an end of either road), and **near** when
+it only comes near (the pair was found by `band_dist`, or this part is away from the crossing): `rs.casing_parts(roads, head_m, heads)`
+gives the parts as drawn, and `solve_levels(parts=...)` tells them apart, with no length in the solver itself. The solver keeps, in
+this order: the real crossings, the order wishes, the near rules, then the cost and fewest positions (Kaveh 2026-10-06: a near rule has
+the lowest weight; it must never cost a real crossing). A **given-up** pair is a real crossing that broke: a flaw on the map. A near
+rule that broke is a **warning** (`attrs["levels_near"]`), shown apart in the editor. Monaco: 0 given up, 87 near warnings, 4 order
+wishes not kept (was 47), 15 positions (was 10); with the near rules above the order wishes instead it would be 0 / 22 / 47 / 10.
+Before, every rule counted as a crossing: 22 given up, 20 of them near-only and the 2 others a head 7 and 18 m from the crossing.
 
 **One part of A** (an edit): a `stack` edit may name a part of A's casing in `a_end`: `start`, `main` or `end` (empty: the whole road, the
 rule above). Added, that part comes after B's fill even where its head joins B (a junction the rule leaves out). Switched off
