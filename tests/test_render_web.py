@@ -1891,10 +1891,13 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     assert [f["road"] for f in area.find(" 12 ")] == ["12"] and area.find("") == []                 # search: an edge id ...
     ref = area.facts["12"]["edge_ref"] = "120113158#1f"
     assert area.find(ref.upper())[0]["road"] == "12" and area.find("0113158")[0]["road"] == "12"   # ... or (a part of) an edge_ref
-    area.add({"relation": "stack", "a": "11", "b": "14", "a_end": "start", "b_end": "end", "enabled": "true"})     # a stack keeps its part
-    assert area.edits().iloc[-1][["a_end", "b_end"]].tolist() == ["start", ""]
-    with pytest.raises(ValueError):
-        area.add({"relation": "stack", "a": "11", "b": "14", "a_end": "middle", "enabled": "true"})
+    stack = {"relation": "stack", "a": "11", "b": "14", "a_end": "start", "b_end": "end", "enabled": "true"}
+    area.apply([{"op": "add", "body": stack}, {"op": "delete", "index": 0}])     # the page's waiting changes, in one solve
+    assert area.edits()[["relation", "a_end", "b_end"]].values.tolist() == [["stack", "start", ""]]     # a stack keeps its part
+    for bad in ([{"op": "add", "body": {**stack, "a_end": "middle"}}], [{"op": "delete", "index": 5}], []):
+        with pytest.raises(ValueError):
+            area.apply(bad)
+    assert len(area.edits()) == 1                                                 # nothing saved
 
 
 def test_edits_name_either_direction_of_a_road():

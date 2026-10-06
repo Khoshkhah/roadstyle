@@ -15,6 +15,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **A stack edit on one part of A** (`a_end` = `start` / `main` / `end`): added, that part of A's casing is after B's fill even at a junction; switched off,
   only that part of a found pair is left out. The editor has the part chooser.
 - The editor warns when a new order (road 1 after road 2) meets an active stack of road 2 over road 1: the stack outranks it, so the order would be given up.
+- The editor: you choose which road is on top for an order or a stack (it was always the road clicked first); changes wait in a list until *Apply and solve*,
+  one solve for all, with a busy layer over the map until the new map is drawn.
 - The editor has a search box: an edge id (either direction of a road) or an edge_ref, or a part of one; a hit is picked and shown.
 
 ### Changed

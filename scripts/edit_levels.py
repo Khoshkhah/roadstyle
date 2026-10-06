@@ -3,8 +3,9 @@
     python scripts/edit_levels.py AREA_DIR [--port 8780]
 
 AREA_DIR holds roads.parquet and pairs.csv (scripts/level_input.py). Click two roads (or find them by edge id / edge_ref), see every pair between them (the found ones and
-your edits), switch a found one off or add one (order / stack: road 1 over road 2, a stack on one part of road 1 if you like; meet: an end of each). Every change is solved at once
-and the page reloads with the new levels (levels.csv is written too); an edit the solver refuses is not saved. The edits.csv before each
+your edits), switch a found one off or add one (order / stack: the road you put on top over the other, a stack on one part of it if you like; meet: an end of each). Changes wait in a list until
+you apply them: then they are solved together and the page reloads with the new levels (levels.csv is written too); if the solver refuses
+them, nothing is saved. The edits.csv before each
 change is kept as edits.csv.bak.
 """
 import argparse
@@ -109,20 +110,19 @@ class Area:
             self.saved = saved
         self.build(edits, solved)
 
-    def add(self, body):
-        """Add one edit from the page's form (an edit the solver refuses raises ValueError and is not saved)."""
-        row = {c: str(body.get(c, "") or "") for c in COLS}
-        if row["relation"] not in ("meet", "stack", "order"):
-            raise ValueError("relation must be meet, stack or order")
-        if row["relation"] == "meet" and not (row["a_end"] in ("start", "end") and row["b_end"] in ("start", "end")):
-            raise ValueError("a meet needs an end of each road (start / end)")
-        if row["relation"] == "stack" and row["a_end"] not in ("", "start", "main", "end"):
-            raise ValueError("a stack's part of road 1 is start, main, end or empty (the whole road)")
-        if row["relation"] != "meet":                           # a stack keeps its part of road 1 (a_end)
-            row["b_end"] = ""
-            if row["relation"] == "order":
-                row["a_end"] = ""
-        self.change(pd.concat([self.edits(), pd.DataFrame([row])], ignore_index=True))
+    def apply(self, ops):
+        """Apply the changes the page collected, in one solve: ``{"op": "delete", "index": i}`` (a row of edits.csv) and ``{"op": "add",
+        "body": row}``. If any is wrong, or the solver refuses the result, nothing is saved (ValueError)."""
+        if not ops:
+            raise ValueError("nothing to apply")
+        if any(o.get("op") not in ("add", "delete") for o in ops):
+            raise ValueError("a change is add or delete")
+        e = self.edits()
+        gone = sorted({int(o["index"]) for o in ops if o["op"] == "delete"}, reverse=True)
+        if any(not 0 <= i < len(e) for i in gone):
+            raise ValueError("an edit to delete is no longer in edits.csv")
+        new = pd.DataFrame([_row(o["body"]) for o in ops if o["op"] == "add"], columns=COLS)
+        self.change(pd.concat([e.drop(index=gone), new], ignore_index=True), saved=self.saved - sum(i < self.saved for i in gone))
 
     def find(self, q, limit=20):
         """The roads for a search: an exact edge id (either direction of a road), else the edge_refs that hold ``q`` (an exact one first)."""
@@ -153,6 +153,22 @@ class Area:
         edits = [r for r in self.rows() if mine(r["ra"], r["rb"])]
         roads = {x for r in found + edits for x in (r["ra"], r["rb"])} | {ra} | ({rb} if rb else set())
         return {"a": ra, "b": rb, "rows": found + edits, "roads": {x: self.facts.get(x, {"road": x}) for x in roads}}
+
+
+def _row(body):
+    """One edit from the page's form, checked."""
+    row = {c: str(body.get(c, "") or "") for c in COLS}
+    if row["relation"] not in ("meet", "stack", "order"):
+        raise ValueError("relation must be meet, stack or order")
+    if row["relation"] == "meet" and not (row["a_end"] in ("start", "end") and row["b_end"] in ("start", "end")):
+        raise ValueError("a meet needs an end of each road (start / end)")
+    if row["relation"] == "stack" and row["a_end"] not in ("", "start", "main", "end"):
+        raise ValueError("a stack's part of the upper road is start, main, end or empty (the whole road)")
+    if row["relation"] != "meet":                               # a stack keeps its part of the upper road (a_end)
+        row["b_end"] = ""
+        if row["relation"] == "order":
+            row["a_end"] = ""
+    return row
 
 
 def _txt(v):
@@ -208,15 +224,10 @@ def _handler(area):
 
         def do_POST(self):
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
-            e = area.edits()
             try:
-                if self.path == "/api/add":
-                    area.add(body)
-                elif self.path == "/api/delete":
-                    i = int(body["index"])
-                    area.change(e.drop(index=i).reset_index(drop=True), saved=area.saved - (i < area.saved))
-                else:
+                if self.path != "/api/apply":
                     return self._send(404, {"error": "not found"})
+                area.apply(body.get("ops", []))
             except (ValueError, KeyError) as err:
                 return self._send(400, {"error": str(err)})
             self._send(200, {"ok": True})

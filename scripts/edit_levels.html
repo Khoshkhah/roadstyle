@@ -68,6 +68,18 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
 #lv .go{width:100%;border:none;border-radius:8px;padding:8px 0;background:var(--lv-ink);color:#fff;font:600 13px system-ui;cursor:pointer;margin-top:4px}
 #lv .go:hover{background:#000} #lv .go:disabled{opacity:.5;cursor:default}
 #lv .go.ghost{background:#fff;color:var(--lv-ink);border:1px solid #d0d5dd} #lv .go.ghost:hover{background:#f2f4f7}
+#lv-busy{position:fixed;left:0;top:0;bottom:0;right:0;z-index:5;display:flex;align-items:center;justify-content:center;
+  background:rgba(246,247,249,.55);backdrop-filter:blur(1.5px);transition:right .2s ease}
+body.lv-open #lv-busy{right:var(--lv-w)}
+#lv-busy .box{display:flex;align-items:center;gap:12px;padding:14px 20px;border-radius:12px;background:#fff;box-shadow:0 8px 28px rgba(16,24,40,.18);
+  font:600 14px system-ui;color:var(--lv-ink)}
+#lv-busy .spin{width:22px;height:22px;border-radius:50%;border:3px solid #dbe4f0;border-top-color:var(--lv-r2);animation:lv-spin .8s linear infinite}
+@keyframes lv-spin{to{transform:rotate(360deg)}}
+#lv-queue-sec{background:#fffbeb;border-bottom:1px solid #fde68a}
+#lv-queue .q{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;background:#fff;border:1px solid #fde68a;margin-bottom:5px;font-size:12.5px}
+#lv-queue .q span{flex:1} #lv-queue .q button{border:none;background:none;color:var(--lv-mute);cursor:pointer;font-size:14px} #lv-queue .q button:hover{color:var(--lv-bad)}
+#lv .btns{display:flex;gap:6px} #lv .btns .go{margin-top:2px}
+#lv-top-seg button{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:5px 8px}
 #lv-toast{position:absolute;left:16px;right:16px;bottom:14px;padding:9px 12px;border-radius:8px;font-size:12.5px;color:#fff;background:var(--lv-ink);
   box-shadow:0 4px 14px rgba(0,0,0,.18);opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none}
 #lv-toast.show{opacity:1;transform:none} #lv-toast.bad{background:var(--lv-bad)}
@@ -78,35 +90,42 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
     <div class="find"><input id="lv-find" type="search" placeholder="Find a road: edge id or edge_ref" autocomplete="off"><div id="lv-hits" hidden></div></div></header>
   <nav class="tabs" id="lv-tabs"><button data-t="edit" class="on">Edit</button><button data-t="history">History<span class="cnt" id="lv-hist-n">0</span></button></nav>
   <div class="scroll" data-tab="edit">
+    <section id="lv-queue-sec" hidden><h2>Waiting to apply <span style="text-transform:none;letter-spacing:0;font-weight:500">not solved, not saved yet</span></h2>
+      <div id="lv-queue"></div>
+      <div class="btns"><button class="go ghost" id="lv-discard" style="flex:1">Discard</button><button class="go" id="lv-apply" style="flex:2">Apply and solve</button></div>
+    </section>
     <section><h2>Selection <button class="link" id="lv-clear" title="Esc">clear</button></h2><div id="lv-cards"></div></section>
     <section id="lv-rel-sec" hidden><h2 id="lv-rel-title">In the tables</h2><div id="lv-rel"></div></section>
     <section id="lv-add-sec" hidden><h2>Add a relation</h2>
       <div class="seg" id="lv-kind"><button data-k="order" class="on">Order</button><button data-k="stack">Stack</button><button data-k="meet">Meet</button></div>
+      <div class="ends" id="lv-top" style="grid-template-columns:1fr"><div><label>on top</label><div class="seg" id="lv-top-seg"></div></div></div>
       <div class="desc" id="lv-desc"></div>
       <div class="ends" id="lv-ends" hidden>
         <div><label><span class="num" style="--c:var(--lv-r1)">1</span> end of road 1</label><div class="seg" data-e="1"><button data-v="start" class="on">start</button><button data-v="end">end</button></div></div>
         <div><label><span class="num" style="--c:var(--lv-r2)">2</span> end of road 2</label><div class="seg" data-e="2"><button data-v="start" class="on">start</button><button data-v="end">end</button></div></div>
       </div>
       <div class="ends" id="lv-part" hidden style="grid-template-columns:1fr">
-        <div><label>which part of <span class="num" style="--c:var(--lv-r1)">1</span>'s casing</label><div class="seg"><button data-v="" class="on">whole road</button><button data-v="start">start head</button><button data-v="main">main</button><button data-v="end">end head</button></div></div>
+        <div><label>which part of the upper road's casing</label><div class="seg"><button data-v="" class="on">whole road</button><button data-v="start">start head</button><button data-v="main">main</button><button data-v="end">end head</button></div></div>
       </div>
-      <button class="go" id="lv-add">Add and solve</button>
-      <button class="go ghost" id="lv-off" hidden>Switch off this part of the found pair</button>
+      <button class="go" id="lv-add">Add to the list</button>
+      <button class="go ghost" id="lv-off" hidden>Switch off this part of the found pair (to the list)</button>
     </section>
     <section><h2>Added now <span style="text-transform:none;letter-spacing:0;font-weight:500">this session, in edits.csv</span></h2><div id="lv-new"></div></section>
   </div>
   <div class="scroll" data-tab="history" hidden>
     <section><h2>Already in edits.csv <span style="text-transform:none;letter-spacing:0;font-weight:500">before this session</span></h2>
-      <div class="desc" style="margin-top:0">Click a row to show its two roads; deleting one asks first.</div><div id="lv-saved"></div></section>
+      <div class="desc" style="margin-top:0">Click a row to show its two roads; delete puts it in the list to apply.</div><div id="lv-saved"></div></section>
   </div>
   <div id="lv-toast"></div>
 </aside>
+<div id="lv-busy" hidden><div class="box"><div class="spin"></div><span id="lv-busy-t">Solving …</span></div></div>
 <script>
 (function(){
   const STATS = __STATS__, $ = id => document.getElementById(id), C = ["#e8590c", "#1971c2"];
   const sel = [null, null], facts = {};                       // sel: road ids; facts: road id -> what the server knows
   let pairRows = [];                                          // what the two tables have between the two picked roads
-  let kind = "order", end1 = "start", end2 = "start", part = "";
+  let kind = "order", end1 = "start", end2 = "start", part = "", top = 0;   // top: which picked road (0 / 1) is on top for an order or a stack
+  let queue = []; try { queue = JSON.parse(sessionStorage.getItem("lv-queue") || "[]"); } catch(e){}     // the changes waiting to be applied
   const PART = {start: "start head", main: "main", end: "end head"};
   const SRC = {found: ["found", "var(--lv-found)", "found in pairs.csv"], saved: ["saved", "var(--lv-saved)", "already in edits.csv"],
                new: ["new", "var(--lv-new)", "added now"]};
@@ -218,10 +237,9 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
       const r = rows[n];
       el.onclick = ev => { if(ev.target.closest(".act")) return; tab("edit"); setPair(r.ra, r.rb, true); };
       const b = el.querySelector(".act");
-      b.onclick = () => r.section === "found" ? change("/api/add", {relation: r.relation, a: r.a, b: r.b, a_end: r.a_end, b_end: r.b_end, enabled: "false"},
-                                                       `Switched off: ${r.relation}`)
-        : (r.section === "new" || confirm("This edit was in edits.csv before this session. Delete it?"))
-          && change("/api/delete", {index: r.index}, `Deleted: ${r.relation}`);
+      b.onclick = () => r.section === "found"
+        ? stage({op: "add", body: {relation: r.relation, a: r.a, b: r.b, a_end: r.a_end || "", b_end: r.b_end || "", enabled: "false"}})
+        : stage({op: "delete", index: r.index, row: {relation: r.relation, a: r.ra, b: r.rb, a_end: r.a_end, b_end: r.b_end, enabled: r.enabled}});
     });
   }
   async function update(){
@@ -265,7 +283,10 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
   }
   function describe(){
     if(sel[1] == null) return;
-    const [a, b] = sel;
+    const [a, b] = kind === "meet" ? sel : [sel[top], sel[1 - top]];
+    $("lv-top").hidden = kind === "meet";
+    $("lv-top-seg").innerHTML = sel.map((r, k) => `<button class="${k === top ? "on" : ""}" data-v="${k}">${who(r)}</button>`).join("");
+    $("lv-top-seg").querySelectorAll("button").forEach(x => x.onclick = () => { top = +x.dataset.v; describe(); });
     $("lv-ends").hidden = kind !== "meet"; $("lv-part").hidden = kind !== "stack"; $("lv-off").hidden = kind !== "stack" || !part;
     $("lv-desc").innerHTML = kind === "order" ? `Where they meet, ${who(a)}'s fill is drawn after ${who(b)}'s (a wish the solver keeps when it can).`
       : kind === "stack" && !part ? `${who(a)} is drawn over ${who(b)}, outline included, where they come near each other (not its heads where it joins ${who(b)}).`
@@ -279,20 +300,39 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
   }
   $("lv-add").onclick = () => {
     if(sel[1] == null) return toast("Pick two roads first", true);
-    change("/api/add", {relation: kind, a: sel[0], b: sel[1], a_end: kind === "meet" ? end1 : kind === "stack" ? part : "", b_end: kind === "meet" ? end2 : "",
-                        enabled: "true"}, `Added: ${kind}${kind === "stack" && part ? " (" + PART[part] + ")" : ""}`);
+    const [a, b] = kind === "meet" ? sel : [sel[top], sel[1 - top]];
+    stage({op: "add", body: {relation: kind, a, b, a_end: kind === "meet" ? end1 : kind === "stack" ? part : "", b_end: kind === "meet" ? end2 : "", enabled: "true"}});
   };
   $("lv-off").onclick = () => sel[1] != null && part
-    && change("/api/add", {relation: "stack", a: sel[0], b: sel[1], a_end: part, b_end: "", enabled: "false"}, `Switched off: ${PART[part]} of the stack`);
-  // --- every change: solved by the server, then the page again, with the same view and selection
-  async function change(path, body, said){
-    $("lv-add").disabled = true; toast("Solving …");
-    try { await api(path, body);
+    && stage({op: "add", body: {relation: "stack", a: sel[top], b: sel[1 - top], a_end: part, b_end: "", enabled: "false"}});
+  // --- the changes wait in a list (kept over a reload of the page) until Apply: then one solve, and the page again with the same view
+  const plain = b => `${b.enabled === "false" ? "switch off: " : ""}${name(b.a)} ${b.relation === "meet" ? `(${b.a_end}) = ${name(b.b)} (${b.b_end})`
+    : b.relation === "stack" ? `${b.a_end ? "(" + PART[b.a_end] + ") " : ""}over ${name(b.b)}` : `after ${name(b.b)}`}`;
+  function stage(q){
+    if(q.op === "delete" && queue.some(x => x.op === "delete" && x.index === q.index)) return toast("Already in the list");
+    q.text = q.op === "delete" ? "delete edit: " + plain(q.row) : `${q.body.relation} · ${plain(q.body)}`;
+    queue.push(q); showQueue(); toast("In the list · apply when ready");
+  }
+  function showQueue(){
+    try { sessionStorage.setItem("lv-queue", JSON.stringify(queue)); } catch(e){}
+    $("lv-queue-sec").hidden = !queue.length;
+    $("lv-apply").textContent = `Apply and solve (${queue.length})`;
+    $("lv-queue").innerHTML = queue.map((q, i) => `<div class="q"><span>${esc(q.text)}</span><button data-i="${i}" title="Take out of the list">✕</button></div>`).join("");
+    $("lv-queue").querySelectorAll("button").forEach(b => b.onclick = () => { queue.splice(+b.dataset.i, 1); showQueue(); });
+  }
+  $("lv-discard").onclick = () => { queue = []; showQueue(); };
+  const busy = t => { $("lv-busy").hidden = !t; if(t) $("lv-busy-t").textContent = t; };
+  $("lv-apply").onclick = async () => {
+    if(!queue.length) return;
+    $("lv-apply").disabled = true; busy(`Solving the levels with ${queue.length} change${queue.length > 1 ? "s" : ""} …`);
+    try { await api("/api/apply", {ops: queue.map(q => q.op === "delete" ? {op: "delete", index: q.index} : {op: "add", body: q.body})});
+      const said = `Applied ${queue.length} change${queue.length > 1 ? "s" : ""}`;
+      queue = []; showQueue(); busy("Drawing the new map …");
       sessionStorage.setItem("lv-view", JSON.stringify({c: map.getCenter(), z: map.getZoom(), b: map.getBearing(), p: map.getPitch(), sel: sel, said: said,
         open: document.body.classList.contains("lv-open")}));
       location.reload();
-    } catch(err){ toast(err.message, true); $("lv-add").disabled = false; }
-  }
+    } catch(err){ busy(null); toast(err.message + " · nothing saved", true); $("lv-apply").disabled = false; }
+  };
   async function lists(){
     const j = await api("/api/edits"); Object.assign(facts, j.roads);
     $("lv-hist-n").textContent = j.rows.filter(r => r.section === "saved").length;
@@ -305,9 +345,10 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
   function start(){
     const v = JSON.parse(sessionStorage.getItem("lv-view") || "null");
     if(v){ sessionStorage.removeItem("lv-view"); map.jumpTo({center: v.c, zoom: v.z, bearing: v.b, pitch: v.p});
-      sel[0] = v.sel[0]; sel[1] = v.sel[1]; if(v.said) toast(v.said + " · solved");
+      sel[0] = v.sel[0]; sel[1] = v.sel[1];
+      if(v.said){ busy("Drawing the new map …"); map.once("idle", () => { busy(null); toast(v.said + " · solved"); }); }
       if(!v.open){ document.body.classList.remove("lv-open"); $("lv-toggle").textContent = "‹"; resize(); } }
-    update(); lists();
+    update(); lists(); showQueue();
   }
   if(map.loaded()) start(); else map.once("load", start);
 })();

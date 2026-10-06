@@ -55,11 +55,13 @@ python scripts/solve_levels.py out/monaco
 
 **The editor** (`python scripts/edit_levels.py out/monaco`, a local page at http://localhost:8780/) writes `edits.csv`: click two roads, or find
 them in the search box by an edge id (either direction) or an edge_ref (or a part of one) (road 1 orange, road 2 blue; their start and end points are marked), see every pair between them (the found ones, with *switch off*, and your edits,
-with *delete*), and add one (`order` or `stack`: road 1 over road 2, a stack on the whole road or one part of it, which can also switch
-that part off in a found pair; `meet`: the chosen end of each). An order against an active stack the other way (road 2 over road 1) would be
-given up, since a stack outranks an order: the panel warns before you add it and points to the stack to switch off first. Every change is solved at once and the
-page reloads with the new levels, keeping the view and the picked roads; `levels.csv` is written too. An edit the solver refuses (an unknown
-road, nothing to switch off) is not saved, and the panel says why. The `edits.csv` before each change is kept as `edits.csv.bak`. The list of
+with *delete*), and add one (`order` or `stack`: you choose which of the two is on top; a stack on the whole road or one part of it, which
+can also switch that part off in a found pair; `meet`: the chosen end of each). An order against an active stack the other way would be
+given up, since a stack outranks an order: the panel warns before you add it and points to the stack to switch off first. Changes wait in a
+list (kept over a reload of the page) until you press *Apply and solve*: then they are solved together while the map shows that it is
+working, and the page reloads with the new levels, keeping the view and the picked roads; `levels.csv` is written too. If one change is
+wrong or the solver refuses them (an unknown
+road, nothing to switch off), nothing is saved, the list stays, and the panel says why. The `edits.csv` before each apply is kept as `edits.csv.bak`. The list of
 your edits shows each one's two roads when clicked. It is written for this page alone (the roadstyle map and its `rs*` API); the v2 test's
 pair editor is not used.
 
