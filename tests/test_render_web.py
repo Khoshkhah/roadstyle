@@ -1888,3 +1888,21 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     new = [r for r in area.relations("11", "12")["rows"] if r["section"] == "new"]
     assert len(new) == 1 and (tmp_path / "levels.csv").exists()                  # added in this session: "new", not "saved"
     assert len(area.relations("12")["rows"]) >= 3                                # one road: everything about it, in both tables
+
+
+def test_edits_name_either_direction_of_a_road():
+    """solve_levels: a meet edit naming the edge that runs against its road has its end turned to the road's way; a meet is the same pair in
+    either order (switching one off works whichever road is named first)."""
+    pytest.importorskip("scipy")
+    import pandas as pd
+
+    import roadstyle as rs
+    a, b, c = (18.0, 59.3), (18.002, 59.3), (18.004, 59.3)
+    g = gpd.GeoDataFrame({"highway": ["residential"] * 3, "edge_id": [1, 2, 3]},
+                         geometry=[LineString([a, b]), LineString([b, a]), LineString([b, c])], crs=4326)     # road 1 both ways, road 3 from its end
+    roads, pairs = rs.level_input(g)
+    assert list(roads["road"]) == ["1", "3"] and list(roads["reversed"].iloc[0]) == ["2"]
+    off = pd.DataFrame([{"relation": "meet", "a": "3", "b": "2", "a_end": "start", "b_end": "start", "enabled": "false"}])     # edge 2's start = road 1's end
+    rs.solve_levels(roads, pairs, edits=off)                    # found as (1 end, 3 start): switched off, no error
+    with pytest.raises(ValueError):
+        rs.solve_levels(roads, pairs, edits=off.assign(b_end="end"))   # edge 2's end is road 1's start: no such meet

@@ -371,22 +371,28 @@ def _read_pairs(pairs):
 def solve_levels(roads, pairs, edits=None, head_m=5.0, max_level=20, margin=1.0, time_limit=60.0, min_positions=True, max_positions=None):
     """Solve the drawing levels of ``roads`` from their ``pairs`` (both from :func:`level_input`, or read back from ``roads.parquet`` /
     ``pairs.csv``) and the caller's ``edits`` (a table or a CSV with the columns of ``pairs`` and ``enabled``: a row with ``enabled`` false
-    switches off the same relation of ``pairs``, any other row is added; ``a`` / ``b`` may name any edge of a road). Returns ``roads`` with
+    switches off the same relation of ``pairs``, any other row is added; ``a`` / ``b`` may name any edge of a road, and a ``meet`` naming the
+    edge that runs the other way has its end (start / end) turned to the road's way; a ``meet`` is the same in either order). Returns ``roads`` with
     ``casing_start``, ``casing_level``, ``casing_end`` and ``fill_level`` (in the road's own direction); ``attrs["levels_given_up"]`` (the
     stack pairs that could not be kept, as road ids) and ``attrs["levels_info"]``."""
     t = _read_pairs(pairs)
-    of = {}
+    of, back = {}, set()                                       # any edge id -> its road's row; the ids of the edges that run against their road
     for i, r in enumerate(roads.itertuples()):
         for e in [r.road, *list(r.edges), *list(r.reversed)]:
             of[str(e)] = i
+        back |= {str(e) for e in r.reversed}
     def key(row):
-        return (row["relation"], row["a"], row["b"], row["a_end"] if row["relation"] == "meet" else None, row["b_end"] if row["relation"] == "meet" else None)
+        if row["relation"] == "meet":                          # no direction: the same pair whichever road is named first
+            return ("meet", *sorted([(row["a"], row["a_end"]), (row["b"], row["b_end"])]))
+        return (row["relation"], row["a"], row["b"])
     rel = {key(row): row for row in t.to_dict("records")}
     if edits is not None:
         for row in _read_pairs(edits).to_dict("records"):
             for c in ("a", "b"):
                 if row[c] not in of:
                     raise ValueError(f"edits: {row[c]!r} is not an edge of the roads")
+                if row["relation"] == "meet" and row[c] in back:                # that edge's start is its road's end
+                    row[c + "_end"] = {"start": "end", "end": "start"}.get(row[c + "_end"], row[c + "_end"])
                 row[c] = roads["road"].iat[of[row[c]]]
             if str(row.get("enabled", "")).strip().lower() in ("false", "0", "no"):
                 if rel.pop(key(row), None) is None:

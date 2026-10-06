@@ -25,6 +25,14 @@ def edge_levels(solved):
     return pd.DataFrame(rows, columns=["edge", "casing_start", "casing_level", "casing_end", "fill_level"])
 
 
+def write(solved, folder):
+    """levels.csv, and levels_info.json: what the solver says about it (the editor shows it without solving again)."""
+    import json
+    edge_levels(solved).to_csv(Path(folder) / "levels.csv", index=False)
+    info = {**solved.attrs["levels_info"], "given_up": [list(p) for p in solved.attrs["levels_given_up"]]}
+    (Path(folder) / "levels_info.json").write_text(json.dumps(info, default=str))
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("out_dir", type=Path)
@@ -35,7 +43,7 @@ def main(argv=None):
     edits = a.out_dir / "edits.csv"
     solved = rs.solve_levels(roads, a.out_dir / "pairs.csv", edits=edits if edits.exists() else None, head_m=a.head_m,
                              max_positions=a.max_positions)
-    edge_levels(solved).to_csv(a.out_dir / "levels.csv", index=False)
+    write(solved, a.out_dir)
     info = solved.attrs["levels_info"]
     print(f"{len(roads)} roads -> {a.out_dir / 'levels.csv'}: {len(solved.attrs['levels_given_up'])} stack pair(s) given up, "
           f"{info.get('order_violations', 0)} order wish(es) not kept, {info.get('seconds')} s")

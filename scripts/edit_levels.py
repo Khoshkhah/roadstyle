@@ -20,7 +20,7 @@ import pandas as pd
 import roadstyle as rs
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from solve_levels import edge_levels  # noqa: E402
+from solve_levels import write  # noqa: E402
 
 COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"]
 
@@ -45,7 +45,34 @@ class Area:
                                      "edges": len(r["edges"]) + len(r["reversed"]), "two_way": len(r["reversed"]) > 0, "length_m": float(m),
                                      "look": "tunnel" if _yes(r.get("tunnel")) else "bridge" if _yes(r.get("bridge")) else "ground"}
         self.saved = len(self.edits())                          # the edits that were in edits.csv when the editor started
-        self.build(self.edits())
+        self.build(self.edits(), self.stored())
+
+    def stored(self):
+        """The levels of levels.csv (the map starts from the tables as they are), or None when it is missing or older than an input."""
+        lv, info = self.dir / "levels.csv", self.dir / "levels_info.json"
+        inputs = [self.dir / "roads.parquet", self.dir / "pairs.csv", self.edits_path]
+        if not (lv.exists() and info.exists()) or lv.stat().st_mtime < max(p.stat().st_mtime for p in inputs):
+            print("levels.csv is missing or older than roads.parquet / pairs.csv / edits.csv: solved again")
+            return None
+        t = pd.read_csv(lv, dtype={"edge": str}).set_index("edge")
+        if not t.index.is_unique or not set(self.road_of) <= set(t.index):             # every edge of the roads, once
+            print("levels.csv does not match roads.parquet: solved again")
+            return None
+        solved = self.roads.copy()
+        cols = ["casing_start", "casing_level", "casing_end", "fill_level"]
+        for c in cols:
+            solved[c] = 0
+        for i, r in enumerate(solved.itertuples()):
+            if r.edges:
+                v = t.loc[str(r.edges[0]), cols].tolist()
+            else:                                               # only the other way: its heads the other way round
+                s, m, e, f = t.loc[str(r.reversed[0]), cols].tolist()
+                v = [e, m, s, f]
+            solved.iloc[i, [solved.columns.get_loc(c) for c in cols]] = v
+        solved.attrs["levels_info"] = {k: v for k, v in json.loads(info.read_text()).items() if k != "given_up"}
+        solved.attrs["levels_given_up"] = [tuple(p) for p in json.loads(info.read_text()).get("given_up", [])]
+        print(f"drawn from {lv} (not solved again)")
+        return solved
 
     def edits(self):
         return pd.read_csv(self.edits_path, dtype=str, keep_default_na=False).reindex(columns=COLS, fill_value="")
@@ -54,8 +81,9 @@ class Area:
         return rs.solve_levels(self.roads, self.pairs, edits=edits if len(edits) else None)
 
     def build(self, edits, solved=None):
-        solved = self.solve(edits) if solved is None else solved
-        edge_levels(solved).to_csv(self.dir / "levels.csv", index=False)
+        if solved is None:
+            solved = self.solve(edits)
+            write(solved, self.dir)
         self.stats = {**solved.attrs["levels_info"], "given_up": [list(p) for p in solved.attrs["levels_given_up"]], "area": self.dir.name}
         for r in solved.itertuples():
             self.facts[r.road]["levels"] = [int(r.casing_start), int(r.casing_level), int(r.casing_end), int(r.fill_level)]
@@ -75,6 +103,7 @@ class Area:
         solved = self.solve(edits)                              # raises ValueError: nothing written
         self.edits_path.with_name("edits.csv.bak").write_text(self.edits_path.read_text())
         edits.to_csv(self.edits_path, index=False)
+        write(solved, self.dir)
         if saved is not None:
             self.saved = saved
         self.build(edits, solved)
