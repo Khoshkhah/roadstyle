@@ -42,7 +42,8 @@ class Area:
         for (_, r), m in zip(self.roads.iterrows(), length, strict=True):
             self.facts[r["road"]] = {"road": r["road"], "name": _txt(r.get("name")), "highway": _txt(r.get("highway")),
                                      "edge_ref": _txt(r.get("edge_ref")), "band": int(r["band"]), "priority": _num(r.get("priority")),
-                                     "edges": len(r["edges"]) + len(r["reversed"]), "two_way": len(r["reversed"]) > 0, "length_m": float(m)}
+                                     "edges": len(r["edges"]) + len(r["reversed"]), "two_way": len(r["reversed"]) > 0, "length_m": float(m),
+                                     "look": "tunnel" if _yes(r.get("tunnel")) else "bridge" if _yes(r.get("bridge")) else "ground"}
         self.saved = len(self.edits())                          # the edits that were in edits.csv when the editor started
         self.build(self.edits())
 
@@ -100,6 +101,10 @@ class Area:
 
 def _txt(v):
     return None if v is None or (isinstance(v, float) and v != v) else str(v)
+
+
+def _yes(v):
+    return _txt(v) not in (None, "", "no", "false", "False", "0")
 
 
 def _num(v):

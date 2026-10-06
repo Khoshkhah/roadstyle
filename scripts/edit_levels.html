@@ -154,6 +154,7 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
       <div class="sub">${esc([f.highway, f.edge_ref].filter(Boolean).join(" · "))}</div>
       <div class="grid"><span>band</span><span>${f.band ?? "–"}</span><span>priority</span><span>${f.priority ?? "–"}</span>
         <span>length</span><span>${f.length_m != null ? f.length_m + " m" : "–"}</span><span>edges</span><span>${f.edges ?? "–"}${f.two_way ? " (two-way)" : ""}</span>
+        <span>look</span><span>${esc(f.look || "–")}</span><span></span><span></span>
         <span>road id</span><span style="grid-column:span 3;font-size:11px">${esc(r)}</span></div>
       <div class="lvls"><div><small>start</small><b>${L[0]}</b></div><div><small>casing</small><b>${L[1]}</b></div>
         <div><small>end</small><b>${L[2]}</b></div><div><small>fill</small><b>${L[3]}</b></div></div></div>`;

@@ -322,7 +322,7 @@ def level_input(edges, id_col="edge_id", layer_col="layer", bridge_col="bridge",
     ``roads``: one row per road (both directions of a segment together): ``road`` (the ``id_col`` of its first edge, as text; the row number
     without ``id_col``), ``edges`` / ``reversed`` (the ids of its edges in its own direction / the other way), ``band`` (``band_col``, else the
     level from the tags), ``priority`` (the ``order``: ``"priority"``, ``"class"``, a column of numbers, or None) and the geometry of its first
-    edge, and its ``highway_col``, ``name`` and ``edge_ref`` when the edges have them. ``pairs``: one row per relation, ``relation`` / ``a`` / ``b`` / ``a_end`` / ``b_end``: ``meet`` (the end ``a_end`` of ``a`` is the end
+    edge, and its ``highway_col``, ``name``, ``edge_ref``, ``tunnel_col``, ``bridge_col`` and ``layer_col`` when the edges have them. ``pairs``: one row per relation, ``relation`` / ``a`` / ``b`` / ``a_end`` / ``b_end``: ``meet`` (the end ``a_end`` of ``a`` is the end
     ``b_end`` of ``b``), ``stack`` (``a`` is over ``b``: different bands, crossing or near away from a shared node) and ``order`` (``a``'s fill
     after ``b``'s where they meet: one band, or different bands that only meet). With ``band_col`` the caller's bands decide over and under
     everywhere: roads of different bands are a stack pair even where they only meet (a zebra crossing set over its street stays over it)."""
@@ -351,7 +351,8 @@ def level_input(edges, id_col="edge_id", layer_col="layer", bridge_col="bridge",
     mine = [[] for _ in first], [[] for _ in first]
     for i, r in enumerate(rid):
         mine[0 if same[i] else 1][r].append(ids[i])
-    shown = {c: list(head[c]) for c in dict.fromkeys((highway_col, "name", "edge_ref")) if c in g.columns}       # to read and draw the roads (the editor)
+    shown = {c: list(head[c]) for c in dict.fromkeys((highway_col, "name", "edge_ref", tunnel_col, bridge_col, layer_col))     # to read and draw the
+             if c in g.columns}                                                                                                     # roads (the editor): look and all
     roads = gpd.GeoDataFrame({"road": name, "edges": mine[0], "reversed": mine[1], "band": beta,
                               "priority": omega if omega is not None else [None] * len(first), **shown}, geometry=list(head.geometry), crs=g.crs)
     rows = ([("meet", name[x], name[y], ex, ey) for x, ex, y, ey in meets] + [("stack", name[u], name[l], None, None) for u, l in stacks]
