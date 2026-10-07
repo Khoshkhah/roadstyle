@@ -2122,3 +2122,25 @@ def test_a_divided_casing_has_a_round_seam_at_each_cut():
     seams = [p for p in pieces if p.get("__rs_seam")]
     assert sorted(p["__rs_cl"] for p in seams) == [-1, 0] and all("__rs_cap" not in p for p in seams)     # round, at the lower number
     assert sorted(p["__rs_cl"] for p in pieces if not p.get("__rs_seam")) == [-1, 0, 1]
+
+
+def test_a_bridge_has_a_soft_offset_shadow_under_its_main_part(monkeypatch):
+    """Position mode (Kaveh 2026-10-06): a soft shadow under a bridge, on what it crosses: blurred, shifted down-right (lit from the top left),
+    drawn just before the bridge's casing at its position, on its main part only (its ends come down to the road); off with bridge_shadow."""
+    from roadstyle import render_web
+    d = 0.001
+    g = gpd.GeoDataFrame({"highway": ["primary", "primary"], "bridge": ["yes", None], "cs": [0, 0], "cm": [1, 0], "ce": [0, 0], "fl": [1, 0]},
+                         geometry=[LineString([(18, 59), (18 + d, 59)]), LineString([(18, 59.01), (18 + d, 59.01)])], crs=4326)
+    kw = dict(backend="web", casing_start_col="cs", casing_level_col="cm", casing_end_col="ce", fill_level_col="fl")
+    style = _style(render_edges(g, **kw).html)
+    ids = [l["id"] for l in style["layers"]]
+    lay = {l["id"]: l for l in style["layers"]}
+    sh = lay["roads-casing-lv1-bridge-shadow"]
+    assert sh["paint"]["line-blur"] == 4.0 and sh["paint"]["line-translate"] == [2, 2] and sh["source"] == "casings"
+    assert ids.index("roads-casing-lv1-bridge-shadow") < ids.index("roads-casing-lv1-bridge")                # under the bridge's casing
+    pieces = [f["properties"] for f in style["sources"]["casings"]["data"]["features"] if f["properties"]["__rs_road"] == 0]
+    assert [bool(_eval(sh["filter"], p)) for p in pieces if not p.get("__rs_seam")] == [False, True, False]   # the main part only
+    import dataclasses
+    monkeypatch.setattr(render_web, "CONFIG", dataclasses.replace(render_web.CONFIG, bridge_shadow=False))
+    off = _style(render_edges(g, **kw).html)
+    assert not [l for l in off["layers"] if l["id"].endswith("-shadow")]

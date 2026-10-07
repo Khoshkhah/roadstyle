@@ -711,7 +711,7 @@ def _casing_parts(geo, head_m, cols):
             if len(pts) < 2 or not (np.diff(pts, axis=0) != 0).any():
                 continue
             coords = np.column_stack([np.round(pts[:, 0] / kx + lon0, 7), np.round(pts[:, 1] / ky + lat0, 7)]).tolist()
-            flat = {"__rs_cap": True} if k == 1 else {}        # the main piece ends at two cuts: flat ends (a round end would reach into the heads)
+            flat = {"__rs_cap": True, "__rs_main": True} if k == 1 else {}   # the main piece ends at two cuts: flat ends (a round end would reach into the heads)
             if split and k != 1:                                # a head of an edge with two different ends: that end's cap
                 flat = {"__rs_cap": p["__rs_cap0" if k == 0 else "__rs_cap1"]}
             q = {**base, "__rs_cl": num, **flat}
@@ -851,8 +851,8 @@ def _tunnel_fill_under(lid, flt, fw, off, bg, on):
              "paint": {"line-color": bg, "line-width": fw, "line-offset": off}}]
 
 
-_CASING_FAMILY = ("roads-casing", "roads-casing-sq", "roads-casing-sx", "roads-casing-dash", "roads-casing-bridge", "roads-casing-sq-bridge",
-                  "roads-casing-sx-bridge")
+_CASING_FAMILY = ("roads-casing", "roads-casing-sq", "roads-casing-sx", "roads-casing-dash", "roads-casing-bridge-shadow", "roads-casing-bridge",
+                  "roads-casing-sq-bridge", "roads-casing-sx-bridge")
 _FILL_FAMILY = ("roads-fill-under", "roads-fill", "roads-fill-sq", "roads-fill-sx", "roads-fill-h", "roads-fill-hsq", "roads-fill-hsx", "roads-fill-pat")
 
 
@@ -1917,6 +1917,13 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                     l = {**l, "filter": ["all", l["filter"], ["!", is_b]]}
                     at = len(layers)
                 layers.append(l)
+            if CONFIG.bridge_shadow:       # a soft shadow under the bridge, on what it crosses: its main part only (its ends come down to the road)
+                main = ["to-boolean", ["get", "__rs_main"]] if divided else ["literal", True]
+                twins.insert(0, {"id": "roads-casing-bridge-shadow", "type": "line", "source": "roads", "layout": lay,
+                                 "filter": ["all", surface, is_b, main],
+                                 "paint": {"line-color": CONFIG.bridge_shadow_color, "line-blur": CONFIG.bridge_shadow_blur,
+                                           "line-width": _width_expr(highway_col, casing=True, scale=1.6, **sw), "line-offset": off,
+                                           "line-translate": list(CONFIG.bridge_shadow_offset), "line-translate-anchor": "viewport"}})
             layers[at + 1:at + 1] = twins
             style["layers"] = layers
         style["layers"] = _level_layers(style["layers"], levels, "casings" if divided else None)
