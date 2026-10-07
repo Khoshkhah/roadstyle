@@ -115,7 +115,7 @@ To give your own band per edge and let the solver do the rest: `rs.compute_level
 
 ## Good to know
 
-- One casing layer and one fill layer are made for each position that occurs, so keep the range small.
+- Each position that occurs gets its casing and fill layers (only those something is drawn by: no bridge layers without a bridge there), so keep the range small.
 - `rsColor` and colour-by reach every position. `tiles=True` works with positions.
 - `render_edges` takes no band and no order: compute the levels first.
 

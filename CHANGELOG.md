@@ -48,6 +48,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `rs.solve_levels(fixed=...)`): the roads within three relations of the changed ones are solved again with the same rules, every other road
   keeps its numbers. When the local result breaks a crossing the previous one kept, has more order wishes not kept, near warnings or drawing
   positions, or the solver fails, the whole area is solved instead and the page says so and why. `roadstyle-levels solve` stays a whole solve.
+- **Leaner pages:** a road layer is made only where some feature can be drawn by it (a position without a bridge has no bridge layers, none
+  without square ends has no square-end layers, ...); the look is the same. The all-modes Monaco page: 485 road layers before, 291 now.
 
 ## [0.16.0] — 2026-10-07
 

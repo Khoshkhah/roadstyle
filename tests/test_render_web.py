@@ -1,4 +1,5 @@
 """Web (MapLibre) backend: client-side recolouring via color_options + the recolour hooks."""
+import copy
 import json
 import math
 import re
@@ -102,8 +103,8 @@ def test_web_annotation_slots_alternate_names_and_arrows():
     assert style["sources"]["arrows"]["data"]["features"] == [] and all("chain" in f["properties"] for f in style["sources"]["slots"]["data"]["features"])
     # one arrow layer per grade tier, each right beside its road tier — a bridge must cover
     # the arrows of the road it crosses, not have them float above everything
-    assert ids.index("roads-arrows") == ids.index("roads-fill-sq") + 1
-    assert ids.index("roads-arrows-lv1") == ids.index("roads-fill-lv1-sq") + 1     # one arrow layer per position
+    assert ids.index("roads-arrows") == ids.index("roads-fill") + 1
+    assert ids.index("roads-arrows-lv1") == ids.index("roads-fill-lv1") + 1     # one arrow layer per position, after the fill layers it has
     assert json.dumps(["to-boolean", ["get", "name"]]) in json.dumps(lab["filter"])          # unnamed -> slot stays empty
     assert lab["layout"]["symbol-placement"] == "line-center"
     # The standing default: label text matches the oneway-arrow grey, and NO halo
@@ -398,7 +399,7 @@ def test_web_3d_bridge_decks():
     # the flat bridge line (its casing layer, and the bridge edges in the position layers) ends where the deck starts
     assert next(l for l in td["layers"] if l["id"].endswith("-bridge") and l["id"].startswith("roads-casing"))["maxzoom"] == 16.0
     assert json.dumps(["<", ["zoom"], 16.0]) in json.dumps(next(l for l in td["layers"] if l["id"] == "roads-fill")["filter"])
-    assert "roads-highlight-bridge" in ids
+    assert "roads-highlight-bridge" not in ids          # a bridge is drawn (and highlighted) by the layers of its positions
     deck = next(l for l in td["layers"] if l["id"] == "roads-bridge-decks")
     assert deck["type"] == "fill-extrusion"
     assert deck["paint"]["fill-extrusion-base"] == ["get", "__rs_base"]
@@ -1142,7 +1143,7 @@ def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
                     pattern: map.getPaintProperty("{casing}-dash", "line-pattern") || null,
                     dash: map.getPaintProperty("{casing}-dash", "line-dasharray") || null,
                     dash_color: map.getPaintProperty("{casing}-dash", "line-color"),
-                    gap: JSON.stringify(map.getPaintProperty("{casing}", "line-color")),
+                    gap: JSON.stringify(map.getPaintProperty("{casing}-sq", "line-color")),     // the tunnel's casing ends flat
                     slider: document.getElementById("tn-str").value, pal: document.getElementById("tn-pal").value}})"""
     errors = []
     with pw.sync_playwright() as p:
@@ -1187,14 +1188,15 @@ def test_level_columns_draw_each_position_casings_then_fills():
     ids = [l["id"] for l in style["layers"]]
     ps = [f["properties"] for f in style["sources"]["roads"]["data"]["features"]]
     assert [(p["__rs_cl"], p["__rs_fl"]) for p in ps] == [(0, 0), (0, 1), (-2, -2), (-1, 1)]
-    for level in (-2, -1, 0, 1):                                     # a casing and a fill layer per position
-        cas, fil = lay[_pos_id("roads-casing", level)], lay[_pos_id("roads-fill", level)]
-        assert [bool(_eval(cas["filter"], p)) for p in ps] == [p["__rs_cl"] == level for p in ps]
-        assert [bool(_eval(fil["filter"], p)) for p in ps] == [p["__rs_fl"] == level for p in ps]
+    for root, key, have in (("roads-casing", "__rs_cl", (-2, -1, 0)), ("roads-fill", "__rs_fl", (-2, 0, 1))):   # a layer per position it has
+        for level in (-2, -1, 0, 1):
+            if level not in have:
+                assert _pos_id(root, level) not in lay                    # no casing at 1, no fill at -1: no layer
+                continue
+            assert [bool(_eval(lay[_pos_id(root, level)]["filter"], p)) for p in ps] == [p[key] == level for p in ps]
     # in position order, casings before fills of the same position, and position 0 keeps its ids
-    order = [_pos_id("roads-casing", l) for l in (-2, -1, 0, 1)]
-    assert ids.index(order[0]) < ids.index(_pos_id("roads-fill", -2)) < ids.index(order[1]) < ids.index(_pos_id("roads-fill", -1)) \
-        < ids.index("roads-casing") < ids.index("roads-fill") < ids.index(order[3]) < ids.index(_pos_id("roads-fill", 1))
+    assert ids.index("roads-casing-lv-2") < ids.index("roads-fill-lv-2") < ids.index("roads-casing-lv-1") \
+        < ids.index("roads-casing") < ids.index("roads-fill") < ids.index("roads-fill-lv1")
     # the page recolours the fill layers of every position
     html = render_edges(g, backend="web", casing_level_col="cl", fill_level_col="fl").html
     assert '"roads-fill-lv1"' in html and '"roads-fill-lv-2"' in html
@@ -1483,7 +1485,7 @@ def test_divided_casing_is_drawn_as_head_and_main_pieces():
     assert by[0][0]["geometry"]["coordinates"][0] == [18.0, 59.0]                     # the first piece starts at the edge's first vertex
     lay = {l["id"]: l for l in style["layers"]}
     assert all(l["source"] == "casings" for i, l in lay.items() if i.startswith("roads-casing") and "-lv" in i or i == "roads-casing")
-    assert lay["roads-fill"]["source"] == "roads" and lay["roads-fill-lv-1"]["source"] == "roads"
+    assert lay["roads-fill"]["source"] == "roads" and "roads-fill-lv-1" not in lay        # every fill is at 0
     assert style["sources"]["roads"]["data"]["features"][0]["geometry"]["coordinates"][-1] == [18 + d, 59.0]       # the fill line is the whole edge
     assert '_has(["get","__rs_edge"],_qIds)' in html                       # the pieces follow rsFilter by their edge
     # without the head columns nothing changes: no casing source
@@ -2703,3 +2705,42 @@ def test_every_piece_of_a_road_names_its_edge():
                         assert isinstance(p["__rs_edge2"], int) and 0 <= p["__rs_edge2"] < n, (name, p)
     assert all("__rs_edge2" in f["properties"] for f in style["sources"]["ends"]["data"]["features"])       # a cap belongs to both twins
     assert {"casings", "halves", "ends", "slots", "shadows", "decks", "ov0"} <= seen           # the page really had every kind of piece
+
+
+def _at_zoom(e, z):
+    return z if e == ["zoom"] else [_at_zoom(x, z) for x in e] if isinstance(e, list) else e
+
+
+@pytest.mark.parametrize("make", [
+    lambda: render_edges(_edges().assign(bridge=["yes", None, None], oneway=[1, 0, 1]), backend="web", arrows=True, labels=True),
+    lambda: render_edges(_edge_world(), backend="web", minzoom=True),
+    lambda: render_edges(_edges().assign(bridge=["yes", None, None]), backend="web", view_3d=True),
+    lambda: render_edges(_edge_world(), backend="web", tiles=True),
+])
+def test_a_page_has_no_road_layer_that_draws_nothing(monkeypatch, make):
+    """A road layer is made only where some feature can be drawn by it (MapLibre walks every layer on every frame): a position without a
+    bridge has no bridge layers, and every layer that draws a feature at some zoom is still there, in the same order."""
+    from roadstyle import render_web as rw
+    seen = []
+    real = rw._drop_empty_layers
+    monkeypatch.setattr(rw, "_drop_empty_layers", lambda layers, feats: seen.append((copy.deepcopy(layers), feats, copy.deepcopy(real(layers, feats)))) or real(layers, feats))
+    make()
+    full, feats, lean = seen[0]
+    assert len(lean) < len(full)
+    ids = [l["id"] for l in lean]
+    assert [l["id"] for l in full if l["id"] in set(ids)] == ids                # the same order
+    for l in full:                                                              # a layer that draws some feature at some zoom stays
+        if l["id"].startswith("roads-") and l.get("filter") and l.get("source") in feats:
+            draws = []
+            for ft in feats[l["source"]]:
+                for z in range(0, 25):
+                    v = rw._ev(_at_zoom(l["filter"], z), ft.get("properties") or {})
+                    assert v is not rw._MAYBE, (l["id"], l["filter"])         # every operator of the filters is read
+                    draws.append(bool(v))
+            assert any(draws) == (l["id"] in ids) or l["id"] == "roads-fill", l["id"]
+    for l in lean:                                                              # a bridge layer only at a bridge's casing position
+        if l["id"].startswith("roads-casing") and l["id"].endswith("-bridge"):
+            pos = int(re.search(r"-lv(-?\d+)", l["id"]).group(1)) if "-lv" in l["id"] else 0
+            assert any(ft["properties"].get("__rs_bridge") and (ft["properties"].get("__rs_cl") or 0) == pos for ft in feats[l["source"]]), l["id"]
+    if any(ft["properties"].get("__rs_bridge") for ft in feats["roads"]):
+        assert len([i for i in ids if i.endswith("-bridge")]) < len([l for l in full if l["id"].endswith("-bridge")])
