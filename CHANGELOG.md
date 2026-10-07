@@ -20,6 +20,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - `level_input` keeps the edges' `lanes` (shown in the editor's cards). A delete in the editor names its row as the page saw it: if edits.csv changed since, nothing is applied.
 - **Your own stacks are always real** (never a near warning), and the order wishes let go are named (`attrs["levels_orders_not_kept"]`) and
   listed in the editor's Issues tab.
+- **Bridge casing dark grey** (`bridge_casing_color` `#374151`; black was too dark).
 - **Casing that closes:** a bridge's heavier casing keeps each piece's cap (it was always flat: two bridge pieces could not close at a bend or
   a junction), and a round seam of casing at each cut inside a road closes the outline on a curve. The fill halves of a road with two
   different ends only paint; the road stays clickable in its own (transparent) fill layer. Default caps stay round.

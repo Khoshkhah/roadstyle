@@ -337,11 +337,11 @@ def test_web_labels_and_arrows_read_style_config(monkeypatch):
 
 
 def test_web_bridge_casing_is_config_colour():
-    """Bridge decks keep a solid dark casing (config.bridge_casing_color, black by default) even
+    """Bridge decks keep a solid dark casing (config.bridge_casing_color, dark grey #374151 by default) even
     though the regular road casing defaults to light grey."""
     style = _style(render_edges(_edges().assign(bridge=["yes", None, None]), backend="web").html)
     bc = next(l for l in style["layers"] if l["id"].endswith("-bridge"))
-    assert bc["paint"]["line-color"] == "#000000"
+    assert bc["paint"]["line-color"] == "#374151"
 
 
 def test_webmap_notebook_repr_is_slim_but_saved_file_is_offline():
@@ -648,10 +648,10 @@ def test_deck_slices_carry_their_road_id():
     slices = [f for f in feats if "__rs_casing_slab" not in f["properties"]]
     assert slices and all("__rs_edges" in s["properties"] for s in slices)
     assert "0" in slices[0]["properties"]["__rs_edges"].split(",")  # edge 0 is the bridge
-    # the black casing ring: slab features + a casing-colour extrusion layer under the body
+    # the dark casing ring: slab features + a casing-colour extrusion layer under the body
     assert any("__rs_casing_slab" in f["properties"] for f in feats)
     cas = next(l for l in style["layers"] if l["id"] == "roads-deck-casing")
-    assert cas["paint"]["fill-extrusion-color"] == "#000000"
+    assert cas["paint"]["fill-extrusion-color"] == "#374151"
 
 
 def test_dashed_path_classes_get_dash_layers():
@@ -1443,7 +1443,7 @@ def test_level_columns_draw_the_bridge_casing_look_at_each_position():
         ps = [f["properties"] for f in style["sources"]["roads"]["data"]["features"]]
         bl, plain = lay["roads-casing-bridge"], lay["roads-casing"]
         assert bl["source"] == source and bl["layout"]["line-cap"] == "round" and plain["layout"]["line-cap"] == "round"
-        assert bl["paint"]["line-color"] == "#000000" and "line-width" in bl["paint"]
+        assert bl["paint"]["line-color"] == "#374151" and "line-width" in bl["paint"]
         assert ids.index("roads-casing-bridge") < ids.index("roads-fill")                                  # a casing layer: before the position's fills
         assert [bool(_eval(bl["filter"], p)) for p in ps] == [True, False]                                 # the bridge layer draws the bridge edge only
         assert [bool(_eval(plain["filter"], p)) for p in ps] == [False, True]                              # the plain layer draws the plain edge only

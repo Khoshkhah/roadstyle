@@ -53,7 +53,7 @@ def test_tunnel_and_bridge_overrides():
     tun = resolve("primary", tunnel=True)
     bri = resolve("primary", bridge=True)
     assert tun.opacity < base.opacity and tun.dash is not None
-    assert bri.casing == "#000000" and bri.casing_width == base.casing_width + 1.5
+    assert bri.casing == "#374151" and bri.casing_width == base.casing_width + 1.5
 
 
 def test_selection_style_three_layers():

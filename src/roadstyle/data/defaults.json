@@ -409,7 +409,7 @@
       "opacity": 0.7
     },
     "basemap": "voyager",
-    "bridge_casing_color": "#000000",
+    "bridge_casing_color": "#374151",
     "twin_end_caps": true,
     "tunnel_casing_dash": [2, 2],
     "tunnel_gap_shade": 0.25,
