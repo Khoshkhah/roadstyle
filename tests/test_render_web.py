@@ -802,7 +802,7 @@ def test_rscolor_raises_painted_roads_within_their_level():
     """rsColor lifts the painted roads to the top of their level (line-sort-key +500, levels are
     1000 apart): over a street they cross, still under a bridge above them."""
     html = render_edges(_edges(), backend="web").html
-    assert "function _applySort()" in html and '["case",["in",["id"],["literal",all]],500,0]' in html
+    assert "function _applySort()" in html and '["case",_has(["id"],all),500,0]' in html and "function _has(expr, ids)" in html
     assert html.index("_applyFill();\n  _applySort();") > html.index("function rsColor(")
 
 
@@ -2100,6 +2100,34 @@ def test_a_road_keeps_the_modes_of_all_its_edges():
                          geometry=[a, LineString(list(a.coords)[::-1])], crs=4326)
     roads, _ = rs.level_input(g)
     assert list(roads["modes"]) == ["driving + walking + cycling"]
+
+
+def test_rsfilter_and_rscolor_by_ids_in_the_browser(tmp_path):
+    """rsFilter / rsColor take an id set as a lookup (_has: a "match"), not a list scanned per feature (a filter of thousands of ids froze
+    the page, 2026-10-07): in a real page they show only those roads, paint them, and reset."""
+    pw = pytest.importorskip("playwright.sync_api")
+    path = tmp_path / "f.html"
+    render_edges(_edges(), backend="web", basemap="blank").save(path)
+    shown = "() => new Set(map.queryRenderedFeatures().filter(f => f.source === 'roads').map(f => f.id)).size"
+    errors = []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && map.loaded()", timeout=30_000)
+        every = page.evaluate(shown)
+        page.evaluate("rsFilter([0, 0])")
+        page.wait_for_function("map.loaded()")
+        one = page.evaluate(shown)
+        page.evaluate("rsFilter([])")
+        page.wait_for_function("map.loaded()")
+        none = page.evaluate(shown)
+        page.evaluate("rsFilter(null); rsColor([1], '#ff0000')")
+        page.wait_for_function("map.loaded()")
+        back = page.evaluate(shown)
+        browser.close()
+    assert errors == [] and every > 1 and one == 1 and none == 0 and back == every
 
 
 def test_level_editor_saves_only_what_the_solver_takes(tmp_path):

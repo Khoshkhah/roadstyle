@@ -455,6 +455,10 @@ if(BM_SWITCHER && BASEMAPS.length > 1){
 // rest across every road layer; the collapsible checkbox panel is just UI over it. The class
 // filter composes (AND) with the id filter from rsFilter below.
 const FILTER = __FILTER__;
+// whether a feature's value is one of ids: a "match" on the sorted, distinct ids (a lookup); an "in" on a literal list scanned the whole list for
+// every feature in every layer, and a filter of thousands of ids froze the page (2026-10-07)
+function _has(expr, ids){ const u=[...new Set(Array.from(ids))].filter(v=>v!=null).sort((a,b)=>a<b?-1:a>b?1:0);
+  return u.length ? ["match",expr,u,true,false] : false; }
 const _fltCbs={}, _fltBase={};
 let _fltVis=null;   // Set of visible classes; null = all
 let _qIds=null;     // id-set filter from rsFilter; null = off
@@ -483,12 +487,12 @@ function _applyRoadFilters(){
     // the archive source, so the tile layer name is what separates them.
     const kind = RS_TILED && l.source==="roads" ? l["source-layer"] : l.source;   // the layer's data: roads, casings, ends, slots, decks
     const isRoads = kind==="roads";
-    if(_qIds && isRoads){ const qf=["in",["id"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
+    if(_qIds && isRoads){ const qf=_has(["id"],_qIds); f=f?["all",f,qf]:qf; }
     // the pieces of a divided casing (levels_split_casing.md) carry their edge's id as __rs_road
-    if(_qIds && kind==="casings"){ const qf=["in",["get","__rs_road"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
+    if(_qIds && kind==="casings"){ const qf=_has(["get","__rs_road"],_qIds); f=f?["all",f,qf]:qf; }
     // a two-way pair's end cap (twin_ends.md) and an arrow or a street name (edge_overlays.md) stay while either of their two edges is shown
-    if(_qIds && (kind==="ends" || kind==="slots" || kind==="arrows")){ const L=["literal",_qIds];
-      const qf=["any",["in",["get","__rs_road"],L],["in",["get","__rs_road2"],L]]; f=f?["all",f,qf]:qf; }
+    if(_qIds && (kind==="ends" || kind==="slots" || kind==="arrows")){
+      const qf=["any",_has(["get","__rs_road"],_qIds),_has(["get","__rs_road2"],_qIds)]; f=f?["all",f,qf]:qf; }
     try{ map.setFilter(l.id,f); }catch(e){}
   });
   return hidden;
@@ -549,7 +553,7 @@ function rsQuery(test, layer){
 function rsFilter(ids, layer){   // show only these features; rsFilter(null) resets
   const L=_lyr(layer); if(!L) return;
   if(L.ov){
-    const f = ids==null ? null : ["in",["id"],["literal",Array.from(ids)]];
+    const f = ids==null ? null : _has(["id"],ids);
     L.ov.layers.forEach(id=>{ if(map.getLayer(id)) try{   // an overlay attached to edges keeps its position and order (ov.base)
       const b=(L.ov.base||{})[id]; map.setFilter(id, f==null ? (b||null) : (b ? ["all",b,f] : f)); }catch(e){} });
     document.dispatchEvent(new CustomEvent("rs:filterchange",
@@ -693,7 +697,7 @@ function _fillExpr(idE){
   const prop=(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill";
   let e=["coalesce",["get",prop],"#888888"];
   if(_qColor) for(let i=_qColor.length-1;i>=0;i--)   // group 0 outermost -> wins overlaps
-    e=["case",["in",idE||["id"],["literal",_qColor[i].ids]],_qColor[i].color,e];
+    e=["case",_has(idE||["id"],_qColor[i].ids),_qColor[i].color,e];
   return e;
 }
 function _applyFill(){
@@ -713,8 +717,8 @@ function _applyFill(){
   const prop=(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill", none="rgba(0,0,0,0)";
   const same=["==",["get",prop],["get",prop+"__b"]], both=[];
   let ee=["case",same,["coalesce",["get",prop],"#888888"],none];
-  if(_qColor) for(let i=_qColor.length-1;i>=0;i--){ const L=["literal",_qColor[i].ids];
-    const b=["all",["in",["get","__rs_road"],L],["in",["get","__rs_road2"],L]];
+  if(_qColor) for(let i=_qColor.length-1;i>=0;i--){
+    const b=["all",_has(["get","__rs_road"],_qColor[i].ids),_has(["get","__rs_road2"],_qColor[i].ids)];
     both.push(b); ee=["case",b,_qColor[i].color,ee]; }
   const ec=["case",["any",same,...both],["coalesce",["get","__rs_casing"],"#000000"],none];
   RS_END_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"circle-color",ee); });
@@ -738,7 +742,7 @@ function _applySort(){
     if(!(l.id in _sortBase)) _sortBase[l.id]=map.getLayoutProperty(l.id,"line-sort-key");
     const base=_sortBase[l.id]; if(base==null) return;
     map.setLayoutProperty(l.id,"line-sort-key",
-      all ? ["+", base, ["case",["in",["id"],["literal",all]],500,0]] : base);
+      all ? ["+", base, ["case",_has(["id"],all),500,0]] : base);
   });
 }
 function rsSetColorField(nameOrIdx){
@@ -758,7 +762,7 @@ function rsColor(ids, color, layer){   // paint an id set one colour; rsColor(nu
       const pn=l.type+"-color";                      // circle-/line-/fill-color by layer type
       if(!(id in _ovBaseC)) _ovBaseC[id]=map.getPaintProperty(id,pn);
       let e=_ovBaseC[id];
-      if(ids!=null && color) e=["case",["in",["id"],["literal",Array.from(ids)]],color,e];
+      if(ids!=null && color) e=["case",_has(["id"],ids),color,e];
       map.setPaintProperty(id,pn,e); });
     document.dispatchEvent(new CustomEvent("rs:colorchange",
       {detail:{overlay:L.ov.label, ids:ids==null?null:Array.from(ids), color:color||null}}));
