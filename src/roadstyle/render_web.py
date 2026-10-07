@@ -733,6 +733,45 @@ def _casing_parts(geo, head_m, cols):
     return out
 
 
+def _bridge_shadows(geo, highway_col, trim_m):
+    """One shadow line per bridge: its connected bridge edges joined into one line (two directions of an edge drawn once), cut ``trim_m``
+    metres short at each end (where it comes down to the road), at the lowest casing number of its edges (``__rs_cl``: under all of it),
+    with its widest class (Kaveh 2026-10-06: a shadow per piece broke at every head and joint, and a half-transparent blurred line darkens
+    where pieces overlap)."""
+    import numpy as np
+    import shapely
+    from shapely.ops import linemerge, unary_union
+    order = list(_CLASSES)
+    br = [ft for ft in geo["features"] if ft["properties"].get("__rs_bridge") and (ft.get("geometry") or {}).get("type") == "LineString"]
+    if not br:
+        return []
+    lines = [shapely.LineString([c[:2] for c in ft["geometry"]["coordinates"]]) for ft in br]
+    u = unary_union(lines)                                     # the union drops the second direction of a two-way bridge
+    merged = linemerge(u) if u.geom_type == "MultiLineString" else u
+    chains = list(merged.geoms) if hasattr(merged, "geoms") else [merged]
+    tree = shapely.STRtree(lines)
+    out = []
+    for ch in chains:
+        members = [br[k]["properties"] for k in tree.query(ch, predicate="intersects") if lines[k].interpolate(0.5, normalized=True).distance(ch) < 1e-7]
+        if not members:
+            continue
+        lvl = min(min(p.get("__rs_cs", p.get("__rs_cl", 0)), p.get("__rs_cl", 0), p.get("__rs_ce", p.get("__rs_cl", 0))) for p in members)
+        cls = max((p.get(highway_col) for p in members), key=lambda c: -order.index(c) if c in order else -len(order))
+        c = list(ch.coords)
+        lon0, lat0 = c[0]
+        kx, ky = 111320.0 * math.cos(math.radians(lat0)), 111320.0
+        xy = np.column_stack([np.asarray([(x - lon0) * kx for x, _ in c]), np.asarray([(y - lat0) * ky for _, y in c])])
+        cum = _cum_lengths(xy)
+        n = float(cum[-1])
+        if n <= 2 * trim_m:
+            continue
+        pts = _part(xy, cum, trim_m, n - trim_m)
+        coords = np.column_stack([np.round(pts[:, 0] / kx + lon0, 7), np.round(pts[:, 1] / ky + lat0, 7)]).tolist()
+        out.append({"type": "Feature", "properties": {highway_col: cls, "__rs_cl": lvl, "__rs_fl": lvl},
+                    "geometry": {"type": "LineString", "coordinates": coords}})
+    return out
+
+
 def _cap_value(v):
     """One end's cap from a column value: "square" (flat, as long as a round end), True (flat, at the end point) or None (round)."""
     if isinstance(v, str) and v.strip().lower() in ("square", "round"):
@@ -885,7 +924,8 @@ def _level_layers(layers, levels, casing_source=None):
     for level in levels:
         for l in block:
             key = "__rs_cl" if l["id"] in _CASING_FAMILY else "__rs_fl"
-            groups.append({**l, **({"source": casing_source} if casing_source and key == "__rs_cl" else {}), "id": _level_id(l["id"], level),
+            groups.append({**l, **({"source": casing_source} if casing_source and key == "__rs_cl" and l.get("source", "roads") == "roads" else {}),
+                           "id": _level_id(l["id"], level),
                            "filter": ["all", l["filter"], ["==", ["coalesce", ["get", key], 0], level]]})
     return rest[:first] + groups + rest[first:]
 
@@ -1917,12 +1957,14 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                     l = {**l, "filter": ["all", l["filter"], ["!", is_b]]}
                     at = len(layers)
                 layers.append(l)
-            if CONFIG.bridge_shadow:       # a soft shadow under the bridge, on what it crosses: its main part only (its ends come down to the road)
-                main = ["to-boolean", ["get", "__rs_main"]] if divided else ["literal", True]
-                twins.insert(0, {"id": "roads-casing-bridge-shadow", "type": "line", "source": "roads", "layout": lay,
-                                 "filter": ["all", surface, is_b, main],
+            shadows = _bridge_shadows(geo, highway_col, head_m) if CONFIG.bridge_shadow else []
+            if shadows:                    # one soft shadow per bridge, under all of it, on what it crosses (its ends come down to the road)
+                style["sources"]["shadows"] = {"type": "geojson", "data": {"type": "FeatureCollection", "features": shadows},
+                                               "tolerance": style["sources"]["roads"].get("tolerance", 0.375)}
+                twins.insert(0, {"id": "roads-casing-bridge-shadow", "type": "line", "source": "shadows", "layout": lay,
+                                 "filter": ["literal", True],
                                  "paint": {"line-color": CONFIG.bridge_shadow_color, "line-blur": CONFIG.bridge_shadow_blur,
-                                           "line-width": _width_expr(highway_col, casing=True, scale=1.6, **sw), "line-offset": off,
+                                           "line-width": _width_expr(highway_col, casing=True, scale=1.6, **sw),
                                            "line-translate": list(CONFIG.bridge_shadow_offset), "line-translate-anchor": "viewport"}})
             layers[at + 1:at + 1] = twins
             style["layers"] = layers

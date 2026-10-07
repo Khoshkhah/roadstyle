@@ -2124,23 +2124,28 @@ def test_a_divided_casing_has_a_round_seam_at_each_cut():
     assert sorted(p["__rs_cl"] for p in pieces if not p.get("__rs_seam")) == [-1, 0, 1]
 
 
-def test_a_bridge_has_a_soft_offset_shadow_under_its_main_part(monkeypatch):
-    """Position mode (Kaveh 2026-10-06): a soft shadow under a bridge, on what it crosses: blurred, shifted down-right (lit from the top left),
-    drawn just before the bridge's casing at its position, on its main part only (its ends come down to the road); off with bridge_shadow."""
+def test_a_bridge_has_one_continuous_soft_shadow(monkeypatch):
+    """Position mode (Kaveh 2026-10-06): one soft shadow per bridge, its edges joined into one line and cut a head short at each end, blurred
+    and shifted down-right (lit from the top left), at the lowest casing number of the bridge (under all of it); off with bridge_shadow."""
+    import dataclasses
+
     from roadstyle import render_web
-    d = 0.001
-    g = gpd.GeoDataFrame({"highway": ["primary", "primary"], "bridge": ["yes", None], "cs": [0, 0], "cm": [1, 0], "ce": [0, 0], "fl": [1, 0]},
-                         geometry=[LineString([(18, 59), (18 + d, 59)]), LineString([(18, 59.01), (18 + d, 59.01)])], crs=4326)
+    m = 1 / 111320.0
+    pts = [(18.0, 59.3 + k * 20 * m) for k in range(4)]                                       # a bridge of three 20 m edges, then a street
+    g = gpd.GeoDataFrame({"highway": ["primary"] * 4, "bridge": ["yes", "yes", "yes", None], "cs": [1, 2, 2, 0], "cm": [2, 3, 2, 0],
+                          "ce": [2, 2, 1, 0], "fl": [2, 3, 2, 0]},
+                         geometry=[LineString([pts[k], pts[k + 1]]) for k in range(3)] + [LineString([pts[3], (18.0, 59.3 + 90 * m)])], crs=4326)
     kw = dict(backend="web", casing_start_col="cs", casing_level_col="cm", casing_end_col="ce", fill_level_col="fl")
     style = _style(render_edges(g, **kw).html)
-    ids = [l["id"] for l in style["layers"]]
+    sh = style["sources"]["shadows"]["data"]["features"]
+    assert len(sh) == 1 and sh[0]["properties"]["__rs_cl"] == 1                                # one line, under the lowest part of the bridge
+    ys = [c[1] for c in sh[0]["geometry"]["coordinates"]]
+    assert abs((max(ys) - min(ys)) / m - 50) < 0.5                                             # 60 m of bridge, 5 m short at each end
     lay = {l["id"]: l for l in style["layers"]}
-    sh = lay["roads-casing-lv1-bridge-shadow"]
-    assert sh["paint"]["line-blur"] == 4.0 and sh["paint"]["line-translate"] == [2, 2] and sh["source"] == "casings"
-    assert ids.index("roads-casing-lv1-bridge-shadow") < ids.index("roads-casing-lv1-bridge")                # under the bridge's casing
-    pieces = [f["properties"] for f in style["sources"]["casings"]["data"]["features"] if f["properties"]["__rs_road"] == 0]
-    assert [bool(_eval(sh["filter"], p)) for p in pieces if not p.get("__rs_seam")] == [False, True, False]   # the main part only
-    import dataclasses
+    ids = [l["id"] for l in style["layers"]]
+    s1 = lay["roads-casing-lv1-bridge-shadow"]
+    assert s1["source"] == "shadows" and s1["paint"]["line-blur"] == 4.0 and s1["paint"]["line-translate"] == [2, 2]
+    assert ids.index("roads-casing-lv1-bridge-shadow") < ids.index("roads-casing-lv1-bridge")
     monkeypatch.setattr(render_web, "CONFIG", dataclasses.replace(render_web.CONFIG, bridge_shadow=False))
     off = _style(render_edges(g, **kw).html)
-    assert not [l for l in off["layers"] if l["id"].endswith("-shadow")]
+    assert "shadows" not in off["sources"] and not [l for l in off["layers"] if l["id"].endswith("-shadow")]
