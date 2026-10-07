@@ -93,14 +93,14 @@ workbench: `pip install "roadstyle[studio]" && roadstyle studio`.
 
 <table>
 <tr>
-<td width="33%" valign="top"><a href="https://khoshkhah.github.io/roadstyle/gallery/"><img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/amber_voyager.png" alt="The defaults" width="100%"></a><br><b>The defaults</b><br><sub><code>rs.render_edges(edges)</code></sub></td>
-<td width="33%" valign="top"><a href="https://khoshkhah.github.io/roadstyle/gallery/"><img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/amber_dark.png" alt="Dark" width="100%"></a><br><b>Dark</b><br><sub><code>basemap="dark_matter"</code></sub></td>
-<td width="33%" valign="top"><a href="https://khoshkhah.github.io/roadstyle/gallery/"><img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/bridges_3d.png" alt="3D bridges" width="100%"></a><br><b>3D bridges</b><br><sub><code>view_3d=True</code></sub></td>
+<td width="33%" valign="top"><a href="https://khoshkhah.github.io/roadstyle/gallery/"><img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/road_look.jpg" alt="The road map look" width="100%"></a><br><b>The road map look</b><br><sub><code>rs.render_edges(edges)</code></sub></td>
+<td width="33%" valign="top"><a href="https://khoshkhah.github.io/roadstyle/gallery/"><img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/bridges_tunnels.jpg" alt="Bridges and tunnels" width="100%"></a><br><b>Bridges and tunnels</b><br><sub><code>rs.render_edges(edges)</code></sub></td>
+<td width="33%" valign="top"><a href="https://khoshkhah.github.io/roadstyle/gallery/"><img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/colour_by_data.jpg" alt="Colour by your data" width="100%"></a><br><b>Colour by your data</b><br><sub><code>color_by="maxspeed_kmh"</code></sub></td>
 </tr>
 <tr>
-<td width="33%" valign="top"><a href="https://khoshkhah.github.io/roadstyle/gallery/"><img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/speed_datadriven.png" alt="Colour by your data" width="100%"></a><br><b>Colour by your data</b><br><sub><code>color_by="maxspeed_kmh", cmap="plasma"</code></sub></td>
-<td width="33%" valign="top"><a href="https://khoshkhah.github.io/roadstyle/gallery/"><img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/satellite.png" alt="Satellite" width="100%"></a><br><b>Satellite</b><br><sub><code>basemap="satellite"</code></sub></td>
-<td width="33%" valign="top"><a href="https://khoshkhah.github.io/roadstyle/gallery/"><img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/dashboard.png" alt="Dashboard" width="100%"></a><br><b>Dashboard</b><br><sub><code>rs.render_dashboard(edges)</code></sub></td>
+<td width="33%" valign="top"><a href="https://khoshkhah.github.io/roadstyle/gallery/"><img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/bridges_3d.jpg" alt="3D bridges" width="100%"></a><br><b>3D bridges</b><br><sub><code>view_3d=True</code></sub></td>
+<td width="33%" valign="top"><a href="https://khoshkhah.github.io/roadstyle/gallery/"><img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/street_view.jpg" alt="Street View" width="100%"></a><br><b>Street View</b><br><sub><code>click a road</code></sub></td>
+<td width="33%" valign="top"><a href="https://khoshkhah.github.io/roadstyle/gallery/"><img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/dashboard.jpg" alt="Dashboard" width="100%"></a><br><b>Dashboard</b><br><sub><code>rs.render_dashboard(edges)</code></sub></td>
 </tr>
 </table>
 

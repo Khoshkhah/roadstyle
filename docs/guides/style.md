@@ -31,9 +31,9 @@ A palette sets each road class's colour, width and casing.
 
 <div class="grid" markdown>
 
-![amber on Voyager](../img/gallery/amber_voyager.png)
+![amber, the default, on Voyager](../img/gallery/road_look.jpg)
 
-![carto on Positron](../img/gallery/carto_positron.png)
+![amber on the blank canvas](../img/gallery/basemap_blank.jpg)
 
 </div>
 
@@ -77,7 +77,7 @@ pass under them. Every map also has a 2D/3D button. Below zoom 16 bridges draw f
 rs.render_edges(edges, view_3d=True)                         # CLI: --view-3d
 ```
 
-![Bridges in 3D](../img/gallery/bridges_3d.png)
+![Bridges in 3D](../img/gallery/bridges_3d.jpg)
 
 In 2D a bridge has a slate casing and a soft shadow; a tunnel fades toward slate and has a dashed casing
 ([Which road is on top](levels.md#bridges-and-tunnels)).

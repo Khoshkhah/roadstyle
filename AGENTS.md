@@ -30,4 +30,4 @@ A consumer project that does not install it runs with `PYTHONPATH=<this repo>/sr
   in the template; Street View: `_svMeasure` / `_svAt` (the spot on the edge, metres along it), `_svPick` / `_svUrl` / `_svUrlOf`, the marker `_svMark` / `_svMarkPlace` / `_svLanePx`, the window `rsSetStreetView`.
 - The JS side has no unit tests. Check a rendering change in a real browser: `rs.snapshot(m,
   "x.png")` and look at the PNG, or drive the page with Playwright.
-- Gallery and README images: `python docs/build_gallery.py`.
+- Gallery and README images: screenshots taken by hand (see `docs/build_gallery.py`, which still makes the report picture).

@@ -1,123 +1,108 @@
 # Gallery
 
-<p class="lead">One look per entry: the keywords that make it, and a real screenshot.</p>
+<p class="lead">What roadstyle can do, one thing per picture, with the line of code that makes it.</p>
 
-Every entry uses the bundled Södermalm sample:
+The pictures are Södermalm (Stockholm) and Monaco, from OpenStreetMap:
 
 ```python
 import geopandas as gpd
 import roadstyle as rs
-edges = gpd.read_file("ui/studio/samples/sodermalm_driving.geojson")
+edges = gpd.read_file("ui/studio/samples/sodermalm_driving.geojson")   # Södermalm; Monaco is duckOSM's Monaco build
 ```
 
-## The defaults
+## The road map look
+
+Outlines, street names along the roads and one-way arrows, out of the box.
 
 ```python
-rs.render_edges(edges)                # amber palette on Voyager
+rs.render_edges(edges)
 ```
 
-![amber on voyager](img/gallery/amber_voyager.png)
+![Södermalm at street zoom: Hornsgatan and the streets around Mariatorget, with their names and one-way arrows](img/gallery/road_look.jpg)
 
-## High saturation
+## Bridges and tunnels
+
+A bridge has a slate outline and a soft shadow on what it crosses; a tunnel fades and has a dashed outline. The order is worked out for you.
 
 ```python
-rs.render_edges(edges, palette="highsat")
+rs.render_edges(edges)
 ```
 
-![highsat on voyager](img/gallery/highsat_voyager.png)
+![Monaco: a bridge with its shadow over a roundabout, a dashed tunnel under both](img/gallery/bridges_tunnels.jpg)
 
-## OSM-Carto on Positron
+More in [Which road is on top](guides/levels.md).
+
+## Stacked roads
+
+Roads, ramps and tunnels crossing each other at several levels, each drawn in the right order. Any place can be fixed by hand in the
+[level editor](guides/levels.md#fix-it-by-hand-the-level-editor).
 
 ```python
-rs.render_edges(edges, palette="carto", basemap="positron")
+rs.render_edges(edges)
 ```
 
-![carto on positron](img/gallery/carto_positron.png)
+![Monaco: tunnels, ramps and a roundabout crossing at several levels](img/gallery/stacked_roads.jpg)
 
-## Dark
+## Colour by your data
+
+Any column, with a legend.
 
 ```python
-rs.render_edges(edges, basemap="dark_matter")
+rs.render_edges(edges, color_by="maxspeed_kmh", cmap="YlOrRd", legend=True)
 ```
 
-![dark matter](img/gallery/amber_dark.png)
-
-## Blank canvas (offline)
-
-```python
-rs.render_edges(edges, palette="mono", basemap="blank", basemap_switcher=False)
-```
-
-![mono on blank](img/gallery/mono_blank.png)
-
-## Satellite
-
-```python
-rs.render_edges(edges, basemap="satellite")
-```
-
-![satellite](img/gallery/satellite.png)
-
-## Colour by data
-
-```python
-rs.render_edges(edges, color_by="maxspeed_kmh", cmap="plasma", basemap="positron")
-```
-
-![coloured by maxspeed](img/gallery/speed_datadriven.png)
+![Södermalm coloured by speed limit, light yellow to dark red, with the legend](img/gallery/colour_by_data.jpg)
 
 More in [Colour by your data](guides/colour.md).
 
 ## 3D bridges
 
+Bridges as raised decks over the roads that pass under them. Every map has a 2D/3D button.
+
 ```python
 rs.render_edges(edges, view_3d=True)
 ```
 
-![3d bridges](img/gallery/bridges_3d.png)
+![Södermalm in 3D: a raised bridge deck over the roads below](img/gallery/bridges_3d.jpg)
 
-## Street View window
+## Street View
+
+Click a road, then the Street View button: Google Street View of that road, in a window you can move.
 
 ```python
 rs.render_edges(edges)                # the Street View button is on by default
 ```
 
-![street view window](img/gallery/street_view_window.png)
-
-## Street View beside the map
-
-```python
-rs.render_street_view(edges)          # CLI: roadstyle edges.gpkg --page street-view
-```
-
-![map and street view side by side](img/gallery/street_view_side.png)
-
-## Street View below the map
-
-```python
-rs.render_street_view(edges, layout="below")
-```
-
-![map with street view under it](img/gallery/street_view_below.png)
+![Ringvägen selected on a satellite base map, with the Street View window showing it](img/gallery/street_view.jpg)
 
 More in [Google Street View](guides/street-view.md).
 
-## Dashboard
+## Ready-made pages
+
+A dashboard with base map, colour and query controls, in one call.
 
 ```python
-rs.render_dashboard(edges).save("dashboard.html")   # CLI: --page dashboard
+rs.render_dashboard(edges, color_options={"Class": {}, "Speed": {"color_by": "maxspeed_kmh"}})
 ```
 
-![dashboard](img/gallery/dashboard.png)
+![The dashboard page: the map coloured by speed, the side panel with base map, colour, legend, a query and its results](img/gallery/dashboard.jpg)
 
 More in [Dashboards & JavaScript](guides/dashboards.md).
 
-## Studio
+## Base maps
 
-```bash
-pip install "roadstyle[studio]" && roadstyle studio
+The same map on another background: Voyager (the default), Positron, Dark Matter, satellite, or a blank canvas that works offline.
+
+```python
+rs.render_edges(edges, basemap="blank")
 ```
 
-![roadstyle studio](img/gallery/studio.png)
+<div class="grid" markdown>
 
-More in [Studio](studio.md).
+![Monaco in 3D on Voyager](img/gallery/basemap_voyager.jpg)
+
+![Monaco in 3D on the blank canvas](img/gallery/basemap_blank.jpg)
+
+</div>
+
+More in [Style the roads](guides/style.md).

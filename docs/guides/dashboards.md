@@ -34,7 +34,7 @@
 Each takes every `render_edges` keyword and returns the same map object (`.save()`, `.html`).
 `color_options` fills the *Colour by* picker; `name=` sets the page title.
 
-![The dashboard page](../img/gallery/dashboard.png)
+![The dashboard page](../img/gallery/dashboard.jpg)
 ![The report page](../img/gallery/report.png)
 
 To reshape a sidebar, `rs.sidebar_html("dashboard")` (or `"report"`) returns its HTML. Edit it
