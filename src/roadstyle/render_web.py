@@ -718,6 +718,18 @@ def _casing_parts(geo, head_m, cols):
             if q.get("__rs_cap") is None:
                 q.pop("__rs_cap", None)
             out.append({"type": "Feature", "properties": q, "geometry": {"type": "LineString", "coordinates": coords}})
+        # a seam at each cut inside the edge: a round dot of casing at the lower of the two pieces' numbers. Two pieces ending flat at a cut
+        # on a curve left a wedge open in the outline (Kaveh 2026-10-06: "not smooth in the middle"); the piece drawn above covers the rest
+        cut_at = sorted({h0, n - h1} - {0.0, n})
+        for c in cut_at:
+            sides = [num for a, b, num in cuts if b - a > 1e-9 and (abs(b - c) < 1e-9 or abs(a - c) < 1e-9)]
+            pts = _part(xy, cum, max(0.0, c - 0.01), min(n, c + 0.01))
+            if len(sides) < 2 or len(pts) < 2:
+                continue
+            coords = np.column_stack([np.round(pts[:, 0] / kx + lon0, 8), np.round(pts[:, 1] / ky + lat0, 8)]).tolist()
+            q = {**base, "__rs_cl": min(sides), "__rs_seam": True}
+            q.pop("__rs_cap", None)
+            out.append({"type": "Feature", "properties": q, "geometry": {"type": "LineString", "coordinates": coords}})
     return out
 
 
@@ -839,7 +851,8 @@ def _tunnel_fill_under(lid, flt, fw, off, bg, on):
              "paint": {"line-color": bg, "line-width": fw, "line-offset": off}}]
 
 
-_CASING_FAMILY = ("roads-casing", "roads-casing-sq", "roads-casing-sx", "roads-casing-dash", "roads-casing-bridge")
+_CASING_FAMILY = ("roads-casing", "roads-casing-sq", "roads-casing-sx", "roads-casing-dash", "roads-casing-bridge", "roads-casing-sq-bridge",
+                  "roads-casing-sx-bridge")
 _FILL_FAMILY = ("roads-fill-under", "roads-fill", "roads-fill-sq", "roads-fill-sx", "roads-fill-h", "roads-fill-hsq", "roads-fill-hsx", "roads-fill-pat")
 
 
@@ -1886,16 +1899,21 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         if divided:       # the divided casing: its own source of pieces (one casing piece per head and for the main part)
             style["sources"]["casings"] = {"type": "geojson", "data": {"type": "FeatureCollection", "features": parts}}
         if any(ft["properties"].get("__rs_bridge") for ft in geo["features"]):
-            # the bridge look in position mode: a heavier black casing with flat ends, in the casing layers of the edge's position
-            # (docs/design/levels_split_casing.md, section 9); the other casing layers leave the bridge edges to it
-            layers, at = [], 0
+            # the bridge look in position mode: a heavier black casing, in the casing layers of the edge's position (docs/design/
+            # levels_split_casing.md, section 9), one twin of each casing layer so a bridge piece keeps its end's cap (round, flat, square;
+            # Kaveh 2026-10-06: flat ends only, two bridge pieces could not close at a bend or a junction); the other casing layers leave
+            # the bridge edges to them
+            layers, at, twins = [], 0, []
             for l in style["layers"]:
                 if l["id"] in ("roads-casing", "roads-casing-sq", "roads-casing-sx", "roads-casing-dash"):
+                    if l["id"] != "roads-casing-dash":
+                        twins.append({"id": l["id"] + "-bridge", "type": "line", "source": "roads", "layout": l["layout"],
+                                      "filter": ["all", l["filter"], is_b],
+                                      "paint": {"line-color": CONFIG.bridge_casing_color, "line-width": bcw, "line-offset": off}})
                     l = {**l, "filter": ["all", l["filter"], ["!", is_b]]}
                     at = len(layers)
                 layers.append(l)
-            layers.insert(at + 1, {"id": "roads-casing-bridge", "type": "line", "source": "roads", "layout": blay, "filter": ["all", surface, is_b],
-                                   "paint": {"line-color": CONFIG.bridge_casing_color, "line-width": bcw, "line-offset": off}})
+            layers[at + 1:at + 1] = twins
             style["layers"] = layers
         style["layers"] = _level_layers(style["layers"], levels, "casings" if divided else None)
         if decks["features"]:        # 3D: the flat bridge line below flat_below, the extruded deck from it up

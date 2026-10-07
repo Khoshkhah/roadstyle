@@ -4,8 +4,8 @@
 
 levels.csv has one row per edge: edge (its id), casing_start, casing_level, casing_end, fill_level, and its ends as drawn: head_start_m,
 head_end_m, cap_start, cap_end; draw them with rs.render_edges(edges, casing_start_col=..., casing_level_col=..., casing_end_col=...,
-fill_level_col=..., head_start_m_col=..., head_end_m_col=..., cap_start_col=..., cap_end_col=...). The ends are 5 m heads, flat caps where
-exactly two roads meet (a bend of 15 degrees at most) and round elsewhere (or with --auto-ends rs.auto_ends' at zoom 18), with yours on top (heads.csv / caps.csv, an empty value: the default; the level editor
+fill_level_col=..., head_start_m_col=..., head_end_m_col=..., cap_start_col=..., cap_end_col=...). The ends are 5 m heads and round caps (or with
+--auto-ends rs.auto_ends' at zoom 18), with yours on top (heads.csv / caps.csv, an empty value: the default; the level editor
 writes them). The solver only learns from the head lengths which main
 parts are empty and which parts of an upper road cross the road under it.
 """
@@ -57,36 +57,10 @@ def ends(auto, heads, caps):
     return t.reset_index()
 
 
-def defaults(roads, pairs, head_m=5.0, max_bend=15.0):
-    """Every road end as drawn unless you set it: ``head_m`` long heads; a flat cap where exactly two road ends meet (one road going on into
-    the next) with a bend of at most ``max_bend`` degrees, round elsewhere (a junction of three or more, a dead end, a sharper bend, where
-    two flat ends would leave the outer corner open). Kaveh 2026-10-06; the automatic heads, made for one zoom, were too short at the
-    others. ``pairs``: level_input's (its meet rows say which ends meet)."""
-    import math
-    from collections import defaultdict
-
-    from roadstyle.levels import _metres, _read_pairs
-    geo = dict(zip(roads["road"], _metres(roads.geometry), strict=True))
-    at = defaultdict(set)                                       # a road end -> the road ends it meets
-    for row in _read_pairs(pairs):
-        if row["relation"] == "meet":
-            at[(row["a"], row["a_end"])].add((row["b"], row["b_end"]))
-            at[(row["b"], row["b_end"])].add((row["a"], row["a_end"]))
-    def heading(r, end):                                        # leaving the node along the road
-        c = list(geo[r].coords) if end == "start" else list(geo[r].coords)[::-1]
-        return math.atan2(c[1][1] - c[0][1], c[1][0] - c[0][0])
-    def cap(r, end):
-        J = at.get((r, end), set())
-        if len(J) != 1:
-            return "round"
-        (o, oe), = J
-        if at.get((o, oe), set()) != {(r, end)}:               # the other end meets more roads: a junction
-            return "round"
-        bend = 180 - abs((math.degrees(heading(r, end) - heading(o, oe)) + 180) % 360 - 180)
-        return "flat" if bend <= max_bend else "round"
-    ids = list(roads["road"])
-    return pd.DataFrame({"road": ids, "start_m": head_m, "end_m": head_m,
-                         "cap_start": [cap(r, "start") for r in ids], "cap_end": [cap(r, "end") for r in ids]})
+def defaults(roads, pairs=None, head_m=5.0):
+    """Every road end as drawn unless you set it: ``head_m`` long heads and round caps (Kaveh 2026-10-06: automatic heads, made for one zoom,
+    were too short at the others; flat caps where two roads meet left small breaks at every joint that was not perfectly straight)."""
+    return pd.DataFrame({"road": list(roads["road"]), "start_m": head_m, "end_m": head_m, "cap_start": "round", "cap_end": "round"})
 
 
 def solve(roads, pairs, edits, heads, caps, auto=False, **kw):

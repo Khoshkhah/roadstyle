@@ -1395,7 +1395,7 @@ def test_divided_casing_is_drawn_as_head_and_main_pieces():
                          crs=4326)
     html = render_edges(g, backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0).html
     style = _style(html)
-    parts = style["sources"]["casings"]["data"]["features"]
+    parts = [f for f in style["sources"]["casings"]["data"]["features"] if not f["properties"].get("__rs_seam")]     # the pieces, not the seams
     by = {}
     for f in parts:
         by.setdefault(f["properties"]["__rs_road"], []).append(f)
@@ -1421,7 +1421,7 @@ def test_divided_casing_main_piece_ends_flat_and_heads_round():
     g = gpd.GeoDataFrame({"highway": ["residential"] * 2, "cs": [-1, 0], "cm": [0, 0], "ce": [-2, 0], "fl": [0, 0]},
                          geometry=[LineString([(18, 59), (18 + d, 59)]), LineString([(18, 59.01), (18 + d, 59.01)])], crs=4326)
     style = _style(render_edges(g, backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0).html)
-    parts = style["sources"]["casings"]["data"]["features"]
+    parts = [f for f in style["sources"]["casings"]["data"]["features"] if not f["properties"].get("__rs_seam")]     # the pieces, not the seams
     flags = [(f["properties"]["__rs_road"], f["properties"]["__rs_cl"], bool(f["properties"].get("__rs_cap"))) for f in parts]
     assert flags == [(0, -1, False), (0, 0, True), (0, -2, False), (1, 0, False)]       # head, MAIN flat, head; the unsplit edge stays round
     lay = {l["id"]: l for l in style["layers"]}
@@ -1430,8 +1430,9 @@ def test_divided_casing_main_piece_ends_flat_and_heads_round():
 
 
 def test_level_columns_draw_the_bridge_casing_look_at_each_position():
-    """Position mode: a bridge edge gets the bridge look in the casing of its position: a heavier black casing with flat ends (roads-casing-bridge, per position),
-    from the casing source when the casing is divided; the plain casing layer leaves bridge edges to it; no bridge edge, no such layer."""
+    """Position mode: a bridge edge gets the bridge look in the casing of its position: a heavier black casing (roads-casing-bridge, per position),
+    with the end shapes of the plain casing (a twin of each: round, flat -sq-bridge for the divided casing's main piece), from the casing source
+    when the casing is divided; the plain casing layer leaves bridge edges to it; no bridge edge, no such layer."""
     d = 0.001
     g = gpd.GeoDataFrame({"highway": ["primary", "primary"], "bridge": ["yes", None], "layer": [None, None], "cm": [0, 0], "fl": [0, 0], "cs": [0, 0], "ce": [0, 0]},
                          geometry=[LineString([(18, 59), (18 + d, 59)]), LineString([(18, 59.01), (18 + d, 59.01)])], crs=4326)     # edge 0 is a bridge, edge 1 is plain, same position
@@ -1441,7 +1442,7 @@ def test_level_columns_draw_the_bridge_casing_look_at_each_position():
         ids = [l["id"] for l in style["layers"]]
         ps = [f["properties"] for f in style["sources"]["roads"]["data"]["features"]]
         bl, plain = lay["roads-casing-bridge"], lay["roads-casing"]
-        assert bl["source"] == source and bl["layout"]["line-cap"] == "butt" and plain["layout"]["line-cap"] == "round"
+        assert bl["source"] == source and bl["layout"]["line-cap"] == "round" and plain["layout"]["line-cap"] == "round"
         assert bl["paint"]["line-color"] == "#000000" and "line-width" in bl["paint"]
         assert ids.index("roads-casing-bridge") < ids.index("roads-fill")                                  # a casing layer: before the position's fills
         assert [bool(_eval(bl["filter"], p)) for p in ps] == [True, False]                                 # the bridge layer draws the bridge edge only
@@ -2012,7 +2013,7 @@ def test_cap_start_and_end_cols_set_one_end_each():
     assert [bool(_eval(lay["roads-fill-sx"]["filter"], p)) for p in ps] == [False, True]
     assert [[bool(_eval(lay[i]["filter"], h)) for h in halves] for i in ("roads-fill-hsq", "roads-fill-h")] == [[True, False], [False, True]]
     assert lay["roads-fill-hsq"]["layout"]["line-cap"] == "butt" and lay["roads-fill-h"]["source"] == "halves"
-    heads = [f["properties"] for f in style["sources"]["casings"]["data"]["features"] if f["properties"]["__rs_road"] == 0]
+    heads = [f["properties"] for f in style["sources"]["casings"]["data"]["features"] if f["properties"]["__rs_road"] == 0 and not f["properties"].get("__rs_seam")]
     assert [h.get("__rs_cap") for h in heads] == [True, True, None]                              # start head flat, main flat (cut), end head round
     auto = _style(render_edges(g.drop(columns=["cl", "fl"]), backend="web", cap_start_col="s", cap_end_col="e").html)     # levels computed here
     assert len(auto["sources"]["halves"]["data"]["features"]) == 2
@@ -2028,7 +2029,7 @@ def test_head_metre_cols_set_where_the_casing_is_cut():
                                 head_start_m_col="hs", head_end_m_col="he").html)
     def lengths(road):
         out = []
-        for f in style["sources"]["casings"]["data"]["features"]:
+        for f in (f for f in style["sources"]["casings"]["data"]["features"] if not f["properties"].get("__rs_seam")):
             if f["properties"]["__rs_road"] == road:
                 c = np.asarray(f["geometry"]["coordinates"])
                 out.append(round(float(np.abs(np.diff(c[:, 1])).sum() / m), 1))
@@ -2088,26 +2089,6 @@ def test_heads_over_the_whole_road_leave_no_main_part():
     assert rs.casing_parts(roads, 5.0, heads("6", "3.8"))["1"][1] is not None
 
 
-def test_default_caps_are_flat_where_only_two_roads_meet():
-    """scripts/solve_levels.defaults (Kaveh 2026-10-06): a flat cap where exactly two road ends meet with a bend of 15 degrees at most;
-    round at a junction of three, at a dead end and at a sharper bend."""
-    import sys
-
-    import roadstyle as rs
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-    from solve_levels import defaults
-    P = lambda x, y: (674000 + x, 6580000 + y)                                         # noqa: E731
-    g = gpd.GeoDataFrame({"highway": ["residential"] * 5, "edge_id": [1, 2, 3, 4, 5]},
-                         geometry=[LineString([P(0, 0), P(50, 0)]), LineString([P(50, 0), P(100, 4)]),       # 1 -> 2: straight on (about 5 degrees)
-                                   LineString([P(100, 4), P(150, 4)]), LineString([P(100, 4), P(100, 60)]),  # 2 -> 3 and 4: a junction of three
-                                   LineString([P(0, 0), P(-40, 30)])], crs=3006)                            # 5 -> 1: a sharp bend
-    roads, pairs = rs.level_input(g)
-    d = defaults(roads, pairs).set_index("road")
-    assert d.loc["1", "cap_end"] == "flat" and d.loc["2", "cap_start"] == "flat"                    # two roads, straight on
-    assert d.loc["2", "cap_end"] == "round" and d.loc["3", "cap_start"] == "round"                  # three roads
-    assert d.loc["1", "cap_start"] == "round" and d.loc["5", "cap_end"] == "round"                  # a sharp bend; a dead end
-    assert (d["start_m"] == 5).all() and (d["end_m"] == 5).all()
-
 
 def test_a_stack_of_yours_is_never_only_near_and_wishes_let_go_are_named():
     """solve_levels (Kaveh 2026-10-06): a stack edit counts as a real crossing even where the two roads only come near (the found ones are
@@ -2126,3 +2107,17 @@ def test_a_stack_of_yours_is_never_only_near_and_wishes_let_go_are_named():
     assert out.attrs["levels_near"] == [] and out.attrs["levels_given_up"] == []
     assert out.set_index("road").loc["1", "fill_level"] > out.set_index("road").loc["2", "fill_level"]   # your stack won
     assert out.attrs["levels_orders_not_kept"] == [("2", "1")]                                          # and the wish it beat is named
+
+
+def test_a_divided_casing_has_a_round_seam_at_each_cut():
+    """_casing_parts (Kaveh 2026-10-06): at each cut inside an edge a tiny round piece of casing at the lower of the two pieces' numbers, so two
+    pieces ending flat at a cut on a curve leave no wedge open in the outline."""
+    m = 1 / 111320.0
+    g = gpd.GeoDataFrame({"highway": ["primary"], "cs": [-1], "cl": [1], "ce": [0], "fl": [1], "cap": ["flat"]},
+                         geometry=[LineString([(18.0, 59.3), (18.0, 59.3 + 50 * m), (18.0 + 0.001, 59.3 + 90 * m)])], crs=4326)
+    style = _style(render_edges(g, backend="web", casing_start_col="cs", casing_level_col="cl", casing_end_col="ce", fill_level_col="fl",
+                                cap_col="cap").html)
+    pieces = [f["properties"] for f in style["sources"]["casings"]["data"]["features"]]
+    seams = [p for p in pieces if p.get("__rs_seam")]
+    assert sorted(p["__rs_cl"] for p in seams) == [-1, 0] and all("__rs_cap" not in p for p in seams)     # round, at the lower number
+    assert sorted(p["__rs_cl"] for p in pieces if not p.get("__rs_seam")) == [-1, 0, 1]

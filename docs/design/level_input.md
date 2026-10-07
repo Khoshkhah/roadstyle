@@ -57,10 +57,11 @@ draws at zoom 18 (street level; widths are pixels, so lower zooms are wider on t
   level or above, else flat: a road going on into a lower piece would show its round end as a bump on it, and a wide road ending on a
   narrower one would cross its outline (Tunnel Aureglia into Rue Grimaldi). Square never helps there (it covers the round end and more).
 
-**The default caps** (Kaveh 2026-10-06): flat where exactly two road ends meet (one road going on into the next) with a bend of 15
-degrees at most, round elsewhere (a junction of three or more, a dead end, a sharper bend, where two flat ends would leave the outer
-corner open). Monaco: 787 of 933 two-road joints. A road with two different ends is drawn from two fill halves that only paint; its own
-fill layer keeps it, transparent, so a click and a selection find the road itself.
+**The default caps are round** (Kaveh 2026-10-06). Flat where exactly two roads meet was tried and dropped: two flat ends close only on
+a perfectly straight line and left small breaks at most joints. A road with two different ends is drawn from two fill halves that only
+paint; its own fill layer keeps it, transparent, so a click and a selection find the road itself. A bridge's heavier casing keeps the
+cap of each of its pieces (it was always flat, so two bridge pieces could not close), and at each cut inside a road (between a head and
+the main part) a round seam of casing at the lower of the two numbers closes the outline on a curve.
 
 **Not the default** (Kaveh 2026-10-06): heads made for zoom 18 were too short at lower zooms, where the roads are wider on the ground,
 and the main casing (a higher level) showed in the joined roads' fills everywhere. The default is back to 5 m heads and round caps

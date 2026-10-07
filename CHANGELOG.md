@@ -20,8 +20,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - `level_input` keeps the edges' `lanes` (shown in the editor's cards). A delete in the editor names its row as the page saw it: if edits.csv changed since, nothing is applied.
 - **Your own stacks are always real** (never a near warning), and the order wishes let go are named (`attrs["levels_orders_not_kept"]`) and
   listed in the editor's Issues tab.
-- **Default caps:** flat where exactly two roads meet (a bend of 15 degrees at most), round elsewhere; the fill halves of a road with two different ends
-  only paint, and the road stays clickable in its own (transparent) fill layer.
+- **Casing that closes:** a bridge's heavier casing keeps each piece's cap (it was always flat: two bridge pieces could not close at a bend or
+  a junction), and a round seam of casing at each cut inside a road closes the outline on a curve. The fill halves of a road with two
+  different ends only paint; the road stays clickable in its own (transparent) fill layer. Default caps stay round.
 - **Automatic head lengths and caps per road end, as an option** (`rs.auto_ends`, at zoom 18; `solve_levels.py --auto-ends`; the default stays 5 m and round:
   made for one zoom, the heads were too short at the others): heads as long as the drawings overlap at the join (before
   solving), caps round unless the round end would lie over a lower road or out of the joined roads (after solving, from the levels);
