@@ -2124,10 +2124,10 @@ def test_a_divided_casing_has_a_round_seam_at_each_cut():
     assert sorted(p["__rs_cl"] for p in pieces if not p.get("__rs_seam")) == [-1, 0, 1]
 
 
-def test_a_bridge_has_one_continuous_soft_shadow(monkeypatch):
-    """Position mode (Kaveh 2026-10-06): one soft shadow per bridge, its edges joined into one line and cut a head short at each end, blurred
-    and shifted down-right (lit from the top left), at the bridge's lowest main casing number (over what it crosses, under all of it); off
-    with bridge_shadow."""
+def test_a_bridge_shadow_is_an_extra_casing(monkeypatch):
+    """Position mode (Kaveh 2026-10-06): the bridge shadow is an extra casing: each casing piece of the bridge at its own casing number, the
+    pieces at one number joined into one line, none at the heads where the bridge comes down; blurred and shifted down-right (lit from the
+    top left), just before the bridge's casing at its position; off with bridge_shadow."""
     import dataclasses
 
     from roadstyle import render_web
@@ -2139,14 +2139,15 @@ def test_a_bridge_has_one_continuous_soft_shadow(monkeypatch):
     kw = dict(backend="web", casing_start_col="cs", casing_level_col="cm", casing_end_col="ce", fill_level_col="fl")
     style = _style(render_edges(g, **kw).html)
     sh = style["sources"]["shadows"]["data"]["features"]
-    assert len(sh) == 1 and sh[0]["properties"]["__rs_cl"] == 2                                # one line, at the bridge's lowest main casing
-    ys = [c[1] for c in sh[0]["geometry"]["coordinates"]]
-    assert abs((max(ys) - min(ys)) / m - 50) < 0.5                                             # 60 m of bridge, 5 m short at each end
+    span = lambda f: round((max(c[1] for c in f["geometry"]["coordinates"]) - min(c[1] for c in f["geometry"]["coordinates"])) / m)   # noqa: E731
+    assert sorted((f["properties"]["__rs_cl"], span(f)) for f in sh) == [(2, 20), (2, 20), (3, 10)]    # at each piece's number: 5-25 m, 25-35, 35-55
+    assert sum(span(f) for f in sh) == 50                                                      # 60 m of bridge, its two coming-down heads left out
     lay = {l["id"]: l for l in style["layers"]}
     ids = [l["id"] for l in style["layers"]]
-    s1 = lay["roads-casing-lv2-bridge-shadow"]
-    assert s1["source"] == "shadows" and s1["paint"]["line-blur"] == 4.0 and s1["paint"]["line-translate"] == [2, 2]
+    s2 = lay["roads-casing-lv2-bridge-shadow"]
+    assert s2["source"] == "shadows" and s2["paint"]["line-blur"] == 4.0 and s2["paint"]["line-translate"] == [2, 2]
     assert ids.index("roads-casing-lv2-bridge-shadow") < ids.index("roads-casing-lv2-bridge") < ids.index("roads-fill-lv2")
+
     monkeypatch.setattr(render_web, "CONFIG", dataclasses.replace(render_web.CONFIG, bridge_shadow=False))
     off = _style(render_edges(g, **kw).html)
     assert "shadows" not in off["sources"] and not [l for l in off["layers"] if l["id"].endswith("-shadow")]
@@ -2164,7 +2165,7 @@ def test_a_branching_bridge_shadow_is_cut_only_at_the_bridge_ends():
     rw._mark_lvl(geo, "tunnel", "bridge", "layer")
     for ft in geo["features"]:
         ft["properties"]["__rs_cl"] = 1
-    sh = rw._bridge_shadows(geo, "highway", 5.0)
+    sh = rw._bridge_shadows(geo, None, "highway", 5.0)
     pts = {tuple(round(v, 7) for v in c) for s in sh for c in s["geometry"]["coordinates"]}
     assert tuple(round(v, 7) for v in P(0, 50)) in pts                                    # the branch point is reached: no gap there
     assert tuple(round(v, 7) for v in P(0, 0)) not in pts and tuple(round(v, 7) for v in P(0, 100)) not in pts   # the real ends are cut
@@ -2175,5 +2176,5 @@ def test_a_branching_bridge_shadow_is_cut_only_at_the_bridge_ends():
     for ft in geo["features"]:
         ft["properties"]["__rs_cl"] = 1
     import shapely
-    sh = shapely.unary_union([shapely.LineString(s["geometry"]["coordinates"]) for s in rw._bridge_shadows(geo, "highway", 5.0)])
+    sh = shapely.unary_union([shapely.LineString(s["geometry"]["coordinates"]) for s in rw._bridge_shadows(geo, None, "highway", 5.0)])
     assert sh.intersection(shapely.LineString([P(0, 0), P(0, 100)]).buffer(1e-9)).length / (100 * m) > 0.89   # all but the two 5 m ends
