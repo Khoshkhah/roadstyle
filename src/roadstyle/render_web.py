@@ -1023,7 +1023,7 @@ def _tunnel_look(layers, edge_ids, s, arrow_color):
 
     for l in layers:
         lid = l["id"]
-        if l.get("source") not in ("roads", "casings", "slots", "arrows") and lid not in edge_ids:
+        if l.get("source") not in ("roads", "casings", "halves", "slots", "arrows") and lid not in edge_ids:
             continue
         l["paint"] = dict(l.get("paint") or {})           # a new paint: the copies of a layer for each position share theirs
         if lid.startswith("roads-casing") and lid.endswith("-dash"):
