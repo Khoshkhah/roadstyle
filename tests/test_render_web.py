@@ -239,8 +239,7 @@ def _road_filters(html):
 def test_minzoom_off_by_default():
     """Existing maps must be byte-identical — `track` is a width channel for some callers, and
     hiding it by class would make their data disappear."""
-    from roadstyle.render_web import render
-    from roadstyle.render_web import _SEAM_MINZOOM
+    from roadstyle.render_web import _SEAM_MINZOOM, render
     seam = json.dumps(["any", ["!", ["to-boolean", ["get", "__rs_seam"]]], [">=", ["zoom"], _SEAM_MINZOOM]])   # hides only the casing seams below z17
     for f in _road_filters(render(_many_edges(20)).html).values():
         assert "zoom" not in json.dumps(f).replace(seam, "")
@@ -2207,3 +2206,17 @@ def test_bridge_shadow_goes_straight_through_a_junction_and_each_line_keeps_its_
     straight = next(f for f in sh if f["properties"]["__rs_cl"] == 1)
     ys = [c[1] for c in straight["geometry"]["coordinates"]]
     assert abs((max(ys) - min(ys)) / m - 90) < 0.5                                         # 0-100 m, less the 5 m passed in at each end where it comes down
+
+
+def test_street_names_fit_their_road_and_tiny_ones_are_left_out():
+    """Street names (Kaveh 2026-10-06): about 3/4 of the road's fill width, at most the old 10 -> 14 px; none where that is under 9 px."""
+    from roadstyle import render_web as rw
+    assert rw._label_px("primary", 18) == 14.0                                             # a wide road: as before
+    assert abs(rw._label_px("residential", 18) - 0.75 * rw.class_width_px("residential", 18, casing=False)) < 1e-9 < rw._label_px("residential", 18) - 9
+    assert rw._label_px("service", 18) < 9                                                 # 5 px wide: no name at z18
+    style = _style(render_edges(_edges(), backend="web").html)
+    lab = next(l for l in style["layers"] if l["id"].startswith("roads-labels"))
+    assert lab["layout"]["text-size"][0] == "interpolate" and lab["layout"]["text-size"][4][0] == "match"
+    first = dict(zip(*[iter(rw._label_readable_filter()[2][2:-1])] * 2, strict=True))
+    assert first["residential"] == 18 and first["service"] > 18 and first["primary"] <= 16
+    assert json.dumps(rw._label_readable_filter()) in json.dumps(lab["filter"])

@@ -733,6 +733,38 @@ def _casing_parts(geo, head_m, cols):
     return out
 
 
+# street names (Kaveh 2026-10-06): about 3/4 of the road's fill width, at most the old 10 -> 14 px ramp, and none where that is under 9 px
+_LABEL_FRACTION, _LABEL_MIN_PX = 0.75, 9.0
+
+
+def _label_base_px(z):
+    return 10.0 + 4.0 * min(max((z - 14.0) / 4.0, 0.0), 1.0)         # the size every name had: 10 px at z14 to 14 px at z18
+
+
+def _label_px(cls, z):
+    return min(_label_base_px(z), _LABEL_FRACTION * class_width_px(cls, z, casing=False))
+
+
+def _label_size_expr():
+    """text-size: a name's size follows its road's fill width (a name as tall as a narrow road touched its outline), at most the old ramp."""
+    e = ["interpolate", ["linear"], ["zoom"]]
+    for z in sorted({z for z in _ZSTOPS if z >= 14} | {14, 18}):
+        m = ["match", ["get", "highway"]]
+        for c in _CLASSES:
+            m += [c, round(_label_px(c, z), 2)]
+        e += [z, m + [round(_label_px(None, z), 2)]]
+    return e
+
+
+def _label_readable_filter():
+    """The first whole zoom from which a class's name is at least _LABEL_MIN_PX tall (filters see whole zooms): no tiny name below it."""
+    m = ["match", ["get", "highway"]]
+    first = lambda c: next((z for z in range(0, 23) if _label_px(c, z) >= _LABEL_MIN_PX), 99)          # noqa: E731
+    for c in _CLASSES:
+        m += [c, first(c)]
+    return [">=", ["zoom"], m + [first(None)]]
+
+
 _SEAM_MINZOOM = 17      # the casing seams (Kaveh 2026-10-06): a primary's casing is 12 m wide on the ground at zoom 16, so a seam reaches past a head
 
 
@@ -2190,14 +2222,14 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                        [">=", ["zoom"], 16]]]
                 if mz:   # a hidden class must not keep its street name floating either
                     lf.append(_minzoom_filter("highway", mz))
+                lf.append(_label_readable_filter())     # no name where it would be under 9 px (its road too narrow at that zoom)
                 def _label_layer(lid, flt):
                     return {"id": lid, "type": "symbol", "source": "slots", "minzoom": 14,
                             "filter": flt,
                             "layout": {"symbol-placement": "line-center",
                                        "text-field": ["get", "name"],
                                        "text-font": ["Noto Sans Regular"],
-                                       "text-size": ["interpolate", ["linear"], ["zoom"],
-                                                     14, 10, 18, 14],
+                                       "text-size": _label_size_expr(),          # about 3/4 of the road's fill width
                                        "text-max-angle": 40, "text-padding": 2,
                                        # major streets' names win label-vs-label collisions too
                                        "symbol-sort-key": ["*", -1, _sort_key("highway")]},
