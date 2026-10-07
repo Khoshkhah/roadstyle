@@ -240,8 +240,10 @@ def test_minzoom_off_by_default():
     """Existing maps must be byte-identical — `track` is a width channel for some callers, and
     hiding it by class would make their data disappear."""
     from roadstyle.render_web import render
+    from roadstyle.render_web import _SEAM_MINZOOM
+    seam = json.dumps(["any", ["!", ["to-boolean", ["get", "__rs_seam"]]], [">=", ["zoom"], _SEAM_MINZOOM]])   # hides only the casing seams below z17
     for f in _road_filters(render(_many_edges(20)).html).values():
-        assert "zoom" not in json.dumps(f)
+        assert "zoom" not in json.dumps(f).replace(seam, "")
 
 
 def test_minzoom_true_uses_the_config_table():
@@ -828,8 +830,12 @@ def _eval(e, p):
         return not _eval(a[0], p)
     if op == "all":
         return all(_eval(x, p) for x in a)
+    if op == "any":
+        return any(_eval(x, p) for x in a)
+    if op == "zoom":
+        return p.get("$zoom", 22)                                   # a street zoom unless the test says otherwise
     x, y = _eval(a[0], p), _eval(a[1], p)
-    return x == y if op == "==" else (x < y if op == "<" else x > y)
+    return {"==": x == y, "<": x < y if op == "<" else None, ">": x > y if op == ">" else None, ">=": x >= y if op == ">=" else None}[op]
 
 
 
