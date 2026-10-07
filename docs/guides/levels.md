@@ -42,7 +42,7 @@ for you with its defaults. It has two halves:
 1. **The input** (`rs.level_input(edges)`): one row per road (both directions together) and the pairs between roads.
    Roads of different bands (`layer`, `bridge`, `tunnel`) that **cross** become a *stack* pair: the higher band is over the lower one.
    Roads that **only meet** (a junction, a tunnel mouth, a bridge end) become an *order* wish: a roundabout over a tunnel, a tunnel over
-   a bridge, a bridge over the road class.
+   a bridge, a bridge over the road class. A roundabout is known by the OSM `junction` column: without it you get a warning.
 2. **The solver** (`rs.solve_levels(roads, pairs, edits=...)`): whole numbers (integer programming with HiGHS), kept in this order:
    real crossings, then the order wishes, then the *near* rules (parts that only come close), then as few positions as possible.
 

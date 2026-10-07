@@ -68,7 +68,7 @@ class Area:
         for c in cols:
             solved[c] = 0
         for i, r in enumerate(solved.itertuples()):
-            if r.edges:
+            if len(r.edges):
                 v = t.loc[str(r.edges[0]), cols].tolist()
             else:                                               # only the other way: its heads the other way round
                 s, m, e, f = t.loc[str(r.reversed[0]), cols].tolist()

@@ -369,6 +369,9 @@ def level_input(edges, id_col="edge_id", layer_col="layer", bridge_col="bridge",
         z = {h: _class_order(h) for h in head[highway_col].dropna().unique()}
         omega = [None if pd.isna(h) else z[h] for h in head[highway_col]]
         if order == "priority":
+            if junction_col not in g.columns:                  # no silent fallback: say that no roundabout can be put on top
+                warnings.warn(f"the edges have no {junction_col!r} column: no road is known as a roundabout, so none is put on top where roads meet "
+                              f"(add the OSM junction tag as {junction_col!r}, or pass junction_col=...)", stacklevel=2)
             omega = [None if w is None else w + _TIER * _tier(r, junction_col, bridge_col, tunnel_col)
                      for w, r in zip(omega, head.to_dict("records"), strict=True)]
     elif order:

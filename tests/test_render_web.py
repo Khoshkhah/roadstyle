@@ -2066,6 +2066,19 @@ def test_heads_and_caps_may_name_either_direction_of_a_road(tmp_path):
         own(tmp_path, roads)
 
 
+def test_the_priority_order_warns_without_a_junction_column():
+    """order="priority" puts a roundabout on top where roads meet; edges with no junction column get a warning that says so (2026-10-07: a
+    caller that left the column out lost every roundabout silently)."""
+    import warnings
+
+    import roadstyle as rs
+    with pytest.warns(UserWarning, match="no 'junction' column"):
+        rs.level_input(_edge_world())
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        rs.level_input(_edge_world().assign(junction=None))                            # the column, even empty: no warning
+
+
 def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     """The level editor (roadstyle.level_editor): the pairs between two roads (by any edge id), an edit the solver refuses is not written, a
     taken one is written with the file before it kept as edits.csv.bak, and levels.csv follows."""
