@@ -21,7 +21,7 @@ Maps go to `~/roadstyle-maps/`. The preview needs Chromium once: `uvx --from roa
 |---|---|
 | `render_place(place, network_type="drive", options, output_path)` | downloads the OpenStreetMap roads of a place with osmnx and draws them |
 | `render_file(path, options, output_path)` | draws a road file (GeoPackage, GeoJSON, Shapefile, …) |
-| `snapshot(html_path, lon, lat, zoom, bearing, pitch)` | a PNG of a saved map, e.g. to check street names (zoom 14+) and arrows (zoom 16+) |
+| `snapshot(html_path, lon, lat, zoom, bearing, pitch)` | a PNG of a saved map, e.g. to check street names and arrows (side streets from zoom 17) |
 
 `options` takes any [`render_edges` keyword](../reference/parameters.md), such as
 `{"color_by": "maxspeed", "legend": true}`. A misspelt one is an error naming the closest valid

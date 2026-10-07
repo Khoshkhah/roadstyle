@@ -33,10 +33,11 @@ INSTRUCTIONS = """\
 roadstyle draws road networks as styled, interactive, offline HTML maps (MapLibre, one file).
 - render_place: any place name -> OpenStreetMap roads (osmnx) -> map. render_file: a road file.
 - Each returns the saved .html path and a PNG preview. Look at the preview before reporting back.
-- Street names show from zoom 14 and one-way arrows on minor streets from zoom 16; the preview is
-  zoomed out, so use snapshot(html_path, lon, lat, zoom=17) to check them.
+- A street name shows where it fits inside its road: main roads from zoom 15-16, side streets from 17.
+  One-way arrows: main roads from zoom 15, side streets from 17. The preview is zoomed out, so use
+  snapshot(html_path, lon, lat, zoom=17) to check them.
 - options = render_edges keywords, e.g. {"color_by": "maxspeed", "legend": true},
-  {"include": ["primary", "secondary"]}, {"basemap": "osm"}, {"palette": "carto"}, {"view_3d": true}.
+  {"include": ["primary", "secondary"]}, {"basemap": "osm"}, {"palette": "carto"} (amber is the default; also highsat, mono), {"view_3d": true}.
 - Edges are directed: a two-way street is two edges drawn side by side. Don't merge them.
 Docs: https://khoshkhah.github.io/roadstyle/ (every keyword: /reference/parameters/)."""
 
@@ -177,7 +178,7 @@ def snapshot(html_path: str, lon: float | None = None, lat: float | None = None,
              pitch: float | None = None) -> list:
     """PNG of a saved roadstyle map, optionally with a camera (centre lon/lat, zoom 0-22).
 
-    Street names appear from zoom 14, one-way arrows on minor streets from zoom 16.
+    Street names: main roads from zoom 15-16, side streets from 17; one-way arrows: main roads from 15, side streets from 17.
     Without a camera the map's own opening view is captured.
     """
     center = (lon, lat) if lon is not None and lat is not None else None
