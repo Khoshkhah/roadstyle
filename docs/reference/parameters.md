@@ -52,6 +52,8 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | `compute_levels(edges, band_col=None, order="priority", ...)` | edges + 4 columns | the level step in one call: `casing_start`, `casing_level`, `casing_end`, `fill_level` ([design](../design/level_input.md)) |
 | `level_input(edges, id_col="edge_id", ...)` | `(roads, pairs)` | the solver's input from any edges: one row per road, one row per relation (`meet`, `stack`, `order`) |
 | `solve_levels(roads, pairs, edits=None, ...)` | roads + 4 columns | the solver; `edits` switch pairs off or add them |
+| `level_area.make_area(edges, folder, db=None, ...)` / `level_area.solve_area(folder)` | `(roads, pairs)` / solved roads | an area folder (`roadstyle-levels make` / `solve`); with `db` every solve also writes into that DuckDB file |
+| `save_area_levels(con, folder)` / `load_area_levels(con, edges)` | – / edges + 8 columns | an area's result into `visualization.edge_levels` and back (the four numbers and each edge's ends); reading checks the edges |
 | `resolve(highway, palette, tunnel, bridge)` | `ResolvedStyle` | one edge's resolved style |
 | `base_style(highway, palette="amber")` | `RoadStyle` | the palette entry for a class |
 | `selection_style(base_width=4.0)` | `dict` | the selection profile scaled to a width |

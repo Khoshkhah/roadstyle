@@ -67,6 +67,8 @@ pick a second one to see every pair between the two.
 - **Each end of a road**: its cap (*round*, *square*, *flat*) and its head length (a slider, in metres).
 - Changes wait in a list until **Apply and solve**: they are solved together, and the map reloads with the new numbers.
   If the solver refuses them, nothing is saved.
+- **Show only some modes**: when the roads have a `modes` column (who may use them, e.g. `driving + walking`; duckOSM gives it), boxes
+  under the search show only the roads of the ticked modes (display only: every road is still solved). A road's card shows its modes.
 - The **Issues** tab lists what to look at: **given up** (red: a real crossing the solver could not keep, a flaw on the map),
   **near warnings** (amber: two roads that only come close; usually fine) and the **order wishes not kept**.
 
@@ -80,6 +82,17 @@ Your changes live in three small tables in the area folder, never overwritten by
 
 `levels.csv` is the result: per edge its four numbers and its ends as drawn (`head_start_m`, `head_end_m`, `cap_start`, `cap_end`).
 An example: Monaco's hand-made tables in `examples/levels/monaco/`.
+
+### An area that belongs to a database
+
+`make_area(edges, folder, db="monaco.duckdb")` ties the area to a DuckDB file (`area.json`): every solve, the editor's too, also writes
+the result into it (`visualization.edge_levels`, with each edge's ends; `rs.save_area_levels`). `rs.load_area_levels(con, edges)` reads it
+back for the same edges and stops with a message for any other edges. duckOSM's `duckosm levels monaco.duckdb` makes such an area for all
+travel modes together (`monaco.levels/` next to the file), and mapstyle draws from it. Keep `edits.csv`, `heads.csv` and `caps.csv`: with
+them a rebuilt file gets the same drawing order back.
+
+Two edges on the same line are one road (its two directions) only when they are the same kind (`highway`, `tunnel`, `bridge`, `layer`): a
+footway lying exactly on a street stays a road of its own.
 
 ## Bridges and tunnels
 
