@@ -83,3 +83,50 @@ def load_levels(con, edges=None, *, schema=SCHEMA, **expect):
         out[c] = merged[c].to_numpy()
     out.attrs["levels_params"] = want
     return out
+
+
+AREA_COLS = COLS + ("head_start_m", "head_end_m", "cap_start", "cap_end")
+
+
+def save_area_levels(con, folder, *, schema=SCHEMA):
+    """Write a level area's result (``folder``/levels.csv: the four numbers and the ends of every edge, ``roadstyle-levels solve``) to
+    ``<schema>.edge_levels`` and a row saying where it came from to ``<schema>.edge_levels_meta``, replacing both. ``con``: a writable duckdb
+    connection."""
+    import datetime
+    from pathlib import Path
+
+    import pandas as pd
+
+    from . import __version__
+    lv = pd.read_csv(Path(folder) / "levels.csv", dtype={"edge": str})
+    table = pd.DataFrame({"edge_id": lv["edge"].astype("int64"), **{c: lv[c] for c in AREA_COLS}})
+    ids = _ids(table)
+    meta = pd.DataFrame([{"source": "area", "area": str(Path(folder).resolve()), "n_edges": len(ids), "edge_hash": _hash(ids),
+                          "roadstyle_version": __version__, "created": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")}])
+    con.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
+    for name, df in (("edge_levels", table), ("edge_levels_meta", meta)):
+        con.register("_rs_levels_df", df)
+        con.execute(f"CREATE OR REPLACE TABLE {schema}.{name} AS SELECT * FROM _rs_levels_df")
+        con.unregister("_rs_levels_df")
+
+
+def load_area_levels(con, edges, *, schema=SCHEMA):
+    """``edges`` (a table with ``edge_id``) with the columns of a level area's result stored by ``save_area_levels``: the four numbers and
+    each edge's ends (``head_start_m``, ``head_end_m``, ``cap_start``, ``cap_end``). A ``ValueError`` if nothing is stored, if it is not from a
+    level area, or if ``edges`` are not the edges it was solved for; nothing is recomputed."""
+    import pandas as pd
+    try:
+        meta = con.execute(f"SELECT * FROM {schema}.edge_levels_meta").df().iloc[0]
+    except Exception as e:                                                  # duckdb.CatalogException: no such table
+        raise ValueError(f"no {schema}.edge_levels_meta in this file: make and solve its level area (roadstyle-levels, duckosm levels)") from e
+    if meta.get("source") != "area":
+        raise ValueError("the stored levels are not from a level area (an older table): make and solve its level area again")
+    ids = _ids(edges)
+    if len(ids) != int(meta["n_edges"]) or _hash(ids) != meta["edge_hash"]:
+        raise ValueError(f"the edges are not the edges the stored levels were solved for ({len(ids)} given, {int(meta['n_edges'])} stored, "
+                         f"or other edge_id values): make and solve the level area again ({meta['area']})")
+    merged = pd.DataFrame({"edge_id": ids}).merge(con.execute(f"SELECT * FROM {schema}.edge_levels").df(), on="edge_id", how="left")
+    out = edges.copy()
+    for c in AREA_COLS:
+        out[c] = merged[c].to_numpy()
+    return out

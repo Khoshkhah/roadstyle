@@ -30,9 +30,10 @@ def read_edges(source, query=None, geometry=None):
     return rs.load_edges(source).gdf
 
 
-def make_area(edges, folder, **level_input_kw):
+def make_area(edges, folder, db=None, **level_input_kw):
     """The solver's input in ``folder``: roads.parquet and pairs.csv (rs.level_input, written again each run), and an empty edits.csv the
-    first time. Returns (roads, pairs)."""
+    first time. With ``db`` (a .duckdb file), the area belongs to it (area.json): every solve also writes the result into it
+    (``visualization.edge_levels``, rs.save_area_levels), the editor's too. Returns (roads, pairs)."""
     import roadstyle as rs
 
     roads, pairs = rs.level_input(edges, **level_input_kw)
@@ -42,7 +43,18 @@ def make_area(edges, folder, **level_input_kw):
     pairs.to_csv(folder / "pairs.csv", index=False)
     if not (folder / "edits.csv").exists():
         (folder / "edits.csv").write_text("relation,a,b,a_end,b_end,enabled\n")
+    if db is not None:
+        import json
+        import os
+        (folder / "area.json").write_text(json.dumps({"db": os.path.relpath(Path(db).resolve(), folder.resolve())}))
     return roads, pairs
+
+
+def area_db(folder):
+    """The .duckdb file the area in ``folder`` belongs to (area.json), or None."""
+    import json
+    f = Path(folder) / "area.json"
+    return (Path(folder) / json.loads(f.read_text())["db"]).resolve() if f.exists() else None
 
 
 def solve_area(folder, auto_ends=False, max_positions=None):
@@ -126,6 +138,18 @@ def write(solved, folder, ends_table):
             "near": [list(p) for p in solved.attrs.get("levels_near", [])],
             "orders_not_kept": [list(p) for p in solved.attrs.get("levels_orders_not_kept", [])]}
     (Path(folder) / "levels_info.json").write_text(json.dumps(info, default=str))
+    db = area_db(folder)
+    if db is not None:                                  # the area of a database: the result goes into it too
+        import duckdb
+
+        import roadstyle as rs
+        con = duckdb.connect(str(db))
+        try:
+            con.execute("INSTALL spatial; LOAD spatial;")  # a duckOSM file has spatial indexes: writing it needs the extension
+            rs.save_area_levels(con, folder)
+            con.execute("CHECKPOINT")
+        finally:
+            con.close()
 
 
 def main(argv=None):

@@ -2028,6 +2028,28 @@ def test_roadstyle_levels_make_and_solve(tmp_path):
     assert len(lv) == len(_edge_world()) and {"casing_level", "fill_level", "head_start_m", "cap_end"} <= set(lv.columns)
 
 
+def test_an_area_of_a_database_writes_its_result_into_it(tmp_path):
+    """make_area(edges, folder, db=...): every solve (solve_area, the editor's too) writes levels.csv into the database
+    (visualization.edge_levels, with the ends); load_area_levels reads it back for the same edges and refuses other edges."""
+    pytest.importorskip("scipy")
+    duckdb = pytest.importorskip("duckdb")
+
+    import roadstyle as rs
+    from roadstyle.level_area import area_db, make_area, solve_area
+    edges = _edge_world().assign(edge_id=[101, 102, 103, 104])
+    db, area = tmp_path / "area.duckdb", tmp_path / "area.levels"
+    duckdb.connect(str(db)).close()
+    make_area(edges, area, db=db, id_col="edge_id")
+    assert area_db(area) == db.resolve()
+    solve_area(area)
+    con = duckdb.connect(str(db), read_only=True)
+    got = rs.load_area_levels(con, edges)
+    assert list(got["edge_id"]) == [101, 102, 103, 104] and got["fill_level"].notna().all() and set(got["cap_start"]) <= {"round", "square", "flat"}
+    with pytest.raises(ValueError, match="not the edges"):
+        rs.load_area_levels(con, edges.iloc[:3])
+    con.close()
+
+
 def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     """The level editor (roadstyle.level_editor): the pairs between two roads (by any edge id), an edit the solver refuses is not written, a
     taken one is written with the file before it kept as edits.csv.bak, and levels.csv follows."""
