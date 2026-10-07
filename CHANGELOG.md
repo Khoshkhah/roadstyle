@@ -64,6 +64,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   (`tunnel_gap_shade`, `tunnel_dash_shade`) is gone. A *Tunnels* box (`tunnel_control`) and `rsSetTunnelStyle({strength, palette, ratio})` move it in the page; the slider has five steps (Normal colors 0, Subtle 20, Balanced 35, Strong 70, Full 100).
 - **No light dashes on a tunnel's fill by default** (`tunnel_fill_dash: []`, v2's look); `[1.2, 1.2]` brings them back.
 - **The default palette is `carto`** (`palettes.DEFAULT_PALETTE`), the soft OpenStreetMap Carto tones, in place of `highsat` (too sharp, Kaveh). `palette="highsat"` keeps the old look.
+- **One arrow per one-way road in the window** (`docs/design/arrows_and_names.md`): the page puts one arrow in the middle of each one-way road's visible part,
+  and keeps it there while it stays in the window; below zoom 17 only the main classes, none on a road shorter than 100 px on screen, and 150 px between arrows; the arrows no longer repeat along every 100 m slot (they crowded zoom 15). A tiled map keeps the old arrows.
+- **An arrow that would touch a street name is left out** (MapLibre places the names first; an arrow never pushes a name away).
 - **Faster page building:** the casing pieces and the arrow and street-name slots are cut with a small numpy cutter instead of shapely's `substring` (the same lines), and a slot of a group of one edge no longer searches for its edge.
   A page of a city of 64,000 roads builds about 40% faster.
 

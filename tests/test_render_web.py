@@ -95,10 +95,11 @@ def test_web_annotation_slots_alternate_names_and_arrows():
     lab = next(l for l in style["layers"] if l["id"] == "roads-labels")
     arr = next(l for l in style["layers"] if l["id"] == "roads-arrows")
     assert json.dumps(["==", ["%", ["get", "slot"], 2], 0]) in json.dumps(lab["filter"])     # names: even slots
-    # arrows: every one-way slot, repeated along the line (odd-slots-only left short
-    # one-way chains — most of a city grid — with no arrow in the viewport)
+    # arrows: one per one-way road in the window (docs/design/arrows_and_names.md): points the page puts in the "arrows" source,
+    # rotated along the road; every slot piece names its chain
     assert json.dumps(["==", ["get", "oneway"], 1]) in json.dumps(arr["filter"])
-    assert arr["layout"]["symbol-placement"] == "line" and arr["layout"]["symbol-spacing"]
+    assert arr["source"] == "arrows" and arr["layout"]["symbol-placement"] == "point" and arr["layout"]["icon-rotate"] == ["get", "b"]
+    assert style["sources"]["arrows"]["data"]["features"] == [] and all("chain" in f["properties"] for f in style["sources"]["slots"]["data"]["features"])
     # one arrow layer per grade tier, each right beside its road tier — a bridge must cover
     # the arrows of the road it crosses, not have them float above everything
     assert ids.index("roads-arrows") == ids.index("roads-fill-sq") + 1
@@ -2305,3 +2306,75 @@ def test_a_bridge_shadow_is_not_on_its_own_road_at_a_joint():
     ys = lambda f: sorted(round((c[1] - 59.3) / m) for c in f["geometry"]["coordinates"])               # noqa: E731
     by = sorted((f["properties"]["__rs_cl"], ys(f)[0], ys(f)[-1]) for f in sh)
     assert by == [(1, 45, 97), (2, 3, 45)]                                                    # A's end head joins B's shadow at 1, under B's fill
+
+
+def test_one_arrow_per_one_way_road_in_the_window(tmp_path):
+    """docs/design/arrows_and_names.md (Kaveh 2026-10-06): a one-way road in the window has one arrow, in its visible part; the arrow stays
+    where it is while it is in the window (a small pan keeps it), and a road whose arrow left the window gets one again. None below zoom 15."""
+    pw = pytest.importorskip("playwright.sync_api")
+    path = tmp_path / "arrows.html"
+    pts = [(18.0 + i * 0.001, 59.3) for i in range(41)]                       # one straight one-way street, about 2.3 km, many slots
+    g = gpd.GeoDataFrame({"highway": ["primary"], "name": ["Long St"], "oneway": [True]}, geometry=[LineString(pts)], crs=4326)
+    render_edges(g, backend="web", basemap="blank").save(path)
+    arrows = "map.getSource('arrows')._data.features.map(f => f.geometry.coordinates)"
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 800, "height": 600})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && map.loaded()", timeout=30_000)
+        def at(lon, zoom):
+            page.evaluate(f"map.jumpTo({{center: [{lon}, 59.3], zoom: {zoom}}})")
+            page.wait_for_function("map.loaded()", timeout=30_000)
+            page.wait_for_timeout(300)
+            return page.evaluate(arrows)
+        far = at(18.02, 14)
+        first = at(18.02, 16)
+        odd = page.evaluate("map.getSource('arrows')._data.features.map(f => f.properties.slot % 2)")
+        nudged = at(18.0203, 16)
+        moved = at(18.035, 16)
+        browser.close()
+    assert errors == [] and far == []
+    assert len(first) == 1 and abs(first[0][0] - 18.02) < 0.004                 # one arrow, in the middle of what is seen
+    assert odd == [1]                                                             # on an odd slot: between two street names
+    assert nudged == first                                                        # a small pan keeps it
+    assert len(moved) == 1 and moved != first                                     # its old place left the window: a new one
+
+
+def test_arrows_are_thinned(tmp_path):
+    """docs/design/arrows_and_names.md, thinning (Kaveh 2026-10-06): below zoom 17 only the main classes get an arrow; arrows stay 150 px
+    apart (two parallel one-way roads a few metres apart show one)."""
+    pw = pytest.importorskip("playwright.sync_api")
+    path = tmp_path / "thin.html"
+    row = lambda y: [(18.0 + i * 0.001, y) for i in range(41)]                 # noqa: E731
+    g = gpd.GeoDataFrame({"highway": ["residential", "primary", "primary"], "name": ["Side", "Main N", "Main S"], "oneway": [True] * 3},
+                         geometry=[LineString(row(59.31)), LineString(row(59.3)), LineString(row(59.30005))], crs=4326)
+    render_edges(g, backend="web", basemap="blank").save(path)
+    names = "map.getSource('arrows')._data.features.map(f => f.properties.name).sort()"
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 800, "height": 600})
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && map.loaded()", timeout=30_000)
+        def at(lat, zoom):
+            page.evaluate(f"map.jumpTo({{center: [18.02, {lat}], zoom: {zoom}}})")
+            page.wait_for_function("map.loaded()", timeout=30_000)
+            page.wait_for_timeout(300)
+            return page.evaluate(names)
+        side16, side17, mains16 = at(59.31, 16), at(59.31, 17), at(59.3, 16)
+        browser.close()
+    assert side16 == [] and side17 == ["Side"]                                  # residential: from zoom 17
+    assert len(mains16) == 1                                                       # 5 m apart: one arrow
+
+
+def test_an_arrow_that_would_touch_a_name_is_left_out():
+    """docs/design/arrows_and_names.md (Kaveh 2026-10-06): the page's arrows collide with the names (placed first, a later layer) and are
+    dropped where they would touch one; they never push a name away."""
+    g = gpd.GeoDataFrame({"highway": ["primary"], "name": ["Long St"], "oneway": [True]},
+                         geometry=[LineString([(18.0, 59.3), (18.01, 59.3)])], crs=4326)
+    style = _style(render_edges(g, backend="web", basemap="blank").html)
+    arrows = [l for l in style["layers"] if l["id"].startswith("roads-arrows")]
+    assert arrows and all(l["layout"]["icon-allow-overlap"] is False and l["layout"]["icon-ignore-placement"] is True for l in arrows)
+    ids = [l["id"] for l in style["layers"]]
+    assert ids.index("roads-arrows") < ids.index("roads-labels")                      # names placed first

@@ -487,7 +487,7 @@ function _applyRoadFilters(){
     // the pieces of a divided casing (levels_split_casing.md) carry their edge's id as __rs_road
     if(_qIds && kind==="casings"){ const qf=["in",["get","__rs_road"],["literal",_qIds]]; f=f?["all",f,qf]:qf; }
     // a two-way pair's end cap (twin_ends.md) and an arrow or a street name (edge_overlays.md) stay while either of their two edges is shown
-    if(_qIds && (kind==="ends" || kind==="slots")){ const L=["literal",_qIds];
+    if(_qIds && (kind==="ends" || kind==="slots" || kind==="arrows")){ const L=["literal",_qIds];
       const qf=["any",["in",["get","__rs_road"],L],["in",["get","__rs_road2"],L]]; f=f?["all",f,qf]:qf; }
     try{ map.setFilter(l.id,f); }catch(e){}
   });
@@ -986,6 +986,101 @@ function addArrow(){
   img.src="data:image/svg+xml;base64,"+btoa(_tunOn ? svg.replace(/fill="[^"]*"/, 'fill="#ffffff"') : svg);
 }
 map.on("load", addArrow);
+// one arrow per one-way road in the window (docs/design/arrows_and_names.md): after every move, each one-way chain of the slots (the
+// pieces with the same "chain") gets ONE point in the middle of its part inside the window, rotated along the road, with the properties of
+// the piece it lies on (so the arrow layers' filters, rsFilter and the class / tunnel toggles treat it as before). Repeating the icon along
+// every 100 m slot crowded zoom 15 (Kaveh); one arrow per stretch (line-center) was often outside the window. An arrow STAYS where it is
+// while it is still in the window (re-centring after every pan slid it along its road); only a chain whose arrow left, or a newly
+// visible one, gets a new place. Thinned (Kaveh, 2026-10-06): below zoom 17 only the main classes; a road whose visible part is shorter
+// than 100 px gets none; arrows stay 150 px apart (an arrow already shown keeps its place, then the higher class wins).
+const _rsArrowAt = new Map();                  // chain -> its arrow feature now
+const _RS_ARROW = {mainBelow: 17, minLenPx: 100, minGapPx: 150, nameGapPx: 14, edgePx: 10,
+                   main: new Set(["motorway", "trunk", "primary", "secondary", "tertiary"])};
+function _rsArrows(){
+  const src = map.getSource("arrows"); if(!src) return;
+  const out = [];
+  if(map.getZoom() >= 15){
+    const bb = map.getBounds(), W = bb.getWest(), E = bb.getEast(), S = bb.getSouth(), N = bb.getNorth();
+    const ctr = map.getCenter(), kx = Math.cos(ctr.lat * Math.PI / 180);   // degrees of longitude to the scale of latitude
+    const pxPerDeg = Math.abs(map.project([ctr.lng, ctr.lat + 0.01]).y - map.project(ctr).y) / 0.01;
+    const mainOnly = map.getZoom() < _RS_ARROW.mainBelow;
+    const vis = new Map(), pieces = new Map();                   // chain -> its visible parts [{slot, lo, hi}] / its pieces [{slot, c, cum, len, p}]
+    for(const f of _sfeats("slots")){
+      const p = f.properties || {}; if(!p.oneway) continue;
+      if(mainOnly && !_RS_ARROW.main.has(String(p.highway || "").replace(/_link$/, ""))) continue;
+      const c = f.geometry && f.geometry.coordinates; if(!c) continue;
+      const cum = [0];                                          // lengths along the piece, in degrees of latitude
+      for(let i = 0; i < c.length - 1; i++) cum.push(cum[i] + Math.hypot((c[i + 1][0] - c[i][0]) * kx, c[i + 1][1] - c[i][1]));
+      if(!pieces.has(p.chain)) pieces.set(p.chain, []);
+      pieces.get(p.chain).push({slot: p.slot, c: c, cum: cum, len: cum[cum.length - 1], p: p});
+      for(let i = 0; i < c.length - 1; i++){
+        let [x0, y0] = c[i], [x1, y1] = c[i + 1], t0 = 0, t1 = 1;   // Liang-Barsky: the part of the segment inside the window
+        const dx = x1 - x0, dy = y1 - y0, P = [-dx, dx, -dy, dy], Q = [x0 - W, E - x0, y0 - S, N - y0];
+        let ok = true;
+        for(let j = 0; j < 4 && ok; j++){
+          if(P[j] === 0){ if(Q[j] < 0) ok = false; }
+          else { const r = Q[j] / P[j]; if(P[j] < 0){ if(r > t1) ok = false; else if(r > t0) t0 = r; } else { if(r < t0) ok = false; else if(r < t1) t1 = r; } }
+        }
+        if(!ok || t1 <= t0) continue;
+        const seg = cum[i + 1] - cum[i];
+        if(!vis.has(p.chain)) vis.set(p.chain, []);
+        vis.get(p.chain).push({slot: p.slot, lo: cum[i] + t0 * seg, hi: cum[i] + t1 * seg});
+      }
+    }
+    const inside = q => q[0] >= W && q[0] <= E && q[1] >= S && q[1] <= N;
+    // the names' text: 10 px at zoom 14 to 14 px at zoom 18 (the label layers), about 0.6 em a letter
+    const fontPx = Math.max(10, Math.min(14, 10 + map.getZoom() - 14)), margin = _RS_ARROW.edgePx / pxPerDeg;
+    const cand = [];                                             // {ft, chain, kept, rank, len}
+    for(const [chain, segs] of vis){
+      const P = pieces.get(chain).sort((u, v) => u.slot - v.slot);
+      let full = 0; const offOf = new Map();
+      for(const q of P){ q.off = full; offOf.set(q.slot, full); full += q.len; }
+      const iv = segs.map(g => [offOf.get(g.slot) + g.lo, offOf.get(g.slot) + g.hi]).sort((u, v) => u[0] - v[0]);   // visible, along the chain
+      const total = iv.reduce((t, r) => t + r[1] - r[0], 0);
+      if(total * pxPerDeg < _RS_ARROW.minLenPx) continue;        // too short on screen
+      const kept = _rsArrowAt.get(chain);
+      if(kept && inside(kept.geometry.coordinates)){ cand.push({ft: kept, chain: chain, kept: 1, rank: kept.properties.rank || 0, len: total}); continue; }
+      let h = total / 2, mid = iv[0][0];                         // the middle of the visible part, along the chain
+      for(const [lo, hi] of iv){ if(h > hi - lo){ h -= hi - lo; continue; } mid = lo + h; break; }
+      // where the arrow may go (Kaveh: arrows overlapped the names): an unnamed road, the middle of its visible part; a named one, the
+      // middle of an odd slot (names sit in the middle of the even ones) or just past either end of a name; of those in the window, the
+      // one nearest the middle. None in the window (the road is too short there for its name and an arrow): the name wins, no arrow.
+      const name = P[0].p.name, spots = [];
+      if(!name) spots.push(mid);
+      else {
+        const half = (String(name).length * fontPx * 0.6 / 2 + _RS_ARROW.nameGapPx) / pxPerDeg;
+        for(const q of P){ const m = q.off + q.len / 2; if(q.slot % 2) spots.push(m); else spots.push(m - half, m + half); }
+      }
+      let best = null;
+      for(const d of spots)
+        if(d >= 0 && d <= full && iv.some(r => d >= r[0] + margin && d <= r[1] - margin) && (best === null || Math.abs(d - mid) < Math.abs(best - mid))) best = d;
+      if(best === null) continue;
+      const q = P.find(u => best <= u.off + u.len) || P[P.length - 1], local = best - q.off;
+      let i = 0; while(i < q.c.length - 2 && q.cum[i + 1] < local) i++;
+      const a = q.c[i], z = q.c[i + 1], t = (local - q.cum[i]) / ((q.cum[i + 1] - q.cum[i]) || 1);
+      const x = a[0] + (z[0] - a[0]) * t, y = a[1] + (z[1] - a[1]) * t;
+      const ang = -Math.atan2(z[1] - a[1], (z[0] - a[0]) * kx) * 180 / Math.PI;   // the icon points east; clockwise degrees
+      const ft = {type: "Feature", properties: Object.assign({}, q.p, {b: ang}), geometry: {type: "Point", coordinates: [x, y]}};
+      cand.push({ft: ft, chain: chain, kept: 0, rank: q.p.rank || 0, len: total});
+    }
+    // at least minGapPx apart: an arrow already shown first (no jumps while panning), then the higher class, then the longer road
+    // ponytail: O(arrows^2) on the few hundred arrows of a window; a screen grid if a window ever holds thousands
+    cand.sort((u, v) => (v.kept - u.kept) || (v.rank - u.rank) || (v.len - u.len));
+    const shown = [], gap2 = _RS_ARROW.minGapPx * _RS_ARROW.minGapPx;
+    _rsArrowAt.clear();
+    for(const c of cand){
+      const q = map.project(c.ft.geometry.coordinates);
+      if(shown.some(s => (s.x - q.x) ** 2 + (s.y - q.y) ** 2 < gap2)) continue;
+      shown.push(q); out.push(c.ft); _rsArrowAt.set(c.chain, c.ft);
+    }
+  }
+  if(map.getZoom() < 15) _rsArrowAt.clear();
+  src.setData({type: "FeatureCollection", features: out});
+}
+map.on("load", _rsArrows);
+map.on("moveend", _rsArrows);
+let _rsSlotsN = -1;     // the slots arrive (inflated) after load: place the arrows once they are there, not on every tile event
+map.on("sourcedata", e => { if(e.sourceId !== "slots") return; const n = _sfeats("slots").length; if(n !== _rsSlotsN){ _rsSlotsN = n; _rsArrows(); } });
 // Self-diagnosis: a map with zero road features is a broken page, not an empty area — say WHY
 // on the map itself (frontends like notebook webviews surface no console). Amber banner reports
 // the inflate state so a screenshot alone pinpoints the failing stage.

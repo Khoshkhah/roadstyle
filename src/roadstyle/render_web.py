@@ -280,7 +280,8 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
     along the chain; street names take the even slots and one-way arrows the odd ones, so the two
     alternate along the road and can never stack. Symbol zoom ramps + collision culling handle
     density per zoom automatically. Unnamed roads leave their name slots empty. Returns a
-    FeatureCollection of slot pieces: {slot, name, highway, oneway}.
+    FeatureCollection of slot pieces: {slot, chain, name, highway, oneway}; ``chain`` numbers the chain a piece is part of (the page
+    puts one arrow on the visible part of each one-way chain, docs/design/arrows_and_names.md).
     """
     import numpy as np
     from shapely.geometry import LineString, Point
@@ -314,7 +315,7 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
         groups[(p.get("name") or None, p.get("lvl", 0),
                 1 if p.get("__rs_oneway") else 0, p.get(class_col), p.get("__rs_fl"), bool(p.get("__rs_tunnel")))].append(e)
 
-    feats = []
+    feats, cid = [], 0
     for (name, lvl, oneway, _cls, fl, tun), edges in groups.items():
         n = len(edges)
         used = [False] * n
@@ -367,6 +368,7 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
         # property entirely on non-"highway" data (None is stripped), silently disabling both.
         hw = collections.Counter(e[3].get(class_col) for e in edges).most_common(1)[0][0]
         for chain in chains:
+            cid += 1
             lon0, lat0 = chain[0]
             kx = 111320.0 * math.cos(math.radians(lat0))
             ch = np.asarray(chain, dtype=float)
@@ -387,7 +389,7 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
                     mx, my = _at(xy, cum, (a + b) / 2)
                     road, twin = owner[id(edges[int(etree.nearest(Point(mx / kx + lon0, my / 111320.0 + lat0)))][3])]
                 feats.append({"type": "Feature",
-                              "properties": {"slot": i, "name": name, "highway": hw,
+                              "properties": {"slot": i, "chain": cid, "rank": ROAD_Z.get(hw, 0), "name": name, "highway": hw,
                                              "oneway": oneway, "lvl": lvl, "__rs_road": road,
                                              **({"__rs_road2": twin} if twin is not None else {}),
                                              **({"fl": fl} if fl is not None else {}),
@@ -2161,6 +2163,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         if slots["features"]:
             if not tiles:   # tiles=True ships the slots as a layer of the pmtiles archive
                 style["sources"]["slots"] = {"type": "geojson", "data": slots}
+                if arrows:     # the page fills it: one arrow per one-way road in the window
+                    style["sources"]["arrows"] = {"type": "geojson", "data": {"type": "FeatureCollection", "features": []}}
             # labels take the ARROWS' opacity by default: both are #5b5b5b, but full-opacity
             # text reads near-black next to 70%-opacity icons — "same colour" must mean same
             # rendered colour, not same hex. labels.opacity in settings overrides.
@@ -2173,9 +2177,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             # Text/icon zoom ramps size the symbols; collision culling thins them when zoomed out
             # (a label that outgrows its piece is dropped by MapLibre automatically).
             # ARROWS BEFORE LABELS on purpose: MapLibre resolves symbol collisions in favour of
-            # the LATER style layer, so the layer order is the culling priority. With arrows
-            # repeating every 170 px they must lose to street names, or one-way roads go
-            # nameless — which is exactly what happened when this block sat after the labels.
+            # the LATER style layer, so the layer order is the culling priority and names are placed
+            # first. An arrow (one per road, placed by the page between two names) that would still touch
+            # a name is left out: docs/design/arrows_and_names.md.
             _MINOR = ["footway", "cycleway", "path", "steps",
                       "service", "track", "pedestrian"]
             if arrows:
@@ -2206,13 +2210,20 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                     # minzoom 15, not 14: arrows are a street-scale affordance — at z14 they
                     # were hundreds of unreadable specks (labels start there because names
                     # thin themselves via collision; line-placed icons do not)
-                    return {"id": lid, "type": "symbol", "source": "slots", "minzoom": 15,
+                    # one arrow per one-way road in the window (Kaveh 2026-10-06, docs/design/arrows_and_names.md): the page
+                    # puts a point in the middle of each chain's visible part into the "arrows" source after every move,
+                    # rotated along the road. ponytail: a tiled map (tiles=True) has no slot geometry in the page and keeps the
+                    # arrows repeated along every slot; give it the chains' lines too if one arrow per road matters there
+                    where = ({"source": "slots", "layout": {"symbol-placement": "line",
+                                                            "symbol-spacing": ["interpolate", ["linear"], ["zoom"], 15, 200, 18, 320, 22, 900]}}
+                             if tiles else
+                             {"source": "arrows", "layout": {"symbol-placement": "point", "icon-rotate": ["get", "b"],
+                                                             # where it would touch a name the arrow is left out (Kaveh 2026-10-06): the names are
+                                                             # placed first (a later layer), and an arrow never pushes a name away
+                                                             "icon-allow-overlap": False, "icon-ignore-placement": True}})
+                    return {"id": lid, "type": "symbol", "source": where["source"], "minzoom": 15,
                             "filter": f,
-                            "layout": {"symbol-placement": "line",
-                                       # spacing WIDENS with zoom: constant px spacing turned
-                                       # huge z18+ roads into arrow conveyor belts
-                                       "symbol-spacing": ["interpolate", ["linear"], ["zoom"],
-                                                          15, 200, 18, 320, 22, 900],
+                            "layout": {**where["layout"],
                                        "icon-image": "oneway",
                                        "icon-rotation-alignment": "map",
                                        "symbol-sort-key": ["*", -1, _sort_key("highway")],
