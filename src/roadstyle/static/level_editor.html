@@ -324,6 +324,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     });
   }
   async function update(){
+    rsDeselect();                                             // the panel colours the picked roads; roadstyle's own selection would keep its (see-through) select colour and hide the hover there
     paint();
     const picked = sel.filter(r => r != null);
     if(picked.length){ try { const j = await api(`/api/relations?a=${encodeURIComponent(picked[0])}` + (picked[1] ? `&b=${encodeURIComponent(picked[1])}` : ""));
