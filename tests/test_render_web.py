@@ -2079,6 +2079,12 @@ def test_the_priority_order_warns_without_a_junction_column():
         rs.level_input(_edge_world().assign(junction=None))                            # the column, even empty: no warning
 
 
+def test_the_road_tooltip_waits_for_the_mouse_to_rest():
+    """hover_delay_ms (300 by default): the page waits this long before the road tooltip shows; 0 shows it at once."""
+    assert "const _TIP_DELAY = 300;" in render_edges(_edge_world(), backend="web", road_tooltip=True).html
+    assert "const _TIP_DELAY = 0;" in render_edges(_edge_world(), backend="web", road_tooltip=True, hover_delay_ms=0).html
+
+
 def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     """The level editor (roadstyle.level_editor): the pairs between two roads (by any edge id), an edit the solver refuses is not written, a
     taken one is written with the file before it kept as edits.csv.bak, and levels.csv follows."""

@@ -129,6 +129,7 @@ setting, or a name the page does not have, is an error.
 | `road_popup` | `True` | web | on click: `True` = `name`, `edge_id`, `edge_ref`, `highway`, `lanes`, `bridge`, `tunnel`; a list = those columns; `"all"`; `"panel"` = docked panel; `False` = none (`rs:select` still fires) |
 | `popup_mode` | `None` (= `"popup"`) | web | `"panel"` docks the read-out in a side panel with a search box |
 | `road_tooltip` | `False` | web | on hover: `True` = every column, a list = those columns |
+| `hover_delay_ms` | `300` | web | the road tooltip shows once the mouse rests this long on a road (a passing mouse shows none); the hover highlight follows at once; `0`: at once |
 | `tooltip` | `None` | web, folium | hover columns. Web: alias of `road_tooltip`, `None` = no tooltip. Folium: `None` = all columns |
 | `selected` | `None` | folium | a GeoDataFrame of edges to highlight (web: use `rsHighlight` / `rsColor`) |
 | `copy_field` | `"edge_id"` | folium | click copies this column's value; `None` = off |

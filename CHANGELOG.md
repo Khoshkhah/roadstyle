@@ -7,6 +7,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **The road tooltip waits** until the mouse rests on a road for `hover_delay_ms` (300 ms; `0`: at once): a mouse passing over the map shows none. The hover highlight still follows at once.
 - **`roadstyle-levels make | solve | edit FOLDER`**: the level step and its editor come with the package (`roadstyle.level_area`:
   `make_area`, `solve_area`; `roadstyle.level_editor`), in place of `scripts/level_input.py`, `scripts/solve_levels.py` and
   `scripts/edit_levels.py`. The area folder and its files are as before.
