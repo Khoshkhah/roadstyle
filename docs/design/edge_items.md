@@ -1,6 +1,6 @@
 # Edge items: one mechanism for everything that belongs to a road
 
-**Status:** design, 2026-10-07, waiting for review. Builds on [A general core](core_model_and_views.md) and
+**Status:** design, 2026-10-07, waiting for review. Step 1 (the label) built on branch `edge-label`. Builds on [A general core](core_model_and_views.md) and
 [Overlays attached to edges](edge_overlays.md).
 
 ## Why

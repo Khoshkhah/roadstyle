@@ -180,4 +180,4 @@ def test_tiles_carry_the_casing_pieces_and_the_end_caps():
     y = int((1 - math.asinh(math.tan(math.radians(59.3))) / math.pi) / 2 * n)
     t = mapbox_vector_tile.decode(gzip.decompress(Reader(MemorySource(_archive_of(html))).get(z, x, y)))
     assert t["casings"]["features"] and t["ends"]["features"]
-    assert all("__rs_road" in f["properties"] for f in t["casings"]["features"])
+    assert all("__rs_edge" in f["properties"] for f in t["casings"]["features"])

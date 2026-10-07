@@ -391,8 +391,8 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
                     road, twin = owner[id(edges[int(etree.nearest(Point(mx / kx + lon0, my / 111320.0 + lat0)))][3])]
                 feats.append({"type": "Feature",
                               "properties": {"slot": i, "chain": cid, "rank": ROAD_Z.get(hw, 0), "name": name, "highway": hw,
-                                             "oneway": oneway, "lvl": lvl, "__rs_road": road,
-                                             **({"__rs_road2": twin} if twin is not None else {}),
+                                             "oneway": oneway, "lvl": lvl, "__rs_edge": road,
+                                             **({"__rs_edge2": twin} if twin is not None else {}),
                                              **({"fl": fl} if fl is not None else {}),
                                              **({"__rs_tunnel": True} if tun else {})},
                               "geometry": {"type": "LineString", "coordinates": coords}})
@@ -580,7 +580,7 @@ def _bridge_decks(geo, dk):
                 props["__rs_base"] = round(base_m * t, 2)
                 props["__rs_height"] = round(base_m * t + thick, 2)
                 props["__rs_chain"] = chain_i
-                props["__rs_edges"] = str(fdir)   # the ONE directed edge this ribbon belongs to
+                props["__rs_edges"] = [fdir] if fdir is not None else []   # the ONE directed edge this ribbon belongs to (a list, like every multi-edge piece)
                 feats.append({"type": "Feature", "properties": props,
                               "geometry": {"type": "Polygon", "coordinates": [coords]}})
             # casing: two strips along the deck's LONG sides, topping out just below the deck
@@ -608,7 +608,7 @@ def _bridge_decks(geo, dk):
                                    for x, y in r] for r in rings]
                             feats.append({"type": "Feature", "properties": {
                                 "highway": pp.get("highway"), "__rs_chain": chain_i,
-                                "__rs_casing_slab": 1,
+                                "__rs_casing_slab": 1, "__rs_edges": sorted({f for _, f in ribbons if f is not None}),
                                 "__rs_base": round(max(base_m * t - 0.5, 0.0), 2),
                                 "__rs_height": round(base_m * t + thick * 0.35, 2)},
                                 "geometry": {"type": "Polygon", "coordinates": cc}})
@@ -687,14 +687,14 @@ def _casing_parts(geo, head_m, cols):
     """The casing of every edge as pieces, for its own source (docs/design/levels_split_casing.md): an edge whose
     three casing numbers (``__rs_cs`` start head, ``__rs_cl`` main, ``__rs_ce`` end head) are not all equal is cut into the first ``head_m`` metres,
     the middle and the last ``head_m`` metres, each with its own ``__rs_cl`` (a road shorter than ``2 * head_m``: two halves, docs/design/short_road_heads.md); any other edge is one piece. A piece carries the properties the casing
-    layers read (``__rs_*`` except the fills, ``cols``, ``lvl``) and ``__rs_road``, the id of its edge."""
+    layers read (``__rs_*`` except the fills, ``cols``, ``lvl``) and ``__rs_edge``, the id of its edge."""
     import numpy as np
     keep = {c for c in cols if c} | {"lvl"}
     out = []
     for i, ft in enumerate(geo["features"]):
         p, g = ft["properties"], ft.get("geometry") or {}
         base = {k: v for k, v in p.items() if (k in keep or k.startswith("__rs_")) and not k.startswith("__rs_fill")}
-        base["__rs_road"] = i
+        base["__rs_edge"] = i
         cs, cm, ce = p["__rs_cs"], p["__rs_cl"], p["__rs_ce"]
         c = g.get("coordinates") or []
         split = p.get("__rs_split")
@@ -798,7 +798,7 @@ def _bridge_shadows(geo, parts, highway_col, trim_m, max_turn=45.0):
     bset = set(br)
     if parts is not None:
         pieces = [(f["properties"].get("__rs_cl", 0), shapely.LineString([c[:2] for c in f["geometry"]["coordinates"]])) for f in parts
-                  if f["properties"].get("__rs_road") in bset and not f["properties"].get("__rs_seam")]
+                  if f["properties"].get("__rs_edge") in bset and not f["properties"].get("__rs_seam")]
     else:
         pieces = [(feats[i]["properties"].get("__rs_cl", 0), line[i]) for i in br]
     chains, clvl = [], []
@@ -885,7 +885,7 @@ def _bridge_shadows(geo, parts, highway_col, trim_m, max_turn=45.0):
                 continue
             pts = _part(xy, cum, a, b)
             cls = min((feats[i]["properties"].get(highway_col) for i in member), key=lambda v: order.index(v) if v in order else len(order))
-            out.append({"type": "Feature", "properties": {highway_col: cls, "__rs_cl": lvl, "__rs_fl": lvl},
+            out.append({"type": "Feature", "properties": {highway_col: cls, "__rs_cl": lvl, "__rs_fl": lvl, "__rs_edges": sorted(member)},
                         "geometry": {"type": "LineString", "coordinates": np.column_stack([np.round(pts[:, 0] / kx + lon0, 7),
                                                                                           np.round(pts[:, 1] / ky + lat0, 7)]).tolist()}})
     return out
@@ -917,7 +917,7 @@ def _mark_caps(geo, cap_col=None, start_col=None, end_col=None):
 def _halves(geo):
     """The fill of every edge with two different ends (``__rs_split``) as two halves cut at the middle, each with its end's ``__rs_cap``
     and all the edge's properties: MapLibre sets line-cap per layer, so each end shape needs its own piece (docs/design/square_ends.md).
-    At the cut the two halves overlap or meet in the same colour. A half carries ``__rs_road``, its edge's feature id (the "roads" source's
+    At the cut the two halves overlap or meet in the same colour. A half carries ``__rs_edge``, its edge's feature id (the "roads" source's
     generated one), for the page's recolouring: the halves source has no id of its own."""
     import numpy as np
     out = []
@@ -935,7 +935,7 @@ def _halves(geo):
             pts = _part(xy, cum, a, b)
             coords = np.column_stack([np.round(pts[:, 0] / kx + lon0, 7), np.round(pts[:, 1] / ky + lat0, 7)]).tolist()
             q = {kk: v for kk, v in p.items() if kk not in ("__rs_cap0", "__rs_cap1", "__rs_split")}
-            q["__rs_road"] = i
+            q["__rs_edge"] = i
             if p[f"__rs_cap{k}"] is not None:
                 q["__rs_cap"] = p[f"__rs_cap{k}"]
             out.append({"type": "Feature", "properties": q, "geometry": {"type": "LineString", "coordinates": coords}})
@@ -947,7 +947,7 @@ def _twin_ends(geo, cols):
     side by side, a road-wide round cap under them fills the dip between the lanes' own round
     ends. Only plain pairs: a bridge or tunnel has butt-capped casings, and a dashed class has no
     casing and butt-capped dashes. Each point carries its pair's styling properties and both
-    twins' feature ids (``__rs_road`` / ``__rs_road2``) for recolouring and id filters. Every fill
+    twins' feature ids (``__rs_edge`` / ``__rs_edge2``) for recolouring and id filters. Every fill
     prop comes twice, the first twin's and the second's (``<prop>__b``): a cap draws only where the
     two lanes have the same colour, so a map coloured per direction never shows one direction's
     colour at a street's end. Where another road is drawn in a lower band at the end point (a
@@ -984,7 +984,7 @@ def _twin_ends(geo, cols):
         props.update({c: v for c, v in p.items() if c.startswith("__rs_fill") or c == "__rs_casing"})
         q = geo["features"][j]["properties"]
         props.update({c + "__b": q.get(c) for c in list(props) if c.startswith("__rs_fill")})
-        props.update(__rs_road=i, __rs_road2=j)
+        props.update(__rs_edge=i, __rs_edge2=j)
         c = ft["geometry"]["coordinates"]
         for end, (pt, kp) in enumerate(((c[0], k[0]), (c[-1], k[1]))):
             head = p.get("__rs_cs" if end == 0 else "__rs_ce")         # the casing number of the lane's head at this end
@@ -1824,7 +1824,10 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     # roads source: inline GeoJSON by default; with `tiles=True` a PMTiles archive embedded in
     # the page instead (MapLibre parses only the tiles in view — the client-side scale path).
     # Feature ids are the feature's index either way (generateId / baked MVT id), so
-    # feature-state, rsFilter/rsColor and the sidecar table share one id space.
+    # feature-state, rsFilter/rsColor and the sidecar table share one id space. Every piece of a road names its edge by
+    # that same index (``__rs_edge``, docs/design/edge_items.md): the roads carry it themselves.
+    for _i, _ft in enumerate(geo["features"]):
+        _ft["properties"]["__rs_edge"] = _i
     _tiler = tc = None
     if tiles:
         try:
@@ -2417,7 +2420,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             if lyr.get("source") == "roads" and "source-layer" not in lyr:
                 lyr["source-layer"] = "roads"
         extra = [{"name": "slots", "fc": slots, "minzoom": 14}] if slots["features"] else []
-        keep = {highway_col, filter_col or highway_col, "__rs_twoway", "lvl", width_m_col}
+        keep = {highway_col, filter_col or highway_col, "__rs_twoway", "__rs_edge", "lvl", width_m_col}
         line_layers = []
         # the casing pieces and the twin end caps ride in the same archive (docs/design/levels_split_casing.md, 12.1)
         for name, kind in (("casings", "line"), ("ends", "point")):
