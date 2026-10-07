@@ -1980,7 +1980,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
             if shadows:                    # the bridge's shadow as an extra casing: each piece at its own number, joined where the number stays
                 style["sources"]["shadows"] = {"type": "geojson", "data": {"type": "FeatureCollection", "features": shadows},
                                                "tolerance": style["sources"]["roads"].get("tolerance", 0.375)}
-                twins.insert(0, {"id": "roads-casing-bridge-shadow", "type": "line", "source": "shadows", "layout": lay,
+                # flat ends: where two shadow lines meet, two round ends of a half-transparent colour overlapped into a darker circle
+                twins.insert(0, {"id": "roads-casing-bridge-shadow", "type": "line", "source": "shadows", "layout": {**lay, "line-cap": "butt"},
                                  "filter": ["literal", True],
                                  "paint": {"line-color": CONFIG.bridge_shadow_color, "line-blur": CONFIG.bridge_shadow_blur,
                                            "line-width": _width_expr(highway_col, casing=True, scale=1.6, **sw),

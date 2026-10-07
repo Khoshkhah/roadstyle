@@ -2146,6 +2146,7 @@ def test_a_bridge_shadow_is_an_extra_casing(monkeypatch):
     ids = [l["id"] for l in style["layers"]]
     s2 = lay["roads-casing-lv2-bridge-shadow"]
     assert s2["source"] == "shadows" and s2["paint"]["line-blur"] == 4.0 and s2["paint"]["line-translate"] == [2, 2]
+    assert s2["layout"]["line-cap"] == "butt"                                                  # no darker circle where two shadow lines meet
     assert ids.index("roads-casing-lv2-bridge-shadow") < ids.index("roads-casing-lv2-bridge") < ids.index("roads-fill-lv2")
 
     monkeypatch.setattr(render_web, "CONFIG", dataclasses.replace(render_web.CONFIG, bridge_shadow=False))
