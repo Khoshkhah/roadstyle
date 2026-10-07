@@ -2091,6 +2091,17 @@ def test_roads_on_the_same_line_are_one_road_only_if_they_are_the_same_kind():
     assert by == {"1": (["1"], ["2"], "tertiary"), "3": (["3"], [], "footway")}
 
 
+def test_a_road_keeps_the_modes_of_all_its_edges():
+    """level_input keeps a modes column: the modes of both directions together (a one-way street's reverse is walking only)."""
+    import roadstyle as rs
+    m = 1 / 111320.0
+    a = LineString([(18.0, 59.3), (18.0, 59.3 + 20 * m)])
+    g = gpd.GeoDataFrame({"edge_id": [1, 2], "highway": ["residential"] * 2, "modes": ["driving + walking", "walking + cycling"]},
+                         geometry=[a, LineString(list(a.coords)[::-1])], crs=4326)
+    roads, _ = rs.level_input(g)
+    assert list(roads["modes"]) == ["driving + walking + cycling"]
+
+
 def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     """The level editor (roadstyle.level_editor): the pairs between two roads (by any edge id), an edit the solver refuses is not written, a
     taken one is written with the file before it kept as edits.csv.bak, and levels.csv follows."""
