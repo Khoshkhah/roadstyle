@@ -1471,31 +1471,35 @@ def _eid(v):
     return str(v)
 
 
-def _edge_overlay(ov, fc, fills, edge_id_col, tunnels=()):
-    """Bake ``__rs_fl`` (the fill number of the feature's edge) and ``__rs_ord`` (its order) on the features of an overlay with ``edge_col``
-    (docs/design/edge_overlays.md). ``fills``: ``{edge id as text: fill number}`` of the roads. An edge id that is not among the roads is an error."""
-    if fills is None:
+def _edge_overlay(ov, fc, roads, edge_id_col, fcol):
+    """Bake on the features of an overlay with ``edge_col`` (docs/design/edge_overlays.md, edge_items.md) what they take from their edge:
+    ``__rs_edge`` (the edge's index in the ``roads`` source, the label every piece of a road carries), ``__rs_fl`` (its fill number),
+    ``__rs_ord`` (the feature's order), ``__rs_cls`` / ``__rs_lvl`` (its class in ``fcol`` and its level, for the class, bridge and tunnel
+    switches) and ``__rs_tunnel``. ``roads``: ``{edge id as text: the edge's properties}``. An edge id that is not among the roads is an error."""
+    if roads is None:
         raise ValueError(f"an overlay with edge_col needs the roads' id column {edge_id_col!r} (edge_id_col): it is not in the edges")
     unknown, orders = [], set()
     for ft in fc["features"]:
         p = ft.setdefault("properties", {}) or {}
         ft["properties"] = p
         e = _eid(p.get(ov.edge_col))
-        if e not in fills:
+        r = roads.get(e)
+        if r is None:
             unknown.append(e)
             continue
         o = p.get(ov.order_col) if ov.order_col else 0
         o = 0 if o is None or (isinstance(o, float) and math.isnan(o)) else int(o)
-        p["__rs_fl"], p["__rs_ord"] = fills[e], o
-        if e in tunnels:
+        fl = r.get("__rs_fl") or 0
+        p.update(__rs_edge=r["__rs_edge"], __rs_fl=fl, __rs_ord=o, __rs_cls=r.get(fcol), __rs_lvl=r.get("lvl", 0))
+        if r.get("__rs_tunnel"):
             p["__rs_tunnel"] = True          # the item of a tunnel takes its look (docs/design/tunnel_look.md)
-        orders.add((fills[e], o))
+        orders.add((fl, o))
     if unknown:
         raise ValueError(f"overlay {ov.label or ''}: {len(unknown)} feature(s) have an {ov.edge_col!r} that is not an edge of the roads (first: {unknown[:5]})")
     return sorted(orders)
 
 
-def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4dff", fills=None, edge_id_col="edge_id", tunnels=()):
+def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4dff", roads=None, edge_id_col="edge_id", fcol="highway"):
     """Add each overlay as its own source + layer(s) to ``style``. Returns ``(under, over, meta, edge)``:
     the layer specs to splice below / above the roads, the JS metadata (label / source / clickable
     layer ids / popup fields) the page reads to wire popups, hover/select highlight, and the Layers
@@ -1516,7 +1520,7 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
         base_filters = None
         if ov.edge_col:
             layers, base_filters = [], {}
-            for pos, order in _edge_overlay(ov, fc, fills, edge_id_col, tunnels):
+            for pos, order in _edge_overlay(ov, fc, roads, edge_id_col, fcol):
                 flt = ["all", ["==", ["get", "__rs_fl"], pos], ["==", ["get", "__rs_ord"], order]]
                 mine = []
                 for lyr in _overlay_layers(sid, ov, kind, hover_color, select_color, along):
@@ -1855,12 +1859,11 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
 
     # extra overlay layers (zones / POIs / any geometry the caller brings); each gets its own source
     # + paint layer(s), placed under or over the roads, and (if `popup` is set) clickable.
-    fills, tunnels = None, set()
-    if overlays and any(getattr(o, "edge_col", None) for o in overlays):
-        if edge_id_col in g.columns:
-            fills = {_eid(ft["properties"].get(edge_id_col)): ft["properties"].get("__rs_fl") or 0 for ft in geo["features"]}
-            tunnels = {_eid(ft["properties"].get(edge_id_col)) for ft in geo["features"] if ft["properties"].get("__rs_tunnel")}
-    under_layers, over_layers, ov_meta, edge_layers = _build_overlays(style, overlays, fills=fills, edge_id_col=edge_id_col, tunnels=tunnels)
+    by_id = None
+    if overlays and any(getattr(o, "edge_col", None) for o in overlays) and edge_id_col in g.columns:
+        by_id = {_eid(ft["properties"].get(edge_id_col)): ft["properties"] for ft in geo["features"]}
+    under_layers, over_layers, ov_meta, edge_layers = _build_overlays(style, overlays, roads=by_id, edge_id_col=edge_id_col,
+                                                                      fcol=filter_col or highway_col)
 
     # Round caps + joins everywhere: consecutive edges are separate LineStrings, and a round cap is
     # the only rendering primitive that seals the seam where two of them connect (line-join only
@@ -2153,7 +2156,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                 layers.append(l)
             shadows = _bridge_shadows(geo, parts, highway_col, CONFIG.bridge_shadow_trim_m) if CONFIG.bridge_shadow else []
             if shadows:                    # the bridge shadow: lines through junctions, each at the lowest casing number of its edges
-                style["sources"]["shadows"] = {"type": "geojson", "data": {"type": "FeatureCollection", "features": shadows},
+                style["sources"]["shadows"] = {"type": "geojson", "data": {"type": "FeatureCollection", "features": shadows}, "generateId": True,
                                                "tolerance": style["sources"]["roads"].get("tolerance", 0.375)}
                 # flat ends: where two shadow lines meet (a casing number changes, a junction) they meet end to end, so the half-transparent
                 # shadow does not double into a dark disc (round ends overlapped)

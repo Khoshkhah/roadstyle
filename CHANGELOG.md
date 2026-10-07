@@ -7,6 +7,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **One lookup for every piece of a road** (docs/design/edge_items.md, step 2): `rsFilter` on the roads, the class filter and the bridge and tunnel
+  switches hide a road's items attached with `Overlay(edge_col=...)` too (they carry `__rs_edge`, the index of their road, and its class and level as
+  `__rs_cls` / `__rs_lvl`), and `rsFilter` now hides the bridge shadows and 3D decks of the filtered roads (shown while any of their edges is).
+  Hovering an attached item highlights its road; clicking it selects the road (`rs:select` with the road, its panel and Street View; an interactive
+  item's fields come along in `overlays`). `rsFilter(ids, label)` on an attached overlay combines with its roads' filters. An overlay that belongs
+  to no road is as before.
 - **Every piece of a road names its edge** (docs/design/edge_items.md, step 1): `roads` features carry `__rs_edge` (their index), and the casing pieces, seams, fill halves, end caps, name and arrow slots carry `__rs_edge` (and `__rs_edge2` for a two-way pair) in place of `__rs_road` / `__rs_road2`; bridge shadow lines and 3D decks carry `__rs_edges`, the list of their edges (a list, no longer a string). The map looks and behaves as before.
 - **`roadstyle-levels make | solve | edit FOLDER`**: the level step and its editor come with the package (`roadstyle.level_area`:
   `make_area`, `solve_area`; `roadstyle.level_editor`), in place of `scripts/level_input.py`, `scripts/solve_levels.py` and

@@ -316,3 +316,59 @@ def test_a_page_with_overlay_styles_boots(tmp_path):
         have = page.evaluate("RS_OVERLAYS.map(o => o.layers.filter(id => map.getLayer(id)).length)")
         browser.close()
     assert errors == [] and all(n > 0 for n in have)
+
+
+def test_an_item_attached_to_a_road_follows_its_road(tmp_path):
+    """docs/design/edge_items.md step 2: rsFilter, rsSetClasses and rsSetTunnels(false) hide the items attached to a hidden road
+    (Overlay(edge_col=...)) and leave an overlay that belongs to no road alone; hovering an item highlights its road and clicking it
+    selects the road (rs:select with the road's id and properties)."""
+    import geopandas as gpd
+    from shapely.geometry import LineString, Point
+
+    from roadstyle import Overlay
+    from roadstyle.render_web import render
+
+    ys = [59.300, 59.3015, 59.303]
+    g = gpd.GeoDataFrame({"highway": ["primary", "primary", "residential"], "tunnel": [None, "yes", None], "edge_id": [100, 101, 102]},
+                         geometry=[LineString([(18.000, y), (18.004, y)]) for y in ys], crs=4326)
+    items = gpd.GeoDataFrame({"edge_id": [100, 101, 102], "kind": ["sign"] * 3},          # 30 m north of the middle of each road
+                             geometry=[Point(18.002, y + 0.00027) for y in ys], crs=4326)
+    free = gpd.GeoDataFrame({"n": [1, 2]}, geometry=[Point(18.001, 59.301), Point(18.003, 59.303)], crs=4326)
+    path = tmp_path / "items.html"
+    render(g, basemap="blank", tunnel_col="tunnel", overlays=[Overlay(items, edge_col="edge_id", kind="circle", radius=8, label="signs", popup=["kind"]),
+                                                             Overlay(free, kind="circle", radius=8, label="free")]).save(path)
+    shown = """async ([call, label]) => { eval(call); await new Promise(r => { map.once('idle', r); map.triggerRepaint(); setTimeout(r, 3000); });
+      const ov = RS_OVERLAYS.find(o => o.label === label);
+      return [...new Set(map.queryRenderedFeatures({layers: ov.layers}).map(f => label === 'signs' ? f.properties.edge_id : f.properties.n))].sort(); }"""
+    errors = []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 800, "height": 700})
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && map.loaded()", timeout=30_000)
+        page.evaluate("map.jumpTo({center: [18.002, 59.3015], zoom: 16}); 0")
+        page.wait_for_function("map.loaded()", timeout=30_000)
+        steps = {c: (page.evaluate(shown, [c, "signs"]), page.evaluate(shown, [c, "free"])) for c in
+                 ("0", "rsFilter([0, 2])", "rsFilter(null)", "rsSetClasses(['primary'])", "rsSetClasses(RS_CLASSES)",
+                  "rsSetTunnels(false)", "rsSetTunnels(true)")}
+        page.evaluate("window.__sel = []; document.addEventListener('rs:select', e => __sel.push([e.detail.id, e.detail.properties.edge_id,"
+                      " (e.detail.overlays || []).map(o => o.label)]))")
+        x, y = page.evaluate("(() => { const p = map.project([18.002, 59.3015 + 0.00027]); return [p.x, p.y]; })()")
+        page.mouse.move(x, y)
+        page.wait_for_timeout(300)
+        hover = page.evaluate("[0, 1, 2].map(i => !!map.getFeatureState({source: 'roads', id: i}).hover)")
+        page.mouse.click(x, y)
+        page.wait_for_timeout(300)
+        sel = page.evaluate("__sel")
+        selected = page.evaluate("[0, 1, 2].map(i => !!map.getFeatureState({source: 'roads', id: i}).select)")
+        browser.close()
+    assert errors == []
+    assert steps["0"] == ([100, 101, 102], [1, 2])
+    assert steps["rsFilter([0, 2])"] == ([100, 102], [1, 2])                 # the items of a filtered road go with it; the free overlay stays
+    assert steps["rsSetClasses(['primary'])"] == ([100, 101], [1, 2])         # a hidden class: its items too
+    assert steps["rsSetTunnels(false)"] == ([100, 102], [1, 2])               # a hidden tunnel: its items too
+    assert steps["rsFilter(null)"][0] == steps["rsSetClasses(RS_CLASSES)"][0] == steps["rsSetTunnels(true)"][0] == [100, 101, 102]
+    assert hover == [False, True, False]                                       # hovering the item of road 1 highlights road 1
+    assert sel == [[1, 101, ["signs"]]] and selected == [False, True, False]   # clicking it selects road 1; its own fields come along
