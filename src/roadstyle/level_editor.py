@@ -45,7 +45,7 @@ class Area:
         self.facts = {}                                         # road id -> what the panel shows about it
         for (_, r), m in zip(self.roads.iterrows(), length, strict=True):
             self.facts[r["road"]] = {"road": r["road"], "name": _txt(r.get("name")), "highway": _txt(r.get("highway")),
-                                     "edge_ref": _txt(r.get("edge_ref")), "lanes": _txt(r.get("lanes")), "caps": ["", ""], "heads": [5.0, 5.0], "band": int(r["band"]), "priority": _num(r.get("priority")),
+                                     "edge_ref": _txt(r.get("edge_ref")), "lanes": _txt(r.get("lanes")), "modes": _txt(r.get("modes")), "caps": ["", ""], "heads": [5.0, 5.0], "band": int(r["band"]), "priority": _num(r.get("priority")),
                                      "edges": len(r["edges"]) + len(r["reversed"]), "two_way": len(r["reversed"]) > 0, "length_m": float(m),
                                      "look": "tunnel" if _yes(r.get("tunnel")) else "bridge" if _yes(r.get("bridge")) else "ground",
                                      "width_px": _widths(_txt(r.get("highway")))}
