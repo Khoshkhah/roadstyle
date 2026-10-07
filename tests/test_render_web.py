@@ -649,7 +649,7 @@ def test_deck_slices_carry_their_road_id():
     feats = style["sources"]["decks"]["data"]["features"]
     slices = [f for f in feats if "__rs_casing_slab" not in f["properties"]]
     assert slices and all("__rs_edges" in s["properties"] for s in slices)
-    assert "0" in slices[0]["properties"]["__rs_edges"].split(",")  # edge 0 is the bridge
+    assert 0 in slices[0]["properties"]["__rs_edges"]  # edge 0 is the bridge
     # the dark casing ring: slab features + a casing-colour extrusion layer under the body
     assert any("__rs_casing_slab" in f["properties"] for f in feats)
     cas = next(l for l in style["layers"] if l["id"] == "roads-deck-casing")
@@ -710,9 +710,9 @@ def test_twoway_bridge_decks_split_per_directed_edge():
     html = render_edges(g, backend="web", view_3d=True).html
     slices = [f for f in _style(html)["sources"]["decks"]["data"]["features"]
               if "__rs_casing_slab" not in f["properties"]]
-    owners = {s["properties"]["__rs_edges"] for s in slices}
-    assert owners == {"0", "1"}                    # both directions present, separately owned
-    assert 'key:"e"+e' in html                     # deck hover keys on the edge, not the chain
+    owners = {s["properties"]["__rs_edges"][0] for s in slices}
+    assert owners == {0, 1}                    # both directions present, separately owned
+    assert 'key:"e"+e[0]' in html                     # deck hover keys on the edge, not the chain
 
 
 def test_query_verbs_accept_overlay_layer_arg():
@@ -902,7 +902,7 @@ def test_twin_pairs_get_one_end_cap_per_end():
     # only the plain, solid two-way street: two ends, both twins' ids; no one-way, bridge, tunnel,
     # or dashed pair
     assert len(pts) == 2
-    assert {(p["properties"]["__rs_road"], p["properties"]["__rs_road2"]) for p in pts} == {(0, 1)}
+    assert {(p["properties"]["__rs_edge"], p["properties"]["__rs_edge2"]) for p in pts} == {(0, 1)}
     assert {tuple(p["geometry"]["coordinates"]) for p in pts} == {(18.0, 59.3), (18.0, 59.31)}
     assert pts[0]["properties"]["__rs_fill"] and pts[0]["properties"]["highway"] == "residential"
 
@@ -911,7 +911,7 @@ def test_twin_pairs_get_one_end_cap_per_end():
 
 def test_end_caps_follow_filters_and_recolour_and_can_be_turned_off():
     html = render_edges(_pairs(), backend="web").html
-    assert 'kind==="ends"' in html and "__rs_road2" in html                  # id filters
+    assert 'kind==="ends"' in html and "__rs_edge2" in html                  # id filters
     assert 'RS_END_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"circle-color",ee)' in html
     off = _style(render_edges(_pairs(), backend="web", settings={"config": {"twin_end_caps": False}}).html)
     assert "ends" not in off["sources"] and not [l for l in off["layers"] if "ends" in l["id"]]
@@ -1474,7 +1474,7 @@ def test_divided_casing_is_drawn_as_head_and_main_pieces():
     parts = [f for f in style["sources"]["casings"]["data"]["features"] if not f["properties"].get("__rs_seam")]     # the pieces, not the seams
     by = {}
     for f in parts:
-        by.setdefault(f["properties"]["__rs_road"], []).append(f)
+        by.setdefault(f["properties"]["__rs_edge"], []).append(f)
     assert [len(by[i]) for i in (0, 1, 2)] == [3, 1, 2]
     assert [f["properties"]["__rs_cl"] for f in by[2]] == [-1, -2]                    # a short road keeps both heads (short_road_heads.md)
     assert [f["properties"]["__rs_cl"] for f in by[0]] == [-1, 0, -2]                 # start head, main, end head
@@ -1498,7 +1498,7 @@ def test_divided_casing_main_piece_ends_flat_and_heads_round():
                          geometry=[LineString([(18, 59), (18 + d, 59)]), LineString([(18, 59.01), (18 + d, 59.01)])], crs=4326)
     style = _style(render_edges(g, backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0).html)
     parts = [f for f in style["sources"]["casings"]["data"]["features"] if not f["properties"].get("__rs_seam")]     # the pieces, not the seams
-    flags = [(f["properties"]["__rs_road"], f["properties"]["__rs_cl"], bool(f["properties"].get("__rs_cap"))) for f in parts]
+    flags = [(f["properties"]["__rs_edge"], f["properties"]["__rs_cl"], bool(f["properties"].get("__rs_cap"))) for f in parts]
     assert flags == [(0, -1, False), (0, 0, True), (0, -2, False), (1, 0, False)]       # head, MAIN flat, head; the unsplit edge stays round
     lay = {l["id"]: l for l in style["layers"]}
     assert lay["roads-casing-sq"]["source"] == "casings" and lay["roads-casing-sq"]["layout"]["line-cap"] == "butt" and lay["roads-casing"]["layout"]["line-cap"] == "round"
@@ -1784,7 +1784,7 @@ def test_edge_overlay_errors_and_colours():
 
 
 def test_arrows_and_street_names_belong_to_an_edge(monkeypatch):
-    """docs/design/edge_overlays.md: every slot (the piece of road that carries an arrow or a name) carries the edge under its middle point (__rs_road, and __rs_road2 for the
+    """docs/design/edge_overlays.md: every slot (the piece of road that carries an arrow or a name) carries the edge under its middle point (__rs_edge, and __rs_edge2 for the
     twin of a two-way street) and the fill number of that edge."""
     a, b, c = (18.000, 59.300), (18.003, 59.300), (18.003, 59.303)
     g = gpd.GeoDataFrame({"highway": ["residential"] * 3, "name": ["Main", "Main", "Side"], "oneway": [False, False, True]},
@@ -1792,13 +1792,13 @@ def test_arrows_and_street_names_belong_to_an_edge(monkeypatch):
     style = _style(render_edges(g, backend="web", arrows=True, labels=True).html)
     roads = [f["properties"] for f in style["sources"]["roads"]["data"]["features"]]
     slots = [f["properties"] for f in style["sources"]["slots"]["data"]["features"]]
-    assert slots and all("__rs_road" in s for s in slots)
+    assert slots and all("__rs_edge" in s for s in slots)
     for s in slots:
-        assert 0 <= s["__rs_road"] < len(roads) and s.get("fl", 0) == roads[s["__rs_road"]]["__rs_fl"]
+        assert 0 <= s["__rs_edge"] < len(roads) and s.get("fl", 0) == roads[s["__rs_edge"]]["__rs_fl"]
     two_way = [s for s in slots if s["name"] == "Main"]
-    assert two_way and all({s["__rs_road"], s["__rs_road2"]} == {0, 1} for s in two_way)       # the pair: its two twins
+    assert two_way and all({s["__rs_edge"], s["__rs_edge2"]} == {0, 1} for s in two_way)       # the pair: its two twins
     one_way = [s for s in slots if s["name"] == "Side"]
-    assert one_way and all(s["__rs_road"] == 2 and "__rs_road2" not in s for s in one_way)
+    assert one_way and all(s["__rs_edge"] == 2 and "__rs_edge2" not in s for s in one_way)
 
 
 def test_road_fill_false_draws_the_casing_but_not_the_fill():
@@ -2305,14 +2305,14 @@ def test_cap_start_and_end_cols_set_one_end_each():
     assert ps[0].get("__rs_split") and ps[1].get("__rs_cap") == "square"                       # flat / round differ; square / square: one edge
     halves = [f["properties"] for f in style["sources"]["halves"]["data"]["features"]]
     assert [h.get("__rs_cap") for h in halves] == [True, None]                                   # start half flat, end half round
-    assert [h["__rs_road"] for h in halves] == [0, 0]                                            # its edge's id, for the recolouring
+    assert [h["__rs_edge"] for h in halves] == [0, 0]                                            # its edge's id, for the recolouring
     assert style["sources"]["halves"]["tolerance"] == style["sources"]["casings"]["tolerance"] == style["sources"]["roads"]["tolerance"]   # one line
     assert [bool(_eval(lay["roads-fill"]["filter"], p)) for p in ps] == [True, False]            # the split edge stays in its fill layer,
     assert [_eval(lay["roads-fill"]["paint"]["line-opacity"], p) for p in ps[:1]] == [0]          # transparent (clicks find the edge), the halves paint it
     assert [bool(_eval(lay["roads-fill-sx"]["filter"], p)) for p in ps] == [False, True]
     assert [[bool(_eval(lay[i]["filter"], h)) for h in halves] for i in ("roads-fill-hsq", "roads-fill-h")] == [[True, False], [False, True]]
     assert lay["roads-fill-hsq"]["layout"]["line-cap"] == "butt" and lay["roads-fill-h"]["source"] == "halves"
-    heads = [f["properties"] for f in style["sources"]["casings"]["data"]["features"] if f["properties"]["__rs_road"] == 0 and not f["properties"].get("__rs_seam")]
+    heads = [f["properties"] for f in style["sources"]["casings"]["data"]["features"] if f["properties"]["__rs_edge"] == 0 and not f["properties"].get("__rs_seam")]
     assert [h.get("__rs_cap") for h in heads] == [True, True, None]                              # start head flat, main flat (cut), end head round
     auto = _style(render_edges(g.drop(columns=["cl", "fl"]), backend="web", cap_start_col="s", cap_end_col="e").html)     # levels computed here
     assert len(auto["sources"]["halves"]["data"]["features"]) == 2
@@ -2329,7 +2329,7 @@ def test_head_metre_cols_set_where_the_casing_is_cut():
     def lengths(road):
         out = []
         for f in (f for f in style["sources"]["casings"]["data"]["features"] if not f["properties"].get("__rs_seam")):
-            if f["properties"]["__rs_road"] == road:
+            if f["properties"]["__rs_edge"] == road:
                 c = np.asarray(f["geometry"]["coordinates"])
                 out.append(round(float(np.abs(np.diff(c[:, 1])).sum() / m), 1))
         return out
@@ -2627,3 +2627,43 @@ def test_an_arrow_that_would_touch_a_name_is_left_out():
     assert arrows and all(l["layout"]["icon-allow-overlap"] is False and l["layout"]["icon-ignore-placement"] is True for l in arrows)
     ids = [l["id"] for l in style["layers"]]
     assert ids.index("roads-arrows") < ids.index("roads-labels")                      # names placed first
+
+
+def test_every_piece_of_a_road_names_its_edge():
+    """docs/design/edge_items.md step 1: every feature of every source that draws a road (all but base maps, overlays and the boundary, so a
+    source added later without the label fails here) carries ``__rs_edge``, the index of its edge in ``roads`` (``__rs_edge2`` too for a
+    two-way pair's shared pieces); the shadow lines and 3D decks carry ``__rs_edges``, the list of their edges."""
+    ln = lambda *c: LineString(c)                                                       # noqa: E731
+    g = gpd.GeoDataFrame(
+        {"highway": ["residential"] * 2 + ["primary"] * 4, "name": ["Main", "Main", "Side", "Bridge", "Bridge", "Bridge"],
+         "oneway": [False, False, True, False, False, True],
+         "cs": [0, 0, -1, 0, 0, 0], "cl": [0, 0, 0, 1, 1, 1], "ce": [0, 0, -2, 0, 0, 0], "fl": [0] * 3 + [1] * 3,
+         "capa": [None, None, "flat", None, None, None], "capb": [None, None, "square", None, None, None],
+         "bridge": [None, None, None, "yes", "yes", "yes"]},
+        geometry=[ln((18.000, 59.300), (18.004, 59.300)), ln((18.004, 59.300), (18.000, 59.300)),            # a two-way street (two twins)
+                  ln((18.004, 59.300), (18.004, 59.304)),                                                    # a one-way street with two different end caps
+                  ln((18.010, 59.300), (18.012, 59.300)), ln((18.012, 59.300), (18.010, 59.300)),            # a two-way bridge
+                  ln((18.012, 59.300), (18.014, 59.300))], crs=4326)                                         # a one-way bridge going on from it
+    kw = dict(backend="web", arrows=True, labels=True, view_3d=True, casing_start_col="cs", casing_level_col="cl", casing_end_col="ce",
+              fill_level_col="fl", cap_start_col="capa", cap_end_col="capb", bridge_col="bridge")
+    seen = set()
+    for extra in ({}, {"tiles": False}):
+        style = _style(render_edges(g, **kw, **extra).html)
+        n = len(style["sources"]["roads"]["data"]["features"])
+        assert all(f["properties"]["__rs_edge"] == i for i, f in enumerate(style["sources"]["roads"]["data"]["features"]))      # the generateId index
+        for name, src in style["sources"].items():
+            if src["type"] != "geojson" or name in ("boundary", "roads", "arrows") or name.startswith("ov"):     # arrows: filled by the page
+                continue
+            feats = src["data"]["features"]
+            assert feats, name
+            seen.add(name)
+            for f in feats:
+                p = f["properties"]
+                if name in ("shadows", "decks"):
+                    assert p["__rs_edges"] and all(isinstance(e, int) and 0 <= e < n for e in p["__rs_edges"]), (name, p)
+                else:
+                    assert isinstance(p["__rs_edge"], int) and 0 <= p["__rs_edge"] < n, (name, p)
+                    if "__rs_edge2" in p:
+                        assert isinstance(p["__rs_edge2"], int) and 0 <= p["__rs_edge2"] < n, (name, p)
+    assert all("__rs_edge2" in f["properties"] for f in style["sources"]["ends"]["data"]["features"])       # a cap belongs to both twins
+    assert {"casings", "halves", "ends", "slots", "shadows", "decks"} <= seen                  # the page really had every kind of piece

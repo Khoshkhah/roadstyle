@@ -488,12 +488,12 @@ function _applyRoadFilters(){
     const kind = RS_TILED && l.source==="roads" ? l["source-layer"] : l.source;   // the layer's data: roads, casings, ends, slots, decks
     const isRoads = kind==="roads";
     if(_qIds && isRoads){ const qf=_has(["id"],_qIds); f=f?["all",f,qf]:qf; }
-    // the pieces of a divided casing (levels_split_casing.md) carry their edge's id as __rs_road
+    // the pieces of a divided casing (levels_split_casing.md) carry their edge's id as __rs_edge
     // and the fill halves of an edge with two different ends (square_ends.md) too: without them its colour stayed when the road was filtered out
-    if(_qIds && (kind==="casings" || kind==="halves")){ const qf=_has(["get","__rs_road"],_qIds); f=f?["all",f,qf]:qf; }
+    if(_qIds && (kind==="casings" || kind==="halves")){ const qf=_has(["get","__rs_edge"],_qIds); f=f?["all",f,qf]:qf; }
     // a two-way pair's end cap (twin_ends.md) and an arrow or a street name (edge_overlays.md) stay while either of their two edges is shown
     if(_qIds && (kind==="ends" || kind==="slots" || kind==="arrows")){
-      const qf=["any",_has(["get","__rs_road"],_qIds),_has(["get","__rs_road2"],_qIds)]; f=f?["all",f,qf]:qf; }
+      const qf=["any",_has(["get","__rs_edge"],_qIds),_has(["get","__rs_edge2"],_qIds)]; f=f?["all",f,qf]:qf; }
     // validate:false: our own filters need no grammar check, which cost ~6 ms a layer (a mode or class switch on a page of ~500 layers froze it ~3 s)
     try{ map.setFilter(l.id,f,{validate:false}); }catch(e){}
   });
@@ -579,9 +579,9 @@ function rsGetProps(ids, layer){ // the rows behind an id set (internals strippe
 // instead of the flat ground-level line
 function _deckIdsForRoad(i){
   const s=map.getSource("decks"), fs=(s && s._data && s._data.features)||[];
-  const out=[], key=","+i+",";
+  const out=[];
   fs.forEach((f,k)=>{ const e=f.properties && f.properties.__rs_edges;
-    if(e!=null && (","+e+",").indexOf(key)>=0) out.push(k); });
+    if(e && e.indexOf(i)>=0) out.push(k); });
   return out;
 }
 let _qHl=[], _qHlD=[];
@@ -705,9 +705,9 @@ function _fillExpr(idE){
 function _applyFill(){
   const look=x=>_tunOn ? _tunMix(x, TUNNEL.to.fill) : x;
   const e=look(_fillExpr());
-  // the fill halves of an edge with two different ends (square_ends.md) have no feature id: they name their edge in __rs_road
+  // the fill halves of an edge with two different ends (square_ends.md) have no feature id: they name their edge in __rs_edge
   // (without it a recolouring could not evaluate on them and MapLibre drew them black)
-  const eh=look(_fillExpr(["get","__rs_road"]));
+  const eh=look(_fillExpr(["get","__rs_edge"]));
   RS_FILL_LAYERS.forEach(id=>{ const l=map.getLayer(id); if(l) map.setPaintProperty(id,"line-color",l.source==="halves"?eh:e); });
   // the dashed layers (<fill layer>-dash0, -dash1 ...: one per dash pattern, for footway, path, steps ...) draw the
   // dashed classes' edges: they take the active colouring too, or such a road keeps its class colour under any "colour by"
@@ -720,7 +720,7 @@ function _applyFill(){
   const same=["==",["get",prop],["get",prop+"__b"]], both=[];
   let ee=["case",same,["coalesce",["get",prop],"#888888"],none];
   if(_qColor) for(let i=_qColor.length-1;i>=0;i--){
-    const b=["all",_has(["get","__rs_road"],_qColor[i].ids),_has(["get","__rs_road2"],_qColor[i].ids)];
+    const b=["all",_has(["get","__rs_edge"],_qColor[i].ids),_has(["get","__rs_edge2"],_qColor[i].ids)];
     both.push(b); ee=["case",b,_qColor[i].color,ee]; }
   const ec=["case",["any",same,...both],["coalesce",["get","__rs_casing"],"#000000"],none];
   RS_END_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"circle-color",ee); });
@@ -1167,9 +1167,10 @@ function srcOf(f){ return f && f.layer && f.layer.id.indexOf("roads-bridge-decks
 function _pickProps(f){ const s=_side();
   return (s && srcOf(f)==="roads" && f.id!=null) ? (s.props[f.id]||f.properties||{}) : (f.properties||{}); }
 function hitOf(f){ if(!f || f.id==null) return null;
-  if(srcOf(f)==="decks"){ const e=f.properties && f.properties.__rs_edges;
-    if(e==null) return null;                                   // casing slab: not a road
-    return {s:"decks", key:"e"+e, ids:_deckIdsForRoad(+e)}; }  // one directed edge = one hover
+  if(srcOf(f)==="decks"){ let e=f.properties && f.properties.__rs_edges;
+    if(typeof e==="string") e=JSON.parse(e);                   // a rendered feature stringifies its list
+    if(!e || !e.length || f.properties.__rs_casing_slab) return null;   // casing slab: not a road
+    return {s:"decks", key:"e"+e[0], ids:_deckIdsForRoad(e[0])}; }  // one directed edge = one hover
   return {s:"roads", key:"r"+f.id, ids:[f.id]}; }
 function setS(h, st){ if(h) h.ids.forEach(id=>_fs({source:h.s, id:id}, st)); }
 let _hov=null, _pt=null, _raf=0;

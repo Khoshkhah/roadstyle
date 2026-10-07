@@ -7,6 +7,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **Every piece of a road names its edge** (docs/design/edge_items.md, step 1): `roads` features carry `__rs_edge` (their index), and the casing pieces, seams, fill halves, end caps, name and arrow slots carry `__rs_edge` (and `__rs_edge2` for a two-way pair) in place of `__rs_road` / `__rs_road2`; bridge shadow lines and 3D decks carry `__rs_edges`, the list of their edges (a list, no longer a string). The map looks and behaves as before.
 - **`roadstyle-levels make | solve | edit FOLDER`**: the level step and its editor come with the package (`roadstyle.level_area`:
   `make_area`, `solve_area`; `roadstyle.level_editor`), in place of `scripts/level_input.py`, `scripts/solve_levels.py` and
   `scripts/edit_levels.py`. The area folder and its files are as before.
