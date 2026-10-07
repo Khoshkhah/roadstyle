@@ -10,6 +10,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **`roadstyle-levels make | solve | edit FOLDER`**: the level step and its editor come with the package (`roadstyle.level_area`:
   `make_area`, `solve_area`; `roadstyle.level_editor`), in place of `scripts/level_input.py`, `scripts/solve_levels.py` and
   `scripts/edit_levels.py`. The area folder and its files are as before.
+- The level editor shows only the roads of the modes you tick (driving, walking, cycling, private), when the roads have `modes`; display only.
 - The level step keeps a `modes` column (who may use a road, e.g. `driving + walking`) and the level editor shows it in the road's card.
 - **Roads on the same line join only if they are the same kind** (`highway`, `tunnel`, `bridge`, `layer`): a footway lying exactly on a tunnel's
   piece was joined with it, and the tunnel piece took the footway's tags (solved and drawn as a footway).
