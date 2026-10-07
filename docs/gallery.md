@@ -89,6 +89,16 @@ rs.render_dashboard(edges, color_options={"Class": {}, "Speed": {"color_by": "ma
 
 More in [Dashboards & JavaScript](guides/dashboards.md).
 
+## Mono palette
+
+Shades of grey on a blank canvas: a quiet base under your own data colours. Other palettes: `amber` (the default), `carto`, `highsat`.
+
+```python
+rs.render_edges(edges, palette="mono", basemap="blank")
+```
+
+![All of Monaco in the mono palette on the blank canvas](img/gallery/palette_mono.jpg)
+
 ## Base maps
 
 The same map on another background: Voyager (the default), Positron, Dark Matter, satellite, or a blank canvas that works offline.
