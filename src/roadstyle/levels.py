@@ -297,7 +297,12 @@ def _solve_intervals(metres, meets, stacks, orders, limit, max_level, margin, mi
         res = solve(np.concatenate([cost, np.zeros(nP + nO)]), Ak, bk, bounds)
         solves += 1
         staged = True
-    if res.status != 0:
+    status = "OPTIMAL"
+    if res.status == 1 and res.x is not None:                  # the last stage (cost, fewest positions) at its time limit: what is over what is
+        status = "TIME_LIMIT"                                  # fixed by the stages before; keep its best numbers and say so (2026-10-07)
+        warnings.warn(f"compute_levels: the last stage (cost, fewest positions) reached its time limit ({limit} s); its best numbers are kept: "
+                      "every rule of the stages before holds, the drawing may have a few more positions", stacklevel=2)
+    elif res.status != 0:
         raise RuntimeError(f"compute_levels: the solver returned status {res.status}: {res.message}")
     x = res.x
     if staged:
@@ -315,7 +320,7 @@ def _solve_intervals(metres, meets, stacks, orders, limit, max_level, margin, mi
     info["given_up_parts"] = sorted({(*pair_list[stack_rows[i][0]], word[name[stack_rows[i][1]][1]]) for i in broke if not row_near[i]})
     info["near_parts"] = sorted({(*pair_list[stack_rows[i][0]], word[name[stack_rows[i][1]][1]]) for i in broke if row_near[i]})
     info["near_warnings"] = len({(u, l) for u, l, _ in info["near_parts"]})              # pairs, as given_up counts them
-    return parts, gu, {**info, "order_pairs": nO, "order_violations": violated, "solves": solves, "solver": how, "status": "OPTIMAL", "seconds": round(time.time() - t0, 1)}
+    return parts, gu, {**info, "order_pairs": nO, "order_violations": violated, "solves": solves, "solver": how, "status": status, "seconds": round(time.time() - t0, 1)}
 
 
 def _road_split(g, cols=()):

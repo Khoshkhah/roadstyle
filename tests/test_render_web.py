@@ -2168,6 +2168,36 @@ def test_the_road_tooltip_waits_for_the_mouse_to_rest():
     assert "const _TIP_DELAY = 0;" in render_edges(_edge_world(), backend="web", road_tooltip=True, hover_delay_ms=0).html
 
 
+def test_the_last_solver_stage_at_its_time_limit_keeps_its_best_numbers(monkeypatch):
+    """The last stage (cost, fewest positions) stopped by its time limit with numbers in hand: they are kept, with a warning and
+    levels_info status TIME_LIMIT (a GitHub build of an all-modes area failed there, 2026-10-07); any other failure is still an error."""
+    pytest.importorskip("scipy")
+    import scipy.optimize as so
+
+    import roadstyle as rs
+    roads, pairs = rs.level_input(_edge_world())
+    first = rs.solve_levels(roads, pairs)
+    fixed = {first["road"].iloc[0]: tuple(int(first[c].iloc[0]) for c in ("casing_start", "casing_level", "casing_end", "fill_level"))}
+    real = so.milp
+
+    def at_limit(*a, **k):
+        r = real(*a, **k)
+        r.status, r.message = 1, "Time limit reached."
+        return r
+    monkeypatch.setattr(so, "milp", at_limit)
+    with pytest.warns(UserWarning, match="time limit"):
+        out = rs.solve_levels(roads, pairs, fixed=fixed)                  # held numbers: HiGHS, not the flow
+    assert out.attrs["levels_info"]["status"] == "TIME_LIMIT" and out["fill_level"].notna().all()
+
+    def failed(*a, **k):
+        r = real(*a, **k)
+        r.status, r.x, r.message = 4, None, "Other."
+        return r
+    monkeypatch.setattr(so, "milp", failed)
+    with pytest.raises(RuntimeError, match="status 4"):
+        rs.solve_levels(roads, pairs, fixed=fixed)
+
+
 def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     """The level editor (roadstyle.level_editor): the pairs between two roads (by any edge id), an edit the solver refuses is not written, a
     taken one is written with the file before it kept as edits.csv.bak, and levels.csv follows."""

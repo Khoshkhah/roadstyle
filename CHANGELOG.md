@@ -4,6 +4,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.17.1] — 2026-10-07
+
+### Fixed
+- **pyarrow is a dependency:** a level area writes `roads.parquet` (`roadstyle-levels make`, `duckosm levels`); without pyarrow it failed.
+- **The solver's last stage at its time limit keeps its best numbers** (cost and fewest positions; what is over what is fixed by the stages
+  before), with a warning and `levels_info["status"] == "TIME_LIMIT"`, instead of failing: an all-modes area failed on a slower machine.
+
 ## [0.17.0] — 2026-10-07
 
 ### Added
