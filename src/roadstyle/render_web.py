@@ -1635,7 +1635,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
            basemap_switcher: bool = True, zoom_readout: bool = True,
-           road_popup=True, road_tooltip=False, popup_mode: str = None,
+           road_popup=True, road_tooltip=False, hover_delay_ms: int = 300, popup_mode: str = None,
            street_view: bool | str = "window", street_view_key: str | None = None,
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
            color_options=None, color_active=0, views=None, overlays=None, compress: bool = True, tunnel_control: bool = False,
@@ -2485,6 +2485,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             .replace("__ROAD_POPUP_MODE__", json.dumps(mode))
             .replace("__ROAD_POPUP_FIELDS__", json.dumps(popup_fields))
             .replace("__ROAD_TOOLTIP__", json.dumps(road_tooltip))
+            .replace("__HOVER_DELAY_MS__", json.dumps(int(hover_delay_ms)))
             .replace("__STREET_VIEW__", "true" if street_view else "false")
             .replace("__SV_WINDOW__", "true" if street_view == "window" else "false")
             .replace("__SV_WINDOW_KEY__", json.dumps(street_view_key or ""))

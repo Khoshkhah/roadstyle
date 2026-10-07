@@ -1442,6 +1442,8 @@ function rsSelect(id){
 }
 window.rsSelect = rsSelect;
 const _ttip = __ROAD_TOOLTIP__, _ttipOnly = Array.isArray(_ttip) ? _ttip : null;  // false | true | [fields]
+const _TIP_DELAY = __HOVER_DELAY_MS__;   // ms the mouse rests on a road before its tooltip shows (a passing mouse shows none); the highlight follows at once
+let _tipT = 0, _cur = null;               // _cur: the road under the mouse now
 const _tip = _ttip ? new maplibregl.Popup(
   {closeButton:false, closeOnClick:false, maxWidth:"260px", offset:10, className:"rs-tip"}) : null;
 function hoverFrame(){ _raf=0; if(!_pt) return;
@@ -1449,13 +1451,17 @@ function hoverFrame(){ _raf=0; if(!_pt) return;
   const ovHit = ho && !ho.under && !ho.base;   // an interactive overlay under the cursor wins over the road, as for a click; an item attached to a road is its road
   const f = ovHit ? null : pick(_pt); map.getCanvas().style.cursor = (f || ovHit) ? "pointer" : "";
   const h = hitOf(f);
-  if((h && h.key) !== (_hov && _hov.key)){
-    setS(_hov,{hover:false}); _hov=h; setS(_hov,{hover:true}); }
-  if(_tip){ if(f){ _tip.setLngLat(map.unproject(_pt)).setHTML(_rfields(_pickProps(f), _ttipOnly));
-      if(!_tip.isOpen()) _tip.addTo(map); } else if(_tip.isOpen()) _tip.remove(); }
+  if(!(h && _cur && h.key === _cur.key)){                                                  // another road, or none: the last one off at once
+    setS(_hov,{hover:false}); _hov=null; if(_tip && _tip.isOpen()) _tip.remove(); _cur = h;
+    if(h){ _hov=h; setS(_hov,{hover:true}); } }
+  if(_tip && _tip.isOpen()){ _tip.setLngLat(map.unproject(_pt)); return; }                 // shown: it follows the mouse along the road
+  clearTimeout(_tipT); if(!h) return;
+  const p = _pt;
+  _tipT = setTimeout(()=>{ if(_pt !== p) return;                                          // the mouse rested on it
+    if(_tip) _tip.setLngLat(map.unproject(p)).setHTML(_rfields(_pickProps(f), _ttipOnly)).addTo(map); }, _TIP_DELAY);
 }
 map.on("mousemove", e=>{ _pt=e.point; if(!_raf) _raf=requestAnimationFrame(hoverFrame); });
-map.on("mouseout", ()=>{ _pt=null; if(_raf){cancelAnimationFrame(_raf);_raf=0;} setS(_hov,{hover:false}); _hov=null; if(_tip) _tip.remove(); });
+map.on("mouseout", ()=>{ _pt=null; if(_raf){cancelAnimationFrame(_raf);_raf=0;} setS(_hov,{hover:false}); _hov=null; _cur=null; clearTimeout(_tipT); if(_tip) _tip.remove(); });
 let _sel=null;
 map.on("click", e=>{
   // visual stacking decides the click: an "over" overlay (POIs, in front of the roads) wins;
