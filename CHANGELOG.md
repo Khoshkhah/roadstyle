@@ -12,8 +12,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `scripts/edit_levels.py`. The area folder and its files are as before.
 - **Lanes pair only within one class:** two edges on one line in opposite directions are a two-way street's two lanes only when they
   are the same class (names, arrows and end caps too): a footway lying on a street the other way round left the street one narrow, shifted lane.
-- **Fast id filters:** `rsFilter`, `rsColor` and the editor's mode boxes look ids up (a MapLibre `match`) instead of scanning a list for
-  every feature in every layer; a filter of thousands of ids froze the page.
+- **Fast filters:** `rsFilter`, `rsColor`, the class / bridge / tunnel switches and the editor's mode boxes look ids up (a MapLibre `match`)
+  and set the filters without MapLibre's grammar check (~6 ms a layer): a switch on a page of ~500 layers froze it for seconds.
 - The level editor shows only the roads of the modes you tick (driving, walking, cycling, private), when the roads have `modes`; display only.
 - The level step keeps a `modes` column (who may use a road, e.g. `driving + walking`) and the level editor shows it in the road's card.
 - **Roads on the same line join only if they are the same kind** (`highway`, `tunnel`, `bridge`, `layer`): a footway lying exactly on a tunnel's
