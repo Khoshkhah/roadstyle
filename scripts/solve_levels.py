@@ -106,7 +106,8 @@ def write(solved, folder, ends_table):
     edge_levels(solved, ends_table).to_csv(Path(folder) / "levels.csv", index=False)
     info = {**solved.attrs["levels_info"], "given_up": [list(p) for p in solved.attrs["levels_given_up"]],
             "given_up_parts": [list(p) for p in solved.attrs.get("levels_given_up_parts", [])],
-            "near": [list(p) for p in solved.attrs.get("levels_near", [])]}
+            "near": [list(p) for p in solved.attrs.get("levels_near", [])],
+            "orders_not_kept": [list(p) for p in solved.attrs.get("levels_orders_not_kept", [])]}
     (Path(folder) / "levels_info.json").write_text(json.dumps(info, default=str))
 
 

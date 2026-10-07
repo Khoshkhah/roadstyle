@@ -147,6 +147,9 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     <section><h2>Near: warnings <span style="text-transform:none;letter-spacing:0;font-weight:500">not crossing, kept last</span></h2>
       <div class="desc" style="margin-top:0">Parts of A that only come near B (they do not cross it), drawn under B's fill: the solver keeps these last, after
         every crossing and order wish. Worth a look only where the two roads overlap on the map.</div><div id="lv-near"></div></section>
+    <section><h2>Order wishes not kept <span style="text-transform:none;letter-spacing:0;font-weight:500">a stack or another wish won</span></h2>
+      <div class="desc" style="margin-top:0">"A after B" wishes (found or yours) the solver let go: A's fill is not after B's. Two wishes that disagree, or a
+        wish against a stack, end up here.</div><div id="lv-wishes"></div></section>
   </div>
   <div id="lv-toast"></div>
 </aside>
@@ -457,6 +460,12 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     };
     list($("lv-given"), j.rows, "bad", "none: every crossing is kept");
     list($("lv-near"), j.near, "warn", "none");
+    const wb = $("lv-wishes");
+    if(!j.wishes.length){ wb.className = ""; wb.innerHTML = `<div class="empty" style="padding:8px">none: every wish is kept</div>`; }
+    else { wb.className = "rows";
+      wb.innerHTML = j.wishes.map(w => `<div class="row" title="Show on the map"><span class="what"><div class="txt">${esc(name(w.a))} <small>${esc(ref(w.a))}</small>
+        after ${esc(name(w.b))} <small>${esc(ref(w.b))}</small></div><div class="gu-parts">fill <b>${w.fa}</b> &nbsp;·&nbsp; wished over fill <b>${w.fb}</b></div></span></div>`).join("");
+      wb.querySelectorAll(".row").forEach((el, n) => el.onclick = () => { tab("edit"); setPair(j.wishes[n].a, j.wishes[n].b, true); }); }
   }
   async function lists(){
     const j = await api("/api/edits"); Object.assign(facts, j.roads);

@@ -77,7 +77,8 @@ class Area:
                 s, m, e, f = t.loc[str(r.reversed[0]), cols].tolist()
                 v = [e, m, s, f]
             solved.iloc[i, [solved.columns.get_loc(c) for c in cols]] = v
-        solved.attrs["levels_info"] = {k: v for k, v in json.loads(info.read_text()).items() if k not in ("given_up", "given_up_parts", "near")}
+        solved.attrs["levels_info"] = {k: v for k, v in json.loads(info.read_text()).items() if k not in ("given_up", "given_up_parts", "near", "orders_not_kept")}
+        solved.attrs["levels_orders_not_kept"] = [tuple(p) for p in json.loads(info.read_text()).get("orders_not_kept", [])]
         solved.attrs["levels_near"] = [tuple(p) for p in json.loads(info.read_text()).get("near", [])]
         solved.attrs["levels_given_up_parts"] = [tuple(p) for p in json.loads(info.read_text()).get("given_up_parts", [])]
         solved.attrs["levels_given_up"] = [tuple(p) for p in json.loads(info.read_text()).get("given_up", [])]
@@ -103,6 +104,7 @@ class Area:
         self.stats = {**solved.attrs["levels_info"], "given_up": [list(p) for p in solved.attrs["levels_given_up"]], "area": self.dir.name}
         self.broken = solved.attrs.get("levels_given_up_parts", [])
         self.near = solved.attrs.get("levels_near", [])
+        self.wishes = solved.attrs.get("levels_orders_not_kept", [])
         for r in solved.itertuples():
             a, d, own_h, own_c = auto.loc[r.road], drawn.loc[r.road], self.heads.get(r.road, ("", "")), self.caps.get(r.road, ("", ""))
             self.facts[r.road]["heads"] = [float(d.start_m), float(d.end_m)]
@@ -202,7 +204,8 @@ class Area:
             return {"a": u, "b": l, "levels": lv, "b_fill": under, "fill_under": lv[3] <= under, "parts": [h for a, b, h in broken if (a, b) == (u, l)]}
         rows = [row(u, l, self.broken) for u, l in self.stats["given_up"]]
         near = [row(u, l, self.near) for u, l in dict.fromkeys((a, b) for a, b, _ in self.near)]      # warnings: parts that only come near
-        return {"rows": rows, "near": near, "roads": {x: self.facts[x] for r in rows + near for x in (r["a"], r["b"])}}
+        wishes = [{"a": x, "b": y, "fa": self.facts[x]["levels"][3], "fb": self.facts[y]["levels"][3]} for x, y in self.wishes]   # x's fill was to be after y's
+        return {"rows": rows, "near": near, "wishes": wishes, "roads": {k: self.facts[k] for r in rows + near + wishes for k in (r["a"], r["b"])}}
 
     def find(self, q, limit=20):
         """The roads for a search: an exact edge id (either direction of a road), else the edge_refs that hold ``q`` (an exact one first)."""

@@ -305,6 +305,7 @@ def _solve_intervals(metres, meets, stacks, orders, limit, max_level, margin, mi
     broke = [i for i in range(nP) if slack[i] >= margin * (1 - 1e-6)]                 # a part of the upper casing is not after the lower fill
     gu = sorted({pair_list[stack_rows[i][0]] for i in broke if not row_near[i]})       # given up: a real crossing broke; a near rule is a warning
     violated = int((slack[nP:] >= margin * (1 - 1e-6)).sum())
+    info["orders_not_kept"] = [O[i] for i in range(nO) if slack[nP + i] >= margin * (1 - 1e-6)]    # (higher, lower): the wishes given way
     name = {c: (r, h) for r in range(n) for h, c in part[r].items()}
     word = {"s": "start", "m": "main", "e": "end"}
     info["given_up_parts"] = sorted({(*pair_list[stack_rows[i][0]], word[name[stack_rows[i][1]][1]]) for i in broke if not row_near[i]})
@@ -555,7 +556,7 @@ def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=
                     else:
                         raise ValueError(f"edits: no {row['relation']} pair {row['a']} {row['b']} {k[3] if k[0] == 'stack' else ''} to switch off".rstrip())
             else:
-                rel[key(row)] = row
+                rel[key(row)] = {**row, "own": True}           # yours: a stack of yours is never "near" (a warning)
     idx = {r: i for i, r in enumerate(roads["road"])}
     meets = [(idx[r["a"]], r["a_end"], idx[r["b"]], r["b_end"]) for r in rel.values() if r["relation"] == "meet"]
     stacks = [(idx[r["a"]], idx[r["b"]]) for r in rel.values() if r["relation"] == "stack" and not r["a_end"]]
@@ -568,7 +569,8 @@ def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=
         geo = list(_metres(roads.geometry))
         ids = list(roads["road"])
         empty = [i for i, r in enumerate(ids) if parts[r][1] is None]
-        near = [(u, l, h) for u, l in stacks for h, p in zip("sme", parts[ids[u]], strict=True)
+        own = {(idx[r["a"]], idx[r["b"]]) for r in rel.values() if r.get("own") and r["relation"] == "stack"}
+        near = [(u, l, h) for u, l in stacks if (u, l) not in own for h, p in zip("sme", parts[ids[u]], strict=True)
                 if p is not None and not _crosses(p, geo[u], geo[l])]
     iv, given, info = _solve_intervals(list(_metres(roads.geometry)), meets, stacks, orders, time_limit, max_level, margin, min_positions,
                                        max_positions, forced, off, empty, near)
@@ -583,6 +585,7 @@ def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=
     out.attrs["levels_given_up"] = [(roads["road"].iat[u], roads["road"].iat[l]) for u, l in given]
     out.attrs["levels_given_up_parts"] = [(roads["road"].iat[u], roads["road"].iat[l], h) for u, l, h in info.pop("given_up_parts", [])]
     out.attrs["levels_near"] = [(roads["road"].iat[u], roads["road"].iat[l], h) for u, l, h in info.pop("near_parts", [])]
+    out.attrs["levels_orders_not_kept"] = [(roads["road"].iat[x], roads["road"].iat[y]) for x, y in info.pop("orders_not_kept", [])]
     out.attrs["levels_info"] = info
     return out
 
@@ -630,6 +633,7 @@ def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tu
         g.attrs["levels_given_up"] = [(int(u), int(l)) for u, l in given]
         g.attrs["levels_given_up_parts"] = [(int(u), int(l), h) for u, l, h in out.attrs["levels_given_up_parts"]]
         g.attrs["levels_near"] = [(int(u), int(l), h) for u, l, h in out.attrs["levels_near"]]
+        g.attrs["levels_orders_not_kept"] = [(int(x), int(y)) for x, y in out.attrs["levels_orders_not_kept"]]
         g.attrs["levels_info"] = out.attrs["levels_info"]
         if given:
             warnings.warn(f"compute_levels: {len(given)} stack pair(s) could not be satisfied; see result.attrs['levels_given_up']", stacklevel=2)

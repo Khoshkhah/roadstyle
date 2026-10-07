@@ -2048,6 +2048,7 @@ def test_near_rules_give_way_to_order_wishes_and_real_crossings_do_not():
     assert given == [] and info["order_violations"] == 0 and len(info["near_parts"]) == 3     # the near rule gives way: a warning
     _, given, info = _solve_intervals(*args)
     assert given == [] and info["order_violations"] == 1                                          # a real crossing is kept, the wish is not
+    assert info["orders_not_kept"] == [(1, 0)]                                                     # which wish: road 1's fill after road 0's
 
 
 def test_auto_ends_fit_heads_and_caps_to_the_joins():
@@ -2106,3 +2107,22 @@ def test_default_caps_are_flat_where_only_two_roads_meet():
     assert d.loc["2", "cap_end"] == "round" and d.loc["3", "cap_start"] == "round"                  # three roads
     assert d.loc["1", "cap_start"] == "round" and d.loc["5", "cap_end"] == "round"                  # a sharp bend; a dead end
     assert (d["start_m"] == 5).all() and (d["end_m"] == 5).all()
+
+
+def test_a_stack_of_yours_is_never_only_near_and_wishes_let_go_are_named():
+    """solve_levels (Kaveh 2026-10-06): a stack edit counts as a real crossing even where the two roads only come near (the found ones are
+    "near" there, kept last), so it wins over an order wish; the wishes the solver let go are in attrs["levels_orders_not_kept"]."""
+    pytest.importorskip("scipy")
+    import pandas as pd
+
+    import roadstyle as rs
+    P = lambda x, y: (674000 + x, 6580000 + y)                                         # noqa: E731
+    g = gpd.GeoDataFrame({"highway": ["residential"] * 2, "edge_id": [1, 2]},
+                         geometry=[LineString([P(0, 0), P(60, 0)]), LineString([P(0, 5), P(60, 5)])], crs=3006)   # side by side, 5 m apart
+    roads, pairs = rs.level_input(g)
+    row = lambda **k: {"a_end": "", "b_end": "", "enabled": "true", **k}               # noqa: E731
+    edits = pd.DataFrame([row(relation="stack", a="1", b="2"), row(relation="order", a="2", b="1")])   # 1 over 2, but wish 2's fill after 1's
+    out = rs.solve_levels(roads, pairs, edits=edits, parts=rs.casing_parts(roads))
+    assert out.attrs["levels_near"] == [] and out.attrs["levels_given_up"] == []
+    assert out.set_index("road").loc["1", "fill_level"] > out.set_index("road").loc["2", "fill_level"]   # your stack won
+    assert out.attrs["levels_orders_not_kept"] == [("2", "1")]                                          # and the wish it beat is named
