@@ -416,11 +416,12 @@
     "bridge_shadow_offset": [2, 2],
     "bridge_shadow_trim_m": 3.0,
     "twin_end_caps": true,
-    "tunnel_casing_dash": [2, 2],
-    "tunnel_gap_shade": 0.25,
-    "tunnel_dash_shade": 0.5,
-    "tunnel_fill_dash": [1.2, 1.2],
+    "tunnel_casing_dash": [1, 1],
+    "tunnel_fill_dash": [],
     "tunnel_fill_dash_color": "rgba(255,255,255,0.55)",
+    "tunnel_strength": 35,
+    "tunnel_palette": "Graphite + silver",
+    "tunnel_palettes": {"One colour": null, "Slate + ice": ["#64748b", "#cbd5e1"], "Blue + cyan": ["#315b7d", "#a9d7e8"], "Warm + sand": ["#806d64", "#e7c9a7"], "Graphite + silver": ["#4b5563", "#b8bec7"], "Indigo + lavender": ["#4c5c96", "#b9c2ea"], "Teal + mint": ["#2f6f73", "#9fd3cf"]},
     "annotations": {
       "slot_m": 100
     },

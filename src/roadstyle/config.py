@@ -49,11 +49,16 @@ class StyleConfig:
     bridge_shadow_offset: list = field(default_factory=lambda: [2, 2])   # px right, down (line-translate): lit from the top left
     bridge_shadow_trim_m: float = 3.0      # metres of no shadow where a bridge comes down to the road (Kaveh 2026-10-06: the head length cut short bridges too much)
     twin_end_caps: bool = True         # one road-wide round end under a two-way road's two lanes
-    tunnel_casing_dash: list = field(default_factory=lambda: [2, 2])   # the tunnel casing dash (osm-carto)
-    tunnel_gap_shade: float = 0.25       # tunnel casing between the dashes: this much darker than a light casing
-    tunnel_dash_shade: float = 0.5       # tunnel dashes: this much darker than the casing
-    tunnel_fill_dash: list = field(default_factory=lambda: [1.2, 1.2])   # light dashes on the tunnel fill ([] = none)
+    tunnel_casing_dash: list = field(default_factory=lambda: [1, 1])   # the tunnel casing: dash and gap, in line widths (1:1, Kaveh 2026-10-06)
+    tunnel_fill_dash: list = field(default_factory=list)   # light dashes on the tunnel fill, e.g. [1.2, 1.2]; none by default (v2's look, Kaveh 2026-10-06)
     tunnel_fill_dash_color: str = "rgba(255,255,255,0.55)"               # their colour, over any road colour
+    tunnel_strength: float = 35          # the tunnel look (docs/design/tunnel_look.md), v2's slider: 0 = normal colours, 100 = the full tunnel colours
+    tunnel_palette: str = "Graphite + silver"   # the casing of a tunnel, a name in tunnel_palettes (two colours by default, Kaveh 2026-10-06)
+    tunnel_palettes: dict = field(default_factory=lambda: {"One colour": None, "Slate + ice": ["#64748b", "#cbd5e1"],
+                                                           "Blue + cyan": ["#315b7d", "#a9d7e8"], "Warm + sand": ["#806d64", "#e7c9a7"],
+                                                           "Graphite + silver": ["#4b5563", "#b8bec7"], "Indigo + lavender": ["#4c5c96", "#b9c2ea"],
+                                                           "Teal + mint": ["#2f6f73", "#9fd3cf"]})
+    # name -> [dash, gap] (v2's two-colour pattern), or None: slate dashes with empty gaps
     minor_no_casing: frozenset[str] = field(default_factory=lambda: _MINOR_NO_CASING)
     #: class -> zoom below which it is hidden. Consulted only when the caller opts in.
     minzoom: dict = field(default_factory=dict)

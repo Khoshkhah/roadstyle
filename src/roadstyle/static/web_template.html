@@ -26,7 +26,7 @@
    the native zoom controls (top-right) and the scale bar (bottom-left). Panel mode docks them. */
 .rs-tl{position:absolute;top:10px;left:10px;z-index:2;display:flex;flex-direction:column;
   gap:8px;align-items:flex-start;max-height:calc(100% - 20px)}
-.rs-tl .co-ctrl,.rs-tl .flt-ctrl{position:static;max-height:none}
+.rs-tl .co-ctrl,.rs-tl .tn-ctrl,.rs-tl .flt-ctrl{position:static;max-height:none}
 .rs-tl .flt-ctrl{overflow:auto;min-height:0}   /* long class lists scroll inside the stack */
 .flt-ctrl{position:absolute;top:10px;left:10px;z-index:2;background:#fff;border-radius:8px;
 box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);
@@ -69,7 +69,7 @@ body.rs-panel #map{right:320px}
 .rs-side-hd2{border-top:1px solid #ececec}
 /* the map's own controls, docked: static block cards instead of floating boxes */
 .rs-side-ctl{flex:0 1 auto;min-height:0;max-height:55%;overflow:auto}
-.rs-side .co-ctrl,.rs-side .flt-ctrl,.rs-side .co-lg{position:static;box-shadow:none;border-radius:0;
+.rs-side .co-ctrl,.rs-side .tn-ctrl,.rs-side .flt-ctrl,.rs-side .co-lg{position:static;box-shadow:none;border-radius:0;
   max-height:none;background:#fff;border-bottom:1px solid #f0f0f0;padding:8px 14px}
 .rs-side .flt-ctrl .flt-hd{padding:0 0 4px}
 .rs-side .flt-ctrl .flt-body{padding:0}
@@ -84,10 +84,12 @@ body.rs-side-hidden{--rs-side:0px}
   border-bottom:1px solid #f3f3f3;font-variant-numeric:tabular-nums}
 .rs-kv span{color:#8a8a8a;flex:0 0 auto}
 .rs-kv b{font-weight:600;text-align:right;word-break:break-all;min-width:0}
-.co-ctrl{position:absolute;top:10px;right:10px;z-index:2;background:#fff;border-radius:8px;
+.co-ctrl,.tn-ctrl{position:absolute;top:10px;right:10px;z-index:2;background:#fff;border-radius:8px;
 box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);padding:6px 10px;
 font:11px system-ui,sans-serif;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#767c88}
-.co-ctrl select{font:13px system-ui,sans-serif;font-weight:600;text-transform:none;letter-spacing:0;
+.tn-ctrl input{vertical-align:middle;width:120px;margin:0 6px 0 0}
+.tn-row{display:flex;align-items:center;gap:6px;margin:3px 0}
+.co-ctrl select,.tn-ctrl select{font:13px system-ui,sans-serif;font-weight:600;text-transform:none;letter-spacing:0;
   border:0;background:transparent;cursor:pointer;outline:none;color:#334155;margin-left:3px}
 .co-lg{position:absolute;left:10px;bottom:24px;z-index:2;background:rgba(255,255,255,.96);
 border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);
@@ -661,6 +663,11 @@ if(FILTER.on){
 // option's fill is baked per edge (__rs_fill / __rs_fill__1 …); setPaintProperty repoints the
 // road-fill layers' line-color at the chosen prop. window.rsSetColorField drives it from your UI.
 const COLOR_OPTIONS = __COLOR_OPTIONS__;
+// the tunnel look, v2's slider (docs/design/tunnel_look.md): TUNNEL.strength 0-100 moves a tunnel's colours toward TUNNEL.to;
+// TUNNEL.layers = {layer id: [[paint property, colour without the look, key of TUNNEL.to], ...]}, TUNNEL.dash = the casing dash layers
+const TUNNEL = __TUNNEL__;
+function _tunMix(e, toward){ return ["case",["to-boolean",["get","__rs_tunnel"]],["interpolate",["linear"],TUNNEL.strength,0,e,100,toward],e]; }
+const _tunOn = Object.keys(TUNNEL.layers).length > 0;
 const RS_FILL_LAYERS = __RS_FILL_LAYERS__;
 const RS_END_LAYERS = __RS_END_LAYERS__;   // twin_ends.md
 const RS_END_CASING_LAYERS = __RS_END_CASING_LAYERS__;
@@ -690,10 +697,11 @@ function _fillExpr(idE){
   return e;
 }
 function _applyFill(){
-  const e=_fillExpr();
+  const look=x=>_tunOn ? _tunMix(x, TUNNEL.to.fill) : x;
+  const e=look(_fillExpr());
   // the fill halves of an edge with two different ends (square_ends.md) have no feature id: they name their edge in __rs_road
   // (without it a recolouring could not evaluate on them and MapLibre drew them black)
-  const eh=_fillExpr(["get","__rs_road"]);
+  const eh=look(_fillExpr(["get","__rs_road"]));
   RS_FILL_LAYERS.forEach(id=>{ const l=map.getLayer(id); if(l) map.setPaintProperty(id,"line-color",l.source==="halves"?eh:e); });
   // the dashed layers (<fill layer>-dash0, -dash1 ...: one per dash pattern, for footway, path, steps ...) draw the
   // dashed classes' edges: they take the active colouring too, or such a road keeps its class colour under any "colour by"
@@ -908,6 +916,62 @@ if(OVERLAYS.length){
     document.body.appendChild(box);
   }
 }
+// window.rsSetTunnelStyle({strength, palette, ratio}) moves the tunnel look (strength 0-100; palette a name of RS_TUNNEL_PALETTES;
+// ratio [dash, gap] in line widths); the Tunnels box is UI over it. The casing follows the slider like everything on a tunnel (Kaveh): its
+// two colours, each moved toward slate by the strength, are two layers with MapLibre's own dash (crisp, and only paint changes: no image,
+// no tile reload): the position's casing layer draws the gap colour (transparent for "One colour"), the dash layer the dashes on top.
+function _tunHex(a, b, t){                       // a -> b by t (0-1), "#rrggbb"
+  const p=c=>c.slice(1).match(/.{2}/g).map(x=>parseInt(x,16)), A=p(a), B=p(b);
+  return "#"+A.map((x,i)=>Math.round(x*(1-t)+B[i]*t).toString(16).padStart(2,"0")).join("");
+}
+function rsSetTunnelStyle(o){
+  if(!_tunOn) return;
+  o = o || {};
+  if(o.strength != null) TUNNEL.strength = Math.max(0, Math.min(100, +o.strength));
+  if(o.palette != null && o.palette in TUNNEL.palettes) TUNNEL.palette = o.palette;
+  if(o.ratio != null) TUNNEL.ratio = o.ratio.map(Number);
+  for(const id in TUNNEL.layers) if(map.getLayer(id))
+    TUNNEL.layers[id].forEach(([k, base, to])=> map.setPaintProperty(id, k, _tunMix(base, TUNNEL.to[to])));
+  const pair = TUNNEL.palettes[TUNNEL.palette], k = TUNNEL.strength/100, tun = ["to-boolean",["get","__rs_tunnel"]];
+  const gap = pair ? _tunHex(pair[1], TUNNEL.to.fill, k) : "rgba(0,0,0,0)";          // "One colour": empty gaps
+  for(const id in TUNNEL.casing) if(map.getLayer(id)) map.setPaintProperty(id, "line-color", ["case", tun, gap, TUNNEL.casing[id]]);
+  TUNNEL.dash.forEach(id=>{ if(!map.getLayer(id)) return;
+    map.setPaintProperty(id, "line-color", _tunHex(pair ? pair[0] : TUNNEL.to.dash, TUNNEL.to.fill, k));
+    map.setPaintProperty(id, "line-dasharray", TUNNEL.ratio); });
+  _applyFill();                                   // the roads' fills: with the active colour-by
+  const r=document.getElementById("tn-str"), v=document.getElementById("tn-val"), s=document.getElementById("tn-pal"),
+        q=document.getElementById("tn-ratio"), pr=document.getElementById("tn-pre");
+  if(r) r.value = _tnStep(TUNNEL.strength); if(v) v.textContent = Math.round(TUNNEL.strength)+"%"; if(s) s.value = TUNNEL.palette;
+  if(q) q.value = TUNNEL.ratio.join(":"); if(pr) pr.value = String(TUNNEL.strength);
+  document.dispatchEvent(new CustomEvent("rs:tunnelchange",{detail:{strength:TUNNEL.strength, palette:TUNNEL.palette, ratio:TUNNEL.ratio}}));
+}
+window.rsSetTunnelStyle = rsSetTunnelStyle;
+window.RS_TUNNEL_PALETTES = TUNNEL.palettes;
+if(_tunOn){ if(map.isStyleLoaded && map.isStyleLoaded()) rsSetTunnelStyle(); else map.on("load", ()=>rsSetTunnelStyle()); }
+const _TN_STEPS = [[0,"Normal colors"],[20,"Subtle"],[35,"Balanced"],[70,"Strong"],[100,"Full"]];
+const _tnStep = v => _TN_STEPS.reduce((b, [x], i)=> Math.abs(x - v) < Math.abs(_TN_STEPS[b][0] - v) ? i : b, 0);   // the nearest step
+if(TUNNEL.control){
+  const w=document.createElement("div"); w.className="tn-ctrl";
+  const sel=(id, opts, val, on)=>{ const e=document.createElement("select"); e.id=id;
+    opts.forEach(([v, t])=>{ const op=document.createElement("option"); op.value=v; op.textContent=t; e.appendChild(op); });
+    e.value=val; e.onchange=()=>on(e.value); return e; };
+  const row=()=>{ const d=document.createElement("div"); d.className="tn-row"; w.appendChild(d); return d; };
+  const r1=row(); r1.appendChild(document.createTextNode("Tunnels"));
+  r1.appendChild(sel("tn-pre", _TN_STEPS.map(([v, t])=>[String(v), t]), String(TUNNEL.strength),
+                     v=>rsSetTunnelStyle({strength:+v})));
+  const r2=row();
+  // five steps, the presets (Kaveh, 2026-10-06: the smooth slider did not work well); its value is the step's index
+  const r=document.createElement("input"); r.type="range"; r.id="tn-str"; r.min=0; r.max=_TN_STEPS.length-1; r.step=1; r.value=_tnStep(TUNNEL.strength);
+  r.title="Tunnel style: Normal colors keeps the normal colours, Full applies the tunnel colours";
+  r.oninput=()=>rsSetTunnelStyle({strength: _TN_STEPS[+r.value][0]});
+  const val=document.createElement("span"); val.id="tn-val"; val.textContent=Math.round(TUNNEL.strength)+"%";
+  r2.appendChild(r); r2.appendChild(val);
+  const r3=row();
+  r3.appendChild(sel("tn-pal", Object.keys(TUNNEL.palettes).map(n=>[n, n]), TUNNEL.palette, v=>rsSetTunnelStyle({palette:v})));
+  r3.appendChild(sel("tn-ratio", [["1:1","1:1"],["2:2","2:2"],["3:3","3:3"],["4:4","4:4"],["2:1","2:1"],["3:2","3:2"],["4:3","4:3"],["1:2","1:2"]], TUNNEL.ratio.join(":"),
+                     v=>rsSetTunnelStyle({ratio:v.split(":")})));
+  _tlHost().appendChild(w);
+}
 // oneway direction-arrow icon (openstreetmap-carto)
 function addArrow(){
   if(map.hasImage("oneway")) return;
@@ -916,8 +980,10 @@ function addArrow(){
   const svg='<svg xmlns="http://www.w3.org/2000/svg" width="96" height="40" viewBox="0 0 12 5">'
     +'<path d="M 0,2 7,2 7,0 12,2.5 7,5 7,3 0,3 z" fill="__ARROW_COLOR__"/></svg>';
   const img=new Image(96,40);
-  img.onload=()=>{ if(!map.hasImage("oneway")) map.addImage("oneway",img,{pixelRatio:4}); };
-  img.src="data:image/svg+xml;base64,"+btoa(svg);
+  // a map with tunnels: an SDF icon (white), coloured by the arrow layers' icon-color, so the tunnel slider can fade a tunnel's arrows
+  // (one symbol layer cannot mix SDF and plain icons)
+  img.onload=()=>{ if(!map.hasImage("oneway")) map.addImage("oneway",img,{pixelRatio:4, sdf:_tunOn}); };
+  img.src="data:image/svg+xml;base64,"+btoa(_tunOn ? svg.replace(/fill="[^"]*"/, 'fill="#ffffff"') : svg);
 }
 map.on("load", addArrow);
 // Self-diagnosis: a map with zero road features is a broken page, not an empty area — say WHY

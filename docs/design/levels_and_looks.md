@@ -23,7 +23,7 @@ differs", and, again, "it shouldn't make a difference".
 2. **Look = data and sublayers on top of the band.** A tunnel or bridge changes how a road is *painted*, never where:
    - **tunnel** (in the low band): its casing is the two-tone one (`__rs_casing` is baked as the solid tone), a dashed
      overlay layer on the casing (`roads-low-casing-dash`), light dashes on the fill (`roads-low-fill-pat`) and a data-driven
-     `line-opacity` on the fill;
+     `line-opacity` on the fill (since [the tunnel look](tunnel_look.md): an opaque fill faded toward the background);
    - **bridge** (in the high band): the black, heavier, butt-capped deck casing and a fill layer of its own, drawn after
      the plain high roads (`roads-bridge-casing` / `-fill`), and the 3D deck ribbons;
    - **dashed classes** (footway, path, steps ...): a sublayer per dash pattern in whichever band the road is.

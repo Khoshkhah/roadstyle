@@ -148,6 +148,7 @@ Each `color_options` value takes `color_by`, `colors`, `cmap`, `vmin`, `vmax`, `
 |---|---|---|---|
 | `tiles` | `False` | web | pack the roads, the casing pieces and the end caps as embedded PMTiles (for ~10⁵ edges); needs `roadstyle[tiles]` |
 | `compress` | `True` | web | gzip the inlined data; `False` = plain JSON |
+| `tunnel_control` | `True` | web | on a map with tunnels, a *Tunnels* box: the tunnel slider in five steps (`tunnel_strength`: 0, 20, 35, 70, 100) with their names, the casing palette and the dash ratio ([design](../design/tunnel_look.md)) |
 | any other keyword | | folium | passed to `folium.Map(...)` (e.g. `location`, `zoom_start`) |
 
 Returns a `WebMap` (web, `.save()`), a `folium.Map` (`.save()`) or a `lonboard.Map` (`.to_html()`).
@@ -282,8 +283,10 @@ The `config` block of the settings. Change it in a [settings override](settings.
 | `casing_extra` | `2.0` | reserved (palettes set casing widths) |
 | `link_scale` | `0.7` | `*_link` width relative to the parent |
 | `tunnel_opacity_scale` | `0.45` | tunnel fade |
-| `tunnel_casing_dash` / `tunnel_gap_shade` / `tunnel_dash_shade` | `[2, 2]` / `0.25` / `0.5` | the tunnel casing: its dash, and how much darker than the road's casing the solid casing and the dashes are (a dark casing, as in `mono`, keeps its tone under the dashes) |
-| `tunnel_fill_dash` / `tunnel_fill_dash_color` | `[1.2, 1.2]` / `rgba(255,255,255,0.55)` | light dashes along a tunnel's fill, over any road colour (`[]` = none); a dashed class (steps, a dashed path) keeps only its own dashes |
+| `tunnel_casing_dash` | `[1, 1]` | the tunnel casing's dash and gap, in line widths; a tunnel's casing is its dash layer alone |
+| `tunnel_strength` | `35` | the tunnel look, v2's slider (0-100): everything on a tunnel (fill, names, arrows, attached items) moves toward slate `#64748b`. Opaque, no see-through |
+| `tunnel_palette` / `tunnel_palettes` | `Graphite + silver` / seven | the tunnel casing: a pattern of two colours as they are (the default `Graphite + silver`), or `One colour` (slate dashes, empty gaps); `name: [dash, gap]` (`Slate + ice`, `Blue + cyan`, `Warm + sand`, `Graphite + silver`, `Indigo + lavender`, `Teal + mint`); an unknown name is an error |
+| `tunnel_fill_dash` / `tunnel_fill_dash_color` | `[]` (none; e.g. `[1.2, 1.2]`) / `rgba(255,255,255,0.55)` | light dashes along a tunnel's fill, over any road colour (`[]` = none); a dashed class (steps, a dashed path) keeps only its own dashes |
 | `twin_end_caps` | `true` | a two-way road ends like one road: one road-wide round cap under its two lanes at each end, where both lanes have the same colour (`false` = each lane's own round end) |
 | `bridge_casing_m` / `bridge_casing_px` | `0.25` / `1.0` | with metre widths (`width_m_col`): a bridge's deck casing is at least this wide each side in metres, whatever `casing_m` is, and never thinner than this many pixels each side at any zoom (metres are sub-pixel zoomed out), so the bridge look shows on lines with no casing |
 | `bridge_casing_extra` / `bridge_casing_color` | `1.5` / `"#64748b"` (slate) | bridge casing, px wider / colour |

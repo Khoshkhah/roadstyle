@@ -774,30 +774,27 @@ def test_zoom_readout_is_on_by_default_and_can_be_turned_off():
     assert "if(false){ const zd=" in render_edges(_edges(), backend="web", zoom_readout=False).html
 
 
-def test_tunnel_casing_in_two_tones():
-    """A tunnel's casing is never missing: two dark shades of the road's own casing, a solid one
-    (the casing colour of the low band's casing layer, baked per edge) with darker dashes on top (a
-    sublayer), so connected tunnels look connected (empty dash gaps hid it) while the dash says "tunnel"."""
+def test_tunnel_casing_is_the_dash_layer_alone():
+    """docs/design/tunnel_look.md, as v2: a tunnel's casing is drawn by the dash sublayer only, slate dashes (#94a3b8, 1:1) with empty gaps;
+    the other casing layers leave the tunnel out (transparent), so the gaps are empty. A street's casing is unchanged."""
     g = gpd.GeoDataFrame({"highway": ["primary", "primary"], "tunnel": ["yes", None]},
                          geometry=[LineString([(18.0, 59.30), (18.01, 59.30)]),
                                    LineString([(18.01, 59.30), (18.02, 59.30)])], crs=4326)
-    style = _style(render_edges(g, backend="web").html)          # highsat: primary casing #bcbcbc
+    style = _style(render_edges(g, backend="web").html)
     lay = {l["id"]: l for l in style["layers"]}
     ids = list(lay)
     assert ids.index("roads-casing") < ids.index("roads-casing-dash") < ids.index("roads-fill")
-    assert "__rs_casing_dash" in json.dumps(lay["roads-casing-dash"]["paint"]["line-color"])
+    assert lay["roads-casing-dash"]["paint"]["line-color"] == "#94a3b8" and lay["roads-casing-dash"]["paint"]["line-dasharray"] == [1, 1]
+    from roadstyle.render_web import _plus_px
+
+    assert _plus_px(["interpolate", ["linear"], ["zoom"], 12, 1, 18, ["get", "w"]], 3) == ["interpolate", ["linear"], ["zoom"], 12, ["+", 1, 3], 18, ["+", ["get", "w"], 3]]
     assert "__rs_tunnel" in json.dumps(lay["roads-casing-dash"]["filter"])      # only the tunnel look
-    assert lay["roads-casing-dash"]["paint"]["line-dasharray"] == [2, 2]
     tun, street = (f["properties"] for f in style["sources"]["roads"]["data"]["features"])
-    assert tun["__rs_casing"] == "#8d8d8d"                       # the solid tone IS the low casing's colour
-    assert tun["__rs_casing_gap"] == "#8d8d8d" and tun["__rs_casing_dash"] == "#5e5e5e"  # 25 / 50 % darker
-    assert street["__rs_casing"] == "#bcbcbc" and "__rs_casing_dash" not in street
-    mono = _style(render_edges(g, backend="web", palette="mono").html)["sources"]["roads"]["data"]
-    tun = mono["features"][0]["properties"]                     # mono primary casing #4f4f4f
-    assert tun["__rs_casing"] == "#4f4f4f" and tun["__rs_casing_dash"] == "#282828"      # dark, darker
-
-
-
+    assert _eval(lay["roads-casing"]["paint"]["line-color"], tun) == "rgba(0,0,0,0)"
+    assert _eval(lay["roads-casing"]["paint"]["line-color"], street) == street["__rs_casing"]
+    for stop in (4, 6):                                       # the casing layer (the gap colour) is as wide as the dash layer for a tunnel only
+        dash_w, case_w = lay["roads-casing-dash"]["paint"]["line-width"][stop], lay["roads-casing"]["paint"]["line-width"][stop]
+        assert case_w == ["case", ["to-boolean", ["get", "__rs_tunnel"]], dash_w, dash_w[1]]      # dash: ["+", w, 3]
 
 
 def test_rscolor_raises_painted_roads_within_their_level():
@@ -990,10 +987,11 @@ def test_a_bridge_deck_casing_shows_with_metre_widths_and_no_casing():
 
 
 
-def test_tunnels_get_light_dashes_on_their_fill_unless_turned_off():
-    """Kaveh's pick among three samples ("light dash is ok"): over the tunnel's fill, translucent, butt-capped; not on
-    a dashed class; `tunnel_fill_dash: []` turns it off."""
-    st = _style(render_edges(_tunnel_world(True), backend="web").html)
+def test_tunnels_get_light_dashes_on_their_fill_only_when_asked():
+    """Light dashes on a tunnel's fill: off by default since v2's tunnel look (Kaveh 2026-10-06); `tunnel_fill_dash: [1.2, 1.2]` (his pick of
+    2026-09-30 among three samples) draws them over the fill, translucent, butt-capped, not on a dashed class."""
+    assert not any(l["id"].endswith("-pat") for l in _style(render_edges(_tunnel_world(True), backend="web").html)["layers"])
+    st = _style(render_edges(_tunnel_world(True), backend="web", settings={"config": {"tunnel_fill_dash": [1.2, 1.2]}}).html)
     lay = {l["id"]: l for l in st["layers"]}
     ids = [l["id"] for l in st["layers"]]
     pat = lay["roads-fill-lv1-pat"]                 # the tunnel's position: over the streets it joins, under the one crossing it (docs/design/level_input.md)
@@ -1001,8 +999,6 @@ def test_tunnels_get_light_dashes_on_their_fill_unless_turned_off():
     assert pat["paint"]["line-dasharray"] == [1.2, 1.2] and pat["layout"]["line-cap"] == "butt"
     assert pat["paint"]["line-color"].startswith("rgba(255,255,255")
     assert '"__rs_dash"' in json.dumps(pat["filter"]) and "__rs_tunnel" in json.dumps(pat["filter"])
-    off = _style(render_edges(_tunnel_world(True), backend="web", settings={"config": {"tunnel_fill_dash": []}}).html)
-    assert not any(l["id"].endswith("-pat") for l in off["layers"])
 
 
 def test_colour_by_recolours_the_dashed_layers_too():
@@ -1091,18 +1087,91 @@ def test_cap_col_gives_square_ends_to_the_edges_that_ask():
     assert "__rs_cap" not in json.dumps(plain["sources"]["roads"])
 
 
-def test_a_tunnel_fill_has_an_opaque_underlay_so_the_casing_does_not_show_through():
-    """The tunnel's fill is translucent (a faded colour); an underlay in the canvas colour sits under it in every position that
-    has a tunnel, so the casing and a street's round end under it do not show through (the tunnel keeps its look)."""
-    style = _style(render_edges(_tunnel_world(True), backend="web").html)
-    ids = [l["id"] for l in style["layers"]]
+def _tunnel_conf(html):
+    return json.loads(re.search(r"const TUNNEL = (\{.*?\});\n", html).group(1))
+
+
+def test_the_tunnel_look_is_v2s_slider():
+    """docs/design/tunnel_look.md: at tunnel_strength (35) everything on a tunnel moves toward the same slate: its fill, its street names,
+    its arrows (an SDF icon of their own) and every item attached to it (Kaveh: one fade, however an item was added); the page gets each
+    colour without the look and the dash layers. A map without tunnels has no look and no Tunnels box; an unknown palette
+    is an error."""
+    from roadstyle.render_web import _TUN_TO, _tun_mix
+    ov = Overlay(_edge_features([12, 11]), edge_col="edge_id", kind="circle", color="#ff0000")
+    html = render_edges(_edge_world().assign(name=["A", "T", "B", "C"]), backend="web", basemap="blank", overlays=[ov]).html
+    style, conf = _style(html), _tunnel_conf(html)
     lay = {l["id"]: l for l in style["layers"]}
-    assert ids.index("roads-casing-lv1-dash") < ids.index("roads-fill-lv1-under") < ids.index("roads-fill-lv1")     # the tunnel's position: 1
-    assert lay["roads-fill-lv1-under"]["paint"]["line-color"].startswith("#") and lay["roads-fill-lv1-under"]["layout"]["line-cap"] == "butt"
+    assert conf["strength"] == 35 and conf["palette"] == "Graphite + silver" and conf["control"] is True and conf["ratio"] == [1, 1]
+    assert conf["dash"] and all(i.startswith("roads-casing") and i.endswith("-dash") for i in conf["dash"])
+    for lid, entries in conf["layers"].items():
+        for k, base, to in entries:
+            assert lay[lid]["paint"][k] == _tun_mix(base, _TUN_TO[to], 35)
+    kinds = {(i.split("-lv")[0].rstrip("-"), k, to) for i, entries in conf["layers"].items() for k, _, to in entries}
+    assert {("roads-fill", "line-color", "fill"), ("roads-labels", "text-color", "fill"),
+            ("roads-arrows", "icon-color", "fill")} <= {(a.replace("-tunnel", "").replace("-bridge", ""), b, c) for a, b, c in kinds}
+    assert {to for entries in conf["layers"].values() for _, _, to in entries} == {"fill"}       # one target for everything
+    arrows = [l for l in style["layers"] if l["id"].startswith("roads-arrows")]
+    assert arrows and all(l["layout"]["icon-image"] == "oneway" and "icon-color" in l["paint"] for l in arrows)
+    slots = style["sources"]["slots"]["data"]["features"]
+    assert any(f["properties"].get("__rs_tunnel") for f in slots) and not all(f["properties"].get("__rs_tunnel") for f in slots)
+    items = style["sources"]["ov0"]["data"]["features"]
+    assert [f["properties"].get("__rs_tunnel") for f in items] == [True, None]           # edge 12 is the tunnel
+    assert any(i.startswith("ov0-") for i in conf["layers"])                            # the item fades like the rest
     a, b = (18.000, 59.30), (18.002, 59.30)
-    plain = [l["id"] for l in _style(render_edges(gpd.GeoDataFrame({"highway": ["primary"]}, geometry=[LineString([a, b])], crs=4326),
-                                                  backend="web").html)["layers"]]
-    assert not [i for i in plain if i.endswith("-under")]
+    plain = render_edges(gpd.GeoDataFrame({"highway": ["primary"]}, geometry=[LineString([a, b])], crs=4326), backend="web").html
+    assert _tunnel_conf(plain)["layers"] == {} and _tunnel_conf(plain)["control"] is False
+    with pytest.raises(ValueError):
+        render_edges(_edge_world(), backend="web", settings={"config": {"tunnel_palette": "Pink"}})
+
+
+def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
+    """The Tunnels box and rsSetTunnelStyle in a real page: the strength moves every tunnel colour, the casing too. The casing is two layers with
+    MapLibre's dash, no image: a palette's gap colour on the position's casing layer (transparent for One colour) and its dash colour on the
+    dash layer, both moved toward slate; Colour by keeps the look."""
+    pw = pytest.importorskip("playwright.sync_api")
+    path = tmp_path / "tunnels.html"
+    g = _edge_world().assign(aadt=[1, 2, 3, 4])
+    from roadstyle import compute_levels
+    from roadstyle.render_web import _level_id
+    lv = compute_levels(g)                                                       # the tunnel (row 1)'s positions, as the page computes them
+    fill, casing = _level_id("roads-fill", int(lv.fill_level[1])), _level_id("roads-casing", int(lv.casing_level[1]))
+    render_edges(g, backend="web", basemap="blank", color_options={"Class": {}, "AADT": {"color_by": "aadt", "cmap": "viridis"}}).save(path)
+    get = f"""() => ({{fill: JSON.stringify(map.getPaintProperty("{fill}", "line-color")),
+                    pattern: map.getPaintProperty("{casing}-dash", "line-pattern") || null,
+                    dash: map.getPaintProperty("{casing}-dash", "line-dasharray") || null,
+                    dash_color: map.getPaintProperty("{casing}-dash", "line-color"),
+                    gap: JSON.stringify(map.getPaintProperty("{casing}", "line-color")),
+                    slider: document.getElementById("tn-str").value, pal: document.getElementById("tn-pal").value}})"""
+    errors = []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("console", lambda m: errors.append(m.text) if m.type == "error" or "Cannot mix SDF" in m.text else None)
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && map.loaded() && document.getElementById('tn-str')", timeout=30_000)
+        page.evaluate("document.addEventListener('rs:tunnelchange', e => window._ev = e.detail)")
+        opened = page.evaluate(get)
+        page.evaluate("rsSetTunnelStyle({strength: 70, palette: 'Teal + mint', ratio: [4, 3]})")
+        moved, ev = page.evaluate(get), page.evaluate("window._ev")
+        page.evaluate("rsSetColorField('AADT')")
+        coloured = page.evaluate(get)
+        page.evaluate("rsSetTunnelStyle({strength: 0})")
+        zero = page.evaluate(get)
+        page.evaluate("rsSetTunnelStyle({palette: 'One colour', strength: 100})")
+        one = page.evaluate(get)
+        browser.close()
+    assert errors == []
+    assert opened["pattern"] is None and opened["dash"] == [1, 1] and opened["slider"] == "2" and opened["pal"] == "Graphite + silver"
+    assert "rgba(0,0,0,0)" not in opened["gap"]                                           # two colours by default: the gaps are the second colour
+    assert moved["slider"] == "3"                                                        # five steps: 0 20 35 70 100
+    assert "70" in moved["fill"] and moved["pal"] == "Teal + mint" and moved["dash"] == [4, 3] and moved["pattern"] is None
+    teal70, mint70 = "#547384", "#76919f"                                                 # #2f6f73, #9fd3cf 70 % toward #64748b (JS rounds .5 up)
+    assert moved["dash_color"] == teal70 and mint70 in moved["gap"]
+    assert ev == {"strength": 70, "palette": "Teal + mint", "ratio": [4, 3]}
+    assert "__rs_fill__1" in coloured["fill"] and "interpolate" in coloured["fill"]          # Colour by keeps the look
+    assert zero["dash_color"] == "#2f6f73" and "#9fd3cf" in zero["gap"]                  # at 0 the palette as it is
+    assert one["dash_color"] == "#64748b" and "rgba(0,0,0,0)" in one["gap"]               # One colour at 100: slate dashes, empty gaps
 
 
 def test_level_columns_draw_each_position_casings_then_fills():
@@ -1141,7 +1210,7 @@ def test_level_columns_keep_the_looks_and_the_dashed_classes():
     ids = [l["id"] for l in style["layers"]]
     lay = {l["id"]: l for l in style["layers"]}
     ps = [f["properties"] for f in style["sources"]["roads"]["data"]["features"]]
-    assert "roads-casing-lv-1-dash" in ids and "roads-fill-lv-1-pat" in ids and "roads-fill-lv-1-under" in ids   # the tunnel's look at -1
+    assert "roads-casing-lv-1-dash" in ids and "roads-fill-lv-1-pat" not in ids and "roads-fill-lv-1-under" not in ids   # no light fill dashes by default   # the tunnel's look at -1 (no underlay: an opaque fill, docs/design/tunnel_look.md)
     assert [bool(_eval(lay["roads-casing-lv-1-dash"]["filter"], p)) for p in ps] == [True, False, False]
     dash = [i for i in ids if i.startswith("roads-fill-lv1-dash")]                                                  # the footway's dashes at 1
     assert dash and '"__rs_fl"' in json.dumps(lay[dash[0]]["filter"]) and '"__rs_cl"' not in json.dumps(lay[dash[0]]["filter"])
@@ -1302,7 +1371,7 @@ def test_level_columns_put_each_positions_arrows_after_its_fill_layers():
     for pos in (-1, 0, 1):
         arrows = "roads-arrows" if pos == 0 else f"roads-arrows-lv{pos}"
         fills = [i for i, n in enumerate(ids) if n.startswith(("roads-fill-lv-1", "roads-fill-lv1")) and (f"lv{pos}" in n)] if pos else \
-            [i for i, n in enumerate(ids) if n in ("roads-fill", "roads-fill-sq", "roads-fill-under", "roads-fill-pat")]
+            [i for i, n in enumerate(ids) if n in ("roads-fill", "roads-fill-sq", "roads-fill-pat")]
         assert ids.index(arrows) == max(fills) + 1, arrows                       # right after the position's fill layers
         assert '"fl"' in json.dumps(lay[arrows]["filter"]) and '"lvl"' not in json.dumps(lay[arrows]["filter"])
     assert "roads-arrows-tunnel" not in ids and "roads-arrows-bridge" not in ids
