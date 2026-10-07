@@ -4,7 +4,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.16.0] — 2026-10-07
 
 ### Added
 - **The level step on its own** (`docs/design/level_input.md`): `rs.level_input(edges)` (the solver's input from any edges: `roads`, one row per road, and `pairs`,
