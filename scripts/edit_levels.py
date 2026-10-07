@@ -178,9 +178,12 @@ class Area:
                 v[k] = m
                 if any(v):
                     heads[r] = tuple(v)
-                hs, he = (float(x) if x else float(self.auto_heads.loc[r, c]) for x, c in zip(v, ("start_m", "end_m"), strict=True))
-                if all(v) and hs + he > self.facts[r]["length_m"] + 0.05:       # both set (the page sends both): they must fit the road
-                    raise ValueError(f"heads of {self.facts[r]['name'] or r}: {hs:g} + {he:g} m is more than the road's {self.facts[r]['length_m']:g} m")
+        for r in {self.road_of.get(str(o["road"])) for o in ops if o["op"] == "head"}:    # after all of them: the page sends both heads together
+            v = heads.get(r, ("", ""))
+            hs, he = (float(x) if x else float(self.auto_heads.loc[r, c]) for x, c in zip(v, ("start_m", "end_m"), strict=True))
+            if all(v) and hs + he > self.facts[r]["length_m"] + 0.05:           # both set: they must fit the road
+                raise ValueError(f"heads of {self.facts[r]['name'] or self.facts[r]['edge_ref'] or r}: {hs:g} + {he:g} m is more than the road's "
+                                 f"{self.facts[r]['length_m']:g} m")
         e = self.edits()
         gone = sorted({int(o["index"]) for o in ops if o["op"] == "delete"}, reverse=True)
         for o in ops:                                           # a delete names its row as the page saw it: edits.csv may have changed since

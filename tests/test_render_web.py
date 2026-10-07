@@ -1925,6 +1925,9 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     assert lv.loc["12", "head_end_m"] == 12.5 and set(lv["cap_start"]) <= {"round", "square", "flat"}
     with pytest.raises(ValueError):
         area.apply([{"op": "head", "road": "12", "end": "end", "m": "-3"}])
+    L = area.facts["12"]["length_m"]                                                       # one longer, the other shorter, in one change: checked together
+    area.apply([{"op": "head", "road": "12", "end": "start", "m": str(round(L - 1, 1))}, {"op": "head", "road": "12", "end": "end", "m": "0.5"}])
+    area.apply([{"op": "head", "road": "12", "end": "start", "m": "0.5"}, {"op": "head", "road": "12", "end": "end", "m": str(round(L - 1, 1))}])
     with pytest.raises(ValueError):                                                       # both heads together cannot be more than the road
         L = area.facts["12"]["length_m"]
         area.apply([{"op": "head", "road": "12", "end": "start", "m": str(L)}, {"op": "head", "road": "12", "end": "end", "m": "1"}])
