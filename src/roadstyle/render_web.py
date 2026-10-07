@@ -1631,7 +1631,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            road_popup=True, road_tooltip=False, popup_mode: str = None,
            street_view: bool | str = "window", street_view_key: str | None = None,
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
-           color_options=None, color_active=0, views=None, overlays=None, compress: bool = True, tunnel_control: bool = True,
+           color_options=None, color_active=0, views=None, overlays=None, compress: bool = True, tunnel_control: bool = False,
            tiles: bool = False,
            minzoom=None, legend: bool = True,
            api_key: str | None = None, **_ignore):
@@ -1700,7 +1700,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     ``palette="mono"``. ``window.rsSetColorField(name|index)`` drives the same swap from your own
     UI.
 
-    ``tunnel_control`` (default True): on a map with tunnels, a *Tunnels* box with v2's tunnel slider (0 = normal colours, 100 = the full
+    ``tunnel_control`` (default False: it was the tool for choosing the tunnel look, 2026-10-07): on a map with tunnels, a *Tunnels* box with v2's tunnel slider (0 = normal colours, 100 = the full
     tunnel colours), its presets, the casing palette and the dash ratio; ``window.rsSetTunnelStyle({strength, palette, ratio})`` does the
     same from your own UI. The starting values are the settings ``tunnel_strength``, ``tunnel_palette`` and ``tunnel_casing_dash``
     (docs/design/tunnel_look.md).

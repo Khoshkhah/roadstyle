@@ -62,6 +62,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `compute_levels(order=...)` defaults to `"priority"`.
 - **One arrow per one-way road in the window** (`docs/design/arrows_and_names.md`): the page puts one arrow in the middle of each one-way road's visible part,
   and keeps it there while it stays in the window; below zoom 17 only the main classes, none on a road shorter than 100 px on screen, and 150 px between arrows; the arrows no longer repeat along every 100 m slot (they crowded zoom 15). A tiled map keeps the old arrows.
+- **The *Tunnels* box is off by default** (`tunnel_control=False`): it was the tool for choosing the tunnel look; the look it chose stays the default.
 - **The default palette is `amber`** (`palettes.DEFAULT_PALETTE`) in place of `highsat` (too sharp); `carto` was tried first, but its white streets
   vanish on a light base map. `palette="highsat"` keeps the old look.
 - **The order where roads meet:** `compute_levels(order="priority")`, now the default of `render_edges`: where roads of one band meet, a roundabout's fill is over a tunnel's,

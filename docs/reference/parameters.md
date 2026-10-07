@@ -153,7 +153,7 @@ setting, or a name the page does not have, is an error.
 |---|---|---|---|
 | `tiles` | `False` | web | pack the roads, the casing pieces and the end caps as embedded PMTiles (for ~10⁵ edges); needs `roadstyle[tiles]` |
 | `compress` | `True` | web | gzip the inlined data; `False` = plain JSON |
-| `tunnel_control` | `True` | web | on a map with tunnels, a *Tunnels* box: the tunnel slider in five steps (`tunnel_strength`: 0, 20, 35, 70, 100) with their names, the casing palette and the dash ratio ([design](../design/tunnel_look.md)) |
+| `tunnel_control` | `False` | web | on a map with tunnels, a *Tunnels* box (a tool for choosing the look): the tunnel slider in five steps (`tunnel_strength`: 0, 20, 35, 70, 100) with their names, the casing palette and the dash ratio ([design](../design/tunnel_look.md)) |
 | any other keyword | | folium | passed to `folium.Map(...)` (e.g. `location`, `zoom_start`) |
 
 Returns a `WebMap` (web, `.save()`), a `folium.Map` (`.save()`) or a `lonboard.Map` (`.to_html()`).

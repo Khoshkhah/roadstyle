@@ -1099,8 +1099,9 @@ def test_the_tunnel_look_is_v2s_slider():
     is an error."""
     from roadstyle.render_web import _TUN_TO, _tun_mix
     ov = Overlay(_edge_features([12, 11]), edge_col="edge_id", kind="circle", color="#ff0000")
-    html = render_edges(_edge_world().assign(name=["A", "T", "B", "C"]), backend="web", basemap="blank", overlays=[ov]).html
+    html = render_edges(_edge_world().assign(name=["A", "T", "B", "C"]), backend="web", basemap="blank", overlays=[ov], tunnel_control=True).html
     style, conf = _style(html), _tunnel_conf(html)
+    assert _tunnel_conf(render_edges(_edge_world(), backend="web", basemap="blank").html)["control"] is False   # the box is off by default
     lay = {l["id"]: l for l in style["layers"]}
     assert conf["strength"] == 35 and conf["palette"] == "Graphite + silver" and conf["control"] is True and conf["ratio"] == [1, 1]
     assert conf["dash"] and all(i.startswith("roads-casing") and i.endswith("-dash") for i in conf["dash"])
@@ -1136,7 +1137,7 @@ def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
     from roadstyle.render_web import _level_id
     lv = compute_levels(g)                                                       # the tunnel (row 1)'s positions, as the page computes them
     fill, casing = _level_id("roads-fill", int(lv.fill_level[1])), _level_id("roads-casing", int(lv.casing_level[1]))
-    render_edges(g, backend="web", basemap="blank", color_options={"Class": {}, "AADT": {"color_by": "aadt", "cmap": "viridis"}}).save(path)
+    render_edges(g, backend="web", basemap="blank", color_options={"Class": {}, "AADT": {"color_by": "aadt", "cmap": "viridis"}}, tunnel_control=True).save(path)
     get = f"""() => ({{fill: JSON.stringify(map.getPaintProperty("{fill}", "line-color")),
                     pattern: map.getPaintProperty("{casing}-dash", "line-pattern") || null,
                     dash: map.getPaintProperty("{casing}-dash", "line-dasharray") || null,

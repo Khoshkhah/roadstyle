@@ -111,7 +111,7 @@ HIDE = "<style>.maplibregl-ctrl-bottom-left,.rs-zoom{display:none!important}</st
 def hero(edges) -> None:
     """The README hero: the Street View window open on Hornsgatan, 1200x600 at 2x, as a JPEG."""
     from PIL import Image
-    html = rs.render_edges(edges, filter_control=False, basemap_switcher=False, tunnel_control=False,
+    html = rs.render_edges(edges, filter_control=False, basemap_switcher=False,
                            road_popup=False).html.replace("</head>", HIDE, 1)
     png = OUT / "hero.png"
     served_shot(html, png, SELECT + """rsSetStreetView(true);

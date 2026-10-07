@@ -6,7 +6,7 @@ any road; only its look differs.
 
 ## The rule
 
-One slider, the **strength** (0 to 100, setting `tunnel_strength`, default 35 as v2; in the Tunnels box five steps, Normal colors 0,
+One slider, the **strength** (0 to 100, setting `tunnel_strength`, default 35 as v2; in the Tunnels box, off by default since 2026-10-07 (`tunnel_control=True`), five steps, Normal colors 0,
 Subtle 20, Balanced 35, Strong 70, Full 100), moves **everything on a tunnel the same way, toward one colour**, slate `#64748b`: the road's fill, its street names, its
 one-way arrows, and every item attached to it with `Overlay(edge_col=...)` (lanes, lines, arrows, names). It makes no difference how an
 item was added ("the fading part applies on every item on a tunnel"). Everything else is unchanged.

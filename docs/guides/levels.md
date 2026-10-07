@@ -85,9 +85,9 @@ An example: Monaco's hand-made tables in `examples/levels/monaco/`.
 
 - A **bridge** has a slate casing (`bridge_casing_color`) and a soft **shadow** shifted down-right (`bridge_shadow`): each part of the
   bridge casts it at its own casing number, so it lies on what the bridge crosses, never on its own road. Hiding the bridges hides it too.
-- A **tunnel** fades toward slate, its fill, names, arrows and attached items alike. The *Tunnels* box sets how much, in five steps
-  (*Normal colors*, *Subtle*, *Balanced*, *Strong*, *Full*: `tunnel_strength` 0, 20, 35, 70, 100), and its two-colour dashed casing
-  (`tunnel_palette`, default *Graphite + silver*). `rsSetTunnelStyle({strength, palette, ratio})` does the same from your page.
+- A **tunnel** fades toward slate, its fill, names, arrows and attached items alike: `tunnel_strength` (default 35; 0 is the normal colours, 100 the full tunnel
+  colours) and a two-colour dashed casing (`tunnel_palette`, default *Graphite + silver*). To try other values, `tunnel_control=True` adds a
+  *Tunnels* box with five steps; `rsSetTunnelStyle({strength, palette, ratio})` does the same from your page.
 
 ## Your own numbers
 
