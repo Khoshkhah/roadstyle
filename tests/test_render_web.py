@@ -852,7 +852,7 @@ def test_tunnels_toggle_like_bridges():
                                    LineString([(18.01, 59.30), (18.02, 59.30)])], crs=4326)
     html = render_edges(g, backend="web").html
     assert '"tunnels": true' in html and "function rsSetTunnels(" in html and '"rs-flt-tn"' in html
-    assert '[">=",["coalesce",["get","lvl"],0],0]' in html
+    assert '[">=",["coalesce",["get",lvl],0],0]' in html                     # lvl: the piece's level, or an attached item's baked __rs_lvl
     plain = render_edges(_edges(), backend="web").html
     assert '"tunnels": false' in plain
 
@@ -911,7 +911,7 @@ def test_twin_pairs_get_one_end_cap_per_end():
 
 def test_end_caps_follow_filters_and_recolour_and_can_be_turned_off():
     html = render_edges(_pairs(), backend="web").html
-    assert 'kind==="ends"' in html and "__rs_edge2" in html                  # id filters
+    assert '["any",_has(["get","__rs_edge"],_qIds),_has(["get","__rs_edge2"],_qIds)]' in html     # id filters: a cap shows while either twin does
     assert 'RS_END_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"circle-color",ee)' in html
     off = _style(render_edges(_pairs(), backend="web", settings={"config": {"twin_end_caps": False}}).html)
     assert "ends" not in off["sources"] and not [l for l in off["layers"] if "ends" in l["id"]]
@@ -1485,7 +1485,7 @@ def test_divided_casing_is_drawn_as_head_and_main_pieces():
     assert all(l["source"] == "casings" for i, l in lay.items() if i.startswith("roads-casing") and "-lv" in i or i == "roads-casing")
     assert lay["roads-fill"]["source"] == "roads" and lay["roads-fill-lv-1"]["source"] == "roads"
     assert style["sources"]["roads"]["data"]["features"][0]["geometry"]["coordinates"][-1] == [18 + d, 59.0]       # the fill line is the whole edge
-    assert 'kind==="casings"' in html
+    assert '_has(["get","__rs_edge"],_qIds)' in html                       # the pieces follow rsFilter by their edge
     # without the head columns nothing changes: no casing source
     assert "casings" not in _style(render_edges(g, backend="web", casing_level_col="cm", fill_level_col="fl").html)["sources"]
 
@@ -2632,26 +2632,37 @@ def test_an_arrow_that_would_touch_a_name_is_left_out():
 def test_every_piece_of_a_road_names_its_edge():
     """docs/design/edge_items.md step 1: every feature of every source that draws a road (all but base maps, overlays and the boundary, so a
     source added later without the label fails here) carries ``__rs_edge``, the index of its edge in ``roads`` (``__rs_edge2`` too for a
-    two-way pair's shared pieces); the shadow lines and 3D decks carry ``__rs_edges``, the list of their edges."""
+    two-way pair's shared pieces); the shadow lines and 3D decks carry ``__rs_edges``, the list of their edges. Step 2: an item attached with
+    ``Overlay(edge_col=...)`` carries ``__rs_edge`` too, the index of the road whose ``edge_id_col`` is its ``edge_col``, and that road's class and level."""
+    from shapely.geometry import Point
     ln = lambda *c: LineString(c)                                                       # noqa: E731
     g = gpd.GeoDataFrame(
         {"highway": ["residential"] * 2 + ["primary"] * 4, "name": ["Main", "Main", "Side", "Bridge", "Bridge", "Bridge"],
          "oneway": [False, False, True, False, False, True],
          "cs": [0, 0, -1, 0, 0, 0], "cl": [0, 0, 0, 1, 1, 1], "ce": [0, 0, -2, 0, 0, 0], "fl": [0] * 3 + [1] * 3,
          "capa": [None, None, "flat", None, None, None], "capb": [None, None, "square", None, None, None],
-         "bridge": [None, None, None, "yes", "yes", "yes"]},
+         "bridge": [None, None, None, "yes", "yes", "yes"], "edge_id": [50, 51, 52, 53, 54, 55]},
         geometry=[ln((18.000, 59.300), (18.004, 59.300)), ln((18.004, 59.300), (18.000, 59.300)),            # a two-way street (two twins)
                   ln((18.004, 59.300), (18.004, 59.304)),                                                    # a one-way street with two different end caps
                   ln((18.010, 59.300), (18.012, 59.300)), ln((18.012, 59.300), (18.010, 59.300)),            # a two-way bridge
                   ln((18.012, 59.300), (18.014, 59.300))], crs=4326)                                         # a one-way bridge going on from it
     kw = dict(backend="web", arrows=True, labels=True, view_3d=True, casing_start_col="cs", casing_level_col="cl", casing_end_col="ce",
-              fill_level_col="fl", cap_start_col="capa", cap_end_col="capb", bridge_col="bridge")
+              fill_level_col="fl", cap_start_col="capa", cap_end_col="capb", bridge_col="bridge",
+              overlays=[Overlay(gpd.GeoDataFrame({"edge_id": [55, 50, 52], "highway": ["crossing"] * 3},       # its own highway is not its road's class
+                                                 geometry=[Point(18.013, 59.3), Point(18.001, 59.3), Point(18.004, 59.302)], crs=4326),
+                                edge_col="edge_id", kind="circle", label="items")])
     seen = set()
     for extra in ({}, {"tiles": False}):
         style = _style(render_edges(g, **kw, **extra).html)
         n = len(style["sources"]["roads"]["data"]["features"])
         assert all(f["properties"]["__rs_edge"] == i for i, f in enumerate(style["sources"]["roads"]["data"]["features"]))      # the generateId index
         for name, src in style["sources"].items():
+            if name == "ov0":                                                            # the attached items
+                roads = style["sources"]["roads"]["data"]["features"]
+                for f in src["data"]["features"]:
+                    p, r = f["properties"], roads[f["properties"]["__rs_edge"]]["properties"]
+                    assert (r["edge_id"], r["highway"], r["lvl"]) == (p["edge_id"], p["__rs_cls"], p["__rs_lvl"]), p
+                seen.add(name)
             if src["type"] != "geojson" or name in ("boundary", "roads", "arrows") or name.startswith("ov"):     # arrows: filled by the page
                 continue
             feats = src["data"]["features"]
@@ -2666,4 +2677,4 @@ def test_every_piece_of_a_road_names_its_edge():
                     if "__rs_edge2" in p:
                         assert isinstance(p["__rs_edge2"], int) and 0 <= p["__rs_edge2"] < n, (name, p)
     assert all("__rs_edge2" in f["properties"] for f in style["sources"]["ends"]["data"]["features"])       # a cap belongs to both twins
-    assert {"casings", "halves", "ends", "slots", "shadows", "decks"} <= seen                  # the page really had every kind of piece
+    assert {"casings", "halves", "ends", "slots", "shadows", "decks", "ov0"} <= seen           # the page really had every kind of piece

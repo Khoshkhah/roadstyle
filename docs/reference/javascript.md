@@ -14,7 +14,7 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | **Query and act on id sets** | | |
 | `rsQuery(p => bool, layer?)` | the ids of the features whose properties match | |
 | `rsGetProps(ids, layer?)` | the rows behind the ids, internal fields removed | |
-| `rsFilter(ids, layer?)` | show only these features; `null` resets. On roads it combines with the class filter; on an overlay attached to edges it keeps each layer's position and order | `rs:filterchange` |
+| `rsFilter(ids, layer?)` | show only these features; `null` resets. On roads it combines with the class, bridge and tunnel filters and hides every piece and every attached item (`Overlay(edge_col=...)`) of the other roads; on an overlay attached to edges it combines with its roads' filters and keeps each layer's position and order | `rs:filterchange` |
 | `rsColor(ids, "#hex", layer?)` | paint the set one colour over the base colours, and draw it on top of the other roads on its level | `rs:colorchange` |
 | `rsColor([[idsA, "#f80"], [idsB, "#08f"]])` | several sets at once, earlier pairs win overlaps (roads only) | `rs:colorchange` |
 | `rsColor(null)` / `rsColor(null, null, layer)` | reset | `rs:colorchange` |
@@ -48,8 +48,8 @@ All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
 
 | event | when | `e.detail` |
 |---|---|---|
-| `rs:select` | a road is clicked or `rsSelect` runs | `id`, `layer` (`null` from `rsSelect`, the MapLibre layer id from a click), `properties`, `overlays` (`[{label, fields, properties}]` of clickable overlays under the point), `streetView` (URL or `null`) |
-| `rs:select` | an overlay feature is clicked | `id`, `layer` and `overlay` (both the overlay label), `fields`, `properties` |
+| `rs:select` | a road, or an item attached to it (`Overlay(edge_col=...)`), is clicked, or `rsSelect` runs | `id` (the road's), `layer` (`null` from `rsSelect`, the MapLibre layer id from a click), `properties` (the road's), `overlays` (`[{label, fields, properties}]` of clickable overlays under the point, a clicked item among them), `streetView` (URL or `null`) |
+| `rs:select` | a feature of an overlay that belongs to no road is clicked | `id`, `layer` and `overlay` (both the overlay label), `fields`, `properties` |
 | `rs:deselect` | a click on empty map, or `rsDeselect` | none |
 | `rs:filterchange` | `rsSetClasses` | `visible`, `hidden` (class lists) |
 | | `rsSetBridges` | `bridges` |
@@ -97,8 +97,10 @@ Read-only globals for building your own controls.
 - Omitted or `null`: the roads.
 - An overlay's `label` (or its index in `RS_OVERLAYS`): that overlay.
 - Each layer has its own ids. Never pass ids from one layer to another.
-- The one-way arrows and the street names belong to an edge (the edge under the middle of each): `rsFilter` on the roads hides them with it, and so does the class filter. The 3D decks are a
-  separate source: `rsFilter` does not reach them.
+- Every piece of a road belongs to its edge (docs/design/edge_items.md): the casing, the fill, the end caps, the one-way arrows and the street names (the edge under the middle of
+  each), the bridge shadows and 3D decks (shown while any of their edges is), and every item attached with `Overlay(edge_col=...)`. `rsFilter` on the roads, the class filter and the
+  bridge and tunnel switches hide them with their edge. Hovering an attached item highlights its road and clicking it selects the road. An overlay that belongs to no road
+  keeps only its own `rsFilter(ids, label)`.
 
 ## Ids past 2**53
 

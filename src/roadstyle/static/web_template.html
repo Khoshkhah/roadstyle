@@ -464,36 +464,41 @@ let _fltVis=null;   // Set of visible classes; null = all
 let _qIds=null;     // id-set filter from rsFilter; null = off
 let _bridgesOn=true;   // rsSetBridges: hide every elevated (lvl>0) road and its 3D deck ribbons
 let _tunnelsOn=true;   // rsSetTunnels: hide every below-ground (lvl<0) road, its names and arrows
-const _fltLayers=()=>map.getStyle().layers.filter(l=>l.id.indexOf("roads")===0);
+const _ovIds={};       // an attached overlay's own rsFilter(ids, label) id set, by label (composed with its edges' filter below)
+// the overlay attached to edges (Overlay(edge_col=...)) that a layer draws, or null
+function _itemOv(id){ return OVERLAYS.find(o=>o.base && id in o.base) || null; }
+const _fltLayers=()=>map.getStyle().layers.filter(l=>l.id.indexOf("roads")===0 || _itemOv(l.id));
 map.on("load",()=>{ _fltLayers().forEach(l=>{ if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null; }); });
+// the one lookup (docs/design/edge_items.md): the class, bridge, tunnel and rsFilter switches decide which edges show, and every layer that
+// draws a piece of a road, or an item attached to one, shows exactly the pieces and items of those edges. The class and level tests stay
+// short property tests: a built-in piece carries its edge's class and level (FILTER.col, lvl), an attached item has them baked
+// (__rs_cls, __rs_lvl). The rsFilter id set goes through the label: __rs_edge, or __rs_edge2 (a two-way pair's shared piece shows while
+// either edge shows). A shadow line or a 3D deck covers several edges (__rs_edges): it shows while any of them shows, decided here.
 function _applyRoadFilters(){
-  const hidden = _fltVis===null ? [] : FILTER.classes.filter(c=>!_fltVis.has(c));
+  const hidden = _fltVis===null ? [] : FILTER.classes.filter(c=>!_fltVis.has(c)), hid=new Set(hidden), q=_qIds && new Set(_qIds);
+  const edgeOn = i=>{ const p=_rprops(i), v=p.lvl||0;
+    return !hid.has(p[FILTER.col]) && (_bridgesOn || v<1) && (_tunnelsOn || v>=0) && (!q || q.has(i)); };
+  const multi = {};   // decks / shadows: the ids of the features with at least one edge shown (null = no switch is on)
+  ["decks","shadows"].forEach(src=>{ multi[src] = !_bridgesOn ? [] : (hidden.length || q || !_tunnelsOn)
+    ? _sfeats(src).map((f,k)=>(f.properties.__rs_edges||[]).some(edgeOn) ? k : -1).filter(k=>k>=0) : null; });
+  const and = (f,c)=>f?["all",f,c]:c;
+  const qr = q && _has(["id"],_qIds), qe = q && ["any",_has(["get","__rs_edge"],_qIds),_has(["get","__rs_edge2"],_qIds)];   // once per change
   _fltLayers().forEach(l=>{
     if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null;
     let f=_fltBase[l.id];
-    if(hidden.length){ const cf=["!",["in",["get",FILTER.col],["literal",hidden]]]; f=f?["all",f,cf]:cf; }
-    if(!_bridgesOn){
-      // decks hold nothing but bridge ribbons (and prop-less casing slabs), shadows nothing but bridge shadows -> hide wholesale;
-      // everything else keeps lvl<1, so ground roads and tunnels stay
-      const bf = l.source==="decks" || l.source==="shadows" ? ["boolean",false] : ["<",["coalesce",["get","lvl"],0],1];
-      f = f?["all",f,bf]:bf;
+    // the layer's data: roads, casings, halves, ends, slots, arrows, decks, shadows or an overlay; in tiles mode the slots share the archive
+    // source, so the tile layer name is what separates them
+    const kind = RS_TILED && l.source==="roads" ? l["source-layer"] : l.source, ov=_itemOv(l.id);
+    if(kind==="decks" || kind==="shadows"){
+      if(multi[kind]) f=and(f, multi[kind].length ? _has(["id"], multi[kind]) : false);
+    }else{
+      const cls=ov?"__rs_cls":FILTER.col, lvl=ov?"__rs_lvl":"lvl";
+      if(hidden.length) f=and(f, ["!",["in",["get",cls],["literal",hidden]]]);
+      if(!_bridgesOn) f=and(f, ["<",["coalesce",["get",lvl],0],1]);
+      if(!_tunnelsOn) f=and(f, [">=",["coalesce",["get",lvl],0],0]);
+      if(q) f=and(f, kind==="roads" ? qr : qe);
+      if(ov && _ovIds[ov.label]) f=and(f, _has(["id"],_ovIds[ov.label]));
     }
-    if(!_tunnelsOn && l.source!=="decks"){   // decks are bridges only; everything else carries lvl
-      const tf=[">=",["coalesce",["get","lvl"],0],0];
-      f = f?["all",f,tf]:tf;
-    }
-    // ids exist only in the roads features — slots (labels/arrows) and decks (3D ribbons) have
-    // their own id spaces, so those layers take just the class filter. In tiles mode slots share
-    // the archive source, so the tile layer name is what separates them.
-    const kind = RS_TILED && l.source==="roads" ? l["source-layer"] : l.source;   // the layer's data: roads, casings, ends, slots, decks
-    const isRoads = kind==="roads";
-    if(_qIds && isRoads){ const qf=_has(["id"],_qIds); f=f?["all",f,qf]:qf; }
-    // the pieces of a divided casing (levels_split_casing.md) carry their edge's id as __rs_edge
-    // and the fill halves of an edge with two different ends (square_ends.md) too: without them its colour stayed when the road was filtered out
-    if(_qIds && (kind==="casings" || kind==="halves")){ const qf=_has(["get","__rs_edge"],_qIds); f=f?["all",f,qf]:qf; }
-    // a two-way pair's end cap (twin_ends.md) and an arrow or a street name (edge_overlays.md) stay while either of their two edges is shown
-    if(_qIds && (kind==="ends" || kind==="slots" || kind==="arrows")){
-      const qf=["any",_has(["get","__rs_edge"],_qIds),_has(["get","__rs_edge2"],_qIds)]; f=f?["all",f,qf]:qf; }
     // validate:false: our own filters need no grammar check, which cost ~6 ms a layer (a mode or class switch on a page of ~500 layers froze it ~3 s)
     try{ map.setFilter(l.id,f,{validate:false}); }catch(e){}
   });
@@ -555,9 +560,10 @@ function rsQuery(test, layer){
 function rsFilter(ids, layer){   // show only these features; rsFilter(null) resets
   const L=_lyr(layer); if(!L) return;
   if(L.ov){
-    const f = ids==null ? null : _has(["id"],ids);
-    L.ov.layers.forEach(id=>{ if(map.getLayer(id)) try{   // an overlay attached to edges keeps its position and order (ov.base)
-      const b=(L.ov.base||{})[id]; map.setFilter(id, f==null ? (b||null) : (b ? ["all",b,f] : f), {validate:false}); }catch(e){} });
+    // an overlay attached to edges: its own ids AND its edges' filter (the one lookup above)
+    if(L.ov.base){ if(ids==null) delete _ovIds[L.ov.label]; else _ovIds[L.ov.label]=Array.from(ids); _applyRoadFilters(); }
+    else{ const f = ids==null ? null : _has(["id"],ids);
+      L.ov.layers.forEach(id=>{ if(map.getLayer(id)) try{ map.setFilter(id, f, {validate:false}); }catch(e){} }); }
     document.dispatchEvent(new CustomEvent("rs:filterchange",
       {detail:{overlay:L.ov.label, ids:ids==null?null:Array.from(ids)}}));
     return;
@@ -836,7 +842,7 @@ function _ovSections(ovs){                                 // extra popup/panel 
 }
 function handleOverlayClick(e, tier){                      // info popup only on SELECT (click), not hover
   for(const ov of OVERLAYS){
-    if(!ov.interactive) continue;
+    if(!ov.interactive || ov.base) continue;               // an item attached to a road: the click selects its road (pick)
     if(tier && (tier==="under") !== !!ov.under) continue;  // consult only the requested tier
     const ids = ov.layers.filter(id=>map.getLayer(id));
     const hits = ids.length ? map.queryRenderedFeatures(e.point, {layers:ids}) : [];
@@ -1156,11 +1162,17 @@ function box(p){ return [[p.x-HIT,p.y-HIT],[p.x+HIT,p.y+HIT]]; }
 // query only layers that EXIST: the 3D view swaps roads-bridge-fill for the deck extrusions,
 // and MapLibre errors out (killing hover+click) when asked to query a missing layer id.
 // the fill halves (source "halves", square_ends.md) only paint: their edge is picked in its own, transparent fill layer
+// an item attached to a road (Overlay(edge_col=...)) is picked as its road (docs/design/edge_items.md): hovering it highlights the road,
+// clicking it selects the road; an interactive item's own fields come along as an overlay of the click (rs:select detail.overlays)
+const ITEM_LAYERS = new Set(OVERLAYS.filter(o=>o.base).flatMap(o=>o.layers));
 const PICK_LAYERS = style.layers.filter(l=>l.source!=="halves").map(l=>l.id)
-  .filter(id=>/^roads-(low-|high-|bridge-)?fill/.test(id)).concat(RS_DECK_LAYERS);
+  .filter(id=>/^roads-(low-|high-|bridge-)?fill/.test(id) || ITEM_LAYERS.has(id)).concat(RS_DECK_LAYERS);
+function _roadOf(f){ const e=f.properties.__rs_edge;   // the road an item belongs to, as a picked road feature
+  return {id:e, properties:_rprops(e), layer:f.layer, item:f,
+          get geometry(){ const r=_feats()[e] || _svTiled(e); return r && r.geometry; }}; }   // tiles: only when Street View asks
 function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id));
   const l = ids.length ? map.queryRenderedFeatures(box(p), {layers:ids}) : [];
-  return l.length ? l[0] : null; }
+  return !l.length ? null : ITEM_LAYERS.has(l[0].layer.id) ? _roadOf(l[0]) : l[0]; }
 function srcOf(f){ return f && f.layer && f.layer.id.indexOf("roads-bridge-decks")===0 ? "decks" : "roads"; }
 // full properties of a picked feature: tiles carry only the style props, so road hits read the
 // sidecar row behind the feature id; decks (and inline mode) keep the feature's own properties
@@ -1426,7 +1438,8 @@ const _ttip = __ROAD_TOOLTIP__, _ttipOnly = Array.isArray(_ttip) ? _ttip : null;
 const _tip = _ttip ? new maplibregl.Popup(
   {closeButton:false, closeOnClick:false, maxWidth:"260px", offset:10, className:"rs-tip"}) : null;
 function hoverFrame(){ _raf=0; if(!_pt) return;
-  const ovHit = _ovHov && !(OVERLAYS.find(o=>o.source===_ovHov.source)||{}).under;   // an interactive overlay under the cursor wins over the road, as for a click
+  const ho = _ovHov && OVERLAYS.find(o=>o.source===_ovHov.source);
+  const ovHit = ho && !ho.under && !ho.base;   // an interactive overlay under the cursor wins over the road, as for a click; an item attached to a road is its road
   const f = ovHit ? null : pick(_pt); map.getCanvas().style.cursor = (f || ovHit) ? "pointer" : "";
   const h = hitOf(f);
   if((h && h.key) !== (_hov && _hov.key)){
