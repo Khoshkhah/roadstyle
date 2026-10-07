@@ -2122,6 +2122,8 @@ def test_a_divided_casing_has_a_round_seam_at_each_cut():
     seams = [p for p in pieces if p.get("__rs_seam")]
     assert sorted(p["__rs_cl"] for p in seams) == [-1, 0] and all("__rs_cap" not in p for p in seams)     # round, at the lower number
     assert sorted(p["__rs_cl"] for p in pieces if not p.get("__rs_seam")) == [-1, 0, 1]
+    lay = {l["id"]: l for l in style["layers"]}
+    assert '["zoom"], 17' in json.dumps(lay["roads-casing"]["filter"]).replace(" ", "").replace(",", ", ")   # seams only from zoom 17: no bump on a flat end below
 
 
 def test_a_bridge_has_one_continuous_shadow_at_its_lowest_casing_number(monkeypatch):

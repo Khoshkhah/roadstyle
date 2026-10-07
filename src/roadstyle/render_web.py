@@ -733,6 +733,9 @@ def _casing_parts(geo, head_m, cols):
     return out
 
 
+_SEAM_MINZOOM = 17      # the casing seams (Kaveh 2026-10-06): a primary's casing is 12 m wide on the ground at zoom 16, so a seam reaches past a head
+
+
 def _bridge_shadows(geo, highway_col, trim_m, max_turn=45.0):
     """The bridge shadow (Kaveh 2026-10-06): the bridge edges joined into lines (two directions of an edge drawn once); where three or more
     meet, the two that go on most straight (turning ``max_turn`` degrees at most) and have the same number are one line through the
@@ -2042,6 +2045,10 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                                            "line-translate": list(CONFIG.bridge_shadow_offset), "line-translate-anchor": "viewport"}})
             layers[at + 1:at + 1] = twins
             style["layers"] = layers
+        if divided:     # the round seams at the cuts only from zoom 17: below it a seam reaches past a 5 m head and shows as a bump on a flat end
+            seam_ok = ["any", ["!", ["to-boolean", ["get", "__rs_seam"]]], [">=", ["zoom"], _SEAM_MINZOOM]]
+            style["layers"] = [{**l, "filter": ["all", l["filter"], seam_ok]} if l["id"] in ("roads-casing", "roads-casing-bridge") else l
+                               for l in style["layers"]]
         style["layers"] = _level_layers(style["layers"], levels, "casings" if divided else None)
         if decks["features"]:        # 3D: the flat bridge line below flat_below, the extruded deck from it up
             for l in style["layers"]:

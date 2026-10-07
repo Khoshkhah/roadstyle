@@ -27,7 +27,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   stretches at one number go on as one line; round ends; none over the heads where the bridge comes down.
 - **Bridge casing slate** (`bridge_casing_color` `#64748b`, the colour tunnels fade to; black was too dark).
 - **Casing that closes:** a bridge's heavier casing keeps each piece's cap (it was always flat: two bridge pieces could not close at a bend or
-  a junction), and a round seam of casing at each cut inside a road closes the outline on a curve. The fill halves of a road with two
+  a junction), and a round seam of casing at each cut inside a road closes the outline on a curve (from zoom 17: below it a seam reached past
+  a 5 m head and showed as a bump on a flat end). The fill halves of a road with two
   different ends only paint; the road stays clickable in its own (transparent) fill layer. Default caps stay round.
 - **Automatic head lengths and caps per road end, as an option** (`rs.auto_ends`, at zoom 18; `solve_levels.py --auto-ends`; the default stays 5 m and round:
   made for one zoom, the heads were too short at the others): heads as long as the drawings overlap at the join (before
