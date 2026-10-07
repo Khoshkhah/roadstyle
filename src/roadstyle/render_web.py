@@ -1111,6 +1111,111 @@ def _level_layers(layers, levels, casing_source=None):
     return rest[:first] + groups + rest[first:]
 
 
+_MAYBE = object()      # a value only the page knows (the zoom), or an expression _ev does not read: the layer may draw
+_MISSING = object()
+_OPS = {"<": lambda x, y: x < y, ">": lambda x, y: x > y, "<=": lambda x, y: x <= y, ">=": lambda x, y: x >= y,
+        "%": lambda x, y: x % y, "*": lambda x, y: x * y, "+": lambda x, y: x + y, "-": lambda x, y: x - y}
+
+
+def _same(a, b):
+    """MapLibre's ``==``: a boolean never equals a number."""
+    return isinstance(a, bool) == isinstance(b, bool) and a == b
+
+
+def _ev(e, p):
+    """A MapLibre expression on a feature's properties ``p``: its value, or _MAYBE where only the page can tell (three-valued logic)."""
+    if not isinstance(e, list) or not e:
+        return e
+    op, a = e[0], e[1:]
+    if op == "literal":
+        return a[0]
+    if op == "get" and len(a) == 1:
+        v = p.get(a[0], _MISSING)
+        return None if v is _MISSING else v
+    if op == "has" and len(a) == 1:
+        return p.get(a[0], _MISSING) is not _MISSING
+    if op in ("all", "any"):
+        out = op == "all"
+        for x in a:
+            v = _ev(x, p)
+            if v is _MAYBE:
+                out = _MAYBE
+            elif bool(v) != (op == "all"):
+                return not (op == "all")
+        return out
+    if op in ("!", "to-boolean", "==", "!=", *_OPS):
+        vals = [_ev(x, p) for x in a]
+        if any(v is _MAYBE for v in vals):
+            return _MAYBE
+        if op == "!":
+            return not vals[0]
+        if op == "to-boolean":
+            return _truthy(vals[0])
+        if op in ("==", "!="):
+            return _same(*vals) == (op == "==")
+        try:
+            return _OPS[op](*vals)
+        except (TypeError, ZeroDivisionError):
+            return _MAYBE
+    if op == "coalesce":
+        for x in a:
+            v = _ev(x, p)
+            if v is _MAYBE or v is not None:
+                return v
+        return None
+    if op == "case":
+        for c, o in zip(a[:-1:2], a[1:-1:2], strict=True):
+            v = _ev(c, p)
+            if v is _MAYBE:
+                return _MAYBE
+            if v:
+                return _ev(o, p)
+        return _ev(a[-1], p)
+    if op == "match":
+        v = _ev(a[0], p)
+        if v is _MAYBE:
+            return _MAYBE
+        for lab, o in zip(a[1:-1:2], a[2:-1:2], strict=True):
+            if any(_same(v, x) for x in (lab if isinstance(lab, list) else [lab])):
+                return _ev(o, p)
+        return _ev(a[-1], p)
+    return _MAYBE                       # ["zoom"], and any operator not read here
+
+
+def _keys(e, out):
+    """The property names an expression reads."""
+    if isinstance(e, list) and e and e[0] != "literal":
+        if e[0] in ("get", "has") and len(e) == 2 and isinstance(e[1], str):
+            out.add(e[1])
+        for x in e[1:]:
+            _keys(x, out)
+    return out
+
+
+def _drop_empty_layers(layers, feats, keep=("roads-fill",)):
+    """The layers without the road layers no feature can draw: a road layer stays when its filter holds, or may hold (it reads the zoom), for
+    some feature of its source (``feats``: {source: features}). A position has a whole family of layers (casing, fill, their square, flat and
+    bridge twins, halves, shadows, dashes, ends, arrows, names) and most of them are empty at most positions, while MapLibre walks every
+    layer on every frame. The layers that stay keep their order; ``keep`` stays always (the page reads roads-fill's line offset)."""
+    seen = {}
+
+    def draws(l):
+        f = l.get("filter")
+        if f is None or l["id"] in keep or l.get("source") not in feats:
+            return True
+        ks = tuple(sorted(_keys(f, set())))
+        if (l["source"], ks) not in seen:     # the distinct values of the properties the filter reads (a few hundred, not every feature)
+            seen[l["source"], ks] = [dict(zip(ks, c, strict=True)) for c in {tuple(_hashable((ft.get("properties") or {}).get(k, _MISSING)) for k in ks)
+                                                                 for ft in feats[l["source"]]}]
+        return any(v is _MAYBE or bool(v) for v in (_ev(f, p) for p in seen[l["source"], ks]))
+
+    return [l for l in layers if not l["id"].startswith("roads-") or draws(l)]
+
+
+def _hashable(v):
+    return tuple(v) if isinstance(v, list) else v
+
+
 def _plus_px(expr, px, when=None):
     """A width expression ``px`` pixels wider (only for the features where ``when`` holds, if given): inside each stop of a top-level zoom
     curve (MapLibre allows ``["zoom"]`` only there)."""
@@ -2354,6 +2459,14 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
              "layout": {"line-cap": "round", "line-join": "round"},
              "paint": {"line-color": "#6a0dad", "line-width": 2.5, "line-opacity": 0.9,
                        "line-dasharray": [3, 2]}})
+
+    # no road layer that nothing can draw (a position without bridges has no bridge layers, ...): the arrows source is filled by the page
+    # from the slots, with their properties
+    feats = {"roads": geo["features"], "slots": slots["features"], "arrows": slots["features"]}
+    for sid, src in style["sources"].items():
+        if src.get("type") == "geojson" and isinstance(src.get("data"), dict):
+            feats.setdefault(sid, src["data"].get("features", []))
+    style["layers"] = _drop_empty_layers(style["layers"], feats)
 
     # the road's own fill: its layers and their opacity as drawn, so that rsSetRoadFill (and a view's road_fill) can put it back
     fill_paint = {}

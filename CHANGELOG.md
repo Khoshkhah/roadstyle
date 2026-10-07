@@ -14,6 +14,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **An area of a database:** `make_area(edges, folder, db=...)` ties the area to a .duckdb file (`area.json`); every solve of it, the editor's
   too, writes the result with each edge's ends into `visualization.edge_levels` (`rs.save_area_levels`), and `rs.load_area_levels(con, edges)`
   reads it back (refusing other edges). duckOSM's `duckosm levels` makes such an area for all modes.
+- **Leaner pages:** a road layer is made only where some feature can be drawn by it (a position without a bridge has no bridge layers, none
+  without square ends has no square-end layers, ...); the look is the same. The all-modes Monaco page: 485 road layers before, 291 now.
 
 ## [0.16.0] — 2026-10-07
 
