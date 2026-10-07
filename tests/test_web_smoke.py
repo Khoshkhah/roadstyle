@@ -372,3 +372,98 @@ def test_an_item_attached_to_a_road_follows_its_road(tmp_path):
     assert steps["rsFilter(null)"][0] == steps["rsSetClasses(RS_CLASSES)"][0] == steps["rsSetTunnels(true)"][0] == [100, 101, 102]
     assert hover == [False, True, False]                                       # hovering the item of road 1 highlights road 1
     assert sel == [[1, 101, ["signs"]]] and selected == [False, True, False]   # clicking it selects road 1; its own fields come along
+
+
+def _open(page, path, center, zoom):
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+    page.goto(path.resolve().as_uri())
+    page.wait_for_function("window.map && map.loaded()", timeout=30_000)
+    page.evaluate(f"map.jumpTo({{center: {list(center)}, zoom: {zoom}}}); 0")
+    page.wait_for_function("map.loaded()", timeout=30_000)
+    page.evaluate("new Promise(r => { map.once('idle', r); map.triggerRepaint(); setTimeout(r, 3000); })")
+    return errors
+
+
+def test_each_direction_and_each_item_selects_its_own_edge_or_itself(tmp_path):
+    """A two-way road's two directions are two edges side by side: a click on either selects that edge (even near the middle, where the
+    tolerance box reaches both), and an item attached to either selects its own edge. An item of Overlay(select="item") is selected itself:
+    its own highlight and popup, rs:select with the item and its road; hover highlights the item, not the road; a click elsewhere clears it."""
+    import geopandas as gpd
+    from shapely.geometry import LineString, Point
+
+    from roadstyle import Overlay
+    from roadstyle.render_web import render
+
+    y0, y1 = 59.300, 59.3003
+    g = gpd.GeoDataFrame({"highway": ["primary", "primary", "residential"], "oneway": [False, False, True], "edge_id": [10, 11, 12]},
+                         geometry=[LineString([(18.000, y0), (18.004, y0)]), LineString([(18.004, y0), (18.000, y0)]),     # the two directions
+                                   LineString([(18.000, y1), (18.004, y1)])], crs=4326)
+    signs = gpd.GeoDataFrame({"edge_id": [10, 11], "kind": ["fwd", "back"]},          # 20 m off: south of the eastbound, north of the westbound
+                             geometry=[Point(18.0012, y0 - 0.00018), Point(18.0028, y0 + 0.00018)], crs=4326)
+    lanes = gpd.GeoDataFrame({"edge_id": [12], "lane": ["L1"]}, geometry=[LineString([(18.0005, y1), (18.0035, y1)])], crs=4326)
+    path = tmp_path / "select.html"
+    render(g, basemap="blank", overlays=[Overlay(signs, edge_col="edge_id", kind="circle", radius=8, label="signs", popup=["kind"]),
+                                         Overlay(lanes, edge_col="edge_id", kind="line", width=6, label="lanes", popup=["lane"], select="item")]).save(path)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 800, "height": 600})
+        errors = _open(page, path, (18.002, y0 + 0.00015), 18)
+        page.evaluate("window.__sel = []; document.addEventListener('rs:select', e => __sel.push([e.detail.id, e.detail.properties.edge_id,"
+                      " e.detail.item ? [e.detail.item.overlay, e.detail.item.properties.lane] : null]))")
+        at = lambda lng, lat, dy=0: page.evaluate(f"(() => {{ const q = map.project([{lng}, {lat}]); return [q.x, q.y + {dy}]; }})()")  # noqa: E731
+        fs = lambda src, i: page.evaluate(f"map.getFeatureState({{source: '{src}', id: {i}}})")                                                        # noqa: E731
+        got = {}
+        for name, xy in (("south lane", at(18.0015, y0, 7)), ("north lane", at(18.0015, y0, -7)), ("south of the middle", at(18.0015, y0, 2)),
+                         ("north of the middle", at(18.0015, y0, -2)), ("sign fwd", at(18.0012, y0 - 0.00018)), ("sign back", at(18.0028, y0 + 0.00018))):
+            page.evaluate("document.querySelectorAll('.maplibregl-popup').forEach(e => e.remove())")    # the last popup would take the click
+            page.mouse.click(*xy)
+            page.wait_for_timeout(150)
+            got[name] = page.evaluate("__sel[__sel.length - 1]")
+        lane = at(18.0015, y1)
+        page.mouse.move(*lane)
+        page.wait_for_timeout(300)
+        hover = (fs("ov1", 0).get("hover"), fs("roads", 2).get("hover"))
+        page.mouse.click(*lane)
+        page.wait_for_timeout(300)
+        got["lane"] = page.evaluate("__sel[__sel.length - 1]")
+        selected = (fs("ov1", 0).get("select"), fs("roads", 2).get("select"))
+        popup = page.evaluate("[...document.querySelectorAll('.maplibregl-popup-content')].map(e => e.textContent).join('|')")
+        page.evaluate("document.querySelectorAll('.maplibregl-popup').forEach(e => e.remove())")
+        page.mouse.click(*at(18.0015, y0 - 0.00025))                                  # nothing there
+        page.wait_for_timeout(200)
+        cleared = fs("ov1", 0).get("select")
+        browser.close()
+    assert errors == []
+    assert got["south lane"][:2] == got["south of the middle"][:2] == got["sign fwd"][:2] == [0, 10]     # the eastbound drives on the south
+    assert got["north lane"][:2] == got["north of the middle"][:2] == got["sign back"][:2] == [1, 11]
+    assert got["lane"] == [2, 12, ["lanes", "L1"]]                           # the item and its road
+    assert hover == (True, None) and selected == (True, None) and not cleared
+    assert "lanes" in popup and "L1" in popup
+
+
+def test_the_class_filter_hides_the_names_and_arrows_of_a_class(tmp_path):
+    """With filter_col, a name or an arrow (whose slot carries the chain's highway) hides with its road's class (__rs_cls)."""
+    import geopandas as gpd
+    from shapely.geometry import LineString
+
+    from roadstyle.render_web import render
+
+    ys = [59.3000, 59.3006]
+    g = gpd.GeoDataFrame({"highway": ["primary"] * 2, "fc": ["A", "B"], "name": ["Alpha", "Beta"], "oneway": [True, True]},
+                         geometry=[LineString([(18.000, y), (18.004, y)]) for y in ys], crs=4326)
+    path = tmp_path / "classes.html"
+    render(g, basemap="blank", filter_col="fc", labels=True, arrows=True).save(path)
+    shown = """async call => { eval(call); await new Promise(r => { map.once('idle', r); map.triggerRepaint(); setTimeout(r, 3000); });
+      const ids = map.getStyle().layers.map(l => l.id).filter(id => /^roads-(labels|arrows)/.test(id));
+      return [...new Set(map.queryRenderedFeatures({layers: ids}).map(f => f.layer.id.split('-')[1] + ':' + f.properties.name))].sort(); }"""
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 800, "height": 600})
+        errors = _open(page, path, (18.0012, 59.3003), 18)                    # a name and its road's arrow apart
+        steps = {c: page.evaluate(shown, c) for c in ("0", "rsSetClasses(['A'])", "rsSetClasses(RS_CLASSES)")}
+        browser.close()
+    assert errors == []
+    assert steps["0"] == steps["rsSetClasses(RS_CLASSES)"] == ["arrows:Alpha", "arrows:Beta", "labels:Alpha", "labels:Beta"]
+    assert steps["rsSetClasses(['A'])"] == ["arrows:Alpha", "labels:Alpha"]

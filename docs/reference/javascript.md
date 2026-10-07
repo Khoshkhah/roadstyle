@@ -48,7 +48,7 @@ All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
 
 | event | when | `e.detail` |
 |---|---|---|
-| `rs:select` | a road, or an item attached to it (`Overlay(edge_col=...)`), is clicked, or `rsSelect` runs | `id` (the road's), `layer` (`null` from `rsSelect`, the MapLibre layer id from a click), `properties` (the road's), `overlays` (`[{label, fields, properties}]` of clickable overlays under the point, a clicked item among them), `streetView` (URL or `null`) |
+| `rs:select` | a road, or an item attached to it (`Overlay(edge_col=...)`), is clicked, or `rsSelect` runs | `id` (the road's), `layer` (`null` from `rsSelect`, the MapLibre layer id from a click), `properties` (the road's), `overlays` (`[{label, fields, properties}]` of clickable overlays under the point, a clicked item among them), `item` (only for an item of `Overlay(select="item")`: `{overlay, id, properties}`, the item itself, selected and highlighted in place of the road), `streetView` (URL or `null`) |
 | `rs:select` | a feature of an overlay that belongs to no road is clicked | `id`, `layer` and `overlay` (both the overlay label), `fields`, `properties` |
 | `rs:deselect` | a click on empty map, or `rsDeselect` | none |
 | `rs:filterchange` | `rsSetClasses` | `visible`, `hidden` (class lists) |

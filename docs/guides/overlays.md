@@ -23,7 +23,7 @@ it does not use the road palette.
 ```python
 rs.Overlay(data, kind=None, placement="over", color=None, opacity=None, outline=None,
            radius=None, width=None, label=None, popup=None, tooltip=None, visible=True,
-           edge_col=None, order_col=None, color_col=None)
+           edge_col=None, order_col=None, color_col=None, select="road")
 ```
 
 - `kind`: `"fill"`, `"line"` or `"circle"`. Left out, it follows the geometry: polygons fill,
@@ -53,7 +53,17 @@ rs.render_edges(edges, overlays=[lanes, markings, signs])
 Each road is drawn by a casing number and a fill number ([which road is on top](levels.md)). A feature takes the **fill number of its edge**. In each position the layers are: the casings, the fills,
 the edge overlays by order, the one-way arrows, the street names. So a sign is over its own road and under every road that passes above it. `placement` is not used for such an overlay.
 
-A feature whose edge id is not among the roads is an error that lists the ids; nothing is drawn at a default place. A click on an edge overlay wins over the roads, like an `"over"` overlay.
+A feature whose edge id is not among the roads is an error that lists the ids; nothing is drawn at a default place.
+
+What a hover or click on such a feature picks is `select`:
+
+- `select="road"` (the default): **its road**. The road highlights and is selected (its popup, `rs:select` with the road), and the feature's
+  own fields come along in `overlays`. A sign or a crossing.
+- `select="item"`: **the feature itself**. It takes the hover and select highlight (`hover_color` / `select_color` of the page), shows its own
+  popup (its `popup` fields, with the road's Street View link), and `rs:select` carries it as `item` (`{overlay, id, properties}`) next to its
+  road (`id`, `properties`), so a panel or Street View can still follow the road. A lane.
+
+Either way the feature hides with its road (`rsFilter`, the class, bridge and tunnel switches).
 Design: [Overlays attached to edges](../design/edge_overlays.md).
 
 ### The look: overlay styles

@@ -41,6 +41,8 @@ class Overlay:
         passes in ``settings=`` (``config.overlays.styles``; roadstyle ships none), the other fields are its fields as arguments, which win over the style.
     tooltip : property fields to show in a HOVER tooltip (independent of ``popup``, exactly like
         the road layer's ``tooltip`` vs ``road_popup``). ``None``/``[]`` = hover only highlights.
+    select : with ``edge_col``, what a hover or click on a feature picks: ``"road"`` (default) its road (the road's highlight, popup and
+        ``rs:select``), ``"item"`` the feature itself (its own highlight and popup; ``rs:select`` carries it as ``item`` next to its road).
     """
     data: object
     kind: str | None = None
@@ -66,6 +68,11 @@ class Overlay:
     text_size: float | None = None     # px
     text_color: str | None = None
     text_halo: str | None = None       # the halo colour (none if absent)
+    select: str = "road"               # with edge_col: a click picks its "road" or the "item" itself (docs/design/edge_items.md)
+
+    def __post_init__(self):
+        if self.select not in ("road", "item"):
+            raise ValueError(f"Overlay select must be 'road' or 'item', not {self.select!r}")
 
 
 def to_fc(data) -> dict:
