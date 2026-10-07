@@ -2145,7 +2145,7 @@ def test_a_bridge_has_one_continuous_shadow_at_its_lowest_casing_number(monkeypa
     ids = [l["id"] for l in style["layers"]]
     s2 = lay["roads-casing-lv1-bridge-shadow"]
     assert s2["source"] == "shadows" and s2["paint"]["line-blur"] == 4.0 and s2["paint"]["line-translate"] == [2, 2]
-    assert s2["layout"]["line-cap"] == "butt"                                                  # no darker circle where two shadow lines meet
+    assert s2["layout"]["line-cap"] == "round"
     assert ids.index("roads-casing-lv1-bridge-shadow") < ids.index("roads-casing-lv1-bridge") < ids.index("roads-fill-lv1")
 
     monkeypatch.setattr(render_web, "CONFIG", dataclasses.replace(render_web.CONFIG, bridge_shadow=False))
@@ -2178,3 +2178,24 @@ def test_a_branching_bridge_shadow_is_cut_only_at_the_bridge_ends():
     import shapely
     sh = shapely.unary_union([shapely.LineString(s["geometry"]["coordinates"]) for s in rw._bridge_shadows(geo, "highway", 5.0)])
     assert sh.intersection(shapely.LineString([P(0, 0), P(0, 100)]).buffer(1e-9)).length / (100 * m) > 0.89   # all but the two 5 m ends
+
+
+def test_bridge_shadow_goes_straight_through_a_junction_and_each_line_keeps_its_own_number():
+    """_bridge_shadows (Kaveh 2026-10-06): where three bridge edges meet, the two going on straight are one line; the third is its own line,
+    at the lowest casing number of its own edges (not of the whole connected bridge: a bridge crossing over a lower bridge it is joined to
+    casts its shadow on it)."""
+    from roadstyle import render_web as rw
+    m = 1 / 111320.0
+    P = lambda x, y: (18.0 + x * m * 2, 59.3 + y * m)                                    # noqa: E731  about metres at 60 N
+    g = gpd.GeoDataFrame({"highway": ["primary"] * 3, "bridge": ["yes"] * 3, "edge_id": [1, 2, 3]},
+                         geometry=[LineString([P(0, 0), P(0, 50)]), LineString([P(0, 50), P(0, 100)]), LineString([P(0, 50), P(60, 50)])], crs=4326)
+    geo = rw.fc_dict(g)
+    rw._mark_lvl(geo, "tunnel", "bridge", "layer")
+    for ft, n in zip(geo["features"], (1, 1, 3), strict=True):
+        ft["properties"].update({"__rs_cs": n, "__rs_cl": n, "__rs_ce": n})
+    sh = rw._bridge_shadows(geo, "highway", 5.0)
+    by = sorted((f["properties"]["__rs_cl"], len(f["geometry"]["coordinates"])) for f in sh)
+    assert [lv for lv, _ in by] == [1, 3]                                                 # two lines: the straight one through the junction, the branch
+    straight = next(f for f in sh if f["properties"]["__rs_cl"] == 1)
+    ys = [c[1] for c in straight["geometry"]["coordinates"]]
+    assert abs((max(ys) - min(ys)) / m - 90) < 0.5                                         # 0-100 m, less the two 5 m ends where it comes down

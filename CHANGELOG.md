@@ -22,8 +22,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   listed in the editor's Issues tab.
 - **The casing follows the same line as the fill:** the casing pieces and fill halves are simplified like the roads (`tolerance` 0.05, was MapLibre's 0.375):
   the outline no longer wobbles along curves.
-- **A bridge shadow** (`bridge_shadow`, on): one continuous soft dark shadow per bridge, shifted 2 px down-right, at the lowest casing
-  number of the bridge's parts (under all of it), none over the heads where the bridge comes down.
+- **A bridge shadow** (`bridge_shadow`, on): a soft dark shadow shifted 2 px down-right, one line per stretch of bridge at the lowest casing
+  number of its own edges (a bridge crossing over a lower one it is joined to casts its shadow on it); at a junction the two straightest
+  stretches at one number go on as one line; round ends; none over the heads where the bridge comes down.
 - **Bridge casing dark grey** (`bridge_casing_color` `#374151`; black was too dark).
 - **Casing that closes:** a bridge's heavier casing keeps each piece's cap (it was always flat: two bridge pieces could not close at a bend or
   a junction), and a round seam of casing at each cut inside a road closes the outline on a curve. The fill halves of a road with two
