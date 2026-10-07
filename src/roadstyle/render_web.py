@@ -764,7 +764,8 @@ def _bridge_shadows(geo, highway_col, trim_m):
         for j in ctree.query(ch.buffer(1e-7)):
             if j != k and chains[j].distance(ch) < 1e-7:
                 parent[root(j)] = root(k)
-    member = [[i for i in br if shapely.intersection(line[i], ch).length > 0] for ch in chains]
+    near = {i: line[i].buffer(1e-7) for i in br}             # with a tolerance: the union nodes the lines and moves their points a hair, so an
+    member = [[i for i in br if ch.intersection(near[i]).length > 1e-6] for ch in chains]   # exact overlap found none and the line was dropped
     def low(p):
         return min(p.get("__rs_cs", p.get("__rs_cl", 0)), p.get("__rs_cl", 0), p.get("__rs_ce", p.get("__rs_cl", 0)))
     lvl = {}
