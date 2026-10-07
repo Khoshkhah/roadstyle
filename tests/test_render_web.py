@@ -2310,9 +2310,11 @@ def test_hiding_the_bridges_hides_their_shadow(tmp_path):
         page.goto(path.resolve().as_uri())
         page.wait_for_function("window.map && map.loaded()", timeout=30_000)
         on = page.evaluate(shown)
-        page.evaluate("rsSetBridges(false)"); page.wait_for_function("map.loaded()")
+        page.evaluate("rsSetBridges(false)")
+        page.wait_for_function("map.loaded()")
         off = page.evaluate(shown)
-        page.evaluate("rsSetBridges(true)"); page.wait_for_function("map.loaded()")
+        page.evaluate("rsSetBridges(true)")
+        page.wait_for_function("map.loaded()")
         back = page.evaluate(shown)
         browser.close()
     assert on > 0 and off == 0 and back == on
