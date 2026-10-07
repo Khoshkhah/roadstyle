@@ -2148,7 +2148,7 @@ def test_a_bridge_has_one_continuous_shadow_at_its_lowest_casing_number(monkeypa
     style = _style(render_edges(g, **kw).html)
     sh = style["sources"]["shadows"]["data"]["features"]
     span = lambda f: round((max(c[1] for c in f["geometry"]["coordinates"]) - min(c[1] for c in f["geometry"]["coordinates"])) / m)   # noqa: E731
-    assert [(f["properties"]["__rs_cl"], span(f)) for f in sh] == [(1, 50)]                    # one line, the lowest number; 60 m less the two 5 m heads
+    assert [(f["properties"]["__rs_cl"], span(f)) for f in sh] == [(1, 54)]                    # one line, the lowest number; 60 m less 3 m at each end
     lay = {l["id"]: l for l in style["layers"]}
     ids = [l["id"] for l in style["layers"]]
     s2 = lay["roads-casing-lv1-bridge-shadow"]
@@ -2206,4 +2206,4 @@ def test_bridge_shadow_goes_straight_through_a_junction_and_each_line_keeps_its_
     assert [lv for lv, _ in by] == [1, 3]                                                 # two lines: the straight one through the junction, the branch
     straight = next(f for f in sh if f["properties"]["__rs_cl"] == 1)
     ys = [c[1] for c in straight["geometry"]["coordinates"]]
-    assert abs((max(ys) - min(ys)) / m - 90) < 0.5                                         # 0-100 m, less the two 5 m ends where it comes down
+    assert abs((max(ys) - min(ys)) / m - 90) < 0.5                                         # 0-100 m, less the 5 m passed in at each end where it comes down

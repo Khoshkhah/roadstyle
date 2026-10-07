@@ -740,8 +740,7 @@ def _bridge_shadows(geo, highway_col, trim_m, max_turn=45.0):
     """The bridge shadow (Kaveh 2026-10-06): the bridge edges joined into lines (two directions of an edge drawn once); where three or more
     meet, the two that go on most straight (turning ``max_turn`` degrees at most) and have the same number are one line through the
     junction, so fewer line ends meet there; each line at the lowest casing number of its own edges (one number for a whole connected bridge put a bridge's shadow under
-    the lower bridge it crosses), no shadow over the head where the bridge comes down to the road (the edge's own head length there, else
-    ``trim_m``). Each line has its widest class. Drawn with round ends."""
+    the lower bridge it crosses), no shadow over the last ``trim_m`` metres where the bridge comes down to the road. Each line has its widest class. Drawn with round ends."""
     import numpy as np
     import shapely
     from shapely.ops import linemerge, unary_union
@@ -826,11 +825,7 @@ def _bridge_shadows(geo, highway_col, trim_m, max_turn=45.0):
             here = at(p)
             if len({frozenset([tuple(line[i].coords[0]), tuple(line[i].coords[-1])]) for i in here}) > 1:
                 return 0.0                                     # another bridge edge goes on from here
-            if not here:
-                return 0.0
-            q = feats[here[0]]["properties"]
-            start = shapely.Point(line[here[0]].coords[0]).distance(p) < 1e-7
-            return float(q.get("__rs_hs" if start else "__rs_he", trim_m))
+            return trim_m if here else 0.0                     # a fixed few metres, not the head: a long head left a short bridge almost no shadow
         lon0, lat0 = c[0]
         kx, ky = 111320.0 * math.cos(math.radians(lat0)), 111320.0
         xy = np.column_stack([np.asarray([(x - lon0) * kx for x, _ in c]), np.asarray([(y - lat0) * ky for _, y in c])])
@@ -2033,7 +2028,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                     l = {**l, "filter": ["all", l["filter"], ["!", is_b]]}
                     at = len(layers)
                 layers.append(l)
-            shadows = _bridge_shadows(geo, highway_col, head_m) if CONFIG.bridge_shadow else []
+            shadows = _bridge_shadows(geo, highway_col, CONFIG.bridge_shadow_trim_m) if CONFIG.bridge_shadow else []
             if shadows:                    # the bridge shadow: lines through junctions, each at the lowest casing number of its edges
                 style["sources"]["shadows"] = {"type": "geojson", "data": {"type": "FeatureCollection", "features": shadows},
                                                "tolerance": style["sources"]["roads"].get("tolerance", 0.375)}

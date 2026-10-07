@@ -47,6 +47,7 @@ class StyleConfig:
     bridge_shadow_color: str = "rgba(0,0,0,0.25)"
     bridge_shadow_blur: float = 4.0        # px (line-blur)
     bridge_shadow_offset: list = field(default_factory=lambda: [2, 2])   # px right, down (line-translate): lit from the top left
+    bridge_shadow_trim_m: float = 3.0      # metres of no shadow where a bridge comes down to the road (Kaveh 2026-10-06: the head length cut short bridges too much)
     twin_end_caps: bool = True         # one road-wide round end under a two-way road's two lanes
     tunnel_casing_dash: list = field(default_factory=lambda: [2, 2])   # the tunnel casing dash (osm-carto)
     tunnel_gap_shade: float = 0.25       # tunnel casing between the dashes: this much darker than a light casing
