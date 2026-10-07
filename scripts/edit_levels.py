@@ -33,10 +33,11 @@ class Area:
         self.roads = gpd.read_parquet(self.dir / "roads.parquet")
         self.pairs = pd.read_csv(self.dir / "pairs.csv", dtype=str, keep_default_na=False)
         self.edits_path = self.dir / "edits.csv"
-        # each road end's head length and cap: 5 m and round (solve_levels.defaults) under yours in heads.csv / caps.csv ("" = the default)
+        # each road end's head length and cap: solve_levels.defaults under yours in heads.csv / caps.csv ("" = the default)
         self.caps_path, self.heads_path = self.dir / "caps.csv", self.dir / "heads.csv"
         self.heads, self.caps = own(self.dir)
-        self.auto_heads = defaults(self.roads).set_index("road")                         # the default head lengths (an empty value)
+        self.defaults = defaults(self.roads, self.pairs)                                  # 5 m heads; flat caps where two roads meet, else round
+        self.auto_heads = self.defaults.set_index("road")
         if not self.edits_path.exists():
             self.edits_path.write_text(",".join(COLS) + "\n")
         self.road_of = {}                                       # any edge id -> its road id
@@ -94,7 +95,7 @@ class Area:
         if solved is None:
             solved, save = self.solve(edits), True
         self.solved = solved
-        auto = defaults(self.roads)
+        auto = self.defaults
         drawn = ends(auto, self.heads, self.caps)
         if save:
             write(solved, self.dir, drawn)
@@ -162,7 +163,7 @@ class Area:
                 if r is None or c not in ("", "round", "square", "flat") or k is None:
                     raise ValueError(f"ends: {o['road']!r} is not a road, {o.get('end')!r} not start / end, or {c!r} not auto (empty), round, square or flat")
                 v = list(caps.pop(r, ("", "")))
-                v[k] = "" if c == "round" else c                # round is every end's shape unless you set another: caps.csv keeps only those
+                v[k] = "" if c == self.defaults.set_index("road").loc[r, ("cap_start", "cap_end")[k]] else c    # the default shape: not stored
                 if any(v):
                     caps[r] = tuple(v)
             elif o["op"] == "head":

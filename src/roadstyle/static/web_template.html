@@ -946,7 +946,8 @@ const HIT = 4;
 function box(p){ return [[p.x-HIT,p.y-HIT],[p.x+HIT,p.y+HIT]]; }
 // query only layers that EXIST: the 3D view swaps roads-bridge-fill for the deck extrusions,
 // and MapLibre errors out (killing hover+click) when asked to query a missing layer id.
-const PICK_LAYERS = style.layers.map(l=>l.id)
+// the fill halves (source "halves", square_ends.md) only paint: their edge is picked in its own, transparent fill layer
+const PICK_LAYERS = style.layers.filter(l=>l.source!=="halves").map(l=>l.id)
   .filter(id=>/^roads-(low-|high-|bridge-)?fill/.test(id)).concat(RS_DECK_LAYERS);
 function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id));
   const l = ids.length ? map.queryRenderedFeatures(box(p), {layers:ids}) : [];

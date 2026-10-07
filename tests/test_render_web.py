@@ -1913,9 +1913,9 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
         with pytest.raises(ValueError):
             area.apply(bad)
     assert len(area.edits()) == 1                                                 # nothing saved
-    area.apply([{"op": "cap", "road": "12", "end": "start", "cap": "flat"}, {"op": "cap", "road": "12", "end": "end", "cap": "square"}])   # caps.csv
-    assert (tmp_path / "caps.csv").read_text().split() == ["road,start,end", "12,flat,square"] and area.facts["12"]["caps"] == ["flat", "square"]
-    area.apply([{"op": "cap", "road": "12", "end": "start", "cap": ""}, {"op": "cap", "road": "12", "end": "end", "cap": ""}])     # round again
+    area.apply([{"op": "cap", "road": "12", "end": "start", "cap": "square"}, {"op": "cap", "road": "12", "end": "end", "cap": "square"}])   # caps.csv
+    assert (tmp_path / "caps.csv").read_text().split() == ["road,start,end", "12,square,square"] and area.facts["12"]["caps"] == ["square", "square"]
+    area.apply([{"op": "cap", "road": "12", "end": "start", "cap": ""}, {"op": "cap", "road": "12", "end": "end", "cap": ""}])     # the default again
     assert (tmp_path / "caps.csv").read_text().split() == ["road,start,end"] and area.facts["12"]["caps"] == ["", ""]
     with pytest.raises(ValueError):
         area.apply([{"op": "cap", "road": "12", "end": "start", "cap": "pointy"}])
@@ -2004,7 +2004,8 @@ def test_cap_start_and_end_cols_set_one_end_each():
     halves = [f["properties"] for f in style["sources"]["halves"]["data"]["features"]]
     assert [h.get("__rs_cap") for h in halves] == [True, None]                                   # start half flat, end half round
     assert [h["__rs_road"] for h in halves] == [0, 0]                                            # its edge's id, for the recolouring
-    assert [bool(_eval(lay["roads-fill"]["filter"], p)) for p in ps] == [False, False]           # the split edge: not in the whole fill
+    assert [bool(_eval(lay["roads-fill"]["filter"], p)) for p in ps] == [True, False]            # the split edge stays in its fill layer,
+    assert [_eval(lay["roads-fill"]["paint"]["line-opacity"], p) for p in ps[:1]] == [0]          # transparent (clicks find the edge), the halves paint it
     assert [bool(_eval(lay["roads-fill-sx"]["filter"], p)) for p in ps] == [False, True]
     assert [[bool(_eval(lay[i]["filter"], h)) for h in halves] for i in ("roads-fill-hsq", "roads-fill-h")] == [[True, False], [False, True]]
     assert lay["roads-fill-hsq"]["layout"]["line-cap"] == "butt" and lay["roads-fill-h"]["source"] == "halves"
@@ -2081,3 +2082,24 @@ def test_heads_over_the_whole_road_leave_no_main_part():
     heads = lambda s, e: pd.DataFrame([{"road": "1", "start_m": s, "end_m": e}])          # noqa: E731
     assert rs.casing_parts(roads, 5.0, heads("6", "3.97"))["1"][1] is None
     assert rs.casing_parts(roads, 5.0, heads("6", "3.8"))["1"][1] is not None
+
+
+def test_default_caps_are_flat_where_only_two_roads_meet():
+    """scripts/solve_levels.defaults (Kaveh 2026-10-06): a flat cap where exactly two road ends meet with a bend of 15 degrees at most;
+    round at a junction of three, at a dead end and at a sharper bend."""
+    import sys
+
+    import roadstyle as rs
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    from solve_levels import defaults
+    P = lambda x, y: (674000 + x, 6580000 + y)                                         # noqa: E731
+    g = gpd.GeoDataFrame({"highway": ["residential"] * 5, "edge_id": [1, 2, 3, 4, 5]},
+                         geometry=[LineString([P(0, 0), P(50, 0)]), LineString([P(50, 0), P(100, 4)]),       # 1 -> 2: straight on (about 5 degrees)
+                                   LineString([P(100, 4), P(150, 4)]), LineString([P(100, 4), P(100, 60)]),  # 2 -> 3 and 4: a junction of three
+                                   LineString([P(0, 0), P(-40, 30)])], crs=3006)                            # 5 -> 1: a sharp bend
+    roads, pairs = rs.level_input(g)
+    d = defaults(roads, pairs).set_index("road")
+    assert d.loc["1", "cap_end"] == "flat" and d.loc["2", "cap_start"] == "flat"                    # two roads, straight on
+    assert d.loc["2", "cap_end"] == "round" and d.loc["3", "cap_start"] == "round"                  # three roads
+    assert d.loc["1", "cap_start"] == "round" and d.loc["5", "cap_end"] == "round"                  # a sharp bend; a dead end
+    assert (d["start_m"] == 5).all() and (d["end_m"] == 5).all()

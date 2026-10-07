@@ -1849,7 +1849,7 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     # round layer (a band's casings stay under its fills). Dashed classes draw butt-capped already.
     # A "square" value gets a square-capped twin (-sx): flat, but as far past the end point as a round end.
     # An edge with two different ends draws its fill from "halves" (two pieces, -h / -hsq / -hsx twins of roads-fill) and its casing
-    # from the heads; the whole-edge fill layers leave it out.
+    # from the heads; the whole-edge fill layers keep it, transparent: a click, a hover and a selection still find the edge itself.
     if splits or any(ft["properties"].get("__rs_cap") for ft in geo["features"]) or (parts and any(f["properties"].get("__rs_cap") for f in parts)):
         sq = ["to-boolean", ["get", "__rs_cap"]]
         sx = ["==", ["get", "__rs_cap"], "square"]
@@ -1861,7 +1861,9 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         for l in style["layers"]:
             if l["id"] in ("roads-low-casing", "roads-low-fill", "roads-casing", "roads-fill",
                            "roads-high-casing", "roads-high-fill"):
-                own = [whole] if splits and l["id"] == "roads-fill" else []
+                own = []
+                if splits and l["id"] == "roads-fill":
+                    l = {**l, "paint": {**l["paint"], "line-opacity": ["case", ["!", whole], 0, l["paint"].get("line-opacity", 1)]}}
                 capped.append({**l, "filter": ["all", l["filter"], ["!", sq], *own]})
                 capped.append({**l, "id": l["id"] + "-sq", "layout": {**l["layout"], "line-cap": "butt"},
                                "filter": ["all", l["filter"], sq, ["!", sx], *own]})
