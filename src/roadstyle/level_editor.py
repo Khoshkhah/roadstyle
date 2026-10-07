@@ -32,7 +32,7 @@ class Area:
         self.edits_path = self.dir / "edits.csv"
         # each road end's head length and cap: solve_levels.defaults under yours in heads.csv / caps.csv ("" = the default)
         self.caps_path, self.heads_path = self.dir / "caps.csv", self.dir / "heads.csv"
-        self.heads, self.caps = own(self.dir)
+        self.heads, self.caps = own(self.dir, self.roads)
         self.defaults = defaults(self.roads, self.pairs)                                  # 5 m heads; flat caps where two roads meet, else round
         self.auto_heads = self.defaults.set_index("road")
         if not self.edits_path.exists():

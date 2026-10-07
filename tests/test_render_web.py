@@ -2050,6 +2050,22 @@ def test_an_area_of_a_database_writes_its_result_into_it(tmp_path):
     con.close()
 
 
+def test_heads_and_caps_may_name_either_direction_of_a_road(tmp_path):
+    """heads.csv / caps.csv rows name a road by any of its edges, as edits.csv does: an edge running against its road swaps start and end;
+    a row naming no road is an error, never left out."""
+    import pandas as pd
+
+    from roadstyle.level_area import own
+    roads = pd.DataFrame({"road": ["1"], "edges": [["1"]], "reversed": [["2"]]})
+    (tmp_path / "heads.csv").write_text("road,start_m,end_m\n2,3.0,\n")
+    (tmp_path / "caps.csv").write_text("road,start,end\n1,flat,round\n")
+    heads, caps = own(tmp_path, roads)
+    assert heads == {"1": ("", "3.0")} and caps == {"1": ("flat", "round")}
+    (tmp_path / "caps.csv").write_text("road,start,end\n9,flat,\n")
+    with pytest.raises(ValueError, match="no road of this area"):
+        own(tmp_path, roads)
+
+
 def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     """The level editor (roadstyle.level_editor): the pairs between two roads (by any edge id), an edit the solver refuses is not written, a
     taken one is written with the file before it kept as edits.csv.bak, and levels.csv follows."""

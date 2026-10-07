@@ -64,7 +64,7 @@ def solve_area(folder, auto_ends=False, max_positions=None):
     folder = Path(folder)
     roads = gpd.read_parquet(folder / "roads.parquet")
     edits = folder / "edits.csv"
-    heads, caps = own(folder)
+    heads, caps = own(folder, roads)
     solved, drawn, _ = solve(roads, folder / "pairs.csv", edits if edits.exists() else None, heads, caps, auto=auto_ends,
                              max_positions=max_positions)
     write(solved, folder, drawn)
@@ -84,8 +84,13 @@ def edge_levels(solved, ends_table):
     return pd.DataFrame(rows, columns=["edge", "casing_start", "casing_level", "casing_end", "fill_level", "head_start_m", "head_end_m", "cap_start", "cap_end"])
 
 
-def own(folder):
-    """Your own head lengths and caps: heads.csv / caps.csv as {road: (start, end)} ("" = the automatic one)."""
+def own(folder, roads):
+    """Your own head lengths and caps: heads.csv / caps.csv as {road: (start, end)} ("" = the automatic one). A row may name any edge of a
+    road, as edits.csv does: an edge running against its road has its start and end swapped. A row naming no road of ``roads`` is an error."""
+    side = {str(r): (str(r), False) for r in roads["road"]}
+    for r, fw, bw in zip(roads["road"], roads["edges"], roads["reversed"], strict=True):
+        side.update({str(x): (str(r), False) for x in fw} | {str(x): (str(r), True) for x in bw})
+
     def read(path, cols):
         if not path.exists():
             return {}
@@ -94,7 +99,17 @@ def own(folder):
             f["start"] = f["end"] = f["cap"]
         if cols[0] not in f:                                    # older still: only the roads, flat
             f[cols[0]] = f[cols[1]] = "flat"
-        return {r: (s, e) for r, s, e in zip(f["road"], f[cols[0]], f[cols[1]], strict=True)}
+        unknown = [r for r in f["road"] if r not in side]
+        if unknown:
+            raise ValueError(f"{path}: {len(unknown)} row(s) name no road of this area (first: {unknown[:5]})")
+        out = {}
+        for r, s, e in zip(f["road"], f[cols[0]], f[cols[1]], strict=True):
+            road, rev = side[r]
+            v = (e, s) if rev else (s, e)
+            if out.get(road, v) != v:
+                raise ValueError(f"{path}: two rows for road {road} (by its two directions) disagree: {out[road]} and {v}")
+            out[road] = v
+        return out
     return read(Path(folder) / "heads.csv", ("start_m", "end_m")), read(Path(folder) / "caps.csv", ("start", "end"))
 
 
