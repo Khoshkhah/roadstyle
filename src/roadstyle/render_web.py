@@ -1869,7 +1869,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
         squares = any("square" in (p.get("__rs_cap"), p.get("__rs_cap0"), p.get("__rs_cap1")) for p in (ft["properties"] for ft in geo["features"]))
         whole = ["!", ["to-boolean", ["get", "__rs_split"]]]
         if splits:
-            style["sources"]["halves"] = {"type": "geojson", "data": {"type": "FeatureCollection", "features": _halves(geo)}}
+            style["sources"]["halves"] = {"type": "geojson", "data": {"type": "FeatureCollection", "features": _halves(geo)},
+                                          "tolerance": style["sources"]["roads"].get("tolerance", 0.375)}   # the same line as the roads' fill
         capped = []
         for l in style["layers"]:
             if l["id"] in ("roads-low-casing", "roads-low-fill", "roads-casing", "roads-fill",
@@ -1897,7 +1898,10 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
     if levels:
         style["layers"] = [l for l in style["layers"] if not l["id"].startswith(("roads-low-", "roads-high-")) and l["id"] not in ("roads-bridge-casing", "roads-bridge-fill")]   # the three bands are gone: positions only
         if divided:       # the divided casing: its own source of pieces (one casing piece per head and for the main part)
-            style["sources"]["casings"] = {"type": "geojson", "data": {"type": "FeatureCollection", "features": parts}}
+            # simplified like the roads (their fill): with MapLibre's default (0.375, 7x coarser) the outline followed a more angular line than
+            # the fill it surrounds and wobbled along curves (Kaveh 2026-10-06: "not smooth")
+            style["sources"]["casings"] = {"type": "geojson", "data": {"type": "FeatureCollection", "features": parts},
+                                           "tolerance": style["sources"]["roads"].get("tolerance", 0.375)}
         if any(ft["properties"].get("__rs_bridge") for ft in geo["features"]):
             # the bridge look in position mode: a heavier black casing, in the casing layers of the edge's position (docs/design/
             # levels_split_casing.md, section 9), one twin of each casing layer so a bridge piece keeps its end's cap (round, flat, square;

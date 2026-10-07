@@ -2008,6 +2008,7 @@ def test_cap_start_and_end_cols_set_one_end_each():
     halves = [f["properties"] for f in style["sources"]["halves"]["data"]["features"]]
     assert [h.get("__rs_cap") for h in halves] == [True, None]                                   # start half flat, end half round
     assert [h["__rs_road"] for h in halves] == [0, 0]                                            # its edge's id, for the recolouring
+    assert style["sources"]["halves"]["tolerance"] == style["sources"]["casings"]["tolerance"] == style["sources"]["roads"]["tolerance"]   # one line
     assert [bool(_eval(lay["roads-fill"]["filter"], p)) for p in ps] == [True, False]            # the split edge stays in its fill layer,
     assert [_eval(lay["roads-fill"]["paint"]["line-opacity"], p) for p in ps[:1]] == [0]          # transparent (clicks find the edge), the halves paint it
     assert [bool(_eval(lay["roads-fill-sx"]["filter"], p)) for p in ps] == [False, True]
