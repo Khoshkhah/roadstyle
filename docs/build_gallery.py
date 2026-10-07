@@ -3,7 +3,8 @@
 Renders the bundled Södermalm driving sample in each look and snapshots it headlessly via
 :func:`rs.snapshot` (needs Playwright + Chromium); the hero and the two Street View shots go
 through :func:`served_shot` instead (served over http, a road selected). Re-run after a visual
-change (build ui/dashboard and ui/report first; not the studio shot, which is taken by hand)::
+change (build ui/dashboard and ui/report first; not the studio shot and not the README's top picture docs/img/hero.jpg, which are
+taken by hand: the top picture from a Monaco page in 3D with Street View open)::
 
     python docs/build_gallery.py
 """
@@ -48,9 +49,8 @@ def main() -> None:
         wm = rs.render_edges(edges, backend="web", **kw)
         rs.snapshot(wm, OUT / f"{name}.png", width=960, height=640, settle=4.0, **cam)
         print("wrote", name)
-    hero(edges)
     street_view_shots(edges)
-    print("wrote hero, street_view_window, street_view_side")
+    print("wrote street_view_window, street_view_below, street_view_side")
     # the sidebar templates (ui/dashboard, ui/report) — shot as pages, not WebMaps. Build them
     # first (their build.py writes the .html) so the shots reflect the current sidebars.
     root = Path(__file__).resolve().parents[1]
@@ -105,21 +105,6 @@ def served_shot(html: str, png: Path, setup_js: str, width: int, height: int, sc
             srv.shutdown()
 
 
-HIDE = "<style>.maplibregl-ctrl-bottom-left,.rs-zoom{display:none!important}</style></head>"
-
-
-def hero(edges) -> None:
-    """The README hero: the Street View window open on Hornsgatan, 1200x600 at 2x, as a JPEG."""
-    from PIL import Image
-    html = rs.render_edges(edges, filter_control=False, basemap_switcher=False,
-                           road_popup=False).html.replace("</head>", HIDE, 1)
-    png = OUT / "hero.png"
-    served_shot(html, png, SELECT + """rsSetStreetView(true);
-        Object.assign(document.querySelector(".rs-svw").style,
-                      {left: "610px", top: "215px", width: "560px", height: "355px"});""",
-                1200, 600, scale=2)
-    Image.open(png).convert("RGB").save(OUT.parent / "hero.jpg", quality=85, optimize=True)
-    png.unlink()
 
 
 def street_view_shots(edges) -> None:

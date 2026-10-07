@@ -3,7 +3,7 @@
 <p class="lead">Turn a road network into a styled, interactive HTML map that works offline, with Google Street View and a JavaScript API.</p>
 
 <div class="rs-hero" markdown>
-![A roadstyle map of Södermalm: Hornsgatan selected, and the floating Street View window showing it](img/hero.jpg)
+![A roadstyle map of Monaco in 3D: bridges, tunnels and roundabouts drawn in order, Rue de la Colle selected, and the floating Street View window showing it](img/hero.jpg)
 </div>
 
 ```bash

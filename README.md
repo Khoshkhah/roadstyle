@@ -25,7 +25,7 @@
   <a href="https://khoshkhah.github.io/roadstyle/">Documentation</a>
 </p>
 
-![A roadstyle map of Södermalm, Stockholm: Hornsgatan selected on the map, and the floating Street View window showing it](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/hero.jpg)
+![A roadstyle map of Monaco in 3D: bridges, tunnels and roundabouts drawn in order, Rue de la Colle selected, and the floating Street View window showing it](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/hero.jpg)
 
 ## Why roadstyle
 
