@@ -2107,7 +2107,7 @@ def test_rsfilter_and_rscolor_by_ids_in_the_browser(tmp_path):
     the page, 2026-10-07): in a real page they show only those roads, paint them, and reset."""
     pw = pytest.importorskip("playwright.sync_api")
     path = tmp_path / "f.html"
-    render_edges(_edges(), backend="web", basemap="blank").save(path)
+    render_edges(_edges().assign(c0="round", c1="flat"), backend="web", basemap="blank", cap_start_col="c0", cap_end_col="c1").save(path)   # two ends: fill halves
     shown = "() => new Set(map.queryRenderedFeatures().filter(f => f.source === 'roads').map(f => f.id)).size"
     errors = []
     with pw.sync_playwright() as p:
@@ -2117,17 +2117,19 @@ def test_rsfilter_and_rscolor_by_ids_in_the_browser(tmp_path):
         page.goto(path.resolve().as_uri())
         page.wait_for_function("window.map && map.loaded()", timeout=30_000)
         every = page.evaluate(shown)
+        drawn = page.evaluate("() => map.queryRenderedFeatures().filter(f => f.source === 'halves').length")
         page.evaluate("rsFilter([0, 0])")
         page.wait_for_function("map.loaded()")
         one = page.evaluate(shown)
         page.evaluate("rsFilter([])")
         page.wait_for_function("map.loaded()")
         none = page.evaluate(shown)
+        halves = page.evaluate("() => map.queryRenderedFeatures().filter(f => f.source === 'halves').length")
         page.evaluate("rsFilter(null); rsColor([1], '#ff0000')")
         page.wait_for_function("map.loaded()")
         back = page.evaluate(shown)
         browser.close()
-    assert errors == [] and every > 1 and one == 1 and none == 0 and back == every
+    assert errors == [] and every > 1 and one == 1 and none == 0 and back == every and drawn > 0 and halves == 0   # the fill halves go with their road
 
 
 def test_a_footway_on_a_street_the_other_way_round_is_no_lane_of_it():

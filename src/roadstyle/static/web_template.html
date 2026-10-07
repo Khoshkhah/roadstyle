@@ -489,7 +489,8 @@ function _applyRoadFilters(){
     const isRoads = kind==="roads";
     if(_qIds && isRoads){ const qf=_has(["id"],_qIds); f=f?["all",f,qf]:qf; }
     // the pieces of a divided casing (levels_split_casing.md) carry their edge's id as __rs_road
-    if(_qIds && kind==="casings"){ const qf=_has(["get","__rs_road"],_qIds); f=f?["all",f,qf]:qf; }
+    // and the fill halves of an edge with two different ends (square_ends.md) too: without them its colour stayed when the road was filtered out
+    if(_qIds && (kind==="casings" || kind==="halves")){ const qf=_has(["get","__rs_road"],_qIds); f=f?["all",f,qf]:qf; }
     // a two-way pair's end cap (twin_ends.md) and an arrow or a street name (edge_overlays.md) stay while either of their two edges is shown
     if(_qIds && (kind==="ends" || kind==="slots" || kind==="arrows")){
       const qf=["any",_has(["get","__rs_road"],_qIds),_has(["get","__rs_road2"],_qIds)]; f=f?["all",f,qf]:qf; }
