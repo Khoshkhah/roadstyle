@@ -51,7 +51,7 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | **Helpers** | | |
 | `compute_levels(edges, band_col=None, order="priority", ...)` | edges + 4 columns | the level step in one call: `casing_start`, `casing_level`, `casing_end`, `fill_level` ([design](../design/level_input.md)) |
 | `level_input(edges, id_col="edge_id", ...)` | `(roads, pairs)` | the solver's input from any edges: one row per road, one row per relation (`meet`, `stack`, `order`) |
-| `solve_levels(roads, pairs, edits=None, ...)` | roads + 4 columns | the solver; `edits` switch pairs off or add them |
+| `solve_levels(roads, pairs, edits=None, ...)` | roads + 4 columns | the solver; `edits` switch pairs off or add them; `fixed` (`{road: (casing_start, casing_level, casing_end, fill_level)}`) holds those roads' numbers and solves the others (the editor's local re-solve) |
 | `resolve(highway, palette, tunnel, bridge)` | `ResolvedStyle` | one edge's resolved style |
 | `base_style(highway, palette="amber")` | `RoadStyle` | the palette entry for a class |
 | `selection_style(base_width=4.0)` | `dict` | the selection profile scaled to a width |

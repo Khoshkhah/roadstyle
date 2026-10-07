@@ -161,12 +161,13 @@ def _relations(metres, ends, beta, omega, band_dist, mouths=True):
     return meets, stacks, orders
 
 
-def _solve_intervals(metres, meets, stacks, orders, limit, max_level, margin, min_positions=True, max_positions=None, forced=(), off=(), empty=(), near=()):
+def _solve_intervals(metres, meets, stacks, orders, limit, max_level, margin, min_positions=True, max_positions=None, forced=(), off=(), empty=(), near=(), fix=None):
     """The solver on roads (one per segment, both directions together) and their relations (:func:`_relations`, or a pairs table). Every road has
     one fill number ``b`` and a casing of three parts: a start head, a main part and an end head, whatever its length (2026-10-06: the
     drawing gives a part its metres, zero for the main part of a road shorter than its two heads; the solver takes no length). ``empty``: the
     roads whose main part is drawn with no length; a stack never lifts it (a rule on a part nobody sees would only cost real ones). ``near``:
     the stack rules ``(upper, lower, "s" / "m" / "e")`` whose part does not cross the lower road: kept last, after the order wishes (2026-10-06: a part that only comes near is a warning, never worth a real crossing or a wish); an edit's part is never near.
+    ``fix``: ``{road: (a_start, a_main, a_end, b)}``, numbers held as they are (bounds; the editor's local re-solve), the others solved with the same rules.
     Returns ``(parts, given_up, info)``: ``parts[r] = (a_start, a_main, a_end, b)``. The model is a linear program solved on a sparse matrix with
     HiGHS (docs/design/levels_split_casing.md, section 7)."""
     import time
@@ -265,17 +266,21 @@ def _solve_intervals(metres, meets, stacks, orders, limit, max_level, margin, mi
         x = None if r.x is None else r.x * margin
         return SimpleNamespace(status={0: 0, 2: 2}.get(r.status, r.status), x=x, fun=None if r.fun is None else r.fun * margin, message=r.message)
     box = (0, 2 * max_level)                                  # non-negative: the lowest number is pinned at 0; the shift to the ground comes afterwards
+    within = [box] * ncol                                      # the bounds of every column: a fixed road's four held at its numbers
+    for r, v in (fix or {}).items():
+        for c, x in zip((part[r]["s"], part[r]["m"], part[r]["e"], r), v, strict=True):
+            within[c] = (x, x)
     solves, staged = 1, False
-    x0 = _difference_lp(cost, A0, b_ub, box[1])                # stage 0: nothing violated; a min-cost flow
+    x0 = None if fix else _difference_lp(cost, A0, b_ub, box[1])   # stage 0: nothing violated; a min-cost flow (it knows no bounds but the box)
     if x0 is not None:
         res, how = SimpleNamespace(status=0, x=x0), "flow"
     else:
-        res, how = solve(cost, A0, b_ub, box), "highs"          # the flow cannot certify: the LP with HiGHS
+        res, how = solve(cost, A0, b_ub, within), "highs"       # the flow cannot certify (or some numbers are held): the LP with HiGHS
     slack = np.zeros(nP + nO)
     if res.status == 2:                                        # infeasible: some stack rules / wishes must be broken: stages with slacks
         S = sp.csr_matrix((-np.ones(nP + nO), (np.arange(base, nrow), np.arange(nP + nO))), shape=(nrow, nP + nO))
         A1 = sp.hstack([A0, S], format="csr")
-        bounds = [box] * ncol + [(0, None)] * (nP + nO)
+        bounds = within + [(0, None)] * (nP + nO)
         rn = np.asarray(row_near, dtype=bool)
         stages = [np.concatenate([np.zeros(ncol), (~rn).astype(float), np.zeros(nO)]),     # 1: the real crossings
                   np.concatenate([np.zeros(ncol), np.zeros(nP), np.ones(nO)]),             # 2: the order wishes
@@ -515,7 +520,7 @@ def _crosses(part, upper, lower, tol=0.5):
     return not x.difference(ends).is_empty
 
 
-def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=60.0, min_positions=True, max_positions=None, parts=None):
+def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=60.0, min_positions=True, max_positions=None, parts=None, fixed=None):
     """Solve the drawing levels of ``roads`` from their ``pairs`` (both from :func:`level_input`, or read back from ``roads.parquet`` /
     ``pairs.csv``) and the caller's ``edits`` (a table or a CSV with the columns of ``pairs`` and ``enabled``: a row with ``enabled`` false
     switches off the same relation of ``pairs``, any other row is added; ``a`` / ``b`` may name any edge of a road, and a ``meet`` naming the
@@ -526,7 +531,9 @@ def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=
     stack pairs that could not be kept, as road ids) and ``attrs["levels_info"]``. Every road has three casing parts whatever its length: the head lengths are the drawing's (``render_edges(head_m=...)``);
     ``parts`` (:func:`casing_parts`: the parts as drawn) tells it the roads whose main part has no length (never lifted) and, for each stack
     pair, which parts of the upper road cross the lower one: a part that only comes near is a last-priority rule, and when it breaks a
-    warning (``attrs["levels_near"]``), not a given-up pair. Without ``parts`` every main part counts and every rule is a crossing."""
+    warning (``attrs["levels_near"]``), not a given-up pair. Without ``parts`` every main part counts and every rule is a crossing.
+    ``fixed``: ``{road: (casing_start, casing_level, casing_end, fill_level)}``, numbers of an earlier result held as they are; only the other
+    roads are solved, with the same rules (the level editor's local re-solve, level_area.solve_local)."""
     of, back = {}, set()                                       # any edge id -> its road's row; the ids of the edges that run against their road
     for i, r in enumerate(roads.itertuples()):
         for e in [r.road, *list(r.edges), *list(r.reversed)]:
@@ -574,8 +581,13 @@ def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=
         own = {(idx[r["a"]], idx[r["b"]]) for r in rel.values() if r.get("own") and r["relation"] == "stack"}
         near = [(u, l, h) for u, l in stacks if (u, l) not in own for h, p in zip("sme", parts[ids[u]], strict=True)
                 if p is not None and not _crosses(p, geo[u], geo[l])]
+    fix = None
+    if fixed:                                                  # an earlier result's numbers (around its ground 0) into the box [0, 2 max_level]
+        fix = {idx[r]: tuple((x + max_level) * margin for x in v) for r, v in fixed.items()}
+        if any(not 0 <= x <= 2 * max_level * margin for v in fix.values() for x in v):
+            raise ValueError(f"solve_levels: a fixed number is outside [-max_level, max_level] ({max_level})")
     iv, given, info = _solve_intervals(list(_metres(roads.geometry)), meets, stacks, orders, time_limit, max_level, margin, min_positions,
-                                       max_positions, forced, off, empty, near)
+                                       max_positions, forced, off, empty, near, fix)
     counts = defaultdict(int)                                  # the solution can sit at any height: the main casing number most edges have becomes 0 (the ground)
     for r, row in enumerate(roads.itertuples()):
         counts[iv[r][1]] += len(row.edges) + len(row.reversed)

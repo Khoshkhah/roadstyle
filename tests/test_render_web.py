@@ -2098,6 +2098,7 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
         area.change(pd.DataFrame([{"relation": "stack", "a": "999", "b": "11", "a_end": "", "b_end": "", "enabled": "true"}]))
     assert (tmp_path / "edits.csv").read_text() == before
     area.change(pd.DataFrame([{"relation": "order", "a": "12", "b": "11", "a_end": "", "b_end": "", "enabled": "false"}]))
+    assert area.said.startswith("solved the whole area") and area.full                    # every road of this tiny area is around the change
     assert "false" in (tmp_path / "edits.csv").read_text() and (tmp_path / "edits.csv.bak").read_text() == before
     new = [r for r in area.relations("11", "12")["rows"] if r["section"] == "new"]
     assert len(new) == 1 and (tmp_path / "levels.csv").exists()                  # added in this session: "new", not "saved"
@@ -2135,6 +2136,33 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     with pytest.raises(ValueError):                                                       # both heads together cannot be more than the road
         L = area.facts["12"]["length_m"]
         area.apply([{"op": "head", "road": "12", "end": "start", "m": str(L)}, {"op": "head", "road": "12", "end": "end", "m": "1"}])
+
+
+def test_the_editor_re_solves_only_the_roads_around_a_change():
+    """level_area.solve_local (the editor's Apply): the roads around a change are solved again with the same rules, every other road keeps its
+    numbers; a local result that breaks what the previous one kept is not used: the whole area is solved, and the result says so and why."""
+    pytest.importorskip("scipy")
+    import pandas as pd
+
+    import roadstyle as rs
+    from roadstyle.level_area import LEVELS, around, solve, solve_local
+    roads, pairs = rs.level_input(_edge_world())       # ground 11 - tunnel 12 - ground 14 in a line, street 13 crossing over the tunnel's middle
+    prev = solve(roads, pairs, None, {}, {})[0]
+    assert around(roads, pairs, None, ["13"], 1) == {"13", "12"} and around(roads, pairs, None, ["13"], 2) == {"11", "12", "13", "14"}
+    row = lambda **k: pd.DataFrame([{"relation": "stack", "a_end": "", "b_end": "", "enabled": "true", **k}])     # noqa: E731
+    off = pd.DataFrame([{"relation": "order", "a": "12", "b": "14", "a_end": "", "b_end": "", "enabled": "false"}])
+    out = solve_local(roads, pairs, off, {}, {}, prev, ["12", "14"], hops=0)[0]
+    lv = out.set_index("road")[LEVELS]
+    assert out.attrs["levels_info"]["resolve"]["how"] == "local" and out.attrs["levels_info"]["resolve"]["free"] == 2
+    was = prev.set_index("road")[LEVELS]
+    assert (lv.loc["13"] - lv.loc["11"] == was.loc["13"] - was.loc["11"]).all()        # held as they were (the ground 0 may move: one shift)
+    assert min(lv.loc["13"]) > lv.loc["12", "fill_level"] > lv.loc["11", "fill_level"]                  # the rules: 13 over 12, the wish 12 after 11
+    out = solve_local(roads, pairs, row(a="11", b="13"), {}, {}, prev, ["11"], hops=0)[0]   # 11 over 13 with 13 held over the tunnel 11's head joins:
+    r = out.attrs["levels_info"]["resolve"]                                                # locally a crossing given up: the whole area instead
+    assert r["how"] == "full" and "given up that were kept" in r["why"]
+    full = solve(roads, pairs, row(a="11", b="13"), {}, {})[0]
+    assert (out[LEVELS] == full[LEVELS]).all().all() and out.attrs["levels_given_up"] == full.attrs["levels_given_up"]
+    assert solve_local(roads, pairs, row(a="11", b="13"), {}, {}, prev, ["11"])[0].attrs["levels_info"]["resolve"]["why"] == "every road is around the change"
 
 
 def test_edits_name_either_direction_of_a_road():

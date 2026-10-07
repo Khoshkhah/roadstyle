@@ -436,10 +436,10 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   $("lv-apply").onclick = async () => {
     if(!queue.length) return;
     $("lv-apply").disabled = true; busy(`Solving the levels with ${queue.length} change${queue.length > 1 ? "s" : ""} …`);
-    try { await api("/api/apply", {ops: queue.map(q => q.op === "cap" ? {op: "cap", road: q.road, end: q.end, cap: q.cap} : q.op === "head" ? {op: "head", road: q.road, end: q.end, m: q.m} : q.op === "delete" ? {op: "delete", index: q.index, row: q.raw} : {op: "add", body: q.body})});
-      const said = `Applied ${queue.length} change${queue.length > 1 ? "s" : ""}`;
+    try { const j = await api("/api/apply", {ops: queue.map(q => q.op === "cap" ? {op: "cap", road: q.road, end: q.end, cap: q.cap} : q.op === "head" ? {op: "head", road: q.road, end: q.end, m: q.m} : q.op === "delete" ? {op: "delete", index: q.index, row: q.raw} : {op: "add", body: q.body})});
+      const said = `Applied ${queue.length} change${queue.length > 1 ? "s" : ""} · ${j.said}`;
       queue = []; showQueue(); busy("Drawing the new map …");
-      sessionStorage.setItem("lv-view", JSON.stringify({c: map.getCenter(), z: map.getZoom(), b: map.getBearing(), p: map.getPitch(), sel: sel, said: said,
+      sessionStorage.setItem("lv-view", JSON.stringify({c: map.getCenter(), z: map.getZoom(), b: map.getBearing(), p: map.getPitch(), sel: sel, said: said, full: j.full,
         open: document.body.classList.contains("lv-open")}));
       location.reload();
     } catch(err){ busy(null); toast(err.message + " · nothing saved", true); $("lv-apply").disabled = false; }
@@ -480,7 +480,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     const v = JSON.parse(sessionStorage.getItem("lv-view") || "null");
     if(v){ sessionStorage.removeItem("lv-view"); map.jumpTo({center: v.c, zoom: v.z, bearing: v.b, pitch: v.p});
       sel[0] = v.sel[0]; sel[1] = v.sel[1];
-      if(v.said) map.once("idle", () => { busy(null); $("lv-busy").classList.remove("solid"); toast(v.said + " · solved"); });
+      if(v.said) map.once("idle", () => { busy(null); $("lv-busy").classList.remove("solid"); toast(v.said, v.full); });   // a whole solve instead of the local one: shown longer
       if(!v.open){ document.body.classList.remove("lv-open"); $("lv-toggle").textContent = "‹"; resize(); } }
     update(); lists(); givenUp(); showQueue();
   }

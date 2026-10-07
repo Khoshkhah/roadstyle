@@ -14,6 +14,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **An area of a database:** `make_area(edges, folder, db=...)` ties the area to a .duckdb file (`area.json`); every solve of it, the editor's
   too, writes the result with each edge's ends into `visualization.edge_levels` (`rs.save_area_levels`), and `rs.load_area_levels(con, edges)`
   reads it back (refusing other edges). duckOSM's `duckosm levels` makes such an area for all modes.
+- **The editor's *Apply and solve* re-solves only the roads around the change** (`roadstyle.level_area.solve_local`,
+  `rs.solve_levels(fixed=...)`): the roads within three relations of the changed ones are solved again with the same rules, every other road
+  keeps its numbers. When the local result breaks a crossing the previous one kept, has more order wishes not kept, near warnings or drawing
+  positions, or the solver fails, the whole area is solved instead and the page says so and why. `roadstyle-levels solve` stays a whole solve.
 
 ## [0.16.0] — 2026-10-07
 

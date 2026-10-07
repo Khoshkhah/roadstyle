@@ -113,6 +113,35 @@ pair editor is not used.
 In Python: `roads, pairs = rs.level_input(edges)`, `solved = rs.solve_levels(roads, pairs, edits=...)`; `rs.compute_levels(edges)` is both in
 one call and returns the edges with the four columns.
 
+## The editor re-solves only the roads around a change (2026-10-07)
+
+On the all-modes Monaco area (6,594 roads, 4,949 stack pairs, one connected graph) a whole solve takes about 50 s, nearly all of it in the
+last stage (cost and fewest positions). *Apply and solve* now solves only the roads around the change (`level_area.solve_local`): the roads
+the change names (the edit rows added or taken out, the roads whose heads changed) and every road within **three relations** of them (meet,
+stack, order, in the pairs and the edits) are solved again; every other road keeps its numbers (`solve_levels(fixed=...)`: bounds, the same
+model and stages). Three, since a rule reaches its roads' neighbours through the meets (a head under the fills it joins) and the next ring
+gives them room; two gave up one order wish more than three in one of six edits, four was slower and no better.
+
+No silent fallback: the local result is not used, and the whole area is solved, when it gives up a crossing part the previous result kept,
+has more order wishes not kept, more near warnings or more drawing positions than the previous one, or the solver fails; the toast after the
+reload says which solve it was and why (`levels_info["resolve"]`: `how` local / full, `why`, `free`, `seconds`). `roadstyle-levels solve`
+stays a whole solve. Monaco, eight edits (a stack pair switched off, a stack on one part added, an order turned round, a head changed; two
+of each):
+
+| | local (3 relations) | whole solve |
+|---|---|---|
+| seconds | 1.9-2.7 (40-230 free roads) | 44-56 |
+| crossings given up | 0 | 0 |
+| near warnings | as the whole solve | |
+| drawing positions | as the whole solve | |
+| order wishes not kept | the whole solve's, or one more (2 of 6) | |
+
+One edit (an order turned round) made more near warnings locally: the whole area was solved (about 53 s), and it had the same count.
+In one other edit (a head) the whole solve stopped at its time limit (60 s for one stage) and failed; the local one took 2 s.
+Limits: the local result is optimal for its free roads only, so a whole solve may keep a wish the local one gives up (one, above), and a
+change that really costs a rule (an edit against a crossing) is always solved twice (about 2 s, then the whole). The ground (the number 0)
+is chosen again after each solve, so the numbers of a held road may all move by one; its order with every other road stays.
+
 ## Compared on Monaco (2,765 driving edges, 2026-10-06)
 
 | | v1, class order | v1, priority | v2 test (tiers) | this |

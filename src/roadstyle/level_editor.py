@@ -19,7 +19,7 @@ import pandas as pd
 import roadstyle as rs
 from roadstyle import render_web
 
-from .level_area import defaults, ends, own, solve, write
+from .level_area import defaults, ends, own, solve, solve_local, write
 
 COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"]
 
@@ -127,11 +127,20 @@ class Area:
 
     def change(self, edits, saved=None, caps=None, heads=None):
         """Solve with ``edits``; save them (and the drawing's ``caps``, road -> (start, end) of "" / "square" / "flat", and ``heads``, road ->
-        (start_m, end_m), which tell the solver the empty mains) only if the solver takes them. Only caps changed: no solve."""
-        if edits is None and heads == self.heads:              # only the ends' shapes changed: the levels as they are
-            solved = self.solved
+        (start_m, end_m), which tell the solver the empty mains) only if the solver takes them. Only caps changed: no solve. The solve is local
+        (level_area.solve_local: the roads around the change, the others as they were), or the whole area when the local result would not do;
+        ``said`` tells which, and why."""
+        if edits is None and (heads is None or heads == self.heads):     # only the ends' shapes changed: the levels as they are
+            solved, self.said, self.full = self.solved, "not solved again (only caps)", False
         else:
-            solved = self.solve(self.edits() if edits is None else edits, heads)          # raises ValueError: nothing written
+            new, hd = self.edits() if edits is None else edits, self.heads if heads is None else heads
+            solved = solve_local(self.roads, self.pairs, new if len(new) else None, hd, self.caps, self.solved,
+                                 _changed(self.edits(), new, self.heads, hd, self.road_of))[0]                  # raises ValueError: nothing written
+            r = solved.attrs["levels_info"]["resolve"]
+            self.full = r["how"] == "full"
+            self.said = (f"re-solved the {r['free']} roads around the change in {r['seconds']} s" if r["how"] == "local" else
+                         f"solved the whole area in {r['seconds']} s: the local re-solve of {r['free']} roads did not do ({r['why']})")
+            print(self.said, flush=True)
         if heads is not None:
             pd.DataFrame([(r, *heads[r]) for r in sorted(heads)], columns=["road", "start_m", "end_m"]).to_csv(self.heads_path, index=False)
             self.heads = dict(heads)
@@ -235,6 +244,15 @@ class Area:
         return {"a": ra, "b": rb, "rows": found + edits, "roads": {x: self.facts.get(x, {"road": x}) for x in roads}}
 
 
+def _changed(old, new, heads_old, heads_new, road_of):
+    """The roads a change names: those of the edit rows added or taken out (old -> new edits.csv) and those whose heads changed."""
+    from collections import Counter
+    rows = lambda t: Counter(map(tuple, t.reindex(columns=COLS, fill_value="").astype(str).to_numpy().tolist()))   # noqa: E731
+    a, b = rows(old), rows(new)
+    out = {road_of.get(x, x) for r in (a - b) + (b - a) for x in (r[1], r[2])}
+    return out | {r for r in set(heads_old) | set(heads_new) if heads_old.get(r) != heads_new.get(r)}
+
+
 def _row(body):
     """One edit from the page's form, checked."""
     row = {c: str(body.get(c, "") or "") for c in COLS}
@@ -326,7 +344,7 @@ def _handler(area):
                 area.apply(body.get("ops", []))
             except (ValueError, KeyError) as err:
                 return self._send(400, {"error": str(err)})
-            self._send(200, {"ok": True})
+            self._send(200, {"ok": True, "said": area.said, "full": area.full})
     return H
 
 

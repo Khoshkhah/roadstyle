@@ -144,6 +144,77 @@ def solve(roads, pairs, edits, heads, caps, auto=False, **kw):
     return solved, ends(base, heads, caps), base
 
 
+HOPS = 3        # the local re-solve frees the changed roads and their neighbours this many relations away (see resolve)
+LEVELS = ["casing_start", "casing_level", "casing_end", "fill_level"]
+
+
+def around(roads, pairs, edits, changed, hops=HOPS):
+    """The roads within ``hops`` relations (meet, stack, order: the pairs and the edits) of the roads of ``changed`` (any edge ids)."""
+    from collections import defaultdict
+
+    from .levels import _read_pairs
+    of = {}
+    for r, fw, bw in zip(roads["road"], roads["edges"], roads["reversed"], strict=True):
+        of.update({str(x): str(r) for x in [r, *fw, *bw]})
+    nb = defaultdict(set)
+    for row in _read_pairs(pairs) + (_read_pairs(edits) if edits is not None else []):
+        a, b = of.get(row["a"]), of.get(row["b"])
+        if a and b:
+            nb[a].add(b)
+            nb[b].add(a)
+    seen = ring = {of[str(x)] for x in changed if str(x) in of}
+    for _ in range(hops):
+        ring = {y for x in ring for y in nb[x]} - seen
+        seen = seen | ring
+    return seen
+
+
+def solve_local(roads, pairs, edits, heads, caps, previous, changed, hops=HOPS):
+    """The level editor's solve after a change: the roads within ``hops`` relations of the ``changed`` ones are solved again, every other road
+    keeps its numbers of ``previous`` (the solved roads before the change), with the same rules as :func:`solve` (solve_levels(fixed=...)).
+    Three relations deep, since a rule reaches its roads' neighbours through the meets (a head under the fills it joins) and the next ring is
+    what gives them room; the free part is still a few hundred roads of thousands. No silent fallback: when the local result breaks a rule
+    the previous one kept or did not have (a crossing given up, an order wish not kept, a near warning), uses more drawing positions, or the
+    solver fails, the whole area is solved (:func:`solve`) and ``levels_info["resolve"]`` says so and why. Returns what :func:`solve` does."""
+    import time
+    t0 = time.time()
+    free = around(roads, pairs, edits, changed, hops)
+    if len(free) == len(roads):                         # the whole area is around the change: the whole solve, once
+        out = solve(roads, pairs, edits, heads, caps)
+        out[0].attrs["levels_info"]["resolve"] = {"how": "full", "why": "every road is around the change", "free": len(free), "hops": hops,
+                                                  "seconds": round(time.time() - t0, 1)}
+        return out
+    prev = previous.set_index("road")[LEVELS]
+    fixed = {r: tuple(int(x) for x in v) for r, v in zip(prev.index, prev.to_numpy().tolist(), strict=True) if r not in free}
+    why = None
+    try:
+        out = solve(roads, pairs, edits, heads, caps, fixed=fixed)
+        why = _worse(out[0], previous)
+    except RuntimeError as err:                         # the solver failed (a time limit): not an error of the change
+        why = f"the local solve failed ({err})"
+    if why is None:
+        out[0].attrs["levels_info"]["resolve"] = {"how": "local", "free": len(free), "hops": hops, "seconds": round(time.time() - t0, 1)}
+        return out
+    out = solve(roads, pairs, edits, heads, caps)
+    out[0].attrs["levels_info"]["resolve"] = {"how": "full", "why": why, "free": len(free), "hops": hops, "seconds": round(time.time() - t0, 1)}
+    return out
+
+
+def _worse(local, previous):
+    """Why the local result ``local`` cannot stand for the whole solve (None: it can): a crossing given up that ``previous`` kept (or did not
+    have), more order wishes not kept or near warnings than ``previous`` (counts: the solver trades one for another as the whole solve may),
+    or more drawing positions."""
+    new = {tuple(p) for p in local.attrs["levels_given_up_parts"]} - {tuple(p) for p in previous.attrs.get("levels_given_up_parts", [])}
+    if new:
+        return f"{len(new)} crossing part(s) given up that were kept (first: {' '.join(sorted(new)[0])})"
+    for k, what in (("levels_orders_not_kept", "order wishes not kept"), ("levels_near", "near warnings")):
+        n, m = len(local.attrs[k]), len(previous.attrs.get(k, []))
+        if n > m:
+            return f"{n} {what}, {m} before"
+    n, m = (len(set(t[LEVELS].to_numpy().ravel().tolist())) for t in (local, previous))
+    return f"{n} drawing positions, {m} before" if n > m else None
+
+
 def write(solved, folder, ends_table):
     """levels.csv (with each edge's ends as drawn), and levels_info.json: what the solver says about it (the editor shows it without solving again)."""
     import json
