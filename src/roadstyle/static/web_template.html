@@ -937,13 +937,15 @@ function rsSetTunnelStyle(o){
   _applyFill();                                   // the roads' fills: with the active colour-by
   const r=document.getElementById("tn-str"), v=document.getElementById("tn-val"), s=document.getElementById("tn-pal"),
         q=document.getElementById("tn-ratio"), pr=document.getElementById("tn-pre");
-  if(r) r.value = TUNNEL.strength; if(v) v.textContent = Math.round(TUNNEL.strength)+"%"; if(s) s.value = TUNNEL.palette;
+  if(r) r.value = _tnStep(TUNNEL.strength); if(v) v.textContent = Math.round(TUNNEL.strength)+"%"; if(s) s.value = TUNNEL.palette;
   if(q) q.value = TUNNEL.ratio.join(":"); if(pr) pr.value = String(TUNNEL.strength);
   document.dispatchEvent(new CustomEvent("rs:tunnelchange",{detail:{strength:TUNNEL.strength, palette:TUNNEL.palette, ratio:TUNNEL.ratio}}));
 }
 window.rsSetTunnelStyle = rsSetTunnelStyle;
 window.RS_TUNNEL_PALETTES = TUNNEL.palettes;
 if(_tunOn){ if(map.isStyleLoaded && map.isStyleLoaded()) rsSetTunnelStyle(); else map.on("load", ()=>rsSetTunnelStyle()); }
+const _TN_STEPS = [[0,"Normal colors"],[20,"Subtle"],[35,"Balanced"],[70,"Strong"],[100,"Full"]];
+const _tnStep = v => _TN_STEPS.reduce((b, [x], i)=> Math.abs(x - v) < Math.abs(_TN_STEPS[b][0] - v) ? i : b, 0);   // the nearest step
 if(TUNNEL.control){
   const w=document.createElement("div"); w.className="tn-ctrl";
   const sel=(id, opts, val, on)=>{ const e=document.createElement("select"); e.id=id;
@@ -951,14 +953,13 @@ if(TUNNEL.control){
     e.value=val; e.onchange=()=>on(e.value); return e; };
   const row=()=>{ const d=document.createElement("div"); d.className="tn-row"; w.appendChild(d); return d; };
   const r1=row(); r1.appendChild(document.createTextNode("Tunnels"));
-  r1.appendChild(sel("tn-pre", [["0","Normal colors"],["20","Subtle"],["35","Balanced"],["70","Strong"]], String(TUNNEL.strength),
+  r1.appendChild(sel("tn-pre", _TN_STEPS.map(([v, t])=>[String(v), t]), String(TUNNEL.strength),
                      v=>rsSetTunnelStyle({strength:+v})));
   const r2=row();
-  const r=document.createElement("input"); r.type="range"; r.id="tn-str"; r.min=0; r.max=100; r.value=TUNNEL.strength;
-  r.title="Tunnel style: 0 keeps the normal colours, 100 applies the tunnel colours";
-  let _tnNext=null;                               // a drag fires many inputs: apply only the newest, once per frame
-  r.oninput=()=>{ const go=_tnNext===null; _tnNext=+r.value;
-    if(go) requestAnimationFrame(()=>{ const v=_tnNext; _tnNext=null; rsSetTunnelStyle({strength: v}); }); };
+  // five steps, the presets (Kaveh, 2026-10-06: the smooth slider did not work well); its value is the step's index
+  const r=document.createElement("input"); r.type="range"; r.id="tn-str"; r.min=0; r.max=_TN_STEPS.length-1; r.step=1; r.value=_tnStep(TUNNEL.strength);
+  r.title="Tunnel style: Normal colors keeps the normal colours, Full applies the tunnel colours";
+  r.oninput=()=>rsSetTunnelStyle({strength: _TN_STEPS[+r.value][0]});
   const val=document.createElement("span"); val.id="tn-val"; val.textContent=Math.round(TUNNEL.strength)+"%";
   r2.appendChild(r); r2.appendChild(val);
   const r3=row();

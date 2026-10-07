@@ -1150,8 +1150,9 @@ def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
         one = page.evaluate(get)
         browser.close()
     assert errors == []
-    assert opened["pattern"] is None and opened["dash"] == [1, 1] and opened["slider"] == "35" and opened["pal"] == "Graphite + silver"
+    assert opened["pattern"] is None and opened["dash"] == [1, 1] and opened["slider"] == "2" and opened["pal"] == "Graphite + silver"
     assert "rgba(0,0,0,0)" not in opened["gap"]                                           # two colours by default: the gaps are the second colour
+    assert moved["slider"] == "3"                                                        # five steps: 0 20 35 70 100
     assert "70" in moved["fill"] and moved["pal"] == "Teal + mint" and moved["dash"] == [4, 3] and moved["pattern"] is None
     teal70, mint70 = "#547384", "#76919f"                                                 # #2f6f73, #9fd3cf 70 % toward #64748b (JS rounds .5 up)
     assert moved["dash_color"] == teal70 and mint70 in moved["gap"]
