@@ -49,7 +49,7 @@ A palette entry may also be wrapped as `{"roads": {...}}`, the form `save_palett
 Pick one with `palette=`. Widths are px at city zoom; the web backend scales them with zoom. All
 three palettes: `opacity` 1.0.
 
-=== "highsat (default)"
+=== "highsat"
 
     Bright fills, light-grey casing on major roads, no casing on minor ones.
 
@@ -68,7 +68,7 @@ three palettes: `opacity` 1.0.
     | cycleway | `#2980B9` | none | 1.5 | 6, 4 |
     | footway, path | `#D98880` | none | 1.5 | 4, 4 |
 
-=== "carto"
+=== "carto (default)"
 
     The OpenStreetMap Carto look: muted fills, a darker casing per class.
 

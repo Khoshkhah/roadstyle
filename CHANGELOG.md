@@ -47,6 +47,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - The editor has an **Issues** tab (given up in red, near warnings in amber): the crossing pairs the solver could not keep, A's parts under B's fill in red, each clickable.
 - `examples/levels/monaco/`: Kaveh's hand-made level tables for Monaco (`edits.csv`, `heads.csv`, `caps.csv`).
 - The editor has a search box: an edge id (either direction of a road) or an edge_ref, or a part of one; a hit is picked and shown.
+- **An `amber` palette** (Kaveh's colours): motorway `#f28c28`, trunk `#f5a623`, primary `#f4c542`, secondary `#f7df72`, tertiary `#b8d986`,
+  residential `#d7dee8`, living_street `#cbd5e1`, service `#94a3b8`, track `#a3a3a3`; the other classes, the widths and the casings as `carto`.
 
 ### Changed
 - **Meet or cross:** roads of different bands that only meet (a tunnel mouth, a bridge end) follow the priority order; roads that cross keep the band. With `band_col`
@@ -61,6 +63,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   a palette's two colours, dash on gap (`tunnel_palette`, default `Graphite + silver`), or slate dashes with empty gaps (`One colour`), moved toward slate with the rest; dash ratio 1:1 (`tunnel_casing_dash`). The two-tone casing
   (`tunnel_gap_shade`, `tunnel_dash_shade`) is gone. A *Tunnels* box (`tunnel_control`) and `rsSetTunnelStyle({strength, palette, ratio})` move it in the page; the slider has five steps (Normal colors 0, Subtle 20, Balanced 35, Strong 70, Full 100).
 - **No light dashes on a tunnel's fill by default** (`tunnel_fill_dash: []`, v2's look); `[1.2, 1.2]` brings them back.
+- **The default palette is `carto`** (`palettes.DEFAULT_PALETTE`), the soft OpenStreetMap Carto tones, in place of `highsat` (too sharp, Kaveh). `palette="highsat"` keeps the old look.
 - **Faster page building:** the casing pieces and the arrow and street-name slots are cut with a small numpy cutter instead of shapely's `substring` (the same lines), and a slot of a group of one edge no longer searches for its edge.
   A page of a city of 64,000 roads builds about 40% faster.
 

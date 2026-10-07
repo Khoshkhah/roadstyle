@@ -358,6 +358,124 @@
         "opacity": 1.0,
         "casing": "#ABABAB"
       }
+    },
+    "amber": {
+      "motorway": {
+        "fill": "#f28c28",
+        "width": 6.0,
+        "casing_width": 8.0,
+        "dash": null,
+        "opacity": 1.0,
+        "casing": "#dc2a48"
+      },
+      "trunk": {
+        "fill": "#f5a623",
+        "width": 5.5,
+        "casing_width": 7.5,
+        "dash": null,
+        "opacity": 1.0,
+        "casing": "#c84e2f"
+      },
+      "primary": {
+        "fill": "#f4c542",
+        "width": 4.5,
+        "casing_width": 6.5,
+        "dash": null,
+        "opacity": 1.0,
+        "casing": "#a06b00"
+      },
+      "secondary": {
+        "fill": "#f7df72",
+        "width": 3.5,
+        "casing_width": 5.5,
+        "dash": null,
+        "opacity": 1.0,
+        "casing": "#707d00"
+      },
+      "tertiary": {
+        "fill": "#b8d986",
+        "width": 2.5,
+        "casing_width": 4.0,
+        "dash": null,
+        "opacity": 1.0,
+        "casing": "#bcbcbc"
+      },
+      "unclassified": {
+        "fill": "#ffffff",
+        "width": 2.0,
+        "casing_width": 3.5,
+        "dash": null,
+        "opacity": 1.0,
+        "casing": "#bcbcbc"
+      },
+      "residential": {
+        "fill": "#d7dee8",
+        "width": 2.0,
+        "casing_width": 3.5,
+        "dash": null,
+        "opacity": 1.0,
+        "casing": "#bcbcbc"
+      },
+      "living_street": {
+        "fill": "#cbd5e1",
+        "width": 1.8,
+        "casing_width": 3.0,
+        "dash": null,
+        "opacity": 1.0,
+        "casing": "#cccccc"
+      },
+      "service": {
+        "fill": "#94a3b8",
+        "width": 1.2,
+        "casing_width": 2.2,
+        "dash": null,
+        "opacity": 1.0,
+        "casing": "#d4d4d4"
+      },
+      "track": {
+        "fill": "#a3a3a3",
+        "width": 1.5,
+        "casing_width": 1.5,
+        "dash": [
+          4,
+          4
+        ],
+        "opacity": 1.0,
+        "casing": "#9e7b54"
+      },
+      "cycleway": {
+        "fill": "#5c7cb6",
+        "width": 1.2,
+        "casing_width": 1.2,
+        "dash": [
+          3,
+          3
+        ],
+        "opacity": 1.0,
+        "casing": "#5c7cb6"
+      },
+      "footway": {
+        "fill": "#C59D9D",
+        "width": 1.2,
+        "casing_width": 1.2,
+        "dash": [
+          4,
+          4
+        ],
+        "opacity": 1.0,
+        "casing": "#C59D9D"
+      },
+      "path": {
+        "fill": "#C59D9D",
+        "width": 1.2,
+        "casing_width": 1.2,
+        "dash": [
+          2,
+          5
+        ],
+        "opacity": 1.0,
+        "casing": "#C59D9D"
+      }
     }
   },
   "config": {

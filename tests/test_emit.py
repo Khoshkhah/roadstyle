@@ -36,7 +36,7 @@ def test_to_spec_shape_and_json_serialisable():
 
 
 def test_spec_features_carry_rs_props():
-    spec = to_spec(_edges())
+    spec = to_spec(_edges(), palette="highsat")
     p = spec["geojson"]["features"][0]["properties"]
     for key in ("__rs_fill", "__rs_w", "__rs_op", "__rs_casing", "__rs_cw", "__rs_class"):
         assert key in p
@@ -64,7 +64,7 @@ def test_spec_explicit_basemaps_include_active():
 
 def test_spec_bakes_single_casing():
     # one casing colour per edge, constant on every base map (default: light grey)
-    spec = to_spec(_edges())
+    spec = to_spec(_edges(), palette="highsat")
     p = spec["geojson"]["features"][0]["properties"]   # motorway, highsat
     assert p["__rs_casing"] == "#bcbcbc"
     assert "__rs_casing_light" not in p and "__rs_casing_dark" not in p

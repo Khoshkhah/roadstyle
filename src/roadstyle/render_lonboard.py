@@ -5,6 +5,7 @@ Two PathLayers (casing under, fill over) mirror the folium "geometry sandwich".
 from __future__ import annotations
 
 from .config import DEFAULT as CONFIG
+from .palettes import DEFAULT_PALETTE
 from .style import resolve
 
 
@@ -87,7 +88,7 @@ def _arrays_from_frame(rf, which):
 
 def render(
     gdf,
-    palette: str = "highsat",
+    palette: str = DEFAULT_PALETTE,
     highway_col: str = "highway",
     tunnel_col: str | None = "tunnel",
     bridge_col: str | None = "bridge",

@@ -25,6 +25,7 @@ from importlib.resources import files
 from .config import DEFAULT as CONFIG
 from .edges import as_edges
 from .fastjson import fc_dict
+from .palettes import DEFAULT_PALETTE
 from .stylers import bake_color_options, bake_props, build_styler, option_styler
 
 SPEC_VERSION = "1"
@@ -43,7 +44,7 @@ def _asset(name: str) -> str:
 def to_spec(
     gdf,
     *,
-    palette: str = "highsat",
+    palette: str = DEFAULT_PALETTE,
     highway_col: str = "highway",
     style=None,
     color_by: str | None = None,

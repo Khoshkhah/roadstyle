@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .config import DEFAULT, StyleConfig
-from .palettes import FALLBACK, PALETTES, SELECTION, RoadStyle
+from .palettes import DEFAULT_PALETTE, FALLBACK, PALETTES, SELECTION, RoadStyle
 
 # Kept for backward-compatible imports (e.g. interactive.py) — mirror StyleConfig defaults.
 LINK_SCALE = DEFAULT.link_scale       # *_link variants render narrower than their parent class
@@ -35,7 +35,7 @@ def normalize_highway(highway) -> tuple[str, bool]:
     return h, is_link
 
 
-def base_style(highway, palette: str = "highsat") -> RoadStyle:
+def base_style(highway, palette: str = DEFAULT_PALETTE) -> RoadStyle:
     table = PALETTES.get(palette)
     if table is None:
         raise ValueError(f"unknown palette {palette!r}; choose from {list(PALETTES)}")
@@ -76,7 +76,7 @@ def _apply(
 
 def resolve(
     highway,
-    palette: str = "highsat",
+    palette: str = DEFAULT_PALETTE,
     tunnel: bool = False,
     bridge: bool = False,
 ) -> ResolvedStyle:

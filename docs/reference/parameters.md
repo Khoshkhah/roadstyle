@@ -53,7 +53,7 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | `level_input(edges, id_col="edge_id", ...)` | `(roads, pairs)` | the solver's input from any edges: one row per road, one row per relation (`meet`, `stack`, `order`) |
 | `solve_levels(roads, pairs, edits=None, ...)` | roads + 4 columns | the solver; `edits` switch pairs off or add them |
 | `resolve(highway, palette, tunnel, bridge)` | `ResolvedStyle` | one edge's resolved style |
-| `base_style(highway, palette="highsat")` | `RoadStyle` | the palette entry for a class |
+| `base_style(highway, palette="carto")` | `RoadStyle` | the palette entry for a class |
 | `selection_style(base_width=4.0)` | `dict` | the selection profile scaled to a width |
 | `normalize_highway(value)` | `(base, is_link)` | strip OSM `_link` |
 | `make_legend(spec, position="bottomleft")` | folium element | a folium legend from a `ResolvedFrame.legend` |
@@ -71,7 +71,7 @@ ignore it.
 | keyword | default | backends | what |
 |---|---|---|---|
 | `backend` | `"web"` | | `"web"` (MapLibre, one offline file), `"folium"`, `"lonboard"` ([Big networks](../guides/big-networks.md)) |
-| `palette` | `"highsat"` | all | `"highsat"`, `"carto"`, `"mono"` or a registered palette |
+| `palette` | `"carto"` | all | `"carto"` (soft OSM Carto tones), `"highsat"` (bright), `"mono"`, `"amber"` (orange to green main roads, slate minor ones) or a registered palette |
 | `basemap` | the `basemap` setting (`"voyager"`) | all | a `BASEMAPS` key, a `Basemap`, a `{z}/{x}/{y}` URL or an xyzservices provider |
 | `basemaps` | web: `esri_gray`, `positron`, `osm`, `satellite`, `voyager`, `dark_matter`, `blank` | web, folium | the base maps offered in the switcher |
 | `basemap_switcher` | `True` | web | the base-map button (a map control, last in the top-right column) and its menu; `False` with a `basemaps=` list keeps them for `rsSetBasemap` |
@@ -204,7 +204,7 @@ change the defaults below.
 | styler | field | default | what |
 |---|---|---|---|
 | `ClassStyler` | `column` | `"highway"` | the class column |
-| | `palette` | `"highsat"` | name or `{class: RoadStyle}` |
+| | `palette` | `"carto"` | name or `{class: RoadStyle}` |
 | | `normalize_links` | `True` | draw `*_link` as the parent class, narrower |
 | | `fallback` | `"unclassified"` | class for unknown values |
 | | `tunnel_col` / `bridge_col` | `None` | tunnel / bridge columns |
@@ -225,7 +225,7 @@ change the defaults below.
 | | `missing` | `"base"` | as for `CategoricalStyler`, with `nan_color` |
 | | `casing`, `casing_width`, `opacity`, `casing_opacity` | `None`, `0.0`, `0.9`, `0.75` | |
 | `ColorTableStyler` | `color_column` | required | a column of colours, one per edge |
-| | `highway_col`, `palette` | `"highway"`, `"highsat"` | where widths and casing come from |
+| | `highway_col`, `palette` | `"highway"`, `"carto"` | where widths and casing come from |
 | | `fallback_color` | `"#bbbbbb"` | blank or invalid colours |
 
 ## Overlay

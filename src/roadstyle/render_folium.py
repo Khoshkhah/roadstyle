@@ -14,6 +14,7 @@ from .config import DEFAULT as CONFIG
 from .controls import BaseLayerSwitcher
 from .fastjson import fc_dict
 from .interactive import InteractiveRoads
+from .palettes import DEFAULT_PALETTE
 from .style import selection_style
 from .stylers import bake_props, build_styler
 
@@ -48,7 +49,7 @@ def _add_legend(m, rf, position="bottomleft"):
 
 def render(
     gdf,
-    palette: str = "highsat",
+    palette: str = DEFAULT_PALETTE,
     highway_col: str = "highway",
     tunnel_col: str | None = "tunnel",
     bridge_col: str | None = "bridge",

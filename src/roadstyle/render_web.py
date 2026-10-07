@@ -28,6 +28,7 @@ from .basemaps import DEFAULT_SWITCHER, get_basemap
 from .config import DEFAULT as CONFIG
 from .fastjson import fc_dict
 from .overlays import Overlay, detect_kind, to_fc
+from .palettes import DEFAULT_PALETTE
 from .stylers import bake_color_options, bake_props, build_styler, option_styler
 
 _VENDOR = os.path.join(os.path.dirname(__file__), "vendor")
@@ -1582,7 +1583,7 @@ class WebMap:
                 'style="width:100%;height:640px;border:0;border-radius:6px"></iframe>')
 
 
-def render(gdf, palette: str = "highsat", highway_col: str = "highway",
+def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            filter_col: str = None,
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,

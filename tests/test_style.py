@@ -15,7 +15,7 @@ from roadstyle import (
 
 def test_both_palettes_present():
     # the two original built-ins are always present; more may be bundled (e.g. "mono")
-    assert {"highsat", "carto"} <= set(PALETTES)
+    assert {"highsat", "carto", "amber"} <= set(PALETTES)
     # key classes exist in every palette
     for p in PALETTES.values():
         for k in ["motorway", "trunk", "primary", "residential", "service"]:
@@ -42,10 +42,22 @@ def test_links_normalize_and_render_narrower():
     assert link.width < full.width and link.fill == full.fill
 
 
-def test_default_casing_is_light_grey():
+def test_highsat_casing_is_light_grey():
     # one casing colour per class; the old black default is now light grey
-    assert resolve("tertiary").casing == "#bcbcbc"
-    assert resolve("motorway").casing == "#bcbcbc"
+    assert resolve("tertiary", palette="highsat").casing == "#bcbcbc"
+    assert resolve("motorway", palette="highsat").casing == "#bcbcbc"
+
+
+def test_the_default_palette_is_carto():
+    """Kaveh 2026-10-06: highsat was too sharp; the default is the soft OSM Carto palette, everywhere a palette is not given."""
+    import inspect
+
+    import roadstyle as rs
+    from roadstyle.palettes import DEFAULT_PALETTE, PALETTES
+    assert DEFAULT_PALETTE == "carto"
+    assert resolve("primary").fill == PALETTES["carto"]["primary"].fill
+    for f in (rs.render_edges, resolve):
+        assert inspect.signature(f).parameters["palette"].default == "carto"
 
 
 def test_tunnel_and_bridge_overrides():

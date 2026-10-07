@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
 from .config import DEFAULT, StyleConfig
-from .palettes import FALLBACK, PALETTES, RoadStyle
+from .palettes import DEFAULT_PALETTE, FALLBACK, PALETTES, RoadStyle
 from .style import _apply, normalize_highway
 
 _TRUE = {"yes", "true", "1", "y", "t"}
@@ -81,7 +81,7 @@ class ClassStyler:
     non-OSM vocabulary where values are matched literally.
     """
     column: str = "highway"
-    palette: str | Mapping[str, RoadStyle] = "highsat"
+    palette: str | Mapping[str, RoadStyle] = DEFAULT_PALETTE
     normalize_links: bool = True
     fallback: str = FALLBACK
     tunnel_col: str | None = None
@@ -300,7 +300,7 @@ class ColorTableStyler:
     """
     color_column: str
     highway_col: str = "highway"
-    palette: str | Mapping[str, RoadStyle] = "highsat"
+    palette: str | Mapping[str, RoadStyle] = DEFAULT_PALETTE
     fallback_color: str = "#bbbbbb"
     column: str | None = None        # the class column (Styler protocol / filtering)
 
@@ -397,7 +397,7 @@ def bake_color_options(gj: dict, frames, style_rf: ResolvedFrame = None):
 
 # ── convenience constructors (so users build a styler without importing the classes) ──────────
 
-def color_by_class(column: str = "highway", palette="highsat", **kw) -> ClassStyler:
+def color_by_class(column: str = "highway", palette=DEFAULT_PALETTE, **kw) -> ClassStyler:
     """Style by a road-class column through a palette (OSM by default)."""
     return ClassStyler(column=column, palette=palette, **kw)
 
@@ -436,7 +436,7 @@ def option_styler(highway_col: str, base_palette: str, opts) -> Styler:
 def build_styler(
     *,
     style=None,
-    palette="highsat",
+    palette=DEFAULT_PALETTE,
     highway_col: str = "highway",
     color_by: str | None = None,        # noqa: F811 - shadow is intentional (kwarg name)
     colors: Mapping[str, str] | None = None,

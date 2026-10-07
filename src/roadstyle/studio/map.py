@@ -19,7 +19,7 @@ with st.sidebar:
     edges, loader = data_section()
 
     with st.expander("Look", expanded=True):
-        palette = st.selectbox("Palette", ["highsat", "carto", "mono"])
+        palette = st.selectbox("Palette", ["carto", "highsat", "mono"])
         basemap = st.selectbox("Base map", list(rs.BASEMAPS), index=0)
         view_3d = st.checkbox("3D bridges (tilted view)", value=False)
         tiles = st.checkbox("Vector tiles (big networks)", value=False,
