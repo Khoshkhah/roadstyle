@@ -771,7 +771,8 @@ _SEAM_MINZOOM = 17      # the casing seams (Kaveh 2026-10-06): a primary's casin
 def _bridge_shadows(geo, highway_col, trim_m, max_turn=45.0):
     """The bridge shadow (Kaveh 2026-10-06): the bridge edges joined into lines (two directions of an edge drawn once); where three or more
     meet, the two that go on most straight (turning ``max_turn`` degrees at most) and have the same number are one line through the
-    junction, so fewer line ends meet there; each line at the lowest casing number of its own edges (one number for a whole connected bridge put a bridge's shadow under
+    junction, so fewer line ends meet there; each line at the main casing number of its own edges, which are joined only at one number (a low head at a far end put a long
+    bridge's shadow under what it crosses; one number for a whole connected bridge put a bridge's shadow under
     the lower bridge it crosses), no shadow over the last ``trim_m`` metres where the bridge comes down to the road. Each line has its widest class. Drawn with round ends."""
     import numpy as np
     import shapely
@@ -785,9 +786,11 @@ def _bridge_shadows(geo, highway_col, trim_m, max_turn=45.0):
     tree = shapely.STRtree([line[i] for i in br])
     def at(p):                                                 # the bridge edges at a point
         return [br[k] for k in tree.query(p.buffer(1e-7)) if line[br[k]].distance(p) < 1e-7]
-    u = unary_union(list(line.values()))                       # the union also drops the second direction of a two-way bridge
-    merged = linemerge(u) if u.geom_type == "MultiLineString" else u
-    chains = [list(ch.coords) for ch in (merged.geoms if hasattr(merged, "geoms") else [merged])]
+    chains = []                                                # joined per main casing number: an edge's shadow is at its own main number
+    for lvl in sorted({feats[i]["properties"].get("__rs_cl", 0) for i in br}):
+        u = unary_union([line[i] for i in br if feats[i]["properties"].get("__rs_cl", 0) == lvl])   # also drops a two-way bridge's 2nd direction
+        merged = linemerge(u) if u.geom_type == "MultiLineString" else u
+        chains += [list(ch.coords) for ch in (merged.geoms if hasattr(merged, "geoms") else [merged])]
     key = lambda xy: (round(xy[0], 7), round(xy[1], 7))                                    # noqa: E731
     kx0 = math.cos(math.radians(chains[0][0][1]))
     def heading(c, end):                                       # leaving the node along the chain
@@ -798,9 +801,9 @@ def _bridge_shadows(geo, highway_col, trim_m, max_turn=45.0):
         for end in (0, -1):
             node.setdefault(key(c[end]), []).append((k, end))
     near = {i: line[i].buffer(1e-7) for i in br}               # with a tolerance: the union nodes the lines and moves their points a hair
-    def low(p):
-        return min(p.get("__rs_cs", p.get("__rs_cl", 0)), p.get("__rs_cl", 0), p.get("__rs_ce", p.get("__rs_cl", 0)))
-    clvl = []                                                  # each chain's own number: the lowest casing number of its edges
+    def low(p):                                                # the main casing number: a low head at a far end pulled a whole long bridge's
+        return p.get("__rs_cl", 0)                             # shadow under the road it crosses (Kaveh 2026-10-06)
+    clvl = []                                                  # each chain's own number: the main casing number of its edges
     for c in chains:
         ch = shapely.LineString(c)
         mine = [i for i in br if ch.intersection(near[i]).length > 1e-6]

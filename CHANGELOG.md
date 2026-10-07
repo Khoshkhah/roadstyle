@@ -24,9 +24,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   (so a service road, 5 px at z18 and 9.5 at z19, shows no name: the name data stops at z18; Kaveh 2026-10-06, accepted).
 - **The casing follows the same line as the fill:** the casing pieces and fill halves are simplified like the roads (`tolerance` 0.05, was MapLibre's 0.375):
   the outline no longer wobbles along curves.
-- **A bridge shadow** (`bridge_shadow`, on): a soft dark shadow shifted 2 px down-right, one line per stretch of bridge at the lowest casing
-  number of its own edges (a bridge crossing over a lower one it is joined to casts its shadow on it); at a junction the two straightest
-  stretches at one number go on as one line; round ends; none over the heads where the bridge comes down.
+- **A bridge shadow** (`bridge_shadow`, on): a soft dark shadow shifted 2 px down-right, at each bridge edge's main casing number (over what it
+  crosses, under the bridge), edges at one number joined into one line and straight on through junctions; round ends; none over the last
+  3 m where a bridge comes down (`bridge_shadow_trim_m`).
 - **Bridge casing slate** (`bridge_casing_color` `#64748b`, the colour tunnels fade to; black was too dark).
 - **Casing that closes:** a bridge's heavier casing keeps each piece's cap (it was always flat: two bridge pieces could not close at a bend or
   a junction), and a round seam of casing at each cut inside a road closes the outline on a curve (from zoom 17: below it a seam reached past

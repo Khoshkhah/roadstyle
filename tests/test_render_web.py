@@ -2131,10 +2131,10 @@ def test_a_divided_casing_has_a_round_seam_at_each_cut():
     assert '["zoom"], 17' in json.dumps(lay["roads-casing"]["filter"]).replace(" ", "").replace(",", ", ")   # seams only from zoom 17: no bump on a flat end below
 
 
-def test_a_bridge_has_one_continuous_shadow_at_its_lowest_casing_number(monkeypatch):
-    """Position mode (Kaveh 2026-10-06): one continuous shadow per bridge, its edges joined into one line, at the lowest casing number of any of
-    its parts (under all of it), none over the heads where the bridge comes down; blurred and shifted down-right (lit from the top left), just
-    before the bridge's casing at that position; off with bridge_shadow."""
+def test_a_bridge_shadow_is_at_each_edges_main_casing_number(monkeypatch):
+    """Position mode (Kaveh 2026-10-06): a bridge's shadow at each edge's main casing number (a low head no longer pulls it under what the
+    bridge crosses), edges at one number joined into one line, none over the last 3 m where the bridge comes down; blurred and shifted
+    down-right (lit from the top left), just before the bridge's casing at that position; off with bridge_shadow."""
     import dataclasses
 
     from roadstyle import render_web
@@ -2147,13 +2147,13 @@ def test_a_bridge_has_one_continuous_shadow_at_its_lowest_casing_number(monkeypa
     style = _style(render_edges(g, **kw).html)
     sh = style["sources"]["shadows"]["data"]["features"]
     span = lambda f: round((max(c[1] for c in f["geometry"]["coordinates"]) - min(c[1] for c in f["geometry"]["coordinates"])) / m)   # noqa: E731
-    assert [(f["properties"]["__rs_cl"], span(f)) for f in sh] == [(1, 54)]                    # one line, the lowest number; 60 m less 3 m at each end
+    assert sorted((f["properties"]["__rs_cl"], span(f)) for f in sh) == [(2, 17), (2, 17), (3, 20)]   # main numbers 2, 3, 2; 3 m off each end
     lay = {l["id"]: l for l in style["layers"]}
     ids = [l["id"] for l in style["layers"]]
-    s2 = lay["roads-casing-lv1-bridge-shadow"]
+    s2 = lay["roads-casing-lv2-bridge-shadow"]
     assert s2["source"] == "shadows" and s2["paint"]["line-blur"] == 4.0 and s2["paint"]["line-translate"] == [2, 2]
     assert s2["layout"]["line-cap"] == "round"
-    assert ids.index("roads-casing-lv1-bridge-shadow") < ids.index("roads-casing-lv1-bridge") < ids.index("roads-fill-lv1")
+    assert ids.index("roads-casing-lv2-bridge-shadow") < ids.index("roads-casing-lv2-bridge") < ids.index("roads-fill-lv2")
 
     monkeypatch.setattr(render_web, "CONFIG", dataclasses.replace(render_web.CONFIG, bridge_shadow=False))
     off = _style(render_edges(g, **kw).html)
