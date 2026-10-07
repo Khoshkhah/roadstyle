@@ -42,18 +42,18 @@ class StyleConfig:
     bridge_casing_extra: float = 1.5   # bridges: casing a touch wider (the deck "wings")
     bridge_casing_m: float = 0.25      # metre widths: a bridge casing is at least this wide each side, whatever casing_m is
     bridge_casing_px: float = 1.0      # ... and never thinner than this many pixels each side at any zoom (metres are sub-pixel zoomed out)
-    bridge_casing_color: str = "#64748b"   # bridge deck casing colour: slate, as tunnels fade to (Kaveh 2026-10-06; black, then dark grey, too dark)
-    bridge_shadow: bool = True             # a soft shadow under a bridge's main part, on what it crosses (Kaveh 2026-10-06)
+    bridge_casing_color: str = "#64748b"   # bridge deck casing colour: slate, as tunnels fade to (2026-10-06; black, then dark grey, too dark)
+    bridge_shadow: bool = True             # a soft shadow under a bridge's main part, on what it crosses (2026-10-06)
     bridge_shadow_color: str = "rgba(0,0,0,0.25)"
     bridge_shadow_blur: float = 4.0        # px (line-blur)
     bridge_shadow_offset: list = field(default_factory=lambda: [2, 2])   # px right, down (line-translate): lit from the top left
-    bridge_shadow_trim_m: float = 3.0      # metres of no shadow where a bridge comes down to the road (Kaveh 2026-10-06: the head length cut short bridges too much)
+    bridge_shadow_trim_m: float = 3.0      # metres of no shadow where a bridge comes down to the road (2026-10-06: the head length cut short bridges too much)
     twin_end_caps: bool = True         # one road-wide round end under a two-way road's two lanes
-    tunnel_casing_dash: list = field(default_factory=lambda: [1, 1])   # the tunnel casing: dash and gap, in line widths (1:1, Kaveh 2026-10-06)
-    tunnel_fill_dash: list = field(default_factory=list)   # light dashes on the tunnel fill, e.g. [1.2, 1.2]; none by default (v2's look, Kaveh 2026-10-06)
+    tunnel_casing_dash: list = field(default_factory=lambda: [1, 1])   # the tunnel casing: dash and gap, in line widths (1:1, 2026-10-06)
+    tunnel_fill_dash: list = field(default_factory=list)   # light dashes on the tunnel fill, e.g. [1.2, 1.2]; none by default (v2's look, 2026-10-06)
     tunnel_fill_dash_color: str = "rgba(255,255,255,0.55)"               # their colour, over any road colour
     tunnel_strength: float = 35          # the tunnel look (docs/design/tunnel_look.md), v2's slider: 0 = normal colours, 100 = the full tunnel colours
-    tunnel_palette: str = "Graphite + silver"   # the casing of a tunnel, a name in tunnel_palettes (two colours by default, Kaveh 2026-10-06)
+    tunnel_palette: str = "Graphite + silver"   # the casing of a tunnel, a name in tunnel_palettes (two colours by default, 2026-10-06)
     tunnel_palettes: dict = field(default_factory=lambda: {"One colour": None, "Slate + ice": ["#64748b", "#cbd5e1"],
                                                            "Blue + cyan": ["#315b7d", "#a9d7e8"], "Warm + sand": ["#806d64", "#e7c9a7"],
                                                            "Graphite + silver": ["#4b5563", "#b8bec7"], "Indigo + lavender": ["#4c5c96", "#b9c2ea"],

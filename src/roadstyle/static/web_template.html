@@ -917,7 +917,7 @@ if(OVERLAYS.length){
   }
 }
 // window.rsSetTunnelStyle({strength, palette, ratio}) moves the tunnel look (strength 0-100; palette a name of RS_TUNNEL_PALETTES;
-// ratio [dash, gap] in line widths); the Tunnels box is UI over it. The casing follows the slider like everything on a tunnel (Kaveh): its
+// ratio [dash, gap] in line widths); the Tunnels box is UI over it. The casing follows the slider like everything on a tunnel: its
 // two colours, each moved toward slate by the strength, are two layers with MapLibre's own dash (crisp, and only paint changes: no image,
 // no tile reload): the position's casing layer draws the gap colour (transparent for "One colour"), the dash layer the dashes on top.
 function _tunHex(a, b, t){                       // a -> b by t (0-1), "#rrggbb"
@@ -960,7 +960,7 @@ if(TUNNEL.control){
   r1.appendChild(sel("tn-pre", _TN_STEPS.map(([v, t])=>[String(v), t]), String(TUNNEL.strength),
                      v=>rsSetTunnelStyle({strength:+v})));
   const r2=row();
-  // five steps, the presets (Kaveh, 2026-10-06: the smooth slider did not work well); its value is the step's index
+  // five steps, the presets (2026-10-06: the smooth slider did not work well); its value is the step's index
   const r=document.createElement("input"); r.type="range"; r.id="tn-str"; r.min=0; r.max=_TN_STEPS.length-1; r.step=1; r.value=_tnStep(TUNNEL.strength);
   r.title="Tunnel style: Normal colors keeps the normal colours, Full applies the tunnel colours";
   r.oninput=()=>rsSetTunnelStyle({strength: _TN_STEPS[+r.value][0]});
@@ -1031,9 +1031,9 @@ map.on("load", addArrow);
 // one arrow per one-way road in the window (docs/design/arrows_and_names.md): after every move, each one-way chain of the slots (the
 // pieces with the same "chain") gets ONE point in the middle of its part inside the window, rotated along the road, with the properties of
 // the piece it lies on (so the arrow layers' filters, rsFilter and the class / tunnel toggles treat it as before). Repeating the icon along
-// every 100 m slot crowded zoom 15 (Kaveh); one arrow per stretch (line-center) was often outside the window. An arrow STAYS where it is
+// every 100 m slot crowded zoom 15; one arrow per stretch (line-center) was often outside the window. An arrow STAYS where it is
 // while it is still in the window (re-centring after every pan slid it along its road); only a chain whose arrow left, or a newly
-// visible one, gets a new place. Thinned (Kaveh, 2026-10-06): below zoom 17 only the main classes; a road whose visible part is shorter
+// visible one, gets a new place. Thinned (2026-10-06): below zoom 17 only the main classes; a road whose visible part is shorter
 // than 100 px gets none; arrows stay 150 px apart (an arrow already shown keeps its place, then the higher class wins).
 const _rsArrowAt = new Map();                  // chain -> its arrow feature now
 const _RS_ARROW = {mainBelow: 17, minLenPx: 100, minGapPx: 150, nameGapPx: 14, edgePx: 10,
@@ -1084,7 +1084,7 @@ function _rsArrows(){
       if(kept && inside(kept.geometry.coordinates)){ cand.push({ft: kept, chain: chain, kept: 1, rank: kept.properties.rank || 0, len: total}); continue; }
       let h = total / 2, mid = iv[0][0];                         // the middle of the visible part, along the chain
       for(const [lo, hi] of iv){ if(h > hi - lo){ h -= hi - lo; continue; } mid = lo + h; break; }
-      // where the arrow may go (Kaveh: arrows overlapped the names): an unnamed road, the middle of its visible part; a named one, the
+      // where the arrow may go (arrows overlapped the names): an unnamed road, the middle of its visible part; a named one, the
       // middle of an odd slot (names sit in the middle of the even ones) or just past either end of a name; of those in the window, the
       // one nearest the middle. None in the window (the road is too short there for its name and an arrow): the name wins, no arrow.
       const name = P[0].p.name, spots = [];

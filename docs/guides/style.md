@@ -11,7 +11,7 @@
     import roadstyle as rs
 
     edges = gpd.read_file("edges.gpkg")
-    rs.render_edges(edges, palette="carto", basemap="positron").save("map.html")
+    rs.render_edges(edges, palette="carto", basemap="positron").save("map.html")   # the default is amber on Voyager
     ```
 
 === "Command line"
@@ -24,14 +24,14 @@
 
 A palette sets each road class's colour, width and casing.
 
-- `carto`: the muted colours of the OpenStreetMap standard map. The default.
+- `amber`: orange, yellow and green main roads, slate-grey streets. The default: every class stands out on a light base map.
+- `carto`: the muted colours of the OpenStreetMap standard map.
 - `highsat`: bright, high contrast.
 - `mono`: shades of grey. Use it under your own data colours.
-- `amber`: orange, yellow and green main roads, slate-grey minor ones; carto's widths and casings.
 
 <div class="grid" markdown>
 
-![highsat on Voyager](../img/gallery/highsat_voyager.png)
+![amber on Voyager](../img/gallery/amber_voyager.png)
 
 ![carto on Positron](../img/gallery/carto_positron.png)
 
@@ -78,6 +78,9 @@ rs.render_edges(edges, view_3d=True)                         # CLI: --view-3d
 ```
 
 ![Bridges in 3D](../img/gallery/bridges_3d.png)
+
+In 2D a bridge has a slate casing and a soft shadow; a tunnel fades toward slate, set in five steps in the *Tunnels* box
+([Which road is on top](levels.md#bridges-and-tunnels)).
 
 ## Keep or drop road classes
 

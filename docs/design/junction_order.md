@@ -1,12 +1,12 @@
 # Which road goes on top at a junction: the plan
 
-**Status:** proposal after research, for sign-off before implementation (Kaveh asked for research
-first, 2026-09-30). A roadstyle change asked for by Kaveh. It builds on `draw_order_per_edge.md`
+**Status:** proposal after research, for sign-off before implementation (research was asked for
+first, 2026-09-30). A roadstyle change asked for. It builds on `draw_order_per_edge.md`
 (`band_col` / `order_col`, implemented, not yet committed).
 
 ## Problem
 
-Reported by Kaveh on duckOSM's Monaco build:
+Reported on duckOSM's Monaco build:
 
 - **Avenue de la Costa and Bretelle Ostende**, edges 4628183342609875807, 6471016024852816111 and
   284593073383310203. A `primary_link` meets two `residential` edges and a car-park entrance.

@@ -17,6 +17,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .palettes import DEFAULT_PALETTE
 
 # output format → default file extension for the derived output name
 _EXT = {"web": ".html", "folium": ".html", "rsjs": ".html", "spec": ".json", "geojson": ".geojson"}
@@ -51,8 +52,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--version", action="version", version=f"roadstyle {__version__}")
 
     style = p.add_argument_group("styling")
-    style.add_argument("--palette", default="carto", choices=["carto", "highsat", "mono", "amber"],
-                       help="class palette (default: carto).")
+    style.add_argument("--palette", default=DEFAULT_PALETTE, choices=["amber", "carto", "highsat", "mono"],
+                       help="class palette (default: amber).")
     style.add_argument("--basemap", help="the primary base map layer (a key in BASEMAPS; "
                        "default from settings: voyager).")
     style.add_argument("--tooltip", nargs="+", metavar="COL",

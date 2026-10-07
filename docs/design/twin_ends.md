@@ -1,10 +1,10 @@
 # Two-way roads that end like one road
 
-**Status:** implemented 2026-09-30 (approved by Kaveh: "just make sure fixing it in roadstyle
-doesn't make another issue"). A roadstyle change asked for by Kaveh, who noticed it on every
+**Status:** implemented 2026-09-30 (approved: "just make sure fixing it in roadstyle
+doesn't make another issue"). A roadstyle change, asked for after it was noticed on every
 two-way road of duckOSM's Monaco maps.
 
-**Found by Kaveh after the first version, fixed:** a cap at a point where another road draws in a
+**Found after the first version, fixed:** a cap at a point where another road draws in a
 lower band (a tunnel mouth, a plain `layer=-1` road, a sidewalk moved by `band_col`) painted its
 casing ring across that road (Monaco: Boulevard Louis II's tunnel mouths). Such an end now gets no
 cap and keeps its old look (1,578 ends in Monaco meet a road in another band).
@@ -39,7 +39,7 @@ At full split, with road width `w`:
 A single road would end in one half-circle, of radius 0.58 `w` (the pair's outer half-width).
 
 The two lanes must stay two features, so that each direction can still be clicked and coloured on
-its own (Kaveh: "we must be able to select them separately").
+its own ("we must be able to select them separately").
 
 ## Options considered
 
@@ -92,7 +92,7 @@ lanes stay exactly as they are, both clickable.
    - to be measured on Tartu before sign-off of the implementation.
 8. **A setting to turn it off:** `config.twin_end_caps` (default `true`).
 
-## Follow-up (Kaveh, 2026-09-30): lanes only for real two-way roads, and tunnel mouths
+## Follow-up (2026-09-30): lanes only for real two-way roads, and tunnel mouths
 
 Seen at Rue du Castelleretto (Monaco, edges 441704187184649227 / 5990211243552773545 and
 4146834466225551101 / 7910395095814073287):
@@ -104,7 +104,7 @@ Seen at Rue du Castelleretto (Monaco, edges 441704187184649227 / 599021124355277
   - **Fix:** an optional `directed_col` (per edge: true / null = a direction of travel of its own,
     false = undirected) says whether an edge can be a lane. A pair is two lanes only when **neither**
     edge is false; otherwise both are drawn centred at full width, as one line, with no end caps;
-    arrows still follow `oneway`. (First named `twoway_col`; renamed by Kaveh, 2026-09-30:
+    arrows still follow `oneway`. (First named `twoway_col`; renamed 2026-09-30:
     "two-way" means two directions, which a footway has too.)
   - mapstyle sets `is_directed` true for an edge open to cars or bikes that isn't a path. The
     walking-only reverse edge stays on the map, on top of the one-way edge, so data and routing

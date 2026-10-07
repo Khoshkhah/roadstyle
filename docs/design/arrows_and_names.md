@@ -1,6 +1,6 @@
 # Arrows and street names on the roads
 
-**Status:** the slots and the street names are as they were; the arrows are new (branch `arrows`, waiting for Kaveh's review, 2026-10-06).
+**Status:** the slots and the street names are as they were; the arrows are new (reviewed and merged, 2026-10-06).
 Code: `_annotation_slots` and the arrow / label layers in `render_web.py`; `_rsArrows` in `web_template.html`.
 
 ## 1. Chains and slots: one plan for both
@@ -43,7 +43,7 @@ The pieces are the `slots` source of the page (inline GeoJSON; with `tiles=True`
 
 The page places them (`_rsArrows`), after every move and once the slots are loaded. **A one-way road in the window has at most one arrow.**
 
-- **Where.** Never on a name (Kaveh: arrows overlapped the names). The pieces of the chain are laid end to end, and a name is taken to
+- **Where.** Never on a name (arrows overlapped the names). The pieces of the chain are laid end to end, and a name is taken to
   cover the middle of its even piece, as wide as its letters at the current text size (about 0.6 em a letter). The places an arrow may go
   are the middle of every odd piece and just past either end of every name (14 px gap); an unnamed road may take the middle of its visible
   part. Of these, the one inside the window (10 px from its edge) and nearest the middle of the road's visible part is taken. If none is
@@ -51,7 +51,7 @@ The page places them (`_rsArrows`), after every move and once the slots are load
   along the road.
 - **It stays.** While an arrow is still in the window it keeps its place; only a road whose arrow has left the window, or a road that has
   just come into view, gets a new place (re-centring after each pan made it slide along the road).
-- **Thinned** (Kaveh, after trying one per road: still too many):
+- **Thinned** (after trying one per road: still too many):
   - none below zoom 15; below zoom 17 only motorway, trunk, primary, secondary and tertiary roads and their links; the minor classes from
     zoom 16 in any case;
   - no arrow on a road whose visible part is shorter than 100 px;
@@ -62,7 +62,7 @@ The page places them (`_rsArrows`), after every move and once the slots are load
   their filters (one-way, drawing position, class, minzoom) and everything that hides a road hides its arrow. One arrow layer per drawing
   position, right after that position's fill layers: a road drawn above covers the arrows below it. Where the arrow would still touch a
   name (the page's estimate of the name's width fell short), the arrow is left out: MapLibre places the names first and drops an arrow
-  that collides with one (`icon-allow-overlap: false`), and an arrow never pushes a name away (`icon-ignore-placement`) (Kaveh 2026-10-06).
+  that collides with one (`icon-allow-overlap: false`), and an arrow never pushes a name away (`icon-ignore-placement`) (2026-10-06).
 
 **Before (until 2026-10-06):** the icon was repeated along every one-way slot (`symbol-placement: line`, about every 200 px at zoom 15). At
 zoom 15 a 100 m slot is about 20 px, so long roads carried many arrows; and an earlier version with one arrow per chain (`line-center`) often

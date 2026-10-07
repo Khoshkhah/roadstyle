@@ -152,7 +152,7 @@ PALETTES: dict[str, dict[str, RoadStyle]] = {
     name: palette_from_dict(roads) for name, roads in _settings.palettes().items()
 }
 HIGHSAT: dict[str, RoadStyle] = PALETTES["highsat"]
-DEFAULT_PALETTE = "carto"      # the palette when none is given: soft OSM Carto tones (Kaveh 2026-10-06: highsat was too sharp)
+DEFAULT_PALETTE = "amber"      # the palette when none is given (2026-10-06: highsat was too sharp; carto's white streets vanish on a light base map)
 CARTO: dict[str, RoadStyle] = PALETTES["carto"]
 
 

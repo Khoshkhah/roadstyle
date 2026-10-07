@@ -93,8 +93,8 @@ workbench: `pip install "roadstyle[studio]" && roadstyle studio`.
 
 <table>
 <tr>
-<td width="33%" valign="top"><a href="https://khoshkhah.github.io/roadstyle/gallery/"><img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/highsat_voyager.png" alt="The defaults" width="100%"></a><br><b>The defaults</b><br><sub><code>rs.render_edges(edges)</code></sub></td>
-<td width="33%" valign="top"><a href="https://khoshkhah.github.io/roadstyle/gallery/"><img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/highsat_dark.png" alt="Dark" width="100%"></a><br><b>Dark</b><br><sub><code>basemap="dark_matter"</code></sub></td>
+<td width="33%" valign="top"><a href="https://khoshkhah.github.io/roadstyle/gallery/"><img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/amber_voyager.png" alt="The defaults" width="100%"></a><br><b>The defaults</b><br><sub><code>rs.render_edges(edges)</code></sub></td>
+<td width="33%" valign="top"><a href="https://khoshkhah.github.io/roadstyle/gallery/"><img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/amber_dark.png" alt="Dark" width="100%"></a><br><b>Dark</b><br><sub><code>basemap="dark_matter"</code></sub></td>
 <td width="33%" valign="top"><a href="https://khoshkhah.github.io/roadstyle/gallery/"><img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/bridges_3d.png" alt="3D bridges" width="100%"></a><br><b>3D bridges</b><br><sub><code>view_3d=True</code></sub></td>
 </tr>
 <tr>

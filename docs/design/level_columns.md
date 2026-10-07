@@ -1,7 +1,7 @@
 # The drawing order of each edge (`casing_level_col`, `fill_level_col`)
 
-**Status:** approved by Kaveh 2026-10-02 as part of mapstyle's `docs/design/node_levels.md` (Approach B, "go ahead"); a roadstyle
-feature asked for by Kaveh, an exception to "roadstyle is not changed for mapstyle".
+**Status:** approved 2026-10-02 as part of mapstyle's `docs/design/node_levels.md` (Approach B, "go ahead"); a roadstyle
+feature asked for, an exception to "roadstyle is not changed for mapstyle".
 
 ## Rule
 

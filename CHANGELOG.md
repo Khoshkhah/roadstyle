@@ -21,7 +21,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **Your own stacks are always real** (never a near warning), and the order wishes let go are named (`attrs["levels_orders_not_kept"]`) and
   listed in the editor's Issues tab.
 - **Street names fit their road:** about 3/4 of the road's fill width (at most the old 10 to 14 px), and none where that would be under 9 px
-  (so a service road, 5 px at z18 and 9.5 at z19, shows no name: the name data stops at z18; Kaveh 2026-10-06, accepted).
+  (so a service road, 5 px at z18 and 9.5 at z19, shows no name: the name data stops at z18; accepted 2026-10-06).
 - **The casing follows the same line as the fill:** the casing pieces and fill halves are simplified like the roads (`tolerance` 0.05, was MapLibre's 0.375):
   the outline no longer wobbles along curves.
 - **A bridge shadow** (`bridge_shadow`, on): a soft dark shadow shifted 2 px down-right, drawn like an extra casing: every part of a bridge
@@ -46,9 +46,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **Near rules last:** a stack rule whose part of A does not cross B (only near) is kept after the order wishes and, broken, is a warning
   (`attrs["levels_near"]`), not a given-up pair; `rs.casing_parts` gives the parts (replaces `empty_mains`), `solve_levels(parts=...)`.
 - The editor has an **Issues** tab (given up in red, near warnings in amber): the crossing pairs the solver could not keep, A's parts under B's fill in red, each clickable.
-- `examples/levels/monaco/`: Kaveh's hand-made level tables for Monaco (`edits.csv`, `heads.csv`, `caps.csv`).
+- `examples/levels/monaco/`: hand-made level tables for Monaco (`edits.csv`, `heads.csv`, `caps.csv`).
 - The editor has a search box: an edge id (either direction of a road) or an edge_ref, or a part of one; a hit is picked and shown.
-- **An `amber` palette** (Kaveh's colours): motorway `#f28c28`, trunk `#f5a623`, primary `#f4c542`, secondary `#f7df72`, tertiary `#b8d986`,
+- **An `amber` palette**: motorway `#f28c28`, trunk `#f5a623`, primary `#f4c542`, secondary `#f7df72`, tertiary `#b8d986`,
   residential `#d7dee8`, living_street `#cbd5e1`, service `#94a3b8`, track `#a3a3a3`; the other classes, the widths and the casings as `carto`.
 - **`views=`**: a *View* menu next to *Colour by*. A view is a name and a set of settings applied together: the colour option, the road fill, which overlays show, the road classes,
   bridges, tunnels, 3D and the base map (`{"Lanes": {"road_fill": False, "overlays": {"lanes": True}}}`). The page opens with the first view; `rsSetView(name)` applies one from a host page.
@@ -62,7 +62,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `compute_levels(order=...)` defaults to `"priority"`.
 - **One arrow per one-way road in the window** (`docs/design/arrows_and_names.md`): the page puts one arrow in the middle of each one-way road's visible part,
   and keeps it there while it stays in the window; below zoom 17 only the main classes, none on a road shorter than 100 px on screen, and 150 px between arrows; the arrows no longer repeat along every 100 m slot (they crowded zoom 15). A tiled map keeps the old arrows.
-- **The default palette is `carto`** (`palettes.DEFAULT_PALETTE`), the soft OpenStreetMap Carto tones, in place of `highsat` (too sharp, Kaveh). `palette="highsat"` keeps the old look.
+- **The default palette is `amber`** (`palettes.DEFAULT_PALETTE`) in place of `highsat` (too sharp); `carto` was tried first, but its white streets
+  vanish on a light base map. `palette="highsat"` keeps the old look.
 - **The order where roads meet:** `compute_levels(order="priority")`, now the default of `render_edges`: where roads of one band meet, a roundabout's fill is over a tunnel's,
   a tunnel's over a bridge's, a bridge's over the road class (`junction_col`, default `junction`: `roundabout` or `circular`). The band is unchanged, so a road that crosses over a tunnel
   still covers it. `order="class"` keeps the road class alone.

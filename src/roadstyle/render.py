@@ -59,7 +59,7 @@ def render_edges(
         coerced to ``RoadEdges`` for you.
     backend : ``"web"`` (self-contained MapLibre, default), ``"folium"`` (portable HTML), or
         ``"lonboard"`` (WebGL).
-    palette : ``"carto"`` (OSM Carto, the default), ``"highsat"`` (high-saturation), ``"mono"`` or ``"amber"``.
+    palette : ``"amber"`` (the default), ``"carto"`` (OSM Carto), ``"highsat"`` (high-saturation) or ``"mono"``.
     include / exclude : highway types to keep / drop (str or iterable) — see filter_edges.
 
     Data-driven styling (optional — when omitted, the classic OSM class styling is unchanged):

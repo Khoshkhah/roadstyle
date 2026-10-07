@@ -58,7 +58,7 @@ def ends(auto, heads, caps):
 
 
 def defaults(roads, pairs=None, head_m=5.0):
-    """Every road end as drawn unless you set it: ``head_m`` long heads and round caps (Kaveh 2026-10-06: automatic heads, made for one zoom,
+    """Every road end as drawn unless you set it: ``head_m`` long heads and round caps (2026-10-06: automatic heads, made for one zoom,
     were too short at the others; flat caps where two roads meet left small breaks at every joint that was not perfectly straight)."""
     return pd.DataFrame({"road": list(roads["road"]), "start_m": head_m, "end_m": head_m, "cap_start": "round", "cap_end": "round"})
 

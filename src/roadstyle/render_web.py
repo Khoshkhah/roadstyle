@@ -723,7 +723,7 @@ def _casing_parts(geo, head_m, cols):
                 q.pop("__rs_cap", None)
             out.append({"type": "Feature", "properties": q, "geometry": {"type": "LineString", "coordinates": coords}})
         # a seam at each cut inside the edge: a round dot of casing at the lower of the two pieces' numbers. Two pieces ending flat at a cut
-        # on a curve left a wedge open in the outline (Kaveh 2026-10-06: "not smooth in the middle"); the piece drawn above covers the rest
+        # on a curve left a wedge open in the outline (2026-10-06: "not smooth in the middle"); the piece drawn above covers the rest
         cut_at = sorted({h0, n - h1} - {0.0, n})
         for c in cut_at:
             sides = [num for a, b, num in cuts if b - a > 1e-9 and (abs(b - c) < 1e-9 or abs(a - c) < 1e-9)]
@@ -737,7 +737,7 @@ def _casing_parts(geo, head_m, cols):
     return out
 
 
-# street names (Kaveh 2026-10-06): about 3/4 of the road's fill width, at most the old 10 -> 14 px ramp, and none where that is under 9 px
+# street names (2026-10-06): about 3/4 of the road's fill width, at most the old 10 -> 14 px ramp, and none where that is under 9 px
 _LABEL_FRACTION, _LABEL_MIN_PX = 0.75, 9.0
 
 
@@ -769,11 +769,11 @@ def _label_readable_filter():
     return [">=", ["zoom"], m + [first(None)]]
 
 
-_SEAM_MINZOOM = 17      # the casing seams (Kaveh 2026-10-06): a primary's casing is 12 m wide on the ground at zoom 16, so a seam reaches past a head
+_SEAM_MINZOOM = 17      # the casing seams (2026-10-06): a primary's casing is 12 m wide on the ground at zoom 16, so a seam reaches past a head
 
 
 def _bridge_shadows(geo, parts, highway_col, trim_m, max_turn=45.0):
-    """The bridge shadow (Kaveh 2026-10-06), an extra casing: every part of a bridge (start head, main part, end head: ``parts``, the divided
+    """The bridge shadow (2026-10-06), an extra casing: every part of a bridge (start head, main part, end head: ``parts``, the divided
     casing; undivided, each edge) casts its shadow at its own casing number, so it is over what the part crosses and under what its head joins
     (never on its own road at a joint); the parts at one number that touch are joined into one line, and where three or more meet the two
     going on most straight (turning ``max_turn`` degrees at most) at one number go on through; no shadow over the last ``trim_m`` metres where
@@ -790,7 +790,7 @@ def _bridge_shadows(geo, parts, highway_col, trim_m, max_turn=45.0):
     tree = shapely.STRtree([line[i] for i in br])
     def at(p):                                                 # the bridge edges at a point
         return [br[k] for k in tree.query(p.buffer(1e-7)) if line[br[k]].distance(p) < 1e-7]
-    # every part of a bridge casts its shadow at its own casing number, like its casing (Kaveh 2026-10-06: "there is no better option"): the
+    # every part of a bridge casts its shadow at its own casing number, like its casing (2026-10-06: "there is no better option"): the
     # casing pieces (start head, main part, end head; ``parts``, the divided casing) or, undivided, each edge at its number; the parts at
     # one number that touch are joined into one line
     bset = set(br)
@@ -996,7 +996,7 @@ def _twin_ends(geo, cols):
     return out
 
 
-# the tunnel look (docs/design/tunnel_look.md): everything on a tunnel moves toward one colour as the slider rises, v2's slate (Kaveh: the
+# the tunnel look (docs/design/tunnel_look.md): everything on a tunnel moves toward one colour as the slider rises, v2's slate (the
 # fade is the same for every item, however it was added); the casing dashes start from v2's lighter slate
 _TUN_TO = {"fill": "#64748b", "dash": "#94a3b8"}
 
@@ -1128,7 +1128,7 @@ def _tunnel_casing_dash(lid, flt, tlay, cw, off, on):
 
 
 def _tunnel_fill_dash(lid, flt, tlay, fw, off, on):
-    """Light dashes along a tunnel's fill (Kaveh, 2026-09-30, among three samples: "light dash is
+    """Light dashes along a tunnel's fill (2026-09-30, among three samples: "light dash is
     ok"); a translucent colour, so it suits any road colour. A dashed class keeps only its own
     dashes. Nothing without tunnels or with ``tunnel_fill_dash: []``."""
     dash = list(CONFIG.tunnel_fill_dash or [])
@@ -2128,13 +2128,13 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         style["layers"] = [l for l in style["layers"] if not l["id"].startswith(("roads-low-", "roads-high-")) and l["id"] not in ("roads-bridge-casing", "roads-bridge-fill")]   # the three bands are gone: positions only
         if divided:       # the divided casing: its own source of pieces (one casing piece per head and for the main part)
             # simplified like the roads (their fill): with MapLibre's default (0.375, 7x coarser) the outline followed a more angular line than
-            # the fill it surrounds and wobbled along curves (Kaveh 2026-10-06: "not smooth")
+            # the fill it surrounds and wobbled along curves (2026-10-06: "not smooth")
             style["sources"]["casings"] = {"type": "geojson", "data": {"type": "FeatureCollection", "features": parts},
                                            "tolerance": style["sources"]["roads"].get("tolerance", 0.375)}
         if any(ft["properties"].get("__rs_bridge") for ft in geo["features"]):
             # the bridge look in position mode: a heavier black casing, in the casing layers of the edge's position (docs/design/
             # levels_split_casing.md, section 9), one twin of each casing layer so a bridge piece keeps its end's cap (round, flat, square;
-            # Kaveh 2026-10-06: flat ends only, two bridge pieces could not close at a bend or a junction); the other casing layers leave
+            # 2026-10-06: flat ends only, two bridge pieces could not close at a bend or a junction); the other casing layers leave
             # the bridge edges to them
             layers, at, twins = [], 0, []
             for l in style["layers"]:
@@ -2249,7 +2249,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                     # minzoom 15, not 14: arrows are a street-scale affordance — at z14 they
                     # were hundreds of unreadable specks (labels start there because names
                     # thin themselves via collision; line-placed icons do not)
-                    # one arrow per one-way road in the window (Kaveh 2026-10-06, docs/design/arrows_and_names.md): the page
+                    # one arrow per one-way road in the window (2026-10-06, docs/design/arrows_and_names.md): the page
                     # puts a point in the middle of each chain's visible part into the "arrows" source after every move,
                     # rotated along the road. ponytail: a tiled map (tiles=True) has no slot geometry in the page and keeps the
                     # arrows repeated along every slot; give it the chains' lines too if one arrow per road matters there
@@ -2257,7 +2257,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                                                             "symbol-spacing": ["interpolate", ["linear"], ["zoom"], 15, 200, 18, 320, 22, 900]}}
                              if tiles else
                              {"source": "arrows", "layout": {"symbol-placement": "point", "icon-rotate": ["get", "b"],
-                                                             # where it would touch a name the arrow is left out (Kaveh 2026-10-06): the names are
+                                                             # where it would touch a name the arrow is left out (2026-10-06): the names are
                                                              # placed first (a later layer), and an arrow never pushes a name away
                                                              "icon-allow-overlap": False, "icon-ignore-placement": True}})
                     return {"id": lid, "type": "symbol", "source": where["source"], "minzoom": 15,

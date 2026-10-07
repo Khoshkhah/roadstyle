@@ -1,6 +1,6 @@
 # Levels and looks: one drawing rule for every road
 
-**Status:** approved by Kaveh 2026-10-01 ("A, do the refactor"). Supersedes `tunnel_portals.md` and the stretch rule of
+**Status:** approved 2026-10-01 ("A, do the refactor"). Supersedes `tunnel_portals.md` and the stretch rule of
 mapstyle's `junctions.md` (`_stretches`).
 
 ## Problem
@@ -11,7 +11,7 @@ tunnel; a bridge deck) were one thing in the code. A tunnel had its own band, it
 into *ground* stretches (drawn with the ground roads) and *under* stretches, and drew the edge itself invisibly. A road
 with a negative `layer` and no tunnel tag was cut the same way. So anything built on the map had to know the tunnel
 rules: the one-way arrows of a tunnel were stacked under its ground stretches and hidden; lanestyle had to mirror the
-cutting in Python to place its lane lines. Kaveh: "a tunnel should act like an ordinary road; only the colour style
+cutting in Python to place its lane lines. The request: "a tunnel should act like an ordinary road; only the colour style
 differs", and, again, "it shouldn't make a difference".
 
 ## Rule
@@ -56,4 +56,4 @@ stretch to its edge (`RS_PIECE_LAYERS`, `l.source === "tpieces"`). `band_col` no
 Tests: a tunnel is in the low band with the tunnel look, whole, and no stretch layers exist; the bridge keeps its look; a
 caller's `band_col` moves a tunnel; colour-by recolours the dashed sublayers; arrows of a tunnel are above its fill;
 the three-band toggles still hide by level. Before / after pictures of Monaco (tunnels, a bridge, a roundabout in a tunnel
-mouth) in `assets/` for Kaveh to look at.
+mouth) in `assets/` to look at.

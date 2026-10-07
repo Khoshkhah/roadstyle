@@ -13,7 +13,15 @@ edges = gpd.read_file("ui/studio/samples/sodermalm_driving.geojson")
 ## The defaults
 
 ```python
-rs.render_edges(edges)                # highsat palette on Voyager
+rs.render_edges(edges)                # amber palette on Voyager
+```
+
+![amber on voyager](img/gallery/amber_voyager.png)
+
+## High saturation
+
+```python
+rs.render_edges(edges, palette="highsat")
 ```
 
 ![highsat on voyager](img/gallery/highsat_voyager.png)
@@ -32,7 +40,7 @@ rs.render_edges(edges, palette="carto", basemap="positron")
 rs.render_edges(edges, basemap="dark_matter")
 ```
 
-![dark matter](img/gallery/highsat_dark.png)
+![dark matter](img/gallery/amber_dark.png)
 
 ## Blank canvas (offline)
 

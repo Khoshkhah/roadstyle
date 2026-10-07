@@ -106,7 +106,7 @@ def test_web_annotation_slots_alternate_names_and_arrows():
     assert ids.index("roads-arrows-lv1") == ids.index("roads-fill-lv1-sq") + 1     # one arrow layer per position
     assert json.dumps(["to-boolean", ["get", "name"]]) in json.dumps(lab["filter"])          # unnamed -> slot stays empty
     assert lab["layout"]["symbol-placement"] == "line-center"
-    # Kaveh's standing default: label text matches the oneway-arrow grey, and NO halo
+    # The standing default: label text matches the oneway-arrow grey, and NO halo
     assert lab["paint"]["text-color"] == "#5b5b5b"
     assert "text-halo-color" not in lab["paint"] and "text-halo-width" not in lab["paint"]
 
@@ -989,7 +989,7 @@ def test_a_bridge_deck_casing_shows_with_metre_widths_and_no_casing():
 
 
 def test_tunnels_get_light_dashes_on_their_fill_only_when_asked():
-    """Light dashes on a tunnel's fill: off by default since v2's tunnel look (Kaveh 2026-10-06); `tunnel_fill_dash: [1.2, 1.2]` (his pick of
+    """Light dashes on a tunnel's fill: off by default since v2's tunnel look (2026-10-06); `tunnel_fill_dash: [1.2, 1.2]` (his pick of
     2026-09-30 among three samples) draws them over the fill, translucent, butt-capped, not on a dashed class."""
     assert not any(l["id"].endswith("-pat") for l in _style(render_edges(_tunnel_world(True), backend="web").html)["layers"])
     st = _style(render_edges(_tunnel_world(True), backend="web", settings={"config": {"tunnel_fill_dash": [1.2, 1.2]}}).html)
@@ -1094,7 +1094,7 @@ def _tunnel_conf(html):
 
 def test_the_tunnel_look_is_v2s_slider():
     """docs/design/tunnel_look.md: at tunnel_strength (35) everything on a tunnel moves toward the same slate: its fill, its street names,
-    its arrows (an SDF icon of their own) and every item attached to it (Kaveh: one fade, however an item was added); the page gets each
+    its arrows (an SDF icon of their own) and every item attached to it (one fade, however an item was added); the page gets each
     colour without the look and the dash layers. A map without tunnels has no look and no Tunnels box; an unknown palette
     is an error."""
     from roadstyle.render_web import _TUN_TO, _tun_mix
@@ -1317,7 +1317,7 @@ def test_compute_levels_solve_band_and_order_are_in_the_optimization():
 
 
 def test_compute_levels_priority_order():
-    """order="priority" (Kaveh, 2026-10-06): where roads of one band meet, a roundabout's fill is over a tunnel's, a tunnel's over a bridge's, a bridge's
+    """order="priority" (2026-10-06): where roads of one band meet, a roundabout's fill is over a tunnel's, a tunnel's over a bridge's, a bridge's
     over the class order; "class" keeps the class order alone. The band is not changed: all five are in band 0 here."""
     pytest.importorskip("scipy")
     d = 0.001
@@ -1975,7 +1975,7 @@ def test_the_numpy_cutter_is_shapelys_substring():
 
 
 def test_level_input_and_solve_levels():
-    """docs/design/level_input.md (Kaveh 2026-10-06): roads of different bands that only meet (a tunnel mouth) take the priority order, roads
+    """docs/design/level_input.md (2026-10-06): roads of different bands that only meet (a tunnel mouth) take the priority order, roads
     that cross take the band; with band_col the caller's bands decide everywhere; edits switch a pair off or add one; ids may name either
     direction of a road."""
     pytest.importorskip("scipy")
@@ -2089,7 +2089,7 @@ def test_edits_name_either_direction_of_a_road():
 
 
 def test_every_part_of_the_upper_casing_is_after_the_lower_fill():
-    """Kaveh 2026-10-06 (Monaco 95449780#1f over 4229327#1f): A over B means every part of A's casing, its heads too, and its fill come after
+    """2026-10-06 (Monaco 95449780#1f over 4229327#1f): A over B means every part of A's casing, its heads too, and its fill come after
     B's fill. Before, only A's main part did: A's start head, held under the fill of the road it lands on, could sit under the fill of the
     street B passing under it close to A's start, and B's fill hid A's outline there."""
     pytest.importorskip("scipy")
@@ -2228,7 +2228,7 @@ def test_heads_over_the_whole_road_leave_no_main_part():
 
 
 def test_a_stack_of_yours_is_never_only_near_and_wishes_let_go_are_named():
-    """solve_levels (Kaveh 2026-10-06): a stack edit counts as a real crossing even where the two roads only come near (the found ones are
+    """solve_levels (2026-10-06): a stack edit counts as a real crossing even where the two roads only come near (the found ones are
     "near" there, kept last), so it wins over an order wish; the wishes the solver let go are in attrs["levels_orders_not_kept"]."""
     pytest.importorskip("scipy")
     import pandas as pd
@@ -2247,7 +2247,7 @@ def test_a_stack_of_yours_is_never_only_near_and_wishes_let_go_are_named():
 
 
 def test_a_divided_casing_has_a_round_seam_at_each_cut():
-    """_casing_parts (Kaveh 2026-10-06): at each cut inside an edge a tiny round piece of casing at the lower of the two pieces' numbers, so two
+    """_casing_parts (2026-10-06): at each cut inside an edge a tiny round piece of casing at the lower of the two pieces' numbers, so two
     pieces ending flat at a cut on a curve leave no wedge open in the outline."""
     m = 1 / 111320.0
     g = gpd.GeoDataFrame({"highway": ["primary"], "cs": [-1], "cl": [1], "ce": [0], "fl": [1], "cap": ["flat"]},
@@ -2263,7 +2263,7 @@ def test_a_divided_casing_has_a_round_seam_at_each_cut():
 
 
 def test_a_bridge_shadow_is_at_each_parts_casing_number(monkeypatch):
-    """Position mode (Kaveh 2026-10-06): the bridge shadow is an extra casing: each part of the bridge (start head, main part, end head) at its
+    """Position mode (2026-10-06): the bridge shadow is an extra casing: each part of the bridge (start head, main part, end head) at its
     own casing number, the parts at one number joined into one line, lines meeting end to end (flat ends); none over the last 3 m where the
     bridge comes down; blurred and shifted down-right (lit from the top left), just before the bridge's casing at that position; off with
     bridge_shadow."""
@@ -2294,7 +2294,7 @@ def test_a_bridge_shadow_is_at_each_parts_casing_number(monkeypatch):
 
 
 def test_hiding_the_bridges_hides_their_shadow(tmp_path):
-    """rsSetBridges(false) hides the bridge shadows with the bridges (Kaveh 2026-10-06: the shadow stayed, its lines carry no lvl)."""
+    """rsSetBridges(false) hides the bridge shadows with the bridges (2026-10-06: the shadow stayed, its lines carry no lvl)."""
     pw = pytest.importorskip("playwright.sync_api")
     m = 1 / 111320.0
     g = gpd.GeoDataFrame({"highway": ["primary"] * 2, "bridge": ["yes", None], "layer": [1, None]},
@@ -2318,7 +2318,7 @@ def test_hiding_the_bridges_hides_their_shadow(tmp_path):
 
 
 def test_a_branching_bridge_shadow_is_cut_only_at_the_bridge_ends():
-    """_bridge_shadows (Kaveh 2026-10-06): where bridge edges branch the lines meet with no cut; only where the bridge comes down is it cut."""
+    """_bridge_shadows (2026-10-06): where bridge edges branch the lines meet with no cut; only where the bridge comes down is it cut."""
     from roadstyle import render_web as rw
     m = 1 / 111320.0
     o = (18.0, 59.3)
@@ -2345,7 +2345,7 @@ def test_a_branching_bridge_shadow_is_cut_only_at_the_bridge_ends():
 
 
 def test_bridge_shadow_goes_straight_through_a_junction_and_each_line_keeps_its_own_number():
-    """_bridge_shadows (Kaveh 2026-10-06): where three bridge edges meet, the two going on straight are one line; the third is its own line,
+    """_bridge_shadows (2026-10-06): where three bridge edges meet, the two going on straight are one line; the third is its own line,
     at the lowest casing number of its own edges (not of the whole connected bridge: a bridge crossing over a lower bridge it is joined to
     casts its shadow on it)."""
     from roadstyle import render_web as rw
@@ -2366,7 +2366,7 @@ def test_bridge_shadow_goes_straight_through_a_junction_and_each_line_keeps_its_
 
 
 def test_street_names_fit_their_road_and_tiny_ones_are_left_out():
-    """Street names (Kaveh 2026-10-06): about 3/4 of the road's fill width, at most the old 10 -> 14 px; none where that is under 9 px."""
+    """Street names (2026-10-06): about 3/4 of the road's fill width, at most the old 10 -> 14 px; none where that is under 9 px."""
     from roadstyle import render_web as rw
     assert rw._label_px("primary", 18) == 14.0                                             # a wide road: as before
     assert abs(rw._label_px("residential", 18) - 0.75 * rw.class_width_px("residential", 18, casing=False)) < 1e-9 < rw._label_px("residential", 18) - 9
@@ -2380,7 +2380,7 @@ def test_street_names_fit_their_road_and_tiny_ones_are_left_out():
 
 
 def test_a_bridge_shadow_is_not_on_its_own_road_at_a_joint():
-    """Kaveh 2026-10-06 ("shadow on its own road"): at a joint with a lower piece of the bridge, the shadow of the higher piece's head is at the
+    """2026-10-06 ("shadow on its own road"): at a joint with a lower piece of the bridge, the shadow of the higher piece's head is at the
     head's number, at or under the lower piece's fill; the main part, over what it crosses, keeps its own higher number."""
     m = 1 / 111320.0
     P = lambda x, y: (18.0 + x * m * 2, 59.3 + y * m)                                    # noqa: E731  about metres at 60 N
@@ -2394,7 +2394,7 @@ def test_a_bridge_shadow_is_not_on_its_own_road_at_a_joint():
 
 
 def test_one_arrow_per_one_way_road_in_the_window(tmp_path):
-    """docs/design/arrows_and_names.md (Kaveh 2026-10-06): a one-way road in the window has one arrow, in its visible part; the arrow stays
+    """docs/design/arrows_and_names.md (2026-10-06): a one-way road in the window has one arrow, in its visible part; the arrow stays
     where it is while it is in the window (a small pan keeps it), and a road whose arrow left the window gets one again. None below zoom 15."""
     pw = pytest.importorskip("playwright.sync_api")
     path = tmp_path / "arrows.html"
@@ -2428,7 +2428,7 @@ def test_one_arrow_per_one_way_road_in_the_window(tmp_path):
 
 
 def test_arrows_are_thinned(tmp_path):
-    """docs/design/arrows_and_names.md, thinning (Kaveh 2026-10-06): below zoom 17 only the main classes get an arrow; arrows stay 150 px
+    """docs/design/arrows_and_names.md, thinning (2026-10-06): below zoom 17 only the main classes get an arrow; arrows stay 150 px
     apart (two parallel one-way roads a few metres apart show one)."""
     pw = pytest.importorskip("playwright.sync_api")
     path = tmp_path / "thin.html"
@@ -2454,7 +2454,7 @@ def test_arrows_are_thinned(tmp_path):
 
 
 def test_an_arrow_that_would_touch_a_name_is_left_out():
-    """docs/design/arrows_and_names.md (Kaveh 2026-10-06): the page's arrows collide with the names (placed first, a later layer) and are
+    """docs/design/arrows_and_names.md (2026-10-06): the page's arrows collide with the names (placed first, a later layer) and are
     dropped where they would touch one; they never push a name away."""
     g = gpd.GeoDataFrame({"highway": ["primary"], "name": ["Long St"], "oneway": [True]},
                          geometry=[LineString([(18.0, 59.3), (18.01, 59.3)])], crs=4326)

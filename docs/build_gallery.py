@@ -19,11 +19,13 @@ OVERVIEW = dict(center=(18.065, 59.314), zoom=13.3)
 BRIDGE = dict(center=(18.076, 59.304), zoom=16.4, pitch=58, bearing=-25)
 
 LOOKS = [
-    ("highsat_voyager", "High-saturation palette on Voyager (the defaults)",
+    ("amber_voyager", "Amber palette on Voyager (the defaults)",
      dict(), OVERVIEW),
+    ("highsat_voyager", "High-saturation palette on Voyager",
+     dict(palette="highsat"), OVERVIEW),
     ("carto_positron", "OSM-Carto palette on Positron",
      dict(palette="carto", basemap="positron"), OVERVIEW),
-    ("highsat_dark", "Dark Matter base",
+    ("amber_dark", "Dark Matter base",
      dict(basemap="dark_matter"), OVERVIEW),
     ("mono_blank", "Mono palette on the blank (tile-less, offline) canvas",
      dict(palette="mono", basemap="blank", basemap_switcher=False), OVERVIEW),
@@ -109,7 +111,7 @@ HIDE = "<style>.maplibregl-ctrl-bottom-left,.rs-zoom{display:none!important}</st
 def hero(edges) -> None:
     """The README hero: the Street View window open on Hornsgatan, 1200x600 at 2x, as a JPEG."""
     from PIL import Image
-    html = rs.render_edges(edges, filter_control=False, basemap_switcher=False,
+    html = rs.render_edges(edges, filter_control=False, basemap_switcher=False, tunnel_control=False,
                            road_popup=False).html.replace("</head>", HIDE, 1)
     png = OUT / "hero.png"
     served_shot(html, png, SELECT + """rsSetStreetView(true);

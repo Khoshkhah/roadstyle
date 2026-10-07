@@ -1,7 +1,7 @@
 # Square ends per edge (`cap_col`)
 
-**Status:** approved by Kaveh 2026-10-02 as part of mapstyle's `docs/design/levels_plan.md` ("go ahead and fix all issues in one
-package"); a roadstyle addition asked for by Kaveh, an exception to "roadstyle is not changed for mapstyle".
+**Status:** approved 2026-10-02 as part of mapstyle's `docs/design/levels_plan.md` ("go ahead and fix all issues in one
+package"); a roadstyle addition asked for, an exception to "roadstyle is not changed for mapstyle".
 
 ## Problem
 
@@ -31,7 +31,7 @@ Before, `band_col` moved the tunnel's casing and fill but dropped its look subla
 Tests: twin layers and filters, order inside a band, nothing without the keyword, the tunnel look in the ground band and
 nothing extra without such a tunnel.
 
-## Square, and one end at a time (Kaveh 2026-10-06)
+## Square, and one end at a time (2026-10-06)
 
 Found in the level editor: a wide road ending on a narrower one at a narrow angle, its round end reaching across the other road
 (Tunnel Aureglia into Rue Grimaldi, Monaco). A flat end there fixes it, but a flat end on both ends makes the road look shorter by

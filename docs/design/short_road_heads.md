@@ -1,6 +1,6 @@
 # A short road keeps its two heads
 
-**Status:** implemented 2026-10-04 (Kaveh: "go with your suggestion"). It changes one rule of `levels_split_casing.md`, section 9.
+**Status:** implemented 2026-10-04 ("go with your suggestion"). It changes one rule of `levels_split_casing.md`, section 9.
 
 ## The case
 

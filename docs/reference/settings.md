@@ -47,7 +47,27 @@ A palette entry may also be wrapped as `{"roads": {...}}`, the form `save_palett
 ## Palettes
 
 Pick one with `palette=`. Widths are px at city zoom; the web backend scales them with zoom. All
-three palettes: `opacity` 1.0.
+four palettes: `opacity` 1.0.
+
+=== "amber (default)"
+
+    The amber colours: orange, yellow and green main roads, slate-grey streets; carto's widths and casings.
+
+    | highway | fill | casing | width / casing width | dash |
+    |---|---|---|---|---|
+    | motorway | `#f28c28` | `#dc2a48` | 6.0 / 8.0 | |
+    | trunk | `#f5a623` | `#c84e2f` | 5.5 / 7.5 | |
+    | primary | `#f4c542` | `#a06b00` | 4.5 / 6.5 | |
+    | secondary | `#f7df72` | `#707d00` | 3.5 / 5.5 | |
+    | tertiary | `#b8d986` | `#bcbcbc` | 2.5 / 4.0 | |
+    | unclassified | `#ffffff` | `#bcbcbc` | 2.0 / 3.5 | |
+    | residential | `#d7dee8` | `#bcbcbc` | 2.0 / 3.5 | |
+    | living_street | `#cbd5e1` | `#cccccc` | 1.8 / 3.0 | |
+    | service | `#94a3b8` | `#d4d4d4` | 1.2 / 2.2 | |
+    | track | `#a3a3a3` | `#9e7b54` | 1.5 | 4, 4 |
+    | cycleway | `#5c7cb6` | same | 1.2 | 3, 3 |
+    | footway | `#C59D9D` | same | 1.2 | 4, 4 |
+    | path | `#C59D9D` | same | 1.2 | 2, 5 |
 
 === "highsat"
 
@@ -68,7 +88,7 @@ three palettes: `opacity` 1.0.
     | cycleway | `#2980B9` | none | 1.5 | 6, 4 |
     | footway, path | `#D98880` | none | 1.5 | 4, 4 |
 
-=== "carto (default)"
+=== "carto"
 
     The OpenStreetMap Carto look: muted fills, a darker casing per class.
 

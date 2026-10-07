@@ -22,7 +22,7 @@ _TIER = 100      # order="priority": each tier is over every class (the class or
 
 
 def _tier(row, junction_col, bridge_col, tunnel_col):
-    """order="priority": roundabout 3, tunnel 2, bridge 1, any other road 0 (Kaveh, 2026-10-06)."""
+    """order="priority": roundabout 3, tunnel 2, bridge 1, any other road 0 (2026-10-06)."""
     import pandas as pd
 
     from .render_web import _truthy
@@ -117,7 +117,7 @@ def _relations(metres, ends, beta, omega, band_dist, mouths=True):
     """The relations of the roads (docs/design/level_input.md): ``(meets, stacks, orders)``.
     ``meets``: ``(x, x_end, y, y_end)`` for every two roads whose ends ``x_end`` / ``y_end`` ("start" / "end") are one node; ``stacks``: ``(upper, lower)``
     for roads of different bands that cross or run within ``band_dist`` metres of each other away from a node they share; ``orders``: ``(higher, lower)``
-    by ``omega`` for roads that meet, of one band or of different bands that only meet (Kaveh 2026-10-06: at a tunnel mouth the priority decides,
+    by ``omega`` for roads that meet, of one band or of different bands that only meet (2026-10-06: at a tunnel mouth the priority decides,
     where roads cross the band does). ``mouths`` False: roads of different bands are always a stack pair, as when the caller gives the bands
     (``band_col``: a zebra crossing set over its street stays over it). ``metres``: the roads' lines in metres."""
     import shapely
@@ -163,11 +163,10 @@ def _relations(metres, ends, beta, omega, band_dist, mouths=True):
 
 def _solve_intervals(metres, meets, stacks, orders, limit, max_level, margin, min_positions=True, max_positions=None, forced=(), off=(), empty=(), near=()):
     """The solver on roads (one per segment, both directions together) and their relations (:func:`_relations`, or a pairs table). Every road has
-    one fill number ``b`` and a casing of three parts: a start head, a main part and an end head, whatever its length (Kaveh 2026-10-06: the
+    one fill number ``b`` and a casing of three parts: a start head, a main part and an end head, whatever its length (2026-10-06: the
     drawing gives a part its metres, zero for the main part of a road shorter than its two heads; the solver takes no length). ``empty``: the
     roads whose main part is drawn with no length; a stack never lifts it (a rule on a part nobody sees would only cost real ones). ``near``:
-    the stack rules ``(upper, lower, "s" / "m" / "e")`` whose part does not cross the lower road: kept last, after the order wishes (Kaveh
-    2026-10-06: a part that only comes near is a warning, never worth a real crossing or a wish); an edit's part is never near.
+    the stack rules ``(upper, lower, "s" / "m" / "e")`` whose part does not cross the lower road: kept last, after the order wishes (2026-10-06: a part that only comes near is a warning, never worth a real crossing or a wish); an edit's part is never near.
     Returns ``(parts, given_up, info)``: ``parts[r] = (a_start, a_main, a_end, b)``. The model is a linear program solved on a sparse matrix with
     HiGHS (docs/design/levels_split_casing.md, section 7)."""
     import time
@@ -211,7 +210,7 @@ def _solve_intervals(metres, meets, stacks, orders, limit, max_level, margin, mi
         if max_positions:                                      # at most max_positions numbers: H - L <= (max_positions - 1) steps (a hard bound;
             le([(H, 1.0), (Lo, -1.0)], (max_positions - 1) * margin)   # the stack pairs and the order wishes give way to it)
     base = len(rhs)
-    # H3, A over B (Kaveh 2026-10-06): every part of A's casing (start head, main part, end head; a short road's one number), and so its fill (H1),
+    # H3, A over B (2026-10-06): every part of A's casing (start head, main part, end head; a short road's one number), and so its fill (H1),
     # after B's fill: b_B + margin <= a_(A, part). Left out: a head of A that joins B, or joins a road that joins B (the next piece of the tunnel
     # A runs into at its mouth): a junction, where the head is under the fills it joins (H2); without it such a head and the head of a street
     # over that next piece made a loop no order can keep. Two ramps, each over one tube of a tunnel and joining the other tube, still make one:
@@ -402,7 +401,7 @@ def _read_pairs(pairs):
 
 
 def auto_ends(roads, pairs, zoom=18.0, highway_col="highway", min_m=0.5, step=0.25, cover=0.99, levels=None):
-    """Each road end's head length and cap from the geometry and the widths the page draws at ``zoom`` (Kaveh 2026-10-06: better than one
+    """Each road end's head length and cap from the geometry and the widths the page draws at ``zoom`` (2026-10-06: better than one
     number and one cap for all). Returns a table ``road``, ``start_m``, ``end_m``, ``cap_start``, ``cap_end`` (in the road's own way):
 
     * a head reaches as far as the road's drawing still overlaps a road joined at that end: from the node along the road until its line is
@@ -410,7 +409,7 @@ def auto_ends(roads, pairs, zoom=18.0, highway_col="highway", min_m=0.5, step=0.
       dead end has ``min_m``; start + end never more than the road (cut in their ratio);
     * a cap is ``"round"`` where the round end of its fill lies inside the fills of the roads joined there that are drawn at its level or
       above (at least ``cover`` of its half disc), else ``"flat"``: a round end on top of a lower road shows as a bump on it (a road going
-      on into a lower piece, Kaveh 2026-10-06), and one reaching out of the joined roads crosses their outlines (a wide road ending on a
+      on into a lower piece, 2026-10-06), and one reaching out of the joined roads crosses their outlines (a wide road ending on a
       narrower one); a square end covers the round one and more, so it never helps. ``levels``: the solved roads (``road``,
       ``fill_level``, :func:`solve_levels`); the caps need them, so they are made after solving (without: every joined road counts).
 

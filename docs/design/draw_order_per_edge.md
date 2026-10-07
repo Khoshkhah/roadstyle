@@ -1,7 +1,7 @@
 # Draw order per edge, not only by class and level
 
-**Status:** approved by Kaveh 2026-09-30 and implemented (`render(order_col=, band_col=)`,
-`_mark_order`, tests in `tests/test_render_web.py`). A roadstyle change asked for by Kaveh, an
+**Status:** approved 2026-09-30 and implemented (`render(order_col=, band_col=)`,
+`_mark_order`, tests in `tests/test_render_web.py`). A roadstyle change asked for, an
 exception to "roadstyle is not changed for mapstyle": any caller gets it.
 
 ## Problem

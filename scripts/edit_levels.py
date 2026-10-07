@@ -121,7 +121,7 @@ class Area:
         draw["s_lon"], draw["s_lat"], draw["e_lon"], draw["e_lat"] = zip(*tips, strict=True)
         m = rs.render_edges(draw, edge_id_col="road", road_popup=False, name=f"Level editor · {self.dir.name}",
                             select_color="rgba(0,0,0,0)",               # the panel colours the picked roads (1 orange, 2 blue): no click glow over them
-                            filter_control=False, tunnel_control=False,  # the panel is the only control (Kaveh): no class filter box, no Tunnels box
+                            filter_control=False, tunnel_control=False,  # the panel is the only control: no class filter box, no Tunnels box
                             casing_start_col="casing_start", casing_level_col="casing_level", casing_end_col="casing_end",
                             fill_level_col="fill_level", cap_start_col="cap_start", cap_end_col="cap_end",
                             head_start_m_col="head_start_m", head_end_m_col="head_end_m")

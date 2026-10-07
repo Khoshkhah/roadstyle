@@ -1,11 +1,11 @@
 # Which road is on top
 
-<p class="lead">Every edge gets two numbers, the position where its outline is drawn and the position where its road is drawn, and the map is drawn by those two numbers alone.</p>
+<p class="lead">Every edge gets numbers for where its outline and its road are drawn. The map is drawn by those numbers alone; a solver works them out, and an editor lets you fix any place by hand.</p>
 
-![A secondary road on a bridge, drawn over a primary road](../img/levels-bridge.png)
+![Monaco: a primary road on a bridge over a roundabout, with its slate casing and shadow; a tunnel passes under both](../img/levels-bridge.png)
 
-The yellow secondary road crosses the orange primary road on a bridge. By road class the primary road would win; by position the
-bridge does. Nothing else decides.
+Monaco, Rond-Point du Portier: the primary road crosses the roundabout on a bridge (slate outline, soft shadow), and a tunnel (dashed
+outline) passes under both. Where the roads only meet, the roundabout is on top; where they cross, the bridge is.
 
 === "Python"
 
@@ -13,59 +13,98 @@ bridge does. Nothing else decides.
     rs.render_edges(edges).save("map.html")    # the positions are computed for you
     ```
 
+=== "Command line"
+
+    ```bash
+    # from a clone of the repository: the level step with files you can read and edit
+    python scripts/level_input.py edges.gpkg out/area     # the solver's input
+    python scripts/solve_levels.py out/area               # levels.csv
+    python scripts/edit_levels.py out/area                # the editor, http://localhost:8780/
+    ```
+
 ## The rule
 
 - Every edge has a **casing position** and a **fill position**: whole numbers, 0 is the ground, null counts as 0.
-  If the casing number is higher than the fill number, they are swapped.
+- The casing has **three parts**: a start head, a main part and an end head, each with its own number (`casing_start`, `casing_level`,
+  `casing_end`). The heads are 5 m long by default; on a short road the main part can have no length.
 - The map is drawn position by position, lowest first. **At each position every outline is drawn first, then every road.**
-- So two edges that share a node, whose `[casing, fill]` ranges overlap, merge without a ring: each outline lies under the other's road.
-- An edge whose positions are all higher than another's is drawn completely over it, outline included: an overpass.
-- An edge with a low casing position and a higher fill position (a bridge edge that touches the ground) has its outline with the ground roads it joins, and its road over them.
+- So two roads that meet at a junction merge without a ring: each head lies under the other road's fill.
+- A road whose numbers are all higher than another's is drawn completely over it, outline included: an overpass.
 
-**Nothing else orders the drawing**: not the road class, not `layer`, `bridge` or `tunnel`. They are only inputs of the program that
-computes the positions. A bridge keeps its look (heavier black casing), a tunnel its look (faded, dashed). Two edges at the *same*
-position are drawn in no set order.
+**Nothing else orders the drawing**: not the road class, not `layer`, `bridge` or `tunnel`. They are only inputs of the solver.
+Two edges at the *same* position are drawn in no set order.
 
-## Where the positions come from
+## Where the numbers come from
 
-The positions come from the **level step**, not from the renderer ([design](../design/level_input.md)). `render_edges(edges)` without level
-columns calls `rs.compute_levels(edges)` with its defaults: a minimum-cost flow (OR-tools; HiGHS through scipy when a wish must be given up)
-over the `layer`, `bridge` and `tunnel` tags and the geometry. Roads of different bands that **cross** follow the band (the higher one over
-the lower one); roads that **only meet** (two streets at a junction, a tunnel mouth, a bridge end) follow the priority order: a roundabout
-(`junction=roundabout`) over a tunnel, a tunnel over a bridge, a bridge over the road class. `order="class"` is the road class alone. To
-give your own band per edge (a sidewalk -1 under its street, a crossing 1 over it), compute the levels with `band_col="band"`: your bands
-then decide over and under everywhere. `render_edges` takes no band and no order.
+The **level step** works them out, before drawing ([design](../design/level_input.md)). `render_edges(edges)` without level columns runs it
+for you with its defaults. It has two halves:
 
-The two halves of the step, with files you can read and edit (`roads.parquet`, `pairs.csv`, `edits.csv`, `levels.csv`):
-`rs.level_input(edges)` / `scripts/level_input.py`, then `rs.solve_levels(roads, pairs, edits=...)` / `scripts/solve_levels.py`.
-
-Computing takes seconds for a district and longer for a big network. Compute it once, and draw with the columns:
+1. **The input** (`rs.level_input(edges)`): one row per road (both directions together) and the pairs between roads.
+   Roads of different bands (`layer`, `bridge`, `tunnel`) that **cross** become a *stack* pair: the higher band is over the lower one.
+   Roads that **only meet** (a junction, a tunnel mouth, a bridge end) become an *order* wish: a roundabout over a tunnel, a tunnel over
+   a bridge, a bridge over the road class.
+2. **The solver** (`rs.solve_levels(roads, pairs, edits=...)`): whole numbers (integer programming with HiGHS), kept in this order:
+   real crossings, then the order wishes, then the *near* rules (parts that only come close), then as few positions as possible.
 
 ```python
-levels = rs.compute_levels(edges)                     # band_col=..., order=... go here, not to render_edges
-rs.save_levels(con, levels)                # duckOSM file, schema visualization; rs.load_levels reads it back
-rs.render_edges(levels, casing_level_col="casing_level", fill_level_col="fill_level",
-                casing_start_col="casing_start", casing_end_col="casing_end").save("map.html")
+levels = rs.compute_levels(edges)          # both halves in one call
+rs.render_edges(levels, casing_start_col="casing_start", casing_level_col="casing_level",
+                casing_end_col="casing_end", fill_level_col="fill_level").save("map.html")
 ```
 
-`compute_levels(edges)` is this method. Each different number is one **position**, and the page has a set of layers for each position. `compute_levels` asks for few positions by default (`min_positions=True`): the casings may lie a little farther from their fills. `min_positions=False` leaves that out.
+Computing takes seconds for a district and longer for a big network: compute once, then draw with the columns.
 
-`method="tags"` is a closed-form rule on the tags alone, with no search. How both methods work, with every argument and the output:
-[Divided casing and one band](../design/levels_split_casing.md).
+## Fix it by hand: the level editor
+
+![The level editor: two roads picked, their cards with ends and heads, the Issues tab](../img/level-editor.png)
+
+`python scripts/edit_levels.py out/area` opens a local page with the map and a panel. Click a road, or find it by edge id or `edge_ref`;
+pick a second one to see every pair between the two.
+
+- **Add a relation**: *order* (whose fill is on top where they meet), *stack* (one over the other: the whole road or one part of its
+  casing) or *meet* (join two ends). You choose which road is on top.
+- **Switch off** a pair the input found.
+- **Each end of a road**: its cap (*round*, *square*, *flat*) and its head length (a slider, in metres).
+- Changes wait in a list until **Apply and solve**: they are solved together, and the map reloads with the new numbers.
+  If the solver refuses them, nothing is saved.
+- The **Issues** tab lists what to look at: **given up** (red: a real crossing the solver could not keep, a flaw on the map),
+  **near warnings** (amber: two roads that only come close; usually fine) and the **order wishes not kept**.
+
+Your changes live in three small tables in the area folder, never overwritten by the input step:
+
+| file | what |
+|---|---|
+| `edits.csv` | your pairs: `relation` (`order`, `stack`, `meet`), `a`, `b`, `a_end`, `b_end`, `enabled` (`false` switches a found pair off) |
+| `heads.csv` | head lengths per road end in metres (`road`, `start_m`, `end_m`; empty: 5 m) |
+| `caps.csv` | cap per road end (`road`, `start`, `end`: `round`, `square`, `flat`; empty: round) |
+
+`levels.csv` is the result: per edge its four numbers and its ends as drawn (`head_start_m`, `head_end_m`, `cap_start`, `cap_end`).
+An example: Monaco's hand-made tables in `examples/levels/monaco/`.
+
+## Bridges and tunnels
+
+- A **bridge** has a slate casing (`bridge_casing_color`) and a soft **shadow** shifted down-right (`bridge_shadow`): each part of the
+  bridge casts it at its own casing number, so it lies on what the bridge crosses, never on its own road. Hiding the bridges hides it too.
+- A **tunnel** fades toward slate, its fill, names, arrows and attached items alike. The *Tunnels* box sets how much, in five steps
+  (*Normal colors*, *Subtle*, *Balanced*, *Strong*, *Full*: `tunnel_strength` 0, 20, 35, 70, 100), and its two-colour dashed casing
+  (`tunnel_palette`, default *Graphite + silver*). `rsSetTunnelStyle({strength, palette, ratio})` does the same from your page.
 
 ## Your own numbers
 
-`compute_levels` is one way to fill the columns. Anything that gives two integers per edge works, for example a sidewalk at -1 under
-a street at 0 and a crossing at 1 over it:
+The solver is one way to fill the columns. Anything that gives whole numbers per edge works, for example a sidewalk at -1 under a street
+at 0 and a crossing at 1 over it:
 
 ```python
 edges["casing_level"] = edges["fill_level"] = edges["kind"].map({"sidewalk": -1, "street": 0, "crossing": 1})
 ```
 
+To give your own band per edge and let the solver do the rest: `rs.compute_levels(edges, band_col="band")`.
+
 ## Good to know
 
 - One casing layer and one fill layer are made for each position that occurs, so keep the range small.
-- `rsColor` and colour-by reach every position. `rsColor` still lifts its painted roads to the top *inside* their position.
-- `tiles=True` works with positions.
+- `rsColor` and colour-by reach every position. `tiles=True` works with positions.
+- `render_edges` takes no band and no order: compute the levels first.
 
-See also: the [full specification](../design/levels_split_casing.md) and every keyword in the [parameters table](../reference/parameters.md).
+See also: [the level step, in full](../design/level_input.md) · [divided casing](../design/levels_split_casing.md) ·
+[every parameter](../reference/parameters.md)

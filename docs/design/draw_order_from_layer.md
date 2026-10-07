@@ -1,6 +1,6 @@
 # Draw order from the OSM `layer` tag
 
-**Status:** implemented 2026-09-30 (approved by Kaveh the same day).
+**Status:** implemented 2026-09-30 (approved the same day).
 
 ## Problem
 

@@ -24,7 +24,7 @@
 
     ---
 
-    Bridges, tunnels and ramps: draw by two numbers per edge, worked out for you.
+    Bridges, tunnels and ramps: numbers per edge worked out by a solver, and an editor to fix any place by hand.
 
     [:octicons-arrow-right-24: Which road is on top](levels.md)
 

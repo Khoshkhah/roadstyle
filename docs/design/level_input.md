@@ -1,11 +1,11 @@
 # The level step: solver input, solver, and a renderer without band or order
 
-**Status:** built (branch `levels`), waiting for Kaveh's review, 2026-10-06. Builds on
+**Status:** built, reviewed and merged, 2026-10-06. Builds on
 [Divided casing and one band](levels_split_casing.md) (the model) and the v2 test's pair tables (`docs/v2/pair-tables.md` on `v2-dev`).
 
 ## Why
 
-The renderer took a band and an order and computed the levels itself, so a rule about drawing order ended up inside the drawing. Kaveh:
+The renderer took a band and an order and computed the levels itself, so a rule about drawing order ended up inside the drawing. The request:
 "the rendering engine shouldn't get order or band as input". Now there are two steps:
 
 1. **the level step**: from the edges (any edges roadstyle draws, not only duckOSM's), the solver's input, then the four numbers per edge;
@@ -24,13 +24,13 @@ Two roads with **different bands** (a tunnel and a street, a bridge and the road
 With an explicit `band_col` the caller's bands decide over and under everywhere, also where roads only meet: a zebra crossing set over its
 street stays over it (lanestyle, mapstyle).
 
-**A over B** (Kaveh 2026-10-06): every part of A's casing (start head, main part, end head) and its fill come after
+**A over B** (2026-10-06): every part of A's casing (start head, main part, end head) and its fill come after
 B's fill. Before, only A's main part did: where B passed under A close to one of its ends, B's fill hid A's outline there (Monaco: the bridge
 95449780#1f over 4229327#1f). A head that **joins** B, or joins a road that joins B (the next piece of the tunnel A runs into at its mouth),
 is left out: it is a junction, where the head is under the fills it joins. Two ramps, each over one tube of a tunnel and joining the other
 tube, still make a loop of four rules no order keeps; the solver gives one of their pairs up and reports it.
 
-**Three parts for every road, no length in the solver** (Kaveh 2026-10-06). Every road has a start head, a main part and an end head,
+**Three parts for every road, no length in the solver** (2026-10-06). Every road has a start head, a main part and an end head,
 whatever its length; the drawing gives them their metres (`head_m`, or a road's own in `heads.csv` / `head_start_m_col` /
 `head_end_m_col`), and a road shorter than its two heads has a main part of no length. The solver takes no metres, only which roads
 have an empty main part (`rs.empty_mains(roads, head_m, heads)` -> `solve_levels(empty_main=...)`): a stack never lifts an empty main
@@ -39,15 +39,15 @@ part, since a rule on a part nobody sees would cost real ones (without it Monaco
 A stack rule is **real** when that part of A crosses B (they meet at a point that is not an end of either road), and **near** when
 it only comes near (the pair was found by `band_dist`, or this part is away from the crossing): `rs.casing_parts(roads, head_m, heads)`
 gives the parts as drawn, and `solve_levels(parts=...)` tells them apart, with no length in the solver itself. The solver keeps, in
-this order: the real crossings, the order wishes, the near rules, then the cost and fewest positions (Kaveh 2026-10-06: a near rule has
-the lowest weight; it must never cost a real crossing). A stack you add (`edits.csv`) is always real, even where the two roads only come near: you asked for it (Kaveh 2026-10-06). The order
+this order: the real crossings, the order wishes, the near rules, then the cost and fewest positions (2026-10-06: a near rule has
+the lowest weight; it must never cost a real crossing). A stack you add (`edits.csv`) is always real, even where the two roads only come near: you asked for it (2026-10-06). The order
 wishes the solver let go are named (`attrs["levels_orders_not_kept"]`, levels_info.json `orders_not_kept`) and listed in the editor's
 Issues tab, so two edits that disagree show which one lost. A **given-up** pair is a real crossing that broke: a flaw on the map. A near
 rule that broke is a **warning** (`attrs["levels_near"]`), shown apart in the editor. Monaco: 0 given up, 87 near warnings, 4 order
 wishes not kept (was 47), 15 positions (was 10); with the near rules above the order wishes instead it would be 0 / 22 / 47 / 10.
 Before, every rule counted as a crossing: 22 given up, 20 of them near-only and the 2 others a head 7 and 18 m from the crossing.
 
-**Automatic heads and caps** (`rs.auto_ends`, Kaveh 2026-10-06: better than one number and one cap for all), for the widths the page
+**Automatic heads and caps** (`rs.auto_ends`, 2026-10-06: better than one number and one cap for all), for the widths the page
 draws at zoom 18 (street level; widths are pixels, so lower zooms are wider on the ground):
 
 - *head length* (before solving, geometry only): from the node along the road until its line is `(own width + the other's) / 2` from every
@@ -57,13 +57,13 @@ draws at zoom 18 (street level; widths are pixels, so lower zooms are wider on t
   level or above, else flat: a road going on into a lower piece would show its round end as a bump on it, and a wide road ending on a
   narrower one would cross its outline (Tunnel Aureglia into Rue Grimaldi). Square never helps there (it covers the round end and more).
 
-**The default caps are round** (Kaveh 2026-10-06). Flat where exactly two roads meet was tried and dropped: two flat ends close only on
+**The default caps are round** (2026-10-06). Flat where exactly two roads meet was tried and dropped: two flat ends close only on
 a perfectly straight line and left small breaks at most joints. A road with two different ends is drawn from two fill halves that only
 paint; its own fill layer keeps it, transparent, so a click and a selection find the road itself. A bridge's heavier casing keeps the
 cap of each of its pieces (it was always flat, so two bridge pieces could not close), and at each cut inside a road (between a head and
 the main part) a round seam of casing at the lower of the two numbers closes the outline on a curve.
 
-**Not the default** (Kaveh 2026-10-06): heads made for zoom 18 were too short at lower zooms, where the roads are wider on the ground,
+**Not the default** (2026-10-06): heads made for zoom 18 were too short at lower zooms, where the roads are wider on the ground,
 and the main casing (a higher level) showed in the joined roads' fills everywhere. The default is back to 5 m heads and round caps
 (`scripts/solve_levels.py --auto-ends` for the automatic ones). Yours in `heads.csv` / `caps.csv` go on top (empty: the default);
 `levels.csv` has the ends as drawn. On Monaco the caps matched 5 of the 6

@@ -1,6 +1,6 @@
 # A general core: roads, items, and views
 
-**Status:** design, nothing built. Builds on [Overlays attached to edges](edge_overlays.md),
+**Status:** design; step 1 (views) built and merged, 2026-10-06. Builds on [Overlays attached to edges](edge_overlays.md),
 [Overlay styles](overlay_styles.md) and [Levels and looks](levels_and_looks.md). Takes ideas from the `v2-dev`
 branch (`docs/v2/`, an unfinished test).
 
@@ -71,7 +71,7 @@ so a library does not copy it onto every item:
 - **The look.** A lane of a tunnel is drawn as tunnel, a lane of a bridge as bridge. `v2-dev` does this in
   its tunnel colouring (`docs/v2/tunnel-coloring.md`): an item is tunnel when its `edge_id` is a tunnel's.
 - **The filters.** Hiding tunnels, a road class or a filtered set hides that road's items, always
-  (Kaveh, 2026-10-05). Today `rsFilter` on roads and on an overlay are separate.
+  (2026-10-05). Today `rsFilter` on roads and on an overlay are separate.
 - **The selection.** A click on an item selects its road as well: Street View, the docked panel and
   `rs:select` follow, and the item's own popup still shows. `_STREET_VIEW_JS` does this by hand now.
 
@@ -131,7 +131,7 @@ rs.render_edges(roads, overlays=[...], views={
 })
 ```
 
-The page shows a *View* menu next to the *Colour by* menu (Kaveh, 2026-10-05). `rsSetView(name)` applies a view from host
+The page shows a *View* menu next to the *Colour by* menu (2026-10-05). `rsSetView(name)` applies a view from host
 page code. A view sets only what it names; the rest stays as it is.
 
 | a view can set | how the page does it | new? |
@@ -172,7 +172,7 @@ the two directions of a road solved as one, priority tiers (roundabout, tunnel, 
 
 ## Steps
 
-Each step is a release that Kaveh tries on local pages first.
+Each step is a release that is tried on local pages first.
 
 | step | what | lanestyle snippet it removes |
 |---|---|---|
@@ -186,7 +186,7 @@ Each step is a release that Kaveh tries on local pages first.
 
 After step 6, lanestyle's page code uses only the public API.
 
-## Decided (Kaveh, 2026-10-05)
+## Decided (2026-10-05)
 
 1. The *View* menu sits next to the *Colour by* menu.
 2. Items always follow their road's filters.

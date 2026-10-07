@@ -40,6 +40,23 @@ Each takes every `render_edges` keyword and returns the same map object (`.save(
 To reshape a sidebar, `rs.sidebar_html("dashboard")` (or `"report"`) returns its HTML. Edit it
 and insert it before `</body>` of a plain `render_edges` map.
 
+## Views: several settings in one menu
+
+`views=` adds a *View* menu above *Colour by*. A view is a name and the settings it sets together; the page opens with the first one.
+
+```python
+rs.render_edges(edges, color_options={"Class": {}, "Amber": {"palette": "amber"}, "Carto": {"palette": "carto"}},
+                views={"Normal":       {"color": "Class", "road_fill": True, "tunnels": True, "bridges": True},
+                       "Casing only":  {"road_fill": False},
+                       "Main roads":   {"classes": ["motorway", "trunk", "primary", "secondary", "tertiary"]},
+                       "Ground only":  {"tunnels": False, "bridges": False}})
+```
+
+The settings: `color` (a `color_options` name), `road_fill`, `bridges`, `tunnels`, `view3d` (True / False), `overlays`
+(`{label: True / False}`), `classes` (a list) and `basemap` (a key). A view sets only what it names, so name the same settings in every
+view when they must switch back. A name the page does not have is an error. From your page: `rsSetView(name)`, and `rsSetRoadFill(on)`
+for the fill alone.
+
 ## Drive the map from your own page
 
 `m.html` is the saved page as a string. Put your panel before `</body>` and talk to the map

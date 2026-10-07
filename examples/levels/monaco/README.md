@@ -1,6 +1,6 @@
 # Monaco: the hand-made level tables
 
-Kaveh's own changes for Monaco, made in the level editor (`scripts/edit_levels.py`), see
+Hand-made changes for Monaco, made in the level editor (`scripts/edit_levels.py`), see
 [docs/design/level_input.md](../../../docs/design/level_input.md):
 
 | file | what |

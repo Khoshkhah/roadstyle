@@ -1,6 +1,6 @@
 # Line widths in metres
 
-**Status:** implemented 2026-09-30 on branch `metre-width` (approved by Kaveh the same day); not released. Agreed in outline on 2026-10-01 as the one roadstyle change
+**Status:** implemented 2026-09-30 on branch `metre-width` (approved the same day); not released. Agreed in outline on 2026-10-01 as the one roadstyle change
 for lanestyle (see lanestyle's `docs/design/lanestyle_on_roadstyle.md`), to be released as 0.10.0.
 
 ## Problem
