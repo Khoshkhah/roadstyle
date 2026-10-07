@@ -42,7 +42,7 @@ class StyleConfig:
     bridge_casing_extra: float = 1.5   # bridges: casing a touch wider (the deck "wings")
     bridge_casing_m: float = 0.25      # metre widths: a bridge casing is at least this wide each side, whatever casing_m is
     bridge_casing_px: float = 1.0      # ... and never thinner than this many pixels each side at any zoom (metres are sub-pixel zoomed out)
-    bridge_casing_color: str = "#374151"   # bridge deck casing colour: dark grey (black was too dark, Kaveh 2026-10-06)
+    bridge_casing_color: str = "#64748b"   # bridge deck casing colour: slate, as tunnels fade to (Kaveh 2026-10-06; black, then dark grey, too dark)
     bridge_shadow: bool = True             # a soft shadow under a bridge's main part, on what it crosses (Kaveh 2026-10-06)
     bridge_shadow_color: str = "rgba(0,0,0,0.25)"
     bridge_shadow_blur: float = 4.0        # px (line-blur)

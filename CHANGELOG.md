@@ -25,7 +25,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **A bridge shadow** (`bridge_shadow`, on): a soft dark shadow shifted 2 px down-right, one line per stretch of bridge at the lowest casing
   number of its own edges (a bridge crossing over a lower one it is joined to casts its shadow on it); at a junction the two straightest
   stretches at one number go on as one line; round ends; none over the heads where the bridge comes down.
-- **Bridge casing dark grey** (`bridge_casing_color` `#374151`; black was too dark).
+- **Bridge casing slate** (`bridge_casing_color` `#64748b`, the colour tunnels fade to; black was too dark).
 - **Casing that closes:** a bridge's heavier casing keeps each piece's cap (it was always flat: two bridge pieces could not close at a bend or
   a junction), and a round seam of casing at each cut inside a road closes the outline on a curve. The fill halves of a road with two
   different ends only paint; the road stays clickable in its own (transparent) fill layer. Default caps stay round.

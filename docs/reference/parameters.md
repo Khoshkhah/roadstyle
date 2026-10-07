@@ -286,7 +286,7 @@ The `config` block of the settings. Change it in a [settings override](settings.
 | `tunnel_fill_dash` / `tunnel_fill_dash_color` | `[1.2, 1.2]` / `rgba(255,255,255,0.55)` | light dashes along a tunnel's fill, over any road colour (`[]` = none); a dashed class (steps, a dashed path) keeps only its own dashes |
 | `twin_end_caps` | `true` | a two-way road ends like one road: one road-wide round cap under its two lanes at each end, where both lanes have the same colour (`false` = each lane's own round end) |
 | `bridge_casing_m` / `bridge_casing_px` | `0.25` / `1.0` | with metre widths (`width_m_col`): a bridge's deck casing is at least this wide each side in metres, whatever `casing_m` is, and never thinner than this many pixels each side at any zoom (metres are sub-pixel zoomed out), so the bridge look shows on lines with no casing |
-| `bridge_casing_extra` / `bridge_casing_color` | `1.5` / `"#374151"` (dark grey) | bridge casing, px wider / colour |
+| `bridge_casing_extra` / `bridge_casing_color` | `1.5` / `"#64748b"` (slate) | bridge casing, px wider / colour |
 | `bridge_shadow` / `bridge_shadow_color` / `bridge_shadow_blur` / `bridge_shadow_offset` | `true` / `rgba(0,0,0,0.25)` / `4` / `[2, 2]` | a soft shadow under a bridge: a line per stretch at the lowest casing number of its edges, straight on through a junction where the numbers agree; none where the bridge comes down (position mode): px of blur, px shifted right and down (lit from the top left) |
 | `minor_no_casing` | cycleway, footway, living_street, path, pedestrian, service, track | classes drawn without casing |
 | `minzoom` | motorway 4 … residential 13 … footway 15 | class → hidden below this zoom, with `minzoom=True` |
