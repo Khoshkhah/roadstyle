@@ -471,13 +471,13 @@ const _fltLayers=()=>map.getStyle().layers.filter(l=>l.id.indexOf("roads")===0 |
 map.on("load",()=>{ _fltLayers().forEach(l=>{ if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null; }); });
 // the one lookup (docs/design/edge_items.md): the class, bridge, tunnel and rsFilter switches decide which edges show, and every layer that
 // draws a piece of a road, or an item attached to one, shows exactly the pieces and items of those edges. The class and level tests stay
-// short property tests: a built-in piece carries its edge's class and level (FILTER.col, lvl), an attached item has them baked
-// (__rs_cls, __rs_lvl). The rsFilter id set goes through the label: __rs_edge, or __rs_edge2 (a two-way pair's shared piece shows while
+// short property tests: every piece and item carries its edge's class (__rs_cls: FILTER.col of the edge, also on a name or an arrow,
+// which carry the chain's highway) and level (lvl; an attached item has it baked as __rs_lvl). The rsFilter id set goes through the label: __rs_edge, or __rs_edge2 (a two-way pair's shared piece shows while
 // either edge shows). A shadow line or a 3D deck covers several edges (__rs_edges): it shows while any of them shows, decided here.
 function _applyRoadFilters(){
   const hidden = _fltVis===null ? [] : FILTER.classes.filter(c=>!_fltVis.has(c)), hid=new Set(hidden), q=_qIds && new Set(_qIds);
   const edgeOn = i=>{ const p=_rprops(i), v=p.lvl||0;
-    return !hid.has(p[FILTER.col]) && (_bridgesOn || v<1) && (_tunnelsOn || v>=0) && (!q || q.has(i)); };
+    return !hid.has(p.__rs_cls) && (_bridgesOn || v<1) && (_tunnelsOn || v>=0) && (!q || q.has(i)); };
   const multi = {};   // decks / shadows: the ids of the features with at least one edge shown (null = no switch is on)
   ["decks","shadows"].forEach(src=>{ multi[src] = !_bridgesOn ? [] : (hidden.length || q || !_tunnelsOn)
     ? _sfeats(src).map((f,k)=>(f.properties.__rs_edges||[]).some(edgeOn) ? k : -1).filter(k=>k>=0) : null; });
@@ -492,8 +492,8 @@ function _applyRoadFilters(){
     if(kind==="decks" || kind==="shadows"){
       if(multi[kind]) f=and(f, multi[kind].length ? _has(["id"], multi[kind]) : false);
     }else{
-      const cls=ov?"__rs_cls":FILTER.col, lvl=ov?"__rs_lvl":"lvl";
-      if(hidden.length) f=and(f, ["!",["in",["get",cls],["literal",hidden]]]);
+      const lvl=ov?"__rs_lvl":"lvl";
+      if(hidden.length) f=and(f, ["!",["in",["get","__rs_cls"],["literal",hidden]]]);
       if(!_bridgesOn) f=and(f, ["<",["coalesce",["get",lvl],0],1]);
       if(!_tunnelsOn) f=and(f, [">=",["coalesce",["get",lvl],0],0]);
       if(q) f=and(f, kind==="roads" ? qr : qe);
@@ -1163,22 +1163,29 @@ function box(p){ return [[p.x-HIT,p.y-HIT],[p.x+HIT,p.y+HIT]]; }
 // and MapLibre errors out (killing hover+click) when asked to query a missing layer id.
 // the fill halves (source "halves", square_ends.md) only paint: their edge is picked in its own, transparent fill layer
 // an item attached to a road (Overlay(edge_col=...)) is picked as its road (docs/design/edge_items.md): hovering it highlights the road,
-// clicking it selects the road; an interactive item's own fields come along as an overlay of the click (rs:select detail.overlays)
+// clicking it selects the road; an interactive item's own fields come along as an overlay of the click (rs:select detail.overlays).
+// An item of an Overlay(select="item") is picked as itself: hover and select highlight the item, a click shows its own popup and
+// rs:select carries it (detail.item) next to its road.
 const ITEM_LAYERS = new Set(OVERLAYS.filter(o=>o.base).flatMap(o=>o.layers));
 const PICK_LAYERS = style.layers.filter(l=>l.source!=="halves").map(l=>l.id)
   .filter(id=>/^roads-(low-|high-|bridge-)?fill/.test(id) || ITEM_LAYERS.has(id)).concat(RS_DECK_LAYERS);
 function _roadOf(f){ const e=f.properties.__rs_edge;   // the road an item belongs to, as a picked road feature
   return {id:e, properties:_rprops(e), layer:f.layer, item:f,
           get geometry(){ const r=_feats()[e] || _svTiled(e); return r && r.geometry; }}; }   // tiles: only when Street View asks
-function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id));
-  const l = ids.length ? map.queryRenderedFeatures(box(p), {layers:ids}) : [];
+// the feature right under the cursor first, the tolerance box only when there is none: a two-way road's two directions lie side by
+// side, and the box reaches both, where the one drawn last would win (a click near the middle selected the other direction)
+function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id)); if(!ids.length) return null;
+  let l = map.queryRenderedFeatures([p.x, p.y], {layers:ids});
+  if(!l.length) l = map.queryRenderedFeatures(box(p), {layers:ids});
   return !l.length ? null : ITEM_LAYERS.has(l[0].layer.id) ? _roadOf(l[0]) : l[0]; }
 function srcOf(f){ return f && f.layer && f.layer.id.indexOf("roads-bridge-decks")===0 ? "decks" : "roads"; }
 // full properties of a picked feature: tiles carry only the style props, so road hits read the
 // sidecar row behind the feature id; decks (and inline mode) keep the feature's own properties
 function _pickProps(f){ const s=_side();
   return (s && srcOf(f)==="roads" && f.id!=null) ? (s.props[f.id]||f.properties||{}) : (f.properties||{}); }
+function _selItem(f){ const o = f && f.item && _itemOv(f.item.layer.id); return o && o.select==="item" ? o : null; }   // its overlay
 function hitOf(f){ if(!f || f.id==null) return null;
+  if(_selItem(f)) return {s:f.item.source, key:"i"+f.item.source+":"+f.item.id, ids:[f.item.id]};
   if(srcOf(f)==="decks"){ let e=f.properties && f.properties.__rs_edges;
     if(typeof e==="string") e=JSON.parse(e);                   // a rendered feature stringifies its list
     if(!e || !e.length || f.properties.__rs_casing_slab) return null;   // casing slab: not a road
@@ -1462,14 +1469,19 @@ map.on("click", e=>{
   clearOvSel();
   if(_sel) setS(_sel,{select:false});
   _sel = hitOf(f); setS(_sel,{select:true});
-  const props = _pickProps(f);
-  const ovs = _ovAt(e.point);          // interactive overlays under the click (e.g. the zone)
+  const props = _pickProps(f), io = _selItem(f);
+  const item = io ? {overlay:io.label, id:f.item.id, properties:f.item.properties||{}} : undefined;   // the item selected itself
+  const ovs = _ovAt(e.point).filter(o=>!io || o.label!==io.label);   // interactive overlays under the click (e.g. the zone)
   // structured click-data for host pages / dashboards (fires in every popup mode, incl. False)
   document.dispatchEvent(new CustomEvent("rs:select",
-    {detail:{id:f.id, layer:f.layer && f.layer.id, properties:props, overlays:ovs,
+    {detail:{id:f.id, layer:f.layer && f.layer.id, properties:props, overlays:ovs, item:item,
              streetView:_svPick(e.lngLat, f, f.id)}}));
   const sv = _sv(e.lngLat, f);
-  if(__ROAD_POPUP__){
+  if(io){ if(io.interactive){             // the item's own popup (its popup fields), the road's Street View below it
+      if(_popupMode === "panel") rsInfoShow('<div class="rs-name">'+io.label+'</div>'+_rrows(item.properties, io.popup) + sv + _ovSections(ovs));
+      else new maplibregl.Popup({closeButton:true, maxWidth:"260px"}).setLngLat(e.lngLat)
+        .setHTML('<span style="color:#777">'+io.label+'</span><br>'+_rfields(item.properties, io.popup) + sv + _ovSections(ovs)).addTo(map); } }
+  else if(__ROAD_POPUP__){
     if(_popupMode === "panel"){ rsInfoShow(_rrows(props, _popupFields) + sv + _ovSections(ovs)); }
     else new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
       .setLngLat(e.lngLat).setHTML(_rfields(props, _popupFields) + sv + _ovSections(ovs)).addTo(map);

@@ -52,6 +52,8 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | `compute_levels(edges, band_col=None, order="priority", ...)` | edges + 4 columns | the level step in one call: `casing_start`, `casing_level`, `casing_end`, `fill_level` ([design](../design/level_input.md)) |
 | `level_input(edges, id_col="edge_id", ...)` | `(roads, pairs)` | the solver's input from any edges: one row per road, one row per relation (`meet`, `stack`, `order`) |
 | `solve_levels(roads, pairs, edits=None, ...)` | roads + 4 columns | the solver; `edits` switch pairs off or add them; `fixed` (`{road: (casing_start, casing_level, casing_end, fill_level)}`) holds those roads' numbers and solves the others (the editor's local re-solve) |
+| `level_area.make_area(edges, folder, db=None, ...)` / `level_area.solve_area(folder)` | `(roads, pairs)` / solved roads | an area folder (`roadstyle-levels make` / `solve`); with `db` every solve also writes into that DuckDB file |
+| `save_area_levels(con, folder)` / `load_area_levels(con, edges)` | – / edges + 8 columns | an area's result into `visualization.edge_levels` and back (the four numbers and each edge's ends); reading checks the edges |
 | `resolve(highway, palette, tunnel, bridge)` | `ResolvedStyle` | one edge's resolved style |
 | `base_style(highway, palette="amber")` | `RoadStyle` | the palette entry for a class |
 | `selection_style(base_width=4.0)` | `dict` | the selection profile scaled to a width |
@@ -254,6 +256,7 @@ the `overlays` setting. See [Add your own layers](../guides/overlays.md).
 | `visible` | `True` | shown on open |
 | `edge_col` | `None` | the property with the id of the feature's edge: the overlay is attached to edges, drawn at its edge's fill number (the guide: [Overlays](../guides/overlays.md#overlays-attached-to-edges)) |
 | `order_col` | `None` | with `edge_col`: the property with the feature's order (whole number, lower first; null = 0) |
+| `select` | `"road"` | with `edge_col`: a hover or click picks the feature's road (`"road"`) or the feature itself (`"item"`: its own highlight and popup, `rs:select` with `item` and the road); anything else is an error |
 | `color_col` | `None` | the property with a colour per feature (null: `color`) |
 | `style` | `None` | the name of a style in the settings `config.overlays.styles` (a library's theme); its fields fill what the overlay does not give |
 | `width_m` | `None` | a line's width in metres, exact from `min_zoom` on (replaces `width`) |
