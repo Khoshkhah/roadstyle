@@ -734,8 +734,8 @@ def _casing_parts(geo, head_m, cols):
 
 
 def _bridge_shadows(geo, highway_col, trim_m):
-    """One shadow line per bridge: its connected bridge edges joined into one line (two directions of an edge drawn once), cut ``trim_m``
-    metres short at each end (where it comes down to the road), at the lowest main casing number of its edges (``__rs_cl``: over what it
+    """One shadow line per bridge: its connected bridge edges joined into lines (two directions of an edge drawn once), cut ``trim_m``
+    metres short where the bridge really ends (where it comes down to the road; not where its own pieces branch or join), at the lowest main casing number of its edges (``__rs_cl``: over what it
     crosses, under all of it; Kaveh 2026-10-06: the lowest head put it under the road it crosses),
     with its widest class (Kaveh 2026-10-06: a shadow per piece broke at every head and joint, and a half-transparent blurred line darkens
     where pieces overlap)."""
@@ -751,9 +751,14 @@ def _bridge_shadows(geo, highway_col, trim_m):
     merged = linemerge(u) if u.geom_type == "MultiLineString" else u
     chains = list(merged.geoms) if hasattr(merged, "geoms") else [merged]
     tree = shapely.STRtree(lines)
+    ends = [shapely.Point(ch.coords[k]) for ch in chains for k in (0, -1)]
+    def going_on(ci, k):                                       # another chain of the bridge starts or ends here: no cut (a branch, a joint)
+        p = shapely.Point(chains[ci].coords[k])
+        return any(j // 2 != ci and e.distance(p) < 1e-7 for j, e in enumerate(ends)) or \
+            any(j != ci and chains[j].distance(p) < 1e-7 for j in range(len(chains)))
     out = []
-    for ch in chains:
-        members = [br[k]["properties"] for k in tree.query(ch, predicate="intersects") if lines[k].interpolate(0.5, normalized=True).distance(ch) < 1e-7]
+    for ci, ch in enumerate(chains):
+        members = [br[k]["properties"] for k in tree.query(ch, predicate="intersects") if shapely.intersection(lines[k], ch).length > 0]   # overlap, not a touch
         if not members:
             continue
         lvl = min(p.get("__rs_cl", 0) for p in members)       # the lowest MAIN casing: over what the bridge crosses (a crossing puts every main above it),
@@ -765,9 +770,10 @@ def _bridge_shadows(geo, highway_col, trim_m):
         xy = np.column_stack([np.asarray([(x - lon0) * kx for x, _ in c]), np.asarray([(y - lat0) * ky for _, y in c])])
         cum = _cum_lengths(xy)
         n = float(cum[-1])
-        if n <= 2 * trim_m:
+        a, b = (0.0 if going_on(ci, 0) else trim_m), (n if going_on(ci, -1) else n - trim_m)     # cut only where the bridge really ends
+        if b - a <= 0.5:
             continue
-        pts = _part(xy, cum, trim_m, n - trim_m)
+        pts = _part(xy, cum, a, b)
         coords = np.column_stack([np.round(pts[:, 0] / kx + lon0, 7), np.round(pts[:, 1] / ky + lat0, 7)]).tolist()
         out.append({"type": "Feature", "properties": {highway_col: cls, "__rs_cl": lvl, "__rs_fl": lvl},
                     "geometry": {"type": "LineString", "coordinates": coords}})

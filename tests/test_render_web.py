@@ -2150,3 +2150,30 @@ def test_a_bridge_has_one_continuous_soft_shadow(monkeypatch):
     monkeypatch.setattr(render_web, "CONFIG", dataclasses.replace(render_web.CONFIG, bridge_shadow=False))
     off = _style(render_edges(g, **kw).html)
     assert "shadows" not in off["sources"] and not [l for l in off["layers"] if l["id"].endswith("-shadow")]
+
+
+def test_a_branching_bridge_shadow_is_cut_only_at_the_bridge_ends():
+    """_bridge_shadows (Kaveh 2026-10-06): where bridge edges branch the lines meet with no cut; only where the bridge comes down is it cut."""
+    from roadstyle import render_web as rw
+    m = 1 / 111320.0
+    o = (18.0, 59.3)
+    P = lambda x, y: (o[0] + x * m * 2, o[1] + y * m)                                    # noqa: E731  (about metres at 60 N)
+    g = gpd.GeoDataFrame({"highway": ["primary"] * 3, "bridge": ["yes"] * 3},
+                         geometry=[LineString([P(0, 0), P(0, 50)]), LineString([P(0, 50), P(0, 100)]), LineString([P(0, 50), P(40, 80)])], crs=4326)
+    geo = rw.fc_dict(g)
+    rw._mark_lvl(geo, "tunnel", "bridge", "layer")
+    for ft in geo["features"]:
+        ft["properties"]["__rs_cl"] = 1
+    sh = rw._bridge_shadows(geo, "highway", 5.0)
+    pts = {tuple(round(v, 7) for v in c) for s in sh for c in s["geometry"]["coordinates"]}
+    assert tuple(round(v, 7) for v in P(0, 50)) in pts                                    # the branch point is reached: no gap there
+    assert tuple(round(v, 7) for v in P(0, 0)) not in pts and tuple(round(v, 7) for v in P(0, 100)) not in pts   # the real ends are cut
+    h = gpd.GeoDataFrame({"highway": ["primary"] * 2, "bridge": ["yes"] * 2},                  # one edge that another one joins in its middle:
+                         geometry=[LineString([P(0, 0), P(0, 100)]), LineString([P(0, 30), P(40, 60)])], crs=4326)   # both lines of it keep their shadow
+    geo = rw.fc_dict(h)
+    rw._mark_lvl(geo, "tunnel", "bridge", "layer")
+    for ft in geo["features"]:
+        ft["properties"]["__rs_cl"] = 1
+    import shapely
+    sh = shapely.unary_union([shapely.LineString(s["geometry"]["coordinates"]) for s in rw._bridge_shadows(geo, "highway", 5.0)])
+    assert sh.intersection(shapely.LineString([P(0, 0), P(0, 100)]).buffer(1e-9)).length / (100 * m) > 0.89   # all but the two 5 m ends
