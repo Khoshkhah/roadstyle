@@ -27,6 +27,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **A bridge shadow** (`bridge_shadow`, on): a soft dark shadow shifted 2 px down-right, drawn like an extra casing: every part of a bridge
   (start head, main part, end head) at its own casing number, so it lies over what the part crosses and never on its own road at a joint;
   parts at one number joined into one line, lines meeting end to end (flat ends); none over the last 3 m where a bridge comes down.
+- Hiding the bridges (`rsSetBridges(false)`, the filter panel's *Bridges* row, a view's `bridges`) hides their shadows too.
 - **Bridge casing slate** (`bridge_casing_color` `#64748b`, the colour tunnels fade to; black was too dark).
 - **Casing that closes:** a bridge's heavier casing keeps each piece's cap (it was always flat: two bridge pieces could not close at a bend or
   a junction), and a round seam of casing at each cut inside a road closes the outline on a curve (from zoom 17: below it a seam reached past

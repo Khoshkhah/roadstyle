@@ -467,9 +467,9 @@ function _applyRoadFilters(){
     let f=_fltBase[l.id];
     if(hidden.length){ const cf=["!",["in",["get",FILTER.col],["literal",hidden]]]; f=f?["all",f,cf]:cf; }
     if(!_bridgesOn){
-      // decks hold nothing but bridge ribbons (and prop-less casing slabs) -> hide wholesale;
+      // decks hold nothing but bridge ribbons (and prop-less casing slabs), shadows nothing but bridge shadows -> hide wholesale;
       // everything else keeps lvl<1, so ground roads and tunnels stay
-      const bf = l.source==="decks" ? ["boolean",false] : ["<",["coalesce",["get","lvl"],0],1];
+      const bf = l.source==="decks" || l.source==="shadows" ? ["boolean",false] : ["<",["coalesce",["get","lvl"],0],1];
       f = f?["all",f,bf]:bf;
     }
     if(!_tunnelsOn && l.source!=="decks"){   // decks are bridges only; everything else carries lvl

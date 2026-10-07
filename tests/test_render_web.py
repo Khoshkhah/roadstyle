@@ -2162,6 +2162,30 @@ def test_a_bridge_shadow_is_at_each_parts_casing_number(monkeypatch):
     assert "shadows" not in off["sources"] and not [l for l in off["layers"] if l["id"].endswith("-shadow")]
 
 
+def test_hiding_the_bridges_hides_their_shadow(tmp_path):
+    """rsSetBridges(false) hides the bridge shadows with the bridges (Kaveh 2026-10-06: the shadow stayed, its lines carry no lvl)."""
+    pw = pytest.importorskip("playwright.sync_api")
+    m = 1 / 111320.0
+    g = gpd.GeoDataFrame({"highway": ["primary"] * 2, "bridge": ["yes", None], "layer": [1, None]},
+                         geometry=[LineString([(18.0, 59.3), (18.0, 59.3 + 60 * m)]), LineString([(18.0, 59.3 + 60 * m), (18.0, 59.3 + 90 * m)])], crs=4326)
+    path = tmp_path / "bridge.html"
+    render_edges(g, backend="web", basemap="blank").save(path)
+    shown = """() => map.getStyle().layers.filter(l => l.source === "shadows")
+                 .map(l => map.queryRenderedFeatures({layers: [l.id]}).length).reduce((a, b) => a + b, 0)"""
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && map.loaded()", timeout=30_000)
+        on = page.evaluate(shown)
+        page.evaluate("rsSetBridges(false)"); page.wait_for_function("map.loaded()")
+        off = page.evaluate(shown)
+        page.evaluate("rsSetBridges(true)"); page.wait_for_function("map.loaded()")
+        back = page.evaluate(shown)
+        browser.close()
+    assert on > 0 and off == 0 and back == on
+
+
 def test_a_branching_bridge_shadow_is_cut_only_at_the_bridge_ends():
     """_bridge_shadows (Kaveh 2026-10-06): where bridge edges branch the lines meet with no cut; only where the bridge comes down is it cut."""
     from roadstyle import render_web as rw
