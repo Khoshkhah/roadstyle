@@ -26,7 +26,7 @@ Docs: https://khoshkhah.github.io/roadstyle/ (every keyword: `/reference/paramet
   `compute_levels(edges)` (the level step; `render_edges` takes no band or order). `compute_levels(edges,
   band_col="band")` (integers) sets the band of an edge (a sidewalk -1, a crossing 1). For a big network compute once:
   `rs.save_levels(con, rs.compute_levels(...))`, and draw with `casing_level_col=` / `fill_level_col=`.
-  To fix places by hand: `scripts/level_input.py` -> `scripts/solve_levels.py` -> `scripts/edit_levels.py AREA_DIR` (a local
+  To fix places by hand: `roadstyle-levels make SOURCE AREA_DIR` -> `roadstyle-levels solve AREA_DIR` -> `roadstyle-levels edit AREA_DIR` (a local
   editor writing `edits.csv` / `heads.csv` / `caps.csv`); draw its `levels.csv` with `casing_start_col` / `casing_level_col` /
   `casing_end_col` / `fill_level_col` and the ends with `head_start_m_col` / `head_end_m_col` / `cap_start_col` / `cap_end_col`.
 - Every other column shows in the popup and is queryable from JavaScript, so join your data

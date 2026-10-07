@@ -2009,20 +2009,35 @@ def test_render_edges_takes_no_band_or_order():
             render_edges(_edges(), backend="web", **{k: v})
 
 
-def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
-    """scripts/edit_levels.py: the pairs between two roads (by any edge id), an edit the solver refuses is not written, a taken one is written
-    with the file before it kept as edits.csv.bak, and levels.csv follows."""
+def test_roadstyle_levels_make_and_solve(tmp_path):
+    """roadstyle-levels make SOURCE FOLDER, then solve FOLDER: roads.parquet, pairs.csv and an empty edits.csv, then levels.csv with one row
+    per edge and its ends; make again keeps your edits.csv."""
     pytest.importorskip("scipy")
-    import sys
-
     import pandas as pd
 
-    import roadstyle as rs
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-    from edit_levels import Area
-    roads, pairs = rs.level_input(_edge_world())
-    roads.to_parquet(tmp_path / "roads.parquet")
-    pairs.to_csv(tmp_path / "pairs.csv", index=False)
+    from roadstyle.level_area import main
+    src, area = tmp_path / "edges.geojson", tmp_path / "area"
+    _edge_world().to_file(src)
+    main(["make", str(src), str(area)])
+    assert {p.name for p in area.iterdir()} == {"roads.parquet", "pairs.csv", "edits.csv"}
+    (area / "edits.csv").write_text("relation,a,b,a_end,b_end,enabled\norder,12,11,,,true\n")
+    main(["make", str(src), str(area)])
+    assert "order,12,11" in (area / "edits.csv").read_text()                       # yours: never written by make
+    main(["solve", str(area)])
+    lv = pd.read_csv(area / "levels.csv")
+    assert len(lv) == len(_edge_world()) and {"casing_level", "fill_level", "head_start_m", "cap_end"} <= set(lv.columns)
+
+
+def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
+    """The level editor (roadstyle.level_editor): the pairs between two roads (by any edge id), an edit the solver refuses is not written, a
+    taken one is written with the file before it kept as edits.csv.bak, and levels.csv follows."""
+    pytest.importorskip("scipy")
+    import pandas as pd
+
+    from roadstyle.level_area import make_area
+    from roadstyle.level_editor import Area
+    make_area(_edge_world(), tmp_path)
+    (tmp_path / "edits.csv").unlink()                                   # as before: no edits.csv yet
     area = Area(tmp_path)
     got = area.relations("12", "11")
     assert {(r["relation"], r["a"], r["b"]) for r in got["rows"] if r["section"] == "found"} >= {("order", "12", "11")}

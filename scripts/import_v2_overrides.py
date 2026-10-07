@@ -2,7 +2,7 @@
 
     python scripts/import_v2_overrides.py road_pairs_overrides.csv AREA_DIR SOURCE [--query SQL]
 
-SOURCE (and --query) are the edges the area was made from (as for level_input.py): they turn v2's edge_ref into the ids of AREA_DIR. v2's
+SOURCE (and --query) are the edges the area was made from (as for roadstyle-levels make): they turn v2's edge_ref into the ids of AREA_DIR. v2's
 "add" rows become edits: connect -> meet (its endpoint_a / endpoint_b), order -> order and near / cross -> stack (upper over lower). A
 "replace" or "remove" row names a pair of v2's own pair table, which this area does not have: the script stops and lists them, and writes
 nothing. A row already in edits.csv is not added twice.
@@ -11,7 +11,8 @@ import argparse
 from pathlib import Path
 
 import pandas as pd
-from level_input import read_edges
+
+from roadstyle.level_area import read_edges
 
 COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"]
 
@@ -54,7 +55,7 @@ def main(argv=None):
     seen = {tuple(r) for r in old[COLS].itertuples(index=False)}
     add = new[[tuple(r) not in seen for r in new[COLS].itertuples(index=False)]]
     pd.concat([old, add], ignore_index=True).to_csv(path, index=False)
-    print(f"{len(add)} v2 override(s) added to {path} ({len(new) - len(add)} already there); solve with scripts/solve_levels.py {a.area_dir}")
+    print(f"{len(add)} v2 override(s) added to {path} ({len(new) - len(add)} already there); solve with roadstyle-levels solve {a.area_dir}")
 
 
 if __name__ == "__main__":

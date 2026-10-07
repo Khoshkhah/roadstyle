@@ -53,6 +53,7 @@ dev = ["roadstyle[all]", "pytest", "ruff", "mypy"]  # everything a user can get 
 [project.scripts]
 roadstyle = "roadstyle.cli:main"
 roadstyle-mcp = "roadstyle.mcp_server:main"
+roadstyle-levels = "roadstyle.level_area:main"
 
 [project.urls]
 Homepage = "https://github.com/Khoshkhah/roadstyle"

@@ -65,7 +65,7 @@ the main part) a round seam of casing at the lower of the two numbers closes the
 
 **Not the default** (2026-10-06): heads made for zoom 18 were too short at lower zooms, where the roads are wider on the ground,
 and the main casing (a higher level) showed in the joined roads' fills everywhere. The default is back to 5 m heads and round caps
-(`scripts/solve_levels.py --auto-ends` for the automatic ones). Yours in `heads.csv` / `caps.csv` go on top (empty: the default);
+(`roadstyle-levels solve --auto-ends` for the automatic ones). Yours in `heads.csv` / `caps.csv` go on top (empty: the default);
 `levels.csv` has the ends as drawn. On Monaco the caps matched 5 of the 6
 flat ends set by hand (the sixth is under a road drawn above it); the head lengths come out a little shorter than the ones set by hand.
 
@@ -78,23 +78,23 @@ road is turned to the road's way, as a meet's end is.
 
 | file | what | written by |
 |---|---|---|
-| `roads.parquet` | one row per road (both directions of a segment together): `road` (the id of its first edge), `edges` / `reversed` (the ids of its edges running its way / the other way), `band`, `priority`, the line | `scripts/level_input.py` (`rs.level_input`), every run |
-| `pairs.csv` | one row per relation: `relation`, `a`, `b`, `a_end`, `b_end` (below) | `scripts/level_input.py`, every run |
-| `edits.csv` | your changes to the pairs, same columns plus `enabled`: `false` switches a pair off, anything else adds one; `a` / `b` may name either direction of a road | created empty once; you, or `scripts/edit_levels.py`; never overwritten by the input step |
-| `caps.csv` | your caps per road end (`road`, `start`, `end`: empty = automatic, `round`, `square`, `flat`) | `scripts/edit_levels.py` (the *start* / *end* choices in a road's card) |
-| `heads.csv` | your head lengths per road end (`road`, `start_m`, `end_m`; empty = automatic) | `scripts/edit_levels.py` (the *heads* sliders in a road's card) |
-| `levels.csv` | the result, one row per edge: `edge`, `casing_start`, `casing_level`, `casing_end`, `fill_level`, and its ends as drawn: `head_start_m`, `head_end_m`, `cap_start`, `cap_end` (render_edges' `head_start_m_col` / `head_end_m_col` / `cap_start_col` / `cap_end_col`) | `scripts/solve_levels.py` |
+| `roads.parquet` | one row per road (both directions of a segment together): `road` (the id of its first edge), `edges` / `reversed` (the ids of its edges running its way / the other way), `band`, `priority`, the line | `roadstyle-levels make` (`rs.level_input`), every run |
+| `pairs.csv` | one row per relation: `relation`, `a`, `b`, `a_end`, `b_end` (below) | `roadstyle-levels make`, every run |
+| `edits.csv` | your changes to the pairs, same columns plus `enabled`: `false` switches a pair off, anything else adds one; `a` / `b` may name either direction of a road | created empty once; you, or `roadstyle-levels edit`; never overwritten by the input step |
+| `caps.csv` | your caps per road end (`road`, `start`, `end`: empty = automatic, `round`, `square`, `flat`) | `roadstyle-levels edit` (the *start* / *end* choices in a road's card) |
+| `heads.csv` | your head lengths per road end (`road`, `start_m`, `end_m`; empty = automatic) | `roadstyle-levels edit` (the *heads* sliders in a road's card) |
+| `levels.csv` | the result, one row per edge: `edge`, `casing_start`, `casing_level`, `casing_end`, `fill_level`, and its ends as drawn: `head_start_m`, `head_end_m`, `cap_start`, `cap_end` (render_edges' `head_start_m_col` / `head_end_m_col` / `cap_start_col` / `cap_end_col`) | `roadstyle-levels solve` |
 
 Relations: `meet` (the end `a_end` of `a` is the end `b_end` of `b`: each head is under the other road's fill), `stack` (`a` is over `b`) and
 `order` (`a`'s fill after `b`'s where they meet, a wish the solver may give up). A manual `meet` row joins two roads that do not share a point.
 
 ```
-python scripts/level_input.py edges.gpkg out/monaco                          # any geo file roadstyle reads
-python scripts/level_input.py monaco.duckdb out/monaco --query "SELECT * EXCLUDE (geometry), ST_AsWKB(geometry) AS geometry FROM driving.edges"
-python scripts/solve_levels.py out/monaco
+roadstyle-levels make edges.gpkg out/monaco                          # any geo file roadstyle reads
+roadstyle-levels make monaco.duckdb out/monaco --query "SELECT * EXCLUDE (geometry), ST_AsWKB(geometry) AS geometry FROM driving.edges"
+roadstyle-levels solve out/monaco
 ```
 
-**The editor** (`python scripts/edit_levels.py out/monaco`, a local page at http://localhost:8780/) writes `edits.csv`: click two roads, or find
+**The editor** (`roadstyle-levels edit out/monaco`, a local page at http://localhost:8780/) writes `edits.csv`: click two roads, or find
 them in the search box by an edge id (either direction) or an edge_ref (or a part of one) (road 1 orange, road 2 blue; their start and end points are marked), see every pair between them (the found ones, with *switch off*, and your edits,
 with *delete*), and add one (`order` or `stack`: you choose which of the two is on top, for each new pair (no default); a stack on the whole road or one part of it, which
 can also switch that part off in a found pair; `meet`: the chosen end of each). An order against an active stack the other way would be

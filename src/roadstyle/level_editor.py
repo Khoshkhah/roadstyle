@@ -1,16 +1,14 @@
 """The level editor (docs/design/level_input.md): a local page to write edits.csv, the overrides of the solver's pairs.
 
-    python scripts/edit_levels.py AREA_DIR [--port 8780]
+    roadstyle-levels edit AREA_DIR [--port 8780]
 
-AREA_DIR holds roads.parquet and pairs.csv (scripts/level_input.py). Click two roads (or find them by edge id / edge_ref), see every pair between them (the found ones and
+AREA_DIR holds roads.parquet and pairs.csv (roadstyle-levels make). Click two roads (or find them by edge id / edge_ref), see every pair between them (the found ones and
 your edits), switch a found one off or add one (order / stack: the road you put on top over the other, a stack on one part of it if you like; meet: an end of each). Changes wait in a list until
 you apply them: then they are solved together and the page reloads with the new levels (levels.csv is written too); if the solver refuses
 them, nothing is saved. The edits.csv before each
 change is kept as edits.csv.bak.
 """
-import argparse
 import json
-import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -21,8 +19,7 @@ import pandas as pd
 import roadstyle as rs
 from roadstyle import render_web
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from solve_levels import defaults, ends, own, solve, write  # noqa: E402
+from .level_area import defaults, ends, own, solve, write
 
 COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"]
 
@@ -333,18 +330,11 @@ def _handler(area):
     return H
 
 
-_EDITOR = (Path(__file__).resolve().parent / "edit_levels.html").read_text()
+_EDITOR = (Path(__file__).resolve().parent / "static" / "level_editor.html").read_text()
 
 
-def main(argv=None):
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("area_dir", type=Path)
-    ap.add_argument("--port", type=int, default=8780)
-    a = ap.parse_args(argv)
-    area = Area(a.area_dir)
-    print(f"level editor: http://localhost:{a.port}/  ({a.area_dir}; Ctrl+C to stop)", flush=True)
-    ThreadingHTTPServer(("127.0.0.1", a.port), _handler(area)).serve_forever()
-
-
-if __name__ == "__main__":
-    main()
+def serve(folder, port=8780):
+    """The editor of the area in ``folder`` at http://localhost:``port``/ until Ctrl+C."""
+    area = Area(folder)
+    print(f"level editor: http://localhost:{port}/  ({folder}; Ctrl+C to stop)", flush=True)
+    ThreadingHTTPServer(("127.0.0.1", port), _handler(area)).serve_forever()

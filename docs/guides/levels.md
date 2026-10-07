@@ -16,10 +16,10 @@ outline) passes under both. Where the roads only meet, the roundabout is on top;
 === "Command line"
 
     ```bash
-    # from a clone of the repository: the level step with files you can read and edit
-    python scripts/level_input.py edges.gpkg out/area     # the solver's input
-    python scripts/solve_levels.py out/area               # levels.csv
-    python scripts/edit_levels.py out/area                # the editor, http://localhost:8780/
+    # the level step with files you can read and edit (an area folder)
+    roadstyle-levels make edges.gpkg out/area     # the solver's input
+    roadstyle-levels solve out/area               # levels.csv
+    roadstyle-levels edit out/area                # the editor, http://localhost:8780/
     ```
 
 ## The rule
@@ -58,7 +58,7 @@ Computing takes seconds for a district and longer for a big network: compute onc
 
 ![The level editor: two roads picked, their cards with ends and heads, the Issues tab](../img/level-editor.png)
 
-`python scripts/edit_levels.py out/area` opens a local page with the map and a panel. Click a road, or find it by edge id or `edge_ref`;
+`roadstyle-levels edit out/area` opens a local page with the map and a panel. Click a road, or find it by edge id or `edge_ref`;
 pick a second one to see every pair between the two.
 
 - **Add a relation**: *order* (whose fill is on top where they meet), *stack* (one over the other: the whole road or one part of its

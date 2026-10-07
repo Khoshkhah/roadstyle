@@ -4,6 +4,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- **`roadstyle-levels make | solve | edit FOLDER`**: the level step and its editor come with the package (`roadstyle.level_area`:
+  `make_area`, `solve_area`; `roadstyle.level_editor`), in place of `scripts/level_input.py`, `scripts/solve_levels.py` and
+  `scripts/edit_levels.py`. The area folder and its files are as before.
+
 ## [0.16.0] — 2026-10-07
 
 ### Added
