@@ -733,61 +733,70 @@ def _casing_parts(geo, head_m, cols):
     return out
 
 
-def _bridge_shadows(geo, parts, highway_col, trim_m):
-    """The bridge shadow, as an extra casing (Kaveh 2026-10-06): each casing piece of a bridge at its own casing number (``parts``, the divided
-    casing; else each bridge edge at its ``__rs_cl``), the pieces at one number that touch joined into one line (so it does not break at
-    every piece; a half-transparent blurred line darkens where pieces overlap), with no shadow where the bridge comes down to the road:
-    its head there (``trim_m`` metres of an undivided edge). Each line has its widest class."""
+def _bridge_shadows(geo, highway_col, trim_m):
+    """One continuous shadow per bridge (Kaveh 2026-10-06: a shadow per casing piece broke wherever the pieces' numbers changed, many times
+    along one bridge): its edges joined into lines (two directions of an edge drawn once), all at one number, the lowest casing number
+    (heads, main) of any edge of the connected bridge, so it is under all of it; no shadow over the head where the bridge comes down to
+    the road (the edge's own head length there, else ``trim_m``). Each line has its widest class."""
     import numpy as np
     import shapely
     from shapely.ops import linemerge, unary_union
     order = list(_CLASSES)
     feats = geo["features"]
-    br = {i for i, ft in enumerate(feats) if ft["properties"].get("__rs_bridge") and (ft.get("geometry") or {}).get("type") == "LineString"}
+    br = [i for i, ft in enumerate(feats) if ft["properties"].get("__rs_bridge") and (ft.get("geometry") or {}).get("type") == "LineString"]
     if not br:
         return []
     line = {i: shapely.LineString([c[:2] for c in feats[i]["geometry"]["coordinates"]]) for i in br}
-    tips = [shapely.Point(line[i].coords[k]) for i in br for k in (0, -1)]
-    tree = shapely.STRtree(list(line.values()))
-    owners = list(line)
-    def real_end(p):                                           # no other bridge edge goes on from this point: the bridge comes down here
-        return sum(1 for k in tree.query(p.buffer(1e-7)) if line[owners[k]].distance(p) < 1e-7) <= 1
-    real = {(round(p.x, 7), round(p.y, 7)) for p in tips if real_end(p)}
-    is_real = lambda xy: (round(xy[0], 7), round(xy[1], 7)) in real                          # noqa: E731
-    pieces = []                                                # (casing number, line, class)
-    if parts is not None:
-        for f in parts:
-            q = f["properties"]
-            if q.get("__rs_seam") or q.get("__rs_road") not in br:
-                continue
-            g = shapely.LineString([c[:2] for c in f["geometry"]["coordinates"]])
-            if not q.get("__rs_main") and (is_real(g.coords[0]) or is_real(g.coords[-1])):
-                continue                                       # a head where the bridge comes down
-            pieces.append((q.get("__rs_cl", 0), g, q.get(highway_col)))
-    else:
-        for i in br:
-            g, q = line[i], feats[i]["properties"]
-            c = list(g.coords)
-            lon0, lat0 = c[0]
-            kx, ky = 111320.0 * math.cos(math.radians(lat0)), 111320.0
-            xy = np.column_stack([np.asarray([(x - lon0) * kx for x, _ in c]), np.asarray([(y - lat0) * ky for _, y in c])])
-            cum = _cum_lengths(xy)
-            n = float(cum[-1])
-            lo, hi = (trim_m if is_real(c[0]) else 0.0), (n - trim_m if is_real(c[-1]) else n)
-            if hi - lo <= 0.5:
-                continue
-            pts = _part(xy, cum, lo, hi)
-            pieces.append((q.get("__rs_cl", 0), shapely.LineString(np.column_stack([pts[:, 0] / kx + lon0, pts[:, 1] / ky + lat0])), q.get(highway_col)))
+    tree = shapely.STRtree([line[i] for i in br])
+    def at(p):                                                 # the bridge edges at a point
+        return [br[k] for k in tree.query(p.buffer(1e-7)) if line[br[k]].distance(p) < 1e-7]
+    u = unary_union(list(line.values()))                       # the union also drops the second direction of a two-way bridge
+    merged = linemerge(u) if u.geom_type == "MultiLineString" else u
+    chains = list(merged.geoms) if hasattr(merged, "geoms") else [merged]
+    parent = list(range(len(chains)))                          # the connected bridges: chains that touch
+    def root(k):
+        while parent[k] != k:
+            parent[k] = parent[parent[k]]
+            k = parent[k]
+        return k
+    ctree = shapely.STRtree(chains)
+    for k, ch in enumerate(chains):
+        for j in ctree.query(ch.buffer(1e-7)):
+            if j != k and chains[j].distance(ch) < 1e-7:
+                parent[root(j)] = root(k)
+    member = [[i for i in br if shapely.intersection(line[i], ch).length > 0] for ch in chains]
+    def low(p):
+        return min(p.get("__rs_cs", p.get("__rs_cl", 0)), p.get("__rs_cl", 0), p.get("__rs_ce", p.get("__rs_cl", 0)))
+    lvl = {}
+    for k, m in enumerate(member):
+        for i in m:
+            lvl[root(k)] = min(lvl.get(root(k), low(feats[i]["properties"])), low(feats[i]["properties"]))
     out = []
-    for lvl in sorted({p[0] for p in pieces}):
-        mine = [p for p in pieces if p[0] == lvl]
-        u = unary_union([p[1] for p in mine])                  # the union also drops the second direction of a two-way bridge
-        merged = linemerge(u) if u.geom_type == "MultiLineString" else u
-        for ch in (list(merged.geoms) if hasattr(merged, "geoms") else [merged]):
-            cls = [p[2] for p in mine if shapely.intersection(p[1], ch).length > 0]
-            cls = min(cls, key=lambda c: order.index(c) if c in order else len(order)) if cls else None
-            out.append({"type": "Feature", "properties": {highway_col: cls, "__rs_cl": lvl, "__rs_fl": lvl},
-                        "geometry": {"type": "LineString", "coordinates": [[round(x, 7), round(y, 7)] for x, y in ch.coords]}})
+    for k, ch in enumerate(chains):
+        if not member[k]:
+            continue
+        c = list(ch.coords)
+        def cut(xy):                                           # metres to leave out at this chain end: the head where the bridge comes down
+            p = shapely.Point(xy)
+            here = at(p)
+            if len(here) != 1:                                 # another bridge edge goes on from here (or a two-way pair): no cut
+                return 0.0 if len({frozenset([tuple(line[i].coords[0]), tuple(line[i].coords[-1])]) for i in here}) > 1 else trim_m
+            q = feats[here[0]]["properties"]
+            start = shapely.Point(line[here[0]].coords[0]).distance(p) < 1e-7
+            return float(q.get("__rs_hs" if start else "__rs_he", trim_m))
+        lon0, lat0 = c[0]
+        kx, ky = 111320.0 * math.cos(math.radians(lat0)), 111320.0
+        xy = np.column_stack([np.asarray([(x - lon0) * kx for x, _ in c]), np.asarray([(y - lat0) * ky for _, y in c])])
+        cum = _cum_lengths(xy)
+        n = float(cum[-1])
+        lo, hi = cut(c[0]), n - cut(c[-1])
+        if hi - lo <= 0.5:
+            continue
+        pts = _part(xy, cum, lo, hi)
+        cls = min((feats[i]["properties"].get(highway_col) for i in member[k]), key=lambda v: order.index(v) if v in order else len(order))
+        out.append({"type": "Feature", "properties": {highway_col: cls, "__rs_cl": lvl[root(k)], "__rs_fl": lvl[root(k)]},
+                    "geometry": {"type": "LineString", "coordinates": np.column_stack([np.round(pts[:, 0] / kx + lon0, 7),
+                                                                                      np.round(pts[:, 1] / ky + lat0, 7)]).tolist()}})
     return out
 
 
@@ -1976,8 +1985,8 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                     l = {**l, "filter": ["all", l["filter"], ["!", is_b]]}
                     at = len(layers)
                 layers.append(l)
-            shadows = _bridge_shadows(geo, parts, highway_col, head_m) if CONFIG.bridge_shadow else []
-            if shadows:                    # the bridge's shadow as an extra casing: each piece at its own number, joined where the number stays
+            shadows = _bridge_shadows(geo, highway_col, head_m) if CONFIG.bridge_shadow else []
+            if shadows:                    # one continuous shadow per bridge, at its lowest casing number (under all of it)
                 style["sources"]["shadows"] = {"type": "geojson", "data": {"type": "FeatureCollection", "features": shadows},
                                                "tolerance": style["sources"]["roads"].get("tolerance", 0.375)}
                 # flat ends: where two shadow lines meet, two round ends of a half-transparent colour overlapped into a darker circle

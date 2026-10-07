@@ -287,7 +287,7 @@ The `config` block of the settings. Change it in a [settings override](settings.
 | `twin_end_caps` | `true` | a two-way road ends like one road: one road-wide round cap under its two lanes at each end, where both lanes have the same colour (`false` = each lane's own round end) |
 | `bridge_casing_m` / `bridge_casing_px` | `0.25` / `1.0` | with metre widths (`width_m_col`): a bridge's deck casing is at least this wide each side in metres, whatever `casing_m` is, and never thinner than this many pixels each side at any zoom (metres are sub-pixel zoomed out), so the bridge look shows on lines with no casing |
 | `bridge_casing_extra` / `bridge_casing_color` | `1.5` / `"#374151"` (dark grey) | bridge casing, px wider / colour |
-| `bridge_shadow` / `bridge_shadow_color` / `bridge_shadow_blur` / `bridge_shadow_offset` | `true` / `rgba(0,0,0,0.25)` / `4` / `[2, 2]` | a soft shadow under a bridge, drawn as an extra casing (each casing piece at its own number, pieces at one number joined; none where the bridge comes down; position mode): px of blur, px shifted right and down (lit from the top left) |
+| `bridge_shadow` / `bridge_shadow_color` / `bridge_shadow_blur` / `bridge_shadow_offset` | `true` / `rgba(0,0,0,0.25)` / `4` / `[2, 2]` | one continuous soft shadow per bridge, at the lowest casing number of its parts (under all of it), none where the bridge comes down (position mode): px of blur, px shifted right and down (lit from the top left) |
 | `minor_no_casing` | cycleway, footway, living_street, path, pedestrian, service, track | classes drawn without casing |
 | `minzoom` | motorway 4 … residential 13 … footway 15 | class → hidden below this zoom, with `minzoom=True` |
 | `basemap` | `"voyager"` | the default base map |

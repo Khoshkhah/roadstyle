@@ -2124,10 +2124,10 @@ def test_a_divided_casing_has_a_round_seam_at_each_cut():
     assert sorted(p["__rs_cl"] for p in pieces if not p.get("__rs_seam")) == [-1, 0, 1]
 
 
-def test_a_bridge_shadow_is_an_extra_casing(monkeypatch):
-    """Position mode (Kaveh 2026-10-06): the bridge shadow is an extra casing: each casing piece of the bridge at its own casing number, the
-    pieces at one number joined into one line, none at the heads where the bridge comes down; blurred and shifted down-right (lit from the
-    top left), just before the bridge's casing at its position; off with bridge_shadow."""
+def test_a_bridge_has_one_continuous_shadow_at_its_lowest_casing_number(monkeypatch):
+    """Position mode (Kaveh 2026-10-06): one continuous shadow per bridge, its edges joined into one line, at the lowest casing number of any of
+    its parts (under all of it), none over the heads where the bridge comes down; blurred and shifted down-right (lit from the top left), just
+    before the bridge's casing at that position; off with bridge_shadow."""
     import dataclasses
 
     from roadstyle import render_web
@@ -2140,14 +2140,13 @@ def test_a_bridge_shadow_is_an_extra_casing(monkeypatch):
     style = _style(render_edges(g, **kw).html)
     sh = style["sources"]["shadows"]["data"]["features"]
     span = lambda f: round((max(c[1] for c in f["geometry"]["coordinates"]) - min(c[1] for c in f["geometry"]["coordinates"])) / m)   # noqa: E731
-    assert sorted((f["properties"]["__rs_cl"], span(f)) for f in sh) == [(2, 20), (2, 20), (3, 10)]    # at each piece's number: 5-25 m, 25-35, 35-55
-    assert sum(span(f) for f in sh) == 50                                                      # 60 m of bridge, its two coming-down heads left out
+    assert [(f["properties"]["__rs_cl"], span(f)) for f in sh] == [(1, 50)]                    # one line, the lowest number; 60 m less the two 5 m heads
     lay = {l["id"]: l for l in style["layers"]}
     ids = [l["id"] for l in style["layers"]]
-    s2 = lay["roads-casing-lv2-bridge-shadow"]
+    s2 = lay["roads-casing-lv1-bridge-shadow"]
     assert s2["source"] == "shadows" and s2["paint"]["line-blur"] == 4.0 and s2["paint"]["line-translate"] == [2, 2]
     assert s2["layout"]["line-cap"] == "butt"                                                  # no darker circle where two shadow lines meet
-    assert ids.index("roads-casing-lv2-bridge-shadow") < ids.index("roads-casing-lv2-bridge") < ids.index("roads-fill-lv2")
+    assert ids.index("roads-casing-lv1-bridge-shadow") < ids.index("roads-casing-lv1-bridge") < ids.index("roads-fill-lv1")
 
     monkeypatch.setattr(render_web, "CONFIG", dataclasses.replace(render_web.CONFIG, bridge_shadow=False))
     off = _style(render_edges(g, **kw).html)
@@ -2166,7 +2165,7 @@ def test_a_branching_bridge_shadow_is_cut_only_at_the_bridge_ends():
     rw._mark_lvl(geo, "tunnel", "bridge", "layer")
     for ft in geo["features"]:
         ft["properties"]["__rs_cl"] = 1
-    sh = rw._bridge_shadows(geo, None, "highway", 5.0)
+    sh = rw._bridge_shadows(geo, "highway", 5.0)
     pts = {tuple(round(v, 7) for v in c) for s in sh for c in s["geometry"]["coordinates"]}
     assert tuple(round(v, 7) for v in P(0, 50)) in pts                                    # the branch point is reached: no gap there
     assert tuple(round(v, 7) for v in P(0, 0)) not in pts and tuple(round(v, 7) for v in P(0, 100)) not in pts   # the real ends are cut
@@ -2177,5 +2176,5 @@ def test_a_branching_bridge_shadow_is_cut_only_at_the_bridge_ends():
     for ft in geo["features"]:
         ft["properties"]["__rs_cl"] = 1
     import shapely
-    sh = shapely.unary_union([shapely.LineString(s["geometry"]["coordinates"]) for s in rw._bridge_shadows(geo, None, "highway", 5.0)])
+    sh = shapely.unary_union([shapely.LineString(s["geometry"]["coordinates"]) for s in rw._bridge_shadows(geo, "highway", 5.0)])
     assert sh.intersection(shapely.LineString([P(0, 0), P(0, 100)]).buffer(1e-9)).length / (100 * m) > 0.89   # all but the two 5 m ends
