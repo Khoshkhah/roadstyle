@@ -27,6 +27,7 @@ A palette sets each road class's colour, width and casing.
 - `carto`: the muted colours of the OpenStreetMap standard map. The default.
 - `highsat`: bright, high contrast.
 - `mono`: shades of grey. Use it under your own data colours.
+- `amber`: orange, yellow and green main roads, slate-grey minor ones; carto's widths and casings.
 
 <div class="grid" markdown>
 

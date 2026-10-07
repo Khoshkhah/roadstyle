@@ -15,7 +15,7 @@ from roadstyle import (
 
 def test_both_palettes_present():
     # the two original built-ins are always present; more may be bundled (e.g. "mono")
-    assert {"highsat", "carto"} <= set(PALETTES)
+    assert {"highsat", "carto", "amber"} <= set(PALETTES)
     # key classes exist in every palette
     for p in PALETTES.values():
         for k in ["motorway", "trunk", "primary", "residential", "service"]:

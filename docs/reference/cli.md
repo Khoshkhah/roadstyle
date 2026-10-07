@@ -40,7 +40,7 @@ Only the styling, filtering and data-colour flags apply to every format; the web
 | `--highway-col COL` | `highway_col` | road-class column (default `highway`) |
 | `--layer NAME` | `load_edges(layer=)` | layer of a multi-layer file, e.g. a GPKG |
 | **Styling** | | |
-| `--palette {carto,highsat,mono}` | `palette` | class palette (default `carto`) |
+| `--palette {carto,highsat,mono,amber}` | `palette` | class palette (default `carto`) |
 | `--basemap KEY` | `basemap` | base map (default from settings: `voyager`) |
 | `--tooltip COL [COL …]` | `tooltip` | columns in the hover tooltip |
 | **Filtering** | | |

@@ -51,7 +51,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--version", action="version", version=f"roadstyle {__version__}")
 
     style = p.add_argument_group("styling")
-    style.add_argument("--palette", default="carto", choices=["carto", "highsat", "mono"],
+    style.add_argument("--palette", default="carto", choices=["carto", "highsat", "mono", "amber"],
                        help="class palette (default: carto).")
     style.add_argument("--basemap", help="the primary base map layer (a key in BASEMAPS; "
                        "default from settings: voyager).")

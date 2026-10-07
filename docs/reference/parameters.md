@@ -68,7 +68,7 @@ ignore it.
 | keyword | default | backends | what |
 |---|---|---|---|
 | `backend` | `"web"` | | `"web"` (MapLibre, one offline file), `"folium"`, `"lonboard"` ([Big networks](../guides/big-networks.md)) |
-| `palette` | `"carto"` | all | `"carto"` (soft OSM Carto tones), `"highsat"` (bright), `"mono"` or a registered palette |
+| `palette` | `"carto"` | all | `"carto"` (soft OSM Carto tones), `"highsat"` (bright), `"mono"`, `"amber"` (orange to green main roads, slate minor ones) or a registered palette |
 | `basemap` | the `basemap` setting (`"voyager"`) | all | a `BASEMAPS` key, a `Basemap`, a `{z}/{x}/{y}` URL or an xyzservices provider |
 | `basemaps` | web: `esri_gray`, `positron`, `osm`, `satellite`, `voyager`, `dark_matter`, `blank` | web, folium | the base maps offered in the switcher |
 | `basemap_switcher` | `True` | web | the base-map button (a map control, last in the top-right column) and its menu; `False` with a `basemaps=` list keeps them for `rsSetBasemap` |
