@@ -1,7 +1,7 @@
 """Build the gallery thumbnails (docs/img/gallery/*.png) — one screenshot per signature look.
 
 Renders the bundled Södermalm driving sample in each look and snapshots it headlessly via
-:func:`rs.snapshot` (needs Playwright + Chromium); the hero and the two Street View shots go
+:func:`rs.snapshot` (needs Playwright + Chromium); the three Street View shots go
 through :func:`served_shot` instead (served over http, a road selected). Re-run after a visual
 change (build ui/dashboard and ui/report first; not the studio shot and not the README's top picture docs/img/hero.jpg, which are
 taken by hand: the top picture from a Monaco page in 3D with Street View open)::
