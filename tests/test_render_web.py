@@ -2126,7 +2126,8 @@ def test_a_divided_casing_has_a_round_seam_at_each_cut():
 
 def test_a_bridge_has_one_continuous_soft_shadow(monkeypatch):
     """Position mode (Kaveh 2026-10-06): one soft shadow per bridge, its edges joined into one line and cut a head short at each end, blurred
-    and shifted down-right (lit from the top left), at the lowest casing number of the bridge (under all of it); off with bridge_shadow."""
+    and shifted down-right (lit from the top left), at the bridge's lowest main casing number (over what it crosses, under all of it); off
+    with bridge_shadow."""
     import dataclasses
 
     from roadstyle import render_web
@@ -2138,14 +2139,14 @@ def test_a_bridge_has_one_continuous_soft_shadow(monkeypatch):
     kw = dict(backend="web", casing_start_col="cs", casing_level_col="cm", casing_end_col="ce", fill_level_col="fl")
     style = _style(render_edges(g, **kw).html)
     sh = style["sources"]["shadows"]["data"]["features"]
-    assert len(sh) == 1 and sh[0]["properties"]["__rs_cl"] == 1                                # one line, under the lowest part of the bridge
+    assert len(sh) == 1 and sh[0]["properties"]["__rs_cl"] == 2                                # one line, at the bridge's lowest main casing
     ys = [c[1] for c in sh[0]["geometry"]["coordinates"]]
     assert abs((max(ys) - min(ys)) / m - 50) < 0.5                                             # 60 m of bridge, 5 m short at each end
     lay = {l["id"]: l for l in style["layers"]}
     ids = [l["id"] for l in style["layers"]]
-    s1 = lay["roads-casing-lv1-bridge-shadow"]
+    s1 = lay["roads-casing-lv2-bridge-shadow"]
     assert s1["source"] == "shadows" and s1["paint"]["line-blur"] == 4.0 and s1["paint"]["line-translate"] == [2, 2]
-    assert ids.index("roads-casing-lv1-bridge-shadow") < ids.index("roads-casing-lv1-bridge")
+    assert ids.index("roads-casing-lv2-bridge-shadow") < ids.index("roads-casing-lv2-bridge") < ids.index("roads-fill-lv2")
     monkeypatch.setattr(render_web, "CONFIG", dataclasses.replace(render_web.CONFIG, bridge_shadow=False))
     off = _style(render_edges(g, **kw).html)
     assert "shadows" not in off["sources"] and not [l for l in off["layers"] if l["id"].endswith("-shadow")]

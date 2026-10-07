@@ -735,7 +735,8 @@ def _casing_parts(geo, head_m, cols):
 
 def _bridge_shadows(geo, highway_col, trim_m):
     """One shadow line per bridge: its connected bridge edges joined into one line (two directions of an edge drawn once), cut ``trim_m``
-    metres short at each end (where it comes down to the road), at the lowest casing number of its edges (``__rs_cl``: under all of it),
+    metres short at each end (where it comes down to the road), at the lowest main casing number of its edges (``__rs_cl``: over what it
+    crosses, under all of it; Kaveh 2026-10-06: the lowest head put it under the road it crosses),
     with its widest class (Kaveh 2026-10-06: a shadow per piece broke at every head and joint, and a half-transparent blurred line darkens
     where pieces overlap)."""
     import numpy as np
@@ -755,7 +756,8 @@ def _bridge_shadows(geo, highway_col, trim_m):
         members = [br[k]["properties"] for k in tree.query(ch, predicate="intersects") if lines[k].interpolate(0.5, normalized=True).distance(ch) < 1e-7]
         if not members:
             continue
-        lvl = min(min(p.get("__rs_cs", p.get("__rs_cl", 0)), p.get("__rs_cl", 0), p.get("__rs_ce", p.get("__rs_cl", 0))) for p in members)
+        lvl = min(p.get("__rs_cl", 0) for p in members)       # the lowest MAIN casing: over what the bridge crosses (a crossing puts every main above it),
+                                                                #   under all of the bridge (every fill is at or above its main); a head is lower at the ends
         cls = max((p.get(highway_col) for p in members), key=lambda c: -order.index(c) if c in order else -len(order))
         c = list(ch.coords)
         lon0, lat0 = c[0]
