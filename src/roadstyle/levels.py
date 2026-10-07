@@ -313,9 +313,11 @@ def _solve_intervals(metres, meets, stacks, orders, limit, max_level, margin, mi
     return parts, gu, {**info, "order_pairs": nO, "order_violations": violated, "solves": solves, "solver": how, "status": "OPTIMAL", "seconds": round(time.time() - t0, 1)}
 
 
-def _road_split(g):
+def _road_split(g, cols=()):
     """Both directions of a segment are one road: ``(ends, first, rid, same)``: the end nodes of every row (exact equality of the end points),
-    the first row of every road, the road of every row, and whether a row runs the same way as its road's first row."""
+    the first row of every road, the road of every row, and whether a row runs the same way as its road's first row. Rows on the same line
+    are one road only if they also agree on ``cols`` (the kind of road): a footway lying exactly on a tunnel's piece is a road of its own
+    (2026-10-07: joined, the tunnel piece took the footway's tags and was solved and drawn as a footway)."""
     import numpy as np
     import shapely
     geoms = np.asarray(g.geometry.values, dtype=object)
@@ -329,12 +331,15 @@ def _road_split(g):
     ends = list(zip(node[:len(geoms)].tolist(), node[len(geoms):].tolist(), strict=True))
     fwd = [xy[off[i]:off[i + 1]].tobytes() for i in range(len(geoms))]
     rev = [xy[off[i]:off[i + 1]][::-1].tobytes() for i in range(len(geoms))]
+    have = [c for c in cols if c and c in g.columns]
+    kind = list(zip(*[["" if v is None or v != v else str(v) for v in g[c]] for c in have], strict=True)) if have else [()] * len(geoms)
+    keys = [(frozenset(e), min(f, r), k) for e, f, r, k in zip(ends, fwd, rev, kind, strict=True)]
     road, first = {}, []
-    for i, k in enumerate((frozenset(e), min(f, r)) for e, f, r in zip(ends, fwd, rev, strict=True)):
+    for i, k in enumerate(keys):
         if k not in road:
             road[k] = len(first)
             first.append(i)
-    rid = [road[(frozenset(e), min(f, r))] for e, f, r in zip(ends, fwd, rev, strict=True)]
+    rid = [road[k] for k in keys]
     same = [fwd[i] == fwd[first[rid[i]]] for i in range(len(geoms))]
     return ends, first, rid, same
 
@@ -357,7 +362,7 @@ def level_input(edges, id_col="edge_id", layer_col="layer", bridge_col="bridge",
     import geopandas as gpd
     import pandas as pd
     g = edges
-    ends, first, rid, same = _road_split(g)
+    ends, first, rid, same = _road_split(g, (highway_col, tunnel_col, bridge_col, layer_col, band_col))
     ids = [str(v) for v in g[id_col]] if id_col and id_col in g.columns else [str(i) for i in range(len(g))]
     head = g.iloc[first]
     if band_col:
@@ -621,7 +626,7 @@ def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tu
     if method == "solve" and not (margin > 0 and max_level > 0):
         raise ValueError(f"compute_levels: margin and max_level must be greater than 0, not {margin!r} and {max_level!r}")
     g = edges.copy()
-    ends, _, rid, same = _road_split(g)
+    ends, _, rid, same = _road_split(g, (highway_col, tunnel_col, bridge_col, layer_col, band_col))
     if method == "tags":
         lv = [_level(r, layer_col, bridge_col, tunnel_col) for r in g.to_dict("records")]
         pos = [(c, c, c, f) for c, f in _tag_intervals(ends, lv)]

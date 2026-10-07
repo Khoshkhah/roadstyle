@@ -2079,6 +2079,18 @@ def test_the_priority_order_warns_without_a_junction_column():
         rs.level_input(_edge_world().assign(junction=None))                            # the column, even empty: no warning
 
 
+def test_roads_on_the_same_line_are_one_road_only_if_they_are_the_same_kind():
+    """Both directions of a segment are one road; a footway lying exactly on a tunnel's piece is not (2026-10-07: it took the tunnel's place)."""
+    import roadstyle as rs
+    m = 1 / 111320.0
+    a = LineString([(18.0, 59.3), (18.0, 59.3 + 20 * m)])
+    g = gpd.GeoDataFrame({"edge_id": [1, 2, 3], "highway": ["tertiary", "tertiary", "footway"], "tunnel": ["yes", "yes", None]},
+                         geometry=[a, LineString(list(a.coords)[::-1]), a], crs=4326)
+    roads, _ = rs.level_input(g)
+    by = {r: (list(e), list(b), h) for r, e, b, h in zip(roads["road"], roads["edges"], roads["reversed"], roads["highway"], strict=True)}
+    assert by == {"1": (["1"], ["2"], "tertiary"), "3": (["3"], [], "footway")}
+
+
 def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     """The level editor (roadstyle.level_editor): the pairs between two roads (by any edge id), an edit the solver refuses is not written, a
     taken one is written with the file before it kept as edits.csv.bak, and levels.csv follows."""
