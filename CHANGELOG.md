@@ -6,6 +6,19 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **`Overlay(select="road" | "item")`** for items attached to a road: `"item"` selects the item itself (its own select and hover highlight,
+  its own popup with the road's Street View link, `rs:select` with `item` = `{overlay, id, properties}` next to the road's `id` and
+  `properties`); `"road"` (default) selects the road as before. The item still hides with its road. Overlays now take the page's
+  `hover_color` / `select_color` for their highlight (they kept the default colours).
+
+### Fixed
+- **Each direction of a two-way road selects its own edge:** a click or hover takes the road right under the cursor before the tolerance box
+  around it, which reached both directions near the middle and picked the one drawn last.
+- **The class filter hides a road's street names and arrows with `filter_col` too:** every piece of a road (fill, casing pieces, fill halves,
+  end caps, name and arrow slots) carries `__rs_cls`, its road's `filter_col` value (else `highway_col`), and the class filter reads it; the
+  slots carried only the chain's `highway`, so with `filter_col` set the names and arrows of a hidden class stayed.
+
 ### Changed
 - **One lookup for every piece of a road** (docs/design/edge_items.md, step 2): `rsFilter` on the roads, the class filter and the bridge and tunnel
   switches hide a road's items attached with `Overlay(edge_col=...)` too (they carry `__rs_edge`, the index of their road, and its class and level as

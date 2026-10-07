@@ -1390,7 +1390,7 @@ def _styled(ov):
     styles = (CONFIG.overlays or {}).get("styles") or {}
     if ov.style not in styles:
         raise ValueError(f"overlay style {ov.style!r} is not in the settings (config.overlays.styles); known: {sorted(styles)}")
-    fields = {f.name for f in dataclasses.fields(type(ov))} - {"data", "style", "edge_col", "order_col"}
+    fields = {f.name for f in dataclasses.fields(type(ov))} - {"data", "style", "edge_col", "order_col", "select"}
     bad = set(styles[ov.style]) - fields
     if bad:
         raise ValueError(f"overlay style {ov.style!r}: unknown field(s) {sorted(bad)}; the fields are {sorted(fields)}")
@@ -1432,7 +1432,7 @@ def _overlay_layers(sid, ov, kind, hover_color="#b388ff", select_color="#7c4dff"
         width = _wm_width_expr(ov.min_zoom)
     radius = C["radius"] if ov.radius is None else ov.radius
     op = ov.opacity
-    interactive = ov.popup is None or bool(ov.popup)
+    interactive = ov.popup is None or bool(ov.popup) or (ov.select == "item" and bool(ov.edge_col))   # an item selected itself takes the highlight
     col = _ov_hl(base, hover_color, select_color, interactive)
     lay = {"visibility": "visible" if getattr(ov, "visible", True) else "none"}
     dash = {"line-dasharray": [float(x) for x in ov.dash]} if ov.dash else {}
@@ -1544,6 +1544,7 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
                      "tooltip": list(ov.tooltip) if ov.tooltip else None,
                      "under": ov.placement == "under" and not ov.edge_col,
                      "base": base_filters,              # the layers' own filters (position and order) that rsFilter must keep
+                     "select": ov.select,               # an item attached to a road: a click picks its "road" or the "item"
                      "interactive": ov.popup is None or bool(ov.popup)})
     return under, over, meta, edge
 
@@ -1862,8 +1863,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     by_id = None
     if overlays and any(getattr(o, "edge_col", None) for o in overlays) and edge_id_col in g.columns:
         by_id = {_eid(ft["properties"].get(edge_id_col)): ft["properties"] for ft in geo["features"]}
-    under_layers, over_layers, ov_meta, edge_layers = _build_overlays(style, overlays, roads=by_id, edge_id_col=edge_id_col,
-                                                                      fcol=filter_col or highway_col)
+    under_layers, over_layers, ov_meta, edge_layers = _build_overlays(style, overlays, hover_color, select_color, roads=by_id,
+                                                                      edge_id_col=edge_id_col, fcol=filter_col or highway_col)
 
     # Round caps + joins everywhere: consecutive edges are separate LineStrings, and a round cap is
     # the only rendering primitive that seals the seam where two of them connect (line-join only
@@ -2408,6 +2409,14 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
 
     view_list = _check_views(views, [o["name"] for o in color_opts_meta or []] if color_options else [],
                              [o["label"] for o in ov_meta], classes, [b["key"] for b in bms])
+
+    # the class every piece of a road is filtered by (docs/design/edge_items.md): its edge's ``filter_col`` value, else ``highway_col``.
+    # A name or an arrow carries the chain's ``highway``, not ``filter_col``: the class filter reads __rs_cls on every piece (the
+    # shadows and 3D decks, which cover several edges, are decided per edge in the page)
+    cls_of = [ft["properties"].get(fcol) for ft in geo["features"]]
+    for fc in [geo, slots] + [style["sources"][k]["data"] for k in ("casings", "halves", "ends") if k in style["sources"]]:
+        for ft in fc["features"]:
+            ft["properties"]["__rs_cls"] = cls_of[ft["properties"]["__rs_edge"]]
 
     pmt = side = None
     if tiles:

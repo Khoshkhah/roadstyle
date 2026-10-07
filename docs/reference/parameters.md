@@ -254,6 +254,7 @@ the `overlays` setting. See [Add your own layers](../guides/overlays.md).
 | `visible` | `True` | shown on open |
 | `edge_col` | `None` | the property with the id of the feature's edge: the overlay is attached to edges, drawn at its edge's fill number (the guide: [Overlays](../guides/overlays.md#overlays-attached-to-edges)) |
 | `order_col` | `None` | with `edge_col`: the property with the feature's order (whole number, lower first; null = 0) |
+| `select` | `"road"` | with `edge_col`: a hover or click picks the feature's road (`"road"`) or the feature itself (`"item"`: its own highlight and popup, `rs:select` with `item` and the road); anything else is an error |
 | `color_col` | `None` | the property with a colour per feature (null: `color`) |
 | `style` | `None` | the name of a style in the settings `config.overlays.styles` (a library's theme); its fields fill what the overlay does not give |
 | `width_m` | `None` | a line's width in metres, exact from `min_zoom` on (replaces `width`) |
