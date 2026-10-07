@@ -10,6 +10,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **`roadstyle-levels make | solve | edit FOLDER`**: the level step and its editor come with the package (`roadstyle.level_area`:
   `make_area`, `solve_area`; `roadstyle.level_editor`), in place of `scripts/level_input.py`, `scripts/solve_levels.py` and
   `scripts/edit_levels.py`. The area folder and its files are as before.
+- **Lanes pair only within one class:** two edges on one line in opposite directions are a two-way street's two lanes only when they
+  are the same class (names, arrows and end caps too): a footway lying on a street the other way round left the street one narrow, shifted lane.
 - **Fast id filters:** `rsFilter`, `rsColor` and the editor's mode boxes look ids up (a MapLibre `match`) instead of scanning a list for
   every feature in every layer; a filter of thousands of ids froze the page.
 - The level editor shows only the roads of the modes you tick (driving, walking, cycling, private), when the roads have `modes`; display only.

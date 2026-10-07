@@ -2130,6 +2130,20 @@ def test_rsfilter_and_rscolor_by_ids_in_the_browser(tmp_path):
     assert errors == [] and every > 1 and one == 1 and none == 0 and back == every
 
 
+def test_a_footway_on_a_street_the_other_way_round_is_no_lane_of_it():
+    """Two edges on one line in opposite directions are a two-way street's lanes only when they are the same class: a footway lying on a
+    street the other way round left the street drawn as one narrow, shifted lane (2026-10-07)."""
+    from roadstyle import render_web as rw
+    m = 1 / 111320.0
+    a = LineString([(18.0, 59.3), (18.0, 59.3 + 20 * m)])
+    g = gpd.GeoDataFrame({"highway": ["tertiary", "footway", "residential", "residential"]},
+                         geometry=[a, LineString(list(a.coords)[::-1]), LineString([(18.001, 59.3), (18.001, 59.3 + 20 * m)]),
+                                   LineString([(18.001, 59.3 + 20 * m), (18.001, 59.3)])], crs=4326)
+    geo = rw.fc_dict(g)
+    rw._mark_twoway(geo, None, "highway")
+    assert [f["properties"]["__rs_twoway"] for f in geo["features"]] == [False, False, True, True]
+
+
 def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     """The level editor (roadstyle.level_editor): the pairs between two roads (by any edge id), an edit the solver refuses is not written, a
     taken one is written with the file before it kept as edits.csv.bak, and levels.csv follows."""
