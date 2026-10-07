@@ -493,7 +493,8 @@ function _applyRoadFilters(){
     // a two-way pair's end cap (twin_ends.md) and an arrow or a street name (edge_overlays.md) stay while either of their two edges is shown
     if(_qIds && (kind==="ends" || kind==="slots" || kind==="arrows")){
       const qf=["any",_has(["get","__rs_road"],_qIds),_has(["get","__rs_road2"],_qIds)]; f=f?["all",f,qf]:qf; }
-    try{ map.setFilter(l.id,f); }catch(e){}
+    // validate:false: our own filters need no grammar check, which cost ~6 ms a layer (a mode or class switch on a page of ~500 layers froze it ~3 s)
+    try{ map.setFilter(l.id,f,{validate:false}); }catch(e){}
   });
   return hidden;
 }
@@ -555,7 +556,7 @@ function rsFilter(ids, layer){   // show only these features; rsFilter(null) res
   if(L.ov){
     const f = ids==null ? null : _has(["id"],ids);
     L.ov.layers.forEach(id=>{ if(map.getLayer(id)) try{   // an overlay attached to edges keeps its position and order (ov.base)
-      const b=(L.ov.base||{})[id]; map.setFilter(id, f==null ? (b||null) : (b ? ["all",b,f] : f)); }catch(e){} });
+      const b=(L.ov.base||{})[id]; map.setFilter(id, f==null ? (b||null) : (b ? ["all",b,f] : f), {validate:false}); }catch(e){} });
     document.dispatchEvent(new CustomEvent("rs:filterchange",
       {detail:{overlay:L.ov.label, ids:ids==null?null:Array.from(ids)}}));
     return;
