@@ -12,6 +12,7 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
 #lv-toggle:hover{color:var(--lv-ink)}
 #lv header{padding:14px 16px 12px;background:#fff;border-bottom:1px solid var(--lv-line)}
 #lv .find{position:relative;margin-top:10px}
+#lv .modes{display:flex;gap:12px;margin-top:8px;font:12px system-ui;color:var(--lv-mute)} #lv .modes label{cursor:pointer;display:flex;gap:4px;align-items:center}
 #lv .find input{width:100%;box-sizing:border-box;border:1px solid #d0d5dd;border-radius:8px;padding:7px 10px 7px 30px;font:13px system-ui;color:var(--lv-ink);
   background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Ccircle cx='6' cy='6' r='4.5'/%3E%3Cpath d='m9.5 9.5 3.5 3.5'/%3E%3C/svg%3E") no-repeat 10px 50%}
 #lv .find input:focus{outline:none;border-color:var(--lv-r2);box-shadow:0 0 0 3px rgba(25,113,194,.15)}
@@ -111,7 +112,8 @@ body.lv-open #lv-busy{right:var(--lv-w)}
 <aside id="lv">
   <button id="lv-toggle" title="Hide the panel">›</button>
   <header><div class="t">Level editor</div><div class="area" id="lv-area"></div><div class="stats" id="lv-stats"></div>
-    <div class="find"><input id="lv-find" type="search" placeholder="Find a road: edge id or edge_ref" autocomplete="off"><div id="lv-hits" hidden></div></div></header>
+    <div class="find"><input id="lv-find" type="search" placeholder="Find a road: edge id or edge_ref" autocomplete="off"><div id="lv-hits" hidden></div></div>
+    <div class="modes" id="lv-modes" hidden title="Show only the roads of these modes (display only: every road is still solved)"></div></header>
   <nav class="tabs" id="lv-tabs"><button data-t="edit" class="on">Edit</button><button data-t="history">History<span class="cnt" id="lv-hist-n">0</span></button><button data-t="given" title="Given up (a real crossing broke) · near warnings">Issues<span class="cnt" id="lv-gu-n" style="background:var(--lv-bad);color:#fff">0</span><span class="cnt" id="lv-nr-n" style="background:#fff4e6;color:#b35c00">0</span></button></nav>
   <div class="scroll" data-tab="edit">
     <section id="lv-queue-sec" hidden><h2>Waiting to apply <span style="text-transform:none;letter-spacing:0;font-weight:500">not solved, not saved yet</span></h2>
@@ -478,7 +480,21 @@ body.lv-open #lv-busy{right:var(--lv-w)}
       else { box.className = ""; box.innerHTML = `<div class="empty" style="padding:8px">${s === "new" ? "nothing added yet" : "none"}</div>`; }
     }
   }
+  // --- which modes show (the roads' modes column, e.g. "driving + walking"; none: private): display only, every road is still solved
+  const MODES = ["driving", "walking", "cycling", "private"];
+  const modesOf = p => p.modes ? String(p.modes).split(" + ") : ["private"];
+  function modeBox(){
+    if(!rsQuery(p => p.modes).length) return;                 // data without modes: no box
+    let on = MODES; try { on = JSON.parse(sessionStorage.getItem("lv-modes") || "null") || MODES; } catch(e){}
+    const box = $("lv-modes"); box.hidden = false;
+    box.innerHTML = MODES.map(m => `<label><input type="checkbox" value="${m}"${on.includes(m) ? " checked" : ""}>${m}</label>`).join("");
+    const apply = () => { const want = [...box.querySelectorAll("input:checked")].map(i => i.value);
+      try { sessionStorage.setItem("lv-modes", JSON.stringify(want)); } catch(e){}
+      rsFilter(want.length === MODES.length ? null : rsQuery(p => modesOf(p).some(m => want.includes(m)))); };
+    box.querySelectorAll("input").forEach(i => i.onchange = apply); apply();
+  }
   function start(){
+    modeBox();
     const v = JSON.parse(sessionStorage.getItem("lv-view") || "null");
     if(v){ sessionStorage.removeItem("lv-view"); map.jumpTo({center: v.c, zoom: v.z, bearing: v.b, pitch: v.p});
       sel[0] = v.sel[0]; sel[1] = v.sel[1];
