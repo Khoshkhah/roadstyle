@@ -1050,6 +1050,31 @@ _CASING_FAMILY = ("roads-casing", "roads-casing-sq", "roads-casing-sx", "roads-c
 _FILL_FAMILY = ("roads-fill", "roads-fill-sq", "roads-fill-sx", "roads-fill-h", "roads-fill-hsq", "roads-fill-hsx", "roads-fill-pat")
 
 
+_VIEW_BOOLS = ("road_fill", "bridges", "tunnels", "view3d")
+
+
+def _check_views(views, colors, overlays, classes, basemaps):
+    """``views`` as the page reads it, ``[{"name", "set"}]``; a setting that is not known, or names a colour option, an overlay, a class or a
+    base map the page does not have, is an error (docs/design/core_model_and_views.md)."""
+    out = []
+    for name, sets in (views or {}).items():
+        unknown = set(sets) - {"color", "overlays", "classes", "basemap", *_VIEW_BOOLS}
+        if unknown:
+            raise ValueError(f"view {name!r}: unknown setting(s) {sorted(unknown)}")
+        for k in _VIEW_BOOLS:
+            if k in sets and not isinstance(sets[k], bool):
+                raise ValueError(f"view {name!r}: {k} must be True or False, got {sets[k]!r}")
+        for k, have, given in (("color", colors, [sets["color"]] if "color" in sets else []),
+                               ("overlays", overlays, list(sets.get("overlays") or {})),
+                               ("classes", classes, list(sets.get("classes") or [])),
+                               ("basemap", basemaps, [sets["basemap"]] if "basemap" in sets else [])):
+            missing = [x for x in given if x not in have]
+            if missing:
+                raise ValueError(f"view {name!r}: {k} {missing} not in the page (it has {have})")
+        out.append({"name": name, "set": sets})
+    return out
+
+
 def _fill_layer_ids(levels):
     """The layers the page recolours (colour-by, rsColor): every road fill layer, and the fill layers of each drawing-order position."""
     fills = ("roads-fill", "roads-fill-sq", "roads-fill-sx", "roads-fill-h", "roads-fill-hsq", "roads-fill-hsx")
@@ -1517,9 +1542,10 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
     return under, over, meta, edge
 
 
-def _place_edge_overlays(layers, edge, levels):
+def _place_edge_overlays(layers, edge, levels, pat_over=False):
     """Splice the layers of the overlays attached to edges into ``layers``: for each position, after its fills and before its one-way arrows (else its street
-    names, else right after its fills), by order, then by the order of the overlays (docs/design/edge_overlays.md)."""
+    names, else right after its fills), by order, then by the order of the overlays (docs/design/edge_overlays.md).
+    ``pat_over``: the tunnel pattern of a position (its ``-pat`` fill layer) is drawn after the overlays of the position, over them."""
     for pos in levels:
         mine = [x for x in edge if x[0] == pos]
         if not mine:
@@ -1532,7 +1558,14 @@ def _place_edge_overlays(layers, edge, levels):
             fam = {_level_id(x, pos) for x in _FILL_FAMILY}
             dash = _level_id("roads-fill", pos) + "-dash"
             at = max(i for i, n in enumerate(ids) if n in fam or n.startswith(dash)) + 1
-        layers[at:at] = [lyr for _, _, _, group in sorted(mine, key=lambda x: (x[1], x[2])) for lyr in group]
+        group = [lyr for _, _, _, group in sorted(mine, key=lambda x: (x[1], x[2])) for lyr in group]
+        layers[at:at] = group
+        if pat_over:
+            pid = _level_id("roads-fill-pat", pos)
+            pats = [l for l in layers if l["id"] == pid]
+            layers[:] = [l for l in layers if l["id"] != pid]
+            at = max(i for i, l in enumerate(layers) if l is group[-1]) + 1
+            layers[at:at] = pats
     return layers
 
 
@@ -1598,7 +1631,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            road_popup=True, road_tooltip=False, popup_mode: str = None,
            street_view: bool | str = "window", street_view_key: str | None = None,
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
-           color_options=None, color_active=0, overlays=None, compress: bool = True, tunnel_control: bool = True,
+           color_options=None, color_active=0, views=None, overlays=None, compress: bool = True, tunnel_control: bool = True,
            tiles: bool = False,
            minzoom=None, legend: bool = True,
            api_key: str | None = None, **_ignore):
@@ -1671,6 +1704,12 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     tunnel colours), its presets, the casing palette and the dash ratio; ``window.rsSetTunnelStyle({strength, palette, ratio})`` does the
     same from your own UI. The starting values are the settings ``tunnel_strength``, ``tunnel_palette`` and ``tunnel_casing_dash``
     (docs/design/tunnel_look.md).
+
+    ``views`` (optional) adds a *View* menu next to *Colour by*: ``{name: {setting: value}}``, each view a set of settings
+    applied together (docs/design/core_model_and_views.md). The settings are ``color`` (a ``color_options`` name), ``road_fill``
+    (bool), ``overlays`` (``{label: bool}``), ``classes`` (a list of road classes), ``bridges``, ``tunnels``, ``view3d`` (bool)
+    and ``basemap`` (a key); a view sets only what it names. The page opens with the first view. ``window.rsSetView(name|index)``
+    applies one from your own UI.
 
     ``overlays`` (optional) draws extra layers the caller brings — a list of :class:`Overlay`
     (zone polygons, POI circles, any geometry). Each becomes its own source + layer(s), placed
@@ -2315,14 +2354,19 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
              "paint": {"line-color": "#6a0dad", "line-width": 2.5, "line-opacity": 0.9,
                        "line-dasharray": [3, 2]}})
 
+    # the road's own fill: its layers and their opacity as drawn, so that rsSetRoadFill (and a view's road_fill) can put it back
+    fill_paint = {}
+    for lyr in style["layers"]:
+        if lyr["id"].startswith("roads-fill") and not lyr["id"].endswith("-pat"):      # the tunnel pattern stays: over the items (_place_edge_overlays)
+            fill_paint[lyr["id"]] = {k: lyr["paint"].get(k) for k in ("line-opacity",)}
+        elif lyr["id"].startswith("roads-ends-fill"):
+            fill_paint[lyr["id"]] = {k: lyr["paint"].get(k) for k in ("circle-opacity", "circle-stroke-opacity")}
     if not road_fill:     # the casing of the road, not its fill: the fill layers stay for clicks and hovers, invisible
         for lyr in style["layers"]:
-            if lyr["id"].startswith("roads-fill"):
-                lyr["paint"] = {**lyr["paint"], "line-opacity": 0}
-            elif lyr["id"].startswith("roads-ends-fill"):
-                lyr["paint"] = {**lyr["paint"], "circle-opacity": 0, "circle-stroke-opacity": 0}
+            if lyr["id"] in fill_paint:
+                lyr["paint"] = {**lyr["paint"], **dict.fromkeys(fill_paint[lyr["id"]], 0)}
     if edge_layers:       # the overlays attached to edges: after the fills of their position, before its arrows (docs/design/edge_overlays.md)
-        style["layers"] = _place_edge_overlays(style["layers"], edge_layers, levels)
+        style["layers"] = _place_edge_overlays(style["layers"], edge_layers, levels, pat_over=not road_fill)
     style["layers"] += over_layers             # caller overlays drawn on top of the roads (e.g. POIs)
     tun_paint, tun_dash, tun_casing = {}, [], {}
     if any(ft["properties"].get("__rs_tunnel") for ft in geo["features"]):      # the tunnel look (docs/design/tunnel_look.md)
@@ -2353,6 +2397,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                           for f in geo.get("features", [])),
            "tunnels": any((f.get("properties") or {}).get("lvl", 0) < 0
                           for f in geo.get("features", []))}
+
+    view_list = _check_views(views, [o["name"] for o in color_opts_meta or []] if color_options else [],
+                             [o["label"] for o in ov_meta], classes, [b["key"] for b in bms])
 
     pmt = side = None
     if tiles:
@@ -2415,6 +2462,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                                                "palette": CONFIG.tunnel_palette, "palettes": CONFIG.tunnel_palettes,
                                                "ratio": list(CONFIG.tunnel_casing_dash or [1, 1]), "bg": _bg_color(active_bm),
                                                "to": _TUN_TO, "control": bool(tunnel_control and tun_paint)}))
+            .replace("__VIEWS__", json.dumps(view_list))
+            .replace("__RS_ROAD_FILL__", json.dumps({"on": bool(road_fill), "paint": fill_paint}))
             .replace("__ROAD_POPUP__", "true" if popup_on else "false")
             .replace("__ROAD_POPUP_MODE__", json.dumps(mode))
             .replace("__ROAD_POPUP_FIELDS__", json.dumps(popup_fields))

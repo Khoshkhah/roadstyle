@@ -50,12 +50,19 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - The editor has a search box: an edge id (either direction of a road) or an edge_ref, or a part of one; a hit is picked and shown.
 - **An `amber` palette** (Kaveh's colours): motorway `#f28c28`, trunk `#f5a623`, primary `#f4c542`, secondary `#f7df72`, tertiary `#b8d986`,
   residential `#d7dee8`, living_street `#cbd5e1`, service `#94a3b8`, track `#a3a3a3`; the other classes, the widths and the casings as `carto`.
+- **`views=`**: a *View* menu next to *Colour by*. A view is a name and a set of settings applied together: the colour option, the road fill, which overlays show, the road classes,
+  bridges, tunnels, 3D and the base map (`{"Lanes": {"road_fill": False, "overlays": {"lanes": True}}}`). The page opens with the first view; `rsSetView(name)` applies one from a host page.
+  An unknown setting, or a name the page does not have, is an error. Design: `docs/design/core_model_and_views.md`.
+- **`rsSetRoadFill(on)`**: the roads' own fill on or off in the page; with `road_fill=False` it can now be shown again.
 
 ### Changed
 - **Meet or cross:** roads of different bands that only meet (a tunnel mouth, a bridge end) follow the priority order; roads that cross keep the band. With `band_col`
   the caller's bands decide everywhere. A short road on top keeps its pair on its fill (it was dropped). Monaco: tunnels on top at 223 of 350 mouths, every crossing right.
 - **`render_edges` takes no `band_col` and no `order`** (an error says to compute the levels first); without level columns it calls `compute_levels` with its defaults.
   `compute_levels(order=...)` defaults to `"priority"`.
+- **One arrow per one-way road in the window** (`docs/design/arrows_and_names.md`): the page puts one arrow in the middle of each one-way road's visible part,
+  and keeps it there while it stays in the window; below zoom 17 only the main classes, none on a road shorter than 100 px on screen, and 150 px between arrows; the arrows no longer repeat along every 100 m slot (they crowded zoom 15). A tiled map keeps the old arrows.
+- **The default palette is `carto`** (`palettes.DEFAULT_PALETTE`), the soft OpenStreetMap Carto tones, in place of `highsat` (too sharp, Kaveh). `palette="highsat"` keeps the old look.
 - **The order where roads meet:** `compute_levels(order="priority")`, now the default of `render_edges`: where roads of one band meet, a roundabout's fill is over a tunnel's,
   a tunnel's over a bridge's, a bridge's over the road class (`junction_col`, default `junction`: `roundabout` or `circular`). The band is unchanged, so a road that crosses over a tunnel
   still covers it. `order="class"` keeps the road class alone.
@@ -64,10 +71,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   a palette's two colours, dash on gap (`tunnel_palette`, default `Graphite + silver`), or slate dashes with empty gaps (`One colour`), moved toward slate with the rest; dash ratio 1:1 (`tunnel_casing_dash`). The two-tone casing
   (`tunnel_gap_shade`, `tunnel_dash_shade`) is gone. A *Tunnels* box (`tunnel_control`) and `rsSetTunnelStyle({strength, palette, ratio})` move it in the page; the slider has five steps (Normal colors 0, Subtle 20, Balanced 35, Strong 70, Full 100).
 - **No light dashes on a tunnel's fill by default** (`tunnel_fill_dash: []`, v2's look); `[1.2, 1.2]` brings them back.
-- **The default palette is `carto`** (`palettes.DEFAULT_PALETTE`), the soft OpenStreetMap Carto tones, in place of `highsat` (too sharp, Kaveh). `palette="highsat"` keeps the old look.
-- **One arrow per one-way road in the window** (`docs/design/arrows_and_names.md`): the page puts one arrow in the middle of each one-way road's visible part,
-  and keeps it there while it stays in the window; below zoom 17 only the main classes, none on a road shorter than 100 px on screen, and 150 px between arrows; the arrows no longer repeat along every 100 m slot (they crowded zoom 15). A tiled map keeps the old arrows.
 - **An arrow that would touch a street name is left out** (MapLibre places the names first; an arrow never pushes a name away).
+- **`road_fill=False`**: the tunnel pattern is drawn over the items of its position, so a tunnel reads as a tunnel on the lanes; a hovered interactive overlay wins over the road under it.
 - **Faster page building:** the casing pieces and the arrow and street-name slots are cut with a small numpy cutter instead of shapely's `substring` (the same lines), and a slot of a group of one edge no longer searches for its edge.
   A page of a city of 64,000 roads builds about 40% faster.
 

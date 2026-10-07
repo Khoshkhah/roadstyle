@@ -30,6 +30,8 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rsSetTunnels(on)` | show / hide every tunnel, with its street names and arrows (the filter panel's *Tunnels* row) | `rs:filterchange` |
 | `rsSetColorField(nameOrIndex)` | switch the active `color_options` entry | `rs:colorchange` |
 | `rsSetTunnelStyle({strength, palette, ratio})` | move the tunnel look: `strength` 0-100, `palette` a name of `RS_TUNNEL_PALETTES`, `ratio` `[dash, gap]` (any may be left out) | `rs:tunnelchange` |
+| `rsSetView(nameOrIndex)` | apply a `views` entry: each setting it names, through the functions of this table | `rs:viewselect` (and each function's own event) |
+| `rsSetRoadFill(on)` | show / hide the roads' own fill (`road_fill`); the casing stays | `rs:roadfillchange` |
 | `rsSetOverlay(labelOrIndex, on)` | show / hide one overlay | `rs:overlaychange` |
 | `rsSetView3D(on)` | tilt to `camera.pitch_3d`, or back to flat and north-up | `rs:viewchange` |
 | `rsPanelShow(on)` | panel mode only: hide / show the docked side panel | |
@@ -61,6 +63,8 @@ All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
 | `rs:overlaychange` | `rsSetOverlay` | `overlay` (label), `visible` |
 | `rs:viewchange` | `rsSetView3D` | `view3d` |
 | `rs:tunnelchange` | `rsSetTunnelStyle` | `strength`, `palette`, `ratio` |
+| `rs:viewselect` | `rsSetView` | `view` (name), `index` |
+| `rs:roadfillchange` | `rsSetRoadFill` | `road_fill` |
 | `rs:streetviewchange` | `rsSetStreetView` | `open` |
 | `rs:streetviewmove` | `rsStreetViewStep` | `id`, `streetView`, `atStart`, `atEnd` |
 | `rs:streetviewspot` | a pick, a step, a walk or turn in the panorama | the `rsGetStreetViewSpot()` object (or `null`) |
@@ -85,6 +89,7 @@ Read-only globals for building your own controls.
 | `RS_CLASS_COLORS` | `{class: fill colour}` |
 | `RS_COLOR_OPTIONS` | `[{name, prop, legend}]`, the `color_options` entries |
 | `RS_TUNNEL_PALETTES` | `{name: [dash, gap] or null}`, the tunnel casing palettes (`null`: one colour) |
+| `RS_VIEWS` | `[{name, set}]`, the `views` entries |
 | `RS_OVERLAYS` | `[{label, source, layers, visible, color, popup, tooltip, under, interactive, …}]` |
 
 ## The `layer` argument

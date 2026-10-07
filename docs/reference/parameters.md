@@ -113,9 +113,14 @@ ignore it.
 | `style` | `None` | all | a styler object; overrides `palette` / `color_by` |
 | `color_options` | `None` | web | `{name: {styler kwargs}}`: a *Colour by* menu that recolours in the browser; the first entry shows on open |
 | `color_active` | `0` | web | the option shown on open (index or name) |
+| `views` | `None` | web | `{name: {setting: value}}`: a *View* menu next to *Colour by*; each view sets several things at once, the first shows on open |
 
 Each `color_options` value takes `color_by`, `colors`, `cmap`, `vmin`, `vmax`, `width_by`,
 `palette`, `style`, `missing`; `{}` is the class style. See [Colour by your data](../guides/colour.md).
+
+A `views` entry sets only what it names: `color` (a `color_options` name), `road_fill`, `bridges`, `tunnels`, `view3d`
+(`True` / `False`), `overlays` (`{label: True / False}`), `classes` (a list of road classes), `basemap` (a key). An unknown
+setting, or a name the page does not have, is an error.
 
 ### Popups & hover
 
