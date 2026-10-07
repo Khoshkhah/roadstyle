@@ -737,8 +737,9 @@ def _casing_parts(geo, head_m, cols):
     return out
 
 
-# street names (2026-10-06): about 3/4 of the road's fill width, at most the old 10 -> 14 px ramp, and none where that is under 9 px
-_LABEL_FRACTION, _LABEL_MIN_PX = 0.75, 9.0
+# street names: 9/10 of the road's fill width, at most the old 10 -> 14 px ramp, and none where that is under 8 px (2026-10-07: 3/4 and
+# 9 px left the names of tertiary and residential streets out until zoom 18; now from 17)
+_LABEL_FRACTION, _LABEL_MIN_PX = 0.9, 8.0
 
 
 def _label_base_px(z):

@@ -2367,16 +2367,16 @@ def test_bridge_shadow_goes_straight_through_a_junction_and_each_line_keeps_its_
 
 
 def test_street_names_fit_their_road_and_tiny_ones_are_left_out():
-    """Street names (2026-10-06): about 3/4 of the road's fill width, at most the old 10 -> 14 px; none where that is under 9 px."""
+    """Street names (2026-10-07): 9/10 of the road's fill width, at most the old 10 -> 14 px; none where that is under 8 px."""
     from roadstyle import render_web as rw
     assert rw._label_px("primary", 18) == 14.0                                             # a wide road: as before
-    assert abs(rw._label_px("residential", 18) - 0.75 * rw.class_width_px("residential", 18, casing=False)) < 1e-9 < rw._label_px("residential", 18) - 9
-    assert rw._label_px("service", 18) < 9                                                 # 5 px wide: no name at z18
+    assert abs(rw._label_px("residential", 17) - 0.9 * rw.class_width_px("residential", 17, casing=False)) < 1e-9 < rw._label_px("residential", 17) - 8
+    assert rw._label_px("service", 18) < 8                                                 # 5 px wide: no name at z18
     style = _style(render_edges(_edges(), backend="web").html)
     lab = next(l for l in style["layers"] if l["id"].startswith("roads-labels"))
     assert lab["layout"]["text-size"][0] == "interpolate" and lab["layout"]["text-size"][4][0] == "match"
     first = dict(zip(*[iter(rw._label_readable_filter()[2][2:-1])] * 2, strict=True))
-    assert first["residential"] == 18 and first["service"] > 18 and first["primary"] <= 16
+    assert first["residential"] == 17 and first["tertiary"] == 17 and first["secondary"] == 16 and first["service"] > 18 and first["primary"] <= 15
     assert json.dumps(rw._label_readable_filter()) in json.dumps(lab["filter"])
 
 

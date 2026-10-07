@@ -20,8 +20,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - `level_input` keeps the edges' `lanes` (shown in the editor's cards). A delete in the editor names its row as the page saw it: if edits.csv changed since, nothing is applied.
 - **Your own stacks are always real** (never a near warning), and the order wishes let go are named (`attrs["levels_orders_not_kept"]`) and
   listed in the editor's Issues tab.
-- **Street names fit their road:** about 3/4 of the road's fill width (at most the old 10 to 14 px), and none where that would be under 9 px
-  (so a service road, 5 px at z18 and 9.5 at z19, shows no name: the name data stops at z18; accepted 2026-10-06).
+- **Street names fit their road:** 9/10 of the road's fill width (at most the old 10 to 14 px), and none where that would be under 8 px:
+  names on secondary roads from zoom 16, on tertiary and residential streets from 17 (a service road shows none: the name data stops at z18).
 - **The casing follows the same line as the fill:** the casing pieces and fill halves are simplified like the roads (`tolerance` 0.05, was MapLibre's 0.375):
   the outline no longer wobbles along curves.
 - **A bridge shadow** (`bridge_shadow`, on): a soft dark shadow shifted 2 px down-right, drawn like an extra casing: every part of a bridge
