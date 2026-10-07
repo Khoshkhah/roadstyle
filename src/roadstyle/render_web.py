@@ -228,10 +228,11 @@ def _offset_expr(col, offset_frac=0.28, offset_zoom=15):
     return e
 
 
-def _mark_twoway(geo, directed_col=None):
+def _mark_twoway(geo, directed_col=None, kind_col="highway"):
     """Flag each edge that has a reverse twin (i.e. a two-way street's other direction), so the
     style fans those into two lanes and drops the one-way arrows. The match is DIRECTED — the twin
-    must run end->start. Two same-direction edges between one node pair (a street split into
+    must run end->start — and of one kind (``kind_col``): a footway lying on a street the other way
+    round is no lane of it (2026-10-07: the street was drawn as one narrow, shifted lane). Two same-direction edges between one node pair (a street split into
     parallel one-way carriageways) are siblings, not a pair: each keeps its arrows."""
     cnt, keys = collections.Counter(), []
     for ft in geo["features"]:
@@ -240,13 +241,13 @@ def _mark_twoway(geo, directed_col=None):
         if g.get("type") == "LineString" and len(c) >= 2:
             a = (round(c[0][0], 6), round(c[0][1], 6))
             z = (round(c[-1][0], 6), round(c[-1][1], 6))
-            k = (a, z)
+            k = (a, z, (ft.get("properties") or {}).get(kind_col))
         else:
-            k = (id(ft), None)
+            k = (id(ft), None, None)
         keys.append(k)
         cnt[k] += 1
     for ft, k in zip(geo["features"], keys, strict=False):
-        rev = (k[1], k[0])
+        rev = (k[1], k[0], k[2])
         n = cnt.get(rev, 0)
         # a loop edge (start == end) is its own reverse key; it needs a second feature to pair up
         p = ft.setdefault("properties", {})
@@ -266,7 +267,7 @@ def _mark_twoway(geo, directed_col=None):
             by[k].append(ft)
         for ft, k in zip(geo["features"], keys, strict=False):
             p = ft["properties"]
-            if p["__rs_twoway"] and (und(ft) or all(und(t) for t in by[(k[1], k[0])] if t is not ft)):
+            if p["__rs_twoway"] and (und(ft) or all(und(t) for t in by[(k[1], k[0], k[2])] if t is not ft)):
                 p["__rs_twoway"] = False
                 if p.get("oneway") is None:      # no `oneway` column: a directed edge with an
                     p["__rs_oneway"] = not und(ft)   # undirected reverse is a one-way road
@@ -297,13 +298,13 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
             continue
         a = (round(c[0][0], 6), round(c[0][1], 6))
         z = (round(c[-1][0], 6), round(c[-1][1], 6))
-        by_ends[(a, z)] = i
+        by_ends[(a, z, p.get(class_col))] = i               # with the class: a footway on a street the other way round is not its twin
         lines.append((i, a, z, c, p))
     for i, a, z, c, p in lines:
         if p.get("__rs_twoway") and (z, a) < (a, z):
             continue
         reps.append((a, z, c, p))
-        owner[id(p)] = (i, by_ends.get((z, a)) if p.get("__rs_twoway") else None)
+        owner[id(p)] = (i, by_ends.get((z, a, p.get(class_col))) if p.get("__rs_twoway") else None)
 
     # class is part of the key: a cycleway running along "Götgatan" carries the street's name
     # too, and without the class it chained INTO the roadway's group — slots then labelled the
@@ -974,8 +975,8 @@ def _twin_ends(geo, cols):
         if (i in used or k is None or not p.get("__rs_twoway") or p.get("__rs_bridge")
                 or p.get("__rs_tunnel") or p.get("__rs_dash") or p.get("__rs_cap") or p.get("__rs_split")):
             continue
-        j = next((j for j in where.get((k[1], k[0]), []) if j != i and j not in used
-                  and geo["features"][j]["properties"].get("__rs_twoway")), None)
+        j = next((j for j in where.get((k[1], k[0]), []) if j != i and j not in used           # its twin: the other way round, the same class
+                  and geo["features"][j]["properties"].get("__rs_twoway") and geo["features"][j]["properties"].get(cols[0]) == p.get(cols[0])), None)
         if j is None:
             continue
         used.update((i, j))
@@ -1781,7 +1782,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             # legend=False opts out — matching the folium backend's `legend` arg.
             color_opts_meta = [{"name": rf.legend.get("title") or "data",
                                 "prop": "__rs_fill", "legend": rf.legend}]
-    _mark_twoway(geo, directed_col)
+    _mark_twoway(geo, directed_col, highway_col)
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
     _mark_caps(geo, cap_col, cap_start_col, cap_end_col)
     for ft in geo["features"] if (head_start_m_col or head_end_m_col) else ():          # this edge's head lengths (null: head_m)
