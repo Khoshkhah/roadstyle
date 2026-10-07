@@ -768,12 +768,12 @@ def _label_readable_filter():
 _SEAM_MINZOOM = 17      # the casing seams (Kaveh 2026-10-06): a primary's casing is 12 m wide on the ground at zoom 16, so a seam reaches past a head
 
 
-def _bridge_shadows(geo, highway_col, trim_m, max_turn=45.0):
-    """The bridge shadow (Kaveh 2026-10-06): the bridge edges joined into lines (two directions of an edge drawn once); where three or more
-    meet, the two that go on most straight (turning ``max_turn`` degrees at most) and have the same number are one line through the
-    junction, so fewer line ends meet there; each line at the main casing number of its own edges, which are joined only at one number (a low head at a far end put a long
-    bridge's shadow under what it crosses; one number for a whole connected bridge put a bridge's shadow under
-    the lower bridge it crosses), no shadow over the last ``trim_m`` metres where the bridge comes down to the road. Each line has its widest class. Drawn with round ends."""
+def _bridge_shadows(geo, parts, highway_col, trim_m, max_turn=45.0):
+    """The bridge shadow (Kaveh 2026-10-06), an extra casing: every part of a bridge (start head, main part, end head: ``parts``, the divided
+    casing; undivided, each edge) casts its shadow at its own casing number, so it is over what the part crosses and under what its head joins
+    (never on its own road at a joint); the parts at one number that touch are joined into one line, and where three or more meet the two
+    going on most straight (turning ``max_turn`` degrees at most) at one number go on through; no shadow over the last ``trim_m`` metres where
+    the bridge comes down to the road. Lines meet end to end (flat ends). Each line has its widest class."""
     import numpy as np
     import shapely
     from shapely.ops import linemerge, unary_union
@@ -786,11 +786,22 @@ def _bridge_shadows(geo, highway_col, trim_m, max_turn=45.0):
     tree = shapely.STRtree([line[i] for i in br])
     def at(p):                                                 # the bridge edges at a point
         return [br[k] for k in tree.query(p.buffer(1e-7)) if line[br[k]].distance(p) < 1e-7]
-    chains = []                                                # joined per main casing number: an edge's shadow is at its own main number
-    for lvl in sorted({feats[i]["properties"].get("__rs_cl", 0) for i in br}):
-        u = unary_union([line[i] for i in br if feats[i]["properties"].get("__rs_cl", 0) == lvl])   # also drops a two-way bridge's 2nd direction
+    # every part of a bridge casts its shadow at its own casing number, like its casing (Kaveh 2026-10-06: "there is no better option"): the
+    # casing pieces (start head, main part, end head; ``parts``, the divided casing) or, undivided, each edge at its number; the parts at
+    # one number that touch are joined into one line
+    bset = set(br)
+    if parts is not None:
+        pieces = [(f["properties"].get("__rs_cl", 0), shapely.LineString([c[:2] for c in f["geometry"]["coordinates"]])) for f in parts
+                  if f["properties"].get("__rs_road") in bset and not f["properties"].get("__rs_seam")]
+    else:
+        pieces = [(feats[i]["properties"].get("__rs_cl", 0), line[i]) for i in br]
+    chains, clvl = [], []
+    for lvl in sorted({lv for lv, _ in pieces}):
+        u = unary_union([g for lv, g in pieces if lv == lvl])  # also drops a two-way bridge's second direction
         merged = linemerge(u) if u.geom_type == "MultiLineString" else u
-        chains += [list(ch.coords) for ch in (merged.geoms if hasattr(merged, "geoms") else [merged])]
+        for ch in (merged.geoms if hasattr(merged, "geoms") else [merged]):
+            chains.append(list(ch.coords))
+            clvl.append(lvl)
     key = lambda xy: (round(xy[0], 7), round(xy[1], 7))                                    # noqa: E731
     kx0 = math.cos(math.radians(chains[0][0][1]))
     def heading(c, end):                                       # leaving the node along the chain
@@ -801,13 +812,6 @@ def _bridge_shadows(geo, highway_col, trim_m, max_turn=45.0):
         for end in (0, -1):
             node.setdefault(key(c[end]), []).append((k, end))
     near = {i: line[i].buffer(1e-7) for i in br}               # with a tolerance: the union nodes the lines and moves their points a hair
-    def low(p):                                                # the main casing number: a low head at a far end pulled a whole long bridge's
-        return p.get("__rs_cl", 0)                             # shadow under the road it crosses (Kaveh 2026-10-06)
-    clvl = []                                                  # each chain's own number: the main casing number of its edges
-    for c in chains:
-        ch = shapely.LineString(c)
-        mine = [i for i in br if ch.intersection(near[i]).length > 1e-6]
-        clvl.append(min((low(feats[i]["properties"]) for i in mine), default=None))
     link = {}                                                  # (chain, end) -> (chain, end) it goes on into through a junction
     for here in node.values():
         if len(here) < 3:
@@ -848,9 +852,9 @@ def _bridge_shadows(geo, highway_col, trim_m, max_turn=45.0):
             out_end = -1 if entry == 0 else 0
             nxt = link.get((ck, out_end))
             ck, entry = (nxt if nxt else (None, None))
-        lines.append(coords)
+        lines.append((coords, clvl[start]))
     out = []
-    for c in lines:
+    for c, lvl in lines:
         ch = shapely.LineString(c)
         member = [i for i in br if ch.intersection(near[i]).length > 1e-6]
         if not member:
@@ -858,23 +862,26 @@ def _bridge_shadows(geo, highway_col, trim_m, max_turn=45.0):
         def cut(xy):                                           # metres to leave out at this line end: the head where the bridge comes down
             p = shapely.Point(xy)
             here = at(p)
+            ends = [i for i in here if min(shapely.Point(line[i].coords[0]).distance(p), shapely.Point(line[i].coords[-1]).distance(p)) < 1e-7]
+            if len(ends) != len(here) or not here:            # inside an edge (a cut between its head and main part): no trim
+                return 0.0
             if len({frozenset([tuple(line[i].coords[0]), tuple(line[i].coords[-1])]) for i in here}) > 1:
                 return 0.0                                     # another bridge edge goes on from here
-            return trim_m if here else 0.0                     # a fixed few metres, not the head: a long head left a short bridge almost no shadow
+            return trim_m                                      # a fixed few metres, not the head: a long head left a short bridge almost no shadow
         lon0, lat0 = c[0]
         kx, ky = 111320.0 * math.cos(math.radians(lat0)), 111320.0
         xy = np.column_stack([np.asarray([(x - lon0) * kx for x, _ in c]), np.asarray([(y - lat0) * ky for _, y in c])])
         cum = _cum_lengths(xy)
         n = float(cum[-1])
-        lo, hi = cut(c[0]), n - cut(c[-1])
-        if hi - lo <= 0.5:
-            continue
-        pts = _part(xy, cum, lo, hi)
-        lvl = min(low(feats[i]["properties"]) for i in member)
-        cls = min((feats[i]["properties"].get(highway_col) for i in member), key=lambda v: order.index(v) if v in order else len(order))
-        out.append({"type": "Feature", "properties": {highway_col: cls, "__rs_cl": lvl, "__rs_fl": lvl},
-                    "geometry": {"type": "LineString", "coordinates": np.column_stack([np.round(pts[:, 0] / kx + lon0, 7),
-                                                                                      np.round(pts[:, 1] / ky + lat0, 7)]).tolist()}})
+        keep = [(cut(c[0]), n - cut(c[-1]))]                   # 3 m off where the bridge comes down to the road
+        for a, b in keep:
+            if b - a <= 0.5:
+                continue
+            pts = _part(xy, cum, a, b)
+            cls = min((feats[i]["properties"].get(highway_col) for i in member), key=lambda v: order.index(v) if v in order else len(order))
+            out.append({"type": "Feature", "properties": {highway_col: cls, "__rs_cl": lvl, "__rs_fl": lvl},
+                        "geometry": {"type": "LineString", "coordinates": np.column_stack([np.round(pts[:, 0] / kx + lon0, 7),
+                                                                                          np.round(pts[:, 1] / ky + lat0, 7)]).tolist()}})
     return out
 
 
@@ -2063,12 +2070,13 @@ def render(gdf, palette: str = "highsat", highway_col: str = "highway",
                     l = {**l, "filter": ["all", l["filter"], ["!", is_b]]}
                     at = len(layers)
                 layers.append(l)
-            shadows = _bridge_shadows(geo, highway_col, CONFIG.bridge_shadow_trim_m) if CONFIG.bridge_shadow else []
+            shadows = _bridge_shadows(geo, parts, highway_col, CONFIG.bridge_shadow_trim_m) if CONFIG.bridge_shadow else []
             if shadows:                    # the bridge shadow: lines through junctions, each at the lowest casing number of its edges
                 style["sources"]["shadows"] = {"type": "geojson", "data": {"type": "FeatureCollection", "features": shadows},
                                                "tolerance": style["sources"]["roads"].get("tolerance", 0.375)}
-                # round ends (Kaveh's pick): fewer ends meet now that the straightest two go on through a junction
-                twins.insert(0, {"id": "roads-casing-bridge-shadow", "type": "line", "source": "shadows", "layout": lay,
+                # flat ends: where two shadow lines meet (a casing number changes, a junction) they meet end to end, so the half-transparent
+                # shadow does not double into a dark disc (round ends overlapped)
+                twins.insert(0, {"id": "roads-casing-bridge-shadow", "type": "line", "source": "shadows", "layout": {**lay, "line-cap": "butt"},
                                  "filter": ["literal", True],
                                  "paint": {"line-color": CONFIG.bridge_shadow_color, "line-blur": CONFIG.bridge_shadow_blur,
                                            "line-width": _width_expr(highway_col, casing=True, scale=1.6, **sw),

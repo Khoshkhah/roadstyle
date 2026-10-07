@@ -2131,10 +2131,11 @@ def test_a_divided_casing_has_a_round_seam_at_each_cut():
     assert '["zoom"], 17' in json.dumps(lay["roads-casing"]["filter"]).replace(" ", "").replace(",", ", ")   # seams only from zoom 17: no bump on a flat end below
 
 
-def test_a_bridge_shadow_is_at_each_edges_main_casing_number(monkeypatch):
-    """Position mode (Kaveh 2026-10-06): a bridge's shadow at each edge's main casing number (a low head no longer pulls it under what the
-    bridge crosses), edges at one number joined into one line, none over the last 3 m where the bridge comes down; blurred and shifted
-    down-right (lit from the top left), just before the bridge's casing at that position; off with bridge_shadow."""
+def test_a_bridge_shadow_is_at_each_parts_casing_number(monkeypatch):
+    """Position mode (Kaveh 2026-10-06): the bridge shadow is an extra casing: each part of the bridge (start head, main part, end head) at its
+    own casing number, the parts at one number joined into one line, lines meeting end to end (flat ends); none over the last 3 m where the
+    bridge comes down; blurred and shifted down-right (lit from the top left), just before the bridge's casing at that position; off with
+    bridge_shadow."""
     import dataclasses
 
     from roadstyle import render_web
@@ -2147,12 +2148,13 @@ def test_a_bridge_shadow_is_at_each_edges_main_casing_number(monkeypatch):
     style = _style(render_edges(g, **kw).html)
     sh = style["sources"]["shadows"]["data"]["features"]
     span = lambda f: round((max(c[1] for c in f["geometry"]["coordinates"]) - min(c[1] for c in f["geometry"]["coordinates"])) / m)   # noqa: E731
-    assert sorted((f["properties"]["__rs_cl"], span(f)) for f in sh) == [(2, 17), (2, 17), (3, 20)]   # main numbers 2, 3, 2; 3 m off each end
+    assert sorted((f["properties"]["__rs_cl"], span(f)) for f in sh) == [(1, 2), (1, 2), (2, 20), (2, 20), (3, 10)]   # each part at its own number:
+    #   start heads 3-5 m (1), 5-25 m (2), the middle main part 25-35 m (3), 35-55 m (2), the end head 55-57 m (1); 3 m off each end
     lay = {l["id"]: l for l in style["layers"]}
     ids = [l["id"] for l in style["layers"]]
     s2 = lay["roads-casing-lv2-bridge-shadow"]
     assert s2["source"] == "shadows" and s2["paint"]["line-blur"] == 4.0 and s2["paint"]["line-translate"] == [2, 2]
-    assert s2["layout"]["line-cap"] == "round"
+    assert s2["layout"]["line-cap"] == "butt"                                                  # lines meet end to end: no darker disc
     assert ids.index("roads-casing-lv2-bridge-shadow") < ids.index("roads-casing-lv2-bridge") < ids.index("roads-fill-lv2")
 
     monkeypatch.setattr(render_web, "CONFIG", dataclasses.replace(render_web.CONFIG, bridge_shadow=False))
@@ -2171,8 +2173,8 @@ def test_a_branching_bridge_shadow_is_cut_only_at_the_bridge_ends():
     geo = rw.fc_dict(g)
     rw._mark_lvl(geo, "tunnel", "bridge", "layer")
     for ft in geo["features"]:
-        ft["properties"]["__rs_cl"] = 1
-    sh = rw._bridge_shadows(geo, "highway", 5.0)
+        ft["properties"]["__rs_cl"] = ft["properties"]["__rs_fl"] = 1
+    sh = rw._bridge_shadows(geo, None, "highway", 5.0)
     pts = {tuple(round(v, 7) for v in c) for s in sh for c in s["geometry"]["coordinates"]}
     assert tuple(round(v, 7) for v in P(0, 50)) in pts                                    # the branch point is reached: no gap there
     assert tuple(round(v, 7) for v in P(0, 0)) not in pts and tuple(round(v, 7) for v in P(0, 100)) not in pts   # the real ends are cut
@@ -2181,9 +2183,9 @@ def test_a_branching_bridge_shadow_is_cut_only_at_the_bridge_ends():
     geo = rw.fc_dict(h)
     rw._mark_lvl(geo, "tunnel", "bridge", "layer")
     for ft in geo["features"]:
-        ft["properties"]["__rs_cl"] = 1
+        ft["properties"]["__rs_cl"] = ft["properties"]["__rs_fl"] = 1
     import shapely
-    sh = shapely.unary_union([shapely.LineString(s["geometry"]["coordinates"]) for s in rw._bridge_shadows(geo, "highway", 5.0)])
+    sh = shapely.unary_union([shapely.LineString(s["geometry"]["coordinates"]) for s in rw._bridge_shadows(geo, None, "highway", 5.0)])
     assert sh.intersection(shapely.LineString([P(0, 0), P(0, 100)]).buffer(1e-9)).length / (100 * m) > 0.89   # all but the two 5 m ends
 
 
@@ -2199,8 +2201,8 @@ def test_bridge_shadow_goes_straight_through_a_junction_and_each_line_keeps_its_
     geo = rw.fc_dict(g)
     rw._mark_lvl(geo, "tunnel", "bridge", "layer")
     for ft, n in zip(geo["features"], (1, 1, 3), strict=True):
-        ft["properties"].update({"__rs_cs": n, "__rs_cl": n, "__rs_ce": n})
-    sh = rw._bridge_shadows(geo, "highway", 5.0)
+        ft["properties"].update({"__rs_cs": n, "__rs_cl": n, "__rs_ce": n, "__rs_fl": n})
+    sh = rw._bridge_shadows(geo, None, "highway", 5.0)
     by = sorted((f["properties"]["__rs_cl"], len(f["geometry"]["coordinates"])) for f in sh)
     assert [lv for lv, _ in by] == [1, 3]                                                 # two lines: the straight one through the junction, the branch
     straight = next(f for f in sh if f["properties"]["__rs_cl"] == 1)
@@ -2220,3 +2222,17 @@ def test_street_names_fit_their_road_and_tiny_ones_are_left_out():
     first = dict(zip(*[iter(rw._label_readable_filter()[2][2:-1])] * 2, strict=True))
     assert first["residential"] == 18 and first["service"] > 18 and first["primary"] <= 16
     assert json.dumps(rw._label_readable_filter()) in json.dumps(lab["filter"])
+
+
+def test_a_bridge_shadow_is_not_on_its_own_road_at_a_joint():
+    """Kaveh 2026-10-06 ("shadow on its own road"): at a joint with a lower piece of the bridge, the shadow of the higher piece's head is at the
+    head's number, at or under the lower piece's fill; the main part, over what it crosses, keeps its own higher number."""
+    m = 1 / 111320.0
+    P = lambda x, y: (18.0 + x * m * 2, 59.3 + y * m)                                    # noqa: E731  about metres at 60 N
+    g = gpd.GeoDataFrame({"highway": ["primary"] * 2, "bridge": ["yes"] * 2, "cs": [2, 1], "cl": [2, 1], "ce": [1, 1], "fl": [2, 1]},
+                         geometry=[LineString([P(0, 0), P(0, 50)]), LineString([P(0, 50), P(0, 100)])], crs=4326)   # A (high), then B (low)
+    style = _style(render_edges(g, backend="web", casing_start_col="cs", casing_level_col="cl", casing_end_col="ce", fill_level_col="fl").html)
+    sh = style["sources"]["shadows"]["data"]["features"]
+    ys = lambda f: sorted(round((c[1] - 59.3) / m) for c in f["geometry"]["coordinates"])               # noqa: E731
+    by = sorted((f["properties"]["__rs_cl"], ys(f)[0], ys(f)[-1]) for f in sh)
+    assert by == [(1, 45, 97), (2, 3, 45)]                                                    # A's end head joins B's shadow at 1, under B's fill
