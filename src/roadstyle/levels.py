@@ -427,6 +427,18 @@ def _read_pairs(pairs):
     return out
 
 
+def dead_end_cap(roads, pairs):
+    """The automatic cap of an end that meets no other road (no ``meet`` row at it), as ``{(road index, "start" / "end"): cap}``: ``"square"`` on
+    a two-way road (one casing around both directions: two half-width round fill ends left a notch at the tip), ``"round"`` on a one-way one."""
+    idx = {r: i for i, r in enumerate(roads["road"])}
+    met = set()
+    for row in _read_pairs(pairs):
+        if row["relation"] == "meet" and row["a"] in idx and row["b"] in idx:
+            met |= {(idx[row["a"]], row["a_end"]), (idx[row["b"]], row["b_end"])}
+    two = [len(e) > 0 and len(b) > 0 for e, b in zip(roads["edges"], roads["reversed"], strict=True)]
+    return {(i, end): "square" if two[i] else "round" for i in range(len(idx)) for end in ("start", "end") if (i, end) not in met}
+
+
 def auto_ends(roads, pairs, zoom=18.0, highway_col="highway", min_m=0.5, step=0.25, cover=0.99, levels=None):
     """Each road end's head length and cap from the geometry and the widths the page draws at ``zoom`` (2026-10-06: better than one
     number and one cap for all). Returns a table ``road``, ``start_m``, ``end_m``, ``cap_start``, ``cap_end`` (in the road's own way):
@@ -434,6 +446,7 @@ def auto_ends(roads, pairs, zoom=18.0, highway_col="highway", min_m=0.5, step=0.
     * a head reaches as far as the road's drawing still overlaps a road joined at that end: from the node along the road until its line is
       ``(own width + the other's) / 2`` from every joined road (a right angle: about half the other's width; a narrow merge: much more); a
       dead end has ``min_m``; start + end never more than the road (cut in their ratio);
+    * a dead end's cap is :func:`dead_end_cap`'s (square on a two-way road);
     * a cap is ``"round"`` where the round end of its fill lies inside the fills of the roads joined there that are drawn at its level or
       above (at least ``cover`` of its half disc), else ``"flat"``: a round end on top of a lower road shows as a bump on it (a road going
       on into a lower piece, 2026-10-06), and one reaching out of the joined roads crosses their outlines (a wide road ending on a
@@ -468,13 +481,14 @@ def auto_ends(roads, pairs, zoom=18.0, highway_col="highway", min_m=0.5, step=0.
             a, b = idx[row["a"]], idx[row["b"]]
             joins.setdefault((a, row["a_end"]), set()).add(b)
             joins.setdefault((b, row["b_end"]), set()).add(a)
+    dead = dead_end_cap(roads, pairs)
     rows = []
     for i, g in enumerate(geo):
         n, out = g.length, []
         for end in ("start", "end"):
             J = sorted(joins.get((i, end), ()))
             if not J or n == 0:
-                out.append((min_m, "round"))
+                out.append((min_m, dead.get((i, end), "round")))
                 continue
             line = g if end == "start" else shapely.LineString(list(g.coords)[::-1])
             d = 0.0

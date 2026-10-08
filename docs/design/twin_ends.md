@@ -22,7 +22,8 @@ first edge of the pair (`_mark_twin_casing`: the two edges must be the same line
 line-offset), as wide as the two directions together (a direction's casing width + twice its offset, `_pair_width`: the outer edge of the two
 lanes, the same as this cap's radius). The second edge has no casing piece; both fills stay as they were. The casing's ends are its own caps
 (round, flat, square from the first edge's caps and heads; its start is the second edge's end), so the blob below is not drawn; a small notch
-between two round fill ends at a dead end is accepted. The twins' casing numbers, heads and caps must agree reversed (the level area writes
+between two round fill ends at a dead end is avoided by the level area's automatic ends: a two-way road's dead end (an end with no `meet`
+row) is `square` (`levels.dead_end_cap`), so each direction keeps its colour and the tip is one full-width end; your caps win. The twins' casing numbers, heads and caps must agree reversed (the level area writes
 them so); a pair that does not is named in a warning, and the first edge's are drawn.
 
 ## Problem

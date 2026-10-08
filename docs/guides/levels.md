@@ -72,7 +72,7 @@ pick a second one to see every pair between the two.
 - **A guard before you add**: the page asks whether the new rule conflicts with the rules there are (found, yours, and the list) and names
   them: the same rule already there, or a loop (A over B, B's fill after C's, C over A: no numbers keep them all, so the solver would give
   one up). You can still add it.
-- **Each end of a road**: its cap (*round*, *square*, *flat*) and its head length (a slider, in metres). The map shows each end's cap.
+- **Each end of a road**: its cap (*round*, *square*, *flat*) and its head length (a slider, in metres). The map shows each end's cap. The automatic cap is round, except a two-way road's dead end (an end that meets no other road): square, so the one casing around both directions ends in one clean full-width end.
 - Changes wait in a list until **Apply and solve**: they are solved together, and the open map redraws the roads that changed in place (more than 1,500 changed roads: the page reloads, and says so).
   If the solver refuses them, nothing is saved.
   A change of caps or heads is saved and drawn without a solve: they are drawing only. Which parts of a stack cross is decided when the

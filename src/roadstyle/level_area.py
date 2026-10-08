@@ -129,10 +129,14 @@ def ends(auto, heads, caps):
     return t.reset_index()
 
 
-def defaults(roads, pairs=None, head_m=5.0):
-    """Every road end as drawn unless you set it: ``head_m`` long heads and round caps (2026-10-06: automatic heads, made for one zoom,
+def defaults(roads, pairs, head_m=5.0):
+    """Every road end as drawn unless you set it: ``head_m`` long heads and round caps, square at a two-way road's dead end (2026-10-06: automatic heads, made for one zoom,
     were too short at the others; flat caps where two roads meet left small breaks at every joint that was not perfectly straight)."""
-    return pd.DataFrame({"road": list(roads["road"]), "start_m": head_m, "end_m": head_m, "cap_start": "round", "cap_end": "round"})
+    from .levels import dead_end_cap
+    dead = dead_end_cap(roads, pairs)      # a two-way road's dead end is square, see dead_end_cap
+    n = len(roads)
+    return pd.DataFrame({"road": list(roads["road"]), "start_m": head_m, "end_m": head_m,
+                         "cap_start": [dead.get((i, "start"), "round") for i in range(n)], "cap_end": [dead.get((i, "end"), "round") for i in range(n)]})
 
 
 def solve(roads, pairs, edits, heads, caps, auto=False, **kw):

@@ -2751,6 +2751,36 @@ def test_auto_ends_fit_heads_and_caps_to_the_joins():
     assert e.loc["1", "cap_start"] == "round" and e.loc["4", "cap_start"] == "round"  # a dead end, the street going on round a bend: round
 
 
+def test_two_way_dead_end_is_square_by_default():
+    """A two-way road's end that meets no road is square (one casing around both directions: two half round ends left a notch); a one-way
+    road's dead end is round, a two-way end that meets a road keeps the rule, and your own cap (caps.csv) wins."""
+    import pandas as pd
+
+    import roadstyle as rs
+    from roadstyle.level_area import defaults, ends
+    P = lambda x, y: (674000 + x, 6580000 + y)                                         # noqa: E731
+    line = lambda *p: LineString([P(*q) for q in p])                                   # noqa: E731
+    g = gpd.GeoDataFrame({"highway": ["residential"] * 5, "edge_id": [1, 2, 3, 4, 5]},
+                         geometry=[line((0, 0), (60, 0)), line((60, 0), (0, 0)),       # a two-way street: dead end at x=0, meets road 3 at x=60
+                                   line((60, 0), (120, 0)),                            # one-way, going on: its far end is a dead end
+                                   line((0, 50), (60, 50)), line((60, 50), (0, 50))], crs=3006)   # a two-way street meeting nothing
+    roads, pairs = rs.level_input(g)
+    d = defaults(roads, pairs).set_index("road")
+    two = roads.set_index("road")
+    two_way = [r for r in two.index if len(two.loc[r, "reversed"])]
+    one_way = [r for r in two.index if not len(two.loc[r, "reversed"])]
+    assert len(two_way) == 2 and len(one_way) == 1
+    met = {r for r in two_way if (pairs[["a", "b"]] == r).any(axis=None)}
+    assert len(met) == 1
+    for r in two_way:
+        a, b = d.loc[r, "cap_start"], d.loc[r, "cap_end"]
+        assert sorted([a, b]) == (["round", "square"] if r in met else ["square", "square"])    # the end that meets road 3 keeps round
+    assert d.loc[one_way[0], ["cap_start", "cap_end"]].tolist() == ["round", "round"]
+    assert (rs.auto_ends(roads, pairs).set_index("road").loc[two_way, ["cap_start", "cap_end"]] == d.loc[two_way, ["cap_start", "cap_end"]]).all(axis=None)
+    r = [x for x in two_way if x not in met][0]
+    assert ends(d.reset_index(), {}, {r: ("round", "")}).set_index("road").loc[r, ["cap_start", "cap_end"]].tolist() == ["round", "square"]
+
+
 def test_heads_over_the_whole_road_leave_no_main_part():
     """casing_parts: heads that cover the road (to within 5 cm, as the editor's "no main part" sets them) leave no main part."""
     import pandas as pd
