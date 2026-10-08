@@ -533,7 +533,9 @@ window.rsSetTunnels = rsSetTunnels;
 // every verb takes an optional `layer` argument: omitted -> the roads; an overlay's label (or
 // index) -> that overlay's features. Overlay sources use generateId too, so the same id-set
 // model applies — but each layer is its OWN id space: never mix ids across layers.
-function _sfeats(src){ const s=map.getSource(src); return (s && s._data && s._data.features)||[]; }
+// MapLibre 5 keeps a GeoJSON source's data in `_data.geojson` (4.x: `_data` itself); there is no sync public getter
+function _sdata(s){ return s && s._data && s._data.geojson; }
+function _sfeats(src){ const g=_sdata(map.getSource(src)); return (g && g.features)||[]; }
 function _feats(){ return _sfeats("roads"); }
 // tiles mode plumbing: _side() -> the sidecar table (null while it inflates / in inline mode);
 // _rprops(id) -> a road's full properties from either world; _fs() -> setFeatureState that adds
@@ -584,7 +586,7 @@ function rsGetProps(ids, layer){ // the rows behind an id set (internals strippe
 // of its whole chain (via the baked __rs_edges), so selection/highlight glows on the deck
 // instead of the flat ground-level line
 function _deckIdsForRoad(i){
-  const s=map.getSource("decks"), fs=(s && s._data && s._data.features)||[];
+  const fs=_sfeats("decks");
   const out=[];
   fs.forEach((f,k)=>{ const e=f.properties && f.properties.__rs_edges;
     if(e && e.indexOf(i)>=0) out.push(k); });
@@ -1149,8 +1151,8 @@ map.on("load", function(){ var tries=0; (function check(){ setTimeout(function()
   try{
     var n;
     if(RS_TILED){ n = map.querySourceFeatures("roads",{sourceLayer:"roads"}).length; }
-    else{ var src = map.getSource("roads");
-      n = (src && src._data && src._data.features) ? src._data.features.length : 0; }
+    else{
+      n = _sfeats("roads").length; }
     if(n) return;
     if(RS_TILED && ++tries < 3) return check();          // tiles may still be decoding/loading
     var st = RS_TILED
