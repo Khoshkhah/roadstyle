@@ -684,6 +684,9 @@ def _part(xy, cum, a, b):
     return np.vstack([_at(xy, cum, a), xy[np.searchsorted(cum, a, side="right"):np.searchsorted(cum, b, side="left")], _at(xy, cum, b)])
 
 
+_SEAM_M = 0.5        # a seam reaches this far each way from its cut, at most a quarter of either piece (see _casing_parts)
+
+
 def _casing_parts(geo, head_m, cols):
     """The casing of every edge as pieces, for its own source (docs/design/levels_split_casing.md): an edge whose
     three casing numbers (``__rs_cs`` start head, ``__rs_cl`` main, ``__rs_ce`` end head) are not all equal is cut into the first ``head_m`` metres,
@@ -725,11 +728,15 @@ def _casing_parts(geo, head_m, cols):
                 q.pop("__rs_cap", None)
             out.append({"type": "Feature", "properties": q, "geometry": {"type": "LineString", "coordinates": coords}})
         # a seam at each cut inside the edge: a round dot of casing at the lower of the two pieces' numbers. Two pieces ending flat at a cut
-        # on a curve left a wedge open in the outline (2026-10-06: "not smooth in the middle"); the piece drawn above covers the rest
+        # on a curve left a wedge open in the outline (2026-10-06: "not smooth in the middle"); the piece drawn above covers the rest.
+        # Up to 0.5 m each way (a quarter of the shorter side at most): a 2 cm seam fell on one or two steps of the map's tile grid
+        # (about 1.3 cm), lost its direction and was drawn as a square block sticking out of the outline at zoom 21 (2026-10-08)
         cut_at = sorted({h0, n - h1} - {0.0, n})
         for c in cut_at:
-            sides = [num for a, b, num in cuts if b - a > 1e-9 and (abs(b - c) < 1e-9 or abs(a - c) < 1e-9)]
-            pts = _part(xy, cum, max(0.0, c - 0.01), min(n, c + 0.01))
+            near = [(a, b, num) for a, b, num in cuts if b - a > 1e-9 and (abs(b - c) < 1e-9 or abs(a - c) < 1e-9)]
+            sides = [num for a, b, num in near]
+            half = min([_SEAM_M] + [(b - a) / 4 for a, b, num in near])
+            pts = _part(xy, cum, max(0.0, c - half), min(n, c + half))
             if len(sides) < 2 or len(pts) < 2:
                 continue
             coords = np.column_stack([np.round(pts[:, 0] / kx + lon0, 8), np.round(pts[:, 1] / ky + lat0, 8)]).tolist()

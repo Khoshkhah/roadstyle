@@ -3196,3 +3196,16 @@ def test_rule_conflicts_finds_duplicates_and_loops():
     assert said([order("11", "13")]) == [("loop", [("stack", "13", "12"), ("order", "12", "11")])]   # 13 < 11 < 12 < 13
     assert said([order("14", "11")]) == [] and said([stack("13", "12", "start")]) == []
     assert said([order("14", "11"), order("11", "14")]) == [("loop", [("order", "14", "11")])]       # the rows before count too
+
+
+def test_a_seam_is_long_enough_to_keep_its_direction():
+    """A seam reaches 0.5 m each way from its cut (a quarter of the shorter piece at most): a 2 cm seam fell on one or two steps of the
+    map's tile grid above zoom 18 and was drawn as a square block out of the outline (2026-10-08)."""
+    kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0)
+    feats = _style(render_edges(_simple_world(), **kw).html)["sources"]["simple"]["data"]["features"]
+    seams = [f["geometry"]["coordinates"] for f in feats if f["properties"].get("__rs_seam")]
+    assert seams
+    for c in seams:
+        (x0, y0), (x1, y1) = c[0][:2], c[-1][:2]
+        metres = math.hypot((x1 - x0) * 111320 * math.cos(math.radians(y0)), (y1 - y0) * 111320)
+        assert 0.9 < metres <= 1.0 + 1e-6
