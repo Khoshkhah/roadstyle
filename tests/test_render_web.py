@@ -2268,7 +2268,8 @@ def test_overlay_styles_work_for_overlays_attached_to_edges():
     ids = [lyr["id"] for lyr in st["layers"]]
     assert any(i.startswith("ov0-line-lv") and "-o1" in i for i in ids) and any(i.startswith("ov1-text-lv") and "-o3" in i for i in ids)
     one = next(lyr for lyr in st["layers"] if lyr["id"].startswith("ov0-line-lv"))
-    assert one["paint"]["line-dasharray"] == [3.0, 3.0] and one["filter"][0] == "all"
+    assert one["filter"][0] == "all"      # simple mode: the line items are drawn in the road layer, their dash a text on the pieces
+    assert {f["properties"].get("__rs_dash") for f in st["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_k"] == 5} == {"3,3"}
 
 
 def test_a_theme_can_be_a_file_and_an_unreadable_settings_file_is_an_error(tmp_path):
@@ -3704,7 +3705,7 @@ def test_the_level_editor_draws_and_puts_arrows_like_render_edges(tmp_path):
     assert ed[0] == pg[0] and set(ed[1]) == set(pg[1]) == {"E_f", "W_f"}
 
 
-def _crossing_with_lanes(n=3, **kw):
+def _crossing_with_lanes(n=3, dash=False, **kw):
     """A road (edge 1) under a bridge (edge 2), each with ``n`` lane items (lines, metres), and the render's style."""
     from shapely.geometry import LineString
     from roadstyle import Overlay
@@ -3715,7 +3716,9 @@ def _crossing_with_lanes(n=3, **kw):
         return render_edges(roads, backend="web", **kw)
     lanes = gpd.GeoDataFrame([{"edge_id": e, "order": k, "w": 3.25, "off": k * 3.0, "c": "#00ff00", "geometry": g}
                               for e, g in ((1, a), (2, b)) for k in range(n)], crs=4326)
-    ov = Overlay(lanes, edge_col="edge_id", order_col="order", color_col="c", width_m_col="w", offset_m_col="off")
+    if dash:
+        lanes["d"] = [[2, 4] if k == 0 else None for k in lanes["order"]]
+    ov = Overlay(lanes, edge_col="edge_id", order_col="order", color_col="c", width_m_col="w", offset_m_col="off", dash_col="d" if dash else None)
     return render_edges(roads, backend="web", overlays=[ov], **kw)
 
 
@@ -3737,6 +3740,7 @@ def test_line_items_are_pieces_of_the_one_road_layer_at_their_edge_fill():
     assert lyr["paint"]["line-opacity"][6] == ["case", ["==", ["get", "__rs_k"], 1], 0, 1]       # the fills hidden, the items (__rs_k 5) drawn
     w = json.dumps(lyr["paint"]["line-width"])
     assert '["*", ["coalesce", ["get", "__rs_iwm"], 0], ' + str(round(512 * 2 ** 18 / 40075016.686, 6)) + "]" in w   # metres -> px at zoom 18
+    assert lyr["paint"]["line-width"][:3] == ["interpolate", ["exponential", 2], ["zoom"]] and lyr["paint"]["line-width"][-2] == 22   # exact at every zoom
     assert "__rs_iom" in json.dumps(lyr["paint"]["line-offset"]) and "__rs_ic" in json.dumps(lyr["paint"]["line-color"])
     hits = [l for l in st["layers"] if l.get("source") == "ov0"]      # the item's own layers: the pick and the highlight only
     assert hits and all(l["paint"]["line-opacity"][0] == "case" for l in hits)
@@ -3751,6 +3755,9 @@ def test_line_items_full_look_and_tiles(monkeypatch):
     seen = {}
     real = tiles.build_pmtiles
     monkeypatch.setattr(tiles, "build_pmtiles", lambda *a, **k: seen.update(k) or real(*a, **k))
+    st = _style(_crossing_with_lanes(dash=True).html)      # a dash per item: the road layer's text pattern
+    assert {f["properties"].get("__rs_dash") for f in st["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_k"] == 5} == {"2,4", None}
+    assert '"2,4"' in json.dumps(next(l for l in st["layers"] if l["id"] == "roads-simple")["paint"]["line-dasharray"])
     _crossing_with_lanes(tiles=True)
     simple = next(x for x in seen["line_layers"] if x["name"] == "simple")
     assert sum(f["properties"]["__rs_k"] == 5 for f in simple["fc"]["features"]) == 6

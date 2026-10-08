@@ -1900,10 +1900,14 @@ def _item_pieces(ov, i, fc):
         cs = g.get("coordinates") or []
         pts = [c for part in cs for c in part] if g.get("type") == "MultiLineString" else cs
         sec = 1 / max(math.cos(math.radians(sum(c[1] for c in pts) / len(pts))), 0.01)
+        d = p.get(ov.dash_col) if ov.dash_col else None
+        d = ov.dash if d is None or (not isinstance(d, (list, tuple)) and missing(d)) else d
+        p.update(__rs_iwm=round(float(w) * sec, 4), __rs_iom=0 if o is None or missing(o) else round(float(o) * sec, 4))   # the item's own layer reads them too
         q = {k: v for k, v in p.items() if k.startswith("__rs_")}
-        q.update(lvl=p.get("__rs_lvl", 0), __rs_k=5, __rs_ov=i, __rs_item=j, __rs_iwm=round(float(w) * sec, 4),
-                 __rs_iom=0 if o is None or missing(o) else round(float(o) * sec, 4),
+        q.update(lvl=p.get("__rs_lvl", 0), __rs_k=5, __rs_ov=i, __rs_item=j,
                  __rs_ic=(p.get(ov.color_col) if ov.color_col else None) or ov.color or C["color"])
+        if d:     # the road layer's dash pattern is a text ("3,3": a property cannot hold an array), as a dashed class's __rs_dash
+            q["__rs_dash"] = ",".join(f"{float(x):g}" for x in (d.split(",") if isinstance(d, str) else d))
         out.append({"type": "Feature", "geometry": g, "properties": q})
     return out
 
@@ -1936,9 +1940,13 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
                 mine = []
                 for lyr in _overlay_layers(sid, ov, kind, hover_color, select_color, along):
                     lyr = {**lyr, "id": f"{lyr['id']}-lv{pos}-o{order}", "filter": flt}
-                    if fill and kind == "line":     # drawn by the road layer: this one only shows the hover / select highlight
+                    if fill and kind == "line":     # drawn by the road layer: this one is the pick and shows the hover / select highlight
                         on = ["any", ["boolean", ["feature-state", "select"], False], ["boolean", ["feature-state", "hover"], False]]
-                        lyr["paint"] = {**lyr["paint"], "line-opacity": ["case", on, 1, 0]}
+                        m = lambda prop: ["interpolate", ["exponential", 2], ["zoom"], *[x for z in (0, 22) for x in
+                                          (z, ["*", ["get", prop], round(512 * 2 ** z / 40075016.686, 6)])]]   # the item's own metres, exact
+                        lyr["layout"] = {**lyr["layout"], "line-cap": "butt"}
+                        lyr["paint"] = {**{k: v for k, v in lyr["paint"].items() if k != "line-dasharray"}, "line-opacity": ["case", on, 1, 0],
+                                        "line-width": m("__rs_iwm"), "line-offset": m("__rs_iom")}
                     base_filters[lyr["id"]] = flt
                     mine.append(lyr)
                 edge.append((pos, order, i, mine))
@@ -2102,6 +2110,15 @@ def _by_feature(cases, default):
     for i, z in enumerate(default[3::2]):
         out += [z, ["case", *[x for cond, c in cases for x in (cond, c[4 + 2 * i])], default[4 + 2 * i]]]
     return out
+
+
+def _exp2(curve, top=22):
+    """A zoom curve as a base-2 exponential one with a stop at ``top`` (its last value, as it was frozen past its last stop), so a metre curve
+    (:func:`_metre_curve`) on its stops is exact at every zoom (2026-10-09: on the linear class curves, items' widths and offsets were linear
+    between stops and stopped growing past zoom 20, so the lanes overlapped zoomed in). The class curves between their whole-zoom stops move
+    a few per cent at most."""
+    out = ["interpolate", ["exponential", 2], ["zoom"], *curve[3:]]
+    return out + [top, curve[-1]] if curve[-2] < top else out
 
 
 def _metre_curve(like, prop):
@@ -2790,7 +2807,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         for k in ("casings", "halves", "shadows", "ends"):
             style["sources"].pop(k, None)
         is_c, is_it = ["==", ["get", "__rs_k"], 0], ["==", ["get", "__rs_k"], 5]
-        soff = _by_feature([(is_it, _metre_curve(off, "__rs_iom"))], off) if items else off   # an item: its own metres, not a direction's shift
+        if items:     # items in metres: every curve of the layer base-2 exponential, so theirs is exact at every zoom (_exp2)
+            cw, fw, bcw = _exp2(cw), _exp2(fw), _exp2(bcw)
+        soff = _by_feature([(is_it, _metre_curve(_exp2(off), "__rs_iom"))], _exp2(off)) if items else off   # an item: its own metres, not a direction's shift
         flt = [f for f in ((_minzoom_filter(highway_col, mz) if mz else None),
                            _seam_filter(),     # the full look's rule: a seam only from zoom 17 (below it a bridge's seams are dark dots at every head)
                            (["any", ["<", ["zoom"], dk["flat_below"]], ["!", is_b]] if decks["features"] else None)) if f]
@@ -2803,9 +2822,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         bwide = _plus_px(bcw, lambda z: 2 * float(CONFIG.bridge_casing_extra) * ramp(z))
         wide = [(is_sh, _plus_px(bcw, lambda z: 2 * (float(CONFIG.bridge_casing_extra) + blur) * ramp(z))), (["all", is_c, is_b], bwide),
                 *([(["any", ["==", ["get", "__rs_k"], 3], ["==", ["get", "__rs_k"], 4]], _plus_px(cw, 3))] if any_tunnel else []), (is_c, cw),
-                *([(is_it, _metre_curve(fw, "__rs_iwm"))] if items else [])]
+                *([(is_it, _plus_px(_metre_curve(fw, "__rs_iwm"), 1))] if items else [])]   # 1 px over: two lanes side by side show no antialiased seam
         op = [1] if road_fill else [["==", ["get", "__rs_k"], 1], 0, 1]
-        sdashes = sorted({(f.get("properties") or {}).get("__rs_dash") for f in geo["features"]} - {None, ""})
+        sdashes = sorted({(f.get("properties") or {}).get("__rs_dash") for f in geo["features"] + items} - {None, ""})
         sdash = {"line-dasharray": _simple_dasharray(sdashes, CONFIG.tunnel_casing_dash or [1, 1])} if sdashes or any_tunnel else {}
         road = {"id": "roads-simple", "type": "line", "source": "simple", "layout": {**lay, "line-cap": _simple_cap(), "line-sort-key": ["get", "__rs_s"]}, **flt,
                 "paint": {**sdash, "line-color": _simple_color(CONFIG.bridge_casing_color, bool(any_tunnel)),

@@ -73,6 +73,7 @@ class Overlay:
     select: str = "road"               # with edge_col: a click picks its "road" or the "item" itself (docs/design/edge_items.md)
     width_m_col: str | None = None     # with edge_col, lines, simple mode: the property with each item's width in metres (else ``width_m``)
     offset_m_col: str | None = None    # with edge_col, lines, simple mode: the property with each item's line-offset in metres (right of the line's direction; null = 0)
+    dash_col: str | None = None        # with edge_col, lines, simple mode: the property with each item's dash pattern in line widths ([3, 3] or "3,3"; null = ``dash``, else solid)
 
     def __post_init__(self):
         if self.select not in ("road", "item"):
