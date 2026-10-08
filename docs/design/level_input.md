@@ -35,10 +35,11 @@ whatever its length; the drawing gives them their metres (`head_m`, or a road's 
 `head_end_m_col`), and a road shorter than its two heads has a main part of no length. The solver takes no metres, only which roads
 have an empty main part (`rs.empty_mains(roads, head_m, heads)` -> `solve_levels(empty_main=...)`): a stack never lifts an empty main
 part, since a rule on a part nobody sees would cost real ones (without it Monaco gave up 23 pairs, 7 of them for invisible parts).
+(2026-10-08: decided at make, with the stack rows; the solver takes no list of them, below.)
 
 A stack rule is **real** when that part of A crosses B (they meet at a point that is not an end of either road), and **near** when
 it only comes near (the pair was found by `band_dist`, or this part is away from the crossing): `rs.casing_parts(roads, head_m, heads)`
-gives the parts as drawn, and `solve_levels(parts=...)` tells them apart, with no length in the solver itself. The solver keeps, in
+gives the parts as drawn, and (since 2026-10-08) `level_input` tells them apart once, at make, into `stack` / `near` rows. The solver keeps, in
 this order: the real crossings, the order wishes, the near rules, then the cost and fewest positions (2026-10-06: a near rule has
 the lowest weight; it must never cost a real crossing). A stack you add (`edits.csv`) is always real, even where the two roads only come near: you asked for it (2026-10-06). The order
 wishes the solver let go are named (`attrs["levels_orders_not_kept"]`, levels_info.json `orders_not_kept`) and listed in the editor's
@@ -47,12 +48,35 @@ rule that broke is a **warning** (`attrs["levels_near"]`), shown apart in the ed
 wishes not kept (was 47), 15 positions (was 10); with the near rules above the order wishes instead it would be 0 / 22 / 47 / 10.
 Before, every rule counted as a crossing: 22 given up, 20 of them near-only and the 2 others a head 7 and 18 m from the crossing.
 
-**Near rules are off by default since 2026-10-08** (`near_rules=False` in `solve_levels`, `compute_levels`, `level_area.solve*`; `--near-rules`
-on the CLI turns them on). A near part is then not lifted at all, exactly as if it were in `off`; stage 3 has nothing and is skipped, and
+**Near rules are off by default since 2026-10-08** (`near_rules=False`; since 2026-10-08 in `level_input` / `compute_levels`, `make --near-rules`
+on the CLI turns them on). A near part is then not lifted at all (no row); stage 3 has nothing and is skipped, and
 `attrs["levels_near"]` is empty. Why: on Monaco all modes (6,825 roads) the near rules cost 45.9 s, 27 positions and 11,911 near rules,
 1,477 of them broken anyway; without them 14.4 s, 9 positions, 0 given up. Both maps had small spots to fix by hand, so the simpler and
-faster one won. A road's stretch beside another that you want over it is an `edits.csv` stack (always real). The editor's head-change check
-is unchanged: which parts cross, and so which are lifted, still depends on the heads.
+faster one won. A road's stretch beside another that you want over it is an `edits.csv` stack (always real).
+
+**The solver works from the tables only** (2026-10-08). Which parts of A cross B is decided once, when the area is made
+(`roadstyle-levels make`, `duckosm levels`, `rs.level_input`, and inside `compute_levels`), with the heads of that time (the folder's
+`heads.csv` if there is one, else `head_m`, 5 m), by the rules above: a part that crosses B, not a head at a junction with B, not an empty
+main part. Each is **one stack row** in `pairs.csv`, `a_end` = `start` / `main` / `end`; a crossing over a head and the main part is two
+rows. There is no whole-road stack row any more. The solver lifts exactly the named parts of the enabled rows: no geometry, no head
+lengths, so a head changed later never needs a solve (the editor saves and draws it). An empty main part is decided at make too: it gets no
+row (it crosses nothing), so the solver needs no list of them; a later head change that empties a main part leaves its row, which is
+harmless (a lifted part of no length is never drawn). With `near_rules=True` (make: `--near-rules`) the parts that only come near are
+written as `near` rows, which the solver keeps last. Monaco all modes: 4,918 whole-road rows became 487 part rows (main 319, start 89, end
+79) on 479 pairs; the other pairs had no crossing part and lifted nothing before either. Solved again: 14.8 s, 9 positions, 0 given up,
+22 wishes not kept, as before.
+
+**Rows union.** Several stack rows of one pair lift each named part; an edit row adds a part; an edit with `enabled=false` switches off
+exactly that row (pair and part). Nothing overrides anything else. To override a found stack, switch off all its rows (the editor has one
+action for it) and add your own parts. A `pairs.csv` made before 2026-10-08 (a stack row with no part) is an error that says to make the
+area again; an edit stack with no part is an error too.
+
+**The editor's guard** (`rs.levels.rule_conflicts`, 2026-10-08): before a rule is added, the editor checks it against the enabled rules
+(found, `edits.csv`, the list waiting to be applied): an exact duplicate, or a **loop**: the solver's rules are difference rules
+`x_i - x_j <= w` between the four numbers of the roads (w 0 or -margin, the same builder the solver uses, `_difference_rules`), and a new
+rule that closes a cycle with at least one strict step can never hold with the others. A breadth-first search from the new rule's one end
+back to its other finds the shortest such cycle; its rules are named in plain words. You may add the rule anyway (the solver then gives one
+up, as before).
 
 **Automatic heads and caps** (`rs.auto_ends`, 2026-10-06: better than one number and one cap for all), for the widths the page
 draws at zoom 18 (street level; widths are pixels, so lower zooms are wider on the ground):
@@ -76,23 +100,23 @@ and the main casing (a higher level) showed in the joined roads' fills everywher
 `levels.csv` has the ends as drawn. On Monaco the caps matched 5 of the 6
 flat ends set by hand (the sixth is under a road drawn above it); the head lengths come out a little shorter than the ones set by hand.
 
-**One part of A** (an edit): a `stack` edit may name a part of A's casing in `a_end`: `start`, `main` or `end` (empty: the whole road, the
-rule above). Added, that part comes after B's fill even where its head joins B (a junction the rule leaves out). Switched off
-(`enabled=false`), only that part is left out of a found whole pair; the rest of the pair stays. A part named on an edge that runs against its
-road is turned to the road's way, as a meet's end is.
+**One part of A** (an edit): a `stack` edit names a part of A's casing in `a_end`: `start`, `main` or `end`. Added, that part comes after
+B's fill even where its head joins B (a junction the rule leaves out). Switched off (`enabled=false`), that row of `pairs.csv` is left out.
+A part named on an edge that runs against its road is turned to the road's way, as a meet's end is.
 
 ## Files (one folder per area)
 
 | file | what | written by |
 |---|---|---|
 | `roads.parquet` | one row per road (both directions of a segment together): `road` (the id of its first edge), `edges` / `reversed` (the ids of its edges running its way / the other way), `band`, `priority`, the line | `roadstyle-levels make` (`rs.level_input`), every run |
-| `pairs.csv` | one row per relation: `relation`, `a`, `b`, `a_end`, `b_end` (below) | `roadstyle-levels make`, every run |
+| `pairs.csv` | one row per relation: `relation`, `a`, `b`, `a_end`, `b_end` (below); a stack one row per part of `a` | `roadstyle-levels make`, every run (with `heads.csv`'s heads) |
 | `edits.csv` | your changes to the pairs, same columns plus `enabled`: `false` switches a pair off, anything else adds one; `a` / `b` may name either direction of a road | created empty once; you, or `roadstyle-levels edit`; never overwritten by the input step |
 | `caps.csv` | your caps per road end (`road`, `start`, `end`: empty = automatic, `round`, `square`, `flat`) | `roadstyle-levels edit` (the *start* / *end* choices in a road's card) |
 | `heads.csv` | your head lengths per road end (`road`, `start_m`, `end_m`; empty = automatic) | `roadstyle-levels edit` (the *heads* sliders in a road's card) |
 | `levels.csv` | the result, one row per edge: `edge`, `casing_start`, `casing_level`, `casing_end`, `fill_level`, and its ends as drawn: `head_start_m`, `head_end_m`, `cap_start`, `cap_end` (render_edges' `head_start_m_col` / `head_end_m_col` / `cap_start_col` / `cap_end_col`) | `roadstyle-levels solve` |
 
-Relations: `meet` (the end `a_end` of `a` is the end `b_end` of `b`: each head is under the other road's fill), `stack` (`a` is over `b`) and
+Relations: `meet` (the end `a_end` of `a` is the end `b_end` of `b`: each head is under the other road's fill), `stack` (the part `a_end` of
+`a`'s casing, `start` / `main` / `end`, is over `b`'s fill), `near` (the same, a part that only comes near: with `--near-rules`, kept last) and
 `order` (`a`'s fill after `b`'s where they meet, a wish the solver may give up). A manual `meet` row joins two roads that do not share a point.
 
 ```
@@ -103,15 +127,17 @@ roadstyle-levels solve out/monaco
 
 **The editor** (`roadstyle-levels edit out/monaco`, a local page at http://localhost:8780/) writes `edits.csv`: click two roads, or find
 them in the search box by an edge id (either direction) or an edge_ref (or a part of one) (road 1 orange, road 2 blue; their start and end points are marked), see every pair between them (the found ones, with *switch off*, and your edits,
-with *delete*), and add one (`order` or `stack`: you choose which of the two is on top, for each new pair (no default); a stack on the whole road or one part of it, which
-can also switch that part off in a found pair; `meet`: the chosen end of each). An order against an active stack the other way would be
-given up, since a stack outranks an order: the panel warns before you add it and points to the stack to switch off first. Changes wait in a
+with *delete*), and add one (`order` or `stack`: you choose which of the two is on top, for each new pair (no default); a stack on one or more parts of the
+upper road, one row each (*whole road* is a shortcut for all three); `meet`: the chosen end of each). *Switch off all found stack rows of
+this pair* puts one switch-off per found row in the list, to override a found stack with your own parts. Before a rule goes into the list
+the page asks the server whether it conflicts with the rules there are (a duplicate, or a loop: above) and says which rules; you may add it
+anyway. Changes wait in a
 list (kept over a reload of the page) until you press *Apply and solve*: then they are solved together while the map shows that it is
 working, and the page reloads with the new levels, keeping the view and the picked roads; `levels.csv` is written too. If one change is
 wrong or the solver refuses them (an unknown
 road, nothing to switch off), nothing is saved, the list stays, and the panel says why. The `edits.csv` before each apply is kept as `edits.csv.bak`. A road's card also has *start* / *end*: round / square / flat for
 each end (`caps.csv`); flat is for an end whose round end reaches across a narrower road it ends on, square keeps the drawn length.
-And *heads*: each end's head length in metres (`heads.csv`, solved with the rest).
+And *heads*: each end's head length in metres (`heads.csv`; drawing only since 2026-10-08: no solve, and `make` reads it to decide the stack rows).
 The *Issues* tab lists the crossing pairs the solver could not keep, with A's parts at or under B's fill in red; a
 row opens the pair, to fix by hand. The list of
 your edits shows each one's two roads when clicked. It is written for this page alone (the roadstyle map and its `rs*` API); the v2 test's

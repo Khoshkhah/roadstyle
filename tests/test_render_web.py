@@ -2064,13 +2064,13 @@ def test_level_input_and_solve_levels():
     fl = dict(zip(roads["road"], rs.solve_levels(roads, pairs)["fill_level"], strict=True))
     assert fl["12"] > fl["11"] and fl["12"] > fl["14"] and fl["13"] > fl["12"]                   # the tunnel over its mouths, under the crossing street
     edits = pd.DataFrame([{"relation": "order", "a": "12", "b": "11", "enabled": "false"},           # switch the mouth's wish off ...
-                          {"relation": "stack", "a": "11", "b": "12", "enabled": "true"}])          # ... and put the ground road over the tunnel there
+                          {"relation": "stack", "a": "11", "b": "12", "a_end": "main", "enabled": "true"}])   # ... and put the ground road's main part over the tunnel
     fl2 = dict(zip(roads["road"], rs.solve_levels(roads, pairs, edits=edits)["fill_level"], strict=True))
     assert fl2["11"] > fl2["12"]
     with pytest.raises(ValueError):
         rs.solve_levels(roads, pairs, edits=pd.DataFrame([{"relation": "order", "a": "99", "b": "11", "enabled": "false"}]))
-    _, kept = rs.level_input(g.assign(band=[0, -1, 0, 0]), band_col="band")                          # the caller's bands: over / under everywhere
-    assert {("stack", "11", "12"), ("stack", "14", "12")} <= {(r.relation, r.a, r.b) for r in kept.itertuples()}
+    _, kept = rs.level_input(g.assign(band=[0, -1, 0, 0]), band_col="band", near_rules=True)       # the caller's bands: over / under everywhere
+    assert {("near", "11", "12", "main"), ("near", "14", "12", "main")} <= {(r.relation, r.a, r.b, r.a_end) for r in kept.itertuples()}   # they only meet: near
 
 
 def test_render_edges_takes_no_band_or_order():
@@ -2270,7 +2270,7 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     assert not [r for r in got["rows"] if r["section"] != "found"] and set(got["roads"]) >= {"11", "12"}
     before = (tmp_path / "edits.csv").read_text()
     with pytest.raises(ValueError):
-        area.change(pd.DataFrame([{"relation": "stack", "a": "999", "b": "11", "a_end": "", "b_end": "", "enabled": "true"}]))
+        area.change(pd.DataFrame([{"relation": "stack", "a": "999", "b": "11", "a_end": "main", "b_end": "", "enabled": "true"}]))
     assert (tmp_path / "edits.csv").read_text() == before
     area.change(pd.DataFrame([{"relation": "order", "a": "12", "b": "11", "a_end": "", "b_end": "", "enabled": "false"}]))
     assert area.said.startswith("solved the whole area") and area.full                    # every road of this tiny area is around the change
@@ -2313,8 +2313,8 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
         area.apply([{"op": "head", "road": "12", "end": "start", "m": str(L)}, {"op": "head", "road": "12", "end": "end", "m": "1"}])
 
 
-def test_the_editor_does_not_solve_for_heads_the_solver_does_not_see(tmp_path, monkeypatch):
-    """A head change that leaves the empty mains and the near parts as they were is saved and drawn without a solve; one that empties a main part solves."""
+def test_the_editor_never_solves_for_a_head_change(tmp_path, monkeypatch):
+    """2026-10-08: the solver works from the tables only, so a head change (even heads over the whole road) is saved and drawn without a solve."""
     pytest.importorskip("scipy")
     from roadstyle import level_editor
     from roadstyle.level_area import make_area
@@ -2322,14 +2322,14 @@ def test_the_editor_does_not_solve_for_heads_the_solver_does_not_see(tmp_path, m
     make_area(_edge_world(), tmp_path)
     area = Area(tmp_path)
     solved = area.solved
+    L = area.facts["12"]["length_m"]
     with monkeypatch.context() as m:
         m.setattr(level_editor, "solve_local", lambda *a, **k: pytest.fail("solved"))
         area.apply([{"op": "head", "road": "12", "end": "end", "m": "12.5"}])
-    assert area.said == "not solved again (the heads change nothing the solver sees)" and area.solved is solved
-    assert (tmp_path / "heads.csv").read_text().split() == ["road,start_m,end_m", "12,,12.5"] and area.facts["12"]["heads"][1] == 12.5
-    L = area.facts["12"]["length_m"]
-    area.apply([{"op": "head", "road": "12", "end": "start", "m": str(L)}, {"op": "head", "road": "12", "end": "end", "m": "0.049"}])   # the heads cover the road
-    assert area.said.startswith(("solved", "re-solved")) and area.solved is not solved                        # its main part has no length
+        assert area.said == "not solved again (heads and caps are drawing only)" and area.solved is solved
+        area.apply([{"op": "head", "road": "12", "end": "start", "m": str(L)}, {"op": "head", "road": "12", "end": "end", "m": "0.049"}])   # no main part
+        assert area.solved is solved
+    assert (tmp_path / "heads.csv").read_text().split() == ["road,start_m,end_m", f"12,{L},0.049"] and area.facts["12"]["heads"][1] == 0.049
 
 
 def test_the_editor_re_solves_only_the_roads_around_a_change():
@@ -2343,7 +2343,7 @@ def test_the_editor_re_solves_only_the_roads_around_a_change():
     roads, pairs = rs.level_input(_edge_world())       # ground 11 - tunnel 12 - ground 14 in a line, street 13 crossing over the tunnel's middle
     prev = solve(roads, pairs, None, {}, {})[0]
     assert around(roads, pairs, None, ["13"], 1) == {"13", "12"} and around(roads, pairs, None, ["13"], 2) == {"11", "12", "13", "14"}
-    row = lambda **k: pd.DataFrame([{"relation": "stack", "a_end": "", "b_end": "", "enabled": "true", **k}])     # noqa: E731
+    row = lambda **k: pd.DataFrame([{"relation": "stack", "a_end": p, "b_end": "", "enabled": "true", **k} for p in ("start", "main", "end")])   # noqa: E731
     off = pd.DataFrame([{"relation": "order", "a": "12", "b": "14", "a_end": "", "b_end": "", "enabled": "false"}])
     out = solve_local(roads, pairs, off, {}, {}, prev, ["12", "14"], hops=0)[0]
     lv = out.set_index("road")[LEVELS]
@@ -2378,9 +2378,9 @@ def test_edits_name_either_direction_of_a_road():
 
 
 def test_every_part_of_the_upper_casing_is_after_the_lower_fill():
-    """2026-10-06 (Monaco 95449780#1f over 4229327#1f): A over B means every part of A's casing, its heads too, and its fill come after
-    B's fill. Before, only A's main part did: A's start head, held under the fill of the road it lands on, could sit under the fill of the
-    street B passing under it close to A's start, and B's fill hid A's outline there."""
+    """2026-10-06 (Monaco 95449780#1f over 4229327#1f): A over B lifts the parts of A's casing that cross B, its heads too (2026-10-08: the
+    stack rows of pairs.csv name them), and its fill, after B's fill. Before, only A's main part was: A's start head, held under the fill of
+    the road it lands on, could sit under the fill of the street B passing under it close to A's start, and B's fill hid A's outline there."""
     pytest.importorskip("scipy")
     import pandas as pd
 
@@ -2388,19 +2388,20 @@ def test_every_part_of_the_upper_casing_is_after_the_lower_fill():
     d = 0.0001                                                             # about 6 m east-west at 59.3
     g = gpd.GeoDataFrame({"highway": ["secondary"] * 3, "bridge": ["yes", None, None], "layer": [1, None, None], "edge_id": [1, 2, 3]},
                          geometry=[LineString([(18.0, 59.3), (18.0 + 3.5 * d, 59.3)]),                    # A: the bridge, about 20 m
-                                   LineString([(18.0 + d, 59.2998), (18.0 + d, 59.3002)]),               # B: the street under it, 6 m from its start
+                                   LineString([(18.0 + d / 2, 59.2998), (18.0 + d / 2, 59.3002)]),       # B: the street under it, 3 m from its start
                                    LineString([(18.0 - 2.5 * d, 59.3), (18.0, 59.3)])], crs=4326)         # J: the road A's start head lands on
     roads, pairs = rs.level_input(g)
+    assert pairs.loc[pairs.relation == "stack", "a_end"].tolist() == ["start"]                          # the crossing is in A's start head
     held = pd.DataFrame([{"relation": "order", "a": "2", "b": "3", "enabled": "true"}])                  # B's fill after J's: J holds A's head low
     out = rs.solve_levels(roads, pairs, edits=held).set_index("road")
     assert out.loc["1", "casing_start"] > out.loc["2", "fill_level"]                                    # A's start head over B's fill
-    assert min(out.loc["1", ["casing_start", "casing_level", "casing_end", "fill_level"]]) > out.loc["2", "fill_level"]
+    assert out.loc["1", "fill_level"] > out.loc["2", "fill_level"]
     assert out.attrs["levels_given_up"] == []                                                           # the wish gave way, not the stack pair
 
 
 def test_stack_edits_can_name_a_part_of_the_upper_road():
-    """solve_levels: a stack edit's a_end names a part of A (start / main / end). Added, that casing part is after B's fill; switched off, only
-    that part of a found whole pair is left out; naming A's other direction turns start and end; switching off a part of no pair is an error."""
+    """solve_levels: a stack edit's a_end names a part of A (start / main / end). Added, that casing part is after B's fill; switched off, that
+    row of pairs.csv is left out; switching off a row that is not there is an error, and so is a stack with no part (2026-10-08)."""
     pytest.importorskip("scipy")
     import pandas as pd
 
@@ -2412,11 +2413,11 @@ def test_stack_edits_can_name_a_part_of_the_upper_road():
     assert out.loc["11", "casing_start"] > out.loc["14", "fill_level"]                      # an added part: that head over B's fill
     out = rs.solve_levels(roads, pairs, edits=row(a="11", b="14", a_end="end")).set_index("road")
     assert out.loc["11", "casing_end"] > out.loc["14", "fill_level"]
-    rs.solve_levels(roads, pairs, edits=row(a="13", b="12", a_end="start", enabled="false"))   # one part of the found pair 13 over 12: switched off
-    with pytest.raises(ValueError):
-        rs.solve_levels(roads, pairs, edits=row(a="11", b="14", a_end="start", enabled="false"))   # no pair 11 over 14 to take a part from
-    with pytest.raises(ValueError):
-        rs.solve_levels(roads, pairs, edits=row(a="11", b="14", a_end="middle"))
+    rs.solve_levels(roads, pairs, edits=row(a="13", b="12", a_end="main", enabled="false"))    # the found row 13 (main) over 12: switched off
+    for bad in (row(a="13", b="12", a_end="start", enabled="false"),                            # no such row (13's start head does not cross 12)
+                row(a="11", b="14", a_end="start", enabled="false"), row(a="11", b="14", a_end="middle"), row(a="11", b="14")):   # no part: no whole road
+        with pytest.raises(ValueError):
+            rs.solve_levels(roads, pairs, edits=bad)
 
 
 def test_cap_start_and_end_cols_set_one_end_each():
@@ -2469,11 +2470,10 @@ def test_near_rules_give_way_to_order_wishes_and_real_crossings_do_not():
     given-up pair; the same rule on a crossing part is kept before the wishes (docs/design/level_input.md)."""
     pytest.importorskip("scipy")
     from roadstyle.levels import _solve_intervals
-    lines = [LineString([(0, 0), (40, 0)]), LineString([(0, 5), (40, 5)])]
-    args = (lines, [], [(0, 1)], [(1, 0)], 30, 20, 1.0)                 # road 0 over road 1, but a wish: road 1's fill after road 0's
-    _, given, info = _solve_intervals(*args, near={(0, 1, h) for h in "sme"}, near_rules=True)
+    parts = [(0, 1, h) for h in "sme"]                                  # road 0 over road 1, but a wish: road 1's fill after road 0's
+    _, given, info = _solve_intervals(["0", "1"], [], [], [(1, 0)], 30, 20, 1.0, near=parts)
     assert given == [] and info["order_violations"] == 0 and len(info["near_parts"]) == 3     # the near rule gives way: a warning
-    _, given, info = _solve_intervals(*args)
+    _, given, info = _solve_intervals(["0", "1"], [], parts, [(1, 0)], 30, 20, 1.0)
     assert given == [] and info["order_violations"] == 1                                          # a real crossing is kept, the wish is not
     assert info["orders_not_kept"] == [(1, 0)]                                                     # which wish: road 1's fill after road 0's
 
@@ -2517,16 +2517,17 @@ def test_heads_over_the_whole_road_leave_no_main_part():
 
 
 def test_near_rules_are_off_by_default():
-    """2026-10-08: a part that only comes near is not lifted and raises no warning; near_rules=True keeps the last-priority rule."""
+    """2026-10-08: a part that only comes near is no row of pairs.csv; level_input(near_rules=True) writes it as a near row, lifted last."""
     pytest.importorskip("scipy")
-    from roadstyle.levels import _solve_intervals
-    lines = [LineString([(0, 0), (40, 0)]), LineString([(0, 5), (40, 5)])]
-    args = (lines, [], [(0, 1)], [(1, 0)], 30, 20, 1.0)
-    near = {(0, 1, h) for h in "sme"}
-    iv, given, info = _solve_intervals(*args, near=near)
-    assert given == [] and info["near_parts"] == [] and info["order_violations"] == 0 and iv[0][1] <= iv[1][3]      # nothing lifted: the wish stands
-    _, given, info = _solve_intervals(*args, near=near, near_rules=True)
-    assert given == [] and len(info["near_parts"]) == 3
+    import roadstyle as rs
+    P = lambda x, y: (674000 + x, 6580000 + y)                                         # noqa: E731
+    g = gpd.GeoDataFrame({"highway": ["residential"] * 2, "bridge": ["yes", None], "layer": [1, None], "edge_id": [1, 2]},
+                         geometry=[LineString([P(0, 0), P(60, 0)]), LineString([P(0, 5), P(60, 5)])], crs=3006)   # a bridge beside a street, 5 m apart
+    _, pairs = rs.level_input(g)
+    assert not pairs["relation"].isin(["stack", "near"]).any()
+    roads, pairs = rs.level_input(g, near_rules=True)
+    assert sorted(pairs.loc[pairs.relation == "near", "a_end"]) == ["end", "main", "start"]
+    assert rs.solve_levels(roads, pairs).attrs["levels_near"] == []                    # kept: nothing against them
 
 
 def test_a_stack_of_yours_is_never_only_near_and_wishes_let_go_are_named():
@@ -2541,8 +2542,8 @@ def test_a_stack_of_yours_is_never_only_near_and_wishes_let_go_are_named():
                          geometry=[LineString([P(0, 0), P(60, 0)]), LineString([P(0, 5), P(60, 5)])], crs=3006)   # side by side, 5 m apart
     roads, pairs = rs.level_input(g)
     row = lambda **k: {"a_end": "", "b_end": "", "enabled": "true", **k}               # noqa: E731
-    edits = pd.DataFrame([row(relation="stack", a="1", b="2"), row(relation="order", a="2", b="1")])   # 1 over 2, but wish 2's fill after 1's
-    out = rs.solve_levels(roads, pairs, edits=edits, parts=rs.casing_parts(roads))
+    edits = pd.DataFrame([row(relation="stack", a="1", b="2", a_end="main"), row(relation="order", a="2", b="1")])   # 1 over 2, but wish 2's fill after 1's
+    out = rs.solve_levels(roads, pairs, edits=edits)
     assert out.attrs["levels_near"] == [] and out.attrs["levels_given_up"] == []
     assert out.set_index("road").loc["1", "fill_level"] > out.set_index("road").loc["2", "fill_level"]   # your stack won
     assert out.attrs["levels_orders_not_kept"] == [("2", "1")]                                          # and the wish it beat is named
@@ -3039,3 +3040,89 @@ def test_simple_puts_the_items_of_edges_above_the_road_layer():
     ids = [l["id"] for l in style["layers"]]
     item = next(i for i, l in enumerate(style["layers"]) if l.get("source", "").startswith("ov"))
     assert ids.index("roads-fill") < item < ids.index("roads-highlight")
+
+
+def _stack_world(junction=False, v=False):
+    """A bridge A (edge 1, 60 m) over a street B (edge 2): B crosses A's main part (at 30 m), or with ``v`` crosses it twice, at 4 m (A's start
+    head) and 8 m (its main part); with ``junction`` B crosses at 3 m and a street J (edge 3) joins B's end to A's start."""
+    P = lambda x, y: (674000 + x, 6580000 + y)                                         # noqa: E731
+    b = [P(3, -20), P(3, 20)] if junction else [P(2, -20), P(6, 20), P(10, -20)] if v else [P(30, -20), P(30, 20)]
+    lines = [LineString([P(0, 0), P(60, 0)]), LineString(b)] + ([LineString([P(3, 20), P(0, 0)])] if junction else [])
+    n = len(lines)
+    return gpd.GeoDataFrame({"highway": ["residential"] * n, "bridge": ["yes"] + [None] * (n - 1), "layer": [1] + [None] * (n - 1),
+                             "junction": [None] * n, "edge_id": list(range(1, n + 1))}, geometry=lines, crs=3006)
+
+
+def test_make_writes_one_stack_row_per_part_that_crosses():
+    """2026-10-08: level_input writes a stack as one row per part of the upper road that crosses the lower one, worked out once with the
+    heads of that time: a crossing in the main part is one main row; a crossing over a head and the main part two rows; a head that joins the
+    lower road (here through J) none."""
+    import roadstyle as rs
+    rows = lambda g, **k: sorted((r.a, r.b, r.a_end) for r in rs.level_input(g, **k)[1].itertuples() if r.relation == "stack")   # noqa: E731
+    assert rows(_stack_world()) == [("1", "2", "main")]
+    assert rows(_stack_world(v=True)) == [("1", "2", "main"), ("1", "2", "start")]
+    assert rows(_stack_world(v=True), head_m=10.0) == [("1", "2", "start")]          # longer heads at make: both crossings in the start head
+    assert rows(_stack_world(junction=True)) == []                                    # A's start head joins J, which joins B: a junction
+    assert rows(_stack_world(junction=True).iloc[:2]) == [("1", "2", "start")]         # without J: the start head crosses B
+
+
+def test_stack_rows_union_and_switch_off_exactly_one_row():
+    """Rows union: an edit adds a part to the found ones; an edit with enabled false takes out exactly that row (pair and part)."""
+    pytest.importorskip("scipy")
+    import pandas as pd
+
+    import roadstyle as rs
+    from roadstyle.levels import merged_relations
+    roads, pairs = rs.level_input(_stack_world(v=True))                               # found: A's start and main over B
+    row = lambda p, on="true": {"relation": "stack", "a": "1", "b": "2", "a_end": p, "b_end": "", "enabled": on}   # noqa: E731
+    parts = lambda e: sorted(k[3] for k in merged_relations(roads, pairs, e) if k[0] == "stack")   # noqa: E731
+    assert parts(None) == ["main", "start"]
+    assert parts(pd.DataFrame([row("end")])) == ["end", "main", "start"]
+    assert parts(pd.DataFrame([row("main", "false")])) == ["start"]
+    assert parts(pd.DataFrame([row(p, "false") for p in ("start", "main")] + [row("end")])) == ["end"]     # override: all found off, your own on
+    out = rs.solve_levels(roads, pairs, edits=pd.DataFrame([row("end")])).set_index("road")
+    assert min(out.loc["1", ["casing_start", "casing_level", "casing_end"]]) > out.loc["2", "fill_level"]
+
+
+def test_a_head_change_after_make_changes_nothing_in_the_solve(tmp_path):
+    """The solver works from the tables only (2026-10-08): heads.csv changed after make gives the same levels; make again reads it."""
+    pytest.importorskip("scipy")
+    import pandas as pd
+
+    from roadstyle.level_area import make_area, solve_area
+    make_area(_stack_world(v=True), tmp_path)
+    cols = ["casing_start", "casing_level", "casing_end", "fill_level"]
+    before = solve_area(tmp_path)[cols]
+    (tmp_path / "heads.csv").write_text("road,start_m,end_m\n1,10,30\n")
+    assert solve_area(tmp_path)[cols].equals(before)
+    _, pairs = make_area(_stack_world(v=True), tmp_path)                                # make again: the heads of heads.csv
+    assert pairs.loc[pairs.relation == "stack", "a_end"].tolist() == ["start"]
+    assert pd.read_csv(tmp_path / "heads.csv").shape == (1, 3)                         # yours: kept
+
+
+def test_an_old_pairs_table_with_whole_road_stacks_is_an_error():
+    """A pairs.csv made before 2026-10-08 (a stack row with no part) is not read as something else: make the area again."""
+    import pandas as pd
+
+    import roadstyle as rs
+    roads, pairs = rs.level_input(_stack_world())
+    old = pd.concat([pairs[pairs.relation != "stack"], pd.DataFrame([{"relation": "stack", "a": "1", "b": "2"}])], ignore_index=True)
+    with pytest.raises(ValueError, match="make the area again|Make the area again"):
+        rs.solve_levels(roads, old)
+
+
+def test_rule_conflicts_finds_duplicates_and_loops():
+    """The editor's guard (levels.rule_conflicts): a duplicate, a two-rule contradiction, a three-rule loop and a rule with no conflict, from
+    the solver's own rules (no geometry)."""
+    import roadstyle as rs
+    from roadstyle.levels import rule_conflicts
+    roads, pairs = rs.level_input(_edge_world())       # meets 11-12, 12-14; stack 13 (main) over 12; orders 12 after 11 and 14
+    stack = lambda a, b, p="main": {"relation": "stack", "a": a, "b": b, "a_end": p, "b_end": "", "enabled": "true"}   # noqa: E731
+    order = lambda a, b: {"relation": "order", "a": a, "b": b, "a_end": "", "b_end": "", "enabled": "true"}            # noqa: E731
+    said = lambda rows: [(why, [(r["relation"], r["a"], r["b"]) for r in w]) for _, why, w in rule_conflicts(roads, pairs, None, rows)]   # noqa: E731
+    assert said([stack("13", "12")]) == [("duplicate", [("stack", "13", "12")])]
+    assert said([stack("12", "13")]) == [("loop", [("stack", "13", "12")])]              # 12 over 13 against 13 over 12
+    assert said([order("12", "13")]) == [("loop", [("stack", "13", "12")])]              # 12's fill after 13's against 13 over 12
+    assert said([order("11", "13")]) == [("loop", [("stack", "13", "12"), ("order", "12", "11")])]   # 13 < 11 < 12 < 13
+    assert said([order("14", "11")]) == [] and said([stack("13", "12", "start")]) == []
+    assert said([order("14", "11"), order("11", "14")]) == [("loop", [("order", "14", "11")])]       # the rows before count too
