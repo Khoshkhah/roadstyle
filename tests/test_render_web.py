@@ -2458,6 +2458,17 @@ def test_a_road_keeps_the_modes_of_all_its_edges():
     assert [list(roads[c][0]) for c in ("edges_modes", "reversed_modes", "edges_lanes", "reversed_lanes")] == [["driving + walking"], ["walking + cycling"], [2], [1]]
 
 
+def test_the_editor_panel_calls_a_road_two_way_only_when_both_directions_are_drawn():
+    """A one-way street with a walking-only reverse is one road of two edges, drawn as one line: the panel does not call it two-way, and each
+    direction shows its own lanes and modes (2026-10-10: 25103774#1r, walking only, showed the street as two-way with every mode)."""
+    import pandas as pd
+    from roadstyle.level_editor import _directions, _two_halves
+    r = pd.Series({"road": "1", "edges": ["1"], "reversed": ["2"], "edge_refs": ["9#1f"], "reversed_refs": ["9#1r"], "edges_directed": [True],
+                   "reversed_directed": [False], "edges_lanes": [2.0], "reversed_lanes": [1.0], "edges_modes": ["driving + walking"], "reversed_modes": ["walking"]})
+    assert not _two_halves(r) and _two_halves(pd.Series({**r.to_dict(), "reversed_directed": [True]}))
+    assert [(d["edge_ref"], d["lanes"], d["modes"]) for d in _directions(r)] == [("9#1f", "2", "driving + walking"), ("9#1r", "1", "walking")]
+
+
 def test_rsfilter_and_rscolor_by_ids_in_the_browser(tmp_path):
     """rsFilter / rsColor take an id set as a lookup (_has: a "match"), not a list scanned per feature (a filter of thousands of ids froze
     the page, 2026-10-07): in a real page they show only those roads, paint them, and reset."""

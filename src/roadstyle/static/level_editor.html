@@ -301,7 +301,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
         ${f.bus_lines ? `<span>bus lines</span><span style="grid-column:span 3">${esc(f.bus_lines)}</span>` : ""}
         <span>road id</span><span style="grid-column:span 3;font-size:11px">${esc(r)}</span>
         ${(f.directions || []).map(d => `<span>${d.way === "along" ? "direction ●→○" : "direction ○→●"}</span><span style="grid-column:span 3;font-size:11px"
-          title="${d.way === "along" ? "This edge runs from the road's start to its end" : "This edge runs the other way, from the road's end to its start"}">${esc(d.edge)}${d.edge_ref ? " · " + esc(d.edge_ref) : d.way === "against" ? " · <i>edge_ref not in roads.parquet (make the area again)</i>" : ""}</span>`).join("")}</div>
+          title="${d.way === "along" ? "This edge runs from the road's start to its end" : "This edge runs the other way, from the road's end to its start"}">${esc(d.edge)}${d.edge_ref ? " · " + esc(d.edge_ref) : d.way === "against" ? " · <i>edge_ref not in roads.parquet (make the area again)</i>" : ""}${d.lanes != null ? " · lanes " + esc(d.lanes) : ""}${d.modes ? " · " + esc(d.modes) : ""}</span>`).join("")}</div>
       <div class="wd" data-w="${esc(r)}">${widthHtml(f)}</div>
       ${["start", "end"].map((e, i) => `<div class="caps" title="The shape of this end of the road (caps.csv, drawing only). It starts round; square = flat but as long as round; flat = stops at the end point">
         <span style="width:44px">${e} ${i ? "○" : "●"}</span>

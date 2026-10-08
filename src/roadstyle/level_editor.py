@@ -56,10 +56,10 @@ class Area:
         for (_, r), m in zip(self.roads.iterrows(), length, strict=True):
             self.facts[r["road"]] = {"road": r["road"], "name": _txt(r.get("name")), "highway": _txt(r.get("highway")),
                                      "edge_ref": _txt(r.get("edge_ref")), "lanes": _txt(r.get("lanes")), "modes": _txt(r.get("modes")), "bus_lines": _txt(r.get("bus_lines")), "caps": ["", ""], "heads": [5.0, 5.0], "band": int(r["band"]), "priority": _num(r.get("priority")),
-                                     "edges": len(r["edges"]) + len(r["reversed"]), "two_way": len(r["reversed"]) > 0, "length_m": float(m),
+                                     "edges": len(r["edges"]) + len(r["reversed"]), "two_way": _two_halves(r), "length_m": float(m),
                                      "directions": _directions(r),
                                      "look": "tunnel" if _yes(r.get("tunnel")) else "bridge" if _yes(r.get("bridge")) else "ground",
-                                     "width_px": _widths(_txt(r.get("highway")), len(r["reversed"]) > 0)}
+                                     "width_px": _widths(_txt(r.get("highway")), _two_halves(r))}
         self.saved = len(self.edits())                          # the edits that were in edits.csv when the editor started
         self.drawn, self.update = None, None
         self.build(self.edits(), self.stored())
@@ -346,15 +346,25 @@ def _row(body):
     return row
 
 
+def _two_halves(r):
+    """Whether the road is drawn as two directions: an edge each way and every one of them directed (``edges_directed`` / ``reversed_directed``, as
+    render_edges' ``directed_col``). A one-way street with a walking-only reverse is one line, not two-way (2026-10-10)."""
+    flags = [*list(r.get("edges_directed", [])), *list(r.get("reversed_directed", []))]
+    return len(r["reversed"]) > 0 and all(not missing(x) and bool(x) for x in flags)
+
+
 def _directions(r):
     """A road's directions for the panel: each edge id with its edge_ref (``edge_refs`` / ``reversed_refs`` of roads.parquet: an area
     made before 2026-10-08 has only the road's own ``edge_ref``, the one of its first edge, the road's id; the others' are None) and ``way``:
     "along" the road or "against"."""
     out = []
-    for way, ids, refs in (("along", r["edges"], r.get("edge_refs")), ("against", r["reversed"], r.get("reversed_refs"))):
+    for way, side in (("along", "edges"), ("against", "reversed")):
+        ids, refs = r[side], r.get("edge_refs" if side == "edges" else "reversed_refs")
         if missing(refs):
             refs = [r.get("edge_ref") if str(e) == str(r["road"]) else None for e in ids]
-        out += [{"edge": str(e), "edge_ref": _txt(x), "way": way} for e, x in zip(ids, refs, strict=True)]
+        own = {c: (list(r[f"{side}_{c}"]) if f"{side}_{c}" in r and not missing(r[f"{side}_{c}"]) else [None] * len(ids)) for c in ("lanes", "modes")}   # each edge's own (since 2026-10-10)
+        out += [{"edge": str(e), "edge_ref": _txt(x), "way": way, "lanes": _txt(int(ln) if not missing(ln) and float(ln).is_integer() else ln), "modes": _txt(md)}
+                for e, x, ln, md in zip(ids, refs, own["lanes"], own["modes"], strict=True)]
     return out
 
 
