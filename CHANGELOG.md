@@ -7,12 +7,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
-- **The tunnel look moves toward a colour you choose** (`tunnel_toward`, default `Slate`): a name in `tunnel_towards` (Slate, Dark, Light, Graphite, Navy, Stone,
+- **The tunnel look moves toward a colour you choose** (`tunnel_toward`, default `Light`, #efede8): a name in `tunnel_towards` (Slate, Dark, Light, Graphite, Navy, Stone,
   Sand, Teal) or any `#rrggbb`, the same on every base map (Dark or Light on the base map's own theme sinks a tunnel into the map and keeps each class hue).
   `rsSetTunnelStyle({toward})`, `RS_TUNNEL_TOWARDS` and a colour list in the Tunnels box.
 
 ### Changed
-- **One tunnel slider for every colour**: the steps 0, 25, 50, 55, 60, 65, 70, 75, 100, and `tunnel_strength` defaults to 50 (was 35), so the default tunnel look is stronger.
+- **One tunnel slider for every colour**: the steps 0, 25, 50, 55, 60, 65, 70, 75, 100, and `tunnel_strength` defaults to 60 (was 35), and the default target is Light (was slate), so the default tunnel look changes.
 
 ## [0.17.1] — 2026-10-07
 

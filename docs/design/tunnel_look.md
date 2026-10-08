@@ -52,11 +52,11 @@ need no image to keep in step (2026-10-06). The street-name and arrow slots carr
 
 ## One colour from a list (2026-10-08)
 
-The colour everything moves toward is a choice (`tunnel_toward`, default `Slate`): a name in `tunnel_towards` (`name: "#rrggbb"`: Slate `#64748b`,
+The colour everything moves toward is a choice (`tunnel_toward`, default `Light`): a name in `tunnel_towards` (`name: "#rrggbb"`: Slate `#64748b`,
 Dark `#14181d`, Light `#efede8`, Graphite `#374151`, Navy `#1e293b`, Stone `#78716c`, Sand `#d6cfc4`, Teal `#134e4a`) or any `#rrggbb`. The same colour on
 every base map: the target does not follow the base-map switcher. Choosing the background colour of the base map (Dark on a dark map, Light on a light one)
 gives v2's "Pre-Mix": a motorway tunnel stays orange but dimmed, every class keeps its hue. There is one slider for every colour, with the steps 0, 25, 50,
-55, 60, 65, 70, 75, 100 and the default 50 (`tunnel_strength`; it was 35 toward slate before this change). The Tunnels box has the colour list and the slider;
+55, 60, 65, 70, 75, 100 and the default 60 (`tunnel_strength`; it was 35 toward slate before this change). The Tunnels box has the colour list and the slider;
 `rsSetTunnelStyle({toward})` takes a name or a colour. An unknown name or a bad colour is an error.
 
 ## Limits
