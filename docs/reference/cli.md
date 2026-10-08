@@ -87,7 +87,7 @@ Street View needs the page served over http(s): `python -m http.server`, then op
 The level step with files you can read and edit ([Which road is on top](../guides/levels.md)):
 
 ```text
-roadstyle-levels make SOURCE FOLDER [--query SQL] [--band-col COL] [--order priority|class|COL]   # roads.parquet, pairs.csv (edits.csv once)
+roadstyle-levels make SOURCE FOLDER [--query SQL] [--band-col COL] [--order priority|class|COL] [--near-rules]   # roads.parquet, pairs.csv (edits.csv once)
 roadstyle-levels solve FOLDER [--auto-ends] [--max-positions N]                                     # levels.csv
 roadstyle-levels edit FOLDER [--port 8780]                                                          # the level editor
 ```

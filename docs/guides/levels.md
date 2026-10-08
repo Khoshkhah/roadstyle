@@ -71,10 +71,11 @@ pick a second one to see every pair between the two.
   stack, press *Switch off all found stack rows of this pair* (one switch-off per row), then add your own parts.
 - **A guard before you add**: the page asks whether the new rule conflicts with the rules there are (found, yours, and the list) and names
   them: the same rule already there, or a loop (A over B, B's fill after C's, C over A: no numbers keep them all, so the solver would give
-  one up). You can still add it.
+  one up). You can still add it, except an exact copy of a row already in `edits.csv`: *Apply* refuses it.
 - **Each end of a road**: its cap (*round*, *square*, *flat*) and its head length (a slider, in metres). The map shows each end's cap. The automatic cap is round, except a two-way road's dead end (an end that meets no other road): square, so the one casing around both directions ends in one clean full-width end.
 - Changes wait in a list until **Apply and solve**: they are solved together, and the open map redraws the roads that changed in place (more than 1,500 changed roads: the page reloads, and says so).
   If the solver refuses them, nothing is saved.
+  *Start new session* moves what is in `edits.csv` now under *Already in edits.csv* and starts the list of changes empty (nothing is deleted).
   A change of caps or heads is saved and drawn without a solve: they are drawing only. Which parts of a stack cross is decided when the
   area is made, with `heads.csv`'s heads; run `make` again to decide it with new heads.
 - **Show only some modes**: when the roads have a `modes` column (who may use them, e.g. `driving + walking`; duckOSM gives it), boxes
@@ -111,8 +112,8 @@ footway lying exactly on a street stays a road of its own.
 - A **bridge** has a slate casing (`bridge_casing_color`) and a soft **shadow** (`bridge_shadow`; in the full look shifted down-right, in simple mode, the default, blurred evenly around the bridge): each part of the
   bridge casts it at its own casing number, so it lies on what the bridge crosses, never on its own road. Hiding the bridges hides it too.
 - A **tunnel** fades toward a chosen colour (`tunnel_toward`, default Sand), its fill, names, arrows and attached items alike: `tunnel_strength` (default 60; 0 is the normal colours, 100 the full tunnel
-  colours) and, in the full look (`simple=False`), a two-colour dashed casing (`tunnel_palette`, default *Graphite + silver*). To try other values, `tunnel_control=True` adds a
-  *Tunnels* box with its steps and colour list ; `rsSetTunnelStyle({strength, palette, ratio})` does the same from your page.
+  colours) and a two-colour dashed casing (`tunnel_palette`, default *Graphite + silver*). To try other values, `tunnel_control=True` adds a
+  *Tunnels* box with its steps and colour list; `rsSetTunnelStyle({strength, palette, ratio})` does the same from your page.
 
 ## Your own numbers
 

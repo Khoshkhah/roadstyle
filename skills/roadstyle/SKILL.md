@@ -32,7 +32,7 @@ Docs: https://khoshkhah.github.io/roadstyle/ (every keyword: `/reference/paramet
 - Every other column shows in the popup and is queryable from JavaScript, so join your data
   onto the edges as columns before rendering.
 - An edge is DIRECTED: its geometry runs the way traffic flows; a two-way road is two edges with
-  reversed geometry, drawn side by side (a two-way footway, path, steps, cycleway ... is ONE full-width line, setting
+  reversed geometry, drawn side by side inside one casing (setting `twin_casing`, `"each"` = a casing each; a two-way footway, path, steps, cycleway ... is ONE full-width line, setting
   `single_line_classes`; its click shows both directions). Don't dissolve or dedupe the twins.
 - Input may also be a file path, a GeoJSON dict, a pyarrow Table, or
   `rs.from_duckdb(con, "SELECT ..., ST_AsWKB(geom) AS geom FROM edges", geometry="geom", crs=4326)`.
