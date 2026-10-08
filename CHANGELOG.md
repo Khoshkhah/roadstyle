@@ -19,6 +19,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   by `render(_edges=...)`; the page swaps them with `GeoJSONSource.updateData`. More than 1,500 changed roads: the whole page again, said
   in the status line. Monaco all modes, one cap: 6.1 s to 0.7 s from Apply to drawn. The roads and simple sources carry feature ids
   (the roads source its index, as `generateId` gave; a piece `16 * edge + k`).
+- **A local re-solve keeps the untouched roads' numbers exactly** (`level_area.solve_local`): the result is shifted back when the solver's ground
+  moved, so the editor's update in place sees only the roads that really moved (fixed roads that moved by different amounts: an error).
 - **The level editor's stack box**: start head / main / end head, several at once, one row each; *whole road* adds all three. *Switch off all found
   stack rows of this pair* (one switch-off per row) to override a found stack.
 

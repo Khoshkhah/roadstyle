@@ -2383,7 +2383,7 @@ def test_the_editor_re_solves_only_the_roads_around_a_change():
     lv = out.set_index("road")[LEVELS]
     assert out.attrs["levels_info"]["resolve"]["how"] == "local" and out.attrs["levels_info"]["resolve"]["free"] == 2
     was = prev.set_index("road")[LEVELS]
-    assert (lv.loc["13"] - lv.loc["11"] == was.loc["13"] - was.loc["11"]).all()        # held as they were (the ground 0 may move: one shift)
+    assert (lv.loc[["11", "13"]] == was.loc[["11", "13"]]).all().all()                  # held exactly as they were (no shift of the whole)
     assert min(lv.loc["13"]) > lv.loc["12", "fill_level"] > lv.loc["11", "fill_level"]                  # the rules: 13 over 12, the wish 12 after 11
     out = solve_local(roads, pairs, row(a="11", b="13"), {}, {}, prev, ["11"], hops=0)[0]   # 11 over 13 with 13 held over the tunnel 11's head joins:
     r = out.attrs["levels_info"]["resolve"]                                                # locally a crossing given up: the whole area instead
@@ -2391,6 +2391,25 @@ def test_the_editor_re_solves_only_the_roads_around_a_change():
     full = solve(roads, pairs, row(a="11", b="13"), {}, {})[0]
     assert (out[LEVELS] == full[LEVELS]).all().all() and out.attrs["levels_given_up"] == full.attrs["levels_given_up"]
     assert solve_local(roads, pairs, row(a="11", b="13"), {}, {}, prev, ["11"])[0].attrs["levels_info"]["resolve"]["why"] == "every road is around the change"
+
+
+def test_a_local_re_solve_keeps_the_fixed_roads_numbers_exactly():
+    """level_area._keep_fixed (2026-10-08): a local result shifted as a whole (the solver's ground moved) is shifted back so the fixed roads
+    keep exactly their numbers, the free ones moving with them; fixed roads that moved by different amounts are an error."""
+    pytest.importorskip("scipy")
+    import roadstyle as rs
+    from roadstyle.level_area import LEVELS, _keep_fixed, solve
+    roads, pairs = rs.level_input(_edge_world())
+    prev = solve(roads, pairs, None, {}, {})[0]
+    was = prev.set_index("road")[LEVELS]
+    fixed = {r: tuple(int(x) for x in was.loc[r]) for r in ("11", "13")}
+    out = prev.copy()
+    out[LEVELS] = out[LEVELS] + 2                                  # as if the ground moved by two
+    _keep_fixed(out, fixed)
+    assert (out.set_index("road")[LEVELS] == was).all().all()      # every road back, the free ones (12, 14) with them
+    out.loc[out["road"] == "13", "fill_level"] += 1
+    with pytest.raises(RuntimeError, match="different amounts"):
+        _keep_fixed(out, fixed)
 
 
 def test_edits_name_either_direction_of_a_road():

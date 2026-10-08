@@ -196,11 +196,25 @@ def solve_local(roads, pairs, edits, heads, caps, previous, changed, hops=HOPS):
     except RuntimeError as err:                         # the solver failed (a time limit): not an error of the change
         why = f"the local solve failed ({err})"
     if why is None:
+        _keep_fixed(out[0], fixed)
         out[0].attrs["levels_info"]["resolve"] = {"how": "local", "free": len(free), "hops": hops, "seconds": round(time.time() - t0, 1)}
         return out
     out = solve(roads, pairs, edits, heads, caps)
     out[0].attrs["levels_info"]["resolve"] = {"how": "full", "why": why, "free": len(free), "hops": hops, "seconds": round(time.time() - t0, 1)}
     return out
+
+
+def _keep_fixed(local, fixed):
+    """Shift the local result as a whole so the ``fixed`` roads keep exactly their numbers (2026-10-08): the solver puts its ground (the
+    most common main casing number) at 0, so a local result can come back shifted by k, and every road would look changed. The fixed roads
+    all agree on one k; when they do not, the solver did not hold them, and that is an error."""
+    now = dict(zip(local["road"], zip(*(local[c].tolist() for c in LEVELS), strict=True), strict=True))
+    shifts = {b - a for r, v in fixed.items() for a, b in zip(now[r], v, strict=True)}
+    if len(shifts) > 1:
+        raise RuntimeError(f"solve_local: the fixed roads moved by different amounts ({sorted(shifts)}): the solver did not hold them")
+    if shifts and (k := shifts.pop()):
+        for c in LEVELS:
+            local[c] = local[c] + k
 
 
 def _worse(local, previous):
