@@ -2870,12 +2870,12 @@ def test_simple_draws_every_road_piece_in_one_layer_in_the_full_order():
     style = _style(html)
     lines = [l for l in style["layers"] if l["id"].startswith("roads-") and l["type"] == "line"]
     assert [l["id"] for l in lines] == ["roads-simple", "roads-fill", "roads-highlight"]
-    assert lines[0]["source"] == "simple" and lines[0]["layout"]["line-sort-key"] == ["get", "__rs_s"] and lines[0]["layout"]["line-cap"] == "round"
+    assert lines[0]["source"] == "simple" and lines[0]["layout"]["line-sort-key"] == ["get", "__rs_s"] and lines[0]["layout"]["line-cap"][-1] == "round"
     assert lines[1]["paint"]["line-opacity"] == 0 and lines[1]["source"] == "roads"
     assert {"casings", "halves", "shadows", "ends"}.isdisjoint(style["sources"])
     feats = [f["properties"] for f in style["sources"]["simple"]["data"]["features"]]
     assert all("__rs_edge" in p and "__rs_cls" in p for p in feats)
-    casings = [(p["__rs_edge"], p["__rs_cl"], p["__rs_s"]) for p in feats if p["__rs_k"] == 0]
+    casings = [(p["__rs_edge"], p["__rs_cl"], p["__rs_s"]) for p in feats if p["__rs_k"] in (0, 3)]     # a tunnel's casing: its gap piece (3), the dashes (4) on top
     # the same pieces as the full look's casing source (no seams), the footway none
     full_pieces = [(p["__rs_edge"], p["__rs_cl"]) for p in (f["properties"] for f in full["sources"]["casings"]["data"]["features"])
                    if not p.get("__rs_seam") and p["__rs_edge"] != 2]
@@ -2926,9 +2926,67 @@ def test_simple_refuses_tiles():
     render_edges(_edges(), backend="web", tiles=True, simple=False)
 
 
-def test_simple_has_the_tunnels_box_without_the_dash_selects():
+def test_simple_has_the_tunnels_box_with_the_palette_and_dash_selects():
     html = render_edges(_edge_world(), backend="web", basemap="blank", tunnel_control=True).html
-    assert '"control": true' in html and '"simple": true' in html and "if(!TUNNEL.simple) r3.appendChild" in html
+    assert '"control": true' in html and "TUNNEL.simple" not in html and "rsSetTunnelStyle=function" in html
+
+
+def test_simple_tunnel_casing_is_a_gap_piece_and_a_dash_piece():
+    """A tunnel's casing in simple mode: a solid piece in the palette's gap colour, then a piece on top in the dash colour with the tunnel_casing_dash
+    dasharray (butt ends), both 3 px wider than a casing, the dashes a little above the gap and under the fill; "One colour": a clear gap."""
+    kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0)
+    style = _style(render_edges(_simple_world(), settings={"config": {"tunnel_casing_dash": [2, 3]}}, **kw).html)
+    feats = [f["properties"] for f in style["sources"]["simple"]["data"]["features"]]
+    gap, dash = [p for p in feats if p["__rs_k"] == 3], [p for p in feats if p["__rs_k"] == 4]
+    assert len(gap) == len(dash) == 3 and all(p["__rs_edge"] == 0 for p in gap + dash)            # the tunnel's three pieces (heads and main), no plain casing
+    assert not [p for p in feats if p["__rs_k"] == 0 and p["__rs_edge"] == 0]
+    assert [round(d["__rs_s"] - g["__rs_s"], 6) for g, d in zip(gap, dash, strict=True)] == [0.1] * 3 and all(d["__rs_s"] < 1 for d in dash)   # under the fill (key 1)
+    layer = next(l for l in style["layers"] if l["id"] == "roads-simple")
+    color = layer["paint"]["line-color"]
+    from roadstyle import render_web as rw
+    dash_c, gap_c = rw.CONFIG.tunnel_palettes["Graphite + silver"]
+    gap_e, dash_e = (color[color.index(["==", ["get", "__rs_k"], k]) + 1] for k in (3, 4))
+    assert gap_e[0] == "interpolate" and gap_e[4] == gap_c and dash_e[4] == dash_c                    # each moved toward the tunnel colour by the strength
+    da = layer["paint"]["line-dasharray"]
+    assert da[:2] == ["case", ["==", ["get", "__rs_k"], 4]] and da[2] == ["literal", [2.0, 3.0]]
+    assert layer["layout"]["line-cap"][:4] == ["case", ["to-boolean", ["get", "__rs_dash"]], "butt", ["==", ["get", "__rs_k"], 4]]
+    w = json.dumps(layer["paint"]["line-width"])
+    assert w.count('"__rs_k"], 3]') >= 1 and "+" in w
+    one = _style(render_edges(_simple_world(), settings={"config": {"tunnel_palette": "One colour"}}, **kw).html)
+    color = next(l for l in one["layers"] if l["id"] == "roads-simple")["paint"]["line-color"]
+    assert color[color.index(["==", ["get", "__rs_k"], 3]) + 1] == "rgba(0,0,0,0)"
+
+
+def test_simple_dashed_class_fill_has_the_full_looks_dasharray():
+    """The footway's fill (``__rs_dash`` "4,4" from the palette) is dashed per feature, butt ended; a solid road gets [1, 0]."""
+    style = _style(render_edges(_simple_world(), backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce").html)
+    layer = next(l for l in style["layers"] if l["id"] == "roads-simple")
+    foot = next(f["properties"] for f in style["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_edge"] == 2)
+    da = layer["paint"]["line-dasharray"]
+    by = da[3]
+    assert by[0] == "match" and foot["__rs_dash"] in by and by[by.index(foot["__rs_dash"]) + 1] == ["literal", [float(v) for v in foot["__rs_dash"].split(",")]]
+    assert by[-1] == ["literal", [1, 0]]
+    plain = render_edges(_edges(), backend="web").html
+    assert "line-dasharray" not in json.dumps(next(l for l in _style(plain)["layers"] if l["id"] == "roads-simple")["paint"])      # no dash, no tunnel: nothing set
+
+
+def test_simple_line_cap_per_piece_from_the_ends():
+    """cap_col / cap_start_col / cap_end_col in simple mode: ``__rs_cap`` per piece (round none, True flat, "square"); a casing's main piece stays round;
+    an edge with two different ends has two fill halves, each with its end's cap, and casing heads with theirs."""
+    d = 0.001
+    g = gpd.GeoDataFrame({"highway": ["residential"] * 3, "cs": [0, 0, 0], "cm": [0, 0, 0], "ce": [0, 0, 0], "fl": [0, 0, 0],
+                          "cap": [None, "square", True], "c0": [None, None, "square"], "c1": [None, None, None]},
+                         geometry=[LineString([(18, 59 + i / 100), (18 + d, 59 + i / 100)]) for i in range(3)], crs=4326)
+    kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0, cap_col="cap")
+    feats = [f["properties"] for f in _style(render_edges(g.drop(columns=["c0", "c1"]), **kw).html)["sources"]["simple"]["data"]["features"]]
+    caps = {(p["__rs_k"], p["__rs_edge"]): p.get("__rs_cap") for p in feats}
+    assert caps == {(0, 0): None, (1, 0): None, (0, 1): "square", (1, 1): "square", (0, 2): True, (1, 2): True}
+    split = _style(render_edges(g.iloc[:1].assign(cap=None, c0="square", c1="flat"), cap_start_col="c0", cap_end_col="c1", **{**kw, "cap_col": None}).html)
+    feats = [f["properties"] for f in split["sources"]["simple"]["data"]["features"]]
+    fills = [p.get("__rs_cap") for p in feats if p["__rs_k"] == 1]
+    assert fills == ["square", True]                                                                # the start half, the end half
+    heads = [(p["__rs_cl"], p.get("__rs_cap"), p.get("__rs_main")) for p in feats if p["__rs_k"] == 0]
+    assert heads == [(0, "square", None), (0, None, True), (0, True, None)]                          # head, main (round), head
 
 
 def test_the_tunnels_box_recolours_the_one_road_layer_in_the_browser(tmp_path):
@@ -2945,9 +3003,13 @@ def test_the_tunnels_box_recolours_the_one_road_layer_in_the_browser(tmp_path):
         page.wait_for_function("window.map && map.loaded() && document.getElementById('tn-str')", timeout=30_000)
         get = 'JSON.stringify(map.getPaintProperty("roads-simple", "line-color"))'
         before = page.evaluate(get)
-        assert page.evaluate("!document.getElementById('tn-pal') && !document.getElementById('tn-ratio')")
+        dash = 'JSON.stringify(map.getPaintProperty("roads-simple", "line-dasharray"))'
+        assert page.evaluate("!!document.getElementById('tn-pal') && !!document.getElementById('tn-ratio')")
+        d0 = page.evaluate(dash)
         page.evaluate("rsSetTunnelStyle({strength: 100, toward: 'Navy'})")
         after = page.evaluate(get)
+        page.evaluate("rsSetTunnelStyle({ratio: [3, 1], palette: 'One colour'})")
+        assert page.evaluate(dash) != d0 and "[3,1]" in page.evaluate(dash) and "rgba(0,0,0,0)" in page.evaluate(get)
         page.evaluate("rsSetTunnelStyle({strength: 0})")
         browser.close()
     assert before != after and "#1e293b" in after and not errors, errors

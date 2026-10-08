@@ -1386,9 +1386,20 @@ const RS_SIMPLE = __RS_SIMPLE__;
 function _simpleColor(){        // render_web._simple_color, with the active colouring, the rsColor groups and the tunnel slider
   const sh=["==",["get","__rs_k"],2];
   const c=["==",["get","__rs_k"],0], b=["to-boolean",["get","__rs_bridge"]];
-  let base=["coalesce",["get","__rs_casing"],"#000000"], fill=_fillExpr(["get","__rs_edge"]);
-  if(RS_SIMPLE.tunnels){ base=_tunMix(base, TUNNEL.to.fill); fill=_tunMix(fill, TUNNEL.to.fill); }   // a tunnel's casing and fill: the tunnel look
-  return ["case",sh,RS_SIMPLE.shadow,c,["case",b,RS_SIMPLE.bridge,base],fill];
+  const base=["coalesce",["get","__rs_casing"],"#000000"];
+  let fill=_fillExpr(["get","__rs_edge"]), cases=[sh,RS_SIMPLE.shadow,c,["case",b,RS_SIMPLE.bridge,base]];
+  if(RS_SIMPLE.tunnels){                 // a tunnel's fill: the tunnel look; its casing: the palette's gap and dash colours (the gap clear for One colour)
+    fill=_tunMix(fill, TUNNEL.to.fill);
+    const pair=TUNNEL.palettes[TUNNEL.palette], k=TUNNEL.strength/100;
+    cases.push(["==",["get","__rs_k"],3], pair ? _tunHex(pair[1], TUNNEL.to.fill, k) : "rgba(0,0,0,0)",
+               ["==",["get","__rs_k"],4], _tunHex(pair ? pair[0] : TUNNEL.to.dash, TUNNEL.to.fill, k));
+  }
+  return ["case",...cases,fill];
+}
+function _simpleDash(){         // render_web._simple_dasharray, with the tunnel dash ratio
+  const solid=["literal",[1,0]], by=["match",["to-string",["coalesce",["get","__rs_dash"],""]]];
+  RS_SIMPLE.dashes.forEach(d=>by.push(d,["literal",d.split(",").map(Number)])); by.push(solid);
+  return ["case",["==",["get","__rs_k"],4],["literal",TUNNEL.ratio.map(Number)],RS_SIMPLE.dashes.length ? by : solid];
 }
 const _rsFullFill=_applyFill, _rsFullSort=_applySort, _rsFullRoadFill=rsSetRoadFill;
 _applyFill=function(){ _rsFullFill();
@@ -1398,6 +1409,10 @@ _applySort=function(){ _rsFullSort();
   const all=_qColor ? [].concat(..._qColor.map(g=>g.ids)) : null, k=["get","__rs_s"];
   if(map.getLayer(RS_SIMPLE.layer)) map.setLayoutProperty(RS_SIMPLE.layer,"line-sort-key",
     all ? ["+",k,["case",["all",["==",["get","__rs_k"],1],_has(["get","__rs_edge"],all)],0.5,0]] : k); };
+const _rsFullTunnel=rsSetTunnelStyle;
+rsSetTunnelStyle=function(o){ _rsFullTunnel(o);       // the palette (colours, in _applyFill) and the dash ratio
+  if(RS_SIMPLE.tunnels && map.getLayer(RS_SIMPLE.layer)) map.setPaintProperty(RS_SIMPLE.layer,"line-dasharray",_simpleDash()); };
+window.rsSetTunnelStyle=rsSetTunnelStyle;
 rsSetRoadFill=function(on){
   if(map.getLayer(RS_SIMPLE.layer)) map.setPaintProperty(RS_SIMPLE.layer,"line-opacity",on ? 1 : ["case",["==",["get","__rs_k"],1],0,1]);
   _rsFullRoadFill(on); };
@@ -1703,40 +1718,74 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
 
 
 def _simple_pieces(geo, parts, cols, shadows=True):
-    """The features of simple mode's one road layer: every casing piece (``__rs_k`` 0; the heads as ``_casing_parts`` cuts them, no seams:
-    every end is round) and every fill (``__rs_k`` 1), with ``__rs_s``, the line-sort-key: ``2 * position``, a bridge's casing a
-    quarter more (the full look draws it after the other casings of its position), a fill ``2 * position + 1``. A dashed class has no
-    casing and its fill comes before the casings of its position (``2 * position - 0.5``), as in the full look. A fill keeps only what the layer reads (``cols``, ``lvl``, ``__rs_*``).
+    """The features of simple mode's one road layer: every casing piece (``__rs_k`` 0; the heads as ``_casing_parts`` cuts them, no seams) and every fill
+    (``__rs_k`` 1), with ``__rs_s``, the line-sort-key: ``2 * position``, a bridge's casing a quarter more (the full look draws it after the other
+    casings of its position), a fill ``2 * position + 1``. A dashed class has no casing and its fill comes before the casings of its position
+    (``2 * position - 0.5``), as in the full look. A fill keeps only what the layer reads (``cols``, ``lvl``, ``__rs_*``).
     A bridge's shadow (``__rs_k`` 2): a copy of its main casing piece (or its whole casing, an edge not cut), just under it (``__rs_s`` 0.1
-    less); the heads, where the bridge comes down to the road, have none."""
+    less); the heads, where the bridge comes down to the road, have none.
+    A tunnel's casing (docs/design/tunnel_look.md) is two pieces instead of one, as the full look's two layers: the gap colour (``__rs_k`` 3, at the
+    casing's key) and the dashes on top (``__rs_k`` 4, 0.1 more, still under the fill).
+    Ends: the layer reads ``__rs_cap`` per piece (line-cap: none round, True flat, "square" square). A casing's main piece (between two cuts) is
+    round, as it was: the full look's flat main piece needs its seams. An edge with two different ends draws its fill as two halves (:func:`_halves`)."""
     keep = {c for c in cols if c} | {"lvl"}
+    halves = collections.defaultdict(list)
+    for h in _halves(geo):
+        halves[h["properties"]["__rs_edge"]].append(h)
     out = []
     for q in parts:
         p = q["properties"]
         if p.get("__rs_seam") or p.get("__rs_dash"):
             continue
+        if p.get("__rs_main"):
+            p = {k: v for k, v in p.items() if k != "__rs_cap"}
         k = 2 * p["__rs_cl"] + (0.25 if p.get("__rs_bridge") else 0)
         if shadows and p.get("__rs_bridge") and (p.get("__rs_main") or p["__rs_cs"] == p["__rs_cl"] == p["__rs_ce"]):
             out.append({"type": "Feature", "geometry": q["geometry"], "properties": {**p, "__rs_k": 2, "__rs_s": k - 0.1}})
-        out.append({"type": "Feature", "geometry": q["geometry"], "properties": {**p, "__rs_k": 0, "__rs_s": k}})
-    for ft in geo["features"]:
+        if p.get("__rs_tunnel") and not p.get("__rs_bridge"):
+            out.append({"type": "Feature", "geometry": q["geometry"], "properties": {**p, "__rs_k": 3, "__rs_s": k}})
+            out.append({"type": "Feature", "geometry": q["geometry"], "properties": {**p, "__rs_k": 4, "__rs_s": k + 0.1}})
+        else:
+            out.append({"type": "Feature", "geometry": q["geometry"], "properties": {**p, "__rs_k": 0, "__rs_s": k}})
+    for i, ft in enumerate(geo["features"]):
         p = ft["properties"]
-        out.append({"type": "Feature", "geometry": ft["geometry"],
-                    "properties": {**{k: v for k, v in p.items() if k in keep or k.startswith("__rs_")}, "__rs_k": 1,
-                                   "__rs_s": 2 * p["__rs_fl"] + (-0.5 if p.get("__rs_dash") else 1)}})
+        for g, p in ([(h["geometry"], h["properties"]) for h in halves[i]] if p.get("__rs_split") else [(ft["geometry"], p)]):
+            out.append({"type": "Feature", "geometry": g,
+                        "properties": {**{k: v for k, v in p.items() if k in keep or k.startswith("__rs_")}, "__rs_k": 1,
+                                       "__rs_s": 2 * p["__rs_fl"] + (-0.5 if p.get("__rs_dash") else 1)}})
     return {"type": "FeatureCollection", "features": out}
+
+
+def _simple_cap():
+    """Simple mode's line-cap per piece: a dashed piece butt (a round cap would seal the gaps), else the piece's ``__rs_cap`` (square, flat or round)."""
+    return ["case", ["to-boolean", ["get", "__rs_dash"]], "butt", ["==", ["get", "__rs_k"], 4], "butt",
+            ["==", ["get", "__rs_cap"], "square"], "square", ["to-boolean", ["get", "__rs_cap"]], "butt", "round"]
+
+
+def _simple_dasharray(dashes, ratio):
+    """Simple mode's line-dasharray per piece (in line widths, as the full look's): a tunnel's dash piece ``ratio``, a dashed class's fill its own
+    ``__rs_dash`` ("4,4"), any other piece solid ([1, 0]). A property cannot hold an array on a GeoJSON source, hence the match on the text."""
+    solid = ["literal", [1, 0]]
+    by = ["match", ["to-string", ["coalesce", ["get", "__rs_dash"], ""]], *[x for d in dashes for x in (d, ["literal", [float(v) for v in d.split(",")]])], solid]
+    return ["case", ["==", ["get", "__rs_k"], 4], ["literal", [float(v) for v in ratio]], by if dashes else solid]
 
 
 def _simple_color(bridge_color, tunnels=False):
     """Simple mode's line-color: a bridge shadow ``bridge_shadow_color``, a casing piece its casing colour (a bridge's ``bridge_color``), a fill its fill; on a map with
-    ``tunnels`` a tunnel's casing and fill both take the tunnel look (_tun_mix toward ``tunnel_toward`` at ``tunnel_strength``). The page
-    builds the same again on every recolouring (the simple-mode script)."""
+    ``tunnels`` a tunnel's fill takes the tunnel look (_tun_mix toward ``tunnel_toward`` at ``tunnel_strength``) and its casing pieces the palette's
+    two colours moved the same way (gap ``__rs_k`` 3, dashes 4; the gap clear for "One colour"). The page builds the same again on every
+    recolouring (the simple-mode script)."""
     c, b = ["==", ["get", "__rs_k"], 0], ["to-boolean", ["get", "__rs_bridge"]]
     base, fill = ["coalesce", ["get", "__rs_casing"], "#000000"], ["coalesce", ["get", "__rs_fill"], "#888888"]
+    cases = [["==", ["get", "__rs_k"], 2], CONFIG.bridge_shadow_color, c, ["case", b, bridge_color, base]]
     if tunnels:
         to, _, s = _tun_settings()                             # the chosen tunnel colour (tunnel_toward), as the full look and the page's _simpleColor
-        base, fill = _tun_mix(base, to, s), _tun_mix(fill, to, s)
-    return ["case", ["==", ["get", "__rs_k"], 2], CONFIG.bridge_shadow_color, c, ["case", b, bridge_color, base], fill]
+        pair = CONFIG.tunnel_palettes[CONFIG.tunnel_palette]
+        toward = lambda x: ["interpolate", ["linear"], s, 0, x, 100, to]
+        fill = _tun_mix(fill, to, s)
+        cases += [["==", ["get", "__rs_k"], 3], toward(pair[1]) if pair else "rgba(0,0,0,0)",
+                  ["==", ["get", "__rs_k"], 4], toward(pair[0] if pair else _TUN_TO["dash"])]
+    return ["case", *cases, fill]
 
 
 def _by_feature(cases, default):
@@ -1928,10 +1977,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     ``simple=True`` (the default; ``simple=False`` draws the full look) draws every road piece in ONE line layer: the casings, cut into their heads as here,
     and the fills of every position, ordered by ``line-sort-key`` (position by position, at each position every casing, then every
     fill), with colour and width per feature. Much faster to load and zoom on a big page. A bridge's casing is ``bridge_casing_extra`` px
-    wider each side than in the full look, and its shadow (``bridge_shadow``) lies evenly around its main part, blurred, not offset; both grow with the zoom (no shadow and the full look's bridge casing below zoom 14, full from 17). It
-    leaves out: tunnel casing dashes and dashed classes' dashes (drawn solid), square and flat ends and the per-end caps (every end round), the twin end caps;
+    wider each side than in the full look, and its shadow (``bridge_shadow``) lies evenly around its main part, blurred, not offset; both grow with the zoom (no shadow and the full look's bridge casing below zoom 14, full from 17). The tunnel casing dashes (two pieces: the palette's gap colour, then the dashes), the dashed classes' dashes and each road's end shapes (``cap_col`` ...) are per feature (MapLibre 5.8 and 5.22; the notebook preview's MapLibre 3.6 draws them solid and round). It leaves out the twin end caps;
     street names and one-way arrows are one layer each, above all roads (a name of a road under a bridge can show on the bridge),
-    and the items of ``Overlay(edge_col=...)`` are drawn above all roads too. Not with ``tiles=True``: that raises a ValueError, pass ``simple=False`` for it. ``tunnel_control=True`` works: the colour and strength recolour the one road layer; the palette and dash ratio have no dashes to change and the box leaves them out.
+    and the items of ``Overlay(edge_col=...)`` are drawn above all roads too. Not with ``tiles=True``: that raises a ValueError, pass ``simple=False`` for it. ``tunnel_control=True`` works: the colour, strength, palette and dash ratio recolour the one road layer.
 
     ``tooltip`` is a convenience alias for the shared backend arg (folium / CLI ``--tooltip``): when
     given and ``road_tooltip`` is unset, its value drives the hover tooltip here too, so the same
@@ -2421,10 +2469,12 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         ramp = lambda z: min(max((z - 14) / 3, 0), 1)
         bwide = _plus_px(bcw, lambda z: 2 * float(CONFIG.bridge_casing_extra) * ramp(z))
         wide = [(is_sh, _plus_px(bcw, lambda z: 2 * (float(CONFIG.bridge_casing_extra) + blur) * ramp(z))), (["all", is_c, is_b], bwide),
-                *([(["all", is_c, is_t], _plus_px(cw, 3))] if any_tunnel else []), (is_c, cw)]
+                *([(["any", ["==", ["get", "__rs_k"], 3], ["==", ["get", "__rs_k"], 4]], _plus_px(cw, 3))] if any_tunnel else []), (is_c, cw)]
         op = [1] if road_fill else [["==", ["get", "__rs_k"], 1], 0, 1]
-        road = {"id": "roads-simple", "type": "line", "source": "simple", "layout": {**lay, "line-sort-key": ["get", "__rs_s"]}, **flt,
-                "paint": {"line-color": _simple_color(CONFIG.bridge_casing_color, bool(any_tunnel)),
+        sdashes = sorted({(f.get("properties") or {}).get("__rs_dash") for f in geo["features"]} - {None, ""})
+        sdash = {"line-dasharray": _simple_dasharray(sdashes, CONFIG.tunnel_casing_dash or [1, 1])} if sdashes or any_tunnel else {}
+        road = {"id": "roads-simple", "type": "line", "source": "simple", "layout": {**lay, "line-cap": _simple_cap(), "line-sort-key": ["get", "__rs_s"]}, **flt,
+                "paint": {**sdash, "line-color": _simple_color(CONFIG.bridge_casing_color, bool(any_tunnel)),
                           "line-width": _by_feature(wide, fw), "line-offset": off,
                           "line-blur": ["interpolate", ["linear"], ["zoom"], 14, 0, 17, ["case", is_sh, blur, 0]],
                           "line-opacity": ["interpolate", ["linear"], ["zoom"], 14, ["case", is_sh, 0, *op], 17, op[-1] if road_fill else ["case", *op]]}}
@@ -2742,7 +2792,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                                                "palette": CONFIG.tunnel_palette, "palettes": CONFIG.tunnel_palettes,
                                                "ratio": list(CONFIG.tunnel_casing_dash or [1, 1]), "bg": _bg_color(active_bm),
                                                "toward": tun_toward, "towards": CONFIG.tunnel_towards,
-                                               "to": {**_TUN_TO, "fill": tun_colour}, "control": bool(tunnel_control and tun_paint), "simple": bool(simple)}))
+                                               "to": {**_TUN_TO, "fill": tun_colour}, "control": bool(tunnel_control and tun_paint)}))
             .replace("__VIEWS__", json.dumps(view_list))
             .replace("__RS_ROAD_FILL__", json.dumps({"on": bool(road_fill), "paint": fill_paint}))
             .replace("__ROAD_POPUP__", "true" if popup_on else "false")
@@ -2766,7 +2816,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         html = html.replace("<script>__RS_TILES__</script>", "", 1)
     if simple:
         html = html.replace("</body>", _SIMPLE_JS.replace("__RS_SIMPLE__", json.dumps({"layer": "roads-simple", "bridge": CONFIG.bridge_casing_color, "shadow": CONFIG.bridge_shadow_color,
-                                                                                       "tunnels": bool(any_tunnel)})) + "</body>", 1)
+                                                                                       "tunnels": bool(any_tunnel),
+                                                                                       "dashes": sdashes})) + "</body>", 1)
     if gz:
         html = html.replace("</body>", _INFLATE_JS.replace("__RS_GZ__", json.dumps(gz)) + "</body>", 1)
     # MapLibre stays a placeholder here: WebMap inlines the vendored copy on save (offline file)

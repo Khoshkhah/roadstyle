@@ -64,7 +64,7 @@ pick a second one to see every pair between the two.
 - **Add a relation**: *order* (whose fill is on top where they meet), *stack* (one over the other: the whole road or one part of its
   casing) or *meet* (join two ends). You choose which road is on top.
 - **Switch off** a pair the input found.
-- **Each end of a road**: its cap (*round*, *square*, *flat*) and its head length (a slider, in metres). The map is drawn in simple mode, where every end is round: a square or flat cap shows only with `simple=False` on a page you build yourself.
+- **Each end of a road**: its cap (*round*, *square*, *flat*) and its head length (a slider, in metres). The map shows each end's cap.
 - Changes wait in a list until **Apply and solve**: they are solved together, and the map reloads with the new numbers.
   If the solver refuses them, nothing is saved.
   A change of caps, or of heads that leaves the solver's inputs as they were (no main part becomes empty, no part starts or stops crossing the road under it), is saved and drawn without a solve.
@@ -100,8 +100,8 @@ footway lying exactly on a street stays a road of its own.
 - A **bridge** has a slate casing (`bridge_casing_color`) and a soft **shadow** (`bridge_shadow`; in the full look shifted down-right, in simple mode, the default, blurred evenly around the bridge): each part of the
   bridge casts it at its own casing number, so it lies on what the bridge crosses, never on its own road. Hiding the bridges hides it too.
 - A **tunnel** fades toward a chosen colour (`tunnel_toward`, default Sand), its fill, names, arrows and attached items alike: `tunnel_strength` (default 60; 0 is the normal colours, 100 the full tunnel
-  colours) and, in the full look (`simple=False`), a two-colour dashed casing (`tunnel_palette`, default *Graphite + silver*; simple mode draws it solid). To try other values, `tunnel_control=True` adds a
-  *Tunnels* box with its steps and colour list (in simple mode without the palette and dash-ratio selects); `rsSetTunnelStyle({strength, palette, ratio})` does the same from your page.
+  colours) and, in the full look (`simple=False`), a two-colour dashed casing (`tunnel_palette`, default *Graphite + silver*). To try other values, `tunnel_control=True` adds a
+  *Tunnels* box with its steps and colour list ; `rsSetTunnelStyle({strength, palette, ratio})` does the same from your page.
 
 ## Your own numbers
 
