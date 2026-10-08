@@ -8,6 +8,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Added
 - **Items in the level editor.** `roadstyle-levels edit AREA --items module:function` (`serve(..., items=f)`): `f(roads)` gets the table the editor draws (one row per edge, `edge`) and returns `(overlays, render_edges keywords)`, e.g. a lane table's lanes as items of the edges; with items, every Apply draws the whole page again. Without it the page is unchanged.
+- **`casing_min_px`.** A casing in metres (`width_m_col`) is at least this many pixels each side of its fill, so a thin casing (lanestyle's 0.14 m) stays visible zoomed out. Default 0: exact metres, as before.
 
 ### Changed
 - **Street View key from the environment.** `street_view_key` defaults to the environment variable `GOOGLE_MAPS_KEY`, so every map built where it is set (the level editor, mapstyle and lanestyle pages included) offers the linked panorama. A passed key wins. The key is written into each page: never publish a page built with an unrestricted key.

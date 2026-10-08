@@ -143,7 +143,7 @@ def _width_expr(col, casing=False, split_zoom=15, split_frac=0.6, scale=1.0):
     return e
 
 
-def _width_m_expr(col, kind, width_m_zoom=16, bridge_m=0.0, bridge_px=0.0, **kw):
+def _width_m_expr(col, kind, width_m_zoom=16, bridge_m=0.0, bridge_px=0.0, casing_px=0.0, **kw):
     """_width_expr, but a line with a metre width (``__rs_wm``, _mark_width_m) is drawn at exactly
     that width from ``width_m_zoom`` on (docs/design/metre_widths.md). ``kind``: ``"fill"`` = width
     - 2 casings, ``"casing"`` = the width, ``"wings"`` (bridge casing) = width + 2 casings.
@@ -168,6 +168,8 @@ def _width_m_expr(col, kind, width_m_zoom=16, bridge_m=0.0, bridge_px=0.0, **kw)
                                       ["*", cls[hi], round((zz - lo) / (hi - lo), 4)]]
         px = 512 * 2 ** z / 40075016.686                 # pixels per metre at the equator
         m = ["*", wm, round(px, 4)]
+        if kind == "casing" and casing_px:      # a casing never thinner than casing_px each side of its fill (0.14 m is under a pixel at zoom 18, 2026-10-10)
+            m = ["max", m, ["+", ["*", ["max", ["+", w, ["*", -2, ["get", "__rs_cm"]]], 0], round(px, 4)], 2 * casing_px]]
         if kind == "wings" and bridge_px:       # never thinner than fill + bridge_px each side: metres go sub-pixel zoomed out
             fill = ["max", ["+", ["get", "__rs_wm"], ["*", -2, ["get", "__rs_cm"]]], 0]
             m = ["max", m, ["+", ["*", fill, round(px, 4)], 2 * bridge_px]]
@@ -2234,7 +2236,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
            edge_id_col: str = "edge_id", road_fill: bool = True, cap_col: str = None, cap_start_col: str = None, cap_end_col: str = None, casing_level_col: str = None, fill_level_col: str = None, casing_start_col: str = None, casing_end_col: str = None, head_m: float = 5.0, head_start_m_col: str = None, head_end_m_col: str = None, directed_col: str = None, driving_col: str = None,
-           width_m_col: str = None, width_m_zoom: float = 16, casing_m: float = 0.15,
+           width_m_col: str = None, width_m_zoom: float = 16, casing_m: float = 0.15, casing_min_px: float = 0.0,
            pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
            basemap_switcher: bool = True, zoom_readout: bool = True,
@@ -2278,7 +2280,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
 
     ``width_m_col`` names a column of widths in metres (a lane, a road with a ``width`` tag, a
     canal): from ``width_m_zoom`` on, such a line is drawn exactly that wide, its casing
-    ``casing_m`` metres inside each edge; null = the class width (docs/design/metre_widths.md).
+    ``casing_m`` metres inside each edge; null = the class width (docs/design/metre_widths.md). ``casing_min_px``: a casing
+    in metres is never thinner than this many pixels each side of its fill (0 = exact metres; a thin casing goes under a pixel).
 
     UI toggles (all on by default):
       - ``arrows`` — one-way direction chevrons along each one-way edge;
@@ -2556,7 +2559,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     bcw = _width_expr(highway_col, casing=True, scale=1.25, **sw)   # heavier bridge casing ("wings")
     if width_m_col:     # metre widths from width_m_zoom on (docs/design/metre_widths.md)
         cw, fw, bcw = (_width_m_expr(highway_col, k, width_m_zoom, bridge_m=CONFIG.bridge_casing_m,
-                                     bridge_px=CONFIG.bridge_casing_px, **sw)
+                                     bridge_px=CONFIG.bridge_casing_px, casing_px=casing_min_px, **sw)
                        for k in ("casing", "fill", "wings"))
     style["layers"] += under_layers            # caller overlays drawn beneath the roads (e.g. zones)
     style["layers"] += [

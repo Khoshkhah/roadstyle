@@ -1040,6 +1040,21 @@ def test_a_two_way_pair_with_metre_widths_is_drawn_in_metres():
     assert _num(offset[4 + 2 * i], fills[1]) == pytest.approx(3.7 / 2 * px, rel=1e-3)
 
 
+def test_casing_min_px_keeps_a_thin_metre_casing_visible():
+    """casing_min_px (2026-10-10): a casing in metres is at least that many pixels each side of its fill; a wide one keeps its metres."""
+    import math
+    g = _twin([(3, "c", "d", 0, 0, 0, 0, None, None)]).assign(w=[6.78])
+    for cm, want in ((0.14, 1.0), (1.0, None)):
+        style = _style(render_edges(g, width_m_col="w", width_m_zoom=0, casing_m=cm, casing_min_px=1.0, **_TWIN_KW).html)
+        feats = [f["properties"] for f in style["sources"]["simple"]["data"]["features"]]
+        width = next(l for l in style["layers"] if l["id"] == "roads-simple")["paint"]["line-width"]
+        i = width[3::2].index(18)
+        px = 512 * 2 ** 18 / 40075016.686 / math.cos(math.radians(59.3005))
+        casing = next(p for p in feats if p["__rs_k"] == 0)
+        side = (_num(width[4 + 2 * i], casing) - (6.78 - 2 * cm) * px) / 2      # the casing's pixels outside the fill, each side
+        assert side == pytest.approx(want if want else cm * px, rel=1e-2)
+
+
 def test_a_two_way_pairs_casing_takes_each_end_its_own_cap():
     """The one casing is cut from the first edge of the pair, with its own heads and caps; the second edge runs the other way, so its start
     is the first one's end. A flat start at a and a square end at b come out at a and at b whichever direction comes first; each fill keeps
