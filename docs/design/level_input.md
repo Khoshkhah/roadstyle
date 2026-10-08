@@ -47,6 +47,13 @@ rule that broke is a **warning** (`attrs["levels_near"]`), shown apart in the ed
 wishes not kept (was 47), 15 positions (was 10); with the near rules above the order wishes instead it would be 0 / 22 / 47 / 10.
 Before, every rule counted as a crossing: 22 given up, 20 of them near-only and the 2 others a head 7 and 18 m from the crossing.
 
+**Near rules are off by default since 2026-10-08** (`near_rules=False` in `solve_levels`, `compute_levels`, `level_area.solve*`; `--near-rules`
+on the CLI turns them on). A near part is then not lifted at all, exactly as if it were in `off`; stage 3 has nothing and is skipped, and
+`attrs["levels_near"]` is empty. Why: on Monaco all modes (6,825 roads) the near rules cost 45.9 s, 27 positions and 11,911 near rules,
+1,477 of them broken anyway; without them 14.4 s, 9 positions, 0 given up. Both maps had small spots to fix by hand, so the simpler and
+faster one won. A road's stretch beside another that you want over it is an `edits.csv` stack (always real). The editor's head-change check
+is unchanged: which parts cross, and so which are lifted, still depends on the heads.
+
 **Automatic heads and caps** (`rs.auto_ends`, 2026-10-06: better than one number and one cap for all), for the widths the page
 draws at zoom 18 (street level; widths are pixels, so lower zooms are wider on the ground):
 

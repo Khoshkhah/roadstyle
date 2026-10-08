@@ -1357,7 +1357,7 @@ def test_compute_levels_solve_band_and_order_are_in_the_optimization():
     # street (0), sidewalk beside it (1), crossing joined to the street's end (2)
     g = gpd.GeoDataFrame({"highway": ["residential", "footway", "footway"], "band": [0, -1, 1]},
                          geometry=[line((18, 59), (18 + d, 59)), line((18, 59.00005), (18 + d, 59.00005)), line((18 + d, 59), (18 + d, 59.001))], crs=4326)
-    out = rs.compute_levels(g, method="solve", band_col="band")
+    out = rs.compute_levels(g, method="solve", band_col="band", near_rules=True)      # the sidewalk only runs beside the street: a near part
     c, f = list(out.casing_level), list(out.fill_level)
     assert out.attrs["levels_given_up"] == []
     assert f[1] < c[0] and c[2] > f[0]                                  # sidewalk entirely under the street, crossing entirely over
@@ -1405,7 +1405,7 @@ def test_compute_levels_on_the_bundled_sample():
     assert [(t.casing_level[i], t.fill_level[i]) for i in chain] == [(1, 1), (0, 1), (-1, 0), (-2, -1), (-2, -1), (-2, 0), (0, 0)]
     assert (t.casing_level[207], t.fill_level[207]) == (0, 3)                      # one edge from ground to ground: no outline over the road below
     pytest.importorskip("scipy")
-    s = rs.compute_levels(g, method="solve")
+    s = rs.compute_levels(g, method="solve", near_rules=True)
     info = s.attrs["levels_info"]
     assert info["pairs"] == 268                                                     # stack pairs (docs/design/level_input.md: roads of different bands that only meet take the order)
     under = [944, 4251, 2082, 2363]
@@ -1512,7 +1512,7 @@ def test_compute_levels_reversed_twin_has_its_heads_the_other_way_round():
             ground((18 + 2 * d, 59), (18 + 3 * d, 59))]                                          # a tunnel meeting its end
     g = gpd.GeoDataFrame({"highway": ["residential"] * 4, "layer": [None, None, None, -1], "tunnel": [None, None, None, "yes"],
                           "band": [0, 0, 0, -1]}, geometry=rows, crs=4326)
-    out = rs.compute_levels(g, method="solve", band_col="band")             # the caller's bands: under its end even where they only meet
+    out = rs.compute_levels(g, method="solve", band_col="band", near_rules=True)             # the caller's bands: under its end even where they only meet
     assert (out.casing_start[0], out.casing_end[0]) == (0, -1)               # the road's end head meets the tunnel, so it is lower than its start head
     assert (out.casing_start[1], out.casing_end[1]) == (-1, 0)               # the reversed twin starts where the road ends: swapped
     assert out.casing_level[0] == out.casing_level[1] and out.fill_level[0] == out.fill_level[1]
@@ -1622,7 +1622,7 @@ def test_compute_levels_lp_stages():
     with _w.catch_warnings(record=True) as caught:
         _w.simplefilter("always")
         tight = rs.compute_levels(g, method="solve", band_col="band", max_level=1)          # three positions only: a stack of four cannot fit
-    assert tight.attrs["levels_info"]["solves"] == 4 and len(tight.attrs["levels_given_up"]) == 1
+    assert tight.attrs["levels_info"]["solves"] == 3 and len(tight.attrs["levels_given_up"]) == 1      # no near rules: no stage 3
     assert any("could not be satisfied" in str(w.message) for w in caught)
     assert all(isinstance(v, int) for v in tight.fill_level)
     fits = rs.compute_levels(g, method="solve", band_col="band", max_level=1, margin=0.5)    # a smaller margin: the same range holds four positions
@@ -1760,7 +1760,7 @@ def test_min_positions_keeps_the_requirements_and_never_uses_more_positions():
     with _w.catch_warnings():
         _w.simplefilter("ignore")
         tight = compute_levels(cross, band_col="band", max_level=1)      # the range is too small: the slack stages, with the span term in stage 3
-    assert tight.attrs["levels_info"]["solves"] == 4 and len(tight.attrs["levels_given_up"]) == 1
+    assert tight.attrs["levels_info"]["solves"] == 3 and len(tight.attrs["levels_given_up"]) == 1      # no near rules: no stage 3
 
 
 def test_stored_levels_remember_min_positions(tmp_path):
@@ -2471,7 +2471,7 @@ def test_near_rules_give_way_to_order_wishes_and_real_crossings_do_not():
     from roadstyle.levels import _solve_intervals
     lines = [LineString([(0, 0), (40, 0)]), LineString([(0, 5), (40, 5)])]
     args = (lines, [], [(0, 1)], [(1, 0)], 30, 20, 1.0)                 # road 0 over road 1, but a wish: road 1's fill after road 0's
-    _, given, info = _solve_intervals(*args, near={(0, 1, h) for h in "sme"})
+    _, given, info = _solve_intervals(*args, near={(0, 1, h) for h in "sme"}, near_rules=True)
     assert given == [] and info["order_violations"] == 0 and len(info["near_parts"]) == 3     # the near rule gives way: a warning
     _, given, info = _solve_intervals(*args)
     assert given == [] and info["order_violations"] == 1                                          # a real crossing is kept, the wish is not
@@ -2514,6 +2514,19 @@ def test_heads_over_the_whole_road_leave_no_main_part():
     assert rs.casing_parts(roads, 5.0, heads("6", "3.97"))["1"][1] is None
     assert rs.casing_parts(roads, 5.0, heads("6", "3.8"))["1"][1] is not None
 
+
+
+def test_near_rules_are_off_by_default():
+    """2026-10-08: a part that only comes near is not lifted and raises no warning; near_rules=True keeps the last-priority rule."""
+    pytest.importorskip("scipy")
+    from roadstyle.levels import _solve_intervals
+    lines = [LineString([(0, 0), (40, 0)]), LineString([(0, 5), (40, 5)])]
+    args = (lines, [], [(0, 1)], [(1, 0)], 30, 20, 1.0)
+    near = {(0, 1, h) for h in "sme"}
+    iv, given, info = _solve_intervals(*args, near=near)
+    assert given == [] and info["near_parts"] == [] and info["order_violations"] == 0 and iv[0][1] <= iv[1][3]      # nothing lifted: the wish stands
+    _, given, info = _solve_intervals(*args, near=near, near_rules=True)
+    assert given == [] and len(info["near_parts"]) == 3
 
 
 def test_a_stack_of_yours_is_never_only_near_and_wishes_let_go_are_named():

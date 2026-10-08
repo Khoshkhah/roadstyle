@@ -6,6 +6,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **The level solver's near rules are off by default** (`near_rules=False` in `solve_levels`, `compute_levels` and the level_area solve functions; CLI `solve --near-rules` turns them on).
+  A part that only comes near the road under it is not lifted (as if switched off); `attrs["levels_near"]` is empty. Monaco all modes: 14.4 s, 9 positions, 0 given up,
+  against 45.9 s, 27 positions with 11,911 near rules, 1,477 of them broken anyway.
+
 ### Added
 - **`render_edges(..., simple=True)`** (web): every road piece in ONE line layer instead of a few hundred (Monaco all modes: 310 layers
   to 7), ordered by `line-sort-key` position by position, casings before fills, with each casing cut into its heads as in the full look;

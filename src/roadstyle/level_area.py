@@ -57,7 +57,7 @@ def area_db(folder):
     return (Path(folder) / json.loads(f.read_text())["db"]).resolve() if f.exists() else None
 
 
-def solve_area(folder, auto_ends=False, max_positions=None):
+def solve_area(folder, auto_ends=False, max_positions=None, near_rules=False):
     """Solve the area in ``folder`` with your edits, heads and caps; write levels.csv and levels_info.json. Returns the solved roads."""
     import geopandas as gpd
 
@@ -66,7 +66,7 @@ def solve_area(folder, auto_ends=False, max_positions=None):
     edits = folder / "edits.csv"
     heads, caps = own(folder, roads)
     solved, drawn, _ = solve(roads, folder / "pairs.csv", edits if edits.exists() else None, heads, caps, auto=auto_ends,
-                             max_positions=max_positions)
+                             max_positions=max_positions, near_rules=near_rules)
     write(solved, folder, drawn)
     return solved
 
@@ -180,7 +180,7 @@ def around(roads, pairs, edits, changed, hops=HOPS):
     return seen
 
 
-def solve_local(roads, pairs, edits, heads, caps, previous, changed, hops=HOPS):
+def solve_local(roads, pairs, edits, heads, caps, previous, changed, hops=HOPS, near_rules=False):
     """The level editor's solve after a change: the roads within ``hops`` relations of the ``changed`` ones are solved again, every other road
     keeps its numbers of ``previous`` (the solved roads before the change), with the same rules as :func:`solve` (solve_levels(fixed=...)).
     Three relations deep, since a rule reaches its roads' neighbours through the meets (a head under the fills it joins) and the next ring is
@@ -191,7 +191,7 @@ def solve_local(roads, pairs, edits, heads, caps, previous, changed, hops=HOPS):
     t0 = time.time()
     free = around(roads, pairs, edits, changed, hops)
     if len(free) == len(roads):                         # the whole area is around the change: the whole solve, once
-        out = solve(roads, pairs, edits, heads, caps)
+        out = solve(roads, pairs, edits, heads, caps, near_rules=near_rules)
         out[0].attrs["levels_info"]["resolve"] = {"how": "full", "why": "every road is around the change", "free": len(free), "hops": hops,
                                                   "seconds": round(time.time() - t0, 1)}
         return out
@@ -199,14 +199,14 @@ def solve_local(roads, pairs, edits, heads, caps, previous, changed, hops=HOPS):
     fixed = {r: tuple(int(x) for x in v) for r, v in zip(prev.index, prev.to_numpy().tolist(), strict=True) if r not in free}
     why = None
     try:
-        out = solve(roads, pairs, edits, heads, caps, fixed=fixed)
+        out = solve(roads, pairs, edits, heads, caps, fixed=fixed, near_rules=near_rules)
         why = _worse(out[0], previous)
     except RuntimeError as err:                         # the solver failed (a time limit): not an error of the change
         why = f"the local solve failed ({err})"
     if why is None:
         out[0].attrs["levels_info"]["resolve"] = {"how": "local", "free": len(free), "hops": hops, "seconds": round(time.time() - t0, 1)}
         return out
-    out = solve(roads, pairs, edits, heads, caps)
+    out = solve(roads, pairs, edits, heads, caps, near_rules=near_rules)
     out[0].attrs["levels_info"]["resolve"] = {"how": "full", "why": why, "free": len(free), "hops": hops, "seconds": round(time.time() - t0, 1)}
     return out
 
@@ -265,6 +265,7 @@ def main(argv=None):
     sv.add_argument("folder", type=Path)
     sv.add_argument("--auto-ends", action="store_true", help="head lengths and caps from rs.auto_ends (at zoom 18) instead of 5 m and round")
     sv.add_argument("--max-positions", type=int, help="at most this many drawing positions (a hard bound: wishes, then stack pairs, give way)")
+    sv.add_argument("--near-rules", action="store_true", help="also lift the parts that only come near the road under them (off by default; slower, more positions)")
     ed = sub.add_parser("edit", help="the level editor: a local page that writes edits.csv / heads.csv / caps.csv and solves")
     ed.add_argument("folder", type=Path)
     ed.add_argument("--port", type=int, default=8780)
@@ -275,7 +276,7 @@ def main(argv=None):
         print(f"{len(edges)} edges -> {len(roads)} roads, {len(pairs)} pairs: "
               + ", ".join(f"{k} {v}" for k, v in pairs["relation"].value_counts().items()) + f" -> {a.folder}")
     elif a.cmd == "solve":
-        solved = solve_area(a.folder, auto_ends=a.auto_ends, max_positions=a.max_positions)
+        solved = solve_area(a.folder, auto_ends=a.auto_ends, max_positions=a.max_positions, near_rules=a.near_rules)
         info = solved.attrs["levels_info"]
         print(f"{len(solved)} roads -> {a.folder / 'levels.csv'}: {len(solved.attrs['levels_given_up'])} stack pair(s) given up, "
               f"{len({(u, lo) for u, lo, _ in solved.attrs.get('levels_near', [])})} near warning(s), "

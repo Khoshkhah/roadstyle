@@ -44,7 +44,9 @@ for you with its defaults. It has two halves:
    Roads that **only meet** (a junction, a tunnel mouth, a bridge end) become an *order* wish: a roundabout over a tunnel, a tunnel over
    a bridge, a bridge over the road class. A roundabout is known by the OSM `junction` column: without it you get a warning.
 2. **The solver** (`rs.solve_levels(roads, pairs, edits=...)`): whole numbers (integer programming with HiGHS), kept in this order:
-   real crossings, then the order wishes, then the *near* rules (parts that only come close), then as few positions as possible.
+   real crossings, then the order wishes, then as few positions as possible. The *near* rules (lifting the parts that only come close to the road
+   under them) are **off by default since 2026-10-08**: on Monaco all modes they cost 45.9 s and 27 positions against 14.4 s and 9 without (and 1,477 of
+   11,911 near rules broke anyway). Turn them on with `near_rules=True` (CLI: `solve --near-rules`); an `edits.csv` stack is always a real rule.
 
 ```python
 levels = rs.compute_levels(edges)          # both halves in one call
@@ -71,7 +73,7 @@ pick a second one to see every pair between the two.
 - **Show only some modes**: when the roads have a `modes` column (who may use them, e.g. `driving + walking`; duckOSM gives it), boxes
   under the search show only the roads of the ticked modes (display only: every road is still solved). A road's card shows its modes.
 - The **Issues** tab lists what to look at: **given up** (red: a real crossing the solver could not keep, a flaw on the map),
-  **near warnings** (amber: two roads that only come close; usually fine) and the **order wishes not kept**.
+  **near warnings** (amber: two roads that only come close; only with near rules on, otherwise none) and the **order wishes not kept**.
 
 Your changes live in three small tables in the area folder, never overwritten by the input step:
 

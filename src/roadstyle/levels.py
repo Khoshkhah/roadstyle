@@ -161,7 +161,7 @@ def _relations(metres, ends, beta, omega, band_dist, mouths=True):
     return meets, stacks, orders
 
 
-def _solve_intervals(metres, meets, stacks, orders, limit, max_level, margin, min_positions=True, max_positions=None, forced=(), off=(), empty=(), near=(), fix=None):
+def _solve_intervals(metres, meets, stacks, orders, limit, max_level, margin, min_positions=True, max_positions=None, forced=(), off=(), empty=(), near=(), fix=None, near_rules=False):
     """The solver on roads (one per segment, both directions together) and their relations (:func:`_relations`, or a pairs table). Every road has
     one fill number ``b`` and a casing of three parts: a start head, a main part and an end head, whatever its length (2026-10-06: the
     drawing gives a part its metres, zero for the main part of a road shorter than its two heads; the solver takes no length). ``empty``: the
@@ -236,8 +236,11 @@ def _solve_intervals(metres, meets, stacks, orders, limit, max_level, margin, mi
         own = {part[u][h] for (a, b, h) in forced if (a, b) == (u, l)}          # an edit's part: lifted even at a junction, never near
         name = {c: h for h, c in part[u].items()}
         for c in dict.fromkeys(lift + sorted(own)):
+            is_near = c not in own and (u, l, name[c]) in near
+            if is_near and not near_rules:                     # near rules off (the default): a near part is not lifted, as if it were in ``off``
+                continue
             stack_rows.append((k, c))
-            row_near.append(c not in own and (u, l, name[c]) in near)
+            row_near.append(is_near)
     for k, c in stack_rows:
         le([(pair_list[k][1], 1.0), (c, -1.0)], -margin)
     for x, y in O:
@@ -588,7 +591,7 @@ def solver_sees(roads, rel, parts):
     return empty, near
 
 
-def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=60.0, min_positions=True, max_positions=None, parts=None, fixed=None):
+def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=60.0, min_positions=True, max_positions=None, parts=None, fixed=None, near_rules=False):
     """Solve the drawing levels of ``roads`` from their ``pairs`` (both from :func:`level_input`, or read back from ``roads.parquet`` /
     ``pairs.csv``) and the caller's ``edits`` (a table or a CSV with the columns of ``pairs`` and ``enabled``: a row with ``enabled`` false
     switches off the same relation of ``pairs``, any other row is added; ``a`` / ``b`` may name any edge of a road, and a ``meet`` naming the
@@ -598,8 +601,9 @@ def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=
     ``casing_start``, ``casing_level``, ``casing_end`` and ``fill_level`` (in the road's own direction); ``attrs["levels_given_up"]`` (the
     stack pairs that could not be kept, as road ids) and ``attrs["levels_info"]``. Every road has three casing parts whatever its length: the head lengths are the drawing's (``render_edges(head_m=...)``);
     ``parts`` (:func:`casing_parts`: the parts as drawn) tells it the roads whose main part has no length (never lifted) and, for each stack
-    pair, which parts of the upper road cross the lower one: a part that only comes near is a last-priority rule, and when it breaks a
-    warning (``attrs["levels_near"]``), not a given-up pair. Without ``parts`` every main part counts and every rule is a crossing.
+    pair, which parts of the upper road cross the lower one. A part that only comes near is not lifted (``near_rules=False``, the default
+    since 2026-10-08, as if it were switched off); with ``near_rules=True`` it is a last-priority rule, and when it breaks a
+    warning (``attrs["levels_near"]``, empty otherwise), not a given-up pair. Without ``parts`` every main part counts and every rule is a crossing.
     ``fixed``: ``{road: (casing_start, casing_level, casing_end, fill_level)}``, numbers of an earlier result held as they are; only the other
     roads are solved, with the same rules (the level editor's local re-solve, level_area.solve_local)."""
     rel, off = merged_relations(roads, pairs, edits)
@@ -617,7 +621,7 @@ def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=
         if any(not 0 <= x <= 2 * max_level * margin for v in fix.values() for x in v):
             raise ValueError(f"solve_levels: a fixed number is outside [-max_level, max_level] ({max_level})")
     iv, given, info = _solve_intervals(list(_metres(roads.geometry)), meets, stacks, orders, time_limit, max_level, margin, min_positions,
-                                       max_positions, forced, off, empty, near, fix)
+                                       max_positions, forced, off, empty, near, fix, near_rules)
     counts = defaultdict(int)                                  # the solution can sit at any height: the main casing number most edges have becomes 0 (the ground)
     for r, row in enumerate(roads.itertuples()):
         counts[iv[r][1]] += len(row.edges) + len(row.reversed)
@@ -635,7 +639,7 @@ def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=
 
 
 def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tunnel",
-                   method="solve", band_col=None, order="priority", highway_col="highway", junction_col="junction", band_dist=10.0, head_m=5.0, max_level=20, margin=1.0, time_limit=60.0, min_positions=True):
+                   method="solve", band_col=None, order="priority", highway_col="highway", junction_col="junction", band_dist=10.0, head_m=5.0, max_level=20, margin=1.0, time_limit=60.0, min_positions=True, near_rules=False):
     """A copy of ``edges`` with the drawing-order columns ``casing_start``, ``casing_level`` (the main part), ``casing_end`` and ``fill_level``;
     ``render_edges(casing_level_col=..., fill_level_col=...)`` draws by the last two (the heads are not drawn yet).
 
@@ -651,7 +655,8 @@ def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tu
       where the other constraints allow; this is a wish, not a requirement. A road with no class takes no part in ``"class"`` or ``"priority"``.
     ``max_level``: the numbers are in ``[-max_level, max_level]``; ``margin``: how much later a road is painted where one must be painted after another
     (only the order matters: it changes the scale); ``time_limit``: seconds for each LP solve; ``min_positions``: also minimise the span of the numbers (fewer positions, a little
-    less compaction; section 7.3.1); False leaves it out.
+    less compaction; section 7.3.1); False leaves it out. ``near_rules``: also lift the parts that only come near the road under them, as last-priority
+    rules (a broken one is a warning in ``attrs["levels_near"]``); off by default (see :func:`solve_levels`).
     Results beyond the columns: ``result.attrs["levels_given_up"]`` = ``[(upper index, lower index)]`` (also warned about;
     ``attrs["levels_given_up_parts"]``: ``(upper, lower, "start" / "main" / "end")``, the parts that broke),
     ``result.attrs["levels_info"]`` = counts, order violations, solver status, seconds.
@@ -670,7 +675,7 @@ def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tu
     else:
         roads, pairs = level_input(g, id_col=None, layer_col=layer_col, bridge_col=bridge_col, tunnel_col=tunnel_col, band_col=band_col,
                                    order=order, highway_col=highway_col, junction_col=junction_col, band_dist=band_dist)
-        out = solve_levels(roads, pairs, parts=casing_parts(roads, head_m), max_level=max_level, margin=margin, time_limit=time_limit, min_positions=min_positions)
+        out = solve_levels(roads, pairs, parts=casing_parts(roads, head_m), max_level=max_level, margin=margin, time_limit=time_limit, min_positions=min_positions, near_rules=near_rules)
         lv = out[["casing_start", "casing_level", "casing_end", "fill_level"]].to_numpy().tolist()
         pos = [tuple(lv[r]) if same[i] else (lv[r][2], lv[r][1], lv[r][0], lv[r][3]) for i, r in enumerate(rid)]   # the other direction: heads swapped
         given = out.attrs["levels_given_up"]
