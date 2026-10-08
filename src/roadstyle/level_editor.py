@@ -142,7 +142,7 @@ class Area:
 
     def _render(self, **kw):
         """The editor's map of ``self.draw`` (render_edges); with ``_edges``, the features of those roads instead (render_web.render)."""
-        return rs.render_edges(self.draw, edge_id_col="edge", driving_col="driving", road_popup=False, name=f"Level editor · {self.dir.name}",
+        return rs.render_edges(self.draw, edge_id_col="edge", directed_col="directed", driving_col="driving", road_popup=False, name=f"Level editor · {self.dir.name}",
                                select_color="rgba(0,0,0,0)",               # the panel colours the picked roads (1 orange, 2 blue): no click glow over them
                                filter_control=False, tunnel_control=False,  # the panel is the only control: no class filter box, no Tunnels box
                                casing_start_col="casing_start", casing_level_col="casing_level", casing_end_col="casing_end",
@@ -369,9 +369,10 @@ def _edge_rows(draw):
     """One row per edge from one row per road (``edges`` / ``reversed``), as the final map has them: an edge of the other direction runs
     the road's line backwards, with its two heads, casing numbers and caps swapped (level_area.edge_levels); ``edge`` is its id."""
     import shapely
-    per = {"edge_ref": ("edge_refs", "reversed_refs"), "oneway": ("edges_oneway", "reversed_oneway"), "driving": ("edges_driving", "reversed_driving")}
-    missing = [c for c in ("oneway", "driving") if per[c][0] not in draw.columns]
-    if missing:        # the arrows come from each edge's own columns, as on every page: no guess from the roads
+    per = {"edge_ref": ("edge_refs", "reversed_refs"), "oneway": ("edges_oneway", "reversed_oneway"), "driving": ("edges_driving", "reversed_driving"),
+           "directed": ("edges_directed", "reversed_directed")}
+    missing = [c for c in ("oneway", "driving", "directed") if per[c][0] not in draw.columns]
+    if missing:        # the drawing and the arrows come from each edge's own columns, as on every page: no guess from the roads
         raise ValueError(f"this area's roads.parquet has no per-edge {missing}: make the area again (make_area / rs.level_input) from edges with those columns")
     use = {c: v for c, v in per.items() if v[0] in draw.columns}          # edge_ref: an area made since 2026-10-08
     def one(side, w):
@@ -384,7 +385,7 @@ def _edge_rows(draw):
     bw = bw.set_geometry(shapely.reverse(bw.geometry.to_numpy()), crs=draw.crs)
     out = pd.concat([fw, bw]).sort_values(["_o", "_w"], kind="stable").drop(columns=["edges", "reversed", "_o", "_w", *(c for v in per.values() for c in v)], errors="ignore")
     out["edge"] = out["edge"].astype(str)
-    for c in ("oneway", "driving"):            # real booleans (null stays null), as the columns of the source edges
+    for c in ("oneway", "driving", "directed"):            # real booleans (null stays null), as the columns of the source edges
         out[c] = out[c].astype("boolean")
     return out.reset_index(drop=True)
 

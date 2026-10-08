@@ -253,7 +253,9 @@ def _class_key(v):
 
 def _mark_twoway(geo, directed_col=None, kind_col="highway", driving_col=None):
     """Flag each edge that has a reverse twin (i.e. a two-way street's other direction), so the
-    style fans those into two lanes and drops the one-way arrows. The match is DIRECTED — the twin
+    style fans those into two lanes, and each edge that gets a one-way arrow (``__rs_oneway``). Two
+    separate questions (2026-10-09): the DRAWING (two directions or one line) is ``directed_col``
+    alone; the ARROW is one-way (``oneway``, else no twin) AND driving (``driving_col``, null = driving). The match is DIRECTED — the twin
     must run end->start — and of one kind (``kind_col``): a footway lying on a street the other way
     round is no lane of it (2026-10-07: the street was drawn as one narrow, shifted lane). Two same-direction edges between one node pair (a street split into
     parallel one-way carriageways) are siblings, not a pair: each keeps its arrows."""
@@ -279,15 +281,14 @@ def _mark_twoway(geo, directed_col=None, kind_col="highway", driving_col=None):
         # included); otherwise a one-way edge = an edge with no reverse twin
         ow = p.get("oneway")
         p["__rs_oneway"] = _truthy(ow) if ow is not None else not p["__rs_twoway"]
-    if directed_col or driving_col:
+    if directed_col:
         # a pair is two lanes only when neither edge is undirected (directed_col false: a footway's
         # other direction, a one-way street's walking-only reverse); null = directed. Checked on
-        # both edges, so no lane is ever drawn shifted without its twin (docs/design/twin_ends.md)
-        # ``driving_col`` false counts the same: a reverse edge for walkers and cyclists only is no second lane for cars,
-        # so the driving edge is a one-way road and keeps its arrow (2026-10-09)
-        def und(ft):
-            p = ft.get("properties") or {}
-            return any(p.get(c) is not None and not _truthy(p[c]) for c in (directed_col, driving_col) if c)
+        # both edges, so no lane is ever drawn shifted without its twin (docs/design/twin_ends.md).
+        # Only directed_col decides the drawing (rs.is_directed: open to cars or bikes, not a path), never driving_col: a one-way
+        # street's bus / bike lane the other way is a half of its own, its arrow on the car edge only (2026-10-09)
+        und = lambda ft: (ft.get("properties") or {}).get(directed_col) is not None and not _truthy(  # noqa: E731
+            ft["properties"][directed_col])
         by = collections.defaultdict(list)
         for ft, k in zip(geo["features"], keys, strict=False):
             by[k].append(ft)
@@ -297,7 +298,7 @@ def _mark_twoway(geo, directed_col=None, kind_col="highway", driving_col=None):
                 p["__rs_twoway"] = False
                 if p.get("oneway") is None:      # no `oneway` column: a directed edge with an
                     p["__rs_oneway"] = not und(ft)   # undirected reverse is a one-way road
-    if driving_col:      # arrows only on driving roads (and only one-way ones)
+    if driving_col:      # arrows only on driving edges (null = driving): a one-way edge cars may not drive gets none
         for ft in geo["features"]:
             p = ft["properties"]
             if p.get(driving_col) is not None and not _truthy(p[driving_col]):
@@ -407,8 +408,16 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
         by_ends[(a, z, _class_key(p.get(class_col)))] = i               # with the class: a footway on a street the other way round is not its twin
         lines.append((i, a, z, c, p))
     for i, a, z, c, p in lines:
-        if (p.get("__rs_twoway") and (z, a) < (a, z)) or p.get("__rs_dup"):
+        if p.get("__rs_dup"):
             continue
+        if p.get("__rs_twoway"):
+            # a two-direction pair has one representative: its one-way direction when only one is (cars one way, a bus / bike lane the
+            # other: the arrow is that edge's, pointing its way; the page puts it in that edge's half, _rsArrowLane), else the edge
+            # with the lower ends
+            j = by_ends.get((z, a, _class_key(p.get(class_col))))
+            q = geo["features"][j]["properties"] if j is not None else {}
+            if (not q.get("__rs_oneway"), (z, a)) < (not p.get("__rs_oneway"), (a, z)):
+                continue
         reps.append((a, z, c, p))
         owner[id(p)] = (i, by_ends.get((z, a, _class_key(p.get(class_col)))) if p.get("__rs_twoway") else p.get("__rs_edge2"))
 
@@ -2167,11 +2176,11 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     ``directed_col`` names a column saying whether an edge is a direction of travel of its own
     (true / null) or an undirected edge (false: a footway stored both ways, a one-way street's
     walking-only reverse). An edge and its reverse are drawn as two lanes only when neither is
-    false; otherwise both are drawn centred, full width, as one line.
+    false; otherwise both are drawn centred, full width, as one line. :func:`roadstyle.is_directed` makes
+    it from duckOSM-like edges: an edge open to cars or bikes that is not a path.
 
     ``driving_col`` names a boolean column saying whether cars may drive an edge (duckOSM's ``driving``); null = every edge counts as driving
-    (null values too). One-way arrows go only on driving edges: an edge with false never gets an arrow, and counts as undirected for the
-    pairing above, so a one-way driving edge whose reverse exists only for walkers or cyclists stays one-way (one line, its arrow).
+    (null values too). It decides the arrows only, never the drawing: an edge gets a one-way arrow only if it is one-way and driving.
 
     ``width_m_col`` names a column of widths in metres (a lane, a road with a ``width`` tag, a
     canal): from ``width_m_zoom`` on, such a line is drawn exactly that wide, its casing

@@ -79,12 +79,29 @@ had that arrow outside the window.
 
 ### Only driving roads, only one-way ones
 
-An edge gets an arrow only if it is one-way and a driving road. With `driving_col` (a boolean per edge, duckOSM's `driving`) an edge that
-cars may not drive never gets one. A twin that is not driving is no second lane for cars: the pair is not a two-way road, the driving edge
-is one-way and keeps its arrow, drawn as one line (the same rule as `directed_col` false). Before (0.18.0, 2026-10-09) a one-way street
-copied to its walking-only reverse was paired as two-way: the pair kept ONE representative (either edge) for the slots, and the other edge
-lying on the same line cut the whole chain out as a "crossing", so the arrow could land on the wrong edge or be missing. The same slot plan
-feeds `tiles=True`, so the rule holds there too. Without `driving_col` every edge counts as driving, as before.
+Two questions, two inputs (2026-10-09):
+
+1. **The drawing, two directions or one line: `directed_col` alone.** An edge and its reverse are two directions only when both are
+   directed. `rs.is_directed(edges)` is the one definition (mapstyle and the level areas use it): an edge open to cars or bikes
+   (`driving` or `cycling`) that is not a path class (config `single_line_classes`). A one-way street's walking-only reverse is
+   undirected: one line. A reverse that is a bus or bike lane is directed: a half of its own (coloured by who uses it: mapstyle's access
+   colours), next to the car half with its arrow.
+2. **The arrow: one-way AND driving.** `__rs_oneway` is true only for an edge that is one-way (its `oneway`, or with no `oneway` column,
+   no twin) and driving (`driving_col` true or null; no `driving_col`: every edge). The `oneway` the pages get is the driving network's,
+   but a non-driving edge never gets an arrow even if a copied `oneway` says true. `driving_col` never decides the drawing.
+
+Example: Monaco, OSM way 1449981121 (Boulevard Charles III, oneway=yes, oneway:bicycle=no). Driving has only #1f (oneway); walking and
+cycling have #1f and #1r (#1r is a bus lane, driving.private_edges access=bus, that bikes use too). Both are directed: two halves; one
+arrow, on #1f, pointing #1f's way, in #1f's half.
+
+A pair drawn as two directions keeps one representative for the slots: its one-way edge when only one is (so its arrow points that
+edge's way), else the edge with the lower ends. The page (`_rsArrowLane`) moves such an arrow off the pair's centre line into the middle
+of its edge's half, right of travel by the half's drawn offset at that zoom (`_svLanePx`, as the Street View marker); with `tiles=True`
+the arrows repeat along the slot lines, on the centre line. An edge lying on a chain's line the other way round (a
+one-way street's undirected reverse) is no crossing: it does not cut the chain's slots. The same slot plan feeds `tiles=True`.
+
+A first fix (unreleased, 2026-10-09) also let `driving_col` false split a pair; it decided the drawing from the cars through the arrow
+input and is gone: the drawing is `directed_col`'s alone.
 
 ## 4. On a tunnel
 
