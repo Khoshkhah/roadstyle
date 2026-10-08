@@ -31,7 +31,7 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rsSetColorField(nameOrIndex)` | switch the active `color_options` entry | `rs:colorchange` |
 | `rsSetTunnelStyle({strength, palette, ratio})` | move the tunnel look: `strength` 0-100, `palette` a name of `RS_TUNNEL_PALETTES`, `ratio` `[dash, gap]` (any may be left out) | `rs:tunnelchange` |
 | `rsSetView(nameOrIndex)` | apply a `views` entry: each setting it names, through the functions of this table | `rs:viewselect` (and each function's own event) |
-| `rsSetRoadFill(on)` | show / hide the roads' own fill (`road_fill`); the casing stays | `rs:roadfillchange` |
+| `rsSetRoadFill(on)` | show / hide the roads' own fill (`road_fill`); the casing stays. With `simple=True` every road piece is the one layer `roads-simple` (source `simple`), and this function, `rsColor` and `rsSetColorField` set it too | `rs:roadfillchange` |
 | `rsSetOverlay(labelOrIndex, on)` | show / hide one overlay | `rs:overlaychange` |
 | `rsSetView3D(on)` | tilt to `camera.pitch_3d`, or back to flat and north-up | `rs:viewchange` |
 | `rsPanelShow(on)` | panel mode only: hide / show the docked side panel | |

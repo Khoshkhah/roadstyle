@@ -1357,6 +1357,34 @@ _INFLATE_JS = """
 """
 
 
+# simple=True (render's docstring), injected after the main map script, so a full-look page stays as it was: the page's own
+# recolouring (_applyFill), painted-road order (_applySort) and road fill switch (rsSetRoadFill) also set the one road layer. A
+# function of the main script is a global: assigning it here is what the main script calls from then on.
+_SIMPLE_JS = """
+<script>
+const RS_SIMPLE = __RS_SIMPLE__;
+function _simpleColor(){        // render_web._simple_color, with the active colouring, the rsColor groups and the tunnel slider
+  const c=["==",["get","__rs_k"],0], b=["to-boolean",["get","__rs_bridge"]], t=["to-boolean",["get","__rs_tunnel"]];
+  const base=["coalesce",["get","__rs_casing"],"#000000"], fill=_fillExpr(["get","__rs_edge"]);
+  if(!RS_SIMPLE.tunnels) return ["case",c,["case",b,RS_SIMPLE.bridge,base],fill];
+  const pair=TUNNEL.palettes[TUNNEL.palette], tc=_tunHex(pair ? pair[0] : TUNNEL.to.dash, TUNNEL.to.fill, TUNNEL.strength/100);
+  return ["case",c,["case",b,RS_SIMPLE.bridge,t,tc,base],_tunMix(fill, TUNNEL.to.fill)];
+}
+const _rsFullFill=_applyFill, _rsFullSort=_applySort, _rsFullRoadFill=rsSetRoadFill;
+_applyFill=function(){ _rsFullFill();
+  if(map.getLayer(RS_SIMPLE.layer)) map.setPaintProperty(RS_SIMPLE.layer,"line-color",_simpleColor()); };
+// a painted road's fill above the other fills of its position, under the casings of the next (line-sort-key 2 * position + 1.5)
+_applySort=function(){ _rsFullSort();
+  const all=_qColor ? [].concat(..._qColor.map(g=>g.ids)) : null, k=["get","__rs_s"];
+  if(map.getLayer(RS_SIMPLE.layer)) map.setLayoutProperty(RS_SIMPLE.layer,"line-sort-key",
+    all ? ["+",k,["case",["all",["==",["get","__rs_k"],1],_has(["get","__rs_edge"],all)],0.5,0]] : k); };
+rsSetRoadFill=function(on){
+  if(map.getLayer(RS_SIMPLE.layer)) map.setPaintProperty(RS_SIMPLE.layer,"line-opacity",on ? 1 : ["case",["==",["get","__rs_k"],0],1,0]);
+  _rsFullRoadFill(on); };
+</script>
+"""
+
+
 # tiles=True bootstrap, injected before the main map script: decode the embedded PMTiles
 # archive, register the pmtiles:// protocol serving it from memory (must exist before the Map
 # is constructed), and asynchronously inflate the sidecar table (full per-edge properties +
@@ -1654,6 +1682,53 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
     return under, over, meta, edge
 
 
+def _simple_pieces(geo, parts, cols):
+    """The features of simple mode's one road layer: every casing piece (``__rs_k`` 0; the heads as ``_casing_parts`` cuts them, no seams:
+    every end is round) and every fill (``__rs_k`` 1), with ``__rs_s``, the line-sort-key: ``2 * position``, a bridge's casing a
+    quarter more (the full look draws it after the other casings of its position), a fill ``2 * position + 1``. A dashed class has no
+    casing and its fill comes before the casings of its position (``2 * position - 0.5``), as in the full look. A fill keeps only what the layer reads (``cols``, ``lvl``, ``__rs_*``)."""
+    keep = {c for c in cols if c} | {"lvl"}
+    out = [{"type": "Feature", "geometry": q["geometry"],
+            "properties": {**q["properties"], "__rs_k": 0, "__rs_s": 2 * q["properties"]["__rs_cl"] + (0.25 if q["properties"].get("__rs_bridge") else 0)}}
+           for q in parts if not q["properties"].get("__rs_seam") and not q["properties"].get("__rs_dash")]
+    for ft in geo["features"]:
+        p = ft["properties"]
+        out.append({"type": "Feature", "geometry": ft["geometry"],
+                    "properties": {**{k: v for k, v in p.items() if k in keep or k.startswith("__rs_")}, "__rs_k": 1,
+                                   "__rs_s": 2 * p["__rs_fl"] + (-0.5 if p.get("__rs_dash") else 1)}})
+    return {"type": "FeatureCollection", "features": out}
+
+
+def _simple_tunnel_casing():
+    """A tunnel's casing in simple mode, one colour: the full look's casing dash colour (the tunnel palette's first colour, or the dash
+    colour for One colour, moved toward the tunnel slate by ``tunnel_strength``); the page's _tunHex, with its rounding."""
+    pair = (CONFIG.tunnel_palettes or {}).get(CONFIG.tunnel_palette)
+    a, b, t = _rgb(pair[0] if pair else _TUN_TO["dash"]), _rgb(_TUN_TO["fill"]), float(CONFIG.tunnel_strength) / 100
+    return "#" + "".join(f"{math.floor(x * (1 - t) + y * t + 0.5):02x}" for x, y in zip(a, b, strict=True))
+
+
+def _simple_color(bridge_color, tunnel_casing=None):
+    """Simple mode's line-color: a casing piece its casing colour (a bridge's ``bridge_color``, a tunnel's ``tunnel_casing``), a fill its
+    fill (a tunnel's moved toward slate, _tun_mix). The page builds the same again on every recolouring (the simple-mode script)."""
+    c, b, t = ["==", ["get", "__rs_k"], 0], ["to-boolean", ["get", "__rs_bridge"]], ["to-boolean", ["get", "__rs_tunnel"]]
+    base, fill = ["coalesce", ["get", "__rs_casing"], "#000000"], ["coalesce", ["get", "__rs_fill"], "#888888"]
+    if tunnel_casing:
+        return ["case", c, ["case", b, bridge_color, t, tunnel_casing, base], _tun_mix(fill, _TUN_TO["fill"], float(CONFIG.tunnel_strength))]
+    return ["case", c, ["case", b, bridge_color, base], fill]
+
+
+def _by_feature(cases, default):
+    """One zoom curve that picks a curve per feature: ``cases`` [(condition, curve), ...], else ``default``. MapLibre allows ``["zoom"]``
+    only in a top-level curve, so the choice goes inside each stop; the curves must share their stops."""
+    curves = [c for _, c in cases] + [default]
+    if any(c[:3] != default[:3] or c[3::2] != default[3::2] for c in curves):
+        raise ValueError("simple=True: the width curves do not share their zoom stops")
+    out = list(default[:3])
+    for i, z in enumerate(default[3::2]):
+        out += [z, ["case", *[x for cond, c in cases for x in (cond, c[4 + 2 * i])], default[4 + 2 * i]]]
+    return out
+
+
 def _place_edge_overlays(layers, edge, levels, pat_over=False):
     """Splice the layers of the overlays attached to edges into ``layers``: for each position, after its fills and before its one-way arrows (else its street
     names, else right after its fills), by order, then by the order of the overlays (docs/design/edge_overlays.md).
@@ -1744,7 +1819,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            street_view: bool | str = "window", street_view_key: str | None = None,
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
            color_options=None, color_active=0, views=None, overlays=None, compress: bool = True, tunnel_control: bool = False,
-           tiles: bool = False,
+           tiles: bool = False, simple: bool = False,
            minzoom=None, legend: bool = True,
            api_key: str | None = None, **_ignore):
     """Build a self-contained MapLibre map of the styled edges.
@@ -1828,6 +1903,13 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     ``under`` or ``over`` the roads, clickable for a popup of its fields, and toggled from a
     *Layers* control.
 
+    ``simple=True`` draws every road piece in ONE line layer: the casings, cut into their heads as here,
+    and the fills of every position, ordered by ``line-sort-key`` (position by position, at each position every casing, then every
+    fill), with colour and width per feature. Much faster to load and zoom on a big page. It leaves out: bridge shadows, tunnel casing
+    dashes and dashed classes' dashes (drawn solid), square and flat ends and the per-end caps (every end round), the twin end caps;
+    street names and one-way arrows are one layer each, above all roads (a name of a road under a bridge can show on the bridge),
+    and the items of ``Overlay(edge_col=...)`` are drawn above all roads too. Not with ``tiles=True`` or ``tunnel_control=True`` (a ValueError).
+
     ``tooltip`` is a convenience alias for the shared backend arg (folium / CLI ``--tooltip``): when
     given and ``road_tooltip`` is unset, its value drives the hover tooltip here too, so the same
     call works across backends."""
@@ -1839,6 +1921,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     # column; False -> no popup. Baked into the page as (enabled flag, field list-or-null).
     # popup_mode="panel" docks the read-out as a side panel and combines with ANY field spec;
     # road_popup="panel" stays as shorthand for panel mode with the default fields.
+    if simple and (tiles or tunnel_control):
+        raise ValueError(f"simple=True does not work with {'tiles=True' if tiles else 'tunnel_control=True'}: "
+                         "draw the full look (simple=False) for it")
     if street_view not in (True, False, "window"):
         raise ValueError(f'street_view must be True, False or "window", got {street_view!r}')
     mode = popup_mode or "popup"
@@ -1958,7 +2043,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         # ~5k features can afford it.
         style["sources"]["roads"] = {"type": "geojson", "data": geo, "generateId": True,
                                      "tolerance": 0.05}
-    ends = _twin_ends(geo, (highway_col, filter_col)) if CONFIG.twin_end_caps else []
+    ends = _twin_ends(geo, (highway_col, filter_col)) if CONFIG.twin_end_caps and not simple else []
     if ends:
         style["sources"]["ends"] = {"type": "geojson",
                                     "data": {"type": "FeatureCollection", "features": ends}}
@@ -2260,7 +2345,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                     l = {**l, "filter": ["all", l["filter"], ["!", is_b]]}
                     at = len(layers)
                 layers.append(l)
-            shadows = _bridge_shadows(geo, parts, highway_col, CONFIG.bridge_shadow_trim_m) if CONFIG.bridge_shadow else []
+            shadows = _bridge_shadows(geo, parts, highway_col, CONFIG.bridge_shadow_trim_m) if CONFIG.bridge_shadow and not simple else []
             if shadows:                    # the bridge shadow: lines through junctions, each at the lowest casing number of its edges
                 style["sources"]["shadows"] = {"type": "geojson", "data": {"type": "FeatureCollection", "features": shadows}, "generateId": True,
                                                "tolerance": style["sources"]["roads"].get("tolerance", 0.375)}
@@ -2295,6 +2380,29 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                 at = next(n for n, l in enumerate(style["layers"]) if l["id"] == _level_id(root, pos))
                 style["layers"].insert(at, _end(lid, flt, casing))
                 ids.append(lid)
+
+    if simple:        # one line layer for every road piece (render's docstring): the full look's road layers and their sources go
+        if parts is None:
+            parts = _casing_parts(geo, head_m, (highway_col, filter_col, width_m_col))
+        style["sources"]["simple"] = {"type": "geojson", "data": _simple_pieces(geo, parts, (highway_col, filter_col, width_m_col)),
+                                      "tolerance": style["sources"]["roads"]["tolerance"]}
+        for k in ("casings", "halves", "shadows", "ends"):
+            style["sources"].pop(k, None)
+        is_c = ["==", ["get", "__rs_k"], 0]
+        flt = [f for f in ((_minzoom_filter(highway_col, mz) if mz else None),
+                           (["any", ["<", ["zoom"], dk["flat_below"]], ["!", is_b]] if decks["features"] else None)) if f]
+        flt = {"filter": ["all", *flt]} if flt else {}
+        wide = [(["all", is_c, is_b], bcw), *([(["all", is_c, is_t], _plus_px(cw, 3))] if any_tunnel else []), (is_c, cw)]
+        road = {"id": "roads-simple", "type": "line", "source": "simple", "layout": {**lay, "line-sort-key": ["get", "__rs_s"]}, **flt,
+                "paint": {"line-color": _simple_color(CONFIG.bridge_casing_color, _simple_tunnel_casing() if any_tunnel else None),
+                          "line-width": _by_feature(wide, fw), "line-offset": off,
+                          **({} if road_fill else {"line-opacity": ["case", is_c, 1, 0]})}}
+        # the edges themselves, invisible: what a click, a hover, Street View and the page's fill code find (the roads source, its ids)
+        pick = {"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, **flt,
+                "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"], "line-width": fw, "line-offset": off, "line-opacity": 0}}
+        at = next(n for n, l in enumerate(style["layers"]) if l["id"].startswith(("roads-casing", "roads-fill")))
+        style["layers"] = [l for l in style["layers"] if not l["id"].startswith(("roads-casing", "roads-fill", "roads-ends"))]
+        style["layers"][at:at] = [road, pick]
 
     # oneway direction arrows (on edges with no reverse twin) + line-placed street names, on top.
     # Both read their cosmetics from data/style.json "config" (labels / arrows blocks), so a user
@@ -2407,7 +2515,10 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                          or i.startswith("roads-fill-")),
                         ("roads-arrows-bridge", ">",
                          lambda i: i.startswith(("roads-high-", "roads-bridge-"))))
-                if levels:        # position mode: one arrow layer per position, right after that position's fill layers
+                if simple:        # one arrow layer, above all roads (under the highlight, as the positions' arrows are)
+                    style["layers"].insert(next(n for n, l in enumerate(style["layers"]) if l["id"] == "roads-highlight"),
+                                           _arrow_layer("roads-arrows", True))
+                elif levels:        # position mode: one arrow layer per position, right after that position's fill layers
                     for pos in levels:
                         fam = {_level_id(x, pos) for x in _FILL_FAMILY}
                         dash = _level_id("roads-fill", pos) + "-dash"
@@ -2444,7 +2555,10 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                                        # major streets' names win label-vs-label collisions too
                                        "symbol-sort-key": ["*", -1, _sort_key("highway")]},
                             "paint": lpaint}
-                if levels:        # position mode: the names of a position sit right after its arrows (or its fill layers), so a road above covers them
+                if simple:        # one name layer, above all roads and their arrows
+                    style["layers"].insert(next(n for n, l in enumerate(style["layers"]) if l["id"] == "roads-highlight"),
+                                           _label_layer("roads-labels", lf))
+                elif levels:        # position mode: the names of a position sit right after its arrows (or its fill layers), so a road above covers them
                     for pos in levels:
                         after = "roads-arrows" if pos == 0 else f"roads-arrows-lv{pos}"
                         ids = [l["id"] for l in style["layers"]]
@@ -2487,7 +2601,10 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         for lyr in style["layers"]:
             if lyr["id"] in fill_paint:
                 lyr["paint"] = {**lyr["paint"], **dict.fromkeys(fill_paint[lyr["id"]], 0)}
-    if edge_layers:       # the overlays attached to edges: after the fills of their position, before its arrows (docs/design/edge_overlays.md)
+    if edge_layers and simple:     # one road layer: the items above all roads, position by position, before the arrows and names
+        at = next(n for n, l in enumerate(style["layers"]) if l["id"] in ("roads-arrows", "roads-labels", "roads-highlight"))
+        style["layers"][at:at] = [lyr for _, _, _, group in sorted(edge_layers, key=lambda x: x[:3]) for lyr in group]
+    elif edge_layers:       # the overlays attached to edges: after the fills of their position, before its arrows (docs/design/edge_overlays.md)
         style["layers"] = _place_edge_overlays(style["layers"], edge_layers, levels, pat_over=not road_fill)
     style["layers"] += over_layers             # caller overlays drawn on top of the roads (e.g. POIs)
     tun_paint, tun_dash, tun_casing = {}, [], {}
@@ -2527,7 +2644,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     # A name or an arrow carries the chain's ``highway``, not ``filter_col``: the class filter reads __rs_cls on every piece (the
     # shadows and 3D decks, which cover several edges, are decided per edge in the page)
     cls_of = [ft["properties"].get(fcol) for ft in geo["features"]]
-    for fc in [geo, slots] + [style["sources"][k]["data"] for k in ("casings", "halves", "ends") if k in style["sources"]]:
+    for fc in [geo, slots] + [style["sources"][k]["data"] for k in ("casings", "halves", "ends", "simple") if k in style["sources"]]:
         for ft in fc["features"]:
             ft["properties"]["__rs_cls"] = cls_of[ft["properties"]["__rs_edge"]]
 
@@ -2613,6 +2730,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                             + "</script>" + setup, 1)
     else:
         html = html.replace("<script>__RS_TILES__</script>", "", 1)
+    if simple:
+        html = html.replace("</body>", _SIMPLE_JS.replace("__RS_SIMPLE__", json.dumps({"layer": "roads-simple", "bridge": CONFIG.bridge_casing_color,
+                                                                                       "tunnels": bool(any_tunnel)})) + "</body>", 1)
     if gz:
         html = html.replace("</body>", _INFLATE_JS.replace("__RS_GZ__", json.dumps(gz)) + "</body>", 1)
     # MapLibre stays a placeholder here: WebMap inlines the vendored copy on save (offline file)

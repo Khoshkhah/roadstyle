@@ -4,6 +4,14 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **`render_edges(..., simple=True)`** (web): every road piece in ONE line layer instead of a few hundred (Monaco all modes: 310 layers
+  to 7), ordered by `line-sort-key` position by position, casings before fills, with each casing cut into its heads as in the full look;
+  colour and width per feature. Leaves out bridge shadows, dashes, square / flat ends and per-end caps (every end round) and twin end caps;
+  names, arrows and edge items are drawn above all roads. Not with `tiles=True` or `tunnel_control=True`. The full look is unchanged.
+
 ## [0.17.1] — 2026-10-07
 
 ### Fixed

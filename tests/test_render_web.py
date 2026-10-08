@@ -2774,3 +2774,63 @@ def test_a_page_has_no_road_layer_that_draws_nothing(monkeypatch, make):
             assert any(ft["properties"].get("__rs_bridge") and (ft["properties"].get("__rs_cl") or 0) == pos for ft in feats[l["source"]]), l["id"]
     if any(ft["properties"].get("__rs_bridge") for ft in feats["roads"]):
         assert len([i for i in ids if i.endswith("-bridge")]) < len([l for l in full if l["id"].endswith("-bridge")])
+
+
+def _simple_world():
+    """Three roads with divided casings (as test_divided_casing_is_drawn_as_head_and_main_pieces), one a bridge, one a tunnel, one a footway (a dashed class)."""
+    d = 0.001
+    return gpd.GeoDataFrame({"highway": ["residential", "primary", "footway"], "bridge": [None, "yes", None], "tunnel": ["yes", None, None],
+                             "cs": [-1, 0, 0], "cm": [0, 1, 0], "ce": [-2, 2, 0], "fl": [0, 2, 1]},
+                            geometry=[LineString([(18, 59), (18 + d, 59)]), LineString([(18, 59.01), (18 + d, 59.01)]),
+                                      LineString([(18, 59.02), (18 + d, 59.02)])], crs=4326)
+
+
+def test_simple_draws_every_road_piece_in_one_layer_in_the_full_order():
+    """simple=True: one road line layer (source "simple": the casing pieces as the full look cuts them, then the fills), a transparent roads-fill on the
+    roads source for picking, the highlight, one arrow and one name layer; the line-sort-key is 2 * position (a bridge's casing + 0.25), a fill
+    2 * position + 1 (a dashed class's - 0.5, before the casings, and no casing); every piece names its edge."""
+    kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0)
+    full = _style(render_edges(_simple_world(), **kw).html)
+    html = render_edges(_simple_world(), simple=True, **kw).html
+    style = _style(html)
+    lines = [l for l in style["layers"] if l["id"].startswith("roads-") and l["type"] == "line"]
+    assert [l["id"] for l in lines] == ["roads-simple", "roads-fill", "roads-highlight"]
+    assert lines[0]["source"] == "simple" and lines[0]["layout"]["line-sort-key"] == ["get", "__rs_s"] and lines[0]["layout"]["line-cap"] == "round"
+    assert lines[1]["paint"]["line-opacity"] == 0 and lines[1]["source"] == "roads"
+    assert {"casings", "halves", "shadows", "ends"}.isdisjoint(style["sources"])
+    feats = [f["properties"] for f in style["sources"]["simple"]["data"]["features"]]
+    assert all("__rs_edge" in p and "__rs_cls" in p for p in feats)
+    casings = [(p["__rs_edge"], p["__rs_cl"], p["__rs_s"]) for p in feats if p["__rs_k"] == 0]
+    # the same pieces as the full look's casing source (no seams), the footway none
+    full_pieces = [(p["__rs_edge"], p["__rs_cl"]) for p in (f["properties"] for f in full["sources"]["casings"]["data"]["features"])
+                   if not p.get("__rs_seam") and p["__rs_edge"] != 2]
+    assert [c[:2] for c in casings] == full_pieces == [(0, -1), (0, 0), (0, -2), (1, 0), (1, 1), (1, 2)]
+    assert [c[2] for c in casings] == [-2, 0, -4, 0.25, 2.25, 4.25]
+    fills = [(p["__rs_edge"], p["__rs_s"]) for p in feats if p["__rs_k"] == 1]
+    assert fills == [(0, 1), (1, 5), (2, 1.5)]
+    assert all(max(c[2] for c in casings if c[0] == e) < s for e, s in fills if e != 2)      # an edge's fill over its own casing
+    assert "const RS_SIMPLE = " in html and "_applyFill=function" in html
+
+
+def test_simple_false_leaves_the_page_as_it_was():
+    """simple=False (the default) is the full look: the same page, without the simple-mode script."""
+    kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0)
+    html = render_edges(_simple_world(), **kw).html
+    assert html == render_edges(_simple_world(), simple=False, **kw).html
+    assert "RS_SIMPLE" not in html and "roads-simple" not in html
+
+
+def test_simple_refuses_tiles_and_the_tunnel_control():
+    for kw in (dict(tiles=True), dict(tunnel_control=True)):
+        with pytest.raises(ValueError, match="simple=True"):
+            render_edges(_edges(), backend="web", simple=True, **kw)
+
+
+def test_simple_puts_the_items_of_edges_above_the_road_layer():
+    """Overlay(edge_col=...) in simple mode: the items after the one road layer, before the arrows / names / highlight."""
+    g = _edge_world()
+    pts = _edge_features([12, 13], order=[0, 0])
+    style = _style(render_edges(g, backend="web", simple=True, overlays=[Overlay(pts, edge_col="edge_id", order_col="order", kind="circle", label="i")]).html)
+    ids = [l["id"] for l in style["layers"]]
+    item = next(i for i, l in enumerate(style["layers"]) if l.get("source", "").startswith("ov"))
+    assert ids.index("roads-fill") < item < ids.index("roads-highlight")

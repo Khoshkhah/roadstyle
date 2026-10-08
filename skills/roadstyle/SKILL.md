@@ -67,7 +67,8 @@ m.save("map.html")                        # m.html is the page as a string
 - Other useful keywords: `include=[...]` / `exclude=[...]` (road classes), `view_3d=True`,
   `tiles=True` (above ~50k edges), `boundary=geojson` (dashed outline),
   `overlays=[rs.Overlay(gdf, placement="under"|"over", label=..., popup=[...])]`, attached to edges: `rs.Overlay(gdf, edge_col="edge_id", order_col="order")` (drawn at its edge's fill number, by order; a click selects its road, or with `select="item"` the item itself: `rs:select` `detail.item` plus the road), look from a library's theme: `rs.Overlay(gdf, style="dashed")` with `settings={"config": {"overlays": {"styles": {...}}}}` (`width_m`, `dash`, `min_zoom`, kind `text`), `render_edges(road_fill=False)` (the road's casing without its fill),
-  `road_popup="panel"` (docked read-out instead of a popup), `arrows=`, `labels=`.
+  `road_popup="panel"` (docked read-out instead of a popup), `arrows=`, `labels=`, `simple=True` (one road layer: fast on a big page;
+  no bridge shadows, dashes or square ends, names and arrows above all roads).
 - Look: `palette="amber"` (the default), `"carto"`, `"highsat"`, `"mono"`. A street name shows where it fits inside its road
   (main roads from zoom 15-16, side streets from 17); one-way arrows on main roads from zoom 15, side streets from 17: check
   with `rs.snapshot(m, "x.png", center=(lon, lat), zoom=17)`. Bridges: slate outline and a shadow; tunnels fade and are dashed.
