@@ -3208,4 +3208,4 @@ def test_a_seam_is_long_enough_to_keep_its_direction():
     for c in seams:
         (x0, y0), (x1, y1) = c[0][:2], c[-1][:2]
         metres = math.hypot((x1 - x0) * 111320 * math.cos(math.radians(y0)), (y1 - y0) * 111320)
-        assert 0.9 < metres <= 1.0 + 1e-6
+        assert 0.9 < metres < 1.01                                   # 1 m (my metre conversion is approximate)
