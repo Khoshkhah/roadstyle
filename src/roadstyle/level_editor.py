@@ -8,6 +8,10 @@ you apply them: then they are solved together and the open page takes the new le
 reloads when more than PARTIAL_MAX roads changed, and says so; levels.csv is written too); if the solver refuses
 them, nothing is saved. The edits.csv before each
 change is kept as edits.csv.bak.
+
+``serve(folder, items=f)`` (CLI ``--items module:function``): ``f(roads)`` gets the table the map is drawn from (one row per edge, its id in
+``edge``, its road in ``road``; ``f`` may add columns to it) and returns ``(overlays, kwargs)`` for rs.render_edges, e.g. lanes as items of
+the edges (Overlay(edge_col=...)) and ``width_m_col``. Their positions follow the fill numbers, so every Apply then draws the whole page again.
 """
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -30,8 +34,8 @@ PARTIAL_MAX = 1500      # more roads changed by an Apply than this: the whole pa
 
 
 class Area:
-    def __init__(self, folder):
-        self.dir = Path(folder)
+    def __init__(self, folder, items=None):
+        self.dir, self.items = Path(folder), items
         self.roads = gpd.read_parquet(self.dir / "roads.parquet")
         self.pairs = pd.read_csv(self.dir / "pairs.csv", dtype=str, keep_default_na=False)
         self.edits_path = self.dir / "edits.csv"
@@ -131,6 +135,9 @@ class Area:
         self.update, self.reload, self._page = None, None, None
         if not in_place:
             return
+        if self.items:
+            self.reload = "the items are drawn at the new levels: the whole page again"
+            return
         changed = [i for i, (x, y) in enumerate(zip(before, self.drawn, strict=True)) if x != y]
         roads = list(dict.fromkeys(draw["road"].iat[i] for i in changed))
         if len(roads) > PARTIAL_MAX:
@@ -142,7 +149,12 @@ class Area:
 
     def _render(self, **kw):
         """The editor's map of ``self.draw`` (render_edges); with ``_edges``, the features of those roads instead (render_web.render)."""
-        return rs.render_edges(self.draw, edge_id_col="edge", directed_col="directed", driving_col="driving", road_popup=False, name=f"Level editor · {self.dir.name}",
+        draw = self.draw
+        if self.items:                                  # the caller's items on the edges (serve(items=...)), on a copy it may add columns to
+            draw = draw.copy()
+            overlays, extra = self.items(draw)
+            kw = {**extra, "overlays": overlays, **kw}
+        return rs.render_edges(draw, edge_id_col="edge", directed_col="directed", driving_col="driving", road_popup=False, name=f"Level editor · {self.dir.name}",
                                select_color="rgba(0,0,0,0)",               # the panel colours the picked roads (1 orange, 2 blue): no click glow over them
                                filter_control=False, tunnel_control=False,  # the panel is the only control: no class filter box, no Tunnels box
                                casing_start_col="casing_start", casing_level_col="casing_level", casing_end_col="casing_end",
@@ -465,8 +477,8 @@ def _handler(area):
 _EDITOR = (Path(__file__).resolve().parent / "static" / "level_editor.html").read_text()
 
 
-def serve(folder, port=8780):
-    """The editor of the area in ``folder`` at http://localhost:``port``/ until Ctrl+C."""
-    area = Area(folder)
+def serve(folder, port=8780, items=None):
+    """The editor of the area in ``folder`` at http://localhost:``port``/ until Ctrl+C; ``items``: see the module's docstring."""
+    area = Area(folder, items)
     print(f"level editor: http://localhost:{port}/  ({folder}; Ctrl+C to stop)", flush=True)
     ThreadingHTTPServer(("127.0.0.1", port), _handler(area)).serve_forever()

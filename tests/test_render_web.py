@@ -3763,3 +3763,31 @@ def test_line_items_full_look_and_tiles(monkeypatch):
     assert sum(f["properties"]["__rs_k"] == 5 for f in simple["fc"]["features"]) == 6
     with pytest.raises(ValueError, match="more than 38 items"):
         _crossing_with_lanes(n=39)
+
+
+def test_the_editor_draws_the_items_of_its_hook_and_reloads_after_an_apply(tmp_path):
+    """serve(items=f) (2026-10-10): f gets the editor's drawn table (one row per edge, ``edge``) and returns overlays and render_edges keywords,
+    which reach the page; an Apply then draws the whole page again (the items sit at the fill numbers) and says so. No hook: the same page as before."""
+    pytest.importorskip("scipy")
+    from shapely.geometry import mapping
+
+    from roadstyle.level_area import make_area
+    from roadstyle.level_editor import Area
+    make_area(_edge_world(), tmp_path)
+    plain = Area(tmp_path).page
+    seen = []
+
+    def items(draw):
+        seen.append(list(draw["edge"]))
+        draw["w"] = 6.0
+        e = draw.iloc[0]
+        fc = {"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": mapping(e.geometry),
+                                                         "properties": {"on": e["edge"], "order": 0, "width_m": 3.0, "lane_id": "L1"}}]}
+        return [Overlay(fc, edge_col="on", order_col="order", width_m_col="width_m", label="lanes", select="item")], {"width_m_col": "w"}
+
+    area = Area(tmp_path, items)
+    page = area.page
+    assert seen and page != plain and "L1" in page and "__rs_wm" in page
+    area.apply([{"op": "cap", "road": "12", "end": "start", "cap": "square"}])
+    assert area.update is None and area.reload == "the items are drawn at the new levels: the whole page again"
+    assert Area(tmp_path).page == Area(tmp_path, None).page

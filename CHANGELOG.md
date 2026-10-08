@@ -4,6 +4,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Items in the level editor.** `roadstyle-levels edit AREA --items module:function` (`serve(..., items=f)`): `f(roads)` gets the table the editor draws (one row per edge, `edge`) and returns `(overlays, render_edges keywords)`, e.g. a lane table's lanes as items of the edges; with items, every Apply draws the whole page again. Without it the page is unchanged.
+
 ## [0.19.0] — 2026-10-09
 
 Lane items in the fill's place: line items attached to an edge are drawn in the one road layer at their edge's position, each with its own width in metres; the level editor's bus mode.

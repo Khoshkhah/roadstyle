@@ -278,6 +278,7 @@ def main(argv=None):
     ed = sub.add_parser("edit", help="the level editor: a local page that writes edits.csv / heads.csv / caps.csv and solves")
     ed.add_argument("folder", type=Path)
     ed.add_argument("--port", type=int, default=8780)
+    ed.add_argument("--items", metavar="MODULE:FUNCTION", help="items drawn on the edges: FUNCTION(roads) -> (overlays, render_edges keywords), see level_editor")
     a = ap.parse_args(argv)
     if a.cmd == "make":
         edges = read_edges(a.source, a.query, a.geometry)
@@ -293,7 +294,12 @@ def main(argv=None):
               f"{info.get('order_violations', 0)} order wish(es) not kept, {info.get('seconds')} s")
     else:
         from .level_editor import serve
-        serve(a.folder, a.port)
+        items = None
+        if a.items:
+            import importlib
+            mod, _, fn = a.items.partition(":")
+            items = getattr(importlib.import_module(mod), fn)
+        serve(a.folder, a.port, items)
 
 
 if __name__ == "__main__":
