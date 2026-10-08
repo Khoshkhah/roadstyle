@@ -45,12 +45,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `rsSetTunnelStyle({toward})`, `RS_TUNNEL_TOWARDS` and a colour list in the Tunnels box.
 
 ### Changed
-- **`tunnel_control=True` works in simple mode:** the *Tunnels* box, with its palette and dash-ratio selects, and `rsSetTunnelStyle({strength, toward, palette, ratio})` recolour the one road layer (and the names, arrows and items that take the tunnel look). Only `tiles=True` still needs `simple=False`.
+- **`tunnel_control=True` works in simple mode:** the *Tunnels* box, with its palette and dash-ratio selects, and `rsSetTunnelStyle({strength, toward, palette, ratio})` recolour the one road layer (and the names, arrows and items that take the tunnel look).
 - **Simple mode draws dashes and end shapes (MapLibre 5.24 per-feature `line-dasharray` and `line-cap`):** a tunnel's casing is two pieces in the one layer, a solid one in the palette's gap colour (clear for *One colour*) and the dashes on top, 3 px wider than a casing; a dashed class's fill (footway, path, steps ...) has the full look's dash pattern; each road's end shapes (`cap_col`, `cap_start_col`, `cap_end_col`, the level editor's round / square / flat) are drawn per piece, two different ends as two fill halves and casing heads, as the full look. A casing's main piece stays round. The notebook preview (MapLibre 3.6) cannot read these two properties.
 - **Simple mode: the bridge shadow and the wider bridge casing grow with the zoom:** none below zoom 14 (no shadow, the full look's bridge casing), linearly to the full values at zoom 17 and above (they were too strong zoomed out).
 - **`simple=True` is the default** for every web map (`render_edges`, the dashboard, report and street-view pages, the level editor): one road layer, no tunnel / dashed-class dashes, every end round,
-  a blurred bridge shadow. `simple=False` draws the full look. `tiles=True` still does not work with simple mode and raises a `ValueError` that says to pass `simple=False`;
-  the command line (`--tiles`) and the Studio (vector tiles) do that themselves. 
+  a blurred bridge shadow. `simple=False` draws the full look. `tiles=True` works with simple mode: the pieces of the one road layer are a layer
+  (`simple`) of the embedded archive, read by `roads-simple` as a vector source layer; the command line (`--tiles`) and the Studio (vector tiles) use simple mode too.
 - **One tunnel slider for every colour**: the steps 0, 25, 50, 55, 60, 65, 70, 75, 100, and `tunnel_strength` defaults to 60 (was 35), and the default target is Sand (was slate), so the default tunnel look changes.
 - **The level editor does not solve for a head change** (see the first entry: the solver takes no heads).
 

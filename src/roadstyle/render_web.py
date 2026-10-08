@@ -2022,7 +2022,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     fill), with colour and width per feature. Much faster to load and zoom on a big page. A bridge's casing is ``bridge_casing_extra`` px
     wider each side than in the full look, and its shadow (``bridge_shadow``) lies evenly around its main part, blurred, not offset; both grow with the zoom (no shadow and the full look's bridge casing below zoom 14, full from 17). The tunnel casing dashes (two pieces: the palette's gap colour, then the dashes), the dashed classes' dashes and each road's end shapes (``cap_col`` ...) are per feature (MapLibre 5.8 and 5.22; the notebook preview's MapLibre 3.6 draws them solid and round). It leaves out the twin end caps;
     street names and one-way arrows are one layer each, above all roads (a name of a road under a bridge can show on the bridge),
-    and the items of ``Overlay(edge_col=...)`` are drawn above all roads too. Not with ``tiles=True``: that raises a ValueError, pass ``simple=False`` for it. ``tunnel_control=True`` works: the colour, strength, palette and dash ratio recolour the one road layer.
+    and the items of ``Overlay(edge_col=...)`` are drawn above all roads too. With ``tiles=True`` the pieces are a layer (``simple``) of the archive. ``tunnel_control=True`` works: the colour, strength, palette and dash ratio recolour the one road layer.
 
     ``tooltip`` is a convenience alias for the shared backend arg (folium / CLI ``--tooltip``): when
     given and ``road_tooltip`` is unset, its value drives the hover tooltip here too, so the same
@@ -2035,8 +2035,6 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     # column; False -> no popup. Baked into the page as (enabled flag, field list-or-null).
     # popup_mode="panel" docks the read-out as a side panel and combines with ANY field spec;
     # road_popup="panel" stays as shorthand for panel mode with the default fields.
-    if simple and tiles:
-        raise ValueError("simple=True does not work with tiles=True: pass simple=False for it (the full look)")
     if street_view not in (True, False, "window"):
         raise ValueError(f'street_view must be True, False or "window", got {street_view!r}')
     mode = popup_mode or "popup"
@@ -2502,8 +2500,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     if simple:        # one line layer for every road piece (render's docstring): the full look's road layers and their sources go
         if parts is None:
             parts = _casing_parts(geo, head_m, (highway_col, filter_col, width_m_col))
-        style["sources"]["simple"] = {"type": "geojson", "data": _simple_pieces(geo, parts, (highway_col, filter_col, width_m_col), CONFIG.bridge_shadow),
-                                      "tolerance": style["sources"]["roads"]["tolerance"]}
+        style["sources"]["simple"] = {"type": "geojson", "data": _simple_pieces(geo, parts, (highway_col, filter_col, width_m_col), CONFIG.bridge_shadow)}
+        if not tiles:     # tiles=True: the pieces go into the archive as its "simple" layer
+            style["sources"]["simple"]["tolerance"] = style["sources"]["roads"]["tolerance"]
         for k in ("casings", "halves", "shadows", "ends"):
             style["sources"].pop(k, None)
         is_c = ["==", ["get", "__rs_k"], 0]
@@ -2792,8 +2791,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         extra = [{"name": "slots", "fc": slots, "minzoom": 14}] if slots["features"] else []
         keep = {highway_col, filter_col or highway_col, "__rs_twoway", "__rs_edge", "lvl", width_m_col}
         line_layers = []
-        # the casing pieces and the twin end caps ride in the same archive (docs/design/levels_split_casing.md, 12.1)
-        for name, kind in (("casings", "line"), ("ends", "point")):
+        # the casing pieces, simple mode's pieces and the twin end caps ride in the same archive (docs/design/levels_split_casing.md, 12.1);
+        # a simple piece's tile id is its index in the layer, not the inline 16 * edge + k (only the level editor's updateData reads that)
+        for name, kind in (("casings", "line"), ("simple", "line"), ("ends", "point")):
             src = style["sources"].pop(name, None)
             for lyr in style["layers"]:
                 if lyr.get("source") == name:

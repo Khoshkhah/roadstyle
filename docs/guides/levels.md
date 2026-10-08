@@ -128,7 +128,7 @@ To give your own band per edge and let the solver do the rest: `rs.compute_level
 ## Good to know
 
 - Each position that occurs gets its casing and fill layers (only those something is drawn by: no bridge layers without a bridge there), so keep the range small.
-- `rsColor` and colour-by reach every position. `tiles=True` (with `simple=False`) works with positions.
+- `rsColor` and colour-by reach every position. `tiles=True` works with positions, in both looks.
 - `render_edges` takes no band and no order: compute the levels first.
 
 See also: [the level step, in full](../design/level_input.md) · [divided casing](../design/levels_split_casing.md) ·

@@ -8,9 +8,9 @@
     import roadstyle as rs
 
     rs.render_edges(edges).save("map.html")               # up to ~10⁴ edges
-    rs.render_edges(edges, tiles=True, simple=False).save("map.html")   # ~10⁵ edges, still one file
+    rs.render_edges(edges, tiles=True).save("map.html")   # ~10⁵ edges, still one file
     levels = rs.compute_levels(edges)      # the drawing order, once
-    rs.render_edges(levels, tiles=True, simple=False, casing_level_col="casing_level", fill_level_col="fill_level",
+    rs.render_edges(levels, tiles=True, casing_level_col="casing_level", fill_level_col="fill_level",
                     casing_start_col="casing_start", casing_end_col="casing_end").save("map.html")
     rs.render_edges(edges, backend="lonboard",            # millions, in a notebook
                     color_by="maxspeed_kmh", cmap="magma", width_by=(1, 5))
@@ -30,7 +30,7 @@ Below ~10⁴ edges this is the simplest and just as fast as the options below.
 
 ## Towards ~10⁵ edges: `tiles=True`
 
-`tiles=True` embeds the roads as a PMTiles vector tileset in the same HTML file. Pass `simple=False` with it: simple mode (the default) does not work with tiles and raises a `ValueError`.
+`tiles=True` embeds the roads as a PMTiles vector tileset in the same HTML file. Both looks work with it: simple mode (the default) puts its road pieces in the tileset as one tile layer, `simple=False` its casing pieces and end caps.
 
 - The browser parses only the tiles in view, so a ~100k-edge map opens in seconds, not ~10 s.
 - Low zooms carry simplified geometry.
