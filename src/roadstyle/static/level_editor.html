@@ -298,6 +298,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
         <span>length</span><span>${f.length_m != null ? f.length_m + " m" : "–"}</span><span>edges</span><span>${f.edges ?? "–"}${f.two_way ? " (two-way)" : ""}</span>
         <span>look</span><span>${esc(f.look || "–")}</span><span>lanes</span><span>${esc(f.lanes ?? "–")}</span>
         ${f.modes ? `<span>modes</span><span style="grid-column:span 3">${esc(f.modes)}</span>` : ""}
+        ${f.bus_lines ? `<span>bus lines</span><span style="grid-column:span 3">${esc(f.bus_lines)}</span>` : ""}
         <span>road id</span><span style="grid-column:span 3;font-size:11px">${esc(r)}</span>
         ${(f.directions || []).map(d => `<span>${d.way === "along" ? "direction ●→○" : "direction ○→●"}</span><span style="grid-column:span 3;font-size:11px"
           title="${d.way === "along" ? "This edge runs from the road's start to its end" : "This edge runs the other way, from the road's end to its start"}">${esc(d.edge)}${d.edge_ref ? " · " + esc(d.edge_ref) : d.way === "against" ? " · <i>edge_ref not in roads.parquet (make the area again)</i>" : ""}</span>`).join("")}</div>
@@ -538,7 +539,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     }
   }
   // --- which modes show (the roads' modes column, e.g. "driving + walking"; none: private): display only, every road is still solved
-  const MODES = ["driving", "walking", "cycling", "private"];
+  const MODES = ["driving", "walking", "cycling", "bus", "private"];   // bus: a bus line runs on it (duckOSM bus.route_edges)
   const modesOf = p => p.modes ? String(p.modes).split(" + ") : ["private"];
   function modeBox(){
     if(!rsQuery(p => p.modes).length) return;                 // data without modes: no box

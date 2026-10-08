@@ -1,6 +1,7 @@
 """The drawing order of each edge, from the data alone (docs/design/levels_split_casing.md): ``casing_level_col`` / ``fill_level_col``."""
 from __future__ import annotations
 
+import re
 import warnings
 from collections import defaultdict
 
@@ -404,6 +405,13 @@ def level_input(edges, id_col="edge_id", layer_col="layer", bridge_col="bridge",
             v = g["modes"].iloc[i]
             both[r] += [] if missing(v) else [t for t in str(v).split(" + ") if t not in both[r]]
         shown["modes"] = [" + ".join(m) or None for m in both]
+    if "bus_lines" in g.columns:                        # the bus lines on any of the road's edges (duckOSM's bus.route_edges), e.g. "3, 607, X1"
+        lines = [[] for _ in first]
+        for i, r in enumerate(rid):
+            v = g["bus_lines"].iloc[i]
+            lines[r] += [] if missing(v) else [t.strip() for t in str(v).split(",") if t.strip() and t.strip() not in lines[r]]
+        key = lambda t: [int(x) if x.isdigit() else x for x in re.split(r"(\d+)", t)]                     # noqa: E731  natural order
+        shown["bus_lines"] = [", ".join(sorted(m, key=key)) or None for m in lines]
     if "edge_ref" in g.columns:                         # each edge's own edge_ref, as edges / reversed (the editor shows both directions)
         refs = ([[] for _ in first], [[] for _ in first])
         for i, r in enumerate(rid):
