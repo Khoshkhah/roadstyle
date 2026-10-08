@@ -1094,7 +1094,7 @@ def _tunnel_conf(html):
 
 
 def test_the_tunnel_look_is_v2s_slider():
-    """docs/design/tunnel_look.md: at tunnel_strength (35) everything on a tunnel moves toward the same slate: its fill, its street names,
+    """docs/design/tunnel_look.md: at tunnel_strength (50) everything on a tunnel moves toward the same slate: its fill, its street names,
     its arrows (an SDF icon of their own) and every item attached to it (one fade, however an item was added); the page gets each
     colour without the look and the dash layers. A map without tunnels has no look and no Tunnels box; an unknown palette
     is an error."""
@@ -1104,11 +1104,11 @@ def test_the_tunnel_look_is_v2s_slider():
     style, conf = _style(html), _tunnel_conf(html)
     assert _tunnel_conf(render_edges(_edge_world(), backend="web", basemap="blank").html)["control"] is False   # the box is off by default
     lay = {l["id"]: l for l in style["layers"]}
-    assert conf["strength"] == 35 and conf["palette"] == "Graphite + silver" and conf["control"] is True and conf["ratio"] == [1, 1]
+    assert conf["strength"] == 50 and conf["palette"] == "Graphite + silver" and conf["control"] is True and conf["ratio"] == [1, 1]
     assert conf["dash"] and all(i.startswith("roads-casing") and i.endswith("-dash") for i in conf["dash"])
     for lid, entries in conf["layers"].items():
         for k, base, to in entries:
-            assert lay[lid]["paint"][k] == _tun_mix(base, _TUN_TO[to], 35)
+            assert lay[lid]["paint"][k] == _tun_mix(base, _TUN_TO[to], 50)
     kinds = {(i.split("-lv")[0].rstrip("-"), k, to) for i, entries in conf["layers"].items() for k, _, to in entries}
     assert {("roads-fill", "line-color", "fill"), ("roads-labels", "text-color", "fill"),
             ("roads-arrows", "icon-color", "fill")} <= {(a.replace("-tunnel", "").replace("-bridge", ""), b, c) for a, b, c in kinds}
@@ -1127,72 +1127,59 @@ def test_the_tunnel_look_is_v2s_slider():
         render_edges(_edge_world(), backend="web", settings={"config": {"tunnel_palette": "Pink"}})
 
 
-def test_the_tunnel_can_move_toward_the_background():
-    """docs/design/tunnel_look.md (2026-10-08): tunnel_toward="background" moves a tunnel toward the base map's background colour instead of slate;
-    satellite has none (an error as the starting base map); an unknown value is an error; "slate" stays the default."""
-    from roadstyle.render_web import _TUN_TO, _tun_mix
+def test_the_tunnel_moves_toward_a_chosen_colour():
+    """docs/design/tunnel_look.md (2026-10-08): tunnel_toward is a name in tunnel_towards or a #rrggbb (default Slate); the slider starts at 50;
+    an unknown name or a bad colour is an error naming the choices."""
+    from roadstyle.render_web import _tun_mix
     cfg = lambda **c: {"config": c}
-    slate = _tunnel_conf(render_edges(_edge_world(), backend="web", basemap="blank").html)
-    assert slate["toward"] == "slate"
-    html = render_edges(_edge_world(), backend="web", basemap="blank_dark", basemaps=["blank_dark", "blank", "satellite"],
-                        settings=cfg(tunnel_toward="background")).html
-    conf, lay = _tunnel_conf(html), {l["id"]: l for l in _style(html)["layers"]}
-    assert conf["toward"] == "background" and conf["background"] == {"light": "#efede8", "dark": "#14181d"} \
-        and conf["dark"] == {"blank_dark": True, "blank": False, "satellite": True} and conf["strength"] == 50 and slate["strength"] == 35
-    for lid, entries in conf["layers"].items():
-        for k, base, to in entries:
-            assert lay[lid]["paint"][k] == _tun_mix(base, "#14181d", 50)
-    with pytest.raises(ValueError, match="slate.*background"):
-        render_edges(_edge_world(), backend="web", basemap="blank", settings=cfg(tunnel_toward="grey"))
-    sat = render_edges(_edge_world(), backend="web", basemap="satellite", settings=cfg(tunnel_toward="background")).html   # dark: no error
-    assert _tunnel_conf(sat)["dark"]["satellite"] is True
-    mine = {"light": "#ffffff", "dark": "#000000"}                       # tunnel_background is a setting; strength set explicitly wins
-    h2 = render_edges(_edge_world(), backend="web", basemap="blank", settings=cfg(tunnel_toward="background", tunnel_background=mine, tunnel_strength=10)).html
-    assert _tunnel_conf(h2)["background"] == mine and _tunnel_conf(h2)["strength"] == 10
-    assert {l["id"]: l for l in _style(h2)["layers"]}[next(iter(_tunnel_conf(h2)["layers"]))]["paint"]
-    for bad in ({"light": "#fff", "dark": "#000000"}, {"light": "#ffffff"}, "#ffffff"):
-        with pytest.raises(ValueError, match="tunnel_background"):
-            render_edges(_edge_world(), backend="web", basemap="blank", settings=cfg(tunnel_toward="background", tunnel_background=bad))
+    base = _tunnel_conf(render_edges(_edge_world(), backend="web", basemap="blank").html)
+    assert base["toward"] == "Slate" and base["to"]["fill"] == "#64748b" and base["strength"] == 50 and base["towards"]["Dark"] == "#14181d"
+    assert list(base["towards"]) == ["Slate", "Dark", "Light", "Graphite", "Navy", "Stone", "Sand", "Teal"]
+    for toward, hexc in (("Dark", "#14181d"), ("#123456", "#123456")):
+        html = render_edges(_edge_world(), backend="web", basemap="blank", settings=cfg(tunnel_toward=toward, tunnel_strength=60)).html
+        conf, lay = _tunnel_conf(html), {l["id"]: l for l in _style(html)["layers"]}
+        assert conf["toward"] == toward and conf["to"]["fill"] == hexc and conf["strength"] == 60
+        for lid, entries in conf["layers"].items():
+            for k, b0, to in entries:
+                assert lay[lid]["paint"][k] == _tun_mix(b0, hexc, 60)
+    for bad in ("Pink", "#12345", 7):
+        with pytest.raises(ValueError, match="tunnel_toward.*Slate"):
+            render_edges(_edge_world(), backend="web", basemap="blank", settings=cfg(tunnel_toward=bad))
+    with pytest.raises(ValueError, match="tunnel_towards"):
+        render_edges(_edge_world(), backend="web", basemap="blank", settings=cfg(tunnel_towards={"Slate": "grey"}))
 
 
-def test_the_tunnel_target_follows_the_base_map_in_the_browser(tmp_path):
-    """Toward the background in a real page: switching the base map rebuilds the expressions with the new background; rsSetTunnelStyle({toward})
-    switches back to slate; a bad value throws; satellite is dark (#14181d)."""
+def test_the_tunnel_target_is_chosen_in_the_browser(tmp_path):
+    """The Tunnels box colour list and rsSetTunnelStyle({toward}) in a real page: a name or a colour rebuilds the expressions; a bad value throws;
+    one slider of nine steps for every colour."""
     pw = pytest.importorskip("playwright.sync_api")
     path = tmp_path / "toward.html"
     from roadstyle import compute_levels
     from roadstyle.render_web import _level_id
     g = _edge_world()
     fill = _level_id("roads-fill", int(compute_levels(g).fill_level[1]))
-    render_edges(g, backend="web", basemap="blank_dark", basemaps=["blank_dark", "blank", "satellite"], tunnel_control=True,
-                 settings={"config": {"tunnel_toward": "background"}}).save(path)
+    render_edges(g, backend="web", basemap="blank_dark", tunnel_control=True).save(path)
     get = f'() => JSON.stringify(map.getPaintProperty("{fill}", "line-color"))'
-    errors, warns = [], []
+    errors = []
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page()
         page.on("pageerror", lambda e: errors.append(str(e)))
-        page.on("console", lambda m: (errors if m.type == "error" else warns).append(m.text))
+        page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
         page.goto(path.resolve().as_uri())
         page.wait_for_function("window.map && map.loaded() && document.getElementById('tn-toward')", timeout=30_000)
-        dark = page.evaluate(get)
-        sel = page.evaluate("document.getElementById('tn-toward').value")
-        steps_bg = page.evaluate("Array.from(document.getElementById('tn-pre').options).map(o => o.value).join()")
-        page.evaluate("rsSetBasemap('blank')")
-        light = page.evaluate(get)
-        page.evaluate("rsSetTunnelStyle({background: {light: '#ffffff', dark: '#000000'}})")
-        mine = page.evaluate(get)
-        page.evaluate("document.getElementById('tn-toward').value = 'slate'; document.getElementById('tn-toward').onchange()")
         slate = page.evaluate(get)
-        steps_slate = page.evaluate("Array.from(document.getElementById('tn-pre').options).map(o => o.value).join() + ' ' + TUNNEL.strength")
+        steps = page.evaluate("Array.from(document.getElementById('tn-pre').options).map(o => o.value).join()")
+        opts = page.evaluate("Array.from(document.getElementById('tn-toward').options).map(o => o.value).join()")
+        page.evaluate("document.getElementById('tn-toward').value = 'Dark'; document.getElementById('tn-toward').onchange()")
+        dark = page.evaluate(get)
+        page.evaluate("rsSetTunnelStyle({toward: '#123456'})")
+        mine = page.evaluate(get)
         bad = page.evaluate("() => { try { rsSetTunnelStyle({toward: 'x'}); return ''; } catch(e) { return e.message; } }")
-        page.evaluate("rsSetTunnelStyle({toward: 'background'}); rsSetBasemap('satellite')")
-        sat = page.evaluate(get)
         browser.close()
-    assert errors == [] and sel == "background"
-    assert "#14181d" in dark and "#efede8" not in dark and "#efede8" in light and "#64748b" in slate and "#64748b" not in light
-    assert "must be" in bad and "#000000" in sat   # satellite is dark: the dark colour set above
-    assert steps_bg == "0,25,50,75,100" and steps_slate == "0,20,35,70,100 35" and "#ffffff" in mine
+    assert errors == []
+    assert steps == "0,25,50,55,60,65,70,75,100" and opts.startswith("Slate,Dark,Light") and opts.endswith("Teal")
+    assert "#64748b" in slate and "#14181d" in dark and "#64748b" not in dark and "#123456" in mine and "Slate" in bad
 
 
 def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
@@ -1235,11 +1222,11 @@ def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
     assert errors == []
     assert opened["pattern"] is None and opened["dash"] == [1, 1] and opened["slider"] == "2" and opened["pal"] == "Graphite + silver"
     assert "rgba(0,0,0,0)" not in opened["gap"]                                           # two colours by default: the gaps are the second colour
-    assert moved["slider"] == "3"                                                        # five steps: 0 20 35 70 100
+    assert moved["slider"] == "6"                                                        # nine steps: 0 25 50 55 60 65 70 75 100
     assert "70" in moved["fill"] and moved["pal"] == "Teal + mint" and moved["dash"] == [4, 3] and moved["pattern"] is None
     teal70, mint70 = "#547384", "#76919f"                                                 # #2f6f73, #9fd3cf 70 % toward #64748b (JS rounds .5 up)
     assert moved["dash_color"] == teal70 and mint70 in moved["gap"]
-    assert ev == {"strength": 70, "palette": "Teal + mint", "ratio": [4, 3], "toward": "slate"}
+    assert ev == {"strength": 70, "palette": "Teal + mint", "ratio": [4, 3], "toward": "Slate"}
     assert "__rs_fill__1" in coloured["fill"] and "interpolate" in coloured["fill"]          # Colour by keeps the look
     assert zero["dash_color"] == "#2f6f73" and "#9fd3cf" in zero["gap"]                  # at 0 the palette as it is
     assert one["dash_color"] == "#64748b" and "rgba(0,0,0,0)" in one["gap"]               # One colour at 100: slate dashes, empty gaps

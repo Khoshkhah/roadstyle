@@ -428,7 +428,6 @@ function rsSetBasemap(keyOrIdx){
     map.addLayer({...def, layout:{...(def.layout||{}), visibility:"visible"}}, after);
   } else if(map.getLayer("basemap")) map.setLayoutProperty("basemap","visibility","none");
   map.setPaintProperty("bg","background-color", b.bg);
-  TUNNEL.bm = b.key; if(_tunOn && TUNNEL.toward === "background") rsSetTunnelStyle();   // the tunnel look follows the new background
   const m = document.querySelector(".bm-menu");
   if(m) Array.from(m.children).forEach((el,i)=>el.classList.toggle("on", i===idx));
   document.dispatchEvent(new CustomEvent("rs:basemapchange",{detail:{basemap:b.key, index:idx}}));
@@ -679,11 +678,8 @@ const COLOR_OPTIONS = __COLOR_OPTIONS__;
 // the tunnel look, v2's slider (docs/design/tunnel_look.md): TUNNEL.strength 0-100 moves a tunnel's colours toward TUNNEL.to;
 // TUNNEL.layers = {layer id: [[paint property, colour without the look, key of TUNNEL.to], ...]}, TUNNEL.dash = the casing dash layers
 const TUNNEL = __TUNNEL__;
-TUNNEL.bm = BASEMAPS[0].key;       // the base map in view (the first one is the page's starting one)
 function _tunMix(e, toward){ return ["case",["to-boolean",["get","__rs_tunnel"]],["interpolate",["linear"],TUNNEL.strength,0,e,100,toward],e]; }
 const _tunOn = Object.keys(TUNNEL.layers).length > 0;
-// the colour the look moves toward: slate, or (TUNNEL.toward "background") one colour per theme: TUNNEL.bgs[base map key]
-function _tunFill(){ return TUNNEL.toward === "background" ? TUNNEL.background[TUNNEL.dark[TUNNEL.bm] ? "dark" : "light"] : TUNNEL.to.fill; }
 const RS_FILL_LAYERS = __RS_FILL_LAYERS__;
 const RS_END_LAYERS = __RS_END_LAYERS__;   // twin_ends.md
 const RS_END_CASING_LAYERS = __RS_END_CASING_LAYERS__;
@@ -713,7 +709,7 @@ function _fillExpr(idE){
   return e;
 }
 function _applyFill(){
-  const look=x=>_tunOn ? _tunMix(x, _tunFill()) : x;
+  const look=x=>_tunOn ? _tunMix(x, TUNNEL.to.fill) : x;
   const e=look(_fillExpr());
   // the fill halves of an edge with two different ends (square_ends.md) have no feature id: they name their edge in __rs_edge
   // (without it a recolouring could not evaluate on them and MapLibre drew them black)
@@ -946,16 +942,13 @@ function rsSetTunnelStyle(o){
   if(o.strength != null) TUNNEL.strength = Math.max(0, Math.min(100, +o.strength));
   if(o.palette != null && o.palette in TUNNEL.palettes) TUNNEL.palette = o.palette;
   if(o.ratio != null) TUNNEL.ratio = o.ratio.map(Number);
-  if(o.toward != null){
-    if(o.toward !== "slate" && o.toward !== "background") throw new Error("rsSetTunnelStyle: toward must be 'slate' or 'background', got "+JSON.stringify(o.toward));
-    TUNNEL.toward = o.toward; }
-  if(o.background != null){
-    const b = o.background;
-    if(!b || !/^#[0-9a-f]{6}$/i.test(b.light) || !/^#[0-9a-f]{6}$/i.test(b.dark)) throw new Error("rsSetTunnelStyle: background must be {light: '#rrggbb', dark: '#rrggbb'}, got "+JSON.stringify(b));
-    TUNNEL.background = {light: b.light, dark: b.dark}; }
+  if(o.toward != null){                          // a name of RS_TUNNEL_TOWARDS or a "#rrggbb"
+    const c = o.toward in TUNNEL.towards ? TUNNEL.towards[o.toward] : (/^#[0-9a-f]{6}$/i.test(o.toward) ? o.toward : null);
+    if(!c) throw new Error("rsSetTunnelStyle: toward must be one of "+Object.keys(TUNNEL.towards).join(", ")+" or '#rrggbb', got "+JSON.stringify(o.toward));
+    TUNNEL.toward = o.toward; TUNNEL.to.fill = c; }
   for(const id in TUNNEL.layers) if(map.getLayer(id))
-    TUNNEL.layers[id].forEach(([k, base, to])=> map.setPaintProperty(id, k, _tunMix(base, to === "fill" ? _tunFill() : TUNNEL.to[to])));
-  const pair = TUNNEL.palettes[TUNNEL.palette], fillTo = _tunFill(), k = TUNNEL.strength/100, tun = ["to-boolean",["get","__rs_tunnel"]];
+    TUNNEL.layers[id].forEach(([k, base, to])=> map.setPaintProperty(id, k, _tunMix(base, TUNNEL.to[to])));
+  const pair = TUNNEL.palettes[TUNNEL.palette], fillTo = TUNNEL.to.fill, k = TUNNEL.strength/100, tun = ["to-boolean",["get","__rs_tunnel"]];
   const gap = pair ? _tunHex(pair[1], fillTo, k) : "rgba(0,0,0,0)";          // "One colour": empty gaps
   for(const id in TUNNEL.casing) if(map.getLayer(id)) map.setPaintProperty(id, "line-color", ["case", tun, gap, TUNNEL.casing[id]]);
   TUNNEL.dash.forEach(id=>{ if(!map.getLayer(id)) return;
@@ -966,19 +959,15 @@ function rsSetTunnelStyle(o){
         q=document.getElementById("tn-ratio"), tw=document.getElementById("tn-toward"), pr=document.getElementById("tn-pre");
   if(r) r.value = _tnStep(TUNNEL.strength); if(v) v.textContent = Math.round(TUNNEL.strength)+"%"; if(s) s.value = TUNNEL.palette;
   if(tw) tw.value = TUNNEL.toward;
-  if(pr && pr.dataset.mode !== TUNNEL.toward){ pr.dataset.mode = TUNNEL.toward; pr.textContent = "";
-    _tnSteps().forEach(([x, t])=>{ const op=document.createElement("option"); op.value=String(x); op.textContent=t; pr.appendChild(op); }); }
   if(q) q.value = TUNNEL.ratio.join(":"); if(pr) pr.value = String(TUNNEL.strength);
   document.dispatchEvent(new CustomEvent("rs:tunnelchange",{detail:{strength:TUNNEL.strength, palette:TUNNEL.palette, ratio:TUNNEL.ratio, toward:TUNNEL.toward}}));
 }
 window.rsSetTunnelStyle = rsSetTunnelStyle;
 window.RS_TUNNEL_PALETTES = TUNNEL.palettes;
+window.RS_TUNNEL_TOWARDS = TUNNEL.towards;
 if(_tunOn){ if(map.isStyleLoaded && map.isStyleLoaded()) rsSetTunnelStyle(); else map.on("load", ()=>rsSetTunnelStyle()); }
-// five steps by mode: toward slate 0 20 35 70 100, toward the background 0 25 50 75 100
-const _TN_NAMES = ["Normal colors","Subtle","Balanced","Strong","Full"];
-const _TN_VALUES = {slate:[0,20,35,70,100], background:[0,25,50,75,100]};
-const _tnSteps = () => _TN_VALUES[TUNNEL.toward].map((v, i)=>[v, _TN_NAMES[i]]);
-const _tnStep = v => _tnSteps().reduce((b, [x], i, a)=> Math.abs(x - v) < Math.abs(a[b][0] - v) ? i : b, 0);   // the nearest step   // the nearest step
+const _TN_STEPS = [0,25,50,55,60,65,70,75,100].map(v=>[v, String(v)]);       // one slider for every colour
+const _tnStep = v => _TN_STEPS.reduce((b, [x], i)=> Math.abs(x - v) < Math.abs(_TN_STEPS[b][0] - v) ? i : b, 0);   // the nearest step
 if(TUNNEL.control){
   const w=document.createElement("div"); w.className="tn-ctrl";
   const sel=(id, opts, val, on)=>{ const e=document.createElement("select"); e.id=id;
@@ -986,16 +975,16 @@ if(TUNNEL.control){
     e.value=val; e.onchange=()=>on(e.value); return e; };
   const row=()=>{ const d=document.createElement("div"); d.className="tn-row"; w.appendChild(d); return d; };
   const r1=row(); r1.appendChild(document.createTextNode("Tunnels"));
-  r1.appendChild(sel("tn-pre", _tnSteps().map(([v, t])=>[String(v), t]), String(TUNNEL.strength),
+  r1.appendChild(sel("tn-pre", _TN_STEPS.map(([v, t])=>[String(v), t]), String(TUNNEL.strength),
                      v=>rsSetTunnelStyle({strength:+v})));
   const r2=row();
   // five steps, the presets (2026-10-06: the smooth slider did not work well); its value is the step's index
-  const r=document.createElement("input"); r.type="range"; r.id="tn-str"; r.min=0; r.max=4; r.step=1; r.value=_tnStep(TUNNEL.strength);
+  const r=document.createElement("input"); r.type="range"; r.id="tn-str"; r.min=0; r.max=_TN_STEPS.length-1; r.step=1; r.value=_tnStep(TUNNEL.strength);
   r.title="Tunnel style: Normal colors keeps the normal colours, Full applies the tunnel colours";
-  r.oninput=()=>rsSetTunnelStyle({strength: _tnSteps()[+r.value][0]});
+  r.oninput=()=>rsSetTunnelStyle({strength: _TN_STEPS[+r.value][0]});
   const val=document.createElement("span"); val.id="tn-val"; val.textContent=Math.round(TUNNEL.strength)+"%";
   r2.appendChild(r); r2.appendChild(val);
-  r1.appendChild(sel("tn-toward", [["slate","Slate"],["background","Background"]], TUNNEL.toward, v=>rsSetTunnelStyle({toward:v, strength:_TN_VALUES[v][2]})));   // the other mode's step set, at its middle step
+  r1.appendChild(sel("tn-toward", [...Object.keys(TUNNEL.towards), ...(TUNNEL.toward in TUNNEL.towards ? [] : [TUNNEL.toward])].map(n=>[n, n]), TUNNEL.toward, v=>rsSetTunnelStyle({toward:v})));
   const r3=row();
   r3.appendChild(sel("tn-pal", Object.keys(TUNNEL.palettes).map(n=>[n, n]), TUNNEL.palette, v=>rsSetTunnelStyle({palette:v})));
   r3.appendChild(sel("tn-ratio", [["1:1","1:1"],["2:2","2:2"],["3:3","3:3"],["4:4","4:4"],["2:1","2:1"],["3:2","3:2"],["4:3","4:3"],["1:2","1:2"]], TUNNEL.ratio.join(":"),
