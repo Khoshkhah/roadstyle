@@ -7,12 +7,27 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **The level solver works from the tables only** (`pairs.csv` + `edits.csv`): a stack is written at make (`rs.level_input`, `roadstyle-levels make`,
+  `duckosm levels`, and inside `compute_levels`) as one row per part of the upper road that crosses the lower one (`a_end` `start` / `main` / `end`),
+  worked out once with the heads of that time (`heads.csv`, else `head_m`); no whole-road stack rows. The solver lifts exactly the named parts of the
+  enabled rows, with no geometry and no head lengths, so a head change never solves (the editor's `what_solver_sees` check is gone). Rows union; an
+  edit with `enabled=false` switches off that exact row. `solve_levels` loses `parts` and `near_rules`; `near_rules` moved to `level_input` /
+  `make --near-rules` (written as `near` rows, kept last). An old `pairs.csv` with whole-road stack rows, or an edit stack with no part, is an error
+  that says what to do (make again / name the part). Monaco all modes: 4,918 whole-road rows to 487 part rows; 14.8 s, 0 given up, 22 wishes not kept.
 - **The level editor redraws only the roads an Apply changed, in place** (no page reload): the server finds the roads whose levels, heads
   or caps are drawn differently and sends their features (roads, simple pieces, and the names / arrows when a fill number changed), built
   by `render(_edges=...)`; the page swaps them with `GeoJSONSource.updateData`. More than 1,500 changed roads: the whole page again, said
   in the status line. Monaco all modes, one cap: 6.1 s to 0.7 s from Apply to drawn. The roads and simple sources carry feature ids
   (the roads source its index, as `generateId` gave; a piece `16 * edge + k`).
-- **The level solver's near rules are off by default** (`near_rules=False` in `solve_levels`, `compute_levels` and the level_area solve functions; CLI `solve --near-rules` turns them on).
+- **The level editor's stack box**: start head / main / end head, several at once, one row each; *whole road* adds all three. *Switch off all found
+  stack rows of this pair* (one switch-off per row) to override a found stack.
+
+### Added
+- **The level editor's guard before a rule is added** (`rs.levels.rule_conflicts`, `POST /api/check`): an exact duplicate, or a loop of the
+  solver's own difference rules through the new one (found, yours, and the list waiting to be applied), named in plain words; you may add it anyway.
+
+### Changed
+- **The level solver's near rules are off by default** (`near_rules=False` in `level_input` and `compute_levels`; CLI `make --near-rules` turns them on).
   A part that only comes near the road under it is not lifted (as if switched off); `attrs["levels_near"]` is empty. Monaco all modes: 14.4 s, 9 positions, 0 given up,
   against 45.9 s, 27 positions with 11,911 near rules, 1,477 of them broken anyway.
 
@@ -33,7 +48,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   a blurred bridge shadow. `simple=False` draws the full look. `tiles=True` still does not work with simple mode and raises a `ValueError` that says to pass `simple=False`;
   the command line (`--tiles`) and the Studio (vector tiles) do that themselves. 
 - **One tunnel slider for every colour**: the steps 0, 25, 50, 55, 60, 65, 70, 75, 100, and `tunnel_strength` defaults to 60 (was 35), and the default target is Sand (was slate), so the default tunnel look changes.
-- **The level editor does not solve for a head change the solver does not see:** the solver takes from the heads only which main parts are empty and which parts of an upper road cross the road under it (`levels.solver_sees`, one helper for `solve_levels` and the editor); when both are as before, the heads are saved and drawn and the levels stay ("not solved again").
+- **The level editor does not solve for a head change** (see the first entry: the solver takes no heads).
 
 ## [0.17.1] — 2026-10-07
 

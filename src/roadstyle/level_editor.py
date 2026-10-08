@@ -3,7 +3,7 @@
     roadstyle-levels edit AREA_DIR [--port 8780]
 
 AREA_DIR holds roads.parquet and pairs.csv (roadstyle-levels make). Click two roads (or find them by edge id / edge_ref), see every pair between them (the found ones and
-your edits), switch a found one off or add one (order / stack: the road you put on top over the other, a stack on one part of it if you like; meet: an end of each). Changes wait in a list until
+your edits), switch a found one off or add one (order / stack: the road you put on top over the other, a stack on one or more parts of its casing, one row each; meet: an end of each). Changes wait in a list until
 you apply them: then they are solved together and the open page takes the new levels of the roads that changed, in place (the whole page
 reloads when more than PARTIAL_MAX roads changed, and says so; levels.csv is written too); if the solver refuses
 them, nothing is saved. The edits.csv before each
@@ -20,7 +20,7 @@ import pandas as pd
 import roadstyle as rs
 from roadstyle import render_web
 
-from .level_area import defaults, ends, own, solve, solve_local, what_solver_sees, write
+from .level_area import defaults, ends, own, solve, solve_local, write
 
 COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"]
 DRAWN = ["casing_start", "casing_level", "casing_end", "fill_level", "head_start_m", "head_end_m", "cap_start", "cap_end"]   # what is drawn of a road
@@ -157,17 +157,13 @@ class Area:
 
     def change(self, edits, saved=None, caps=None, heads=None):
         """Solve with ``edits``; save them (and the drawing's ``caps``, road -> (start, end) of "" / "square" / "flat", and ``heads``, road ->
-        (start_m, end_m), which tell the solver the empty mains) only if the solver takes them. Only caps changed: no solve. The solve is local
+        (start_m, end_m)) only if the solver takes them. Only caps or heads changed: no solve (the solver works from the tables only, 2026-10-08:
+        which parts of a stack cross was decided when the area was made). The solve is local
         (level_area.solve_local: the roads around the change, the others as they were), or the whole area when the local result would not do;
         ``said`` tells which, and why."""
-        same = edits is None and (heads is None or heads == self.heads)
-        if edits is None and not same:                       # only heads changed (caps too): does the solver see a difference?
-            e = self.edits()
-            same = what_solver_sees(self.roads, self.pairs, e if len(e) else None, self.heads, self.caps) == \
-                what_solver_sees(self.roads, self.pairs, e if len(e) else None, heads, self.caps)
-        if same:                                             # only the ends' shapes changed: the levels as they are
+        if edits is None:                                    # only the ends' shapes changed: the levels as they are
             solved, self.full = self.solved, False
-            self.said = "not solved again (only caps)" if heads is None or heads == self.heads else "not solved again (the heads change nothing the solver sees)"
+            self.said = "not solved again (only caps)" if heads is None or heads == self.heads else "not solved again (heads and caps are drawing only)"
         else:
             new, hd = self.edits() if edits is None else edits, self.heads if heads is None else heads
             solved = solve_local(self.roads, self.pairs, new if len(new) else None, hd, self.caps, self.solved,
@@ -249,6 +245,27 @@ class Area:
         wishes = [{"a": x, "b": y, "fa": self.facts[x]["levels"][3], "fb": self.facts[y]["levels"][3]} for x, y in self.wishes]   # x's fill was to be after y's
         return {"rows": rows, "near": near, "wishes": wishes, "roads": {k: self.facts[k] for r in rows + near + wishes for k in (r["a"], r["b"])}}
 
+    def check(self, rows, ops=()):
+        """The guard before rules are added (levels.rule_conflicts): which of ``rows`` (the page's new rules) conflict with the enabled rules
+        (found, edits.csv, and the changes waiting in the list, ``ops`` as apply takes them), in plain words."""
+        from .levels import rule_conflicts
+        e = self.edits()
+        gone = sorted({int(o["index"]) for o in ops if o.get("op") == "delete"})
+        edits = pd.concat([e.drop(index=gone), pd.DataFrame([_row(o["body"]) for o in ops if o.get("op") == "add"], columns=COLS)], ignore_index=True)
+        found = rule_conflicts(self.roads, self.pairs, edits if len(edits) else None, [_row(r) for r in rows])
+        return [{"rule": self.say(row), "why": why, "with": [self.say(r) for r in rules]} for row, why, rules in found]
+
+    def say(self, r):
+        """A rule in plain words, with whose it is (found / yours) when it is in the tables."""
+        def nm(x):
+            f = self.facts.get(self.road_of.get(str(x), str(x)), {})
+            return (f.get("name") or f.get("highway") or "road") + (f" [{f['edge_ref']}]" if f.get("edge_ref") else f" [{x}]")
+        part = {"start": "start head", "main": "main", "end": "end head"}
+        txt = (f"{nm(r['a'])} ({r['a_end']}) joins {nm(r['b'])} ({r['b_end']})" if r["relation"] == "meet"
+               else f"{nm(r['a'])}'s fill after {nm(r['b'])}'s" if r["relation"] == "order"
+               else f"{nm(r['a'])}'s {part.get(r['a_end'], r['a_end'])} over {nm(r['b'])}" + (" (near only)" if r["relation"] == "near" else ""))
+        return txt + (" · yours" if r.get("own") else " · found" if "enabled" not in r else "")
+
     def find(self, q, limit=20):
         """The roads for a search: an exact edge id (either direction of a road), else the edge_refs that hold ``q`` (an exact one first)."""
         q = q.strip()
@@ -292,13 +309,13 @@ def _changed(old, new, heads_old, heads_new, road_of):
 def _row(body):
     """One edit from the page's form, checked."""
     row = {c: str(body.get(c, "") or "") for c in COLS}
-    if row["relation"] not in ("meet", "stack", "order"):
-        raise ValueError("relation must be meet, stack or order")
+    if row["relation"] not in ("meet", "stack", "order", "near"):
+        raise ValueError("relation must be meet, stack or order (or near, to switch a found near row off)")
     if row["relation"] == "meet" and not (row["a_end"] in ("start", "end") and row["b_end"] in ("start", "end")):
         raise ValueError("a meet needs an end of each road (start / end)")
-    if row["relation"] == "stack" and row["a_end"] not in ("", "start", "main", "end"):
-        raise ValueError("a stack's part of the upper road is start, main, end or empty (the whole road)")
-    if row["relation"] != "meet":                               # a stack keeps its part of the upper road (a_end)
+    if row["relation"] in ("stack", "near") and row["a_end"] not in ("start", "main", "end"):
+        raise ValueError("a stack names one part of the upper road: start, main or end (one row per part)")
+    if row["relation"] != "meet":                               # a stack (near) keeps its part of the upper road (a_end)
         row["b_end"] = ""
         if row["relation"] == "order":
             row["a_end"] = ""
@@ -375,6 +392,8 @@ def _handler(area):
         def do_POST(self):
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
             try:
+                if self.path == "/api/check":
+                    return self._send(200, {"conflicts": area.check(body.get("rows", []), body.get("ops", []))})
                 if self.path != "/api/apply":
                     return self._send(404, {"error": "not found"})
                 area.apply(body.get("ops", []))
