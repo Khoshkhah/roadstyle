@@ -1877,11 +1877,14 @@ with open(os.path.join(os.path.dirname(__file__), "static", "web_template.html")
     _HTML = _fh.read()
 
 
-# Notebook previews pin MapLibre v3: v4+ silently never finishes style loading inside Jupyter
-# Notebook 7's page (data lands, zero features render) — reproduced against a live server; v3
-# renders the identical style JSON fine. Saved files keep the vendored 4.7.1 (unaffected in a
-# normal browser tab).
-_MAPLIBRE_CDN = "https://cdn.jsdelivr.net/npm/maplibre-gl@3.6.2/dist"
+# The notebook preview loads MapLibre from the CDN at the vendored version (test pins the match;
+# simple mode's per-feature line-cap / line-dasharray need >= 5.22). The preview is an
+# <iframe srcdoc>, whose location.origin is "null" (the URL about:srcdoc), while MapLibre's blob
+# worker reports the notebook server's origin; MapLibre 4.0 - 5.19 drops worker messages whose
+# origin differs, so every GeoJSON / vector source stalls: style never finishes loading, zero
+# roads (Notebook 7, JupyterLab, Streamlit, any srcdoc). 5.20 accepts the "null" origin.
+# Checked headless against Jupyter Notebook 7.5 and JupyterLab 4.5 (2026-10-07).
+_MAPLIBRE_CDN = "https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist"
 
 
 class WebMap:
@@ -1906,10 +1909,7 @@ class WebMap:
         return path
 
     def _repr_html_(self):
-        # Tiled maps preview through the same CDN v3 swap: vendored MapLibre v4 silently
-        # stalls ANY roads source (GeoJSON or vector) inside sandboxed iframes (Notebook 7,
-        # Streamlit), and pmtiles.js's Protocol.tile is v3compat — callback-style addProtocol
-        # works, so the embedded-tiles pipeline runs fine under v3.
+        # tiles=True too: pmtiles.js's Protocol.tile takes the promise-style call of MapLibre 4+.
         slim = (self._tpl
                 .replace("<style>__MAPLIBRE_CSS__</style>",
                          f'<link rel="stylesheet" href="{_MAPLIBRE_CDN}/maplibre-gl.css"/>')

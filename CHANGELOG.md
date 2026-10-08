@@ -6,6 +6,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **The notebook preview draws again, with the bundled MapLibre (5.24 from the CDN, was 3.6.2):** 3.6 rejected simple mode's per-feature
+  `line-cap` / `line-dasharray`, so the default map was blank. Why the preview had been held at 3.6: it is an `<iframe srcdoc>`, whose
+  `location.origin` is `"null"`, while MapLibre's worker reports the notebook server's origin; MapLibre 4.0 to 5.19 drops worker messages
+  whose origin differs, so no source ever loaded (style never finished, zero roads). 5.20 accepts the `"null"` origin. Checked headless in
+  Jupyter Notebook 7.5 and JupyterLab 4.5: simple, `simple=False` and `tiles=True` draw their roads. A test pins the CDN version to the vendored one.
+
 ### Changed
 - **The level solver works from the tables only** (`pairs.csv` + `edits.csv`): a stack is written at make (`rs.level_input`, `roadstyle-levels make`,
   `duckosm levels`, and inside `compute_levels`) as one row per part of the upper road that crosses the lower one (`a_end` `start` / `main` / `end`),
@@ -46,7 +53,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Changed
 - **`tunnel_control=True` works in simple mode:** the *Tunnels* box, with its palette and dash-ratio selects, and `rsSetTunnelStyle({strength, toward, palette, ratio})` recolour the one road layer (and the names, arrows and items that take the tunnel look).
-- **Simple mode draws dashes and end shapes (MapLibre 5.24 per-feature `line-dasharray` and `line-cap`):** a tunnel's casing is two pieces in the one layer, a solid one in the palette's gap colour (clear for *One colour*) and the dashes on top, 3 px wider than a casing; a dashed class's fill (footway, path, steps ...) has the full look's dash pattern; each road's end shapes (`cap_col`, `cap_start_col`, `cap_end_col`, the level editor's round / square / flat) are drawn per piece, two different ends as two fill halves and casing heads, as the full look. A casing's main piece stays round. The notebook preview (MapLibre 3.6) cannot read these two properties.
+- **Simple mode draws dashes and end shapes (MapLibre 5.24 per-feature `line-dasharray` and `line-cap`):** a tunnel's casing is two pieces in the one layer, a solid one in the palette's gap colour (clear for *One colour*) and the dashes on top, 3 px wider than a casing; a dashed class's fill (footway, path, steps ...) has the full look's dash pattern; each road's end shapes (`cap_col`, `cap_start_col`, `cap_end_col`, the level editor's round / square / flat) are drawn per piece, two different ends as two fill halves and casing heads, as the full look. A casing's main piece stays round.
 - **Simple mode: the bridge shadow and the wider bridge casing grow with the zoom:** none below zoom 14 (no shadow, the full look's bridge casing), linearly to the full values at zoom 17 and above (they were too strong zoomed out).
 - **`simple=True` is the default** for every web map (`render_edges`, the dashboard, report and street-view pages, the level editor): one road layer, no tunnel / dashed-class dashes, every end round,
   a blurred bridge shadow. `simple=False` draws the full look. `tiles=True` works with simple mode: the pieces of the one road layer are a layer

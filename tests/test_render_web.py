@@ -357,6 +357,15 @@ def test_webmap_notebook_repr_is_slim_but_saved_file_is_offline():
     assert "__MAPLIBRE_JS__" not in wm.html and "cdn.jsdelivr" not in wm.html
 
 
+def test_notebook_cdn_maplibre_is_the_vendored_version():
+    """The preview's CDN MapLibre is the vendored one: simple mode needs >= 5.22, and below 5.20
+    a srcdoc iframe (origin "null") never loads a source."""
+    import re
+    from roadstyle.render_web import _MAPLIBRE_CDN, _asset
+    vendored = re.search(r"maplibre-gl-js/blob/v([\d.]+)/", _asset("maplibre-gl.js")[:400]).group(1)
+    assert f"maplibre-gl@{vendored}/" in _MAPLIBRE_CDN
+
+
 def test_web_camera_pitch_and_bearing():
     """pitch=/bearing= set the starting camera (and survive the bounds fit); defaults come from
     the `camera` settings block (0/0)."""
