@@ -23,7 +23,7 @@ line-offset), as wide as the two directions together (a direction's casing width
 lanes, the same as this cap's radius). The second edge has no casing piece; both fills stay as they were. The casing's ends are its own caps
 (round, flat, square from the first edge's caps and heads; its start is the second edge's end), so the blob below is not drawn; a small notch
 between two round fill ends at a dead end is avoided by the level area's automatic ends: a two-way road's dead end (an end with no `meet`
-row) is `square` (`levels.dead_end_cap`), so each direction keeps its colour and the tip is one full-width end; your caps win. The twins' casing numbers, heads and caps must agree reversed (the level area writes
+row) is `square` (`levels.dead_end_cap`), so each direction keeps its colour and the tip is one full-width end; your caps win. A plain `render_edges` call does the same on its own (`_mark_twin_dead_ends`): an end of a pair where no other edge has an end point (rounded to 6 places, as `_mark_twoway`; lines crossing mid-line do not count) is `square` unless the data gives it a cap, round included. The twins' casing numbers, heads and caps must agree reversed (the level area writes
 them so); a pair that does not is named in a warning, and the first edge's are drawn.
 
 ## Problem

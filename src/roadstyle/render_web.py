@@ -1018,6 +1018,40 @@ def _mark_caps(geo, cap_col=None, start_col=None, end_col=None):
             p["__rs_cap0"], p["__rs_cap1"], p["__rs_split"] = s0, s1, True
 
 
+def _mark_twin_dead_ends(geo, cap_col=None, start_col=None, end_col=None):
+    """Config ``twin_casing`` "one": a twin pair's dead end is SQUARE (one casing round both directions + two half-width round fills leave a notch
+    at the tip), for the casing and both fills, wherever the data gives that end no cap (its cap columns null or absent: a given cap, "round"
+    too, wins). A dead end is a point where no end point of any edge lies but the pair's own two (lines that cross or touch mid-line do not
+    count; points rounded to 6 places as in :func:`_mark_twoway`). Returns the number of dead ends made square."""
+    pt = lambda c: (round(c[0], 6), round(c[1], 6))  # noqa: E731
+    ends, cs = collections.Counter(), {}
+    for i, ft in enumerate(geo["features"]):
+        c = (ft.get("geometry") or {}).get("coordinates") or []
+        if (ft.get("geometry") or {}).get("type") == "LineString" and len(c) >= 2:
+            cs[i] = (pt(c[0]), pt(c[-1]))
+            ends.update(cs[i])
+    given = lambda p, col: bool(col) and p.get(col) is not None and p.get(col) == p.get(col)  # noqa: E731
+    n = 0
+    for i, ft in enumerate(geo["features"]):
+        p = ft["properties"]
+        if p.get("__rs_twin") is None or i not in cs:
+            continue
+        s0, s1 = (p.get("__rs_cap0", p.get("__rs_cap")), p.get("__rs_cap1", p.get("__rs_cap"))) if p.get("__rs_split") else (p.get("__rs_cap"),) * 2
+        new = [s0, s1]
+        for k, (col, pnt) in enumerate(((start_col, cs[i][0]), (end_col, cs[i][1]))):
+            if cs[i][0] != cs[i][1] and ends[pnt] == 2 and not given(p, col) and not given(p, cap_col):
+                new[k] = "square"
+                n += i < p["__rs_twin"]
+        if new[0] == new[1]:
+            p.pop("__rs_cap0", None), p.pop("__rs_cap1", None), p.pop("__rs_split", None)
+            if new[0] is not None:
+                p["__rs_cap"] = new[0]
+        elif new != [s0, s1] or p.get("__rs_split"):
+            p.pop("__rs_cap", None)
+            p["__rs_cap0"], p["__rs_cap1"], p["__rs_split"] = new[0], new[1], True
+    return n
+
+
 def _halves(geo):
     """The fill of every edge with two different ends (``__rs_split``) as two halves cut at the middle, each with its end's ``__rs_cap``
     and all the edge's properties: MapLibre sets line-cap per layer, so each end shape needs its own piece (docs/design/square_ends.md).
@@ -2203,6 +2237,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     if CONFIG.twin_casing not in ("one", "each"):
         raise ValueError(f'twin_casing must be "one" or "each", got {CONFIG.twin_casing!r}')
     pairs = bool(levels) and CONFIG.twin_casing == "one" and _mark_twin_casing(geo, highway_col, edge_id_col, head_m)   # one casing per two-way pair
+    if pairs:
+        _mark_twin_dead_ends(geo, cap_col, cap_start_col, cap_end_col)      # a pair's dead end without a given cap: square
     if width_m_col:
         _mark_width_m(geo, width_m_col, casing_m)
     _stringify_unsafe_ints(geo)   # BIGINT ids (e.g. edge_id) -> string so JS doesn't round them

@@ -1040,6 +1040,52 @@ def test_a_two_way_pairs_casing_takes_each_end_its_own_cap():
         assert ends == [(0, False, "square"), (0, True, True), (1, False, "square"), (1, True, True)]
 
 
+def _twin_caps(g, simple=True, **kw):
+    """(casing cap at a, at b, fill caps by (edge, point)) of a drawn pair: a = (18, 59.30), b = (18, 59.301); a piece's cap counts at each of
+    its end points that are a or b (a whole piece: both ends, a half: its own). The full look reads the casing pieces and the halves."""
+    a, b = (18.0, 59.30), (18.0, 59.301)
+    style = _style(render_edges(g, **{**_TWIN_KW, "simple": simple, **kw}).html)
+    src = style["sources"]["simple" if simple else "casings"]["data"]["features"]
+    hv = style["sources"]["halves"]["data"]["features"] if "halves" in style["sources"] else []
+    cas, fills = {}, {}
+    for f in src + hv:
+        p, c = f["properties"], [tuple(x) for x in f["geometry"]["coordinates"]]
+        into = fills if p.get("__rs_k") == 1 or f in hv else cas
+        if into is cas and (p.get("__rs_edge") != 0 or p.get("__rs_main") or p.get("__rs_seam")):
+            continue
+        for pt in {c[0], c[-1]} & {a, b}:
+            into[(p["__rs_edge"], pt) if into is fills else pt] = p.get("__rs_cap")
+    return cas, fills
+
+
+def test_a_two_way_pairs_dead_end_is_square_without_given_caps():
+    """twin_casing "one": a pair's dead end gets "square" (casing and both fills) when the data gives that end no cap; a junction end (another
+    edge's end point there) stays round; a line crossing mid-line is no junction; a given cap wins; "each" and a one-way road are unchanged."""
+    a, b = (18.0, 59.30), (18.0, 59.301)
+    pair = [(1, "a", "b", 0, 0, 0, 0, None, None), (2, "b", "a", 0, 0, 0, 0, None, None)]
+    for simple in (True, False):
+        cas, fills = _twin_caps(_twin(pair + [(3, "c", "d", 0, 0, 0, 0, None, None)]), simple)     # c-d runs by, touching nothing
+        assert cas == {a: "square", b: "square"}
+        # a one-way edge ending at b: b is a junction, a is still a dead end
+        g = _twin(pair + [(3, "c", "b", 0, 0, 0, 0, None, None)])
+        cas, fills = _twin_caps(g, simple)
+        assert cas == {a: "square", b: None}
+        assert {k: v for k, v in fills.items() if k[0] in (0, 1)} == {(0, a): "square", (0, b): None, (1, a): "square", (1, b): None}
+        # a given cap wins (round included); the other end is still automatic
+        cas, fills = _twin_caps(_twin([(1, "a", "b", 0, 0, 0, 0, "round", None), (2, "b", "a", 0, 0, 0, 0, None, "round")]), simple)
+        assert cas == {a: None, b: "square"}
+        assert fills[(0, a)] is None and fills[(1, a)] is None and fills[(0, b)] == "square" and fills[(1, b)] == "square"
+    # a line crossing mid-line (a point inside it, not an end point at b) is no junction
+    x = _twin(pair)
+    cross = gpd.GeoDataFrame({"highway": "primary", "edge_id": [3], "cs": [0], "cm": [0], "ce": [0], "fl": [0], "cap_s": [None], "cap_e": [None]},
+                             geometry=[LineString([(17.999, 59.301), b, (18.001, 59.301)])], crs=4326)
+    assert _twin_caps(gpd.GeoDataFrame(__import__('pandas').concat([x, cross], ignore_index=True), crs=4326))[0] == {a: "square", b: "square"}
+    # "each" keeps today's blob look (no squares); a one-way road keeps round
+    assert _twin_caps(_twin(pair), settings={"config": {"twin_casing": "each"}})[1] == {(0, a): None, (0, b): None, (1, a): None, (1, b): None}
+    one = _twin([(1, "a", "b", 0, 0, 0, 0, None, None)])
+    assert _twin_caps(one)[0] == {a: None, b: None}
+
+
 def test_twin_casing_each_is_todays_look():
     """twin_casing "each": every direction draws its own casing, shifted, half the width; no __rs_pair anywhere, the end blobs as before."""
     g = _twin([(1, "a", "b", 0, 0, 0, 0, None, None), (2, "b", "a", 0, 0, 0, 0, None, None)])
@@ -1049,7 +1095,7 @@ def test_twin_casing_each_is_todays_look():
     assert "__rs_pair" not in html and "__rs_twin" not in html
     assert sorted((p["__rs_edge"], p["__rs_k"]) for p in feats) == [(0, 0), (0, 1), (1, 0), (1, 1)]
     one = _style(render_edges(g, **_TWIN_KW).html)
-    drop = lambda p: {k: v for k, v in p.items() if k not in ("__rs_pair", "__rs_twin", "__rs_edge2")}           # noqa: E731
+    drop = lambda p: {k: v for k, v in p.items() if k not in ("__rs_pair", "__rs_twin", "__rs_edge2", "__rs_cap")}           # noqa: E731
     assert [drop(f["properties"]) for f in one["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_edge"] == 0] == \
         [drop(p) for p in feats if p["__rs_edge"] == 0]                         # the first edge's pieces: the same, flagged
     assert "ends" in _style(render_edges(g, **{**_TWIN_KW, "simple": False}, **each).html)["sources"]
