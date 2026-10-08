@@ -3702,3 +3702,52 @@ def test_the_level_editor_draws_and_puts_arrows_like_render_edges(tmp_path):
     pg = _two_rules_seen(render_edges(g.assign(is_directed=rs.is_directed(g)), backend="web", simple=False, edge_id_col="edge_id",
                                       directed_col="is_directed", driving_col="driving"), list(g["ref"]))
     assert ed[0] == pg[0] and set(ed[1]) == set(pg[1]) == {"E_f", "W_f"}
+
+
+def _crossing_with_lanes(n=3, **kw):
+    """A road (edge 1) under a bridge (edge 2), each with ``n`` lane items (lines, metres), and the render's style."""
+    from shapely.geometry import LineString
+    from roadstyle import Overlay
+    a, b = LineString([(18.060, 59.315), (18.064, 59.315)]), LineString([(18.062, 59.3135), (18.062, 59.3165)])
+    roads = gpd.GeoDataFrame({"edge_id": [1, 2], "highway": ["residential"] * 2, "bridge": ["no", "yes"], "layer": [0, 1],
+                              "oneway": ["yes", "yes"]}, geometry=[a, b], crs=4326)
+    lanes = gpd.GeoDataFrame([{"edge_id": e, "order": k, "w": 3.25, "off": k * 3.0, "c": "#00ff00", "geometry": g}
+                              for e, g in ((1, a), (2, b)) for k in range(n)], crs=4326)
+    ov = Overlay(lanes, edge_col="edge_id", order_col="order", color_col="c", width_m_col="w", offset_m_col="off")
+    return render_edges(roads, backend="web", overlays=[ov], **kw)
+
+
+def test_line_items_are_pieces_of_the_one_road_layer_at_their_edge_fill():
+    """2026-10-09: in simple mode the line items attached to edges are drawn in the road layer at their edge's fill, by order: the lower road's
+    lanes stay under the bridge's casing, each edge's items above its fill; road_fill=False hides the fills, not the items."""
+    st = _style(_crossing_with_lanes(road_fill=False).html)
+    fs = st["sources"]["simple"]["data"]["features"]
+    key = lambda e, k: sorted(f["properties"]["__rs_s"] for f in fs if f["properties"]["__rs_edge"] == e and f["properties"]["__rs_k"] == k)
+    lo, hi = (min(f["properties"]["__rs_edge"] for f in fs), max(f["properties"]["__rs_edge"] for f in fs))
+    assert len(key(lo, 5)) == len(key(hi, 5)) == 3
+    assert max(key(lo, 1)) < min(key(lo, 5)) and max(key(lo, 5)) < min(key(hi, 0)) < max(key(hi, 1)) < min(key(hi, 5))
+    item = next(f["properties"] for f in fs if f["properties"]["__rs_k"] == 5)
+    assert item["__rs_ic"] == "#00ff00" and item["__rs_iwm"] > 3.25 and "lvl" in item and "__rs_cls" in item
+    lyr = next(l for l in st["layers"] if l["id"] == "roads-simple")
+    assert lyr["paint"]["line-opacity"][6] == ["case", ["==", ["get", "__rs_k"], 1], 0, 1]       # the fills hidden, the items (__rs_k 5) drawn
+    w = json.dumps(lyr["paint"]["line-width"])
+    assert '["*", ["coalesce", ["get", "__rs_iwm"], 0], ' + str(round(512 * 2 ** 18 / 40075016.686, 6)) + "]" in w   # metres -> px at zoom 18
+    assert "__rs_iom" in json.dumps(lyr["paint"]["line-offset"]) and "__rs_ic" in json.dumps(lyr["paint"]["line-color"])
+    hits = [l for l in st["layers"] if l.get("source") == "ov0"]      # the item's own layers: the pick and the highlight only
+    assert hits and all(l["paint"]["line-opacity"][0] == "case" for l in hits)
+
+
+def test_line_items_full_look_and_tiles(monkeypatch):
+    """The full look keeps the items' own layers; tiles=True carries the item pieces in the simple tile layer; too many items is an error."""
+    st = _style(_crossing_with_lanes(simple=False).html)
+    assert "simple" not in st["sources"] and all("line-opacity" not in l["paint"] or l["paint"]["line-opacity"] == 0.9
+                                                  for l in st["layers"] if l.get("source") == "ov0")
+    from roadstyle import tiles
+    seen = {}
+    real = tiles.build_pmtiles
+    monkeypatch.setattr(tiles, "build_pmtiles", lambda *a, **k: seen.update(k) or real(*a, **k))
+    _crossing_with_lanes(tiles=True)
+    simple = next(x for x in seen["line_layers"] if x["name"] == "simple")
+    assert sum(f["properties"]["__rs_k"] == 5 for f in simple["fc"]["features"]) == 6
+    with pytest.raises(ValueError, match="more than 38 items"):
+        _crossing_with_lanes(n=39)

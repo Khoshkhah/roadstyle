@@ -1605,14 +1605,14 @@ function _simpleColor(){        // render_web._simple_color, with the active col
   const sh=["==",["get","__rs_k"],2];
   const c=["==",["get","__rs_k"],0], b=["to-boolean",["get","__rs_bridge"]];
   const base=["coalesce",["get","__rs_casing"],"#000000"];
-  let fill=_fillExpr(["get","__rs_edge"]), cases=[sh,RS_SIMPLE.shadow,c,["case",b,RS_SIMPLE.bridge,base]];
+  let fill=_fillExpr(["get","__rs_edge"]), item=["coalesce",["get","__rs_ic"],"#888888"], cases=[sh,RS_SIMPLE.shadow,c,["case",b,RS_SIMPLE.bridge,base]];
   if(RS_SIMPLE.tunnels){                 // a tunnel's fill: the tunnel look; its casing: the palette's gap and dash colours (the gap clear for One colour)
-    fill=_tunMix(fill, TUNNEL.to.fill);
+    fill=_tunMix(fill, TUNNEL.to.fill); item=_tunMix(item, TUNNEL.to.fill);
     const pair=TUNNEL.palettes[TUNNEL.palette], k=TUNNEL.strength/100;
     cases.push(["==",["get","__rs_k"],3], pair ? _tunHex(pair[1], TUNNEL.to.fill, k) : "rgba(0,0,0,0)",
                ["==",["get","__rs_k"],4], _tunHex(pair ? pair[0] : TUNNEL.to.dash, TUNNEL.to.fill, k));
   }
-  return ["case",...cases,fill];
+  return ["case",...cases,["==",["get","__rs_k"],5],item,fill];    // an item (__rs_k 5) keeps its own colour
 }
 function _simpleDash(){         // render_web._simple_dasharray, with the tunnel dash ratio
   const solid=["literal",[1,0]], by=["match",["to-string",["coalesce",["get","__rs_dash"],""]]];
@@ -1622,11 +1622,11 @@ function _simpleDash(){         // render_web._simple_dasharray, with the tunnel
 const _rsFullFill=_applyFill, _rsFullSort=_applySort, _rsFullRoadFill=rsSetRoadFill;
 _applyFill=function(){ _rsFullFill();
   if(map.getLayer(RS_SIMPLE.layer)) map.setPaintProperty(RS_SIMPLE.layer,"line-color",_simpleColor()); };
-// a painted road's fill above the other fills of its position, under the casings of the next (line-sort-key 2 * position + 1.5)
+// a painted road's fill (and its items) above the other fills of its position, under the casings of the next (line-sort-key 2 * position + 1.5)
 _applySort=function(){ _rsFullSort();
   const all=_qColor ? [].concat(..._qColor.map(g=>g.ids)) : null, k=["get","__rs_s"];
   if(map.getLayer(RS_SIMPLE.layer)) map.setLayoutProperty(RS_SIMPLE.layer,"line-sort-key",
-    all ? ["+",k,["case",["all",["==",["get","__rs_k"],1],["any",_has(["get","__rs_edge"],all),_has(["get","__rs_edge2"],all)]],0.5,0]] : k); };
+    all ? ["+",k,["case",["all",["any",["==",["get","__rs_k"],1],["==",["get","__rs_k"],5]],["any",_has(["get","__rs_edge"],all),_has(["get","__rs_edge2"],all)]],0.5,0]] : k); };
 const _rsFullTunnel=rsSetTunnelStyle;
 rsSetTunnelStyle=function(o){ _rsFullTunnel(o);       // the palette (colours, in _applyFill) and the dash ratio
   if(RS_SIMPLE.tunnels && map.getLayer(RS_SIMPLE.layer)) map.setPaintProperty(RS_SIMPLE.layer,"line-dasharray",_simpleDash()); };
@@ -1885,14 +1885,39 @@ def _edge_overlay(ov, fc, roads, edge_id_col, fcol):
     return sorted(orders)
 
 
-def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4dff", roads=None, edge_id_col="edge_id", fcol="highway"):
-    """Add each overlay as its own source + layer(s) to ``style``. Returns ``(under, over, meta, edge)``:
+def _item_pieces(ov, i, fc):
+    """Simple mode: the line items of an overlay attached to edges as pieces of the one road layer (``__rs_k`` 5, docs/design/edge_items.md):
+    what the filters read from their edge (baked by :func:`_edge_overlay`), ``lvl``, their colour ``__rs_ic`` and their width / offset in
+    metres over cos(latitude) (``__rs_iwm`` / ``__rs_iom``, as ``_mark_width_m``). ``__rs_s`` is set by :func:`_simple_pieces`."""
+    C = {"color": "#6aa9ff", **(CONFIG.overlays or {})}
+    out = []
+    for j, ft in enumerate(fc["features"]):
+        p, g = ft["properties"], ft.get("geometry") or {}
+        w = p.get(ov.width_m_col) if ov.width_m_col else ov.width_m
+        if w is None or missing(w):
+            raise ValueError(f"overlay {ov.label or i}: item {j} has no width in metres ({ov.width_m_col or 'width_m'})")
+        o = p.get(ov.offset_m_col) if ov.offset_m_col else None
+        cs = g.get("coordinates") or []
+        pts = [c for part in cs for c in part] if g.get("type") == "MultiLineString" else cs
+        sec = 1 / max(math.cos(math.radians(sum(c[1] for c in pts) / len(pts))), 0.01)
+        q = {k: v for k, v in p.items() if k.startswith("__rs_")}
+        q.update(lvl=p.get("__rs_lvl", 0), __rs_k=5, __rs_ov=i, __rs_item=j, __rs_iwm=round(float(w) * sec, 4),
+                 __rs_iom=0 if o is None or missing(o) else round(float(o) * sec, 4),
+                 __rs_ic=(p.get(ov.color_col) if ov.color_col else None) or ov.color or C["color"])
+        out.append({"type": "Feature", "geometry": g, "properties": q})
+    return out
+
+
+def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4dff", roads=None, edge_id_col="edge_id", fcol="highway", fill=False):
+    """Add each overlay as its own source + layer(s) to ``style``. Returns ``(under, over, meta, edge, items)``:
     the layer specs to splice below / above the roads, the JS metadata (label / source / clickable
     layer ids / popup fields) the page reads to wire popups, hover/select highlight, and the Layers
     toggle, and the layers of the overlays attached to edges, ``[(position, order, overlay index, [layer specs])]``, which go
     between the fills of their position and its arrows (``_place_edge_overlays``). Overlay sources carry ``generateId``
-    so interactive features can take feature-state."""
-    under, over, meta, edge = [], [], [], []
+    so interactive features can take feature-state.
+    ``fill`` (simple mode): the line items attached to edges also come back as ``items``, pieces of the one road layer (:func:`_item_pieces`);
+    their own layers stay, invisible but on hover / select, for the pick, the popup and the highlight."""
+    under, over, meta, edge, items = [], [], [], [], []
     for i, item in enumerate(overlays or []):
         ov = _styled(item if isinstance(item, Overlay) else Overlay(data=item))
         fc = to_fc(ov.data)
@@ -1911,10 +1936,15 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
                 mine = []
                 for lyr in _overlay_layers(sid, ov, kind, hover_color, select_color, along):
                     lyr = {**lyr, "id": f"{lyr['id']}-lv{pos}-o{order}", "filter": flt}
+                    if fill and kind == "line":     # drawn by the road layer: this one only shows the hover / select highlight
+                        on = ["any", ["boolean", ["feature-state", "select"], False], ["boolean", ["feature-state", "hover"], False]]
+                        lyr["paint"] = {**lyr["paint"], "line-opacity": ["case", on, 1, 0]}
                     base_filters[lyr["id"]] = flt
                     mine.append(lyr)
                 edge.append((pos, order, i, mine))
                 layers += mine
+            if fill and kind == "line":
+                items += _item_pieces(ov, i, fc)
         else:
             layers = _overlay_layers(sid, ov, kind, hover_color, select_color, along)
             (under if ov.placement == "under" else over).extend(layers)
@@ -1932,10 +1962,10 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
                      "base": base_filters,              # the layers' own filters (position and order) that rsFilter must keep
                      "select": ov.select,               # an item attached to a road: a click picks its "road" or the "item"
                      "interactive": ov.popup is None or bool(ov.popup)})
-    return under, over, meta, edge
+    return under, over, meta, edge, items
 
 
-def _simple_pieces(geo, parts, cols, shadows=True):
+def _simple_pieces(geo, parts, cols, shadows=True, items=()):
     """The features of simple mode's one road layer: every casing piece (``__rs_k`` 0; the heads and seams as ``_casing_parts`` cuts them) and every fill
     (``__rs_k`` 1), with ``__rs_s``, the line-sort-key: ``2 * position``, a bridge's casing a quarter more (the full look draws it after the other
     casings of its position), a fill ``2 * position + 1``. A dashed class has no casing and its fill comes before the casings of its position
@@ -1946,7 +1976,9 @@ def _simple_pieces(geo, parts, cols, shadows=True):
     casing's key) and the dashes on top (``__rs_k`` 4, 0.1 more, still under the fill).
     Ends: the layer reads ``__rs_cap`` per piece (line-cap: none round, True flat, "square" square). As in the full look, a casing's main piece
     (between two cuts) ends flat and each cut gets its seam (a round dot at the lower number): a round main piece reached past a short head
-    into the junction (2026-10-08). An edge with two different ends draws its fill as two halves (:func:`_halves`)."""
+    into the junction (2026-10-08). An edge with two different ends draws its fill as two halves (:func:`_halves`).
+    ``items`` (:func:`_item_pieces`, ``__rs_k`` 5): the line items attached to edges, each at its edge's fill: ``2 * position + 1`` plus
+    _ITEM_STEP per rank on its edge (by order, overlay, feature), above every fill of the position and under the next casings (see _ITEM_STEP)."""
     keep = {c for c in cols if c} | {"lvl"}
     halves = collections.defaultdict(list)
     for h in _halves(geo):
@@ -1981,6 +2013,13 @@ def _simple_pieces(geo, parts, cols, shadows=True):
             raise ValueError(f"simple=True: more than {_MAX_EDGES:,} edges; the line-sort-key's tie-breaker would reach the next key step (pass simple=False)")
         f["id"], n[e] = e * _PIECES + n[e], n[e] + 1
         f["properties"]["__rs_s"] += e * _TIE   # same key: by edge, not by feature order, so a road redrawn in place (updateData) keeps its place
+    rank = collections.Counter()
+    for j, f in enumerate(sorted(items, key=lambda f: (f["properties"]["__rs_edge"], f["properties"]["__rs_ord"], f["properties"]["__rs_ov"], f["properties"]["__rs_item"]))):
+        p = f["properties"]
+        e, rank[p["__rs_edge"]] = p["__rs_edge"], rank[p["__rs_edge"]] + 1
+        if rank[e] > _MAX_ITEMS:
+            raise ValueError(f"simple=True: edge {e} has more than {_MAX_ITEMS} items; they do not fit between its fill and the next casings (pass simple=False)")
+        out.append({**f, "id": _MAX_EDGES * _PIECES + j, "properties": {**p, "__rs_s": 2 * p["__rs_fl"] + 1 + rank[e] * _ITEM_STEP + e * _TIE}})
     return {"type": "FeatureCollection", "features": out}
 
 
@@ -1988,6 +2027,10 @@ _PIECES = 16        # the most pieces of one edge in simple mode: 3 casing piece
 # the line-sort-key's tie-breaker per edge (2026-10-08): keys differ by at least 0.05 (offsets -0.5, -0.1, 0, 0.1, 0.15, 0.25, 1, 1.5 of
 # 2 * position; a painted fill + 0.5), so _MAX_EDGES * _TIE (0.01) never reaches the next key
 _TIE, _MAX_EDGES = 1e-8, 1_000_000
+# an item's step above its edge's fill (2026-10-09): more than the whole tie-breaker range, so every item of a position is above every fill of it;
+# a painted road (rsColor) moves its fill and items up 0.5, and its last item must stay under the next position's bridge shadow (2 * position + 1.9):
+# 1.5 + _MAX_ITEMS * _ITEM_STEP + _TIE range < 1.9
+_ITEM_STEP, _MAX_ITEMS = 0.01, 38
 
 
 def _edge_features(geo, edges, head_m, cols, fcol, slots):
@@ -2016,7 +2059,7 @@ def _mark_cls(geo, feature_lists, fcol):
 
 def _simple_cap():
     """Simple mode's line-cap per piece: a dashed piece butt (a round cap would seal the gaps), else the piece's ``__rs_cap`` (square, flat or round)."""
-    return ["case", ["to-boolean", ["get", "__rs_dash"]], "butt", ["==", ["get", "__rs_k"], 4], "butt",
+    return ["case", ["to-boolean", ["get", "__rs_dash"]], "butt", ["==", ["get", "__rs_k"], 4], "butt", ["==", ["get", "__rs_k"], 5], "butt",
             ["==", ["get", "__rs_cap"], "square"], "square", ["to-boolean", ["get", "__rs_cap"]], "butt", "round"]
 
 
@@ -2035,15 +2078,16 @@ def _simple_color(bridge_color, tunnels=False):
     recolouring (the simple-mode script)."""
     c, b = ["==", ["get", "__rs_k"], 0], ["to-boolean", ["get", "__rs_bridge"]]
     base, fill = ["coalesce", ["get", "__rs_casing"], "#000000"], ["coalesce", ["get", "__rs_fill"], "#888888"]
+    item = ["coalesce", ["get", "__rs_ic"], "#888888"]                  # an item (__rs_k 5) its own colour, not the road's colouring
     cases = [["==", ["get", "__rs_k"], 2], CONFIG.bridge_shadow_color, c, ["case", b, bridge_color, base]]
     if tunnels:
         to, _, s = _tun_settings()                             # the chosen tunnel colour (tunnel_toward), as the full look and the page's _simpleColor
         pair = CONFIG.tunnel_palettes[CONFIG.tunnel_palette]
         toward = lambda x: ["interpolate", ["linear"], s, 0, x, 100, to]
-        fill = _tun_mix(fill, to, s)
+        fill, item = _tun_mix(fill, to, s), _tun_mix(item, to, s)
         cases += [["==", ["get", "__rs_k"], 3], toward(pair[1]) if pair else "rgba(0,0,0,0)",
                   ["==", ["get", "__rs_k"], 4], toward(pair[0] if pair else _TUN_TO["dash"])]
-    return ["case", *cases, fill]
+    return ["case", *cases, ["==", ["get", "__rs_k"], 5], item, fill]
 
 
 def _by_feature(cases, default):
@@ -2055,6 +2099,15 @@ def _by_feature(cases, default):
     out = list(default[:3])
     for i, z in enumerate(default[3::2]):
         out += [z, ["case", *[x for cond, c in cases for x in (cond, c[4 + 2 * i])], default[4 + 2 * i]]]
+    return out
+
+
+def _metre_curve(like, prop):
+    """A zoom curve in px for the metres in ``prop`` (over cos(latitude), null 0) on the stops and interpolation of ``like``, for
+    :func:`_by_feature`: exact at each stop (512 * 2^z / C px per metre), and between them too where ``like`` is base-2 exponential."""
+    out = list(like[:3])
+    for z in like[3::2]:
+        out += [z, ["*", ["coalesce", ["get", prop], 0], round(512 * 2 ** z / 40075016.686, 6)]]
     return out
 
 
@@ -2395,8 +2448,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     by_id = None
     if overlays and any(getattr(o, "edge_col", None) for o in overlays) and edge_id_col in g.columns:
         by_id = {_eid(ft["properties"].get(edge_id_col)): ft["properties"] for ft in geo["features"]}
-    under_layers, over_layers, ov_meta, edge_layers = _build_overlays(style, overlays, hover_color, select_color, roads=by_id,
-                                                                      edge_id_col=edge_id_col, fcol=filter_col or highway_col)
+    under_layers, over_layers, ov_meta, edge_layers, items = _build_overlays(style, overlays, hover_color, select_color, roads=by_id,
+                                                                             edge_id_col=edge_id_col, fcol=filter_col or highway_col, fill=simple)
 
     # Round caps + joins everywhere: consecutive edges are separate LineStrings, and a round cap is
     # the only rendering primitive that seals the seam where two of them connect (line-join only
@@ -2729,12 +2782,13 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     if simple:        # one line layer for every road piece (render's docstring): the full look's road layers and their sources go
         if parts is None:
             parts = _casing_parts(geo, head_m, (highway_col, filter_col, width_m_col))
-        style["sources"]["simple"] = {"type": "geojson", "data": _simple_pieces(geo, parts, (highway_col, filter_col, width_m_col), CONFIG.bridge_shadow)}
+        style["sources"]["simple"] = {"type": "geojson", "data": _simple_pieces(geo, parts, (highway_col, filter_col, width_m_col), CONFIG.bridge_shadow, items)}
         if not tiles:     # tiles=True: the pieces go into the archive as its "simple" layer
             style["sources"]["simple"]["tolerance"] = style["sources"]["roads"]["tolerance"]
         for k in ("casings", "halves", "shadows", "ends"):
             style["sources"].pop(k, None)
-        is_c = ["==", ["get", "__rs_k"], 0]
+        is_c, is_it = ["==", ["get", "__rs_k"], 0], ["==", ["get", "__rs_k"], 5]
+        soff = _by_feature([(is_it, _metre_curve(off, "__rs_iom"))], off) if items else off   # an item: its own metres, not a direction's shift
         flt = [f for f in ((_minzoom_filter(highway_col, mz) if mz else None),
                            _seam_filter(),     # the full look's rule: a seam only from zoom 17 (below it a bridge's seams are dark dots at every head)
                            (["any", ["<", ["zoom"], dk["flat_below"]], ["!", is_b]] if decks["features"] else None)) if f]
@@ -2746,13 +2800,14 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         ramp = lambda z: min(max((z - 14) / 3, 0), 1)
         bwide = _plus_px(bcw, lambda z: 2 * float(CONFIG.bridge_casing_extra) * ramp(z))
         wide = [(is_sh, _plus_px(bcw, lambda z: 2 * (float(CONFIG.bridge_casing_extra) + blur) * ramp(z))), (["all", is_c, is_b], bwide),
-                *([(["any", ["==", ["get", "__rs_k"], 3], ["==", ["get", "__rs_k"], 4]], _plus_px(cw, 3))] if any_tunnel else []), (is_c, cw)]
+                *([(["any", ["==", ["get", "__rs_k"], 3], ["==", ["get", "__rs_k"], 4]], _plus_px(cw, 3))] if any_tunnel else []), (is_c, cw),
+                *([(is_it, _metre_curve(fw, "__rs_iwm"))] if items else [])]
         op = [1] if road_fill else [["==", ["get", "__rs_k"], 1], 0, 1]
         sdashes = sorted({(f.get("properties") or {}).get("__rs_dash") for f in geo["features"]} - {None, ""})
         sdash = {"line-dasharray": _simple_dasharray(sdashes, CONFIG.tunnel_casing_dash or [1, 1])} if sdashes or any_tunnel else {}
         road = {"id": "roads-simple", "type": "line", "source": "simple", "layout": {**lay, "line-cap": _simple_cap(), "line-sort-key": ["get", "__rs_s"]}, **flt,
                 "paint": {**sdash, "line-color": _simple_color(CONFIG.bridge_casing_color, bool(any_tunnel)),
-                          "line-width": _pair_width(_by_feature(wide, fw), highway_col, offset_frac, offset_zoom) if pairs else _by_feature(wide, fw), "line-offset": off,
+                          "line-width": _pair_width(_by_feature(wide, fw), highway_col, offset_frac, offset_zoom) if pairs else _by_feature(wide, fw), "line-offset": soff,
                           "line-blur": ["interpolate", ["linear"], ["zoom"], 14, 0, 17, ["case", is_sh, blur, 0]],
                           "line-opacity": ["interpolate", ["linear"], ["zoom"], 14, ["case", is_sh, 0, *op], 17, op[-1] if road_fill else ["case", *op]]}}
         # the edges themselves, invisible: what a click, a hover, Street View and the page's fill code find (the roads source, its ids)

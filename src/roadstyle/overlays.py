@@ -43,6 +43,8 @@ class Overlay:
         the road layer's ``tooltip`` vs ``road_popup``). ``None``/``[]`` = hover only highlights.
     select : with ``edge_col``, what a hover or click on a feature picks: ``"road"`` (default) its road (the road's highlight, popup and
         ``rs:select``), ``"item"`` the feature itself (its own highlight and popup; ``rs:select`` carries it as ``item`` next to its road).
+    width_m_col / offset_m_col : with ``edge_col`` and line features, in simple mode: the items are drawn IN the one road layer at their edge's
+        fill (docs/design/edge_items.md), each with its own width and line-offset in metres from these properties (the width else ``width_m``).
     """
     data: object
     kind: str | None = None
@@ -69,6 +71,8 @@ class Overlay:
     text_color: str | None = None
     text_halo: str | None = None       # the halo colour (none if absent)
     select: str = "road"               # with edge_col: a click picks its "road" or the "item" itself (docs/design/edge_items.md)
+    width_m_col: str | None = None     # with edge_col, lines, simple mode: the property with each item's width in metres (else ``width_m``)
+    offset_m_col: str | None = None    # with edge_col, lines, simple mode: the property with each item's line-offset in metres (right of the line's direction; null = 0)
 
     def __post_init__(self):
         if self.select not in ("road", "item"):
