@@ -294,7 +294,8 @@ The `config` block of the settings. Change it in a [settings override](settings.
 | `link_scale` | `0.7` | `*_link` width relative to the parent |
 | `tunnel_opacity_scale` | `0.45` | tunnel fade |
 | `tunnel_casing_dash` | `[1, 1]` | the tunnel casing's dash and gap, in line widths; a tunnel's casing is its dash layer alone |
-| `tunnel_strength` | `35` | the tunnel look, v2's slider (0-100): everything on a tunnel (fill, names, arrows, attached items) moves toward slate `#64748b`. Opaque, no see-through |
+| `tunnel_strength` | `60` | the tunnel look, v2's slider (0-100): everything on a tunnel (fill, names, arrows, attached items) moves toward the `tunnel_toward` colour. Opaque, no see-through. The Tunnels box has the steps 0, 25, 50, 55, 60, 65, 70, 75, 100 |
+| `tunnel_toward` / `tunnel_towards` | `Sand` / eight | the colour a tunnel moves toward: a name in `tunnel_towards` (`name: "#rrggbb"`: Slate `#64748b`, Dark `#14181d`, Light `#efede8`, Graphite `#374151`, Navy `#1e293b`, Stone `#78716c`, Sand `#d6cfc4`, Teal `#134e4a`) or any `#rrggbb`; the same for every base map. An unknown name or a bad colour is an error naming the choices |
 | `tunnel_palette` / `tunnel_palettes` | `Graphite + silver` / seven | the tunnel casing: a pattern of two colours as they are (the default `Graphite + silver`), or `One colour` (slate dashes, empty gaps); `name: [dash, gap]` (`Slate + ice`, `Blue + cyan`, `Warm + sand`, `Graphite + silver`, `Indigo + lavender`, `Teal + mint`); an unknown name is an error |
 | `tunnel_fill_dash` / `tunnel_fill_dash_color` | `[]` (none; e.g. `[1.2, 1.2]`) / `rgba(255,255,255,0.55)` | light dashes along a tunnel's fill, over any road colour (`[]` = none); a dashed class (steps, a dashed path) keeps only its own dashes |
 | `twin_end_caps` | `true` | a two-way road ends like one road: one road-wide round cap under its two lanes at each end, where both lanes have the same colour (`false` = each lane's own round end) |

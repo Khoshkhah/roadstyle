@@ -21,6 +21,7 @@ import html as _html
 import json
 import math
 import os
+import re
 from collections.abc import Mapping
 
 from . import _settings
@@ -1003,13 +1004,31 @@ def _twin_ends(geo, cols):
 _TUN_TO = {"fill": "#64748b", "dash": "#94a3b8"}
 
 
+_HEX6 = re.compile(r"#[0-9a-fA-F]{6}")
+
+
+def _tun_settings():
+    """``(colour, toward, strength)`` of the tunnel look from the settings, checked: ``tunnel_toward`` is a name in ``tunnel_towards`` or a ``#rrggbb``."""
+    towards, toward = CONFIG.tunnel_towards, CONFIG.tunnel_toward
+    for n, c in towards.items():
+        if not (isinstance(c, str) and _HEX6.fullmatch(c)):
+            raise ValueError(f"tunnel_towards {n!r}: {c!r} is not a '#rrggbb' colour")
+    if toward in towards:
+        colour = towards[toward]
+    elif isinstance(toward, str) and _HEX6.fullmatch(toward):
+        colour = toward
+    else:
+        raise ValueError(f"tunnel_toward {toward!r} is not a colour name in {list(towards)} or a '#rrggbb' colour")
+    return colour, toward, float(CONFIG.tunnel_strength)
+
+
 def _tun_mix(expr, toward, s):
     """A tunnel feature's colour: ``expr`` moved toward ``toward`` by the slider ``s`` (0-100); any other feature keeps ``expr``
     (docs/design/tunnel_look.md). The page builds the same expression again when the slider moves (_tunMix)."""
     return ["case", ["to-boolean", ["get", "__rs_tunnel"]], ["interpolate", ["linear"], s, 0, expr, 100, toward], expr]
 
 
-def _tunnel_look(layers, edge_ids, s, arrow_color):
+def _tunnel_look(layers, edge_ids, s, arrow_color, to=_TUN_TO):
     """The tunnel look on the finished layer list (docs/design/tunnel_look.md), at slider ``s``: everything on a tunnel (its fill, its street
     names, its arrows, every item attached to it) moves toward the same slate. Its casing is two layers, both 3 px wider than a casing: the
     position's casing layer draws the gap colour (transparent for One colour), the dash layer the dashes on top. Returns
@@ -1019,9 +1038,9 @@ def _tunnel_look(layers, edge_ids, s, arrow_color):
     tun = ["to-boolean", ["get", "__rs_tunnel"]]
     clear = "rgba(0,0,0,0)"
 
-    def mix(l, k, base, to):
-        out.setdefault(l["id"], []).append([k, base, to])
-        l["paint"][k] = _tun_mix(base, _TUN_TO[to], s)
+    def mix(l, k, base, to_key):
+        out.setdefault(l["id"], []).append([k, base, to_key])
+        l["paint"][k] = _tun_mix(base, to[to_key], s)
 
     for l in layers:
         lid = l["id"]
@@ -2615,12 +2634,14 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     elif edge_layers:       # the overlays attached to edges: after the fills of their position, before its arrows (docs/design/edge_overlays.md)
         style["layers"] = _place_edge_overlays(style["layers"], edge_layers, levels, pat_over=not road_fill)
     style["layers"] += over_layers             # caller overlays drawn on top of the roads (e.g. POIs)
+    tun_colour, tun_toward, tun_strength = _tun_settings()
     tun_paint, tun_dash, tun_casing = {}, [], {}
     if any(ft["properties"].get("__rs_tunnel") for ft in geo["features"]):      # the tunnel look (docs/design/tunnel_look.md)
         if CONFIG.tunnel_palette not in CONFIG.tunnel_palettes:
             raise ValueError(f"tunnel_palette {CONFIG.tunnel_palette!r} is not in tunnel_palettes {list(CONFIG.tunnel_palettes)}")
+        tun_to = {**_TUN_TO, "fill": tun_colour}
         tun_paint, tun_dash, tun_casing = _tunnel_look(style["layers"], {l["id"] for _, _, _, grp in edge_layers for l in grp},
-                                           float(CONFIG.tunnel_strength), arw["color"])
+                                           tun_strength, arw["color"], tun_to)
 
     # road-class filter panel: the distinct classes present, most important first. `filter_col`
     # (optional) drives the filter from a different column than the styling `highway_col` — e.g. a
@@ -2713,10 +2734,11 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             .replace("__COLOR_OPTIONS__", json.dumps(color_opts_meta or []))
             .replace("__CO_ACTIVE__", str(_active))
             .replace("__OVERLAYS__", json.dumps(ov_meta))
-            .replace("__TUNNEL__", json.dumps({"layers": tun_paint, "dash": tun_dash, "casing": tun_casing, "strength": float(CONFIG.tunnel_strength),
+            .replace("__TUNNEL__", json.dumps({"layers": tun_paint, "dash": tun_dash, "casing": tun_casing, "strength": tun_strength,
                                                "palette": CONFIG.tunnel_palette, "palettes": CONFIG.tunnel_palettes,
                                                "ratio": list(CONFIG.tunnel_casing_dash or [1, 1]), "bg": _bg_color(active_bm),
-                                               "to": _TUN_TO, "control": bool(tunnel_control and tun_paint)}))
+                                               "toward": tun_toward, "towards": CONFIG.tunnel_towards,
+                                               "to": {**_TUN_TO, "fill": tun_colour}, "control": bool(tunnel_control and tun_paint)}))
             .replace("__VIEWS__", json.dumps(view_list))
             .replace("__RS_ROAD_FILL__", json.dumps({"on": bool(road_fill), "paint": fill_paint}))
             .replace("__ROAD_POPUP__", "true" if popup_on else "false")

@@ -537,7 +537,9 @@
     "tunnel_casing_dash": [1, 1],
     "tunnel_fill_dash": [],
     "tunnel_fill_dash_color": "rgba(255,255,255,0.55)",
-    "tunnel_strength": 35,
+    "tunnel_strength": 60,
+    "tunnel_toward": "Sand",
+    "tunnel_towards": {"Slate": "#64748b", "Dark": "#14181d", "Light": "#efede8", "Graphite": "#374151", "Navy": "#1e293b", "Stone": "#78716c", "Sand": "#d6cfc4", "Teal": "#134e4a"},
     "tunnel_palette": "Graphite + silver",
     "tunnel_palettes": {"One colour": null, "Slate + ice": ["#64748b", "#cbd5e1"], "Blue + cyan": ["#315b7d", "#a9d7e8"], "Warm + sand": ["#806d64", "#e7c9a7"], "Graphite + silver": ["#4b5563", "#b8bec7"], "Indigo + lavender": ["#4c5c96", "#b9c2ea"], "Teal + mint": ["#2f6f73", "#9fd3cf"]},
     "annotations": {

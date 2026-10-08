@@ -71,7 +71,7 @@ m.save("map.html")                        # m.html is the page as a string
   no dashes or square ends, names and arrows above all roads).
 - Look: `palette="amber"` (the default), `"carto"`, `"highsat"`, `"mono"`. A street name shows where it fits inside its road
   (main roads from zoom 15-16, side streets from 17); one-way arrows on main roads from zoom 15, side streets from 17: check
-  with `rs.snapshot(m, "x.png", center=(lon, lat), zoom=17)`. Bridges: slate outline and a shadow; tunnels fade and are dashed.
+  with `rs.snapshot(m, "x.png", center=(lon, lat), zoom=17)`. Bridges: slate outline and a shadow; tunnels fade and are dashed. `settings={"config": {"tunnel_toward": "Dark"}}` (a name in `tunnel_towards`, or a `#rrggbb`) picks the colour they fade toward (default Sand; Dark or Light matching the base map keeps each class hue).
 - Ready-made pages: `rs.render_dashboard(edges, ...)` (query sidebar) and
   `rs.render_report(edges, ...)` (stats sidebar) and `rs.render_street_view(edges, ...)` (Google
   Street View beside the map, or under it with `layout="below"`, following the clicked road;
