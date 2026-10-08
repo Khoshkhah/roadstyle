@@ -3520,3 +3520,59 @@ def test_an_unclassed_two_way_pair_pairs_and_the_warning_names_it():
     feats = [f["properties"] for f in _style(html)["sources"]["simple"]["data"]["features"]]
     assert {p["__rs_edge"] for p in feats if p["__rs_k"] != 1} == {0}                  # one casing, the first edge's
     assert all(p.get("__rs_twoway", True) for p in feats) and sorted(p["__rs_edge"] for p in feats if p["__rs_k"] == 1) == [0, 1]
+
+
+def _slots_of(lines, oneway=False):
+    import json as _j
+    import geopandas as gpd
+    from shapely.geometry import LineString
+    from roadstyle.render_web import _annotation_slots
+    gdf = gpd.GeoDataFrame({"highway": [h for _, h, _ in lines], "name": [n for n, _, _ in lines]},
+                           geometry=[LineString(c) for _, _, c in lines], crs=4326)
+    g = _j.loads(gdf.to_json())
+    for f in g["features"]:
+        f["properties"]["__rs_oneway"] = oneway
+    return _annotation_slots(g, 100)["features"]
+
+
+def _x(f):
+    c = f["geometry"]["coordinates"]
+    return min(p[0] for p in c), max(p[0] for p in c)
+
+
+_K43 = 111320.0 * math.cos(math.radians(43.7))
+
+
+def test_slots_keep_away_from_crossings_but_run_through_plain_nodes():
+    from roadstyle.render_web import _crossing_half_m
+    # Main St: three edges, plain nodes at x = 0.0005 and the junction with Side St at x = 0.0010 (Side St is a different group)
+    lines = [("Main St", "residential", [(0.0, 43.7), (0.0005, 43.7)]), ("Main St", "residential", [(0.0005, 43.7), (0.0010, 43.7)]),
+             ("Main St", "residential", [(0.0010, 43.7), (0.0030, 43.7)]), ("Side St", "residential", [(0.0010, 43.699), (0.0010, 43.701)])]
+    main = sorted((f for f in _slots_of(lines) if f["properties"]["name"] == "Main St"), key=lambda f: _x(f))
+    m = _crossing_half_m("residential", 43.7)
+    for f in main:
+        lo, hi = _x(f)
+        assert not (0.0010 - m / _K43 + 1e-6 < hi and lo < 0.0010 + m / _K43 - 1e-6), (lo, hi)      # never inside the margin
+    assert main[0]["properties"]["slot"] == 0 and _x(main[0])[0] == 0.0
+    left = [f for f in main if _x(f)[1] <= 0.0010]
+    assert len(left) == 1 and _x(left[0])[1] * _K43 > 60             # the 0 - 0.0010 stretch (~71 m) is one slot across the plain node
+
+
+def test_slots_keep_away_from_a_zebra_and_a_bridge():
+    from roadstyle.render_web import _crossing_half_m
+    lines = [("Main St", "residential", [(0.0, 43.7), (0.0040, 43.7)]),
+             ("", "footway", [(0.0010, 43.69995), (0.0010, 43.70005)]),          # a zebra
+             ("Bridge", "secondary", [(0.0030, 43.699), (0.0030, 43.701)])]
+    main = sorted((f for f in _slots_of(lines) if f["properties"]["name"] == "Main St"), key=_x)
+    zebra, bridge = _crossing_half_m("footway", 43.7), _crossing_half_m("secondary", 43.7)
+    assert zebra >= 4.0 and bridge > zebra - 1
+    for f in main:
+        lo, hi = _x(f)
+        for at, m in ((0.0010, zebra), (0.0030, bridge)):
+            assert hi <= at - m / _K43 + 1e-6 or lo >= at + m / _K43 - 1e-6
+
+
+def test_name_layer_is_line_center_with_a_sort_key():
+    style = _style(render_edges(_edges(), backend="web", arrows=True, labels=True).html)
+    lab = next(l for l in style["layers"] if l["id"] == "roads-labels")
+    assert lab["layout"]["symbol-placement"] == "line-center" and lab["layout"]["symbol-sort-key"][:2] == ["*", -1]

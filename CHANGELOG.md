@@ -6,6 +6,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **Street names and one-way arrows stay off crossings:** the annotation slots are cut back by half the crossing road's drawn width plus 2 m
+  (at least 2 m + 2 m for a footway, so a zebra too) around every point where another road meets or crosses the street, bridges and tunnels
+  over it included; the stretches between are divided into slots on their own. A street through a plain node stays one stretch. Names keep
+  `line-center` and the class sort key. A short one-way road between two crossings may get no arrow. See docs/design/arrows_and_names.md.
+
 ### Fixed
 - **Both directions of an unclassed road are a pair:** a missing class (None, NaN, "") is one value when edges are paired or grouped
   (`_cls`: two-way marking, the twin casing, slots), so an edge pair with no `highway` is drawn as a pair, not as two different roads
