@@ -1,6 +1,6 @@
 {
   "name": "roadstyle",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "description": "Draw road networks as styled, interactive, offline HTML maps: a skill for writing roadstyle code and an MCP server (render_place, render_file, snapshot).",
   "author": {
     "name": "Kaveh",

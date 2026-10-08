@@ -4,7 +4,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.18.1] — 2026-10-09
+
+One-way arrows only on cars' one-ways, the same rule in every page, tiles and the level editor; empty DuckDB columns no longer crash.
 
 ### Added
 - **`rs.is_directed(edges, driving_col="driving", cycling_col="cycling", highway_col="highway")`**: the one definition of a directed edge
@@ -12,6 +14,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   whose reverse is a bus / bike lane is two halves with one arrow, on the car edge; a walking-only reverse is no half (one line).
 
 ### Fixed
+- **An empty column from DuckDB no longer crashes `render_edges`:** a column with no values comes as a nullable dtype (pandas NA), and
+  `v != v` / `v in (...)` raised on it; one test for a missing value (None, NaN, NA) is used everywhere.
 - **One-way arrows only on driving roads (`driving_col`).** An edge gets an arrow only if it is one-way and driving: `driving_col="driving"`,
   an edge with false never gets one, even with a copied `oneway`. `driving_col` decides the arrows only; the drawing (two directions or one
   line) is `directed_col`'s. A two-direction pair with one one-way edge has its arrow on that edge, pointing its way, in its own half. A one-way street's
