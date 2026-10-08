@@ -1606,6 +1606,10 @@ function _simpleColor(){        // render_web._simple_color, with the active col
   const c=["==",["get","__rs_k"],0], b=["to-boolean",["get","__rs_bridge"]];
   const base=["coalesce",["get","__rs_casing"],"#000000"];
   let fill=_fillExpr(["get","__rs_edge"]), item=["coalesce",["get","__rs_ic"],"#888888"], cases=[sh,RS_SIMPLE.shadow,c,["case",b,RS_SIMPLE.bridge,base]];
+  // a road painted by rsColor shows it on its items too: where items replace a road's fill (lanes), the fill alone would show nothing
+  // (2026-10-10: the level editor's picked roads were not visible with lanes); unpainted, an item keeps its own colour
+  if(typeof _qColor!=="undefined" && _qColor) for(let i=_qColor.length-1;i>=0;i--)
+    item=["case",["any",_has(["get","__rs_edge"],_qColor[i].ids),_has(["get","__rs_edge2"],_qColor[i].ids)],_qColor[i].color,item];
   if(RS_SIMPLE.tunnels){                 // a tunnel's fill: the tunnel look; its casing: the palette's gap and dash colours (the gap clear for One colour)
     fill=_tunMix(fill, TUNNEL.to.fill); item=_tunMix(item, TUNNEL.to.fill);
     const pair=TUNNEL.palettes[TUNNEL.palette], k=TUNNEL.strength/100;
