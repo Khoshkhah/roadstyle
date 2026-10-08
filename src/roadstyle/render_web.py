@@ -1364,11 +1364,10 @@ _SIMPLE_JS = """
 <script>
 const RS_SIMPLE = __RS_SIMPLE__;
 function _simpleColor(){        // render_web._simple_color, with the active colouring, the rsColor groups and the tunnel slider
-  const c=["==",["get","__rs_k"],0], b=["to-boolean",["get","__rs_bridge"]], t=["to-boolean",["get","__rs_tunnel"]];
-  const base=["coalesce",["get","__rs_casing"],"#000000"], fill=_fillExpr(["get","__rs_edge"]);
-  if(!RS_SIMPLE.tunnels) return ["case",c,["case",b,RS_SIMPLE.bridge,base],fill];
-  const pair=TUNNEL.palettes[TUNNEL.palette], tc=_tunHex(pair ? pair[0] : TUNNEL.to.dash, TUNNEL.to.fill, TUNNEL.strength/100);
-  return ["case",c,["case",b,RS_SIMPLE.bridge,t,tc,base],_tunMix(fill, TUNNEL.to.fill)];
+  const c=["==",["get","__rs_k"],0], b=["to-boolean",["get","__rs_bridge"]];
+  let base=["coalesce",["get","__rs_casing"],"#000000"], fill=_fillExpr(["get","__rs_edge"]);
+  if(RS_SIMPLE.tunnels){ base=_tunMix(base, TUNNEL.to.fill); fill=_tunMix(fill, TUNNEL.to.fill); }   // a tunnel's casing and fill: the tunnel look
+  return ["case",c,["case",b,RS_SIMPLE.bridge,base],fill];
 }
 const _rsFullFill=_applyFill, _rsFullSort=_applySort, _rsFullRoadFill=rsSetRoadFill;
 _applyFill=function(){ _rsFullFill();
@@ -1699,21 +1698,15 @@ def _simple_pieces(geo, parts, cols):
     return {"type": "FeatureCollection", "features": out}
 
 
-def _simple_tunnel_casing():
-    """A tunnel's casing in simple mode, one colour: the full look's casing dash colour (the tunnel palette's first colour, or the dash
-    colour for One colour, moved toward the tunnel slate by ``tunnel_strength``); the page's _tunHex, with its rounding."""
-    pair = (CONFIG.tunnel_palettes or {}).get(CONFIG.tunnel_palette)
-    a, b, t = _rgb(pair[0] if pair else _TUN_TO["dash"]), _rgb(_TUN_TO["fill"]), float(CONFIG.tunnel_strength) / 100
-    return "#" + "".join(f"{math.floor(x * (1 - t) + y * t + 0.5):02x}" for x, y in zip(a, b, strict=True))
-
-
-def _simple_color(bridge_color, tunnel_casing=None):
-    """Simple mode's line-color: a casing piece its casing colour (a bridge's ``bridge_color``, a tunnel's ``tunnel_casing``), a fill its
-    fill (a tunnel's moved toward slate, _tun_mix). The page builds the same again on every recolouring (the simple-mode script)."""
-    c, b, t = ["==", ["get", "__rs_k"], 0], ["to-boolean", ["get", "__rs_bridge"]], ["to-boolean", ["get", "__rs_tunnel"]]
+def _simple_color(bridge_color, tunnels=False):
+    """Simple mode's line-color: a casing piece its casing colour (a bridge's ``bridge_color``), a fill its fill; on a map with
+    ``tunnels`` a tunnel's casing and fill both take the tunnel look (_tun_mix toward the tunnel slate at ``tunnel_strength``). The page
+    builds the same again on every recolouring (the simple-mode script)."""
+    c, b = ["==", ["get", "__rs_k"], 0], ["to-boolean", ["get", "__rs_bridge"]]
     base, fill = ["coalesce", ["get", "__rs_casing"], "#000000"], ["coalesce", ["get", "__rs_fill"], "#888888"]
-    if tunnel_casing:
-        return ["case", c, ["case", b, bridge_color, t, tunnel_casing, base], _tun_mix(fill, _TUN_TO["fill"], float(CONFIG.tunnel_strength))]
+    if tunnels:
+        s = float(CONFIG.tunnel_strength)
+        base, fill = _tun_mix(base, _TUN_TO["fill"], s), _tun_mix(fill, _TUN_TO["fill"], s)
     return ["case", c, ["case", b, bridge_color, base], fill]
 
 
@@ -2394,7 +2387,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         flt = {"filter": ["all", *flt]} if flt else {}
         wide = [(["all", is_c, is_b], bcw), *([(["all", is_c, is_t], _plus_px(cw, 3))] if any_tunnel else []), (is_c, cw)]
         road = {"id": "roads-simple", "type": "line", "source": "simple", "layout": {**lay, "line-sort-key": ["get", "__rs_s"]}, **flt,
-                "paint": {"line-color": _simple_color(CONFIG.bridge_casing_color, _simple_tunnel_casing() if any_tunnel else None),
+                "paint": {"line-color": _simple_color(CONFIG.bridge_casing_color, bool(any_tunnel)),
                           "line-width": _by_feature(wide, fw), "line-offset": off,
                           **({} if road_fill else {"line-opacity": ["case", is_c, 1, 0]})}}
         # the edges themselves, invisible: what a click, a hover, Street View and the page's fill code find (the roads source, its ids)
