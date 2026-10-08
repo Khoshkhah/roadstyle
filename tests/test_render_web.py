@@ -3209,3 +3209,10 @@ def test_a_seam_is_long_enough_to_keep_its_direction():
         (x0, y0), (x1, y1) = c[0][:2], c[-1][:2]
         metres = math.hypot((x1 - x0) * 111320 * math.cos(math.radians(y0)), (y1 - y0) * 111320)
         assert 0.9 < metres < 1.01                                   # 1 m (my metre conversion is approximate)
+
+
+def test_simple_seams_only_from_zoom_17_as_the_full_look():
+    """A seam (a round dot at a casing cut) is drawn from zoom 17 only, as in the full look: below it a bridge's seams were dark dots at every head."""
+    style = _style(render_edges(_simple_world(), backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce").html)
+    flt = json.dumps(next(l for l in style["layers"] if l["id"] == "roads-simple")["filter"])
+    assert json.dumps(["any", ["!", ["to-boolean", ["get", "__rs_seam"]]], [">=", ["zoom"], 17]]) in flt

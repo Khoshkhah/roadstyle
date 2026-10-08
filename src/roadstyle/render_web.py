@@ -2508,6 +2508,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             style["sources"].pop(k, None)
         is_c = ["==", ["get", "__rs_k"], 0]
         flt = [f for f in ((_minzoom_filter(highway_col, mz) if mz else None),
+                           ["any", ["!", ["to-boolean", ["get", "__rs_seam"]]], [">=", ["zoom"], _SEAM_MINZOOM]],     # the full look's rule: a seam only from zoom 17 (below it a bridge's seams are dark dots at every head)
                            (["any", ["<", ["zoom"], dk["flat_below"]], ["!", is_b]] if decks["features"] else None)) if f]
         flt = {"filter": ["all", *flt]} if flt else {}
         # a bridge: its casing bridge_casing_extra px wider each side than the full look's, and its shadow (__rs_k 2) bridge_shadow_blur px
