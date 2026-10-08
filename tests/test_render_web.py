@@ -3789,5 +3789,9 @@ def test_the_editor_draws_the_items_of_its_hook_and_reloads_after_an_apply(tmp_p
     page = area.page
     assert seen and page != plain and "L1" in page and "__rs_wm" in page
     area.apply([{"op": "cap", "road": "12", "end": "start", "cap": "square"}])
+    assert area.update is not None and area.reload is None              # a cap moves no fill number: the items stay, the page updates in place
+    moved = area.solved.copy()
+    moved.loc[moved["road"] == "12", "fill_level"] += 3                 # a new fill number moves its items: the whole page again
+    area.build(area.edits(), moved, in_place=True)
     assert area.update is None and area.reload == "the items are drawn at the new levels: the whole page again"
     assert Area(tmp_path).page == Area(tmp_path, None).page

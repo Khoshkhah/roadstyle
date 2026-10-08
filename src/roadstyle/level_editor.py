@@ -11,7 +11,8 @@ change is kept as edits.csv.bak.
 
 ``serve(folder, items=f)`` (CLI ``--items module:function``): ``f(roads)`` gets the table the map is drawn from (one row per edge, its id in
 ``edge``, its road in ``road``; ``f`` may add columns to it) and returns ``(overlays, kwargs)`` for rs.render_edges, e.g. lanes as items of
-the edges (Overlay(edge_col=...)) and ``width_m_col``. Their positions follow the fill numbers, so every Apply then draws the whole page again.
+the edges (Overlay(edge_col=...)) and ``width_m_col``. Their positions follow the fill numbers, so an Apply that changes a fill number draws the
+whole page again; a cap or a head is taken in place.
 """
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -135,15 +136,15 @@ class Area:
         self.update, self.reload, self._page = None, None, None
         if not in_place:
             return
-        if self.items:
-            self.reload = "the items are drawn at the new levels: the whole page again"
-            return
         changed = [i for i, (x, y) in enumerate(zip(before, self.drawn, strict=True)) if x != y]
         roads = list(dict.fromkeys(draw["road"].iat[i] for i in changed))
         if len(roads) > PARTIAL_MAX:
             self.reload = f"{len(roads)} roads changed, more than {PARTIAL_MAX}: the whole page again"
             return
         names = any(before[i][k] != self.drawn[i][k] for i in changed for k in (1, 3))   # a fill number (max of casing, fill) changed: the names and
+        if self.items and names:                       # the items sit at their edge's fill number: a new one moves them, so the whole page; a cap or a
+            self.reload = "the items are drawn at the new levels: the whole page again"      # head leaves every fill number as it was: in place (2026-10-10)
+            return
         feats = self._render(_edges=changed, arrows=names, labels=names)                    # arrows again (their chains follow it); both directions of a road
         self.update = {"roads": roads, "features": feats, "pieces": render_web._PIECES, "facts": {r: self.facts[r] for r in roads}, "stats": self.stats}
 
