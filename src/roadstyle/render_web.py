@@ -2299,7 +2299,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
       - ``street_view_key`` — a Google Maps JavaScript API key for the ``"window"``: its bar then
         offers Linked (a real panorama; the map marker walks and turns with the viewer, street
         imagery only) and Classic (the keyless embed), as on :func:`render_street_view`. The key
-        is written into the page - restrict it to your site's addresses. Without it, unchanged.
+        is written into the page - restrict it to your site's addresses. Default: the environment
+        variable ``GOOGLE_MAPS_API_KEY``, so every map built where it is set has it. Without a key, unchanged.
       - ``hover_color`` / ``select_color`` — the highlight colours for a hovered / selected road (the
         ``roads-highlight`` feature-state); default light-violet ``#b388ff`` / violet ``#7c4dff``.
 
@@ -2350,6 +2351,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     # road_popup="panel" stays as shorthand for panel mode with the default fields.
     if street_view not in (True, False, "window"):
         raise ValueError(f'street_view must be True, False or "window", got {street_view!r}')
+    street_view_key = street_view_key or os.environ.get("GOOGLE_MAPS_API_KEY") or None     # every page, not only those that pass it (2026-10-10)
     mode = popup_mode or "popup"
     if road_popup is False:
         popup_on, popup_fields = False, None

@@ -21,6 +21,7 @@ plain HTML/CSS/JS, safe to copy out and reshape.
 from __future__ import annotations
 
 import json
+import os
 
 from .render import render_edges
 
@@ -90,7 +91,8 @@ def render_street_view(gdf, *, panel_width: float = 42, resizable: bool = True,
     keyless embed, which cannot say where the viewer walks. With it the panel is a real panorama:
     the map marker follows every step and turn inside it, and it shows Google's own street imagery
     only (the embed also shows people's indoor photos). The key is written into the page, as every
-    browser key is - restrict it to your site's addresses in the Google Cloud console.
+    browser key is - restrict it to your site's addresses in the Google Cloud console. Default: the
+    environment variable ``GOOGLE_MAPS_API_KEY``.
     ``resizable=True`` adds a divider the viewer can drag to change it (their choice is remembered
     in their browser); ``False`` fixes the width. Any :func:`render_edges` keyword passes through.
     Returns a :class:`WebMap`; ``.save("street_view.html")`` writes the page."""
@@ -101,7 +103,7 @@ def render_street_view(gdf, *, panel_width: float = 42, resizable: bool = True,
 
     def edit(frag):
         frag = frag.replace("--sv-w: 42%;", f"--sv-w: {panel_width:g}%;", 1)
-        frag = frag.replace("__SV_KEY__", json.dumps(street_view_key or ""), 1)
+        frag = frag.replace("__SV_KEY__", json.dumps(street_view_key or os.environ.get("GOOGLE_MAPS_API_KEY") or ""), 1)
         if layout == "below":
             frag = frag.replace('<div id="sv" data-layout="beside">', '<div id="sv" data-layout="below">', 1)
         if not resizable:
