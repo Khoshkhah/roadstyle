@@ -2452,8 +2452,10 @@ def test_a_road_keeps_the_modes_of_all_its_edges():
     a = LineString([(18.0, 59.3), (18.0, 59.3 + 20 * m)])
     g = gpd.GeoDataFrame({"edge_id": [1, 2], "highway": ["residential"] * 2, "modes": ["driving + walking", "walking + cycling"]},
                          geometry=[a, LineString(list(a.coords)[::-1])], crs=4326)
-    roads, _ = rs.level_input(g)
+    roads, _ = rs.level_input(g.assign(lanes=[2, 1]))
     assert list(roads["modes"]) == ["driving + walking + cycling"]
+    # and each edge's own, for the editor (2026-10-10: a one-way street's walking-only reverse showed every mode and the street's lanes)
+    assert [list(roads[c][0]) for c in ("edges_modes", "reversed_modes", "edges_lanes", "reversed_lanes")] == [["driving + walking"], ["walking + cycling"], [2], [1]]
 
 
 def test_rsfilter_and_rscolor_by_ids_in_the_browser(tmp_path):

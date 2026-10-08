@@ -357,7 +357,7 @@ def level_input(edges, id_col="edge_id", layer_col="layer", bridge_col="bridge",
     ``roads``: one row per road (both directions of a segment together): ``road`` (the ``id_col`` of its first edge, as text; the row number
     without ``id_col``), ``edges`` / ``reversed`` (the ids of its edges in its own direction / the other way), ``band`` (``band_col``, else the
     level from the tags), ``priority`` (the ``order``: ``"priority"``, ``"class"``, a column of numbers, or None) and the geometry of its first
-    edge, and its ``highway_col``, ``name``, ``edge_ref`` (and ``edge_refs`` / ``reversed_refs``, and ``edges_oneway`` / ``reversed_oneway`` and ``edges_driving`` / ``reversed_driving`` and ``edges_directed`` / ``reversed_directed`` (:func:`roadstyle.is_directed`, from the edges' ``driving``, ``cycling`` and ``highway_col``): each edge's own, null where the edges have no such column, as ``edges`` / ``reversed``), ``lanes``, ``modes`` (who may use it, e.g. duckOSM's travel modes), ``tunnel_col``, ``bridge_col`` and ``layer_col`` when the edges have them. ``pairs``: one row per relation, ``relation`` / ``a`` / ``b`` / ``a_end`` / ``b_end``: ``meet`` (the end ``a_end`` of ``a`` is the end
+    edge, and its ``highway_col``, ``name``, ``edge_ref`` (and ``edge_refs`` / ``reversed_refs``, and ``edges_oneway`` / ``reversed_oneway`` and ``edges_driving`` / ``reversed_driving`` and ``edges_directed`` / ``reversed_directed`` (:func:`roadstyle.is_directed`, from the edges' ``driving``, ``cycling`` and ``highway_col``), ``edges_lanes`` / ``reversed_lanes`` and ``edges_modes`` / ``reversed_modes``: each edge's own, null where the edges have no such column, as ``edges`` / ``reversed``), ``lanes``, ``modes`` (who may use it, e.g. duckOSM's travel modes), ``tunnel_col``, ``bridge_col`` and ``layer_col`` when the edges have them. ``pairs``: one row per relation, ``relation`` / ``a`` / ``b`` / ``a_end`` / ``b_end``: ``meet`` (the end ``a_end`` of ``a`` is the end
     ``b_end`` of ``b``), ``stack`` (``a`` is over ``b``: different bands, crossing or near away from a shared node) and ``order`` (``a``'s fill
     after ``b``'s where they meet: one band, or different bands that only meet). A stack is one row per part of ``a``'s casing that must be
     after ``b``'s fill, its ``a_end`` ``start`` / ``main`` / ``end`` (2026-10-08): the parts that cross ``b``, worked out here once with the heads
@@ -412,6 +412,13 @@ def level_input(edges, id_col="edge_id", layer_col="layer", bridge_col="bridge",
             lines[r] += [] if missing(v) else [t.strip() for t in str(v).split(",") if t.strip() and t.strip() not in lines[r]]
         key = lambda t: [int(x) if x.isdigit() else x for x in re.split(r"(\d+)", t)]                     # noqa: E731  natural order
         shown["bus_lines"] = [", ".join(sorted(m, key=key)) or None for m in lines]
+    for c in ("lanes", "modes"):                        # each edge's own too (2026-10-10: a one-way street's walking-only reverse showed the street's lanes and every mode)
+        if c in g.columns:
+            own = ([[] for _ in first], [[] for _ in first])
+            for i, r in enumerate(rid):
+                v = g[c].iloc[i]
+                own[0 if same[i] else 1][r].append(None if missing(v) else (v.item() if hasattr(v, "item") else v))
+            shown[f"edges_{c}"], shown[f"reversed_{c}"] = own
     if "edge_ref" in g.columns:                         # each edge's own edge_ref, as edges / reversed (the editor shows both directions)
         refs = ([[] for _ in first], [[] for _ in first])
         for i, r in enumerate(rid):

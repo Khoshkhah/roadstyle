@@ -383,11 +383,11 @@ def _edge_rows(draw):
     the road's line backwards, with its two heads, casing numbers and caps swapped (level_area.edge_levels); ``edge`` is its id."""
     import shapely
     per = {"edge_ref": ("edge_refs", "reversed_refs"), "oneway": ("edges_oneway", "reversed_oneway"), "driving": ("edges_driving", "reversed_driving"),
-           "directed": ("edges_directed", "reversed_directed")}
+           "directed": ("edges_directed", "reversed_directed"), "lanes": ("edges_lanes", "reversed_lanes"), "modes": ("edges_modes", "reversed_modes")}
     missing = [c for c in ("oneway", "driving", "directed") if per[c][0] not in draw.columns]
     if missing:        # the drawing and the arrows come from each edge's own columns, as on every page: no guess from the roads
         raise ValueError(f"this area's roads.parquet has no per-edge {missing}: make the area again (make_area / rs.level_input) from edges with those columns")
-    use = {c: v for c, v in per.items() if v[0] in draw.columns}          # edge_ref: an area made since 2026-10-08
+    use = {c: v for c, v in per.items() if v[0] in draw.columns}          # edge_ref: an area made since 2026-10-08; lanes, modes: since 2026-10-10
     def one(side, w):
         cols = {c: draw[v[side]] for c, v in use.items()}
         t = draw.assign(edge=draw["edges" if side == 0 else "reversed"], _o=range(len(draw)), _w=w, **cols)
