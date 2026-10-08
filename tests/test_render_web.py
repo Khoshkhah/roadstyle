@@ -3673,6 +3673,8 @@ def test_the_level_editor_and_render_edges_give_the_same_arrows(tmp_path):
 def test_empty_nullable_columns_from_duckdb_render():
     """A column with no values comes from DuckDB as a nullable dtype (pandas NA): `v != v` and `v in (...)` raised on it (2026-10-09,
     mapstyle's planner page); one test for a missing value (roadstyle._na.missing) everywhere."""
+    import pandas as pd
+
     from roadstyle._na import missing
     assert missing(None) and missing(float("nan")) and missing(pd.NA) and not missing("") and not missing(0)
     g = gpd.GeoDataFrame({"highway": ["residential", "residential"], "edge_ref": pd.array([None, None], dtype="Int32"),
