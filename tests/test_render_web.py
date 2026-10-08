@@ -3795,3 +3795,10 @@ def test_the_editor_draws_the_items_of_its_hook_and_reloads_after_an_apply(tmp_p
     area.build(area.edits(), moved, in_place=True)
     assert area.update is None and area.reload == "the items are drawn at the new levels: the whole page again"
     assert Area(tmp_path).page == Area(tmp_path, None).page
+
+
+def test_only_clickable_items_are_picked():
+    """A non-interactive item (popup=[], no select="item": lanestyle's lane lines, arrows) is not a pick layer, so a click on it reaches the
+    lane or road under it (2026-10-10: a click on a lane arrow selected the road, not the lane)."""
+    html = render_edges(_edges(), backend="web").html
+    assert "OVERLAYS.filter(o=>o.base && (o.interactive || o.select===\"item\"))" in html

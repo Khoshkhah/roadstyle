@@ -1190,7 +1190,8 @@ function box(p){ return [[p.x-HIT,p.y-HIT],[p.x+HIT,p.y+HIT]]; }
 // clicking it selects the road; an interactive item's own fields come along as an overlay of the click (rs:select detail.overlays).
 // An item of an Overlay(select="item") is picked as itself: hover and select highlight the item, a click shows its own popup and
 // rs:select carries it (detail.item) next to its road.
-const ITEM_LAYERS = new Set(OVERLAYS.filter(o=>o.base).flatMap(o=>o.layers));
+// only clickable items take part (2026-10-10): a non-interactive item (lanestyle's lane lines, arrows) let the click through to the lane under it
+const ITEM_LAYERS = new Set(OVERLAYS.filter(o=>o.base && (o.interactive || o.select==="item")).flatMap(o=>o.layers));
 const PICK_LAYERS = style.layers.filter(l=>l.source!=="halves").map(l=>l.id)
   .filter(id=>/^roads-(low-|high-|bridge-)?fill/.test(id) || ITEM_LAYERS.has(id)).concat(RS_DECK_LAYERS);
 function _roadOf(f){ const e=f.properties.__rs_edge;   // the road an item belongs to, as a picked road feature
