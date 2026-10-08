@@ -156,7 +156,10 @@ def _width_m_expr(col, kind, width_m_zoom=16, bridge_m=0.0, bridge_px=0.0, **kw)
                    strict=True))
     k = {"fill": -2, "casing": 0, "wings": 2}[kind]
     cm = ["max", ["get", "__rs_cm"], bridge_m] if kind == "wings" and bridge_m else ["get", "__rs_cm"]   # a bridge's deck shows
-    wm = ["max", ["+", ["get", "__rs_wm"], ["*", k, cm]], 0] if k else ["get", "__rs_wm"]
+    w = ["get", "__rs_wm"]
+    if casing:      # a two-way pair's one casing (__rs_pair) with metres on both (__rs_twm): both directions, their two casings in the middle once
+        w = ["case", ["all", ["to-boolean", ["get", "__rs_pair"]], ["has", "__rs_twm"]], ["+", w, ["get", "__rs_twm"], ["*", -2, ["get", "__rs_cm"]]], w]
+    wm = ["max", ["+", w, ["*", k, cm]], 0] if k else w
     e = ["interpolate", ["exponential", 2], ["zoom"]]
     for z in sorted(set(_ZSTOPS) | {width_m_zoom, 22}):
         zz = min(max(z, _ZSTOPS[0]), _ZSTOPS[-1])
@@ -227,23 +230,37 @@ def _offset_match(col, z, offset_frac=0.28, offset_zoom=15):
     return m
 
 
-def _offset_expr(col, offset_frac=0.28, offset_zoom=15, pairs=False):
+def _offset_expr(col, offset_frac=0.28, offset_zoom=15, pairs=False, width_m_zoom=None):
     """line-offset (px) = offset_frac * the road's pixel width, for two-way edges (0 for one-way),
     ramped in from offset_zoom. Pixel-proportional -> constant overlap at every zoom. ``pairs``: a two-way pair's one casing
-    (``__rs_pair``, :func:`_mark_twin_casing`) is not shifted."""
+    (``__rs_pair``, :func:`_mark_twin_casing`) is not shifted. From ``width_m_zoom`` on, a direction whose pair has metres on both
+    (``__rs_twm``) is shifted by metres: half the other direction's fill, so the two fills together are centred on the line (2026-10-10)."""
     two = ["to-boolean", ["get", "__rs_twoway"]]
     if pairs:
         two = ["all", two, ["!", ["to-boolean", ["get", "__rs_pair"]]]]
-    e = ["interpolate", ["linear"], ["zoom"]]
-    for z in _ZSTOPS:
-        e += [z, ["case", two, _offset_match(col, z, offset_frac, offset_zoom), 0]]
+    if width_m_zoom is None:
+        e = ["interpolate", ["linear"], ["zoom"]]
+        for z in _ZSTOPS:
+            e += [z, ["case", two, _offset_match(col, z, offset_frac, offset_zoom), 0]]
+        return e
+    e = ["interpolate", ["exponential", 2], ["zoom"]]          # as _width_m_expr: the metres exact between stops
+    for z in sorted(set(_ZSTOPS) | {width_m_zoom, 22}):
+        c = _offset_match(col, min(max(z, _ZSTOPS[0]), _ZSTOPS[-1]), offset_frac, offset_zoom)
+        if z >= width_m_zoom:
+            px = round(512 * 2 ** z / 40075016.686, 4)
+            c = ["case", ["has", "__rs_twm"], ["*", ["-", ["*", 0.5, ["get", "__rs_twm"]], ["get", "__rs_cm"]], px], c]
+        e += [z, ["case", two, c, 0]]
     return e
 
 
-def _pair_width(expr, col, offset_frac=0.28, offset_zoom=15):
+def _pair_width(expr, col, offset_frac=0.28, offset_zoom=15, width_m_zoom=None):
     """A casing width curve, with a two-way pair's one casing (``__rs_pair``) as wide as its two directions together: a direction's casing
-    width (the two-way width of ``expr``) plus twice the direction's offset, at each stop of the curve (docs/design/twin_ends.md)."""
-    return _plus_px(expr, lambda z: ["*", 2, _offset_match(col, z, offset_frac, offset_zoom)], when=["to-boolean", ["get", "__rs_pair"]])
+    width (the two-way width of ``expr``) plus twice the direction's offset, at each stop of the curve (docs/design/twin_ends.md). From
+    ``width_m_zoom`` on, a pair with metres on both (``__rs_twm``) has its width in ``expr`` already (_width_m_expr)."""
+    def px(z):
+        add = ["*", 2, _offset_match(col, min(max(z, _ZSTOPS[0]), _ZSTOPS[-1]), offset_frac, offset_zoom)]
+        return ["case", ["has", "__rs_twm"], 0, add] if width_m_zoom is not None and z >= width_m_zoom else add
+    return _plus_px(expr, px, when=["to-boolean", ["get", "__rs_pair"]])
 
 
 def _class_key(v):
@@ -2403,6 +2420,11 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         _mark_twin_dead_ends(geo, cap_col, cap_start_col, cap_end_col)      # a pair's dead end without a given cap: square
     if width_m_col:
         _mark_width_m(geo, width_m_col, casing_m)
+        for ft in geo["features"] if pairs else ():     # a pair with metres on both: the other direction's (_width_m_expr, _offset_expr)
+            p, tw = ft["properties"], ft["properties"].get("__rs_twin")
+            q = geo["features"][tw]["properties"] if tw is not None else {}
+            if "__rs_wm" in p and "__rs_wm" in q:
+                p["__rs_twm"] = q["__rs_wm"]
     _stringify_unsafe_ints(geo)   # BIGINT ids (e.g. edge_id) -> string so JS doesn't round them
 
     # active base map + the set offered to the in-map switcher (active shown first)
@@ -2483,7 +2505,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            "line-sort-key": 0}   # positions only: no class, level or order
     tlay = {**lay, "line-cap": "butt"}                    # butt cap -> clean dash ticks on tunnel casing
     blay = {**lay, "line-cap": "butt"}                    # butt cap -> square bridge deck ends
-    off = _offset_expr(highway_col, offset_frac, offset_zoom, pairs)
+    wmz = width_m_zoom if width_m_col and pairs else None
+    off = _offset_expr(highway_col, offset_frac, offset_zoom, pairs, wmz)
     sw = dict(split_zoom=offset_zoom, split_frac=width_frac)
     # Three bands by draw order (docs/design/levels_and_looks.md): below ground, ground, above, from the level (lvl, the
     # OSM layer) or a caller's band_col, and nothing else. A tunnel or a bridge is only a LOOK on a road of its band:
@@ -2783,7 +2806,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                                for l in style["layers"]]
         style["layers"] = _level_layers(style["layers"], levels, "casings" if divided else None)
         if pairs:          # a two-way pair's one casing as wide as its two directions (casing, bridge casing, tunnel dashes)
-            style["layers"] = [{**l, "paint": {**l["paint"], "line-width": _pair_width(l["paint"]["line-width"], highway_col, offset_frac, offset_zoom)}}
+            style["layers"] = [{**l, "paint": {**l["paint"], "line-width": _pair_width(l["paint"]["line-width"], highway_col, offset_frac, offset_zoom, wmz)}}
                                if l.get("source") == "casings" else l for l in style["layers"]]
         if decks["features"]:        # 3D: the flat bridge line below flat_below, the extruded deck from it up
             for l in style["layers"]:
@@ -2833,7 +2856,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         sdash = {"line-dasharray": _simple_dasharray(sdashes, CONFIG.tunnel_casing_dash or [1, 1])} if sdashes or any_tunnel else {}
         road = {"id": "roads-simple", "type": "line", "source": "simple", "layout": {**lay, "line-cap": _simple_cap(), "line-sort-key": ["get", "__rs_s"]}, **flt,
                 "paint": {**sdash, "line-color": _simple_color(CONFIG.bridge_casing_color, bool(any_tunnel)),
-                          "line-width": _pair_width(_by_feature(wide, fw), highway_col, offset_frac, offset_zoom) if pairs else _by_feature(wide, fw), "line-offset": soff,
+                          "line-width": _pair_width(_by_feature(wide, fw), highway_col, offset_frac, offset_zoom, wmz) if pairs else _by_feature(wide, fw), "line-offset": soff,
                           "line-blur": ["interpolate", ["linear"], ["zoom"], 14, 0, 17, ["case", is_sh, blur, 0]],
                           "line-opacity": ["interpolate", ["linear"], ["zoom"], 14, ["case", is_sh, 0, *op], 17, op[-1] if road_fill else ["case", *op]]}}
         # the edges themselves, invisible: what a click, a hover, Street View and the page's fill code find (the roads source, its ids)

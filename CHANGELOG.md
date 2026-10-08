@@ -9,6 +9,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ### Added
 - **Items in the level editor.** `roadstyle-levels edit AREA --items module:function` (`serve(..., items=f)`): `f(roads)` gets the table the editor draws (one row per edge, `edge`) and returns `(overlays, render_edges keywords)`, e.g. a lane table's lanes as items of the edges; with items, every Apply draws the whole page again. Without it the page is unchanged.
 
+### Changed
+- **A two-way pair with metre widths is drawn in metres.** When both directions have a `width_m_col` width, from `width_m_zoom` on the pair's one casing is both directions together (their two inner casings once) and each direction is shifted by half the other direction's fill, so the carriageway is centred on the line. Before, the shift and the pair casing's extra width were class pixels, so lanes drawn as items in metres did not match their casing.
+
 ## [0.19.0] — 2026-10-09
 
 Lane items in the fill's place: line items attached to an edge are drawn in the one road layer at their edge's position, each with its own width in metres; the level editor's bus mode.

@@ -967,9 +967,9 @@ _TWIN_KW = dict(backend="web", casing_start_col="cs", casing_level_col="cm", cas
 def _num(e, p):
     """A width or offset stop on a feature's properties (+, * and what render_web._ev reads)."""
     from roadstyle.render_web import _ev
-    if isinstance(e, list) and e and e[0] in ("+", "*"):
-        a, b = (_num(x, p) for x in e[1:])
-        return a + b if e[0] == "+" else a * b
+    if isinstance(e, list) and e and e[0] in ("+", "*", "-", "max"):
+        v = [_num(x, p) for x in e[1:]]
+        return {"+": sum(v), "*": v[0] * v[1] if len(v) == 2 else None, "-": v[0] - v[1] if len(v) == 2 else -v[0], "max": max(v)}[e[0]]
     if isinstance(e, list) and e and e[0] in ("case", "match"):
         if e[0] == "case":
             for c, o in zip(e[1:-1:2], e[2:-1:2], strict=True):
@@ -1017,6 +1017,27 @@ def test_a_two_way_pair_has_one_casing_and_a_fill_per_direction():
     assert sorted((p["__rs_edge"], p.get("__rs_pair")) for p in pieces) == [(0, True), (2, None)] and "ends" not in full["sources"]
     cas = next(l for l in full["layers"] if l["id"] == "roads-casing")
     assert cas["source"] == "casings" and "__rs_pair" in json.dumps(cas["paint"]["line-width"]) and "__rs_pair" in json.dumps(cas["paint"]["line-offset"])
+
+
+def test_a_two_way_pair_with_metre_widths_is_drawn_in_metres():
+    """A pair whose two directions have metre widths (2026-10-10, lanes as items): the one casing is both directions together, their two
+    casings in the middle once (4 + 6 - 2 * 0.15 m), unshifted; each direction's fill is shifted by half the OTHER direction's fill, so the
+    two fills meet on the line (the carriageway centred on it, as GMNS lays out lanes). Not by the class pixels the casing had nothing to do with."""
+    import math
+    g = _twin([(1, "a", "b", 0, 0, 0, 0, None, None), (2, "b", "a", 0, 0, 0, 0, None, None)]).assign(w=[4.0, 6.0])
+    style = _style(render_edges(g, width_m_col="w", width_m_zoom=0, **_TWIN_KW).html)
+    feats = [f["properties"] for f in style["sources"]["simple"]["data"]["features"]]
+    lyr = next(l for l in style["layers"] if l["id"] == "roads-simple")
+    width, offset = lyr["paint"]["line-width"], lyr["paint"]["line-offset"]
+    i = width[3::2].index(20)
+    assert offset[3::2][i] == 20
+    px = 512 * 2 ** 20 / 40075016.686 / math.cos(math.radians(59.3005))           # px per metre at zoom 20, at the street's latitude
+    pair = next(p for p in feats if p.get("__rs_pair") and p["__rs_k"] == 0)
+    fills = {p["__rs_edge"]: p for p in feats if p["__rs_k"] == 1}
+    assert _num(width[4 + 2 * i], pair) == pytest.approx((4 + 6 - 0.3) * px, rel=1e-3) and _num(offset[4 + 2 * i], pair) == 0
+    assert _num(width[4 + 2 * i], fills[0]) == pytest.approx(3.7 * px, rel=1e-3)                 # a direction's fill: its width - 2 casings
+    assert _num(offset[4 + 2 * i], fills[0]) == pytest.approx(5.7 / 2 * px, rel=1e-3)            # half the other one's fill
+    assert _num(offset[4 + 2 * i], fills[1]) == pytest.approx(3.7 / 2 * px, rel=1e-3)
 
 
 def test_a_two_way_pairs_casing_takes_each_end_its_own_cap():
