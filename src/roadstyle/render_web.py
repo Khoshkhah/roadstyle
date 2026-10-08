@@ -296,6 +296,17 @@ def _mark_single_line(geo, kind_col, classes):
             r["__rs_twoway"] = r["__rs_oneway"] = False
 
 
+_NAME_MARGIN_M = 2.0       # names and arrows stay this far (metres) beyond a crossing road's drawn half-width
+_ZEBRA_HALF_M = 2.0        # ... and at least this far from a footway or path line: a zebra's stripes are about 4 m wide along the street
+
+
+def _crossing_half_m(cls, lat):
+    """How far along a street a name or arrow keeps from a road crossing or joining it: half that road's drawn width (with casing) at zoom 20,
+    in metres at latitude ``lat`` (a footway, path, cycleway or steps: at least a zebra's half-width), plus _NAME_MARGIN_M."""
+    half = 0.5 * class_width_px(cls, 20) * 40075016.686 * math.cos(math.radians(lat)) / (512 * 2 ** 20)
+    return (max(half, _ZEBRA_HALF_M) if cls in ("footway", "path", "cycleway", "steps") else half) + _NAME_MARGIN_M
+
+
 def _annotation_slots(geo, slot_m, class_col="highway"):
     """Divide every road chain into equal ``slot_m``-metre slots — the annotation plan.
 
@@ -308,9 +319,16 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
     puts one arrow on the visible part of each one-way chain, docs/design/arrows_and_names.md).
     """
     import numpy as np
+    import shapely
     from shapely.geometry import LineString, Point
     from shapely.strtree import STRtree
 
+    all_lines = [None] * len(geo["features"])          # every road's line, twins and footways too: what a name or arrow keeps away from
+    for i, ft in enumerate(geo["features"]):
+        g = ft.get("geometry") or {}
+        if g.get("type") == "LineString" and len(g.get("coordinates") or []) >= 2:
+            all_lines[i] = LineString([c[:2] for c in g["coordinates"]])
+    all_tree = STRtree(all_lines)
     reps = []                                    # (start, end, coords, props), twins collapsed
     by_ends, owner = {}, {}                      # (start, end) -> feature index; id(props) -> (feature index, its twin's index): the road a slot belongs to
     lines = []
@@ -355,6 +373,7 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
             a, z, c, _ = edges[start]
             used[start] = True
             chain = list(c)
+            members.append(start)
             for prepend in (False, True):
                 node = a if prepend else z
                 while True:
@@ -371,6 +390,7 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
                         else:
                             break                # opposing one-way: not a continuation
                         used[j] = True
+                        members.append(j)
                         chain = seg[:-1] + chain
                     else:                        # need a segment STARTING at the chain tail
                         if ja == node:
@@ -380,18 +400,23 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
                         else:
                             break
                         used[j] = True
+                        members.append(j)
                         chain = chain + seg[1:]
                     node = nxt
             return chain
 
-        chains = [walk(i) for i in range(n) if not used[i]]
+        chains = []
+        for i in range(n):
+            if not used[i]:
+                members = []
+                chains.append((walk(i), members))
         etree = STRtree([LineString(e[2]) for e in edges]) if n > 1 else None          # which edge of the group a slot lies on (a group of one edge: that edge)
         # the caller's class column ("highway" only by convention — e.g. Overture data styles by
         # "class"); stored under the slots' own fixed "highway" key either way, which is what the
         # arrow/label minzoom filters and sort keys read. Hardcoding the lookup dropped the
         # property entirely on non-"highway" data (None is stripped), silently disabling both.
         hw = collections.Counter(e[3].get(class_col) for e in edges).most_common(1)[0][0]
-        for chain in chains:
+        for chain, members in chains:
             cid += 1
             lon0, lat0 = chain[0]
             kx = 111320.0 * math.cos(math.radians(lat0))
@@ -400,25 +425,53 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
             cum = _cum_lengths(xy)
             total = float(cum[-1])
 
-            pieces = max(1, int(total // slot_m) + (1 if total % slot_m > slot_m * 0.3 else 0))
-            for i in range(pieces):
-                a, b = i * slot_m, min((i + 1) * slot_m, total)
-                if b - a < slot_m * 0.2:
+            # the stretches of the chain between its crossings: every other road's line that meets or crosses it (a junction, a bridge or tunnel
+            # over it, a zebra) takes half its drawn width plus a margin out of the chain, so no name or arrow sits across a crossing
+            mine = {k for e in members for k in owner[id(edges[e][3])] if k is not None}
+            chain_ll, local = LineString(chain), LineString(xy)
+            cuts = []
+            for k in all_tree.query(chain_ll):
+                k = int(k)
+                if k in mine:
                     continue
-                pts = _part(xy, cum, a, b)
-                coords = np.column_stack([np.round(pts[:, 0] / kx + lon0, 6), np.round(pts[:, 1] / 111320.0 + lat0, 6)]).tolist()
-                if etree is None:
-                    road, twin = owner[id(edges[0][3])]
-                else:
-                    mx, my = _at(xy, cum, (a + b) / 2)
-                    road, twin = owner[id(edges[int(etree.nearest(Point(mx / kx + lon0, my / 111320.0 + lat0)))][3])]
-                feats.append({"type": "Feature",
-                              "properties": {"slot": i, "chain": cid, "rank": ROAD_Z.get(hw, 0), "name": name, "highway": hw,
-                                             "oneway": oneway, "lvl": lvl, "__rs_edge": road,
-                                             **({"__rs_edge2": twin} if twin is not None else {}),
-                                             **({"fl": fl} if fl is not None else {}),
-                                             **({"__rs_tunnel": True} if tun else {})},
-                              "geometry": {"type": "LineString", "coordinates": coords}})
+                hit = chain_ll.intersection(all_lines[k])
+                if hit.is_empty:
+                    continue
+                half = _crossing_half_m(geo["features"][k]["properties"].get(class_col), lat0)
+                for part in shapely.get_parts(hit):
+                    d = [local.project(Point((x - lon0) * kx, (y - lat0) * 111320.0)) for x, y in shapely.get_coordinates(part)]
+                    cuts.append((min(d) - half, max(d) + half))
+            free, at_ = [], 0.0
+            for lo, hi in sorted(cuts):
+                if lo > at_:
+                    free.append((at_, lo))
+                at_ = max(at_, hi)
+            if at_ < total:
+                free.append((at_, total))
+            nxt = 0
+            for lo, hi in free:         # each stretch is divided into slots on its own, starting with a name slot (an even number)
+                nxt += nxt % 2
+                length = hi - lo
+                pieces = max(1, int(length // slot_m) + (1 if length % slot_m > slot_m * 0.3 else 0))
+                for j in range(pieces):
+                    a, b = lo + j * slot_m, lo + min((j + 1) * slot_m, length)
+                    if b - a < slot_m * 0.2:
+                        continue
+                    i, nxt = nxt, nxt + 1
+                    pts = _part(xy, cum, a, b)
+                    coords = np.column_stack([np.round(pts[:, 0] / kx + lon0, 6), np.round(pts[:, 1] / 111320.0 + lat0, 6)]).tolist()
+                    if etree is None:
+                        road, twin = owner[id(edges[0][3])]
+                    else:
+                        mx, my = _at(xy, cum, (a + b) / 2)
+                        road, twin = owner[id(edges[int(etree.nearest(Point(mx / kx + lon0, my / 111320.0 + lat0)))][3])]
+                    feats.append({"type": "Feature",
+                                  "properties": {"slot": i, "chain": cid, "rank": ROAD_Z.get(hw, 0), "name": name, "highway": hw,
+                                                 "oneway": oneway, "lvl": lvl, "__rs_edge": road,
+                                                 **({"__rs_edge2": twin} if twin is not None else {}),
+                                                 **({"fl": fl} if fl is not None else {}),
+                                                 **({"__rs_tunnel": True} if tun else {})},
+                                  "geometry": {"type": "LineString", "coordinates": coords}})
     return {"type": "FeatureCollection", "features": feats}
 
 

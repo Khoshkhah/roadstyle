@@ -6,6 +6,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **Street names and one-way arrows stay off crossings:** the annotation slots are cut back by half the crossing road's drawn width plus 2 m
+  (at least 2 m + 2 m for a footway, so a zebra too) around every point where another road meets or crosses the street, bridges and tunnels
+  over it included; the stretches between are divided into slots on their own. A street through a plain node stays one stretch. Names keep
+  `line-center` and the class sort key. A short one-way road between two crossings may get no arrow. See docs/design/arrows_and_names.md.
+
 ### Fixed
 - **The notebook preview draws again, with the bundled MapLibre (5.24 from the CDN, was 3.6.2):** 3.6 rejected simple mode's per-feature
   `line-cap` / `line-dasharray`, so the default map was blank. Why the preview had been held at 3.6: it is an `<iframe srcdoc>`, whose
