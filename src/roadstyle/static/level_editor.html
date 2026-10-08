@@ -135,7 +135,8 @@ body.lv-open #lv-busy{right:var(--lv-w)}
       </div>
       <button class="go" id="lv-add">Add to the list</button>
     </section>
-    <section><h2>Added now <span style="text-transform:none;letter-spacing:0;font-weight:500">this session, in edits.csv</span></h2><div id="lv-new"></div></section>
+    <section><h2>Added now <span style="text-transform:none;letter-spacing:0;font-weight:500">this session, in edits.csv</span>
+      <button id="lv-newsession" title="Everything already in edits.csv moves to the list below; this list starts empty. Nothing is deleted." style="float:right;border:1px solid var(--lv-line,#ced4da);background:#fff;border-radius:6px;padding:2px 8px;font-size:11.5px;cursor:pointer;text-transform:none;letter-spacing:0">Start new session</button></h2><div id="lv-new"></div></section>
   </div>
   <div class="scroll" data-tab="history" hidden>
     <section><h2>Already in edits.csv <span style="text-transform:none;letter-spacing:0;font-weight:500">before this session</span></h2>
@@ -523,6 +524,10 @@ body.lv-open #lv-busy{right:var(--lv-w)}
         after ${esc(name(w.b))} <small>${esc(ref(w.b))}</small></div><div class="gu-parts">fill <b>${w.fa}</b> &nbsp;·&nbsp; wished over fill <b>${w.fb}</b></div></span></div>`).join("");
       wb.querySelectorAll(".row").forEach((el, n) => el.onclick = () => { tab("edit"); setPair(j.wishes[n].a, j.wishes[n].b, true); }); }
   }
+  $("lv-newsession").onclick = async () => {                 // a new list: the edits so far stay in edits.csv, under "already in edits.csv"
+    if(queue.length) return toast("Apply or remove the waiting changes first", true);
+    try { await api("/api/new_session", {}); await lists(); toast("New session: earlier edits are under “Already in edits.csv”"); } catch(err){ toast(err.message, true); }
+  };
   async function lists(){
     const j = await api("/api/edits"); Object.assign(facts, j.roads);
     $("lv-hist-n").textContent = j.rows.filter(r => r.section === "saved").length;

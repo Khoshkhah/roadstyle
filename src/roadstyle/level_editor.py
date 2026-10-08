@@ -435,6 +435,9 @@ def _handler(area):
             try:
                 if self.path == "/api/check":
                     return self._send(200, {"conflicts": area.check(body.get("rows", []), body.get("ops", []))})
+                if self.path == "/api/new_session":                # what is in edits.csv now counts as saved before: "added now" starts empty
+                    area.saved = len(area.edits())
+                    return self._send(200, {"ok": True, "saved": area.saved})
                 if self.path != "/api/apply":
                     return self._send(404, {"error": "not found"})
                 area.apply(body.get("ops", []))
