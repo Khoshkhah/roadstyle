@@ -182,8 +182,6 @@ def main(argv: list[str] | None = None) -> int:
         if args.format == "web":
             web_kw = {"compress": not args.no_compress, "tiles": args.tiles,
                       "view_3d": args.view_3d}
-            if args.tiles:
-                web_kw["simple"] = False          # tiles need the full look
             # only the controls the user turned off: a --page keeps its own control defaults
             for flag, kw in (("no_arrows", "arrows"), ("no_labels", "labels"),
                              ("no_filter", "filter_control"),

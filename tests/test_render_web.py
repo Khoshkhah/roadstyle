@@ -2989,12 +2989,6 @@ def test_simple_is_the_default_and_simple_false_is_the_full_look():
     assert "RS_SIMPLE" not in html and "roads-simple" not in html
 
 
-def test_simple_refuses_tiles():
-    with pytest.raises(ValueError, match="pass simple=False"):
-        render_edges(_edges(), backend="web", tiles=True)         # simple is the default: no silent switch to the full look
-    render_edges(_edges(), backend="web", tiles=True, simple=False)
-
-
 def test_simple_has_the_tunnels_box_with_the_palette_and_dash_selects():
     html = render_edges(_edge_world(), backend="web", basemap="blank", tunnel_control=True).html
     assert '"control": true' in html and "TUNNEL.simple" not in html and "rsSetTunnelStyle=function" in html

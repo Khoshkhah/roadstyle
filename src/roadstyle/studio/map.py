@@ -30,7 +30,7 @@ with st.sidebar:
     if view_3d:
         kw["view_3d"] = True
     if tiles:
-        kw["tiles"], kw["simple"] = True, False       # tiles need the full look
+        kw["tiles"] = True
 
     co = colour_by_section(edges)   # shared "Colour by data" block (built-in in-map dropdown + legend)
     if len(co) > 1:

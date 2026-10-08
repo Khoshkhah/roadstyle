@@ -181,3 +181,32 @@ def test_tiles_carry_the_casing_pieces_and_the_end_caps():
     t = mapbox_vector_tile.decode(gzip.decompress(Reader(MemorySource(_archive_of(html))).get(z, x, y)))
     assert t["casings"]["features"] and t["ends"]["features"]
     assert all("__rs_edge" in f["properties"] for f in t["casings"]["features"])
+
+
+def test_simple_mode_tiles_carry_the_pieces():
+    """simple=True (the default) with tiles=True: the one road layer's pieces are the archive's "simple" layer, with what its expressions read."""
+    import math
+
+    import mapbox_vector_tile
+    from pmtiles.reader import MemorySource, Reader
+
+    from roadstyle.render_web import render
+    a, b, c = (18.0, 59.3), (18.001, 59.3), (18.002, 59.3)
+    g = gpd.GeoDataFrame({"highway": ["primary", "primary", "footway"], "bridge": [None, "yes", None]},
+                         geometry=[LineString([a, b]), LineString([b, c]), LineString([a, c])], crs=4326)
+    html = render(g, basemap="blank", tiles=True).html
+    style = json.JSONDecoder().raw_decode(html, html.index("const style = ") + 14)[0]
+    assert "simple" not in style["sources"]
+    lyr = {l["id"]: l for l in style["layers"]}
+    assert (lyr["roads-simple"]["source"], lyr["roads-simple"]["source-layer"]) == ("roads", "simple")
+    assert (lyr["roads-fill"]["source"], lyr["roads-fill"]["source-layer"]) == ("roads", "roads")
+    z = 15
+    n = 1 << z
+    x = int((18.001 + 180) / 360 * n)
+    y = int((1 - math.asinh(math.tan(math.radians(59.3))) / math.pi) / 2 * n)
+    feats = mapbox_vector_tile.decode(gzip.decompress(Reader(MemorySource(_archive_of(html))).get(z, x, y)))["simple"]["features"]
+    ps = [f["properties"] for f in feats]
+    assert {p["__rs_k"] for p in ps} == {0, 1, 2}                       # casings, fills, the bridge's shadow
+    assert all({"__rs_s", "__rs_edge", "__rs_cls", "highway"} <= p.keys() for p in ps)
+    assert any(isinstance(p.get("__rs_dash"), str) for p in ps)         # the footway's dash pattern, as text (the dasharray match)
+    assert any(p.get("__rs_fill") for p in ps if p["__rs_k"] == 1)
