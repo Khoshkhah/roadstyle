@@ -1086,6 +1086,22 @@ def test_a_two_way_pairs_dead_end_is_square_without_given_caps():
     assert _twin_caps(one)[0] == {a: None, b: None}
 
 
+def test_a_plain_call_without_level_columns_draws_a_pair_with_one_casing():
+    """twin_casing "one" when render_edges computes the levels itself (no level columns): one casing for the pair (the first edge's, full
+    width), a fill per direction, square dead ends; simple mode and the full look (2026-10-09)."""
+    a, b = (18.0, 59.30), (18.0, 59.301)
+    g = _twin([(1, "a", "b", 0, 0, 0, 0, None, None), (2, "b", "a", 0, 0, 0, 0, None, None)])[["highway", "edge_id", "geometry"]]
+    for simple, src in ((True, "simple"), (False, "casings")):
+        feats = [f for f in _style(render_edges(g, backend="web", simple=simple).html)["sources"][src]["data"]["features"]]
+        casing = [f["properties"] for f in feats if f["properties"].get("__rs_k") != 1]
+        assert casing and {p["__rs_edge"] for p in casing} == {0} and all(p.get("__rs_pair") for p in casing)
+        ends = {pt: f["properties"].get("__rs_cap") for f in feats if f["properties"].get("__rs_k") != 1 and not f["properties"].get("__rs_main")
+                and not f["properties"].get("__rs_seam") for pt in {tuple(x) for x in f["geometry"]["coordinates"]} & {a, b}}
+        assert ends == {a: "square", b: "square"}
+        if simple:
+            assert sorted(f["properties"]["__rs_edge"] for f in feats if f["properties"]["__rs_k"] == 1) == [0, 1]
+
+
 def test_twin_casing_each_is_todays_look():
     """twin_casing "each": every direction draws its own casing, shifted, half the width; no __rs_pair anywhere, the end blobs as before."""
     g = _twin([(1, "a", "b", 0, 0, 0, 0, None, None), (2, "b", "a", 0, 0, 0, 0, None, None)])

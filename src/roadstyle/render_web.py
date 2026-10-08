@@ -2297,7 +2297,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     levels = _mark_levels(geo, casing_level_col, fill_level_col, casing_start_col, casing_end_col) if (casing_level_col or fill_level_col) else None
     if CONFIG.twin_casing not in ("one", "each"):
         raise ValueError(f'twin_casing must be "one" or "each", got {CONFIG.twin_casing!r}')
-    pairs = bool(levels) and CONFIG.twin_casing == "one" and _mark_twin_casing(geo, highway_col, edge_id_col, head_m)   # one casing per two-way pair
+    pairs = CONFIG.twin_casing == "one" and _mark_twin_casing(geo, highway_col, edge_id_col, head_m)   # one casing per two-way pair (levels given or computed above)
     if pairs:
         _mark_twin_dead_ends(geo, cap_col, cap_start_col, cap_end_col)      # a pair's dead end without a given cap: square
     if width_m_col:

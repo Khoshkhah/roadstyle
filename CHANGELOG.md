@@ -26,8 +26,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Changed
 - **A two-way road's dead end is square by default** in the level area (`level_area.defaults`, `rs.auto_ends`; `levels.dead_end_cap`): an end with no `meet` row on a road that has both directions. With one casing around both directions, two half-width round fill ends left a notch at the tip. One-way roads and ends that meet a road keep their rule; `caps.csv` always wins. `render_edges` does the same without a level area or cap columns (`_mark_twin_dead_ends`): a pair's end that no other edge has an end point at (lines crossing or touching mid-line do not count) is square for the casing and both fills, unless the data gives that end a cap (`cap_col` / `cap_start_col` / `cap_end_col`, `"round"` too); `twin_casing="each"` keeps the blob.
-- **A two-way road has one casing around both directions** (setting `twin_casing`, `"one"` by default on this branch; `"each"` = the look
-  before). The pair's casing is cut once, from the first edge's pieces, unshifted and as wide as both directions together; the other edge has no
+- **A two-way road has one casing around both directions** (setting `twin_casing`, `"one"` by default; `"each"` = the look
+  before), with the level columns given or computed by `render_edges` itself (a plain call). The pair's casing is cut once, from the first edge's pieces, unshifted and as wide as both directions together; the other edge has no
   casing piece; each direction keeps its own fill, colour and caps. Ends are caps, no blob (`twin_end_caps` applies to `"each"` only); the
   first edge's start is the second's end, so each cap is the first edge's own at that end. The twins must agree reversed (casing numbers, heads,
   caps), else a warning names the pair. Simple mode, the full look and `tiles=True`; the bridge shadow and the tunnel dashes follow the one
