@@ -534,7 +534,11 @@ window.rsSetTunnels = rsSetTunnels;
 // index) -> that overlay's features. Overlay sources use generateId too, so the same id-set
 // model applies — but each layer is its OWN id space: never mix ids across layers.
 // MapLibre 5 keeps a GeoJSON source's data in `_data.geojson` (4.x: `_data` itself); there is no sync public getter
-function _sdata(s){ return s && s._data && s._data.geojson; }
+// After an updateData (the level editor's update in place) it keeps a Map id -> feature instead, in the source's order (a feature replaced
+// keeps its place): read as a FeatureCollection, kept until the source's data changes again
+function _sdata(s){ const d=s && s._data; if(!d) return null; if(d.geojson || !d.updateable) return d.geojson;
+  return d._rs || (d._rs={type:"FeatureCollection", features:Array.from(d.updateable.values())}); }
+map.on("sourcedata", e=>{ const s=map.getSource(e.sourceId); if(s && s._data) delete s._data._rs; });
 function _sfeats(src){ const g=_sdata(map.getSource(src)); return (g && g.features)||[]; }
 function _feats(){ return _sfeats("roads"); }
 // tiles mode plumbing: _side() -> the sidecar table (null while it inflates / in inline mode);

@@ -107,7 +107,11 @@ with *delete*), and add one (`order` or `stack`: you choose which of the two is 
 can also switch that part off in a found pair; `meet`: the chosen end of each). An order against an active stack the other way would be
 given up, since a stack outranks an order: the panel warns before you add it and points to the stack to switch off first. Changes wait in a
 list (kept over a reload of the page) until you press *Apply and solve*: then they are solved together while the map shows that it is
-working, and the page reloads with the new levels, keeping the view and the picked roads; `levels.csv` is written too. If one change is
+working, and the open page takes the new levels in place: the server compares what is drawn of each road (its four numbers, head
+lengths and caps) before and after, and sends the features of the roads that changed, built by render's own code (`render(_edges=...)`:
+the roads, their pieces in simple mode's one layer, the names and arrows again when a fill number changed), which the page swaps by
+feature id (`GeoJSONSource.updateData`); the panel's facts follow. More than `PARTIAL_MAX` (1,500) changed roads: the page reloads,
+keeping the view and the picked roads, and the status line says why. `levels.csv` is written too. If one change is
 wrong or the solver refuses them (an unknown
 road, nothing to switch off), nothing is saved, the list stays, and the panel says why. The `edits.csv` before each apply is kept as `edits.csv.bak`. A road's card also has *start* / *end*: round / square / flat for
 each end (`caps.csv`); flat is for an end whose round end reaches across a narrower road it ends on, square keeps the drawn length.

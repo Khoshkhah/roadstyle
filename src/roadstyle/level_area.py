@@ -73,10 +73,10 @@ def solve_area(folder, auto_ends=False, max_positions=None, near_rules=False):
 
 def edge_levels(solved, ends_table):
     """One row per edge from one row per road (and its ends as drawn): an edge running the other way has its two heads and caps swapped."""
-    e = ends_table.set_index("road")
+    e = {r: v for r, *v in ends_table[["road", "start_m", "end_m", "cap_start", "cap_end"]].itertuples(index=False)}   # a dict: .loc per road took seconds
     rows = []
     for r in solved.itertuples():
-        hs, he, cs, ce = e.loc[r.road, ["start_m", "end_m", "cap_start", "cap_end"]]
+        hs, he, cs, ce = e[r.road]
         for x in r.edges:
             rows.append((x, r.casing_start, r.casing_level, r.casing_end, r.fill_level, hs, he, cs, ce))
         for x in r.reversed:

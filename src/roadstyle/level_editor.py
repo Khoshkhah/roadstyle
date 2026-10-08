@@ -4,7 +4,8 @@
 
 AREA_DIR holds roads.parquet and pairs.csv (roadstyle-levels make). Click two roads (or find them by edge id / edge_ref), see every pair between them (the found ones and
 your edits), switch a found one off or add one (order / stack: the road you put on top over the other, a stack on one part of it if you like; meet: an end of each). Changes wait in a list until
-you apply them: then they are solved together and the page reloads with the new levels (levels.csv is written too); if the solver refuses
+you apply them: then they are solved together and the open page takes the new levels of the roads that changed, in place (the whole page
+reloads when more than PARTIAL_MAX roads changed, and says so; levels.csv is written too); if the solver refuses
 them, nothing is saved. The edits.csv before each
 change is kept as edits.csv.bak.
 """
@@ -22,6 +23,8 @@ from roadstyle import render_web
 from .level_area import defaults, ends, own, solve, solve_local, what_solver_sees, write
 
 COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"]
+DRAWN = ["casing_start", "casing_level", "casing_end", "fill_level", "head_start_m", "head_end_m", "cap_start", "cap_end"]   # what is drawn of a road
+PARTIAL_MAX = 1500      # more roads changed by an Apply than this: the whole page again instead of an update in place
 
 
 class Area:
@@ -50,6 +53,7 @@ class Area:
                                      "look": "tunnel" if _yes(r.get("tunnel")) else "bridge" if _yes(r.get("bridge")) else "ground",
                                      "width_px": _widths(_txt(r.get("highway")))}
         self.saved = len(self.edits())                          # the edits that were in edits.csv when the editor started
+        self.drawn, self.update = None, None
         self.build(self.edits(), self.stored())
 
     def stored(self):
@@ -88,8 +92,11 @@ class Area:
     def solve(self, edits, heads=None):
         return solve(self.roads, self.pairs, edits if len(edits) else None, self.heads if heads is None else heads, self.caps)[0]
 
-    def build(self, edits, solved=None, save=False):
-        """The page from ``solved`` (solved here if None): the automatic caps from its levels, yours on top; ``save``: levels.csv too."""
+    def build(self, edits, solved=None, save=False, in_place=False):
+        """The map of ``solved`` (solved here if None): the automatic caps from its levels, yours on top; ``save``: levels.csv too.
+        ``in_place``: the open page takes the change in place when at most PARTIAL_MAX roads are drawn differently (their levels, heads or
+        caps): ``self.update`` holds what it needs (the new features of those roads, render_web.render(_edges=...), and their facts) and the
+        whole page is built again only when it is asked for. Else ``self.update`` is None and ``self.reload`` says why the page reloads."""
         if solved is None:
             solved, save = self.solve(edits), True
         self.solved = solved
@@ -97,33 +104,56 @@ class Area:
         drawn = ends(auto, self.heads, self.caps)
         if save:
             write(solved, self.dir, drawn)
-        auto, drawn = auto.set_index("road"), drawn.set_index("road")
+        auto, drawn = auto.set_index("road").to_dict("index"), drawn.set_index("road").to_dict("index")      # dicts: .loc per road took a second
         self.stats = {**solved.attrs["levels_info"], "given_up": [list(p) for p in solved.attrs["levels_given_up"]], "area": self.dir.name}
         self.broken = solved.attrs.get("levels_given_up_parts", [])
         self.near = solved.attrs.get("levels_near", [])
         self.wishes = solved.attrs.get("levels_orders_not_kept", [])
         for r in solved.itertuples():
-            a, d, own_h, own_c = auto.loc[r.road], drawn.loc[r.road], self.heads.get(r.road, ("", "")), self.caps.get(r.road, ("", ""))
-            self.facts[r.road]["heads"] = [float(d.start_m), float(d.end_m)]
-            self.facts[r.road]["heads_auto"] = [float(a.start_m), float(a.end_m)]       # what auto gives; heads_own: which ends you set
+            a, d, own_h, own_c = auto[r.road], drawn[r.road], self.heads.get(r.road, ("", "")), self.caps.get(r.road, ("", ""))
+            self.facts[r.road]["heads"] = [float(d["start_m"]), float(d["end_m"])]
+            self.facts[r.road]["heads_auto"] = [float(a["start_m"]), float(a["end_m"])]       # what auto gives; heads_own: which ends you set
             self.facts[r.road]["heads_own"] = [bool(own_h[0]), bool(own_h[1])]
             self.facts[r.road]["caps"] = list(own_c)                                 # "" = auto
-            self.facts[r.road]["caps_auto"] = [a.cap_start, a.cap_end]
+            self.facts[r.road]["caps_auto"] = [a["cap_start"], a["cap_end"]]
             self.facts[r.road]["levels"] = [int(r.casing_start), int(r.casing_level), int(r.casing_end), int(r.fill_level)]
         draw = solved.drop(columns=["edges", "reversed"]).to_crs(4326)
         draw["head_start_m"], draw["head_end_m"] = ([self.facts[r]["heads"][k] for r in draw["road"]] for k in (0, 1))
-        draw["cap_start"], draw["cap_end"] = drawn.loc[draw["road"], "cap_start"].tolist(), drawn.loc[draw["road"], "cap_end"].tolist()
+        draw["cap_start"], draw["cap_end"] = ([drawn[r][c] for r in draw["road"]] for c in ("cap_start", "cap_end"))
         draw["oneway"] = [not f["two_way"] for f in (self.facts[r] for r in draw["road"])]      # a road with no other direction is one way
         tips = draw.geometry.apply(lambda ln: list(ln.coords[0][:2]) + list(ln.coords[-1][:2]))
         draw["s_lon"], draw["s_lat"], draw["e_lon"], draw["e_lat"] = zip(*tips, strict=True)
-        m = rs.render_edges(draw, edge_id_col="road", road_popup=False, name=f"Level editor · {self.dir.name}",
-                            select_color="rgba(0,0,0,0)",               # the panel colours the picked roads (1 orange, 2 blue): no click glow over them
-                            filter_control=False, tunnel_control=False,  # the panel is the only control: no class filter box, no Tunnels box
-                            casing_start_col="casing_start", casing_level_col="casing_level", casing_end_col="casing_end",
-                            fill_level_col="fill_level", cap_start_col="cap_start", cap_end_col="cap_end",
-                            head_start_m_col="head_start_m", head_end_m_col="head_end_m")
-        page = m.html if hasattr(m, "html") else str(m)
-        self.page = page.replace("</body>", _EDITOR.replace("__STATS__", json.dumps(self.stats, default=str)) + "</body>", 1)
+        self.draw, before = draw, self.drawn
+        self.drawn = list(zip(*(draw[c].tolist() for c in DRAWN), strict=True))           # a road's row: what is drawn of it
+        self.update, self.reload, self._page = None, None, None
+        if not in_place:
+            return
+        changed = [i for i, (x, y) in enumerate(zip(before, self.drawn, strict=True)) if x != y]
+        if len(changed) > PARTIAL_MAX:
+            self.reload = f"{len(changed)} roads changed, more than {PARTIAL_MAX}: the whole page again"
+            return
+        names = any(before[i][k] != self.drawn[i][k] for i in changed for k in (1, 3))   # a fill number (max of casing, fill) changed: the names and
+        feats = self._render(_edges=changed, arrows=names, labels=names)                    # arrows again (their chains follow it)
+        roads = [draw["road"].iat[i] for i in changed]
+        self.update = {"roads": roads, "features": feats, "pieces": render_web._PIECES, "facts": {r: self.facts[r] for r in roads}, "stats": self.stats}
+
+    def _render(self, **kw):
+        """The editor's map of ``self.draw`` (render_edges); with ``_edges``, the features of those roads instead (render_web.render)."""
+        return rs.render_edges(self.draw, edge_id_col="road", road_popup=False, name=f"Level editor · {self.dir.name}",
+                               select_color="rgba(0,0,0,0)",               # the panel colours the picked roads (1 orange, 2 blue): no click glow over them
+                               filter_control=False, tunnel_control=False,  # the panel is the only control: no class filter box, no Tunnels box
+                               casing_start_col="casing_start", casing_level_col="casing_level", casing_end_col="casing_end",
+                               fill_level_col="fill_level", cap_start_col="cap_start", cap_end_col="cap_end",
+                               head_start_m_col="head_start_m", head_end_m_col="head_end_m", **kw)
+
+    @property
+    def page(self):
+        """The whole page, built when asked for (after an update in place, only when the page is loaded again)."""
+        if self._page is None:
+            m = self._render()
+            page = m.html if hasattr(m, "html") else str(m)
+            self._page = page.replace("</body>", _EDITOR.replace("__STATS__", json.dumps(self.stats, default=str)) + "</body>", 1)
+        return self._page
 
     def change(self, edits, saved=None, caps=None, heads=None):
         """Solve with ``edits``; save them (and the drawing's ``caps``, road -> (start, end) of "" / "square" / "flat", and ``heads``, road ->
@@ -160,7 +190,7 @@ class Area:
             edits = self.edits()
         if saved is not None:
             self.saved = saved
-        self.build(edits, solved, save=True)                   # levels.csv has the ends as drawn: written for a cap too
+        self.build(edits, solved, save=True, in_place=True)    # levels.csv has the ends as drawn: written for a cap too
 
     def apply(self, ops):
         """Apply the changes the page collected, in one solve: ``{"op": "delete", "index": i, "row": row}`` (a row of edits.csv, as the page showed it) and ``{"op": "add",
@@ -350,7 +380,7 @@ def _handler(area):
                 area.apply(body.get("ops", []))
             except (ValueError, KeyError) as err:
                 return self._send(400, {"error": str(err)})
-            self._send(200, {"ok": True, "said": area.said, "full": area.full})
+            self._send(200, {"ok": True, "said": area.said, "full": area.full, "update": area.update, "reload": area.reload})
     return H
 
 

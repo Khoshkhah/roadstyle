@@ -158,7 +158,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
 <div id="lv-busy" hidden><div class="box"><div class="spin"></div><span id="lv-busy-t">Solving …</span></div></div>
 <script>
 (function(){
-  const STATS = __STATS__, $ = id => document.getElementById(id), C = ["#e8590c", "#1971c2"];
+  let STATS = __STATS__; const $ = id => document.getElementById(id), C = ["#e8590c", "#1971c2"];
   const sel = [null, null], facts = {};                       // sel: road ids; facts: road id -> what the server knows
   let pairRows = [];                                          // what the two tables have between the two picked roads
   let kind = "order", end1 = "start", end2 = "start", part = "", top = null, pairKey = "";   // top: which picked road (0 / 1) is on top for an order or a stack: none until chosen, for each new pair
@@ -183,9 +183,10 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   function tab(t){ document.querySelectorAll("#lv-tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === t));
     document.querySelectorAll("#lv [data-tab]").forEach(d => d.hidden = d.dataset.tab !== t); }
   document.querySelectorAll("#lv-tabs button").forEach(b => b.onclick = () => tab(b.dataset.t));
-  $("lv-stats").innerHTML = [["order wishes", STATS.order_pairs], ["not kept", STATS.order_violations || 0], ["stack pairs", STATS.pairs || 0],
+  const showStats = () => { $("lv-stats").innerHTML = [["order wishes", STATS.order_pairs], ["not kept", STATS.order_violations || 0], ["stack pairs", STATS.pairs || 0],
     ["given up", STATS.given_up.length], ["near warnings", STATS.near_warnings || 0]].map(([k, v]) => `<span class="stat"${k === "given up" || k === "near warnings" ? ` style="cursor:pointer" title="Show the list" data-gu="1"` : ""}${k === "given up" ? ` id="lv-gu-stat"` : ""}><b>${v}</b> ${k}</span>`).join("");
-  document.querySelectorAll("#lv-stats [data-gu]").forEach(e => e.onclick = () => tab("given"));
+  document.querySelectorAll("#lv-stats [data-gu]").forEach(e => e.onclick = () => tab("given")); };
+  showStats();
   function toast(t, bad){ const e = $("lv-toast"); e.textContent = t; e.className = "show" + (bad ? " bad" : ""); clearTimeout(e._t);
     e._t = setTimeout(() => e.className = "", bad ? 6000 : 2600); }
   async function api(path, body){
@@ -440,14 +441,33 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   $("lv-apply").onclick = async () => {
     if(!queue.length) return;
     $("lv-apply").disabled = true; busy(`Solving the levels with ${queue.length} change${queue.length > 1 ? "s" : ""} …`);
-    try { const j = await api("/api/apply", {ops: queue.map(q => q.op === "cap" ? {op: "cap", road: q.road, end: q.end, cap: q.cap} : q.op === "head" ? {op: "head", road: q.road, end: q.end, m: q.m} : q.op === "delete" ? {op: "delete", index: q.index, row: q.raw} : {op: "add", body: q.body})});
-      const said = `Applied ${queue.length} change${queue.length > 1 ? "s" : ""} · ${j.said}`;
-      queue = []; showQueue(); busy("Drawing the new map …");
-      sessionStorage.setItem("lv-view", JSON.stringify({c: map.getCenter(), z: map.getZoom(), b: map.getBearing(), p: map.getPitch(), sel: sel, said: said, full: j.full,
-        open: document.body.classList.contains("lv-open")}));
-      location.reload();
-    } catch(err){ busy(null); toast(err.message + " · nothing saved", true); $("lv-apply").disabled = false; }
+    let j;
+    try { j = await api("/api/apply", {ops: queue.map(q => q.op === "cap" ? {op: "cap", road: q.road, end: q.end, cap: q.cap} : q.op === "head" ? {op: "head", road: q.road, end: q.end, m: q.m} : q.op === "delete" ? {op: "delete", index: q.index, row: q.raw} : {op: "add", body: q.body})}); }
+    catch(err){ busy(null); toast(err.message + " · nothing saved", true); $("lv-apply").disabled = false; return; }
+    let said = `Applied ${queue.length} change${queue.length > 1 ? "s" : ""} · ${j.said}`, why = j.reload;
+    queue = []; showQueue();
+    if(j.update){                                             // the roads that changed, in place: no reload
+      try { patch(j.update); busy(null); $("lv-apply").disabled = false;
+        return toast(`${said} · ${j.update.roads.length} road${j.update.roads.length === 1 ? "" : "s"} redrawn in place`, j.full); }
+      catch(err){ why = `could not redraw in place (${err.message}): the whole page again`; }
+    }
+    busy("Drawing the new map …");                            // the whole page again, and the status line says why
+    sessionStorage.setItem("lv-view", JSON.stringify({c: map.getCenter(), z: map.getZoom(), b: map.getBearing(), p: map.getPitch(), sel: sel,
+      said: said + (why ? " · " + why : ""), full: j.full || !!why, open: document.body.classList.contains("lv-open")}));
+    location.reload();
   };
+  // the update in place (level_editor.Area.build): the changed roads' features as a whole rebuild would draw them, by feature id (GeoJSONSource.updateData):
+  // the roads themselves (pick, hover), their pieces in the one road layer (the ids of a road's pieces it has no more taken out), the
+  // names and arrows again when a fill number changed; then the panel's facts
+  function patch(u){
+    const f = u.features, P = u.pieces, ids = new Set(f.simple.map(x => x.id)), gone = [];
+    f.roads.forEach(r => { for(let k = 0; k < P; k++) if(!ids.has(r.id * P + k)) gone.push(r.id * P + k); });
+    map.getSource("roads").updateData({add: f.roads});
+    map.getSource("simple").updateData({remove: gone, add: f.simple});
+    if(f.slots){ map.getSource("slots").setData({type: "FeatureCollection", features: f.slots}); _rsArrowAt.clear(); _rsArrows(); }
+    Object.assign(facts, u.facts); STATS = u.stats; showStats();
+    update(); lists(); givenUp();
+  }
   async function givenUp(){
     const j = await api("/api/given_up"); Object.assign(facts, j.roads);
     $("lv-gu-n").textContent = j.rows.length; $("lv-nr-n").textContent = j.near.length;

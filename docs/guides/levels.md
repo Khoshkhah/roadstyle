@@ -67,7 +67,7 @@ pick a second one to see every pair between the two.
   casing) or *meet* (join two ends). You choose which road is on top.
 - **Switch off** a pair the input found.
 - **Each end of a road**: its cap (*round*, *square*, *flat*) and its head length (a slider, in metres). The map shows each end's cap.
-- Changes wait in a list until **Apply and solve**: they are solved together, and the map reloads with the new numbers.
+- Changes wait in a list until **Apply and solve**: they are solved together, and the open map redraws the roads that changed in place (more than 1,500 changed roads: the page reloads, and says so).
   If the solver refuses them, nothing is saved.
   A change of caps, or of heads that leaves the solver's inputs as they were (no main part becomes empty, no part starts or stops crossing the road under it), is saved and drawn without a solve.
 - **Show only some modes**: when the roads have a `modes` column (who may use them, e.g. `driving + walking`; duckOSM gives it), boxes

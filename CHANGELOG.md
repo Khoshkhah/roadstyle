@@ -7,6 +7,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **The level editor redraws only the roads an Apply changed, in place** (no page reload): the server finds the roads whose levels, heads
+  or caps are drawn differently and sends their features (roads, simple pieces, and the names / arrows when a fill number changed), built
+  by `render(_edges=...)`; the page swaps them with `GeoJSONSource.updateData`. More than 1,500 changed roads: the whole page again, said
+  in the status line. Monaco all modes, one cap: 6.1 s to 0.7 s from Apply to drawn. The roads and simple sources carry feature ids
+  (the roads source its index, as `generateId` gave; a piece `16 * edge + k`).
 - **The level solver's near rules are off by default** (`near_rules=False` in `solve_levels`, `compute_levels` and the level_area solve functions; CLI `solve --near-rules` turns them on).
   A part that only comes near the road under it is not lifted (as if switched off); `attrs["levels_near"]` is empty. Monaco all modes: 14.4 s, 9 positions, 0 given up,
   against 45.9 s, 27 positions with 11,911 near rules, 1,477 of them broken anyway.

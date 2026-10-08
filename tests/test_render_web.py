@@ -2332,6 +2332,40 @@ def test_the_editor_does_not_solve_for_heads_the_solver_does_not_see(tmp_path, m
     assert area.said.startswith(("solved", "re-solved")) and area.solved is not solved                        # its main part has no length
 
 
+def test_the_editor_updates_the_open_page_with_the_features_a_whole_page_has(tmp_path, monkeypatch):
+    """After an Apply the editor sends the features of the roads that changed (level_editor.Area.update), built by render's own code: for a
+    cap, a head and a level change they are the features of those roads in the whole page built again (the roads, their simple-mode
+    pieces, the slots when a fill number changed). More changed roads than PARTIAL_MAX: no update, the page reloads and says why."""
+    pytest.importorskip("scipy")
+    import pandas as pd
+
+    from roadstyle import level_editor
+    from roadstyle.level_area import make_area
+    from roadstyle.level_editor import Area
+    make_area(_edge_world(), tmp_path)
+    area = Area(tmp_path)
+    js = lambda x: json.loads(json.dumps(x, default=str))                                  # noqa: E731 - as the page gets them
+    order = pd.DataFrame([{"relation": "order", "a": "12", "b": "11", "a_end": "", "b_end": "", "enabled": "false"}])
+    for change in ([{"op": "cap", "road": "12", "end": "start", "cap": "square"}], [{"op": "head", "road": "12", "end": "end", "m": "12.5"}], order):
+        levels = {r: f["levels"] for r, f in area.facts.items()}
+        if isinstance(change, list):
+            area.apply(change)
+        else:
+            area.change(change)
+            assert {r for r, f in area.facts.items() if f["levels"] != levels[r]}            # the levels changed
+        u = js(area.update)
+        assert u["roads"] and u["features"]["simple"] and area.reload is None and set(u["facts"]) == set(u["roads"])
+        src = _style_of(area.page)["sources"]
+        idx = [f["id"] for f in u["features"]["roads"]]
+        assert [f["properties"]["road"] for f in u["features"]["roads"]] == u["roads"]
+        assert u["features"]["roads"] == [src["roads"]["data"]["features"][i] for i in idx]
+        assert u["features"]["simple"] == [f for f in src["simple"]["data"]["features"] if f["properties"]["__rs_edge"] in idx]
+        assert ("slots" in u["features"]) == (change is order) and u["features"].get("slots", src["slots"]["data"]["features"]) == src["slots"]["data"]["features"]
+    monkeypatch.setattr(level_editor, "PARTIAL_MAX", 0)
+    area.apply([{"op": "cap", "road": "12", "end": "start", "cap": ""}])
+    assert area.update is None and area.reload == "1 roads changed, more than 0: the whole page again"
+
+
 def test_the_editor_re_solves_only_the_roads_around_a_change():
     """level_area.solve_local (the editor's Apply): the roads around a change are solved again with the same rules, every other road keeps its
     numbers; a local result that breaks what the previous one kept is not used: the whole area is solved, and the result says so and why."""
