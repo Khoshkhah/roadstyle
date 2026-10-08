@@ -1364,10 +1364,11 @@ _SIMPLE_JS = """
 <script>
 const RS_SIMPLE = __RS_SIMPLE__;
 function _simpleColor(){        // render_web._simple_color, with the active colouring, the rsColor groups and the tunnel slider
+  const sh=["==",["get","__rs_k"],2];
   const c=["==",["get","__rs_k"],0], b=["to-boolean",["get","__rs_bridge"]];
   let base=["coalesce",["get","__rs_casing"],"#000000"], fill=_fillExpr(["get","__rs_edge"]);
   if(RS_SIMPLE.tunnels){ base=_tunMix(base, TUNNEL.to.fill); fill=_tunMix(fill, TUNNEL.to.fill); }   // a tunnel's casing and fill: the tunnel look
-  return ["case",c,["case",b,RS_SIMPLE.bridge,base],fill];
+  return ["case",sh,RS_SIMPLE.shadow,c,["case",b,RS_SIMPLE.bridge,base],fill];
 }
 const _rsFullFill=_applyFill, _rsFullSort=_applySort, _rsFullRoadFill=rsSetRoadFill;
 _applyFill=function(){ _rsFullFill();
@@ -1378,7 +1379,7 @@ _applySort=function(){ _rsFullSort();
   if(map.getLayer(RS_SIMPLE.layer)) map.setLayoutProperty(RS_SIMPLE.layer,"line-sort-key",
     all ? ["+",k,["case",["all",["==",["get","__rs_k"],1],_has(["get","__rs_edge"],all)],0.5,0]] : k); };
 rsSetRoadFill=function(on){
-  if(map.getLayer(RS_SIMPLE.layer)) map.setPaintProperty(RS_SIMPLE.layer,"line-opacity",on ? 1 : ["case",["==",["get","__rs_k"],0],1,0]);
+  if(map.getLayer(RS_SIMPLE.layer)) map.setPaintProperty(RS_SIMPLE.layer,"line-opacity",on ? 1 : ["case",["==",["get","__rs_k"],1],0,1]);
   _rsFullRoadFill(on); };
 </script>
 """
@@ -1681,15 +1682,23 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
     return under, over, meta, edge
 
 
-def _simple_pieces(geo, parts, cols):
+def _simple_pieces(geo, parts, cols, shadows=True):
     """The features of simple mode's one road layer: every casing piece (``__rs_k`` 0; the heads as ``_casing_parts`` cuts them, no seams:
     every end is round) and every fill (``__rs_k`` 1), with ``__rs_s``, the line-sort-key: ``2 * position``, a bridge's casing a
     quarter more (the full look draws it after the other casings of its position), a fill ``2 * position + 1``. A dashed class has no
-    casing and its fill comes before the casings of its position (``2 * position - 0.5``), as in the full look. A fill keeps only what the layer reads (``cols``, ``lvl``, ``__rs_*``)."""
+    casing and its fill comes before the casings of its position (``2 * position - 0.5``), as in the full look. A fill keeps only what the layer reads (``cols``, ``lvl``, ``__rs_*``).
+    A bridge's shadow (``__rs_k`` 2): a copy of its main casing piece (or its whole casing, an edge not cut), just under it (``__rs_s`` 0.1
+    less); the heads, where the bridge comes down to the road, have none."""
     keep = {c for c in cols if c} | {"lvl"}
-    out = [{"type": "Feature", "geometry": q["geometry"],
-            "properties": {**q["properties"], "__rs_k": 0, "__rs_s": 2 * q["properties"]["__rs_cl"] + (0.25 if q["properties"].get("__rs_bridge") else 0)}}
-           for q in parts if not q["properties"].get("__rs_seam") and not q["properties"].get("__rs_dash")]
+    out = []
+    for q in parts:
+        p = q["properties"]
+        if p.get("__rs_seam") or p.get("__rs_dash"):
+            continue
+        k = 2 * p["__rs_cl"] + (0.25 if p.get("__rs_bridge") else 0)
+        if shadows and p.get("__rs_bridge") and (p.get("__rs_main") or p["__rs_cs"] == p["__rs_cl"] == p["__rs_ce"]):
+            out.append({"type": "Feature", "geometry": q["geometry"], "properties": {**p, "__rs_k": 2, "__rs_s": k - 0.1}})
+        out.append({"type": "Feature", "geometry": q["geometry"], "properties": {**p, "__rs_k": 0, "__rs_s": k}})
     for ft in geo["features"]:
         p = ft["properties"]
         out.append({"type": "Feature", "geometry": ft["geometry"],
@@ -1699,7 +1708,7 @@ def _simple_pieces(geo, parts, cols):
 
 
 def _simple_color(bridge_color, tunnels=False):
-    """Simple mode's line-color: a casing piece its casing colour (a bridge's ``bridge_color``), a fill its fill; on a map with
+    """Simple mode's line-color: a bridge shadow ``bridge_shadow_color``, a casing piece its casing colour (a bridge's ``bridge_color``), a fill its fill; on a map with
     ``tunnels`` a tunnel's casing and fill both take the tunnel look (_tun_mix toward the tunnel slate at ``tunnel_strength``). The page
     builds the same again on every recolouring (the simple-mode script)."""
     c, b = ["==", ["get", "__rs_k"], 0], ["to-boolean", ["get", "__rs_bridge"]]
@@ -1707,7 +1716,7 @@ def _simple_color(bridge_color, tunnels=False):
     if tunnels:
         s = float(CONFIG.tunnel_strength)
         base, fill = _tun_mix(base, _TUN_TO["fill"], s), _tun_mix(fill, _TUN_TO["fill"], s)
-    return ["case", c, ["case", b, bridge_color, base], fill]
+    return ["case", ["==", ["get", "__rs_k"], 2], CONFIG.bridge_shadow_color, c, ["case", b, bridge_color, base], fill]
 
 
 def _by_feature(cases, default):
@@ -1898,8 +1907,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
 
     ``simple=True`` draws every road piece in ONE line layer: the casings, cut into their heads as here,
     and the fills of every position, ordered by ``line-sort-key`` (position by position, at each position every casing, then every
-    fill), with colour and width per feature. Much faster to load and zoom on a big page. It leaves out: bridge shadows, tunnel casing
-    dashes and dashed classes' dashes (drawn solid), square and flat ends and the per-end caps (every end round), the twin end caps;
+    fill), with colour and width per feature. Much faster to load and zoom on a big page. A bridge's casing is ``bridge_casing_extra`` px
+    wider each side than in the full look, and its shadow (``bridge_shadow``) lies evenly around its main part, blurred, not offset. It
+    leaves out: tunnel casing dashes and dashed classes' dashes (drawn solid), square and flat ends and the per-end caps (every end round), the twin end caps;
     street names and one-way arrows are one layer each, above all roads (a name of a road under a bridge can show on the bridge),
     and the items of ``Overlay(edge_col=...)`` are drawn above all roads too. Not with ``tiles=True`` or ``tunnel_control=True`` (a ValueError).
 
@@ -2377,7 +2387,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     if simple:        # one line layer for every road piece (render's docstring): the full look's road layers and their sources go
         if parts is None:
             parts = _casing_parts(geo, head_m, (highway_col, filter_col, width_m_col))
-        style["sources"]["simple"] = {"type": "geojson", "data": _simple_pieces(geo, parts, (highway_col, filter_col, width_m_col)),
+        style["sources"]["simple"] = {"type": "geojson", "data": _simple_pieces(geo, parts, (highway_col, filter_col, width_m_col), CONFIG.bridge_shadow),
                                       "tolerance": style["sources"]["roads"]["tolerance"]}
         for k in ("casings", "halves", "shadows", "ends"):
             style["sources"].pop(k, None)
@@ -2385,11 +2395,16 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         flt = [f for f in ((_minzoom_filter(highway_col, mz) if mz else None),
                            (["any", ["<", ["zoom"], dk["flat_below"]], ["!", is_b]] if decks["features"] else None)) if f]
         flt = {"filter": ["all", *flt]} if flt else {}
-        wide = [(["all", is_c, is_b], bcw), *([(["all", is_c, is_t], _plus_px(cw, 3))] if any_tunnel else []), (is_c, cw)]
+        # a bridge: its casing bridge_casing_extra px wider each side than the full look's, and its shadow (__rs_k 2) bridge_shadow_blur px
+        # wider each side again, blurred that much, evenly around it (line-translate is not per feature)
+        is_sh, blur = ["==", ["get", "__rs_k"], 2], float(CONFIG.bridge_shadow_blur)
+        bwide = _plus_px(bcw, 2 * float(CONFIG.bridge_casing_extra))
+        wide = [(is_sh, _plus_px(bwide, 2 * blur)), (["all", is_c, is_b], bwide),
+                *([(["all", is_c, is_t], _plus_px(cw, 3))] if any_tunnel else []), (is_c, cw)]
         road = {"id": "roads-simple", "type": "line", "source": "simple", "layout": {**lay, "line-sort-key": ["get", "__rs_s"]}, **flt,
                 "paint": {"line-color": _simple_color(CONFIG.bridge_casing_color, bool(any_tunnel)),
-                          "line-width": _by_feature(wide, fw), "line-offset": off,
-                          **({} if road_fill else {"line-opacity": ["case", is_c, 1, 0]})}}
+                          "line-width": _by_feature(wide, fw), "line-offset": off, "line-blur": ["case", is_sh, blur, 0],
+                          **({} if road_fill else {"line-opacity": ["case", ["==", ["get", "__rs_k"], 1], 0, 1]})}}
         # the edges themselves, invisible: what a click, a hover, Street View and the page's fill code find (the roads source, its ids)
         pick = {"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, **flt,
                 "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"], "line-width": fw, "line-offset": off, "line-opacity": 0}}
@@ -2724,7 +2739,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     else:
         html = html.replace("<script>__RS_TILES__</script>", "", 1)
     if simple:
-        html = html.replace("</body>", _SIMPLE_JS.replace("__RS_SIMPLE__", json.dumps({"layer": "roads-simple", "bridge": CONFIG.bridge_casing_color,
+        html = html.replace("</body>", _SIMPLE_JS.replace("__RS_SIMPLE__", json.dumps({"layer": "roads-simple", "bridge": CONFIG.bridge_casing_color, "shadow": CONFIG.bridge_shadow_color,
                                                                                        "tunnels": bool(any_tunnel)})) + "</body>", 1)
     if gz:
         html = html.replace("</body>", _INFLATE_JS.replace("__RS_GZ__", json.dumps(gz)) + "</body>", 1)

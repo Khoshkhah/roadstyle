@@ -2809,6 +2809,13 @@ def test_simple_draws_every_road_piece_in_one_layer_in_the_full_order():
     fills = [(p["__rs_edge"], p["__rs_s"]) for p in feats if p["__rs_k"] == 1]
     assert fills == [(0, 1), (1, 5), (2, 1.5)]
     assert all(max(c[2] for c in casings if c[0] == e) < s for e, s in fills if e != 2)      # an edge's fill over its own casing
+    # the bridge's shadow: one copy of its main casing piece, just under it, with every piece's labels; blurred, wider than the casing
+    shadows = [p for p in feats if p["__rs_k"] == 2]
+    assert [(p["__rs_edge"], p["__rs_cl"], p["__rs_s"]) for p in shadows] == [(1, 1, 2.15)] and "__rs_cls" in shadows[0]
+    paint = lines[0]["paint"]
+    assert paint["line-blur"][0] == "case" and paint["line-color"][1:3] == [["==", ["get", "__rs_k"], 2], "rgba(0,0,0,0.25)"]
+    w = paint["line-width"][4]                                       # the first zoom stop: shadow, bridge casing, ... cases
+    assert w[0] == "case" and w[1] == ["==", ["get", "__rs_k"], 2]
     assert "const RS_SIMPLE = " in html and "_applyFill=function" in html
 
 
