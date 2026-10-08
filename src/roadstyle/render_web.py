@@ -707,6 +707,7 @@ def _part(xy, cum, a, b):
 
 
 _SEAM_M = 0.5        # a seam reaches this far each way from its cut, at most a quarter of either piece (see _casing_parts)
+_LAP_M = 2.0         # a lap (the flat seam below _SEAM_MINZOOM) reaches this far each way, at most half of either piece
 
 
 def _casing_parts(geo, head_m, cols):
@@ -767,6 +768,16 @@ def _casing_parts(geo, head_m, cols):
             q = {**base, "__rs_cl": min(sides), "__rs_seam": True}
             q.pop("__rs_cap", None)
             out.append({"type": "Feature", "properties": q, "geometry": {"type": "LineString", "coordinates": coords}})
+            # below _SEAM_MINZOOM a lap instead (2026-10-08): flat, up to _LAP_M each way (half of either piece at most). The two flat ends
+            # at a cut take their directions from their own pieces' segments after the map snaps them to its tile grid (22 cm at zoom 14,
+            # 5 cm at 16), so they stand a few degrees apart and a thin gap opens across the outline; a lap at the lower number lies across it.
+            # None on a dashed or tunnel casing: a solid lap would fill its gaps
+            if base.get("__rs_dash") or base.get("__rs_tunnel"):
+                continue
+            half = min([_LAP_M] + [(b - a) / 2 for a, b, num in near])
+            pts = _part(xy, cum, max(0.0, c - half), min(n, c + half))
+            coords = np.column_stack([np.round(pts[:, 0] / kx + lon0, 7), np.round(pts[:, 1] / ky + lat0, 7)]).tolist()
+            out.append({"type": "Feature", "properties": {**q, "__rs_cap": True, "__rs_lap": True}, "geometry": {"type": "LineString", "coordinates": coords}})
     return out
 
 
@@ -804,6 +815,12 @@ def _label_readable_filter():
 
 
 _SEAM_MINZOOM = 17      # the casing seams (2026-10-06): a primary's casing is 12 m wide on the ground at zoom 16, so a seam reaches past a head
+
+
+def _seam_filter():
+    """The casing seams' filter: every piece, the round seams from _SEAM_MINZOOM, the flat laps below it (_casing_parts)."""
+    seam, lap = ["to-boolean", ["get", "__rs_seam"]], ["to-boolean", ["get", "__rs_lap"]]
+    return ["any", ["!", seam], ["all", ["!", lap], [">=", ["zoom"], _SEAM_MINZOOM]], ["all", lap, ["<", ["zoom"], _SEAM_MINZOOM]]]
 
 
 def _bridge_shadows(geo, parts, highway_col, trim_m, max_turn=45.0):
@@ -2503,8 +2520,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             layers[at + 1:at + 1] = twins
             style["layers"] = layers
         if divided:     # the round seams at the cuts only from zoom 17: below it a seam reaches past a 5 m head and shows as a bump on a flat end
-            seam_ok = ["any", ["!", ["to-boolean", ["get", "__rs_seam"]]], [">=", ["zoom"], _SEAM_MINZOOM]]
-            style["layers"] = [{**l, "filter": ["all", l["filter"], seam_ok]} if l["id"] in ("roads-casing", "roads-casing-bridge") else l
+            seam_ok = _seam_filter()        # (and the flat laps only below 17: they ride in the flat-ended -sq layers)
+            style["layers"] = [{**l, "filter": ["all", l["filter"], seam_ok]} if l["id"] in ("roads-casing", "roads-casing-bridge", "roads-casing-sq", "roads-casing-sq-bridge") else l
                                for l in style["layers"]]
         style["layers"] = _level_layers(style["layers"], levels, "casings" if divided else None)
         if decks["features"]:        # 3D: the flat bridge line below flat_below, the extruded deck from it up
@@ -2535,7 +2552,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             style["sources"].pop(k, None)
         is_c = ["==", ["get", "__rs_k"], 0]
         flt = [f for f in ((_minzoom_filter(highway_col, mz) if mz else None),
-                           ["any", ["!", ["to-boolean", ["get", "__rs_seam"]]], [">=", ["zoom"], _SEAM_MINZOOM]],     # the full look's rule: a seam only from zoom 17 (below it a bridge's seams are dark dots at every head)
+                           _seam_filter(),     # the full look's rule: a seam only from zoom 17 (below it a bridge's seams are dark dots at every head)
                            (["any", ["<", ["zoom"], dk["flat_below"]], ["!", is_b]] if decks["features"] else None)) if f]
         flt = {"filter": ["all", *flt]} if flt else {}
         # a bridge: its casing bridge_casing_extra px wider each side than the full look's, and its shadow (__rs_k 2) bridge_shadow_blur px

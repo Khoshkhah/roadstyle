@@ -241,8 +241,8 @@ def _road_filters(html):
 def test_minzoom_off_by_default():
     """Existing maps must be byte-identical — `track` is a width channel for some callers, and
     hiding it by class would make their data disappear."""
-    from roadstyle.render_web import _SEAM_MINZOOM, render
-    seam = json.dumps(["any", ["!", ["to-boolean", ["get", "__rs_seam"]]], [">=", ["zoom"], _SEAM_MINZOOM]])   # hides only the casing seams below z17
+    from roadstyle.render_web import _seam_filter, render
+    seam = json.dumps(_seam_filter())   # only the casing seams (round from z17) and laps (flat below z17)
     for f in _road_filters(render(_many_edges(20)).html).values():
         assert "zoom" not in json.dumps(f).replace(seam, "")
 
@@ -2651,7 +2651,7 @@ def test_a_divided_casing_has_a_round_seam_at_each_cut():
     style = _style(render_edges(g, backend="web", casing_start_col="cs", casing_level_col="cl", casing_end_col="ce", fill_level_col="fl",
                                 cap_col="cap", simple=False).html)
     pieces = [f["properties"] for f in style["sources"]["casings"]["data"]["features"]]
-    seams = [p for p in pieces if p.get("__rs_seam")]
+    seams = [p for p in pieces if p.get("__rs_seam") and not p.get("__rs_lap")]                           # (the laps: test_a_lap_closes_the_cut_below_zoom_17)
     assert sorted(p["__rs_cl"] for p in seams) == [-1, 0] and all("__rs_cap" not in p for p in seams)     # round, at the lower number
     assert sorted(p["__rs_cl"] for p in pieces if not p.get("__rs_seam")) == [-1, 0, 1]
     lay = {l["id"]: l for l in style["layers"]}
@@ -3105,9 +3105,10 @@ def test_simple_line_cap_per_piece_from_the_ends():
     feats = [f["properties"] for f in split["sources"]["simple"]["data"]["features"]]
     fills = [p.get("__rs_cap") for p in feats if p["__rs_k"] == 1]
     assert fills == ["square", True]                                                                # the start half, the end half
-    heads = [(p["__rs_cl"], p.get("__rs_cap"), p.get("__rs_main")) for p in feats if p["__rs_k"] == 0]
+    heads = [(p["__rs_cl"], p.get("__rs_cap"), p.get("__rs_main")) for p in feats if p["__rs_k"] == 0 and not p.get("__rs_lap")]
     assert heads[:3] == [(0, "square", None), (0, True, True), (0, True, None)]                       # head, main (flat), head
     assert heads[3:] == [(0, None, None)] * 2 and all(p.get("__rs_seam") for p in feats if p["__rs_k"] == 0 and not p.get("__rs_cap"))   # the two seams, round
+    assert [p.get("__rs_cap") for p in feats if p.get("__rs_lap")] == [True, True]                  # and the two laps, flat (below zoom 17)
 
 
 def test_the_tunnels_box_recolours_the_one_road_layer_in_the_browser(tmp_path):
@@ -3237,7 +3238,7 @@ def test_a_seam_is_long_enough_to_keep_its_direction():
     map's tile grid above zoom 18 and was drawn as a square block out of the outline (2026-10-08)."""
     kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0)
     feats = _style(render_edges(_simple_world(), **kw).html)["sources"]["simple"]["data"]["features"]
-    seams = [f["geometry"]["coordinates"] for f in feats if f["properties"].get("__rs_seam")]
+    seams = [f["geometry"]["coordinates"] for f in feats if f["properties"].get("__rs_seam") and not f["properties"].get("__rs_lap")]
     assert seams
     for c in seams:
         (x0, y0), (x1, y1) = c[0][:2], c[-1][:2]
@@ -3249,4 +3250,26 @@ def test_simple_seams_only_from_zoom_17_as_the_full_look():
     """A seam (a round dot at a casing cut) is drawn from zoom 17 only, as in the full look: below it a bridge's seams were dark dots at every head."""
     style = _style(render_edges(_simple_world(), backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce").html)
     flt = json.dumps(next(l for l in style["layers"] if l["id"] == "roads-simple")["filter"])
-    assert json.dumps(["any", ["!", ["to-boolean", ["get", "__rs_seam"]]], [">=", ["zoom"], 17]]) in flt
+    seam, lap = ["to-boolean", ["get", "__rs_seam"]], ["to-boolean", ["get", "__rs_lap"]]
+    assert json.dumps(["any", ["!", seam], ["all", ["!", lap], [">=", ["zoom"], 17]], ["all", lap, ["<", ["zoom"], 17]]]) in flt
+
+
+def test_a_lap_closes_the_cut_below_zoom_17():
+    """Below zoom 17 a flat lap lies across each casing cut at the lower number, up to 2 m each way and half of either piece: the two flat
+    ends at a cut take their directions from the map's tile grid (22 cm at zoom 14), stood a few degrees apart and left a thin gap across a
+    bridge's outline (2026-10-08). Both looks."""
+    kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0)
+    for simple, src in ((True, "simple"), (False, "casings")):
+        style = _style(render_edges(_simple_world(), simple=simple, **kw).html)
+        feats = style["sources"][src]["data"]["features"]
+        laps = [f for f in feats if f["properties"].get("__rs_lap")]
+        seams = [f for f in feats if f["properties"].get("__rs_seam") and not f["properties"].get("__rs_lap")]
+        solid = [f for f in seams if not (f["properties"].get("__rs_dash") or f["properties"].get("__rs_tunnel"))]   # (none on dashes)
+        assert laps and len(laps) == len(solid) and not any(f["properties"].get("__rs_tunnel") for f in laps)
+        for lap, seam in zip(laps, solid):
+            p = lap["properties"]
+            assert p["__rs_cap"] is True and p["__rs_seam"] and (p["__rs_edge"], p["__rs_cl"]) == (seam["properties"]["__rs_edge"], seam["properties"]["__rs_cl"])   # flat, at the seam's number
+            (x0, y0), (x1, y1) = lap["geometry"]["coordinates"][0][:2], lap["geometry"]["coordinates"][-1][:2]
+            assert math.hypot((x1 - x0) * 111320 * math.cos(math.radians(y0)), (y1 - y0) * 111320) <= 4.0 + 0.01
+        for lyr in (l for l in style["layers"] if l.get("source") == src and not l["id"].endswith("-dash")):
+            assert '["all", ["to-boolean", ["get", "__rs_lap"]], ["<", ["zoom"], 17]]' in json.dumps(lyr["filter"])
