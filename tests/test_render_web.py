@@ -1137,19 +1137,27 @@ def test_the_tunnel_can_move_toward_the_background():
     html = render_edges(_edge_world(), backend="web", basemap="blank_dark", basemaps=["blank_dark", "blank", "satellite"],
                         settings=cfg(tunnel_toward="background")).html
     conf, lay = _tunnel_conf(html), {l["id"]: l for l in _style(html)["layers"]}
-    assert conf["toward"] == "background" and conf["bgs"] == {"blank_dark": "#14181d", "blank": "#efede8", "satellite": None}
+    assert conf["toward"] == "background" and conf["background"] == {"light": "#efede8", "dark": "#14181d"} \
+        and conf["dark"] == {"blank_dark": True, "blank": False, "satellite": True} and conf["strength"] == 50 and slate["strength"] == 35
     for lid, entries in conf["layers"].items():
         for k, base, to in entries:
-            assert lay[lid]["paint"][k] == _tun_mix(base, "#14181d", 35)
+            assert lay[lid]["paint"][k] == _tun_mix(base, "#14181d", 50)
     with pytest.raises(ValueError, match="slate.*background"):
         render_edges(_edge_world(), backend="web", basemap="blank", settings=cfg(tunnel_toward="grey"))
-    with pytest.raises(ValueError, match="satellite"):
-        render_edges(_edge_world(), backend="web", basemap="satellite", settings=cfg(tunnel_toward="background"))
+    sat = render_edges(_edge_world(), backend="web", basemap="satellite", settings=cfg(tunnel_toward="background")).html   # dark: no error
+    assert _tunnel_conf(sat)["dark"]["satellite"] is True
+    mine = {"light": "#ffffff", "dark": "#000000"}                       # tunnel_background is a setting; strength set explicitly wins
+    h2 = render_edges(_edge_world(), backend="web", basemap="blank", settings=cfg(tunnel_toward="background", tunnel_background=mine, tunnel_strength=10)).html
+    assert _tunnel_conf(h2)["background"] == mine and _tunnel_conf(h2)["strength"] == 10
+    assert {l["id"]: l for l in _style(h2)["layers"]}[next(iter(_tunnel_conf(h2)["layers"]))]["paint"]
+    for bad in ({"light": "#fff", "dark": "#000000"}, {"light": "#ffffff"}, "#ffffff"):
+        with pytest.raises(ValueError, match="tunnel_background"):
+            render_edges(_edge_world(), backend="web", basemap="blank", settings=cfg(tunnel_toward="background", tunnel_background=bad))
 
 
 def test_the_tunnel_target_follows_the_base_map_in_the_browser(tmp_path):
     """Toward the background in a real page: switching the base map rebuilds the expressions with the new background; rsSetTunnelStyle({toward})
-    switches back to slate; a bad value throws; satellite warns and keeps slate."""
+    switches back to slate; a bad value throws; satellite is dark (#14181d)."""
     pw = pytest.importorskip("playwright.sync_api")
     path = tmp_path / "toward.html"
     from roadstyle import compute_levels
@@ -1169,17 +1177,22 @@ def test_the_tunnel_target_follows_the_base_map_in_the_browser(tmp_path):
         page.wait_for_function("window.map && map.loaded() && document.getElementById('tn-toward')", timeout=30_000)
         dark = page.evaluate(get)
         sel = page.evaluate("document.getElementById('tn-toward').value")
+        steps_bg = page.evaluate("Array.from(document.getElementById('tn-pre').options).map(o => o.value).join()")
         page.evaluate("rsSetBasemap('blank')")
         light = page.evaluate(get)
-        page.evaluate("rsSetTunnelStyle({toward: 'slate'})")
+        page.evaluate("rsSetTunnelStyle({background: {light: '#ffffff', dark: '#000000'}})")
+        mine = page.evaluate(get)
+        page.evaluate("document.getElementById('tn-toward').value = 'slate'; document.getElementById('tn-toward').onchange()")
         slate = page.evaluate(get)
+        steps_slate = page.evaluate("Array.from(document.getElementById('tn-pre').options).map(o => o.value).join() + ' ' + TUNNEL.strength")
         bad = page.evaluate("() => { try { rsSetTunnelStyle({toward: 'x'}); return ''; } catch(e) { return e.message; } }")
         page.evaluate("rsSetTunnelStyle({toward: 'background'}); rsSetBasemap('satellite')")
         sat = page.evaluate(get)
         browser.close()
     assert errors == [] and sel == "background"
     assert "#14181d" in dark and "#efede8" not in dark and "#efede8" in light and "#64748b" in slate and "#64748b" not in light
-    assert "must be" in bad and "#64748b" in sat and any("no single background" in w for w in warns)
+    assert "must be" in bad and "#000000" in sat   # satellite is dark: the dark colour set above
+    assert steps_bg == "0,25,50,75,100" and steps_slate == "0,20,35,70,100 35" and "#ffffff" in mine
 
 
 def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):

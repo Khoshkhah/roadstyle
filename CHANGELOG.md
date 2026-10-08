@@ -7,9 +7,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
-- **`tunnel_toward="background"`** (default `"slate"`, unchanged): a tunnel moves toward the base map's background colour instead of slate, so it keeps its hue
-  and sinks into the map; follows the base-map switcher. `rsSetTunnelStyle({toward})` and a Slate / Background choice in the Tunnels box.
-  Satellite has no single background colour (error when it starts the page, console warning and slate after a switch).
+- **`tunnel_toward="background"`** (default `"slate"`, unchanged): a tunnel moves toward a background colour instead of slate, so it keeps its hue
+  and sinks into the map: light base maps toward `#efede8`, dark base maps and satellite toward `#14181d` (the setting `tunnel_background`); the slider starts at 50 with the steps 0, 25, 50, 75, 100 (`tunnel_strength` unset now means the mode's middle step: 35 toward slate); follows the base-map switcher.
+  `rsSetTunnelStyle({toward})` and a Slate / Background choice in the Tunnels box.
 
 ## [0.17.1] — 2026-10-07
 

@@ -53,10 +53,10 @@ need no image to keep in step (2026-10-06). The street-name and arrow slots carr
 ## Toward the background (2026-10-08)
 
 `tunnel_toward="background"` (default `"slate"`, the look above unchanged; `rsSetTunnelStyle({toward})`; a Slate / Background choice in the Tunnels box)
-moves everything that moves toward slate toward the current base map's background colour instead (v2's "Pre-Mix"): a motorway tunnel stays orange but
-dimmed, every class keeps its hue. Opaque as before. When the viewer switches the base map the target follows and the expressions are built again.
-A base map's background is its flat colour (`blank`, `blank_dark`); a tiled one has only the neutral canvas colour behind its tiles (light `#e8e6e1`, dark `#0e1113`),
-not the colour of the tiles. Satellite has no single colour: as the starting base map it is an error, and after a switch to it tunnels move toward slate, with a console warning.
+moves everything that moves toward slate toward a background colour instead (v2's "Pre-Mix"): a motorway tunnel stays orange but
+dimmed, every class keeps its hue. Opaque as before. One target per theme, the blank maps' colours, not a lookup of each base map: every light
+base map moves toward `#efede8` (blank), every dark one toward `#14181d` (blank_dark); satellite counts as dark; the two colours are the setting `tunnel_background` (`{"light", "dark"}`, `#rrggbb`; also `rsSetTunnelStyle({background})`). Toward the background the slider starts at 50 (not 35, unless `tunnel_strength` is set) and the Tunnels box has the steps 0, 25, 50, 75, 100 (toward slate: 0, 20, 35, 70, 100); switching the choice in the box switches the step set and moves to its middle step. When the viewer switches the
+base map the target follows (light to dark changes it) and the expressions are built again.
 
 ## Limits
 

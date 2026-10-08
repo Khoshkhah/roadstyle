@@ -21,6 +21,7 @@ import html as _html
 import json
 import math
 import os
+import re
 from collections.abc import Mapping
 
 from . import _settings
@@ -1001,6 +1002,22 @@ def _twin_ends(geo, cols):
 # the tunnel look (docs/design/tunnel_look.md): everything on a tunnel moves toward one colour as the slider rises, v2's slate (the
 # fade is the same for every item, however it was added); the casing dashes start from v2's lighter slate
 _TUN_TO = {"fill": "#64748b", "dash": "#94a3b8"}
+
+
+def _tun_bg(bm, bg):
+    """The colour a tunnel moves toward on base map ``bm``: ``bg["light"]`` for a light map, ``bg["dark"]`` for a dark one (satellite is dark)."""
+    return bg["dark" if bm.is_dark else "light"]
+
+
+def _tun_settings():
+    """``(toward, strength, background)`` of the tunnel look from the settings, checked. Strength None = the middle step of the mode."""
+    toward, bg = CONFIG.tunnel_toward, CONFIG.tunnel_background
+    if toward not in ("slate", "background"):
+        raise ValueError(f"tunnel_toward {toward!r} is not one of 'slate', 'background'")
+    if not isinstance(bg, dict) or set(bg) != {"light", "dark"} or not all(isinstance(c, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", c) for c in bg.values()):
+        raise ValueError(f"tunnel_background must be {{'light': '#rrggbb', 'dark': '#rrggbb'}}, got {bg!r}")
+    st = CONFIG.tunnel_strength
+    return toward, float(st if st is not None else (50 if toward == "background" else 35)), bg
 
 
 def _tun_mix(expr, toward, s):
@@ -2490,19 +2507,16 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     if edge_layers:       # the overlays attached to edges: after the fills of their position, before its arrows (docs/design/edge_overlays.md)
         style["layers"] = _place_edge_overlays(style["layers"], edge_layers, levels, pat_over=not road_fill)
     style["layers"] += over_layers             # caller overlays drawn on top of the roads (e.g. POIs)
+    tun_toward, tun_strength, tun_bgs = _tun_settings()
     tun_paint, tun_dash, tun_casing = {}, [], {}
     if any(ft["properties"].get("__rs_tunnel") for ft in geo["features"]):      # the tunnel look (docs/design/tunnel_look.md)
         if CONFIG.tunnel_palette not in CONFIG.tunnel_palettes:
             raise ValueError(f"tunnel_palette {CONFIG.tunnel_palette!r} is not in tunnel_palettes {list(CONFIG.tunnel_palettes)}")
-        if CONFIG.tunnel_toward not in ("slate", "background"):
-            raise ValueError(f"tunnel_toward {CONFIG.tunnel_toward!r} is not one of 'slate', 'background'")
         tun_to = _TUN_TO
-        if CONFIG.tunnel_toward == "background":
-            if active_bm.satellite:
-                raise ValueError(f"tunnel_toward='background': base map {active_bm.key!r} is satellite imagery and has no single background colour")
-            tun_to = {**_TUN_TO, "fill": _bg_color(active_bm)}
+        if tun_toward == "background":
+            tun_to = {**_TUN_TO, "fill": _tun_bg(active_bm, tun_bgs)}
         tun_paint, tun_dash, tun_casing = _tunnel_look(style["layers"], {l["id"] for _, _, _, grp in edge_layers for l in grp},
-                                           float(CONFIG.tunnel_strength), arw["color"], tun_to)
+                                           tun_strength, arw["color"], tun_to)
 
     # road-class filter panel: the distinct classes present, most important first. `filter_col`
     # (optional) drives the filter from a different column than the styling `highway_col` — e.g. a
@@ -2595,10 +2609,10 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             .replace("__COLOR_OPTIONS__", json.dumps(color_opts_meta or []))
             .replace("__CO_ACTIVE__", str(_active))
             .replace("__OVERLAYS__", json.dumps(ov_meta))
-            .replace("__TUNNEL__", json.dumps({"layers": tun_paint, "dash": tun_dash, "casing": tun_casing, "strength": float(CONFIG.tunnel_strength),
+            .replace("__TUNNEL__", json.dumps({"layers": tun_paint, "dash": tun_dash, "casing": tun_casing, "strength": tun_strength,
                                                "palette": CONFIG.tunnel_palette, "palettes": CONFIG.tunnel_palettes,
                                                "ratio": list(CONFIG.tunnel_casing_dash or [1, 1]), "bg": _bg_color(active_bm),
-                                               "toward": CONFIG.tunnel_toward, "bgs": {b.key: None if b.satellite else _bg_color(b) for b in bms_list},
+                                               "toward": tun_toward, "background": tun_bgs, "dark": {b.key: bool(b.is_dark) for b in bms_list},
                                                "to": _TUN_TO, "control": bool(tunnel_control and tun_paint)}))
             .replace("__VIEWS__", json.dumps(view_list))
             .replace("__RS_ROAD_FILL__", json.dumps({"on": bool(road_fill), "paint": fill_paint}))

@@ -52,8 +52,9 @@ class StyleConfig:
     tunnel_casing_dash: list = field(default_factory=lambda: [1, 1])   # the tunnel casing: dash and gap, in line widths (1:1, 2026-10-06)
     tunnel_fill_dash: list = field(default_factory=list)   # light dashes on the tunnel fill, e.g. [1.2, 1.2]; none by default (v2's look, 2026-10-06)
     tunnel_fill_dash_color: str = "rgba(255,255,255,0.55)"               # their colour, over any road colour
-    tunnel_strength: float = 35          # the tunnel look (docs/design/tunnel_look.md), v2's slider: 0 = normal colours, 100 = the full tunnel colours
+    tunnel_strength: float | None = None          # the tunnel look (docs/design/tunnel_look.md), v2\'s slider: 0 = normal colours, 100 = the full tunnel colours; None = the mode\'s middle step (35 toward slate, 50 toward the background)
     tunnel_toward: str = "slate"         # the colour a tunnel moves toward: "slate" #64748b, or "background" (the base map's, 2026-10-08)
+    tunnel_background: dict = field(default_factory=lambda: {"light": "#efede8", "dark": "#14181d"})   # tunnel_toward="background": the target on light base maps, and on dark ones and satellite
     tunnel_palette: str = "Graphite + silver"   # the casing of a tunnel, a name in tunnel_palettes (two colours by default, 2026-10-06)
     tunnel_palettes: dict = field(default_factory=lambda: {"One colour": None, "Slate + ice": ["#64748b", "#cbd5e1"],
                                                            "Blue + cyan": ["#315b7d", "#a9d7e8"], "Warm + sand": ["#806d64", "#e7c9a7"],
