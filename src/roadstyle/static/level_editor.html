@@ -197,12 +197,12 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     const j = await r.json(); if(!r.ok) throw new Error(j.error || r.statusText); return j;
   }
   // --- the map: the picked roads coloured, their ends marked
-  const idOf = r => rsQuery(p => String(p.road) === String(r))[0];
+  const idsOf = r => rsQuery(p => String(p.road) === String(r));      // a road's edges: both directions of a two-way road
   function paint(){
-    const g = sel.map((r, k) => r != null && idOf(r) != null ? [[idOf(r)], C[k]] : null).filter(Boolean);
+    const g = sel.map((r, k) => r != null && idsOf(r).length ? [idsOf(r), C[k]] : null).filter(Boolean);
     rsColor(g.length ? g : null);
     const f = [];
-    sel.forEach((r, k) => { if(r == null) return; const id = idOf(r); if(id == null) return; const p = rsGetProps([id])[0];
+    sel.forEach((r, k) => { if(r == null) return; const id = idsOf(r)[0]; if(id == null) return; const p = rsGetProps([id])[0];   // the road's ends, on each edge
       f.push({type: "Feature", properties: {c: C[k], open: 0}, geometry: {type: "Point", coordinates: [p.s_lon, p.s_lat]}});
       f.push({type: "Feature", properties: {c: C[k], open: 1}, geometry: {type: "Point", coordinates: [p.e_lon, p.e_lat]}}); });
     const fc = {type: "FeatureCollection", features: f}, src = map.getSource("lv-ends");
@@ -211,7 +211,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
       map.addLayer({id: "lv-ends", type: "circle", source: "lv-ends", paint: {"circle-radius": 6, "circle-stroke-width": 2.5,
         "circle-stroke-color": ["get", "c"], "circle-color": ["case", ["==", ["get", "open"], 1], "#ffffff", ["get", "c"]]}}); }
   }
-  function focus(roads){ const ids = roads.map(idOf).filter(i => i != null); if(ids.length) rsFocus(ids, {padding: 90, maxZoom: 18}); }
+  function focus(roads){ const ids = roads.flatMap(idsOf); if(ids.length) rsFocus(ids, {padding: 90, maxZoom: 18}); }
   // --- selection
   function pick(r){
     r = String(r);
@@ -264,7 +264,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     const box = (k, v) => `<div class="wd-box"><small>${k}</small><b>${v.toFixed(1)}<span> px</span></b><em>≈ ${(v * mpp).toFixed(1)} m</em></div>`;
     const pct = (100 * w.fill[0] / w.casing[0]).toFixed(1);
     return `<div class="wd-h"><span>drawn width</span><span>at z${z.toFixed(1)}</span></div>
-      <div class="wd-row">${box("fill", w.fill[0])}${box("outer", w.casing[0])}
+      <div class="wd-row">${box(f.two_way ? "fill, each direction" : "fill", w.fill[0])}${box(f.two_way ? "outer, both directions" : "outer", w.casing[0])}
         <div class="wd-x" title="Cross-section: the fill (${pct} % of the outer width) between its casings"><div><i style="width:${pct}%"></i></div>section</div></div>`;
   }
   map.on("zoomend", () => document.querySelectorAll("#lv-cards [data-w]").forEach(el => el.innerHTML = widthHtml(facts[el.dataset.w] || {})));
@@ -297,7 +297,9 @@ body.lv-open #lv-busy{right:var(--lv-w)}
         <span>length</span><span>${f.length_m != null ? f.length_m + " m" : "–"}</span><span>edges</span><span>${f.edges ?? "–"}${f.two_way ? " (two-way)" : ""}</span>
         <span>look</span><span>${esc(f.look || "–")}</span><span>lanes</span><span>${esc(f.lanes ?? "–")}</span>
         ${f.modes ? `<span>modes</span><span style="grid-column:span 3">${esc(f.modes)}</span>` : ""}
-        <span>road id</span><span style="grid-column:span 3;font-size:11px">${esc(r)}</span></div>
+        <span>road id</span><span style="grid-column:span 3;font-size:11px">${esc(r)}</span>
+        ${(f.directions || []).map(d => `<span>${d.way === "along" ? "direction ●→○" : "direction ○→●"}</span><span style="grid-column:span 3;font-size:11px"
+          title="${d.way === "along" ? "This edge runs from the road's start to its end" : "This edge runs the other way, from the road's end to its start"}">${esc(d.edge)}${d.edge_ref ? " · " + esc(d.edge_ref) : d.way === "against" ? " · <i>edge_ref not in roads.parquet (make the area again)</i>" : ""}</span>`).join("")}</div>
       <div class="wd" data-w="${esc(r)}">${widthHtml(f)}</div>
       ${["start", "end"].map((e, i) => `<div class="caps" title="The shape of this end of the road (caps.csv, drawing only). It starts round; square = flat but as long as round; flat = stops at the end point">
         <span style="width:44px">${e} ${i ? "○" : "●"}</span>

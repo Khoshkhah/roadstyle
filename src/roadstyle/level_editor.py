@@ -50,8 +50,9 @@ class Area:
             self.facts[r["road"]] = {"road": r["road"], "name": _txt(r.get("name")), "highway": _txt(r.get("highway")),
                                      "edge_ref": _txt(r.get("edge_ref")), "lanes": _txt(r.get("lanes")), "modes": _txt(r.get("modes")), "caps": ["", ""], "heads": [5.0, 5.0], "band": int(r["band"]), "priority": _num(r.get("priority")),
                                      "edges": len(r["edges"]) + len(r["reversed"]), "two_way": len(r["reversed"]) > 0, "length_m": float(m),
+                                     "directions": _directions(r),
                                      "look": "tunnel" if _yes(r.get("tunnel")) else "bridge" if _yes(r.get("bridge")) else "ground",
-                                     "width_px": _widths(_txt(r.get("highway")))}
+                                     "width_px": _widths(_txt(r.get("highway")), len(r["reversed"]) > 0)}
         self.saved = len(self.edits())                          # the edits that were in edits.csv when the editor started
         self.drawn, self.update = None, None
         self.build(self.edits(), self.stored())
@@ -117,29 +118,30 @@ class Area:
             self.facts[r.road]["caps"] = list(own_c)                                 # "" = auto
             self.facts[r.road]["caps_auto"] = [a["cap_start"], a["cap_end"]]
             self.facts[r.road]["levels"] = [int(r.casing_start), int(r.casing_level), int(r.casing_end), int(r.fill_level)]
-        draw = solved.drop(columns=["edges", "reversed"]).to_crs(4326)
+        draw = solved.to_crs(4326)
         draw["head_start_m"], draw["head_end_m"] = ([self.facts[r]["heads"][k] for r in draw["road"]] for k in (0, 1))
         draw["cap_start"], draw["cap_end"] = ([drawn[r][c] for r in draw["road"]] for c in ("cap_start", "cap_end"))
         draw["oneway"] = [not f["two_way"] for f in (self.facts[r] for r in draw["road"])]      # a road with no other direction is one way
         tips = draw.geometry.apply(lambda ln: list(ln.coords[0][:2]) + list(ln.coords[-1][:2]))
-        draw["s_lon"], draw["s_lat"], draw["e_lon"], draw["e_lat"] = zip(*tips, strict=True)
+        draw["s_lon"], draw["s_lat"], draw["e_lon"], draw["e_lat"] = zip(*tips, strict=True)    # the road's ends, on each of its edges
+        draw = _edge_rows(draw)
         self.draw, before = draw, self.drawn
-        self.drawn = list(zip(*(draw[c].tolist() for c in DRAWN), strict=True))           # a road's row: what is drawn of it
+        self.drawn = list(zip(*(draw[c].tolist() for c in DRAWN), strict=True))           # an edge's row: what is drawn of it
         self.update, self.reload, self._page = None, None, None
         if not in_place:
             return
         changed = [i for i, (x, y) in enumerate(zip(before, self.drawn, strict=True)) if x != y]
-        if len(changed) > PARTIAL_MAX:
-            self.reload = f"{len(changed)} roads changed, more than {PARTIAL_MAX}: the whole page again"
+        roads = list(dict.fromkeys(draw["road"].iat[i] for i in changed))
+        if len(roads) > PARTIAL_MAX:
+            self.reload = f"{len(roads)} roads changed, more than {PARTIAL_MAX}: the whole page again"
             return
         names = any(before[i][k] != self.drawn[i][k] for i in changed for k in (1, 3))   # a fill number (max of casing, fill) changed: the names and
-        feats = self._render(_edges=changed, arrows=names, labels=names)                    # arrows again (their chains follow it)
-        roads = [draw["road"].iat[i] for i in changed]
+        feats = self._render(_edges=changed, arrows=names, labels=names)                    # arrows again (their chains follow it); both directions of a road
         self.update = {"roads": roads, "features": feats, "pieces": render_web._PIECES, "facts": {r: self.facts[r] for r in roads}, "stats": self.stats}
 
     def _render(self, **kw):
         """The editor's map of ``self.draw`` (render_edges); with ``_edges``, the features of those roads instead (render_web.render)."""
-        return rs.render_edges(self.draw, edge_id_col="road", road_popup=False, name=f"Level editor · {self.dir.name}",
+        return rs.render_edges(self.draw, edge_id_col="edge", road_popup=False, name=f"Level editor · {self.dir.name}",
                                select_color="rgba(0,0,0,0)",               # the panel colours the picked roads (1 orange, 2 blue): no click glow over them
                                filter_control=False, tunnel_control=False,  # the panel is the only control: no class filter box, no Tunnels box
                                casing_start_col="casing_start", casing_level_col="casing_level", casing_end_col="casing_end",
@@ -267,15 +269,17 @@ class Area:
         return txt + (" · yours" if r.get("own") else " · found" if "enabled" not in r else "")
 
     def find(self, q, limit=20):
-        """The roads for a search: an exact edge id (either direction of a road), else the edge_refs that hold ``q`` (an exact one first)."""
+        """The roads for a search: an exact edge id (either direction of a road), else the edge_refs (of either direction) that hold ``q``
+        (an exact one first)."""
         q = q.strip()
         if not q:
             return []
         if q in self.road_of:
             return [self.facts[self.road_of[q]]]
         low = q.lower()
-        hits = [f for f in self.facts.values() if f["edge_ref"] and low in f["edge_ref"].lower()]
-        return sorted(hits, key=lambda f: (f["edge_ref"].lower() != low, f["edge_ref"]))[:limit]
+        refs = lambda f: [x.lower() for x in [f["edge_ref"], *(d["edge_ref"] for d in f["directions"])] if x]     # noqa: E731
+        hits = [f for f in self.facts.values() if any(low in x for x in refs(f))]
+        return sorted(hits, key=lambda f: (low not in refs(f), f["edge_ref"] or ""))[:limit]
 
     def rows(self):
         """Every edit, with its index, its section (saved before this session / added now) and its two roads."""
@@ -322,18 +326,51 @@ def _row(body):
     return row
 
 
-def _widths(cls):
+def _directions(r):
+    """A road's directions for the panel: each edge id with its edge_ref (``edge_refs`` / ``reversed_refs`` of roads.parquet: an area
+    made before 2026-10-08 has only the road's own ``edge_ref``, its other direction's is None) and ``way``: "along" the road or "against"."""
+    out = []
+    for way, ids, refs in (("along", r["edges"], r.get("edge_refs")), ("against", r["reversed"], r.get("reversed_refs"))):
+        refs = list(refs) if refs is not None and not (isinstance(refs, float) and refs != refs) else [None] * len(ids)
+        out += [{"edge": str(e), "edge_ref": _txt(x), "way": way} for e, x in zip(ids, refs, strict=True)]
+    return out
+
+
+def _widths(cls, two_way=False):
     """The page's width of a road of class ``cls`` in pixels, fill and casing, at the zoom stops of its width expression (linear between
-    them, the end values outside): the panel shows it at the map's zoom. One line per road here, so no two-way narrowing."""
+    them, the end values outside): the panel shows it at the map's zoom. A ``two_way`` road: the fill of one direction (narrowed as the
+    page draws it) and the outer width of the pair's one casing (both directions together, render_web._pair_width)."""
     out = {}
     for kind in ("fill", "casing"):
         e = render_web._width_expr("highway", casing=kind == "casing")         # ["interpolate", ["linear"], ["zoom"], z, match, z, match, ...]
         vals = []
-        for m in e[4::2]:
-            m = m[1] if m[0] == "*" else m                      # ["*", match, two-way case]: the match
-            vals.append(dict(zip(m[2:-1:2], m[3:-1:2], strict=True)).get(cls, m[-1]))
+        for z, m in zip(e[3::2], e[4::2], strict=True):
+            f = m[2][2] if m[0] == "*" and two_way else 1       # ["*", match, ["case", two-way?, factor, 1]]
+            m = m[1] if m[0] == "*" else m
+            v = dict(zip(m[2:-1:2], m[3:-1:2], strict=True)).get(cls, m[-1]) * f
+            if two_way and kind == "casing":
+                o = render_web._offset_match("highway", z)
+                v += 2 * dict(zip(o[2:-1:2], o[3:-1:2], strict=True)).get(cls, o[-1])
+            vals.append(round(v, 2))
         out[kind] = vals
     return {"z": e[3::2], **out}
+
+
+def _edge_rows(draw):
+    """One row per edge from one row per road (``edges`` / ``reversed``), as the final map has them: an edge of the other direction runs
+    the road's line backwards, with its two heads, casing numbers and caps swapped (level_area.edge_levels); ``edge`` is its id."""
+    import shapely
+    refs = "edge_refs" in draw.columns                          # each edge's own edge_ref (an area made since 2026-10-08)
+    def one(ids, rs, w):
+        t = draw.assign(edge=draw[ids], _o=range(len(draw)), _w=w, **({"edge_ref": draw[rs]} if refs else {}))
+        return pd.DataFrame.explode(t, ["edge", "edge_ref"] if refs else "edge").dropna(subset=["edge"])     # geopandas' explode is of geometries
+    fw, bw = one("edges", "edge_refs", 0), one("reversed", "reversed_refs", 1)
+    for a, b in (("casing_start", "casing_end"), ("head_start_m", "head_end_m"), ("cap_start", "cap_end")):
+        bw[a], bw[b] = bw[b].to_numpy(), bw[a].to_numpy()
+    bw = bw.set_geometry(shapely.reverse(bw.geometry.to_numpy()), crs=draw.crs)
+    out = pd.concat([fw, bw]).sort_values(["_o", "_w"], kind="stable").drop(columns=["edges", "reversed", "_o", "_w", "edge_refs", "reversed_refs"], errors="ignore")
+    out["edge"] = out["edge"].astype(str)
+    return out.reset_index(drop=True)
 
 
 def _txt(v):

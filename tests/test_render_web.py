@@ -907,7 +907,7 @@ def _pairs():
 
 
 def test_twin_pairs_get_one_end_cap_per_end():
-    style = _style(render_edges(_pairs(), backend="web", simple=False).html)
+    style = _style(render_edges(_pairs(), backend="web", simple=False, settings={"config": {"twin_casing": "each"}}).html)
     pts = style["sources"]["ends"]["data"]["features"]
     # only the plain, solid two-way street: two ends, both twins' ids; no one-way, bridge, tunnel,
     # or dashed pair
@@ -950,6 +950,125 @@ def test_single_line_classes_is_a_setting():
     assert street[1].get("__rs_dup") and not street[0]["__rs_twoway"] and street[7]["__rs_twoway"]
 
 
+def _twin(rows):
+    """A two-way primary (two reverse edges) and a one-way street: rows of (edge_id, start, end, casing start / main / end, fill, cap_start,
+    cap_end); the points are a = (18, 59.30), b = (18, 59.301)."""
+    pt = {"a": (18.0, 59.30), "b": (18.0, 59.301), "c": (18.001, 59.30), "d": (18.001, 59.301)}
+    cols = ["edge_id", "s", "e", "cs", "cm", "ce", "fl", "cap_s", "cap_e"]
+    t = {c: [r[i] for r in rows] for i, c in enumerate(cols)}
+    return gpd.GeoDataFrame({"highway": "primary", **{c: t[c] for c in cols if c not in ("s", "e")}},
+                            geometry=[LineString([pt[r[1]], pt[r[2]]]) for r in rows], crs=4326)
+
+
+_TWIN_KW = dict(backend="web", casing_start_col="cs", casing_level_col="cm", casing_end_col="ce", fill_level_col="fl",
+                cap_start_col="cap_s", cap_end_col="cap_e", head_m=5.0)
+
+
+def _num(e, p):
+    """A width or offset stop on a feature's properties (+, * and what render_web._ev reads)."""
+    from roadstyle.render_web import _ev
+    if isinstance(e, list) and e and e[0] in ("+", "*"):
+        a, b = (_num(x, p) for x in e[1:])
+        return a + b if e[0] == "+" else a * b
+    if isinstance(e, list) and e and e[0] in ("case", "match"):
+        if e[0] == "case":
+            for c, o in zip(e[1:-1:2], e[2:-1:2], strict=True):
+                if _ev(c, p):
+                    return _num(o, p)
+            return _num(e[-1], p)
+        v = _ev(e[1], p)
+        for lab, o in zip(e[2:-1:2], e[3:-1:2], strict=True):
+            if v == lab or (isinstance(lab, list) and v in lab):
+                return _num(o, p)
+        return _num(e[-1], p)
+    return _ev(e, p)
+
+
+def test_a_two_way_pair_has_one_casing_and_a_fill_per_direction():
+    """twin_casing "one" (the default, 2026-10-08): a two-way road given as two directed edges has ONE casing, the first edge's pieces,
+    unshifted and as wide as both directions together (a direction's casing + twice its offset: the outer edge of the two lanes, as the
+    end caps' radius); the second edge has no casing piece; each direction keeps its own fill, shifted, as before. Simple mode, the bridge
+    shadow and the tunnel's two casing pieces too, and the full look; no end blobs (each piece has its own cap)."""
+    from roadstyle.render_web import _end_radius_expr, _ZSTOPS
+    g = _twin([(1, "a", "b", 0, 0, 0, 0, None, None), (2, "b", "a", 0, 0, 0, 0, None, None), (3, "c", "d", 0, 0, 0, 0, None, None)])
+    for extra in ({}, {"bridge": "yes"}, {"tunnel": "yes"}):
+        style = _style(render_edges(g.assign(**extra), **_TWIN_KW).html)
+        feats = [f["properties"] for f in style["sources"]["simple"]["data"]["features"]]
+        casing = [(p["__rs_edge"], p["__rs_k"], p.get("__rs_pair"), p.get("__rs_edge2")) for p in feats if p["__rs_k"] != 1]
+        assert {c[0] for c in casing} == {0, 2} and all(c[2:] == (True, 1) for c in casing if c[0] == 0)
+        assert all(c[2:] == (None, None) for c in casing if c[0] == 2)                    # the one-way street: as before
+        ks = {c[1] for c in casing if c[0] == 0}
+        assert ks == ({0, 2} if extra.get("bridge") else {3, 4} if extra.get("tunnel") else {0})       # its shadow, its tunnel pieces
+        fills = [p for p in feats if p["__rs_k"] == 1]
+        assert sorted(p["__rs_edge"] for p in fills) == [0, 1, 2] and not any(p.get("__rs_pair") for p in fills)
+        lyr = next(l for l in style["layers"] if l["id"] == "roads-simple")
+        z = _ZSTOPS.index(18)
+        width, offset = lyr["paint"]["line-width"], lyr["paint"]["line-offset"]
+        pair = next(p for p in feats if p.get("__rs_pair") and p["__rs_k"] in (0, 3))
+        fill = next(p for p in fills if p["__rs_edge"] == 0)
+        lane = {**pair, "__rs_pair": None}                                                # the same piece as one direction's casing
+        assert _num(offset[4 + 2 * z], pair) == 0 and _num(offset[4 + 2 * z], fill) > 0
+        assert _num(width[4 + 2 * z], pair) == pytest.approx(_num(width[4 + 2 * z], lane) + 2 * _num(offset[4 + 2 * z], fill))
+        if not extra:
+            outer = _num(_end_radius_expr("highway", casing=True)[4 + 2 * z], pair)       # the pair's outer half-width at zoom 18
+            assert _num(width[4 + 2 * z], pair) == pytest.approx(2 * outer, abs=0.01)
+    full = _style(render_edges(g, simple=False, **_TWIN_KW).html)
+    pieces = [f["properties"] for f in full["sources"]["casings"]["data"]["features"]]
+    assert sorted((p["__rs_edge"], p.get("__rs_pair")) for p in pieces) == [(0, True), (2, None)] and "ends" not in full["sources"]
+    cas = next(l for l in full["layers"] if l["id"] == "roads-casing")
+    assert cas["source"] == "casings" and "__rs_pair" in json.dumps(cas["paint"]["line-width"]) and "__rs_pair" in json.dumps(cas["paint"]["line-offset"])
+
+
+def test_a_two_way_pairs_casing_takes_each_end_its_own_cap():
+    """The one casing is cut from the first edge of the pair, with its own heads and caps; the second edge runs the other way, so its start
+    is the first one's end. A flat start at a and a square end at b come out at a and at b whichever direction comes first; each fill keeps
+    its own caps."""
+    a, b = (18.0, 59.30), (18.0, 59.301)
+    along = (1, "a", "b", 0, 0, 0, 0, "yes", "square")
+    back = (2, "b", "a", 0, 0, 0, 0, "square", "yes")
+    for rows in ([along, back], [back, along]):
+        feats = _style(render_edges(_twin(rows), **_TWIN_KW).html)["sources"]["simple"]["data"]["features"]
+        heads = [f for f in feats if f["properties"]["__rs_k"] == 0 and not f["properties"].get("__rs_main") and not f["properties"].get("__rs_seam")]
+        assert {f["properties"]["__rs_edge"] for f in heads} == {0}
+        at = {}
+        for f in heads:
+            c = [tuple(x) for x in f["geometry"]["coordinates"]]
+            at[a if a in (c[0], c[-1]) else b] = f["properties"].get("__rs_cap")
+        assert at == {a: True, b: "square"}
+        fills = [f for f in feats if f["properties"]["__rs_k"] == 1]               # two different ends: each fill in two halves, its own caps
+        ends = sorted((f["properties"]["__rs_edge"], a in [tuple(x) for x in f["geometry"]["coordinates"]], f["properties"].get("__rs_cap")) for f in fills)
+        assert ends == [(0, False, "square"), (0, True, True), (1, False, "square"), (1, True, True)]
+
+
+def test_twin_casing_each_is_todays_look():
+    """twin_casing "each": every direction draws its own casing, shifted, half the width; no __rs_pair anywhere, the end blobs as before."""
+    g = _twin([(1, "a", "b", 0, 0, 0, 0, None, None), (2, "b", "a", 0, 0, 0, 0, None, None)])
+    each = {"settings": {"config": {"twin_casing": "each"}}}
+    html = render_edges(g, **_TWIN_KW, **each).html
+    feats = [f["properties"] for f in _style(html)["sources"]["simple"]["data"]["features"]]
+    assert "__rs_pair" not in html and "__rs_twin" not in html
+    assert sorted((p["__rs_edge"], p["__rs_k"]) for p in feats) == [(0, 0), (0, 1), (1, 0), (1, 1)]
+    one = _style(render_edges(g, **_TWIN_KW).html)
+    drop = lambda p: {k: v for k, v in p.items() if k not in ("__rs_pair", "__rs_twin", "__rs_edge2")}           # noqa: E731
+    assert [drop(f["properties"]) for f in one["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_edge"] == 0] == \
+        [drop(p) for p in feats if p["__rs_edge"] == 0]                         # the first edge's pieces: the same, flagged
+    assert "ends" in _style(render_edges(g, **{**_TWIN_KW, "simple": False}, **each).html)["sources"]
+    with pytest.raises(ValueError, match="twin_casing"):
+        render_edges(g, **_TWIN_KW, settings={"config": {"twin_casing": "both"}})
+
+
+def test_a_two_way_pair_that_disagrees_is_named_in_a_warning():
+    """The pair's casing is the first edge's: the twins must agree, reversed (casing numbers, heads, caps). One that does not is named."""
+    import warnings
+    ok = _twin([(1, "a", "b", -1, 0, 1, 1, "yes", None), (2, "b", "a", 1, 0, -1, 1, None, "yes")])
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        render_edges(ok, **_TWIN_KW, edge_id_col="edge_id")
+    for bad in (ok.assign(ce=[1, 0]), ok.assign(cap_e=[None, None])):
+        with pytest.warns(UserWarning, match=r"twin_casing: 1 two-way pair.*: 1 / 2"):
+            render_edges(bad, **_TWIN_KW, edge_id_col="edge_id")
+
+
 def test_end_caps_follow_filters_and_recolour_and_can_be_turned_off():
     html = render_edges(_pairs(), backend="web").html
     assert '["any",_has(["get","__rs_edge"],_qIds),_has(["get","__rs_edge2"],_qIds)]' in html     # id filters: a cap shows while either twin does
@@ -962,14 +1081,14 @@ def test_end_caps_hide_where_the_two_directions_differ():
     """A map coloured per direction (twins with different colours) keeps today's ends: the cap is
     transparent unless both lanes share a colour, so no direction's colour shows at a street's end."""
     g = _pairs().iloc[:2].assign(edge_id=["a", "b"])
-    html = render_edges(g, backend="web", color_table={"a": "#ff0000", "b": "#0000ff"}, simple=False).html
+    html = render_edges(g, backend="web", color_table={"a": "#ff0000", "b": "#0000ff"}, simple=False, settings={"config": {"twin_casing": "each"}}).html
     style = _style(html)
     p = style["sources"]["ends"]["data"]["features"][0]["properties"]
     assert p["__rs_fill"] != p["__rs_fill__b"]
     fill = {l["id"]: l for l in style["layers"]}["roads-ends-fill"]["paint"]["circle-color"]
     assert fill[0] == "case" and fill[1] == ["==", ["get", "__rs_fill"], ["get", "__rs_fill__b"]]
     assert fill[-1] == "rgba(0,0,0,0)"
-    same = _style(render_edges(_pairs().iloc[:2], backend="web", simple=False).html)["sources"]["ends"]["data"]["features"][0]["properties"]
+    same = _style(render_edges(_pairs().iloc[:2], backend="web", simple=False, settings={"config": {"twin_casing": "each"}}).html)["sources"]["ends"]["data"]["features"][0]["properties"]
     assert same["__rs_fill"] == same["__rs_fill__b"]
 
 
@@ -986,7 +1105,7 @@ def test_directed_col_draws_a_pair_as_two_lanes_only_when_both_edges_are_directe
         if oneway:
             cols["oneway"] = oneway
         g = gpd.GeoDataFrame(cols, geometry=[LineString([a, b]), LineString([b, a])], crs=4326)
-        st = _style(render_edges(g, backend="web", directed_col="is_directed", simple=False).html)
+        st = _style(render_edges(g, backend="web", directed_col="is_directed", simple=False, settings={"config": {"twin_casing": "each"}}).html)
         ps = [f["properties"] for f in st["sources"]["roads"]["data"]["features"]]
         return [p["__rs_twoway"] for p in ps], [p["__rs_oneway"] for p in ps], "ends" in st["sources"]
 
@@ -1521,7 +1640,7 @@ def test_level_columns_draw_each_positions_end_caps_with_that_position():
     rows = [(a, 0, 0), (a[::-1], 0, 0), (b, 1, 1), (b[::-1], 1, 1), (c, -1, -1), (c[::-1], -1, -1)]     # three two-way streets at three positions
     g = gpd.GeoDataFrame({"highway": ["residential"] * 6, "cl": [r[1] for r in rows], "fl": [r[2] for r in rows]},
                          geometry=[LineString(r[0]) for r in rows], crs=4326)
-    html = render_edges(g, backend="web", casing_level_col="cl", fill_level_col="fl", simple=False).html
+    html = render_edges(g, backend="web", casing_level_col="cl", fill_level_col="fl", simple=False, settings={"config": {"twin_casing": "each"}}).html
     style = _style(html)
     ids = [l["id"] for l in style["layers"]]
     ends = [i for i in ids if i.startswith("roads-ends")]
@@ -1634,12 +1753,12 @@ def test_twin_end_cap_ring_uses_the_head_number_and_flat_pairs_get_none():
     g = gpd.GeoDataFrame({"highway": ["residential"] * 2, "cs": [r[2] for r in rows], "ce": [r[3] for r in rows], "cm": [0, 0], "fl": [0, 0], "flat": [False, False]},
                          geometry=[LineString([r[0], r[1]]) for r in rows], crs=4326)
     kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce")
-    style = _style(render_edges(g, **kw, simple=False).html)
+    style = _style(render_edges(g, **kw, simple=False, settings={"config": {"twin_casing": "each"}}).html)
     caps = {tuple(f["geometry"]["coordinates"]): f["properties"] for f in style["sources"]["ends"]["data"]["features"]}
     assert caps[(18.0, 59.0)]["__rs_cl"] == -1 and caps[(18 + d, 59.0)]["__rs_cl"] == -2          # the head numbers at the two nodes
     assert caps[(18.0, 59.0)]["__rs_fl"] == 0                                                      # the fill circle: the road's fill number
     assert "roads-ends-casing-lv-1" in {l["id"] for l in style["layers"]} and "roads-ends-casing-lv-2" in {l["id"] for l in style["layers"]}
-    flat = _style(render_edges(g.assign(flat=[True, True]), cap_col="flat", **kw, simple=False).html)
+    flat = _style(render_edges(g.assign(flat=[True, True]), cap_col="flat", **kw, simple=False, settings={"config": {"twin_casing": "each"}}).html)
     assert "ends" not in flat["sources"]                                                           # a pair drawn flat with cap_col gets no cap
 
 
@@ -2406,6 +2525,42 @@ def test_the_editor_updates_the_open_page_with_the_features_a_whole_page_has(tmp
     assert area.update is None and area.reload == "1 roads changed, more than 0: the whole page again"
 
 
+def test_the_editor_draws_and_updates_both_directions_of_a_road(tmp_path):
+    """A two-way road in the level editor (2026-10-08): its two edges are one road (picked, found and shown by either: the card lists each
+    direction's edge id and edge_ref), the map draws them as the final map does (one edge per direction: the pair's one casing, a fill
+    each, the other direction running the road's line backwards with its heads and caps swapped), and the update in place after an Apply
+    carries both edges and all their pieces, as the whole page has them."""
+    pytest.importorskip("scipy")
+    import pandas as pd
+    from shapely import reverse
+
+    from roadstyle.level_area import make_area
+    from roadstyle.level_editor import Area
+    g = _edge_world().assign(edge_ref=["11f", "12f", "14f", "13f"])
+    back = g[g["edge_id"] == 12].assign(edge_id=22, edge_ref="12r")
+    back = back.set_geometry(reverse(back.geometry.to_numpy()), crs=g.crs)
+    make_area(gpd.GeoDataFrame(pd.concat([g, back], ignore_index=True), crs=g.crs), tmp_path)
+    area = Area(tmp_path)
+    f = area.facts["12"]
+    assert f["two_way"] and f["directions"] == [{"edge": "12", "edge_ref": "12f", "way": "along"}, {"edge": "22", "edge_ref": "12r", "way": "against"}]
+    assert [h["road"] for h in area.find("22")] == ["12"] and [h["road"] for h in area.find("12r")] == ["12"]
+    js = lambda x: json.loads(json.dumps(x, default=str))                                  # noqa: E731 - as the page gets them
+    area.apply([{"op": "cap", "road": "22", "end": "start", "cap": "square"}])             # by the other direction's id: the road's start
+    assert area.facts["12"]["caps"] == ["square", ""]
+    rows = area.draw[area.draw["road"] == "12"]
+    assert rows["edge"].tolist() == ["12", "22"] and rows["cap_start"].tolist()[0] == rows["cap_end"].tolist()[1] == "square"
+    assert list(rows.geometry.iloc[1].coords) == list(rows.geometry.iloc[0].coords)[::-1]
+    u = js(area.update)
+    assert u["roads"] == ["12"] and sorted(r["properties"]["edge"] for r in u["features"]["roads"]) == ["12", "22"]
+    src = _style_of(area.page)["sources"]
+    idx = [r["id"] for r in u["features"]["roads"]]
+    assert u["features"]["simple"] == [x for x in src["simple"]["data"]["features"] if x["properties"]["__rs_edge"] in idx]
+    kinds = sorted((src["roads"]["data"]["features"][x["properties"]["__rs_edge"]]["properties"]["edge"], x["properties"]["__rs_k"], bool(x["properties"].get("__rs_pair")))
+                   for x in u["features"]["simple"] if not x["properties"].get("__rs_seam"))
+    assert ("12", 1, False) in kinds and ("22", 1, False) in kinds                          # a fill each
+    assert {k for k in kinds if k[1] != 1} and all(k[0] == "12" and k[2] for k in kinds if k[1] != 1)   # one casing, the first edge's
+
+
 def test_the_editor_re_solves_only_the_roads_around_a_change():
     """level_area.solve_local (the editor's Apply): the roads around a change are solved again with the same rules, every other road keeps its
     numbers; a local result that breaks what the previous one kept is not used: the whole area is solved, and the result says so and why."""
@@ -2889,7 +3044,7 @@ def test_every_piece_of_a_road_names_its_edge():
                                 edge_col="edge_id", kind="circle", label="items")])
     seen = set()
     for extra in ({}, {"tiles": False}):
-        style = _style(render_edges(g, **kw, **extra, simple=False).html)
+        style = _style(render_edges(g, **kw, **extra, simple=False, settings={"config": {"twin_casing": "each"}}).html)
         n = len(style["sources"]["roads"]["data"]["features"])
         assert all(f["properties"]["__rs_edge"] == i for i, f in enumerate(style["sources"]["roads"]["data"]["features"]))      # the generateId index
         roads = style["sources"]["roads"]["data"]["features"]

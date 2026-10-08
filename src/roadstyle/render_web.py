@@ -22,6 +22,7 @@ import json
 import math
 import os
 import re
+import warnings
 from collections.abc import Mapping
 
 from . import _settings
@@ -211,22 +212,37 @@ def _end_radius_expr(col, casing=False, offset_frac=0.28, offset_zoom=15, split_
     return e
 
 
-def _offset_expr(col, offset_frac=0.28, offset_zoom=15):
+def _offset_match(col, z, offset_frac=0.28, offset_zoom=15):
+    """A two-way direction's offset (px) at zoom ``z``, per class: offset_frac * the road's pixel width, ramped in from offset_zoom."""
+    ramp = 0.0 if z <= offset_zoom else (1.0 if z >= offset_zoom + 2 else (z - offset_zoom) / 2.0)
+    m = ["match", ["get", col]]
+    for c in _CLASSES:
+        b, lk = _base(c)
+        g = ROAD_GROUP.get(b, "residential")
+        w = _gwidth(WIDTH[g], HI_RATE[g], z) * (0.6 if lk else 1)
+        m += [c, round(w * offset_frac * ramp, 3)]
+    dw = _gwidth(WIDTH["residential"], HI_RATE["residential"], z)
+    m.append(round(dw * offset_frac * ramp, 3))
+    return m
+
+
+def _offset_expr(col, offset_frac=0.28, offset_zoom=15, pairs=False):
     """line-offset (px) = offset_frac * the road's pixel width, for two-way edges (0 for one-way),
-    ramped in from offset_zoom. Pixel-proportional -> constant overlap at every zoom."""
+    ramped in from offset_zoom. Pixel-proportional -> constant overlap at every zoom. ``pairs``: a two-way pair's one casing
+    (``__rs_pair``, :func:`_mark_twin_casing`) is not shifted."""
+    two = ["to-boolean", ["get", "__rs_twoway"]]
+    if pairs:
+        two = ["all", two, ["!", ["to-boolean", ["get", "__rs_pair"]]]]
     e = ["interpolate", ["linear"], ["zoom"]]
     for z in _ZSTOPS:
-        ramp = 0.0 if z <= offset_zoom else (1.0 if z >= offset_zoom + 2 else (z - offset_zoom) / 2.0)
-        m = ["match", ["get", col]]
-        for c in _CLASSES:
-            b, lk = _base(c)
-            g = ROAD_GROUP.get(b, "residential")
-            w = _gwidth(WIDTH[g], HI_RATE[g], z) * (0.6 if lk else 1)
-            m += [c, round(w * offset_frac * ramp, 3)]
-        dw = _gwidth(WIDTH["residential"], HI_RATE["residential"], z)
-        m.append(round(dw * offset_frac * ramp, 3))
-        e += [z, ["case", ["to-boolean", ["get", "__rs_twoway"]], m, 0]]
+        e += [z, ["case", two, _offset_match(col, z, offset_frac, offset_zoom), 0]]
     return e
+
+
+def _pair_width(expr, col, offset_frac=0.28, offset_zoom=15):
+    """A casing width curve, with a two-way pair's one casing (``__rs_pair``) as wide as its two directions together: a direction's casing
+    width (the two-way width of ``expr``) plus twice the direction's offset, at each stop of the curve (docs/design/twin_ends.md)."""
+    return _plus_px(expr, lambda z: ["*", 2, _offset_match(col, z, offset_frac, offset_zoom)], when=["to-boolean", ["get", "__rs_pair"]])
 
 
 def _mark_twoway(geo, directed_col=None, kind_col="highway"):
@@ -294,6 +310,40 @@ def _mark_single_line(geo, kind_col, classes):
         p["__rs_dup"], p["__rs_edge2"], q["__rs_edge2"] = True, j, i
         for r in (p, q):
             r["__rs_twoway"] = r["__rs_oneway"] = False
+
+
+def _mark_twin_casing(geo, kind_col, id_col=None, head_m=5.0):
+    """Config ``twin_casing`` "one" (2026-10-08): a two-way road given as two directed edges (``__rs_twoway``, :func:`_mark_twoway`) has ONE
+    casing around both directions, drawn once at the pair's full width, unshifted; each direction keeps its own fill. Pairs each two-way edge
+    with one reverse edge of its class whose line is its own line backwards (two different lines between the same two points are two roads:
+    each keeps its own casing) and sets ``__rs_twin`` (the other edge's position in ``geo``) on both: :func:`_casing_parts` cuts the casing
+    of the first of the two only, from its own numbers, heads and caps (its start is the other's end). The two must agree, reversed:
+    casing numbers (start head, main, end head), head lengths and end shapes; a pair that does not is named in a warning (the first
+    edge's are drawn). Returns whether any pair was found."""
+    first, bad, found = {}, [], False
+    for i, ft in enumerate(geo["features"]):
+        p, g = ft["properties"], ft.get("geometry") or {}
+        c = g.get("coordinates") or []
+        if not p.get("__rs_twoway") or g.get("type") != "LineString" or len(c) < 2:
+            continue
+        line = tuple((round(x[0], 7), round(x[1], 7)) for x in c)
+        j = first.pop((line[::-1], p.get(kind_col)), None)
+        if j is None:
+            first.setdefault((line, p.get(kind_col)), i)
+            continue
+        q = geo["features"][j]["properties"]
+        p["__rs_twin"], q["__rs_twin"] = j, i
+        found = True
+        def ends(r):            # (start, end) of each: casing number, head length, end shape
+            whole = r.get("__rs_cap")
+            return ((r["__rs_cs"], r.get("__rs_hs", head_m), r.get("__rs_cap0", whole)), (r["__rs_ce"], r.get("__rs_he", head_m), r.get("__rs_cap1", whole)))
+        if (ends(q), q["__rs_cl"]) != (ends(p)[::-1], p["__rs_cl"]):
+            bad.append((q.get(id_col, j) if id_col else j, p.get(id_col, i) if id_col else i))
+    if bad:
+        warnings.warn(f"twin_casing: {len(bad)} two-way pair(s) whose two directions disagree on their casing numbers, heads or end shapes "
+                      f"(reversed); the first edge of each is drawn: " + ", ".join(f"{a} / {b}" for a, b in bad[:10]) + (" ..." if len(bad) > 10 else ""),
+                      stacklevel=3)
+    return found
 
 
 def _annotation_slots(geo, slot_m, class_col="highway"):
@@ -724,6 +774,11 @@ def _casing_parts(geo, head_m, cols):
             continue
         base = {k: v for k, v in p.items() if (k in keep or k.startswith("__rs_")) and not k.startswith("__rs_fill")}
         base["__rs_edge"] = p.get("__rs_edge", i)      # render numbers the roads (a part of them: render(_edges=...) keeps their numbers)
+        tw = p.get("__rs_twin")
+        if tw is not None:                              # a two-way pair's one casing (_mark_twin_casing): the first edge's pieces, full width,
+            if tw < base["__rs_edge"]:                  # unshifted (__rs_pair), shown while either edge is (__rs_edge2); the other edge has none
+                continue
+            base["__rs_pair"], base["__rs_edge2"] = True, tw
         cs, cm, ce = p["__rs_cs"], p["__rs_cl"], p["__rs_ce"]
         c = g.get("coordinates") or []
         split = p.get("__rs_split")
@@ -1823,8 +1878,10 @@ _TIE, _MAX_EDGES = 1e-8, 1_000_000
 def _edge_features(geo, edges, head_m, cols, fcol, slots):
     """The features of the edges ``edges`` (their numbers) in each source a simple page draws them in, built as :func:`render` builds them for
     the whole page: ``roads`` (the edges), ``simple`` (their pieces) and, with ``slots``, the whole ``slots`` (names and arrows: their chains
-    follow the fill numbers, so one road can change them along a street). The level editor's update in place (level_editor.Area)."""
-    sub = {"type": "FeatureCollection", "features": [geo["features"][i] for i in edges]}
+    follow the fill numbers, so one road can change them along a street). The level editor's update in place (level_editor.Area). An edge of a
+    two-way pair with one casing (``__rs_twin``) comes with its twin: the casing is cut from one of the two."""
+    tw = {geo["features"][i]["properties"].get("__rs_twin") for i in edges} - {None}
+    sub = {"type": "FeatureCollection", "features": [geo["features"][i] for i in sorted(set(edges) | tw)]}
     out = {"roads": sub["features"], "simple": _simple_pieces(sub, _casing_parts(sub, head_m, cols), cols, CONFIG.bridge_shadow)["features"]}
     if slots:
         out["slots"] = _annotation_slots(geo, (CONFIG.annotations or {}).get("slot_m", 100), cols[0])["features"]
@@ -2143,6 +2200,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             if v is not None and v == v and float(v) > 0:
                 p[k] = float(v)
     levels = _mark_levels(geo, casing_level_col, fill_level_col, casing_start_col, casing_end_col) if (casing_level_col or fill_level_col) else None
+    if CONFIG.twin_casing not in ("one", "each"):
+        raise ValueError(f'twin_casing must be "one" or "each", got {CONFIG.twin_casing!r}')
+    pairs = bool(levels) and CONFIG.twin_casing == "one" and _mark_twin_casing(geo, highway_col, edge_id_col, head_m)   # one casing per two-way pair
     if width_m_col:
         _mark_width_m(geo, width_m_col, casing_m)
     _stringify_unsafe_ints(geo)   # BIGINT ids (e.g. edge_id) -> string so JS doesn't round them
@@ -2204,7 +2264,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         # ("wave") on each zoom crossing. Near-zero simplification keeps zooming smooth;
         # ~5k features can afford it.
         style["sources"]["roads"] = {"type": "geojson", "data": geo, "tolerance": 0.05}
-    ends = _twin_ends(geo, (highway_col, filter_col)) if CONFIG.twin_end_caps and not simple else []
+    ends = _twin_ends(geo, (highway_col, filter_col)) if CONFIG.twin_end_caps and CONFIG.twin_casing == "each" and not simple else []   # one casing: its own caps
     if ends:
         style["sources"]["ends"] = {"type": "geojson",
                                     "data": {"type": "FeatureCollection", "features": ends}}
@@ -2225,7 +2285,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            "line-sort-key": 0}   # positions only: no class, level or order
     tlay = {**lay, "line-cap": "butt"}                    # butt cap -> clean dash ticks on tunnel casing
     blay = {**lay, "line-cap": "butt"}                    # butt cap -> square bridge deck ends
-    off = _offset_expr(highway_col, offset_frac, offset_zoom)
+    off = _offset_expr(highway_col, offset_frac, offset_zoom, pairs)
     sw = dict(split_zoom=offset_zoom, split_frac=width_frac)
     # Three bands by draw order (docs/design/levels_and_looks.md): below ground, ground, above, from the level (lvl, the
     # OSM layer) or a caller's band_col, and nothing else. A tunnel or a bridge is only a LOOK on a road of its band:
@@ -2445,7 +2505,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     splits = any(ft["properties"].get("__rs_split") for ft in geo["features"])      # an edge with two different ends (cap_start_col / cap_end_col)
     if splits and not levels:
         raise ValueError("cap_start_col / cap_end_col need the level columns (casing_level_col / fill_level_col): one end at a time is drawn from the casing heads")
-    divided = bool(levels and (casing_start_col or casing_end_col or splits))
+    divided = bool(levels and (casing_start_col or casing_end_col or splits or pairs))      # a pair's one casing: a piece of the casings source
     parts = _casing_parts(geo, head_m, (highway_col, filter_col, width_m_col)) if divided else None      # the pieces of a divided casing
     # each band's casing and fill get a butt-capped twin for the edges that ask for it, drawn right after the
     # round layer (a band's casings stay under its fills). Dashed classes draw butt-capped already.
@@ -2524,6 +2584,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             style["layers"] = [{**l, "filter": ["all", l["filter"], seam_ok]} if l["id"] in ("roads-casing", "roads-casing-bridge", "roads-casing-sq", "roads-casing-sq-bridge") else l
                                for l in style["layers"]]
         style["layers"] = _level_layers(style["layers"], levels, "casings" if divided else None)
+        if pairs:          # a two-way pair's one casing as wide as its two directions (casing, bridge casing, tunnel dashes)
+            style["layers"] = [{**l, "paint": {**l["paint"], "line-width": _pair_width(l["paint"]["line-width"], highway_col, offset_frac, offset_zoom)}}
+                               if l.get("source") == "casings" else l for l in style["layers"]]
         if decks["features"]:        # 3D: the flat bridge line below flat_below, the extruded deck from it up
             for l in style["layers"]:
                 if l["id"].endswith("-bridge") and l["id"].startswith("roads-casing"):
@@ -2568,7 +2631,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         sdash = {"line-dasharray": _simple_dasharray(sdashes, CONFIG.tunnel_casing_dash or [1, 1])} if sdashes or any_tunnel else {}
         road = {"id": "roads-simple", "type": "line", "source": "simple", "layout": {**lay, "line-cap": _simple_cap(), "line-sort-key": ["get", "__rs_s"]}, **flt,
                 "paint": {**sdash, "line-color": _simple_color(CONFIG.bridge_casing_color, bool(any_tunnel)),
-                          "line-width": _by_feature(wide, fw), "line-offset": off,
+                          "line-width": _pair_width(_by_feature(wide, fw), highway_col, offset_frac, offset_zoom) if pairs else _by_feature(wide, fw), "line-offset": off,
                           "line-blur": ["interpolate", ["linear"], ["zoom"], 14, 0, 17, ["case", is_sh, blur, 0]],
                           "line-opacity": ["interpolate", ["linear"], ["zoom"], 14, ["case", is_sh, 0, *op], 17, op[-1] if road_fill else ["case", *op]]}}
         # the edges themselves, invisible: what a click, a hover, Street View and the page's fill code find (the roads source, its ids)

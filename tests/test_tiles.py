@@ -167,11 +167,11 @@ def test_tiles_carry_the_casing_pieces_and_the_end_caps():
     import mapbox_vector_tile
     from pmtiles.reader import MemorySource, Reader
 
-    from roadstyle.render_web import render
+    from roadstyle import render_edges
     a, b, c = (18.0, 59.3), (18.001, 59.3), (18.002, 59.3)
     g = gpd.GeoDataFrame({"highway": ["primary"] * 4},
                          geometry=[LineString([a, b]), LineString([b, a]), LineString([b, c]), LineString([c, b])], crs=4326)
-    html = render(g, basemap="blank", tiles=True, simple=False).html
+    html = render_edges(g, backend="web", basemap="blank", tiles=True, simple=False, settings={"config": {"twin_casing": "each"}}).html   # the end caps: today's look
     style = json.JSONDecoder().raw_decode(html, html.index("const style = ") + 14)[0]
     kinds = {l["source-layer"] for l in style["layers"] if l.get("source") == "roads"}
     assert {"roads", "casings", "ends"} <= kinds
@@ -227,3 +227,23 @@ def test_single_line_pair_rides_the_tiles():
     foot = [f["properties"] for f in feats["roads"]["features"] if f["properties"].get("highway") == "footway"]
     assert sorted(bool(p.get("__rs_dup")) for p in foot) == [False, True] and {p["__rs_edge2"] for p in foot} == {7, 8}
     assert {f["properties"]["__rs_edge"] for f in feats["simple"]["features"] if f["properties"]["highway"] == "footway"} == {7}
+
+
+def test_tiles_carry_a_two_way_pairs_one_casing():
+    """tiles=True: the pair's one casing (twin_casing "one") rides in the archive's "simple" layer with what the layer reads: only the first
+    edge has casing pieces, flagged __rs_pair and naming the other edge (__rs_edge2); both directions have their fill."""
+    import mapbox_vector_tile
+    from pmtiles.reader import MemorySource, Reader
+
+    from roadstyle.render_web import render
+    a, b = (18.0, 59.3), (18.001, 59.3)
+    g = gpd.GeoDataFrame({"highway": ["primary"] * 2}, geometry=[LineString([a, b]), LineString([b, a])], crs=4326)
+    html = render(g, basemap="blank", tiles=True).html
+    style = json.JSONDecoder().raw_decode(html, html.index("const style = ") + 14)[0]
+    assert "__rs_pair" in json.dumps(next(l for l in style["layers"] if l["id"] == "roads-simple")["paint"]["line-width"])
+    z = 15
+    n = 1 << z
+    x = int((18.0005 + 180) / 360 * n)
+    y = int((1 - math.asinh(math.tan(math.radians(59.3))) / math.pi) / 2 * n)
+    ps = [f["properties"] for f in mapbox_vector_tile.decode(gzip.decompress(Reader(MemorySource(_archive_of(html))).get(z, x, y)))["simple"]["features"]]
+    assert sorted((p["__rs_edge"], p["__rs_k"], p.get("__rs_pair"), p.get("__rs_edge2")) for p in ps) == [(0, 0, True, 1), (0, 1, None, None), (1, 1, None, None)]

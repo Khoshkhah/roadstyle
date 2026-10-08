@@ -14,6 +14,17 @@ All notable changes to **roadstyle** are documented here. The format is based on
   Jupyter Notebook 7.5 and JupyterLab 4.5: simple, `simple=False` and `tiles=True` draw their roads. A test pins the CDN version to the vendored one.
 
 ### Changed
+- **A two-way road has one casing around both directions** (setting `twin_casing`, `"one"` by default on this branch; `"each"` = the look
+  before). The pair's casing is cut once, from the first edge's pieces, unshifted and as wide as both directions together; the other edge has no
+  casing piece; each direction keeps its own fill, colour and caps. Ends are caps, no blob (`twin_end_caps` applies to `"each"` only); the
+  first edge's start is the second's end, so each cap is the first edge's own at that end. The twins must agree reversed (casing numbers, heads,
+  caps), else a warning names the pair. Simple mode, the full look and `tiles=True`; the bridge shadow and the tunnel dashes follow the one
+  casing; the pieces name both edges (`__rs_edge2`), so the casing shows while either direction does. A bridge such as Avenue de France
+  (Monaco) was two dark bands with square ends.
+- **The level editor draws both directions of a two-way road** as the final map does (one edge each, the other direction running the road's line
+  backwards with its heads and caps swapped): either direction picks the road, the search finds either edge id or edge_ref, the road card
+  lists each direction's edge id and edge_ref (`rs.level_input` now writes `edge_refs` / `reversed_refs`; an area made before shows the
+  other direction's id only), and the update in place after an Apply carries both edges' pieces.
 - **A two-way footway, path, steps, cycleway ... is one full-width line, not two lanes** (setting `single_line_classes`, default footway, path, steps,
   pedestrian, cycleway, track, bridleway, corridor, platform; `[]` = lanes for all). Of a reverse pair only the first edge is drawn (so two reversed
   dash patterns never overlap); the second is flagged `__rs_dup` and draws nowhere (simple, full look, `tiles=True`, the level editor). Both edges

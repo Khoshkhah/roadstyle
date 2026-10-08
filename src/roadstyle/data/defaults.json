@@ -535,6 +535,7 @@
     "bridge_shadow_trim_m": 3.0,
     "single_line_classes": ["footway", "path", "steps", "pedestrian", "cycleway", "track", "bridleway", "corridor", "platform"],
     "twin_end_caps": true,
+    "twin_casing": "one",
     "tunnel_casing_dash": [1, 1],
     "tunnel_fill_dash": [],
     "tunnel_fill_dash_color": "rgba(255,255,255,0.55)",

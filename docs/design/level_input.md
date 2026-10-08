@@ -147,6 +147,11 @@ row opens the pair, to fix by hand. The list of
 your edits shows each one's two roads when clicked. It is written for this page alone (the roadstyle map and its `rs*` API); the v2 test's
 pair editor is not used.
 
+**Both directions** (2026-10-08): the editor's map draws a two-way road as two edges, as the final map does (the road's `edges` along its
+line, its `reversed` running it backwards with the two heads, casing numbers and caps swapped): the pair's one casing (`twin_casing`) and a
+fill per direction. Either direction picks the road; the card lists each direction's edge id and edge_ref (`rs.level_input` writes
+`edge_refs` / `reversed_refs`; an area made before has only the road's own edge_ref); the update in place after an Apply carries both edges.
+
 In Python: `roads, pairs = rs.level_input(edges)`, `solved = rs.solve_levels(roads, pairs, edits=...)`; `rs.compute_levels(edges)` is both in
 one call and returns the edges with the four columns.
 

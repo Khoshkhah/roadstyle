@@ -50,6 +50,7 @@ class StyleConfig:
     bridge_shadow_trim_m: float = 3.0      # metres of no shadow where a bridge comes down to the road (2026-10-06: the head length cut short bridges too much)
     single_line_classes: list = field(default_factory=lambda: ["footway", "path", "steps", "pedestrian", "cycleway", "track", "bridleway", "corridor", "platform"])   # a two-way pair of these is one full-width line, not two lanes
     twin_end_caps: bool = True         # one road-wide round end under a two-way road's two lanes
+    twin_casing: str = "one"           # a two-way road given as two directed edges: "one" casing around both directions (full width, drawn once), or "each" direction its own
     tunnel_casing_dash: list = field(default_factory=lambda: [1, 1])   # the tunnel casing: dash and gap, in line widths (1:1, 2026-10-06)
     tunnel_fill_dash: list = field(default_factory=list)   # light dashes on the tunnel fill, e.g. [1.2, 1.2]; none by default (v2's look, 2026-10-06)
     tunnel_fill_dash_color: str = "rgba(255,255,255,0.55)"               # their colour, over any road colour
