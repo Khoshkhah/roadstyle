@@ -181,6 +181,7 @@ Returns a `WebMap` (web, `.save()`), a `folium.Map` (`.save()`) or a `lonboard.M
 | `width_m_zoom` | `16` | web | the zoom from which `width_m_col` widths apply; below it, the class widths (so a narrow line doesn't vanish zoomed out) |
 | `casing_m` | `0.15` | web | with `width_m_col`: the casing on each side, in metres, inside the width (two lines side by side show a `2 × casing_m` divider) |
 | `directed_col` | `None` | web | a column: true / null = the edge is a direction of travel of its own, false = undirected (a footway stored both ways, a one-way street's walking-only reverse). An edge and its reverse are two lanes only when neither is false; otherwise one line, centred and full width |
+| `driving_col` | `None` | web | a column: true / null = cars may drive the edge, false = they may not (duckOSM's `driving`). One-way arrows go only on driving edges. A false edge counts as undirected in the pairing of `directed_col`, so a one-way street whose reverse exists only for walkers and cyclists is one line with its arrow on the driving edge. `None` = every edge counts as driving |
 
 ### Overlays & boundary
 

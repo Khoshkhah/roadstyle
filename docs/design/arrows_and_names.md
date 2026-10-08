@@ -77,6 +77,15 @@ The page places them (`_rsArrows`), after every move and once the slots are load
 zoom 15 a 100 m slot is about 20 px, so long roads carried many arrows; and an earlier version with one arrow per chain (`line-center`) often
 had that arrow outside the window.
 
+### Only driving roads, only one-way ones
+
+An edge gets an arrow only if it is one-way and a driving road. With `driving_col` (a boolean per edge, duckOSM's `driving`) an edge that
+cars may not drive never gets one. A twin that is not driving is no second lane for cars: the pair is not a two-way road, the driving edge
+is one-way and keeps its arrow, drawn as one line (the same rule as `directed_col` false). Before (0.18.0, 2026-10-09) a one-way street
+copied to its walking-only reverse was paired as two-way: the pair kept ONE representative (either edge) for the slots, and the other edge
+lying on the same line cut the whole chain out as a "crossing", so the arrow could land on the wrong edge or be missing. The same slot plan
+feeds `tiles=True`, so the rule holds there too. Without `driving_col` every edge counts as driving, as before.
+
 ## 4. On a tunnel
 
 With the tunnel look (`docs/design/tunnel_look.md`), the names and arrows of a tunnel fade with the slider like everything else on it: the

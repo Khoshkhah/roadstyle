@@ -1179,6 +1179,43 @@ def test_directed_col_draws_a_pair_as_two_lanes_only_when_both_edges_are_directe
     assert lanes([True, False], oneway=[True, False])[1] == [True, False]     # `oneway` still rules arrows
 
 
+def test_driving_col_puts_arrows_on_one_way_driving_edges_only():
+    """``driving_col``: arrows only on driving edges, and only one-way ones. Pair A is a one-way street copied to its walking/cycling-only
+    reverse (both `oneway` true, the reverse not driving): arrow on the driving edge alone. Pair B is a true two-way street: none.
+    C is a one-way driving edge with no twin: arrow. D is a one-way edge no car may drive: none."""
+    def seg(y, flip=False):
+        pts = [(18.000, y), (18.003, y)]
+        return LineString(pts[::-1] if flip else pts)
+    rows = [("A_f", True, True, seg(59.300)), ("A_r", True, False, seg(59.300, True)),
+            ("B_f", False, True, seg(59.310)), ("B_r", False, True, seg(59.310, True)),
+            ("C", True, True, seg(59.320)), ("D", True, False, seg(59.330))]
+    g = gpd.GeoDataFrame({"highway": ["secondary"] * 6, "ref": [r[0] for r in rows], "oneway": [r[1] for r in rows],
+                          "driving": [r[2] for r in rows]}, geometry=[r[3] for r in rows], crs=4326)
+
+    def arrows(slots):
+        refs = list(g["ref"])
+        return {refs[f["properties"]["__rs_edge"]] for f in slots if f["properties"]["oneway"] and f["properties"]["slot"] % 2}
+
+    def inline(**kw):
+        st = _style(render_edges(g, backend="web", simple=False, **kw).html)
+        return arrows(st["sources"]["slots"]["data"]["features"])
+
+    assert inline(driving_col="driving") == {"A_f", "C"}
+    assert "D" in inline()                       # no driving_col: every edge counts as driving, as before
+
+    pytest.importorskip("pmtiles")                # tiles=True: the archive's slots layer is the same plan
+    from roadstyle import tiles as _tiles
+    seen = []
+    real = _tiles.build_pmtiles
+    _tiles.build_pmtiles = lambda *a, **k: seen.append(k["extra_layers"]) or real(*a, **k)
+    try:
+        render_edges(g, backend="web", tiles=True, driving_col="driving")
+    finally:
+        _tiles.build_pmtiles = real
+    slots = next(l["fc"] for l in seen[0] if l["name"] == "slots")["features"]
+    assert arrows(slots) == {"A_f", "C"}
+
+
 # ---- a tunnel is an ordinary road with a tunnel style (mapstyle's junctions.md, rule 1) ----------
 
 def _tunnel_world(cross):
@@ -3608,3 +3645,26 @@ def test_name_layer_is_line_center_with_a_sort_key():
     style = _style(render_edges(_edges(), backend="web", arrows=True, labels=True).html)
     lab = next(l for l in style["layers"] if l["id"] == "roads-labels")
     assert lab["layout"]["symbol-placement"] == "line-center" and lab["layout"]["symbol-sort-key"][:2] == ["*", -1]
+
+
+def test_the_level_editor_and_render_edges_give_the_same_arrows(tmp_path):
+    """One rule for arrows (one-way AND driving, from each edge's own columns): the editor's page, fed from the level area, and render_edges on
+    the same edges give the same arrows, for a one-way street with a walking-only reverse, a two-way street and a one-way edge nobody may drive."""
+    from roadstyle import level_editor
+    from roadstyle.level_area import make_area
+    ys = {"A": 59.300, "B": 59.310, "D": 59.330}
+    rows = [("A_f", "A", True, True, False), ("A_r", "A", True, False, True), ("B_f", "B", False, True, False), ("B_r", "B", False, True, True),
+            ("D", "D", True, False, False)]
+    geo = [LineString([(18.003, ys[r[1]]), (18.000, ys[r[1]])] if r[4] else [(18.000, ys[r[1]]), (18.003, ys[r[1]])]) for r in rows]
+    g = gpd.GeoDataFrame({"edge_id": [str(i) for i in range(5)], "highway": "secondary", "ref": [r[0] for r in rows],
+                          "oneway": [r[2] for r in rows], "driving": [r[3] for r in rows]}, geometry=geo, crs=4326)
+    make_area(g, tmp_path, id_col="edge_id")
+    area = level_editor.Area(tmp_path)
+    ed = _style(area._render().html)["sources"]["slots"]["data"]["features"]
+    pg = _style(render_edges(g, backend="web", simple=False, edge_id_col="edge_id", driving_col="driving").html)["sources"]["slots"]["data"]["features"]
+
+    def arrows(slots, refs):
+        return {refs[f["properties"]["__rs_edge"]] for f in slots if f["properties"]["oneway"] and f["properties"]["slot"] % 2}
+    assert arrows(pg, list(g["ref"])) == {"A_f"}
+    ids = [str(x) for x in area.draw["edge"]]
+    assert arrows(ed, [g["ref"][int(i)] for i in ids]) == {"A_f"}

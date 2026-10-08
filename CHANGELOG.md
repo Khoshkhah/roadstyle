@@ -4,6 +4,18 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **One-way arrows only on driving roads (`driving_col`).** A one-way street with a walking/cycling-only reverse edge (both copied `oneway`)
+  was paired as two-way and drew its arrow on either edge. `driving_col="driving"`: an edge with false never gets an arrow, and counts as
+  undirected in the pairing, so the driving edge stays one-way with its arrow; the reverse edge lying on the same line no longer cuts the
+  chain's slots. Also with `tiles=True`. Default `None`: every edge counts as driving, as before.
+- **The level editor decides arrows like every page.** It no longer calls a road one-way when it has no reverse edge in any mode: each edge
+  carries its own `oneway` and `driving` (new `roads.parquet` columns `edges_oneway` / `reversed_oneway` / `edges_driving` /
+  `reversed_driving`, written by `rs.level_input` / `make_area`) and the editor draws with `driving_col="driving"`. An area made before this
+  must be made again (the editor stops with that message).
+
 ## [0.18.0] — 2026-10-09
 
 Simple mode is the default look (one road layer, MapLibre 5.24), a two-way road has one casing, tunnels fade toward Sand at 60, names and
