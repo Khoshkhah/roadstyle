@@ -1,5 +1,6 @@
 """tiles=True — PMTiles archive building and the embedded-tiles web output."""
 import gzip
+import math
 import json
 
 import geopandas as gpd
@@ -210,3 +211,19 @@ def test_simple_mode_tiles_carry_the_pieces():
     assert all({"__rs_s", "__rs_edge", "__rs_cls", "highway"} <= p.keys() for p in ps)
     assert any(isinstance(p.get("__rs_dash"), str) for p in ps)         # the footway's dash pattern, as text (the dasharray match)
     assert any(p.get("__rs_fill") for p in ps if p["__rs_k"] == 1)
+
+
+def test_single_line_pair_rides_the_tiles():
+    import mapbox_vector_tile
+    from pmtiles.reader import MemorySource, Reader
+
+    from roadstyle.render_web import render
+    from test_render_web import _pairs
+    html = render(_pairs(), basemap="blank", tiles=True).html
+    z, n = 15, 1 << 15
+    x = int((18.04 + 180) / 360 * n)
+    y = int((1 - math.asinh(math.tan(math.radians(59.305))) / math.pi) / 2 * n)
+    feats = mapbox_vector_tile.decode(gzip.decompress(Reader(MemorySource(_archive_of(html))).get(z, x, y)))
+    foot = [f["properties"] for f in feats["roads"]["features"] if f["properties"].get("highway") == "footway"]
+    assert sorted(bool(p.get("__rs_dup")) for p in foot) == [False, True] and {p["__rs_edge2"] for p in foot} == {7, 8}
+    assert {f["properties"]["__rs_edge"] for f in feats["simple"]["features"] if f["properties"]["highway"] == "footway"} == {7}

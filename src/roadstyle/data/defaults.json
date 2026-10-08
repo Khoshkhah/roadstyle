@@ -533,6 +533,7 @@
     "bridge_shadow_blur": 4.0,
     "bridge_shadow_offset": [2, 2],
     "bridge_shadow_trim_m": 3.0,
+    "single_line_classes": ["footway", "path", "steps", "pedestrian", "cycleway", "track", "bridleway", "corridor", "platform"],
     "twin_end_caps": true,
     "tunnel_casing_dash": [1, 1],
     "tunnel_fill_dash": [],

@@ -274,6 +274,28 @@ def _mark_twoway(geo, directed_col=None, kind_col="highway"):
                     p["__rs_oneway"] = not und(ft)   # undirected reverse is a one-way road
 
 
+def _mark_single_line(geo, kind_col, classes):
+    """A reverse pair of a class in ``classes`` (config ``single_line_classes``: a footway, a path ...) is drawn as ONE line at full width, no
+    lanes: the later edge of the pair is flagged ``__rs_dup`` (it draws nothing, no piece, no layer feature), the first keeps all the drawing
+    and both name each other in ``__rs_edge2`` (their positions in ``geo``: the page's one lookup, the popup, rsFilter, rsColor). The pair has
+    no one-way arrows. Matched like :func:`_mark_twoway` (end -> start, one class), but whether the pair is directed does not matter."""
+    first = {}
+    for i, ft in enumerate(geo["features"]):
+        p, g = ft.setdefault("properties", {}), ft.get("geometry") or {}
+        c = g.get("coordinates") or []
+        if p.get(kind_col) not in classes or g.get("type") != "LineString" or len(c) < 2:
+            continue
+        a, z = (round(c[0][0], 6), round(c[0][1], 6)), (round(c[-1][0], 6), round(c[-1][1], 6))
+        j = first.pop((z, a, p[kind_col]), None)
+        if j is None:
+            first.setdefault((a, z, p[kind_col]), i)
+            continue
+        q = geo["features"][j]["properties"]
+        p["__rs_dup"], p["__rs_edge2"], q["__rs_edge2"] = True, j, i
+        for r in (p, q):
+            r["__rs_twoway"] = r["__rs_oneway"] = False
+
+
 def _annotation_slots(geo, slot_m, class_col="highway"):
     """Divide every road chain into equal ``slot_m``-metre slots — the annotation plan.
 
@@ -302,10 +324,10 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
         by_ends[(a, z, p.get(class_col))] = i               # with the class: a footway on a street the other way round is not its twin
         lines.append((i, a, z, c, p))
     for i, a, z, c, p in lines:
-        if p.get("__rs_twoway") and (z, a) < (a, z):
+        if (p.get("__rs_twoway") and (z, a) < (a, z)) or p.get("__rs_dup"):
             continue
         reps.append((a, z, c, p))
-        owner[id(p)] = (i, by_ends.get((z, a, p.get(class_col))) if p.get("__rs_twoway") else None)
+        owner[id(p)] = (i, by_ends.get((z, a, p.get(class_col))) if p.get("__rs_twoway") else p.get("__rs_edge2"))
 
     # class is part of the key: a cycleway running along "Götgatan" carries the street's name
     # too, and without the class it chained INTO the roadway's group — slots then labelled the
@@ -429,7 +451,7 @@ def _bridge_decks(geo, dk):
         a = (round(c[0][0], 6), round(c[0][1], 6))
         z = (round(c[-1][0], 6), round(c[-1][1], 6))
         pair_edges[min((a, z), (z, a))].append(fi)
-        if p.get("__rs_twoway") and (z, a) < (a, z):
+        if (p.get("__rs_twoway") and (z, a) < (a, z)) or p.get("__rs_dup"):
             continue
         reps.append((a, z, c, p, fi))
 
@@ -697,6 +719,8 @@ def _casing_parts(geo, head_m, cols):
     out = []
     for i, ft in enumerate(geo["features"]):
         p, g = ft["properties"], ft.get("geometry") or {}
+        if p.get("__rs_dup"):                           # one line for a reverse pair (_mark_single_line): its twin draws it
+            continue
         base = {k: v for k, v in p.items() if (k in keep or k.startswith("__rs_")) and not k.startswith("__rs_fill")}
         base["__rs_edge"] = p.get("__rs_edge", i)      # render numbers the roads (a part of them: render(_edges=...) keeps their numbers)
         cs, cm, ce = p["__rs_cs"], p["__rs_cl"], p["__rs_ce"]
@@ -932,7 +956,7 @@ def _halves(geo):
     for i, ft in enumerate(geo["features"]):
         p, g = ft["properties"], ft.get("geometry") or {}
         c = g.get("coordinates") or []
-        if not p.get("__rs_split") or g.get("type") != "LineString" or len(c) < 2:
+        if not p.get("__rs_split") or p.get("__rs_dup") or g.get("type") != "LineString" or len(c) < 2:
             continue
         lon0, lat0 = c[0][0], c[0][1]
         kx, ky = 111320.0 * math.cos(math.radians(lat0)), 111320.0
@@ -1415,7 +1439,7 @@ _applyFill=function(){ _rsFullFill();
 _applySort=function(){ _rsFullSort();
   const all=_qColor ? [].concat(..._qColor.map(g=>g.ids)) : null, k=["get","__rs_s"];
   if(map.getLayer(RS_SIMPLE.layer)) map.setLayoutProperty(RS_SIMPLE.layer,"line-sort-key",
-    all ? ["+",k,["case",["all",["==",["get","__rs_k"],1],_has(["get","__rs_edge"],all)],0.5,0]] : k); };
+    all ? ["+",k,["case",["all",["==",["get","__rs_k"],1],["any",_has(["get","__rs_edge"],all),_has(["get","__rs_edge2"],all)]],0.5,0]] : k); };
 const _rsFullTunnel=rsSetTunnelStyle;
 rsSetTunnelStyle=function(o){ _rsFullTunnel(o);       // the palette (colours, in _applyFill) and the dash ratio
   if(RS_SIMPLE.tunnels && map.getLayer(RS_SIMPLE.layer)) map.setPaintProperty(RS_SIMPLE.layer,"line-dasharray",_simpleDash()); };
@@ -1755,6 +1779,8 @@ def _simple_pieces(geo, parts, cols, shadows=True):
             out.append({"type": "Feature", "geometry": q["geometry"], "properties": {**p, "__rs_k": 0, "__rs_s": k}})
     for i, ft in enumerate(geo["features"]):
         p = ft["properties"]
+        if p.get("__rs_dup"):
+            continue
         for g, p in ([(h["geometry"], h["properties"]) for h in halves[p.get("__rs_edge", i)]] if p.get("__rs_split") else [(ft["geometry"], p)]):
             out.append({"type": "Feature", "geometry": g,
                         "properties": {**{k: v for k, v in p.items() if k in keep or k.startswith("__rs_")}, "__rs_k": 1,
@@ -2089,6 +2115,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             color_opts_meta = [{"name": rf.legend.get("title") or "data",
                                 "prop": "__rs_fill", "legend": rf.legend}]
     _mark_twoway(geo, directed_col, highway_col)
+    if CONFIG.single_line_classes:
+        _mark_single_line(geo, highway_col, set(CONFIG.single_line_classes))
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
     _mark_caps(geo, cap_col, cap_start_col, cap_end_col)
     for ft in geo["features"] if (head_start_m_col or head_end_m_col) else ():          # this edge's head lengths (null: head_m)
@@ -2713,6 +2741,10 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
 
     # no road layer that nothing can draw (a position without bridges has no bridge layers, ...): the arrows source is filled by the page
     # from the slots, with their properties
+    if any(ft["properties"].get("__rs_dup") for ft in geo["features"]):     # a reverse pair drawn as one line (_mark_single_line): its second edge draws nowhere
+        nd = ["!", ["to-boolean", ["get", "__rs_dup"]]]
+        style["layers"] = [{**l, "filter": ["all", l["filter"], nd] if l.get("filter") else nd}
+                           if l.get("source") in ("roads", "casings", "halves") else l for l in style["layers"]]
     feats = {"roads": geo["features"], "slots": slots["features"], "arrows": slots["features"]}
     for sid, src in style["sources"].items():
         if src.get("type") == "geojson" and isinstance(src.get("data"), dict):

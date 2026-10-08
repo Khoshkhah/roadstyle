@@ -482,7 +482,7 @@ function _applyRoadFilters(){
   ["decks","shadows"].forEach(src=>{ multi[src] = !_bridgesOn ? [] : (hidden.length || q || !_tunnelsOn)
     ? _sfeats(src).map((f,k)=>(f.properties.__rs_edges||[]).some(edgeOn) ? k : -1).filter(k=>k>=0) : null; });
   const and = (f,c)=>f?["all",f,c]:c;
-  const qr = q && _has(["id"],_qIds), qe = q && ["any",_has(["get","__rs_edge"],_qIds),_has(["get","__rs_edge2"],_qIds)];   // once per change
+  const qr = q && ["any",_has(["id"],_qIds),_has(["get","__rs_edge2"],_qIds)], qe = q && ["any",_has(["get","__rs_edge"],_qIds),_has(["get","__rs_edge2"],_qIds)];   // once per change
   _fltLayers().forEach(l=>{
     if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null;
     let f=_fltBase[l.id];
@@ -711,7 +711,7 @@ function _fillExpr(idE){
   const prop=(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill";
   let e=["coalesce",["get",prop],"#888888"];
   if(_qColor) for(let i=_qColor.length-1;i>=0;i--)   // group 0 outermost -> wins overlaps
-    e=["case",_has(idE||["id"],_qColor[i].ids),_qColor[i].color,e];
+    e=["case",["any",_has(idE||["id"],_qColor[i].ids),_has(["get","__rs_edge2"],_qColor[i].ids)],_qColor[i].color,e];
   return e;
 }
 function _applyFill(){
@@ -756,7 +756,7 @@ function _applySort(){
     if(!(l.id in _sortBase)) _sortBase[l.id]=map.getLayoutProperty(l.id,"line-sort-key");
     const base=_sortBase[l.id]; if(base==null) return;
     map.setLayoutProperty(l.id,"line-sort-key",
-      all ? ["+", base, ["case",_has(["id"],all),500,0]] : base);
+      all ? ["+", base, ["case",["any",_has(["id"],all),_has(["get","__rs_edge2"],all)],500,0]] : base);
   });
 }
 function rsSetColorField(nameOrIdx){
@@ -1219,6 +1219,12 @@ function _rpairs(p, only){  // shared field filter: [nameOrNull, [[k, v], ...]]
 function _rfields(p, only){ const [name, kv]=_rpairs(p, only);
   // the field NAME in bold, its value plain - the popup and the hover tooltip both read this way
   return (name ? ["<b>"+name+"</b>"] : []).concat(kv.map(([k,s])=>"<b>"+k+"</b>: "+s)).join("<br>"); }
+// a reverse pair drawn as one line (config single_line_classes): its edge names the other direction in __rs_edge2, and the line's popup, panel and tooltip show both
+function _twinDetail(p){ return p && p.__rs_edge2!=null ? {id:p.__rs_edge2, properties:_rprops(p.__rs_edge2)} : undefined; }   // rs:select detail.twin
+function _both(p, rows, only){ const f=rows?_rrows:_rfields, t=p.__rs_edge2!=null ? _rprops(p.__rs_edge2) : null;
+  if(!t || !Object.keys(t).length) return f(p, only);
+  const sec=(n,q)=>'<div style="color:#777;margin-top:.3em">Direction '+n+'</div>'+f(q, only);
+  return p.__rs_dup ? sec(1,t)+sec(2,p) : sec(1,p)+sec(2,t); }
 function _rrows(p, only){   // the side panel's layout: big name, then aligned key/value rows
   const [name, kv]=_rpairs(p, only);
   return (name ? '<div class="rs-name">'+name+'</div>' : "")+
@@ -1435,9 +1441,10 @@ function rsSelect(id){
   clearOvSel();
   if(_sel) setS(_sel,{select:false});
   // a bridge: glow the deck chain (shown above flat_below) AND the flat line (shown below it)
-  const dids = (props && props.lvl>0) ? _deckIdsForRoad(id) : [];
-  _sel = dids.length ? {s:"decks", key:"e"+id, ids:dids, road:id}
-                     : {s:"roads", key:"r"+id, ids:[id]};
+  const hi = props && props.__rs_dup ? props.__rs_edge2 : id;      // a reverse pair is drawn by one edge: that one glows
+  const dids = (props && props.lvl>0) ? _deckIdsForRoad(hi) : [];
+  _sel = dids.length ? {s:"decks", key:"e"+hi, ids:dids, road:hi}
+                     : {s:"roads", key:"r"+hi, ids:[hi]};
   setS(_sel,{select:true});
   if(_sel.road!=null) _fs({source:"roads", id:_sel.road},{select:true});
   // best effort for programmatic selection: overlays at the edge's midpoint (when on screen)
@@ -1445,12 +1452,12 @@ function rsSelect(id){
   let ovs=[]; if(c){ try{ ovs=_ovAt(map.project({lng:c[0], lat:c[1]})); }catch(err){} }
   const cll = c ? {lng:c[0], lat:c[1]} : null;
   document.dispatchEvent(new CustomEvent("rs:select",
-    {detail:{id:id, layer:null, properties:props || {}, overlays:ovs, streetView:_svPick(cll, _feats()[id] || _svTiled(id), id)}}));
+    {detail:{id:id, layer:null, properties:props || {}, twin:_twinDetail(props), overlays:ovs, streetView:_svPick(cll, _feats()[id] || _svTiled(id), id)}}));
   const sv = _sv(cll, _feats()[id] || _svTiled(id));
   if(__ROAD_POPUP__){
-    if(_popupMode === "panel"){ rsInfoShow(_rrows(props||{}, _popupFields) + sv + _ovSections(ovs)); }
+    if(_popupMode === "panel"){ rsInfoShow(_both(props||{}, true, _popupFields) + sv + _ovSections(ovs)); }
     else if(c) new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
-      .setLngLat(c).setHTML(_rfields(props||{}, _popupFields) + sv + _ovSections(ovs)).addTo(map);
+      .setLngLat(c).setHTML(_both(props||{}, false, _popupFields) + sv + _ovSections(ovs)).addTo(map);
   }
 }
 window.rsSelect = rsSelect;
@@ -1471,7 +1478,7 @@ function hoverFrame(){ _raf=0; if(!_pt) return;
   clearTimeout(_tipT); if(!h) return;
   const p = _pt;
   _tipT = setTimeout(()=>{ if(_pt !== p) return;                                          // the mouse rested on it
-    if(_tip) _tip.setLngLat(map.unproject(p)).setHTML(_rfields(_pickProps(f), _ttipOnly)).addTo(map); }, _TIP_DELAY);
+    if(_tip) _tip.setLngLat(map.unproject(p)).setHTML(_both(_pickProps(f), false, _ttipOnly)).addTo(map); }, _TIP_DELAY);
 }
 map.on("mousemove", e=>{ _pt=e.point; if(!_raf) _raf=requestAnimationFrame(hoverFrame); });
 map.on("mouseout", ()=>{ _pt=null; if(_raf){cancelAnimationFrame(_raf);_raf=0;} setS(_hov,{hover:false}); _hov=null; _cur=null; clearTimeout(_tipT); if(_tip) _tip.remove(); });
@@ -1493,7 +1500,7 @@ map.on("click", e=>{
   const ovs = _ovAt(e.point).filter(o=>!io || o.label!==io.label);   // interactive overlays under the click (e.g. the zone)
   // structured click-data for host pages / dashboards (fires in every popup mode, incl. False)
   document.dispatchEvent(new CustomEvent("rs:select",
-    {detail:{id:f.id, layer:f.layer && f.layer.id, properties:props, overlays:ovs, item:item,
+    {detail:{id:f.id, layer:f.layer && f.layer.id, properties:props, twin:_twinDetail(props), overlays:ovs, item:item,
              streetView:_svPick(e.lngLat, f, f.id)}}));
   const sv = _sv(e.lngLat, f);
   if(io){ if(io.interactive){             // the item's own popup (its popup fields), the road's Street View below it
@@ -1501,9 +1508,9 @@ map.on("click", e=>{
       else new maplibregl.Popup({closeButton:true, maxWidth:"260px"}).setLngLat(e.lngLat)
         .setHTML('<span style="color:#777">'+io.label+'</span><br>'+_rfields(item.properties, io.popup) + sv + _ovSections(ovs)).addTo(map); } }
   else if(__ROAD_POPUP__){
-    if(_popupMode === "panel"){ rsInfoShow(_rrows(props, _popupFields) + sv + _ovSections(ovs)); }
+    if(_popupMode === "panel"){ rsInfoShow(_both(props, true, _popupFields) + sv + _ovSections(ovs)); }
     else new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
-      .setLngLat(e.lngLat).setHTML(_rfields(props, _popupFields) + sv + _ovSections(ovs)).addTo(map);
+      .setLngLat(e.lngLat).setHTML(_both(props, false, _popupFields) + sv + _ovSections(ovs)).addTo(map);
   }
 });
 map.on("load", ()=>{ try{ map.fitBounds(__BOUNDS__,

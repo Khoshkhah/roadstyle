@@ -14,6 +14,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   Jupyter Notebook 7.5 and JupyterLab 4.5: simple, `simple=False` and `tiles=True` draw their roads. A test pins the CDN version to the vendored one.
 
 ### Changed
+- **A two-way footway, path, steps, cycleway ... is one full-width line, not two lanes** (setting `single_line_classes`, default footway, path, steps,
+  pedestrian, cycleway, track, bridleway, corridor, platform; `[]` = lanes for all). Of a reverse pair only the first edge is drawn (so two reversed
+  dash patterns never overlap); the second is flagged `__rs_dup` and draws nowhere (simple, full look, `tiles=True`, the level editor). Both edges
+  keep their data and name each other (`__rs_edge2`): a click, `rsSelect` and the tooltip show "Direction 1" and "Direction 2" with each one's own
+  fields, `rs:select` carries `detail.twin`. Filters and colours treat the line as both edges: it shows (and takes a colour) while either edge is in
+  the `rsFilter` / `rsColor` set; hiding one direction alone is not possible (the class, bridge and tunnel switches hit both alike). No arrows.
 - **The level solver works from the tables only** (`pairs.csv` + `edits.csv`): a stack is written at make (`rs.level_input`, `roadstyle-levels make`,
   `duckosm levels`, and inside `compute_levels`) as one row per part of the upper road that crosses the lower one (`a_end` `start` / `main` / `end`),
   worked out once with the heads of that time (`heads.csv`, else `head_m`); no whole-road stack rows. The solver lifts exactly the named parts of the

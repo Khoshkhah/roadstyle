@@ -49,7 +49,7 @@ roadstyle styles each edge by its `highway` class, so footways and cycleways get
 ### The graph is directed
 
 A two-way street is two edges, one per direction, and a one-way street is one. That is exactly
-what roadstyle expects: it draws the two directions side by side and puts arrows on one-way
+what roadstyle expects: it draws the two directions side by side (a footway or path: one line) and puts arrows on one-way
 streets. Keep the graph directed; don't convert it with `ox.convert.to_undirected`.
 
 ### Bridges and tunnels

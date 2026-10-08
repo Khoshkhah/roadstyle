@@ -812,7 +812,7 @@ def test_rscolor_raises_painted_roads_within_their_level():
     """rsColor lifts the painted roads to the top of their level (line-sort-key +500, levels are
     1000 apart): over a street they cross, still under a bridge above them."""
     html = render_edges(_edges(), backend="web").html
-    assert "function _applySort()" in html and '["case",_has(["id"],all),500,0]' in html and "function _has(expr, ids)" in html
+    assert "function _applySort()" in html and '["case",["any",_has(["id"],all),_has(["get","__rs_edge2"],all)],500,0]' in html and "function _has(expr, ids)" in html
     assert html.index("_applyFill();\n  _applySort();") > html.index("function rsColor(")
 
 
@@ -917,6 +917,37 @@ def test_twin_pairs_get_one_end_cap_per_end():
     assert pts[0]["properties"]["__rs_fill"] and pts[0]["properties"]["highway"] == "residential"
 
 
+
+
+def _roads_of(html):
+    return [f["properties"] for f in _style(html)["sources"]["roads"]["data"]["features"]]
+
+
+def test_two_way_footway_is_one_full_width_line_and_a_street_keeps_its_lanes():
+    """single_line_classes: a reverse pair of a footway is drawn once (the later edge draws nothing), full width (no lane offset), no arrows;
+    both edges name each other (the popup shows both directions); a residential pair still fans into lanes."""
+    for simple in (True, False):
+        html = render_edges(_pairs(), backend="web", simple=simple).html
+        ps = _roads_of(html)
+        foot, street = ps[7:9], ps[0:2]
+        assert [p["__rs_twoway"] for p in foot] == [False, False] and [p["__rs_oneway"] for p in foot] == [False, False]
+        assert [p.get("__rs_dup") for p in foot] == [None, True] and (foot[0]["__rs_edge2"], foot[1]["__rs_edge2"]) == (8, 7)
+        assert all(p["__rs_twoway"] and "__rs_dup" not in p for p in street)
+        style = _style(html)
+        if simple:
+            pieces = style["sources"]["simple"]["data"]["features"]
+            assert {f["properties"]["__rs_edge"] for f in pieces if f["properties"]["highway"] == "footway"} == {7}
+        else:
+            nd = ["!", ["to-boolean", ["get", "__rs_dup"]]]
+            assert all(l["filter"] == nd or l["filter"][-1] == nd for l in style["layers"] if l.get("source") in ("roads", "casings", "halves"))
+        assert "_both(" in html and "function _twinDetail" in html
+
+
+def test_single_line_classes_is_a_setting():
+    off = _roads_of(render_edges(_pairs(), backend="web", settings={"config": {"single_line_classes": []}}).html)
+    assert all(p["__rs_twoway"] for p in off[7:9]) and not any("__rs_dup" in p for p in off)
+    street = _roads_of(render_edges(_pairs(), backend="web", settings={"config": {"single_line_classes": ["residential"]}}).html)
+    assert street[1].get("__rs_dup") and not street[0]["__rs_twoway"] and street[7]["__rs_twoway"]
 
 
 def test_end_caps_follow_filters_and_recolour_and_can_be_turned_off():
