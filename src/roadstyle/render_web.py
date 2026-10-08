@@ -353,6 +353,7 @@ def _mark_twin_casing(geo, kind_col, id_col=None, head_m=5.0):
 
 _NAME_MARGIN_M = 2.0       # names and arrows stay this far (metres) beyond a crossing road's drawn half-width
 _ZEBRA_HALF_M = 2.0        # ... and at least this far from a footway or path line: a zebra's stripes are about 4 m wide along the street
+_ARROW_MIN_M = 8.0         # a one-way stretch too short for a name slot (20 % of slot_m) still gets an arrow slot from this length (2026-10-09)
 
 
 def _crossing_half_m(cls, lat):
@@ -511,7 +512,9 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
                 for j in range(pieces):
                     a, b = lo + j * slot_m, lo + min((j + 1) * slot_m, length)
                     if b - a < slot_m * 0.2:
-                        continue
+                        if not (oneway and b - a >= _ARROW_MIN_M):
+                            continue
+                        nxt += 1 - nxt % 2          # too short for a name, long enough for an arrow: an arrow slot (an odd number)
                     i, nxt = nxt, nxt + 1
                     pts = _part(xy, cum, a, b)
                     coords = np.column_stack([np.round(pts[:, 0] / kx + lon0, 6), np.round(pts[:, 1] / 111320.0 + lat0, 6)]).tolist()

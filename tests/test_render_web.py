@@ -3572,6 +3572,22 @@ def test_slots_keep_away_from_a_zebra_and_a_bridge():
             assert hi <= at - m / _K43 + 1e-6 or lo >= at + m / _K43 - 1e-6
 
 
+def test_a_short_one_way_stretch_gets_an_arrow_slot_not_a_name_slot():
+    """A stretch between two crossings shorter than a name slot (20 m with slot_m 100) but at least 8 m long is an arrow slot (odd) on a
+    one-way street, nothing on a two-way one (2026-10-09)."""
+    from roadstyle.render_web import _crossing_half_m
+    z = _crossing_half_m("footway", 43.7)
+    x1, x2 = 0.0010, 0.0010 + (2 * z + 15) / _K43                       # two zebras, 15 m of street between their margins
+    lines = [("Main St", "residential", [(0.0, 43.7), (0.0025, 43.7)]),
+             ("", "footway", [(x1, 43.69995), (x1, 43.70005)]), ("", "footway", [(x2, 43.69995), (x2, 43.70005)])]
+    def between(oneway):
+        return [f for f in _slots_of(lines, oneway) if f["properties"]["name"] == "Main St" and x1 < _x(f)[0] < x2]
+    short = between(True)
+    assert len(short) == 1 and short[0]["properties"]["slot"] % 2 == 1
+    assert 14 < (_x(short[0])[1] - _x(short[0])[0]) * _K43 < 16
+    assert between(False) == []
+
+
 def test_name_layer_is_line_center_with_a_sort_key():
     style = _style(render_edges(_edges(), backend="web", arrows=True, labels=True).html)
     lab = next(l for l in style["layers"] if l["id"] == "roads-labels")
