@@ -16,6 +16,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `rsSetTunnelStyle({toward})`, `RS_TUNNEL_TOWARDS` and a colour list in the Tunnels box.
 
 ### Changed
+- **Simple mode: the bridge shadow and the wider bridge casing grow with the zoom:** none below zoom 14 (no shadow, the full look's bridge casing), linearly to the full values at zoom 17 and above (they were too strong zoomed out).
 - **`simple=True` is the default** for every web map (`render_edges`, the dashboard, report and street-view pages, the level editor): one road layer, no tunnel / dashed-class dashes, every end round,
   a blurred bridge shadow. `simple=False` draws the full look. `tiles=True` and `tunnel_control=True` still do not work with simple mode and raise a `ValueError` that says to pass `simple=False`;
   the command line (`--tiles`) and the Studio (vector tiles) do that themselves. In the level editor the square and flat end caps are not drawn (every end is round).

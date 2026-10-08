@@ -1238,12 +1238,13 @@ def _hashable(v):
 
 def _plus_px(expr, px, when=None):
     """A width expression ``px`` pixels wider (only for the features where ``when`` holds, if given): inside each stop of a top-level zoom
-    curve (MapLibre allows ``["zoom"]`` only there)."""
-    wider = (lambda v: ["+", v, px]) if when is None else (lambda v: ["case", when, ["+", v, px], v])
+    curve (MapLibre allows ``["zoom"]`` only there). ``px`` may be a function of the stop's zoom."""
+    wider = (lambda v, p: ["+", v, p]) if when is None else (lambda v, p: ["case", when, ["+", v, p], v])
     if isinstance(expr, list) and expr and expr[0] in ("interpolate", "step"):
         first = 4 if expr[0] == "interpolate" else 2
-        return [*expr[:first], *[wider(v) if (i - first) % 2 == 0 else v for i, v in enumerate(expr[first:], first)]]
-    return wider(expr)
+        return [*expr[:first], *[wider(v, px(expr[i - 1]) if callable(px) else px) if (i - first) % 2 == 0 else v
+                                 for i, v in enumerate(expr[first:], first)]]
+    return wider(expr, px)
 
 
 def _tunnel_casing_dash(lid, flt, tlay, cw, off, on):
@@ -1927,7 +1928,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     ``simple=True`` (the default; ``simple=False`` draws the full look) draws every road piece in ONE line layer: the casings, cut into their heads as here,
     and the fills of every position, ordered by ``line-sort-key`` (position by position, at each position every casing, then every
     fill), with colour and width per feature. Much faster to load and zoom on a big page. A bridge's casing is ``bridge_casing_extra`` px
-    wider each side than in the full look, and its shadow (``bridge_shadow``) lies evenly around its main part, blurred, not offset. It
+    wider each side than in the full look, and its shadow (``bridge_shadow``) lies evenly around its main part, blurred, not offset; both grow with the zoom (no shadow and the full look's bridge casing below zoom 14, full from 17). It
     leaves out: tunnel casing dashes and dashed classes' dashes (drawn solid), square and flat ends and the per-end caps (every end round), the twin end caps;
     street names and one-way arrows are one layer each, above all roads (a name of a road under a bridge can show on the bridge),
     and the items of ``Overlay(edge_col=...)`` are drawn above all roads too. Not with ``tiles=True`` or ``tunnel_control=True``: those raise a ValueError, pass ``simple=False`` for them.
@@ -2417,13 +2418,17 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         # a bridge: its casing bridge_casing_extra px wider each side than the full look's, and its shadow (__rs_k 2) bridge_shadow_blur px
         # wider each side again, blurred that much, evenly around it (line-translate is not per feature)
         is_sh, blur = ["==", ["get", "__rs_k"], 2], float(CONFIG.bridge_shadow_blur)
-        bwide = _plus_px(bcw, 2 * float(CONFIG.bridge_casing_extra))
-        wide = [(is_sh, _plus_px(bwide, 2 * blur)), (["all", is_c, is_b], bwide),
+        # both grow with the zoom: none below zoom 14 (the full look's plain bridge casing, no shadow), full from 17 (a stop at each, so linear)
+        ramp = lambda z: min(max((z - 14) / 3, 0), 1)
+        bwide = _plus_px(bcw, lambda z: 2 * float(CONFIG.bridge_casing_extra) * ramp(z))
+        wide = [(is_sh, _plus_px(bcw, lambda z: 2 * (float(CONFIG.bridge_casing_extra) + blur) * ramp(z))), (["all", is_c, is_b], bwide),
                 *([(["all", is_c, is_t], _plus_px(cw, 3))] if any_tunnel else []), (is_c, cw)]
+        op = [1] if road_fill else [["==", ["get", "__rs_k"], 1], 0, 1]
         road = {"id": "roads-simple", "type": "line", "source": "simple", "layout": {**lay, "line-sort-key": ["get", "__rs_s"]}, **flt,
                 "paint": {"line-color": _simple_color(CONFIG.bridge_casing_color, bool(any_tunnel)),
-                          "line-width": _by_feature(wide, fw), "line-offset": off, "line-blur": ["case", is_sh, blur, 0],
-                          **({} if road_fill else {"line-opacity": ["case", ["==", ["get", "__rs_k"], 1], 0, 1]})}}
+                          "line-width": _by_feature(wide, fw), "line-offset": off,
+                          "line-blur": ["interpolate", ["linear"], ["zoom"], 14, 0, 17, ["case", is_sh, blur, 0]],
+                          "line-opacity": ["interpolate", ["linear"], ["zoom"], 14, ["case", is_sh, 0, *op], 17, op[-1] if road_fill else ["case", *op]]}}
         # the edges themselves, invisible: what a click, a hover, Street View and the page's fill code find (the roads source, its ids)
         pick = {"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, **flt,
                 "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"], "line-width": fw, "line-offset": off, "line-opacity": 0}}

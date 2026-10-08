@@ -2888,7 +2888,14 @@ def test_simple_draws_every_road_piece_in_one_layer_in_the_full_order():
     shadows = [p for p in feats if p["__rs_k"] == 2]
     assert [(p["__rs_edge"], p["__rs_cl"], p["__rs_s"]) for p in shadows] == [(1, 1, 2.15)] and "__rs_cls" in shadows[0]
     paint = lines[0]["paint"]
-    assert paint["line-blur"][0] == "case" and paint["line-color"][1:3] == [["==", ["get", "__rs_k"], 2], "rgba(0,0,0,0.25)"]
+    # both bridge additions grow with the zoom: none at 14 and below, full at 17 and above (zoom at the top, the cases inside)
+    assert paint["line-blur"][:3] == ["interpolate", ["linear"], ["zoom"]] and paint["line-blur"][3:5] == [14, 0] and paint["line-blur"][5] == 17 and paint["line-blur"][6][0] == "case"
+    op = paint["line-opacity"]
+    assert op[:3] == ["interpolate", ["linear"], ["zoom"]] and op[3] == 14 and op[4][:3] == ["case", ["==", ["get", "__rs_k"], 2], 0] and op[5] == 17
+    stops = dict(zip(paint["line-width"][3::2], paint["line-width"][4::2], strict=True))
+    extra = lambda z: stops[z][4][2]                                # the bridge casing's extra px at a stop: (case, shadow cond, shadow, bridge cond, bridge, ...)
+    assert extra(14) == 0.0 and extra(15) == 1.0 and extra(17) == 3.0 and extra(20) == 3.0
+    assert paint["line-color"][1:3] == [["==", ["get", "__rs_k"], 2], "rgba(0,0,0,0.25)"]
     w = paint["line-width"][4]                                       # the first zoom stop: shadow, bridge casing, ... cases
     assert w[0] == "case" and w[1] == ["==", ["get", "__rs_k"], 2]
     assert "const RS_SIMPLE = " in html and "_applyFill=function" in html
