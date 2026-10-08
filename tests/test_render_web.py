@@ -3507,3 +3507,16 @@ def test_a_lap_closes_the_cut_below_zoom_17():
             assert math.hypot((x1 - x0) * 111320 * math.cos(math.radians(y0)), (y1 - y0) * 111320) <= 4.0 + 0.01
         for lyr in (l for l in style["layers"] if l.get("source") == src and not l["id"].endswith("-dash")):
             assert '["all", ["to-boolean", ["get", "__rs_lap"]], ["<", ["zoom"], 17]]' in json.dumps(lyr["filter"])
+
+
+def test_an_unclassed_two_way_pair_pairs_and_the_warning_names_it():
+    """Both directions of a road with no class (an area outline taken as a road) are a pair: one casing, a fill per direction (NaN != NaN
+    made them two roads). render_edges warns once, with the count and the edge ids."""
+    a, b = (18.00, 59.30), (18.00, 59.31)
+    g = gpd.GeoDataFrame({"highway": [None, float("nan")], "edge_ref": ["w#2f", "w#2r"]},
+                         geometry=[LineString([a, b]), LineString([b, a])], crs=4326)
+    with pytest.warns(UserWarning, match=r"2 edges have no 'highway' value.*w#2f, w#2r"):
+        html = render_edges(g, **_TWIN_KW).html
+    feats = [f["properties"] for f in _style(html)["sources"]["simple"]["data"]["features"]]
+    assert {p["__rs_edge"] for p in feats if p["__rs_k"] != 1} == {0}                  # one casing, the first edge's
+    assert all(p.get("__rs_twoway", True) for p in feats) and sorted(p["__rs_edge"] for p in feats if p["__rs_k"] == 1) == [0, 1]

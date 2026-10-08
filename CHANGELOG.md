@@ -7,6 +7,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Fixed
+- **Both directions of an unclassed road are a pair:** a missing class (None, NaN, "") is one value when edges are paired or grouped
+  (`_cls`: two-way marking, the twin casing, slots), so an edge pair with no `highway` is drawn as a pair, not as two different roads
+  (NaN != NaN). `render_edges` warns once when edges have no class, naming how many and up to 5 ids: they are drawn with the default
+  style; usually bad data, e.g. an area outline (`area:highway`) taken as a road (Monaco way 1549041737).
 - **The notebook preview draws again, with the bundled MapLibre (5.24 from the CDN, was 3.6.2):** 3.6 rejected simple mode's per-feature
   `line-cap` / `line-dasharray`, so the default map was blank. Why the preview had been held at 3.6: it is an `<iframe srcdoc>`, whose
   `location.origin` is `"null"`, while MapLibre's worker reports the notebook server's origin; MapLibre 4.0 to 5.19 drops worker messages

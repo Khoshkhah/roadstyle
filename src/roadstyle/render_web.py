@@ -245,6 +245,11 @@ def _pair_width(expr, col, offset_frac=0.28, offset_zoom=15):
     return _plus_px(expr, lambda z: ["*", 2, _offset_match(col, z, offset_frac, offset_zoom)], when=["to-boolean", ["get", "__rs_pair"]])
 
 
+def _class_key(v):
+    """A road's class as a grouping key: a missing class (None, NaN, "") is one value, so both directions of an unclassed road still pair (NaN != NaN)."""
+    return "" if v is None or v != v else v
+
+
 def _mark_twoway(geo, directed_col=None, kind_col="highway"):
     """Flag each edge that has a reverse twin (i.e. a two-way street's other direction), so the
     style fans those into two lanes and drops the one-way arrows. The match is DIRECTED — the twin
@@ -258,7 +263,7 @@ def _mark_twoway(geo, directed_col=None, kind_col="highway"):
         if g.get("type") == "LineString" and len(c) >= 2:
             a = (round(c[0][0], 6), round(c[0][1], 6))
             z = (round(c[-1][0], 6), round(c[-1][1], 6))
-            k = (a, z, (ft.get("properties") or {}).get(kind_col))
+            k = (a, z, _class_key((ft.get("properties") or {}).get(kind_col)))
         else:
             k = (id(ft), None, None)
         keys.append(k)
@@ -327,9 +332,9 @@ def _mark_twin_casing(geo, kind_col, id_col=None, head_m=5.0):
         if not p.get("__rs_twoway") or g.get("type") != "LineString" or len(c) < 2:
             continue
         line = tuple((round(x[0], 7), round(x[1], 7)) for x in c)
-        j = first.pop((line[::-1], p.get(kind_col)), None)
+        j = first.pop((line[::-1], _class_key(p.get(kind_col))), None)
         if j is None:
-            first.setdefault((line, p.get(kind_col)), i)
+            first.setdefault((line, _class_key(p.get(kind_col))), i)
             continue
         q = geo["features"][j]["properties"]
         p["__rs_twin"], q["__rs_twin"] = j, i
@@ -371,13 +376,13 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
             continue
         a = (round(c[0][0], 6), round(c[0][1], 6))
         z = (round(c[-1][0], 6), round(c[-1][1], 6))
-        by_ends[(a, z, p.get(class_col))] = i               # with the class: a footway on a street the other way round is not its twin
+        by_ends[(a, z, _class_key(p.get(class_col)))] = i               # with the class: a footway on a street the other way round is not its twin
         lines.append((i, a, z, c, p))
     for i, a, z, c, p in lines:
         if (p.get("__rs_twoway") and (z, a) < (a, z)) or p.get("__rs_dup"):
             continue
         reps.append((a, z, c, p))
-        owner[id(p)] = (i, by_ends.get((z, a, p.get(class_col))) if p.get("__rs_twoway") else p.get("__rs_edge2"))
+        owner[id(p)] = (i, by_ends.get((z, a, _class_key(p.get(class_col)))) if p.get("__rs_twoway") else p.get("__rs_edge2"))
 
     # class is part of the key: a cycleway running along "Götgatan" carries the street's name
     # too, and without the class it chained INTO the roadway's group — slots then labelled the
@@ -387,7 +392,7 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
     for e in reps:
         p = e[3]
         groups[(p.get("name") or None, p.get("lvl", 0),
-                1 if p.get("__rs_oneway") else 0, p.get(class_col), p.get("__rs_fl"), bool(p.get("__rs_tunnel")))].append(e)
+                1 if p.get("__rs_oneway") else 0, _class_key(p.get(class_col)), p.get("__rs_fl"), bool(p.get("__rs_tunnel")))].append(e)
 
     feats, cid = [], 0
     for (name, lvl, oneway, _cls, fl, tun), edges in groups.items():
