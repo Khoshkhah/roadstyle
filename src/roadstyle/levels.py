@@ -4,6 +4,8 @@ from __future__ import annotations
 import warnings
 from collections import defaultdict
 
+from ._na import missing
+
 
 def _level(row, layer_col, bridge_col, tunnel_col):
     """The OSM level of an edge: a non-zero ``layer``, else bridge 1, tunnel -1, else 0 (the rule of ``render_edges``)."""
@@ -331,7 +333,7 @@ def _road_split(g, cols=()):
     fwd = [xy[off[i]:off[i + 1]].tobytes() for i in range(len(geoms))]
     rev = [xy[off[i]:off[i + 1]][::-1].tobytes() for i in range(len(geoms))]
     have = [c for c in cols if c and c in g.columns]
-    kind = list(zip(*[["" if v is None or v != v else str(v) for v in g[c]] for c in have], strict=True)) if have else [()] * len(geoms)
+    kind = list(zip(*[["" if missing(v) else str(v) for v in g[c]] for c in have], strict=True)) if have else [()] * len(geoms)
     keys = [(frozenset(e), min(f, r), k) for e, f, r, k in zip(ends, fwd, rev, kind, strict=True)]
     road, first = {}, []
     for i, k in enumerate(keys):
@@ -354,7 +356,7 @@ def level_input(edges, id_col="edge_id", layer_col="layer", bridge_col="bridge",
     ``roads``: one row per road (both directions of a segment together): ``road`` (the ``id_col`` of its first edge, as text; the row number
     without ``id_col``), ``edges`` / ``reversed`` (the ids of its edges in its own direction / the other way), ``band`` (``band_col``, else the
     level from the tags), ``priority`` (the ``order``: ``"priority"``, ``"class"``, a column of numbers, or None) and the geometry of its first
-    edge, and its ``highway_col``, ``name``, ``edge_ref`` (and ``edge_refs`` / ``reversed_refs``, each edge's, as ``edges`` / ``reversed``), ``lanes``, ``modes`` (who may use it, e.g. duckOSM's travel modes), ``tunnel_col``, ``bridge_col`` and ``layer_col`` when the edges have them. ``pairs``: one row per relation, ``relation`` / ``a`` / ``b`` / ``a_end`` / ``b_end``: ``meet`` (the end ``a_end`` of ``a`` is the end
+    edge, and its ``highway_col``, ``name``, ``edge_ref`` (and ``edge_refs`` / ``reversed_refs``, and ``edges_oneway`` / ``reversed_oneway`` and ``edges_driving`` / ``reversed_driving`` and ``edges_directed`` / ``reversed_directed`` (:func:`roadstyle.is_directed`, from the edges' ``driving``, ``cycling`` and ``highway_col``): each edge's own, null where the edges have no such column, as ``edges`` / ``reversed``), ``lanes``, ``modes`` (who may use it, e.g. duckOSM's travel modes), ``tunnel_col``, ``bridge_col`` and ``layer_col`` when the edges have them. ``pairs``: one row per relation, ``relation`` / ``a`` / ``b`` / ``a_end`` / ``b_end``: ``meet`` (the end ``a_end`` of ``a`` is the end
     ``b_end`` of ``b``), ``stack`` (``a`` is over ``b``: different bands, crossing or near away from a shared node) and ``order`` (``a``'s fill
     after ``b``'s where they meet: one band, or different bands that only meet). A stack is one row per part of ``a``'s casing that must be
     after ``b``'s fill, its ``a_end`` ``start`` / ``main`` / ``end`` (2026-10-08): the parts that cross ``b``, worked out here once with the heads
@@ -365,6 +367,9 @@ def level_input(edges, id_col="edge_id", layer_col="layer", bridge_col="bridge",
     import geopandas as gpd
     import pandas as pd
     g = edges
+    if {"driving", "cycling"} <= set(g.columns):        # directed: what draws two directions or one line, the one rule (edges.is_directed)
+        from .edges import is_directed
+        g = g.assign(directed=is_directed(g, highway_col=highway_col))
     ends, first, rid, same = _road_split(g, (highway_col, tunnel_col, bridge_col, layer_col, band_col))
     ids = [str(v) for v in g[id_col]] if id_col and id_col in g.columns else [str(i) for i in range(len(g))]
     head = g.iloc[first]
@@ -397,14 +402,20 @@ def level_input(edges, id_col="edge_id", layer_col="layer", bridge_col="bridge",
         both = [[] for _ in first]
         for i, r in enumerate(rid):
             v = g["modes"].iloc[i]
-            both[r] += [] if v is None or v != v else [t for t in str(v).split(" + ") if t not in both[r]]
+            both[r] += [] if missing(v) else [t for t in str(v).split(" + ") if t not in both[r]]
         shown["modes"] = [" + ".join(m) or None for m in both]
     if "edge_ref" in g.columns:                         # each edge's own edge_ref, as edges / reversed (the editor shows both directions)
         refs = ([[] for _ in first], [[] for _ in first])
         for i, r in enumerate(rid):
             v = g["edge_ref"].iloc[i]
-            refs[0 if same[i] else 1][r].append(None if v is None or v != v else str(v))
+            refs[0 if same[i] else 1][r].append(None if missing(v) else str(v))
         shown["edge_refs"], shown["reversed_refs"] = refs
+    for c in ("oneway", "driving", "directed"):         # each edge's own oneway / driving (its arrow) and directed (two directions or one line), as edges / reversed
+        per = ([[] for _ in first], [[] for _ in first])           # no such column: null on every edge, which the pages read as "not given"
+        for i, r in enumerate(rid):
+            v = g[c].iloc[i] if c in g.columns else None
+            per[0 if same[i] else 1][r].append(None if missing(v) else bool(v))
+        shown[f"edges_{c}"], shown[f"reversed_{c}"] = per
     roads = gpd.GeoDataFrame({"road": name, "edges": mine[0], "reversed": mine[1], "band": beta,
                               "priority": omega if omega is not None else [None] * len(first), **shown}, geometry=list(head.geometry), crs=g.crs)
     lift, near = _stack_parts(metres, name, meets, stacks, casing_parts(roads, head_m, heads))
@@ -423,7 +434,7 @@ def _read_pairs(pairs):
     for row in out:
         for c in ("a", "b", "a_end", "b_end"):
             v = row.get(c)
-            row[c] = None if v is None or (isinstance(v, float) and v != v) or v == "" else str(v)
+            row[c] = None if missing(v) or v == "" else str(v)
     return out
 
 
@@ -469,8 +480,8 @@ def auto_ends(roads, pairs, zoom=18.0, highway_col="highway", min_m=0.5, step=0.
     lat = float(roads.to_crs(4326).geometry.union_all().centroid.y) if roads.crs is not None else 0.0
     mpp = 40075016.686 * math.cos(math.radians(lat)) / (512 * 2 ** zoom)       # metres per pixel at that zoom, here
     cls = roads[highway_col] if highway_col in roads else [None] * len(ids)
-    w = [class_width_px(None if c is None or c != c else str(c), zoom) * mpp for c in cls]                     # whole width, casing included
-    wf = [class_width_px(None if c is None or c != c else str(c), zoom, casing=False) * mpp for c in cls]      # the fill
+    w = [class_width_px(None if missing(c) else str(c), zoom) * mpp for c in cls]                     # whole width, casing included
+    wf = [class_width_px(None if missing(c) else str(c), zoom, casing=False) * mpp for c in cls]      # the fill
     fill = None
     if levels is not None:
         f = dict(zip(levels["road"], levels["fill_level"], strict=True))

@@ -77,6 +77,32 @@ The page places them (`_rsArrows`), after every move and once the slots are load
 zoom 15 a 100 m slot is about 20 px, so long roads carried many arrows; and an earlier version with one arrow per chain (`line-center`) often
 had that arrow outside the window.
 
+### Only driving roads, only one-way ones
+
+Two questions, two inputs (2026-10-09):
+
+1. **The drawing, two directions or one line: `directed_col` alone.** An edge and its reverse are two directions only when both are
+   directed. `rs.is_directed(edges)` is the one definition (mapstyle and the level areas use it): an edge open to cars or bikes
+   (`driving` or `cycling`) that is not a path class (config `single_line_classes`). A one-way street's walking-only reverse is
+   undirected: one line. A reverse that is a bus or bike lane is directed: a half of its own (coloured by who uses it: mapstyle's access
+   colours), next to the car half with its arrow.
+2. **The arrow: one-way AND driving.** `__rs_oneway` is true only for an edge that is one-way (its `oneway`, or with no `oneway` column,
+   no twin) and driving (`driving_col` true or null; no `driving_col`: every edge). The `oneway` the pages get is the driving network's,
+   but a non-driving edge never gets an arrow even if a copied `oneway` says true. `driving_col` never decides the drawing.
+
+Example: Monaco, OSM way 1449981121 (Boulevard Charles III, oneway=yes, oneway:bicycle=no). Driving has only #1f (oneway); walking and
+cycling have #1f and #1r (#1r is a bus lane, driving.private_edges access=bus, that bikes use too). Both are directed: two halves; one
+arrow, on #1f, pointing #1f's way, in #1f's half.
+
+A pair drawn as two directions keeps one representative for the slots: its one-way edge when only one is (so its arrow points that
+edge's way), else the edge with the lower ends. The page (`_rsArrowLane`) moves such an arrow off the pair's centre line into the middle
+of its edge's half, right of travel by the half's drawn offset at that zoom (`_svLanePx`, as the Street View marker); with `tiles=True`
+the arrows repeat along the slot lines, on the centre line. An edge lying on a chain's line the other way round (a
+one-way street's undirected reverse) is no crossing: it does not cut the chain's slots. The same slot plan feeds `tiles=True`.
+
+A first fix (unreleased, 2026-10-09) also let `driving_col` false split a pair; it decided the drawing from the cars through the arrow
+input and is gone: the drawing is `directed_col`'s alone.
+
 ## 4. On a tunnel
 
 With the tunnel look (`docs/design/tunnel_look.md`), the names and arrows of a tunnel fade with the slider like everything else on it: the

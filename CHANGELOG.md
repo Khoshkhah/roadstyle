@@ -4,6 +4,24 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **`rs.is_directed(edges, driving_col="driving", cycling_col="cycling", highway_col="highway")`**: the one definition of a directed edge
+  for `directed_col` (mapstyle's): an edge open to cars or bikes that is not a path class (config `single_line_classes`). A one-way street
+  whose reverse is a bus / bike lane is two halves with one arrow, on the car edge; a walking-only reverse is no half (one line).
+
+### Fixed
+- **One-way arrows only on driving roads (`driving_col`).** An edge gets an arrow only if it is one-way and driving: `driving_col="driving"`,
+  an edge with false never gets one, even with a copied `oneway`. `driving_col` decides the arrows only; the drawing (two directions or one
+  line) is `directed_col`'s. A two-direction pair with one one-way edge has its arrow on that edge, pointing its way, in its own half. A one-way street's
+  reverse edge lying on the same line no longer cuts the chain's slots. Also with `tiles=True`. Default `None`: every edge counts as driving.
+- **The level editor draws and decides arrows like every page.** It no longer calls a road one-way when it has no reverse edge in any mode:
+  each edge carries its own `oneway`, `driving` and `directed` (new `roads.parquet` columns `edges_oneway` / `reversed_oneway`,
+  `edges_driving` / `reversed_driving`, `edges_directed` / `reversed_directed`, written by `rs.level_input` / `make_area`; `directed` with
+  `rs.is_directed` when the edges have `driving`) and the editor draws with `directed_col="directed"`, `driving_col="driving"`. An area made
+  before this must be made again (the editor stops with that message).
+
 ## [0.18.0] — 2026-10-09
 
 Simple mode is the default look (one road layer, MapLibre 5.24), a two-way road has one casing, tunnels fade toward Sand at 60, names and

@@ -20,6 +20,8 @@ import pandas as pd
 import roadstyle as rs
 from roadstyle import render_web
 
+from ._na import missing
+
 from .level_area import defaults, ends, own, solve, solve_local, write
 
 COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"]
@@ -121,7 +123,6 @@ class Area:
         draw = solved.to_crs(4326)
         draw["head_start_m"], draw["head_end_m"] = ([self.facts[r]["heads"][k] for r in draw["road"]] for k in (0, 1))
         draw["cap_start"], draw["cap_end"] = ([drawn[r][c] for r in draw["road"]] for c in ("cap_start", "cap_end"))
-        draw["oneway"] = [not f["two_way"] for f in (self.facts[r] for r in draw["road"])]      # a road with no other direction is one way
         tips = draw.geometry.apply(lambda ln: list(ln.coords[0][:2]) + list(ln.coords[-1][:2]))
         draw["s_lon"], draw["s_lat"], draw["e_lon"], draw["e_lat"] = zip(*tips, strict=True)    # the road's ends, on each of its edges
         draw = _edge_rows(draw)
@@ -141,7 +142,7 @@ class Area:
 
     def _render(self, **kw):
         """The editor's map of ``self.draw`` (render_edges); with ``_edges``, the features of those roads instead (render_web.render)."""
-        return rs.render_edges(self.draw, edge_id_col="edge", road_popup=False, name=f"Level editor · {self.dir.name}",
+        return rs.render_edges(self.draw, edge_id_col="edge", directed_col="directed", driving_col="driving", road_popup=False, name=f"Level editor · {self.dir.name}",
                                select_color="rgba(0,0,0,0)",               # the panel colours the picked roads (1 orange, 2 blue): no click glow over them
                                filter_control=False, tunnel_control=False,  # the panel is the only control: no class filter box, no Tunnels box
                                casing_start_col="casing_start", casing_level_col="casing_level", casing_end_col="casing_end",
@@ -338,7 +339,7 @@ def _directions(r):
     "along" the road or "against"."""
     out = []
     for way, ids, refs in (("along", r["edges"], r.get("edge_refs")), ("against", r["reversed"], r.get("reversed_refs"))):
-        if refs is None or (isinstance(refs, float) and refs != refs):
+        if missing(refs):
             refs = [r.get("edge_ref") if str(e) == str(r["road"]) else None for e in ids]
         out += [{"edge": str(e), "edge_ref": _txt(x), "way": way} for e, x in zip(ids, refs, strict=True)]
     return out
@@ -368,21 +369,29 @@ def _edge_rows(draw):
     """One row per edge from one row per road (``edges`` / ``reversed``), as the final map has them: an edge of the other direction runs
     the road's line backwards, with its two heads, casing numbers and caps swapped (level_area.edge_levels); ``edge`` is its id."""
     import shapely
-    refs = "edge_refs" in draw.columns                          # each edge's own edge_ref (an area made since 2026-10-08)
-    def one(ids, rs, w):
-        t = draw.assign(edge=draw[ids], _o=range(len(draw)), _w=w, **({"edge_ref": draw[rs]} if refs else {}))
-        return pd.DataFrame.explode(t, ["edge", "edge_ref"] if refs else "edge").dropna(subset=["edge"])     # geopandas' explode is of geometries
-    fw, bw = one("edges", "edge_refs", 0), one("reversed", "reversed_refs", 1)
+    per = {"edge_ref": ("edge_refs", "reversed_refs"), "oneway": ("edges_oneway", "reversed_oneway"), "driving": ("edges_driving", "reversed_driving"),
+           "directed": ("edges_directed", "reversed_directed")}
+    missing = [c for c in ("oneway", "driving", "directed") if per[c][0] not in draw.columns]
+    if missing:        # the drawing and the arrows come from each edge's own columns, as on every page: no guess from the roads
+        raise ValueError(f"this area's roads.parquet has no per-edge {missing}: make the area again (make_area / rs.level_input) from edges with those columns")
+    use = {c: v for c, v in per.items() if v[0] in draw.columns}          # edge_ref: an area made since 2026-10-08
+    def one(side, w):
+        cols = {c: draw[v[side]] for c, v in use.items()}
+        t = draw.assign(edge=draw["edges" if side == 0 else "reversed"], _o=range(len(draw)), _w=w, **cols)
+        return pd.DataFrame.explode(t, ["edge", *use]).dropna(subset=["edge"])     # geopandas' explode is of geometries
+    fw, bw = one(0, 0), one(1, 1)
     for a, b in (("casing_start", "casing_end"), ("head_start_m", "head_end_m"), ("cap_start", "cap_end")):
         bw[a], bw[b] = bw[b].to_numpy(), bw[a].to_numpy()
     bw = bw.set_geometry(shapely.reverse(bw.geometry.to_numpy()), crs=draw.crs)
-    out = pd.concat([fw, bw]).sort_values(["_o", "_w"], kind="stable").drop(columns=["edges", "reversed", "_o", "_w", "edge_refs", "reversed_refs"], errors="ignore")
+    out = pd.concat([fw, bw]).sort_values(["_o", "_w"], kind="stable").drop(columns=["edges", "reversed", "_o", "_w", *(c for v in per.values() for c in v)], errors="ignore")
     out["edge"] = out["edge"].astype(str)
+    for c in ("oneway", "driving", "directed"):            # real booleans (null stays null), as the columns of the source edges
+        out[c] = out[c].astype("boolean")
     return out.reset_index(drop=True)
 
 
 def _txt(v):
-    return None if v is None or (isinstance(v, float) and v != v) else str(v)
+    return None if missing(v) else str(v)
 
 
 def _yes(v):

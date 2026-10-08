@@ -356,3 +356,15 @@ def as_edges(data, *, class_col: str = "highway") -> RoadEdges:
         "file path, GeoJSON mapping, pyarrow Table, or DuckDB relation — or use "
         "roadstyle.from_duckdb()/from_arrow()/from_geojson()/load_edges() for full control."
     )
+
+
+def is_directed(edges, driving_col: str = "driving", cycling_col: str = "cycling", highway_col: str = "highway"):
+    """Per edge, whether it is a direction of travel of its own (``render_edges(directed_col=...)``): an edge open to cars or bikes
+    (``driving_col`` or ``cycling_col``) that is not a path (config ``single_line_classes``: a footway, a path, steps ...). False =
+    undirected: a footway stored both ways, a one-way street's walking-only reverse edge. A one-way street whose reverse is a bus or
+    bike lane (oneway=yes, oneway:bicycle=no) has two directed edges: two halves, its arrow on the car edge only (``driving_col``). The
+    one definition mapstyle and the level areas use (2026-10-09). Returns a boolean Series (nulls give null, which the pages read as
+    directed)."""
+    from .config import DEFAULT
+    d, c = (edges[k].astype("boolean") for k in (driving_col, cycling_col))
+    return (d | c) & ~edges[highway_col].isin(list(DEFAULT.single_line_classes))
