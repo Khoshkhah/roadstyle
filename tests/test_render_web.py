@@ -2617,7 +2617,7 @@ def test_one_arrow_per_one_way_road_in_the_window(tmp_path):
     pts = [(18.0 + i * 0.001, 59.3) for i in range(41)]                       # one straight one-way street, about 2.3 km, many slots
     g = gpd.GeoDataFrame({"highway": ["primary"], "name": ["Long St"], "oneway": [True]}, geometry=[LineString(pts)], crs=4326)
     render_edges(g, backend="web", basemap="blank").save(path)
-    arrows = "map.getSource('arrows')._data.features.map(f => f.geometry.coordinates)"
+    arrows = "map.getSource('arrows')._data.geojson.features.map(f => f.geometry.coordinates)"
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page(viewport={"width": 800, "height": 600})
@@ -2632,7 +2632,7 @@ def test_one_arrow_per_one_way_road_in_the_window(tmp_path):
             return page.evaluate(arrows)
         far = at(18.02, 14)
         first = at(18.02, 16)
-        odd = page.evaluate("map.getSource('arrows')._data.features.map(f => f.properties.slot % 2)")
+        odd = page.evaluate("map.getSource('arrows')._data.geojson.features.map(f => f.properties.slot % 2)")
         nudged = at(18.0203, 16)
         moved = at(18.035, 16)
         browser.close()
@@ -2652,7 +2652,7 @@ def test_arrows_are_thinned(tmp_path):
     g = gpd.GeoDataFrame({"highway": ["residential", "primary", "primary"], "name": ["Side", "Main N", "Main S"], "oneway": [True] * 3},
                          geometry=[LineString(row(59.31)), LineString(row(59.3)), LineString(row(59.30005))], crs=4326)
     render_edges(g, backend="web", basemap="blank").save(path)
-    names = "map.getSource('arrows')._data.features.map(f => f.properties.name).sort()"
+    names = "map.getSource('arrows')._data.geojson.features.map(f => f.properties.name).sort()"
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page(viewport={"width": 800, "height": 600})
