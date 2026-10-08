@@ -1840,7 +1840,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            street_view: bool | str = "window", street_view_key: str | None = None,
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
            color_options=None, color_active=0, views=None, overlays=None, compress: bool = True, tunnel_control: bool = False,
-           tiles: bool = False, simple: bool = False,
+           tiles: bool = False, simple: bool = True,
            minzoom=None, legend: bool = True,
            api_key: str | None = None, **_ignore):
     """Build a self-contained MapLibre map of the styled edges.
@@ -1924,13 +1924,13 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     ``under`` or ``over`` the roads, clickable for a popup of its fields, and toggled from a
     *Layers* control.
 
-    ``simple=True`` draws every road piece in ONE line layer: the casings, cut into their heads as here,
+    ``simple=True`` (the default; ``simple=False`` draws the full look) draws every road piece in ONE line layer: the casings, cut into their heads as here,
     and the fills of every position, ordered by ``line-sort-key`` (position by position, at each position every casing, then every
     fill), with colour and width per feature. Much faster to load and zoom on a big page. A bridge's casing is ``bridge_casing_extra`` px
     wider each side than in the full look, and its shadow (``bridge_shadow``) lies evenly around its main part, blurred, not offset. It
     leaves out: tunnel casing dashes and dashed classes' dashes (drawn solid), square and flat ends and the per-end caps (every end round), the twin end caps;
     street names and one-way arrows are one layer each, above all roads (a name of a road under a bridge can show on the bridge),
-    and the items of ``Overlay(edge_col=...)`` are drawn above all roads too. Not with ``tiles=True`` or ``tunnel_control=True`` (a ValueError).
+    and the items of ``Overlay(edge_col=...)`` are drawn above all roads too. Not with ``tiles=True`` or ``tunnel_control=True``: those raise a ValueError, pass ``simple=False`` for them.
 
     ``tooltip`` is a convenience alias for the shared backend arg (folium / CLI ``--tooltip``): when
     given and ``road_tooltip`` is unset, its value drives the hover tooltip here too, so the same
@@ -1945,7 +1945,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     # road_popup="panel" stays as shorthand for panel mode with the default fields.
     if simple and (tiles or tunnel_control):
         raise ValueError(f"simple=True does not work with {'tiles=True' if tiles else 'tunnel_control=True'}: "
-                         "draw the full look (simple=False) for it")
+                         "pass simple=False for it (the full look)")
     if street_view not in (True, False, "window"):
         raise ValueError(f'street_view must be True, False or "window", got {street_view!r}')
     mode = popup_mode or "popup"

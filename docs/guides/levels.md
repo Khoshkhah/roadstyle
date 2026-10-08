@@ -64,7 +64,7 @@ pick a second one to see every pair between the two.
 - **Add a relation**: *order* (whose fill is on top where they meet), *stack* (one over the other: the whole road or one part of its
   casing) or *meet* (join two ends). You choose which road is on top.
 - **Switch off** a pair the input found.
-- **Each end of a road**: its cap (*round*, *square*, *flat*) and its head length (a slider, in metres).
+- **Each end of a road**: its cap (*round*, *square*, *flat*) and its head length (a slider, in metres). The map is drawn in simple mode, where every end is round: a square or flat cap shows only with `simple=False` on a page you build yourself.
 - Changes wait in a list until **Apply and solve**: they are solved together, and the map reloads with the new numbers.
   If the solver refuses them, nothing is saved.
   A change of caps, or of heads that leaves the solver's inputs as they were (no main part becomes empty, no part starts or stops crossing the road under it), is saved and drawn without a solve.
@@ -97,10 +97,10 @@ footway lying exactly on a street stays a road of its own.
 
 ## Bridges and tunnels
 
-- A **bridge** has a slate casing (`bridge_casing_color`) and a soft **shadow** shifted down-right (`bridge_shadow`): each part of the
+- A **bridge** has a slate casing (`bridge_casing_color`) and a soft **shadow** (`bridge_shadow`; in the full look shifted down-right, in simple mode, the default, blurred evenly around the bridge): each part of the
   bridge casts it at its own casing number, so it lies on what the bridge crosses, never on its own road. Hiding the bridges hides it too.
 - A **tunnel** fades toward a chosen colour (`tunnel_toward`, default Sand), its fill, names, arrows and attached items alike: `tunnel_strength` (default 60; 0 is the normal colours, 100 the full tunnel
-  colours) and a two-colour dashed casing (`tunnel_palette`, default *Graphite + silver*). To try other values, `tunnel_control=True` adds a
+  colours) and, in the full look (`simple=False`), a two-colour dashed casing (`tunnel_palette`, default *Graphite + silver*; simple mode draws it solid). To try other values, `tunnel_control=True` (with `simple=False`) adds a
   *Tunnels* box with five steps; `rsSetTunnelStyle({strength, palette, ratio})` does the same from your page.
 
 ## Your own numbers
@@ -117,7 +117,7 @@ To give your own band per edge and let the solver do the rest: `rs.compute_level
 ## Good to know
 
 - Each position that occurs gets its casing and fill layers (only those something is drawn by: no bridge layers without a bridge there), so keep the range small.
-- `rsColor` and colour-by reach every position. `tiles=True` works with positions.
+- `rsColor` and colour-by reach every position. `tiles=True` (with `simple=False`) works with positions.
 - `render_edges` takes no band and no order: compute the levels first.
 
 See also: [the level step, in full](../design/level_input.md) · [divided casing](../design/levels_split_casing.md) ·

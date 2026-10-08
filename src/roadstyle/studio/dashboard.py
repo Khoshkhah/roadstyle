@@ -51,7 +51,7 @@ with st.sidebar:
 kw = {"basemap": basemap, "view_3d": view_3d, "basemaps": bms or None,
       "color_options": color_options, "name": title}
 if tiles:
-    kw["tiles"] = True
+    kw["tiles"], kw["simple"] = True, False       # tiles need the full look
 if minzoom:
     kw["minzoom"] = True
 if hover:

@@ -92,7 +92,7 @@ def test_sidecar_shape():
 
 def test_render_tiles_swaps_source_and_embeds_archive():
     from roadstyle.render_web import render
-    html = render(_edges(), basemap="blank", tiles=True).html
+    html = render(_edges(), basemap="blank", tiles=True, simple=False).html
     i = html.index("const style = ") + len("const style = ")
     style = json.JSONDecoder().raw_decode(html, i)[0]
     assert style["sources"]["roads"]["type"] == "vector"
@@ -131,9 +131,9 @@ def test_tile_class_gating_follows_the_minzoom_parameter():
     at every zoom). minzoom=True opts into the settings table, thinning low-zoom tiles too."""
     from roadstyle.render_web import render
     g = _edges()
-    plain = _archive_of(render(g, basemap="blank", tiles=True).html)
+    plain = _archive_of(render(g, basemap="blank", tiles=True, simple=False).html)
     assert "service" in _tile_classes(plain, 10)               # everything, even at z10
-    thin = _archive_of(render(g, basemap="blank", tiles=True, minzoom=True).html)
+    thin = _archive_of(render(g, basemap="blank", tiles=True, minzoom=True, simple=False).html)
     assert "service" not in _tile_classes(thin, 10)            # service minzoom is 14
     assert "primary" in _tile_classes(thin, 10)
 
@@ -170,7 +170,7 @@ def test_tiles_carry_the_casing_pieces_and_the_end_caps():
     a, b, c = (18.0, 59.3), (18.001, 59.3), (18.002, 59.3)
     g = gpd.GeoDataFrame({"highway": ["primary"] * 4},
                          geometry=[LineString([a, b]), LineString([b, a]), LineString([b, c]), LineString([c, b])], crs=4326)
-    html = render(g, basemap="blank", tiles=True).html
+    html = render(g, basemap="blank", tiles=True, simple=False).html
     style = json.JSONDecoder().raw_decode(html, html.index("const style = ") + 14)[0]
     kinds = {l["source-layer"] for l in style["layers"] if l.get("source") == "roads"}
     assert {"roads", "casings", "ends"} <= kinds

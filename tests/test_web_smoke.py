@@ -85,7 +85,7 @@ def test_tiled_map_boots_draws_and_queries(tmp_path):
 
     path = tmp_path / "smoke_tiles.html"
     g = _edges()
-    render(g, basemap="blank", tiles=True).save(path)
+    render(g, basemap="blank", tiles=True, simple=False).save(path)
 
     errors = []
     with pw.sync_playwright() as p:

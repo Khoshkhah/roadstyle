@@ -16,6 +16,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `rsSetTunnelStyle({toward})`, `RS_TUNNEL_TOWARDS` and a colour list in the Tunnels box.
 
 ### Changed
+- **`simple=True` is the default** for every web map (`render_edges`, the dashboard, report and street-view pages, the level editor): one road layer, no tunnel / dashed-class dashes, every end round,
+  a blurred bridge shadow. `simple=False` draws the full look. `tiles=True` and `tunnel_control=True` still do not work with simple mode and raise a `ValueError` that says to pass `simple=False`;
+  the command line (`--tiles`) and the Studio (vector tiles) do that themselves. In the level editor the square and flat end caps are not drawn (every end is round).
 - **One tunnel slider for every colour**: the steps 0, 25, 50, 55, 60, 65, 70, 75, 100, and `tunnel_strength` defaults to 60 (was 35), and the default target is Sand (was slate), so the default tunnel look changes.
 - **The level editor does not solve for a head change the solver does not see:** the solver takes from the heads only which main parts are empty and which parts of an upper road cross the road under it (`levels.solver_sees`, one helper for `solve_levels` and the editor); when both are as before, the heads are saved and drawn and the levels stay ("not solved again").
 

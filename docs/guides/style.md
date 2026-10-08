@@ -79,7 +79,7 @@ rs.render_edges(edges, view_3d=True)                         # CLI: --view-3d
 
 ![Bridges in 3D](../img/gallery/bridges_3d.jpg)
 
-In 2D a bridge has a slate casing and a soft shadow; a tunnel fades toward slate and has a dashed casing
+In 2D a bridge has a slate casing and a soft shadow; a tunnel fades toward a chosen colour (with `simple=False` it also has a dashed casing)
 ([Which road is on top](levels.md#bridges-and-tunnels)).
 
 ## Keep or drop road classes
