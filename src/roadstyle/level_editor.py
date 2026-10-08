@@ -328,10 +328,12 @@ def _row(body):
 
 def _directions(r):
     """A road's directions for the panel: each edge id with its edge_ref (``edge_refs`` / ``reversed_refs`` of roads.parquet: an area
-    made before 2026-10-08 has only the road's own ``edge_ref``, its other direction's is None) and ``way``: "along" the road or "against"."""
+    made before 2026-10-08 has only the road's own ``edge_ref``, the one of its first edge, the road's id; the others' are None) and ``way``:
+    "along" the road or "against"."""
     out = []
     for way, ids, refs in (("along", r["edges"], r.get("edge_refs")), ("against", r["reversed"], r.get("reversed_refs"))):
-        refs = list(refs) if refs is not None and not (isinstance(refs, float) and refs != refs) else [None] * len(ids)
+        if refs is None or (isinstance(refs, float) and refs != refs):
+            refs = [r.get("edge_ref") if str(e) == str(r["road"]) else None for e in ids]
         out += [{"edge": str(e), "edge_ref": _txt(x), "way": way} for e, x in zip(ids, refs, strict=True)]
     return out
 
