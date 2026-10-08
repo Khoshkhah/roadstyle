@@ -2257,6 +2257,25 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
         area.apply([{"op": "head", "road": "12", "end": "start", "m": str(L)}, {"op": "head", "road": "12", "end": "end", "m": "1"}])
 
 
+def test_the_editor_does_not_solve_for_heads_the_solver_does_not_see(tmp_path, monkeypatch):
+    """A head change that leaves the empty mains and the near parts as they were is saved and drawn without a solve; one that empties a main part solves."""
+    pytest.importorskip("scipy")
+    from roadstyle import level_editor
+    from roadstyle.level_area import make_area
+    from roadstyle.level_editor import Area
+    make_area(_edge_world(), tmp_path)
+    area = Area(tmp_path)
+    solved = area.solved
+    with monkeypatch.context() as m:
+        m.setattr(level_editor, "solve_local", lambda *a, **k: pytest.fail("solved"))
+        area.apply([{"op": "head", "road": "12", "end": "end", "m": "12.5"}])
+    assert area.said == "not solved again (the heads change nothing the solver sees)" and area.solved is solved
+    assert (tmp_path / "heads.csv").read_text().split() == ["road,start_m,end_m", "12,,12.5"] and area.facts["12"]["heads"][1] == 12.5
+    L = area.facts["12"]["length_m"]
+    area.apply([{"op": "head", "road": "12", "end": "start", "m": str(L)}, {"op": "head", "road": "12", "end": "end", "m": "0.049"}])   # the heads cover the road
+    assert area.said.startswith(("solved", "re-solved")) and area.solved is not solved                        # its main part has no length
+
+
 def test_the_editor_re_solves_only_the_roads_around_a_change():
     """level_area.solve_local (the editor's Apply): the roads around a change are solved again with the same rules, every other road keeps its
     numbers; a local result that breaks what the previous one kept is not used: the whole area is solved, and the result says so and why."""

@@ -19,7 +19,7 @@ import pandas as pd
 import roadstyle as rs
 from roadstyle import render_web
 
-from .level_area import defaults, ends, own, solve, solve_local, write
+from .level_area import defaults, ends, own, solve, solve_local, what_solver_sees, write
 
 COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"]
 
@@ -130,8 +130,14 @@ class Area:
         (start_m, end_m), which tell the solver the empty mains) only if the solver takes them. Only caps changed: no solve. The solve is local
         (level_area.solve_local: the roads around the change, the others as they were), or the whole area when the local result would not do;
         ``said`` tells which, and why."""
-        if edits is None and (heads is None or heads == self.heads):     # only the ends' shapes changed: the levels as they are
-            solved, self.said, self.full = self.solved, "not solved again (only caps)", False
+        same = edits is None and (heads is None or heads == self.heads)
+        if edits is None and not same:                       # only heads changed (caps too): does the solver see a difference?
+            e = self.edits()
+            same = what_solver_sees(self.roads, self.pairs, e if len(e) else None, self.heads, self.caps) == \
+                what_solver_sees(self.roads, self.pairs, e if len(e) else None, heads, self.caps)
+        if same:                                             # only the ends' shapes changed: the levels as they are
+            solved, self.full = self.solved, False
+            self.said = "not solved again (only caps)" if heads is None or heads == self.heads else "not solved again (the heads change nothing the solver sees)"
         else:
             new, hd = self.edits() if edits is None else edits, self.heads if heads is None else heads
             solved = solve_local(self.roads, self.pairs, new if len(new) else None, hd, self.caps, self.solved,

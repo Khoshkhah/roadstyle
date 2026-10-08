@@ -4,6 +4,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- **The level editor does not solve for a head change the solver does not see:** the solver takes from the heads only which main parts are empty and which parts of an upper road cross the road under it (`levels.solver_sees`, one helper for `solve_levels` and the editor); when both are as before, the heads are saved and drawn and the levels stay ("not solved again").
+
 ## [0.17.1] — 2026-10-07
 
 ### Fixed
