@@ -1935,12 +1935,13 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
         base_filters = None
         if ov.edge_col:
             layers, base_filters = [], {}
+            metres = ov.width_m is not None or bool(ov.width_m_col)   # only items with a width in metres join the road layer; a px-wide line keeps its own layer (2026-10-09)
             for pos, order in _edge_overlay(ov, fc, roads, edge_id_col, fcol):
                 flt = ["all", ["==", ["get", "__rs_fl"], pos], ["==", ["get", "__rs_ord"], order]]
                 mine = []
                 for lyr in _overlay_layers(sid, ov, kind, hover_color, select_color, along):
                     lyr = {**lyr, "id": f"{lyr['id']}-lv{pos}-o{order}", "filter": flt}
-                    if fill and kind == "line":     # drawn by the road layer: this one is the pick and shows the hover / select highlight
+                    if fill and kind == "line" and metres:   # drawn by the road layer: this one is the pick and shows the hover / select highlight
                         on = ["any", ["boolean", ["feature-state", "select"], False], ["boolean", ["feature-state", "hover"], False]]
                         m = lambda prop: ["interpolate", ["exponential", 2], ["zoom"], *[x for z in (0, 22) for x in
                                           (z, ["*", ["get", prop], round(512 * 2 ** z / 40075016.686, 6)])]]   # the item's own metres, exact
@@ -1951,7 +1952,7 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
                     mine.append(lyr)
                 edge.append((pos, order, i, mine))
                 layers += mine
-            if fill and kind == "line":
+            if fill and kind == "line" and metres:
                 items += _item_pieces(ov, i, fc)
         else:
             layers = _overlay_layers(sid, ov, kind, hover_color, select_color, along)

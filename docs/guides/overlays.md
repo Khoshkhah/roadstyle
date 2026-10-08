@@ -49,6 +49,11 @@ rs.render_edges(edges, overlays=[lanes, markings, signs])
 - `edge_col`: the property with the **id of the feature's edge**. The ids are the values of the roads' own id column (`edge_id_col` of `render_edges`, default `edge_id`).
 - `order_col`: the property with a whole number, the **order** of the feature: the lower is drawn first (null is 0). The order is global: it orders the features of different edges at the same position too.
 - `color_col`: a property with a colour per feature.
+- `width_m_col`, `offset_m_col`, `dash_col` (line items, simple mode): each item's own width and side offset in metres (exact at every
+  zoom; offset + = right of the edge's direction) and its dash pattern (in line widths; empty = solid). In simple mode, LINE items attached
+  with `edge_col` and a width in metres are drawn **in the one road layer at their edge's fill position** (in `order_col` order), so a bridge above covers them;
+  an edge that has such items draws no fill of its own: its items are its fill (lanestyle's lanes). At most 38 items per edge: put many
+  marks of one kind into one MultiLineString. `select="item"` selects one item.
 
 Each road is drawn by a casing number and a fill number ([which road is on top](levels.md)). A feature takes the **fill number of its edge**. In each position the layers are: the casings, the fills,
 the edge overlays by order, the one-way arrows, the street names. So a sign is over its own road and under every road that passes above it. `placement` is not used for such an overlay.

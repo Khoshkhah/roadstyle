@@ -4,6 +4,23 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.19.0] — 2026-10-09
+
+Lane items in the fill's place: line items attached to an edge are drawn in the one road layer at their edge's position, each with its own width in metres; the level editor's bus mode.
+
+### Added
+- **Line items at their edge's fill position (simple mode).** `Overlay(edge_col=..., order_col=...)` LINE items go into the one ordered
+  road layer at their edge's fill position, in order, so a bridge above covers them; an edge that has items draws no fill of its own (its
+  items are its fill). Per item: `width_m_col` (metres, exact at every zoom: the layer's width and offset curves are base-2 exponential up
+  to zoom 22 on a page with items), `offset_m_col` (metres, + = right), `dash_col`, flat ends; `select="item"` selects one item (picked by its
+  own width). At most 38 items per edge (a clear error beyond). Shape and point overlays as before; the full look unchanged.
+- **The level editor's bus mode:** a *bus* mode box (a bus line runs on the road, duckOSM `bus.route_edges`) and the road's **bus lines**
+  in its card (`bus_lines`, merged over both directions by `level_input`).
+
+### Known
+- An overlay's own show/hide switch, `rsFilter(ids, label)` and `rsColor(ids, color, label)` do not yet reach items drawn in the road
+  layer; the level editor's in-place update does not rebuild items; a selected item's highlight is drawn above all roads.
+
 ## [0.18.1] — 2026-10-09
 
 One-way arrows only on cars' one-ways, the same rule in every page, tiles and the level editor; empty DuckDB columns no longer crash.
