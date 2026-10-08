@@ -372,6 +372,8 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   function showRel(rows, n){
     pairRows = n === 2 ? rows : [];
     $("lv-rel-sec").hidden = false;
+    const cards = $("lv-cards").closest("section");          // two roads: the rules between them first, above the two (tall) road cards; one road: under its card
+    if(n === 2) cards.before($("lv-rel-sec")); else cards.after($("lv-rel-sec"));
     $("lv-rel-title").textContent = n === 2 ? "Between these two roads" : "Everything about this road";
     const box = $("lv-rel"); box.innerHTML = "";
     const all = n === 2 ? rows.filter(r => r.section === "found" && (r.relation === "stack" || r.relation === "near") && !isOff(r, rows) && !queued(r)) : [];
