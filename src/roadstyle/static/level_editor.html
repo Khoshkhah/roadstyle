@@ -127,11 +127,11 @@ body.lv-open #lv-busy{right:var(--lv-w)}
       <div class="ends" id="lv-top" style="grid-template-columns:1fr"><div><label>on top</label><div class="seg" id="lv-top-seg"></div></div></div>
       <div class="desc" id="lv-desc"></div>
       <div class="ends" id="lv-ends" hidden>
-        <div><label><span class="num" style="--c:var(--lv-r1)">1</span> end of road 1</label><div class="seg" data-e="1"><button data-v="start" class="on">start</button><button data-v="end">end</button></div></div>
-        <div><label><span class="num" style="--c:var(--lv-r2)">2</span> end of road 2</label><div class="seg" data-e="2"><button data-v="start" class="on">start</button><button data-v="end">end</button></div></div>
+        <div><label><span class="num" style="--c:var(--lv-r1)">1</span> end of road 1</label><div class="seg" data-e="1"><button data-v="start" class="on">start <span class="mk" style="color:var(--lv-r1)">●</span></button><button data-v="end">end <span class="mk" style="color:var(--lv-r1)">○</span></button></div></div>
+        <div><label><span class="num" style="--c:var(--lv-r2)">2</span> end of road 2</label><div class="seg" data-e="2"><button data-v="start" class="on">start <span class="mk" style="color:var(--lv-r2)">●</span></button><button data-v="end">end <span class="mk" style="color:var(--lv-r2)">○</span></button></div></div>
       </div>
       <div class="ends" id="lv-part" hidden style="grid-template-columns:1fr">
-        <div><label>which parts of the upper road's casing (one row each)</label><div class="seg"><button data-v="all" title="All three parts: three rows">whole road</button><button data-v="start">start head</button><button data-v="main" class="on">main</button><button data-v="end">end head</button></div></div>
+        <div><label>which parts of the upper road's casing (one row each)</label><div class="seg"><button data-v="all" title="All three parts: three rows">whole road</button><button data-v="start">start head <span class="mk">●</span></button><button data-v="main" class="on">main</button><button data-v="end">end head <span class="mk">○</span></button></div></div>
       </div>
       <button class="go" id="lv-add">Add to the list</button>
     </section>
@@ -164,7 +164,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   if(/"said":/.test(sessionStorage.getItem("lv-view") || "")){                 // the page again after an apply: covered until drawn at your view
     $("lv-busy").classList.add("solid"); $("lv-busy").hidden = false; $("lv-busy-t").textContent = "Drawing the new map …"; }
   let queue = []; try { queue = JSON.parse(sessionStorage.getItem("lv-queue") || "[]"); } catch(e){}     // the changes waiting to be applied
-  const PART = {start: "start head", main: "main", end: "end head"};
+  const PART = {start: "start head", main: "main", end: "end head"}, END = {start: "●", end: "○"};
   const SRC = {found: ["found", "var(--lv-found)", "found in pairs.csv"], saved: ["saved", "var(--lv-saved)", "already in edits.csv"],
                new: ["new", "var(--lv-new)", "added now"]};
   const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
@@ -172,6 +172,8 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   const ref = r => (facts[r] || {}).edge_ref || r;
   const badge = r => { const k = sel.indexOf(r); return k >= 0 ? `<span class="num" style="--c:${C[k]}">${k + 1}</span>` : ""; };
   const who = r => `${badge(r)}${esc(name(r))}`;
+  const mk = (end, r) => { const k = sel.indexOf(r);           // a road's end as the map marks it (lv-ends): ● start, ○ end, in the picked road's colour
+    return end === "start" || end === "end" ? ` <span class="mk"${k >= 0 ? ` style="color:${C[k]}"` : ""}>${end === "start" ? "●" : "○"}</span>` : ""; };
   // --- the panel: open / closed, the map beside it
   document.body.classList.add("lv-open");
   const resize = () => setTimeout(() => map.resize(), 220);
@@ -304,8 +306,8 @@ body.lv-open #lv-busy{right:var(--lv-w)}
         <div><small>end</small><b>${L[2]}</b></div><div><small>fill</small><b>${L[3]}</b></div></div></div>`;
   }
   function relText(r){
-    if(r.relation === "meet") return `${who(r.ra)} <small>${esc(r.a_end)}</small> = ${who(r.rb)} <small>${esc(r.b_end)}</small>`;
-    if(r.relation === "stack" || r.relation === "near") return `${who(r.ra)} <small>${esc(PART[r.a_end] || r.a_end)}</small> over ${who(r.rb)}${r.relation === "near" ? " <small>(near only)</small>" : ""}`;
+    if(r.relation === "meet") return `${who(r.ra)} <small>${esc(r.a_end)}${mk(r.a_end, r.ra)}</small> = ${who(r.rb)} <small>${esc(r.b_end)}${mk(r.b_end, r.rb)}</small>`;
+    if(r.relation === "stack" || r.relation === "near") return `${who(r.ra)} <small>${esc(PART[r.a_end] || r.a_end)}${mk(r.a_end, r.ra)}</small> over ${who(r.rb)}${r.relation === "near" ? " <small>(near only)</small>" : ""}`;
     return `${who(r.ra)} after ${who(r.rb)}`;
   }
   function rowHtml(r){
@@ -412,6 +414,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     $("lv-top-seg").innerHTML = sel.map((r, k) => `<button class="${k === top ? "on" : ""}" data-v="${k}">${who(r)}</button>`).join("");
     $("lv-top-seg").querySelectorAll("button").forEach(x => x.onclick = () => { top = +x.dataset.v; describe(); });
     $("lv-ends").hidden = kind !== "meet"; $("lv-part").hidden = kind !== "stack";
+    document.querySelectorAll("#lv-part .mk").forEach(m => m.style.color = top == null ? "" : C[top]);     // the upper road's colour, as on the map
     $("lv-add").disabled = (kind !== "meet" && top == null) || (kind === "stack" && !parts.size);
     if(kind !== "meet" && top == null){ $("lv-desc").innerHTML = `<div class="warn">Choose which road is on top.</div>`; return; }
     const [a, b] = kind === "meet" ? sel : [sel[top], sel[1 - top]];
@@ -440,8 +443,8 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     rows.forEach(body => stage({op: "add", body}));
   };
   // --- the changes wait in a list (kept over a reload of the page) until Apply: then one solve, and the page again with the same view
-  const plain = b => `${b.enabled === "false" ? "switch off: " : ""}${name(b.a)} ${b.relation === "meet" ? `(${b.a_end}) = ${name(b.b)} (${b.b_end})`
-    : b.relation === "stack" || b.relation === "near" ? `(${PART[b.a_end] || b.a_end}) over ${name(b.b)}${b.relation === "near" ? " (near only)" : ""}` : `after ${name(b.b)}`}`;
+  const plain = b => `${b.enabled === "false" ? "switch off: " : ""}${name(b.a)} ${b.relation === "meet" ? `(${b.a_end} ${END[b.a_end]}) = ${name(b.b)} (${b.b_end} ${END[b.b_end]})`
+    : b.relation === "stack" || b.relation === "near" ? `(${PART[b.a_end] || b.a_end}${END[b.a_end] ? " " + END[b.a_end] : ""}) over ${name(b.b)}${b.relation === "near" ? " (near only)" : ""}` : `after ${name(b.b)}`}`;
   const payload = q => q.op === "cap" ? {op: "cap", road: q.road, end: q.end, cap: q.cap} : q.op === "head" ? {op: "head", road: q.road, end: q.end, m: q.m}
     : q.op === "delete" ? {op: "delete", index: q.index, row: q.raw} : {op: "add", body: q.body};     // a change as the server takes it
   function stage(q){
@@ -498,7 +501,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
       if(!rows.length){ box.className = ""; box.innerHTML = `<div class="empty" style="padding:8px">${none}</div>`; return; }
       box.className = "rows";
       box.innerHTML = rows.map(r => {
-        const part = (n, i) => `<b class="${r.parts.includes(n) ? cls : ""}" title="${n} casing ${r.levels[i]}">${n} ${r.levels[i]}</b>`;
+        const part = (n, i) => `<b class="${r.parts.includes(n) ? cls : ""}" title="${n} casing ${r.levels[i]}">${n}${mk(n, r.a)} ${r.levels[i]}</b>`;
         return `<div class="row" title="Show on the map"><span class="what"><div class="txt">${esc(name(r.a))} <small>${esc(ref(r.a))}</small>
           over ${esc(name(r.b))} <small>${esc(ref(r.b))}</small>${r.fill_under && cls === "bad" ? ` <span class="tag" style="--c:var(--lv-bad)">fill under too</span>` : ""}</div>
           <div class="gu-parts">A ${["start", "main", "end"].map(part).join("")} <b>fill ${r.levels[3]}</b> &nbsp;·&nbsp; B fill <b>${r.b_fill}</b></div></span></div>`;
