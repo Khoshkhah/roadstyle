@@ -3711,6 +3711,8 @@ def _crossing_with_lanes(n=3, **kw):
     a, b = LineString([(18.060, 59.315), (18.064, 59.315)]), LineString([(18.062, 59.3135), (18.062, 59.3165)])
     roads = gpd.GeoDataFrame({"edge_id": [1, 2], "highway": ["residential"] * 2, "bridge": ["no", "yes"], "layer": [0, 1],
                               "oneway": ["yes", "yes"]}, geometry=[a, b], crs=4326)
+    if not n:
+        return render_edges(roads, backend="web", **kw)
     lanes = gpd.GeoDataFrame([{"edge_id": e, "order": k, "w": 3.25, "off": k * 3.0, "c": "#00ff00", "geometry": g}
                               for e, g in ((1, a), (2, b)) for k in range(n)], crs=4326)
     ov = Overlay(lanes, edge_col="edge_id", order_col="order", color_col="c", width_m_col="w", offset_m_col="off")
@@ -3721,11 +3723,14 @@ def test_line_items_are_pieces_of_the_one_road_layer_at_their_edge_fill():
     """2026-10-09: in simple mode the line items attached to edges are drawn in the road layer at their edge's fill, by order: the lower road's
     lanes stay under the bridge's casing, each edge's items above its fill; road_fill=False hides the fills, not the items."""
     st = _style(_crossing_with_lanes(road_fill=False).html)
+    plain = _style(_crossing_with_lanes(n=0).html)["sources"]["simple"]["data"]["features"]
+    assert sum(f["properties"]["__rs_k"] == 1 for f in plain) == 2      # no items: both edges keep their fill
     fs = st["sources"]["simple"]["data"]["features"]
     key = lambda e, k: sorted(f["properties"]["__rs_s"] for f in fs if f["properties"]["__rs_edge"] == e and f["properties"]["__rs_k"] == k)
     lo, hi = (min(f["properties"]["__rs_edge"] for f in fs), max(f["properties"]["__rs_edge"] for f in fs))
     assert len(key(lo, 5)) == len(key(hi, 5)) == 3
-    assert max(key(lo, 1)) < min(key(lo, 5)) and max(key(lo, 5)) < min(key(hi, 0)) < max(key(hi, 1)) < min(key(hi, 5))
+    assert not key(lo, 1) and not key(hi, 1)          # an edge with items draws no fill of its own
+    assert max(key(lo, 5)) < min(key(hi, 0)) < min(key(hi, 5))
     item = next(f["properties"] for f in fs if f["properties"]["__rs_k"] == 5)
     assert item["__rs_ic"] == "#00ff00" and item["__rs_iwm"] > 3.25 and "lvl" in item and "__rs_cls" in item
     lyr = next(l for l in st["layers"] if l["id"] == "roads-simple")

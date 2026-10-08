@@ -1978,7 +1978,8 @@ def _simple_pieces(geo, parts, cols, shadows=True, items=()):
     (between two cuts) ends flat and each cut gets its seam (a round dot at the lower number): a round main piece reached past a short head
     into the junction (2026-10-08). An edge with two different ends draws its fill as two halves (:func:`_halves`).
     ``items`` (:func:`_item_pieces`, ``__rs_k`` 5): the line items attached to edges, each at its edge's fill: ``2 * position + 1`` plus
-    _ITEM_STEP per rank on its edge (by order, overlay, feature), above every fill of the position and under the next casings (see _ITEM_STEP)."""
+    _ITEM_STEP per rank on its edge (by order, overlay, feature), above every fill of the position and under the next casings (see _ITEM_STEP).
+    An edge with items has no fill piece (left out, so rsSetRoadFill and a view's road_fill cannot bring it back): its items are its fill."""
     keep = {c for c in cols if c} | {"lvl"}
     halves = collections.defaultdict(list)
     for h in _halves(geo):
@@ -1996,9 +1997,10 @@ def _simple_pieces(geo, parts, cols, shadows=True, items=()):
             out.append({"type": "Feature", "geometry": q["geometry"], "properties": {**p, "__rs_k": 4, "__rs_s": k + 0.1}})
         else:
             out.append({"type": "Feature", "geometry": q["geometry"], "properties": {**p, "__rs_k": 0, "__rs_s": k}})
+    itemed = {f["properties"]["__rs_edge"] for f in items}     # an edge with items draws no fill of its own: its items are its fill (2026-10-09)
     for i, ft in enumerate(geo["features"]):
         p = ft["properties"]
-        if p.get("__rs_dup"):
+        if p.get("__rs_dup") or p.get("__rs_edge", i) in itemed:
             continue
         for g, p in ([(h["geometry"], h["properties"]) for h in halves[p.get("__rs_edge", i)]] if p.get("__rs_split") else [(ft["geometry"], p)]):
             out.append({"type": "Feature", "geometry": g,
