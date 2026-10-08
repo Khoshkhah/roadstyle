@@ -21,6 +21,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   (the roads source its index, as `generateId` gave; a piece `16 * edge + k`).
 - **A local re-solve keeps the untouched roads' numbers exactly** (`level_area.solve_local`): the result is shifted back when the solver's ground
   moved, so the editor's update in place sees only the roads that really moved (fixed roads that moved by different amounts: an error).
+- **Simple mode's line-sort-key has a per-edge tie-breaker** (`+ edge * 1e-8`, under the smallest key step of 0.05; at most 1,000,000 edges, more is
+  an error that says to pass `simple=False`): pieces with the same key are drawn by edge, so a road redrawn in place keeps its place.
 - **The level editor's stack box**: start head / main / end head, several at once, one row each; *whole road* adds all three. *Switch off all found
   stack rows of this pair* (one switch-off per row) to override a found stack.
 

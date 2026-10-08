@@ -2931,6 +2931,7 @@ def test_simple_draws_every_road_piece_in_one_layer_in_the_full_order():
     """simple=True: one road line layer (source "simple": the casing pieces as the full look cuts them, then the fills), a transparent roads-fill on the
     roads source for picking, the highlight, one arrow and one name layer; the line-sort-key is 2 * position (a bridge's casing + 0.25), a fill
     2 * position + 1 (a dashed class's - 0.5, before the casings, and no casing); every piece names its edge."""
+    from roadstyle.render_web import _TIE
     kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0)
     full = _style(render_edges(_simple_world(), simple=False, **kw).html)
     html = render_edges(_simple_world(), **kw).html
@@ -2948,13 +2949,13 @@ def test_simple_draws_every_road_piece_in_one_layer_in_the_full_order():
                    if not (p.get("__rs_seam") and p["__rs_edge"] == 0) and p["__rs_edge"] != 2]
     assert [c[:2] for c in casings] == full_pieces
     assert [c[:2] for c in casings if c[0] == 0] == [(0, -1), (0, 0), (0, -2)] and {c[:2] for c in casings if c[0] == 1} == {(1, 0), (1, 1), (1, 2)}
-    assert [c[2] for c in casings] == [2 * c[1] + (0.25 if c[0] == 1 else 0) for c in casings]
+    assert [c[2] for c in casings] == [2 * c[1] + (0.25 if c[0] == 1 else 0) + c[0] * _TIE for c in casings]     # + the edge's tie-breaker
     fills = [(p["__rs_edge"], p["__rs_s"]) for p in feats if p["__rs_k"] == 1]
-    assert fills == [(0, 1), (1, 5), (2, 1.5)]
+    assert fills == [(0, 1), (1, 5 + _TIE), (2, 1.5 + 2 * _TIE)]
     assert all(max(c[2] for c in casings if c[0] == e) < s for e, s in fills if e != 2)      # an edge's fill over its own casing
     # the bridge's shadow: one copy of its main casing piece, just under it, with every piece's labels; blurred, wider than the casing
     shadows = [p for p in feats if p["__rs_k"] == 2]
-    assert [(p["__rs_edge"], p["__rs_cl"], p["__rs_s"]) for p in shadows] == [(1, 1, 2.15)] and "__rs_cls" in shadows[0]
+    assert [(p["__rs_edge"], p["__rs_cl"], p["__rs_s"]) for p in shadows] == [(1, 1, 2.15 + _TIE)] and "__rs_cls" in shadows[0]
     paint = lines[0]["paint"]
     # both bridge additions grow with the zoom: none at 14 and below, full at 17 and above (zoom at the top, the cases inside)
     assert paint["line-blur"][:3] == ["interpolate", ["linear"], ["zoom"]] and paint["line-blur"][3:5] == [14, 0] and paint["line-blur"][5] == 17 and paint["line-blur"][6][0] == "case"
@@ -2997,6 +2998,22 @@ def test_simple_refuses_tiles():
 def test_simple_has_the_tunnels_box_with_the_palette_and_dash_selects():
     html = render_edges(_edge_world(), backend="web", basemap="blank", tunnel_control=True).html
     assert '"control": true' in html and "TUNNEL.simple" not in html and "rsSetTunnelStyle=function" in html
+
+
+def test_simple_same_key_pieces_keep_their_order_after_an_update_in_place():
+    """Two roads at one position have pieces with the same base key; MapLibre draws equal keys in feature order, and updateData puts a
+    redrawn road's pieces last. The per-edge tie-breaker (2026-10-08) makes the order the same as in the whole page built again."""
+    d = 0.001
+    g = gpd.GeoDataFrame({"highway": ["residential", "residential"]},
+                         geometry=[LineString([(18, 59), (18 + d, 59)]), LineString([(18 + d / 2, 58.999), (18 + d / 2, 59.001)])], crs=4326)
+    order = lambda fs: [(f["properties"]["__rs_edge"], f["properties"]["__rs_k"]) for f in sorted(fs, key=lambda f: f["properties"]["__rs_s"])]  # noqa: E731 - stable, as MapLibre
+    page = _style(render_edges(g, backend="web").html)["sources"]["simple"]["data"]["features"]
+    new = render_edges(g, backend="web", _edges=[0])["simple"]                                          # road 0 redrawn in place:
+    patched = [f for f in page if f["properties"]["__rs_edge"] != 0] + new                              # updateData puts it last
+    assert len({f["properties"]["__rs_s"] for f in page}) == len(page) and order(patched) == order(page)
+    with pytest.raises(ValueError, match="more than 1,000,000 edges"):
+        from roadstyle.render_web import _simple_pieces
+        _simple_pieces({"features": []}, [{"geometry": None, "properties": {"__rs_cl": 0, "__rs_cs": 0, "__rs_ce": 0, "__rs_edge": 1_000_000}}], ())
 
 
 def test_simple_tunnel_casing_is_a_gap_piece_and_a_dash_piece():

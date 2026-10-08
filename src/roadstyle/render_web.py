@@ -1757,11 +1757,17 @@ def _simple_pieces(geo, parts, cols, shadows=True):
         e = f["properties"]["__rs_edge"]
         if n[e] == _PIECES:
             raise ValueError(f"simple=True: edge {e} has more than {_PIECES} pieces")
+        if e >= _MAX_EDGES:
+            raise ValueError(f"simple=True: more than {_MAX_EDGES:,} edges; the line-sort-key's tie-breaker would reach the next key step (pass simple=False)")
         f["id"], n[e] = e * _PIECES + n[e], n[e] + 1
+        f["properties"]["__rs_s"] += e * _TIE   # same key: by edge, not by feature order, so a road redrawn in place (updateData) keeps its place
     return {"type": "FeatureCollection", "features": out}
 
 
 _PIECES = 16        # the most pieces of one edge in simple mode: 3 casing pieces and 2 seams, each with a shadow or a second tunnel piece, 2 fill halves
+# the line-sort-key's tie-breaker per edge (2026-10-08): keys differ by at least 0.05 (offsets -0.5, -0.1, 0, 0.1, 0.15, 0.25, 1, 1.5 of
+# 2 * position; a painted fill + 0.5), so _MAX_EDGES * _TIE (0.01) never reaches the next key
+_TIE, _MAX_EDGES = 1e-8, 1_000_000
 
 
 def _edge_features(geo, edges, head_m, cols, fcol, slots):
