@@ -2313,6 +2313,25 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
         area.apply([{"op": "head", "road": "12", "end": "start", "m": str(L)}, {"op": "head", "road": "12", "end": "end", "m": "1"}])
 
 
+def test_the_editor_does_not_solve_for_heads_the_solver_does_not_see(tmp_path, monkeypatch):
+    """A head change that leaves the empty mains and the near parts as they were is saved and drawn without a solve; one that empties a main part solves."""
+    pytest.importorskip("scipy")
+    from roadstyle import level_editor
+    from roadstyle.level_area import make_area
+    from roadstyle.level_editor import Area
+    make_area(_edge_world(), tmp_path)
+    area = Area(tmp_path)
+    solved = area.solved
+    with monkeypatch.context() as m:
+        m.setattr(level_editor, "solve_local", lambda *a, **k: pytest.fail("solved"))
+        area.apply([{"op": "head", "road": "12", "end": "end", "m": "12.5"}])
+    assert area.said == "not solved again (the heads change nothing the solver sees)" and area.solved is solved
+    assert (tmp_path / "heads.csv").read_text().split() == ["road,start_m,end_m", "12,,12.5"] and area.facts["12"]["heads"][1] == 12.5
+    L = area.facts["12"]["length_m"]
+    area.apply([{"op": "head", "road": "12", "end": "start", "m": str(L)}, {"op": "head", "road": "12", "end": "end", "m": "0.049"}])   # the heads cover the road
+    assert area.said.startswith(("solved", "re-solved")) and area.solved is not solved                        # its main part has no length
+
+
 def test_the_editor_re_solves_only_the_roads_around_a_change():
     """level_area.solve_local (the editor's Apply): the roads around a change are solved again with the same rules, every other road keeps its
     numbers; a local result that breaks what the previous one kept is not used: the whole area is solved, and the result says so and why."""
@@ -2873,6 +2892,17 @@ def test_simple_draws_every_road_piece_in_one_layer_in_the_full_order():
     w = paint["line-width"][4]                                       # the first zoom stop: shadow, bridge casing, ... cases
     assert w[0] == "case" and w[1] == ["==", ["get", "__rs_k"], 2]
     assert "const RS_SIMPLE = " in html and "_applyFill=function" in html
+
+
+def test_simple_tunnels_move_toward_the_chosen_tunnel_colour():
+    """A tunnel in simple mode takes the tunnel look toward ``tunnel_toward`` at ``tunnel_strength`` from the start, as the full look
+    (it moved toward slate until the page recoloured, 2026-10-08)."""
+    kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0, simple=True)
+    color = json.dumps(next(l for l in _style(render_edges(_simple_world(), **kw).html)["layers"] if l["id"] == "roads-simple")["paint"]["line-color"])
+    assert '100, "#d6cfc4"' in color and '100, "#64748b"' not in color and "60.0" in color      # Sand at 60, the defaults (slate: only the bridge casing)
+    navy = render_edges(_simple_world(), settings={"config": {"tunnel_toward": "Navy", "tunnel_strength": 75}}, **kw).html
+    color = json.dumps(next(l for l in _style(navy)["layers"] if l["id"] == "roads-simple")["paint"]["line-color"])
+    assert '"#1e293b"' in color and "75.0" in color
 
 
 def test_simple_false_leaves_the_page_as_it_was():

@@ -144,6 +144,17 @@ def solve(roads, pairs, edits, heads, caps, auto=False, **kw):
     return solved, ends(base, heads, caps), base
 
 
+def what_solver_sees(roads, pairs, edits, heads, caps):
+    """The empty main parts and the near parts the solver gets for these heads (levels.solver_sees, as ``solve`` passes them): two heads
+    tables with the same answer solve to the same numbers."""
+    import roadstyle as rs
+    from .levels import merged_relations, solver_sees
+
+    first = ends(defaults(roads), heads, caps)
+    empty, near = solver_sees(roads, merged_relations(roads, pairs, edits)[0], rs.casing_parts(roads, 5.0, first[["road", "start_m", "end_m"]]))
+    return sorted(empty), sorted(near)
+
+
 HOPS = 3        # the local re-solve frees the changed roads and their neighbours this many relations away (see resolve)
 LEVELS = ["casing_start", "casing_level", "casing_end", "fill_level"]
 

@@ -17,6 +17,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Changed
 - **One tunnel slider for every colour**: the steps 0, 25, 50, 55, 60, 65, 70, 75, 100, and `tunnel_strength` defaults to 60 (was 35), and the default target is Sand (was slate), so the default tunnel look changes.
+- **The level editor does not solve for a head change the solver does not see:** the solver takes from the heads only which main parts are empty and which parts of an upper road cross the road under it (`levels.solver_sees`, one helper for `solve_levels` and the editor); when both are as before, the heads are saved and drawn and the levels stay ("not solved again").
 
 ## [0.17.1] — 2026-10-07
 

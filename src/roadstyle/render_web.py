@@ -1728,13 +1728,13 @@ def _simple_pieces(geo, parts, cols, shadows=True):
 
 def _simple_color(bridge_color, tunnels=False):
     """Simple mode's line-color: a bridge shadow ``bridge_shadow_color``, a casing piece its casing colour (a bridge's ``bridge_color``), a fill its fill; on a map with
-    ``tunnels`` a tunnel's casing and fill both take the tunnel look (_tun_mix toward the tunnel slate at ``tunnel_strength``). The page
+    ``tunnels`` a tunnel's casing and fill both take the tunnel look (_tun_mix toward ``tunnel_toward`` at ``tunnel_strength``). The page
     builds the same again on every recolouring (the simple-mode script)."""
     c, b = ["==", ["get", "__rs_k"], 0], ["to-boolean", ["get", "__rs_bridge"]]
     base, fill = ["coalesce", ["get", "__rs_casing"], "#000000"], ["coalesce", ["get", "__rs_fill"], "#888888"]
     if tunnels:
-        s = float(CONFIG.tunnel_strength)
-        base, fill = _tun_mix(base, _TUN_TO["fill"], s), _tun_mix(fill, _TUN_TO["fill"], s)
+        to, _, s = _tun_settings()                             # the chosen tunnel colour (tunnel_toward), as the full look and the page's _simpleColor
+        base, fill = _tun_mix(base, to, s), _tun_mix(fill, to, s)
     return ["case", ["==", ["get", "__rs_k"], 2], CONFIG.bridge_shadow_color, c, ["case", b, bridge_color, base], fill]
 
 

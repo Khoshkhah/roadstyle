@@ -67,6 +67,7 @@ pick a second one to see every pair between the two.
 - **Each end of a road**: its cap (*round*, *square*, *flat*) and its head length (a slider, in metres).
 - Changes wait in a list until **Apply and solve**: they are solved together, and the map reloads with the new numbers.
   If the solver refuses them, nothing is saved.
+  A change of caps, or of heads that leaves the solver's inputs as they were (no main part becomes empty, no part starts or stops crossing the road under it), is saved and drawn without a solve.
 - **Show only some modes**: when the roads have a `modes` column (who may use them, e.g. `driving + walking`; duckOSM gives it), boxes
   under the search show only the roads of the ticked modes (display only: every road is still solved). A road's card shows its modes.
 - The **Issues** tab lists what to look at: **given up** (red: a real crossing the solver could not keep, a flaw on the map),
