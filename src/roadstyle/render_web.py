@@ -1718,7 +1718,7 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
 
 
 def _simple_pieces(geo, parts, cols, shadows=True):
-    """The features of simple mode's one road layer: every casing piece (``__rs_k`` 0; the heads as ``_casing_parts`` cuts them, no seams) and every fill
+    """The features of simple mode's one road layer: every casing piece (``__rs_k`` 0; the heads and seams as ``_casing_parts`` cuts them) and every fill
     (``__rs_k`` 1), with ``__rs_s``, the line-sort-key: ``2 * position``, a bridge's casing a quarter more (the full look draws it after the other
     casings of its position), a fill ``2 * position + 1``. A dashed class has no casing and its fill comes before the casings of its position
     (``2 * position - 0.5``), as in the full look. A fill keeps only what the layer reads (``cols``, ``lvl``, ``__rs_*``).
@@ -1726,8 +1726,9 @@ def _simple_pieces(geo, parts, cols, shadows=True):
     less); the heads, where the bridge comes down to the road, have none.
     A tunnel's casing (docs/design/tunnel_look.md) is two pieces instead of one, as the full look's two layers: the gap colour (``__rs_k`` 3, at the
     casing's key) and the dashes on top (``__rs_k`` 4, 0.1 more, still under the fill).
-    Ends: the layer reads ``__rs_cap`` per piece (line-cap: none round, True flat, "square" square). A casing's main piece (between two cuts) is
-    round, as it was: the full look's flat main piece needs its seams. An edge with two different ends draws its fill as two halves (:func:`_halves`)."""
+    Ends: the layer reads ``__rs_cap`` per piece (line-cap: none round, True flat, "square" square). As in the full look, a casing's main piece
+    (between two cuts) ends flat and each cut gets its seam (a round dot at the lower number): a round main piece reached past a short head
+    into the junction (2026-10-08). An edge with two different ends draws its fill as two halves (:func:`_halves`)."""
     keep = {c for c in cols if c} | {"lvl"}
     halves = collections.defaultdict(list)
     for h in _halves(geo):
@@ -1735,10 +1736,8 @@ def _simple_pieces(geo, parts, cols, shadows=True):
     out = []
     for q in parts:
         p = q["properties"]
-        if p.get("__rs_seam") or p.get("__rs_dash"):
+        if p.get("__rs_dash") or (p.get("__rs_seam") and p.get("__rs_tunnel")):     # a tunnel's casing is its dashes alone, no seam dots
             continue
-        if p.get("__rs_main"):
-            p = {k: v for k, v in p.items() if k != "__rs_cap"}
         k = 2 * p["__rs_cl"] + (0.25 if p.get("__rs_bridge") else 0)
         if shadows and p.get("__rs_bridge") and (p.get("__rs_main") or p["__rs_cs"] == p["__rs_cl"] == p["__rs_ce"]):
             out.append({"type": "Feature", "geometry": q["geometry"], "properties": {**p, "__rs_k": 2, "__rs_s": k - 0.1}})

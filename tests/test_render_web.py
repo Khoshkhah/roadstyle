@@ -2876,11 +2876,12 @@ def test_simple_draws_every_road_piece_in_one_layer_in_the_full_order():
     feats = [f["properties"] for f in style["sources"]["simple"]["data"]["features"]]
     assert all("__rs_edge" in p and "__rs_cls" in p for p in feats)
     casings = [(p["__rs_edge"], p["__rs_cl"], p["__rs_s"]) for p in feats if p["__rs_k"] in (0, 3)]     # a tunnel's casing: its gap piece (3), the dashes (4) on top
-    # the same pieces as the full look's casing source (no seams), the footway none
+    # the same pieces as the full look's casing source, seams too (a tunnel's casing is its dashes alone: no seam dots), the footway none
     full_pieces = [(p["__rs_edge"], p["__rs_cl"]) for p in (f["properties"] for f in full["sources"]["casings"]["data"]["features"])
-                   if not p.get("__rs_seam") and p["__rs_edge"] != 2]
-    assert [c[:2] for c in casings] == full_pieces == [(0, -1), (0, 0), (0, -2), (1, 0), (1, 1), (1, 2)]
-    assert [c[2] for c in casings] == [-2, 0, -4, 0.25, 2.25, 4.25]
+                   if not (p.get("__rs_seam") and p["__rs_edge"] == 0) and p["__rs_edge"] != 2]
+    assert [c[:2] for c in casings] == full_pieces
+    assert [c[:2] for c in casings if c[0] == 0] == [(0, -1), (0, 0), (0, -2)] and {c[:2] for c in casings if c[0] == 1} == {(1, 0), (1, 1), (1, 2)}
+    assert [c[2] for c in casings] == [2 * c[1] + (0.25 if c[0] == 1 else 0) for c in casings]
     fills = [(p["__rs_edge"], p["__rs_s"]) for p in feats if p["__rs_k"] == 1]
     assert fills == [(0, 1), (1, 5), (2, 1.5)]
     assert all(max(c[2] for c in casings if c[0] == e) < s for e, s in fills if e != 2)      # an edge's fill over its own casing
@@ -2971,7 +2972,8 @@ def test_simple_dashed_class_fill_has_the_full_looks_dasharray():
 
 
 def test_simple_line_cap_per_piece_from_the_ends():
-    """cap_col / cap_start_col / cap_end_col in simple mode: ``__rs_cap`` per piece (round none, True flat, "square"); a casing's main piece stays round;
+    """cap_col / cap_start_col / cap_end_col in simple mode: ``__rs_cap`` per piece (round none, True flat, "square"); as in the full look a casing's
+    main piece ends flat with a round seam dot at each cut (a round main piece reached past a short head into the junction, 2026-10-08);
     an edge with two different ends has two fill halves, each with its end's cap, and casing heads with theirs."""
     d = 0.001
     g = gpd.GeoDataFrame({"highway": ["residential"] * 3, "cs": [0, 0, 0], "cm": [0, 0, 0], "ce": [0, 0, 0], "fl": [0, 0, 0],
@@ -2986,7 +2988,8 @@ def test_simple_line_cap_per_piece_from_the_ends():
     fills = [p.get("__rs_cap") for p in feats if p["__rs_k"] == 1]
     assert fills == ["square", True]                                                                # the start half, the end half
     heads = [(p["__rs_cl"], p.get("__rs_cap"), p.get("__rs_main")) for p in feats if p["__rs_k"] == 0]
-    assert heads == [(0, "square", None), (0, None, True), (0, True, None)]                          # head, main (round), head
+    assert heads[:3] == [(0, "square", None), (0, True, True), (0, True, None)]                       # head, main (flat), head
+    assert heads[3:] == [(0, None, None)] * 2 and all(p.get("__rs_seam") for p in feats if p["__rs_k"] == 0 and not p.get("__rs_cap"))   # the two seams, round
 
 
 def test_the_tunnels_box_recolours_the_one_road_layer_in_the_browser(tmp_path):
