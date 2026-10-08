@@ -1009,7 +1009,7 @@ def _tun_mix(expr, toward, s):
     return ["case", ["to-boolean", ["get", "__rs_tunnel"]], ["interpolate", ["linear"], s, 0, expr, 100, toward], expr]
 
 
-def _tunnel_look(layers, edge_ids, s, arrow_color):
+def _tunnel_look(layers, edge_ids, s, arrow_color, to=_TUN_TO):
     """The tunnel look on the finished layer list (docs/design/tunnel_look.md), at slider ``s``: everything on a tunnel (its fill, its street
     names, its arrows, every item attached to it) moves toward the same slate. Its casing is two layers, both 3 px wider than a casing: the
     position's casing layer draws the gap colour (transparent for One colour), the dash layer the dashes on top. Returns
@@ -1019,9 +1019,9 @@ def _tunnel_look(layers, edge_ids, s, arrow_color):
     tun = ["to-boolean", ["get", "__rs_tunnel"]]
     clear = "rgba(0,0,0,0)"
 
-    def mix(l, k, base, to):
-        out.setdefault(l["id"], []).append([k, base, to])
-        l["paint"][k] = _tun_mix(base, _TUN_TO[to], s)
+    def mix(l, k, base, to_key):
+        out.setdefault(l["id"], []).append([k, base, to_key])
+        l["paint"][k] = _tun_mix(base, to[to_key], s)
 
     for l in layers:
         lid = l["id"]
@@ -2494,8 +2494,15 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     if any(ft["properties"].get("__rs_tunnel") for ft in geo["features"]):      # the tunnel look (docs/design/tunnel_look.md)
         if CONFIG.tunnel_palette not in CONFIG.tunnel_palettes:
             raise ValueError(f"tunnel_palette {CONFIG.tunnel_palette!r} is not in tunnel_palettes {list(CONFIG.tunnel_palettes)}")
+        if CONFIG.tunnel_toward not in ("slate", "background"):
+            raise ValueError(f"tunnel_toward {CONFIG.tunnel_toward!r} is not one of 'slate', 'background'")
+        tun_to = _TUN_TO
+        if CONFIG.tunnel_toward == "background":
+            if active_bm.satellite:
+                raise ValueError(f"tunnel_toward='background': base map {active_bm.key!r} is satellite imagery and has no single background colour")
+            tun_to = {**_TUN_TO, "fill": _bg_color(active_bm)}
         tun_paint, tun_dash, tun_casing = _tunnel_look(style["layers"], {l["id"] for _, _, _, grp in edge_layers for l in grp},
-                                           float(CONFIG.tunnel_strength), arw["color"])
+                                           float(CONFIG.tunnel_strength), arw["color"], tun_to)
 
     # road-class filter panel: the distinct classes present, most important first. `filter_col`
     # (optional) drives the filter from a different column than the styling `highway_col` — e.g. a
@@ -2591,6 +2598,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             .replace("__TUNNEL__", json.dumps({"layers": tun_paint, "dash": tun_dash, "casing": tun_casing, "strength": float(CONFIG.tunnel_strength),
                                                "palette": CONFIG.tunnel_palette, "palettes": CONFIG.tunnel_palettes,
                                                "ratio": list(CONFIG.tunnel_casing_dash or [1, 1]), "bg": _bg_color(active_bm),
+                                               "toward": CONFIG.tunnel_toward, "bgs": {b.key: None if b.satellite else _bg_color(b) for b in bms_list},
                                                "to": _TUN_TO, "control": bool(tunnel_control and tun_paint)}))
             .replace("__VIEWS__", json.dumps(view_list))
             .replace("__RS_ROAD_FILL__", json.dumps({"on": bool(road_fill), "paint": fill_paint}))

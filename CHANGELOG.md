@@ -4,6 +4,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **`tunnel_toward="background"`** (default `"slate"`, unchanged): a tunnel moves toward the base map's background colour instead of slate, so it keeps its hue
+  and sinks into the map; follows the base-map switcher. `rsSetTunnelStyle({toward})` and a Slate / Background choice in the Tunnels box.
+  Satellite has no single background colour (error when it starts the page, console warning and slate after a switch).
+
 ## [0.17.1] — 2026-10-07
 
 ### Fixed

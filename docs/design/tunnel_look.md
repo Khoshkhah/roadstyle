@@ -50,6 +50,14 @@ measured on Monaco both take the same time per slider step (about 325 ms headles
 need no image to keep in step (2026-10-06). The street-name and arrow slots carry `__rs_tunnel` from their road; on a map with tunnels the arrow icon is an SDF one, coloured by
 `icon-color` (one symbol layer cannot mix SDF and plain icons). An item gets `__rs_tunnel` from its edge when the overlay is attached (`_edge_overlay`).
 
+## Toward the background (2026-10-08)
+
+`tunnel_toward="background"` (default `"slate"`, the look above unchanged; `rsSetTunnelStyle({toward})`; a Slate / Background choice in the Tunnels box)
+moves everything that moves toward slate toward the current base map's background colour instead (v2's "Pre-Mix"): a motorway tunnel stays orange but
+dimmed, every class keeps its hue. Opaque as before. When the viewer switches the base map the target follows and the expressions are built again.
+A base map's background is its flat colour (`blank`, `blank_dark`); a tiled one has only the neutral canvas colour behind its tiles (light `#e8e6e1`, dark `#0e1113`),
+not the colour of the tiles. Satellite has no single colour: as the starting base map it is an error, and after a switch to it tunnels move toward slate, with a console warning.
+
 ## Limits
 
 - At a high strength a tunnel's name nears its fill colour (everything moves to the same slate); at 100 they are one colour.

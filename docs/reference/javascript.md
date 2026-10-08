@@ -29,7 +29,7 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rsSetBridges(on)` | show / hide every bridge and its 3D deck (the filter panel's *Bridges* row) | `rs:filterchange` |
 | `rsSetTunnels(on)` | show / hide every tunnel, with its street names and arrows (the filter panel's *Tunnels* row) | `rs:filterchange` |
 | `rsSetColorField(nameOrIndex)` | switch the active `color_options` entry | `rs:colorchange` |
-| `rsSetTunnelStyle({strength, palette, ratio})` | move the tunnel look: `strength` 0-100, `palette` a name of `RS_TUNNEL_PALETTES`, `ratio` `[dash, gap]` (any may be left out) | `rs:tunnelchange` |
+| `rsSetTunnelStyle({strength, palette, ratio, toward})` | move the tunnel look: `strength` 0-100, `palette` a name of `RS_TUNNEL_PALETTES`, `ratio` `[dash, gap]`, `toward` `"slate"` or `"background"` (any may be left out; another `toward` throws) | `rs:tunnelchange` |
 | `rsSetView(nameOrIndex)` | apply a `views` entry: each setting it names, through the functions of this table | `rs:viewselect` (and each function's own event) |
 | `rsSetRoadFill(on)` | show / hide the roads' own fill (`road_fill`); the casing stays | `rs:roadfillchange` |
 | `rsSetOverlay(labelOrIndex, on)` | show / hide one overlay | `rs:overlaychange` |
@@ -62,7 +62,7 @@ All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
 | `rs:basemapchange` | `rsSetBasemap` | `basemap` (key), `index` |
 | `rs:overlaychange` | `rsSetOverlay` | `overlay` (label), `visible` |
 | `rs:viewchange` | `rsSetView3D` | `view3d` |
-| `rs:tunnelchange` | `rsSetTunnelStyle` | `strength`, `palette`, `ratio` |
+| `rs:tunnelchange` | `rsSetTunnelStyle` | `strength`, `palette`, `ratio`, `toward` |
 | `rs:viewselect` | `rsSetView` | `view` (name), `index` |
 | `rs:roadfillchange` | `rsSetRoadFill` | `road_fill` |
 | `rs:streetviewchange` | `rsSetStreetView` | `open` |

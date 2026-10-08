@@ -1127,6 +1127,61 @@ def test_the_tunnel_look_is_v2s_slider():
         render_edges(_edge_world(), backend="web", settings={"config": {"tunnel_palette": "Pink"}})
 
 
+def test_the_tunnel_can_move_toward_the_background():
+    """docs/design/tunnel_look.md (2026-10-08): tunnel_toward="background" moves a tunnel toward the base map's background colour instead of slate;
+    satellite has none (an error as the starting base map); an unknown value is an error; "slate" stays the default."""
+    from roadstyle.render_web import _TUN_TO, _tun_mix
+    cfg = lambda **c: {"config": c}
+    slate = _tunnel_conf(render_edges(_edge_world(), backend="web", basemap="blank").html)
+    assert slate["toward"] == "slate"
+    html = render_edges(_edge_world(), backend="web", basemap="blank_dark", basemaps=["blank_dark", "blank", "satellite"],
+                        settings=cfg(tunnel_toward="background")).html
+    conf, lay = _tunnel_conf(html), {l["id"]: l for l in _style(html)["layers"]}
+    assert conf["toward"] == "background" and conf["bgs"] == {"blank_dark": "#14181d", "blank": "#efede8", "satellite": None}
+    for lid, entries in conf["layers"].items():
+        for k, base, to in entries:
+            assert lay[lid]["paint"][k] == _tun_mix(base, "#14181d", 35)
+    with pytest.raises(ValueError, match="slate.*background"):
+        render_edges(_edge_world(), backend="web", basemap="blank", settings=cfg(tunnel_toward="grey"))
+    with pytest.raises(ValueError, match="satellite"):
+        render_edges(_edge_world(), backend="web", basemap="satellite", settings=cfg(tunnel_toward="background"))
+
+
+def test_the_tunnel_target_follows_the_base_map_in_the_browser(tmp_path):
+    """Toward the background in a real page: switching the base map rebuilds the expressions with the new background; rsSetTunnelStyle({toward})
+    switches back to slate; a bad value throws; satellite warns and keeps slate."""
+    pw = pytest.importorskip("playwright.sync_api")
+    path = tmp_path / "toward.html"
+    from roadstyle import compute_levels
+    from roadstyle.render_web import _level_id
+    g = _edge_world()
+    fill = _level_id("roads-fill", int(compute_levels(g).fill_level[1]))
+    render_edges(g, backend="web", basemap="blank_dark", basemaps=["blank_dark", "blank", "satellite"], tunnel_control=True,
+                 settings={"config": {"tunnel_toward": "background"}}).save(path)
+    get = f'() => JSON.stringify(map.getPaintProperty("{fill}", "line-color"))'
+    errors, warns = [], []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("console", lambda m: (errors if m.type == "error" else warns).append(m.text))
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && map.loaded() && document.getElementById('tn-toward')", timeout=30_000)
+        dark = page.evaluate(get)
+        sel = page.evaluate("document.getElementById('tn-toward').value")
+        page.evaluate("rsSetBasemap('blank')")
+        light = page.evaluate(get)
+        page.evaluate("rsSetTunnelStyle({toward: 'slate'})")
+        slate = page.evaluate(get)
+        bad = page.evaluate("() => { try { rsSetTunnelStyle({toward: 'x'}); return ''; } catch(e) { return e.message; } }")
+        page.evaluate("rsSetTunnelStyle({toward: 'background'}); rsSetBasemap('satellite')")
+        sat = page.evaluate(get)
+        browser.close()
+    assert errors == [] and sel == "background"
+    assert "#14181d" in dark and "#efede8" not in dark and "#efede8" in light and "#64748b" in slate and "#64748b" not in light
+    assert "must be" in bad and "#64748b" in sat and any("no single background" in w for w in warns)
+
+
 def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
     """The Tunnels box and rsSetTunnelStyle in a real page: the strength moves every tunnel colour, the casing too. The casing is two layers with
     MapLibre's dash, no image: a palette's gap colour on the position's casing layer (transparent for One colour) and its dash colour on the
@@ -1171,7 +1226,7 @@ def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
     assert "70" in moved["fill"] and moved["pal"] == "Teal + mint" and moved["dash"] == [4, 3] and moved["pattern"] is None
     teal70, mint70 = "#547384", "#76919f"                                                 # #2f6f73, #9fd3cf 70 % toward #64748b (JS rounds .5 up)
     assert moved["dash_color"] == teal70 and mint70 in moved["gap"]
-    assert ev == {"strength": 70, "palette": "Teal + mint", "ratio": [4, 3]}
+    assert ev == {"strength": 70, "palette": "Teal + mint", "ratio": [4, 3], "toward": "slate"}
     assert "__rs_fill__1" in coloured["fill"] and "interpolate" in coloured["fill"]          # Colour by keeps the look
     assert zero["dash_color"] == "#2f6f73" and "#9fd3cf" in zero["gap"]                  # at 0 the palette as it is
     assert one["dash_color"] == "#64748b" and "rgba(0,0,0,0)" in one["gap"]               # One colour at 100: slate dashes, empty gaps
