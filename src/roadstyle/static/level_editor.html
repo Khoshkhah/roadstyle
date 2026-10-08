@@ -106,8 +106,8 @@ body.lv-open #lv-busy{right:var(--lv-w)}
 #lv .btns{display:flex;gap:6px} #lv .btns .go{margin-top:2px}
 #lv-top-seg button{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:5px 8px}
 #lv-toast{position:absolute;left:16px;right:16px;bottom:14px;padding:9px 12px;border-radius:8px;font-size:12.5px;color:#fff;background:var(--lv-ink);
-  box-shadow:0 4px 14px rgba(0,0,0,.18);opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none}
-#lv-toast.show{opacity:1;transform:none} #lv-toast.bad{background:var(--lv-bad)}
+  box-shadow:0 4px 14px rgba(0,0,0,.18);opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;user-select:text}
+#lv-toast.show{opacity:1;transform:none} #lv-toast.bad{background:var(--lv-bad);pointer-events:auto;cursor:pointer}
 </style>
 <aside id="lv">
   <button id="lv-toggle" title="Hide the panel">›</button>
@@ -188,8 +188,10 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     ["given up", STATS.given_up.length], ["near warnings", STATS.near_warnings || 0]].map(([k, v]) => `<span class="stat"${k === "given up" || k === "near warnings" ? ` style="cursor:pointer" title="Show the list" data-gu="1"` : ""}${k === "given up" ? ` id="lv-gu-stat"` : ""}><b>${v}</b> ${k}</span>`).join("");
   document.querySelectorAll("#lv-stats [data-gu]").forEach(e => e.onclick = () => tab("given")); };
   showStats();
-  function toast(t, bad){ const e = $("lv-toast"); e.textContent = t; e.className = "show" + (bad ? " bad" : ""); clearTimeout(e._t);
-    e._t = setTimeout(() => e.className = "", bad ? 6000 : 2600); }
+  // an error stays until clicked (select its text to copy it) and goes to the browser console; a note fades after 4 s (2026-10-08)
+  function toast(t, bad){ const e = $("lv-toast"); e.textContent = bad ? t + "  ✕" : t; e.className = "show" + (bad ? " bad" : ""); clearTimeout(e._t);
+    if(bad){ console.error("level editor:", t); e.onclick = () => { if(!String(getSelection())) e.className = ""; }; }
+    else e._t = setTimeout(() => e.className = "", 4000); }
   async function api(path, body){
     const r = await fetch(path, body ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)} : {});
     const j = await r.json(); if(!r.ok) throw new Error(j.error || r.statusText); return j;
@@ -476,7 +478,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     queue = []; showQueue();
     if(j.update){                                             // the roads that changed, in place: no reload
       try { patch(j.update); busy(null); $("lv-apply").disabled = false;
-        return toast(`${said} · ${j.update.roads.length} road${j.update.roads.length === 1 ? "" : "s"} redrawn in place`, j.full); }
+        return toast(`${said} · ${j.update.roads.length} road${j.update.roads.length === 1 ? "" : "s"} redrawn in place`); }        // a full solve is a note, not an error
       catch(err){ why = `could not redraw in place (${err.message}): the whole page again`; }
     }
     busy("Drawing the new map …");                            // the whole page again, and the status line says why
@@ -546,7 +548,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     const v = JSON.parse(sessionStorage.getItem("lv-view") || "null");
     if(v){ sessionStorage.removeItem("lv-view"); map.jumpTo({center: v.c, zoom: v.z, bearing: v.b, pitch: v.p});
       sel[0] = v.sel[0]; sel[1] = v.sel[1];
-      if(v.said) map.once("idle", () => { busy(null); $("lv-busy").classList.remove("solid"); toast(v.said, v.full); });   // a whole solve instead of the local one: shown longer
+      if(v.said) map.once("idle", () => { busy(null); $("lv-busy").classList.remove("solid"); toast(v.said); });         // a whole solve instead of the local one: a note, not an error
       if(!v.open){ document.body.classList.remove("lv-open"); $("lv-toggle").textContent = "‹"; resize(); } }
     update(); lists(); givenUp(); showQueue();
   }

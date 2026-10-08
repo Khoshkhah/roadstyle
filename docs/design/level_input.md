@@ -160,7 +160,7 @@ model and stages). Three, since a rule reaches its roads' neighbours through the
 gives them room; two gave up one order wish more than three in one of six edits, four was slower and no better.
 
 No silent fallback: the local result is not used, and the whole area is solved, when it gives up a crossing part the previous result kept,
-has more order wishes not kept, more near warnings or more drawing positions than the previous one, or the solver fails; the toast after the
+has more order wishes not kept or more near warnings than the previous one, or the solver fails (more drawing positions alone do not count since 2026-10-08: in simple mode a position is only a sort number); the toast after the
 reload says which solve it was and why (`levels_info["resolve"]`: `how` local / full, `why`, `free`, `seconds`). `roadstyle-levels solve`
 stays a whole solve. Monaco, eight edits (a stack pair switched off, a stack on one part added, an order turned round, a head changed; two
 of each):

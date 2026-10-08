@@ -359,6 +359,8 @@ def _metres(geoseries):
 def _handler(area):
     class H(BaseHTTPRequestHandler):
         def _send(self, code, body, kind="application/json"):
+            if code >= 400:                                    # every error the page shows is in this log too
+                print(f"error {code} on {self.path}: {body.get('error') if isinstance(body, dict) else body}", flush=True)
             data = body.encode() if isinstance(body, str) else json.dumps(body, default=str).encode()
             self.send_response(code)
             self.send_header("Content-Type", kind)

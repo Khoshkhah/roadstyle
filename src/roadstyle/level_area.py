@@ -219,8 +219,8 @@ def _keep_fixed(local, fixed):
 
 def _worse(local, previous):
     """Why the local result ``local`` cannot stand for the whole solve (None: it can): a crossing given up that ``previous`` kept (or did not
-    have), more order wishes not kept or near warnings than ``previous`` (counts: the solver trades one for another as the whole solve may),
-    or more drawing positions."""
+    have), more order wishes not kept or near warnings than ``previous`` (counts: the solver trades one for another as the whole solve may).
+    More drawing positions do not count (2026-10-08): in simple mode a position is only a sort number in the one road layer."""
     new = {tuple(p) for p in local.attrs["levels_given_up_parts"]} - {tuple(p) for p in previous.attrs.get("levels_given_up_parts", [])}
     if new:
         return f"{len(new)} crossing part(s) given up that were kept (first: {' '.join(sorted(new)[0])})"
@@ -228,8 +228,7 @@ def _worse(local, previous):
         n, m = len(local.attrs[k]), len(previous.attrs.get(k, []))
         if n > m:
             return f"{n} {what}, {m} before"
-    n, m = (len(set(t[LEVELS].to_numpy().ravel().tolist())) for t in (local, previous))
-    return f"{n} drawing positions, {m} before" if n > m else None
+    return None
 
 
 def write(solved, folder, ends_table):
