@@ -2920,11 +2920,37 @@ def test_simple_is_the_default_and_simple_false_is_the_full_look():
     assert "RS_SIMPLE" not in html and "roads-simple" not in html
 
 
-def test_simple_refuses_tiles_and_the_tunnel_control():
-    for kw in (dict(tiles=True), dict(tunnel_control=True)):
-        with pytest.raises(ValueError, match="pass simple=False"):
-            render_edges(_edges(), backend="web", **kw)           # simple is the default: no silent switch to the full look
-        render_edges(_edges(), backend="web", simple=False, **kw)
+def test_simple_refuses_tiles():
+    with pytest.raises(ValueError, match="pass simple=False"):
+        render_edges(_edges(), backend="web", tiles=True)         # simple is the default: no silent switch to the full look
+    render_edges(_edges(), backend="web", tiles=True, simple=False)
+
+
+def test_simple_has_the_tunnels_box_without_the_dash_selects():
+    html = render_edges(_edge_world(), backend="web", basemap="blank", tunnel_control=True).html
+    assert '"control": true' in html and '"simple": true' in html and "if(!TUNNEL.simple) r3.appendChild" in html
+
+
+def test_the_tunnels_box_recolours_the_one_road_layer_in_the_browser(tmp_path):
+    pw = pytest.importorskip("playwright.sync_api")
+    path = tmp_path / "simple_tunnels.html"
+    render_edges(_edge_world(), backend="web", basemap="blank", tunnel_control=True).save(path)
+    errors = []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && map.loaded() && document.getElementById('tn-str')", timeout=30_000)
+        get = 'JSON.stringify(map.getPaintProperty("roads-simple", "line-color"))'
+        before = page.evaluate(get)
+        assert page.evaluate("!document.getElementById('tn-pal') && !document.getElementById('tn-ratio')")
+        page.evaluate("rsSetTunnelStyle({strength: 100, toward: 'Navy'})")
+        after = page.evaluate(get)
+        page.evaluate("rsSetTunnelStyle({strength: 0})")
+        browser.close()
+    assert before != after and "#1e293b" in after and not errors, errors
 
 
 def test_simple_puts_the_items_of_edges_above_the_road_layer():

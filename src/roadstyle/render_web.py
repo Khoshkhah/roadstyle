@@ -1931,7 +1931,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     wider each side than in the full look, and its shadow (``bridge_shadow``) lies evenly around its main part, blurred, not offset; both grow with the zoom (no shadow and the full look's bridge casing below zoom 14, full from 17). It
     leaves out: tunnel casing dashes and dashed classes' dashes (drawn solid), square and flat ends and the per-end caps (every end round), the twin end caps;
     street names and one-way arrows are one layer each, above all roads (a name of a road under a bridge can show on the bridge),
-    and the items of ``Overlay(edge_col=...)`` are drawn above all roads too. Not with ``tiles=True`` or ``tunnel_control=True``: those raise a ValueError, pass ``simple=False`` for them.
+    and the items of ``Overlay(edge_col=...)`` are drawn above all roads too. Not with ``tiles=True``: that raises a ValueError, pass ``simple=False`` for it. ``tunnel_control=True`` works: the colour and strength recolour the one road layer; the palette and dash ratio have no dashes to change and the box leaves them out.
 
     ``tooltip`` is a convenience alias for the shared backend arg (folium / CLI ``--tooltip``): when
     given and ``road_tooltip`` is unset, its value drives the hover tooltip here too, so the same
@@ -1944,9 +1944,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     # column; False -> no popup. Baked into the page as (enabled flag, field list-or-null).
     # popup_mode="panel" docks the read-out as a side panel and combines with ANY field spec;
     # road_popup="panel" stays as shorthand for panel mode with the default fields.
-    if simple and (tiles or tunnel_control):
-        raise ValueError(f"simple=True does not work with {'tiles=True' if tiles else 'tunnel_control=True'}: "
-                         "pass simple=False for it (the full look)")
+    if simple and tiles:
+        raise ValueError("simple=True does not work with tiles=True: pass simple=False for it (the full look)")
     if street_view not in (True, False, "window"):
         raise ValueError(f'street_view must be True, False or "window", got {street_view!r}')
     mode = popup_mode or "popup"
@@ -2743,7 +2742,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                                                "palette": CONFIG.tunnel_palette, "palettes": CONFIG.tunnel_palettes,
                                                "ratio": list(CONFIG.tunnel_casing_dash or [1, 1]), "bg": _bg_color(active_bm),
                                                "toward": tun_toward, "towards": CONFIG.tunnel_towards,
-                                               "to": {**_TUN_TO, "fill": tun_colour}, "control": bool(tunnel_control and tun_paint)}))
+                                               "to": {**_TUN_TO, "fill": tun_colour}, "control": bool(tunnel_control and tun_paint), "simple": bool(simple)}))
             .replace("__VIEWS__", json.dumps(view_list))
             .replace("__RS_ROAD_FILL__", json.dumps({"on": bool(road_fill), "paint": fill_paint}))
             .replace("__ROAD_POPUP__", "true" if popup_on else "false")

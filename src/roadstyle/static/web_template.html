@@ -985,9 +985,9 @@ if(TUNNEL.control){
   const val=document.createElement("span"); val.id="tn-val"; val.textContent=Math.round(TUNNEL.strength)+"%";
   r2.appendChild(r); r2.appendChild(val);
   r1.appendChild(sel("tn-toward", [...Object.keys(TUNNEL.towards), ...(TUNNEL.toward in TUNNEL.towards ? [] : [TUNNEL.toward])].map(n=>[n, n]), TUNNEL.toward, v=>rsSetTunnelStyle({toward:v})));
-  const r3=row();
-  r3.appendChild(sel("tn-pal", Object.keys(TUNNEL.palettes).map(n=>[n, n]), TUNNEL.palette, v=>rsSetTunnelStyle({palette:v})));
-  r3.appendChild(sel("tn-ratio", [["1:1","1:1"],["2:2","2:2"],["3:3","3:3"],["4:4","4:4"],["2:1","2:1"],["3:2","3:2"],["4:3","4:3"],["1:2","1:2"]], TUNNEL.ratio.join(":"),
+  const r3=row();                                 // simple mode has no dashes: no palette and no dash ratio
+  if(!TUNNEL.simple) r3.appendChild(sel("tn-pal", Object.keys(TUNNEL.palettes).map(n=>[n, n]), TUNNEL.palette, v=>rsSetTunnelStyle({palette:v})));
+  if(!TUNNEL.simple) r3.appendChild(sel("tn-ratio", [["1:1","1:1"],["2:2","2:2"],["3:3","3:3"],["4:4","4:4"],["2:1","2:1"],["3:2","3:2"],["4:3","4:3"],["1:2","1:2"]], TUNNEL.ratio.join(":"),
                      v=>rsSetTunnelStyle({ratio:v.split(":")})));
   _tlHost().appendChild(w);
 }

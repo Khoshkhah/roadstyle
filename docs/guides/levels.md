@@ -100,8 +100,8 @@ footway lying exactly on a street stays a road of its own.
 - A **bridge** has a slate casing (`bridge_casing_color`) and a soft **shadow** (`bridge_shadow`; in the full look shifted down-right, in simple mode, the default, blurred evenly around the bridge): each part of the
   bridge casts it at its own casing number, so it lies on what the bridge crosses, never on its own road. Hiding the bridges hides it too.
 - A **tunnel** fades toward a chosen colour (`tunnel_toward`, default Sand), its fill, names, arrows and attached items alike: `tunnel_strength` (default 60; 0 is the normal colours, 100 the full tunnel
-  colours) and, in the full look (`simple=False`), a two-colour dashed casing (`tunnel_palette`, default *Graphite + silver*; simple mode draws it solid). To try other values, `tunnel_control=True` (with `simple=False`) adds a
-  *Tunnels* box with five steps; `rsSetTunnelStyle({strength, palette, ratio})` does the same from your page.
+  colours) and, in the full look (`simple=False`), a two-colour dashed casing (`tunnel_palette`, default *Graphite + silver*; simple mode draws it solid). To try other values, `tunnel_control=True` adds a
+  *Tunnels* box with its steps and colour list (in simple mode without the palette and dash-ratio selects); `rsSetTunnelStyle({strength, palette, ratio})` does the same from your page.
 
 ## Your own numbers
 
