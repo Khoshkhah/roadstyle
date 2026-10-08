@@ -83,7 +83,7 @@ m.save("map.html")                        # m.html is the page as a string
   and ◀ ▶ buttons stepping 15 m along the edge (`rsStreetViewStep(m)`, event
   `rs:streetviewmove`); `rsGetStreetViewSpot()` / event `rs:streetviewspot` read the spot back
   (edge `id`, metres `m` along it, `lng`/`lat`, `heading`, `source`: `"panorama"` = current, only
-  with `street_view_key=` (default: env `GOOGLE_MAPS_API_KEY`); `"map"` = the clicked or stepped spot); `street_view=True` = a plain popup link, `False` = none. Street View loads only
+  with `street_view_key=` (default: env `GOOGLE_MAPS_KEY`); `"map"` = the clicked or stepped spot); `street_view=True` = a plain popup link, `False` = none. Street View loads only
   when the page is served (http/https), not opened from disk: `python -m http.server`.
 - Colours, widths, casing and camera defaults are settings, not keywords:
   `rs.render_edges(..., settings={"config": {"labels": {"color": "#888"}}})`.

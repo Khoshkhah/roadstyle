@@ -142,7 +142,7 @@ setting, or a name the page does not have, is an error.
 | keyword | default | backends | what |
 |---|---|---|---|
 | `street_view` | `"window"` | web | `"window"` = a map button and a floating window that follows the clicked road; `True` = a link in the popup; `False` = none. Needs the page served over http(s) ([guide](../guides/street-view.md)) |
-| `street_view_key` | env `GOOGLE_MAPS_API_KEY` | web | a Google Maps JavaScript API key for the window: its bar offers Linked (a panorama; the map marker walks with the viewer) and Classic (the embed). Written into the page; restrict it to your site's addresses |
+| `street_view_key` | env `GOOGLE_MAPS_KEY` | web | a Google Maps JavaScript API key for the window: its bar offers Linked (a panorama; the map marker walks with the viewer) and Classic (the embed). Written into the page; restrict it to your site's addresses |
 
 ### Camera & 3D
 
@@ -206,7 +206,7 @@ change the defaults below.
 | `layout` | `"beside"` | `"beside"` = Street View right of the map, `"below"` = under it |
 | `panel_width` | `42` | Street View's share of the window, 20-80 % (of the height when below) |
 | `resizable` | `True` | a divider the viewer can drag; the choice is remembered in their browser |
-| `street_view_key` | env `GOOGLE_MAPS_API_KEY` | a Google Maps JavaScript API key: the panel becomes a real panorama, the map marker walks and turns with the viewer, and it shows Google's own street imagery only. Written into the page; restrict it to your site's addresses |
+| `street_view_key` | env `GOOGLE_MAPS_KEY` | a Google Maps JavaScript API key: the panel becomes a real panorama, the map marker walks and turns with the viewer, and it shows Google's own street imagery only. Written into the page; restrict it to your site's addresses |
 
 ## Stylers
 

@@ -85,7 +85,7 @@ def test_street_view_below_layout():
 def test_street_view_key_turns_the_embed_into_a_panorama_that_reports_its_moves(monkeypatch):
     """Without a key: the keyless embed, no Maps script. With one: the key in the page, the panorama
     that moves the map marker, Google's own imagery only."""
-    monkeypatch.delenv("GOOGLE_MAPS_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_MAPS_KEY", raising=False)
     h = rs.render_street_view(_edges()).html
     assert "const GKEY = \"\";" in h and "rsSetStreetViewMarkerAt" in h
     h = rs.render_street_view(_edges(), street_view_key="AIzaTEST").html
@@ -97,7 +97,7 @@ def test_street_view_key_turns_the_embed_into_a_panorama_that_reports_its_moves(
 
 def test_street_view_window_takes_the_key_too(monkeypatch):
     """The floating window every dashboard uses: the same Linked / Classic switch with a key."""
-    monkeypatch.delenv("GOOGLE_MAPS_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_MAPS_KEY", raising=False)
     h = rs.render_edges(_edges(), backend="web", street_view="window").html
     assert "const _svKey = \"\";" in h
     h = rs.render_edges(_edges(), backend="web", street_view="window", street_view_key="AIzaTEST").html
@@ -105,8 +105,8 @@ def test_street_view_window_takes_the_key_too(monkeypatch):
 
 
 def test_street_view_key_comes_from_the_environment(monkeypatch):
-    """GOOGLE_MAPS_API_KEY is every page's key when none is passed (2026-10-10: the editor, mapstyle and lanestyle pages had none); a passed one wins."""
-    monkeypatch.setenv("GOOGLE_MAPS_API_KEY", "AIzaENV")
+    """GOOGLE_MAPS_KEY is every page's key when none is passed (2026-10-10: the editor, mapstyle and lanestyle pages had none); a passed one wins."""
+    monkeypatch.setenv("GOOGLE_MAPS_KEY", "AIzaENV")
     assert 'const _svKey = "AIzaENV";' in rs.render_edges(_edges(), backend="web").html
     assert 'const GKEY = "AIzaENV";' in rs.render_street_view(_edges()).html
     assert 'const _svKey = "AIzaMINE";' in rs.render_edges(_edges(), backend="web", street_view_key="AIzaMINE").html
