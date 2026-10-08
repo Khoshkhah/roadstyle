@@ -4,6 +4,8 @@ from __future__ import annotations
 import warnings
 from collections import defaultdict
 
+from ._na import missing
+
 
 def _level(row, layer_col, bridge_col, tunnel_col):
     """The OSM level of an edge: a non-zero ``layer``, else bridge 1, tunnel -1, else 0 (the rule of ``render_edges``)."""
@@ -331,7 +333,7 @@ def _road_split(g, cols=()):
     fwd = [xy[off[i]:off[i + 1]].tobytes() for i in range(len(geoms))]
     rev = [xy[off[i]:off[i + 1]][::-1].tobytes() for i in range(len(geoms))]
     have = [c for c in cols if c and c in g.columns]
-    kind = list(zip(*[["" if v is None or v != v else str(v) for v in g[c]] for c in have], strict=True)) if have else [()] * len(geoms)
+    kind = list(zip(*[["" if missing(v) else str(v) for v in g[c]] for c in have], strict=True)) if have else [()] * len(geoms)
     keys = [(frozenset(e), min(f, r), k) for e, f, r, k in zip(ends, fwd, rev, kind, strict=True)]
     road, first = {}, []
     for i, k in enumerate(keys):
@@ -397,19 +399,19 @@ def level_input(edges, id_col="edge_id", layer_col="layer", bridge_col="bridge",
         both = [[] for _ in first]
         for i, r in enumerate(rid):
             v = g["modes"].iloc[i]
-            both[r] += [] if v is None or v != v else [t for t in str(v).split(" + ") if t not in both[r]]
+            both[r] += [] if missing(v) else [t for t in str(v).split(" + ") if t not in both[r]]
         shown["modes"] = [" + ".join(m) or None for m in both]
     if "edge_ref" in g.columns:                         # each edge's own edge_ref, as edges / reversed (the editor shows both directions)
         refs = ([[] for _ in first], [[] for _ in first])
         for i, r in enumerate(rid):
             v = g["edge_ref"].iloc[i]
-            refs[0 if same[i] else 1][r].append(None if v is None or v != v else str(v))
+            refs[0 if same[i] else 1][r].append(None if missing(v) else str(v))
         shown["edge_refs"], shown["reversed_refs"] = refs
     for c in ("oneway", "driving"):                     # each edge's own oneway / driving (what decides its arrows, render_web._mark_twoway), as edges / reversed
         per = ([[] for _ in first], [[] for _ in first])           # no such column: null on every edge, which the pages read as "not given"
         for i, r in enumerate(rid):
             v = g[c].iloc[i] if c in g.columns else None
-            per[0 if same[i] else 1][r].append(None if v is None or v != v else bool(v))
+            per[0 if same[i] else 1][r].append(None if missing(v) else bool(v))
         shown[f"edges_{c}"], shown[f"reversed_{c}"] = per
     roads = gpd.GeoDataFrame({"road": name, "edges": mine[0], "reversed": mine[1], "band": beta,
                               "priority": omega if omega is not None else [None] * len(first), **shown}, geometry=list(head.geometry), crs=g.crs)
@@ -429,7 +431,7 @@ def _read_pairs(pairs):
     for row in out:
         for c in ("a", "b", "a_end", "b_end"):
             v = row.get(c)
-            row[c] = None if v is None or (isinstance(v, float) and v != v) or v == "" else str(v)
+            row[c] = None if missing(v) or v == "" else str(v)
     return out
 
 
@@ -475,8 +477,8 @@ def auto_ends(roads, pairs, zoom=18.0, highway_col="highway", min_m=0.5, step=0.
     lat = float(roads.to_crs(4326).geometry.union_all().centroid.y) if roads.crs is not None else 0.0
     mpp = 40075016.686 * math.cos(math.radians(lat)) / (512 * 2 ** zoom)       # metres per pixel at that zoom, here
     cls = roads[highway_col] if highway_col in roads else [None] * len(ids)
-    w = [class_width_px(None if c is None or c != c else str(c), zoom) * mpp for c in cls]                     # whole width, casing included
-    wf = [class_width_px(None if c is None or c != c else str(c), zoom, casing=False) * mpp for c in cls]      # the fill
+    w = [class_width_px(None if missing(c) else str(c), zoom) * mpp for c in cls]                     # whole width, casing included
+    wf = [class_width_px(None if missing(c) else str(c), zoom, casing=False) * mpp for c in cls]      # the fill
     fill = None
     if levels is not None:
         f = dict(zip(levels["road"], levels["fill_level"], strict=True))

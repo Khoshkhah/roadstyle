@@ -26,6 +26,7 @@ import warnings
 from collections.abc import Mapping
 
 from . import _settings
+from ._na import missing
 from .basemaps import DEFAULT_SWITCHER, get_basemap
 from .config import DEFAULT as CONFIG
 from .fastjson import fc_dict
@@ -247,7 +248,7 @@ def _pair_width(expr, col, offset_frac=0.28, offset_zoom=15):
 
 def _class_key(v):
     """A road's class as a grouping key: a missing class (None, NaN, "") is one value, so both directions of an unclassed road still pair (NaN != NaN)."""
-    return "" if v is None or v != v else v
+    return "" if missing(v) else v
 
 
 def _mark_twoway(geo, directed_col=None, kind_col="highway", driving_col=None):
@@ -760,7 +761,7 @@ def _bridge_decks(geo, dk):
 
 
 def _truthy(v):
-    return v not in (None, "", "no", "false", "0", 0, False)
+    return not missing(v) and v not in ("", "no", "false", "0", 0, False)
 
 
 def _mark_lvl(geo, tunnel_col, bridge_col, layer_col):
@@ -1070,7 +1071,7 @@ def _cap_value(v):
     """One end's cap from a column value: "square" (flat, as long as a round end), True (flat, at the end point) or None (round)."""
     if isinstance(v, str) and v.strip().lower() in ("square", "round"):
         return "square" if v.strip().lower() == "square" else None
-    return True if _truthy(v) and not (isinstance(v, float) and v != v) else None
+    return True if _truthy(v) else None
 
 
 def _mark_caps(geo, cap_col=None, start_col=None, end_col=None):

@@ -20,6 +20,8 @@ import pandas as pd
 import roadstyle as rs
 from roadstyle import render_web
 
+from ._na import missing
+
 from .level_area import defaults, ends, own, solve, solve_local, write
 
 COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"]
@@ -337,7 +339,7 @@ def _directions(r):
     "along" the road or "against"."""
     out = []
     for way, ids, refs in (("along", r["edges"], r.get("edge_refs")), ("against", r["reversed"], r.get("reversed_refs"))):
-        if refs is None or (isinstance(refs, float) and refs != refs):
+        if missing(refs):
             refs = [r.get("edge_ref") if str(e) == str(r["road"]) else None for e in ids]
         out += [{"edge": str(e), "edge_ref": _txt(x), "way": way} for e, x in zip(ids, refs, strict=True)]
     return out
@@ -388,7 +390,7 @@ def _edge_rows(draw):
 
 
 def _txt(v):
-    return None if v is None or (isinstance(v, float) and v != v) else str(v)
+    return None if missing(v) else str(v)
 
 
 def _yes(v):
