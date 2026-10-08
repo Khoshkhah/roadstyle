@@ -233,7 +233,13 @@ class Area:
             if i is not None and not (0 <= i < len(e) and all(str(e.iat[i, e.columns.get_loc(c)]) == str(o["row"].get(c, "") or "") for c in COLS)):
                 raise ValueError("an edit to delete is not in edits.csv as the page showed it (changed since): reload the page")
         new = pd.DataFrame([_row(o["body"]) for o in ops if o["op"] == "add"], columns=COLS)
-        edits = pd.concat([e.drop(index=gone), new], ignore_index=True) if any(o["op"] in ("add", "delete") for o in ops) else None
+        kept, seen = e.drop(index=gone), set()               # an exact copy of a rule already there is refused: a second copy kept the rule
+        have = {tuple(str(x) for x in r) for r in kept[COLS].astype(str).itertuples(index=False)}    # working after one copy was deleted (2026-10-08)
+        for r in new[COLS].astype(str).itertuples(index=False):
+            if tuple(r) in have or tuple(r) in seen:
+                raise ValueError(f"this rule is already in edits.csv: {self.say(dict(zip(COLS, r)))}: nothing saved")
+            seen.add(tuple(r))
+        edits = pd.concat([kept, new], ignore_index=True) if any(o["op"] in ("add", "delete") for o in ops) else None
         self.change(edits, saved=self.saved - sum(i < self.saved for i in gone), caps=caps, heads=heads)
 
     def given_up(self):

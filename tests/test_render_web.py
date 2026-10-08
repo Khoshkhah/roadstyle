@@ -2498,6 +2498,9 @@ def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
         with pytest.raises(ValueError):
             area.apply(bad)
     assert len(area.edits()) == 1                                                 # nothing saved
+    with pytest.raises(ValueError, match="already in edits.csv"):                 # an exact copy of a rule already there (2026-10-08: copies kept
+        area.apply([{"op": "add", "body": stack}])                                # a rule working after one copy was deleted)
+    assert len(area.edits()) == 1
     area.apply([{"op": "cap", "road": "12", "end": "start", "cap": "square"}, {"op": "cap", "road": "12", "end": "end", "cap": "square"}])   # caps.csv
     assert (tmp_path / "caps.csv").read_text().split() == ["road,start,end", "12,square,square"] and area.facts["12"]["caps"] == ["square", "square"]
     area.apply([{"op": "cap", "road": "12", "end": "start", "cap": ""}, {"op": "cap", "road": "12", "end": "end", "cap": ""}])     # the default again
