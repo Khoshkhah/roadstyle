@@ -482,7 +482,7 @@ function _applyRoadFilters(){
   ["decks","shadows"].forEach(src=>{ multi[src] = !_bridgesOn ? [] : (hidden.length || q || !_tunnelsOn)
     ? _sfeats(src).map((f,k)=>(f.properties.__rs_edges||[]).some(edgeOn) ? k : -1).filter(k=>k>=0) : null; });
   const and = (f,c)=>f?["all",f,c]:c;
-  const qr = q && _has(["id"],_qIds), qe = q && ["any",_has(["get","__rs_edge"],_qIds),_has(["get","__rs_edge2"],_qIds)];   // once per change
+  const qr = q && ["any",_has(["id"],_qIds),_has(["get","__rs_edge2"],_qIds)], qe = q && ["any",_has(["get","__rs_edge"],_qIds),_has(["get","__rs_edge2"],_qIds)];   // once per change
   _fltLayers().forEach(l=>{
     if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null;
     let f=_fltBase[l.id];
@@ -533,7 +533,13 @@ window.rsSetTunnels = rsSetTunnels;
 // every verb takes an optional `layer` argument: omitted -> the roads; an overlay's label (or
 // index) -> that overlay's features. Overlay sources use generateId too, so the same id-set
 // model applies — but each layer is its OWN id space: never mix ids across layers.
-function _sfeats(src){ const s=map.getSource(src); return (s && s._data && s._data.features)||[]; }
+// MapLibre 5 keeps a GeoJSON source's data in `_data.geojson` (4.x: `_data` itself); there is no sync public getter
+// After an updateData (the level editor's update in place) it keeps a Map id -> feature instead, in the source's order (a feature replaced
+// keeps its place): read as a FeatureCollection, kept until the source's data changes again
+function _sdata(s){ const d=s && s._data; if(!d) return null; if(d.geojson || !d.updateable) return d.geojson;
+  return d._rs || (d._rs={type:"FeatureCollection", features:Array.from(d.updateable.values())}); }
+map.on("sourcedata", e=>{ const s=map.getSource(e.sourceId); if(s && s._data) delete s._data._rs; });
+function _sfeats(src){ const g=_sdata(map.getSource(src)); return (g && g.features)||[]; }
 function _feats(){ return _sfeats("roads"); }
 // tiles mode plumbing: _side() -> the sidecar table (null while it inflates / in inline mode);
 // _rprops(id) -> a road's full properties from either world; _fs() -> setFeatureState that adds
@@ -584,7 +590,7 @@ function rsGetProps(ids, layer){ // the rows behind an id set (internals strippe
 // of its whole chain (via the baked __rs_edges), so selection/highlight glows on the deck
 // instead of the flat ground-level line
 function _deckIdsForRoad(i){
-  const s=map.getSource("decks"), fs=(s && s._data && s._data.features)||[];
+  const fs=_sfeats("decks");
   const out=[];
   fs.forEach((f,k)=>{ const e=f.properties && f.properties.__rs_edges;
     if(e && e.indexOf(i)>=0) out.push(k); });
@@ -705,7 +711,7 @@ function _fillExpr(idE){
   const prop=(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill";
   let e=["coalesce",["get",prop],"#888888"];
   if(_qColor) for(let i=_qColor.length-1;i>=0;i--)   // group 0 outermost -> wins overlaps
-    e=["case",_has(idE||["id"],_qColor[i].ids),_qColor[i].color,e];
+    e=["case",["any",_has(idE||["id"],_qColor[i].ids),_has(["get","__rs_edge2"],_qColor[i].ids)],_qColor[i].color,e];
   return e;
 }
 function _applyFill(){
@@ -750,7 +756,7 @@ function _applySort(){
     if(!(l.id in _sortBase)) _sortBase[l.id]=map.getLayoutProperty(l.id,"line-sort-key");
     const base=_sortBase[l.id]; if(base==null) return;
     map.setLayoutProperty(l.id,"line-sort-key",
-      all ? ["+", base, ["case",_has(["id"],all),500,0]] : base);
+      all ? ["+", base, ["case",["any",_has(["id"],all),_has(["get","__rs_edge2"],all)],500,0]] : base);
   });
 }
 function rsSetColorField(nameOrIdx){
@@ -928,7 +934,7 @@ if(OVERLAYS.length){
     document.body.appendChild(box);
   }
 }
-// window.rsSetTunnelStyle({strength, palette, ratio}) moves the tunnel look (strength 0-100; palette a name of RS_TUNNEL_PALETTES;
+// window.rsSetTunnelStyle({strength, palette, ratio, toward}) moves the tunnel look (strength 0-100; palette a name of RS_TUNNEL_PALETTES;
 // ratio [dash, gap] in line widths); the Tunnels box is UI over it. The casing follows the slider like everything on a tunnel: its
 // two colours, each moved toward slate by the strength, are two layers with MapLibre's own dash (crisp, and only paint changes: no image,
 // no tile reload): the position's casing layer draws the gap colour (transparent for "One colour"), the dash layer the dashes on top.
@@ -942,25 +948,31 @@ function rsSetTunnelStyle(o){
   if(o.strength != null) TUNNEL.strength = Math.max(0, Math.min(100, +o.strength));
   if(o.palette != null && o.palette in TUNNEL.palettes) TUNNEL.palette = o.palette;
   if(o.ratio != null) TUNNEL.ratio = o.ratio.map(Number);
+  if(o.toward != null){                          // a name of RS_TUNNEL_TOWARDS or a "#rrggbb"
+    const c = o.toward in TUNNEL.towards ? TUNNEL.towards[o.toward] : (/^#[0-9a-f]{6}$/i.test(o.toward) ? o.toward : null);
+    if(!c) throw new Error("rsSetTunnelStyle: toward must be one of "+Object.keys(TUNNEL.towards).join(", ")+" or '#rrggbb', got "+JSON.stringify(o.toward));
+    TUNNEL.toward = o.toward; TUNNEL.to.fill = c; }
   for(const id in TUNNEL.layers) if(map.getLayer(id))
     TUNNEL.layers[id].forEach(([k, base, to])=> map.setPaintProperty(id, k, _tunMix(base, TUNNEL.to[to])));
-  const pair = TUNNEL.palettes[TUNNEL.palette], k = TUNNEL.strength/100, tun = ["to-boolean",["get","__rs_tunnel"]];
-  const gap = pair ? _tunHex(pair[1], TUNNEL.to.fill, k) : "rgba(0,0,0,0)";          // "One colour": empty gaps
+  const pair = TUNNEL.palettes[TUNNEL.palette], fillTo = TUNNEL.to.fill, k = TUNNEL.strength/100, tun = ["to-boolean",["get","__rs_tunnel"]];
+  const gap = pair ? _tunHex(pair[1], fillTo, k) : "rgba(0,0,0,0)";          // "One colour": empty gaps
   for(const id in TUNNEL.casing) if(map.getLayer(id)) map.setPaintProperty(id, "line-color", ["case", tun, gap, TUNNEL.casing[id]]);
   TUNNEL.dash.forEach(id=>{ if(!map.getLayer(id)) return;
-    map.setPaintProperty(id, "line-color", _tunHex(pair ? pair[0] : TUNNEL.to.dash, TUNNEL.to.fill, k));
+    map.setPaintProperty(id, "line-color", _tunHex(pair ? pair[0] : TUNNEL.to.dash, fillTo, k));
     map.setPaintProperty(id, "line-dasharray", TUNNEL.ratio); });
   _applyFill();                                   // the roads' fills: with the active colour-by
   const r=document.getElementById("tn-str"), v=document.getElementById("tn-val"), s=document.getElementById("tn-pal"),
-        q=document.getElementById("tn-ratio"), pr=document.getElementById("tn-pre");
+        q=document.getElementById("tn-ratio"), tw=document.getElementById("tn-toward"), pr=document.getElementById("tn-pre");
   if(r) r.value = _tnStep(TUNNEL.strength); if(v) v.textContent = Math.round(TUNNEL.strength)+"%"; if(s) s.value = TUNNEL.palette;
+  if(tw) tw.value = TUNNEL.toward;
   if(q) q.value = TUNNEL.ratio.join(":"); if(pr) pr.value = String(TUNNEL.strength);
-  document.dispatchEvent(new CustomEvent("rs:tunnelchange",{detail:{strength:TUNNEL.strength, palette:TUNNEL.palette, ratio:TUNNEL.ratio}}));
+  document.dispatchEvent(new CustomEvent("rs:tunnelchange",{detail:{strength:TUNNEL.strength, palette:TUNNEL.palette, ratio:TUNNEL.ratio, toward:TUNNEL.toward}}));
 }
 window.rsSetTunnelStyle = rsSetTunnelStyle;
 window.RS_TUNNEL_PALETTES = TUNNEL.palettes;
+window.RS_TUNNEL_TOWARDS = TUNNEL.towards;
 if(_tunOn){ if(map.isStyleLoaded && map.isStyleLoaded()) rsSetTunnelStyle(); else map.on("load", ()=>rsSetTunnelStyle()); }
-const _TN_STEPS = [[0,"Normal colors"],[20,"Subtle"],[35,"Balanced"],[70,"Strong"],[100,"Full"]];
+const _TN_STEPS = [0,25,50,55,60,65,70,75,100].map(v=>[v, String(v)]);       // one slider for every colour
 const _tnStep = v => _TN_STEPS.reduce((b, [x], i)=> Math.abs(x - v) < Math.abs(_TN_STEPS[b][0] - v) ? i : b, 0);   // the nearest step
 if(TUNNEL.control){
   const w=document.createElement("div"); w.className="tn-ctrl";
@@ -978,6 +990,7 @@ if(TUNNEL.control){
   r.oninput=()=>rsSetTunnelStyle({strength: _TN_STEPS[+r.value][0]});
   const val=document.createElement("span"); val.id="tn-val"; val.textContent=Math.round(TUNNEL.strength)+"%";
   r2.appendChild(r); r2.appendChild(val);
+  r1.appendChild(sel("tn-toward", [...Object.keys(TUNNEL.towards), ...(TUNNEL.toward in TUNNEL.towards ? [] : [TUNNEL.toward])].map(n=>[n, n]), TUNNEL.toward, v=>rsSetTunnelStyle({toward:v})));
   const r3=row();
   r3.appendChild(sel("tn-pal", Object.keys(TUNNEL.palettes).map(n=>[n, n]), TUNNEL.palette, v=>rsSetTunnelStyle({palette:v})));
   r3.appendChild(sel("tn-ratio", [["1:1","1:1"],["2:2","2:2"],["3:3","3:3"],["4:4","4:4"],["2:1","2:1"],["3:2","3:2"],["4:3","4:3"],["1:2","1:2"]], TUNNEL.ratio.join(":"),
@@ -1142,8 +1155,8 @@ map.on("load", function(){ var tries=0; (function check(){ setTimeout(function()
   try{
     var n;
     if(RS_TILED){ n = map.querySourceFeatures("roads",{sourceLayer:"roads"}).length; }
-    else{ var src = map.getSource("roads");
-      n = (src && src._data && src._data.features) ? src._data.features.length : 0; }
+    else{
+      n = _sfeats("roads").length; }
     if(n) return;
     if(RS_TILED && ++tries < 3) return check();          // tiles may still be decoding/loading
     var st = RS_TILED
@@ -1206,6 +1219,12 @@ function _rpairs(p, only){  // shared field filter: [nameOrNull, [[k, v], ...]]
 function _rfields(p, only){ const [name, kv]=_rpairs(p, only);
   // the field NAME in bold, its value plain - the popup and the hover tooltip both read this way
   return (name ? ["<b>"+name+"</b>"] : []).concat(kv.map(([k,s])=>"<b>"+k+"</b>: "+s)).join("<br>"); }
+// a reverse pair drawn as one line (config single_line_classes): its edge names the other direction in __rs_edge2, and the line's popup, panel and tooltip show both
+function _twinDetail(p){ return p && p.__rs_edge2!=null ? {id:p.__rs_edge2, properties:_rprops(p.__rs_edge2)} : undefined; }   // rs:select detail.twin
+function _both(p, rows, only){ const f=rows?_rrows:_rfields, t=p.__rs_edge2!=null ? _rprops(p.__rs_edge2) : null;
+  if(!t || !Object.keys(t).length) return f(p, only);
+  const sec=(n,q)=>'<div style="color:#777;margin-top:.3em">Direction '+n+'</div>'+f(q, only);
+  return p.__rs_dup ? sec(1,t)+sec(2,p) : sec(1,p)+sec(2,t); }
 function _rrows(p, only){   // the side panel's layout: big name, then aligned key/value rows
   const [name, kv]=_rpairs(p, only);
   return (name ? '<div class="rs-name">'+name+'</div>' : "")+
@@ -1422,9 +1441,10 @@ function rsSelect(id){
   clearOvSel();
   if(_sel) setS(_sel,{select:false});
   // a bridge: glow the deck chain (shown above flat_below) AND the flat line (shown below it)
-  const dids = (props && props.lvl>0) ? _deckIdsForRoad(id) : [];
-  _sel = dids.length ? {s:"decks", key:"e"+id, ids:dids, road:id}
-                     : {s:"roads", key:"r"+id, ids:[id]};
+  const hi = props && props.__rs_dup ? props.__rs_edge2 : id;      // a reverse pair is drawn by one edge: that one glows
+  const dids = (props && props.lvl>0) ? _deckIdsForRoad(hi) : [];
+  _sel = dids.length ? {s:"decks", key:"e"+hi, ids:dids, road:hi}
+                     : {s:"roads", key:"r"+hi, ids:[hi]};
   setS(_sel,{select:true});
   if(_sel.road!=null) _fs({source:"roads", id:_sel.road},{select:true});
   // best effort for programmatic selection: overlays at the edge's midpoint (when on screen)
@@ -1432,12 +1452,12 @@ function rsSelect(id){
   let ovs=[]; if(c){ try{ ovs=_ovAt(map.project({lng:c[0], lat:c[1]})); }catch(err){} }
   const cll = c ? {lng:c[0], lat:c[1]} : null;
   document.dispatchEvent(new CustomEvent("rs:select",
-    {detail:{id:id, layer:null, properties:props || {}, overlays:ovs, streetView:_svPick(cll, _feats()[id] || _svTiled(id), id)}}));
+    {detail:{id:id, layer:null, properties:props || {}, twin:_twinDetail(props), overlays:ovs, streetView:_svPick(cll, _feats()[id] || _svTiled(id), id)}}));
   const sv = _sv(cll, _feats()[id] || _svTiled(id));
   if(__ROAD_POPUP__){
-    if(_popupMode === "panel"){ rsInfoShow(_rrows(props||{}, _popupFields) + sv + _ovSections(ovs)); }
+    if(_popupMode === "panel"){ rsInfoShow(_both(props||{}, true, _popupFields) + sv + _ovSections(ovs)); }
     else if(c) new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
-      .setLngLat(c).setHTML(_rfields(props||{}, _popupFields) + sv + _ovSections(ovs)).addTo(map);
+      .setLngLat(c).setHTML(_both(props||{}, false, _popupFields) + sv + _ovSections(ovs)).addTo(map);
   }
 }
 window.rsSelect = rsSelect;
@@ -1458,7 +1478,7 @@ function hoverFrame(){ _raf=0; if(!_pt) return;
   clearTimeout(_tipT); if(!h) return;
   const p = _pt;
   _tipT = setTimeout(()=>{ if(_pt !== p) return;                                          // the mouse rested on it
-    if(_tip) _tip.setLngLat(map.unproject(p)).setHTML(_rfields(_pickProps(f), _ttipOnly)).addTo(map); }, _TIP_DELAY);
+    if(_tip) _tip.setLngLat(map.unproject(p)).setHTML(_both(_pickProps(f), false, _ttipOnly)).addTo(map); }, _TIP_DELAY);
 }
 map.on("mousemove", e=>{ _pt=e.point; if(!_raf) _raf=requestAnimationFrame(hoverFrame); });
 map.on("mouseout", ()=>{ _pt=null; if(_raf){cancelAnimationFrame(_raf);_raf=0;} setS(_hov,{hover:false}); _hov=null; _cur=null; clearTimeout(_tipT); if(_tip) _tip.remove(); });
@@ -1480,7 +1500,7 @@ map.on("click", e=>{
   const ovs = _ovAt(e.point).filter(o=>!io || o.label!==io.label);   // interactive overlays under the click (e.g. the zone)
   // structured click-data for host pages / dashboards (fires in every popup mode, incl. False)
   document.dispatchEvent(new CustomEvent("rs:select",
-    {detail:{id:f.id, layer:f.layer && f.layer.id, properties:props, overlays:ovs, item:item,
+    {detail:{id:f.id, layer:f.layer && f.layer.id, properties:props, twin:_twinDetail(props), overlays:ovs, item:item,
              streetView:_svPick(e.lngLat, f, f.id)}}));
   const sv = _sv(e.lngLat, f);
   if(io){ if(io.interactive){             // the item's own popup (its popup fields), the road's Street View below it
@@ -1488,9 +1508,9 @@ map.on("click", e=>{
       else new maplibregl.Popup({closeButton:true, maxWidth:"260px"}).setLngLat(e.lngLat)
         .setHTML('<span style="color:#777">'+io.label+'</span><br>'+_rfields(item.properties, io.popup) + sv + _ovSections(ovs)).addTo(map); } }
   else if(__ROAD_POPUP__){
-    if(_popupMode === "panel"){ rsInfoShow(_rrows(props, _popupFields) + sv + _ovSections(ovs)); }
+    if(_popupMode === "panel"){ rsInfoShow(_both(props, true, _popupFields) + sv + _ovSections(ovs)); }
     else new maplibregl.Popup({closeButton:true, maxWidth:"260px"})
-      .setLngLat(e.lngLat).setHTML(_rfields(props, _popupFields) + sv + _ovSections(ovs)).addTo(map);
+      .setLngLat(e.lngLat).setHTML(_both(props, false, _popupFields) + sv + _ovSections(ovs)).addTo(map);
   }
 });
 map.on("load", ()=>{ try{ map.fitBounds(__BOUNDS__,

@@ -48,11 +48,16 @@ class StyleConfig:
     bridge_shadow_blur: float = 4.0        # px (line-blur)
     bridge_shadow_offset: list = field(default_factory=lambda: [2, 2])   # px right, down (line-translate): lit from the top left
     bridge_shadow_trim_m: float = 3.0      # metres of no shadow where a bridge comes down to the road (2026-10-06: the head length cut short bridges too much)
+    single_line_classes: list = field(default_factory=lambda: ["footway", "path", "steps", "pedestrian", "cycleway", "track", "bridleway", "corridor", "platform"])   # a two-way pair of these is one full-width line, not two lanes
     twin_end_caps: bool = True         # one road-wide round end under a two-way road's two lanes
+    twin_casing: str = "one"           # a two-way road given as two directed edges: "one" casing around both directions (full width, drawn once), or "each" direction its own
     tunnel_casing_dash: list = field(default_factory=lambda: [1, 1])   # the tunnel casing: dash and gap, in line widths (1:1, 2026-10-06)
     tunnel_fill_dash: list = field(default_factory=list)   # light dashes on the tunnel fill, e.g. [1.2, 1.2]; none by default (v2's look, 2026-10-06)
     tunnel_fill_dash_color: str = "rgba(255,255,255,0.55)"               # their colour, over any road colour
-    tunnel_strength: float = 35          # the tunnel look (docs/design/tunnel_look.md), v2's slider: 0 = normal colours, 100 = the full tunnel colours
+    tunnel_strength: float = 60          # the tunnel look (docs/design/tunnel_look.md), v2's slider: 0 = normal colours, 100 = the full tunnel colours
+    tunnel_toward: str = "Sand"         # the colour a tunnel moves toward: a name in tunnel_towards, or "#rrggbb" (2026-10-08)
+    tunnel_towards: dict = field(default_factory=lambda: {"Slate": "#64748b", "Dark": "#14181d", "Light": "#efede8", "Graphite": "#374151",
+                                                          "Navy": "#1e293b", "Stone": "#78716c", "Sand": "#d6cfc4", "Teal": "#134e4a"})
     tunnel_palette: str = "Graphite + silver"   # the casing of a tunnel, a name in tunnel_palettes (two colours by default, 2026-10-06)
     tunnel_palettes: dict = field(default_factory=lambda: {"One colour": None, "Slate + ice": ["#64748b", "#cbd5e1"],
                                                            "Blue + cyan": ["#315b7d", "#a9d7e8"], "Warm + sand": ["#806d64", "#e7c9a7"],

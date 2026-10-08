@@ -4,6 +4,98 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.18.0] — 2026-10-09
+
+Simple mode is the default look (one road layer, MapLibre 5.24), a two-way road has one casing, tunnels fade toward Sand at 60, names and
+arrows stay off crossings, and the level solver works from the tables with near rules off.
+
+### Added
+- **The level editor's guard before a rule is added** (`rs.levels.rule_conflicts`, `POST /api/check`): an exact duplicate, or a loop of the
+  solver's own difference rules through the new one (found, yours, and the list waiting to be applied), named in plain words; you may add it anyway.
+- **`render_edges(..., simple=True)`** (web): every road piece in ONE line layer instead of a few hundred (Monaco all modes: 310 layers
+  to 7), ordered by `line-sort-key` position by position, casings before fills, with each casing cut into its heads as in the full look;
+  colour and width per feature. A bridge has a wider casing and a blurred shadow evenly around it. Leaves out twin end caps;
+  names, arrows and edge items are drawn above all roads. The full look is unchanged (`simple=False`).
+- **The tunnel look moves toward a colour you choose** (`tunnel_toward`, default `Sand`, #d6cfc4): a name in `tunnel_towards` (Slate, Dark, Light, Graphite, Navy, Stone,
+  Sand, Teal) or any `#rrggbb`, the same on every base map (Dark or Light on the base map's own theme sinks a tunnel into the map and keeps each class hue).
+  `rsSetTunnelStyle({toward})`, `RS_TUNNEL_TOWARDS` and a colour list in the Tunnels box.
+- **The level editor's *Start new session* button:** what is in `edits.csv` now moves under *Already in edits.csv* and the list of changes
+  starts empty; nothing is deleted.
+- **Credits:** a *Built on* section in the README and on the docs home page (MapLibre GL JS, OpenStreetMap and openstreetmap-carto, HiGHS,
+  GeoPandas, Shapely, lonboard, folium).
+
+### Changed
+- **Street names and one-way arrows stay off crossings:** the annotation slots are cut back by half the crossing road's drawn width plus 2 m
+  (at least 2 m + 2 m for a footway, so a zebra too) around every point where another road meets or crosses the street, bridges and tunnels
+  over it included; the stretches between are divided into slots on their own. A street through a plain node stays one stretch. Names keep
+  `line-center` and the class sort key. An arrow needs a stretch of 8 m, a name 20 m (with `slot_m` 100): a one-way stretch of 8 to 20 m
+  is an arrow slot (Monaco: 254 of 394 one-way chains have a piece, 177 when arrows also needed 20 m). See docs/design/arrows_and_names.md.
+- **A two-way road's dead end is square by default** in the level area (`level_area.defaults`, `rs.auto_ends`; `levels.dead_end_cap`): an end with no `meet` row on a road that has both directions. With one casing around both directions, two half-width round fill ends left a notch at the tip. One-way roads and ends that meet a road keep their rule; `caps.csv` always wins. `render_edges` does the same without a level area or cap columns (`_mark_twin_dead_ends`): a pair's end that no other edge has an end point at (lines crossing or touching mid-line do not count) is square for the casing and both fills, unless the data gives that end a cap (`cap_col` / `cap_start_col` / `cap_end_col`, `"round"` too); `twin_casing="each"` keeps the blob.
+- **A two-way road has one casing around both directions** (setting `twin_casing`, `"one"` by default; `"each"` = the look
+  before), with the level columns given or computed by `render_edges` itself (a plain call). The pair's casing is cut once, from the first edge's pieces, unshifted and as wide as both directions together; the other edge has no
+  casing piece; each direction keeps its own fill, colour and caps. Ends are caps, no blob (`twin_end_caps` applies to `"each"` only); the
+  first edge's start is the second's end, so each cap is the first edge's own at that end. The twins must agree reversed (casing numbers, heads,
+  caps), else a warning names the pair. Simple mode, the full look and `tiles=True`; the bridge shadow and the tunnel dashes follow the one
+  casing; the pieces name both edges (`__rs_edge2`), so the casing shows while either direction does. A bridge such as Avenue de France
+  (Monaco) was two dark bands with square ends.
+- **The level editor draws both directions of a two-way road** as the final map does (one edge each, the other direction running the road's line
+  backwards with its heads and caps swapped): either direction picks the road, the search finds either edge id or edge_ref, the road card
+  lists each direction's edge id and edge_ref (`rs.level_input` now writes `edge_refs` / `reversed_refs`; an area made before shows the
+  other direction's id only), and the update in place after an Apply carries both edges' pieces.
+- **A two-way footway, path, steps, cycleway ... is one full-width line, not two lanes** (setting `single_line_classes`, default footway, path, steps,
+  pedestrian, cycleway, track, bridleway, corridor, platform; `[]` = lanes for all). Of a reverse pair only the first edge is drawn (so two reversed
+  dash patterns never overlap); the second is flagged `__rs_dup` and draws nowhere (simple, full look, `tiles=True`, the level editor). Both edges
+  keep their data and name each other (`__rs_edge2`): a click, `rsSelect` and the tooltip show "Direction 1" and "Direction 2" with each one's own
+  fields, `rs:select` carries `detail.twin`. Filters and colours treat the line as both edges: it shows (and takes a colour) while either edge is in
+  the `rsFilter` / `rsColor` set; hiding one direction alone is not possible (the class, bridge and tunnel switches hit both alike). No arrows.
+- **The level solver works from the tables only** (`pairs.csv` + `edits.csv`): a stack is written at make (`rs.level_input`, `roadstyle-levels make`,
+  `duckosm levels`, and inside `compute_levels`) as one row per part of the upper road that crosses the lower one (`a_end` `start` / `main` / `end`),
+  worked out once with the heads of that time (`heads.csv`, else `head_m`); no whole-road stack rows. The solver lifts exactly the named parts of the
+  enabled rows, with no geometry and no head lengths, so a head change never solves (the editor's `what_solver_sees` check is gone). Rows union; an
+  edit with `enabled=false` switches off that exact row. `solve_levels` loses `parts` and `near_rules`; `near_rules` moved to `level_input` /
+  `make --near-rules` (written as `near` rows, kept last). An old `pairs.csv` with whole-road stack rows, or an edit stack with no part, is an error
+  that says what to do (make again / name the part). Monaco all modes: 4,918 whole-road rows to 487 part rows; 14.8 s, 0 given up, 22 wishes not kept.
+- **The level editor redraws only the roads an Apply changed, in place** (no page reload): the server finds the roads whose levels, heads
+  or caps are drawn differently and sends their features (roads, simple pieces, and the names / arrows when a fill number changed), built
+  by `render(_edges=...)`; the page swaps them with `GeoJSONSource.updateData`. More than 1,500 changed roads: the whole page again, said
+  in the status line. Monaco all modes, one cap: 6.1 s to 0.7 s from Apply to drawn. The roads and simple sources carry feature ids
+  (the roads source its index, as `generateId` gave; a piece `16 * edge + k`).
+- **A local re-solve keeps the untouched roads' numbers exactly** (`level_area.solve_local`): the result is shifted back when the solver's ground
+  moved, so the editor's update in place sees only the roads that really moved (fixed roads that moved by different amounts: an error).
+- **Simple mode's line-sort-key has a per-edge tie-breaker** (`+ edge * 1e-8`, under the smallest key step of 0.05; at most 1,000,000 edges, more is
+  an error that says to pass `simple=False`): pieces with the same key are drawn by edge, so a road redrawn in place keeps its place.
+- **The level editor's stack box**: start head / main / end head, several at once, one row each; *whole road* adds all three. *Switch off all found
+  stack rows of this pair* (one switch-off per row) to override a found stack.
+- **The level solver's near rules are off by default** (`near_rules=False` in `level_input` and `compute_levels`; CLI `make --near-rules` turns them on).
+  A part that only comes near the road under it is not lifted (as if switched off); `attrs["levels_near"]` is empty. Monaco all modes: 14.4 s, 9 positions, 0 given up,
+  against 45.9 s, 27 positions with 11,911 near rules, 1,477 of them broken anyway.
+- **`tunnel_control=True` works in simple mode:** the *Tunnels* box, with its palette and dash-ratio selects, and `rsSetTunnelStyle({strength, toward, palette, ratio})` recolour the one road layer (and the names, arrows and items that take the tunnel look).
+- **Simple mode draws dashes and end shapes (MapLibre 5.24 per-feature `line-dasharray` and `line-cap`):** a tunnel's casing is two pieces in the one layer, a solid one in the palette's gap colour (clear for *One colour*) and the dashes on top, 3 px wider than a casing; a dashed class's fill (footway, path, steps ...) has the full look's dash pattern; each road's end shapes (`cap_col`, `cap_start_col`, `cap_end_col`, the level editor's round / square / flat) are drawn per piece, two different ends as two fill halves and casing heads, as the full look. A casing's main piece stays round.
+- **Simple mode: the bridge shadow and the wider bridge casing grow with the zoom:** none below zoom 14 (no shadow, the full look's bridge casing), linearly to the full values at zoom 17 and above (they were too strong zoomed out).
+- **`simple=True` is the default** for every web map (`render_edges`, the dashboard, report and street-view pages, the level editor): one road layer (with the dashes and end shapes above),
+  a blurred bridge shadow. `simple=False` draws the full look. `tiles=True` works with simple mode: the pieces of the one road layer are a layer
+  (`simple`) of the embedded archive, read by `roads-simple` as a vector source layer; the command line (`--tiles`) and the Studio (vector tiles) use simple mode too.
+- **One tunnel slider for every colour**: the steps 0, 25, 50, 55, 60, 65, 70, 75, 100, and `tunnel_strength` defaults to 60 (was 35), and the default target is Sand (was slate), so the default tunnel look changes.
+- **The level editor does not solve for a head change** (see the first entry: the solver takes no heads).
+- **The level editor:** with two roads picked, the rules between them come first, above the road cards; the map's end marks stand beside
+  every start / end in the boxes and lists; a local re-solve with more drawing positions is kept (no full solve for that alone), a full solve
+  is a note, not a red error, and an error stays until clicked (also in the console and the server log).
+- **Casing cuts:** a seam reaches 0.5 m each way from its cut (a quarter of the shorter piece at most; a 2 cm seam lost its direction above
+  zoom 18), seams are drawn from zoom 17 in simple mode as in the full look, and below zoom 17 a flat lap lies across each cut, so a bridge's
+  outline has no thin gap.
+
+### Fixed
+- **Both directions of an unclassed road are a pair:** a missing class (None, NaN, "") is one value when edges are paired or grouped
+  (`_cls`: two-way marking, the twin casing, slots), so an edge pair with no `highway` is drawn as a pair, not as two different roads
+  (NaN != NaN). `render_edges` warns once when edges have no class, naming how many and up to 5 ids: they are drawn with the default
+  style; usually bad data, e.g. an area outline (`area:highway`) taken as a road (Monaco way 1549041737).
+- **The notebook preview draws again, with the bundled MapLibre (5.24 from the CDN, was 3.6.2):** 3.6 rejected simple mode's per-feature
+  `line-cap` / `line-dasharray`, so the default map was blank. Why the preview had been held at 3.6: it is an `<iframe srcdoc>`, whose
+  `location.origin` is `"null"`, while MapLibre's worker reports the notebook server's origin; MapLibre 4.0 to 5.19 drops worker messages
+  whose origin differs, so no source ever loaded (style never finished, zero roads). 5.20 accepts the `"null"` origin. Checked headless in
+  Jupyter Notebook 7.5 and JupyterLab 4.5: simple, `simple=False` and `tiles=True` draw their roads. A test pins the CDN version to the vendored one.
+- **The level editor refuses an exact copy of a rule already in `edits.csv` on Apply** (copies kept a rule working after one copy was deleted).
+
 ## [0.17.1] — 2026-10-07
 
 ### Fixed

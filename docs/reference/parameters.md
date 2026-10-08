@@ -49,9 +49,9 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | `use_settings(*sources)` | | apply settings (path or dict) for the process; no argument drops them |
 | `Overlay` | | an extra layer for the web backend ([below](#overlay)) |
 | **Helpers** | | |
-| `compute_levels(edges, band_col=None, order="priority", ...)` | edges + 4 columns | the level step in one call: `casing_start`, `casing_level`, `casing_end`, `fill_level` ([design](../design/level_input.md)) |
-| `level_input(edges, id_col="edge_id", ...)` | `(roads, pairs)` | the solver's input from any edges: one row per road, one row per relation (`meet`, `stack`, `order`) |
-| `solve_levels(roads, pairs, edits=None, ...)` | roads + 4 columns | the solver; `edits` switch pairs off or add them; `fixed` (`{road: (casing_start, casing_level, casing_end, fill_level)}`) holds those roads' numbers and solves the others (the editor's local re-solve) |
+| `compute_levels(edges, band_col=None, order="priority", ...)` | edges + 4 columns | the level step in one call (`near_rules=False`: set True to also lift parts that only come near; `head_m` decides once which parts of a stack cross, see [design](../design/level_input.md)): `casing_start`, `casing_level`, `casing_end`, `fill_level` ([design](../design/level_input.md)) |
+| `level_input(edges, id_col="edge_id", ...)` | `(roads, pairs)` | the solver's input from any edges: one row per road, one row per relation (`meet`, `stack` one row per crossing part of the upper road, `order`; `near` with `near_rules=True`); `head_m` / `heads` (a heads.csv table) decide which parts cross |
+| `solve_levels(roads, pairs, edits=None, ...)` | roads + 4 columns | the solver, from the tables only (a stack: one row per part, `a_end` start / main / end); `edits` switch rows off or add them; `fixed` (`{road: (casing_start, casing_level, casing_end, fill_level)}`) holds those roads' numbers and solves the others (the editor's local re-solve) |
 | `level_area.make_area(edges, folder, db=None, ...)` / `level_area.solve_area(folder)` | `(roads, pairs)` / solved roads | an area folder (`roadstyle-levels make` / `solve`); with `db` every solve also writes into that DuckDB file |
 | `save_area_levels(con, folder)` / `load_area_levels(con, edges)` | – / edges + 8 columns | an area's result into `visualization.edge_levels` and back (the four numbers and each edge's ends); reading checks the edges |
 | `resolve(highway, palette, tunnel, bridge)` | `ResolvedStyle` | one edge's resolved style |
@@ -60,7 +60,8 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | `normalize_highway(value)` | `(base, is_link)` | strip OSM `_link` |
 | `make_legend(spec, position="bottomleft")` | folium element | a folium legend from a `ResolvedFrame.legend` |
 
-A `WebMap` has `.html` (the page as a string), `.save(path)`, and shows inline in a notebook.
+A `WebMap` has `.html` (the page as a string), `.save(path)`, and shows inline in a notebook (Jupyter Notebook 7, JupyterLab): the
+preview loads the bundled MapLibre version (5.24) from the jsDelivr CDN instead of inlining it, so it needs the network.
 
 ## `render_edges`
 
@@ -155,8 +156,9 @@ setting, or a name the page does not have, is an error.
 | keyword | default | backends | what |
 |---|---|---|---|
 | `tiles` | `False` | web | pack the roads, the casing pieces and the end caps as embedded PMTiles (for ~10⁵ edges); needs `roadstyle[tiles]` |
+| `simple` | `True` | web | draw every road piece (the casings, cut into their heads, and the fills, every position) in ONE line layer, ordered by `line-sort-key` as the full look orders its layers, colour and width per feature: much faster to load and zoom on a big page. A bridge's casing is `bridge_casing_extra` px wider each side than in the full look, and its shadow lies evenly around its main part (blurred, not offset); both grow with the zoom: below zoom 14 no shadow and the full look's bridge casing, from 17 the full extra width and shadow. A tunnel's casing is two pieces (the palette's gap colour, then the dashes on top, `tunnel_casing_dash`), a dashed class's fill has its dash pattern, and each road's end shapes (`cap_col`, `cap_start_col`, `cap_end_col`) are drawn per piece (needs MapLibre 5.22, the bundled one; the notebook preview loads the same version). Leaves out the twin end caps. Street names and one-way arrows are one layer each, drawn above all roads (a name of a road under a bridge can show on the bridge); the items of `Overlay(edge_col=...)` too. With `tiles=True` the pieces are a tile layer of the archive; `tunnel_control=True` works, with its palette and dash-ratio selects. `simple=False` is the full look: dashes, square and flat ends, the offset shadow) |
 | `compress` | `True` | web | gzip the inlined data; `False` = plain JSON |
-| `tunnel_control` | `False` | web | on a map with tunnels, a *Tunnels* box (a tool for choosing the look): the tunnel slider in five steps (`tunnel_strength`: 0, 20, 35, 70, 100) with their names, the casing palette and the dash ratio ([design](../design/tunnel_look.md)) |
+| `tunnel_control` | `False` | web | on a map with tunnels, a *Tunnels* box (a tool for choosing the look): the colour list (`tunnel_toward`), the tunnel slider (`tunnel_strength`: 0, 25, 50, 55, 60, 65, 70, 75, 100), the casing palette and the dash ratio ([design](../design/tunnel_look.md)) |
 | any other keyword | | folium | passed to `folium.Map(...)` (e.g. `location`, `zoom_start`) |
 
 Returns a `WebMap` (web, `.save()`), a `folium.Map` (`.save()`) or a `lonboard.Map` (`.to_html()`).
@@ -293,10 +295,13 @@ The `config` block of the settings. Change it in a [settings override](settings.
 | `link_scale` | `0.7` | `*_link` width relative to the parent |
 | `tunnel_opacity_scale` | `0.45` | tunnel fade |
 | `tunnel_casing_dash` | `[1, 1]` | the tunnel casing's dash and gap, in line widths; a tunnel's casing is its dash layer alone |
-| `tunnel_strength` | `35` | the tunnel look, v2's slider (0-100): everything on a tunnel (fill, names, arrows, attached items) moves toward slate `#64748b`. Opaque, no see-through |
+| `tunnel_strength` | `60` | the tunnel look, v2's slider (0-100): everything on a tunnel (fill, names, arrows, attached items) moves toward the `tunnel_toward` colour. Opaque, no see-through. The Tunnels box has the steps 0, 25, 50, 55, 60, 65, 70, 75, 100 |
+| `tunnel_toward` / `tunnel_towards` | `Sand` / eight | the colour a tunnel moves toward: a name in `tunnel_towards` (`name: "#rrggbb"`: Slate `#64748b`, Dark `#14181d`, Light `#efede8`, Graphite `#374151`, Navy `#1e293b`, Stone `#78716c`, Sand `#d6cfc4`, Teal `#134e4a`) or any `#rrggbb`; the same for every base map. An unknown name or a bad colour is an error naming the choices |
 | `tunnel_palette` / `tunnel_palettes` | `Graphite + silver` / seven | the tunnel casing: a pattern of two colours as they are (the default `Graphite + silver`), or `One colour` (slate dashes, empty gaps); `name: [dash, gap]` (`Slate + ice`, `Blue + cyan`, `Warm + sand`, `Graphite + silver`, `Indigo + lavender`, `Teal + mint`); an unknown name is an error |
 | `tunnel_fill_dash` / `tunnel_fill_dash_color` | `[]` (none; e.g. `[1.2, 1.2]`) / `rgba(255,255,255,0.55)` | light dashes along a tunnel's fill, over any road colour (`[]` = none); a dashed class (steps, a dashed path) keeps only its own dashes |
+| `single_line_classes` | footway, path, steps, pedestrian, cycleway, track, bridleway, corridor, platform | a two-way pair (two reverse edges) of these classes is drawn as ONE line at full width, once, not as two lanes (a footway as two thin dashed lines looked wrong); both edges keep their data, a click shows both directions. `[]` = every pair is lanes |
 | `twin_end_caps` | `true` | a two-way road ends like one road: one road-wide round cap under its two lanes at each end, where both lanes have the same colour (`false` = each lane's own round end) |
+| `twin_casing` | `"one"` | a two-way road given as two directed edges: `"one"` = ONE casing around both directions, at the road's full width (a direction's casing + twice its offset), drawn once from the first edge's casing pieces (numbers, heads, caps; the twins must agree reversed, else a warning names the pair), each direction keeping its own fill; the end caps are the casing's own (no `twin_end_caps` blob); a pair's dead end (no other edge has an end point there) is square for the casing and both fills unless a cap column gives it a cap. The bridge shadow and the tunnel dashes follow it. `"each"` = each direction its own casing, half the width, shifted (the look before 2026-10-08) |
 | `bridge_casing_m` / `bridge_casing_px` | `0.25` / `1.0` | with metre widths (`width_m_col`): a bridge's deck casing is at least this wide each side in metres, whatever `casing_m` is, and never thinner than this many pixels each side at any zoom (metres are sub-pixel zoomed out), so the bridge look shows on lines with no casing |
 | `bridge_casing_extra` / `bridge_casing_color` | `1.5` / `"#64748b"` (slate) | bridge casing, px wider / colour |
 | `bridge_shadow` / `bridge_shadow_color` / `bridge_shadow_blur` / `bridge_shadow_offset` | `true` / `rgba(0,0,0,0.25)` / `4` / `[2, 2]` (and `bridge_shadow_trim_m` `3`: no shadow over the last 3 m where a bridge comes down) | a soft shadow under a bridge: a line per stretch at the lowest casing number of its edges, straight on through a junction where the numbers agree; none where the bridge comes down (position mode): px of blur, px shifted right and down (lit from the top left) |

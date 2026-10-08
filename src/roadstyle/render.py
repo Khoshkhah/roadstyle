@@ -1,6 +1,8 @@
 """Top-level ``render_edges`` — normalise input, filter, then render with the chosen backend."""
 from __future__ import annotations
 
+import warnings
+
 from collections.abc import Mapping
 
 from .edges import as_edges
@@ -23,6 +25,19 @@ def _color_map(table, key_col: str, color_col: str) -> dict:
         raise ValueError(
             f"color_table must be a dict, a Series, or a DataFrame with {key_col!r} and "
             f"{color_col!r} columns") from e
+
+
+def _warn_unclassed(g, col):
+    """Warn once when edges have no class (None, NaN or ""): they are drawn with the default style."""
+    if col not in g.columns:
+        return
+    bad = g[g[col].isna() | (g[col].astype(str).str.strip() == "")]
+    if bad.empty:
+        return
+    idc = next((c for c in ("edge_ref", "edge_id", "osm_edge_id", "id") if c in g.columns), None)
+    names = [str(v) for v in (bad[idc] if idc else bad.index)[:5]]
+    warnings.warn(f"{len(bad)} edges have no '{col}' value: they are drawn with the default style; usually bad data, e.g. an area outline "
+                  f"(area:highway) taken as a road ({idc or 'row'}: {', '.join(names)}{' ...' if len(bad) > 5 else ''})", stacklevel=3)
 
 
 def render_edges(
@@ -108,6 +123,8 @@ def render_edges(
     edges = as_edges(gdf, class_col=highway_col)   # canonical: RoadEdges (EPSG:4326, lines)
     g = edges.gdf
     col = edges.class_col
+
+    _warn_unclassed(g, col)
 
     # Decide styling. No data-driven args => classic OSM path (validate the class column).
     if color_table is not None:

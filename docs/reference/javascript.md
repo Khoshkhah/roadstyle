@@ -29,9 +29,9 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rsSetBridges(on)` | show / hide every bridge and its 3D deck (the filter panel's *Bridges* row) | `rs:filterchange` |
 | `rsSetTunnels(on)` | show / hide every tunnel, with its street names and arrows (the filter panel's *Tunnels* row) | `rs:filterchange` |
 | `rsSetColorField(nameOrIndex)` | switch the active `color_options` entry | `rs:colorchange` |
-| `rsSetTunnelStyle({strength, palette, ratio})` | move the tunnel look: `strength` 0-100, `palette` a name of `RS_TUNNEL_PALETTES`, `ratio` `[dash, gap]` (any may be left out) | `rs:tunnelchange` |
+| `rsSetTunnelStyle({strength, palette, ratio, toward})` | move the tunnel look: `strength` 0-100, `palette` a name of `RS_TUNNEL_PALETTES`, `ratio` `[dash, gap]`, `toward` a name of `RS_TUNNEL_TOWARDS` or a `#rrggbb` (any may be left out; another `toward` throws) | `rs:tunnelchange` |
 | `rsSetView(nameOrIndex)` | apply a `views` entry: each setting it names, through the functions of this table | `rs:viewselect` (and each function's own event) |
-| `rsSetRoadFill(on)` | show / hide the roads' own fill (`road_fill`); the casing stays | `rs:roadfillchange` |
+| `rsSetRoadFill(on)` | show / hide the roads' own fill (`road_fill`); the casing stays. With `simple=True` every road piece is the one layer `roads-simple` (source `simple`), and this function, `rsColor` and `rsSetColorField` set it too | `rs:roadfillchange` |
 | `rsSetOverlay(labelOrIndex, on)` | show / hide one overlay | `rs:overlaychange` |
 | `rsSetView3D(on)` | tilt to `camera.pitch_3d`, or back to flat and north-up | `rs:viewchange` |
 | `rsPanelShow(on)` | panel mode only: hide / show the docked side panel | |
@@ -48,7 +48,7 @@ All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
 
 | event | when | `e.detail` |
 |---|---|---|
-| `rs:select` | a road, or an item attached to it (`Overlay(edge_col=...)`), is clicked, or `rsSelect` runs | `id` (the road's), `layer` (`null` from `rsSelect`, the MapLibre layer id from a click), `properties` (the road's), `overlays` (`[{label, fields, properties}]` of clickable overlays under the point, a clicked item among them), `item` (only for an item of `Overlay(select="item")`: `{overlay, id, properties}`, the item itself, selected and highlighted in place of the road), `streetView` (URL or `null`) |
+| `rs:select` | a road, or an item attached to it (`Overlay(edge_col=...)`), is clicked, or `rsSelect` runs | `id` (the road's), `layer` (`null` from `rsSelect`, the MapLibre layer id from a click), `properties` (the road's), `overlays` (`[{label, fields, properties}]` of clickable overlays under the point, a clicked item among them), `item` (only for an item of `Overlay(select="item")`: `{overlay, id, properties}`, the item itself, selected and highlighted in place of the road), `streetView` (URL or `null`), `twin` (`{id, properties}` of the other direction when the road is half of a pair drawn as one line, `single_line_classes`; else absent) |
 | `rs:select` | a feature of an overlay that belongs to no road is clicked | `id`, `layer` and `overlay` (both the overlay label), `fields`, `properties` |
 | `rs:deselect` | a click on empty map, or `rsDeselect` | none |
 | `rs:filterchange` | `rsSetClasses` | `visible`, `hidden` (class lists) |
@@ -62,7 +62,7 @@ All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
 | `rs:basemapchange` | `rsSetBasemap` | `basemap` (key), `index` |
 | `rs:overlaychange` | `rsSetOverlay` | `overlay` (label), `visible` |
 | `rs:viewchange` | `rsSetView3D` | `view3d` |
-| `rs:tunnelchange` | `rsSetTunnelStyle` | `strength`, `palette`, `ratio` |
+| `rs:tunnelchange` | `rsSetTunnelStyle` | `strength`, `palette`, `ratio`, `toward` |
 | `rs:viewselect` | `rsSetView` | `view` (name), `index` |
 | `rs:roadfillchange` | `rsSetRoadFill` | `road_fill` |
 | `rs:streetviewchange` | `rsSetStreetView` | `open` |
@@ -88,6 +88,7 @@ Read-only globals for building your own controls.
 | `RS_CLASS_COL` | the column `RS_CLASSES` came from |
 | `RS_CLASS_COLORS` | `{class: fill colour}` |
 | `RS_COLOR_OPTIONS` | `[{name, prop, legend}]`, the `color_options` entries |
+| `RS_TUNNEL_TOWARDS` | `{name: "#rrggbb"}`, the colours a tunnel can move toward |
 | `RS_TUNNEL_PALETTES` | `{name: [dash, gap] or null}`, the tunnel casing palettes (`null`: one colour) |
 | `RS_VIEWS` | `[{name, set}]`, the `views` entries |
 | `RS_OVERLAYS` | `[{label, source, layers, visible, color, popup, tooltip, under, interactive, …}]` |

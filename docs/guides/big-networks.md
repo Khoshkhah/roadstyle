@@ -30,7 +30,7 @@ Below ~10⁴ edges this is the simplest and just as fast as the options below.
 
 ## Towards ~10⁵ edges: `tiles=True`
 
-`tiles=True` embeds the roads as a PMTiles vector tileset in the same HTML file.
+`tiles=True` embeds the roads as a PMTiles vector tileset in the same HTML file. Both looks work with it: simple mode (the default) puts its road pieces in the tileset as one tile layer, `simple=False` its casing pieces and end caps.
 
 - The browser parses only the tiles in view, so a ~100k-edge map opens in seconds, not ~10 s.
 - Low zooms carry simplified geometry.

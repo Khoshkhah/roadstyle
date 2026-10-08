@@ -18,7 +18,7 @@ def _edges():
 
 
 def _props(html):
-    geo = json.loads(re.search(r'"data":\s*(\{.*?\}),\s*"generateId"', html, re.S).group(1))
+    geo = json.loads(re.search(r'"data":\s*(\{.*?\}),\s*"tolerance"', html, re.S).group(1))
     return {f["properties"]["edge_id"]: f["properties"] for f in geo["features"]}
 
 

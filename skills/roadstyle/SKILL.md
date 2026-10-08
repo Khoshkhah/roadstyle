@@ -32,7 +32,8 @@ Docs: https://khoshkhah.github.io/roadstyle/ (every keyword: `/reference/paramet
 - Every other column shows in the popup and is queryable from JavaScript, so join your data
   onto the edges as columns before rendering.
 - An edge is DIRECTED: its geometry runs the way traffic flows; a two-way road is two edges with
-  reversed geometry, drawn side by side. Don't dissolve or dedupe the twins.
+  reversed geometry, drawn side by side inside one casing (setting `twin_casing`, `"each"` = a casing each; a two-way footway, path, steps, cycleway ... is ONE full-width line, setting
+  `single_line_classes`; its click shows both directions). Don't dissolve or dedupe the twins.
 - Input may also be a file path, a GeoJSON dict, a pyarrow Table, or
   `rs.from_duckdb(con, "SELECT ..., ST_AsWKB(geom) AS geom FROM edges", geometry="geom", crs=4326)`.
 - **osmnx edges go in as they are** (0.9+): `rs.render_edges(ox.graph_to_gdfs(G, nodes=False))`.
@@ -67,10 +68,11 @@ m.save("map.html")                        # m.html is the page as a string
 - Other useful keywords: `include=[...]` / `exclude=[...]` (road classes), `view_3d=True`,
   `tiles=True` (above ~50k edges), `boundary=geojson` (dashed outline),
   `overlays=[rs.Overlay(gdf, placement="under"|"over", label=..., popup=[...])]`, attached to edges: `rs.Overlay(gdf, edge_col="edge_id", order_col="order")` (drawn at its edge's fill number, by order; a click selects its road, or with `select="item"` the item itself: `rs:select` `detail.item` plus the road), look from a library's theme: `rs.Overlay(gdf, style="dashed")` with `settings={"config": {"overlays": {"styles": {...}}}}` (`width_m`, `dash`, `min_zoom`, kind `text`), `render_edges(road_fill=False)` (the road's casing without its fill),
-  `road_popup="panel"` (docked read-out instead of a popup), `arrows=`, `labels=`.
+  `road_popup="panel"` (docked read-out instead of a popup), `arrows=`, `labels=`, `simple=` (default `True`: one road layer, fast on a big page;
+  names and arrows above all roads, no twin end caps; `simple=False` is the full look; both work with `tiles=True`).
 - Look: `palette="amber"` (the default), `"carto"`, `"highsat"`, `"mono"`. A street name shows where it fits inside its road
   (main roads from zoom 15-16, side streets from 17); one-way arrows on main roads from zoom 15, side streets from 17: check
-  with `rs.snapshot(m, "x.png", center=(lon, lat), zoom=17)`. Bridges: slate outline and a shadow; tunnels fade and are dashed.
+  with `rs.snapshot(m, "x.png", center=(lon, lat), zoom=17)`. Bridges: slate outline and a shadow; tunnels fade and are dashed. `settings={"config": {"tunnel_toward": "Dark"}}` (a name in `tunnel_towards`, or a `#rrggbb`) picks the colour they fade toward (default Sand; Dark or Light matching the base map keeps each class hue).
 - Ready-made pages: `rs.render_dashboard(edges, ...)` (query sidebar) and
   `rs.render_report(edges, ...)` (stats sidebar) and `rs.render_street_view(edges, ...)` (Google
   Street View beside the map, or under it with `layout="below"`, following the clicked road;

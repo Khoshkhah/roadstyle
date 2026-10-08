@@ -6,8 +6,9 @@ any road; only its look differs.
 
 ## The rule
 
-One slider, the **strength** (0 to 100, setting `tunnel_strength`, default 35 as v2; in the Tunnels box, off by default since 2026-10-07 (`tunnel_control=True`), five steps, Normal colors 0,
-Subtle 20, Balanced 35, Strong 70, Full 100), moves **everything on a tunnel the same way, toward one colour**, slate `#64748b`: the road's fill, its street names, its
+One slider, the **strength** (0 to 100, setting `tunnel_strength`, default 60 since 2026-10-08, 35 as v2 before; in the Tunnels box, off by default since 2026-10-07 (`tunnel_control=True`), the steps 0, 25,
+50, 55, 60, 65, 70, 75, 100), moves **everything on a tunnel the same way, toward one colour**, `tunnel_toward` (default Sand `#d6cfc4` since
+2026-10-08, slate `#64748b` before; see *One colour from a list* below): the road's fill, its street names, its
 one-way arrows, and every item attached to it with `Overlay(edge_col=...)` (lanes, lines, arrows, names). It makes no difference how an
 item was added ("the fading part applies on every item on a tunnel"). Everything else is unchanged.
 
@@ -18,12 +19,12 @@ The fill is **opaque**: no see-through fill and no underlay, so overlapping piec
 As v2, a tunnel's casing is drawn by its dash layer alone (the other casing layers leave a tunnel out), 3 px wider than a casing
 (1.5 px each side) so its colours show:
 
-The casing follows the slider like everything on a tunnel (2026-10-06): its colours move toward the same slate `#64748b`.
+The casing follows the slider like everything on a tunnel (2026-10-06): its colours move toward the same colour.
 
-- **One colour** (`tunnel_palette`; the default is two colours, `Graphite + silver`, 2026-10-06): dashes with empty gaps, `#94a3b8` at 0, moved toward slate.
+- **One colour** (`tunnel_palette`; the default is two colours, `Graphite + silver`, 2026-10-06): dashes with empty gaps, `#94a3b8` at 0, moved toward the colour.
   Why a second colour exists: with empty gaps, where a tunnel passes under a road it looks connected to it; a solid second colour
   closes the gaps. So the default should become a pair once one is chosen.
-- **A two-colour palette**: the palette's two colours, dash and gap, at any strength: as they are at 0, each moved toward slate as the
+- **A two-colour palette**: the palette's two colours, dash and gap, at any strength: as they are at 0, each moved toward the colour as the
   strength rises. (v2 blended the gap up from the background; at 35 % the second colour was hard to see.) v2's
   `Slate + ice`, `Blue + cyan`, `Warm + sand`, and three more to try with stronger second colours: `Graphite + silver`, `Indigo + lavender`,
   `Teal + mint` (`tunnel_palettes`, `name: [dash, gap]`).
@@ -42,7 +43,7 @@ look. While the slider is dragged, only its newest value is applied (once per fr
 ## How
 
 Each colour that takes the look is a MapLibre expression: for a feature with `__rs_tunnel`,
-`["interpolate", ["linear"], strength, 0, <colour>, 100, "#64748b"]`, else the colour (`_tun_mix` in Python, `_tunMix` in the page). The page
+`["interpolate", ["linear"], strength, 0, <colour>, 100, <tunnel_toward>]`, else the colour (`_tun_mix` in Python, `_tunMix` in the page). The page
 keeps each layer's colours without the look (`TUNNEL.layers`) and builds the expressions again when the slider moves; no data is baked per
 value. A two-colour casing is two layers with MapLibre's own dash, no image: the position's casing layer draws the tunnel's gap colour
 (transparent for One colour) and the dash layer the dash colour on top, both 3 px wider than a casing. v2 drew a pattern image instead;
@@ -50,7 +51,16 @@ measured on Monaco both take the same time per slider step (about 325 ms headles
 need no image to keep in step (2026-10-06). The street-name and arrow slots carry `__rs_tunnel` from their road; on a map with tunnels the arrow icon is an SDF one, coloured by
 `icon-color` (one symbol layer cannot mix SDF and plain icons). An item gets `__rs_tunnel` from its edge when the overlay is attached (`_edge_overlay`).
 
+## One colour from a list (2026-10-08)
+
+The colour everything moves toward is a choice (`tunnel_toward`, default `Sand`): a name in `tunnel_towards` (`name: "#rrggbb"`: Slate `#64748b`,
+Dark `#14181d`, Light `#efede8`, Graphite `#374151`, Navy `#1e293b`, Stone `#78716c`, Sand `#d6cfc4`, Teal `#134e4a`) or any `#rrggbb`. The same colour on
+every base map: the target does not follow the base-map switcher. Choosing the background colour of the base map (Dark on a dark map, Light on a light one)
+gives v2's "Pre-Mix": a motorway tunnel stays orange but dimmed, every class keeps its hue. There is one slider for every colour, with the steps 0, 25, 50,
+55, 60, 65, 70, 75, 100 and the default 60 (`tunnel_strength`; it was 35 toward slate before this change). The Tunnels box has the colour list and the slider;
+`rsSetTunnelStyle({toward})` takes a name or a colour. An unknown name or a bad colour is an error.
+
 ## Limits
 
-- At a high strength a tunnel's name nears its fill colour (everything moves to the same slate); at 100 they are one colour.
+- At a high strength a tunnel's name nears its fill colour (everything moves to the same colour); at 100 they are one colour.
 - A slider move resets an `rsColor` recolouring of an overlay attached to edges. `rsColor` on the roads is kept.

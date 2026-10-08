@@ -9,7 +9,7 @@ default tiles carry every class at every zoom, matching the inline look.
 
 Tiles carry ONLY the properties the style expressions read (``__rs_*`` paints, the class/filter
 columns, ``__rs_twoway``, ``lvl``) plus the feature ``id`` (= the feature's index, the same id space
-as ``generateId`` today). Everything else — full attributes for popups/`rsQuery`, per-edge
+as the inline roads' own ``id``). Everything else — full attributes for popups/`rsQuery`, per-edge
 midpoints and bboxes for `rsSelect`/`rsFocus` — travels in a small gzipped sidecar table the
 page inflates separately (see render_web).
 
@@ -86,8 +86,7 @@ def build_pmtiles(fc: dict, *, class_col: str, keep: set, minzoom_table: dict | 
                   extra_layers: list | None = None, line_layers: list | None = None) -> bytes:
     """Encode GeoJSON FeatureCollections (lon/lat) into a PMTiles archive (bytes).
 
-    Feature ``id`` = index in ``fc["features"]`` — the exact id space ``generateId`` gives the
-    inline version, so feature-state, ``rsFilter``/``rsColor`` id filters and the sidecar table
+    Feature ``id`` = index in ``fc["features"]`` — the exact id space the inline version gives each feature (its own ``id``), so feature-state, ``rsFilter``/``rsColor`` id filters and the sidecar table
     all line up. Per zoom, features whose class sits below its ``minzoom_table`` entry are left
     out (they pop in when zooming — same rule the visual ``minzoom`` filter uses), geometry is
     simplified to ~half a tile pixel and clipped to the tile + buffer (skipped when the feature

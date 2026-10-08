@@ -161,13 +161,27 @@ def _relations(metres, ends, beta, omega, band_dist, mouths=True):
     return meets, stacks, orders
 
 
-def _solve_intervals(metres, meets, stacks, orders, limit, max_level, margin, min_positions=True, max_positions=None, forced=(), off=(), empty=(), near=(), fix=None):
-    """The solver on roads (one per segment, both directions together) and their relations (:func:`_relations`, or a pairs table). Every road has
-    one fill number ``b`` and a casing of three parts: a start head, a main part and an end head, whatever its length (2026-10-06: the
-    drawing gives a part its metres, zero for the main part of a road shorter than its two heads; the solver takes no length). ``empty``: the
-    roads whose main part is drawn with no length; a stack never lifts it (a rule on a part nobody sees would only cost real ones). ``near``:
-    the stack rules ``(upper, lower, "s" / "m" / "e")`` whose part does not cross the lower road: kept last, after the order wishes (2026-10-06: a part that only comes near is a warning, never worth a real crossing or a wish); an edit's part is never near.
-    ``fix``: ``{road: (a_start, a_main, a_end, b)}``, numbers held as they are (bounds; the editor's local re-solve), the others solved with the same rules.
+def _difference_rules(n, meets, lifts, orders, margin):
+    """The rules of the solver as ``(i, j, w, rule)``: ``x_i - x_j <= w`` on the columns of :func:`_solve_intervals` (``b_r`` = r; the casing
+    parts of road r = n + 3 r + 0 / 1 / 2 for start / main / end). ``rule``: None for H1 (each casing part under its road's fill), else
+    ``("meet" / "stack" / "order", k)``, k the index into ``meets`` / ``lifts`` / ``orders``. H2: the heads of two roads that meet are each under
+    the other's fill; H3: the part ``(u, l, h)`` after l's fill by ``margin``; H4: ``(x, y)``, x's fill after y's by ``margin``."""
+    col = lambda r, h: n + 3 * r + "sme".index(h)             # noqa: E731
+    out = [(col(r, h), r, 0.0, None) for r in range(n) for h in "sme"]
+    for k, (x, ex, y, ey) in enumerate(meets):
+        out += [(col(x, ex[0]), y, 0.0, ("meet", k)), (col(y, ey[0]), x, 0.0, ("meet", k))]
+    out += [(l, col(u, h), -margin, ("stack", k)) for k, (u, l, h) in enumerate(lifts)]
+    out += [(y, x, -margin, ("order", k)) for k, (x, y) in enumerate(orders)]
+    return out
+
+
+def _solve_intervals(metres, meets, stacks, orders, limit, max_level, margin, min_positions=True, max_positions=None, near=(), fix=None):
+    """The solver on roads (one per segment, both directions together) and their relations (a pairs table). Every road has one fill number
+    ``b`` and a casing of three parts: a start head, a main part and an end head, whatever its length; the solver takes no length and no
+    geometry (2026-10-08: it works from the tables only, so a head change never needs a solve). ``stacks``: ``(upper, lower, "s" / "m" / "e")``,
+    that part of the upper road's casing after the lower road's fill; ``near``: the same for parts that only come near the lower road (pairs.csv's
+    ``near`` rows, written by make with ``near_rules``): kept last, after the order wishes, a broken one a warning. ``fix``: ``{road: (a_start,
+    a_main, a_end, b)}``, numbers held as they are (bounds; the editor's local re-solve), the others solved with the same rules.
     Returns ``(parts, given_up, info)``: ``parts[r] = (a_start, a_main, a_end, b)``. The model is a linear program solved on a sparse matrix with
     HiGHS (docs/design/levels_split_casing.md, section 7)."""
     import time
@@ -177,10 +191,10 @@ def _solve_intervals(metres, meets, stacks, orders, limit, max_level, margin, mi
     import scipy.sparse as sp
     t0, n = time.time(), len(metres)
     zero = [(0, 0, 0, 0)] * n
-    whole = set(stacks)                                        # the stack pairs of the whole road (the rule below); forced / off: (A, B, "s" / "m" / "e")
-    pair_list = sorted(whole | {(u, l) for u, l, _ in forced})
-    empty = set(empty)
-    info = {"pairs": len(pair_list), "roads": n, "meets": len(meets), "empty_mains": len(empty)}
+    stacks = set(stacks)
+    lifts = sorted(stacks | set(near), key=lambda t: (t[0], t[1], "mse".index(t[2])))     # a part named twice is one rule; a stack outranks a near
+    pair_list = sorted({(u, l) for u, l, _ in lifts})
+    info = {"pairs": len(pair_list), "roads": n, "meets": len(meets)}
     O = sorted(set(orders))
     if not pair_list and not O:
         return zero, [], {**info, "pairs": 0, "order_pairs": 0, "order_violations": 0, "solves": 0, "seconds": 0.0}      # no pair, no order: all zero is the optimum
@@ -197,11 +211,10 @@ def _solve_intervals(metres, meets, stacks, orders, limit, max_level, margin, mi
         for v, co in terms:
             rows.append(k), cols.append(v), vals.append(co)
         rhs.append(c)
-    for r, v in casing:
-        le([(v, 1.0), (r, -1.0)], 0.0)                         # H1: a_c <= b_road(c)
-    for x, ex, y, ey in meets:                                 # H2: the heads of two roads that meet are each under the other's fill
-        le([(part[x]["s" if ex == "start" else "e"], 1.0), (y, -1.0)], 0.0)
-        le([(part[y]["s" if ey == "start" else "e"], 1.0), (x, -1.0)], 0.0)
+    rules = _difference_rules(n, meets, lifts, O, margin)     # every rule x_i - x_j <= w (the editor's check reads the same ones)
+    for i, j, w, t in rules:
+        if t is None or t[0] == "meet":                        # H1, H2: hard
+            le([(i, 1.0), (j, -1.0)], w)
     if min_positions or max_positions:                         # section 7.3.1: H above and L below every number; the span H - L is in the cost
         H, Lo, first_nv = ncol, ncol + 1, ncol
         for v in range(first_nv):
@@ -211,37 +224,13 @@ def _solve_intervals(metres, meets, stacks, orders, limit, max_level, margin, mi
         if max_positions:                                      # at most max_positions numbers: H - L <= (max_positions - 1) steps (a hard bound;
             le([(H, 1.0), (Lo, -1.0)], (max_positions - 1) * margin)   # the stack pairs and the order wishes give way to it)
     base = len(rhs)
-    # H3, A over B (2026-10-06): every part of A's casing (start head, main part, end head; a short road's one number), and so its fill (H1),
-    # after B's fill: b_B + margin <= a_(A, part). Left out: a head of A that joins B, or joins a road that joins B (the next piece of the tunnel
-    # A runs into at its mouth): a junction, where the head is under the fills it joins (H2); without it such a head and the head of a street
-    # over that next piece made a loop no order can keep. Two ramps, each over one tube of a tunnel and joining the other tube, still make one:
-    # the solver gives one of their pairs up and says so (Monaco: 16).
-    touching = defaultdict(set)                                # road -> the roads it shares a node with
-    for x, _, y, _ in meets:
-        touching[x].add(y)
-        touching[y].add(x)
-    at_head = defaultdict(set)                                 # (road, "s" / "e") -> the roads that head joins
-    for x, ex, y, ey in meets:
-        at_head[(x, "s" if ex == "start" else "e")].add(y)
-        at_head[(y, "s" if ey == "start" else "e")].add(x)
-    def junction(u, heads, l):
-        return any(l in at_head[(u, h)] or at_head[(u, h)] & touching[l] for h in heads)
-    stack_rows, row_near = [], []                              # (pair index, the casing column it lifts); whether that rule is only "near"
-    near = set(near)
-    off, forced = set(off), set(forced)
-    for k, (u, l) in enumerate(pair_list):
-        lift = []
-        if (u, l) in whole:
-            lift = [part[u][h] for h in ("m", "s", "e") if (u not in empty if h == "m" else not junction(u, (h,), l)) and (u, l, h) not in off]
-        own = {part[u][h] for (a, b, h) in forced if (a, b) == (u, l)}          # an edit's part: lifted even at a junction, never near
-        name = {c: h for h, c in part[u].items()}
-        for c in dict.fromkeys(lift + sorted(own)):
-            stack_rows.append((k, c))
-            row_near.append(c not in own and (u, l, name[c]) in near)
-    for k, c in stack_rows:
-        le([(pair_list[k][1], 1.0), (c, -1.0)], -margin)
-    for x, y in O:
-        le([(y, 1.0), (x, -1.0)], -margin)                     # H4: b_y + margin <= b_x
+    # H3, A over B: each named part of A's casing (start head, main part, end head), and so its fill (H1), after B's fill: b_B + margin <= a_(A, part)
+    k_of = {p: k for k, p in enumerate(pair_list)}
+    stack_rows = [(k_of[(u, l)], part[u][h]) for u, l, h in lifts]      # (pair index, the casing column it lifts)
+    row_near = [t not in stacks for t in lifts]                         # whether that rule is only "near"
+    for i, j, w, t in rules:
+        if t is not None and t[0] != "meet":                   # H3 (stack rows, in the order of stack_rows), H4: given up in the stages
+            le([(i, 1.0), (j, -1.0)], w)
     nrow, nP, nO = len(rhs), len(stack_rows), len(O)
     A0 = sp.csr_matrix((vals, (rows, cols)), shape=(nrow, ncol))
     b_ub = np.array(rhs)
@@ -359,15 +348,19 @@ def _metres(geoseries):
 
 
 def level_input(edges, id_col="edge_id", layer_col="layer", bridge_col="bridge", tunnel_col="tunnel", band_col=None, order="priority",
-                highway_col="highway", junction_col="junction", band_dist=10.0):
+                highway_col="highway", junction_col="junction", band_dist=10.0, head_m=5.0, heads=None, near_rules=False):
     """The solver's input (docs/design/level_input.md), from any edges roadstyle draws: ``(roads, pairs)``.
 
     ``roads``: one row per road (both directions of a segment together): ``road`` (the ``id_col`` of its first edge, as text; the row number
     without ``id_col``), ``edges`` / ``reversed`` (the ids of its edges in its own direction / the other way), ``band`` (``band_col``, else the
     level from the tags), ``priority`` (the ``order``: ``"priority"``, ``"class"``, a column of numbers, or None) and the geometry of its first
-    edge, and its ``highway_col``, ``name``, ``edge_ref``, ``lanes``, ``modes`` (who may use it, e.g. duckOSM's travel modes), ``tunnel_col``, ``bridge_col`` and ``layer_col`` when the edges have them. ``pairs``: one row per relation, ``relation`` / ``a`` / ``b`` / ``a_end`` / ``b_end``: ``meet`` (the end ``a_end`` of ``a`` is the end
+    edge, and its ``highway_col``, ``name``, ``edge_ref`` (and ``edge_refs`` / ``reversed_refs``, each edge's, as ``edges`` / ``reversed``), ``lanes``, ``modes`` (who may use it, e.g. duckOSM's travel modes), ``tunnel_col``, ``bridge_col`` and ``layer_col`` when the edges have them. ``pairs``: one row per relation, ``relation`` / ``a`` / ``b`` / ``a_end`` / ``b_end``: ``meet`` (the end ``a_end`` of ``a`` is the end
     ``b_end`` of ``b``), ``stack`` (``a`` is over ``b``: different bands, crossing or near away from a shared node) and ``order`` (``a``'s fill
-    after ``b``'s where they meet: one band, or different bands that only meet). With ``band_col`` the caller's bands decide over and under
+    after ``b``'s where they meet: one band, or different bands that only meet). A stack is one row per part of ``a``'s casing that must be
+    after ``b``'s fill, its ``a_end`` ``start`` / ``main`` / ``end`` (2026-10-08): the parts that cross ``b``, worked out here once with the heads
+    ``head_m`` long, or ``heads``' own (a table or CSV ``road``, ``start_m``, ``end_m``, as heads.csv; :func:`casing_parts`), leaving out a head
+    at a junction with ``b`` and an empty main part (:func:`_stack_parts`); the solver takes no geometry. ``near_rules``: also a ``near`` row for each
+    part that only comes near ``b`` (the solver's last priority, a warning when broken). With ``band_col`` the caller's bands decide over and under
     everywhere: roads of different bands are a stack pair even where they only meet (a zebra crossing set over its street stays over it)."""
     import geopandas as gpd
     import pandas as pd
@@ -392,7 +385,8 @@ def level_input(edges, id_col="edge_id", layer_col="layer", bridge_col="bridge",
     elif order:
         omega = [None if pd.isna(v) else float(v) for v in pd.to_numeric(head[order], errors="coerce")]
     re_ = [ends[i] for i in first]
-    meets, stacks, orders = _relations(list(_metres(head.geometry)), re_, beta, omega, band_dist, mouths=not band_col)
+    metres = list(_metres(head.geometry))
+    meets, stacks, orders = _relations(metres, re_, beta, omega, band_dist, mouths=not band_col)
     name = [ids[i] for i in first]
     mine = [[] for _ in first], [[] for _ in first]
     for i, r in enumerate(rid):
@@ -405,9 +399,18 @@ def level_input(edges, id_col="edge_id", layer_col="layer", bridge_col="bridge",
             v = g["modes"].iloc[i]
             both[r] += [] if v is None or v != v else [t for t in str(v).split(" + ") if t not in both[r]]
         shown["modes"] = [" + ".join(m) or None for m in both]
+    if "edge_ref" in g.columns:                         # each edge's own edge_ref, as edges / reversed (the editor shows both directions)
+        refs = ([[] for _ in first], [[] for _ in first])
+        for i, r in enumerate(rid):
+            v = g["edge_ref"].iloc[i]
+            refs[0 if same[i] else 1][r].append(None if v is None or v != v else str(v))
+        shown["edge_refs"], shown["reversed_refs"] = refs
     roads = gpd.GeoDataFrame({"road": name, "edges": mine[0], "reversed": mine[1], "band": beta,
                               "priority": omega if omega is not None else [None] * len(first), **shown}, geometry=list(head.geometry), crs=g.crs)
-    rows = ([("meet", name[x], name[y], ex, ey) for x, ex, y, ey in meets] + [("stack", name[u], name[l], None, None) for u, l in stacks]
+    lift, near = _stack_parts(metres, name, meets, stacks, casing_parts(roads, head_m, heads))
+    word = {"s": "start", "m": "main", "e": "end"}
+    rows = ([("meet", name[x], name[y], ex, ey) for x, ex, y, ey in meets] + [("stack", name[u], name[l], word[h], None) for u, l, h in lift]
+            + ([("near", name[u], name[l], word[h], None) for u, l, h in near] if near_rules else [])
             + [("order", name[x], name[y], None, None) for x, y in orders])
     return roads, pd.DataFrame(rows, columns=["relation", "a", "b", "a_end", "b_end"])
 
@@ -424,6 +427,18 @@ def _read_pairs(pairs):
     return out
 
 
+def dead_end_cap(roads, pairs):
+    """The automatic cap of an end that meets no other road (no ``meet`` row at it), as ``{(road index, "start" / "end"): cap}``: ``"square"`` on
+    a two-way road (one casing around both directions: two half-width round fill ends left a notch at the tip), ``"round"`` on a one-way one."""
+    idx = {r: i for i, r in enumerate(roads["road"])}
+    met = set()
+    for row in _read_pairs(pairs):
+        if row["relation"] == "meet" and row["a"] in idx and row["b"] in idx:
+            met |= {(idx[row["a"]], row["a_end"]), (idx[row["b"]], row["b_end"])}
+    two = [len(e) > 0 and len(b) > 0 for e, b in zip(roads["edges"], roads["reversed"], strict=True)]
+    return {(i, end): "square" if two[i] else "round" for i in range(len(idx)) for end in ("start", "end") if (i, end) not in met}
+
+
 def auto_ends(roads, pairs, zoom=18.0, highway_col="highway", min_m=0.5, step=0.25, cover=0.99, levels=None):
     """Each road end's head length and cap from the geometry and the widths the page draws at ``zoom`` (2026-10-06: better than one
     number and one cap for all). Returns a table ``road``, ``start_m``, ``end_m``, ``cap_start``, ``cap_end`` (in the road's own way):
@@ -431,6 +446,7 @@ def auto_ends(roads, pairs, zoom=18.0, highway_col="highway", min_m=0.5, step=0.
     * a head reaches as far as the road's drawing still overlaps a road joined at that end: from the node along the road until its line is
       ``(own width + the other's) / 2`` from every joined road (a right angle: about half the other's width; a narrow merge: much more); a
       dead end has ``min_m``; start + end never more than the road (cut in their ratio);
+    * a dead end's cap is :func:`dead_end_cap`'s (square on a two-way road);
     * a cap is ``"round"`` where the round end of its fill lies inside the fills of the roads joined there that are drawn at its level or
       above (at least ``cover`` of its half disc), else ``"flat"``: a round end on top of a lower road shows as a bump on it (a road going
       on into a lower piece, 2026-10-06), and one reaching out of the joined roads crosses their outlines (a wide road ending on a
@@ -465,13 +481,14 @@ def auto_ends(roads, pairs, zoom=18.0, highway_col="highway", min_m=0.5, step=0.
             a, b = idx[row["a"]], idx[row["b"]]
             joins.setdefault((a, row["a_end"]), set()).add(b)
             joins.setdefault((b, row["b_end"]), set()).add(a)
+    dead = dead_end_cap(roads, pairs)
     rows = []
     for i, g in enumerate(geo):
         n, out = g.length, []
         for end in ("start", "end"):
             J = sorted(joins.get((i, end), ()))
             if not J or n == 0:
-                out.append((min_m, "round"))
+                out.append((min_m, dead.get((i, end), "round")))
                 continue
             line = g if end == "start" else shapely.LineString(list(g.coords)[::-1])
             d = 0.0
@@ -496,8 +513,8 @@ def auto_ends(roads, pairs, zoom=18.0, highway_col="highway", min_m=0.5, step=0.
 def casing_parts(roads, head_m=5.0, heads=None):
     """Each road's three casing parts as drawn, in metres: ``{road: (start head, main part or None, end head)}``; the heads ``head_m`` long
     or ``heads``' own (a table or CSV: ``road`` (any edge id of it), ``start_m``, ``end_m``; empty = ``head_m``), a road shorter than its two
-    heads cut in their ratio with no main part. For :func:`solve_levels`' ``parts``: which main parts are empty, and which parts of an upper
-    road cross the road under it (the others only come near). The solver itself takes no length."""
+    heads cut in their ratio with no main part. For :func:`level_input` (make): which main parts are empty, and which parts of an upper
+    road cross the road under it (the others only come near), decided once into the stack rows. The solver takes no length."""
     import pandas as pd
     from shapely.ops import substring
     hl = {r: [head_m, head_m] for r in roads["road"]}
@@ -536,20 +553,32 @@ def _crosses(part, upper, lower, tol=0.5):
     return not x.difference(ends).is_empty
 
 
-def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=60.0, min_positions=True, max_positions=None, parts=None, fixed=None):
-    """Solve the drawing levels of ``roads`` from their ``pairs`` (both from :func:`level_input`, or read back from ``roads.parquet`` /
-    ``pairs.csv``) and the caller's ``edits`` (a table or a CSV with the columns of ``pairs`` and ``enabled``: a row with ``enabled`` false
-    switches off the same relation of ``pairs``, any other row is added; ``a`` / ``b`` may name any edge of a road, and a ``meet`` naming the
-    edge that runs the other way has its end (start / end) turned to the road's way; a ``meet`` is the same in either order). A ``stack`` edit may name
-    a part of A in ``a_end``: ``start`` / ``main`` / ``end`` (empty: the whole road, the rule with its junction exceptions). Added, that part is after
-    B's fill even at a junction; switched off, only that part of the found pair is left out. Returns ``roads`` with
-    ``casing_start``, ``casing_level``, ``casing_end`` and ``fill_level`` (in the road's own direction); ``attrs["levels_given_up"]`` (the
-    stack pairs that could not be kept, as road ids) and ``attrs["levels_info"]``. Every road has three casing parts whatever its length: the head lengths are the drawing's (``render_edges(head_m=...)``);
-    ``parts`` (:func:`casing_parts`: the parts as drawn) tells it the roads whose main part has no length (never lifted) and, for each stack
-    pair, which parts of the upper road cross the lower one: a part that only comes near is a last-priority rule, and when it breaks a
-    warning (``attrs["levels_near"]``), not a given-up pair. Without ``parts`` every main part counts and every rule is a crossing.
-    ``fixed``: ``{road: (casing_start, casing_level, casing_end, fill_level)}``, numbers of an earlier result held as they are; only the other
-    roads are solved, with the same rules (the level editor's local re-solve, level_area.solve_local)."""
+def _stack_parts(metres, ids, meets, stacks, parts):
+    """The parts of each stack pair's upper road that must be over the lower one, at make time: ``(lift, near)``, each ``(upper, lower,
+    "s" / "m" / "e")`` (road indexes). ``parts``: :func:`casing_parts`. Left out: an empty main part (it is never drawn), and a head of A that
+    joins B, or joins a road that joins B (the next piece of the tunnel A runs into at its mouth): a junction, where the head is under the fills
+    it joins; without that, such a head and the head of a street over that next piece made a loop no order can keep. Two ramps, each over one
+    tube of a tunnel and joining the other tube, still make one: the solver gives one of their pairs up and says so. Of the others, a part that
+    crosses B is in ``lift``, a part that only comes near it in ``near``."""
+    touching, at_head = defaultdict(set), defaultdict(set)     # road -> the roads it shares a node with; (road, "s" / "e") -> the roads that head joins
+    for x, ex, y, ey in meets:
+        touching[x].add(y)
+        touching[y].add(x)
+        at_head[(x, "s" if ex == "start" else "e")].add(y)
+        at_head[(y, "s" if ey == "start" else "e")].add(x)
+    lift, near = [], []
+    for u, l in stacks:
+        for h, p in zip("sme", parts[ids[u]], strict=True):
+            if p is None or (h != "m" and (l in at_head[(u, h)] or at_head[(u, h)] & touching[l])):
+                continue
+            (lift if _crosses(p, metres[u], metres[l]) else near).append((u, l, h))
+    return lift, near
+
+
+def merged_relations(roads, pairs, edits=None):
+    """The pairs with the edits on top: key -> row, an edit's row marked ``own``. The rows union (2026-10-08): an edit row adds its relation
+    (a stack: one part of A), an edit with ``enabled`` false switches off that exact row (a stack: pair and part); nothing else overrides
+    anything. A stack or near row with no part (a pairs.csv made before 2026-10-08, one row for the whole road) is an error: make it again."""
     of, back = {}, set()                                       # any edge id -> its road's row; the ids of the edges that run against their road
     for i, r in enumerate(roads.itertuples()):
         for e in [r.road, *list(r.edges), *list(r.reversed)]:
@@ -558,52 +587,126 @@ def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=
     def key(row):
         if row["relation"] == "meet":                          # no direction: the same pair whichever road is named first
             return ("meet", *sorted([(row["a"], row["a_end"]), (row["b"], row["b_end"])]))
-        if row["relation"] == "stack":                         # a part of A, or the whole road ("")
-            return ("stack", row["a"], row["b"], row["a_end"] or "")
+        if row["relation"] in ("stack", "near"):               # one part of A
+            return (row["relation"], row["a"], row["b"], row["a_end"])
         return (row["relation"], row["a"], row["b"])
-    off = set()                                                # (A, B, part): switched off in a found whole pair
-    rel = {key(row): row for row in _read_pairs(pairs)}
+    rows = _read_pairs(pairs)
+    whole = [r for r in rows if r["relation"] in ("stack", "near") and r["a_end"] not in _PARTS]
+    if whole:
+        raise ValueError(f"pairs: {len(whole)} stack row(s) name no part of the upper road (first: {whole[0]['a']} over {whole[0]['b']}): a pairs.csv "
+                         "made before 2026-10-08, with one row for the whole road. Make the area again (roadstyle-levels make, or duckosm levels): it "
+                         "writes one row per part (a_end start / main / end); your edits.csv, heads.csv and caps.csv are kept")
+    rel = {key(row): row for row in rows}
     if edits is not None:
         for row in _read_pairs(edits):
-            if row["relation"] == "stack" and (row["a_end"] or "") not in ("", "start", "main", "end"):
-                raise ValueError(f"edits: a stack's part (a_end) is start, main, end or empty, not {row['a_end']!r}")
+            if row["relation"] in ("stack", "near") and row["a_end"] not in _PARTS:
+                raise ValueError(f"edits: a stack names one part of the upper road in a_end (start, main or end), not {row['a_end'] or 'none'!r} "
+                                 f"({row['a']} over {row['b']}); since 2026-10-08 there is no whole-road stack: one row per part")
             for c in ("a", "b"):
                 if row[c] not in of:
                     raise ValueError(f"edits: {row[c]!r} is not an edge of the roads")
-                if (row["relation"] == "meet" or (row["relation"] == "stack" and c == "a")) and row[c] in back:     # that edge's start is its road's end
+                if (row["relation"] == "meet" or (row["relation"] in ("stack", "near") and c == "a")) and row[c] in back:   # that edge's start is its road's end
                     row[c + "_end"] = {"start": "end", "end": "start"}.get(row[c + "_end"], row[c + "_end"])
                 row[c] = roads["road"].iat[of[row[c]]]
             if str(row.get("enabled", "")).strip().lower() in ("false", "0", "no"):
                 k = key(row)
                 if rel.pop(k, None) is None:
-                    if k[0] == "stack" and k[3] and ("stack", k[1], k[2], "") in rel:        # one part of a found whole pair
-                        off.add((k[1], k[2], k[3]))
-                    else:
-                        raise ValueError(f"edits: no {row['relation']} pair {row['a']} {row['b']} {k[3] if k[0] == 'stack' else ''} to switch off".rstrip())
+                    raise ValueError(f"edits: no {row['relation']} pair {row['a']} {row['b']} {k[3] if len(k) == 4 and k[0] != 'meet' else ''} to switch off".rstrip())
             else:
-                rel[key(row)] = {**row, "own": True}           # yours: a stack of yours is never "near" (a warning)
+                rel[key(row)] = {**row, "own": True}
+    return rel
+
+
+_PARTS = ("start", "main", "end")
+
+
+def _indexed(roads, rel):
+    """The rows of ``rel`` (:func:`merged_relations`) on road indexes, as the solver takes them: ``{relation: [(rule, row)]}``; a rule is
+    ``(x, x_end, y, y_end)`` (meet), ``(upper, lower, "s" / "m" / "e")`` (stack, near) or ``(higher, lower)`` (order)."""
     idx = {r: i for i, r in enumerate(roads["road"])}
-    meets = [(idx[r["a"]], r["a_end"], idx[r["b"]], r["b_end"]) for r in rel.values() if r["relation"] == "meet"]
-    stacks = [(idx[r["a"]], idx[r["b"]]) for r in rel.values() if r["relation"] == "stack" and not r["a_end"]]
-    short = {"start": "s", "main": "m", "end": "e"}
-    forced = [(idx[r["a"]], idx[r["b"]], short[r["a_end"]]) for r in rel.values() if r["relation"] == "stack" and r["a_end"]]
-    off = [(idx[a], idx[b], short[h]) for a, b, h in off]
-    orders = [(idx[r["a"]], idx[r["b"]]) for r in rel.values() if r["relation"] == "order"]
-    empty, near = [], []
-    if parts is not None:
-        geo = list(_metres(roads.geometry))
-        ids = list(roads["road"])
-        empty = [i for i, r in enumerate(ids) if parts[r][1] is None]
-        own = {(idx[r["a"]], idx[r["b"]]) for r in rel.values() if r.get("own") and r["relation"] == "stack"}
-        near = [(u, l, h) for u, l in stacks if (u, l) not in own for h, p in zip("sme", parts[ids[u]], strict=True)
-                if p is not None and not _crosses(p, geo[u], geo[l])]
+    out = {"meet": [], "stack": [], "near": [], "order": []}
+    for r in rel.values():
+        if r["relation"] not in out:
+            raise ValueError(f"pairs: the relation {r['relation']!r} is not meet, stack, near or order")
+        a, b = idx[r["a"]], idx[r["b"]]
+        out[r["relation"]].append(((a, r["a_end"], b, r["b_end"]) if r["relation"] == "meet" else (a, b, r["a_end"][0])
+                                   if r["relation"] in ("stack", "near") else (a, b), r))
+    return out
+
+
+def rule_conflicts(roads, pairs, edits, rows, margin=1.0):
+    """The level editor's check before rules are added (2026-10-08): ``[(row, "duplicate" / "loop", [rule rows])]`` for each of ``rows`` (rules
+    as edits.csv rows) that conflicts with the enabled rules (``pairs`` with ``edits`` on top, and the ``rows`` before it). A duplicate: the same
+    row is there. A loop: a cycle of the solver's rules (:func:`_difference_rules`) through the new one, each keeping a number at or above the
+    next and at least one strictly above, back to the first: no numbers keep them all, so the solver gives one up. From the rules only, no
+    geometry: a path in the graph of ``x_i - x_j <= w`` (an arc j -> i, every ``w`` 0 or -margin) from the new rule's i back to its j that
+    has a strict arc if the new rule has none (a breadth-first search on (number, strict yet)). Rows with ``enabled`` false are not checked."""
+    from collections import deque
+
+    import pandas as pd
+    none = pd.DataFrame(columns=["relation", "a", "b", "a_end", "b_end"])
+    rel, n, out = merged_relations(roads, pairs, edits), len(roads), []
+    for row in rows:
+        if str(row.get("enabled", "")).strip().lower() in ("false", "0", "no"):
+            continue
+        ((k, new),) = merged_relations(roads, none, pd.DataFrame([row])).items()
+        if k in rel:
+            out.append((row, "duplicate", [rel[k]]))
+            continue
+        by, adj = _indexed(roads, rel), defaultdict(list)
+        lists = {"meet": by["meet"], "stack": by["stack"] + by["near"], "order": by["order"]}
+        for i, j, w, t in _difference_rules(n, *([r for r, _ in lists[x]] for x in ("meet", "stack", "order")), margin):
+            adj[j].append((i, w < 0, None if t is None else lists[t[0]][t[1]][1]))
+        ((rule, _),) = sum(_indexed(roads, {k: new}).values(), [])
+        kind = new["relation"] if new["relation"] != "near" else "stack"
+        mine = [x for x in _difference_rules(n, *([rule] if kind == x else [] for x in ("meet", "stack", "order")), margin) if x[3] is not None]
+        for i, j, w, _ in mine:
+            start = (i, w < 0)
+            prev, q, end = {start: None}, deque([start]), None
+            while q and end is None:
+                v, f = s = q.popleft()
+                for u, strict, src in adj[v]:
+                    t = (u, f or strict)
+                    if t not in prev:
+                        prev[t] = (s, src)
+                        if t == (j, True):
+                            end = t
+                            break
+                        q.append(t)
+            if end is not None:
+                path = []
+                while prev[end] is not None:
+                    end, src = prev[end]
+                    if src is not None and src not in path:
+                        path.append(src)
+                out.append((row, "loop", path[::-1]))
+                break
+        rel[k] = new
+    return out
+
+
+def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=60.0, min_positions=True, max_positions=None, fixed=None):
+    """Solve the drawing levels of ``roads`` from their ``pairs`` (both from :func:`level_input`, or read back from ``roads.parquet`` /
+    ``pairs.csv``) and the caller's ``edits`` (a table or a CSV with the columns of ``pairs`` and ``enabled``: a row with ``enabled`` false
+    switches off the same row of ``pairs``, any other row is added; ``a`` / ``b`` may name any edge of a road, and a ``meet`` naming the
+    edge that runs the other way has its end (start / end) turned to the road's way; a ``meet`` is the same in either order). A ``stack`` row names
+    one part of A in ``a_end``: ``start`` / ``main`` / ``end``; that part is after B's fill (several rows of a pair: each part). The solver works
+    from the tables only (2026-10-08): no geometry, no head lengths; which parts cross was decided when the pairs were made (:func:`level_input`).
+    ``near`` rows (``level_input(near_rules=True)``) are last-priority rules; a broken one is a warning (``attrs["levels_near"]``), not a given-up
+    pair. Returns ``roads`` with ``casing_start``, ``casing_level``, ``casing_end`` and ``fill_level`` (in the road's own direction);
+    ``attrs["levels_given_up"]`` (the stack pairs that could not be kept, as road ids) and ``attrs["levels_info"]``.
+    ``fixed``: ``{road: (casing_start, casing_level, casing_end, fill_level)}``, numbers of an earlier result held as they are; only the other
+    roads are solved, with the same rules (the level editor's local re-solve, level_area.solve_local)."""
+    by = _indexed(roads, merged_relations(roads, pairs, edits))
+    meets, stacks, near, orders = ([t for t, _ in by[k]] for k in ("meet", "stack", "near", "order"))
+    idx = {r: i for i, r in enumerate(roads["road"])}
     fix = None
     if fixed:                                                  # an earlier result's numbers (around its ground 0) into the box [0, 2 max_level]
         fix = {idx[r]: tuple((x + max_level) * margin for x in v) for r, v in fixed.items()}
         if any(not 0 <= x <= 2 * max_level * margin for v in fix.values() for x in v):
             raise ValueError(f"solve_levels: a fixed number is outside [-max_level, max_level] ({max_level})")
-    iv, given, info = _solve_intervals(list(_metres(roads.geometry)), meets, stacks, orders, time_limit, max_level, margin, min_positions,
-                                       max_positions, forced, off, empty, near, fix)
+    iv, given, info = _solve_intervals(list(roads["road"]), meets, stacks, orders, time_limit, max_level, margin, min_positions,
+                                       max_positions, near, fix)
     counts = defaultdict(int)                                  # the solution can sit at any height: the main casing number most edges have becomes 0 (the ground)
     for r, row in enumerate(roads.itertuples()):
         counts[iv[r][1]] += len(row.edges) + len(row.reversed)
@@ -621,7 +724,7 @@ def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=
 
 
 def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tunnel",
-                   method="solve", band_col=None, order="priority", highway_col="highway", junction_col="junction", band_dist=10.0, head_m=5.0, max_level=20, margin=1.0, time_limit=60.0, min_positions=True):
+                   method="solve", band_col=None, order="priority", highway_col="highway", junction_col="junction", band_dist=10.0, head_m=5.0, max_level=20, margin=1.0, time_limit=60.0, min_positions=True, near_rules=False):
     """A copy of ``edges`` with the drawing-order columns ``casing_start``, ``casing_level`` (the main part), ``casing_end`` and ``fill_level``;
     ``render_edges(casing_level_col=..., fill_level_col=...)`` draws by the last two (the heads are not drawn yet).
 
@@ -631,13 +734,15 @@ def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tu
     * the **band** of a road is the column ``band_col`` (integers) if given, else its level from the tags (``layer``, else bridge 1, tunnel -1, else 0);
       two roads within ``band_dist`` metres with different bands are a stack pair (the higher band is over the lower one), a crossing included;
     * every road's casing is divided into a start head, a main part and an end head; the heads merge with the roads that meet there, the main
-      part is stacked. ``head_m`` (the heads' length in the drawing) tells the solver which main parts are empty and which parts cross (:func:`casing_parts`) and is stored with the numbers (``attrs["levels_params"]``) as the head length to draw them with;
+      part is stacked. ``head_m`` (the heads' length in the drawing) decides once, before the solve, which parts of a stack's upper road cross the
+      road under it (:func:`level_input`; an empty main part is never lifted) and is stored with the numbers (``attrs["levels_params"]``) as the head length to draw them with;
     * ``order`` (a column of numbers, ``"class"`` for the renderer's class order, or ``"priority"``: roundabouts (``junction_col`` is ``roundabout`` or
       ``circular``), then tunnels, then bridges, then the class order): where roads of one band meet, the one with the higher number has the later fill
       where the other constraints allow; this is a wish, not a requirement. A road with no class takes no part in ``"class"`` or ``"priority"``.
     ``max_level``: the numbers are in ``[-max_level, max_level]``; ``margin``: how much later a road is painted where one must be painted after another
     (only the order matters: it changes the scale); ``time_limit``: seconds for each LP solve; ``min_positions``: also minimise the span of the numbers (fewer positions, a little
-    less compaction; section 7.3.1); False leaves it out.
+    less compaction; section 7.3.1); False leaves it out. ``near_rules``: also lift the parts that only come near the road under them, as last-priority
+    rules (a broken one is a warning in ``attrs["levels_near"]``); off by default (see :func:`solve_levels`).
     Results beyond the columns: ``result.attrs["levels_given_up"]`` = ``[(upper index, lower index)]`` (also warned about;
     ``attrs["levels_given_up_parts"]``: ``(upper, lower, "start" / "main" / "end")``, the parts that broke),
     ``result.attrs["levels_info"]`` = counts, order violations, solver status, seconds.
@@ -655,8 +760,8 @@ def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tu
         pos = [(c, c, c, f) for c, f in _tag_intervals(ends, lv)]
     else:
         roads, pairs = level_input(g, id_col=None, layer_col=layer_col, bridge_col=bridge_col, tunnel_col=tunnel_col, band_col=band_col,
-                                   order=order, highway_col=highway_col, junction_col=junction_col, band_dist=band_dist)
-        out = solve_levels(roads, pairs, parts=casing_parts(roads, head_m), max_level=max_level, margin=margin, time_limit=time_limit, min_positions=min_positions)
+                                   order=order, highway_col=highway_col, junction_col=junction_col, band_dist=band_dist, head_m=head_m, near_rules=near_rules)
+        out = solve_levels(roads, pairs, max_level=max_level, margin=margin, time_limit=time_limit, min_positions=min_positions)
         lv = out[["casing_start", "casing_level", "casing_end", "fill_level"]].to_numpy().tolist()
         pos = [tuple(lv[r]) if same[i] else (lv[r][2], lv[r][1], lv[r][0], lv[r][3]) for i, r in enumerate(rid)]   # the other direction: heads swapped
         given = out.attrs["levels_given_up"]

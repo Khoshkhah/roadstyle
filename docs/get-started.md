@@ -57,7 +57,7 @@ pip install "roadstyle[numeric,tiles]"   # extras combine; "roadstyle[all]" take
 
 The file is self-contained: it opens from disk with no server. Hover a road to highlight it, click
 it for its attributes, and switch the base map with the button at the bottom right. In a notebook
-the map shows inline.
+the map shows inline (it loads MapLibre from a CDN, so the preview needs the network).
 
 !!! note "Street View needs a server"
     The Street View button works only when the page is served over http(s), for example with
@@ -76,7 +76,8 @@ the map shows inline.
 | anything else | optional | shown in the popup, queryable from JavaScript |
 
 An edge is **directed**: its geometry runs the way traffic flows. A two-way road is two edges with
-reversed geometry, drawn side by side, so do not merge them.
+reversed geometry, drawn side by side as two lanes inside one casing (`twin_casing`), so do not merge them. A two-way footway, path, steps or cycleway
+(`single_line_classes`) is drawn as one full-width line instead; a click on it shows both directions.
 
 ## Loading data
 

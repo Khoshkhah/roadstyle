@@ -366,6 +366,7 @@ rs.compute_levels(edges, method="solve", band_col=None, order=None, band_dist=10
 | `max_level` | 20 | the range of the numbers: every casing and fill number is in `[0, 2 · max_level]` before the shift to the ground. A stack deeper than `2 · max_level / margin + 1` positions cannot be satisfied: the extra pairs are given up |
 | `margin` | 1.0 | `δ`: how much later a road must be painted where one must be painted after another. Only the order of the numbers matters, so it changes the scale and nothing else (with the range: the number of positions that fit). Must be greater than 0 |
 | `min_positions` | True | the span term of 7.3.1: fewer positions (layers) in the page, a little less compaction; `False` leaves it out |
+| `near_rules` | False | also lift the parts of a stack pair's upper road that only come near the lower one, as last-priority rules (off by default since 2026-10-08; an input of `level_input` / make since 2026-10-08, written as `near` rows, see `level_input.md`) |
 | `time_limit` | 60 | seconds for each LP solve |
 
 ### Output

@@ -1,6 +1,7 @@
 """A level area (docs/design/level_input.md): one folder with the solver's input, your changes and the result.
 
-    roadstyle-levels make SOURCE FOLDER [--query SQL]   # roads.parquet + pairs.csv (written again each run); edits.csv created empty once
+    roadstyle-levels make SOURCE FOLDER [--query SQL]   # roads.parquet + pairs.csv (written again each run, a stack's parts with heads.csv's
+                                                        # heads); edits.csv created empty once
     roadstyle-levels solve FOLDER                       # levels.csv + levels_info.json
     roadstyle-levels edit FOLDER [--port 8780]          # the level editor, a local page
 
@@ -32,12 +33,15 @@ def read_edges(source, query=None, geometry=None):
 
 def make_area(edges, folder, db=None, **level_input_kw):
     """The solver's input in ``folder``: roads.parquet and pairs.csv (rs.level_input, written again each run), and an empty edits.csv the
-    first time. With ``db`` (a .duckdb file), the area belongs to it (area.json): every solve also writes the result into it
+    first time. Which parts of a stack's upper road cross the road under it is decided here, once, with the heads of the folder's heads.csv
+    if there is one (else 5 m): a head changed later never needs a solve (2026-10-08). With ``db`` (a .duckdb file), the area belongs to it (area.json): every solve also writes the result into it
     (``visualization.edge_levels``, rs.save_area_levels), the editor's too. Returns (roads, pairs)."""
     import roadstyle as rs
 
-    roads, pairs = rs.level_input(edges, **level_input_kw)
     folder = Path(folder)
+    if (folder / "heads.csv").exists():
+        level_input_kw.setdefault("heads", folder / "heads.csv")
+    roads, pairs = rs.level_input(edges, **level_input_kw)
     folder.mkdir(parents=True, exist_ok=True)
     roads.to_parquet(folder / "roads.parquet")
     pairs.to_csv(folder / "pairs.csv", index=False)
@@ -73,10 +77,10 @@ def solve_area(folder, auto_ends=False, max_positions=None):
 
 def edge_levels(solved, ends_table):
     """One row per edge from one row per road (and its ends as drawn): an edge running the other way has its two heads and caps swapped."""
-    e = ends_table.set_index("road")
+    e = {r: v for r, *v in ends_table[["road", "start_m", "end_m", "cap_start", "cap_end"]].itertuples(index=False)}   # a dict: .loc per road took seconds
     rows = []
     for r in solved.itertuples():
-        hs, he, cs, ce = e.loc[r.road, ["start_m", "end_m", "cap_start", "cap_end"]]
+        hs, he, cs, ce = e[r.road]
         for x in r.edges:
             rows.append((x, r.casing_start, r.casing_level, r.casing_end, r.fill_level, hs, he, cs, ce))
         for x in r.reversed:
@@ -125,20 +129,23 @@ def ends(auto, heads, caps):
     return t.reset_index()
 
 
-def defaults(roads, pairs=None, head_m=5.0):
-    """Every road end as drawn unless you set it: ``head_m`` long heads and round caps (2026-10-06: automatic heads, made for one zoom,
+def defaults(roads, pairs, head_m=5.0):
+    """Every road end as drawn unless you set it: ``head_m`` long heads and round caps, square at a two-way road's dead end (2026-10-06: automatic heads, made for one zoom,
     were too short at the others; flat caps where two roads meet left small breaks at every joint that was not perfectly straight)."""
-    return pd.DataFrame({"road": list(roads["road"]), "start_m": head_m, "end_m": head_m, "cap_start": "round", "cap_end": "round"})
+    from .levels import dead_end_cap
+    dead = dead_end_cap(roads, pairs)      # a two-way road's dead end is square, see dead_end_cap
+    n = len(roads)
+    return pd.DataFrame({"road": list(roads["road"]), "start_m": head_m, "end_m": head_m,
+                         "cap_start": [dead.get((i, "start"), "round") for i in range(n)], "cap_end": [dead.get((i, "end"), "round") for i in range(n)]})
 
 
 def solve(roads, pairs, edits, heads, caps, auto=False, **kw):
-    """The whole step: the defaults (or ``auto``: rs.auto_ends' head lengths before solving and caps after), the solve, your own on top.
-    Returns (solved, the ends as drawn, the ends without yours)."""
+    """The whole step: the solve (from the tables only), and the ends as drawn: the defaults (or ``auto``: rs.auto_ends' head lengths and
+    caps, the caps from the solved levels), your own on top. Returns (solved, the ends as drawn, the ends without yours)."""
     import roadstyle as rs
 
-    base = rs.auto_ends(roads, pairs) if auto else defaults(roads, pairs)
-    first = ends(base, heads, caps)
-    solved = rs.solve_levels(roads, pairs, edits=edits, parts=rs.casing_parts(roads, 5.0, first[["road", "start_m", "end_m"]]), **kw)
+    base = defaults(roads, pairs)
+    solved = rs.solve_levels(roads, pairs, edits=edits, **kw)
     if auto:
         base = rs.auto_ends(roads, pairs, levels=solved)
     return solved, ends(base, heads, caps), base
@@ -193,6 +200,7 @@ def solve_local(roads, pairs, edits, heads, caps, previous, changed, hops=HOPS):
     except RuntimeError as err:                         # the solver failed (a time limit): not an error of the change
         why = f"the local solve failed ({err})"
     if why is None:
+        _keep_fixed(out[0], fixed)
         out[0].attrs["levels_info"]["resolve"] = {"how": "local", "free": len(free), "hops": hops, "seconds": round(time.time() - t0, 1)}
         return out
     out = solve(roads, pairs, edits, heads, caps)
@@ -200,10 +208,23 @@ def solve_local(roads, pairs, edits, heads, caps, previous, changed, hops=HOPS):
     return out
 
 
+def _keep_fixed(local, fixed):
+    """Shift the local result as a whole so the ``fixed`` roads keep exactly their numbers (2026-10-08): the solver puts its ground (the
+    most common main casing number) at 0, so a local result can come back shifted by k, and every road would look changed. The fixed roads
+    all agree on one k; when they do not, the solver did not hold them, and that is an error."""
+    now = dict(zip(local["road"], zip(*(local[c].tolist() for c in LEVELS), strict=True), strict=True))
+    shifts = {b - a for r, v in fixed.items() for a, b in zip(now[r], v, strict=True)}
+    if len(shifts) > 1:
+        raise RuntimeError(f"solve_local: the fixed roads moved by different amounts ({sorted(shifts)}): the solver did not hold them")
+    if shifts and (k := shifts.pop()):
+        for c in LEVELS:
+            local[c] = local[c] + k
+
+
 def _worse(local, previous):
     """Why the local result ``local`` cannot stand for the whole solve (None: it can): a crossing given up that ``previous`` kept (or did not
-    have), more order wishes not kept or near warnings than ``previous`` (counts: the solver trades one for another as the whole solve may),
-    or more drawing positions."""
+    have), more order wishes not kept or near warnings than ``previous`` (counts: the solver trades one for another as the whole solve may).
+    More drawing positions do not count (2026-10-08): in simple mode a position is only a sort number in the one road layer."""
     new = {tuple(p) for p in local.attrs["levels_given_up_parts"]} - {tuple(p) for p in previous.attrs.get("levels_given_up_parts", [])}
     if new:
         return f"{len(new)} crossing part(s) given up that were kept (first: {' '.join(sorted(new)[0])})"
@@ -211,8 +232,7 @@ def _worse(local, previous):
         n, m = len(local.attrs[k]), len(previous.attrs.get(k, []))
         if n > m:
             return f"{n} {what}, {m} before"
-    n, m = (len(set(t[LEVELS].to_numpy().ravel().tolist())) for t in (local, previous))
-    return f"{n} drawing positions, {m} before" if n > m else None
+    return None
 
 
 def write(solved, folder, ends_table):
@@ -250,6 +270,7 @@ def main(argv=None):
     mk.add_argument("--band-col", help="the caller's bands (integers); default: the level from the layer / bridge / tunnel tags")
     mk.add_argument("--order", default="priority", help='"priority" (default), "class", or a column of numbers')
     mk.add_argument("--band-dist", type=float, default=10.0, help="metres: roads of different bands this near are over / under (default 10)")
+    mk.add_argument("--near-rules", action="store_true", help="also write the parts that only come near the road under them (near rows: lifted last; slower, more positions)")
     sv = sub.add_parser("solve", help="levels.csv from the input and your edits.csv / heads.csv / caps.csv")
     sv.add_argument("folder", type=Path)
     sv.add_argument("--auto-ends", action="store_true", help="head lengths and caps from rs.auto_ends (at zoom 18) instead of 5 m and round")
@@ -260,7 +281,8 @@ def main(argv=None):
     a = ap.parse_args(argv)
     if a.cmd == "make":
         edges = read_edges(a.source, a.query, a.geometry)
-        roads, pairs = make_area(edges, a.folder, id_col=a.id_col, band_col=a.band_col, order=a.order, band_dist=a.band_dist)
+        roads, pairs = make_area(edges, a.folder, id_col=a.id_col, band_col=a.band_col, order=a.order, band_dist=a.band_dist,
+                                  near_rules=a.near_rules)
         print(f"{len(edges)} edges -> {len(roads)} roads, {len(pairs)} pairs: "
               + ", ".join(f"{k} {v}" for k, v in pairs["relation"].value_counts().items()) + f" -> {a.folder}")
     elif a.cmd == "solve":

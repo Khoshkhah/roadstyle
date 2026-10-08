@@ -14,6 +14,15 @@ Arrows and names are placed on a plan made once, in Python, from the roads (`_an
 2. **Slots.** Each chain is cut into equal pieces of `slot_m` metres (setting `annotations.slot_m`, default 100), numbered 0, 1, 2 … along
    the chain. A leftover at the end shorter than 30 % of `slot_m` gets no piece of its own (no name or arrow there); a piece shorter than
    20 % of `slot_m` is dropped, so a chain shorter than 20 m has none.
+   **Crossings (2026-10-08).** Before the cutting, every other road's line that meets or crosses the chain (a junction, the chain's own ends
+   where others join, a bridge or tunnel over it, a zebra: any edge of the data, twins of the chain's own edges excepted) takes
+   `half its drawn width + 2 m` out of the chain, on each side of the point: half the width with casing at zoom 20 in metres (a footway,
+   path, cycleway or steps at least 2 m: a zebra's stripes are about 4 m wide along the street). The stretches left between are cut into
+   slots on their own, each starting with a name slot (an even number), so a street through a node that is not a crossing stays one stretch,
+   and no name or arrow sits across a crossing. A stretch shorter than 20 m (with `slot_m` 100) gets no name piece; on a one-way
+   street a stretch of at least 8 m still gets one arrow piece (an odd slot, `_ARROW_MIN_M`, 2026-10-09: 254 of Monaco's 394 one-way chains
+   have a piece, 177 with 20 m for both). A name is one `line-center`
+   symbol in the middle of its slot, the same place at every zoom.
 3. **Each piece knows its road.** It carries the edge under its middle (`__rs_road`, and the twin `__rs_road2` of a two-way street), so
    hiding a road (`rsFilter`, the class filter, the Bridges / Tunnels toggles) hides its names and arrows with it. It also carries `chain`
    (the chain's number), `rank` (the class order, higher = more important), `name`, `highway`, `oneway`, `lvl` and `fl`.
