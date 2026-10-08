@@ -90,6 +90,18 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
   are flat strokes with no labels or arrows.
 - For a quick look at any geometry, those tools are fine; roadstyle is for roads.
 
+## Built on
+
+- **[MapLibre GL JS](https://maplibre.org/)** (BSD-3-Clause) draws every web map: roadstyle writes its style and
+  data, and a copy of MapLibre is inlined in each saved page so it opens offline.
+- **[OpenStreetMap](https://www.openstreetmap.org/copyright)** data (© OpenStreetMap contributors, ODbL) and the
+  **[openstreetmap-carto](https://github.com/gravitystorm/openstreetmap-carto)** style, whose road classes,
+  colours and widths roadstyle follows.
+- **[HiGHS](https://highs.dev/)**, through [SciPy](https://scipy.org/), solves which road is drawn on top.
+- **[GeoPandas](https://geopandas.org/)** and **[Shapely](https://shapely.readthedocs.io/)** for the geometry;
+  **[lonboard](https://developmentseed.org/lonboard/)** (deck.gl) and **[folium](https://python-visualization.github.io/folium/)**
+  for the notebook back-ends.
+
 [:material-image-multiple: Gallery](gallery.md) ·
 [:material-book-open-variant: Reference](reference/parameters.md) ·
 [:material-tune: Studio](studio.md) ·

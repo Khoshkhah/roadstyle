@@ -249,6 +249,18 @@ More: [settings & base maps](https://khoshkhah.github.io/roadstyle/reference/set
 | **Reference** | [every parameter](https://khoshkhah.github.io/roadstyle/reference/parameters/) · [JavaScript API](https://khoshkhah.github.io/roadstyle/reference/javascript/) · [settings & base maps](https://khoshkhah.github.io/roadstyle/reference/settings/) · [command line](https://khoshkhah.github.io/roadstyle/reference/cli/) |
 | **[Changelog](https://github.com/Khoshkhah/roadstyle/blob/main/CHANGELOG.md)** | what changed in each release |
 
+## Built on
+
+- **[MapLibre GL JS](https://maplibre.org/)** (BSD-3-Clause) draws every web map: roadstyle writes its style and
+  data, and a copy of MapLibre is inlined in each saved page so it opens offline.
+- **[OpenStreetMap](https://www.openstreetmap.org/copyright)** data (© OpenStreetMap contributors, ODbL) and the
+  **[openstreetmap-carto](https://github.com/gravitystorm/openstreetmap-carto)** style, whose road classes,
+  colours and widths roadstyle follows.
+- **[HiGHS](https://highs.dev/)**, through [SciPy](https://scipy.org/), solves which road is drawn on top.
+- **[GeoPandas](https://geopandas.org/)** and **[Shapely](https://shapely.readthedocs.io/)** for the geometry;
+  **[lonboard](https://developmentseed.org/lonboard/)** (deck.gl) and **[folium](https://python-visualization.github.io/folium/)**
+  for the notebook back-ends.
+
 ## License
 
 [MIT](https://github.com/Khoshkhah/roadstyle/blob/main/LICENSE). Base-map tiles come from
