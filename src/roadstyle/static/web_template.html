@@ -1192,6 +1192,9 @@ function box(p){ return [[p.x-HIT,p.y-HIT],[p.x+HIT,p.y+HIT]]; }
 // rs:select carries it (detail.item) next to its road.
 // only clickable items take part (2026-10-10): a non-interactive item (lanestyle's lane lines, arrows) let the click through to the lane under it
 const ITEM_LAYERS = new Set(OVERLAYS.filter(o=>o.base && (o.interactive || o.select==="item")).flatMap(o=>o.layers));
+// render(items=...): the road's own items are pieces of the one road layer; a picked one (__rs_pick) is clicked and highlighted as itself there
+const ROAD_ITEMS = __ROAD_ITEMS__;   // {label, popup, layer: the one road layer} or null
+const ITEM_PICK = ROAD_ITEMS && {label:ROAD_ITEMS.label, popup:ROAD_ITEMS.popup, select:"item", interactive:true};
 const PICK_LAYERS = style.layers.filter(l=>l.source!=="halves").map(l=>l.id)
   .filter(id=>/^roads-(low-|high-|bridge-)?fill/.test(id) || ITEM_LAYERS.has(id)).concat(RS_DECK_LAYERS);
 function _roadOf(f){ const e=f.properties.__rs_edge;   // the road an item belongs to, as a picked road feature
@@ -1200,6 +1203,9 @@ function _roadOf(f){ const e=f.properties.__rs_edge;   // the road an item belon
 // the feature right under the cursor first, the tolerance box only when there is none: a two-way road's two directions lie side by
 // side, and the box reaches both, where the one drawn last would win (a click near the middle selected the other direction)
 function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id)); if(!ids.length) return null;
+  if(ITEM_PICK && map.getLayer(ROAD_ITEMS.layer)){       // a picked road item under the cursor wins over its road
+    const it = map.queryRenderedFeatures([p.x, p.y], {layers:[ROAD_ITEMS.layer], filter:["to-boolean",["get","__rs_pick"]]});
+    if(it.length) return _roadOf(it[0]); }
   let l = map.queryRenderedFeatures([p.x, p.y], {layers:ids});
   if(!l.length) l = map.queryRenderedFeatures(box(p), {layers:ids});
   return !l.length ? null : ITEM_LAYERS.has(l[0].layer.id) ? _roadOf(l[0]) : l[0]; }
@@ -1208,7 +1214,8 @@ function srcOf(f){ return f && f.layer && f.layer.id.indexOf("roads-bridge-decks
 // sidecar row behind the feature id; decks (and inline mode) keep the feature's own properties
 function _pickProps(f){ const s=_side();
   return (s && srcOf(f)==="roads" && f.id!=null) ? (s.props[f.id]||f.properties||{}) : (f.properties||{}); }
-function _selItem(f){ const o = f && f.item && _itemOv(f.item.layer.id); return o && o.select==="item" ? o : null; }   // its overlay
+function _selItem(f){ if(ITEM_PICK && f && f.item && f.item.layer.id===ROAD_ITEMS.layer) return ITEM_PICK;   // a road item of items=
+  const o = f && f.item && _itemOv(f.item.layer.id); return o && o.select==="item" ? o : null; }   // its overlay
 function hitOf(f){ if(!f || f.id==null) return null;
   if(_selItem(f)) return {s:f.item.source, key:"i"+f.item.source+":"+f.item.id, ids:[f.item.id]};
   if(srcOf(f)==="decks"){ let e=f.properties && f.properties.__rs_edges;

@@ -3823,6 +3823,57 @@ def test_line_items_are_pieces_of_the_one_road_layer_at_their_edge_fill():
     assert hits and all(l["paint"]["line-opacity"][0] == "case" for l in hits)
 
 
+def _road_with_items():
+    """One road (edge 1) with two lane items of render(items=...): a picked, unseen lane and a lane line."""
+    from shapely.geometry import LineString
+    a = LineString([(18.060, 59.315), (18.064, 59.315)])
+    roads = gpd.GeoDataFrame({"edge_id": [1], "highway": ["residential"], "oneway": ["yes"]}, geometry=[a], crs=4326)
+    items = gpd.GeoDataFrame([{"edge_id": 1, "order": 0, "width_m": 3.0, "color": "rgba(0,0,0,0)", "pick": True, "lane_id": "1_1", "geometry": a},
+                              {"edge_id": 1, "order": 1, "width_m": 0.15, "color": "#ffffff", "pick": False, "lane_id": "x", "geometry": a}], crs=4326)
+    return roads, items
+
+
+def test_road_items_are_pieces_of_the_road_layer_with_no_source_of_their_own():
+    """2026-10-10: render(items=...) puts the road's own items (lanes, lines, marks) in the one road layer only: no overlay source or layer;
+    a picked item keeps its own fields (the popup), the others only what the layer reads; items need simple mode."""
+    roads, items = _road_with_items()
+    html = render_edges(roads, backend="web", items=items, items_popup=["lane_id"]).html
+    st = _style(html)
+    assert not [k for k in st["sources"] if k.startswith("ov")] and not [l for l in st["layers"] if l["id"].startswith("ov")]
+    k5 = sorted((f["properties"] for f in st["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_k"] == 5), key=lambda p: p["__rs_ord"])
+    assert [p.get("__rs_pick") for p in k5] == [True, None] and k5[0]["lane_id"] == "1_1" and "lane_id" not in k5[1]
+    assert sum(f["properties"]["__rs_k"] == 1 for f in st["sources"]["simple"]["data"]["features"]) == 1        # the road keeps its fill
+    assert 'const ROAD_ITEMS = {"label": "items", "popup": ["lane_id"], "layer": "roads-simple"}' in html
+    assert "feature-state" in json.dumps(next(l for l in st["layers"] if l["id"] == "roads-simple")["paint"]["line-color"])
+    with pytest.raises(ValueError, match="simple"):
+        render_edges(roads, backend="web", items=items, simple=False)
+
+
+def test_a_click_on_a_road_item_selects_the_item_in_the_browser(tmp_path):
+    pw = pytest.importorskip("playwright.sync_api")
+    roads, items = _road_with_items()
+    path = tmp_path / "items.html"
+    render_edges(roads, backend="web", basemap="blank", items=items, items_popup=["lane_id"]).save(path)
+    errors = []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && map.loaded()", timeout=30_000)
+        page.evaluate("map.jumpTo({center:[18.062, 59.315], zoom: 18})")
+        page.wait_for_function("map.loaded()", timeout=30_000)
+        page.evaluate("window._got=null; document.addEventListener('rs:select', e=>{ window._got=e.detail; })")
+        pt = page.evaluate("(()=>{const q=map.project([18.062, 59.315]); return [q.x, q.y];})()")
+        page.mouse.click(*pt)
+        page.wait_for_function("window._got", timeout=10_000)
+        got = page.evaluate("({item: _got.item && _got.item.properties.lane_id, road: _got.id, "
+                            "sel: map.queryRenderedFeatures(map.project([18.062, 59.315]), {layers:['roads-simple'], filter:['to-boolean',['get','__rs_pick']]})"
+                            ".map(f=>map.getFeatureState({source:'simple', id:f.id}).select)})")
+        browser.close()
+    assert got["item"] == "1_1" and got["road"] == 0 and got["sel"] == [True] and not errors, (got, errors)
+
+
 def test_line_items_full_look_and_tiles(monkeypatch):
     """The full look keeps the items' own layers; tiles=True carries the item pieces in the simple tile layer; too many items is an error."""
     st = _style(_crossing_with_lanes(simple=False).html)

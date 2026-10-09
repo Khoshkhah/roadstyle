@@ -1647,6 +1647,8 @@ function _simpleColor(){        // render_web._simple_color, with the active col
     cases.push(["==",["get","__rs_k"],3], pair ? _tunHex(pair[1], TUNNEL.to.fill, k) : "rgba(0,0,0,0)",
                ["==",["get","__rs_k"],4], _tunHex(pair ? pair[0] : TUNNEL.to.dash, TUNNEL.to.fill, k));
   }
+  // a picked item of items= highlighted in the road layer itself (feature-state of the simple source), as render_web._simple_color
+  item=["case",["boolean",["feature-state","select"],false],RS_SIMPLE.select,["boolean",["feature-state","hover"],false],RS_SIMPLE.hover,item];
   return ["case",...cases,["==",["get","__rs_k"],5],item,fill];    // an item (__rs_k 5) keeps its own colour
 }
 function _simpleDash(){         // render_web._simple_dasharray, with the tunnel dash ratio
@@ -1947,6 +1949,25 @@ def _item_pieces(ov, i, fc):
     return out
 
 
+def _road_items(data, roads, edge_id_col, fcol, k):
+    """``render(items=...)`` (2026-10-10): the road's own line items as pieces of the one road layer (``__rs_k`` 5, as :func:`_item_pieces`), with
+    no source or layer of their own. Each feature names its road in ``edge_id_col`` and has ``width_m``, and may have ``order`` (lower first),
+    ``offset_m`` (right of the road's direction), ``color``, ``dash`` and ``pick``: a picked item (true) is clicked and highlighted as itself
+    through the road layer, and keeps its own fields for the popup (``items_popup``); the others let a click through to their road."""
+    if roads is None:
+        raise ValueError(f"items=: the roads have no id column {edge_id_col!r} (edge_id_col) to attach the items to")
+    ov = Overlay(data, edge_col=edge_id_col, order_col="order", color_col="color", width_m_col="width_m", offset_m_col="offset_m",
+                 dash_col="dash", label="items")
+    fc = to_fc(ov.data)
+    _edge_overlay(ov, fc, roads, edge_id_col, fcol)
+    out = _item_pieces(ov, k, fc)
+    for q in out:
+        src = fc["features"][q["properties"]["__rs_item"]]["properties"]
+        if _truthy(src.get("pick")):
+            q["properties"].update({c: v for c, v in src.items() if not c.startswith("__rs_") and c != "pick"}, __rs_pick=True)
+    return out
+
+
 def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4dff", roads=None, edge_id_col="edge_id", fcol="highway", fill=False):
     """Add each overlay as its own source + layer(s) to ``style``. Returns ``(under, over, meta, edge, items)``:
     the layer specs to splice below / above the roads, the JS metadata (label / source / clickable
@@ -2138,7 +2159,7 @@ def _simple_dasharray(dashes, ratio):
     return ["case", ["==", ["get", "__rs_k"], 4], ["literal", [float(v) for v in ratio]], by if dashes else solid]
 
 
-def _simple_color(bridge_color, tunnels=False):
+def _simple_color(bridge_color, tunnels=False, select_color=None, hover_color=None):
     """Simple mode's line-color: a bridge shadow ``bridge_shadow_color``, a casing piece its casing colour (a bridge's ``bridge_color``), a fill its fill; on a map with
     ``tunnels`` a tunnel's fill takes the tunnel look (_tun_mix toward ``tunnel_toward`` at ``tunnel_strength``) and its casing pieces the palette's
     two colours moved the same way (gap ``__rs_k`` 3, dashes 4; the gap clear for "One colour"). The page builds the same again on every
@@ -2154,6 +2175,8 @@ def _simple_color(bridge_color, tunnels=False):
         fill, item = _tun_mix(fill, to, s), _tun_mix(item, to, s)
         cases += [["==", ["get", "__rs_k"], 3], toward(pair[1]) if pair else "rgba(0,0,0,0)",
                   ["==", ["get", "__rs_k"], 4], toward(pair[0] if pair else _TUN_TO["dash"])]
+    if select_color:                    # a picked item of items= (__rs_pick) highlighted in the road layer itself (feature-state of the simple source)
+        item = ["case", ["boolean", ["feature-state", "select"], False], select_color, ["boolean", ["feature-state", "hover"], False], hover_color, item]
     return ["case", *cases, ["==", ["get", "__rs_k"], 5], item, fill]
 
 
@@ -2276,7 +2299,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            road_popup=True, road_tooltip=False, hover_delay_ms: int = 300, popup_mode: str = None,
            street_view: bool | str = "window", street_view_key: str | None = None,
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
-           color_options=None, color_active=0, views=None, overlays=None, compress: bool = True, tunnel_control: bool = False,
+           color_options=None, color_active=0, views=None, overlays=None, items=None, items_popup=None, compress: bool = True, tunnel_control: bool = False,
            tiles: bool = False, simple: bool = True,
            minzoom=None, legend: bool = True,
            api_key: str | None = None, _edges=None, **_ignore):
@@ -2416,14 +2439,14 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         # one pre-resolved fill set per "colour by" option — options bake only their FILLS; the
         # shared width/casing/dash comes from the road palette's own styler, so a data-coloured
         # map keeps the palette's plate casing (a data styler has none of its own).
-        items = (list(color_options.items()) if isinstance(color_options, Mapping)
+        named = (list(color_options.items()) if isinstance(color_options, Mapping)
                  else [(o["name"], {k: v for k, v in o.items() if k != "name"})
                        for o in color_options])
         frames = [(name, option_styler(highway_col, palette, opts).resolve_frame(g))
-                  for name, opts in items]
+                  for name, opts in named]
         style_rf = (styler or build_styler(palette=palette, highway_col=highway_col)).resolve_frame(g)
         geo, color_opts_meta = bake_color_options(fc_dict(g), frames, style_rf=style_rf)
-        _names = [n for n, _ in items]
+        _names = [n for n, _ in named]
         _active = (color_active if isinstance(color_active, int)
                    else _names.index(color_active) if color_active in _names else 0)
     else:
@@ -2531,10 +2554,15 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     # extra overlay layers (zones / POIs / any geometry the caller brings); each gets its own source
     # + paint layer(s), placed under or over the roads, and (if `popup` is set) clickable.
     by_id = None
-    if overlays and any(getattr(o, "edge_col", None) for o in overlays) and edge_id_col in g.columns:
+    if ((overlays and any(getattr(o, "edge_col", None) for o in overlays)) or items is not None) and edge_id_col in g.columns:
         by_id = {_eid(ft["properties"].get(edge_id_col)): ft["properties"] for ft in geo["features"]}
+    road_items = items
     under_layers, over_layers, ov_meta, edge_layers, items = _build_overlays(style, overlays, hover_color, select_color, roads=by_id,
                                                                              edge_id_col=edge_id_col, fcol=filter_col or highway_col, fill=simple)
+    if road_items is not None:              # the road's own items (lanes, lane lines, marks): pieces of the one road layer, no source or layer of their own
+        if not simple:
+            raise ValueError("items=: only in simple mode (simple=True)")
+        items = items + _road_items(road_items, by_id, edge_id_col, filter_col or highway_col, len(overlays or ()))
 
     # Round caps + joins everywhere: consecutive edges are separate LineStrings, and a round cap is
     # the only rendering primitive that seals the seam where two of them connect (line-join only
@@ -2894,7 +2922,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         sdashes = sorted({(f.get("properties") or {}).get("__rs_dash") for f in geo["features"] + items} - {None, ""})
         sdash = {"line-dasharray": _simple_dasharray(sdashes, CONFIG.tunnel_casing_dash or [1, 1])} if sdashes or any_tunnel else {}
         road = {"id": "roads-simple", "type": "line", "source": "simple", "layout": {**lay, "line-cap": _simple_cap(), "line-sort-key": ["get", "__rs_s"]}, **flt,
-                "paint": {**sdash, "line-color": _simple_color(CONFIG.bridge_casing_color, bool(any_tunnel)),
+                "paint": {**sdash, "line-color": _simple_color(CONFIG.bridge_casing_color, bool(any_tunnel), select_color, hover_color),
                           "line-width": _pair_width(_by_feature(wide, fw), highway_col, offset_frac, offset_zoom, wmz) if pairs else _by_feature(wide, fw), "line-offset": soff,
                           "line-blur": ["interpolate", ["linear"], ["zoom"], 14, 0, 17, ["case", is_sh, blur, 0]],
                           "line-opacity": ["interpolate", ["linear"], ["zoom"], 14, ["case", is_sh, 0, *op], 17, op[-1] if road_fill else ["case", *op]]}}
@@ -3210,6 +3238,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             .replace("__COLOR_OPTIONS__", json.dumps(color_opts_meta or []))
             .replace("__CO_ACTIVE__", str(_active))
             .replace("__OVERLAYS__", json.dumps(ov_meta))
+            .replace("__ROAD_ITEMS__", json.dumps({"label": "items", "popup": items_popup, "layer": "roads-simple"} if road_items is not None else None))
             .replace("__TUNNEL__", json.dumps({"layers": tun_paint, "dash": tun_dash, "casing": tun_casing, "strength": tun_strength,
                                                "palette": CONFIG.tunnel_palette, "palettes": CONFIG.tunnel_palettes,
                                                "ratio": list(CONFIG.tunnel_casing_dash or [1, 1]), "bg": _bg_color(active_bm),
@@ -3238,6 +3267,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         html = html.replace("<script>__RS_TILES__</script>", "", 1)
     if simple:
         html = html.replace("</body>", _SIMPLE_JS.replace("__RS_SIMPLE__", json.dumps({"layer": "roads-simple", "bridge": CONFIG.bridge_casing_color, "shadow": CONFIG.bridge_shadow_color,
+                                                                                       "select": select_color, "hover": hover_color,
                                                                                        "tunnels": bool(any_tunnel),
                                                                                        "dashes": sdashes})) + "</body>", 1)
     if gz:

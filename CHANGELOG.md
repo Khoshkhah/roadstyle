@@ -8,9 +8,14 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Added
 - **Items in the level editor.** `roadstyle-levels edit AREA --items module:function` (`serve(..., items=f)`): `f(roads)` gets the table the editor draws (one row per edge, `edge`) and returns `(overlays, render_edges keywords)`, e.g. a lane table's lanes as items of the edges; with items, every Apply draws the whole page again. Without it the page is unchanged.
+- **`items=` — a road's own items in the road layer.** `render_edges(..., items=gdf, items_popup=[...])` (simple mode): line items (lanes, lane lines, marks) that name their road in the edge id column, with `width_m` and optional `order`, `offset_m`, `color`, `dash`, `pick`, become pieces of the one road layer above their road's fill, with no source or layer of their own. A `pick` item is clicked and highlighted as itself through the road layer (`rs:select` `detail.item`, popup `items_popup`); the others let a click through to their road. `Overlay` stays for what is not a road.
+- **`labels.size` setting:** the street names' size per zoom (`[[zoom, px], ...]`), the same for every class (roads in metres).
 - **`casing_min_px`.** A casing in metres (`width_m_col`) is at least this many pixels each side of its fill, so a thin casing (lanestyle's 0.14 m) stays visible zoomed out. Default 0: exact metres, as before.
 
 ### Changed
+- **An edge with items keeps its fill** under them: its ends (round, flat, square) are the road's own; lanes alone left a round casing end empty.
+- **`twin_casing: "each"` with metre widths** shifts each direction by metres too, so each direction's own casing and fill sit side by side.
+- **Square ends** are drawn by a 0.5 m piece in the piece's own direction (a 1 cm piece pointed any way after rounding, and a reverse direction's landed on the other half).
 - **Street View key from the environment.** `street_view_key` defaults to the environment variable `GOOGLE_MAPS_KEY`, so every map built where it is set (the level editor, mapstyle and lanestyle pages included) offers the linked panorama. A passed key wins. The key is written into each page: never publish a page built with an unrestricted key.
 - **A two-way pair with metre widths is drawn in metres.** When both directions have a `width_m_col` width, from `width_m_zoom` on the pair's one casing is both directions together (their two inner casings once) and each direction is shifted by half the other direction's fill, so the carriageway is centred on the line. Before, the shift and the pair casing's extra width were class pixels, so lanes drawn as items in metres did not match their casing.
 
