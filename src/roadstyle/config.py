@@ -69,7 +69,8 @@ class StyleConfig:
     minzoom: dict = field(default_factory=dict)
     #: the primary base map layer (a key in basemaps.BASEMAPS); per-call `basemap=` overrides
     basemap: str = "voyager"
-    #: street-name label paint (web backend): color, halo_color, halo_width (0/None = no halo)
+    #: street-name label paint (web backend): color, halo_color, halo_width (0/None = no halo); size: [[zoom, px], ...] for every class
+    #: (absent: each class's size from its fill width)
     labels: dict = field(default_factory=lambda: {"color": "#5b5b5b", "halo_color": None,
                                                  "halo_width": 0})
     #: oneway-arrow chevrons (web backend): color, opacity

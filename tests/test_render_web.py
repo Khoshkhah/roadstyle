@@ -1145,6 +1145,16 @@ def test_twin_casing_each_in_metres_shifts_each_direction_by_metres():
     fs = _style(render_edges(g, backend="web", width_m_col="w", settings={"config": {"twin_casing": "each"}}).html)["sources"]["roads"]["data"]["features"]
     two = [f["properties"] for f in fs if f["properties"].get("__rs_twoway")]
     assert two and all("__rs_twm" in p and "__rs_twin" not in p and not p.get("__rs_pair") for p in two)
+    st = _style(render_edges(g, backend="web", width_m_col="w", settings={"config": {"twin_casing": "each"}}).html)
+    assert "__rs_twm" in json.dumps(next(l for l in st["layers"] if l["id"] == "roads-simple")["paint"]["line-offset"])   # the shift in metres
+
+
+def test_label_size_stops_from_the_settings():
+    """2026-10-10: config labels.size [[zoom, px], ...] sets the names' size at every zoom, for every class; halo from the same settings."""
+    st = _style(render_edges(_pairs().assign(name="Main Street"), backend="web", settings={"config": {"labels": {"size": [[20, 16], [16, 11]], "halo_color": "#fff", "halo_width": 1.5}}}).html)
+    lab = next(l for l in st["layers"] if l.get("layout", {}).get("text-size") and l["layout"].get("symbol-placement") == "line-center")
+    assert lab["layout"]["text-size"] == ["interpolate", ["linear"], ["zoom"], 16.0, 11.0, 20.0, 16.0]
+    assert lab["paint"]["text-halo-color"] == "#fff" and lab["paint"]["text-halo-width"] == 1.5
 
 
 def test_twin_casing_each_is_todays_look():

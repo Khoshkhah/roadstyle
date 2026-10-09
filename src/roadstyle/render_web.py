@@ -958,8 +958,11 @@ def _label_px(cls, z):
     return min(_label_base_px(z), _LABEL_FRACTION * class_width_px(cls, z, casing=False))
 
 
-def _label_size_expr():
-    """text-size: a name's size follows its road's fill width (a name as tall as a narrow road touched its outline), at most the old ramp."""
+def _label_size_expr(stops=None):
+    """text-size: a name's size follows its road's fill width (a name as tall as a narrow road touched its outline), at most the old ramp.
+    ``stops`` (config ``labels.size``, 2026-10-10): ``[[zoom, px], ...]`` instead, the same for every class (e.g. roads in metres)."""
+    if stops:
+        return ["interpolate", ["linear"], ["zoom"], *[float(v) for zp in sorted(stops) for v in zp]]
     e = ["interpolate", ["linear"], ["zoom"]]
     for z in sorted({z for z in _ZSTOPS if z >= 14} | {14, 18}):
         m = ["match", ["get", "highway"]]
@@ -2537,7 +2540,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            "line-sort-key": 0}   # positions only: no class, level or order
     tlay = {**lay, "line-cap": "butt"}                    # butt cap -> clean dash ticks on tunnel casing
     blay = {**lay, "line-cap": "butt"}                    # butt cap -> square bridge deck ends
-    wmz = width_m_zoom if width_m_col and pairs else None
+    wmz = width_m_zoom if width_m_col else None           # a pair with metres on both shifted by metres, one casing or each its own (2026-10-10)
     off = _offset_expr(highway_col, offset_frac, offset_zoom, pairs, wmz)
     sw = dict(split_zoom=offset_zoom, split_frac=width_frac)
     # Three bands by draw order (docs/design/levels_and_looks.md): below ground, ground, above, from the level (lvl, the
@@ -3037,14 +3040,15 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                        [">=", ["zoom"], 16]]]
                 if mz:   # a hidden class must not keep its street name floating either
                     lf.append(_minzoom_filter("highway", mz))
-                lf.append(_label_readable_filter())     # no name where it would be under 9 px (its road too narrow at that zoom)
+                if not lbl.get("size"):                 # no name where it would be under 9 px (its road too narrow at that zoom); labels.size sets it instead
+                    lf.append(_label_readable_filter())
                 def _label_layer(lid, flt):
                     return {"id": lid, "type": "symbol", "source": "slots", "minzoom": 14,
                             "filter": flt,
                             "layout": {"symbol-placement": "line-center",
                                        "text-field": ["get", "name"],
                                        "text-font": ["Noto Sans Regular"],
-                                       "text-size": _label_size_expr(),          # about 3/4 of the road's fill width
+                                       "text-size": _label_size_expr(lbl.get("size")),          # about 3/4 of the road's fill width
                                        "text-max-angle": 40, "text-padding": 2,
                                        # major streets' names win label-vs-label collisions too
                                        "symbol-sort-key": ["*", -1, _sort_key("highway")]},
