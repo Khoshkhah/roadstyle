@@ -45,6 +45,9 @@ def _asset(fname):
 
 # --- openstreetmap-carto road model — loaded from data/defaults.json "roads" (+ any user
 # roadstyle.json override), like every other styling table. Edit the JSON, not this file.
+_CW = {}        # class_width_px by (class, zoom, casing): emptied whenever the road tables are built again
+
+
 def _load_road_model() -> None:
     """(Re)build the module road tables from :func:`_settings.roads`.
 
@@ -52,6 +55,7 @@ def _load_road_model() -> None:
     every expression builder below reads these module globals at call time, so a rebuild is all a
     new setting set needs."""
     global WIDTH, HI_RATE, CASING_RATIO, ROAD_GROUP, _LINKS, _CLASSES, _ZSTOPS, ROAD_Z
+    _CW.clear()
     r = _settings.roads()
     WIDTH = {g: {int(z): w for z, w in t.items()} for g, t in r["width"].items()}   # px by zoom, per group
     HI_RATE = dict(r["width_zoom_rate"])       # per-group growth rate per zoom past the last stop
@@ -101,7 +105,16 @@ def _gwidth(t, hi, z):
 
 def class_width_px(cls, zoom, casing=True):
     """The width a road of class ``cls`` is drawn with at ``zoom``, in pixels: its whole width with the casing (``casing``), or its fill.
-    The page's width expression, read at one zoom (linear between its stops, the end values outside); one line per road, no two-way narrowing."""
+    The page's width expression, read at one zoom (linear between its stops, the end values outside); one line per road, no two-way narrowing.
+    Kept per (class, zoom, casing) until the road tables change (2026-10-09: the name slots asked once per crossing, 39,000 times on Monaco,
+    and building the expression each time took 25 of the editor's 30 s per page)."""
+    key = (cls, zoom, casing)
+    if key not in _CW:
+        _CW[key] = _class_width_px(cls, zoom, casing)
+    return _CW[key]
+
+
+def _class_width_px(cls, zoom, casing):
     e = _width_expr("highway", casing=casing)
     zs, ms = e[3::2], e[4::2]
     def at(m):
