@@ -45,6 +45,8 @@ class Overlay:
         ``rs:select``), ``"item"`` the feature itself (its own highlight and popup; ``rs:select`` carries it as ``item`` next to its road).
     width_m_col / offset_m_col : with ``edge_col`` and line features, in simple mode: the items are drawn IN the one road layer at their edge's
         fill (docs/design/edge_items.md), each with its own width and line-offset in metres from these properties (the width else ``width_m``).
+    cap_col : with ``edge_col`` and line features, in simple mode: the property with each item's end shape, ``"round"`` (null too), ``"flat"``
+        or ``"square"``; a dashed item is always flat.
     casing : with ``edge_col`` and line features, in simple mode: the items are drawn with the casings, at their edge's casing number (under
         every fill and item of that number), not after the fills: an outline of their own (a lane connector's casing).
     """
@@ -76,6 +78,7 @@ class Overlay:
     width_m_col: str | None = None     # with edge_col, lines, simple mode: the property with each item's width in metres (else ``width_m``)
     offset_m_col: str | None = None    # with edge_col, lines, simple mode: the property with each item's line-offset in metres (right of the line's direction; null = 0)
     dash_col: str | None = None        # with edge_col, lines, simple mode: the property with each item's dash pattern in line widths ([3, 3] or "3,3"; null = ``dash``, else solid)
+    cap_col: str | None = None         # with edge_col, lines, simple mode: the property with each item's end shape: "round" (null: round), "flat" or "square"
     casing: bool = False               # with edge_col, lines, simple mode: drawn with the casings (the edge's casing number), not after the fills
 
     def __post_init__(self):
