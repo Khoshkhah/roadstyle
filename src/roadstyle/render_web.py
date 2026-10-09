@@ -346,15 +346,10 @@ def _mark_single_line(geo, kind_col, classes):
             r["__rs_twoway"] = r["__rs_oneway"] = False
 
 
-def _mark_twin_casing(geo, kind_col, id_col=None, head_m=5.0):
-    """Config ``twin_casing`` "one" (2026-10-08): a two-way road given as two directed edges (``__rs_twoway``, :func:`_mark_twoway`) has ONE
-    casing around both directions, drawn once at the pair's full width, unshifted; each direction keeps its own fill. Pairs each two-way edge
-    with one reverse edge of its class whose line is its own line backwards (two different lines between the same two points are two roads:
-    each keeps its own casing) and sets ``__rs_twin`` (the other edge's position in ``geo``) on both: :func:`_casing_parts` cuts the casing
-    of the first of the two only, from its own numbers, heads and caps (its start is the other's end). The two must agree, reversed:
-    casing numbers (start head, main, end head), head lengths and end shapes; a pair that does not is named in a warning (the first
-    edge's are drawn). Returns whether any pair was found."""
-    first, bad, found = {}, [], False
+def _twin_pairs(geo, kind_col):
+    """The two-way pairs ``(i, j)`` (positions in ``geo``): a two-way edge (``__rs_twoway``) and one reverse edge of its class whose line is its own
+    line backwards (two different lines between the same two points are two roads)."""
+    first, out = {}, []
     for i, ft in enumerate(geo["features"]):
         p, g = ft["properties"], ft.get("geometry") or {}
         c = g.get("coordinates") or []
@@ -364,8 +359,22 @@ def _mark_twin_casing(geo, kind_col, id_col=None, head_m=5.0):
         j = first.pop((line[::-1], _class_key(p.get(kind_col))), None)
         if j is None:
             first.setdefault((line, _class_key(p.get(kind_col))), i)
-            continue
-        q = geo["features"][j]["properties"]
+        else:
+            out.append((j, i))
+    return out
+
+
+def _mark_twin_casing(geo, kind_col, id_col=None, head_m=5.0):
+    """Config ``twin_casing`` "one" (2026-10-08): a two-way road given as two directed edges (``__rs_twoway``, :func:`_mark_twoway`) has ONE
+    casing around both directions, drawn once at the pair's full width, unshifted; each direction keeps its own fill. Pairs each two-way edge
+    with one reverse edge of its class whose line is its own line backwards (two different lines between the same two points are two roads:
+    each keeps its own casing) and sets ``__rs_twin`` (the other edge's position in ``geo``) on both: :func:`_casing_parts` cuts the casing
+    of the first of the two only, from its own numbers, heads and caps (its start is the other's end). The two must agree, reversed:
+    casing numbers (start head, main, end head), head lengths and end shapes; a pair that does not is named in a warning (the first
+    edge's are drawn). Returns whether any pair was found."""
+    bad, found = [], False
+    for j, i in _twin_pairs(geo, kind_col):
+        p, q = geo["features"][i]["properties"], geo["features"][j]["properties"]
         p["__rs_twin"], q["__rs_twin"] = j, i
         found = True
         def ends(r):            # (start, end) of each: casing number, head length, end shape
@@ -1899,7 +1908,7 @@ def _edge_overlay(ov, fc, roads, edge_id_col, fcol):
         o = p.get(ov.order_col) if ov.order_col else 0
         o = 0 if o is None or (isinstance(o, float) and math.isnan(o)) else int(o)
         fl = r.get("__rs_fl") or 0
-        p.update(__rs_edge=r["__rs_edge"], __rs_fl=fl, __rs_cl=r.get("__rs_cl") or 0, __rs_ord=o, __rs_cls=r.get(fcol), __rs_lvl=r.get("lvl", 0))
+        p.update(__rs_edge=r["__rs_edge"], __rs_fl=fl, __rs_ord=o, __rs_cls=r.get(fcol), __rs_lvl=r.get("lvl", 0))
         if r.get("__rs_tunnel"):
             p["__rs_tunnel"] = True          # the item of a tunnel takes its look (docs/design/tunnel_look.md)
         orders.add((fl, o))
@@ -1927,8 +1936,6 @@ def _item_pieces(ov, i, fc):
         d = ov.dash if d is None or (not isinstance(d, (list, tuple)) and missing(d)) else d
         p.update(__rs_iwm=round(float(w) * sec, 4), __rs_iom=0 if o is None or missing(o) else round(float(o) * sec, 4))   # the item's own layer reads them too
         q = {k: v for k, v in p.items() if k.startswith("__rs_")}
-        if ov.casing:
-            q["__rs_ci"] = True       # drawn with the casings (_simple_pieces)
         q.update(lvl=p.get("__rs_lvl", 0), __rs_k=5, __rs_ov=i, __rs_item=j,
                  __rs_ic=(p.get(ov.color_col) if ov.color_col else None) or ov.color or C["color"])
         if d:     # the road layer's dash pattern is a text ("3,3": a property cannot hold an array), as a dashed class's __rs_dash
@@ -2029,7 +2036,8 @@ def _simple_pieces(geo, parts, cols, shadows=True, items=()):
     into the junction (2026-10-08). An edge with two different ends draws its fill as two halves (:func:`_halves`).
     ``items`` (:func:`_item_pieces`, ``__rs_k`` 5): the line items attached to edges, each at its edge's fill: ``2 * position + 1`` plus
     _ITEM_STEP per rank on its edge (by order, overlay, feature), above every fill of the position and under the next casings (see _ITEM_STEP).
-    An edge with items has no fill piece (left out, so rsSetRoadFill and a view's road_fill cannot bring it back): its items are its fill."""
+    An edge with items keeps its fill under them (2026-10-10): its ends are those of the road without items (the lanes alone left the casing's
+    round end empty)."""
     keep = {c for c in cols if c} | {"lvl"}
     halves = collections.defaultdict(list)
     for h in _halves(geo):
@@ -2048,10 +2056,9 @@ def _simple_pieces(geo, parts, cols, shadows=True, items=()):
             out.append({"type": "Feature", "geometry": q["geometry"], "properties": {**p, "__rs_k": 4, "__rs_s": k + 0.1}})
         else:
             out.append({"type": "Feature", "geometry": q["geometry"], "properties": {**p, "__rs_k": 0, "__rs_s": k}})
-    itemed = {f["properties"]["__rs_edge"] for f in items if not f["properties"].get("__rs_ci")}   # an edge with items draws no fill of its own: its items are its fill (2026-10-09)
     for i, ft in enumerate(geo["features"]):
         p = ft["properties"]
-        if p.get("__rs_dup") or p.get("__rs_edge", i) in itemed:
+        if p.get("__rs_dup"):
             continue
         for g, p in ([(h["geometry"], h["properties"]) for h in halves[p.get("__rs_edge", i)]] if p.get("__rs_split") else [(ft["geometry"], p)]):
             out.append({"type": "Feature", "geometry": g,
@@ -2069,9 +2076,6 @@ def _simple_pieces(geo, parts, cols, shadows=True, items=()):
     rank = collections.Counter()
     for j, f in enumerate(sorted(items, key=lambda f: (f["properties"]["__rs_edge"], f["properties"]["__rs_ord"], f["properties"]["__rs_ov"], f["properties"]["__rs_item"]))):
         p = f["properties"]
-        if p.get("__rs_ci"):     # an item drawn with the casings (Overlay casing=True): over its edge's casing, under every fill of that number
-            out.append({**f, "id": _MAX_EDGES * _PIECES + j, "properties": {**p, "__rs_s": 2 * p["__rs_cl"] + 0.05 + p["__rs_edge"] * _TIE}})
-            continue
         e, rank[p["__rs_edge"]] = p["__rs_edge"], rank[p["__rs_edge"]] + 1
         if rank[e] > _MAX_ITEMS:
             raise ValueError(f"simple=True: edge {e} has more than {_MAX_ITEMS} items; they do not fit between its fill and the next casings (pass simple=False)")
@@ -2447,11 +2451,12 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         _mark_twin_dead_ends(geo, cap_col, cap_start_col, cap_end_col)      # a pair's dead end without a given cap: square
     if width_m_col:
         _mark_width_m(geo, width_m_col, casing_m)
-        for ft in geo["features"] if pairs else ():     # a pair with metres on both: the other direction's (_width_m_expr, _offset_expr)
-            p, tw = ft["properties"], ft["properties"].get("__rs_twin")
-            q = geo["features"][tw]["properties"] if tw is not None else {}
+        # a pair with metres on both: the other direction's (_width_m_expr, _offset_expr); with twin_casing "each" (2026-10-10) each direction keeps
+        # its own casing, shifted as in "one", so the two fills meet on the line and cover the casings between them
+        for i, j in _twin_pairs(geo, highway_col):
+            p, q = geo["features"][i]["properties"], geo["features"][j]["properties"]
             if "__rs_wm" in p and "__rs_wm" in q:
-                p["__rs_twm"] = q["__rs_wm"]
+                p["__rs_twm"], q["__rs_twm"] = q["__rs_wm"], p["__rs_wm"]
     _stringify_unsafe_ints(geo)   # BIGINT ids (e.g. edge_id) -> string so JS doesn't round them
 
     # active base map + the set offered to the in-map switcher (active shown first)

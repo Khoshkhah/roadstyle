@@ -1138,6 +1138,15 @@ def test_a_plain_call_without_level_columns_draws_a_pair_with_one_casing():
             assert sorted(f["properties"]["__rs_edge"] for f in feats if f["properties"]["__rs_k"] == 1) == [0, 1]
 
 
+def test_twin_casing_each_in_metres_shifts_each_direction_by_metres():
+    """2026-10-10: with twin_casing "each" and metre widths, each direction keeps its own casing (no one pair casing) and is shifted by
+    metres as in "one" (__rs_twm, the other direction's width), so the two fills meet on the line and cover the casings between them."""
+    g = _pairs().assign(w=4.0)
+    fs = _style(render_edges(g, backend="web", width_m_col="w", settings={"config": {"twin_casing": "each"}}).html)["sources"]["roads"]["data"]["features"]
+    two = [f["properties"] for f in fs if f["properties"].get("__rs_twoway")]
+    assert two and all("__rs_twm" in p and "__rs_twin" not in p and not p.get("__rs_pair") for p in two)
+
+
 def test_twin_casing_each_is_todays_look():
     """twin_casing "each": every direction draws its own casing, shifted, half the width; no __rs_pair anywhere, the end blobs as before."""
     g = _twin([(1, "a", "b", 0, 0, 0, 0, None, None), (2, "b", "a", 0, 0, 0, 0, None, None)])
@@ -3789,7 +3798,8 @@ def test_line_items_are_pieces_of_the_one_road_layer_at_their_edge_fill():
     key = lambda e, k: sorted(f["properties"]["__rs_s"] for f in fs if f["properties"]["__rs_edge"] == e and f["properties"]["__rs_k"] == k)
     lo, hi = (min(f["properties"]["__rs_edge"] for f in fs), max(f["properties"]["__rs_edge"] for f in fs))
     assert len(key(lo, 5)) == len(key(hi, 5)) == 3
-    assert not key(lo, 1) and not key(hi, 1)          # an edge with items draws no fill of its own
+    assert len(key(lo, 1)) == len(key(hi, 1)) == 1    # an edge with items keeps its fill, under them
+    assert max(key(lo, 1)) < min(key(lo, 5)) and max(key(hi, 1)) < min(key(hi, 5))
     assert max(key(lo, 5)) < min(key(hi, 0)) < min(key(hi, 5))
     item = next(f["properties"] for f in fs if f["properties"]["__rs_k"] == 5)
     assert item["__rs_ic"] == "#00ff00" and item["__rs_iwm"] > 3.25 and "lvl" in item and "__rs_cls" in item
@@ -3801,24 +3811,6 @@ def test_line_items_are_pieces_of_the_one_road_layer_at_their_edge_fill():
     assert "__rs_iom" in json.dumps(lyr["paint"]["line-offset"]) and "__rs_ic" in json.dumps(lyr["paint"]["line-color"])
     hits = [l for l in st["layers"] if l.get("source") == "ov0"]      # the item's own layers: the pick and the highlight only
     assert hits and all(l["paint"]["line-opacity"][0] == "case" for l in hits)
-
-
-def test_casing_items_are_drawn_with_the_casings():
-    """2026-10-10: an Overlay with casing=True (a lane connector's casing) is drawn at its edge's casing number, under every fill and item of
-    that number, so it never covers a crossing road's lanes; it is no fill of its edge (the edge keeps its own)."""
-    from shapely.geometry import LineString
-    from roadstyle import Overlay
-    a, b = LineString([(18.060, 59.315), (18.064, 59.315)]), LineString([(18.062, 59.3135), (18.062, 59.3165)])
-    roads = gpd.GeoDataFrame({"edge_id": [1, 2], "highway": ["residential"] * 2, "oneway": ["yes", "yes"]}, geometry=[a, b], crs=4326)
-    casing = gpd.GeoDataFrame([{"edge_id": 1, "w": 4.0, "c": "#16a34a", "geometry": a}], crs=4326)
-    lanes = gpd.GeoDataFrame([{"edge_id": 2, "w": 3.0, "c": "#00ff00", "geometry": b}], crs=4326)
-    ovs = [Overlay(casing, edge_col="edge_id", color_col="c", width_m_col="w", casing=True),
-           Overlay(lanes, edge_col="edge_id", color_col="c", width_m_col="w")]
-    fs = _style(render_edges(roads, backend="web", overlays=ovs).html)["sources"]["simple"]["data"]["features"]
-    ci = [f["properties"]["__rs_s"] for f in fs if f["properties"].get("__rs_ci")]
-    above = [f["properties"]["__rs_s"] for f in fs if f["properties"]["__rs_k"] in (1, 5) and not f["properties"].get("__rs_ci")]
-    assert len(ci) == 1 and max(ci) < min(above)
-    assert sum(f["properties"]["__rs_k"] == 1 for f in fs) == 1          # edge 1 keeps its fill, edge 2's lane is its fill
 
 
 def test_line_items_full_look_and_tiles(monkeypatch):
