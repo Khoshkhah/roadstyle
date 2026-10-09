@@ -2012,7 +2012,9 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
 def _square_end(q, line_of):
     """A casing head with a square end (``__rs_cap`` "square"): MapLibre caps a line at both of its ends, so the head's other end, the cut, was square
     too and stuck out where the road bends there (2026-10-10, a service road's bend: a square green corner). The head flat (``__rs_cap`` True) and
-    a 1 cm piece at the road end that carries the square cap: ``[head, cap]``; a piece that is not a head (both ends or no end of its edge) as it is."""
+    a 0.5 m piece at the road end (or the whole last segment, if shorter) that carries the square cap: ``[head, cap]``; a piece that is not a head
+    (both ends or no end of its edge) as it is. 0.5 m, not 1 cm: pieces keep 7 decimals (1 cm), so a 1 cm piece pointed any way and its square
+    cap stood off at an angle (2026-10-10)."""
     g = q["geometry"]
     c = g.get("coordinates") or []
     e = line_of.get(q["properties"]["__rs_edge"]) or []           # the edge's line, by its number (the editor draws a part of the roads)
@@ -2020,7 +2022,7 @@ def _square_end(q, line_of):
     if g.get("type") != "LineString" or len(c) < 2 or len(e) < 2 or at(c[0], e[0]) == at(c[-1], e[-1]):
         return [q]
     end, prev = (c[0], c[1]) if at(c[0], e[0]) else (c[-1], c[-2])
-    k = 0.01 / max(math.hypot((prev[0] - end[0]) * 111320 * math.cos(math.radians(end[1])), (prev[1] - end[1]) * 111320), 1e-6)
+    k = 0.5 / max(math.hypot((prev[0] - end[0]) * 111320 * math.cos(math.radians(end[1])), (prev[1] - end[1]) * 111320), 1e-6)
     stub = [[end[0] + (prev[0] - end[0]) * min(k, 1), end[1] + (prev[1] - end[1]) * min(k, 1)], list(end)]
     return [{**q, "properties": {**q["properties"], "__rs_cap": True}}, {**q, "geometry": {"type": "LineString", "coordinates": stub}}]
 
