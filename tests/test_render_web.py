@@ -3821,23 +3821,6 @@ def test_casing_items_are_drawn_with_the_casings():
     assert sum(f["properties"]["__rs_k"] == 1 for f in fs) == 1          # edge 1 keeps its fill, edge 2's lane is its fill
 
 
-def test_items_are_round_unless_their_cap_col_says_so():
-    """2026-10-10: a line item ends round; Overlay cap_col makes one flat or square; a dashed item stays flat (butt)."""
-    from shapely.geometry import LineString
-    from roadstyle import Overlay
-    a = LineString([(18.060, 59.315), (18.064, 59.315)])
-    roads = gpd.GeoDataFrame({"edge_id": [1], "highway": ["residential"], "oneway": ["yes"]}, geometry=[a], crs=4326)
-    lanes = gpd.GeoDataFrame([{"edge_id": 1, "order": k, "w": 3.0, "cap": c, "geometry": a} for k, c in enumerate([None, "flat", "square"])], crs=4326)
-    st = _style(render_edges(roads, backend="web", overlays=[Overlay(lanes, edge_col="edge_id", order_col="order", width_m_col="w", cap_col="cap")]).html)
-    caps = [f["properties"].get("__rs_cap") for f in sorted((f for f in st["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_k"] == 5),
-                                                           key=lambda f: f["properties"]["__rs_ord"])]
-    assert caps == [None, True, "square"]
-    cap = next(l for l in st["layers"] if l["id"] == "roads-simple")["layout"]["line-cap"]
-    assert cap[-1] == "round" and ["==", ["get", "__rs_k"], 5] not in cap
-    with pytest.raises(ValueError, match="end shape"):
-        render_edges(roads, backend="web", overlays=[Overlay(lanes.assign(cap="blob"), edge_col="edge_id", width_m_col="w", cap_col="cap")])
-
-
 def test_line_items_full_look_and_tiles(monkeypatch):
     """The full look keeps the items' own layers; tiles=True carries the item pieces in the simple tile layer; too many items is an error."""
     st = _style(_crossing_with_lanes(simple=False).html)

@@ -1908,9 +1908,6 @@ def _edge_overlay(ov, fc, roads, edge_id_col, fcol):
     return sorted(orders)
 
 
-_ITEM_CAPS = {"round": None, "flat": True, "square": "square"}     # an item's end shape (Overlay cap_col) as __rs_cap (_simple_cap)
-
-
 def _item_pieces(ov, i, fc):
     """Simple mode: the line items of an overlay attached to edges as pieces of the one road layer (``__rs_k`` 5, docs/design/edge_items.md):
     what the filters read from their edge (baked by :func:`_edge_overlay`), ``lvl``, their colour ``__rs_ic`` and their width / offset in
@@ -1932,12 +1929,6 @@ def _item_pieces(ov, i, fc):
         q = {k: v for k, v in p.items() if k.startswith("__rs_")}
         if ov.casing:
             q["__rs_ci"] = True       # drawn with the casings (_simple_pieces)
-        c = p.get(ov.cap_col) if ov.cap_col else None
-        if c is not None and not missing(c):
-            if c not in _ITEM_CAPS:
-                raise ValueError(f"overlay {ov.label or i}: item {j} has the end shape {c!r} ({ov.cap_col}); one of {sorted(_ITEM_CAPS)}")
-            if _ITEM_CAPS[c]:
-                q["__rs_cap"] = _ITEM_CAPS[c]
         q.update(lvl=p.get("__rs_lvl", 0), __rs_k=5, __rs_ov=i, __rs_item=j,
                  __rs_ic=(p.get(ov.color_col) if ov.color_col else None) or ov.color or C["color"])
         if d:     # the road layer's dash pattern is a text ("3,3": a property cannot hold an array), as a dashed class's __rs_dash
@@ -2123,9 +2114,8 @@ def _mark_cls(geo, feature_lists, fcol):
 
 
 def _simple_cap():
-    """Simple mode's line-cap per piece: a dashed piece butt (a round cap would seal the gaps), else the piece's ``__rs_cap`` (square, flat or round;
-    an item's from its Overlay ``cap_col``, round by default, 2026-10-10)."""
-    return ["case", ["to-boolean", ["get", "__rs_dash"]], "butt", ["==", ["get", "__rs_k"], 4], "butt",
+    """Simple mode's line-cap per piece: a dashed piece butt (a round cap would seal the gaps), else the piece's ``__rs_cap`` (square, flat or round)."""
+    return ["case", ["to-boolean", ["get", "__rs_dash"]], "butt", ["==", ["get", "__rs_k"], 4], "butt", ["==", ["get", "__rs_k"], 5], "butt",
             ["==", ["get", "__rs_cap"], "square"], "square", ["to-boolean", ["get", "__rs_cap"]], "butt", "round"]
 
 
