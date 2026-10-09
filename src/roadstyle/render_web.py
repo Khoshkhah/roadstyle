@@ -2030,13 +2030,15 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
     return under, over, meta, edge, items
 
 
-def _square_end(q, line_of):
-    """A casing head with a square end (``__rs_cap`` "square"): MapLibre caps a line at both of its ends, so the head's other end, the cut, was square
-    too and stuck out where the road bends there (2026-10-10, a service road's bend: a square green corner). The head flat (``__rs_cap`` True) and
-    a 0.5 m piece at the road end (or the whole last segment, if shorter) that carries the square cap: ``[head, cap]``; a piece that is not a head
-    (both ends or no end of its edge) as it is. 0.5 m, not 1 cm: pieces keep 7 decimals (1 cm), so a 1 cm piece pointed any way and its square
-    cap stood off at an angle (2026-10-10)."""
-    g = q["geometry"]
+def _end_stub(q, line_of):
+    """A piece with one road end and one cut (a casing head, a fill half) whose road end is not flat (``__rs_cap`` "square", or none: round):
+    MapLibre caps a line at both of its ends, so the cut got the same shape. A square one stuck out where the road bends there (2026-10-10, a
+    service road's bend); a round one on a road shorter than its width reached past the road's other, flat end (2026-10-09, a light disc at the
+    tunnel roundabout Rond-Point du Portier). The piece flat (``__rs_cap`` True) and a short piece at the road end (or the whole last segment, if
+    shorter) that carries the end's shape: ``[piece, stub]``; a piece that is not like that (both ends or no end of its edge) as it is.
+    A square stub 0.5 m (pieces keep 7 decimals, 1 cm, so a 1 cm piece pointed any way and its square cap stood off at an angle); a round one
+    5 cm, as a round cap has no direction and its circle reaches back into the road by half the width plus the stub. The stub has ``__rs_stub``."""
+    g = q.get("geometry") or {}
     c = g.get("coordinates") or []
     e = line_of.get(q["properties"]["__rs_edge"]) or []           # the edge's line, by its number (the editor draws a part of the roads)
     at = lambda a, b: abs(a[0] - b[0]) < 1e-6 and abs(a[1] - b[1]) < 1e-6      # noqa: E731  pieces are rounded to 7 decimals, the edge is not
@@ -2044,13 +2046,159 @@ def _square_end(q, line_of):
         return [q]
     first = at(c[0], e[0])
     end, prev = (c[0], c[1]) if first else (c[-1], c[-2])
-    k = 0.5 / max(math.hypot((prev[0] - end[0]) * 111320 * math.cos(math.radians(end[1])), (prev[1] - end[1]) * 111320), 1e-6)
+    m = 0.5 if q["properties"].get("__rs_cap") == "square" else 0.05
+    k = m / max(math.hypot((prev[0] - end[0]) * 111320 * math.cos(math.radians(end[1])), (prev[1] - end[1]) * 111320), 1e-6)
     inner = [end[0] + (prev[0] - end[0]) * min(k, 1), end[1] + (prev[1] - end[1]) * min(k, 1)]
     stub = [list(end), inner] if first else [inner, list(end)]      # the piece's own direction: a line-offset (a two-way direction's shift) keeps its side
-    return [{**q, "properties": {**q["properties"], "__rs_cap": True}}, {**q, "geometry": {"type": "LineString", "coordinates": stub}}]
+    return [{**q, "properties": {**q["properties"], "__rs_cap": True}}, {**q, "properties": {**q["properties"], "__rs_stub": True}, "geometry": {"type": "LineString", "coordinates": stub}}]
 
 
-def _simple_pieces(geo, parts, cols, shadows=True, items=()):
+_MITRE_MAX = 60.0       # degrees: a sharper turn is left as it is (a mitre's point grows without bound)
+_ITEM_JOIN_M = 2.0      # an item's end and the next item's start this close (metres) may be one lane going on (SUMO cuts two links' lanes apart)
+
+
+def _unit(a, b, lat):
+    """The unit vector from a to b in metres east / north (lon/lat points), and its length."""
+    x, y = (b[0] - a[0]) * 111320 * math.cos(math.radians(lat)), (b[1] - a[1]) * 111320
+    n = math.hypot(x, y)
+    return (x / n, y / n) if n > 0 else (0.0, 0.0), n
+
+
+def _heading(c, first):
+    """The way a line runs (as drawn, from its first point to its last) at its first or last point, from a point at least 0.5 m away (the
+    last steps are rounded to 7 decimals, so they may point any way)."""
+    pts = c if not first else c[::-1]
+    for q in pts[-2::-1]:
+        u, n = _unit(q, pts[-1], pts[-1][1])
+        if n >= 0.5:
+            return u if not first else (-u[0], -u[1])
+    u = _unit(pts[0], pts[-1], pts[-1][1])[0]
+    return u if not first else (-u[0], -u[1])
+
+
+def _reach(own, oth):
+    """How far a flat end goes on to close the corner where it meets the line going on: ``own`` and ``oth`` are (point in metres, heading,
+    half width, offset to the right in metres) at the end (heading: the way the line leaves through it, outward) and at the other line's
+    start (heading: into it); the extension (metres) or None. The two drawn lines (offsets applied) meet where their rays cross, and the end
+    goes on to the point where its outer edge meets the other's outer edge (the outer side of the turn): with equal widths a mitre."""
+    (p, u, h, o), (q, v, k, w) = own, oth
+    cos = max(-1.0, min(1.0, u[0] * v[0] + u[1] * v[1]))
+    turn = math.degrees(math.acos(cos))
+    if turn < 0.5 or turn > _MITRE_MAX:
+        return None
+    rn = lambda d, x: (d[1] * x, -d[0] * x)                 # noqa: E731  x metres to the right of heading d
+    pa, pb = (p[0] + rn(u, o)[0], p[1] + rn(u, o)[1]), (q[0] + rn(v, w)[0], q[1] + rn(v, w)[1])
+    det = u[0] * v[1] - u[1] * v[0]
+    dx, dy = pb[0] - pa[0], pb[1] - pa[1]
+    s, t = (dx * v[1] - dy * v[0]) / det, (u[0] * dy - u[1] * dx) / det      # pa + s u = pb - t v
+    if max(abs(s), abs(t)) > _ITEM_JOIN_M:
+        return None
+    sin = math.sin(math.radians(turn))
+    # to the other's outer edge, but never past its own mitre (an end meeting a much wider line nearly straight on reached metres past it)
+    return max(s, 0.0) + min(max((k - h * cos) / sin, 0.0), h * math.tan(math.radians(turn) / 2))
+
+
+def _push(f, first, m):
+    """``f`` with its first or last point pushed ``m`` metres straight on, the way the line leaves there."""
+    c = f["geometry"]["coordinates"]
+    u = _heading(c, first)
+    u = (-u[0], -u[1]) if first else u                         # the way it leaves through its first point
+    end = c[0] if first else c[-1]
+    pt = [round(end[0] + u[0] * m / (111320 * math.cos(math.radians(end[1]))), 7), round(end[1] + u[1] * m / 111320, 7)]
+    return {**f, "geometry": {"type": "LineString", "coordinates": [pt, *c] if first else [*c, pt]}}
+
+
+def _mitre_ends(out, line_of, world, items):
+    """Flat ends where a road or an item goes on (2026-10-09: wedges at the bends of the tunnel roundabout's short flat-ended roads and of the
+    bus and bike lanes, the road under them showing through): pushed on to close the corner (:func:`_reach`) with the line that goes on most
+    straight (turning _MITRE_MAX degrees at most, as the bridge shadows go on). A road's flat piece at its edge's end, with the other roads ending
+    there (in metres, ``__rs_wm``; a casing piece by their casings' width, a fill by their fills'); an item's end with the items of its colour
+    and dash that start within _ITEM_JOIN_M (and its start with those that end there), by their widths and offsets. Ends that go on nowhere
+    (dead ends, sharp turns) stay as they are. ``world``: every road of the page (a reverse pair drawn as one line counts once)."""
+    snap = lambda p: (round(p[0], 6), round(p[1], 6))       # noqa: E731
+    wide = {}                                                # each road in metres: (casing width, fill width) in metres, by edge
+    for i, f in enumerate(world["features"]):
+        p = f.get("properties") or {}
+        c = (f.get("geometry") or {}).get("coordinates") or []
+        if not p.get("__rs_dup") and "__rs_wm" in p and (f.get("geometry") or {}).get("type") == "LineString" and len(c) >= 2:
+            k = math.cos(math.radians(c[0][1]))
+            wide[p.get("__rs_edge", i)] = (p["__rs_wm"] * k, (p["__rs_wm"] - 2 * p["__rs_cm"]) * k)
+    ends = collections.defaultdict(list)                     # each road end: (edge, first)
+    for e in wide:
+        c = line_of[e]
+        ends[snap(c[0])].append((e, True))
+        ends[snap(c[-1])].append((e, False))
+    at = lambda a, b: abs(a[0] - b[0]) < 1e-6 and abs(a[1] - b[1]) < 1e-6      # noqa: E731
+    lat0 = next((c[0][1] for c in line_of.values() if c), 0.0)
+    for f in items:
+        lat0 = ((f.get("geometry") or {}).get("coordinates") or [[0, lat0]])[0][1]
+        break
+    k0 = 111320 * math.cos(math.radians(lat0))
+    xy = lambda pt, _=None: (pt[0] * k0, pt[1] * 111320)     # noqa: E731  metres, at one latitude for all (two points' own ones put them metres apart)
+    for i, f in enumerate(out):
+        p, g = f["properties"], f.get("geometry") or {}
+        c, e = g.get("coordinates") or [], line_of.get(p["__rs_edge"]) or []
+        if p.get("__rs_cap") is not True or p.get("__rs_seam") or p.get("__rs_lap") or p["__rs_edge"] not in wide or g.get("type") != "LineString" or len(c) < 2:
+            continue
+        j = 1 if p["__rs_k"] == 1 else 0                    # a fill by the fills' widths, every casing piece by the casings'
+        for first in (True, False):
+            if not at(c[0] if first else c[-1], e[0] if first else e[-1]):        # a piece keeps its edge's direction
+                continue
+            node, lat0 = (e[0] if first else e[-1]), e[0][1]
+            u = _heading(e, first)
+            u = (-u[0], -u[1]) if first else u
+            best = None
+            for o, ofirst in ends[snap(node)]:
+                if o == p["__rs_edge"]:
+                    continue
+                v = _heading(line_of[o], ofirst)
+                v = v if ofirst else (-v[0], -v[1])          # into the other road
+                m = _reach((xy(node, lat0), u, wide[p["__rs_edge"]][j] / 2, 0.0), (xy(node, lat0), v, wide[o][j] / 2, 0.0))
+                if m is not None and (best is None or u[0] * v[0] + u[1] * v[1] > best[0]):
+                    best = (u[0] * v[0] + u[1] * v[1], m)
+            if best and best[1] > 0:
+                f = out[i] = _push(out[i], first, best[1])
+                c = f["geometry"]["coordinates"]
+    lines = [k for k, f in enumerate(items) if (f.get("geometry") or {}).get("type") == "LineString" and len(f["geometry"]["coordinates"]) >= 2]
+    key = lambda f: (f["properties"].get("__rs_ic"), f["properties"].get("__rs_dash"))   # noqa: E731
+    cell = lambda pt: (math.floor(pt[0] / 3e-5), math.floor(pt[1] / 3e-5))    # noqa: E731  about 2.4 x 3.3 m here, more than _ITEM_JOIN_M
+    by = collections.defaultdict(list)                       # (colour and dash, first, cell): the items with that end there
+    for k in lines:
+        c = items[k]["geometry"]["coordinates"]
+        for first in (True, False):
+            by[(key(items[k]), first, cell(c[0] if first else c[-1]))].append(k)
+    def side(k, first):                                       # (metres point, outward heading, half width, offset right of the outward heading)
+        f = items[k]
+        c, pr = f["geometry"]["coordinates"], f["properties"]
+        cl = math.cos(math.radians(c[0][1]))
+        u = _heading(c, first)
+        out_u = (-u[0], -u[1]) if first else u
+        o = pr["__rs_iom"] * cl
+        return xy(c[0] if first else c[-1], c[0][1]), out_u, pr["__rs_iwm"] * cl / 2, (-o if first else o)   # leaving backwards, its right is the left
+    pushes = []
+    for k in lines:
+        for first in (True, False):
+            p, u, h, o = side(k, first)
+            best = None
+            x, y = cell(items[k]["geometry"]["coordinates"][0 if first else -1])
+            for j in (j for dx in (-1, 0, 1) for dy in (-1, 0, 1) for j in by[(key(items[k]), not first, (x + dx, y + dy))]):
+                if j == k:
+                    continue
+                q, v, kk, w = side(j, not first)                 # the other's start (when this is an end) or its end
+                v, w = (-v[0], -v[1]), -w                         # into it, its offset right of that way
+                if math.hypot(q[0] - p[0], q[1] - p[1]) > _ITEM_JOIN_M:
+                    continue
+                m = _reach((p, u, h, o), (q, v, kk, w))
+                if m is not None and (best is None or u[0] * v[0] + u[1] * v[1] > best[0]):
+                    best = (u[0] * v[0] + u[1] * v[1], m)
+            if best and best[1] > 0:
+                pushes.append((k, first, best[1]))
+    for k, first, m in pushes:
+        items[k] = _push(items[k], first, m)
+    return out, items
+
+
+def _simple_pieces(geo, parts, cols, shadows=True, items=(), world=None):
     """The features of simple mode's one road layer: every casing piece (``__rs_k`` 0; the heads and seams as ``_casing_parts`` cuts them) and every fill
     (``__rs_k`` 1), with ``__rs_s``, the line-sort-key: ``2 * position``, a bridge's casing a quarter more (the full look draws it after the other
     casings of its position), a fill ``2 * position + 1``. A dashed class has no casing and its fill comes before the casings of its position
@@ -2059,20 +2207,22 @@ def _simple_pieces(geo, parts, cols, shadows=True, items=()):
     less); the heads, where the bridge comes down to the road, have none.
     A tunnel's casing (docs/design/tunnel_look.md) is two pieces instead of one, as the full look's two layers: the gap colour (``__rs_k`` 3, at the
     casing's key) and the dashes on top (``__rs_k`` 4, 0.1 more, still under the fill).
-    Ends: the layer reads ``__rs_cap`` per piece (line-cap: none round, True flat, "square" square). As in the full look, a casing's main piece
+    Ends: the layer reads ``__rs_cap`` per piece (line-cap: none round, True flat, "square" square); a round or square road end on a piece that
+    also ends at a cut is carried by a stub (:func:`_end_stub`); a flat end where the road or an item goes on is pushed to a mitre (:func:`_mitre_ends`). As in the full look, a casing's main piece
     (between two cuts) ends flat and each cut gets its seam (a round dot at the lower number): a round main piece reached past a short head
     into the junction (2026-10-08). An edge with two different ends draws its fill as two halves (:func:`_halves`).
     ``items`` (:func:`_item_pieces`, ``__rs_k`` 5): the line items attached to edges, each at its edge's fill: ``2 * position + 1`` plus
     _ITEM_STEP per rank on its edge (by order, overlay, feature), above every fill of the position and under the next casings (see _ITEM_STEP).
     An edge with items keeps its fill under them (2026-10-10): its ends are those of the road without items (the lanes alone left the casing's
-    round end empty)."""
+    round end empty). ``world``: every road of the page when ``geo`` is a part of them (the editor's update in place), for the roads a part's
+    ends meet."""
     keep = {c for c in cols if c} | {"lvl"}
     halves = collections.defaultdict(list)
     for h in _halves(geo):
         halves[h["properties"]["__rs_edge"]].append(h)
     out = []
-    line_of = {(f.get("properties") or {}).get("__rs_edge", i): (f.get("geometry") or {}).get("coordinates") for i, f in enumerate(geo["features"])}
-    for q in (x for q0 in parts for x in (_square_end(q0, line_of) if q0["properties"].get("__rs_cap") == "square" and not q0["properties"].get("__rs_seam") else [q0])):
+    line_of = {(f.get("properties") or {}).get("__rs_edge", i): (f.get("geometry") or {}).get("coordinates") for i, f in enumerate((world or geo)["features"])}
+    for q in (x for q0 in parts for x in (_end_stub(q0, line_of) if q0["properties"].get("__rs_cap") is not True and not q0["properties"].get("__rs_seam") else [q0])):
         p = q["properties"]
         if p.get("__rs_dash") or (p.get("__rs_seam") and p.get("__rs_tunnel")):     # a tunnel's casing is its dashes alone, no seam dots
             continue
@@ -2088,10 +2238,12 @@ def _simple_pieces(geo, parts, cols, shadows=True, items=()):
         p = ft["properties"]
         if p.get("__rs_dup"):
             continue
-        for g, p in ([(h["geometry"], h["properties"]) for h in halves[p.get("__rs_edge", i)]] if p.get("__rs_split") else [(ft["geometry"], p)]):
+        hs = [x for h in halves[p.get("__rs_edge", i)] for x in (_end_stub(h, line_of) if h["properties"].get("__rs_cap") is not True else [h])]
+        for g, p in ([(h["geometry"], h["properties"]) for h in hs] if p.get("__rs_split") else [(ft["geometry"], p)]):
             out.append({"type": "Feature", "geometry": g,
                         "properties": {**{k: v for k, v in p.items() if k in keep or k.startswith("__rs_")}, "__rs_k": 1,
                                        "__rs_s": 2 * p["__rs_fl"] + (-0.5 if p.get("__rs_dash") else 1)}})
+    out, items = _mitre_ends(out, line_of, world or geo, list(items))
     n = collections.Counter()           # a feature id per piece, _PIECES per edge, so the page can swap one road's pieces (GeoJSONSource.updateData)
     for f in out:
         e = f["properties"]["__rs_edge"]
@@ -2111,7 +2263,7 @@ def _simple_pieces(geo, parts, cols, shadows=True, items=()):
     return {"type": "FeatureCollection", "features": out}
 
 
-_PIECES = 24        # the most pieces of one edge in simple mode (20): 3 casing pieces, 2 seams, 2 laps and 2 square-end stubs (_square_end), each with a shadow or a second tunnel piece, 2 fill halves
+_PIECES = 24        # the most pieces of one edge in simple mode (22): 3 casing pieces, 2 seams, 2 laps and 2 end stubs (_end_stub), each with a shadow or a second tunnel piece, 2 fill halves and their 2 end stubs
 # the line-sort-key's tie-breaker per edge (2026-10-08): keys differ by at least 0.05 (offsets -0.5, -0.1, 0, 0.1, 0.15, 0.25, 1, 1.5 of
 # 2 * position; a painted fill + 0.5), so _MAX_EDGES * _TIE (0.01) never reaches the next key
 _TIE, _MAX_EDGES = 1e-8, 1_000_000
@@ -2128,7 +2280,7 @@ def _edge_features(geo, edges, head_m, cols, fcol, slots):
     two-way pair with one casing (``__rs_twin``) comes with its twin: the casing is cut from one of the two."""
     tw = {geo["features"][i]["properties"].get("__rs_twin") for i in edges} - {None}
     sub = {"type": "FeatureCollection", "features": [geo["features"][i] for i in sorted(set(edges) | tw)]}
-    out = {"roads": sub["features"], "simple": _simple_pieces(sub, _casing_parts(sub, head_m, cols), cols, CONFIG.bridge_shadow)["features"]}
+    out = {"roads": sub["features"], "simple": _simple_pieces(sub, _casing_parts(sub, head_m, cols), cols, CONFIG.bridge_shadow, world=geo)["features"]}
     if slots:
         out["slots"] = _annotation_slots(geo, (CONFIG.annotations or {}).get("slot_m", 100), cols[0])["features"]
     _mark_cls(geo, out.values(), fcol)

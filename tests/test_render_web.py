@@ -1071,9 +1071,10 @@ def test_a_two_way_pairs_casing_takes_each_end_its_own_cap():
             c = [tuple(x) for x in f["geometry"]["coordinates"]]
             at[a if a in (c[0], c[-1]) else b] = f["properties"].get("__rs_cap")
         assert at == {a: True, b: "square"}
-        fills = [f for f in feats if f["properties"]["__rs_k"] == 1]               # two different ends: each fill in two halves, its own caps
-        ends = sorted((f["properties"]["__rs_edge"], a in [tuple(x) for x in f["geometry"]["coordinates"]], f["properties"].get("__rs_cap")) for f in fills)
-        assert ends == [(0, False, "square"), (0, True, True), (1, False, "square"), (1, True, True)]
+        fills = [f for f in feats if f["properties"]["__rs_k"] == 1]               # two different ends: each fill in two halves, its own caps; the
+        # square half flat at its cut, its square end on a stub (_end_stub)
+        ends = sorted((f["properties"]["__rs_edge"], a in [tuple(x) for x in f["geometry"]["coordinates"]], str(f["properties"].get("__rs_cap"))) for f in fills)
+        assert ends == [(0, False, "True"), (0, False, "square"), (0, True, "True"), (1, False, "True"), (1, False, "square"), (1, True, "True")]
 
 
 def _twin_caps(g, simple=True, **kw):
@@ -3344,7 +3345,7 @@ def test_simple_draws_every_road_piece_in_one_layer_in_the_full_order():
     assert {"casings", "halves", "shadows", "ends"}.isdisjoint(style["sources"])
     feats = [f["properties"] for f in style["sources"]["simple"]["data"]["features"]]
     assert all("__rs_edge" in p and "__rs_cls" in p for p in feats)
-    casings = [(p["__rs_edge"], p["__rs_cl"], p["__rs_s"]) for p in feats if p["__rs_k"] in (0, 3)]     # a tunnel's casing: its gap piece (3), the dashes (4) on top
+    casings = [(p["__rs_edge"], p["__rs_cl"], p["__rs_s"]) for p in feats if p["__rs_k"] in (0, 3) and not p.get("__rs_stub")]   # a tunnel's casing: its gap piece (3), the dashes (4) on top; a round end on its stub (_end_stub)
     # the same pieces as the full look's casing source, seams too (a tunnel's casing is its dashes alone: no seam dots), the footway none
     full_pieces = [(p["__rs_edge"], p["__rs_cl"]) for p in (f["properties"] for f in full["sources"]["casings"]["data"]["features"])
                    if not (p.get("__rs_seam") and p["__rs_edge"] == 0) and p["__rs_edge"] != 2]
@@ -3417,7 +3418,7 @@ def test_simple_tunnel_casing_is_a_gap_piece_and_a_dash_piece():
     kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0)
     style = _style(render_edges(_simple_world(), settings={"config": {"tunnel_casing_dash": [2, 3]}}, **kw).html)
     feats = [f["properties"] for f in style["sources"]["simple"]["data"]["features"]]
-    gap, dash = [p for p in feats if p["__rs_k"] == 3], [p for p in feats if p["__rs_k"] == 4]
+    gap, dash = [p for p in feats if p["__rs_k"] == 3 and not p.get("__rs_stub")], [p for p in feats if p["__rs_k"] == 4 and not p.get("__rs_stub")]
     assert len(gap) == len(dash) == 3 and all(p["__rs_edge"] == 0 for p in gap + dash)            # the tunnel's three pieces (heads and main), no plain casing
     assert not [p for p in feats if p["__rs_k"] == 0 and p["__rs_edge"] == 0]
     assert [round(d["__rs_s"] - g["__rs_s"], 6) for g, d in zip(gap, dash, strict=True)] == [0.1] * 3 and all(d["__rs_s"] < 1 for d in dash)   # under the fill (key 1)
@@ -3466,7 +3467,7 @@ def test_simple_line_cap_per_piece_from_the_ends():
     split = _style(render_edges(g.iloc[:1].assign(cap=None, c0="square", c1="flat"), cap_start_col="c0", cap_end_col="c1", **{**kw, "cap_col": None}).html)
     feats = [f["properties"] for f in split["sources"]["simple"]["data"]["features"]]
     fills = [p.get("__rs_cap") for p in feats if p["__rs_k"] == 1]
-    assert fills == ["square", True]                                                                # the start half, the end half
+    assert fills == [True, "square", True]                          # the start half (flat at its cut), its square stub at the road end, the end half
     heads = [(p["__rs_cl"], p.get("__rs_cap"), p.get("__rs_main")) for p in feats if p["__rs_k"] == 0 and not p.get("__rs_lap")]
     # head (flat), its 0.5 m square stub at the road end (2026-10-10: a square cap at the head's cut stuck out where the road bends), main (flat), head
     assert heads[:4] == [(0, True, None), (0, "square", None), (0, True, True), (0, True, None)]
@@ -3930,3 +3931,25 @@ def test_only_clickable_items_are_picked():
     lane or road under it (2026-10-10: a click on a lane arrow selected the road, not the lane)."""
     html = render_edges(_edges(), backend="web").html
     assert "OVERLAYS.filter(o=>o.base && (o.interactive || o.select===\"item\"))" in html
+
+
+def test_simple_flat_ends_that_go_on_close_the_bend_and_a_round_end_is_a_stub():
+    """2026-10-09 (tunnel roundabout, bus lanes): two flat-ended roads in metres meeting at a 30-degree bend each go on past the node to the
+    mitre (half the width times tan 15 degrees), so no wedge opens on the outer side; a dead end stays where it is. A road with a flat start
+    and a round end: both fill halves flat, the round end on a 5 cm stub at the road end (a round cap at the cut reached past the flat start)."""
+    k = 111320 * math.cos(math.radians(59))
+    a, n = (18.0, 59.0), (18.0 + 30 / k, 59.0)
+    b = (n[0] + 30 * math.cos(math.radians(30)) / k, n[1] + 30 * math.sin(math.radians(30)) / 111320)
+    g = gpd.GeoDataFrame({"highway": ["residential"] * 2, "w": [6.0, 6.0], "cap": [True, True]},
+                         geometry=[LineString([a, n]), LineString([n, b])], crs=4326)
+    feats = _style(render_edges(g, backend="web", width_m_col="w", cap_col="cap").html)["sources"]["simple"]["data"]["features"]
+    fill0 = next(f for f in feats if f["properties"]["__rs_k"] == 1 and f["properties"]["__rs_edge"] == 0)["geometry"]["coordinates"]
+    past = (fill0[-1][0] - n[0]) * k
+    assert abs(fill0[0][0] - a[0]) < 1e-6 and abs(past - 3.0 * math.tan(math.radians(15))) < 0.05      # the fill: half its 6 m
+    g = gpd.GeoDataFrame({"highway": ["residential"], "w": [9.0], "c0": ["flat"], "c1": ["round"]},
+                         geometry=[LineString([a, (a[0] + 4.8 / k, a[1])])], crs=4326)
+    feats = _style(render_edges(g, backend="web", width_m_col="w", cap_start_col="c0", cap_end_col="c1").html)["sources"]["simple"]["data"]["features"]
+    fills = [f for f in feats if f["properties"]["__rs_k"] == 1]
+    assert [f["properties"].get("__rs_cap") for f in fills] == [True, True, None] and fills[2]["properties"]["__rs_stub"]
+    (x0, _), (x1, _) = fills[2]["geometry"]["coordinates"]
+    assert abs(x1 - (a[0] + 4.8 / k)) < 1e-6 and 0.03 < (x1 - x0) * k < 0.07
