@@ -2004,9 +2004,10 @@ def _square_end(q, line_of):
     g = q["geometry"]
     c = g.get("coordinates") or []
     e = line_of.get(q["properties"]["__rs_edge"]) or []           # the edge's line, by its number (the editor draws a part of the roads)
-    if g.get("type") != "LineString" or len(c) < 2 or len(e) < 2 or (c[0] == e[0]) == (c[-1] == e[-1]):
+    at = lambda a, b: abs(a[0] - b[0]) < 1e-6 and abs(a[1] - b[1]) < 1e-6      # noqa: E731  pieces are rounded to 7 decimals, the edge is not
+    if g.get("type") != "LineString" or len(c) < 2 or len(e) < 2 or at(c[0], e[0]) == at(c[-1], e[-1]):
         return [q]
-    end, prev = (c[0], c[1]) if c[0] == e[0] else (c[-1], c[-2])
+    end, prev = (c[0], c[1]) if at(c[0], e[0]) else (c[-1], c[-2])
     k = 0.01 / max(math.hypot((prev[0] - end[0]) * 111320 * math.cos(math.radians(end[1])), (prev[1] - end[1]) * 111320), 1e-6)
     stub = [[end[0] + (prev[0] - end[0]) * min(k, 1), end[1] + (prev[1] - end[1]) * min(k, 1)], list(end)]
     return [{**q, "properties": {**q["properties"], "__rs_cap": True}}, {**q, "geometry": {"type": "LineString", "coordinates": stub}}]

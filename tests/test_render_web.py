@@ -3441,6 +3441,7 @@ def test_simple_line_cap_per_piece_from_the_ends():
     feats = [f["properties"] for f in _style(render_edges(g.drop(columns=["c0", "c1"]), **kw).html)["sources"]["simple"]["data"]["features"]]
     caps = {(p["__rs_k"], p["__rs_edge"]): p.get("__rs_cap") for p in feats}
     assert caps == {(0, 0): None, (1, 0): None, (0, 1): "square", (1, 1): "square", (0, 2): True, (1, 2): True}
+    g = g.set_geometry([LineString([(18.000000123, 59.000000123), (18 + d, 59)])] + list(g.geometry[1:]), crs=4326)   # more decimals than a piece keeps
     split = _style(render_edges(g.iloc[:1].assign(cap=None, c0="square", c1="flat"), cap_start_col="c0", cap_end_col="c1", **{**kw, "cap_col": None}).html)
     feats = [f["properties"] for f in split["sources"]["simple"]["data"]["features"]]
     fills = [p.get("__rs_cap") for p in feats if p["__rs_k"] == 1]
@@ -3450,7 +3451,7 @@ def test_simple_line_cap_per_piece_from_the_ends():
     assert heads[:4] == [(0, True, None), (0, "square", None), (0, True, True), (0, True, None)]
     stub = next(f for f in split["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_k"] == 0 and f["properties"].get("__rs_cap") == "square")
     (x0, y0), (x1, y1) = stub["geometry"]["coordinates"]
-    assert (x1, y1) == (18, 59) and 0.005 < math.hypot((x1 - x0) * 111320 * math.cos(math.radians(59)), (y1 - y0) * 111320) < 0.02
+    assert abs(x1 - 18) < 1e-6 and abs(y1 - 59) < 1e-6 and 0.005 < math.hypot((x1 - x0) * 111320 * math.cos(math.radians(59)), (y1 - y0) * 111320) < 0.02
     assert heads[4:] == [(0, None, None)] * 2 and all(p.get("__rs_seam") for p in feats if p["__rs_k"] == 0 and not p.get("__rs_cap"))   # the two seams, round
     assert [p.get("__rs_cap") for p in feats if p.get("__rs_lap")] == [True, True]                  # and the two laps, flat (below zoom 17)
 
