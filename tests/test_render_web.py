@@ -2482,6 +2482,8 @@ def test_the_editor_panel_calls_a_road_two_way_only_when_both_directions_are_dra
                    "reversed_directed": [False], "edges_lanes": [2.0], "reversed_lanes": [1.0], "edges_modes": ["driving + walking"], "reversed_modes": ["walking"]})
     assert not _two_halves(r) and _two_halves(pd.Series({**r.to_dict(), "reversed_directed": [True]}))
     assert [(d["edge_ref"], d["lanes"], d["modes"]) for d in _directions(r)] == [("9#1f", "2", "driving + walking"), ("9#1r", "1", "walking")]
+    from roadstyle.level_editor import _driving_edges
+    assert _driving_edges(pd.Series({**r.to_dict(), "edges_driving": [True], "reversed_driving": [False]})) == 1          # the panel's "edges": cars' edges
 
 
 def test_rsfilter_and_rscolor_by_ids_in_the_browser(tmp_path):

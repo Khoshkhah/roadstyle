@@ -56,7 +56,7 @@ class Area:
         for (_, r), m in zip(self.roads.iterrows(), length, strict=True):
             self.facts[r["road"]] = {"road": r["road"], "name": _txt(r.get("name")), "highway": _txt(r.get("highway")),
                                      "edge_ref": _txt(r.get("edge_ref")), "lanes": _txt(r.get("lanes")), "modes": _txt(r.get("modes")), "bus_lines": _txt(r.get("bus_lines")), "caps": ["", ""], "heads": [5.0, 5.0], "band": int(r["band"]), "priority": _num(r.get("priority")),
-                                     "edges": len(r["edges"]) + len(r["reversed"]), "two_way": _two_halves(r), "length_m": float(m),
+                                     "edges": _driving_edges(r), "two_way": _two_halves(r), "length_m": float(m),
                                      "directions": _directions(r),
                                      "look": "tunnel" if _yes(r.get("tunnel")) else "bridge" if _yes(r.get("bridge")) else "ground",
                                      "width_px": _widths(_txt(r.get("highway")), _two_halves(r))}
@@ -344,6 +344,13 @@ def _row(body):
         if row["relation"] == "order":
             row["a_end"] = ""
     return row
+
+
+def _driving_edges(r):
+    """The road's edges cars may drive (``edges_driving`` / ``reversed_driving``; null = driving, as render_edges' ``driving_col``): what the panel
+    counts, so 2 means two-way for cars; a one-way street's walking-only reverse is not counted (2026-10-10)."""
+    flags = [*list(r.get("edges_driving", [])), *list(r.get("reversed_driving", []))]
+    return sum(1 for x in flags if missing(x) or bool(x))
 
 
 def _two_halves(r):
