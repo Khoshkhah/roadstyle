@@ -3953,3 +3953,11 @@ def test_simple_flat_ends_that_go_on_close_the_bend_and_a_round_end_is_a_stub():
     assert [f["properties"].get("__rs_cap") for f in fills] == [True, True, None] and fills[2]["properties"]["__rs_stub"]
     (x0, _), (x1, _) = fills[2]["geometry"]["coordinates"]
     assert abs(x1 - (a[0] + 4.8 / k)) < 1e-6 and 0.03 < (x1 - x0) * k < 0.07
+
+
+def test_the_tunnel_look_keeps_each_colours_alpha():
+    """2026-10-09: the tunnel look moves a colour toward the tunnel colour but keeps its own alpha, so an unseen item (rgba(0,0,0,0), lanestyle's
+    car lanes) stays unseen on a tunnel instead of a see-through strip, darker where two overlap."""
+    from roadstyle.render_web import _tun_mix
+    e = _tun_mix(["get", "__rs_ic"], "#d6cfc4", 60)
+    assert e[0] == "case" and e[2][0] == "let" and e[2][3][4] == ["at", 3, ["to-rgba", ["get", "__rs_ic"]]] and e[3] == ["get", "__rs_ic"]

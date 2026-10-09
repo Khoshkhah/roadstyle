@@ -684,7 +684,9 @@ const COLOR_OPTIONS = __COLOR_OPTIONS__;
 // the tunnel look, v2's slider (docs/design/tunnel_look.md): TUNNEL.strength 0-100 moves a tunnel's colours toward TUNNEL.to;
 // TUNNEL.layers = {layer id: [[paint property, colour without the look, key of TUNNEL.to], ...]}, TUNNEL.dash = the casing dash layers
 const TUNNEL = __TUNNEL__;
-function _tunMix(e, toward){ return ["case",["to-boolean",["get","__rs_tunnel"]],["interpolate",["linear"],TUNNEL.strength,0,e,100,toward],e]; }
+function _tunMix(e, toward){   // as _tun_mix: the colour keeps its own alpha (an unseen item stays unseen)
+  const m=["to-rgba",["interpolate",["linear"],TUNNEL.strength,0,e,100,toward]];
+  return ["case",["to-boolean",["get","__rs_tunnel"]],["let","m",m,["rgba",["at",0,["var","m"]],["at",1,["var","m"]],["at",2,["var","m"]],["at",3,["to-rgba",e]]]],e]; }
 const _tunOn = Object.keys(TUNNEL.layers).length > 0;
 const RS_FILL_LAYERS = __RS_FILL_LAYERS__;
 const RS_END_LAYERS = __RS_END_LAYERS__;   // twin_ends.md

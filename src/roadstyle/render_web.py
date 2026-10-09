@@ -1273,8 +1273,11 @@ def _tun_settings():
 
 def _tun_mix(expr, toward, s):
     """A tunnel feature's colour: ``expr`` moved toward ``toward`` by the slider ``s`` (0-100); any other feature keeps ``expr``
-    (docs/design/tunnel_look.md). The page builds the same expression again when the slider moves (_tunMix)."""
-    return ["case", ["to-boolean", ["get", "__rs_tunnel"]], ["interpolate", ["linear"], s, 0, expr, 100, toward], expr]
+    (docs/design/tunnel_look.md). The page builds the same expression again when the slider moves (_tunMix). The colour keeps its own alpha
+    (2026-10-09: an unseen item, rgba(0,0,0,0), moved toward an opaque colour became a see-through strip on every tunnel, darker where two overlapped)."""
+    mixed = ["to-rgba", ["interpolate", ["linear"], s, 0, expr, 100, toward]]
+    keep = ["rgba", ["at", 0, ["var", "m"]], ["at", 1, ["var", "m"]], ["at", 2, ["var", "m"]], ["at", 3, ["to-rgba", expr]]]
+    return ["case", ["to-boolean", ["get", "__rs_tunnel"]], ["let", "m", mixed, keep], expr]
 
 
 def _tunnel_look(layers, edge_ids, s, arrow_color, to=_TUN_TO):
