@@ -3803,6 +3803,24 @@ def test_line_items_are_pieces_of_the_one_road_layer_at_their_edge_fill():
     assert hits and all(l["paint"]["line-opacity"][0] == "case" for l in hits)
 
 
+def test_casing_items_are_drawn_with_the_casings():
+    """2026-10-10: an Overlay with casing=True (a lane connector's casing) is drawn at its edge's casing number, under every fill and item of
+    that number, so it never covers a crossing road's lanes; it is no fill of its edge (the edge keeps its own)."""
+    from shapely.geometry import LineString
+    from roadstyle import Overlay
+    a, b = LineString([(18.060, 59.315), (18.064, 59.315)]), LineString([(18.062, 59.3135), (18.062, 59.3165)])
+    roads = gpd.GeoDataFrame({"edge_id": [1, 2], "highway": ["residential"] * 2, "oneway": ["yes", "yes"]}, geometry=[a, b], crs=4326)
+    casing = gpd.GeoDataFrame([{"edge_id": 1, "w": 4.0, "c": "#16a34a", "geometry": a}], crs=4326)
+    lanes = gpd.GeoDataFrame([{"edge_id": 2, "w": 3.0, "c": "#00ff00", "geometry": b}], crs=4326)
+    ovs = [Overlay(casing, edge_col="edge_id", color_col="c", width_m_col="w", casing=True),
+           Overlay(lanes, edge_col="edge_id", color_col="c", width_m_col="w")]
+    fs = _style(render_edges(roads, backend="web", overlays=ovs).html)["sources"]["simple"]["data"]["features"]
+    ci = [f["properties"]["__rs_s"] for f in fs if f["properties"].get("__rs_ci")]
+    above = [f["properties"]["__rs_s"] for f in fs if f["properties"]["__rs_k"] in (1, 5) and not f["properties"].get("__rs_ci")]
+    assert len(ci) == 1 and max(ci) < min(above)
+    assert sum(f["properties"]["__rs_k"] == 1 for f in fs) == 1          # edge 1 keeps its fill, edge 2's lane is its fill
+
+
 def test_line_items_full_look_and_tiles(monkeypatch):
     """The full look keeps the items' own layers; tiles=True carries the item pieces in the simple tile layer; too many items is an error."""
     st = _style(_crossing_with_lanes(simple=False).html)

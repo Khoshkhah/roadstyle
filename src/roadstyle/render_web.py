@@ -1899,7 +1899,7 @@ def _edge_overlay(ov, fc, roads, edge_id_col, fcol):
         o = p.get(ov.order_col) if ov.order_col else 0
         o = 0 if o is None or (isinstance(o, float) and math.isnan(o)) else int(o)
         fl = r.get("__rs_fl") or 0
-        p.update(__rs_edge=r["__rs_edge"], __rs_fl=fl, __rs_ord=o, __rs_cls=r.get(fcol), __rs_lvl=r.get("lvl", 0))
+        p.update(__rs_edge=r["__rs_edge"], __rs_fl=fl, __rs_cl=r.get("__rs_cl") or 0, __rs_ord=o, __rs_cls=r.get(fcol), __rs_lvl=r.get("lvl", 0))
         if r.get("__rs_tunnel"):
             p["__rs_tunnel"] = True          # the item of a tunnel takes its look (docs/design/tunnel_look.md)
         orders.add((fl, o))
@@ -1927,6 +1927,8 @@ def _item_pieces(ov, i, fc):
         d = ov.dash if d is None or (not isinstance(d, (list, tuple)) and missing(d)) else d
         p.update(__rs_iwm=round(float(w) * sec, 4), __rs_iom=0 if o is None or missing(o) else round(float(o) * sec, 4))   # the item's own layer reads them too
         q = {k: v for k, v in p.items() if k.startswith("__rs_")}
+        if ov.casing:
+            q["__rs_ci"] = True       # drawn with the casings (_simple_pieces)
         q.update(lvl=p.get("__rs_lvl", 0), __rs_k=5, __rs_ov=i, __rs_item=j,
                  __rs_ic=(p.get(ov.color_col) if ov.color_col else None) or ov.color or C["color"])
         if d:     # the road layer's dash pattern is a text ("3,3": a property cannot hold an array), as a dashed class's __rs_dash
@@ -2046,7 +2048,7 @@ def _simple_pieces(geo, parts, cols, shadows=True, items=()):
             out.append({"type": "Feature", "geometry": q["geometry"], "properties": {**p, "__rs_k": 4, "__rs_s": k + 0.1}})
         else:
             out.append({"type": "Feature", "geometry": q["geometry"], "properties": {**p, "__rs_k": 0, "__rs_s": k}})
-    itemed = {f["properties"]["__rs_edge"] for f in items}     # an edge with items draws no fill of its own: its items are its fill (2026-10-09)
+    itemed = {f["properties"]["__rs_edge"] for f in items if not f["properties"].get("__rs_ci")}   # an edge with items draws no fill of its own: its items are its fill (2026-10-09)
     for i, ft in enumerate(geo["features"]):
         p = ft["properties"]
         if p.get("__rs_dup") or p.get("__rs_edge", i) in itemed:
@@ -2067,6 +2069,9 @@ def _simple_pieces(geo, parts, cols, shadows=True, items=()):
     rank = collections.Counter()
     for j, f in enumerate(sorted(items, key=lambda f: (f["properties"]["__rs_edge"], f["properties"]["__rs_ord"], f["properties"]["__rs_ov"], f["properties"]["__rs_item"]))):
         p = f["properties"]
+        if p.get("__rs_ci"):     # an item drawn with the casings (Overlay casing=True): over its edge's casing, under every fill of that number
+            out.append({**f, "id": _MAX_EDGES * _PIECES + j, "properties": {**p, "__rs_s": 2 * p["__rs_cl"] + 0.05 + p["__rs_edge"] * _TIE}})
+            continue
         e, rank[p["__rs_edge"]] = p["__rs_edge"], rank[p["__rs_edge"]] + 1
         if rank[e] > _MAX_ITEMS:
             raise ValueError(f"simple=True: edge {e} has more than {_MAX_ITEMS} items; they do not fit between its fill and the next casings (pass simple=False)")
