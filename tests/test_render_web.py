@@ -2696,7 +2696,8 @@ def test_the_editor_draws_and_updates_both_directions_of_a_road(tmp_path):
     make_area(gpd.GeoDataFrame(pd.concat([g, back], ignore_index=True), crs=g.crs), tmp_path)
     area = Area(tmp_path)
     f = area.facts["12"]
-    assert f["two_way"] and f["directions"] == [{"edge": "12", "edge_ref": "12f", "way": "along"}, {"edge": "22", "edge_ref": "12r", "way": "against"}]
+    assert f["two_way"] and f["directions"] == [{"edge": "12", "edge_ref": "12f", "way": "along", "lanes": None, "modes": None},
+                                                {"edge": "22", "edge_ref": "12r", "way": "against", "lanes": None, "modes": None}]
     assert [h["road"] for h in area.find("22")] == ["12"] and [h["road"] for h in area.find("12r")] == ["12"]
     js = lambda x: json.loads(json.dumps(x, default=str))                                  # noqa: E731 - as the page gets them
     area.apply([{"op": "cap", "road": "22", "end": "start", "cap": "square"}])             # by the other direction's id: the road's start
@@ -3445,8 +3446,12 @@ def test_simple_line_cap_per_piece_from_the_ends():
     fills = [p.get("__rs_cap") for p in feats if p["__rs_k"] == 1]
     assert fills == ["square", True]                                                                # the start half, the end half
     heads = [(p["__rs_cl"], p.get("__rs_cap"), p.get("__rs_main")) for p in feats if p["__rs_k"] == 0 and not p.get("__rs_lap")]
-    assert heads[:3] == [(0, "square", None), (0, True, True), (0, True, None)]                       # head, main (flat), head
-    assert heads[3:] == [(0, None, None)] * 2 and all(p.get("__rs_seam") for p in feats if p["__rs_k"] == 0 and not p.get("__rs_cap"))   # the two seams, round
+    # head (flat), its 1 cm square stub at the road end (2026-10-10: a square cap at the head's cut stuck out where the road bends), main (flat), head
+    assert heads[:4] == [(0, True, None), (0, "square", None), (0, True, True), (0, True, None)]
+    stub = next(f for f in split["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_k"] == 0 and f["properties"].get("__rs_cap") == "square")
+    (x0, y0), (x1, y1) = stub["geometry"]["coordinates"]
+    assert (x1, y1) == (18, 59) and 0.005 < math.hypot((x1 - x0) * 111320 * math.cos(math.radians(59)), (y1 - y0) * 111320) < 0.02
+    assert heads[4:] == [(0, None, None)] * 2 and all(p.get("__rs_seam") for p in feats if p["__rs_k"] == 0 and not p.get("__rs_cap"))   # the two seams, round
     assert [p.get("__rs_cap") for p in feats if p.get("__rs_lap")] == [True, True]                  # and the two laps, flat (below zoom 17)
 
 

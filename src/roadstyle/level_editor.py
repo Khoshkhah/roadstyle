@@ -350,7 +350,7 @@ def _two_halves(r):
     """Whether the road is drawn as two directions: an edge each way and every one of them directed (``edges_directed`` / ``reversed_directed``, as
     render_edges' ``directed_col``). A one-way street with a walking-only reverse is one line, not two-way (2026-10-10)."""
     flags = [*list(r.get("edges_directed", [])), *list(r.get("reversed_directed", []))]
-    return len(r["reversed"]) > 0 and all(not missing(x) and bool(x) for x in flags)
+    return len(r["reversed"]) > 0 and all(missing(x) or bool(x) for x in flags)        # null = directed, as render_edges' directed_col
 
 
 def _directions(r):

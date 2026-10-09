@@ -1997,6 +1997,21 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
     return under, over, meta, edge, items
 
 
+def _square_end(q, line_of):
+    """A casing head with a square end (``__rs_cap`` "square"): MapLibre caps a line at both of its ends, so the head's other end, the cut, was square
+    too and stuck out where the road bends there (2026-10-10, a service road's bend: a square green corner). The head flat (``__rs_cap`` True) and
+    a 1 cm piece at the road end that carries the square cap: ``[head, cap]``; a piece that is not a head (both ends or no end of its edge) as it is."""
+    g = q["geometry"]
+    c = g.get("coordinates") or []
+    e = line_of.get(q["properties"]["__rs_edge"]) or []           # the edge's line, by its number (the editor draws a part of the roads)
+    if g.get("type") != "LineString" or len(c) < 2 or len(e) < 2 or (c[0] == e[0]) == (c[-1] == e[-1]):
+        return [q]
+    end, prev = (c[0], c[1]) if c[0] == e[0] else (c[-1], c[-2])
+    k = 0.01 / max(math.hypot((prev[0] - end[0]) * 111320 * math.cos(math.radians(end[1])), (prev[1] - end[1]) * 111320), 1e-6)
+    stub = [[end[0] + (prev[0] - end[0]) * min(k, 1), end[1] + (prev[1] - end[1]) * min(k, 1)], list(end)]
+    return [{**q, "properties": {**q["properties"], "__rs_cap": True}}, {**q, "geometry": {"type": "LineString", "coordinates": stub}}]
+
+
 def _simple_pieces(geo, parts, cols, shadows=True, items=()):
     """The features of simple mode's one road layer: every casing piece (``__rs_k`` 0; the heads and seams as ``_casing_parts`` cuts them) and every fill
     (``__rs_k`` 1), with ``__rs_s``, the line-sort-key: ``2 * position``, a bridge's casing a quarter more (the full look draws it after the other
@@ -2017,7 +2032,8 @@ def _simple_pieces(geo, parts, cols, shadows=True, items=()):
     for h in _halves(geo):
         halves[h["properties"]["__rs_edge"]].append(h)
     out = []
-    for q in parts:
+    line_of = {(f.get("properties") or {}).get("__rs_edge", i): (f.get("geometry") or {}).get("coordinates") for i, f in enumerate(geo["features"])}
+    for q in (x for q0 in parts for x in (_square_end(q0, line_of) if q0["properties"].get("__rs_cap") == "square" and not q0["properties"].get("__rs_seam") else [q0])):
         p = q["properties"]
         if p.get("__rs_dash") or (p.get("__rs_seam") and p.get("__rs_tunnel")):     # a tunnel's casing is its dashes alone, no seam dots
             continue
@@ -2057,7 +2073,7 @@ def _simple_pieces(geo, parts, cols, shadows=True, items=()):
     return {"type": "FeatureCollection", "features": out}
 
 
-_PIECES = 16        # the most pieces of one edge in simple mode: 3 casing pieces and 2 seams, each with a shadow or a second tunnel piece, 2 fill halves
+_PIECES = 24        # the most pieces of one edge in simple mode (20): 3 casing pieces, 2 seams, 2 laps and 2 square-end stubs (_square_end), each with a shadow or a second tunnel piece, 2 fill halves
 # the line-sort-key's tie-breaker per edge (2026-10-08): keys differ by at least 0.05 (offsets -0.5, -0.1, 0, 0.1, 0.15, 0.25, 1, 1.5 of
 # 2 * position; a painted fill + 0.5), so _MAX_EDGES * _TIE (0.01) never reaches the next key
 _TIE, _MAX_EDGES = 1e-8, 1_000_000
