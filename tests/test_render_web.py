@@ -3471,8 +3471,8 @@ def test_simple_line_cap_per_piece_from_the_ends():
     # head (flat), its 0.5 m square stub at the road end (2026-10-10: a square cap at the head's cut stuck out where the road bends), main (flat), head
     assert heads[:4] == [(0, True, None), (0, "square", None), (0, True, True), (0, True, None)]
     stub = next(f for f in split["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_k"] == 0 and f["properties"].get("__rs_cap") == "square")
-    (x0, y0), (x1, y1) = stub["geometry"]["coordinates"]
-    assert abs(x1 - 18) < 1e-6 and abs(y1 - 59) < 1e-6 and 0.45 < math.hypot((x1 - x0) * 111320 * math.cos(math.radians(59)), (y1 - y0) * 111320) < 0.55   # 0.5 m: 7 decimals keep its direction
+    (x0, y0), (x1, y1) = stub["geometry"]["coordinates"]        # from the road end (the edge's start) on, as the edge runs: a line-offset keeps its side
+    assert abs(x0 - 18) < 1e-6 and abs(y0 - 59) < 1e-6 and 0.45 < math.hypot((x1 - x0) * 111320 * math.cos(math.radians(59)), (y1 - y0) * 111320) < 0.55   # 0.5 m: 7 decimals keep its direction
     assert heads[4:] == [(0, None, None)] * 2 and all(p.get("__rs_seam") for p in feats if p["__rs_k"] == 0 and not p.get("__rs_cap"))   # the two seams, round
     assert [p.get("__rs_cap") for p in feats if p.get("__rs_lap")] == [True, True]                  # and the two laps, flat (below zoom 17)
 

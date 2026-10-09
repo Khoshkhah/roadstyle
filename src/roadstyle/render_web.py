@@ -2021,9 +2021,11 @@ def _square_end(q, line_of):
     at = lambda a, b: abs(a[0] - b[0]) < 1e-6 and abs(a[1] - b[1]) < 1e-6      # noqa: E731  pieces are rounded to 7 decimals, the edge is not
     if g.get("type") != "LineString" or len(c) < 2 or len(e) < 2 or at(c[0], e[0]) == at(c[-1], e[-1]):
         return [q]
-    end, prev = (c[0], c[1]) if at(c[0], e[0]) else (c[-1], c[-2])
+    first = at(c[0], e[0])
+    end, prev = (c[0], c[1]) if first else (c[-1], c[-2])
     k = 0.5 / max(math.hypot((prev[0] - end[0]) * 111320 * math.cos(math.radians(end[1])), (prev[1] - end[1]) * 111320), 1e-6)
-    stub = [[end[0] + (prev[0] - end[0]) * min(k, 1), end[1] + (prev[1] - end[1]) * min(k, 1)], list(end)]
+    inner = [end[0] + (prev[0] - end[0]) * min(k, 1), end[1] + (prev[1] - end[1]) * min(k, 1)]
+    stub = [list(end), inner] if first else [inner, list(end)]      # the piece's own direction: a line-offset (a two-way direction's shift) keeps its side
     return [{**q, "properties": {**q["properties"], "__rs_cap": True}}, {**q, "geometry": {"type": "LineString", "coordinates": stub}}]
 
 
