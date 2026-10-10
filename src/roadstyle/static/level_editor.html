@@ -567,6 +567,8 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   }
   function start(){
     modeBox();
+    const at = (new URLSearchParams(location.search).get("at") || "").split(",").map(Number);   // a link to a place: ?at=lon,lat,zoom (2026-10-10)
+    if(at.length === 3 && at.every(Number.isFinite)) map.jumpTo({center: [at[0], at[1]], zoom: at[2]});
     const v = JSON.parse(sessionStorage.getItem("lv-view") || "null");
     if(v){ sessionStorage.removeItem("lv-view"); map.jumpTo({center: v.c, zoom: v.z, bearing: v.b, pitch: v.p});
       sel[0] = v.sel[0]; sel[1] = v.sel[1];
