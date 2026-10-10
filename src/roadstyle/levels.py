@@ -661,14 +661,12 @@ def _indexed(roads, rel):
 
 
 def rule_conflicts(roads, pairs, edits, rows, margin=1.0):
-    """The level editor's check before rules are added (2026-10-08): ``[(row, "duplicate" / "loop", [rule rows])]`` for each of ``rows`` (rules
+    """The level editor's check before rules are added (2026-10-08): ``[(row, "duplicate" / "not kept" / "loop", [rule rows])]`` for each of ``rows`` (rules
     as edits.csv rows) that conflicts with the enabled rules (``pairs`` with ``edits`` on top, and the ``rows`` before it). A duplicate: the same
-    row is there. A loop: a cycle of the solver's rules (:func:`_difference_rules`) through the new one, each keeping a number at or above the
+    row is there and holds; "not kept": the same row is there, in a loop with the other rules (their rows). A loop: a cycle of the solver's rules (:func:`_difference_rules`) through the new one, each keeping a number at or above the
     next and at least one strictly above, back to the first: no numbers keep them all, so the solver gives one up. From the rules only, no
     geometry: a path in the graph of ``x_i - x_j <= w`` (an arc j -> i, every ``w`` 0 or -margin) from the new rule's i back to its j that
     has a strict arc if the new rule has none (a breadth-first search on (number, strict yet)). Rows with ``enabled`` false are not checked."""
-    from collections import deque
-
     import pandas as pd
     none = pd.DataFrame(columns=["relation", "a", "b", "a_end", "b_end"])
     rel, n, out = merged_relations(roads, pairs, edits), len(roads), []
@@ -676,39 +674,49 @@ def rule_conflicts(roads, pairs, edits, rows, margin=1.0):
         if str(row.get("enabled", "")).strip().lower() in ("false", "0", "no"):
             continue
         ((k, new),) = merged_relations(roads, none, pd.DataFrame([row])).items()
-        if k in rel:
-            out.append((row, "duplicate", [rel[k]]))
+        if k in rel:                # already there: is it kept? A loop with the other rules says why not (2026-10-09: "already in edits.csv"
+            others = {kk: v for kk, v in rel.items() if kk != k}     # said nothing of the loop that kept a saved rule from holding)
+            path = _loop(roads, others, new, n, margin)
+            out.append((row, "duplicate", [rel[k]]) if path is None else (row, "not kept", path))
             continue
-        by, adj = _indexed(roads, rel), defaultdict(list)
-        lists = {"meet": by["meet"], "stack": by["stack"] + by["near"], "order": by["order"]}
-        for i, j, w, t in _difference_rules(n, *([r for r, _ in lists[x]] for x in ("meet", "stack", "order")), margin):
-            adj[j].append((i, w < 0, None if t is None else lists[t[0]][t[1]][1]))
-        ((rule, _),) = sum(_indexed(roads, {k: new}).values(), [])
-        kind = new["relation"] if new["relation"] != "near" else "stack"
-        mine = [x for x in _difference_rules(n, *([rule] if kind == x else [] for x in ("meet", "stack", "order")), margin) if x[3] is not None]
-        for i, j, w, _ in mine:
-            start = (i, w < 0)
-            prev, q, end = {start: None}, deque([start]), None
-            while q and end is None:
-                v, f = s = q.popleft()
-                for u, strict, src in adj[v]:
-                    t = (u, f or strict)
-                    if t not in prev:
-                        prev[t] = (s, src)
-                        if t == (j, True):
-                            end = t
-                            break
-                        q.append(t)
-            if end is not None:
-                path = []
-                while prev[end] is not None:
-                    end, src = prev[end]
-                    if src is not None and src not in path:
-                        path.append(src)
-                out.append((row, "loop", path[::-1]))
-                break
+        path = _loop(roads, rel, new, n, margin)
+        if path is not None:
+            out.append((row, "loop", path))
         rel[k] = new
     return out
+
+
+def _loop(roads, rel, new, n, margin):
+    """The rule rows of a loop through ``new`` (one rule row) and the rules of ``rel`` (see :func:`rule_conflicts`), or None."""
+    from collections import deque
+    by, adj = _indexed(roads, rel), defaultdict(list)
+    lists = {"meet": by["meet"], "stack": by["stack"] + by["near"], "order": by["order"]}
+    for i, j, w, t in _difference_rules(n, *([r for r, _ in lists[x]] for x in ("meet", "stack", "order")), margin):
+        adj[j].append((i, w < 0, None if t is None else lists[t[0]][t[1]][1]))
+    ((rule, _),) = sum(_indexed(roads, {"new": new}).values(), [])
+    kind = new["relation"] if new["relation"] != "near" else "stack"
+    mine = [x for x in _difference_rules(n, *([rule] if kind == x else [] for x in ("meet", "stack", "order")), margin) if x[3] is not None]
+    for i, j, w, _ in mine:
+        start = (i, w < 0)
+        prev, q, end = {start: None}, deque([start]), None
+        while q and end is None:
+            v, f = s = q.popleft()
+            for u, strict, src in adj[v]:
+                t = (u, f or strict)
+                if t not in prev:
+                    prev[t] = (s, src)
+                    if t == (j, True):
+                        end = t
+                        break
+                    q.append(t)
+        if end is not None:
+            path = []
+            while prev[end] is not None:
+                end, src = prev[end]
+                if src is not None and src not in path:
+                    path.append(src)
+            return path[::-1]
+    return None
 
 
 def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=60.0, min_positions=True, max_positions=None, fixed=None):

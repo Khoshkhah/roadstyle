@@ -192,7 +192,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   // an error stays until clicked (select its text to copy it) and goes to the browser console; a note fades after 4 s (2026-10-08)
   function toast(t, bad){ const e = $("lv-toast"); e.textContent = bad ? t + "  ✕" : t; e.className = "show" + (bad ? " bad" : ""); clearTimeout(e._t);
     if(bad){ console.error("level editor:", t); e.onclick = () => { if(!String(getSelection())) e.className = ""; }; }
-    else e._t = setTimeout(() => e.className = "", 4000); }
+    else e._t = setTimeout(() => e.className = "", Math.max(4000, 60 * t.length)); }      // time to read it (a loop's rules are long)
   async function api(path, body){
     const r = await fetch(path, body ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)} : {});
     const j = await r.json(); if(!r.ok) throw new Error(j.error || r.statusText); return j;
@@ -448,6 +448,8 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     try { found = (await api("/api/check", {rows, ops: queue.map(payload)})).conflicts; } catch(err){ return toast(err.message, true); }
     if(found.length && !confirm("This conflicts with rules already there:\n\n" + found.map(c => c.why === "duplicate"
         ? `• ${c.rule}\n   is already in the tables (${c.with[0]}).`
+        : c.why === "not kept"                               // saved already, but in a loop: the rules that keep it from holding
+        ? `• ${c.rule}\n   is already saved, but the solver cannot keep it: it makes a loop with:\n${c.with.map(w => "     – " + w).join("\n")}\n   Switch one of them off to keep it.`
         : `• ${c.rule}\n   makes a loop with:\n${c.with.map(w => "     – " + w).join("\n")}\n   No levels keep them all: the solver gives one of them up.`).join("\n\n")
         + "\n\nAdd it anyway?")) return;
     rows.forEach(body => stage({op: "add", body}));
@@ -526,7 +528,14 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     else { wb.className = "rows";
       wb.innerHTML = j.wishes.map(w => `<div class="row" title="Show on the map"><span class="what"><div class="txt">${esc(name(w.a))} <small>${esc(ref(w.a))}</small>
         after ${esc(name(w.b))} <small>${esc(ref(w.b))}</small></div><div class="gu-parts">fill <b>${w.fa}</b> &nbsp;·&nbsp; wished over fill <b>${w.fb}</b></div></span></div>`).join("");
-      wb.querySelectorAll(".row").forEach((el, n) => el.onclick = () => { tab("edit"); setPair(j.wishes[n].a, j.wishes[n].b, true); }); }
+      wb.querySelectorAll(".row").forEach((el, n) => el.onclick = async () => {   // the pair, and why the wish is not kept: the loop it makes (2026-10-09)
+        const w = j.wishes[n], row = {relation: "order", a: w.a, b: w.b, a_end: "", b_end: "", enabled: "true"};
+        let found = []; try { found = (await api("/api/check", {rows: [row]})).conflicts; } catch(err){}
+        const loop = found.find(c => c.why === "not kept");
+        if(loop && !el.querySelector(".why")) el.querySelector(".what").insertAdjacentHTML("beforeend",
+          `<div class="gu-parts why">loop with: ${loop.with.map(esc).join(" · ")}</div>`);
+        tab("edit"); setPair(w.a, w.b, true);
+        if(loop) toast(`Not kept: it makes a loop with ${loop.with.join(" · ")}. Switch one of them off to keep it.`); }); }
   }
   $("lv-newsession").onclick = async () => {                 // a new list: the edits so far stay in edits.csv, under "already in edits.csv"
     if(queue.length) return toast("Apply or remove the waiting changes first", true);

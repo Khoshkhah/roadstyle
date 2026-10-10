@@ -4011,3 +4011,19 @@ def test_the_tunnel_look_keeps_each_colours_alpha():
     from roadstyle.render_web import _tun_mix
     e = _tun_mix(["get", "__rs_ic"], "#d6cfc4", 60)
     assert e[0] == "case" and e[2][0] == "let" and e[2][3][4] == ["at", 3, ["to-rgba", ["get", "__rs_ic"]]] and e[3] == ["get", "__rs_ic"]
+
+
+def test_a_saved_rule_that_is_not_kept_names_its_loop():
+    """2026-10-09 (Allée Lazare Sauvaigo): a rule already in edits.csv that the solver cannot keep is "not kept", with the rules of its loop,
+    not only "already there"; one that holds is a duplicate. A over B, B over C as stacks, C's fill after A's as an order: the order loops."""
+    import pandas as pd
+    from roadstyle.levels import rule_conflicts
+    roads = pd.DataFrame({"road": ["A", "B", "C"], "edges": [[], [], []], "reversed": [[], [], []]})
+    pairs = pd.DataFrame([{"relation": "stack", "a": "A", "b": "B", "a_end": p, "b_end": ""} for p in ("start", "main", "end")]
+                         + [{"relation": "stack", "a": "B", "b": "C", "a_end": p, "b_end": ""} for p in ("start", "main", "end")])
+    wish = {"relation": "order", "a": "C", "b": "A", "a_end": "", "b_end": "", "enabled": "true"}
+    ((_, why, rules),) = rule_conflicts(roads, pairs, pd.DataFrame([wish]), [wish])
+    assert why == "not kept" and {r["relation"] for r in rules} == {"stack"} and {(r["a"], r["b"]) for r in rules} == {("A", "B"), ("B", "C")}
+    kept = {"relation": "order", "a": "A", "b": "C", "a_end": "", "b_end": "", "enabled": "true"}
+    ((_, why, _),) = rule_conflicts(roads, pairs, pd.DataFrame([kept]), [kept])
+    assert why == "duplicate"
