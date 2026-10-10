@@ -3875,6 +3875,35 @@ def test_a_click_on_a_road_item_selects_the_item_in_the_browser(tmp_path):
     assert got["item"] == "1_1" and got["road"] == 0 and got["sel"] == [True] and not errors, (got, errors)
 
 
+def test_a_road_drawn_over_another_roads_lanes_is_what_a_click_finds(tmp_path):
+    """2026-10-09 (Allée Lazare Sauvaigo over Tunnel Dorsale): where a road is drawn over another road's unseen, picked lanes, a hover or
+    click finds the road on top, not the lane under it; away from it, the lane is still found."""
+    pw = pytest.importorskip("playwright.sync_api")
+    import pandas as pd
+    from shapely.geometry import LineString
+    roads, items = _road_with_items()                                       # edge 1: a road with an unseen picked lane, at level 0
+    over = LineString([(18.062, 59.314), (18.062, 59.316)])
+    roads = gpd.GeoDataFrame(pd.concat([roads, gpd.GeoDataFrame({"edge_id": [2], "highway": ["pedestrian"], "oneway": ["no"]}, geometry=[over], crs=4326)],
+                                       ignore_index=True), crs=4326)
+    for c, v in (("cs", [0, 1]), ("cm", [0, 1]), ("ce", [0, 1]), ("fl", [0, 1])):
+        roads[c] = v
+    path = tmp_path / "over.html"
+    render_edges(roads, backend="web", basemap="blank", items=items, items_popup=["lane_id"], casing_start_col="cs", casing_level_col="cm",
+                 casing_end_col="ce", fill_level_col="fl").save(path)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && map.loaded()", timeout=30_000)
+        page.evaluate("map.jumpTo({center:[18.062, 59.315], zoom: 18})")
+        page.wait_for_function("map.loaded()", timeout=30_000)
+        page.evaluate("new Promise(r => { map.once('idle', r); map.triggerRepaint(); setTimeout(r, 3000); })")
+        at = lambda lng: page.evaluate(f"(()=>{{const f = pick(map.project([{lng}, 59.315])); return f && [f.id, !!f.item];}})()")   # noqa: E731
+        crossing, beside = at(18.062), at(18.0605)
+        browser.close()
+    assert crossing == [1, False] and beside == [0, True], (crossing, beside)      # the pedestrian road (feature 1); the lane of road 0
+
+
 def test_line_items_full_look_and_tiles(monkeypatch):
     """The full look keeps the items' own layers; tiles=True carries the item pieces in the simple tile layer; too many items is an error."""
     st = _style(_crossing_with_lanes(simple=False).html)

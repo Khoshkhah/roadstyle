@@ -1648,6 +1648,22 @@ _INFLATE_JS = """
 _SIMPLE_JS = """
 <script>
 const RS_SIMPLE = __RS_SIMPLE__;
+// what is drawn on top under the cursor is what a hover or a click finds (2026-10-09: a tunnel's unseen lanes under a plaza won over
+// the plaza drawn over them, so the plaza could not be picked there): of the road pieces and the picked items under the cursor (lane
+// lines and marks let it through), the highest line-sort-key; a picked item is itself, any other piece its road. Nothing right under
+// the cursor: the page's own pick (its tolerance box). An item on a layer of its own (an overlay above every road) stays the page's pick.
+const _pickAll = pick;
+pick = function(p){
+  const own = _pickAll(p);
+  if(!map.getLayer(RS_SIMPLE.layer) || (own && own.item && own.item.layer.id !== RS_SIMPLE.layer)) return own;
+  const hit = map.queryRenderedFeatures([p.x, p.y], {layers:[RS_SIMPLE.layer]})
+    .filter(f=>f.properties.__rs_k!==5 || (ITEM_PICK && f.properties.__rs_pick));
+  if(!hit.length) return own;
+  const top = hit.reduce((a, b)=>b.properties.__rs_s > a.properties.__rs_s ? b : a);
+  if(top.properties.__rs_k===5) return _roadOf(top);
+  const e = top.properties.__rs_edge;
+  return {id:e, properties:_rprops(e), layer:{id:"roads-fill"}, get geometry(){ const r=_feats()[e] || _svTiled(e); return r && r.geometry; }};
+};
 function _simpleColor(){        // render_web._simple_color, with the active colouring, the rsColor groups and the tunnel slider
   const sh=["==",["get","__rs_k"],2];
   const c=["==",["get","__rs_k"],0], b=["to-boolean",["get","__rs_bridge"]];
