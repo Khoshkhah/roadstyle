@@ -4027,3 +4027,18 @@ def test_a_saved_rule_that_is_not_kept_names_its_loop():
     kept = {"relation": "order", "a": "A", "b": "C", "a_end": "", "b_end": "", "enabled": "true"}
     ((_, why, _),) = rule_conflicts(roads, pairs, pd.DataFrame([kept]), [kept])
     assert why == "duplicate"
+
+
+def test_the_slots_of_a_part_are_the_whole_pages_slots_of_its_roads():
+    """2026-10-09 (the level editor's Apply): the names and arrows of a few roads are placed again for their name groups only; for every road
+    they cover they are the slots a whole page has (chains numbered by their first road), and no other road's."""
+    from roadstyle.render_web import _annotation_slots
+    geo = json.loads(gpd.GeoDataFrame(_edge_world()).to_json())
+    for i, f in enumerate(geo["features"]):
+        f["properties"]["__rs_edge"] = i
+    whole = _annotation_slots(geo, 100)["features"]
+    part = _annotation_slots(geo, 100, only=[0])
+    assert part["roads"] and 0 in part["roads"]
+    key = lambda fs: sorted(json.dumps(f, sort_keys=True) for f in fs)          # noqa: E731
+    assert key(part["features"]) == key([f for f in whole if f["properties"]["__rs_edge"] in set(part["roads"])])
+    assert len(part["features"]) <= len(whole)

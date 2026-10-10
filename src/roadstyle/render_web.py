@@ -414,7 +414,7 @@ def _crossing_half_m(cls, lat):
     return (max(half, _ZEBRA_HALF_M) if cls in ("footway", "path", "cycleway", "steps") else half) + _NAME_MARGIN_M
 
 
-def _annotation_slots(geo, slot_m, class_col="highway"):
+def _annotation_slots(geo, slot_m, class_col="highway", only=None):
     """Divide every road chain into equal ``slot_m``-metre slots — the annotation plan.
 
     Chains walk same-name, same-grade, same-directionness edges through degree-2 nodes (a two-way
@@ -423,7 +423,9 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
     alternate along the road and can never stack. Symbol zoom ramps + collision culling handle
     density per zoom automatically. Unnamed roads leave their name slots empty. Returns a
     FeatureCollection of slot pieces: {slot, chain, name, highway, oneway}; ``chain`` numbers the chain a piece is part of (the page
-    puts one arrow on the visible part of each one-way chain, docs/design/arrows_and_names.md).
+    puts one arrow on the visible part of each one-way chain, docs/design/arrows_and_names.md): one more than the smallest road number in
+    it, the same however much of the map is built. ``only`` (road numbers, the level editor's update in place, 2026-10-09): the chains of
+    the groups those roads are in (any fill number: their old and new chains), and ``roads``, every road whose slots they replace.
     """
     import numpy as np
     import shapely
@@ -467,8 +469,14 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
     # street's class onto the cycleway's geometry and vice versa, so names and arrows appeared
     # to sit on the wrong line.
     groups = collections.defaultdict(list)       # (name, lvl, oneway, class) -> edge list
+    near = None
+    if only is not None:                         # the groups of these roads, whatever their fill number
+        near = {(p.get("name") or None, p.get("lvl", 0), _class_key(p.get(class_col)), bool(p.get("__rs_tunnel")))
+                for p in (geo["features"][i]["properties"] for i in only)}
     for e in reps:
         p = e[3]
+        if near is not None and (p.get("name") or None, p.get("lvl", 0), _class_key(p.get(class_col)), bool(p.get("__rs_tunnel"))) not in near:
+            continue
         groups[(p.get("name") or None, p.get("lvl", 0),
                 1 if p.get("__rs_oneway") else 0, _class_key(p.get(class_col)), p.get("__rs_fl"), bool(p.get("__rs_tunnel")))].append(e)
 
@@ -532,7 +540,7 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
         # property entirely on non-"highway" data (None is stripped), silently disabling both.
         hw = collections.Counter(e[3].get(class_col) for e in edges).most_common(1)[0][0]
         for chain, members in chains:
-            cid += 1
+            cid = 1 + min(owner[id(edges[e][3])][0] for e in members)      # by its first road: the same in a part of the map
             lon0, lat0 = chain[0]
             kx = 111320.0 * math.cos(math.radians(lat0))
             ch = np.asarray(chain, dtype=float)
@@ -591,6 +599,9 @@ def _annotation_slots(geo, slot_m, class_col="highway"):
                                                  **({"fl": fl} if fl is not None else {}),
                                                  **({"__rs_tunnel": True} if tun else {})},
                                   "geometry": {"type": "LineString", "coordinates": coords}})
+    if only is not None:                         # every road whose slots these replace (a group's roads and their twins)
+        covered = sorted({k for g in groups.values() for e in g for k in owner[id(e[3])] if k is not None})
+        return {"type": "FeatureCollection", "features": feats, "roads": covered}
     return {"type": "FeatureCollection", "features": feats}
 
 
@@ -2311,16 +2322,17 @@ _ITEM_STEP, _MAX_ITEMS = 0.01, 38
 
 def _edge_features(geo, edges, head_m, cols, fcol, slots, items=()):
     """The features of the edges ``edges`` (their numbers) in each source a simple page draws them in, built as :func:`render` builds them for
-    the whole page: ``roads`` (the edges), ``simple`` (their pieces) and, with ``slots``, the whole ``slots`` (names and arrows: their chains
-    follow the fill numbers, so one road can change them along a street). The level editor's update in place (level_editor.Area). An edge of a
+    the whole page: ``roads`` (the edges), ``simple`` (their pieces) and, with ``slots``, the ``slots`` of their name groups (names and arrows:
+    their chains follow the fill numbers, so one road can change them along a street) and ``slot_roads``, the roads whose slots they replace. The level editor's update in place (level_editor.Area). An edge of a
     two-way pair with one casing (``__rs_twin``) comes with its twin: the casing is cut from one of the two. ``items``: every road item
     (render ``items=``) as pieces; the edges' own come back in ``simple``, at their new fill numbers (2026-10-09: before, items reloaded the page)."""
     tw = {geo["features"][i]["properties"].get("__rs_twin") for i in edges} - {None}
     sub = {"type": "FeatureCollection", "features": [geo["features"][i] for i in sorted(set(edges) | tw)]}
     out = {"roads": sub["features"], "simple": _simple_pieces(sub, _casing_parts(sub, head_m, cols), cols, CONFIG.bridge_shadow, items=items, world=geo)["features"]}
-    if slots:
-        out["slots"] = _annotation_slots(geo, (CONFIG.annotations or {}).get("slot_m", 100), cols[0])["features"]
-    _mark_cls(geo, out.values(), fcol)
+    if slots:                                    # the slots of these roads' name groups only, and the roads they replace (2026-10-09)
+        fc = _annotation_slots(geo, (CONFIG.annotations or {}).get("slot_m", 100), cols[0], only=sorted(set(edges) | tw))
+        out["slots"], out["slot_roads"] = fc["features"], fc["roads"]
+    _mark_cls(geo, [v for k, v in out.items() if k != "slot_roads"], fcol)
     return out
 
 

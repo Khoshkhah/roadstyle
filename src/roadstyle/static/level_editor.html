@@ -503,7 +503,9 @@ body.lv-open #lv-busy{right:var(--lv-w)}
       for(let k = 0; k < M; k++) if(!ids.has(I + r.id * M + k)) gone.push(I + r.id * M + k); });   // its road items (lanes, lines, marks) too
     map.getSource("roads").updateData({add: f.roads});
     map.getSource("simple").updateData({remove: gone, add: f.simple});
-    if(f.slots){ map.getSource("slots").setData({type: "FeatureCollection", features: f.slots}); _rsArrowAt.clear(); _rsArrows(); }
+    if(f.slots){                                             // the slots of the changed roads' name groups, in place of theirs (2026-10-09)
+      const drop = new Set(f.slot_roads || []), keep = f.slot_roads ? _sfeats("slots").filter(s => !drop.has(s.properties.__rs_edge)) : [];
+      map.getSource("slots").setData({type: "FeatureCollection", features: keep.concat(f.slots)}); _rsArrowAt.clear(); _rsArrows(); }
     Object.assign(facts, u.facts); STATS = u.stats; showStats();
     update(); lists(); givenUp();
   }
