@@ -1,7 +1,7 @@
 """tiles=True — PMTiles archive building and the embedded-tiles web output."""
 import gzip
-import math
 import json
+import math
 
 import geopandas as gpd
 import pytest
@@ -216,9 +216,9 @@ def test_simple_mode_tiles_carry_the_pieces():
 def test_single_line_pair_rides_the_tiles():
     import mapbox_vector_tile
     from pmtiles.reader import MemorySource, Reader
+    from test_render_web import _pairs
 
     from roadstyle.render_web import render
-    from test_render_web import _pairs
     html = render(_pairs(), basemap="blank", tiles=True).html
     z, n = 15, 1 << 15
     x = int((18.04 + 180) / 360 * n)

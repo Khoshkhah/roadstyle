@@ -26,7 +26,6 @@ import roadstyle as rs
 from roadstyle import render_web
 
 from ._na import missing
-
 from .level_area import defaults, ends, own, solve, solve_local, write
 
 COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"]
@@ -253,7 +252,7 @@ class Area:
         have = {tuple(str(x) for x in r) for r in kept[COLS].astype(str).itertuples(index=False)}    # working after one copy was deleted (2026-10-08)
         for r in new[COLS].astype(str).itertuples(index=False):
             if tuple(r) in have or tuple(r) in seen:
-                row = dict(zip(COLS, r))
+                row = dict(zip(COLS, r, strict=True))
                 why = [c for c in self.check([row]) if c["why"] == "not kept"] if tuple(r) in have else []   # saved, but kept? (2026-10-09)
                 raise ValueError(f"this rule is already in edits.csv: {self.say(row)}" + (
                     f"; it is not kept: it makes a loop with {'; '.join(why[0]['with'])} (switch one of them off)" if why else "") + ": nothing saved")

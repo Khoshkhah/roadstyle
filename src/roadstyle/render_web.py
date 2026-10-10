@@ -2042,7 +2042,7 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
                     lyr = {**lyr, "id": f"{lyr['id']}-lv{pos}-o{order}", "filter": flt}
                     if fill and kind == "line" and metres:   # drawn by the road layer: this one is the pick and shows the hover / select highlight
                         on = ["any", ["boolean", ["feature-state", "select"], False], ["boolean", ["feature-state", "hover"], False]]
-                        m = lambda prop: ["interpolate", ["exponential", 2], ["zoom"], *[x for z in (0, 22) for x in
+                        m = lambda prop: ["interpolate", ["exponential", 2], ["zoom"], *[x for z in (0, 22) for x in  # noqa: E731
                                           (z, ["*", ["get", prop], round(512 * 2 ** z / 40075016.686, 6)])]]   # the item's own metres, exact
                         lyr["layout"] = {**lyr["layout"], "line-cap": "butt"}
                         lyr["paint"] = {**{k: v for k, v in lyr["paint"].items() if k != "line-dasharray"}, "line-opacity": ["case", on, 1, 0],
@@ -2282,10 +2282,10 @@ def _simple_pieces(geo, parts, cols, shadows=True, items=(), world=None):
         if p.get("__rs_dup"):
             continue
         hs = [x for h in halves[p.get("__rs_edge", i)] for x in (_end_stub(h, line_of) if h["properties"].get("__rs_cap") is not True else [h])]
-        for g, p in ([(h["geometry"], h["properties"]) for h in hs] if p.get("__rs_split") else [(ft["geometry"], p)]):
+        for g, q in ([(h["geometry"], h["properties"]) for h in hs] if p.get("__rs_split") else [(ft["geometry"], p)]):
             out.append({"type": "Feature", "geometry": g,
-                        "properties": {**{k: v for k, v in p.items() if k in keep or k.startswith("__rs_")}, "__rs_k": 1,
-                                       "__rs_s": 2 * p["__rs_fl"] + (-0.5 if p.get("__rs_dash") else 1)}})
+                        "properties": {**{k: v for k, v in q.items() if k in keep or k.startswith("__rs_")}, "__rs_k": 1,
+                                       "__rs_s": 2 * q["__rs_fl"] + (-0.5 if q.get("__rs_dash") else 1)}})
     out, items = _mitre_ends(out, line_of, world or geo, list(items))
     n = collections.Counter()           # a feature id per piece, _PIECES per edge, so the page can swap one road's pieces (GeoJSONSource.updateData)
     for f in out:
@@ -2300,7 +2300,7 @@ def _simple_pieces(geo, parts, cols, shadows=True, items=(), world=None):
         mine = {f["properties"].get("__rs_edge", i) for i, f in enumerate(geo["features"])}
         items = [f for f in items if f["properties"]["__rs_edge"] in mine]
     rank = collections.Counter()
-    for j, f in enumerate(sorted(items, key=lambda f: (f["properties"]["__rs_edge"], f["properties"]["__rs_ord"], f["properties"]["__rs_ov"], f["properties"]["__rs_item"]))):
+    for f in sorted(items, key=lambda f: (f["properties"]["__rs_edge"], f["properties"]["__rs_ord"], f["properties"]["__rs_ov"], f["properties"]["__rs_item"])):
         p = f["properties"]
         e, rank[p["__rs_edge"]] = p["__rs_edge"], rank[p["__rs_edge"]] + 1
         if rank[e] > _MAX_ITEMS:
@@ -2372,7 +2372,7 @@ def _simple_color(bridge_color, tunnels=False, select_color=None, hover_color=No
     if tunnels:
         to, _, s = _tun_settings()                             # the chosen tunnel colour (tunnel_toward), as the full look and the page's _simpleColor
         pair = CONFIG.tunnel_palettes[CONFIG.tunnel_palette]
-        toward = lambda x: ["interpolate", ["linear"], s, 0, x, 100, to]
+        toward = lambda x: ["interpolate", ["linear"], s, 0, x, 100, to]  # noqa: E731
         fill, item = _tun_mix(fill, to, s), _tun_mix(item, to, s)
         cases += [["==", ["get", "__rs_k"], 3], toward(pair[1]) if pair else "rgba(0,0,0,0)",
                   ["==", ["get", "__rs_k"], 4], toward(pair[0] if pair else _TUN_TO["dash"])]
@@ -3118,7 +3118,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         # wider each side again, blurred that much, evenly around it (line-translate is not per feature)
         is_sh, blur = ["==", ["get", "__rs_k"], 2], float(CONFIG.bridge_shadow_blur)
         # both grow with the zoom: none below zoom 14 (the full look's plain bridge casing, no shadow), full from 17 (a stop at each, so linear)
-        ramp = lambda z: min(max((z - 14) / 3, 0), 1)
+        ramp = lambda z: min(max((z - 14) / 3, 0), 1)  # noqa: E731
         bwide = _plus_px(bcw, lambda z: 2 * float(CONFIG.bridge_casing_extra) * ramp(z))
         wide = [(is_sh, _plus_px(bcw, lambda z: 2 * (float(CONFIG.bridge_casing_extra) + blur) * ramp(z))), (["all", is_c, is_b], bwide),
                 *([(["any", ["==", ["get", "__rs_k"], 3], ["==", ["get", "__rs_k"], 4]], _plus_px(cw, 3))] if any_tunnel else []), (is_c, cw),

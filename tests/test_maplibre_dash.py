@@ -1,5 +1,6 @@
 """The vendored MapLibre must draw a per-feature (data-driven) line-dasharray (MapLibre >= 5.8) and line-cap."""
 import pytest
+
 from roadstyle.render_web import _asset
 
 

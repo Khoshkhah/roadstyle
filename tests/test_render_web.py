@@ -361,6 +361,7 @@ def test_notebook_cdn_maplibre_is_the_vendored_version():
     """The preview's CDN MapLibre is the vendored one: simple mode needs >= 5.22, and below 5.20
     a srcdoc iframe (origin "null") never loads a source."""
     import re
+
     from roadstyle.render_web import _MAPLIBRE_CDN, _asset
     vendored = re.search(r"maplibre-gl-js/blob/v([\d.]+)/", _asset("maplibre-gl.js")[:400]).group(1)
     assert f"maplibre-gl@{vendored}/" in _MAPLIBRE_CDN
@@ -989,7 +990,7 @@ def test_a_two_way_pair_has_one_casing_and_a_fill_per_direction():
     unshifted and as wide as both directions together (a direction's casing + twice its offset: the outer edge of the two lanes, as the
     end caps' radius); the second edge has no casing piece; each direction keeps its own fill, shifted, as before. Simple mode, the bridge
     shadow and the tunnel's two casing pieces too, and the full look; no end blobs (each piece has its own cap)."""
-    from roadstyle.render_web import _end_radius_expr, _ZSTOPS
+    from roadstyle.render_web import _ZSTOPS, _end_radius_expr
     g = _twin([(1, "a", "b", 0, 0, 0, 0, None, None), (2, "b", "a", 0, 0, 0, 0, None, None), (3, "c", "d", 0, 0, 0, 0, None, None)])
     for extra in ({}, {"bridge": "yes"}, {"tunnel": "yes"}):
         style = _style(render_edges(g.assign(**extra), **_TWIN_KW).html)
@@ -1181,6 +1182,7 @@ def test_a_two_way_pair_that_disagrees_is_named_in_a_warning():
     ok = _twin([(1, "a", "b", -1, 0, 1, 1, "yes", None), (2, "b", "a", 1, 0, -1, 1, None, "yes")])
     with warnings.catch_warnings():
         warnings.simplefilter("error")
+        warnings.filterwarnings("ignore", message="CARTO base map requested with no API key")    # CI has no key: not the twins' warning
         render_edges(ok, **_TWIN_KW, edge_id_col="edge_id")
     for bad in (ok.assign(ce=[1, 0]), ok.assign(cap_e=[None, None])):
         with pytest.warns(UserWarning, match=r"twin_casing: 1 two-way pair.*: 1 / 2"):
@@ -1447,7 +1449,7 @@ def test_the_tunnel_moves_toward_a_chosen_colour():
     """docs/design/tunnel_look.md (2026-10-08): tunnel_toward is a name in tunnel_towards or a #rrggbb (default Slate); the slider starts at 50;
     an unknown name or a bad colour is an error naming the choices."""
     from roadstyle.render_web import _tun_mix
-    cfg = lambda **c: {"config": c}
+    cfg = lambda **c: {"config": c}  # noqa: E731
     base = _tunnel_conf(render_edges(_edge_world(), backend="web", basemap="blank").html)
     assert base["toward"] == "Sand" and base["to"]["fill"] == "#d6cfc4" and base["strength"] == 60 and base["towards"]["Dark"] == "#14181d"
     assert list(base["towards"]) == ["Slate", "Dark", "Light", "Graphite", "Navy", "Stone", "Sand", "Teal"]
@@ -1456,7 +1458,7 @@ def test_the_tunnel_moves_toward_a_chosen_colour():
         conf, lay = _tunnel_conf(html), {l["id"]: l for l in _style(html)["layers"]}
         assert conf["toward"] == toward and conf["to"]["fill"] == hexc and conf["strength"] == 60
         for lid, entries in conf["layers"].items():
-            for k, b0, to in entries:
+            for k, b0, _to in entries:
                 assert lay[lid]["paint"][k] == _tun_mix(b0, hexc, 60)
     for bad in ("Pink", "#12345", 7):
         with pytest.raises(ValueError, match="tunnel_toward.*Slate"):
@@ -2497,6 +2499,7 @@ def test_the_editor_panel_calls_a_road_two_way_only_when_both_directions_are_dra
     """A one-way street with a walking-only reverse is one road of two edges, drawn as one line: the panel does not call it two-way, and each
     direction shows its own lanes and modes (2026-10-10: 25103774#1r, walking only, showed the street as two-way with every mode)."""
     import pandas as pd
+
     from roadstyle.level_editor import _directions, _two_halves
     r = pd.Series({"road": "1", "edges": ["1"], "reversed": ["2"], "edge_refs": ["9#1f"], "reversed_refs": ["9#1r"], "edges_directed": [True],
                    "reversed_directed": [False], "edges_lanes": [2.0], "reversed_lanes": [1.0], "edges_modes": ["driving + walking"], "reversed_modes": ["walking"]})
@@ -2931,7 +2934,6 @@ def test_auto_ends_fit_heads_and_caps_to_the_joins():
 def test_two_way_dead_end_is_square_by_default():
     """A two-way road's end that meets no road is square (one casing around both directions: two half round ends left a notch); a one-way
     road's dead end is round, a two-way end that meets a road keeps the rule, and your own cap (caps.csv) wins."""
-    import pandas as pd
 
     import roadstyle as rs
     from roadstyle.level_area import defaults, ends
@@ -3364,7 +3366,7 @@ def test_simple_draws_every_road_piece_in_one_layer_in_the_full_order():
     op = paint["line-opacity"]
     assert op[:3] == ["interpolate", ["linear"], ["zoom"]] and op[3] == 14 and op[4][:3] == ["case", ["==", ["get", "__rs_k"], 2], 0] and op[5] == 17
     stops = dict(zip(paint["line-width"][3::2], paint["line-width"][4::2], strict=True))
-    extra = lambda z: stops[z][4][2]                                # the bridge casing's extra px at a stop: (case, shadow cond, shadow, bridge cond, bridge, ...)
+    extra = lambda z: stops[z][4][2]                                # noqa: E731 - the bridge casing's extra px at a stop: (case, shadow cond, shadow, bridge cond, bridge, ...)
     assert extra(14) == 0.0 and extra(15) == 1.0 and extra(17) == 3.0 and extra(20) == 3.0
     assert paint["line-color"][1:3] == [["==", ["get", "__rs_k"], 2], "rgba(0,0,0,0.25)"]
     w = paint["line-width"][4]                                       # the first zoom stop: shadow, bridge casing, ... cases
@@ -3633,7 +3635,7 @@ def test_a_lap_closes_the_cut_below_zoom_17():
         seams = [f for f in feats if f["properties"].get("__rs_seam") and not f["properties"].get("__rs_lap")]
         solid = [f for f in seams if not (f["properties"].get("__rs_dash") or f["properties"].get("__rs_tunnel"))]   # (none on dashes)
         assert laps and len(laps) == len(solid) and not any(f["properties"].get("__rs_tunnel") for f in laps)
-        for lap, seam in zip(laps, solid):
+        for lap, seam in zip(laps, solid, strict=True):
             p = lap["properties"]
             assert p["__rs_cap"] is True and p["__rs_seam"] and (p["__rs_edge"], p["__rs_cl"]) == (seam["properties"]["__rs_edge"], seam["properties"]["__rs_cl"])   # flat, at the seam's number
             (x0, y0), (x1, y1) = lap["geometry"]["coordinates"][0][:2], lap["geometry"]["coordinates"][-1][:2]
@@ -3657,8 +3659,10 @@ def test_an_unclassed_two_way_pair_pairs_and_the_warning_names_it():
 
 def _slots_of(lines, oneway=False):
     import json as _j
+
     import geopandas as gpd
     from shapely.geometry import LineString
+
     from roadstyle.render_web import _annotation_slots
     gdf = gpd.GeoDataFrame({"highway": [h for _, h, _ in lines], "name": [n for n, _, _ in lines]},
                            geometry=[LineString(c) for _, _, c in lines], crs=4326)
@@ -3785,6 +3789,7 @@ def test_the_level_editor_draws_and_puts_arrows_like_render_edges(tmp_path):
 def _crossing_with_lanes(n=3, dash=False, **kw):
     """A road (edge 1) under a bridge (edge 2), each with ``n`` lane items (lines, metres), and the render's style."""
     from shapely.geometry import LineString
+
     from roadstyle import Overlay
     a, b = LineString([(18.060, 59.315), (18.064, 59.315)]), LineString([(18.062, 59.3135), (18.062, 59.3165)])
     roads = gpd.GeoDataFrame({"edge_id": [1, 2], "highway": ["residential"] * 2, "bridge": ["no", "yes"], "layer": [0, 1],
@@ -3806,7 +3811,7 @@ def test_line_items_are_pieces_of_the_one_road_layer_at_their_edge_fill():
     plain = _style(_crossing_with_lanes(n=0).html)["sources"]["simple"]["data"]["features"]
     assert sum(f["properties"]["__rs_k"] == 1 for f in plain) == 2      # no items: both edges keep their fill
     fs = st["sources"]["simple"]["data"]["features"]
-    key = lambda e, k: sorted(f["properties"]["__rs_s"] for f in fs if f["properties"]["__rs_edge"] == e and f["properties"]["__rs_k"] == k)
+    key = lambda e, k: sorted(f["properties"]["__rs_s"] for f in fs if f["properties"]["__rs_edge"] == e and f["properties"]["__rs_k"] == k)  # noqa: E731
     lo, hi = (min(f["properties"]["__rs_edge"] for f in fs), max(f["properties"]["__rs_edge"] for f in fs))
     assert len(key(lo, 5)) == len(key(hi, 5)) == 3
     assert len(key(lo, 1)) == len(key(hi, 1)) == 1    # an edge with items keeps its fill, under them
@@ -4017,6 +4022,7 @@ def test_a_saved_rule_that_is_not_kept_names_its_loop():
     """2026-10-09 (Allée Lazare Sauvaigo): a rule already in edits.csv that the solver cannot keep is "not kept", with the rules of its loop,
     not only "already there"; one that holds is a duplicate. A over B, B over C as stacks, C's fill after A's as an order: the order loops."""
     import pandas as pd
+
     from roadstyle.levels import rule_conflicts
     roads = pd.DataFrame({"road": ["A", "B", "C"], "edges": [[], [], []], "reversed": [[], [], []]})
     pairs = pd.DataFrame([{"relation": "stack", "a": "A", "b": "B", "a_end": p, "b_end": ""} for p in ("start", "main", "end")]
