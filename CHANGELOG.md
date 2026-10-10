@@ -11,6 +11,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ### Added
 - **A link to a place in the level editor:** `?at=lon,lat,zoom` opens the editor there (a reload after Apply keeps your own view).
 
+### Changed
+- **Hover waits for the mouse to rest:** a road or an overlay item lights up and shows its tooltip only after `hover_delay_ms` (300; 0: at once); leaving clears it at once.
+
 ## [0.21.0] — 2026-10-10
 
 ### Added
