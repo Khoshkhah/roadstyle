@@ -6,6 +6,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.21.1] — 2026-10-10
+
+### Added
+- **A link to a place in the level editor:** `?at=lon,lat,zoom` opens the editor there (a reload after Apply keeps your own view).
+
 ## [0.21.0] — 2026-10-10
 
 ### Added
