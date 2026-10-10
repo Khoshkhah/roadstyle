@@ -189,7 +189,7 @@ Returns a `WebMap` (web, `.save()`), a `folium.Map` (`.save()`) or a `lonboard.M
 | keyword | default | backends | what |
 |---|---|---|---|
 | `overlays` | `None` | web | a list of [`Overlay`](#overlay): zones, points, lines |
-| `items` | `None` | web, simple | the road's own line items (lanes, lane lines, marks): a GeoDataFrame or FeatureCollection whose features name their road in the edge id column (`edge_id_col`), with `width_m` (metres) and optional `order` (lower first), `offset_m` (metres, + = right), `color`, `dash` and `pick`. Drawn in the one road layer above their road's fill, with no source or layer of their own; a `pick` item is clicked and highlighted as itself (`rs:select` `detail.item`), the others let a click through to their road |
+| `items` | `None` | web, simple | the road's own line items (lanes, lane lines, marks): a GeoDataFrame or FeatureCollection whose features name their road in the edge id column (`edge_id_col`), with `width_m` (metres) and optional `order` (lower first), `offset_m` (metres, + = right), `color`, `dash`, `pick` and `minzoom` (shown from that zoom on). Drawn in the one road layer above their road's fill, with no source or layer of their own; a `pick` item is clicked and highlighted as itself (`rs:select` `detail.item`), the others let a click through to their road |
 | `items_popup` | `None` | web, simple | the fields a clicked `pick` item shows (`None`: all of its fields) |
 | `boundary` | `None` | web | a dashed outline on top: shapely geometry, GeoDataFrame or GeoJSON |
 

@@ -4048,3 +4048,15 @@ def test_the_slots_of_a_part_are_the_whole_pages_slots_of_its_roads():
     key = lambda fs: sorted(json.dumps(f, sort_keys=True) for f in fs)          # noqa: E731
     assert key(part["features"]) == key([f for f in whole if f["properties"]["__rs_edge"] in set(part["roads"])])
     assert len(part["features"]) <= len(whole)
+
+
+def test_a_road_item_with_a_minzoom_shows_from_that_zoom():
+    """items= ``minzoom`` (2026-10-10, zebra stripes): baked as ``__rs_imz`` and kept out of the one road layer below that zoom; no item with one:
+    no such filter."""
+    roads, items = _road_with_items()
+    plain = next(l for l in _style(render_edges(roads, backend="web", items=items).html)["layers"] if l["id"] == "roads-simple")
+    assert "__rs_imz" not in json.dumps(plain.get("filter"))
+    st = _style(render_edges(roads, backend="web", items=items.assign(minzoom=[None, 17.0])).html)
+    lyr = next(l for l in st["layers"] if l["id"] == "roads-simple")
+    assert ["any", ["!", ["has", "__rs_imz"]], [">=", ["zoom"], ["get", "__rs_imz"]]] in lyr["filter"]
+    assert [f["properties"].get("__rs_imz") for f in st["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_k"] == 5] == [None, 17.0]

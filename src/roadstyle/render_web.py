@@ -1995,8 +1995,9 @@ def _item_pieces(ov, i, fc):
 def _road_items(data, roads, edge_id_col, fcol, k):
     """``render(items=...)`` (2026-10-10): the road's own line items as pieces of the one road layer (``__rs_k`` 5, as :func:`_item_pieces`), with
     no source or layer of their own. Each feature names its road in ``edge_id_col`` and has ``width_m``, and may have ``order`` (lower first),
-    ``offset_m`` (right of the road's direction), ``color``, ``dash`` and ``pick``: a picked item (true) is clicked and highlighted as itself
-    through the road layer, and keeps its own fields for the popup (``items_popup``); the others let a click through to their road."""
+    ``offset_m`` (right of the road's direction), ``color``, ``dash``, ``pick`` and ``minzoom``: a picked item (true) is clicked and highlighted as
+    itself through the road layer, and keeps its own fields for the popup (``items_popup``); the others let a click through to their road. An item
+    with ``minzoom`` shows from that zoom on (``__rs_imz``; 2026-10-10: zebra stripes, a smear of white zoomed out)."""
     if roads is None:
         raise ValueError(f"items=: the roads have no id column {edge_id_col!r} (edge_id_col) to attach the items to")
     ov = Overlay(data, edge_col=edge_id_col, order_col="order", color_col="color", width_m_col="width_m", offset_m_col="offset_m",
@@ -2008,6 +2009,8 @@ def _road_items(data, roads, edge_id_col, fcol, k):
         src = fc["features"][q["properties"]["__rs_item"]]["properties"]
         if _truthy(src.get("pick")):
             q["properties"].update({c: v for c, v in src.items() if not c.startswith("__rs_") and c != "pick"}, __rs_pick=True)
+        if src.get("minzoom") is not None and not missing(src.get("minzoom")):
+            q["properties"]["__rs_imz"] = float(src["minzoom"])
     return out
 
 
@@ -3112,7 +3115,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         soff = _by_feature([(is_it, _metre_curve(_exp2(off), "__rs_iom"))], _exp2(off)) if items else off   # an item: its own metres, not a direction's shift
         flt = [f for f in ((_minzoom_filter(highway_col, mz) if mz else None),
                            _seam_filter(),     # the full look's rule: a seam only from zoom 17 (below it a bridge's seams are dark dots at every head)
-                           (["any", ["<", ["zoom"], dk["flat_below"]], ["!", is_b]] if decks["features"] else None)) if f]
+                           (["any", ["<", ["zoom"], dk["flat_below"]], ["!", is_b]] if decks["features"] else None),
+                           (["any", ["!", ["has", "__rs_imz"]], [">=", ["zoom"], ["get", "__rs_imz"]]]      # an item's own minzoom
+                            if any("__rs_imz" in f["properties"] for f in items) else None)) if f]
         flt = {"filter": ["all", *flt]} if flt else {}
         # a bridge: its casing bridge_casing_extra px wider each side than the full look's, and its shadow (__rs_k 2) bridge_shadow_blur px
         # wider each side again, blurred that much, evenly around it (line-translate is not per feature)

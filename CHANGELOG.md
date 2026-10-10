@@ -6,6 +6,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **`minzoom` on a road item** (`items=`): the item shows from that zoom on (e.g. zebra stripes, a smear of white zoomed out).
+
 ## [0.20.0] — 2026-10-09
 
 ### Added
