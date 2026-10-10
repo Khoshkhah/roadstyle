@@ -6,8 +6,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.20.0] — 2026-10-09
+
 ### Added
-- **Items in the level editor.** `roadstyle-levels edit AREA --items module:function` (`serve(..., items=f)`): `f(roads)` gets the table the editor draws (one row per edge, `edge`) and returns `(overlays, render_edges keywords)`, e.g. a lane table's lanes as items of the edges; with items, every Apply draws the whole page again. Without it the page is unchanged.
+- **Items in the level editor.** `roadstyle-levels edit AREA --items module:function` (`serve(..., items=f)`): `f(roads)` gets the table the editor draws (one row per edge, `edge`) and returns `(overlays, render_edges keywords)`, e.g. a lane table's lanes as the roads' own items (`items=`), redrawn in place with their road on Apply; overlays attached to edges draw the whole page again. Without it the page is unchanged.
 - **`items=` — a road's own items in the road layer.** `render_edges(..., items=gdf, items_popup=[...])` (simple mode): line items (lanes, lane lines, marks) that name their road in the edge id column, with `width_m` and optional `order`, `offset_m`, `color`, `dash`, `pick`, become pieces of the one road layer above their road's fill, with no source or layer of their own. A `pick` item is clicked and highlighted as itself through the road layer (`rs:select` `detail.item`, popup `items_popup`); the others let a click through to their road. `Overlay` stays for what is not a road.
 - **`labels.size` setting:** the street names' size per zoom (`[[zoom, px], ...]`), the same for every class (roads in metres).
 - **`casing_min_px`.** A casing in metres (`width_m_col`) is at least this many pixels each side of its fill, so a thin casing (lanestyle's 0.14 m) stays visible zoomed out. Default 0: exact metres, as before.

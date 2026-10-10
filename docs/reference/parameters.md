@@ -312,7 +312,7 @@ The `config` block of the settings. Change it in a [settings override](settings.
 | `minor_no_casing` | cycleway, footway, living_street, path, pedestrian, service, track | classes drawn without casing |
 | `minzoom` | motorway 4 … residential 13 … footway 15 | class → hidden below this zoom, with `minzoom=True` |
 | `basemap` | `"voyager"` | the default base map |
-| `labels` | `color #5b5b5b`, no halo | street-name paint |
+| `labels` | `color #5b5b5b`, no halo | street-name paint; `size`: `[[zoom, px], ...]`, the names' size per zoom for every class (roads in metres) instead of following each class's width |
 | `arrows` | `color #5b5b5b`, `opacity 0.7` | one-way chevron paint |
 | `camera` | `pitch 0`, `bearing 0`, `pitch_3d 55`, `max_pitch 70` | starting camera and 3D tilt |
 | `bridge_decks` | `base_m 5`, `thickness_m 1`, `ramp_m 40`, `step_m 2.5`, `match_zoom 18`, `opacity 0.7`, `width_scale 0.6`, `flat_below 16`, `casing_px 2` | 3D bridge decks |
