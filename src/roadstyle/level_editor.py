@@ -36,7 +36,7 @@ PARTIAL_MAX = 1500      # more roads changed by an Apply than this: the whole pa
 
 class Area:
     def __init__(self, folder, items=None):
-        self.dir, self.items = Path(folder), items
+        self.dir, self.items, self._overlays = Path(folder), items, []
         self.roads = gpd.read_parquet(self.dir / "roads.parquet")
         self.pairs = pd.read_csv(self.dir / "pairs.csv", dtype=str, keep_default_na=False)
         self.edits_path = self.dir / "edits.csv"
@@ -142,11 +142,12 @@ class Area:
             self.reload = f"{len(roads)} roads changed, more than {PARTIAL_MAX}: the whole page again"
             return
         names = any(before[i][k] != self.drawn[i][k] for i in changed for k in (1, 3))   # a fill number (max of casing, fill) changed: the names and
-        if self.items and names:                       # the items sit at their edge's fill number: a new one moves them, so the whole page; a cap or a
-            self.reload = "the items are drawn at the new levels: the whole page again"      # head leaves every fill number as it was: in place (2026-10-10)
-            return
         feats = self._render(_edges=changed, arrows=names, labels=names)                    # arrows again (their chains follow it); both directions of a road
-        self.update = {"roads": roads, "features": feats, "pieces": render_web._PIECES, "facts": {r: self.facts[r] for r in roads}, "stats": self.stats}
+        if self._overlays and names:                   # overlay items sit at their edge's fill number in layers of their own: a new one moves them,
+            self.reload = "the overlays are drawn at the new levels: the whole page again"   # so the whole page. Road items (items=) come with their roads (2026-10-09)
+            return
+        self.update = {"roads": roads, "features": feats, "pieces": render_web._PIECES, "items": [render_web._MAX_EDGES * render_web._PIECES, render_web._MAX_ITEMS],
+                       "facts": {r: self.facts[r] for r in roads}, "stats": self.stats}
 
     def _render(self, **kw):
         """The editor's map of ``self.draw`` (render_edges); with ``_edges``, the features of those roads instead (render_web.render)."""
@@ -155,6 +156,7 @@ class Area:
             draw = draw.copy()
             overlays, extra = self.items(draw)
             kw = {**extra, "overlays": overlays, **kw}
+            self._overlays = overlays
         return rs.render_edges(draw, edge_id_col="edge", directed_col="directed", driving_col="driving", road_popup=False, name=f"Level editor · {self.dir.name}",
                                select_color="rgba(0,0,0,0)",               # the panel colours the picked roads (1 orange, 2 blue): no click glow over them
                                filter_control=False, tunnel_control=False,  # the panel is the only control: no class filter box, no Tunnels box

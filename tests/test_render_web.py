@@ -3925,7 +3925,8 @@ def test_line_items_full_look_and_tiles(monkeypatch):
 
 def test_the_editor_draws_the_items_of_its_hook_and_reloads_after_an_apply(tmp_path):
     """serve(items=f) (2026-10-10): f gets the editor's drawn table (one row per edge, ``edge``) and returns overlays and render_edges keywords,
-    which reach the page; an Apply then draws the whole page again (the items sit at the fill numbers) and says so. No hook: the same page as before."""
+    which reach the page; an Apply that moves a fill number draws the whole page again for overlays (their own layers) and says so, and
+    redraws road items (render items=) in place with their road. No hook: the same page as before."""
     pytest.importorskip("scipy")
     from shapely.geometry import mapping
 
@@ -3951,8 +3952,28 @@ def test_the_editor_draws_the_items_of_its_hook_and_reloads_after_an_apply(tmp_p
     moved = area.solved.copy()
     moved.loc[moved["road"] == "12", "fill_level"] += 3                 # a new fill number moves its items: the whole page again
     area.build(area.edits(), moved, in_place=True)
-    assert area.update is None and area.reload == "the items are drawn at the new levels: the whole page again"
+    assert area.update is None and area.reload == "the overlays are drawn at the new levels: the whole page again"
     assert Area(tmp_path).page == Area(tmp_path, None).page
+
+    def road_items(draw):                       # the road's own items (render items=, lanestyle): redrawn in place with their road (2026-10-09)
+        draw["w"] = 6.0
+        e = draw.iloc[0]
+        fc = {"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": mapping(e.geometry),
+                                                         "properties": {"edge": e["edge"], "order": 0, "width_m": 3.0, "pick": True, "lane_id": "L1"}}]}
+        return [], {"width_m_col": "w", "items": fc}
+
+    area = Area(tmp_path, road_items)
+    assert "L1" in area.page
+    first = area.draw.iloc[0]["road"]
+    moved = area.solved.copy()
+    moved.loc[moved["road"] == first, "fill_level"] += 3
+    area.build(area.edits(), moved, in_place=True)
+    assert area.reload is None and area.update is not None
+    base, per = area.update["items"]
+    lanes = [f for f in area.update["features"]["simple"] if f["properties"]["__rs_k"] == 5]
+    fill = next(f for f in area.update["features"]["simple"] if f["properties"]["__rs_k"] == 1 and f["properties"]["__rs_edge"] == lanes[0]["properties"]["__rs_edge"])
+    assert len(lanes) == 1 and lanes[0]["id"] == base + lanes[0]["properties"]["__rs_edge"] * per          # its id: by road and rank, as the page swaps it
+    assert fill["properties"]["__rs_s"] < lanes[0]["properties"]["__rs_s"] < fill["properties"]["__rs_s"] + 1   # over its road's new fill
 
 
 def test_only_clickable_items_are_picked():

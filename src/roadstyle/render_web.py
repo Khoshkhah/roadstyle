@@ -2285,13 +2285,17 @@ def _simple_pieces(geo, parts, cols, shadows=True, items=(), world=None):
             raise ValueError(f"simple=True: more than {_MAX_EDGES:,} edges; the line-sort-key's tie-breaker would reach the next key step (pass simple=False)")
         f["id"], n[e] = e * _PIECES + n[e], n[e] + 1
         f["properties"]["__rs_s"] += e * _TIE   # same key: by edge, not by feature order, so a road redrawn in place (updateData) keeps its place
+    if world is not None:                       # a part of the roads (the editor's update in place): their own items, mitred against all
+        mine = {f["properties"].get("__rs_edge", i) for i, f in enumerate(geo["features"])}
+        items = [f for f in items if f["properties"]["__rs_edge"] in mine]
     rank = collections.Counter()
     for j, f in enumerate(sorted(items, key=lambda f: (f["properties"]["__rs_edge"], f["properties"]["__rs_ord"], f["properties"]["__rs_ov"], f["properties"]["__rs_item"]))):
         p = f["properties"]
         e, rank[p["__rs_edge"]] = p["__rs_edge"], rank[p["__rs_edge"]] + 1
         if rank[e] > _MAX_ITEMS:
             raise ValueError(f"simple=True: edge {e} has more than {_MAX_ITEMS} items; they do not fit between its fill and the next casings (pass simple=False)")
-        out.append({**f, "id": _MAX_EDGES * _PIECES + j, "properties": {**p, "__rs_s": 2 * p["__rs_fl"] + 1 + rank[e] * _ITEM_STEP + e * _TIE}})
+        # an id per edge and rank (2026-10-09), as the pieces' (e * _PIECES + n): the level editor swaps one road's items in place
+        out.append({**f, "id": _MAX_EDGES * _PIECES + e * _MAX_ITEMS + rank[e] - 1, "properties": {**p, "__rs_s": 2 * p["__rs_fl"] + 1 + rank[e] * _ITEM_STEP + e * _TIE}})
     return {"type": "FeatureCollection", "features": out}
 
 
@@ -2305,14 +2309,15 @@ _TIE, _MAX_EDGES = 1e-8, 1_000_000
 _ITEM_STEP, _MAX_ITEMS = 0.01, 38
 
 
-def _edge_features(geo, edges, head_m, cols, fcol, slots):
+def _edge_features(geo, edges, head_m, cols, fcol, slots, items=()):
     """The features of the edges ``edges`` (their numbers) in each source a simple page draws them in, built as :func:`render` builds them for
     the whole page: ``roads`` (the edges), ``simple`` (their pieces) and, with ``slots``, the whole ``slots`` (names and arrows: their chains
     follow the fill numbers, so one road can change them along a street). The level editor's update in place (level_editor.Area). An edge of a
-    two-way pair with one casing (``__rs_twin``) comes with its twin: the casing is cut from one of the two."""
+    two-way pair with one casing (``__rs_twin``) comes with its twin: the casing is cut from one of the two. ``items``: every road item
+    (render ``items=``) as pieces; the edges' own come back in ``simple``, at their new fill numbers (2026-10-09: before, items reloaded the page)."""
     tw = {geo["features"][i]["properties"].get("__rs_twin") for i in edges} - {None}
     sub = {"type": "FeatureCollection", "features": [geo["features"][i] for i in sorted(set(edges) | tw)]}
-    out = {"roads": sub["features"], "simple": _simple_pieces(sub, _casing_parts(sub, head_m, cols), cols, CONFIG.bridge_shadow, world=geo)["features"]}
+    out = {"roads": sub["features"], "simple": _simple_pieces(sub, _casing_parts(sub, head_m, cols), cols, CONFIG.bridge_shadow, items=items, world=geo)["features"]}
     if slots:
         out["slots"] = _annotation_slots(geo, (CONFIG.annotations or {}).get("slot_m", 100), cols[0])["features"]
     _mark_cls(geo, out.values(), fcol)
@@ -2710,7 +2715,11 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     if _edges is not None:        # not a page: the features of these edges (_edge_features), for the level editor's update in place
         if not simple:
             raise ValueError("_edges: only simple=True")
-        return _edge_features(geo, _edges, head_m, (highway_col, filter_col, width_m_col), filter_col or highway_col, arrows or labels)
+        ritems = ()
+        if items is not None:               # the road's own items at the new fill numbers (overlays: the page is drawn again, level_editor)
+            by_id = {_eid(ft["properties"].get(edge_id_col)): ft["properties"] for ft in geo["features"]}
+            ritems = _road_items(items, by_id, edge_id_col, filter_col or highway_col, len(overlays or ()))
+        return _edge_features(geo, _edges, head_m, (highway_col, filter_col, width_m_col), filter_col or highway_col, arrows or labels, ritems)
     _tiler = tc = None
     if tiles:
         try:

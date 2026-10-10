@@ -496,8 +496,9 @@ body.lv-open #lv-busy{right:var(--lv-w)}
   // the roads themselves (pick, hover), their pieces in the one road layer (the ids of a road's pieces it has no more taken out), the
   // names and arrows again when a fill number changed; then the panel's facts
   function patch(u){
-    const f = u.features, P = u.pieces, ids = new Set(f.simple.map(x => x.id)), gone = [];
-    f.roads.forEach(r => { for(let k = 0; k < P; k++) if(!ids.has(r.id * P + k)) gone.push(r.id * P + k); });
+    const f = u.features, P = u.pieces, ids = new Set(f.simple.map(x => x.id)), gone = [], [I, M] = u.items || [0, 0];
+    f.roads.forEach(r => { for(let k = 0; k < P; k++) if(!ids.has(r.id * P + k)) gone.push(r.id * P + k);
+      for(let k = 0; k < M; k++) if(!ids.has(I + r.id * M + k)) gone.push(I + r.id * M + k); });   // its road items (lanes, lines, marks) too
     map.getSource("roads").updateData({add: f.roads});
     map.getSource("simple").updateData({remove: gone, add: f.simple});
     if(f.slots){ map.getSource("slots").setData({type: "FeatureCollection", features: f.slots}); _rsArrowAt.clear(); _rsArrows(); }
