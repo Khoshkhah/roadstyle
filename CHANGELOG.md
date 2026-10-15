@@ -6,6 +6,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **Street View opens empty:** closing the Street View window forgets the last road, so opening it again waits for a road instead of jumping back to the last one.
+
 ## [0.21.1] — 2026-10-10
 
 ### Added

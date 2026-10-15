@@ -371,7 +371,9 @@ if(_svWindow){
     if(!last) return; last.url=e.detail.streetView; ends(e.detail.atStart, e.detail.atEnd); show();
   });
   rsSetStreetView=function(on){
-    if(!on) hideP();                           // closed: drop the panorama (see hideP)
+    if(!on){ hideP();                          // closed: drop the panorama (see hideP)
+      // and forget the road: opened again it waits for a road, not the last one (Kaveh, 2026-10-14)
+      last=null; fr.hidden=true; msg.hidden=false; msg.textContent="Click a road to see it in Street View."; ttl.textContent="Street View"; }
     w.hidden=!on; if(on && innerWidth>520) place(); rsSetStreetViewMarker(!!on);
     st.open=!!on; save(); if(btn) btn.classList.toggle("rs-on", !!on); show();
     document.dispatchEvent(new CustomEvent("rs:streetviewchange", {detail:{open:!!on}}));
