@@ -6,6 +6,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **`data_maxzoom=`:** the last zoom MapLibre cuts the page's GeoJSON sources into tiles at. Above it, MapLibre enlarges those tiles and does
+  not cut them again at each zoom step. Default `None`: MapLibre's own.
+
 ### Fixed
 - **Street View opens empty:** closing the Street View window forgets the last road, so opening it again waits for a road instead of jumping back to the last one.
 

@@ -2500,7 +2500,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
            basemap_switcher: bool = True, zoom_readout: bool = True,
-           road_popup=True, road_tooltip=False, hover_delay_ms: int = 300, popup_mode: str = None,
+           road_popup=True, road_tooltip=False, hover_delay_ms: int = 300, data_maxzoom: int = None, popup_mode: str = None,
            street_view: bool | str = "window", street_view_key: str | None = None,
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
            color_options=None, color_active=0, views=None, overlays=None, items=None, items_popup=None, compress: bool = True, tunnel_control: bool = False,
@@ -3351,6 +3351,10 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     elif edge_layers:       # the overlays attached to edges: after the fills of their position, before its arrows (docs/design/edge_overlays.md)
         style["layers"] = _place_edge_overlays(style["layers"], edge_layers, levels, pat_over=not road_fill)
     style["layers"] += over_layers             # caller overlays drawn on top of the roads (e.g. POIs)
+    if data_maxzoom is not None:               # the last zoom MapLibre cuts the GeoJSON sources into tiles at; above it the tiles are reused,
+        for src in style["sources"].values():  # enlarged (no new cutting on every zoom step); positions are as exact as that zoom's tile grid
+            if src.get("type") == "geojson":
+                src["maxzoom"] = int(data_maxzoom)
     tun_colour, tun_toward, tun_strength = _tun_settings()
     tun_paint, tun_dash, tun_casing = {}, [], {}
     if any(ft["properties"].get("__rs_tunnel") for ft in geo["features"]):      # the tunnel look (docs/design/tunnel_look.md)

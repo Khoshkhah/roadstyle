@@ -133,6 +133,7 @@ setting, or a name the page does not have, is an error.
 | `popup_mode` | `None` (= `"popup"`) | web | `"panel"` docks the read-out in a side panel with a search box |
 | `road_tooltip` | `False` | web | on hover: `True` = every column, a list = those columns |
 | `hover_delay_ms` | `300` | web | a road or an overlay item lights up and shows its tooltip once the mouse rests this long on it (a passing mouse lights nothing); `0`: at once |
+| `data_maxzoom` | `None` | web | the last zoom MapLibre cuts the GeoJSON sources into tiles at; above it, MapLibre enlarges those tiles and does not cut them again. Positions are as exact as the tile grid of that zoom. `None`: MapLibre's own |
 | `tooltip` | `None` | web, folium | hover columns. Web: alias of `road_tooltip`, `None` = no tooltip. Folium: `None` = all columns |
 | `selected` | `None` | folium | a GeoDataFrame of edges to highlight (web: use `rsHighlight` / `rsColor`) |
 | `copy_field` | `"edge_id"` | folium | click copies this column's value; `None` = off |

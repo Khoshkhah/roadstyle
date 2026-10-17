@@ -2559,6 +2559,14 @@ def test_the_road_tooltip_waits_for_the_mouse_to_rest():
     assert "const _TIP_DELAY = 0;" in render_edges(_edge_world(), backend="web", road_tooltip=True, hover_delay_ms=0).html
 
 
+def test_data_maxzoom_sets_the_last_cut_zoom_of_every_geojson_source():
+    """data_maxzoom: every GeoJSON source of the page is cut into tiles up to that zoom only (above it MapLibre reuses them); default: MapLibre's own."""
+    style = _style(render_edges(_edges(), backend="web", basemap="blank", data_maxzoom=17).html)
+    geo = [s for s in style["sources"].values() if s["type"] == "geojson"]
+    assert geo and all(s["maxzoom"] == 17 for s in geo)
+    assert all("maxzoom" not in s for s in _style(render_edges(_edges(), backend="web", basemap="blank").html)["sources"].values() if s["type"] == "geojson")
+
+
 def test_the_last_solver_stage_at_its_time_limit_keeps_its_best_numbers(monkeypatch):
     """The last stage (cost, fewest positions) stopped by its time limit with numbers in hand: they are kept, with a warning and
     levels_info status TIME_LIMIT (a GitHub build of an all-modes area failed there, 2026-10-07); any other failure is still an error."""
