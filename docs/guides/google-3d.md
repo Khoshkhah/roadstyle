@@ -34,12 +34,13 @@ this in the 3D view, the map follows.
 | pitch (tilt) | tilt |
 | zoom | range: the distance from the camera to the center, in metres |
 
-If the page keeps the map inside a box (`map.setMaxBounds(...)`), the 3D camera stays inside the same box.
+The map has the last word. If you move the 3D view to a place where the map cannot go, the map stops
+at its limit and the 3D view goes back to the map's camera. This keeps the two views the same when the
+page keeps the map inside a box (`map.setMaxBounds(...)`), and when you tilt more than the map can.
 
 Some differences stay:
 
-- The map tilts to 70° only (the setting `camera.max_pitch`). Google can tilt more. Then the map
-  stays at 70°.
+- The tilt stops at 70° in the two views (the map's setting `camera.max_pitch`).
 - The window is smaller than the map, so it shows the same view at a smaller size. If the window has a
   different shape, it shows less on the sides.
 

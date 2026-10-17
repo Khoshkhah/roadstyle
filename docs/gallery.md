@@ -77,6 +77,19 @@ rs.render_edges(edges)                # the Street View button is on by default
 
 More in [Google Street View](guides/street-view.md).
 
+## Google 3D
+
+Google's photorealistic 3D view in a window next to the map. The two cameras move together, and a clicked road is drawn in
+the 3D view. Needs a [Google key](guides/google-key.md). Try it on the [live map](maps/live.html).
+
+```python
+rs.render_edges(edges, google_3d=True)
+```
+
+![Götgatan at Medborgarplatsen: the street selected on the map, and the same street in the Google 3D window](img/gallery/google_3d.jpg)
+
+More in [Google 3D](guides/google-3d.md).
+
 ## Ready-made pages
 
 A dashboard with base map, colour and query controls, in one call.

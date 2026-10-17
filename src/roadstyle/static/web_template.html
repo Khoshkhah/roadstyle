@@ -456,7 +456,7 @@ if(_g3d){
   const turn=(a, b)=>Math.abs(((a-b)%360+540)%360-180);
   const there=t=>{ const c=map.getCenter();     // the map is already at t: Google's change came from the map
     return Math.abs(c.lng-t.center[0])<1e-7 && Math.abs(c.lat-t.center[1])<1e-7 && turn(map.getBearing(), t.bearing)<0.05 &&
-           Math.abs(map.getPitch()-Math.min(t.pitch, map.getMaxPitch()))<0.05 && Math.abs(map.getZoom()-t.zoom)<0.002; };
+           Math.abs(map.getPitch()-t.pitch)<0.05 && Math.abs(map.getZoom()-t.zoom)<0.002; };
   map.on("move", e=>{                          // the map moved (mouse, keys, buttons): Google follows
     if(!m3 || e.rsG3d) return;
     lastMap=performance.now(); Object.assign(m3, toGoogle()); });
@@ -465,7 +465,12 @@ if(_g3d){
     requestAnimationFrame(()=>{ queued=false;
       // Google's late reports of a map move would pull the map back while it is dragged
       if(!m3 || !m3.center || !m3.range || performance.now()-lastMap<300) return;
-      const t=toMap(); if(!there(t)) map.jumpTo(t, {rsG3d:true}); }); };
+      const t=toMap(); if(there(t)) return;
+      map.jumpTo(t, {rsG3d:true});
+      // THE MAP IS THE JUDGE: where it cannot follow (its maxBounds box, its maximum pitch) it stops at
+      // its limit, and Google goes back to the map's camera. Google's own bounds limit the position of
+      // its camera, not the point it looks at: a tilted, far camera left the box and moved the view.
+      if(!there(t)) Object.assign(m3, toGoogle()); }); };
   // THE MAP'S CENTER BESIDE THE WINDOW: while the window is open, the map's padding puts its center (the
   // point the two cameras share, where a clicked road comes to) in the middle of the map's free side, so
   // the window does not cover it. Phones keep the plain center: there the window docks at the bottom.
@@ -488,9 +493,7 @@ if(_g3d){
     msg.textContent="Loading Google 3D…"; msg.hidden=false;
     _gmLoad(_svKey).then(()=>google.maps.importLibrary("maps3d")).then(l=>{
       if(w.hidden || m3) return;               // closed while it loaded
-      // a map kept inside a box (map.setMaxBounds) keeps Google's camera inside the same box
-      const b=map.getMaxBounds(), box=b && {bounds:{north:b.getNorth(), south:b.getSouth(), east:b.getEast(), west:b.getWest()}};
-      lib=l; m3=new l.Map3DElement(Object.assign(toGoogle(), {mode:l.MapMode.HYBRID}, box));
+      lib=l; m3=new l.Map3DElement(Object.assign(toGoogle(), {mode:l.MapMode.HYBRID}));
       for(const ev of ["gmp-centerchange", "gmp-headingchange", "gmp-tiltchange", "gmp-rangechange"]) m3.addEventListener(ev, fromGoogle);
       msg.hidden=true; w.appendChild(m3);
     }).catch(e=>{ console.warn("rs google 3d:", e); say("<b>Google 3D did not load.</b><span>"+String(e.message||e)+"</span>"+SETUP); });
