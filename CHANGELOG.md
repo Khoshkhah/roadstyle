@@ -11,6 +11,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   not cut them again at each zoom step. Default `None`: MapLibre's own.
 
 ### Fixed
+- **A solver stage at its time limit never fails the solve:** there is always an answer, so a stage stopped before it found one keeps
+  the answer of the stage before (it holds every rule so far); any stage stopped with an answer keeps it and the next stages go on. A
+  warning names the stage, and `levels_info["status"] == "TIME_LIMIT"`. A Monaco all-modes solve failed on GitHub's slower machine.
 - **Street View opens empty:** closing the Street View window forgets the last road, so opening it again waits for a road instead of jumping back to the last one.
 
 ## [0.21.1] — 2026-10-10

@@ -278,22 +278,27 @@ def _solve_intervals(metres, meets, stacks, orders, limit, max_level, margin, mi
                   np.concatenate([np.zeros(ncol), np.zeros(nP), np.ones(nO)]),             # 2: the order wishes
                   np.concatenate([np.zeros(ncol), rn.astype(float), np.zeros(nO)])]        # 3: the near rules
         Ak, bk = A1, b_ub
-        for c in stages:                                       # each stage at its optimum, held by the next ones
-            if not c.any():
+        best = late = None                                     # the last answer found; the first stage stopped by its time limit
+        for k, c in enumerate([*stages, np.concatenate([cost, np.zeros(nP + nO)])], 1):    # each stage at its optimum, held by the next ones;
+            if k <= 3 and not c.any():                                                     # 4: cost, fewest positions
                 continue
             r = solve(c, Ak, bk, bounds)
-            if r.status != 0:
-                raise RuntimeError(f"compute_levels: the solver returned status {r.status}: {r.message}")
             solves += 1
+            if r.status not in (0, 1) or (r.x is None and best is None):
+                raise RuntimeError(f"compute_levels: the solver returned status {r.status}: {r.message}")
+            late = late or (k if r.status == 1 else None)
+            if r.x is None:                                    # its time limit before any answer: the answer of the stage before holds every
+                break                                          # row so far, so it is kept (2026-10-08)
+            best = r.x                                         # at its time limit with an answer: maybe not the best, but every row holds
             Ak, bk = sp.vstack([Ak, sp.csr_matrix(c)], format="csr"), np.append(bk, r.fun + 1e-7 * max(1.0, r.fun))
-        res = solve(np.concatenate([cost, np.zeros(nP + nO)]), Ak, bk, bounds)
-        solves += 1
+        res = SimpleNamespace(status=1 if late else 0, x=best, message="Time limit reached." if late else "")
         staged = True
     status = "OPTIMAL"
-    if res.status == 1 and res.x is not None:                  # the last stage (cost, fewest positions) at its time limit: what is over what is
-        status = "TIME_LIMIT"                                  # fixed by the stages before; keep its best numbers and say so (2026-10-07)
-        warnings.warn(f"compute_levels: the last stage (cost, fewest positions) reached its time limit ({limit} s); its best numbers are kept: "
-                      "every rule of the stages before holds, the drawing may have a few more positions", stacklevel=2)
+    if res.status == 1 and res.x is not None:                  # a stage at its time limit: there is always an answer (the stages before, or the
+        status = "TIME_LIMIT"                                  # slacks), so keep the last one found and say so (2026-10-07, 2026-10-08)
+        stage = {1: "the real crossings", 2: "the order wishes", 3: "the near rules", 4: "cost, fewest positions"}[late if staged else 4]
+        warnings.warn(f"compute_levels: a solver stage ({stage}) reached its time limit ({limit} s); the last answer found is kept: "
+                      "more pairs may be given up and the drawing may have a few more positions than the best", stacklevel=2)
     elif res.status != 0:
         raise RuntimeError(f"compute_levels: the solver returned status {res.status}: {res.message}")
     x = res.x

@@ -2597,6 +2597,42 @@ def test_the_last_solver_stage_at_its_time_limit_keeps_its_best_numbers(monkeypa
         rs.solve_levels(roads, pairs, fixed=fixed)
 
 
+def test_a_solver_stage_at_its_time_limit_without_an_answer_keeps_the_answer_of_the_stage_before(monkeypatch):
+    """There is always an answer: a stage stopped by its time limit before it found one keeps the answer of the stage before (it holds every
+    row so far), with a warning naming the stage and levels_info status TIME_LIMIT (a GitHub test run of Monaco failed there, 2026-10-08)."""
+    pytest.importorskip("scipy")
+    import scipy.optimize as so
+
+    import roadstyle as rs
+    d = 0.001
+    rows = [LineString([(18 - 2 * d, 59), (18 + 2 * d, 59)]), LineString([(18, 58.998), (18, 59.002)]),
+            LineString([(18 - 2 * d, 58.998), (18 + 2 * d, 59.002)]), LineString([(18 - 2 * d, 59.002), (18 + 2 * d, 58.998)])]
+    g = gpd.GeoDataFrame({"highway": ["primary"] * 4, "band": [0, 1, 2, 3]}, geometry=rows, crs=4326)
+    kw = dict(method="solve", band_col="band", max_level=1)                  # a stack of four in three positions: the staged solve
+    real, calls = so.milp, []
+    monkeypatch.setattr(so, "milp", lambda *a, **k: calls.append(1) or real(*a, **k))
+    ok = rs.compute_levels(g, **kw)
+    n = len(calls)
+    seen = []
+
+    def at_limit(*a, **k):
+        seen.append(1)
+        r = real(*a, **k)
+        if len(seen) >= stop:
+            r.status, r.x, r.fun, r.message = 1, None, None, "Time limit reached."
+        return r
+    monkeypatch.setattr(so, "milp", at_limit)
+    stop = n                                                                 # the last stage: the answer of the stage before is kept
+    with pytest.warns(UserWarning, match="time limit"):
+        out = rs.compute_levels(g, **kw)
+    assert out.attrs["levels_info"]["status"] == "TIME_LIMIT" and out["fill_level"].notna().all()
+    assert len(out.attrs["levels_given_up"]) >= len(ok.attrs["levels_given_up"])
+    seen.clear()
+    stop = 2                                                                 # the first stage (after the plain solve): no answer to keep
+    with pytest.raises(RuntimeError, match="Time limit"):
+        rs.compute_levels(g, **kw)
+
+
 def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
     """The level editor (roadstyle.level_editor): the pairs between two roads (by any edge id), an edit the solver refuses is not written, a
     taken one is written with the file before it kept as edits.csv.bak, and levels.csv follows."""
