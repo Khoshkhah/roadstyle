@@ -60,6 +60,7 @@ nav:
       - Put it on a website: guides/website.md
       - AI agents: guides/agents.md
   - Gallery: gallery.md
+  - Live map: maps/live.html
   - Reference:
       - Every parameter: reference/parameters.md
       - JavaScript API: reference/javascript.md

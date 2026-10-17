@@ -21,6 +21,7 @@
   <a href="#install">Install</a> ·
   <a href="#quickstart">Quickstart</a> ·
   <a href="#gallery">Gallery</a> ·
+  <a href="https://khoshkhah.github.io/roadstyle/maps/live.html"><b>Live map</b></a> ·
   <a href="#for-ai-agents">AI agents</a> ·
   <a href="https://khoshkhah.github.io/roadstyle/">Documentation</a>
 </p>

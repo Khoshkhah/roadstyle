@@ -90,5 +90,17 @@ html = rs.render_street_view(g, name="Roads and Street View", layout="below").ht
 (OUT / "street_view_below.html").write_text(html.replace("</body>", OPEN_ON + "</body>", 1),
                                                encoding="utf-8")
 
+# the live map (README and the docs home link to it): the sample's own columns only, every control on
+live = gpd.read_file(REPO / "notebooks" / "data" / "sodermalm_edges.gpkg").to_crs(4326)
+rs.render_edges(
+    live, backend="web",
+    color_options={
+        "Road class": {},
+        "Speed limit": {"color_by": "maxspeed_kmh", "cmap": "plasma", "vmin": 20, "vmax": 60},
+        "Lanes": {"color_by": "lanes", "cmap": "viridis", "vmin": 1, "vmax": 4},
+    },
+    name="roadstyle: live map of Södermalm",
+).save(OUT / "live.html")
+
 for f in sorted(OUT.glob("*.html")):
     print(f"wrote {f.relative_to(REPO)} ({f.stat().st_size // 1024} KB)")

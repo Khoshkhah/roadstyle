@@ -6,6 +6,8 @@
 ![A roadstyle map of Monaco in 3D: bridges, tunnels and roundabouts drawn in order, Rue de la Colle selected, and the floating Street View window showing it](img/hero.jpg)
 </div>
 
+[:material-map: Open the live map](maps/live.html){ .md-button .md-button--primary }
+
 ```bash
 pip install roadstyle
 ```
