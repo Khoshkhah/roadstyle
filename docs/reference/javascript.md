@@ -37,6 +37,7 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rsPanelShow(on)` | panel mode only: hide / show the docked side panel | |
 | **Street View** | | |
 | `rsSetStreetView(on)` | open / close the Street View window (`street_view="window"` only; otherwise does nothing) | `rs:streetviewchange` |
+| `rsSetGoogle3D(on)` | open / close the Google 3D window (`google_3d=True` only; otherwise does nothing) | `rs:google3dchange` |
 | `rsStreetViewStep(m)` | move the Street View spot `m` metres along the edge (negative = back), stopping at its ends; returns the new URL | `rs:streetviewmove` |
 | `rsSetStreetViewMarker(on)` | show / hide the map marker at the Street View spot | |
 | `rsSetStreetViewMarkerAt(lng, lat, heading)` | put the marker where a panorama stands, looking `heading` degrees (for a Street View that reports its own moves). The spot is snapped onto the road as drawn, in its lane: the clicked edge while the viewer is on it, else the nearest road on screen in the direction they walked; free only with no road within 20 m. `null` goes back to the edge spot; the next selection or step clears it | |
@@ -66,6 +67,7 @@ All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
 | `rs:viewselect` | `rsSetView` | `view` (name), `index` |
 | `rs:roadfillchange` | `rsSetRoadFill` | `road_fill` |
 | `rs:streetviewchange` | `rsSetStreetView` | `open` |
+| `rs:google3dchange` | `rsSetGoogle3D` | `open` |
 | `rs:streetviewmove` | `rsStreetViewStep` | `id`, `streetView`, `atStart`, `atEnd` |
 | `rs:streetviewspot` | a pick, a step, a walk or turn in the panorama | the `rsGetStreetViewSpot()` object (or `null`) |
 

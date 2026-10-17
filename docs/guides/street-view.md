@@ -44,6 +44,9 @@ rs.render_edges(edges, street_view=False)    # no Street View
 rs.render_edges(edges, street_view_key=KEY)  # the window with Linked / Classic (see below)
 ```
 
+A key needs more than the key itself: billing, the Maps JavaScript API and a list of your web
+addresses. See [Set up a Google key](google-key.md).
+
 With a Google Maps JavaScript API key the window's bar has the same **Linked / Classic** switch as
 the side-by-side page: Linked is a real panorama and the map marker walks with you, Classic is the
 keyless embed.
@@ -91,9 +94,10 @@ and it also offers people's indoor photos. With `street_view_key=` the panel is 
 (the Maps JavaScript API): every step and turn moves the marker on the map, which pans to keep it in
 view, and only Google's own street imagery is shown. The page's own step buttons still walk along
 the clicked road. A switch in the panel's bar flips between the two: **Linked** (this panorama) and
-**Classic** (the keyless embed); the viewer's choice is remembered in their browser. The key is written into the page, as every browser key is: in the Google Cloud
-console restrict it to your site's addresses ("Websites") and to the Maps JavaScript API. Google
-bills Dynamic Street View per panorama beyond a monthly free allowance.
+**Classic** (the keyless embed); the viewer's choice is remembered in their browser. The key is written into the page, as every browser key is.
+To make the key and limit it to your own addresses, see [Set up a Google key](google-key.md). Google
+bills Dynamic Street View per panorama beyond a monthly free allowance. The same key also opens the
+[Google 3D](google-3d.md) window.
 
 ## Where it looks
 

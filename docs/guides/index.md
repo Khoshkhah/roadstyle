@@ -52,6 +52,22 @@
 
     [:octicons-arrow-right-24: Google Street View](street-view.md)
 
+-   :material-cube-outline:{ .lg .middle } **Google 3D**
+
+    ---
+
+    Google's photorealistic 3D view in a window, its camera linked with the map's.
+
+    [:octicons-arrow-right-24: Google 3D](google-3d.md)
+
+-   :material-key-outline:{ .lg .middle } **Set up a Google key**
+
+    ---
+
+    One key for Street View and Google 3D: billing, the API, and your web addresses.
+
+    [:octicons-arrow-right-24: Set up a Google key](google-key.md)
+
 -   :material-map-search-outline:{ .lg .middle } **Big networks**
 
     ---

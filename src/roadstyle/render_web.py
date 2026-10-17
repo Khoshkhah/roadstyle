@@ -2501,7 +2501,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            arrows: bool = True, labels: bool = True, filter_control: bool = True,
            basemap_switcher: bool = True, zoom_readout: bool = True,
            road_popup=True, road_tooltip=False, hover_delay_ms: int = 300, data_maxzoom: int = None, popup_mode: str = None,
-           street_view: bool | str = "window", street_view_key: str | None = None,
+           street_view: bool | str = "window", street_view_key: str | None = None, google_3d: bool = False,
            tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
            color_options=None, color_active=0, views=None, overlays=None, items=None, items_popup=None, compress: bool = True, tunnel_control: bool = False,
            tiles: bool = False, simple: bool = True,
@@ -2564,6 +2564,10 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         imagery only) and Classic (the keyless embed), as on :func:`render_street_view`. The key
         is written into the page - restrict it to your site's addresses. Default: the environment
         variable ``GOOGLE_MAPS_KEY``, so every map built where it is set has it. Without a key, unchanged.
+      - ``google_3d`` — ``True``: a Google 3D button on the map opening a floating window with
+        Google's photorealistic 3D view, its camera linked both ways with the map's (center,
+        rotation, tilt, zoom); a clicked road is drawn in it and the camera flies along it. Needs
+        ``street_view_key`` (the same key; docs/guides/google-key.md). Default ``False``.
       - ``hover_color`` / ``select_color`` — the highlight colours for a hovered / selected road (the
         ``roads-highlight`` feature-state); default light-violet ``#b388ff`` / violet ``#7c4dff``.
 
@@ -2615,6 +2619,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     if street_view not in (True, False, "window"):
         raise ValueError(f'street_view must be True, False or "window", got {street_view!r}')
     street_view_key = street_view_key or os.environ.get("GOOGLE_MAPS_KEY") or None     # every page, not only those that pass it (2026-10-10)
+    if google_3d and not street_view_key:
+        raise ValueError("google_3d=True needs a Google Maps JavaScript API key: pass street_view_key=... or set GOOGLE_MAPS_KEY "
+                         "(how to make one: https://khoshkhah.github.io/roadstyle/guides/google-key/)")
     mode = popup_mode or "popup"
     if road_popup is False:
         popup_on, popup_fields = False, None
@@ -3468,6 +3475,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             .replace("__STREET_VIEW__", "true" if street_view else "false")
             .replace("__SV_WINDOW__", "true" if street_view == "window" else "false")
             .replace("__SV_WINDOW_KEY__", json.dumps(street_view_key or ""))
+            .replace("__GOOGLE_3D__", "true" if google_3d else "false")
             .replace("__RS_TILED__", "true" if tiles else "false"))
     if tiles:
         import base64

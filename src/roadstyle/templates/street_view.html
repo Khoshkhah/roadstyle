@@ -80,7 +80,7 @@
   // embed: it reports every step and turn, so the map marker walks and turns with the viewer, and
   // it asks for Google's own street imagery only - the embed also shows people's indoor photos
   const GKEY = __SV_KEY__;
-  let pano = null, svc = null, loading = null, lastUrl = null, lastAt = {atStart: false, atEnd: false};
+  let pano = null, svc = null, lastUrl = null, lastAt = {atStart: false, atEnd: false};
   const MODE_KEY = "rs-street-view-mode";
   let mode = "classic";
   if (GKEY) { mode = "linked"; try { mode = localStorage.getItem(MODE_KEY) || "linked"; } catch (err) {} }
@@ -100,12 +100,7 @@
     });
   }
   const pdiv = document.getElementById("sv-pano");
-  const gload = () => loading || (loading = new Promise((ok, no) => {
-    window.__rsSvReady = ok;
-    const s = document.createElement("script");
-    s.src = "https://maps.googleapis.com/maps/api/js?key=" + encodeURIComponent(GKEY) + "&v=weekly&loading=async&callback=__rsSvReady";
-    s.async = true; s.onerror = no; document.head.appendChild(s);
-  }));
+  const gload = () => _gmLoad(GKEY);     // the map page's one loader: a page may load Google's script only once
   // THE PANORAMA EXISTS ONLY WHILE IT IS ON SCREEN. One that sat hidden while Classic showed came
   // back black with a single tile in a corner, and showing it again first did not cure that in a real
   // browser. So hiding it drops it, and the next Linked view builds a new one inside a box that is

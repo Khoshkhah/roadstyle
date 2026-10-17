@@ -504,6 +504,18 @@ def test_web_street_view_window():
         render_edges(_edges(), backend="web", street_view="windows")
 
 
+def test_google_3d_window_needs_the_key(monkeypatch):
+    """google_3d=True: a map button and a floating Google 3D window with the Street View key; off by default, and an error without a key."""
+    import pytest
+    monkeypatch.delenv("GOOGLE_MAPS_KEY", raising=False)
+    assert "const _g3d = false;" in render_edges(_edges(), backend="web").html
+    h = render_edges(_edges(), backend="web", google_3d=True, street_view_key="AIzaTEST").html
+    assert "const _g3d = true;" in h and 'const _svKey = "AIzaTEST";' in h and "window.rsSetGoogle3D = rsSetGoogle3D;" in h
+    assert "__GOOGLE_3D__" not in h and "__SELECT_COLOR__" not in h
+    with pytest.raises(ValueError, match="google_3d=True needs"):
+        render_edges(_edges(), backend="web", google_3d=True)
+
+
 def test_oneway_column_drives_arrows():
     """The data contract: an explicit `oneway` column controls the arrows (undirected networks
     included); without the column, one-way = an edge with no reverse twin."""

@@ -147,7 +147,8 @@ box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px
 .rs-svw-msg{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
   padding:14px;text-align:center;color:#666;background:#f4f4f4}
 .rs-svw-msg code{background:#e6e6e6;padding:1px 4px;border-radius:3px;color:#333}
-.rs-svw.rs-drag iframe,.rs-svw.rs-drag .rs-svw-pano{pointer-events:none}
+.rs-svw.rs-drag iframe,.rs-svw.rs-drag .rs-svw-pano,.rs-svw.rs-drag gmp-map-3d{pointer-events:none}
+.rs-g3d gmp-map-3d{flex:1;width:100%}
 .maplibregl-ctrl-group button.rs-on{background:#dfe9ff}
 .rs-svm{pointer-events:none}
 @media (max-width:520px){.rs-svw{   /* phones only: a docs column is ~690 px */left:0!important;right:0!important;top:auto!important;bottom:0!important;
@@ -261,6 +262,55 @@ if(_popupMode==="panel"){    // panel-reopen button: same chrome as 2D, right be
     d.appendChild(b); return d;
   }, onRemove(){}});
 }
+// GOOGLE'S MAPS JAVASCRIPT API, loaded once for every window that needs it (Street View's Linked
+// panorama, Google 3D): a page may load Google's script only once
+let _gmLoading=null;
+function _gmLoad(key){ return _gmLoading || (_gmLoading=new Promise((ok, no)=>{
+  window.__rsGmReady=ok; const s=document.createElement("script");
+  s.src="https://maps.googleapis.com/maps/api/js?key="+encodeURIComponent(key)+"&v=weekly&loading=async&callback=__rsGmReady";
+  s.async=true; s.onerror=no; document.head.appendChild(s); })); }
+// A FLOATING WINDOW over the map (Street View, Google 3D): dragged by its bar, resized by its corner,
+// always inside the map. Its place, size and open state are remembered per PAGE in this browser:
+// every map on a site shares one localStorage, and a window enlarged on a big page must not reopen
+// over a small embedded one. The first open puts it in the map's bottom-right corner (left: bottom-left).
+function _rsFloat(w, bar, name, left){
+  const KEY=name+":"+location.pathname;
+  const st=(()=>{ try{ return JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ return {}; } })();
+  const save=()=>{ try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(e){} };
+  if(st.w) Object.assign(w.style, {width:st.w+"px", height:st.h+"px"});
+  // anchor by the top-left once visible, so the corner grip grows the window toward the pointer
+  // (right/bottom anchoring grows it the other way); keep a remembered spot on this screen
+  const place=()=>{
+    const m=map.getContainer().getBoundingClientRect();
+    // never bigger than most of the map, so the map stays clickable beside it
+    const W=Math.min(w.offsetWidth, Math.max(220, m.width*0.6)), H=Math.min(w.offsetHeight, Math.max(150, m.height*0.6));
+    Object.assign(w.style, {width:W+"px", height:H+"px"});
+    if(st.left==null){    // first open: a bottom corner of the map, whatever panels the page adds
+      st.left=left ? m.left+12 : m.right-W-56; st.top=m.bottom-H-40; }
+    // ...and inside the map, whatever screen it was placed on before
+    st.left=Math.max(m.left, Math.min(m.right-W, st.left)); st.top=Math.max(m.top, Math.min(m.bottom-H, st.top));
+    Object.assign(w.style, {left:st.left+"px", top:st.top+"px", right:"auto", bottom:"auto"});
+  };
+  bar.addEventListener("pointerdown", e=>{    // drag by the title bar
+    if(e.target.tagName==="BUTTON") return;
+    const r=w.getBoundingClientRect(), dx=e.clientX-r.left, dy=e.clientY-r.top;
+    bar.setPointerCapture(e.pointerId); w.classList.add("rs-drag");   // the iframe mustn't swallow it
+    // inside the MAP, not the browser window: a page's side panel covers the rest, and a window
+    // dragged under it could not be reached again
+    const mv=ev=>{ const m=map.getContainer().getBoundingClientRect();
+                   st.left=Math.max(m.left, Math.min(m.right-w.offsetWidth, ev.clientX-dx));
+                   st.top=Math.max(m.top, Math.min(m.bottom-30, ev.clientY-dy));
+                   Object.assign(w.style, {left:st.left+"px", top:st.top+"px", right:"auto", bottom:"auto"}); };
+    bar.addEventListener("pointermove", mv);
+    bar.addEventListener("pointerup", ()=>{ bar.removeEventListener("pointermove", mv);
+      w.classList.remove("rs-drag"); save(); }, {once:true});
+  });
+  new ResizeObserver(()=>{ if(!w.hidden && innerWidth>520){ st.w=w.offsetWidth; st.h=w.offsetHeight; save(); } }).observe(w);
+  // THE MAP CHANGED SIZE (a side panel shown again, the browser narrowed): pull the window back
+  // inside it, or it sits under the panel where no one can reach it
+  map.on("resize", ()=>{ if(!w.hidden && innerWidth>520){ place(); save(); } });
+  return {st, save, place};
+}
 // Street View window (street_view="window"): hidden until the map button (or
 // rsSetStreetView(true)) opens it; then a draggable, resizable window over the map that follows
 // every road selection. Nothing is loaded from Google while it is closed. Whether it is open, its
@@ -271,11 +321,7 @@ const _svWindow = __SV_WINDOW__;
 const _svKey = __SV_WINDOW_KEY__;
 function rsSetStreetView(){}
 if(_svWindow){
-  // per PAGE: every map on a site shares one localStorage, and a window enlarged on a big page
-  // must not reopen over a small embedded one
-  const KEY="rs-street-view-window:"+location.pathname, fromDisk=location.protocol==="file:";
-  const st=(()=>{ try{ return JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ return {}; } })();
-  const save=()=>{ try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(e){} };
+  const fromDisk=location.protocol==="file:";
   const w=document.createElement("div"); w.className="rs-svw"; w.hidden=true;
   w.innerHTML='<div class="rs-svw-bar"><span class="rs-svw-t">Street View</span>'+
     '<span class="rs-svw-mode" hidden><button type="button" data-m="linked" title="The map marker walks and turns with you; Google\'s street photos only">Linked</button>'+
@@ -288,9 +334,10 @@ if(_svWindow){
   document.body.appendChild(w);
   const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"),
         fr=w.querySelector("iframe"), pdiv=w.querySelector(".rs-svw-pano"), flip=w.querySelector(".rs-svw-mode");
+  const {st, save, place}=_rsFloat(w, bar, "rs-street-view-window", false);
   // Linked or Classic, remembered in this browser (the same choice as the Street View page's)
   const MODE_KEY="rs-street-view-mode";
-  let mode="classic", pano=null, svc=null, loading=null;
+  let mode="classic", pano=null, svc=null;
   if(_svKey){ mode="linked"; try{ mode=localStorage.getItem(MODE_KEY)||"linked"; }catch(e){}
     flip.hidden=false;
     const mark=()=>flip.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.m===mode));
@@ -302,10 +349,7 @@ if(_svWindow){
       // the same spot in the other panel: where the viewer has walked to, where the marker stands
       if(!rsStreetViewStep(0)) show();
     }); }
-  const gload=()=>loading || (loading=new Promise((ok, no)=>{
-    window.__rsSvwReady=ok; const s=document.createElement("script");
-    s.src="https://maps.googleapis.com/maps/api/js?key="+encodeURIComponent(_svKey)+"&v=weekly&loading=async&callback=__rsSvwReady";
-    s.async=true; s.onerror=no; document.head.appendChild(s); }));
+  const gload=()=>_gmLoad(_svKey);
   // THE PANORAMA EXISTS ONLY WHILE IT IS ON SCREEN. One that sat hidden - Classic showing, or the
   // window closed - came back black with a single tile in a corner, and showing it again first did
   // not cure that in a real browser. So hiding it drops it, and the next Linked view builds a new one
@@ -325,20 +369,6 @@ if(_svWindow){
       const report=()=>{ const p=pano && pano.getPosition(); if(p) rsSetStreetViewMarkerAt(p.lng(), p.lat(), pano.getPov().heading); };
       pano.addListener("position_changed", report); pano.addListener("pov_changed", report); },
       ()=>{ hideP(); msg.hidden=false; msg.textContent="No street photos within 50 m of this spot."; }); });
-  if(st.w) Object.assign(w.style, {width:st.w+"px", height:st.h+"px"});
-  // anchor by the top-left once visible, so the corner grip grows the window toward the pointer
-  // (right/bottom anchoring grows it the other way); keep a remembered spot on this screen
-  const place=()=>{
-    const m=map.getContainer().getBoundingClientRect();
-    // never bigger than most of the map, so the map stays clickable beside it
-    const W=Math.min(w.offsetWidth, Math.max(220, m.width*0.6)), H=Math.min(w.offsetHeight, Math.max(150, m.height*0.6));
-    Object.assign(w.style, {width:W+"px", height:H+"px"});
-    if(st.left==null){    // first open: the map's bottom-right corner, whatever panels the page adds
-      st.left=m.right-W-56; st.top=m.bottom-H-40; }
-    // ...and inside the map, whatever screen it was placed on before
-    st.left=Math.max(m.left, Math.min(m.right-W, st.left)); st.top=Math.max(m.top, Math.min(m.bottom-H, st.top));
-    Object.assign(w.style, {left:st.left+"px", top:st.top+"px", right:"auto", bottom:"auto"});
-  };
   let last=null, btn=null;                   // the latest road selection: {name, url}
   const esc=t=>String(t).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);
   const show=()=>{
@@ -379,24 +409,6 @@ if(_svWindow){
     document.dispatchEvent(new CustomEvent("rs:streetviewchange", {detail:{open:!!on}}));
   };
   bar.lastChild.onclick=()=>rsSetStreetView(false);
-  bar.addEventListener("pointerdown", e=>{    // drag by the title bar
-    if(e.target.tagName==="BUTTON") return;
-    const r=w.getBoundingClientRect(), dx=e.clientX-r.left, dy=e.clientY-r.top;
-    bar.setPointerCapture(e.pointerId); w.classList.add("rs-drag");   // the iframe mustn't swallow it
-    // inside the MAP, not the browser window: a page's side panel covers the rest, and a window
-    // dragged under it could not be reached again
-    const mv=ev=>{ const m=map.getContainer().getBoundingClientRect();
-                   st.left=Math.max(m.left, Math.min(m.right-w.offsetWidth, ev.clientX-dx));
-                   st.top=Math.max(m.top, Math.min(m.bottom-30, ev.clientY-dy));
-                   Object.assign(w.style, {left:st.left+"px", top:st.top+"px", right:"auto", bottom:"auto"}); };
-    bar.addEventListener("pointermove", mv);
-    bar.addEventListener("pointerup", ()=>{ bar.removeEventListener("pointermove", mv);
-      w.classList.remove("rs-drag"); save(); }, {once:true});
-  });
-  new ResizeObserver(()=>{ if(!w.hidden && innerWidth>520){ st.w=w.offsetWidth; st.h=w.offsetHeight; save(); } }).observe(w);
-  // THE MAP CHANGED SIZE (a side panel shown again, the browser narrowed): pull the window back
-  // inside it, or it sits under the panel where no one can reach it
-  map.on("resize", ()=>{ if(!w.hidden && innerWidth>520){ place(); save(); } });
   map.addControl({onAdd(){
     const d=document.createElement("div"); d.className="maplibregl-ctrl maplibregl-ctrl-group";
     btn=document.createElement("button"); btn.type="button"; btn.title="Street View";
@@ -411,6 +423,107 @@ if(_svWindow){
   if(st.open) map.once("load", ()=>rsSetStreetView(true));
 }
 window.rsSetStreetView = rsSetStreetView;
+// GOOGLE 3D window (google_3d=True, with a key): Google's photorealistic 3D view in a floating window,
+// opened by its map button (or rsSetGoogle3D(true)). Its camera and the map's are linked both ways:
+// center = center, bearing = heading, pitch = tilt, and zoom <-> range (the metres from Google's camera
+// to its center: the map's own camera distance at that zoom). A clicked road is drawn in the 3D view
+// and the camera flies along it (the map follows). Google's 3D map exists only while the window is
+// open: closing it drops it, as nothing is loaded from Google while it is closed.
+const _g3d = __GOOGLE_3D__;
+function rsSetGoogle3D(){}
+if(_g3d){
+  const w=document.createElement("div"); w.className="rs-svw rs-g3d"; w.hidden=true;
+  w.innerHTML='<div class="rs-svw-bar"><span class="rs-svw-t">Google 3D</span>'+
+    '<button type="button" title="Close">✕</button></div><div class="rs-svw-msg"></div>';
+  document.body.appendChild(w);
+  const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg");
+  const {st, save, place}=_rsFloat(w, bar, "rs-google-3d-window", true);
+  let m3=null, lib=null, line=null, btn=null, lastMap=0, queued=false;
+  const say=html=>{ msg.innerHTML=html; msg.hidden=false; if(m3){ m3.remove(); m3=null; line=null; } };
+  const SETUP='<a href="https://khoshkhah.github.io/roadstyle/guides/google-key/" target="_blank" rel="noopener">How to set up the key ↗</a>';
+  const prevAuth=window.gm_authFailure;       // Google calls this when it refuses the key on this address
+  window.gm_authFailure=()=>{ if(prevAuth) prevAuth();
+    say("<b>Google refused the key on this page.</b><span>Add <code>"+location.origin+"/*</code> to the key's Websites list.</span>"+SETUP); };
+  // the camera link
+  const rad=d=>d*Math.PI/180, EARTH=40075016.686;
+  const camPx=()=>map.getCanvas().clientHeight/2/Math.tan(rad(map.getVerticalFieldOfView())/2);  // the map's camera to its center, px
+  const toGoogle=()=>{ const c=map.getCenter();
+    return {center:{lat:c.lat, lng:c.lng, altitude:0}, heading:(map.getBearing()+360)%360, tilt:map.getPitch(),
+            range:camPx()*EARTH*Math.cos(rad(c.lat))/(512*Math.pow(2, map.getZoom()))}; };
+  const toMap=()=>{ const c=m3.center;
+    return {center:[c.lng, c.lat], bearing:m3.heading||0, pitch:m3.tilt||0,
+            zoom:Math.log2(EARTH*Math.cos(rad(c.lat))*camPx()/(512*m3.range))}; };
+  const turn=(a, b)=>Math.abs(((a-b)%360+540)%360-180);
+  const there=t=>{ const c=map.getCenter();     // the map is already at t: Google's change came from the map
+    return Math.abs(c.lng-t.center[0])<1e-7 && Math.abs(c.lat-t.center[1])<1e-7 && turn(map.getBearing(), t.bearing)<0.05 &&
+           Math.abs(map.getPitch()-Math.min(t.pitch, map.getMaxPitch()))<0.05 && Math.abs(map.getZoom()-t.zoom)<0.002; };
+  map.on("move", e=>{                          // the map moved (mouse, keys, buttons): Google follows
+    if(!m3 || e.rsG3d) return;
+    lastMap=performance.now(); Object.assign(m3, toGoogle()); });
+  const fromGoogle=()=>{                       // Google moved: the map follows, once a frame
+    if(queued) return; queued=true;
+    requestAnimationFrame(()=>{ queued=false;
+      // Google's late reports of a map move would pull the map back while it is dragged
+      if(!m3 || !m3.center || !m3.range || performance.now()-lastMap<300) return;
+      const t=toMap(); if(!there(t)) map.jumpTo(t, {rsG3d:true}); }); };
+  // THE MAP'S CENTER BESIDE THE WINDOW: while the window is open, the map's padding puts its center (the
+  // point the two cameras share, where a clicked road comes to) in the middle of the map's free side, so
+  // the window does not cover it. Phones keep the plain center: there the window docks at the bottom.
+  const pad=()=>{
+    const m=map.getContainer().getBoundingClientRect(), r=w.getBoundingClientRect(), p={...map.getPadding(), left:0, right:0};
+    if(!w.hidden && innerWidth>520){
+      if(r.left+r.width/2 < m.left+m.width/2) p.left=Math.max(0, r.right-m.left);
+      else p.right=Math.max(0, m.right-r.left); }
+    const o=map.getPadding();
+    if(Math.abs(o.left-p.left)>1 || Math.abs(o.right-p.right)>1) map.easeTo({padding:p, duration:300});
+  };
+  new ResizeObserver(pad).observe(w);          // opened, closed or resized
+  bar.addEventListener("pointerup", pad);      // dragged
+  map.on("resize", pad);
+  const open=()=>{
+    if(location.protocol==="file:"){
+      say("<b>Google 3D needs this page served, not opened from disk.</b>"+
+          "<span>Run <code>python -m http.server</code> in its folder and open it from an address in the key's Websites list.</span>"+SETUP);
+      return; }
+    msg.textContent="Loading Google 3D…"; msg.hidden=false;
+    _gmLoad(_svKey).then(()=>google.maps.importLibrary("maps3d")).then(l=>{
+      if(w.hidden || m3) return;               // closed while it loaded
+      lib=l; m3=new l.Map3DElement(Object.assign(toGoogle(), {mode:l.MapMode.HYBRID}));
+      for(const ev of ["gmp-centerchange", "gmp-headingchange", "gmp-tiltchange", "gmp-rangechange"]) m3.addEventListener(ev, fromGoogle);
+      msg.hidden=true; w.appendChild(m3);
+    }).catch(e=>{ console.warn("rs google 3d:", e); say("<b>Google 3D did not load.</b><span>"+String(e.message||e)+"</span>"+SETUP); });
+  };
+  document.addEventListener("rs:select", e=>{  // a road: draw it in the 3D view and fly along it
+    const d=e.detail; if(d.overlay || !m3) return;
+    const F=_feats(), cs=_svLine((F && F[d.id]) || _svTiled(d.id)); if(cs.length<2) return;
+    const p=d.properties||{}; ttl.textContent=p.name||p.highway||"Unnamed road";
+    if(line) line.remove();
+    line=new lib.Polyline3DElement({path:cs.map(c=>({lat:c[1], lng:c[0]})), strokeColor:__SELECT_COLOR__, strokeWidth:8,
+                                    outerColor:"#ffffff", outerWidth:0.3, drawsOccludedSegments:true});
+    m3.appendChild(line);
+    const dist=_svDist(cs), len=dist[dist.length-1], mid=_svAt({geometry:{type:"LineString", coordinates:cs}}, len/2);
+    m3.flyCameraTo({endCamera:{center:{lat:mid.lat, lng:mid.lng, altitude:0}, heading:mid.h, tilt:62, range:Math.max(180, len*1.6)},
+                    durationMillis:1500});
+  });
+  rsSetGoogle3D=function(on){
+    w.hidden=!on;
+    if(on){ if(innerWidth>520) place(); if(!m3) open(); }
+    else { if(m3){ m3.remove(); m3=null; line=null; } ttl.textContent="Google 3D"; }
+    st.open=!!on; save(); if(btn) btn.classList.toggle("rs-on", !!on);
+    document.dispatchEvent(new CustomEvent("rs:google3dchange", {detail:{open:!!on}}));
+  };
+  bar.lastChild.onclick=()=>rsSetGoogle3D(false);
+  map.addControl({onAdd(){
+    const d=document.createElement("div"); d.className="maplibregl-ctrl maplibregl-ctrl-group";
+    btn=document.createElement("button"); btn.type="button"; btn.title="Google 3D";
+    btn.innerHTML='<svg viewBox="0 0 24 24" width="17" height="17" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">'+
+      '<path d="M12 3 4 7.5v9L12 21l8-4.5v-9z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/></svg>';
+    btn.onclick=()=>rsSetGoogle3D(w.hidden);
+    d.appendChild(btn); return d;
+  }, onRemove(){}});
+  if(st.open) map.once("load", ()=>rsSetGoogle3D(true));
+}
+window.rsSetGoogle3D = rsSetGoogle3D;
 // base-layer switching: window.rsSetBasemap(key|index) is the API (swaps the raster source's
 // tiles; the road layers stay put); the dropdown is just UI over it and stays in sync.
 // A tile-less entry (blank) hides the raster layer and shows the plain background colour.

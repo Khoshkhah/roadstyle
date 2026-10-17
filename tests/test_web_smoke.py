@@ -136,6 +136,31 @@ def test_map_boots_with_street_view_window_left_open(tmp_path):
     assert reopened
 
 
+def test_google_3d_window_opens_with_the_street_view_window(tmp_path):
+    """google_3d=True: its map button opens its window next to the Street View window; from disk it says the page must be served
+    (Google refuses a key there), and nothing on the page throws. The camera link reads the map's field of view."""
+    from roadstyle.render_web import render
+
+    path = tmp_path / "g3d.html"
+    render(_edges(), basemap="blank", google_3d=True, street_view_key="AIzaTEST").save(path)
+    errors = []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && window.map.loaded()", timeout=30_000)
+        page.click("button[title='Google 3D']")
+        page.evaluate("rsSetStreetView(true)")
+        state = page.evaluate("""() => { const g = document.querySelector('.rs-g3d');
+            return {open: !g.hidden, text: g.querySelector('.rs-svw-msg').textContent, sv: !document.querySelector('.rs-svw:not(.rs-g3d)').hidden,
+                    fov: typeof map.getVerticalFieldOfView}; }""")
+        browser.close()
+
+    assert errors == []
+    assert state["open"] and state["sv"] and "served" in state["text"] and state["fov"] == "function"
+
+
 def test_basemap_switch_rebuilds_source_with_its_maxzoom(tmp_path):
     """rsSetBasemap rebuilds the raster source (maxzoom and attribution are fixed at creation) and
     puts the layer back in the same place, under the roads."""

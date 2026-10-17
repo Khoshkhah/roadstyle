@@ -143,7 +143,8 @@ setting, or a name the page does not have, is an error.
 | keyword | default | backends | what |
 |---|---|---|---|
 | `street_view` | `"window"` | web | `"window"` = a map button and a floating window that follows the clicked road; `True` = a link in the popup; `False` = none. Needs the page served over http(s) ([guide](../guides/street-view.md)) |
-| `street_view_key` | env `GOOGLE_MAPS_KEY` | web | a Google Maps JavaScript API key for the window: its bar offers Linked (a panorama; the map marker walks with the viewer) and Classic (the embed). Written into the page; restrict it to your site's addresses |
+| `street_view_key` | env `GOOGLE_MAPS_KEY` | web | a Google Maps JavaScript API key for the window: its bar offers Linked (a panorama; the map marker walks with the viewer) and Classic (the embed). Written into the page; restrict it to your site's addresses ([Set up a Google key](../guides/google-key.md)) |
+| `google_3d` | `False` | web | `True`: a Google 3D button and a floating window with Google's photorealistic 3D view; its camera and the map's move together, and a clicked road is drawn in it. Needs `street_view_key` (an error without it) ([guide](../guides/google-3d.md)) |
 
 ### Camera & 3D
 

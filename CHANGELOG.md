@@ -7,8 +7,17 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`google_3d=True`: a Google 3D window.** A map button opens Google's photorealistic 3D view in a floating window. Its camera and the
+  map's move together (center, turn, tilt, zoom), and a clicked road is drawn in it. While it is open, the map's center moves beside it. It uses the Street View key (`street_view_key`,
+  default env `GOOGLE_MAPS_KEY`); without a key it is an error. JS: `rsSetGoogle3D(on)`, event `rs:google3dchange`. Default `False`.
+- **A guide to set up the Google key** (`docs/guides/google-key.md`): billing, the Maps JavaScript API, the Websites list and the API
+  restriction, with the console errors and their causes. The Street View and Google 3D guides link to it.
 - **`data_maxzoom=`:** the last zoom MapLibre cuts the page's GeoJSON sources into tiles at. Above it, MapLibre enlarges those tiles and does
   not cut them again at each zoom step. Default `None`: MapLibre's own.
+
+### Changed
+- **One loader for Google's script:** the Street View window, the Street View page and the Google 3D window share it, because a page can
+  load Google's script only once.
 
 ### Fixed
 - **A solver stage at its time limit never fails the solve:** there is always an answer, so a stage stopped before it found one keeps
