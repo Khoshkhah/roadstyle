@@ -4,11 +4,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.22.0] — 2026-10-17
 
 ### Added
 - **`google_3d=True`: a Google 3D window.** A map button opens Google's photorealistic 3D view in a floating window. Its camera and the
-  map's move together (center, turn, tilt, zoom), and a clicked road is drawn in it. While it is open, the map's center moves beside it. A map kept inside a box (`map.setMaxBounds`) keeps the 3D camera in the same box. It uses the Street View key (`street_view_key`,
+  map's move together (center, turn, tilt, zoom), and a clicked road is drawn in it. While it is open, the map's center moves beside it. Where the map cannot follow (its `maxBounds` box, its maximum pitch), the 3D view goes back to the map's camera. It uses the Street View key (`street_view_key`,
   default env `GOOGLE_MAPS_KEY`); without a key it is an error. JS: `rsSetGoogle3D(on)`, event `rs:google3dchange`. Default `False`.
 - **A live map in the docs** (`maps/live.html`): Södermalm with every control, Google 3D and a *Colour by* menu (road class, speed limit,
   lanes), kept inside Södermalm. The docs build reads the Google key from the repo secret `GOOGLE_MAPS_KEY`.
