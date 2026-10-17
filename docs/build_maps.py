@@ -6,7 +6,8 @@ Run from the repo root::
 
 They are not committed: the docs workflow (.github/workflows/docs.yml) builds them before
 ``mkdocs build``, with the CARTO key from the repo secret ``CARTO_API_KEY`` so the base map carries
-no "API KEY REQUIRED" watermark. Locally, set ``CARTO_API_KEY`` first. Each is a self-contained map the manual embeds in an ``<iframe>``. They use the bundled sample
+no "API KEY REQUIRED" watermark, and with the Google key from the secret ``GOOGLE_MAPS_KEY`` (the live map's
+Google 3D window, Street View's Linked mode). Locally, set ``CARTO_API_KEY`` and ``GOOGLE_MAPS_KEY`` first. Each is a self-contained map the manual embeds in an ``<iframe>``. They use the bundled sample
 edges (``notebooks/data/sodermalm_edges.gpkg``) with a couple of seeded columns so the data-driven
 demos look real.
 """
@@ -90,17 +91,23 @@ html = rs.render_street_view(g, name="Roads and Street View", layout="below").ht
 (OUT / "street_view_below.html").write_text(html.replace("</body>", OPEN_ON + "</body>", 1),
                                                encoding="utf-8")
 
-# the live map (README and the docs home link to it): the sample's own columns only, every control on
+# the live map (README and the docs home link to it): the sample's own columns only, every control on,
+# Google 3D too (it needs GOOGLE_MAPS_KEY: without it, render_edges stops with an error)
 live = gpd.read_file(REPO / "notebooks" / "data" / "sodermalm_edges.gpkg").to_crs(4326)
-rs.render_edges(
-    live, backend="web",
+x0, y0, x1, y1 = live.total_bounds
+mx, my = (x1 - x0) * 0.15, (y1 - y0) * 0.15          # a margin round the data
+# the map stays inside Södermalm (and cannot zoom out past it); the Google 3D camera takes the same box
+KEEP_IN = f"<script>map.setMaxBounds([[{x0 - mx:.5f}, {y0 - my:.5f}], [{x1 + mx:.5f}, {y1 + my:.5f}]]);</script>"
+html = rs.render_edges(
+    live, backend="web", google_3d=True,
     color_options={
         "Road class": {},
         "Speed limit": {"color_by": "maxspeed_kmh", "cmap": "plasma", "vmin": 20, "vmax": 60},
         "Lanes": {"color_by": "lanes", "cmap": "viridis", "vmin": 1, "vmax": 4},
     },
     name="roadstyle: live map of Södermalm",
-).save(OUT / "live.html")
+).html
+(OUT / "live.html").write_text(html.replace("</body>", KEEP_IN + "</body>", 1), encoding="utf-8")
 
 for f in sorted(OUT.glob("*.html")):
     print(f"wrote {f.relative_to(REPO)} ({f.stat().st_size // 1024} KB)")

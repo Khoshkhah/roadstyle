@@ -47,11 +47,17 @@ jobs:
       # need a key, which lives in the repo secret CARTO_API_KEY. It is not in git, but it is
       # in the deployed pages (browsers send it with each tile request) - restrict the key
       # to khoshkhah.github.io in the CARTO dashboard.
+      # The Google Maps JavaScript API key (repo secret GOOGLE_MAPS_KEY) is in the pages the same
+      # way: the live map's Google 3D window and the Street View windows' Linked mode use it. Limit
+      # it to https://khoshkhah.github.io/roadstyle/* and to the Maps JavaScript API
+      # (docs/guides/google-key.md).
       - name: Build the live maps
         env:
           CARTO_API_KEY: ${{ secrets.CARTO_API_KEY }}
+          GOOGLE_MAPS_KEY: ${{ secrets.GOOGLE_MAPS_KEY }}
         run: |
           test -n "$CARTO_API_KEY" || { echo "::error::repo secret CARTO_API_KEY is not set"; exit 1; }
+          test -n "$GOOGLE_MAPS_KEY" || { echo "::error::repo secret GOOGLE_MAPS_KEY is not set"; exit 1; }
           python docs/build_maps.py
 
       # First run flips the Pages source from the gh-pages branch to GitHub

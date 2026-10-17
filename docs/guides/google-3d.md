@@ -34,6 +34,8 @@ this in the 3D view, the map follows.
 | pitch (tilt) | tilt |
 | zoom | range: the distance from the camera to the center, in metres |
 
+If the page keeps the map inside a box (`map.setMaxBounds(...)`), the 3D camera stays inside the same box.
+
 Some differences stay:
 
 - The map tilts to 70° only (the setting `camera.max_pitch`). Google can tilt more. Then the map
