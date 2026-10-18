@@ -4,7 +4,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.22.1] — 2026-10-17
 
 ### Fixed
 - **Google 3D on a hill:** Google's center is in metres above sea level, and roadstyle gave 0 m, so on high ground (Monaco, 120 m)
