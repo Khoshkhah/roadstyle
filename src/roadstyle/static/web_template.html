@@ -149,6 +149,8 @@ box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px
 .rs-svw-msg code{background:#e6e6e6;padding:1px 4px;border-radius:3px;color:#333}
 .rs-svw.rs-drag iframe,.rs-svw.rs-drag .rs-svw-pano,.rs-svw.rs-drag gmp-map-3d{pointer-events:none}
 .rs-g3d gmp-map-3d{flex:1;width:100%}
+.rs-svw-bar a.rs-g3d-src{color:#9aa3ad;font-size:10px;text-decoration:none;white-space:nowrap}
+.rs-g3d-warn{color:#fbbf24;font-size:11px;white-space:nowrap}
 .maplibregl-ctrl-group button.rs-on{background:#dfe9ff}
 .rs-svm{pointer-events:none}
 @media (max-width:520px){.rs-svw{   /* phones only: a docs column is ~690 px */left:0!important;right:0!important;top:auto!important;bottom:0!important;
@@ -434,6 +436,9 @@ function rsSetGoogle3D(){}
 if(_g3d){
   const w=document.createElement("div"); w.className="rs-svw rs-g3d"; w.hidden=true;
   w.innerHTML='<div class="rs-svw-bar"><span class="rs-svw-t">Google 3D</span>'+
+    '<span class="rs-g3d-warn" hidden title="The ground heights did not load: on a hill, the 3D view can be closer than the map">\u26a0 no ground heights</span>'+
+    '<a class="rs-g3d-src" href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener"'+
+    ' title="Ground heights: Terrain Tiles on AWS (Mapzen; SRTM and other sources)">heights: Mapzen</a>'+
     '<button type="button" title="Close">✕</button></div><div class="rs-svw-msg"></div>';
   document.body.appendChild(w);
   const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg");
@@ -447,8 +452,30 @@ if(_g3d){
   // the camera link
   const rad=d=>d*Math.PI/180, EARTH=40075016.686;
   const camPx=()=>map.getCanvas().clientHeight/2/Math.tan(rad(map.getVerticalFieldOfView())/2);  // the map's camera to its center, px
+  // THE GROUND'S HEIGHT under the center. Google's center is in metres above SEA LEVEL, and the map's
+  // center is on the ground: on a hill (Monaco, 120 m) a center at 0 m was under the ground, and Google's
+  // camera came far too close. The height comes from the free Terrain Tiles on AWS (Terrarium PNGs, no
+  // key, the bare ground): one zoom-14 tile per area, kept; a pixel's color is its height. Until a tile
+  // is in, the last height found holds, and its arrival moves Google to the right height. The sea floor
+  // counts as 0 m: the map's water is at sea level.
+  const DEM_Z=14, dem=new Map(), warn=w.querySelector(".rs-g3d-warn");
+  let lastGround=0;
+  const ground=(lng, lat)=>{
+    const n=2**DEM_Z, x=(lng+180)/360*n, y=(1-Math.log(Math.tan(rad(lat))+1/Math.cos(rad(lat)))/Math.PI)/2*n;
+    const key=DEM_Z+"/"+Math.floor(x)+"/"+Math.floor(y);
+    let t=dem.get(key);
+    if(!t){ t={px:null}; dem.set(key, t);
+      const img=new Image(); img.crossOrigin="anonymous";
+      img.onload=()=>{ const c=document.createElement("canvas"); c.width=c.height=256;
+        const g=c.getContext("2d", {willReadFrequently:true}); g.drawImage(img, 0, 0);
+        t.px=g.getImageData(0, 0, 256, 256).data; if(m3) Object.assign(m3, toGoogle()); };
+      img.onerror=()=>{ warn.hidden=false; console.warn("rs google 3d: no ground heights from", img.src); };
+      img.src="https://s3.amazonaws.com/elevation-tiles-prod/terrarium/"+key+".png"; }
+    if(!t.px) return lastGround;
+    const i=(Math.min(255, Math.floor(x%1*256))+Math.min(255, Math.floor(y%1*256))*256)*4;
+    return lastGround=Math.max(0, t.px[i]*256+t.px[i+1]+t.px[i+2]/256-32768); };
   const toGoogle=()=>{ const c=map.getCenter();
-    return {center:{lat:c.lat, lng:c.lng, altitude:0}, heading:(map.getBearing()+360)%360, tilt:map.getPitch(),
+    return {center:{lat:c.lat, lng:c.lng, altitude:ground(c.lng, c.lat)}, heading:(map.getBearing()+360)%360, tilt:map.getPitch(),
             range:camPx()*EARTH*Math.cos(rad(c.lat))/(512*Math.pow(2, map.getZoom()))}; };
   const toMap=()=>{ const c=m3.center;
     return {center:[c.lng, c.lat], bearing:m3.heading||0, pitch:m3.tilt||0,
@@ -507,7 +534,7 @@ if(_g3d){
                                     outerColor:"#ffffff", outerWidth:0.3, drawsOccludedSegments:true});
     m3.appendChild(line);
     const dist=_svDist(cs), len=dist[dist.length-1], mid=_svAt({geometry:{type:"LineString", coordinates:cs}}, len/2);
-    m3.flyCameraTo({endCamera:{center:{lat:mid.lat, lng:mid.lng, altitude:0}, heading:mid.h, tilt:62, range:Math.max(180, len*1.6)},
+    m3.flyCameraTo({endCamera:{center:{lat:mid.lat, lng:mid.lng, altitude:ground(mid.lng, mid.lat)}, heading:mid.h, tilt:62, range:Math.max(180, len*1.6)},
                     durationMillis:1500});
   });
   rsSetGoogle3D=function(on){

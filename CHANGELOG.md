@@ -4,6 +4,14 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **Google 3D on a hill:** Google's center is in metres above sea level, and roadstyle gave 0 m, so on high ground (Monaco, 120 m)
+  the 3D camera came much closer than the map's. The page now reads the ground height under the center from the free Terrain Tiles
+  on AWS (Mapzen, Terrarium PNGs, no key) and gives it to Google. The window bar credits them; if they do not load, it shows
+  "⚠ no ground heights".
+
 ## [0.22.0] — 2026-10-17
 
 ### Added

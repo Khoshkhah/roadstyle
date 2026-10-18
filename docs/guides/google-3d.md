@@ -34,6 +34,13 @@ this in the 3D view, the map follows.
 | pitch (tilt) | tilt |
 | zoom | range: the distance from the camera to the center, in metres |
 
+Google puts its camera above sea level, and the map is on the ground. So the page reads the
+height of the ground under the center from the free
+[Terrain Tiles on AWS](https://registry.opendata.aws/terrain-tiles/) (Mapzen, no key), and gives it to
+Google. Without it, the 3D view on a hill (Monaco: 120 m) was much closer than the map. The window
+bar shows the credit **heights: Mapzen**. If the heights do not load, the bar shows
+**⚠ no ground heights**: then the 3D view can be too close on a hill.
+
 The map has the last word. If you move the 3D view to a place where the map cannot go, the map stops
 at its limit and the 3D view goes back to the map's camera. This keeps the two views the same when the
 page keeps the map inside a box (`map.setMaxBounds(...)`), and when you tilt more than the map can.

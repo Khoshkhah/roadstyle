@@ -512,6 +512,7 @@ def test_google_3d_window_needs_the_key(monkeypatch):
     h = render_edges(_edges(), backend="web", google_3d=True, street_view_key="AIzaTEST").html
     assert "const _g3d = true;" in h and 'const _svKey = "AIzaTEST";' in h and "window.rsSetGoogle3D = rsSetGoogle3D;" in h
     assert "__GOOGLE_3D__" not in h and "__SELECT_COLOR__" not in h
+    assert "elevation-tiles-prod/terrarium/" in h and "heights: Mapzen" in h     # the ground height under Google's center, credited
     with pytest.raises(ValueError, match="google_3d=True needs"):
         render_edges(_edges(), backend="web", google_3d=True)
 
