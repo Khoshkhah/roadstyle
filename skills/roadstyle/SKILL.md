@@ -88,6 +88,9 @@ m.save("map.html")                        # m.html is the page as a string
 - `google_3d=True` adds a Google 3D button and window (Google's photorealistic 3D view; its camera and the map's
   move together). It needs `street_view_key` (default env `GOOGLE_MAPS_KEY`), else `ValueError`. Key setup:
   `/guides/google-key/` (billing, Maps JavaScript API, Websites list). JS: `rsSetGoogle3D(on)`, `rs:google3dchange`.
+  The map is the judge: where it cannot follow (`map.setMaxBounds`, max pitch) the 3D view goes back to it. The
+  ground height under the center comes from the free Terrain Tiles on AWS (no key; the bar credits "heights: Mapzen",
+  and shows "⚠ no ground heights" if they fail), so hills match too. Online only, like Street View.
 - Colours, widths, casing and camera defaults are settings, not keywords:
   `rs.render_edges(..., settings={"config": {"labels": {"color": "#888"}}})`.
 - Unsure of a keyword? `help(rs.render_edges)` or the parameters page. Don't guess: an unknown

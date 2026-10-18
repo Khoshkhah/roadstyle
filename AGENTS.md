@@ -28,6 +28,11 @@ A consumer project that does not install it runs with `PYTHONPATH=<this repo>/sr
   for its placeholder when a new option seems to do nothing.
 - The road popup and hover tooltip text: `_rfields` (popup/tooltip) and `_rrows` (docked panel)
   in the template; Street View: `_svMeasure` / `_svAt` (the spot on the edge, metres along it), `_svPick` / `_svUrl` / `_svUrlOf`, the marker `_svMark` / `_svMarkPlace` / `_svLanePx`, the window `rsSetStreetView`.
+- Google's script is loaded once for every window by `_gmLoad(key)`; a floating window (drag, size, place, remembered)
+  is `_rsFloat(w, bar, name, left)`. Google 3D (`google_3d=True`, the `if(_g3d)` block): `toGoogle` / `toMap` convert the
+  cameras (zoom <-> range from MapLibre's camera distance), `there` stops echo loops, the map is the judge (it clamps,
+  Google goes back), `ground` reads the ground height from Terrain Tiles (Google's center is above sea level), `pad`
+  moves the map's center beside the window. Check a change on a hill (Monaco), not only on flat Södermalm.
 - The JS side has no unit tests. Check a rendering change in a real browser: `rs.snapshot(m,
   "x.png")` and look at the PNG, or drive the page with Playwright.
 - Gallery and README images: screenshots taken by hand (see `docs/build_gallery.py`, which still makes the report picture).
