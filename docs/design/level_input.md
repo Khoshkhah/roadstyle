@@ -119,6 +119,11 @@ Relations: `meet` (the end `a_end` of `a` is the end `b_end` of `b`: each head i
 `a`'s casing, `start` / `main` / `end`, is over `b`'s fill), `near` (the same, a part that only comes near: with `--near-rules`, kept last) and
 `order` (`a`'s fill after `b`'s where they meet, a wish the solver may give up). A manual `meet` row joins two roads that do not share a point.
 
+**An area of a database** (`make_area(..., db=...)`, `duckosm levels`) keeps `edits.csv`, `heads.csv` and `caps.csv` in that database
+too, so the one file holds everything (2026-10-20). Each solve copies them to `visualization.level_edits`, `level_heads` and `level_caps`
+(the text as it is, the ids BIGINT), and a file the folder does not have removes its table. When you make a new folder for the database,
+`make_area` first writes each file the folder does not have from these tables (`rs.restore_area_inputs`).
+
 ```
 roadstyle-levels make edges.gpkg out/monaco                          # any geo file roadstyle reads
 roadstyle-levels make monaco.duckdb out/monaco --query "SELECT * EXCLUDE (geometry), ST_AsWKB(geometry) AS geometry FROM driving.edges"

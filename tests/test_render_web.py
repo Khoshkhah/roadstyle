@@ -2466,6 +2466,31 @@ def test_an_area_of_a_database_writes_its_result_into_it(tmp_path):
     con.close()
 
 
+def test_an_area_keeps_its_edits_heads_and_caps_in_the_database(tmp_path):
+    """Each solve of a database's area stores edits.csv / heads.csv / caps.csv in visualization.level_*; a new folder of that database
+    gets them back, the text as it was (2026-10-20: one file holds everything)."""
+    pytest.importorskip("scipy")
+    duckdb = pytest.importorskip("duckdb")
+
+    from roadstyle.level_area import make_area, solve_area
+    edges = _edge_world().assign(edge_id=[101, 102, 103, 104])
+    db, area = tmp_path / "area.duckdb", tmp_path / "area.levels"
+    duckdb.connect(str(db)).close()
+    make_area(edges, area, db=db, id_col="edge_id")
+    (area / "heads.csv").write_text("road,start_m,end_m\n101,6.8,\n")
+    (area / "caps.csv").write_text("road,start,end\n102,flat,\n")
+    solve_area(area)
+    con = duckdb.connect(str(db), read_only=True)
+    assert con.execute("SELECT road, start_m, end_m FROM visualization.level_heads").fetchall() == [(101, "6.8", "")]
+    assert {r[0] for r in con.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'visualization'").fetchall()} >= {
+        "level_edits", "level_heads", "level_caps"}
+    con.close()
+    again = tmp_path / "again.levels"
+    make_area(edges, again, db=db, id_col="edge_id")
+    for f in ("edits.csv", "heads.csv", "caps.csv"):
+        assert (again / f).read_text() == (area / f).read_text()
+
+
 def test_heads_and_caps_may_name_either_direction_of_a_road(tmp_path):
     """heads.csv / caps.csv rows name a road by any of its edges, as edits.csv does: an edge running against its road swaps start and end;
     a row naming no road is an error, never left out."""

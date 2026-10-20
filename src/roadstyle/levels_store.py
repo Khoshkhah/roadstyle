@@ -88,10 +88,47 @@ def load_levels(con, edges=None, *, schema=SCHEMA, **expect):
 AREA_COLS = COLS + ("head_start_m", "head_end_m", "cap_start", "cap_end")
 
 
+# a level area's own input, kept in the database too (2026-10-20), so the file holds everything: {file: (table, id columns)}
+AREA_INPUTS = {"edits.csv": ("level_edits", ("a", "b")), "heads.csv": ("level_heads", ("road",)), "caps.csv": ("level_caps", ("road",))}
+
+
+def _save_area_inputs(con, folder, schema):
+    """edits.csv, heads.csv and caps.csv of ``folder`` as tables ``<schema>.level_edits`` / ``level_heads`` / ``level_caps``: the text as it
+    is, the ids BIGINT. A file the folder does not have removes its table."""
+    from pathlib import Path
+
+    import pandas as pd
+    for f, (table, ids) in AREA_INPUTS.items():
+        path = Path(folder) / f
+        if not path.exists():
+            con.execute(f"DROP TABLE IF EXISTS {schema}.{table}")
+            continue
+        df = pd.read_csv(path, dtype=str, keep_default_na=False)
+        con.register("_rs_input_df", df)
+        cast = ", ".join(f'CAST(NULLIF("{c}", \'\') AS BIGINT) AS "{c}"' for c in ids if c in df.columns)
+        con.execute(f"CREATE OR REPLACE TABLE {schema}.{table} AS SELECT * {'REPLACE (' + cast + ')' if cast else ''} FROM _rs_input_df")
+        con.unregister("_rs_input_df")
+
+
+def restore_area_inputs(con, folder, *, schema=SCHEMA):
+    """Write edits.csv, heads.csv and caps.csv into ``folder`` from the database, for each file the folder does not have and the database
+    does. Returns the names of the files written."""
+    from pathlib import Path
+    have = {r[0] for r in con.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = ?", [schema]).fetchall()}
+    written = []
+    for f, (table, _) in AREA_INPUTS.items():
+        path = Path(folder) / f
+        if table in have and not path.exists():
+            Path(folder).mkdir(parents=True, exist_ok=True)
+            con.execute(f"SELECT * FROM {schema}.{table}").df().to_csv(path, index=False)
+            written.append(f)
+    return written
+
+
 def save_area_levels(con, folder, *, schema=SCHEMA):
     """Write a level area's result (``folder``/levels.csv: the four numbers and the ends of every edge, ``roadstyle-levels solve``) to
-    ``<schema>.edge_levels`` and a row saying where it came from to ``<schema>.edge_levels_meta``, replacing both. ``con``: a writable duckdb
-    connection."""
+    ``<schema>.edge_levels`` and a row saying where it came from to ``<schema>.edge_levels_meta``, replacing both, and the area's own input
+    (edits.csv, heads.csv, caps.csv) to ``level_edits`` / ``level_heads`` / ``level_caps``. ``con``: a writable duckdb connection."""
     import datetime
     from pathlib import Path
 
@@ -108,6 +145,7 @@ def save_area_levels(con, folder, *, schema=SCHEMA):
         con.register("_rs_levels_df", df)
         con.execute(f"CREATE OR REPLACE TABLE {schema}.{name} AS SELECT * FROM _rs_levels_df")
         con.unregister("_rs_levels_df")
+    _save_area_inputs(con, folder, schema)
 
 
 def load_area_levels(con, edges, *, schema=SCHEMA):

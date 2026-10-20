@@ -35,10 +35,24 @@ def make_area(edges, folder, db=None, **level_input_kw):
     """The solver's input in ``folder``: roads.parquet and pairs.csv (rs.level_input, written again each run), and an empty edits.csv the
     first time. Which parts of a stack's upper road cross the road under it is decided here, once, with the heads of the folder's heads.csv
     if there is one (else 5 m): a head changed later never needs a solve (2026-10-08). With ``db`` (a .duckdb file), the area belongs to it (area.json): every solve also writes the result into it
-    (``visualization.edge_levels``, rs.save_area_levels), the editor's too. Returns (roads, pairs)."""
+    (``visualization.edge_levels``, rs.save_area_levels), the editor's too, and your edits.csv / heads.csv / caps.csv go into it as
+    ``visualization.level_edits`` / ``level_heads`` / ``level_caps``; a file the folder does not have is written from there first. Returns
+    (roads, pairs)."""
     import roadstyle as rs
 
     folder = Path(folder)
+    if db is not None:                                  # a new folder of a database: your edits, heads and caps from the database
+        import duckdb
+
+        import roadstyle as rs
+        con = duckdb.connect(str(db), read_only=True)
+        try:
+            con.execute("INSTALL spatial; LOAD spatial;")  # a duckOSM file has geometry columns
+            got = rs.restore_area_inputs(con, folder)
+        finally:
+            con.close()
+        if got:
+            print(f"{', '.join(got)}: written from {db} (visualization.level_*)", flush=True)
     if (folder / "heads.csv").exists():
         level_input_kw.setdefault("heads", folder / "heads.csv")
     roads, pairs = rs.level_input(edges, **level_input_kw)

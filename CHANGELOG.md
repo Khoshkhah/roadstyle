@@ -6,6 +6,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **A level area of a database keeps your edits in it.** Each solve copies `edits.csv`, `heads.csv` and `caps.csv` to
+  `visualization.level_edits`, `level_heads` and `level_caps`, so the database file holds everything. A new area folder gets
+  the files back from there (`make_area(..., db=...)`, `rs.restore_area_inputs`).
+
 ### Fixed
 - **The panel search finds a road by its id again when the page sets its own popup fields.** The docked panel's search
   (`popup_mode="panel"`) read only the popup fields, so a page with `road_popup=["name", ...]` and no `edge_id` answered
