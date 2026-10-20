@@ -3470,6 +3470,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             .replace("__ROAD_POPUP__", "true" if popup_on else "false")
             .replace("__ROAD_POPUP_MODE__", json.dumps(mode))
             .replace("__ROAD_POPUP_FIELDS__", json.dumps(popup_fields))
+            .replace("__EDGE_ID_COL__", json.dumps(edge_id_col))
             .replace("__ROAD_TOOLTIP__", json.dumps(road_tooltip))
             .replace("__HOVER_DELAY_MS__", json.dumps(int(hover_delay_ms)))
             .replace("__STREET_VIEW__", "true" if street_view else "false")

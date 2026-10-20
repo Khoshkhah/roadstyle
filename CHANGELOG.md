@@ -4,6 +4,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **The panel search finds a road by its id again when the page sets its own popup fields.** The docked panel's search
+  (`popup_mode="panel"`) read only the popup fields, so a page with `road_popup=["name", ...]` and no `edge_id` answered
+  "no match" for an edge id. It now always reads the id column (`edge_id_col`) and `edge_ref` as well.
+
 ## [0.22.1] — 2026-10-17
 
 ### Fixed

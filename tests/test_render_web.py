@@ -537,6 +537,18 @@ def test_oneway_column_drives_arrows():
     assert flags2 == [True, True]
 
 
+def test_web_panel_search_always_reads_the_id():
+    """The panel search finds a road by its id even when road_popup lists other fields: the id
+    column (edge_id_col) and edge_ref are always searched (a custom list used to hide the id)."""
+    html = render_edges(_edges(), backend="web", road_popup=["name"], popup_mode="panel").html
+    assert '__EDGE_ID_COL__' not in html
+    assert 'const _ID_KEYS = [...new Set(["edge_id", "edge_ref"])]' in html
+    assert '_popupFields.concat(_ID_KEYS' in html
+    other = render_edges(_edges().rename(columns={"edge_id": "eid"}), backend="web",
+                         edge_id_col="eid", popup_mode="panel").html
+    assert 'new Set(["eid", "edge_ref"])' in other
+
+
 def test_web_panel_popup_mode_and_select_events():
     """road_popup="panel" routes the click read-out into the full-height side panel (curated
     fields); popup_mode="panel" does the same while keeping a custom field list; rs:select /
