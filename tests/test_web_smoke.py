@@ -492,3 +492,24 @@ def test_the_class_filter_hides_the_names_and_arrows_of_a_class(tmp_path):
     assert errors == []
     assert steps["0"] == steps["rsSetClasses(RS_CLASSES)"] == ["arrows:Alpha", "arrows:Beta", "labels:Alpha", "labels:Beta"]
     assert steps["rsSetClasses(['A'])"] == ["arrows:Alpha", "labels:Alpha"]
+
+
+def test_a_tilted_map_keeps_its_arrows(tmp_path):
+    """The arrows are placed by road length on screen; the tilt of the 3D view squashed the scale (8 times at zoom 17) and thinned them out."""
+    from roadstyle.render_web import render
+
+    path = tmp_path / "arrows.html"
+    render(_edges(12), basemap="blank").save(path)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 1200, "height": 800})
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && window.map.loaded()", timeout=30_000)
+        page.evaluate("map.jumpTo({center: [18.0055, 59.3005], zoom: 17.3})")
+        page.wait_for_timeout(2500)
+        flat = page.evaluate("map.querySourceFeatures('arrows').length")
+        page.evaluate("map.jumpTo({center: [18.0055, 59.3005], zoom: 17.3, pitch: 55})")
+        page.wait_for_timeout(2500)
+        tilted = page.evaluate("map.querySourceFeatures('arrows').length")
+        browser.close()
+    assert flat > 0 and tilted >= flat * 0.5, (flat, tilted)

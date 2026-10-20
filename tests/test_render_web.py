@@ -1,11 +1,13 @@
 """Web (MapLibre) backend: client-side recolouring via color_options + the recolour hooks."""
 import copy
+import importlib.util
 import json
 import math
 import re
 from pathlib import Path
 
 import geopandas as gpd
+
 import pytest
 from shapely.geometry import LineString
 
@@ -3385,7 +3387,8 @@ def _at_zoom(e, z):
     lambda: render_edges(_edges().assign(bridge=["yes", None, None], oneway=[1, 0, 1]), backend="web", simple=False, arrows=True, labels=True),
     lambda: render_edges(_edge_world(), backend="web", simple=False, minzoom=True),
     lambda: render_edges(_edges().assign(bridge=["yes", None, None]), backend="web", simple=False, view_3d=True),
-    lambda: render_edges(_edge_world(), backend="web", simple=False, tiles=True),
+    pytest.param(lambda: render_edges(_edge_world(), backend="web", simple=False, tiles=True),
+                 marks=pytest.mark.skipif(importlib.util.find_spec("mapbox_vector_tile") is None, reason="tiles need mapbox_vector_tile")),
 ])
 def test_a_page_has_no_road_layer_that_draws_nothing(monkeypatch, make):
     """A road layer is made only where some feature can be drawn by it (MapLibre walks every layer on every frame): a position without a
@@ -4005,6 +4008,7 @@ def test_a_road_drawn_over_another_roads_lanes_is_what_a_click_finds(tmp_path):
 
 def test_line_items_full_look_and_tiles(monkeypatch):
     """The full look keeps the items' own layers; tiles=True carries the item pieces in the simple tile layer; too many items is an error."""
+    pytest.importorskip("mapbox_vector_tile")                       # tiles=True needs it (the `tiles` extra)
     st = _style(_crossing_with_lanes(simple=False).html)
     assert "simple" not in st["sources"] and all("line-opacity" not in l["paint"] or l["paint"]["line-opacity"] == 0.9
                                                   for l in st["layers"] if l.get("source") == "ov0")
@@ -4154,3 +4158,56 @@ def test_a_road_item_with_a_minzoom_shows_from_that_zoom():
     lyr = next(l for l in st["layers"] if l["id"] == "roads-simple")
     assert ["any", ["!", ["has", "__rs_imz"]], [">=", ["zoom"], ["get", "__rs_imz"]]] in lyr["filter"]
     assert [f["properties"].get("__rs_imz") for f in st["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_k"] == 5] == [None, 17.0]
+
+
+def test_a_solve_never_deletes_the_tables_of_your_edits(tmp_path):
+    """The tables are the master (2026-10-20): a folder that has no heads.csv (a new one, or one that lost it) leaves level_heads in the database."""
+    pytest.importorskip("scipy")
+    duckdb = pytest.importorskip("duckdb")
+
+    from roadstyle.level_area import make_area, solve_area
+    edges = _edge_world().assign(edge_id=[101, 102, 103, 104])
+    db, area = tmp_path / "area.duckdb", tmp_path / "area.levels"
+    duckdb.connect(str(db)).close()
+    make_area(edges, area, db=db, id_col="edge_id")
+    (area / "heads.csv").write_text("road,start_m,end_m\n101,6.8,\n")
+    solve_area(area)
+    (area / "heads.csv").unlink()
+    solve_area(area)                                                           # the folder has no heads.csv now
+    con = duckdb.connect(str(db), read_only=True)
+    assert con.execute("SELECT road, start_m FROM visualization.level_heads").fetchall() == [(101, "6.8")]
+    con.close()
+
+
+def test_stored_levels_can_be_read_for_some_of_the_edges(tmp_path):
+    """load_area_levels(subset=True): a map of one mode of the file reads the order that was solved for all of them."""
+    pytest.importorskip("scipy")
+    duckdb = pytest.importorskip("duckdb")
+
+    import roadstyle as rs
+    from roadstyle.level_area import make_area, solve_area
+    edges = _edge_world().assign(edge_id=[101, 102, 103, 104])
+    db, area = tmp_path / "area.duckdb", tmp_path / "area.levels"
+    duckdb.connect(str(db)).close()
+    make_area(edges, area, db=db, id_col="edge_id")
+    solve_area(area)
+    con = duckdb.connect(str(db), read_only=True)
+    full = rs.load_area_levels(con, edges)
+    part = rs.load_area_levels(con, edges.iloc[[3, 1]], subset=True)
+    assert list(part["edge_id"]) == [104, 102]
+    assert list(part["fill_level"]) == [full["fill_level"][3], full["fill_level"][1]]               # the same numbers, in the order asked
+    with pytest.raises(ValueError, match="not edges the stored levels were solved for"):
+        rs.load_area_levels(con, edges.iloc[:2].assign(edge_id=[101, 999]), subset=True)
+    with pytest.raises(ValueError, match="not the edges"):                                             # without subset: as before
+        rs.load_area_levels(con, edges.iloc[:3])
+    con.close()
+
+
+def test_the_version_is_the_one_of_a_source_tree():
+    """roadstyle imported from a checkout says the version of its pyproject.toml, not that of another installed copy."""
+    import roadstyle as rs
+    root = Path(rs.__file__).resolve().parents[2]
+    if not (root / "pyproject.toml").is_file():
+        pytest.skip("not a source tree")
+    assert rs._source_version() == re.search(r'^version\s*=\s*"([^"]+)"', (root / "pyproject.toml").read_text(), re.M).group(1)
+    assert rs.__version__ == rs._source_version()

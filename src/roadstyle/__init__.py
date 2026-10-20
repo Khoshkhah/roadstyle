@@ -102,10 +102,27 @@ def use_settings(*sources) -> None:
     render_web._load_road_model()
 
 
-# Single source of truth is [project] version in pyproject.toml (read from the install metadata).
+def _source_version():
+    """The version in the ``pyproject.toml`` next to ``src/`` when roadstyle is imported from a source checkout (PYTHONPATH=.../src), else ``None``:
+    the metadata of another, older installed copy must not win there (it said 0.17.1 for a 0.22.1 tree)."""
+    import re
+    from pathlib import Path
+    p = Path(__file__).resolve().parents[2] / "pyproject.toml"
+    if not p.is_file():
+        return None
+    text = p.read_text(encoding="utf-8")
+    if not re.search(r'^name\s*=\s*"roadstyle"', text, re.M):
+        return None
+    m = re.search(r'^version\s*=\s*"([^"]+)"', text, re.M)
+    return m.group(1) if m else None
+
+
+# Single source of truth is [project] version in pyproject.toml: read from the source tree, else from the install metadata.
 try:
-    from importlib.metadata import version as _pkg_version
-    __version__ = _pkg_version("roadstyle")
+    __version__ = _source_version()
+    if __version__ is None:
+        from importlib.metadata import version as _pkg_version
+        __version__ = _pkg_version("roadstyle")
 except Exception:                                    # running from a bare source tree
     __version__ = "0+unknown"
 

@@ -1235,7 +1235,9 @@ function _rsArrows(){
   if(map.getZoom() >= 15){
     const bb = map.getBounds(), W = bb.getWest(), E = bb.getEast(), S = bb.getSouth(), N = bb.getNorth();
     const ctr = map.getCenter(), kx = Math.cos(ctr.lat * Math.PI / 180);   // degrees of longitude to the scale of latitude
-    const pxPerDeg = Math.abs(map.project([ctr.lng, ctr.lat + 0.01]).y - map.project(ctr).y) / 0.01;
+    // pixels per degree of latitude at the center, from the zoom: the projection of a tilted (3D) map squashes the vertical pixels (8 times at zoom 17),
+    // and every road looked too short for an arrow
+    const pxPerDeg = 111320 / (78271.51696 * Math.cos(ctr.lat * Math.PI / 180) / Math.pow(2, map.getZoom()));
     const mainOnly = map.getZoom() < _RS_ARROW.mainBelow;
     const vis = new Map(), pieces = new Map();                   // chain -> its visible parts [{slot, lo, hi}] / its pieces [{slot, c, cum, len, p}]
     for(const f of _sfeats("slots")){

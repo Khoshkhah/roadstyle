@@ -7,11 +7,19 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`load_area_levels(con, edges, subset=True)`** reads the stored order for some of the edges it was solved for (a map of one mode of the file).
 - **A level area of a database keeps your edits in it.** Each solve copies `edits.csv`, `heads.csv` and `caps.csv` to
   `visualization.level_edits`, `level_heads` and `level_caps`, so the database file holds everything. A new area folder gets
   the files back from there (`make_area(..., db=...)`, `rs.restore_area_inputs`).
 
 ### Fixed
+- **A solve never deletes the tables of your edits.** A folder without `heads.csv` or `caps.csv` (a new one, or one that lost the file)
+  dropped `visualization.level_heads` / `level_caps` of the database at the next solve. The tables are the master: a missing file leaves its table.
+- **The arrows of a tilted (3D) map.** They were placed by road length on screen, measured from the vertical pixels, which the tilt squashes
+  (8 times at zoom 17): almost every road looked too short and the 3D view kept a few arrows. The scale now comes from the zoom and the latitude.
+- **`roadstyle.__version__` from a source checkout** (`PYTHONPATH=.../src`) is the version of its `pyproject.toml`, not of another installed copy.
+- A test that needs the optional `mapbox_vector_tile` is skipped without it.
+
 - **The panel search finds a road by its id again when the page sets its own popup fields.** The docked panel's search
   (`popup_mode="panel"`) read only the popup fields, so a page with `road_popup=["name", ...]` and no `edge_id` answered
   "no match" for an edge id. It now always reads the id column (`edge_id_col`) and `edge_ref` as well.

@@ -94,14 +94,13 @@ AREA_INPUTS = {"edits.csv": ("level_edits", ("a", "b")), "heads.csv": ("level_he
 
 def _save_area_inputs(con, folder, schema):
     """edits.csv, heads.csv and caps.csv of ``folder`` as tables ``<schema>.level_edits`` / ``level_heads`` / ``level_caps``: the text as it
-    is, the ids BIGINT. A file the folder does not have removes its table."""
+    is, the ids BIGINT. A file the folder does not have leaves its table as it is."""
     from pathlib import Path
 
     import pandas as pd
     for f, (table, ids) in AREA_INPUTS.items():
         path = Path(folder) / f
-        if not path.exists():
-            con.execute(f"DROP TABLE IF EXISTS {schema}.{table}")
+        if not path.exists():                       # the tables are the master: a folder without the file does not delete them (2026-10-20)
             continue
         df = pd.read_csv(path, dtype=str, keep_default_na=False)
         con.register("_rs_input_df", df)
@@ -148,10 +147,11 @@ def save_area_levels(con, folder, *, schema=SCHEMA):
     _save_area_inputs(con, folder, schema)
 
 
-def load_area_levels(con, edges, *, schema=SCHEMA):
+def load_area_levels(con, edges, *, schema=SCHEMA, subset=False):
     """``edges`` (a table with ``edge_id``) with the columns of a level area's result stored by ``save_area_levels``: the four numbers and
     each edge's ends (``head_start_m``, ``head_end_m``, ``cap_start``, ``cap_end``). A ``ValueError`` if nothing is stored, if it is not from a
-    level area, or if ``edges`` are not the edges it was solved for; nothing is recomputed."""
+    level area, or if ``edges`` are not the edges it was solved for; nothing is recomputed. ``subset=True``: ``edges`` may be some of the edges it was
+    solved for (a map of one mode of the file: the order was solved for all of them together); an edge it has no row for is an error."""
     import pandas as pd
     try:
         meta = con.execute(f"SELECT * FROM {schema}.edge_levels_meta").df().iloc[0]
@@ -160,7 +160,13 @@ def load_area_levels(con, edges, *, schema=SCHEMA):
     if meta.get("source") != "area":
         raise ValueError("the stored levels are not from a level area (an older table): make and solve its level area again")
     ids = _ids(edges)
-    if len(ids) != int(meta["n_edges"]) or _hash(ids) != meta["edge_hash"]:
+    if subset:
+        stored = set(con.execute(f"SELECT edge_id FROM {schema}.edge_levels").df()["edge_id"])
+        missing = [i for i in ids if i not in stored]
+        if missing:
+            raise ValueError(f"{len(missing)} of the edges are not edges the stored levels were solved for (for example {missing[0]}): "
+                             f"make and solve the level area again ({meta['area']})")
+    elif len(ids) != int(meta["n_edges"]) or _hash(ids) != meta["edge_hash"]:
         raise ValueError(f"the edges are not the edges the stored levels were solved for ({len(ids)} given, {int(meta['n_edges'])} stored, "
                          f"or other edge_id values): make and solve the level area again ({meta['area']})")
     merged = pd.DataFrame({"edge_id": ids}).merge(con.execute(f"SELECT * FROM {schema}.edge_levels").df(), on="edge_id", how="left")
