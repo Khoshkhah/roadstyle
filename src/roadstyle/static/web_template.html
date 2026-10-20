@@ -204,7 +204,10 @@ function _sideInit(){
   function _sideSearch(q){
     q=(q||"").trim().toLowerCase();
     if(q.length<2){ qres.innerHTML=""; return; }
-    const only=(_popupFields&&_popupFields.length)?_popupFields:null, info=[];
+    // the road's id is ALWAYS searched, whatever the popup lists: a page with its own popup fields
+    // (road_popup=[...] without edge_id) found no road by its id, the one search a review needs
+    const only=(_popupFields&&_popupFields.length)
+      ?_popupFields.concat(_ID_KEYS.filter(function(k){ return _popupFields.indexOf(k)<0; })):null, info=[];
     const ids=rsQuery(function(p){
       const ks=only||Object.keys(p);
       for(const k of ks){ if(k[0]==="_"||k==="lvl") continue;
@@ -1401,6 +1404,7 @@ function _rrows(p, only){   // the side panel's layout: big name, then aligned k
   return (name ? '<div class="rs-name">'+name+'</div>' : "")+
     kv.map(([k,s])=>'<div class="rs-kv"><span>'+k+'</span><b>'+s+'</b></div>').join(""); }
 const _popupFields = __ROAD_POPUP_FIELDS__;   // curated field list, or null => all columns
+const _ID_KEYS = [...new Set([__EDGE_ID_COL__, "edge_ref"])];   // the road's id fields: the panel search always reads them
 // GOOGLE STREET VIEW of the clicked edge (the window, the side-by-side page, or a plain link),
 // looking the way the edge runs. A plain maps URL, no API key; where it stands is below.
 const _streetView = __STREET_VIEW__;
