@@ -4,7 +4,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.22.2] — 2026-10-20
 
 ### Added
 - **`load_area_levels(con, edges, subset=True)`** reads the stored order for some of the edges it was solved for (a map of one mode of the file).
