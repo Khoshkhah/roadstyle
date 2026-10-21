@@ -166,6 +166,11 @@ const RS_DECK_LAYERS = style.layers.filter(l=>l.id.indexOf("roads-bridge-decks")
 const map = new maplibregl.Map({container:"map", style:style, center:__CENTER__, zoom:13,
   pitch:__PITCH__, bearing:__BEARING__, maxPitch:__MAX_PITCH__,
   attributionControl:{compact:true}});
+// One tile zoom on the whole screen. In a tilted view MapLibre loads the near tiles at a higher zoom than the far ones. A width that
+// depends on the zoom AND on the feature is baked per tile for [tile zoom, tile zoom + 1] and clamped there, so every road changed
+// width where two tile zooms met (a horizontal line across the map). With one tile zoom the bake is exact on the whole screen.
+function _flatTiles(){ Object.keys(style.sources).forEach(id=>{ const s=map.getSource(id); if(s && s.type!=="raster") s.calculateTileZoom=z=>z; }); }
+map.on("styledata", _flatTiles);
 map.addControl(new maplibregl.NavigationControl({visualizePitch:true}));
 map.addControl(new maplibregl.ScaleControl({maxWidth:120, unit:"metric"}), "bottom-left");
 // panel mode: a full-height side panel hosts the map controls (colour-by, road filter, legend,
