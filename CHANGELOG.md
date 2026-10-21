@@ -4,7 +4,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.24.0] — 2026-10-20
 
 ### Added
 - **The style in config files: profiles and palettes** (docs/design/style_config.md). A **palette** holds only colors (road
