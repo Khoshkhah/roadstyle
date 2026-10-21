@@ -4,7 +4,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.23.0] — 2026-10-20
 
 ### Added
 - **`find_control=True` and `rsFind(text)`.** A "Search roads…" box on every page, not only in panel mode. `rsFind(text)` is always defined and returns the ids of
