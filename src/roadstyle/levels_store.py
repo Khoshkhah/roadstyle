@@ -174,3 +174,24 @@ def load_area_levels(con, edges, *, schema=SCHEMA, subset=False):
     for c in AREA_COLS:
         out[c] = merged[c].to_numpy()
     return out
+
+
+LEVEL_KWARGS = dict(casing_start_col="casing_start", casing_level_col="casing_level", casing_end_col="casing_end", fill_level_col="fill_level",
+                    head_start_m_col="head_start_m", head_end_m_col="head_end_m", cap_start_col="cap_start", cap_end_col="cap_end")
+
+
+def stored_levels(db, edges, edge_id_col="edge_id"):
+    """``(edges with the stored level columns, the render_edges keywords that name them)`` for ``render_edges(..., levels_db=db)``. ``db``: a duckOSM file with a level
+    area (``visualization.edge_levels``); ``edges`` may be some of the edges it was solved for (a map of one mode), their ids ``int64`` or text. A ``ValueError`` says
+    what is wrong: no stored levels, or an edge it has no row for."""
+    import duckdb
+    import pandas as pd
+    con = duckdb.connect(str(db), read_only=True)
+    try:
+        got = load_area_levels(con, pd.DataFrame({"edge_id": edges[edge_id_col].to_numpy()}), subset=True)
+    finally:
+        con.close()
+    out = edges.copy()
+    for c in AREA_COLS:
+        out[c] = got[c].to_numpy()
+    return out, dict(LEVEL_KWARGS)

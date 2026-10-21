@@ -1923,7 +1923,7 @@ def _overlay_layers(sid, ov, kind, hover_color="#b388ff", select_color="#7c4dff"
         return [{"id": f"{sid}-circle", "type": "circle", "source": sid, "layout": dict(lay), **zooms,
                  "paint": {"circle-radius": radius, "circle-color": col,
                            "circle-opacity": C["circle_opacity"] if op is None else op,
-                           "circle-stroke-color": C["circle_stroke"], "circle-stroke-width": 1}}]
+                           "circle-stroke-color": ov.outline or C["circle_stroke"], "circle-stroke-width": 1 if ov.width is None else ov.width}}]
     return [{"id": f"{sid}-line", "type": "line", "source": sid, **zooms,
              "layout": {**lay, "line-cap": "butt" if ov.dash else "round"},
              "paint": {"line-color": col, "line-width": width, **dash,
@@ -2068,6 +2068,7 @@ def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4df
                      "visible": getattr(ov, "visible", True),
                      "color": ov.color,
                      "popup": list(ov.popup) if ov.popup is not None else None,
+                     "popup_window": bool(ov.popup_window),
                      "tooltip": list(ov.tooltip) if ov.tooltip else None,
                      "under": ov.placement == "under" and not ov.edge_col,
                      "base": base_filters,              # the layers' own filters (position and order) that rsFilter must keep
@@ -2339,14 +2340,33 @@ def _edge_features(geo, edges, head_m, cols, fcol, slots, items=()):
     return out
 
 
+def _host_panel(html, width, name):
+    """The host page's own panel (``side_panel_html``): full height on the right, with the docked panel's » handle (its « button is a map control, added by the page). Its
+    markup is in the page itself, so a script in it runs; ``--rs-side`` follows the panel, as the docked panel's does."""
+    if html is None:
+        return ""
+    w = int(width)
+    return (f"<style>body{{--rs-side:{w}px}}#map{{right:{w}px}}body.rs-side-hidden{{--rs-side:0px}}body.rs-side-hidden #map{{right:0}}.rs-host{{width:{w}px}}</style>"
+            f'<div class="rs-side rs-host"><div class="rs-side-hd"><span>{_html.escape(name)}</span><span class="rs-side-min" title="Hide panel">&raquo;</span></div>'
+            f'<div class="rs-side-host">{html}</div></div>')
+
+
+_ACCESS = (("private", "#c8c8c8", "Private roads"), ("bus", "#9db8d9", "Bus lanes"),     # access_col: the kinds, their colour and the row's text (as mapstyle's layers.js)
+           ("pedestrian", "#dddde8", "Pedestrian streets"), ("delivery", "#e8d2b0", "Delivery only"))
+
+
 def _mark_cls(geo, feature_lists, fcol):
     """``__rs_cls`` on every piece of a road (docs/design/edge_items.md): its edge's ``fcol`` value. A name or an arrow carries the chain's
     ``highway``, not ``filter_col``: the class filter reads __rs_cls on every piece (the shadows and 3D decks, which cover several edges, are
     decided per edge in the page)."""
     cls_of = [ft["properties"].get(fcol) for ft in geo["features"]]
+    acc_of = [ft["properties"].get("__rs_access") for ft in geo["features"]]      # access_col: the same for the names and arrows
     for fs in feature_lists:
         for ft in fs:
-            ft["properties"]["__rs_cls"] = cls_of[ft["properties"]["__rs_edge"]]
+            i = ft["properties"]["__rs_edge"]
+            ft["properties"]["__rs_cls"] = cls_of[i]
+            if acc_of[i] is not None:
+                ft["properties"]["__rs_access"] = acc_of[i]
 
 
 def _simple_cap():
@@ -2498,7 +2518,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            edge_id_col: str = "edge_id", road_fill: bool = True, cap_col: str = None, cap_start_col: str = None, cap_end_col: str = None, casing_level_col: str = None, fill_level_col: str = None, casing_start_col: str = None, casing_end_col: str = None, head_m: float = 5.0, head_start_m_col: str = None, head_end_m_col: str = None, directed_col: str = None, driving_col: str = None,
            width_m_col: str = None, width_m_zoom: float = 16, casing_m: float = 0.15, casing_min_px: float = 0.0,
            pitch: float = None, bearing: float = None, view_3d: bool = False,
-           arrows: bool = True, labels: bool = True, filter_control: bool = True,
+           arrows: bool = True, labels: bool = True, filter_control: bool = True, find_control: bool = False, overlay_control: bool = True, overlay_popup: bool = True,
+           access_col: str = None, side_panel_html: str = None, host_panel_width: int = 320,
            basemap_switcher: bool = True, zoom_readout: bool = True,
            road_popup=True, road_tooltip=False, hover_delay_ms: int = 300, data_maxzoom: int = None, popup_mode: str = None,
            street_view: bool | str = "window", street_view_key: str | None = None, google_3d: bool = False,
@@ -2547,6 +2568,13 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
       - ``arrows`` — one-way direction chevrons along each one-way edge;
       - ``labels`` — curved street-name labels (from the ``name`` column);
       - ``filter_control`` — a collapsible checkbox panel to show/hide each road class;
+      - ``find_control`` — (default off) a "Search roads…" box in the top-left stack, and the JS ``rsFind(text)`` (always defined) that returns the ids it
+        finds (docs/design/sensor_matching_requests.md; the docked panel has its own box);
+      - ``overlay_control`` — the Layers box of the overlays (default on; ``False`` hides it, ``rsSetOverlay`` still works);
+      - ``overlay_popup`` — ``False``: no overlay shows a click popup (an overlay stays clickable and fires ``rs:select``); one overlay: ``Overlay(popup_window=False)``;
+      - ``access_col`` — a column with ``private`` / ``bus`` / ``pedestrian`` / ``delivery`` (or nothing): such roads get the colour of their value and a row each in the Roads box,
+        and ``rsSetAccess(kind, on)``, ``rsGetAccess()``, ``RS_ACCESS``;
+      - ``side_panel_html`` / ``host_panel_width`` — a full-height panel on the right for the host page, with the docked panel's » handle, « button and ``rsPanelShow(on)``;
       - ``zoom_readout`` — the small "z 13.2" zoom level beside the scale bar (default on);
       - ``basemap_switcher`` — the in-map base-layer dropdown (uses ``basemap`` / ``basemaps``);
       - ``road_popup`` — the info popup shown when a road is clicked (click-to-select is kept either
@@ -2637,7 +2665,14 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         if k in _ignore:
             raise ValueError(f"render_edges takes no {k}: compute the levels first (rs.compute_levels(edges, {k}=...), or rs.level_input + "
                              "rs.solve_levels) and pass casing_level_col / fill_level_col / casing_start_col / casing_end_col")
+    if side_panel_html is not None and mode == "panel":
+        raise ValueError("side_panel_html and popup_mode='panel' are two panels on the right: use one")
     g = gdf.to_crs(4326)
+    if access_col:
+        if access_col not in g.columns:
+            raise ValueError(f"access_col {access_col!r} is not a column of the edges")
+        g = g.copy()
+        g["__rs_access"] = g[access_col].where(g[access_col].isin([a[0] for a in _ACCESS]), None).astype(object)   # ``__rs_*`` goes with every piece (_mark_cls: also with the names and arrows)
     if not (casing_level_col or fill_level_col):       # the only way of drawing: positions, computed here with the level step's defaults
         from .levels import compute_levels
         g = compute_levels(g, layer_col=layer_col, bridge_col=bridge_col, tunnel_col=tunnel_col, method="solve",
@@ -3385,7 +3420,14 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             classes.append(c)
             swatches[c] = p_.get("__rs_fill") or "#888888"
     classes.sort(key=lambda c: (-ROAD_Z.get(_base(c)[0], 4), c))
-    flt = {"on": bool(filter_control and classes), "col": fcol, "classes": classes,
+    access = []
+    if access_col:
+        n = collections.Counter(p.get("__rs_access") for p in (f.get("properties") or {} for f in geo.get("features", [])))
+        access = [[k, c, label, n[k]] for k, c, label in _ACCESS if n[k]]
+        # driving's pedestrian streets that cars may not use have their own row: where no usable road is of the class, a class row would be a second switch for them
+        if n["pedestrian"] and "pedestrian" in classes and not any(not p.get("__rs_access") and p.get(fcol) == "pedestrian" for p in (f.get("properties") or {} for f in geo["features"])):
+            classes.remove("pedestrian")
+    flt = {"on": bool(filter_control and classes), "col": fcol, "classes": classes, "access": access,
            "swatches": swatches,
            # any elevated / below-ground feature ⇒ the panel offers a Bridges / Tunnels on/off row
            # (rsSetBridges / rsSetTunnels)
@@ -3459,6 +3501,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             .replace("__COLOR_OPTIONS__", json.dumps(color_opts_meta or []))
             .replace("__CO_ACTIVE__", str(_active))
             .replace("__OVERLAYS__", json.dumps(ov_meta))
+            .replace("__FIND_CONTROL__", "true" if find_control else "false")
+            .replace("__OVERLAY_CONTROL__", "true" if overlay_control else "false")
+            .replace("__OVERLAY_POPUP__", "true" if overlay_popup else "false")
             .replace("__ROAD_ITEMS__", json.dumps({"label": "items", "popup": items_popup, "layer": "roads-simple"} if road_items is not None else None))
             .replace("__TUNNEL__", json.dumps({"layers": tun_paint, "dash": tun_dash, "casing": tun_casing, "strength": tun_strength,
                                                "palette": CONFIG.tunnel_palette, "palettes": CONFIG.tunnel_palettes,
@@ -3477,7 +3522,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             .replace("__SV_WINDOW__", "true" if street_view == "window" else "false")
             .replace("__SV_WINDOW_KEY__", json.dumps(street_view_key or ""))
             .replace("__GOOGLE_3D__", "true" if google_3d else "false")
-            .replace("__RS_TILED__", "true" if tiles else "false"))
+            .replace("__RS_TILED__", "true" if tiles else "false")
+            .replace("__HOST_PANEL_HTML__", _host_panel(side_panel_html, host_panel_width, name)))     # the last: the host's own text may hold any other token
     if tiles:
         import base64
         setup = (_TILES_JS.replace("__RS_PMTILES_B64__", base64.b64encode(pmt).decode())

@@ -27,12 +27,14 @@ class Overlay:
     kind : ``"fill"`` | ``"line"`` | ``"circle"`` | ``"text"`` — defaults to auto-detect from the geometry (``"text"`` is never detected).
     placement : ``"under"`` (below the roads — e.g. zone fills) or ``"over"`` (on top — e.g. POIs).
     color / opacity : the layer's paint colour and (kind-dependent) default opacity.
-    outline : polygon outline colour (``fill`` only; defaults to ``color``).
+    outline : polygon outline colour (``fill``; defaults to ``color``) or a circle's ring colour (``circle``; defaults to the ``circle_stroke`` setting).
     radius : circle radius in px (``circle`` only).
-    width : line / outline width in px (``line`` / ``fill`` outline).
+    width : line / outline width in px (``line`` / ``fill`` outline), or a circle's ring width (``circle``; default 1).
     label : the name shown in the *Layers* toggle (defaults to ``"Layer N"``).
     popup : property fields to show when a feature is clicked; if set, the layer is interactive.
         Pass ``[]`` for a non-interactive overlay (decoration only).
+    popup_window : ``False``: the overlay stays clickable (it is lit, and ``rs:select`` fires with its fields) but a click shows no popup (and, in
+        panel mode, no read-out). For a host page that shows the record in its own panel. The hover tooltip does not change.
     edge_col / order_col / color_col : an overlay attached to edges (docs/design/edge_overlays.md): ``edge_col`` names the property
         with the id of the feature's edge (the ids of the roads' ``edge_id_col``), ``order_col`` the property with its order (whole
         number, lower first), ``color_col`` a property with a colour per feature. Each feature is drawn at the position of its edge's
@@ -57,6 +59,7 @@ class Overlay:
     label: str | None = None
     popup: list[str] | None = None
     tooltip: list[str] | None = None
+    popup_window: bool = True          # False: clickable and selected, but no floating popup (docs/design/sensor_matching_requests.md)
     visible: bool = True               # initial visibility (the Layers toggle starts checked/unchecked to match)
     edge_col: str | None = None        # the property with the id of the feature's edge: drawn at its edge's fill number (docs/design/edge_overlays.md)
     order_col: str | None = None       # with edge_col: the property with the feature's order (whole number, lower first; null = 0)

@@ -39,6 +39,9 @@ font:13px system-ui,sans-serif;color:#334155;max-height:70%;overflow:auto}
 .flt-ctrl.collapsed .flt-body{display:none}
 .flt-ctrl label{cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px}
 .flt-ctrl label:hover{color:#1a6bd6}
+.rs-find{background:#fff;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);
+  font:13px system-ui,sans-serif;color:#334155;width:230px;box-sizing:border-box}
+.rs-find .rs-side-q-res:empty{display:none}
 /* panel mode: a full-height side panel; the map (and every right-anchored control) shifts left.
    --rs-side is set on <body> so host-page controls can offset themselves the same way. */
 body.rs-panel{--rs-side:320px}
@@ -66,6 +69,7 @@ body.rs-panel #map{right:320px}
 .rs-side-tools{padding:9px 14px;border-bottom:1px solid #ececec;display:none}
 .rs-side-tools:not(:empty){display:block}
 .rs-side-bd{flex:1;overflow:auto;padding:12px 14px}
+.rs-host .rs-side-host{flex:1;overflow:auto}
 .rs-side-hd2{border-top:1px solid #ececec}
 /* the map's own controls, docked: static block cards instead of floating boxes */
 .rs-side-ctl{flex:0 1 auto;min-height:0;max-height:55%;overflow:auto}
@@ -156,7 +160,7 @@ box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px
 @media (max-width:520px){.rs-svw{   /* phones only: a docs column is ~690 px */left:0!important;right:0!important;top:auto!important;bottom:0!important;
   width:auto!important;height:45%!important;border-radius:10px 10px 0 0;resize:none}}
 </style></head><body>
-<div id="map"></div><script>
+<div id="map"></div>__HOST_PANEL_HTML__<script>
 const style = __STYLE__, BASEMAPS = __BASEMAPS__;
 // tiles=True: the roads are an embedded-PMTiles vector source (no inline features) — reads of
 // per-edge data go to the sidecar table (window.RS_SIDE), and roads feature-state needs the
@@ -177,17 +181,63 @@ map.addControl(new maplibregl.ScaleControl({maxWidth:120, unit:"metric"}), "bott
 // host tools) and the selected road's record. Built BEFORE the controls, so they mount into it.
 const _popupMode = __ROAD_POPUP_MODE__;       // "popup" (floating) or "panel" (full-height side panel)
 let _sideBd=null, _sideTab=null, _sideCtl=null;
+const _hostEl=document.querySelector(".rs-host"), _hostKey="rs-host-panel:"+location.pathname;   // side_panel_html: the host page's own panel (docs/design/sensor_matching_requests.md)
+let _sideEl=_hostEl;
 function rsPanelShow(on){                      // hide/unhide the whole panel; the map takes the space
-  if(!_sideBd) return;
+  if(!_sideEl) return;
   document.body.classList.toggle("rs-side-hidden", !on);
   if(_sideTab) _sideTab.style.display = on ? "none" : "block";
+  if(_hostEl) try{ localStorage.setItem(_hostKey, on ? "1" : "0"); }catch(e){}
   try{ map.resize(); }catch(e){}
 }
 window.rsPanelShow = rsPanelShow;
+// FIND: substring over the curated popup fields (or every public prop) — matched against each
+// field's VALUE, or its column NAME when the field is set, so "bridge" finds bridge=yes roads (no
+// value literally contains "bridge"), likewise tunnel/oneway. The road's id is ALWAYS searched,
+// whatever the popup lists: a page with its own popup fields (road_popup=[...] without edge_id)
+// found no road by its id, the one search a review needs. rsFind(text) returns the matching ids
+// (as rsQuery does); the search box of the panel and of find_control=True is UI over it.
+function _findRows(q){
+  q=(q||"").trim().toLowerCase();
+  if(q.length<2) return {ids:[], info:[]};
+  const only=(_popupFields&&_popupFields.length)
+    ?_popupFields.concat(_ID_KEYS.filter(function(k){ return _popupFields.indexOf(k)<0; })):null, info=[];
+  const ids=rsQuery(function(p){
+    const ks=only||Object.keys(p);
+    for(const k of ks){ if(k[0]==="_"||k==="lvl") continue;
+      const v=p[k]; if(v==null) continue; const t=(""+v).toLowerCase();
+      const set=t&&t!=="nan"&&t!=="no"&&t!=="false"&&t!=="none"&&t!=="0";
+      if((t!=="nan"&&t.indexOf(q)>=0)||(k.toLowerCase().indexOf(q)>=0&&set)){ info.push([k, ""+v, p.name!=null?""+p.name:""]); return true; } }
+    return false;
+  });
+  return {ids:ids, info:info};
+}
+function rsFind(text){ return _findRows(text).ids; }
+window.rsFind = rsFind;
+// the box: type, 250 ms later up to 30 rows; a click on a row selects the road (record + highlight,
+// exactly like a map click) and flies to it
+function _findWire(qin, qres){
+  function run(q){
+    const r=_findRows(q), ids=r.ids, info=r.info;
+    if(!ids.length && (q||"").trim().length<2){ qres.innerHTML=""; return; }
+    const n=Math.min(ids.length,30); let h="";
+    for(let i=0;i<n;i++){ const k=info[i][0], v=info[i][1], nm=info[i][2];
+      const lab=(nm&&nm.toLowerCase()!=="nan")?nm:v;
+      h+='<div class="rs-qrow" data-id="'+ids[i]+'"><b>'+lab+'</b><span>'+k+': '+v+'</span></div>'; }
+    if(!ids.length) h='<div class="rs-qmore">no match</div>';
+    else if(ids.length>n) h+='<div class="rs-qmore">'+ids.length+' matches \u2014 showing '+n+'</div>';
+    qres.innerHTML=h;
+    qres.querySelectorAll(".rs-qrow").forEach(function(r){
+      r.onclick=function(){ const id=+r.dataset.id; rsSelect(id); rsFocus(id); }; });
+  }
+  let t=0;
+  qin.oninput=function(){ clearTimeout(t); t=setTimeout(function(){ run(qin.value); },250); };
+  qin.onkeydown=function(e){ if(e.key==="Escape"){ qin.value=""; run(""); } };
+}
 function _sideInit(){
   if(_sideBd || _popupMode!=="panel") return;
   document.body.classList.add("rs-panel");
-  const sd=document.createElement("div"); sd.className="rs-side";
+  const sd=document.createElement("div"); sd.className="rs-side"; _sideEl=sd;
   sd.innerHTML='<div class="rs-side-hd"><span>'+(document.title||"Map")+'</span>'+
     '<span class="rs-side-min" title="Hide panel">&raquo;</span></div>'+
     '<div class="rs-side-q"><input type="search" placeholder="Search roads\u2026" spellcheck="false">'+
@@ -201,39 +251,7 @@ function _sideInit(){
   sd.querySelector(".rs-side-min").onclick=()=>{ rsPanelShow(false); };
   _sideBd=sd.querySelector(".rs-side-bd");
   _sideCtl=sd.querySelector(".rs-side-ctl");
-  // search: substring over the curated popup fields (or every public prop) — matched against each
-  // field's VALUE, or its column NAME when the field is set, so "bridge" finds bridge=yes roads (no
-  // value literally contains "bridge"), likewise tunnel/oneway. 30 rows max; clicking a row selects
-  // the road (record + highlight, exactly like a map click) and flies to it.
-  const qin=sd.querySelector(".rs-side-q input"), qres=sd.querySelector(".rs-side-q-res");
-  function _sideSearch(q){
-    q=(q||"").trim().toLowerCase();
-    if(q.length<2){ qres.innerHTML=""; return; }
-    // the road's id is ALWAYS searched, whatever the popup lists: a page with its own popup fields
-    // (road_popup=[...] without edge_id) found no road by its id, the one search a review needs
-    const only=(_popupFields&&_popupFields.length)
-      ?_popupFields.concat(_ID_KEYS.filter(function(k){ return _popupFields.indexOf(k)<0; })):null, info=[];
-    const ids=rsQuery(function(p){
-      const ks=only||Object.keys(p);
-      for(const k of ks){ if(k[0]==="_"||k==="lvl") continue;
-        const v=p[k]; if(v==null) continue; const t=(""+v).toLowerCase();
-        const set=t&&t!=="nan"&&t!=="no"&&t!=="false"&&t!=="none"&&t!=="0";
-        if((t!=="nan"&&t.indexOf(q)>=0)||(k.toLowerCase().indexOf(q)>=0&&set)){ info.push([k, ""+v, p.name!=null?""+p.name:""]); return true; } }
-      return false;
-    });
-    const n=Math.min(ids.length,30); let h="";
-    for(let i=0;i<n;i++){ const k=info[i][0], v=info[i][1], nm=info[i][2];
-      const lab=(nm&&nm.toLowerCase()!=="nan")?nm:v;
-      h+='<div class="rs-qrow" data-id="'+ids[i]+'"><b>'+lab+'</b><span>'+k+': '+v+'</span></div>'; }
-    if(!ids.length) h='<div class="rs-qmore">no match</div>';
-    else if(ids.length>n) h+='<div class="rs-qmore">'+ids.length+' matches \u2014 showing '+n+'</div>';
-    qres.innerHTML=h;
-    qres.querySelectorAll(".rs-qrow").forEach(function(r){
-      r.onclick=function(){ const id=+r.dataset.id; rsSelect(id); rsFocus(id); }; });
-  }
-  let _qt=0;
-  qin.oninput=function(){ clearTimeout(_qt); _qt=setTimeout(function(){ _sideSearch(qin.value); },250); };
-  qin.onkeydown=function(e){ if(e.key==="Escape"){ qin.value=""; _sideSearch(""); } };
+  _findWire(sd.querySelector(".rs-side-q input"), sd.querySelector(".rs-side-q-res"));
   rsInfoClear();
   try{ map.resize(); }catch(e){}               // #map just lost 320px to the panel
 }
@@ -261,7 +279,8 @@ map.addControl({onAdd(m){
   m.on("pitchend", upd); m.on("pitch", upd); upd();
   d.appendChild(b); return d;
 }, onRemove(){}});
-if(_popupMode==="panel"){    // panel-reopen button: same chrome as 2D, right below it in the stack
+if(_hostEl){ _hostEl.querySelector(".rs-side-min").onclick=()=>{ rsPanelShow(false); }; }
+if(_popupMode==="panel" || _hostEl){    // panel-reopen button: same chrome as 2D, right below it in the stack
   map.addControl({onAdd(){
     const d=document.createElement("div"); d.className="maplibregl-ctrl maplibregl-ctrl-group";
     const b=document.createElement("button"); b.type="button";
@@ -272,6 +291,7 @@ if(_popupMode==="panel"){    // panel-reopen button: same chrome as 2D, right be
     d.appendChild(b); return d;
   }, onRemove(){}});
 }
+if(_hostEl){ let on=innerWidth>700; try{ const v=localStorage.getItem(_hostKey); if(v!=null) on=v==="1"; }catch(e){} if(!on) rsPanelShow(false); }   // remembered per page; a narrow screen starts closed
 // GOOGLE'S MAPS JAVASCRIPT API, loaded once for every window that needs it (Street View's Linked
 // panorama, Google 3D): a page may load Google's script only once
 let _gmLoading=null;
@@ -617,6 +637,8 @@ function _has(expr, ids){ const u=[...new Set(Array.from(ids))].filter(v=>v!=nul
 const _fltCbs={}, _fltBase={};
 let _fltVis=null;   // Set of visible classes; null = all
 let _qIds=null;     // id-set filter from rsFilter; null = off
+const ACCESS = FILTER.access || [];   // access_col: [[kind, colour, label, count], ...] for the kinds the data has (docs/design/sensor_matching_requests.md)
+const _accHid = new Set();            // the access kinds switched off (rsSetAccess)
 let _bridgesOn=true;   // rsSetBridges: hide every elevated (lvl>0) road and its 3D deck ribbons
 let _tunnelsOn=true;   // rsSetTunnels: hide every below-ground (lvl<0) road, its names and arrows
 const _ovIds={};       // an attached overlay's own rsFilter(ids, label) id set, by label (composed with its edges' filter below)
@@ -632,9 +654,9 @@ map.on("load",()=>{ _fltLayers().forEach(l=>{ if(!(l.id in _fltBase)) _fltBase[l
 function _applyRoadFilters(){
   const hidden = _fltVis===null ? [] : FILTER.classes.filter(c=>!_fltVis.has(c)), hid=new Set(hidden), q=_qIds && new Set(_qIds);
   const edgeOn = i=>{ const p=_rprops(i), v=p.lvl||0;
-    return !hid.has(p.__rs_cls) && (_bridgesOn || v<1) && (_tunnelsOn || v>=0) && (!q || q.has(i)); };
+    return !hid.has(p.__rs_cls) && !(p.__rs_access && _accHid.has(p.__rs_access)) && (_bridgesOn || v<1) && (_tunnelsOn || v>=0) && (!q || q.has(i)); };
   const multi = {};   // decks / shadows: the ids of the features with at least one edge shown (null = no switch is on)
-  ["decks","shadows"].forEach(src=>{ multi[src] = !_bridgesOn ? [] : (hidden.length || q || !_tunnelsOn)
+  ["decks","shadows"].forEach(src=>{ multi[src] = !_bridgesOn ? [] : (hidden.length || q || !_tunnelsOn || _accHid.size)
     ? _sfeats(src).map((f,k)=>(f.properties.__rs_edges||[]).some(edgeOn) ? k : -1).filter(k=>k>=0) : null; });
   const and = (f,c)=>f?["all",f,c]:c;
   const qr = q && ["any",_has(["id"],_qIds),_has(["get","__rs_edge2"],_qIds)], qe = q && ["any",_has(["get","__rs_edge"],_qIds),_has(["get","__rs_edge2"],_qIds)];   // once per change
@@ -649,6 +671,7 @@ function _applyRoadFilters(){
     }else{
       const lvl=ov?"__rs_lvl":"lvl";
       if(hidden.length) f=and(f, ["!",["in",["get","__rs_cls"],["literal",hidden]]]);
+      if(_accHid.size) f=and(f, ["!",["in",["coalesce",["get","__rs_access"],""],["literal",[..._accHid]]]]);
       if(!_bridgesOn) f=and(f, ["<",["coalesce",["get",lvl],0],1]);
       if(!_tunnelsOn) f=and(f, [">=",["coalesce",["get",lvl],0],0]);
       if(q) f=and(f, kind==="roads" ? qr : qe);
@@ -804,6 +827,12 @@ function _tlHost(){
   if(!h){ h=document.createElement("div"); h.className="rs-tl"; h.id="rs-tl"; document.body.appendChild(h); }
   return h;
 }
+if(__FIND_CONTROL__ && _popupMode!=="panel"){    // find_control=True: the search box on a page with no docked panel
+  const fb=document.createElement("div"); fb.className="rs-find rs-side-q";
+  fb.innerHTML='<input type="search" placeholder="Search roads\u2026" spellcheck="false"><div class="rs-side-q-res"></div>';
+  _findWire(fb.querySelector("input"), fb.querySelector(".rs-side-q-res"));
+  _tlHost().prepend(fb);
+}
 if(FILTER.on){
   const box=document.createElement("div"); box.className="flt-ctrl";
   const hd=document.createElement("div"); hd.className="flt-hd"; hd.textContent="Roads ▾";
@@ -830,8 +859,27 @@ if(FILTER.on){
       lab.appendChild(cb); lab.appendChild(document.createTextNode(r[2]));
       body.appendChild(lab);
     });
+  // restricted roads (access_col): a row each after Bridges / Tunnels, with the kind's colour
+  ACCESS.forEach((a,i)=>{
+    const lab=document.createElement("label"); lab.className="flt-grade";
+    if(i===0) lab.style.cssText="margin-top:4px;padding-top:4px;border-top:1px solid #ddd";
+    const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=true; cb.id="rs-flt-acc-"+a[0];
+    cb.onchange=()=> rsSetAccess(a[0], cb.checked);
+    const sw=document.createElement("span"); sw.className="flt-sw"; sw.style.background=a[1];
+    lab.appendChild(cb); lab.appendChild(sw); lab.appendChild(document.createTextNode(" "+a[2]));
+    body.appendChild(lab);
+  });
   _tlHost().appendChild(box);
 }
+function rsSetAccess(kind, on){      // show / hide the roads of one access kind
+  on ? _accHid.delete(kind) : _accHid.add(kind); _applyRoadFilters();
+  const cb=document.getElementById("rs-flt-acc-"+kind); if(cb) cb.checked=!!on;
+  document.dispatchEvent(new CustomEvent("rs:filterchange",{detail:{access:kind, visible:!!on}}));
+}
+window.rsSetAccess = rsSetAccess;
+window.rsGetAccess = ()=>Object.fromEntries(ACCESS.map(a=>[a[0], !_accHid.has(a[0])]));
+window.RS_ACCESS = Object.fromEntries(ACCESS.map(a=>[a[0], a[3]]));
+if(ACCESS.length) map.on("load", ()=>{ _applyFill(); });     // the kinds' colours; the page's first paint is the class colours
 // "colour by" recolouring: swap which baked fill prop the road layers read (no re-render). Each
 // option's fill is baked per edge (__rs_fill / __rs_fill__1 …); setPaintProperty repoints the
 // road-fill layers' line-color at the chosen prop. window.rsSetColorField drives it from your UI.
@@ -864,9 +912,11 @@ function coUpdateLegend(){
   if(_coLegendBox) _coLegendBox.style.display = h ? "" : "none";
 }
 let _qColor=null;   // [{ids, color}, ...] recolour groups, layered over the active option
+// a road with an access kind (access_col) has the kind's colour: over the active "colour by" option, under rsColor
+function _accWrap(e){ return ACCESS.length ? ["case",...ACCESS.flatMap(a=>[["==",["get","__rs_access"],a[0]],a[1]]),e] : e; }
 function _fillExpr(idE){
   const prop=(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill";
-  let e=["coalesce",["get",prop],"#888888"];
+  let e=_accWrap(["coalesce",["get",prop],"#888888"]);
   if(_qColor) for(let i=_qColor.length-1;i>=0;i--)   // group 0 outermost -> wins overlaps
     e=["case",["any",_has(idE||["id"],_qColor[i].ids),_has(["get","__rs_edge2"],_qColor[i].ids)],_qColor[i].color,e];
   return e;
@@ -887,7 +937,7 @@ function _applyFill(){
   // second lane's); otherwise it is transparent and the ends look as without caps
   const prop=(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill", none="rgba(0,0,0,0)";
   const same=["==",["get",prop],["get",prop+"__b"]], both=[];
-  let ee=["case",same,["coalesce",["get",prop],"#888888"],none];
+  let ee=["case",same,_accWrap(["coalesce",["get",prop],"#888888"]),none];
   if(_qColor) for(let i=_qColor.length-1;i>=0;i--){
     const b=["all",_has(["get","__rs_edge"],_qColor[i].ids),_has(["get","__rs_edge2"],_qColor[i].ids)];
     both.push(b); ee=["case",b,_qColor[i].color,ee]; }
@@ -983,6 +1033,8 @@ if(COLOR_OPTIONS.some(o=>o.legend)){
 // overlays (zone fills) — and a selected road also reports the interactive overlays under the
 // click (rs:select detail.overlays), so a sidebar can show the road AND its zone together.
 const OVERLAYS = __OVERLAYS__;
+const _OV_POPUP = __OVERLAY_POPUP__;       // overlay_popup=False: no overlay shows a popup (an Overlay's popup_window=False: that one); a click still selects and fires rs:select
+const _ovWin = ov => ov.popup_window!==false && _OV_POPUP;
 let _ovSel=null, _ovHov=null, _ovUnder=null, _ovT=0;      // {source,id} of the selected / lit (hovered) overlay feature; the one under the mouse now
 function _ovState(ref, st){ if(ref) map.setFeatureState({source:ref.source, id:ref.id}, st); }
 function clearOvSel(){ _ovState(_ovSel,{select:false}); _ovSel=null; }
@@ -994,12 +1046,12 @@ function _ovAt(pt){
     if(!ov.interactive) continue;
     const ids = ov.layers.filter(id=>map.getLayer(id));
     const hits = ids.length ? map.queryRenderedFeatures(pt, {layers:ids}) : [];
-    if(hits.length) out.push({label:ov.label, fields:ov.popup, properties:hits[0].properties||{}});
+    if(hits.length) out.push({label:ov.label, fields:ov.popup, properties:hits[0].properties||{}, shown:_ovWin(ov)});
   }
   return out;
 }
 function _ovSections(ovs){                                 // extra popup/panel rows per overlay hit
-  return (ovs||[]).map(o =>
+  return (ovs||[]).filter(o=>o.shown!==false).map(o =>
     '<hr style="border:none;border-top:1px solid #dedede;margin:6px 0">'+
     '<span style="color:#777">'+o.label+'</span><br>'+_rfields(o.properties, o.fields)).join("");
 }
@@ -1014,7 +1066,8 @@ function handleOverlayClick(e, tier){                      // info popup only on
       rsDeselect();                                        // road selection yields to the overlay
       _ovState(_ovSel,{select:false}); _ovSel={source:ov.source, id:f.id}; _ovState(_ovSel,{select:true});
       const fields = ov.popup && ov.popup.length ? ov.popup : Object.keys(p);
-      if(_popupMode==="panel"){   // panel mode: dock the read-out like a road's, no floating popup
+      if(!_ovWin(ov)){ /* popup_window=False: selected and lit, nothing shown */ }
+      else if(_popupMode==="panel"){   // panel mode: dock the read-out like a road's, no floating popup
         rsInfoShow('<div class="rs-name">'+ov.label+'</div>'+_rrows(p, fields));
       }else{
         const rows = fields.filter(k=>p[k]!=null && p[k]!=="").map(k=>"<b>"+k+"</b>: "+p[k]);
@@ -1074,7 +1127,7 @@ function _ovRow(ov){
   lab.appendChild(document.createTextNode(" "+ov.label));
   return lab;
 }
-if(OVERLAYS.length){
+if(OVERLAYS.length && __OVERLAY_CONTROL__){     // overlay_control=False: no Layers box (rsSetOverlay still works)
   // panel mode: overlay toggles join the panel's Roads card, right after its Bridges row — a
   // second floating "Layers" box on the map competes with the panel that hosts everything else.
   // Non-panel keeps the standalone Layers control.
@@ -1685,7 +1738,7 @@ map.on("click", e=>{
     {detail:{id:f.id, layer:f.layer && f.layer.id, properties:props, twin:_twinDetail(props), overlays:ovs, item:item,
              streetView:_svPick(e.lngLat, f, f.id)}}));
   const sv = _sv(e.lngLat, f);
-  if(io){ if(io.interactive){             // the item's own popup (its popup fields), the road's Street View below it
+  if(io){ if(io.interactive && _ovWin(io)){             // the item's own popup (its popup fields), the road's Street View below it
       if(_popupMode === "panel") rsInfoShow('<div class="rs-name">'+io.label+'</div>'+_rrows(item.properties, io.popup) + sv + _ovSections(ovs));
       else new maplibregl.Popup({closeButton:true, maxWidth:"260px"}).setLngLat(e.lngLat)
         .setHTML('<span style="color:#777">'+io.label+'</span><br>'+_rfields(item.properties, io.popup) + sv + _ovSections(ovs)).addTo(map); } }

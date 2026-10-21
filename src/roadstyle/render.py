@@ -62,6 +62,7 @@ def render_edges(
     color_col: str = "color",
     settings=None,
     api_key: str | None = None,
+    levels_db=None,
     **kwargs,
 ):
     """Render styled road edges on a map.
@@ -99,6 +100,9 @@ def render_edges(
       - ``filter_col`` : (web backend) column the filter panel lists/filters by, when it should
         differ from the styling ``highway_col`` — e.g. width/casing follow an OSM-highway proxy
         while the filter lists the source's own road class. Default ``None`` = filter by ``highway_col``.
+      - ``levels_db`` : (web backend) a duckOSM file: the stored drawing order (``visualization.edge_levels``, ``duckosm levels``) is read for these edges, which may be
+        some of the edges it was solved for (one mode of the file); ids ``int64`` or text (``edge_id_col``). Not with level columns of your own. A ``ValueError`` says what is
+        missing: no stored levels, or an edge without a row.
       - ``boundary`` : (web backend) a shapely geometry / GeoDataFrame / GeoJSON mapping drawn as a
         dashed outline on top of the roads (e.g. the area the network was clipped to).
     """
@@ -150,6 +154,14 @@ def render_edges(
     if include is not None or exclude is not None:
         g = filter_edges(g, include=include, exclude=exclude,
                          highway_col=col, match_links=match_links)
+    if levels_db is not None:
+        if backend != "web":
+            raise ValueError("levels_db is for the web backend")
+        if any(kwargs.get(k) for k in ("casing_level_col", "fill_level_col", "casing_start_col", "casing_end_col")):
+            raise ValueError("levels_db and level columns of your own (casing_level_col, fill_level_col, ...) are two drawing orders: use one")
+        from .levels_store import stored_levels
+        g, level_kw = stored_levels(levels_db, g, kwargs.get("edge_id_col", "edge_id"))
+        kwargs = {**kwargs, **level_kw}
     if backend == "folium":
         from .render_folium import render
     elif backend == "lonboard":
