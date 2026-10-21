@@ -184,3 +184,44 @@ def test_side_panel_html_with_docked_panel_is_an_error(tmp_path):
 
     with pytest.raises(ValueError, match="two panels"):
         render(_edges(), basemap="blank", side_panel_html="x", popup_mode="panel")
+
+
+def test_rscolorbase_survives_rscolor(tmp_path):
+    """Issue (b): rsColorBase groups stay under rsColor's own, and rsColor(null) does not clear them."""
+    path = _page(tmp_path, "base")
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        has = "JSON.stringify(map.getPaintProperty('roads-simple','line-color'))"
+        ids = page.evaluate("rsQuery(()=>true)")
+        page.evaluate(f"rsColorBase([[{ids[:2]}, '#00ee00']])")
+        page.evaluate(f"rsColor({ids[2:3]}, '#ee0000')")
+        both = page.evaluate(has)
+        page.evaluate("rsColor(null)")
+        after = page.evaluate(has)
+        page.evaluate("rsColorBase(null)")
+        cleared = page.evaluate(has)
+        browser.close()
+    assert "#00ee00" in both and "#ee0000" in both and "#00ee00" in after and "#ee0000" not in after
+    assert "#00ee00" not in cleared and not errors
+
+
+def test_overlay_hover_lights_one_feature(tmp_path):
+    """Issue (a): features of an overlay that share a number (a property ``id``) are not lit together."""
+    import geopandas as gpd
+    from shapely.geometry import box
+
+    from roadstyle import Overlay
+
+    areas = gpd.GeoDataFrame({"id": [7, 7, 7], "kind": ["b"] * 3}, geometry=[box(18.001 + i * 0.002, 59.30, 18.002 + i * 0.002, 59.301) for i in range(3)], crs=4326)
+    path = _page(tmp_path, "same", overlays=[Overlay(data=areas, label="B", popup=["kind"])])
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        page.evaluate("map.jumpTo({center:[18.004,59.3005], zoom:15, pitch:0, bearing:0})")
+        page.wait_for_timeout(1500)
+        xy = page.evaluate("(()=>{const q=map.project([18.0015,59.3005]); return [q.x,q.y]})()")
+        page.mouse.move(xy[0], xy[1])
+        page.mouse.move(xy[0] + 2, xy[1] + 1)
+        page.wait_for_timeout(1000)
+        lit = page.evaluate("[0,1,2].filter(i=>map.getFeatureState({source:'ov0',id:i}).hover)")
+        browser.close()
+    assert len(lit) == 1 and not errors

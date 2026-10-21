@@ -114,6 +114,8 @@ rs.snapshot(m, "map.png", zoom=15)        # headless screenshot; then view map.p
 | `rsFocus(ids)` | fit the camera |
 | `rsSelect(id)` / `rsDeselect()` | select like a click (glow + popup) |
 | `rsFilter(ids)` / `rsFilter(null)` | show only these / all |
+| `rsFind(text)` | ids of the roads that match a text (an id or a name); `find_control=True` adds the box |
+| `rsColorBase([[ids, c], ...])` | colours under `rsColor`'s own: `rsColor(null)` leaves them (a host's own roads) |
 | `rsGetProps(ids)` | the rows behind the ids |
 | `rsSetBasemap`, `rsSetClasses`, `rsSetColorField`, `rsSetOverlay`, `rsSetView3D` | drive the built-in controls |
 

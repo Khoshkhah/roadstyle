@@ -912,13 +912,16 @@ function coUpdateLegend(){
   if(_coLegendBox) _coLegendBox.style.display = h ? "" : "none";
 }
 let _qColor=null;   // [{ids, color}, ...] recolour groups, layered over the active option
+let _qBase=null;    // rsColorBase: groups UNDER rsColor's (a host's own colours: rsColor(null) and every rsColor call leave them)
+const _qAll=()=>(_qColor||[]).concat(_qBase||[]);     // outermost first
 // a road with an access kind (access_col) has the kind's colour: over the active "colour by" option, under rsColor
 function _accWrap(e){ return ACCESS.length ? ["case",...ACCESS.flatMap(a=>[["==",["get","__rs_access"],a[0]],a[1]]),e] : e; }
 function _fillExpr(idE){
   const prop=(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill";
   let e=_accWrap(["coalesce",["get",prop],"#888888"]);
-  if(_qColor) for(let i=_qColor.length-1;i>=0;i--)   // group 0 outermost -> wins overlaps
-    e=["case",["any",_has(idE||["id"],_qColor[i].ids),_has(["get","__rs_edge2"],_qColor[i].ids)],_qColor[i].color,e];
+  const qa=_qAll();
+  for(let i=qa.length-1;i>=0;i--)   // group 0 outermost -> wins overlaps
+    e=["case",["any",_has(idE||["id"],qa[i].ids),_has(["get","__rs_edge2"],qa[i].ids)],qa[i].color,e];
   return e;
 }
 function _applyFill(){
@@ -938,9 +941,10 @@ function _applyFill(){
   const prop=(COLOR_OPTIONS[_coActive]||{}).prop||"__rs_fill", none="rgba(0,0,0,0)";
   const same=["==",["get",prop],["get",prop+"__b"]], both=[];
   let ee=["case",same,_accWrap(["coalesce",["get",prop],"#888888"]),none];
-  if(_qColor) for(let i=_qColor.length-1;i>=0;i--){
-    const b=["all",_has(["get","__rs_edge"],_qColor[i].ids),_has(["get","__rs_edge2"],_qColor[i].ids)];
-    both.push(b); ee=["case",b,_qColor[i].color,ee]; }
+  const qa=_qAll();
+  for(let i=qa.length-1;i>=0;i--){
+    const b=["all",_has(["get","__rs_edge"],qa[i].ids),_has(["get","__rs_edge2"],qa[i].ids)];
+    both.push(b); ee=["case",b,qa[i].color,ee]; }
   const ec=["case",["any",same,...both],["coalesce",["get","__rs_casing"],"#000000"],none];
   RS_END_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"circle-color",ee); });
   RS_END_CASING_LAYERS.forEach(id=>{ if(map.getLayer(id)) map.setPaintProperty(id,"circle-color",ec); });
@@ -1004,6 +1008,15 @@ function rsColor(ids, color, layer){   // paint an id set one colour; rsColor(nu
       ? {ids:_qColor && _qColor[0].ids, color:_qColor && _qColor[0].color}
       : {groups:_qColor.map(g=>({ids:g.ids, color:g.color}))}}));
 }
+// rsColorBase([[ids, colour], ...]): recolour groups under rsColor's own, for a host that paints its own roads (a restricted road, a
+// picked road) and must not lose them when another caller uses rsColor; rsColorBase(null) clears them. rsColor(null) does not.
+function rsColorBase(groups){
+  _qBase = Array.isArray(groups) ? groups.filter(g=>g&&g[0]!=null&&g[1]).map(g=>({ids:Array.from(g[0]), color:g[1]})) : null;
+  if(_qBase && !_qBase.length) _qBase=null;
+  _applyFill();
+  document.dispatchEvent(new CustomEvent("rs:colorchange",{detail:{base:true, groups:(_qBase||[]).map(g=>({ids:g.ids, color:g.color}))}}));
+}
+window.rsColorBase = rsColorBase;
 window.rsSetColorField = rsSetColorField;
 window.rsColor = rsColor;
 window.RS_COLOR_OPTIONS = COLOR_OPTIONS;

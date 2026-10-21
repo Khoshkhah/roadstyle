@@ -53,6 +53,7 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | `level_input(edges, id_col="edge_id", ...)` | `(roads, pairs)` | the solver's input from any edges: one row per road, one row per relation (`meet`, `stack` one row per crossing part of the upper road, `order`; `near` with `near_rules=True`); `head_m` / `heads` (a heads.csv table) decide which parts cross |
 | `solve_levels(roads, pairs, edits=None, ...)` | roads + 4 columns | the solver, from the tables only (a stack: one row per part, `a_end` start / main / end); `edits` switch rows off or add them; `fixed` (`{road: (casing_start, casing_level, casing_end, fill_level)}`) holds those roads' numbers and solves the others (the editor's local re-solve) |
 | `level_area.make_area(edges, folder, db=None, ...)` / `level_area.solve_area(folder)` | `(roads, pairs)` / solved roads | an area folder (`roadstyle-levels make` / `solve`); with `db` every solve also writes into that DuckDB file |
+| `render_edges(..., levels_db=file)` | – | reads `visualization.edge_levels` of a duckOSM file for these edges (some of the edges it was solved for; ids int64 or text); an error with level columns of your own |
 | `save_area_levels(con, folder)` / `load_area_levels(con, edges)` | – / edges + 8 columns | an area's result into `visualization.edge_levels` and back (the four numbers and each edge's ends); reading checks the edges |
 | `resolve(highway, palette, tunnel, bridge)` | `ResolvedStyle` | one edge's resolved style |
 | `base_style(highway, palette="amber")` | `RoadStyle` | the palette entry for a class |
@@ -100,6 +101,10 @@ ignore it.
 | `match_links` | `True` | all | `primary` also matches `primary_link` |
 | `filter_control` | `True` | web, folium | the road-class filter panel (folium: only when there is no legend) |
 | `filter_col` | `None` | web | the column the filter panel lists, when it differs from `highway_col` |
+| `find_control` | `False` | web | a "Search roads…" box in the top-left stack (the docked panel has its own); the JS `rsFind(text)` is always defined ([design](../design/sensor_matching_requests.md)) |
+| `overlay_control` | `True` | web | `False` hides the *Layers* box of the overlays; `rsSetOverlay` still works |
+| `overlay_popup` | `True` | web | `False`: no overlay shows a click popup (it stays clickable and fires `rs:select`); one overlay: `Overlay(popup_window=False)` |
+| `access_col` | `None` | web | a column with `private`, `bus`, `pedestrian`, `delivery` or nothing. Roads with a value get its colour (`#c8c8c8`, `#9db8d9`, `#dddde8`, `#e8d2b0`: under `rsColor`, over *colour by*) and a row each in the Roads box after Bridges and Tunnels; `rsSetAccess`, `rsGetAccess`, `RS_ACCESS`. The class row `pedestrian` goes when all its roads have an access kind |
 
 ### Colour by data
 
@@ -131,6 +136,8 @@ setting, or a name the page does not have, is an error.
 |---|---|---|---|
 | `road_popup` | `True` | web | on click: `True` = `name`, `edge_id`, `edge_ref`, `highway`, `lanes`, `bridge`, `tunnel`; a list = those columns; `"all"`; `"panel"` = docked panel; `False` = none (`rs:select` still fires) |
 | `popup_mode` | `None` (= `"popup"`) | web | `"panel"` docks the read-out in a side panel with a search box |
+| `side_panel_html` | `None` | web | the HTML of your own full-height panel on the right, with the docked panel's » handle, « map button and `rsPanelShow(on)`; the open or closed state is kept per page; `--rs-side` follows it. An error with `popup_mode="panel"` |
+| `host_panel_width` | `320` | web | the width of that panel, px |
 | `road_tooltip` | `False` | web | on hover: `True` = every column, a list = those columns |
 | `hover_delay_ms` | `300` | web | a road or an overlay item lights up and shows its tooltip once the mouse rests this long on it (a passing mouse lights nothing); `0`: at once |
 | `data_maxzoom` | `None` | web | the last zoom MapLibre cuts the GeoJSON sources into tiles at; above it, MapLibre enlarges those tiles and does not cut them again. Positions are as exact as the tile grid of that zoom. `None`: MapLibre's own |
@@ -256,11 +263,12 @@ the `overlays` setting. See [Add your own layers](../guides/overlays.md).
 | `placement` | `"over"` | `"under"` or `"over"` the roads |
 | `color` | `"#6aa9ff"` | paint colour |
 | `opacity` | fill `0.15`, circle `0.85`, line `0.9` | |
-| `outline` | `color` | polygon outline colour |
+| `outline` | `color` | polygon outline colour; a circle's ring colour (default: the `circle_stroke` setting) |
 | `radius` | `6` | circle radius, px |
-| `width` | `2` | line / outline width, px |
+| `width` | `2` | line / outline width, px; a circle's ring width (default 1) |
 | `label` | `"Layer N"` | name in the *Layers* control, and the `layer` argument of the JS API |
 | `popup` | `None` = all fields | fields on click; `[]` = not clickable |
+| `popup_window` | `True` | `False`: clickable and selected (`rs:select` fires) but no popup (and no read-out in panel mode) |
 | `tooltip` | `None` | fields on hover |
 | `visible` | `True` | shown on open |
 | `edge_col` | `None` | the property with the id of the feature's edge: the overlay is attached to edges, drawn at its edge's fill number (the guide: [Overlays](../guides/overlays.md#overlays-attached-to-edges)) |

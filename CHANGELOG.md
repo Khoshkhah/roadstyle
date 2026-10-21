@@ -4,6 +4,27 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **`find_control=True` and `rsFind(text)`.** A "Search roads…" box on every page, not only in panel mode. `rsFind(text)` is always defined and returns the ids of
+  the roads that match (an id or a name).
+- **`overlay_control=False`** hides the Layers box. **`Overlay(popup_window=False)`** (or `overlay_popup=False` for the page): the overlay stays clickable and
+  fires `rs:select`, but a click shows no popup.
+- **`outline` and `width` for circle overlays:** the ring colour and the ring width.
+- **`access_col="access"`:** roads with `private`, `bus`, `pedestrian` or `delivery` get the kind's colour and a row each in the Roads box
+  (after Bridges and Tunnels), with `rsSetAccess`, `rsGetAccess` and `RS_ACCESS`. mapstyle can use these rows instead of its own copy.
+- **`side_panel_html=` and `host_panel_width=`:** a collapsible side panel for the host page, with the docked panel's » handle, « button and `rsPanelShow`.
+- **`render_edges(..., levels_db=file)`** reads the stored drawing order (`visualization.edge_levels`) of a duckOSM file for the given edges, which can be
+  some of the edges it was solved for. The ids can be int64 or text.
+- **`rsColorBase(groups)`:** recolour groups under those of `rsColor`. A host that paints its own roads no longer loses them when another caller uses `rsColor`.
+
+### Fixed
+- **Road widths no longer step at a line across a tilted (3D) map.** MapLibre loads the near tiles of a tilted view at a higher zoom than the far tiles,
+  and a width that depends on the zoom and on the feature is baked per tile and clamped to that tile's zoom. The page now uses one tile zoom on the
+  whole screen. A tilted view loads more tiles (121 against 21 in a test at pitch 72).
+- (Not reproduced: an overlay hover that lights every feature with the same number. A test now guards that one feature is lit.)
+
 ## [0.22.2] — 2026-10-20
 
 ### Added

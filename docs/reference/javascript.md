@@ -18,6 +18,9 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rsColor(ids, "#hex", layer?)` | paint the set one colour over the base colours, and draw it on top of the other roads on its level | `rs:colorchange` |
 | `rsColor([[idsA, "#f80"], [idsB, "#08f"]])` | several sets at once, earlier pairs win overlaps (roads only) | `rs:colorchange` |
 | `rsColor(null)` / `rsColor(null, null, layer)` | reset | `rs:colorchange` |
+| `rsColorBase([[idsA, "#f80"], ...])` / `rsColorBase(null)` | recolour groups UNDER those of `rsColor`, for a host that paints its own roads: `rsColor` and `rsColor(null)` leave them | `rs:colorchange` (`base: true`) |
+| `rsFind(text)` | the ids of the roads that match the text (a part of a popup field value or of an id; the docked panel's search); always defined, `find_control=True` adds the box | |
+| `rsSetAccess(kind, on)` / `rsGetAccess()` / `RS_ACCESS` | with `access_col`: show / hide the roads of one access kind; `{kind: shown}`; `{kind: count}` | `rs:filterchange` (`access`) |
 | `rsHighlight(ids, layer?)` | selection glow on the set; `[]` clears | `rs:highlightchange` |
 | `rsFocus(ids, opt?, layer?)` | fit the camera to one id or a set; `opt` goes to MapLibre `fitBounds` (default `padding` 80, `maxZoom` 17) | |
 | **Selection** | | |
@@ -34,7 +37,7 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rsSetRoadFill(on)` | show / hide the roads' own fill (`road_fill`); the casing stays. With `simple=True` every road piece is the one layer `roads-simple` (source `simple`), and this function, `rsColor` and `rsSetColorField` set it too | `rs:roadfillchange` |
 | `rsSetOverlay(labelOrIndex, on)` | show / hide one overlay | `rs:overlaychange` |
 | `rsSetView3D(on)` | tilt to `camera.pitch_3d`, or back to flat and north-up | `rs:viewchange` |
-| `rsPanelShow(on)` | panel mode only: hide / show the docked side panel | |
+| `rsPanelShow(on)` | panel mode and `side_panel_html`: hide / show the side panel (a host panel's state is kept per page) | |
 | **Street View** | | |
 | `rsSetStreetView(on)` | open / close the Street View window (`street_view="window"` only; otherwise does nothing) | `rs:streetviewchange` |
 | `rsSetGoogle3D(on)` | open / close the Google 3D window (`google_3d=True` only; otherwise does nothing) | `rs:google3dchange` |

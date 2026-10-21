@@ -68,12 +68,12 @@ kept per page in `localStorage`. It is an error to use it with `popup_mode="pane
 
 `render_edges(..., levels_db="area.duckdb")` reads `visualization.edge_levels` of that file for the
 given edges (`load_area_levels(subset=True)`). The ids of the edges can be int64 or strings. The
-numbers go in the `render_edges` level columns. An explicit level column or `levels_db=None` leaves
-the call as it was. A `ValueError` says so when the file has no stored levels or an edge has no row.
+numbers go in the `render_edges` level columns. A `ValueError` says so when the file has no stored levels, an edge has no row, or level columns of your own are also given.
 
 ## Known issues that are fixed with them
 
-- **(a)** An overlay hover lights every feature that has the same number: see the test in
-  `tests/test_requests_browser.py` for the cause and the fix.
-- **(b)** `rsColor` is one slot. A host that wraps it to add its own colour removes the colours of
-  other callers: see `rsColor(ids, color, layer)` with a key (described in CHANGELOG when done).
+- **(a)** "An overlay hover lights every feature that has the same number". It does not happen in this version: an overlay's hover and
+  select state is set per generated feature id. A test (features that share a property `id`) guards that one feature is lit. The level
+  editor's `popup=[]` workaround of duckOSM is not needed for this reason.
+- **(b)** `rsColor` is one slot: a host that wraps it (duckOSM's level editor, for the restricted roads) must add its own groups to every call.
+  `rsColorBase(groups)` is a second slot under it: `rsColor(...)` and `rsColor(null)` leave it. The host calls `rsColorBase` once.
