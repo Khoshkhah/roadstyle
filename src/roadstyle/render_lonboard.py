@@ -10,7 +10,10 @@ from .style import resolve
 
 
 def _hex_to_rgb(h, alpha=255):
-    h = (h or "#000000").lstrip("#")
+    if not h:                                     # no color: the theme's fallback casing
+        from . import _settings
+        h = _settings.theme_value("roads.fallback.casing")
+    h = h.lstrip("#")
     return [int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), alpha]
 
 

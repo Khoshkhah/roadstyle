@@ -37,6 +37,7 @@ from .emit import (
     to_iframe,
     to_spec,
 )
+from .export import export_inline, export_look, export_style
 from .filters import filter_edges, highway_types
 from .legend import make_legend
 from .levels import auto_ends, casing_parts, compute_levels, level_input, solve_levels
@@ -133,6 +134,9 @@ except Exception:                                    # running from a bare sourc
     __version__ = "0+unknown"
 
 __all__ = [
+    "export_inline",
+    "export_look",
+    "export_style",
     "compute_levels",
     "level_input",
     "solve_levels",

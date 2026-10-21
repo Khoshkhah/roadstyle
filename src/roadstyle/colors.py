@@ -61,7 +61,10 @@ class ColorRamp:
         self._base = _branca_linear(cmap)        # normalised 0..1
         self._span = (self.vmax - self.vmin) or 1.0
 
-    def __call__(self, value, *, nan_color: str = "#cccccc") -> str:
+    def __call__(self, value, *, nan_color: str = None) -> str:
+        if nan_color is None:                    # the theme's data.nodata (docs/design/style_config.md)
+            from . import _settings
+            nan_color = _settings.theme_value("data.nodata")
         if value is None:
             return nan_color
         try:

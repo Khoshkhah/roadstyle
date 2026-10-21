@@ -72,7 +72,7 @@ def test_tunnel_and_bridge_overrides():
 def test_selection_style_three_layers():
     s = selection_style(base_width=4.0)
     assert set(s) == {"glow", "casing", "core"}
-    assert s["core"]["color"] == "#EE00FF"
+    assert s["core"]["color"] == "#7c4dff"          # the web map's select color, for folium too (the theme, 2026-10-19)
     assert s["glow"]["width"] == 12.0
 
 

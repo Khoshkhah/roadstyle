@@ -18,7 +18,7 @@ Each entry is a :class:`RoadStyle` (fill colour, line widths, one casing colour,
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from . import _settings
 
@@ -28,7 +28,7 @@ class RoadStyle:
     fill: str
     width: float
     casing_width: float
-    casing: str | None = "#bcbcbc"       # casing colour (None = no casing); default light grey
+    casing: str | None = field(default_factory=lambda: _settings.theme_value("roads.fallback.palette_casing"))   # casing colour (None = no casing)
     dash: tuple[int, int] | None = None  # dash pattern (on, off) in px
     opacity: float = 1.0
 
@@ -56,7 +56,7 @@ class RoadStyle:
         dash = d.get("dash")
         # legacy palette files carried casing_light/casing_dark; the dark variant (the one every
         # built-in theme actually used) maps onto the single ``casing``
-        casing = d.get("casing", d.get("casing_dark", "#bcbcbc"))
+        casing = d.get("casing", d.get("casing_dark", _settings.theme_value("roads.fallback.palette_casing")))
         return cls(
             fill=d["fill"],
             width=float(d["width"]),

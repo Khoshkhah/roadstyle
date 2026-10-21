@@ -145,7 +145,7 @@ def test_access_col_rows_colours_and_filter(tmp_path):
         browser, page, errors = _open(p, path)
         rows = page.evaluate("[...document.querySelectorAll('.flt-body label')].map(l=>l.textContent.trim())")
         counts = page.evaluate("RS_ACCESS")
-        colour = page.evaluate("JSON.stringify(map.getPaintProperty('roads-simple','line-color')).includes('#c8c8c8')")
+        fills = page.evaluate("map.querySourceFeatures('roads').map(f=>f.properties.__rs_fill)")
         shown = page.evaluate("map.getFilter('roads-simple')")
         page.evaluate("rsSetAccess('private', false)")
         hidden = page.evaluate("JSON.stringify(map.getFilter('roads-simple'))")
@@ -156,7 +156,7 @@ def test_access_col_rows_colours_and_filter(tmp_path):
     assert rows[-4:] == ["Private roads", "Bus lanes", "Pedestrian streets", "Delivery only"]
     assert "pedestrian" not in rows[:-4]                       # every pedestrian road has an access kind: no second switch
     assert counts == {"private": 2, "bus": 1, "pedestrian": 1, "delivery": 1}
-    assert colour and "__rs_access" not in json.dumps(shown) and "__rs_access" in hidden
+    assert {'#c8c8c8', '#9db8d9', '#dddde8', '#e8d2b0'} <= set(fills) and "__rs_access" not in json.dumps(shown) and "__rs_access" in hidden
     assert state["private"] is False and state["bus"] is True and bus_off is False and not errors
 
 
@@ -187,22 +187,23 @@ def test_side_panel_html_with_docked_panel_is_an_error(tmp_path):
 
 
 def test_rscolorbase_survives_rscolor(tmp_path):
-    """Issue (b): rsColorBase groups stay under rsColor's own, and rsColor(null) does not clear them."""
+    """Issue (b): rsColorBase groups (state ``rs_base``) stay under rsColor's own (``rs_colors``), and rsColor(null) does not clear them."""
     path = _page(tmp_path, "base")
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, path)
-        has = "JSON.stringify(map.getPaintProperty('roads-simple','line-color'))"
         ids = page.evaluate("rsQuery(()=>true)")
+        state = "JSON.stringify([map.getGlobalState().rs_base, map.getGlobalState().rs_colors])"
         page.evaluate(f"rsColorBase([[{ids[:2]}, '#00ee00']])")
         page.evaluate(f"rsColor({ids[2:3]}, '#ee0000')")
-        both = page.evaluate(has)
+        both = json.loads(page.evaluate(state))
         page.evaluate("rsColor(null)")
-        after = page.evaluate(has)
+        after = json.loads(page.evaluate(state))
         page.evaluate("rsColorBase(null)")
-        cleared = page.evaluate(has)
+        cleared = json.loads(page.evaluate(state))
+        used = page.evaluate("JSON.stringify(map.getPaintProperty('roads-simple','line-color')).includes('rs_base')")
         browser.close()
-    assert "#00ee00" in both and "#ee0000" in both and "#00ee00" in after and "#ee0000" not in after
-    assert "#00ee00" not in cleared and not errors
+    assert sorted(both[0].values()) == ["#00ee00"] * 2 and list(both[1].values()) == ["#ee0000"]
+    assert after[0] == both[0] and after[1] == {} and cleared == [{}, {}] and used and not errors
 
 
 def test_overlay_hover_lights_one_feature(tmp_path):

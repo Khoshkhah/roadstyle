@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from . import _settings
 from .config import DEFAULT, StyleConfig
 from .palettes import DEFAULT_PALETTE, FALLBACK, PALETTES, SELECTION, RoadStyle
 
@@ -66,7 +67,7 @@ def _apply(
     if tunnel:                       # tunnels: faded + dashed
         opacity *= config.tunnel_opacity_scale
         casing_opacity *= config.tunnel_opacity_scale
-        dash = dash or (4, 4)
+        dash = dash or tuple(_settings.theme_value("tunnels.folium_dash"))
     if bridge:                       # bridges: solid dark casing, a touch wider (deck marker)
         casing = config.bridge_casing_color
         casing_width = (casing_width or width) + config.bridge_casing_extra
@@ -86,11 +87,13 @@ def resolve(
     return _apply(rs, is_link, tunnel, bridge)
 
 
-def selection_style(base_width: float = 4.0) -> dict:
-    """Neon-violet selected-edge style (3 stacked layers: glow, casing, core)."""
+def selection_style(base_width: float = None) -> dict:
+    """The selected-edge style of folium (3 stacked layers: glow, casing, core), from the theme's ``selection``."""
+    f = _settings.theme_value("selection.folium")
+    base_width = f["base_width"] if base_width is None else base_width
     return {
-        "glow":   {"color": SELECTION["glow"], "width": base_width * 3.0,
+        "glow":   {"color": SELECTION["glow"], "width": base_width * f["glow_scale"],
                    "opacity": SELECTION["glow_opacity"]},
-        "casing": {"color": SELECTION["casing"], "width": base_width * 1.8, "opacity": 1.0},
-        "core":   {"color": SELECTION["core"], "width": base_width * 1.5, "opacity": 1.0},
+        "casing": {"color": SELECTION["casing"], "width": base_width * f["casing_scale"], "opacity": 1.0},
+        "core":   {"color": SELECTION["core"], "width": base_width * f["core_scale"], "opacity": 1.0},
     }

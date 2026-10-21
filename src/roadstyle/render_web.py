@@ -54,8 +54,14 @@ def _load_road_model() -> None:
     Runs at import and again from :func:`roadstyle.use_settings` after a programmatic override —
     every expression builder below reads these module globals at call time, so a rebuild is all a
     new setting set needs."""
-    global WIDTH, HI_RATE, CASING_RATIO, ROAD_GROUP, _LINKS, _CLASSES, _ZSTOPS, ROAD_Z
+    global WIDTH, HI_RATE, CASING_RATIO, ROAD_GROUP, _LINKS, _CLASSES, _ZSTOPS, ROAD_Z, THEME, _FB, _LINK_W, _SPLIT, _MINOR, _TUN_TO
     _CW.clear()
+    THEME = _settings.theme()                  # every style value (docs/design/style_config.md)
+    _FB = dict(THEME["roads"]["fallback"])     # a class or a value with no entry: its fill, casing, group and order
+    _LINK_W = float(THEME["roads"]["links"]["width"])     # a link's width: this part of its main class's
+    _SPLIT = dict(THEME["roads"]["split"])     # two-way roads: offset_frac, width_frac, offset_zoom, ramp_zooms
+    _MINOR = [c for c, e in THEME["roads"]["classes"].items() if e.get("minor")]     # arrows and names later, smaller arrows
+    _TUN_TO = dict(THEME["tunnels"]["to"])
     r = _settings.roads()
     WIDTH = {g: {int(z): w for z, w in t.items()} for g, t in r["width"].items()}   # px by zoom, per group
     HI_RATE = dict(r["width_zoom_rate"])       # per-group growth rate per zoom past the last stop
@@ -81,13 +87,19 @@ def _sort_key(col):
     m = ["match", ["get", col]]
     for c in _CLASSES:
         b, lk = _base(c)
-        m += [c, ROAD_Z[c] if c in ROAD_Z else ROAD_Z.get(b, 4) - (0.5 if lk else 0)]
-    m.append(4)
+        m += [c, class_order(c)]
+    m.append(_FB["order"])
     return ["+", ["*", ["coalesce", ["get", "lvl"], 0], 1000], m]
 
 
 def _base(c):
     return (c[:-5], True) if c.endswith("_link") else (c, False)
+
+
+def class_order(c):
+    """The draw order of a class (theme roads.classes.<class>.order): the table's value, else a link just under its main class."""
+    b, lk = _base(c)
+    return ROAD_Z[c] if c in ROAD_Z else ROAD_Z.get(b, _FB["order"]) + (_FB["link_order"] if lk else 0)
 
 
 def _gwidth(t, hi, z):
@@ -129,7 +141,7 @@ def _class_width_px(cls, zoom, casing):
     return float(at(ms[i]) + (at(ms[i + 1]) - at(ms[i])) * f)
 
 
-def _width_expr(col, casing=False, split_zoom=15, split_frac=0.6, scale=1.0):
+def _width_expr(col, casing=False, split_zoom=None, split_frac=None, scale=1.0):
     """interpolate(zoom) of match(class -> width). Two-way lanes shrink to ``split_frac`` of the
     full width once the directions have fanned apart (ramped from full at split_zoom to split_frac
     at split_zoom+2), so the two lanes together read as one road of the right width.
@@ -137,17 +149,20 @@ def _width_expr(col, casing=False, split_zoom=15, split_frac=0.6, scale=1.0):
     ``scale`` multiplies every output width (e.g. 1.25 for a heavier bridge casing). It scales the
     per-stop *values*, not the whole expression, because MapLibre forbids a ``zoom`` interpolate
     nested inside ``["*", ...]`` — the zoom input must stay top-level."""
+    split_zoom = _SPLIT["offset_zoom"] if split_zoom is None else split_zoom
+    split_frac = _SPLIT["width_frac"] if split_frac is None else split_frac
     e = ["interpolate", ["linear"], ["zoom"]]
     for z in _ZSTOPS:
         m = ["match", ["get", col]]
         for c in _CLASSES:
             b, lk = _base(c)
-            g = ROAD_GROUP.get(b, "residential")
+            g = ROAD_GROUP.get(b, _FB["group"])
             w = _gwidth(WIDTH[g], HI_RATE[g], z) * (CASING_RATIO[g] if casing else 1) * scale
             if lk:
-                w *= 0.6
+                w *= _LINK_W
             m += [c, round(w, 2)]
-        dw = _gwidth(WIDTH["residential"], HI_RATE["residential"], z) * (CASING_RATIO["residential"] if casing else 1) * scale
+        g = _FB["group"]
+        dw = _gwidth(WIDTH[g], HI_RATE[g], z) * (CASING_RATIO[g] if casing else 1) * scale
         m.append(round(dw, 2))
         f = 1.0 if z <= split_zoom else (split_frac if z >= split_zoom + 2 else 1.0 - (1 - split_frac) * (z - split_zoom) / 2.0)
         if f < 1.0:
@@ -156,7 +171,7 @@ def _width_expr(col, casing=False, split_zoom=15, split_frac=0.6, scale=1.0):
     return e
 
 
-def _width_m_expr(col, kind, width_m_zoom=16, bridge_m=0.0, bridge_px=0.0, casing_px=0.0, **kw):
+def _width_m_expr(col, kind, width_m_zoom=None, bridge_m=0.0, bridge_px=0.0, casing_px=0.0, **kw):
     """_width_expr, but a line with a metre width (``__rs_wm``, _mark_width_m) is drawn at exactly
     that width from ``width_m_zoom`` on (docs/design/metre_widths.md). ``kind``: ``"fill"`` = width
     - 2 casings, ``"casing"`` = the width, ``"wings"`` (bridge casing) = width + 2 casings.
@@ -164,8 +179,9 @@ def _width_m_expr(col, kind, width_m_zoom=16, bridge_m=0.0, bridge_px=0.0, casin
     Base-2 exponential interpolation, so the width is exact between stops too (pixels per metre
     double per zoom). Lines without a metre width keep their class widths, frozen past the last
     class stop as today; the stops go on to 22, MapLibre's max zoom."""
+    width_m_zoom = THEME["roads"]["width_m_zoom"] if width_m_zoom is None else width_m_zoom
     casing = kind != "fill"
-    cls = dict(zip(_ZSTOPS, _width_expr(col, casing=casing, scale=1.25 if kind == "wings" else 1.0, **kw)[4::2],
+    cls = dict(zip(_ZSTOPS, _width_expr(col, casing=casing, scale=THEME["bridges"]["wing_scale"] if kind == "wings" else 1.0, **kw)[4::2],
                    strict=True))
     k = {"fill": -2, "casing": 0, "wings": 2}[kind]
     cm = ["max", ["get", "__rs_cm"], bridge_m] if kind == "wings" and bridge_m else ["get", "__rs_cm"]   # a bridge's deck shows
@@ -208,48 +224,55 @@ def _mark_width_m(geo, col, casing_m):
         p["__rs_wm"], p["__rs_cm"] = round(w * sec, 4), round(casing_m * sec, 4)
 
 
-def _end_radius_expr(col, casing=False, offset_frac=0.28, offset_zoom=15, split_frac=0.6):
+def _end_radius_expr(col, casing=False, offset_frac=None, offset_zoom=None, split_frac=None):
     """circle-radius (px) of a two-way pair's end cap (docs/design/twin_ends.md): the pair's outer
     half-width, i.e. the lane offset (_offset_expr) plus half a lane's width (_width_expr, split to
     ``split_frac`` like a two-way lane), per class, at every zoom stop. So the cap is exactly as
     wide as the two lanes together, with the lane split ramping in from ``offset_zoom``."""
+    offset_frac = _SPLIT["offset_frac"] if offset_frac is None else offset_frac
+    offset_zoom = _SPLIT["offset_zoom"] if offset_zoom is None else offset_zoom
+    split_frac = _SPLIT["width_frac"] if split_frac is None else split_frac
     e = ["interpolate", ["linear"], ["zoom"]]
     for z in _ZSTOPS:
-        ramp = 0.0 if z <= offset_zoom else (1.0 if z >= offset_zoom + 2 else (z - offset_zoom) / 2.0)
+        ramp = min(max((z - offset_zoom) / _SPLIT["ramp_zooms"], 0.0), 1.0)
         f = 1.0 - (1 - split_frac) * ramp            # the lane width factor (_width_expr's split)
 
         def r(g, lk):
-            w = _gwidth(WIDTH[g], HI_RATE[g], z) * (0.6 if lk else 1)
+            w = _gwidth(WIDTH[g], HI_RATE[g], z) * (_LINK_W if lk else 1)
             lane = w * (CASING_RATIO[g] if casing else 1) * f
             return round(w * offset_frac * ramp + lane / 2, 3)
         m = ["match", ["get", col]]
         for c in _CLASSES:
             b, lk = _base(c)
-            m += [c, r(ROAD_GROUP.get(b, "residential"), lk)]
-        m.append(r("residential", False))
+            m += [c, r(ROAD_GROUP.get(b, _FB["group"]), lk)]
+        m.append(r(_FB["group"], False))
         e += [z, m]
     return e
 
 
-def _offset_match(col, z, offset_frac=0.28, offset_zoom=15):
+def _offset_match(col, z, offset_frac=None, offset_zoom=None):
     """A two-way direction's offset (px) at zoom ``z``, per class: offset_frac * the road's pixel width, ramped in from offset_zoom."""
-    ramp = 0.0 if z <= offset_zoom else (1.0 if z >= offset_zoom + 2 else (z - offset_zoom) / 2.0)
+    offset_frac = _SPLIT["offset_frac"] if offset_frac is None else offset_frac
+    offset_zoom = _SPLIT["offset_zoom"] if offset_zoom is None else offset_zoom
+    ramp = min(max((z - offset_zoom) / _SPLIT["ramp_zooms"], 0.0), 1.0)
     m = ["match", ["get", col]]
     for c in _CLASSES:
         b, lk = _base(c)
-        g = ROAD_GROUP.get(b, "residential")
-        w = _gwidth(WIDTH[g], HI_RATE[g], z) * (0.6 if lk else 1)
+        g = ROAD_GROUP.get(b, _FB["group"])
+        w = _gwidth(WIDTH[g], HI_RATE[g], z) * (_LINK_W if lk else 1)
         m += [c, round(w * offset_frac * ramp, 3)]
-    dw = _gwidth(WIDTH["residential"], HI_RATE["residential"], z)
+    dw = _gwidth(WIDTH[_FB["group"]], HI_RATE[_FB["group"]], z)
     m.append(round(dw * offset_frac * ramp, 3))
     return m
 
 
-def _offset_expr(col, offset_frac=0.28, offset_zoom=15, pairs=False, width_m_zoom=None):
+def _offset_expr(col, offset_frac=None, offset_zoom=None, pairs=False, width_m_zoom=None):
     """line-offset (px) = offset_frac * the road's pixel width, for two-way edges (0 for one-way),
     ramped in from offset_zoom. Pixel-proportional -> constant overlap at every zoom. ``pairs``: a two-way pair's one casing
     (``__rs_pair``, :func:`_mark_twin_casing`) is not shifted. From ``width_m_zoom`` on, a direction whose pair has metres on both
     (``__rs_twm``) is shifted by metres: half the other direction's fill, so the two fills together are centred on the line (2026-10-10)."""
+    offset_frac = _SPLIT["offset_frac"] if offset_frac is None else offset_frac
+    offset_zoom = _SPLIT["offset_zoom"] if offset_zoom is None else offset_zoom
     two = ["to-boolean", ["get", "__rs_twoway"]]
     if pairs:
         two = ["all", two, ["!", ["to-boolean", ["get", "__rs_pair"]]]]
@@ -268,10 +291,12 @@ def _offset_expr(col, offset_frac=0.28, offset_zoom=15, pairs=False, width_m_zoo
     return e
 
 
-def _pair_width(expr, col, offset_frac=0.28, offset_zoom=15, width_m_zoom=None):
+def _pair_width(expr, col, offset_frac=None, offset_zoom=None, width_m_zoom=None):
     """A casing width curve, with a two-way pair's one casing (``__rs_pair``) as wide as its two directions together: a direction's casing
     width (the two-way width of ``expr``) plus twice the direction's offset, at each stop of the curve (docs/design/twin_ends.md). From
     ``width_m_zoom`` on, a pair with metres on both (``__rs_twm``) has its width in ``expr`` already (_width_m_expr)."""
+    offset_frac = _SPLIT["offset_frac"] if offset_frac is None else offset_frac
+    offset_zoom = _SPLIT["offset_zoom"] if offset_zoom is None else offset_zoom
     def px(z):
         add = ["*", 2, _offset_match(col, min(max(z, _ZSTOPS[0]), _ZSTOPS[-1]), offset_frac, offset_zoom)]
         return ["case", ["has", "__rs_twm"], 0, add] if width_m_zoom is not None and z >= width_m_zoom else add
@@ -745,7 +770,7 @@ def _bridge_decks(geo, dk):
                 continue
             mid = (d0 + d1) / 2
             pp, ffi, rfi = props_at(mid)
-            grp = ROAD_GROUP.get(str(pp.get("highway", "")), "residential")
+            grp = ROAD_GROUP.get(str(pp.get("highway", "")), _FB["group"])
             px = _gwidth(WIDTH[grp], HI_RATE[grp], dk["match_zoom"])
             # width_scale trims the ribbon: at a tilted camera the extruded side walls (and a
             # dual carriageway's second chain) add apparent width, so 1.0 reads too fat
@@ -971,15 +996,14 @@ def _casing_parts(geo, head_m, cols):
 
 # street names: 9/10 of the road's fill width, at most the old 10 -> 14 px ramp, and none where that is under 8 px (2026-10-07: 3/4 and
 # 9 px left the names of tertiary and residential streets out until zoom 18; now from 17)
-_LABEL_FRACTION, _LABEL_MIN_PX = 0.9, 8.0
-
-
+# (theme labels.fraction, labels.min_px, labels.base_size)
 def _label_base_px(z):
-    return 10.0 + 4.0 * min(max((z - 14.0) / 4.0, 0.0), 1.0)         # the size every name had: 10 px at z14 to 14 px at z18
+    (z0, p0), (z1, p1) = THEME["labels"]["base_size"]          # the size every name had: 10 px at z14 to 14 px at z18
+    return p0 + (p1 - p0) * min(max((z - z0) / (z1 - z0), 0.0), 1.0)
 
 
 def _label_px(cls, z):
-    return min(_label_base_px(z), _LABEL_FRACTION * class_width_px(cls, z, casing=False))
+    return min(_label_base_px(z), THEME["labels"]["fraction"] * class_width_px(cls, z, casing=False))
 
 
 def _label_size_expr(stops=None):
@@ -997,9 +1021,9 @@ def _label_size_expr(stops=None):
 
 
 def _label_readable_filter():
-    """The first whole zoom from which a class's name is at least _LABEL_MIN_PX tall (filters see whole zooms): no tiny name below it."""
+    """The first whole zoom from which a class's name is at least labels.min_px tall (filters see whole zooms): no tiny name below it."""
     m = ["match", ["get", "highway"]]
-    first = lambda c: next((z for z in range(0, 23) if _label_px(c, z) >= _LABEL_MIN_PX), 99)          # noqa: E731
+    first = lambda c: next((z for z in range(0, 23) if _label_px(c, z) >= THEME["labels"]["min_px"]), 99)          # noqa: E731
     for c in _CLASSES:
         m += [c, first(c)]
     return [">=", ["zoom"], m + [first(None)]]
@@ -1272,9 +1296,8 @@ def _twin_ends(geo, cols):
     return out
 
 
-# the tunnel look (docs/design/tunnel_look.md): everything on a tunnel moves toward one colour as the slider rises, v2's slate (the
-# fade is the same for every item, however it was added); the casing dashes start from v2's lighter slate
-_TUN_TO = {"fill": "#64748b", "dash": "#94a3b8"}
+# the tunnel look (docs/design/tunnel_look.md): everything on a tunnel moves toward one colour as the slider rises (the fade is the same
+# for every item, however it was added); _TUN_TO (theme tunnels.to) is set with the road model
 
 
 _HEX6 = re.compile(r"#[0-9a-fA-F]{6}")
@@ -1295,16 +1318,55 @@ def _tun_settings():
     return colour, toward, float(CONFIG.tunnel_strength)
 
 
-def _tun_mix(expr, toward, s):
-    """A tunnel feature's colour: ``expr`` moved toward ``toward`` by the slider ``s`` (0-100); any other feature keeps ``expr``
-    (docs/design/tunnel_look.md). The page builds the same expression again when the slider moves (_tunMix). The colour keeps its own alpha
+def _fill_props(color_opts_meta):
+    """The baked fill property of each colour option, in order (option 0: ``__rs_fill``)."""
+    return [o["prop"] for o in color_opts_meta or ()] or ["__rs_fill"]
+
+
+def _gs(name):
+    """A state value of the page (MapLibre global-state, docs/design/style_config.md step 2): a slider, a menu or the JS API sets it, the
+    expressions made here read it. The page builds no style expression; ``state`` in the style gives the start values."""
+    return ["global-state", name]
+
+
+def _painted(key, state="rs_colors"):
+    """The colour rsColor gave the road that the property ``key`` names (its edge index, ``__rs_edge`` / ``__rs_edge2``), else null. ``state="rs_base"``: the colour
+    of rsColorBase, the groups under rsColor's."""
+    return ["get", ["to-string", ["get", key]], _gs(state)]
+
+
+def _fill_base(props):
+    """A road's fill under the active colour option (state ``rs_co``): ``props`` are the baked fill properties of the options, in order."""
+    opts = [["coalesce", ["get", pr], _FB["fill"]] for pr in props]
+    return opts[0] if len(opts) == 1 else ["match", _gs("rs_co"), *[x for i, o in enumerate(opts[1:], 1) for x in (i, o)], opts[0]]
+
+
+def _fill_expr(props):
+    """A road's fill: the colour rsColor gave it or its second edge (state ``rs_colors``), else rsColorBase's (``rs_base``), else the active option's (``_fill_base``)."""
+    return ["coalesce", _painted("__rs_edge"), _painted("__rs_edge2"), _painted("__rs_edge", "rs_base"), _painted("__rs_edge2", "rs_base"), _fill_base(props)]
+
+
+def _tun_gap():
+    """A tunnel casing's gap colour: the tunnel palette's second colour moved toward the tunnel colour by the strength; none for One colour."""
+    return ["case", _gs("rs_tun_two"), ["interpolate", ["linear"], _gs("rs_tun_strength"), 0, _gs("rs_tun_c1"), 100, _gs("rs_tun_toward")],
+            "rgba(0,0,0,0)"]
+
+
+def _tun_dash():
+    """A tunnel casing's dash colour: the palette's first colour (One colour: tunnels.to.dash) moved toward the tunnel colour by the strength."""
+    return ["interpolate", ["linear"], _gs("rs_tun_strength"), 0, _gs("rs_tun_c0"), 100, _gs("rs_tun_toward")]
+
+
+def _tun_mix(expr):
+    """A tunnel feature's colour: ``expr`` moved toward the tunnel colour (state ``rs_tun_toward``) by the strength (``rs_tun_strength``,
+    0-100); any other feature keeps ``expr`` (docs/design/tunnel_look.md). The colour keeps its own alpha
     (2026-10-09: an unseen item, rgba(0,0,0,0), moved toward an opaque colour became a see-through strip on every tunnel, darker where two overlapped)."""
-    mixed = ["to-rgba", ["interpolate", ["linear"], s, 0, expr, 100, toward]]
+    mixed = ["to-rgba", ["interpolate", ["linear"], _gs("rs_tun_strength"), 0, expr, 100, _gs("rs_tun_toward")]]
     keep = ["rgba", ["at", 0, ["var", "m"]], ["at", 1, ["var", "m"]], ["at", 2, ["var", "m"]], ["at", 3, ["to-rgba", expr]]]
     return ["case", ["to-boolean", ["get", "__rs_tunnel"]], ["let", "m", mixed, keep], expr]
 
 
-def _tunnel_look(layers, edge_ids, s, arrow_color, to=_TUN_TO):
+def _tunnel_look(layers, edge_ids, arrow_color):
     """The tunnel look on the finished layer list (docs/design/tunnel_look.md), at slider ``s``: everything on a tunnel (its fill, its street
     names, its arrows, every item attached to it) moves toward the same slate. Its casing is two layers, both 3 px wider than a casing: the
     position's casing layer draws the gap colour (transparent for One colour), the dash layer the dashes on top. Returns
@@ -1312,11 +1374,10 @@ def _tunnel_look(layers, edge_ids, s, arrow_color, to=_TUN_TO):
     the dash layers and ``{casing layer id: its colour without the look}``, for the page."""
     out, dash, casing = {}, [], {}
     tun = ["to-boolean", ["get", "__rs_tunnel"]]
-    clear = "rgba(0,0,0,0)"
 
     def mix(l, k, base, to_key):
         out.setdefault(l["id"], []).append([k, base, to_key])
-        l["paint"][k] = _tun_mix(base, to[to_key], s)
+        l["paint"][k] = _tun_mix(base)
 
     for l in layers:
         lid = l["id"]
@@ -1325,9 +1386,10 @@ def _tunnel_look(layers, edge_ids, s, arrow_color, to=_TUN_TO):
         l["paint"] = dict(l.get("paint") or {})           # a new paint: the copies of a layer for each position share theirs
         if lid.startswith("roads-casing") and lid.endswith("-dash"):
             dash.append(lid)
+            l["paint"]["line-color"], l["paint"]["line-dasharray"] = _tun_dash(), _gs("rs_tun_ratio")
         elif lid.startswith("roads-casing") and "-bridge" not in lid:
             casing[lid] = l["paint"]["line-color"]
-            l["paint"]["line-color"] = ["case", tun, clear, l["paint"]["line-color"]]     # One colour: empty gaps; the page sets a palette's gap colour
+            l["paint"]["line-color"] = ["case", tun, _tun_gap(), l["paint"]["line-color"]]     # the palette's gap colour (One colour: empty)
             l["paint"]["line-width"] = _plus_px(l["paint"]["line-width"], 3, tun)          # as wide as the dash layer
         elif lid.startswith("roads-fill") and not lid.endswith("-pat"):
             mix(l, "line-color", l["paint"]["line-color"], "fill")
@@ -1350,12 +1412,12 @@ _FILL_FAMILY = ("roads-fill", "roads-fill-sq", "roads-fill-sx", "roads-fill-h", 
 _VIEW_BOOLS = ("road_fill", "bridges", "tunnels", "view3d")
 
 
-def _check_views(views, colors, overlays, classes, basemaps):
-    """``views`` as the page reads it, ``[{"name", "set"}]``; a setting that is not known, or names a colour option, an overlay, a class or a
-    base map the page does not have, is an error (docs/design/core_model_and_views.md)."""
+def _check_views(views, colors, overlays, classes, basemaps, palettes=()):
+    """``views`` as the page reads it, ``[{"name", "set"}]``; a setting that is not known, or names a colour option, an overlay, a class, a
+    base map or a palette the page does not have, is an error (docs/design/core_model_and_views.md)."""
     out = []
     for name, sets in (views or {}).items():
-        unknown = set(sets) - {"color", "overlays", "classes", "basemap", *_VIEW_BOOLS}
+        unknown = set(sets) - {"color", "overlays", "classes", "basemap", "palette", *_VIEW_BOOLS}
         if unknown:
             raise ValueError(f"view {name!r}: unknown setting(s) {sorted(unknown)}")
         for k in _VIEW_BOOLS:
@@ -1364,12 +1426,161 @@ def _check_views(views, colors, overlays, classes, basemaps):
         for k, have, given in (("color", colors, [sets["color"]] if "color" in sets else []),
                                ("overlays", overlays, list(sets.get("overlays") or {})),
                                ("classes", classes, list(sets.get("classes") or [])),
-                               ("basemap", basemaps, [sets["basemap"]] if "basemap" in sets else [])):
+                               ("basemap", basemaps, [sets["basemap"]] if "basemap" in sets else []),
+                               ("palette", list(palettes), [sets["palette"]] if "palette" in sets else [])):
             missing = [x for x in given if x not in have]
             if missing:
                 raise ValueError(f"view {name!r}: {k} {missing} not in the page (it has {have})")
         out.append({"name": name, "set": sets})
     return out
+
+
+def _palette_copies(args, names):
+    """For each palette a view names: the same build with that palette in force (its colours, docs/design/style_config.md), up to the tiles."""
+    from . import use_settings
+    prev = list(_settings._EXTRA)
+    out = {}
+    for n in names:
+        use_settings(*prev, {"palette": n})
+        try:
+            out[n] = render(**{**args, "palette": n, "views": None, "_palette_copy": True})
+        finally:
+            use_settings(*prev)
+    return out
+
+
+def _zoom_curve(v):
+    return isinstance(v, list) and len(v) > 3 and ((v[0] == "interpolate" and v[2] == ["zoom"]) or (v[0] == "step" and v[1] == ["zoom"]))
+
+
+def _by_palette(base, vals):
+    """One paint value per palette (state ``rs_palette``): ``base`` for the page's palette, ``vals`` {palette: value} for the others. A zoom
+    curve keeps the zoom at the top (MapLibre allows it only there): the choice goes into each stop."""
+    if _zoom_curve(base):
+        first = 4 if base[0] == "interpolate" else 3
+        if all(_zoom_curve(v) and len(v) == len(base) and v[:first - 1] == base[:first - 1]
+               and v[first - 1::2] == base[first - 1::2] for v in vals.values()):
+            return [*base[:first - 1], *[x if (i - first + 1) % 2 == 0 else _by_palette(x, {n: v[i] for n, v in vals.items()})
+                                         for i, x in enumerate(base[first - 1:], first - 1)]]
+    if all(v == base for v in vals.values()):
+        return base
+    return ["match", _gs("rs_palette"), *[x for n, v in vals.items() for x in (n, v)], base]
+
+
+def _merge_palettes(style, geo, slots, copies, base_name):
+    """A view's palette in one page (docs/design/style_config.md, the view row ``palette``): ``copies`` {palette: the same build with that
+    palette}. A paint or layout value that differs becomes one value per palette; a feature property that differs (a road's baked fill and
+    casing) gets a copy per palette, ``<key>@<palette>``, and every expression that reads it picks the copy of the palette in force. A palette
+    holds only colours, so the two builds have the same layers; if not, it is an error."""
+    ids = [lyr["id"] for lyr in style["layers"]]
+    differ = {}                                       # property -> the palettes it differs in
+
+    def feature_lists(st, g, sl):
+        seen = {id(g["features"]): g["features"], id(sl.get("features", [])): sl.get("features", [])}
+        for src in st["sources"].values():
+            if src.get("type") == "geojson" and isinstance(src.get("data"), dict):
+                seen.setdefault(id(src["data"].get("features", [])), src["data"].get("features", []))
+        return list(seen.values())
+    base_lists = feature_lists(style, geo, slots)
+    for n, cp in copies.items():
+        if [lyr["id"] for lyr in cp["style"]["layers"]] != ids:
+            raise ValueError(f"palette {n!r} makes other layers than {base_name!r}: a palette holds only colours (docs/design/style_config.md)")
+        copy_lists = feature_lists(cp["style"], cp["geo"], cp["slots"])
+        if [len(x) for x in copy_lists] != [len(x) for x in base_lists]:
+            raise ValueError(f"palette {n!r} makes other features than {base_name!r}: a palette holds only colours")
+        for bf, cf in zip(base_lists, copy_lists, strict=True):
+            keys = {k for a, b in zip(bf, cf, strict=True) for k, v in (b.get("properties") or {}).items() if (a.get("properties") or {}).get(k) != v}
+            for a, b in zip(bf, cf, strict=True):
+                for k in keys:
+                    a["properties"][f"{k}@{n}"] = (b.get("properties") or {}).get(k)
+            for k in keys:
+                differ.setdefault(k, []).append(n)
+        for lyr, other in zip(style["layers"], cp["style"]["layers"], strict=True):
+            for k in ("filter", "minzoom", "maxzoom", "source", "source-layer", "type"):
+                if lyr.get(k) != other.get(k):
+                    raise ValueError(f"palette {n!r} changes {k} of layer {lyr['id']!r}: a palette holds only colours")
+    for i, lyr in enumerate(style["layers"]):
+        for part in ("paint", "layout"):
+            for k, v in list((lyr.get(part) or {}).items()):
+                vals = {n: (cp["style"]["layers"][i].get(part) or {}).get(k) for n, cp in copies.items()}
+                lyr[part][k] = _by_palette(v, vals)
+
+    def pick(e):
+        if isinstance(e, list):
+            if len(e) == 2 and e[0] == "get" and isinstance(e[1], str) and e[1] in differ:
+                return ["match", _gs("rs_palette"), *[x for n in dict.fromkeys(differ[e[1]]) for x in (n, ["get", f"{e[1]}@{n}"])], e]
+            return [pick(x) for x in e]
+        return e
+    for lyr in style["layers"]:
+        for part in ("paint", "layout"):
+            if lyr.get(part):
+                lyr[part] = {k: pick(v) for k, v in lyr[part].items()}
+        if lyr.get("filter") is not None:
+            lyr["filter"] = pick(lyr["filter"])
+
+
+def _bake_state(style):
+    """The style with the page state (global-state, step 2 of style_config.md) baked: every ``["global-state", k]`` its start value, and the
+    tunnel look's colour mix without ``let`` (RustGIS draws neither; it draws a let as black, 2026-10-19). Without let the mix moves the
+    colour's alpha too, which only matters for an unseen item on a tunnel."""
+    state = {k: v["default"] for k, v in (style.get("state") or {}).items()}
+
+    def bake(e):
+        if isinstance(e, list):
+            if len(e) == 2 and e[0] == "global-state":
+                v = state[e[1]]
+                return ["literal", v] if isinstance(v, (list, dict)) else v
+            if len(e) == 4 and e[0] == "let" and e[1] == "m" and isinstance(e[2], list) and e[2][:1] == ["to-rgba"]:
+                return bake(e[2][1])                          # the interpolate inside to-rgba
+            return [bake(x) for x in e]
+        if isinstance(e, dict):
+            return {k: bake(v) for k, v in e.items()}
+        return e
+    out = {**style, "layers": [{**lyr, **{k: bake(lyr[k]) for k in ("paint", "layout", "filter") if k in lyr}} for lyr in style["layers"]]}
+    out.pop("state", None)
+    return out
+
+
+def _swap(v, old, new):
+    """``v`` with every part equal to ``old`` replaced by ``new``."""
+    if v == old:
+        return new
+    return [_swap(x, old, new) for x in v] if isinstance(v, list) else v
+
+
+def _state_expressions(style, props, fill_ids, end_fill_ids, end_casing_ids, ov_meta):
+    """The road layers read the page state (docs/design/style_config.md step 2), so the page builds no expression: a road fill (colour
+    option, rsColor), a two-way end cap (drawn where its two lanes have one colour), a deck (the option's colour), the paint order of a
+    painted road (+500 at a crossing of its level; simple mode +0.5), and an overlay's colours set by rsColor."""
+    base = ["coalesce", ["get", "__rs_fill"], _FB["fill"]]
+    has = lambda k: ["has", ["to-string", ["get", k]], _gs("rs_colors")]          # noqa: E731
+    same = ["match", _gs("rs_co"), *[x for i, pr in enumerate(props[1:], 1) for x in (i, ["==", ["get", pr], ["get", pr + "__b"]])],
+            ["==", ["get", props[0]], ["get", props[0] + "__b"]]] if len(props) > 1 else ["==", ["get", props[0]], ["get", props[0] + "__b"]]
+    both = ["all", has("__rs_edge"), has("__rs_edge2"), ["==", _painted("__rs_edge"), _painted("__rs_edge2")]]
+    clear = "rgba(0,0,0,0)"
+    for lyr in style["layers"]:
+        lid, paint, layout = lyr["id"], lyr.setdefault("paint", {}), lyr.get("layout") or {}
+        if lid in fill_ids or any(lid.startswith(b + "-dash") for b in fill_ids):
+            paint["line-color"] = _swap(paint["line-color"], base, _fill_expr(props))
+        elif lid.startswith("roads-bridge-decks"):
+            paint["fill-extrusion-color"] = _swap(paint["fill-extrusion-color"], base, _fill_base(props))     # decks: the option's colour
+        elif lid in end_fill_ids:
+            paint["circle-color"] = ["case", both, _painted("__rs_edge"), same, _fill_base(props), clear]
+        elif lid in end_casing_ids:
+            paint["circle-color"] = ["case", ["any", same, both], ["coalesce", ["get", "__rs_casing"], _FB["casing"]], clear]
+        if lyr.get("type") == "line" and layout.get("line-sort-key") is not None:
+            if lyr.get("source") == "roads":
+                layout["line-sort-key"] = ["+", layout["line-sort-key"], ["case", ["any", has("__rs_edge"), has("__rs_edge2")], 500, 0]]
+            elif lid == "roads-simple":
+                layout["line-sort-key"] = ["+", layout["line-sort-key"], ["case", ["all", ["any", ["==", ["get", "__rs_k"], 1], ["==", ["get", "__rs_k"], 5]],
+                                                                                  ["any", has("__rs_edge"), has("__rs_edge2")]], 0.5, 0]]
+    by_id = {lyr["id"]: lyr for lyr in style["layers"]}
+    for i, ov in enumerate(ov_meta or ()):
+        for lid in ov.get("layers", ()):
+            lyr = by_id.get(lid)
+            k = f"{lyr['type']}-color" if lyr and lyr["type"] in ("line", "fill", "circle") else None
+            if k and k in lyr.get("paint", {}):
+                lyr["paint"][k] = ["coalesce", ["get", ["to-string", ["id"]], _gs(f"rs_ov_{i}")], lyr["paint"][k]]
 
 
 def _fill_layer_ids(levels):
@@ -1526,7 +1737,7 @@ def _plus_px(expr, px, when=None):
 def _tunnel_casing_dash(lid, flt, tlay, cw, off, on):
     """The dashes of a tunnel's two-tone casing, a sublayer on the band's casing (``on``: the band has a tunnel)."""
     return [{"id": lid, "type": "line", "source": "roads", "layout": tlay, "filter": flt,
-             "paint": {"line-color": _TUN_TO["dash"], "line-width": _plus_px(cw, 3), "line-offset": off,      # as v2: 1.5 px wider each side, so its colours show
+             "paint": {"line-color": _TUN_TO["dash"], "line-width": _plus_px(cw, THEME["tunnels"]["dash_extra_px"]), "line-offset": off,      # wider than a casing, so its colours show
                        "line-dasharray": list(CONFIG.tunnel_casing_dash or [1, 1])}}] if on else []
 
 
@@ -1539,7 +1750,7 @@ def _tunnel_fill_dash(lid, flt, tlay, fw, off, on):
         return []
     return [{"id": lid, "type": "line", "source": "roads", "layout": tlay,
              "filter": ["all", flt, ["!", ["to-boolean", ["get", "__rs_dash"]]]],
-             "paint": {"line-color": CONFIG.tunnel_fill_dash_color or "rgba(255,255,255,0.55)",
+             "paint": {"line-color": CONFIG.tunnel_fill_dash_color,
                        "line-width": fw, "line-offset": off, "line-dasharray": [float(x) for x in dash]}}]
 
 
@@ -1675,46 +1886,6 @@ pick = function(p){
   const e = top.properties.__rs_edge;
   return {id:e, properties:_rprops(e), layer:{id:"roads-fill"}, get geometry(){ const r=_feats()[e] || _svTiled(e); return r && r.geometry; }};
 };
-function _simpleColor(){        // render_web._simple_color, with the active colouring, the rsColor groups and the tunnel slider
-  const sh=["==",["get","__rs_k"],2];
-  const c=["==",["get","__rs_k"],0], b=["to-boolean",["get","__rs_bridge"]];
-  const base=["coalesce",["get","__rs_casing"],"#000000"];
-  let fill=_fillExpr(["get","__rs_edge"]), item=["coalesce",["get","__rs_ic"],"#888888"], cases=[sh,RS_SIMPLE.shadow,c,["case",b,RS_SIMPLE.bridge,base]];
-  // a road painted by rsColor shows it on its items too: where items replace a road's fill (lanes), the fill alone would show nothing
-  // (2026-10-10: the level editor's picked roads were not visible with lanes); unpainted, an item keeps its own colour
-  const qa=_qAll();
-  for(let i=qa.length-1;i>=0;i--)
-    item=["case",["any",_has(["get","__rs_edge"],qa[i].ids),_has(["get","__rs_edge2"],qa[i].ids)],qa[i].color,item];
-  if(RS_SIMPLE.tunnels){                 // a tunnel's fill: the tunnel look; its casing: the palette's gap and dash colours (the gap clear for One colour)
-    fill=_tunMix(fill, TUNNEL.to.fill); item=_tunMix(item, TUNNEL.to.fill);
-    const pair=TUNNEL.palettes[TUNNEL.palette], k=TUNNEL.strength/100;
-    cases.push(["==",["get","__rs_k"],3], pair ? _tunHex(pair[1], TUNNEL.to.fill, k) : "rgba(0,0,0,0)",
-               ["==",["get","__rs_k"],4], _tunHex(pair ? pair[0] : TUNNEL.to.dash, TUNNEL.to.fill, k));
-  }
-  // a picked item of items= highlighted in the road layer itself (feature-state of the simple source), as render_web._simple_color
-  item=["case",["boolean",["feature-state","select"],false],RS_SIMPLE.select,["boolean",["feature-state","hover"],false],RS_SIMPLE.hover,item];
-  return ["case",...cases,["==",["get","__rs_k"],5],item,fill];    // an item (__rs_k 5) keeps its own colour
-}
-function _simpleDash(){         // render_web._simple_dasharray, with the tunnel dash ratio
-  const solid=["literal",[1,0]], by=["match",["to-string",["coalesce",["get","__rs_dash"],""]]];
-  RS_SIMPLE.dashes.forEach(d=>by.push(d,["literal",d.split(",").map(Number)])); by.push(solid);
-  return ["case",["==",["get","__rs_k"],4],["literal",TUNNEL.ratio.map(Number)],RS_SIMPLE.dashes.length ? by : solid];
-}
-const _rsFullFill=_applyFill, _rsFullSort=_applySort, _rsFullRoadFill=rsSetRoadFill;
-_applyFill=function(){ _rsFullFill();
-  if(map.getLayer(RS_SIMPLE.layer)) map.setPaintProperty(RS_SIMPLE.layer,"line-color",_simpleColor()); };
-// a painted road's fill (and its items) above the other fills of its position, under the casings of the next (line-sort-key 2 * position + 1.5)
-_applySort=function(){ _rsFullSort();
-  const all=_qColor ? [].concat(..._qColor.map(g=>g.ids)) : null, k=["get","__rs_s"];
-  if(map.getLayer(RS_SIMPLE.layer)) map.setLayoutProperty(RS_SIMPLE.layer,"line-sort-key",
-    all ? ["+",k,["case",["all",["any",["==",["get","__rs_k"],1],["==",["get","__rs_k"],5]],["any",_has(["get","__rs_edge"],all),_has(["get","__rs_edge2"],all)]],0.5,0]] : k); };
-const _rsFullTunnel=rsSetTunnelStyle;
-rsSetTunnelStyle=function(o){ _rsFullTunnel(o);       // the palette (colours, in _applyFill) and the dash ratio
-  if(RS_SIMPLE.tunnels && map.getLayer(RS_SIMPLE.layer)) map.setPaintProperty(RS_SIMPLE.layer,"line-dasharray",_simpleDash()); };
-window.rsSetTunnelStyle=rsSetTunnelStyle;
-rsSetRoadFill=function(on){
-  if(map.getLayer(RS_SIMPLE.layer)) map.setPaintProperty(RS_SIMPLE.layer,"line-opacity",on ? 1 : ["case",["==",["get","__rs_k"],1],0,1]);
-  _rsFullRoadFill(on); };
 </script>
 """
 
@@ -1821,7 +1992,7 @@ def _tiles(bm):
 def _bg_color(bm):
     """The plain canvas colour behind (or instead of) the tiles: ``bm.bg`` when it's a flat
     colour; the thumbnail gradients of the tiled built-ins fall back to a light/dark neutral."""
-    return bm.bg if bm.bg.startswith("#") else ("#0e1113" if bm.is_dark else "#e8e6e1")
+    return bm.bg if bm.bg.startswith("#") else THEME["background"]["dark" if bm.is_dark else "light"]
 
 
 def _basemap_style(bm):
@@ -1883,14 +2054,14 @@ def _bake_wm(fc, width_m):
         ft.setdefault("properties", {})["__rs_wm"] = float(width_m) / max(math.cos(math.radians(pt[1])), 0.01)
 
 
-def _overlay_layers(sid, ov, kind, hover_color="#b388ff", select_color="#7c4dff", along=True):
+def _overlay_layers(sid, ov, kind, hover_color=None, select_color=None, along=True):
     """The MapLibre layer spec(s) for one overlay source: a fill (+ outline), a circle, a line or a text (``along``: the text follows a line).
 
     Interactive overlays (those with a popup) recolour on hover / select via feature-state, the same
     way roads do, so the hovered / clicked feature highlights."""
-    C = {"color": "#6aa9ff", "radius": 6.0, "width": 2.0, "fill_opacity": 0.15,
-         "circle_opacity": 0.85, "line_opacity": 0.9, "outline_opacity": 0.9,
-         "circle_stroke": "#ffffff", **(CONFIG.overlays or {})}
+    C = {**THEME["overlays"], **(CONFIG.overlays or {})}
+    hover_color = THEME["selection"]["hover"] if hover_color is None else hover_color
+    select_color = THEME["selection"]["select"] if select_color is None else select_color
     base = ov.color or C["color"]                     # per-Overlay value wins over the setting
     if ov.color_col:                                  # a colour per feature (null / missing: the overlay's)
         base = ["coalesce", ["get", ov.color_col], base]
@@ -1909,9 +2080,10 @@ def _overlay_layers(sid, ov, kind, hover_color="#b388ff", select_color="#7c4dff"
             raise ValueError("an overlay of kind 'text' needs text_col (the property that holds the text)")
         return [{"id": f"{sid}-text", "type": "symbol", "source": sid, **zooms,
                  "layout": {**lay, "symbol-placement": "line-center" if along else "point", "text-field": ["get", ov.text_col],
-                            "text-font": ["Noto Sans Regular"], "text-size": ov.text_size or 12, "text-max-angle": 40, "text-padding": 2},
+                            "text-font": THEME["labels"]["font"], "text-size": ov.text_size or C["text_size"], "text-max-angle": C["text_max_angle"],
+                            "text-padding": C["text_padding"]},
                  "paint": {"text-color": ov.text_color or base,
-                           **({"text-halo-color": ov.text_halo, "text-halo-width": 1.5} if ov.text_halo else {})}}]
+                           **({"text-halo-color": ov.text_halo, "text-halo-width": C["text_halo_width"]} if ov.text_halo else {})}}]
     if kind == "fill":
         return [
             {"id": f"{sid}-fill", "type": "fill", "source": sid, "layout": dict(lay), **zooms,
@@ -1924,9 +2096,9 @@ def _overlay_layers(sid, ov, kind, hover_color="#b388ff", select_color="#7c4dff"
         return [{"id": f"{sid}-circle", "type": "circle", "source": sid, "layout": dict(lay), **zooms,
                  "paint": {"circle-radius": radius, "circle-color": col,
                            "circle-opacity": C["circle_opacity"] if op is None else op,
-                           "circle-stroke-color": ov.outline or C["circle_stroke"], "circle-stroke-width": 1 if ov.width is None else ov.width}}]
+                           "circle-stroke-color": ov.outline or C["circle_stroke"], "circle-stroke-width": C["circle_stroke_width"] if ov.width is None else ov.width}}]
     return [{"id": f"{sid}-line", "type": "line", "source": sid, **zooms,
-             "layout": {**lay, "line-cap": "butt" if ov.dash else "round"},
+             "layout": {**lay, "line-cap": THEME["tunnels"]["cap"] if ov.dash else THEME["roads"]["cap"]},
              "paint": {"line-color": col, "line-width": width, **dash,
                        "line-opacity": C["line_opacity"] if op is None else op}}]
 
@@ -1970,7 +2142,7 @@ def _item_pieces(ov, i, fc):
     """Simple mode: the line items of an overlay attached to edges as pieces of the one road layer (``__rs_k`` 5, docs/design/edge_items.md):
     what the filters read from their edge (baked by :func:`_edge_overlay`), ``lvl``, their colour ``__rs_ic`` and their width / offset in
     metres over cos(latitude) (``__rs_iwm`` / ``__rs_iom``, as ``_mark_width_m``). ``__rs_s`` is set by :func:`_simple_pieces`."""
-    C = {"color": "#6aa9ff", **(CONFIG.overlays or {})}
+    C = {**THEME["overlays"], **(CONFIG.overlays or {})}
     out = []
     for j, ft in enumerate(fc["features"]):
         p, g = ft["properties"], ft.get("geometry") or {}
@@ -2015,7 +2187,7 @@ def _road_items(data, roads, edge_id_col, fcol, k):
     return out
 
 
-def _build_overlays(style, overlays, hover_color="#b388ff", select_color="#7c4dff", roads=None, edge_id_col="edge_id", fcol="highway", fill=False):
+def _build_overlays(style, overlays, hover_color=None, select_color=None, roads=None, edge_id_col="edge_id", fcol="highway", fill=False):
     """Add each overlay as its own source + layer(s) to ``style``. Returns ``(under, over, meta, edge, items)``:
     the layer specs to splice below / above the roads, the JS metadata (label / source / clickable
     layer ids / popup fields) the page reads to wire popups, hover/select highlight, and the Layers
@@ -2352,8 +2524,8 @@ def _host_panel(html, width, name):
             f'<div class="rs-side-host">{html}</div></div>')
 
 
-_ACCESS = (("private", "#c8c8c8", "Private roads"), ("bus", "#9db8d9", "Bus lanes"),     # access_col: the kinds, their colour and the row's text (as mapstyle's layers.js)
-           ("pedestrian", "#dddde8", "Pedestrian streets"), ("delivery", "#e8d2b0", "Delivery only"))
+_ACCESS = (("private", "Private roads"), ("bus", "Bus lanes"),        # access_col: the kinds and the row's text (as mapstyle's layers.js); the colors are the palette's ``access``
+           ("pedestrian", "Pedestrian streets"), ("delivery", "Delivery only"))
 
 
 def _mark_cls(geo, feature_lists, fcol):
@@ -2381,25 +2553,23 @@ def _simple_dasharray(dashes, ratio):
     ``__rs_dash`` ("4,4"), any other piece solid ([1, 0]). A property cannot hold an array on a GeoJSON source, hence the match on the text."""
     solid = ["literal", [1, 0]]
     by = ["match", ["to-string", ["coalesce", ["get", "__rs_dash"], ""]], *[x for d in dashes for x in (d, ["literal", [float(v) for v in d.split(",")]])], solid]
-    return ["case", ["==", ["get", "__rs_k"], 4], ["literal", [float(v) for v in ratio]], by if dashes else solid]
+    return ["case", ["==", ["get", "__rs_k"], 4], _gs("rs_tun_ratio"), by if dashes else solid]
 
 
-def _simple_color(bridge_color, tunnels=False, select_color=None, hover_color=None):
+def _simple_color(bridge_color, tunnels=False, select_color=None, hover_color=None, props=("__rs_fill",)):
     """Simple mode's line-color: a bridge shadow ``bridge_shadow_color``, a casing piece its casing colour (a bridge's ``bridge_color``), a fill its fill; on a map with
     ``tunnels`` a tunnel's fill takes the tunnel look (_tun_mix toward ``tunnel_toward`` at ``tunnel_strength``) and its casing pieces the palette's
     two colours moved the same way (gap ``__rs_k`` 3, dashes 4; the gap clear for "One colour"). The page builds the same again on every
     recolouring (the simple-mode script)."""
     c, b = ["==", ["get", "__rs_k"], 0], ["to-boolean", ["get", "__rs_bridge"]]
-    base, fill = ["coalesce", ["get", "__rs_casing"], "#000000"], ["coalesce", ["get", "__rs_fill"], "#888888"]
-    item = ["coalesce", ["get", "__rs_ic"], "#888888"]                  # an item (__rs_k 5) its own colour, not the road's colouring
+    base, fill = ["coalesce", ["get", "__rs_casing"], _FB["casing"]], _fill_expr(list(props))
+    # an item (__rs_k 5) its own colour, not the road's colouring; a road painted by rsColor shows it on its items too: where items replace
+    # a road's fill (lanes), the fill alone would show nothing (2026-10-10: the level editor's picked roads were not visible with lanes)
+    item = ["coalesce", _painted("__rs_edge"), _painted("__rs_edge2"), _painted("__rs_edge", "rs_base"), _painted("__rs_edge2", "rs_base"), ["coalesce", ["get", "__rs_ic"], _FB["fill"]]]
     cases = [["==", ["get", "__rs_k"], 2], CONFIG.bridge_shadow_color, c, ["case", b, bridge_color, base]]
     if tunnels:
-        to, _, s = _tun_settings()                             # the chosen tunnel colour (tunnel_toward), as the full look and the page's _simpleColor
-        pair = CONFIG.tunnel_palettes[CONFIG.tunnel_palette]
-        toward = lambda x: ["interpolate", ["linear"], s, 0, x, 100, to]  # noqa: E731
-        fill, item = _tun_mix(fill, to, s), _tun_mix(item, to, s)
-        cases += [["==", ["get", "__rs_k"], 3], toward(pair[1]) if pair else "rgba(0,0,0,0)",
-                  ["==", ["get", "__rs_k"], 4], toward(pair[0] if pair else _TUN_TO["dash"])]
+        fill, item = _tun_mix(fill), _tun_mix(item)            # the tunnel look, from the state the Tunnels box sets
+        cases += [["==", ["get", "__rs_k"], 3], _tun_gap(), ["==", ["get", "__rs_k"], 4], _tun_dash()]
     if select_color:                    # a picked item of items= (__rs_pick) highlighted in the road layer itself (feature-state of the simple source)
         item = ["case", ["boolean", ["feature-state", "select"], False], select_color, ["boolean", ["feature-state", "hover"], False], hover_color, item]
     return ["case", *cases, ["==", ["get", "__rs_k"], 5], item, fill]
@@ -2467,6 +2637,11 @@ def _place_edge_overlays(layers, edge, levels, pat_over=False):
 with open(os.path.join(os.path.dirname(__file__), "static", "web_template.html"),
           encoding="utf-8") as _fh:
     _HTML = _fh.read()
+# the popup's look and text, shared with the GeoLibre plugin (export_style copies both files): inlined here, popup.js as a plain script
+with open(os.path.join(os.path.dirname(__file__), "static", "popup.css"), encoding="utf-8") as _fh:
+    _HTML = _HTML.replace("__POPUP_CSS__", _fh.read())
+with open(os.path.join(os.path.dirname(__file__), "static", "popup.js"), encoding="utf-8") as _fh:
+    _HTML = _HTML.replace("__POPUP_JS__", _fh.read().replace("export ", ""))
 
 
 # The notebook preview loads MapLibre from the CDN at the vendored version (test pins the match;
@@ -2514,21 +2689,21 @@ class WebMap:
 def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            filter_col: str = None,
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
-           offset_frac: float = 0.28, width_frac: float = 0.6, offset_zoom: int = 15,
+           offset_frac: float = None, width_frac: float = None, offset_zoom: int = None,
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
            edge_id_col: str = "edge_id", road_fill: bool = True, cap_col: str = None, cap_start_col: str = None, cap_end_col: str = None, casing_level_col: str = None, fill_level_col: str = None, casing_start_col: str = None, casing_end_col: str = None, head_m: float = 5.0, head_start_m_col: str = None, head_end_m_col: str = None, directed_col: str = None, driving_col: str = None,
-           width_m_col: str = None, width_m_zoom: float = 16, casing_m: float = 0.15, casing_min_px: float = 0.0,
+           width_m_col: str = None, width_m_zoom: float = None, casing_m: float = None, casing_min_px: float = None,
            pitch: float = None, bearing: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True, find_control: bool = False, overlay_control: bool = True, overlay_popup: bool = True,
            access_col: str = None, side_panel_html: str = None, host_panel_width: int = 320,
            basemap_switcher: bool = True, zoom_readout: bool = True,
            road_popup=True, road_tooltip=False, hover_delay_ms: int = 300, data_maxzoom: int = None, popup_mode: str = None,
            street_view: bool | str = "window", street_view_key: str | None = None, google_3d: bool = False,
-           tooltip=None, hover_color: str = "#b388ff", select_color: str = "#7c4dff", boundary=None,
+           tooltip=None, hover_color: str = None, select_color: str = None, boundary=None,
            color_options=None, color_active=0, views=None, overlays=None, items=None, items_popup=None, compress: bool = True, tunnel_control: bool = False,
            tiles: bool = False, simple: bool = True,
            minzoom=None, legend: bool = True,
-           api_key: str | None = None, _edges=None, **_ignore):
+           api_key: str | None = None, _edges=None, _palette_copy: bool = False, _export: bool = False, **_ignore):
     """Build a self-contained MapLibre map of the styled edges.
 
     Every edge is drawn by two **positions**, the number where its casing is drawn and the number where its fill is drawn
@@ -2637,6 +2812,17 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     ``tooltip`` is a convenience alias for the shared backend arg (folium / CLI ``--tooltip``): when
     given and ``road_tooltip`` is unset, its value drives the hover tooltip here too, so the same
     call works across backends."""
+    _args = dict(locals())        # this call's arguments: a view's palette is a second build with another palette (_palette_copies)
+    # the look keywords left out take the theme's values (docs/design/style_config.md)
+    _sp, _cs, _sel = THEME["roads"]["split"], THEME["casing"], THEME["selection"]
+    offset_frac = _sp["offset_frac"] if offset_frac is None else offset_frac
+    width_frac = _sp["width_frac"] if width_frac is None else width_frac
+    offset_zoom = _sp["offset_zoom"] if offset_zoom is None else offset_zoom
+    width_m_zoom = THEME["roads"]["width_m_zoom"] if width_m_zoom is None else width_m_zoom
+    casing_m = _cs["m"] if casing_m is None else casing_m
+    casing_min_px = _cs["min_px"] if casing_min_px is None else casing_min_px
+    hover_color = _sel["hover"] if hover_color is None else hover_color
+    select_color = _sel["select"] if select_color is None else select_color
     # `tooltip=` is the folium/CLI hover arg; the web backend's own name is `road_tooltip`. Alias it
     # through so a shared `tooltip=`/`--tooltip` works on the web backend instead of being ignored.
     if tooltip is not None and not road_tooltip:
@@ -2710,6 +2896,11 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             color_opts_meta = [{"name": rf.legend.get("title") or "data",
                                 "prop": "__rs_fill", "legend": rf.legend}]
     _mark_twoway(geo, directed_col, highway_col, driving_col)
+    for ft in geo["features"] if access_col else ():      # a road with an access kind has its kind's colour in every colour option (the palette's ``access``); rsColor and rsColorBase paint over it
+        p = ft["properties"]
+        if THEME["access"].get(p.get("__rs_access")):
+            for k in [k for k in p if k.startswith("__rs_fill")]:
+                p[k] = THEME["access"][p["__rs_access"]]
     if CONFIG.single_line_classes:
         _mark_single_line(geo, highway_col, set(CONFIG.single_line_classes))
     _mark_lvl(geo, tunnel_col, bridge_col, layer_col)
@@ -2819,10 +3010,10 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     # the only rendering primitive that seals the seam where two of them connect (line-join only
     # works *within* a feature). Network continuity outranks end-cap shape — a round blob at a
     # dead end is cosmetic, a notch at a connection or junction is a break in the network.
-    lay = {"line-cap": "round", "line-join": "round",
+    lay = {"line-cap": THEME["roads"]["cap"], "line-join": THEME["roads"]["join"],
            "line-sort-key": 0}   # positions only: no class, level or order
-    tlay = {**lay, "line-cap": "butt"}                    # butt cap -> clean dash ticks on tunnel casing
-    blay = {**lay, "line-cap": "butt"}                    # butt cap -> square bridge deck ends
+    tlay = {**lay, "line-cap": THEME["tunnels"]["cap"]}   # clean dash ticks on tunnel casing
+    blay = {**lay, "line-cap": THEME["bridges"]["cap"]}   # square bridge deck ends
     wmz = width_m_zoom if width_m_col else None           # a pair with metres on both shifted by metres, one casing or each its own (2026-10-10)
     off = _offset_expr(highway_col, offset_frac, offset_zoom, pairs, wmz)
     sw = dict(split_zoom=offset_zoom, split_frac=width_frac)
@@ -2869,7 +3060,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         style["sources"]["decks"] = {"type": "geojson", "data": decks, "generateId": True}
     cw = _width_expr(highway_col, casing=True, **sw)      # casing width expr (reused across layers)
     fw = _width_expr(highway_col, **sw)                   # fill width expr
-    bcw = _width_expr(highway_col, casing=True, scale=1.25, **sw)   # heavier bridge casing ("wings")
+    bcw = _width_expr(highway_col, casing=True, scale=THEME["bridges"]["wing_scale"], **sw)   # heavier bridge casing ("wings")
     if width_m_col:     # metre widths from width_m_zoom on (docs/design/metre_widths.md)
         cw, fw, bcw = (_width_m_expr(highway_col, k, width_m_zoom, bridge_m=CONFIG.bridge_casing_m,
                                      bridge_px=CONFIG.bridge_casing_px, casing_px=casing_min_px, **sw)
@@ -2880,28 +3071,28 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         # tunnel LOOK: its casing drawn by the dash sublayer alone, light dashes on the fill (a sublayer), and the colours of
         # v2's tunnel slider (_tunnel_look, docs/design/tunnel_look.md).
         {"id": "roads-low-casing", "type": "line", "source": "roads", "layout": lay, "filter": low,
-         "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
+         "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], _FB["casing"]],
                    "line-width": cw, "line-offset": off}},
         *_tunnel_casing_dash("roads-low-casing-dash", tunnel, tlay, cw, off, any_tunnel),
         {"id": "roads-low-fill", "type": "line", "source": "roads", "layout": lay, "filter": low,
-         "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
+         "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], _FB["fill"]],
                    "line-width": fw, "line-offset": off}},
         *_tunnel_fill_dash("roads-low-fill-pat", tunnel, tlay, fw, off, any_tunnel),
         {"id": "roads-casing", "type": "line", "source": "roads", "layout": lay, "filter": surface,
-         "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
+         "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], _FB["casing"]],
                    "line-width": cw, "line-offset": off}},
         *_tunnel_casing_dash("roads-casing-dash", tunnel_g, tlay, cw, off, tun_g),
         {"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, "filter": surface,
-         "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
+         "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], _FB["fill"]],
                    "line-width": fw, "line-offset": off}},
         *_tunnel_fill_dash("roads-fill-pat", tunnel_g, tlay, fw, off, tun_g),
         # above ground, not a bridge (a positive layer alone: a raised walkway): over the ground roads it crosses
         {"id": "roads-high-casing", "type": "line", "source": "roads", "layout": lay, "filter": high,
-         "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], "#000000"],
+         "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], _FB["casing"]],
                    "line-width": cw, "line-offset": off}},
         *_tunnel_casing_dash("roads-high-casing-dash", tunnel_h, tlay, cw, off, tun_h),
         {"id": "roads-high-fill", "type": "line", "source": "roads", "layout": lay, "filter": high,
-         "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
+         "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], _FB["fill"]],
                    "line-width": fw, "line-offset": off}},
         *_tunnel_fill_dash("roads-high-fill-pat", tunnel_h, tlay, fw, off, tun_h),
         # The bridge LOOK, last (on top). Flat view: heavier square-capped casing reads as a deck.
@@ -2914,14 +3105,14 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                    "line-width": bcw, "line-offset": off}},
         {"id": "roads-bridge-fill", "type": "line", "source": "roads", "layout": lay,
          "filter": bridge,
-         "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"],
+         "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], _FB["fill"]],
                    "line-width": fw, "line-offset": off}},
         # hover/select highlight, driven by feature-state set from the viewer (GPU recolour, no relayout)
         {"id": "roads-highlight", "type": "line", "source": "roads", "layout": lay,
          "paint": {
              "line-color": ["case", ["boolean", ["feature-state", "select"], False], select_color, hover_color],
              "line-opacity": ["case", ["any", ["boolean", ["feature-state", "hover"], False],
-                                       ["boolean", ["feature-state", "select"], False]], 0.85, 0],
+                                       ["boolean", ["feature-state", "select"], False]], THEME["selection"]["opacity"], 0],
              "line-width": fw, "line-offset": off}},
     ]
     if ends:
@@ -2936,7 +3127,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         same = ["==", ["get", "__rs_fill"], ["get", "__rs_fill__b"]]
 
         def _end(lid, flt, casing):
-            col = ["coalesce", ["get", "__rs_casing" if casing else "__rs_fill"], "#000000" if casing else "#888888"]
+            col = ["coalesce", ["get", "__rs_casing" if casing else "__rs_fill"], _FB["casing"] if casing else _FB["fill"]]
             if casing:     # no ring where a lower band meets the end (__rs_nocase, _twin_ends)
                 flt = ["all", flt, ["!", ["to-boolean", ["get", "__rs_nocase"]]]]
             return {"id": lid, "type": "circle", "source": "ends", "filter": flt,
@@ -2977,7 +3168,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
              "paint": {"fill-extrusion-color":
                            ["case", ["boolean", ["feature-state", "select"], False], select_color,
                             ["boolean", ["feature-state", "hover"], False], hover_color,
-                            ["coalesce", ["get", "__rs_fill"], "#888888"]],
+                            ["coalesce", ["get", "__rs_fill"], _FB["fill"]]],
                        "fill-extrusion-base": ["get", "__rs_base"],
                        "fill-extrusion-height": ["get", "__rs_height"],
                        "fill-extrusion-opacity": dk["opacity"]}})
@@ -3012,7 +3203,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                              "filter": ["all", base_f, ["==", ["get", "__rs_dash"], ds]],
                              "paint": {**l["paint"],
                                        "line-color": ["coalesce", ["get", "__rs_casing"],
-                                                      "#f2f2f2"]}})
+                                                      THEME["bridges"]["decks"]["underlay"]]}})
                     relayered.append(
                         {**l, "id": f"{lid}-dash{di}",
                          "layout": {**l.get("layout", {}), "line-cap": "butt"},
@@ -3114,7 +3305,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                 twins.insert(0, {"id": "roads-casing-bridge-shadow", "type": "line", "source": "shadows", "layout": {**lay, "line-cap": "butt"},
                                  "filter": ["literal", True],
                                  "paint": {"line-color": CONFIG.bridge_shadow_color, "line-blur": CONFIG.bridge_shadow_blur,
-                                           "line-width": _width_expr(highway_col, casing=True, scale=1.6, **sw),
+                                           "line-width": _width_expr(highway_col, casing=True, scale=THEME["bridges"]["shadow"]["width_scale"], **sw),
                                            "line-translate": list(CONFIG.bridge_shadow_offset), "line-translate-anchor": "viewport"}})
             layers[at + 1:at + 1] = twins
             style["layers"] = layers
@@ -3166,22 +3357,23 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         # wider each side again, blurred that much, evenly around it (line-translate is not per feature)
         is_sh, blur = ["==", ["get", "__rs_k"], 2], float(CONFIG.bridge_shadow_blur)
         # both grow with the zoom: none below zoom 14 (the full look's plain bridge casing, no shadow), full from 17 (a stop at each, so linear)
-        ramp = lambda z: min(max((z - 14) / 3, 0), 1)  # noqa: E731
+        r0, r1 = THEME["bridges"]["ramp"]
+        ramp = lambda z: min(max((z - r0) / (r1 - r0), 0), 1)  # noqa: E731
         bwide = _plus_px(bcw, lambda z: 2 * float(CONFIG.bridge_casing_extra) * ramp(z))
         wide = [(is_sh, _plus_px(bcw, lambda z: 2 * (float(CONFIG.bridge_casing_extra) + blur) * ramp(z))), (["all", is_c, is_b], bwide),
-                *([(["any", ["==", ["get", "__rs_k"], 3], ["==", ["get", "__rs_k"], 4]], _plus_px(cw, 3))] if any_tunnel else []), (is_c, cw),
-                *([(is_it, _plus_px(_metre_curve(fw, "__rs_iwm"), 1))] if items else [])]   # 1 px over: two lanes side by side show no antialiased seam
-        op = [1] if road_fill else [["==", ["get", "__rs_k"], 1], 0, 1]
+                *([(["any", ["==", ["get", "__rs_k"], 3], ["==", ["get", "__rs_k"], 4]], _plus_px(cw, THEME["tunnels"]["dash_extra_px"]))] if any_tunnel else []), (is_c, cw),
+                *([(is_it, _plus_px(_metre_curve(fw, "__rs_iwm"), THEME["overlays"]["item_overlap_px"]))] if items else [])]   # 1 px over: two lanes side by side show no antialiased seam
+        op = ["case", ["all", ["!", _gs("rs_fill_on")], ["==", ["get", "__rs_k"], 1]], 0, 1]     # road_fill off: no fill pieces (state rs_fill_on)
         sdashes = sorted({(f.get("properties") or {}).get("__rs_dash") for f in geo["features"] + items} - {None, ""})
         sdash = {"line-dasharray": _simple_dasharray(sdashes, CONFIG.tunnel_casing_dash or [1, 1])} if sdashes or any_tunnel else {}
         road = {"id": "roads-simple", "type": "line", "source": "simple", "layout": {**lay, "line-cap": _simple_cap(), "line-sort-key": ["get", "__rs_s"]}, **flt,
-                "paint": {**sdash, "line-color": _simple_color(CONFIG.bridge_casing_color, bool(any_tunnel), select_color, hover_color),
+                "paint": {**sdash, "line-color": _simple_color(CONFIG.bridge_casing_color, bool(any_tunnel), select_color, hover_color, _fill_props(color_opts_meta)),
                           "line-width": _pair_width(_by_feature(wide, fw), highway_col, offset_frac, offset_zoom, wmz) if pairs else _by_feature(wide, fw), "line-offset": soff,
-                          "line-blur": ["interpolate", ["linear"], ["zoom"], 14, 0, 17, ["case", is_sh, blur, 0]],
-                          "line-opacity": ["interpolate", ["linear"], ["zoom"], 14, ["case", is_sh, 0, *op], 17, op[-1] if road_fill else ["case", *op]]}}
+                          "line-blur": ["interpolate", ["linear"], ["zoom"], r0, 0, r1, ["case", is_sh, blur, 0]],
+                          "line-opacity": ["interpolate", ["linear"], ["zoom"], r0, ["case", is_sh, 0, op], r1, op]}}
         # the edges themselves, invisible: what a click, a hover, Street View and the page's fill code find (the roads source, its ids)
         pick = {"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, **flt,
-                "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], "#888888"], "line-width": fw, "line-offset": off, "line-opacity": 0}}
+                "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], _FB["fill"]], "line-width": fw, "line-offset": off, "line-opacity": 0}}
         at = next(n for n, l in enumerate(style["layers"]) if l["id"].startswith(("roads-casing", "roads-fill")))
         style["layers"] = [l for l in style["layers"] if not l["id"].startswith(("roads-casing", "roads-fill", "roads-ends"))]
         style["layers"][at:at] = [road, pick]
@@ -3197,8 +3389,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         cam["pitch"] = pitch
     if bearing is not None:
         cam["bearing"] = bearing
-    arw = {"color": "#5b5b5b", "opacity": 0.7, **(CONFIG.arrows or {})}
-    lbl = {"color": "#5b5b5b", "halo_color": None, "halo_width": 0, **(CONFIG.labels or {})}
+    arw = {**THEME["arrows"], **(CONFIG.arrows or {})}
+    lbl = {**THEME["labels"], **(CONFIG.labels or {})}
     slot_m = (CONFIG.annotations or {}).get("slot_m", 100)
     slots = {"features": []}
     if arrows or labels:
@@ -3206,7 +3398,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         if slots["features"]:
             if not tiles:   # tiles=True ships the slots as a layer of the pmtiles archive
                 style["sources"]["slots"] = {"type": "geojson", "data": slots}
-                if arrows:     # the page fills it: one arrow per one-way road in the window
+                if arrows and not _export:     # the page fills it: one arrow per one-way road in the window (an app has no page to)
                     style["sources"]["arrows"] = {"type": "geojson", "data": {"type": "FeatureCollection", "features": []}}
             # labels take the ARROWS' opacity by default: both are #5b5b5b, but full-opacity
             # text reads near-black next to 70%-opacity icons — "same colour" must mean same
@@ -3223,8 +3415,6 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             # the LATER style layer, so the layer order is the culling priority and names are placed
             # first. An arrow (one per road, placed by the page between two names) that would still touch
             # a name is left out: docs/design/arrows_and_names.md.
-            _MINOR = ["footway", "cycleway", "path", "steps",
-                      "service", "track", "pedestrian"]
             if arrows:
                 # Every one-way slot, repeated along the line — not one arrow per odd slot
                 # (line-center on odd slots put ONE arrow per 200 m of chain, so at street zoom
@@ -3247,7 +3437,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                     f = ["all", ["==", ["get", "oneway"], 1],
                          tier,
                          ["any", ["!", ["match", ["get", "highway"], _MINOR, True, False]],
-                          [">=", ["zoom"], 16]]]
+                          [">=", ["zoom"], arw["minor_minzoom"]]]]
                     if mz:
                         f.append(_minzoom_filter("highway", mz))
                     # minzoom 15, not 14: arrows are a street-scale affordance — at z14 they
@@ -3258,13 +3448,13 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                     # rotated along the road. ponytail: a tiled map (tiles=True) has no slot geometry in the page and keeps the
                     # arrows repeated along every slot; give it the chains' lines too if one arrow per road matters there
                     where = ({"source": "slots", "layout": {"symbol-placement": "line",
-                                                            "symbol-spacing": ["interpolate", ["linear"], ["zoom"], 15, 200, 18, 320, 22, 900]}}
-                             if tiles else
+                                                            "symbol-spacing": ["interpolate", ["linear"], ["zoom"], *[x for zp in arw["spacing"] for x in zp]]}}
+                             if tiles or _export else
                              {"source": "arrows", "layout": {"symbol-placement": "point", "icon-rotate": ["get", "b"],
                                                              # where it would touch a name the arrow is left out (2026-10-06): the names are
                                                              # placed first (a later layer), and an arrow never pushes a name away
                                                              "icon-allow-overlap": False, "icon-ignore-placement": True}})
-                    return {"id": lid, "type": "symbol", "source": where["source"], "minzoom": 15,
+                    return {"id": lid, "type": "symbol", "source": where["source"], "minzoom": arw["minzoom"],
                             "filter": f,
                             "layout": {**where["layout"],
                                        "icon-image": "oneway",
@@ -3277,13 +3467,12 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                                        # cycleway's arrow does not dwarf its own line. (The
                                        # class factor sits inside the stops: MapLibre only
                                        # allows ["zoom"] in a TOP-LEVEL interpolate.)
-                                       "icon-size": ["interpolate", ["exponential", 1.8],
+                                       "icon-size": ["interpolate", ["exponential", arw["size"]["base"]],
                                                      ["zoom"]] + [
-                                           part for z, base in ((15, 0.5), (18, 0.9),
-                                                                (22, 3.0))
+                                           part for z, base in arw["size"]["stops"]
                                            for part in (z, ["*", base,
                                                ["match", ["get", "highway"],
-                                                _MINOR, 0.6, 1.0]])]},
+                                                _MINOR, arw["size"]["minor"], 1.0]])]},
                             "paint": {"icon-opacity": arw["opacity"]}}
                 # insert after the LAST layer of the tier's fill family, not after the first
                 # "-fill": tiled multi-level bridges append deck sub-layers (roads-bridge-
@@ -3315,26 +3504,26 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                         if members:
                             style["layers"].insert(max(members) + 1, _arrow_layer(lid, [cmp, ["coalesce", ["get", "lvl"], 0], 0]))
             if labels:
-                style["glyphs"] = "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"
+                style["glyphs"] = lbl["glyphs"]
                 lf = ["all", ["==", ["%", ["get", "slot"], 2], 0],
                       ["to-boolean", ["get", "name"]],
                       # minor classes wait for z16, like their arrows: a cycleway named after
                       # the street it runs beside would duplicate the street's name onto a
                       # line still hugging the roadway's stroke
                       ["any", ["!", ["match", ["get", "highway"], _MINOR, True, False]],
-                       [">=", ["zoom"], 16]]]
+                       [">=", ["zoom"], lbl["minor_minzoom"]]]]
                 if mz:   # a hidden class must not keep its street name floating either
                     lf.append(_minzoom_filter("highway", mz))
                 if not lbl.get("size"):                 # no name where it would be under 9 px (its road too narrow at that zoom); labels.size sets it instead
                     lf.append(_label_readable_filter())
                 def _label_layer(lid, flt):
-                    return {"id": lid, "type": "symbol", "source": "slots", "minzoom": 14,
+                    return {"id": lid, "type": "symbol", "source": "slots", "minzoom": lbl["minzoom"],
                             "filter": flt,
                             "layout": {"symbol-placement": "line-center",
                                        "text-field": ["get", "name"],
-                                       "text-font": ["Noto Sans Regular"],
+                                       "text-font": lbl["font"],
                                        "text-size": _label_size_expr(lbl.get("size")),          # about 3/4 of the road's fill width
-                                       "text-max-angle": 40, "text-padding": 2,
+                                       "text-max-angle": lbl["max_angle"], "text-padding": lbl["padding"],
                                        # major streets' names win label-vs-label collisions too
                                        "symbol-sort-key": ["*", -1, _sort_key("highway")]},
                             "paint": lpaint}
@@ -3361,9 +3550,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         style["sources"]["boundary"] = {"type": "geojson", "data": _boundary_fc(boundary)}
         style["layers"].append(
             {"id": "boundary", "type": "line", "source": "boundary",
-             "layout": {"line-cap": "round", "line-join": "round"},
-             "paint": {"line-color": "#6a0dad", "line-width": 2.5, "line-opacity": 0.9,
-                       "line-dasharray": [3, 2]}})
+             "layout": {"line-cap": THEME["roads"]["cap"], "line-join": THEME["roads"]["join"]},
+             "paint": {"line-color": THEME["boundary"]["color"], "line-width": THEME["boundary"]["width"],
+                       "line-opacity": THEME["boundary"]["opacity"], "line-dasharray": THEME["boundary"]["dash"]}})
 
     # no road layer that nothing can draw (a position without bridges has no bridge layers, ...): the arrows source is filled by the page
     # from the slots, with their properties
@@ -3384,10 +3573,11 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             fill_paint[lyr["id"]] = {k: lyr["paint"].get(k) for k in ("line-opacity",)}
         elif lyr["id"].startswith("roads-ends-fill"):
             fill_paint[lyr["id"]] = {k: lyr["paint"].get(k) for k in ("circle-opacity", "circle-stroke-opacity")}
-    if not road_fill:     # the casing of the road, not its fill: the fill layers stay for clicks and hovers, invisible
-        for lyr in style["layers"]:
-            if lyr["id"] in fill_paint:
-                lyr["paint"] = {**lyr["paint"], **dict.fromkeys(fill_paint[lyr["id"]], 0)}
+    # road_fill=False draws the casing of the road, not its fill: the fill layers stay for clicks and hovers, invisible. The switch is the
+    # state rs_fill_on (rsSetRoadFill, a view's road_fill); off, each fill opacity is 0
+    for lyr in style["layers"]:
+        if lyr["id"] in fill_paint:
+            lyr["paint"] = {**lyr["paint"], **{k: ["case", _gs("rs_fill_on"), 1 if v is None else v, 0] for k, v in fill_paint[lyr["id"]].items()}}
     if edge_layers and simple:     # one road layer: the items above all roads, position by position, before the arrows and names
         at = next(n for n, l in enumerate(style["layers"]) if l["id"] in ("roads-arrows", "roads-labels", "roads-highlight"))
         style["layers"][at:at] = [lyr for _, _, _, group in sorted(edge_layers, key=lambda x: x[:3]) for lyr in group]
@@ -3399,32 +3589,43 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             if src.get("type") == "geojson":
                 src["maxzoom"] = int(data_maxzoom)
     tun_colour, tun_toward, tun_strength = _tun_settings()
+    _state_expressions(style, _fill_props(color_opts_meta), set(_fill_layer_ids(levels)), end_fill_ids if levels else [], end_casing_ids if levels else [],
+                       ov_meta)
+    pair = CONFIG.tunnel_palettes.get(CONFIG.tunnel_palette)
+    style["state"] = {**{k: {"default": v} for k, v in {
+        "rs_co": _active, "rs_colors": {}, "rs_base": {}, "rs_fill_on": bool(road_fill),
+        "rs_tun_strength": tun_strength, "rs_tun_toward": tun_colour, "rs_tun_two": bool(pair),
+        "rs_tun_c0": pair[0] if pair else _TUN_TO["dash"], "rs_tun_c1": pair[1] if pair else _TUN_TO["dash"],
+        "rs_tun_ratio": [float(x) for x in CONFIG.tunnel_casing_dash or [1, 1]]}.items()},
+        **{f"rs_ov_{i}": {"default": {}} for i in range(len(ov_meta))}}
     tun_paint, tun_dash, tun_casing = {}, [], {}
     if any(ft["properties"].get("__rs_tunnel") for ft in geo["features"]):      # the tunnel look (docs/design/tunnel_look.md)
         if CONFIG.tunnel_palette not in CONFIG.tunnel_palettes:
             raise ValueError(f"tunnel_palette {CONFIG.tunnel_palette!r} is not in tunnel_palettes {list(CONFIG.tunnel_palettes)}")
-        tun_to = {**_TUN_TO, "fill": tun_colour}
-        tun_paint, tun_dash, tun_casing = _tunnel_look(style["layers"], {l["id"] for _, _, _, grp in edge_layers for l in grp},
-                                           tun_strength, arw["color"], tun_to)
+        tun_paint, tun_dash, tun_casing = _tunnel_look(style["layers"], {l["id"] for _, _, _, grp in edge_layers for l in grp}, arw["color"])
 
     # road-class filter panel: the distinct classes present, most important first. `filter_col`
     # (optional) drives the filter from a different column than the styling `highway_col` — e.g. a
     # source's own road class while widths/casing follow an OSM-highway proxy. The web filter reads
     # this raw property directly (["get", col]), so no re-bake is needed.
     fcol = filter_col or highway_col
-    classes, seen, swatches = [], set(), {}
+    classes, seen, swatches, by_access = [], set(), {}, set()
     for ft in geo["features"]:
         p_ = ft.get("properties", {})
         c = p_.get(fcol)
-        if c and c not in seen:
+        if c and (c not in seen or (c in by_access and not p_.get("__rs_access"))):     # a class swatch is a road of the class, not a restricted one (its fill is its kind's)
+            if c not in seen:
+                classes.append(c)
             seen.add(c)
-            classes.append(c)
-            swatches[c] = p_.get("__rs_fill") or "#888888"
-    classes.sort(key=lambda c: (-ROAD_Z.get(_base(c)[0], 4), c))
+            by_access.discard(c)
+            if p_.get("__rs_access"):
+                by_access.add(c)
+            swatches[c] = p_.get("__rs_fill") or _FB["fill"]
+    classes.sort(key=lambda c: (-ROAD_Z.get(_base(c)[0], _FB["order"]), c))
     access = []
     if access_col:
         n = collections.Counter(p.get("__rs_access") for p in (f.get("properties") or {} for f in geo.get("features", [])))
-        access = [[k, c, label, n[k]] for k, c, label in _ACCESS if n[k]]
+        access = [[k, THEME["access"][k], label, n[k]] for k, label in _ACCESS if n[k]]
         # driving's pedestrian streets that cars may not use have their own row: where no usable road is of the class, a class row would be a second switch for them
         if n["pedestrian"] and "pedestrian" in classes and not any(not p.get("__rs_access") and p.get(fcol) == "pedestrian" for p in (f.get("properties") or {} for f in geo["features"])):
             classes.remove("pedestrian")
@@ -3438,12 +3639,37 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                           for f in geo.get("features", []))}
 
     view_list = _check_views(views, [o["name"] for o in color_opts_meta or []] if color_options else [],
-                             [o["label"] for o in ov_meta], classes, [b["key"] for b in bms])
+                             [o["label"] for o in ov_meta], classes, [b["key"] for b in bms], _settings.style_names("palettes"))
 
     # the class every piece of a road is filtered by: its edge's ``filter_col`` value, else ``highway_col``
     _mark_cls(geo, [fc["features"] for fc in [geo, slots] + [style["sources"][k]["data"] for k in ("casings", "halves", "ends", "simple")
                                                               if k in style["sources"]]], fcol)
 
+    if _palette_copy:            # a second build for a view's palette: the style and the features, before the tiles
+        return {"style": style, "geo": geo, "slots": slots}
+    style["state"]["rs_palette"] = {"default": palette if isinstance(palette, str) else "custom"}     # a palette made in code has no name
+    view_pals = [p_ for p_ in dict.fromkeys(v["set"]["palette"] for v in view_list if "palette" in v["set"]) if p_ != palette]
+    if view_pals:
+        _merge_palettes(style, geo, slots, _palette_copies(_args, view_pals), palette)
+        # the Roads panel's swatches follow a view's palette: each class's colour in each palette (its first edge's baked fill)
+        first = {}
+        for ft in geo["features"]:
+            first.setdefault(ft["properties"].get(fcol), ft["properties"])
+        flt["palettes"] = {n: {c: first[c].get(f"__rs_fill@{n}", first[c].get("__rs_fill")) or _FB["fill"] for c in classes}
+                           for n in view_pals}
+        flt["palettes"][style["state"]["rs_palette"]["default"]] = dict(swatches)
+
+    if _export:
+        # the arrows: the page puts one per one-way chain into view (_rsArrows), a style cannot; number the arrow slots (the odd ones,
+        # 200 m apart, else the chain's only slot) of each one-way chain, so the arrow layers can keep every n-th (docs/design/style_export.md)
+        chains = {}
+        for ft in slots["features"]:
+            if ft["properties"].get("oneway"):
+                chains.setdefault(ft["properties"]["chain"], []).append(ft["properties"])
+        for ps in chains.values():
+            ps.sort(key=lambda p: p["slot"])
+            for k, p in enumerate([p for p in ps if p["slot"] % 2] or ps[:1]):
+                p["__rs_arw"] = k
     pmt = side = None
     if tiles:
         # labels/arrows read the "slots" layer of the same archive (an inline slots source at
@@ -3472,18 +3698,60 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                     line_layers.append({"name": name, "fc": src["data"], "keep": keep})
                 else:
                     extra.append({"name": name, "fc": src["data"], "minzoom": tc["minzoom"]})
+        if _export:      # a style for other apps (docs/design/style_export.md): RustGIS draws no GeoJSON source, so every one goes in the archive
+            for sid, src in [(s, v) for s, v in style["sources"].items() if v.get("type") == "geojson"]:
+                del style["sources"][sid]
+                fs = src["data"]["features"]
+                if not fs:         # draws nothing
+                    style["layers"] = [lyr for lyr in style["layers"] if lyr.get("source") != sid]
+                    continue
+                for lyr in style["layers"]:
+                    if lyr.get("source") == sid:
+                        lyr["source"], lyr["source-layer"] = "roads", sid
+                # ponytail: points and polygons go whole into every tile they touch (extra_layers); clip them if a big polygon overlay makes the tiles heavy
+                if all((f.get("geometry") or {}).get("type") in ("LineString", "MultiLineString") for f in fs):
+                    line_layers.append({"name": sid, "fc": src["data"], "keep": None})
+                else:
+                    extra.append({"name": sid, "fc": src["data"], "minzoom": tc["minzoom"], "keep": None})
+        roads_keep = keep
+        if _export:      # the export's road tiles keep every column, so an app shows a road's data; an id past 2**53 as text (JS would round it)
+            roads_keep = None
+            for ft in geo["features"]:
+                p_ = ft["properties"]
+                for k_, v_ in list(p_.items()):
+                    if isinstance(v_, int) and not isinstance(v_, bool) and abs(v_) >= 2 ** 53:
+                        p_[k_] = str(v_)
         pmt = _tiler.build_pmtiles(
-            geo, class_col=highway_col, keep=keep,
+            geo, class_col=highway_col, keep=roads_keep,
             minzoom_table=mz, minzoom=tc["minzoom"], maxzoom=tc["maxzoom"],
             extent=tc["extent"], buffer_px=tc["buffer_px"], extra_layers=extra or None,
             line_layers=line_layers or None)
         side = _tiler.sidecar(geo)
 
     minx, miny, maxx, maxy = (float(v) for v in g.total_bounds)
+    if _export:          # not a page (docs/design/style_export.md): an app has no slider and no menu, so the page state is baked
+        style = _bake_state(style)
+        main = ["match", ["get", "highway"], [h + s_ for h in arw["main"] for s_ in ("", "_link")], True, False]
+        for lyr in style["layers"]:
+            if lyr["id"].startswith("roads-arrows"):          # the sprite's arrow is an SDF icon: coloured by the layer
+                lyr["paint"].setdefault("icon-color", arw["color"])
+                # fewer arrows, as the page's rules: side streets from arrows.main_below, and an arrow slot every 800 m at zoom 15, 400 m
+                # at 16, 200 m from 17: about 330 px apart at each zoom; one arrow in the middle of its slot
+                lyr["filter"] = ["all", lyr["filter"], ["has", "__rs_arw"], ["any", main, [">=", ["zoom"], arw["main_below"]]],
+                                 ["==", ["%", ["get", "__rs_arw"], ["step", ["zoom"], 4, 16, 2, 17, 1]], 0]]
+                lyr["layout"] = {**{k: v for k, v in lyr["layout"].items() if k != "symbol-spacing"}, "symbol-placement": "line-center"}
+        # the page's road click popup, hover tooltip and hover delay, for the app's plugin (the same rules as the page's)
+        inter = {"popup": popup_fields if popup_on else False, "tooltip": road_tooltip, "hover_delay_ms": int(hover_delay_ms)}
+        return {"style": style, "pmtiles": pmt, "bounds": (minx, miny, maxx, maxy), "interaction": inter}
     # after every style/filter/bounds decision above — those read the features, the browser never does
     gz = _compress_sources(style) if compress else {}
     html = (_HTML.replace("__TITLE__", _html.escape(name))
             .replace("__ARROW_COLOR__", str(arw["color"]))
+            .replace("__ARROW_ICON__", json.dumps(arw["icon"]))
+            .replace("__ARROW_RULES__", json.dumps({"mainBelow": arw["main_below"], "main": arw["main"], "minLenPx": arw["place"]["min_len_px"],
+                                                     "minGapPx": arw["place"]["min_gap_px"], "nameGapPx": arw["place"]["name_gap_px"],
+                                                     "edgePx": arw["place"]["edge_px"], "charWidth": arw["place"]["char_width"],
+                                                     "baseSize": THEME["labels"]["base_size"]}))
             .replace("__STYLE__", json.dumps(style))
             .replace("__BASEMAPS__", json.dumps(bms))
             .replace("__BM_SWITCHER__", json.dumps(bool(basemap_switcher)))
@@ -3498,7 +3766,6 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             .replace("__BEARING__", json.dumps(cam["bearing"]))
             .replace("__BOUNDS__", json.dumps([[minx, miny], [maxx, maxy]]))
             .replace("__RS_FILL_LAYERS__", json.dumps(_fill_layer_ids(levels)))
-            .replace("__RS_END_LAYERS__", json.dumps(end_fill_ids)).replace("__RS_END_CASING_LAYERS__", json.dumps(end_casing_ids))
             .replace("__COLOR_OPTIONS__", json.dumps(color_opts_meta or []))
             .replace("__CO_ACTIVE__", str(_active))
             .replace("__OVERLAYS__", json.dumps(ov_meta))
@@ -3509,6 +3776,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             .replace("__TUNNEL__", json.dumps({"layers": tun_paint, "dash": tun_dash, "casing": tun_casing, "strength": tun_strength,
                                                "palette": CONFIG.tunnel_palette, "palettes": CONFIG.tunnel_palettes,
                                                "ratio": list(CONFIG.tunnel_casing_dash or [1, 1]), "bg": _bg_color(active_bm),
+                                               "steps": THEME["tunnels"]["steps"], "ratios": THEME["tunnels"]["ratios"],
                                                "toward": tun_toward, "towards": CONFIG.tunnel_towards,
                                                "to": {**_TUN_TO, "fill": tun_colour}, "control": bool(tunnel_control and tun_paint)}))
             .replace("__VIEWS__", json.dumps(view_list))

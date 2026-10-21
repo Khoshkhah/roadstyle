@@ -14,6 +14,8 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | `render_report(gdf, **kw)` | `WebMap` | map + stats sidebar ([Pages](#pages)) |
 | `render_street_view(gdf, **kw)` | `WebMap` | map + Google Street View side by side ([Pages](#pages)) |
 | `sidebar_html(name)` | `str` | a bundled sidebar fragment: `"dashboard"`, `"report"`, `"street_view"` |
+| `export_style(gdf, out_dir, *, base_url, format="xyz", basemap=<render_edges'>, **kw)` | path of `style.json` | the roads as a MapLibre style + vector tiles (`"xyz"` folder or `"pmtiles"`) + sprite, for other map apps ([Put it on a website](../guides/website.md#a-style-for-other-map-apps)); `basemap=None`: no base map; `kw` go to `render_edges` |
+| `export_look(path=None, *, profile=None, palette=None, edges=None, positions=None)` | the look (dict) | MapLibre layers with no source for a data layer in another app (the GeoLibre plugin's "Style a layer with roadstyle"); one casing and one fill layer per drawing position (`positions`, else those of `edges`, else -10 to 10) |
 | `snapshot(map_or_html, out_path, *, center, zoom, pitch, bearing, width=1200, height=800, scale=1, settle=2.5, timeout=40)` | path | a PNG via headless Chromium (needs `playwright`) |
 | **Read your data** | | |
 | `RoadEdges` | | the canonical input: EPSG:4326 lines + a class column |
@@ -74,6 +76,7 @@ ignore it.
 
 | keyword | default | backends | what |
 |---|---|---|---|
+| `profile` | `None` | all | the name of a profile: every style value that is not a color (`default`, `highsat`, or `./profiles/<name>.yaml`); `None` = the one in force ([Profiles and palettes](settings.md#profiles-and-palettes)) |
 | `backend` | `"web"` | | `"web"` (MapLibre, one offline file), `"folium"`, `"lonboard"` ([Big networks](../guides/big-networks.md)) |
 | `palette` | `"amber"` | all | `"amber"` (orange to green main roads, slate-grey streets), `"carto"` (soft OSM Carto tones), `"highsat"` (bright), `"mono"` or a registered palette |
 | `basemap` | the `basemap` setting (`"voyager"`) | all | a `BASEMAPS` key, a `Basemap`, a `{z}/{x}/{y}` URL or an xyzservices provider |
@@ -127,8 +130,9 @@ Each `color_options` value takes `color_by`, `colors`, `cmap`, `vmin`, `vmax`, `
 `palette`, `style`, `missing`; `{}` is the class style. See [Colour by your data](../guides/colour.md).
 
 A `views` entry sets only what it names: `color` (a `color_options` name), `road_fill`, `bridges`, `tunnels`, `view3d`
-(`True` / `False`), `overlays` (`{label: True / False}`), `classes` (a list of road classes), `basemap` (a key). An unknown
-setting, or a name the page does not have, is an error.
+(`True` / `False`), `overlays` (`{label: True / False}`), `classes` (a list of road classes), `basemap` (a key), `palette` (a palette
+name: every color of the map, [Profiles and palettes](settings.md#profiles-and-palettes)). An unknown setting, or a name the page does not
+have, is an error. Each palette that a view names is built once more into the page, so the page is somewhat larger.
 
 ### Popups & hover
 
@@ -275,7 +279,7 @@ the `overlays` setting. See [Add your own layers](../guides/overlays.md).
 | `order_col` | `None` | with `edge_col`: the property with the feature's order (whole number, lower first; null = 0) |
 | `select` | `"road"` | with `edge_col`: a hover or click picks the feature's road (`"road"`) or the feature itself (`"item"`: its own highlight and popup, `rs:select` with `item` and the road); anything else is an error |
 | `color_col` | `None` | the property with a colour per feature (null: `color`) |
-| `style` | `None` | the name of a style in the settings `config.overlays.styles` (a library's theme); its fields fill what the overlay does not give |
+| `style` | `None` | the name of a style in the theme's `overlays.styles` (a library's theme; the older settings key `config.overlays.styles` still works); its fields fill what the overlay does not give |
 | `width_m` | `None` | a line's width in metres, exact from `min_zoom` on (replaces `width`) |
 | `dash` | `None` | a line's dash pattern in line widths, `[3, 3]` |
 | `min_zoom` / `max_zoom` | `None` | the zooms in which the overlay is drawn |
@@ -300,13 +304,14 @@ Built-ins: [Settings & palettes](settings.md#base-maps-api-keys).
 
 ## StyleConfig
 
-The `config` block of the settings. Change it in a [settings override](settings.md), not in code.
+The values the stylers read. Since 2026-10-19 every style field comes from the [theme](settings.md#profiles-and-palettes) (the field
+names below are the older `config` keys; each maps to a theme key). Change them in a theme, not in code.
 
 | field | default | what |
 |---|---|---|
 | `fill_opacity` / `casing_opacity` | `0.9` / `0.75` | line opacities |
 | `casing_extra` | `2.0` | reserved (palettes set casing widths) |
-| `link_scale` | `0.7` | `*_link` width relative to the parent |
+| `link_scale` | `0.6` | `*_link` width relative to the parent (theme `roads.links.width`; was 0.7 for folium and lonboard until 2026-10-19, the web map's 0.6 now for all) |
 | `tunnel_opacity_scale` | `0.45` | tunnel fade |
 | `tunnel_casing_dash` | `[1, 1]` | the tunnel casing's dash and gap, in line widths; a tunnel's casing is its dash layer alone |
 | `tunnel_strength` | `60` | the tunnel look, v2's slider (0-100): everything on a tunnel (fill, names, arrows, attached items) moves toward the `tunnel_toward` colour. Opaque, no see-through. The Tunnels box has the steps 0, 25, 50, 55, 60, 65, 70, 75, 100 |

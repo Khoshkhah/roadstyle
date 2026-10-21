@@ -4,6 +4,49 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **The style in config files: profiles and palettes** (docs/design/style_config.md). A **palette** holds only colors (road
+  classes, names, arrows, bridges, tunnels, selection, data maps, overlays, boundary, background): `data/palettes/amber.yaml`,
+  `carto`, `highsat`, `mono`. A **profile** holds everything else (widths by zoom, class order and minzoom, zoom ranges, sizes,
+  dashes, caps, the tunnel look): `data/profiles/default.yaml`, `highsat`. Python reads them and builds the style; it holds no
+  style value (a test checks the colors). `render_edges(profile=..., palette=...)` take names; own files go in `./profiles/` and
+  `./palettes/` and state only what they change. `profile="highsat", palette="highsat"` is today's high-saturation look.
+
+- **`rsColorBase` and `access_col` follow the page state.** `rsColorBase(groups)` is the state `rs_base` (under `rs_colors`); the colour of an access kind is baked in the road's
+  fill (the palette key `access`, in every colour option), so the page builds no expression for them either.
+- **`rs.export_style(edges, out_dir, base_url=...)`: the roads for other map apps.** It writes `style.json` (the style of the
+  `tiles=True` page), the road tiles as a `tiles/{z}/{x}/{y}.pbf` folder (`format="pmtiles"`: one `roads.pmtiles`) and a sprite
+  with the one-way arrow. GeoLibre, RustGIS, QGIS and MapLibre pages open the style by its URL. Every GeoJSON source goes into
+  the tiles, because RustGIS draws none. The page's JavaScript (popups, the `rs*` API, the controls) is not in the style.
+  `basemap=None` removes the base map. The arrows follow fixed rules close to the page's (side streets from zoom 17, about
+  330 px apart), and `view_3d=True` is the default, so the style has the bridge decks. Design: `docs/design/style_export.md`.
+- **`rs.export_look(path)`: the simple look for a data layer in another app.** It writes MapLibre layers with no source that
+  read the raw duckOSM columns (`highway`, `oneway`, `tunnel`, `bridge`, `casing_level`, `fill_level`): the class colours and
+  widths, a casing, one casing and one fill layer per drawing position, tunnels faded, two-way roads side by side. An app puts them on a data layer, for
+  example a duckOSM DuckDB or GeoParquet layer (the GeoLibre plugin, on the branch `geolibre`, does that). Not in the look: names, arrows, 3D decks (they need `export_style`).
+
+### Changed
+- **Links are 0.6 of their main class's width everywhere.** The web map drew 0.6 and folium / lonboard used `link_scale` 0.7.
+- **Folium's selection colors are the web map's:** select `#7c4dff`, hover `#b388ff` (were `#EE00FF` / `#D000FF`).
+- **`defaults.json` holds only the settings that are not a look:** `basemap`, `camera`, `annotations`, `tiles`.
+- **`palette="highsat"` alone uses the default widths and dashes.** highsat's own (no casing on minor classes, longer dashes)
+  are the profile `highsat`.
+- **One-way arrows on side streets from zoom 16.5** (was 17): theme `arrows.main_below`, which the page reads.
+- **The page builds no style expression** (docs/design/style_config.md, step 2). The Colour by menu, `rsColor`, `rsSetRoadFill`,
+  a view and the Tunnels box set state values (MapLibre `global-state`); the expressions that read them are made in Python, once.
+  The page no longer recolours anything when it opens. The functions and events of the JS API are the same. The style has the start
+  values in `state`: `rs_co`, `rs_colors`, `rs_fill_on`, `rs_tun_*`, `rs_ov_<n>`.
+- **The arrow icon, the arrow placement rules and the Tunnels box lists come from the profile** (`arrows.icon`, `arrows.place`,
+  `arrows.main`, `tunnels.steps`, `tunnels.ratios`), and folium's hover look from the palette and the profile.
+- **A view can switch the palette:** `views={"Night": {"palette": "mono"}}`. The page holds each view's palette (built once more,
+  merged by the state `rs_palette`): the road colors, names, arrows, bridges, tunnels and the Roads panel's swatches change together.
+
+### Deprecated
+- Style values in the older settings layout (`palettes`, `selection`, `roads`, and the style keys of `config`) are read for one
+  release, each as its profile or palette key, with a `DeprecationWarning` that names it.
+
 ## [0.23.0] — 2026-10-20
 
 ### Added

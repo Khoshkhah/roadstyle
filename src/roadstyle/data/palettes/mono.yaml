@@ -1,0 +1,29 @@
+# roadstyle palette 'mono': every color of a map, nothing else (docs/design/style_config.md).
+# The widths, zooms, sizes and dashes are in the profile (data/profiles/). An own palette states only what it changes
+# and merges over 'amber'.
+
+classes:   # per road class: fill, casing (null = no casing), opacity
+  motorway: {fill: "#707070", casing: "#3c3c3c", opacity: 1.0}
+  trunk: {fill: "#7a7a7a", casing: "#444444", opacity: 1.0}
+  primary: {fill: "#8a8a8a", casing: "#4f4f4f", opacity: 1.0}
+  secondary: {fill: "#9c9c9c", casing: "#5c5c5c", opacity: 1.0}
+  tertiary: {fill: "#b0b0b0", casing: "#6e6e6e", opacity: 1.0}
+  unclassified: {fill: "#c4c4c4", casing: "#828282", opacity: 1.0}
+  residential: {fill: "#c4c4c4", casing: "#828282", opacity: 1.0}
+  living_street: {fill: "#d4d4d4", casing: "#9a9a9a", opacity: 1.0}
+  service: {fill: "#e4e4e4", casing: "#bcbcbc", opacity: 1.0}
+  track: {fill: "#9a9a9a", casing: "#9a9a9a", opacity: 1.0}
+  cycleway: {fill: "#888888", casing: "#888888", opacity: 1.0}
+  footway: {fill: "#ABABAB", casing: "#ABABAB", opacity: 1.0}
+  path: {fill: "#ABABAB", casing: "#ABABAB", opacity: 1.0}
+roads: {fallback: {"fill": "#888888", "casing": "#000000", "palette_casing": "#bcbcbc"}, fill_opacity: 0.9}
+casing: {opacity: 0.75}
+labels: {color: "#5b5b5b", halo_color: null}
+arrows: {color: "#5b5b5b", opacity: 0.7}
+bridges: {casing_color: "#64748b", shadow: {"color": "rgba(0,0,0,0.25)"}, decks: {"underlay": "#f2f2f2", "opacity": 0.7}}
+tunnels: {fill_dash_color: "rgba(255,255,255,0.55)", toward: "Sand", towards: {"Slate": "#64748b", "Dark": "#14181d", "Light": "#efede8", "Graphite": "#374151", "Navy": "#1e293b", "Stone": "#78716c", "Sand": "#d6cfc4", "Teal": "#134e4a"}, palette: "Graphite + silver", palettes: {"One colour": null, "Slate + ice": ["#64748b", "#cbd5e1"], "Blue + cyan": ["#315b7d", "#a9d7e8"], "Warm + sand": ["#806d64", "#e7c9a7"], "Graphite + silver": ["#4b5563", "#b8bec7"], "Indigo + lavender": ["#4c5c96", "#b9c2ea"], "Teal + mint": ["#2f6f73", "#9fd3cf"]}, to: {"fill": "#64748b", "dash": "#94a3b8"}}
+selection: {hover: "#b388ff", select: "#7c4dff", casing: "#000000", opacity: 0.85, glow_opacity: 0.35, folium_hover: "#ffffff"}
+data: {nodata: "#cccccc", color_table: "#bbbbbb", opacity: 0.9, casing_opacity: 0.75}
+overlays: {color: "#6aa9ff", circle_stroke: "#ffffff", fill_opacity: 0.15, circle_opacity: 0.85, line_opacity: 0.9, outline_opacity: 0.9}
+boundary: {color: "#6a0dad", opacity: 0.9}
+background: {light: "#e8e6e1", dark: "#0e1113"}

@@ -106,7 +106,7 @@ _TEMPLATE = Template("""
     layer.on('mouseover', function(e){
       if(!on(feat)) return;
       if(pinnedLayer===layer){ e.target.closeTooltip(); return; }   // pinned: don't stack hover tip
-      e.target.setStyle({color:'#ffffff', weight:feat.properties.__rs_w+2, opacity:1});
+      e.target.setStyle({color:'{{ this.hover_color }}', weight:feat.properties.__rs_w+{{ this.hover_extra }}, opacity:1});
       e.target.bringToFront();
     });
     layer.on('mouseout', function(e){ fillLayer.resetStyle(e.target); });
@@ -183,4 +183,9 @@ class InteractiveRoads(MacroElement):
         self.order = order if order is not None else list(reversed(ORDER))
         self.show_filter = show_filter
         self.hook = hook
+        from . import (
+            _settings,  # the hover look: the palette's folium_hover colour, the profile's extra px
+        )
+        self.hover_color = _settings.theme_value("selection.folium_hover")
+        self.hover_extra = _settings.theme_value("selection.folium.hover_extra_px")
         self._template = _TEMPLATE

@@ -1,5 +1,4 @@
 """Bundled palette/config data files + user-override layering (roadstyle._settings)."""
-import importlib
 import json
 
 import pytest
@@ -71,14 +70,16 @@ def test_override_propagates_into_reloaded_modules(tmp_path, monkeypatch, fresh)
     monkeypatch.setenv("ROADSTYLE_CONFIG", str(override))
     _settings.refresh()
 
+    # the in-place rebuild that use_settings runs, not importlib.reload: a reload makes a second PALETTES dict, and the
+    # renderers, imported before, keep the first one (2026-10-19: later tests read stale palettes)
     import roadstyle.palettes as palettes
-    palettes = importlib.reload(palettes)
+    palettes._reload()
     try:
-        assert palettes.HIGHSAT["service"].fill == "#abcdef"
+        assert palettes.PALETTES["highsat"]["service"].fill == "#abcdef"      # what the renderers read
     finally:
         monkeypatch.delenv("ROADSTYLE_CONFIG", raising=False)
         _settings.refresh()
-        importlib.reload(palettes)        # restore the unmodified module for later tests
+        palettes._reload()                # back to the unmodified tables for later tests
 
 
 def test_user_override_roads_tables_deep_merge(tmp_path, monkeypatch, fresh):
@@ -95,8 +96,9 @@ def test_user_override_roads_tables_deep_merge(tmp_path, monkeypatch, fresh):
     r = _settings.roads()
     assert r["z_order"]["service"] == 9
     assert r["z_order"]["motorway"] == 9           # untouched entries survive
-    assert r["width"]["service"]["18"] == 8.0
-    assert r["width"]["service"]["15"] == 2        # untouched zoom stops survive
+    assert r["width"]["service"][18] == 8.0        # zoom keys are numbers, whatever the file wrote (the theme, 2026-10-19)
+    assert r["width"]["service"][15] == 2          # untouched zoom stops survive
+    assert "18" not in r["width"]["service"]
     assert r["group"]["motorway"] == "major"       # untouched tables survive
 
 
@@ -105,17 +107,17 @@ def test_use_settings_overrides_from_code_and_resets(fresh):
     imported tables (config, palettes, web road model) and a plain call must undo it."""
     import roadstyle as rs
     from roadstyle import render_web
-    from roadstyle.palettes import HIGHSAT
+    from roadstyle.palettes import PALETTES
 
     try:
         rs.use_settings({"config": {"labels": {"color": "#ff00aa"}},
                          "roads": {"z_order": {"service": 9}},
                          "palettes": {"highsat": {"service": {"fill": "#0000ff"}}}})
-        assert render_web.CONFIG.labels == {"color": "#ff00aa"}
+        assert render_web.CONFIG.labels["color"] == "#ff00aa"      # merged into the theme's labels (2026-10-19), the rest kept
         assert render_web.ROAD_Z["service"] == 9
-        assert HIGHSAT["service"].fill == "#0000ff"
+        assert PALETTES["highsat"]["service"].fill == "#0000ff"
     finally:
         rs.use_settings()
     assert render_web.ROAD_Z["service"] == 1.5         # back to bundled defaults
-    assert HIGHSAT["service"].fill != "#0000ff"
+    assert PALETTES["highsat"]["service"].fill != "#0000ff"
     assert render_web.CONFIG.labels["color"] == "#5b5b5b"

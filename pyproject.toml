@@ -70,6 +70,8 @@ roadstyle = [
     "py.typed", "static/*.js", "static/*.css", "static/*.html", "vendor/*.js", "vendor/*.css",
     "templates/*.html",                       # bundled dashboard/report sidebars (see pages.py)
     "data/*.json", "data/palettes/*.json",   # bundled palettes + style config (see _settings.py)
+    "data/profiles/*.yaml", "data/palettes/*.yaml",   # the bundled profiles and palettes: every style value (see _settings.theme)
+    "data/sprite.png",                        # the one-way arrow of export_style (see export.py)
 ]
 
 [tool.pytest.ini_options]

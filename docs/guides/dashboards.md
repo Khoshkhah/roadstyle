@@ -53,8 +53,16 @@ rs.render_edges(edges, color_options={"Class": {}, "Amber": {"palette": "amber"}
 ```
 
 The settings: `color` (a `color_options` name), `road_fill`, `bridges`, `tunnels`, `view3d` (True / False), `overlays`
-(`{label: True / False}`), `classes` (a list) and `basemap` (a key). A view sets only what it names, so name the same settings in every
-view when they must switch back. A name the page does not have is an error. From your page: `rsSetView(name)`, and `rsSetRoadFill(on)`
+(`{label: True / False}`), `classes` (a list), `basemap` (a key) and `palette` (a palette name). A view sets only what it names, so name
+the same settings in every view when they must switch back.
+
+`palette` switches every color of the map: the road classes, and also the names, arrows, bridges, tunnels and the Roads panel's
+swatches. A color option with a palette (`{"palette": "carto"}`, above) recolors only the road fills.
+
+```python
+rs.render_edges(edges, views={"Day": {"palette": "amber", "basemap": "positron"},
+                              "Night": {"palette": "mono", "basemap": "dark_matter"}})
+``` A name the page does not have is an error. From your page: `rsSetView(name)`, and `rsSetRoadFill(on)`
 for the fill alone.
 
 ## Drive the map from your own page

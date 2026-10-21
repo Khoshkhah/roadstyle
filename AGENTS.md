@@ -33,6 +33,10 @@ A consumer project that does not install it runs with `PYTHONPATH=<this repo>/sr
   cameras (zoom <-> range from MapLibre's camera distance), `there` stops echo loops, the map is the judge (it clamps,
   Google goes back), `ground` reads the ground height from Terrain Tiles (Google's center is above sea level), `pad`
   moves the map's center beside the window. Check a change on a hill (Monaco), not only on flat Södermalm.
+- Every style value is in a config file (docs/design/style_config.md): colors in `src/roadstyle/data/palettes/*.yaml`, all else in
+  `src/roadstyle/data/profiles/default.yaml`. Read them merged with `THEME[...]` in `render_web.py` or `_settings.theme_value(path)`
+  elsewhere, never as a literal. `tests/test_theme.py` fails on a color literal and on a color in a profile. A new style value = a
+  key in the profile or in every palette (with its comment) + the code that reads it.
 - The JS side has no unit tests. Check a rendering change in a real browser: `rs.snapshot(m,
   "x.png")` and look at the PNG, or drive the page with Playwright.
 - Gallery and README images: screenshots taken by hand (see `docs/build_gallery.py`, which still makes the report picture).

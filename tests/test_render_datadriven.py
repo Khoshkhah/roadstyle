@@ -27,7 +27,7 @@ def _html(m):
 
 def test_classic_path_renders_baked_props():
     import folium
-    m = render_edges(_edges(), theme="dark")
+    m = render_edges(_edges())
     assert isinstance(m, folium.Map)
     html = _html(m)
     # One folium path: the OSM class styling now also bakes per-edge __rs_* props (read by the
@@ -77,7 +77,7 @@ def test_folium_pin_inlined_in_both_styling_modes():
 def test_folium_filter_for_class_legend_for_data_driven():
     # Through the one InteractiveRoads layer: class styling shows the road-type filter (no legend);
     # a data-driven map shows a legend instead (no filter panel).
-    class_html = _html(render_edges(_edges(), theme="dark"))
+    class_html = _html(render_edges(_edges()))
     assert "Road types" in class_html and "rs-legend" not in class_html
     num_html = _html(render_edges(_edges(), color_by="aadt", cmap="viridis"))
     assert "rs-legend" in num_html and "Road types" not in num_html

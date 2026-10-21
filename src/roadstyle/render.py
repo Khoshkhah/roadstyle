@@ -61,6 +61,7 @@ def render_edges(
     color_key: str = "edge_id",
     color_col: str = "color",
     settings=None,
+    profile: str | None = None,
     api_key: str | None = None,
     levels_db=None,
     **kwargs,
@@ -75,6 +76,9 @@ def render_edges(
     backend : ``"web"`` (self-contained MapLibre, default), ``"folium"`` (portable HTML), or
         ``"lonboard"`` (WebGL).
     palette : ``"amber"`` (the default), ``"carto"`` (OSM Carto), ``"highsat"`` (high-saturation) or ``"mono"``.
+    profile : the name of a profile: every style value that is not a color (widths, zooms, sizes, dashes). ``None``: the one in
+        force (``default``, or what the settings name). Bundled: ``default``, ``highsat``; own ones in ``./profiles/<name>.yaml``
+        (docs/design/style_config.md). ``palette`` names the colors the same way (bundled and ``./palettes/<name>.yaml``).
     include / exclude : highway types to keep / drop (str or iterable) — see filter_edges.
 
     Data-driven styling (optional — when omitted, the classic OSM class styling is unchanged):
@@ -108,6 +112,13 @@ def render_edges(
     """
     if "order_col" in kwargs:
         raise ValueError("order_col is removed: roadstyle draws by positions (docs/design/levels_split_casing.md, section 12)")
+    from . import _settings as _st
+    pick = {k: v for k, v in (("profile", profile), ("palette", palette)) if v is not None and v != _st.theme()["active"][k]
+            and (k == "profile" or v in _st.style_names("palettes"))}      # a palette made in code (register_palette) has no file
+    if pick:
+        # a profile / palette by name for THIS render (docs/design/style_config.md): a settings source after any settings= of the call
+        settings = [settings, pick] if settings is not None else pick
+        profile = None
     if settings is not None:
         # scoped settings: apply the override for THIS render only, then restore. Same layout as
         # a roadstyle.json / use_settings source (dict or path); stacks on top of any overrides
@@ -115,10 +126,10 @@ def render_edges(
         from . import _settings as _s
         from . import use_settings as _use
         call_args = {k: v for k, v in locals().items()
-                     if k not in ("gdf", "settings", "kwargs", "_s", "_use")}
+                     if k not in ("gdf", "settings", "kwargs", "_s", "_use", "_st", "pick")}
         prev = list(_s._EXTRA)
         try:
-            _use(*prev, settings)
+            _use(*prev, *(settings if isinstance(settings, list) else [settings]))
             return render_edges(gdf, settings=None, **call_args, **kwargs)
         finally:
             _use(*prev)

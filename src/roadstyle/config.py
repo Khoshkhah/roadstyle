@@ -23,58 +23,47 @@ from dataclasses import dataclass, field, fields
 
 from . import _settings
 
-# default OSM classes that carry no casing (fill only) — matches the web renderer. Used as the
-# in-code fallback when the data file omits the key.
-_MINOR_NO_CASING = frozenset(
-    {"service", "living_street", "pedestrian", "track", "cycleway", "footway", "path"}
-)
-
 
 @dataclass(frozen=True)
 class StyleConfig:
     """Knobs shared by every styler. Defaults == the original calibrated values."""
 
-    fill_opacity: float = 0.9          # softer than fully opaque (matches the web renderer)
-    casing_opacity: float = 0.75
-    casing_extra: float = 2.0          # casing width = fill width + casing_extra (web renderer)
-    link_scale: float = 0.7            # ``*_link`` variants render narrower than their parent
-    tunnel_opacity_scale: float = 0.45  # tunnels fade to 45 % and gain a dash
-    bridge_casing_extra: float = 1.5   # bridges: casing a touch wider (the deck "wings")
-    bridge_casing_m: float = 0.25      # metre widths: a bridge casing is at least this wide each side, whatever casing_m is
-    bridge_casing_px: float = 1.0      # ... and never thinner than this many pixels each side at any zoom (metres are sub-pixel zoomed out)
-    bridge_casing_color: str = "#64748b"   # bridge deck casing colour: slate, as tunnels fade to (2026-10-06; black, then dark grey, too dark)
-    bridge_shadow: bool = True             # a soft shadow under a bridge's main part, on what it crosses (2026-10-06)
-    bridge_shadow_color: str = "rgba(0,0,0,0.25)"
-    bridge_shadow_blur: float = 4.0        # px (line-blur)
-    bridge_shadow_offset: list = field(default_factory=lambda: [2, 2])   # px right, down (line-translate): lit from the top left
-    bridge_shadow_trim_m: float = 3.0      # metres of no shadow where a bridge comes down to the road (2026-10-06: the head length cut short bridges too much)
-    single_line_classes: list = field(default_factory=lambda: ["footway", "path", "steps", "pedestrian", "cycleway", "track", "bridleway", "corridor", "platform"])   # a two-way pair of these is one full-width line, not two lanes
-    twin_end_caps: bool = True         # one road-wide round end under a two-way road's two lanes
-    twin_casing: str = "one"           # a two-way road given as two directed edges: "one" casing around both directions (full width, drawn once), or "each" direction its own
-    tunnel_casing_dash: list = field(default_factory=lambda: [1, 1])   # the tunnel casing: dash and gap, in line widths (1:1, 2026-10-06)
-    tunnel_fill_dash: list = field(default_factory=list)   # light dashes on the tunnel fill, e.g. [1.2, 1.2]; none by default (v2's look, 2026-10-06)
-    tunnel_fill_dash_color: str = "rgba(255,255,255,0.55)"               # their colour, over any road colour
-    tunnel_strength: float = 60          # the tunnel look (docs/design/tunnel_look.md), v2's slider: 0 = normal colours, 100 = the full tunnel colours
-    tunnel_toward: str = "Sand"         # the colour a tunnel moves toward: a name in tunnel_towards, or "#rrggbb" (2026-10-08)
-    tunnel_towards: dict = field(default_factory=lambda: {"Slate": "#64748b", "Dark": "#14181d", "Light": "#efede8", "Graphite": "#374151",
-                                                          "Navy": "#1e293b", "Stone": "#78716c", "Sand": "#d6cfc4", "Teal": "#134e4a"})
-    tunnel_palette: str = "Graphite + silver"   # the casing of a tunnel, a name in tunnel_palettes (two colours by default, 2026-10-06)
-    tunnel_palettes: dict = field(default_factory=lambda: {"One colour": None, "Slate + ice": ["#64748b", "#cbd5e1"],
-                                                           "Blue + cyan": ["#315b7d", "#a9d7e8"], "Warm + sand": ["#806d64", "#e7c9a7"],
-                                                           "Graphite + silver": ["#4b5563", "#b8bec7"], "Indigo + lavender": ["#4c5c96", "#b9c2ea"],
-                                                           "Teal + mint": ["#2f6f73", "#9fd3cf"]})
+    fill_opacity: float = field(default_factory=lambda: _settings.theme_value("roads.fill_opacity"))   # softer than fully opaque (matches the web renderer)
+    casing_opacity: float = field(default_factory=lambda: _settings.theme_value("casing.opacity"))
+    casing_extra: float = field(default_factory=lambda: _settings.theme_value("casing.extra"))   # casing width = fill width + casing_extra (web renderer)
+    link_scale: float = field(default_factory=lambda: _settings.theme_value("roads.links.width"))   # ``*_link`` variants render narrower than their parent
+    tunnel_opacity_scale: float = field(default_factory=lambda: _settings.theme_value("tunnels.opacity_scale"))   # tunnels fade to 45 % and gain a dash
+    bridge_casing_extra: float = field(default_factory=lambda: _settings.theme_value("bridges.casing_extra"))   # bridges: casing a touch wider (the deck "wings")
+    bridge_casing_m: float = field(default_factory=lambda: _settings.theme_value("bridges.casing_m"))   # metre widths: a bridge casing is at least this wide each side, whatever casing_m is
+    bridge_casing_px: float = field(default_factory=lambda: _settings.theme_value("bridges.casing_px"))   # ... and never thinner than this many pixels each side at any zoom (metres are sub-pixel zoomed out)
+    bridge_casing_color: str = field(default_factory=lambda: _settings.theme_value("bridges.casing_color"))   # bridge deck casing colour: slate, as tunnels fade to (2026-10-06; black, then dark grey, too dark)
+    bridge_shadow: bool = field(default_factory=lambda: _settings.theme_value("bridges.shadow.show"))   # a soft shadow under a bridge's main part, on what it crosses (2026-10-06)
+    bridge_shadow_color: str = field(default_factory=lambda: _settings.theme_value("bridges.shadow.color"))
+    bridge_shadow_blur: float = field(default_factory=lambda: _settings.theme_value("bridges.shadow.blur"))   # px (line-blur)
+    bridge_shadow_offset: list = field(default_factory=lambda: _settings.theme_value("bridges.shadow.offset"))   # px right, down (line-translate): lit from the top left
+    bridge_shadow_trim_m: float = field(default_factory=lambda: _settings.theme_value("bridges.shadow.trim_m"))   # metres of no shadow where a bridge comes down to the road (2026-10-06: the head length cut short bridges too much)
+    single_line_classes: list = field(default_factory=lambda: _settings.style()["config"]["single_line_classes"])   # a two-way pair of these is one full-width line, not two lanes
+    twin_end_caps: bool = field(default_factory=lambda: _settings.theme_value("roads.twin_end_caps"))   # one road-wide round end under a two-way road's two lanes
+    twin_casing: str = field(default_factory=lambda: _settings.theme_value("roads.twin_casing"))   # a two-way road given as two directed edges: "one" casing around both directions (full width, drawn once), or "each" direction its own
+    tunnel_casing_dash: list = field(default_factory=lambda: _settings.theme_value("tunnels.casing_dash"))   # the tunnel casing: dash and gap, in line widths (1:1, 2026-10-06)
+    tunnel_fill_dash: list = field(default_factory=lambda: _settings.theme_value("tunnels.fill_dash"))   # light dashes on the tunnel fill, e.g. [1.2, 1.2]; none by default (v2's look, 2026-10-06)
+    tunnel_fill_dash_color: str = field(default_factory=lambda: _settings.theme_value("tunnels.fill_dash_color"))   # their colour, over any road colour
+    tunnel_strength: float = field(default_factory=lambda: _settings.theme_value("tunnels.strength"))   # the tunnel look (docs/design/tunnel_look.md), v2's slider: 0 = normal colours, 100 = the full tunnel colours
+    tunnel_toward: str = field(default_factory=lambda: _settings.theme_value("tunnels.toward"))   # the colour a tunnel moves toward: a name in tunnel_towards, or "#rrggbb" (2026-10-08)
+    tunnel_towards: dict = field(default_factory=lambda: _settings.theme_value("tunnels.towards"))
+    tunnel_palette: str = field(default_factory=lambda: _settings.theme_value("tunnels.palette"))   # the casing of a tunnel, a name in tunnel_palettes (two colours by default, 2026-10-06)
+    tunnel_palettes: dict = field(default_factory=lambda: _settings.theme_value("tunnels.palettes"))
     # name -> [dash, gap] (v2's two-colour pattern), or None: slate dashes with empty gaps
-    minor_no_casing: frozenset[str] = field(default_factory=lambda: _MINOR_NO_CASING)
+    minor_no_casing: frozenset[str] = field(default_factory=lambda: frozenset(_settings.style()["config"]["minor_no_casing"]))
     #: class -> zoom below which it is hidden. Consulted only when the caller opts in.
-    minzoom: dict = field(default_factory=dict)
+    minzoom: dict = field(default_factory=lambda: _settings.style()["config"]["minzoom"])
     #: the primary base map layer (a key in basemaps.BASEMAPS); per-call `basemap=` overrides
     basemap: str = "voyager"
     #: street-name label paint (web backend): color, halo_color, halo_width (0/None = no halo); size: [[zoom, px], ...] for every class
     #: (absent: each class's size from its fill width)
-    labels: dict = field(default_factory=lambda: {"color": "#5b5b5b", "halo_color": None,
-                                                 "halo_width": 0})
+    labels: dict = field(default_factory=lambda: _settings.theme_value("labels"))
     #: oneway-arrow chevrons (web backend): color, opacity
-    arrows: dict = field(default_factory=lambda: {"color": "#5b5b5b", "opacity": 0.7})
+    arrows: dict = field(default_factory=lambda: _settings.theme_value("arrows"))
     #: camera (web backend): starting pitch (deg tilt, capped by max_pitch — 70 by default:
     #: past ~72 MapLibre's horizon tile cover explodes on large GeoJSON sources, roads stop
     #: rendering and hover/select dies with them) and bearing (deg clockwise from N),
@@ -86,15 +75,10 @@ class StyleConfig:
     #: thickness, and metres per lane for the ribbon width
     #: ribbon width comes from the same class width table as the roads, converted to metres at
     #: match_zoom — decks and flat roads render equally wide at that zoom
-    bridge_decks: dict = field(default_factory=lambda: {"base_m": 5.0, "thickness_m": 1.0,
-                                                        "ramp_m": 40.0, "step_m": 2.5,
-                                                        "match_zoom": 18.0, "opacity": 0.7})
+    bridge_decks: dict = field(default_factory=lambda: _settings.theme_value("bridges.decks"))
     #: overlay layer defaults (web backend): colour, circle radius, line/outline width, the
     #: per-kind opacities, and the circle stroke. A per-Overlay value always wins.
-    overlays: dict = field(default_factory=lambda: {
-        "color": "#6aa9ff", "radius": 6.0, "width": 2.0, "fill_opacity": 0.15,
-        "circle_opacity": 0.85, "line_opacity": 0.9, "outline_opacity": 0.9,
-        "circle_stroke": "#ffffff"})
+    overlays: dict = field(default_factory=lambda: _settings.theme_value("overlays"))
     #: annotation slots (web backend): each road chain is divided into equal slot_m-metre pieces;
     #: names take even slots, oneway arrows odd ones — alternating, never stacked. Text/icon zoom
     #: ramps and collision culling handle density automatically; unnamed name-slots stay empty.

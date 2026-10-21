@@ -1,0 +1,119 @@
+# roadstyle profile 'default': every style value of a map that is not a color (docs/design/style_config.md):
+# widths by zoom, zoom ranges, sizes, dashes, caps, spacing, the tunnel look. The colors are in the palette (data/palettes/).
+# An own profile states only what it changes and merges over this file.
+# roads.classes: per class: group (its row in width), order (higher = drawn on top where roads meet), minzoom (hidden
+# below, with render_edges(minzoom=True)), no_casing (fill only), single_line (a two-way pair is one line), minor (arrows
+# and names later, smaller arrows), width / casing_width / dash (folium and lonboard; dash also on the web map).
+# Widths are px at the zoom given, unless the key ends in _m (metres).
+
+roads:
+  classes:
+    motorway: {group: "major", order: 9, minzoom: 4, width: 6.0, casing_width: 8.0, dash: null}
+    trunk: {group: "major", order: 8, minzoom: 5, width: 5.5, casing_width: 7.5, dash: null}
+    primary: {group: "primary", order: 7, minzoom: 7, width: 4.5, casing_width: 6.5, dash: null}
+    secondary: {group: "secondary", order: 6, minzoom: 9, width: 3.5, casing_width: 5.5, dash: null}
+    tertiary: {group: "tertiary", order: 5, minzoom: 11, width: 2.5, casing_width: 4.0, dash: null}
+    unclassified: {group: "residential", order: 4, minzoom: 13, width: 2.0, casing_width: 3.5, dash: null}
+    residential: {group: "residential", order: 4, minzoom: 13, width: 2.0, casing_width: 3.5, dash: null}
+    road: {group: "residential", order: 4}
+    busway: {group: "residential", order: 4}
+    raceway: {group: "tertiary", order: 5}
+    living_street: {group: "living_street", order: 3, minzoom: 14, no_casing: true, width: 1.8, casing_width: 3.0, dash: null}
+    service: {group: "service", order: 1.5, minzoom: 15, no_casing: true, minor: true, width: 1.2, casing_width: 2.2, dash: null}
+    pedestrian: {group: "pedestrian", order: 2, minzoom: 14, no_casing: true, single_line: true, minor: true}
+    footway: {group: "path", order: 1, minzoom: 15, no_casing: true, single_line: true, minor: true, width: 1.2, casing_width: 1.2, dash: [4, 4]}
+    path: {group: "path", order: 1, minzoom: 15, no_casing: true, single_line: true, minor: true, width: 1.2, casing_width: 1.2, dash: [2, 5]}
+    cycleway: {group: "path", order: 1, minzoom: 14, no_casing: true, single_line: true, minor: true, width: 1.2, casing_width: 1.2, dash: [3, 3]}
+    steps: {group: "path", order: 0.9, single_line: true, minor: true}
+    bridleway: {group: "path", order: 1, single_line: true}
+    track: {group: "path", order: 1.1, minzoom: 14, no_casing: true, single_line: true, minor: true, width: 1.5, casing_width: 1.5, dash: [4, 4]}
+    corridor: {group: "path", order: 1, single_line: true}
+    construction: {group: "path", order: 0}
+    motorway_link: {order: 1.9, minzoom: 11}
+    trunk_link: {order: 1.85, minzoom: 11}
+    primary_link: {order: 1.8, minzoom: 11}
+    secondary_link: {order: 1.75, minzoom: 12}
+    tertiary_link: {order: 1.7, minzoom: 12}
+    platform: {order: 0.5, single_line: true}
+  fallback: {group: "residential", order: 4, link_order: -0.5, width: 2.0, casing_width: 3.0}   # a class with no entry
+  width:   # px by zoom, per group (the web map)
+    major: {8: 0.8, 10: 1.3, 12: 3.5, 13: 6, 14: 8, 15: 10, 16: 13, 17: 17, 18: 22}
+    primary: {8: 0.7, 10: 1.2, 12: 3.5, 13: 5, 14: 7, 15: 9, 16: 12, 17: 15, 18: 19}
+    secondary: {10: 0.8, 12: 2.5, 13: 4, 14: 6, 15: 8, 16: 10, 17: 13, 18: 17}
+    tertiary: {12: 2, 13: 3, 14: 4.5, 15: 6, 16: 8, 17: 11, 18: 14}
+    residential: {12: 0.5, 13: 1.5, 14: 2.5, 15: 4, 16: 6, 17: 9, 18: 13}
+    living_street: {13: 2, 14: 2.5, 15: 4, 16: 6, 17: 9, 18: 13}
+    service: {13: 0.8, 14: 1.2, 15: 2, 16: 2.8, 17: 4, 18: 5}
+    pedestrian: {13: 2, 14: 3, 15: 4, 16: 6, 17: 9, 18: 13}
+    path: {12: 0.4, 13: 0.6, 14: 0.8, 15: 1, 16: 1.4, 17: 2, 18: 2.6, 19: 3}
+  width_zoom_rate: {major: 2.0, primary: 2.0, secondary: 2.0, tertiary: 1.95, residential: 1.9, living_street: 1.9, service: 1.9, pedestrian: 1.85, path: 1.3}   # growth per zoom past the last stop
+  casing_ratio: {major: 1.17, primary: 1.18, secondary: 1.19, tertiary: 1.21, residential: 1.24, living_street: 1.24, service: 1.27, pedestrian: 1.21, path: 1.0}   # casing width = fill width x ratio
+  zoom_stops: [12, 13, 14, 15, 16, 17, 18, 19, 20]
+  links: {classes: ["motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"], width: 0.6}   # width: of the main class's width
+  cap: "round"
+  join: "round"
+  split: {offset_frac: 0.28, width_frac: 0.6, offset_zoom: 15, ramp_zooms: 2}   # two-way roads: each direction offset_frac of the road width aside, width_frac wide, from offset_zoom over ramp_zooms
+  width_m_zoom: 16   # roads in metres (width_m_col): the zoom where a metre width equals the class width
+  twin_end_caps: true   # one road-wide round end under a two-way road's two lanes
+  twin_casing: "one"   # a two-way road as two edges: one casing around both, or each its own
+
+casing: {extra: 2.0, m: 0.15, min_px: 0.0}   # m, min_px: roads in metres
+
+labels:
+  halo_width: 0
+  font: ["Noto Sans Regular"]
+  glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"
+  minzoom: 14
+  minor_minzoom: 16
+  fraction: 0.9   # a name fits inside its road: at most this part of the road width
+  min_px: 8.0   # no name smaller than this
+  base_size: [[14, 10], [18, 14]]   # px by zoom: the size a name starts from (labels.size: one table for every class)
+  max_angle: 40
+  padding: 2
+
+arrows:
+  minzoom: 15
+  minor_minzoom: 16
+  main_below: 16.5   # the page: below this zoom only the main classes (motorway ... tertiary) get arrows (2026-10-19: was 17)
+  size: {base: 1.8, stops: [[15, 0.5], [18, 0.9], [22, 3.0]], minor: 0.6}   # icon size by zoom; minor classes x minor
+  spacing: [[15, 200], [18, 320], [22, 900]]   # px between repeated arrows (tiles=True)
+  icon: {path: "M 0,2 7,2 7,0 12,2.5 7,5 7,3 0,3 z", view_box: [12, 5], width: 96, height: 40, pixel_ratio: 4}   # drawn 4x large: the size ramp scales it up to ~10x
+  main: ["motorway", "trunk", "primary", "secondary", "tertiary"]   # the main classes (and their links), with arrows below main_below
+  place: {min_len_px: 100, min_gap_px: 150, name_gap_px: 14, edge_px: 10, char_width: 0.6}   # the page: no arrow on a road shorter than min_len_px on screen; arrows min_gap_px apart; name_gap_px beside a name; edge_px from the window edge; a name's width = its letters x char_width x its size
+
+bridges:
+  cap: "butt"   # square deck ends
+  wing_scale: 1.25   # the deck casing: the road casing width x this
+  ramp: [14, 17]   # simple mode: the wings and the shadow grow from the first zoom to the second
+  casing_extra: 1.5   # px wider than a road casing (the deck wings)
+  casing_m: 0.25   # metre widths: at least this wide each side
+  casing_px: 1.0   # and never thinner than this each side
+  shadow: {show: true, blur: 4.0, offset: [2, 2], trim_m: 3.0, width_scale: 1.6}
+  decks: {base_m: 5.0, thickness_m: 1.0, ramp_m: 40.0, step_m: 2.5, match_zoom: 18.0, width_scale: 0.6, flat_below: 16.0, casing_px: 2.0}   # view_3d: the extruded decks
+
+tunnels:
+  opacity_scale: 0.45   # folium / lonboard: a tunnel fades to this
+  cap: "butt"   # clean dash ends
+  folium_dash: [4, 4]   # folium / lonboard: a tunnel of a solid class gets this dash
+  casing_dash: [1, 1]   # dash and gap, in line widths
+  fill_dash: []
+  strength: 60   # 0 = normal colors, 100 = the full tunnel colors
+  dash_extra_px: 3   # the dash layer and the casing under it: px wider than a casing
+  steps: [0, 25, 50, 55, 60, 65, 70, 75, 100]   # the Tunnels box: the strength slider's steps
+  ratios: [[1, 1], [2, 2], [3, 3], [4, 4], [2, 1], [3, 2], [4, 3], [1, 2]]   # the Tunnels box: the dash ratios to choose from
+
+selection: {folium: {"base_width": 4.0, "glow_scale": 3.0, "casing_scale": 1.8, "core_scale": 1.5, "hover_extra_px": 2}}
+
+data: {width: 2.0, casing_width: 0.0}
+
+overlays:
+  radius: 6.0
+  width: 2.0
+  circle_stroke_width: 1
+  text_size: 12
+  text_max_angle: 40
+  text_padding: 2
+  text_halo_width: 1.5
+  item_overlap_px: 1
+
+boundary: {width: 2.5, dash: [3, 2]}

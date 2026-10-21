@@ -56,9 +56,8 @@ def _compress(values):
 
 def _class_order(highway):
     """The class order ``z_order`` of the renderer (a link just under its parent, or the table's own value): higher = on top."""
-    from .render_web import ROAD_Z, _base
-    b, link = _base(highway)
-    return ROAD_Z[highway] if highway in ROAD_Z else ROAD_Z.get(b, 4) - (0.5 if link else 0)
+    from .render_web import class_order
+    return class_order(highway)
 
 
 def _difference_lp(cost, A, b, hi):

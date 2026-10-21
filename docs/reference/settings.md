@@ -1,6 +1,6 @@
 # Settings & palettes
 
-<p class="lead">Every styling default is a setting you can override without touching code: palettes, opacities, camera, base map, API keys.</p>
+<p class="lead">The look of a map is a profile (widths, zooms, sizes) and a palette (colors), picked by name; the other settings are the base map, the camera and the API keys.</p>
 
 ## Settings levels
 
@@ -19,30 +19,59 @@ bundled default.
 Files at levels 2-4 are read when `roadstyle` is imported: create them before `import roadstyle`.
 A file that is not valid JSON is skipped.
 
+## Profiles and palettes
+
+The look of a map is two files, picked by name (docs/design/style_config.md). Python holds no style value.
+
+| | holds | bundled | pick |
+|---|---|---|---|
+| **palette** | only colors: road classes (fill, casing, opacity), names, arrows, bridges, tunnels, selection, data maps, overlays, boundary, background | `amber` (default), `carto`, `highsat`, `mono` in `roadstyle/data/palettes/` | `palette="carto"` |
+| **profile** | everything that is not a color: widths by zoom, class order and minzoom, zoom ranges of names and arrows, sizes, dashes, caps, the tunnel look | `default`, `highsat` in `roadstyle/data/profiles/` | `profile="highsat"` |
+
+Read the bundled files for every key and its comment. `profile="highsat", palette="highsat"` is the high-saturation look with
+its own widths and dashes; `palette="highsat"` alone uses the default profile.
+
+**Your own:** a file `./palettes/<name>.yaml` or `./profiles/<name>.yaml` in the working directory (or under
+`~/.config/roadstyle/`). It states only what it changes and merges over `amber` or `default`. Pick it by its name:
+
+```yaml
+# ./palettes/night.yaml
+classes:
+  residential: {fill: "#334155"}
+labels: {color: "#e2e8f0", halo_color: "#0f172a", halo_width: 1}    # halo_width is a size: it belongs to the profile
+bridges: {casing_color: "#94a3b8"}
+```
+
+```python
+rs.render_edges(edges, palette="night")                 # this render
+rs.render_edges(edges, profile="highsat", palette="highsat")
+rs.use_settings({"palette": "night"})                   # the rest of the process
+```
+
+An unknown name is an error that lists the names there are. A palette made in code (`rs.register_palette`) gives only its
+class looks; the other colors come from the palette in force.
+
 ## The settings file
 
-Every level uses the same layout as `defaults.json`:
+Every settings level uses one layout. `profile` and `palette` name the look; `config` holds what is not a look:
 
-| section | holds | merges |
+| key | holds | merges |
 |---|---|---|
-| `palettes` | `{palette: {class: RoadStyle fields}}`; a new name adds a palette | per road class |
-| `config` | the [`StyleConfig`](parameters.md#styleconfig) fields: opacities, labels, arrows, camera, basemap, bridge decks, tiles, API keys | per key |
-| `selection` | selection colours: `core`, `glow`, `glow_opacity`, `casing` | per key |
-| `roads` | the web width and draw-order model: `width`, `width_zoom_rate`, `casing_ratio`, `group`, `links`, `zoom_stops`, `z_order` | per table entry |
+| `profile`, `palette` | names (the last level that gives one wins) | replace |
+| `config` | `basemap`, `camera`, `annotations` (`slot_m`), `tiles`, `api_key`, `api_keys` | per key |
 
 ```jsonc
 {
-  "palettes": {
-    "highsat": { "service": { "fill": "#E0E0E0" } },            // retint one class
-    "mytheme": { "motorway": { "fill": "#f00", "width": 6, "casing_width": 8 } }
-  },
-  "config":    { "fill_opacity": 0.95, "basemap": "positron", "api_keys": { "carto": "…" } },
-  "selection": { "core": "#FF0000" },
-  "roads":     { "z_order": { "service": 5 } }
+  "profile": "default",
+  "palette": "carto",
+  "config":  { "basemap": "positron", "api_keys": { "carto": "…" } }
 }
 ```
 
-A palette entry may also be wrapped as `{"roads": {...}}`, the form `save_palette` writes.
+**The older layout** (2026-10-19): a settings file that still gives style values as `palettes`, `selection`, `roads` or as
+style keys of `config` (`labels`, `arrows`, `bridge_*`, `tunnel_*`, `minzoom`, ...) keeps working for one release. roadstyle
+reads each one as its theme key and gives a `DeprecationWarning` that names the new key (`config.bridge_casing_color ->
+theme bridges.casing_color`). A palette entry may also be wrapped as `{"roads": {...}}`, the form `save_palette` writes.
 
 ## Palettes
 
@@ -143,7 +172,7 @@ In every palette:
 | `rs.load_palette("mine.json")` | read it back and register it under its `name` (`register=False` to skip) |
 | `rs.palette_to_dict(p)` / `rs.palette_from_dict(d)` | the same as plain dicts |
 
-A `RoadStyle` needs `fill`, `width`, `casing_width`; `casing` (default `#bcbcbc`, `None` = none),
+A `RoadStyle` needs `fill`, `width`, `casing_width`; `casing` (default: the palette's `roads.fallback.palette_casing`, `None` = none),
 `dash` (`[on, off]` px) and `opacity` (1.0) are optional. For a non-OSM class column, register a
 palette keyed by your classes and pass `highway_col=`.
 

@@ -14,9 +14,15 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
+from . import _settings
 from .config import DEFAULT, StyleConfig
 from .palettes import DEFAULT_PALETTE, FALLBACK, PALETTES, RoadStyle
 from .style import _apply, normalize_highway
+
+
+def _theme(path):
+    """A dataclass default read from the theme in force when the styler is made (docs/design/style_config.md)."""
+    return field(default_factory=lambda: _settings.theme_value(path))
 
 _TRUE = {"yes", "true", "1", "y", "t"}
 
@@ -175,14 +181,14 @@ class CategoricalStyler:
     """
     column: str = ""
     colors: Mapping[str, str] = field(default_factory=dict)
-    fallback_color: str = "#cccccc"
+    fallback_color: str = _theme("data.nodata")
     missing: str = "base"              # unmapped edges as a colour OPTION: "base" = the base option's
                                        # fill; "self" = this fallback_color (for loud base palettes)
-    width: float | str = 2.0           # constant px, or a column name to read width from
+    width: float | str = _theme("data.width")   # constant px, or a column name to read width from
     casing: str | None = None          # constant casing colour, or None for no casing
-    casing_width: float = 0.0
-    opacity: float = 0.9
-    casing_opacity: float = 0.75
+    casing_width: float = _theme("data.casing_width")
+    opacity: float = _theme("data.opacity")
+    casing_opacity: float = _theme("data.casing_opacity")
     dash: tuple[int, int] | None = None
 
     def resolve_frame(self, gdf) -> ResolvedFrame:
@@ -231,14 +237,14 @@ class NumericStyler:
     cmap: object = "viridis"           # branca scheme name, matplotlib name, or list of hex stops
     vmin: float | None = None
     vmax: float | None = None
-    width: float = 2.0                 # constant width unless width_by is given
+    width: float = _theme("data.width")   # constant width unless width_by is given
     width_by: tuple[float, float] | None = None   # (min_px, max_px) ramp over [vmin, vmax]
     width_column: str | None = None    # column driving the width ramp (defaults to `column`)
-    opacity: float = 0.9
+    opacity: float = _theme("data.opacity")
     casing: str | None = None
-    casing_width: float = 0.0
-    casing_opacity: float = 0.75
-    nan_color: str = "#cccccc"
+    casing_width: float = _theme("data.casing_width")
+    casing_opacity: float = _theme("data.casing_opacity")
+    nan_color: str = _theme("data.nodata")
     missing: str = "base"              # what NaN edges wear as a colour OPTION: "base" = the base
                                        # option's fill (neutral-base maps); "self" = this nan_color —
                                        # use when the base palette is loud and would fake a data value
@@ -301,7 +307,7 @@ class ColorTableStyler:
     color_column: str
     highway_col: str = "highway"
     palette: str | Mapping[str, RoadStyle] = DEFAULT_PALETTE
-    fallback_color: str = "#bbbbbb"
+    fallback_color: str = _theme("data.color_table")
     column: str | None = None        # the class column (Styler protocol / filtering)
 
     def __post_init__(self):
@@ -313,8 +319,9 @@ class ColorTableStyler:
             # borrow per-class widths + casing, then override the fill
             rf = ClassStyler(column=self.highway_col, palette=self.palette).resolve_frame(gdf)
         else:
-            rf = ResolvedFrame([self.fallback_color] * n, [2.0] * n, ["#bcbcbc"] * n,
-                               [3.0] * n, [None] * n, [0.9] * n, [0.75] * n, [None] * n)
+            fb, t = _settings.theme_value("roads.fallback"), _settings.theme()
+            rf = ResolvedFrame([self.fallback_color] * n, [fb["width"]] * n, [fb["palette_casing"]] * n,
+                               [fb["casing_width"]] * n, [None] * n, [t["roads"]["fill_opacity"]] * n, [t["casing"]["opacity"]] * n, [None] * n)
         colors = gdf[self.color_column].tolist() if self.color_column in gdf.columns else [None] * n
         rf.fill = [_color_or(c, self.fallback_color) for c in colors]
         rf.legend = None             # arbitrary per-edge colours -> no categorical legend

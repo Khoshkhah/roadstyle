@@ -1,0 +1,15 @@
+# roadstyle profile 'highsat': the high-saturation look's own widths and dashes (minor classes without casing, longer
+# dashes). It merges over 'default'. Use it with the palette of the same name: profile="highsat", palette="highsat".
+
+roads:
+  classes:
+    tertiary: {width: 2.5, casing_width: 4.5, dash: null}
+    unclassified: {width: 2.0, casing_width: 4.0, dash: null}
+    residential: {width: 2.0, casing_width: 4.0, dash: null}
+    living_street: {width: 2.0, casing_width: 0.0, dash: null}
+    pedestrian: {width: 1.5, casing_width: 0.0, dash: null}
+    service: {width: 1.0, casing_width: 0.0, dash: null}
+    track: {width: 1.5, casing_width: 0.0, dash: null}
+    cycleway: {width: 1.5, casing_width: 0.0, dash: [6, 4]}
+    footway: {width: 1.5, casing_width: 0.0, dash: [4, 4]}
+    path: {width: 1.5, casing_width: 0.0, dash: [4, 4]}
