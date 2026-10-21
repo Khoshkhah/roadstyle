@@ -40,7 +40,13 @@ from .emit import (
 from .filters import filter_edges, highway_types
 from .legend import make_legend
 from .levels import auto_ends, casing_parts, compute_levels, level_input, solve_levels
-from .levels_store import load_area_levels, load_levels, restore_area_inputs, save_area_levels, save_levels
+from .levels_store import (
+    load_area_levels,
+    load_levels,
+    restore_area_inputs,
+    save_area_levels,
+    save_levels,
+)
 from .overlays import Overlay
 from .pages import render_dashboard, render_report, render_street_view, sidebar_html
 from .palettes import (
