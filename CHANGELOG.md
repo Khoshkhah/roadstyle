@@ -4,6 +4,14 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **A short road is cut once** (`short_road_heads.md`). A road shorter than its two heads was cut at `h0` and at `n - h1`. These are the same point only in exact
+  arithmetic, so the last bit of `cos` and `hypot` decided whether a middle piece under 2 cm and a second seam and lap came between them. glibc, Pyodide and Rust's
+  wasm math library gave three different answers (Monaco: 78 of 8,561 edges differ between native Python and the GeoLibre plugin's Pyodide). Now the road is two
+  pieces and one seam on every platform. The map looks the same: the extra piece was less than a pixel wide.
+
 ## [0.24.2] — 2026-10-22
 
 ### Fixed

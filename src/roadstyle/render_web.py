@@ -951,9 +951,13 @@ def _casing_parts(geo, head_m, cols):
         n = float(cum[-1])
         h0, h1 = p.get("__rs_hs", head_m), p.get("__rs_he", head_m)       # this edge's head lengths (head_start_m_col / head_end_m_col)
         if h0 + h1 >= n - 0.05:         # a short road (or main part under 5 cm) is two pieces, one at each head's number, cut in the heads' ratio (docs/design/short_road_heads.md)
-            h0, h1 = n * h0 / (h0 + h1), n * h1 / (h0 + h1)
-        cuts = [(0.0, h0, cs), (h0, n - h1, cm), (n - h1, n, ce)]
-        for k, (a, b, num) in enumerate(cuts):
+            # cut once: h0 and n - h1 are the same point only in exact arithmetic, and the last bit of cos and hypot (glibc, Pyodide, wasm)
+            # decided whether a middle piece under 2 cm and a second seam came between them
+            h0 = n * h0 / (h0 + h1)
+            cuts = [(0.0, h0, cs, 0), (h0, n, ce, 2)]
+        else:
+            cuts = [(0.0, h0, cs, 0), (h0, n - h1, cm, 1), (n - h1, n, ce, 2)]       # k: 0 the start head, 1 the main part, 2 the end head
+        for a, b, num, k in cuts:
             pts = _part(xy, cum, a, b)
             if len(pts) < 2 or not (np.diff(pts, axis=0) != 0).any():
                 continue
@@ -969,9 +973,9 @@ def _casing_parts(geo, head_m, cols):
         # on a curve left a wedge open in the outline (2026-10-06: "not smooth in the middle"); the piece drawn above covers the rest.
         # Up to 0.5 m each way (a quarter of the shorter side at most): a 2 cm seam fell on one or two steps of the map's tile grid
         # (about 1.3 cm), lost its direction and was drawn as a square block sticking out of the outline at zoom 21 (2026-10-08)
-        cut_at = sorted({h0, n - h1} - {0.0, n})
+        cut_at = sorted({a for a, _, _, _ in cuts[1:]} - {0.0, n})
         for c in cut_at:
-            near = [(a, b, num) for a, b, num in cuts if b - a > 1e-9 and (abs(b - c) < 1e-9 or abs(a - c) < 1e-9)]
+            near = [(a, b, num) for a, b, num, _ in cuts if b - a > 1e-9 and (abs(b - c) < 1e-9 or abs(a - c) < 1e-9)]
             sides = [num for a, b, num in near]
             half = min([_SEAM_M] + [(b - a) / 4 for a, b, num in near])
             pts = _part(xy, cum, max(0.0, c - half), min(n, c + half))

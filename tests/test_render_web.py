@@ -1892,6 +1892,28 @@ def test_compute_levels_reversed_twin_has_its_heads_the_other_way_round():
     assert out.casing_level[0] == out.casing_level[1] and out.fill_level[0] == out.fill_level[1]
 
 
+def test_short_road_is_cut_once():
+    """A road shorter than its two heads is two pieces and one seam (short_road_heads.md), whatever the last bit of cos and hypot: the page
+    cuts it once. Cut at h0 and at n - h1 (equal in exact arithmetic), it kept a middle piece under 2 cm or a second seam on some
+    platforms and not on others. Three Monaco roads where glibc's cos and hypot did that (geolibre-roadstyle, docs/design/rust-spike.md, S4)."""
+    roads = [  # line, casing start, main and end numbers, head lengths at the start and the end
+        ([(7.4179186, 43.734364), (7.4178807, 43.7343466)], (0, 0, -1), (5.0, 5.0)),
+        ([(7.417406100000001, 43.731892800000004), (7.417392, 43.731903300000006)], (0, 2, 1), (5.0, 5.0)),
+        ([(7.4251499, 43.7397216), (7.4251233, 43.739687700000005)], (1, 2, 0), (3.8, 0.5)),
+    ]
+    g = gpd.GeoDataFrame({"highway": ["residential"] * 3, "cs": [r[1][0] for r in roads], "cm": [r[1][1] for r in roads],
+                          "ce": [r[1][2] for r in roads], "fl": [r[1][1] for r in roads], "hs": [r[2][0] for r in roads], "he": [r[2][1] for r in roads]},
+                         geometry=[LineString(r[0]) for r in roads], crs=4326)
+    html = render_edges(g, backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce",
+                        head_start_m_col="hs", head_end_m_col="he", head_m=5.0, simple=False).html
+    feats = [f["properties"] for f in _style(html)["sources"]["casings"]["data"]["features"]]
+    for i, (_, (cs, _cm, ce), _) in enumerate(roads):
+        mine = [p for p in feats if p["__rs_edge"] == i]
+        assert [p["__rs_cl"] for p in mine if not p.get("__rs_seam")] == [cs, ce], f"road {i}: the two heads only"
+        assert len([p for p in mine if p.get("__rs_seam") and not p.get("__rs_lap")]) == 1, f"road {i}: one seam"
+        assert len([p for p in mine if p.get("__rs_lap")]) == 1, f"road {i}: one lap"
+
+
 def test_divided_casing_is_drawn_as_head_and_main_pieces():
     """casing_start_col / casing_end_col / head_m: an edge >= 2 * head_m with unequal casing numbers is cut into three casing pieces (first head_m metres,
     middle, last head_m metres), each at its own number, in their own source; the fill stays one line; a short edge is two halves, one at each head's number; an equal-numbered edge is one piece."""

@@ -23,6 +23,14 @@ are equal, or when the page and the solver use the same `head_m` (a short road h
 | length < `2 · head_m`, numbers not all equal | **two**: the first half at the start number, the second half at the end number |
 | numbers all equal, or any other geometry | one, as before |
 
+## One cut (2026-10-22)
+
+The code cut a short road at `h0` and at `n - h1`, with the heads scaled to the road (`h0 + h1 = n`). The two cuts are the same point only in exact arithmetic. In
+floating point the middle piece was one last bit long, zero or negative, so the last bit of `cos` and `hypot` decided whether a middle piece under 2 cm at the main
+number and a second seam and lap were drawn. glibc, Pyodide and Rust's wasm math library decided differently (Monaco: 78 of 8,561 edges differ between native Python
+and Pyodide). Now `_casing_parts` cuts a short road once, at `h0`: the two halves of the table above, and one seam and one lap. `test_short_road_is_cut_once` uses
+three Monaco roads that had the extra pieces natively.
+
 ## Not done
 
 The head is still one global length. A fork whose branches stay together for longer than the head still shows a casing line after it; a head that depends on the junction is a change of the solver.
