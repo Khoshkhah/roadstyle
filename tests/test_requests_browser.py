@@ -245,3 +245,21 @@ def test_one_tile_zoom_in_a_tilted_view(tmp_path):
             return [...new Set(Object.values(ts).map(x=>x.tileID.overscaledZ))]})()""")
         browser.close()
     assert zooms == [17] and not errors
+
+
+def test_simple_mode_glow_follows_the_pieces_after_an_update_in_place(tmp_path):
+    """The level editor swaps a road's pieces (GeoJSONSource.updateData): the pieces a road glows through are the new ones."""
+    path = _page(tmp_path, "inplace")
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        page.evaluate("map.jumpTo({center: [18.0005, 59.305], zoom: 15, pitch: 0})")
+        page.wait_for_function("map.loaded()", timeout=60_000)
+        old = page.evaluate("_pieces(0)")
+        page.evaluate("""(() => { const f = _sfeats('simple').find(x => x.id === _pieces(0)[0]);
+            map.getSource('simple').updateData({remove: _pieces(0), add: [{...f, id: 987654321}]}); })()""")
+        page.wait_for_timeout(1500)
+        new = page.evaluate("_pieces(0)")
+        page.evaluate("rsSelect(0)")
+        lit = page.evaluate("_pieces(0).map(id => !!map.getFeatureState({source: 'simple', id}).select)")
+        browser.close()
+    assert old and new == [987654321] and lit == [True] and not errors

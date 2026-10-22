@@ -4,6 +4,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.24.2] — 2026-10-22
+
+### Fixed
+- **The glow of a hovered or selected road follows its pieces after an update in place** (simple mode). 0.24.1 kept the list of the pieces of a road once. The level
+  editor swaps a road's pieces (`GeoJSONSource.updateData`), so a road could glow through pieces that were gone. The list is made again when the data changes.
+
 ## [0.24.1] — 2026-10-21
 
 ### Added

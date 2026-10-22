@@ -718,11 +718,13 @@ function _feats(){ return _sfeats("roads"); }
 function _side(){ return (RS_TILED && window.RS_SIDE) || null; }
 function _rprops(i){ const s=_side(); if(s) return s.props[i]||{};
   const f=_feats()[i]; return (f && f.properties)||{}; }
-let _pcIdx = null;                       // lean: a road's index -> the ids of its fill pieces in the simple source
+let _pcIdx = null, _pcFs = null;         // lean: a road's index -> the ids of its fill pieces in the simple source, and the feature list it was made from
 function _pieces(e){
-  if(!_pcIdx){ const m=new Map(), fs=_sfeats("simple");
+  const fs=_sfeats("simple");            // a new list after the data changes (setData, or the level editor's updateData): the index is made again
+  if(!_pcIdx || _pcFs!==fs){ const m=new Map();
     fs.forEach((f,i)=>{ const p=f.properties||{}; if(p.__rs_k===1){ let a=m.get(p.__rs_edge); if(!a) m.set(p.__rs_edge, a=[]); a.push(f.id!=null ? f.id : i); } });
-    if(fs.length) _pcIdx=m; else return []; }
+    if(!fs.length) return [];
+    _pcIdx=m; _pcFs=fs; }
   return _pcIdx.get(e) || []; }
 function _roadOfPiece(f){ const e=f.properties.__rs_edge;      // a fill piece, as the road feature it belongs to
   return {id:e, properties:_rprops(e), layer:{id:"roads-fill"}, get geometry(){ const r=_feats()[e]; return r && r.geometry; }}; }
