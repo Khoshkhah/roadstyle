@@ -4,7 +4,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.24.1] — 2026-10-21
 
 ### Added
 - **`max_pitch=` on a render call** (web): the most the map can tilt, in degrees. The default stays 70 (`camera.max_pitch`). `max_pitch=60` keeps the page from the
