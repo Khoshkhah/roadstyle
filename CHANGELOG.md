@@ -4,7 +4,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.24.3] — 2026-10-22
 
 ### Fixed
 - **A short road is cut once** (`short_road_heads.md`). A road shorter than its two heads was cut at `h0` and at `n - h1`. These are the same point only in exact
