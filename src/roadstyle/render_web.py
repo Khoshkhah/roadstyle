@@ -2556,7 +2556,7 @@ def _simple_dasharray(dashes, ratio):
     return ["case", ["==", ["get", "__rs_k"], 4], _gs("rs_tun_ratio"), by if dashes else solid]
 
 
-def _simple_color(bridge_color, tunnels=False, select_color=None, hover_color=None, props=("__rs_fill",)):
+def _simple_color(bridge_color, tunnels=False, select_color=None, hover_color=None, props=("__rs_fill",), glow=None):
     """Simple mode's line-color: a bridge shadow ``bridge_shadow_color``, a casing piece its casing colour (a bridge's ``bridge_color``), a fill its fill; on a map with
     ``tunnels`` a tunnel's fill takes the tunnel look (_tun_mix toward ``tunnel_toward`` at ``tunnel_strength``) and its casing pieces the palette's
     two colours moved the same way (gap ``__rs_k`` 3, dashes 4; the gap clear for "One colour"). The page builds the same again on every
@@ -2572,6 +2572,10 @@ def _simple_color(bridge_color, tunnels=False, select_color=None, hover_color=No
         cases += [["==", ["get", "__rs_k"], 3], _tun_gap(), ["==", ["get", "__rs_k"], 4], _tun_dash()]
     if select_color:                    # a picked item of items= (__rs_pick) highlighted in the road layer itself (feature-state of the simple source)
         item = ["case", ["boolean", ["feature-state", "select"], False], select_color, ["boolean", ["feature-state", "hover"], False], hover_color, item]
+    if glow:        # ``glow`` (select colour, hover colour, opacity): a hovered or selected road's fill pieces (feature-state of the simple source, set by the page) go
+        sel, hov, op = glow            # that far toward the highlight colour, as the road's own highlight layer drew it over the fill: opacity op of the colour
+        mix = lambda c: ["interpolate", ["linear"], op, 0, fill, 1, c]        # noqa: E731
+        fill = ["case", ["boolean", ["feature-state", "select"], False], mix(sel), ["boolean", ["feature-state", "hover"], False], mix(hov), fill]
     return ["case", *cases, ["==", ["get", "__rs_k"], 5], item, fill]
 
 
@@ -2693,11 +2697,11 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            tunnel_col: str = "tunnel", bridge_col: str = "bridge", layer_col: str = "layer",
            edge_id_col: str = "edge_id", road_fill: bool = True, cap_col: str = None, cap_start_col: str = None, cap_end_col: str = None, casing_level_col: str = None, fill_level_col: str = None, casing_start_col: str = None, casing_end_col: str = None, head_m: float = 5.0, head_start_m_col: str = None, head_end_m_col: str = None, directed_col: str = None, driving_col: str = None,
            width_m_col: str = None, width_m_zoom: float = None, casing_m: float = None, casing_min_px: float = None,
-           pitch: float = None, bearing: float = None, view_3d: bool = False,
+           pitch: float = None, bearing: float = None, max_pitch: float = None, view_3d: bool = False,
            arrows: bool = True, labels: bool = True, filter_control: bool = True, find_control: bool = False, overlay_control: bool = True, overlay_popup: bool = True,
            access_col: str = None, side_panel_html: str = None, host_panel_width: int = 320,
            basemap_switcher: bool = True, zoom_readout: bool = True,
-           road_popup=True, road_tooltip=False, hover_delay_ms: int = 300, data_maxzoom: int = None, popup_mode: str = None,
+           road_popup=True, road_tooltip=False, hover_delay_ms: int = 300, data_maxzoom: int = None, data_tolerance: float = None, popup_mode: str = None,
            street_view: bool | str = "window", street_view_key: str | None = None, google_3d: bool = False,
            tooltip=None, hover_color: str = None, select_color: str = None, boundary=None,
            color_options=None, color_active=0, views=None, overlays=None, items=None, items_popup=None, compress: bool = True, tunnel_control: bool = False,
@@ -3323,6 +3327,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                     l["maxzoom"] = dk["flat_below"]
                 elif l["id"].startswith(("roads-casing", "roads-fill")) and l.get("source") in ("roads", "casings"):
                     l["filter"] = ["all", l["filter"], ["any", ["<", ["zoom"], dk["flat_below"]], ["!", is_b]]]
+    lean = bool(simple) and not tiles       # simple mode, inline data: the roads source draws nothing, so it is cut into no tiles (see the hidden layers below)
     end_fill_ids, end_casing_ids = ["roads-ends-low-fill", "roads-ends-fill", "roads-ends-high-fill"], ["roads-ends-low-casing", "roads-ends-casing", "roads-ends-high-casing"]
     if levels:        # position mode: a cap's casing is drawn right before its position's casing layers, its fill right before its position's fill layers
         end_fill_ids, end_casing_ids = [], []
@@ -3367,7 +3372,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         sdashes = sorted({(f.get("properties") or {}).get("__rs_dash") for f in geo["features"] + items} - {None, ""})
         sdash = {"line-dasharray": _simple_dasharray(sdashes, CONFIG.tunnel_casing_dash or [1, 1])} if sdashes or any_tunnel else {}
         road = {"id": "roads-simple", "type": "line", "source": "simple", "layout": {**lay, "line-cap": _simple_cap(), "line-sort-key": ["get", "__rs_s"]}, **flt,
-                "paint": {**sdash, "line-color": _simple_color(CONFIG.bridge_casing_color, bool(any_tunnel), select_color, hover_color, _fill_props(color_opts_meta)),
+                "paint": {**sdash, "line-color": _simple_color(CONFIG.bridge_casing_color, bool(any_tunnel), select_color, hover_color, _fill_props(color_opts_meta),
+                                                 (select_color, hover_color, THEME["selection"]["opacity"]) if lean else None),
                           "line-width": _pair_width(_by_feature(wide, fw), highway_col, offset_frac, offset_zoom, wmz) if pairs else _by_feature(wide, fw), "line-offset": soff,
                           "line-blur": ["interpolate", ["linear"], ["zoom"], r0, 0, r1, ["case", is_sh, blur, 0]],
                           "line-opacity": ["interpolate", ["linear"], ["zoom"], r0, ["case", is_sh, 0, op], r1, op]}}
@@ -3376,6 +3382,11 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                 "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], _FB["fill"]], "line-width": fw, "line-offset": off, "line-opacity": 0}}
         at = next(n for n, l in enumerate(style["layers"]) if l["id"].startswith(("roads-casing", "roads-fill")))
         style["layers"] = [l for l in style["layers"] if not l["id"].startswith(("roads-casing", "roads-fill", "roads-ends"))]
+        if lean:        # MapLibre cuts a source into tiles only while a layer of it is drawn, and every tile of the roads source cost the page a freeze (the 22k-entry colour state is
+            pick["layout"] = {**pick["layout"], "visibility": "none"}             # copied into each paint expression and back from the worker with each tile): the road is
+            for l in style["layers"]:                                              # picked on the fill pieces of roads-simple, and its glow is their state. The layers stay,
+                if l["id"].startswith("roads-highlight"):                          # hidden, for the page that reads their paint (roads-fill's line-offset)
+                    l["layout"] = {**l["layout"], "visibility": "none"}
         style["layers"][at:at] = [road, pick]
 
     # oneway direction arrows (on edges with no reverse twin) + line-placed street names, on top.
@@ -3387,6 +3398,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         cam["pitch"] = cam["pitch_3d"]     # perspective camera only — no terrain data added
     if pitch is not None:
         cam["pitch"] = pitch
+    if max_pitch is not None:
+        cam["max_pitch"] = max_pitch       # 60: MapLibre keeps one tile zoom, so a road has one width on the whole screen
     if bearing is not None:
         cam["bearing"] = bearing
     arw = {**THEME["arrows"], **(CONFIG.arrows or {})}
@@ -3588,6 +3601,10 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         for src in style["sources"].values():  # enlarged (no new cutting on every zoom step); positions are as exact as that zoom's tile grid
             if src.get("type") == "geojson":
                 src["maxzoom"] = int(data_maxzoom)
+    if data_tolerance is not None:             # how far MapLibre simplifies the road geometry in every tile it cuts (the default here is 0.05,
+        for src in style["sources"].values():  # 0.375 is MapLibre's own): zoomed out one tile holds a whole district, and each vertex costs time
+            if src.get("type") == "geojson" and "tolerance" in src:
+                src["tolerance"] = float(data_tolerance)
     tun_colour, tun_toward, tun_strength = _tun_settings()
     _state_expressions(style, _fill_props(color_opts_meta), set(_fill_layer_ids(levels)), end_fill_ids if levels else [], end_casing_ids if levels else [],
                        ov_meta)
@@ -3792,6 +3809,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             .replace("__SV_WINDOW_KEY__", json.dumps(street_view_key or ""))
             .replace("__GOOGLE_3D__", "true" if google_3d else "false")
             .replace("__RS_TILED__", "true" if tiles else "false")
+            .replace("__RS_LEAN__", '"roads-simple"' if lean else "false")
             .replace("__HOST_PANEL_HTML__", _host_panel(side_panel_html, host_panel_width, name)))     # the last: the host's own text may hold any other token
     if tiles:
         import base64

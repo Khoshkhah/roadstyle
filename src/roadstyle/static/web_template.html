@@ -154,6 +154,9 @@ const style = __STYLE__, BASEMAPS = __BASEMAPS__;
 // per-edge data go to the sidecar table (window.RS_SIDE), and roads feature-state needs the
 // source-layer name. RS_TILED=false leaves every code path exactly as the inline version.
 const RS_TILED = __RS_TILED__;
+// RS_LEAN (simple mode, inline data): the id of the one road layer, else false. The roads source is not drawn then, so MapLibre cuts it into no tiles. A road is
+// picked on the fill pieces of that layer (__rs_k 1, their __rs_edge is the road's index), and its hover / select glow is the feature-state of those pieces (_fs).
+const RS_LEAN = __RS_LEAN__;
 const RS_DECK_LAYERS = style.layers.filter(l=>l.id.indexOf("roads-bridge-decks")===0).map(l=>l.id);
 const map = new maplibregl.Map({container:"map", style:style, center:__CENTER__, zoom:13,
   pitch:__PITCH__, bearing:__BEARING__, maxPitch:__MAX_PITCH__,
@@ -161,6 +164,7 @@ const map = new maplibregl.Map({container:"map", style:style, center:__CENTER__,
 // One tile zoom on the whole screen. In a tilted view MapLibre loads the near tiles at a higher zoom than the far ones. A width that
 // depends on the zoom AND on the feature is baked per tile for [tile zoom, tile zoom + 1] and clamped there, so every road changed
 // width where two tile zooms met (a horizontal line across the map). With one tile zoom the bake is exact on the whole screen.
+// It does nothing up to 60 degrees of tilt (MapLibre uses one tile zoom there); above it, it loads more tiles (2 to 3.6 times as many at 66 to 70 degrees).
 function _flatTiles(){ Object.keys(style.sources).forEach(id=>{ const s=map.getSource(id); if(s && s.type!=="raster") s.calculateTileZoom=z=>z; }); }
 map.on("styledata", _flatTiles);
 map.addControl(new maplibregl.NavigationControl({visualizePitch:true}));
@@ -714,7 +718,17 @@ function _feats(){ return _sfeats("roads"); }
 function _side(){ return (RS_TILED && window.RS_SIDE) || null; }
 function _rprops(i){ const s=_side(); if(s) return s.props[i]||{};
   const f=_feats()[i]; return (f && f.properties)||{}; }
+let _pcIdx = null;                       // lean: a road's index -> the ids of its fill pieces in the simple source
+function _pieces(e){
+  if(!_pcIdx){ const m=new Map(), fs=_sfeats("simple");
+    fs.forEach((f,i)=>{ const p=f.properties||{}; if(p.__rs_k===1){ let a=m.get(p.__rs_edge); if(!a) m.set(p.__rs_edge, a=[]); a.push(f.id!=null ? f.id : i); } });
+    if(fs.length) _pcIdx=m; else return []; }
+  return _pcIdx.get(e) || []; }
+function _roadOfPiece(f){ const e=f.properties.__rs_edge;      // a fill piece, as the road feature it belongs to
+  return {id:e, properties:_rprops(e), layer:{id:"roads-fill"}, get geometry(){ const r=_feats()[e]; return r && r.geometry; }}; }
+const _FILL_PIECE = ["any", ["==", ["get", "__rs_k"], 1], ["!", ["has", "__rs_k"]]];   // the fill pieces of the road layer, and what has no piece kind (overlays, decks)
 function _fs(ref, st){
+  if(RS_LEAN && ref.source==="roads"){ _pieces(ref.id).forEach(id=>map.setFeatureState({source:"simple", id:id}, st)); return; }
   if(RS_TILED && ref.source==="roads") ref={source:"roads", sourceLayer:"roads", id:ref.id};
   map.setFeatureState(ref, st); }
 function _lyr(name){   // -> {src, ov} | null; ov null = the roads
@@ -1341,7 +1355,7 @@ const ITEM_LAYERS = new Set(OVERLAYS.filter(o=>o.base && (o.interactive || o.sel
 const ROAD_ITEMS = __ROAD_ITEMS__;   // {label, popup, layer: the one road layer} or null
 const ITEM_PICK = ROAD_ITEMS && {label:ROAD_ITEMS.label, popup:ROAD_ITEMS.popup, select:"item", interactive:true};
 const PICK_LAYERS = style.layers.filter(l=>l.source!=="halves").map(l=>l.id)
-  .filter(id=>/^roads-(low-|high-|bridge-)?fill/.test(id) || ITEM_LAYERS.has(id)).concat(RS_DECK_LAYERS);
+  .filter(id=>(RS_LEAN ? id===RS_LEAN : /^roads-(low-|high-|bridge-)?fill/.test(id)) || ITEM_LAYERS.has(id)).concat(RS_DECK_LAYERS);
 function _roadOf(f){ const e=f.properties.__rs_edge;   // the road an item belongs to, as a picked road feature
   return {id:e, properties:_rprops(e), layer:f.layer, item:f,
           get geometry(){ const r=_feats()[e] || _svTiled(e); return r && r.geometry; }}; }   // tiles: only when Street View asks
@@ -1351,9 +1365,10 @@ function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id)); if(!ids.
   if(ITEM_PICK && map.getLayer(ROAD_ITEMS.layer)){       // a picked road item under the cursor wins over its road
     const it = map.queryRenderedFeatures([p.x, p.y], {layers:[ROAD_ITEMS.layer], filter:["to-boolean",["get","__rs_pick"]]});
     if(it.length) return _roadOf(it[0]); }
-  let l = map.queryRenderedFeatures([p.x, p.y], {layers:ids});
-  if(!l.length) l = map.queryRenderedFeatures(box(p), {layers:ids});
-  return !l.length ? null : ITEM_LAYERS.has(l[0].layer.id) ? _roadOf(l[0]) : l[0]; }
+  const q = RS_LEAN ? {layers:ids, filter:_FILL_PIECE} : {layers:ids};
+  let l = map.queryRenderedFeatures([p.x, p.y], q);
+  if(!l.length) l = map.queryRenderedFeatures(box(p), q);
+  return !l.length ? null : ITEM_LAYERS.has(l[0].layer.id) ? _roadOf(l[0]) : RS_LEAN && l[0].layer.id===RS_LEAN ? _roadOfPiece(l[0]) : l[0]; }
 function srcOf(f){ return f && f.layer && f.layer.id.indexOf("roads-bridge-decks")===0 ? "decks" : "roads"; }
 // full properties of a picked feature: tiles carry only the style props, so road hits read the
 // sidecar row behind the feature id; decks (and inline mode) keep the feature's own properties
@@ -1511,8 +1526,9 @@ function rsSetStreetViewMarkerAt(lng, lat, heading){
   const off=(a, b)=>{ const x=Math.abs(a-b)%360; return x>180 ? 360-x : x; };
   let best=_svPos ? _svOnEdge(_svPos.f, ll) : null;
   if(!best || best.d>_SV_LANE_M+6 || best.m<=0.01 || best.m>=_svAt(best.f, 1e9).len-0.01){
-    const q=map.project([ll.lng, ll.lat]), r=40, lays=RS_FILL_LAYERS.filter(id=>map.getLayer(id)), cand=[];
-    map.queryRenderedFeatures([[q.x-r, q.y-r], [q.x+r, q.y+r]], {layers:lays}).forEach(f=>{
+    const q=map.project([ll.lng, ll.lat]), r=40, lays=RS_LEAN ? [RS_LEAN] : RS_FILL_LAYERS.filter(id=>map.getLayer(id)), cand=[];
+    map.queryRenderedFeatures([[q.x-r, q.y-r], [q.x+r, q.y+r]], RS_LEAN ? {layers:lays, filter:["==", ["get", "__rs_k"], 1]} : {layers:lays}).forEach(f=>{
+      if(RS_LEAN) f=_roadOfPiece(f);
       if(f.id==null || cand.some(c=>c.f.id===f.id)) return;
       const o=_svOnEdge(f, ll); if(o) cand.push(o); });
     // the direction they walked (else look) first, then the nearest: a divided road's other

@@ -4,6 +4,29 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **`max_pitch=` on a render call** (web): the most the map can tilt, in degrees. The default stays 70 (`camera.max_pitch`). `max_pitch=60` keeps the page from the
+  views where the one tile zoom (see 0.23.0) loads more tiles: up to 60 degrees MapLibre itself uses one tile zoom.
+
+- **`data_tolerance=` on a render call** (web): how far MapLibre simplifies the road geometry in the tiles it cuts. Default `None` keeps roadstyle's `0.05`. `data_tolerance=1`
+  makes a sweep to a new area at zoom 12 about three times faster on a page of 22,000 roads (687 to 226 ms; the first tile 2.4 s to 0.6 s), because zoomed out one
+  tile holds a whole district.
+
+### Changed
+- **Simple mode with inline data cuts no tiles of the roads source.** The roads source drew nothing in simple mode: it held two layers only, the invisible layer that
+  found the road under the cursor and the layer that glowed a hovered or selected road. MapLibre cut it into tiles all the same, and copied the whole page state
+  (the colour of each road set by `rsColor`) into each paint expression and back from the worker with each tile. On a page of 22,000 roads one such reply held
+  about 2.8 million characters. The page took 40 to 70 ms to read it, and each tile that came in during a zoom froze the page. The two layers are now hidden, so the
+  source is cut into no tiles. A road is picked on the fill pieces of the road layer (`roads-simple`). A hovered or selected road glows through the state of its
+  pieces: their fill goes toward the highlight colour by the selection opacity, as the old layer drew it. On a Nacka page at zoom 12 to 16 (headless Chromium) the
+  frozen time of a scripted zoom fell from 9.2 s to 6.4 s, the frame rate rose from 17-34 to 22-42 frames a second, and with a real graphics card the tasks over 30 ms
+  fell from 24 to 12 (1.1 s to 0.5 s). Picks at 380 points gave the same road as before. A highlighted road ends square at its ends, not round.
+  `tiles=True` and `simple=False` keep the old layers. The one tile zoom for the whole screen stays: it is what keeps a road at one width in a tilted
+  view (no horizontal line where two tile zooms meet), and it costs tiles only above 60 degrees. With one road source cut into tiles, not two, a tilted view
+  freezes less than before: in a scripted zoom at 66 degrees the frozen time was 0.8 to 2.3 s, against 2.9 s on the old page.
+
 ## [0.24.0] — 2026-10-20
 
 ### Added

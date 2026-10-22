@@ -31,23 +31,6 @@ def _open(p, path, size=(1000, 700)):
     page.wait_for_function("window.map && window.map.loaded()", timeout=60_000)
     return browser, page, errors
 
-
-def test_one_tile_zoom_in_a_tilted_view(tmp_path):
-    """Item 1: a tilted map loads every tile of the roads at one zoom (no width step)."""
-    from roadstyle.render_web import render
-
-    path = tmp_path / "tilt.html"
-    render(_edges(), basemap="blank", simple=True).save(path)
-    with pw.sync_playwright() as p:
-        browser, page, errors = _open(p, path)
-        page.evaluate("map.jumpTo({center:[18.005,59.305], zoom:17.6, pitch:72, bearing:-25})")
-        page.wait_for_timeout(4000)
-        zooms = page.evaluate("""(()=>{const t=map.style.tileManagers.roads; const ts=t._inViewTiles?._tiles||t._tiles;
-            return [...new Set(Object.values(ts).map(x=>x.tileID.overscaledZ))]})()""")
-        browser.close()
-    assert zooms == [17] and not errors
-
-
 def _page(tmp_path, name, edges=None, **kw):
     from roadstyle.render_web import render
 
@@ -145,7 +128,7 @@ def test_access_col_rows_colours_and_filter(tmp_path):
         browser, page, errors = _open(p, path)
         rows = page.evaluate("[...document.querySelectorAll('.flt-body label')].map(l=>l.textContent.trim())")
         counts = page.evaluate("RS_ACCESS")
-        fills = page.evaluate("map.querySourceFeatures('roads').map(f=>f.properties.__rs_fill)")
+        fills = page.evaluate("map.querySourceFeatures('simple').map(f=>f.properties.__rs_fill)")      # simple mode draws the roads from their pieces; the roads source is cut into no tiles
         shown = page.evaluate("map.getFilter('roads-simple')")
         page.evaluate("rsSetAccess('private', false)")
         hidden = page.evaluate("JSON.stringify(map.getFilter('roads-simple'))")
@@ -226,3 +209,39 @@ def test_overlay_hover_lights_one_feature(tmp_path):
         lit = page.evaluate("[0,1,2].filter(i=>map.getFeatureState({source:'ov0',id:i}).hover)")
         browser.close()
     assert len(lit) == 1 and not errors
+
+
+def test_simple_mode_cuts_no_tiles_of_the_roads_source(tmp_path):
+    """Simple mode (inline data) draws the roads from their pieces: the roads source is cut into no tiles (each one cost the page a
+    freeze), a road is picked on a fill piece, and its select glow is the feature-state of its pieces."""
+    path = _page(tmp_path, "lean")
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        page.evaluate("map.jumpTo({center: [18.0005, 59.305], zoom: 15, pitch: 0})")
+        page.wait_for_function("map.loaded()", timeout=60_000)
+        page.wait_for_timeout(1500)
+        tiles = page.evaluate("""Object.fromEntries(['roads', 'simple'].map(k => { const t = (map.style.sourceCaches || map.style.tileManagers)[k];
+            return [k, Object.keys((t && t._inViewTiles && t._inViewTiles._tiles) || {}).length]; }))""")
+        hit = page.evaluate("(() => { const f = pick(map.project([18.0, 59.305])); return f && [f.id, f.layer.id, Object.keys(f.properties).length > 3]; })()")
+        pieces = page.evaluate("_pieces(0).length")
+        page.evaluate("rsSelect(0)")
+        lit = page.evaluate("_pieces(0).map(id => !!map.getFeatureState({source: 'simple', id}).select)")
+        page.evaluate("rsDeselect()")
+        off = page.evaluate("_pieces(0).map(id => !!map.getFeatureState({source: 'simple', id}).select)")
+        browser.close()
+    assert tiles["roads"] == 0 and tiles["simple"] > 0
+    assert hit == [0, "roads-fill", True]                      # the road, with its full properties, as when it was picked on its own layer
+    assert pieces > 0 and lit == [True] * pieces and off == [False] * pieces and not errors
+
+
+def test_one_tile_zoom_in_a_tilted_view(tmp_path):
+    """A tilted map loads every tile of the road pieces at one zoom: a road has one width on the whole screen (no horizontal line where two tile zooms meet)."""
+    path = _page(tmp_path, "tilt")
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        page.evaluate("map.jumpTo({center:[18.005,59.305], zoom:17.6, pitch:70, bearing:-25})")
+        page.wait_for_timeout(4000)
+        zooms = page.evaluate("""(()=>{const t=map.style.tileManagers.simple; const ts=t._inViewTiles?._tiles||t._tiles;
+            return [...new Set(Object.values(ts).map(x=>x.tileID.overscaledZ))]})()""")
+        browser.close()
+    assert zooms == [17] and not errors

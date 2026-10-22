@@ -65,8 +65,10 @@ class StyleConfig:
     #: oneway-arrow chevrons (web backend): color, opacity
     arrows: dict = field(default_factory=lambda: _settings.theme_value("arrows"))
     #: camera (web backend): starting pitch (deg tilt, capped by max_pitch — 70 by default:
-    #: past ~72 MapLibre's horizon tile cover explodes on large GeoJSON sources, roads stop
-    #: rendering and hover/select dies with them) and bearing (deg clockwise from N),
+    #: up to 60 deg MapLibre loads every tile at one zoom, so a road has one width on the whole screen;
+    #: above it the tiles get different zooms and a road's width can step where two zooms meet, and past ~72
+    #: the horizon tile cover explodes on large GeoJSON sources and roads stop rendering. `max_pitch=60`
+    #: on a render call, or camera.max_pitch, keeps the tilt where the width is exact) and bearing (deg clockwise from N),
     #: plus pitch_3d — the tilt `view_3d=True` and the on-map 2D/3D toggle ease to.
     #: Per-call `pitch=` / `bearing=` override; tilt/rotate stay interactive either way.
     camera: dict = field(default_factory=lambda: {"pitch": 0, "bearing": 0, "pitch_3d": 55,

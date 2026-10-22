@@ -38,7 +38,7 @@ def test_saved_map_boots_and_draws_roads(tmp_path):
         page.wait_for_function(
             "window.map && typeof window.map.loaded === 'function' && window.map.loaded()",
             timeout=30_000)
-        n_source = page.evaluate("window.map.querySourceFeatures('roads').length")
+        n_source = page.evaluate("window.map.querySourceFeatures('simple').length")
         n_query = page.evaluate("rsQuery(p => p.highway === 'primary').length")
         browser.close()
 
@@ -66,7 +66,7 @@ def test_compressed_map_inflates_and_attaches(tmp_path):
         # querySourceFeatures sees anything, so poll for the features too.
         page.wait_for_function(
             "window.__rs_gz && window.__rs_gz.ok"
-            " && window.map.querySourceFeatures('roads').length > 0", timeout=30_000)
+            " && window.map.querySourceFeatures('simple').length > 0", timeout=30_000)
         inflated = page.evaluate("window.__rs_gz.features")
         browser.close()
 
@@ -255,7 +255,7 @@ def test_edge_overlay_page_boots_and_rsfilter_keeps_position_and_order(tmp_path)
         page = browser.new_page()
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(path.resolve().as_uri())
-        page.wait_for_function("window.map && window.map.loaded() && window.map.querySourceFeatures('roads').length > 0", timeout=30_000)
+        page.wait_for_function("window.map && window.map.loaded() && window.map.querySourceFeatures('simple').length > 0", timeout=30_000)
         ids = page.evaluate("RS_OVERLAYS[0].layers")
         assert ids and all("-lv" in i and "-o" in i for i in ids)
         base = page.evaluate("id => map.getFilter(id)", ids[0])
@@ -283,7 +283,7 @@ def test_rsfilter_reaches_the_arrows_and_street_names(tmp_path):
         page = browser.new_page()
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(path.resolve().as_uri())
-        page.wait_for_function("window.map && window.map.loaded() && window.map.querySourceFeatures('roads').length > 0", timeout=30_000)
+        page.wait_for_function("window.map && window.map.loaded() && window.map.querySourceFeatures('simple').length > 0", timeout=30_000)
         layers = page.evaluate("map.getStyle().layers.map(l => l.id).filter(i => i.startsWith('roads-arrows') || i.startsWith('roads-labels'))")
         assert layers
         before = page.evaluate("ids => ids.map(i => JSON.stringify(map.getFilter(i)))", layers)
@@ -309,7 +309,7 @@ def test_a_road_without_its_fill_is_still_found_by_a_click(tmp_path):
         page = browser.new_page()
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(path.resolve().as_uri())
-        page.wait_for_function("window.map && window.map.loaded() && window.map.querySourceFeatures('roads').length > 0", timeout=30_000)
+        page.wait_for_function("window.map && window.map.loaded() && window.map.querySourceFeatures('simple').length > 0", timeout=30_000)
         found = page.evaluate("map.queryRenderedFeatures({layers: PICK_LAYERS.filter(id => map.getLayer(id))}).length")
         browser.close()
     assert errors == [] and found > 0
@@ -337,7 +337,7 @@ def test_a_page_with_overlay_styles_boots(tmp_path):
         page = browser.new_page()
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(path.resolve().as_uri())
-        page.wait_for_function("window.map && window.map.querySourceFeatures('roads').length > 0", timeout=30_000)
+        page.wait_for_function("window.map && window.map.querySourceFeatures('simple').length > 0", timeout=30_000)
         have = page.evaluate("RS_OVERLAYS.map(o => o.layers.filter(id => map.getLayer(id)).length)")
         browser.close()
     assert errors == [] and all(n > 0 for n in have)
@@ -383,11 +383,11 @@ def test_an_item_attached_to_a_road_follows_its_road(tmp_path):
         x, y = page.evaluate("(() => { const p = map.project([18.002, 59.3015 + 0.00027]); return [p.x, p.y]; })()")
         page.mouse.move(x, y)
         page.wait_for_timeout(700)                                           # past hover_delay_ms (300)
-        hover = page.evaluate("[0, 1, 2].map(i => !!map.getFeatureState({source: 'roads', id: i}).hover)")
+        hover = page.evaluate("[0, 1, 2].map(i => _pieces(i).some(id => !!map.getFeatureState({source: 'simple', id}).hover))")      # a road glows through the state of its pieces
         page.mouse.click(x, y)
         page.wait_for_timeout(300)
         sel = page.evaluate("__sel")
-        selected = page.evaluate("[0, 1, 2].map(i => !!map.getFeatureState({source: 'roads', id: i}).select)")
+        selected = page.evaluate("[0, 1, 2].map(i => _pieces(i).some(id => !!map.getFeatureState({source: 'simple', id}).select))")
         browser.close()
     assert errors == []
     assert steps["0"] == ([100, 101, 102], [1, 2])

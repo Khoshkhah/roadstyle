@@ -469,11 +469,17 @@ def test_web_pick_survives_missing_layers():
 
 
 def test_web_camera_max_pitch():
-    """The tilt limit is a setting (camera.max_pitch, default 70: past ~72 MapLibre's horizon
-    tile cover explodes on large GeoJSON sources — roads stop rendering and hover/select dies
-    with them, so the camera is bounded to the regime that renders) — MapLibre's default 60 made
-    the camera stop partway when tilting interactively."""
-    assert "maxPitch:70" in render_edges(_edges(), backend="web").html
+    """The tilt limit is a setting (camera.max_pitch, default 70; max_pitch= on a render call). Up to 60 deg
+    MapLibre loads every tile at one zoom, so a road has one width on the whole screen. Above it the tiles get
+    different zooms: a width that depends on zoom and feature is baked per tile, so it can step where two zooms
+    meet, and past ~72 the tile cover explodes on large GeoJSON sources (roads stop rendering and hover/select
+    dies with them). So 70 is the most a page tilts by default, and max_pitch=60 is the option that keeps the width exact."""
+    html = render_edges(_edges(), backend="web").html
+    assert "maxPitch:70" in html
+    assert "maxPitch:60" in render_edges(_edges(), backend="web", max_pitch=60).html
+    assert "calculateTileZoom=z=>z" in html                              # one tile zoom on the whole screen: a road has one width in a tilted view
+    from roadstyle.config import StyleConfig as _C
+    assert _C().camera["max_pitch"] == 70
 
 
 def test_snapshot_writes_png(tmp_path):
@@ -2642,6 +2648,15 @@ def test_data_maxzoom_sets_the_last_cut_zoom_of_every_geojson_source():
     geo = [s for s in style["sources"].values() if s["type"] == "geojson"]
     assert geo and all(s["maxzoom"] == 17 for s in geo)
     assert all("maxzoom" not in s for s in _style(render_edges(_edges(), backend="web", basemap="blank").html)["sources"].values() if s["type"] == "geojson")
+
+
+def test_data_tolerance_sets_the_simplification_of_the_road_tile_sources():
+    """data_tolerance: the GeoJSON sources that carry a tolerance (the roads) take it; default None keeps roadstyle's 0.05."""
+    style = _style(render_edges(_edges(), backend="web", basemap="blank", data_tolerance=1).html)
+    tol = [s["tolerance"] for s in style["sources"].values() if s["type"] == "geojson" and "tolerance" in s]
+    assert tol and all(t == 1.0 for t in tol)
+    base = _style(render_edges(_edges(), backend="web", basemap="blank").html)
+    assert all(s["tolerance"] == 0.05 for s in base["sources"].values() if s["type"] == "geojson" and "tolerance" in s)
 
 
 def test_the_last_solver_stage_at_its_time_limit_keeps_its_best_numbers(monkeypatch):

@@ -145,6 +145,7 @@ have, is an error. Each palette that a view names is built once more into the pa
 | `road_tooltip` | `False` | web | on hover: `True` = every column, a list = those columns |
 | `hover_delay_ms` | `300` | web | a road or an overlay item lights up and shows its tooltip once the mouse rests this long on it (a passing mouse lights nothing); `0`: at once |
 | `data_maxzoom` | `None` | web | the last zoom MapLibre cuts the GeoJSON sources into tiles at; above it, MapLibre enlarges those tiles and does not cut them again. Positions are as exact as the tile grid of that zoom. `None`: MapLibre's own |
+| `data_tolerance` | `None` | web | how far MapLibre simplifies the road geometry in the tiles it cuts. `None`: `0.05`, which keeps every vertex. A road is cut into tiles in the browser, and zoomed out one tile holds a whole district: `1` makes a sweep at zoom 12 about three times faster (687 to 226 ms on a 22,000-road page), and the page looks the same at zoom 14 and above (no pixel differs in a 760 x 560 view) and the same at zoom 12 to within a fraction of a pixel along road edges |
 | `tooltip` | `None` | web, folium | hover columns. Web: alias of `road_tooltip`, `None` = no tooltip. Folium: `None` = all columns |
 | `selected` | `None` | folium | a GeoDataFrame of edges to highlight (web: use `rsHighlight` / `rsColor`) |
 | `copy_field` | `"edge_id"` | folium | click copies this column's value; `None` = off |
@@ -162,6 +163,7 @@ have, is an error. Each palette that a view names is built once more into the pa
 | keyword | default | backends | what |
 |---|---|---|---|
 | `pitch` / `bearing` | the `camera` setting (`0` / `0`) | web | starting tilt / rotation in degrees |
+| `max_pitch` | the `camera` setting (`70`) | web | the most the map can tilt, in degrees. `60` keeps the view where MapLibre itself uses one tile zoom. Above 60 the page forces one tile zoom on the whole screen (a road has one width everywhere), and that loads 2 to 3.6 times as many tiles |
 | `view_3d` | `False` | web | open tilted to `camera.pitch_3d`, with raised 3D bridge decks |
 
 ### Output & scale
