@@ -5,9 +5,9 @@ name: Rust
 on:
   push:
     branches: [main, rust-engine]
-    paths: ["rust/**", "src/roadstyle/data/**", ".github/workflows/rust.yml"]
+    paths: ["rust/**", "src/roadstyle/**", "tests/test_engine_parity.py", ".github/workflows/rust.yml"]
   pull_request:
-    paths: ["rust/**", "src/roadstyle/data/**", ".github/workflows/rust.yml"]
+    paths: ["rust/**", "src/roadstyle/**", "tests/test_engine_parity.py", ".github/workflows/rust.yml"]
   schedule:
     - cron: "17 3 * * *"          # each night: the Tartu goldens too
   workflow_dispatch:
@@ -56,6 +56,42 @@ jobs:
           ls -l target/wasm32-unknown-unknown/release/roadstyle_wasm.wasm
           # the core builds for wasm32 with no features (docs/design/rust_library.md, rule 3 of the layers)
           cargo build --offline --release --target wasm32-unknown-unknown -p roadstyle --no-default-features
+
+  python:
+    # the Python binding (phase P5): build roadstyle._rust and check that the two engines give the same style
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Toolchain
+        run: |
+          rustup toolchain install "$RUST" --profile minimal --component clippy
+          rustup default "$RUST"
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-py-${{ env.RUST }}-${{ hashFiles('rust/Cargo.lock') }}
+
+      - name: Install roadstyle
+        run: pip install -e ".[dev]"
+
+      - name: Build the extension
+        run: |
+          (cd rust && cargo fetch --locked)
+          python rust/roadstyle-py/build.py
+          (cd rust && cargo clippy --offline -p roadstyle-py -- -D warnings)
+
+      - name: The two engines
+        run: pytest -q tests/test_engine_parity.py
 
   tartu:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'

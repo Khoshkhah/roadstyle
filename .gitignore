@@ -35,3 +35,7 @@ docs/maps/
 
 # the WebAssembly module of the Rust-engine dashboard example (examples/dashboard_rust/README.md)
 examples/dashboard_rust/pkg/
+
+# the Rust extension of a development build (rust/roadstyle-py/build.py)
+src/roadstyle/_rust*.so
+src/roadstyle/_rust*.pyd

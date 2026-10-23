@@ -6,7 +6,17 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **The Rust engine from Python** (`docs/design/rust_library.md`, phase P5). `export_inline(..., engine="rust")` makes the style with roadstyle's Rust
+  engine, the extension `roadstyle._rust` (`rust/roadstyle-py`; a development build: `python rust/roadstyle-py/build.py`). The default stays
+  `engine="python"`; `ROADSTYLE_ENGINE` sets it. The Rust engine needs the drawing levels in the roads (`casing_level`, `fill_level`); without them it
+  gives an error, and it never goes back to Python without a message. `tests/test_engine_parity.py` checks that the two engines give the same style.
+
 ### Changed
+- **`export_inline` writes the legend data** in the style's metadata `roadstyle:color_options` (the page's `COLOR_OPTIONS`), when the map has data
+  colours, as the Rust engine does. The dashboard module reads it.
+- **The Rust engine is a set of crates** (phase P2): `roadstyle-model`, `roadstyle-io`, `roadstyle-levels`, `roadstyle-engine`, `roadstyle-tiles` and the
+  facade `roadstyle`. The crate `roadstyle-rs` stays for one version, as the old name of the facade.
 - **The map controls are ES modules** (`static/dashboard/`, `docs/design/dashboard_module.md`). The controls and the road interaction of the web page
   (colour by, legend, road filter, find, panel, Street View, Google 3D, base map, overlays, tunnels, views, arrows, hover and click) were one script in the
   page template. Now each control is a file, and `rsDashboard(map, options)` adds them all to a MapLibre map. The pages that use the Rust engine can

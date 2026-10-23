@@ -3775,7 +3775,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                 lyr["layout"] = {**{k: v for k, v in lyr["layout"].items() if k != "symbol-spacing"}, "symbol-placement": "line-center"}
         # the page's road click popup, hover tooltip and hover delay, for the app's plugin (the same rules as the page's)
         inter = {"popup": popup_fields if popup_on else False, "tooltip": road_tooltip, "hover_delay_ms": int(hover_delay_ms)}
-        return {"style": style, "pmtiles": pmt, "bounds": (minx, miny, maxx, maxy), "interaction": inter}
+        # the legend data of a data-coloured map, as the page's COLOR_OPTIONS: {name, prop, legend} for each colour option
+        return {"style": style, "pmtiles": pmt, "bounds": (minx, miny, maxx, maxy), "interaction": inter,
+                "color_options": color_opts_meta or None}
     # after every style/filter/bounds decision above — those read the features, the browser never does
     gz = _compress_sources(style) if compress else {}
     html = (_HTML.replace("__TITLE__", _html.escape(name))

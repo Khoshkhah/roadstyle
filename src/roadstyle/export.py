@@ -143,12 +143,17 @@ def _tag_groups(style, overlays):
         lyr.setdefault("metadata", {})["roadstyle:group"] = labels[int(m.group(1))] if m else "roads"
 
 
-def export_inline(edges, **kwargs) -> dict:
+def export_inline(edges, *, engine: str | None = None, **kwargs) -> dict:
     """The style of ``export_style`` with the data inside (GeoJSON sources, no tiles, no files), for a plugin that makes the map in
     the browser (the roadstyle GeoLibre plugin runs roadstyle in Pyodide). The arrow icon is in the metadata (roadstyle:images), the
-    page's popup, tooltip and hover settings in roadstyle:interaction. ``kwargs``: the keywords of ``render_edges``."""
+    page's popup, tooltip and hover settings in roadstyle:interaction. ``kwargs``: the keywords of ``render_edges``.
+
+    ``engine``: "python" (default) or "rust" (roadstyle's Rust engine, the same style; ``ROADSTYLE_ENGINE`` sets the default)."""
     import base64
 
+    from . import _engine
+    if _engine.engine(engine) == "rust":
+        return _engine.export_inline(edges, **kwargs)
     from . import _settings
     from .render import render_edges
 
@@ -163,6 +168,8 @@ def export_inline(edges, **kwargs) -> dict:
     style.setdefault("metadata", {}).update({
         "roadstyle:interaction": out["interaction"],
         "roadstyle:images": {"oneway": {"url": "data:image/png;base64," + base64.b64encode(png).decode(), "sdf": True, "pixelRatio": icon["pixel_ratio"]}}})
+    if out.get("color_options"):     # the legend data for the dashboard module (docs/design/dashboard_module.md, "The legend data")
+        style["metadata"]["roadstyle:color_options"] = json.loads(json.dumps(out["color_options"]))   # as JSON: lists, not tuples
     style["center"], style["zoom"] = _camera(out["bounds"])
     style["name"] = kwargs.get("name") or "roads"   # an app shows it (GeoLibre's Layers panel)
     return style

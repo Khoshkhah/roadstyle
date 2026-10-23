@@ -1,6 +1,6 @@
 # roadstyle as a Rust library: the design and the migration plan
 
-**Status:** agreed 2026-10-23: decisions 1 to 8 as recommended, decision 9 open. Nothing in this document is built. It continues [One Rust engine for roadstyle](rust_engine.md)
+**Status:** agreed 2026-10-23: decisions 1 to 8 as recommended, decision 9 open. Built: P0, P1, P2 (the crates), and step 1 of P5. It continues [One Rust engine for roadstyle](rust_engine.md)
 (steps 1 and 3 are done) and uses [The style in a config file](style_config.md) and
 [A general core: roads, items, and views](core_model_and_views.md). The decisions are in
 [Decisions](#decisions).
@@ -1341,6 +1341,11 @@ allowed in the crate (ported numeric code).
 - **Risk.** The model work and the feature work both edit `roadstyle-engine`. The model API comes first, in one small change.
 
 #### P5: the Python binding
+
+**State (2026-10-23):** step 1 is done. `rust/roadstyle-py` makes `roadstyle._rust` (`make_style`, `make_look`, `Tiler`; abi3, the GIL is free
+while Rust works). `roadstyle._engine` has the switch, and `export_inline(engine="rust")` gives the same style as Python for the 7 cases of
+`tests/test_engine_parity.py` (Rust 0.12 s, Python 0.57 s on 1,373 roads). Next: the tiles of `export_style`, `compute_levels`, the look of
+`render_edges`, the wheels with maturin.
 
 - **Content.** `roadstyle-py` (PyO3, maturin, abi3 wheels for Linux x86_64 and aarch64, macOS, Windows). Python calls Rust part by
   part, in this order: the style of `export_inline`, the tiles (`tiles.py`), the levels (`compute_levels`), the look
