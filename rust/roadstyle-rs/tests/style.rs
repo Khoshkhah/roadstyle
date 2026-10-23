@@ -19,10 +19,11 @@ fn monaco_style_equals_eea9f49() {
     assert_eq!(style_hash(&area), "73866c91712a646256eadfc787817cfc97ae8d41e0a58ee9fc258491741b3c97");
 }
 
-/// Tartu's inputs (9.5 MB) are not in git: `ROADSTYLE_RS_TARTU=<folder with roads.parquet and features.parquet> cargo test --release -- --ignored`.
+/// Tartu's inputs (9.5 MB) are not in git: get them with `tests/get_tartu.sh`, then `cargo test --release -- --ignored`.
 #[test]
-#[ignore = "needs ROADSTYLE_RS_TARTU"]
+#[ignore = "needs tests/get_tartu.sh"]
 fn tartu_style_equals_eea9f49() {
-    let area = std::env::var("ROADSTYLE_RS_TARTU").expect("ROADSTYLE_RS_TARTU: the folder of Tartu's roads.parquet and features.parquet");
-    assert_eq!(style_hash(Path::new(&area)), "7e75de83bf43e83b557694706297d9c4ba6342af3ad9aefbf4f06cd1c9d8a0c4");
+    let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
+    assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_tartu.sh", area.display());
+    assert_eq!(style_hash(&area), "7e75de83bf43e83b557694706297d9c4ba6342af3ad9aefbf4f06cd1c9d8a0c4");
 }
