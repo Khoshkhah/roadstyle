@@ -60,7 +60,8 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     cols.to_engine(&mut feats);
     compute_levels(&mut feats, &look_json["args"], look.head_m)?;
     let colors = roads::mark_roads(&mut feats, &look, &look_json["args"])?;
-    let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow)?;
+    let width_col = look_json["args"]["width_m_col"].as_str().filter(|c| !c.is_empty());
+    let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow, width_col)?;
     // render's arrows and labels (both on by default): the slots exist only for them
     let (arrows, labels) = (look_json["args"]["arrows"] != false, look_json["args"]["labels"] != false);
     let slots = if arrows || labels { slots::slots_source(&feats, &slots::SlotLook::from_json(&look_json)?) }

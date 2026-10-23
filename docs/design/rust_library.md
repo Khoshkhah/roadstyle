@@ -1432,10 +1432,10 @@ the P0 golden run decides), **Python** (stays in Python), **internal** (not port
 | 26 | `head_end_m_col` | done | |
 | 27 | `directed_col` | done | |
 | 28 | `driving_col` | done | |
-| 29 | `width_m_col` | P4 | no metre widths in Rust |
-| 30 | `width_m_zoom` | P4 | |
-| 31 | `casing_m` | P4 | |
-| 32 | `casing_min_px` | P4 | |
+| 29 | `width_m_col` | done | the same style as Python (`tests/test_engine_parity.py`), with the mitre ends |
+| 30 | `width_m_zoom` | done | the same style as Python (`tests/test_engine_parity.py`), with the mitre ends |
+| 31 | `casing_m` | done | the same style as Python (`tests/test_engine_parity.py`), with the mitre ends |
+| 32 | `casing_min_px` | done | the same style as Python (`tests/test_engine_parity.py`), with the mitre ends |
 | 33 | `pitch` | done | the export gives the same style as Python; the page: the dashboard module |
 | 34 | `bearing` | done | the export gives the same style as Python; the page: the dashboard module |
 | 35 | `max_pitch` | done | the export gives the same style as Python; the page: the dashboard module |

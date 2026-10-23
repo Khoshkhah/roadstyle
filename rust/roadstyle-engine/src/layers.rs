@@ -166,6 +166,85 @@ impl Model {
         Value::Array(e)
     }
 
+    /// The stops of the metre-width curves: the zoom stops, width_m_zoom and 22 (MapLibre's last zoom), in order, each once.
+    fn metre_stops(&self, wmz: &Value) -> Vec<(f64, Value)> {
+        let mut zs: Vec<(f64, Value)> = Vec::new();
+        for v in self.zstops.iter().chain([wmz, &json!(22)]) {
+            let z = v.as_f64().unwrap_or(22.0);
+            if !zs.iter().any(|(x, _)| *x == z) {
+                zs.push((z, v.clone()));
+            }
+        }
+        zs.sort_by(|a, b| a.0.total_cmp(&b.0));
+        zs
+    }
+
+    fn clamp_stop(&self, z: f64) -> f64 {
+        z.clamp(self.zstops[0].as_f64().unwrap(), self.zstops[self.zstops.len() - 1].as_f64().unwrap())
+    }
+
+    /// _width_m_expr: _width_expr, but a line with a metre width (__rs_wm) is drawn at exactly that width from width_m_zoom on, on a base-2
+    /// exponential curve to zoom 22. `kind`: "fill" (the width less two casings), "casing" (the width) or "wings" (a bridge's casing: the
+    /// width and two casings). `bridge_m` / `bridge_px`: config bridge_casing_m / _px; `casing_px`: render's casing_min_px.
+    pub fn width_m_expr(&self, col: &str, kind: &str, ml: &MetreLook) -> Value {
+        let MetreLook { wmz, bridge_m, bridge_px, casing_px, wing_scale } = ml;
+        let (wmz, wing_scale) = (wmz, *wing_scale);
+        let casing = kind != "fill";
+        let cls_e = self.width_expr(col, casing, if kind == "wings" { wing_scale } else { 1.0 });
+        let cls: Vec<Value> = cls_e.as_array().unwrap()[4..].iter().step_by(2).cloned().collect();
+        let k = match kind { "fill" => -2, "casing" => 0, _ => 2 };
+        let truthy_num = |v: &Value| v.as_f64().is_some_and(|x| x != 0.0);
+        let cm = if kind == "wings" && truthy_num(bridge_m) { json!(["max", ["get", "__rs_cm"], bridge_m]) } else { json!(["get", "__rs_cm"]) };
+        let mut w = json!(["get", "__rs_wm"]);
+        if casing {     // a two-way pair's one casing with metres on both: both directions, their two casings in the middle once
+            w = json!(["case", ["all", ["to-boolean", ["get", "__rs_pair"]], ["has", "__rs_twm"]], ["+", w, ["get", "__rs_twm"], ["*", -2, ["get", "__rs_cm"]]], w]);
+        }
+        let wm = if k != 0 { json!(["max", ["+", w, ["*", k, cm]], 0]) } else { w.clone() };
+        let twice = |v: &Value| if let Some(i) = v.as_i64() { json!(2 * i) } else { json!(2.0 * v.as_f64().unwrap_or(0.0)) };
+        let stops: Vec<f64> = self.zstops.iter().map(|z| z.as_f64().unwrap()).collect();
+        let wz = wmz.as_f64().unwrap_or(f64::INFINITY);
+        let mut e = vec![json!("interpolate"), json!(["exponential", 2]), json!(["zoom"])];
+        for (z, zv) in self.metre_stops(wmz) {
+            let zz = self.clamp_stop(z);
+            let lo = stops.iter().rposition(|s| *s <= zz).unwrap();
+            let hi = stops.iter().position(|s| *s >= zz).unwrap();
+            let c = if lo == hi { cls[lo].clone() } else {
+                let (a, b) = (stops[lo], stops[hi]);
+                json!(["+", ["*", cls[lo], py_round((b - zz) / (b - a), 4)], ["*", cls[hi], py_round((zz - a) / (b - a), 4)]])
+            };
+            let px = py_round(512.0 * 2f64.powf(z) / 40075016.686, 4);
+            let mut m = json!(["*", wm, px]);
+            if kind == "casing" && truthy_num(casing_px) {     // a casing never thinner than casing_px each side of its fill
+                m = json!(["max", m, ["+", ["*", ["max", ["+", w, ["*", -2, ["get", "__rs_cm"]]], 0], px], twice(casing_px)]]);
+            }
+            if kind == "wings" && truthy_num(bridge_px) {      // never thinner than the fill and bridge_px each side
+                let fill = json!(["max", ["+", ["get", "__rs_wm"], ["*", -2, ["get", "__rs_cm"]]], 0]);
+                m = json!(["max", m, ["+", ["*", fill, px], twice(bridge_px)]]);
+            }
+            e.push(zv);
+            e.push(if z < wz { c } else { json!(["case", ["has", "__rs_wm"], m, c]) });
+        }
+        Value::Array(e)
+    }
+
+    /// _offset_expr with width_m_zoom: from width_m_zoom on, a direction whose pair has metres on both (__rs_twm) is shifted by metres.
+    pub fn offset_expr_m(&self, col: &str, pairs: bool, wmz: &Value) -> Value {
+        let two = json!(["to-boolean", ["get", "__rs_twoway"]]);
+        let two = if pairs { json!(["all", two, ["!", ["to-boolean", ["get", "__rs_pair"]]]]) } else { two };
+        let wz = wmz.as_f64().unwrap_or(f64::INFINITY);
+        let mut e = vec![json!("interpolate"), json!(["exponential", 2]), json!(["zoom"])];
+        for (z, zv) in self.metre_stops(wmz) {
+            let mut c = self.offset_match(col, self.clamp_stop(z));
+            if z >= wz {
+                let px = py_round(512.0 * 2f64.powf(z) / 40075016.686, 4);
+                c = json!(["case", ["has", "__rs_twm"], ["*", ["-", ["*", 0.5, ["get", "__rs_twm"]], ["get", "__rs_cm"]], px], c]);
+            }
+            e.push(zv);
+            e.push(json!(["case", two, c, 0]));
+        }
+        Value::Array(e)
+    }
+
     /// class_order: the table's order, else a link just under its main class.
     fn class_order(&self, c: &str) -> Value {
         if let Some(v) = self.z_order.get(c) {
@@ -233,6 +312,16 @@ fn tun_gap() -> Value {
 
 fn tun_dash() -> Value {
     json!(["interpolate", ["linear"], gs("rs_tun_strength"), 0, gs("rs_tun_c0"), 100, gs("rs_tun_toward")])
+}
+
+/// The settings of the metre-width curves (_width_m_expr): width_m_zoom, config bridge_casing_m / bridge_casing_px, render's
+/// casing_min_px, and the theme's bridge wing scale.
+pub struct MetreLook {
+    pub wmz: Value,
+    pub bridge_m: Value,
+    pub bridge_px: Value,
+    pub casing_px: Value,
+    pub wing_scale: f64,
 }
 
 /// _plus_px: a zoom curve `px(zoom)` pixels wider at each stop (only where `when` holds, if given).
@@ -527,10 +616,14 @@ impl Model {
     }
 
     /// _pair_width: a two-way pair's one casing as wide as its two directions (no metre widths).
-    fn pair_width(&self, expr: &Value) -> Value {
+    /// _pair_width; with width_m_zoom (`wmz`), a pair with metres on both has its width in `expr` already from that zoom on.
+    fn pair_width(&self, expr: &Value, wmz: Option<f64>) -> Value {
         let (z0, z1) = (self.zstops[0].as_f64().unwrap(), self.zstops[self.zstops.len() - 1].as_f64().unwrap());
-        plus_px(expr, |z| json!(["*", 2, self.offset_match("highway", z.as_f64().unwrap().clamp(z0, z1))]),
-                Some(&json!(["to-boolean", ["get", "__rs_pair"]])))
+        plus_px(expr, |z| {
+            let zf = z.as_f64().unwrap();
+            let add = json!(["*", 2, self.offset_match("highway", zf.clamp(z0, z1))]);
+            match wmz { Some(w) if zf >= w => json!(["case", ["has", "__rs_twm"], 0, add]), _ => add }
+        }, Some(&json!(["to-boolean", ["get", "__rs_pair"]])))
     }
 }
 
@@ -568,10 +661,20 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     let lbl = merged(&th["labels"], &cfg["labels"]);
 
     let lay = json!({"line-cap": th["roads"]["cap"], "line-join": th["roads"]["join"], "line-sort-key": 0});
-    let off = m.offset_expr("highway", pairs);
-    let cw = m.width_expr("highway", true, 1.0);
-    let fw = m.width_expr("highway", false, 1.0);
-    let bcw = m.width_expr("highway", true, th["bridges"]["wing_scale"].as_f64().unwrap_or(1.0));
+    // render's width_m_col: metre widths from width_m_zoom on (docs/design/metre_widths.md)
+    let args = &look["args"];
+    let metres = args["width_m_col"].as_str().is_some_and(|c| !c.is_empty());
+    let wmz = if args["width_m_zoom"].is_null() { th["roads"]["width_m_zoom"].clone() } else { args["width_m_zoom"].clone() };
+    let wing = th["bridges"]["wing_scale"].as_f64().unwrap_or(1.0);
+    let off = if metres { m.offset_expr_m("highway", pairs, &wmz) } else { m.offset_expr("highway", pairs) };
+    let (cw, fw, bcw) = if metres {
+        let casing_px = if args["casing_min_px"].is_null() { th["casing"]["min_px"].clone() } else { args["casing_min_px"].clone() };
+        let ml = MetreLook { wmz: wmz.clone(), bridge_m: cfg["bridge_casing_m"].clone(), bridge_px: cfg["bridge_casing_px"].clone(), casing_px, wing_scale: wing };
+        let mk = |k: &str| m.width_m_expr("highway", k, &ml);
+        (mk("casing"), mk("fill"), mk("wings"))
+    } else {
+        (m.width_expr("highway", true, 1.0), m.width_expr("highway", false, 1.0), m.width_expr("highway", true, wing))
+    };
     let lean_layout = |l: &Value| { let mut o = l.as_object().unwrap().clone(); o.insert("visibility".into(), "none".into()); Value::Object(o) };
 
     // roads-simple and the invisible roads-fill (simple mode)
@@ -626,7 +729,7 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     }
     paint.insert("line-color".into(), Value::Array(color));
     let width = by_feature(&wide, &fw);
-    paint.insert("line-width".into(), if pairs { m.pair_width(&width) } else { width });
+    paint.insert("line-width".into(), if pairs { m.pair_width(&width, if metres { wmz.as_f64() } else { None }) } else { width });
     paint.insert("line-offset".into(), off.clone());
     paint.insert("line-blur".into(), json!(["interpolate", ["linear"], ["zoom"], r0v, 0, r1v, ["case", is_sh, blur, 0]]));
     paint.insert("line-opacity".into(), json!(["interpolate", ["linear"], ["zoom"], r0v, ["case", is_sh, 0, op], r1v, op]));

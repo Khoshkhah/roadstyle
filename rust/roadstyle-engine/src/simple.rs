@@ -1,7 +1,7 @@
 //! The "simple" source: simple mode's one road layer, every casing piece and every fill (render_web._casing_parts, _halves, _end_stub,
 //! _simple_pieces), from the roads after their stages (roads::mark_roads). The geometry is computed as numpy computes it: a flat
 //! projection at the line's first point, sequential sums, `hypot`, and numpy's rounding (`rint(x * 10^d) / 10^d`).
-//! Not ported: _mitre_ends (it moves flat ends only for roads with metre widths, `__rs_wm`, and for items; this data has neither).
+//! _mitre_ends is ported for the roads with metre widths (`__rs_wm`); its part for the items waits for the items (phase P4).
 
 use crate::read::Feature;
 use crate::roads::truthy;
@@ -101,7 +101,7 @@ fn is_true(v: Option<&Value>) -> bool {
 
 /// _casing_parts: the casing of every edge as pieces. An edge whose three casing numbers differ (or with two different ends) is cut into
 /// its start head, its main part and its end head, with a seam (and a lap, not on a dashed or tunnel casing) at each cut inside it.
-fn casing_parts(roads: &[Feature], head_m: f64) -> Vec<Piece> {
+fn casing_parts(roads: &[Feature], head_m: f64, width_col: Option<&str>) -> Vec<Piece> {
     let mut out = Vec::new();
     for (i, f) in roads.iter().enumerate() {
         let p = &f.props;
@@ -109,7 +109,7 @@ fn casing_parts(roads: &[Feature], head_m: f64) -> Vec<Piece> {
             continue; // one line for a reverse pair: its twin draws it
         }
         let mut base: Props = p.iter()
-            .filter(|(k, _)| *k == "highway" || *k == "lvl" || (k.starts_with("__rs_") && !k.starts_with("__rs_fill")))
+            .filter(|(k, _)| *k == "highway" || *k == "lvl" || Some(*k) == width_col || (k.starts_with("__rs_") && !k.starts_with("__rs_fill")))
             .map(|(k, v)| (k, v.clone())).collect();
         let edge = p.get("__rs_edge").and_then(Value::as_i64).unwrap_or(i as i64);
         base.insert("__rs_edge", edge.into());
@@ -248,14 +248,12 @@ fn with(mut p: Props, k: i64, s: f64) -> Props {
 
 /// The "simple" source: _simple_pieces (casing pieces __rs_k 0, bridge shadows 2, tunnel gap 3 and dashes 4, fills 1), the feature ids
 /// (edge * PIECES + n), the tie-breaker per edge and __rs_cls (_mark_cls).
-pub fn simple_source(roads: &[Feature], head_m: f64, shadows: bool) -> Result<Source, String> {
-    if roads.iter().any(|f| f.props.contains_key("__rs_wm")) {
-        return Err("roads with metre widths (__rs_wm): _mitre_ends is not ported".into());
-    }
+/// `width_col`: render's width_m_col, which the pieces keep (the layer's `cols`).
+pub fn simple_source(roads: &[Feature], head_m: f64, shadows: bool, width_col: Option<&str>) -> Result<Source, String> {
     let line_of: Vec<Option<&Vec<Pt>>> = roads.iter().map(|f| f.coords.as_ref()).collect();
     let mut halves = halves(roads);
     let mut out: Vec<Piece> = Vec::new();
-    for q0 in casing_parts(roads, head_m) {
+    for q0 in casing_parts(roads, head_m, width_col) {
         let stub = !is_true(q0.props.get("__rs_cap")) && !truthy(q0.props.get("__rs_seam"));
         for q in if stub { end_stub(q0, &line_of) } else { vec![q0] } {
             let p = &q.props;
@@ -289,11 +287,12 @@ pub fn simple_source(roads: &[Feature], head_m: f64, shadows: bool) -> Result<So
             vec![Piece { props: p.clone(), coords: f.coords.clone() }]
         };
         for h in fills {
-            let props: Props = h.props.into_iter().filter(|(k, _)| *k == "highway" || *k == "lvl" || k.starts_with("__rs_")).collect();
+            let props: Props = h.props.into_iter().filter(|(k, _)| *k == "highway" || *k == "lvl" || Some(*k) == width_col || k.starts_with("__rs_")).collect();
             let s = 2.0 * int(&props, "__rs_fl") as f64 + if truthy(props.get("__rs_dash")) { -0.5 } else { 1.0 };
             out.push(Piece { props: with(props, 1, s), coords: h.coords });
         }
     }
+    mitre_ends(&mut out, &line_of, roads);
     let mut n: HashMap<i64, usize> = HashMap::new();
     let mut features = Vec::with_capacity(out.len());
     for mut f in out {
@@ -314,4 +313,126 @@ pub fn simple_source(roads: &[Feature], head_m: f64, shadows: bool) -> Result<So
         features.push(Feat { id, props: f.props, coords: f.coords });
     }
     Ok(Source { feats: features, id_first: false, tolerance: 0.05, maxzoom: None })
+}
+
+// _mitre_ends (the roads' part; items are not ported): a flat end where another road with metre widths goes on is pushed on to close the
+// corner with the road that goes on most straight, turning _MITRE_MAX degrees at most.
+const MITRE_MAX: f64 = 60.0;
+const ITEM_JOIN_M: f64 = 2.0;
+
+/// _unit: the unit vector from a to b in metres east and north, and its length.
+fn unit(a: &Pt, b: &Pt, lat: f64) -> ((f64, f64), f64) {
+    let (x, y) = ((b[0] - a[0]) * 111320.0 * lat.to_radians().cos(), (b[1] - a[1]) * 111320.0);
+    let n = x.hypot(y);
+    (if n > 0.0 { (x / n, y / n) } else { (0.0, 0.0) }, n)
+}
+
+/// _heading: the way a line runs at its first or last point, from a point at least 0.5 m away.
+fn heading(c: &[Pt], first: bool) -> (f64, f64) {
+    let pts: Vec<&Pt> = if first { c.iter().rev().collect() } else { c.iter().collect() };
+    let last = pts[pts.len() - 1];
+    let flip = |u: (f64, f64)| if first { (-u.0, -u.1) } else { u };
+    for q in pts[..pts.len() - 1].iter().rev() {
+        let (u, n) = unit(q, last, last[1]);
+        if n >= 0.5 {
+            return flip(u);
+        }
+    }
+    flip(unit(pts[0], last, last[1]).0)
+}
+
+/// _reach: how far a flat end goes on to close the corner with the line that goes on (None: not a corner to close).
+fn reach(own: ((f64, f64), (f64, f64), f64, f64), oth: ((f64, f64), (f64, f64), f64, f64)) -> Option<f64> {
+    let ((p, u, h, o), (q, v, k, w)) = (own, oth);
+    let cos = (u.0 * v.0 + u.1 * v.1).clamp(-1.0, 1.0);
+    let turn = cos.acos().to_degrees();
+    if !(0.5..=MITRE_MAX).contains(&turn) {
+        return None;
+    }
+    let rn = |d: (f64, f64), x: f64| (d.1 * x, -d.0 * x);
+    let (pa, pb) = ((p.0 + rn(u, o).0, p.1 + rn(u, o).1), (q.0 + rn(v, w).0, q.1 + rn(v, w).1));
+    let det = u.0 * v.1 - u.1 * v.0;
+    let (dx, dy) = (pb.0 - pa.0, pb.1 - pa.1);
+    let (s, t) = ((dx * v.1 - dy * v.0) / det, (u.0 * dy - u.1 * dx) / det);
+    if s.abs().max(t.abs()) > ITEM_JOIN_M {
+        return None;
+    }
+    let sin = turn.to_radians().sin();
+    Some(s.max(0.0) + ((k - h * cos) / sin).max(0.0).min(h * (turn.to_radians() / 2.0).tan()))
+}
+
+/// _push: the line with its first or last point pushed `m` metres straight on.
+fn push(c: &mut Vec<Pt>, first: bool, m: f64) {
+    let u = heading(c, first);
+    let u = if first { (-u.0, -u.1) } else { u };
+    let end = if first { c[0] } else { c[c.len() - 1] };
+    let pt = [crate::layers::py_round(end[0] + u.0 * m / (111320.0 * end[1].to_radians().cos()), 7), crate::layers::py_round(end[1] + u.1 * m / 111320.0, 7)];
+    if first { c.insert(0, pt) } else { c.push(pt) }
+}
+
+fn mitre_ends(out: &mut [Piece], line_of: &[Option<&Vec<Pt>>], roads: &[Feature]) {
+    let snap = |p: &Pt| (format!("{:.6}", p[0]), format!("{:.6}", p[1]));
+    let mut wide: indexmap::IndexMap<i64, (f64, f64)> = indexmap::IndexMap::new();
+    for (i, f) in roads.iter().enumerate() {
+        let p = &f.props;
+        let (Some(wm), Some(c)) = (p.get("__rs_wm").and_then(Value::as_f64), f.coords.as_ref().filter(|c| c.len() >= 2)) else { continue };
+        if truthy(p.get("__rs_dup")) {
+            continue;
+        }
+        let k = c[0][1].to_radians().cos();
+        let cm = p.get("__rs_cm").and_then(Value::as_f64).unwrap_or(0.0);
+        wide.insert(p.get("__rs_edge").and_then(Value::as_i64).unwrap_or(i as i64), (wm * k, (wm - 2.0 * cm) * k));
+    }
+    if wide.is_empty() {
+        return;
+    }
+    let line = |e: i64| line_of.get(e as usize).copied().flatten();
+    let mut ends: HashMap<(String, String), Vec<(i64, bool)>> = HashMap::new();
+    for &e in wide.keys() {
+        let Some(c) = line(e) else { continue };
+        ends.entry(snap(&c[0])).or_default().push((e, true));
+        ends.entry(snap(&c[c.len() - 1])).or_default().push((e, false));
+    }
+    let at = |a: &Pt, b: &Pt| (a[0] - b[0]).abs() < 1e-6 && (a[1] - b[1]).abs() < 1e-6;
+    let lat0 = line_of.iter().flatten().find(|c| !c.is_empty()).map_or(0.0, |c| c[0][1]);
+    let k0 = 111320.0 * lat0.to_radians().cos();
+    let xy = |pt: &Pt| (pt[0] * k0, pt[1] * 111320.0);
+    for f in out.iter_mut() {
+        let p = &f.props;
+        let Some(edge) = p.get("__rs_edge").and_then(Value::as_i64) else { continue };
+        if p.get("__rs_cap") != Some(&Value::Bool(true)) || truthy(p.get("__rs_seam")) || truthy(p.get("__rs_lap")) || !wide.contains_key(&edge) {
+            continue;
+        }
+        let (Some(c), Some(e)) = (f.coords.as_mut().filter(|c| c.len() >= 2), line(edge)) else { continue };
+        let j = if int(p, "__rs_k") == 1 { 1 } else { 0 };
+        for first in [true, false] {
+            let (cp, ep) = if first { (&c[0], &e[0]) } else { (&c[c.len() - 1], &e[e.len() - 1]) };
+            if !at(cp, ep) {
+                continue;
+            }
+            let node = *ep;
+            let u = heading(e, first);
+            let u = if first { (-u.0, -u.1) } else { u };
+            let mut best: Option<(f64, f64)> = None;
+            for &(o, ofirst) in ends.get(&snap(&node)).into_iter().flatten() {
+                if o == edge {
+                    continue;
+                }
+                let Some(oc) = line(o) else { continue };
+                let v = heading(oc, ofirst);
+                let v = if ofirst { v } else { (-v.0, -v.1) };
+                let pick = |x: (f64, f64)| if j == 1 { x.1 } else { x.0 };
+                let m = reach((xy(&node), u, pick(wide[&edge]) / 2.0, 0.0), (xy(&node), v, pick(wide[&o]) / 2.0, 0.0));
+                let dot = u.0 * v.0 + u.1 * v.1;
+                if let Some(m) = m {
+                    if best.is_none_or(|b| dot > b.0) {
+                        best = Some((dot, m));
+                    }
+                }
+            }
+            if let Some((_, m)) = best.filter(|b| b.1 > 0.0) {
+                push(c, first, m);
+            }
+        }
+    }
 }

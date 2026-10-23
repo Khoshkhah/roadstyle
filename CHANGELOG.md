@@ -18,6 +18,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **The Rust engine takes more of render's keywords**, with the same style as Python: `labels`, `arrows`, `road_fill`, `road_popup`, `road_tooltip`,
   `hover_delay_ms`, `data_maxzoom`, `data_tolerance`, `select_color` and `hover_color` (also on the overlays), `access_col` (the access colours),
   `head_m`, `offset_zoom`, `minzoom` (true or a table), `cap_col` (the end columns only when they are named, as in Python) and `boundary`.
+- **The Rust engine draws metre widths** (`width_m_col`, `width_m_zoom`, `casing_m`, `casing_min_px`), with the mitre ends where a flat end meets another
+  metre road, as Python. Before, it stopped with an error on such roads.
 - **The Rust engine parses floats exactly** (serde_json `float_roundtrip`), so a coordinate from Python has the same last digit.
   **Note for the users of the Rust engine:** the engine now follows `labels=False` and `arrows=False` in the look's `args`, as Python does. Before,
   it always drew the names and the arrows. The looks of the GeoLibre plugin and of duckosm-rust's page have both false (from mapstyle's

@@ -131,7 +131,7 @@ The crate makes the style of `export_inline` for simple mode with stored levels 
 - [ ] `access_col`: the access colours (`__rs_access`, the theme's `access`).
 - [x] No stored levels: `render` computes them (`compute_levels(method="solve")`), and so does the engine (`roadstyle-engine`, `compute_levels`; the same style on the parity fixture). Only `head_m=5`.
 - [ ] `head_m` (fixed 5.0), `road_fill` (fixed on), `offset_zoom` (`offset_frac` and `width_frac` are read).
-- [ ] Metre widths: `width_m_col`, `width_m_zoom`, `casing_m`, `casing_min_px` (`_mark_width_m`, `_mitre_ends`; the crate stops with an error on `__rs_wm`).
+- [x] Metre widths: `width_m_col`, `width_m_zoom`, `casing_m`, `casing_min_px` (`_mark_width_m`, `_width_m_expr`, the roads' part of `_mitre_ends`; 2026-10-23).
 - [ ] `simple=False`: the layer set of casings and fills for each level (`_level_id`, `_fill_layer_ids`); the crate has simple mode only.
 - [ ] `arrows`, `labels` (fixed on), `minzoom` (class thinning by `config.minzoom`, opt-in).
 - [ ] `view_3d`: the 3D bridge decks (`_bridge_decks`; out by decision until a new version).

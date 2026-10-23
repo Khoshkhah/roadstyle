@@ -56,7 +56,7 @@ fn bench(look_path: &str, roads_path: &str, features_path: &str) {
     mark("read the roads");
     let colors = roads::mark_roads(&mut feats, &look, &look_json["args"]).unwrap_or_else(|e| fail(e));
     mark("mark the roads (colours, pairs, levels)");
-    let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow).unwrap_or_else(|e| fail(e));
+    let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow, None).unwrap_or_else(|e| fail(e));
     mark("pieces (simple)");
     let slots = slots::slots_source(&feats, &slots::SlotLook::from_json(&look_json).unwrap_or_else(|e| fail(e)));
     mark("names and arrows (slots)");
@@ -161,7 +161,7 @@ fn main() {
     // --layers: the road layers alone, for the 12 subsets of tools/make_layer_goldens.py (no base map)
     let mut feats = read::read_roads(data, "geometry").unwrap_or_else(|e| fail(format!("{roads_path}: {e}")));
     let colors = roads::mark_roads(&mut feats, &look, &look_json["args"]).unwrap_or_else(|e| fail(e));
-    let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow).unwrap_or_else(|e| fail(e));
+    let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow, None).unwrap_or_else(|e| fail(e));
     let slots = slots::slots_source(&feats, &slot_look);
     let roads = roads::roads_source(feats);
     let layers = layers::road_layers(&look_json, &roads.feats, &simple.feats, features(&slots), &mut [], &colors.props, colors.active).unwrap_or_else(|e| fail(e));

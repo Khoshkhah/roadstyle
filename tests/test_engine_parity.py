@@ -159,6 +159,23 @@ def test_export_inline_boundary(part, keywords, kind):
     assert diff(ru, py) == []
 
 
+@pytest.mark.parametrize("opts", [{}, {"casing_m": 0.3, "casing_min_px": 0.5, "width_m_zoom": 15}, {"cap_col": "cap"}],
+                         ids=["defaults", "options", "flat ends (the mitre ends)"])
+def test_export_inline_metre_widths(part, keywords, opts):
+    """width_m_col: a road with a width in metres is drawn at that width from width_m_zoom on (3.5 m for each lane where lanes is given)."""
+    from compare_engines import diff
+
+    roads = part.copy()
+    roads["width_m"] = [3.5 * n if isinstance(n, int) and n > 0 else None for n in roads["lanes"]]
+    roads["cap"] = "flat"
+    kw = {**keywords, "width_m_col": "width_m", **opts}
+    if "cap_col" in opts:      # every end flat: the flat ends where another metre road goes on are mitred (_mitre_ends)
+        kw = {k: v for k, v in kw.items() if k not in ("cap_start_col", "cap_end_col")}
+    py = rs.export_inline(roads, engine="python", **kw)
+    ru = rs.export_inline(roads, engine="rust", **kw)
+    assert diff(ru, py) == []
+
+
 def test_engine_names(monkeypatch):
     assert _engine.engine(None) == "python"
     monkeypatch.setenv("ROADSTYLE_ENGINE", "rust")

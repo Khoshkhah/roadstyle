@@ -20,6 +20,8 @@ pub struct Look {
     pub bridge_shadow: bool,
     /// the theme's access colours (render's access_col: the palette's `access`)
     access: serde_json::Map<String, Value>,
+    /// the theme's casing.m: a metre-wide road's casing in metres (render's casing_m)
+    casing_m: f64,
 }
 
 impl Look {
@@ -44,6 +46,7 @@ impl Look {
             head_m: look["args"]["head_m"].as_f64().map_or_else(|| look["head_m"].as_f64().ok_or("look.json: no head_m"), Ok)?,
             bridge_shadow: truthy(look["config"].get("bridge_shadow")),
             access: look["theme"]["access"].as_object().cloned().unwrap_or_default(),
+            casing_m: look["theme"]["casing"]["m"].as_f64().unwrap_or(0.0),
         })
     }
 }
@@ -108,6 +111,10 @@ pub fn mark_roads(fs: &mut [Feature], look: &Look, args: &Value) -> Result<crate
     mark_levels(fs);
     if look.twin_one && mark_twin_casing(fs) {
         mark_twin_dead_ends(fs, &caps);
+    }
+    // render's width_m_col: metre widths (docs/design/metre_widths.md); casing_m, else the theme's casing.m
+    if let Some(col) = args["width_m_col"].as_str().filter(|c| !c.is_empty()) {
+        mark_width_m(fs, col, args["casing_m"].as_f64().unwrap_or(look.casing_m));
     }
     stringify_unsafe_ints(fs);
     for (i, f) in fs.iter_mut().enumerate() {
@@ -345,6 +352,16 @@ fn mark_levels(fs: &mut [Feature]) {
 /// _twin_pairs + _mark_twin_casing: a two-way edge and a reverse edge of its class on the same line backwards share one casing
 /// (__rs_twin: the other's position). Returns whether any pair was found. (Python also warns when the two disagree; not here.)
 fn mark_twin_casing(fs: &mut [Feature]) -> bool {
+    let pairs = twin_pairs(fs);
+    for &(j, i) in &pairs {
+        fs[i].props.insert("__rs_twin", j.into());
+        fs[j].props.insert("__rs_twin", i.into());
+    }
+    !pairs.is_empty()
+}
+
+/// _twin_pairs: a two-way edge and a reverse edge of its class on the same line backwards, as (first, second).
+fn twin_pairs(fs: &[Feature]) -> Vec<(usize, usize)> {
     let mut first: HashMap<(String, String), usize> = HashMap::new();
     let mut pairs = Vec::new();
     for i in 0..fs.len() {
@@ -363,11 +380,28 @@ fn mark_twin_casing(fs: &mut [Feature]) -> bool {
             Some(j) => pairs.push((j, i)),
         }
     }
-    for &(j, i) in &pairs {
-        fs[i].props.insert("__rs_twin", j.into());
-        fs[j].props.insert("__rs_twin", i.into());
+    pairs
+}
+
+/// _mark_width_m: __rs_wm / __rs_cm, the line's width and casing in metres over cos(latitude) at its mean latitude, for a finite width
+/// above 0 (any other value keeps the class width). Then a pair with metres on both gets the other direction's in __rs_twm.
+fn mark_width_m(fs: &mut [Feature], col: &str, casing_m: f64) {
+    for f in fs.iter_mut() {
+        let Some(w) = f.props.get(col).and_then(py_float) else { continue };
+        let pts = f.coords.as_deref().unwrap_or(&[]);
+        if !(w > 0.0 && w.is_finite()) || pts.is_empty() {
+            continue;
+        }
+        let sec = 1.0 / (pts.iter().map(|c| c[1]).sum::<f64>() / pts.len() as f64).to_radians().cos();
+        f.props.insert("__rs_wm", crate::layers::py_round(w * sec, 4).into());
+        f.props.insert("__rs_cm", crate::layers::py_round(casing_m * sec, 4).into());
     }
-    !pairs.is_empty()
+    for (i, j) in twin_pairs(fs) {
+        if let (Some(a), Some(b)) = (fs[i].props.get("__rs_wm").cloned(), fs[j].props.get("__rs_wm").cloned()) {
+            fs[i].props.insert("__rs_twm", b);
+            fs[j].props.insert("__rs_twm", a);
+        }
+    }
 }
 
 /// _mark_twin_dead_ends: a twin pair's dead end (no other edge ends there) without a given cap is square.
