@@ -86,6 +86,31 @@ impl Model {
         match c.strip_suffix("_link") { Some(b) => (b, true), None => (c, false) }
     }
 
+    /// _end_radius_expr: the circle radius (px) of a two-way pair's end cap: the lane offset plus half a lane (split as a two-way lane),
+    /// per class, at every zoom stop; `casing`: the casing's.
+    pub(crate) fn end_radius_expr(&self, col: &str, casing: bool) -> Value {
+        let mut e = vec![json!("interpolate"), json!(["linear"]), json!(["zoom"])];
+        for (z, zv) in self.stops() {
+            let ramp = ((z - self.offset_zoom) / self.ramp_zooms).clamp(0.0, 1.0);
+            let f = 1.0 - (1.0 - self.width_frac) * ramp;
+            let r = |g: &str, lk: bool| {
+                let w = self.gwidth(g, z) * if lk { self.link_w } else { 1.0 };
+                let lane = w * if casing { self.casing_ratio[g] } else { 1.0 } * f;
+                py_round(w * self.offset_frac * ramp + lane / 2.0, 3)
+            };
+            let mut m = vec![json!("match"), json!(["get", col])];
+            for c in &self.classes {
+                let (b, lk) = Self::base(c);
+                m.push(json!(c));
+                m.push(json!(r(self.group_of(b), lk)));
+            }
+            m.push(json!(r(&self.fb_group, false)));
+            e.push(zv.clone());
+            e.push(Value::Array(m));
+        }
+        Value::Array(e)
+    }
+
     /// ROAD_Z of a class's main class (its draw order), else the fallback order.
     pub(crate) fn z_of(&self, c: &str) -> f64 {
         self.z_order.get(Self::base(c).0).unwrap_or(&self.fb_order).as_f64().unwrap_or(0.0)
@@ -882,6 +907,7 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
             parts_caps: casings.iter().any(|f| f["properties"].get("__rs_cap").is_some_and(py_truth)), shadows: !fs.shadows.is_empty(),
             pairs: pairs.then(|| Box::new(|e: &Value| m.pair_width(e, if metres { wmz.as_f64() } else { None })) as Box<dyn Fn(&Value) -> Value>),
             decks: decks.then_some(dk.flat_below), any_tunnel, dashes: &dashes, select: select.clone(), hover: hover.clone(),
+            ends: (!fs.ends.is_empty()).then(|| (m.end_radius_expr("highway", false), m.end_radius_expr("highway", true))),
         })
     });
     match full_layers {
@@ -979,12 +1005,21 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
         feats.insert("casings", fp(fs.casings.as_ref(), &empty_map));
         feats.insert("halves", fp(fs.halves.as_ref(), &empty_map));
         feats.insert("shadows", fp(Some(&fs.shadows), &empty_map));
+        feats.insert("ends", fp(Some(&fs.ends), &empty_map));
     }
     let mut layers = drop_empty_layers(layers, &feats);
-    for l in layers.iter_mut().filter(|l| l["id"].as_str().is_some_and(|i| i.starts_with("roads-fill") && !i.ends_with("-pat"))) {
-        let v = l["paint"].get("line-opacity").cloned().unwrap_or(Value::Null);
-        info.fill_paint.insert(l["id"].as_str().unwrap().to_string(), json!({"line-opacity": v}));
-        l["paint"]["line-opacity"] = json!(["case", gs("rs_fill_on"), if v.is_null() { json!(1) } else { v }, 0]);
+    for l in layers.iter_mut() {
+        let lid = l["id"].as_str().unwrap_or("").to_string();
+        // the road fill switch: each fill layer's opacity (the end caps' fills too) goes to 0 when it is off
+        let keys: &[&str] = if lid.starts_with("roads-fill") && !lid.ends_with("-pat") { &["line-opacity"] }
+                            else if lid.starts_with("roads-ends-fill") { &["circle-opacity", "circle-stroke-opacity"] } else { continue };
+        let mut rec = Map::new();
+        for k in keys {
+            let v = l["paint"].get(*k).cloned().unwrap_or(Value::Null);
+            rec.insert(k.to_string(), v.clone());
+            l["paint"][*k] = json!(["case", gs("rs_fill_on"), if v.is_null() { json!(1) } else { v }, 0]);
+        }
+        info.fill_paint.insert(lid, Value::Object(rec));
     }
     // the overlays on a street: between the road layer and the arrows, by fill number, order and overlay; the overlays over the roads: on top
     edge.sort_by_key(|e| (e.0, e.1, e.2));
@@ -1008,6 +1043,24 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
             l["paint"]["line-color"] = swap(&l["paint"]["line-color"], &base, &fill_expr(fills, fb_fill));
         } else if l["id"] == "roads-bridge-decks" {
             l["paint"]["fill-extrusion-color"] = swap(&l["paint"]["fill-extrusion-color"], &base, &fill_base(fills, fb_fill));
+        } else if l["id"].as_str().is_some_and(|i| i.starts_with("roads-ends-")) {
+            // a two-way end cap: drawn where its two lanes have one colour (the colour option's, or rsColor's)
+            let eq = |pr: &String| json!(["==", ["get", pr], ["get", format!("{pr}__b")]]);
+            let same = if fills.len() > 1 {
+                let mut m = vec![json!("match"), gs("rs_co")];
+                for (i, pr) in fills.iter().enumerate().skip(1) {
+                    m.push(json!(i));
+                    m.push(eq(pr));
+                }
+                m.push(eq(&fills[0]));
+                Value::Array(m)
+            } else { eq(&fills[0]) };
+            let both = json!(["all", has("__rs_edge"), has("__rs_edge2"), ["==", painted("__rs_edge", "rs_colors"), painted("__rs_edge2", "rs_colors")]]);
+            l["paint"]["circle-color"] = if l["id"].as_str().is_some_and(|i| i.starts_with("roads-ends-fill")) {
+                json!(["case", both, painted("__rs_edge", "rs_colors"), same, fill_base(fills, fb_fill), "rgba(0,0,0,0)"])
+            } else {
+                json!(["case", ["any", same, both], ["coalesce", ["get", "__rs_casing"], fb_casing], "rgba(0,0,0,0)"])
+            };
         }
         if l["type"] == "line" && l["layout"].get("line-sort-key").is_some_and(|v| !v.is_null()) {
             let key = l["layout"]["line-sort-key"].clone();

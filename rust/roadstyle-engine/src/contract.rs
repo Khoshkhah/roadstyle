@@ -55,7 +55,8 @@ fn filter_panel(look: &Value, roads: &[Feat], m: &Model) -> Value {
     let restricted = |p: &crate::props::Props| p.get("__rs_access").is_some_and(|a| !a.is_null() && a != false && a != "");
     for f in roads {
         let p = &f.props;
-        let Some(c) = p.get("highway").and_then(Value::as_str).filter(|c| !c.is_empty()) else { continue };
+        let cls = crate::cls_of(p);
+        let Some(c) = cls.as_str().filter(|c| !c.is_empty()) else { continue };
         if !seen.contains(c) || (by_access.contains(c) && !restricted(p)) {
             if !seen.contains(c) {
                 classes.push(c.to_string());
@@ -76,7 +77,7 @@ fn filter_panel(look: &Value, roads: &[Feat], m: &Model) -> Value {
         // driving's pedestrian streets that cars may not use have their own row: where no usable road is of the class, a class row would
         // be a second switch for them
         if n("pedestrian") > 0 && classes.iter().any(|c| c == "pedestrian")
-            && !roads.iter().any(|f| !restricted(&f.props) && f.props.get("highway").and_then(Value::as_str) == Some("pedestrian")) {
+            && !roads.iter().any(|f| !restricted(&f.props) && crate::cls_of(&f.props).as_str() == Some("pedestrian")) {
             classes.retain(|c| c != "pedestrian");
         }
     }

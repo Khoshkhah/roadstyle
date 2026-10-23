@@ -104,6 +104,8 @@ fn is_true(v: Option<&Value>) -> bool {
 /// _casing_parts: the casing of every edge as pieces. An edge whose three casing numbers differ (or with two different ends) is cut into
 /// its start head, its main part and its end head, with a seam (and a lap, not on a dashed or tunnel casing) at each cut inside it.
 pub(crate) fn casing_parts(roads: &[Feature], head_m: f64, width_col: Option<&str>) -> Vec<Piece> {
+    let fcol = crate::cls_col();
+    let fcol = fcol.as_str();
     let mut out = Vec::new();
     for (i, f) in roads.iter().enumerate() {
         let p = &f.props;
@@ -111,7 +113,7 @@ pub(crate) fn casing_parts(roads: &[Feature], head_m: f64, width_col: Option<&st
             continue; // one line for a reverse pair: its twin draws it
         }
         let mut base: Props = p.iter()
-            .filter(|(k, _)| *k == "highway" || *k == "lvl" || Some(*k) == width_col || (k.starts_with("__rs_") && !k.starts_with("__rs_fill")))
+            .filter(|(k, _)| *k == "highway" || *k == fcol || *k == "lvl" || Some(*k) == width_col || (k.starts_with("__rs_") && !k.starts_with("__rs_fill")))
             .map(|(k, v)| (k, v.clone())).collect();
         let edge = p.get("__rs_edge").and_then(Value::as_i64).unwrap_or(i as i64);
         base.insert("__rs_edge", edge.into());
@@ -253,6 +255,8 @@ fn with(mut p: Props, k: i64, s: f64) -> Props {
 /// `width_col`: render's width_m_col, which the pieces keep (the layer's `cols`).
 /// `items`: the line items on the edges (_item_pieces, `__rs_k` 5), each over its edge's fill, by its rank on the edge.
 pub fn simple_source(roads: &[Feature], head_m: f64, shadows: bool, width_col: Option<&str>, items: Vec<Piece>) -> Result<Source, String> {
+    let fcol = crate::cls_col();
+    let fcol = fcol.as_str();
     let line_of: Vec<Option<&Vec<Pt>>> = roads.iter().map(|f| f.coords.as_ref()).collect();
     let mut halves = halves(roads);
     let mut out: Vec<Piece> = Vec::new();
@@ -290,7 +294,7 @@ pub fn simple_source(roads: &[Feature], head_m: f64, shadows: bool, width_col: O
             vec![Piece { props: p.clone(), coords: f.coords.clone() }]
         };
         for h in fills {
-            let props: Props = h.props.into_iter().filter(|(k, _)| *k == "highway" || *k == "lvl" || Some(*k) == width_col || k.starts_with("__rs_")).collect();
+            let props: Props = h.props.into_iter().filter(|(k, _)| *k == "highway" || *k == fcol || *k == "lvl" || Some(*k) == width_col || k.starts_with("__rs_")).collect();
             let s = 2.0 * int(&props, "__rs_fl") as f64 + if truthy(props.get("__rs_dash")) { -0.5 } else { 1.0 };
             out.push(Piece { props: with(props, 1, s), coords: h.coords });
         }
@@ -312,7 +316,7 @@ pub fn simple_source(roads: &[Feature], head_m: f64, shadows: bool, width_col: O
         *c += 1;
         let s = f.props["__rs_s"].as_f64().unwrap_or(0.0) + e as f64 * TIE;
         f.props.insert("__rs_s", s.into());
-        let cls = roads.get(e as usize).and_then(|r| r.props.get("highway")).cloned().unwrap_or(Value::Null);
+        let cls = roads.get(e as usize).map(|r| crate::cls_of(&r.props)).unwrap_or(Value::Null);
         f.props.insert("__rs_cls", cls);
         features.push(Feat { id, props: f.props, coords: f.coords });
     }
@@ -331,7 +335,7 @@ pub fn simple_source(roads: &[Feature], head_m: f64, shadows: bool, width_col: O
         f.props.insert("__rs_s", s.into());
         // _mark_cls: the class and the access of the item's road
         let road = roads.get(e as usize).map(|r| &r.props);
-        f.props.insert("__rs_cls", road.and_then(|p| p.get("highway")).cloned().unwrap_or(Value::Null));
+        f.props.insert("__rs_cls", road.map(crate::cls_of).unwrap_or(Value::Null));
         if let Some(a) = road.and_then(|p| p.get("__rs_access")).filter(|a| !a.is_null()) {
             f.props.insert("__rs_access", a.clone());
         }

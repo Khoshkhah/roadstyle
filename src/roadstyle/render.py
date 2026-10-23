@@ -121,7 +121,7 @@ def render_edges(
     if engine == "rust" and backend != "web":
         raise ValueError(f"engine='rust' makes the web page only, not backend={backend!r}")
     if rust_page:
-        why = (["a Styler object (style=)"] if style is not None else []) + _engine.own_style_names(palette, profile)
+        why = ["a Styler object (style=)"] if style is not None else []
         if why and _engine.fallback(engine, ", ".join(why) + " is Python's"):
             rust_page = False
     if rust_page:

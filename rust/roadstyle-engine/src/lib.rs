@@ -33,6 +33,20 @@ pub fn warn(msg: String) {
     WARNINGS.with(|w| w.borrow_mut().push(msg));
 }
 
+thread_local! {
+    static CLS: std::cell::RefCell<String> = std::cell::RefCell::new("highway".into());
+}
+
+/// The column of the class filter (render's filter_col, else highway_col; in the engine's names): `__rs_cls` on every piece is its value.
+pub(crate) fn cls_col() -> String {
+    CLS.with(|c| c.borrow().clone())
+}
+
+/// The class filter's value of a road (render's fcol).
+pub(crate) fn cls_of(p: &props::Props) -> Value {
+    CLS.with(|c| p.get(&c.borrow()).cloned().unwrap_or(Value::Null))
+}
+
 /// The warnings of the last calls on this thread, and none after.
 pub fn take_warnings() -> Vec<String> {
     WARNINGS.with(|w| std::mem::take(&mut *w.borrow_mut()))
@@ -77,6 +91,13 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     }
     let cols = ColumnMap::from_args(&look_json["args"]);
     cols.to_engine(&mut feats);
+    // render's filter_col: in the engine's names (a keyword's column has the engine's name; a column with an engine name is kept aside)
+    let fcol = look_json["args"]["filter_col"].as_str().filter(|c| !c.is_empty()).map_or_else(|| "highway".to_string(), |f| {
+        cols.0.iter().find(|(_, user)| user == f).map(|(own, _)| own.to_string())
+            .or_else(|| cols.0.iter().find(|(own, _)| *own == f).map(|(own, _)| ColumnMap::kept(own)))
+            .unwrap_or_else(|| f.to_string())
+    });
+    CLS.with(|c| *c.borrow_mut() = fcol);
     compute_levels(&mut feats, &look_json["args"], look.head_m)?;
     let colors = roads::mark_roads(&mut feats, &look, &look_json["args"])?;
     let width_col = look_json["args"]["width_m_col"].as_str().filter(|c| !c.is_empty());
@@ -114,12 +135,9 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
         }
     }
     // render's simple=False: the full look (full.rs): its casing pieces, its halves and its bridge shadows, no pieces of one road layer
-    let fsrc = if full {
+    let mut fsrc = if full {
         if !items.is_empty() {
             return Err("items=: only in simple mode (simple=True)".into());
-        }
-        if look_json["config"]["twin_end_caps"] == true && look_json["config"]["twin_casing"] == "each" {
-            return Err("simple=False with twin_casing \"each\" and twin_end_caps: the road-wide end caps are Python's; use engine='python'".into());
         }
         let named = |k: &str| look_json["args"][k].as_str().is_some_and(|c| !c.is_empty());
         let computed = !named("casing_level_col") && !named("fill_level_col");        // render computes them with the heads
@@ -158,8 +176,11 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     if glyphs.is_none() && ovs.iter().any(|o| o.kind == "text") {      // _build_overlays: a text overlay needs a font
         glyphs = Some(json!("https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"));
     }
-    // render's order: the roads, the overlays (_build_overlays), the 3D decks
+    // render's order: the roads, the two-way end caps (the full look), the overlays (_build_overlays), the 3D decks
     let mut sources = vec![("roads".to_string(), Src::Typed(roads))];
+    if let Some(fs) = fsrc.as_mut().filter(|fs| !fs.ends.is_empty()) {
+        sources.push(("ends".into(), Src::Json(json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": std::mem::take(&mut fs.ends)}}))));
+    }
     for (i, ov) in ovs.into_iter().enumerate() {
         let mut s = serde_json::Map::new();
         s.insert("type".into(), "geojson".into());
@@ -376,7 +397,7 @@ impl ColumnMap {
                 Src::Typed(s) => s.feats.iter_mut().for_each(|f| self.0.iter().for_each(|(own, _)| { f.props.shift_remove(&Self::kept(own)); })),
                 // the 3D decks and the halves are copies of the roads' properties: the user's names, as the roads; the casing pieces
                 // and the bridge shadows have the class and the __rs_* marks: the class's name, and a kept column goes away
-                Src::Json(s) if matches!(name.as_str(), "casings" | "shadows") => {
+                Src::Json(s) if matches!(name.as_str(), "casings" | "shadows" | "ends") => {
                     for f in s["data"]["features"].as_array_mut().into_iter().flatten() {
                         if let Some(p) = f["properties"].as_object_mut() {
                             for (own, user) in &self.0 {
@@ -422,7 +443,7 @@ impl ColumnMap {
                 _ => {}
             }
         }
-        for l in layers.iter_mut().filter(|l| matches!(l["source"].as_str(), Some("roads" | "simple" | "casings" | "halves" | "shadows"))) {
+        for l in layers.iter_mut().filter(|l| matches!(l["source"].as_str(), Some("roads" | "simple" | "casings" | "halves" | "shadows" | "ends"))) {
             for (own, user) in &self.0 {
                 gets(l, own, user);
             }

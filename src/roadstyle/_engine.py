@@ -96,6 +96,9 @@ def look(*, palette=None, profile=None, settings=None, args=None, features=None)
     o = {"palette": palette, "profile": profile, "settings": settings, "args": args or {}}
     if features is not None:
         o["features"] = features
+    files = _own_files()
+    if files:
+        o["files"] = files
     return json.loads(rust().make_look(json.dumps(o)))
 
 
@@ -108,7 +111,7 @@ def export_inline(edges, **kwargs) -> dict:
     kwargs.pop("engine", None)
     kwargs.setdefault("view_3d", True)      # as export_inline
     lk = _look_of(kwargs)
-    text = rust().make_style(_geoparquet(edges), json.dumps(lk), None, None, kwargs.get("name"))
+    text = rust().make_style(_geoparquet(edges), json.dumps(lk), None, None, kwargs.get("name") or "roads")     # export_inline's name
     _warn()
     return json.loads(text)
 
@@ -153,6 +156,21 @@ def _settings_data(settings):
         except Exception as e:      # missing, not JSON / YAML, not a mapping: an error that names the file (_settings._sources)
             raise ValueError(f"settings file {settings}: {e}") from e
     return settings
+
+
+def _own_files() -> dict:
+    """The user's own profiles and palettes (_settings._style_dirs: ./profiles, ./palettes, then the user config; the first file of a name
+    wins) as text, for the engine's look."""
+    from . import _settings as _s
+    out = {}
+    for kind in ("profiles", "palettes"):
+        found = {}
+        for d in _s._style_dirs(kind):
+            for f in sorted(d.glob("*.yaml")) if d.is_dir() else ():
+                found.setdefault(f.stem, f.read_text(encoding="utf-8"))
+        if found:
+            out[kind] = found
+    return out
 
 
 def own_style_names(palette=None, profile=None) -> list[str]:
@@ -323,11 +341,6 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
         kwargs = {**kwargs, **level_kw}
     tiled = bool(kwargs.get("tiles"))
     lk = _look_of({**kwargs, "palette": palette, "profile": profile, "settings": settings, "highway_col": highway_col, "state": "live"})
-    if (kwargs.get("simple") is False and lk["config"].get("twin_end_caps") and lk["config"].get("twin_casing") == "each"
-            and fallback(engine, 'the full look with twin_casing "each" and twin_end_caps (the road-wide end caps)')):
-        from .render import render_edges
-        return render_edges(gdf, backend="web", engine="python", palette=palette, profile=profile, settings=settings, highway_col=highway_col,
-                            include=include, exclude=exclude, match_links=match_links, levels_db=levels_db, **kwargs)
     pq = _geoparquet(g)
     style = json.loads(rust().make_style(pq, json.dumps(lk), None, None, kwargs.get("name")))
     _warn()
@@ -430,17 +443,20 @@ def _tiled_page(pq, lk, style, highway_col, kwargs):
     tc = lk["config"]["tiles"]
     z0, z1 = int(tc["minzoom"]), int(tc["maxzoom"])
     keep = sorted({highway_col, kwargs.get("filter_col") or highway_col, "__rs_twoway", "__rs_edge", "lvl", kwargs.get("width_m_col")} - {None})
-    names = [n for n in ("roads", "casings", "simple", "slots") if n in srcs and srcs[n]["data"]["features"]]
+    names = [n for n in ("roads", "casings", "simple", "slots", "ends") if n in srcs and srcs[n]["data"]["features"]]
     t = rust().Tiler(pq, json.dumps({**lk, "args": {**lk["args"], "tile_keep": keep, "tile_layers": names}}), None, None, "", [])
-    pts = [c for n in names for f in srcs[n]["data"]["features"] for c in ((f.get("geometry") or {}).get("coordinates") or [])]
+    def points(g):            # a LineString's points, a Point itself
+        c = (g or {}).get("coordinates") or []
+        return [c] if (g or {}).get("type") == "Point" else c
+    pts = [c for n in names for f in srcs[n]["data"]["features"] for c in points(f.get("geometry"))]
     bounds = (min(p[0] for p in pts), min(p[1] for p in pts), max(p[0] for p in pts), max(p[1] for p in pts))
     archive = _pmtiles(t, z0, z1, bounds, names)
     # the style: the roads source a vector one; the pieces and the slots its layers
     srcs["roads"] = {"type": "vector", "url": "pmtiles://roads", "minzoom": z0, "maxzoom": z1}
-    for n in ("casings", "simple", "slots"):        # the halves and the bridge shadows stay inline, as render's tiled branch keeps them
+    for n in ("casings", "simple", "slots", "ends"):        # the halves and the bridge shadows stay inline, as render's tiled branch keeps them
         srcs.pop(n, None)
     for lyr in style["layers"]:
-        if lyr.get("source") in ("casings", "simple", "slots"):
+        if lyr.get("source") in ("casings", "simple", "slots", "ends"):
             lyr["source"], lyr["source-layer"] = "roads", lyr["source"]
         elif lyr.get("source") == "roads":
             lyr["source-layer"] = "roads"

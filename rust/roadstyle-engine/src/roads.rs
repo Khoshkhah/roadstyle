@@ -108,7 +108,9 @@ pub fn mark_roads(fs: &mut [Feature], look: &Look, args: &Value) -> Result<crate
     let caps = CapCols::from_args(args);
     mark_caps(fs, &caps);
     mark_heads(fs);
-    mark_levels(fs);
+    let named = |k: &str| args[k].as_str().is_some_and(|c| !c.is_empty());
+    let computed = !named("casing_level_col") && !named("fill_level_col");      // render computes all four (compute_levels)
+    mark_levels(fs, ["casing_level_col", "fill_level_col", "casing_start_col", "casing_end_col"].map(|k| computed || named(k)));
     if look.twin_one && mark_twin_casing(fs, look.head_m, Some("edge_id")) {        // render passes its edge_id_col (the engine's edge_id)
         mark_twin_dead_ends(fs, &caps);
     }
@@ -128,7 +130,7 @@ pub fn mark_roads(fs: &mut [Feature], look: &Look, args: &Value) -> Result<crate
 pub fn roads_source(fs: Vec<Feature>) -> crate::props::Source {
     let feats = fs.into_iter().enumerate().map(|(id, f)| {
         let mut props = f.props;
-        let cls = props.get(HIGHWAY).cloned().unwrap_or(Value::Null);
+        let cls = crate::cls_of(&props);
         props.insert("__rs_cls", cls);
         crate::props::Feat { id, props, coords: f.coords }
     }).collect();
@@ -335,14 +337,17 @@ fn mark_heads(fs: &mut [Feature]) {
 }
 
 /// _mark_levels: __rs_cl / __rs_fl (casing at most the fill), the heads' casing numbers __rs_cs / __rs_ce, band 0.
-fn mark_levels(fs: &mut [Feature]) {
+/// _mark_levels: `named` says which of the columns casing_level, fill_level, casing_start and casing_end render reads (a keyword names it,
+/// or render computed the levels); a head that has none takes the main casing number.
+fn mark_levels(fs: &mut [Feature], named: [bool; 4]) {
     let num = |v: Option<&Value>| v.and_then(py_float).filter(|x| !x.is_nan()).map_or(0, |x| x.round_ties_even() as i64);
     for f in fs {
         let p = &mut f.props;
-        let (c, fl) = (num(p.get("casing_level")), num(p.get("fill_level")));
+        let col = |k: usize, c: &str| if named[k] { num(p.get(c)) } else { 0 };
+        let (c, fl) = (col(0, "casing_level"), col(1, "fill_level"));
         let (c, fl) = (c.min(fl), c.max(fl));
-        let cs = num(p.get("casing_start")).min(fl);
-        let ce = num(p.get("casing_end")).min(fl);
+        let cs = if named[2] { num(p.get("casing_start")).min(fl) } else { c };
+        let ce = if named[3] { num(p.get("casing_end")).min(fl) } else { c };
         for (k, v) in [("__rs_cl", c), ("__rs_fl", fl), ("__rs_cs", cs), ("__rs_ce", ce), ("__rs_band", 0)] {
             p.insert(k, v.into());
         }

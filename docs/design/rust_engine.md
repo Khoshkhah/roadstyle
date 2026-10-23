@@ -127,13 +127,13 @@ The crate makes the style of `export_inline` for simple mode with stored levels 
 
 **Keywords of `render_edges` / `render_web.render` that change the style**
 
-- [x] Column names (`ColumnMap`, 2026-10-23); `filter_col` and `cap_col` still fixed. Before, fixed in the crate: `highway_col` (highway), `filter_col`, `tunnel_col`, `bridge_col`, `layer_col`, `edge_id_col` (edge_id), `cap_col` / `cap_start_col` / `cap_end_col`, `casing_level_col`, `fill_level_col`, `casing_start_col`, `casing_end_col`, `head_start_m_col`, `head_end_m_col`, `directed_col` (is_directed), `driving_col` (has_arrows).
+- [x] Column names (`ColumnMap`, 2026-10-23), `filter_col` and `cap_col`. Before, fixed in the crate: `highway_col` (highway), `filter_col`, `tunnel_col`, `bridge_col`, `layer_col`, `edge_id_col` (edge_id), `cap_col` / `cap_start_col` / `cap_end_col`, `casing_level_col`, `fill_level_col`, `casing_start_col`, `casing_end_col`, `head_start_m_col`, `head_end_m_col`, `directed_col` (is_directed), `driving_col` (has_arrows).
 - [x] `access_col`: the access colours (`__rs_access`, the theme's `access`; 2026-10-23).
 - [x] No stored levels: `render` computes them (`compute_levels(method="solve")`), and so does the engine (`roadstyle-engine`, `compute_levels`; the same style on the parity fixture). Only `head_m=5`.
 - [x] `head_m`, `road_fill`, `offset_zoom`, `offset_frac`, `width_frac` (2026-10-23).
 - [x] Metre widths: `width_m_col`, `width_m_zoom`, `casing_m`, `casing_min_px` (`_mark_width_m`, `_width_m_expr`, the roads' part of `_mitre_ends`; 2026-10-23).
 - [x] `simple=False`: the full look (`full.rs`, 2026-10-23): the layer set of casings and fills for each position, the end caps, the dashed
-  classes, the bridge look and its shadows. Not with `twin_casing: "each"` and `twin_end_caps` (the road-wide end caps, `_twin_ends`).
+  classes, the bridge look and its shadows, and the road-wide end caps of `twin_casing: "each"` (`_twin_ends`).
 - [x] `arrows`, `labels`, `minzoom` (true or a table; 2026-10-23).
 - [x] `view_3d`: the 3D bridge decks (`decks.rs`, 2026-10-23). The engine makes the ribbons with its own mitre offsets, not GEOS: the same properties, the same shapes to the rounding (1e-6 deg).
 - [x] `items`: edge items and lanes (`__rs_k` 5, `__rs_ic`, the items' mitre ends; 2026-10-23). `items_popup` is a page keyword. A MultiLineString item is an error in the engine.
@@ -157,7 +157,7 @@ The crate makes the style of `export_inline` for simple mode with stored levels 
 - [ ] Specs: `to_spec`, `save_spec`, `load_spec`.
 - [ ] Input: `load_edges`, `from_duckdb`, `from_arrow`, `from_geojson`, `as_edges`, `normalize_edges`, `filter_edges` (`include`, `exclude`, `match_links`), `highway_types`, `is_directed`. The crate reads GeoParquet with fixed column names only.
 - [ ] Levels: the level areas and their editor (`save_area_levels`, `load_area_levels`, `restore_area_inputs`, `level_area.py`, `level_editor.py`), and the stored levels in a duckOSM file (`load_levels`, `save_levels`, `levels_store.py`). The crate has `compute_levels` with `level_input`, `solve_levels` and `auto_ends` inside it.
-- [ ] Palettes and settings: `register_palette`, `save_palette`, `load_palette`, `palette_to_dict`, `palette_from_dict` (the crate takes a palette only through `settings`); `use_settings` with a file path (the crate takes mappings).
+- [ ] Palettes and settings (the engine reads own profile and palette files and settings files through the binding, 2026-10-23): `register_palette`, `save_palette`, `load_palette`, `palette_to_dict`, `palette_from_dict` (the crate takes a palette only through `settings`); `use_settings` with a file path (the crate takes mappings).
 - [ ] Base maps: `BASEMAPS`, `get_basemap`, `register_basemap`, `get_api_key`, `set_api_key`.
 - [ ] The other tools: `cli.py`, `mcp_server.py`, the studio (`ui/studio`).
 - [ ] mapstyle's half of the look (mode, theme and paths; `features`): its own task after the plan, with Kaveh's OK.

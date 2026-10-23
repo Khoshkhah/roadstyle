@@ -50,6 +50,8 @@ pub struct FullSources {
     pub casings: Option<Vec<Value>>,
     pub halves: Option<Vec<Value>>,
     pub shadows: Vec<Value>,
+    /// the road-wide end caps of the two-way pairs (twin_casing "each" with twin_end_caps)
+    pub ends: Vec<Value>,
 }
 
 fn feature(p: Piece) -> Value {
@@ -60,7 +62,7 @@ fn feature(p: Piece) -> Value {
 fn mark_cls(mut p: Piece, roads: &[Feature]) -> Piece {
     let e = p.props.get("__rs_edge").and_then(Value::as_u64).unwrap_or(0) as usize;
     let road = roads.get(e).map(|r| &r.props);
-    p.props.insert("__rs_cls", road.and_then(|r| r.get("highway")).cloned().unwrap_or(Value::Null));
+    p.props.insert("__rs_cls", road.map(crate::cls_of).unwrap_or(Value::Null));
     if let Some(a) = road.and_then(|r| r.get("__rs_access")).filter(|a| !a.is_null()) {
         p.props.insert("__rs_access", a.clone());
     }
@@ -86,7 +88,76 @@ pub fn sources(roads: &[Feature], look: &Value, head_m: f64, width_col: Option<&
         bridge_shadows(roads, parts.as_deref(), cfg["bridge_shadow_trim_m"].as_f64().unwrap_or(0.0), order)
     } else { Vec::new() };
     let casings = parts.map(|ps| ps.into_iter().map(|p| feature(mark_cls(p, roads))).collect());
-    FullSources { casings, halves, shadows }
+    let ends = if cfg["twin_end_caps"] == true && cfg["twin_casing"] == "each" { twin_ends(roads) } else { Vec::new() };
+    FullSources { casings, halves, shadows, ends }
+}
+
+/// _twin_ends: a point at each end of each plain two-way pair (no bridge, tunnel, dash or end shape), with the pair's styling and both
+/// twins' fills (`<prop>__b`): a road-wide round cap under the two lanes, drawn where both have one colour. Where a road of a lower
+/// position meets the end, the cap has no casing ring (`__rs_nocase`).
+fn twin_ends(roads: &[Feature]) -> Vec<Value> {
+    let key = |p: &Pt| ((p[0] * 1e6).round() as i64, (p[1] * 1e6).round() as i64);
+    type K = ((i64, i64), (i64, i64));
+    let mut keys: Vec<Option<K>> = Vec::new();
+    let (mut wh, mut at): (HashMap<K, Vec<usize>>, HashMap<(i64, i64), Vec<usize>>) = (HashMap::new(), HashMap::new());
+    for (i, f) in roads.iter().enumerate() {
+        let k = f.coords.as_ref().filter(|c| c.len() >= 2).map(|c| (key(&c[0]), key(&c[c.len() - 1])));
+        if let Some(k) = k {
+            if k.0 != k.1 {
+                wh.entry(k).or_default().push(i);
+            }
+            at.entry(k.0).or_default().push(i);
+            at.entry(k.1).or_default().push(i);
+        }
+        keys.push(k);
+    }
+    let t = |p: &Props, k: &str| p.get(k).is_some_and(py_truth);
+    let num = |p: &Props, k: &str| p.get(k).and_then(Value::as_i64);
+    let mut used = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for (i, f) in roads.iter().enumerate() {
+        let (p, Some(k)) = (&f.props, keys[i]) else { continue };
+        if used.contains(&i) || !t(p, "__rs_twoway") || ["__rs_bridge", "__rs_tunnel", "__rs_dash", "__rs_cap", "__rs_split"].iter().any(|x| t(p, x)) {
+            continue;
+        }
+        let Some(j) = wh.get(&(k.1, k.0)).into_iter().flatten().copied()
+            .find(|&j| j != i && !used.contains(&j) && t(&roads[j].props, "__rs_twoway") && roads[j].props.get("highway") == p.get("highway")) else { continue };
+        used.extend([i, j]);
+        let mut props = Map::new();
+        let fcol = crate::cls_col();
+        for c in ["highway", fcol.as_str(), "lvl", "__rs_band", "__rs_cl", "__rs_fl"] {
+            if let Some(v) = p.get(c).filter(|v| !v.is_null()) {
+                props.insert(c.into(), v.clone());
+            }
+        }
+        for (c, v) in p.iter().filter(|(c, _)| c.starts_with("__rs_fill") || *c == "__rs_casing") {
+            props.insert(c.into(), v.clone());
+        }
+        let q = &roads[j].props;
+        let fills: Vec<String> = props.keys().filter(|c| c.starts_with("__rs_fill")).cloned().collect();
+        for c in fills {
+            props.insert(format!("{c}__b"), q.get(&c).cloned().unwrap_or(Value::Null));
+        }
+        props.insert("__rs_edge".into(), json!(i));
+        props.insert("__rs_edge2".into(), json!(j));
+        let c = f.coords.as_ref().unwrap();
+        for (end, (pt, kp)) in [(c[0], k.0), (c[c.len() - 1], k.1)].into_iter().enumerate() {
+            let head = num(p, if end == 0 { "__rs_cs" } else { "__rs_ce" }).or_else(|| num(p, "__rs_cl")).unwrap_or(0);
+            let low = at[&kp].iter().any(|&n| n != i && n != j && num(&roads[n].props, "__rs_fl").unwrap_or(0) < head);
+            let mut e = props.clone();
+            if low {
+                e.insert("__rs_nocase".into(), json!(true));
+            }
+            e.insert("__rs_cl".into(), json!(head));
+            // _mark_cls
+            e.insert("__rs_cls".into(), crate::cls_of(p));
+            if let Some(a) = p.get("__rs_access").filter(|a| !a.is_null()) {
+                e.insert("__rs_access".into(), a.clone());
+            }
+            out.push(json!({"type": "Feature", "properties": e, "geometry": {"type": "Point", "coordinates": [pt[0], pt[1]]}}));
+        }
+    }
+    out
 }
 
 /// What the full look's layers read (render's locals).
@@ -110,6 +181,8 @@ pub struct FullIn<'a> {
     pub dashes: &'a [String],
     pub select: Value,
     pub hover: Value,
+    /// the end caps' radius (fill, casing): _end_radius_expr, when there are end caps
+    pub ends: Option<(Value, Value)>,
 }
 
 /// render's layers of the full look in position mode, up to the arrows and the names: the three bands' casings and fills, the bridge
@@ -313,6 +386,26 @@ pub fn layers(f: &FullIn) -> Vec<Value> {
     if let Some(pw) = &f.pairs {        // a two-way pair's one casing as wide as its two directions
         for l in ls.iter_mut().filter(|l| l["source"] == "casings") {
             l["paint"]["line-width"] = pw(&l["paint"]["line-width"]);
+        }
+    }
+    // the end caps of a position: the casing right before the position's casing layers, the fill right before its fill layers
+    if let Some((rfill, rcasing)) = &f.ends {
+        let same = json!(["==", ["get", "__rs_fill"], ["get", "__rs_fill__b"]]);
+        for &pos in f.levels {
+            for (casing, key, root) in [(true, "__rs_cl", "roads-casing"), (false, "__rs_fl", "roads-fill")] {
+                let lid = format!("{}{}", if casing { "roads-ends-casing" } else { "roads-ends-fill" }, if pos == 0 { String::new() } else { format!("-lv{pos}") });
+                let here = json!(["==", ["coalesce", ["get", key], 0], pos]);
+                let mut flt = match &f.mz { Some(m) => json!(["all", m, here]), None => here };
+                if casing {
+                    flt = json!(["all", flt, ["!", ["to-boolean", ["get", "__rs_nocase"]]]]);
+                }
+                let col = if casing { json!(["coalesce", ["get", "__rs_casing"], fb_casing]) } else { json!(["coalesce", ["get", "__rs_fill"], fb_fill]) };
+                let layer = json!({"id": lid, "type": "circle", "source": "ends", "filter": flt,
+                                   "paint": {"circle-color": ["case", same, col, "rgba(0,0,0,0)"], "circle-radius": if casing { rcasing } else { rfill },
+                                             "circle-pitch-alignment": "map"}});
+                let at = ls.iter().position(|l| id(l) == level_id(root, pos)).unwrap_or(ls.len());
+                ls.insert(at, layer);
+            }
         }
     }
     if let Some(fbz) = f.decks {

@@ -391,14 +391,20 @@ def _full_roads(part, case):
         kw = {"highway_col": "fclass", "tunnel_col": "tun", "bridge_col": "brg", "layer_col": "lyr", "edge_id_col": "eid"}
     elif case in ("kinds", "on edges"):
         kw = _overlays(part, case)
+    elif case.startswith("twin ends"):      # twin_casing "each": a casing for each direction, and a road-wide end cap under a pair's two lanes
+        kw = {"settings": [_settings_of(), {"config": {"twin_casing": "each"}}], **(_LIVE["colors"] if case.endswith("colours") else {})}
     else:
         kw = {"decks": {"view_3d": True}, "colors": _LIVE["colors"], "minzoom": {"minzoom": True}, "access": {"access_col": "access"},
               "road_fill off": {"road_fill": False}, "plain": {}}[case]
     return roads, kw
 
 
+def _settings_of():
+    return json.loads((DATA / "look.json").read_text())["settings"]
+
+
 @pytest.mark.parametrize("case", ["plain", "decks", "cap_col", "cap_col only", "metres", "computed levels", "other column names", "colors",
-                                  "on edges", "kinds", "minzoom", "access", "road_fill off"])
+                                  "on edges", "kinds", "minzoom", "access", "road_fill off", "twin ends", "twin ends and colours"])
 def test_export_inline_full_look(part, keywords, case):
     """simple=False, the full look: a casing and a fill layer for each position with their end-cap twins, the dashed classes, the bridge
     look and its shadows (the engine's own line merge, in render_web's order), over the sources casings, halves and shadows."""

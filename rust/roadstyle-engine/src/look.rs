@@ -128,19 +128,43 @@ fn set_path(dst: &mut Value, path: &str, value: &Value) {
     }
 }
 
-fn names(kind: &str) -> Vec<&'static str> {
-    if kind == "profiles" { PROFILES.iter().map(|p| p.0).collect() } else { PALETTES.iter().map(|p| p.0).collect() }
+thread_local! {
+    /// The user's own profiles and palettes for this make_look (render's ./profiles, ./palettes, ~/.config/roadstyle/...): (kind, name, text).
+    static OWN: std::cell::RefCell<Vec<(String, String, String)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+fn own(kind: &str, name: &str) -> Option<String> {
+    OWN.with(|o| o.borrow().iter().find(|(k, n, _)| k == kind && n == name).map(|(_, _, t)| t.clone()))
+}
+
+/// style_names: the bundled names, then the user's own ones.
+fn names(kind: &str) -> Vec<String> {
+    let mut out: Vec<String> = if kind == "profiles" { PROFILES.iter().map(|p| p.0.to_string()).collect() }
+                               else { PALETTES.iter().map(|p| p.0.to_string()).collect() };
+    OWN.with(|o| for (k, n, _) in o.borrow().iter() {
+        if k == kind && !out.contains(n) {
+            out.push(n.clone());
+        }
+    });
+    out
 }
 
 /// _style_file: one profile or palette by name, merged over the base (default / amber) unless it is the base.
 fn style_file(kind: &str, name: &str) -> Result<Value, String> {
     let files: &[(&str, &str)] = if kind == "profiles" { &PROFILES } else { &PALETTES };
-    let text = files.iter().find(|f| f.0 == name).map(|f| f.1)
+    let mine = own(kind, name);        // the user's own file first, as _style_dirs
+    let text = mine.clone().or_else(|| files.iter().find(|f| f.0 == name).map(|f| f.1.to_string()))
         .ok_or_else(|| format!("no {} named '{name}'; there are: {}", &kind[..kind.len() - 1], names(kind).join(", ")))?;     // Python's repr
-    let data = yaml(text).map_err(|e| format!("{} {name}: {e}", &kind[..kind.len() - 1]))?;
+    let data = yaml(&text).map_err(|e| format!("{} {name}: {e}", &kind[..kind.len() - 1]))?;
     let base = lookup(&BASE, kind).unwrap();
-    if name == base {
+    if name == base && mine.is_none() {
         return Ok(data);
+    }
+    if name == base {        // an own file with the base's name: over the bundled base
+        let text = files.iter().find(|f| f.0 == name).map(|f| f.1).unwrap_or_default();
+        let mut out = yaml(text).map_err(|e| format!("{} {name}: {e}", &kind[..kind.len() - 1]))?;
+        deep_merge(&mut out, &data);
+        return Ok(out);
     }
     let mut out = style_file(kind, base)?;
     deep_merge(&mut out, &data);
@@ -235,7 +259,7 @@ pub fn theme(sources: &[Value]) -> Result<Value, String> {
     let classes = out["roads"]["classes"].clone();
     let mut pals = Map::new();
     for n in names("palettes") {
-        pals.insert(n.to_string(), class_entries(&style_file("palettes", n)?["classes"], &classes));
+        pals.insert(n.to_string(), class_entries(&style_file("palettes", &n)?["classes"], &classes));
     }
     out["palettes"] = Value::Object(pals);
     for d in sources {
@@ -360,6 +384,17 @@ fn roads(theme: &Value) -> Value {
 /// The look of render_edges(palette=, profile=, settings=, **args): `options` holds "palette" (default "amber"), "profile", "settings"
 /// (a mapping, or a list of them; none: null), "args" (the render's keywords) and "features" (mapstyle's base-map part, as given).
 pub fn make_look(options: &Value) -> Result<Value, String> {
+    // `files`: the user's own profiles and palettes as text ({"profiles": {name: text}, "palettes": {...}}), for this look only
+    let mine: Vec<(String, String, String)> = ["profiles", "palettes"].iter().flat_map(|k| {
+        options["files"][*k].as_object().into_iter().flatten().filter_map(move |(n, t)| Some((k.to_string(), n.clone(), t.as_str()?.to_string())))
+    }).collect();
+    OWN.with(|o| *o.borrow_mut() = mine);
+    let out = make_look_of(options);
+    OWN.with(|o| o.borrow_mut().clear());
+    out
+}
+
+fn make_look_of(options: &Value) -> Result<Value, String> {
     let palette = options.get("palette").and_then(Value::as_str).unwrap_or("amber");
     let profile = options.get("profile").filter(|v| !v.is_null());
     let settings = options.get("settings").cloned().unwrap_or(Value::Null);
@@ -368,7 +403,7 @@ pub fn make_look(options: &Value) -> Result<Value, String> {
     if let Some(p) = profile.filter(|p| p.as_str() != Some("default")) {
         pick.insert("profile".into(), p.clone());
     }
-    if palette != "amber" && names("palettes").contains(&palette) {
+    if palette != "amber" && names("palettes").iter().any(|n| n == palette) {
         pick.insert("palette".into(), palette.into());
     }
     let mut sources: Vec<Value> = match &settings {

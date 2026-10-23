@@ -25,6 +25,7 @@ pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name:
     let mut tiled = tiles::Tiles::new(min_zoom, max_zoom, num("buffer_px")?);
     let arg = |k: &str| cfg_all["args"][k].as_str().filter(|c| !c.is_empty()).map(String::from);
     let (width_col, highway_col) = (arg("width_m_col"), arg("highway_col").unwrap_or_else(|| "highway".into()));
+    let filter_col = arg("filter_col");
     let Parts { name, center, zoom, mut layers, sources, metadata, glyphs, state } = make_parts(parquet, look, features, None, name)?;
     let mut read: std::collections::HashSet<String> = keep.iter().cloned().chain(["name".to_string(), "kind".to_string()]).collect();
     fn texts(v: &Value, out: &mut std::collections::HashSet<String>) {
@@ -56,14 +57,14 @@ pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name:
             Src::Typed(s) if exact.is_some() => tiled.add_typed(&k, s, exact.as_ref().unwrap(), slots, from),
             // render's tiles: the pieces of `simple` keep the class, lvl, the metre width column and the __rs_* marks (not a picked item's fields)
             Src::Typed(s) if k == "simple" => {
-                let keep: std::collections::HashSet<String> = [highway_col.clone(), "lvl".into()].into_iter().chain(width_col.clone()).collect();
+                let keep: std::collections::HashSet<String> = [highway_col.clone(), "lvl".into()].into_iter().chain(width_col.clone()).chain(filter_col.clone()).collect();
                 tiled.add_typed(&k, s, &keep, slots, from)
             }
             Src::Typed(s) => tiled.add_typed(&k, s, &read, slots, from),
             // the full look's casing pieces: the columns of the simple pieces (tiles.py's line layers with `keep`)
             Src::Json(s) if k == "casings" => {
                 let keep: std::collections::HashSet<String> = exact.clone().unwrap_or_else(|| {
-                    [highway_col.clone(), "lvl".into()].into_iter().chain(width_col.clone()).collect()
+                    [highway_col.clone(), "lvl".into()].into_iter().chain(width_col.clone()).chain(filter_col.clone()).collect()
                 });
                 tiled.add(&k, s, &keep, false, from)
             }

@@ -37,16 +37,17 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **`export_style(..., engine="rust", format="pmtiles")`**: one archive of the Rust engine's tiles.
 - **The full look in the Rust engine** (`simple=False`, `full.rs`): a casing and a fill layer for each drawing position with their end-cap
   twins, the dashed classes, the tunnel and bridge looks and the bridge shadows, over the sources `casings`, `halves` and `shadows`. The same
-  style as Python byte for byte, inline, in tiles and on the page. Not with `twin_casing: "each"` and `twin_end_caps` (an error with
-  `engine="rust"`).
+  style as Python byte for byte, inline, in tiles and on the page, with the road-wide end caps of `twin_casing: "each"` (`_twin_ends`).
 - **`views=` with `engine="rust"`**: the View menu, and a view's palette (the colours of each palette in the page, as Python's
   `_merge_palettes`, from a Rust style of each palette). Not with `tiles=True` (the tiles have one palette).
 - **`ROADSTYLE_ENGINE=rust` runs the whole test suite.** With the Rust engine as the default, a part that the Rust engine does not have
-  (folium and lonboard are other renderers; a Styler object, an own profile or palette file, the road-wide end caps of `twin_casing: "each"`
-  in the full look, `compute_levels` keywords other than the defaults) is made by the Python engine with a warning. With `engine="rust"`
+  (folium and lonboard are other renderers; a Styler object, `compute_levels` keywords other than the defaults) is made by the Python
+  engine with a warning. With `engine="rust"`
   given, it is an error. The engine's own warnings (a two-way pair whose directions disagree) are Python warnings, and the Rust look takes
   the settings in force (`roadstyle.json`, `$ROADSTYLE_CONFIG`, `use_settings`). CI runs the suite with each engine.
 - **`compute_levels(engine="rust")`** gives `levels_given_up` and `levels_orders_not_kept` as Python does.
+- **The Rust engine takes `filter_col`** (the class filter: `__rs_cls` on every piece, the filter panel) and the user's own profiles and
+  palettes (`./profiles`, `./palettes`, `~/.config/roadstyle/`), as Python does.
 - **The interaction contract in the style** (`docs/design/rust_library.md`, "The interaction contract"). With the look's `args.state = "live"`,
   the Rust engine makes the style of the page: the global state stays in the expressions (MapLibre's `state` block), and the metadata has
   `roadstyle:contract` (1), `roadstyle:state` (the start value of each `rs_*` state) and `roadstyle:controls` (the options of `rsDashboard` that
