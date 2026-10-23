@@ -1,5 +1,5 @@
 // oneway direction-arrow icon (openstreetmap-carto)
-import {map, O, _sfeats, _feats} from "./core.js";
+import {map, O, RS_PREFIX, _sfeats, _feats} from "./core.js";
 import {_tunOn} from "./tunnel.js";
 import {_svLanePx} from "./svspot.js";
 export function addArrow(){
@@ -36,7 +36,7 @@ function _rsArrowLane(ft){
 }
 let _RS_ARROW = null;     // the profile's arrows.place, main_below and main, and labels.base_size
 export function _rsArrows(){
-  const src = map.getSource("arrows"); if(!src) return;
+  const src = map.getSource(RS_PREFIX+"arrows"); if(!src) return;
   const out = [];
   if(map.getZoom() >= 15){
     const bb = map.getBounds(), W = bb.getWest(), E = bb.getEast(), S = bb.getSouth(), N = bb.getNorth();
@@ -46,7 +46,7 @@ export function _rsArrows(){
     const pxPerDeg = 111320 / (78271.51696 * Math.cos(ctr.lat * Math.PI / 180) / Math.pow(2, map.getZoom()));
     const mainOnly = map.getZoom() < _RS_ARROW.mainBelow;
     const vis = new Map(), pieces = new Map();                   // chain -> its visible parts [{slot, lo, hi}] / its pieces [{slot, c, cum, len, p}]
-    for(const f of _sfeats("slots")){
+    for(const f of _sfeats(RS_PREFIX+"slots")){
       const p = f.properties || {}; if(!p.oneway) continue;
       if(mainOnly && !_RS_ARROW.main.has(String(p.highway || "").replace(/_link$/, ""))) continue;
       const c = f.geometry && f.geometry.coordinates; if(!c) continue;
@@ -126,6 +126,6 @@ export function initArrows(){
   map.on("load", addArrow);
   map.on("load", _rsArrows);
   map.on("moveend", _rsArrows);
-  map.on("sourcedata", e => { if(e.sourceId !== "slots") return; const n = _sfeats("slots").length; if(n !== _rsSlotsN){ _rsSlotsN = n; _rsArrows(); } });
+  map.on("sourcedata", e => { if(e.sourceId !== RS_PREFIX+"slots") return; const n = _sfeats(RS_PREFIX+"slots").length; if(n !== _rsSlotsN){ _rsSlotsN = n; _rsArrows(); } });
   map.on("styleimagemissing", e=>{ if(e.id==="oneway") addArrow(); });
 }

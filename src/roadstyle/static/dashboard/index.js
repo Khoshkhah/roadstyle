@@ -1,26 +1,28 @@
 // roadstyle's map dashboard, the entry: rsDashboard(map, options) adds the map controls and the road interaction of roadstyle's page
 // to a MapLibre map (docs/design/dashboard_module.md). The options have the names of render_web.render's keywords; the values are
 // those the page reads (render_web.py makes them). Call it right after `new maplibregl.Map(...)`, before the map's "load" event.
-import {initCore} from "./core.js";
+import {initCore, useStyle} from "./core.js";
 import {initPanel, initPanelTab} from "./panel.js";
 import {initZoom} from "./zoom.js";
 import {initView3D} from "./view3d.js";
 import {initStreetView} from "./streetview.js";
 import {initGoogle3D} from "./google3d.js";
 import {initBasemap} from "./basemap.js";
-import {initFilter, initFilterBox} from "./filter.js";
+import {initFilter, initFilterBox, useFilter} from "./filter.js";
 import {initFind} from "./find.js";
-import {initColor} from "./color.js";
-import {initLegend} from "./legend.js";
+import {initColor, useColor} from "./color.js";
+import {useLegend} from "./legend.js";
 import {initOverlays} from "./overlays.js";
 import {initTunnel} from "./tunnel.js";
 import {initViews} from "./views.js";
 import {initArrows} from "./arrows.js";
-import {initSelect} from "./select.js";
+import {initSelect, useSelect} from "./select.js";
 // an option left out: render's default. The theme's values (select_color, arrow_icon, arrow_color, arrow_rules) have none:
 // they come from the look (roadstyle's profile and palette).
 const RS_DEFAULTS = {
-  style: null,                 // the style object the map was made with (the layer ids, the base map layer)
+  style: null,                 // the roads style (the layer ids, the base map layer, the metadata); null: it comes later (rs.setStyle)
+  prefix: "",                  // the prefix of the roads style's source and layer ids in the map ("rs-": the page added them so)
+  engine: null,                // {props: id => Promise of the road's properties}: a page whose roads are only in vector tiles
   basemaps: [], basemap_switcher: true,
   tiles: false, simple: false, // simple: the id of the one road layer of simple mode with inline data, else false
   popup_mode: "popup", find_control: false, zoom_readout: true, pitch_3d: 55,
@@ -30,15 +32,20 @@ const RS_DEFAULTS = {
   tunnel: {layers: {}, steps: [], control: false}, fill_layers: [], road_fill: {on: true, paint: {}},
   views: [], items: null, edge_id_col: "edge_id", arrow_icon: null,
 };
-export function rsDashboard(map, options){
-  const o = {...RS_DEFAULTS, ...options};
-  // the road popup, the hover tooltip and the hover delay: else the style's metadata roadstyle:interaction (export_style, the Rust engine)
+// the options that the page did not give and that the style's metadata gives: the road popup, the hover tooltip and the hover delay
+// (roadstyle:interaction: export_style, the Rust engine), the colour options and their legends (roadstyle:color_options: the Rust
+// engine, when the map has data colours)
+function fromStyle(o, given){
   const meta = (o.style && o.style.metadata) || {}, it = meta["roadstyle:interaction"] || {};
-  if(!("road_popup" in o)) o.road_popup = "popup" in it ? it.popup : null;           // false: none; null: every field; [fields]
-  if(!("road_tooltip" in o)) o.road_tooltip = it.tooltip || false;                   // false | true | [fields]
-  if(!("hover_delay_ms" in o)) o.hover_delay_ms = it.hover_delay_ms != null ? it.hover_delay_ms : 300;
-  // the colour options and their legends: else the style's metadata roadstyle:color_options (the Rust engine, when the map has data colours)
-  if(!("color_options" in o)) o.color_options = meta["roadstyle:color_options"] || [];
+  if(!given.has("road_popup")) o.road_popup = "popup" in it ? it.popup : null;           // false: none; null: every field; [fields]
+  if(!given.has("road_tooltip")) o.road_tooltip = it.tooltip || false;                   // false | true | [fields]
+  if(!given.has("hover_delay_ms")) o.hover_delay_ms = it.hover_delay_ms != null ? it.hover_delay_ms : 300;
+  if(!given.has("color_options")) o.color_options = meta["roadstyle:color_options"] || [];
+}
+// returns the dashboard object (docs/design/rust_library.md, "The runtime API"); today it has setStyle
+export function rsDashboard(map, options){
+  const o = {...RS_DEFAULTS, ...options}, given = new Set(Object.keys(options));
+  fromStyle(o, given);
   initCore(map, o);
   initPanel();
   initZoom();
@@ -51,11 +58,18 @@ export function rsDashboard(map, options){
   initFind();
   initFilterBox();
   initColor();
-  initLegend();
+  useLegend();
   initOverlays();
   initTunnel();
   initViews();
   initArrows();
   initSelect();
-  return map;
+  return {
+    // a new roads style: the page added its sources and layers to the map first (with the prefix). The controls stay; they read the
+    // new style, its metadata and its layers. The selection, the hover and the properties of engine.props go: they were the old roads'.
+    setStyle(style){
+      o.style = style; fromStyle(o, given);
+      useStyle(style); useSelect(); useFilter(); useColor(); useLegend();
+    },
+  };
 }

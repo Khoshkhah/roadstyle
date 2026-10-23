@@ -31,8 +31,7 @@ rsDashboard(map, {style, select_color: "#7c4dff"});
 - The page must have the global `maplibregl` (MapLibre's UMD script).
 - The page adds MapLibre's navigation and scale controls before `rsDashboard`, if it wants them. The dashboard's buttons
   (2D/3D, Street View, Google 3D, base map) go below them in the top-right column.
-- A style from the Rust engine is simple mode with inline data. Give `simple: "roads-simple"`, or the hover and select glow do not
-  show.
+- A style from the Rust engine is simple mode. Give `simple: "roads-simple"`, or the hover and select glow do not show.
 - `examples/dashboard_rust/` is a working page on a style from `rust/roadstyle-wasm` (Monaco).
 
 The Python page (`render_web.render`) does not load modules. When `render_web.py` is imported, it reads the files in a fixed order
@@ -41,6 +40,42 @@ saved page still works offline, as one file. Because the files become one script
 name. A top-level name of a file is also a global of the Python page. Scripts that the page adds later use these globals: the
 simple-mode script replaces `pick`, and the level editor calls `_sfeats` and `_rsArrows`.
 
+## Roads that come later, as vector tiles
+
+duckosm-rust's page adds the roads only after a build, as vector tiles of the engine's `Tiler`, on top of a base map that is not
+roadstyle's (OpenFreeMap). Each network change gives a new roads style. `examples/dashboard_rust/tiles.html` does the same on Monaco.
+
+```js
+const rs = rsDashboard(map, {style: null, prefix: "rs-", tiles: true, simple: "roads-simple",
+                             engine: {props: (id) => worker.roadProps(id)}});
+// after each build: remove the old rs- layers and sources, add the new ones with the prefix, then
+rs.setStyle(style);
+```
+
+- **`rsDashboard` returns an object.** Today it has one method, `setStyle(style)`. The plan for the runtime API
+  (`rust_library.md`, "The runtime API") adds the other methods to the same object.
+- **`setStyle(style)`.** The page adds the new style's sources and layers to the map first. The dashboard then reads the new style:
+  its layers (to pick a road and to filter), its metadata (the popup and tooltip fields, the hover delay, the colour options and
+  the legend), and its feature ids. The controls are made once, in `rsDashboard`; `setStyle` does not add a second set. The
+  Colour by menu and the legend are made again in their place. The selection, the hover and the fetched properties go, because
+  they are the old roads'. A switch that is off (a class, Bridges, Tunnels) applies to the new roads too.
+- **`style: null`.** The dashboard starts with no roads: nothing to pick until `setStyle`.
+- **`prefix`.** The page adds the roads style's sources and layers with this prefix (`"rs-"`). The dashboard adds it to each
+  source and layer id that it uses. The names in the style itself stay as they are: a layer's `source-layer`, the metadata.
+- **The base map.** With no `basemaps` option the dashboard has no base map button and does not touch the map's own base map.
+- **The glow on tiles.** In the engine's tiles the `roads` source has no lines: the map draws the roads from the pieces of the
+  `simple` source. The page adds the `simple` source with `promoteId: "__rs_edge"`. Then all the pieces of a road have the road's
+  id, and one feature state (`{source: "rs-simple", sourceLayer: "simple", id: road}`) lights the whole road, also in tiles that
+  load later. Without `promoteId`, `setStyle` writes an error in the console. A road is picked on its fill pieces (`__rs_k` 1).
+- **`engine.props(id)`.** A function that returns a Promise of one road's properties (`id`: the road's row, the `__rs_edge` of its
+  pieces). The dashboard calls it for a click, `rsSelect` and the hover tooltip, also for the road's second edge
+  (`__rs_edge2`), and keeps the answers until the next style. If the Promise fails, the dashboard writes an error in the console
+  and shows nothing. Without `engine.props` (the Python page) all of this runs at once, as before. `engine` is the same port as
+  the plan's `engine.restyle`.
+- **Limits.** `rsQuery`, `rsFind`, `rsGetProps` and `rsFocus` need all roads' properties and lines in the page (inline data, or
+  Python's sidecar table `window.RS_SIDE`). With `engine.props` only, they find nothing. Street View takes the road's line from
+  its longest fill piece in the loaded tiles.
+
 ## The options
 
 `rsDashboard(map, options)` takes one object. Each key has the name of a `render` keyword where one exists. The values are the
@@ -48,11 +83,13 @@ values that the page reads, which `render` makes from its keywords. The template
 
 | Option | From `render` | Default in `index.js` | Read by |
 |---|---|---|---|
-| `style` | the style object | (required) | `core.js` (deck layers), `select.js` (pick layers), `basemap.js` (the base map layer) |
+| `style` | the style object | `null`: the roads come later (`setStyle`) | `core.js` (deck layers), `select.js` (pick layers), `basemap.js` (the base map layer) |
+| `prefix` | (none: the Python page adds the style as it is) | `""` | `core.js`, and each file that names a source or a layer |
+| `engine` | (none) | `null`; `{props: id => Promise}` | `core.js` (`_withProps`), `select.js` |
 | `basemaps` | `basemaps` | `[]` | `basemap.js` |
 | `basemap_switcher` | `basemap_switcher` | `true` | `basemap.js` |
 | `tiles` | `tiles` | `false` | `core.js` (the sidecar table `window.RS_SIDE`) |
-| `simple` | `simple` with inline data: the id of the one road layer | `false` | `core.js`, `select.js`, `svspot.js` |
+| `simple` | `simple` with inline data: the id of the one road layer (the Rust engine: also with tiles) | `false` | `core.js`, `select.js`, `svspot.js` |
 | `popup_mode` | `popup_mode` (or `road_popup="panel"`) | `"popup"` | `panel.js`, and each control that docks in the panel |
 | `find_control` | `find_control` | `false` | `find.js` |
 | `zoom_readout` | `zoom_readout` | `true` | `zoom.js` |
@@ -135,3 +172,6 @@ The legend is correct only for option 0, because the metadata does not give the 
   made with the old and the new code: the pixels are the same, and there are no page errors.
 - `examples/dashboard_rust/` in a browser: the modules load as ES modules (strict mode) on a Rust-engine style, with no page errors.
   The popup, the hover tooltip, the glow, the search, Street View and 2D/3D work.
+- `examples/dashboard_rust/tiles.html` in a browser: a mouse click on a road shows the properties from `engine.props` (both
+  directions of a pair) and lights the road on the tiles; after `setStyle` with another colouring the legend shows, there is one
+  set of buttons, and the hover tooltip shows the fetched properties. No page errors.

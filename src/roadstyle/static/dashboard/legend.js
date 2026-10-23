@@ -19,14 +19,16 @@ export function coUpdateLegend(){
   _coLegendEl.innerHTML = h;
   if(_coLegendBox) _coLegendBox.style.display = h ? "" : "none";
 }
-export function initLegend(){
-  if(COLOR_OPTIONS.some(o=>o.legend)){
+// the box once an option has a legend (at the start, or with a later style: rs.setStyle), then the active option's legend
+export function useLegend(){
+  if(!_coLegendBox && COLOR_OPTIONS.some(o=>o.legend)){
     _coLegendBox=document.createElement("div"); _coLegendBox.className="co-lg";
     const hd=document.createElement("div"); hd.className="co-lg-hd"; hd.textContent="Legend ▾";
     hd.onclick=()=>{ const c=_coLegendBox.classList.toggle("collapsed"); hd.textContent="Legend "+(c?"▸":"▾"); };
     _coLegendEl=document.createElement("div"); _coLegendEl.className="co-lg-body";
     _coLegendBox.appendChild(hd); _coLegendBox.appendChild(_coLegendEl);
     if(_popupMode==="panel"){ _coLegendBox.classList.add("collapsed"); hd.textContent="Legend ▸"; }  // panel: collapse to save space
-    (_sideCtl||document.body).appendChild(_coLegendBox); coUpdateLegend();
+    (_sideCtl||document.body).appendChild(_coLegendBox);
   }
+  coUpdateLegend();
 }

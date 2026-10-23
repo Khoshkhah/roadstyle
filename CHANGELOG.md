@@ -12,6 +12,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   page template. Now each control is a file, and `rsDashboard(map, options)` adds them all to a MapLibre map. The pages that use the Rust engine can
   import the same files. The Python page puts them in the page as one script, so a saved page still works offline. The look, the texts and the
   `window.rs*` API do not change.
+- **The dashboard on roads that come later** (`dashboard_module.md`, "Roads that come later"). `rsDashboard` returns an object with
+  `setStyle(style)`: a page gives a new roads style after each build, and the controls stay. New options: `prefix` (the page added the
+  style's sources and layers with it), `engine: {props}` (one road's properties on request) and `style: null`. In simple mode with
+  vector tiles a road glows through its pieces (`promoteId: "__rs_edge"` on the `simple` source).
 
 ## [0.24.3] — 2026-10-22
 

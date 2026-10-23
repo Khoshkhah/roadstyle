@@ -1,6 +1,6 @@
 // GOOGLE STREET VIEW of the clicked edge (the window, the side-by-side page, or a plain link),
 // looking the way the edge runs. A plain maps URL, no API key; where it stands is below.
-import {map, O, RS_TILED, RS_LEAN, _feats, _roadOfPiece} from "./core.js";
+import {map, O, RS_PREFIX, RS_TILED, RS_LEAN, _feats, _roadOfPiece} from "./core.js";
 import {_svWindow} from "./streetview.js";
 import {srcOf} from "./select.js";
 let _streetView = false;
@@ -22,13 +22,15 @@ export function _svLine(f){ const g=f && f.geometry;
   return !g ? [] : g.type==="LineString" ? g.coordinates : g.type==="MultiLineString" ? [].concat(...g.coordinates) : []; }
 function _svFeat(f){ const F=_feats();       // the edge's full geometry (a picked one may be tile-clipped)
   return (f && f.id!=null && srcOf(f)==="roads" && F && F[f.id]) || f; }
-// tiles mode keeps no geometry in the page: take the edge's longest piece from the loaded tiles
-// (rsSelect of an edge whose tiles are not loaded yet gets no heading, marker or steps)
+// tiles mode keeps no geometry in the page: take the edge's longest piece from the loaded tiles; simple mode: its longest fill piece
+// (the Rust engine's roads source has no lines). rsSelect of an edge whose tiles are not loaded yet gets no heading, marker or steps.
 export function _svTiled(id){
   if(!RS_TILED) return null;
   let best=null;
-  for(const f of map.querySourceFeatures("roads", {sourceLayer:"roads"}))
-    if(f.id===id && (!best || _svLine(f).length>_svLine(best).length)) best=f;
+  const fs = RS_LEAN ? map.querySourceFeatures(RS_PREFIX+"simple", {sourceLayer:"simple", filter:["==", ["get", "__rs_k"], 1]})
+                     : map.querySourceFeatures(RS_PREFIX+"roads", {sourceLayer:"roads"});
+  for(const f of fs)
+    if((RS_LEAN ? f.properties.__rs_edge : f.id)===id && (!best || _svLine(f).length>_svLine(best).length)) best=f;
   return best; }
 export function _svDist(cs){ const k=Math.cos(cs[0][1]*Math.PI/180), d=[0];
   for(let i=1;i<cs.length;i++) d.push(d[i-1]+Math.hypot((cs[i][0]-cs[i-1][0])*k*_SV_R, (cs[i][1]-cs[i-1][1])*_SV_R));
@@ -71,7 +73,7 @@ export function _svPick(ll, f, id){
 // the drawn lane offset (px) of an edge at this zoom: roads-fill's own line-offset expression,
 // ["interpolate",["linear"],["zoom"], z, ["case", two-way?, ["match",["get",class], ..., dflt], 0], ...]
 export function _svLanePx(props){
-  const e=map.getPaintProperty("roads-fill", "line-offset");
+  const e=map.getPaintProperty(RS_PREFIX+"roads-fill", "line-offset");
   if(!Array.isArray(e) || e[0]!=="interpolate") return typeof e==="number" ? e : 0;
   const val=x=>{ if(typeof x==="number") return x;
     if(!Array.isArray(x)) return 0;
@@ -187,7 +189,7 @@ export function _sv(ll, f){
   return !u ? "" : '<div class="rs-sv" style="margin-top:4px"><a target="_blank" rel="noopener" href="'+
     u.replace(/&/g, "&amp;")+'">Street View &#8599;</a></div>'; }
 export function initSpot(){
-  _streetView = !!O.street_view; RS_FILL_LAYERS = O.fill_layers;
+  _streetView = !!O.street_view; RS_FILL_LAYERS = O.fill_layers.map(id=>RS_PREFIX+id);
   window.rsSetStreetViewMarkerAt = rsSetStreetViewMarkerAt;
   map.on("move", _svMarkPlace);                   // zoom / rotate / pitch change the drawn offset
   window.rsGetStreetViewSpot = rsGetStreetViewSpot;

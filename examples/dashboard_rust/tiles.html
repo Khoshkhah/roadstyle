@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
+<title>roadstyle dashboard, Rust engine tiles</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<!-- An example: roadstyle's dashboard modules on roads that come later, as vector tiles of the Rust engine (Tiler), over a base map
+     that is not roadstyle's (OpenFreeMap). As duckosm-rust's page: the roads style's sources and layers get the prefix "rs-", a new
+     roads style replaces the old one (the button), and a click asks the engine for the road's properties. README.md in this folder. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<link rel="stylesheet" href="../../src/roadstyle/static/dashboard/dashboard.css">
+<link rel="stylesheet" href="../../src/roadstyle/static/popup.css">
+<style>html,body{margin:0;height:100%}#map{position:absolute;inset:0}
+#next{position:absolute;left:10px;bottom:40px;z-index:2;font:13px system-ui,sans-serif;padding:6px 10px}</style>
+</head><body>
+<div id="map"></div><button id="next" type="button">Colour by lanes</button>
+<script type="module">
+import init, {Tiler} from "./pkg/roadstyle_wasm.js";
+import {rsDashboard} from "../../src/roadstyle/static/dashboard/index.js";
+
+const DATA = "../../rust/roadstyle-rs/tests/data/";
+const bytes = (u) => fetch(u).then((r) => r.arrayBuffer()).then((b) => new Uint8Array(b));
+const [, roads, lookText] = await Promise.all([init(), bytes(DATA + "monaco/roads.parquet"), fetch(DATA + "look.json").then((r) => r.text())]);
+const theme = JSON.parse(lookText).theme;
+
+const map = new maplibregl.Map({container: "map", style: "https://tiles.openfreemap.org/styles/positron", center: [7.42, 43.735], zoom: 14,
+  attributionControl: {compact: true}});
+window.map = map;
+map.addControl(new maplibregl.NavigationControl({visualizePitch: true}));
+map.addControl(new maplibregl.ScaleControl({maxWidth: 120, unit: "metric"}), "bottom-left");
+
+// the tiles of the roads style now on the map: rs://<generation>/<source>/<z>/<x>/<y>, a new generation for each style
+let tiler = null, gen = 0;
+maplibregl.addProtocol("rs", async (params) => {
+  const [g, source, z, x, y] = params.url.slice("rs://".length).split("/");
+  return {data: +g === gen ? tiler.tile(source, +z, +x, +y) : new Uint8Array()};
+});
+// the dashboard before the roads: no style yet; the roads' properties come from the engine, one road at a time
+const rs = rsDashboard(map, {
+  style: null,
+  prefix: "rs-",
+  tiles: true,
+  simple: "roads-simple",     // the engine's style is simple mode: the roads are drawn by this one layer, from the simple source
+  engine: {props: async (id) => JSON.parse(tiler.props("roads", id))},
+  select_color: theme.selection.select,
+  street_view: "window",
+});
+window.rs = rs;
+
+// a roads style on the map, in place of the one before: its images, sources and layers with the prefix rs-, then rs.setStyle
+async function showRoads(colorBy) {
+  const look = JSON.parse(lookText);
+  if (colorBy) Object.assign(look.args, colorBy);
+  tiler = new Tiler(roads, JSON.stringify(look), undefined, "Monaco", `rs://${++gen}/`, ["name", "edge_id", "highway"]);
+  const style = JSON.parse(tiler.style());
+  for (const l of map.getStyle().layers) if (l.id.startsWith("rs-")) map.removeLayer(l.id);
+  for (const id of Object.keys(map.getStyle().sources)) if (id.startsWith("rs-")) map.removeSource(id);
+  for (const [id, im] of Object.entries(style.metadata["roadstyle:images"] || {})) {
+    if (!map.hasImage("rs-" + id)) map.addImage("rs-" + id, (await map.loadImage(im.url)).data, {sdf: im.sdf, pixelRatio: im.pixelRatio});
+  }
+  // promoteId: the pieces of a road have the road's id in the map, so the dashboard lights them all with one feature state
+  for (const [id, src] of Object.entries(style.sources)) map.addSource("rs-" + id, id === "simple" ? {...src, promoteId: "__rs_edge"} : src);
+  for (const l of style.layers) {
+    const layer = JSON.parse(JSON.stringify(l).replaceAll('"oneway"', '"rs-oneway"'));   // the image name in the layout
+    map.addLayer({...layer, id: "rs-" + l.id, source: "rs-" + l.source});
+  }
+  rs.setStyle(style);
+}
+await map.once("load");
+await showRoads(null);
+let lanes = false;
+document.getElementById("next").onclick = async () => {
+  lanes = !lanes;
+  await showRoads(lanes ? {color_by: "lanes", cmap: "YlOrRd", vmin: 1, vmax: 4} : null);
+  document.getElementById("next").textContent = lanes ? "Colour by class" : "Colour by lanes";
+};
+</script>
+</body></html>

@@ -135,6 +135,8 @@ rsDashboard(map, {style, find_control: true});
 ```
 
 Call `rsDashboard` immediately after you make the map. The options have the names of the Python keywords. The functions and events
-on this page then work on that map. The options and the files: `docs/design/dashboard_module.md` in the repository.
+on this page then work on that map. Roads that come later (vector tiles, a new style after each build): give `style: null`, the
+`prefix` of their source and layer ids, `engine: {props: id => Promise}` for one road's properties, and call `setStyle(style)` on the
+object that `rsDashboard` returns. The options and the files: `docs/design/dashboard_module.md` in the repository.
 
 **See also:** [Dashboards & JavaScript](../guides/dashboards.md) · [Every parameter](parameters.md) · [Put it on a website](../guides/website.md)

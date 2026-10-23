@@ -59,21 +59,29 @@ export function rsSetRoadFill(on){
   RS_ROAD_FILL.on = !!on;
   document.dispatchEvent(new CustomEvent("rs:roadfillchange",{detail:{road_fill:!!on}}));
 }
-export function initColor(){
+let _coBox = null;   // the Colour by menu
+// the colour options and the menu: at the start, and again for a new style (rs.setStyle) in the same place in the stack
+export function useColor(){
   COLOR_OPTIONS = O.color_options; _coActive = O.color_active;
-  window.rsColorBase = rsColorBase;
-  window.rsSetColorField = rsSetColorField;
-  window.rsColor = rsColor;
   window.RS_COLOR_OPTIONS = COLOR_OPTIONS;
+  let w = null;
   if(COLOR_OPTIONS.length > 1){
-    const w=document.createElement("div"); w.className="co-ctrl";
+    w=document.createElement("div"); w.className="co-ctrl";
     w.appendChild(document.createTextNode("Colour by "));
     const sel=document.createElement("select"); sel.id="co-select";
     COLOR_OPTIONS.forEach((o,i)=>{ const op=document.createElement("option");
       op.value=i; op.textContent=o.name; sel.appendChild(op); });
     sel.onchange=()=> rsSetColorField(parseInt(sel.value,10));
-    w.appendChild(sel); _tlHost().prepend(w);   // colour-by sits above the filter in the stack
+    w.appendChild(sel);
   }
+  if(_coBox && w) _coBox.replaceWith(w); else if(_coBox) _coBox.remove(); else if(w) _tlHost().prepend(w);   // colour-by sits above the filter in the stack
+  _coBox = w;
+}
+export function initColor(){
+  window.rsColorBase = rsColorBase;
+  window.rsSetColorField = rsSetColorField;
+  window.rsColor = rsColor;
+  useColor();
   if(_coActive){ const _ap=()=>rsSetColorField(_coActive);   // display the requested option on load
     if(map.isStyleLoaded && map.isStyleLoaded()) _ap(); else map.on("load", _ap); }
   RS_ROAD_FILL = O.road_fill;
