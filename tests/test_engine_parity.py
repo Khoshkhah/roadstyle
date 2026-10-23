@@ -101,6 +101,19 @@ def test_export_inline_levels_computed(part, keywords):
     assert diff(ru, py) == []
 
 
+@pytest.mark.parametrize("drop", [["directed_col"], ["driving_col"], ["directed_col", "driving_col"]])
+def test_export_inline_direction_columns_not_named(part, keywords, drop):
+    # render reads directed_col and driving_col only when they are named (None by default): the roads have the columns is_directed and
+    # has_arrows, and without the keywords neither engine reads them (0.25.0: the Rust engine read them by these names)
+    from compare_engines import diff
+
+    kw = {k: v for k, v in keywords.items() if k not in drop}
+    assert {"is_directed", "has_arrows"} <= set(part.columns)
+    py = rs.export_inline(part, engine="python", **kw)
+    ru = rs.export_inline(part, engine="rust", **kw)
+    assert diff(ru, py) == []
+
+
 # the column keywords: the same roads with other column names give the same style, with those names
 _RENAME = {"highway": "fclass", "tunnel": "tun", "bridge": "brg", "layer": "lyr", "edge_id": "eid"}
 

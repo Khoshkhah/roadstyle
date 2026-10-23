@@ -1,6 +1,8 @@
 [package]
 name = "roadstyle-py"
 version.workspace = true
+repository.workspace = true
+homepage.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "The Python binding of roadstyle's Rust engine: the module roadstyle._rust (PyO3, abi3)"

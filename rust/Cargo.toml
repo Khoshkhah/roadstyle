@@ -9,7 +9,9 @@ default-members = ["roadstyle-model", "roadstyle-io", "roadstyle-levels", "roads
 resolver = "2"
 
 [workspace.package]
-version = "0.0.1"
+version = "0.25.0"
+repository = "https://github.com/Khoshkhah/roadstyle"
+homepage = "https://khoshkhah.github.io/roadstyle/"
 edition = "2021"
 license = "MIT"
 

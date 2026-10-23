@@ -1,6 +1,8 @@
 [package]
 name = "roadstyle-rs"
 version.workspace = true
+repository.workspace = true
+homepage.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "The old name of the facade crate roadstyle, kept for one version (docs/design/rust_library.md)"

@@ -6,6 +6,39 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.25.0] — 2026-10-23
+
+**The Rust engine, as an option.** roadstyle 0.25.0 has a second engine, in Rust, inside the package (the module `roadstyle._rust`). The
+default stays the Python engine: a map made with 0.24.3 is the same with 0.25.0, except for the Python fixes below. Select the Rust engine for one call with
+`engine="rust"`, or for all calls with the environment variable `ROADSTYLE_ENGINE=rust`.
+
+- **What the Rust engine does:** `render_edges` (the web page, also `tiles=True`, `simple=False`, `views=`, overlays and items),
+  `export_inline`, `export_style` (XYZ and PMTiles), `export_look`, `compute_levels` (`method="tags"` and `"solve"`, with the defaults), the
+  data colours (`color_by`, `color_table`, `color_options`, the legend) and the look (`palette`, `profile`, `settings`). Its output is the
+  Python engine's output: the same style and page byte for byte, and tiles with the same features (`tests/test_engine_parity.py`, and the
+  whole test suite runs with `ROADSTYLE_ENGINE=rust`). One known difference: where the two directions of one road have the same line, a
+  name or arrow slot can go to the other direction (4 slots on Monaco, 10 on Tartu). The name and the arrow on the map are the same.
+- **What stays Python only:** `style=` (a Styler object of Python), the `compute_levels` keywords other than the defaults, the folium and
+  lonboard backends, and mapstyle's half of the look. With `engine="rust"` these give an error. With `ROADSTYLE_ENGINE=rust` the Python
+  engine makes them, with a warning.
+- **Speed** (Tartu, 64,828 roads, the whole web page): 19.1 s with Python and 6.2 s with Rust; with `tiles=True`, 147.5 s and 12.2 s.
+- **New metadata in the style:** `roadstyle:color_options` (the legend data), and on the page's style `roadstyle:contract`,
+  `roadstyle:state` and `roadstyle:controls` (the interaction contract, `docs/reference/contract.md`).
+- **For the users of the Rust engine in the browser** (duckosm-rust's page, the GeoLibre plugin): the engine now follows `labels=False` and
+  `arrows=False` in the look's `args`. Before, it always drew the names and the arrows (see "Added").
+- **Python fixes** (they change the output of the Python engine too): the title of a tiled page, the paint order of a painted road in a
+  tiled style, the width of a 3D bridge deck with another class column, the order of `export_look`'s no-casing classes, and the order of
+  the bridge shadows. See "Fixed" and "Changed (output)".
+
+### Packaging
+- **Wheels for each platform.** roadstyle was a pure-Python wheel. Now each wheel has the Rust module in it, and the release builds one
+  wheel for each platform: Linux x86_64 and aarch64 (manylinux), macOS x86_64 and arm64, and Windows x64. The wheels are abi3, so one
+  wheel serves every Python from 3.10. `pip install roadstyle` takes the wheel of the platform; nothing else changes for the user.
+- **The source distribution needs Rust.** On a platform with no wheel, pip builds the sdist with maturin. If no Rust toolchain is on the
+  `PATH`, maturin installs a temporary one for the build (the package puccinialin), and the build takes some minutes. With
+  `MATURIN_NO_INSTALL_RUST=1` it does not, and pip stops with "Cargo, the Rust package manager, is not installed or is not on PATH". Then
+  install Rust (https://rustup.rs) and run `pip install roadstyle` again.
+
 ### Added
 - **The Rust engine from Python** (`docs/design/rust_library.md`, phase P5). `export_inline(..., engine="rust")` makes the style with roadstyle's Rust
   engine, the extension `roadstyle._rust` (`rust/roadstyle-py`; a development build: `python rust/roadstyle-py/build.py`). The default stays
@@ -76,6 +109,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   number and their first point. Before, the order came from GEOS's line merge. The map does not change.
 
 ### Fixed
+- **The direction columns in the Rust engine** (`directed_col`, `driving_col`): the engine read the columns `is_directed` and `has_arrows`
+  also when the keywords did not name them. Python reads them only when they are named (their default is None). Now the Rust engine does
+  the same, so roads with these columns get the same style from the two engines.
 - **The title of a tiled page** (`tiles=True`): it was "ends" (a loop of the tiled branch used the name of the title). Now it is the map's name.
 - **The width of a 3D bridge deck with another class column** (`highway_col`): the deck read a column named `highway`, so with another class
   column every deck had the fallback width. Now it reads `highway_col`.
