@@ -1,6 +1,9 @@
 //! roadstyle's engine in Rust (docs/design/rust_engine.md): the style of a map from the roads in a GeoParquet file, its vector
 //! tiles, and the drawing levels (`levels`). The front-ends: the native program (main.rs), the browser (crate roadstyle-wasm).
 
+// Ported numeric code: index loops over parallel arrays and tuple types of the Python stages read as they are in Python.
+#![allow(clippy::needless_range_loop, clippy::type_complexity)]
+
 pub mod colors;
 pub mod features;
 pub mod geom;

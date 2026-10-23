@@ -3,7 +3,7 @@
 //! style's sources is a layer in its tiles (the layers' `source-layer`). One GeoJSON text of all the roads (Tartu: 150 MB) is then
 //! not made, parsed and cut into tiles by MapLibre again.
 //!
-//! Each feature keeps its id (`id`, or its position for a source with `generateId`, as MapLibre gives it) and its properties (a null
+//! Each feature has its index in its source as its id (tiles.py), and its properties (a null
 //! value is left out: MapLibre reads a missing one as null). Below the last zoom a line is simplified to half a tile unit, and a
 //! line shorter than that is left out. A feature is clipped to the tile and a buffer around it, except a feature of a whole layer
 //! (the name and arrow slots): it goes whole into every tile it touches, because MapLibre places a label only in the tile that has
@@ -139,9 +139,8 @@ impl Tiles {
     }
 
     /// Add a GeoJSON source of the style (`{"type": "geojson", "data": FeatureCollection, ...}`) as the layer `name`, and free its
-    /// tree. Only the properties in `keep` go into the tiles. `whole`: see the module; `min_zoom`: the layer's first zoom.
+    /// tree. The properties in `keep` and every `__rs_*` property go into the tiles, all of a whole layer's (tiles.py's tile_props). `whole`: see the module; `min_zoom`: the layer's first zoom.
     pub fn add(&mut self, name: &str, source: Value, keep: &HashSet<String>, whole: bool, min_zoom: u32) {
-        let generate = source["generateId"].as_bool() == Some(true);
         let Value::Object(mut s) = source else { return };
         let features = match s.remove("data").map(|mut d| d["features"].take()) {
             Some(Value::Array(f)) => f,
@@ -152,12 +151,13 @@ impl Tiles {
         for (i, f) in features.into_iter().enumerate() {
             let Value::Object(mut f) = f else { continue };
             let Some(g) = f.get("geometry").and_then(geom) else { continue };
-            let id = if generate { Some(i as u64) } else { f.get("id").and_then(Value::as_u64) };
+            let id = Some(i as u64); // tiles.py: a feature's id is its index in its source
             let props = match f.remove("properties") {
                 Some(Value::Object(p)) => p,
                 _ => Map::new(),
             };
-            b.push(id, g, props.into_iter().filter(|(k, _)| keep.contains(k)));
+            // tiles.py's tile_props: a whole layer (keep=None there) all its properties, else `keep` and every __rs_*
+            b.push(id, g, props.into_iter().filter(|(k, _)| whole || k.starts_with("__rs_") || keep.contains(k)));
         }
         self.layers.insert(name.to_string(), b.layer(whole, min_zoom));
     }
@@ -165,10 +165,10 @@ impl Tiles {
     /// Add a source of typed features (roads, simple), as `add` adds its JSON.
     pub fn add_typed(&mut self, name: &str, source: crate::props::Source, keep: &HashSet<String>, whole: bool, min_zoom: u32) {
         let mut b = Builder::default();
-        for f in source.feats {
+        for (i, f) in source.feats.into_iter().enumerate() {
             let Some(c) = f.coords else { continue };
             let g = Geom::Lines(vec![c.iter().filter_map(|p| merc_ll(p[0], p[1])).collect()]);
-            b.push(Some(f.id as u64), g, f.props.into_iter().filter(|(k, _)| keep.contains(*k)));
+            b.push(Some(i as u64), g, f.props.into_iter().filter(|(k, _)| whole || k.starts_with("__rs_") || keep.contains(*k)));
         }
         self.layers.insert(name.to_string(), b.layer(whole, min_zoom));
     }
@@ -208,9 +208,9 @@ impl Tiles {
     fn layer_tile(&self, name: &str, layer: &Layer, z: u32, x: u32, y: u32) -> Vec<u8> {
         let n = (1u64 << z) as f64;
         let buffer = if layer.whole { 0.0 } else { self.buffer };
-        let b = buffer / EXTENT / n;
         let (x0, y0) = (x as f64 / n, y as f64 / n);
-        let found = layer.tree.locate_in_envelope_intersecting(&AABB::from_corners([x0 - b, y0 - b], [x0 + 1.0 / n + b, y0 + 1.0 / n + b]));
+        // tiles.py: a feature is in the tiles its box touches; the buffer is for the clipping only
+        let found = layer.tree.locate_in_envelope_intersecting(&AABB::from_corners([x0, y0], [x0 + 1.0 / n, y0 + 1.0 / n]));
         let mut hits: Vec<u32> = found.map(|h| h.data).collect();
         hits.sort_unstable(); // the order of the source: the drawing order of features in one layer
         // the tile's own units: (merc * 2^z - x) * EXTENT
@@ -319,9 +319,10 @@ impl Builder {
 fn line_parts(mut ls: Vec<Vec<P>>, simplify: bool, clip: Option<(f64, f64)>) -> Vec<Vec<[i32; 2]>> {
     if simplify {
         ls = ls.iter().map(|l| douglas_peucker(l, 0.5)).collect();
-        if ls.iter().map(|l| length(l)).sum::<f64>() < 0.5 {
-            return Vec::new();
-        }
+    }
+    // tiles.py: a line shorter than half a tile unit is left out at every zoom (a whole layer's lines are not checked)
+    if clip.is_some() && ls.iter().map(|l| length(l)).sum::<f64>() < 0.5 {
+        return Vec::new();
     }
     ls.into_iter()
         .flat_map(|l| match clip {
@@ -674,8 +675,9 @@ mod tests {
         // the bytes have the layer's name, the keys and a string value, and no key for the null value
         let text = String::from_utf8_lossy(&tile);
         assert!(text.contains("roads") && text.contains("name") && text.contains("lanes") && !text.contains("gone"));
-        assert_eq!(t.props("roads", 7), r#"{"name":"A","lanes":2,"w":1.5,"bridge":true,"n":-3}"#);
-        assert_eq!(t.props("roads", 8), "null");
+        // tiles.py: a feature's id is its index in its source (not its own "id")
+        assert_eq!(t.props("roads", 0), r#"{"name":"A","lanes":2,"w":1.5,"bridge":true,"n":-3}"#);
+        assert_eq!(t.props("roads", 7), "null");
     }
 
     #[test]
@@ -701,7 +703,9 @@ mod tests {
         assert_eq!(line_parts(bend(0.6), true, None).len(), 1);
         assert_eq!(line_parts(bend(0.6), true, None)[0].len(), 3);
         assert_eq!(line_parts(bend(0.4), false, None)[0].len(), 3, "the last zoom keeps every point");
-        assert!(line_parts(vec![vec![[0.0, 0.0], [0.4, 0.0]]], true, None).is_empty());
+        let short = || vec![vec![[0.0, 0.0], [0.4, 0.0]]];
+        assert!(line_parts(short(), true, Some((-80.0, 4176.0))).is_empty());
+        assert!(line_parts(short(), false, Some((-80.0, 4176.0))).is_empty(), "also at the last zoom");
         // a whole line keeps its points out of the tile, a clipped one ends at the buffer
         let long = || vec![vec![[0.0, 10.0], [4000.0, 10.0], [9000.0, 10.0]]];
         assert_eq!(line_parts(long(), false, None), vec![vec![[0, 10], [4000, 10], [9000, 10]]]);

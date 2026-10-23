@@ -24,17 +24,18 @@ fn monaco_style() {
     assert_eq!(style_hash(&area), "abca96d8f217e49df8d6fc1aedf92413f561d70a98790c6aa843073b952db760");
 }
 
-/// Tartu's inputs (9.5 MB) are not in git: get them with `tests/get_tartu.sh`, then `cargo test --release -- --ignored`.
+/// Tartu's inputs are not in git: get them with `tests/get_goldens.sh`, then `cargo test --release -- --ignored`.
 #[test]
-#[ignore = "needs tests/get_tartu.sh"]
+#[ignore = "needs tests/get_goldens.sh"]
 fn tartu_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
-    assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_tartu.sh", area.display());
+    assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
     assert_eq!(style_hash(&area), "afb6db082d50ac2f1d5688dce29d9532abdb6c9a70c001399e6c8d9b9ae70833");
 }
 
 /// The vector tiles (make_tiled): the SHA-256 of the style and of every tile of the roads' box at zooms 12, 14 and 15 (each tile with
-/// its zoom, x and y), so a change in the memory use cannot change a tile.
+/// its zoom, x and y), so a change in the memory use cannot change a tile. The tiles follow tiles.py; tests/areas.rs compares them
+/// with Python's (P0: the tile range, the ids and the properties changed to tiles.py's rules on 2026-10-23).
 fn tiles_hash(area: &Path) -> String {
     let data = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data");
     let read = |p: PathBuf| std::fs::read(&p).unwrap_or_else(|e| panic!("{}: {e}", p.display()));
@@ -68,13 +69,13 @@ fn tiles_hash(area: &Path) -> String {
 #[test]
 fn monaco_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(tiles_hash(&area), "a2e655f4e5d97352bb5de0baae559c84883790c1d162d3a17c5f0802df01fdf7");
+    assert_eq!(tiles_hash(&area), "2c24d3b5cbb50dab3aa8e5ac9bcf10a24af8dbc1cd5280222d4aca180373917e");
 }
 
 #[test]
-#[ignore = "needs tests/get_tartu.sh"]
+#[ignore = "needs tests/get_goldens.sh"]
 fn tartu_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
-    assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_tartu.sh", area.display());
-    assert_eq!(tiles_hash(&area), "1e60a56f592823aba30a41dec5cd798278e448341d51d2c91f10f43232700e65");
+    assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
+    assert_eq!(tiles_hash(&area), "c7ec0b3714a9a8508970fe7326c029dcce58ebc632997ab0b5ce7192d1201d4e");
 }

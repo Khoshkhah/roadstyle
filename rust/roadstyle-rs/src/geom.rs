@@ -54,7 +54,7 @@ impl Reader<'_> {
             1 => Geom::Point(self.pt(le)?),
             2 => Geom::LineString(self.pts(le)?),
             3 => Geom::Polygon(self.rings(le)?),
-            4 | 5 | 6 => {
+            4..=6 => {
                 let n = self.u32(le)? as usize;
                 let parts: Vec<Geom> = (0..n).map(|_| self.geom()).collect::<Option<_>>()?;
                 match t {

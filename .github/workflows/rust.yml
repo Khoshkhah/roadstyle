@@ -1,0 +1,87 @@
+name: Rust
+
+# The Rust engine in rust/ (docs/design/rust_library.md, P0): the tests against Python's goldens, clippy, and the WebAssembly build.
+# The large goldens come from the pre-release rust-test-data (rust/roadstyle-rs/tests/get_goldens.sh).
+on:
+  push:
+    branches: [main, rust-engine]
+    paths: ["rust/**", "src/roadstyle/data/**", ".github/workflows/rust.yml"]
+  pull_request:
+    paths: ["rust/**", "src/roadstyle/data/**", ".github/workflows/rust.yml"]
+  schedule:
+    - cron: "17 3 * * *"          # each night: the Tartu goldens too
+  workflow_dispatch:
+
+env:
+  RUST: "1.99.1"                  # the version the goldens were checked with (rustc --version)
+  CARGO_BUILD_JOBS: "4"
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          rustup toolchain install "$RUST" --profile minimal --component clippy --target wasm32-unknown-unknown
+          rustup default "$RUST"
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-${{ env.RUST }}-${{ hashFiles('rust/Cargo.lock') }}
+
+      - name: Fetch the crates and the goldens
+        run: |
+          cargo fetch --locked
+          roadstyle-rs/tests/get_goldens.sh
+
+      - name: Tests
+        run: cargo test --offline --release
+
+      - name: Clippy
+        run: cargo clippy --offline --all-targets -- -D warnings
+
+      - name: WebAssembly
+        run: |
+          cargo build --offline --release --target wasm32-unknown-unknown -p roadstyle-wasm
+          ls -l target/wasm32-unknown-unknown/release/roadstyle_wasm.wasm
+
+  tartu:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          rustup toolchain install "$RUST" --profile minimal
+          rustup default "$RUST"
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-${{ env.RUST }}-${{ hashFiles('rust/Cargo.lock') }}
+
+      - name: Fetch the crates and the goldens
+        run: |
+          cargo fetch --locked
+          roadstyle-rs/tests/get_goldens.sh
+
+      - name: The ignored goldens (Tartu)
+        run: cargo test --offline --release -- --ignored --skip monaco_solve_rows --skip slot_differences

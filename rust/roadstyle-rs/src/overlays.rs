@@ -125,7 +125,7 @@ pub fn feature_overlays(fcs: Map<String, Value>, look: &Value, edge_attached: &[
         let spec = specs.iter().find(|s| s["name"] == name.as_str()).cloned().unwrap_or(Value::Null);
         let kind = spec["kind"].as_str().unwrap_or("");
         let ov_kind = match kind { "polygon" => "fill", "line" => "line", _ => "circle" };
-        let ticked = spec.get("ticked").map_or(true, |v| v != false);
+        let ticked = spec.get("ticked").is_none_or(|v| v != false);
         let mut l = json!({"label": name, "kind": ov_kind, "ticked": ticked});
         let mut ov = Overlay { name: name.clone(), kind: ov_kind, under: kind != "point", edge: edge_attached.contains(&name), color: Value::Null,
                                outline: Value::Null, opacity: Value::Null, width: Value::Null, radius: Value::Null, visible: ticked, fc: Value::Null, l: Value::Null };

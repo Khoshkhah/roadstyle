@@ -85,7 +85,7 @@ pub fn mark_roads(fs: &mut [Feature], look: &Look, args: &Value) -> Result<crate
     }
     stringify_unsafe_ints(fs);
     for (i, f) in fs.iter_mut().enumerate() {
-        f.props.insert("__rs_edge".into(), i.into());
+        f.props.insert("__rs_edge", i.into());
     }
     Ok(colors)
 }
@@ -175,9 +175,9 @@ fn mark_twoway(fs: &mut [Feature]) {
         let n = count(&r);
         let two = if k.is_some() && r == *k { n >= 2 } else { n >= 1 };
         let p = &mut fs[i].props;
-        p.insert("__rs_twoway".into(), two.into());
+        p.insert("__rs_twoway", two.into());
         let ow = if missing(p.get("oneway")) { !two } else { truthy(p.get("oneway")) };
-        p.insert("__rs_oneway".into(), ow.into());
+        p.insert("__rs_oneway", ow.into());
     }
     // directed_col: a pair is two lanes only when neither edge is undirected (null = directed)
     let und = |f: &Feature| !missing(f.props.get(DIRECTED)) && !truthy(f.props.get(DIRECTED));
@@ -186,18 +186,18 @@ fn mark_twoway(fs: &mut [Feature]) {
         if fs[i].props["__rs_twoway"] != true {
             continue;
         }
-        let others_und = by.get(&rev(k)).map_or(true, |v| v.iter().filter(|&&t| t != i).all(|&t| undirected[t]));
+        let others_und = by.get(&rev(k)).is_none_or(|v| v.iter().filter(|&&t| t != i).all(|&t| undirected[t]));
         if undirected[i] || others_und {
             let p = &mut fs[i].props;
-            p.insert("__rs_twoway".into(), false.into());
+            p.insert("__rs_twoway", false.into());
             if missing(p.get("oneway")) {
-                p.insert("__rs_oneway".into(), (!undirected[i]).into());
+                p.insert("__rs_oneway", (!undirected[i]).into());
             }
         }
     }
     for f in fs.iter_mut() {        // driving_col: no arrows where cars may not drive (null = driving)
         if !missing(f.props.get(DRIVING)) && !truthy(f.props.get(DRIVING)) {
-            f.props.insert("__rs_oneway".into(), false.into());
+            f.props.insert("__rs_oneway", false.into());
         }
     }
 }
@@ -214,12 +214,12 @@ fn mark_single_line(fs: &mut [Feature], classes: &HashSet<String>) {
                 first.entry((a, z, kind)).or_insert(i);
             }
             Some(j) => {
-                fs[i].props.insert("__rs_dup".into(), true.into());
-                fs[i].props.insert("__rs_edge2".into(), j.into());
-                fs[j].props.insert("__rs_edge2".into(), i.into());
+                fs[i].props.insert("__rs_dup", true.into());
+                fs[i].props.insert("__rs_edge2", j.into());
+                fs[j].props.insert("__rs_edge2", i.into());
                 for r in [i, j] {
-                    fs[r].props.insert("__rs_twoway".into(), false.into());
-                    fs[r].props.insert("__rs_oneway".into(), false.into());
+                    fs[r].props.insert("__rs_twoway", false.into());
+                    fs[r].props.insert("__rs_oneway", false.into());
                 }
             }
         }
@@ -233,9 +233,9 @@ fn mark_lvl(fs: &mut [Feature]) {
         let ly = p.get(LAYER).and_then(py_float).filter(|v| v.is_finite()).map_or(0, |v| v.trunc() as i64);
         let (br, tu) = (truthy(p.get(BRIDGE)), truthy(p.get(TUNNEL)));
         let lvl = if ly != 0 { ly } else if br { 1 } else if tu { -1 } else { 0 };
-        p.insert("lvl".into(), lvl.into());
-        p.insert("__rs_bridge".into(), br.into());
-        p.insert("__rs_tunnel".into(), tu.into());
+        p.insert("lvl", lvl.into());
+        p.insert("__rs_bridge", br.into());
+        p.insert("__rs_tunnel", tu.into());
     }
 }
 
@@ -259,12 +259,12 @@ fn mark_caps(fs: &mut [Feature]) {
         let (s0, s1) = (end(CAP_START), end(CAP_END));
         if s0 == s1 {
             if !s0.is_null() {
-                p.insert("__rs_cap".into(), s0);
+                p.insert("__rs_cap", s0);
             }
         } else {
-            p.insert("__rs_cap0".into(), s0);
-            p.insert("__rs_cap1".into(), s1);
-            p.insert("__rs_split".into(), true.into());
+            p.insert("__rs_cap0", s0);
+            p.insert("__rs_cap1", s1);
+            p.insert("__rs_split", true.into());
         }
     }
 }
@@ -274,7 +274,7 @@ fn mark_heads(fs: &mut [Feature]) {
     for f in fs {
         for (col, k) in [("head_start_m", "__rs_hs"), ("head_end_m", "__rs_he")] {
             if let Some(v) = f.props.get(col).and_then(py_float).filter(|v| *v > 0.0) {
-                f.props.insert(k.into(), v.into());
+                f.props.insert(k, v.into());
             }
         }
     }
@@ -290,7 +290,7 @@ fn mark_levels(fs: &mut [Feature]) {
         let cs = num(p.get("casing_start")).min(fl);
         let ce = num(p.get("casing_end")).min(fl);
         for (k, v) in [("__rs_cl", c), ("__rs_fl", fl), ("__rs_cs", cs), ("__rs_ce", ce), ("__rs_band", 0)] {
-            p.insert(k.into(), v.into());
+            p.insert(k, v.into());
         }
     }
 }
@@ -317,8 +317,8 @@ fn mark_twin_casing(fs: &mut [Feature]) -> bool {
         }
     }
     for &(j, i) in &pairs {
-        fs[i].props.insert("__rs_twin".into(), j.into());
-        fs[j].props.insert("__rs_twin".into(), i.into());
+        fs[i].props.insert("__rs_twin", j.into());
+        fs[j].props.insert("__rs_twin", i.into());
     }
     !pairs.is_empty()
 }
@@ -352,14 +352,14 @@ fn mark_twin_dead_ends(fs: &mut [Feature]) {
                 p.shift_remove(k);
             }
             if !new[0].is_null() {
-                p.insert("__rs_cap".into(), new[0].clone());
+                p.insert("__rs_cap", new[0].clone());
             }
         } else if new != [s0, s1] || split {
             p.shift_remove("__rs_cap");
             let [n0, n1] = new;
-            p.insert("__rs_cap0".into(), n0);
-            p.insert("__rs_cap1".into(), n1);
-            p.insert("__rs_split".into(), true.into());
+            p.insert("__rs_cap0", n0);
+            p.insert("__rs_cap1", n1);
+            p.insert("__rs_split", true.into());
         }
     }
 }

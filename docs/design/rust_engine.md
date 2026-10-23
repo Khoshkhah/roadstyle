@@ -47,7 +47,7 @@ cargo test --offline
 |---|---|
 | The unit tests of both ports (11) | The flow, the solver, the input geometry, the tiles |
 | `tests/style.rs`, Monaco | The SHA-256 of `make_style` against the style of `0806ac2` from the same inputs, with rule C for the building heights |
-| `tests/style.rs`, Tartu (`--ignored`) | The same for Tartu. The inputs (9.5 MB) are not in git. `tests/get_tartu.sh` gets them from the GitHub pre-release `rust-test-data` |
+| `tests/style.rs`, Tartu (`--ignored`) | The same for Tartu. The inputs are not in git. `tests/get_goldens.sh` gets them, with the large goldens, from the GitHub pre-release `rust-test-data` |
 | `tests/levels.rs` | The tags rows and the solve rows of Monaco against duckosm-rust's own `edge_levels_visualization.parquet`, the edge hash and the solve summary |
 
 The reference styles are too large for git (Monaco 26 MB, Tartu 151 MB), so the test keeps only their hashes. To see a difference, make the old style again with `rust/roadstyle-rs/tests/old_style.sh`. It builds `0806ac2` from a geolibre-roadstyle checkout. Then compare the two files.

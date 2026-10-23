@@ -149,7 +149,7 @@ impl Network {
                     let (v, res, c) = arc(r, &flow);
                     if res > 0 && c + pi[u] - pi[v] == 0 && level[u] == level[v] + 1 {
                         let amount = excess[u].min(res);
-                        if r % 2 == 0 {
+                        if r.is_multiple_of(2) {
                             flow[r / 2] += amount;
                         } else {
                             flow[r / 2] -= amount;
@@ -178,7 +178,7 @@ impl Network {
     /// A residual arc `r` (2k: arc k forward, 2k + 1: arc k backward): its head, its room and its cost.
     fn residual(&self, r: usize, flow: &[i64]) -> (usize, i64, i64) {
         let k = r / 2;
-        if r % 2 == 0 {
+        if r.is_multiple_of(2) {
             (self.to[k] as usize, self.cap[k] - flow[k], self.cost[k])
         } else {
             (self.from[k] as usize, flow[k], -self.cost[k])

@@ -4,11 +4,79 @@
 //!     (- for no features or no planner)
 //!     cargo run --release -- --layers spike/data/look.json spike/data/layers/all/roads.parquet     # the road layers alone, as {"layers": [...]}
 //!     cargo run --release -- --tiles look.json roads.parquet features.parquet     # the map with vector tiles: the times and the sizes
+//!     cargo run --release -- --bench look.json roads.parquet features.parquet     # each stage: its time, the memory in use after it, its peak
 
 use roadstyle_rs::{layers, read, roads, simple, slots};
 use serde_json::{json, Value};
 use std::time::Instant;
 use std::{env, fs, process};
+
+/// The native program counts its memory (--bench): the bytes in use, and the peak since the last stage.
+struct Count;
+static NOW: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+static PEAK: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+unsafe impl std::alloc::GlobalAlloc for Count {
+    unsafe fn alloc(&self, l: std::alloc::Layout) -> *mut u8 {
+        let n = NOW.fetch_add(l.size(), std::sync::atomic::Ordering::Relaxed) + l.size();
+        PEAK.fetch_max(n, std::sync::atomic::Ordering::Relaxed);
+        std::alloc::System.alloc(l)
+    }
+    unsafe fn dealloc(&self, p: *mut u8, l: std::alloc::Layout) {
+        NOW.fetch_sub(l.size(), std::sync::atomic::Ordering::Relaxed);
+        std::alloc::System.dealloc(p, l)
+    }
+    unsafe fn realloc(&self, p: *mut u8, l: std::alloc::Layout, size: usize) -> *mut u8 {
+        if size > l.size() {
+            let n = NOW.fetch_add(size - l.size(), std::sync::atomic::Ordering::Relaxed) + size - l.size();
+            PEAK.fetch_max(n, std::sync::atomic::Ordering::Relaxed);
+        } else {
+            NOW.fetch_sub(l.size() - size, std::sync::atomic::Ordering::Relaxed);
+        }
+        std::alloc::System.realloc(p, l, size)
+    }
+}
+
+#[global_allocator]
+static ALLOC: Count = Count;
+
+/// --bench: the stages of make_parts one by one (as make_parts runs them), and the text, with the time and the memory of each.
+fn bench(look_path: &str, roads_path: &str, features_path: &str) {
+    use std::sync::atomic::Ordering::Relaxed;
+    let mut t = Instant::now();
+    println!("| Stage | Time (ms) | In use after (MB) | Peak in it (MB) |\n|---|---|---|---|");
+    let mut mark = |stage: &str| {
+        println!("| {stage} | {:.0} | {} | {} |", t.elapsed().as_secs_f64() * 1e3, NOW.load(Relaxed) >> 20, PEAK.load(Relaxed) >> 20);
+        PEAK.store(NOW.load(Relaxed), Relaxed);
+        t = Instant::now();
+    };
+    let look_json = json_file(look_path);
+    let look = roads::Look::from_json(&look_json).unwrap_or_else(|e| fail(e));
+    let mut feats = read::read_roads(fs::read(roads_path).unwrap(), "geometry").unwrap_or_else(|e| fail(e));
+    mark("read the roads");
+    let colors = roads::mark_roads(&mut feats, &look, &look_json["args"]).unwrap_or_else(|e| fail(e));
+    mark("mark the roads (colours, pairs, levels)");
+    let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow).unwrap_or_else(|e| fail(e));
+    mark("pieces (simple)");
+    let slots = slots::slots_source(&feats, &slots::SlotLook::from_json(&look_json).unwrap_or_else(|e| fail(e)));
+    mark("names and arrows (slots)");
+    let mut ovs = Vec::new();
+    if features_path != "-" {
+        let mut fcs = roadstyle_rs::features::feature_collections(fs::read(features_path).unwrap(), &look_json).unwrap_or_else(|e| fail(e));
+        let attached = roadstyle_rs::overlays::edge_attach(&mut fcs, &feats);
+        ovs = roadstyle_rs::overlays::feature_overlays(fcs, &look_json, &attached).0;
+    }
+    mark("base map");
+    let roads = roads::roads_source(feats);
+    mark("roads source");
+    let layers = layers::road_layers(&look_json, &roads.feats, &simple.feats, features(&slots), &mut ovs, &colors.props, colors.active).unwrap_or_else(|e| fail(e));
+    mark("layers");
+    let mut text = Vec::new();
+    roads.write_json(&mut text);
+    simple.write_json(&mut text);
+    serde_json::to_writer(&mut text, &slots).unwrap();
+    mark(&format!("the text of the sources ({} MB, {} layers)", text.len() >> 20, layers.len()));
+}
 
 fn fail(msg: String) -> ! {
     eprintln!("{msg}");
@@ -26,6 +94,10 @@ fn features(source: &Value) -> &[Value] {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+    if args.len() == 5 && args[1] == "--bench" {
+        bench(&args[2], &args[3], &args[4]);
+        return;
+    }
     if args.len() == 4 && args[1] == "--features" {
         // step 3 check: the base-map feature collections from the worker's features.parquet, as {name: FeatureCollection}
         let data = fs::read(&args[3]).unwrap_or_else(|e| fail(format!("{}: {e}", args[3])));

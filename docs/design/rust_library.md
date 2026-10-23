@@ -1244,6 +1244,57 @@ flowchart TB
 - **Risk.** glibc's `cos` and `hypot` differ between machines (see `tests/test_render_web.py:1898`). Mitigation: the goldens come from
   one machine type (Linux x86_64), and the Rust code rounds where Python rounds (`py_round`).
 
+#### P0: result (2026-10-23)
+
+**The goldens.** `rust/roadstyle-rs/tests/make_goldens.py` is the one generator (Python roadstyle 0.24.3 from `src/`). For Monaco
+(13,298 roads), the Södermalm sample (4,563 driving edges, with duckOSM's solved levels) and Tartu (64,828 roads) it writes the roads-only
+style of `export_inline`, the tiles of `export_style` (the 3 x 3 tiles around the centre at zooms 12, 14 and 15) and the levels (the tags
+rule; the solve with duckOSM's level-area defaults, not for Tartu: Python's solve needs too much memory there). The files over 1 MB and
+Tartu's inputs are on the pre-release `rust-test-data` (`goldens-1.tar`, 42.5 MB); `tests/get_goldens.sh` gets them and checks their
+SHA-256. The colour cases and the looks of tasks 1 and 3 come from the same script. `tests/areas.rs` compares the engine with them.
+
+**Differences found and fixed** (the engine now does what Python does):
+
+| Difference | Fix |
+|---|---|
+| The slots wrote `__rs_arw` before `__rs_cls` | Python's order (task 1) |
+| A tile had the features within its buffer | `tiles.py`: a feature is in the tiles its box touches; the buffer is for the clipping only |
+| The ids of `simple` were `16 x edge + piece`, the slots had none | `tiles.py`: a feature's id is its index in its source |
+| A tile kept only the properties the layers read | `tiles.py`'s `tile_props`: every `__rs_*` property and `keep`; all the properties of a whole layer (the slots) |
+| A line shorter than half a tile unit stayed at the last zoom | `tiles.py`: it is left out at every zoom |
+
+After these fixes, every golden tile of the three areas has the same features, ids, properties and geometry as Python's (decoded), and
+the styles are the same below the top level, key order included, except the items below.
+
+**Differences that stay, each with its cause and a decision:**
+
+| Difference | Cause | Decision |
+|---|---|---|
+| The nearest road of a slot: 4 slots of Monaco, 10 of Tartu, none of Södermalm (and 2 or 3 of them get a twin `__rs_edge2` as a result) | Each is the two directions of one way, with the same line: the slot's middle is at distance 0 from both. GEOS's `STRtree.nearest` takes the one its tree reaches first; the engine the lower index. "The higher index" does not match either (8 differ on Monaco then) | Keep. The two edges are one way; the name and the arrow are the same. An exact copy needs GEOS's tree (its build and its search) |
+| The solve of Monaco: 8 of 13,298 rows | Python's LP (OR-tools) and the engine's min-cost flow take different answers among equal best ones: both have 0 hard rules broken, 0 stack parts not lifted, 16 order wishes not kept, 9 numbers. Södermalm is equal in all rows | Keep: equal quality by roadstyle's own rules |
+| The bytes of a tile | Python's encoder (mapbox_vector_tile) writes a negative integer as `int_value` and a float with no fraction as an integer; the engine writes `sint_value` and a double. MapLibre reads the same numbers | Keep: the tests compare decoded tiles, not bytes |
+| No Python solve golden for Tartu | Python's solve needs more memory than the machine can give | Keep: Monaco and Södermalm cover the solve; Tartu has the tags rule |
+| The base map in tiles (`export_style`): Python writes the points and polygons whole, the engine clips the polygons | Not in the goldens (the export goldens have no base map) | Open: P4, with the base map in the export goldens |
+
+**The benchmark** (`main.rs --bench`, native release build, 2026-10-23):
+
+| Stage | Monaco: ms | in use after, MB | peak in it, MB | Tartu: ms | in use after, MB | peak in it, MB |
+|---|---|---|---|---|---|---|
+| Read the roads | 43 | 38 | 41 | 210 | 185 | 198 |
+| Mark the roads (colours, pairs, levels) | 152 | 74 | 82 | 825 | 361 | 404 |
+| Pieces (`simple`) | 85 | 126 | 128 | 508 | 711 | 719 |
+| Names and arrows (`slots`) | 111 | 134 | 138 | 658 | 764 | 788 |
+| Base map | 24 | 143 | 145 | 196 | 871 | 881 |
+| Roads source | 8 | 143 | 144 | 25 | 871 | 874 |
+| Layers | 58 | 145 | 149 | 83 | 874 | 887 |
+| The text of the sources | 39 | 177 | 177 | 225 | 1,134 | 1,134 |
+| Whole process (`/usr/bin/time`) | 550 | | 194 (resident) | 2,890 | | 1,128 (resident) |
+
+**CI.** `.github/workflows/rust.yml`: on each push to `main` or `rust-engine` that changes `rust/` or roadstyle's data, and on pull
+requests: the goldens from the pre-release, `cargo test --offline --release`, `cargo clippy -D warnings`, the wasm32 build. Each night
+and by hand: the ignored Tartu goldens. Clippy: the `.into()` calls of `&str` are gone; `needless_range_loop` and `type_complexity` are
+allowed in the crate (ported numeric code).
+
 #### P1: merge the work in progress
 
 - **Content.** `rust-tile-speed`, then `rust-tiles` (they conflict in `tiles.rs`), task 1 (`rust-colors`), task 2 (the dashboard

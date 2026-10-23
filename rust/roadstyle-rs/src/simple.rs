@@ -112,13 +112,13 @@ fn casing_parts(roads: &[Feature], head_m: f64) -> Vec<Piece> {
             .filter(|(k, _)| *k == "highway" || *k == "lvl" || (k.starts_with("__rs_") && !k.starts_with("__rs_fill")))
             .map(|(k, v)| (k, v.clone())).collect();
         let edge = p.get("__rs_edge").and_then(Value::as_i64).unwrap_or(i as i64);
-        base.insert("__rs_edge".into(), edge.into());
+        base.insert("__rs_edge", edge.into());
         if let Some(tw) = p.get("__rs_twin").and_then(Value::as_i64) {
             if tw < edge {
                 continue; // a two-way pair's one casing: the first edge's pieces
             }
-            base.insert("__rs_pair".into(), true.into());
-            base.insert("__rs_edge2".into(), tw.into());
+            base.insert("__rs_pair", true.into());
+            base.insert("__rs_edge2", tw.into());
         }
         let (cs, cm, ce) = (int(p, "__rs_cs"), int(p, "__rs_cl"), int(p, "__rs_ce"));
         let split = truthy(p.get("__rs_split"));
@@ -146,16 +146,16 @@ fn casing_parts(roads: &[Feature], head_m: f64) -> Vec<Piece> {
                 continue;
             }
             let mut q = base.clone();
-            q.insert("__rs_cl".into(), num.into());
+            q.insert("__rs_cl", num.into());
             if k == 1 {
                 // the main piece ends at two cuts: flat ends
-                q.insert("__rs_cap".into(), true.into());
-                q.insert("__rs_main".into(), true.into());
+                q.insert("__rs_cap", true.into());
+                q.insert("__rs_main", true.into());
             } else if split {
                 // a head of an edge with two different ends: that end's cap
-                q.insert("__rs_cap".into(), p.get(if k == 0 { "__rs_cap0" } else { "__rs_cap1" }).cloned().unwrap_or(Value::Null));
+                q.insert("__rs_cap", p.get(if k == 0 { "__rs_cap0" } else { "__rs_cap1" }).cloned().unwrap_or(Value::Null));
             }
-            if q.get("__rs_cap").map_or(true, Value::is_null) {
+            if q.get("__rs_cap").is_none_or(Value::is_null) {
                 q.shift_remove("__rs_cap");
             }
             out.push(Piece { props: q, coords: Some(line.lonlat(&pts, 1e7)) });
@@ -173,8 +173,8 @@ fn casing_parts(roads: &[Feature], head_m: f64) -> Vec<Piece> {
                 continue;
             }
             let mut q = base.clone();
-            q.insert("__rs_cl".into(), near.iter().map(|x| x.2).min().unwrap().into());
-            q.insert("__rs_seam".into(), true.into());
+            q.insert("__rs_cl", near.iter().map(|x| x.2).min().unwrap().into());
+            q.insert("__rs_seam", true.into());
             q.shift_remove("__rs_cap");
             out.push(Piece { props: q.clone(), coords: Some(line.lonlat(&pts, 1e8)) });
             if truthy(base.get("__rs_dash")) || truthy(base.get("__rs_tunnel")) {
@@ -182,8 +182,8 @@ fn casing_parts(roads: &[Feature], head_m: f64) -> Vec<Piece> {
             }
             let half = near.iter().map(|(a, b, _, _)| (b - a) / 2.0).fold(LAP_M, f64::min);
             let pts = line.part((cut - half).max(0.0), (cut + half).min(n));
-            q.insert("__rs_cap".into(), true.into());
-            q.insert("__rs_lap".into(), true.into());
+            q.insert("__rs_cap", true.into());
+            q.insert("__rs_lap", true.into());
             out.push(Piece { props: q, coords: Some(line.lonlat(&pts, 1e7)) });
         }
     }
@@ -205,10 +205,10 @@ fn halves(roads: &[Feature]) -> HashMap<i64, Vec<Piece>> {
         for (k, (a, b)) in [(0.0, n / 2.0), (n / 2.0, n)].into_iter().enumerate() {
             let mut q: Props = p.iter().filter(|(kk, _)| !matches!(*kk, "__rs_cap0" | "__rs_cap1" | "__rs_split"))
                 .map(|(kk, v)| (kk, v.clone())).collect();
-            q.insert("__rs_edge".into(), edge.into());
+            q.insert("__rs_edge", edge.into());
             let cap = p.get(if k == 0 { "__rs_cap0" } else { "__rs_cap1" }).cloned().unwrap_or(Value::Null);
             if !cap.is_null() {
-                q.insert("__rs_cap".into(), cap);
+                q.insert("__rs_cap", cap);
             }
             out.entry(edge).or_default().push(Piece { props: q, coords: Some(line.lonlat(&line.part(a, b), 1e7)) });
         }
@@ -234,15 +234,15 @@ fn end_stub(q: Piece, line_of: &[Option<&Vec<Pt>>]) -> Vec<Piece> {
     let inner = [end[0] + (prev[0] - end[0]) * k, end[1] + (prev[1] - end[1]) * k];
     let stub = if first { vec![end, inner] } else { vec![inner, end] };
     let mut flat = q.props.clone();
-    flat.insert("__rs_cap".into(), true.into());
+    flat.insert("__rs_cap", true.into());
     let mut sp = q.props;
-    sp.insert("__rs_stub".into(), true.into());
+    sp.insert("__rs_stub", true.into());
     vec![Piece { props: flat, coords: q.coords }, Piece { props: sp, coords: Some(stub) }]
 }
 
 fn with(mut p: Props, k: i64, s: f64) -> Props {
-    p.insert("__rs_k".into(), k.into());
-    p.insert("__rs_s".into(), s.into());
+    p.insert("__rs_k", k.into());
+    p.insert("__rs_s", s.into());
     p
 }
 
@@ -308,9 +308,9 @@ pub fn simple_source(roads: &[Feature], head_m: f64, shadows: bool) -> Result<So
         let id = e as usize * PIECES + *c;
         *c += 1;
         let s = f.props["__rs_s"].as_f64().unwrap_or(0.0) + e as f64 * TIE;
-        f.props.insert("__rs_s".into(), s.into());
+        f.props.insert("__rs_s", s.into());
         let cls = roads.get(e as usize).and_then(|r| r.props.get("highway")).cloned().unwrap_or(Value::Null);
-        f.props.insert("__rs_cls".into(), cls);
+        f.props.insert("__rs_cls", cls);
         features.push(Feat { id, props: f.props, coords: f.coords });
     }
     Ok(Source { feats: features, id_first: false, tolerance: 0.05 })
