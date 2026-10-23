@@ -79,6 +79,7 @@ nav:
           - Keywords by engine: rust/keywords.md
       - Explanation:
           - Architecture of the Rust version: rust/architecture.md
+          - How a map is drawn: rust/drawing.md
           - Parity and speed: rust/parity.md
   - Studio: studio.md
 

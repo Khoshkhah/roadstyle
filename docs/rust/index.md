@@ -48,6 +48,7 @@ The same engine is also a WebAssembly package for the browser, and a set of Rust
     ---
 
     [Architecture of the Rust version](architecture.md) ·
+    [How a map is drawn](drawing.md) ·
     [Parity and speed](parity.md)
 
 </div>
