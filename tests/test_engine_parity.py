@@ -131,6 +131,21 @@ def test_export_inline_other_highway_column(part, keywords):
     assert diff(ru, py) == []
 
 
+@pytest.mark.parametrize("ends", ["cap_col only", "cap_col and the end columns"])
+def test_export_inline_cap_col(part, keywords, ends):
+    """cap_col: a cap for both ends ("square", another true value, "round"); with the end columns too, an end's own cap wins."""
+    from compare_engines import diff
+
+    roads = part.copy()
+    roads["cap"] = [("square", "flat", "round", None)[i % 4] for i in range(len(roads))]
+    kw = {**keywords, "cap_col": "cap"}
+    if ends == "cap_col only":
+        kw = {k: v for k, v in kw.items() if k not in ("cap_start_col", "cap_end_col")}
+    py = rs.export_inline(roads, engine="python", **kw)
+    ru = rs.export_inline(roads, engine="rust", **kw)
+    assert diff(ru, py) == []
+
+
 def test_engine_names(monkeypatch):
     assert _engine.engine(None) == "python"
     monkeypatch.setenv("ROADSTYLE_ENGINE", "rust")

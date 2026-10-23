@@ -1409,8 +1409,8 @@ the P0 golden run decides), **Python** (stays in Python), **internal** (not port
 | 3 | `highway_col` | done | the engine's column map (`ColumnMap`): the user's names in the data and the road layers |
 | 4 | `filter_col` | done | |
 | 5 | `styler` | P5 | a Python object; the binding converts it |
-| 6 | `basemap` | task 2 | the page |
-| 7 | `basemaps` | task 2 | |
+| 6 | `basemap` | done | the dashboard module (task 2, `src/roadstyle/static/dashboard/`) |
+| 7 | `basemaps` | done | the dashboard module (task 2, `src/roadstyle/static/dashboard/`) |
 | 8 | `name` | done | |
 | 9 | `offset_frac` | look | |
 | 10 | `width_frac` | look | |
@@ -1420,7 +1420,7 @@ the P0 golden run decides), **Python** (stays in Python), **internal** (not port
 | 14 | `layer_col` | done | the engine's column map (`ColumnMap`): the user's names in the data and the road layers |
 | 15 | `edge_id_col` | done | the engine's column map (`ColumnMap`): the user's names in the data and the road layers |
 | 16 | `road_fill` | done | the same style as Python (`tests/test_engine_parity.py`) |
-| 17 | `cap_col` | P4 | |
+| 17 | `cap_col` | done | the same style as Python (`tests/test_engine_parity.py`) |
 | 18 | `cap_start_col` | done | |
 | 19 | `cap_end_col` | done | |
 | 20 | `casing_level_col` | done | with stored levels; without them the engine computes them, as `render` (`compute_levels`, solve) |
@@ -1436,46 +1436,46 @@ the P0 golden run decides), **Python** (stays in Python), **internal** (not port
 | 30 | `width_m_zoom` | P4 | |
 | 31 | `casing_m` | P4 | |
 | 32 | `casing_min_px` | P4 | |
-| 33 | `pitch` | task 2; P6 | |
-| 34 | `bearing` | task 2; P6 | |
-| 35 | `max_pitch` | task 2; P6 | |
+| 33 | `pitch` | done | the export gives the same style as Python; the page: the dashboard module |
+| 34 | `bearing` | done | the export gives the same style as Python; the page: the dashboard module |
+| 35 | `max_pitch` | done | the export gives the same style as Python; the page: the dashboard module |
 | 36 | `view_3d` | P4 | no bridge decks in Rust (building extrusion is done) |
 | 37 | `arrows` | done | the same style as Python (`tests/test_engine_parity.py`) |
 | 38 | `labels` | done | the same style as Python (`tests/test_engine_parity.py`) |
-| 39 | `filter_control` | task 2 | |
-| 40 | `find_control` | task 2 | |
-| 41 | `overlay_control` | task 2 | |
-| 42 | `overlay_popup` | task 2 | |
+| 39 | `filter_control` | done | the dashboard module (task 2, `src/roadstyle/static/dashboard/`) |
+| 40 | `find_control` | done | the dashboard module (task 2, `src/roadstyle/static/dashboard/`) |
+| 41 | `overlay_control` | done | the dashboard module (task 2, `src/roadstyle/static/dashboard/`) |
+| 42 | `overlay_popup` | done | the dashboard module (task 2, `src/roadstyle/static/dashboard/`) |
 | 43 | `access_col` | done | the same style as Python (`tests/test_engine_parity.py`) |
 | 44 | `side_panel_html` | P6 | the page writer |
 | 45 | `host_panel_width` | P6 | |
-| 46 | `basemap_switcher` | task 2 | |
-| 47 | `zoom_readout` | task 2 | |
+| 46 | `basemap_switcher` | done | the dashboard module (task 2, `src/roadstyle/static/dashboard/`) |
+| 47 | `zoom_readout` | done | the dashboard module (task 2, `src/roadstyle/static/dashboard/`) |
 | 48 | `road_popup` | done | the same style as Python (`tests/test_engine_parity.py`) |
 | 49 | `road_tooltip` | done | the same style as Python (`tests/test_engine_parity.py`) |
 | 50 | `hover_delay_ms` | done | the same style as Python (`tests/test_engine_parity.py`) |
 | 51 | `data_maxzoom` | done | the same style as Python (`tests/test_engine_parity.py`) |
 | 52 | `data_tolerance` | done | the same style as Python (`tests/test_engine_parity.py`) |
-| 53 | `popup_mode` | task 2 | |
-| 54 | `street_view` | task 2 | |
-| 55 | `street_view_key` | task 2 | |
-| 56 | `google_3d` | task 2 | |
+| 53 | `popup_mode` | done | the export gives the same style as Python; the page: the dashboard module |
+| 54 | `street_view` | done | the dashboard module (task 2, `src/roadstyle/static/dashboard/`) |
+| 55 | `street_view_key` | done | the dashboard module (task 2, `src/roadstyle/static/dashboard/`) |
+| 56 | `google_3d` | done | the dashboard module (task 2, `src/roadstyle/static/dashboard/`) |
 | 57 | `tooltip` | done | the alias of `road_tooltip` |
 | 58 | `hover_color` | done | the overlays too |
 | 59 | `select_color` | done | the overlays too |
 | 60 | `boundary` | P4 | |
-| 61 | `color_options` | task 1 | |
-| 62 | `color_active` | task 1 | |
+| 61 | `color_options` | done | task 1 (`colors.rs`); the same style as Python |
+| 62 | `color_active` | done | task 1 (`colors.rs`); the same style as Python |
 | 63 | `views` | P3 (palette rows); task 2 (menu) | |
 | 64 | `overlays` | done for base-map overlays and `edge_attach`; P4 for `Overlay` from user data | |
 | 65 | `items` | P4 | |
 | 66 | `items_popup` | P4; task 2 | |
 | 67 | `compress` | P6 | |
-| 68 | `tunnel_control` | task 2 | |
+| 68 | `tunnel_control` | done | the dashboard module (task 2, `src/roadstyle/static/dashboard/`) |
 | 69 | `tiles` | done (tiles on request); P6 (PMTiles in the page) | |
 | 70 | `simple` | done for `True`; `False` is not ported (decision 2) | |
 | 71 | `minzoom` | done | the same style as Python (`tests/test_engine_parity.py`) |
-| 72 | `legend` | task 1 | |
+| 72 | `legend` | done | task 1 (`colors.rs`); the same style as Python |
 | 73 | `api_key` | P6 | the base-map URL |
 | 74 | `_edges` | Python | the level editor's update in place |
 | 75 | `_palette_copy` | internal | replaced by the Rust palette merge (P3) |

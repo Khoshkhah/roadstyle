@@ -102,11 +102,12 @@ pub fn mark_roads(fs: &mut [Feature], look: &Look, args: &Value) -> Result<crate
         mark_single_line(fs, &look.single_line);
     }
     mark_lvl(fs);
-    mark_caps(fs);
+    let caps = CapCols::from_args(args);
+    mark_caps(fs, &caps);
     mark_heads(fs);
     mark_levels(fs);
     if look.twin_one && mark_twin_casing(fs) {
-        mark_twin_dead_ends(fs);
+        mark_twin_dead_ends(fs, &caps);
     }
     stringify_unsafe_ints(fs);
     for (i, f) in fs.iter_mut().enumerate() {
@@ -277,11 +278,32 @@ fn cap_value(v: &Value) -> Value {
 }
 
 /// _mark_caps (no cap_col; cap_start_col / cap_end_col): __rs_cap when the two ends agree, else __rs_cap0 / __rs_cap1 / __rs_split.
-fn mark_caps(fs: &mut [Feature]) {
+/// render's cap columns: `cap_col` (both ends; the user's name) and `cap_start_col` / `cap_end_col` (one end each; the engine's names
+/// cap_start / cap_end after ColumnMap). Only the named ones are read.
+pub(crate) struct CapCols {
+    whole: Option<String>,
+    start: bool,
+    end: bool,
+}
+
+impl CapCols {
+    fn from_args(args: &Value) -> CapCols {
+        let named = |k: &str| args[k].as_str().is_some_and(|c| !c.is_empty());
+        CapCols { whole: args["cap_col"].as_str().filter(|c| !c.is_empty()).map(String::from), start: named("cap_start_col"), end: named("cap_end_col") }
+    }
+}
+
+/// A value is given: set, and not NaN (Python: not None and equal to itself).
+fn given(v: Option<&Value>) -> bool {
+    !missing(v) && v.and_then(Value::as_f64).is_none_or(|x| !x.is_nan())
+}
+
+fn mark_caps(fs: &mut [Feature], caps: &CapCols) {
     for f in fs {
         let p = &mut f.props;
-        let end = |col: &str| p.get(col).filter(|v| !v.is_null()).map_or(Value::Null, cap_value);
-        let (s0, s1) = (end(CAP_START), end(CAP_END));
+        let whole = caps.whole.as_deref().and_then(|c| p.get(c)).filter(|v| given(Some(v))).map_or(Value::Null, cap_value);
+        let end = |on: bool, col: &str| if on && given(p.get(col)) { cap_value(p.get(col).unwrap()) } else { whole.clone() };
+        let (s0, s1) = (end(caps.start, CAP_START), end(caps.end, CAP_END));
         if s0 == s1 {
             if !s0.is_null() {
                 p.insert("__rs_cap", s0);
@@ -349,7 +371,7 @@ fn mark_twin_casing(fs: &mut [Feature]) -> bool {
 }
 
 /// _mark_twin_dead_ends: a twin pair's dead end (no other edge ends there) without a given cap is square.
-fn mark_twin_dead_ends(fs: &mut [Feature]) {
+fn mark_twin_dead_ends(fs: &mut [Feature], caps: &CapCols) {
     let mut count: HashMap<(String, String), usize> = HashMap::new();
     let cs: Vec<Option<((String, String), (String, String))>> = fs.iter().map(|f| ends(f).map(|(a, z)| (point_key(&a), point_key(&z)))).collect();
     for (a, z) in cs.iter().flatten() {
@@ -367,8 +389,9 @@ fn mark_twin_dead_ends(fs: &mut [Feature]) {
         let split = truthy(p.get("__rs_split"));
         let (s0, s1) = if split { (get("__rs_cap0", &whole), get("__rs_cap1", &whole)) } else { (whole.clone(), whole.clone()) };
         let mut new = [s0.clone(), s1.clone()];
-        for (k, (col, pnt)) in [(CAP_START, a), (CAP_END, z)].into_iter().enumerate() {
-            if a != z && count.get(pnt) == Some(&2) && missing(p.get(col)) {
+        let whole_given = caps.whole.as_deref().is_some_and(|c| given(p.get(c)));
+        for (k, (on, col, pnt)) in [(caps.start, CAP_START, a), (caps.end, CAP_END, z)].into_iter().enumerate() {
+            if a != z && count.get(pnt) == Some(&2) && !(on && given(p.get(col))) && !whole_given {
                 new[k] = "square".into();
             }
         }
