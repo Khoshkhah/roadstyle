@@ -62,7 +62,7 @@ values that the page reads, which `render` makes from its keywords. The template
 | `google_3d` | `google_3d` | `false` | `google3d.js` |
 | `select_color` | `select_color` (the theme's `selection.select`) | (none) | `google3d.js` (the clicked road's line) |
 | `filter` | `filter_control`, `access_col`: `{on, col, classes, swatches, palettes, bridges, tunnels, access}` | `{on: false, classes: []}` | `filter.js`, `views.js` |
-| `color_options` | `color_options` or a data styler's legend: `[{name, prop, legend}]` | `[]` | `color.js`, `legend.js`, `views.js` |
+| `color_options` | `color_options` or a data styler's legend: `[{name, prop, legend}]` | the style's metadata, else `[]` | `color.js`, `legend.js`, `views.js` |
 | `color_active` | `color_active`, as an index | `0` | `color.js` |
 | `overlays` | `overlays`: `[{label, source, layers, popup, tooltip, interactive, under, base, select, color, visible, popup_window}]` | `[]` | `core.js`, `overlays.js`, `filter.js`, `select.js` |
 | `overlay_control` | `overlay_control` | `true` | `overlays.js` |
@@ -79,7 +79,8 @@ values that the page reads, which `render` makes from its keywords. The template
 | `arrow_icon`, `arrow_color`, `arrow_rules` | the theme's `arrows` and `labels.base_size` | `null`: no arrow image, no arrow placement | `arrows.js` |
 
 When a page does not give `road_popup`, `road_tooltip` or `hover_delay_ms`, `index.js` reads them from the style's metadata
-`roadstyle:interaction`. `export_style` and the Rust engine write this metadata.
+`roadstyle:interaction`. `export_style` and the Rust engine write this metadata. When a page does not give `color_options`,
+`index.js` reads them from the style's metadata `roadstyle:color_options`. The Rust engine writes it when the map has data colours.
 
 ## The files and the controls
 
@@ -118,8 +119,14 @@ The legend form is the form that `stylers.bake_color_options` makes and that the
   `{title, kind: "continuous", ramp: [colour, ...], vmin, vmax}`.
 - The road layers pick the active option from the global state `rs_co` (the option's index). `rsSetColorField` sets it.
 
-When the Rust engine makes `color_by` and the legend, a page gives its list as `color_options`. The dashboard does not read
-it from the style's metadata yet, because the Rust engine has no key for it yet.
+The Rust engine (`rust-engine` from `b3222cd`) writes the same list as the style's metadata `roadstyle:color_options`, and
+`rsDashboard` reads it from there.
+
+A limit of the Rust engine's style: the engine bakes each global state (`rs_co`, `rs_colors`, `rs_base`, `rs_fill_on`, `rs_tun_*`)
+into the expressions, as `export_style` does. Thus on that style the legend shows the active option, but the Colour by menu,
+`rsSetColorField`, `rsColor`, `rsColorBase`, `rsSetRoadFill` and the Tunnels box do not change the map. The hover and select glow
+work, because they use feature-state. For a page that switches colours, the engine must keep these states as `global-state`.
+The legend is correct only for option 0, because the metadata does not give the active option.
 
 ## Checks
 

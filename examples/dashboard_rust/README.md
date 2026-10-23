@@ -30,3 +30,5 @@ Then open `http://localhost:8000/examples/dashboard_rust/`.
 The page gives `rsDashboard` only the options that the Rust style does not have: `simple` (the one road layer), the selection colour and the
 controls.
 The road popup fields, the hover tooltip and the hover delay come from the style's metadata `roadstyle:interaction`.
+The page colours the roads by their lane count (`color_by="lanes"` in the look's `args`). The legend comes from the style's metadata
+`roadstyle:color_options`.

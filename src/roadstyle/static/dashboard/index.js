@@ -25,7 +25,7 @@ const RS_DEFAULTS = {
   tiles: false, simple: false, // simple: the id of the one road layer of simple mode with inline data, else false
   popup_mode: "popup", find_control: false, zoom_readout: true, pitch_3d: 55,
   street_view: "window", street_view_key: "", google_3d: false,
-  filter: {on: false, classes: []}, color_options: [], color_active: 0,
+  filter: {on: false, classes: []}, color_active: 0,
   overlays: [], overlay_control: true, overlay_popup: true,
   tunnel: {layers: {}, steps: [], control: false}, fill_layers: [], road_fill: {on: true, paint: {}},
   views: [], items: null, edge_id_col: "edge_id", arrow_icon: null,
@@ -33,10 +33,12 @@ const RS_DEFAULTS = {
 export function rsDashboard(map, options){
   const o = {...RS_DEFAULTS, ...options};
   // the road popup, the hover tooltip and the hover delay: else the style's metadata roadstyle:interaction (export_style, the Rust engine)
-  const it = ((o.style && o.style.metadata) || {})["roadstyle:interaction"] || {};
+  const meta = (o.style && o.style.metadata) || {}, it = meta["roadstyle:interaction"] || {};
   if(!("road_popup" in o)) o.road_popup = "popup" in it ? it.popup : null;           // false: none; null: every field; [fields]
   if(!("road_tooltip" in o)) o.road_tooltip = it.tooltip || false;                   // false | true | [fields]
   if(!("hover_delay_ms" in o)) o.hover_delay_ms = it.hover_delay_ms != null ? it.hover_delay_ms : 300;
+  // the colour options and their legends: else the style's metadata roadstyle:color_options (the Rust engine, when the map has data colours)
+  if(!("color_options" in o)) o.color_options = meta["roadstyle:color_options"] || [];
   initCore(map, o);
   initPanel();
   initZoom();

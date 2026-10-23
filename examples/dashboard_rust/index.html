@@ -17,9 +17,13 @@ import {rsDashboard} from "../../src/roadstyle/static/dashboard/index.js";
 
 const DATA = "../../rust/roadstyle-rs/tests/data/";
 const bytes = (u) => fetch(u).then((r) => r.arrayBuffer()).then((b) => new Uint8Array(b));
-const [, roads, look] = await Promise.all([init(), bytes(DATA + "monaco/roads.parquet"), fetch(DATA + "look.json").then((r) => r.text())]);
-const style = JSON.parse(makeStyle(roads, look, undefined, undefined, "Monaco"));
-const theme = JSON.parse(look).theme;
+const [, roads, lookText] = await Promise.all([init(), bytes(DATA + "monaco/roads.parquet"), fetch(DATA + "look.json").then((r) => r.text())]);
+// the roads coloured by their lane count, as render_edges(color_by="lanes", cmap="YlOrRd", vmin=1, vmax=4): the engine reads render's
+// keywords from the look's args, and writes the legend data into the style's metadata roadstyle:color_options
+const look = JSON.parse(lookText);
+Object.assign(look.args, {color_by: "lanes", cmap: "YlOrRd", vmin: 1, vmax: 4});
+const style = JSON.parse(makeStyle(roads, JSON.stringify(look), undefined, undefined, "Monaco"));
+const theme = look.theme;
 
 const map = new maplibregl.Map({container: "map", style, attributionControl: {compact: true}});
 map.addControl(new maplibregl.NavigationControl({visualizePitch: true}));
@@ -28,7 +32,8 @@ map.addControl(new maplibregl.ScaleControl({maxWidth: 120, unit: "metric"}), "bo
 for (const [id, im] of Object.entries(style.metadata["roadstyle:images"] || {})) {
   map.loadImage(im.url).then((r) => map.addImage(id, r.data, {sdf: im.sdf, pixelRatio: im.pixelRatio}));
 }
-// the popup fields, the tooltip and the hover delay come from the style's metadata roadstyle:interaction
+// the popup fields, the tooltip and the hover delay come from the style's metadata roadstyle:interaction, the legend from
+// roadstyle:color_options
 rsDashboard(map, {
   style,
   simple: "roads-simple",     // the engine's style is simple mode: the roads are drawn by this one layer
