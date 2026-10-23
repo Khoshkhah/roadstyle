@@ -93,9 +93,9 @@ fn main() {
     // --layers: the road layers alone, for the 12 subsets of tools/make_layer_goldens.py (no base map)
     let mut feats = read::read_roads(data, "geometry").unwrap_or_else(|e| fail(format!("{roads_path}: {e}")));
     roads::mark_roads(&mut feats, &look);
-    let roads = roads::roads_source(&feats);
     let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow).unwrap_or_else(|e| fail(e));
     let slots = slots::slots_source(&feats, &slot_look);
+    let roads = roads::roads_source(feats);
     let layers = layers::road_layers(&look_json, features(&roads), features(&simple), features(&slots), &mut []).unwrap_or_else(|e| fail(e));
     println!("{}", json!({"layers": layers}));
 }

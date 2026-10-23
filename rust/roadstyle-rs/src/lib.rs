@@ -43,7 +43,6 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
                            feats.len()));
     }
     roads::mark_roads(&mut feats, &look);
-    let roads = roads::roads_source(&feats);
     let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow)?;
     let slots = slots::slots_source(&feats, &slots::SlotLook::from_json(&look_json)?);
     let mut ovs = Vec::new();
@@ -53,6 +52,15 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
         let attached = overlays::edge_attach(&mut fcs, &feats);
         (ovs, images) = overlays::feature_overlays(fcs, &look_json, &attached);
     }
+    // everything that reads the roads is done before this: the roads source takes them
+    // export_inline(planner=True): the route planner's graphs, or the number of roads past the limit
+    let planned = match planner {
+        Some(_) if feats.len() > planner::PLANNER_MAX_EDGES => Some(("roadstyle:planner_skipped", json!(feats.len()))),
+        Some(p) => Some(("roadstyle:planner", planner::planner_data(&feats, p)?)),
+        None => None,
+    };
+    let (center, zoom) = camera(&feats);
+    let roads = roads::roads_source(feats);
     let layers = layers::road_layers(&look_json, source_features(&roads), source_features(&simple), source_features(&slots), &mut ovs)?;
     let glyphs = (!source_features(&slots).is_empty()).then(|| look_json["theme"]["labels"]["glyphs"].clone());
     let mut sources = vec![("roads".to_string(), roads)];
@@ -71,14 +79,9 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     let it = &look_json["interaction"];
     metadata.insert("roadstyle:interaction".into(), json!({"popup": it["popup"], "tooltip": look_json["args"]["tooltip"], "hover_delay_ms": it["hover_delay_ms"]}));
     metadata.insert("roadstyle:images".into(), Value::Object(images));
-    if let Some(p) = planner {          // export_inline(planner=True): the route planner's graphs, or the number of roads past the limit
-        if feats.len() > planner::PLANNER_MAX_EDGES {
-            metadata.insert("roadstyle:planner_skipped".into(), json!(feats.len()));
-        } else {
-            metadata.insert("roadstyle:planner".into(), planner::planner_data(&feats, p)?);
-        }
+    if let Some((k, v)) = planned {
+        metadata.insert(k.into(), v);
     }
-    let (center, zoom) = camera(&feats);
     let name = name.map_or_else(|| look_json["args"]["name"].clone(), Value::from);
     Ok(Parts { name, center, zoom, layers, sources, metadata: Value::Object(metadata), glyphs })
 }
