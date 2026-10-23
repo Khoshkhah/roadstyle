@@ -1573,6 +1573,7 @@ def _state_expressions(style, props, fill_ids, end_fill_ids, end_casing_ids, ov_
         elif lid in end_casing_ids:
             paint["circle-color"] = ["case", ["any", same, both], ["coalesce", ["get", "__rs_casing"], _FB["casing"]], clear]
         if lyr.get("type") == "line" and layout.get("line-sort-key") is not None:
+            layout = lyr["layout"] = dict(layout)      # layers can share one layout dict (tiles=True: roads-fill, roads-highlight): add the key once to each
             if lyr.get("source") == "roads":
                 layout["line-sort-key"] = ["+", layout["line-sort-key"], ["case", ["any", has("__rs_edge"), has("__rs_edge2")], 500, 0]]
             elif lid == "roads-simple":

@@ -675,7 +675,15 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     } else {
         (m.width_expr("highway", true, 1.0), m.width_expr("highway", false, 1.0), m.width_expr("highway", true, wing))
     };
-    let lean_layout = |l: &Value| { let mut o = l.as_object().unwrap().clone(); o.insert("visibility".into(), "none".into()); Value::Object(o) };
+    // render's lean mode (inline data): the roads source draws nothing, so MapLibre cuts it into no tiles; with tiles=True its layers are drawn
+    let lean = args["tiles"] != true;
+    let lean_layout = |l: &Value| {
+        let mut o = l.as_object().unwrap().clone();
+        if lean {
+            o.insert("visibility".into(), "none".into());
+        }
+        Value::Object(o)
+    };
 
     // roads-simple and the invisible roads-fill (simple mode)
     // render's minzoom: true the config's table of the classes' first zooms, a mapping that table with changes, else none (_minzoom_filter)
@@ -718,8 +726,10 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     }
     let (s_on, h_on) = (json!(["boolean", ["feature-state", "select"], false]), json!(["boolean", ["feature-state", "hover"], false]));
     item = json!(["case", s_on, select, h_on, hover, item]);
-    let mix = |c: &Value, f: &Value| json!(["interpolate", ["linear"], sel["opacity"], 0, f, 1, c]);
-    fill = json!(["case", s_on, mix(select, &fill), h_on, mix(hover, &fill), fill]);
+    if lean {
+        let mix = |c: &Value, f: &Value| json!(["interpolate", ["linear"], sel["opacity"], 0, f, 1, c]);
+        fill = json!(["case", s_on, mix(select, &fill), h_on, mix(hover, &fill), fill]);
+    }
     let mut color = vec![json!("case")];
     color.extend(cases);
     color.extend([k(5), item, fill]);

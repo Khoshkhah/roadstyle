@@ -76,7 +76,8 @@ def keywords():
 
 @pytest.mark.parametrize("case", sorted(CASES))
 def test_export_inline_same_style(part, keywords, case):
-    from compare_engines import diff     # the first differences only: pytest's own diff of two styles of several MB is too slow
+    # the first differences only: pytest's own diff of two styles of several MB is too slow
+    from compare_engines import diff
 
     py = rs.export_inline(part, engine="python", **{**keywords, **options(case, part)})
     ru = rs.export_inline(part, engine="rust", **{**keywords, **options(case, part)})
@@ -174,6 +175,29 @@ def test_export_inline_metre_widths(part, keywords, opts):
     py = rs.export_inline(roads, engine="python", **kw)
     ru = rs.export_inline(roads, engine="rust", **kw)
     assert diff(ru, py) == []
+
+
+@pytest.mark.parametrize("case", ["plain", "numeric", "categorical", "road_popup"])
+def test_export_style(part, keywords, case, tmp_path):
+    """export_style: the same style.json and the same files; each tile has the same features when decoded. A tile's number can be
+    an integer in one engine and a float in the other (Python's pandas columns with nulls are floats): MapLibre reads the same number."""
+    import mapbox_vector_tile as mvt
+    from compare_engines import diff
+
+    kw = {k: v for k, v in keywords.items() if k not in ("basemap", "basemaps")}     # export_style: the base map comes from the app
+    kw.update(options(case, part))
+    py, ru = tmp_path / "python", tmp_path / "rust"
+    rs.export_style(part, py, base_url="http://x", engine="python", **kw)
+    rs.export_style(part, ru, base_url="http://x", engine="rust", **kw)
+    assert diff(json.loads((ru / "style.json").read_text()), json.loads((py / "style.json").read_text())) == []
+    files = sorted(p.relative_to(py) for p in py.rglob("*") if p.is_file())
+    assert files == sorted(p.relative_to(ru) for p in ru.rglob("*") if p.is_file())
+    for f in files:
+        a, b = (py / f).read_bytes(), (ru / f).read_bytes()
+        if f.suffix == ".pbf" and a != b:
+            assert (mvt.decode(a) if a else {}) == (mvt.decode(b) if b else {}), f
+        else:
+            assert a == b, f
 
 
 @pytest.mark.parametrize("method", ["tags", "solve"])

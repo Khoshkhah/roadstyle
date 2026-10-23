@@ -98,3 +98,62 @@ def compute_levels(edges, *, layer_col="layer", bridge_col="bridge", tunnel_col=
                                              d["min_positions"] and method == "solve")
     g.attrs["levels_info"] = {"engine": "rust", **dict(info)}
     return g
+
+
+def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs):
+    """``roadstyle.export_style`` by the Rust engine: the style and the tiles from ``Tiler``; the files around them as Python writes them.
+    ``format="xyz"`` only (PMTiles in Rust is phase P6)."""
+    import gzip  # noqa: F401  (the same imports as export.py)
+    from importlib.resources import files
+    from pathlib import Path
+
+    from . import _settings
+    from .export import _camera, _plugin_css
+    from .tiles import _merc, _tile_range
+
+    if format != "xyz":
+        raise ValueError("engine='rust': export_style writes format='xyz' only (PMTiles in Rust is phase P6); use engine='python'")
+    kwargs = dict(kwargs)
+    name = kwargs.get("name") or "roads"
+    palette, profile, settings = kwargs.pop("palette", None), kwargs.pop("profile", None), kwargs.pop("settings", None)
+    kwargs.setdefault("view_3d", True)
+    kwargs["tiles"] = True                                 # render's tiled look: the roads source draws (no lean mode)
+    lk = look(palette=palette, profile=profile, settings=settings, args=kwargs, features=kwargs.pop("features", None))
+    t = rust().Tiler(_geoparquet(edges), json.dumps(lk), None, name, "", [str(c) for c in edges.columns])   # every column: a click shows the data
+    style, base = json.loads(t.style), base_url.rstrip("/")
+    bounds = tuple(float(v) for v in edges.total_bounds)
+    roads = style["sources"]["roads"]
+    roads = style["sources"]["roads"] = {**{k: roads[k] for k in ("type", "minzoom", "maxzoom")}, "tiles": [f"{base}/tiles/{{z}}/{{x}}/{{y}}.pbf"],
+                                        "bounds": list(bounds)}
+    meta = style.pop("metadata", {})
+    style = {k: style[k] for k in ("version", "sources", "layers", "glyphs") if k in style}     # Python's key order: the same bytes
+    style["sprite"], style["name"] = f"{base}/sprite", name
+    style["center"], style["zoom"] = _camera(bounds)
+    style["metadata"] = meta
+    for lyr in style["layers"]:                                         # Python tags a layer's group after its source-layer
+        if "metadata" in lyr:
+            lyr["metadata"] = lyr.pop("metadata")
+    style.setdefault("metadata", {}).pop("roadstyle:images", None)     # export_style draws the arrow from the sprite
+    d = Path(out_dir)
+    d.mkdir(parents=True, exist_ok=True)
+    lo, hi = _merc(*bounds[:2]), _merc(*bounds[2:])
+    for z in range(int(roads["minzoom"]), int(roads["maxzoom"]) + 1):     # every tile in the roads' bounds; an empty one is an empty file
+        x0, x1, y0, y1 = _tile_range((lo[0], lo[1], hi[0], hi[1]), z)
+        for x in range(x0, x1 + 1):
+            for y in range(y0, y1 + 1):
+                p = d / "tiles" / str(z) / str(x) / f"{y}.pbf"
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_bytes(t.tile(z, x, y))
+    (d / "popup.css").write_text(_plugin_css())
+    (d / "popup.js").write_text(files("roadstyle").joinpath("static/popup.js").read_text())
+    style["metadata"]["roadstyle:interaction"] = {**style["metadata"].get("roadstyle:interaction", {}), "css": f"{base}/popup.css",
+                                                  "js": f"{base}/popup.js"}
+    png = files("roadstyle").joinpath("data/sprite.png").read_bytes()
+    icon = _settings.theme_value("arrows.icon")
+    index = json.dumps({"oneway": {"x": 0, "y": 0, "width": icon["width"], "height": icon["height"], "pixelRatio": icon["pixel_ratio"], "sdf": True}})
+    for n in ("sprite", "sprite@2x"):
+        (d / f"{n}.png").write_bytes(png)
+        (d / f"{n}.json").write_text(index)
+    path = d / "style.json"
+    path.write_text(json.dumps(style, separators=(",", ":")))
+    return path

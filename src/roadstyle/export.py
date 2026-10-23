@@ -32,7 +32,7 @@ _LEVEL_COLS = {"casing_level_col": "casing_level", "fill_level_col": "fill_level
                "cap_start_col": "cap_start", "cap_end_col": "cap_end"}
 
 
-def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs) -> Path:
+def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", engine: str | None = None, **kwargs) -> Path:
     """Write the roads as ``style.json`` + vector tiles + a sprite into ``out_dir``; return the path of ``style.json``.
 
     ``edges``: a GeoDataFrame, or the path of a duckOSM GeoParquet file (``duckosm export-gis --format geoparquet``: the
@@ -68,6 +68,9 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs
             if c in edges.columns:
                 kwargs.setdefault(k, c)
     kwargs.setdefault("view_3d", True)        # the bridge decks: the page has a 3D button, an app has only its own tilt
+    from . import _engine
+    if _engine.engine(engine) == "rust":     # ``engine``: "python" (default) or "rust" (the style and the tiles of the Rust engine)
+        return _engine.export_style(edges, out_dir, base_url=base_url, format=format, **{**kwargs, "name": name})
     out = render_edges(edges, **{**kwargs, "basemap": "blank", "tiles": True, "backend": "web", "_export": True})
     style, base = out["style"], base_url.rstrip("/")
     style["sources"].pop("bm", None)           # the roads only: no background, no base map
@@ -112,6 +115,8 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs
     (d / "popup.css").write_text(_plugin_css())
     (d / "popup.js").write_text(files("roadstyle").joinpath("static/popup.js").read_text())
     style.setdefault("metadata", {})["roadstyle:interaction"] = {**out["interaction"], "css": f"{base}/popup.css", "js": f"{base}/popup.js"}
+    if out.get("color_options"):     # the legend data, as in export_inline
+        style["metadata"]["roadstyle:color_options"] = json.loads(json.dumps(out["color_options"]))
     png = files("roadstyle").joinpath("data/sprite.png").read_bytes()
     from . import _settings
     icon = _settings.theme_value("arrows.icon")          # the profile's arrow; sprite.png is drawn from the default path

@@ -22,12 +22,19 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `head_m`, `offset_zoom`, `minzoom` (true or a table), `cap_col` (the end columns only when they are named, as in Python) and `boundary`.
 - **The Rust engine draws metre widths** (`width_m_col`, `width_m_zoom`, `casing_m`, `casing_min_px`), with the mitre ends where a flat end meets another
   metre road, as Python. Before, it stopped with an error on such roads.
+- **`export_style(..., engine="rust")`** writes the style and the XYZ tiles with the Rust engine (`Tiler`). The style is the same as Python's byte for
+  byte, and the tiles have the same features. `format="pmtiles"` stays Python only for now.
 - **The Rust engine parses floats exactly** (serde_json `float_roundtrip`), so a coordinate from Python has the same last digit.
   **Note for the users of the Rust engine:** the engine now follows `labels=False` and `arrows=False` in the look's `args`, as Python does. Before,
   it always drew the names and the arrows. The looks of the GeoLibre plugin and of duckosm-rust's page have both false (from mapstyle's
   keywords): set them true there, or the maps have no names and no arrows after an update of the engine.
 
+### Fixed
+- **The paint order of a painted road in a tiled style** (`tiles=True`, `export_style`): `roads-fill` and `roads-highlight` shared one layout, so
+  the +500 of a painted road was added two times to each. Now each layer gets it one time. The order on the map does not change.
+
 ### Changed
+- **`export_style` writes the legend data** in `roadstyle:color_options`, as `export_inline` does.
 - **`export_inline` writes the legend data** in the style's metadata `roadstyle:color_options` (the page's `COLOR_OPTIONS`), when the map has data
   colours, as the Rust engine does. The dashboard module reads it.
 - **The Rust engine is a set of crates** (phase P2): `roadstyle-model`, `roadstyle-io`, `roadstyle-levels`, `roadstyle-engine`, `roadstyle-tiles` and the
