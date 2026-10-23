@@ -67,6 +67,20 @@ nav:
       - Interaction contract: reference/contract.md
       - Settings & palettes: reference/settings.md
       - Command line: reference/cli.md
+  - Rust engine:
+      - rust/index.md
+      - "Tutorial: your first map": rust/first-map.md
+      - How-to guides:
+          - Switch the engine: rust/switch-engine.md
+          - Use it in the browser: rust/browser.md
+          - Tiles and PMTiles: rust/tiles.md
+          - Build from source: rust/build.md
+      - Reference:
+          - Keywords by engine: rust/keywords.md
+          - The crates: rust/crates.md
+      - Explanation:
+          - How the engine is built: rust/architecture.md
+          - Parity and speed: rust/parity.md
   - Studio: studio.md
 
 # Old pages; keep their URLs working.
@@ -98,7 +112,11 @@ markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:            # ```mermaid blocks become diagrams (Material loads Mermaid)
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.details
   - pymdownx.tabbed:
       alternate_style: true
