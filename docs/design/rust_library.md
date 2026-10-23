@@ -26,14 +26,15 @@ correct only when it is byte for byte equal to the output of Python.
 4. [The data flow of one map](#the-data-flow-of-one-map)
 5. [The render model](#the-render-model): the numbers of each road, the objects on roads, the order of the map
 6. [Input and output formats](#input-and-output-formats)
-7. [The config: the look](#the-config-the-look)
-8. [The public API](#the-public-api)
-9. [Efficiency](#efficiency)
-10. [The migration plan](#the-migration-plan)
-11. [The parity checklist](#the-parity-checklist)
-12. [Quality](#quality)
-13. [Decisions that are open](#decisions-that-are-open)
-14. [Found during the inventory](#found-during-the-inventory)
+7. [The interaction contract](#the-interaction-contract): what a dashboard reads and changes at run time
+8. [The config: the look](#the-config-the-look)
+9. [The public API](#the-public-api)
+10. [Efficiency](#efficiency)
+11. [The migration plan](#the-migration-plan)
+12. [The parity checklist](#the-parity-checklist)
+13. [Quality](#quality)
+14. [Decisions that are open](#decisions-that-are-open)
+15. [Found during the inventory](#found-during-the-inventory)
 
 ## What exists today
 
@@ -648,6 +649,193 @@ is read, another CRS is an error, or it is transformed with the feature `proj` (
 | The legend: `metadata["roadstyle:color_options"]` | engine (task 1) | yes | yes | yes |
 | The level rows (for `visualization.edge_levels`) | levels | yes | yes | yes |
 
+## The interaction contract
+
+The interaction contract is everything that a dashboard can read from the rendered output and change in it at run time. It has
+three users: the Python page (the dashboard bundle in one HTML file), duckosm-rust's page (ES modules, the engine in a worker) and the
+GeoLibre plugin (ES modules on GeoLibre's map). Today the contract is not written down. The dashboard module (task 2, branch
+`claude/dashboard-js-5ddf3e`, 19 files, 1,684 lines) reads 3 metadata keys, about 20 `__rs_*` properties and layer ids that start
+with `roads`. It changes the map with 7 kinds of calls and has 31 `rs*` functions (29 of them on `window`), with no types and no version,
+and 15 `rs:*` events with names that clash (`rs:viewchange` is the 3D button, `rs:viewselect` is the View menu).
+
+```mermaid
+flowchart LR
+    subgraph engine["Engine (Python, native, worker)"]
+        st["style: layers + sources"]
+        md["metadata: roadstyle:contract,<br/>controls, state, color_options,<br/>interaction, images, levels"]
+    end
+    subgraph map["MapLibre map"]
+        lay["layers<br/>(role and group in their metadata)"]
+        gs["global-state<br/>rs_co, rs_colors, rs_fill_on, ..."]
+        fs["feature-state<br/>hover, select"]
+    end
+    subgraph dash["roadstyle-dashboard"]
+        state["DashboardState"]
+        api["rs object: methods, on(), getState(), setState()"]
+        ctl["controls: Colour by, legend,<br/>Roads box, Layers, Tunnels, View"]
+    end
+    host["host page<br/>(Python page, duckosm-rust, GeoLibre)"]
+    url["URL, saved views"]
+    st --> lay
+    md -->|"read once"| state
+    ctl --> state
+    api --> state
+    state -->|"setGlobalStateProperty"| gs
+    state -->|"setFeatureState"| fs
+    state -->|"setFilter, visibility"| lay
+    gs --> lay
+    fs --> lay
+    state -->|"restyle(change), if an engine is attached"| engine
+    engine -->|"style patch"| lay
+    host <-->|"calls and events"| api
+    url <-->|"getState / setState"| api
+```
+
+*The engine writes the contract into the style. The dashboard keeps one state and changes the map only through MapLibre's own calls. Only a change that needs new data goes back to the engine.*
+
+### The output: what the engine writes for the dashboard
+
+The style carries a version, `metadata["roadstyle:contract"] = 1`, and each key below has a JSON schema
+(`contract.schema.json`, made from the Rust types in `roadstyle-model::contract`). The TypeScript types of the npm packages are made
+from the same schema.
+
+| Key | Content | Today |
+|---|---|---|
+| `roadstyle:contract` | the version of this contract | new |
+| `roadstyle:interaction` | the popup fields, the tooltip fields, the hover delay | Python export, Rust |
+| `roadstyle:color_options` | `[{name, prop, legend}]`, and the active option | Python export, Rust; the active option is new (the legend is correct only for option 0 today) |
+| `roadstyle:controls` | what the engine knows and the controls show: the classes and their swatches, the access kinds and their counts, the tunnel look (palettes, colors, steps), the views, the arrow image and rules | new: today Python gives these as `rsDashboard` options, and the Rust users have none |
+| `roadstyle:state` | each global state name and its start value (`rs_co`, `rs_colors`, `rs_base`, `rs_fill_on`, `rs_palette`, `rs_ov_<n>`, `rs_tun_*`) | new: today the names are written in the JS and in `render_web.py` |
+| `roadstyle:images` | the images to add (`oneway`) | Rust |
+| `roadstyle:levels` | the source of the numbers (see the render model) | new |
+| `roadstyle:planner`, `roadstyle:planner_skipped` | the route planner's graphs | Rust |
+| layer `metadata["roadstyle:group"]`, `["roadstyle:over"]` | the group of a layer (`roads`, or an overlay's name) | Rust |
+| layer `metadata["roadstyle:role"]` | `casing`, `fill`, `item`, `arrows`, `labels`, `highlight`, `deck`, `base` | new |
+
+The rules:
+
+1. **Layers are found by their role and group, not by their id.** The ids change with the plan (`roads-fill-lv3`) and a host can add a
+   prefix (duckosm-rust adds `rs-`, GeoLibre renames the layers). Today `filter.js` takes every layer whose id starts with `roads`.
+2. **Public and internal.** Public for a host: the metadata keys above, the layer roles and groups, the data columns (`edge_id`, the
+   class column and every column kept in the tiles), and the anchor layer `roads-highlight`. Internal (between the engine and the
+   dashboard of the same version, checked by a test): the `__rs_*` properties that the dashboard reads (`__rs_edge`, `__rs_edge2`,
+   `__rs_edges`, `__rs_cls`, `__rs_lvl`, `__rs_tunnel`, `__rs_bridge`, `__rs_access`, `__rs_k`, `__rs_fl`, `__rs_ord`, `__rs_arw`, the
+   slot fields), the feature ids, and the layer ids.
+3. **The ids.** A feature's id is its row in the table (the roads source), or the row times 24 plus the piece (the `simple` source),
+   because feature state needs small numbers. The public API takes the edge id (`edge_id`, as text, so a 64-bit hash stays exact), and
+   the dashboard maps it to the row.
+4. **The state stays live.** For a page with a dashboard, the engine writes `["global-state", name]` in the expressions (`state: live`).
+   For a static style (`export_style`, a plain MapLibre app, RustGIS), it writes the start values (`state: baked`). Today the Rust engine
+   always bakes them, so the Colour by menu, `rsColor`, the road fill switch and the Tunnels box do nothing on its style
+   (`dashboard_module.md`).
+
+### The state model
+
+`DashboardState` is one object. Each control changes it, and the dashboard applies a change with the cheapest mechanism:
+
+| Control | State | Mechanism | Needs the engine again |
+|---|---|---|---|
+| hover, click, select | `selection` | `feature-state` (`hover`, `select`) on the road, its pieces, its decks and its items | no |
+| highlight a set of roads | `highlight` | `feature-state` | no |
+| Colour by, an option that the style has | `colorBy` | global state `rs_co` | no |
+| `rsColor` groups, the base groups | `colors`, `colorBase` | global state `rs_colors`, `rs_base` (edge to color) | no |
+| Colour by, a column that the style does not have, a new ramp, `vmin`, `vmax`, `width_by` | `colorBy` | `restyle`: new paint expressions and a new legend | yes |
+| the legend | from `colorBy` | the DOM, from `roadstyle:color_options` | no (yes with a new column) |
+| classes, Bridges, Tunnels, access kinds, a set of ids | `filter` | `setFilter` on every layer of a road, through one function (`_applyRoadFilters`) | no |
+| an overlay on or off | `overlays` | layer visibility | no |
+| an overlay's color option | `overlays` | global state `rs_ov_<n>` | no |
+| the road fill on or off | `roadFill` | global state `rs_fill_on` | no |
+| the tunnel look (strength, color, palette, dash ratio) | `tunnel` | global state `rs_tun_*` | no |
+| a palette that a view names | `palette` | global state `rs_palette` (the style has a copy of the colors for each such palette) | no; another palette: yes |
+| another profile (widths, zooms) | | a new style (`setStyle`) | yes |
+| a view | `view` | `setState` with the view's part of the state | no |
+| the base map | `basemap` | the raster source and layer made again | no |
+| 2D or 3D | `view3d` | the camera pitch and the deck layers | no |
+| Street View, Google 3D | `streetView`, `google3d` | the windows and Google's API | no |
+| the side panel | `panel` | the DOM | no |
+| the camera | `camera` | `jumpTo` | no |
+| the one-way arrows | | `setData` on the `arrows` source after each move | no |
+| a level edit | | the engine solves again; `updateData` (inline) or a new tile generation | yes |
+
+### The runtime API
+
+`rsDashboard(map, options)` returns one object. The Python page sets `window.rs` to it.
+
+```ts
+type EdgeId = string;
+interface DashboardState {
+  v: 1;
+  selection: EdgeId | null;
+  highlight: EdgeId[];
+  colorBy: string;                                   // the name of a color option
+  colors: { color: string; ids: EdgeId[] }[];        // rsColor
+  filter: { classes: string[] | null; bridges: boolean; tunnels: boolean; access: string[]; ids: EdgeId[] | null };
+  overlays: Record<string, { visible: boolean; colorBy?: string }>;
+  roadFill: boolean;
+  tunnel: { strength: number; toward: string; palette: string; ratio: [number, number] };
+  palette: string;
+  view: string | null;
+  basemap: string;
+  view3d: boolean;
+  camera: { center: [number, number]; zoom: number; pitch: number; bearing: number };
+  streetView: { mode: "off" | "window" | "panel"; spot?: { edge: EdgeId; m: number } };
+  google3d: boolean;
+  panel: boolean;
+}
+interface Dashboard {
+  readonly contract: number;
+  select(id: EdgeId | null): void;
+  highlight(ids: EdgeId[]): void;
+  focus(ids: EdgeId[]): void;
+  query(where: Record<string, unknown>): EdgeId[];
+  find(text: string): EdgeId[];
+  props(id: EdgeId): Record<string, unknown> | null;
+  setColorBy(name: string): void;
+  color(groups: DashboardState["colors"] | null): void;
+  setFilter(filter: Partial<DashboardState["filter"]>): void;
+  setOverlay(name: string, visible: boolean): void;
+  setTunnelStyle(look: Partial<DashboardState["tunnel"]>): void;
+  setView(name: string): void;
+  setBasemap(key: string): void;
+  getState(): DashboardState;
+  setState(change: Partial<DashboardState>): void;   // a saved view, a URL
+  can(change: Partial<DashboardState>): boolean;     // false when the change needs an engine and none is attached
+  on(event: DashboardEvent, fn: (e: unknown) => void): () => void;  // returns the function that removes it
+  destroy(): void;
+}
+type DashboardEvent = "select" | "deselect" | "hover" | "state" | "filter" | "color" | "overlay" | "tunnel"
+                    | "view" | "view3d" | "basemap" | "streetview" | "google3d";
+```
+
+- **Events.** `on()` takes the names above. The event `state` gives each change as the part of the state that changed. The old
+  `document` events (`rs:select`, `rs:filterchange`, ...) are sent too, for one minor version.
+- **Saved views and URLs.** `getState()` gives the whole state, and `setState()` takes a part of it. A URL keeps the part that differs
+  from the start state (`#rs=` and the JSON in base64url). A view of `views=` is a named part of the state, so the View menu calls
+  `setState`.
+- **The old names.** `window.rsSelect`, `window.rsSetColorField` and the other `window.rs*` functions stay as aliases of the object's methods for
+  one minor version, with one warning in the console. Then they go. A name that starts with `_` is not public, also when the Python page
+  makes it a global.
+
+### When the dashboard needs the engine again
+
+Some changes need new data or new expressions: a color column that the style does not have, a new ramp or range, `width_by`, another
+palette or profile, a level edit. The dashboard asks for them through a port, so that it does not depend on WebAssembly:
+
+```js
+rsDashboard(map, {style, engine: {restyle: (change) => worker.restyle(change)}});  // returns a Promise of a StylePatch
+```
+
+- `Tiler.restyle(change)` in `roadstyle-wasm` gives a `StylePatch`: the new paint and filter expressions of each layer role, the new
+  `roadstyle:color_options` entry with its legend and, when the tiles must change, a new tile generation (`rs://<generation>/...`, as
+  duckosm-rust's page does today with a new worker for each style). The worker keeps the roads table, so it computes the categories,
+  the ramp and the legend from the column without a new read.
+- A color by a column is an expression on a property that is in the source (`["get", column]` in a `match` or an `interpolate`), so
+  only the paint changes. For this, the column must be in the tiles (`keep`). Python bakes a color column for each option today
+  (`__rs_fill__<i>`); the expression form is new behavior (decision 8).
+- **The Python page has no engine.** It shows only the options that it has in the style. `can()` returns false for a change that needs
+  the engine, and the control does not show that choice. Nothing changes without a message.
+- **duckosm-rust's page and the GeoLibre plugin** attach the worker's `restyle`.
+
 ## The config: the look
 
 ### One name for each thing
@@ -922,7 +1110,8 @@ flowchart TB
 
 - **Content.** `roadstyle-look`: the structs, the bundled files, `Look::resolve`, the schema. A reader of today's `look.json`
   (version 0), so the users can move one at a time. `resolveLook` in `roadstyle-wasm`. The `palette` view row
-  (`_merge_palettes`) in Rust.
+  (`_merge_palettes`) in Rust. The output side of the interaction contract: `roadstyle:contract`, `roadstyle:controls`,
+  `roadstyle:state`, the layer roles, and `state: live` (the global state kept in the expressions).
 - **Golden test.** For 4 palettes x 2 profiles x the settings fixtures of `tests/test_settings_overrides.py`, the look from Rust is
   equal to the look from Python. The style from the Rust look is equal to the style from the Python look.
 - **First user.** The GeoLibre plugin: `build.py` stops running Python and mapstyle to make the 64 looks.
@@ -958,7 +1147,9 @@ flowchart TB
 
 - **Content.** The page writer in `roadstyle-io` (feature `page`): the HTML frame, the dashboard bundle, the style, the page options,
   the gzip of the sources (`compress`), the host panel. `export_style` (style.json, XYZ tiles, PMTiles, sprite). The three page
-  sidebars (`dashboard.html`, `report.html`, `street_view.html`) as static files. The npm packages.
+  sidebars (`dashboard.html`, `report.html`, `street_view.html`) as static files. The npm packages. The runtime API of the
+  interaction contract: the `rs` object, `getState` and `setState`, the events, the aliases of the old names, the engine port
+  and `Tiler.restyle`.
 - **Golden test.** The page from Rust is equal to the page from Python, for the reference pages of `docs/build_maps.py`.
 - **First user.** mapstyle (`export_style`, `render_report`).
 - **Exit.** `render_web.render` only converts its keywords and calls Rust.
@@ -979,7 +1170,7 @@ flowchart TB
 | D: model, render model and memory | P4 | `rust/roadstyle-model/`, `rust/roadstyle-io/`, `rust/roadstyle-levels/` (fixed roads, edits) | P2 |
 | E: style features | P4 | `rust/roadstyle-engine/` | D for the model API |
 | F: Python binding | P5 | `rust/roadstyle-py/`, `src/roadstyle/_engine.py`, `tests/test_engine_parity.py` | P2 |
-| G: page and export | P6 | `rust/roadstyle-io/src/page.rs`, `rust/roadstyle-tiles/src/pmtiles.rs`, `src/roadstyle/static/dashboard/` | task 2, C |
+| G: page, export and the runtime API | P6 | `rust/roadstyle-io/src/page.rs`, `rust/roadstyle-tiles/src/pmtiles.rs`, `src/roadstyle/static/dashboard/`, `rust/roadstyle-wasm/src/restyle.rs` | task 2, C |
 
 Rules:
 
@@ -1125,7 +1316,7 @@ the P0 golden run decides), **Python** (stays in Python), **internal** (not port
 | `snapshot`, `make_legend`, `BaseLayerSwitcher` | Python | |
 | `roadstyle` CLI (input, `-o`, `-f` web/folium/rsjs/spec/geojson, `--palette`, `--basemap`, `--tooltip`, `--include`, `--exclude`, `--color-by`, `--colors`, `--cmap`, `--vmin`, `--vmax`, `--width-by`, `--page`, `--panel-width`, `--no-resize`, `--layout`, `--view-3d`, `--pitch`, `--bearing`, `--no-arrows`, `--no-labels`, `--no-filter`, `--no-basemap-switcher`, `--tiles`, `--no-compress`, `--highway-col`, `--layer`) | Python | it calls Rust through `render_edges` |
 | `roadstyle studio`, `roadstyle-mcp` | Python | |
-| The `window.rs*` API (29 functions) and the 13 `rs:*` events | task 2 | the dashboard module keeps each name |
+| The `window.rs*` API (29 functions) and the `rs:*` events | task 2 (the module keeps each name); P6 (the `rs` object, the old names as aliases for one minor version) | |
 
 ## Quality
 
@@ -1184,6 +1375,7 @@ My recommendation is first in each row.
 | 6 | npm | Publish `roadstyle-wasm` and `roadstyle-dashboard` after P3 | Users keep building from a commit |
 | 7 | Versions | One version for all crates and packages, the same as Python roadstyle | A version for each crate |
 | 8 | New behavior of the render model (placement along an edge with side and offset, the split of the merged layer, an icon kind) | Make it once, in Rust, after P5; Python gets it through the binding. Its golden is the Rust output after a review of the pages | Make it in Python first (the reference), then port it |
+| 9 | The runtime API of the dashboard | One typed `rs` object from `rsDashboard`, with `getState`, `setState` and `on()`; the `window.rs*` names as aliases for one minor version | Keep the `window.rs*` functions as the API |
 
 ## Found during the inventory
 
