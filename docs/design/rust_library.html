@@ -1683,6 +1683,765 @@ palette or profile, a level edit. The dashboard asks for them through a port, so
   the engine, and the control does not show that choice. Nothing changes without a message.</li>
 <li><strong>duckosm-rust's page and the GeoLibre plugin</strong> attach the worker's <code>restyle</code>.</li>
 </ul>
+<h3 id="the-inventory-of-shared-variables">The inventory of shared variables</h3>
+<p>The tables below list every variable that the engine, the dashboard and the page share at commit <code>686fe4c</code> (branch
+<code>claude/dashboard-js-5ddf3e</code>, which includes <code>rust-engine</code>). These commands make the name lists again:</p>
+<pre><code class="language-bash">git grep -ohE '&quot;rs_[a-z0-9_]+&quot;|rs_ov_' -- src rust | tr -d '&quot;' | sort -u          # the global state: 12 names
+git grep -ohE '__rs_[A-Za-z0-9_]+' -- src rust | sort -u                           # the properties: 66 names
+git grep -ohE 'roadstyle:[a-z_]+' -- src rust | sort -u                            # the metadata keys
+git grep -ohE '__[A-Z][A-Z0-9_]+__' -- src/roadstyle/static/web_template.html | sort -u   # the page placeholders
+git grep -nE 'localStorage|--rs-' -- src/roadstyle/static                          # the stored keys and the CSS variables
+</code></pre>
+<p>In P3 these tables move to <code>docs/reference/contract.md</code>, and a test (<code>tests/test_contract_names.py</code>) runs the same searches and fails
+when the code has a name that the reference does not have, or the reverse.</p>
+<h4 id="the-page-and-control-variables">The page and control variables</h4>
+<p>"Run time" says whether a page can change the value after it opens. "Gap" marks a value that a page cannot change today and that the
+contract makes changeable (or a value that is not used).</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Type, default</th>
+<th>Set in</th>
+<th>Read by</th>
+<th>Run time</th>
+<th>API</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> (title)</td>
+<td>text, <code>"roadstyle"</code></td>
+<td><code>render</code> keyword; look <code>args.name</code>; style <code>name</code></td>
+<td>page title, host panel</td>
+<td>no</td>
+<td></td>
+</tr>
+<tr>
+<td><code>style</code></td>
+<td>the style object</td>
+<td><code>rsDashboard</code> option</td>
+<td>every control</td>
+<td><code>restyle</code> patches it</td>
+<td><code>restyle</code></td>
+</tr>
+<tr>
+<td><code>basemaps</code>, <code>basemap</code></td>
+<td>keys, <code>DEFAULT_SWITCHER</code>, <code>"voyager"</code></td>
+<td><code>render</code>; <code>rsDashboard</code> option (<code>BASEMAPS</code>)</td>
+<td><code>basemap.js</code></td>
+<td>yes</td>
+<td><code>rsSetBasemap</code>; <code>rs:basemapchange</code>; <code>window.RS_BASEMAPS</code></td>
+</tr>
+<tr>
+<td><code>basemap_switcher</code></td>
+<td>bool, true</td>
+<td><code>render</code>; option</td>
+<td><code>basemap.js</code></td>
+<td>no</td>
+<td></td>
+</tr>
+<tr>
+<td><code>api_key</code></td>
+<td>text</td>
+<td><code>render</code>, <code>set_api_key</code></td>
+<td>the base-map URL</td>
+<td>no</td>
+<td></td>
+</tr>
+<tr>
+<td><code>zoom_readout</code></td>
+<td>bool, true</td>
+<td><code>render</code>; option</td>
+<td><code>zoom.js</code></td>
+<td>no</td>
+<td></td>
+</tr>
+<tr>
+<td><code>pitch</code>, <code>bearing</code>, <code>max_pitch</code></td>
+<td>numbers, none, none, 70</td>
+<td><code>render</code>; <code>defaults.json</code> camera</td>
+<td>the map</td>
+<td>the camera: yes; <code>max_pitch</code>: no</td>
+<td>gap: no getter or setter of the camera (only <code>rsFocus</code>)</td>
+</tr>
+<tr>
+<td><code>pitch_3d</code></td>
+<td>number, 55</td>
+<td><code>defaults.json</code>; option</td>
+<td><code>view3d.js</code></td>
+<td>yes</td>
+<td><code>rsSetView3D</code>; <code>rs:viewchange</code></td>
+</tr>
+<tr>
+<td><code>view_3d</code> (bridge decks)</td>
+<td>bool, false</td>
+<td><code>render</code>; look <code>args.view_3d</code></td>
+<td>engine (deck layers)</td>
+<td>no: the decks are in the style or not</td>
+<td></td>
+</tr>
+<tr>
+<td>3D buildings</td>
+<td>an overlay (<code>roadstyle:group</code> = <code>buildings 3D</code>)</td>
+<td>engine (mapstyle features)</td>
+<td>the Layers box only when Python gives <code>overlays</code></td>
+<td>gap: a Rust style has no overlay list for the dashboard</td>
+<td><code>rsSetOverlay</code></td>
+</tr>
+<tr>
+<td><code>find_control</code></td>
+<td>bool, false</td>
+<td><code>render</code>; option</td>
+<td><code>find.js</code></td>
+<td>no</td>
+<td><code>rsFind</code></td>
+</tr>
+<tr>
+<td>find fields</td>
+<td>the popup fields, and <code>edge_id_col</code> and <code>edge_ref</code> (<code>_ID_KEYS</code>)</td>
+<td><code>road_popup</code>, <code>edge_id_col</code></td>
+<td><code>find.js</code></td>
+<td>no</td>
+<td><code>rsFind</code></td>
+</tr>
+<tr>
+<td><code>edge_id_col</code></td>
+<td>text, <code>"edge_id"</code></td>
+<td><code>render</code>; option</td>
+<td><code>find.js</code>, <code>select.js</code></td>
+<td>no</td>
+<td></td>
+</tr>
+<tr>
+<td><code>road_popup</code></td>
+<td>false, null (every field) or fields; <code>DEFAULT_ROAD_POPUP</code></td>
+<td><code>render</code>; <code>roadstyle:interaction.popup</code>; option</td>
+<td><code>select.js</code>, <code>find.js</code></td>
+<td>gap</td>
+<td></td>
+</tr>
+<tr>
+<td><code>popup_mode</code></td>
+<td><code>"popup"</code> or <code>"panel"</code></td>
+<td><code>render</code>; option</td>
+<td><code>panel.js</code> and every docked control</td>
+<td>no</td>
+<td></td>
+</tr>
+<tr>
+<td><code>road_tooltip</code>, <code>tooltip</code></td>
+<td>false, true or fields</td>
+<td><code>render</code>; look <code>args.tooltip</code>; <code>roadstyle:interaction.tooltip</code></td>
+<td><code>select.js</code></td>
+<td>gap</td>
+<td></td>
+</tr>
+<tr>
+<td><code>hover_delay_ms</code></td>
+<td>ms, 300</td>
+<td><code>render</code>; <code>roadstyle:interaction</code>; option; <code>_TIP_DELAY</code></td>
+<td><code>select.js</code>, <code>overlays.js</code></td>
+<td>gap</td>
+<td></td>
+</tr>
+<tr>
+<td><code>copy_field</code></td>
+<td>text, <code>"edge_id"</code></td>
+<td>look <code>args.copy_field</code> (mapstyle passes it)</td>
+<td>folium only</td>
+<td>gap: not used by the web page</td>
+<td></td>
+</tr>
+<tr>
+<td><code>hover_color</code></td>
+<td>color, <code>selection.hover</code> (<code>#b388ff</code>)</td>
+<td><code>render</code>; the palette</td>
+<td>engine: a literal in each highlight expression</td>
+<td>gap: fixed in the style; <code>__HOVER_COLOR__</code> is replaced (<code>render_web.py:3784</code>) but the template has no such placeholder</td>
+<td>new: <code>rs_hover</code></td>
+</tr>
+<tr>
+<td><code>select_color</code></td>
+<td>color, <code>selection.select</code> (<code>#7c4dff</code>)</td>
+<td><code>render</code>; the palette; option (Google 3D line)</td>
+<td>engine (literal), <code>google3d.js</code></td>
+<td>gap: fixed in the style</td>
+<td>new: <code>rs_select</code></td>
+</tr>
+<tr>
+<td>the glow</td>
+<td><code>selection.opacity</code> 0.85, <code>glow_opacity</code> 0.35 (palette); the width of the fill (simple mode)</td>
+<td>the palette</td>
+<td>engine (<code>_simple_color(glow=...)</code>)</td>
+<td>gap: fixed</td>
+<td>new: <code>rs_glow</code></td>
+</tr>
+<tr>
+<td><code>filter</code></td>
+<td><code>{on, col, classes, swatches, palettes, bridges, tunnels, access}</code>, off</td>
+<td><code>render</code> (<code>filter_control</code>, <code>filter_col</code>, <code>access_col</code>); option</td>
+<td><code>filter.js</code>, <code>views.js</code></td>
+<td>yes</td>
+<td><code>rsSetClasses</code>, <code>rsSetBridges</code>, <code>rsSetTunnels</code>, <code>rsSetAccess</code>, <code>rsGetAccess</code>, <code>rsFilter</code>; <code>rs:filterchange</code>; <code>window.RS_CLASSES</code>, <code>RS_CLASS_COL</code>, <code>RS_CLASS_COLORS</code>, <code>RS_ACCESS</code></td>
+</tr>
+<tr>
+<td>access colors</td>
+<td><code>access.private</code>, <code>bus</code>, <code>pedestrian</code>, <code>delivery</code> (palette)</td>
+<td>the palette</td>
+<td>engine (<code>__rs_access</code> colors)</td>
+<td>no</td>
+<td></td>
+</tr>
+<tr>
+<td><code>color_options</code></td>
+<td><code>[{name, prop, legend}]</code></td>
+<td><code>render</code>; <code>roadstyle:color_options</code>; option</td>
+<td><code>color.js</code>, <code>legend.js</code>, <code>views.js</code></td>
+<td>the choice: yes; a new option: <code>restyle</code></td>
+<td><code>rsSetColorField</code>; <code>rs:colorchange</code>; <code>window.RS_COLOR_OPTIONS</code></td>
+</tr>
+<tr>
+<td>the legend</td>
+<td><code>{title, kind, entries}</code> or <code>{title, kind, ramp, vmin, vmax}</code></td>
+<td>the data styler (<code>bake_color_options</code>)</td>
+<td><code>legend.js</code></td>
+<td>follows the option</td>
+<td>gap: the metadata does not give the active option</td>
+</tr>
+<tr>
+<td><code>color_active</code></td>
+<td>index or name, 0</td>
+<td><code>render</code>; option</td>
+<td><code>color.js</code></td>
+<td>yes</td>
+<td><code>rs_co</code></td>
+</tr>
+<tr>
+<td>host colors</td>
+<td><code>[{color, ids}]</code></td>
+<td>the host page</td>
+<td>the fill and item expressions</td>
+<td>yes</td>
+<td><code>rsColor</code>, <code>rsColorBase</code>; <code>rs:colorchange</code></td>
+</tr>
+<tr>
+<td><code>road_fill</code></td>
+<td><code>{on, paint}</code>, on</td>
+<td><code>render</code>; option</td>
+<td><code>color.js</code></td>
+<td>yes</td>
+<td><code>rsSetRoadFill</code>; <code>rs:roadfillchange</code></td>
+</tr>
+<tr>
+<td><code>overlays</code></td>
+<td><code>[{label, source, layers, popup, tooltip, interactive, under, base, select, color, visible, popup_window}]</code></td>
+<td><code>render</code> (<code>Overlay</code>); option</td>
+<td><code>core.js</code>, <code>overlays.js</code>, <code>filter.js</code>, <code>select.js</code></td>
+<td>visibility, color: yes</td>
+<td><code>rsSetOverlay</code>; <code>rs:overlaychange</code>; <code>window.RS_OVERLAYS</code></td>
+</tr>
+<tr>
+<td><code>overlay_control</code>, <code>overlay_popup</code></td>
+<td>bool, true</td>
+<td><code>render</code>; option</td>
+<td><code>overlays.js</code></td>
+<td>no</td>
+<td></td>
+</tr>
+<tr>
+<td><code>items</code>, <code>items_popup</code></td>
+<td><code>{label, popup, layer}</code> or null</td>
+<td><code>render</code>; option</td>
+<td><code>select.js</code></td>
+<td>no</td>
+<td></td>
+</tr>
+<tr>
+<td><code>tunnel</code></td>
+<td><code>{layers, control, strength, palette, palettes, ratio, ratios, toward, towards, to, steps}</code></td>
+<td><code>render</code> (<code>tunnel_control</code>) and the look (<code>tunnels</code>)</td>
+<td><code>tunnel.js</code>, <code>arrows.js</code></td>
+<td>yes</td>
+<td><code>rsSetTunnelStyle</code>; <code>rs:tunnelchange</code>; <code>window.RS_TUNNEL_PALETTES</code>, <code>RS_TUNNEL_TOWARDS</code></td>
+</tr>
+<tr>
+<td>the bridge look</td>
+<td>casing color and width, shadow, deck (look <code>bridges</code>)</td>
+<td>the look</td>
+<td>engine</td>
+<td>no</td>
+<td></td>
+</tr>
+<tr>
+<td><code>views</code></td>
+<td><code>{name: {setting: value}}</code></td>
+<td><code>render</code>; option</td>
+<td><code>views.js</code></td>
+<td>yes</td>
+<td><code>rsSetView</code>; <code>rs:viewselect</code>; <code>window.RS_VIEWS</code></td>
+</tr>
+<tr>
+<td><code>palette</code> (views)</td>
+<td>text</td>
+<td><code>render</code>; views</td>
+<td>engine (<code>rs_palette</code>)</td>
+<td>yes, among the palettes that the views name</td>
+<td><code>rsSetView</code></td>
+</tr>
+<tr>
+<td><code>arrows</code>, <code>labels</code></td>
+<td>bool, true</td>
+<td><code>render</code>; look <code>args</code></td>
+<td>engine</td>
+<td>gap: no switch at run time (a visibility change is enough)</td>
+<td></td>
+</tr>
+<tr>
+<td><code>arrow_icon</code>, <code>arrow_color</code>, <code>arrow_rules</code></td>
+<td>the look (<code>arrows</code>, <code>labels.base_size</code>)</td>
+<td>option</td>
+<td><code>arrows.js</code></td>
+<td>no</td>
+<td></td>
+</tr>
+<tr>
+<td><code>street_view</code></td>
+<td><code>"window"</code>, true, false</td>
+<td><code>render</code>; option</td>
+<td><code>streetview.js</code>, <code>svspot.js</code></td>
+<td>yes</td>
+<td><code>rsSetStreetView</code>; <code>rs:streetviewchange</code></td>
+</tr>
+<tr>
+<td>Street View mode</td>
+<td><code>"linked"</code> or classic</td>
+<td><code>localStorage</code> <code>rs-street-view-mode</code></td>
+<td><code>streetview.js</code></td>
+<td>yes</td>
+<td>the window's buttons</td>
+</tr>
+<tr>
+<td><code>street_view_key</code></td>
+<td>text, <code>GOOGLE_MAPS_KEY</code></td>
+<td><code>render</code>; option</td>
+<td><code>streetview.js</code>, <code>google3d.js</code></td>
+<td>no</td>
+<td></td>
+</tr>
+<tr>
+<td>Street View spot and marker</td>
+<td><code>{edge, m}</code></td>
+<td>the click; the host</td>
+<td><code>svspot.js</code></td>
+<td>yes</td>
+<td><code>rsSetStreetViewMarkerAt</code>, <code>rsSetStreetViewMarker</code>, <code>rsStreetViewStep</code>, <code>rsGetStreetViewSpot</code>; <code>rs:streetviewmove</code>, <code>rs:streetviewspot</code></td>
+</tr>
+<tr>
+<td><code>google_3d</code></td>
+<td>bool, false</td>
+<td><code>render</code>; option</td>
+<td><code>google3d.js</code></td>
+<td>yes</td>
+<td><code>rsSetGoogle3D</code>; <code>rs:google3dchange</code></td>
+</tr>
+<tr>
+<td>the place of the two windows</td>
+<td><code>{left, top, width, height}</code></td>
+<td><code>localStorage</code> <code>rs-street-view-window:&lt;path&gt;</code>, <code>rs-google-3d-window:&lt;path&gt;</code></td>
+<td><code>float.js</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>side_panel_html</code>, <code>host_panel_width</code></td>
+<td>HTML, 320 px</td>
+<td><code>render</code></td>
+<td>the page, <code>panel.js</code></td>
+<td>open or closed: yes</td>
+<td><code>rsPanelShow</code>; <code>localStorage</code> <code>rs-host-panel:&lt;path&gt;</code></td>
+</tr>
+<tr>
+<td><code>--rs-side</code></td>
+<td>CSS length</td>
+<td><code>panel.js</code></td>
+<td><code>dashboard.css</code> (the controls on the right move with the panel)</td>
+<td>yes</td>
+<td></td>
+</tr>
+<tr>
+<td>the theme of the page (light, dark)</td>
+<td>none on the map page; <code>data-theme</code> on the sidebars of <code>render_dashboard</code> and <code>render_report</code></td>
+<td><code>templates/*.html</code></td>
+<td>the sidebars</td>
+<td>the sidebars: yes</td>
+<td>gap: <code>dashboard.css</code> and <code>popup.css</code> have literal colors and one CSS variable (<code>--rs-side</code>)</td>
+</tr>
+<tr>
+<td><code>simple</code>, <code>tiles</code>, <code>fill_layers</code></td>
+<td>the mode and the road fill layer ids</td>
+<td><code>render</code>; option</td>
+<td><code>core.js</code>, <code>select.js</code>, <code>svspot.js</code></td>
+<td>no</td>
+<td></td>
+</tr>
+<tr>
+<td><code>compress</code>, <code>data_maxzoom</code>, <code>data_tolerance</code></td>
+<td></td>
+<td><code>render</code></td>
+<td>engine</td>
+<td>no</td>
+<td></td>
+</tr>
+<tr>
+<td><code>boundary</code></td>
+<td>the outline</td>
+<td><code>render</code></td>
+<td>engine</td>
+<td>no</td>
+<td></td>
+</tr>
+<tr>
+<td>page self-checks</td>
+<td><code>window.__rs_gz</code>, <code>window.__rs_tiles</code></td>
+<td><code>_INFLATE_JS</code>, <code>_TILES_JS</code></td>
+<td>the page's banner</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>window.map</code></td>
+<td>the map</td>
+<td>the page</td>
+<td>the level editor, host scripts</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>URL parameters</td>
+<td>none today</td>
+<td></td>
+<td></td>
+<td></td>
+<td>new: <code>#rs=</code> (<code>getState</code>, <code>setState</code>)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="the-global-state-rs_">The global state <code>rs_*</code></h4>
+<p>The style reads each one with <code>["global-state", name]</code> (<code>_gs()</code> in <code>render_web.py</code>, <code>gs()</code> in <code>layers.rs</code>). In P3 the engine lists them
+with their start values in <code>roadstyle:state</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Start value</th>
+<th>Values</th>
+<th>Read by</th>
+<th>Set by</th>
+<th>API</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rs_co</code></td>
+<td>integer</td>
+<td><code>color_active</code></td>
+<td>0 to the number of options - 1</td>
+<td>the fill pieces and items (<code>match</code> on the option)</td>
+<td>Colour by menu, views</td>
+<td><code>rsSetColorField</code>; <code>rs:colorchange</code></td>
+</tr>
+<tr>
+<td><code>rs_colors</code></td>
+<td>object: edge index to color</td>
+<td><code>{}</code></td>
+<td>colors</td>
+<td>the fills, items, end caps, attached overlays (<code>_painted</code>)</td>
+<td>host page</td>
+<td><code>rsColor</code>; <code>rs:colorchange</code></td>
+</tr>
+<tr>
+<td><code>rs_base</code></td>
+<td>object: edge index to color</td>
+<td><code>{}</code></td>
+<td>colors</td>
+<td>the same, under <code>rs_colors</code></td>
+<td>host page</td>
+<td><code>rsColorBase</code></td>
+</tr>
+<tr>
+<td><code>rs_fill_on</code></td>
+<td>bool</td>
+<td><code>road_fill</code></td>
+<td></td>
+<td>the fill pieces' opacity</td>
+<td>road fill switch, views</td>
+<td><code>rsSetRoadFill</code>; <code>rs:roadfillchange</code></td>
+</tr>
+<tr>
+<td><code>rs_ov_&lt;i&gt;</code></td>
+<td>object: feature id to color</td>
+<td><code>{}</code></td>
+<td>colors</td>
+<td>the paint of overlay <code>i</code></td>
+<td>host page</td>
+<td><code>rsColor(..., overlay)</code></td>
+</tr>
+<tr>
+<td><code>rs_palette</code></td>
+<td>text</td>
+<td>the start palette</td>
+<td>the palettes that the views name</td>
+<td>each color that differs between these palettes (<code>__rs_fill@&lt;palette&gt;</code> and the paint values)</td>
+<td>View menu</td>
+<td><code>rsSetView</code>; <code>rs:viewselect</code></td>
+</tr>
+<tr>
+<td><code>rs_tun_strength</code></td>
+<td>number</td>
+<td><code>tunnel_strength</code> (60)</td>
+<td>0 to 100 (<code>steps</code>)</td>
+<td>each tunnel color</td>
+<td>Tunnels box</td>
+<td><code>rsSetTunnelStyle</code>; <code>rs:tunnelchange</code></td>
+</tr>
+<tr>
+<td><code>rs_tun_toward</code></td>
+<td>color</td>
+<td><code>tunnel_toward</code> (Sand <code>#d6cfc4</code>)</td>
+<td><code>towards</code>, or any <code>#rrggbb</code></td>
+<td>the same</td>
+<td>Tunnels box</td>
+<td>the same</td>
+</tr>
+<tr>
+<td><code>rs_tun_two</code></td>
+<td>bool</td>
+<td>the palette has two colors</td>
+<td></td>
+<td>the tunnel casing</td>
+<td>Tunnels box</td>
+<td>the same</td>
+</tr>
+<tr>
+<td><code>rs_tun_c0</code>, <code>rs_tun_c1</code></td>
+<td>colors</td>
+<td><code>tunnel_palettes[tunnel_palette]</code></td>
+<td>the palettes</td>
+<td>the tunnel casing dash and gap</td>
+<td>Tunnels box</td>
+<td>the same</td>
+</tr>
+<tr>
+<td><code>rs_tun_ratio</code></td>
+<td><code>[dash, gap]</code></td>
+<td><code>tunnel_casing_dash</code> (<code>[1, 1]</code>)</td>
+<td><code>ratios</code></td>
+<td>the tunnel casing dash layer</td>
+<td>Tunnels box</td>
+<td>the same</td>
+</tr>
+<tr>
+<td>new: <code>rs_hover</code>, <code>rs_select</code></td>
+<td>colors</td>
+<td><code>selection.hover</code>, <code>selection.select</code></td>
+<td>colors</td>
+<td>every highlight expression</td>
+<td>host page</td>
+<td><code>setSelectionStyle</code></td>
+</tr>
+<tr>
+<td>new: <code>rs_glow</code></td>
+<td>number</td>
+<td><code>selection.glow_opacity</code></td>
+<td>0 to 1</td>
+<td>the simple-mode glow</td>
+<td>host page</td>
+<td><code>setSelectionStyle</code></td>
+</tr>
+</tbody>
+</table>
+<p>With <code>state: baked</code> (the export, RustGIS), the engine writes the start values in place of these expressions.</p>
+<h4 id="the-feature-properties-__rs_">The feature properties <code>__rs_*</code></h4>
+<p>66 names. None is public for a host page: a host reads the data columns and the API. "Dashboard" marks the names that the dashboard
+reads (the internal contract between the engine and the dashboard of the same version). "Leaflet" marks the names of the Leaflet spec
+(<code>emit.to_spec</code>, <code>static/roadstyle.js</code>). Each one goes into a typed field of the render model, and the engine writes the property only
+when a layer reads it.</p>
+<table>
+<thead>
+<tr>
+<th>Names</th>
+<th>Meaning</th>
+<th>Written by</th>
+<th>Read by</th>
+<th>Kind</th>
+<th>Replaced by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>__rs_fill</code>, <code>__rs_w</code>, <code>__rs_op</code>, <code>__rs_dash</code>, <code>__rs_casing</code>, <code>__rs_cw</code>, <code>__rs_cop</code>, <code>__rs_class</code></td>
+<td>the class style of the edge: fill color, width, opacity, dash, casing color, casing width, casing opacity, class</td>
+<td><code>stylers.bake_props</code>, <code>roads.rs</code></td>
+<td>engine layers, <code>color.js</code> (<code>__rs_fill</code>), Leaflet</td>
+<td>dashboard (<code>__rs_fill</code>), Leaflet</td>
+<td><code>RoadDraw.class</code> + the look; the layer expressions read the class</td>
+</tr>
+<tr>
+<td><code>__rs_fill__&lt;i&gt;</code> (<code>__rs_fill__1</code>, ...), <code>__rs_fill@&lt;palette&gt;</code>, <code>__rs_fill__b</code>, <code>__rs_color</code></td>
+<td>the fill of color option <code>i</code>, of a palette of a view, the twin's fill (end caps), the <code>color_table</code> column</td>
+<td><code>bake_color_options</code>, <code>_merge_palettes</code>, <code>render.py</code></td>
+<td>engine, <code>color.js</code></td>
+<td>dashboard (<code>__rs_fill__&lt;i&gt;</code>)</td>
+<td><code>RoadDraw.look</code> paint columns (task 1)</td>
+</tr>
+<tr>
+<td><code>__rs_cl</code>, <code>__rs_fl</code>, <code>__rs_cs</code>, <code>__rs_ce</code></td>
+<td>the casing (main), fill, casing start and casing end numbers</td>
+<td><code>_mark_levels</code>, <code>roads.rs</code></td>
+<td>engine</td>
+<td>internal</td>
+<td><code>RoadDraw.levels</code></td>
+</tr>
+<tr>
+<td><code>__rs_hs</code>, <code>__rs_he</code>, <code>__rs_cap</code>, <code>__rs_cap0</code>, <code>__rs_cap1</code>, <code>__rs_split</code></td>
+<td>the head lengths, the cap of both ends, of each end, two different ends</td>
+<td><code>render</code> (the head columns), <code>_mark_caps</code></td>
+<td>engine</td>
+<td>internal</td>
+<td><code>RoadDraw.ends</code></td>
+</tr>
+<tr>
+<td><code>__rs_band</code></td>
+<td>always 0 since the positions</td>
+<td><code>_mark_levels</code></td>
+<td>engine</td>
+<td>internal</td>
+<td>removed</td>
+</tr>
+<tr>
+<td><code>__rs_twoway</code>, <code>__rs_oneway</code>, <code>__rs_dup</code>, <code>__rs_twin</code>, <code>__rs_pair</code></td>
+<td>two directions, the arrow, the second edge of a single-line pair, the edge of the shared casing, the shared casing</td>
+<td><code>_mark_twoway</code>, <code>_mark_single_line</code>, <code>_mark_twin_casing</code></td>
+<td>engine, <code>arrows.js</code>, <code>svspot.js</code> (<code>__rs_twoway</code>), <code>select.js</code> (<code>__rs_dup</code>)</td>
+<td>dashboard (<code>__rs_twoway</code>, <code>__rs_dup</code>)</td>
+<td><code>RoadDraw.direction</code> and the derived <code>twin</code>, <code>single_line</code></td>
+</tr>
+<tr>
+<td><code>__rs_bridge</code>, <code>__rs_tunnel</code>, <code>__rs_access</code>, <code>__rs_lvl</code></td>
+<td>the bridge look, the tunnel look, the access kind, the tag level of an attached item</td>
+<td><code>_mark_lvl</code>, <code>access_col</code>, <code>_edge_overlay</code></td>
+<td>engine, <code>filter.js</code> (<code>__rs_access</code>, <code>__rs_lvl</code>)</td>
+<td>dashboard (<code>__rs_access</code>, <code>__rs_lvl</code>)</td>
+<td><code>RoadDraw.structure</code>, <code>RoadDraw.look.access</code></td>
+</tr>
+<tr>
+<td><code>__rs_cls</code></td>
+<td>the class column of the edge on every piece, name and arrow (for the class filter)</td>
+<td><code>_mark_cls</code>, <code>roads.rs</code>, <code>slots.rs</code></td>
+<td><code>filter.js</code></td>
+<td>dashboard</td>
+<td>the edge label: the dashboard reads the class through the edge</td>
+</tr>
+<tr>
+<td><code>__rs_edge</code>, <code>__rs_edge2</code>, <code>__rs_edges</code></td>
+<td>the edge label: the edge's row, the twin's row, the rows of a shadow or a deck</td>
+<td>every generator</td>
+<td><code>core.js</code>, <code>filter.js</code>, <code>select.js</code>, <code>arrows.js</code>, the level editor</td>
+<td>dashboard</td>
+<td>the edge label of each piece (render model)</td>
+</tr>
+<tr>
+<td><code>__rs_k</code>, <code>__rs_s</code></td>
+<td>the kind of piece (0 casing, 1 fill, 2 shadow, 3 tunnel gap, 4 tunnel dash, 5 item) and its sort key</td>
+<td><code>_simple_pieces</code>, <code>simple.rs</code></td>
+<td>engine, <code>core.js</code>, <code>svspot.js</code> (<code>__rs_k</code>)</td>
+<td>dashboard (<code>__rs_k</code>)</td>
+<td><code>DrawKey</code></td>
+</tr>
+<tr>
+<td><code>__rs_main</code>, <code>__rs_seam</code>, <code>__rs_lap</code>, <code>__rs_stub</code>, <code>__rs_nocase</code></td>
+<td>the main casing piece, a seam, a lap, an end stub, an end cap with no casing ring</td>
+<td><code>_casing_parts</code>, <code>simple.rs</code>, <code>_twin_ends</code></td>
+<td>engine</td>
+<td>internal</td>
+<td>the piece generators</td>
+</tr>
+<tr>
+<td><code>__rs_wm</code>, <code>__rs_cm</code>, <code>__rs_twm</code></td>
+<td>the width, the casing and the pair width in metres (over cos of the latitude)</td>
+<td><code>_mark_width_m</code></td>
+<td>engine</td>
+<td>internal</td>
+<td><code>RoadDraw.look.width_m</code></td>
+</tr>
+<tr>
+<td><code>__rs_ord</code>, <code>__rs_ov</code>, <code>__rs_item</code>, <code>__rs_ic</code>, <code>__rs_iwm</code>, <code>__rs_iom</code>, <code>__rs_imz</code>, <code>__rs_pick</code></td>
+<td>an attached object's order, its overlay, its row, color, width and offset in metres, minzoom, and "pick it as itself"</td>
+<td><code>_edge_overlay</code>, <code>_item_pieces</code>, <code>_road_items</code></td>
+<td>engine, <code>select.js</code> (<code>__rs_pick</code>)</td>
+<td>dashboard (<code>__rs_pick</code>)</td>
+<td><code>Attachment</code></td>
+</tr>
+<tr>
+<td><code>__rs_arw</code></td>
+<td>the number of an arrow slot (for the export's thinning)</td>
+<td><code>_annotation_slots</code>, <code>slots.rs</code></td>
+<td>engine</td>
+<td>internal</td>
+<td>the slot attachments</td>
+</tr>
+<tr>
+<td><code>__rs_base</code>, <code>__rs_height</code>, <code>__rs_casing_slab</code>, <code>__rs_chain</code></td>
+<td>a 3D deck's base and height, its casing slab, its chain</td>
+<td><code>_bridge_decks</code></td>
+<td>engine, <code>select.js</code> (<code>__rs_casing_slab</code>)</td>
+<td>dashboard (<code>__rs_casing_slab</code>)</td>
+<td>the deck generator</td>
+</tr>
+<tr>
+<td><code>__rs_fc_</code>, <code>__rs_fc_frame</code>, <code>__rs_fc_i</code>, <code>__rs_fc_id</code>, <code>__rs_fc_wkb</code></td>
+<td>not properties: temporary names in the DuckDB query of <code>fastjson.py</code></td>
+<td><code>fastjson.py</code></td>
+<td></td>
+<td>internal</td>
+<td>removed (the Rust readers)</td>
+</tr>
+<tr>
+<td><code>__rs_gz</code>, <code>__rs_tiles</code></td>
+<td>not properties: the page's self-check globals (<code>window.__rs_gz</code>, <code>window.__rs_tiles</code>)</td>
+<td><code>_INFLATE_JS</code>, <code>_TILES_JS</code></td>
+<td>the page's banner</td>
+<td>page</td>
+<td>the page writer</td>
+</tr>
+<tr>
+<td><code>__rs_fill__</code></td>
+<td>the prefix of <code>__rs_fill__&lt;i&gt;</code> in the code</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4 id="the-gaps-that-the-contract-closes">The gaps that the contract closes</h4>
+<ol>
+<li>The hover color, the select color and the glow are literals in the style: the global states <code>rs_hover</code>, <code>rs_select</code>, <code>rs_glow</code> and
+   <code>setSelectionStyle</code>. The dead <code>__HOVER_COLOR__</code> replacement goes.</li>
+<li><code>select_color</code> is also a <code>rsDashboard</code> option (the Google 3D line): the dashboard reads it from <code>roadstyle:controls</code>.</li>
+<li>The legend has no active option in the metadata: <code>roadstyle:color_options</code> gets it.</li>
+<li>A Rust style has no overlay list for the Layers box (the 3D buildings, the base-map layers): <code>roadstyle:controls.overlays</code>.</li>
+<li>The camera has no getter or setter: <code>camera</code> in the state.</li>
+<li>The popup fields, the tooltip fields and the hover delay are fixed: <code>popup</code>, <code>tooltip</code>, <code>hoverDelay</code> in the state.</li>
+<li>Arrows and names cannot be switched off at run time: <code>labels</code> and <code>arrows</code> in the state (layer visibility).</li>
+<li><code>copy_field</code> is in the look's <code>args</code> but the web page does not use it: a copy button in the popup, or remove it from the web
+   contract (P0 decides with the parity list).</li>
+<li>The map page has no light and dark theme, and <code>dashboard.css</code> and <code>popup.css</code> have literal colors: CSS variables <code>--rs-*</code> from a
+   <code>ui</code> section of the palette (open point 3 of <code>style_config.md</code>), and <code>data-theme</code> on the page.</li>
+<li>There are no URL parameters: <code>#rs=</code> with <code>getState</code> and <code>setState</code>.</li>
+</ol>
 <h2 id="the-config-the-look">The config: the look</h2>
 <h3 id="one-name-for-each-thing">One name for each thing</h3>
 <table>
@@ -2073,7 +2832,8 @@ measurements. <code>MAX_ROADS</code> = 200,000 is an estimate from Tartu only.</
 <li><strong>Content.</strong> <code>roadstyle-look</code>: the structs, the bundled files, <code>Look::resolve</code>, the schema. A reader of today's <code>look.json</code>
   (version 0), so the users can move one at a time. <code>resolveLook</code> in <code>roadstyle-wasm</code>. The <code>palette</code> view row
   (<code>_merge_palettes</code>) in Rust. The output side of the interaction contract: <code>roadstyle:contract</code>, <code>roadstyle:controls</code>,
-  <code>roadstyle:state</code>, the layer roles, and <code>state: live</code> (the global state kept in the expressions).</li>
+  <code>roadstyle:state</code>, the layer roles, and <code>state: live</code> (the global state kept in the expressions). The inventory of shared variables
+  moves to <code>docs/reference/contract.md</code>, with <code>tests/test_contract_names.py</code>.</li>
 <li><strong>Golden test.</strong> For 4 palettes x 2 profiles x the settings fixtures of <code>tests/test_settings_overrides.py</code>, the look from Rust is
   equal to the look from Python. The style from the Rust look is equal to the style from the Python look.</li>
 <li><strong>First user.</strong> The GeoLibre plugin: <code>build.py</code> stops running Python and mapstyle to make the 64 looks.</li>
@@ -2934,6 +3694,11 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 <td>Property</td>
 <td><code>proptest</code>: a tile decodes to the input geometry within half a tile unit; the levels keep each casing under the fill of each higher road that crosses it; the merge of the look is the same for any split of one settings source into two</td>
 <td><code>rust/&lt;crate&gt;/tests/</code></td>
+</tr>
+<tr>
+<td>Contract names</td>
+<td>Each <code>rs_*</code>, <code>__rs_*</code>, <code>roadstyle:*</code>, <code>localStorage</code> key and <code>--rs-*</code> variable in the code has a row in <code>docs/reference/contract.md</code>, and each row has a name in the code</td>
+<td><code>tests/test_contract_names.py</code></td>
 </tr>
 <tr>
 <td>Cross-language</td>
