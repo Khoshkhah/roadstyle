@@ -650,27 +650,83 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
-name = "roadstyle-rs"
+name = "roadstyle"
+version = "0.0.1"
+dependencies = [
+ "roadstyle-engine",
+ "roadstyle-levels",
+ "roadstyle-tiles",
+ "serde_json",
+]
+
+[[package]]
+name = "roadstyle-engine"
+version = "0.0.1"
+dependencies = [
+ "base64 0.22.1",
+ "indexmap",
+ "roadstyle-io",
+ "roadstyle-model",
+ "rstar",
+ "serde_json",
+ "yaml-rust2",
+]
+
+[[package]]
+name = "roadstyle-io"
 version = "0.0.1"
 dependencies = [
  "arrow-array",
  "arrow-schema",
- "base64 0.22.1",
  "bytes",
+ "parquet",
+ "roadstyle-model",
+ "serde_json",
+]
+
+[[package]]
+name = "roadstyle-levels"
+version = "0.0.1"
+dependencies = [
+ "rstar",
+ "sha2",
+]
+
+[[package]]
+name = "roadstyle-model"
+version = "0.0.1"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
+name = "roadstyle-rs"
+version = "0.0.1"
+dependencies = [
+ "base64 0.22.1",
  "flate2",
  "indexmap",
  "parquet",
- "rstar",
+ "roadstyle",
  "serde_json",
  "sha2",
- "yaml-rust2",
+]
+
+[[package]]
+name = "roadstyle-tiles"
+version = "0.0.1"
+dependencies = [
+ "indexmap",
+ "roadstyle-model",
+ "rstar",
+ "serde_json",
 ]
 
 [[package]]
 name = "roadstyle-wasm"
 version = "0.0.1"
 dependencies = [
- "roadstyle-rs",
+ "roadstyle",
  "serde_json",
  "wasm-bindgen",
 ]

@@ -6,11 +6,7 @@ use bytes::Bytes;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use serde_json::{Map, Value};
 
-pub struct Feature {
-    pub props: crate::props::Props,
-    /// None: not a LineString (the stages skip it, as roadstyle does)
-    pub coords: Option<Vec<[f64; 2]>>,
-}
+pub use roadstyle_model::Feature;
 
 pub fn read_roads(data: Vec<u8>, geom_col: &str) -> Result<Vec<Feature>, String> {
     let reader = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data))

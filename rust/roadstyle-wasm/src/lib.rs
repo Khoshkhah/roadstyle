@@ -60,7 +60,7 @@ mod wasm {
     /// makeStyle(roads: Uint8Array, look: string, features?: Uint8Array, planner?: Uint8Array, name?: string) -> string; an error is a thrown Error.
     #[wasm_bindgen(js_name = makeStyle)]
     pub fn make_style(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, JsError> {
-        roadstyle_rs::make_style(parquet, look, features, planner, name).map_err(|e| JsError::new(&e))
+        roadstyle::make_style(parquet, look, features, planner, name).map_err(|e| JsError::new(&e))
     }
 
     /// A map with vector tiles: `new Tiler(roads, look, features?, name?, prefix, keep)`, then `style()` (the style's JSON text) and
@@ -69,7 +69,7 @@ mod wasm {
     #[wasm_bindgen]
     pub struct Tiler {
         style: String,
-        tiles: roadstyle_rs::tiles::Tiles,
+        tiles: roadstyle::tiles::Tiles,
     }
 
     #[wasm_bindgen]
@@ -77,7 +77,7 @@ mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name: Option<String>, prefix: &str, keep: Vec<String>)
                    -> Result<Tiler, JsError> {
-            let (style, tiles) = roadstyle_rs::make_tiled(parquet, look, features, name, prefix, &keep).map_err(|e| JsError::new(&e))?;
+            let (style, tiles) = roadstyle::make_tiled(parquet, look, features, name, prefix, &keep).map_err(|e| JsError::new(&e))?;
             Ok(Tiler { style, tiles })
         }
 
@@ -87,7 +87,7 @@ mod wasm {
 
         /// `source` is the style's one source, `roads`: the tile has a layer for each of the old sources.
         pub fn tile(&self, source: &str, z: u32, x: u32, y: u32) -> Vec<u8> {
-            if source == roadstyle_rs::tiles::SOURCE { self.tiles.tile(z, x, y) } else { Vec::new() }
+            if source == roadstyle::tiles::SOURCE { self.tiles.tile(z, x, y) } else { Vec::new() }
         }
 
         /// The properties of the feature `id` of a source, as JSON (`null` when there is none).
@@ -101,7 +101,7 @@ mod wasm {
     #[wasm_bindgen(js_name = makeLook)]
     pub fn make_look(options: &str) -> Result<String, JsError> {
         let o: serde_json::Value = serde_json::from_str(options).map_err(|e| JsError::new(&format!("options: not JSON: {e}")))?;
-        roadstyle_rs::look::make_look(&o).map(|l| l.to_string()).map_err(|e| JsError::new(&e))
+        roadstyle::look::make_look(&o).map(|l| l.to_string()).map_err(|e| JsError::new(&e))
     }
 
         /// The size of the module's memory, in bytes.

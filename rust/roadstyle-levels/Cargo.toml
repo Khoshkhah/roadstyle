@@ -1,0 +1,10 @@
+[package]
+name = "roadstyle-levels"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "roadstyle's drawing levels: the tags rule and the solver (no dependency on the other crates)"
+
+[dependencies]
+rstar.workspace = true
+sha2.workspace = true

@@ -9,6 +9,9 @@
 //! (the name and arrow slots): it goes whole into every tile it touches, because MapLibre places a label only in the tile that has
 //! its anchor.
 
+// Ported numeric code: index loops over parallel arrays and tuple types of the Python stages read as they are in Python.
+#![allow(clippy::needless_range_loop, clippy::type_complexity)]
+
 use rstar::{primitives::GeomWithData, primitives::Rectangle, RTree, AABB};
 use serde_json::{Map, Value};
 use indexmap::IndexMap;
@@ -163,7 +166,7 @@ impl Tiles {
     }
 
     /// Add a source of typed features (roads, simple), as `add` adds its JSON.
-    pub fn add_typed(&mut self, name: &str, source: crate::props::Source, keep: &HashSet<String>, whole: bool, min_zoom: u32) {
+    pub fn add_typed(&mut self, name: &str, source: roadstyle_model::props::Source, keep: &HashSet<String>, whole: bool, min_zoom: u32) {
         let mut b = Builder::default();
         for (i, f) in source.feats.into_iter().enumerate() {
             let Some(c) = f.coords else { continue };

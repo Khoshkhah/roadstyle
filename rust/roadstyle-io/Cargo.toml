@@ -1,0 +1,14 @@
+[package]
+name = "roadstyle-io"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "roadstyle's readers: the roads and other tables from GeoParquet"
+
+[dependencies]
+roadstyle-model.workspace = true
+serde_json.workspace = true
+parquet.workspace = true
+arrow-array.workspace = true
+arrow-schema.workspace = true
+bytes.workspace = true

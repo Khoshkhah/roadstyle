@@ -1,24 +1,18 @@
 [package]
 name = "roadstyle-rs"
-version = "0.0.1"
-edition = "2021"
-license = "MIT"
-description = "roadstyle's engine: the style of a map, its vector tiles and the drawing levels (docs/design/rust_engine.md)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The old name of the facade crate roadstyle, kept for one version (docs/design/rust_library.md)"
 
 [dependencies]
-serde_json = { version = "1", features = ["preserve_order"] }
-# the versions of duckosm-rust (offline from the same cache); snap, not zstd: GeoPandas writes Snappy, and snap is pure Rust (wasm)
-parquet = { version = "=60.0.0", default-features = false, features = ["arrow", "snap"] }
-arrow-array = "=60.0.0"
-arrow-schema = "=60.0.0"
-bytes = "1"
-indexmap = "2"                      # the order of Python's dicts (the slots' groups)
-rstar = "0.12"                      # the R-tree for the crossings (shapely STRtree) and the levels
-sha2 = "0.10"                       # edge_levels_meta.edge_hash: roadstyle's sha256 of the sorted edge ids
-yaml-rust2 = "0.13"                 # the look: roadstyle's profiles and palettes (src/roadstyle/data/*.yaml)
-base64 = "0.22"                     # the look: the arrow image as a data URL
+roadstyle.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 # the golden levels are duckosm-rust's own Parquet files, which it writes with zstd (only the tests read them)
 parquet = { version = "=60.0.0", default-features = false, features = ["zstd"] }
+sha2.workspace = true
+indexmap.workspace = true
+base64.workspace = true
 flate2 = "1"                        # the golden styles of tests/colors.rs are gzipped
