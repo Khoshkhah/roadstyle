@@ -121,6 +121,44 @@ The data is roadstyle's own: the crate reads `src/roadstyle/data/` (the profiles
 
 **Not in the engine: mapstyle's part of the look.** mapstyle turns its mode, theme and paths into the palette name, the settings and the args, and makes `features` (layers.yaml, the 3D buildings, the theme's feature style, the textures and icons as data URLs) from its own data in the mapstyle repository. geolibre-roadstyle's `build.py` still makes that part with mapstyle. A port of it is a separate decision: it needs mapstyle's data in this repository or a mapstyle crate.
 
+## What Python roadstyle can do and the crate cannot yet (2026-10-23)
+
+The crate makes the style of `export_inline` for simple mode with stored levels (with mapstyle's base map, the planner data, the names and arrows), its vector tiles, the colours of data (`color_by`, `color_table`, `color_options`, legend), the look from `palette`, `profile` and `settings`, and the levels (`compute_levels`, tags and solve). This list is what is left, by the Python function or option. "Fixed" means the crate has one value where Python has an option.
+
+**Keywords of `render_edges` / `render_web.render` that change the style**
+
+- [ ] Column names, fixed in the crate: `highway_col` (highway), `filter_col`, `tunnel_col`, `bridge_col`, `layer_col`, `edge_id_col` (edge_id), `cap_col` / `cap_start_col` / `cap_end_col`, `casing_level_col`, `fill_level_col`, `casing_start_col`, `casing_end_col`, `head_start_m_col`, `head_end_m_col`, `directed_col` (is_directed), `driving_col` (has_arrows).
+- [ ] `access_col`: the access colours (`__rs_access`, the theme's `access`).
+- [ ] No stored levels: `render` computes them (`compute_levels(method="solve")`). The crate has the solver (`levels`), but `make_style` needs the level columns.
+- [ ] `head_m` (fixed 5.0), `road_fill` (fixed on), `offset_zoom` (`offset_frac` and `width_frac` are read).
+- [ ] Metre widths: `width_m_col`, `width_m_zoom`, `casing_m`, `casing_min_px` (`_mark_width_m`, `_mitre_ends`; the crate stops with an error on `__rs_wm`).
+- [ ] `simple=False`: the layer set of casings and fills for each level (`_level_id`, `_fill_layer_ids`); the crate has simple mode only.
+- [ ] `arrows`, `labels` (fixed on), `minzoom` (class thinning by `config.minzoom`, opt-in).
+- [ ] `view_3d`: the 3D bridge decks (`_bridge_decks`; out by decision until a new version).
+- [ ] `items`, `items_popup`: edge items and lanes (`__rs_k` 5, `__rs_ic`).
+- [ ] `overlays=`: the caller's own `Overlay` layers (`_build_overlays`, `overlays.py`). The crate has mapstyle's base-map overlays only.
+- [ ] `boundary` (the dashed outline), `hover_color`, `select_color` (the crate uses the theme's `selection`).
+- [ ] `data_maxzoom`, `data_tolerance` (the GeoJSON sources' `maxzoom` and `tolerance`), `pitch`, `bearing`, `max_pitch` (the camera; the crate writes `center` and `zoom`).
+- [ ] `road_popup` (the crate writes the default popup fields), `popup_mode`; `road_tooltip` and `hover_delay_ms` from the look.
+- [ ] `views`: named presets of colour option, palette and filters (`_check_views`).
+- [ ] `style=`: a Python `Styler` object (an error in the crate); a colour option with another palette than the look's.
+- [ ] `tiles=True`: the PMTiles archive with the sidecar table (`tiles.build_pmtiles`, `tiles.sidecar`). The crate makes tiles on request (`Tiler`); the rules of `tiles.py` are on the branch `rust-tiles`, not merged.
+
+**Keywords of the HTML page, not of the style** (the dashboard JS module of task 2): `filter_control`, `find_control`, `overlay_control`, `overlay_popup`, `side_panel_html`, `host_panel_width`, `basemap_switcher`, `basemap`, `basemaps`, `api_key`, `zoom_readout`, `street_view`, `street_view_key`, `google_3d`, `tunnel_control`, `compress`.
+
+**Public functions**
+
+- [ ] Backends: `render_edges(backend="folium")` (`render_folium.py`), `backend="lonboard"` (`render_lonboard.py`).
+- [ ] `export_style`: `style.json` with a tile folder or one PMTiles file and the sprite. `export_look`: the simple look for another app's data layer.
+- [ ] Pages: `render_dashboard`, `render_report`, `sidebar_html`, `make_legend`, `to_html`, `to_iframe`, `save`, `render_street_view`, `snapshot` (a PNG through a browser).
+- [ ] Specs: `to_spec`, `save_spec`, `load_spec`.
+- [ ] Input: `load_edges`, `from_duckdb`, `from_arrow`, `from_geojson`, `as_edges`, `normalize_edges`, `filter_edges` (`include`, `exclude`, `match_links`), `highway_types`, `is_directed`. The crate reads GeoParquet with fixed column names only.
+- [ ] Levels: the level areas and their editor (`save_area_levels`, `load_area_levels`, `restore_area_inputs`, `level_area.py`, `level_editor.py`), and the stored levels in a duckOSM file (`load_levels`, `save_levels`, `levels_store.py`). The crate has `compute_levels` with `level_input`, `solve_levels` and `auto_ends` inside it.
+- [ ] Palettes and settings: `register_palette`, `save_palette`, `load_palette`, `palette_to_dict`, `palette_from_dict` (the crate takes a palette only through `settings`); `use_settings` with a file path (the crate takes mappings).
+- [ ] Base maps: `BASEMAPS`, `get_basemap`, `register_basemap`, `get_api_key`, `set_api_key`.
+- [ ] The other tools: `cli.py`, `mcp_server.py`, the studio (`ui/studio`).
+- [ ] mapstyle's half of the look (mode, theme and paths; `features`): its own task after the plan, with Kaveh's OK.
+
 ## Next steps
 
 1. geolibre-roadstyle and duckosm-rust use the crate at a fixed commit and delete their copies. The duckosm-rust session does this step.
