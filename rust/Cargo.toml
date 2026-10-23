@@ -1,0 +1,9 @@
+# roadstyle's engine in Rust (docs/design/rust_engine.md): the library and its front-ends.
+# A Python binding (roadstyle-py, maturin and PyO3) is a later member.
+[workspace]
+members = ["roadstyle-rs", "roadstyle-wasm"]
+resolver = "2"
+
+[profile.release]
+lto = true
+codegen-units = 1

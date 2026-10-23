@@ -1,0 +1,15 @@
+[package]
+name = "roadstyle-wasm"
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+description = "The browser's front-end of roadstyle-rs: makeStyle, Tiler, memoryBytes (docs/design/rust_engine.md)"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+roadstyle-rs = { path = "../roadstyle-rs" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "=0.2.129"           # the version of the wasm-bindgen program that makes the JavaScript glue

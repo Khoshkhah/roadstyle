@@ -1,0 +1,2996 @@
+{
+ "palette": "ms_all_google",
+ "settings": {
+  "palettes": {
+   "ms_all_google": {
+    "pedestrian": {
+     "fill": "#f6f6f6",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#cfcfcf",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "motorway": {
+     "fill": "#e892a2",
+     "width": 6.0,
+     "casing_width": 8.0,
+     "casing": "#c24e6b",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "busway": {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#bbbbbb",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "tertiary": {
+     "fill": "#ffffff",
+     "width": 2.5,
+     "casing_width": 4.0,
+     "casing": "#8f8f8f",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "ferry": {
+     "fill": "#6666ff",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": null,
+     "dash": [
+      6,
+      4
+     ],
+     "opacity": 1.0
+    },
+    "platform": {
+     "fill": "#e4e4e4",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#c4c4c4",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "living_street": {
+     "fill": "#ededed",
+     "width": 1.8,
+     "casing_width": 3.0,
+     "casing": "#bbbbbb",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "steps": {
+     "fill": "#b8b8b8",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": null,
+     "dash": [
+      0.6,
+      0.5
+     ],
+     "opacity": 1.0
+    },
+    "raceway": {
+     "fill": "#ffc0cb",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#bbbbbb",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "bridleway": {
+     "fill": "#eef5e8",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#a9c79a",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "corridor": {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#c4c4c4",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "path": {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#c4c4c4",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "footway": {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#c4c4c4",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "unclassified": {
+     "fill": "#ffffff",
+     "width": 2.0,
+     "casing_width": 3.5,
+     "casing": "#bbbbbb",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "construction": {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#bbbbbb",
+     "dash": [
+      5,
+      4
+     ],
+     "opacity": 1.0
+    },
+    "residential": {
+     "fill": "#ffffff",
+     "width": 2.0,
+     "casing_width": 3.5,
+     "casing": "#bbbbbb",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "secondary": {
+     "fill": "#f7fabf",
+     "width": 3.5,
+     "casing_width": 5.5,
+     "casing": "#707d00",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "primary": {
+     "fill": "#fcd6a4",
+     "width": 4.5,
+     "casing_width": 6.5,
+     "casing": "#a06b00",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "service": {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing_width": 2.2,
+     "casing": "#bbbbbb",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "track": {
+     "fill": "#f2ecdc",
+     "width": 1.5,
+     "casing_width": 1.5,
+     "casing": "#c9bb9a",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "cycleway": {
+     "fill": "#1e8e3e",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#ffffff",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "trunk": {
+     "fill": "#f9b29c",
+     "width": 5.5,
+     "casing_width": 7.5,
+     "casing": "#c84e2f",
+     "dash": null,
+     "opacity": 1.0
+    }
+   }
+  },
+  "roads": {
+   "group": {
+    "platform": "path",
+    "ferry": "path"
+   },
+   "width": {
+    "em": {
+     "12": 0.8,
+     "13": 1.2,
+     "14": 1.8,
+     "15": 2.4,
+     "16": 3,
+     "17": 3.8,
+     "18": 4.8
+    }
+   },
+   "width_zoom_rate": {
+    "em": 1.3
+   },
+   "casing_ratio": {
+    "em": 1.5
+   }
+  },
+  "config": {
+   "minor_no_casing": [
+    "service",
+    "living_street"
+   ]
+  }
+ },
+ "args": {
+  "name": "monaco (all, google)",
+  "tooltip": [
+   "edge_id",
+   "osm_id",
+   "highway",
+   "name",
+   "access"
+  ],
+  "copy_field": "edge_id",
+  "basemap": "blank",
+  "basemaps": [
+   "blank",
+   "voyager_nolabels",
+   "voyager",
+   "positron",
+   "osm",
+   "satellite"
+  ],
+  "casing_start_col": "casing_start",
+  "casing_level_col": "casing_level",
+  "casing_end_col": "casing_end",
+  "fill_level_col": "fill_level",
+  "head_start_m_col": "head_start_m",
+  "head_end_m_col": "head_end_m",
+  "cap_start_col": "cap_start",
+  "cap_end_col": "cap_end",
+  "directed_col": "is_directed",
+  "driving_col": "has_arrows",
+  "arrows": false,
+  "labels": false,
+  "view_3d": false
+ },
+ "theme": {
+  "roads": {
+   "classes": {
+    "motorway": {
+     "group": "major",
+     "order": 9,
+     "minzoom": 4,
+     "width": 6.0,
+     "casing_width": 8.0,
+     "dash": null
+    },
+    "trunk": {
+     "group": "major",
+     "order": 8,
+     "minzoom": 5,
+     "width": 5.5,
+     "casing_width": 7.5,
+     "dash": null
+    },
+    "primary": {
+     "group": "primary",
+     "order": 7,
+     "minzoom": 7,
+     "width": 4.5,
+     "casing_width": 6.5,
+     "dash": null
+    },
+    "secondary": {
+     "group": "secondary",
+     "order": 6,
+     "minzoom": 9,
+     "width": 3.5,
+     "casing_width": 5.5,
+     "dash": null
+    },
+    "tertiary": {
+     "group": "tertiary",
+     "order": 5,
+     "minzoom": 11,
+     "width": 2.5,
+     "casing_width": 4.0,
+     "dash": null
+    },
+    "unclassified": {
+     "group": "residential",
+     "order": 4,
+     "minzoom": 13,
+     "width": 2.0,
+     "casing_width": 3.5,
+     "dash": null
+    },
+    "residential": {
+     "group": "residential",
+     "order": 4,
+     "minzoom": 13,
+     "width": 2.0,
+     "casing_width": 3.5,
+     "dash": null
+    },
+    "road": {
+     "group": "residential",
+     "order": 4
+    },
+    "busway": {
+     "group": "residential",
+     "order": 4
+    },
+    "raceway": {
+     "group": "tertiary",
+     "order": 5
+    },
+    "living_street": {
+     "group": "living_street",
+     "order": 3,
+     "minzoom": 14,
+     "width": 1.8,
+     "casing_width": 3.0,
+     "dash": null,
+     "no_casing": true
+    },
+    "service": {
+     "group": "service",
+     "order": 1.5,
+     "minzoom": 15,
+     "minor": true,
+     "width": 1.2,
+     "casing_width": 2.2,
+     "dash": null,
+     "no_casing": true
+    },
+    "pedestrian": {
+     "group": "pedestrian",
+     "order": 2,
+     "minzoom": 14,
+     "single_line": true,
+     "minor": true
+    },
+    "footway": {
+     "group": "path",
+     "order": 1,
+     "minzoom": 15,
+     "single_line": true,
+     "minor": true,
+     "width": 1.2,
+     "casing_width": 1.2,
+     "dash": [
+      4,
+      4
+     ]
+    },
+    "path": {
+     "group": "path",
+     "order": 1,
+     "minzoom": 15,
+     "single_line": true,
+     "minor": true,
+     "width": 1.2,
+     "casing_width": 1.2,
+     "dash": [
+      2,
+      5
+     ]
+    },
+    "cycleway": {
+     "group": "path",
+     "order": 1,
+     "minzoom": 14,
+     "single_line": true,
+     "minor": true,
+     "width": 1.2,
+     "casing_width": 1.2,
+     "dash": [
+      3,
+      3
+     ]
+    },
+    "steps": {
+     "group": "path",
+     "order": 0.9,
+     "single_line": true,
+     "minor": true
+    },
+    "bridleway": {
+     "group": "path",
+     "order": 1,
+     "single_line": true
+    },
+    "track": {
+     "group": "path",
+     "order": 1.1,
+     "minzoom": 14,
+     "single_line": true,
+     "minor": true,
+     "width": 1.5,
+     "casing_width": 1.5,
+     "dash": [
+      4,
+      4
+     ]
+    },
+    "corridor": {
+     "group": "path",
+     "order": 1,
+     "single_line": true
+    },
+    "construction": {
+     "group": "path",
+     "order": 0
+    },
+    "motorway_link": {
+     "order": 1.9,
+     "minzoom": 11
+    },
+    "trunk_link": {
+     "order": 1.85,
+     "minzoom": 11
+    },
+    "primary_link": {
+     "order": 1.8,
+     "minzoom": 11
+    },
+    "secondary_link": {
+     "order": 1.75,
+     "minzoom": 12
+    },
+    "tertiary_link": {
+     "order": 1.7,
+     "minzoom": 12
+    },
+    "platform": {
+     "order": 0.5,
+     "single_line": true,
+     "group": "path"
+    },
+    "ferry": {
+     "group": "path"
+    }
+   },
+   "fallback": {
+    "group": "residential",
+    "order": 4,
+    "link_order": -0.5,
+    "width": 2.0,
+    "casing_width": 3.0,
+    "fill": "#888888",
+    "casing": "#000000",
+    "palette_casing": "#bcbcbc"
+   },
+   "width": {
+    "major": {
+     "8": 0.8,
+     "10": 1.3,
+     "12": 3.5,
+     "13": 6,
+     "14": 8,
+     "15": 10,
+     "16": 13,
+     "17": 17,
+     "18": 22
+    },
+    "primary": {
+     "8": 0.7,
+     "10": 1.2,
+     "12": 3.5,
+     "13": 5,
+     "14": 7,
+     "15": 9,
+     "16": 12,
+     "17": 15,
+     "18": 19
+    },
+    "secondary": {
+     "10": 0.8,
+     "12": 2.5,
+     "13": 4,
+     "14": 6,
+     "15": 8,
+     "16": 10,
+     "17": 13,
+     "18": 17
+    },
+    "tertiary": {
+     "12": 2,
+     "13": 3,
+     "14": 4.5,
+     "15": 6,
+     "16": 8,
+     "17": 11,
+     "18": 14
+    },
+    "residential": {
+     "12": 0.5,
+     "13": 1.5,
+     "14": 2.5,
+     "15": 4,
+     "16": 6,
+     "17": 9,
+     "18": 13
+    },
+    "living_street": {
+     "13": 2,
+     "14": 2.5,
+     "15": 4,
+     "16": 6,
+     "17": 9,
+     "18": 13
+    },
+    "service": {
+     "13": 0.8,
+     "14": 1.2,
+     "15": 2,
+     "16": 2.8,
+     "17": 4,
+     "18": 5
+    },
+    "pedestrian": {
+     "13": 2,
+     "14": 3,
+     "15": 4,
+     "16": 6,
+     "17": 9,
+     "18": 13
+    },
+    "path": {
+     "12": 0.4,
+     "13": 0.6,
+     "14": 0.8,
+     "15": 1,
+     "16": 1.4,
+     "17": 2,
+     "18": 2.6,
+     "19": 3
+    },
+    "em": {
+     "12": 0.8,
+     "13": 1.2,
+     "14": 1.8,
+     "15": 2.4,
+     "16": 3,
+     "17": 3.8,
+     "18": 4.8
+    }
+   },
+   "width_zoom_rate": {
+    "major": 2.0,
+    "primary": 2.0,
+    "secondary": 2.0,
+    "tertiary": 1.95,
+    "residential": 1.9,
+    "living_street": 1.9,
+    "service": 1.9,
+    "pedestrian": 1.85,
+    "path": 1.3,
+    "em": 1.3
+   },
+   "casing_ratio": {
+    "major": 1.17,
+    "primary": 1.18,
+    "secondary": 1.19,
+    "tertiary": 1.21,
+    "residential": 1.24,
+    "living_street": 1.24,
+    "service": 1.27,
+    "pedestrian": 1.21,
+    "path": 1.0,
+    "em": 1.5
+   },
+   "zoom_stops": [
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20
+   ],
+   "links": {
+    "classes": [
+     "motorway_link",
+     "trunk_link",
+     "primary_link",
+     "secondary_link",
+     "tertiary_link"
+    ],
+    "width": 0.6
+   },
+   "cap": "round",
+   "join": "round",
+   "split": {
+    "offset_frac": 0.28,
+    "width_frac": 0.6,
+    "offset_zoom": 15,
+    "ramp_zooms": 2
+   },
+   "width_m_zoom": 16,
+   "twin_end_caps": true,
+   "twin_casing": "one",
+   "fill_opacity": 0.9
+  },
+  "casing": {
+   "extra": 2.0,
+   "m": 0.15,
+   "min_px": 0.0,
+   "opacity": 0.75
+  },
+  "labels": {
+   "halo_width": 0,
+   "font": [
+    "Noto Sans Regular"
+   ],
+   "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+   "minzoom": 14,
+   "minor_minzoom": 16,
+   "fraction": 0.9,
+   "min_px": 8.0,
+   "base_size": [
+    [
+     14,
+     10
+    ],
+    [
+     18,
+     14
+    ]
+   ],
+   "max_angle": 40,
+   "padding": 2,
+   "color": "#5b5b5b",
+   "halo_color": null
+  },
+  "arrows": {
+   "minzoom": 15,
+   "minor_minzoom": 16,
+   "main_below": 16.5,
+   "size": {
+    "base": 1.8,
+    "stops": [
+     [
+      15,
+      0.5
+     ],
+     [
+      18,
+      0.9
+     ],
+     [
+      22,
+      3.0
+     ]
+    ],
+    "minor": 0.6
+   },
+   "spacing": [
+    [
+     15,
+     200
+    ],
+    [
+     18,
+     320
+    ],
+    [
+     22,
+     900
+    ]
+   ],
+   "icon": {
+    "path": "M 0,2 7,2 7,0 12,2.5 7,5 7,3 0,3 z",
+    "view_box": [
+     12,
+     5
+    ],
+    "width": 96,
+    "height": 40,
+    "pixel_ratio": 4
+   },
+   "main": [
+    "motorway",
+    "trunk",
+    "primary",
+    "secondary",
+    "tertiary"
+   ],
+   "place": {
+    "min_len_px": 100,
+    "min_gap_px": 150,
+    "name_gap_px": 14,
+    "edge_px": 10,
+    "char_width": 0.6
+   },
+   "color": "#5b5b5b",
+   "opacity": 0.7
+  },
+  "bridges": {
+   "cap": "butt",
+   "wing_scale": 1.25,
+   "ramp": [
+    14,
+    17
+   ],
+   "casing_extra": 1.5,
+   "casing_m": 0.25,
+   "casing_px": 1.0,
+   "shadow": {
+    "show": true,
+    "blur": 4.0,
+    "offset": [
+     2,
+     2
+    ],
+    "trim_m": 3.0,
+    "width_scale": 1.6,
+    "color": "rgba(0,0,0,0.25)"
+   },
+   "decks": {
+    "base_m": 5.0,
+    "thickness_m": 1.0,
+    "ramp_m": 40.0,
+    "step_m": 2.5,
+    "match_zoom": 18.0,
+    "width_scale": 0.6,
+    "flat_below": 16.0,
+    "casing_px": 2.0,
+    "underlay": "#f2f2f2",
+    "opacity": 0.7
+   },
+   "casing_color": "#64748b"
+  },
+  "tunnels": {
+   "opacity_scale": 0.45,
+   "cap": "butt",
+   "folium_dash": [
+    4,
+    4
+   ],
+   "casing_dash": [
+    1,
+    1
+   ],
+   "fill_dash": [],
+   "strength": 60,
+   "dash_extra_px": 3,
+   "steps": [
+    0,
+    25,
+    50,
+    55,
+    60,
+    65,
+    70,
+    75,
+    100
+   ],
+   "ratios": [
+    [
+     1,
+     1
+    ],
+    [
+     2,
+     2
+    ],
+    [
+     3,
+     3
+    ],
+    [
+     4,
+     4
+    ],
+    [
+     2,
+     1
+    ],
+    [
+     3,
+     2
+    ],
+    [
+     4,
+     3
+    ],
+    [
+     1,
+     2
+    ]
+   ],
+   "fill_dash_color": "rgba(255,255,255,0.55)",
+   "toward": "Sand",
+   "towards": {
+    "Slate": "#64748b",
+    "Dark": "#14181d",
+    "Light": "#efede8",
+    "Graphite": "#374151",
+    "Navy": "#1e293b",
+    "Stone": "#78716c",
+    "Sand": "#d6cfc4",
+    "Teal": "#134e4a"
+   },
+   "palette": "Graphite + silver",
+   "palettes": {
+    "One colour": null,
+    "Slate + ice": [
+     "#64748b",
+     "#cbd5e1"
+    ],
+    "Blue + cyan": [
+     "#315b7d",
+     "#a9d7e8"
+    ],
+    "Warm + sand": [
+     "#806d64",
+     "#e7c9a7"
+    ],
+    "Graphite + silver": [
+     "#4b5563",
+     "#b8bec7"
+    ],
+    "Indigo + lavender": [
+     "#4c5c96",
+     "#b9c2ea"
+    ],
+    "Teal + mint": [
+     "#2f6f73",
+     "#9fd3cf"
+    ]
+   },
+   "to": {
+    "fill": "#64748b",
+    "dash": "#94a3b8"
+   }
+  },
+  "selection": {
+   "folium": {
+    "base_width": 4.0,
+    "glow_scale": 3.0,
+    "casing_scale": 1.8,
+    "core_scale": 1.5,
+    "hover_extra_px": 2
+   },
+   "hover": "#b388ff",
+   "select": "#7c4dff",
+   "casing": "#000000",
+   "opacity": 0.85,
+   "glow_opacity": 0.35,
+   "folium_hover": "#ffffff"
+  },
+  "data": {
+   "width": 2.0,
+   "casing_width": 0.0,
+   "nodata": "#cccccc",
+   "color_table": "#bbbbbb",
+   "opacity": 0.9,
+   "casing_opacity": 0.75
+  },
+  "overlays": {
+   "radius": 6.0,
+   "width": 2.0,
+   "circle_stroke_width": 1,
+   "text_size": 12,
+   "text_max_angle": 40,
+   "text_padding": 2,
+   "text_halo_width": 1.5,
+   "item_overlap_px": 1,
+   "color": "#6aa9ff",
+   "circle_stroke": "#ffffff",
+   "fill_opacity": 0.15,
+   "circle_opacity": 0.85,
+   "line_opacity": 0.9,
+   "outline_opacity": 0.9
+  },
+  "boundary": {
+   "width": 2.5,
+   "dash": [
+    3,
+    2
+   ],
+   "color": "#6a0dad",
+   "opacity": 0.9
+  },
+  "background": {
+   "light": "#e8e6e1",
+   "dark": "#0e1113"
+  },
+  "access": {
+   "private": "#c8c8c8",
+   "bus": "#9db8d9",
+   "pedestrian": "#dddde8",
+   "delivery": "#e8d2b0"
+  },
+  "palettes": {
+   "amber": {
+    "motorway": {
+     "fill": "#f28c28",
+     "width": 6.0,
+     "casing_width": 8.0,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#dc2a48"
+    },
+    "trunk": {
+     "fill": "#f5a623",
+     "width": 5.5,
+     "casing_width": 7.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#c84e2f"
+    },
+    "primary": {
+     "fill": "#f4c542",
+     "width": 4.5,
+     "casing_width": 6.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#a06b00"
+    },
+    "secondary": {
+     "fill": "#f7df72",
+     "width": 3.5,
+     "casing_width": 5.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#707d00"
+    },
+    "tertiary": {
+     "fill": "#b8d986",
+     "width": 2.5,
+     "casing_width": 4.0,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#bcbcbc"
+    },
+    "unclassified": {
+     "fill": "#ffffff",
+     "width": 2.0,
+     "casing_width": 3.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#bcbcbc"
+    },
+    "residential": {
+     "fill": "#d7dee8",
+     "width": 2.0,
+     "casing_width": 3.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#bcbcbc"
+    },
+    "living_street": {
+     "fill": "#cbd5e1",
+     "width": 1.8,
+     "casing_width": 3.0,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#cccccc"
+    },
+    "service": {
+     "fill": "#94a3b8",
+     "width": 1.2,
+     "casing_width": 2.2,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#d4d4d4"
+    },
+    "track": {
+     "fill": "#a3a3a3",
+     "width": 1.5,
+     "casing_width": 1.5,
+     "dash": [
+      4,
+      4
+     ],
+     "opacity": 1.0,
+     "casing": "#9e7b54"
+    },
+    "cycleway": {
+     "fill": "#5c7cb6",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "dash": [
+      3,
+      3
+     ],
+     "opacity": 1.0,
+     "casing": "#5c7cb6"
+    },
+    "footway": {
+     "fill": "#C59D9D",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "dash": [
+      4,
+      4
+     ],
+     "opacity": 1.0,
+     "casing": "#C59D9D"
+    },
+    "path": {
+     "fill": "#C59D9D",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "dash": [
+      2,
+      5
+     ],
+     "opacity": 1.0,
+     "casing": "#C59D9D"
+    }
+   },
+   "carto": {
+    "motorway": {
+     "fill": "#e892a2",
+     "width": 6.0,
+     "casing_width": 8.0,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#dc2a48"
+    },
+    "trunk": {
+     "fill": "#f9b29c",
+     "width": 5.5,
+     "casing_width": 7.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#c84e2f"
+    },
+    "primary": {
+     "fill": "#fcd6a4",
+     "width": 4.5,
+     "casing_width": 6.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#a06b00"
+    },
+    "secondary": {
+     "fill": "#f7fabf",
+     "width": 3.5,
+     "casing_width": 5.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#707d00"
+    },
+    "tertiary": {
+     "fill": "#ffffff",
+     "width": 2.5,
+     "casing_width": 4.0,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#bcbcbc"
+    },
+    "unclassified": {
+     "fill": "#ffffff",
+     "width": 2.0,
+     "casing_width": 3.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#bcbcbc"
+    },
+    "residential": {
+     "fill": "#ffffff",
+     "width": 2.0,
+     "casing_width": 3.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#bcbcbc"
+    },
+    "living_street": {
+     "fill": "#ededed",
+     "width": 1.8,
+     "casing_width": 3.0,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#cccccc"
+    },
+    "service": {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing_width": 2.2,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#d4d4d4"
+    },
+    "track": {
+     "fill": "#9e7b54",
+     "width": 1.5,
+     "casing_width": 1.5,
+     "dash": [
+      4,
+      4
+     ],
+     "opacity": 1.0,
+     "casing": "#9e7b54"
+    },
+    "cycleway": {
+     "fill": "#5c7cb6",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "dash": [
+      3,
+      3
+     ],
+     "opacity": 1.0,
+     "casing": "#5c7cb6"
+    },
+    "footway": {
+     "fill": "#C59D9D",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "dash": [
+      4,
+      4
+     ],
+     "opacity": 1.0,
+     "casing": "#C59D9D"
+    },
+    "path": {
+     "fill": "#C59D9D",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "dash": [
+      2,
+      5
+     ],
+     "opacity": 1.0,
+     "casing": "#C59D9D"
+    }
+   },
+   "highsat": {
+    "motorway": {
+     "fill": "#00E5FF",
+     "width": 6.0,
+     "casing_width": 8.0,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#bcbcbc"
+    },
+    "trunk": {
+     "fill": "#FF007F",
+     "width": 5.5,
+     "casing_width": 7.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#bcbcbc"
+    },
+    "primary": {
+     "fill": "#FF9100",
+     "width": 4.5,
+     "casing_width": 6.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#bcbcbc"
+    },
+    "secondary": {
+     "fill": "#FFEA00",
+     "width": 3.5,
+     "casing_width": 5.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#bcbcbc"
+    },
+    "tertiary": {
+     "fill": "#00E676",
+     "width": 2.5,
+     "casing_width": 4.0,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#bcbcbc"
+    },
+    "unclassified": {
+     "fill": "#FFFFFF",
+     "width": 2.0,
+     "casing_width": 3.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#bcbcbc"
+    },
+    "residential": {
+     "fill": "#FFFFFF",
+     "width": 2.0,
+     "casing_width": 3.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#bcbcbc"
+    },
+    "living_street": {
+     "fill": "#DDDDDD",
+     "width": 1.8,
+     "casing_width": 3.0,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": null
+    },
+    "service": {
+     "fill": "#F0F0F0",
+     "width": 1.2,
+     "casing_width": 2.2,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": null
+    },
+    "track": {
+     "fill": "#9E7B54",
+     "width": 1.5,
+     "casing_width": 1.5,
+     "dash": [
+      4,
+      4
+     ],
+     "opacity": 1.0,
+     "casing": null
+    },
+    "cycleway": {
+     "fill": "#2980B9",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "dash": [
+      3,
+      3
+     ],
+     "opacity": 1.0,
+     "casing": null
+    },
+    "footway": {
+     "fill": "#D98880",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "dash": [
+      4,
+      4
+     ],
+     "opacity": 1.0,
+     "casing": null
+    },
+    "path": {
+     "fill": "#D98880",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "dash": [
+      2,
+      5
+     ],
+     "opacity": 1.0,
+     "casing": null
+    }
+   },
+   "mono": {
+    "motorway": {
+     "fill": "#707070",
+     "width": 6.0,
+     "casing_width": 8.0,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#3c3c3c"
+    },
+    "trunk": {
+     "fill": "#7a7a7a",
+     "width": 5.5,
+     "casing_width": 7.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#444444"
+    },
+    "primary": {
+     "fill": "#8a8a8a",
+     "width": 4.5,
+     "casing_width": 6.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#4f4f4f"
+    },
+    "secondary": {
+     "fill": "#9c9c9c",
+     "width": 3.5,
+     "casing_width": 5.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#5c5c5c"
+    },
+    "tertiary": {
+     "fill": "#b0b0b0",
+     "width": 2.5,
+     "casing_width": 4.0,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#6e6e6e"
+    },
+    "unclassified": {
+     "fill": "#c4c4c4",
+     "width": 2.0,
+     "casing_width": 3.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#828282"
+    },
+    "residential": {
+     "fill": "#c4c4c4",
+     "width": 2.0,
+     "casing_width": 3.5,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#828282"
+    },
+    "living_street": {
+     "fill": "#d4d4d4",
+     "width": 1.8,
+     "casing_width": 3.0,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#9a9a9a"
+    },
+    "service": {
+     "fill": "#e4e4e4",
+     "width": 1.2,
+     "casing_width": 2.2,
+     "dash": null,
+     "opacity": 1.0,
+     "casing": "#bcbcbc"
+    },
+    "track": {
+     "fill": "#9a9a9a",
+     "width": 1.5,
+     "casing_width": 1.5,
+     "dash": [
+      4,
+      4
+     ],
+     "opacity": 1.0,
+     "casing": "#9a9a9a"
+    },
+    "cycleway": {
+     "fill": "#888888",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "dash": [
+      3,
+      3
+     ],
+     "opacity": 1.0,
+     "casing": "#888888"
+    },
+    "footway": {
+     "fill": "#ABABAB",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "dash": [
+      4,
+      4
+     ],
+     "opacity": 1.0,
+     "casing": "#ABABAB"
+    },
+    "path": {
+     "fill": "#ABABAB",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "dash": [
+      2,
+      5
+     ],
+     "opacity": 1.0,
+     "casing": "#ABABAB"
+    }
+   },
+   "ms_all_google": {
+    "pedestrian": {
+     "fill": "#f6f6f6",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#cfcfcf",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "motorway": {
+     "fill": "#e892a2",
+     "width": 6.0,
+     "casing_width": 8.0,
+     "casing": "#c24e6b",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "busway": {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#bbbbbb",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "tertiary": {
+     "fill": "#ffffff",
+     "width": 2.5,
+     "casing_width": 4.0,
+     "casing": "#8f8f8f",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "ferry": {
+     "fill": "#6666ff",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": null,
+     "dash": [
+      6,
+      4
+     ],
+     "opacity": 1.0
+    },
+    "platform": {
+     "fill": "#e4e4e4",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#c4c4c4",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "living_street": {
+     "fill": "#ededed",
+     "width": 1.8,
+     "casing_width": 3.0,
+     "casing": "#bbbbbb",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "steps": {
+     "fill": "#b8b8b8",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": null,
+     "dash": [
+      0.6,
+      0.5
+     ],
+     "opacity": 1.0
+    },
+    "raceway": {
+     "fill": "#ffc0cb",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#bbbbbb",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "bridleway": {
+     "fill": "#eef5e8",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#a9c79a",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "corridor": {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#c4c4c4",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "path": {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#c4c4c4",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "footway": {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#c4c4c4",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "unclassified": {
+     "fill": "#ffffff",
+     "width": 2.0,
+     "casing_width": 3.5,
+     "casing": "#bbbbbb",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "construction": {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#bbbbbb",
+     "dash": [
+      5,
+      4
+     ],
+     "opacity": 1.0
+    },
+    "residential": {
+     "fill": "#ffffff",
+     "width": 2.0,
+     "casing_width": 3.5,
+     "casing": "#bbbbbb",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "secondary": {
+     "fill": "#f7fabf",
+     "width": 3.5,
+     "casing_width": 5.5,
+     "casing": "#707d00",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "primary": {
+     "fill": "#fcd6a4",
+     "width": 4.5,
+     "casing_width": 6.5,
+     "casing": "#a06b00",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "service": {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing_width": 2.2,
+     "casing": "#bbbbbb",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "track": {
+     "fill": "#f2ecdc",
+     "width": 1.5,
+     "casing_width": 1.5,
+     "casing": "#c9bb9a",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "cycleway": {
+     "fill": "#1e8e3e",
+     "width": 1.2,
+     "casing_width": 1.2,
+     "casing": "#ffffff",
+     "dash": null,
+     "opacity": 1.0
+    },
+    "trunk": {
+     "fill": "#f9b29c",
+     "width": 5.5,
+     "casing_width": 7.5,
+     "casing": "#c84e2f",
+     "dash": null,
+     "opacity": 1.0
+    }
+   }
+  },
+  "active": {
+   "profile": "default",
+   "palette": "amber"
+  }
+ },
+ "config": {
+  "fill_opacity": 0.9,
+  "casing_opacity": 0.75,
+  "casing_extra": 2.0,
+  "link_scale": 0.6,
+  "tunnel_opacity_scale": 0.45,
+  "bridge_casing_extra": 1.5,
+  "bridge_casing_m": 0.25,
+  "bridge_casing_px": 1.0,
+  "bridge_casing_color": "#64748b",
+  "bridge_shadow": true,
+  "bridge_shadow_color": "rgba(0,0,0,0.25)",
+  "bridge_shadow_blur": 4.0,
+  "bridge_shadow_offset": [
+   2,
+   2
+  ],
+  "bridge_shadow_trim_m": 3.0,
+  "single_line_classes": [
+   "pedestrian",
+   "footway",
+   "path",
+   "cycleway",
+   "steps",
+   "bridleway",
+   "track",
+   "corridor",
+   "platform"
+  ],
+  "twin_end_caps": true,
+  "twin_casing": "one",
+  "tunnel_casing_dash": [
+   1,
+   1
+  ],
+  "tunnel_fill_dash": [],
+  "tunnel_fill_dash_color": "rgba(255,255,255,0.55)",
+  "tunnel_strength": 60,
+  "tunnel_toward": "Sand",
+  "tunnel_towards": {
+   "Slate": "#64748b",
+   "Dark": "#14181d",
+   "Light": "#efede8",
+   "Graphite": "#374151",
+   "Navy": "#1e293b",
+   "Stone": "#78716c",
+   "Sand": "#d6cfc4",
+   "Teal": "#134e4a"
+  },
+  "tunnel_palette": "Graphite + silver",
+  "tunnel_palettes": {
+   "One colour": null,
+   "Slate + ice": [
+    "#64748b",
+    "#cbd5e1"
+   ],
+   "Blue + cyan": [
+    "#315b7d",
+    "#a9d7e8"
+   ],
+   "Warm + sand": [
+    "#806d64",
+    "#e7c9a7"
+   ],
+   "Graphite + silver": [
+    "#4b5563",
+    "#b8bec7"
+   ],
+   "Indigo + lavender": [
+    "#4c5c96",
+    "#b9c2ea"
+   ],
+   "Teal + mint": [
+    "#2f6f73",
+    "#9fd3cf"
+   ]
+  },
+  "minor_no_casing": [
+   "living_street",
+   "service"
+  ],
+  "minzoom": {
+   "motorway": 4,
+   "trunk": 5,
+   "primary": 7,
+   "secondary": 9,
+   "tertiary": 11,
+   "unclassified": 13,
+   "residential": 13,
+   "living_street": 14,
+   "service": 15,
+   "pedestrian": 14,
+   "footway": 15,
+   "path": 15,
+   "cycleway": 14,
+   "track": 14,
+   "motorway_link": 11,
+   "trunk_link": 11,
+   "primary_link": 11,
+   "secondary_link": 12,
+   "tertiary_link": 12
+  },
+  "basemap": "voyager",
+  "labels": {
+   "halo_width": 0,
+   "font": [
+    "Noto Sans Regular"
+   ],
+   "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+   "minzoom": 14,
+   "minor_minzoom": 16,
+   "fraction": 0.9,
+   "min_px": 8.0,
+   "base_size": [
+    [
+     14,
+     10
+    ],
+    [
+     18,
+     14
+    ]
+   ],
+   "max_angle": 40,
+   "padding": 2,
+   "color": "#5b5b5b",
+   "halo_color": null
+  },
+  "arrows": {
+   "minzoom": 15,
+   "minor_minzoom": 16,
+   "main_below": 16.5,
+   "size": {
+    "base": 1.8,
+    "stops": [
+     [
+      15,
+      0.5
+     ],
+     [
+      18,
+      0.9
+     ],
+     [
+      22,
+      3.0
+     ]
+    ],
+    "minor": 0.6
+   },
+   "spacing": [
+    [
+     15,
+     200
+    ],
+    [
+     18,
+     320
+    ],
+    [
+     22,
+     900
+    ]
+   ],
+   "icon": {
+    "path": "M 0,2 7,2 7,0 12,2.5 7,5 7,3 0,3 z",
+    "view_box": [
+     12,
+     5
+    ],
+    "width": 96,
+    "height": 40,
+    "pixel_ratio": 4
+   },
+   "main": [
+    "motorway",
+    "trunk",
+    "primary",
+    "secondary",
+    "tertiary"
+   ],
+   "place": {
+    "min_len_px": 100,
+    "min_gap_px": 150,
+    "name_gap_px": 14,
+    "edge_px": 10,
+    "char_width": 0.6
+   },
+   "color": "#5b5b5b",
+   "opacity": 0.7
+  },
+  "camera": {
+   "pitch": 0,
+   "bearing": 0,
+   "pitch_3d": 55,
+   "max_pitch": 70
+  },
+  "bridge_decks": {
+   "base_m": 5.0,
+   "thickness_m": 1.0,
+   "ramp_m": 40.0,
+   "step_m": 2.5,
+   "match_zoom": 18.0,
+   "width_scale": 0.6,
+   "flat_below": 16.0,
+   "casing_px": 2.0,
+   "underlay": "#f2f2f2",
+   "opacity": 0.7
+  },
+  "overlays": {
+   "radius": 6.0,
+   "width": 2.0,
+   "circle_stroke_width": 1,
+   "text_size": 12,
+   "text_max_angle": 40,
+   "text_padding": 2,
+   "text_halo_width": 1.5,
+   "item_overlap_px": 1,
+   "color": "#6aa9ff",
+   "circle_stroke": "#ffffff",
+   "fill_opacity": 0.15,
+   "circle_opacity": 0.85,
+   "line_opacity": 0.9,
+   "outline_opacity": 0.9
+  },
+  "annotations": {
+   "slot_m": 100
+  },
+  "tiles": {
+   "minzoom": 6,
+   "maxzoom": 15,
+   "extent": 4096,
+   "buffer_px": 80
+  },
+  "api_key": null,
+  "api_keys": {}
+ },
+ "styles": {
+  "classes": {
+   "pedestrian": [
+    {
+     "fill": "#f6f6f6",
+     "width": 1.2,
+     "casing": "#cfcfcf",
+     "casing_width": 1.2,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#f6f6f6",
+     "width": 0.72,
+     "casing": "#cfcfcf",
+     "casing_width": 0.72,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "motorway": [
+    {
+     "fill": "#e892a2",
+     "width": 6.0,
+     "casing": "#c24e6b",
+     "casing_width": 8.0,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#e892a2",
+     "width": 3.5999999999999996,
+     "casing": "#c24e6b",
+     "casing_width": 4.8,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "busway": [
+    {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing": "#bbbbbb",
+     "casing_width": 1.2,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#ffffff",
+     "width": 0.72,
+     "casing": "#bbbbbb",
+     "casing_width": 0.72,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "tertiary": [
+    {
+     "fill": "#ffffff",
+     "width": 2.5,
+     "casing": "#8f8f8f",
+     "casing_width": 4.0,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#ffffff",
+     "width": 1.5,
+     "casing": "#8f8f8f",
+     "casing_width": 2.4,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "ferry": [
+    {
+     "fill": "#6666ff",
+     "width": 1.2,
+     "casing": null,
+     "casing_width": 1.2,
+     "dash": "6,4",
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#6666ff",
+     "width": 0.72,
+     "casing": null,
+     "casing_width": 0.72,
+     "dash": "6,4",
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "platform": [
+    {
+     "fill": "#e4e4e4",
+     "width": 1.2,
+     "casing": "#c4c4c4",
+     "casing_width": 1.2,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#e4e4e4",
+     "width": 0.72,
+     "casing": "#c4c4c4",
+     "casing_width": 0.72,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "living_street": [
+    {
+     "fill": "#ededed",
+     "width": 1.8,
+     "casing": "#bbbbbb",
+     "casing_width": 3.0,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#ededed",
+     "width": 1.08,
+     "casing": "#bbbbbb",
+     "casing_width": 1.7999999999999998,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "steps": [
+    {
+     "fill": "#b8b8b8",
+     "width": 1.2,
+     "casing": null,
+     "casing_width": 1.2,
+     "dash": "0.6,0.5",
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#b8b8b8",
+     "width": 0.72,
+     "casing": null,
+     "casing_width": 0.72,
+     "dash": "0.6,0.5",
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "raceway": [
+    {
+     "fill": "#ffc0cb",
+     "width": 1.2,
+     "casing": "#bbbbbb",
+     "casing_width": 1.2,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#ffc0cb",
+     "width": 0.72,
+     "casing": "#bbbbbb",
+     "casing_width": 0.72,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "bridleway": [
+    {
+     "fill": "#eef5e8",
+     "width": 1.2,
+     "casing": "#a9c79a",
+     "casing_width": 1.2,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#eef5e8",
+     "width": 0.72,
+     "casing": "#a9c79a",
+     "casing_width": 0.72,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "corridor": [
+    {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing": "#c4c4c4",
+     "casing_width": 1.2,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#ffffff",
+     "width": 0.72,
+     "casing": "#c4c4c4",
+     "casing_width": 0.72,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "path": [
+    {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing": "#c4c4c4",
+     "casing_width": 1.2,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#ffffff",
+     "width": 0.72,
+     "casing": "#c4c4c4",
+     "casing_width": 0.72,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "footway": [
+    {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing": "#c4c4c4",
+     "casing_width": 1.2,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#ffffff",
+     "width": 0.72,
+     "casing": "#c4c4c4",
+     "casing_width": 0.72,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "unclassified": [
+    {
+     "fill": "#ffffff",
+     "width": 2.0,
+     "casing": "#bbbbbb",
+     "casing_width": 3.5,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing": "#bbbbbb",
+     "casing_width": 2.1,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "construction": [
+    {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing": "#bbbbbb",
+     "casing_width": 1.2,
+     "dash": "5,4",
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#ffffff",
+     "width": 0.72,
+     "casing": "#bbbbbb",
+     "casing_width": 0.72,
+     "dash": "5,4",
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "residential": [
+    {
+     "fill": "#ffffff",
+     "width": 2.0,
+     "casing": "#bbbbbb",
+     "casing_width": 3.5,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing": "#bbbbbb",
+     "casing_width": 2.1,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "secondary": [
+    {
+     "fill": "#f7fabf",
+     "width": 3.5,
+     "casing": "#707d00",
+     "casing_width": 5.5,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#f7fabf",
+     "width": 2.1,
+     "casing": "#707d00",
+     "casing_width": 3.3,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "primary": [
+    {
+     "fill": "#fcd6a4",
+     "width": 4.5,
+     "casing": "#a06b00",
+     "casing_width": 6.5,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#fcd6a4",
+     "width": 2.6999999999999997,
+     "casing": "#a06b00",
+     "casing_width": 3.9,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "service": [
+    {
+     "fill": "#ffffff",
+     "width": 1.2,
+     "casing": "#bbbbbb",
+     "casing_width": 2.2,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#ffffff",
+     "width": 0.72,
+     "casing": "#bbbbbb",
+     "casing_width": 1.32,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "track": [
+    {
+     "fill": "#f2ecdc",
+     "width": 1.5,
+     "casing": "#c9bb9a",
+     "casing_width": 1.5,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#f2ecdc",
+     "width": 0.8999999999999999,
+     "casing": "#c9bb9a",
+     "casing_width": 0.8999999999999999,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "cycleway": [
+    {
+     "fill": "#1e8e3e",
+     "width": 1.2,
+     "casing": "#ffffff",
+     "casing_width": 1.2,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#1e8e3e",
+     "width": 0.72,
+     "casing": "#ffffff",
+     "casing_width": 0.72,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ],
+   "trunk": [
+    {
+     "fill": "#f9b29c",
+     "width": 5.5,
+     "casing": "#c84e2f",
+     "casing_width": 7.5,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    },
+    {
+     "fill": "#f9b29c",
+     "width": 3.3,
+     "casing": "#c84e2f",
+     "casing_width": 4.5,
+     "dash": null,
+     "opacity": 0.9,
+     "casing_opacity": 0.75
+    }
+   ]
+  },
+  "fallback": [
+   {
+    "fill": "#ffffff",
+    "width": 2.0,
+    "casing": "#bbbbbb",
+    "casing_width": 3.5,
+    "dash": null,
+    "opacity": 0.9,
+    "casing_opacity": 0.75
+   },
+   {
+    "fill": "#ffffff",
+    "width": 1.2,
+    "casing": "#bbbbbb",
+    "casing_width": 2.1,
+    "dash": null,
+    "opacity": 0.9,
+    "casing_opacity": 0.75
+   }
+  ]
+ },
+ "head_m": 5.0,
+ "slots": {
+  "z_order": {
+   "motorway": 9,
+   "trunk": 8,
+   "primary": 7,
+   "secondary": 6,
+   "tertiary": 5,
+   "unclassified": 4,
+   "residential": 4,
+   "road": 4,
+   "busway": 4,
+   "raceway": 5,
+   "living_street": 3,
+   "service": 1.5,
+   "pedestrian": 2,
+   "footway": 1,
+   "path": 1,
+   "cycleway": 1,
+   "steps": 0.9,
+   "bridleway": 1,
+   "track": 1.1,
+   "corridor": 1,
+   "construction": 0,
+   "motorway_link": 1.9,
+   "trunk_link": 1.85,
+   "primary_link": 1.8,
+   "secondary_link": 1.75,
+   "tertiary_link": 1.7,
+   "platform": 0.5
+  },
+  "width_z20": {
+   "motorway": 102.96,
+   "trunk": 102.96,
+   "primary": 89.68,
+   "secondary": 80.92,
+   "tertiary": 64.41,
+   "unclassified": 58.19,
+   "residential": 58.19,
+   "road": 58.19,
+   "busway": 58.19,
+   "raceway": 64.41,
+   "living_street": 58.19,
+   "service": 22.92,
+   "pedestrian": 53.84,
+   "footway": 3.9,
+   "path": 3.9,
+   "cycleway": 3.9,
+   "steps": 3.9,
+   "bridleway": 3.9,
+   "track": 3.9,
+   "corridor": 3.9,
+   "construction": 3.9,
+   "platform": 3.9,
+   "ferry": 3.9,
+   "motorway_link": 61.78,
+   "trunk_link": 61.78,
+   "primary_link": 53.81,
+   "secondary_link": 48.55,
+   "tertiary_link": 38.65
+  },
+  "width_z20_fallback": 58.19
+ },
+ "roads_model": {
+  "width": {
+   "major": {
+    "8": 0.8,
+    "10": 1.3,
+    "12": 3.5,
+    "13": 6,
+    "14": 8,
+    "15": 10,
+    "16": 13,
+    "17": 17,
+    "18": 22
+   },
+   "primary": {
+    "8": 0.7,
+    "10": 1.2,
+    "12": 3.5,
+    "13": 5,
+    "14": 7,
+    "15": 9,
+    "16": 12,
+    "17": 15,
+    "18": 19
+   },
+   "secondary": {
+    "10": 0.8,
+    "12": 2.5,
+    "13": 4,
+    "14": 6,
+    "15": 8,
+    "16": 10,
+    "17": 13,
+    "18": 17
+   },
+   "tertiary": {
+    "12": 2,
+    "13": 3,
+    "14": 4.5,
+    "15": 6,
+    "16": 8,
+    "17": 11,
+    "18": 14
+   },
+   "residential": {
+    "12": 0.5,
+    "13": 1.5,
+    "14": 2.5,
+    "15": 4,
+    "16": 6,
+    "17": 9,
+    "18": 13
+   },
+   "living_street": {
+    "13": 2,
+    "14": 2.5,
+    "15": 4,
+    "16": 6,
+    "17": 9,
+    "18": 13
+   },
+   "service": {
+    "13": 0.8,
+    "14": 1.2,
+    "15": 2,
+    "16": 2.8,
+    "17": 4,
+    "18": 5
+   },
+   "pedestrian": {
+    "13": 2,
+    "14": 3,
+    "15": 4,
+    "16": 6,
+    "17": 9,
+    "18": 13
+   },
+   "path": {
+    "12": 0.4,
+    "13": 0.6,
+    "14": 0.8,
+    "15": 1,
+    "16": 1.4,
+    "17": 2,
+    "18": 2.6,
+    "19": 3
+   },
+   "em": {
+    "12": 0.8,
+    "13": 1.2,
+    "14": 1.8,
+    "15": 2.4,
+    "16": 3,
+    "17": 3.8,
+    "18": 4.8
+   }
+  },
+  "width_zoom_rate": {
+   "major": 2.0,
+   "primary": 2.0,
+   "secondary": 2.0,
+   "tertiary": 1.95,
+   "residential": 1.9,
+   "living_street": 1.9,
+   "service": 1.9,
+   "pedestrian": 1.85,
+   "path": 1.3,
+   "em": 1.3
+  },
+  "casing_ratio": {
+   "major": 1.17,
+   "primary": 1.18,
+   "secondary": 1.19,
+   "tertiary": 1.21,
+   "residential": 1.24,
+   "living_street": 1.24,
+   "service": 1.27,
+   "pedestrian": 1.21,
+   "path": 1.0,
+   "em": 1.5
+  },
+  "group": {
+   "motorway": "major",
+   "trunk": "major",
+   "primary": "primary",
+   "secondary": "secondary",
+   "tertiary": "tertiary",
+   "unclassified": "residential",
+   "residential": "residential",
+   "road": "residential",
+   "busway": "residential",
+   "raceway": "tertiary",
+   "living_street": "living_street",
+   "service": "service",
+   "pedestrian": "pedestrian",
+   "footway": "path",
+   "path": "path",
+   "cycleway": "path",
+   "steps": "path",
+   "bridleway": "path",
+   "track": "path",
+   "corridor": "path",
+   "construction": "path",
+   "platform": "path",
+   "ferry": "path"
+  },
+  "links": [
+   "motorway_link",
+   "trunk_link",
+   "primary_link",
+   "secondary_link",
+   "tertiary_link"
+  ],
+  "zoom_stops": [
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   19,
+   20
+  ],
+  "z_order": {
+   "motorway": 9,
+   "trunk": 8,
+   "primary": 7,
+   "secondary": 6,
+   "tertiary": 5,
+   "unclassified": 4,
+   "residential": 4,
+   "road": 4,
+   "busway": 4,
+   "raceway": 5,
+   "living_street": 3,
+   "service": 1.5,
+   "pedestrian": 2,
+   "footway": 1,
+   "path": 1,
+   "cycleway": 1,
+   "steps": 0.9,
+   "bridleway": 1,
+   "track": 1.1,
+   "corridor": 1,
+   "construction": 0,
+   "motorway_link": 1.9,
+   "trunk_link": 1.85,
+   "primary_link": 1.8,
+   "secondary_link": 1.75,
+   "tertiary_link": 1.7,
+   "platform": 0.5
+  }
+ },
+ "features": {
+  "layers_yaml": {
+   "popup": [
+    "name",
+    "kind"
+   ],
+   "layers": [
+    {
+     "name": "background",
+     "table": "boundary",
+     "kind": "polygon",
+     "show": true,
+     "schema": "main",
+     "merge_into": "landcover"
+    },
+    {
+     "name": "ocean",
+     "table": "ocean",
+     "kind": "polygon",
+     "show": true
+    },
+    {
+     "name": "landcover",
+     "table": "land",
+     "kind": "polygon",
+     "show": true
+    },
+    {
+     "name": "institutional",
+     "table": "sites",
+     "kind": "polygon",
+     "show": true,
+     "merge_into": "landcover",
+     "where": "kind IN ('school','university','college','kindergarten','hospital','prison','sports_centre','construction','bridge','zoo')"
+    },
+    {
+     "name": "water",
+     "table": "water_polygons",
+     "kind": "polygon",
+     "show": true
+    },
+    {
+     "name": "waterways",
+     "table": "water_lines",
+     "kind": "line",
+     "show": true
+    },
+    {
+     "name": "paved",
+     "table": "paved",
+     "kind": "polygon",
+     "show": true
+    },
+    {
+     "name": "buildings",
+     "table": "buildings",
+     "kind": "polygon",
+     "show": true,
+     "height": true
+    },
+    {
+     "name": "raceway",
+     "table": "streets",
+     "kind": "line",
+     "show": true,
+     "where": "kind = 'raceway'",
+     "outside_networks": true
+    },
+    {
+     "name": "other_ways",
+     "table": "streets",
+     "kind": "line",
+     "show": true,
+     "outside_networks": true,
+     "where": "kind NOT IN ('raceway','rail','tram','light_rail','subway','narrow_gauge','funicular','monorail')"
+    },
+    {
+     "name": "railways",
+     "table": "streets",
+     "kind": "line",
+     "show": true,
+     "where": "kind IN ('rail','tram','light_rail','subway','narrow_gauge','funicular','monorail')",
+     "ticked": false
+    },
+    {
+     "name": "parking",
+     "table": "sites",
+     "kind": "polygon",
+     "show": true,
+     "where": "kind = 'parking'",
+     "ticked": false
+    },
+    {
+     "name": "parking_p",
+     "table": "sites",
+     "kind": "point",
+     "show": true,
+     "where": "kind = 'parking'",
+     "centroid": true,
+     "ticked": false
+    },
+    {
+     "name": "bus_station",
+     "table": "sites",
+     "kind": "polygon",
+     "show": true,
+     "where": "kind = 'bus_station'",
+     "ticked": false
+    },
+    {
+     "name": "platform",
+     "table": "sites",
+     "kind": "polygon",
+     "show": true,
+     "where": "kind = 'platform'",
+     "ticked": false
+    },
+    {
+     "name": "traffic_signals",
+     "table": "traffic",
+     "kind": "point",
+     "show": true,
+     "where": "kind = 'traffic_signals'",
+     "ticked": false
+    },
+    {
+     "name": "crossings",
+     "table": "traffic",
+     "kind": "point",
+     "show": true,
+     "where": "kind = 'crossing'",
+     "bearing": true,
+     "ticked": false
+    },
+    {
+     "name": "bus_stations",
+     "table": "public_transport",
+     "kind": "point",
+     "show": true,
+     "where": "kind = 'bus_stop'",
+     "ticked": false
+    },
+    {
+     "name": "train_stations",
+     "table": "public_transport",
+     "kind": "point",
+     "show": true,
+     "where": "kind IN ('station','halt')",
+     "ticked": false
+    },
+    {
+     "name": "bicycle",
+     "table": "pois",
+     "kind": "point",
+     "show": true,
+     "where": "kind = 'bicycle_rental'",
+     "ticked": false
+    }
+   ]
+  },
+  "buildings_3d": {
+   "m_per_level": 3,
+   "min_height": 2,
+   "max_height": 200,
+   "opacity": 0.9,
+   "heights": {
+    "house": 6,
+    "detached": 6,
+    "semidetached_house": 6,
+    "terrace": 7,
+    "residential": 9,
+    "apartments": 15,
+    "garage": 3,
+    "garages": 3,
+    "shed": 3,
+    "roof": 3,
+    "greenhouse": 3,
+    "retail": 6,
+    "commercial": 12,
+    "office": 15,
+    "industrial": 8,
+    "school": 9,
+    "church": 15,
+    "default": 9
+   }
+  },
+  "style": {
+   "areas": {
+    "ocean": {
+     "fill": "#aad3df",
+     "outline": null,
+     "opacity": 1.0
+    },
+    "water": {
+     "fill": "#aad3df",
+     "outline": null,
+     "opacity": 1.0
+    },
+    "paved": {
+     "fill": "#ededed",
+     "outline": "#bbbbbb",
+     "opacity": 1.0
+    },
+    "buildings": {
+     "fill": "#d9d0c9",
+     "outline": "#c2b8ac",
+     "opacity": 0.9,
+     "min_zoom": 15
+    },
+    "parking": {
+     "fill": "#eeeeee",
+     "outline": "#dddddd",
+     "opacity": 0.7,
+     "min_zoom": 15
+    },
+    "bus_station": {
+     "fill": "#d6e4f0",
+     "outline": "#9db8d2",
+     "opacity": 0.85,
+     "min_zoom": 15
+    },
+    "platform": {
+     "fill": "#bbbbbb",
+     "outline": "#969696",
+     "opacity": 0.9
+    },
+    "landcover": {
+     "forest": "#add19e",
+     "wood": "#add19e",
+     "grass": "#cdebb0",
+     "grassland": "#cdebb0",
+     "meadow": "#cdebb0",
+     "park": "#c8facc",
+     "garden": "#cfeda5",
+     "residential": "#e0dfdf",
+     "commercial": "#f2dad9",
+     "retail": "#ffd6d1",
+     "industrial": "#ebdbe8",
+     "railway": "#ebdbe8",
+     "farmland": "#eef0d5",
+     "farmyard": "#f5dcba",
+     "orchard": "#aedfa3",
+     "vineyard": "#aedfa3",
+     "allotments": "#c9e1bf",
+     "beach_resort": "#fff1ba",
+     "shrubbery": "#c8d7ab",
+     "zoo": "#d8eecf",
+     "grave_yard": "#aacbaf",
+     "cemetery": "#aacbaf",
+     "scrub": "#c8d7ab",
+     "heath": "#d6d99f",
+     "wetland": "#add19e",
+     "sand": "#f5e9c6",
+     "quarry": "#c5c3c3",
+     "brownfield": "#b6b592",
+     "recreation_ground": "#dffce2",
+     "pitch": "#aae0cb",
+     "track": "#aae0cb",
+     "stadium": "#dffce2",
+     "nature_reserve": "#d5e8d1",
+     "golf_course": "#b5e3b5",
+     "playground": "#dffce2",
+     "village_green": "#cdebb0",
+     "garages": "#dfddce",
+     "greenfield": "#f1eee8",
+     "beach": "#fff1ba",
+     "dog_park": "#e5f5df",
+     "flowerbed": "#dcefc7",
+     "marina": "#b5d0d0",
+     "ice_rink": "#ddecec",
+     "swimming_area": "#aad3df",
+     "religious": "#cecdc9",
+     "military": "#f3d8d8",
+     "school": "#ffffe5",
+     "kindergarten": "#ffffe5",
+     "university": "#ffffe5",
+     "college": "#ffffe5",
+     "hospital": "#ffe5e5",
+     "sports_centre": "#dffce2",
+     "prison": "#dcdcd0",
+     "construction": "#c7c7b4",
+     "bridge": "#b8b8b8",
+     "default": "#e8e6df"
+    }
+   },
+   "landcover_pattern": {
+    "forest": "trees",
+    "wood": "trees",
+    "orchard": "rows",
+    "vineyard": "rows",
+    "cemetery": "graves",
+    "wetland": "waves",
+    "scrub": "dots",
+    "heath": "dots",
+    "beach": "sand",
+    "sand": "sand",
+    "quarry": "hatch",
+    "brownfield": "hatch"
+   },
+   "landcover_outline": {
+    "pitch": "#8bad8b",
+    "playground": "#8bad8b",
+    "track": "#8bad8b",
+    "stadium": "#8bad8b",
+    "nature_reserve": "#77a075",
+    "garden": "#b3d17d",
+    "school": "#dcd6ac",
+    "kindergarten": "#dcd6ac",
+    "university": "#dcd6ac",
+    "college": "#dcd6ac",
+    "hospital": "#e6c6c6",
+    "sports_centre": "#a0d0a8"
+   },
+   "buildings_3d": {
+    "m_per_level": 3,
+    "min_height": 2,
+    "max_height": 200,
+    "opacity": 0.9,
+    "heights": {
+     "house": 6,
+     "detached": 6,
+     "semidetached_house": 6,
+     "terrace": 7,
+     "residential": 9,
+     "apartments": 15,
+     "garage": 3,
+     "garages": 3,
+     "shed": 3,
+     "roof": 3,
+     "greenhouse": 3,
+     "retail": 6,
+     "commercial": 12,
+     "office": 15,
+     "industrial": 8,
+     "school": 9,
+     "church": 15,
+     "default": 9
+    }
+   },
+   "lines": {
+    "waterways": {
+     "color": "#4a90d9",
+     "width": 1.6
+    },
+    "railways": {
+     "color": "#707070",
+     "width": 1.4,
+     "dash": [
+      6,
+      4
+     ]
+    },
+    "raceway": {
+     "color": "#ffc0cb",
+     "width": 5,
+     "width_zoom": {
+      "14": 1,
+      "16": 3,
+      "18": 13,
+      "20": 50
+     }
+    },
+    "other_ways": {
+     "color": "#999999",
+     "width": 1.4,
+     "dash": [
+      3,
+      3
+     ]
+    }
+   },
+   "points": {
+    "train_stations": {
+     "color": "#8b008b",
+     "size": 1.4,
+     "icon": "train.svg",
+     "min_zoom": 12
+    },
+    "parking_p": {
+     "color": "#2b6cb0",
+     "size": 1.0,
+     "icon": "parking_p.svg",
+     "min_zoom": 16
+    },
+    "bus_stations": {
+     "color": "#1e6eb4",
+     "size": 1.0,
+     "icon": "bus.svg",
+     "min_zoom": 16
+    },
+    "bicycle": {
+     "color": "#2e8b57",
+     "size": 0.9,
+     "icon": "bicycle.svg",
+     "min_zoom": 16
+    },
+    "traffic_signals": {
+     "color": "#d64545",
+     "size": 0.9,
+     "icon": "traffic_light.svg",
+     "min_zoom": 16
+    },
+    "crossings": {
+     "color": "#5a5a5a",
+     "size": 0.85,
+     "icon": "crossing.svg",
+     "min_zoom": 16
+    },
+    "default": {
+     "color": "#808080",
+     "size": 1.0,
+     "min_zoom": 14
+    }
+   },
+   "icon": {
+    "size": {
+     "12": 5,
+     "14": 9,
+     "16": 14,
+     "18": 22,
+     "20": 32
+    },
+    "hi_rate": 1.5,
+    "opacity": 0.8,
+    "color": "#8a8a8a"
+   }
+  },
+  "images": {
+   "ms-pat-forest": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABlklEQVR4nO2aUXKDMAxEt0yOwrn621P0pj1Mv5hpGQKSsbxa4f0kISO9GMmL/PH1/Ykna2EHwNYEwA6ArQmAHQBbEwA7ALYmAHYAbL1u3PtzcG298XsUta6Ao+TPrqdVC4CrJKUgeAFYk5OB4AHgTUoCwuO7wATADoCtCcDxXe8mR2JT5F0B1qQkkgfaHoGr5GSSB9prwLskpZIH7hXBFf8TlkseuOcGWerqQtXaYHcX2gPA/lGIUogLVVkBYS5UAUCoC1UAEKoJgB0AWxMAOwCDQl2oAgAg0IWqAACCXKgSACDAhaoBADq70CM3WGLmZ9V+BZSZ+Vn1F4DazK+LC90AlJv5WfVCm9tqIZ+ytozqAmlrywgAqWtLNID0tSUSgMR5ggVFZ35WbTvBFbZ/QCl5U9dZzj68ujmxzF1nXwMqzPxcXeeoCPZyW4za4u460W1w5HmCpq4zYiOUuracAeg580tbW0a+EUp5nkDxlVhXVQLQ1HUYACLPE7i7TqUVsMnVdSoCABxdpyoAwNh1KgMw6fEAfgF5ejMIc9EbbwAAAABJRU5ErkJggg==",
+   "ms-pat-wood": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABlklEQVR4nO2aUXKDMAxEt0yOwrn621P0pj1Mv5hpGQKSsbxa4f0kISO9GMmL/PH1/Ykna2EHwNYEwA6ArQmAHQBbEwA7ALYmAHYAbL1u3PtzcG298XsUta6Ao+TPrqdVC4CrJKUgeAFYk5OB4AHgTUoCwuO7wATADoCtCcDxXe8mR2JT5F0B1qQkkgfaHoGr5GSSB9prwLskpZIH7hXBFf8TlkseuOcGWerqQtXaYHcX2gPA/lGIUogLVVkBYS5UAUCoC1UAEKoJgB0AWxMAOwCDQl2oAgAg0IWqAACCXKgSACDAhaoBADq70CM3WGLmZ9V+BZSZ+Vn1F4DazK+LC90AlJv5WfVCm9tqIZ+ytozqAmlrywgAqWtLNID0tSUSgMR5ggVFZ35WbTvBFbZ/QCl5U9dZzj68ujmxzF1nXwMqzPxcXeeoCPZyW4za4u460W1w5HmCpq4zYiOUuracAeg580tbW0a+EUp5nkDxlVhXVQLQ1HUYACLPE7i7TqUVsMnVdSoCABxdpyoAwNh1KgMw6fEAfgF5ejMIc9EbbwAAAABJRU5ErkJggg==",
+   "ms-pat-orchard": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAA9ElEQVR4nO2ZQQrCMBQFVTyPd3LnRbxgT+RKEJEkjch882ZW0jQ6DIkt7fF2vx6SOdECNAagBWgMQAvQGIAWoDEALUBjAFqA5jx43vby+TLxO2Xn9wJsjWMjIuXnx2+BVoBP9ZYbdwXQAjStAL0/mSXG41dA7zL4rDh7HS4/f/RGaObm4y/mx28BA9ACNAagBWgMQAvQGIAWoDEALUBjAFqAJj6A7wV2THw/VuK5/rfz47eA7wU6Jy2PARpjJZ7b/3o8fgX4XmDnF81Sdn78FjAALUBjAFqAxgC0AI0BaAEaA9ACNAagBWgMQAvQGIAWoIkP8ADzFzNOyZoOvQAAAABJRU5ErkJggg==",
+   "ms-pat-vineyard": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAA9ElEQVR4nO2ZQQrCMBQFVTyPd3LnRbxgT+RKEJEkjch882ZW0jQ6DIkt7fF2vx6SOdECNAagBWgMQAvQGIAWoDEALUBjAFqA5jx43vby+TLxO2Xn9wJsjWMjIuXnx2+BVoBP9ZYbdwXQAjStAL0/mSXG41dA7zL4rDh7HS4/f/RGaObm4y/mx28BA9ACNAagBWgMQAvQGIAWoDEALUBjAFqAJj6A7wV2THw/VuK5/rfz47eA7wU6Jy2PARpjJZ7b/3o8fgX4XmDnF81Sdn78FjAALUBjAFqAxgC0AI0BaAEaA9ACNAagBWgMQAvQGIAWoIkP8ADzFzNOyZoOvQAAAABJRU5ErkJggg==",
+   "ms-pat-cemetery": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAA5ElEQVR4nO2YQQrDMAwEm9JH5UWFPiE/zLN6ySEEArYwjCPNQC7GtpZB8UHLd/u9KvOmA9AogA5AowA6AI0CAmf24xsFep8dQAegKS/g07Dn7n86r68dNae6zw5o2HO1t9+stzLVfeU7QAF0AJryAloewSvRx2rK+8p3gALoADQKoAPQKIAOQKOAwBlngplQAB2AxplgR6GUOBMMFk2DAugANOUFOBMcXPxxKIAOQKMAOgCNAugANAoInHEmmAkF0AFonAl2FEqJM8Fg0TQogA5AU16AM8HBxR+HAugANAqgA9D8ARwULOIoa07LAAAAAElFTkSuQmCC",
+   "ms-pat-wetland": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABM0lEQVR4nO2YQQ7CMAwEC+qP+A9XXsET+ydOlcAEkzYJU4mZU1XFzmZTWdWebvfr9M+caQE0GkALoNEAWgCNBtACaDSAFkAz/2CPpWLNZbiKd5ZpGmtAzcHj2l8Y8aJrDi9aBJQOvKXfUujRw5BUV/wC9txE68FjzXO/FkOqdM2Fl6Wb+EbPT7ekp/S8p9cbpRlQuondG3QgM6S25iPZECQmcw1ddf39f4AG0AJoNIAWQKMBtAAaDaAF0JgHjN5g41rzgIb6rG/EPGDFPCApOsrwMg8ImAf0RANoATQaQAug0QBaAI0G0AJozANGb7BxrXlAQ33WN2IesGIekBQdZXiZBwTMA3qiAbQAGg2gBdBoAC2ARgNoATTmAaM32LjWPKChPusbMQ9YMQ9Iio4yvIbmAQ+DHFWS5/QePAAAAABJRU5ErkJggg==",
+   "ms-pat-scrub": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABWElEQVR4nO2ZWQ7CMAxEA+I8PRZn4Jcr5kT8oVCaRHFrj7cnIdEi0enUG/j2ej9LZO5oAWjSALQANGkAWgCa8AY80AKEqM37rf0gQgTU0bF3A/Y3/3feuwFTqDWgm1PWoETAMKeU0Xs43/OrBkxzSiF7E36Oo7TBbpqGL4KrBkxzyhqUCBjm1MXU5sUCtQZIPPGjbnP5dbXWALFuo9UAMdIAtIAOYt1GqwGlCHUb7ZMge7fRHAEipAFoAWjSALQANGkAWgCaNAAtAE0agBaAJg1AC0AT3gDun8Pqd4icEWBih8hlgJkdYvgakAYwfa+ZHSJnBEjuEMlwt0GVN92i/W/xVZbnDk9FkDR3zAxg389fBHnuGBlgYpI7S88AM5PcWbzUAPLc4cWAUohzR68NbuU43LX39WV9owgwMcmdZTYIubzpFk81gEQagBaAJg1AC0CTBqAFoPkAx2gk83GtIFUAAAAASUVORK5CYII=",
+   "ms-pat-heath": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABV0lEQVR4nO2Z6w3CMAyEA2KersQqiBEzEf9QKE2iuLXPr09CokWi16tf4Nvr/SyRuaMFoEkD0ALQpAFoAWjCG/BACxCiNu+39oMIEVBHx94N2N/833nvBkyh1oBuTlmDEgHDnFJG7+F8z68aMM0phexN+DmO0ga7aRq+CK4aMM0pa1AiYJhTF1ObFwvUGiDxxI+6zeXX1VoDxLqNVgPESAPQAjqIdRutBpQi1G20T4Ls3UZzBIiQBqAFoEkD0ALQpAFoAWjSALQANGkAWgCaNAAtAE14A7h/DqvfIXJGgIkdIpcBZnaI4WtAGsD0vWZ2iJwRILlDJMPdBlXedIv2v8VXWZ47PBVB0twxM4B9P38R5LljZICJSe4sPQPMTHJn8VIDyHOHFwNKIc4dvTa4leNw197Xl/WNIsDEJHeW2SDk8qZbPNUAEmkAWgCaNAAtAE0agBaA5gNIAiT1Hf1aagAAAABJRU5ErkJggg==",
+   "ms-pat-beach": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABDUlEQVR4nO2YQQ7DIAwEt31aP9Sv9NrP5G29RyAFK2Zc2LnklGQ9Ejbw+H7e2pknHYDGAugANBZAB6CxADoAjQXQAWgsgA7Q4Jj5s2oCjtMznWoCXqdnOtUESBOLl2oKmIoFBN6Z2qWzGRUwvUtnMypgepfOJrIElilechO0AAugA9BYAB2AxgLoADQWQAegIQWUOFBRAsqcKikBZU6V5BLAi5fcBC3AAugANCsJCI3UVQSE9xWrCAjvK1YRIAX3FSsJCGEBdAAaC6AD0FgAHYDGAhK+iV9zjXC3gDJ3fVe5W0CZu76rZCyBvylechO0gJ0ENBvzLgK602kXAd3ptIsAqTOddhLQxALoADQ/Lh0UGA3I7soAAAAASUVORK5CYII=",
+   "ms-pat-sand": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABDUlEQVR4nO2YQQ7DIAwEt31aH9VP9Nj/5G29RyAFK2Zc2LnklGQ9Ejbw+H7e2pknHYDGAugANBZAB6CxADoAjQXQAWgsgA7Q4Jj5s2oCjtMznWoCXqdnOtUESBOLl2oKmIoFBN6Z2qWzGRUwvUtnMypgepfOJrIElilechO0AAugA9BYAB2AxgLoADQWQAegIQWUOFBRAsqcKikBZU6V5BLAi5fcBC3AAugANCsJCI3UVQSE9xWrCAjvK1YRIAX3FSsJCGEBdAAaC6AD0FgAHYDGAhK+iV9zjXC3gDJ3fVe5W0CZu76rZCyBvylechO0gJ0ENBvzLgK602kXAd3ptIsAqTOddhLQxALoADQ/LQkUFFPaUVYAAAAASUVORK5CYII=",
+   "ms-pat-quarry": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABA0lEQVR4nO2XSwrCQBTAxjmuez2K53XjYhD/YIwl3ZSWlLw+KDS74+Ew3jhOY4z9lvh5ufnqw+t5E/wcr21wfWhT/CRlRv7ZAv7qZT7hHy3g58MR/L0FKIYj+FsL0AxH8NcLUA1H8OsCdMMR/Fwvvi0z8td/gqrhCH79BHTDEfxcL74tM/K1ACkz8rUAKTPytQApM/K1ACkz8rUAKTPytQApM/K1ACkz8rUAKTPytQApM/K1ACkz8rUAKTPytQApM/K1ACkz8rUAKTPytQApM/K1ACkz8rUAKTPytQApM/K1ACkz8rUAKTPytQApM/K1ACkz8rUAKTPytQApM/K1ACkz8mdYxVfLw8zvdAAAAABJRU5ErkJggg==",
+   "ms-pat-brownfield": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABBklEQVR4nO2XQarCQBTAxrmkdxC9zj+vGxeDqF8FYyzpprSk5PVBodmdjvvxwvE3xjhsiZ+Xm88+vJ43wc/x3AbXhzbFT1Jm5P9bwE+9zDv8owV8fTiCv7cAxXAEf2sBmuEI/noBquEIfl2AbjiCn+vFp2VG/vpPUDUcwa+fgG44gp/rxadlRr4WIGVGvhYgZUa+FiBlRr4WIGVGvhYgZUa+FiBlRr4WIGVGvhYgZUa+FiBlRr4WIGVGvhYgZUa+FiBlRr4WIGVGvhYgZUa+FiBlRr4WIGVGvhYgZUa+FiBlRr4WIGVGvhYgZUa+FiBlRr4WIGVGvhYgZUa+FiBlRr4WIGVG/gxMhleb1L/EOQAAAABJRU5ErkJggg==",
+   "ms-icon-parking_p": "data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjMmI2Y2IwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4Ij48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxMiAxMikgc2NhbGUoMS42KSB0cmFuc2xhdGUoLTEzLjYgLTEyKSI+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBkPSJNOSA2djEyaDIuNnYtMy42SDE0YTQuMiA0LjIgMCAwIDAgMC04LjRIOVptMi42IDIuMkgxNGEyIDIgMCAwIDEgMCA0aC0yLjRWOC4yWiIvPjwvZz48L3N2Zz4K",
+   "ms-icon-traffic_signals": "data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjZDY0NTQ1IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4Ij48cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik04IDJoOGEyIDIgMCAwIDEgMiAydjE2YTIgMiAwIDAgMS0yIDJIOGEyIDIgMCAwIDEtMi0yVjRhMiAyIDAgMCAxIDItMlptNCAzLjNhMiAyIDAgMSAwIDAgNCAyIDIgMCAwIDAgMC00Wm0wIDUuNGEyIDIgMCAxIDAgMCA0IDIgMiAwIDAgMCAwLTRabTAgNS4zYTIgMiAwIDEgMCAwIDQgMiAyIDAgMCAwIDAtNFoiLz48L3N2Zz4K",
+   "ms-icon-crossings": "data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjNWE1YTVhIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4Ij48cGF0aCBkPSJNNCA0aDMuMnYxNkg0ek0xMC40IDRoMy4ydjE2aC0zLjJ6TTE2LjggNEgyMHYxNmgtMy4yeiIvPjwvc3ZnPgo=",
+   "ms-icon-bus_stations": "data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjMWU2ZWI0IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4Ij48cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik01IDNoMTRhMiAyIDAgMCAxIDIgMnYxMWEyIDIgMCAwIDEtMSAxLjdWMTlhMSAxIDAgMCAxLTIgMHYtMUg2djFhMSAxIDAgMCAxLTIgMHYtMS4zQTIgMiAwIDAgMSAzIDE2VjVhMiAyIDAgMCAxIDItMlptMSAzdjVoMTJWNkg2Wm0xLjUgNi41YTEuNSAxLjUgMCAxIDAgMCAzIDEuNSAxLjUgMCAwIDAgMC0zWm05IDBhMS41IDEuNSAwIDEgMCAwIDMgMS41IDEuNSAwIDAgMCAwLTNaIi8+PC9zdmc+Cg==",
+   "ms-icon-train_stations": "data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjOGIwMDhiIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4Ij48cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik03IDJoMTBhMyAzIDAgMCAxIDMgM3Y5YTMgMyAwIDAgMS0yLjQgMi45NEwxOS41IDIwSDE3bC0xLjItMkg4LjJMNyAyMEg0LjVsMS45LTMuMDZBMyAzIDAgMCAxIDQgMTRWNWEzIDMgMCAwIDEgMy0zWm0tMSA1djMuNWg1VjdINlptNyAwdjMuNWg1VjdoLTVabS00IDYuNWExLjUgMS41IDAgMSAwIDAgMyAxLjUgMS41IDAgMCAwIDAtM1ptNiAwYTEuNSAxLjUgMCAxIDAgMCAzIDEuNSAxLjUgMCAwIDAgMC0zWiIvPjwvc3ZnPgo=",
+   "ms-icon-bicycle": "data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjMmU4YjU3IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4Ij48cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik01LjUgMTNhMy41IDMuNSAwIDEgMCAwIDcgMy41IDMuNSAwIDAgMCAwLTdabTAgMmExLjUgMS41IDAgMSAxIDAgMyAxLjUgMS41IDAgMCAxIDAtM1ptMTMtMmEzLjUgMy41IDAgMSAwIDAgNyAzLjUgMy41IDAgMCAwIDAtN1ptMCAyYTEuNSAxLjUgMCAxIDEgMCAzIDEuNSAxLjUgMCAwIDEgMC0zWiIvPjxwYXRoIGQ9Ik0xNCA1aDIuNmExIDEgMCAwIDEgMCAyaC0xLjJsMS4xIDIuNSAxLjkgNC4yLTEuOC44TDE0LjYgMTFIMTBsLTIuNCA0LjQtMS43LTFMOC43IDkuMmwtLjktMi4ySDZhMSAxIDAgMSAxIDAtMmgyLjVhMSAxIDAgMCAxIC45LjZsLjcgMS42aDQuN0wxNCA1WiIvPjwvc3ZnPgo="
+  }
+ },
+ "oneway_image": {
+  "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAAAoCAYAAAABk/85AAABw0lEQVR42u2bvUoDQRRGv7tuG00C6oNYWAtq5SsJ9rZCBFufwcIIPoIvYCloQMXOItkcCyeyFiJqZmcY722GSWAJ58y388NEKrAAC+06cAUctL6rgBV5dSKgD7zyXhfArovoVsAAeORzjYF9F9GdgOcAfgo0LRGXwJ6L6E7APLQzF5FWAC4iDwEuIhMBLiITAS4iEwEuIhMBLiITAS4iEwFRRNjixxZWJglJA0m3oSV8vqxqwvOq0B9LOjaz8UKEJDOz5j8noRchAUtNhAGDgh2sSbqR1I+QgKUkwoDngl9BlaTVyOD/JMIAfNpOKAKYFw7CchbhCUgn4lrSWeVcOqtKUvttsy1pyxPQwWo4jP469CeSRpJOzOzJgOYfjLxcwJ9KGpnZJEzEK56ANOBrSY2ZYcBOwfuAnqTz0MbeiP0IfC5LtNhHEXUAMYwo4FfgF1UXeoS6SEA/4iBrg6+/AT/76iF1iad1gJkZkRYYSwH/IcDnzDTgXUBi8C4gMXgXkBi8C0gM3gUkBu+3It7701b/ATgCNtsbuUIvLSQV4OATCWgcfDoB7WsjEwff7Z/0XgL4O+AQ2HDw3QkYAvfAca4j/g1E6b7dl0ni4QAAAABJRU5ErkJggg==",
+  "sdf": true,
+  "pixelRatio": 4
+ },
+ "interaction": {
+  "popup": [
+   "name",
+   "edge_id",
+   "edge_ref",
+   "highway",
+   "lanes",
+   "bridge",
+   "tunnel"
+  ],
+  "hover_delay_ms": 300
+ }
+}
