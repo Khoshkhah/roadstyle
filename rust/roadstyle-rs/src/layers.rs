@@ -19,7 +19,7 @@ pub struct Model {
     hi_rate: HashMap<String, f64>,
     casing_ratio: HashMap<String, f64>,
     group: Vec<(String, String)>, // class -> width group, in the table's order
-    classes: Vec<String>,         // the groups' classes, then the links (_CLASSES)
+    pub(crate) classes: Vec<String>, // the groups' classes, then the links (_CLASSES)
     zstops: Vec<Value>,
     z_order: Map<String, Value>,
     link_w: f64,
@@ -474,7 +474,7 @@ fn merged(a: &Value, b: &Value) -> Map<String, Value> {
 
 impl Model {
     /// class_width_px (casing as given): the class's width at `zoom` read off the width curve (linear between its stops, the ends outside).
-    fn class_width_px(&self, cls: Option<&str>, zoom: f64, casing: bool) -> f64 {
+    pub(crate) fn class_width_px(&self, cls: Option<&str>, zoom: f64, casing: bool) -> f64 {
         let e = self.width_expr("highway", casing, 1.0);
         let e = e.as_array().unwrap();
         let zs: Vec<f64> = e[3..].iter().step_by(2).map(|z| z.as_f64().unwrap()).collect();

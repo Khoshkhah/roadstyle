@@ -6,6 +6,7 @@ pub mod features;
 pub mod geom;
 pub mod layers;
 pub mod levels;
+pub mod look;
 pub mod overlays;
 pub mod planner;
 pub mod props;

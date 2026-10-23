@@ -94,7 +94,15 @@ mod wasm {
         }
     }
 
-    /// The size of the module's memory, in bytes.
+    /// makeLook(options: string) -> string: the look (look.json) of render_edges' palette, profile and settings (roadstyle-rs look.rs);
+    /// options: {"palette", "profile", "settings", "args", "features"} as JSON text. An error is a thrown Error.
+    #[wasm_bindgen(js_name = makeLook)]
+    pub fn make_look(options: &str) -> Result<String, JsError> {
+        let o: serde_json::Value = serde_json::from_str(options).map_err(|e| JsError::new(&format!("options: not JSON: {e}")))?;
+        roadstyle_rs::look::make_look(&o).map(|l| l.to_string()).map_err(|e| JsError::new(&e))
+    }
+
+        /// The size of the module's memory, in bytes.
     #[wasm_bindgen(js_name = memoryBytes)]
     pub fn memory_bytes() -> usize {
         core::arch::wasm32::memory_size(0) * 65536

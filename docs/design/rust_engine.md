@@ -104,6 +104,23 @@ Not in the engine: `style=` (a Styler object of Python), and an option with anot
 
 **A change in the bytes of the style.** The first case found one difference that the spike's compare script did not see, because it ignored the key order: Python writes `__rs_cls` before `__rs_arw` in the slots. The engine now does the same. The Monaco and Tartu styles are the same data as before, with other bytes, so their hashes in `tests/style.rs` changed.
 
+## The look in Rust (2026-10-23)
+
+Before, Python made the look (`look.json`: the resolved palette, profile, settings and render keywords) for the engine. The module `look` makes it now: `make_look(options)`, in the browser `makeLook(options)`. `options` holds render_edges' `palette` (default `amber`), `profile`, `settings` (a mapping or a list of them), `args` (the other keywords) and `features` (mapstyle's base-map part, as given).
+
+It ports:
+
+- the `pick` of `render_edges`: a profile, and a bundled palette, other than the default, is a settings source after `settings`;
+- `_settings.theme()`: the profile and the palette merged, the road classes of every palette at the profile's widths, the settings in the older layout (`_old_style_keys`: `palettes`, `config`, `selection`, `roads`), and `active`;
+- `_settings.style()` and `StyleConfig` (its fields in order, as `dataclasses.asdict` writes them), and `_settings.roads()`;
+- the class styles (`RoadStyle.from_dict`, then `style._apply`, plain and as a link), the slots' tables (the draw order, each class's width at zoom 20, with the engine's own width curve), the arrow image and the popup fields, as geolibre-roadstyle's `look_of` adds them.
+
+The data is roadstyle's own: the crate reads `src/roadstyle/data/` (the profiles, the palettes, `defaults.json`, `sprite.png`) when it is built, so there is one copy of it. The settings are given; the engine does not read `roadstyle.json` files or `$ROADSTYLE_CONFIG`, because the browser has none.
+
+**Check.** `tests/look.rs`: the look of the fixture's palette, settings and args (with its `features` given) is `tests/data/look.json`, byte for byte; and the ten looks of `tests/make_looks.py` (each built-in profile x palette, a settings source in the older layout with its own palette, and one in the newer layout) are equal to Python's, key order included.
+
+**Not in the engine: mapstyle's part of the look.** mapstyle turns its mode, theme and paths into the palette name, the settings and the args, and makes `features` (layers.yaml, the 3D buildings, the theme's feature style, the textures and icons as data URLs) from its own data in the mapstyle repository. geolibre-roadstyle's `build.py` still makes that part with mapstyle. A port of it is a separate decision: it needs mapstyle's data in this repository or a mapstyle crate.
+
 ## Next steps
 
 1. geolibre-roadstyle and duckosm-rust use the crate at a fixed commit and delete their copies. The duckosm-rust session does this step.
