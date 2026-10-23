@@ -15,14 +15,16 @@ use serde_json::{json, Value};
 /// kind) and `keep` (the caller's own, for example its popup's).
 pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name: Option<String>, prefix: &str, keep: &[String])
                   -> Result<(String, tiles::Tiles), String> {
-    let cfg: Value = serde_json::from_str(look).map_err(|e| format!("look: not JSON: {e}"))?;
-    let cfg = &cfg["config"]["tiles"];
+    let cfg_all: Value = serde_json::from_str(look).map_err(|e| format!("look: not JSON: {e}"))?;
+    let cfg = &cfg_all["config"]["tiles"];
     let num = |k: &str| cfg[k].as_f64().ok_or_else(|| format!("look: config.tiles.{k} is not a number"));
     if num("extent")? != tiles::EXTENT {
         return Err(format!("look: config.tiles.extent is {}, the tiles are made with {}", num("extent")?, tiles::EXTENT));
     }
     let (min_zoom, max_zoom) = (num("minzoom")? as u32, num("maxzoom")? as u32);
     let mut tiled = tiles::Tiles::new(min_zoom, max_zoom, num("buffer_px")?);
+    let arg = |k: &str| cfg_all["args"][k].as_str().filter(|c| !c.is_empty()).map(String::from);
+    let (width_col, highway_col) = (arg("width_m_col"), arg("highway_col").unwrap_or_else(|| "highway".into()));
     let Parts { name, center, zoom, mut layers, sources, metadata, glyphs } = make_parts(parquet, look, features, None, name)?;
     let mut read: std::collections::HashSet<String> = keep.iter().cloned().chain(["name".to_string(), "kind".to_string()]).collect();
     fn texts(v: &Value, out: &mut std::collections::HashSet<String>) {
@@ -43,6 +45,11 @@ pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name:
         let slots = k == "slots";
         let from = if slots { slots_from } else { 0 };
         match s {
+            // render's tiles: the pieces of `simple` keep the class, lvl, the metre width column and the __rs_* marks (not a picked item's fields)
+            Src::Typed(s) if k == "simple" => {
+                let keep: std::collections::HashSet<String> = [highway_col.clone(), "lvl".into()].into_iter().chain(width_col.clone()).collect();
+                tiled.add_typed(&k, s, &keep, slots, from)
+            }
             Src::Typed(s) => tiled.add_typed(&k, s, &read, slots, from),
             Src::Json(s) => {
                 // render's export: another GeoJSON source (the 3D decks, an overlay) keeps all its properties (keep=None). Python writes

@@ -14,12 +14,14 @@ const LAP_M: f64 = 2.0; // a lap (the flat seam below zoom 17) reaches this far 
 const PIECES: usize = 24; // the most pieces of one edge (the feature id is edge * PIECES + n)
 const TIE: f64 = 1e-8; // the line-sort-key's tie-breaker per edge
 const MAX_EDGES: usize = 1_000_000;
+const ITEM_STEP: f64 = 0.01; // an item's step above its edge's fill, by its rank on the edge
+const MAX_ITEMS: usize = 38; // the most items of one edge between its fill and the next casings
 
-pub(crate) type Pt = [f64; 2];
+pub type Pt = [f64; 2];
 
-struct Piece {
-    props: Props,
-    coords: Option<Vec<Pt>>,
+pub struct Piece {
+    pub props: Props,
+    pub coords: Option<Vec<Pt>>,
 }
 
 /// np.round(x, d) for d > 0: rint(x * 10^d) / 10^d.
@@ -249,7 +251,8 @@ fn with(mut p: Props, k: i64, s: f64) -> Props {
 /// The "simple" source: _simple_pieces (casing pieces __rs_k 0, bridge shadows 2, tunnel gap 3 and dashes 4, fills 1), the feature ids
 /// (edge * PIECES + n), the tie-breaker per edge and __rs_cls (_mark_cls).
 /// `width_col`: render's width_m_col, which the pieces keep (the layer's `cols`).
-pub fn simple_source(roads: &[Feature], head_m: f64, shadows: bool, width_col: Option<&str>) -> Result<Source, String> {
+/// `items`: the line items on the edges (_item_pieces, `__rs_k` 5), each over its edge's fill, by its rank on the edge.
+pub fn simple_source(roads: &[Feature], head_m: f64, shadows: bool, width_col: Option<&str>, items: Vec<Piece>) -> Result<Source, String> {
     let line_of: Vec<Option<&Vec<Pt>>> = roads.iter().map(|f| f.coords.as_ref()).collect();
     let mut halves = halves(roads);
     let mut out: Vec<Piece> = Vec::new();
@@ -292,7 +295,8 @@ pub fn simple_source(roads: &[Feature], head_m: f64, shadows: bool, width_col: O
             out.push(Piece { props: with(props, 1, s), coords: h.coords });
         }
     }
-    mitre_ends(&mut out, &line_of, roads);
+    let mut items = items;
+    mitre_ends(&mut out, &line_of, roads, &mut items);
     let mut n: HashMap<i64, usize> = HashMap::new();
     let mut features = Vec::with_capacity(out.len());
     for mut f in out {
@@ -312,11 +316,32 @@ pub fn simple_source(roads: &[Feature], head_m: f64, shadows: bool, width_col: O
         f.props.insert("__rs_cls", cls);
         features.push(Feat { id, props: f.props, coords: f.coords });
     }
+    // the items, by edge, order, overlay and feature: an id per edge and rank, and a sort key over the edge's fill
+    items.sort_by_key(|f| ["__rs_edge", "__rs_ord", "__rs_ov", "__rs_item"].map(|k| f.props.get(k).and_then(Value::as_i64).unwrap_or(0)));
+    let mut rank: HashMap<i64, usize> = HashMap::new();
+    for mut f in items {
+        let e = f.props.get("__rs_edge").and_then(Value::as_i64).unwrap_or(0);
+        let r = rank.entry(e).or_default();
+        *r += 1;
+        if *r > MAX_ITEMS {
+            return Err(format!("simple=True: edge {e} has more than {MAX_ITEMS} items; they do not fit between its fill and the next casings"));
+        }
+        let id = MAX_EDGES * PIECES + e as usize * MAX_ITEMS + *r - 1;
+        let s = 2.0 * int(&f.props, "__rs_fl") as f64 + 1.0 + *r as f64 * ITEM_STEP + e as f64 * TIE;
+        f.props.insert("__rs_s", s.into());
+        // _mark_cls: the class and the access of the item's road
+        let road = roads.get(e as usize).map(|r| &r.props);
+        f.props.insert("__rs_cls", road.and_then(|p| p.get("highway")).cloned().unwrap_or(Value::Null));
+        if let Some(a) = road.and_then(|p| p.get("__rs_access")).filter(|a| !a.is_null()) {
+            f.props.insert("__rs_access", a.clone());
+        }
+        features.push(Feat { id, props: f.props, coords: f.coords });
+    }
     Ok(Source { feats: features, id_first: false, tolerance: 0.05, maxzoom: None })
 }
 
-// _mitre_ends (the roads' part; items are not ported): a flat end where another road with metre widths goes on is pushed on to close the
-// corner with the road that goes on most straight, turning _MITRE_MAX degrees at most.
+// _mitre_ends: a flat end where another road with metre widths goes on is pushed on to close the corner with the road that goes on most
+// straight, turning _MITRE_MAX degrees at most; an item's end where an item of its colour and dash goes on (within _ITEM_JOIN_M) too.
 const MITRE_MAX: f64 = 60.0;
 const ITEM_JOIN_M: f64 = 2.0;
 
@@ -370,7 +395,7 @@ fn push(c: &mut Vec<Pt>, first: bool, m: f64) {
     if first { c.insert(0, pt) } else { c.push(pt) }
 }
 
-fn mitre_ends(out: &mut [Piece], line_of: &[Option<&Vec<Pt>>], roads: &[Feature]) {
+fn mitre_ends(out: &mut [Piece], line_of: &[Option<&Vec<Pt>>], roads: &[Feature], items: &mut [Piece]) {
     let snap = |p: &Pt| (format!("{:.6}", p[0]), format!("{:.6}", p[1]));
     let mut wide: indexmap::IndexMap<i64, (f64, f64)> = indexmap::IndexMap::new();
     for (i, f) in roads.iter().enumerate() {
@@ -383,9 +408,6 @@ fn mitre_ends(out: &mut [Piece], line_of: &[Option<&Vec<Pt>>], roads: &[Feature]
         let cm = p.get("__rs_cm").and_then(Value::as_f64).unwrap_or(0.0);
         wide.insert(p.get("__rs_edge").and_then(Value::as_i64).unwrap_or(i as i64), (wm * k, (wm - 2.0 * cm) * k));
     }
-    if wide.is_empty() {
-        return;
-    }
     let line = |e: i64| line_of.get(e as usize).copied().flatten();
     let mut ends: HashMap<(String, String), Vec<(i64, bool)>> = HashMap::new();
     for &e in wide.keys() {
@@ -394,7 +416,9 @@ fn mitre_ends(out: &mut [Piece], line_of: &[Option<&Vec<Pt>>], roads: &[Feature]
         ends.entry(snap(&c[c.len() - 1])).or_default().push((e, false));
     }
     let at = |a: &Pt, b: &Pt| (a[0] - b[0]).abs() < 1e-6 && (a[1] - b[1]).abs() < 1e-6;
-    let lat0 = line_of.iter().flatten().find(|c| !c.is_empty()).map_or(0.0, |c| c[0][1]);
+    // one latitude for all the metres (two points' own ones put them metres apart): the first item's, else the first road's
+    let lat0 = items.first().and_then(|f| f.coords.as_ref()).and_then(|c| c.first()).map(|p| p[1])
+        .or_else(|| line_of.iter().flatten().find(|c| !c.is_empty()).map(|c| c[0][1])).unwrap_or(0.0);
     let k0 = 111320.0 * lat0.to_radians().cos();
     let xy = |pt: &Pt| (pt[0] * k0, pt[1] * 111320.0);
     for f in out.iter_mut() {
@@ -434,5 +458,61 @@ fn mitre_ends(out: &mut [Piece], line_of: &[Option<&Vec<Pt>>], roads: &[Feature]
                 push(c, first, m);
             }
         }
+    }
+    // the items: an end with the items of its colour and dash that start within ITEM_JOIN_M (and a start with those that end there)
+    let lines: Vec<usize> = (0..items.len()).filter(|&k| items[k].coords.as_ref().is_some_and(|c| c.len() >= 2)).collect();
+    let text = |f: &Piece, k: &str| f.props.get(k).filter(|v| !v.is_null()).map(Value::to_string);     // Python's None: missing or null
+    let key = |f: &Piece| (text(f, "__rs_ic"), text(f, "__rs_dash"));
+    let cell = |p: &Pt| ((p[0] / 3e-5).floor() as i64, (p[1] / 3e-5).floor() as i64);
+    let end_of = |c: &Vec<Pt>, first: bool| if first { c[0] } else { c[c.len() - 1] };
+    let mut by: HashMap<_, Vec<usize>> = HashMap::new();
+    for &k in &lines {
+        let c = items[k].coords.as_ref().unwrap();
+        for first in [true, false] {
+            by.entry((key(&items[k]), first, cell(&end_of(c, first)))).or_default().push(k);
+        }
+    }
+    let num = |p: &Props, k: &str| p.get(k).and_then(Value::as_f64).unwrap_or(0.0);
+    let side = |f: &Piece, first: bool| {
+        let c = f.coords.as_ref().unwrap();
+        let cl = c[0][1].to_radians().cos();
+        let u = heading(c, first);
+        let out_u = if first { (-u.0, -u.1) } else { u };
+        let o = num(&f.props, "__rs_iom") * cl;
+        (xy(&end_of(c, first)), out_u, num(&f.props, "__rs_iwm") * cl / 2.0, if first { -o } else { o })
+    };
+    let mut pushes = Vec::new();
+    for &k in &lines {
+        for first in [true, false] {
+            let (p, u, h, o) = side(&items[k], first);
+            let (x, y) = cell(&end_of(items[k].coords.as_ref().unwrap(), first));
+            let mut best: Option<(f64, f64)> = None;
+            for dx in [-1, 0, 1] {
+                for dy in [-1, 0, 1] {
+                    for &j in by.get(&(key(&items[k]), !first, (x + dx, y + dy))).into_iter().flatten() {
+                        if j == k {
+                            continue;
+                        }
+                        let (q, v, kk, w) = side(&items[j], !first);
+                        let (v, w) = ((-v.0, -v.1), -w);
+                        if (q.0 - p.0).hypot(q.1 - p.1) > ITEM_JOIN_M {
+                            continue;
+                        }
+                        let dot = u.0 * v.0 + u.1 * v.1;
+                        if let Some(m) = reach((p, u, h, o), (q, v, kk, w)) {
+                            if best.is_none_or(|b| dot > b.0) {
+                                best = Some((dot, m));
+                            }
+                        }
+                    }
+                }
+            }
+            if let Some((_, m)) = best.filter(|b| b.1 > 0.0) {
+                pushes.push((k, first, m));
+            }
+        }
+    }
+    for (k, first, m) in pushes {
+        push(items[k].coords.as_mut().unwrap(), first, m);
     }
 }

@@ -177,6 +177,36 @@ def test_export_inline_metre_widths(part, keywords, opts):
     assert diff(ru, py) == []
 
 
+def _overlays(part, case):
+    """The keywords of an overlay case: the caller's overlays of each kind, on edges, and render's items= (two lanes per road)."""
+    import geopandas as gpd
+
+    h = part[part.geometry.length > 0.0003].head(40)
+    lanes = [{"edge_id": e, "width_m": 3.0, "offset_m": side * 1.5, "color": "#cc3333" if side < 0 else "#3333cc", "order": int(side > 0),
+              "dash": "2,2" if side > 0 and i % 3 == 0 else None, "pick": side > 0 and i % 5 == 0, "minzoom": 17 if side > 0 and i % 7 == 0 else None,
+              "geometry": g} for i, (e, g) in enumerate(zip(h["edge_id"], h.geometry, strict=True)) for side in (-1, 1)]
+    zones = rs.Overlay(h.assign(geometry=h.geometry.buffer(0.0002)), label="zones", placement="under", popup=["name"])
+    pois = rs.Overlay(h.assign(geometry=h.geometry.centroid), label="pois", color="#f00", tooltip=["name"])
+    lines = rs.Overlay(h[["name", "geometry"]], kind="line", dash=[2, 2], min_zoom=14, popup=[])
+    text = rs.Overlay(h[["name", "geometry"]], kind="text", text_col="name", text_halo="#fff")
+    per_feature = rs.Overlay(h.assign(c="#123456")[["c", "geometry"]], color_col="c", width_m=3.0)
+    on_edge = rs.Overlay(h[["edge_id", "geometry"]], label="on edge", edge_col="edge_id", color="#0a0")
+    in_metres = rs.Overlay(h[["edge_id", "geometry"]].assign(w=2.5), edge_col="edge_id", width_m_col="w", color="#0a0", label="lanes")
+    return {"kinds": {"overlays": [zones, pois, lines]}, "text": {"overlays": [text]}, "colour column": {"overlays": [per_feature]},
+            "on edges": {"overlays": [on_edge]}, "items": {"items": gpd.GeoDataFrame(lanes, crs="EPSG:4326")},
+            "items and metre overlay": {"overlays": [in_metres], "items": gpd.GeoDataFrame(lanes, crs="EPSG:4326")}}[case]
+
+
+@pytest.mark.parametrize("case", ["kinds", "text", "colour column", "on edges", "items", "items and metre overlay"])
+def test_export_inline_overlays(part, keywords, case):
+    """overlays= (the caller's rs.Overlay layers) and items= (the road's line items in the one road layer, with their mitre ends)."""
+    from compare_engines import diff
+
+    py = rs.export_inline(part, engine="python", **{**keywords, **_overlays(part, case)})
+    ru = rs.export_inline(part, engine="rust", **{**keywords, **_overlays(part, case)})
+    assert diff(ru, py) == []
+
+
 @pytest.mark.parametrize("rename", [False, True], ids=["names", "other column names"])
 def test_export_inline_decks(part, keywords, rename):
     """view_3d: the 3D bridge decks. The properties are the same, the polygons have the same shape: Python makes them with GEOS, the
@@ -201,14 +231,18 @@ def test_export_inline_decks(part, keywords, rename):
     assert diff(ru, py) == []
 
 
-@pytest.mark.parametrize("case", ["plain", "numeric", "categorical", "road_popup", "view_3d"])
+@pytest.mark.parametrize("case", ["plain", "numeric", "categorical", "road_popup", "view_3d", "kinds", "items and metre overlay", "other column names"])
 def test_export_style(part, keywords, case, tmp_path):
     """export_style: the same style.json and the same files; each tile has the same features when decoded (compare_engines.tile_diff:
     the numbers by value, the 3D decks by shape)."""
     from compare_engines import diff, tile_diff
 
     kw = {k: v for k, v in keywords.items() if k not in ("basemap", "basemaps")}     # export_style: the base map comes from the app
-    kw.update(CASES.get(case) or {"view_3d": True})
+    if case == "other column names":
+        part = part.rename(columns=_RENAME)
+        kw.update(highway_col="fclass", tunnel_col="tun", bridge_col="brg", layer_col="lyr", edge_id_col="eid")
+    else:
+        kw.update(CASES[case] if case in CASES else {"view_3d": True} if case == "view_3d" else _overlays(part, case))
     py, ru = tmp_path / "python", tmp_path / "rust"
     rs.export_style(part, py, base_url="http://x", engine="python", **kw)
     rs.export_style(part, ru, base_url="http://x", engine="rust", **kw)

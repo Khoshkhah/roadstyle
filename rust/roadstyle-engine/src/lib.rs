@@ -62,7 +62,6 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     compute_levels(&mut feats, &look_json["args"], look.head_m)?;
     let colors = roads::mark_roads(&mut feats, &look, &look_json["args"])?;
     let width_col = look_json["args"]["width_m_col"].as_str().filter(|c| !c.is_empty());
-    let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow, width_col)?;
     // render's arrows and labels (both on by default): the slots exist only for them
     let (arrows, labels) = (look_json["args"]["arrows"] != false, look_json["args"]["labels"] != false);
     let slots = if arrows || labels { slots::slots_source(&feats, &slots::SlotLook::from_json(&look_json)?) }
@@ -74,6 +73,23 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
         let attached = overlays::edge_attach(&mut fcs, &feats);
         (ovs, images) = overlays::feature_overlays(fcs, &look_json, &attached);
     }
+    // render's overlays=: the caller's own, after the base map's
+    ovs.extend(overlays::user_overlays(&look_json["args"]["overlays"], ovs.len())?);
+    // the line items on the edges (an overlay's lines in metres, render's items=): pieces of the one road layer
+    let mut items = Vec::new();
+    if ovs.iter().any(overlays::metre_items) || !look_json["args"]["items"].is_null() {
+        let by_id: std::collections::HashMap<String, &props::Props> =
+            feats.iter().filter_map(|f| f.props.get("edge_id").map(|e| (overlays::eid(e), &f.props))).collect();
+        for (i, ov) in ovs.iter_mut().enumerate().filter(|(_, o)| overlays::metre_items(o)) {
+            overlays::edge_overlay(ov, &by_id)?;
+            items.extend(overlays::item_pieces(ov, i, &look_json)?);
+        }
+        if !look_json["args"]["items"].is_null() {
+            let col = look_json["args"]["edge_id_col"].as_str().unwrap_or("edge_id");
+            items.extend(overlays::road_items(&look_json["args"]["items"], &by_id, col, ovs.len(), &look_json)?);
+        }
+    }
+    let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow, width_col, items)?;
     // everything that reads the roads is done before this: the roads source takes them
     // export_inline(planner=True): the route planner's graphs, or the number of roads past the limit
     let planned = match planner {
@@ -91,7 +107,10 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     } else { Vec::new() };
     let layers = layers::road_layers(&look_json, &roads.feats, &simple.feats, source_features(&slots), !decks.is_empty(), &mut ovs, &colors.props,
                                      colors.active)?;
-    let glyphs = (labels && !source_features(&slots).is_empty()).then(|| look_json["theme"]["labels"]["glyphs"].clone());
+    let mut glyphs = (labels && !source_features(&slots).is_empty()).then(|| look_json["theme"]["labels"]["glyphs"].clone());
+    if glyphs.is_none() && ovs.iter().any(|o| o.kind == "text") {      // _build_overlays: a text overlay needs a font
+        glyphs = Some(json!("https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"));
+    }
     let mut sources = vec![("roads".to_string(), Src::Typed(roads))];
     if !decks.is_empty() {
         sources.push(("decks".into(), Src::Json(json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": decks}, "generateId": true}))));

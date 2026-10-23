@@ -26,6 +26,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   byte, and the tiles have the same features. `format="pmtiles"` stays Python only for now.
 - **The Rust engine draws the 3D bridge decks** (`view_3d=True`, the default of `export_inline` and `export_style`): the same deck features as Python,
   with the same properties. The engine makes the ribbons with its own mitre offsets, not with GEOS, so a corner can differ by the rounding (1e-6 deg).
+- **The Rust engine draws the caller's overlays and the road items** (`overlays=`, `items=`): every kind of `Overlay` (fill, line, circle, text), a
+  style of the settings, a colour per feature, metre widths, dashes and zoom ranges, overlays on edges, and the line items in metres in the one road
+  layer with their mitre ends. The same style as Python, inline and in tiles.
 - **The Rust engine parses floats exactly** (serde_json `float_roundtrip`), so a coordinate from Python has the same last digit.
   **Note for the users of the Rust engine:** the engine now follows `labels=False` and `arrows=False` in the look's `args`, as Python does. Before,
   it always drew the names and the arrows. The looks of the GeoLibre plugin and of duckosm-rust's page have both false (from mapstyle's

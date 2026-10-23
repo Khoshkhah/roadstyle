@@ -65,15 +65,49 @@ def export_inline(edges, **kwargs) -> dict:
         raise ValueError(f"engine='rust': the roads have no column {', '.join(missing)}")
     kwargs = dict(kwargs)
     kwargs.pop("engine", None)
-    palette, profile, settings = kwargs.pop("palette", None), kwargs.pop("profile", None), kwargs.pop("settings", None)
-    features = kwargs.pop("features", None)
     kwargs.setdefault("view_3d", True)      # as export_inline
+    lk = _look_of(kwargs)
+    text = rust().make_style(_geoparquet(edges), json.dumps(lk), None, None, kwargs.get("name"))
+    return json.loads(text)
+
+
+def _look_of(kwargs) -> dict:
+    """The resolved look of render's keywords, with what the engine reads as JSON: the boundary as GeoJSON (_boundary_fc) and each overlay
+    as its fields, its style of the settings filled in (_styled), its data as a FeatureCollection (``fc``)."""
+    kwargs = dict(kwargs)
+    palette, profile, settings = kwargs.pop("palette", None), kwargs.pop("profile", None), kwargs.pop("settings", None)
+    features, overlays, items = kwargs.pop("features", None), kwargs.pop("overlays", None), kwargs.pop("items", None)
     if kwargs.get("boundary") is not None:   # a shapely geometry or a GeoDataFrame: GeoJSON, as render does (_boundary_fc)
         from .render_web import _boundary_fc
         kwargs["boundary"] = json.loads(json.dumps(_boundary_fc(kwargs["boundary"])))
     lk = look(palette=palette, profile=profile, settings=settings, args=kwargs, features=features)
-    text = rust().make_style(_geoparquet(edges), json.dumps(lk), None, None, kwargs.get("name"))
-    return json.loads(text)
+    if overlays:
+        lk["args"]["overlays"] = [_overlay_json(o, (lk["config"].get("overlays") or {}).get("styles") or {}) for o in overlays]
+    if items is not None:          # render's items=: the road's own line items, as GeoJSON
+        from .overlays import to_fc
+        lk["args"]["items"] = json.loads(json.dumps(to_fc(items)))
+    return lk
+
+
+def _overlay_json(ov, styles) -> dict:
+    """An rs.Overlay (or its data) as the engine reads it: its fields (render_web._styled: a style's fields where the overlay gives none), and
+    its data as GeoJSON in ``fc`` (overlays.to_fc)."""
+    import dataclasses
+
+    from .overlays import Overlay, to_fc
+
+    ov = ov if isinstance(ov, Overlay) else Overlay(data=ov)
+    if ov.style:
+        if ov.style not in styles:
+            raise ValueError(f"overlay style {ov.style!r} is not in the settings (config.overlays.styles); known: {sorted(styles)}")
+        fields = {f.name for f in dataclasses.fields(Overlay)} - {"data", "style", "edge_col", "order_col", "select"}
+        bad = set(styles[ov.style]) - fields
+        if bad:
+            raise ValueError(f"overlay style {ov.style!r}: unknown field(s) {sorted(bad)}; the fields are {sorted(fields)}")
+        ov = dataclasses.replace(ov, **{k: v for k, v in styles[ov.style].items() if getattr(ov, k) is None})
+    out = {f.name: getattr(ov, f.name) for f in dataclasses.fields(Overlay) if f.name != "data"}
+    out["fc"] = json.loads(json.dumps(to_fc(ov.data)))
+    return out
 
 
 # compute_levels' keywords that the Rust engine has only at their defaults
@@ -115,10 +149,9 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs
         raise ValueError("engine='rust': export_style writes format='xyz' only (PMTiles in Rust is phase P6); use engine='python'")
     kwargs = dict(kwargs)
     name = kwargs.get("name") or "roads"
-    palette, profile, settings = kwargs.pop("palette", None), kwargs.pop("profile", None), kwargs.pop("settings", None)
     kwargs.setdefault("view_3d", True)
     kwargs["tiles"] = True                                 # render's tiled look: the roads source draws (no lean mode)
-    lk = look(palette=palette, profile=profile, settings=settings, args=kwargs, features=kwargs.pop("features", None))
+    lk = _look_of(kwargs)
     t = rust().Tiler(_geoparquet(edges), json.dumps(lk), None, name, "", [str(c) for c in edges.columns])   # every column: a click shows the data
     style, base = json.loads(t.style), base_url.rstrip("/")
     bounds = tuple(float(v) for v in edges.total_bounds)

@@ -345,6 +345,28 @@ fn plus_px(expr: &Value, px: impl Fn(&Value) -> Value, when: Option<&Value>) -> 
 }
 
 /// _by_feature: one zoom curve that picks a curve per feature, the choice inside each stop.
+/// _exp2: a zoom curve as a base-2 exponential one with a stop at 22 (its last value), so a metre curve on its stops is exact at every zoom.
+fn exp2(curve: &Value) -> Value {
+    let c = curve.as_array().unwrap();
+    let mut out = vec![json!("interpolate"), json!(["exponential", 2]), json!(["zoom"])];
+    out.extend(c[3..].iter().cloned());
+    if c[c.len() - 2].as_f64().is_some_and(|z| z < 22.0) {
+        out.extend([json!(22), c[c.len() - 1].clone()]);
+    }
+    Value::Array(out)
+}
+
+/// _metre_curve: a zoom curve in px for the metres in `prop` (null 0) on the stops and interpolation of `like` (512 * 2^z / C px per metre).
+fn metre_curve(like: &Value, prop: &str) -> Value {
+    let l = like.as_array().unwrap();
+    let mut out: Vec<Value> = l[..3].to_vec();
+    for z in l[3..].iter().step_by(2) {
+        out.push(z.clone());
+        out.push(json!(["*", ["coalesce", ["get", prop], 0], py_round(512.0 * 2f64.powf(z.as_f64().unwrap()) / 40075016.686, 6)]));
+    }
+    Value::Array(out)
+}
+
 fn by_feature(cases: &[(Value, Value)], default: &Value) -> Value {
     let d = default.as_array().unwrap();
     let mut out: Vec<Value> = d[..3].to_vec();
@@ -676,6 +698,12 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     } else {
         (m.width_expr("highway", true, 1.0), m.width_expr("highway", false, 1.0), m.width_expr("highway", true, wing))
     };
+    // the line items on the edges (__rs_k 5): every curve of the road layer base-2 exponential, so theirs in metres is exact at every zoom
+    let items: Vec<&Props> = sp.iter().copied().filter(|p| p.get("__rs_k") == Some(&json!(5))).collect();
+    let (fw0, off0) = (fw.clone(), off.clone()); // the highlight's, as the full look made it
+    let (cw, fw, bcw) = if items.is_empty() { (cw, fw, bcw) } else { (exp2(&cw), exp2(&fw), exp2(&bcw)) };
+    let is_it = json!(["==", ["get", "__rs_k"], 5]);
+    let soff = if items.is_empty() { off.clone() } else { by_feature(&[(is_it.clone(), metre_curve(&exp2(&off), "__rs_iom"))], &exp2(&off)) };
     // render's lean mode (inline data): the roads source draws nothing, so MapLibre cuts it into no tiles; with tiles=True its layers are drawn
     let lean = args["tiles"] != true;
     let lean_layout = |l: &Value| {
@@ -706,6 +734,9 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     if decks {
         flt.push(json!(["any", ["<", ["zoom"], dk.flat_below], ["!", ["to-boolean", ["get", "__rs_bridge"]]]]));
     }
+    if items.iter().any(|p| p.contains_key("__rs_imz")) {      // an item's own minzoom
+        flt.push(json!(["any", ["!", ["has", "__rs_imz"]], [">=", ["zoom"], ["get", "__rs_imz"]]]));
+    }
     let flt = Value::Array(flt);
     let k = |n: i64| json!(["==", ["get", "__rs_k"], n]);
     let (is_c, is_sh, is_b) = (k(0), k(2), json!(["to-boolean", ["get", "__rs_bridge"]]));
@@ -721,6 +752,10 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
         wide.push((json!(["any", k(3), k(4)]), plus_px(&cw, |_| px.clone(), None)));
     }
     wide.push((is_c.clone(), cw.clone()));
+    if !items.is_empty() {     // 1 px over: two lanes side by side show no antialiased seam
+        let px = th["overlays"]["item_overlap_px"].clone();
+        wide.push((is_it.clone(), plus_px(&metre_curve(&fw, "__rs_iwm"), |_| px.clone(), None)));
+    }
     let op = json!(["case", ["all", ["!", gs("rs_fill_on")], k(1)], 0, 1]);
     // _simple_color, with the glow of lean mode
     let mut fill = fill_expr(fills, fb_fill);
@@ -743,13 +778,17 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     color.extend(cases);
     color.extend([k(5), item, fill]);
     let mut paint = Map::new();
-    if !dashes.is_empty() || any_tunnel {
-        paint.insert("line-dasharray".into(), simple_dasharray(&dashes));
+    let mut sdashes = dashes.clone();
+    sdashes.extend(items.iter().filter_map(|p| p.get("__rs_dash").and_then(Value::as_str)).filter(|d| !d.is_empty()).map(String::from));
+    sdashes.sort();
+    sdashes.dedup();
+    if !sdashes.is_empty() || any_tunnel {
+        paint.insert("line-dasharray".into(), simple_dasharray(&sdashes));
     }
     paint.insert("line-color".into(), Value::Array(color));
     let width = by_feature(&wide, &fw);
     paint.insert("line-width".into(), if pairs { m.pair_width(&width, if metres { wmz.as_f64() } else { None }) } else { width });
-    paint.insert("line-offset".into(), off.clone());
+    paint.insert("line-offset".into(), soff);
     paint.insert("line-blur".into(), json!(["interpolate", ["linear"], ["zoom"], r0v, 0, r1v, ["case", is_sh, blur, 0]]));
     paint.insert("line-opacity".into(), json!(["interpolate", ["linear"], ["zoom"], r0v, ["case", is_sh, 0, op], r1v, op]));
     let mut simple_layout = lay.as_object().unwrap().clone();
@@ -760,23 +799,33 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
                       "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], fb_fill], "line-width": fw, "line-offset": off, "line-opacity": 0}});
     let mut highlight = json!({"id": "roads-highlight", "type": "line", "source": "roads", "layout": lean_layout(&lay),
                                "paint": {"line-color": ["case", s_on, select, hover],
-                                         "line-opacity": ["case", ["any", h_on, s_on], sel["opacity"], 0], "line-width": fw, "line-offset": off}});
+                                         "line-opacity": ["case", ["any", h_on, s_on], sel["opacity"], 0], "line-width": fw0, "line-offset": off0}});
     if decks {        // a bridge glows on its deck from flat_below up; in position mode the flat bridge layers do not exist
         highlight["filter"] = json!(["!", ["!", ["to-boolean", 1]]]);
     }
     // the base map's overlays (_build_overlays): under the roads, over them, or on a street (_edge_overlay: one copy per fill number)
-    let by_id: HashMap<String, &Props> = rp.iter()
-        .filter_map(|p| match p.get("edge_id") { Some(Value::String(s)) => Some((s.clone(), *p)), _ => None }).collect();
+    let by_id: HashMap<String, &Props> = rp.iter().filter_map(|p| p.get("edge_id").map(|e| (crate::overlays::eid(e), *p))).collect();
     let (mut under, mut over, mut edge, mut ov_ids) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     for (i, ov) in ovs.iter_mut().enumerate() {
         let sid = format!("ov{i}");
         let mut ids: Vec<String> = Vec::new();
         if ov.edge {
-            for (pos, order) in edge_overlay(&mut ov.fc, &by_id)? {
+            for (pos, order) in edge_overlay(ov, &by_id)? {
                 let flt = json!(["all", ["==", ["get", "__rs_fl"], pos], ["==", ["get", "__rs_ord"], order]]);
+                let drawn = crate::overlays::metre_items(ov);
                 let mine: Vec<Value> = overlay_layers(&sid, ov, look).into_iter().map(|mut l| {
                     l["id"] = format!("{}-lv{pos}-o{order}", l["id"].as_str().unwrap()).into();
                     l["filter"] = flt.clone();
+                    if drawn {        // drawn by the road layer: this layer is the pick and shows the hover / select highlight
+                        let mc = |prop: &str| json!(["interpolate", ["exponential", 2], ["zoom"],
+                            0, ["*", ["get", prop], py_round(512.0 / 40075016.686, 6)], 22, ["*", ["get", prop], py_round(512.0 * 2f64.powi(22) / 40075016.686, 6)]]);
+                        l["layout"]["line-cap"] = json!("butt");
+                        let p = l["paint"].as_object_mut().unwrap();
+                        p.shift_remove("line-dasharray");
+                        p.insert("line-opacity".into(), json!(["case", ["any", s_on, h_on], 1, 0]));
+                        p.insert("line-width".into(), mc("__rs_iwm"));
+                        p.insert("line-offset".into(), mc("__rs_iom"));
+                    }
                     l
                 }).collect();
                 ids.extend(mine.iter().map(|l| l["id"].as_str().unwrap().to_string()));
@@ -1011,6 +1060,9 @@ fn restyle(layers: Vec<Value>, ovs: &[Overlay]) -> Vec<Value> {
     let mut extra: IndexMap<String, Vec<Value>> = IndexMap::new();
     for (i, lys) in &by_ov {
         let ll = &ovs[*i].l;
+        if ll.is_null() {
+            continue; // a caller's overlay: no restyle of mapstyle's
+        }
         let first = layers[lys[0]].clone();
         let body_type = first["type"].as_str().unwrap_or("").to_string();
         let bodies: Vec<usize> = lys.iter().copied().filter(|&k| layers[k]["type"] == body_type.as_str()).collect();

@@ -135,14 +135,14 @@ The crate makes the style of `export_inline` for simple mode with stored levels 
 - [ ] `simple=False`: the layer set of casings and fills for each level (`_level_id`, `_fill_layer_ids`); the crate has simple mode only.
 - [x] `arrows`, `labels`, `minzoom` (true or a table; 2026-10-23).
 - [x] `view_3d`: the 3D bridge decks (`decks.rs`, 2026-10-23). The engine makes the ribbons with its own mitre offsets, not GEOS: the same properties, the same shapes to the rounding (1e-6 deg).
-- [ ] `items`, `items_popup`: edge items and lanes (`__rs_k` 5, `__rs_ic`).
-- [ ] `overlays=`: the caller's own `Overlay` layers (`_build_overlays`, `overlays.py`). The crate has mapstyle's base-map overlays only.
+- [x] `items`: edge items and lanes (`__rs_k` 5, `__rs_ic`, the items' mitre ends; 2026-10-23). `items_popup` is a page keyword. A MultiLineString item is an error in the engine.
+- [x] `overlays=`: the caller's own `Overlay` layers (`_build_overlays`, `overlays.py`; every kind, a style of the settings, on edges, in metres as items; 2026-10-23).
 - [x] `boundary` (the dashed outline), `hover_color`, `select_color` (2026-10-23).
 - [x] `data_maxzoom`, `data_tolerance`, `pitch`, `bearing`, `max_pitch` (2026-10-23).
 - [x] `road_popup`, `popup_mode`, `road_tooltip`, `tooltip`, `hover_delay_ms` (2026-10-23).
 - [ ] `views`: named presets of colour option, palette and filters (`_check_views`).
 - [ ] `style=`: a Python `Styler` object (an error in the crate); a colour option with another palette than the look's.
-- [ ] `tiles=True`: the PMTiles archive with the sidecar table (`tiles.build_pmtiles`, `tiles.sidecar`). The crate makes tiles on request (`Tiler`), with the rules of `tiles.py` (see "Step 2").
+- [ ] `tiles=True`: the PMTiles archive with the sidecar table (`tiles.build_pmtiles`, `tiles.sidecar`). The crate makes tiles on request (`Tiler`), with the rules of `tiles.py` (see "Step 2"), and the tiled look (no lean mode) for `export_style`.
 
 **Keywords of the HTML page, not of the style** (the dashboard JS module of task 2): `filter_control`, `find_control`, `overlay_control`, `overlay_popup`, `side_panel_html`, `host_panel_width`, `basemap_switcher`, `basemap`, `basemaps`, `api_key`, `zoom_readout`, `street_view`, `street_view_key`, `google_3d`, `tunnel_control`, `compress`.
 
