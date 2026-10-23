@@ -194,29 +194,7 @@ fn compute_levels(feats: &mut [read::Feature], args: &Value, head_m: f64) -> Res
         return Err(format!("head_m={head_m}: the Rust engine computes the levels with head_m=5 only (compute them first, or use the Python engine)"));
     }
     // the engine's own names: ColumnMap gave the user's columns these names before this step
-    let (hw, layer, bridge, tunnel) = ("highway", "layer", "bridge", "tunnel");
-    // a value as the text that the tag rules read: Python's _truthy and int(float(layer)) on the GeoDataFrame's values
-    let text = |v: Option<&Value>| -> Option<String> {
-        match v? {
-            Value::Null => None,
-            Value::Bool(b) => Some(if *b { "1" } else { "0" }.to_string()),
-            Value::Number(n) => n.as_f64().filter(|x| !x.is_nan()).map(|_| n.to_string()),
-            Value::String(s) => Some(s.clone()),
-            other => Some(other.to_string()),
-        }
-    };
-    let mut edges = roadstyle_levels::LevelEdges::default();
-    for (i, f) in feats.iter().enumerate() {
-        edges.add(0, roadstyle_levels::LevelEdge {
-            edge_id: i as i64,         // the row: compute_levels works on the frame's rows, in their order
-            highway: text(f.props.get(hw)).unwrap_or_default(),
-            tunnel: text(f.props.get(tunnel)),
-            bridge: text(f.props.get(bridge)),
-            layer: text(f.props.get(layer)),
-            junction: text(f.props.get("junction")),
-            geometry: f.coords.as_ref().map_or_else(Vec::new, |c| c.iter().map(|p| (p[0], p[1])).collect()),
-        });
-    }
+    let edges = level_edges(feats, ["highway", "layer", "bridge", "tunnel", "junction"]);
     let Some(levels) = roadstyle_levels::compute(&edges, roadstyle_levels::Method::Solve)? else { return Ok(()) };
     for r in levels.rows {
         let p = &mut feats[r.edge_id as usize].props;
@@ -346,4 +324,33 @@ fn boundary_fc(b: &Value) -> Option<Value> {
         Some("Feature") => Some(json!({"type": "FeatureCollection", "features": [b]})),
         _ => Some(json!({"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {}, "geometry": b}]})),
     }
+}
+
+/// The roads as the level solver reads them, in their order (the edge id is the row: compute_levels works on the frame's rows). `cols`:
+/// the columns of the class, the layer, the bridge, the tunnel and the junction. A value is the text that the tag rules read (Python's
+/// _truthy and int(float(layer)) on the GeoDataFrame's values).
+pub fn level_edges(feats: &[read::Feature], cols: [&str; 5]) -> roadstyle_levels::LevelEdges {
+    let [hw, layer, bridge, tunnel, junction] = cols;
+    let text = |v: Option<&Value>| -> Option<String> {
+        match v? {
+            Value::Null => None,
+            Value::Bool(b) => Some(if *b { "1" } else { "0" }.to_string()),
+            Value::Number(n) => n.as_f64().filter(|x| !x.is_nan()).map(|_| n.to_string()),
+            Value::String(s) => Some(s.clone()),
+            other => Some(other.to_string()),
+        }
+    };
+    let mut edges = roadstyle_levels::LevelEdges::default();
+    for (i, f) in feats.iter().enumerate() {
+        edges.add(0, roadstyle_levels::LevelEdge {
+            edge_id: i as i64,
+            highway: text(f.props.get(hw)).unwrap_or_default(),
+            tunnel: text(f.props.get(tunnel)),
+            bridge: text(f.props.get(bridge)),
+            layer: text(f.props.get(layer)),
+            junction: text(f.props.get(junction)),
+            geometry: f.coords.as_ref().map_or_else(Vec::new, |c| c.iter().map(|p| (p[0], p[1])).collect()),
+        });
+    }
+    edges
 }

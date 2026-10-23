@@ -762,7 +762,8 @@ def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=
 
 
 def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tunnel",
-                   method="solve", band_col=None, order="priority", highway_col="highway", junction_col="junction", band_dist=10.0, head_m=5.0, max_level=20, margin=1.0, time_limit=60.0, min_positions=True, near_rules=False):
+                   method="solve", band_col=None, order="priority", highway_col="highway", junction_col="junction", band_dist=10.0, head_m=5.0, max_level=20, margin=1.0, time_limit=60.0, min_positions=True, near_rules=False,
+                   engine=None):
     """A copy of ``edges`` with the drawing-order columns ``casing_start``, ``casing_level`` (the main part), ``casing_end`` and ``fill_level``;
     ``render_edges(casing_level_col=..., fill_level_col=...)`` draws by the last two (the heads are not drawn yet).
 
@@ -787,6 +788,12 @@ def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tu
     ponytail: tags method ignores crossings without tags and band / order; solve method does not cut a road at the place where it changes level."""
     if method not in ("tags", "solve"):
         raise ValueError(f"compute_levels: method must be 'tags' or 'solve', not {method!r}")
+    from . import _engine
+    if _engine.engine(engine) == "rust":      # ``engine``: "python" (default) or "rust" (docs/design/rust_library.md, P5)
+        return _engine.compute_levels(edges, layer_col=layer_col, bridge_col=bridge_col, tunnel_col=tunnel_col, method=method,
+                                      highway_col=highway_col, junction_col=junction_col, time_limit=time_limit, band_col=band_col,
+                                      order=order, band_dist=band_dist, head_m=head_m, max_level=max_level, margin=margin,
+                                      min_positions=min_positions, near_rules=near_rules)
     if method == "tags" and (band_col or order not in (None, "priority")):           # the default order is no request: tags has none
         raise ValueError("compute_levels: band_col and order are part of the optimization problem; use method='solve'")
     if method == "solve" and not (margin > 0 and max_level > 0):

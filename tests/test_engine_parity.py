@@ -176,6 +176,22 @@ def test_export_inline_metre_widths(part, keywords, opts):
     assert diff(ru, py) == []
 
 
+@pytest.mark.parametrize("method", ["tags", "solve"])
+def test_compute_levels(part, method):
+    """compute_levels: the same four columns from both engines (the roads of the part of Monaco, with no level columns)."""
+    roads = part.drop(columns=[c for c in _LEVEL_COLS if c in part.columns])
+    py = rs.compute_levels(roads, method=method, engine="python")
+    ru = rs.compute_levels(roads, method=method, engine="rust")
+    cols = ["casing_start", "casing_level", "casing_end", "fill_level"]
+    assert py[cols].astype(int).values.tolist() == ru[cols].astype(int).values.tolist()
+    assert ru.attrs["levels_params"] == py.attrs["levels_params"]
+
+
+def test_compute_levels_rust_defaults_only(part):
+    with pytest.raises(ValueError, match="only at the defaults"):
+        rs.compute_levels(part, method="solve", engine="rust", max_level=5)
+
+
 def test_engine_names(monkeypatch):
     assert _engine.engine(None) == "python"
     monkeypatch.setenv("ROADSTYLE_ENGINE", "rust")

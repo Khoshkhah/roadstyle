@@ -56,10 +56,36 @@ impl Tiler {
     }
 }
 
+/// compute_levels(roads, method, cols) -> (rows, info): roadstyle's compute_levels with its defaults, on the roads in their order (GeoParquet
+/// bytes). `method`: "tags" or "solve"; `cols`: the columns of the class, the layer, the bridge, the tunnel and the junction. `rows`: for
+/// each road (casing_start, casing_level, casing_end, fill_level); `info`: the counts of the solve.
+#[pyfunction]
+#[allow(clippy::type_complexity)]
+fn compute_levels(py: Python<'_>, roads: Vec<u8>, method: String, cols: [String; 5])
+                  -> PyResult<(Vec<(i64, i64, i64, i64)>, Vec<(String, i64)>)> {
+    let m = roadstyle::levels::Method::parse(&method).filter(|m| *m != roadstyle::levels::Method::None)
+        .ok_or_else(|| PyValueError::new_err(format!("method must be 'tags' or 'solve', not {method:?}")))?;
+    py.detach(|| {
+        let feats = roadstyle::read::read_roads(roads, "geometry")?;
+        let c: [&str; 5] = [&cols[0], &cols[1], &cols[2], &cols[3], &cols[4]];
+        let edges = roadstyle::level_edges(&feats, c);
+        let mut rows = vec![(0, 0, 0, 0); feats.len()];
+        let Some(levels) = roadstyle::levels::compute(&edges, m)? else { return Ok((rows, vec![])) };
+        for r in &levels.rows {
+            rows[r.edge_id as usize] = (r.casing_start, r.casing_level, r.casing_end, r.fill_level);
+        }
+        let info = vec![("roads".to_string(), levels.roads as i64), ("given_up".into(), levels.given_up as i64),
+                        ("orders_not_kept".into(), levels.orders_not_kept as i64)];
+        Ok((rows, info))
+    })
+    .map_err(|e: String| PyValueError::new_err(e))
+}
+
 #[pymodule]
 fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(make_style, m)?)?;
     m.add_function(wrap_pyfunction!(make_look, m)?)?;
+    m.add_function(wrap_pyfunction!(compute_levels, m)?)?;
     m.add_class::<Tiler>()?;
     m.add("MAX_ROADS", roadstyle::MAX_ROADS)?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;

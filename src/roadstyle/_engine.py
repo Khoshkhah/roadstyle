@@ -74,3 +74,27 @@ def export_inline(edges, **kwargs) -> dict:
     lk = look(palette=palette, profile=profile, settings=settings, args=kwargs, features=features)
     text = rust().make_style(_geoparquet(edges), json.dumps(lk), None, None, kwargs.get("name"))
     return json.loads(text)
+
+
+# compute_levels' keywords that the Rust engine has only at their defaults
+_LEVEL_DEFAULTS = {"band_col": None, "order": "priority", "band_dist": 10.0, "head_m": 5.0, "max_level": 20, "margin": 1.0,
+                   "min_positions": True, "near_rules": False}
+
+
+def compute_levels(edges, *, layer_col="layer", bridge_col="bridge", tunnel_col="tunnel", method="solve", highway_col="highway",
+                   junction_col="junction", time_limit=60.0, **kw):
+    """``roadstyle.compute_levels`` by the Rust engine: the same four columns (casing_start, casing_level, casing_end, fill_level).
+    The attrs have ``levels_params`` and ``levels_info`` (with the counts; the lists of given-up pairs are Python's only)."""
+    other = {k: v for k, v in kw.items() if v != _LEVEL_DEFAULTS.get(k, object())}
+    if other:
+        raise ValueError(f"engine='rust': compute_levels has {', '.join(sorted(other))} only at the defaults; use engine='python'")
+    rows, info = rust().compute_levels(_geoparquet(edges), method, [highway_col, layer_col, bridge_col, tunnel_col, junction_col])
+    g = edges.copy()
+    for i, c in enumerate(("casing_start", "casing_level", "casing_end", "fill_level")):
+        g[c] = [r[i] for r in rows]
+    from .levels_store import levels_params
+    d = _LEVEL_DEFAULTS
+    g.attrs["levels_params"] = levels_params(method, d["head_m"], d["band_dist"], d["margin"], d["max_level"], d["band_col"], d["order"],
+                                             d["min_positions"] and method == "solve")
+    g.attrs["levels_info"] = {"engine": "rust", **dict(info)}
+    return g

@@ -368,6 +368,7 @@ rs.compute_levels(edges, method="solve", band_col=None, order=None, band_dist=10
 | `min_positions` | True | the span term of 7.3.1: fewer positions (layers) in the page, a little less compaction; `False` leaves it out |
 | `near_rules` | False | also lift the parts of a stack pair's upper road that only come near the lower one, as last-priority rules (off by default since 2026-10-08; an input of `level_input` / make since 2026-10-08, written as `near` rows, see `level_input.md`) |
 | `time_limit` | 60 | seconds for each LP solve |
+| `engine` | None | `"python"` (the default; `ROADSTYLE_ENGINE` sets it) or `"rust"`: roadstyle's Rust engine (`roadstyle-levels`), with the other arguments at their defaults only; the same four columns |
 
 ### Output
 
