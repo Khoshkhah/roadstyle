@@ -62,7 +62,7 @@ impl Tiler {
 #[pyfunction]
 #[allow(clippy::type_complexity)]
 fn compute_levels(py: Python<'_>, roads: Vec<u8>, method: String, cols: [String; 5])
-                  -> PyResult<(Vec<(i64, i64, i64, i64)>, Vec<(String, i64)>)> {
+                  -> PyResult<(Vec<(i64, i64, i64, i64)>, String)> {
     let m = roadstyle::levels::Method::parse(&method).filter(|m| *m != roadstyle::levels::Method::None)
         .ok_or_else(|| PyValueError::new_err(format!("method must be 'tags' or 'solve', not {method:?}")))?;
     py.detach(|| {
@@ -70,19 +70,27 @@ fn compute_levels(py: Python<'_>, roads: Vec<u8>, method: String, cols: [String;
         let c: [&str; 5] = [&cols[0], &cols[1], &cols[2], &cols[3], &cols[4]];
         let edges = roadstyle::level_edges(&feats, c);
         let mut rows = vec![(0, 0, 0, 0); feats.len()];
-        let Some(levels) = roadstyle::levels::compute(&edges, m)? else { return Ok((rows, vec![])) };
+        let Some(levels) = roadstyle::levels::compute(&edges, m)? else { return Ok((rows, "{}".into())) };
         for r in &levels.rows {
             rows[r.edge_id as usize] = (r.casing_start, r.casing_level, r.casing_end, r.fill_level);
         }
-        let info = vec![("roads".to_string(), levels.roads as i64), ("given_up".into(), levels.given_up as i64),
-                        ("orders_not_kept".into(), levels.orders_not_kept as i64)];
-        Ok((rows, info))
+        // the counts, and the pairs (road numbers) that compute_levels gives as attrs
+        let info = serde_json::json!({"roads": levels.roads, "given_up": levels.given_up, "orders_not_kept": levels.orders_not_kept,
+                                      "given_up_pairs": levels.given_up_pairs, "orders_not_kept_pairs": levels.orders_not_kept_pairs});
+        Ok((rows, info.to_string()))
     })
     .map_err(|e: String| PyValueError::new_err(e))
 }
 
+/// The engine's warnings since the last call of this (render_web's warnings.warn): the binding gives them as Python warnings.
+#[pyfunction]
+fn take_warnings() -> Vec<String> {
+    roadstyle::take_warnings()
+}
+
 #[pymodule]
 fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(take_warnings, m)?)?;
     m.add_function(wrap_pyfunction!(make_style, m)?)?;
     m.add_function(wrap_pyfunction!(make_look, m)?)?;
     m.add_function(wrap_pyfunction!(compute_levels, m)?)?;

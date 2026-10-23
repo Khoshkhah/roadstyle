@@ -92,6 +92,9 @@ jobs:
       - name: The two engines
         run: pytest -q tests/test_engine_parity.py
 
+      - name: The whole suite with the Rust engine as the default (docs/design/rust_library.md, P5's golden test)
+        run: ROADSTYLE_ENGINE=rust pytest -q
+
   tartu:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest

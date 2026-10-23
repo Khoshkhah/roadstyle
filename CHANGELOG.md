@@ -41,6 +41,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `engine="rust"`).
 - **`views=` with `engine="rust"`**: the View menu, and a view's palette (the colours of each palette in the page, as Python's
   `_merge_palettes`, from a Rust style of each palette). Not with `tiles=True` (the tiles have one palette).
+- **`ROADSTYLE_ENGINE=rust` runs the whole test suite.** With the Rust engine as the default, a part that the Rust engine does not have
+  (folium and lonboard are other renderers; a Styler object, an own profile or palette file, the road-wide end caps of `twin_casing: "each"`
+  in the full look, `compute_levels` keywords other than the defaults) is made by the Python engine with a warning. With `engine="rust"`
+  given, it is an error. The engine's own warnings (a two-way pair whose directions disagree) are Python warnings, and the Rust look takes
+  the settings in force (`roadstyle.json`, `$ROADSTYLE_CONFIG`, `use_settings`). CI runs the suite with each engine.
+- **`compute_levels(engine="rust")`** gives `levels_given_up` and `levels_orders_not_kept` as Python does.
 - **The interaction contract in the style** (`docs/design/rust_library.md`, "The interaction contract"). With the look's `args.state = "live"`,
   the Rust engine makes the style of the page: the global state stays in the expressions (MapLibre's `state` block), and the metadata has
   `roadstyle:contract` (1), `roadstyle:state` (the start value of each `rs_*` state) and `roadstyle:controls` (the options of `rsDashboard` that

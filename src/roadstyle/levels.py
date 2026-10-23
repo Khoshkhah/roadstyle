@@ -789,7 +789,10 @@ def compute_levels(edges, layer_col="layer", bridge_col="bridge", tunnel_col="tu
     if method not in ("tags", "solve"):
         raise ValueError(f"compute_levels: method must be 'tags' or 'solve', not {method!r}")
     from . import _engine
-    if _engine.engine(engine) == "rust":      # ``engine``: "python" (default) or "rust" (docs/design/rust_library.md, P5)
+    other = _engine.levels_other(band_col=band_col, order=order, band_dist=band_dist, head_m=head_m, max_level=max_level, margin=margin,
+                                 min_positions=min_positions, near_rules=near_rules)
+    if _engine.engine(engine) == "rust" and not (other and _engine.fallback(engine, f"compute_levels with {', '.join(other)} not at the defaults")):
+        # ``engine``: "python" (default) or "rust" (docs/design/rust_library.md, P5)
         return _engine.compute_levels(edges, layer_col=layer_col, bridge_col=bridge_col, tunnel_col=tunnel_col, method=method,
                                       highway_col=highway_col, junction_col=junction_col, time_limit=time_limit, band_col=band_col,
                                       order=order, band_dist=band_dist, head_m=head_m, max_level=max_level, margin=margin,

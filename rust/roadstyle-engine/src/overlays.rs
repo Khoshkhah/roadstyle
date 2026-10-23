@@ -387,6 +387,10 @@ pub fn eid(v: &Value) -> String {
 /// `edge_col` (and its order in `order_col`).
 pub fn edge_overlay(ov: &mut Overlay, roads: &std::collections::HashMap<String, &crate::props::Props>) -> Result<Vec<(i64, i64)>, String> {
     let col = ov.user["edge_col"].as_str().unwrap_or("edge_id").to_string();
+    if roads.is_empty() && !ov.user.is_null() {
+        let id = ov.user["edge_id_col"].as_str().unwrap_or("edge_id");
+        return Err(format!("an overlay with edge_col needs the roads' id column '{id}' (edge_id_col): it is not in the edges"));
+    }
     let order_col = ov.user["order_col"].as_str().map(String::from);
     let mut orders = std::collections::BTreeSet::new();
     let mut unknown = Vec::new();
@@ -412,10 +416,10 @@ pub fn edge_overlay(ov: &mut Overlay, roads: &std::collections::HashMap<String, 
         }
         orders.insert((fl, o));
     }
-    if !unknown.is_empty() {
+    if !unknown.is_empty() {        // Python's text: the names as its repr writes them
         let label = ov.user["label"].as_str().unwrap_or("");
-        return Err(format!("overlay {label}: {} feature(s) have an {col:?} that is not an edge of the roads (first: {:?})", unknown.len(),
-                           &unknown[..unknown.len().min(5)]));
+        let first: Vec<String> = unknown.iter().take(5).map(|u| format!("'{u}'")).collect();
+        return Err(format!("overlay {label}: {} feature(s) have an '{col}' that is not an edge of the roads (first: [{}])", unknown.len(), first.join(", ")));
     }
     Ok(orders.into_iter().collect())
 }

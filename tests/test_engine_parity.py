@@ -426,11 +426,12 @@ def test_compute_levels(part, method):
 
 
 def test_compute_levels_rust_defaults_only(part):
-    with pytest.raises(ValueError, match="only at the defaults"):
+    with pytest.raises(ValueError, match="not at the defaults"):
         rs.compute_levels(part, method="solve", engine="rust", max_level=5)
 
 
 def test_engine_names(monkeypatch):
+    monkeypatch.delenv("ROADSTYLE_ENGINE", raising=False)
     assert _engine.engine(None) == "python"
     monkeypatch.setenv("ROADSTYLE_ENGINE", "rust")
     assert _engine.engine(None) == "rust"

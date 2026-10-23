@@ -98,6 +98,9 @@ pub struct Levels {
     /// Solve only: the stack pairs that could not be kept, and the order wishes that were not kept.
     pub given_up: usize,
     pub orders_not_kept: usize,
+    /// Solve only: the pairs themselves, as (upper road, lower road) and (first road, second road), the road numbers of `input::road_split`.
+    pub given_up_pairs: Vec<(usize, usize)>,
+    pub orders_not_kept_pairs: Vec<(usize, usize)>,
     /// Solve only: the best value of each stage (see `solve::Solved::stages`).
     pub stages: [i64; 3],
 }
@@ -109,6 +112,7 @@ pub fn compute(edges: &LevelEdges, method: Method) -> Result<Option<Levels>, Str
     let edges = edges.edges();
     let roads = input::road_split(&edges)?;
     let (mut given_up, mut orders_not_kept, mut stages) = (0, 0, [0; 3]);
+    let (mut given_up_pairs, mut orders_not_kept_pairs) = (Vec::new(), Vec::new());
     let rows = match method {
         Method::Tags => tags(&edges, &roads.ends),
         _ => {
@@ -116,6 +120,8 @@ pub fn compute(edges: &LevelEdges, method: Method) -> Result<Option<Levels>, Str
             let s = solve::solve(&rules, 20)?;
             given_up = s.given_up.len();
             orders_not_kept = s.orders_not_kept.len();
+            given_up_pairs = s.given_up.clone();
+            orders_not_kept_pairs = s.orders_not_kept.clone();
             stages = s.stages;
             solved_rows(&edges, &roads, &rules, &s)
         }
@@ -128,6 +134,8 @@ pub fn compute(edges: &LevelEdges, method: Method) -> Result<Option<Levels>, Str
         roads: roads.first.len(),
         given_up,
         orders_not_kept,
+        given_up_pairs,
+        orders_not_kept_pairs,
         stages,
     }))
 }

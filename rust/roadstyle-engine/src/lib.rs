@@ -24,6 +24,20 @@ pub(crate) use roadstyle_model::obj;
 
 use serde_json::{json, Value};
 
+thread_local! {
+    static WARNINGS: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// A warning of the engine (Python's warnings.warn in render_web): the caller takes them after a call (`take_warnings`).
+pub fn warn(msg: String) {
+    WARNINGS.with(|w| w.borrow_mut().push(msg));
+}
+
+/// The warnings of the last calls on this thread, and none after.
+pub fn take_warnings() -> Vec<String> {
+    WARNINGS.with(|w| std::mem::take(&mut *w.borrow_mut()))
+}
+
 /// The most roads of one map: a browser keeps the module's memory under 4 GB. Tartu (63,965 roads) peaks at 1.13 GB natively (2.13 GB
 /// before the typed sources, docs/design/rust_engine.md), and the wasm module used 0.65 to 0.77 times the native peak in the earlier
 /// measurements: about 14 KB a road, so 200,000 roads are about 2.8 GB.
@@ -77,14 +91,20 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
         let attached = overlays::edge_attach(&mut fcs, &feats);
         (ovs, images) = overlays::feature_overlays(fcs, &look_json, &attached);
     }
-    // render's overlays=: the caller's own, after the base map's
+    // render's overlays=: the caller's own, after the base map's (each knows the roads' id column, for its error)
+    let first_user = ovs.len();
     ovs.extend(overlays::user_overlays(&look_json["args"]["overlays"], ovs.len())?);
+    for ov in ovs[first_user..].iter_mut() {
+        ov.user["edge_id_col"] = look_json["args"]["edge_id_col"].clone();
+    }
+    // the full look draws an overlay's lines in metres as an overlay, not as items of the one road layer
+    let full = look_json["args"]["simple"] == false;
     // the line items on the edges (an overlay's lines in metres, render's items=): pieces of the one road layer
     let mut items = Vec::new();
-    if ovs.iter().any(overlays::metre_items) || !look_json["args"]["items"].is_null() {
+    if (!full && ovs.iter().any(overlays::metre_items)) || !look_json["args"]["items"].is_null() {
         let by_id: std::collections::HashMap<String, &props::Props> =
             feats.iter().filter_map(|f| f.props.get("edge_id").map(|e| (overlays::eid(e), &f.props))).collect();
-        for (i, ov) in ovs.iter_mut().enumerate().filter(|(_, o)| overlays::metre_items(o)) {
+        for (i, ov) in ovs.iter_mut().enumerate().filter(|(_, o)| !full && overlays::metre_items(o)) {
             overlays::edge_overlay(ov, &by_id)?;
             items.extend(overlays::item_pieces(ov, i, &look_json)?);
         }
@@ -94,7 +114,6 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
         }
     }
     // render's simple=False: the full look (full.rs): its casing pieces, its halves and its bridge shadows, no pieces of one road layer
-    let full = look_json["args"]["simple"] == false;
     let fsrc = if full {
         if !items.is_empty() {
             return Err("items=: only in simple mode (simple=True)".into());

@@ -143,14 +143,16 @@ The crate makes the style of `export_inline` for simple mode with stored levels 
 - [x] `road_popup`, `popup_mode`, `road_tooltip`, `tooltip`, `hover_delay_ms` (2026-10-23).
 - [x] `views`: named presets of colour option, palette and filters (`_check_views`, `_merge_palettes`; 2026-10-23, the page of `render_edges`).
 - [ ] `style=`: a Python `Styler` object (an error in the crate); a colour option with another palette than the look's.
-- [ ] `tiles=True`: the PMTiles archive with the sidecar table (`tiles.build_pmtiles`, `tiles.sidecar`). The crate makes tiles on request (`Tiler`), with the rules of `tiles.py` (see "Step 2"), and the tiled look (no lean mode) for `export_style`.
+- [x] `tiles=True`: the page's PMTiles archive with the sidecar table (2026-10-23: the Python binding writes the archive of the crate's `Tiler`
+  tiles with the `pmtiles` package). A PMTiles writer in the crate (for the browser) is P6.
 
 **Keywords of the HTML page, not of the style** (the dashboard JS module of task 2): `filter_control`, `find_control`, `overlay_control`, `overlay_popup`, `side_panel_html`, `host_panel_width`, `basemap_switcher`, `basemap`, `basemaps`, `api_key`, `zoom_readout`, `street_view`, `street_view_key`, `google_3d`, `tunnel_control`, `compress`.
 
 **Public functions**
 
 - [ ] Backends: `render_edges(backend="folium")` (`render_folium.py`), `backend="lonboard"` (`render_lonboard.py`).
-- [ ] `export_style`: done for the tile folder (`engine="rust"`, 2026-10-23); one PMTiles file is open. `export_look`: the simple look for another app's data layer.
+- [x] `export_style`: the tile folder and one PMTiles file (`engine="rust"`, 2026-10-23).
+- [ ] `export_look`: the simple look for another app's data layer.
 - [ ] Pages: `render_dashboard`, `render_report`, `sidebar_html`, `make_legend`, `to_html`, `to_iframe`, `save`, `render_street_view`, `snapshot` (a PNG through a browser).
 - [ ] Specs: `to_spec`, `save_spec`, `load_spec`.
 - [ ] Input: `load_edges`, `from_duckdb`, `from_arrow`, `from_geojson`, `as_edges`, `normalize_edges`, `filter_edges` (`include`, `exclude`, `match_links`), `highway_types`, `is_directed`. The crate reads GeoParquet with fixed column names only.

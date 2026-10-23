@@ -607,7 +607,8 @@ fn part(xy: &[Pt], cum: &[f64], a: f64, b: f64) -> Vec<Pt> {
 /// that meet end to end at a point where only they meet are one line.
 // ponytail: no noding where two lines cross (GEOS's union cuts them there); two bridges of one number that cross in the middle are rare
 fn line_merge(lines: Vec<Vec<Pt>>) -> Vec<Vec<Pt>> {
-    let key = |p: &Pt| ((p[0] * 1e9).round() as i64, (p[1] * 1e9).round() as i64);
+    // the points to 1e-7 degrees (the pieces' rounding): a head's cut end and the next edge's own first point are one node
+    let key = |p: &Pt| ((p[0] * 1e7).round() as i64, (p[1] * 1e7).round() as i64);
     let mut uniq: Vec<Vec<Pt>> = Vec::new();
     for l in lines {
         let rev: Vec<Pt> = l.iter().rev().copied().collect();

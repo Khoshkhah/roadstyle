@@ -109,7 +109,7 @@ pub fn mark_roads(fs: &mut [Feature], look: &Look, args: &Value) -> Result<crate
     mark_caps(fs, &caps);
     mark_heads(fs);
     mark_levels(fs);
-    if look.twin_one && mark_twin_casing(fs) {
+    if look.twin_one && mark_twin_casing(fs, look.head_m, Some("edge_id")) {        // render passes its edge_id_col (the engine's edge_id)
         mark_twin_dead_ends(fs, &caps);
     }
     // render's width_m_col: metre widths (docs/design/metre_widths.md); casing_m, else the theme's casing.m
@@ -350,12 +350,35 @@ fn mark_levels(fs: &mut [Feature]) {
 }
 
 /// _twin_pairs + _mark_twin_casing: a two-way edge and a reverse edge of its class on the same line backwards share one casing
-/// (__rs_twin: the other's position). Returns whether any pair was found. (Python also warns when the two disagree; not here.)
-fn mark_twin_casing(fs: &mut [Feature]) -> bool {
+/// (__rs_twin: the other's position). Returns whether any pair was found. The two must agree, reversed (casing numbers, heads and end
+/// shapes); a pair that does not is named in a warning, by `id_col` (render's edge_id_col), else by position.
+fn mark_twin_casing(fs: &mut [Feature], head_m: f64, id_col: Option<&str>) -> bool {
     let pairs = twin_pairs(fs);
+    let mut bad = Vec::new();
     for &(j, i) in &pairs {
         fs[i].props.insert("__rs_twin", j.into());
         fs[j].props.insert("__rs_twin", i.into());
+        let ends = |p: &crate::props::Props| {
+            let whole = p.get("__rs_cap").cloned().unwrap_or(Value::Null);
+            let f = |k: &str| p.get(k).cloned().unwrap_or(Value::Null);
+            let h = |k: &str| p.get(k).and_then(Value::as_f64).unwrap_or(head_m);
+            let cap = |k: &str| match p.get(k) { Some(v) => v.clone(), None => whole.clone() };
+            ((f("__rs_cs"), h("__rs_hs"), cap("__rs_cap0")), (f("__rs_ce"), h("__rs_he"), cap("__rs_cap1")))
+        };
+        let (p, q) = (&fs[i].props, &fs[j].props);
+        let (ep, eq) = (ends(p), ends(q));
+        if (eq.0 != ep.1 || eq.1 != ep.0) || q.get("__rs_cl") != p.get("__rs_cl") {
+            let name = |k: usize, r: &crate::props::Props| match id_col.and_then(|c| r.get(c)) {
+                Some(Value::String(s)) => s.clone(),
+                Some(v) => v.to_string(),
+                None => k.to_string(),
+            };
+            bad.push(format!("{} / {}", name(j, q), name(i, p)));
+        }
+    }
+    if !bad.is_empty() {
+        crate::warn(format!("twin_casing: {} two-way pair(s) whose two directions disagree on their casing numbers, heads or end shapes (reversed); \
+                             the first edge of each is drawn: {}{}", bad.len(), bad[..bad.len().min(10)].join(", "), if bad.len() > 10 { " ..." } else { "" }));
     }
     !pairs.is_empty()
 }

@@ -136,7 +136,7 @@ fn names(kind: &str) -> Vec<&'static str> {
 fn style_file(kind: &str, name: &str) -> Result<Value, String> {
     let files: &[(&str, &str)] = if kind == "profiles" { &PROFILES } else { &PALETTES };
     let text = files.iter().find(|f| f.0 == name).map(|f| f.1)
-        .ok_or_else(|| format!("no {} named {name:?}; there are: {}", &kind[..kind.len() - 1], names(kind).join(", ")))?;
+        .ok_or_else(|| format!("no {} named '{name}'; there are: {}", &kind[..kind.len() - 1], names(kind).join(", ")))?;     // Python's repr
     let data = yaml(text).map_err(|e| format!("{} {name}: {e}", &kind[..kind.len() - 1]))?;
     let base = lookup(&BASE, kind).unwrap();
     if name == base {

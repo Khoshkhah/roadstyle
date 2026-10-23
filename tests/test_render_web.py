@@ -326,6 +326,7 @@ def test_twoway_requires_a_reverse_twin_not_just_shared_endpoints():
 def test_web_labels_and_arrows_read_style_config(monkeypatch):
     """Label paint and arrow cosmetics come from StyleConfig (data/style.json "config" +
     roadstyle.json overrides), not hardcoded paint — a partial override dict keeps the rest."""
+    monkeypatch.setenv("ROADSTYLE_ENGINE", "python")         # it reads render_web's own internals (CONFIG, its passes, its tiler)
     import dataclasses
 
     import roadstyle.render_web as rw
@@ -1285,11 +1286,12 @@ def test_directed_col_draws_a_pair_as_two_lanes_only_when_both_edges_are_directe
     assert lanes([True, False], oneway=[True, False])[1] == [True, False]     # `oneway` still rules arrows
 
 
-def test_driving_col_puts_arrows_on_one_way_driving_edges_only():
+def test_driving_col_puts_arrows_on_one_way_driving_edges_only(monkeypatch):
     """``driving_col``: arrows only on driving edges, and only one-way ones. Pair A is a one-way street whose reverse is not driving
     (both `oneway` true): arrow on the driving edge alone; with no ``directed_col`` the pair is still two directions (driving_col never
     decides the drawing, 2026-10-09). Pair B is a true two-way street: none. C is a one-way driving edge with no twin: arrow. D is a
     one-way edge no car may drive: none."""
+    monkeypatch.setenv("ROADSTYLE_ENGINE", "python")         # it reads render_web's own internals (CONFIG, its passes, its tiler)
     def seg(y, flip=False):
         pts = [(18.000, y), (18.003, y)]
         return LineString(pts[::-1] if flip else pts)
@@ -3187,6 +3189,7 @@ def test_a_bridge_shadow_is_at_each_parts_casing_number(monkeypatch):
     own casing number, the parts at one number joined into one line, lines meeting end to end (flat ends); none over the last 3 m where the
     bridge comes down; blurred and shifted down-right (lit from the top left), just before the bridge's casing at that position; off with
     bridge_shadow."""
+    monkeypatch.setenv("ROADSTYLE_ENGINE", "python")         # it reads render_web's own internals (CONFIG, its passes, its tiler)
     import dataclasses
 
     from roadstyle import render_web
@@ -3457,6 +3460,7 @@ def _at_zoom(e, z):
 def test_a_page_has_no_road_layer_that_draws_nothing(monkeypatch, make):
     """A road layer is made only where some feature can be drawn by it (MapLibre walks every layer on every frame): a position without a
     bridge has no bridge layers, and every layer that draws a feature at some zoom is still there, in the same order."""
+    monkeypatch.setenv("ROADSTYLE_ENGINE", "python")         # it reads render_web's own internals (CONFIG, its passes, its tiler)
     from roadstyle import render_web as rw
     seen = []
     real = rw._drop_empty_layers
@@ -4073,6 +4077,7 @@ def test_a_road_drawn_over_another_roads_lanes_is_what_a_click_finds(tmp_path):
 
 def test_line_items_full_look_and_tiles(monkeypatch):
     """The full look keeps the items' own layers; tiles=True carries the item pieces in the simple tile layer; too many items is an error."""
+    monkeypatch.setenv("ROADSTYLE_ENGINE", "python")         # it reads render_web's own internals (CONFIG, its passes, its tiler)
     pytest.importorskip("mapbox_vector_tile")                       # tiles=True needs it (the `tiles` extra)
     st = _style(_crossing_with_lanes(simple=False).html)
     assert "simple" not in st["sources"] and all("line-opacity" not in l["paint"] or l["paint"]["line-opacity"] == 0.9

@@ -114,15 +114,24 @@ def render_edges(
     if "order_col" in kwargs:
         raise ValueError("order_col is removed: roadstyle draws by positions (docs/design/levels_split_casing.md, section 12)")
     from . import _engine
-    if _engine.engine(engine) == "rust":       # ``engine``: "python" (default) or "rust" (the roads' style from the Rust engine, the page from Python)
-        if backend != "web":
-            raise ValueError(f"engine='rust' makes the web page only, not backend={backend!r}")
+    hooks = [k for k in ("_export", "_parts", "_edges", "_palette_copy") if kwargs.get(k) is not None and kwargs.get(k) is not False]
+    # ``engine``: "python" (default) or "rust" (the roads' style from the Rust engine, the page from Python). The internal hooks of the
+    # export and the level editor are Python's; folium and lonboard are other renderers, for which the engine does not apply
+    rust_page = _engine.engine(engine) == "rust" and not hooks and backend == "web"
+    if engine == "rust" and backend != "web":
+        raise ValueError(f"engine='rust' makes the web page only, not backend={backend!r}")
+    if rust_page:
+        why = (["a Styler object (style=)"] if style is not None else []) + _engine.own_style_names(palette, profile)
+        if why and _engine.fallback(engine, ", ".join(why) + " is Python's"):
+            rust_page = False
+    if rust_page:
+        _warn_unclassed(as_edges(gdf, class_col=highway_col).gdf, highway_col)
         data = {k: v for k, v in (("style", style), ("color_by", color_by), ("colors", colors), ("cmap", cmap), ("vmin", vmin), ("vmax", vmax),
                                   ("width_by", width_by), ("color_table", color_table)) if v is not None}
         if color_table is not None:         # a mapping, a Series or a DataFrame: {edge id as text: colour}, as the Python path reads it
             data["color_table"] = _color_map(color_table, color_key, color_col)
         return _engine.render_page(gdf, palette=palette, profile=profile, settings=settings, highway_col=highway_col, include=include,
-                                   exclude=exclude, match_links=match_links, levels_db=levels_db, api_key=api_key, **data, **kwargs)
+                                   exclude=exclude, match_links=match_links, levels_db=levels_db, api_key=api_key, engine=engine, **data, **kwargs)
     from . import _settings as _st
     pick = {k: v for k, v in (("profile", profile), ("palette", palette)) if v is not None and v != _st.theme()["active"][k]
             and (k == "profile" or v in _st.style_names("palettes"))}      # a palette made in code (register_palette) has no file

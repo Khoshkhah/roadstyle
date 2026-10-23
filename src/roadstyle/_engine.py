@@ -25,6 +25,23 @@ def engine(name: str | None = None) -> str:
     return e
 
 
+def _warn():
+    """The Rust engine's warnings of the last call, as Python's (render_web's warnings.warn)."""
+    import warnings
+    for w in rust().take_warnings():
+        warnings.warn(w, stacklevel=4)
+
+
+def fallback(name: str | None, reason: str) -> bool:
+    """A part that the Rust engine does not have: with ``engine="rust"`` given, an error; with the default (``ROADSTYLE_ENGINE=rust``),
+    a warning, and the Python engine makes this one (it never changes engine without a message). Returns True: use Python."""
+    if name is not None:
+        raise ValueError(f"engine='rust': {reason}; use engine='python'")
+    import warnings
+    warnings.warn(f"roadstyle: {reason}: the Python engine makes this one (ROADSTYLE_ENGINE=rust)", stacklevel=3)
+    return True
+
+
 def rust():
     """The Rust extension module, or an ImportError that says how to build it."""
     try:
@@ -44,10 +61,34 @@ def available() -> bool:
 
 
 def _geoparquet(edges) -> bytes:
-    """The roads as GeoParquet bytes (the geometry as WKB), as the Rust reader reads them."""
+    """The roads as GeoParquet bytes (the geometry as WKB), as the Rust reader reads them. A column of mixed values (True and "square" in a
+    cap column) is text: true and false as "true" and "false", which the engine reads as Python's truth (render_web._truthy)."""
+    import pyarrow as pa
+
     buf = io.BytesIO()
-    edges.to_parquet(buf, index=False)
+    try:
+        edges.to_parquet(buf, index=False)
+    except (pa.ArrowInvalid, pa.ArrowTypeError):
+        g = edges.copy()
+        gone = lambda v: v is None or (isinstance(v, float) and v != v)       # noqa: E731
+        for c in g.columns:
+            if c != g.geometry.name and g[c].dtype == object and len({type(v) for v in g[c] if not gone(v)}) > 1:
+                g[c] = [None if gone(v) else "true" if v is True else "false" if v is False else str(v) for v in g[c]]
+        buf = io.BytesIO()
+        g.to_parquet(buf, index=False)
     return buf.getvalue()
+
+
+def _check_tunnels(cfg):
+    """render_web._tun_settings' checks of the tunnel look: each colour of tunnel_towards a '#rrggbb', tunnel_toward one of them or one."""
+    import re
+    hexc = re.compile(r"#[0-9a-fA-F]{6}")
+    towards, toward = cfg.get("tunnel_towards") or {}, cfg.get("tunnel_toward")
+    for n, c in towards.items():
+        if not (isinstance(c, str) and hexc.fullmatch(c)):
+            raise ValueError(f"tunnel_towards {n!r}: {c!r} is not a '#rrggbb' colour")
+    if toward not in towards and not (isinstance(toward, str) and hexc.fullmatch(toward)):
+        raise ValueError(f"tunnel_toward {toward!r} is not a colour name in {list(towards)} or a '#rrggbb' colour")
 
 
 def look(*, palette=None, profile=None, settings=None, args=None, features=None) -> dict:
@@ -68,6 +109,7 @@ def export_inline(edges, **kwargs) -> dict:
     kwargs.setdefault("view_3d", True)      # as export_inline
     lk = _look_of(kwargs)
     text = rust().make_style(_geoparquet(edges), json.dumps(lk), None, None, kwargs.get("name"))
+    _warn()
     return json.loads(text)
 
 
@@ -80,13 +122,48 @@ def _look_of(kwargs) -> dict:
     if kwargs.get("boundary") is not None:   # a shapely geometry or a GeoDataFrame: GeoJSON, as render does (_boundary_fc)
         from .render_web import _boundary_fc
         kwargs["boundary"] = json.loads(json.dumps(_boundary_fc(kwargs["boundary"])))
-    lk = look(palette=palette, profile=profile, settings=settings, args=kwargs, features=features)
+    # the settings in force (roadstyle.json, $ROADSTYLE_CONFIG, use_settings), then the call's, as render_edges stacks them
+    from . import _settings as _s
+    given = _settings_data(settings)
+    active = _s._sources()
+    if active:
+        given = [*active, *(given if isinstance(given, list) else [given] if given is not None else [])]
+    lk = look(palette=palette, profile=profile, settings=given, args=kwargs, features=features)
+    _check_tunnels(lk["config"])
+    if lk["config"].get("twin_casing") not in ("one", "each"):
+        raise ValueError(f'twin_casing must be "one" or "each", got {lk["config"].get("twin_casing")!r}')
     if overlays:
         lk["args"]["overlays"] = [_overlay_json(o, (lk["config"].get("overlays") or {}).get("styles") or {}) for o in overlays]
     if items is not None:          # render's items=: the road's own line items, as GeoJSON
         from .overlays import to_fc
         lk["args"]["items"] = json.loads(json.dumps(to_fc(items)))
     return lk
+
+
+def _settings_data(settings):
+    """render's settings for the engine: a mapping, or a list of them; a file (JSON or YAML) is read here, as use_settings reads it."""
+    from pathlib import Path
+
+    if isinstance(settings, (list, tuple)):
+        return [_settings_data(x) for x in settings]
+    if isinstance(settings, (str, Path)):
+        from ._settings import _read_settings
+        try:
+            return _read_settings(Path(settings))
+        except Exception as e:      # missing, not JSON / YAML, not a mapping: an error that names the file (_settings._sources)
+            raise ValueError(f"settings file {settings}: {e}") from e
+    return settings
+
+
+def own_style_names(palette=None, profile=None) -> list[str]:
+    """The palette and profile names that are files of the user (./palettes, ./profiles), not bundled: the engine has the bundled ones."""
+    from . import _settings as _s
+    out = []
+    for kind, name in (("palettes", palette), ("profiles", profile)):
+        bundled = [f.stem for f in (_s.data_dir() / kind).glob("*.yaml")]
+        if isinstance(name, str) and name in _s.style_names(kind) and name not in bundled:
+            out.append(f"{kind[:-1]} {name!r}")
+    return out
 
 
 def _overlay_json(ov, styles) -> dict:
@@ -115,6 +192,11 @@ _LEVEL_DEFAULTS = {"band_col": None, "order": "priority", "band_dist": 10.0, "he
                    "min_positions": True, "near_rules": False}
 
 
+def levels_other(**kw) -> list[str]:
+    """compute_levels' keywords that are not at the defaults the Rust engine has."""
+    return sorted(k for k, v in kw.items() if v != _LEVEL_DEFAULTS.get(k, object()))
+
+
 def compute_levels(edges, *, layer_col="layer", bridge_col="bridge", tunnel_col="tunnel", method="solve", highway_col="highway",
                    junction_col="junction", time_limit=60.0, **kw):
     """``roadstyle.compute_levels`` by the Rust engine: the same four columns (casing_start, casing_level, casing_end, fill_level).
@@ -123,6 +205,8 @@ def compute_levels(edges, *, layer_col="layer", bridge_col="bridge", tunnel_col=
     if other:
         raise ValueError(f"engine='rust': compute_levels has {', '.join(sorted(other))} only at the defaults; use engine='python'")
     rows, info = rust().compute_levels(_geoparquet(edges), method, [highway_col, layer_col, bridge_col, tunnel_col, junction_col])
+    info = json.loads(info)
+    pairs = {k: [tuple(p) for p in info.pop(k, [])] for k in ("given_up_pairs", "orders_not_kept_pairs")}
     g = edges.copy()
     for i, c in enumerate(("casing_start", "casing_level", "casing_end", "fill_level")):
         g[c] = [r[i] for r in rows]
@@ -130,7 +214,17 @@ def compute_levels(edges, *, layer_col="layer", bridge_col="bridge", tunnel_col=
     d = _LEVEL_DEFAULTS
     g.attrs["levels_params"] = levels_params(method, d["head_m"], d["band_dist"], d["margin"], d["max_level"], d["band_col"], d["order"],
                                              d["min_positions"] and method == "solve")
-    g.attrs["levels_info"] = {"engine": "rust", **dict(info)}
+    g.attrs["levels_info"] = {"engine": "rust", **info}
+    if method == "solve":         # as Python's: the pairs as road numbers (the parts of a given-up pair and the near rules are Python's)
+        g.attrs["levels_given_up"] = pairs["given_up_pairs"]
+        g.attrs["levels_orders_not_kept"] = pairs["orders_not_kept_pairs"]
+        if not g.attrs["levels_given_up"]:
+            g.attrs["levels_given_up_parts"] = []
+        g.attrs["levels_near"] = []
+        if g.attrs["levels_given_up"]:
+            import warnings
+            warnings.warn(f"compute_levels: {len(g.attrs['levels_given_up'])} stack pair(s) could not be satisfied; see result.attrs['levels_given_up']",
+                          stacklevel=3)
     return g
 
 
@@ -153,6 +247,7 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs
     kwargs["tiles"] = True                                 # render's tiled look: the roads source draws (no lean mode)
     lk = _look_of(kwargs)
     t = rust().Tiler(_geoparquet(edges), json.dumps(lk), None, name, "", [str(c) for c in edges.columns])   # every column: a click shows the data
+    _warn()
     style, base = json.loads(t.style), base_url.rstrip("/")
     bounds = tuple(float(v) for v in edges.total_bounds)
     roads = style["sources"]["roads"]
@@ -196,7 +291,7 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs
 
 
 def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="highway", include=None, exclude=None, match_links=True,
-                levels_db=None, **kwargs):
+                levels_db=None, engine=None, **kwargs):
     """``render_edges(backend="web", engine="rust")``: the roads' style from the Rust engine (state "live": the state in the expressions and
     the interaction contract in the metadata), the base map and the page as Python writes them (render_web._page_basemaps, _page_html),
     with the settings of the call in force. ``tiles=True``: the roads, their pieces and their names in an embedded PMTiles archive of the
@@ -210,6 +305,10 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
     from .edges import as_edges
     from .filters import filter_edges
 
+    for k in ("band_col", "order"):                     # inputs of the level step, not of the drawing (docs/design/level_input.md)
+        if k in kwargs:
+            raise ValueError(f"render_edges takes no {k}: compute the levels first (rs.compute_levels(edges, {k}=...), or rs.level_input + "
+                             "rs.solve_levels) and pass casing_level_col / fill_level_col / casing_start_col / casing_end_col")
     for k, why in (("style", "a Styler object is Python's"), ("styler", "a Styler object is Python's")):
         if kwargs.get(k):
             raise ValueError(f"engine='rust': {k}= ({why}); use engine='python'")
@@ -224,8 +323,14 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
         kwargs = {**kwargs, **level_kw}
     tiled = bool(kwargs.get("tiles"))
     lk = _look_of({**kwargs, "palette": palette, "profile": profile, "settings": settings, "highway_col": highway_col, "state": "live"})
+    if (kwargs.get("simple") is False and lk["config"].get("twin_end_caps") and lk["config"].get("twin_casing") == "each"
+            and fallback(engine, 'the full look with twin_casing "each" and twin_end_caps (the road-wide end caps)')):
+        from .render import render_edges
+        return render_edges(gdf, backend="web", engine="python", palette=palette, profile=profile, settings=settings, highway_col=highway_col,
+                            include=include, exclude=exclude, match_links=match_links, levels_db=levels_db, **kwargs)
     pq = _geoparquet(g)
     style = json.loads(rust().make_style(pq, json.dumps(lk), None, None, kwargs.get("name")))
+    _warn()
     a = {k: p.default for k, p in inspect.signature(rw.render).parameters.items() if p.default is not inspect.Parameter.empty}
     a.update(kwargs)
     mode = "panel" if a["road_popup"] == "panel" else (a["popup_mode"] or "popup")

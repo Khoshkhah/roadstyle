@@ -690,6 +690,10 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     let pick = |k: &str, theme: &'static str| match &look["args"][k] { Value::Null => sel[theme].clone(), v => v.clone() };
     let (select, hover) = (&pick("select_color", "select"), &pick("hover_color", "hover"));
     let any_tunnel = rp.iter().any(|p| p.get("__rs_tunnel").is_some_and(py_truth));
+    if any_tunnel && cfg["tunnel_palettes"].get(cfg["tunnel_palette"].as_str().unwrap_or("")).is_none() {        // render's check (the tunnel look)
+        let names: Vec<String> = cfg["tunnel_palettes"].as_object().into_iter().flatten().map(|(k, _)| format!("'{k}'")).collect();
+        return Err(format!("tunnel_palette '{}' is not in tunnel_palettes [{}]", cfg["tunnel_palette"].as_str().unwrap_or(""), names.join(", ")));
+    }
     let pairs = rp.iter().any(|p| p.contains_key("__rs_twin"));
     let any_dup = rp.iter().any(|p| p.get("__rs_dup").is_some_and(py_truth));
     let mut dashes: Vec<String> = rp.iter().filter_map(|p| p.get("__rs_dash").and_then(Value::as_str)).filter(|s| !s.is_empty()).map(String::from).collect();
@@ -832,7 +836,7 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
         if ov.edge {
             for (pos, order) in edge_overlay(ov, &by_id)? {
                 let flt = json!(["all", ["==", ["get", "__rs_fl"], pos], ["==", ["get", "__rs_ord"], order]]);
-                let drawn = crate::overlays::metre_items(ov);
+                let drawn = full.is_none() && crate::overlays::metre_items(ov);
                 let mine: Vec<Value> = overlay_layers(&sid, ov, look).into_iter().map(|mut l| {
                     l["id"] = format!("{}-lv{pos}-o{order}", l["id"].as_str().unwrap()).into();
                     l["filter"] = flt.clone();
