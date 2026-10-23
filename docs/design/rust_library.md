@@ -1463,7 +1463,7 @@ the P0 golden run decides), **Python** (stays in Python), **internal** (not port
 | 57 | `tooltip` | done | the alias of `road_tooltip` |
 | 58 | `hover_color` | done | the overlays too |
 | 59 | `select_color` | done | the overlays too |
-| 60 | `boundary` | P4 | |
+| 60 | `boundary` | done | the same style as Python (`tests/test_engine_parity.py`); the binding converts shapely and GeoPandas |
 | 61 | `color_options` | done | task 1 (`colors.rs`); the same style as Python |
 | 62 | `color_active` | done | task 1 (`colors.rs`); the same style as Python |
 | 63 | `views` | P3 (palette rows); task 2 (menu) | |

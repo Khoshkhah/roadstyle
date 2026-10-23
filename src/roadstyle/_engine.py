@@ -68,6 +68,9 @@ def export_inline(edges, **kwargs) -> dict:
     palette, profile, settings = kwargs.pop("palette", None), kwargs.pop("profile", None), kwargs.pop("settings", None)
     features = kwargs.pop("features", None)
     kwargs.setdefault("view_3d", True)      # as export_inline
+    if kwargs.get("boundary") is not None:   # a shapely geometry or a GeoDataFrame: GeoJSON, as render does (_boundary_fc)
+        from .render_web import _boundary_fc
+        kwargs["boundary"] = json.loads(json.dumps(_boundary_fc(kwargs["boundary"])))
     lk = look(palette=palette, profile=profile, settings=settings, args=kwargs, features=features)
     text = rust().make_style(_geoparquet(edges), json.dumps(lk), None, None, kwargs.get("name"))
     return json.loads(text)

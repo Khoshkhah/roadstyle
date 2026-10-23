@@ -28,6 +28,7 @@ def diff(a, b, path="$", out=None, most=8):
     out = [] if out is None else out
     if len(out) >= most:
         return out
+    a, b = (list(x) if isinstance(x, tuple) else x for x in (a, b))     # a tuple and a list are the same JSON
     if type(a) is not type(b) and not (isinstance(a, (int, float)) and isinstance(b, (int, float)) and a == b):
         out.append(f"{path}: rust {type(a).__name__} {str(a)[:90]} | python {type(b).__name__} {str(b)[:90]}")
     elif isinstance(a, dict):

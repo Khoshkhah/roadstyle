@@ -95,6 +95,16 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     if !source_features(&slots).is_empty() {        // as Python: no slots source without slots
         sources.push(("slots".into(), Src::Json(slots)));
     }
+    // render's boundary: a dashed outline over the roads (GeoJSON: a geometry, a Feature or a FeatureCollection; the Python binding
+    // converts a shapely geometry or a GeoDataFrame)
+    let mut layers = layers;
+    if let Some(fc) = boundary_fc(&look_json["args"]["boundary"]) {
+        sources.push(("boundary".into(), Src::Json(json!({"type": "geojson", "data": fc}))));
+        let (th, b) = (&look_json["theme"], &look_json["theme"]["boundary"]);
+        layers.push(json!({"id": "boundary", "type": "line", "source": "boundary", "metadata": {"roadstyle:group": "roads"},
+                           "layout": {"line-cap": th["roads"]["cap"], "line-join": th["roads"]["join"]},
+                           "paint": {"line-color": b["color"], "line-width": b["width"], "line-opacity": b["opacity"], "line-dasharray": b["dash"]}}));
+    }
     images.insert("oneway".into(), look_json["oneway_image"].clone());
     let mut metadata = serde_json::Map::new();
     // the export's page metadata: the road popup's fields, the hover tooltip and the hover delay (roadstyle:interaction)
@@ -123,7 +133,6 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
         metadata.insert("roadstyle:color_options".into(), Value::Array(colors.meta));
     }
     let name = name.map_or_else(|| look_json["args"]["name"].clone(), Value::from);
-    let mut layers = layers;
     data_settings(&mut sources, &look_json["args"]);
     cols.to_user(&mut sources, &mut layers);
     Ok(Parts { name, center, zoom, layers, sources, metadata: Value::Object(metadata), glyphs })
@@ -325,5 +334,15 @@ fn data_settings(sources: &mut [(String, Src)], args: &Value) {
             }
             Src::Json(_) => {}
         }
+    }
+}
+
+/// render_web._boundary_fc for GeoJSON: a FeatureCollection as it is, a Feature in one, a geometry in a Feature with no properties.
+fn boundary_fc(b: &Value) -> Option<Value> {
+    match b["type"].as_str() {
+        _ if b.is_null() || b == &Value::Bool(false) => None,
+        Some("FeatureCollection") => Some(b.clone()),
+        Some("Feature") => Some(json!({"type": "FeatureCollection", "features": [b]})),
+        _ => Some(json!({"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {}, "geometry": b}]})),
     }
 }

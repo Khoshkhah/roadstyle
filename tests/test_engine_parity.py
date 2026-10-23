@@ -146,6 +146,19 @@ def test_export_inline_cap_col(part, keywords, ends):
     assert diff(ru, py) == []
 
 
+@pytest.mark.parametrize("kind", ["shapely", "GeoDataFrame"])
+def test_export_inline_boundary(part, keywords, kind):
+    """boundary: the dashed outline of an area over the roads."""
+    import geopandas as gpd
+    from compare_engines import diff
+
+    shape = part.union_all().convex_hull.buffer(0.0005)
+    boundary = shape if kind == "shapely" else gpd.GeoDataFrame(geometry=[shape], crs="EPSG:4326")
+    py = rs.export_inline(part, engine="python", **{**keywords, "boundary": boundary})
+    ru = rs.export_inline(part, engine="rust", **{**keywords, "boundary": boundary})
+    assert diff(ru, py) == []
+
+
 def test_engine_names(monkeypatch):
     assert _engine.engine(None) == "python"
     monkeypatch.setenv("ROADSTYLE_ENGINE", "rust")

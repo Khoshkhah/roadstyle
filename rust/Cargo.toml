@@ -14,7 +14,7 @@ edition = "2021"
 license = "MIT"
 
 [workspace.dependencies]
-serde_json = { version = "1", features = ["preserve_order"] }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }   # float_roundtrip: parse floats exactly, as Python
 # the versions of duckosm-rust (offline from the same cache); snap, not zstd: GeoPandas writes Snappy, and snap is pure Rust (wasm)
 parquet = { version = "=60.0.0", default-features = false, features = ["arrow", "snap"] }
 arrow-array = "=60.0.0"

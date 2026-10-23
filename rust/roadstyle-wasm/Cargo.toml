@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 roadstyle = { path = "../roadstyle" }
-serde_json = { version = "1", features = ["preserve_order"] }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "=0.2.129"           # the version of the wasm-bindgen program that makes the JavaScript glue
