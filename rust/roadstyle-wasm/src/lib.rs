@@ -64,7 +64,8 @@ mod wasm {
     }
 
     /// A map with vector tiles: `new Tiler(roads, look, features?, name?, prefix, keep)`, then `style()` (the style's JSON text) and
-    /// `tile(source, z, x, y)` (a vector tile, empty when nothing is in it) for each request of the map, and `props(source, id)`.
+    /// `tile(source, z, x, y)` (a vector tile, empty when nothing is in it) for each request of the map, and `props(layer, id)` (the
+    /// tile layer, for example `roads`).
     #[wasm_bindgen]
     pub struct Tiler {
         style: String,
@@ -84,8 +85,9 @@ mod wasm {
             self.style.clone()
         }
 
+        /// `source` is the style's one source, `roads`: the tile has a layer for each of the old sources.
         pub fn tile(&self, source: &str, z: u32, x: u32, y: u32) -> Vec<u8> {
-            self.tiles.tile(source, z, x, y)
+            if source == roadstyle_rs::tiles::SOURCE { self.tiles.tile(z, x, y) } else { Vec::new() }
         }
 
         /// The properties of the feature `id` of a source, as JSON (`null` when there is none).
