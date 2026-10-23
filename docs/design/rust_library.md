@@ -1,9 +1,9 @@
 # roadstyle as a Rust library: the design and the migration plan
 
-**Status:** proposal, 2026-10-23. Nothing in this document is built. It continues [One Rust engine for roadstyle](rust_engine.md)
+**Status:** agreed 2026-10-23: decisions 1 to 8 as recommended, decision 9 open. Nothing in this document is built. It continues [One Rust engine for roadstyle](rust_engine.md)
 (steps 1 and 3 are done) and uses [The style in a config file](style_config.md) and
-[A general core: roads, items, and views](core_model_and_views.md). The decisions that are open are in
-[Decisions that are open](#decisions-that-are-open).
+[A general core: roads, items, and views](core_model_and_views.md). The decisions are in
+[Decisions](#decisions).
 
 ## Summary
 
@@ -33,7 +33,7 @@ correct only when it is byte for byte equal to the output of Python.
 11. [The migration plan](#the-migration-plan)
 12. [The parity checklist](#the-parity-checklist)
 13. [Quality](#quality)
-14. [Decisions that are open](#decisions-that-are-open)
+14. [Decisions](#decisions)
 15. [Found during the inventory](#found-during-the-inventory)
 
 ## What exists today
@@ -542,7 +542,7 @@ sort key works only inside one layer. Thus the layer planner turns the keys into
 | Plan | Layers | Sort key | Today |
 |---|---|---|---|
 | **Merged** (`simple=True`, the default) | one line layer for every line piece of every position (`roads-simple`); the other kinds in their own layers | `2p` for a casing (+0.25 bridge, -0.1 shadow, +0.1 tunnel dashes), `2p - 0.5` for a dashed fill, `2p + 1` for a fill, `2p + 1 + 0.01 order` for a line attachment, + `1e-8 edge` | Python and Rust |
-| **Per position** (`simple=False`) | for each position, a casing layer, a fill layer, the attachment layers, an arrow layer and a name layer, in the order of the diagram | constant | Python only (see decision 2) |
+| **Per position** (`simple=False`) | for each position, a casing layer, a fill layer, the attachment layers, an arrow layer and a name layer, in the order of the diagram | constant | Python only; not ported (decision 2) |
 
 The key formula is one function in `roadstyle-engine` (`order::sort_key`), and both plans use it. Today it is written two times
 (`_simple_pieces` in Python, `simple.rs` in Rust).
@@ -1403,7 +1403,7 @@ the P0 golden run decides), **Python** (stays in Python), **internal** (not port
 | 67 | `compress` | P6 | |
 | 68 | `tunnel_control` | task 2 | |
 | 69 | `tiles` | done (tiles on request); P6 (PMTiles in the page) | |
-| 70 | `simple` | done for `True`; see decision 2 for `False` | |
+| 70 | `simple` | done for `True`; `False` is not ported (decision 2) | |
 | 71 | `minzoom` | check | |
 | 72 | `legend` | task 1 | |
 | 73 | `api_key` | P6 | the base-map URL |
@@ -1506,20 +1506,23 @@ the P0 golden run decides), **Python** (stays in Python), **internal** (not port
 `rust/roadstyle/examples/`: `style.rs` (a GeoParquet file to style.json), `tiles.rs` (a tile server on request), `bench.rs`.
 `examples/dashboard_rust/` (task 2): a page on `roadstyle-wasm` and `roadstyle-dashboard`.
 
-## Decisions that are open
+## Decisions
 
-My recommendation is first in each row.
+Decisions 1 to 8 were agreed on 2026-10-23, each as recommended. Decision 9 is open; the recommendation is first.
 
-| # | Decision | Recommendation | The other choice |
+| # | Decision | Decided (2026-10-23) | Not chosen |
 |---|---|---|---|
 | 1 | The crates | The nine crates of [The crates](#the-crates) | Keep one crate with feature flags |
-| 2 | Full mode (`simple=False`) | Do not port it. Its one user (SonoFlow `viz/daily.py:179`) needs "change the color of each road from a property in the page", so add that call to the dashboard module and retire full mode | Port full mode to Rust (more layers, more goldens) |
+| 2 | Full mode (`simple=False`) | It is not ported. Its one user (SonoFlow `viz/daily.py:179`) needs "change the color of each road from a property in the page": the dashboard module gets that call, and full mode is retired | Port full mode to Rust (more layers, more goldens) |
 | 3 | The look file | Look v1: typed and versioned; the engine reads today's file as version 0 for one minor version | Keep today's file |
 | 4 | Unknown keywords | A warning for one minor version, then an error (today `**kwargs` ignores them; see below) | An error at once |
 | 5 | The Python package | One wheel `roadstyle` with the engine in it (maturin, abi3) | A pure Python `roadstyle` and a separate `roadstyle-engine` wheel |
 | 6 | npm | Publish `roadstyle-wasm` and `roadstyle-dashboard` after P3 | Users keep building from a commit |
 | 7 | Versions | One version for all crates and packages, the same as Python roadstyle | A version for each crate |
-| 8 | New behavior of the render model (placement along an edge with side and offset, the split of the merged layer, an icon kind) | Make it once, in Rust, after P5; Python gets it through the binding. Its golden is the Rust output after a review of the pages | Make it in Python first (the reference), then port it |
+| 8 | New behavior of the render model (placement along an edge with side and offset, the split of the merged layer, an icon kind, a color by a column as an expression) | Made once, in Rust, after P5; Python gets it through the binding. Its golden is the Rust output after a review of the pages | Make it in Python first (the reference), then port it |
+
+| # | Open decision | Recommendation | The other choice |
+|---|---|---|---|
 | 9 | The runtime API of the dashboard | One typed `rs` object from `rsDashboard`, with `getState`, `setState` and `on()`; the `window.rs*` names as aliases for one minor version | Keep the `window.rs*` functions as the API |
 
 ## Found during the inventory

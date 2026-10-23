@@ -27,10 +27,10 @@ p > em:only-child { color: var(--muted); }
 <body>
 <main>
 <h1 id="roadstyle-as-a-rust-library-the-design-and-the-migration-plan">roadstyle as a Rust library: the design and the migration plan</h1>
-<p><strong>Status:</strong> proposal, 2026-10-23. Nothing in this document is built. It continues <a href="rust_engine.md">One Rust engine for roadstyle</a>
+<p><strong>Status:</strong> agreed 2026-10-23: decisions 1 to 8 as recommended, decision 9 open. Nothing in this document is built. It continues <a href="rust_engine.md">One Rust engine for roadstyle</a>
 (steps 1 and 3 are done) and uses <a href="style_config.md">The style in a config file</a> and
-<a href="core_model_and_views.md">A general core: roads, items, and views</a>. The decisions that are open are in
-<a href="#decisions-that-are-open">Decisions that are open</a>.</p>
+<a href="core_model_and_views.md">A general core: roads, items, and views</a>. The decisions are in
+<a href="#decisions">Decisions</a>.</p>
 <h2 id="summary">Summary</h2>
 <p>roadstyle has one reference implementation, in Python (version 0.24.3, about 11,000 lines of Python, a 1,688-line page template and
 about 500 tests). A Rust crate, <code>roadstyle-rs</code> (5,582 lines), already makes the style and the vector tiles of the simple mode, and it
@@ -56,7 +56,7 @@ correct only when it is byte for byte equal to the output of Python.</p>
 <li><a href="#the-migration-plan">The migration plan</a></li>
 <li><a href="#the-parity-checklist">The parity checklist</a></li>
 <li><a href="#quality">Quality</a></li>
-<li><a href="#decisions-that-are-open">Decisions that are open</a></li>
+<li><a href="#decisions">Decisions</a></li>
 <li><a href="#found-during-the-inventory">Found during the inventory</a></li>
 </ol>
 <h2 id="what-exists-today">What exists today</h2>
@@ -1031,7 +1031,7 @@ sort key works only inside one layer. Thus the layer planner turns the keys into
 <td><strong>Per position</strong> (<code>simple=False</code>)</td>
 <td>for each position, a casing layer, a fill layer, the attachment layers, an arrow layer and a name layer, in the order of the diagram</td>
 <td>constant</td>
-<td>Python only (see decision 2)</td>
+<td>Python only; not ported (decision 2)</td>
 </tr>
 </tbody>
 </table>
@@ -3377,7 +3377,7 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 <tr>
 <td>70</td>
 <td><code>simple</code></td>
-<td>done for <code>True</code>; see decision 2 for <code>False</code></td>
+<td>done for <code>True</code>; <code>False</code> is not ported (decision 2)</td>
 <td></td>
 </tr>
 <tr>
@@ -3782,15 +3782,15 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 <h3 id="examples">Examples</h3>
 <p><code>rust/roadstyle/examples/</code>: <code>style.rs</code> (a GeoParquet file to style.json), <code>tiles.rs</code> (a tile server on request), <code>bench.rs</code>.
 <code>examples/dashboard_rust/</code> (task 2): a page on <code>roadstyle-wasm</code> and <code>roadstyle-dashboard</code>.</p>
-<h2 id="decisions-that-are-open">Decisions that are open</h2>
-<p>My recommendation is first in each row.</p>
+<h2 id="decisions">Decisions</h2>
+<p>Decisions 1 to 8 were agreed on 2026-10-23, each as recommended. Decision 9 is open; the recommendation is first.</p>
 <table>
 <thead>
 <tr>
 <th>#</th>
 <th>Decision</th>
-<th>Recommendation</th>
-<th>The other choice</th>
+<th>Decided (2026-10-23)</th>
+<th>Not chosen</th>
 </tr>
 </thead>
 <tbody>
@@ -3803,7 +3803,7 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 <tr>
 <td>2</td>
 <td>Full mode (<code>simple=False</code>)</td>
-<td>Do not port it. Its one user (SonoFlow <code>viz/daily.py:179</code>) needs "change the color of each road from a property in the page", so add that call to the dashboard module and retire full mode</td>
+<td>It is not ported. Its one user (SonoFlow <code>viz/daily.py:179</code>) needs "change the color of each road from a property in the page": the dashboard module gets that call, and full mode is retired</td>
 <td>Port full mode to Rust (more layers, more goldens)</td>
 </tr>
 <tr>
@@ -3838,10 +3838,22 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 </tr>
 <tr>
 <td>8</td>
-<td>New behavior of the render model (placement along an edge with side and offset, the split of the merged layer, an icon kind)</td>
-<td>Make it once, in Rust, after P5; Python gets it through the binding. Its golden is the Rust output after a review of the pages</td>
+<td>New behavior of the render model (placement along an edge with side and offset, the split of the merged layer, an icon kind, a color by a column as an expression)</td>
+<td>Made once, in Rust, after P5; Python gets it through the binding. Its golden is the Rust output after a review of the pages</td>
 <td>Make it in Python first (the reference), then port it</td>
 </tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Open decision</th>
+<th>Recommendation</th>
+<th>The other choice</th>
+</tr>
+</thead>
+<tbody>
 <tr>
 <td>9</td>
 <td>The runtime API of the dashboard</td>
