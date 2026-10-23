@@ -31,8 +31,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   layer with their mitre ends. The same style as Python, inline and in tiles.
 - **`render_edges(..., engine="rust")`** makes the web page with the Rust engine: the roads' style comes from Rust, and Python writes the base map
   and the page. The page is the same as the Python engine's page, byte for byte (with 3D decks: the same page, the decks' corners to the
-  rounding). `tiles=True`, `simple=False`, `style=` (a Styler object) and the other backends stay Python only and give an error with
-  `engine="rust"`.
+  rounding). With `tiles=True` the archive has the Rust engine's tiles (the same features as Python's when decoded); the rest of the page is
+  the same. `simple=False`, `style=` (a Styler object) and the other backends stay Python only and give an error with `engine="rust"`.
+  Time on Tartu (64,828 roads): 19.1 s with Python and 6.2 s with Rust; with `tiles=True`, 147.5 s and 12.2 s.
+- **`export_style(..., engine="rust", format="pmtiles")`**: one archive of the Rust engine's tiles.
 - **The interaction contract in the style** (`docs/design/rust_library.md`, "The interaction contract"). With the look's `args.state = "live"`,
   the Rust engine makes the style of the page: the global state stays in the expressions (MapLibre's `state` block), and the metadata has
   `roadstyle:contract` (1), `roadstyle:state` (the start value of each `rs_*` state) and `roadstyle:controls` (the options of `rsDashboard` that
@@ -45,6 +47,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   keywords): set them true there, or the maps have no names and no arrows after an update of the engine.
 
 ### Fixed
+- **The title of a tiled page** (`tiles=True`): it was "ends" (a loop of the tiled branch used the name of the title). Now it is the map's name.
 - **The width of a 3D bridge deck with another class column** (`highway_col`): the deck read a column named `highway`, so with another class
   column every deck had the fallback width. Now it reads `highway_col`.
 - **The paint order of a painted road in a tiled style** (`tiles=True`, `export_style`): `roads-fill` and `roads-highlight` shared one layout, so
