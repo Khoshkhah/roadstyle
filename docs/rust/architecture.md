@@ -16,9 +16,9 @@ roadstyle's JavaScript adds the controls and answers the mouse.
 ```mermaid
 flowchart TB
     inp["Roads + look"]
-    eng["Rust engine<br/>makes the style and the tiles"]
+    eng["Rust engine<br/>makes the style<br/>and the tiles"]
     ml["MapLibre GL JS<br/>draws the map"]
-    dash["roadstyle dashboard (JavaScript)<br/>controls, hover, click"]
+    dash["roadstyle dashboard<br/>(JavaScript)<br/>controls, hover, click"]
     you["You or your page"]
     inp --> eng
     eng -->|"style + tiles"| ml
