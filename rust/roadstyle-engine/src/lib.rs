@@ -56,6 +56,7 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
         return Err(format!("this area has {} roads, and the plugin draws at most {MAX_ROADS} (the browser's memory): use a smaller area",
                            feats.len()));
     }
+    compute_levels(&mut feats, &look_json["args"], look_json["args"]["head_m"].as_f64().unwrap_or(look.head_m))?;
     let colors = roads::mark_roads(&mut feats, &look, &look_json["args"])?;
     let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow)?;
     let slots = slots::slots_source(&feats, &slots::SlotLook::from_json(&look_json)?);
@@ -145,4 +146,49 @@ fn camera(feats: &[read::Feature]) -> (Value, Value) {
 
 fn source_features(source: &Value) -> &[Value] {
     source["data"]["features"].as_array().map_or(&[][..], |v| v.as_slice())
+}
+
+/// render's level step: with no `casing_level_col` and no `fill_level_col` in the keywords, the drawing positions come from
+/// `compute_levels(method="solve")` with its defaults (render_web.render), on the roads in their order. It writes the columns that
+/// compute_levels writes: casing_start, casing_level, casing_end and fill_level.
+fn compute_levels(feats: &mut [read::Feature], args: &Value, head_m: f64) -> Result<(), String> {
+    let given = |k: &str| matches!(&args[k], Value::String(s) if !s.is_empty());
+    if given("casing_level_col") || given("fill_level_col") {
+        return Ok(());
+    }
+    if head_m != 5.0 {
+        return Err(format!("head_m={head_m}: the Rust engine computes the levels with head_m=5 only (compute them first, or use the Python engine)"));
+    }
+    let col = |k: &str, default: &'static str| args[k].as_str().filter(|s| !s.is_empty()).unwrap_or(default).to_string();
+    let (hw, layer, bridge, tunnel) = (col("highway_col", "highway"), col("layer_col", "layer"), col("bridge_col", "bridge"), col("tunnel_col", "tunnel"));
+    // a value as the text that the tag rules read: Python's _truthy and int(float(layer)) on the GeoDataFrame's values
+    let text = |v: Option<&Value>| -> Option<String> {
+        match v? {
+            Value::Null => None,
+            Value::Bool(b) => Some(if *b { "1" } else { "0" }.to_string()),
+            Value::Number(n) => n.as_f64().filter(|x| !x.is_nan()).map(|_| n.to_string()),
+            Value::String(s) => Some(s.clone()),
+            other => Some(other.to_string()),
+        }
+    };
+    let mut edges = roadstyle_levels::LevelEdges::default();
+    for (i, f) in feats.iter().enumerate() {
+        edges.add(0, roadstyle_levels::LevelEdge {
+            edge_id: i as i64,         // the row: compute_levels works on the frame's rows, in their order
+            highway: text(f.props.get(&hw)).unwrap_or_default(),
+            tunnel: text(f.props.get(&tunnel)),
+            bridge: text(f.props.get(&bridge)),
+            layer: text(f.props.get(&layer)),
+            junction: text(f.props.get("junction")),
+            geometry: f.coords.as_ref().map_or_else(Vec::new, |c| c.iter().map(|p| (p[0], p[1])).collect()),
+        });
+    }
+    let Some(levels) = roadstyle_levels::compute(&edges, roadstyle_levels::Method::Solve)? else { return Ok(()) };
+    for r in levels.rows {
+        let p = &mut feats[r.edge_id as usize].props;
+        for (k, v) in [("casing_start", r.casing_start), ("casing_level", r.casing_level), ("casing_end", r.casing_end), ("fill_level", r.fill_level)] {
+            p.insert(k, v.into());
+        }
+    }
+    Ok(())
 }

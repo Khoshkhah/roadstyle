@@ -11,6 +11,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   engine, the extension `roadstyle._rust` (`rust/roadstyle-py`; a development build: `python rust/roadstyle-py/build.py`). The default stays
   `engine="python"`; `ROADSTYLE_ENGINE` sets it. The Rust engine needs the drawing levels in the roads (`casing_level`, `fill_level`); without them it
   gives an error, and it never goes back to Python without a message. `tests/test_engine_parity.py` checks that the two engines give the same style.
+- **The Rust engine computes the drawing levels** when the keywords name no level columns, as `render` does (`compute_levels`, method "solve", with
+  its defaults). Before, the Rust engine needed `casing_level` and `fill_level` in the roads.
 
 ### Changed
 - **`export_inline` writes the legend data** in the style's metadata `roadstyle:color_options` (the page's `COLOR_OPTIONS`), when the map has data

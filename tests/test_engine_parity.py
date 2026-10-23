@@ -64,6 +64,22 @@ def test_export_inline_same_style(part, keywords, case):
     assert diff(ru, py) == []
 
 
+# render's level step: the keywords name no level columns, so both engines compute the positions (compute_levels, method="solve")
+_LEVEL_COLS = ["casing_start", "casing_level", "casing_end", "fill_level", "head_start_m", "head_end_m", "cap_start", "cap_end"]
+_LEVEL_ARGS = ["casing_start_col", "casing_level_col", "casing_end_col", "fill_level_col", "head_start_m_col", "head_end_m_col",
+               "cap_start_col", "cap_end_col"]
+
+
+def test_export_inline_levels_computed(part, keywords):
+    from compare_engines import diff
+
+    roads = part.drop(columns=[c for c in _LEVEL_COLS if c in part.columns])
+    kw = {k: v for k, v in keywords.items() if k not in _LEVEL_ARGS}
+    py = rs.export_inline(roads, engine="python", **kw)
+    ru = rs.export_inline(roads, engine="rust", **kw)
+    assert diff(ru, py) == []
+
+
 def test_engine_names(monkeypatch):
     assert _engine.engine(None) == "python"
     monkeypatch.setenv("ROADSTYLE_ENGINE", "rust")
@@ -72,6 +88,3 @@ def test_engine_names(monkeypatch):
         _engine.engine("go")
 
 
-def test_rust_needs_the_levels(part, keywords):
-    with pytest.raises(ValueError, match="no column casing_level"):
-        rs.export_inline(part.drop(columns=["casing_level"]), engine="rust", **keywords)

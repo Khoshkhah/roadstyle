@@ -1423,7 +1423,7 @@ the P0 golden run decides), **Python** (stays in Python), **internal** (not port
 | 17 | `cap_col` | P4 | |
 | 18 | `cap_start_col` | done | |
 | 19 | `cap_end_col` | done | |
-| 20 | `casing_level_col` | done | with stored levels; without them, P4 (the solver is in Rust) |
+| 20 | `casing_level_col` | done | with stored levels; without them the engine computes them, as `render` (`compute_levels`, solve) |
 | 21 | `fill_level_col` | done | as 20 |
 | 22 | `casing_start_col` | done | |
 | 23 | `casing_end_col` | done | |

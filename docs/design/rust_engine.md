@@ -129,7 +129,7 @@ The crate makes the style of `export_inline` for simple mode with stored levels 
 
 - [ ] Column names, fixed in the crate: `highway_col` (highway), `filter_col`, `tunnel_col`, `bridge_col`, `layer_col`, `edge_id_col` (edge_id), `cap_col` / `cap_start_col` / `cap_end_col`, `casing_level_col`, `fill_level_col`, `casing_start_col`, `casing_end_col`, `head_start_m_col`, `head_end_m_col`, `directed_col` (is_directed), `driving_col` (has_arrows).
 - [ ] `access_col`: the access colours (`__rs_access`, the theme's `access`).
-- [ ] No stored levels: `render` computes them (`compute_levels(method="solve")`). The crate has the solver (`levels`), but `make_style` needs the level columns.
+- [x] No stored levels: `render` computes them (`compute_levels(method="solve")`), and so does the engine (`roadstyle-engine`, `compute_levels`; the same style on the parity fixture). Only `head_m=5`.
 - [ ] `head_m` (fixed 5.0), `road_fill` (fixed on), `offset_zoom` (`offset_frac` and `width_frac` are read).
 - [ ] Metre widths: `width_m_col`, `width_m_zoom`, `casing_m`, `casing_min_px` (`_mark_width_m`, `_mitre_ends`; the crate stops with an error on `__rs_wm`).
 - [ ] `simple=False`: the layer set of casings and fills for each level (`_level_id`, `_fill_layer_ids`); the crate has simple mode only.

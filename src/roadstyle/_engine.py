@@ -2,7 +2,8 @@
 
 ``engine="python"`` (the default) runs the Python code. ``engine="rust"`` runs the Rust engine, the extension module
 ``roadstyle._rust`` (built from ``rust/roadstyle-py``). The environment variable ``ROADSTYLE_ENGINE`` sets the default. A part that
-the Rust engine does not have gives an error with ``engine="rust"``; it never goes back to Python without a message.
+the Rust engine does not have gives an error with ``engine="rust"``; it never goes back to Python without a message. Without level
+columns the Rust engine computes the levels, as ``render`` does (``compute_levels``, method "solve").
 """
 from __future__ import annotations
 
@@ -12,9 +13,8 @@ import os
 
 ENGINES = ("python", "rust")
 
-# what the Rust engine reads from the roads (the columns that the worker's SQL and duckOSM's visualization.edge_levels give);
-# render_edges computes them in Python when they are not there, the Rust engine does not yet (phase P4)
-RUST_COLUMNS = ("highway", "casing_level", "fill_level")
+# what the Rust engine needs in the roads
+RUST_COLUMNS = ("highway",)
 
 
 def engine(name: str | None = None) -> str:
@@ -62,8 +62,7 @@ def export_inline(edges, **kwargs) -> dict:
     """``roadstyle.export_inline`` made by the Rust engine: the same style, from the same keywords."""
     missing = [c for c in RUST_COLUMNS if c not in edges.columns]
     if missing:
-        raise ValueError(f"engine='rust': the roads have no column {', '.join(missing)}; the Rust engine does not compute the "
-                         "drawing levels yet. Give duckOSM's levels (visualization.edge_levels), or use engine='python'")
+        raise ValueError(f"engine='rust': the roads have no column {', '.join(missing)}")
     kwargs = dict(kwargs)
     kwargs.pop("engine", None)
     palette, profile, settings = kwargs.pop("palette", None), kwargs.pop("profile", None), kwargs.pop("settings", None)

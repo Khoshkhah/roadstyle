@@ -735,6 +735,7 @@ dependencies = [
  "base64 0.22.1",
  "indexmap",
  "roadstyle-io",
+ "roadstyle-levels",
  "roadstyle-model",
  "rstar",
  "serde_json",
