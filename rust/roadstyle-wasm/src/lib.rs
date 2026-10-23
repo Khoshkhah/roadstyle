@@ -1,4 +1,4 @@
-//! The browser's front-end of roadstyle-rs (docs/design/rust_engine.md): `makeStyle`, `Tiler` and `memoryBytes` through
+//! The browser's front-end of roadstyle-rs (docs/design/rust_engine.md): `makeStyle`, `makePage`, `Tiler` and `memoryBytes` through
 //! wasm-bindgen, and the allocator that grows the memory in large steps. Natively the crate is empty.
 
 /// The allocator in the browser: the standard one (dlmalloc), but when it grows the memory, the memory grows once more by its size (16 to
@@ -61,6 +61,13 @@ mod wasm {
     #[wasm_bindgen(js_name = makeStyle)]
     pub fn make_style(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, JsError> {
         roadstyle::make_style(parquet, look, features, planner, name).map_err(|e| JsError::new(&e))
+    }
+
+    /// makePage(style: string, page: string, parts: string, pmtiles?: Uint8Array) -> string: the page of a live style (state "live") with
+    /// the dashboard's options (roadstyle::page; MapLibre stays a placeholder).
+    #[wasm_bindgen(js_name = makePage)]
+    pub fn make_page(style: &str, page: &str, parts: &str, pmtiles: Option<Vec<u8>>) -> Result<String, JsError> {
+        roadstyle::page::make_page(style, page, parts, pmtiles.as_deref()).map_err(|e| JsError::new(&e))
     }
 
     /// A map with vector tiles: `new Tiler(roads, look, features?, name?, prefix, keep)`, then `style()` (the style's JSON text) and

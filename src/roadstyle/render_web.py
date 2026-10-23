@@ -1822,112 +1822,26 @@ def _stringify_unsafe_ints(geo):
 # Safe because nothing in the page reads FEATURES at load: the style, colour options, filter classes,
 # legend and fitBounds bounds are all computed here in Python and baked in, and popup/tooltip read
 # `feature.properties` only on user interaction, long after the data lands.
-_INFLATE_JS = """
-<script id="rs-gz" type="application/json">__RS_GZ__</script>
-<script>
-(async function(){
-  var el=document.getElementById("rs-gz");
-  var blobs=JSON.parse(el.textContent);
-  var data={};
-  try{
-    for(var sid in blobs){
-      // atob + Blob.stream, NOT fetch("data:..."): sandboxed webviews (VS Code notebooks) ship a
-      // CSP whose connect-src blocks data: fetches — tiles load but the roads never appear.
-      var b=atob(blobs[sid]), arr=new Uint8Array(b.length);
-      for(var i=0;i<b.length;i++) arr[i]=b.charCodeAt(i);
-      data[sid]=await new Response(new Blob([arr]).stream()
-                  .pipeThrough(new DecompressionStream("gzip"))).json();
-    }
-    el.textContent="";                                   // release the base64 copies
-  }catch(e){
-    window.__rs_gz={ok:false, stage:"inflate", error:String(e)};
-    document.body.insertAdjacentHTML("afterbegin",
-      '<div style="position:fixed;z-index:9999;top:0;left:0;right:0;padding:10px;background:#c00;'+
-      'color:#fff;font:13px sans-serif">Could not decompress the map data: '+e+
-      ' \u2014 this page needs a browser with DecompressionStream.</div>');
-    return;
-  }
-  // `window.map` is the CONTAINER DIV until MapLibre finishes constructing (an element id
-  // auto-creates a global), so a handle grabbed too early has no getSource and the data is silently
-  // never attached. Poll for the real Map; never call through an unchecked handle. Never give up:
-  // MapLibre builds its sources on an animation frame, and browsers pause those while a page is
-  // off screen (a background tab, a notebook output scrolled away), so the sources can appear
-  // minutes late. After the first minute keep checking once a second, and tell the banner.
-  var tries=0;
-  (function fill(){
-    var m=window.map, sids=Object.keys(data);
-    if(!(m && typeof m.getSource==="function") || !sids.every(function(s){return m.getSource(s);})){
-      if(++tries>600) window.__rs_gz={ok:false, stage:"attach", waiting:true, error:"still waiting for the map"};
-      return setTimeout(fill, tries>600 ? 1000 : 100);
-    }
-    var n=0;
-    sids.forEach(function(s){ m.getSource(s).setData(data[s]); n+=data[s].features.length; });
-    window.__rs_gz={ok:true, sources:sids, features:n};
-    var banner=document.getElementById("rs-diag"); if(banner) banner.remove();   // late, but here
-    data=null;
-  })();
-})();
-</script>
-"""
+def _page_part(name):
+    """A script of the page (static/page/<name>.html): the same text for the Python and the Rust page writer."""
+    with open(os.path.join(os.path.dirname(__file__), "static", "page", name + ".html"), encoding="utf-8", newline="") as fh:
+        return fh.read()
+
+
+_INFLATE_JS = _page_part("inflate")
 
 
 # simple=True (render's docstring), injected after the main map script, so a full-look page stays as it was: the page's own
 # recolouring (_applyFill), painted-road order (_applySort) and road fill switch (rsSetRoadFill) also set the one road layer. A
 # function of the main script is a global: assigning it here is what the main script calls from then on.
-_SIMPLE_JS = """
-<script>
-const RS_SIMPLE = __RS_SIMPLE__;
-// what is drawn on top under the cursor is what a hover or a click finds (2026-10-09: a tunnel's unseen lanes under a plaza won over
-// the plaza drawn over them, so the plaza could not be picked there): of the road pieces and the picked items under the cursor (lane
-// lines and marks let it through), the highest line-sort-key; a picked item is itself, any other piece its road. Nothing right under
-// the cursor: the page's own pick (its tolerance box). An item on a layer of its own (an overlay above every road) stays the page's pick.
-const _pickAll = pick;
-pick = function(p){
-  const own = _pickAll(p);
-  if(!map.getLayer(RS_SIMPLE.layer) || (own && own.item && own.item.layer.id !== RS_SIMPLE.layer)) return own;
-  const hit = map.queryRenderedFeatures([p.x, p.y], {layers:[RS_SIMPLE.layer]})
-    .filter(f=>f.properties.__rs_k!==5 || (ITEM_PICK && f.properties.__rs_pick));
-  if(!hit.length) return own;
-  const top = hit.reduce((a, b)=>b.properties.__rs_s > a.properties.__rs_s ? b : a);
-  if(top.properties.__rs_k===5) return _roadOf(top);
-  const e = top.properties.__rs_edge;
-  return {id:e, properties:_rprops(e), layer:{id:"roads-fill"}, get geometry(){ const r=_feats()[e] || _svTiled(e); return r && r.geometry; }};
-};
-</script>
-"""
+_SIMPLE_JS = _page_part("simple")
 
 
 # tiles=True bootstrap, injected before the main map script: decode the embedded PMTiles
 # archive, register the pmtiles:// protocol serving it from memory (must exist before the Map
 # is constructed), and asynchronously inflate the sidecar table (full per-edge properties +
 # midpoints + bboxes) that keeps rsQuery / popups / rsFocus working without inline GeoJSON.
-_TILES_JS = """
-<script id="rs-side" type="application/json">__RS_SIDE_B64__</script>
-<script>
-window.RS_SIDE=null;
-(function(){
-  var b=atob("__RS_PMTILES_B64__"), arr=new Uint8Array(b.length);
-  for(var i=0;i<b.length;i++) arr[i]=b.charCodeAt(i);
-  var buf=arr.buffer;
-  var src={getKey:function(){return "roads";},
-           getBytes:function(o,l){return Promise.resolve({data:buf.slice(o,o+l)});}};
-  var proto=new pmtiles.Protocol();
-  proto.add(new pmtiles.PMTiles(src));
-  maplibregl.addProtocol("pmtiles", proto.tile);
-  window.__rs_tiles={ok:true, bytes:arr.length};
-  (async function(){
-    var el=document.getElementById("rs-side");
-    try{
-      var s=atob(el.textContent.trim()), a=new Uint8Array(s.length);
-      for(var i=0;i<s.length;i++) a[i]=s.charCodeAt(i);
-      window.RS_SIDE=await new Response(new Blob([a]).stream()
-        .pipeThrough(new DecompressionStream("gzip"))).json();
-      el.textContent="";
-    }catch(e){ window.__rs_tiles={ok:false, stage:"sidecar", error:String(e)}; }
-  })();
-})();
-</script>
-"""
+_TILES_JS = _page_part("tiles")
 
 
 def _minzoom_filter(col, table):

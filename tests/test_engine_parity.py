@@ -420,6 +420,28 @@ def test_export_inline_full_look(part, keywords, case):
     assert diff(ru, py) == []
 
 
+def test_the_page_writer_gzips_by_itself(part, keywords):
+    """roadstyle::page without the blobs of Python's zlib (the browser): the same page, its big sources gzipped by the crate; the same
+    sources when they are read back."""
+    import base64
+    import gzip
+    import re
+
+    parts = rs.render_edges(part, backend="web", _parts=True, **keywords)
+    py = rs.render_edges(part, backend="web", engine="python", **keywords).html
+    cam = {k: parts["camera"][k] for k in ("pitch", "bearing", "max_pitch")}
+    ru = _engine.rust().make_page(json.dumps(parts["style"]), json.dumps(parts["options"]), json.dumps(
+        {"name": keywords.get("name") or "roadstyle", "cam": cam, "bounds": list(parts["bounds"]), "side_panel_html": None, "host_panel_width": 320,
+         "compress": True, "simple_js": parts["simple_js"]}), None)
+    from roadstyle.render_web import WebMap
+    ru = WebMap(ru).html                  # the page's MapLibre, as the Python page has it
+    blob = lambda html: {k: json.loads(gzip.decompress(base64.b64decode(v))) for k, v in json.loads(       # noqa: E731
+        re.search(r'id="rs-gz" type="application/json">(.*?)</script>', html, re.S).group(1)).items()}
+    assert blob(ru) == blob(py)
+    cut = lambda html: re.sub(r'(id="rs-gz" type="application/json">).*?(</script>)', r"\1\2", html, flags=re.S)       # noqa: E731
+    assert cut(ru) == cut(py)
+
+
 @pytest.mark.parametrize("method", ["tags", "solve"])
 def test_compute_levels(part, method):
     """compute_levels: the same four columns from both engines (the roads of the part of Monaco, with no level columns)."""

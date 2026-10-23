@@ -1,0 +1,26 @@
+
+<script id="rs-side" type="application/json">__RS_SIDE_B64__</script>
+<script>
+window.RS_SIDE=null;
+(function(){
+  var b=atob("__RS_PMTILES_B64__"), arr=new Uint8Array(b.length);
+  for(var i=0;i<b.length;i++) arr[i]=b.charCodeAt(i);
+  var buf=arr.buffer;
+  var src={getKey:function(){return "roads";},
+           getBytes:function(o,l){return Promise.resolve({data:buf.slice(o,o+l)});}};
+  var proto=new pmtiles.Protocol();
+  proto.add(new pmtiles.PMTiles(src));
+  maplibregl.addProtocol("pmtiles", proto.tile);
+  window.__rs_tiles={ok:true, bytes:arr.length};
+  (async function(){
+    var el=document.getElementById("rs-side");
+    try{
+      var s=atob(el.textContent.trim()), a=new Uint8Array(s.length);
+      for(var i=0;i<s.length;i++) a[i]=s.charCodeAt(i);
+      window.RS_SIDE=await new Response(new Blob([a]).stream()
+        .pipeThrough(new DecompressionStream("gzip"))).json();
+      el.textContent="";
+    }catch(e){ window.__rs_tiles={ok:false, stage:"sidecar", error:String(e)}; }
+  })();
+})();
+</script>

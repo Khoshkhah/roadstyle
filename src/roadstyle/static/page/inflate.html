@@ -1,0 +1,46 @@
+
+<script id="rs-gz" type="application/json">__RS_GZ__</script>
+<script>
+(async function(){
+  var el=document.getElementById("rs-gz");
+  var blobs=JSON.parse(el.textContent);
+  var data={};
+  try{
+    for(var sid in blobs){
+      // atob + Blob.stream, NOT fetch("data:..."): sandboxed webviews (VS Code notebooks) ship a
+      // CSP whose connect-src blocks data: fetches — tiles load but the roads never appear.
+      var b=atob(blobs[sid]), arr=new Uint8Array(b.length);
+      for(var i=0;i<b.length;i++) arr[i]=b.charCodeAt(i);
+      data[sid]=await new Response(new Blob([arr]).stream()
+                  .pipeThrough(new DecompressionStream("gzip"))).json();
+    }
+    el.textContent="";                                   // release the base64 copies
+  }catch(e){
+    window.__rs_gz={ok:false, stage:"inflate", error:String(e)};
+    document.body.insertAdjacentHTML("afterbegin",
+      '<div style="position:fixed;z-index:9999;top:0;left:0;right:0;padding:10px;background:#c00;'+
+      'color:#fff;font:13px sans-serif">Could not decompress the map data: '+e+
+      ' — this page needs a browser with DecompressionStream.</div>');
+    return;
+  }
+  // `window.map` is the CONTAINER DIV until MapLibre finishes constructing (an element id
+  // auto-creates a global), so a handle grabbed too early has no getSource and the data is silently
+  // never attached. Poll for the real Map; never call through an unchecked handle. Never give up:
+  // MapLibre builds its sources on an animation frame, and browsers pause those while a page is
+  // off screen (a background tab, a notebook output scrolled away), so the sources can appear
+  // minutes late. After the first minute keep checking once a second, and tell the banner.
+  var tries=0;
+  (function fill(){
+    var m=window.map, sids=Object.keys(data);
+    if(!(m && typeof m.getSource==="function") || !sids.every(function(s){return m.getSource(s);})){
+      if(++tries>600) window.__rs_gz={ok:false, stage:"attach", waiting:true, error:"still waiting for the map"};
+      return setTimeout(fill, tries>600 ? 1000 : 100);
+    }
+    var n=0;
+    sids.forEach(function(s){ m.getSource(s).setData(data[s]); n+=data[s].features.length; });
+    window.__rs_gz={ok:true, sources:sids, features:n};
+    var banner=document.getElementById("rs-diag"); if(banner) banner.remove();   // late, but here
+    data=null;
+  })();
+})();
+</script>

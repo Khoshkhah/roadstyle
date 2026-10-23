@@ -82,6 +82,14 @@ fn compute_levels(py: Python<'_>, roads: Vec<u8>, method: String, cols: [String;
     .map_err(|e: String| PyValueError::new_err(e))
 }
 
+/// render_web._page_html in Rust (roadstyle::page): the page of a live style with the dashboard's options. `parts`: name, cam, bounds,
+/// side_panel_html, host_panel_width, compress, gz (the blobs, made by Python's zlib), side_b64, side, simple_js; `pmtiles`: a tiled page.
+#[pyfunction]
+#[pyo3(signature = (style, page, parts, pmtiles=None))]
+fn make_page(style: String, page: String, parts: String, pmtiles: Option<Vec<u8>>) -> PyResult<String> {
+    roadstyle::page::make_page(&style, &page, &parts, pmtiles.as_deref()).map_err(PyValueError::new_err)
+}
+
 /// The engine's warnings since the last call of this (render_web's warnings.warn): the binding gives them as Python warnings.
 #[pyfunction]
 fn take_warnings() -> Vec<String> {
@@ -91,6 +99,7 @@ fn take_warnings() -> Vec<String> {
 #[pymodule]
 fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(take_warnings, m)?)?;
+    m.add_function(wrap_pyfunction!(make_page, m)?)?;
     m.add_function(wrap_pyfunction!(make_style, m)?)?;
     m.add_function(wrap_pyfunction!(make_look, m)?)?;
     m.add_function(wrap_pyfunction!(compute_levels, m)?)?;

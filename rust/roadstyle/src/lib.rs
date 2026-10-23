@@ -3,6 +3,7 @@
 //! ...), and it has `make_tiled`, which needs both the engine and the tiles. A Rust user adds only this crate.
 
 pub use roadstyle_engine::*;
+pub mod page;
 pub use roadstyle_levels as levels;
 pub use roadstyle_tiles as tiles;
 

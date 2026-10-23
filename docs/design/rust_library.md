@@ -1255,6 +1255,12 @@ look (P3), the layer roles, `docs/reference/contract.md`.
 
 #### P6: the page and the export in Rust
 
+**State (2026-10-23):** the page writer is done (`rust/roadstyle/src/page.rs`, `make_page` in the Python binding, `makePage` in the browser
+package): the pages of `tests/test_engine_parity.py` are byte for byte the Python pages. `export_style` (XYZ and PMTiles) is done through
+the binding, with the archive written by the `pmtiles` package. Open: a PMTiles writer in the crate (for the browser), the npm packages,
+the runtime API (`getState`, `setState`, the events), `Tiler.restyle`, the sidebars of `render_dashboard` and `render_report`. The crate
+reads the static files from `src/roadstyle/` when it is built; a crates.io package needs them in the crate (a build step copies them).
+
 - **Content.** The page writer in `roadstyle-io` (feature `page`): the HTML frame, the dashboard bundle, the style, the page options,
   the gzip of the sources (`compress`), the host panel. `export_style` (style.json, XYZ tiles, PMTiles, sprite). The three page
   sidebars (`dashboard.html`, `report.html`, `street_view.html`) as static files. The npm packages. The runtime API of the

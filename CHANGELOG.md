@@ -48,6 +48,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **`compute_levels(engine="rust")`** gives `levels_given_up` and `levels_orders_not_kept` as Python does.
 - **The Rust engine takes `filter_col`** (the class filter: `__rs_cls` on every piece, the filter panel) and the user's own profiles and
   palettes (`./profiles`, `./palettes`, `~/.config/roadstyle/`), as Python does.
+- **The page writer in Rust** (`roadstyle::page`, phase P6): render_web's `_page_html` in Rust, with Python's JSON text (its separators, its
+  `\uXXXX`, its floats), so `render_edges(engine="rust")` writes the page with it and the page is Python's byte for byte. The browser package
+  has it as `makePage` (the duckosm-rust page and the GeoLibre plugin can write a whole page). The page's three scripts (the gzip loader,
+  simple mode's recolouring, the tiles' setup) are static files now (`static/page/`), the same text for both writers.
 - **The interaction contract in the style** (`docs/design/rust_library.md`, "The interaction contract"). With the look's `args.state = "live"`,
   the Rust engine makes the style of the page: the global state stays in the expressions (MapLibre's `state` block), and the metadata has
   `roadstyle:contract` (1), `roadstyle:state` (the start value of each `rs_*` state) and `roadstyle:controls` (the options of `rsDashboard` that
