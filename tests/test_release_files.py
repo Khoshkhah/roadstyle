@@ -24,8 +24,9 @@ def _toml_value(path, key):
 
 
 def test_one_version_everywhere():
-    # roadstyle-mcp is released with roadstyle and pins it exactly; the MCP Registry entry and
-    # the Claude Code plugin name the same version.
+    # roadstyle-mcp is released with roadstyle and pins it exactly; the MCP Registry entry, the
+    # Claude Code plugin and the Rust crates (one workspace version, rust_library.md decision 7)
+    # name the same version.
     v = _toml_value("pyproject.toml", "version")
     shim = (ROOT / "packages/roadstyle-mcp/pyproject.toml").read_text()
     server = json.loads((ROOT / "server.json").read_text())
@@ -36,5 +37,6 @@ def test_one_version_everywhere():
         "server.json version": server["version"],
         "server.json package": server["packages"][0]["version"],
         "plugin.json version": plugin["version"],
+        "Rust crates version": _toml_value("rust/Cargo.toml", "version"),
     } == dict.fromkeys(["roadstyle-mcp version", "roadstyle-mcp pin", "server.json version",
-                        "server.json package", "plugin.json version"], v)
+                        "server.json package", "plugin.json version", "Rust crates version"], v)

@@ -92,7 +92,9 @@ pub fn mark_roads(fs: &mut [Feature], look: &Look, args: &Value) -> Result<crate
         }
     }
     let colors = crate::colors::bake(fs, look, args)?;
-    mark_twoway(fs);
+    // render: the direction columns are read only when they are named (directed_col, driving_col: None by default)
+    let named = |k: &str| args[k].as_str().is_some_and(|c| !c.is_empty());
+    mark_twoway(fs, named("directed_col"), named("driving_col"));
     // a road with an access kind has its kind's colour in every colour option (the palette's `access`)
     for f in fs.iter_mut().filter(|_| access_col.is_some()) {
         let Some(c) = f.props.get("__rs_access").and_then(Value::as_str).and_then(|k| look.access.get(k)).filter(|c| !c.is_null()).cloned() else { continue };
@@ -195,7 +197,7 @@ fn ends(f: &Feature) -> Option<([f64; 2], [f64; 2])> {
 type EndKey = Option<((String, String), (String, String), String)>;
 
 /// _mark_twoway: __rs_twoway (a reverse twin of the same class, both directed) and __rs_oneway (the arrows).
-fn mark_twoway(fs: &mut [Feature]) {
+fn mark_twoway(fs: &mut [Feature], directed: bool, driving: bool) {
     let keys: Vec<EndKey> = fs.iter().map(|f| ends(f).map(|(a, z)| (point_key(&a), point_key(&z), class_key(f.props.get(HIGHWAY))))).collect();
     let rev = |k: &EndKey| k.as_ref().map(|(a, z, c)| (z.clone(), a.clone(), c.clone()));
     let mut by: HashMap<EndKey, Vec<usize>> = HashMap::new();
@@ -214,25 +216,29 @@ fn mark_twoway(fs: &mut [Feature]) {
         let ow = if missing(p.get("oneway")) { !two } else { truthy(p.get("oneway")) };
         p.insert("__rs_oneway", ow.into());
     }
-    // directed_col: a pair is two lanes only when neither edge is undirected (null = directed)
-    let und = |f: &Feature| !missing(f.props.get(DIRECTED)) && !truthy(f.props.get(DIRECTED));
-    let undirected: Vec<bool> = fs.iter().map(und).collect();
-    for (i, k) in keys.iter().enumerate() {
-        if fs[i].props["__rs_twoway"] != true {
-            continue;
-        }
-        let others_und = by.get(&rev(k)).is_none_or(|v| v.iter().filter(|&&t| t != i).all(|&t| undirected[t]));
-        if undirected[i] || others_und {
-            let p = &mut fs[i].props;
-            p.insert("__rs_twoway", false.into());
-            if missing(p.get("oneway")) {
-                p.insert("__rs_oneway", (!undirected[i]).into());
+    if directed {
+        // directed_col: a pair is two lanes only when neither edge is undirected (null = directed)
+        let und = |f: &Feature| !missing(f.props.get(DIRECTED)) && !truthy(f.props.get(DIRECTED));
+        let undirected: Vec<bool> = fs.iter().map(und).collect();
+        for (i, k) in keys.iter().enumerate() {
+            if fs[i].props["__rs_twoway"] != true {
+                continue;
+            }
+            let others_und = by.get(&rev(k)).is_none_or(|v| v.iter().filter(|&&t| t != i).all(|&t| undirected[t]));
+            if undirected[i] || others_und {
+                let p = &mut fs[i].props;
+                p.insert("__rs_twoway", false.into());
+                if missing(p.get("oneway")) {
+                    p.insert("__rs_oneway", (!undirected[i]).into());
+                }
             }
         }
     }
-    for f in fs.iter_mut() {        // driving_col: no arrows where cars may not drive (null = driving)
-        if !missing(f.props.get(DRIVING)) && !truthy(f.props.get(DRIVING)) {
-            f.props.insert("__rs_oneway", false.into());
+    if driving {
+        for f in fs.iter_mut() {        // driving_col: no arrows where cars may not drive (null = driving)
+            if !missing(f.props.get(DRIVING)) && !truthy(f.props.get(DRIVING)) {
+                f.props.insert("__rs_oneway", false.into());
+            }
         }
     }
 }
