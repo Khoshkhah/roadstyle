@@ -23,11 +23,11 @@ export function _svLine(f){ const g=f && f.geometry;
 function _svFeat(f){ const F=_feats();       // the edge's full geometry (a picked one may be tile-clipped)
   return (f && f.id!=null && srcOf(f)==="roads" && F && F[f.id]) || f; }
 // tiles mode keeps no geometry in the page: take the edge's longest piece from the loaded tiles; simple mode: its longest fill piece
-// (the Rust engine's roads source has no lines). rsSelect of an edge whose tiles are not loaded yet gets no heading, marker or steps.
+// (the Rust engine's source-layer "roads" has no lines). rsSelect of an edge whose tiles are not loaded yet gets no heading, marker or steps.
 export function _svTiled(id){
   if(!RS_TILED) return null;
   let best=null;
-  const fs = RS_LEAN ? map.querySourceFeatures(RS_PREFIX+"simple", {sourceLayer:"simple", filter:["==", ["get", "__rs_k"], 1]})
+  const fs = RS_LEAN ? map.querySourceFeatures(RS_PREFIX+"roads", {sourceLayer:"simple", filter:["==", ["get", "__rs_k"], 1]})
                      : map.querySourceFeatures(RS_PREFIX+"roads", {sourceLayer:"roads"});
   for(const f of fs)
     if((RS_LEAN ? f.properties.__rs_edge : f.id)===id && (!best || _svLine(f).length>_svLine(best).length)) best=f;

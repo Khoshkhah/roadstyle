@@ -63,10 +63,12 @@ rs.setStyle(style);
 - **`prefix`.** The page adds the roads style's sources and layers with this prefix (`"rs-"`). The dashboard adds it to each
   source and layer id that it uses. The names in the style itself stay as they are: a layer's `source-layer`, the metadata.
 - **The base map.** With no `basemaps` option the dashboard has no base map button and does not touch the map's own base map.
-- **The glow on tiles.** In the engine's tiles the `roads` source has no lines: the map draws the roads from the pieces of the
-  `simple` source. The page adds the `simple` source with `promoteId: "__rs_edge"`. Then all the pieces of a road have the road's
-  id, and one feature state (`{source: "rs-simple", sourceLayer: "simple", id: road}`) lights the whole road, also in tiles that
-  load later. Without `promoteId`, `setStyle` writes an error in the console. A road is picked on its fill pieces (`__rs_k` 1).
+- **The glow on tiles.** The engine's tiled style (`rust-engine` from `f92323f`) has one vector source `roads`; each layer names
+  its source layer (`roads`, `simple`, `slots`), as in Python's tiles. The source layer `roads` has no lines: the map draws the
+  roads from the pieces in `simple`. The page adds the source with `promoteId: {simple: "__rs_edge"}`. Then all the pieces of a
+  road have the road's id, and one feature state (`{source: "rs-roads", sourceLayer: "simple", id: road}`) lights the whole road,
+  also in tiles that load later. Without `promoteId`, `setStyle` writes an error in the console. A road is picked on its fill
+  pieces (`__rs_k` 1).
 - **`engine.props(id)`.** A function that returns a Promise of one road's properties (`id`: the road's row, the `__rs_edge` of its
   pieces). The dashboard calls it for a click, `rsSelect` and the hover tooltip, also for the road's second edge
   (`__rs_edge2`), and keeps the answers until the next style. If the Promise fails, the dashboard writes an error in the console

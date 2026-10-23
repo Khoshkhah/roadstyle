@@ -28,8 +28,9 @@ export function useStyle(st){
   style = st || {layers:[], sources:{}, metadata:{}};
   RS_DECK_LAYERS = style.layers.filter(l=>l.id.indexOf("roads-bridge-decks")===0).map(l=>RS_PREFIX+l.id);
   _pcache.clear();
-  const s = RS_LEAN && RS_TILED && map.getSource(RS_PREFIX+"simple");
-  if(s && s.promoteId!=="__rs_edge") console.error('rs: the simple source needs promoteId "__rs_edge" (addSource), or a road does not glow');
+  const s = RS_LEAN && RS_TILED && style.layers.length && map.getSource(RS_PREFIX+"roads");
+  if(s && !(s.promoteId && s.promoteId.simple==="__rs_edge"))
+    console.error('rs: the roads source needs promoteId {simple: "__rs_edge"} (addSource), or a road does not glow');
 }
 // whether a feature's value is one of ids: a "match" on the sorted, distinct ids (a lookup); an "in" on a literal list scanned the whole list for
 // every feature in every layer, and a filter of thousands of ids froze the page (2026-10-07)
@@ -78,10 +79,11 @@ export function _roadOfPiece(f){ const e=f.properties.__rs_edge;      // a fill 
   return {id:e, properties:_rprops(e), layer:{id:RS_PREFIX+"roads-fill"}, get geometry(){ const r=_feats()[e]; return r && r.geometry; }}; }
 export const _FILL_PIECE = ["any", ["==", ["get", "__rs_k"], 1], ["!", ["has", "__rs_k"]]];   // the fill pieces of the road layer, and what has no piece kind (overlays, decks)
 // ref.source: "roads" or "decks" (the roads style's, RS_PREFIX added here), or an overlay's source id. With tiles the glow is the state of the
-// road in the roads source (a source-layer of the same name). Simple mode with tiles (the Rust engine's Tiler: its roads source has no
-// lines): the state of the road's pieces, which all have the road's id when the page gives the simple source promoteId "__rs_edge"
+// road in the vector source "roads", source-layer "roads". Simple mode with tiles (the Rust engine's Tiler: its source-layer "roads" has
+// no lines): the state of the road's pieces (source-layer "simple"), which all have the road's id when the page gives the source
+// promoteId {simple: "__rs_edge"}
 export function _fs(ref, st){
-  if(RS_LEAN && RS_TILED && ref.source==="roads"){ map.setFeatureState({source:RS_PREFIX+"simple", sourceLayer:"simple", id:ref.id}, st); return; }
+  if(RS_LEAN && RS_TILED && ref.source==="roads"){ map.setFeatureState({source:RS_PREFIX+"roads", sourceLayer:"simple", id:ref.id}, st); return; }
   if(RS_LEAN && ref.source==="roads"){ _pieces(ref.id).forEach(id=>map.setFeatureState({source:RS_PREFIX+"simple", id:id}, st)); return; }
   if(RS_TILED && ref.source==="roads") ref={source:RS_PREFIX+"roads", sourceLayer:"roads", id:ref.id};
   else if(ref.source==="roads" || ref.source==="decks") ref={source:RS_PREFIX+ref.source, id:ref.id};

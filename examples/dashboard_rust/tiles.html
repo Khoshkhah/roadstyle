@@ -39,7 +39,7 @@ const rs = rsDashboard(map, {
   style: null,
   prefix: "rs-",
   tiles: true,
-  simple: "roads-simple",     // the engine's style is simple mode: the roads are drawn by this one layer, from the simple source
+  simple: "roads-simple",     // the engine's style is simple mode: the roads are drawn by this one layer (source-layer "simple")
   engine: {props: async (id) => JSON.parse(tiler.props("roads", id))},
   select_color: theme.selection.select,
   street_view: "window",
@@ -57,8 +57,9 @@ async function showRoads(colorBy) {
   for (const [id, im] of Object.entries(style.metadata["roadstyle:images"] || {})) {
     if (!map.hasImage("rs-" + id)) map.addImage("rs-" + id, (await map.loadImage(im.url)).data, {sdf: im.sdf, pixelRatio: im.pixelRatio});
   }
-  // promoteId: the pieces of a road have the road's id in the map, so the dashboard lights them all with one feature state
-  for (const [id, src] of Object.entries(style.sources)) map.addSource("rs-" + id, id === "simple" ? {...src, promoteId: "__rs_edge"} : src);
+  // the one vector source "roads" (its source layers: roads, simple, slots). promoteId: the pieces of a road have the road's id in the
+  // map, so the dashboard lights them all with one feature state
+  for (const [id, src] of Object.entries(style.sources)) map.addSource("rs-" + id, id === "roads" ? {...src, promoteId: {simple: "__rs_edge"}} : src);
   for (const l of style.layers) {
     const layer = JSON.parse(JSON.stringify(l).replaceAll('"oneway"', '"rs-oneway"'));   // the image name in the layout
     map.addLayer({...layer, id: "rs-" + l.id, source: "rs-" + l.source});

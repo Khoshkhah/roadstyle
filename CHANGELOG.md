@@ -15,7 +15,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **The dashboard on roads that come later** (`dashboard_module.md`, "Roads that come later"). `rsDashboard` returns an object with
   `setStyle(style)`: a page gives a new roads style after each build, and the controls stay. New options: `prefix` (the page added the
   style's sources and layers with it), `engine: {props}` (one road's properties on request) and `style: null`. In simple mode with
-  vector tiles a road glows through its pieces (`promoteId: "__rs_edge"` on the `simple` source).
+  vector tiles a road glows through its pieces (`promoteId: {simple: "__rs_edge"}` on the `roads` source).
 
 ## [0.24.3] — 2026-10-22
 

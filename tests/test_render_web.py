@@ -803,7 +803,7 @@ def test_web_street_view_link():
     assert "rsSetStreetViewMarker(!!on);" in on and 'data-step="15"' in on
     # the marker sits on the DRAWN lane (roads-fill's own line-offset at this zoom), not 2.5 m out,
     # which is off the road when zoomed in; and it follows zoom / rotate / pitch
-    assert 'map.getPaintProperty("roads-fill", "line-offset")' in on
+    assert 'map.getPaintProperty(RS_PREFIX+"roads-fill", "line-offset")' in on
     assert 'map.on("move", _svMarkPlace);' in on
 
 
