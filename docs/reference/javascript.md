@@ -123,4 +123,18 @@ Read-only globals for building your own controls.
     Or add a small integer column in Python (`pidx = 0..n-1`) and query on it. In pandas, a column
     that mixes big ints and `None` turns into float64 and rounds the ids: use `dtype="Int64"`.
 
+## The dashboard on another map
+
+The controls and the road interaction of a saved page are ES modules in `roadstyle/static/dashboard/`. A page that makes its own
+MapLibre map, for example from a style of roadstyle's Rust engine, can add them:
+
+```js
+import {rsDashboard} from "./dashboard/index.js";   // and link dashboard/dashboard.css and popup.css
+const map = new maplibregl.Map({container: "map", style});
+rsDashboard(map, {style, find_control: true});
+```
+
+Call `rsDashboard` immediately after you make the map. The options have the names of the Python keywords. The functions and events
+on this page then work on that map. The options and the files: `docs/design/dashboard_module.md` in the repository.
+
 **See also:** [Dashboards & JavaScript](../guides/dashboards.md) · [Every parameter](parameters.md) · [Put it on a website](../guides/website.md)

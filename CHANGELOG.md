@@ -4,6 +4,15 @@ All notable changes to **roadstyle** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- **The map controls are ES modules** (`static/dashboard/`, `docs/design/dashboard_module.md`). The controls and the road interaction of the web page
+  (colour by, legend, road filter, find, panel, Street View, Google 3D, base map, overlays, tunnels, views, arrows, hover and click) were one script in the
+  page template. Now each control is a file, and `rsDashboard(map, options)` adds them all to a MapLibre map. The pages that use the Rust engine can
+  import the same files. The Python page puts them in the page as one script, so a saved page still works offline. The look, the texts and the
+  `window.rs*` API do not change.
+
 ## [0.24.3] — 2026-10-22
 
 ### Fixed

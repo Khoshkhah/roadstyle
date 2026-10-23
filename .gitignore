@@ -32,3 +32,6 @@ ui/report/report.html
 
 # the Manual's live maps: built in CI with the CARTO key secret (docs.yml)
 docs/maps/
+
+# the WebAssembly module of the Rust-engine dashboard example (examples/dashboard_rust/README.md)
+examples/dashboard_rust/pkg/

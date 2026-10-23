@@ -21,15 +21,20 @@ A consumer project that does not install it runs with `PYTHONPATH=<this repo>/sr
 
 - `src/roadstyle/render_web.py` — `render(...)`: Python keywords become `__PLACEHOLDER__`
   replacements in `src/roadstyle/static/web_template.html` (one `.replace` chain near the end).
-- A new web option = the keyword + its `.replace` + a `const` in the template + a test in
-  `tests/test_render_web.py` + a row in `docs/reference/parameters.md` and `docs/reference/javascript.md` +
-  CHANGELOG. If agents calling the library need to know it, also `skills/roadstyle/SKILL.md`.
+- The page's controls and road interaction are ES modules in `src/roadstyle/static/dashboard/` (one file for each control,
+  `index.js` is the entry `rsDashboard(map, options)`); the Rust-engine pages import them, and `render_web.py` puts them in the
+  page as one script (`_DASH_FILES`, without `import` lines and `export` words). A top-level name must be unique in the folder.
+  Design: `docs/design/dashboard_module.md`.
+- A new web option = the keyword + its `.replace` + a key in the template's `rsDashboard(map, {...})` call + its default in
+  `dashboard/index.js` + the module that reads `O.<key>` + a test in `tests/test_render_web.py` (`_opt(html, key)`) + a row in
+  `docs/reference/parameters.md`, `docs/reference/javascript.md` and `docs/design/dashboard_module.md` + CHANGELOG. If agents
+  calling the library need to know it, also `skills/roadstyle/SKILL.md`.
 - `render_edges` takes `**kwargs`, so a misspelt keyword is silently ignored: grep the template
   for its placeholder when a new option seems to do nothing.
-- The road popup and hover tooltip text: `_rfields` (popup/tooltip) and `_rrows` (docked panel)
-  in the template; Street View: `_svMeasure` / `_svAt` (the spot on the edge, metres along it), `_svPick` / `_svUrl` / `_svUrlOf`, the marker `_svMark` / `_svMarkPlace` / `_svLanePx`, the window `rsSetStreetView`.
+- The road popup and hover tooltip text: `_rfields` (popup/tooltip, `static/popup.js`) and `_rrows` (docked panel,
+  `dashboard/select.js`); Street View: `_svMeasure` / `_svAt` (the spot on the edge, metres along it), `_svPick` / `_svUrl` / `_svUrlOf`, the marker `_svMark` / `_svMarkPlace` / `_svLanePx`, the window `rsSetStreetView`.
 - Google's script is loaded once for every window by `_gmLoad(key)`; a floating window (drag, size, place, remembered)
-  is `_rsFloat(w, bar, name, left)`. Google 3D (`google_3d=True`, the `if(_g3d)` block): `toGoogle` / `toMap` convert the
+  is `_rsFloat(w, bar, name, left)`. Google 3D (`google_3d=True`, `dashboard/google3d.js`): `toGoogle` / `toMap` convert the
   cameras (zoom <-> range from MapLibre's camera distance), `there` stops echo loops, the map is the judge (it clamps,
   Google goes back), `ground` reads the ground height from Terrain Tiles (Google's center is above sea level), `pad`
   moves the map's center beside the window. Check a change on a hill (Monaco), not only on flat Södermalm.

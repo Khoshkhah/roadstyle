@@ -28,8 +28,13 @@ def _edges():
 
 def _style(html):
     """Pull the inlined MapLibre style JSON back out of the page."""
-    m = re.search(r"const style = (\{.*?\}), BASEMAPS", html, re.S)
-    return json.loads(m.group(1))
+    return json.JSONDecoder().raw_decode(html, html.index("const style = ") + len("const style = "))[0]
+
+
+def _opt(html, key):
+    """One option of the page's rsDashboard(map, {...}) call (static/web_template.html), as a Python value."""
+    at = html.index("\n  " + key + ": ", html.index("rsDashboard(map, {"))
+    return json.JSONDecoder().raw_decode(html, at + len(key) + 5)[0]
 
 
 def test_web_color_options_bake_variants_and_wire_recolour():
@@ -66,11 +71,11 @@ def test_web_no_color_options_is_unchanged():
     style = _style(wm.html)
     p = style["sources"]["roads"]["data"]["features"][0]["properties"]
     assert "__rs_fill__1" not in p            # no variants baked
-    assert "const COLOR_OPTIONS = [];" in wm.html   # picker JS present but inert (empty)
+    assert _opt(wm.html, "color_options") == []   # picker JS present but inert (empty)
 
 
 def _copts(html):
-    return re.search(r"const COLOR_OPTIONS = (.+?);", html).group(1)
+    return json.dumps(_opt(html, "color_options"))
 
 
 def test_web_color_by_bakes_its_legend():
@@ -140,7 +145,7 @@ def test_web_overlays_place_under_and_over_roads():
     # popup fields + toggle wiring present; overlay props preserved for the popup
     assert "handleOverlayClick" in wm.html and "ov-ctrl" in wm.html
     # placement is baked into the JS meta: click precedence follows the visual stacking
-    meta = json.loads(wm.html.split("const OVERLAYS = ")[1].split(";\n")[0])
+    meta = _opt(wm.html, "overlays")
     assert [m["under"] for m in meta] == [True, False]
     z = style["sources"]["ov0"]["data"]["features"][0]["properties"]
     assert z["taz_id"] == "Z0" and z["weight"] == 0.5
@@ -155,7 +160,7 @@ def test_web_overlay_kind_autodetected():
 
 def test_web_no_overlays_is_inert():
     wm = render_edges(_edges(), backend="web")
-    assert "const OVERLAYS = [];" in wm.html
+    assert _opt(wm.html, "overlays") == []
 
 
 # --- compress: gzip the source data, inflate in the browser -------------------------------------
@@ -338,7 +343,7 @@ def test_web_labels_and_arrows_read_style_config(monkeypatch):
                      "text-halo-width": 2, "text-opacity": 0.5}
     arrow = next(l for l in style["layers"] if l["id"] == "roads-arrows")
     assert arrow["minzoom"] == 15 and arrow["paint"]["icon-opacity"] == 0.5
-    assert 'fill="#123456"' in wm.html               # the chevron SVG itself is retinted
+    assert _opt(wm.html, "arrow_color") == "#123456"   # the chevron SVG itself is retinted
 
 
 def test_web_bridge_casing_is_config_colour():
@@ -394,7 +399,7 @@ def test_web_view_3d_flag():
 def test_web_camera_toggle_control():
     """Every map carries the 2D/3D toggle button; its target pitch comes from terrain settings."""
     html = render_edges(_edges(), backend="web").html
-    assert "const PITCH3D = 55" in html and 'b.textContent = m.getPitch()<5 ? "3D" : "2D"' in html
+    assert _opt(html, "pitch_3d") == 55 and 'b.textContent = m.getPitch()<5 ? "3D" : "2D"' in html
 
 
 def test_web_3d_bridge_decks():
@@ -465,7 +470,7 @@ def test_web_pick_survives_missing_layers():
     list to existing layers or every hover/click errors out and nothing is selectable."""
     html = render_edges(_edges(), backend="web", view_3d=True).html
     assert "PICK_LAYERS.filter(id=>map.getLayer(id))" in html
-    assert "concat(RS_DECK_LAYERS)" in html.split("PICK_LAYERS")[1][:220]
+    assert "concat(RS_DECK_LAYERS)" in html.split("PICK_LAYERS = style.layers")[1][:220]
 
 
 def test_web_camera_max_pitch():
@@ -503,11 +508,11 @@ def test_web_street_view_window():
     follows the clicked road; the popup link opens that window instead of a new tab."""
     import pytest
     win = render_edges(_edges(), backend="web").html                     # the default
-    assert "const _svWindow = true;" in win and "const _streetView = true;" in win
+    assert _opt(win, "street_view") == "window" and '_svWindow = O.street_view==="window"' in win
     assert "window.rsSetStreetView = rsSetStreetView;" in win and "maps/embed?pb=" in win
     link = render_edges(_edges(), backend="web", street_view=True).html  # the plain link instead
-    assert "const _svWindow = false;" in link and "const _streetView = true;" in link
-    assert "__SV_WINDOW__" not in win
+    assert _opt(link, "street_view") is True and "_streetView = !!O.street_view" in link
+    assert "__STREET_VIEW__" not in win
     with pytest.raises(ValueError):
         render_edges(_edges(), backend="web", street_view="windows")
 
@@ -516,9 +521,9 @@ def test_google_3d_window_needs_the_key(monkeypatch):
     """google_3d=True: a map button and a floating Google 3D window with the Street View key; off by default, and an error without a key."""
     import pytest
     monkeypatch.delenv("GOOGLE_MAPS_KEY", raising=False)
-    assert "const _g3d = false;" in render_edges(_edges(), backend="web").html
+    assert _opt(render_edges(_edges(), backend="web").html, "google_3d") is False
     h = render_edges(_edges(), backend="web", google_3d=True, street_view_key="AIzaTEST").html
-    assert "const _g3d = true;" in h and 'const _svKey = "AIzaTEST";' in h and "window.rsSetGoogle3D = rsSetGoogle3D;" in h
+    assert _opt(h, "google_3d") is True and _opt(h, "street_view_key") == "AIzaTEST" and "window.rsSetGoogle3D = rsSetGoogle3D;" in h
     assert "__GOOGLE_3D__" not in h and "__SELECT_COLOR__" not in h
     assert "elevation-tiles-prod/terrarium/" in h and "heights: Mapzen" in h     # the ground height under Google's center, credited
     with pytest.raises(ValueError, match="google_3d=True needs"):
@@ -550,11 +555,11 @@ def test_web_panel_search_always_reads_the_id():
     column (edge_id_col) and edge_ref are always searched (a custom list used to hide the id)."""
     html = render_edges(_edges(), backend="web", road_popup=["name"], popup_mode="panel").html
     assert '__EDGE_ID_COL__' not in html
-    assert 'const _ID_KEYS = [...new Set(["edge_id", "edge_ref"])]' in html
+    assert _opt(html, "edge_id_col") == "edge_id" and '_ID_KEYS = [...new Set([O.edge_id_col, "edge_ref"])]' in html
     assert '_popupFields.concat(_ID_KEYS' in html
     other = render_edges(_edges().rename(columns={"edge_id": "eid"}), backend="web",
                          edge_id_col="eid", popup_mode="panel").html
-    assert 'new Set(["eid", "edge_ref"])' in other
+    assert _opt(other, "edge_id_col") == "eid"
 
 
 def test_web_panel_popup_mode_and_select_events():
@@ -562,11 +567,11 @@ def test_web_panel_popup_mode_and_select_events():
     fields); popup_mode="panel" does the same while keeping a custom field list; rs:select /
     rs:deselect CustomEvents fire in every mode for host pages."""
     panel = render_edges(_edges(), backend="web", road_popup="panel").html
-    assert '_popupMode = "panel"' in panel and 'className="rs-side"' in panel.replace("'", '"')
+    assert _opt(panel, "popup_mode") == "panel" and 'className="rs-side"' in panel.replace("'", '"')
     custom = render_edges(_edges(), backend="web", road_popup=["name"], popup_mode="panel").html
-    assert '_popupMode = "panel"' in custom and '["name"]' in custom
+    assert _opt(custom, "popup_mode") == "panel" and _opt(custom, "road_popup") == ["name"]
     default = render_edges(_edges(), backend="web").html
-    assert '_popupMode = "popup"' in default
+    assert _opt(default, "popup_mode") == "popup"
     for html in (panel, default):
         assert 'CustomEvent("rs:select"' in html and 'CustomEvent("rs:deselect"' in html
 
@@ -613,8 +618,7 @@ def test_blank_basemap_with_switcher_precreates_hidden_raster():
     raster = next(l for l in style["layers"] if l["id"] == "basemap")
     assert raster["layout"] == {"visibility": "none"}
     assert style["sources"]["bm"]["tiles"]           # voyager tiles, ready to show
-    m = re.search(r"BASEMAPS = (\[.*?\]);", wm.html, re.S)
-    entries = json.loads(m.group(1))
+    entries = _opt(wm.html, "basemaps")
     assert entries[0]["tiles"] == [] and entries[0]["bg"] == "#efede8"
 
 
@@ -625,7 +629,7 @@ def test_basemap_maxzoom_reaches_the_page():
     wm = render_edges(_edges(), backend="web", basemap="esri_gray",
                       basemaps=["esri_gray", "osm", "blank"])
     assert _style(wm.html)["sources"]["bm"]["maxzoom"] == 16
-    entries = json.loads(re.search(r"BASEMAPS = (\[.*?\]);", wm.html, re.S).group(1))
+    entries = _opt(wm.html, "basemaps")
     assert {e["key"]: e["maxzoom"] for e in entries} == {"esri_gray": 16, "osm": 19, "blank": 19}
     assert "Esri" in entries[0]["attr"] and "OpenStreetMap" in entries[1]["attr"]
 
@@ -653,13 +657,11 @@ def test_switcher_off_with_explicit_basemaps_keeps_them_addressable():
     baked, so window.rsSetBasemap('key') can drive a custom UI."""
     wm = render_edges(_edges(), backend="web", basemaps=["voyager", "blank"],
                       basemap_switcher=False)
-    m = re.search(r"BASEMAPS = (\[.*?\]);", wm.html, re.S)
-    assert [e["key"] for e in json.loads(m.group(1))] == ["voyager", "blank"]
-    assert "const BM_SWITCHER = false" in wm.html
+    assert [e["key"] for e in _opt(wm.html, "basemaps")] == ["voyager", "blank"]
+    assert _opt(wm.html, "basemap_switcher") is False
     # without an explicit list, only the fixed backdrop is baked (nothing to switch to)
     wm2 = render_edges(_edges(), backend="web", basemap_switcher=False)
-    m2 = re.search(r"BASEMAPS = (\[.*?\]);", wm2.html, re.S)
-    assert len(json.loads(m2.group(1))) == 1
+    assert len(_opt(wm2.html, "basemaps")) == 1
 
 
 def test_query_id_verbs_are_baked():
@@ -785,9 +787,9 @@ def test_web_street_view_link():
     """The road read-out carries a Google Street View link by default (heading from the clicked
     edge's direction, computed in the page); street_view=False turns it off."""
     on = render_edges(_edges(), backend="web").html
-    assert "const _streetView = true;" in on and "map_action=pano" in on
+    assert _opt(on, "street_view") == "window" and "map_action=pano" in on
     off = render_edges(_edges(), backend="web", street_view=False).html
-    assert "const _streetView = false;" in off
+    assert _opt(off, "street_view") is False
     assert "__STREET_VIEW__" not in on + off
     # host pages whose own panel replaces the popup get the same URL on the click event
     assert on.count("streetView:_svPick(") == 2
@@ -815,8 +817,8 @@ def test_basemap_button_is_a_map_control_in_the_top_right_column():
 
 
 def test_zoom_readout_is_on_by_default_and_can_be_turned_off():
-    assert "if(true){ const zd=" in render_edges(_edges(), backend="web").html
-    assert "if(false){ const zd=" in render_edges(_edges(), backend="web", zoom_readout=False).html
+    assert _opt(render_edges(_edges(), backend="web").html, "zoom_readout") is True
+    assert _opt(render_edges(_edges(), backend="web", zoom_readout=False).html, "zoom_readout") is False
 
 
 def test_tunnel_casing_is_the_dash_layer_alone():
@@ -1371,12 +1373,12 @@ def test_colour_by_recolours_the_dashed_layers_too():
     """A footway / path / steps edge is drawn by a ``-dash<n>`` layer (line-dasharray is not data-driven): it must
     follow the active colouring, or it keeps its class colour under any "colour by"."""
     html = render_edges(_tunnel_world(True), backend="web").html
-    assert 'const RS_FILL_LAYERS = ["roads-fill", "roads-fill-sq", "roads-fill-sx", "roads-fill-h", "roads-fill-hsq", "roads-fill-hsx", "roads-fill-lv1"' in html          # the tunnel at position 1: over the streets it joins
+    assert _opt(html, "fill_layers")[:7] == ["roads-fill", "roads-fill-sq", "roads-fill-sx", "roads-fill-h", "roads-fill-hsq", "roads-fill-hsx", "roads-fill-lv1"]          # the tunnel at position 1: over the streets it joins
     w = _tunnel_world(True)
     foot = w.iloc[[0]].assign(highway="footway", tunnel=None, layer=None, geometry=[LineString([(18.03, 59.30), (18.03, 59.31)])])
     full = render_edges(pd.concat([w, foot], ignore_index=True), backend="web", simple=False).html     # the full look; a footway: a -dash<n> layer
     style = _style(full)
-    fills = json.loads(full.split("const RS_FILL_LAYERS = ")[1].split(";")[0])
+    fills = _opt(full, "fill_layers")
     dashed = [l for l in style["layers"] if any(l["id"].startswith(f + "-dash") for f in fills)]
     assert dashed and all("rs_colors" in json.dumps(l["paint"]["line-color"]) for l in dashed)     # a dashed edge takes the colouring too
     assert "RS_PIECE_LAYERS" not in html and "tpieces" not in html
@@ -1460,7 +1462,7 @@ def test_cap_col_gives_square_ends_to_the_edges_that_ask():
 
 
 def _tunnel_conf(html):
-    return json.loads(re.search(r"const TUNNEL = (\{.*?\});\n", html).group(1))
+    return _opt(html, "tunnel")
 
 
 def test_the_tunnel_look_is_v2s_slider():
@@ -2246,7 +2248,7 @@ def test_an_attached_item_selects_its_road_or_itself():
     html = render_edges(_edge_world(), backend="web", select_color="#123456",
                         overlays=[Overlay(_edge_features([12]), edge_col="edge_id", kind="circle"),
                                   Overlay(_edge_features([13]), edge_col="edge_id", kind="circle", select="item", popup=[])]).html
-    meta = json.loads(html.split("const OVERLAYS = ")[1].split(";\n")[0])
+    meta = _opt(html, "overlays")
     assert [m["select"] for m in meta] == ["road", "item"]
     circle = next(l for l in _style(html)["layers"] if l["id"].startswith("ov1-circle-lv"))
     assert '["case", ["boolean", ["feature-state", "select"], false], "#123456"' in json.dumps(circle["paint"]["circle-color"])
@@ -2301,12 +2303,12 @@ def test_views_are_baked_and_checked():
     the page does not have, is an error (no view is silently half applied)."""
     html = render_edges(_edges(), backend="web", color_options=_CO, overlays=[Overlay(_marks(), label="marks")],
                         views={"Flow": {"color": "AADT", "overlays": {"marks": False}}, "Casing": {"road_fill": False}}).html
-    views = json.loads(re.search(r"const VIEWS = (\[.*?\]);\n", html).group(1))
+    views = _opt(html, "views")
     assert views == [{"name": "Flow", "set": {"color": "AADT", "overlays": {"marks": False}}},
                      {"name": "Casing", "set": {"road_fill": False}}]
-    fill = json.loads(re.search(r"const RS_ROAD_FILL = (\{.*?\});\n", html).group(1))
+    fill = _opt(html, "road_fill")
     assert fill["on"] is True and "roads-fill" in fill["paint"] and not any(k.endswith("-pat") for k in fill["paint"])
-    assert "const VIEWS = [];" in render_edges(_edges(), backend="web").html                 # no views: no menu
+    assert _opt(render_edges(_edges(), backend="web").html, "views") == []                 # no views: no menu
     for bad in ({"colour": "AADT"}, {"color": "Speed"}, {"road_fill": 1}, {"overlays": {"lanes": True}},
                 {"classes": ["trunk"]}, {"basemap": "nowhere"}):
         with pytest.raises(ValueError):
@@ -2660,8 +2662,8 @@ def test_a_footway_on_a_street_the_other_way_round_is_no_lane_of_it():
 
 def test_the_road_tooltip_waits_for_the_mouse_to_rest():
     """hover_delay_ms (300 by default): the page waits this long before the road tooltip shows; 0 shows it at once."""
-    assert "const _TIP_DELAY = 300;" in render_edges(_edge_world(), backend="web", road_tooltip=True).html
-    assert "const _TIP_DELAY = 0;" in render_edges(_edge_world(), backend="web", road_tooltip=True, hover_delay_ms=0).html
+    assert _opt(render_edges(_edge_world(), backend="web", road_tooltip=True).html, "hover_delay_ms") == 300
+    assert _opt(render_edges(_edge_world(), backend="web", road_tooltip=True, hover_delay_ms=0).html, "hover_delay_ms") == 0
 
 
 def test_data_maxzoom_sets_the_last_cut_zoom_of_every_geojson_source():
@@ -4009,7 +4011,7 @@ def test_road_items_are_pieces_of_the_road_layer_with_no_source_of_their_own():
     k5 = sorted((f["properties"] for f in st["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_k"] == 5), key=lambda p: p["__rs_ord"])
     assert [p.get("__rs_pick") for p in k5] == [True, None] and k5[0]["lane_id"] == "1_1" and "lane_id" not in k5[1]
     assert sum(f["properties"]["__rs_k"] == 1 for f in st["sources"]["simple"]["data"]["features"]) == 1        # the road keeps its fill
-    assert 'const ROAD_ITEMS = {"label": "items", "popup": ["lane_id"], "layer": "roads-simple"}' in html
+    assert _opt(html, "items") == {"label": "items", "popup": ["lane_id"], "layer": "roads-simple"}
     assert "feature-state" in json.dumps(next(l for l in st["layers"] if l["id"] == "roads-simple")["paint"]["line-color"])
     with pytest.raises(ValueError, match="simple"):
         render_edges(roads, backend="web", items=items, simple=False)

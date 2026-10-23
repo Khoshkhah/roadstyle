@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
+<title>roadstyle dashboard, Rust engine</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<!-- An example: roadstyle's dashboard modules (src/roadstyle/static/dashboard/) on a style that the Rust engine makes
+     (rust/roadstyle-wasm) from the Monaco test data. How to build and open it: README.md in this folder. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<link rel="stylesheet" href="../../src/roadstyle/static/dashboard/dashboard.css">
+<link rel="stylesheet" href="../../src/roadstyle/static/popup.css">
+<style>html,body{margin:0;height:100%}#map{position:absolute;inset:0}</style>
+</head><body>
+<div id="map"></div>
+<script type="module">
+import init, {makeStyle} from "./pkg/roadstyle_wasm.js";
+import {rsDashboard} from "../../src/roadstyle/static/dashboard/index.js";
+
+const DATA = "../../rust/roadstyle-rs/tests/data/";
+const bytes = (u) => fetch(u).then((r) => r.arrayBuffer()).then((b) => new Uint8Array(b));
+const [, roads, look] = await Promise.all([init(), bytes(DATA + "monaco/roads.parquet"), fetch(DATA + "look.json").then((r) => r.text())]);
+const style = JSON.parse(makeStyle(roads, look, undefined, undefined, "Monaco"));
+const theme = JSON.parse(look).theme;
+
+const map = new maplibregl.Map({container: "map", style, attributionControl: {compact: true}});
+map.addControl(new maplibregl.NavigationControl({visualizePitch: true}));
+map.addControl(new maplibregl.ScaleControl({maxWidth: 120, unit: "metric"}), "bottom-left");
+// the style's images (the one-way arrow): the style's metadata roadstyle:images
+for (const [id, im] of Object.entries(style.metadata["roadstyle:images"] || {})) {
+  map.loadImage(im.url).then((r) => map.addImage(id, r.data, {sdf: im.sdf, pixelRatio: im.pixelRatio}));
+}
+// the popup fields, the tooltip and the hover delay come from the style's metadata roadstyle:interaction
+rsDashboard(map, {
+  style,
+  simple: "roads-simple",     // the engine's style is simple mode: the roads are drawn by this one layer
+  select_color: theme.selection.select,
+  street_view: "window",
+  find_control: true,
+});
+window.map = map;
+</script>
+</body></html>

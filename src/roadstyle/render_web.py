@@ -2650,6 +2650,18 @@ with open(os.path.join(os.path.dirname(__file__), "static", "popup.css"), encodi
     _HTML = _HTML.replace("__POPUP_CSS__", _fh.read())
 with open(os.path.join(os.path.dirname(__file__), "static", "popup.js"), encoding="utf-8") as _fh:
     _HTML = _HTML.replace("__POPUP_JS__", _fh.read().replace("export ", ""))
+# the map's controls and road interaction (static/dashboard/, ES modules shared with the pages that use the Rust engine,
+# docs/design/dashboard_module.md): one plain script here, without the import lines and the export words, so the page stays one file
+_DASH = os.path.join(os.path.dirname(__file__), "static", "dashboard")
+_DASH_FILES = ["core", "panel", "find", "zoom", "view3d", "float", "streetview", "google3d", "basemap", "filter",
+               "color", "legend", "overlays", "tunnel", "views", "arrows", "svspot", "select", "index"]
+with open(os.path.join(_DASH, "dashboard.css"), encoding="utf-8") as _fh:
+    _HTML = _HTML.replace("__DASHBOARD_CSS__", _fh.read())
+_js = []
+for _n in _DASH_FILES:
+    with open(os.path.join(_DASH, _n + ".js"), encoding="utf-8") as _fh:
+        _js.append(re.sub(r"^export ", "", re.sub(r"^import .*\n", "", _fh.read(), flags=re.M), flags=re.M))
+_HTML = _HTML.replace("__DASHBOARD_JS__", "".join(_js))
 
 
 # The notebook preview loads MapLibre from the CDN at the vendored version (test pins the match;
@@ -3767,7 +3779,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     # after every style/filter/bounds decision above — those read the features, the browser never does
     gz = _compress_sources(style) if compress else {}
     html = (_HTML.replace("__TITLE__", _html.escape(name))
-            .replace("__ARROW_COLOR__", str(arw["color"]))
+            .replace("__ARROW_COLOR__", json.dumps(arw["color"]))
             .replace("__ARROW_ICON__", json.dumps(arw["icon"]))
             .replace("__ARROW_RULES__", json.dumps({"mainBelow": arw["main_below"], "main": arw["main"], "minLenPx": arw["place"]["min_len_px"],
                                                      "minGapPx": arw["place"]["min_gap_px"], "nameGapPx": arw["place"]["name_gap_px"],
@@ -3781,7 +3793,6 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             .replace("__CENTER__", json.dumps([(minx + maxx) / 2, (miny + maxy) / 2]))
             .replace("__PITCH3D__", json.dumps(cam["pitch_3d"]))
             .replace("__MAX_PITCH__", json.dumps(cam["max_pitch"]))
-            .replace("__HOVER_COLOR__", json.dumps(hover_color))
             .replace("__SELECT_COLOR__", json.dumps(select_color))
             .replace("__PITCH__", json.dumps(cam["pitch"]))
             .replace("__BEARING__", json.dumps(cam["bearing"]))
@@ -3802,14 +3813,12 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                                                "to": {**_TUN_TO, "fill": tun_colour}, "control": bool(tunnel_control and tun_paint)}))
             .replace("__VIEWS__", json.dumps(view_list))
             .replace("__RS_ROAD_FILL__", json.dumps({"on": bool(road_fill), "paint": fill_paint}))
-            .replace("__ROAD_POPUP__", "true" if popup_on else "false")
+            .replace("__ROAD_POPUP__", json.dumps(popup_fields if popup_on else False))
             .replace("__ROAD_POPUP_MODE__", json.dumps(mode))
-            .replace("__ROAD_POPUP_FIELDS__", json.dumps(popup_fields))
             .replace("__EDGE_ID_COL__", json.dumps(edge_id_col))
             .replace("__ROAD_TOOLTIP__", json.dumps(road_tooltip))
             .replace("__HOVER_DELAY_MS__", json.dumps(int(hover_delay_ms)))
-            .replace("__STREET_VIEW__", "true" if street_view else "false")
-            .replace("__SV_WINDOW__", "true" if street_view == "window" else "false")
+            .replace("__STREET_VIEW__", json.dumps(street_view))
             .replace("__SV_WINDOW_KEY__", json.dumps(street_view_key or ""))
             .replace("__GOOGLE_3D__", "true" if google_3d else "false")
             .replace("__RS_TILED__", "true" if tiles else "false")
