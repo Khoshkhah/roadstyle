@@ -188,7 +188,7 @@ def _plugin_css():
 
 
 def export_look(path=None, *, profile=None, palette=None, edges=None, highway_col: str = "highway", oneway_col: str = "oneway",
-                tunnel_col: str = "tunnel", bridge_col: str = "bridge", id_col: str = "edge_id", positions=None) -> dict:
+                tunnel_col: str = "tunnel", bridge_col: str = "bridge", id_col: str = "edge_id", positions=None, engine: str | None = None) -> dict:
     """The simple look for a data layer that another app draws (approach 2 of docs/design/style_export.md): MapLibre layers with no
     source, made from the profile and the palette, that read the raw duckOSM columns: the class colours and widths, a casing, the
     drawing order from ``casing_level`` / ``fill_level`` (one casing and one fill layer per position, in order), tunnels faded with a
@@ -203,6 +203,20 @@ def export_look(path=None, *, profile=None, palette=None, edges=None, highway_co
 
     prev = list(_settings._EXTRA)
     pick = {k: v for k, v in (("profile", profile), ("palette", palette)) if v is not None}
+    from . import _engine
+    if _engine.engine(engine) == "rust":     # ``engine``: "python" (default) or "rust" (roadstyle_engine::export_look)
+        if positions is None and edges is not None:
+            import geopandas as gpd
+            g = gpd.read_parquet(edges) if isinstance(edges, (str, Path)) else edges
+            lv = [int(v) for c in ("casing_level", "fill_level") if c in g.columns for v in g[c].dropna().unique()]
+            positions = range(min(lv, default=0), max(lv, default=0) + 1)
+        lk = _engine._look_of({"palette": palette, "profile": profile})
+        look = json.loads(_engine.rust().export_look(json.dumps(lk), [highway_col, oneway_col, tunnel_col, bridge_col, id_col],
+                                                     [int(p) for p in (positions if positions is not None else range(-10, 11))]))
+        if path is not None:
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            Path(path).write_text(json.dumps(look, separators=(",", ":")))
+        return look
     if pick:
         use_settings(*prev, pick)
     try:
@@ -232,7 +246,7 @@ def export_look(path=None, *, profile=None, palette=None, edges=None, highway_co
         pair = cfg.tunnel_palettes.get(cfg.tunnel_palette)
         tun_dash = mix(pair[0] if pair else rw._TUN_TO["dash"])
         casing = ["case", bri, cfg.bridge_casing_color, tun, tun_dash, by_class("casing")]
-        no_casing = [c for c, e in classes.items() if not e.get("casing")] + list(cfg.minor_no_casing)
+        no_casing = [c for c, e in classes.items() if not e.get("casing")] + sorted(cfg.minor_no_casing)     # a frozenset: in order, so the look is stable
         fw = rw._swap(rw._width_expr(highway_col), tw, two)
         cw = rw._swap(rw._width_expr(highway_col, casing=True), tw, two)
         bcw = rw._swap(rw._width_expr(highway_col, casing=True, scale=t["bridges"]["wing_scale"]), tw, two)

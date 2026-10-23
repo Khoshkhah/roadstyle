@@ -96,6 +96,15 @@ fn make_page(style: String, page: String, parts: String, pmtiles: Option<Vec<u8>
     roadstyle::page::make_page(&style, &page, &parts, pmtiles.as_deref()).map_err(PyValueError::new_err)
 }
 
+/// export_look(look, cols, positions) -> str: the simple look for another app's data layer (roadstyle_engine::export_look); `cols`: the
+/// columns [highway, oneway, tunnel, bridge, id].
+#[pyfunction]
+fn export_look(look: String, cols: [String; 5], positions: Vec<i64>) -> PyResult<String> {
+    let look: serde_json::Value = serde_json::from_str(&look).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    let c = roadstyle::export_look::LookCols { highway: &cols[0], oneway: &cols[1], tunnel: &cols[2], bridge: &cols[3], id: &cols[4] };
+    roadstyle::export_look::export_look(&look, &c, &positions).map(|v| v.to_string()).map_err(PyValueError::new_err)
+}
+
 /// The engine's warnings since the last call of this (render_web's warnings.warn): the binding gives them as Python warnings.
 #[pyfunction]
 fn take_warnings() -> Vec<String> {
@@ -106,6 +115,7 @@ fn take_warnings() -> Vec<String> {
 fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(take_warnings, m)?)?;
     m.add_function(wrap_pyfunction!(make_page, m)?)?;
+    m.add_function(wrap_pyfunction!(export_look, m)?)?;
     m.add_function(wrap_pyfunction!(make_style, m)?)?;
     m.add_function(wrap_pyfunction!(make_look, m)?)?;
     m.add_function(wrap_pyfunction!(compute_levels, m)?)?;

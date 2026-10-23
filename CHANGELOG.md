@@ -52,6 +52,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `\uXXXX`, its floats), so `render_edges(engine="rust")` writes the page with it and the page is Python's byte for byte. The browser package
   has it as `makePage` (the duckosm-rust page and the GeoLibre plugin can write a whole page). The page's three scripts (the gzip loader,
   simple mode's recolouring, the tiles' setup) are static files now (`static/page/`), the same text for both writers.
+- **`export_look(engine="rust")`** and `exportLook` in the browser package: the simple look for another app's data layer, the same as
+  Python's. Python's `export_look` writes the no-casing classes in order now (they came from a set, so the look changed from run to run).
 - **The `rs` object** (`static/dashboard/api.js`, the runtime API of the interaction contract): `window.rs` and the value of `rsDashboard`
   have `getState`, `setState`, `can`, `link` (the state in the URL, `#rs=`), `on` and the controls' actions with the roads' edge ids. A page
   opened with `#rs=` applies that state. The `window.rs*` functions and the `rs:*` events do not change.

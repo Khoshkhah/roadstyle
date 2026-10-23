@@ -70,6 +70,17 @@ mod wasm {
         roadstyle::page::make_page(style, page, parts, pmtiles.as_deref()).map_err(|e| JsError::new(&e))
     }
 
+    /// exportLook(look: string, cols: string[] (highway, oneway, tunnel, bridge, id), positions: number[]) -> string: the simple look
+    /// for another app's data layer (roadstyle's export_look) from a resolved look.
+    #[wasm_bindgen(js_name = exportLook)]
+    pub fn export_look(look: &str, cols: Vec<String>, positions: Vec<i32>) -> Result<String, JsError> {
+        let look: serde_json::Value = serde_json::from_str(look).map_err(|e| JsError::new(&e.to_string()))?;
+        let c = |i: usize| cols.get(i).map(String::as_str).unwrap_or(["highway", "oneway", "tunnel", "bridge", "edge_id"][i]);
+        let lc = roadstyle::export_look::LookCols { highway: c(0), oneway: c(1), tunnel: c(2), bridge: c(3), id: c(4) };
+        let ps: Vec<i64> = positions.into_iter().map(i64::from).collect();
+        roadstyle::export_look::export_look(&look, &lc, &ps).map(|v| v.to_string()).map_err(|e| JsError::new(&e))
+    }
+
     /// A map with vector tiles: `new Tiler(roads, look, features?, name?, prefix, keep)`, then `style()` (the style's JSON text) and
     /// `tile(source, z, x, y)` (a vector tile, empty when nothing is in it) for each request of the map, and `props(layer, id)` (the
     /// tile layer, for example `roads`).

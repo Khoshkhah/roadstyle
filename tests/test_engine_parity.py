@@ -478,6 +478,14 @@ def test_the_pmtiles_writer_is_the_pmtiles_packages(part, keywords):
     assert tiles(ru) == tiles(py)
 
 
+@pytest.mark.parametrize("kw", [{}, {"palette": "carto"}, {"profile": "highsat", "palette": "mono"}, {"positions": [0, 1, 2], "highway_col": "fclass"}],
+                         ids=["default", "carto", "highsat mono", "positions and a column"])
+def test_export_look(kw):
+    """export_look (the simple look for another app's data layer, the GeoLibre plugin's): the same look from both engines."""
+    from compare_engines import diff
+    assert diff(rs.export_look(engine="rust", **kw), rs.export_look(engine="python", **kw)) == []
+
+
 @pytest.mark.parametrize("method", ["tags", "solve"])
 def test_compute_levels(part, method):
     """compute_levels: the same four columns from both engines (the roads of the part of Monaco, with no level columns)."""

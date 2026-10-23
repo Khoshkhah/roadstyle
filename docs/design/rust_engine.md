@@ -152,7 +152,7 @@ The crate makes the style of `export_inline` for simple mode with stored levels 
 
 - [ ] Backends: `render_edges(backend="folium")` (`render_folium.py`), `backend="lonboard"` (`render_lonboard.py`).
 - [x] `export_style`: the tile folder and one PMTiles file (`engine="rust"`, 2026-10-23).
-- [ ] `export_look`: the simple look for another app's data layer.
+- [x] `export_look`: the simple look for another app's data layer (`export_look.rs`, 2026-10-23).
 - [ ] Pages: `render_dashboard`, `render_report`, `sidebar_html`, `make_legend`, `to_html`, `to_iframe`, `save`, `render_street_view`, `snapshot` (a PNG through a browser).
 - [ ] Specs: `to_spec`, `save_spec`, `load_spec`.
 - [ ] Input: `load_edges`, `from_duckdb`, `from_arrow`, `from_geojson`, `as_edges`, `normalize_edges`, `filter_edges` (`include`, `exclude`, `match_links`), `highway_types`, `is_directed`. The crate reads GeoParquet with fixed column names only.

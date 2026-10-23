@@ -139,7 +139,7 @@ impl Model {
         last.1
     }
 
-    fn stops(&self) -> impl Iterator<Item = (f64, &Value)> {
+    pub(crate) fn stops(&self) -> impl Iterator<Item = (f64, &Value)> {
         self.zstops.iter().map(|z| (z.as_f64().unwrap(), z))
     }
 
@@ -276,7 +276,7 @@ impl Model {
     }
 
     /// class_order: the table's order, else a link just under its main class.
-    fn class_order(&self, c: &str) -> Value {
+    pub(crate) fn class_order(&self, c: &str) -> Value {
         if let Some(v) = self.z_order.get(c) {
             return v.clone();
         }
@@ -397,7 +397,7 @@ fn metre_curve(like: &Value, prop: &str) -> Value {
     Value::Array(out)
 }
 
-fn by_feature(cases: &[(Value, Value)], default: &Value) -> Value {
+pub(crate) fn by_feature(cases: &[(Value, Value)], default: &Value) -> Value {
     let d = default.as_array().unwrap();
     let mut out: Vec<Value> = d[..3].to_vec();
     let mut i = 0;
@@ -416,7 +416,7 @@ fn by_feature(cases: &[(Value, Value)], default: &Value) -> Value {
 }
 
 /// _minzoom_filter: a feature only from its class's first zoom (a class that the table does not name: 0, always drawn).
-fn minzoom_filter(col: &str, table: &Map<String, Value>) -> Value {
+pub(crate) fn minzoom_filter(col: &str, table: &Map<String, Value>) -> Value {
     let mut keys: Vec<&String> = table.keys().collect();
     keys.sort();
     let mut m = vec![json!("match"), json!(["coalesce", ["get", col], ""])];
@@ -602,7 +602,7 @@ fn drop_empty_layers(layers: Vec<Value>, feats: &HashMap<&str, Vec<&dyn Get>>) -
 }
 
 /// _swap: `v` with every part equal to `old` replaced by `new`.
-fn swap(v: &Value, old: &Value, new: &Value) -> Value {
+pub(crate) fn swap(v: &Value, old: &Value, new: &Value) -> Value {
     if v == old {
         return new.clone();
     }
@@ -1330,7 +1330,7 @@ fn label_px(m: &Model, th: &Value, cls: Option<&str>, z: f64) -> f64 {
 }
 
 /// _label_size_expr: text-size per class (or labels.size's own stops).
-fn label_size_expr(m: &Model, th: &Value, fixed: Option<&Value>) -> Value {
+pub(crate) fn label_size_expr(m: &Model, th: &Value, fixed: Option<&Value>) -> Value {
     if let Some(stops) = fixed {
         let mut s: Vec<Vec<f64>> = stops.as_array().unwrap().iter().map(|zp| zp.as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect()).collect();
         s.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -1357,7 +1357,7 @@ fn label_size_expr(m: &Model, th: &Value, fixed: Option<&Value>) -> Value {
 }
 
 /// _label_readable_filter: the first whole zoom from which a class's name is at least labels.min_px tall.
-fn label_readable_filter(m: &Model, th: &Value) -> Value {
+pub(crate) fn label_readable_filter(m: &Model, th: &Value) -> Value {
     let min = th["labels"]["min_px"].as_f64().unwrap();
     let first = |c: Option<&str>| (0..23).find(|&z| label_px(m, th, c, z as f64) >= min).unwrap_or(99);
     let mut mm = vec![json!("match"), json!(["get", "highway"])];
