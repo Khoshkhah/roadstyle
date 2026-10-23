@@ -36,11 +36,16 @@ enum Val {
 struct Feat {
     id: Option<u64>,
     geom: Geom,
-    props: Vec<(u32, Val)>,
+    /// (key, value): the numbers of the layer's key and value
+    props: Vec<(u32, u32)>,
 }
 
+/// A source made ready: its keys, its distinct values (each also as the bytes of its Value message in a tile, made once and not for
+/// each tile: half of a tile's time was this), its features and their boxes.
 struct Layer {
     keys: Vec<String>,
+    vals: Vec<Val>,
+    encoded: Vec<Vec<u8>>,
     feats: Vec<Feat>,
     tree: RTree<GeomWithData<Rectangle<P>, u32>>,
 }
@@ -160,7 +165,7 @@ impl Tiles {
         let Some(layer) = self.layers.get(name) else { return "null".into() };
         let Some(f) = layer.feats.iter().find(|f| f.id == Some(id)) else { return "null".into() };
         let m: Map<String, Value> = f.props.iter().map(|(k, v)| {
-            let v = match v {
+            let v = match &layer.vals[*v as usize] {
                 Val::Str(s) => Value::from(&**s),
                 Val::Bool(b) => Value::from(*b),
                 Val::Int(i) => Value::from(*i),
@@ -231,7 +236,7 @@ impl Tiles {
                 enc.feature(f, kind, &geometry, &layer.keys);
             }
         }
-        enc.finish(name)
+        enc.finish(name, &layer.encoded)
     }
 }
 
@@ -240,6 +245,9 @@ impl Tiles {
 struct Builder {
     keys: Vec<String>,
     key_at: HashMap<String, u32>,
+    vals: Vec<Val>,
+    encoded: Vec<Vec<u8>>,
+    val_at: HashMap<Vec<u8>, u32>,
     feats: Vec<Feat>,
     boxes: Vec<GeomWithData<Rectangle<P>, u32>>,
 }
@@ -248,10 +256,20 @@ impl Builder {
     /// A feature without a point (bounds) is left out; a null value is not in the tiles.
     fn push<K: AsRef<str>>(&mut self, id: Option<u64>, g: Geom, props: impl Iterator<Item = (K, Value)>) {
         let Some((lo, hi)) = bounds(&g) else { return };
-        let (keys, key_at) = (&mut self.keys, &mut self.key_at);
+        let (keys, key_at, vals, encoded, val_at) = (&mut self.keys, &mut self.key_at, &mut self.vals, &mut self.encoded, &mut self.val_at);
         let props = props
             .filter_map(|(k, v)| {
                 let v = val(&v)?;
+                let m = encode(&v);
+                let v = match val_at.get(&m) {
+                    Some(&at) => at,
+                    None => {
+                        vals.push(v);
+                        encoded.push(m.clone());
+                        val_at.insert(m, vals.len() as u32 - 1);
+                        vals.len() as u32 - 1
+                    }
+                };
                 let at = match key_at.get(k.as_ref()) {
                     Some(&at) => at,
                     None => {
@@ -268,7 +286,7 @@ impl Builder {
     }
 
     fn layer(self) -> Layer {
-        Layer { keys: self.keys, feats: self.feats, tree: RTree::bulk_load(self.boxes) }
+        Layer { keys: self.keys, vals: self.vals, encoded: self.encoded, feats: self.feats, tree: RTree::bulk_load(self.boxes) }
     }
 }
 
@@ -459,13 +477,43 @@ fn packed(out: &mut Vec<u8>, field: u32, vs: &[u32]) {
     bytes_field(out, field, &d);
 }
 
+/// The bytes of a value's Value message in a tile.
+fn encode(v: &Val) -> Vec<u8> {
+    let mut m = Vec::new();
+    match v {
+        Val::Str(s) => bytes_field(&mut m, 1, s.as_bytes()),
+        Val::Dbl(d) => {
+            m.push((3 << 3) | 1);
+            m.extend_from_slice(&d.to_le_bytes());
+        }
+        Val::Int(i) if *i < 0 => {
+            m.push(6 << 3);
+            varint(&mut m, ((*i << 1) ^ (*i >> 63)) as u64);
+        }
+        Val::Int(i) => {
+            m.push(5 << 3);
+            varint(&mut m, *i as u64);
+        }
+        Val::UInt(u) => {
+            m.push(5 << 3);
+            varint(&mut m, *u);
+        }
+        Val::Bool(b) => {
+            m.push(7 << 3);
+            m.push(*b as u8);
+        }
+    }
+    m
+}
+
+/// One layer of a tile: its keys and values in the order they first come (the layer's numbers of them), and the features.
 #[derive(Default)]
 struct Encoder {
     features: Vec<u8>,
     keys: Vec<String>,
     key_at: HashMap<u32, u32>,
-    values: Vec<Vec<u8>>,
-    value_at: HashMap<Vec<u8>, u32>,
+    values: Vec<u32>,
+    value_at: HashMap<u32, u32>,
 }
 
 impl Encoder {
@@ -476,38 +524,10 @@ impl Encoder {
                 self.keys.push(names[*k as usize].clone());
                 self.keys.len() as u32 - 1
             });
-            let mut m = Vec::new(); // the Value message
-            match v {
-                Val::Str(s) => bytes_field(&mut m, 1, s.as_bytes()),
-                Val::Dbl(d) => {
-                    m.push((3 << 3) | 1);
-                    m.extend_from_slice(&d.to_le_bytes());
-                }
-                Val::Int(i) if *i < 0 => {
-                    m.push(6 << 3);
-                    varint(&mut m, ((*i << 1) ^ (*i >> 63)) as u64);
-                }
-                Val::Int(i) => {
-                    m.push(5 << 3);
-                    varint(&mut m, *i as u64);
-                }
-                Val::UInt(u) => {
-                    m.push(5 << 3);
-                    varint(&mut m, *u);
-                }
-                Val::Bool(b) => {
-                    m.push(7 << 3);
-                    m.push(*b as u8);
-                }
-            }
-            let at = match self.value_at.get(&m) {
-                Some(&at) => at,
-                None => {
-                    self.values.push(m.clone());
-                    self.value_at.insert(m, self.values.len() as u32 - 1);
-                    self.values.len() as u32 - 1
-                }
-            };
+            let at = *self.value_at.entry(*v).or_insert_with(|| {
+                self.values.push(*v);
+                self.values.len() as u32 - 1
+            });
             tags.push(key);
             tags.push(at);
         }
@@ -523,7 +543,7 @@ impl Encoder {
         bytes_field(&mut self.features, 2, &msg);
     }
 
-    fn finish(self, name: &str) -> Vec<u8> {
+    fn finish(self, name: &str, encoded: &[Vec<u8>]) -> Vec<u8> {
         if self.features.is_empty() {
             return Vec::new();
         }
@@ -533,7 +553,7 @@ impl Encoder {
         bytes_field(&mut layer, 1, name.as_bytes());
         layer.extend_from_slice(&self.features);
         self.keys.iter().for_each(|k| bytes_field(&mut layer, 3, k.as_bytes()));
-        self.values.iter().for_each(|v| bytes_field(&mut layer, 4, v));
+        self.values.iter().for_each(|&v| bytes_field(&mut layer, 4, &encoded[v as usize]));
         layer.push(5 << 3);
         varint(&mut layer, EXTENT as u64);
         let mut tile = Vec::with_capacity(layer.len() + 8);

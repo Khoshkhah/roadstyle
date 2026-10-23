@@ -19,3 +19,4 @@ sha2 = "0.10"                       # edge_levels_meta.edge_hash: roadstyle's sh
 [dev-dependencies]
 # the golden levels are duckosm-rust's own Parquet files, which it writes with zstd (only the tests read them)
 parquet = { version = "=60.0.0", default-features = false, features = ["zstd"] }
+flate2 = "1"                        # the golden styles of tests/colors.rs are gzipped

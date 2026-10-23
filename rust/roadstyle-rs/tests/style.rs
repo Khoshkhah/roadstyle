@@ -1,8 +1,11 @@
 //! The style must be byte for byte the style of geolibre-roadstyle's Rust port at commit 0806ac2 (its `make_style`, natively, from the
-//! same inputs), with one change: the building heights follow rule C (the higher of the height tag and the levels, features.rs), not
-//! 0806ac2's rule A (the height tag first). On 2026-10-23 the only differences from 0806ac2's style were the `height` of 15 buildings
-//! of Monaco and 355 of Tartu. The reference styles are too large for git (Monaco 26 MB, Tartu 151 MB), so the test compares their
-//! SHA-256. `tests/old_style.sh` makes 0806ac2's style again, to see a difference.
+//! same inputs), with two changes:
+//! - the building heights follow rule C (the higher of the height tag and the levels, features.rs), not 0806ac2's rule A (the height
+//!   tag first): on 2026-10-23 the `height` of 15 buildings of Monaco and 355 of Tartu;
+//! - the slots have Python's key order (__rs_cls before __rs_arw, tests/colors.rs): the same data, other bytes.
+//!
+//! The reference styles are too large for git (Monaco 26 MB, Tartu 151 MB), so the test compares their SHA-256. `tests/old_style.sh`
+//! makes 0806ac2's style again, to see a difference.
 
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
@@ -18,7 +21,7 @@ fn style_hash(area: &Path) -> String {
 #[test]
 fn monaco_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(style_hash(&area), "814e09f47893b22038c45f60d0cdfc2bb587aa47f056651cf924f11c0ed218be");
+    assert_eq!(style_hash(&area), "abca96d8f217e49df8d6fc1aedf92413f561d70a98790c6aa843073b952db760");
 }
 
 /// Tartu's inputs (9.5 MB) are not in git: get them with `tests/get_tartu.sh`, then `cargo test --release -- --ignored`.
@@ -27,7 +30,7 @@ fn monaco_style() {
 fn tartu_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_tartu.sh", area.display());
-    assert_eq!(style_hash(&area), "3b35e26702d42e4b18167f249d85cd7012f6aac70324ffb53fc2353548b69d85");
+    assert_eq!(style_hash(&area), "afb6db082d50ac2f1d5688dce29d9532abdb6c9a70c001399e6c8d9b9ae70833");
 }
 
 /// The vector tiles (make_tiled): the SHA-256 of the style and of every tile of the roads' box at zooms 12, 14 and 16 (each tile with

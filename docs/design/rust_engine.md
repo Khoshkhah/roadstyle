@@ -86,6 +86,24 @@ It is also faster: Tartu's style 5.8 s to 5.1 s, Monaco's style 1.1 s to 0.7 s.
 
 What is left: each text value in the properties (colors, classes) is its own string. A value type with one copy of each text would cut more, but the layers read `serde_json::Value`, so that change is larger.
 
+## Data-driven colour and width (2026-10-23)
+
+The engine reads the colour options of `render_edges` from `look["args"]`: `color_by`, `colors`, `cmap`, `vmin`, `vmax`, `width_by`, `color_table` with `color_key`, `color_options`, `color_active` and `legend`. The module `colors` ports roadstyle's `stylers.py` (the class, categorical, numeric and colour-table stylers, `bake_props`, `bake_color_options`, `build_styler`), the `color_table` step of `render_edges` and the colouring of `render_web.render`.
+
+| Part | In the engine |
+|---|---|
+| Ramps (`cmap`) | branca's `LinearColormap`: the same lookup (an exact branca name, then the first name in order that is the same without case or starts with `<name>_`, then matplotlib at 9 stops) and the same arithmetic (`int(u * 255.9999)` for each channel). The schemes, the matplotlib stops and the colour names are data, `src/cmaps.json` (branca 0.8.2, matplotlib 3.10.9) |
+| Values given by the caller | Keep their JSON form, as in Python: `vmin: 1` stays an integer in the legend, a computed one is a float |
+| Missing values | A missing categorical value is the key `"nan"`, as pandas 3 gives it (a text column holds NaN) |
+| The layers | The fill expression of each colour option and the state `rs_co` (the active option) |
+| The legend data | `metadata["roadstyle:color_options"]`: the page's `COLOR_OPTIONS`, a list of `{name, prop, legend}`. Only when the map has data colours. Python's `export_inline` does not write it; its page has it in the HTML |
+
+Not in the engine: `style=` (a Styler object of Python), and an option with another palette than the look's (the look has the class styles of one palette). Both stop with an error message.
+
+**Check.** `tests/colors.rs` compares the engine's style with Python's `export_inline` for 1,373 roads of Monaco (Monte Carlo) and seven cases: no options, a numeric `color_by` with `cmap`, `vmin` and `vmax`, `width_by`, a categorical `color_by`, a `color_table`, three `color_options` with `color_active` and `missing="self"`, and `legend=False`. Below the top level, all must be the same, key order included; the legend data must equal the page's `COLOR_OPTIONS`. `tests/make_goldens.py` makes the goldens and `cmaps.json` (in the conda environment `roadstyle`).
+
+**A change in the bytes of the style.** The first case found one difference that the spike's compare script did not see, because it ignored the key order: Python writes `__rs_cls` before `__rs_arw` in the slots. The engine now does the same. The Monaco and Tartu styles are the same data as before, with other bytes, so their hashes in `tests/style.rs` changed.
+
 ## Next steps
 
 1. geolibre-roadstyle and duckosm-rust use the crate at a fixed commit and delete their copies. The duckosm-rust session does this step.
