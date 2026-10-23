@@ -8,6 +8,64 @@ The tables with sizes, modules, APIs, metadata keys and design gaps come from th
 Their texts are the first sentences of the code's own comments. The full design, with the parts that are not built, is in
 [the Rust library plan](../design/rust_library.md).
 
+## The big picture: the engine, JavaScript and MapLibre
+
+A roadstyle map has three parts, and each part has one job. The Rust engine makes the data. MapLibre GL JS draws it.
+roadstyle's JavaScript adds the controls and answers the mouse.
+
+```mermaid
+flowchart TB
+    subgraph make["Part 1. The Rust engine makes the data"]
+        direction LR
+        inp["the roads (GeoParquet)<br/>+ the look (palette, profile,<br/>settings, keywords)"]
+        eng["Rust engine<br/>native in Python, or<br/>WebAssembly in the browser"]
+        inp --> eng
+    end
+    subgraph between["The data between the parts"]
+        direction LR
+        sty["MapLibre style (JSON)<br/>sources, layers, expressions"]
+        meta["roadstyle:* metadata<br/>controls, state, legend, popup"]
+        tiles["vector tiles (MVT)<br/>or one PMTiles archive"]
+    end
+    subgraph inbrowser["Parts 2 and 3. In the browser"]
+        direction LR
+        ml["MapLibre GL JS<br/>draws with WebGL:<br/>camera, zoom, 3D"]
+        dash["roadstyle dashboard (JS)<br/>controls, hover, click,<br/>the rs object"]
+        dash -->|"setFilter, setGlobalStateProperty,<br/>setFeatureState, queryRenderedFeatures"| ml
+    end
+    host["your page or the user"]
+    eng --> sty & meta & tiles
+    sty --> ml
+    tiles -->|"addProtocol rs://, or pmtiles://"| ml
+    meta --> dash
+    host <-->|"clicks, rs.setState, rs.on"| dash
+    dash -.->|"engine.props: one road's properties"| eng
+```
+
+*Rust gives JSON text and bytes, and never calls JavaScript or MapLibre. MapLibre does not know roadstyle: for MapLibre the
+roads are an ordinary style. The dashboard reads only the style; on a click it can ask the engine for one road (the dashed
+arrow).*
+
+**1. The Rust engine makes the data.** From the roads and the look, it makes a MapLibre style: the sources, the layers and their
+paint expressions (the widths, the colors, the casings, the drawing order), and the `roadstyle:*` metadata for the dashboard. It
+also makes the vector tiles, one at a time on request or all in one PMTiles archive. The engine never draws.
+
+**2. MapLibre GL JS draws.** MapLibre is the JavaScript map library in the browser. It reads the style and the tiles and draws
+them with WebGL. It moves the camera, zooms and tilts the map. It asks for each tile that it needs.
+
+**3. roadstyle's JavaScript adds the controls.** The dashboard modules (`src/roadstyle/static/dashboard/`) read the metadata and
+add the Roads box, Colour by, the legend, the search, Street View and the other controls. They change the map only with
+MapLibre's own calls. The `rs` object is the API of the dashboard for a host page.
+
+The engine runs in one of two places:
+
+| Case | Where the engine runs | What runs in the browser |
+|---|---|---|
+| Python: `render_edges(engine="rust")` | natively, in the Python process, before the page exists | MapLibre and the dashboard; the style is inside the HTML file |
+| The browser: the WebAssembly package | in the page or in a worker. `roadstyle_wasm.js` (made by `wasm-bindgen`) lets JavaScript call `makeStyle` and `new Tiler` as normal functions | the engine, MapLibre and the dashboard. MapLibre gets each tile from `tiler.tile(z, x, y)` through `maplibregl.addProtocol("rs", ...)` |
+
+The Python page and the browser pages use the same MapLibre version (5.24) and the same dashboard files.
+
 ## The crates
 
 The workspace `rust/` has three kinds of crates:
