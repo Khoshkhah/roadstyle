@@ -1456,15 +1456,19 @@ from the same schema.</p>
 <p>The rules:</p>
 <ol>
 <li><strong>Layers are found by their role and group, not by their id.</strong> The ids change with the plan (<code>roads-fill-lv3</code>) and a host can add a
-   prefix (duckosm-rust adds <code>rs-</code>, GeoLibre renames the layers). Today <code>filter.js</code> takes every layer whose id starts with <code>roads</code>.</li>
+   prefix (duckosm-rust adds <code>rs-</code>, GeoLibre renames the layers). Today <code>filter.js</code> takes every layer whose id starts with <code>roads</code>.
+   Until the layers have roles, the option <code>prefix</code> (for example <code>"rs-"</code>) tells the dashboard the prefix of the roads style's source
+   and layer ids in the map; the names inside the style (<code>source-layer</code>, metadata) do not have it.</li>
 <li><strong>Public and internal.</strong> Public for a host: the metadata keys above, the layer roles and groups, the data columns (<code>edge_id</code>, the
    class column and every column kept in the tiles), and the anchor layer <code>roads-highlight</code>. Internal (between the engine and the
    dashboard of the same version, checked by a test): the <code>__rs_*</code> properties that the dashboard reads (<code>__rs_edge</code>, <code>__rs_edge2</code>,
    <code>__rs_edges</code>, <code>__rs_cls</code>, <code>__rs_lvl</code>, <code>__rs_tunnel</code>, <code>__rs_bridge</code>, <code>__rs_access</code>, <code>__rs_k</code>, <code>__rs_fl</code>, <code>__rs_ord</code>, <code>__rs_arw</code>, the
    slot fields), the feature ids, and the layer ids.</li>
 <li><strong>The ids.</strong> A feature's id is its row in the table (the roads source), or the row times 24 plus the piece (the <code>simple</code> source),
-   because feature state needs small numbers. The public API takes the edge id (<code>edge_id</code>, as text, so a 64-bit hash stays exact), and
-   the dashboard maps it to the row.</li>
+   because feature state needs small numbers. With tiles and the simple mode, the <code>simple</code> source has <code>promoteId: "__rs_edge"</code>, so the
+   glow of a road is the feature state of its row (the engine's road tiles have no lines). The public API takes the edge id
+   (<code>edge_id</code>, as text, so a 64-bit hash stays exact), and the dashboard maps it to the row. The engine port <code>props</code> takes the row
+   today; it takes the edge id when the map from edge id to row is in the contract.</li>
 <li><strong>The state stays live.</strong> For a page with a dashboard, the engine writes <code>["global-state", name]</code> in the expressions (<code>state: live</code>).
    For a static style (<code>export_style</code>, a plain MapLibre app, RustGIS), it writes the start values (<code>state: baked</code>). Today the Rust engine
    always bakes them, so the Colour by menu, <code>rsColor</code>, the road fill switch and the Tunnels box do nothing on its style
@@ -1611,7 +1615,9 @@ from the same schema.</p>
 </tbody>
 </table>
 <h3 id="the-runtime-api">The runtime API</h3>
-<p><code>rsDashboard(map, options)</code> returns one object. The Python page sets <code>window.rs</code> to it.</p>
+<p><code>rsDashboard(map, options)</code> returns one object. The Python page sets <code>window.rs</code> to it. The dashboard module already returns it
+(branch <code>claude/dashboard-js-5ddf3e</code>), with one method, <code>setStyle</code>; the other methods below go on the same object. <code>style: null</code> is
+allowed: the roads come later, with <code>setStyle</code>.</p>
 <pre><code class="language-ts">type EdgeId = string;
 interface DashboardState {
   v: 1;
@@ -1634,6 +1640,8 @@ interface DashboardState {
 }
 interface Dashboard {
   readonly contract: number;
+  setStyle(style: object): void;                     // a late or a new roads style: the page adds its sources and layers first;
+                                                     // the controls stay, the menu and the legend are made again, the selection is cleared
   select(id: EdgeId | null): void;
   highlight(ids: EdgeId[]): void;
   focus(ids: EdgeId[]): void;
@@ -1669,7 +1677,10 @@ type DashboardEvent = &quot;select&quot; | &quot;deselect&quot; | &quot;hover&qu
 <h3 id="when-the-dashboard-needs-the-engine-again">When the dashboard needs the engine again</h3>
 <p>Some changes need new data or new expressions: a color column that the style does not have, a new ramp or range, <code>width_by</code>, another
 palette or profile, a level edit. The dashboard asks for them through a port, so that it does not depend on WebAssembly:</p>
-<pre><code class="language-js">rsDashboard(map, {style, engine: {restyle: (change) =&gt; worker.restyle(change)}});  // returns a Promise of a StylePatch
+<pre><code class="language-js">rsDashboard(map, {style, prefix: &quot;rs-&quot;, engine: {
+  props: (row) =&gt; worker.props(row),            // one road's properties on request: a click, rsSelect, the tooltip (built)
+  restyle: (change) =&gt; worker.restyle(change),  // a Promise of a StylePatch (planned)
+}});
 </code></pre>
 <ul>
 <li><code>Tiler.restyle(change)</code> in <code>roadstyle-wasm</code> gives a <code>StylePatch</code>: the new paint and filter expressions of each layer role, the new
@@ -1719,11 +1730,35 @@ contract makes changeable (or a value that is not used).</p>
 </tr>
 <tr>
 <td><code>style</code></td>
-<td>the style object</td>
+<td>the style object, or null (the roads come later)</td>
 <td><code>rsDashboard</code> option</td>
 <td>every control</td>
-<td><code>restyle</code> patches it</td>
-<td><code>restyle</code></td>
+<td>yes</td>
+<td><code>setStyle</code>; <code>restyle</code> (planned)</td>
+</tr>
+<tr>
+<td><code>prefix</code></td>
+<td>text, <code>""</code></td>
+<td><code>rsDashboard</code> option</td>
+<td>every control that finds a roads layer or source</td>
+<td>no</td>
+<td></td>
+</tr>
+<tr>
+<td><code>engine.props</code></td>
+<td><code>(row) =&gt; Promise&lt;props&gt;</code></td>
+<td><code>rsDashboard</code> option</td>
+<td><code>select.js</code> (click, <code>rsSelect</code>, the tooltip, the twin <code>__rs_edge2</code>)</td>
+<td></td>
+<td>the engine port</td>
+</tr>
+<tr>
+<td><code>engine.restyle</code></td>
+<td><code>(change) =&gt; Promise&lt;StylePatch&gt;</code></td>
+<td><code>rsDashboard</code> option</td>
+<td>the controls that need the engine</td>
+<td></td>
+<td>the engine port (planned)</td>
 </tr>
 <tr>
 <td><code>basemaps</code>, <code>basemap</code></td>

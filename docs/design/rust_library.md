@@ -716,14 +716,18 @@ The rules:
 
 1. **Layers are found by their role and group, not by their id.** The ids change with the plan (`roads-fill-lv3`) and a host can add a
    prefix (duckosm-rust adds `rs-`, GeoLibre renames the layers). Today `filter.js` takes every layer whose id starts with `roads`.
+   Until the layers have roles, the option `prefix` (for example `"rs-"`) tells the dashboard the prefix of the roads style's source
+   and layer ids in the map; the names inside the style (`source-layer`, metadata) do not have it.
 2. **Public and internal.** Public for a host: the metadata keys above, the layer roles and groups, the data columns (`edge_id`, the
    class column and every column kept in the tiles), and the anchor layer `roads-highlight`. Internal (between the engine and the
    dashboard of the same version, checked by a test): the `__rs_*` properties that the dashboard reads (`__rs_edge`, `__rs_edge2`,
    `__rs_edges`, `__rs_cls`, `__rs_lvl`, `__rs_tunnel`, `__rs_bridge`, `__rs_access`, `__rs_k`, `__rs_fl`, `__rs_ord`, `__rs_arw`, the
    slot fields), the feature ids, and the layer ids.
 3. **The ids.** A feature's id is its row in the table (the roads source), or the row times 24 plus the piece (the `simple` source),
-   because feature state needs small numbers. The public API takes the edge id (`edge_id`, as text, so a 64-bit hash stays exact), and
-   the dashboard maps it to the row.
+   because feature state needs small numbers. With tiles and the simple mode, the `simple` source has `promoteId: "__rs_edge"`, so the
+   glow of a road is the feature state of its row (the engine's road tiles have no lines). The public API takes the edge id
+   (`edge_id`, as text, so a 64-bit hash stays exact), and the dashboard maps it to the row. The engine port `props` takes the row
+   today; it takes the edge id when the map from edge id to row is in the contract.
 4. **The state stays live.** For a page with a dashboard, the engine writes `["global-state", name]` in the expressions (`state: live`).
    For a static style (`export_style`, a plain MapLibre app, RustGIS), it writes the start values (`state: baked`). Today the Rust engine
    always bakes them, so the Colour by menu, `rsColor`, the road fill switch and the Tunnels box do nothing on its style
@@ -759,7 +763,9 @@ The rules:
 
 ### The runtime API
 
-`rsDashboard(map, options)` returns one object. The Python page sets `window.rs` to it.
+`rsDashboard(map, options)` returns one object. The Python page sets `window.rs` to it. The dashboard module already returns it
+(branch `claude/dashboard-js-5ddf3e`), with one method, `setStyle`; the other methods below go on the same object. `style: null` is
+allowed: the roads come later, with `setStyle`.
 
 ```ts
 type EdgeId = string;
@@ -784,6 +790,8 @@ interface DashboardState {
 }
 interface Dashboard {
   readonly contract: number;
+  setStyle(style: object): void;                     // a late or a new roads style: the page adds its sources and layers first;
+                                                     // the controls stay, the menu and the legend are made again, the selection is cleared
   select(id: EdgeId | null): void;
   highlight(ids: EdgeId[]): void;
   focus(ids: EdgeId[]): void;
@@ -822,7 +830,10 @@ Some changes need new data or new expressions: a color column that the style doe
 palette or profile, a level edit. The dashboard asks for them through a port, so that it does not depend on WebAssembly:
 
 ```js
-rsDashboard(map, {style, engine: {restyle: (change) => worker.restyle(change)}});  // returns a Promise of a StylePatch
+rsDashboard(map, {style, prefix: "rs-", engine: {
+  props: (row) => worker.props(row),            // one road's properties on request: a click, rsSelect, the tooltip (built)
+  restyle: (change) => worker.restyle(change),  // a Promise of a StylePatch (planned)
+}});
 ```
 
 - `Tiler.restyle(change)` in `roadstyle-wasm` gives a `StylePatch`: the new paint and filter expressions of each layer role, the new
@@ -860,7 +871,10 @@ contract makes changeable (or a value that is not used).
 | Variable | Type, default | Set in | Read by | Run time | API |
 |---|---|---|---|---|---|
 | `name` (title) | text, `"roadstyle"` | `render` keyword; look `args.name`; style `name` | page title, host panel | no | |
-| `style` | the style object | `rsDashboard` option | every control | `restyle` patches it | `restyle` |
+| `style` | the style object, or null (the roads come later) | `rsDashboard` option | every control | yes | `setStyle`; `restyle` (planned) |
+| `prefix` | text, `""` | `rsDashboard` option | every control that finds a roads layer or source | no | |
+| `engine.props` | `(row) => Promise<props>` | `rsDashboard` option | `select.js` (click, `rsSelect`, the tooltip, the twin `__rs_edge2`) | | the engine port |
+| `engine.restyle` | `(change) => Promise<StylePatch>` | `rsDashboard` option | the controls that need the engine | | the engine port (planned) |
 | `basemaps`, `basemap` | keys, `DEFAULT_SWITCHER`, `"voyager"` | `render`; `rsDashboard` option (`BASEMAPS`) | `basemap.js` | yes | `rsSetBasemap`; `rs:basemapchange`; `window.RS_BASEMAPS` |
 | `basemap_switcher` | bool, true | `render`; option | `basemap.js` | no | |
 | `api_key` | text | `render`, `set_api_key` | the base-map URL | no | |
