@@ -61,7 +61,10 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     compute_levels(&mut feats, &look_json["args"], look_json["args"]["head_m"].as_f64().unwrap_or(look.head_m))?;
     let colors = roads::mark_roads(&mut feats, &look, &look_json["args"])?;
     let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow)?;
-    let slots = slots::slots_source(&feats, &slots::SlotLook::from_json(&look_json)?);
+    // render's arrows and labels (both on by default): the slots exist only for them
+    let (arrows, labels) = (look_json["args"]["arrows"] != false, look_json["args"]["labels"] != false);
+    let slots = if arrows || labels { slots::slots_source(&feats, &slots::SlotLook::from_json(&look_json)?) }
+                else { json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": []}}) };
     let mut ovs = Vec::new();
     let mut images = serde_json::Map::new();
     if let Some(f) = features {
@@ -79,7 +82,7 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     let (center, zoom) = camera(&feats);
     let roads = roads::roads_source(feats);
     let layers = layers::road_layers(&look_json, &roads.feats, &simple.feats, source_features(&slots), &mut ovs, &colors.props, colors.active)?;
-    let glyphs = (!source_features(&slots).is_empty()).then(|| look_json["theme"]["labels"]["glyphs"].clone());
+    let glyphs = (labels && !source_features(&slots).is_empty()).then(|| look_json["theme"]["labels"]["glyphs"].clone());
     let mut sources = vec![("roads".to_string(), Src::Typed(roads))];
     for (i, ov) in ovs.into_iter().enumerate() {
         let mut s = serde_json::Map::new();
@@ -89,12 +92,28 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
         sources.push((format!("ov{i}"), Src::Json(Value::Object(s))));
     }
     sources.push(("simple".into(), Src::Typed(simple)));
-    sources.push(("slots".into(), Src::Json(slots)));
+    if !source_features(&slots).is_empty() {        // as Python: no slots source without slots
+        sources.push(("slots".into(), Src::Json(slots)));
+    }
     images.insert("oneway".into(), look_json["oneway_image"].clone());
     let mut metadata = serde_json::Map::new();
     // the export's page metadata: the road popup's fields, the hover tooltip and the hover delay (roadstyle:interaction)
     let it = &look_json["interaction"];
-    metadata.insert("roadstyle:interaction".into(), json!({"popup": it["popup"], "tooltip": look_json["args"]["tooltip"], "hover_delay_ms": it["hover_delay_ms"]}));
+    let args = &look_json["args"];
+    // render's road_popup: true (or not given) the default fields, a list those fields, "panel" the default fields in the side panel,
+    // another text every column (null), false no popup; road_tooltip, else the folium name tooltip, else none
+    let popup = match &args["road_popup"] {
+        Value::Bool(false) => json!(false),
+        Value::Array(a) => Value::Array(a.clone()),
+        Value::String(s) if s != "panel" => Value::Null,
+        _ => it["popup"].clone(),
+    };
+    let truthy = |v: &Value| !matches!(v, Value::Null | Value::Bool(false)) && v != "" && v.as_array().is_none_or(|a| !a.is_empty());
+    let tooltip = if truthy(&args["road_tooltip"]) { args["road_tooltip"].clone() }
+                  else if !args["tooltip"].is_null() { args["tooltip"].clone() } else { args["road_tooltip"].clone() };
+    let tooltip = if tooltip.is_null() { json!(false) } else { tooltip };
+    let delay = args["hover_delay_ms"].as_f64().map_or_else(|| it["hover_delay_ms"].clone(), |d| json!(d as i64));
+    metadata.insert("roadstyle:interaction".into(), json!({"popup": popup, "tooltip": tooltip, "hover_delay_ms": delay}));
     metadata.insert("roadstyle:images".into(), Value::Object(images));
     if let Some((k, v)) = planned {
         metadata.insert(k.into(), v);
@@ -105,6 +124,7 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     }
     let name = name.map_or_else(|| look_json["args"]["name"].clone(), Value::from);
     let mut layers = layers;
+    data_settings(&mut sources, &look_json["args"]);
     cols.to_user(&mut sources, &mut layers);
     Ok(Parts { name, center, zoom, layers, sources, metadata: Value::Object(metadata), glyphs })
 }
@@ -279,6 +299,31 @@ impl ColumnMap {
             for (own, user) in &self.0 {
                 gets(l, own, user);
             }
+        }
+    }
+}
+
+/// render's data_maxzoom (every GeoJSON source) and data_tolerance (every GeoJSON source that has a tolerance).
+fn data_settings(sources: &mut [(String, Src)], args: &Value) {
+    let maxzoom = args["data_maxzoom"].as_f64().map(|z| z as i64);
+    let tolerance = args["data_tolerance"].as_f64();
+    for (_, src) in sources.iter_mut() {
+        match src {
+            Src::Typed(s) => {
+                s.maxzoom = maxzoom.or(s.maxzoom);
+                s.tolerance = tolerance.unwrap_or(s.tolerance);
+            }
+            Src::Json(s) if s["type"] == "geojson" => {
+                if let (Some(t), Some(o)) = (tolerance, s.as_object_mut()) {
+                    if o.contains_key("tolerance") {
+                        o.insert("tolerance".into(), t.into());
+                    }
+                }
+                if let (Some(z), Some(o)) = (maxzoom, s.as_object_mut()) {
+                    o.insert("maxzoom".into(), z.into());
+                }
+            }
+            Src::Json(_) => {}
         }
     }
 }

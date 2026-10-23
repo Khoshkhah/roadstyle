@@ -10,10 +10,19 @@
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
+/// The fixture's look as the GeoLibre plugin draws it: with the names and the arrows. The look's args have arrows and labels false
+/// (from mapstyle's keywords), and the engine follows them as Python does; tests/make_goldens.py also sets them true.
+fn plugin_look(bytes: &[u8]) -> String {
+    let mut look: serde_json::Value = serde_json::from_slice(bytes).unwrap();
+    look["args"]["arrows"] = true.into();
+    look["args"]["labels"] = true.into();
+    look.to_string()
+}
+
 fn style_hash(area: &Path) -> String {
     let data = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data");
     let read = |p: PathBuf| std::fs::read(&p).unwrap_or_else(|e| panic!("{}: {e}", p.display()));
-    let look = String::from_utf8(read(data.join("look.json"))).unwrap();
+    let look = plugin_look(&read(data.join("look.json")));
     let style = roadstyle_rs::make_style(read(area.join("roads.parquet")), &look, Some(read(area.join("features.parquet"))), None, None).unwrap();
     Sha256::digest(style.as_bytes()).iter().map(|b| format!("{b:02x}")).collect()
 }
@@ -39,7 +48,7 @@ fn tartu_style() {
 fn tiles_hash(area: &Path) -> String {
     let data = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data");
     let read = |p: PathBuf| std::fs::read(&p).unwrap_or_else(|e| panic!("{}: {e}", p.display()));
-    let look = String::from_utf8(read(data.join("look.json"))).unwrap();
+    let look = plugin_look(&read(data.join("look.json")));
     let roads = read(area.join("roads.parquet"));
     let (mut x0, mut y0, mut x1, mut y1) = (f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
     for c in roadstyle_rs::read::read_roads(roads.clone(), "geometry").unwrap().iter().filter_map(|f| f.coords.as_ref()).flatten() {

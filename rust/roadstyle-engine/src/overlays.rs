@@ -210,7 +210,9 @@ pub fn overlay_layers(sid: &str, ov: &Overlay, look: &Value) -> Vec<Value> {
     for (k, v) in cfg["overlays"].as_object().into_iter().flatten() {
         c.insert(k.clone(), v.clone());
     }
-    let (hover, select) = (&th["selection"]["hover"], &th["selection"]["select"]);
+    // render's hover_color / select_color go to the overlays too (_build_overlays), else the theme's selection colours
+    let pick = |k: &str, theme: &str| match &look["args"][k] { Value::Null => th["selection"][theme].clone(), v => v.clone() };
+    let (hover, select) = (&pick("hover_color", "hover"), &pick("select_color", "select"));
     let base = or(&ov.color, &c["color"]);
     let width = or(&ov.width, &c["width"]);
     let radius = or(&ov.radius, &c["radius"]);

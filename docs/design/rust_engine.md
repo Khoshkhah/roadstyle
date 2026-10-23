@@ -127,7 +127,7 @@ The crate makes the style of `export_inline` for simple mode with stored levels 
 
 **Keywords of `render_edges` / `render_web.render` that change the style**
 
-- [ ] Column names, fixed in the crate: `highway_col` (highway), `filter_col`, `tunnel_col`, `bridge_col`, `layer_col`, `edge_id_col` (edge_id), `cap_col` / `cap_start_col` / `cap_end_col`, `casing_level_col`, `fill_level_col`, `casing_start_col`, `casing_end_col`, `head_start_m_col`, `head_end_m_col`, `directed_col` (is_directed), `driving_col` (has_arrows).
+- [x] Column names (`ColumnMap`, 2026-10-23); `filter_col` and `cap_col` still fixed. Before, fixed in the crate: `highway_col` (highway), `filter_col`, `tunnel_col`, `bridge_col`, `layer_col`, `edge_id_col` (edge_id), `cap_col` / `cap_start_col` / `cap_end_col`, `casing_level_col`, `fill_level_col`, `casing_start_col`, `casing_end_col`, `head_start_m_col`, `head_end_m_col`, `directed_col` (is_directed), `driving_col` (has_arrows).
 - [ ] `access_col`: the access colours (`__rs_access`, the theme's `access`).
 - [x] No stored levels: `render` computes them (`compute_levels(method="solve")`), and so does the engine (`roadstyle-engine`, `compute_levels`; the same style on the parity fixture). Only `head_m=5`.
 - [ ] `head_m` (fixed 5.0), `road_fill` (fixed on), `offset_zoom` (`offset_frac` and `width_frac` are read).

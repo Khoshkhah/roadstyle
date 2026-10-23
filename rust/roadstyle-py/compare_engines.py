@@ -51,8 +51,8 @@ def main(cases):
     look = json.loads((DATA / "look.json").read_text())
     kw = {"palette": look["palette"], "settings": look["settings"], **look["args"], "arrows": True, "labels": True}
     for case in cases or sorted(CASES):
-        ru = rs.export_inline(part, engine="rust", **kw, **options(case, part))
-        py = rs.export_inline(part, engine="python", **kw, **options(case, part))
+        ru = rs.export_inline(part, engine="rust", **{**kw, **options(case, part)})
+        py = rs.export_inline(part, engine="python", **{**kw, **options(case, part)})
         d = diff(ru, py)
         print(f"{case:14s} {'equal' if not d else 'DIFFERENT'}", flush=True)
         for x in d:

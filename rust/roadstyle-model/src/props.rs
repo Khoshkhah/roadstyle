@@ -160,6 +160,8 @@ pub struct Source {
     pub feats: Vec<Feat>,
     pub id_first: bool,
     pub tolerance: f64,
+    /// render's data_maxzoom: the last zoom at which MapLibre cuts the source into tiles (None: MapLibre's default)
+    pub maxzoom: Option<i64>,
 }
 
 impl Source {
@@ -197,6 +199,10 @@ impl Source {
         }
         out.extend_from_slice(br#"]},"tolerance":"#);
         serde_json::to_writer(&mut *out, &self.tolerance).unwrap();
+        if let Some(z) = self.maxzoom {
+            out.extend_from_slice(br#","maxzoom":"#);
+            out.extend_from_slice(z.to_string().as_bytes());
+        }
         out.push(b'}');
     }
 }
@@ -217,7 +223,7 @@ mod tests {
         assert!(!p2.contains_key("lvl") && p2.get("never seen").is_none());
         for id_first in [true, false] {
             let s = Source { feats: vec![Feat { id: 3, props: props.clone(), coords: Some(vec![[7.0, 43.5], [7.25, 43.75]]) },
-                                         Feat { id: 4, props: Props::default(), coords: None }], id_first, tolerance: 0.05 };
+                                         Feat { id: 4, props: Props::default(), coords: None }], id_first, tolerance: 0.05, maxzoom: None };
             let mut text = Vec::new();
             s.write_json(&mut text);
             let feature = |id: usize, p: &Props, g: Value| if id_first {

@@ -15,6 +15,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   its defaults). Before, the Rust engine needed `casing_level` and `fill_level` in the roads.
 - **The Rust engine takes the column keywords** (`highway_col`, `tunnel_col`, `bridge_col`, `layer_col`, `edge_id_col` and the level, head, cap,
   `directed_col` and `driving_col` columns), with the same style as Python: the user's names in the data and in the road layers.
+- **The Rust engine takes more of render's keywords**, with the same style as Python: `labels`, `arrows`, `road_fill`, `road_popup`, `road_tooltip`,
+  `hover_delay_ms`, `data_maxzoom`, `data_tolerance`, `select_color` and `hover_color` (also on the overlays).
+  **Note for the users of the Rust engine:** the engine now follows `labels=False` and `arrows=False` in the look's `args`, as Python does. Before,
+  it always drew the names and the arrows. The looks of the GeoLibre plugin and of duckosm-rust's page have both false (from mapstyle's
+  keywords): set them true there, or the maps have no names and no arrows after an update of the engine.
 
 ### Changed
 - **`export_inline` writes the legend data** in the style's metadata `roadstyle:color_options` (the page's `COLOR_OPTIONS`), when the map has data

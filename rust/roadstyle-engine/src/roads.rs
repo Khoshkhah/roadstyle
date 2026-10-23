@@ -99,7 +99,7 @@ pub fn roads_source(fs: Vec<Feature>) -> crate::props::Source {
         props.insert("__rs_cls", cls);
         crate::props::Feat { id, props, coords: f.coords }
     }).collect();
-    crate::props::Source { feats, id_first: true, tolerance: 0.05 }
+    crate::props::Source { feats, id_first: true, tolerance: 0.05, maxzoom: None }
 }
 
 // --- helpers: Python's values ---

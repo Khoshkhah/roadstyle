@@ -529,7 +529,9 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     let fb_fill = &th["roads"]["fallback"]["fill"];
     let fb_casing = &th["roads"]["fallback"]["casing"];
     let sel = &th["selection"];
-    let (select, hover) = (&sel["select"], &sel["hover"]);
+    // render's select_color / hover_color, else the theme's selection colours
+    let pick = |k: &str, theme: &'static str| match &look["args"][k] { Value::Null => sel[theme].clone(), v => v.clone() };
+    let (select, hover) = (&pick("select_color", "select"), &pick("hover_color", "hover"));
     let any_tunnel = rp.iter().any(|p| p.get("__rs_tunnel").is_some_and(py_truth));
     let pairs = rp.iter().any(|p| p.contains_key("__rs_twin"));
     let any_dup = rp.iter().any(|p| p.get("__rs_dup").is_some_and(py_truth));
@@ -644,11 +646,14 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
         for zp in arw["spacing"].as_array().into_iter().flatten() {
             spacing.extend(zp.as_array().unwrap().iter().cloned());
         }
+        let (arrows, labels) = (look["args"]["arrows"] != false, look["args"]["labels"] != false);
+        if arrows {
         layers.push(json!({"id": "roads-arrows", "type": "symbol", "source": "slots", "minzoom": arw["minzoom"],
                            "filter": ["all", ["==", ["get", "oneway"], 1], true, minor_or(&arw["minor_minzoom"])],
                            "layout": {"symbol-placement": "line", "symbol-spacing": spacing, "icon-image": "oneway", "icon-rotation-alignment": "map",
                                       "symbol-sort-key": sort, "icon-size": icon},
                            "paint": {"icon-opacity": arw["opacity"]}}));
+        }
         let mut lf = vec![json!("all"), json!(["==", ["%", ["get", "slot"], 2], 0]), json!(["to-boolean", ["get", "name"]]), minor_or(&lbl["minor_minzoom"])];
         let fixed = lbl.get("size").filter(|v| py_truth(v));
         if fixed.is_none() {
@@ -659,11 +664,13 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
             lpaint["text-halo-color"] = lbl["halo_color"].clone();
             lpaint["text-halo-width"] = lbl["halo_width"].clone();
         }
+        if labels {
         layers.push(json!({"id": "roads-labels", "type": "symbol", "source": "slots", "minzoom": lbl["minzoom"], "filter": lf,
                            "layout": {"symbol-placement": "line-center", "text-field": ["get", "name"], "text-font": lbl["font"],
                                       "text-size": label_size_expr(&m, th, fixed), "text-max-angle": lbl["max_angle"], "text-padding": lbl["padding"],
                                       "symbol-sort-key": sort},
                            "paint": lpaint}));
+        }
     }
     layers.push(highlight);
 
@@ -728,7 +735,9 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     let dash = &th["tunnels"]["to"]["dash"];
     let ratio: Vec<f64> = cfg["tunnel_casing_dash"].as_array().filter(|a| !a.is_empty()).map(|a| a.iter().filter_map(Value::as_f64).collect())
         .unwrap_or_else(|| vec![1.0, 1.0]);
-    let state: Map<String, Value> = json!({"rs_co": active, "rs_colors": {}, "rs_base": {}, "rs_fill_on": true,
+    // render's road_fill: the start value of rs_fill_on (off: each fill's opacity is 0)
+    let road_fill = !matches!(look["args"]["road_fill"], Value::Bool(false));
+    let state: Map<String, Value> = json!({"rs_co": active, "rs_colors": {}, "rs_base": {}, "rs_fill_on": road_fill,
         "rs_tun_strength": cfg["tunnel_strength"].as_f64().unwrap_or(0.0), "rs_tun_toward": colour, "rs_tun_two": pair.is_some(),
         "rs_tun_c0": pair.as_ref().map_or(dash, |p| &p[0]), "rs_tun_c1": pair.as_ref().map_or(dash, |p| &p[1]), "rs_tun_ratio": ratio})
         .as_object().unwrap().clone();

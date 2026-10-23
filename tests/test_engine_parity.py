@@ -26,6 +26,21 @@ CASES = {
                       "color_active": "lanes"},
     "no_legend": {"color_by": "lanes", "cmap": "magma", "legend": False},
     "color_table": "every third road: one of three colours, by its edge_id",   # made from the roads (make_goldens.py: color_table)
+    # the other keywords of the style and the page metadata
+    "labels_off": {"labels": False},
+    "arrows_off": {"arrows": False},
+    "road_fill_off": {"road_fill": False},
+    "road_popup": {"road_popup": ["name", "highway"]},
+    "popup_off": {"road_popup": False},
+    "popup_mode": {"popup_mode": "panel"},
+    "road_tooltip": {"road_tooltip": ["name"]},
+    "hover_delay": {"hover_delay_ms": 450},
+    "data_maxzoom": {"data_maxzoom": 16},
+    "data_tolerance": {"data_tolerance": 0.5},
+    "camera": {"pitch": 30, "bearing": 20, "max_pitch": 70},
+    "select_color": {"select_color": "#ff00ff"},
+    "hover_color": {"hover_color": "#00ff00"},
+    "view_3d_off": {"view_3d": False},
 }
 
 
@@ -58,8 +73,8 @@ def keywords():
 def test_export_inline_same_style(part, keywords, case):
     from compare_engines import diff     # the first differences only: pytest's own diff of two styles of several MB is too slow
 
-    py = rs.export_inline(part, engine="python", **keywords, **options(case, part))
-    ru = rs.export_inline(part, engine="rust", **keywords, **options(case, part))
+    py = rs.export_inline(part, engine="python", **{**keywords, **options(case, part)})
+    ru = rs.export_inline(part, engine="rust", **{**keywords, **options(case, part)})
     assert [lyr["id"] for lyr in ru["layers"]] == [lyr["id"] for lyr in py["layers"]]
     assert diff(ru, py) == []
 

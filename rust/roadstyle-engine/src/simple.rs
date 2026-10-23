@@ -313,5 +313,5 @@ pub fn simple_source(roads: &[Feature], head_m: f64, shadows: bool) -> Result<So
         f.props.insert("__rs_cls", cls);
         features.push(Feat { id, props: f.props, coords: f.coords });
     }
-    Ok(Source { feats: features, id_first: false, tolerance: 0.05 })
+    Ok(Source { feats: features, id_first: false, tolerance: 0.05, maxzoom: None })
 }
