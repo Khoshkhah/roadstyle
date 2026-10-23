@@ -63,6 +63,29 @@ The test data in `rust/roadstyle-rs/tests/data/`:
 
 Result on 2026-10-23: all tests pass, Tartu too. The style of Monaco and the style of Tartu are byte for byte the same as the style of `eea9f49`. After the move, geolibre-roadstyle's `0806ac2` changed the building heights in its copy. The crate has that change too, and its style is byte for byte the same as the style of `0806ac2`. Then Kaveh chose rule C for the building height: the higher of the `height` tag and (`building:levels` + `roof:levels`) x `m_per_level`. In Tartu the `height` tag is often an ETAK code (0 to 9), and levels first makes the buildings of Monaco lower than OpenFreeMap's. With rule C, the style differs from the style of `0806ac2` only in the `height` of 15 buildings of Monaco and 355 of Tartu, and the test has the hashes of the new style. The levels are the same rows as duckosm-rust's.
 
+## Step 3: less memory (2026-10-23)
+
+Kaveh chose to do this step before step 2, because the limit of 100,000 roads stops larger areas, for example Stockholm county. The work is on the branch `rust-memory`. The style and the tiles did not change: the SHA-256 tests of the style and of the tiles (`tests/style.rs`, Monaco and Tartu) give the same hashes as before the step.
+
+Two changes:
+
+1. **The source `roads` takes the roads.** Before, it made a copy of the properties of each road. Now `make_parts` makes it last, after all stages that read the roads, and the properties move into it.
+2. **Typed sources `roads` and `simple`** (module `props`). `Props` keeps the properties as a list, with one copy of each key name for the whole program. It has the methods of serde_json's `Map`, so the stages did not change much. A `Feat` keeps its line as numbers, not as JSON arrays. `Source::write_json` writes the same text as the JSON tree, and a unit test compares the two. The layers read typed and JSON properties through the trait `Get`. The base map and the slots stay JSON.
+
+The peak memory, natively (`/usr/bin/time`, the peak resident memory):
+
+| Area | Output | Before | After |
+|---|---|---|---|
+| Tartu (63,965 roads) | Style | 2.13 GB | 1.13 GB |
+| Tartu | Tiles (`make_tiled`) | 2.13 GB | 1.01 GB |
+| Monaco (13,298 roads) | Style | 387 MB | 196 MB |
+
+It is also faster: Tartu's style 5.8 s to 5.1 s, Monaco's style 1.1 s to 0.7 s.
+
+`MAX_ROADS` is now 200,000, not 100,000. This number is an estimate, not a measurement. In the earlier measurements, the WebAssembly module used 0.65 to 0.77 times the native peak. Thus Tartu needs about 14 KB for each road, and 200,000 roads need about 2.8 GB of the 4 GB that a browser gives. Before the limit goes higher, measure a larger area in a browser.
+
+What is left: each text value in the properties (colors, classes) is its own string. A value type with one copy of each text would cut more, but the layers read `serde_json::Value`, so that change is larger.
+
 ## Next steps
 
 1. geolibre-roadstyle and duckosm-rust use the crate at a fixed commit and delete their copies. The duckosm-rust session does this step.
@@ -71,5 +94,5 @@ Result on 2026-10-23: all tests pass, Tartu too. The style of Monaco and the sty
    - `slots` whole, not clipped;
    - the zooms and the buffer from `look["config"]["tiles"]` (zooms 6 to 15, buffer 80);
    - at low zooms, simplification to half a tile unit.
-3. Typed pieces in place of JSON trees, to use less memory. Tartu needs 2.1 GB natively. Because of this, the limit is 100,000 roads.
+3. Typed pieces in place of JSON trees, to use less memory: done (see above).
 4. The Python binding. Then Python roadstyle calls Rust part by part, and its golden tests check each part.

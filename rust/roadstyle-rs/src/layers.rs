@@ -2,6 +2,7 @@
 //! `_load_road_model` (look.json "roads_model" and "theme"). Each function names the Python function it ports.
 
 use crate::overlays::{edge_overlay, overlay_layers, Overlay};
+use crate::props::{Feat, Get, Props};
 use indexmap::IndexMap;
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
@@ -319,13 +320,13 @@ fn as_num(v: &Value) -> Option<f64> {
 }
 
 /// _ev: a MapLibre expression on a feature's properties, or Maybe where only the page can tell.
-fn ev(e: &Value, p: &Map<String, Value>) -> Ev {
+fn ev(e: &Value, p: &dyn Get) -> Ev {
     let Some(arr) = e.as_array().filter(|a| !a.is_empty()) else { return Ev::V(e.clone()) };
     let (op, a) = (arr[0].as_str().unwrap_or(""), &arr[1..]);
     match op {
         "literal" => Ev::V(a[0].clone()),
-        "get" if a.len() == 1 => Ev::V(a[0].as_str().and_then(|k| p.get(k)).cloned().unwrap_or(Value::Null)),
-        "has" if a.len() == 1 => Ev::V(Value::Bool(a[0].as_str().is_some_and(|k| p.contains_key(k)))),
+        "get" if a.len() == 1 => Ev::V(a[0].as_str().and_then(|k| p.value(k)).cloned().unwrap_or(Value::Null)),
+        "has" if a.len() == 1 => Ev::V(Value::Bool(a[0].as_str().is_some_and(|k| p.value(k).is_some()))),
         "all" | "any" => {
             let all = op == "all";
             let mut out = Ev::V(Value::Bool(all));
@@ -409,14 +410,14 @@ fn ev(e: &Value, p: &Map<String, Value>) -> Ev {
 }
 
 /// _drop_empty_layers: a road layer stays when its filter holds, or may hold, for some feature of its source; roads-fill always stays.
-fn drop_empty_layers(layers: Vec<Value>, feats: &HashMap<&str, Vec<&Map<String, Value>>>) -> Vec<Value> {
+fn drop_empty_layers(layers: Vec<Value>, feats: &HashMap<&str, Vec<&dyn Get>>) -> Vec<Value> {
     layers.into_iter().filter(|l| {
         let id = l["id"].as_str().unwrap_or("");
         if !id.starts_with("roads-") || id == "roads-fill" {
             return true;
         }
         let (Some(f), Some(fs)) = (l.get("filter"), l["source"].as_str().and_then(|s| feats.get(s))) else { return true };
-        fs.iter().any(|p| match ev(f, p) { Ev::Maybe => true, Ev::V(v) => py_truth(&v) })
+        fs.iter().any(|p| match ev(f, *p) { Ev::Maybe => true, Ev::V(v) => py_truth(&v) })
     }).collect()
 }
 
@@ -494,17 +495,21 @@ impl Model {
     }
 }
 
+fn typed_props(fs: &[Feat]) -> Vec<&Props> {
+    fs.iter().map(|f| &f.props).collect()
+}
+
 fn props_of<'a>(fs: &'a [Value], empty: &'a Map<String, Value>) -> Vec<&'a Map<String, Value>> {
     fs.iter().map(|f| f["properties"].as_object().unwrap_or(empty)).collect()
 }
 
 /// The road layers of the style: what render_web.render, the export and mapstyle's export make for simple mode with stored levels and
 /// inline data (no base-map layers, no 3D decks, no metre widths, no items). `roads`, `simple`, `slots`: the features of the three sources.
-pub fn road_layers(look: &Value, roads: &[Value], simple: &[Value], slots: &[Value], ovs: &mut [Overlay]) -> Result<Vec<Value>, String> {
+pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value], ovs: &mut [Overlay]) -> Result<Vec<Value>, String> {
     let m = Model::from_look(look)?;
     let (th, cfg) = (&look["theme"], &look["config"]);
     let empty = Map::new();
-    let (rp, sp, lp) = (props_of(roads, &empty), props_of(simple, &empty), props_of(slots, &empty));
+    let (rp, sp, lp) = (typed_props(roads), typed_props(simple), props_of(slots, &empty));
     let fb_fill = &th["roads"]["fallback"]["fill"];
     let fb_casing = &th["roads"]["fallback"]["casing"];
     let sel = &th["selection"];
@@ -582,7 +587,7 @@ pub fn road_layers(look: &Value, roads: &[Value], simple: &[Value], slots: &[Val
                            "paint": {"line-color": ["case", s_on, select, hover],
                                      "line-opacity": ["case", ["any", h_on, s_on], sel["opacity"], 0], "line-width": fw, "line-offset": off}});
     // the base map's overlays (_build_overlays): under the roads, over them, or on a street (_edge_overlay: one copy per fill number)
-    let by_id: HashMap<String, &Map<String, Value>> = rp.iter()
+    let by_id: HashMap<String, &Props> = rp.iter()
         .filter_map(|p| match p.get("edge_id") { Some(Value::String(s)) => Some((s.clone(), *p)), _ => None }).collect();
     let (mut under, mut over, mut edge, mut ov_ids) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     for (i, ov) in ovs.iter_mut().enumerate() {
@@ -653,7 +658,10 @@ pub fn road_layers(look: &Value, roads: &[Value], simple: &[Value], slots: &[Val
             l["filter"] = match l.get("filter") { Some(f) => json!(["all", f, nd]), None => nd.clone() };
         }
     }
-    let feats: HashMap<&str, Vec<&Map<String, Value>>> = [("roads", rp.clone()), ("slots", lp.clone()), ("arrows", lp.clone()), ("simple", sp.clone())].into();
+    let rd: Vec<&dyn Get> = rp.iter().map(|p| *p as &dyn Get).collect();
+    let sd: Vec<&dyn Get> = sp.iter().map(|p| *p as &dyn Get).collect();
+    let ld: Vec<&dyn Get> = lp.iter().map(|p| *p as &dyn Get).collect();
+    let feats: HashMap<&str, Vec<&dyn Get>> = [("roads", rd), ("slots", ld.clone()), ("arrows", ld), ("simple", sd)].into();
     let mut layers = drop_empty_layers(layers, &feats);
     for l in layers.iter_mut().filter(|l| l["id"].as_str().is_some_and(|i| i.starts_with("roads-fill") && !i.ends_with("-pat"))) {
         let v = l["paint"].get("line-opacity").cloned().unwrap_or(json!(1));

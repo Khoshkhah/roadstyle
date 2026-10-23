@@ -53,7 +53,14 @@ pub struct Tiles {
 
 /// Web Mercator in [0, 1] (x to the east, y to the south), as the tiles count.
 fn merc(c: &Value) -> Option<P> {
-    let (lon, lat) = (c.get(0)?.as_f64()?, c.get(1)?.as_f64()?.clamp(-85.051_128_78, 85.051_128_78));
+    merc_ll(c.get(0)?.as_f64()?, c.get(1)?.as_f64()?)
+}
+
+fn merc_ll(lon: f64, lat: f64) -> Option<P> {
+    if !lon.is_finite() || !lat.is_finite() {
+        return None; // as JSON: a number that is not finite is null
+    }
+    let lat = lat.clamp(-85.051_128_78, 85.051_128_78);
     let y = (std::f64::consts::FRAC_PI_4 + lat.to_radians() / 2.0).tan().ln();
     Some([(lon + 180.0) / 360.0, 0.5 - y / (2.0 * std::f64::consts::PI)])
 }
@@ -122,37 +129,29 @@ impl Tiles {
             _ => Vec::new(),
         };
         drop(s);
-        let mut keys: Vec<String> = Vec::new();
-        let mut key_at: HashMap<String, u32> = HashMap::new();
-        let mut feats = Vec::with_capacity(features.len());
-        let mut boxes = Vec::new();
+        let mut b = Builder::default();
         for (i, f) in features.into_iter().enumerate() {
             let Value::Object(mut f) = f else { continue };
             let Some(g) = f.get("geometry").and_then(geom) else { continue };
-            let Some((lo, hi)) = bounds(&g) else { continue };
             let id = if generate { Some(i as u64) } else { f.get("id").and_then(Value::as_u64) };
             let props = match f.remove("properties") {
                 Some(Value::Object(p)) => p,
                 _ => Map::new(),
             };
-            let props = props
-                .into_iter()
-                .filter_map(|(k, v)| {
-                    if !keep.contains(&k) {
-                        return None;
-                    }
-                    let v = val(&v)?;
-                    let at = *key_at.entry(k).or_insert_with_key(|k| {
-                        keys.push(k.clone());
-                        keys.len() as u32 - 1
-                    });
-                    Some((at, v))
-                })
-                .collect();
-            boxes.push(GeomWithData::new(Rectangle::from_corners(lo, hi), feats.len() as u32));
-            feats.push(Feat { id, geom: g, props });
+            b.push(id, g, props.into_iter().filter(|(k, _)| keep.contains(k)));
         }
-        self.layers.insert(name.to_string(), Layer { keys, feats, tree: RTree::bulk_load(boxes) });
+        self.layers.insert(name.to_string(), b.layer());
+    }
+
+    /// Add a source of typed features (roads, simple), as `add` adds its JSON.
+    pub fn add_typed(&mut self, name: &str, source: crate::props::Source, keep: &HashSet<String>) {
+        let mut b = Builder::default();
+        for f in source.feats {
+            let Some(c) = f.coords else { continue };
+            let g = Geom::Lines(vec![c.iter().filter_map(|p| merc_ll(p[0], p[1])).collect()]);
+            b.push(Some(f.id as u64), g, f.props.into_iter().filter(|(k, _)| keep.contains(*k)));
+        }
+        self.layers.insert(name.to_string(), b.layer());
     }
 
     /// The properties of the feature `id` of the source `name` (those in the tiles), as JSON; `null` when there is no such feature.
@@ -233,6 +232,43 @@ impl Tiles {
             }
         }
         enc.finish(name)
+    }
+}
+
+/// A layer made feature by feature: the keys in the order they come, and the box of each feature.
+#[derive(Default)]
+struct Builder {
+    keys: Vec<String>,
+    key_at: HashMap<String, u32>,
+    feats: Vec<Feat>,
+    boxes: Vec<GeomWithData<Rectangle<P>, u32>>,
+}
+
+impl Builder {
+    /// A feature without a point (bounds) is left out; a null value is not in the tiles.
+    fn push<K: AsRef<str>>(&mut self, id: Option<u64>, g: Geom, props: impl Iterator<Item = (K, Value)>) {
+        let Some((lo, hi)) = bounds(&g) else { return };
+        let (keys, key_at) = (&mut self.keys, &mut self.key_at);
+        let props = props
+            .filter_map(|(k, v)| {
+                let v = val(&v)?;
+                let at = match key_at.get(k.as_ref()) {
+                    Some(&at) => at,
+                    None => {
+                        keys.push(k.as_ref().to_string());
+                        key_at.insert(k.as_ref().to_string(), keys.len() as u32 - 1);
+                        keys.len() as u32 - 1
+                    }
+                };
+                Some((at, v))
+            })
+            .collect();
+        self.boxes.push(GeomWithData::new(Rectangle::from_corners(lo, hi), self.feats.len() as u32));
+        self.feats.push(Feat { id, geom: g, props });
+    }
+
+    fn layer(self) -> Layer {
+        Layer { keys: self.keys, feats: self.feats, tree: RTree::bulk_load(self.boxes) }
     }
 }
 

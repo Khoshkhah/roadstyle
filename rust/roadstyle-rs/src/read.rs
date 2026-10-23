@@ -7,7 +7,7 @@ use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use serde_json::{Map, Value};
 
 pub struct Feature {
-    pub props: Map<String, Value>,
+    pub props: crate::props::Props,
     /// None: not a LineString (the stages skip it, as roadstyle does)
     pub coords: Option<Vec<[f64; 2]>>,
 }
@@ -21,13 +21,13 @@ pub fn read_roads(data: Vec<u8>, geom_col: &str) -> Result<Vec<Feature>, String>
         let batch = batch.map_err(|e| e.to_string())?;
         let schema = batch.schema();
         let start = out.len();
-        out.extend((0..batch.num_rows()).map(|_| Feature { props: Map::new(), coords: None }));
+        out.extend((0..batch.num_rows()).map(|_| Feature { props: Default::default(), coords: None }));
         for (field, col) in schema.fields().iter().zip(batch.columns()) {
             for (r, f) in out[start..].iter_mut().enumerate() {
                 if field.name() == geom_col {
                     f.coords = binary(col, r).and_then(wkb_line);
                 } else {
-                    f.props.insert(field.name().clone(), value(col, r)?);
+                    f.props.insert(field.name(), value(col, r)?);
                 }
             }
         }

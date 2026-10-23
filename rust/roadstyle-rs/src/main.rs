@@ -96,6 +96,6 @@ fn main() {
     let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow).unwrap_or_else(|e| fail(e));
     let slots = slots::slots_source(&feats, &slot_look);
     let roads = roads::roads_source(feats);
-    let layers = layers::road_layers(&look_json, features(&roads), features(&simple), features(&slots), &mut []).unwrap_or_else(|e| fail(e));
+    let layers = layers::road_layers(&look_json, &roads.feats, &simple.feats, features(&slots), &mut []).unwrap_or_else(|e| fail(e));
     println!("{}", json!({"layers": layers}));
 }

@@ -28,7 +28,7 @@ pub struct Overlay {
 }
 
 /// _band: below (-1 ...), on (0) or over (1 ...) the ground: the OSM layer if it is a number, else 1 for a bridge, -1 for a tunnel.
-fn band(p: &Map<String, Value>) -> f64 {
+fn band(p: &crate::props::Props) -> f64 {
     let layer = match p.get("layer") {
         Some(Value::String(s)) => s.trim().parse::<f64>().ok(),
         Some(Value::Number(n)) => n.as_f64(),
@@ -237,7 +237,7 @@ pub fn overlay_layers(sid: &str, ov: &Overlay, look: &Value) -> Vec<Value> {
 
 /// _edge_overlay: on each feature of an overlay on a street, what it takes from its edge (`roads`: the roads source's properties, by edge id
 /// as text); returns the (fill number, order) pairs, sorted.
-pub fn edge_overlay(fc: &mut Value, roads: &std::collections::HashMap<String, &Map<String, Value>>) -> Result<Vec<(i64, i64)>, String> {
+pub fn edge_overlay(fc: &mut Value, roads: &std::collections::HashMap<String, &crate::props::Props>) -> Result<Vec<(i64, i64)>, String> {
     let mut orders = std::collections::BTreeSet::new();
     for f in fc["features"].as_array_mut().into_iter().flatten() {
         let p = f["properties"].as_object_mut().unwrap();

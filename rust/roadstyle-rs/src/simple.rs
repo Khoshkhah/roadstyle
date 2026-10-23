@@ -5,7 +5,8 @@
 
 use crate::read::Feature;
 use crate::roads::truthy;
-use serde_json::{json, Map, Value};
+use crate::props::{Feat, Props, Source};
+use serde_json::Value;
 use std::collections::HashMap;
 
 const SEAM_M: f64 = 0.5; // a seam reaches this far each way from its cut, at most a quarter of either piece
@@ -17,7 +18,7 @@ const MAX_EDGES: usize = 1_000_000;
 pub(crate) type Pt = [f64; 2];
 
 struct Piece {
-    props: Map<String, Value>,
+    props: Props,
     coords: Option<Vec<Pt>>,
 }
 
@@ -90,7 +91,7 @@ impl Line {
     }
 }
 
-fn int(p: &Map<String, Value>, k: &str) -> i64 {
+fn int(p: &Props, k: &str) -> i64 {
     p.get(k).and_then(Value::as_i64).unwrap_or(0)
 }
 
@@ -107,9 +108,9 @@ fn casing_parts(roads: &[Feature], head_m: f64) -> Vec<Piece> {
         if truthy(p.get("__rs_dup")) {
             continue; // one line for a reverse pair: its twin draws it
         }
-        let mut base: Map<String, Value> = p.iter()
-            .filter(|(k, _)| k.as_str() == "highway" || k.as_str() == "lvl" || (k.starts_with("__rs_") && !k.starts_with("__rs_fill")))
-            .map(|(k, v)| (k.clone(), v.clone())).collect();
+        let mut base: Props = p.iter()
+            .filter(|(k, _)| *k == "highway" || *k == "lvl" || (k.starts_with("__rs_") && !k.starts_with("__rs_fill")))
+            .map(|(k, v)| (k, v.clone())).collect();
         let edge = p.get("__rs_edge").and_then(Value::as_i64).unwrap_or(i as i64);
         base.insert("__rs_edge".into(), edge.into());
         if let Some(tw) = p.get("__rs_twin").and_then(Value::as_i64) {
@@ -202,8 +203,8 @@ fn halves(roads: &[Feature]) -> HashMap<i64, Vec<Piece>> {
         let n = line.len();
         let edge = p.get("__rs_edge").and_then(Value::as_i64).unwrap_or(i as i64);
         for (k, (a, b)) in [(0.0, n / 2.0), (n / 2.0, n)].into_iter().enumerate() {
-            let mut q: Map<String, Value> = p.iter().filter(|(kk, _)| !matches!(kk.as_str(), "__rs_cap0" | "__rs_cap1" | "__rs_split"))
-                .map(|(kk, v)| (kk.clone(), v.clone())).collect();
+            let mut q: Props = p.iter().filter(|(kk, _)| !matches!(*kk, "__rs_cap0" | "__rs_cap1" | "__rs_split"))
+                .map(|(kk, v)| (kk, v.clone())).collect();
             q.insert("__rs_edge".into(), edge.into());
             let cap = p.get(if k == 0 { "__rs_cap0" } else { "__rs_cap1" }).cloned().unwrap_or(Value::Null);
             if !cap.is_null() {
@@ -239,7 +240,7 @@ fn end_stub(q: Piece, line_of: &[Option<&Vec<Pt>>]) -> Vec<Piece> {
     vec![Piece { props: flat, coords: q.coords }, Piece { props: sp, coords: Some(stub) }]
 }
 
-fn with(mut p: Map<String, Value>, k: i64, s: f64) -> Map<String, Value> {
+fn with(mut p: Props, k: i64, s: f64) -> Props {
     p.insert("__rs_k".into(), k.into());
     p.insert("__rs_s".into(), s.into());
     p
@@ -247,7 +248,7 @@ fn with(mut p: Map<String, Value>, k: i64, s: f64) -> Map<String, Value> {
 
 /// The "simple" source: _simple_pieces (casing pieces __rs_k 0, bridge shadows 2, tunnel gap 3 and dashes 4, fills 1), the feature ids
 /// (edge * PIECES + n), the tie-breaker per edge and __rs_cls (_mark_cls).
-pub fn simple_source(roads: &[Feature], head_m: f64, shadows: bool) -> Result<Value, String> {
+pub fn simple_source(roads: &[Feature], head_m: f64, shadows: bool) -> Result<Source, String> {
     if roads.iter().any(|f| f.props.contains_key("__rs_wm")) {
         return Err("roads with metre widths (__rs_wm): _mitre_ends is not ported".into());
     }
@@ -288,7 +289,7 @@ pub fn simple_source(roads: &[Feature], head_m: f64, shadows: bool) -> Result<Va
             vec![Piece { props: p.clone(), coords: f.coords.clone() }]
         };
         for h in fills {
-            let props: Map<String, Value> = h.props.into_iter().filter(|(k, _)| k == "highway" || k == "lvl" || k.starts_with("__rs_")).collect();
+            let props: Props = h.props.into_iter().filter(|(k, _)| *k == "highway" || *k == "lvl" || k.starts_with("__rs_")).collect();
             let s = 2.0 * int(&props, "__rs_fl") as f64 + if truthy(props.get("__rs_dash")) { -0.5 } else { 1.0 };
             out.push(Piece { props: with(props, 1, s), coords: h.coords });
         }
@@ -310,9 +311,7 @@ pub fn simple_source(roads: &[Feature], head_m: f64, shadows: bool) -> Result<Va
         f.props.insert("__rs_s".into(), s.into());
         let cls = roads.get(e as usize).and_then(|r| r.props.get("highway")).cloned().unwrap_or(Value::Null);
         f.props.insert("__rs_cls".into(), cls);
-        let geometry = f.coords.map_or(Value::Null, |c| json!({"type": "LineString", "coordinates": c}));
-        features.push(crate::obj([("type", "Feature".into()), ("geometry", geometry), ("properties", Value::Object(f.props)), ("id", id.into())]));
+        features.push(Feat { id, props: f.props, coords: f.coords });
     }
-    Ok(crate::obj([("type", "geojson".into()), ("data", crate::obj([("type", "FeatureCollection".into()), ("features", Value::Array(features))])),
-                   ("tolerance", 0.05.into())]))
+    Ok(Source { feats: features, id_first: false, tolerance: 0.05 })
 }

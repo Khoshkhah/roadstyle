@@ -2,7 +2,7 @@
 //! order. Each function names the Python function it ports; the columns are the ones mapstyle passes (docs/design/rust-spike.md, S2).
 
 use crate::read::Feature;
-use serde_json::{json, Map, Value};
+use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
 /// The look data the stages read (look.json: the resolved class styles and the render's defaults).
@@ -72,16 +72,14 @@ pub fn mark_roads(fs: &mut [Feature], look: &Look) {
 
 /// The "roads" source of the style, from the marked roads (with __rs_cls, _mark_cls: filter_col is highway_col). It takes the roads:
 /// their properties move into the source, not a copy (Tartu: 0.5 GB).
-pub fn roads_source(fs: Vec<Feature>) -> Value {
-    let features: Vec<Value> = fs.into_iter().enumerate().map(|(i, f)| {
+pub fn roads_source(fs: Vec<Feature>) -> crate::props::Source {
+    let feats = fs.into_iter().enumerate().map(|(id, f)| {
         let mut props = f.props;
         let cls = props.get(HIGHWAY).cloned().unwrap_or(Value::Null);
-        props.insert("__rs_cls".into(), cls);
-        let geometry = f.coords.map_or(Value::Null, |c| json!({"type": "LineString", "coordinates": c}));
-        crate::obj([("id", i.into()), ("type", "Feature".into()), ("properties", Value::Object(props)), ("geometry", geometry)])
+        props.insert("__rs_cls", cls);
+        crate::props::Feat { id, props, coords: f.coords }
     }).collect();
-    crate::obj([("type", "geojson".into()), ("data", crate::obj([("type", "FeatureCollection".into()), ("features", Value::Array(features))])),
-                ("tolerance", 0.05.into())])
+    crate::props::Source { feats, id_first: true, tolerance: 0.05 }
 }
 
 // --- helpers: Python's values ---
@@ -367,7 +365,7 @@ fn mark_twin_dead_ends(fs: &mut [Feature]) {
 /// _stringify_unsafe_ints: an integer past 2**53 - 1 as text (JavaScript would round it).
 fn stringify_unsafe_ints(fs: &mut [Feature]) {
     for f in fs {
-        let p: &mut Map<String, Value> = &mut f.props;
+        let p = &mut f.props;
         for v in p.values_mut() {
             if let Value::Number(n) = v {
                 let big = n.as_u64().map(|x| x > JS_MAX_SAFE_INT).or_else(|| n.as_i64().map(|x| x.unsigned_abs() > JS_MAX_SAFE_INT));
