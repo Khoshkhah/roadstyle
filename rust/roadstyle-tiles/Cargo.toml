@@ -10,3 +10,4 @@ roadstyle-model.workspace = true
 serde_json.workspace = true
 indexmap.workspace = true
 rstar.workspace = true
+flate2 = "1"                        # the PMTiles archive: its tiles, directories and metadata are gzipped

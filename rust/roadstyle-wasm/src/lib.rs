@@ -97,6 +97,12 @@ mod wasm {
             if source == roadstyle::tiles::SOURCE { self.tiles.tile(z, x, y) } else { Vec::new() }
         }
 
+        /// archive(bounds, layers): a PMTiles archive of every tile in bounds [min lon, min lat, max lon, max lat] (one file of the map).
+        pub fn archive(&self, bounds: Vec<f64>, layers: Vec<String>) -> Result<Vec<u8>, JsError> {
+            let b: [f64; 4] = bounds.try_into().map_err(|_| JsError::new("bounds: four numbers"))?;
+            self.tiles.archive(b, &layers).ok_or_else(|| JsError::new("the archive has no tile"))
+        }
+
         /// The properties of the feature `id` of a source, as JSON (`null` when there is none).
         pub fn props(&self, source: &str, id: u32) -> String {
             self.tiles.props(source, id as u64)

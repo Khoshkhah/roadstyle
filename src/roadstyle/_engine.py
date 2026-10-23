@@ -471,29 +471,7 @@ def _tiled_page(pq, lk, style, highway_col, kwargs):
 
 
 def _pmtiles(t, z0, z1, bounds, names) -> bytes:
-    """A PMTiles archive (gzipped tiles, as tiles.build_pmtiles) of the Tiler ``t``'s tiles in ``bounds`` (lon / lat) from zoom ``z0`` to
-    ``z1``; an empty tile is left out. ``names``: the tile layers, for the archive's metadata."""
-    import gzip
-    import io
-
-    from pmtiles.tile import Compression, TileType, zxy_to_tileid
-    from pmtiles.writer import Writer
-
-    from .tiles import _merc, _tile_range
-
-    (mx0, my0), (mx1, my1) = _merc(*bounds[:2]), _merc(*bounds[2:])
-    buf = io.BytesIO()
-    w = Writer(buf)
-    for z in range(z0, z1 + 1):
-        x0, x1, y0, y1 = _tile_range((mx0, my0, mx1, my1), z)
-        for x in range(x0, x1 + 1):
-            for y in range(y0, y1 + 1):
-                data = t.tile(z, x, y)
-                if data:
-                    w.write_tile(zxy_to_tileid(z, x, y), gzip.compress(data, 6, mtime=0))
-    e7 = [int(v * 1e7) for v in bounds]
-    w.finalize({"tile_type": TileType.MVT, "tile_compression": Compression.GZIP, "min_zoom": z0, "max_zoom": z1,
-                "min_lon_e7": e7[0], "min_lat_e7": e7[1], "max_lon_e7": e7[2], "max_lat_e7": e7[3],
-                "center_zoom": (z0 + z1) // 2, "center_lon_e7": (e7[0] + e7[2]) // 2, "center_lat_e7": (e7[1] + e7[3]) // 2},
-               {"vector_layers": [{"id": n, "fields": {}} for n in names]})
-    return buf.getvalue()
+    """A PMTiles archive (gzipped tiles, as tiles.build_pmtiles) of the Tiler ``t``'s tiles in ``bounds`` (lon / lat), from its first to its
+    last zoom (``z0``, ``z1``: the same); an empty tile is left out. ``names``: the tile layers, for the archive's metadata. The crate writes
+    it (roadstyle_tiles::pmtiles), the format of the pmtiles package's Writer."""
+    return t.archive([float(v) for v in bounds], list(names))

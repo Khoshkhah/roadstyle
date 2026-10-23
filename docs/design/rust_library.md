@@ -1257,7 +1257,7 @@ look (P3), the layer roles, `docs/reference/contract.md`.
 
 **State (2026-10-23):** the page writer is done (`rust/roadstyle/src/page.rs`, `make_page` in the Python binding, `makePage` in the browser
 package): the pages of `tests/test_engine_parity.py` are byte for byte the Python pages. `export_style` (XYZ and PMTiles) is done through
-the binding, with the archive written by the `pmtiles` package. Open: a PMTiles writer in the crate (for the browser), the npm packages,
+the binding, and the crate writes the PMTiles archive (`roadstyle_tiles::pmtiles`, `Tiler.archive`). Open: the npm packages,
 the runtime API (`getState`, `setState`, the events), `Tiler.restyle`, the sidebars of `render_dashboard` and `render_report`. The crate
 reads the static files from `src/roadstyle/` when it is built; a crates.io package needs them in the crate (a build step copies them).
 

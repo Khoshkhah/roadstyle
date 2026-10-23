@@ -442,6 +442,42 @@ def test_the_page_writer_gzips_by_itself(part, keywords):
     assert cut(ru) == cut(py)
 
 
+def test_the_pmtiles_writer_is_the_pmtiles_packages(part, keywords):
+    """roadstyle_tiles::pmtiles: the archive of the Tiler's tiles has the header, the entries and the tiles that the pmtiles package's
+    Writer gives for the same tiles (the gzip streams differ: its carry the time, and the two gzip libraries compress in other ways)."""
+    import gzip
+    import io
+
+    from pmtiles.reader import MemorySource, Reader, all_tiles
+    from pmtiles.tile import Compression, TileType, zxy_to_tileid
+    from pmtiles.writer import Writer
+
+    from roadstyle.tiles import _merc, _tile_range
+    lk = _engine._look_of({**keywords, "tiles": True})
+    t = _engine.rust().Tiler(_engine._geoparquet(part), json.dumps(lk), None, None, "", [])
+    b = [float(v) for v in part.total_bounds]
+    ru = t.archive(b, ["roads", "simple", "slots"])
+    buf = io.BytesIO()
+    w = Writer(buf)
+    (mx0, my0), (mx1, my1) = _merc(*b[:2]), _merc(*b[2:])
+    for z in range(6, 16):
+        x0, x1, y0, y1 = _tile_range((mx0, my0, mx1, my1), z)
+        for x in range(x0, x1 + 1):
+            for y in range(y0, y1 + 1):
+                if d := t.tile(z, x, y):
+                    w.write_tile(zxy_to_tileid(z, x, y), gzip.compress(d, 6, mtime=0))
+    e7 = [int(v * 1e7) for v in b]
+    w.finalize({"tile_type": TileType.MVT, "tile_compression": Compression.GZIP, "min_lon_e7": e7[0], "min_lat_e7": e7[1], "max_lon_e7": e7[2],
+                "max_lat_e7": e7[3], "center_zoom": 10, "center_lon_e7": (e7[0] + e7[2]) // 2, "center_lat_e7": (e7[1] + e7[3]) // 2},
+               {"vector_layers": [{"id": n, "fields": {}} for n in ("roads", "simple", "slots")]})
+    py = buf.getvalue()
+    head = lambda a: {k: v for k, v in Reader(MemorySource(a)).header().items() if "offset" not in k and "length" not in k}    # noqa: E731
+    assert head(ru) == head(py)
+    assert Reader(MemorySource(ru)).metadata() == Reader(MemorySource(py)).metadata()
+    tiles = lambda a: {k: gzip.decompress(v) for k, v in all_tiles(MemorySource(a))}        # noqa: E731  (two gzip libraries: other streams)
+    assert tiles(ru) == tiles(py)
+
+
 @pytest.mark.parametrize("method", ["tags", "solve"])
 def test_compute_levels(part, method):
     """compute_levels: the same four columns from both engines (the roads of the part of Monaco, with no level columns)."""

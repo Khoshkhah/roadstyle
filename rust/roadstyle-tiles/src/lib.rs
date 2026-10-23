@@ -12,6 +12,8 @@
 // Ported numeric code: index loops over parallel arrays and tuple types of the Python stages read as they are in Python.
 #![allow(clippy::needless_range_loop, clippy::type_complexity)]
 
+pub mod pmtiles;
+
 use rstar::{primitives::GeomWithData, primitives::Rectangle, RTree, AABB};
 use serde_json::{Map, Value};
 use indexmap::IndexMap;
@@ -191,6 +193,33 @@ impl Tiles {
             (layer.keys[*k as usize].clone(), v)
         }).collect();
         Value::Object(m).to_string()
+    }
+
+    /// The archive of every tile of the bounds `[min lon, min lat, max lon, max lat]` (an empty tile is left out), in zoom and then x, y
+    /// order, as render's tiled page and export_style write it; `layers`: the tile layers of the metadata's vector_layers.
+    pub fn archive(&self, bounds: [f64; 4], layers: &[String]) -> Option<Vec<u8>> {
+        let mut w = pmtiles::Writer::default();
+        let (lo, hi) = (merc_ll(bounds[0], bounds[1])?, merc_ll(bounds[2], bounds[3])?);
+        for z in self.min_zoom..=self.max_zoom {
+            let n = (1u64 << z) as f64;
+            let last = (1u32 << z) - 1;
+            let cell = |v: f64| ((v * n).floor().max(0.0) as u32).min(last);      // tiles.py's _tile_range
+            let (x0, x1, y0, y1) = (cell(lo[0]), cell(hi[0]), cell(hi[1]), cell(lo[1]));
+            for x in x0..=x1 {
+                for y in y0..=y1 {
+                    let t = self.tile(z, x, y);
+                    if !t.is_empty() {
+                        w.write_tile(pmtiles::tile_id(z, x, y), &pmtiles::gzip(&t));
+                    }
+                }
+            }
+        }
+        let e7: Vec<i32> = bounds.iter().map(|v| (v * 1e7) as i32).collect();
+        let place = pmtiles::Place { min_lon_e7: e7[0], min_lat_e7: e7[1], max_lon_e7: e7[2], max_lat_e7: e7[3],
+                                     center_zoom: ((self.min_zoom + self.max_zoom) / 2) as u8,
+                                     center_lon_e7: (e7[0] + e7[2]) / 2, center_lat_e7: (e7[1] + e7[3]) / 2 };
+        let meta = serde_json::json!({"vector_layers": layers.iter().map(|n| serde_json::json!({"id": n, "fields": {}})).collect::<Vec<_>>()});
+        w.finish(&place, &meta.to_string())
     }
 
     /// The tile z/x/y as a vector tile with a layer for each source that has features in it; empty when nothing is in it.

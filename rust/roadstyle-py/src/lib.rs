@@ -54,6 +54,12 @@ impl Tiler {
     fn props(&self, layer: &str, id: u64) -> String {
         self.tiles.props(layer, id)
     }
+
+    /// archive(bounds, layers) -> bytes: a PMTiles archive of every tile in bounds [min lon, min lat, max lon, max lat] (roadstyle_tiles::pmtiles).
+    fn archive<'py>(&self, py: Python<'py>, bounds: [f64; 4], layers: Vec<String>) -> PyResult<Bound<'py, PyBytes>> {
+        let a = py.detach(|| self.tiles.archive(bounds, &layers)).ok_or_else(|| PyValueError::new_err("the archive has no tile"))?;
+        Ok(PyBytes::new(py, &a))
+    }
 }
 
 /// compute_levels(roads, method, cols) -> (rows, info): roadstyle's compute_levels with its defaults, on the roads in their order (GeoParquet
