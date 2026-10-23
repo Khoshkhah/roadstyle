@@ -18,6 +18,8 @@ pub struct Look {
     pub head_m: f64,
     /// config bridge_shadow: a bridge's main casing piece casts a shadow (simple source)
     pub bridge_shadow: bool,
+    /// the theme's access colours (render's access_col: the palette's `access`)
+    access: serde_json::Map<String, Value>,
 }
 
 impl Look {
@@ -38,8 +40,10 @@ impl Look {
             single_line: look["config"]["single_line_classes"].as_array().into_iter().flatten()
                 .filter_map(|v| v.as_str().map(String::from)).collect(),
             twin_one: look["config"]["twin_casing"] == "one",
-            head_m: look["head_m"].as_f64().ok_or("look.json: no head_m")?,
+            // render's head_m keyword, else its default in the look
+            head_m: look["args"]["head_m"].as_f64().map_or_else(|| look["head_m"].as_f64().ok_or("look.json: no head_m"), Ok)?,
             bridge_shadow: truthy(look["config"].get("bridge_shadow")),
+            access: look["theme"]["access"].as_object().cloned().unwrap_or_default(),
         })
     }
 }
@@ -70,9 +74,30 @@ impl Look {
 
 /// The stages of render_web.render on the roads, in its order; each road gets `__rs_edge`, its position. `args`: look["args"], with the
 /// options of the colours (colors.rs).
+/// render's access_col: the kinds that have their own colour and row (_ACCESS); any other value is null.
+const ACCESS_KINDS: [&str; 4] = ["private", "bus", "pedestrian", "delivery"];
+
 pub fn mark_roads(fs: &mut [Feature], look: &Look, args: &Value) -> Result<crate::colors::Colors, String> {
+    let access_col = args["access_col"].as_str().filter(|c| !c.is_empty());
+    if let Some(col) = access_col {
+        if !fs.iter().any(|f| f.props.contains_key(col)) && !fs.is_empty() {
+            return Err(format!("access_col {col:?} is not a column of the edges"));
+        }
+        for f in fs.iter_mut() {
+            let kind = f.props.get(col).and_then(Value::as_str).filter(|k| ACCESS_KINDS.contains(k)).map_or(Value::Null, Value::from);
+            f.props.insert("__rs_access", kind);
+        }
+    }
     let colors = crate::colors::bake(fs, look, args)?;
     mark_twoway(fs);
+    // a road with an access kind has its kind's colour in every colour option (the palette's `access`)
+    for f in fs.iter_mut().filter(|_| access_col.is_some()) {
+        let Some(c) = f.props.get("__rs_access").and_then(Value::as_str).and_then(|k| look.access.get(k)).filter(|c| !c.is_null()).cloned() else { continue };
+        let keys: Vec<&'static str> = f.props.iter().map(|(k, _)| k).filter(|k| k.starts_with("__rs_fill")).collect();
+        for k in keys {
+            f.props.insert(k, c.clone());
+        }
+    }
     if !look.single_line.is_empty() {
         mark_single_line(fs, &look.single_line);
     }

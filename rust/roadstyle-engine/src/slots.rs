@@ -448,6 +448,9 @@ pub fn slots_source(roads: &[Feature], look: &SlotLook) -> Value {
     for f in feats.iter_mut() {
         let e = f["properties"]["__rs_edge"].as_u64().unwrap() as usize;
         f["properties"]["__rs_cls"] = roads[e].props.get("highway").cloned().unwrap_or(Value::Null);
+        if let Some(a) = roads[e].props.get("__rs_access").filter(|a| !a.is_null()) {      // access_col: the same for the names and arrows
+            f["properties"]["__rs_access"] = a.clone();
+        }
     }
     let mut by_chain: IndexMap<i64, Vec<usize>> = IndexMap::new();
     for (k, f) in feats.iter().enumerate() {

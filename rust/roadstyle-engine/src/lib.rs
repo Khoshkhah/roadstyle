@@ -58,7 +58,7 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     }
     let cols = ColumnMap::from_args(&look_json["args"]);
     cols.to_engine(&mut feats);
-    compute_levels(&mut feats, &look_json["args"], look_json["args"]["head_m"].as_f64().unwrap_or(look.head_m))?;
+    compute_levels(&mut feats, &look_json["args"], look.head_m)?;
     let colors = roads::mark_roads(&mut feats, &look, &look_json["args"])?;
     let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow)?;
     // render's arrows and labels (both on by default): the slots exist only for them

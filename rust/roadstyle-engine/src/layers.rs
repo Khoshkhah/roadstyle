@@ -73,7 +73,7 @@ impl Model {
             // render(offset_frac=, width_frac=) over the theme's split: mapstyle passes 0 and 1 for a mode without lanes (one centred line per road)
             offset_frac: look["args"]["offset_frac"].as_f64().map_or_else(|| num(&split["offset_frac"], "split.offset_frac"), Ok)?,
             width_frac: look["args"]["width_frac"].as_f64().map_or_else(|| num(&split["width_frac"], "split.width_frac"), Ok)?,
-            offset_zoom: num(&split["offset_zoom"], "split.offset_zoom")?,
+            offset_zoom: look["args"]["offset_zoom"].as_f64().map_or_else(|| num(&split["offset_zoom"], "split.offset_zoom"), Ok)?,
             ramp_zooms: num(&split["ramp_zooms"], "split.ramp_zooms")?,
             fb_group: fb["group"].as_str().ok_or("look.json: no fallback group")?.to_string(),
             fb_order: fb["order"].clone(),
@@ -272,6 +272,30 @@ fn by_feature(cases: &[(Value, Value)], default: &Value) -> Value {
         i += 1;
     }
     Value::Array(out)
+}
+
+/// _minzoom_filter: a feature only from its class's first zoom (a class that the table does not name: 0, always drawn).
+fn minzoom_filter(col: &str, table: &Map<String, Value>) -> Value {
+    let mut keys: Vec<&String> = table.keys().collect();
+    keys.sort();
+    let mut m = vec![json!("match"), json!(["coalesce", ["get", col], ""])];
+    for k in keys {
+        m.push(json!(k));
+        m.push(json!(table[k].as_f64().unwrap_or(0.0)));
+    }
+    m.push(json!(0.0));
+    json!([">=", ["zoom"], m])
+}
+
+/// `filter` with `extra` added at its end (["all", ...]), or as it is.
+fn with_minzoom(filter: Value, extra: Option<Value>) -> Value {
+    match (filter, extra) {
+        (Value::Array(mut a), Some(z)) => {
+            a.push(z);
+            Value::Array(a)
+        }
+        (f, _) => f,
+    }
 }
 
 fn seam_filter() -> Value {
@@ -551,7 +575,18 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     let lean_layout = |l: &Value| { let mut o = l.as_object().unwrap().clone(); o.insert("visibility".into(), "none".into()); Value::Object(o) };
 
     // roads-simple and the invisible roads-fill (simple mode)
-    let flt = json!(["all", seam_filter()]);
+    // render's minzoom: true the config's table of the classes' first zooms, a mapping that table with changes, else none (_minzoom_filter)
+    let mz: Option<Map<String, Value>> = match &look["args"]["minzoom"] {
+        Value::Bool(true) => Some(cfg["minzoom"].as_object().cloned().unwrap_or_default()),
+        Value::Object(o) => {
+            let mut t = cfg["minzoom"].as_object().cloned().unwrap_or_default();
+            t.extend(o.iter().map(|(k, v)| (k.clone(), v.clone())));
+            Some(t)
+        }
+        _ => None,
+    }.filter(|t| !t.is_empty());
+    let mz_filter = |col: &str| mz.as_ref().map(|t| minzoom_filter(col, t));
+    let flt = match mz_filter("highway") { Some(z) => json!(["all", z, seam_filter()]), None => json!(["all", seam_filter()]) };
     let k = |n: i64| json!(["==", ["get", "__rs_k"], n]);
     let (is_c, is_sh, is_b) = (k(0), k(2), json!(["to-boolean", ["get", "__rs_bridge"]]));
     let blur = cfg["bridge_shadow_blur"].as_f64().unwrap();
@@ -649,12 +684,15 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
         let (arrows, labels) = (look["args"]["arrows"] != false, look["args"]["labels"] != false);
         if arrows {
         layers.push(json!({"id": "roads-arrows", "type": "symbol", "source": "slots", "minzoom": arw["minzoom"],
-                           "filter": ["all", ["==", ["get", "oneway"], 1], true, minor_or(&arw["minor_minzoom"])],
+                           "filter": with_minzoom(json!(["all", ["==", ["get", "oneway"], 1], true, minor_or(&arw["minor_minzoom"])]), mz_filter("highway")),
                            "layout": {"symbol-placement": "line", "symbol-spacing": spacing, "icon-image": "oneway", "icon-rotation-alignment": "map",
                                       "symbol-sort-key": sort, "icon-size": icon},
                            "paint": {"icon-opacity": arw["opacity"]}}));
         }
         let mut lf = vec![json!("all"), json!(["==", ["%", ["get", "slot"], 2], 0]), json!(["to-boolean", ["get", "name"]]), minor_or(&lbl["minor_minzoom"])];
+        if let Some(z) = mz_filter("highway") {      // a hidden class must not keep its street name floating either
+            lf.push(z);
+        }
         let fixed = lbl.get("size").filter(|v| py_truth(v));
         if fixed.is_none() {
             lf.push(label_readable_filter(&m, th));

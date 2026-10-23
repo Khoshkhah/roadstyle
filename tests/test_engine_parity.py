@@ -41,6 +41,11 @@ CASES = {
     "select_color": {"select_color": "#ff00ff"},
     "hover_color": {"hover_color": "#00ff00"},
     "view_3d_off": {"view_3d": False},
+    "access_col": {"access_col": "access"},
+    "head_m": {"head_m": 8.0},
+    "offset_zoom": {"offset_zoom": 16},
+    "minzoom": {"minzoom": True},
+    "minzoom_table": {"minzoom": {"residential": 15, "footway": 17}},
 }
 
 

@@ -1414,7 +1414,7 @@ the P0 golden run decides), **Python** (stays in Python), **internal** (not port
 | 8 | `name` | done | |
 | 9 | `offset_frac` | look | |
 | 10 | `width_frac` | look | |
-| 11 | `offset_zoom` | look | |
+| 11 | `offset_zoom` | done | the same style as Python (`tests/test_engine_parity.py`) |
 | 12 | `tunnel_col` | done | the engine's column map (`ColumnMap`): the user's names in the data and the road layers |
 | 13 | `bridge_col` | done | the engine's column map (`ColumnMap`): the user's names in the data and the road layers |
 | 14 | `layer_col` | done | the engine's column map (`ColumnMap`): the user's names in the data and the road layers |
@@ -1427,7 +1427,7 @@ the P0 golden run decides), **Python** (stays in Python), **internal** (not port
 | 21 | `fill_level_col` | done | as 20 |
 | 22 | `casing_start_col` | done | |
 | 23 | `casing_end_col` | done | |
-| 24 | `head_m` | done | |
+| 24 | `head_m` | done | the same style as Python (`tests/test_engine_parity.py`) |
 | 25 | `head_start_m_col` | done | |
 | 26 | `head_end_m_col` | done | |
 | 27 | `directed_col` | done | |
@@ -1446,7 +1446,7 @@ the P0 golden run decides), **Python** (stays in Python), **internal** (not port
 | 40 | `find_control` | task 2 | |
 | 41 | `overlay_control` | task 2 | |
 | 42 | `overlay_popup` | task 2 | |
-| 43 | `access_col` | P4 (colors); task 2 (rows) | |
+| 43 | `access_col` | done | the same style as Python (`tests/test_engine_parity.py`) |
 | 44 | `side_panel_html` | P6 | the page writer |
 | 45 | `host_panel_width` | P6 | |
 | 46 | `basemap_switcher` | task 2 | |
@@ -1474,7 +1474,7 @@ the P0 golden run decides), **Python** (stays in Python), **internal** (not port
 | 68 | `tunnel_control` | task 2 | |
 | 69 | `tiles` | done (tiles on request); P6 (PMTiles in the page) | |
 | 70 | `simple` | done for `True`; `False` is not ported (decision 2) | |
-| 71 | `minzoom` | check | |
+| 71 | `minzoom` | done | the same style as Python (`tests/test_engine_parity.py`) |
 | 72 | `legend` | task 1 | |
 | 73 | `api_key` | P6 | the base-map URL |
 | 74 | `_edges` | Python | the level editor's update in place |
