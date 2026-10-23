@@ -199,10 +199,25 @@ fn painted(key: &str, state: &str) -> Value {
     json!(["get", ["to-string", ["get", key]], gs(state)])
 }
 
-/// _fill_expr with one colour option (_fill_base: the baked __rs_fill).
-fn fill_expr(fb_fill: &Value) -> Value {
+/// _fill_base: a road's fill under the active colour option (state rs_co); `props`: the baked fill property of each option, in order.
+fn fill_base(props: &[String], fb_fill: &Value) -> Value {
+    let opts: Vec<Value> = props.iter().map(|p| json!(["coalesce", ["get", p], fb_fill])).collect();
+    if opts.len() == 1 {
+        return opts[0].clone();
+    }
+    let mut m = vec![json!("match"), gs("rs_co")];
+    for (i, o) in opts.iter().enumerate().skip(1) {
+        m.push(i.into());
+        m.push(o.clone());
+    }
+    m.push(opts[0].clone());
+    Value::Array(m)
+}
+
+/// _fill_expr: the colour rsColor gave the road or its second edge (rs_colors), else rsColorBase's (rs_base), else the active option's.
+fn fill_expr(props: &[String], fb_fill: &Value) -> Value {
     json!(["coalesce", painted("__rs_edge", "rs_colors"), painted("__rs_edge2", "rs_colors"), painted("__rs_edge", "rs_base"),
-           painted("__rs_edge2", "rs_base"), ["coalesce", ["get", "__rs_fill"], fb_fill]])
+           painted("__rs_edge2", "rs_base"), fill_base(props, fb_fill)])
 }
 
 /// _tun_mix: a tunnel feature's colour moved toward the tunnel colour by the strength, keeping its own alpha.
@@ -505,7 +520,8 @@ fn props_of<'a>(fs: &'a [Value], empty: &'a Map<String, Value>) -> Vec<&'a Map<S
 
 /// The road layers of the style: what render_web.render, the export and mapstyle's export make for simple mode with stored levels and
 /// inline data (no base-map layers, no 3D decks, no metre widths, no items). `roads`, `simple`, `slots`: the features of the three sources.
-pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value], ovs: &mut [Overlay]) -> Result<Vec<Value>, String> {
+pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value], ovs: &mut [Overlay], fills: &[String], active: usize)
+                   -> Result<Vec<Value>, String> {
     let m = Model::from_look(look)?;
     let (th, cfg) = (&look["theme"], &look["config"]);
     let empty = Map::new();
@@ -550,7 +566,7 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     wide.push((is_c.clone(), cw.clone()));
     let op = json!(["case", ["all", ["!", gs("rs_fill_on")], k(1)], 0, 1]);
     // _simple_color, with the glow of lean mode
-    let mut fill = fill_expr(fb_fill);
+    let mut fill = fill_expr(fills, fb_fill);
     let mut item = json!(["coalesce", painted("__rs_edge", "rs_colors"), painted("__rs_edge2", "rs_colors"), painted("__rs_edge", "rs_base"),
                           painted("__rs_edge2", "rs_base"), ["coalesce", ["get", "__rs_ic"], fb_fill]]);
     let mut cases = vec![k(2), cfg["bridge_shadow_color"].clone(), is_c.clone(),
@@ -681,7 +697,7 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     let has = |key: &str| json!(["has", ["to-string", ["get", key]], gs("rs_colors")]);
     for l in layers.iter_mut() {
         if l["id"] == "roads-fill" {
-            l["paint"]["line-color"] = swap(&l["paint"]["line-color"], &base, &fill_expr(fb_fill));
+            l["paint"]["line-color"] = swap(&l["paint"]["line-color"], &base, &fill_expr(fills, fb_fill));
         }
         if l["type"] == "line" && l["layout"].get("line-sort-key").is_some_and(|v| !v.is_null()) {
             let key = l["layout"]["line-sort-key"].clone();
@@ -712,7 +728,7 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     let dash = &th["tunnels"]["to"]["dash"];
     let ratio: Vec<f64> = cfg["tunnel_casing_dash"].as_array().filter(|a| !a.is_empty()).map(|a| a.iter().filter_map(Value::as_f64).collect())
         .unwrap_or_else(|| vec![1.0, 1.0]);
-    let state: Map<String, Value> = json!({"rs_co": 0, "rs_colors": {}, "rs_base": {}, "rs_fill_on": true,
+    let state: Map<String, Value> = json!({"rs_co": active, "rs_colors": {}, "rs_base": {}, "rs_fill_on": true,
         "rs_tun_strength": cfg["tunnel_strength"].as_f64().unwrap_or(0.0), "rs_tun_toward": colour, "rs_tun_two": pair.is_some(),
         "rs_tun_c0": pair.as_ref().map_or(dash, |p| &p[0]), "rs_tun_c1": pair.as_ref().map_or(dash, |p| &p[1]), "rs_tun_ratio": ratio})
         .as_object().unwrap().clone();

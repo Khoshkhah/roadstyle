@@ -1,6 +1,7 @@
 //! roadstyle's engine in Rust (docs/design/rust_engine.md): the style of a map from the roads in a GeoParquet file, its vector
 //! tiles, and the drawing levels (`levels`). The front-ends: the native program (main.rs), the browser (crate roadstyle-wasm).
 
+pub mod colors;
 pub mod features;
 pub mod geom;
 pub mod layers;
@@ -51,7 +52,7 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
         return Err(format!("this area has {} roads, and the plugin draws at most {MAX_ROADS} (the browser's memory): use a smaller area",
                            feats.len()));
     }
-    roads::mark_roads(&mut feats, &look);
+    let colors = roads::mark_roads(&mut feats, &look, &look_json["args"])?;
     let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow)?;
     let slots = slots::slots_source(&feats, &slots::SlotLook::from_json(&look_json)?);
     let mut ovs = Vec::new();
@@ -70,7 +71,7 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     };
     let (center, zoom) = camera(&feats);
     let roads = roads::roads_source(feats);
-    let layers = layers::road_layers(&look_json, &roads.feats, &simple.feats, source_features(&slots), &mut ovs)?;
+    let layers = layers::road_layers(&look_json, &roads.feats, &simple.feats, source_features(&slots), &mut ovs, &colors.props, colors.active)?;
     let glyphs = (!source_features(&slots).is_empty()).then(|| look_json["theme"]["labels"]["glyphs"].clone());
     let mut sources = vec![("roads".to_string(), Src::Typed(roads))];
     for (i, ov) in ovs.into_iter().enumerate() {
@@ -90,6 +91,10 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     metadata.insert("roadstyle:images".into(), Value::Object(images));
     if let Some((k, v)) = planned {
         metadata.insert(k.into(), v);
+    }
+    // the legend data of a data-coloured map, as the page's COLOR_OPTIONS (render_web: {name, prop, legend} for each colour option)
+    if !colors.meta.is_empty() {
+        metadata.insert("roadstyle:color_options".into(), Value::Array(colors.meta));
     }
     let name = name.map_or_else(|| look_json["args"]["name"].clone(), Value::from);
     Ok(Parts { name, center, zoom, layers, sources, metadata: Value::Object(metadata), glyphs })

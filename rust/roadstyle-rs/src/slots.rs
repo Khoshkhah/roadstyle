@@ -443,7 +443,12 @@ pub fn slots_source(roads: &[Feature], look: &SlotLook) -> Value {
             }
         }
     }
-    // the export: number the arrow slots (the odd ones, else the chain's only slot) of each one-way chain; then _mark_cls
+    // _mark_cls, then the export: number the arrow slots (the odd ones, else the chain's only slot) of each one-way chain (render_web's
+    // order: __rs_cls before __rs_arw)
+    for f in feats.iter_mut() {
+        let e = f["properties"]["__rs_edge"].as_u64().unwrap() as usize;
+        f["properties"]["__rs_cls"] = roads[e].props.get("highway").cloned().unwrap_or(Value::Null);
+    }
     let mut by_chain: IndexMap<i64, Vec<usize>> = IndexMap::new();
     for (k, f) in feats.iter().enumerate() {
         if f["properties"]["oneway"] == 1 {
@@ -457,10 +462,6 @@ pub fn slots_source(roads: &[Feature], look: &SlotLook) -> Value {
         for (n, k) in pick.into_iter().enumerate() {
             feats[k]["properties"]["__rs_arw"] = n.into();
         }
-    }
-    for f in feats.iter_mut() {
-        let e = f["properties"]["__rs_edge"].as_u64().unwrap() as usize;
-        f["properties"]["__rs_cls"] = roads[e].props.get("highway").cloned().unwrap_or(Value::Null);
     }
     crate::obj([("type", "geojson".into()), ("data", crate::obj([("type", "FeatureCollection".into()), ("features", Value::Array(feats))]))])
 }

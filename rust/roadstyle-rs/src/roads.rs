@@ -7,6 +7,9 @@ use std::collections::{HashMap, HashSet};
 
 /// The look data the stages read (look.json: the resolved class styles and the render's defaults).
 pub struct Look {
+    /// the theme's data.* values (the data stylers' widths, opacities and no-data colours) and the palette's name
+    pub(crate) data: Value,
+    pub(crate) palette: String,
     classes: HashMap<String, [Value; 2]>,
     fallback: [Value; 2],
     single_line: HashSet<String>,
@@ -28,6 +31,8 @@ impl Look {
         let styles = &look["styles"];
         let classes = styles["classes"].as_object().ok_or("look.json: no styles.classes")?;
         Ok(Look {
+            data: look["theme"]["data"].clone(),
+            palette: look["palette"].as_str().unwrap_or_default().to_string(),
             classes: classes.iter().map(|(k, v)| Ok((k.clone(), pair(v)?))).collect::<Result<_, String>>()?,
             fallback: pair(&styles["fallback"])?,
             single_line: look["config"]["single_line_classes"].as_array().into_iter().flatten()
@@ -50,9 +55,23 @@ const CAP_START: &str = "cap_start";
 const CAP_END: &str = "cap_end";
 const JS_MAX_SAFE_INT: u64 = (1 << 53) - 1;
 
-/// The stages of render_web.render on the roads, in its order; each road gets `__rs_edge`, its position.
-pub fn mark_roads(fs: &mut [Feature], look: &Look) {
-    bake_props(fs, look);
+impl Look {
+    /// ClassStyler: a class's style (plain or link, resolved at build time) and its base class (normalize_highway).
+    pub(crate) fn class_style(&self, highway: Option<&Value>) -> (&Value, String) {
+        let h = match highway {
+            None | Some(Value::Null) => String::new(),
+            Some(Value::String(s)) => s.trim().to_lowercase(),
+            Some(v) => v.to_string().trim().to_lowercase(),
+        };
+        let (base, link) = match h.strip_suffix("_link") { Some(b) => (b.to_string(), 1), None => (h, 0) };
+        (&self.classes.get(&base).unwrap_or(&self.fallback)[link], base)
+    }
+}
+
+/// The stages of render_web.render on the roads, in its order; each road gets `__rs_edge`, its position. `args`: look["args"], with the
+/// options of the colours (colors.rs).
+pub fn mark_roads(fs: &mut [Feature], look: &Look, args: &Value) -> Result<crate::colors::Colors, String> {
+    let colors = crate::colors::bake(fs, look, args)?;
     mark_twoway(fs);
     if !look.single_line.is_empty() {
         mark_single_line(fs, &look.single_line);
@@ -68,6 +87,7 @@ pub fn mark_roads(fs: &mut [Feature], look: &Look) {
     for (i, f) in fs.iter_mut().enumerate() {
         f.props.insert("__rs_edge".into(), i.into());
     }
+    Ok(colors)
 }
 
 /// The "roads" source of the style, from the marked roads (with __rs_cls, _mark_cls: filter_col is highway_col). It takes the roads:
@@ -136,24 +156,6 @@ fn ends(f: &Feature) -> Option<([f64; 2], [f64; 2])> {
 }
 
 // --- the stages ---
-
-/// stylers.ClassStyler.resolve_frame + bake_props: the class's style (style.normalize_highway: lower case, "_link" cut off; unknown: the fallback).
-fn bake_props(fs: &mut [Feature], look: &Look) {
-    for f in fs {
-        let h = match f.props.get(HIGHWAY) {
-            None | Some(Value::Null) => String::new(),
-            Some(Value::String(s)) => s.trim().to_lowercase(),
-            Some(v) => v.to_string().trim().to_lowercase(),
-        };
-        let (base, link) = match h.strip_suffix("_link") { Some(b) => (b.to_string(), 1), None => (h, 0) };
-        let s = &look.classes.get(&base).unwrap_or(&look.fallback)[link];
-        for (k, src) in [("__rs_fill", "fill"), ("__rs_w", "width"), ("__rs_op", "opacity"), ("__rs_dash", "dash"),
-                         ("__rs_casing", "casing"), ("__rs_cw", "casing_width"), ("__rs_cop", "casing_opacity")] {
-            f.props.insert(k.into(), s[src].clone());
-        }
-        f.props.insert("__rs_class".into(), base.into());
-    }
-}
 
 type EndKey = Option<((String, String), (String, String), String)>;
 
