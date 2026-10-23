@@ -85,4 +85,4 @@ limit is an estimate from Tartu, not a measurement of a larger area. Stockholm c
 
 The memory for each road goes down when the columnar road model of the plan is built (P4). It is not built.
 
-**See also:** [How the engine is built](architecture.md) · [Build from source](build.md#run-the-tests)
+**See also:** [Architecture of the Rust version](architecture.md) · [Build from source](build.md#run-the-tests)

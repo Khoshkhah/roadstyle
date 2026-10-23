@@ -77,9 +77,8 @@ nav:
           - Build from source: rust/build.md
       - Reference:
           - Keywords by engine: rust/keywords.md
-          - The crates: rust/crates.md
       - Explanation:
-          - How the engine is built: rust/architecture.md
+          - Architecture of the Rust version: rust/architecture.md
           - Parity and speed: rust/parity.md
   - Studio: studio.md
 
@@ -101,6 +100,11 @@ plugins:
         web-backend.md: reference/javascript.md
         palettes.md: reference/settings.md
         street-view.md: guides/street-view.md
+        rust/crates.md: rust/architecture.md
+
+# docs/rust/architecture.md: its tables of crates, modules and design gaps, made from the code at each build
+hooks:
+  - docs/gen_architecture.py
 
 markdown_extensions:
   - admonition

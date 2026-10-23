@@ -41,14 +41,13 @@ The same engine is also a WebAssembly package for the browser, and a set of Rust
 
     [Keywords by engine](keywords.md) ·
     [The `rs` object](../reference/javascript.md#the-rs-object) ·
-    [Interaction contract](../reference/contract.md) ·
-    [The crates](crates.md)
+    [Interaction contract](../reference/contract.md)
 
 -   :material-lightbulb-outline:{ .lg .middle } **Explanation**
 
     ---
 
-    [How the engine is built](architecture.md) ·
+    [Architecture of the Rust version](architecture.md) ·
     [Parity and speed](parity.md)
 
 </div>
