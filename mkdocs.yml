@@ -64,6 +64,7 @@ nav:
   - Reference:
       - Every parameter: reference/parameters.md
       - JavaScript API: reference/javascript.md
+      - Interaction contract: reference/contract.md
       - Settings & palettes: reference/settings.md
       - Command line: reference/cli.md
   - Studio: studio.md
