@@ -60,7 +60,7 @@ def look(*, palette=None, profile=None, settings=None, args=None, features=None)
 
 def export_inline(edges, **kwargs) -> dict:
     """``roadstyle.export_inline`` made by the Rust engine: the same style, from the same keywords."""
-    missing = [c for c in RUST_COLUMNS if c not in edges.columns]
+    missing = [c for c in RUST_COLUMNS if (kwargs.get(f"{c}_col") or c) not in edges.columns]
     if missing:
         raise ValueError(f"engine='rust': the roads have no column {', '.join(missing)}")
     kwargs = dict(kwargs)

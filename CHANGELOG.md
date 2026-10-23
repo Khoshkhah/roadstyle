@@ -13,6 +13,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   gives an error, and it never goes back to Python without a message. `tests/test_engine_parity.py` checks that the two engines give the same style.
 - **The Rust engine computes the drawing levels** when the keywords name no level columns, as `render` does (`compute_levels`, method "solve", with
   its defaults). Before, the Rust engine needed `casing_level` and `fill_level` in the roads.
+- **The Rust engine takes the column keywords** (`highway_col`, `tunnel_col`, `bridge_col`, `layer_col`, `edge_id_col` and the level, head, cap,
+  `directed_col` and `driving_col` columns), with the same style as Python: the user's names in the data and in the road layers.
 
 ### Changed
 - **`export_inline` writes the legend data** in the style's metadata `roadstyle:color_options` (the page's `COLOR_OPTIONS`), when the map has data

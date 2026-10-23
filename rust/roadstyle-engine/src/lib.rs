@@ -56,6 +56,8 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
         return Err(format!("this area has {} roads, and the plugin draws at most {MAX_ROADS} (the browser's memory): use a smaller area",
                            feats.len()));
     }
+    let cols = ColumnMap::from_args(&look_json["args"]);
+    cols.to_engine(&mut feats);
     compute_levels(&mut feats, &look_json["args"], look_json["args"]["head_m"].as_f64().unwrap_or(look.head_m))?;
     let colors = roads::mark_roads(&mut feats, &look, &look_json["args"])?;
     let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow)?;
@@ -102,6 +104,8 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
         metadata.insert("roadstyle:color_options".into(), Value::Array(colors.meta));
     }
     let name = name.map_or_else(|| look_json["args"]["name"].clone(), Value::from);
+    let mut layers = layers;
+    cols.to_user(&mut sources, &mut layers);
     Ok(Parts { name, center, zoom, layers, sources, metadata: Value::Object(metadata), glyphs })
 }
 
@@ -159,8 +163,8 @@ fn compute_levels(feats: &mut [read::Feature], args: &Value, head_m: f64) -> Res
     if head_m != 5.0 {
         return Err(format!("head_m={head_m}: the Rust engine computes the levels with head_m=5 only (compute them first, or use the Python engine)"));
     }
-    let col = |k: &str, default: &'static str| args[k].as_str().filter(|s| !s.is_empty()).unwrap_or(default).to_string();
-    let (hw, layer, bridge, tunnel) = (col("highway_col", "highway"), col("layer_col", "layer"), col("bridge_col", "bridge"), col("tunnel_col", "tunnel"));
+    // the engine's own names: ColumnMap gave the user's columns these names before this step
+    let (hw, layer, bridge, tunnel) = ("highway", "layer", "bridge", "tunnel");
     // a value as the text that the tag rules read: Python's _truthy and int(float(layer)) on the GeoDataFrame's values
     let text = |v: Option<&Value>| -> Option<String> {
         match v? {
@@ -175,10 +179,10 @@ fn compute_levels(feats: &mut [read::Feature], args: &Value, head_m: f64) -> Res
     for (i, f) in feats.iter().enumerate() {
         edges.add(0, roadstyle_levels::LevelEdge {
             edge_id: i as i64,         // the row: compute_levels works on the frame's rows, in their order
-            highway: text(f.props.get(&hw)).unwrap_or_default(),
-            tunnel: text(f.props.get(&tunnel)),
-            bridge: text(f.props.get(&bridge)),
-            layer: text(f.props.get(&layer)),
+            highway: text(f.props.get(hw)).unwrap_or_default(),
+            tunnel: text(f.props.get(tunnel)),
+            bridge: text(f.props.get(bridge)),
+            layer: text(f.props.get(layer)),
             junction: text(f.props.get("junction")),
             geometry: f.coords.as_ref().map_or_else(Vec::new, |c| c.iter().map(|p| (p[0], p[1])).collect()),
         });
@@ -191,4 +195,90 @@ fn compute_levels(feats: &mut [read::Feature], args: &Value, head_m: f64) -> Res
         }
     }
     Ok(())
+}
+
+/// The column keywords of render (highway_col, tunnel_col, ...): the engine reads its own names (highway, tunnel, ...), so a user's
+/// column gets the engine's name on the way in and its own name back on the way out, in the data and the expressions of the sources
+/// `roads` and `simple`. As in Python, the slots and their layers keep `highway`, and the popup fields stay as given. A column that has
+/// the engine's name but is not the named one is kept under another name in between, and gets its name back.
+struct ColumnMap(Vec<(&'static str, String)>);
+
+impl ColumnMap {
+    const KEYWORDS: [(&'static str, &'static str); 15] = [
+        ("highway_col", "highway"), ("tunnel_col", "tunnel"), ("bridge_col", "bridge"), ("layer_col", "layer"), ("edge_id_col", "edge_id"),
+        ("casing_level_col", "casing_level"), ("fill_level_col", "fill_level"), ("casing_start_col", "casing_start"),
+        ("casing_end_col", "casing_end"), ("head_start_m_col", "head_start_m"), ("head_end_m_col", "head_end_m"),
+        ("cap_start_col", "cap_start"), ("cap_end_col", "cap_end"), ("directed_col", "is_directed"), ("driving_col", "has_arrows"),
+    ];
+
+    fn from_args(args: &Value) -> ColumnMap {
+        ColumnMap(Self::KEYWORDS.iter()
+            .filter_map(|(k, own)| args[*k].as_str().filter(|u| !u.is_empty() && u != own).map(|u| (*own, u.to_string())))
+            .collect())
+    }
+
+    fn kept(own: &str) -> String {
+        format!("__rs_kept_{own}")
+    }
+
+    fn to_engine(&self, feats: &mut [read::Feature]) {
+        for f in feats.iter_mut() {
+            for (own, user) in &self.0 {
+                if f.props.contains_key(user) {
+                    f.props.rename(own, &Self::kept(own));
+                    f.props.rename(user, own);
+                }
+            }
+        }
+    }
+
+    fn to_user(&self, sources: &mut [(String, Src)], layers: &mut [Value]) {
+        if self.0.is_empty() {
+            return;
+        }
+        for (name, src) in sources.iter_mut() {
+            match src {
+                // the roads keep every column: a kept one gets its own name back; the pieces of `simple` have only the class and
+                // the __rs_* marks, so a kept column (an __rs_ name in between) goes away there
+                Src::Typed(s) if name == "roads" || name == "simple" => {
+                    for f in s.feats.iter_mut() {
+                        for (own, user) in &self.0 {
+                            if f.props.rename(own, user) {
+                                if name == "roads" {
+                                    f.props.rename(&Self::kept(own), own);
+                                } else {
+                                    f.props.shift_remove(&Self::kept(own));
+                                }
+                            }
+                        }
+                    }
+                }
+                Src::Typed(s) => s.feats.iter_mut().for_each(|f| self.0.iter().for_each(|(own, _)| { f.props.shift_remove(&Self::kept(own)); })),
+                Src::Json(s) => {
+                    for f in s["data"]["features"].as_array_mut().into_iter().flatten() {
+                        if let Some(p) = f["properties"].as_object_mut() {
+                            self.0.iter().for_each(|(own, _)| { p.shift_remove(&Self::kept(own)); });
+                        }
+                    }
+                }
+            }
+        }
+        fn gets(v: &mut Value, own: &str, user: &str) {
+            match v {
+                Value::Array(a) => {
+                    if a.len() == 2 && matches!(a[0].as_str(), Some("get" | "has")) && a[1] == own {
+                        a[1] = user.into();
+                    }
+                    a.iter_mut().for_each(|x| gets(x, own, user));
+                }
+                Value::Object(o) => o.values_mut().for_each(|x| gets(x, own, user)),
+                _ => {}
+            }
+        }
+        for l in layers.iter_mut().filter(|l| matches!(l["source"].as_str(), Some("roads" | "simple"))) {
+            for (own, user) in &self.0 {
+                gets(l, own, user);
+            }
+        }
+    }
 }

@@ -1406,7 +1406,7 @@ the P0 golden run decides), **Python** (stays in Python), **internal** (not port
 |---|---|---|---|
 | 1 | `gdf` | done for GeoParquet; P5 for a GeoDataFrame | |
 | 2 | `palette` | look; task 3 | |
-| 3 | `highway_col` | P4 | Rust reads the column `highway` |
+| 3 | `highway_col` | done | the engine's column map (`ColumnMap`): the user's names in the data and the road layers |
 | 4 | `filter_col` | done | |
 | 5 | `styler` | P5 | a Python object; the binding converts it |
 | 6 | `basemap` | task 2 | the page |
@@ -1415,10 +1415,10 @@ the P0 golden run decides), **Python** (stays in Python), **internal** (not port
 | 9 | `offset_frac` | look | |
 | 10 | `width_frac` | look | |
 | 11 | `offset_zoom` | look | |
-| 12 | `tunnel_col` | P4 | Rust reads `tunnel` |
-| 13 | `bridge_col` | P4 | Rust reads `bridge` |
-| 14 | `layer_col` | P4 | Rust reads `layer` |
-| 15 | `edge_id_col` | P4 | |
+| 12 | `tunnel_col` | done | the engine's column map (`ColumnMap`): the user's names in the data and the road layers |
+| 13 | `bridge_col` | done | the engine's column map (`ColumnMap`): the user's names in the data and the road layers |
+| 14 | `layer_col` | done | the engine's column map (`ColumnMap`): the user's names in the data and the road layers |
+| 15 | `edge_id_col` | done | the engine's column map (`ColumnMap`): the user's names in the data and the road layers |
 | 16 | `road_fill` | done | state `rs_fill_on` |
 | 17 | `cap_col` | P4 | |
 | 18 | `cap_start_col` | done | |

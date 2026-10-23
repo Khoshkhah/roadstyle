@@ -59,6 +59,17 @@ impl Props {
         }
     }
 
+    /// Give the property `from` the name `to`, in its place (a property `to` that is there goes away). False: no property `from`.
+    pub fn rename(&mut self, from: &str, to: &str) -> bool {
+        let Some(i) = self.at(from) else { return false };
+        if let Some(j) = self.at(to).filter(|&j| j != i) {
+            self.0.remove(j);
+            return self.rename(from, to);
+        }
+        self.0[i].0 = intern(to);
+        true
+    }
+
     pub fn shift_remove(&mut self, k: &str) -> Option<Value> {
         self.at(k).map(|i| self.0.remove(i).1)
     }

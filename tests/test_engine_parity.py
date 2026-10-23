@@ -80,6 +80,37 @@ def test_export_inline_levels_computed(part, keywords):
     assert diff(ru, py) == []
 
 
+# the column keywords: the same roads with other column names give the same style, with those names
+_RENAME = {"highway": "fclass", "tunnel": "tun", "bridge": "brg", "layer": "lyr", "edge_id": "eid"}
+
+
+@pytest.mark.parametrize("levels", ["given", "computed"])
+def test_export_inline_column_names(part, keywords, levels):
+    from compare_engines import diff
+
+    roads, kw = part, dict(keywords)
+    if levels == "computed":
+        roads = part.drop(columns=[c for c in _LEVEL_COLS if c in part.columns])
+        kw = {k: v for k, v in kw.items() if k not in _LEVEL_ARGS}
+    roads = roads.rename(columns=_RENAME)
+    kw.update(highway_col="fclass", tunnel_col="tun", bridge_col="brg", layer_col="lyr", edge_id_col="eid")
+    py = rs.export_inline(roads, engine="python", **kw)
+    ru = rs.export_inline(roads, engine="rust", **kw)
+    assert diff(ru, py) == []
+
+
+def test_export_inline_other_highway_column(part, keywords):
+    """A column named highway that is not the class column (highway_col names another one) stays data, as in Python."""
+    from compare_engines import diff
+
+    roads = part.rename(columns={"highway": "fclass"})
+    roads["highway"] = "other"
+    kw = {**keywords, "highway_col": "fclass"}
+    py = rs.export_inline(roads, engine="python", **kw)
+    ru = rs.export_inline(roads, engine="rust", **kw)
+    assert diff(ru, py) == []
+
+
 def test_engine_names(monkeypatch):
     assert _engine.engine(None) == "python"
     monkeypatch.setenv("ROADSTYLE_ENGINE", "rust")
