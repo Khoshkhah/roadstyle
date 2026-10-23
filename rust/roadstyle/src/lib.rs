@@ -60,6 +60,13 @@ pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name:
                 tiled.add_typed(&k, s, &keep, slots, from)
             }
             Src::Typed(s) => tiled.add_typed(&k, s, &read, slots, from),
+            // the full look's casing pieces: the columns of the simple pieces (tiles.py's line layers with `keep`)
+            Src::Json(s) if k == "casings" => {
+                let keep: std::collections::HashSet<String> = exact.clone().unwrap_or_else(|| {
+                    [highway_col.clone(), "lvl".into()].into_iter().chain(width_col.clone()).collect()
+                });
+                tiled.add(&k, s, &keep, false, from)
+            }
             Src::Json(s) => {
                 // render's export: another GeoJSON source (the 3D decks, an overlay) keeps all its properties (keep=None). Python writes
                 // its points and polygons whole; the engine clips them with the buffer, as the lines (docs/design/rust_library.md, P0)

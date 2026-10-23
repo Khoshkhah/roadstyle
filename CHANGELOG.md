@@ -35,6 +35,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   the same. `simple=False`, `style=` (a Styler object) and the other backends stay Python only and give an error with `engine="rust"`.
   Time on Tartu (64,828 roads): 19.1 s with Python and 6.2 s with Rust; with `tiles=True`, 147.5 s and 12.2 s.
 - **`export_style(..., engine="rust", format="pmtiles")`**: one archive of the Rust engine's tiles.
+- **The full look in the Rust engine** (`simple=False`, `full.rs`): a casing and a fill layer for each drawing position with their end-cap
+  twins, the dashed classes, the tunnel and bridge looks and the bridge shadows, over the sources `casings`, `halves` and `shadows`. The same
+  style as Python byte for byte, inline, in tiles and on the page. Not with `twin_casing: "each"` and `twin_end_caps` (an error with
+  `engine="rust"`).
 - **`views=` with `engine="rust"`**: the View menu, and a view's palette (the colours of each palette in the page, as Python's
   `_merge_palettes`, from a Rust style of each palette). Not with `tiles=True` (the tiles have one palette).
 - **The interaction contract in the style** (`docs/design/rust_library.md`, "The interaction contract"). With the look's `args.state = "live"`,
@@ -47,6 +51,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   **Note for the users of the Rust engine:** the engine now follows `labels=False` and `arrows=False` in the look's `args`, as Python does. Before,
   it always drew the names and the arrows. The looks of the GeoLibre plugin and of duckosm-rust's page have both false (from mapstyle's
   keywords): set them true there, or the maps have no names and no arrows after an update of the engine.
+
+### Changed (output)
+- **The bridge shadows in one order** (`simple=False`): each shadow line runs from its lower end, and the lines are in the order of their casing
+  number and their first point. Before, the order came from GEOS's line merge. The map does not change.
 
 ### Fixed
 - **The title of a tiled page** (`tiles=True`): it was "ends" (a loop of the tiled branch used the name of the title). Now it is the map's name.

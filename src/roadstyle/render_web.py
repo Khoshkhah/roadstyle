@@ -1128,6 +1128,8 @@ def _bridge_shadows(geo, parts, highway_col, trim_m, max_turn=45.0):
             ck, entry = (nxt if nxt else (None, None))
         lines.append((coords, clvl[start]))
     out = []
+    # one order for every engine (GEOS's line merge gives its own): each line from its lower end, by casing number, then by first point
+    lines = sorted(((c if tuple(c[0]) <= tuple(c[-1]) else c[::-1], lvl) for c, lvl in lines), key=lambda t: (t[1], tuple(t[0][0])))
     for c, lvl in lines:
         ch = shapely.LineString(c)
         member = [i for i in br if ch.intersection(near[i]).length > 1e-6]

@@ -103,7 +103,7 @@ fn is_true(v: Option<&Value>) -> bool {
 
 /// _casing_parts: the casing of every edge as pieces. An edge whose three casing numbers differ (or with two different ends) is cut into
 /// its start head, its main part and its end head, with a seam (and a lap, not on a dashed or tunnel casing) at each cut inside it.
-fn casing_parts(roads: &[Feature], head_m: f64, width_col: Option<&str>) -> Vec<Piece> {
+pub(crate) fn casing_parts(roads: &[Feature], head_m: f64, width_col: Option<&str>) -> Vec<Piece> {
     let mut out = Vec::new();
     for (i, f) in roads.iter().enumerate() {
         let p = &f.props;
@@ -193,7 +193,7 @@ fn casing_parts(roads: &[Feature], head_m: f64, width_col: Option<&str>) -> Vec<
 }
 
 /// _halves: the fill of every edge with two different ends (__rs_split) as two halves cut at the middle, each with its end's cap.
-fn halves(roads: &[Feature]) -> HashMap<i64, Vec<Piece>> {
+pub(crate) fn halves(roads: &[Feature]) -> HashMap<i64, Vec<Piece>> {
     let mut out: HashMap<i64, Vec<Piece>> = HashMap::new();
     for (i, f) in roads.iter().enumerate() {
         let p = &f.props;

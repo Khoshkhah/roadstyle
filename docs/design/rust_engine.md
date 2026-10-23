@@ -132,7 +132,8 @@ The crate makes the style of `export_inline` for simple mode with stored levels 
 - [x] No stored levels: `render` computes them (`compute_levels(method="solve")`), and so does the engine (`roadstyle-engine`, `compute_levels`; the same style on the parity fixture). Only `head_m=5`.
 - [x] `head_m`, `road_fill`, `offset_zoom`, `offset_frac`, `width_frac` (2026-10-23).
 - [x] Metre widths: `width_m_col`, `width_m_zoom`, `casing_m`, `casing_min_px` (`_mark_width_m`, `_width_m_expr`, the roads' part of `_mitre_ends`; 2026-10-23).
-- [ ] `simple=False`: the layer set of casings and fills for each level (`_level_id`, `_fill_layer_ids`); the crate has simple mode only.
+- [x] `simple=False`: the full look (`full.rs`, 2026-10-23): the layer set of casings and fills for each position, the end caps, the dashed
+  classes, the bridge look and its shadows. Not with `twin_casing: "each"` and `twin_end_caps` (the road-wide end caps, `_twin_ends`).
 - [x] `arrows`, `labels`, `minzoom` (true or a table; 2026-10-23).
 - [x] `view_3d`: the 3D bridge decks (`decks.rs`, 2026-10-23). The engine makes the ribbons with its own mitre offsets, not GEOS: the same properties, the same shapes to the rounding (1e-6 deg).
 - [x] `items`: edge items and lanes (`__rs_k` 5, `__rs_ic`, the items' mitre ends; 2026-10-23). `items_popup` is a page keyword. A MultiLineString item is an error in the engine.
@@ -140,7 +141,7 @@ The crate makes the style of `export_inline` for simple mode with stored levels 
 - [x] `boundary` (the dashed outline), `hover_color`, `select_color` (2026-10-23).
 - [x] `data_maxzoom`, `data_tolerance`, `pitch`, `bearing`, `max_pitch` (2026-10-23).
 - [x] `road_popup`, `popup_mode`, `road_tooltip`, `tooltip`, `hover_delay_ms` (2026-10-23).
-- [ ] `views`: named presets of colour option, palette and filters (`_check_views`).
+- [x] `views`: named presets of colour option, palette and filters (`_check_views`, `_merge_palettes`; 2026-10-23, the page of `render_edges`).
 - [ ] `style=`: a Python `Styler` object (an error in the crate); a colour option with another palette than the look's.
 - [ ] `tiles=True`: the PMTiles archive with the sidecar table (`tiles.build_pmtiles`, `tiles.sidecar`). The crate makes tiles on request (`Tiler`), with the rules of `tiles.py` (see "Step 2"), and the tiled look (no lean mode) for `export_style`.
 

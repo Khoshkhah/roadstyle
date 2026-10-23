@@ -86,7 +86,7 @@ fn filter_panel(look: &Value, roads: &[Feat], m: &Model) -> Value {
 }
 
 /// _fill_layer_ids: the layers the page recolours: every road fill layer, and the fill layers of each drawing position.
-fn fill_layer_ids(roads: &[Feat]) -> Vec<String> {
+pub(crate) fn fill_layer_ids(roads: &[Feat]) -> Vec<String> {
     let fills = ["roads-fill", "roads-fill-sq", "roads-fill-sx", "roads-fill-h", "roads-fill-hsq", "roads-fill-hsx"];
     let mut levels: Vec<i64> = roads.iter().flat_map(|f| ["__rs_cl", "__rs_fl", "__rs_cs", "__rs_ce"].map(|k| f.props.get(k).and_then(Value::as_i64)))
         .flatten().chain([0]).collect();
@@ -115,14 +115,16 @@ pub fn controls(look: &Value, roads: &[Feat], info: PageInfo, active: usize) -> 
     to.insert("fill".into(), colour);
     let control = args["tunnel_control"] == true && !info.tunnel_layers.is_empty();
     let ratio = cfg["tunnel_casing_dash"].as_array().filter(|a| !a.is_empty()).cloned().unwrap_or_else(|| vec![json!(1), json!(1)]);
-    let tunnel = json!({"layers": info.tunnel_layers, "dash": [], "casing": {}, "strength": cfg["tunnel_strength"].as_f64().unwrap_or(0.0),
+    let tunnel = json!({"layers": info.tunnel_layers, "dash": info.tunnel_dash, "casing": info.tunnel_casing, "strength": cfg["tunnel_strength"].as_f64().unwrap_or(0.0),
         "palette": cfg["tunnel_palette"], "palettes": cfg["tunnel_palettes"], "ratio": ratio,
         // the canvas colour of the base map: the page that adds a base map sets its own
         "bg": th["background"]["light"], "steps": th["tunnels"]["steps"], "ratios": th["tunnels"]["ratios"],
         "toward": toward, "towards": cfg["tunnel_towards"], "to": to, "control": control});
     let views: Vec<Value> = args["views"].as_object().into_iter().flatten().map(|(n, s)| json!({"name": n, "set": s})).collect();
     let items = if args["items"].is_null() { Value::Null } else { json!({"label": "items", "popup": args["items_popup"], "layer": "roads-simple"}) };
-    Ok(json!({"tiles": tiles, "simple": if tiles { json!(false) } else { json!("roads-simple") }, "pitch_3d": cam["pitch_3d"],
+    // render's lean mode: simple mode with inline data
+    let lean = !tiles && args["simple"] != false;
+    Ok(json!({"tiles": tiles, "simple": if lean { json!("roads-simple") } else { json!(false) }, "pitch_3d": cam["pitch_3d"],
         "select_color": select, "filter": filter_panel(look, roads, &m), "color_active": active, "overlays": info.overlays, "tunnel": tunnel,
         "fill_layers": fill_layer_ids(roads), "road_fill": {"on": args["road_fill"] != false, "paint": info.fill_paint}, "views": views,
         "items": items, "edge_id_col": args["edge_id_col"].as_str().unwrap_or("edge_id"), "arrow_icon": arw["icon"], "arrow_color": arw["color"],

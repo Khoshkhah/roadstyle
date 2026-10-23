@@ -311,11 +311,11 @@ fn tun_mix(expr: &Value) -> Value {
     json!(["case", ["to-boolean", ["get", "__rs_tunnel"]], ["let", "m", mixed, keep], expr])
 }
 
-fn tun_gap() -> Value {
+pub(crate) fn tun_gap() -> Value {
     json!(["case", gs("rs_tun_two"), ["interpolate", ["linear"], gs("rs_tun_strength"), 0, gs("rs_tun_c1"), 100, gs("rs_tun_toward")], "rgba(0,0,0,0)"])
 }
 
-fn tun_dash() -> Value {
+pub(crate) fn tun_dash() -> Value {
     json!(["interpolate", ["linear"], gs("rs_tun_strength"), 0, gs("rs_tun_c0"), 100, gs("rs_tun_toward")])
 }
 
@@ -330,7 +330,7 @@ pub struct MetreLook {
 }
 
 /// _plus_px: a zoom curve `px(zoom)` pixels wider at each stop (only where `when` holds, if given).
-fn plus_px(expr: &Value, px: impl Fn(&Value) -> Value, when: Option<&Value>) -> Value {
+pub(crate) fn plus_px(expr: &Value, px: impl Fn(&Value) -> Value, when: Option<&Value>) -> Value {
     let e = expr.as_array().unwrap();
     let first = if e[0] == "interpolate" { 4 } else { 2 };
     let mut out: Vec<Value> = e[..first].to_vec();
@@ -414,7 +414,7 @@ fn with_minzoom(filter: Value, extra: Option<Value>) -> Value {
     }
 }
 
-fn seam_filter() -> Value {
+pub(crate) fn seam_filter() -> Value {
     let (seam, lap) = (json!(["to-boolean", ["get", "__rs_seam"]]), json!(["to-boolean", ["get", "__rs_lap"]]));
     json!(["any", ["!", seam], ["all", ["!", lap], [">=", ["zoom"], 17]], ["all", lap, ["<", ["zoom"], 17]]])
 }
@@ -644,7 +644,7 @@ impl Model {
 
     /// _pair_width: a two-way pair's one casing as wide as its two directions (no metre widths).
     /// _pair_width; with width_m_zoom (`wmz`), a pair with metres on both has its width in `expr` already from that zoom on.
-    fn pair_width(&self, expr: &Value, wmz: Option<f64>) -> Value {
+    pub(crate) fn pair_width(&self, expr: &Value, wmz: Option<f64>) -> Value {
         let (z0, z1) = (self.zstops[0].as_f64().unwrap(), self.zstops[self.zstops.len() - 1].as_f64().unwrap());
         plus_px(expr, |z| {
             let zf = z.as_f64().unwrap();
@@ -670,12 +670,14 @@ fn props_of<'a>(fs: &'a [Value], empty: &'a Map<String, Value>) -> Vec<&'a Map<S
 pub struct PageInfo {
     pub overlays: Vec<Value>,
     pub tunnel_layers: Map<String, Value>,
+    pub tunnel_dash: Vec<String>,
+    pub tunnel_casing: Map<String, Value>,
     pub fill_paint: Map<String, Value>,
 }
 
 #[allow(clippy::too_many_arguments)] // the sources of the style, as make_parts has them
-pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value], decks: bool, ovs: &mut [Overlay], fills: &[String], active: usize)
-                   -> Result<(Vec<Value>, PageInfo), String> {
+pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value], decks: bool, ovs: &mut [Overlay], fills: &[String], active: usize,
+                   full: Option<&crate::full::FullSources>) -> Result<(Vec<Value>, PageInfo), String> {
     let mut info = PageInfo::default();
     let m = Model::from_look(look)?;
     let (th, cfg) = (&look["theme"], &look["config"]);
@@ -866,7 +868,22 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
         ov_ids.push(ids);
     }
     let mut layers = under;
-    layers.extend([road, pick]);
+    let levels = crate::full::levels_of(&rp);
+    let full_layers = full.map(|fs| {
+        let casings: Vec<&Value> = fs.casings.iter().flatten().collect();
+        crate::full::layers(&crate::full::FullIn {
+            look, rp: &rp, levels: &levels, cw: cw.clone(), fw: fw.clone(), bcw: bcw.clone(), off: off.clone(),
+            shadow_w: m.width_expr("highway", true, th["bridges"]["shadow"]["width_scale"].as_f64().unwrap_or(1.0)), lay: lay.clone(),
+            mz: mz_filter("highway"), divided: fs.casings.is_some(),
+            parts_caps: casings.iter().any(|f| f["properties"].get("__rs_cap").is_some_and(py_truth)), shadows: !fs.shadows.is_empty(),
+            pairs: pairs.then(|| Box::new(|e: &Value| m.pair_width(e, if metres { wmz.as_f64() } else { None })) as Box<dyn Fn(&Value) -> Value>),
+            decks: decks.then_some(dk.flat_below), any_tunnel, dashes: &dashes, select: select.clone(), hover: hover.clone(),
+        })
+    });
+    match full_layers {
+        Some(fl) => layers.extend(fl),
+        None => layers.extend([road, pick]),
+    }
 
     // the arrows and the names (simple mode: one layer each, above all roads, under the highlight)
     let sort = json!(["*", -1, m.sort_key("highway")]);
@@ -883,7 +900,6 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
             spacing.extend(zp.as_array().unwrap().iter().cloned());
         }
         let (arrows, labels) = (look["args"]["arrows"] != false, look["args"]["labels"] != false);
-        if arrows {
         // the page with inline data puts one arrow per one-way road in the window into the "arrows" source (_rsArrows); tiles and the
         // export repeat them along the slots
         let (source, mut layout) = if live && args["tiles"] != true {
@@ -894,9 +910,12 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
         for (k, v) in [("icon-image", json!("oneway")), ("icon-rotation-alignment", json!("map")), ("symbol-sort-key", sort.clone()), ("icon-size", Value::Array(icon))] {
             layout[k] = v;
         }
-        layers.push(json!({"id": "roads-arrows", "type": "symbol", "source": source, "minzoom": arw["minzoom"],
-                           "filter": with_minzoom(json!(["all", ["==", ["get", "oneway"], 1], true, minor_or(&arw["minor_minzoom"])]), mz_filter("highway")),
-                           "layout": layout, "paint": {"icon-opacity": arw["opacity"]}}));
+        // _arrow_layer: `cond` is the position's (the full look), else true
+        let arrow_layer = |lid: &str, cond: Value| json!({"id": lid, "type": "symbol", "source": source, "minzoom": arw["minzoom"],
+            "filter": with_minzoom(json!(["all", ["==", ["get", "oneway"], 1], cond, minor_or(&arw["minor_minzoom"])]), mz_filter("highway")),
+            "layout": layout, "paint": {"icon-opacity": arw["opacity"]}});
+        if arrows && full.is_none() {
+            layers.push(arrow_layer("roads-arrows", json!(true)));
         }
         let mut lf = vec![json!("all"), json!(["==", ["%", ["get", "slot"], 2], 0]), json!(["to-boolean", ["get", "name"]]), minor_or(&lbl["minor_minzoom"])];
         if let Some(z) = mz_filter("highway") {      // a hidden class must not keep its street name floating either
@@ -911,15 +930,23 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
             lpaint["text-halo-color"] = lbl["halo_color"].clone();
             lpaint["text-halo-width"] = lbl["halo_width"].clone();
         }
-        if labels {
-        layers.push(json!({"id": "roads-labels", "type": "symbol", "source": "slots", "minzoom": lbl["minzoom"], "filter": lf,
-                           "layout": {"symbol-placement": "line-center", "text-field": ["get", "name"], "text-font": lbl["font"],
-                                      "text-size": label_size_expr(&m, th, fixed), "text-max-angle": lbl["max_angle"], "text-padding": lbl["padding"],
-                                      "symbol-sort-key": sort},
-                           "paint": lpaint}));
+        let label_layer = |lid: &str, flt: Value| json!({"id": lid, "type": "symbol", "source": "slots", "minzoom": lbl["minzoom"], "filter": flt,
+            "layout": {"symbol-placement": "line-center", "text-field": ["get", "name"], "text-font": lbl["font"],
+                       "text-size": label_size_expr(&m, th, fixed), "text-max-angle": lbl["max_angle"], "text-padding": lbl["padding"],
+                       "symbol-sort-key": sort},
+            "paint": lpaint});
+        let lf = Value::Array(lf);
+        if full.is_some() {        // the full look: one arrow and one name layer for each position, after its fills
+            let pos_label = |lid: &str, here: Value| label_layer(lid, json!(["all", lf, here]));
+            crate::full::annotate(&mut layers, &levels, arrows.then_some(&arrow_layer as &dyn Fn(&str, Value) -> Value),
+                                  labels.then_some(&pos_label as &dyn Fn(&str, Value) -> Value));
+        } else if labels {
+            layers.push(label_layer("roads-labels", lf.clone()));
         }
     }
-    layers.push(highlight);
+    if full.is_none() {
+        layers.push(highlight);
+    }
     if decks {
         let deck = |id: &str, flt: Value, color: Value, base: &str, height: &str| json!({"id": id, "type": "fill-extrusion", "source": "decks",
             "minzoom": dk.flat_below, "filter": flt, "paint": {"fill-extrusion-color": color, "fill-extrusion-base": ["get", base],
@@ -932,14 +959,23 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     // the passes: a reverse pair's second edge draws nowhere; the layers no feature can draw go; the fill's opacity switch
     if any_dup {
         let nd = json!(["!", ["to-boolean", ["get", "__rs_dup"]]]);
-        for l in layers.iter_mut().filter(|l| l["source"] == "roads") {
+        for l in layers.iter_mut().filter(|l| matches!(l["source"].as_str(), Some("roads" | "casings" | "halves"))) {
             l["filter"] = match l.get("filter") { Some(f) => json!(["all", f, nd]), None => nd.clone() };
         }
     }
     let rd: Vec<&dyn Get> = rp.iter().map(|p| *p as &dyn Get).collect();
     let sd: Vec<&dyn Get> = sp.iter().map(|p| *p as &dyn Get).collect();
     let ld: Vec<&dyn Get> = lp.iter().map(|p| *p as &dyn Get).collect();
-    let feats: HashMap<&str, Vec<&dyn Get>> = [("roads", rd), ("slots", ld.clone()), ("arrows", ld), ("simple", sd)].into();
+    let empty_map = Map::new();
+    fn fp<'a>(v: Option<&'a Vec<Value>>, empty: &'a Map<String, Value>) -> Vec<&'a dyn Get> {
+        v.into_iter().flatten().map(|f| f["properties"].as_object().unwrap_or(empty) as &dyn Get).collect()
+    }
+    let mut feats: HashMap<&str, Vec<&dyn Get>> = [("roads", rd), ("slots", ld.clone()), ("arrows", ld), ("simple", sd)].into();
+    if let Some(fs) = full {
+        feats.insert("casings", fp(fs.casings.as_ref(), &empty_map));
+        feats.insert("halves", fp(fs.halves.as_ref(), &empty_map));
+        feats.insert("shadows", fp(Some(&fs.shadows), &empty_map));
+    }
     let mut layers = drop_empty_layers(layers, &feats);
     for l in layers.iter_mut().filter(|l| l["id"].as_str().is_some_and(|i| i.starts_with("roads-fill") && !i.ends_with("-pat"))) {
         let v = l["paint"].get("line-opacity").cloned().unwrap_or(Value::Null);
@@ -949,7 +985,9 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     // the overlays on a street: between the road layer and the arrows, by fill number, order and overlay; the overlays over the roads: on top
     edge.sort_by_key(|e| (e.0, e.1, e.2));
     let edge_ids: HashSet<String> = edge.iter().flat_map(|e| e.3.iter().map(|l| l["id"].as_str().unwrap().to_string())).collect();
-    if !edge.is_empty() {
+    if !edge.is_empty() && full.is_some() {        // the full look: after the fills of their position, before its arrows
+        crate::full::place_edge_overlays(&mut layers, &edge, &levels, look["args"]["road_fill"] == false);
+    } else if !edge.is_empty() {
         let at = layers.iter().position(|l| matches!(l["id"].as_str(), Some("roads-arrows" | "roads-labels" | "roads-highlight"))).unwrap_or(layers.len());
         let items: Vec<Value> = edge.into_iter().flat_map(|e| e.3).collect();
         layers.splice(at..at, items);
@@ -958,8 +996,11 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     // _state_expressions: a road fill reads the colours of rsColor; a painted road sorts on top
     let base = json!(["coalesce", ["get", "__rs_fill"], fb_fill]);
     let has = |key: &str| json!(["has", ["to-string", ["get", key]], gs("rs_colors")]);
+    // the layers the page recolours (_fill_layer_ids) and their dashed fills
+    let fill_ids: HashSet<String> = crate::contract::fill_layer_ids(roads).into_iter().collect();
+    let is_fill = |lid: &str| fill_ids.contains(lid) || fill_ids.iter().any(|b| lid.starts_with(&format!("{b}-dash")));
     for l in layers.iter_mut() {
-        if l["id"] == "roads-fill" {
+        if l["id"].as_str().is_some_and(is_fill) {
             l["paint"]["line-color"] = swap(&l["paint"]["line-color"], &base, &fill_expr(fills, fb_fill));
         } else if l["id"] == "roads-bridge-decks" {
             l["paint"]["fill-extrusion-color"] = swap(&l["paint"]["fill-extrusion-color"], &base, &fill_base(fills, fb_fill));
@@ -996,7 +1037,16 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
                 l["paint"][k] = tun_mix(&base);
                 info.tunnel_layers.entry(id.clone()).or_insert_with(|| json!([])).as_array_mut().unwrap().push(json!([k, base, "fill"]));
             };
-            if id.starts_with("roads-fill") && !id.ends_with("-pat") {
+            let tun = json!(["to-boolean", ["get", "__rs_tunnel"]]);
+            if id.starts_with("roads-casing") && id.ends_with("-dash") {        // the full look's tunnel casing: its dashes and its gap
+                info.tunnel_dash.push(id.clone());
+                l["paint"]["line-color"] = tun_dash();
+                l["paint"]["line-dasharray"] = gs("rs_tun_ratio");
+            } else if id.starts_with("roads-casing") && !id.contains("-bridge") {
+                info.tunnel_casing.insert(id.clone(), l["paint"]["line-color"].clone());
+                l["paint"]["line-color"] = json!(["case", tun, tun_gap(), l["paint"]["line-color"]]);
+                l["paint"]["line-width"] = plus_px(&l["paint"]["line-width"], |_| json!(3), Some(&tun));
+            } else if id.starts_with("roads-fill") && !id.ends_with("-pat") {
                 let b = l["paint"]["line-color"].clone();
                 mix(l, "line-color", b);
             } else if id.starts_with("roads-labels") {
