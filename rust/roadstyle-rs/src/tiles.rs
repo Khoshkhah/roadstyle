@@ -1,20 +1,23 @@
-//! The style's sources as vector tiles (Mapbox Vector Tile 2.1), made when the map asks for them: the page gives MapLibre each
-//! source as `{"type": "vector", "tiles": ["<prefix><source>/{z}/{x}/{y}"]}` and answers the requests with `Tiles::tile`. One
-//! GeoJSON text of all the roads (Tartu: 150 MB) is then not made, parsed and cut into tiles by MapLibre again.
+//! The style's sources as vector tiles (Mapbox Vector Tile 2.1), made when the map asks for them, with the rules of roadstyle's
+//! tiles.py: the page gives MapLibre one source, `{"type": "vector", "tiles": ["<prefix>roads/{z}/{x}/{y}"]}`, and each of the
+//! style's sources is a layer in its tiles (the layers' `source-layer`). One GeoJSON text of all the roads (Tartu: 150 MB) is then
+//! not made, parsed and cut into tiles by MapLibre again.
 //!
-//! Each feature keeps its id (`id`, or its position for a source with `generateId`, as MapLibre gives it), its properties (a null
-//! value is left out: MapLibre reads a missing one as null) and its geometry, clipped to the tile and a buffer around it.
+//! Each feature keeps its id (`id`, or its position for a source with `generateId`, as MapLibre gives it) and its properties (a null
+//! value is left out: MapLibre reads a missing one as null). Below the last zoom a line is simplified to half a tile unit, and a
+//! line shorter than that is left out. A feature is clipped to the tile and a buffer around it, except a feature of a whole layer
+//! (the name and arrow slots): it goes whole into every tile it touches, because MapLibre places a label only in the tile that has
+//! its anchor.
 
 use rstar::{primitives::GeomWithData, primitives::Rectangle, RTree, AABB};
 use serde_json::{Map, Value};
+use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 
-/// The tile's size in its own units, and the buffer around it (in the same units: 1/8 of a pixel each at 512 px): wide lines, their
-/// offsets and the labels along them reach over the tile's edge.
-const EXTENT: f64 = 4096.0;
-const BUFFER: f64 = 512.0;
-/// The last zoom of the tiles; MapLibre zooms them in after it. 0.15 m a unit at 60 degrees north.
-pub const MAX_ZOOM: u32 = 16;
+/// The tile's size in its own units.
+pub const EXTENT: f64 = 4096.0;
+/// The name of the one vector source.
+pub const SOURCE: &str = "roads";
 
 type P = [f64; 2];
 
@@ -48,12 +51,19 @@ struct Layer {
     encoded: Vec<Vec<u8>>,
     feats: Vec<Feat>,
     tree: RTree<GeomWithData<Rectangle<P>, u32>>,
+    /// The features go whole into the tiles: not clipped and not simplified.
+    whole: bool,
+    min_zoom: u32,
 }
 
-/// The sources of a style, ready to be cut into tiles.
-#[derive(Default)]
+/// The sources of a style, ready to be cut into tiles: the layers in their order, the first and last zoom of the tiles (MapLibre
+/// zooms the last one in), and the buffer around a tile in its units (wide lines, their offsets and the labels along them reach over
+/// the tile's edge).
 pub struct Tiles {
-    layers: HashMap<String, Layer>,
+    layers: IndexMap<String, Layer>,
+    min_zoom: u32,
+    max_zoom: u32,
+    buffer: f64,
 }
 
 /// Web Mercator in [0, 1] (x to the east, y to the south), as the tiles count.
@@ -124,9 +134,13 @@ fn bounds(g: &Geom) -> Option<(P, P)> {
 }
 
 impl Tiles {
-    /// Add a GeoJSON source of the style (`{"type": "geojson", "data": FeatureCollection, ...}`) under its name, and free its tree.
-    /// Only the properties in `keep` go into the tiles.
-    pub fn add(&mut self, name: &str, source: Value, keep: &HashSet<String>) {
+    pub fn new(min_zoom: u32, max_zoom: u32, buffer: f64) -> Tiles {
+        Tiles { layers: IndexMap::new(), min_zoom, max_zoom, buffer }
+    }
+
+    /// Add a GeoJSON source of the style (`{"type": "geojson", "data": FeatureCollection, ...}`) as the layer `name`, and free its
+    /// tree. Only the properties in `keep` go into the tiles. `whole`: see the module; `min_zoom`: the layer's first zoom.
+    pub fn add(&mut self, name: &str, source: Value, keep: &HashSet<String>, whole: bool, min_zoom: u32) {
         let generate = source["generateId"].as_bool() == Some(true);
         let Value::Object(mut s) = source else { return };
         let features = match s.remove("data").map(|mut d| d["features"].take()) {
@@ -145,18 +159,18 @@ impl Tiles {
             };
             b.push(id, g, props.into_iter().filter(|(k, _)| keep.contains(k)));
         }
-        self.layers.insert(name.to_string(), b.layer());
+        self.layers.insert(name.to_string(), b.layer(whole, min_zoom));
     }
 
     /// Add a source of typed features (roads, simple), as `add` adds its JSON.
-    pub fn add_typed(&mut self, name: &str, source: crate::props::Source, keep: &HashSet<String>) {
+    pub fn add_typed(&mut self, name: &str, source: crate::props::Source, keep: &HashSet<String>, whole: bool, min_zoom: u32) {
         let mut b = Builder::default();
         for f in source.feats {
             let Some(c) = f.coords else { continue };
             let g = Geom::Lines(vec![c.iter().filter_map(|p| merc_ll(p[0], p[1])).collect()]);
             b.push(Some(f.id as u64), g, f.props.into_iter().filter(|(k, _)| keep.contains(*k)));
         }
-        self.layers.insert(name.to_string(), b.layer());
+        self.layers.insert(name.to_string(), b.layer(whole, min_zoom));
     }
 
     /// The properties of the feature `id` of the source `name` (those in the tiles), as JSON; `null` when there is no such feature.
@@ -177,18 +191,32 @@ impl Tiles {
         Value::Object(m).to_string()
     }
 
-    /// The tile z/x/y of the source `name` as a vector tile with one layer of that name; empty when nothing is in it.
-    pub fn tile(&self, name: &str, z: u32, x: u32, y: u32) -> Vec<u8> {
-        let Some(layer) = self.layers.get(name) else { return Vec::new() };
+    /// The tile z/x/y as a vector tile with a layer for each source that has features in it; empty when nothing is in it.
+    pub fn tile(&self, z: u32, x: u32, y: u32) -> Vec<u8> {
+        if z < self.min_zoom || z > self.max_zoom {
+            return Vec::new();
+        }
+        let mut out = Vec::new();
+        for (name, layer) in &self.layers {
+            if z >= layer.min_zoom {
+                out.extend(self.layer_tile(name, layer, z, x, y)); // a tile's layers are repeated fields: their bytes join
+            }
+        }
+        out
+    }
+
+    fn layer_tile(&self, name: &str, layer: &Layer, z: u32, x: u32, y: u32) -> Vec<u8> {
         let n = (1u64 << z) as f64;
-        let b = BUFFER / EXTENT / n;
+        let buffer = if layer.whole { 0.0 } else { self.buffer };
+        let b = buffer / EXTENT / n;
         let (x0, y0) = (x as f64 / n, y as f64 / n);
         let found = layer.tree.locate_in_envelope_intersecting(&AABB::from_corners([x0 - b, y0 - b], [x0 + 1.0 / n + b, y0 + 1.0 / n + b]));
         let mut hits: Vec<u32> = found.map(|h| h.data).collect();
         hits.sort_unstable(); // the order of the source: the drawing order of features in one layer
         // the tile's own units: (merc * 2^z - x) * EXTENT
         let to = |p: &P| [(p[0] * n - x as f64) * EXTENT, (p[1] * n - y as f64) * EXTENT];
-        let (lo, hi) = (-BUFFER, EXTENT + BUFFER);
+        let (lo, hi) = (-buffer, EXTENT + buffer);
+        let simplify = !layer.whole && z < self.max_zoom;
         let mut enc = Encoder::default();
         for i in hits {
             let f = &layer.feats[i as usize];
@@ -199,13 +227,8 @@ impl Tiles {
                     (1, points_cmd(&ps))
                 }
                 Geom::Lines(ls) => {
-                    let parts: Vec<Vec<[i32; 2]>> = ls
-                        .iter()
-                        .flat_map(|l| clip_line(&l.iter().map(to).collect::<Vec<_>>(), lo, hi))
-                        .map(|l| dedup(l.into_iter().map(round)))
-                        .filter(|l| l.len() >= 2)
-                        .collect();
-                    (2, lines_cmd(&parts))
+                    let ls: Vec<Vec<P>> = ls.iter().map(|l| l.iter().map(to).collect()).collect();
+                    (2, lines_cmd(&line_parts(ls, simplify, (!layer.whole).then_some((lo, hi)))))
                 }
                 Geom::Polygons(ps) => {
                     let mut rings = Vec::new();
@@ -285,9 +308,68 @@ impl Builder {
         self.feats.push(Feat { id, geom: g, props });
     }
 
-    fn layer(self) -> Layer {
-        Layer { keys: self.keys, vals: self.vals, encoded: self.encoded, feats: self.feats, tree: RTree::bulk_load(self.boxes) }
+    fn layer(self, whole: bool, min_zoom: u32) -> Layer {
+        Layer { keys: self.keys, vals: self.vals, encoded: self.encoded, feats: self.feats, tree: RTree::bulk_load(self.boxes), whole, min_zoom }
     }
+}
+
+
+/// The parts of a line (in the tile's units) in a tile: simplified to half a unit and none when shorter than that (tiles.py), then
+/// clipped to the square [lo, hi]^2 when `clip` is given.
+fn line_parts(mut ls: Vec<Vec<P>>, simplify: bool, clip: Option<(f64, f64)>) -> Vec<Vec<[i32; 2]>> {
+    if simplify {
+        ls = ls.iter().map(|l| douglas_peucker(l, 0.5)).collect();
+        if ls.iter().map(|l| length(l)).sum::<f64>() < 0.5 {
+            return Vec::new();
+        }
+    }
+    ls.into_iter()
+        .flat_map(|l| match clip {
+            Some((lo, hi)) => clip_line(&l, lo, hi),
+            None => vec![l],
+        })
+        .map(|l| dedup(l.into_iter().map(round)))
+        .filter(|l| l.len() >= 2)
+        .collect()
+}
+
+fn length(l: &[P]) -> f64 {
+    l.windows(2).map(|w| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1])).sum()
+}
+
+/// The distance from p to the segment ab.
+fn seg_dist(p: P, a: P, b: P) -> f64 {
+    let d = [b[0] - a[0], b[1] - a[1]];
+    let l2 = d[0] * d[0] + d[1] * d[1];
+    let t = if l2 == 0.0 { 0.0 } else { (((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / l2).clamp(0.0, 1.0) };
+    (p[0] - a[0] - t * d[0]).hypot(p[1] - a[1] - t * d[1])
+}
+
+/// Douglas-Peucker: the points of the line that keep it within `tol` of the original (shapely's simplify).
+/// ponytail: no topology check (GEOS's preserve_topology also keeps a line from crossing itself); add it if a simplified road
+/// crosses itself at a low zoom.
+fn douglas_peucker(ps: &[P], tol: f64) -> Vec<P> {
+    if ps.len() < 3 {
+        return ps.to_vec();
+    }
+    let mut keep = vec![false; ps.len()];
+    (keep[0], keep[ps.len() - 1]) = (true, true);
+    let mut todo = vec![(0, ps.len() - 1)];
+    while let Some((a, b)) = todo.pop() {
+        let (mut far, mut at) = (0.0, a);
+        for i in a + 1..b {
+            let d = seg_dist(ps[i], ps[a], ps[b]);
+            if d > far {
+                (far, at) = (d, i);
+            }
+        }
+        if far > tol {
+            keep[at] = true;
+            todo.push((a, at));
+            todo.push((at, b));
+        }
+    }
+    ps.iter().zip(keep).filter(|(_, k)| *k).map(|(p, _)| *p).collect()
 }
 
 fn round(p: P) -> [i32; 2] {
@@ -581,14 +663,14 @@ mod tests {
 
     #[test]
     fn a_tile_has_the_feature_its_id_and_properties() {
-        let mut t = Tiles::default();
+        let mut t = Tiles::new(0, 15, 80.0);
         t.add("roads", json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": [
             {"type": "Feature", "id": 7, "properties": {"name": "A", "lanes": 2, "w": 1.5, "bridge": true, "gone": null, "n": -3},
-             "geometry": {"type": "LineString", "coordinates": [[1.0, 1.0], [10.0, 10.0]]}}]}}), &keys(&["name", "lanes", "w", "bridge", "gone", "n"]));
-        let tile = t.tile("roads", 0, 0, 0);
+             "geometry": {"type": "LineString", "coordinates": [[1.0, 1.0], [10.0, 10.0]]}}]}}), &keys(&["name", "lanes", "w", "bridge", "gone", "n"]), false, 0);
+        let tile = t.tile(0, 0, 0);
         assert!(!tile.is_empty());
-        assert!(!t.tile("roads", 3, 4, 3).is_empty(), "the road is in tile 3/4/3");
-        assert!(t.tile("roads", 3, 2, 5).is_empty(), "and not in a tile far from it");
+        assert!(!t.tile(3, 4, 3).is_empty(), "the road is in tile 3/4/3");
+        assert!(t.tile(3, 2, 5).is_empty(), "and not in a tile far from it");
         // the bytes have the layer's name, the keys and a string value, and no key for the null value
         let text = String::from_utf8_lossy(&tile);
         assert!(text.contains("roads") && text.contains("name") && text.contains("lanes") && !text.contains("gone"));
@@ -598,16 +680,42 @@ mod tests {
 
     #[test]
     fn the_outer_ring_has_a_positive_area() {
-        let mut t = Tiles::default();
+        let mut t = Tiles::new(0, 15, 80.0);
         // a square around (1, 1) degrees, counterclockwise in lon / lat (clockwise on the screen after y goes down)
         t.add("land", json!({"type": "geojson", "generateId": true, "data": {"type": "FeatureCollection", "features": [
             {"type": "Feature", "properties": {}, "geometry": {"type": "Polygon",
-             "coordinates": [[[0.5, 0.5], [1.5, 0.5], [1.5, 1.5], [0.5, 1.5], [0.5, 0.5]]]}}]}}), &keys(&[]));
+             "coordinates": [[[0.5, 0.5], [1.5, 0.5], [1.5, 1.5], [0.5, 1.5], [0.5, 0.5]]]}}]}}), &keys(&[]), false, 0);
         let f = &t.layers["land"].feats[0];
         assert_eq!(f.id, Some(0));
         let Geom::Polygons(ps) = &f.geom else { panic!() };
         let r: Vec<[i32; 2]> = ps[0][0].iter().map(|p| round([p[0] * 4096.0 * 64.0, p[1] * 4096.0 * 64.0])).collect();
         assert!(area(&r) < 0, "lon / lat counterclockwise is negative in the tile's units");
-        assert!(!t.tile("land", 0, 0, 0).is_empty());
+        assert!(!t.tile(0, 0, 0).is_empty());
+    }
+
+    #[test]
+    fn the_rules_of_tiles_py() {
+        // below the last zoom: a bend of 0.4 units goes, a bend of 0.6 units stays, a line shorter than 0.5 units goes
+        let bend = |h: f64| vec![vec![[0.0, 0.0], [50.0, h], [100.0, 0.0]]];
+        assert_eq!(line_parts(bend(0.4), true, None), vec![vec![[0, 0], [100, 0]]]);
+        assert_eq!(line_parts(bend(0.6), true, None).len(), 1);
+        assert_eq!(line_parts(bend(0.6), true, None)[0].len(), 3);
+        assert_eq!(line_parts(bend(0.4), false, None)[0].len(), 3, "the last zoom keeps every point");
+        assert!(line_parts(vec![vec![[0.0, 0.0], [0.4, 0.0]]], true, None).is_empty());
+        // a whole line keeps its points out of the tile, a clipped one ends at the buffer
+        let long = || vec![vec![[0.0, 10.0], [4000.0, 10.0], [9000.0, 10.0]]];
+        assert_eq!(line_parts(long(), false, None), vec![vec![[0, 10], [4000, 10], [9000, 10]]]);
+        assert_eq!(line_parts(long(), false, Some((-80.0, 4176.0))), vec![vec![[0, 10], [4000, 10], [4176, 10]]]);
+        // the zooms: no tile out of 6 to 15, no tile of a layer before its first zoom
+        let fc = json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": [
+            {"type": "Feature", "id": 1, "properties": {}, "geometry": {"type": "LineString", "coordinates": [[1.0, 1.0], [1.01, 1.0]]}}]}});
+        let mut t = Tiles::new(6, 15, 80.0);
+        t.add("slots", fc, &keys(&[]), true, 14);
+        let at = |z: u32| {
+            let n = (1u64 << z) as f64;
+            let [x, y] = merc(&json!([1.005, 1.0])).unwrap();
+            t.tile(z, (x * n) as u32, (y * n) as u32)
+        };
+        assert!(at(13).is_empty() && at(16).is_empty() && !at(14).is_empty() && !at(15).is_empty());
     }
 }

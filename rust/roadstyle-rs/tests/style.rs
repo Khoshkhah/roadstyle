@@ -33,8 +33,8 @@ fn tartu_style() {
     assert_eq!(style_hash(&area), "afb6db082d50ac2f1d5688dce29d9532abdb6c9a70c001399e6c8d9b9ae70833");
 }
 
-/// The vector tiles (make_tiled): the SHA-256 of the style and of every tile of the roads' box at zooms 12, 14 and 16 (each tile with
-/// its source, zoom, x and y), so a change in the memory use cannot change a tile.
+/// The vector tiles (make_tiled): the SHA-256 of the style and of every tile of the roads' box at zooms 12, 14 and 15 (each tile with
+/// its zoom, x and y), so a change in the memory use cannot change a tile.
 fn tiles_hash(area: &Path) -> String {
     let data = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data");
     let read = |p: PathBuf| std::fs::read(&p).unwrap_or_else(|e| panic!("{}: {e}", p.display()));
@@ -46,21 +46,18 @@ fn tiles_hash(area: &Path) -> String {
     }
     let keep = ["osm_id".to_string(), "access".to_string()];
     let (style, tiles) = roadstyle_rs::make_tiled(roads, &look, Some(read(area.join("features.parquet"))), None, "rs://", &keep).unwrap();
-    let sources: Vec<String> = serde_json::from_str::<serde_json::Value>(&style).unwrap()["sources"].as_object().unwrap().keys().cloned().collect();
     let mut h = Sha256::new();
     h.update(style.as_bytes());
-    for z in [12u32, 14, 16] {
+    for z in [12u32, 14, 15] {
         let n = (1u64 << z) as f64;
         let tx = |lon: f64| ((lon + 180.0) / 360.0 * n) as u32;
         let ty = |lat: f64| ((1.0 - lat.to_radians().tan().asinh() / std::f64::consts::PI) / 2.0 * n) as u32;
-        for s in &sources {
-            for x in tx(x0)..=tx(x1) {
-                for y in ty(y1)..=ty(y0) {
-                    let t = tiles.tile(s, z, x, y);
-                    if !t.is_empty() {
-                        h.update(format!("{s}/{z}/{x}/{y}:{}:", t.len()).as_bytes());
-                        h.update(&t);
-                    }
+        for x in tx(x0)..=tx(x1) {
+            for y in ty(y1)..=ty(y0) {
+                let t = tiles.tile(z, x, y);
+                if !t.is_empty() {
+                    h.update(format!("{z}/{x}/{y}:{}:", t.len()).as_bytes());
+                    h.update(&t);
                 }
             }
         }
@@ -71,7 +68,7 @@ fn tiles_hash(area: &Path) -> String {
 #[test]
 fn monaco_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(tiles_hash(&area), "e55082e48e667ef0ecb253384f40aef0ff954646071245c82903c3de9d4b676b");
+    assert_eq!(tiles_hash(&area), "a2e655f4e5d97352bb5de0baae559c84883790c1d162d3a17c5f0802df01fdf7");
 }
 
 #[test]
@@ -79,5 +76,5 @@ fn monaco_tiles() {
 fn tartu_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_tartu.sh", area.display());
-    assert_eq!(tiles_hash(&area), "bc8359d0e0dfbb364d9569f882482e2a000c10561c30c5ff2ab381331df94624");
+    assert_eq!(tiles_hash(&area), "1e60a56f592823aba30a41dec5cd798278e448341d51d2c91f10f43232700e65");
 }

@@ -15,6 +15,8 @@ bytes = "1"
 indexmap = "2"                      # the order of Python's dicts (the slots' groups)
 rstar = "0.12"                      # the R-tree for the crossings (shapely STRtree) and the levels
 sha2 = "0.10"                       # edge_levels_meta.edge_hash: roadstyle's sha256 of the sorted edge ids
+yaml-rust2 = "0.13"                 # the look: roadstyle's profiles and palettes (src/roadstyle/data/*.yaml)
+base64 = "0.22"                     # the look: the arrow image as a data URL
 
 [dev-dependencies]
 # the golden levels are duckosm-rust's own Parquet files, which it writes with zstd (only the tests read them)
