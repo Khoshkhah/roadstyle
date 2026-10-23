@@ -10,9 +10,19 @@ on:
     tags: ["v*"]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+  # one roadstyle wheel with the Rust engine in it for each platform (abi3: one wheel for every Python from 3.10), and the sdist
+  # (docs/design/rust_library.md, decision 5)
+  wheels:
+    strategy:
+      matrix:
+        include:
+          - {os: ubuntu-latest, target: x86_64}
+          - {os: ubuntu-latest, target: aarch64}
+          - {os: macos-latest, target: x86_64}
+          - {os: macos-latest, target: aarch64}
+          - {os: windows-latest, target: x64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -20,19 +30,44 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Build sdist + wheel (roadstyle and roadstyle-mcp)
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --out dist
+          manylinux: auto
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.os }}-${{ matrix.target }}
+          path: dist/
+
+  sdist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: roadstyle-mcp (pure Python, released with roadstyle)
         run: |
           pip install build
-          python -m build
           python -m build packages/roadstyle-mcp --outdir dist/
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dist
+          name: sdist
           path: dist/
 
   publish:
-    needs: build
+    needs: [wheels, sdist]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: pypi
@@ -41,8 +76,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: dist
           path: dist/
+          merge-multiple: true
 
       - uses: pypa/gh-action-pypi-publish@release/v1
 

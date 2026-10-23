@@ -1,6 +1,7 @@
 [build-system]
-requires = ["setuptools>=77"]
-build-backend = "setuptools.build_meta"
+# one wheel with the Rust engine in it (docs/design/rust_library.md, decision 5): the module roadstyle._rust (rust/roadstyle-py, abi3)
+requires = ["maturin>=1.8,<2"]
+build-backend = "maturin"
 
 [project]
 name = "roadstyle"
@@ -62,17 +63,13 @@ Documentation = "https://khoshkhah.github.io/roadstyle/"
 Source = "https://github.com/Khoshkhah/roadstyle"
 Changelog = "https://github.com/Khoshkhah/roadstyle/blob/main/CHANGELOG.md"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.setuptools.package-data]
-roadstyle = [
-    "py.typed", "static/*.js", "static/*.css", "static/*.html", "static/dashboard/*", "vendor/*.js", "vendor/*.css",
-    "templates/*.html",                       # bundled dashboard/report sidebars (see pages.py)
-    "data/*.json", "data/palettes/*.json",   # bundled palettes + style config (see _settings.py)
-    "data/profiles/*.yaml", "data/palettes/*.yaml",   # the bundled profiles and palettes: every style value (see _settings.theme)
-    "data/sprite.png",                        # the one-way arrow of export_style (see export.py)
-]
+[tool.maturin]
+python-source = "src"
+module-name = "roadstyle._rust"
+manifest-path = "rust/roadstyle-py/Cargo.toml"
+# the package's files are every file in src/roadstyle (the static pages, vendor, templates, data); a development build of the module
+# (rust/roadstyle-py/build.py) is not one of them
+exclude = ["src/roadstyle/_rust.abi3.so", "src/roadstyle/**/__pycache__/**"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

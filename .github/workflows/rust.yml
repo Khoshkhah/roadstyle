@@ -81,13 +81,12 @@ jobs:
             rust/target
           key: rust-py-${{ env.RUST }}-${{ hashFiles('rust/Cargo.lock') }}
 
-      - name: Install roadstyle
+      - name: Install roadstyle (maturin builds the extension roadstyle._rust)
         run: pip install -e ".[dev]"
 
-      - name: Build the extension
+      - name: Clippy of the binding
         run: |
           (cd rust && cargo fetch --locked)
-          python rust/roadstyle-py/build.py
           (cd rust && cargo clippy --offline -p roadstyle-py -- -D warnings)
 
       - name: The two engines

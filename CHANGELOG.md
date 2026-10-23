@@ -51,6 +51,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   the +500 of a painted road was added two times to each. Now each layer gets it one time. The order on the map does not change.
 
 ### Changed
+- **One wheel with the Rust engine in it** (decision 5 of `docs/design/rust_library.md`). The package builds with maturin: each wheel has the
+  module `roadstyle._rust` (abi3, one wheel for Linux x86_64 and aarch64, macOS x86_64 and arm64, and Windows), and the release workflow
+  builds them. The files of the package do not change. An install from the source needs a Rust toolchain.
 - **`export_style` writes the legend data** in `roadstyle:color_options`, as `export_inline` does.
 - **`export_inline` writes the legend data** in the style's metadata `roadstyle:color_options` (the page's `COLOR_OPTIONS`), when the map has data
   colours, as the Rust engine does. The dashboard module reads it.
