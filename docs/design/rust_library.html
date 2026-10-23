@@ -38,7 +38,8 @@ has the level solver. duckosm-rust's browser page and the GeoLibre plugin use it
 Python.</p>
 <p>This plan makes one Rust library with a pure core and adapters around the core. The core has three independent parts: the road
 model, the look (the typed config) and the engine. The adapters read and write files and connect the core to Rust, JavaScript and
-Python. The plan has seven phases. Python roadstyle stays the reference until the last phase: a change in the Rust output is
+Python. A typed render model (the drawing numbers of each road, the objects attached to roads and one order for the whole map)
+replaces the <code>__rs_*</code> properties that Python and Rust bake today. The plan has seven phases. Python roadstyle stays the reference until the last phase: a change in the Rust output is
 correct only when it is byte for byte equal to the output of Python.</p>
 <h2 id="contents">Contents</h2>
 <ol>
@@ -46,6 +47,8 @@ correct only when it is byte for byte equal to the output of Python.</p>
 <li><a href="#the-architecture">The architecture</a></li>
 <li><a href="#the-crates">The crates</a></li>
 <li><a href="#the-data-flow-of-one-map">The data flow of one map</a></li>
+<li><a href="#the-render-model">The render model</a>: the numbers of each road, the objects on roads, the order of the map</li>
+<li><a href="#input-and-output-formats">Input and output formats</a></li>
 <li><a href="#the-config-the-look">The config: the look</a></li>
 <li><a href="#the-public-api">The public API</a></li>
 <li><a href="#efficiency">Efficiency</a></li>
@@ -368,7 +371,7 @@ There is no golden test against Rust in <code>tests/</code>.</p>
         CFG[&quot;palette, profile, settings files&quot;]
     end
     subgraph core[&quot;Pure core: no I/O, builds for wasm32&quot;]
-        M[&quot;roadstyle-model&lt;br/&gt;roads as columns&quot;]
+        M[&quot;roadstyle-model&lt;br/&gt;roads as columns, render model&quot;]
         L[&quot;roadstyle-look&lt;br/&gt;typed, versioned look&quot;]
         E[&quot;roadstyle-engine&lt;br/&gt;style, data-driven paint, legend&quot;]
         T[&quot;roadstyle-tiles&lt;br/&gt;vector tiles&quot;]
@@ -377,6 +380,7 @@ There is no golden test against Rust in <code>tests/</code>.</p>
         L --&gt; E
         M --&gt; T
         E --&gt; T
+        LV --&gt; E
     end
     subgraph adapters_out[&quot;Adapters: output and bindings&quot;]
         IO[&quot;roadstyle-io&lt;br/&gt;style.json, tiles, PMTiles, page&quot;]
@@ -486,6 +490,7 @@ There is no golden test against Rust in <code>tests/</code>.</p>
     py[&quot;roadstyle-py (PyO3, abi3)&quot;]
     model --&gt; engine
     look --&gt; engine
+    levels --&gt; engine
     model --&gt; tiles
     engine --&gt; tiles
     model --&gt; io
@@ -496,7 +501,8 @@ There is no golden test against Rust in <code>tests/</code>.</p>
     facade --&gt; wasm
     facade --&gt; py
 </pre>
-<p><em>Each arrow is a Cargo dependency. <code>roadstyle-levels</code> has no dependency on the other crates, so duckosm-core can take it alone.</em></p>
+<p><em>Each arrow is a Cargo dependency. <code>roadstyle-levels</code> has no dependency on the other crates, so duckosm-core can take it alone.
+The engine uses it to compute the numbers when the caller gives none.</em></p>
 <table>
 <thead>
 <tr>
@@ -509,7 +515,7 @@ There is no golden test against Rust in <code>tests/</code>.</p>
 <tbody>
 <tr>
 <td><code>roadstyle-model</code></td>
-<td><code>RoadTable</code> (columns over Arrow arrays), <code>Geometry</code> (one coordinate buffer with offsets), <code>ColumnMap</code>, <code>Source</code> and <code>Props</code> (from <code>props</code>), validation, <code>MAX_ROADS</code></td>
+<td><code>RoadTable</code> and <code>FeatureTable</code> (columns over Arrow arrays), <code>Geometry</code> (one coordinate buffer with offsets), the render model (<code>RoadDraw</code>, <code>Levels</code>, <code>End</code>, <code>Attachment</code>, <code>DrawKey</code>), <code>ColumnMap</code> and its presets, <code>RoadSource</code>, validation, <code>MAX_ROADS</code></td>
 <td>arrow-array, arrow-schema</td>
 <td>yes</td>
 </tr>
@@ -527,8 +533,8 @@ There is no golden test against Rust in <code>tests/</code>.</p>
 </tr>
 <tr>
 <td><code>roadstyle-engine</code></td>
-<td><code>roads</code>, <code>simple</code>, <code>slots</code>, <code>layers</code>, <code>overlays</code>, <code>features</code>, <code>planner</code>, <code>geom</code>, data-driven color and width, the legend, the simplification</td>
-<td>model, look, serde_json, rstar, indexmap; rayon (optional)</td>
+<td><code>roads</code>, <code>simple</code>, <code>slots</code>, <code>layers</code>, <code>overlays</code>, <code>features</code>, <code>planner</code>, <code>geom</code>; the <code>LevelPlan</code> rules, the piece generators, <code>order</code> (the sort key and the layer planner), linear referencing for attachments; data-driven color and width, the legend, the simplification</td>
+<td>model, look, levels, serde_json, rstar, indexmap; rayon (optional)</td>
 <td>yes</td>
 </tr>
 <tr>
@@ -539,8 +545,8 @@ There is no golden test against Rust in <code>tests/</code>.</p>
 </tr>
 <tr>
 <td><code>roadstyle-io</code></td>
-<td><code>read</code> (GeoParquet), GeoJSON, DuckDB (feature <code>duckdb</code>, native only), the style writer (streamed), the tile folder, PMTiles, the page writer (feature <code>page</code>, with the dashboard bundle)</td>
-<td>parquet (snap), duckdb (optional)</td>
+<td>the readers of <a href="#input-and-output-formats">Input and output formats</a> (GeoParquet, Arrow IPC, GeoJSON, FlatGeobuf, CSV, DuckDB), the style writer (streamed), the tile folder, PMTiles, the page writer (feature <code>page</code>, with the dashboard bundle)</td>
+<td>parquet (snap), arrow-ipc, flatgeobuf, csv, duckdb: each optional</td>
 <td>yes, without <code>duckdb</code></td>
 </tr>
 <tr>
@@ -643,8 +649,32 @@ Python <code>roadstyle</code> program, which calls Rust. A Rust CLI with the sam
 <tr>
 <td><code>geojson</code></td>
 <td>io</td>
-<td>GeoJSON reader</td>
+<td>GeoJSON and NDJSON reader</td>
 <td>on</td>
+</tr>
+<tr>
+<td><code>ipc</code></td>
+<td>io</td>
+<td>Arrow IPC stream reader</td>
+<td>on</td>
+</tr>
+<tr>
+<td><code>fgb</code></td>
+<td>io</td>
+<td>FlatGeobuf reader</td>
+<td>off</td>
+</tr>
+<tr>
+<td><code>csv</code></td>
+<td>io</td>
+<td>CSV with WKT reader</td>
+<td>off</td>
+</tr>
+<tr>
+<td><code>proj</code></td>
+<td>io</td>
+<td>Transform from another CRS to EPSG:4326 (pure Rust)</td>
+<td>off</td>
 </tr>
 <tr>
 <td><code>duckdb</code></td>
@@ -743,6 +773,581 @@ subclass of <code>ValueError</code> (<code>roadstyle.LookError(ValueError)</code
    the page).</li>
 <li><strong>Page.</strong> MapLibre draws the style. The dashboard module reads the metadata and adds the controls.</li>
 </ol>
+<h2 id="the-render-model">The render model</h2>
+<p>The render model is the set of values that the engine draws from: the drawing numbers of each road, the objects that belong to a
+road, and the order of all layers of the map. It is the core of roadstyle, and today it has no type. Python bakes it as about 40
+<code>__rs_*</code> properties (<code>render_web.py</code>), and the crate copies these properties (<code>roads.rs</code>, <code>simple.rs</code>, <code>slots.rs</code>). This section makes
+it one typed model in <code>roadstyle-model</code>, with the rules in <code>roadstyle-engine</code>. The specification of the numbers stays
+<a href="levels_split_casing.md">Divided casing and one band</a>. This section does not change it.</p>
+<pre class="mermaid">flowchart LR
+    subgraph sources[&quot;Where each value comes from&quot;]
+        cols[&quot;caller columns&lt;br/&gt;casing_level_col, fill_level_col, ...&quot;]
+        stored[&quot;stored levels&lt;br/&gt;visualization.edge_levels + meta&quot;]
+        edits[&quot;user edits&lt;br/&gt;edits.csv, heads.csv, caps.csv&quot;]
+        tags[&quot;the tags&lt;br/&gt;layer, bridge, tunnel&quot;]
+        objs[&quot;caller objects&lt;br/&gt;Overlay(edge_col), items&quot;]
+        base[&quot;base-map features&lt;br/&gt;crossings, signals&quot;]
+    end
+    plan[&quot;LevelPlan&lt;br/&gt;one source of numbers for each map&quot;]
+    solver[&quot;roadstyle-levels&lt;br/&gt;Tags or Solve, with fixed roads&quot;]
+    draw[&quot;RoadDraw&lt;br/&gt;numbers, ends, direction, look&quot;]
+    att[&quot;Attachment&lt;br/&gt;edge, along, side, offset,&lt;br/&gt;kind, role, order&quot;]
+    gen[&quot;generators&lt;br/&gt;casing parts, fills, seams, laps,&lt;br/&gt;twin casing, shadows, slots&quot;]
+    key[&quot;DrawKey&lt;br/&gt;position, phase, order, tie&quot;]
+    planner[&quot;layer planner&lt;br/&gt;merged or per position&quot;]
+    out[&quot;MapLibre layers + sources&quot;]
+    cols --&gt; plan
+    stored --&gt; plan
+    tags --&gt; solver
+    edits --&gt; solver
+    plan --&gt;|&quot;no numbers, or some&quot;| solver
+    solver --&gt; plan
+    plan --&gt; draw
+    objs --&gt; att
+    base --&gt;|&quot;snap to the edge on top&quot;| att
+    draw --&gt; gen
+    gen --&gt; key
+    att --&gt; key
+    draw --&gt;|&quot;position of the edge&quot;| att
+    key --&gt; planner
+    planner --&gt; out
+</pre>
+<p><em>Each value has one source. Every piece (a casing part, a fill, a name, a lane, a sign) gets one DrawKey, and one planner turns the keys into layers.</em></p>
+<h3 id="words">Words</h3>
+<table>
+<thead>
+<tr>
+<th>Word</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>edge</strong></td>
+<td>one row of the input: one line with one direction</td>
+</tr>
+<tr>
+<td><strong>road</strong></td>
+<td>both directions of one segment. The solver works on roads, and the result is copied to each edge of the road</td>
+</tr>
+<tr>
+<td><strong>position</strong></td>
+<td>a drawing number. A higher position is drawn later. 0 is the ground</td>
+</tr>
+<tr>
+<td><strong>piece</strong></td>
+<td>one feature that the engine draws: a casing part, a fill, a fill half, a seam, a lap, a shadow, a name slot, an attached object</td>
+</tr>
+<tr>
+<td><strong>attachment</strong></td>
+<td>an object that belongs to an edge and is drawn at the place of that edge</td>
+</tr>
+<tr>
+<td><strong>role</strong></td>
+<td>the name of a style in the profile (<code>lane</code>, <code>divider</code>, <code>sign</code>), which an attachment names (<code>overlay_styles.md</code>)</td>
+</tr>
+<tr>
+<td><strong>draw key</strong></td>
+<td>the place of a piece in the order of the map</td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-numbers-and-ends-of-a-road-roaddraw">The numbers and ends of a road: <code>RoadDraw</code></h3>
+<p><code>RoadDraw</code> holds one row for each edge, as columns:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>edge_id</code></td>
+<td><code>EdgeId</code> (<code>i64</code>, or text for other schemas)</td>
+<td>the id of the edge</td>
+<td>required</td>
+</tr>
+<tr>
+<td><code>class</code></td>
+<td>dictionary text, and <code>is_link</code></td>
+<td>the road class (<code>highway</code> without <code>_link</code>)</td>
+<td>the fallback style</td>
+</tr>
+<tr>
+<td><code>geometry</code></td>
+<td>a line in the coordinate buffer</td>
+<td>the edge's line</td>
+<td>required</td>
+</tr>
+<tr>
+<td><code>levels</code></td>
+<td><code>Levels { casing_start, casing_main, casing_end, fill: i16 }</code></td>
+<td>the four positions</td>
+<td>see the rules below</td>
+</tr>
+<tr>
+<td><code>ends</code></td>
+<td><code>[End; 2]</code>, <code>End { head_m: Option&lt;f32&gt;, cap: Cap }</code>, <code>Cap = Round, Square, Flat</code></td>
+<td>the head length and the shape of each end</td>
+<td><code>head_m</code> of the profile (5 m), <code>Round</code></td>
+</tr>
+<tr>
+<td><code>direction</code></td>
+<td><code>directed: Option&lt;bool&gt;</code>, <code>oneway: Option&lt;bool&gt;</code>, <code>driving: Option&lt;bool&gt;</code></td>
+<td>two lanes or one line; the arrow</td>
+<td>null: as today (<code>directed</code> null = directed, <code>oneway</code> null = no twin)</td>
+</tr>
+<tr>
+<td><code>structure</code></td>
+<td><code>tag_level: i8</code>, <code>bridge: bool</code>, <code>tunnel: bool</code></td>
+<td>the look (deck, tunnel) and the Bridges and Tunnels switches; not the order</td>
+<td>0, false, false</td>
+</tr>
+<tr>
+<td><code>look</code></td>
+<td><code>access</code>, <code>width_m</code>, the data-driven paint (task 1)</td>
+<td>the colors and widths of this edge</td>
+<td>none</td>
+</tr>
+<tr>
+<td>derived</td>
+<td><code>twin</code>, <code>single_line</code>, <code>split</code></td>
+<td>found by the engine: the reverse edge, a pair drawn as one line, two different caps</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>The engine derives the pieces from <code>RoadDraw</code> with the rules of today: three casing parts (start head, main, end head), or two
+halves for a short road (one cut, <code>short_road_heads.md</code>), or one piece when the three numbers are equal; seams of 0.5 m and laps
+of 2 m at each cut; one casing for a two-way pair (<code>twin_casing = "one"</code>); fill halves when the two caps differ; bridge shadows;
+tunnel gap and dashes.</p>
+<h3 id="where-the-numbers-come-from-levelplan">Where the numbers come from: <code>LevelPlan</code></h3>
+<pre><code class="language-rust">pub enum LevelPlan {
+    Given(LevelColumns),                       // the caller's columns (casing_level_col, fill_level_col, ...)
+    Stored { table: LevelColumns, meta: LevelMeta }, // visualization.edge_levels and edge_levels_meta
+    Compute { method: Method, params: SolveParams, edits: Edits },  // Tags, or Solve with the rule rows
+    Partial { given: LevelColumns, method: Method, params: SolveParams, edits: Edits }, // some roads given, the rest solved
+}
+</code></pre>
+<p>The rules:</p>
+<ol>
+<li><strong>One source of numbers for one map.</strong> The positions are a ranking for the whole network: a number of one road means something
+   only against the numbers of the roads that it meets or crosses. Thus all numbers of one map come from one solve or one stored
+   table (<code>levels_split_casing.md</code>, section 12.1). The engine does not mix two sources by a default.</li>
+<li><strong>Some numbers given, the rest computed.</strong> The caller gives the numbers of some roads. These roads are held (<code>fixed</code>: all four
+   numbers of a whole road), and the solver computes the others with them as bounds. Python has this as <code>solve_levels(fixed=...)</code>
+   (the editor's local solve). It is the only way to mix: a road with no number is never drawn at 0 without a message.</li>
+<li><strong>The ends are not the numbers.</strong> For each end, the first source that has a value wins: the user's edit (<code>heads.csv</code>,
+   <code>caps.csv</code>), the caller's column (<code>head_start_m_col</code>, <code>cap_start_col</code>, ...), the solver's result (the square cap at the dead end of
+   a two-way road, <code>auto_ends</code> when asked), the profile (<code>head_m</code>, round).</li>
+<li><strong>Edits are rules, not numbers.</strong> An edit adds a row to the solver's input or switches one off (<code>enabled = false</code> removes the same
+   row of <code>pairs.csv</code>). It never sets a number. The Rust solver has no edits today (<code>levels/mod.rs:3</code>), and P4 adds them.</li>
+<li><strong>Stored numbers are checked.</strong> The engine compares the stored parameters (<code>method</code>, <code>head_m</code>, <code>band_dist</code>, <code>margin</code>,
+   <code>max_level</code>, <code>band_source</code>, <code>order_source</code>, <code>min_positions</code>), the number of edges and the edge hash. An edge with no stored row is
+   an error, as in Python's <code>levels_db</code>. (The worker SQL of today joins with <code>LEFT JOIN</code>, and a missing row becomes 0.)</li>
+<li><strong>One normalization.</strong> A value that is not a number is an error with <code>Given</code> and <code>Stored</code> (Python reads it as 0 today: P0 lists this
+   as a difference to decide). A float is rounded half to even. The main casing number is never above the fill, and each head is lowered
+   to the fill. A reversed edge has its start and end swapped.</li>
+<li><strong>The source is in the style.</strong> The metadata <code>roadstyle:levels</code> holds the method, the edge hash, the version and the pairs that the
+   solver gave up, so a page can show where the numbers come from.</li>
+</ol>
+<h3 id="objects-that-belong-to-a-road-attachment">Objects that belong to a road: <code>Attachment</code></h3>
+<p>Today four mechanisms put objects on roads: the slots (names and arrows), <code>Overlay(edge_col=...)</code>, <code>items=</code> (metre-wide lines), and
+<code>edge_attach</code> (the base map's crossings and traffic signals, by distance). Each one carries its edge in its own way. <code>edge_items.md</code>
+asks for one mechanism. The model is one type:</p>
+<pre><code class="language-rust">pub struct Attachment {
+    pub edge: EdgeId,     // the edge that it belongs to
+    pub at: Along,        // Geometry(given) | Whole | At { m } | Span { from_m, to_m }: metres along the edge
+    pub side: Side,       // Center | Right | Left, of the edge's direction
+    pub offset_m: f32,    // from the side
+    pub kind: Kind,       // Line | Fill | Circle | Icon | Text
+    pub role: RoleId,     // a style of the profile: &quot;lane&quot;, &quot;divider&quot;, &quot;sign&quot;, &quot;sensor&quot;, &quot;bus_stop&quot;
+    pub order: i16,       // inside the position: the lower is drawn first
+    pub phase: Phase,     // OverFill (default) | WithCasing
+    pub row: u32,         // the row of its data, for the popup
+}
+</code></pre>
+<ul>
+<li><strong>What it gets from its edge.</strong> The position (the edge's fill number), the tunnel look, the filters (hiding a road hides its
+  objects) and the selection (a click selects the road too, unless the role says <code>interactive: false</code>). Every piece carries the
+  same edge label (<code>__rs_edge</code>, and <code>__rs_edge2</code> for both directions of a pair).</li>
+<li><strong>The place.</strong> <code>Geometry</code> is today's case: the caller gives the line, polygon or point. <code>At</code>, <code>Span</code>, <code>Side</code> and <code>offset_m</code> are new:
+  the engine cuts the edge's line at the metres (linear referencing) and moves the result to the side. A sensor at 40 m on the right,
+  a bus stop at the end, a lane marking from 10 m to 60 m need no geometry from the caller. An object on one lane of a two-way road
+  follows the lane's offset in pixels (the expression of the road), not a fixed number of metres.</li>
+<li><strong>Built in.</strong> The slots are attachments that the engine makes: a name is <code>Text</code> on a <code>Span</code> (an even slot), an arrow is <code>Icon</code> on
+  a <code>Span</code> (an odd slot). The base map's crossings and traffic signals become attachments when they are snapped to the edge that is
+  drawn on top (<code>edge_attach</code>).</li>
+<li><strong>New kinds of objects need no change of the core.</strong> A new object is a new role: a style entry in a profile (its <code>kind</code> and its
+  paint values) and a palette key for its color. The five kinds are a closed list in the core. A sixth kind is a change of the core
+  and of the layer planner.</li>
+<li><strong>Errors.</strong> An edge id that is not among the roads is an error with the count and the first ids, as in Python today.</li>
+</ul>
+<h3 id="the-order-of-the-whole-map-drawkey">The order of the whole map: <code>DrawKey</code></h3>
+<p>Every piece has one key, <code>DrawKey { position, phase, order, tie }</code>. The order of the map is the order of the keys:</p>
+<pre class="mermaid">flowchart TB
+    bg[&quot;background, base map (raster or the base-map layers)&quot;]
+    under[&quot;overlays with placement under&quot;]
+    subgraph pos[&quot;for each position p, lowest first&quot;]
+        direction TB
+        c[&quot;1 casings: heads, main, seams, laps;&lt;br/&gt;bridge shadow, bridge casing; tunnel gap and dashes&quot;]
+        cw[&quot;2 attachments with phase WithCasing (new)&quot;]
+        f[&quot;3 fills: dashed classes first, then fills and fill halves&quot;]
+        a[&quot;4 attachments, by order, then by overlay&quot;]
+        ar[&quot;5 one-way arrows&quot;]
+        lb[&quot;6 street names&quot;]
+        c --&gt; cw --&gt; f --&gt; a --&gt; ar --&gt; lb
+    end
+    hl[&quot;hover and selection (roads-highlight)&quot;]
+    deck[&quot;3D: bridge decks, buildings&quot;]
+    bnd[&quot;boundary&quot;]
+    over[&quot;overlays with placement over&quot;]
+    bg --&gt; under --&gt; pos --&gt; hl --&gt; deck --&gt; bnd --&gt; over
+</pre>
+<p><em>At one position every casing is under every fill. A higher position is over the whole of a lower one, casing included.</em></p>
+<p>MapLibre orders the layers by their place in the list, and the features of one layer by <code>line-sort-key</code> (or <code>symbol-sort-key</code>). A
+sort key works only inside one layer. Thus the layer planner turns the keys into layers in one of two ways:</p>
+<table>
+<thead>
+<tr>
+<th>Plan</th>
+<th>Layers</th>
+<th>Sort key</th>
+<th>Today</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Merged</strong> (<code>simple=True</code>, the default)</td>
+<td>one line layer for every line piece of every position (<code>roads-simple</code>); the other kinds in their own layers</td>
+<td><code>2p</code> for a casing (+0.25 bridge, -0.1 shadow, +0.1 tunnel dashes), <code>2p - 0.5</code> for a dashed fill, <code>2p + 1</code> for a fill, <code>2p + 1 + 0.01 order</code> for a line attachment, + <code>1e-8 edge</code></td>
+<td>Python and Rust</td>
+</tr>
+<tr>
+<td><strong>Per position</strong> (<code>simple=False</code>)</td>
+<td>for each position, a casing layer, a fill layer, the attachment layers, an arrow layer and a name layer, in the order of the diagram</td>
+<td>constant</td>
+<td>Python only (see decision 2)</td>
+</tr>
+</tbody>
+</table>
+<p>The key formula is one function in <code>roadstyle-engine</code> (<code>order::sort_key</code>), and both plans use it. Today it is written two times
+(<code>_simple_pieces</code> in Python, <code>simple.rs</code> in Rust).</p>
+<p>The limits of the merged plan, as in Python today:</p>
+<ul>
+<li>Only line pieces share the one layer. A polygon, a circle, an icon or a text attachment is in a layer of its own above the whole
+  road layer. Thus it does not go under a road at a higher position (Python: only metre-wide line items are pieces of the road layer;
+  Rust: no item at all yet, <code>__rs_k = 5</code> is read and never made).</li>
+<li>The names and the arrows are one layer each, above all roads. A name of a road under a bridge can show on the bridge.</li>
+<li>A later improvement can split the merged layer at the positions that have such attachments (a filter on the sort key), with one
+  more layer for each such position. It is new behavior: see decision 8.</li>
+</ul>
+<h2 id="input-and-output-formats">Input and output formats</h2>
+<h3 id="all-inputs-become-one-form">All inputs become one form</h3>
+<p>Each reader is an adapter that gives Arrow record batches. The model makes one <code>RoadTable</code> from them (the columns of <code>RoadDraw</code>,
+plus the other columns for popups as dictionary or plain arrays), and a <code>FeatureTable</code> for the base map and the overlays. The engine
+reads only these two types.</p>
+<pre><code class="language-rust">pub trait RoadSource {
+    fn schema(&amp;self) -&gt; SchemaRef;
+    fn next_batch(&amp;mut self) -&gt; Option&lt;Result&lt;RecordBatch, DataError&gt;&gt;;
+}
+pub fn read_roads(src: impl RoadSource, map: &amp;ColumnMap) -&gt; Result&lt;RoadTable, DataError&gt;;
+</code></pre>
+<pre class="mermaid">flowchart LR
+    gp[&quot;GeoParquet&quot;] --&gt; rb
+    ipc[&quot;Arrow IPC&lt;br/&gt;(Arrow JS, duckdb-wasm)&quot;] --&gt; rb
+    cdi[&quot;Arrow C Data Interface&lt;br/&gt;(pyarrow, GeoPandas, Polars, DuckDB)&quot;] --&gt; rb
+    gj[&quot;GeoJSON, NDJSON&quot;] --&gt; rb
+    fgb[&quot;FlatGeobuf&quot;] --&gt; rb
+    csv[&quot;CSV with WKT&quot;] --&gt; rb
+    ddb[&quot;DuckDB tables&lt;br/&gt;(GeoPackage, PostGIS through DuckDB)&quot;] --&gt; rb
+    mem[&quot;Rust builder, JS objects&quot;] --&gt; rb
+    rb[&quot;Arrow record batches&lt;br/&gt;(RoadSource)&quot;] --&gt; cm[&quot;ColumnMap + preset&lt;br/&gt;check, CRS&quot;]
+    cm --&gt; rt[&quot;RoadTable, FeatureTable&quot;]
+    rt --&gt; eng[&quot;engine&quot;]
+</pre>
+<p><em>Every format ends as Arrow batches, so the column map and the checks are written once.</em></p>
+<table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Adapter</th>
+<th>Feature</th>
+<th>Native</th>
+<th>WebAssembly</th>
+<th>Python</th>
+<th>No copy of the columns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GeoParquet (WKB or GeoArrow geometry)</td>
+<td><code>io::parquet</code></td>
+<td><code>parquet</code> (default)</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>no: one decode</td>
+</tr>
+<tr>
+<td>Arrow C Data Interface (pyarrow, GeoPandas <code>to_arrow</code>, Polars, DuckDB)</td>
+<td><code>roadstyle-py</code>, <code>io::arrow</code></td>
+<td>core</td>
+<td>yes</td>
+<td>no</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Arrow IPC stream (Arrow JS, duckdb-wasm)</td>
+<td><code>io::ipc</code></td>
+<td><code>ipc</code></td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>one copy into the module, then yes</td>
+</tr>
+<tr>
+<td>GeoArrow native coordinates</td>
+<td>model</td>
+<td>core</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>WKB column</td>
+<td><code>geom::wkb</code></td>
+<td>core</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>no: one decode</td>
+</tr>
+<tr>
+<td>GeoJSON, newline-delimited GeoJSON</td>
+<td><code>io::geojson</code> (a streamed parse, no JSON tree)</td>
+<td><code>geojson</code></td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>FlatGeobuf (with a box filter)</td>
+<td><code>io::fgb</code> (<code>flatgeobuf</code> crate, pure Rust)</td>
+<td><code>fgb</code></td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>CSV with a WKT column</td>
+<td><code>io::csv</code></td>
+<td><code>csv</code></td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>DuckDB table or query</td>
+<td><code>io::duckdb</code> (DuckDB's Arrow interface)</td>
+<td><code>duckdb</code></td>
+<td>yes</td>
+<td>through duckdb-wasm and Arrow IPC or Parquet</td>
+<td>through Python's duckdb</td>
+<td>yes natively</td>
+</tr>
+<tr>
+<td>GeoPackage, PostGIS</td>
+<td>through DuckDB (<code>spatial</code>, <code>postgres</code> extensions) or GeoPandas</td>
+<td><code>duckdb</code></td>
+<td>yes</td>
+<td>no</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>Rust values, JS objects</td>
+<td><code>RoadTableBuilder</code>, <code>Tiler.fromRows</code></td>
+<td>core</td>
+<td>yes</td>
+<td>yes</td>
+<td>no</td>
+<td>Rust yes, JS no</td>
+</tr>
+<tr>
+<td>GeoDataFrame</td>
+<td><code>to_arrow()</code>, then the C Data Interface</td>
+<td>Python</td>
+<td></td>
+<td></td>
+<td>yes</td>
+<td>WKB decode only</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Large areas.</strong> The reader takes batches (for example 65,536 rows), maps and checks each one, adds it to the columns and frees it:
+the peak is the table and one batch, not a JSON tree. A box filter reads only the rows in an area (FlatGeobuf's index, the bounding
+box columns of GeoParquet 1.1). The engine itself needs the whole table, because the twins, the chains of the slots, the levels and
+the camera are global. The output streams: the style is written source by source, and the tiles are made on request.</p>
+<p><strong>Memory of each path.</strong> Arrow C Data: the columns are not copied, and only WKB is decoded into the coordinate buffer. Arrow IPC in a
+browser: one copy into the module. GeoParquet and the other files: one decode, and the file bytes are freed after it. GeoJSON: one
+streamed pass. P4 measures each path on Tartu.</p>
+<h3 id="schemas-the-column-map-and-its-presets">Schemas: the column map and its presets</h3>
+<p><code>ColumnMap</code> names the column of each field of <code>RoadDraw</code> (the Python keywords <code>highway_col</code>, <code>edge_id_col</code>, <code>tunnel_col</code>, <code>bridge_col</code>,
+<code>layer_col</code>, <code>directed_col</code>, <code>driving_col</code>, <code>access_col</code>, the level and end columns). A preset is a <code>ColumnMap</code> with a conversion:</p>
+<table>
+<thead>
+<tr>
+<th>Preset</th>
+<th>Class</th>
+<th>Id</th>
+<th>Bridge, tunnel, layer</th>
+<th>Direction</th>
+<th>Conversion</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>duckosm</code></td>
+<td><code>highway</code></td>
+<td><code>edge_id</code> (BIGINT hash)</td>
+<td><code>bridge</code>, <code>tunnel</code>, <code>layer</code></td>
+<td><code>oneway</code>, <code>is_directed</code>, <code>has_arrows</code></td>
+<td>the levels from <code>visualization.edge_levels</code></td>
+</tr>
+<tr>
+<td><code>osmnx</code></td>
+<td><code>highway</code></td>
+<td><code>(u, v, key)</code></td>
+<td><code>bridge</code>, <code>tunnel</code>, <code>layer</code></td>
+<td><code>oneway</code>, <code>reversed</code></td>
+<td>a list cell becomes its first value that is not null (<code>_flatten_osmnx</code>); a warning for an edge that is both bridge and tunnel</td>
+</tr>
+<tr>
+<td><code>overture</code></td>
+<td><code>class</code> (<code>subclass = link</code> gives <code>is_link</code>)</td>
+<td><code>id</code> (text)</td>
+<td><code>road_flags</code> (<code>is_bridge</code>, <code>is_tunnel</code>), <code>level_rules</code></td>
+<td><code>access_restrictions</code> (to check)</td>
+<td>a flag on a part of a segment (<code>between</code>) splits the segment at that part</td>
+</tr>
+<tr>
+<td><code>gmns</code></td>
+<td><code>facility_type</code>, through a class table</td>
+<td><code>link_id</code></td>
+<td>none</td>
+<td><code>directed</code></td>
+<td>the class table is part of the preset</td>
+</tr>
+<tr>
+<td><code>nvdb</code></td>
+<td>to define with fetching-sweden-data</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>own table</td>
+<td>the keywords</td>
+<td>the keywords</td>
+<td>the keywords</td>
+<td>the keywords</td>
+<td>none</td>
+</tr>
+</tbody>
+</table>
+<p>A missing column is an error that names the preset, the column and the nearest names in the table. A column of the wrong type is an
+error that names the type found.</p>
+<p><strong>Geometry.</strong> A road is a LineString or a MultiLineString. A MultiLineString is one piece, as in Python today, and it gets no heads.
+The base map, the overlays and the attachments take every geometry type. <strong>The CRS.</strong> The model is in EPSG:4326. The Python
+front-end transforms with GeoPandas, as today (<code>validate.to_wgs84</code>). A Rust reader reads the CRS of the file: EPSG:4326 or OGC:CRS84
+is read, another CRS is an error, or it is transformed with the feature <code>proj</code> (pure Rust, so it builds for WebAssembly).</p>
+<h3 id="outputs">Outputs</h3>
+<table>
+<thead>
+<tr>
+<th>Output</th>
+<th>Made by</th>
+<th>Native</th>
+<th>WebAssembly</th>
+<th>Python</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MapLibre style with the sources in it (<code>export_inline</code>, <code>makeStyle</code>)</td>
+<td>engine, <code>io</code></td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Style with vector sources, and tiles on request (<code>Tiler</code>)</td>
+<td>tiles</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>A tile folder (<code>tiles/{z}/{x}/{y}.pbf</code>), a sprite (<code>export_style</code>)</td>
+<td><code>io</code></td>
+<td>yes</td>
+<td>no</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>A PMTiles file</td>
+<td>tiles, feature <code>pmtiles</code></td>
+<td>yes</td>
+<td>yes (bytes)</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>The HTML page</td>
+<td><code>io</code>, feature <code>page</code></td>
+<td>yes</td>
+<td>no</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>The data for folium: GeoJSON with the paint of each edge</td>
+<td>engine (<code>bake</code>)</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>The data for lonboard: casing and fill color (RGBA) and width of each edge, as Arrow arrays</td>
+<td>engine (<code>paint_arrays</code>)</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes, as numpy arrays with no copy</td>
+</tr>
+<tr>
+<td>The legend: <code>metadata["roadstyle:color_options"]</code></td>
+<td>engine (task 1)</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>The level rows (for <code>visualization.edge_levels</code>)</td>
+<td>levels</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+</tbody>
+</table>
 <h2 id="the-config-the-look">The config: the look</h2>
 <h3 id="one-name-for-each-thing">One name for each thing</h3>
 <table>
@@ -1141,10 +1746,12 @@ measurements. <code>MAX_ROADS</code> = 200,000 is an estimate from Tartu only.</
 </ul>
 <h4 id="p4-the-columnar-model-memory-and-the-missing-style-features">P4: the columnar model, memory, and the missing style features</h4>
 <ul>
-<li><strong>Content.</strong> <code>RoadTable</code> over Arrow, dictionary text, typed slots and base map, the column map (<code>highway_col</code>, <code>edge_id_col</code>,
-  <code>tunnel_col</code>, <code>bridge_col</code>, <code>layer_col</code>, <code>cap_col</code>). Then the style features that only Python has: metre widths (<code>width_m_col</code>,
-  <code>width_m_zoom</code>, <code>casing_m</code>, <code>casing_min_px</code>), 3D bridge decks (<code>view_3d</code>), <code>boundary</code>, <code>access_col</code> colors, <code>items</code>,
-  <code>Overlay</code> from user data, <code>include</code> and <code>exclude</code>, levels computed when no level columns are given.</li>
+<li><strong>Content.</strong> <code>RoadTable</code> over Arrow, dictionary text, typed slots and base map, the column map and the presets (<code>highway_col</code>,
+  <code>edge_id_col</code>, <code>tunnel_col</code>, <code>bridge_col</code>, <code>layer_col</code>, <code>cap_col</code>), the readers of the format table. The render model: <code>RoadDraw</code>,
+  <code>LevelPlan</code> (with <code>fixed</code> roads and the edit rows in <code>roadstyle-levels</code>), <code>Attachment</code> for the slots, <code>items</code>, <code>Overlay</code> from user
+  data and <code>edge_attach</code>, <code>DrawKey</code> and the one sort-key function. Then the style features that only Python has: metre widths
+  (<code>width_m_col</code>, <code>width_m_zoom</code>, <code>casing_m</code>, <code>casing_min_px</code>), 3D bridge decks (<code>view_3d</code>), <code>boundary</code>, <code>access_col</code> colors,
+  <code>include</code> and <code>exclude</code>, levels computed when no level columns are given.</li>
 <li><strong>Golden test.</strong> The hashes do not change for the model work. Each new feature gets its golden from Python.</li>
 <li><strong>Benchmark.</strong> The targets of <a href="#efficiency">Efficiency</a>. Measure Stockholm county in Chrome and Edge, then set <code>MAX_ROADS</code>.</li>
 <li><strong>First user.</strong> duckosm-rust's page (larger areas).</li>
@@ -1207,9 +1814,9 @@ measurements. <code>MAX_ROADS</code> = 200,000 is an estimate from Tartu only.</
 <td>P2</td>
 </tr>
 <tr>
-<td>D: model and memory</td>
+<td>D: model, render model and memory</td>
 <td>P4</td>
-<td><code>rust/roadstyle-model/</code>, <code>rust/roadstyle-io/</code></td>
+<td><code>rust/roadstyle-model/</code>, <code>rust/roadstyle-io/</code>, <code>rust/roadstyle-levels/</code> (fixed roads, edits)</td>
 <td>P2</td>
 </tr>
 <tr>
@@ -2126,6 +2733,12 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 <td>One version for all crates and packages, the same as Python roadstyle</td>
 <td>A version for each crate</td>
 </tr>
+<tr>
+<td>8</td>
+<td>New behavior of the render model (placement along an edge with side and offset, the split of the merged layer, an icon kind)</td>
+<td>Make it once, in Rust, after P5; Python gets it through the binding. Its golden is the Rust output after a review of the pages</td>
+<td>Make it in Python first (the reference), then port it</td>
+</tr>
 </tbody>
 </table>
 <h2 id="found-during-the-inventory">Found during the inventory</h2>
@@ -2139,6 +2752,14 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 <li><strong><code>docs/reference/parameters.md</code></strong> shows defaults that the code resolves from the profile (<code>offset_frac</code> 0.28, <code>cmap</code> <code>"viridis"</code>,
    <code>pitch</code> 0) as if they were the keyword defaults (<code>None</code>).</li>
 <li><strong>The Burnaby style time (6.2 s)</strong> of the brief is not in any file of the repository. P0 measures it again.</li>
+<li><strong>A stored level row that is missing becomes 0 in the browser.</strong> <code>roads_sql.js</code> joins <code>visualization.edge_levels</code> with a
+   <code>LEFT JOIN</code>, and <code>mark_levels</code> reads null as 0. Python's <code>levels_db</code> stops with an error for the same case.</li>
+<li><strong>Two fill numbers in Rust's <code>edge_attach</code>.</strong> It picks the edge on top by the raw <code>fill_level</code> column (<code>overlays.rs:50</code>), but
+   <code>edge_overlay</code> draws the object at <code>__rs_fl</code>, the number after the swap and the lowering. The two can differ when the input has a
+   casing number above its fill number.</li>
+<li><strong>Superseded design notes.</strong> <code>levels_and_looks.md</code> (the three bands) and <code>draw_order_per_edge.md</code> (<code>band_col</code>, <code>order_col</code>,
+   <code>line-sort-key = lvl * 1000 + order</code>) describe rules that <code>levels_split_casing.md</code> section 12 removed. <code>render</code> rejects <code>band_col</code> and
+   <code>order</code> (<code>render_web.py:2859</code>).</li>
 </ol>
 </main>
 <script type="module">
