@@ -1,0 +1,2151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>roadstyle in Rust</title>
+<!-- Made from rust_library.md; edit the Markdown file, not this one. -->
+<style>
+:root { --bg: #ffffff; --fg: #1f2328; --muted: #59636e; --line: #d1d9e0; --code: #f6f8fa; --link: #0969da; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #0d1117; --fg: #e6edf3; --muted: #9198a1; --line: #3d444d; --code: #151b23; --link: #4493f8; }
+}
+:root[data-theme="dark"] { --bg: #0d1117; --fg: #e6edf3; --muted: #9198a1; --line: #3d444d; --code: #151b23; --link: #4493f8; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.6 system-ui, sans-serif; margin: 0; }
+main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+a { color: var(--link); }
+h1, h2 { border-bottom: 1px solid var(--line); padding-bottom: .3em; }
+table { border-collapse: collapse; display: block; overflow-x: auto; margin: 1em 0; }
+th, td { border: 1px solid var(--line); padding: 4px 8px; vertical-align: top; }
+code { background: var(--code); padding: .1em .3em; border-radius: 4px; font-size: 90%; }
+pre { background: var(--code); padding: 12px; overflow-x: auto; border-radius: 6px; }
+pre code { background: none; padding: 0; }
+pre.mermaid { background: none; text-align: center; }
+p > em:only-child { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+<h1 id="roadstyle-as-a-rust-library-the-design-and-the-migration-plan">roadstyle as a Rust library: the design and the migration plan</h1>
+<p><strong>Status:</strong> proposal, 2026-10-23. Nothing in this document is built. It continues <a href="rust_engine.md">One Rust engine for roadstyle</a>
+(steps 1 and 3 are done) and uses <a href="style_config.md">The style in a config file</a> and
+<a href="core_model_and_views.md">A general core: roads, items, and views</a>. The decisions that are open are in
+<a href="#decisions-that-are-open">Decisions that are open</a>.</p>
+<h2 id="summary">Summary</h2>
+<p>roadstyle has one reference implementation, in Python (version 0.24.3, about 11,000 lines of Python, a 1,688-line page template and
+about 500 tests). A Rust crate, <code>roadstyle-rs</code> (5,582 lines), already makes the style and the vector tiles of the simple mode, and it
+has the level solver. duckosm-rust's browser page and the GeoLibre plugin use it through WebAssembly. The rest of roadstyle is only in
+Python.</p>
+<p>This plan makes one Rust library with a pure core and adapters around the core. The core has three independent parts: the road
+model, the look (the typed config) and the engine. The adapters read and write files and connect the core to Rust, JavaScript and
+Python. The plan has seven phases. Python roadstyle stays the reference until the last phase: a change in the Rust output is
+correct only when it is byte for byte equal to the output of Python.</p>
+<h2 id="contents">Contents</h2>
+<ol>
+<li><a href="#what-exists-today">What exists today</a></li>
+<li><a href="#the-architecture">The architecture</a></li>
+<li><a href="#the-crates">The crates</a></li>
+<li><a href="#the-data-flow-of-one-map">The data flow of one map</a></li>
+<li><a href="#the-config-the-look">The config: the look</a></li>
+<li><a href="#the-public-api">The public API</a></li>
+<li><a href="#efficiency">Efficiency</a></li>
+<li><a href="#the-migration-plan">The migration plan</a></li>
+<li><a href="#the-parity-checklist">The parity checklist</a></li>
+<li><a href="#quality">Quality</a></li>
+<li><a href="#decisions-that-are-open">Decisions that are open</a></li>
+<li><a href="#found-during-the-inventory">Found during the inventory</a></li>
+</ol>
+<h2 id="what-exists-today">What exists today</h2>
+<h3 id="python-roadstyle-version-0243">Python roadstyle (version 0.24.3)</h3>
+<p>Line counts from <code>wc -l</code> at commit <code>337cf37</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Files</th>
+<th>Lines</th>
+<th>What it does</th>
+<th>Heavy dependencies</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Web renderer</td>
+<td><code>render_web.py</code></td>
+<td>3,837</td>
+<td><code>render(...)</code>, 76 parameters: bakes the <code>__rs_*</code> properties, builds the MapLibre style, fills the page template</td>
+<td>geopandas, shapely</td>
+</tr>
+<tr>
+<td>Page template</td>
+<td><code>static/web_template.html</code>, <code>popup.js</code>, <code>popup.css</code></td>
+<td>1,688 + 30</td>
+<td>The page: controls, legend, popups, Street View, Google 3D, the 29 <code>window.rs*</code> functions and 13 <code>rs:*</code> events</td>
+<td>MapLibre 5.24.0 (vendored)</td>
+</tr>
+<tr>
+<td>Entry point</td>
+<td><code>render.py</code></td>
+<td>184</td>
+<td><code>render_edges(...)</code>, 21 parameters: data styler, filters, settings scope, dispatch to web, folium or lonboard</td>
+<td></td>
+</tr>
+<tr>
+<td>Stylers</td>
+<td><code>stylers.py</code>, <code>style.py</code>, <code>colors.py</code>, <code>legend.py</code></td>
+<td>482 + 99 + 120 + 110</td>
+<td>Data-driven color and width (<code>ClassStyler</code>, <code>CategoricalStyler</code>, <code>NumericStyler</code>, <code>ColorTableStyler</code>), color ramps, folium legends</td>
+<td>branca, matplotlib, mapclassify</td>
+</tr>
+<tr>
+<td>Config</td>
+<td><code>_settings.py</code>, <code>config.py</code>, <code>palettes.py</code>, <code>basemaps.py</code>, <code>data/</code></td>
+<td>343 + 113 + 173 + 315</td>
+<td>Palettes (4) and profiles (2) in YAML, the merge of user files and <code>settings=</code>, base-map providers</td>
+<td>pyyaml</td>
+</tr>
+<tr>
+<td>Levels</td>
+<td><code>levels.py</code>, <code>level_area.py</code>, <code>levels_store.py</code>, <code>level_editor.py</code></td>
+<td>816 + 320 + 197 + 506</td>
+<td>The drawing-order solver, the level-area folder workflow, DuckDB storage, the editor server</td>
+<td>scipy (HiGHS), ortools, shapely</td>
+</tr>
+<tr>
+<td>Export</td>
+<td><code>export.py</code>, <code>tiles.py</code>, <code>emit.py</code>, <code>fastjson.py</code></td>
+<td>290 + 213 + 249 + 98</td>
+<td><code>export_style</code> (style.json + XYZ or PMTiles), <code>export_inline</code>, <code>export_look</code>, the embedded PMTiles, the Leaflet spec</td>
+<td>mapbox-vector-tile, pmtiles, duckdb</td>
+</tr>
+<tr>
+<td>Pages</td>
+<td><code>pages.py</code>, <code>templates/*.html</code></td>
+<td>114 + 615</td>
+<td><code>render_dashboard</code>, <code>render_report</code>, <code>render_street_view</code>: sidebars on the <code>rs*</code> API</td>
+<td></td>
+</tr>
+<tr>
+<td>Other backends</td>
+<td><code>render_folium.py</code>, <code>render_lonboard.py</code>, <code>controls.py</code>, <code>interactive.py</code></td>
+<td>124 + 147 + 126 + 191</td>
+<td>folium and lonboard maps</td>
+<td>folium, lonboard</td>
+</tr>
+<tr>
+<td>Data model</td>
+<td><code>edges.py</code>, <code>validate.py</code>, <code>filters.py</code>, <code>overlays.py</code></td>
+<td>370 + 62 + 54 + 115</td>
+<td><code>RoadEdges</code>, readers (file, GeoJSON, Arrow, DuckDB), validation, filters, <code>Overlay</code></td>
+<td>geopandas</td>
+</tr>
+<tr>
+<td>Tools</td>
+<td><code>cli.py</code>, <code>mcp_server.py</code>, <code>snapshot.py</code>, <code>studio/</code></td>
+<td>223 + 194 + 106 + 533</td>
+<td>The <code>roadstyle</code> and <code>roadstyle-levels</code> programs, the MCP server, PNG screenshots, the Streamlit studio</td>
+<td>playwright, streamlit, osmnx</td>
+</tr>
+</tbody>
+</table>
+<p>The tests: 26 files, about 500 test functions (213 in <code>tests/test_render_web.py</code>). They are behavior tests on dicts, HTML and JS.
+There is no golden test against Rust in <code>tests/</code>.</p>
+<h3 id="rust-today-rust-commit-337cf37">Rust today (<code>rust/</code>, commit <code>337cf37</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>Crate</th>
+<th>Module</th>
+<th>Lines</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>roadstyle-rs</code></td>
+<td><code>lib.rs</code></td>
+<td>185</td>
+<td><code>make_parts</code>, <code>make_style</code> (the style as one JSON text), <code>make_tiled</code> (the style and its tiles), <code>MAX_ROADS</code> = 200,000</td>
+</tr>
+<tr>
+<td></td>
+<td><code>read</code>, <code>geom</code></td>
+<td>113 + 220</td>
+<td>GeoParquet (WKB lines) to features, WKB, area and centroid</td>
+</tr>
+<tr>
+<td></td>
+<td><code>roads</code>, <code>simple</code>, <code>slots</code></td>
+<td>378 + 317 + 466</td>
+<td>The <code>__rs_*</code> properties, the casing pieces, the names and the one-way arrows</td>
+</tr>
+<tr>
+<td></td>
+<td><code>features</code>, <code>overlays</code></td>
+<td>111 + 258</td>
+<td>The base-map layers and <code>edge_attach</code></td>
+</tr>
+<tr>
+<td></td>
+<td><code>layers</code></td>
+<td>987</td>
+<td>The road layers and the expression builders (<code>Model::from_look</code>)</td>
+</tr>
+<tr>
+<td></td>
+<td><code>props</code></td>
+<td>223</td>
+<td>The typed sources <code>roads</code> and <code>simple</code> (one copy of each key name)</td>
+</tr>
+<tr>
+<td></td>
+<td><code>tiles</code></td>
+<td>593</td>
+<td>The vector tiles on request (MVT 2.1)</td>
+</tr>
+<tr>
+<td></td>
+<td><code>planner</code></td>
+<td>146</td>
+<td><code>metadata["roadstyle:planner"]</code></td>
+</tr>
+<tr>
+<td></td>
+<td><code>levels/</code></td>
+<td>1,484</td>
+<td><code>compute</code>: the tags rule and the solver (least span first, then push-relabel min-cost flow)</td>
+</tr>
+<tr>
+<td></td>
+<td><code>main.rs</code></td>
+<td>101</td>
+<td>The native program (timings)</td>
+</tr>
+<tr>
+<td><code>roadstyle-wasm</code></td>
+<td><code>lib.rs</code></td>
+<td>102</td>
+<td><code>makeStyle</code>, <code>Tiler</code> (<code>style</code>, <code>tile</code>, <code>props</code>), <code>memoryBytes</code>, the allocator that grows in large steps</td>
+</tr>
+<tr>
+<td></td>
+<td><code>js/</code></td>
+<td>148</td>
+<td><code>roads_sql.js</code>, <code>features_sql.js</code>: the SQL that duckdb-wasm runs to write the inputs</td>
+</tr>
+</tbody>
+</table>
+<p>Facts that the plan must use:</p>
+<ul>
+<li>The engine reads one input file, <code>look.json</code> (63 KB). Python writes it (<code>tools/make_spike_fixture.py</code> of geolibre-roadstyle,
+  mapstyle's <code>render_map(_export=...)</code>). It holds Python's internal tables: <code>settings</code>, <code>args</code>, <code>theme</code>, <code>config</code>, <code>styles</code>,
+  <code>roads_model</code>, <code>slots</code>, <code>features</code>, <code>interaction</code>. It has no version and no schema.</li>
+<li>The scope of the engine is the simple mode with stored levels (<code>layers.rs:506</code>): no 3D decks, no metre widths, no items, no
+  full mode (<code>simple=False</code>).</li>
+<li>Errors are <code>Result&lt;_, String&gt;</code> (about 25 places). There are no features, no threads and no benchmarks.</li>
+<li>The golden tests compare SHA-256 hashes with the output of geolibre-roadstyle's port (commit <code>0806ac2</code>, with building rule C).
+  That port was compared with Python's output in geolibre-roadstyle (<code>spike/test_compare.py</code>). This repository has no golden
+  test from Python yet. The branch <code>rust-colors</code> adds the first one (<code>tests/make_goldens.py</code>, not committed).</li>
+<li>No CI job runs <code>cargo</code>.</li>
+</ul>
+<h3 id="work-in-progress-the-plan-includes-it-and-does-not-do-it-again">Work in progress (the plan includes it and does not do it again)</h3>
+<table>
+<thead>
+<tr>
+<th>Work</th>
+<th>Where</th>
+<th>Content</th>
+<th>State on 2026-10-23</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Task 1: data-driven color and width, the legend</td>
+<td>main checkout, branch <code>rust-colors</code> (session roadstyle-rs)</td>
+<td><code>tests/colors.rs</code> against Python's <code>export_inline</code> for <code>color_by</code>, <code>colors</code>, <code>cmap</code>, <code>vmin</code>, <code>vmax</code>, <code>width_by</code>, <code>color_table</code>, <code>color_options</code>, <code>color_active</code>, <code>legend</code>; <code>cmaps.json</code> (the branca and matplotlib ramps)</td>
+<td>not committed; no Rust module yet</td>
+</tr>
+<tr>
+<td>Task 2: one shared dashboard JS module</td>
+<td>branch <code>claude/dashboard-js-5ddf3e</code> (session roadstyle-dashboard-js)</td>
+<td>20 ES modules in <code>src/roadstyle/static/dashboard/</code>, entry <code>rsDashboard(map, options)</code>; the template loses 1,650 lines</td>
+<td>not committed</td>
+</tr>
+<tr>
+<td>Task 3: the look resolution in Rust</td>
+<td>after task 1, same session</td>
+<td>Rust makes the look from the palette, the profile and the settings</td>
+<td>not started</td>
+</tr>
+<tr>
+<td>Tiles follow <code>tiles.py</code> (step 2)</td>
+<td>branch <code>rust-tiles</code>, <code>89d8bff</code></td>
+<td>One <code>roads</code> source with source layers, zooms 6 to 15, buffer 80, simplification below the last zoom</td>
+<td>not merged</td>
+</tr>
+<tr>
+<td>Tile speed</td>
+<td>branch <code>rust-tile-speed</code>, <code>17f51c1</code></td>
+<td>The bytes of a value are made once</td>
+<td>being merged; conflicts with <code>rust-tiles</code> in <code>tiles.rs</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-users">The users</h3>
+<table>
+<thead>
+<tr>
+<th>User</th>
+<th>Uses</th>
+<th>How</th>
+<th>Pinned at</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>duckosm-rust (<code>crates/duckosm-core</code>)</td>
+<td><code>roadstyle-rs::levels</code> only</td>
+<td>Cargo git dependency</td>
+<td><code>900b43e</code></td>
+</tr>
+<tr>
+<td>duckosm-rust browser page</td>
+<td><code>roadstyle-wasm</code>: <code>Tiler</code>, <code>memoryBytes</code></td>
+<td><code>build.sh</code> builds the module; <code>map_worker.js</code>; a copy of <code>look.json</code> and of the two SQL files</td>
+<td><code>900b43e</code></td>
+</tr>
+<tr>
+<td>GeoLibre plugin (geolibre-roadstyle)</td>
+<td><code>roadstyle-wasm</code>: <code>makeStyle</code></td>
+<td><code>build.py</code> builds the module (branch <code>use-roadstyle-rs</code>); at build time it runs Python roadstyle and mapstyle to make 64 looks</td>
+<td><code>900b43e</code></td>
+</tr>
+<tr>
+<td>mapstyle</td>
+<td>Python: <code>render_edges</code>, <code>render_report</code>, <code>Overlay</code>, <code>export_style</code>, <code>export_inline</code>, <code>load_area_levels</code>, <code>palette_to_dict</code></td>
+<td>Python import</td>
+<td><code>roadstyle&gt;=0.24.2</code></td>
+</tr>
+<tr>
+<td>Python users (16 projects)</td>
+<td><code>render_edges</code> (75 calls), <code>Overlay</code> (82 calls), <code>render_street_view</code> (1), <code>render_dashboard</code> (1)</td>
+<td>Python import; 45 calls use <code>backend="web"</code>, 4 use folium, 1 lonboard</td>
+<td>various</td>
+</tr>
+<tr>
+<td>Page scripts of users</td>
+<td><code>rsColor</code>, <code>rsHighlight</code>, <code>rsFocus</code>, <code>rsSelect</code>, <code>rsSetColorField</code>, <code>rsSetOverlay</code>, <code>rs:select</code></td>
+<td>JS in the page</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>About 27 of the keywords carry most of the use: <code>backend</code>, <code>name</code>, <code>tooltip</code>, <code>basemap</code>, <code>palette</code>, <code>basemaps</code>, <code>boundary</code>,
+<code>arrows</code>, <code>overlays</code>, <code>filter_control</code>, <code>color_options</code>, <code>road_popup</code>, <code>color_by</code>, <code>cmap</code>, <code>vmin</code>, <code>vmax</code>, <code>legend</code>, <code>colors</code>,
+<code>color_active</code>, <code>road_tooltip</code>, <code>street_view</code>, <code>street_view_key</code>, <code>google_3d</code>, <code>color_table</code>, <code>labels</code>, <code>hover_color</code>, <code>select_color</code>.</p>
+<h2 id="the-architecture">The architecture</h2>
+<h3 id="the-choice-a-pure-core-with-adapters-around-it">The choice: a pure core with adapters around it</h3>
+<p>The core has no I/O. It has three parts, and two of them are independent inputs of the third:</p>
+<ul>
+<li><strong>The road model</strong> (<code>roadstyle-model</code>): the roads as columns, their geometry, the column map, the validation.</li>
+<li><strong>The look</strong> (<code>roadstyle-look</code>): the typed, versioned config: palettes, profiles, settings and the map options that change the style.</li>
+<li><strong>The engine</strong> (<code>roadstyle-engine</code>, <code>roadstyle-tiles</code>, <code>roadstyle-levels</code>): pure functions from (roads, look) to the style,
+  the tiles and the levels.</li>
+</ul>
+<p>The adapters are around the core. Each one connects the core to one thing outside:</p>
+<ul>
+<li><strong>Readers and writers</strong> (<code>roadstyle-io</code>): GeoParquet, Arrow, GeoJSON, DuckDB, the style file, the tile folder, PMTiles, the HTML page.</li>
+<li><strong>Bindings</strong>: WebAssembly and JavaScript (<code>roadstyle-wasm</code>), Python (<code>roadstyle-py</code>).</li>
+<li><strong>The dashboard module</strong> (JavaScript): a separate front-end package. It reads only the style and its <code>roadstyle:*</code> metadata. It
+  does not call the engine.</li>
+</ul>
+<pre class="mermaid">flowchart LR
+    subgraph adapters_in[&quot;Adapters: input&quot;]
+        PQ[&quot;GeoParquet / Arrow&quot;]
+        GJ[&quot;GeoJSON&quot;]
+        DDB[&quot;DuckDB (native)&quot;]
+        GDF[&quot;GeoDataFrame (Python)&quot;]
+        CFG[&quot;palette, profile, settings files&quot;]
+    end
+    subgraph core[&quot;Pure core: no I/O, builds for wasm32&quot;]
+        M[&quot;roadstyle-model&lt;br/&gt;roads as columns&quot;]
+        L[&quot;roadstyle-look&lt;br/&gt;typed, versioned look&quot;]
+        E[&quot;roadstyle-engine&lt;br/&gt;style, data-driven paint, legend&quot;]
+        T[&quot;roadstyle-tiles&lt;br/&gt;vector tiles&quot;]
+        LV[&quot;roadstyle-levels&lt;br/&gt;drawing order&quot;]
+        M --&gt; E
+        L --&gt; E
+        M --&gt; T
+        E --&gt; T
+    end
+    subgraph adapters_out[&quot;Adapters: output and bindings&quot;]
+        IO[&quot;roadstyle-io&lt;br/&gt;style.json, tiles, PMTiles, page&quot;]
+        WASM[&quot;roadstyle-wasm&lt;br/&gt;JS API&quot;]
+        PY[&quot;roadstyle-py&lt;br/&gt;Python API&quot;]
+    end
+    DASH[&quot;dashboard module (JS)&lt;br/&gt;reads style + metadata&quot;]
+    PQ &amp; GJ &amp; DDB --&gt; M
+    GDF --&gt; PY
+    CFG --&gt; L
+    E --&gt; IO
+    T --&gt; IO
+    E &amp; T &amp; LV --&gt; WASM
+    E &amp; T &amp; LV --&gt; PY
+    WASM -.-&gt;|&quot;style JSON&quot;| DASH
+    IO -.-&gt;|&quot;page&quot;| DASH
+</pre>
+<p><em>The core in the middle has no arrow to a file, a database or a browser. The model and the look do not point at each other.</em></p>
+<h3 id="rules-of-the-layers">Rules of the layers</h3>
+<ol>
+<li>A dependency points into the core, never out of it. <code>roadstyle-engine</code> does not know Parquet, Python or JavaScript.</li>
+<li><code>roadstyle-model</code> and <code>roadstyle-look</code> do not depend on each other. Data-driven color needs both the values of a column and
+   the look, so it is a function of the engine, not of the look.</li>
+<li>The core builds for <code>wasm32-unknown-unknown</code> with no features. A CI job checks this (see <a href="#quality">Quality</a>).</li>
+<li>The engine is single-thread by default. The feature <code>parallel</code> adds rayon for the native build.</li>
+<li>The page options (popups, Street View, controls) do not go into the engine. The engine copies the few that the style must
+   carry into its metadata (<code>roadstyle:interaction</code>). The other options go to the dashboard module.</li>
+<li>One copy of each rule. The worker SQL, the palettes and the profiles each have one file, and each user takes them from one
+   commit of this repository.</li>
+</ol>
+<h3 id="the-alternatives-that-i-did-not-choose">The alternatives that I did not choose</h3>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A strict stack: data, then config, then engine, then interface (each layer uses only the layer under it)</td>
+<td>The config does not need the data, and the data does not need the config. A stack makes one depend on the other with no reason. It also puts the readers (Parquet, DuckDB) under the engine, so the WebAssembly build carries them.</td>
+</tr>
+<tr>
+<td>One crate with modules and feature flags (today's <code>roadstyle-rs</code>)</td>
+<td>It works for one user. With three users it has costs: duckosm-core takes Parquet and Arrow to get only the level solver; a change in one module rebuilds all; the public API is every <code>pub</code> item. The crate split is cheap now (5,600 lines) and expensive later.</td>
+</tr>
+<tr>
+<td>Many small crates (one per module: <code>slots</code>, <code>simple</code>, <code>overlays</code>, ...)</td>
+<td>These modules change together for one style change. More crates give more version bumps and more <code>Cargo.toml</code> files, and no user needs them alone.</td>
+</tr>
+<tr>
+<td>The engine builds the page (HTML)</td>
+<td>The page is interaction, not style. Three pages exist (the Python page, the duckosm-rust page, the GeoLibre plugin) and each has its own frame. The dashboard module serves all three. The page writer is a small adapter in <code>roadstyle-io</code>.</td>
+</tr>
+<tr>
+<td>Keep <code>look.json</code> as Python's internal tables</td>
+<td>Each Python refactor can break the Rust users, and no test shows it. A typed, versioned look with a schema stops this.</td>
+</tr>
+<tr>
+<td>A full rewrite of Python roadstyle in Rust at once</td>
+<td>No reference during the work, and 16 Python projects wait. Part by part, with Python as the reference, each part can ship alone.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="what-stays-in-python">What stays in Python</h3>
+<table>
+<thead>
+<tr>
+<th>Stays in Python</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The folium and lonboard backends (<code>render_folium.py</code>, <code>render_lonboard.py</code>, <code>controls.py</code>, <code>interactive.py</code>, <code>legend.py</code>)</td>
+<td>They are Python objects for notebooks. They can take the resolved colors and widths from Rust (one call for each distinct class key, see <code>vectorize_style_resolution.md</code>).</td>
+</tr>
+<tr>
+<td>The GeoDataFrame front-end: <code>render_edges</code> and its keywords, <code>RoadEdges</code>, <code>Overlay</code></td>
+<td>The Python API does not change. It converts the GeoDataFrame to Arrow and calls Rust.</td>
+</tr>
+<tr>
+<td><code>WebMap</code> (<code>.html</code>, <code>.save</code>, <code>_repr_html_</code>), <code>snapshot</code>, the Streamlit studio, the MCP server, the notebook helpers</td>
+<td>They are tools around a page. They need Python, a browser or the network.</td>
+</tr>
+<tr>
+<td>The level editor server (<code>level_editor.py</code>) and the folder workflow (<code>level_area.py</code>)</td>
+<td>They are a local tool with an HTTP server and files. They call the Rust solver when it is at parity.</td>
+</tr>
+<tr>
+<td><code>emit.py</code> (the Leaflet spec and <code>roadstyle.js</code>)</td>
+<td>It is the old Leaflet output. It stays as it is, or it is removed in a later major version.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="the-crates">The crates</h2>
+<pre class="mermaid">flowchart TB
+    model[&quot;roadstyle-model&quot;]
+    look[&quot;roadstyle-look&lt;br/&gt;feature: schema&quot;]
+    levels[&quot;roadstyle-levels&quot;]
+    engine[&quot;roadstyle-engine&lt;br/&gt;feature: parallel&quot;]
+    tiles[&quot;roadstyle-tiles&lt;br/&gt;features: parallel, pmtiles&quot;]
+    io[&quot;roadstyle-io&lt;br/&gt;features: parquet, geojson, duckdb, page&quot;]
+    facade[&quot;roadstyle (facade)&lt;br/&gt;default: io, tiles, levels&quot;]
+    wasm[&quot;roadstyle-wasm (cdylib)&quot;]
+    py[&quot;roadstyle-py (PyO3, abi3)&quot;]
+    model --&gt; engine
+    look --&gt; engine
+    model --&gt; tiles
+    engine --&gt; tiles
+    model --&gt; io
+    look --&gt; io
+    engine --&gt; io
+    tiles --&gt; io
+    model &amp; look &amp; engine &amp; tiles &amp; levels &amp; io --&gt; facade
+    facade --&gt; wasm
+    facade --&gt; py
+</pre>
+<p><em>Each arrow is a Cargo dependency. <code>roadstyle-levels</code> has no dependency on the other crates, so duckosm-core can take it alone.</em></p>
+<table>
+<thead>
+<tr>
+<th>Crate</th>
+<th>Content (from today's modules)</th>
+<th>Dependencies</th>
+<th>Builds for wasm32</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>roadstyle-model</code></td>
+<td><code>RoadTable</code> (columns over Arrow arrays), <code>Geometry</code> (one coordinate buffer with offsets), <code>ColumnMap</code>, <code>Source</code> and <code>Props</code> (from <code>props</code>), validation, <code>MAX_ROADS</code></td>
+<td>arrow-array, arrow-schema</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>roadstyle-look</code></td>
+<td><code>Look</code> (the typed config), the bundled palettes and profiles, the resolution, the JSON schema (feature <code>schema</code>)</td>
+<td>serde, serde_json, schemars (optional)</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>roadstyle-levels</code></td>
+<td><code>levels/</code> as it is today: <code>LevelEdges</code>, <code>compute</code>, <code>Method</code>, <code>Row</code></td>
+<td>rstar, sha2</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>roadstyle-engine</code></td>
+<td><code>roads</code>, <code>simple</code>, <code>slots</code>, <code>layers</code>, <code>overlays</code>, <code>features</code>, <code>planner</code>, <code>geom</code>, data-driven color and width, the legend, the simplification</td>
+<td>model, look, serde_json, rstar, indexmap; rayon (optional)</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>roadstyle-tiles</code></td>
+<td><code>tiles</code>: the MVT encoder, the tile index, tiles on request, a tile cache; the PMTiles writer (feature <code>pmtiles</code>)</td>
+<td>model, engine; rayon (optional)</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>roadstyle-io</code></td>
+<td><code>read</code> (GeoParquet), GeoJSON, DuckDB (feature <code>duckdb</code>, native only), the style writer (streamed), the tile folder, PMTiles, the page writer (feature <code>page</code>, with the dashboard bundle)</td>
+<td>parquet (snap), duckdb (optional)</td>
+<td>yes, without <code>duckdb</code></td>
+</tr>
+<tr>
+<td><code>roadstyle</code></td>
+<td>The facade: re-exports and the <code>Map</code> builder. The only crate that a Rust user adds.</td>
+<td>all above</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>roadstyle-wasm</code></td>
+<td>The JS API (<code>makeStyle</code>, <code>Tiler</code>, <code>resolveLook</code>, <code>memoryBytes</code>), the allocator</td>
+<td>roadstyle (features <code>io/parquet</code>, <code>tiles</code>)</td>
+<td>only</td>
+</tr>
+<tr>
+<td><code>roadstyle-py</code></td>
+<td>The Python module <code>roadstyle._engine</code></td>
+<td>roadstyle, pyo3, arrow (pyarrow interface)</td>
+<td>no</td>
+</tr>
+</tbody>
+</table>
+<p>The JavaScript packages:</p>
+<table>
+<thead>
+<tr>
+<th>Package</th>
+<th>Content</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>roadstyle-wasm</code> (npm)</td>
+<td>The WebAssembly module, the wasm-bindgen glue, <code>roads_sql.js</code>, <code>features_sql.js</code>, the TypeScript types</td>
+<td><code>rust/roadstyle-wasm/</code></td>
+</tr>
+<tr>
+<td><code>roadstyle-dashboard</code> (npm)</td>
+<td>The ES modules of task 2, <code>dashboard.css</code>, <code>popup.css</code></td>
+<td><code>src/roadstyle/static/dashboard/</code></td>
+</tr>
+</tbody>
+</table>
+<p>The CLI: the native program <code>main.rs</code> becomes a benchmark tool (<code>rust/roadstyle/examples/bench.rs</code>). The user CLI stays the
+Python <code>roadstyle</code> program, which calls Rust. A Rust CLI with the same flags is a later step, when a user without Python asks for it.</p>
+<h3 id="which-user-takes-which-crate">Which user takes which crate</h3>
+<pre class="mermaid">flowchart LR
+    subgraph users[&quot;Users&quot;]
+        dcore[&quot;duckosm-core&lt;br/&gt;(native levels)&quot;]
+        dpage[&quot;duckosm-rust page&quot;]
+        geo[&quot;GeoLibre plugin&quot;]
+        ms[&quot;mapstyle&quot;]
+        pyu[&quot;Python users&lt;br/&gt;SonoFlow, sensor-matching, ...&quot;]
+        lan[&quot;lanestyle, urbanstyle&quot;]
+    end
+    levels[&quot;roadstyle-levels&quot;]
+    wasm[&quot;roadstyle-wasm (npm)&quot;]
+    dash[&quot;roadstyle-dashboard (npm)&quot;]
+    pyw[&quot;roadstyle wheel&lt;br/&gt;(Python + roadstyle-py)&quot;]
+    dcore --&gt; levels
+    dpage --&gt; wasm
+    dpage --&gt; dash
+    geo --&gt; wasm
+    geo --&gt; dash
+    ms --&gt; pyw
+    pyu --&gt; pyw
+    lan --&gt; pyw
+</pre>
+<p><em>The browser users take the npm packages. The Python users take one wheel and see no Rust.</em></p>
+<h3 id="feature-flags">Feature flags</h3>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Crate</th>
+<th>Effect</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>parallel</code></td>
+<td>engine, tiles</td>
+<td>rayon: sources and tiles on all cores</td>
+<td>off</td>
+</tr>
+<tr>
+<td><code>pmtiles</code></td>
+<td>tiles</td>
+<td>The PMTiles archive writer</td>
+<td>off in the crate, on in the facade</td>
+</tr>
+<tr>
+<td><code>parquet</code></td>
+<td>io</td>
+<td>GeoParquet and Parquet reader (snap; zstd with <code>zstd</code>)</td>
+<td>on</td>
+</tr>
+<tr>
+<td><code>geojson</code></td>
+<td>io</td>
+<td>GeoJSON reader</td>
+<td>on</td>
+</tr>
+<tr>
+<td><code>duckdb</code></td>
+<td>io</td>
+<td>DuckDB reader for <code>&lt;mode&gt;.edges</code> and <code>visualization.edge_levels</code> (native only)</td>
+<td>off</td>
+</tr>
+<tr>
+<td><code>page</code></td>
+<td>io</td>
+<td>The HTML page writer with the dashboard bundle</td>
+<td>off</td>
+</tr>
+<tr>
+<td><code>schema</code></td>
+<td>look</td>
+<td><code>Look::json_schema()</code></td>
+<td>off</td>
+</tr>
+</tbody>
+</table>
+<h3 id="errors">Errors</h3>
+<p>Each crate has one error enum (<code>thiserror</code>), <code>#[non_exhaustive]</code>. The facade has <code>roadstyle::Error</code>, which holds each of them.
+Each error says what is wrong, where (a column, a key path, a feature id) and what to do.</p>
+<table>
+<thead>
+<tr>
+<th>Error</th>
+<th>Examples</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DataError</code></td>
+<td>missing column <code>highway</code>; column <code>layer</code> has type <code>List</code>, expected integer or text; feature 812 has no line; 230,114 roads, the limit is 200,000</td>
+</tr>
+<tr>
+<td><code>LookError</code></td>
+<td><code>roads.width.major</code>: expected a map of zoom to px, found a number; unknown palette <code>ambr</code> (the names are <code>amber</code>, <code>carto</code>, <code>highsat</code>, <code>mono</code>); look version 3, this engine reads 1 and 2</td>
+</tr>
+<tr>
+<td><code>EngineError</code></td>
+<td>a view names palette <code>x</code> that the look does not have</td>
+</tr>
+<tr>
+<td><code>TileError</code></td>
+<td>zoom 23 is past the last zoom 16</td>
+</tr>
+<tr>
+<td><code>IoError</code></td>
+<td>Parquet file is not readable; the DuckDB file has no <code>visualization.edge_levels</code> (give the <code>rs.save_levels</code> command)</td>
+</tr>
+</tbody>
+</table>
+<p>In JavaScript, an error is a thrown <code>Error</code> with <code>name</code> = the kind (<code>LookError</code>) and a <code>path</code> property. In Python, each error is a
+subclass of <code>ValueError</code> (<code>roadstyle.LookError(ValueError)</code>), so <code>except ValueError</code> in user code still works.</p>
+<h2 id="the-data-flow-of-one-map">The data flow of one map</h2>
+<pre class="mermaid">flowchart LR
+    subgraph where1[&quot;Python process (native)&quot;]
+        gdf[&quot;GeoDataFrame&quot;] --&gt;|&quot;to_arrow(), no copy&quot;| arrow1[&quot;Arrow table&quot;]
+        opts[&quot;render_edges keywords&quot;] --&gt; spec[&quot;LookSpec + MapOptions&quot;]
+    end
+    subgraph where2[&quot;Browser: worker&quot;]
+        sql[&quot;duckdb-wasm: roads_sql.js&quot;] --&gt; pq[&quot;roads.parquet bytes&quot;]
+    end
+    subgraph core[&quot;Engine (native or wasm)&quot;]
+        roads[&quot;RoadTable&quot;]
+        lk[&quot;Look (resolved)&quot;]
+        sty[&quot;Style + metadata&quot;]
+        tl[&quot;Tiles on request&quot;]
+        roads --&gt; sty
+        lk --&gt; sty
+        sty --&gt; tl
+    end
+    arrow1 --&gt; roads
+    pq --&gt; roads
+    spec --&gt; lk
+    subgraph where3[&quot;Browser: main thread&quot;]
+        ml[&quot;MapLibre&quot;]
+        db[&quot;dashboard module&lt;br/&gt;rsDashboard(map, options)&quot;]
+    end
+    sty --&gt;|&quot;style JSON&quot;| ml
+    tl --&gt;|&quot;rs:// or tile files&quot;| ml
+    sty --&gt;|&quot;roadstyle:* metadata&quot;| db
+    db --&gt;|&quot;rs* calls&quot;| ml
+</pre>
+<p><em>The engine is the same code in both places. In the browser it runs in a worker, and the main thread only draws.</em></p>
+<p>The steps:</p>
+<ol>
+<li><strong>Input.</strong> Python gives an Arrow table (no copy from pyarrow). The browser gives the Parquet bytes that duckdb-wasm writes.</li>
+<li><strong>Model.</strong> The reader maps the columns (<code>ColumnMap</code>: <code>highway_col</code>, <code>edge_id_col</code>, <code>tunnel_col</code>, ...), checks them and makes a
+   <code>RoadTable</code>.</li>
+<li><strong>Look.</strong> <code>Look::resolve</code> merges the palette, the profile and the settings, and adds the map options that change the style.</li>
+<li><strong>Style.</strong> The engine makes the layers, the sources and the metadata.</li>
+<li><strong>Output.</strong> Inline (the sources in the style, <code>export_inline</code>), tiled (<code>Tiler</code>, tiles on request), or files (<code>export_style</code>,
+   the page).</li>
+<li><strong>Page.</strong> MapLibre draws the style. The dashboard module reads the metadata and adds the controls.</li>
+</ol>
+<h2 id="the-config-the-look">The config: the look</h2>
+<h3 id="one-name-for-each-thing">One name for each thing</h3>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>palette</strong></td>
+<td>Only colors (<code>data/palettes/&lt;name&gt;.yaml</code>)</td>
+</tr>
+<tr>
+<td><strong>profile</strong></td>
+<td>All values that are not colors: widths by zoom, zoom ranges, dashes, caps, the tunnel look (<code>data/profiles/&lt;name&gt;.yaml</code>)</td>
+</tr>
+<tr>
+<td><strong>settings</strong></td>
+<td>Overrides from <code>roadstyle.json</code>, <code>$ROADSTYLE_CONFIG</code>, <code>use_settings(...)</code>, <code>render_edges(settings=...)</code></td>
+</tr>
+<tr>
+<td><strong>map options</strong></td>
+<td>The keywords of one map that change the style (<code>arrows</code>, <code>labels</code>, <code>view_3d</code>, <code>boundary</code>, the column names, ...)</td>
+</tr>
+<tr>
+<td><strong>page options</strong></td>
+<td>The keywords of one map that change only the page (<code>road_popup</code>, <code>street_view</code>, <code>filter_control</code>, ...)</td>
+</tr>
+<tr>
+<td><strong>look</strong></td>
+<td>The result of the resolution: one typed, versioned value that the engine reads</td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-resolution">The resolution</h3>
+<pre class="mermaid">flowchart LR
+    bp[&quot;bundled profiles&lt;br/&gt;default, highsat&quot;] --&gt; mp[&quot;profile = default + named profile&quot;]
+    up[&quot;own profiles&lt;br/&gt;./profiles, ~/.config/roadstyle&quot;] --&gt; mp
+    bpal[&quot;bundled palettes&lt;br/&gt;amber, carto, highsat, mono&quot;] --&gt; mpal[&quot;palette = amber + named palette&quot;]
+    upal[&quot;own palettes&lt;br/&gt;./palettes, ~/.config/roadstyle&quot;] --&gt; mpal
+    mp --&gt; merge[&quot;deep merge:&lt;br/&gt;profile, then palette,&lt;br/&gt;then settings in order&quot;]
+    mpal --&gt; merge
+    st[&quot;settings&lt;br/&gt;roadstyle.json, $ROADSTYLE_CONFIG,&lt;br/&gt;use_settings, settings=&quot;] --&gt; merge
+    merge --&gt; val[&quot;validate:&lt;br/&gt;schema, units, colors, zoom keys&quot;]
+    mo[&quot;map options&quot;] --&gt; val
+    val --&gt; look[&quot;Look v1&lt;br/&gt;schema_version, theme,&lt;br/&gt;palettes for views, options&quot;]
+    look --&gt; hash[&quot;look hash&lt;br/&gt;(cache key)&quot;]
+</pre>
+<p><em>The defaults are the bundled <code>default</code> profile and <code>amber</code> palette. A user file states only what it changes.</em></p>
+<p>The rules:</p>
+<ol>
+<li>The merge is the merge of <code>_settings.py</code> today: the named profile over <code>default</code>, the named palette over <code>amber</code>, the palette over
+   the profile, then each settings source in order (lowest first: <code>~/.config/roadstyle/roadstyle.json</code>, <code>./roadstyle.json</code>,
+   <code>$ROADSTYLE_CONFIG</code>, <code>use_settings</code>, <code>settings=</code>). The old keys (<code>_OLD_*</code> tables) are read with a deprecation warning, as today.</li>
+<li>Validation after the merge. An unknown key is an error with its path and the nearest known key. Today an unknown key is
+   ignored without a message.</li>
+<li>The file reading is an adapter. The core resolves from values (JSON text or Rust structs). The browser gives the files that it
+   has. The bundled palettes and profiles are in the crate (made from the YAML files when the crate builds).</li>
+<li>The look has <code>schema_version</code> (an integer, starts at 1). The engine reads version N and N-1. A change that removes or renames
+   a key increments the version.</li>
+<li>The JSON schema of the look is published with each release (<code>look.schema.json</code>). An editor can check a user file with it.</li>
+<li>One copy of the bundled files: <code>src/roadstyle/data/</code> until phase 5. Then the files move into <code>rust/roadstyle-look/data/</code>, and
+   Python reads the bundled values from the engine.</li>
+</ol>
+<h3 id="the-typed-look">The typed look</h3>
+<pre><code class="language-rust">pub struct Look {
+    pub schema_version: u32,
+    pub profile: String,                 // the names, for the page and the cache
+    pub palette: String,
+    pub roads: RoadLook,                 // classes (group, order, minzoom, width, casing, dash), widths by zoom, split, links, caps
+    pub casing: CasingLook,
+    pub labels: LabelLook,
+    pub arrows: ArrowLook,
+    pub bridges: BridgeLook,
+    pub tunnels: TunnelLook,
+    pub selection: SelectionLook,
+    pub data: DataLook,                  // no-data color, opacities of data maps
+    pub overlays: OverlayLook,
+    pub boundary: BoundaryLook,
+    pub background: Background,
+    pub access: AccessColors,
+    pub palettes: IndexMap&lt;String, PaletteColors&gt;, // the palettes that views name (`__rs_fill@mono`)
+    pub tiles: TileLook,                 // zooms 6 to 15, extent 4096, buffer 80 (defaults.json)
+    pub camera: CameraLook,              // pitch_3d 55, max_pitch 70
+    pub options: StyleOptions,           // the map options: columns, arrows, labels, view_3d, boundary, head_m, ...
+}
+</code></pre>
+<p>Each struct derives <code>Serialize</code>, <code>Deserialize</code>, <code>Default</code> (the bundled values) and <code>JsonSchema</code> (feature <code>schema</code>), and has
+<code>#[serde(deny_unknown_fields)]</code>. A color is a <code>Color</code> type (it parses <code>#rrggbb</code>, <code>#rrggbbaa</code>, <code>rgba(...)</code>), not a text. A zoom
+table is <code>ZoomTable</code> (sorted zoom keys).</p>
+<h2 id="the-public-api">The public API</h2>
+<h3 id="rust">Rust</h3>
+<pre><code class="language-rust">use roadstyle::{io, Look, LookSpec, Map, MapOptions};
+
+let look = Look::resolve(&amp;LookSpec::new(&quot;default&quot;, &quot;amber&quot;))?;          // the bundled profile and palette
+let roads = io::parquet::read_roads(&amp;bytes, &amp;io::ColumnMap::default())?; // RoadTable
+let map = Map::new(&amp;roads, &amp;look, MapOptions { arrows: true, labels: true, ..Default::default() })?;
+
+let style: String = map.style_json()?;              // export_inline: the sources in the style
+let tiled = map.tiled(&quot;rs://roads/&quot;)?;              // the style with vector sources, and the tiles
+let bytes: Vec&lt;u8&gt; = tiled.tile(&quot;roads&quot;, 14, 8800, 4700);
+io::write_style_dir(&amp;map, &quot;out/&quot;, io::TileFormat::Pmtiles)?;  // export_style
+</code></pre>
+<p>The level solver alone (duckosm-core):</p>
+<pre><code class="language-rust">use roadstyle_levels::{LevelEdges, Method, compute};
+let mut edges = LevelEdges::default();
+edges.add(0, edge);                                 // rank 0 = driving
+let levels = compute(&amp;edges, Method::Solve)?;
+</code></pre>
+<h3 id="javascript">JavaScript</h3>
+<p>The JS API of today stays the same through phase 3, so the two users do not break. The new form takes one options object:</p>
+<pre><code class="language-js">import init, { Tiler, resolveLook, memoryBytes } from &quot;roadstyle-wasm&quot;;
+await init();
+const look = resolveLook({ profile: &quot;default&quot;, palette: &quot;amber&quot;, settings: {} });  // JSON text
+const tiler = new Tiler(roadsParquet, look, { features, name: &quot;Tartu&quot;, prefix: &quot;rs://1/&quot;, keep: [&quot;name&quot;] });
+const style = JSON.parse(tiler.style());
+// in the main thread
+import { rsDashboard } from &quot;roadstyle-dashboard&quot;;
+const map = new maplibregl.Map({ container: &quot;map&quot;, style });
+rsDashboard(map, { style, street_view: &quot;window&quot; });
+</code></pre>
+<h3 id="python">Python</h3>
+<p>The API does not change. <code>render_edges(gdf, ...)</code> keeps its 21 keywords, the web keywords and the result type <code>WebMap</code>. Inside, it
+calls <code>roadstyle._engine</code> for each part that is at parity (see the phases).</p>
+<h3 id="stability-rules">Stability rules</h3>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Rule</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Version numbers</td>
+<td>One version for all crates, the wheel and the npm packages (lockstep), the same as Python roadstyle. A release has one tag.</td>
+</tr>
+<tr>
+<td>Before 1.0</td>
+<td>A minor version (0.x to 0.y) can break the API. A patch version cannot. The CHANGELOG lists each break and what to change.</td>
+</tr>
+<tr>
+<td>Public API</td>
+<td>The <code>roadstyle</code> facade, the JS API of <code>roadstyle-wasm</code>, <code>rsDashboard</code> and the <code>rs*</code> functions, the Python API, the look schema, the <code>roadstyle:*</code> metadata keys. The inner crates are published, but their API follows the facade and can change in a minor version.</td>
+</tr>
+<tr>
+<td>The look schema</td>
+<td><code>schema_version</code> is separate. The engine reads N and N-1.</td>
+</tr>
+<tr>
+<td>The output</td>
+<td>A change of the style or of the tiles is a change of behavior: a new golden, a CHANGELOG line, and the same change in Python first while Python is the reference.</td>
+</tr>
+<tr>
+<td>Deprecation</td>
+<td>A removed keyword or JS function gives a warning for one minor version, then an error.</td>
+</tr>
+<tr>
+<td>Rust version (MSRV)</td>
+<td>The Rust version of duckosm-rust's toolchain, written in <code>rust-toolchain.toml</code> and in CI.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="efficiency">Efficiency</h2>
+<h3 id="numbers-today-native-release-build-peak-resident-memory-from-usrbintime">Numbers today (native release build, peak resident memory from <code>/usr/bin/time</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Roads</th>
+<th>Output</th>
+<th>Memory</th>
+<th>Time</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Monaco</td>
+<td>13,298</td>
+<td>style</td>
+<td>196 MB</td>
+<td>0.7 s</td>
+<td><code>rust_engine.md</code></td>
+</tr>
+<tr>
+<td>Tartu</td>
+<td>63,965</td>
+<td>style</td>
+<td>1.13 GB</td>
+<td>5.1 s</td>
+<td><code>rust_engine.md</code></td>
+</tr>
+<tr>
+<td>Tartu</td>
+<td>63,965</td>
+<td>tiles (<code>make_tiled</code>)</td>
+<td>1.01 GB</td>
+<td></td>
+<td><code>rust_engine.md</code></td>
+</tr>
+<tr>
+<td>Tartu</td>
+<td></td>
+<td>tiles: the last zoom, after step 2</td>
+<td>18.8 MB, 313 tiles</td>
+<td></td>
+<td>branch <code>rust-tiles</code></td>
+</tr>
+<tr>
+<td>Burnaby</td>
+<td>157,808</td>
+<td>style</td>
+<td></td>
+<td>6.2 s</td>
+<td>the session brief (not in a file of the repository)</td>
+</tr>
+<tr>
+<td>Burnaby</td>
+<td>157,808</td>
+<td>tiles of one 3 x 3 view, zoom 12</td>
+<td></td>
+<td>0.8 s (slowest tile 0.17 s)</td>
+<td>branch <code>rust-tile-speed</code></td>
+</tr>
+<tr>
+<td>Burnaby</td>
+<td>79,199</td>
+<td>levels (solve)</td>
+<td></td>
+<td>3.1 s native, 5.2 s wasm</td>
+<td>duckosm-rust <code>docs/levels.md</code></td>
+</tr>
+</tbody>
+</table>
+<p>Tartu uses about 17 KB for each road natively. The browser module used 0.65 to 0.77 times the native peak in earlier
+measurements. <code>MAX_ROADS</code> = 200,000 is an estimate from Tartu only.</p>
+<h3 id="targets">Targets</h3>
+<table>
+<thead>
+<tr>
+<th>Measure</th>
+<th>Today</th>
+<th>Target</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Memory for each road, tiled path</td>
+<td>about 16 KB (Tartu tiles)</td>
+<td>4 KB or less</td>
+<td>the columnar model, dictionary text, no GeoJSON tree on the tiled path</td>
+</tr>
+<tr>
+<td>Stockholm county (456,813 driving edges) in a browser tab</td>
+<td>not possible (over <code>MAX_ROADS</code>)</td>
+<td>the first view in less than 10 s, peak less than 2.5 GB</td>
+<td>the same, then measure and raise <code>MAX_ROADS</code></td>
+</tr>
+<tr>
+<td>Tartu style, native</td>
+<td>5.1 s</td>
+<td>2 s</td>
+<td>the columnar model; <code>parallel</code> for the sources</td>
+</tr>
+<tr>
+<td>One tile on request</td>
+<td>0.17 s (slowest, Burnaby)</td>
+<td>50 ms</td>
+<td>the tile cache, the bytes of a value made once (<code>rust-tile-speed</code>)</td>
+</tr>
+<tr>
+<td>WebAssembly against native</td>
+<td>1.7 times (levels)</td>
+<td>2 times or less in every stage</td>
+<td>the same code; measure each stage</td>
+</tr>
+<tr>
+<td>Python <code>render_edges</code> on 50,000 edges, lonboard</td>
+<td>2.0 s for the style (<code>vectorize_style_resolution.md</code>)</td>
+<td>0.2 s</td>
+<td>one Rust resolution for each distinct class key</td>
+</tr>
+</tbody>
+</table>
+<h3 id="how">How</h3>
+<ol>
+<li><strong>Columns, not features.</strong> <code>RoadTable</code> keeps each property as one Arrow array, not a map per road. Text columns are dictionary
+   arrays: one copy of each class name, color and road name. This is the open item of step 3 ("each text value is its own string").</li>
+<li><strong>Geometry in one buffer.</strong> All coordinates are in one <code>Vec&lt;[f64; 2]&gt;</code> with an offset for each road (the GeoArrow layout). The
+   coordinates stay <code>f64</code>, for parity with Python.</li>
+<li><strong>No copy from Python.</strong> pyarrow gives the table through the Arrow C data interface (<code>arrow::pyarrow</code>). geopandas <code>to_arrow()</code>
+   gives WKB, and the reader decodes it once.</li>
+<li><strong>In the browser, one copy.</strong> The Parquet bytes go from duckdb-wasm into the module once. The worker keeps the tables, and the
+   main thread gets only the style and the tiles.</li>
+<li><strong>The tiled path makes no GeoJSON.</strong> The tile index reads the columns. Only <code>export_inline</code> writes GeoJSON, and it streams it
+   source by source (as <code>make_style</code> does today).</li>
+<li><strong>Typed metadata and slots.</strong> The base map, the slots and the layer list stop being <code>serde_json::Value</code> trees. The layer list
+   stays JSON at the edge, when it is written.</li>
+<li><strong>Caches.</strong> The resolved look is cached by its hash. The tiles are cached by (source, z, x, y) with a byte limit (LRU). No
+   other cache before a measurement asks for it.</li>
+<li><strong>Threads.</strong> Native only, feature <code>parallel</code>: the sources in parallel, the tiles in parallel. The solver stays single-thread
+   (its stages depend on each other).</li>
+<li><strong>The browser limits.</strong> A wasm32 module has at most 4 GB of memory, and a tab can get less. The module must stay under
+   <code>MAX_ROADS</code>, and the error says to use a smaller area or the tiled path. The allocator grows the memory in large steps (16 to
+   256 MB), because each small step is slow in Edge on Windows.</li>
+</ol>
+<h2 id="the-migration-plan">The migration plan</h2>
+<h3 id="today-and-the-target">Today and the target</h3>
+<pre class="mermaid">flowchart LR
+    subgraph today[&quot;Today&quot;]
+        direction TB
+        p1[&quot;Python: look resolution, data-driven color, legend,&lt;br/&gt;full mode, metre widths, decks, items, boundary,&lt;br/&gt;PMTiles, page, pages, CLI, folium, lonboard&quot;]
+        r1[&quot;Rust (roadstyle-rs): simple-mode style,&lt;br/&gt;tiles on request, levels, worker SQL&quot;]
+        j1[&quot;Page JS: web_template.html (1,688 lines)&quot;]
+    end
+    subgraph target[&quot;Target&quot;]
+        direction TB
+        r2[&quot;Rust core: model, look, engine, tiles, levels&quot;]
+        r3[&quot;Rust adapters: io, wasm, py&quot;]
+        j2[&quot;JS: roadstyle-dashboard&quot;]
+        p2[&quot;Python: render_edges API, folium, lonboard,&lt;br/&gt;studio, MCP, snapshot, level editor&quot;]
+    end
+    p1 --&gt;|&quot;phases 3 to 6&quot;| r2
+    r1 --&gt;|&quot;phase 2: split&quot;| r2
+    r1 --&gt;|&quot;phase 2&quot;| r3
+    j1 --&gt;|&quot;task 2&quot;| j2
+    p1 --&gt;|&quot;stays&quot;| p2
+</pre>
+<p><em>Everything that makes a style or a tile moves to Rust. Python keeps its API and its notebook tools.</em></p>
+<h3 id="the-phases">The phases</h3>
+<pre class="mermaid">flowchart TB
+    P0[&quot;P0 Reference&lt;br/&gt;Python goldens, CI for cargo&quot;]
+    P1[&quot;P1 Merge the work in progress&lt;br/&gt;tiles, tile speed, task 1, task 2&quot;]
+    P2[&quot;P2 Crate split&lt;br/&gt;no change of output&quot;]
+    P3[&quot;P3 Typed look in Rust&lt;br/&gt;task 3, look v1, schema&quot;]
+    P4[&quot;P4 Columnar model, memory,&lt;br/&gt;missing style features&quot;]
+    P5[&quot;P5 Python binding&lt;br/&gt;Python calls Rust part by part&quot;]
+    P6[&quot;P6 Page and export in Rust&lt;br/&gt;page writer, PMTiles, npm&quot;]
+    P7[&quot;P7 Python is a thin layer&lt;br/&gt;1.0&quot;]
+    P0 --&gt; P1 --&gt; P2
+    P2 --&gt; P3
+    P2 --&gt; P4
+    P2 --&gt; P5
+    P3 --&gt; P6
+    P4 --&gt; P6
+    P5 --&gt; P7
+    P6 --&gt; P7
+</pre>
+<p><em>After the crate split (P2), P3, P4 and P5 run at the same time in different crates.</em></p>
+<h4 id="p0-the-reference">P0: the reference</h4>
+<ul>
+<li><strong>Content.</strong> Commit <code>tests/make_goldens.py</code> (from <code>rust-colors</code>) as the one generator. It writes, from Python, the goldens for
+  Monaco, Tartu and the Södermalm sample: <code>export_inline</code> (the style), <code>export_style</code> (style.json and the tiles), <code>compute_levels</code>
+  (tags and solve) and the look. The golden files are gzipped. The large ones go to the GitHub pre-release <code>rust-test-data</code>, and the
+  repository keeps their SHA-256. A CI job runs <code>cargo test --offline</code>, <code>cargo clippy</code> and the wasm32 build.</li>
+<li><strong>Golden test.</strong> The Rust output today against the Python goldens. Each difference is in a list, with a cause and a decision.</li>
+<li><strong>Benchmark.</strong> <code>bench</code> (from <code>main.rs</code>) for Monaco and Tartu: time and peak memory of each stage, in a table in this file.</li>
+<li><strong>First user.</strong> The roadstyle-rs session.</li>
+<li><strong>Exit.</strong> CI is green. The list of differences from Python is empty, or each item has a decision.</li>
+<li><strong>Risk.</strong> glibc's <code>cos</code> and <code>hypot</code> differ between machines (see <code>tests/test_render_web.py:1898</code>). Mitigation: the goldens come from
+  one machine type (Linux x86_64), and the Rust code rounds where Python rounds (<code>py_round</code>).</li>
+</ul>
+<h4 id="p1-merge-the-work-in-progress">P1: merge the work in progress</h4>
+<ul>
+<li><strong>Content.</strong> <code>rust-tile-speed</code>, then <code>rust-tiles</code> (they conflict in <code>tiles.rs</code>), task 1 (<code>rust-colors</code>), task 2 (the dashboard
+  module). duckosm-rust and geolibre-roadstyle pin the new commit and delete their copies of <code>look.json</code> and of the SQL.</li>
+<li><strong>Golden test.</strong> The tiles against Python's <code>tiles.py</code> output (from P0). Task 1 against <code>export_inline</code> with each data keyword.
+  Task 2: the 24 screenshots of <code>style_config.md</code> are the same.</li>
+<li><strong>Exit.</strong> One branch <code>rust-engine</code> with all four. The two Rust users build from it.</li>
+<li><strong>Risk.</strong> Three branches edit <code>rust/roadstyle-rs/src</code>. Merge one at a time, in the order above.</li>
+</ul>
+<h4 id="p2-the-crate-split">P2: the crate split</h4>
+<ul>
+<li><strong>Content.</strong> A move of files, with no change of behavior: the crates of <a href="#the-crates">The crates</a>. <code>Result&lt;_, String&gt;</code> becomes the
+  error enums. <code>main.rs</code> becomes <code>examples/bench.rs</code>.</li>
+<li><strong>Golden test.</strong> The same hashes as before the move.</li>
+<li><strong>Benchmark.</strong> The wasm module size before and after (no growth of more than 2 %).</li>
+<li><strong>Exit.</strong> <code>cargo build --target wasm32-unknown-unknown -p roadstyle --no-default-features</code> passes. duckosm-core depends on
+  <code>roadstyle-levels</code> only.</li>
+<li><strong>Risk.</strong> It touches every file in <code>rust/</code>. It must run when no other branch edits <code>rust/</code>: a freeze of one day, after P1.</li>
+</ul>
+<h4 id="p3-the-typed-look-in-rust-task-3">P3: the typed look in Rust (task 3)</h4>
+<ul>
+<li><strong>Content.</strong> <code>roadstyle-look</code>: the structs, the bundled files, <code>Look::resolve</code>, the schema. A reader of today's <code>look.json</code>
+  (version 0), so the users can move one at a time. <code>resolveLook</code> in <code>roadstyle-wasm</code>. The <code>palette</code> view row
+  (<code>_merge_palettes</code>) in Rust.</li>
+<li><strong>Golden test.</strong> For 4 palettes x 2 profiles x the settings fixtures of <code>tests/test_settings_overrides.py</code>, the look from Rust is
+  equal to the look from Python. The style from the Rust look is equal to the style from the Python look.</li>
+<li><strong>First user.</strong> The GeoLibre plugin: <code>build.py</code> stops running Python and mapstyle to make the 64 looks.</li>
+<li><strong>Exit.</strong> No user reads Python's internal tables (<code>render_web.CONFIG</code>, <code>ROAD_Z</code>, <code>_settings.theme()</code>) to make a look.</li>
+<li><strong>Risk.</strong> mapstyle changes the settings by mode (<code>mode_settings</code>). Its looks go into the golden set.</li>
+</ul>
+<h4 id="p4-the-columnar-model-memory-and-the-missing-style-features">P4: the columnar model, memory, and the missing style features</h4>
+<ul>
+<li><strong>Content.</strong> <code>RoadTable</code> over Arrow, dictionary text, typed slots and base map, the column map (<code>highway_col</code>, <code>edge_id_col</code>,
+  <code>tunnel_col</code>, <code>bridge_col</code>, <code>layer_col</code>, <code>cap_col</code>). Then the style features that only Python has: metre widths (<code>width_m_col</code>,
+  <code>width_m_zoom</code>, <code>casing_m</code>, <code>casing_min_px</code>), 3D bridge decks (<code>view_3d</code>), <code>boundary</code>, <code>access_col</code> colors, <code>items</code>,
+  <code>Overlay</code> from user data, <code>include</code> and <code>exclude</code>, levels computed when no level columns are given.</li>
+<li><strong>Golden test.</strong> The hashes do not change for the model work. Each new feature gets its golden from Python.</li>
+<li><strong>Benchmark.</strong> The targets of <a href="#efficiency">Efficiency</a>. Measure Stockholm county in Chrome and Edge, then set <code>MAX_ROADS</code>.</li>
+<li><strong>First user.</strong> duckosm-rust's page (larger areas).</li>
+<li><strong>Risk.</strong> The model work and the feature work both edit <code>roadstyle-engine</code>. The model API comes first, in one small change.</li>
+</ul>
+<h4 id="p5-the-python-binding">P5: the Python binding</h4>
+<ul>
+<li><strong>Content.</strong> <code>roadstyle-py</code> (PyO3, maturin, abi3 wheels for Linux x86_64 and aarch64, macOS, Windows). Python calls Rust part by
+  part, in this order: the style of <code>export_inline</code>, the tiles (<code>tiles.py</code>), the levels (<code>compute_levels</code>), the look
+  (<code>_settings.theme()</code>), the data stylers. An explicit switch <code>engine="python"</code> or <code>engine="rust"</code> (also <code>ROADSTYLE_ENGINE</code>) selects the
+  engine. A part that Rust does not have gives an error with <code>engine="rust"</code>. It does not change to Python without a message.</li>
+<li><strong>Golden test.</strong> The full pytest suite runs two times, one time with each engine. A new test, <code>tests/test_engine_parity.py</code>,
+  compares the two outputs byte for byte for each fixture and each keyword in the parity checklist.</li>
+<li><strong>Benchmark.</strong> <code>render_edges</code> on 5,000, 50,000 and 456,813 edges, with each engine.</li>
+<li><strong>First user.</strong> SonoFlow (nightly pages).</li>
+<li><strong>Risk.</strong> Wheels for each platform make the release longer. maturin's GitHub action builds them.</li>
+</ul>
+<h4 id="p6-the-page-and-the-export-in-rust">P6: the page and the export in Rust</h4>
+<ul>
+<li><strong>Content.</strong> The page writer in <code>roadstyle-io</code> (feature <code>page</code>): the HTML frame, the dashboard bundle, the style, the page options,
+  the gzip of the sources (<code>compress</code>), the host panel. <code>export_style</code> (style.json, XYZ tiles, PMTiles, sprite). The three page
+  sidebars (<code>dashboard.html</code>, <code>report.html</code>, <code>street_view.html</code>) as static files. The npm packages.</li>
+<li><strong>Golden test.</strong> The page from Rust is equal to the page from Python, for the reference pages of <code>docs/build_maps.py</code>.</li>
+<li><strong>First user.</strong> mapstyle (<code>export_style</code>, <code>render_report</code>).</li>
+<li><strong>Exit.</strong> <code>render_web.render</code> only converts its keywords and calls Rust.</li>
+</ul>
+<h4 id="p7-python-is-a-thin-layer">P7: Python is a thin layer</h4>
+<ul>
+<li><strong>Content.</strong> Remove the Python code of each part that is at parity for one minor version with no difference. scipy, ortools,
+  mapbox-vector-tile and pmtiles leave the dependencies. Version 1.0.</li>
+<li><strong>Exit.</strong> Python roadstyle has the API, folium, lonboard and the tools. The Rust goldens become the reference.</li>
+</ul>
+<h3 id="parallel-work-without-two-sessions-in-one-file">Parallel work without two sessions in one file</h3>
+<table>
+<thead>
+<tr>
+<th>Lane</th>
+<th>Phase</th>
+<th>Owns these files</th>
+<th>Waits for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A: reference and CI</td>
+<td>P0</td>
+<td><code>tests/make_goldens.py</code>, <code>rust/*/tests/</code>, <code>.github/workflows/rust.yml</code></td>
+<td></td>
+</tr>
+<tr>
+<td>B: work in progress</td>
+<td>P1</td>
+<td>the branches of each task, as today</td>
+<td>A for the goldens</td>
+</tr>
+<tr>
+<td>C: the look</td>
+<td>P3</td>
+<td><code>rust/roadstyle-look/</code>, <code>rust/roadstyle-wasm/src/look.rs</code></td>
+<td>P2</td>
+</tr>
+<tr>
+<td>D: model and memory</td>
+<td>P4</td>
+<td><code>rust/roadstyle-model/</code>, <code>rust/roadstyle-io/</code></td>
+<td>P2</td>
+</tr>
+<tr>
+<td>E: style features</td>
+<td>P4</td>
+<td><code>rust/roadstyle-engine/</code></td>
+<td>D for the model API</td>
+</tr>
+<tr>
+<td>F: Python binding</td>
+<td>P5</td>
+<td><code>rust/roadstyle-py/</code>, <code>src/roadstyle/_engine.py</code>, <code>tests/test_engine_parity.py</code></td>
+<td>P2</td>
+</tr>
+<tr>
+<td>G: page and export</td>
+<td>P6</td>
+<td><code>rust/roadstyle-io/src/page.rs</code>, <code>rust/roadstyle-tiles/src/pmtiles.rs</code>, <code>src/roadstyle/static/dashboard/</code></td>
+<td>task 2, C</td>
+</tr>
+</tbody>
+</table>
+<p>Rules:</p>
+<ol>
+<li>One session for each lane. A lane edits only its own files.</li>
+<li>A change of the API of another crate is a small change of its own, reviewed first, and the other lane rebases on it.</li>
+<li>Each lane works on a branch from <code>origin/main</code> (or from <code>rust-engine</code> until P1 is merged), and checks
+   <code>git log origin/main..&lt;branch&gt;</code> before a push.</li>
+<li>Nothing goes to <code>main</code>, PyPI, crates.io or npm before a person tries the pages and gives an OK.</li>
+</ol>
+<h2 id="the-parity-checklist">The parity checklist</h2>
+<p>States: <strong>done</strong> (Rust makes the same output today), <strong>look</strong> (Rust reads the value from <code>look.json</code>, which Python makes;
+the resolution moves in P3), <strong>task 1</strong>, <strong>task 2</strong>, <strong>task 3</strong> (in progress), <strong>P<em>n</em></strong> (planned in phase <em>n</em>), <strong>check</strong> (not known:
+the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>internal</strong> (not ported).</p>
+<h3 id="render_webrender-76-parameters"><code>render_web.render</code>: 76 parameters</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Parameter</th>
+<th>State</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>gdf</code></td>
+<td>done for GeoParquet; P5 for a GeoDataFrame</td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>palette</code></td>
+<td>look; task 3</td>
+<td></td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>highway_col</code></td>
+<td>P4</td>
+<td>Rust reads the column <code>highway</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>filter_col</code></td>
+<td>done</td>
+<td></td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>styler</code></td>
+<td>P5</td>
+<td>a Python object; the binding converts it</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>basemap</code></td>
+<td>task 2</td>
+<td>the page</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>basemaps</code></td>
+<td>task 2</td>
+<td></td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>name</code></td>
+<td>done</td>
+<td></td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>offset_frac</code></td>
+<td>look</td>
+<td></td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>width_frac</code></td>
+<td>look</td>
+<td></td>
+</tr>
+<tr>
+<td>11</td>
+<td><code>offset_zoom</code></td>
+<td>look</td>
+<td></td>
+</tr>
+<tr>
+<td>12</td>
+<td><code>tunnel_col</code></td>
+<td>P4</td>
+<td>Rust reads <code>tunnel</code></td>
+</tr>
+<tr>
+<td>13</td>
+<td><code>bridge_col</code></td>
+<td>P4</td>
+<td>Rust reads <code>bridge</code></td>
+</tr>
+<tr>
+<td>14</td>
+<td><code>layer_col</code></td>
+<td>P4</td>
+<td>Rust reads <code>layer</code></td>
+</tr>
+<tr>
+<td>15</td>
+<td><code>edge_id_col</code></td>
+<td>P4</td>
+<td></td>
+</tr>
+<tr>
+<td>16</td>
+<td><code>road_fill</code></td>
+<td>done</td>
+<td>state <code>rs_fill_on</code></td>
+</tr>
+<tr>
+<td>17</td>
+<td><code>cap_col</code></td>
+<td>P4</td>
+<td></td>
+</tr>
+<tr>
+<td>18</td>
+<td><code>cap_start_col</code></td>
+<td>done</td>
+<td></td>
+</tr>
+<tr>
+<td>19</td>
+<td><code>cap_end_col</code></td>
+<td>done</td>
+<td></td>
+</tr>
+<tr>
+<td>20</td>
+<td><code>casing_level_col</code></td>
+<td>done</td>
+<td>with stored levels; without them, P4 (the solver is in Rust)</td>
+</tr>
+<tr>
+<td>21</td>
+<td><code>fill_level_col</code></td>
+<td>done</td>
+<td>as 20</td>
+</tr>
+<tr>
+<td>22</td>
+<td><code>casing_start_col</code></td>
+<td>done</td>
+<td></td>
+</tr>
+<tr>
+<td>23</td>
+<td><code>casing_end_col</code></td>
+<td>done</td>
+<td></td>
+</tr>
+<tr>
+<td>24</td>
+<td><code>head_m</code></td>
+<td>done</td>
+<td></td>
+</tr>
+<tr>
+<td>25</td>
+<td><code>head_start_m_col</code></td>
+<td>done</td>
+<td></td>
+</tr>
+<tr>
+<td>26</td>
+<td><code>head_end_m_col</code></td>
+<td>done</td>
+<td></td>
+</tr>
+<tr>
+<td>27</td>
+<td><code>directed_col</code></td>
+<td>done</td>
+<td></td>
+</tr>
+<tr>
+<td>28</td>
+<td><code>driving_col</code></td>
+<td>done</td>
+<td></td>
+</tr>
+<tr>
+<td>29</td>
+<td><code>width_m_col</code></td>
+<td>P4</td>
+<td>no metre widths in Rust</td>
+</tr>
+<tr>
+<td>30</td>
+<td><code>width_m_zoom</code></td>
+<td>P4</td>
+<td></td>
+</tr>
+<tr>
+<td>31</td>
+<td><code>casing_m</code></td>
+<td>P4</td>
+<td></td>
+</tr>
+<tr>
+<td>32</td>
+<td><code>casing_min_px</code></td>
+<td>P4</td>
+<td></td>
+</tr>
+<tr>
+<td>33</td>
+<td><code>pitch</code></td>
+<td>task 2; P6</td>
+<td></td>
+</tr>
+<tr>
+<td>34</td>
+<td><code>bearing</code></td>
+<td>task 2; P6</td>
+<td></td>
+</tr>
+<tr>
+<td>35</td>
+<td><code>max_pitch</code></td>
+<td>task 2; P6</td>
+<td></td>
+</tr>
+<tr>
+<td>36</td>
+<td><code>view_3d</code></td>
+<td>P4</td>
+<td>no bridge decks in Rust (building extrusion is done)</td>
+</tr>
+<tr>
+<td>37</td>
+<td><code>arrows</code></td>
+<td>done</td>
+<td></td>
+</tr>
+<tr>
+<td>38</td>
+<td><code>labels</code></td>
+<td>done</td>
+<td></td>
+</tr>
+<tr>
+<td>39</td>
+<td><code>filter_control</code></td>
+<td>task 2</td>
+<td></td>
+</tr>
+<tr>
+<td>40</td>
+<td><code>find_control</code></td>
+<td>task 2</td>
+<td></td>
+</tr>
+<tr>
+<td>41</td>
+<td><code>overlay_control</code></td>
+<td>task 2</td>
+<td></td>
+</tr>
+<tr>
+<td>42</td>
+<td><code>overlay_popup</code></td>
+<td>task 2</td>
+<td></td>
+</tr>
+<tr>
+<td>43</td>
+<td><code>access_col</code></td>
+<td>P4 (colors); task 2 (rows)</td>
+<td></td>
+</tr>
+<tr>
+<td>44</td>
+<td><code>side_panel_html</code></td>
+<td>P6</td>
+<td>the page writer</td>
+</tr>
+<tr>
+<td>45</td>
+<td><code>host_panel_width</code></td>
+<td>P6</td>
+<td></td>
+</tr>
+<tr>
+<td>46</td>
+<td><code>basemap_switcher</code></td>
+<td>task 2</td>
+<td></td>
+</tr>
+<tr>
+<td>47</td>
+<td><code>zoom_readout</code></td>
+<td>task 2</td>
+<td></td>
+</tr>
+<tr>
+<td>48</td>
+<td><code>road_popup</code></td>
+<td>done (metadata); task 2</td>
+<td></td>
+</tr>
+<tr>
+<td>49</td>
+<td><code>road_tooltip</code></td>
+<td>done (metadata)</td>
+<td></td>
+</tr>
+<tr>
+<td>50</td>
+<td><code>hover_delay_ms</code></td>
+<td>done (metadata)</td>
+<td></td>
+</tr>
+<tr>
+<td>51</td>
+<td><code>data_maxzoom</code></td>
+<td>check</td>
+<td></td>
+</tr>
+<tr>
+<td>52</td>
+<td><code>data_tolerance</code></td>
+<td>check</td>
+<td></td>
+</tr>
+<tr>
+<td>53</td>
+<td><code>popup_mode</code></td>
+<td>task 2</td>
+<td></td>
+</tr>
+<tr>
+<td>54</td>
+<td><code>street_view</code></td>
+<td>task 2</td>
+<td></td>
+</tr>
+<tr>
+<td>55</td>
+<td><code>street_view_key</code></td>
+<td>task 2</td>
+<td></td>
+</tr>
+<tr>
+<td>56</td>
+<td><code>google_3d</code></td>
+<td>task 2</td>
+<td></td>
+</tr>
+<tr>
+<td>57</td>
+<td><code>tooltip</code></td>
+<td>done</td>
+<td>the alias of <code>road_tooltip</code></td>
+</tr>
+<tr>
+<td>58</td>
+<td><code>hover_color</code></td>
+<td>look</td>
+<td><code>__HOVER_COLOR__</code> is replaced, but the template has no such placeholder</td>
+</tr>
+<tr>
+<td>59</td>
+<td><code>select_color</code></td>
+<td>look</td>
+<td></td>
+</tr>
+<tr>
+<td>60</td>
+<td><code>boundary</code></td>
+<td>P4</td>
+<td></td>
+</tr>
+<tr>
+<td>61</td>
+<td><code>color_options</code></td>
+<td>task 1</td>
+<td></td>
+</tr>
+<tr>
+<td>62</td>
+<td><code>color_active</code></td>
+<td>task 1</td>
+<td></td>
+</tr>
+<tr>
+<td>63</td>
+<td><code>views</code></td>
+<td>P3 (palette rows); task 2 (menu)</td>
+<td></td>
+</tr>
+<tr>
+<td>64</td>
+<td><code>overlays</code></td>
+<td>done for base-map overlays and <code>edge_attach</code>; P4 for <code>Overlay</code> from user data</td>
+<td></td>
+</tr>
+<tr>
+<td>65</td>
+<td><code>items</code></td>
+<td>P4</td>
+<td></td>
+</tr>
+<tr>
+<td>66</td>
+<td><code>items_popup</code></td>
+<td>P4; task 2</td>
+<td></td>
+</tr>
+<tr>
+<td>67</td>
+<td><code>compress</code></td>
+<td>P6</td>
+<td></td>
+</tr>
+<tr>
+<td>68</td>
+<td><code>tunnel_control</code></td>
+<td>task 2</td>
+<td></td>
+</tr>
+<tr>
+<td>69</td>
+<td><code>tiles</code></td>
+<td>done (tiles on request); P6 (PMTiles in the page)</td>
+<td></td>
+</tr>
+<tr>
+<td>70</td>
+<td><code>simple</code></td>
+<td>done for <code>True</code>; see decision 2 for <code>False</code></td>
+<td></td>
+</tr>
+<tr>
+<td>71</td>
+<td><code>minzoom</code></td>
+<td>check</td>
+<td></td>
+</tr>
+<tr>
+<td>72</td>
+<td><code>legend</code></td>
+<td>task 1</td>
+<td></td>
+</tr>
+<tr>
+<td>73</td>
+<td><code>api_key</code></td>
+<td>P6</td>
+<td>the base-map URL</td>
+</tr>
+<tr>
+<td>74</td>
+<td><code>_edges</code></td>
+<td>Python</td>
+<td>the level editor's update in place</td>
+</tr>
+<tr>
+<td>75</td>
+<td><code>_palette_copy</code></td>
+<td>internal</td>
+<td>replaced by the Rust palette merge (P3)</td>
+</tr>
+<tr>
+<td>76</td>
+<td><code>_export</code></td>
+<td>internal</td>
+<td>the Rust export is the API</td>
+</tr>
+</tbody>
+</table>
+<h3 id="render_edges-21-parameters"><code>render_edges</code>: 21 parameters</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Parameter</th>
+<th>State</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>gdf</code></td>
+<td>P5</td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>backend</code></td>
+<td>Python</td>
+<td><code>"web"</code> calls Rust; <code>"folium"</code> and <code>"lonboard"</code> stay</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>palette</code></td>
+<td>task 3</td>
+<td></td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>highway_col</code></td>
+<td>P4</td>
+<td></td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>include</code></td>
+<td>P4</td>
+<td></td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>exclude</code></td>
+<td>P4</td>
+<td></td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>match_links</code></td>
+<td>P4</td>
+<td></td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>style</code></td>
+<td>P5</td>
+<td></td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>color_by</code></td>
+<td>task 1</td>
+<td></td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>colors</code></td>
+<td>task 1</td>
+<td></td>
+</tr>
+<tr>
+<td>11</td>
+<td><code>cmap</code></td>
+<td>task 1</td>
+<td><code>cmaps.json</code>: branca and matplotlib ramps at 9 stops</td>
+</tr>
+<tr>
+<td>12</td>
+<td><code>vmin</code></td>
+<td>task 1</td>
+<td></td>
+</tr>
+<tr>
+<td>13</td>
+<td><code>vmax</code></td>
+<td>task 1</td>
+<td></td>
+</tr>
+<tr>
+<td>14</td>
+<td><code>width_by</code></td>
+<td>task 1</td>
+<td></td>
+</tr>
+<tr>
+<td>15</td>
+<td><code>color_table</code></td>
+<td>task 1</td>
+<td></td>
+</tr>
+<tr>
+<td>16</td>
+<td><code>color_key</code></td>
+<td>task 1</td>
+<td></td>
+</tr>
+<tr>
+<td>17</td>
+<td><code>color_col</code></td>
+<td>task 1</td>
+<td></td>
+</tr>
+<tr>
+<td>18</td>
+<td><code>settings</code></td>
+<td>task 3</td>
+<td></td>
+</tr>
+<tr>
+<td>19</td>
+<td><code>profile</code></td>
+<td>task 3</td>
+<td></td>
+</tr>
+<tr>
+<td>20</td>
+<td><code>api_key</code></td>
+<td>P6</td>
+<td></td>
+</tr>
+<tr>
+<td>21</td>
+<td><code>levels_db</code></td>
+<td>P5</td>
+<td>the DuckDB reader (feature <code>duckdb</code>)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-pages-the-export-the-cli-and-the-other-api">The pages, the export, the CLI and the other API</h3>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>State</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>render_dashboard</code>, <code>render_report</code>, <code>render_street_view</code>, <code>sidebar_html</code></td>
+<td>P6</td>
+<td>the sidebars are static files on the <code>rs*</code> API</td>
+</tr>
+<tr>
+<td><code>export_inline</code></td>
+<td>done</td>
+<td><code>make_style</code></td>
+</tr>
+<tr>
+<td><code>export_style</code> (XYZ, PMTiles, sprite, popup files)</td>
+<td>P6</td>
+<td></td>
+</tr>
+<tr>
+<td><code>export_look</code></td>
+<td>P3</td>
+<td></td>
+</tr>
+<tr>
+<td><code>compute_levels(method="tags")</code></td>
+<td>done</td>
+<td>equal rows to duckosm-rust; P5 connects it to Python</td>
+</tr>
+<tr>
+<td><code>compute_levels(method="solve")</code>, <code>level_input</code>, <code>solve_levels</code></td>
+<td>done for the default call; check for <code>edits</code>, <code>fixed</code>, <code>max_positions</code></td>
+<td>Tartu: 64,828 of 64,828 rows equal to roadstyle (duckosm-rust <code>tools/compare_levels.py</code>)</td>
+</tr>
+<tr>
+<td><code>auto_ends</code>, <code>casing_parts</code></td>
+<td>check</td>
+<td></td>
+</tr>
+<tr>
+<td><code>save_levels</code>, <code>load_levels</code>, <code>stored_levels</code>, area levels</td>
+<td>Python; P5 for the DuckDB reader</td>
+<td></td>
+</tr>
+<tr>
+<td><code>level_area</code> (<code>roadstyle-levels make</code>, <code>solve</code>), <code>level_editor</code> (<code>edit</code>)</td>
+<td>Python</td>
+<td>they call the Rust solver after P5</td>
+</tr>
+<tr>
+<td><code>use_settings</code>, palettes API (<code>register_palette</code>, <code>load_palette</code>, <code>save_palette</code>, <code>palette_to_dict</code>, <code>palette_from_dict</code>)</td>
+<td>task 3</td>
+<td></td>
+</tr>
+<tr>
+<td>Basemaps (<code>BASEMAPS</code>, <code>get_basemap</code>, <code>register_basemap</code>, <code>set_api_key</code>)</td>
+<td>P3</td>
+<td>the list moves into the look</td>
+</tr>
+<tr>
+<td>Stylers (<code>ClassStyler</code>, <code>CategoricalStyler</code>, <code>NumericStyler</code>, <code>ColorTableStyler</code>, <code>build_styler</code>, <code>color_by*</code>)</td>
+<td>task 1 (the style); P5 (the Python classes call Rust)</td>
+<td></td>
+</tr>
+<tr>
+<td><code>resolve</code>, <code>base_style</code>, <code>selection_style</code>, <code>normalize_highway</code></td>
+<td>P3</td>
+<td></td>
+</tr>
+<tr>
+<td>Edges (<code>RoadEdges</code>, <code>as_edges</code>, <code>load_edges</code>, <code>from_geojson</code>, <code>from_arrow</code>, <code>from_duckdb</code>, <code>is_directed</code>)</td>
+<td>Python front-end; P4 for the readers</td>
+<td></td>
+</tr>
+<tr>
+<td><code>Overlay</code></td>
+<td>Python front-end; P4 for the engine</td>
+<td></td>
+</tr>
+<tr>
+<td><code>to_spec</code>, <code>to_geojson</code>, <code>to_html</code>, <code>to_iframe</code>, <code>save</code>, <code>save_spec</code>, <code>load_spec</code></td>
+<td>Python</td>
+<td>the Leaflet output</td>
+</tr>
+<tr>
+<td><code>snapshot</code>, <code>make_legend</code>, <code>BaseLayerSwitcher</code></td>
+<td>Python</td>
+<td></td>
+</tr>
+<tr>
+<td><code>roadstyle</code> CLI (input, <code>-o</code>, <code>-f</code> web/folium/rsjs/spec/geojson, <code>--palette</code>, <code>--basemap</code>, <code>--tooltip</code>, <code>--include</code>, <code>--exclude</code>, <code>--color-by</code>, <code>--colors</code>, <code>--cmap</code>, <code>--vmin</code>, <code>--vmax</code>, <code>--width-by</code>, <code>--page</code>, <code>--panel-width</code>, <code>--no-resize</code>, <code>--layout</code>, <code>--view-3d</code>, <code>--pitch</code>, <code>--bearing</code>, <code>--no-arrows</code>, <code>--no-labels</code>, <code>--no-filter</code>, <code>--no-basemap-switcher</code>, <code>--tiles</code>, <code>--no-compress</code>, <code>--highway-col</code>, <code>--layer</code>)</td>
+<td>Python</td>
+<td>it calls Rust through <code>render_edges</code></td>
+</tr>
+<tr>
+<td><code>roadstyle studio</code>, <code>roadstyle-mcp</code></td>
+<td>Python</td>
+<td></td>
+</tr>
+<tr>
+<td>The <code>window.rs*</code> API (29 functions) and the 13 <code>rs:*</code> events</td>
+<td>task 2</td>
+<td>the dashboard module keeps each name</td>
+</tr>
+</tbody>
+</table>
+<h2 id="quality">Quality</h2>
+<h3 id="tests">Tests</h3>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>What</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Unit</td>
+<td>Each crate: the expression builders, the merge of the look, the MVT encoder, the solver stages</td>
+<td><code>rust/&lt;crate&gt;/src</code> (<code>#[cfg(test)]</code>)</td>
+</tr>
+<tr>
+<td>Golden</td>
+<td>The Rust output against the Python output, byte for byte, for Monaco, Tartu and Södermalm, for each keyword of the parity checklist</td>
+<td><code>rust/roadstyle/tests/</code>, generator <code>tests/make_goldens.py</code></td>
+</tr>
+<tr>
+<td>Property</td>
+<td><code>proptest</code>: a tile decodes to the input geometry within half a tile unit; the levels keep each casing under the fill of each higher road that crosses it; the merge of the look is the same for any split of one settings source into two</td>
+<td><code>rust/&lt;crate&gt;/tests/</code></td>
+</tr>
+<tr>
+<td>Cross-language</td>
+<td>The same fixture through native Rust, WebAssembly (Node, <code>wasm-bindgen-test</code>) and the Python binding gives the same SHA-256</td>
+<td>CI</td>
+</tr>
+<tr>
+<td>Browser</td>
+<td>The page in Chromium with Playwright: the layers load, a click shows the popup, the controls work (as <code>tests/test_web_smoke.py</code> does today)</td>
+<td><code>tests/</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="benchmarks">Benchmarks</h3>
+<ul>
+<li><code>examples/bench.rs</code>: each stage (read, look, sources, layers, tiles) with its time and the peak memory, for Monaco, Tartu and
+  Burnaby. The results go into a table in this file at each release.</li>
+<li><code>criterion</code> for the hot functions: the tile encoder, the expression builders, the solver.</li>
+<li>CI records the peak memory of Monaco and fails when it increases by more than 10 %. CI records the time but does not fail on it,
+  because the GitHub runners are not steady.</li>
+</ul>
+<h3 id="ci-github-actions">CI (GitHub Actions)</h3>
+<table>
+<thead>
+<tr>
+<th>Job</th>
+<th>When</th>
+<th>Steps</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rust</code></td>
+<td>each push</td>
+<td><code>cargo fmt --check</code>, <code>cargo clippy -D warnings</code>, <code>cargo test --offline</code>, the wasm32 build with no default features, the size of the module</td>
+</tr>
+<tr>
+<td><code>parity</code></td>
+<td>each push</td>
+<td>pytest with <code>engine="rust"</code>, <code>tests/test_engine_parity.py</code></td>
+</tr>
+<tr>
+<td><code>tartu</code></td>
+<td>each night</td>
+<td>the <code>--ignored</code> goldens with the inputs from the pre-release</td>
+</tr>
+<tr>
+<td><code>release</code></td>
+<td>a tag</td>
+<td>crates.io (in the order model, look, levels, engine, tiles, io, roadstyle), PyPI wheels (maturin), npm</td>
+</tr>
+</tbody>
+</table>
+<h3 id="docs-diataxis">Docs (Diátaxis)</h3>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Pages</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tutorial</td>
+<td>"Your first map from Rust"; "Your first map in a browser worker"</td>
+</tr>
+<tr>
+<td>How-to</td>
+<td>Use roadstyle in a worker; Use your own palette or profile; Show a large area with tiles; Use the Rust engine from Python</td>
+</tr>
+<tr>
+<td>Reference</td>
+<td>rustdoc for each crate; the look schema (<code>look.schema.json</code>) as a table; the JS API; <code>docs/reference/parameters.md</code> made from the parity checklist</td>
+</tr>
+<tr>
+<td>Explanation</td>
+<td>This file; <code>rust_engine.md</code>; <code>levels_split_casing.md</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="examples">Examples</h3>
+<p><code>rust/roadstyle/examples/</code>: <code>style.rs</code> (a GeoParquet file to style.json), <code>tiles.rs</code> (a tile server on request), <code>bench.rs</code>.
+<code>examples/dashboard_rust/</code> (task 2): a page on <code>roadstyle-wasm</code> and <code>roadstyle-dashboard</code>.</p>
+<h2 id="decisions-that-are-open">Decisions that are open</h2>
+<p>My recommendation is first in each row.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Decision</th>
+<th>Recommendation</th>
+<th>The other choice</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>The crates</td>
+<td>The nine crates of <a href="#the-crates">The crates</a></td>
+<td>Keep one crate with feature flags</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Full mode (<code>simple=False</code>)</td>
+<td>Do not port it. Its one user (SonoFlow <code>viz/daily.py:179</code>) needs "change the color of each road from a property in the page", so add that call to the dashboard module and retire full mode</td>
+<td>Port full mode to Rust (more layers, more goldens)</td>
+</tr>
+<tr>
+<td>3</td>
+<td>The look file</td>
+<td>Look v1: typed and versioned; the engine reads today's file as version 0 for one minor version</td>
+<td>Keep today's file</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Unknown keywords</td>
+<td>A warning for one minor version, then an error (today <code>**kwargs</code> ignores them; see below)</td>
+<td>An error at once</td>
+</tr>
+<tr>
+<td>5</td>
+<td>The Python package</td>
+<td>One wheel <code>roadstyle</code> with the engine in it (maturin, abi3)</td>
+<td>A pure Python <code>roadstyle</code> and a separate <code>roadstyle-engine</code> wheel</td>
+</tr>
+<tr>
+<td>6</td>
+<td>npm</td>
+<td>Publish <code>roadstyle-wasm</code> and <code>roadstyle-dashboard</code> after P3</td>
+<td>Users keep building from a commit</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Versions</td>
+<td>One version for all crates and packages, the same as Python roadstyle</td>
+<td>A version for each crate</td>
+</tr>
+</tbody>
+</table>
+<h2 id="found-during-the-inventory">Found during the inventory</h2>
+<p>These are not part of the plan. Each one is a separate fix.</p>
+<ol>
+<li><strong><code>theme=</code> is ignored without a message.</strong> <code>render_edges</code> has no <code>theme</code> keyword since 0.24.0 (<code>style_config.md</code>), and
+   <code>render_web.render(**_ignore)</code> drops it. SonoFlow passes it (<code>viz/chains.py:124</code>, <code>viz/daily.py:168</code>), and the scan counts 28 calls
+   in 8 projects.</li>
+<li><strong><code>__HOVER_COLOR__</code></strong> is replaced in <code>render_web.py:3784</code>, but <code>web_template.html</code> has no such placeholder.</li>
+<li><strong><code>docs/design/style_config.md</code></strong> still names <code>data/themes/default.yaml</code>. The files are <code>data/profiles/</code> and <code>data/palettes/</code>.</li>
+<li><strong><code>docs/reference/parameters.md</code></strong> shows defaults that the code resolves from the profile (<code>offset_frac</code> 0.28, <code>cmap</code> <code>"viridis"</code>,
+   <code>pitch</code> 0) as if they were the keyword defaults (<code>None</code>).</li>
+<li><strong>The Burnaby style time (6.2 s)</strong> of the brief is not in any file of the repository. P0 measures it again.</li>
+</ol>
+</main>
+<script type="module">
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs";
+const dark = document.documentElement.dataset.theme === "dark" ||
+  (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "default", flowchart: { htmlLabels: true } });
+</script>
+</body>
+</html>
