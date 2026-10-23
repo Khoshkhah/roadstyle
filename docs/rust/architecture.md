@@ -15,36 +15,21 @@ roadstyle's JavaScript adds the controls and answers the mouse.
 
 ```mermaid
 flowchart TB
-    subgraph make["Part 1. The Rust engine makes the data"]
-        direction LR
-        inp["the roads (GeoParquet)<br/>+ the look (palette, profile,<br/>settings, keywords)"]
-        eng["Rust engine<br/>native in Python, or<br/>WebAssembly in the browser"]
-        inp --> eng
-    end
-    subgraph between["The data between the parts"]
-        direction LR
-        sty["MapLibre style (JSON)<br/>sources, layers, expressions"]
-        meta["roadstyle:* metadata<br/>controls, state, legend, popup"]
-        tiles["vector tiles (MVT)<br/>or one PMTiles archive"]
-    end
-    subgraph inbrowser["Parts 2 and 3. In the browser"]
-        direction LR
-        ml["MapLibre GL JS<br/>draws with WebGL:<br/>camera, zoom, 3D"]
-        dash["roadstyle dashboard (JS)<br/>controls, hover, click,<br/>the rs object"]
-        dash -->|"setFilter, setGlobalStateProperty,<br/>setFeatureState, queryRenderedFeatures"| ml
-    end
-    host["your page or the user"]
-    eng --> sty & meta & tiles
-    sty --> ml
-    tiles -->|"addProtocol rs://, or pmtiles://"| ml
-    meta --> dash
-    host <-->|"clicks, rs.setState, rs.on"| dash
-    dash -.->|"engine.props: one road's properties"| eng
+    inp["Roads + look"]
+    eng["Rust engine<br/>makes the style and the tiles"]
+    ml["MapLibre GL JS<br/>draws the map"]
+    dash["roadstyle dashboard (JavaScript)<br/>controls, hover, click"]
+    you["You or your page"]
+    inp --> eng
+    eng -->|"style + tiles"| ml
+    eng -->|"metadata"| dash
+    dash -->|"MapLibre calls"| ml
+    you <-->|"clicks, rs object"| dash
 ```
 
 *Rust gives JSON text and bytes, and never calls JavaScript or MapLibre. MapLibre does not know roadstyle: for MapLibre the
-roads are an ordinary style. The dashboard reads only the style; on a click it can ask the engine for one road (the dashed
-arrow).*
+roads are an ordinary style. The dashboard reads only the style. One call goes back to the engine: on a click, a browser page can
+ask the engine for the properties of one road (`engine.props`).*
 
 **1. The Rust engine makes the data.** From the roads and the look, it makes a MapLibre style: the sources, the layers and their
 paint expressions (the widths, the colors, the casings, the drawing order), and the `roadstyle:*` metadata for the dashboard. It
