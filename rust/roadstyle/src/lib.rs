@@ -41,10 +41,19 @@ pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name:
     texts(&metadata["roadstyle:interaction"], &mut read);
     // the name and arrow slots go whole into the tiles, from the first zoom of their layers (tiles.py: 14, their symbols' minzoom)
     let slots_from = layers.iter().filter(|l| l["source"] == "slots").map(|l| l["minzoom"].as_f64().unwrap_or(0.0) as u32).min().unwrap_or(0);
+    // render(tiles=True)'s page (the Python binding): the columns of its road and simple tiles (`tile_keep`; every __rs_* goes too) and
+    // the sources in its tiles (`tile_layers`: roads, simple, slots; the page keeps the others inline)
+    let exact: Option<std::collections::HashSet<String>> = cfg_all["args"]["tile_keep"].as_array()
+        .map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
+    let only: Option<Vec<&str>> = cfg_all["args"]["tile_layers"].as_array().map(|a| a.iter().filter_map(Value::as_str).collect());
     for (k, s) in sources {
         let slots = k == "slots";
         let from = if slots { slots_from } else { 0 };
+        if only.as_ref().is_some_and(|o| !o.contains(&k.as_str())) {
+            continue;
+        }
         match s {
+            Src::Typed(s) if exact.is_some() => tiled.add_typed(&k, s, exact.as_ref().unwrap(), slots, from),
             // render's tiles: the pieces of `simple` keep the class, lvl, the metre width column and the __rs_* marks (not a picked item's fields)
             Src::Typed(s) if k == "simple" => {
                 let keep: std::collections::HashSet<String> = [highway_col.clone(), "lvl".into()].into_iter().chain(width_col.clone()).collect();

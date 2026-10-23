@@ -3729,16 +3729,16 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         line_layers = []
         # the casing pieces, simple mode's pieces and the twin end caps ride in the same archive (docs/design/levels_split_casing.md, 12.1);
         # a simple piece's tile id is its index in the layer, not the inline 16 * edge + k (only the level editor's updateData reads that)
-        for name, kind in (("casings", "line"), ("simple", "line"), ("ends", "point")):
-            src = style["sources"].pop(name, None)
+        for sname, kind in (("casings", "line"), ("simple", "line"), ("ends", "point")):     # not `name`: that is the page's title
+            src = style["sources"].pop(sname, None)
             for lyr in style["layers"]:
-                if lyr.get("source") == name:
-                    lyr["source"], lyr["source-layer"] = "roads", name
+                if lyr.get("source") == sname:
+                    lyr["source"], lyr["source-layer"] = "roads", sname
             if src and src["data"]["features"]:
                 if kind == "line":
-                    line_layers.append({"name": name, "fc": src["data"], "keep": keep})
+                    line_layers.append({"name": sname, "fc": src["data"], "keep": keep})
                 else:
-                    extra.append({"name": name, "fc": src["data"], "minzoom": tc["minzoom"]})
+                    extra.append({"name": sname, "fc": src["data"], "minzoom": tc["minzoom"]})
         if _export:      # a style for other apps (docs/design/style_export.md): RustGIS draws no GeoJSON source, so every one goes in the archive
             for sid, src in [(s, v) for s, v in style["sources"].items() if v.get("type") == "geojson"]:
                 del style["sources"][sid]

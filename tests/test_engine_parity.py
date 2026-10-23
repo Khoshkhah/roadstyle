@@ -231,8 +231,9 @@ def test_export_inline_decks(part, keywords, rename):
     assert diff(ru, py) == []
 
 
+@pytest.mark.parametrize("fmt", ["xyz", "pmtiles"])
 @pytest.mark.parametrize("case", ["plain", "numeric", "categorical", "road_popup", "view_3d", "kinds", "items and metre overlay", "other column names"])
-def test_export_style(part, keywords, case, tmp_path):
+def test_export_style(part, keywords, case, fmt, tmp_path):
     """export_style: the same style.json and the same files; each tile has the same features when decoded (compare_engines.tile_diff:
     the numbers by value, the 3D decks by shape)."""
     from compare_engines import diff, tile_diff
@@ -244,8 +245,8 @@ def test_export_style(part, keywords, case, tmp_path):
     else:
         kw.update(CASES[case] if case in CASES else {"view_3d": True} if case == "view_3d" else _overlays(part, case))
     py, ru = tmp_path / "python", tmp_path / "rust"
-    rs.export_style(part, py, base_url="http://x", engine="python", **kw)
-    rs.export_style(part, ru, base_url="http://x", engine="rust", **kw)
+    rs.export_style(part, py, base_url="http://x", engine="python", format=fmt, **kw)
+    rs.export_style(part, ru, base_url="http://x", engine="rust", format=fmt, **kw)
     assert diff(json.loads((ru / "style.json").read_text()), json.loads((py / "style.json").read_text())) == []
     files = sorted(p.relative_to(py) for p in py.rglob("*") if p.is_file())
     assert files == sorted(p.relative_to(ru) for p in ru.rglob("*") if p.is_file())
@@ -253,8 +254,20 @@ def test_export_style(part, keywords, case, tmp_path):
         a, b = (py / f).read_bytes(), (ru / f).read_bytes()
         if f.suffix == ".pbf" and a != b:
             assert tile_diff(b, a) == [], f
+        elif f.suffix == ".pmtiles":
+            ta, tb = _archive(a), _archive(b)
+            for k in sorted(set(ta) | set(tb)):
+                assert tile_diff(tb.get(k, b""), ta.get(k, b"")) == [], k
         else:
             assert a == b, f
+
+
+def _archive(data):
+    """The tiles of a PMTiles archive, gunzipped, by (z, x, y)."""
+    import gzip
+
+    from pmtiles.reader import MemorySource, all_tiles
+    return {k: gzip.decompress(v) for k, v in all_tiles(MemorySource(data))}
 
 
 _LIVE = {"plain": {}, "controls": {"tunnel_control": True, "filter_control": True, "access_col": "access"},
@@ -318,6 +331,28 @@ def test_render_edges_page(part, keywords, case, monkeypatch):
         return st, html[:at] + html[at + end:]
     (sr, hr), (sp, hp) = cut(ru), cut(py)
     assert diff(sr, sp) == [] and hr == hp
+
+
+@pytest.mark.parametrize("case", ["plain", "controls", "items and metre overlay"])
+def test_render_edges_tiled_page(part, keywords, case, monkeypatch):
+    """render_edges(tiles=True, engine="rust"): the same page as the Python engine's, but the embedded PMTiles archive, whose tiles are the
+    same when decoded (compare_engines.tile_diff); the style, the sidecar table and the rest of the page are the same byte for byte."""
+    import base64
+    import gzip
+    import re
+
+    from compare_engines import tile_diff
+    monkeypatch.delenv("GOOGLE_MAPS_KEY", raising=False)
+    opts = {"compress": False, "tiles": True, **(_PAGES[case] if case in _PAGES else _overlays(part, case))}
+
+    def parts(html):
+        pm = re.search(r'atob\("([A-Za-z0-9+/=]+)"\)', html).group(1)
+        side = re.search(r'id="rs-side" type="application/json">([A-Za-z0-9+/=]+)<', html).group(1)
+        return _archive(base64.b64decode(pm)), gzip.decompress(base64.b64decode(side)), html.replace(pm, "PM").replace(side, "SIDE")
+    (tp, sp, hp), (tr, sr, hr) = (parts(rs.render_edges(part, backend="web", engine=e, **{**keywords, **opts}).html) for e in ("python", "rust"))
+    assert hr == hp and sr == sp
+    for k in sorted(set(tp) | set(tr)):
+        assert tile_diff(tr.get(k, b""), tp.get(k, b"")) == [], k
 
 
 @pytest.mark.parametrize("method", ["tags", "solve"])

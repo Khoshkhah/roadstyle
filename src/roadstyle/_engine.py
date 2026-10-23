@@ -136,7 +136,7 @@ def compute_levels(edges, *, layer_col="layer", bridge_col="bridge", tunnel_col=
 
 def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs):
     """``roadstyle.export_style`` by the Rust engine: the style and the tiles from ``Tiler``; the files around them as Python writes them.
-    ``format="xyz"`` only (PMTiles in Rust is phase P6)."""
+    ``format``: "xyz" (a tile folder) or "pmtiles" (one archive, roads.pmtiles)."""
     import gzip  # noqa: F401  (the same imports as export.py)
     from importlib.resources import files
     from pathlib import Path
@@ -145,8 +145,8 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs
     from .export import _camera, _plugin_css
     from .tiles import _merc, _tile_range
 
-    if format != "xyz":
-        raise ValueError("engine='rust': export_style writes format='xyz' only (PMTiles in Rust is phase P6); use engine='python'")
+    if format not in ("xyz", "pmtiles"):
+        raise ValueError(f"format must be 'xyz' or 'pmtiles', got {format!r}")
     kwargs = dict(kwargs)
     name = kwargs.get("name") or "roads"
     kwargs.setdefault("view_3d", True)
@@ -156,8 +156,8 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs
     style, base = json.loads(t.style), base_url.rstrip("/")
     bounds = tuple(float(v) for v in edges.total_bounds)
     roads = style["sources"]["roads"]
-    roads = style["sources"]["roads"] = {**{k: roads[k] for k in ("type", "minzoom", "maxzoom")}, "tiles": [f"{base}/tiles/{{z}}/{{x}}/{{y}}.pbf"],
-                                        "bounds": list(bounds)}
+    at = {"tiles": [f"{base}/tiles/{{z}}/{{x}}/{{y}}.pbf"]} if format == "xyz" else {"url": f"pmtiles://{base}/roads.pmtiles"}
+    roads = style["sources"]["roads"] = {**{k: roads[k] for k in ("type", "minzoom", "maxzoom")}, **at, "bounds": list(bounds)}
     meta = style.pop("metadata", {})
     style = {k: style[k] for k in ("version", "sources", "layers", "glyphs") if k in style}     # Python's key order: the same bytes
     style["sprite"], style["name"] = f"{base}/sprite", name
@@ -170,7 +170,10 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs
     d = Path(out_dir)
     d.mkdir(parents=True, exist_ok=True)
     lo, hi = _merc(*bounds[:2]), _merc(*bounds[2:])
-    for z in range(int(roads["minzoom"]), int(roads["maxzoom"]) + 1):     # every tile in the roads' bounds; an empty one is an empty file
+    if format == "pmtiles":
+        names = sorted({lyr["source-layer"] for lyr in style["layers"] if "source-layer" in lyr})
+        (d / "roads.pmtiles").write_bytes(_pmtiles(t, int(roads["minzoom"]), int(roads["maxzoom"]), bounds, names))
+    for z in range(int(roads["minzoom"]), int(roads["maxzoom"]) + 1) if format == "xyz" else ():   # every tile in the bounds; an empty one: an empty file
         x0, x1, y0, y1 = _tile_range((lo[0], lo[1], hi[0], hi[1]), z)
         for x in range(x0, x1 + 1):
             for y in range(y0, y1 + 1):
@@ -196,7 +199,8 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
                 levels_db=None, **kwargs):
     """``render_edges(backend="web", engine="rust")``: the roads' style from the Rust engine (state "live": the state in the expressions and
     the interaction contract in the metadata), the base map and the page as Python writes them (render_web._page_basemaps, _page_html),
-    with the settings of the call in force. ``tiles=True`` (a PMTiles page) and ``simple=False`` (the full look) are Python's only."""
+    with the settings of the call in force. ``tiles=True``: the roads, their pieces and their names in an embedded PMTiles archive of the
+    Rust engine's tiles (_tiled_page). ``simple=False`` (the full look) is Python's only."""
     import inspect
     import os
 
@@ -206,7 +210,7 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
     from .edges import as_edges
     from .filters import filter_edges
 
-    for k, why in (("tiles", "a PMTiles page is phase P6"), ("style", "a Styler object is Python's"), ("styler", "a Styler object is Python's")):
+    for k, why in (("style", "a Styler object is Python's"), ("styler", "a Styler object is Python's")):
         if kwargs.get(k):
             raise ValueError(f"engine='rust': {k}= ({why}); use engine='python'")
     if kwargs.get("simple") is False:
@@ -220,8 +224,12 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
         from .levels_store import stored_levels
         g, level_kw = stored_levels(levels_db, g, kwargs.get("edge_id_col", "edge_id"))
         kwargs = {**kwargs, **level_kw}
+    tiled = bool(kwargs.get("tiles"))
     lk = _look_of({**kwargs, "palette": palette, "profile": profile, "settings": settings, "highway_col": highway_col, "state": "live"})
-    style = json.loads(rust().make_style(_geoparquet(g), json.dumps(lk), None, None, kwargs.get("name")))
+    pq = _geoparquet(g)
+    style = json.loads(rust().make_style(pq, json.dumps(lk), None, None, kwargs.get("name")))
+    dashes = sorted({f["properties"].get("__rs_dash") for f in style["sources"]["simple"]["data"]["features"]} - {None, ""})
+    archive = _tiled_page(pq, lk, style, highway_col, kwargs) if tiled else None
     meta, ctl = style.pop("metadata"), None
     ctl, inter = meta["roadstyle:controls"], meta["roadstyle:interaction"]
     for lyr in style["layers"]:
@@ -266,9 +274,66 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
             "tunnel": {**ctl["tunnel"], "bg": bg}, "fill_layers": ctl["fill_layers"], "road_fill": ctl["road_fill"], "views": ctl["views"],
             "items": ctl["items"], "road_popup": inter["popup"], "road_tooltip": inter["tooltip"], "hover_delay_ms": inter["hover_delay_ms"],
             "edge_id_col": ctl["edge_id_col"], "arrow_icon": ctl["arrow_icon"], "arrow_color": ctl["arrow_color"], "arrow_rules": ctl["arrow_rules"]}
-    dashes = sorted({f["properties"].get("__rs_dash") for f in style["sources"]["simple"]["data"]["features"]} - {None, ""})
     simple_js = {"layer": "roads-simple", "bridge": cfg["bridge_casing_color"], "shadow": cfg["bridge_shadow_color"], "select": ctl["select_color"],
                  "hover": a["hover_color"] or th["selection"]["hover"], "tunnels": bool(ctl["tunnel"]["layers"]), "dashes": dashes}
     x0, y0, x1, y1 = (float(v) for v in g.total_bounds)
     return rw.WebMap(rw._page_html(page_style, page, name=a["name"], cam=cam, bounds=(x0, y0, x1, y1), side_panel_html=a["side_panel_html"],
-                                   host_panel_width=a["host_panel_width"], compress=a["compress"], simple_js=simple_js))
+                                   host_panel_width=a["host_panel_width"], compress=a["compress"], tiles=archive, simple_js=simple_js))
+
+
+def _tiled_page(pq, lk, style, highway_col, kwargs):
+    """render(tiles=True) by the Rust engine: (the PMTiles archive, the sidecar table) of the page, and ``style`` made as the tiled page's
+    (render_web's tiled branch): one vector source ``roads`` with the layers ``roads``, ``simple`` and ``slots``. The tiles are the Rust
+    Tiler's, with the columns of tiles.build_pmtiles (``keep`` and every ``__rs_*``; the slots whole, from zoom 14); the sidecar is
+    tiles.sidecar of the roads (every column, for the popups)."""
+    from .tiles import sidecar
+
+    srcs = style["sources"]
+    side = sidecar(srcs["roads"]["data"])
+    tc = lk["config"]["tiles"]
+    z0, z1 = int(tc["minzoom"]), int(tc["maxzoom"])
+    keep = sorted({highway_col, kwargs.get("filter_col") or highway_col, "__rs_twoway", "__rs_edge", "lvl", kwargs.get("width_m_col")} - {None})
+    names = [n for n in ("roads", "simple", "slots") if n in srcs and srcs[n]["data"]["features"]]
+    t = rust().Tiler(pq, json.dumps({**lk, "args": {**lk["args"], "tile_keep": keep, "tile_layers": names}}), None, None, "", [])
+    pts = [c for n in names for f in srcs[n]["data"]["features"] for c in ((f.get("geometry") or {}).get("coordinates") or [])]
+    bounds = (min(p[0] for p in pts), min(p[1] for p in pts), max(p[0] for p in pts), max(p[1] for p in pts))
+    archive = _pmtiles(t, z0, z1, bounds, names)
+    # the style: the roads source a vector one; the pieces and the slots its layers
+    srcs["roads"] = {"type": "vector", "url": "pmtiles://roads", "minzoom": z0, "maxzoom": z1}
+    for n in ("simple", "slots"):
+        srcs.pop(n, None)
+    for lyr in style["layers"]:
+        if lyr.get("source") in ("simple", "slots"):
+            lyr["source"], lyr["source-layer"] = "roads", lyr["source"]
+        elif lyr.get("source") == "roads":
+            lyr["source-layer"] = "roads"
+    return archive, side
+
+
+def _pmtiles(t, z0, z1, bounds, names) -> bytes:
+    """A PMTiles archive (gzipped tiles, as tiles.build_pmtiles) of the Tiler ``t``'s tiles in ``bounds`` (lon / lat) from zoom ``z0`` to
+    ``z1``; an empty tile is left out. ``names``: the tile layers, for the archive's metadata."""
+    import gzip
+    import io
+
+    from pmtiles.tile import Compression, TileType, zxy_to_tileid
+    from pmtiles.writer import Writer
+
+    from .tiles import _merc, _tile_range
+
+    (mx0, my0), (mx1, my1) = _merc(*bounds[:2]), _merc(*bounds[2:])
+    buf = io.BytesIO()
+    w = Writer(buf)
+    for z in range(z0, z1 + 1):
+        x0, x1, y0, y1 = _tile_range((mx0, my0, mx1, my1), z)
+        for x in range(x0, x1 + 1):
+            for y in range(y0, y1 + 1):
+                data = t.tile(z, x, y)
+                if data:
+                    w.write_tile(zxy_to_tileid(z, x, y), gzip.compress(data, 6, mtime=0))
+    e7 = [int(v * 1e7) for v in bounds]
+    w.finalize({"tile_type": TileType.MVT, "tile_compression": Compression.GZIP, "min_zoom": z0, "max_zoom": z1,
+                "min_lon_e7": e7[0], "min_lat_e7": e7[1], "max_lon_e7": e7[2], "max_lat_e7": e7[3],
+                "center_zoom": (z0 + z1) // 2, "center_lon_e7": (e7[0] + e7[2]) // 2, "center_lat_e7": (e7[1] + e7[3]) // 2},
+               {"vector_layers": [{"id": n, "fields": {}} for n in names]})
+    return buf.getvalue()
