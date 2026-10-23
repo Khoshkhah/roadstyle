@@ -114,8 +114,7 @@ fn val(v: &Value) -> Option<Val> {
             (_, Some(u)) => Val::UInt(u),
             _ => Val::Dbl(n.as_f64()?),
         },
-        Value::Null => return None,
-        other => Val::Str(other.to_string().into()), // the sources have no lists or objects; as text if one comes
+        Value::Null | Value::Array(_) | Value::Object(_) => return None, // tiles.py (mapbox_vector_tile) leaves out a list or an object
     })
 }
 

@@ -44,7 +44,16 @@ pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name:
         let from = if slots { slots_from } else { 0 };
         match s {
             Src::Typed(s) => tiled.add_typed(&k, s, &read, slots, from),
-            Src::Json(s) => tiled.add(&k, s, &read, slots, from), // frees the source's tree
+            Src::Json(s) => {
+                // render's export: another GeoJSON source (the 3D decks, an overlay) keeps all its properties (keep=None). Python writes
+                // its points and polygons whole; the engine clips them with the buffer, as the lines (docs/design/rust_library.md, P0)
+                let mut keep = read.clone();
+                if !slots {
+                    let fs = s["data"]["features"].as_array().map(Vec::as_slice).unwrap_or_default();
+                    keep.extend(fs.iter().filter_map(|f| f["properties"].as_object()).flat_map(|p| p.keys().cloned()));
+                }
+                tiled.add(&k, s, &keep, slots, from) // frees the source's tree
+            }
         }
     }
     for l in layers.iter_mut() {

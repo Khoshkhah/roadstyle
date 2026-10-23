@@ -5,6 +5,7 @@
 #![allow(clippy::needless_range_loop, clippy::type_complexity)]
 
 pub mod colors;
+pub mod decks;
 pub mod features;
 pub mod layers;
 pub mod look;
@@ -82,9 +83,19 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     };
     let (center, zoom) = camera(&feats);
     let roads = roads::roads_source(feats);
-    let layers = layers::road_layers(&look_json, &roads.feats, &simple.feats, source_features(&slots), &mut ovs, &colors.props, colors.active)?;
+    // render's view_3d: the bridges' extruded decks (_bridge_decks)
+    let decks = if look_json["args"]["view_3d"] == true {
+        // a casing slab names the user's own `highway` column (Python's props.get("highway")): kept aside when highway_col is another
+        let hw = if cols.0.iter().any(|(own, _)| *own == "highway") { ColumnMap::kept("highway") } else { "highway".into() };
+        decks::bridge_decks(&roads.feats, &decks::DeckLook::from_config(&look_json["config"]["bridge_decks"]), &layers::Model::from_look(&look_json)?, &hw)
+    } else { Vec::new() };
+    let layers = layers::road_layers(&look_json, &roads.feats, &simple.feats, source_features(&slots), !decks.is_empty(), &mut ovs, &colors.props,
+                                     colors.active)?;
     let glyphs = (labels && !source_features(&slots).is_empty()).then(|| look_json["theme"]["labels"]["glyphs"].clone());
     let mut sources = vec![("roads".to_string(), Src::Typed(roads))];
+    if !decks.is_empty() {
+        sources.push(("decks".into(), Src::Json(json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": decks}, "generateId": true}))));
+    }
     for (i, ov) in ovs.into_iter().enumerate() {
         let mut s = serde_json::Map::new();
         s.insert("type".into(), "geojson".into());
@@ -262,6 +273,20 @@ impl ColumnMap {
                     }
                 }
                 Src::Typed(s) => s.feats.iter_mut().for_each(|f| self.0.iter().for_each(|(own, _)| { f.props.shift_remove(&Self::kept(own)); })),
+                // the 3D decks are copies of the roads' properties: the user's names, as the roads
+                Src::Json(s) if name == "decks" => {
+                    for f in s["data"]["features"].as_array_mut().into_iter().flatten() {
+                        if let Some(p) = f["properties"].as_object_mut().filter(|p| !p.contains_key("__rs_casing_slab")) {
+                            for (own, user) in &self.0 {
+                                if p.contains_key(*own) {
+                                    let kept = Self::kept(own);
+                                    let name = |k: &String| if k == own { user.clone() } else if *k == kept { own.to_string() } else { k.clone() };
+                                    *p = std::mem::take(p).into_iter().map(|(k, v)| (name(&k), v)).collect();
+                                }
+                            }
+                        }
+                    }
+                }
                 Src::Json(s) => {
                     for f in s["data"]["features"].as_array_mut().into_iter().flatten() {
                         if let Some(p) = f["properties"].as_object_mut() {

@@ -630,7 +630,7 @@ def _annotation_slots(geo, slot_m, class_col="highway", only=None):
     return {"type": "FeatureCollection", "features": feats}
 
 
-def _bridge_decks(geo, dk):
+def _bridge_decks(geo, dk, highway_col="highway"):
     """Bridge chains (lvl +1) as RAMPED deck ribbons for the 3D view's extrusions.
 
     Connected bridge edges are walked into chains — ONLY to shape the ramp profile (0 at the
@@ -770,7 +770,7 @@ def _bridge_decks(geo, dk):
                 continue
             mid = (d0 + d1) / 2
             pp, ffi, rfi = props_at(mid)
-            grp = ROAD_GROUP.get(str(pp.get("highway", "")), _FB["group"])
+            grp = ROAD_GROUP.get(str(pp.get(highway_col, "")), _FB["group"])     # the class column (highway_col), not a column named highway
             px = _gwidth(WIDTH[grp], HI_RATE[grp], dk["match_zoom"])
             # width_scale trims the ribbon: at a tilted camera the extruded side walls (and a
             # dual carriageway's second chain) add apparent width, so 1.0 reads too fat
@@ -3076,7 +3076,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     # can't track the stylized px road widths across zooms — multi-width band variants were
     # tried and looked worse (double-deck halos / width pops), so slightly-narrow-when-zoomed-
     # out is the accepted trade. Tune with bridge_decks.width_scale / match_zoom in settings.
-    decks = _bridge_decks(geo, dk) if view_3d else {"features": []}
+    decks = _bridge_decks(geo, dk, highway_col) if view_3d else {"features": []}
     if decks["features"]:
         style["sources"]["decks"] = {"type": "geojson", "data": decks, "generateId": True}
     cw = _width_expr(highway_col, casing=True, **sw)      # casing width expr (reused across layers)

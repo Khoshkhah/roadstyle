@@ -177,15 +177,38 @@ def test_export_inline_metre_widths(part, keywords, opts):
     assert diff(ru, py) == []
 
 
-@pytest.mark.parametrize("case", ["plain", "numeric", "categorical", "road_popup"])
-def test_export_style(part, keywords, case, tmp_path):
-    """export_style: the same style.json and the same files; each tile has the same features when decoded. A tile's number can be
-    an integer in one engine and a float in the other (Python's pandas columns with nulls are floats): MapLibre reads the same number."""
-    import mapbox_vector_tile as mvt
+@pytest.mark.parametrize("rename", [False, True], ids=["names", "other column names"])
+def test_export_inline_decks(part, keywords, rename):
+    """view_3d: the 3D bridge decks. The properties are the same, the polygons have the same shape: Python makes them with GEOS, the
+    engine with its own mitre offsets, so a vertex can differ by the rounding (1e-6 deg, about 0.1 m)."""
+    import shapely
     from compare_engines import diff
+    from shapely.geometry import shape
+
+    roads, kw = part, {**keywords, "view_3d": True}
+    if rename:
+        roads = part.rename(columns=_RENAME)
+        kw.update(highway_col="fclass", tunnel_col="tun", bridge_col="brg", layer_col="lyr", edge_id_col="eid")
+    py = rs.export_inline(roads, engine="python", **kw)
+    ru = rs.export_inline(roads, engine="rust", **kw)
+    fp, fr = (s["sources"]["decks"]["data"]["features"] for s in (py, ru))
+    assert len(fr) == len(fp) > 0
+    for a, b in zip(fr, fp, strict=True):
+        assert diff(a["properties"], b["properties"]) == []
+        assert shapely.hausdorff_distance(shape(a["geometry"]), shape(b["geometry"])) < 2e-6
+    for s in (py, ru):
+        s["sources"]["decks"]["data"]["features"] = []
+    assert diff(ru, py) == []
+
+
+@pytest.mark.parametrize("case", ["plain", "numeric", "categorical", "road_popup", "view_3d"])
+def test_export_style(part, keywords, case, tmp_path):
+    """export_style: the same style.json and the same files; each tile has the same features when decoded (compare_engines.tile_diff:
+    the numbers by value, the 3D decks by shape)."""
+    from compare_engines import diff, tile_diff
 
     kw = {k: v for k, v in keywords.items() if k not in ("basemap", "basemaps")}     # export_style: the base map comes from the app
-    kw.update(options(case, part))
+    kw.update(CASES.get(case) or {"view_3d": True})
     py, ru = tmp_path / "python", tmp_path / "rust"
     rs.export_style(part, py, base_url="http://x", engine="python", **kw)
     rs.export_style(part, ru, base_url="http://x", engine="rust", **kw)
@@ -195,7 +218,7 @@ def test_export_style(part, keywords, case, tmp_path):
     for f in files:
         a, b = (py / f).read_bytes(), (ru / f).read_bytes()
         if f.suffix == ".pbf" and a != b:
-            assert (mvt.decode(a) if a else {}) == (mvt.decode(b) if b else {}), f
+            assert tile_diff(b, a) == [], f
         else:
             assert a == b, f
 

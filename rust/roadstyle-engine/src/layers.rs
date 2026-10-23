@@ -86,12 +86,12 @@ impl Model {
         match c.strip_suffix("_link") { Some(b) => (b, true), None => (c, false) }
     }
 
-    fn group_of(&self, base: &str) -> &str {
+    pub(crate) fn group_of(&self, base: &str) -> &str {
         self.group.iter().find(|(c, _)| c == base).map_or(self.fb_group.as_str(), |(_, g)| g.as_str())
     }
 
     /// _gwidth: a group's width at zoom z (linear between its stops, growing by its rate past the last).
-    fn gwidth(&self, g: &str, z: f64) -> f64 {
+    pub(crate) fn gwidth(&self, g: &str, z: f64) -> f64 {
         let t = &self.width[g];
         let (first, last) = (t[0], t[t.len() - 1]);
         if z <= first.0 {
@@ -412,7 +412,7 @@ fn simple_dasharray(dashes: &[String]) -> Value {
 }
 
 /// Python's truthiness of a JSON value (bool(v)).
-fn py_truth(v: &Value) -> bool {
+pub(crate) fn py_truth(v: &Value) -> bool {
     match v {
         Value::Null => false,
         Value::Bool(b) => *b,
@@ -637,7 +637,8 @@ fn props_of<'a>(fs: &'a [Value], empty: &'a Map<String, Value>) -> Vec<&'a Map<S
 
 /// The road layers of the style: what render_web.render, the export and mapstyle's export make for simple mode with stored levels and
 /// inline data (no base-map layers, no 3D decks, no metre widths, no items). `roads`, `simple`, `slots`: the features of the three sources.
-pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value], ovs: &mut [Overlay], fills: &[String], active: usize)
+#[allow(clippy::too_many_arguments)] // the sources of the style, as make_parts has them
+pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value], decks: bool, ovs: &mut [Overlay], fills: &[String], active: usize)
                    -> Result<Vec<Value>, String> {
     let m = Model::from_look(look)?;
     let (th, cfg) = (&look["theme"], &look["config"]);
@@ -697,7 +698,15 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
         _ => None,
     }.filter(|t| !t.is_empty());
     let mz_filter = |col: &str| mz.as_ref().map(|t| minzoom_filter(col, t));
-    let flt = match mz_filter("highway") { Some(z) => json!(["all", z, seam_filter()]), None => json!(["all", seam_filter()]) };
+    let mut flt = vec![json!("all")];
+    flt.extend(mz_filter("highway"));
+    flt.push(seam_filter());
+    // the 3D decks (view_3d): a bridge is the flat line below flat_below and the extruded deck from it up
+    let dk = crate::decks::DeckLook::from_config(&cfg["bridge_decks"]);
+    if decks {
+        flt.push(json!(["any", ["<", ["zoom"], dk.flat_below], ["!", ["to-boolean", ["get", "__rs_bridge"]]]]));
+    }
+    let flt = Value::Array(flt);
     let k = |n: i64| json!(["==", ["get", "__rs_k"], n]);
     let (is_c, is_sh, is_b) = (k(0), k(2), json!(["to-boolean", ["get", "__rs_bridge"]]));
     let blur = cfg["bridge_shadow_blur"].as_f64().unwrap();
@@ -749,9 +758,12 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     let road = json!({"id": "roads-simple", "type": "line", "source": "simple", "layout": simple_layout, "filter": flt, "paint": paint});
     let pick = json!({"id": "roads-fill", "type": "line", "source": "roads", "layout": lean_layout(&lay), "filter": flt,
                       "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], fb_fill], "line-width": fw, "line-offset": off, "line-opacity": 0}});
-    let highlight = json!({"id": "roads-highlight", "type": "line", "source": "roads", "layout": lean_layout(&lay),
-                           "paint": {"line-color": ["case", s_on, select, hover],
-                                     "line-opacity": ["case", ["any", h_on, s_on], sel["opacity"], 0], "line-width": fw, "line-offset": off}});
+    let mut highlight = json!({"id": "roads-highlight", "type": "line", "source": "roads", "layout": lean_layout(&lay),
+                               "paint": {"line-color": ["case", s_on, select, hover],
+                                         "line-opacity": ["case", ["any", h_on, s_on], sel["opacity"], 0], "line-width": fw, "line-offset": off}});
+    if decks {        // a bridge glows on its deck from flat_below up; in position mode the flat bridge layers do not exist
+        highlight["filter"] = json!(["!", ["!", ["to-boolean", 1]]]);
+    }
     // the base map's overlays (_build_overlays): under the roads, over them, or on a street (_edge_overlay: one copy per fill number)
     let by_id: HashMap<String, &Props> = rp.iter()
         .filter_map(|p| match p.get("edge_id") { Some(Value::String(s)) => Some((s.clone(), *p)), _ => None }).collect();
@@ -824,6 +836,14 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
         }
     }
     layers.push(highlight);
+    if decks {
+        let deck = |id: &str, flt: Value, color: Value, base: &str, height: &str| json!({"id": id, "type": "fill-extrusion", "source": "decks",
+            "minzoom": dk.flat_below, "filter": flt, "paint": {"fill-extrusion-color": color, "fill-extrusion-base": ["get", base],
+            "fill-extrusion-height": ["get", height], "fill-extrusion-opacity": dk.opacity}});
+        layers.push(deck("roads-deck-casing", json!(["has", "__rs_casing_slab"]), cfg["bridge_casing_color"].clone(), "__rs_base", "__rs_height"));
+        layers.push(deck("roads-bridge-decks", json!(["!", ["has", "__rs_casing_slab"]]),
+                         json!(["case", s_on, select, h_on, hover, ["coalesce", ["get", "__rs_fill"], fb_fill]]), "__rs_base", "__rs_height"));
+    }
 
     // the passes: a reverse pair's second edge draws nowhere; the layers no feature can draw go; the fill's opacity switch
     if any_dup {
@@ -856,6 +876,8 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     for l in layers.iter_mut() {
         if l["id"] == "roads-fill" {
             l["paint"]["line-color"] = swap(&l["paint"]["line-color"], &base, &fill_expr(fills, fb_fill));
+        } else if l["id"] == "roads-bridge-decks" {
+            l["paint"]["fill-extrusion-color"] = swap(&l["paint"]["fill-extrusion-color"], &base, &fill_base(fills, fb_fill));
         }
         if l["type"] == "line" && l["layout"].get("line-sort-key").is_some_and(|v| !v.is_null()) {
             let key = l["layout"]["line-sort-key"].clone();

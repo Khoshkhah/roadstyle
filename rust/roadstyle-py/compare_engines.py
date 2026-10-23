@@ -47,6 +47,42 @@ def diff(a, b, path="$", out=None, most=8):
     return out
 
 
+def tile_diff(ru, py, buffer=80, most=8):
+    """The differences of two vector tiles (Rust, Python), decoded. A number can be an integer in one and a float in the other. A polygon
+    layer is compared by shape: Python writes a polygon whole (an empty feature when it collapses in the tile's units), the engine clips it
+    to the tile and its buffer and leaves out a polygon with no area; the deck polygons of the two engines differ by the rounding (1e-6 deg).
+    So both are clipped to the tile and its buffer, and each feature of Python with an area must have the feature of the same id in Rust,
+    with the same properties and at most 4 tile units away (Hausdorff)."""
+    import mapbox_vector_tile as mvt
+    import shapely
+    from shapely.geometry import box, shape
+
+    a, b = (mvt.decode(x) if x else {} for x in (ru, py))
+    out = []
+    for name in sorted(set(a) | set(b)):
+        fa, fb = (a.get(name) or {}).get("features", []), (b.get(name) or {}).get("features", [])
+        if not any("Polygon" in f["geometry"]["type"] for f in fa + fb):
+            if fa != fb:
+                out.append(f"{name}: " + "; ".join(diff(fa, fb, most=3)))
+            continue
+        frame = box(-buffer, -buffer, 4096 + buffer, 4096 + buffer)
+        by_id = {f["id"]: f for f in fa}
+        for f in fb:
+            g = shapely.make_valid(shape(f["geometry"])).intersection(frame) if f["geometry"]["coordinates"] else None
+            if g is None or g.area < 4:
+                continue
+            r = by_id.get(f["id"])
+            if r is None:
+                out.append(f"{name}: feature {f['id']} only in python")
+            elif r["properties"] != f["properties"]:
+                out.append(f"{name}: feature {f['id']}: " + "; ".join(diff(r["properties"], f["properties"], most=3)))
+            elif (h := g.hausdorff_distance(shape(r["geometry"]).intersection(frame))) > 4:
+                out.append(f"{name}: feature {f['id']}: {h:.1f} tile units apart")
+            if len(out) >= most:
+                break
+    return out
+
+
 def main(cases):
     part = roads()
     look = json.loads((DATA / "look.json").read_text())

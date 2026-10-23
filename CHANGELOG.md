@@ -24,12 +24,16 @@ All notable changes to **roadstyle** are documented here. The format is based on
   metre road, as Python. Before, it stopped with an error on such roads.
 - **`export_style(..., engine="rust")`** writes the style and the XYZ tiles with the Rust engine (`Tiler`). The style is the same as Python's byte for
   byte, and the tiles have the same features. `format="pmtiles"` stays Python only for now.
+- **The Rust engine draws the 3D bridge decks** (`view_3d=True`, the default of `export_inline` and `export_style`): the same deck features as Python,
+  with the same properties. The engine makes the ribbons with its own mitre offsets, not with GEOS, so a corner can differ by the rounding (1e-6 deg).
 - **The Rust engine parses floats exactly** (serde_json `float_roundtrip`), so a coordinate from Python has the same last digit.
   **Note for the users of the Rust engine:** the engine now follows `labels=False` and `arrows=False` in the look's `args`, as Python does. Before,
   it always drew the names and the arrows. The looks of the GeoLibre plugin and of duckosm-rust's page have both false (from mapstyle's
   keywords): set them true there, or the maps have no names and no arrows after an update of the engine.
 
 ### Fixed
+- **The width of a 3D bridge deck with another class column** (`highway_col`): the deck read a column named `highway`, so with another class
+  column every deck had the fallback width. Now it reads `highway_col`.
 - **The paint order of a painted road in a tiled style** (`tiles=True`, `export_style`): `roads-fill` and `roads-highlight` shared one layout, so
   the +500 of a painted road was added two times to each. Now each layer gets it one time. The order on the map does not change.
 

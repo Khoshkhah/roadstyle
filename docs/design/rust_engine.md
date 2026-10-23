@@ -128,18 +128,18 @@ The crate makes the style of `export_inline` for simple mode with stored levels 
 **Keywords of `render_edges` / `render_web.render` that change the style**
 
 - [x] Column names (`ColumnMap`, 2026-10-23); `filter_col` and `cap_col` still fixed. Before, fixed in the crate: `highway_col` (highway), `filter_col`, `tunnel_col`, `bridge_col`, `layer_col`, `edge_id_col` (edge_id), `cap_col` / `cap_start_col` / `cap_end_col`, `casing_level_col`, `fill_level_col`, `casing_start_col`, `casing_end_col`, `head_start_m_col`, `head_end_m_col`, `directed_col` (is_directed), `driving_col` (has_arrows).
-- [ ] `access_col`: the access colours (`__rs_access`, the theme's `access`).
+- [x] `access_col`: the access colours (`__rs_access`, the theme's `access`; 2026-10-23).
 - [x] No stored levels: `render` computes them (`compute_levels(method="solve")`), and so does the engine (`roadstyle-engine`, `compute_levels`; the same style on the parity fixture). Only `head_m=5`.
-- [ ] `head_m` (fixed 5.0), `road_fill` (fixed on), `offset_zoom` (`offset_frac` and `width_frac` are read).
+- [x] `head_m`, `road_fill`, `offset_zoom`, `offset_frac`, `width_frac` (2026-10-23).
 - [x] Metre widths: `width_m_col`, `width_m_zoom`, `casing_m`, `casing_min_px` (`_mark_width_m`, `_width_m_expr`, the roads' part of `_mitre_ends`; 2026-10-23).
 - [ ] `simple=False`: the layer set of casings and fills for each level (`_level_id`, `_fill_layer_ids`); the crate has simple mode only.
-- [ ] `arrows`, `labels` (fixed on), `minzoom` (class thinning by `config.minzoom`, opt-in).
-- [ ] `view_3d`: the 3D bridge decks (`_bridge_decks`; out by decision until a new version).
+- [x] `arrows`, `labels`, `minzoom` (true or a table; 2026-10-23).
+- [x] `view_3d`: the 3D bridge decks (`decks.rs`, 2026-10-23). The engine makes the ribbons with its own mitre offsets, not GEOS: the same properties, the same shapes to the rounding (1e-6 deg).
 - [ ] `items`, `items_popup`: edge items and lanes (`__rs_k` 5, `__rs_ic`).
 - [ ] `overlays=`: the caller's own `Overlay` layers (`_build_overlays`, `overlays.py`). The crate has mapstyle's base-map overlays only.
-- [ ] `boundary` (the dashed outline), `hover_color`, `select_color` (the crate uses the theme's `selection`).
-- [ ] `data_maxzoom`, `data_tolerance` (the GeoJSON sources' `maxzoom` and `tolerance`), `pitch`, `bearing`, `max_pitch` (the camera; the crate writes `center` and `zoom`).
-- [ ] `road_popup` (the crate writes the default popup fields), `popup_mode`; `road_tooltip` and `hover_delay_ms` from the look.
+- [x] `boundary` (the dashed outline), `hover_color`, `select_color` (2026-10-23).
+- [x] `data_maxzoom`, `data_tolerance`, `pitch`, `bearing`, `max_pitch` (2026-10-23).
+- [x] `road_popup`, `popup_mode`, `road_tooltip`, `tooltip`, `hover_delay_ms` (2026-10-23).
 - [ ] `views`: named presets of colour option, palette and filters (`_check_views`).
 - [ ] `style=`: a Python `Styler` object (an error in the crate); a colour option with another palette than the look's.
 - [ ] `tiles=True`: the PMTiles archive with the sidecar table (`tiles.build_pmtiles`, `tiles.sidecar`). The crate makes tiles on request (`Tiler`), with the rules of `tiles.py` (see "Step 2").
@@ -149,7 +149,7 @@ The crate makes the style of `export_inline` for simple mode with stored levels 
 **Public functions**
 
 - [ ] Backends: `render_edges(backend="folium")` (`render_folium.py`), `backend="lonboard"` (`render_lonboard.py`).
-- [ ] `export_style`: `style.json` with a tile folder or one PMTiles file and the sprite. `export_look`: the simple look for another app's data layer.
+- [ ] `export_style`: done for the tile folder (`engine="rust"`, 2026-10-23); one PMTiles file is open. `export_look`: the simple look for another app's data layer.
 - [ ] Pages: `render_dashboard`, `render_report`, `sidebar_html`, `make_legend`, `to_html`, `to_iframe`, `save`, `render_street_view`, `snapshot` (a PNG through a browser).
 - [ ] Specs: `to_spec`, `save_spec`, `load_spec`.
 - [ ] Input: `load_edges`, `from_duckdb`, `from_arrow`, `from_geojson`, `as_edges`, `normalize_edges`, `filter_edges` (`include`, `exclude`, `match_links`), `highway_types`, `is_directed`. The crate reads GeoParquet with fixed column names only.
