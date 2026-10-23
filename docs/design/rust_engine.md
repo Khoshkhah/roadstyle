@@ -142,7 +142,7 @@ The crate makes the style of `export_inline` for simple mode with stored levels 
 - [ ] `road_popup` (the crate writes the default popup fields), `popup_mode`; `road_tooltip` and `hover_delay_ms` from the look.
 - [ ] `views`: named presets of colour option, palette and filters (`_check_views`).
 - [ ] `style=`: a Python `Styler` object (an error in the crate); a colour option with another palette than the look's.
-- [ ] `tiles=True`: the PMTiles archive with the sidecar table (`tiles.build_pmtiles`, `tiles.sidecar`). The crate makes tiles on request (`Tiler`); the rules of `tiles.py` are on the branch `rust-tiles`, not merged.
+- [ ] `tiles=True`: the PMTiles archive with the sidecar table (`tiles.build_pmtiles`, `tiles.sidecar`). The crate makes tiles on request (`Tiler`), with the rules of `tiles.py` (see "Step 2").
 
 **Keywords of the HTML page, not of the style** (the dashboard JS module of task 2): `filter_control`, `find_control`, `overlay_control`, `overlay_popup`, `side_panel_html`, `host_panel_width`, `basemap_switcher`, `basemap`, `basemaps`, `api_key`, `zoom_readout`, `street_view`, `street_view_key`, `google_3d`, `tunnel_control`, `compress`.
 
@@ -159,13 +159,33 @@ The crate makes the style of `export_inline` for simple mode with stored levels 
 - [ ] The other tools: `cli.py`, `mcp_server.py`, the studio (`ui/studio`).
 - [ ] mapstyle's half of the look (mode, theme and paths; `features`): its own task after the plan, with Kaveh's OK.
 
+## Step 2: the tiles follow `tiles.py` (2026-10-23)
+
+`make_tiled` and `Tiles` (module `tiles`) now use the rules of roadstyle's `tiles.py`:
+
+| Rule | Before | Now |
+|---|---|---|
+| Sources | One vector source for each style source | One vector source `roads`. Each old source is a layer in its tiles, and each style layer has that name as its `source-layer` |
+| Name and arrow slots | Clipped to the tile | Whole in each tile that they touch, from the first zoom of their layers (14) |
+| Zooms and buffer | Zoom 0 to 16, buffer 512 units | `look["config"]["tiles"]`: zoom 6 to 15, buffer 80 units. The look must have these values, else `make_tiled` stops with an error |
+| Lines below the last zoom | All points | Simplified to half a tile unit (Douglas-Peucker). A line shorter than half a unit is not in the tile |
+
+The browser API did not change. A page asks for `tile("roads", z, x, y)` and gets all layers in one tile. `props("roads", id)` gives the properties of a road. Polygons are clipped and not simplified, as before. `tiles.py` does not simplify polygons either.
+
+The simplification has no topology check. GEOS's `simplify` (with `preserve_topology`) also keeps a line from crossing itself.
+
+Sizes and times natively (`main.rs --tiles`, the tiles around the center):
+
+| Area, zoom | Before | Now |
+|---|---|---|
+| Monaco, 12 | 2.8 MB, 575 ms a tile | 2.7 MB, 222 ms a tile |
+| Tartu, 12 | 26.4 MB | 16.8 MB |
+| Tartu, 14 | 26.5 MB | 18.1 MB |
+| Tartu, last zoom (16 before, 15 now) | 29.0 MB in 1,008 tiles | 18.8 MB in 313 tiles |
+
 ## Next steps
 
 1. geolibre-roadstyle and duckosm-rust use the crate at a fixed commit and delete their copies. The duckosm-rust session does this step.
-2. The tiles follow `tiles.py`:
-   - one source `roads` with source layers;
-   - `slots` whole, not clipped;
-   - the zooms and the buffer from `look["config"]["tiles"]` (zooms 6 to 15, buffer 80);
-   - at low zooms, simplification to half a tile unit.
+2. The tiles follow `tiles.py`: done (see above). duckosm-rust's page must show the map again with the new tiles.
 3. Typed pieces in place of JSON trees, to use less memory: done (see above).
 4. The Python binding. Then Python roadstyle calls Rust part by part, and its golden tests check each part.
