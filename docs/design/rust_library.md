@@ -1346,7 +1346,11 @@ allowed in the crate (ported numeric code).
 while Rust works). `roadstyle._engine` has the switch, and `export_inline(engine="rust")` gives the same style as Python for the 7 cases of
 `tests/test_engine_parity.py` (Rust 0.12 s, Python 0.57 s on 1,373 roads). `compute_levels(engine="rust")` and
 `export_style(engine="rust", format="xyz")` are done too: the same `style.json` byte for byte, the same files, and each tile with the same features when
-decoded (a number can be an integer in one engine and a float in the other). Next: the look of `render_edges`, the wheels with maturin.
+decoded (a number can be an integer in one engine and a float in the other). `render_edges(engine="rust")` is done too: the Rust engine makes
+the live style (`args.state = "live"`) and Python writes the page with the same page writer (`render_web._page_html`); the page is the same
+byte for byte. The output side of the P3 contract is in it: `roadstyle:contract`, `roadstyle:state` and `roadstyle:controls` (the options of
+`rsDashboard` from the style, checked against `render(_parts=True)`), and the dashboard reads them. Next: the wheels with maturin, the typed
+look (P3), the layer roles, `docs/reference/contract.md`.
 
 - **Content.** `roadstyle-py` (PyO3, maturin, abi3 wheels for Linux x86_64 and aarch64, macOS, Windows). Python calls Rust part by
   part, in this order: the style of `export_inline`, the tiles (`tiles.py`), the levels (`compute_levels`), the look

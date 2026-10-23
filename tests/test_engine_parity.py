@@ -257,6 +257,69 @@ def test_export_style(part, keywords, case, tmp_path):
             assert a == b, f
 
 
+_LIVE = {"plain": {}, "controls": {"tunnel_control": True, "filter_control": True, "access_col": "access"},
+         "colors": {"color_options": {"class": {}, "lanes": {"color_by": "lanes", "cmap": "Blues", "vmin": 1, "vmax": 3}}, "color_active": "lanes"},
+         "decks": {"view_3d": True}}
+
+
+@pytest.mark.parametrize("case", [*_LIVE, "kinds", "text", "on edges", "items and metre overlay"])
+def test_live_style_and_contract(part, keywords, case):
+    """state="live" (a page with the dashboard): the style of render's page (the state in the expressions, the page's arrows), and the
+    interaction contract in its metadata: roadstyle:state is the page's state, roadstyle:controls the options of rsDashboard that the page
+    gets from the style (render_web.render's `page`). The base map, the page's own options and the decks' vertices are left out."""
+    from compare_engines import diff
+
+    opts = _LIVE[case] if case in _LIVE else _overlays(part, case)
+    parts = rs.render_edges(part, backend="web", _parts=True, **{**keywords, **opts})
+    py, page = parts["style"], parts["options"]
+    lk = _engine._look_of({**keywords, "view_3d": False, **opts, "state": "live"})
+    ru = json.loads(_engine.rust().make_style(_engine._geoparquet(part), json.dumps(lk), None, None, None))
+    meta = ru.pop("metadata")
+    assert meta["roadstyle:contract"] == 1
+    assert diff(meta["roadstyle:state"], {k: v["default"] for k, v in py["state"].items()}) == []
+    controls = meta["roadstyle:controls"]
+    want = {k: page[k] for k in controls}
+    want["tunnel"] = {**want["tunnel"], "bg": controls["tunnel"]["bg"]}      # the base map's canvas colour: the page's own
+    assert diff(controls, want) == []
+    py["sources"].pop("bm", None)
+    py["layers"] = [lyr for lyr in py["layers"] if lyr["id"] not in ("bg", "basemap")]
+    for st in (ru, py):
+        for lyr in st["layers"]:
+            lyr.pop("metadata", None)
+        for k in ("name", "center", "zoom", "glyphs"):
+            st.pop(k, None)
+        if "decks" in st["sources"]:       # by shape: test_export_inline_decks
+            st["sources"]["decks"]["data"]["features"] = []
+    assert diff(ru, py) == []
+
+
+_PAGES = {"plain": {}, "controls": {"tunnel_control": True, "filter_control": True, "access_col": "access"},
+          "numeric": {"color_by": "lanes", "cmap": "YlOrRd", "vmin": 1, "vmax": 4}, "colors": _LIVE["colors"], "compressed": {"compress": True},
+          "panel": {"road_popup": "panel"}, "base map": {"basemap": "osm", "basemaps": ["osm", "blank"]}, "classes": {"exclude": ["footway", "steps"]}}
+
+
+@pytest.mark.parametrize("case", [*_PAGES, "kinds", "items and metre overlay", "decks"])
+def test_render_edges_page(part, keywords, case, monkeypatch):
+    """render_edges(engine="rust"): the page of the Rust engine's live style, written by Python's page writer, is the page of the Python
+    engine byte for byte (with the decks: the same page but the decks' vertices, see test_export_inline_decks)."""
+    monkeypatch.delenv("GOOGLE_MAPS_KEY", raising=False)
+    opts = {"compress": False, **(_PAGES[case] if case in _PAGES else {"view_3d": True} if case == "decks" else _overlays(part, case))}
+    py = rs.render_edges(part, backend="web", engine="python", **{**keywords, **opts}).html
+    ru = rs.render_edges(part, backend="web", engine="rust", **{**keywords, **opts}).html
+    if case != "decks":
+        assert ru == py
+        return
+    from compare_engines import diff
+
+    def cut(html):
+        at = html.index("const style = ") + len("const style = ")
+        st, end = json.JSONDecoder().raw_decode(html[at:])
+        st["sources"]["decks"]["data"]["features"] = len(st["sources"]["decks"]["data"]["features"])
+        return st, html[:at] + html[at + end:]
+    (sr, hr), (sp, hp) = cut(ru), cut(py)
+    assert diff(sr, sp) == [] and hr == hp
+
+
 @pytest.mark.parametrize("method", ["tags", "solve"])
 def test_compute_levels(part, method):
     """compute_levels: the same four columns from both engines (the roads of the part of Monaco, with no level columns)."""

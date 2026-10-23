@@ -64,6 +64,7 @@ def render_edges(
     profile: str | None = None,
     api_key: str | None = None,
     levels_db=None,
+    engine: str | None = None,
     **kwargs,
 ):
     """Render styled road edges on a map.
@@ -112,6 +113,16 @@ def render_edges(
     """
     if "order_col" in kwargs:
         raise ValueError("order_col is removed: roadstyle draws by positions (docs/design/levels_split_casing.md, section 12)")
+    from . import _engine
+    if _engine.engine(engine) == "rust":       # ``engine``: "python" (default) or "rust" (the roads' style from the Rust engine, the page from Python)
+        if backend != "web":
+            raise ValueError(f"engine='rust' makes the web page only, not backend={backend!r}")
+        data = {k: v for k, v in (("style", style), ("color_by", color_by), ("colors", colors), ("cmap", cmap), ("vmin", vmin), ("vmax", vmax),
+                                  ("width_by", width_by), ("color_table", color_table)) if v is not None}
+        if color_table is not None:         # a mapping, a Series or a DataFrame: {edge id as text: colour}, as the Python path reads it
+            data["color_table"] = _color_map(color_table, color_key, color_col)
+        return _engine.render_page(gdf, palette=palette, profile=profile, settings=settings, highway_col=highway_col, include=include,
+                                   exclude=exclude, match_links=match_links, levels_db=levels_db, api_key=api_key, **data, **kwargs)
     from . import _settings as _st
     pick = {k: v for k, v in (("profile", profile), ("palette", palette)) if v is not None and v != _st.theme()["active"][k]
             and (k == "profile" or v in _st.style_names("palettes"))}      # a palette made in code (register_palette) has no file

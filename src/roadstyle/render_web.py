@@ -2707,6 +2707,34 @@ class WebMap:
                 'style="width:100%;height:640px;border:0;border-radius:6px"></iframe>')
 
 
+def _page_basemaps(basemap, basemaps, api_key, basemap_switcher):
+    """The page's base maps: the active one, the list for the in-map switcher (the active one first) and the style that draws it (its
+    source and layers, before the roads')."""
+    active = basemap or CONFIG.basemap
+    active_bm = get_basemap(active, api_key=api_key)
+    bkeys = list(basemaps) if basemaps else list(DEFAULT_SWITCHER)
+    bms_list = [active_bm] + [get_basemap(k, api_key=api_key) for k in bkeys if k != active_bm.key and k != active]
+    # maxzoom + attr: switching rebuilds the raster source, whose maxzoom is fixed at creation
+    bms = [{"key": b.key, "label": b.label, "tiles": _tiles(b), "bg": _bg_color(b),
+            "maxzoom": b.maxzoom, "attr": b.attr}
+           for b in bms_list]
+    if not basemap_switcher and not basemaps:
+        # no dropdown and no explicit set -> bake only the fixed backdrop. An explicit
+        # `basemaps=` list stays fully addressable via window.rsSetBasemap (custom UI).
+        bms = bms[:1]
+    style = _basemap_style(active_bm)
+    if "bm" not in style["sources"]:
+        # a blank base map is active but the switcher offers tiled ones: pre-create the raster
+        # layer hidden, so switching is a visibility flip (hidden layers fetch no tiles)
+        _b = next((b for b in bms if b["tiles"]), None)
+        if _b:
+            style["sources"]["bm"] = {"type": "raster", "tiles": _b["tiles"], "tileSize": 256,
+                                      "maxzoom": _b["maxzoom"], "attribution": _b["attr"]}
+            style["layers"].append({"id": "basemap", "type": "raster", "source": "bm",
+                                    "layout": {"visibility": "none"}})
+    return active_bm, bms, style
+
+
 def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            filter_col: str = None,
            styler=None, basemap=None, basemaps=None, name: str = "roadstyle",
@@ -2724,7 +2752,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            color_options=None, color_active=0, views=None, overlays=None, items=None, items_popup=None, compress: bool = True, tunnel_control: bool = False,
            tiles: bool = False, simple: bool = True,
            minzoom=None, legend: bool = True,
-           api_key: str | None = None, _edges=None, _palette_copy: bool = False, _export: bool = False, **_ignore):
+           api_key: str | None = None, _edges=None, _palette_copy: bool = False, _export: bool = False, _parts: bool = False, **_ignore):
     """Build a self-contained MapLibre map of the styled edges.
 
     Every edge is drawn by two **positions**, the number where its casing is drawn and the number where its fill is drawn
@@ -2951,28 +2979,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     # active base map + the set offered to the in-map switcher (active shown first)
     # the primary base map layer is a *setting* (config.basemap, defaults.json), overridable
     # per call with `basemap=`
-    active = basemap or CONFIG.basemap
-    active_bm = get_basemap(active, api_key=api_key)
-    bkeys = list(basemaps) if basemaps else list(DEFAULT_SWITCHER)
-    bms_list = [active_bm] + [get_basemap(k, api_key=api_key) for k in bkeys if k != active_bm.key and k != active]
-    # maxzoom + attr: switching rebuilds the raster source, whose maxzoom is fixed at creation
-    bms = [{"key": b.key, "label": b.label, "tiles": _tiles(b), "bg": _bg_color(b),
-            "maxzoom": b.maxzoom, "attr": b.attr}
-           for b in bms_list]
-    if not basemap_switcher and not basemaps:
-        # no dropdown and no explicit set -> bake only the fixed backdrop. An explicit
-        # `basemaps=` list stays fully addressable via window.rsSetBasemap (custom UI).
-        bms = bms[:1]
-    style = _basemap_style(active_bm)
-    if "bm" not in style["sources"]:
-        # a blank base map is active but the switcher offers tiled ones: pre-create the raster
-        # layer hidden, so switching is a visibility flip (hidden layers fetch no tiles)
-        _b = next((b for b in bms if b["tiles"]), None)
-        if _b:
-            style["sources"]["bm"] = {"type": "raster", "tiles": _b["tiles"], "tileSize": 256,
-                                      "maxzoom": _b["maxzoom"], "attribution": _b["attr"]}
-            style["layers"].append({"id": "basemap", "type": "raster", "source": "bm",
-                                    "layout": {"visibility": "none"}})
+    active_bm, bms, style = _page_basemaps(basemap, basemaps, api_key, basemap_switcher)
     # roads source: inline GeoJSON by default; with `tiles=True` a PMTiles archive embedded in
     # the page instead (MapLibre parses only the tiles in view — the client-side scale path).
     # Feature ids are the feature's index either way (the feature's id / baked MVT id), so
@@ -3779,56 +3786,82 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         # the legend data of a data-coloured map, as the page's COLOR_OPTIONS: {name, prop, legend} for each colour option
         return {"style": style, "pmtiles": pmt, "bounds": (minx, miny, maxx, maxy), "interaction": inter,
                 "color_options": color_opts_meta or None}
-    # after every style/filter/bounds decision above — those read the features, the browser never does
+    # the options of rsDashboard (static/dashboard/index.js), as the page gives them: each has the name of render's keyword
+    page = {"basemaps": bms, "basemap_switcher": bool(basemap_switcher), "tiles": bool(tiles), "simple": "roads-simple" if lean else False,
+            "popup_mode": mode, "find_control": bool(find_control), "zoom_readout": bool(zoom_readout), "pitch_3d": cam["pitch_3d"],
+            "street_view": street_view, "street_view_key": street_view_key or "", "google_3d": bool(google_3d), "select_color": select_color,
+            "filter": flt, "color_options": color_opts_meta or [], "color_active": _active, "overlays": ov_meta,
+            "overlay_control": bool(overlay_control), "overlay_popup": bool(overlay_popup),
+            "tunnel": {"layers": tun_paint, "dash": tun_dash, "casing": tun_casing, "strength": tun_strength,
+                       "palette": CONFIG.tunnel_palette, "palettes": CONFIG.tunnel_palettes,
+                       "ratio": list(CONFIG.tunnel_casing_dash or [1, 1]), "bg": _bg_color(active_bm),
+                       "steps": THEME["tunnels"]["steps"], "ratios": THEME["tunnels"]["ratios"],
+                       "toward": tun_toward, "towards": CONFIG.tunnel_towards,
+                       "to": {**_TUN_TO, "fill": tun_colour}, "control": bool(tunnel_control and tun_paint)},
+            "fill_layers": _fill_layer_ids(levels), "road_fill": {"on": bool(road_fill), "paint": fill_paint}, "views": view_list,
+            "items": {"label": "items", "popup": items_popup, "layer": "roads-simple"} if road_items is not None else None,
+            "road_popup": popup_fields if popup_on else False, "road_tooltip": road_tooltip, "hover_delay_ms": int(hover_delay_ms),
+            "edge_id_col": edge_id_col, "arrow_icon": arw["icon"], "arrow_color": arw["color"],
+            "arrow_rules": {"mainBelow": arw["main_below"], "main": arw["main"], "minLenPx": arw["place"]["min_len_px"],
+                            "minGapPx": arw["place"]["min_gap_px"], "nameGapPx": arw["place"]["name_gap_px"],
+                            "edgePx": arw["place"]["edge_px"], "charWidth": arw["place"]["char_width"],
+                            "baseSize": THEME["labels"]["base_size"]}}
+    simple_js = {"layer": "roads-simple", "bridge": CONFIG.bridge_casing_color, "shadow": CONFIG.bridge_shadow_color,
+                 "select": select_color, "hover": hover_color, "tunnels": bool(any_tunnel), "dashes": sdashes} if simple else None
+    if _parts:      # the page's parts, not the page (the Rust engine's parity test, docs/design/rust_library.md "The interaction contract")
+        return {"style": style, "options": page, "bounds": (minx, miny, maxx, maxy), "camera": cam, "simple_js": simple_js}
+    return WebMap(_page_html(style, page, name=name, cam=cam, bounds=(minx, miny, maxx, maxy), side_panel_html=side_panel_html,
+                             host_panel_width=host_panel_width, compress=compress, tiles=(pmt, side) if tiles else None, simple_js=simple_js))
+
+def _page_html(style, page, *, name, cam, bounds, side_panel_html, host_panel_width, compress, tiles=None, simple_js=None):
+    """The page: the map with the style (base map and roads) and the dashboard with its options (``page``: the options of rsDashboard).
+    ``tiles``: (the PMTiles archive, the sidecar table) of a tiled page; ``simple_js``: the settings of simple mode's recolouring script."""
+    minx, miny, maxx, maxy = bounds
     gz = _compress_sources(style) if compress else {}
+    J = lambda k: json.dumps(page[k])        # noqa: E731
     html = (_HTML.replace("__TITLE__", _html.escape(name))
-            .replace("__ARROW_COLOR__", json.dumps(arw["color"]))
-            .replace("__ARROW_ICON__", json.dumps(arw["icon"]))
-            .replace("__ARROW_RULES__", json.dumps({"mainBelow": arw["main_below"], "main": arw["main"], "minLenPx": arw["place"]["min_len_px"],
-                                                     "minGapPx": arw["place"]["min_gap_px"], "nameGapPx": arw["place"]["name_gap_px"],
-                                                     "edgePx": arw["place"]["edge_px"], "charWidth": arw["place"]["char_width"],
-                                                     "baseSize": THEME["labels"]["base_size"]}))
+            .replace("__ARROW_COLOR__", J("arrow_color"))
+            .replace("__ARROW_ICON__", J("arrow_icon"))
+            .replace("__ARROW_RULES__", J("arrow_rules"))
             .replace("__STYLE__", json.dumps(style))
-            .replace("__BASEMAPS__", json.dumps(bms))
-            .replace("__BM_SWITCHER__", json.dumps(bool(basemap_switcher)))
-            .replace("__ZOOM_READOUT__", json.dumps(bool(zoom_readout)))
-            .replace("__FILTER__", json.dumps(flt))
+            .replace("__BASEMAPS__", J("basemaps"))
+            .replace("__BM_SWITCHER__", J("basemap_switcher"))
+            .replace("__ZOOM_READOUT__", J("zoom_readout"))
+            .replace("__FILTER__", J("filter"))
             .replace("__CENTER__", json.dumps([(minx + maxx) / 2, (miny + maxy) / 2]))
-            .replace("__PITCH3D__", json.dumps(cam["pitch_3d"]))
+            .replace("__PITCH3D__", J("pitch_3d"))
             .replace("__MAX_PITCH__", json.dumps(cam["max_pitch"]))
-            .replace("__SELECT_COLOR__", json.dumps(select_color))
+            .replace("__SELECT_COLOR__", J("select_color"))
             .replace("__PITCH__", json.dumps(cam["pitch"]))
             .replace("__BEARING__", json.dumps(cam["bearing"]))
             .replace("__BOUNDS__", json.dumps([[minx, miny], [maxx, maxy]]))
-            .replace("__RS_FILL_LAYERS__", json.dumps(_fill_layer_ids(levels)))
-            .replace("__COLOR_OPTIONS__", json.dumps(color_opts_meta or []))
-            .replace("__CO_ACTIVE__", str(_active))
-            .replace("__OVERLAYS__", json.dumps(ov_meta))
-            .replace("__FIND_CONTROL__", "true" if find_control else "false")
-            .replace("__OVERLAY_CONTROL__", "true" if overlay_control else "false")
-            .replace("__OVERLAY_POPUP__", "true" if overlay_popup else "false")
-            .replace("__ROAD_ITEMS__", json.dumps({"label": "items", "popup": items_popup, "layer": "roads-simple"} if road_items is not None else None))
-            .replace("__TUNNEL__", json.dumps({"layers": tun_paint, "dash": tun_dash, "casing": tun_casing, "strength": tun_strength,
-                                               "palette": CONFIG.tunnel_palette, "palettes": CONFIG.tunnel_palettes,
-                                               "ratio": list(CONFIG.tunnel_casing_dash or [1, 1]), "bg": _bg_color(active_bm),
-                                               "steps": THEME["tunnels"]["steps"], "ratios": THEME["tunnels"]["ratios"],
-                                               "toward": tun_toward, "towards": CONFIG.tunnel_towards,
-                                               "to": {**_TUN_TO, "fill": tun_colour}, "control": bool(tunnel_control and tun_paint)}))
-            .replace("__VIEWS__", json.dumps(view_list))
-            .replace("__RS_ROAD_FILL__", json.dumps({"on": bool(road_fill), "paint": fill_paint}))
-            .replace("__ROAD_POPUP__", json.dumps(popup_fields if popup_on else False))
-            .replace("__ROAD_POPUP_MODE__", json.dumps(mode))
-            .replace("__EDGE_ID_COL__", json.dumps(edge_id_col))
-            .replace("__ROAD_TOOLTIP__", json.dumps(road_tooltip))
-            .replace("__HOVER_DELAY_MS__", json.dumps(int(hover_delay_ms)))
-            .replace("__STREET_VIEW__", json.dumps(street_view))
-            .replace("__SV_WINDOW_KEY__", json.dumps(street_view_key or ""))
-            .replace("__GOOGLE_3D__", "true" if google_3d else "false")
-            .replace("__RS_TILED__", "true" if tiles else "false")
-            .replace("__RS_LEAN__", '"roads-simple"' if lean else "false")
+            .replace("__RS_FILL_LAYERS__", J("fill_layers"))
+            .replace("__COLOR_OPTIONS__", J("color_options"))
+            .replace("__CO_ACTIVE__", J("color_active"))
+            .replace("__OVERLAYS__", J("overlays"))
+            .replace("__FIND_CONTROL__", J("find_control"))
+            .replace("__OVERLAY_CONTROL__", J("overlay_control"))
+            .replace("__OVERLAY_POPUP__", J("overlay_popup"))
+            .replace("__ROAD_ITEMS__", J("items"))
+            .replace("__TUNNEL__", J("tunnel"))
+            .replace("__VIEWS__", J("views"))
+            .replace("__RS_ROAD_FILL__", J("road_fill"))
+            .replace("__ROAD_POPUP__", J("road_popup"))
+            .replace("__ROAD_POPUP_MODE__", J("popup_mode"))
+            .replace("__EDGE_ID_COL__", J("edge_id_col"))
+            .replace("__ROAD_TOOLTIP__", J("road_tooltip"))
+            .replace("__HOVER_DELAY_MS__", J("hover_delay_ms"))
+            .replace("__STREET_VIEW__", J("street_view"))
+            .replace("__SV_WINDOW_KEY__", J("street_view_key"))
+            .replace("__GOOGLE_3D__", J("google_3d"))
+            .replace("__RS_TILED__", J("tiles"))
+            .replace("__RS_LEAN__", J("simple"))
             .replace("__HOST_PANEL_HTML__", _host_panel(side_panel_html, host_panel_width, name)))     # the last: the host's own text may hold any other token
     if tiles:
         import base64
+
+        from . import tiles as _tiler
+        pmt, side = tiles
         setup = (_TILES_JS.replace("__RS_PMTILES_B64__", base64.b64encode(pmt).decode())
                  .replace("__RS_SIDE_B64__", _tiler._b64gz(side)))
         html = html.replace("<script>__RS_TILES__</script>",
@@ -3837,13 +3870,11 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                             + "</script>" + setup, 1)
     else:
         html = html.replace("<script>__RS_TILES__</script>", "", 1)
-    if simple:
-        html = html.replace("</body>", _SIMPLE_JS.replace("__RS_SIMPLE__", json.dumps({"layer": "roads-simple", "bridge": CONFIG.bridge_casing_color, "shadow": CONFIG.bridge_shadow_color,
-                                                                                       "select": select_color, "hover": hover_color,
-                                                                                       "tunnels": bool(any_tunnel),
-                                                                                       "dashes": sdashes})) + "</body>", 1)
+    if simple_js:
+        html = html.replace("</body>", _SIMPLE_JS.replace("__RS_SIMPLE__", json.dumps(simple_js)) + "</body>", 1)
     if gz:
         html = html.replace("</body>", _INFLATE_JS.replace("__RS_GZ__", json.dumps(gz)) + "</body>", 1)
     # MapLibre stays a placeholder here: WebMap inlines the vendored copy on save (offline file)
     # and swaps in CDN tags for the notebook preview (small enough for notebook output limits).
-    return WebMap(html)
+    return html
+

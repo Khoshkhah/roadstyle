@@ -5,6 +5,7 @@
 #![allow(clippy::needless_range_loop, clippy::type_complexity)]
 
 pub mod colors;
+pub mod contract;
 pub mod decks;
 pub mod features;
 pub mod layers;
@@ -44,6 +45,8 @@ pub struct Parts {
     pub metadata: Value,
     /// The names' font, when there are labels.
     pub glyphs: Option<Value>,
+    /// state "live": MapLibre's global state, each name with its start value (`{"rs_co": {"default": 0}, ...}`)
+    pub state: Option<Value>,
 }
 
 /// The style's layers and sources: the roads ("roads", "simple", "slots") and, with `features` (the base-map tables as the worker's SQL
@@ -105,8 +108,16 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
         let hw = if cols.0.iter().any(|(own, _)| *own == "highway") { ColumnMap::kept("highway") } else { "highway".into() };
         decks::bridge_decks(&roads.feats, &decks::DeckLook::from_config(&look_json["config"]["bridge_decks"]), &layers::Model::from_look(&look_json)?, &hw)
     } else { Vec::new() };
-    let layers = layers::road_layers(&look_json, &roads.feats, &simple.feats, source_features(&slots), !decks.is_empty(), &mut ovs, &colors.props,
-                                     colors.active)?;
+    let (layers, info) = layers::road_layers(&look_json, &roads.feats, &simple.feats, source_features(&slots), !decks.is_empty(), &mut ovs,
+                                             &colors.props, colors.active)?;
+    // state "live" (a page with the dashboard, docs/design/rust_library.md "The interaction contract"): the state stays in the expressions,
+    // and the style says what the controls show
+    let live = look_json["args"]["state"] == "live";
+    let (contract, state) = if live {
+        let st = contract::page_state(&look_json, colors.active, ovs.len());
+        (Some((contract::controls(&look_json, &roads.feats, info, colors.active)?, st.clone())),
+         Some(Value::Object(st.into_iter().map(|(k, v)| (k, json!({"default": v}))).collect())))
+    } else { (None, None) };
     let mut glyphs = (labels && !source_features(&slots).is_empty()).then(|| look_json["theme"]["labels"]["glyphs"].clone());
     if glyphs.is_none() && ovs.iter().any(|o| o.kind == "text") {      // _build_overlays: a text overlay needs a font
         glyphs = Some(json!("https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"));
@@ -124,7 +135,16 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     }
     sources.push(("simple".into(), Src::Typed(simple)));
     if !source_features(&slots).is_empty() {        // as Python: no slots source without slots
+        let mut slots = slots;
+        if live {        // the arrow slots' numbers are for the export's thinning; the page puts the arrows itself
+            for f in slots["data"]["features"].as_array_mut().into_iter().flatten() {
+                f["properties"].as_object_mut().map(|p| p.shift_remove("__rs_arw"));
+            }
+        }
         sources.push(("slots".into(), Src::Json(slots)));
+        if live && arrows && look_json["args"]["tiles"] != true {        // the page fills it: one arrow per one-way road in the window
+            sources.push(("arrows".into(), Src::Json(json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": []}}))));
+        }
     }
     // render's boundary: a dashed outline over the roads (GeoJSON: a geometry, a Feature or a FeatureCollection; the Python binding
     // converts a shapely geometry or a GeoDataFrame)
@@ -163,15 +183,20 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     if !colors.meta.is_empty() {
         metadata.insert("roadstyle:color_options".into(), Value::Array(colors.meta));
     }
+    if let Some((controls, st)) = contract {
+        metadata.insert("roadstyle:contract".into(), json!(contract::CONTRACT));
+        metadata.insert("roadstyle:state".into(), Value::Object(st));
+        metadata.insert("roadstyle:controls".into(), controls);
+    }
     let name = name.map_or_else(|| look_json["args"]["name"].clone(), Value::from);
     data_settings(&mut sources, &look_json["args"]);
     cols.to_user(&mut sources, &mut layers);
-    Ok(Parts { name, center, zoom, layers, sources, metadata: Value::Object(metadata), glyphs })
+    Ok(Parts { name, center, zoom, layers, sources, metadata: Value::Object(metadata), glyphs, state })
 }
 
 /// The style as one JSON text, with each source's GeoJSON in it (roadstyle's export_inline).
 pub fn make_style(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, String> {
-    let Parts { name, center, zoom, layers, sources, metadata, glyphs } = make_parts(parquet, look, features, planner, name)?;
+    let Parts { name, center, zoom, layers, sources, metadata, glyphs, state } = make_parts(parquet, look, features, planner, name)?;
     // The sources become text one at a time, and each is freed at once: a big area's sources are the most of the memory (Tartu: the
     // peak went from 4.3 GB to 2.5 GB natively).
     let metadata = metadata.to_string();
@@ -187,6 +212,9 @@ pub fn make_style(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     out.extend_from_slice(metadata.as_bytes());
     if let Some(g) = glyphs {
         out.extend_from_slice(format!(r#","glyphs":{g}"#).as_bytes());
+    }
+    if let Some(st) = state {
+        out.extend_from_slice(format!(r#","state":{st}"#).as_bytes());
     }
     out.push(b'}');
     Ok(String::from_utf8(out).expect("serde_json writes UTF-8"))

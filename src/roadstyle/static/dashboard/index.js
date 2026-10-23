@@ -34,9 +34,16 @@ const RS_DEFAULTS = {
 };
 // the options that the page did not give and that the style's metadata gives: the road popup, the hover tooltip and the hover delay
 // (roadstyle:interaction: export_style, the Rust engine), the colour options and their legends (roadstyle:color_options: the Rust
-// engine, when the map has data colours)
+// engine, when the map has data colours), and the other controls of a style made with state "live" (roadstyle:controls, the interaction
+// contract of docs/design/rust_library.md: the filter panel, the overlays, the tunnel look, the road fill, the arrows' rules, ...).
+// The overlays' sources and layers there have no prefix: the page's prefix goes on them.
 function fromStyle(o, given){
   const meta = (o.style && o.style.metadata) || {}, it = meta["roadstyle:interaction"] || {};
+  const ctl = meta["roadstyle:controls"] || {}, P = o.prefix || "";
+  for(const k in ctl) if(!given.has(k)) o[k] = ctl[k];
+  if(!given.has("overlays") && ctl.overlays && P)
+    o.overlays = ctl.overlays.map(ov=>({...ov, source: P+ov.source, layers: ov.layers.map(id=>P+id), hit: ov.hit && P+ov.hit,
+                                        base: ov.base && Object.fromEntries(Object.entries(ov.base).map(([id, f])=>[P+id, f]))}));
   if(!given.has("road_popup")) o.road_popup = "popup" in it ? it.popup : null;           // false: none; null: every field; [fields]
   if(!given.has("road_tooltip")) o.road_tooltip = it.tooltip || false;                   // false | true | [fields]
   if(!given.has("hover_delay_ms")) o.hover_delay_ms = it.hover_delay_ms != null ? it.hover_delay_ms : 300;

@@ -190,3 +190,85 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs
     path = d / "style.json"
     path.write_text(json.dumps(style, separators=(",", ":")))
     return path
+
+
+def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="highway", include=None, exclude=None, match_links=True,
+                levels_db=None, **kwargs):
+    """``render_edges(backend="web", engine="rust")``: the roads' style from the Rust engine (state "live": the state in the expressions and
+    the interaction contract in the metadata), the base map and the page as Python writes them (render_web._page_basemaps, _page_html),
+    with the settings of the call in force. ``tiles=True`` (a PMTiles page) and ``simple=False`` (the full look) are Python's only."""
+    import inspect
+    import os
+
+    from . import _settings as _s
+    from . import render_web as rw
+    from . import use_settings as _use
+    from .edges import as_edges
+    from .filters import filter_edges
+
+    for k, why in (("tiles", "a PMTiles page is phase P6"), ("style", "a Styler object is Python's"), ("styler", "a Styler object is Python's")):
+        if kwargs.get(k):
+            raise ValueError(f"engine='rust': {k}= ({why}); use engine='python'")
+    if kwargs.get("simple") is False:
+        raise ValueError("engine='rust': simple=False (the full look) is Python's; use engine='python'")
+    g = as_edges(gdf, class_col=highway_col).gdf
+    if include is not None or exclude is not None:
+        g = filter_edges(g, include=include, exclude=exclude, highway_col=highway_col, match_links=match_links)
+    if levels_db is not None:
+        if any(kwargs.get(k) for k in ("casing_level_col", "fill_level_col", "casing_start_col", "casing_end_col")):
+            raise ValueError("levels_db and level columns of your own (casing_level_col, fill_level_col, ...) are two drawing orders: use one")
+        from .levels_store import stored_levels
+        g, level_kw = stored_levels(levels_db, g, kwargs.get("edge_id_col", "edge_id"))
+        kwargs = {**kwargs, **level_kw}
+    lk = _look_of({**kwargs, "palette": palette, "profile": profile, "settings": settings, "highway_col": highway_col, "state": "live"})
+    style = json.loads(rust().make_style(_geoparquet(g), json.dumps(lk), None, None, kwargs.get("name")))
+    meta, ctl = style.pop("metadata"), None
+    ctl, inter = meta["roadstyle:controls"], meta["roadstyle:interaction"]
+    for lyr in style["layers"]:
+        lyr.pop("metadata", None)          # the page gives the dashboard its options; its style has no metadata
+    a = {k: p.default for k, p in inspect.signature(rw.render).parameters.items() if p.default is not inspect.Parameter.empty}
+    a.update(kwargs)
+    mode = "panel" if a["road_popup"] == "panel" else (a["popup_mode"] or "popup")
+    if a["side_panel_html"] is not None and mode == "panel":
+        raise ValueError("side_panel_html and popup_mode='panel' are two panels on the right: use one")
+    if a["street_view"] not in (True, False, "window"):
+        raise ValueError(f'street_view must be True, False or "window", got {a["street_view"]!r}')
+    key = a["street_view_key"] or os.environ.get("GOOGLE_MAPS_KEY") or None
+    if a["google_3d"] and not key:
+        raise ValueError("google_3d=True needs a Google Maps JavaScript API key: pass street_view_key=... or set GOOGLE_MAPS_KEY")
+    # the page's own parts with the settings of the call in force (the base map, its canvas colour), as render_edges applies them
+    pick = {k: v for k, v in (("profile", profile), ("palette", palette)) if v is not None and v != _s.theme()["active"][k]
+            and (k == "profile" or v in _s.style_names("palettes"))}
+    srcs = [*(settings if isinstance(settings, list) else [settings] if settings is not None else []), *([pick] if pick else [])]
+    prev = list(_s._EXTRA)
+    try:
+        _use(*prev, *srcs)
+        active_bm, bms, base = rw._page_basemaps(a["basemap"], a["basemaps"], a["api_key"], a["basemap_switcher"])
+        bg = rw._bg_color(active_bm)
+    finally:
+        _use(*prev)
+    for lyr in base["layers"]:
+        lyr.setdefault("paint", {})        # as render_web._state_expressions gives every layer of the page
+    page_style = {"version": 8, "sources": {**base["sources"], **style["sources"]}, "layers": base["layers"] + style["layers"],
+                  **{k: style[k] for k in ("glyphs", "state") if k in style}}
+    cfg, th = lk["config"], lk["theme"]
+    cam = {"pitch": 0, "bearing": 0, "pitch_3d": 55, "max_pitch": 70, **(cfg.get("camera") or {})}
+    if a["view_3d"]:
+        cam["pitch"] = cam["pitch_3d"]
+    for k in ("pitch", "max_pitch", "bearing"):
+        if a[k] is not None:
+            cam[k] = a[k]
+    page = {"basemaps": bms, "basemap_switcher": bool(a["basemap_switcher"]), "tiles": ctl["tiles"], "simple": ctl["simple"], "popup_mode": mode,
+            "find_control": bool(a["find_control"]), "zoom_readout": bool(a["zoom_readout"]), "pitch_3d": ctl["pitch_3d"],
+            "street_view": a["street_view"], "street_view_key": key or "", "google_3d": bool(a["google_3d"]), "select_color": ctl["select_color"],
+            "filter": ctl["filter"], "color_options": meta.get("roadstyle:color_options") or [], "color_active": ctl["color_active"],
+            "overlays": ctl["overlays"], "overlay_control": bool(a["overlay_control"]), "overlay_popup": bool(a["overlay_popup"]),
+            "tunnel": {**ctl["tunnel"], "bg": bg}, "fill_layers": ctl["fill_layers"], "road_fill": ctl["road_fill"], "views": ctl["views"],
+            "items": ctl["items"], "road_popup": inter["popup"], "road_tooltip": inter["tooltip"], "hover_delay_ms": inter["hover_delay_ms"],
+            "edge_id_col": ctl["edge_id_col"], "arrow_icon": ctl["arrow_icon"], "arrow_color": ctl["arrow_color"], "arrow_rules": ctl["arrow_rules"]}
+    dashes = sorted({f["properties"].get("__rs_dash") for f in style["sources"]["simple"]["data"]["features"]} - {None, ""})
+    simple_js = {"layer": "roads-simple", "bridge": cfg["bridge_casing_color"], "shadow": cfg["bridge_shadow_color"], "select": ctl["select_color"],
+                 "hover": a["hover_color"] or th["selection"]["hover"], "tunnels": bool(ctl["tunnel"]["layers"]), "dashes": dashes}
+    x0, y0, x1, y1 = (float(v) for v in g.total_bounds)
+    return rw.WebMap(rw._page_html(page_style, page, name=a["name"], cam=cam, bounds=(x0, y0, x1, y1), side_panel_html=a["side_panel_html"],
+                                   host_panel_width=a["host_panel_width"], compress=a["compress"], simple_js=simple_js))

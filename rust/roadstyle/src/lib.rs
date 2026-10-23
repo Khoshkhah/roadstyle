@@ -25,7 +25,7 @@ pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name:
     let mut tiled = tiles::Tiles::new(min_zoom, max_zoom, num("buffer_px")?);
     let arg = |k: &str| cfg_all["args"][k].as_str().filter(|c| !c.is_empty()).map(String::from);
     let (width_col, highway_col) = (arg("width_m_col"), arg("highway_col").unwrap_or_else(|| "highway".into()));
-    let Parts { name, center, zoom, mut layers, sources, metadata, glyphs } = make_parts(parquet, look, features, None, name)?;
+    let Parts { name, center, zoom, mut layers, sources, metadata, glyphs, state } = make_parts(parquet, look, features, None, name)?;
     let mut read: std::collections::HashSet<String> = keep.iter().cloned().chain(["name".to_string(), "kind".to_string()]).collect();
     fn texts(v: &Value, out: &mut std::collections::HashSet<String>) {
         match v {
@@ -74,6 +74,9 @@ pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name:
     let mut style = json!({"version": 8, "name": name, "center": center, "zoom": zoom, "layers": layers, "sources": vector, "metadata": metadata});
     if let Some(g) = glyphs {
         style["glyphs"] = g;
+    }
+    if let Some(st) = state {
+        style["state"] = st;
     }
     Ok((style.to_string(), tiled))
 }

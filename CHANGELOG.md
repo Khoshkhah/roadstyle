@@ -29,6 +29,16 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **The Rust engine draws the caller's overlays and the road items** (`overlays=`, `items=`): every kind of `Overlay` (fill, line, circle, text), a
   style of the settings, a colour per feature, metre widths, dashes and zoom ranges, overlays on edges, and the line items in metres in the one road
   layer with their mitre ends. The same style as Python, inline and in tiles.
+- **`render_edges(..., engine="rust")`** makes the web page with the Rust engine: the roads' style comes from Rust, and Python writes the base map
+  and the page. The page is the same as the Python engine's page, byte for byte (with 3D decks: the same page, the decks' corners to the
+  rounding). `tiles=True`, `simple=False`, `style=` (a Styler object) and the other backends stay Python only and give an error with
+  `engine="rust"`.
+- **The interaction contract in the style** (`docs/design/rust_library.md`, "The interaction contract"). With the look's `args.state = "live"`,
+  the Rust engine makes the style of the page: the global state stays in the expressions (MapLibre's `state` block), and the metadata has
+  `roadstyle:contract` (1), `roadstyle:state` (the start value of each `rs_*` state) and `roadstyle:controls` (the options of `rsDashboard` that
+  come from the style: the filter panel, the overlays, the tunnel look, the road fill, the fill layers, the items, the arrows' rules, the
+  select colour). The dashboard reads `roadstyle:controls` for each option that the page does not give, so a page with a Rust style (the
+  duckosm-rust page, the GeoLibre plugin) gets the same controls as the Python page.
 - **The Rust engine parses floats exactly** (serde_json `float_roundtrip`), so a coordinate from Python has the same last digit.
   **Note for the users of the Rust engine:** the engine now follows `labels=False` and `arrows=False` in the look's `args`, as Python does. Before,
   it always drew the names and the arrows. The looks of the GeoLibre plugin and of duckosm-rust's page have both false (from mapstyle's

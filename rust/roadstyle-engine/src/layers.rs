@@ -86,6 +86,11 @@ impl Model {
         match c.strip_suffix("_link") { Some(b) => (b, true), None => (c, false) }
     }
 
+    /// ROAD_Z of a class's main class (its draw order), else the fallback order.
+    pub(crate) fn z_of(&self, c: &str) -> f64 {
+        self.z_order.get(Self::base(c).0).unwrap_or(&self.fb_order).as_f64().unwrap_or(0.0)
+    }
+
     pub(crate) fn group_of(&self, base: &str) -> &str {
         self.group.iter().find(|(c, _)| c == base).map_or(self.fb_group.as_str(), |(_, g)| g.as_str())
     }
@@ -659,9 +664,19 @@ fn props_of<'a>(fs: &'a [Value], empty: &'a Map<String, Value>) -> Vec<&'a Map<S
 
 /// The road layers of the style: what render_web.render, the export and mapstyle's export make for simple mode with stored levels and
 /// inline data (no base-map layers, no 3D decks, no metre widths, no items). `roads`, `simple`, `slots`: the features of the three sources.
+/// What the page's controls read from the layers (contract.rs): the overlays' entries for the Layers box, each tunnel colour without the
+/// tunnel look (_tunnel_look) and each fill layer's opacity without the road fill switch.
+#[derive(Default)]
+pub struct PageInfo {
+    pub overlays: Vec<Value>,
+    pub tunnel_layers: Map<String, Value>,
+    pub fill_paint: Map<String, Value>,
+}
+
 #[allow(clippy::too_many_arguments)] // the sources of the style, as make_parts has them
 pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value], decks: bool, ovs: &mut [Overlay], fills: &[String], active: usize)
-                   -> Result<Vec<Value>, String> {
+                   -> Result<(Vec<Value>, PageInfo), String> {
+    let mut info = PageInfo::default();
     let m = Model::from_look(look)?;
     let (th, cfg) = (&look["theme"], &look["config"]);
     let empty = Map::new();
@@ -686,6 +701,8 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     let lay = json!({"line-cap": th["roads"]["cap"], "line-join": th["roads"]["join"], "line-sort-key": 0});
     // render's width_m_col: metre widths from width_m_zoom on (docs/design/metre_widths.md)
     let args = &look["args"];
+    // state "live" (a page with the dashboard): the expressions keep ["global-state", name]; else the export's style, the state baked
+    let live = args["state"] == "live";
     let metres = args["width_m_col"].as_str().is_some_and(|c| !c.is_empty());
     let wmz = if args["width_m_zoom"].is_null() { th["roads"]["width_m_zoom"].clone() } else { args["width_m_zoom"].clone() };
     let wing = th["bridges"]["wing_scale"].as_f64().unwrap_or(1.0);
@@ -809,6 +826,7 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     for (i, ov) in ovs.iter_mut().enumerate() {
         let sid = format!("ov{i}");
         let mut ids: Vec<String> = Vec::new();
+        let mut base = Map::new();         // an overlay on edges: each layer's own filter (position and order), which rsFilter keeps
         if ov.edge {
             for (pos, order) in edge_overlay(ov, &by_id)? {
                 let flt = json!(["all", ["==", ["get", "__rs_fl"], pos], ["==", ["get", "__rs_ord"], order]]);
@@ -829,6 +847,7 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
                     l
                 }).collect();
                 ids.extend(mine.iter().map(|l| l["id"].as_str().unwrap().to_string()));
+                base.extend(mine.iter().map(|l| (l["id"].as_str().unwrap().to_string(), flt.clone())));
                 edge.push((pos, order, i, mine));
             }
         } else {
@@ -836,6 +855,14 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
             ids.extend(ls.iter().map(|l| l["id"].as_str().unwrap().to_string()));
             if ov.under { under.extend(ls) } else { over.extend(ls) }
         }
+        // _build_overlays' entry for the page (the Layers box, the popups, the hover and the select)
+        let u = &ov.user;
+        let label = if u.is_null() { ov.name.clone() } else { u["label"].as_str().filter(|l| !l.is_empty()).map_or_else(|| format!("Layer {}", i + 1), String::from) };
+        let list = |v: &Value| v.as_array().filter(|a| !a.is_empty()).map(|a| Value::Array(a.clone())).unwrap_or(Value::Null);
+        info.overlays.push(json!({"label": label, "source": sid, "layers": ids, "hit": ids.first(), "visible": ov.visible, "color": ov.color,
+            "popup": if u["popup"].is_array() { u["popup"].clone() } else { Value::Null }, "popup_window": u["popup_window"] != false,
+            "tooltip": list(&u["tooltip"]), "under": ov.under && !ov.edge, "base": if ov.edge { Value::Object(base) } else { Value::Null },
+            "select": u["select"].as_str().unwrap_or("road"), "interactive": !u["popup"].is_array() || list(&u["popup"]) != Value::Null}));
         ov_ids.push(ids);
     }
     let mut layers = under;
@@ -857,11 +884,19 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
         }
         let (arrows, labels) = (look["args"]["arrows"] != false, look["args"]["labels"] != false);
         if arrows {
-        layers.push(json!({"id": "roads-arrows", "type": "symbol", "source": "slots", "minzoom": arw["minzoom"],
+        // the page with inline data puts one arrow per one-way road in the window into the "arrows" source (_rsArrows); tiles and the
+        // export repeat them along the slots
+        let (source, mut layout) = if live && args["tiles"] != true {
+            ("arrows", json!({"symbol-placement": "point", "icon-rotate": ["get", "b"], "icon-allow-overlap": false, "icon-ignore-placement": true}))
+        } else {
+            ("slots", json!({"symbol-placement": "line", "symbol-spacing": spacing}))
+        };
+        for (k, v) in [("icon-image", json!("oneway")), ("icon-rotation-alignment", json!("map")), ("symbol-sort-key", sort.clone()), ("icon-size", Value::Array(icon))] {
+            layout[k] = v;
+        }
+        layers.push(json!({"id": "roads-arrows", "type": "symbol", "source": source, "minzoom": arw["minzoom"],
                            "filter": with_minzoom(json!(["all", ["==", ["get", "oneway"], 1], true, minor_or(&arw["minor_minzoom"])]), mz_filter("highway")),
-                           "layout": {"symbol-placement": "line", "symbol-spacing": spacing, "icon-image": "oneway", "icon-rotation-alignment": "map",
-                                      "symbol-sort-key": sort, "icon-size": icon},
-                           "paint": {"icon-opacity": arw["opacity"]}}));
+                           "layout": layout, "paint": {"icon-opacity": arw["opacity"]}}));
         }
         let mut lf = vec![json!("all"), json!(["==", ["%", ["get", "slot"], 2], 0]), json!(["to-boolean", ["get", "name"]]), minor_or(&lbl["minor_minzoom"])];
         if let Some(z) = mz_filter("highway") {      // a hidden class must not keep its street name floating either
@@ -907,7 +942,8 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     let feats: HashMap<&str, Vec<&dyn Get>> = [("roads", rd), ("slots", ld.clone()), ("arrows", ld), ("simple", sd)].into();
     let mut layers = drop_empty_layers(layers, &feats);
     for l in layers.iter_mut().filter(|l| l["id"].as_str().is_some_and(|i| i.starts_with("roads-fill") && !i.ends_with("-pat"))) {
-        let v = l["paint"].get("line-opacity").cloned().unwrap_or(json!(1));
+        let v = l["paint"].get("line-opacity").cloned().unwrap_or(Value::Null);
+        info.fill_paint.insert(l["id"].as_str().unwrap().to_string(), json!({"line-opacity": v}));
         l["paint"]["line-opacity"] = json!(["case", gs("rs_fill_on"), if v.is_null() { json!(1) } else { v }, 0]);
     }
     // the overlays on a street: between the road layer and the arrows, by fill number, order and overlay; the overlays over the roads: on top
@@ -950,38 +986,28 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
         }
     }
     // the page's state (its start values, baked below)
-    let towards = cfg["tunnel_towards"].as_object().cloned().unwrap_or_default();
-    let toward = &cfg["tunnel_toward"];
-    let colour = toward.as_str().and_then(|t| towards.get(t)).cloned().unwrap_or_else(|| toward.clone());
-    let pair = cfg["tunnel_palette"].as_str().and_then(|p| cfg["tunnel_palettes"].get(p)).filter(|v| !v.is_null()).cloned();
-    let dash = &th["tunnels"]["to"]["dash"];
-    let ratio: Vec<f64> = cfg["tunnel_casing_dash"].as_array().filter(|a| !a.is_empty()).map(|a| a.iter().filter_map(Value::as_f64).collect())
-        .unwrap_or_else(|| vec![1.0, 1.0]);
-    // render's road_fill: the start value of rs_fill_on (off: each fill's opacity is 0)
-    let road_fill = !matches!(look["args"]["road_fill"], Value::Bool(false));
-    let state: Map<String, Value> = json!({"rs_co": active, "rs_colors": {}, "rs_base": {}, "rs_fill_on": road_fill,
-        "rs_tun_strength": cfg["tunnel_strength"].as_f64().unwrap_or(0.0), "rs_tun_toward": colour, "rs_tun_two": pair.is_some(),
-        "rs_tun_c0": pair.as_ref().map_or(dash, |p| &p[0]), "rs_tun_c1": pair.as_ref().map_or(dash, |p| &p[1]), "rs_tun_ratio": ratio})
-        .as_object().unwrap().clone();
-    let mut state = state;
-    for i in 0..ovs.len() {
-        state.insert(format!("rs_ov_{i}"), json!({}));
-    }
+    let state = crate::contract::page_state(look, active, ovs.len());
     // _tunnel_look: everything on a tunnel moves toward the tunnel colour
     if any_tunnel {
         for l in layers.iter_mut().filter(|l| matches!(l["source"].as_str(), Some("roads" | "casings" | "halves" | "slots" | "arrows"))
                                             || l["id"].as_str().is_some_and(|i| edge_ids.contains(i))) {
             let id = l["id"].as_str().unwrap_or("").to_string();
+            let mut mix = |l: &mut Value, k: &str, base: Value| {        // the page's record: [paint property, its colour without the look, "fill"]
+                l["paint"][k] = tun_mix(&base);
+                info.tunnel_layers.entry(id.clone()).or_insert_with(|| json!([])).as_array_mut().unwrap().push(json!([k, base, "fill"]));
+            };
             if id.starts_with("roads-fill") && !id.ends_with("-pat") {
-                l["paint"]["line-color"] = tun_mix(&l["paint"]["line-color"]);
+                let b = l["paint"]["line-color"].clone();
+                mix(l, "line-color", b);
             } else if id.starts_with("roads-labels") {
-                l["paint"]["text-color"] = tun_mix(&l["paint"]["text-color"]);
+                let b = l["paint"]["text-color"].clone();
+                mix(l, "text-color", b);
             } else if id.starts_with("roads-arrows") {
-                l["paint"]["icon-color"] = tun_mix(&arw["color"]);
+                mix(l, "icon-color", arw["color"].clone());
             } else if edge_ids.contains(&id) {
                 for k in ["fill-color", "line-color", "circle-color", "text-color"] {
                     if let Some(c) = l["paint"].get(k).cloned() {
-                        l["paint"][k] = tun_mix(&c);
+                        mix(l, k, c);
                     }
                 }
             }
@@ -993,13 +1019,13 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     let mut out = Vec::new();
     for l in layers {
         let mut l = l.as_object().unwrap().clone();
-        for k in ["paint", "layout", "filter"] {
+        for k in ["paint", "layout", "filter"].into_iter().filter(|_| !live) {
             if let Some(v) = l.get(k) {
                 let b = bake(v, &state);
                 l.insert(k.into(), b);
             }
         }
-        if l["id"].as_str().is_some_and(|i| i.starts_with("roads-arrows")) {
+        if !live && l["id"].as_str().is_some_and(|i| i.starts_with("roads-arrows")) {
             if l["paint"].get("icon-color").is_none() {
                 l["paint"]["icon-color"] = arw["color"].clone();
             }
@@ -1016,7 +1042,7 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
         meta["roadstyle:group"] = group.into();
         out.push(Value::Object(l));
     }
-    Ok(if ovs.is_empty() { out } else { restyle(out, ovs) })
+    Ok((if ovs.is_empty() { out } else { restyle(out, ovs) }, info))
 }
 
 fn kind_match(colors: &Value, default: &Value) -> Value {
