@@ -1,6 +1,10 @@
 # roadstyle as a Rust library: the design and the migration plan
 
-**Status:** agreed 2026-10-23: decisions 1 to 8 as recommended, decision 9 open. Built: P0, P1, P2 (the crates), and step 1 of P5. It continues [One Rust engine for roadstyle](rust_engine.md)
+**Status:** agreed 2026-10-23: decisions 1 to 8 as recommended, decision 9 open. Built (2026-10-23, branch `rust-engine`): P0, P1, P2 (the
+crates), P4's style features (all of render's keywords that change the style, the full look too), P5 (the binding, the wheel, the whole test
+suite with `ROADSTYLE_ENGINE=rust`), the output side of P3's contract (`roadstyle:contract`, `roadstyle:state`, `roadstyle:controls`,
+`docs/reference/contract.md`) and of P6 the page writer, the PMTiles writer, `export_look` and the runtime API (`rs`). Open: P3's typed look
+and the layer roles, P6's npm packages and `Tiler.restyle`, the level options of `compute_levels` in Rust, P7. It continues [One Rust engine for roadstyle](rust_engine.md)
 (steps 1 and 3 are done) and uses [The style in a config file](style_config.md) and
 [A general core: roads, items, and views](core_model_and_views.md). The decisions are in
 [Decisions](#decisions).
