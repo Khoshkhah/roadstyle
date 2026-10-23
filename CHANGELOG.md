@@ -35,6 +35,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   the same. `simple=False`, `style=` (a Styler object) and the other backends stay Python only and give an error with `engine="rust"`.
   Time on Tartu (64,828 roads): 19.1 s with Python and 6.2 s with Rust; with `tiles=True`, 147.5 s and 12.2 s.
 - **`export_style(..., engine="rust", format="pmtiles")`**: one archive of the Rust engine's tiles.
+- **`views=` with `engine="rust"`**: the View menu, and a view's palette (the colours of each palette in the page, as Python's
+  `_merge_palettes`, from a Rust style of each palette). Not with `tiles=True` (the tiles have one palette).
 - **The interaction contract in the style** (`docs/design/rust_library.md`, "The interaction contract"). With the look's `args.state = "live"`,
   the Rust engine makes the style of the page: the global state stays in the expressions (MapLibre's `state` block), and the metadata has
   `roadstyle:contract` (1), `roadstyle:state` (the start value of each `rs_*` state) and `roadstyle:controls` (the options of `rsDashboard` that

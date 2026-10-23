@@ -228,12 +228,6 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
     lk = _look_of({**kwargs, "palette": palette, "profile": profile, "settings": settings, "highway_col": highway_col, "state": "live"})
     pq = _geoparquet(g)
     style = json.loads(rust().make_style(pq, json.dumps(lk), None, None, kwargs.get("name")))
-    dashes = sorted({f["properties"].get("__rs_dash") for f in style["sources"]["simple"]["data"]["features"]} - {None, ""})
-    archive = _tiled_page(pq, lk, style, highway_col, kwargs) if tiled else None
-    meta, ctl = style.pop("metadata"), None
-    ctl, inter = meta["roadstyle:controls"], meta["roadstyle:interaction"]
-    for lyr in style["layers"]:
-        lyr.pop("metadata", None)          # the page gives the dashboard its options; its style has no metadata
     a = {k: p.default for k, p in inspect.signature(rw.render).parameters.items() if p.default is not inspect.Parameter.empty}
     a.update(kwargs)
     mode = "panel" if a["road_popup"] == "panel" else (a["popup_mode"] or "popup")
@@ -244,7 +238,8 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
     key = a["street_view_key"] or os.environ.get("GOOGLE_MAPS_KEY") or None
     if a["google_3d"] and not key:
         raise ValueError("google_3d=True needs a Google Maps JavaScript API key: pass street_view_key=... or set GOOGLE_MAPS_KEY")
-    # the page's own parts with the settings of the call in force (the base map, its canvas colour), as render_edges applies them
+    # the page's own parts with the settings of the call in force (the base map, its canvas colour, the views' names), as render_edges
+    # applies them
     pick = {k: v for k, v in (("profile", profile), ("palette", palette)) if v is not None and v != _s.theme()["active"][k]
             and (k == "profile" or v in _s.style_names("palettes"))}
     srcs = [*(settings if isinstance(settings, list) else [settings] if settings is not None else []), *([pick] if pick else [])]
@@ -253,8 +248,17 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
         _use(*prev, *srcs)
         active_bm, bms, base = rw._page_basemaps(a["basemap"], a["basemaps"], a["api_key"], a["basemap_switcher"])
         bg = rw._bg_color(active_bm)
+        views = _views(style, pq, kwargs, [b["key"] for b in bms], palette, profile, settings, highway_col) if a["views"] else []
     finally:
         _use(*prev)
+    if tiled and any("palette" in v["set"] for v in views):
+        raise ValueError("engine='rust': tiles=True with a view's palette (the tiles have one palette); use engine='python'")
+    dashes = sorted({f["properties"].get("__rs_dash") for f in style["sources"]["simple"]["data"]["features"]} - {None, ""})
+    archive = _tiled_page(pq, lk, style, highway_col, kwargs) if tiled else None
+    meta = style.pop("metadata")
+    ctl, inter = meta["roadstyle:controls"], meta["roadstyle:interaction"]
+    for lyr in style["layers"]:
+        lyr.pop("metadata", None)          # the page gives the dashboard its options; its style has no metadata
     for lyr in base["layers"]:
         lyr.setdefault("paint", {})        # as render_web._state_expressions gives every layer of the page
     page_style = {"version": 8, "sources": {**base["sources"], **style["sources"]}, "layers": base["layers"] + style["layers"],
@@ -271,7 +275,7 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
             "street_view": a["street_view"], "street_view_key": key or "", "google_3d": bool(a["google_3d"]), "select_color": ctl["select_color"],
             "filter": ctl["filter"], "color_options": meta.get("roadstyle:color_options") or [], "color_active": ctl["color_active"],
             "overlays": ctl["overlays"], "overlay_control": bool(a["overlay_control"]), "overlay_popup": bool(a["overlay_popup"]),
-            "tunnel": {**ctl["tunnel"], "bg": bg}, "fill_layers": ctl["fill_layers"], "road_fill": ctl["road_fill"], "views": ctl["views"],
+            "tunnel": {**ctl["tunnel"], "bg": bg}, "fill_layers": ctl["fill_layers"], "road_fill": ctl["road_fill"], "views": views,
             "items": ctl["items"], "road_popup": inter["popup"], "road_tooltip": inter["tooltip"], "hover_delay_ms": inter["hover_delay_ms"],
             "edge_id_col": ctl["edge_id_col"], "arrow_icon": ctl["arrow_icon"], "arrow_color": ctl["arrow_color"], "arrow_rules": ctl["arrow_rules"]}
     simple_js = {"layer": "roads-simple", "bridge": cfg["bridge_casing_color"], "shadow": cfg["bridge_shadow_color"], "select": ctl["select_color"],
@@ -279,6 +283,35 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
     x0, y0, x1, y1 = (float(v) for v in g.total_bounds)
     return rw.WebMap(rw._page_html(page_style, page, name=a["name"], cam=cam, bounds=(x0, y0, x1, y1), side_panel_html=a["side_panel_html"],
                                    host_panel_width=a["host_panel_width"], compress=a["compress"], tiles=archive, simple_js=simple_js))
+
+
+def _views(style, pq, kwargs, basemaps, palette, profile, settings, highway_col):
+    """render's ``views``, checked (render_web._check_views), as the page reads them; a palette that a view names other than the page's
+    is merged into ``style`` (render_web._merge_palettes: the colours that differ, one copy per palette, picked by the state rs_palette),
+    from a Rust style of that palette, and the filter panel gets each class's colour in each palette."""
+    from . import _settings as _s
+    from . import render_web as rw
+
+    meta, ctl = style["metadata"], style["metadata"]["roadstyle:controls"]
+    colors = [o["name"] for o in meta.get("roadstyle:color_options") or []] if kwargs.get("color_options") else []
+    views = rw._check_views(kwargs["views"], colors, [o["label"] for o in ctl["overlays"]], ctl["filter"]["classes"], basemaps,
+                            _s.style_names("palettes"))
+    pals = [p for p in dict.fromkeys(v["set"]["palette"] for v in views if "palette" in v["set"]) if p != palette]
+    if pals:
+        def build(n):
+            lk = _look_of({**kwargs, "palette": n, "profile": profile, "settings": settings, "highway_col": highway_col, "state": "live"})
+            st = json.loads(rust().make_style(pq, json.dumps(lk), None, None, kwargs.get("name")))
+            return {"style": st, "geo": st["sources"]["roads"]["data"], "slots": (st["sources"].get("slots") or {}).get("data") or {"features": []}}
+        slots = (style["sources"].get("slots") or {}).get("data") or {"features": []}
+        rw._merge_palettes(style, style["sources"]["roads"]["data"], slots, {n: build(n) for n in pals}, palette)
+        fb = rw._FB["fill"]
+        first = {}
+        for ft in style["sources"]["roads"]["data"]["features"]:
+            first.setdefault(ft["properties"].get(ctl["filter"]["col"]), ft["properties"])
+        flt = ctl["filter"]
+        flt["palettes"] = {n: {c: first[c].get(f"__rs_fill@{n}", first[c].get("__rs_fill")) or fb for c in flt["classes"]} for n in pals}
+        flt["palettes"][style["metadata"]["roadstyle:state"]["rs_palette"]] = dict(flt["swatches"])
+    return views
 
 
 def _tiled_page(pq, lk, style, highway_col, kwargs):

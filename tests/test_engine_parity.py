@@ -355,6 +355,18 @@ def test_render_edges_tiled_page(part, keywords, case, monkeypatch):
         assert tile_diff(tr.get(k, b""), tp.get(k, b"")) == [], k
 
 
+@pytest.mark.parametrize("views", [{"plain": {"road_fill": False}, "bridges": {"bridges": True, "classes": ["primary"]}},
+                                   {"carto": {"palette": "carto"}, "mono": {"palette": "mono", "road_fill": False}}],
+                         ids=["settings", "palettes"])
+def test_render_edges_views(part, keywords, views, monkeypatch):
+    """render_edges(views=..., engine="rust"): the View menu, and a view's palette in the page (the colours of each palette, the state
+    rs_palette): the Python engine's page byte for byte. The bundled palettes, as the fixture's own palette makes other features than they."""
+    monkeypatch.delenv("GOOGLE_MAPS_KEY", raising=False)
+    kw = {**{k: v for k, v in keywords.items() if k not in ("palette", "settings", "basemap", "basemaps")}, "palette": "amber", "compress": False,
+          "views": views}
+    assert rs.render_edges(part, engine="rust", **kw).html == rs.render_edges(part, engine="python", **kw).html
+
+
 @pytest.mark.parametrize("method", ["tags", "solve"])
 def test_compute_levels(part, method):
     """compute_levels: the same four columns from both engines (the roads of the part of Monaco, with no level columns)."""
