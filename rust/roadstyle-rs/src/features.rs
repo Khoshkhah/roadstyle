@@ -31,19 +31,25 @@ fn metres(text: Option<&str>) -> Option<f64> {
     Some(if feet { h * 0.3048 } else { h })
 }
 
-/// building_height: the height tag from min_height, else (building:levels + roof:levels) x m_per_level, else the height of the kind (the
-/// order of OpenMapTiles); at most max_height.
+/// building_height: the higher of the height tag (from min_height) and (building:levels + roof:levels) x m_per_level, else the one of
+/// them that is given, else the height of the kind; at most max_height. Not the order of OpenMapTiles (height first): in Tartu the
+/// height tag is often an ETAK code (0 to 9), and levels first makes Monaco's buildings lower than OpenFreeMap's.
 fn building_height(height: Option<&str>, levels: Option<&str>, roof_levels: Option<&str>, kind: Option<&str>, cfg: &Value) -> Value {
     let top = cfg.get("max_height").and_then(Value::as_f64).unwrap_or(200.0);
     let cap = |v: f64| if v <= top { json!(v) } else { cfg.get("max_height").cloned().unwrap_or(json!(200)) };
-    if let Some(h) = metres(height).filter(|h| *h >= cfg["min_height"].as_f64().unwrap()) {
-        return cap(h);
+    let tag = metres(height).filter(|h| *h >= cfg["min_height"].as_f64().unwrap());
+    let floors = number(levels)
+        .map(|n| n.0)
+        .filter(|l| *l != 0.0)
+        .map(|l| (l + number(roof_levels).map_or(0.0, |n| n.0)) * cfg["m_per_level"].as_f64().unwrap());
+    match (tag, floors) {
+        (Some(h), Some(f)) => cap(h.max(f)),
+        (Some(v), None) | (None, Some(v)) => cap(v),
+        (None, None) => {
+            let hs = &cfg["heights"];
+            kind.and_then(|k| hs.get(k)).unwrap_or(&hs["default"]).clone()
+        }
     }
-    if let Some(l) = number(levels).map(|n| n.0).filter(|l| *l != 0.0) {
-        return cap((l + number(roof_levels).map_or(0.0, |n| n.0)) * cfg["m_per_level"].as_f64().unwrap());
-    }
-    let hs = &cfg["heights"];
-    kind.and_then(|k| hs.get(k)).unwrap_or(&hs["default"]).clone()
 }
 
 /// building_base: the bottom of a building (part) for fill-extrusion-base: the min_height tag, else building:min_level x m_per_level, else 0.
@@ -87,4 +93,19 @@ pub fn feature_collections(parquet: Vec<u8>, look: &Value) -> Result<Map<String,
         let features: Vec<Value> = fs.into_iter().map(|(_, f)| f).collect();
         (name, crate::obj([("type", "FeatureCollection".into()), ("features", Value::Array(features))]))
     }).collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_higher_of_the_height_tag_and_the_levels() {
+        let cfg = json!({"m_per_level": 3.66, "min_height": 2, "max_height": 200, "heights": {"house": 6, "default": 8}});
+        let h = |height, levels| building_height(height, levels, None, Some("house"), &cfg).as_f64().unwrap();
+        assert!((h(Some("3"), Some("3")) - 10.98).abs() < 1e-9, "Tartu: an ETAK code 3 and 3 levels");
+        assert_eq!(h(Some("9"), Some("2")), 9.0, "Monaco: 9 m and 2 levels (7.32 m)");
+        assert_eq!(h(Some("12 m"), None), 12.0, "the height tag only");
+        assert_eq!(h(None, None), 6.0, "the height of the kind");
+    }
 }

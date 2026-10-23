@@ -46,7 +46,7 @@ cargo test --offline
 | Test | What it compares |
 |---|---|
 | The unit tests of both ports (11) | The flow, the solver, the input geometry, the tiles |
-| `tests/style.rs`, Monaco | The SHA-256 of `make_style` against the style of `0806ac2` from the same inputs |
+| `tests/style.rs`, Monaco | The SHA-256 of `make_style` against the style of `0806ac2` from the same inputs, with rule C for the building heights |
 | `tests/style.rs`, Tartu (`--ignored`) | The same for Tartu. The inputs (9.5 MB) are not in git. `tests/get_tartu.sh` gets them from the GitHub pre-release `rust-test-data` |
 | `tests/levels.rs` | The tags rows and the solve rows of Monaco against duckosm-rust's own `edge_levels_visualization.parquet`, the edge hash and the solve summary |
 
@@ -61,7 +61,7 @@ The test data in `rust/roadstyle-rs/tests/data/`:
 | `monaco/level_edges.parquet` | The edges and private edges of the three modes from duckosm-rust's test `duckosm-build/tests/levels.rs`, with a `rank` column |
 | `monaco/levels_tags.parquet`, `monaco/levels_solve.parquet` | The same duckosm-rust test, as it wrote them (zstd: the tests read zstd, the library does not) |
 
-Result on 2026-10-23: all tests pass, Tartu too. The style of Monaco and the style of Tartu are byte for byte the same as the style of `eea9f49`. After the move, geolibre-roadstyle's `0806ac2` changed the building heights in its copy. The crate has that change too, and its style is byte for byte the same as the style of `0806ac2`. The levels are the same rows as duckosm-rust's.
+Result on 2026-10-23: all tests pass, Tartu too. The style of Monaco and the style of Tartu are byte for byte the same as the style of `eea9f49`. After the move, geolibre-roadstyle's `0806ac2` changed the building heights in its copy. The crate has that change too, and its style is byte for byte the same as the style of `0806ac2`. Then Kaveh chose rule C for the building height: the higher of the `height` tag and (`building:levels` + `roof:levels`) x `m_per_level`. In Tartu the `height` tag is often an ETAK code (0 to 9), and levels first makes the buildings of Monaco lower than OpenFreeMap's. With rule C, the style differs from the style of `0806ac2` only in the `height` of 15 buildings of Monaco and 355 of Tartu, and the test has the hashes of the new style. The levels are the same rows as duckosm-rust's.
 
 ## Next steps
 

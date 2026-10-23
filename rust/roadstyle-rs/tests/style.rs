@@ -1,6 +1,8 @@
 //! The style must be byte for byte the style of geolibre-roadstyle's Rust port at commit 0806ac2 (its `make_style`, natively, from the
-//! same inputs). The reference styles are too large for git (Monaco 26 MB, Tartu 151 MB), so the test compares their SHA-256.
-//! `tests/old_style.sh` makes a reference style again, to see a difference.
+//! same inputs), with one change: the building heights follow rule C (the higher of the height tag and the levels, features.rs), not
+//! 0806ac2's rule A (the height tag first). On 2026-10-23 the only differences from 0806ac2's style were the `height` of 15 buildings
+//! of Monaco and 355 of Tartu. The reference styles are too large for git (Monaco 26 MB, Tartu 151 MB), so the test compares their
+//! SHA-256. `tests/old_style.sh` makes 0806ac2's style again, to see a difference.
 
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
@@ -14,16 +16,16 @@ fn style_hash(area: &Path) -> String {
 }
 
 #[test]
-fn monaco_style_equals_0806ac2() {
+fn monaco_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(style_hash(&area), "ff75be721d3cf593c807b811d77a059e4beaa883974a98ae84c0e220ebbc90be");
+    assert_eq!(style_hash(&area), "814e09f47893b22038c45f60d0cdfc2bb587aa47f056651cf924f11c0ed218be");
 }
 
 /// Tartu's inputs (9.5 MB) are not in git: get them with `tests/get_tartu.sh`, then `cargo test --release -- --ignored`.
 #[test]
 #[ignore = "needs tests/get_tartu.sh"]
-fn tartu_style_equals_0806ac2() {
+fn tartu_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_tartu.sh", area.display());
-    assert_eq!(style_hash(&area), "3aa98e03cf76e3526f8605057bb309d2f00e67edc02437d6b0885fdaf7c64a2b");
+    assert_eq!(style_hash(&area), "3b35e26702d42e4b18167f249d85cd7012f6aac70324ffb53fc2353548b69d85");
 }
