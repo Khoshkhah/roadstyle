@@ -21,7 +21,7 @@ The modules of `roadstyle-rs`, and where they come from:
 
 | Module | Content | From |
 |---|---|---|
-| `read` | The roads from GeoParquet (WKB lines), any Parquet table | geolibre-roadstyle `wasm/src/`, commit `eea9f49` (branch `vector-tiles`) |
+| `read` | The roads from GeoParquet (WKB lines), any Parquet table | geolibre-roadstyle `wasm/src/`, commit `eea9f49` (branch `vector-tiles`), then the building heights of `0806ac2` |
 | `roads`, `simple`, `slots` | The `roads` source, the casing pieces, the names and arrows | the same |
 | `features`, `overlays`, `geom` | The base-map layers, `edge_attach`, WKB, GEOS's area and centroid | the same |
 | `layers` | The road tables, the expression builders and the passes on the layer list | the same |
@@ -46,21 +46,22 @@ cargo test --offline
 | Test | What it compares |
 |---|---|
 | The unit tests of both ports (11) | The flow, the solver, the input geometry, the tiles |
-| `tests/style.rs`, Monaco | The SHA-256 of `make_style` against the style of `eea9f49` from the same inputs |
+| `tests/style.rs`, Monaco | The SHA-256 of `make_style` against the style of `0806ac2` from the same inputs |
 | `tests/style.rs`, Tartu (`--ignored`) | The same for Tartu. The inputs (9.5 MB) are not in git. `tests/get_tartu.sh` gets them from the GitHub pre-release `rust-test-data` |
 | `tests/levels.rs` | The tags rows and the solve rows of Monaco against duckosm-rust's own `edge_levels_visualization.parquet`, the edge hash and the solve summary |
 
-The reference styles are too large for git (Monaco 26 MB, Tartu 151 MB), so the test keeps only their hashes. To see a difference, make the old style again with `rust/roadstyle-rs/tests/old_style.sh`. It builds `eea9f49` from a geolibre-roadstyle checkout. Then compare the two files.
+The reference styles are too large for git (Monaco 26 MB, Tartu 151 MB), so the test keeps only their hashes. To see a difference, make the old style again with `rust/roadstyle-rs/tests/old_style.sh`. It builds `0806ac2` from a geolibre-roadstyle checkout. Then compare the two files.
 
 The test data in `rust/roadstyle-rs/tests/data/`:
 
 | File | Made by |
 |---|---|
-| `look.json`, `monaco/roads.parquet`, `monaco/features.parquet` | geolibre-roadstyle's fixture (`tools/make_spike_fixture.py`) |
+| `look.json`, `monaco/roads.parquet`, `monaco/features.parquet` | geolibre-roadstyle's fixture (`tools/make_spike_fixture.py`); `look.json` and `features.parquet` from `0806ac2` (`m_per_level` 3.66, the columns `roof_levels`, `min_height`, `min_level`) |
+| `tartu/` (from the pre-release, file `tartu-inputs-2.tar`) | The same fixture before `0806ac2`. Its `features.parquet` has the three new columns, but they are empty: the case of a database without these tags |
 | `monaco/level_edges.parquet` | The edges and private edges of the three modes from duckosm-rust's test `duckosm-build/tests/levels.rs`, with a `rank` column |
 | `monaco/levels_tags.parquet`, `monaco/levels_solve.parquet` | The same duckosm-rust test, as it wrote them (zstd: the tests read zstd, the library does not) |
 
-Result on 2026-10-23: all tests pass, Tartu too. The style of Monaco and the style of Tartu are byte for byte the same as the style of `eea9f49`. The levels are the same rows as duckosm-rust's.
+Result on 2026-10-23: all tests pass, Tartu too. The style of Monaco and the style of Tartu are byte for byte the same as the style of `eea9f49`. After the move, geolibre-roadstyle's `0806ac2` changed the building heights in its copy. The crate has that change too, and its style is byte for byte the same as the style of `0806ac2`. The levels are the same rows as duckosm-rust's.
 
 ## Next steps
 

@@ -2689,7 +2689,7 @@
    ]
   },
   "buildings_3d": {
-   "m_per_level": 3,
+   "m_per_level": 3.66,
    "min_height": 2,
    "max_height": 200,
    "opacity": 0.9,
@@ -2842,7 +2842,7 @@
     "sports_centre": "#a0d0a8"
    },
    "buildings_3d": {
-    "m_per_level": 3,
+    "m_per_level": 3.66,
     "min_height": 2,
     "max_height": 200,
     "opacity": 0.9,

@@ -1,4 +1,4 @@
-//! The style must be byte for byte the style of geolibre-roadstyle's Rust port at commit eea9f49 (its `make_style`, natively, from the
+//! The style must be byte for byte the style of geolibre-roadstyle's Rust port at commit 0806ac2 (its `make_style`, natively, from the
 //! same inputs). The reference styles are too large for git (Monaco 26 MB, Tartu 151 MB), so the test compares their SHA-256.
 //! `tests/old_style.sh` makes a reference style again, to see a difference.
 
@@ -14,16 +14,16 @@ fn style_hash(area: &Path) -> String {
 }
 
 #[test]
-fn monaco_style_equals_eea9f49() {
+fn monaco_style_equals_0806ac2() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(style_hash(&area), "73866c91712a646256eadfc787817cfc97ae8d41e0a58ee9fc258491741b3c97");
+    assert_eq!(style_hash(&area), "ff75be721d3cf593c807b811d77a059e4beaa883974a98ae84c0e220ebbc90be");
 }
 
 /// Tartu's inputs (9.5 MB) are not in git: get them with `tests/get_tartu.sh`, then `cargo test --release -- --ignored`.
 #[test]
 #[ignore = "needs tests/get_tartu.sh"]
-fn tartu_style_equals_eea9f49() {
+fn tartu_style_equals_0806ac2() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_tartu.sh", area.display());
-    assert_eq!(style_hash(&area), "7e75de83bf43e83b557694706297d9c4ba6342af3ad9aefbf4f06cd1c9d8a0c4");
+    assert_eq!(style_hash(&area), "3aa98e03cf76e3526f8605057bb309d2f00e67edc02437d6b0885fdaf7c64a2b");
 }
