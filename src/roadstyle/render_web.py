@@ -2571,7 +2571,7 @@ with open(os.path.join(os.path.dirname(__file__), "static", "popup.js"), encodin
 # docs/design/dashboard_module.md): one plain script here, without the import lines and the export words, so the page stays one file
 _DASH = os.path.join(os.path.dirname(__file__), "static", "dashboard")
 _DASH_FILES = ["core", "panel", "find", "zoom", "view3d", "float", "streetview", "google3d", "basemap", "filter",
-               "color", "legend", "overlays", "tunnel", "views", "arrows", "svspot", "select", "index"]
+               "color", "legend", "overlays", "tunnel", "views", "arrows", "svspot", "select", "api", "index"]
 with open(os.path.join(_DASH, "dashboard.css"), encoding="utf-8") as _fh:
     _HTML = _HTML.replace("__DASHBOARD_CSS__", _fh.read())
 _js = []

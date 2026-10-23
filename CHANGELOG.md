@@ -52,6 +52,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `\uXXXX`, its floats), so `render_edges(engine="rust")` writes the page with it and the page is Python's byte for byte. The browser package
   has it as `makePage` (the duckosm-rust page and the GeoLibre plugin can write a whole page). The page's three scripts (the gzip loader,
   simple mode's recolouring, the tiles' setup) are static files now (`static/page/`), the same text for both writers.
+- **The `rs` object** (`static/dashboard/api.js`, the runtime API of the interaction contract): `window.rs` and the value of `rsDashboard`
+  have `getState`, `setState`, `can`, `link` (the state in the URL, `#rs=`), `on` and the controls' actions with the roads' edge ids. A page
+  opened with `#rs=` applies that state. The `window.rs*` functions and the `rs:*` events do not change.
 - **A PMTiles writer in the crate** (`roadstyle_tiles::pmtiles`, `Tiler.archive` in the Python binding and in the browser package): the
   archive of the pmtiles package's Writer (the same header, entries and tiles), with no time in its gzip streams, so the same map gives the
   same archive. The Rust engine's tiled pages and `export_style(format="pmtiles")` use it.

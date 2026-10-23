@@ -17,6 +17,7 @@ import {initTunnel} from "./tunnel.js";
 import {initViews} from "./views.js";
 import {initArrows} from "./arrows.js";
 import {initSelect, useSelect} from "./select.js";
+import {makeApi, fromUrl} from "./api.js";
 // an option left out: render's default. The theme's values (select_color, arrow_icon, arrow_color, arrow_rules) have none:
 // they come from the look (roadstyle's profile and palette).
 const RS_DEFAULTS = {
@@ -49,7 +50,7 @@ function fromStyle(o, given){
   if(!given.has("hover_delay_ms")) o.hover_delay_ms = it.hover_delay_ms != null ? it.hover_delay_ms : 300;
   if(!given.has("color_options")) o.color_options = meta["roadstyle:color_options"] || [];
 }
-// returns the dashboard object (docs/design/rust_library.md, "The runtime API"); today it has setStyle
+// returns the dashboard object (docs/design/rust_library.md, "The runtime API", api.js): setStyle, and the methods of the API
 export function rsDashboard(map, options){
   const o = {...RS_DEFAULTS, ...options}, given = new Set(Object.keys(options));
   fromStyle(o, given);
@@ -71,12 +72,15 @@ export function rsDashboard(map, options){
   initViews();
   initArrows();
   initSelect();
-  return {
+  const rs = makeApi({
     // a new roads style: the page added its sources and layers to the map first (with the prefix). The controls stay; they read the
     // new style, its metadata and its layers. The selection, the hover and the properties of engine.props go: they were the old roads'.
     setStyle(style){
       o.style = style; fromStyle(o, given);
       useStyle(style); useSelect(); useFilter(); useColor(); useLegend();
     },
-  };
+  });
+  window.rs = rs;                 // the page's one object (the window.rs* functions stay as they are)
+  fromUrl(rs);
+  return rs;
 }

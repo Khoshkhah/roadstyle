@@ -5,6 +5,35 @@
 Each built-in control is a thin UI over one of these functions, so a host page can drive the map
 with the controls hidden. How to use them together: [Dashboards & JavaScript](../guides/dashboards.md).
 
+## The `rs` object
+
+`window.rs` (and the value that `rsDashboard(map, options)` returns) is one object for the whole page, with the edge ids of the roads
+(`edge_id_col`, as text) in place of rows. The `window.rs*` functions below stay. Its state:
+
+```js
+{v: 1, selection, highlight, colorBy, colors, filter: {classes, bridges, tunnels, access, ids}, overlays: {label: {visible}},
+ roadFill, tunnel, palette, view, basemap, view3d, camera: {center, zoom, pitch, bearing}, streetView: {mode}, google3d, panel}
+```
+
+| method | does |
+|---|---|
+| `rs.getState()` | the state now (a copy) |
+| `rs.setState(part)` | applies a part of the state through the controls' functions (a saved view, a URL) |
+| `rs.can(part)` | false for a part that this page cannot apply (an unknown key, a colour option the style does not have) |
+| `rs.link()` | the part that differs from the start, as `#rs=` and base64url JSON; a page opened with it applies it |
+| `rs.on(event, fn)` | `event`: `state` (each change, as the part of the state that changed), or `select`, `deselect`, `filter`, `color`, `overlay`, `tunnel`, `view`, `view3d`, `basemap`, `highlight`, `roadfill`, `streetview`, `google3d` (the `rs:*` event's `detail`); returns the function that removes it |
+| `rs.select(id)`, `rs.highlight(ids)`, `rs.focus(ids)` | as `rsSelect`, `rsHighlight`, `rsFocus`, with edge ids (`null`: deselect) |
+| `rs.query({column: value})`, `rs.find(text)`, `rs.props(id)` | edge ids of the roads that match; one road's properties |
+| `rs.setColorBy(name)`, `rs.color([{color, ids}])`, `rs.setFilter({classes, bridges, tunnels, access, ids})` | as the controls |
+| `rs.setOverlay(label, visible)`, `rs.setTunnelStyle(look)`, `rs.setView(name)`, `rs.setBasemap(key)` | as the controls |
+| `rs.setStyle(style)` | a new roads style (a page whose roads come later) |
+| `rs.destroy()` | removes the object's listeners |
+
+```js
+rs.on("state", part => history.replaceState(null, "", rs.link()));    // the URL follows the map
+rs.setState({colorBy: "speed", filter: {bridges: false}});
+```
+
 ## Functions
 
 `layer?` is optional; see [the `layer` argument](#the-layer-argument).
