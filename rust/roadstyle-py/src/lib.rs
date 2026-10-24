@@ -155,7 +155,7 @@ fn compute_levels(py: Python<'_>, roads: Vec<u8>, method: String, cols: [String;
         let c: [&str; 5] = [&cols[0], &cols[1], &cols[2], &cols[3], &cols[4]];
         let edges = roadstyle::level_edges(&feats, c);
         let mut rows = vec![(0, 0, 0, 0); feats.len()];
-        let Some(levels) = roadstyle::levels::compute(&edges, m)? else { return Ok((rows, "{}".into())) };
+        let Some(levels) = roadstyle::levels::levels(&edges, &roadstyle::levels::Options { method: m })? else { return Ok((rows, "{}".into())) };
         for r in &levels.rows {
             rows[r.edge_id as usize] = (r.casing_start, r.casing_level, r.casing_end, r.fill_level);
         }

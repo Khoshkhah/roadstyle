@@ -2,7 +2,7 @@
 //! sample file cut to its boundary, three modes. `data/monaco/level_edges.parquet` holds the edges and private edges of the three
 //! modes with their rank; `levels_tags.parquet` and `levels_solve.parquet` are duckosm-rust's `edge_levels_visualization.parquet`.
 
-use roadstyle_rs::levels::{compute, LevelEdge, LevelEdges, Method, Row};
+use roadstyle_rs::levels::{levels, LevelEdge, LevelEdges, Method, Options, Row};
 use roadstyle_rs::read::{read_roads, read_table};
 use serde_json::{json, Map, Value};
 use std::path::PathBuf;
@@ -37,8 +37,8 @@ fn as_map(r: &Row) -> Map<String, Value> {
     m
 }
 
-fn check(method: Method, golden: &str) -> roadstyle_rs::levels::Levels {
-    let lv = compute(&edges(), method).unwrap().unwrap();
+fn check(method: Method, golden: &str) -> std::sync::Arc<roadstyle_rs::levels::Levels> {
+    let lv = levels(&edges(), &Options { method }).unwrap().unwrap();
     let want: Vec<Map<String, Value>> = read_table(data(golden), "").unwrap().into_iter().map(|r| r.cols).collect();
     let got: Vec<Map<String, Value>> = lv.rows.iter().map(as_map).collect();
     assert_eq!(got.len(), want.len(), "number of rows");

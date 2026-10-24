@@ -319,7 +319,7 @@ fn compute_levels(table: &mut RoadTable, args: &Value, head_m: f64) -> Result<()
     }
     // the engine's own names: ColumnMap gave the user's columns these names before this step
     let edges = level_edges(table, ["highway", "layer", "bridge", "tunnel", "junction"]);
-    let Some(levels) = roadstyle_levels::compute(&edges, roadstyle_levels::Method::Solve)? else { return Ok(()) };
+    let Some(levels) = roadstyle_levels::levels(&edges, &Default::default())? else { return Ok(()) };
     // one row for each edge, in the edges' order (the edge id is the row)
     if levels.rows.len() != table.len() || levels.rows.iter().enumerate().any(|(i, r)| r.edge_id != i as i64) {
         return Err(format!("compute_levels: {} rows for {} roads, not one for each road in its order", levels.rows.len(), table.len()));

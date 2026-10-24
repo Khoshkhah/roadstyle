@@ -105,31 +105,83 @@ pub struct Levels {
     pub stages: [i64; 3],
 }
 
-pub fn compute(edges: &LevelEdges, method: Method) -> Result<Option<Levels>, String> {
-    if method == Method::None {
+/// The options of roadstyle's `compute_levels`, with its defaults.
+#[derive(Clone, Debug)]
+pub struct Options {
+    pub method: Method,
+}
+
+impl Default for Options {
+    fn default() -> Options {
+        Options {
+            method: Method::Solve,
+        }
+    }
+}
+
+/// The levels of the last networks, by a hash of the edges and the options: a style, its tiles and each palette of one network
+/// solve one time.
+/// ponytail: the last 2 networks only; keep more when a caller alternates between more networks.
+static CACHE: std::sync::Mutex<Vec<(u64, std::sync::Arc<Levels>)>> =
+    std::sync::Mutex::new(Vec::new());
+
+/// The drawing levels of the edges (`compute_levels`), from the cache when the same edges and options were done before.
+pub fn levels(edges: &LevelEdges, o: &Options) -> Result<Option<std::sync::Arc<Levels>>, String> {
+    use std::hash::{Hash, Hasher};
+    if o.method == Method::None {
         return Ok(None);
     }
     let edges = edges.edges();
-    let roads = input::road_split(&edges)?;
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    format!("{o:?}").hash(&mut h);
+    for e in &edges {
+        (
+            e.edge_id,
+            &e.highway,
+            &e.tunnel,
+            &e.bridge,
+            &e.layer,
+            &e.junction,
+        )
+            .hash(&mut h);
+        e.geometry
+            .iter()
+            .for_each(|p| (p.0.to_bits(), p.1.to_bits()).hash(&mut h));
+    }
+    let key = h.finish();
+    let mut cache = CACHE.lock().map_err(|e| e.to_string())?;
+    if let Some((_, lv)) = cache.iter().find(|(k, _)| *k == key) {
+        return Ok(Some(lv.clone()));
+    }
+    let lv = std::sync::Arc::new(compute(&edges, o)?);
+    if cache.len() == 2 {
+        cache.remove(0);
+    }
+    cache.push((key, lv.clone()));
+    Ok(Some(lv))
+}
+
+fn compute(edges: &[&LevelEdge], o: &Options) -> Result<Levels, String> {
+    let roads = input::road_split(edges)?;
     let (mut given_up, mut orders_not_kept, mut stages) = (0, 0, [0; 3]);
     let (mut given_up_pairs, mut orders_not_kept_pairs) = (Vec::new(), Vec::new());
-    let rows = match method {
-        Method::Tags => tags(&edges, &roads.ends),
+    let rows = match o.method {
+        Method::Tags => tags(edges, &roads.ends),
         _ => {
-            let (rules, _) = input::relations(&edges, &roads);
+            let (rules, _) = input::relations(edges, &roads);
             let s = solve::solve(&rules, 20)?;
             given_up = s.given_up.len();
             orders_not_kept = s.orders_not_kept.len();
             given_up_pairs = s.given_up.clone();
             orders_not_kept_pairs = s.orders_not_kept.clone();
             stages = s.stages;
-            solved_rows(&edges, &roads, &rules, &s)
+            solved_rows(edges, &roads, &rules, &s)
         }
     };
     let ids: Vec<i64> = rows.iter().map(|r| r.edge_id).collect();
-    Ok(Some(Levels {
+    Ok(Levels {
         rows,
-        method,
+        method: o.method,
         edge_hash: edge_hash(&ids),
         roads: roads.first.len(),
         given_up,
@@ -137,13 +189,17 @@ pub fn compute(edges: &LevelEdges, method: Method) -> Result<Option<Levels>, Str
         given_up_pairs,
         orders_not_kept_pairs,
         stages,
-    }))
+    })
 }
 
-fn edge_hash(sorted_ids: &[i64]) -> String {
+/// roadstyle's hash of the edge ids (`edge_levels_meta.edge_hash`): sha256 of the sorted ids, 8 bytes each, little endian; the first
+/// 32 hex characters.
+pub fn edge_hash(ids: &[i64]) -> String {
     use sha2::{Digest, Sha256};
+    let mut sorted = ids.to_vec();
+    sorted.sort_unstable();
     let mut h = Sha256::new();
-    for id in sorted_ids {
+    for id in sorted {
         h.update(id.to_le_bytes());
     }
     h.finalize()
@@ -259,4 +315,42 @@ fn solved_rows(
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_second_call_is_from_the_cache() {
+        let mut edges = LevelEdges::default();
+        for (id, bridge) in [(7, None), (3, Some("yes".to_string()))] {
+            let geometry = vec![(0.0, id as f64 * 1e-4), (1e-3, 0.0)];
+            edges.add(
+                0,
+                LevelEdge {
+                    edge_id: id,
+                    highway: "residential".into(),
+                    tunnel: None,
+                    bridge,
+                    layer: None,
+                    junction: None,
+                    geometry,
+                },
+            );
+        }
+        let o = Options {
+            method: Method::Tags,
+        };
+        let (a, b) = (
+            levels(&edges, &o).unwrap().unwrap(),
+            levels(&edges, &o).unwrap().unwrap(),
+        );
+        assert!(std::sync::Arc::ptr_eq(&a, &b));
+        assert_eq!(a.edge_hash, edge_hash(&[7, 3]));
+        assert_eq!(
+            a.rows.iter().map(|r| r.fill_level).collect::<Vec<_>>(),
+            [1, 0]
+        );
+    }
 }
