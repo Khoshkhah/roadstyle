@@ -22,7 +22,7 @@ maplibregl.addProtocol("rs", (p) => studio.tile(p.url).then((bytes) => ({data: n
 let map = null, rs = null, urls = [];          // urls: the Blob URLs of the last style's GeoJSON, freed with it
 
 // the base map: the page's own source and layers (bm, basemap, bg), as roadstyle's page has them, under the roads
-// ponytail: the base map part of the style is made here and in render_web._basemap_style; it moves to the page writer (R3)
+// TODO(R3): a copy of render_web._basemap_style. Remove it in the change that uses the page writer.
 function baseStyle(){
   const bm = o.basemaps.find((b) => b.key === o.basemap) || o.basemaps[0];
   const style = {version: 8, sources: {}, layers: [{id: "bg", type: "background", paint: {"background-color": bm ? bm.bg : "#ffffff"}}]};
