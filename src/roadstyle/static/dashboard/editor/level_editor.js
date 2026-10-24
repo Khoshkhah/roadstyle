@@ -150,7 +150,17 @@ function build(){
   window.RS_SIDE = JSON.parse(new TextDecoder().decode(src.roadTable()));
   tiler = pkg.tileSources(src, `lv://${++gen}/`, KEEP);
   document.dispatchEvent(new CustomEvent("rs:tableready"));
-  return JSON.parse(tiler.style());
+  return ownSources(JSON.parse(tiler.style()));
+}
+// the editor's sources with names of their own ("lv-roads", ...; on the map with the prefix P): a host's source of the same name (one that
+// its base map's layers share with its roads) stays. The layer ids stay the dashboard's (it finds them by its prefix), and the roles in
+// roadstyle:sources name the new sources.
+function ownSources(st){
+  const name = id => "lv-" + id;
+  st.sources = Object.fromEntries(Object.entries(st.sources).map(([id, src]) => [name(id), src]));
+  for(const l of st.layers) if(l.source) l.source = name(l.source);
+  for(const r of Object.values((st.metadata || {})["roadstyle:sources"] || {})) if(r.source) r.source = name(r.source);
+  return st;
 }
 const style = build();
 ml.addProtocol("lv", async (params) => {                             // the editor's own tiles (a host's rs:// stays its own)
@@ -181,8 +191,10 @@ async function showRoads(st){                                      // the roads 
   const layers = st.layers.map(l => P + l.id), sources = Object.keys(st.sources).map(id => P + id);
   // off: the editor's own layers, the layers with an id it adds, and the first time the host dashboard's roads (the layers of the roles of
   // its style's roadstyle:sources: not its base map)
-  const roles = first && dashboard ? Object.values((dashboardStyle?.metadata || {})["roadstyle:sources"] || {}).map(r => P + r.source) : [];
-  const off = new Set([...mine.layers, ...layers, ...map.getStyle().layers.filter(l => roles.includes(l.source)).map(l => l.id)]);
+  // (a role is a source and its source layer: a host's base map can share the roads' tile source with other source layers)
+  const role = (source, layer) => source + "|" + (layer || "");
+  const roles = first && dashboard ? Object.values((dashboardStyle?.metadata || {})["roadstyle:sources"] || {}).map(r => role(P + r.source, r.layer)) : [];
+  const off = new Set([...mine.layers, ...layers, ...map.getStyle().layers.filter(l => roles.includes(role(l.source, l["source-layer"]))).map(l => l.id)]);
   if(first && dashboard){                                          // the host's, as they are, to put back
     const now = map.getStyle();
     Object.assign(taken, {layers: now.layers.filter(l => off.has(l.id)), order: now.layers.map(l => l.id), style: dashboardStyle,
@@ -195,7 +207,7 @@ async function showRoads(st){                                      // the roads 
     if(!map.hasImage(P + id)){ map.addImage(P + id, (await map.loadImage(im.url)).data, {sdf: im.sdf, pixelRatio: im.pixelRatio}); mine.images.push(P + id); }
   // a live style's global state (rs_colors, rs_co, ...): its start values, as a style with them would set them (the base map has none)
   for(const [k, v] of Object.entries(st.state || {})) map.setGlobalStateProperty(k, v.default ?? null);
-  for(const [id, src] of Object.entries(st.sources)) map.addSource(P + id, id === "roads" ? {...src, promoteId: {simple: "__rs_edge"}} : src);
+  for(const [id, src] of Object.entries(st.sources)) map.addSource(P + id, id === "lv-roads" ? {...src, promoteId: {simple: "__rs_edge"}} : src);
   for(const l of st.layers){
     const layer = JSON.parse(JSON.stringify(l).replaceAll('"oneway"', `"${P}oneway"`));
     map.addLayer({...layer, id: P + l.id, source: P + l.source}, map.getLayer("lv-ends") ? "lv-ends" : undefined);   // under the panel's end marks

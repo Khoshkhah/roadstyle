@@ -12,7 +12,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   the query `level_edges`, the edges of a duckOSM file's level area (duckOSM's `load_roads`, the same rows and columns on Monaco). The
   editor is a module, `static/dashboard/editor/level_editor.js`: `levelEditor({map, container, pkg, store})` on a host's map or one of
   its own, with `browserStore` (the files in the browser) or `httpStore` (`roadstyle serve`), the event `"solved"` (levels.csv and the
-  map's table) and downloads of edits.csv and levels.csv. `roadstyle serve`'s page uses the same module.
+  map's table) and downloads of edits.csv and levels.csv. `roadstyle serve`'s page uses the same module. On a host map the editor's
+  sources have names of their own (a host whose base map shares the roads' tile source keeps it), and the panel follows the page's
+  theme (dark with the system, unless `data-theme` on `<html>` says otherwise).
 
 ### Changed
 - **`cargo test` at `rust/` builds 113 crates in about 1 minute, not 195 in 5** (review D1). The programs `roadstyle-cli` and

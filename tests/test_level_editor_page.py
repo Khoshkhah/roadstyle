@@ -71,13 +71,20 @@ await map.once("load");
 map.addSource("host-water", {type: "geojson", data: {type: "Feature", properties: {}, geometry: {type: "Polygon",
   coordinates: [[[7.41, 43.72], [7.43, 43.72], [7.43, 43.74], [7.41, 43.74], [7.41, 43.72]]]}}});
 map.addLayer({id: "host-water", type: "fill", source: "host-water", paint: {"fill-color": "#aad3df"}});
+// its roads as vector tiles, in one tile source with its base map (duckosm-rust's page: the base map's layers are other source
+// layers of the roads' source)
 const edges = new Uint8Array(await (await fetch("/edges.parquet")).arrayBuffer());
-const own = JSON.parse(pkg.makeStyle(edges, pkg.resolveLook(JSON.stringify({args: {state: "live"}}))));
+const hostTiles = pkg.tileSources(pkg.makeSources(edges, pkg.resolveLook(JSON.stringify({args: {state: "live"}})), undefined, undefined, "host"),
+  "hostt://", ["edge_id", "name", "highway"]);
+maplibregl.addProtocol("hostt", async (q) => { const [source, z, x, y] = q.url.slice("hostt://".length).split("/");
+  return {data: hostTiles.tile(source, +z, +x, +y)}; });
+const own = JSON.parse(hostTiles.style());
 for(const [k, v] of Object.entries(own.state || {})) map.setGlobalStateProperty(k, v.default ?? null);     // a live style's state
 for(const [id, im] of Object.entries(own.metadata["roadstyle:images"] || {}))
   map.addImage("host-" + id, (await map.loadImage(im.url)).data, {sdf: im.sdf, pixelRatio: im.pixelRatio});
 for(const [id, src] of Object.entries(own.sources)) map.addSource("host-" + id, src);
 for(const l of own.layers) map.addLayer({...JSON.parse(JSON.stringify(l).replaceAll('"oneway"', '"host-oneway"')), id: "host-" + l.id, source: "host-" + l.source});
+map.addLayer({id: "host-land", type: "fill", source: "host-roads", "source-layer": "landuse", paint: {"fill-color": "#eeeeee"}});
 window.hostRoads = own.layers.map(l => "host-" + l.id);
 const host = rsDashboard(map, {style: own, prefix: "host-", basemap_switcher: false});
 window.host = host;
@@ -147,9 +154,10 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             roads = page.evaluate("window.ready")
             assert page.evaluate("window.rs === window.host"), "the editor uses the host's dashboard, not a second one"
             assert page.evaluate("hostMap.getStyle().layers.some(l => l.id.startsWith('host-roads'))"), "the editor's roads with the host's prefix"
-            assert page.evaluate("!!hostMap.getLayer('host-water')"), "the host's base map stays"
+            assert page.evaluate("!!hostMap.getLayer('host-water') && !!hostMap.getLayer('host-land')"), "the host's base map stays"
+            assert page.evaluate("!!hostMap.getSource('host-roads') && !!hostMap.getSource('host-lv-roads')"), "the host's source and the editor's"
             # the host's own roads went (the layers of the roles of its style's roadstyle:sources): every road layer is the editor's
-            assert page.evaluate("hostMap.getStyle().layers.filter(l => l.id.startsWith('host-roads')).every(l => l.source === 'host-roads')")
+            assert page.evaluate("hostMap.getStyle().layers.filter(l => l.id.startsWith('host-roads')).every(l => l.source === 'host-lv-roads')")
             stored = page.evaluate("localStorage.getItem('lv:test-area:levels.csv')")
             assert stored and len(stored.strip().split("\n")) > roads, "the first solve saved levels.csv in the browser"
             assert page.locator("#lv").count() == 1, "the panel is in the host's container"
@@ -168,11 +176,18 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
                 page.evaluate("window.editor.destroy()")
                 assert page.evaluate("counts()") == page.evaluate("window.before"), "no listener of the editor left"
                 assert page.evaluate(back) == page.evaluate("JSON.stringify(window.hostSources)"), "the host's layers as they were"
-                assert page.evaluate("!document.getElementById('lv') && !hostMap.getLayer('lv-ends') && !hostMap.getSource('host-roads')")
+                assert page.evaluate("!document.getElementById('lv') && !hostMap.getLayer('lv-ends') && !hostMap.getSource('host-lv-roads')")
                 assert page.evaluate("window.rs === window.host && !window.lvApi && !document.body.classList.contains('lv-open')")
                 page.evaluate("window.openEditor()")
                 page.wait_for_function("!!document.getElementById('lv') && !!window.lvApi", timeout=60000)
                 assert page.evaluate("counts()") == opened, "one listener of each kind after each open"
+            # the panel follows the page's theme: the system's dark, unless the page sets data-theme on <html>
+            bg = "getComputedStyle(document.querySelector('#lv header')).backgroundColor"
+            assert page.evaluate(bg) == "rgb(255, 255, 255)"
+            page.emulate_media(color_scheme="dark")
+            assert page.evaluate(bg) == "rgb(36, 42, 52)"
+            page.evaluate("document.documentElement.dataset.theme = 'light'")
+            assert page.evaluate(bg) == "rgb(255, 255, 255)"
             assert not errors, errors
             b.close()
     finally:

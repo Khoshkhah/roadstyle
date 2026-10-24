@@ -263,14 +263,16 @@ editor.addEventListener("solved", (e) => apply(e.detail.levelsCsv, e.detail.draw
 `levelEditor({map, container, pkg, store})` draws the area on `map` (your MapLibre map; without it, a map of its own in `container`)
 and puts the editor's panel in `container`. Its tiles have the protocol `lv://`, apart from yours. A page has one dashboard (its state
 is the module's): when your map has one, give it as `levelEditor({..., dashboard, prefix})` with the prefix it was made with. The editor
-then takes your roads off the map (the layers of the roles in your style's `roadstyle:sources`; your base map stays), draws its roads
-with your prefix and gives your dashboard its style. Without a dashboard of yours, the editor makes one with the prefix `lv-rs-`; when
+then takes your roads off the map (the layers of the roles in your style's `roadstyle:sources`, by source and source layer; your base
+map stays, also when it shares a tile source with your roads), draws its roads with your prefix and its own sources (`<prefix>lv-roads`,
+apart from yours) and gives your dashboard its style. Without a dashboard of yours, the editor makes one with the prefix `lv-rs-`; when
 the page has one and you do not give it, `levelEditor` throws an error. `editor.destroy()` closes the editor: it takes off its panel,
 its listeners, its roads, tiles and images, and puts your roads, your road table and your dashboard's style back. Your files stay in
 the store. A store is `{load(name, bytes), save(name, data)}`: `browserStore(key)` keeps the files
 in this browser, `httpStore(base)` uses `roadstyle serve`. After each solve the editor sends the event `"solved"` with `levelsCsv`
 (one row for each edge: its four drawing numbers, its head lengths and its caps), `levelsInfo` and `draw()` (the map's table,
-GeoParquet). `editor.download(name)` downloads edits.csv, heads.csv, caps.csv or levels.csv as they are now. The module needs the
+GeoParquet). `editor.download(name)` downloads edits.csv, heads.csv, caps.csv or levels.csv as they are now. The panel follows the
+page's theme: dark when the system is dark, unless the page sets `data-theme="light"` or `"dark"` on `<html>`. The module needs these
 files of `static/` beside it: `dashboard/` with its subfolders, `level_editor.html` (the panel), `dashboard.css` and `popup.css`.
 
 ## Keep the main thread free
