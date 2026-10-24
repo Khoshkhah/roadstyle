@@ -2959,7 +2959,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         # as a second tile layer); the source just points at the embedded pmtiles:// protocol
         style["sources"]["roads"] = {"type": "vector", "url": "pmtiles://roads",
                                      "minzoom": tc["minzoom"], "maxzoom": tc["maxzoom"]}
-        if simple and not _export:      # the page: every piece of a road has its row (__rs_edge), so one feature state lights them all
+        if simple:      # every piece of a road has its row (__rs_edge), so one feature state lights them all (the contract)
             style["sources"]["roads"]["promoteId"] = {"simple": "__rs_edge"}
     else:
         # tolerance 0.05 (default 0.375): the source re-tiles at every integer zoom and
@@ -3323,8 +3323,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         style["sources"]["simple"] = {"type": "geojson", "data": _simple_pieces(geo, parts, (highway_col, filter_col, width_m_col), CONFIG.bridge_shadow, items)}
         if not tiles:     # tiles=True: the pieces go into the archive as its "simple" layer
             style["sources"]["simple"]["tolerance"] = style["sources"]["roads"]["tolerance"]
-            if lean:      # every piece of a road has its row (__rs_edge), so one feature state lights them all
-                style["sources"]["simple"]["promoteId"] = "__rs_edge"
+            style["sources"]["simple"]["promoteId"] = "__rs_edge"      # every piece of a road has its row: one feature state lights them all
         for k in ("casings", "halves", "shadows", "ends"):
             style["sources"].pop(k, None)
         is_c, is_it = ["==", ["get", "__rs_k"], 0], ["==", ["get", "__rs_k"], 5]
@@ -3352,7 +3351,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         sdash = {"line-dasharray": _simple_dasharray(sdashes, CONFIG.tunnel_casing_dash or [1, 1])} if sdashes or any_tunnel else {}
         road = {"id": "roads-simple", "type": "line", "source": "simple", "layout": {**lay, "line-cap": _simple_cap(), "line-sort-key": ["get", "__rs_s"]}, **flt,
                 "paint": {**sdash, "line-color": _simple_color(CONFIG.bridge_casing_color, bool(any_tunnel), select_color, hover_color, _fill_props(color_opts_meta),
-                                                 (select_color, hover_color, THEME["selection"]["opacity"]) if lean else None),
+                                                 (select_color, hover_color, THEME["selection"]["opacity"])),
                           "line-width": _pair_width(_by_feature(wide, fw), highway_col, offset_frac, offset_zoom, wmz) if pairs else _by_feature(wide, fw), "line-offset": soff,
                           "line-blur": ["interpolate", ["linear"], ["zoom"], r0, 0, r1, ["case", is_sh, blur, 0]],
                           "line-opacity": ["interpolate", ["linear"], ["zoom"], r0, ["case", is_sh, 0, op], r1, op]}}

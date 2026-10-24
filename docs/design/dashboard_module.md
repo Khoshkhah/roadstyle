@@ -63,7 +63,8 @@ rs.setStyle(style, {road_table});
   source and layer id that it uses. The names in the style itself stay as they are: a layer's `source-layer`, the metadata.
 - **The base map.** With no `basemaps` option the dashboard has no base map button and does not touch the map's own base map.
 - **The glow on tiles.** The engine's tiled style has one vector source `roads`; each layer names its source layer (`simple`,
-  `slots`), as in Python's tiles. The engine gives the source `promoteId` `"__rs_edge"`, so all the pieces of a road have the
+  `slots`), as in Python's tiles. Every style of the engine gives the pieces `promoteId` `"__rs_edge"` (on the vector source
+  `{simple: "__rs_edge"}`) and has the select and hover glow in its road layer (2026-10-24), so all the pieces of a road have the
   road's row as their id, and one feature state (`{source: "rs-roads", sourceLayer: "simple", id: row}`) lights the whole road,
   also in tiles that load later. Without `promoteId`, `setStyle` writes an error in the console. A road is picked on its fill
   pieces (`__rs_k` 1).

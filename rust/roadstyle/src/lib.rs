@@ -290,23 +290,6 @@ pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name:
     o.exact = cfg_all["args"]["tile_keep"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
     o.only = cfg_all["args"]["tile_layers"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
     let tiled = tile_sources(&mut s, &o);
-    let (min_zoom, max_zoom) = (o.min_zoom, o.max_zoom);
-    let sources::Sources { name, center, zoom, mut layers, metadata, glyphs, state, .. } = s;
-    for l in layers.iter_mut() {
-        if let Some(src) = l.get("source").cloned() {
-            l["source-layer"] = src;
-            l["source"] = tiles::SOURCE.into();
-        }
-    }
-    let vector = json!({tiles::SOURCE: {"type": "vector", "tiles": [format!("{prefix}{}/{{z}}/{{x}}/{{y}}", tiles::SOURCE)],
-                                        "minzoom": min_zoom, "maxzoom": max_zoom}});
-    let mut style = json!({"version": 8, "name": name, "center": center, "zoom": zoom, "layers": layers, "sources": vector, "metadata": metadata});
-    if let Some(g) = glyphs {
-        style["glyphs"] = g;
-    }
-    if let Some(st) = state {
-        style["state"] = st;
-    }
-    Ok((style.to_string(), tiled))
+    Ok((vector_style(&s.style(|_| String::new()), prefix, (o.min_zoom, o.max_zoom)).to_string(), tiled))
 }
 

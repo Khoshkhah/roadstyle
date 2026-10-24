@@ -180,8 +180,8 @@ fn style_parts(table: RoadTable, look_json: &Value, features: Option<Vec<Row>>, 
     // and the style says what the controls show
     let live = look_json["args"]["state"] == "live";
     // a page has no roads source: its pieces draw and glow (one feature state for each road's row), and the road table has the roads
-    // the pieces carry their road's row as the feature id on a page, and with live data (R22: rs.setData keys the states by the row)
-    (roads.in_style, simple.promote) = (!live, live || look_json["args"]["live_data"] == true);
+    // the pieces carry their road's row as the feature id in every style (the contract: the glow, rs.setData's states)
+    (roads.in_style, simple.promote) = (!live, true);
     let (mut contract, state) = if live {
         let st = contract::page_state(&look_json, colors.active, ovs.len());
         (Some((contract::controls(&look_json, &roads.roads, info, colors.active)?, st.clone())),

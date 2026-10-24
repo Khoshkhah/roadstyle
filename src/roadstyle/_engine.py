@@ -330,7 +330,7 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs
     bounds = tuple(float(v) for v in edges.total_bounds)
     roads = style["sources"]["roads"]
     at = {"tiles": [f"{base}/tiles/{{z}}/{{x}}/{{y}}.pbf"]} if format == "xyz" else {"url": f"pmtiles://{base}/roads.pmtiles"}
-    roads = style["sources"]["roads"] = {**{k: roads[k] for k in ("type", "minzoom", "maxzoom")}, **at, "bounds": list(bounds)}
+    roads = style["sources"]["roads"] = {**{k: roads[k] for k in ("type", "minzoom", "maxzoom", "promoteId") if k in roads}, **at, "bounds": list(bounds)}
     meta = style.pop("metadata", {})
     style = {k: style[k] for k in ("version", "sources", "layers", "glyphs") if k in style}     # Python's key order: the same bytes
     style["sprite"], style["name"] = f"{base}/sprite", name
