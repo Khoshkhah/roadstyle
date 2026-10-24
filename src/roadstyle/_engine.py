@@ -449,7 +449,7 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
         if a[k] is not None:
             cam[k] = a[k]
     page = {"basemaps": bms, "basemap_switcher": bool(a["basemap_switcher"]), "tiles": ctl["tiles"], "simple": ctl["simple"],
-            "sources": rw._roles(style["layers"]), "arrows": rw._arrow_kind(style["layers"]), "popup_mode": mode,
+            "sources": rw._roles(style["layers"]), "arrows": rw._arrow_kind(style["layers"]), "live": meta.get("roadstyle:live"), "popup_mode": mode,
             "find_control": bool(a["find_control"]), "zoom_readout": bool(a["zoom_readout"]), "pitch_3d": ctl["pitch_3d"],
             "street_view": a["street_view"], "street_view_key": key or "", "google_3d": bool(a["google_3d"]), "select_color": ctl["select_color"],
             "filter": ctl["filter"], "color_options": meta.get("roadstyle:color_options") or [], "color_active": ctl["color_active"],

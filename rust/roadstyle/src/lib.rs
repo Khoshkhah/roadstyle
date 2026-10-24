@@ -250,6 +250,7 @@ pub fn save_sources(s: &sources::Sources, dir: &std::path::Path, format: Format,
 /// and each layer on the tile layer of its old source (`source-layer`).
 pub fn vector_style(style: &Value, prefix: &str, zooms: (u32, u32)) -> Value {
     let mut style = style.clone();
+    let promote = style["sources"]["simple"]["promoteId"].as_str().map(|p| json!({"simple": p}));
     for l in style["layers"].as_array_mut().into_iter().flatten() {
         if let Some(src) = l.get("source").cloned() {
             l["source-layer"] = src;
@@ -258,6 +259,9 @@ pub fn vector_style(style: &Value, prefix: &str, zooms: (u32, u32)) -> Value {
     }
     style["sources"] = json!({tiles::SOURCE: {"type": "vector", "tiles": [format!("{prefix}{}/{{z}}/{{x}}/{{y}}", tiles::SOURCE)],
                                               "minzoom": zooms.0, "maxzoom": zooms.1}});
+    if let Some(p) = promote {          // the pieces' row as the feature id, as on the GeoJSON source
+        style["sources"][tiles::SOURCE]["promoteId"] = p;
+    }
     style
 }
 

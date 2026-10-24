@@ -34,6 +34,7 @@ rsDashboard(map, {
   simple: __RS_LEAN__,
   sources: __RS_SOURCES__,
   arrows: __RS_ARROWS__,
+  live: __RS_LIVE__,
   popup_mode: __ROAD_POPUP_MODE__,
   find_control: __FIND_CONTROL__,
   zoom_readout: __ZOOM_READOUT__,
@@ -66,10 +67,10 @@ rsDashboard(map, {
 // the inflate state so a screenshot alone pinpoints the failing stage.
 map.on("load", function(){ var tries=0; (function check(){ setTimeout(function(){
   try{
-    var n;
-    if(RS_TILED){ n = map.querySourceFeatures("roads",{sourceLayer:"roads"}).length; }
+    var n, src = RS_LEAN ? "simple" : "roads";      // the source that draws: a simple page's pieces (it has no roads source)
+    if(RS_TILED){ n = map.querySourceFeatures("roads",{sourceLayer:src}).length; }
     else{
-      n = _sfeats("roads").length; }
+      n = _sfeats(src).length; }
     if(n) return;
     if(RS_TILED && ++tries < 3) return check();          // tiles may still be decoding/loading
     var st = RS_TILED

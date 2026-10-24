@@ -164,7 +164,8 @@ pub fn make_parts(mut table: RoadTable, look: &str, features: Option<Vec<Row>>, 
     // and the style says what the controls show
     let live = look_json["args"]["state"] == "live";
     // a page has no roads source: its pieces draw and glow (one feature state for each road's row), and the road table has the roads
-    (roads.in_style, simple.promote) = (!live, live);
+    // the pieces carry their road's row as the feature id on a page, and with live data (R22: rs.setData keys the states by the row)
+    (roads.in_style, simple.promote) = (!live, live || look_json["args"]["live_data"] == true);
     let (mut contract, state) = if live {
         let st = contract::page_state(&look_json, colors.active, ovs.len());
         (Some((contract::controls(&look_json, &roads.roads, info, colors.active)?, st.clone())),
@@ -239,6 +240,15 @@ pub fn make_parts(mut table: RoadTable, look: &str, features: Option<Vec<Row>>, 
     // the legend data of a data-coloured map, as the page's COLOR_OPTIONS (render_web: {name, prop, legend} for each colour option)
     if !colors.meta.is_empty() {
         metadata.insert("roadstyle:color_options".into(), Value::Array(colors.meta));
+    }
+    // R22, live data: the feature states that the road layer reads, so a page's dashboard (rs.setData) colours and sizes the roads from a
+    // table with no new build; the ramp is the call's cmap (else viridis), as 9 colours, and the no-data colour the theme's
+    if look_json["args"]["live_data"] == true {
+        let cmap = if look_json["args"]["cmap"].is_null() { json!("viridis") } else { look_json["args"]["cmap"].clone() };
+        let ramp = colors::Ramp::new(&cmap)?;
+        metadata.insert("roadstyle:live".into(), json!({
+            "color": layers::LIVE_COLOR, "width": layers::LIVE_WIDTH, "types": {layers::LIVE_COLOR: "color", layers::LIVE_WIDTH: "factor"},
+            "ramp": (0..9).map(|i| ramp.hex(i as f64 / 8.0)).collect::<Vec<_>>(), "nodata": look_json["theme"]["data"]["nodata"]}));
     }
     if let Some((controls, st)) = contract {
         metadata.insert("roadstyle:contract".into(), json!(contract::CONTRACT));

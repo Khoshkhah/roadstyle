@@ -131,7 +131,7 @@ pub fn page_html(mut style: Value, page: &Value, p: &PageParts) -> String {
         ("__RS_ROAD_FILL__", j("road_fill")), ("__ROAD_POPUP__", j("road_popup")), ("__ROAD_POPUP_MODE__", j("popup_mode")),
         ("__EDGE_ID_COL__", j("edge_id_col")), ("__ROAD_TOOLTIP__", j("road_tooltip")), ("__HOVER_DELAY_MS__", j("hover_delay_ms")),
         ("__STREET_VIEW__", j("street_view")), ("__SV_WINDOW_KEY__", j("street_view_key")), ("__GOOGLE_3D__", j("google_3d")),
-        ("__RS_TILED__", j("tiles")), ("__RS_LEAN__", j("simple")), ("__RS_SOURCES__", j("sources")), ("__RS_ARROWS__", j("arrows")),
+        ("__RS_TILED__", j("tiles")), ("__RS_LEAN__", j("simple")), ("__RS_SOURCES__", j("sources")), ("__RS_ARROWS__", j("arrows")), ("__RS_LIVE__", j("live")),
         // the last: the host's own text may hold any other token
         ("__HOST_PANEL_HTML__", host_panel(p.side_panel_html, p.host_panel_width, p.name)),
     ];
