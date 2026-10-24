@@ -85,7 +85,7 @@ fn fail(msg: String) -> ! {
 
 /// A saved look (version 1 or 0).
 fn look_file(p: &str) -> roadstyle_rs::Look {
-    roadstyle_rs::Look::from_value(json_file(p)).unwrap_or_else(|e| fail(e))
+    roadstyle_rs::Look::from_value(json_file(p)).unwrap_or_else(|e| fail(e.into()))
 }
 
 fn json_file(path: &str) -> Value {

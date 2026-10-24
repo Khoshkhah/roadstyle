@@ -2,6 +2,7 @@
 //! are data (cmaps.json: branca's schemes and colour names, each matplotlib colormap at 9 stops; made by roadstyle-rs's
 //! tests/make_goldens.py from branca and matplotlib).
 
+use crate::Error;
 use serde_json::{Map, Value};
 use std::sync::OnceLock;
 
@@ -29,10 +30,10 @@ pub struct Ramp {
 impl Ramp {
     /// _branca_linear: a branca scheme (exact, then the first of the names in order that is the same ignoring case or starts with
     /// "<name>_"), else a matplotlib colormap (9 stops); or a list of colours (hex or a colour name).
-    pub fn new(cmap: &Value) -> Result<Ramp, String> {
+    pub fn new(cmap: &Value) -> Result<Ramp, Error> {
         let c = cmaps();
         let list: Vec<String> = match cmap {
-            Value::Array(a) => a.iter().map(|x| x.as_str().map(String::from).ok_or_else(|| format!("cmap: not a colour: {x}"))).collect::<Result<_, _>>()?,
+            Value::Array(a) => a.iter().map(|x| x.as_str().map(String::from).ok_or_else(|| Error::Options(format!("cmap: not a colour: {x}")))).collect::<Result<_, _>>()?,
             Value::String(name) => {
                 let lower = name.to_lowercase();
                 let mut names: Vec<&String> = c.branca.keys().collect();
@@ -40,14 +41,14 @@ impl Ramp {
                 let found = c.branca.get(name).or_else(|| {
                     names.into_iter().find(|n| n.to_lowercase() == lower || n.to_lowercase().starts_with(&format!("{lower}_"))).map(|n| &c.branca[n])
                 }).or_else(|| c.matplotlib.get(name));
-                let found = found.ok_or_else(|| format!("unknown cmap {name:?}; use a branca scheme name (e.g. 'viridis', 'YlOrRd'), a list of hex \
-                                                          colour stops, or a matplotlib colormap name"))?;
+                let found = found.ok_or_else(|| Error::Unknown(format!("unknown cmap {name:?}; use a branca scheme name (e.g. 'viridis', 'YlOrRd'), a list of hex \
+                                                          colour stops, or a matplotlib colormap name")))?;
                 found.as_array().unwrap().iter().map(|x| x.as_str().unwrap().to_string()).collect()
             }
-            other => return Err(format!("cmap: a name or a list of colours, not {other}")),
+            other => return Err(Error::Options(format!("cmap: a name or a list of colours, not {other}"))),
         };
         if list.len() < 2 {
-            return Err("You must provide at least 2 colors.".into());
+            return Err(Error::Options("You must provide at least 2 colors.".into()));
         }
         let n = list.len();
         let colors = list.iter().map(|x| parse_color(x)).collect::<Result<Vec<_>, _>>()?;
@@ -81,13 +82,13 @@ impl Ramp {
 }
 
 /// _parse_color: "#rrggbb" or a colour name.
-fn parse_color(x: &str) -> Result<[f64; 4], String> {
+fn parse_color(x: &str) -> Result<[f64; 4], Error> {
     let hex = if x.starts_with('#') && x.len() == 7 {
         x.to_string()
     } else {
-        cmaps().css.get(&x.to_lowercase()).and_then(Value::as_str).map(String::from).ok_or_else(|| format!("Unknown color {x:?}."))?
+        cmaps().css.get(&x.to_lowercase()).and_then(Value::as_str).map(String::from).ok_or_else(|| Error::Unknown(format!("Unknown color {x:?}.")))?
     };
-    let ch = |a: usize| u8::from_str_radix(&hex[a..a + 2], 16).map(|v| v as f64 / 255.0).map_err(|_| format!("Unknown color {x:?}."));
+    let ch = |a: usize| u8::from_str_radix(&hex[a..a + 2], 16).map(|v| v as f64 / 255.0).map_err(|_| Error::Unknown(format!("Unknown color {x:?}.")));
     Ok([ch(1)?, ch(3)?, ch(5)?, 1.0])
 }
 

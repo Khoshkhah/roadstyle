@@ -51,7 +51,9 @@ fn a_saved_look_of_version_0_and_1() {
     assert_eq!(new.to_json(), old.to_json());
     assert_eq!(v0(new.to_value()).to_string(), serde_json::from_str::<Value>(&text).unwrap().to_string());
     let later = text.replacen('{', r#"{"schema_version": 2, "#, 1);
-    assert!(roadstyle_rs::Look::from_json(&later).unwrap_err().contains("look version 2"));
+    let e = roadstyle_rs::Look::from_json(&later).unwrap_err();
+    assert_eq!(e, roadstyle_rs::look::Error::Version { found: 2 });
+    assert_eq!(e.to_string(), "look version 2: this engine reads versions 0 and 1", "the text that Python and JavaScript show");
     let unknown = text.replacen('{', r#"{"pallete": "x", "#, 1);
-    assert!(roadstyle_rs::Look::from_json(&unknown).unwrap_err().contains("pallete"));
+    assert!(matches!(roadstyle_rs::Look::from_json(&unknown).unwrap_err(), roadstyle_rs::look::Error::Look(m) if m.contains("pallete")));
 }

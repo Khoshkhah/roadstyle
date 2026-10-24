@@ -5,6 +5,7 @@
 //! patterns.py (the textures: their masks are drawn one time, in data/basemap/patterns/). The files are roadstyle's own:
 //! src/roadstyle/data/basemap/, read at build time, so there is one copy of them.
 
+use crate::Error;
 use crate::resolve::{carto_entries, yaml};
 use base64::Engine;
 use serde::Deserialize;
@@ -172,13 +173,13 @@ fn merge(a: Option<&Value>, b: &Value) -> Value {
 
 /// A theme: osm_carto.yaml in its colours (its transform on every colour, then its own colours), the theme file itself (empty for
 /// "osm") and its transform (saturation, lighten), for the colours that come from elsewhere.
-pub fn load_theme(theme: &str) -> Result<(Value, Value, (f64, f64)), String> {
+pub fn load_theme(theme: &str) -> Result<(Value, Value, (f64, f64)), Error> {
     let base = style(CARTO);
     if theme == "osm" {
         return Ok((base, json!({}), (1.0, 0.0)));
     }
     let text = THEMES.iter().find(|t| t.0 == theme).map(|t| t.1)
-        .ok_or_else(|| format!("unknown theme '{theme}'; choose from {}", pyrepr(&themes())))?;
+        .ok_or_else(|| Error::Unknown(format!("unknown theme '{theme}'; choose from {}", pyrepr(&themes()))))?;
     let t = style(text);
     let tr = &t["transform"];
     let tr = (tr["saturation"].as_f64().unwrap_or(1.0), tr["lighten"].as_f64().unwrap_or(0.0));
@@ -205,10 +206,10 @@ fn data_url(mime: &str, data: &[u8]) -> String {
 
 /// pattern_png: one 64 px tile of the texture `name` in `color` on transparent (MapLibre's fill-pattern cannot tint an image, so each
 /// colour is an image of its own).
-fn pattern_png(name: &str, color: &str) -> Result<Vec<u8>, String> {
-    let mask = PATTERNS.iter().find(|p| p.0 == name).ok_or_else(|| format!("no texture named '{name}'"))?.1;
+fn pattern_png(name: &str, color: &str) -> Result<Vec<u8>, Error> {
+    let mask = PATTERNS.iter().find(|p| p.0 == name).ok_or_else(|| Error::Unknown(format!("no texture named '{name}'")))?.1;
     let (w, h, ch, px) = crate::png::decode(mask)?;
-    let c = hex(color).ok_or_else(|| format!("texture {name}: {color} is not a '#rrggbb' colour"))?;
+    let c = hex(color).ok_or_else(|| Error::Options(format!("texture {name}: {color} is not a '#rrggbb' colour")))?;
     let rgba: Vec<u8> = px.chunks(ch).flat_map(|p| [c[0] as u8, c[1] as u8, c[2] as u8, p[ch - 1]]).collect();
     Ok(crate::png::encode_rgba(w, h, &rgba))
 }
@@ -219,7 +220,7 @@ fn kind_of<'a>(specs: &'a [Value], name: &str) -> &'a str {
 
 /// The images of the base map that feature_overlays puts in roadstyle:images, for each layer of layers.yaml that is drawn on its own:
 /// the landcover textures (`ms-pat-<kind>`) and the point layers' icons (`ms-icon-<layer>`), as data URLs.
-fn images(st: &Value, specs: &[Value]) -> Result<Map<String, Value>, String> {
+fn images(st: &Value, specs: &[Value]) -> Result<Map<String, Value>, Error> {
     let f = &st["features"];
     let mut out = Map::new();
     for s in specs.iter().filter(|s| s["show"] != false && s.get("merge_into").is_none()) {
@@ -236,7 +237,7 @@ fn images(st: &Value, specs: &[Value]) -> Result<Map<String, Value>, String> {
             let mut p = f["points"]["default"].as_object().cloned().unwrap_or_default();
             p.extend(f["points"][name].as_object().cloned().unwrap_or_default());
             if let Some(icon) = p.get("icon").and_then(Value::as_str).filter(|i| !i.is_empty()) {
-                let svg = ICONS.iter().find(|i| i.0 == icon).ok_or_else(|| format!("no icon named '{icon}'"))?.1;
+                let svg = ICONS.iter().find(|i| i.0 == icon).ok_or_else(|| Error::Unknown(format!("no icon named '{icon}'")))?.1;
                 let color = p.get("color").and_then(Value::as_str).unwrap_or_default();
                 let svg = svg.replacen("<svg ", &format!("<svg fill=\"{color}\" "), 1);
                 out.insert(format!("ms-icon-{name}"), data_url("image/svg+xml", svg.as_bytes()).into());
@@ -247,14 +248,14 @@ fn images(st: &Value, specs: &[Value]) -> Result<Map<String, Value>, String> {
 }
 
 /// mode_settings and the base map's part of the look for one choice (render_map's mode, theme and paths).
-pub fn base_map(b: &BaseMap) -> Result<BaseMapLook, String> {
+pub fn base_map(b: &BaseMap) -> Result<BaseMapLook, Error> {
     if !LOOKS.contains(&b.mode.as_str()) {
-        return Err(format!("unknown mode '{}'; choose from {}", b.mode, pyrepr(&LOOKS)));
+        return Err(Error::Unknown(format!("unknown mode '{}'; choose from {}", b.mode, pyrepr(&LOOKS))));
     }
     let styles = style(PATHS);
     let st = styles.get(&b.paths).ok_or_else(|| {
         let names: Vec<&str> = styles.as_object().into_iter().flatten().map(|(k, _)| k.as_str()).collect();
-        format!("unknown path style '{}'; choose from {}", b.paths, pyrepr(&names))
+        Error::Unknown(format!("unknown path style '{}'; choose from {}", b.paths, pyrepr(&names)))
     })?;
     let modes = style(MODES);
     let spec = modes.get(&b.mode).filter(|s| !s.is_null()).cloned().unwrap_or_else(|| json!({}));

@@ -67,7 +67,7 @@ mod wasm {
         /// Look.fromJson(text): a saved look (version 1 or 0). An error is a thrown Error.
         #[wasm_bindgen(js_name = fromJson)]
         pub fn from_json(text: &str) -> Result<JsLook, JsError> {
-            roadstyle::Look::from_json(text).map(JsLook).map_err(|e| JsError::new(&e))
+            roadstyle::Look::from_json(text).map(JsLook).map_err(|e| JsError::new(&e.to_string()))
         }
 
         /// toJson(): the look's text (version 1).
@@ -82,7 +82,7 @@ mod wasm {
     #[wasm_bindgen(js_name = resolveLook)]
     pub fn resolve_look(options: &str) -> Result<JsLook, JsError> {
         let o: serde_json::Value = serde_json::from_str(options).map_err(|e| JsError::new(&format!("options: not JSON: {e}")))?;
-        roadstyle::look::Options::from_value(&o).and_then(|o| roadstyle::Look::resolve(&o)).map(JsLook).map_err(|e| JsError::new(&e))
+        roadstyle::look::Options::from_value(&o).and_then(|o| roadstyle::Look::resolve(&o)).map(JsLook).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// makeLook(options: string) -> Look: the old name of resolveLook, for one version.
@@ -101,7 +101,7 @@ mod wasm {
         } else {
             cmap.into()
         };
-        roadstyle::look::Ramp::new(&c).map(|r| r.stops(n)).map_err(|e| JsError::new(&e))
+        roadstyle::look::Ramp::new(&c).map(|r| r.stops(n)).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// makeStyle(roads: Uint8Array, look: Look, features?: Uint8Array, planner?: Uint8Array, name?: string) -> string; an error is a thrown Error.

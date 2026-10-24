@@ -79,7 +79,11 @@ fn the_64_looks_of_mapstyle() {
 
 #[test]
 fn a_wrong_choice_names_the_choices() {
-    let err = |b: BaseMap| Look::resolve(&Options { base_map: Some(b), ..Default::default() }).unwrap_err();
+    // an unknown name, with the text that Python and JavaScript show
+    let err = |b: BaseMap| match Look::resolve(&Options { base_map: Some(b), ..Default::default() }).unwrap_err() {
+        roadstyle_look::Error::Unknown(m) => m,
+        e => panic!("not an unknown name: {e:?}"),
+    };
     assert!(err(BaseMap { mode: "boat".into(), ..Default::default() }).contains("choose from ('all', 'driving', 'walking', 'cycling')"));
     assert!(err(BaseMap { theme: "dark".into(), ..Default::default() }).contains("choose from ('osm', 'google', 'grey', 'roadstyle')"));
     assert!(err(BaseMap { paths: "x".into(), ..Default::default() }).contains("unknown path style 'x'"));

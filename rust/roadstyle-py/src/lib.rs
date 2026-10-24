@@ -26,7 +26,7 @@ impl PyLook {
     /// Look.from_json(text) -> Look: a saved look (version 1 or 0). An error is a ValueError.
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
-        roadstyle::Look::from_json(text).map(PyLook).map_err(PyValueError::new_err)
+        roadstyle::Look::from_json(text).map(PyLook).map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     /// json() -> str: the look's text (version 1).
@@ -52,7 +52,7 @@ impl PyLook {
     /// with_arg(key, value) -> Look: the same look with the map option `key` set to `value` (JSON text).
     fn with_arg(&self, key: &str, value: &str) -> PyResult<Self> {
         let v: serde_json::Value = serde_json::from_str(value).map_err(|e| PyValueError::new_err(format!("{key}: not JSON: {e}")))?;
-        self.0.clone().with_arg(key, v).map(PyLook).map_err(PyValueError::new_err)
+        self.0.clone().with_arg(key, v).map(PyLook).map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
@@ -62,7 +62,7 @@ impl PyLook {
 fn resolve_look(py: Python<'_>, options: String) -> PyResult<PyLook> {
     py.detach(|| {
         let o: serde_json::Value = serde_json::from_str(&options).map_err(|e| format!("options: not JSON: {e}"))?;
-        roadstyle::Look::resolve(&roadstyle::look::Options::from_value(&o)?)
+        Ok::<_, String>(roadstyle::Look::resolve(&roadstyle::look::Options::from_value(&o)?)?)
     })
     .map(PyLook)
     .map_err(PyValueError::new_err)
@@ -342,7 +342,7 @@ fn make_area(py: Python<'_>, edges: Vec<u8>, folder: String, id_col: String, hig
 /// colours, the theme file itself, [saturation, lighten] of its transform]. An unknown theme is a ValueError that names the themes.
 #[pyfunction]
 fn base_map_theme(theme: &str) -> PyResult<String> {
-    let (style, file, (s, l)) = roadstyle::look::basemap::load_theme(theme).map_err(PyValueError::new_err)?;
+    let (style, file, (s, l)) = roadstyle::look::basemap::load_theme(theme).map_err(|e| PyValueError::new_err(e.to_string()))?;
     Ok(serde_json::json!([style, file, [s, l]]).to_string())
 }
 
