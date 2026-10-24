@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/>
+<title>roadstyle studio</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<!-- roadstyle studio in the browser: the knobs, roadstyle's Rust engine in a Web Worker (worker.js), the map with the dashboard
+     (preview.html) and the render_edges code of the knobs. No Python, no server except one that serves these files
+     (roadstyle serve, or python -m http.server in the repository's root). ui/studio/README.md. -->
+<style>
+:root{--side:340px;--ink:#334155;--muted:#767c88;--line:#e4e4e4;--accent:#7c4dff;--bg:#fff;--panel:#f8fafc}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ink:#e2e8f0;--muted:#94a3b8;--line:#334155;--bg:#0f172a;--panel:#1e293b}}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px/1.45 system-ui,-apple-system,sans-serif}
+#side{position:absolute;left:0;top:0;bottom:0;width:var(--side);overflow:auto;border-right:1px solid var(--line);box-sizing:border-box;padding:12px 14px}
+#side h1{font-size:16px;margin:0 0 10px}
+details{border-bottom:1px solid var(--line);padding:6px 0}
+summary{cursor:pointer;font-weight:600;padding:3px 0}
+label{display:block;margin:6px 0 2px;color:var(--muted)}
+label.inline{display:flex;align-items:center;gap:6px;color:var(--ink)}
+select,input[type=text],input[type=file]{width:100%;box-sizing:border-box;font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:4px 6px}
+.list{max-height:160px;overflow:auto;border:1px solid var(--line);border-radius:5px;padding:4px 6px}
+.note{color:var(--muted);font-size:12px;margin:4px 0}
+.err{color:#c2410c}
+#main{position:absolute;left:var(--side);right:0;top:0;bottom:0;display:flex;flex-direction:column}
+#preview{flex:1;border:0;width:100%}
+#bottom{height:34%;display:flex;border-top:1px solid var(--line);background:var(--panel)}
+#code{flex:1;margin:0;padding:10px 12px;overflow:auto;font:12px/1.5 ui-monospace,monospace;white-space:pre}
+#actions{width:230px;padding:10px;display:flex;flex-direction:column;gap:8px;border-left:1px solid var(--line)}
+#actions button{font:inherit;padding:7px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:inherit;cursor:pointer}
+#status{font-size:12px;color:var(--muted)}
+.ov{border-top:1px dashed var(--line);margin-top:6px;padding-top:4px}
+@media (max-width:760px){#side{position:static;width:auto;height:auto}#main{position:static;height:80vh}:root{--side:0px}}
+</style>
+</head><body>
+<div id="side">
+  <h1>roadstyle studio</h1>
+  <details open><summary>Data</summary>
+    <label for="sample">A sample network</label>
+    <select id="sample"></select>
+    <label for="file">…or a road file (GeoParquet)</label>
+    <input id="file" type="file" accept=".parquet,.geoparquet">
+    <div class="note">GeoJSON and GPKG files: when the engine reads them (the look session's readers).</div>
+    <div id="count" class="note"></div>
+  </details>
+  <details open><summary>Look</summary>
+    <label for="palette">Palette</label>
+    <select id="palette"><option>amber</option><option>carto</option><option>highsat</option><option>mono</option></select>
+    <label for="basemap">Base map</label>
+    <select id="basemap"></select>
+    <div id="bmnote" class="note"></div>
+    <label class="inline"><input id="view3d" type="checkbox"> 3D bridges (tilted view)</label>
+    <label class="inline"><input id="tiles" type="checkbox"> Vector tiles (big networks)</label>
+  </details>
+  <details><summary>Colour by data</summary>
+    <div class="note">Columns with many numbers: a colour ramp from the 2nd to the 98th percentile. Columns with few values (categories):
+      when the engine gives the ramps' steps.</div>
+    <div id="colours" class="list"></div>
+  </details>
+  <details><summary>Filter</summary>
+    <label>Road classes</label>
+    <div id="classes" class="list"></div>
+    <label class="inline"><input id="minzoom" type="checkbox"> Hide minor roads when zoomed out</label>
+  </details>
+  <details><summary>Decorations</summary>
+    <label class="inline"><input id="labels" type="checkbox" checked> Street names</label>
+    <label class="inline"><input id="arrows" type="checkbox" checked> One-way arrows</label>
+  </details>
+  <details><summary>Popup &amp; hover</summary>
+    <label for="popup">Click popup</label>
+    <select id="popup"><option value="curated">curated fields</option><option value="choose">choose columns</option>
+      <option value="panel">side panel</option><option value="all">all columns</option><option value="off">off</option></select>
+    <div id="popupcols" class="list" hidden></div>
+    <label>Hover tooltip columns</label>
+    <div id="hover" class="list"></div>
+  </details>
+  <details><summary>Overlays</summary>
+    <label for="ovfile">Zones / POIs / lines (GeoJSON)</label>
+    <input id="ovfile" type="file" accept=".geojson,.json" multiple>
+    <label>…or sample overlays</label>
+    <div id="ovsamples" class="list"></div>
+    <div id="overlays"></div>
+  </details>
+</div>
+<div id="main">
+  <iframe id="preview" title="map"></iframe>
+  <div id="bottom">
+    <pre id="code"></pre>
+    <div id="actions">
+      <button id="copy" type="button">Copy the code</button>
+      <div id="status"></div>
+    </div>
+  </div>
+</div>
+<script type="module" src="studio.js"></script>
+</body></html>

@@ -67,7 +67,6 @@ export interface RoadTableData {
   props: Array<Record<string, unknown> | null>;
   mids?: Array<[number, number] | null>;
   bboxes?: Array<[number, number, number, number] | null>;
-  headings?: Array<number | null>;
   lines?: Array<Array<[number, number]> | null>;
 }
 

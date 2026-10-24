@@ -256,6 +256,24 @@ fn export_look(look: String, cols: [String; 5], positions: Vec<i64>) -> PyResult
     roadstyle::export_look::export_look(&look, &c, &positions).map(|v| v.to_string()).map_err(PyValueError::new_err)
 }
 
+/// make_area(edges, folder, ...) -> (roads, pairs, warnings): roadstyle's make_area (level_input) in Rust (roadstyle::level_area): writes
+/// roads.parquet, pairs.csv and, the first time, edits.csv in `folder`, from the edges (GeoParquet bytes); the keywords of level_input.
+#[pyfunction]
+#[pyo3(signature = (edges, folder, id_col="edge_id".to_string(), highway_col="highway".to_string(), layer_col="layer".to_string(),
+                    bridge_col="bridge".to_string(), tunnel_col="tunnel".to_string(), junction_col="junction".to_string(), band_col=None,
+                    order=Some("priority".to_string()), band_dist=10.0, head_m=5.0, near_rules=false))]
+#[allow(clippy::too_many_arguments)]
+fn make_area(py: Python<'_>, edges: Vec<u8>, folder: String, id_col: String, highway_col: String, layer_col: String, bridge_col: String,
+             tunnel_col: String, junction_col: String, band_col: Option<String>, order: Option<String>, band_dist: f64, head_m: f64,
+             near_rules: bool) -> PyResult<(usize, usize, Vec<String>)> {
+    let o = roadstyle::level_area::MakeOptions { id_col, highway_col, layer_col, bridge_col, tunnel_col, junction_col, band_col, order, band_dist,
+                                                 head_m, near_rules };
+    py.detach(|| {
+        let table = roadstyle::read::read_roads(edges, "geometry")?;
+        roadstyle::level_area::make_area(&table, std::path::Path::new(&folder), &o).map(|m| (m.roads, m.pairs, m.warnings))
+    }).map_err(|e: String| PyValueError::new_err(e))
+}
+
 /// serve(area, port, page=None): roadstyle serve (roadstyle-cli) in a thread of its own: the level editor's page files (in the extension,
 /// or the folder `page`) at / and the area folder at /area/, on 127.0.0.1. Returns at once; the server stops with the Python process
 /// (roadstyle-levels edit waits for Ctrl+C). An error when the extension has no editor WebAssembly package (build_editor.sh, then build).
@@ -289,6 +307,7 @@ fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compute_levels, m)?)?;
     m.add_function(wrap_pyfunction!(solve_rules, m)?)?;
     m.add_function(wrap_pyfunction!(serve, m)?)?;
+    m.add_function(wrap_pyfunction!(make_area, m)?)?;
     m.add_class::<Tiler>()?;
     m.add_class::<Sources>()?;
     m.add_function(wrap_pyfunction!(make_sources, m)?)?;

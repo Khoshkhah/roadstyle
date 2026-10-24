@@ -7,6 +7,10 @@ edition.workspace = true
 license.workspace = true
 description = "The roadstyle program: one command for each job (serve: the level editor's files)"
 
+[dependencies]
+roadstyle.workspace = true
+serde_json.workspace = true
+
 [lib]
 name = "roadstyle_cli"
 

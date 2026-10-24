@@ -24,7 +24,7 @@ import {setData, clearData} from "./live.js";
 const RS_DEFAULTS = {
   style: null,                 // the roads style (the layer ids, the base map layer, the metadata); null: it comes later (rs.setStyle)
   prefix: "",                  // the prefix of the roads style's source and layer ids in the map ("rs-": the page added them so)
-  road_table: null,            // the road table {props, mids, bboxes, headings, lines} by row (stage 1); null: window.RS_SIDE, else none
+  road_table: null,            // the road table {props, mids, bboxes, lines} by row (stage 1); null: window.RS_SIDE, else none
   sources: null,               // role -> {source, layer} (roadstyle:sources); null: the style's metadata, else its layers
   arrows: undefined,           // "points" | "line" | "line-center" | null (roadstyle:arrows); undefined: the metadata, else the style
   live: null,                  // the live data (R22): {color: "rs_c", width: "rs_w", types, ramp, nodata}, or null (the page has none)

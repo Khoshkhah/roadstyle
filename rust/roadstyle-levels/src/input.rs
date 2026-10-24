@@ -472,11 +472,11 @@ fn substring(l: &[Pt], a: f64, b: f64) -> Vec<Pt> {
     out
 }
 
-/// The three casing parts of a road (`casing_parts`): the heads `head_m` long (cut in their ratio on a short road),
-/// and the main part, None when it is shorter than 5 cm.
-fn casing_parts(l: &[Pt], head_m: f64) -> [Option<Vec<Pt>>; 3] {
+/// The three casing parts of a road (`casing_parts`): the heads `[start, end]` metres long (cut in their ratio on a
+/// short road), and the main part, None when it is shorter than 5 cm.
+fn casing_parts(l: &[Pt], heads: [f64; 2]) -> [Option<Vec<Pt>>; 3] {
     let n = length(l);
-    let (mut h0, mut h1) = (head_m, head_m);
+    let [mut h0, mut h1] = heads;
     if h0 + h1 >= n {
         (h0, h1) = (n * h0 / (h0 + h1), n * h1 / (h0 + h1));
     }
@@ -496,9 +496,15 @@ impl RTreeObject for Indexed {
     }
 }
 
-/// The rules of the roads (`_relations` and `_stack_parts`), and the band of each road. With `band_col`, roads of
-/// different bands are a stack pair also where they only meet (no tunnel mouths).
-pub fn relations(edges: &[&LevelEdge], roads: &Roads, o: &Options) -> (Rules, Vec<i64>) {
+/// The rules of the roads (`_relations` and `_stack_parts`), the band of each road and its priority (None: no order wish).
+/// With `band_col`, roads of different bands are a stack pair also where they only meet (no tunnel mouths). `heads`: a
+/// road's own head lengths (heads.csv), else `head_m`; they decide which parts of a stack's upper road cross.
+pub fn relations(
+    edges: &[&LevelEdge],
+    roads: &Roads,
+    o: &Options,
+    heads: &HashMap<usize, [f64; 2]>,
+) -> (Rules, Vec<i64>, Vec<Option<f64>>) {
     let n = roads.first.len();
     let band_dist = o.band_dist;
     let head: Vec<&LevelEdge> = roads.first.iter().map(|&i| edges[i]).collect();
@@ -620,7 +626,7 @@ pub fn relations(edges: &[&LevelEdge], roads: &Roads, o: &Options) -> (Rules, Ve
     let empty = BTreeSet::new();
     let (mut lifts, mut near) = (Vec::new(), Vec::new());
     for &(u, l) in &stacks {
-        let parts = casing_parts(&m[u], o.head_m);
+        let parts = casing_parts(&m[u], heads.get(&u).copied().unwrap_or([o.head_m; 2]));
         let tl = touching.get(&l).unwrap_or(&empty);
         for (h, p) in parts.iter().enumerate() {
             let Some(p) = p else { continue };
@@ -647,6 +653,7 @@ pub fn relations(edges: &[&LevelEdge], roads: &Roads, o: &Options) -> (Rules, Ve
             fixed: Vec::new(),
         },
         band,
+        omega,
     )
 }
 

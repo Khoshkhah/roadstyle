@@ -62,6 +62,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   Python extension); build the page's WebAssembly package with `rust/roadstyle-wasm/build_editor.sh` before you build them. The server
   answers only to its own address (`Host`, against DNS rebinding), saves only the page's own changes (`Origin`), and takes at most 16 MB. `solve_levels(..., engine="rust")` and `roadstyle-levels solve
   --engine rust` solve the same tables with the Rust solver (no `max_positions`, no time limit).
+- **The roadstyle program** (`rust/roadstyle-cli`, docs/rust/cli.md): `roadstyle sources` (stage 1), `roadstyle tiles` (stage 2, PMTiles
+  or XYZ), `roadstyle levels make|solve` and `roadstyle serve`, with the option names of the Python keywords.
+- **The levels' make in Rust**: `make_area(engine="rust")` and `roadstyle-levels make` (default `--engine rust`) write the same
+  roads.parquet and pairs.csv as Python's `level_input`, faster (Tartu 0.7 s, Python 13.2 s).
 - Rust: `roadstyle_levels::levels(edges, options)` replaces `compute(edges, method)`. `Options` has the keywords of `compute_levels`, and
   also `fixed` (numbers that stay as they are, as `solve_levels(fixed=...)`) and `edits` (the rows of `visualization.level_edits`, as
   `solve_levels(edits=...)`). `edge_hash(ids)` is public.

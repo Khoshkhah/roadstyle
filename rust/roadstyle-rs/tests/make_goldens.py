@@ -240,8 +240,8 @@ def write_area(area):
         print(f"{area}: {p.name} {p.stat().st_size // 1000} KB")
 
 def write_level_area():
-    """tests/data/level_area/ (tests/level_area.rs): a level area of the roads of Monaco in BOX (make_area: roads.parquet, pairs.csv),
-    and checks.json: rules to add, and what roadstyle's rule_conflicts says of each (its index and why)."""
+    """tests/data/level_area/ (tests/level_area.rs): a level area of the roads of Monaco in BOX (edges.parquet, make's input; make_area:
+    roads.parquet, pairs.csv), and checks.json: rules to add, and what roadstyle's rule_conflicts says of each (its index and why)."""
     import pandas as pd
 
     from roadstyle.level_area import make_area
@@ -251,6 +251,9 @@ def write_level_area():
     g = g[(b.minx >= BOX[0]) & (b.maxx <= BOX[2]) & (b.miny >= BOX[1]) & (b.maxy <= BOX[3])].drop(
         columns=["casing_start", "casing_level", "casing_end", "fill_level"], errors="ignore").reset_index(drop=True)
     out = DATA / "level_area"
+    out.mkdir(exist_ok=True)
+    t = pa.Table.from_pandas(g.drop(columns="geometry"), preserve_index=False)      # make's input, for Rust's make (tests/level_area.rs)
+    pq.write_table(t.append_column("geometry", pa.array(shapely.to_wkb(g.geometry.values), pa.binary())), out / "edges.parquet", compression="snappy")
     roads, pairs = make_area(g, out)
     (out / "edits.csv").unlink(missing_ok=True)
     order, stack = pairs[pairs.relation == "order"].iloc[0], pairs[pairs.relation == "stack"].iloc[0]
