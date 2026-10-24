@@ -1300,22 +1300,23 @@ Two programs have the name `roadstyle` today, with two grammars:
 | Option syntax | short `-o` and `-f`, choices, lists as more words (`--include motorway trunk`, `--width-by 1 6`), named flags | one value for each option, JSON when it parses, `--no-<keyword>` is false, `-` is `_` |
 | Different names | `--no-filter`, `--tooltip`, `--page dashboard\|report\|street-view`, `--no-compress`, `--colors`, `--version` | each keyword of render by its own name (`--filter-control false`), `--sidebar dashboard` |
 
-The plan, in P7 (after the design steps):
+The plan, in P7 (after the design steps). The Rust grammar is the design (decided 2026-10-24: the Rust version is the main library);
+Python's form stays only where it costs a few lines:
 
-1. The Rust program keeps its commands and also takes Python's form: when the first argument is a file and not a command, the
-   command is `page`, with `-o`/`--output` (default: the input's name with `.html`) and `-f`/`--format` (`web` only).
-2. Python's option names are aliases in one table in `commands.rs`: `--no-filter` (`filter_control` false), `--tooltip`
-   (`road_tooltip`), `--no-compress`, `--page dashboard`, `--version`, and lists of more words for `--include`, `--exclude`, `--tooltip`
-   and `--width-by` (up to the next option).
-3. `levels edit` is the editor's name (`serve` stays as an alias). Python's levels options come where the Rust code has them
-   (`--auto-ends`, `--max-positions`). `--query`/`--geometry` (a `.duckdb` source), `--engine python` and `--items` are errors.
+1. The Rust program keeps its commands and grammar. It also takes the file-first form: when the first argument is a file and not a
+   command, the command is `page`, with `-o`/`--output` (default: the input's name with `.html`). No `-f`, no argparse-style lists
+   (`--include motorway trunk`): a list is one value, as JSON or with commas.
+2. Python's other option names are not aliases: the program's options are the keywords of render by their own names (`--filter-control
+   false`, `--road-tooltip '["name"]'`), and `--version` is added.
+3. `levels edit` is the editor's name (`serve` stays as an alias). The Rust solver's options come in their Rust names. A Python-only
+   option (`--query`/`--geometry` for a `.duckdb` source, `--engine`, `--items`) is an error that names the Python call that still has it.
 4. An output that only Python has (`-f folium`, `rsjs`, `spec`, `geojson`, `studio`, and a page that Rust does not make) is an error
    that names the Python call that still makes it, for example `rs.render_folium(...)`.
 5. One program on PATH: the Python package's console script `roadstyle` calls the Rust program (`_rust.cli(argv)`, which runs
    `commands::run`) for each command that Rust has, and keeps Python's code only for the outputs of step 4. `cargo install roadstyle-cli`
    gives the same program. `roadstyle-levels` stays for one version as an alias of `roadstyle levels`, with a deprecation message.
-6. Tests: one table of command lines in both forms that must give the same page on Monaco (the Python program against the Rust
-   program), and one error test for each output of step 4.
+6. Tests: the program's own command lines (the Rust CLI tests) on Monaco, the file-first form against `page`, and one error test for each
+   output of step 4.
 
 #### The design queue (2026-10-23)
 
