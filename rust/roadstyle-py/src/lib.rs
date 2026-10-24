@@ -393,7 +393,7 @@ fn make_area(py: Python<'_>, edges: &Bound<'_, PyAny>, folder: String, id_col: S
     let edges = stream(edges)?;
     py.detach(|| {
         let table = roadstyle::read::roads_from(edges, "geometry")?;
-        roadstyle::level_area::make_area(&table, std::path::Path::new(&folder), &o).map(|m| (m.roads, m.pairs, m.warnings))
+        roadstyle::level_area::make_area(&table, std::path::Path::new(&folder), &o).map(|f| (f.made.roads, f.made.pairs, f.made.warnings))
     }).map_err(|e: String| PyValueError::new_err(e))
 }
 
@@ -423,8 +423,8 @@ fn duckosm_catalog_sql(catalog: &str) -> [String; 2] {
 /// duckosm_plan(tables, columns, mode, tags, specs, only=False) -> str: the SQL that reads a duckOSM file (roadstyle_io::duckosm, the one
 /// copy of it), as JSON text: {"roads": [3 statements], "meta": the stored levels' query or null (tags), "select": the roads of `mode`,
 /// "layers": [{"spec", "name", "sql": [the queries in order]}] for the base map (`specs`: layers.yaml's layers as JSON text), "subset":
-/// with `only` (the map of `mode` alone), the queries of its roads with no stored levels and of its edge_ids}. `tables` and `columns`: the rows of the
-/// catalog's information_schema.
+/// with `only` (the map of `mode` alone), the queries of its roads with no stored levels and of its edge_ids, "level_edges": the edges of the
+/// file's level area (duckOSM's load_roads)}. `tables` and `columns`: the rows of the catalog's information_schema.
 #[pyfunction]
 #[pyo3(signature = (tables, columns, mode, tags, specs, only=false))]
 fn duckosm_plan(tables: Vec<(String, String)>, columns: Vec<(String, String, String)>, mode: &str, tags: bool, specs: &str, only: bool)
@@ -438,7 +438,8 @@ fn duckosm_plan(tables: Vec<(String, String)>, columns: Vec<(String, String, Str
         .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "sql": l.sql})).collect();
     let meta = (!tags).then_some(duckosm::LEVELS_META_SQL);
     let subset = (only && !tags).then_some([duckosm::SUBSET_SQL, duckosm::IDS_SQL]);
-    Ok(serde_json::json!({"roads": roads, "meta": meta, "select": select, "layers": layers, "subset": subset}).to_string())
+    let level_edges = duckosm::level_edges_sql(&cat).map_err(PyValueError::new_err)?;
+    Ok(serde_json::json!({"roads": roads, "meta": meta, "select": select, "layers": layers, "subset": subset, "level_edges": level_edges}).to_string())
 }
 
 /// duckosm_levels(row) -> str: the look's keyword `levels` (JSON text) from the stored levels' metadata row (source, n_edges, edge_hash),

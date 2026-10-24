@@ -44,9 +44,35 @@ pub struct Made {
     pub warnings: Vec<String>,
 }
 
+/// A level area's files in memory: roads.parquet (bytes), pairs.csv and an empty edits.csv (text).
+pub struct AreaFiles {
+    pub roads: Vec<u8>,
+    pub pairs: String,
+    pub edits: String,
+    pub made: Made,
+}
+
+/// The header of an empty edits.csv.
+pub const EDITS_HEADER: &str = "relation,a,b,a_end,b_end,enabled\n";
+
 /// The solver's input of the edges `table` in `folder`: roads.parquet and pairs.csv (written again each time) and an empty edits.csv the
 /// first time. The folder's heads.csv, when there is one, gives a road's own head lengths.
-pub fn make_area(table: &RoadTable, folder: &Path, o: &MakeOptions) -> Result<Made, String> {
+pub fn make_area(table: &RoadTable, folder: &Path, o: &MakeOptions) -> Result<AreaFiles, String> {
+    let heads = std::fs::read_to_string(folder.join("heads.csv")).unwrap_or_default();
+    let f = make_files(table, o, &heads)?;
+    std::fs::create_dir_all(folder).map_err(|e| format!("{}: {e}", folder.display()))?;
+    let write = |name: &str, bytes: &[u8]| std::fs::write(folder.join(name), bytes).map_err(|e| format!("{}: {e}", folder.join(name).display()));
+    write("roads.parquet", &f.roads)?;
+    write("pairs.csv", f.pairs.as_bytes())?;
+    if !folder.join("edits.csv").exists() {
+        write("edits.csv", f.edits.as_bytes())?;
+    }
+    Ok(f)
+}
+
+/// The solver's input of the edges `table` in memory (a page with no server makes its area so): `heads` is heads.csv's text ("" for none),
+/// which gives a road's own head lengths.
+pub fn make_files(table: &RoadTable, o: &MakeOptions, heads: &str) -> Result<AreaFiles, String> {
     let mut warnings = Vec::new();
     let has = |c: &str| table.names().iter().any(|n| n == c);
     let (order, order_col) = match o.order.as_deref() {
@@ -71,7 +97,7 @@ pub fn make_area(table: &RoadTable, folder: &Path, o: &MakeOptions) -> Result<Ma
     for (e, &id) in edges.iter_mut().zip(&ids) {
         e.edge_id = id;
     }
-    let heads = read_heads(&folder.join("heads.csv"))?;
+    let heads = read_heads(heads)?;
     let lo = Options { band_col: o.band_col.is_some(), order, band_dist: o.band_dist, head_m: o.head_m, near_rules: o.near_rules, ..Default::default() };
     let input = make(&edges, &lo, &heads)?;
     let id = |i: usize| ids[i];
@@ -185,22 +211,14 @@ pub fn make_area(table: &RoadTable, folder: &Path, o: &MakeOptions) -> Result<Ma
         pairs += &format!("order,{},{},,\n", road(x), road(y));
     }
     let count = r.meets.len() + r.lifts.len() + r.near.len() + r.orders.len();
-    std::fs::create_dir_all(folder).map_err(|e| format!("{}: {e}", folder.display()))?;
-    let write = |name: &str, bytes: &[u8]| std::fs::write(folder.join(name), bytes).map_err(|e| format!("{}: {e}", folder.join(name).display()));
-    write("roads.parquet", &write_columns(out)?)?;
-    write("pairs.csv", pairs.as_bytes())?;
-    if !folder.join("edits.csv").exists() {
-        write("edits.csv", b"relation,a,b,a_end,b_end,enabled\n")?;
-    }
-    Ok(Made { roads: n, pairs: count, warnings })
+    Ok(AreaFiles { roads: write_columns(out)?, pairs, edits: EDITS_HEADER.into(), made: Made { roads: n, pairs: count, warnings } })
 }
 
 /// A road's own head lengths: an edge id and `[start_m, end_m]` in that edge's way (None: the default).
 type Heads = Vec<(i64, [Option<f64>; 2])>;
 
-/// heads.csv (`road`, `start_m`, `end_m`; empty: the default), by any edge id of a road.
-fn read_heads(path: &Path) -> Result<Heads, String> {
-    let Ok(text) = std::fs::read_to_string(path) else { return Ok(Vec::new()) };
+/// heads.csv's text (`road`, `start_m`, `end_m`; empty: the default), by any edge id of a road.
+fn read_heads(text: &str) -> Result<Heads, String> {
     let mut lines = text.lines().filter(|l| !l.trim().is_empty());
     let head: Vec<&str> = lines.next().unwrap_or("").split(',').map(str::trim).collect();
     let at = |n: &str| head.iter().position(|h| *h == n);

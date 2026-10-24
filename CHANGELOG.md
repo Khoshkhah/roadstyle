@@ -6,6 +6,14 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **The level editor in a page with no server.** `makeArea(edges, options)` (roadstyle-wasm; `roadstyle::level_area::make_files` in
+  Rust) makes a level area's roads.parquet, pairs.csv and edits.csv in memory, the same bytes as the folder form. `duckosmPlan` gives
+  the query `level_edges`, the edges of a duckOSM file's level area (duckOSM's `load_roads`, the same rows and columns on Monaco). The
+  editor is a module, `static/dashboard/editor/level_editor.js`: `levelEditor({map, container, pkg, store})` on a host's map or one of
+  its own, with `browserStore` (the files in the browser) or `httpStore` (`roadstyle serve`), the event `"solved"` (levels.csv and the
+  map's table) and downloads of edits.csv and levels.csv. `roadstyle serve`'s page uses the same module.
+
 ### Changed
 - **`cargo test` at `rust/` builds 113 crates in about 1 minute, not 195 in 5** (review D1). The programs `roadstyle-cli` and
   `roadstyle-snapshot` (bundled SQLite, headless_chrome) are not default members: CI tests them in a step of their own (`-p`). Fat LTO

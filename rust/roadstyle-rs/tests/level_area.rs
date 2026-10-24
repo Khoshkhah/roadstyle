@@ -60,7 +60,7 @@ fn the_check_before_a_rule_is_added_as_roadstyle() {
 fn make_gives_roadstyle_s_input() {
     let dir = std::env::temp_dir().join(format!("roadstyle-make-{}", std::process::id()));
     let table = roadstyle_rs::read::read_roads(std::fs::read(data("edges.parquet")).unwrap(), "geometry").unwrap();
-    let made = roadstyle_rs::level_area::make_area(&table, &dir, &Default::default()).unwrap();
+    let made = roadstyle_rs::level_area::make_area(&table, &dir, &Default::default()).unwrap().made;
     let lines = |p: PathBuf| {
         let mut l: Vec<String> = std::fs::read_to_string(p).unwrap().lines().map(String::from).collect();
         l.sort();

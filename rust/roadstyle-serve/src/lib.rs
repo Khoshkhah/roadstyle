@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn the_editor_files_are_in_the_program() {
-        for f in ["level_editor/index.html", "level_editor/app.js", "level_editor.html", "dashboard/index.js", "dashboard/dashboard.css", "popup.css", "popup.js"] {
+        for f in ["level_editor/index.html", "level_editor/app.js", "level_editor.html", "dashboard/index.js", "dashboard/editor/level_editor.js", "dashboard/dashboard.css", "popup.css", "popup.js"] {
             assert!(EMBEDDED.iter().any(|(n, b)| *n == f && !b.is_empty()), "{f}");
         }
     }

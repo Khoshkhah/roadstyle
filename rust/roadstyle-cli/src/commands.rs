@@ -241,7 +241,7 @@ fn levels(sub: &str, pos: &[String], mut opts: Vec<(String, Option<String>)>) ->
             }
             no_more(&opts)?;
             let table = roads(edges)?;
-            let made = make_area(&table, Path::new(folder), &o)?;
+            let made = make_area(&table, Path::new(folder), &o)?.made;
             for w in &made.warnings {
                 eprintln!("warning: {w}");
             }
