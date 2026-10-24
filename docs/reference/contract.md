@@ -20,6 +20,7 @@ The export's style (`export_style`, `export_inline`: `state` baked) has `roadsty
 | `roadstyle:controls` | the options of `rsDashboard` that come from the style (the next table) |
 | `roadstyle:interaction` | `{popup, tooltip, hover_delay_ms}`: the road popup's fields, the hover tooltip, the hover delay |
 | `roadstyle:color_options` | `[{name, prop, legend}]`: the colour options and their legends |
+| `roadstyle:live` | with `live_data=True` only: `{color, width, types, ramp, nodata}`: the feature states that the road layer reads on the road's row (`rs_c` a colour, `rs_w` a width factor), the default ramp (9 colours of `cmap`) and the no-data colour; a page gives it to the dashboard as the option `live` (null without `live_data`) |
 | `roadstyle:images` | the images that the host adds (`oneway`) |
 | `roadstyle:planner`, `roadstyle:planner_skipped` | the route planner's graphs, or the number of roads past its limit |
 | layer `roadstyle:group` | the group of a layer: `roads`, or an overlay's label |
@@ -171,7 +172,7 @@ when a layer reads it.
 `static/web_template.html` has one placeholder for each value that `render_web._page_html` puts in the page:
 `__TITLE__`, `__MAPLIBRE_CSS__`, `__MAPLIBRE_JS__`, `__RS_TILES__`, `__DASHBOARD_CSS__`, `__POPUP_CSS__`, `__HOST_PANEL_HTML__`,
 `__POPUP_JS__`, `__DASHBOARD_JS__`, `__STYLE__`, `__CENTER__`, `__PITCH__`, `__BEARING__`, `__MAX_PITCH__`, `__BASEMAPS__`,
-`__BM_SWITCHER__`, `__RS_TILED__`, `__RS_LEAN__`, `__RS_SOURCES__`, `__RS_ARROWS__`, `__ROAD_POPUP_MODE__`, `__FIND_CONTROL__`, `__ZOOM_READOUT__`, `__PITCH3D__`,
+`__BM_SWITCHER__`, `__RS_TILED__`, `__RS_LEAN__`, `__RS_SOURCES__`, `__RS_ARROWS__`, `__RS_LIVE__`, `__ROAD_POPUP_MODE__`, `__FIND_CONTROL__`, `__ZOOM_READOUT__`, `__PITCH3D__`,
 `__STREET_VIEW__`, `__SV_WINDOW_KEY__`, `__GOOGLE_3D__`, `__SELECT_COLOR__`, `__FILTER__`, `__COLOR_OPTIONS__`, `__CO_ACTIVE__`,
 `__OVERLAYS__`, `__OVERLAY_CONTROL__`, `__OVERLAY_POPUP__`, `__TUNNEL__`, `__RS_FILL_LAYERS__`, `__RS_ROAD_FILL__`, `__VIEWS__`,
 `__ROAD_ITEMS__`, `__ROAD_POPUP__`, `__ROAD_TOOLTIP__`, `__HOVER_DELAY_MS__`, `__EDGE_ID_COL__`, `__ARROW_ICON__`, `__ARROW_COLOR__`,
