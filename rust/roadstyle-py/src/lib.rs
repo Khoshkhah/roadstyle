@@ -362,7 +362,7 @@ fn duckosm_catalog_sql(catalog: &str) -> [String; 2] {
 }
 
 /// duckosm_plan(tables, columns, mode, tags, specs, only=False) -> str: the SQL that reads a duckOSM file (roadstyle_io::duckosm, the one
-/// copy of it), as JSON text: {"roads": [3 statements], "meta": the stored levels' query or null (tags), "select": the roads of `mode`,
+/// copy of it), as JSON text: {"roads": [3 statements] (null when the file has no network of `mode`: "roads_error" says why), "meta": the stored levels' query or null (tags), "select": the roads of `mode`,
 /// "layers": [{"spec", "name", "sql": [the queries in order]}] for the base map (`specs`: layers.yaml's layers as JSON text), "subset":
 /// with `only` (the map of `mode` alone), the queries of its roads with no stored levels and of its edge_ids}. `tables` and `columns`: the rows of the
 /// catalog's information_schema.
@@ -373,13 +373,17 @@ fn duckosm_plan(tables: Vec<(String, String)>, columns: Vec<(String, String, Str
     use roadstyle::duckosm;
     let cat = duckosm::Catalog { tables, columns };
     let specs: Vec<serde_json::Value> = serde_json::from_str(specs).map_err(|e| PyValueError::new_err(format!("specs: {e}")))?;
-    let roads = duckosm::roads_sql(&cat, tags, only.then_some(mode)).map_err(PyValueError::new_err)?;
+    // the base map's queries also for a file with no network: then "roads" is null and "roads_error" says why
+    let (roads, roads_error) = match duckosm::roads_sql(&cat, tags, only.then_some(mode)) {
+        Ok(r) => (Some(r), None),
+        Err(e) => (None, Some(e)),
+    };
     let select = duckosm::roads_select(mode).map_err(PyValueError::new_err)?;
     let layers: Vec<serde_json::Value> = duckosm::features_sql(&cat, &specs).into_iter()
         .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "sql": l.sql})).collect();
     let meta = (!tags).then_some(duckosm::LEVELS_META_SQL);
     let subset = (only && !tags).then_some([duckosm::SUBSET_SQL, duckosm::IDS_SQL]);
-    Ok(serde_json::json!({"roads": roads, "meta": meta, "select": select, "layers": layers, "subset": subset}).to_string())
+    Ok(serde_json::json!({"roads": roads, "roads_error": roads_error, "meta": meta, "select": select, "layers": layers, "subset": subset}).to_string())
 }
 
 /// duckosm_levels(row) -> str: the look's keyword `levels` (JSON text) from the stored levels' metadata row (source, n_edges, edge_hash),

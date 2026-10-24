@@ -53,7 +53,9 @@ fn roads_union(cat: &Catalog, only: Option<&str>) -> Result<String, String> {
                 else if *c == "edge_ref" { "CAST(NULL AS VARCHAR)".into() } else { "NULL".into() };
         format!("{v} AS {c}")
     }).collect::<Vec<_>>().join(", ");
-    Ok(modes.iter().map(|m| format!("SELECT {COLS}, {}, '{m}' AS mode, NULL AS pmode, NULL AS access FROM {m}.edges", optional(m, "edges", &[])))
+    // pmode and access as text where the branch has none: with no private_edges they are NULL only, which DuckDB types as an integer
+    Ok(modes.iter().map(|m| format!("SELECT {COLS}, {}, '{m}' AS mode, CAST(NULL AS VARCHAR) AS pmode, CAST(NULL AS VARCHAR) AS access FROM {m}.edges",
+                                    optional(m, "edges", &[])))
         .chain(private.iter().map(|m| format!("SELECT {COLS}, {}, NULL AS mode, '{m}' AS pmode, access FROM {m}.private_edges",
                                                optional(m, "private_edges", &["walk_type"]))))
         .collect::<Vec<_>>().join(" UNION ALL "))

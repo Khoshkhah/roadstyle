@@ -294,7 +294,7 @@ mod wasm {
 
     /// duckosmPlan(catalog, mode, tags, specs) -> string: the SQL that reads a duckOSM file (roadstyle-io's duckosm.rs, the one copy that
     /// Python runs too), as JSON text: {"catalog": the 2 queries of the catalog, "roads": 3 statements, "meta": the stored levels' query or
-    /// null, "select": the roads of `mode`, "layers": [{spec, name, sql: the
+    /// null, "select": the roads of `mode` ("roads" is null when the file has no network of `mode`: "roads_error" says why), "layers": [{spec, name, sql: the
     /// queries in order}]}. `catalog`: the JSON text of {"name", "tables":
     /// [[schema, table]], "columns": [[schema, table, column]]} (with no tables: only "catalog" is in the answer); `specs`: layers.yaml's
     /// layers as JSON text. `only`: the map of `mode` alone; then "subset" has the queries of its roads with no stored levels and
@@ -316,7 +316,12 @@ mod wasm {
         let specs: Vec<serde_json::Value> = serde_json::from_str(specs).map_err(|e| err(format!("specs: {e}")))?;
         let layers: Vec<serde_json::Value> = duckosm::features_sql(&cat, &specs).into_iter()
             .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "sql": l.sql})).collect();
-        Ok(serde_json::json!({"catalog": queries, "roads": duckosm::roads_sql(&cat, tags, only.then_some(mode)).map_err(err)?, "meta": (!tags).then_some(duckosm::LEVELS_META_SQL),
+        // the base map's queries also for a file with no network: then "roads" is null and "roads_error" says why
+        let (roads, roads_error) = match duckosm::roads_sql(&cat, tags, only.then_some(mode)) {
+            Ok(r) => (Some(r), None),
+            Err(e) => (None, Some(e)),
+        };
+        Ok(serde_json::json!({"catalog": queries, "roads": roads, "roads_error": roads_error, "meta": (!tags).then_some(duckosm::LEVELS_META_SQL),
                               "select": duckosm::roads_select(mode).map_err(err)?, "layers": layers,
                               "subset": (only && !tags).then_some([duckosm::SUBSET_SQL, duckosm::IDS_SQL])}).to_string())
     }
