@@ -1,5 +1,5 @@
 //! The style must be byte for byte the style of geolibre-roadstyle's Rust port at commit 0806ac2 (its `make_style`, natively, from the
-//! same inputs), with eight changes:
+//! same inputs), with nine changes:
 //! - the building heights follow rule C (the higher of the height tag and the levels, features.rs), not 0806ac2's rule A (the height
 //!   tag first): on 2026-10-23 the `height` of 15 buildings of Monaco and 355 of Tartu;
 //! - the slots have Python's key order (__rs_cls before __rs_arw, tests/colors.rs): the same data, other bytes;
@@ -96,7 +96,7 @@ fn tiles_hash(area: &Path) -> String {
 #[test]
 fn monaco_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(tiles_hash(&area), "3425ac1323cdde63d8614a82e372d43fdf399a261e3de9757123eeddf1a685f7");
+    assert_eq!(tiles_hash(&area), "e33584163186f97e226f7e120ec4a6ac9eab146ecefb08655faf0ceb0d23e9f1");
 }
 
 /// tiles.py's extra layers: the sea of Monaco (a polygon) is in the tiles at its west edge, where only its box reaches.
@@ -106,8 +106,9 @@ fn the_sea_at_the_tile_edge() {
     let read = |p: PathBuf| std::fs::read(&p).unwrap();
     let mut look: serde_json::Value = serde_json::from_slice(&read(data.join("look.json"))).unwrap();
     look["args"]["export"] = true.into();
-    let (_, tiles) = roadstyle_rs::make_tiled(read(data.join("monaco/roads.parquet")), &look.to_string(), Some(read(data.join("monaco/features.parquet"))),
-                                              None, "rs://", &[]).unwrap();
+    let look = roadstyle_rs::Look::from_value(look).unwrap();
+    let (_, tiles, _) = roadstyle_rs::make_tiled(read(data.join("monaco/roads.parquet")), &look, Some(read(data.join("monaco/features.parquet"))),
+                                                 None, "rs://", &[]).unwrap();
     for (z, x, y) in [(14, 8528, 5973), (14, 8528, 5974), (15, 17057, 11946), (15, 17057, 11947), (15, 17057, 11948)] {
         let t = tiles.tile(z, x, y);
         assert!(!t.is_empty() && t.windows(3).any(|w| w == b"ov1"), "{z}/{x}/{y}: no sea");

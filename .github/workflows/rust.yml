@@ -45,6 +45,10 @@ jobs:
           roadstyle-rs/tests/get_goldens.sh
 
       - name: Tests
+        # release for the speed of the goldens, with the overflow checks of a debug build (pmtiles.rs's overflow, 2026-10-24, panicked
+        # only in debug)
+        env:
+          CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "true"
         run: cargo test --offline --release
 
       - name: Clippy
