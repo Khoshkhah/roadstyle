@@ -1,7 +1,7 @@
 // road-class filtering: window.rsSetClasses([...]) shows exactly those classes and hides the
 // rest across every road layer; the collapsible checkbox panel is just UI over it. The class
 // filter composes (AND) with the id filter from rsFilter below.
-import {map, O, OVERLAYS, RS_PREFIX, RoadTable, _has, _itemOv, _rprops, _sfeats, _src, _role, _lyr, _emit} from "./core.js";
+import {map, O, OVERLAYS, RS_ROLES, RoadTable, _has, _itemOv, _rprops, _sfeats, _src, _role, _lyr, _emit} from "./core.js";
 import {_popupMode, _tlHost, _box, _check} from "./panel.js";
 export let FILTER = {on:false, classes:[]};
 const _fltCbs={}, _fltBase={};
@@ -16,7 +16,7 @@ const _ovKinds={};     // rsSetKinds: the kinds of a base-map layer that show, b
 const _ovBase={};      // a not attached overlay layer's own filter, by layer id (read once)
 let _modes=null, _modeRows=null;   // rsSetModes: the modes whose roads show (null: all), and the rows that one of them can use
 // the overlay attached to edges (Overlay(edge_col=...)) that a layer draws: core.js, _itemOv
-const _fltLayers=()=>map.getStyle().layers.filter(l=>l.id.indexOf(RS_PREFIX+"roads")===0 || _itemOv(l.id));
+const _fltLayers=()=>map.getStyle().layers.filter(l=>RS_ROLES.has(_role(l)) || _itemOv(l.id));
 // the one lookup (docs/design/edge_items.md): the class, bridge, tunnel and rsFilter switches decide which edges show, and every layer that
 // draws a piece of a road, or an item attached to one, shows exactly the pieces and items of those edges. The class and level tests stay
 // short property tests: every piece and item carries its edge's class (__rs_cls: FILTER.col of the edge, also on a name or an arrow,

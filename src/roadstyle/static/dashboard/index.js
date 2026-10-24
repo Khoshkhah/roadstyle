@@ -36,7 +36,7 @@ const RS_DEFAULTS = {
   filter: {on: false, classes: []}, color_active: 0,
   overlays: [], overlay_control: true, overlay_popup: true,
   modes: [], box_layout: "corner",   // roadstyle:controls.modes [[mode, count], ...]; "stack": a base map's page (Layers under Roads, folded)
-  tunnel: {layers: {}, steps: [], control: false}, fill_layers: [], road_fill: {on: true, paint: {}},
+  tunnel: {layers: {}, steps: [], control: false}, fill_layers: [], pick: [], road_fill: {on: true, paint: {}},
   views: [], items: null, edge_id_col: "edge_id", arrow_icon: null,
 };
 // the options that the page did not give and that the style's metadata gives: the road popup, the hover tooltip and the hover delay

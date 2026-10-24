@@ -15,6 +15,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `docs/design/dashboard_module.md`, "Trusted inputs".
 
 ### Changed
+- **The dashboard tests no layer id for a prefix** (R7). The road filters act on the layers of the road roles (`sources`, `roadstyle:sources`), and a road is picked on the layers of the new option `pick` (`roadstyle:controls`). A deck is known by its role `decks`.
 - **export_look: the yes/no tags use the engine's rule** (audit R6, both engines). A oneway, tunnel or bridge value is yes unless it
   is missing or "", "no", "false" or "0" (lower-cased), as on the map that the engine draws. Before, the exported look had lists of
   yes values, so tunnel=covered and other values not in the lists were not tunnels in it. Of Monaco, Södermalm and Tartu, only
