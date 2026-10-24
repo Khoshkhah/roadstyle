@@ -23,7 +23,8 @@ A consumer project that does not install it runs with `PYTHONPATH=<this repo>/sr
   replacements in `src/roadstyle/static/web_template.html` (one `.replace` chain near the end).
 - The page's controls and road interaction are ES modules in `src/roadstyle/static/dashboard/` (one file for each control,
   `index.js` is the entry `rsDashboard(map, options)`); the Rust-engine pages import them, and `render_web.py` puts them in the
-  page as one script (`_DASH_FILES`, without `import` lines and `export` words). A top-level name must be unique in the folder.
+  page as one script (in the order of `static/dashboard/files.txt`, which the Rust page writer reads too, without `import` lines and
+  `export` words). A new module: a line in `files.txt`. A top-level name must be unique in the folder.
   Design: `docs/design/dashboard_module.md`.
 - A new web option = the keyword + its `.replace` + a key in the template's `rsDashboard(map, {...})` call + its default in
   `dashboard/index.js` + the module that reads `O.<key>` + a test in `tests/test_render_web.py` (`_opt(html, key)`) + a row in

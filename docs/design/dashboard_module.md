@@ -35,7 +35,7 @@ rsDashboard(map, {style, select_color: "#7c4dff"});
 - `examples/dashboard_rust/` is a working page on a style from `rust/roadstyle-wasm` (Monaco).
 
 The Python page (`render_web.render`) does not load modules. When `render_web.py` is imported, it reads the files in a fixed order
-(`_DASH_FILES`), removes each `import` line and each `export ` word, and puts the result in the page as one plain script. Thus a
+(`static/dashboard/files.txt`; the Rust page writer's `build.rs` reads the same list), removes each `import` line and each `export ` word, and puts the result in the page as one plain script. Thus a
 saved page still works offline, as one file. Because the files become one script, two files must not declare the same top-level
 name. A top-level name of a file is also a global of the Python page. Scripts that the page adds later use these globals: the
 simple-mode script replaces `pick`, and the level editor calls `_sfeats` and `_rsArrows`.
