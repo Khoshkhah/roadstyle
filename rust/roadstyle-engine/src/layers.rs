@@ -366,7 +366,7 @@ fn simple_dasharray(dashes: &[String]) -> Value {
 }
 
 /// Python's truthiness of a JSON value or of a road's cell (bool(v)).
-pub(crate) fn py_truth<'a>(v: impl Into<Cell<'a>>) -> bool {
+pub fn py_truth<'a>(v: impl Into<Cell<'a>>) -> bool {
     match v.into() {
         Cell::Null => false,
         Cell::Bool(b) => b,

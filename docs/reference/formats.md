@@ -415,7 +415,7 @@ The road fields are in the source `roads` (GeoJSON) or in the side table (tiles)
 - the live style, with the data inline (gzipped, `compress=True`) or with the PMTiles archive (`tiles=True`);
 - MapLibre GL JS 5.24 (inside the file, or from a CDN);
 - the dashboard: the modules of `static/dashboard/` as one script, the popup (`popup.js`, `popup.css`) and `dashboard.css`;
-- the options of the dashboard: the `rsDashboard(map, {...})` call, with the values of the page keywords.
+- the options of the dashboard: the object `RS_OPTIONS`, with the values of the page keywords and the camera (`camera`).
 
 The file opens from disk. It needs a server only for Street View and Google 3D.
 

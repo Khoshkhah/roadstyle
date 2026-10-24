@@ -19,6 +19,23 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `TypeError`. The output does not change. On Tartu (64,828 edges), `compute_levels(method="tags")` takes 66 ms, not 123 ms: there is
   no Parquet encode in Python and no Parquet decode in Rust. `duckosm.read` gives Arrow tables. In Rust, `roadstyle_io::read::roads_from`
   and `table_from` read Arrow batches, and the facade has `tiled_of` and `features_of` for roads that a reader gave.
+- **The Rust engine makes the whole page in one call** (audit R3). `roadstyle::page_options::page_from(roads, look, options, given)`
+  runs stage 1, the arrows or the tiles, the views and their palettes, builds the options of `rsDashboard` (typed: `page::PageOptions`)
+  and writes the page. Python's `render_edges(engine="rust")`, the new command `roadstyle page` and the browser's `makePage(roads,
+  look, options, given?)` call it. Python gives only what it alone knows: the data steps, the look's options, the base maps' keys and the
+  Google Maps key. A view's palette resolves its look in Rust (Python makes no extra looks). The page writer gzips the road table and
+  the big sources itself; the two engines' pages are the same byte for byte but these blobs, which are the same when read back.
+- **`roadstyle:controls` has no page keywords** (rule 5, R3). It has the facts of the look and of the roads that a host's dashboard
+  needs (the filter panel, the overlays, the tunnel look, `select_color`, `pitch_3d`, ...). `tiles` and `views` are not in it any more:
+  they are the caller's page keywords, which the page gives in `RS_OPTIONS` and a host gives to `rsDashboard` itself.
+- **`sidebar="dashboard"` or `"report"`**: the bundled sidebar of `render_dashboard` and `render_report`, in both engines. It sets
+  `name`, `basemap_switcher`, `filter_control` and `road_popup` where the call gives none (`pages.SIDEBAR_DEFAULTS`). The two
+  functions now pass `sidebar=` to `render_edges`, so the Rust engine makes these pages too, and the CLI with `--sidebar`.
+- **The page has its options in one object** (audit R3, step 1, both engines). The template's 38 placeholders of the dashboard's
+  options and the camera are one `__RS_OPTIONS__`: the JSON object `RS_OPTIONS` has the options of `rsDashboard` and `camera`
+  (`center`, `pitch`, `bearing`, `max_pitch`, `bounds`), and the page calls `rsDashboard(map, {...RS_OPTIONS, style})`. The page
+  writers fill in the frame's four tokens in one pass, so a value is not read again. A script that read the page's text
+  (`maxPitch:70`, `\n  tiles: true,`) reads `RS_OPTIONS` now.
 - **`js/roads_sql.js` and `js/features_sql.js` run the SQL of `duckosmPlan`** (roadstyle-io's `duckosm.rs`), the one copy that
   Python runs too. They have no SQL of their own now. Their functions and arguments do not change, and a new `readCatalog(q, catalog)`
   gives the catalog that `duckosmPlan` reads. Load the module (`init()`) before you call them. On Monaco they write the same
@@ -77,6 +94,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   has the key: a casing piece has no `__rs_fill@<palette>: null` any more. The map does not change.
 
 ### Added
+- **`rs.setData(rows, {stepped: true})`**: each road gets the ramp's nearest stop, not a colour between two stops, and the legend shows the
+  same steps. SonoFlow's Daily page colours so, which lets it move to live data in the simple look with the same look.
 - **The dashboard has mapstyle's page functions** (docs/design/mapstyle_page_scripts.md), found by their roles in the metadata, not by
   layer ids: `rsSetModes` / `rsGetModes` / `RS_MODES` (the roads of some modes, from `roadstyle:controls.modes` and the road table's
   flags), `rsSetKinds` / `rsGetKinds` / `RS_KINDS` (a base-map layer's kinds), `rsSetInteraction` / `rsGetInteraction` (a layer's

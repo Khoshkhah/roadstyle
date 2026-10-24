@@ -124,6 +124,7 @@ ignore it.
 | `style` | `None` | all | a styler object; overrides `palette` / `color_by` |
 | `color_options` | `None` | web | `{name: {styler kwargs}}`: a *Colour by* menu that recolours in the browser; the first entry shows on open |
 | `color_active` | `0` | web | the option shown on open (index or name) |
+| `sidebar` | `None` | web | `"dashboard"` or `"report"`: the bundled sidebar of `render_dashboard` or `render_report` on the page; it also sets `name`, `basemap_switcher`, `filter_control` and `road_popup` where the call gives none |
 | `views` | `None` | web | `{name: {setting: value}}`: a *View* menu next to *Colour by*; each view sets several things at once, the first shows on open |
 
 Each `color_options` value takes `color_by`, `colors`, `cmap`, `vmin`, `vmax`, `width_by`,

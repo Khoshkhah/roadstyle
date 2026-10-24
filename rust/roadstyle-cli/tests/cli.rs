@@ -42,6 +42,31 @@ fn sources_then_tiles() {
     std::fs::remove_dir_all(&dir).ok();
 }
 
+/// The page in one call (page_options::page_from): the options in RS_OPTIONS, MapLibre inline, a view's palette, and a tiled page.
+#[test]
+fn page_of_monaco() {
+    let dir = tmp("page");
+    std::fs::create_dir_all(&dir).unwrap();
+    let page = |args: &[&str]| {
+        let out = dir.join("monaco.html");
+        let mut c = Command::new(env!("CARGO_BIN_EXE_roadstyle"));
+        c.args(["page", &data("monaco/roads.parquet"), &out.to_string_lossy()]).args(args);
+        let r = c.env_remove("ROADSTYLE_API_KEY").env_remove("GOOGLE_MAPS_KEY").output().unwrap();
+        assert!(r.status.success(), "roadstyle page {args:?}: {}", String::from_utf8_lossy(&r.stderr));
+        let html = std::fs::read_to_string(&out).unwrap();
+        let at = html.find("const RS_OPTIONS = ").unwrap() + "const RS_OPTIONS = ".len();
+        let opts = serde_json::Deserializer::from_str(&html[at..]).into_iter::<serde_json::Value>().next().unwrap().unwrap();
+        (html, opts)
+    };
+    let (html, o) = page(&["--basemap", "osm", "--palette", "amber", "--views", r#"{"mono": {"palette": "mono"}}"#, "--name", "Monaco"]);
+    assert!(!html.contains("__MAPLIBRE_JS__") && html.contains("maplibregl") && html.contains("<title>Monaco</title>"));
+    assert_eq!((o["basemaps"][0]["key"].as_str(), o["tiles"].as_bool(), o["views"][0]["name"].as_str()), (Some("osm"), Some(false), Some("mono")));
+    assert!(o["filter"]["palettes"]["mono"].is_object() && o["camera"]["bounds"][0][0].as_f64().unwrap() > 7.0);
+    let (html, o) = page(&["--basemap", "osm", "--tiles"]);
+    assert!(o["tiles"] == true && html.contains("pmtiles://roads"));
+    std::fs::remove_dir_all(&dir).ok();
+}
+
 #[test]
 fn levels_make_and_solve() {
     let dir = tmp("levels");

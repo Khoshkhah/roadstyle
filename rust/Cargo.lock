@@ -1340,6 +1340,7 @@ dependencies = [
  "roadstyle-io",
  "roadstyle-levels",
  "roadstyle-tiles",
+ "serde",
  "serde_json",
 ]
 

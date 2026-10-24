@@ -421,6 +421,18 @@ impl Options {
     pub fn from_value(v: &Value) -> Result<Options, String> {
         Options::deserialize(v).map_err(|e| format!("look options: {e}"))
     }
+
+    /// style_names: the profiles or the palettes (`kind`) that these options can name, the bundled ones, then the own ones (`files`).
+    pub fn style_names(&self, kind: &str) -> Vec<String> {
+        names(&self.own(), kind)
+    }
+
+    fn own(&self) -> Vec<(String, String, String)> {
+        ["profiles", "palettes"].iter().flat_map(|k| {
+            self.files.get(*k).and_then(Value::as_object).into_iter().flatten()
+                .filter_map(move |(n, t)| Some((k.to_string(), n.clone(), t.as_str()?.to_string())))
+        }).collect()
+    }
 }
 
 /// The look of render_edges(palette=, profile=, settings=, **args) as a JSON value (version 1): `options` as `Options` reads them.
@@ -429,10 +441,7 @@ pub fn make_look(options: &Value) -> Result<Value, String> {
 }
 
 pub(crate) fn resolve(options: &Options) -> Result<LookData, String> {
-    let own: Vec<(String, String, String)> = ["profiles", "palettes"].iter().flat_map(|k| {
-        options.files.get(*k).and_then(Value::as_object).into_iter().flatten()
-            .filter_map(move |(n, t)| Some((k.to_string(), n.clone(), t.as_str()?.to_string())))
-    }).collect();
+    let own = options.own();
     let bm = options.base_map.as_ref().map(crate::basemap::base_map).transpose()?;
     if bm.is_some() && (options.palette.is_some() || options.features.is_some()) {
         return Err("look options: base_map gives the palette and the base map's part (features): give none of them with it".into());

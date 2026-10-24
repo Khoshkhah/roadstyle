@@ -102,7 +102,7 @@ def test_render_tiles_swaps_source_and_embeds_archive():
     for lyr in style["layers"]:
         if lyr.get("source") == "roads":
             assert lyr["source-layer"] in ("roads", "slots", "casings", "ends")
-    assert "\n  tiles: true,\n" in html
+    assert '"tiles": true, "simple"' in html
     assert 'id="rs-side"' in html                       # the sidecar blob
     assert "pmtiles.Protocol" in html                   # vendored pmtiles.js + setup
 
@@ -142,7 +142,7 @@ def test_tile_class_gating_follows_the_minzoom_parameter():
 def test_render_without_tiles_is_unchanged():
     from roadstyle.render_web import render
     html = render(_edges(), basemap="blank").html
-    assert "\n  tiles: false,\n" in html
+    assert '"tiles": false, "simple"' in html
     assert "pmtiles.Protocol" not in html
     i = html.index("const style = ") + len("const style = ")
     style = json.JSONDecoder().raw_decode(html, i)[0]
