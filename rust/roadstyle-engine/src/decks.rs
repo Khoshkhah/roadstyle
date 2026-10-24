@@ -33,10 +33,6 @@ impl DeckLook {
     }
 }
 
-fn node(c: &P) -> Node {
-    (py_round(c[0], 6), py_round(c[1], 6))
-}
-
 /// A node as a hash key (the rounded floats' bits: py_round gives no -0.0).
 fn hk(n: Node) -> (u64, u64) {
     (n.0.to_bits(), n.1.to_bits())
@@ -150,7 +146,7 @@ pub fn bridge_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str) -> Vec<Va
         if !p.get("__rs_bridge").is_some_and(py_truth) || lvl < 1.0 || c.len() < 2 {
             continue;
         }
-        let (a, z) = (node(&c[0]), node(&c[c.len() - 1]));
+        let [a, z] = roads.topo().ends[fi].expect("a line of two points or more").map(|n| { let q = roads.topo().points[n as usize]; (q[0], q[1]) });
         pair_edges.entry(key(a, z)).or_default().push(fi);
         if (p.get("__rs_twoway").is_some_and(py_truth) && lt((z, a), (a, z))) || p.get("__rs_dup").is_some_and(py_truth) {
             continue;

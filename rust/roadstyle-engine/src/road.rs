@@ -5,6 +5,7 @@
 
 use crate::draw::{Draw, Values};
 use crate::props::Get;
+use roadstyle_model::topology::Topology;
 use roadstyle_model::{Cell, RoadTable};
 use serde_json::{Map, Value};
 
@@ -17,6 +18,7 @@ pub struct Roads {
     pub values: Values,
     /// a view's palettes (palettes.rs): the marks that another palette sets to other values, after the road's own properties
     pub extra: Vec<Extra>,
+    topo: std::sync::OnceLock<Box<Topology>>,
 }
 
 /// A mark in another palette (render_web._merge_palettes): `<mark>@<palette>` with each road's value there (None: that road has no
@@ -30,7 +32,7 @@ pub struct Extra {
 impl Roads {
     pub fn new(table: RoadTable) -> Roads {
         let draw = vec![Draw::default(); table.len()];
-        Roads { table, draw, values: Values::default(), extra: Vec::new() }
+        Roads { table, draw, values: Values::default(), extra: Vec::new(), topo: std::sync::OnceLock::new() }
     }
 
     pub fn len(&self) -> usize {
@@ -61,6 +63,11 @@ impl Roads {
 
     pub fn line(&self, i: usize) -> Option<&[Pt]> {
         self.table.line(i)
+    }
+
+    /// The roads' nodes and their R-tree, made the first time a stage asks (the lines do not change after that).
+    pub fn topo(&self) -> &Topology {
+        self.topo.get_or_init(|| Box::new(Topology::new(&self.table)))
     }
 }
 

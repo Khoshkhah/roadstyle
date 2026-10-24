@@ -7,6 +7,7 @@
 pub mod geom;
 pub mod props;
 pub mod table;
+pub mod topology;
 
 pub use table::{Cell, Lines, RoadTable};
 
