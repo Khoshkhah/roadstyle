@@ -27,7 +27,8 @@
    "sha256": "9bf8ccca8d4c3731d3df7090ac0f0078eac1c2925bfc4134854330483a832154",
    "layers": 61,
    "bytes": 31705712
-  }
+  },
+  "note": "the Rust style's normalised digest differs since review D4 (2026-10-24: one colour mix, rounded half up; some casing colours 1 off in one channel): tests/test_duckosm.py compares the styles with differences()"
  },
  "style_cycling_osm_google": {
   "sha256": "e696c87f055f1416e1294be300265e967d55b64eb8081cc0a7f4596ccbba6b28",
@@ -37,7 +38,8 @@
    "sha256": "f2f28890c86739c7fe970302aac1e52dd7b9f8eef0e3f88044a5938965024e2a",
    "layers": 61,
    "bytes": 31715398
-  }
+  },
+  "note": "the Rust style's normalised digest differs since review D4 (2026-10-24: one colour mix, rounded half up; some casing colours 1 off in one channel): tests/test_duckosm.py compares the styles with differences()"
  },
  "style_all_grey_google": {
   "sha256": "b1cc5ec671a79ebc2b9a83a466bd0dba52b16c3a2565e93e283a72edda8c099a",
@@ -77,6 +79,7 @@
    "sha256": "c59764f91f32b2015e11cade19f222f5284e18dc16a552e6829de9c89ba737ec",
    "layers": 60,
    "bytes": 29640909
-  }
+  },
+  "note": "the Rust style's normalised digest differs since review D4 (2026-10-24: one colour mix, rounded half up; some casing colours 1 off in one channel): tests/test_duckosm.py compares the styles with differences()"
  }
 }
