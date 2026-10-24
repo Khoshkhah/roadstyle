@@ -165,7 +165,7 @@ rsDashboard(map, {style, find_control: true});
 
 Call `rsDashboard` immediately after you make the map. The options have the names of the Python keywords. The functions and events
 on this page then work on that map. Roads that come later (vector tiles, a new style after each build): give `style: null`, the
-`prefix` of their source and layer ids, `engine: {props: id => Promise}` for one road's properties, and call `setStyle(style)` on the
+`prefix` of their source and layer ids, and call `setStyle(style, {road_table})` (the road table of stage 1) on the
 object that `rsDashboard` returns. Live data (a style made with `live_data=True`): `rs.setData(rows, {colorBy, widthBy})` colours
 and sizes the roads from a table with no new style, and `rs.clearData()` takes it away. The options and the files:
 `docs/design/dashboard_module.md` in the repository.

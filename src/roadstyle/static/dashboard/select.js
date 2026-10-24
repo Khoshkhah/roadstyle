@@ -1,9 +1,9 @@
 // hover + click-to-select + info popup (feature-state, tolerance box, throttled to one query/frame)
 import {POPUP, _rpairs, _rfields} from "../popup.js";
-import {map, style, O, RS_PREFIX, RS_LEAN, RS_DECK_LAYERS, OVERLAYS, _itemOv, _side, _rprops, _pcache, _withProps, RoadTable, _road, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad, _joinedKeys} from "./core.js";
+import {map, style, O, RS_PREFIX, RS_LEAN, RS_DECK_LAYERS, OVERLAYS, _itemOv, _side, _rprops, RoadTable, _road, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad, _joinedKeys} from "./core.js";
 import {_popupMode, rsInfoShow, rsInfoClear} from "./panel.js";
 import {_ovUnder, _ovWin, clearOvSel, _ovAt, _ovSections, handleOverlayClick} from "./overlays.js";
-import {_svLine, _svDist, _svTiled, _svPick, _sv, initSpot} from "./svspot.js";
+import {_svLine, _svDist, _svPick, _sv, initSpot} from "./svspot.js";
 const HIT = 4;
 function box(p){ return [[p.x-HIT,p.y-HIT],[p.x+HIT,p.y+HIT]]; }
 // query only layers that EXIST: the 3D view swaps roads-bridge-fill for the deck extrusions,
@@ -19,7 +19,7 @@ let ROAD_ITEMS = null;   // {label, popup, layer: the one road layer} or null
 let ITEM_PICK = null, PICK_LAYERS = [];
 export function _roadOf(f){ const e=f.properties.__rs_edge;   // the road an item belongs to, as a picked road feature
   return {id:e, properties:_rprops(e), layer:f.layer, item:f,
-          get geometry(){ const r=_road(e) || _svTiled(e); return r && r.geometry; }}; }   // tiles: only when Street View asks
+          get geometry(){ const r=_road(e); return r && r.geometry; }}; }
 // the feature right under the cursor first, the tolerance box only when there is none: a two-way road's two directions lie side by
 // side, and the box reaches both, where the one drawn last would win (a click near the middle selected the other direction)
 export function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id)); if(!ids.length) return null;
@@ -32,9 +32,9 @@ export function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id)); i
   return !l.length ? null : ITEM_LAYERS.has(l[0].layer.id) ? _roadOf(l[0]) : RS_LEAN && l[0].layer.id===RS_LEAN ? _roadOfPiece(l[0]) : l[0]; }
 export function srcOf(f){ return f && f.layer && f.layer.id.indexOf(RS_PREFIX+"roads-bridge-decks")===0 ? "decks" : "roads"; }
 // full properties of a picked feature: tiles carry only the style props, so road hits read the
-// sidecar row behind the feature id (or the properties that engine.props gave); decks (and inline mode) keep the feature's own properties
+// road table's row behind the feature id; decks keep the feature's own properties
 function _pickProps(f){ const t=_side();
-  if(srcOf(f)==="roads" && f.id!=null){ if(t) return t.props[f.id] ? RoadTable.props(f.id) : f.properties||{}; if(_pcache.has(f.id)) return _pcache.get(f.id); }
+  if(t && srcOf(f)==="roads" && f.id!=null && t.props[f.id]) return RoadTable.props(f.id);
   return f.properties||{}; }
 function _selItem(f){ if(ITEM_PICK && f && f.item && f.item.layer.id===ROAD_ITEMS.layer) return ITEM_PICK;   // a road item of items=
   const o = f && f.item && _itemOv(f.item.layer.id); return o && o.select==="item" ? o : null; }   // its overlay
@@ -75,8 +75,7 @@ function _midOf(g){                         // the middle of the length (a middl
   const d=_svDist(cs), h=d[d.length-1]/2; let i=0; while(i<cs.length-2 && d[i+1]<h) i++;
   const t=(h-d[i])/((d[i+1]-d[i])||1);
   return [cs[i][0]+t*(cs[i+1][0]-cs[i][0]), cs[i][1]+t*(cs[i+1][1]-cs[i][1])]; }
-export function rsSelect(id){ _withProps([id], ()=>_select(id)); }
-function _select(id){
+export function rsSelect(id){
   const props = RoadTable.has(id) ? RoadTable.props(id) : null;
   if(props==null) return;
   clearOvSel();
@@ -89,12 +88,12 @@ function _select(id){
   setS(_sel,{select:true});
   if(_sel.road!=null) _fs({source:"roads", id:_sel.road},{select:true});
   // best effort for programmatic selection: overlays at the edge's midpoint (when on screen)
-  const c = RoadTable.mid(id) || _midOf((_road(id) || _svTiled(id) || {}).geometry);
+  const c = RoadTable.mid(id) || _midOf((_road(id) || {}).geometry);
   let ovs=[]; if(c){ try{ ovs=_ovAt(map.project({lng:c[0], lat:c[1]})); }catch(err){} }
   const cll = c ? {lng:c[0], lat:c[1]} : null;
   document.dispatchEvent(new CustomEvent("rs:select",
-    {detail:{id:id, layer:null, properties:props || {}, twin:_twinDetail(props), overlays:ovs, streetView:_svPick(cll, _road(id) || _svTiled(id), id)}}));
-  const sv = _sv(cll, _road(id) || _svTiled(id));
+    {detail:{id:id, layer:null, properties:props || {}, twin:_twinDetail(props), overlays:ovs, streetView:_svPick(cll, _road(id), id)}}));
+  const sv = _sv(cll, _road(id));
   if(_roadPopup){
     if(_popupMode === "panel"){ rsInfoShow(_both(props||{}, true, _popupFields) + sv + _ovSections(ovs)); }
     else if(c) new maplibregl.Popup({closeButton:true, maxWidth:POPUP.maxWidth})
@@ -117,8 +116,7 @@ function hoverFrame(){ _raf=0; if(!_pt) return;
   const p = _pt;
   _tipT = setTimeout(()=>{ if(_pt !== p) return;                                          // the mouse rested on it: light it up
     _hov=h; setS(_hov,{hover:true});
-    if(_tip) _withProps(srcOf(f)==="roads" ? [f.id] : [], ()=>{ if(_hov!==h) return;                   // engine.props: still on the road when they come
-      _tip.setLngLat(map.unproject(p)).setHTML(_both(_pickProps(f), false, _ttipOnly)).addTo(map); }); }, _TIP_DELAY);
+    if(_tip) _tip.setLngLat(map.unproject(p)).setHTML(_both(_pickProps(f), false, _ttipOnly)).addTo(map); }, _TIP_DELAY);
 }
 let _sel=null;
 // what the style decides: the layers a road is picked on, the popup and tooltip fields, the hover delay. Again for a new style
@@ -154,27 +152,25 @@ export function initSelect(){
     if(handleOverlayClick(e, "over")) return;
     const f = pick(e.point);
     if(!f){ if(!handleOverlayClick(e, "under")) rsDeselect(); return; }
-    _withProps(srcOf(f)==="roads" ? [f.id] : [], ()=>{   // engine.props: the road's properties first (at once without it)
-      clearOvSel();
-      if(_sel) setS(_sel,{select:false});
-      _sel = hitOf(f); setS(_sel,{select:true});
-      const props = _pickProps(f), io = _selItem(f);
-      const item = io ? {overlay:io.label, id:f.item.id, properties:f.item.properties||{}} : undefined;   // the item selected itself
-      const ovs = _ovAt(e.point).filter(o=>!io || o.label!==io.label);   // interactive overlays under the click (e.g. the zone)
-      // structured click-data for host pages / dashboards (fires in every popup mode, incl. False)
-      document.dispatchEvent(new CustomEvent("rs:select",
-        {detail:{id:f.id, layer:f.layer && f.layer.id, properties:props, twin:_twinDetail(props), overlays:ovs, item:item,
-                 streetView:_svPick(e.lngLat, f, f.id)}}));
-      const sv = _sv(e.lngLat, f);
-      if(io){ if(io.interactive && _ovWin(io)){             // the item's own popup (its popup fields), the road's Street View below it
-          if(_popupMode === "panel") rsInfoShow('<div class="rs-name">'+io.label+'</div>'+_rrows(item.properties, io.popup) + sv + _ovSections(ovs));
-          else new maplibregl.Popup({closeButton:true, maxWidth:POPUP.maxWidth}).setLngLat(e.lngLat)
-            .setHTML('<span style="color:#777">'+io.label+'</span><br>'+_rfields(item.properties, io.popup) + sv + _ovSections(ovs)).addTo(map); } }
-      else if(_roadPopup){
-        if(_popupMode === "panel"){ rsInfoShow(_both(props, true, _popupFields) + sv + _ovSections(ovs)); }
-        else new maplibregl.Popup({closeButton:true, maxWidth:POPUP.maxWidth})
-          .setLngLat(e.lngLat).setHTML(_both(props, false, _popupFields) + sv + _ovSections(ovs)).addTo(map);
-      }
-    });
+    clearOvSel();
+    if(_sel) setS(_sel,{select:false});
+    _sel = hitOf(f); setS(_sel,{select:true});
+    const props = _pickProps(f), io = _selItem(f);
+    const item = io ? {overlay:io.label, id:f.item.id, properties:f.item.properties||{}} : undefined;   // the item selected itself
+    const ovs = _ovAt(e.point).filter(o=>!io || o.label!==io.label);   // interactive overlays under the click (e.g. the zone)
+    // structured click-data for host pages / dashboards (fires in every popup mode, incl. False)
+    document.dispatchEvent(new CustomEvent("rs:select",
+      {detail:{id:f.id, layer:f.layer && f.layer.id, properties:props, twin:_twinDetail(props), overlays:ovs, item:item,
+               streetView:_svPick(e.lngLat, f, f.id)}}));
+    const sv = _sv(e.lngLat, f);
+    if(io){ if(io.interactive && _ovWin(io)){             // the item's own popup (its popup fields), the road's Street View below it
+        if(_popupMode === "panel") rsInfoShow('<div class="rs-name">'+io.label+'</div>'+_rrows(item.properties, io.popup) + sv + _ovSections(ovs));
+        else new maplibregl.Popup({closeButton:true, maxWidth:POPUP.maxWidth}).setLngLat(e.lngLat)
+          .setHTML('<span style="color:#777">'+io.label+'</span><br>'+_rfields(item.properties, io.popup) + sv + _ovSections(ovs)).addTo(map); } }
+    else if(_roadPopup){
+      if(_popupMode === "panel"){ rsInfoShow(_both(props, true, _popupFields) + sv + _ovSections(ovs)); }
+      else new maplibregl.Popup({closeButton:true, maxWidth:POPUP.maxWidth})
+        .setLngLat(e.lngLat).setHTML(_both(props, false, _popupFields) + sv + _ovSections(ovs)).addTo(map);
+    }
   });
 }

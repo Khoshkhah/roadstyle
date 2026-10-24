@@ -31,7 +31,7 @@ export function useStyle(st){
   const lean = style.layers.find(l=>(l["source-layer"] || l.source)==="simple" && l.type==="line");
   RS_LEAN = lean ? RS_PREFIX+lean.id : false;
   RS_DECK_LAYERS = style.layers.filter(l=>l.id.indexOf("roads-bridge-decks")===0).map(l=>RS_PREFIX+l.id);
-  _pcache.clear(); _decks = null;
+  _decks = null;
   _checkPromote();
 }
 // simple mode needs the pieces' row as their id (promoteId "__rs_edge"): else the glow by row lights other pieces. Checked when the map has
@@ -76,8 +76,8 @@ export function _sdata(s){ const d=s && s._data; if(!d) return null; if(d.geojso
 // the features of an inline source of the roads style that has no table (decks, slots, overlays); src: the source's id in the map
 export function _sfeats(src){ const g=_sdata(src && map.getSource(src)); return (g && g.features)||[]; }
 // THE ROAD TABLE: each road's fields, midpoint, bbox, heading and line, keyed by the row ({props, mids, bboxes, headings, lines}, as stage 1
-// makes it). The page gives it (options.road_table, or window.RS_SIDE: the page loads it after the style and then sends rs:tableready), or
-// one road's fields at a time (engine.props). RoadTable is the one port of every read of a road; null and {} where it has nothing.
+// makes it). The page gives it (options.road_table, or window.RS_SIDE: the page loads it after the style and then sends rs:tableready).
+// RoadTable is the one port of every read of a road; null and {} where it has nothing (before the table has come).
 function _table(){ return O.road_table || window.RS_SIDE || null; }
 export function _side(){ return _table(); }
 // live data (live.js, rs.setData): row -> the joined row's fields, which a road's properties show too (the popup, the panel); null: none
@@ -85,8 +85,8 @@ export let _joined = null, _joinedKeys = [];
 export function _setJoined(m){ _joined = m;
   _joinedKeys = m ? [...new Set([].concat(...[...m.values()].slice(0, 100).map(r => Object.keys(r))))] : []; }
 export const RoadTable = {
-  has(i){ const t=_table(); return t ? t.props[i]!=null : _pcache.has(i); },
-  props(i){ const t=_table(), p=(t ? t.props[i] : _pcache.get(i)) || {}, j=_joined && _joined.get(i); return j ? {...p, ...j} : p; },
+  has(i){ const t=_table(); return !!t && t.props[i]!=null; },
+  props(i){ const t=_table(), p=(t && t.props[i]) || {}, j=_joined && _joined.get(i); return j ? {...p, ...j} : p; },
   line(i){ const t=_table(); return (t && t.lines && t.lines[i]) || null; },
   mid(i){ const t=_table(); return (t && t.mids && t.mids[i]) || null; },
   bbox(i){ const t=_table(); return (t && t.bboxes && t.bboxes[i]) || null; },
@@ -95,20 +95,9 @@ export const RoadTable = {
 export function _rprops(i){ return RoadTable.props(i); }
 // a road as a feature with its whole line ({id, properties, geometry}), for Street View and Google 3D; null without a line
 export function _road(i){ const c=RoadTable.line(i); return c ? {id:i, get properties(){ return RoadTable.props(i); }, geometry:{type:"LineString", coordinates:c}} : null; }
-// engine.props(id) => Promise of the road's properties: a page whose roads are only in vector tiles, and whose worker has the roads
-// table, gives one road's properties when they are needed (a click, rsSelect). They are kept here until the next style.
-export const _pcache = new Map();
-// fetch the properties of the roads ids, and of their second edges (__rs_edge2), then call go; without engine.props go runs at once
-export function _withProps(ids, go){
-  const get = O.engine && O.engine.props; if(!get) return go();
-  const one = i => _pcache.has(i) ? Promise.resolve(_pcache.get(i)) : Promise.resolve(get(i)).then(p=>{ p=p||{}; _pcache.set(i, p); return p; });
-  Promise.all(ids.filter(i=>i!=null).map(i=>one(i).then(p=>p.__rs_edge2!=null ? one(p.__rs_edge2) : null)))
-    .then(go, e=>console.error("rs: engine.props failed", e)); }
-// a fill piece, as the road feature it belongs to. Its line: the road's whole line (the road table), else the piece's own (a page with
-// engine.props only: the piece under the click, cut at its tile) - Street View's spot, marker and steps need one
+// a fill piece, as the road feature it belongs to (its line: the road's whole line, from the road table)
 export function _roadOfPiece(f){ const e=f.properties.__rs_edge;
-  return {id:e, get properties(){ return _rprops(e); }, layer:{id:RS_PREFIX+"roads-fill"},   // a getter: engine.props can answer later
-          get geometry(){ const r=_road(e); return r ? r.geometry : f.geometry; }}; }
+  return {id:e, properties:_rprops(e), layer:{id:RS_PREFIX+"roads-fill"}, get geometry(){ const r=_road(e); return r && r.geometry; }}; }
 export const _FILL_PIECE = ["any", ["==", ["get", "__rs_k"], 1], ["!", ["has", "__rs_k"]]];   // the fill pieces of the road layer, and what has no piece kind (overlays, decks)
 // THE GLOW: the feature state of a road by its row. ref.source: "roads" or "decks" (roles of the roads style), or an overlay's source id.
 // Simple mode: the road's pieces in the role simple, which all have the row as their id (promoteId "__rs_edge"); the full look: the road in

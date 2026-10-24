@@ -67,17 +67,12 @@ rs.setStyle(style, {road_table});
   road's row as their id, and one feature state (`{source: "rs-roads", sourceLayer: "simple", id: row}`) lights the whole road,
   also in tiles that load later. Without `promoteId`, `setStyle` writes an error in the console. A road is picked on its fill
   pieces (`__rs_k` 1).
-- **`engine.props(id)`.** A function that returns a Promise of one road's properties (`id`: the road's row, the `__rs_edge` of its
-  pieces). The dashboard calls it for a click, `rsSelect` and the hover tooltip, also for the road's second edge
-  (`__rs_edge2`), and keeps the answers until the next style. If the Promise fails, the dashboard writes an error in the console
-  and shows nothing. Without `engine.props` (the Python page) all of this runs at once, as before. `engine` is the same port as
-  the plan's `engine.restyle`.
-- **Limits.** `rsQuery`, `rsFind`, `rsGetProps` and `rsFocus` need all roads' properties and lines in the page (inline data, or
-  Python's sidecar table `window.RS_SIDE`). With `engine.props` only, they find nothing.
-- **Street View on tiles.** The spot, the marker, the heading and the step buttons need a line of the road. The page has no road
-  lines in tiles mode, so a click uses the line of the clicked piece (cut at its tile), and `rsSelect` uses the road's longest fill
-  piece in the loaded tiles. A step stops at the end of that piece. In Linked mode the marker goes to the next piece on the screen
-  when the viewer walks past the end. The marker is a MapLibre marker, not a layer: a new roads style (`setStyle`) does not remove it.
+- **The road table.** The page gives each style's road table (`setStyle(style, {road_table})`, from `makeSources(...).roadTable()`).
+  A road's fields, its line (Street View, Google 3D), its midpoint and its bbox come from it, so `rsQuery`, `rsFind` and `rsFocus`
+  work with tiles too. (Until 2026-10-24 a page could give one road's fields at a time with `engine.props`; the road table replaced
+  it. duckosm-rust's frozen page still pins a roadstyle with `engine.props`: at the end of its freeze it gives the road table.)
+- **Street View on tiles.** The spot, the marker, the heading and the step buttons use the road's line from the road table. The
+  marker is a MapLibre marker, not a layer: a new roads style (`setStyle`) does not remove it.
 
 ## One way for GeoJSON and tiles (design step g)
 
@@ -91,7 +86,7 @@ of `core.js` do it; the other files call them.
   only for a vector source. Filters, picking, the glow, the decks, the slots and Street View use it, with no branch on tiles.
 - **The road table (`RoadTable`).** One port for every read of a road: `has(i)`, `props(i)`, `line(i)`, `mid(i)`, `bbox(i)`,
   `rows()`, by the road's row. The data is the road table of stage 1 (`{props, mids, bboxes, headings, lines}`), from the option
-  `road_table` or from `window.RS_SIDE`. A page with no table gives one road's fields with `engine.props`. `_road(i)` makes a
+  `road_table` or from `window.RS_SIDE`. `_road(i)` makes a
   feature with the road's whole line for Street View and Google 3D. `rsQuery`, `rsFind`, `rsGetProps` and `rsFocus` read the
   table, so they work with tiles when the page has the table.
 - **The glow (`_fs`).** The feature state of a road by its row. In simple mode the state goes on the pieces of the role
@@ -144,7 +139,6 @@ values that the page reads, which `render` makes from its keywords. The template
 |---|---|---|---|
 | `style` | the style object | `null`: the roads come later (`setStyle`) | `core.js` (deck layers), `select.js` (pick layers), `basemap.js` (the base map layer) |
 | `prefix` | (none: the Python page adds the style as it is) | `""` | `core.js`, and each file that names a source or a layer |
-| `engine` | (none) | `null`; `{props: id => Promise}` | `core.js` (`_withProps`), `select.js` |
 | `road_table` | (none: the tiled page sets `window.RS_SIDE`) | `null` | `core.js` (`RoadTable`) |
 | `live` | `live_data=True` (the Rust engine): `{color, width, types, ramp, nodata}` | the metadata `roadstyle:live`, else `null` | `live.js` |
 | `basemaps` | `basemaps` | `[]` | `basemap.js` |
@@ -234,6 +228,6 @@ The legend is correct only for option 0, because the metadata does not give the 
   made with the old and the new code: the pixels are the same, and there are no page errors.
 - `examples/dashboard_rust/` in a browser: the modules load as ES modules (strict mode) on a Rust-engine style, with no page errors.
   The popup, the hover tooltip, the glow, the search, Street View and 2D/3D work.
-- `examples/dashboard_rust/tiles.html` in a browser: a mouse click on a road shows the properties from `engine.props` (both
+- `examples/dashboard_rust/tiles.html` in a browser: a mouse click on a road shows the properties from the road table (both
   directions of a pair) and lights the road on the tiles; after `setStyle` with another colouring the legend shows, there is one
   set of buttons, and the hover tooltip shows the fetched properties. No page errors.

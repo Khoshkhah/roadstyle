@@ -1,6 +1,6 @@
 // GOOGLE STREET VIEW of the clicked edge (the window, the side-by-side page, or a plain link),
 // looking the way the edge runs. A plain maps URL, no API key; where it stands is below.
-import {map, O, RS_PREFIX, RS_LEAN, _src, _road, _roadOfPiece} from "./core.js";
+import {map, O, RS_PREFIX, RS_LEAN, _road, _roadOfPiece} from "./core.js";
 import {_svWindow} from "./streetview.js";
 import {srcOf} from "./select.js";
 let _streetView = false;
@@ -22,15 +22,6 @@ export function _svLine(f){ const g=f && f.geometry;
   return !g ? [] : g.type==="LineString" ? g.coordinates : g.type==="MultiLineString" ? [].concat(...g.coordinates) : []; }
 function _svFeat(f){                          // the edge's full geometry (a picked one may be tile-clipped)
   return (f && f.id!=null && srcOf(f)==="roads" && _road(f.id)) || f; }
-// tiles mode keeps no geometry in the page: take the edge's longest piece from the loaded tiles; simple mode: its longest fill piece
-// (the Rust engine's source-layer "roads" has no lines). rsSelect of an edge whose tiles are not loaded yet gets no heading, marker or steps.
-export function _svTiled(id){
-  const s=_src(RS_LEAN ? "simple" : "roads"); if(!s || !s.sourceLayer) return null;
-  let best=null;
-  const fs = map.querySourceFeatures(s.source, RS_LEAN ? {sourceLayer:s.sourceLayer, filter:["==", ["get", "__rs_k"], 1]} : {sourceLayer:s.sourceLayer});
-  for(const f of fs)
-    if((RS_LEAN ? f.properties.__rs_edge : f.id)===id && (!best || _svLine(f).length>_svLine(best).length)) best=f;
-  return best; }
 export function _svDist(cs){ const k=Math.cos(cs[0][1]*Math.PI/180), d=[0];
   for(let i=1;i<cs.length;i++) d.push(d[i-1]+Math.hypot((cs[i][0]-cs[i-1][0])*k*_SV_R, (cs[i][1]-cs[i-1][1])*_SV_R));
   return d; }

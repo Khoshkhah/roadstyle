@@ -29,7 +29,7 @@ rs.on("select", (e) => console.log(e.properties));
   metadata, or have roadstyle's defaults.
 - The road table (each road's fields, midpoint, bbox, heading and line) is the option `road_table`, or `window.RS_SIDE`.
 - Roads that come later (vector tiles, a new style after each build): give `style: null` and the `prefix` of their ids in the map,
-  then call `rs.setStyle(style, {road_table})`. A page with no table can give one road's fields with `engine: {props}`.
+  then call `rs.setStyle(style, {road_table})`.
 - `rsDashboard` returns the `rs` object: `select`, `find`, `setFilter`, `getState`, `setState`, `link` (a URL fragment), `on`.
 
 The options, the files and the data that each control reads: `docs/design/dashboard_module.md` in the repository.
