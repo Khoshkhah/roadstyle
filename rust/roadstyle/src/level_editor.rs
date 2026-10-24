@@ -5,7 +5,7 @@
 
 use roadstyle_io::read::{read_table, wkb_line};
 use roadstyle_io::write;
-use roadstyle_levels::area::{Area, AreaRoad, AreaSolved, PairRow, Previous, Relation, Side, Why, HOPS};
+use roadstyle_levels::area::{Area, AreaRoad, AreaSolved, Conflict, PairRow, Previous, Relation, Side, Why, HOPS};
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
 
@@ -388,21 +388,70 @@ impl Editor {
     }
 }
 
+/// How an answer was solved: the whole area, or only the roads around a change.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum How {
+    Full,
+    Local,
+}
+
+/// A solve's answer (`Editor::solve`, `solve_local`): the numbers of each road (the roads' order), the rules not kept by road id, the
+/// counts, and how it was solved (`why`: the reason for a whole solve after a change).
+#[derive(Clone, Debug)]
+pub struct Answer {
+    pub levels: Vec<[i64; 4]>,
+    pub given_up: Vec<(i64, i64)>,
+    pub given_up_parts: Vec<(i64, i64, Side)>,
+    pub near: Vec<(i64, i64, Side)>,
+    pub orders_not_kept: Vec<(i64, i64)>,
+    pub roads: usize,
+    pub pairs: usize,
+    pub meets: usize,
+    pub order_pairs: usize,
+    /// The road pairs with a near warning.
+    pub near_warnings: usize,
+    pub how: How,
+    pub why: Option<String>,
+}
+
+impl Answer {
+    /// The answer as the page reads it, the road ids as text (JavaScript holds no 64-bit integer exactly).
+    pub fn to_json(&self) -> Value {
+        let pairs = |v: &[(i64, i64)]| v.iter().map(|&(a, b)| json!([a.to_string(), b.to_string()])).collect::<Vec<_>>();
+        let parts = |v: &[(i64, i64, Side)]| v.iter().map(|&(a, b, h)| json!([a.to_string(), b.to_string(), side_name(h)])).collect::<Vec<_>>();
+        json!({"levels": self.levels, "given_up": pairs(&self.given_up), "given_up_parts": parts(&self.given_up_parts),
+               "near": parts(&self.near), "orders_not_kept": pairs(&self.orders_not_kept),
+               "info": {"roads": self.roads, "pairs": self.pairs, "meets": self.meets, "order_pairs": self.order_pairs,
+                        "order_violations": self.orders_not_kept.len(), "near_warnings": self.near_warnings, "solver": "rust"},
+               "resolve": {"how": match self.how { How::Full => "full", How::Local => "local" }, "why": self.why}})
+    }
+}
+
+/// The check's conflicts as the page reads them: `[[index, why, [rule rows]]]`, why "duplicate", "not kept" or "loop".
+pub fn conflicts_json(found: &[Conflict]) -> Value {
+    let why = |w: Why| match w {
+        Why::Duplicate => "duplicate",
+        Why::NotKept => "not kept",
+        Why::Loop => "loop",
+    };
+    Value::Array(found.iter().map(|c| json!([c.row, why(c.why), c.with.iter().map(row_json).collect::<Vec<_>>()])).collect())
+}
+
 impl Editor {
-    /// The whole solve with the edits (edits.csv text), as JSON (`answer`).
-    pub fn solve(&mut self, edits: &str) -> Result<String, String> {
+    /// The whole solve with the edits (edits.csv text).
+    pub fn solve(&mut self, edits: &str) -> Result<Answer, String> {
         let s = self.area.solve(&read_pairs(edits)?, &HashMap::new(), 20, 1.0)?;
         self.last = Some(Previous::from(&s));
-        Ok(self.answer(&s, "full", None).to_string())
+        Ok(self.answer(&s, How::Full, None))
     }
 
     /// The solve after a change that names the roads of `changed` (edge ids): the roads around it (local), else the whole area.
-    pub fn solve_local(&mut self, edits: &str, changed: &[String]) -> Result<String, String> {
+    pub fn solve_local(&mut self, edits: &str, changed: &[String]) -> Result<Answer, String> {
         let Some(prev) = &self.last else { return self.solve(edits) };
         let changed = changed.iter().map(|c| id(c)).collect::<Result<Vec<_>, _>>()?;
         let (s, why) = self.area.solve_local(&read_pairs(edits)?, prev, &changed, HOPS, 20, 1.0)?;
         self.last = Some(Previous::from(&s));
-        Ok(self.answer(&s, if why.is_some() { "full" } else { "local" }, why).to_string())
+        Ok(self.answer(&s, if why.is_some() { How::Full } else { How::Local }, why))
     }
 
     /// The answer that the page starts from (levels.csv and levels_info.json, not solved again): 4 numbers for each road in its own way,
@@ -419,30 +468,20 @@ impl Editor {
         Ok(())
     }
 
-    /// The check before rules are added (rows: CSV text with a header): `[[index, why, [rule rows]]]`, why "duplicate", "not kept" or
-    /// "loop".
-    pub fn check(&self, edits: &str, rows: &str) -> Result<String, String> {
-        let found = self.area.conflicts(&read_pairs(edits)?, &read_pairs(rows)?)?;
-        let why = |w: Why| match w {
-            Why::Duplicate => "duplicate",
-            Why::NotKept => "not kept",
-            Why::Loop => "loop",
-        };
-        Ok(Value::Array(found.iter().map(|c| json!([c.row, why(c.why), c.with.iter().map(row_json).collect::<Vec<_>>()])).collect()).to_string())
+    /// The check before rules are added (rows: CSV text with a header): the rows that conflict (`conflicts_json` for the page).
+    pub fn check(&self, edits: &str, rows: &str) -> Result<Vec<Conflict>, String> {
+        Ok(self.area.conflicts(&read_pairs(edits)?, &read_pairs(rows)?)?)
     }
 
-    /// An answer as the page reads it: the numbers of each road (the roads' order), the rules not kept by road id (text), the counts and how
-    /// it was solved ("full" or "local", and why the whole area).
-    fn answer(&self, s: &AreaSolved, how: &str, why: Option<String>) -> Value {
-        let id = |r: usize| self.roads()[r].id.to_string();
-        let pairs = |v: &[(usize, usize)]| v.iter().map(|&(a, b)| json!([id(a), id(b)])).collect::<Vec<_>>();
-        let parts = |v: &[(usize, usize, Side)]| v.iter().map(|&(a, b, h)| json!([id(a), id(b), side_name(h)])).collect::<Vec<_>>();
+    /// The typed answer of a solve: the area's road numbers as road ids.
+    fn answer(&self, s: &AreaSolved, how: How, why: Option<String>) -> Answer {
+        let id = |r: usize| self.roads()[r].id;
+        let pairs = |v: &[(usize, usize)]| v.iter().map(|&(a, b)| (id(a), id(b))).collect();
+        let parts = |v: &[(usize, usize, Side)]| v.iter().map(|&(a, b, h)| (id(a), id(b), h)).collect();
         let near: HashSet<(usize, usize)> = s.near_parts.iter().map(|&(u, l, _)| (u, l)).collect();
-        json!({"levels": s.levels, "given_up": pairs(&s.given_up), "given_up_parts": parts(&s.given_up_parts), "near": parts(&s.near_parts),
-               "orders_not_kept": pairs(&s.orders_not_kept),
-               "info": {"roads": self.roads().len(), "pairs": s.pairs, "meets": s.meets, "order_pairs": s.order_pairs,
-                        "order_violations": s.orders_not_kept.len(), "near_warnings": near.len(), "solver": "rust"},
-               "resolve": {"how": how, "why": why}})
+        Answer { levels: s.levels.clone(), given_up: pairs(&s.given_up), given_up_parts: parts(&s.given_up_parts), near: parts(&s.near_parts),
+                 orders_not_kept: pairs(&s.orders_not_kept), roads: self.roads().len(), pairs: s.pairs, meets: s.meets, order_pairs: s.order_pairs,
+                 near_warnings: near.len(), how, why }
     }
 }
 

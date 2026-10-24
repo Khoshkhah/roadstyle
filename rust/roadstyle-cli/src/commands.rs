@@ -253,18 +253,19 @@ fn levels(sub: &str, pos: &[String], mut opts: Vec<(String, Option<String>)>) ->
             let dir = Path::new(folder);
             let text = |f: &str| std::fs::read_to_string(dir.join(f)).unwrap_or_default();
             let mut ed = Editor::new(read(&dir.join("roads.parquet").to_string_lossy())?, &text("pairs.csv"))?;
-            let answer: Value = serde_json::from_str(&ed.solve(&text("edits.csv"))?).map_err(|e| Error::Engine(e.to_string()))?;
-            let levels: Vec<i64> = answer["levels"].as_array().into_iter().flatten().flat_map(|v| v.as_array().cloned().unwrap_or_default())
-                .filter_map(|x| x.as_i64()).collect();
+            let answer = ed.solve(&text("edits.csv"))?;
+            let levels: Vec<i64> = answer.levels.iter().flatten().copied().collect();
             let csv = ed.levels_csv(&levels, &text("heads.csv"), &text("caps.csv"))?;
             std::fs::write(dir.join("levels.csv"), csv).map_err(|e| Error::File(e.to_string()))?;
-            let mut info = answer["info"].clone();
+            // levels_info.json: the counts with the rules not kept (the page's answer without the numbers)
+            let json = answer.to_json();
+            let mut info = json["info"].clone();
             for k in ["given_up", "given_up_parts", "near", "orders_not_kept"] {
-                info[k] = answer[k].clone();
+                info[k] = json[k].clone();
             }
             std::fs::write(dir.join("levels_info.json"), info.to_string()).map_err(|e| Error::File(e.to_string()))?;
-            println!("{} roads -> {}: {} stack pair(s) given up, {} order wish(es) not kept", answer["levels"].as_array().map_or(0, Vec::len),
-                     dir.join("levels.csv").display(), answer["given_up"].as_array().map_or(0, Vec::len), info["order_violations"]);
+            println!("{} roads -> {}: {} stack pair(s) given up, {} order wish(es) not kept", answer.levels.len(),
+                     dir.join("levels.csv").display(), answer.given_up.len(), answer.orders_not_kept.len());
             Ok(())
         }
         _ => Err(Error::Usage(USAGE.into())),
