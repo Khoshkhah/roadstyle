@@ -56,9 +56,6 @@ def _goldens():
 
 
 @needs_db
-# ponytail: xfail until the Rust engine's 3D decks equal Python's on all of Monaco (decks.rs, 2026-10-24: 1,312 decks, Python 1,311, other
-# slabs and properties for the same roads; tests/test_engine_parity.py's area does not show it). strict: the test fails when they match.
-@pytest.mark.xfail(strict=True, reason="the Rust engine's 3D decks differ from Python's on all of Monaco (decks.rs)")
 @pytest.mark.parametrize("choice", ["all osm google", "driving osm google", "walking osm google", "cycling osm google", "all grey google",
                                     "walking google komoot", "driving osm google only", "walking osm google only"])
 def test_the_style_is_mapstyles(choice):
@@ -69,7 +66,13 @@ def test_the_style_is_mapstyles(choice):
     gen, digests = _goldens()
     mode, theme, paths, *only = choice.split()
     style = duckosm.export_inline(DB, mode, theme=theme, paths=paths, only=bool(only))
-    assert gen.digest(gen.normalised(style)) == digests[gen.name_of(mode, theme, paths, bool(only))]["normalised"]
+    name = gen.name_of(mode, theme, paths, bool(only))
+    assert gen.digest(gen.normalised(style)) == digests[name]["normalised"]
+    # the 3D decks' union area of each chain (the normalised form has their chains, edges, heights and heads)
+    want, got = gen.deck_areas(gen.stored(name)), gen.deck_areas(style)
+    assert set(got) == set(want)
+    for (chain, slab), a in want.items():
+        assert abs(got[chain, slab] - a) <= gen.DECK_AREA[slab] * a, f"chain {chain} ({'slabs' if slab else 'decks'}): {got[chain, slab]} against {a}"
 
 
 @needs_db

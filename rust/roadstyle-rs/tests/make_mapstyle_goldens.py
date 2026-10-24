@@ -12,7 +12,8 @@ geolibre-roadstyle (its build.py), or in the folder $PROJECTS:
   tests/data/mapstyle/ (not in git: about 2.8 MB each, gzipped), and
   tests/data/mapstyle_digests.json (in git): for each style, the sha256 of its canonical JSON (json.dumps with sort_keys and the
   separators "," and ":"), its number of layers and the size of that text (the record), and the same three of its normalised form
-  (`normalised`: what tests/test_duckosm.py compares with the Rust engine's style). The canonical text is the same with each hash seed."""
+  (`normalised`: what tests/test_duckosm.py compares with the Rust engine's style). The canonical text is the same with each hash seed.
+- renormalise: the normalised digests again from the stored styles, after a rule of `normalised` changed (the record stays)."""
 import gzip
 import hashlib
 import importlib.util
@@ -58,8 +59,9 @@ def normalised(style):
     - no `source` and `target` on a road (the Rust reader keeps them: R13);
     - every coordinate to 9 places (the Rust engine computes a centroid, mapstyle uses shapely: the last digit can differ);
     - each PNG image as its pixels (the Rust engine's PNG encoder writes other bytes for the same image);
-    - the 3D decks without their geometry (Python makes the polygons with GEOS, Rust with its own offsets: tests/test_engine_parity.py's
-      test_export_inline_decks compares them by shape);
+    - the 3D decks as their chains, each with the set of its features' edges, slab flag, base, height and heads (`_deck_chains`): GEOS's
+      offset curve cuts a curved slice into 0 to n parts, Rust draws one mitre strip for each side (tests/test_engine_parity.py's
+      test_export_inline_decks_on_curves); the union area of each chain's decks and slabs is compared apart (`deck_areas`, DECK_AREA);
     - a polygon by its rings, not by the order of its parts, the start point or the orientation of a ring (the background's land:
       mapstyle cuts the sea out with GEOS, the Rust reader with i_overlay, which writes the same points in another order);
     - a slot's road (`__rs_edge`, `__rs_edge2`) as the road or its undirected twin, the lower row of the two (the same line reversed, the
@@ -97,14 +99,49 @@ def normalised(style):
         for k, (row, edge_id) in rows.items():
             props = out["sources"][name]["data"]["features"][k]["properties"]
             props["__rs_edge"], props["edge_id"] = row, edge_id
-    for f in out["sources"].get("decks", {}).get("data", {}).get("features", []):
-        f.pop("geometry", None)
+    if "decks" in out["sources"]:
+        out["sources"]["decks"]["data"] = {"chains": _deck_chains(style)}
     for src in out["sources"].values():
         for f in (src.get("data") or {}).get("features", []) if isinstance(src.get("data"), dict) else []:
             g = f.get("geometry") or {}
             if g.get("type") in ("Polygon", "MultiPolygon"):
                 f["geometry"] = {"type": "MultiPolygon", "rings": _rings(g)}
     return out
+
+
+DECK_KEYS = ("__rs_edges", "__rs_casing_slab", "__rs_base", "__rs_height", "__rs_hs", "__rs_he")
+# the union area of a chain's decks and of its slabs, as a part of mapstyle's: tests/test_engine_parity.py's _DECK_AREA and _SLAB_AREA
+DECK_AREA = {False: 0.005, True: 0.05}
+
+
+def _decks(style):
+    return ((style["sources"].get("decks") or {}).get("data") or {}).get("features") or []
+
+
+def _deck_chains(style):
+    """{chain: the sorted set of its features' DECK_KEYS values (as JSON text)}."""
+    out = {}
+    for f in _decks(style):
+        p = f["properties"]
+        out.setdefault(str(p["__rs_chain"]), set()).add(json.dumps([p.get(k) for k in DECK_KEYS]))
+    return {c: sorted(v) for c, v in sorted(out.items())}
+
+
+def deck_areas(style):
+    """{(chain, slab): the union area of the chain's decks (slab False) or casing slabs (True)}."""
+    from shapely import make_valid
+    from shapely.geometry import shape
+    from shapely.ops import unary_union
+    parts = {}
+    for f in _decks(style):
+        p = f["properties"]
+        parts.setdefault((str(p["__rs_chain"]), bool(p.get("__rs_casing_slab"))), []).append(make_valid(shape(f["geometry"])))
+    return {k: unary_union(v).area for k, v in parts.items()}
+
+
+def stored(name):
+    """The stored mapstyle style `name` (tests/data/mapstyle/, not in git)."""
+    return json.loads(gzip.decompress((HERE / "data" / "mapstyle" / f"{name}.json.gz").read_bytes()))
 
 
 def _attached_ties(style):
@@ -190,6 +227,18 @@ def write_styles():
     (HERE / "data" / "mapstyle_digests.json").write_text(json.dumps(digests, indent=1) + "\n")
 
 
+def renormalise():
+    """The normalised digests again from the stored styles (after a rule of `normalised` changed), each style's record digest unchanged."""
+    path = HERE / "data" / "mapstyle_digests.json"
+    digests = json.loads(path.read_text())
+    for name, d in digests.items():
+        style = stored(name)
+        assert {k: v for k, v in digest(style).items()} == {k: d[k] for k in ("sha256", "layers", "bytes")}, f"{name}: not the stored golden"
+        d["normalised"] = digest(normalised(style))
+        print(name, d["normalised"])
+    path.write_text(json.dumps(digests, indent=1) + "\n")
+
+
 if __name__ == "__main__":
     for part in sys.argv[1:]:
-        {"looks": write_looks, "styles": write_styles}[part]()
+        {"looks": write_looks, "styles": write_styles, "renormalise": renormalise}[part]()
