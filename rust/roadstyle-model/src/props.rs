@@ -12,29 +12,38 @@ fn names() -> &'static Mutex<HashSet<&'static str>> {
     NAMES.get_or_init(Default::default)
 }
 
-/// The one copy of a key name (made the first time; a program has some hundred names).
-fn intern(k: &str) -> &'static str {
-    let mut t = names().lock().unwrap();
-    if let Some(&s) = t.get(k) {
-        return s;
-    }
-    let s: &'static str = Box::leak(k.into());
-    t.insert(s);
-    s
+thread_local! {
+    /// this thread's names already looked up (audit R11: the global lock only for a name that the thread has not seen)
+    static SEEN: std::cell::RefCell<std::collections::HashMap<Box<str>, &'static str>> = Default::default();
 }
 
-/// The copy of a name, if a property has it.
-fn find(k: &str) -> Option<&'static str> {
-    names().lock().unwrap().get(k).copied()
+/// The one copy of a key name (made the first time; a program has some hundred names).
+fn intern(k: &str) -> &'static str {
+    if let Some(s) = SEEN.with(|m| m.borrow().get(k).copied()) {
+        return s;
+    }
+    let s = {
+        let mut t = names().lock().unwrap();
+        match t.get(k) {
+            Some(&s) => s,
+            None => {
+                let s: &'static str = Box::leak(k.into());
+                t.insert(s);
+                s
+            }
+        }
+    };
+    SEEN.with(|m| m.borrow_mut().insert(k.into(), s));
+    s
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Props(Vec<(&'static str, Value)>);
 
 impl Props {
+    /// A key's place: by its text, with no lock (audit R11).
     fn at(&self, k: &str) -> Option<usize> {
-        let k = find(k)?;
-        self.0.iter().position(|e| std::ptr::eq(e.0, k))
+        self.0.iter().position(|e| e.0 == k)
     }
 
     pub fn get(&self, k: &str) -> Option<&Value> {
