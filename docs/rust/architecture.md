@@ -224,35 +224,21 @@ Cdylib, in `rust/roadstyle-py/`. Public API: `make_style`, `make_look`, `compute
 
 ```mermaid
 flowchart TB
-    subgraph native["Python process (native)"]
-        gdf["GeoDataFrame + render_edges keywords"]
-        gdf -->|"to_parquet, make_look"| inp1["roads.parquet bytes + look JSON"]
-    end
-    subgraph worker["Browser: worker"]
-        sql["duckdb-wasm + roads_sql.js"] --> inp2["roads.parquet bytes"]
-        mk["makeLook"] --> lk2["look JSON"]
-    end
-    subgraph core["Rust engine: native in Python, WebAssembly in the worker"]
-        rd["roadstyle-io: read"] --> eng["roadstyle-engine: levels, sources, layers"]
-        eng --> sty["style + roadstyle:* metadata"]
-        sty --> tl["roadstyle-tiles: Tiler, PMTiles"]
-        sty --> pg["roadstyle: page writer"]
-    end
-    inp1 --> rd
-    inp2 --> rd
-    lk2 --> eng
-    subgraph page["Browser: page (main thread)"]
-        ml["MapLibre"]
-        db["dashboard: rsDashboard(map, options)"]
-        rsobj["rs object"]
-        db --> rsobj
-    end
-    sty -->|"style JSON"| ml
-    tl -->|"rs:// or pmtiles://"| ml
-    pg -->|"one HTML file"| page
-    sty -->|"roadstyle:* metadata"| db
-    db -->|"setFilter, global state, feature state"| ml
-    db -.->|"engine.props: one road"| tl
+    py["Python:<br/>GeoDataFrame<br/>+ keywords"]
+    wk["Browser worker:<br/>duckdb-wasm<br/>+ roads_sql.js"]
+    eng["Rust engine:<br/>read, levels,<br/>style, tiles"]
+    sty["style<br/>+ metadata"]
+    tl["tiles"]
+    db["dashboard<br/>+ rs object"]
+    ml["MapLibre"]
+    py -->|"Parquet + look"| eng
+    wk -->|"Parquet + look"| eng
+    eng --> sty
+    eng --> tl
+    sty -->|"metadata"| db
+    sty -->|"style"| ml
+    tl --> ml
+    db -->|"MapLibre calls"| ml
 ```
 
 *The engine is the same code in both places. In Python it runs natively; in the browser it runs in a worker, and the page only
@@ -294,30 +280,22 @@ against the code.
 
 ```mermaid
 flowchart TB
-    subgraph engine["Engine"]
-        st["layers + sources"]
-        md["metadata: contract, state,<br/>controls, interaction, color_options"]
-    end
-    subgraph map["MapLibre map"]
-        lay["layers"]
-        gs["global state<br/>rs_co, rs_colors, rs_fill_on, ..."]
-        fs["feature state<br/>hover, select"]
-    end
-    subgraph dash["Dashboard"]
-        ctl["controls"]
-        api["rs object: getState, setState, on, link"]
-    end
+    md["engine:<br/>style + metadata"]
+    ctl["dashboard<br/>controls"]
+    api["rs object"]
     host["host page"]
-    st --> lay
-    md -->|"read once, and at setStyle"| ctl
-    ctl -->|"setGlobalStateProperty"| gs
-    ctl -->|"setFeatureState"| fs
-    ctl -->|"setFilter, visibility"| lay
+    gs["global state<br/>rs_co, rs_colors"]
+    fs["feature state<br/>hover, select"]
+    lay["MapLibre<br/>layers"]
+    md -->|"read"| ctl
+    host <-->|"calls, events"| api
+    api --> ctl
+    ctl -->|"set state"| gs
+    ctl -->|"set state"| fs
+    ctl -->|"setFilter"| lay
     gs --> lay
     fs --> lay
-    api --> ctl
-    host <-->|"calls and events"| api
-    ctl -.->|"restyle (planned)"| engine
+    ctl -.->|"restyle (planned)"| md
 ```
 
 *The dashed arrow is planned, not built. A change that needs new data (a color column that the style does not have, another
@@ -326,25 +304,27 @@ profile) cannot go back to the engine, and `rs.can(...)` returns false for it.*
 ## The JavaScript side
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph w["Worker"]
         duck["duckdb-wasm"]
-        rsql["roads_sql.js: writeRoads"]
-        fsql["features_sql.js: writeFeatures"]
-        wasm["roadstyle-wasm: makeLook, makeStyle, Tiler, makePage"]
-        duck --> rsql & fsql
-        rsql & fsql -->|"Parquet bytes"| wasm
+        rsql["roads_sql.js<br/>writeRoads"]
+        fsql["features_sql.js<br/>writeFeatures"]
+        wasm["roadstyle-wasm<br/>makeStyle, Tiler"]
+        duck --> rsql
+        duck --> fsql
+        rsql -->|"Parquet"| wasm
+        fsql -->|"Parquet"| wasm
     end
     subgraph p["Page"]
-        idx["dashboard/index.js: rsDashboard"]
-        core["core.js: state, road data, id sets"]
-        ctl["controls: select, color, legend, filter, find,<br/>overlays, tunnel, views, basemap, view3d,<br/>streetview, google3d, arrows, panel, zoom"]
-        api["api.js: the rs object"]
-        idx --> core & ctl & api
-        ctl --> core
-        api --> ctl
+        idx["index.js<br/>rsDashboard"]
+        core["core.js<br/>state, road data"]
+        ctl["the controls<br/>one file each"]
+        api["api.js<br/>rs object"]
+        idx --> core
+        idx --> ctl
+        idx --> api
     end
-    wasm -->|"style JSON, tiles"| p
+    wasm -->|"style, tiles"| idx
 ```
 
 *The dashboard modules are ES modules. The Python page puts them in the page as one plain script (`render_web._DASH_FILES`), so a
@@ -442,14 +422,14 @@ The phases of the plan, on 2026-10-23:
 
 ```mermaid
 flowchart TB
-    P0["P0 the reference:<br/>Python goldens, CI"]:::done
-    P1["P1 one branch with all the work"]:::done
-    P2["P2 the crate split"]:::done
-    P3["P3 the typed look, the layer roles"]:::part
-    P4["P4 the style features; the columnar model"]:::part
-    P5["P5 the Python binding, the wheel"]:::done
-    P6["P6 the page, the export, the rs object"]:::part
-    P7["P7 Python as a thin layer, 1.0"]:::open
+    P0["P0 the reference:<br/>goldens, CI"]:::done
+    P1["P1 one branch<br/>with all work"]:::done
+    P2["P2 the crate<br/>split"]:::done
+    P3["P3 typed look,<br/>layer roles"]:::part
+    P4["P4 style features,<br/>columnar model"]:::part
+    P5["P5 Python binding,<br/>the wheel"]:::done
+    P6["P6 page, export,<br/>rs object"]:::part
+    P7["P7 Python as a<br/>thin layer, 1.0"]:::open
     P0 --> P1 --> P2
     P2 --> P3 & P4 & P5
     P3 & P4 --> P6
