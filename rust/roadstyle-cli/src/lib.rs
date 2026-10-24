@@ -2,3 +2,6 @@
 //! roadstyle-serve, which the Python binding calls too.
 
 pub mod commands;
+mod error;
+
+pub use error::Error;

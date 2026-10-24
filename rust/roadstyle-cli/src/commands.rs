@@ -2,6 +2,7 @@
 //! `levels solve`) and the level editor (`serve`). The options have the names of roadstyle's Python keywords (`--color-by lanes` is
 //! `color_by="lanes"`, `--no-arrows` is `arrows=False`); a value that is JSON (a number, true, a list) is read as JSON.
 
+use crate::Error;
 use roadstyle::level_area::{make_area, MakeOptions};
 use roadstyle::level_editor::Editor;
 use serde_json::{Map, Value};
@@ -72,7 +73,7 @@ const MAPLIBRE_CSS: &str = include_str!("../../../src/roadstyle/vendor/maplibre-
 
 /// The look's options of the command's options: --palette, --profile, --settings FILE.json and every other option as a keyword
 /// (`args`), which `defaults` can add to.
-fn look_options(opts: &mut Vec<(String, Option<String>)>, defaults: impl FnOnce(&mut Map<String, Value>)) -> Result<roadstyle::look::Options, String> {
+fn look_options(opts: &mut Vec<(String, Option<String>)>, defaults: impl FnOnce(&mut Map<String, Value>)) -> Result<roadstyle::look::Options, Error> {
     let mut look = Map::new();
     for k in ["palette", "profile"] {
         if let Some(v) = take(opts, k) {
@@ -80,31 +81,31 @@ fn look_options(opts: &mut Vec<(String, Option<String>)>, defaults: impl FnOnce(
         }
     }
     if let Some(f) = take(opts, "settings") {
-        let text = String::from_utf8(read(&f)?).map_err(|e| format!("{f}: {e}"))?;
-        look.insert("settings".into(), serde_json::from_str(&text).map_err(|e| format!("{f}: not JSON: {e}"))?);
+        let text = String::from_utf8(read(&f)?).map_err(|e| Error::File(format!("{f}: {e}")))?;
+        look.insert("settings".into(), serde_json::from_str(&text).map_err(|e| Error::File(format!("{f}: not JSON: {e}")))?);
     }
     let mut kw: Map<String, Value> = opts.iter().map(keyword).collect();
     defaults(&mut kw);
     look.insert("args".into(), Value::Object(kw));
-    roadstyle::look::Options::from_value(&Value::Object(look))
+    Ok(roadstyle::look::Options::from_value(&Value::Object(look))?)
 }
 
-fn read(path: &str) -> Result<Vec<u8>, String> {
-    std::fs::read(path).map_err(|e| format!("{path}: {e}"))
+fn read(path: &str) -> Result<Vec<u8>, Error> {
+    std::fs::read(path).map_err(|e| Error::File(format!("{path}: {e}")))
 }
 
 /// The roads of a file by its extension (roadstyle-io's readers): GeoParquet (.parquet, the line in `geometry`), GeoJSON (.geojson,
 /// .json), a Shapefile (.shp, with its .dbf and .prj beside it) or a GeoPackage (.gpkg, its first feature table). The lines in
 /// EPSG:4326 (a Shapefile or GeoPackage in another CRS is reprojected).
-fn roads(path: &str) -> Result<roadstyle::RoadTable, String> {
+fn roads(path: &str) -> Result<roadstyle::RoadTable, Error> {
     let p = Path::new(path);
     let beside = |ext: &str| p.with_extension(ext).to_string_lossy().into_owned();
     match p.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref() {
-        Some("parquet" | "geoparquet") => roadstyle::read::read_roads(read(path)?, "geometry"),
-        Some("geojson" | "json") => roadstyle::geojson::read_roads(&read(path)?),
+        Some("parquet" | "geoparquet") => Ok(roadstyle::read::read_roads(read(path)?, "geometry")?),
+        Some("geojson" | "json") => Ok(roadstyle::geojson::read_roads(&read(path)?)?),
         Some("shp") => {
             let prj = std::fs::read_to_string(beside("prj")).ok();
-            roadstyle::shp::read_roads(&read(path)?, &read(&beside("dbf"))?, prj.as_deref(), path)
+            Ok(roadstyle::shp::read_roads(&read(path)?, &read(&beside("dbf"))?, prj.as_deref(), path)?)
         }
         Some("gpkg") => {
             let (t, warning) = roadstyle::gpkg::read_roads(&read(path)?, path)?;
@@ -113,13 +114,13 @@ fn roads(path: &str) -> Result<roadstyle::RoadTable, String> {
             }
             Ok(t)
         }
-        _ => Err(format!("{path}: the roads must be a .parquet, .geojson, .shp or .gpkg file")),
+        _ => Err(Error::Usage(format!("{path}: the roads must be a .parquet, .geojson, .shp or .gpkg file"))),
     }
 }
 
 /// Runs one command (`args` without the program's name).
-pub fn run(args: &[String]) -> Result<(), String> {
-    let (cmd, rest) = args.split_first().ok_or(USAGE)?;
+pub fn run(args: &[String]) -> Result<(), Error> {
+    let (cmd, rest) = args.split_first().ok_or(Error::Usage(USAGE.into()))?;
     let (pos, mut opts) = split(rest);
     let list = |v: Option<String>| v.map(|s| s.split(',').map(str::trim).filter(|c| !c.is_empty()).map(String::from).collect::<Vec<_>>()).unwrap_or_default();
     match (cmd.as_str(), pos.as_slice()) {
@@ -127,7 +128,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
             let format = match take(&mut opts, "format").as_deref().unwrap_or("geojson") {
                 "geojson" => roadstyle::Format::GeoJson,
                 "geoparquet" => roadstyle::Format::GeoParquet,
-                f => return Err(format!("--format must be geojson or geoparquet, not {f}")),
+                f => return Err(Error::Usage(format!("--format must be geojson or geoparquet, not {f}"))),
             };
             let keep = list(take(&mut opts, "keep"));
             let name = take(&mut opts, "name");
@@ -157,7 +158,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
             }
             let html = page.html.replacen("__MAPLIBRE_CSS__", MAPLIBRE_CSS, 1)
                 .replacen("__MAPLIBRE_JS__", &MAPLIBRE_JS.replace("</script>", "<\\/script>"), 1);
-            std::fs::write(out, &html).map_err(|e| format!("{out}: {e}"))?;
+            std::fs::write(out, &html).map_err(|e| Error::File(format!("{out}: {e}")))?;
             println!("{out} {} bytes", html.len());
             Ok(())
         }
@@ -167,15 +168,15 @@ pub fn run(args: &[String]) -> Result<(), String> {
             let base = take(&mut opts, "base_url").map(|b| format!("{}/", b.trim_end_matches('/'))).unwrap_or_default();
             no_more(&opts)?;
             let (style, tiles) = roadstyle::tile_files(Path::new(src), &keep, None, &roadstyle::xyz_at(&base))?;
-            let bounds = tiles.bounds().ok_or(format!("tiles: no feature in the files of {src}"))?;
+            let bounds = tiles.bounds().ok_or(Error::Engine(format!("tiles: no feature in the files of {src}")))?;
             let out = PathBuf::from(out);
             match format.as_str() {
                 "pmtiles" => {
-                    let bytes = tiles.archive(bounds, &tiles.layer_names()).ok_or("tiles: no tile")?;
+                    let bytes = tiles.archive(bounds, &tiles.layer_names()).ok_or(Error::Engine("tiles: no tile".into()))?;
                     if let Some(d) = out.parent().filter(|d| !d.as_os_str().is_empty()) {
-                        std::fs::create_dir_all(d).map_err(|e| format!("{}: {e}", d.display()))?;
+                        std::fs::create_dir_all(d).map_err(|e| Error::File(format!("{}: {e}", d.display())))?;
                     }
-                    std::fs::write(&out, &bytes).map_err(|e| format!("{}: {e}", out.display()))?;
+                    std::fs::write(&out, &bytes).map_err(|e| Error::File(format!("{}: {e}", out.display())))?;
                     println!("{} {} bytes", out.display(), bytes.len());
                 }
                 "xyz" => {
@@ -188,38 +189,38 @@ pub fn run(args: &[String]) -> Result<(), String> {
                                 let b = tiles.tile(z, x, y);
                                 if !b.is_empty() {
                                     let p = out.join("roads").join(z.to_string()).join(x.to_string());
-                                    std::fs::create_dir_all(&p).map_err(|e| format!("{}: {e}", p.display()))?;
-                                    std::fs::write(p.join(y.to_string()), &b).map_err(|e| e.to_string())?;
+                                    std::fs::create_dir_all(&p).map_err(|e| Error::File(format!("{}: {e}", p.display())))?;
+                                    std::fs::write(p.join(y.to_string()), &b).map_err(|e| Error::File(e.to_string()))?;
                                     n += 1;
                                 }
                             }
                         }
                     }
-                    std::fs::write(out.join("style.json"), style.to_string()).map_err(|e| e.to_string())?;
+                    std::fs::write(out.join("style.json"), style.to_string()).map_err(|e| Error::File(e.to_string()))?;
                     println!("{} tiles and style.json in {}", n, out.display());
                 }
-                f => return Err(format!("--format must be pmtiles or xyz, not {f}")),
+                f => return Err(Error::Usage(format!("--format must be pmtiles or xyz, not {f}"))),
             }
             Ok(())
         }
         ("levels", [sub, rest @ ..]) => levels(sub, rest, opts),
         ("serve", [area]) => {
-            let port: u16 = take(&mut opts, "port").map_or(Ok(8780), |p| p.parse().map_err(|_| "--port needs a number"))?;
+            let port: u16 = take(&mut opts, "port").map_or(Ok(8780), |p| p.parse().map_err(|_| Error::Usage("--port needs a number".into())))?;
             let page = take(&mut opts, "page").map_or(roadstyle_serve::Page::Embedded, |p| roadstyle_serve::Page::Dir(p.into()));
             no_more(&opts)?;
             println!("level editor: http://127.0.0.1:{port}/level_editor/  ({area}; Ctrl+C to stop)");
-            roadstyle_serve::serve(Path::new(area), page, port)
+            Ok(roadstyle_serve::serve(Path::new(area), page, port)?)
         }
         ("snapshot", [page, out]) => snapshot(page, out, opts),
         ("help" | "-h", _) => {
             println!("{USAGE}");
             Ok(())
         }
-        _ => Err(USAGE.into()),
+        _ => Err(Error::Usage(USAGE.into())),
     }
 }
 
-fn levels(sub: &str, pos: &[String], mut opts: Vec<(String, Option<String>)>) -> Result<(), String> {
+fn levels(sub: &str, pos: &[String], mut opts: Vec<(String, Option<String>)>) -> Result<(), Error> {
     match (sub, pos) {
         ("make", [edges, folder]) => {
             let d = MakeOptions::default();
@@ -231,7 +232,7 @@ fn levels(sub: &str, pos: &[String], mut opts: Vec<(String, Option<String>)>) ->
             if let Some(order) = take(&mut opts, "order") {
                 o.order = (order != "none").then_some(order);
             }
-            let num = |v: Option<String>, d: f64, k: &str| v.map_or(Ok(d), |v| v.parse().map_err(|_| format!("--{k} needs a number")));
+            let num = |v: Option<String>, d: f64, k: &str| v.map_or(Ok(d), |v| v.parse().map_err(|_| Error::Usage(format!("--{k} needs a number"))));
             o.band_dist = num(take(&mut opts, "band_dist"), o.band_dist, "band-dist")?;
             o.head_m = num(take(&mut opts, "head_m"), o.head_m, "head-m")?;
             if let Some(i) = opts.iter().position(|(n, v)| n == "near_rules" && v.is_none()) {
@@ -252,28 +253,28 @@ fn levels(sub: &str, pos: &[String], mut opts: Vec<(String, Option<String>)>) ->
             let dir = Path::new(folder);
             let text = |f: &str| std::fs::read_to_string(dir.join(f)).unwrap_or_default();
             let mut ed = Editor::new(read(&dir.join("roads.parquet").to_string_lossy())?, &text("pairs.csv"))?;
-            let answer: Value = serde_json::from_str(&ed.solve(&text("edits.csv"))?).map_err(|e| e.to_string())?;
+            let answer: Value = serde_json::from_str(&ed.solve(&text("edits.csv"))?).map_err(|e| Error::Engine(e.to_string()))?;
             let levels: Vec<i64> = answer["levels"].as_array().into_iter().flatten().flat_map(|v| v.as_array().cloned().unwrap_or_default())
                 .filter_map(|x| x.as_i64()).collect();
             let csv = ed.levels_csv(&levels, &text("heads.csv"), &text("caps.csv"))?;
-            std::fs::write(dir.join("levels.csv"), csv).map_err(|e| e.to_string())?;
+            std::fs::write(dir.join("levels.csv"), csv).map_err(|e| Error::File(e.to_string()))?;
             let mut info = answer["info"].clone();
             for k in ["given_up", "given_up_parts", "near", "orders_not_kept"] {
                 info[k] = answer[k].clone();
             }
-            std::fs::write(dir.join("levels_info.json"), info.to_string()).map_err(|e| e.to_string())?;
+            std::fs::write(dir.join("levels_info.json"), info.to_string()).map_err(|e| Error::File(e.to_string()))?;
             println!("{} roads -> {}: {} stack pair(s) given up, {} order wish(es) not kept", answer["levels"].as_array().map_or(0, Vec::len),
                      dir.join("levels.csv").display(), answer["given_up"].as_array().map_or(0, Vec::len), info["order_violations"]);
             Ok(())
         }
-        _ => Err(USAGE.into()),
+        _ => Err(Error::Usage(USAGE.into())),
     }
 }
 
 /// An error for an option the command does not take.
-fn no_more(opts: &[(String, Option<String>)]) -> Result<(), String> {
+fn no_more(opts: &[(String, Option<String>)]) -> Result<(), Error> {
     match opts.first() {
-        Some((n, _)) => Err(format!("unknown option --{}\n\n{USAGE}", n.replace('_', "-"))),
+        Some((n, _)) => Err(Error::Usage(format!("unknown option --{}\n\n{USAGE}", n.replace('_', "-")))),
         None => Ok(()),
     }
 }
@@ -288,15 +289,15 @@ fn tile_of(lon: f64, lat: f64, z: u32) -> [u32; 2] {
 }
 
 /// `snapshot`: the PNG of a saved page; a map that did not load in the time is taken with a warning (on stderr), as in Python.
-fn snapshot(page: &str, out: &str, mut opts: Vec<(String, Option<String>)>) -> Result<(), String> {
+fn snapshot(page: &str, out: &str, mut opts: Vec<(String, Option<String>)>) -> Result<(), Error> {
     use roadstyle_snapshot::{Camera, Shot};
-    let num = |k: &str, v: Option<String>| -> Result<Option<f64>, String> {
-        v.map(|v| v.parse::<f64>().map_err(|_| format!("--{k} needs a number, not {v:?}"))).transpose()
+    let num = |k: &str, v: Option<String>| -> Result<Option<f64>, Error> {
+        v.map(|v| v.parse::<f64>().map_err(|_| Error::Usage(format!("--{k} needs a number, not {v:?}")))).transpose()
     };
     let center = match take(&mut opts, "center") {
         Some(c) => {
-            let ll: Vec<f64> = c.split(',').map(|v| v.trim().parse::<f64>()).collect::<Result<_, _>>().map_err(|_| "--center needs LON,LAT")?;
-            Some(<[f64; 2]>::try_from(ll).map_err(|_| "--center needs LON,LAT")?)
+            let ll: Vec<f64> = c.split(',').map(|v| v.trim().parse::<f64>()).collect::<Result<_, _>>().map_err(|_| Error::Usage("--center needs LON,LAT".into()))?;
+            Some(<[f64; 2]>::try_from(ll).map_err(|_| Error::Usage("--center needs LON,LAT".into()))?)
         }
         None => None,
     };
@@ -309,9 +310,9 @@ fn snapshot(page: &str, out: &str, mut opts: Vec<(String, Option<String>)>) -> R
                       scale: num("scale", take(&mut opts, "scale"))?.unwrap_or(d.scale),
                       settle: secs("settle", take(&mut opts, "settle"), d.settle)?, timeout: secs("timeout", take(&mut opts, "timeout"), d.timeout)? };
     if let Some((k, _)) = opts.first() {
-        return Err(format!("snapshot: unknown option --{k}\n{USAGE}"));
+        return Err(Error::Usage(format!("snapshot: unknown option --{k}\n{USAGE}")));
     }
-    let pic = roadstyle_snapshot::snapshot(page.as_ref(), out.as_ref(), &cam, &shot).map_err(|e| e.to_string())?;
+    let pic = roadstyle_snapshot::snapshot(page.as_ref(), out.as_ref(), &cam, &shot).map_err(|e| Error::Engine(e.to_string()))?;
     if let Some(w) = pic.warning {
         eprintln!("roadstyle: warning: {w}");
     }
