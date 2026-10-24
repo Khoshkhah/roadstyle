@@ -175,3 +175,17 @@ def test_stage_1_is_the_road_table_form_and_only_an_export_has_the_roads(part, k
     src.page_arrows()
     st = json.loads(src.style())
     assert next(lyr for lyr in st["layers"] if lyr["id"] == "roads-arrows")["source"] == "arrows" and st["metadata"]["roadstyle:arrows"] == "points"
+
+
+def test_a_warning_of_the_rust_engine_is_a_python_warning():
+    """R17: the engine gives its warnings back with its output (no thread-local in the engine); the binding gives them to Python. A
+    two-way pair whose two directions have other casing numbers gets the twin_casing warning."""
+    import geopandas as gpd
+    from shapely.geometry import LineString
+
+    a, b = (18.0, 59.30), (18.0, 59.301)
+    g = gpd.GeoDataFrame({"edge_id": [1, 2], "highway": "primary", "cs": [1, 1], "cm": [1, 2], "ce": [1, 1], "fl": [3, 3]},
+                         geometry=[LineString([a, b]), LineString([b, a])], crs=4326)
+    kw = dict(casing_start_col="cs", casing_level_col="cm", casing_end_col="ce", fill_level_col="fl", engine="rust")
+    with pytest.warns(UserWarning, match="twin_casing: 1 two-way pair"):
+        rs.export_inline(g, **kw)

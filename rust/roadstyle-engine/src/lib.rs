@@ -29,34 +29,6 @@ pub(crate) use roadstyle_model::obj;
 
 use serde_json::{json, Value};
 
-thread_local! {
-    static WARNINGS: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
-}
-
-/// A warning of the engine (Python's warnings.warn in render_web): the caller takes them after a call (`take_warnings`).
-pub fn warn(msg: String) {
-    WARNINGS.with(|w| w.borrow_mut().push(msg));
-}
-
-thread_local! {
-    static CLS: std::cell::RefCell<String> = std::cell::RefCell::new("highway".into());
-}
-
-/// The column of the class filter (render's filter_col, else highway_col; in the engine's names): `__rs_cls` on every piece is its value.
-pub(crate) fn cls_col() -> String {
-    CLS.with(|c| c.borrow().clone())
-}
-
-/// The class filter's value of a road (render's fcol).
-pub(crate) fn cls_of(r: Road) -> Value {
-    CLS.with(|c| r.get(&c.borrow()).map_or(Value::Null, Cell::to_value))
-}
-
-/// The warnings of the last calls on this thread, and none after.
-pub fn take_warnings() -> Vec<String> {
-    WARNINGS.with(|w| std::mem::take(&mut *w.borrow_mut()))
-}
-
 /// The most roads of one map: a browser keeps the module's memory under 4 GB. Tartu (63,965 roads) peaks at 1.13 GB natively (2.13 GB
 /// before the typed sources, docs/design/rust_engine.md), and the wasm module used 0.65 to 0.77 times the native peak in the earlier
 /// measurements: about 14 KB a road, so 200,000 roads are about 2.8 GB.
@@ -83,6 +55,8 @@ pub struct Parts {
     pub glyphs: Option<Value>,
     /// state "live": MapLibre's global state, each name with its start value (`{"rs_co": {"default": 0}, ...}`)
     pub state: Option<Value>,
+    /// the warnings of the stages (Python's warnings.warn in render_web)
+    pub warnings: Vec<String>,
 }
 
 /// The style's layers and sources: the roads ("roads", "simple", "slots") and, with `features` (the base-map tables as the worker's SQL
@@ -114,8 +88,8 @@ fn style_parts(table: RoadTable, look: &Look, features: Option<Vec<Row>>, planne
             .or_else(|| cols.0.iter().find(|(own, _)| *own == f).map(|(own, _)| ColumnMap::kept(own)))
             .unwrap_or_else(|| f.to_string())
     });
-    CLS.with(|c| *c.borrow_mut() = fcol);
     let mut feats = Roads::new(table);
+    feats.cls = fcol;
     let colors = roads::mark_roads(&mut feats, &look.road, &look.args)?;
     let width_col = look.args["width_m_col"].as_str().filter(|c| !c.is_empty());
     // render's arrows and labels (both on by default): the slots exist only for them
@@ -162,6 +136,7 @@ fn style_parts(table: RoadTable, look: &Look, features: Option<Vec<Row>>, planne
         None => None,
     };
     let (center, zoom) = camera(&feats);
+    let warnings = std::mem::take(&mut feats.warnings);
     let mut roads = roads::roads_source(feats);
     // render's view_3d: the bridges' extruded decks (_bridge_decks)
     let decks = if look.args["view_3d"] == true {
@@ -267,7 +242,7 @@ fn style_parts(table: RoadTable, look: &Look, features: Option<Vec<Row>>, planne
     let name = name.map_or_else(|| look.args["name"].clone(), Value::from);
     data_settings(&mut sources, &look.args);
     cols.to_user(&mut sources, &mut layers);
-    Ok(Parts { name, center, zoom, layers, sources, metadata: Value::Object(metadata), glyphs, state })
+    Ok(Parts { name, center, zoom, layers, sources, metadata: Value::Object(metadata), glyphs, state, warnings })
 }
 
 /// The style as one JSON text, with each source's GeoJSON in it (roadstyle's export_inline): stage 1 (`sources::Sources`), written.

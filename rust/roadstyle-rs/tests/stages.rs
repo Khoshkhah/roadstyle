@@ -19,7 +19,7 @@ fn same_tiles(area: &str) {
     let look = roadstyle_rs::Look::from_value(look).unwrap();
     let (roads, features) = (data(&format!("{area}/roads.parquet")), data(&format!("{area}/features.parquet")));
     let keep = ["osm_id".to_string(), "access".to_string()];
-    let (_, one) = roadstyle_rs::make_tiled(roads.clone(), &look, Some(features.clone()), None, "rs://", &keep).unwrap();
+    let (_, one, _) = roadstyle_rs::make_tiled(roads.clone(), &look, Some(features.clone()), None, "rs://", &keep).unwrap();
     let s = roadstyle_rs::make_sources(roads.clone(), &look, Some(features), None, None).unwrap();
     let dir = std::env::temp_dir().join(format!("roadstyle-stages-{area}-{}", std::process::id()));
     let mut by_file = Vec::new();

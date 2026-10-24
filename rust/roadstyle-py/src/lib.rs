@@ -4,6 +4,17 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
+use std::cell::RefCell;
+
+thread_local! {
+    /// The engine's warnings of the calls since the last `take_warnings` (audit R17: the engine has no global state; it gives its
+    /// warnings back with its output, and Python's warnings are global, so the binding keeps them for `take_warnings`).
+    static PENDING: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+}
+
+fn warned(w: &[String]) {
+    PENDING.with(|p| p.borrow_mut().extend_from_slice(w));
+}
 
 /// A resolved look (roadstyle-look), parsed one time: `resolve_look(options)` makes it, `Look.from_json(text)` reads a saved look
 /// (version 1, or version 0: today's look.json). The calls below take it, not its text.
@@ -60,7 +71,11 @@ fn resolve_look(py: Python<'_>, options: String) -> PyResult<PyLook> {
 fn make_style(py: Python<'_>, roads: Vec<u8>, look: PyRef<'_, PyLook>, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>)
               -> PyResult<String> {
     let look = &look.0;
-    py.detach(|| roadstyle::make_style(roads, look, features, planner, name)).map_err(PyValueError::new_err)
+    let s = py.detach(|| roadstyle::make_sources(roads, look, features, planner, name)).map_err(PyValueError::new_err)?;
+    warned(&s.warnings);
+    let mut out = Vec::new();
+    py.detach(|| s.write_style(&mut out)).expect("a Vec takes every byte");
+    Ok(String::from_utf8(out).expect("serde_json writes UTF-8"))
 }
 
 /// A map with vector tiles: Tiler(roads, look, features=None, name=None, prefix="", keep=[]), then `style` (the style's JSON text)
@@ -80,7 +95,8 @@ impl Tiler {
     fn new(py: Python<'_>, roads: Vec<u8>, look: PyRef<'_, PyLook>, features: Option<Vec<u8>>, name: Option<String>, prefix: String,
            keep: Vec<String>) -> PyResult<Self> {
         let look = &look.0;
-        let (style, tiles) = py.detach(|| roadstyle::make_tiled(roads, look, features, name, &prefix, &keep)).map_err(PyValueError::new_err)?;
+        let (style, tiles, w) = py.detach(|| roadstyle::make_tiled(roads, look, features, name, &prefix, &keep)).map_err(PyValueError::new_err)?;
+        warned(&w);
         Ok(Tiler { style, tiles })
     }
 
@@ -187,7 +203,10 @@ impl Sources {
     fn add_palettes(&mut self, py: Python<'_>, base: String, looks: Vec<(String, PyRef<'_, PyLook>)>) -> PyResult<()> {
         let looks: Vec<(String, roadstyle::Look)> = looks.into_iter().map(|(n, l)| (n, l.0.clone())).collect();
         let s = &mut self.inner;
-        py.detach(|| roadstyle::palettes::add(s, &base, &looks)).map_err(PyValueError::new_err)
+        let before = s.warnings.len();
+        py.detach(|| roadstyle::palettes::add(s, &base, &looks)).map_err(PyValueError::new_err)?;
+        warned(&s.warnings[before..]);
+        Ok(())
     }
 
     /// road_table() -> str: the road table as the page loads it (tiles.sidecar's form: props, mids, bboxes, lines).
@@ -213,6 +232,7 @@ fn make_sources(py: Python<'_>, roads: Vec<u8>, look: PyRef<'_, PyLook>, feature
                 name: Option<String>) -> PyResult<Sources> {
     let look = &look.0;
     let inner = py.detach(|| roadstyle::make_sources(roads, look, features, planner, name)).map_err(PyValueError::new_err)?;
+    warned(&inner.warnings);
     Ok(Sources { inner })
 }
 
@@ -333,7 +353,7 @@ fn serve(area: String, port: u16, page: Option<String>) -> PyResult<()> {
 /// The engine's warnings since the last call of this (render_web's warnings.warn): the binding gives them as Python warnings.
 #[pyfunction]
 fn take_warnings() -> Vec<String> {
-    roadstyle::take_warnings()
+    PENDING.with(|p| std::mem::take(&mut *p.borrow_mut()))
 }
 
 #[pymodule]

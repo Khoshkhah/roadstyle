@@ -22,6 +22,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   Python (`roadstyle._rust`): `resolve_look(options)` and `Look.from_json(text)`, with `json()`, `part(key)` and `with_arg(key, value)`.
   **A host that passes the look's text** (the duckosm-rust map worker, the GeoLibre plugin's worker) changes one line when it moves to
   this version: `makeStyle(roads, Look.fromJson(lookText), ...)`, and the same for `new Tiler(...)`.
+- **The engine has no hidden state between calls** (audit R17). The class filter's column goes with the roads through the stages, and
+  the warnings come back with the output (`Sources::warnings`, the third value of `make_tiled`), not in thread-locals; the user's own
+  profiles and palettes go through the look's resolution. A colour option's fill name uses the one table of property names. The Python
+  binding keeps the warnings of its calls for `take_warnings()`, so the Python warnings do not change. The property names' table
+  (`props::intern`) and the level solver's cache stay global for now: the first is part of R11, the second belongs to the level solver.
 - **The road layer reads its class tables by an index** (R8, both engines). Each width and offset table over the classes is one
   `["at", ["get", "__rs_ci"], ["literal", [...]]]`, and each feature of `simple` has its class index `__rs_ci`. A piece keeps only what
   the road layer and the page read on it, so it has no `highway` any more (the page reads the class from the road table). On Tartu:

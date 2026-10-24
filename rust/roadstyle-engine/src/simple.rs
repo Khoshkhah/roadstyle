@@ -78,8 +78,8 @@ pub struct Cols {
 }
 
 impl Cols {
-    pub fn new(width: Option<&str>) -> Cols {
-        Cols { fcol: crate::cls_col(), width: width.map(String::from) }
+    pub fn new(fcol: &str, width: Option<&str>) -> Cols {
+        Cols { fcol: fcol.into(), width: width.map(String::from) }
     }
 
     /// A property of a casing piece: the class, lvl, the metre width's column and every mark but the fills.
@@ -202,7 +202,7 @@ impl Piece {
             q.insert("__rs_k", dk.kind.into());
             q.insert("__rs_s", (dk.key + edge as f64 * TIE).into());
         }
-        q.insert("__rs_cls", crate::cls_of(r));
+        q.insert("__rs_cls", r.cls());
         q
     }
 }
@@ -606,13 +606,13 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
         f.props.insert("__rs_s", s.into());
         // _mark_cls: the class and the access of the item's road
         let road = roads.at(e as usize);
-        f.props.insert("__rs_cls", road.map(crate::cls_of).unwrap_or(Value::Null));
+        f.props.insert("__rs_cls", road.map(Road::cls).unwrap_or(Value::Null));
         if let Some(a) = road.and_then(|p| p.get("__rs_access")).filter(|a| !a.is_null()) {
             f.props.insert("__rs_access", a.to_value());
         }
         placed.push((id, f));
     }
-    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(width_col), tolerance: 0.05, maxzoom: None, names: Vec::new(), promote: false, palette: Vec::new(), read: None, classes: None })
+    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(&roads.cls, width_col), tolerance: 0.05, maxzoom: None, names: Vec::new(), promote: false, palette: Vec::new(), read: None, classes: None })
 }
 
 // _mitre_ends: a flat end where another road with metre widths goes on is pushed on to close the corner with the road that goes on most

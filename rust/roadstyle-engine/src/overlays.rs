@@ -407,7 +407,7 @@ pub fn edge_overlay(ov: &mut Overlay, roads: &std::collections::HashMap<String, 
         p.insert("__rs_edge".into(), r.get("__rs_edge").map_or(Value::Null, Cell::to_value));
         p.insert("__rs_fl".into(), fl.into());
         p.insert("__rs_ord".into(), o.into());
-        p.insert("__rs_cls".into(), crate::cls_of(r));
+        p.insert("__rs_cls".into(), r.cls());
         p.insert("__rs_lvl".into(), r.get("lvl").map_or(json!(0), Cell::to_value));
         if truthy(r.get("__rs_tunnel")) {
             p.insert("__rs_tunnel".into(), true.into());

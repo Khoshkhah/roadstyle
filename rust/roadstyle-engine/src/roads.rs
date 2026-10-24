@@ -89,7 +89,7 @@ pub fn mark_roads(fs: &mut Roads, look: &Look, args: &Value) -> Result<crate::co
 /// their properties move into the source, not a copy (Tartu: 0.5 GB).
 pub fn roads_source(mut fs: Roads) -> crate::road::RoadsSource {
     for i in 0..fs.len() {
-        let cls = crate::cls_of(fs.road(i));
+        let cls = fs.road(i).cls();
         fs.draw[i].cls = Some(fs.values.id(&cls));
     }
     crate::road::RoadsSource { roads: fs, tolerance: 0.05, maxzoom: None, names: Vec::new(), in_style: true, read: None }
@@ -324,7 +324,7 @@ fn mark_twin_casing(fs: &mut Roads, pairs: &[(usize, usize)], head_m: f64, id_co
         }
     }
     if !bad.is_empty() {
-        crate::warn(format!("twin_casing: {} two-way pair(s) whose two directions disagree on their casing numbers, heads or end shapes (reversed); \
+        fs.warnings.push(format!("twin_casing: {} two-way pair(s) whose two directions disagree on their casing numbers, heads or end shapes (reversed); \
                              the first edge of each is drawn: {}{}", bad.len(), bad[..bad.len().min(10)].join(", "), if bad.len() > 10 { " ..." } else { "" }));
     }
     !pairs.is_empty()
