@@ -1295,8 +1295,14 @@ uses [review_checklist.md](review_checklist.md)):
    done.
 3. R22, the live data join: a page colours and sizes the roads from a table by MapLibre's feature state (`rs_c`, `rs_w`), with no new build:
    done.
-4. R2 (stage 1 once, its typed output kept; a view's palette as a restyle: done, `roadstyle-engine::palettes`), R1 with R8 (each layer and dashboard module declares what it
-   reads; one class index), R4 (one `Topology`), R3 (a typed stage 3, one `__RS_OPTIONS__`).
+4. R2 (stage 1 once, its typed output kept; a view's palette as a restyle: done, `roadstyle-engine::palettes`), R1 with R8 (each layer
+   and dashboard module declares what it reads; one class index: done), R4 (one `Topology`: done), then the second audit's items
+   ([audit_2026-10-24.md](audit_2026-10-24.md)) in this order: N1 (integers past 2^53 stay Int64 in the model), N3 (one `tile_stage`),
+   N7 (one writer of `roadstyle:sources`, `roadstyle:arrows`, `roadstyle:live`), N2 (stage 1 without the `tiles` and `state` switches),
+   N4 with R1 (one typed road table), N6 then N5 (stage 2 borrows the sources; the border files from Arrow), the engine side of N8 (every
+   style reads `rs_c` and `rs_w`); then R3 (a typed stage 3, one `__RS_OPTIONS__`; with it rule 5, the page options in the engine,
+   `contract.rs`). Rust only, with no Python golden: `live_data`, `export_geojson` / `tile_geojson` and the GeoParquet road table. R17 grew:
+   the levels' `CACHE`.
 5. (c) `roadstyle-look` (with R16, R17).
 6. **The mapstyle merge** (approved 2026-10-23): roadstyle gets a duckOSM reader for the roads of every mode and the base-map tables
    (`features.*`) in `roadstyle-io`; mapstyle's look (`styles/*.yaml`: layers, modes, paths, osm_carto, themes, the icons, the patterns,

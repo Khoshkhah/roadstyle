@@ -221,7 +221,7 @@ There is no golden test against Rust in <code>tests/</code>.</p>
 <td></td>
 <td><code>levels/</code></td>
 <td>1,484</td>
-<td><code>compute</code>: the tags rule and the solver (least span first, then push-relabel min-cost flow)</td>
+<td><code>levels</code>: the tags rule and the solver (least span first, then push-relabel min-cost flow)</td>
 </tr>
 <tr>
 <td></td>
@@ -532,7 +532,7 @@ The engine uses it to compute the numbers when the caller gives none.</em></p>
 </tr>
 <tr>
 <td><code>roadstyle-levels</code></td>
-<td><code>levels/</code> as it is today: <code>LevelEdges</code>, <code>compute</code>, <code>Method</code>, <code>Row</code></td>
+<td><code>levels/</code> as it is today: <code>LevelEdges</code>, <code>levels</code>, <code>Options</code>, <code>Method</code>, <code>Row</code></td>
 <td>rstar, sha2</td>
 <td>yes</td>
 </tr>
@@ -949,7 +949,8 @@ tunnel gap and dashes.</p>
    <code>caps.csv</code>), the caller's column (<code>head_start_m_col</code>, <code>cap_start_col</code>, ...), the solver's result (the square cap at the dead end of
    a two-way road, <code>auto_ends</code> when asked), the profile (<code>head_m</code>, round).</li>
 <li><strong>Edits are rules, not numbers.</strong> An edit adds a row to the solver's input or switches one off (<code>enabled = false</code> removes the same
-   row of <code>pairs.csv</code>). It never sets a number. The Rust solver has no edits today (<code>levels/mod.rs:3</code>), and P4 adds them.</li>
+   row of <code>pairs.csv</code>). It never sets a number. The Rust solver takes them as <code>Options::edits</code>, and the held roads as
+   <code>Options::fixed</code> (2026-10-23).</li>
 <li><strong>Stored numbers are checked.</strong> The engine compares the stored parameters (<code>method</code>, <code>head_m</code>, <code>band_dist</code>, <code>margin</code>,
    <code>max_level</code>, <code>band_source</code>, <code>order_source</code>, <code>min_positions</code>), the number of edges and the edge hash. An edge with no stored row is
    an error, as in Python's <code>levels_db</code>. (The worker SQL of today joins with <code>LEFT JOIN</code>, and a missing row becomes 0.)</li>
@@ -1834,10 +1835,10 @@ let bytes: Vec&lt;u8&gt; = tiled.tile(&quot;roads&quot;, 14, 8800, 4700);
 io::write_style_dir(&amp;map, &quot;out/&quot;, io::TileFormat::Pmtiles)?;  // export_style
 </code></pre>
 <p>The level solver alone (duckosm-core):</p>
-<pre><code class="language-rust">use roadstyle_levels::{LevelEdges, Method, compute};
+<pre><code class="language-rust">use roadstyle_levels::{levels, LevelEdges, Options};
 let mut edges = LevelEdges::default();
 edges.add(0, edge);                                 // rank 0 = driving
-let levels = compute(&amp;edges, Method::Solve)?;
+let lv = levels(&amp;edges, &amp;Options::default())?;     // compute_levels' defaults (the solve); a second call with the same edges is cached
 </code></pre>
 <h3 id="javascript">JavaScript</h3>
 <p>The JS API of today stays the same through phase 3, so the two users do not break. The new form takes one options object:</p>
@@ -2374,8 +2375,14 @@ uses <a href="review_checklist.md">review_checklist.md</a>):</p>
    done.</li>
 <li>R22, the live data join: a page colours and sizes the roads from a table by MapLibre's feature state (<code>rs_c</code>, <code>rs_w</code>), with no new build:
    done.</li>
-<li>R2 (stage 1 once, its typed output kept; a view's palette as a restyle: done, <code>roadstyle-engine::palettes</code>), R1 with R8 (each layer and dashboard module declares what it
-   reads; one class index), R4 (one <code>Topology</code>), R3 (a typed stage 3, one <code>__RS_OPTIONS__</code>).</li>
+<li>R2 (stage 1 once, its typed output kept; a view's palette as a restyle: done, <code>roadstyle-engine::palettes</code>), R1 with R8 (each layer
+   and dashboard module declares what it reads; one class index: done), R4 (one <code>Topology</code>: done), then the second audit's items
+   (<a href="audit_2026-10-24.md">audit_2026-10-24.md</a>) in this order: N1 (integers past 2^53 stay Int64 in the model), N3 (one <code>tile_stage</code>),
+   N7 (one writer of <code>roadstyle:sources</code>, <code>roadstyle:arrows</code>, <code>roadstyle:live</code>), N2 (stage 1 without the <code>tiles</code> and <code>state</code> switches),
+   N4 with R1 (one typed road table), N6 then N5 (stage 2 borrows the sources; the border files from Arrow), the engine side of N8 (every
+   style reads <code>rs_c</code> and <code>rs_w</code>); then R3 (a typed stage 3, one <code>__RS_OPTIONS__</code>; with it rule 5, the page options in the engine,
+   <code>contract.rs</code>). Rust only, with no Python golden: <code>live_data</code>, <code>export_geojson</code> / <code>tile_geojson</code> and the GeoParquet road table. R17 grew:
+   the levels' <code>CACHE</code>.</li>
 <li>(c) <code>roadstyle-look</code> (with R16, R17).</li>
 <li><strong>The mapstyle merge</strong> (approved 2026-10-23): roadstyle gets a duckOSM reader for the roads of every mode and the base-map tables
    (<code>features.*</code>) in <code>roadstyle-io</code>; mapstyle's look (<code>styles/*.yaml</code>: layers, modes, paths, osm_carto, themes, the icons, the patterns,
