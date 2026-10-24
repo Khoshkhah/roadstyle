@@ -7,6 +7,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **export_look: the yes/no tags use the engine's rule** (audit R6, both engines). A oneway, tunnel or bridge value is yes unless it
+  is missing or "", "no", "false" or "0" (lower-cased), as on the map that the engine draws. Before, the exported look had lists of
+  yes values, so tunnel=covered and other values not in the lists were not tunnels in it. Of Monaco, Södermalm and Tartu, only
+  Tartu's 6 edges with tunnel=covered change (edge_id 362803906715553762, 2028099516943553165, 2430057063666112407,
+  4366746885451034747, 6872884880915285120, 7467383434792342616): they are now tunnels in the exported look. The engine's own
+  yes/no check (roads.rs) uses the same rule (`roadstyle_model::flags`).
 - **Every style reads a road's colour and width from the feature state** (audit N8, both engines). The road layer reads
   `["coalesce", ["feature-state", "rs_c"], <baked colour>]` and each width and offset stop × `["coalesce", ["feature-state", "rs_w"], 1]`,
   in every style, not only with `live_data`; `live_data` now only adds the metadata `roadstyle:live` and the page's option `live`.
