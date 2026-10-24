@@ -59,7 +59,8 @@ The workspace `rust/` has three kinds of crates:
 
 - **The core:** `roadstyle-model` (the roads and their properties), `roadstyle-levels` (the drawing order), `roadstyle-engine`
   (the style) and `roadstyle-tiles` (the vector tiles and PMTiles).
-- **The reader:** `roadstyle-io` reads GeoParquet bytes.
+- **The reader:** `roadstyle-io` reads Arrow batches (`roads_from`, `table_from`) and GeoParquet bytes (`read_roads`, `read_table`, which
+  give their batches to the same decoder).
 - **The front-ends:** the facade `roadstyle` for Rust users (with the page writer), `roadstyle-wasm` for the browser and
   `roadstyle-py` for Python. `roadstyle-rs` is the old name of the facade.
 
@@ -128,7 +129,9 @@ and are not on crates.io. To read their API documentation, run `cargo doc --no-d
 
 ### The interface between the crates and their users
 
-The roads go in as the bytes of a GeoParquet file (the geometry as WKB in EPSG:4326). The look goes in as a typed `Look`
+The roads go in as Arrow batches (the geometry as WKB in EPSG:4326). Python gives an Arrow table (any object with
+`__arrow_c_stream__`; the binding reads it through the Arrow C stream interface), and bytes are a `TypeError`. The CLI and the browser
+give the bytes of a GeoParquet file. The look goes in as a typed `Look`
 (`roadstyle-look`): the palette, the profile, the settings and the keywords of `render_edges`, merged one time by `Look::resolve`, or a
 saved look read by `Look::from_json` (version 1, or version 0: the `look.json` of 0.25.0). The style comes out as JSON
 text, with the metadata for the dashboard. Errors are text: `Result<_, String>` in Rust, a thrown `Error` in JavaScript, a
@@ -340,8 +343,8 @@ one HTML file.
 | 3. The page | `roadstyle::page` | the style, the data and the options of the dashboard → one HTML file | Rust `page::make_page`; the browser `makePage`; Python through `render_edges` |
 | The one call | `roadstyle` (facade) | the roads and the look → the output of the way you ask for | Rust `make_tiled`; Python `render_edges`, `export_style`; the browser `new Tiler` |
 
-Where the inputs come from: the roads are GeoParquet bytes that Python writes (`_engine._geoparquet`) or that the browser
-worker writes from a duckOSM file (`writeRoads`). The look comes from `Look::resolve` (the browser: `resolveLook`; Python: `_rust.resolve_look`), and each binding keeps it as a handle. In Python the
+Where the inputs come from: the roads are an Arrow table that Python makes (`_engine._arrow`: GeoPandas' `to_arrow`; `duckosm.read`:
+DuckDB's `arrow()`), or GeoParquet bytes that the browser worker writes from a duckOSM file (`writeRoads`). The look comes from `Look::resolve` (the browser: `resolveLook`; Python: `_rust.resolve_look`), and each binding keeps it as a handle. In Python the
 stages run natively; in the browser they run in the page or in a worker, and the page only draws. Then the dashboard reads the
 metadata and adds the controls, and the `rs` object is the API for a host page.
 

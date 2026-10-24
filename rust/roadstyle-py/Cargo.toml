@@ -15,4 +15,5 @@ crate-type = ["cdylib"]
 roadstyle.workspace = true
 roadstyle-cli = { path = "../roadstyle-cli" }
 serde_json.workspace = true
+arrow-array = { workspace = true, features = ["ffi"] }   # the Arrow C stream from Python (audit R15)
 pyo3 = { version = "0.30", features = ["abi3-py39", "extension-module"] }

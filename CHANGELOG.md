@@ -7,6 +7,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **Python gives the roads to the Rust engine as an Arrow table, not as GeoParquet bytes** (audit R15). The binding
+  (`roadstyle._rust`: `make_style`, `make_sources`, `Tiler`, `compute_levels`, `make_area`) reads any object with
+  `__arrow_c_stream__` (GeoPandas' `to_arrow`, a pyarrow table, DuckDB's `arrow()`) through the Arrow C stream interface. Bytes are a
+  `TypeError`. The output does not change. On Tartu (64,828 edges), `compute_levels(method="tags")` takes 66 ms, not 123 ms: there is
+  no Parquet encode in Python and no Parquet decode in Rust. `duckosm.read` gives Arrow tables. In Rust, `roadstyle_io::read::roads_from`
+  and `table_from` read Arrow batches, and the facade has `tiled_of` and `features_of` for roads that a reader gave.
 - **The Rust engine makes the whole page in one call** (audit R3). `roadstyle::page_options::page_from(roads, look, options, given)`
   runs stage 1, the arrows or the tiles, the views and their palettes, builds the options of `rsDashboard` (typed: `page::PageOptions`)
   and writes the page. Python's `render_edges(engine="rust")`, the new command `roadstyle page` and the browser's `makePage(roads,
