@@ -10,6 +10,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **Every style reads a road's colour and width from the feature state** (audit N8, both engines). The road layer reads
   `["coalesce", ["feature-state", "rs_c"], <baked colour>]` and each width and offset stop × `["coalesce", ["feature-state", "rs_w"], 1]`,
   in every style, not only with `live_data`; `live_data` now only adds the metadata `roadstyle:live` and the page's option `live`.
+- **`rsColor` and `rsColorBase` write the feature state `rs_c`** (audit N8, the dashboard). A road gets one colour on the row that draws
+  it: the colour of `rsColor`, else that of `rsColorBase`, else that of `rs.setData`. A road of a two-way pair drawn as one line
+  (`__rs_dup`) gets its colour on its twin's row. The rows that `rsColor` painted are in the global state `rs_top` (a list of rows, with
+  no colours), which the sort key reads: a painted road stays on top of the others of its level. The global states `rs_colors` and
+  `rs_base` (a colour for each road, which made MapLibre lay out every tile again) are not written any more on the simple look. The full
+  look (`simple=False`) keeps them until it is removed.
 - **The road layer reads its class tables by an index** (R8, both engines). Each width and offset table over the classes is one
   `["at", ["get", "__rs_ci"], ["literal", [...]]]`, and each feature of `simple` has its class index `__rs_ci`. A piece keeps only what
   the road layer and the page read on it, so it has no `highway` any more (the page reads the class from the road table). On Tartu:
