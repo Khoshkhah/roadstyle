@@ -63,7 +63,7 @@ pub fn tile_sources(s: &mut sources::Sources, o: &tiles::stage::TileOptions) -> 
             Src::Roads(_) => {
                 let (keep, whole, from) = o.rule(k, Default::default);
                 let r = &s.roads;
-                tiled.add_lines(k, r.roads.iter().map(|x| (x.line(), x.iter().map(|(n, c)| (r.out_name(n), c.to_value())))), &keep, whole, from)
+                tiled.add_lines(k, r.roads.iter().map(|x| (x.line(), r.props(x, None).map(|(n, c)| (n, c.to_value())))), &keep, whole, from)
             }
             Src::Simple(p) => {
                 let (keep, whole, from) = o.rule(k, Default::default);
@@ -169,8 +169,7 @@ pub fn write_source_file<W: std::io::Write + Send>(s: &sources::Sources, file: &
     match &s.sources[i].1 {
         Src::Roads(_) => roadstyle_io::write::parquet_to(w, || s.roads.roads.iter().map(|r| roadstyle_io::write::Row {
             id: Some(r.i as i64),
-            props: r.iter().map(|(k, c)| (s.roads.out_name(k), c)).filter(|(k, _)| k.starts_with("__rs_") || drawn.contains(*k))
-                .map(|(k, c)| (k.to_string(), c.to_value())).collect(),
+            props: s.roads.props(r, Some(drawn)).map(|(k, c)| (k.to_string(), c.to_value())).collect(),
             geometry: line(r.line().filter(|_| lines)),
         }), true),
         Src::Simple(p) => roadstyle_io::write::parquet_to(w, || p.features(&s.roads.roads).map(|(id, props, c)| roadstyle_io::write::Row {
@@ -191,9 +190,9 @@ pub fn write_source_file<W: std::io::Write + Send>(s: &sources::Sources, file: &
 /// middle (`__heading`) and its box (`__bbox_*`), and its line as the geometry.
 fn road_rows(s: &sources::Sources) -> impl Iterator<Item = roadstyle_io::write::Row> + '_ {
     use roadstyle_engine::geom::line;
-    s.roads.roads.iter().map(move |r| {
+    s.roads.roads.iter().zip(s.road_rows()).map(move |(r, row)| {
         let c = r.line();
-        let mut props: Vec<(String, Value)> = r.iter().map(|(k, v)| (s.roads.out_name(k).to_string(), v.to_value())).collect();
+        let mut props: Vec<(String, Value)> = row.into_iter().map(|(k, v)| (k.to_string(), v.to_value())).collect();
         let mid = c.and_then(line::mid);
         let bb = c.and_then(line::bbox);
         let num = |v: Option<f64>| v.map_or(Value::Null, Value::from);
@@ -222,7 +221,7 @@ pub fn write_road_table<W: std::io::Write>(s: &sources::Sources, w: &mut W) -> s
         w.write_all(b"]")
     };
     let pts = |c: &[[f64; 2]]| dumps(&json!(c), true);
-    list(w, "props", true, &|r| dumps(&Value::Object(r.iter().map(|(k, v)| (s.roads.out_name(k).to_string(), v.to_value())).collect()), true))?;
+    list(w, "props", true, &|r| dumps(&Value::Object(s.road_row(r).into_iter().map(|(k, v)| (k.to_string(), v.to_value())).collect()), true))?;
     list(w, "mids", false, &|r| r.line().and_then(line::mid).map_or("null".into(), |m| dumps(&json!(m), true)))?;
     list(w, "bboxes", false, &|r| r.line().and_then(line::bbox).map_or("null".into(), |b| dumps(&json!(b), true)))?;
     list(w, "headings", false, &|r| r.line().and_then(line::heading).map_or("null".into(), |h| dumps(&json!(h), true)))?;

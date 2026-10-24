@@ -92,6 +92,7 @@ pub fn merge(base: &mut Sources, base_name: &str, copies: &[(String, Sources)]) 
             }
         }
     }
+    base.set_reads();       // the layers read the copies now
     Ok(())
 }
 

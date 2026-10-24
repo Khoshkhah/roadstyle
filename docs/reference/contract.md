@@ -181,6 +181,13 @@ The layers' own expressions read the properties that they name in `["get", name]
 reads a `__rs_*` property that is not declared, and `rust/roadstyle-rs/tests/sources.rs` fails when a layer reads a property whose name is
 not a literal. A change to a module that reads a new property adds the property to `reads.json`.
 
+Both engines write only what is read (R1, 2026-10-24), in the GeoJSON, the GeoParquet files and the tiles:
+
+- A piece keeps the properties of that set. An item (`__rs_k` 5) also keeps its own fields (a picked item's popup fields).
+- A road of the `roads` source keeps all its fields and only the stage values (`__rs_*`) of that set.
+- A row of the road table keeps all its fields, the stage values of `table`, and the fills (`__rs_fill*`, which the filter's swatches of
+  a view's palette read).
+
 ## The page's placeholders
 
 `static/web_template.html` has one placeholder for each value that `render_web._page_html` puts in the page:

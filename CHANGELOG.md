@@ -7,6 +7,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **The features carry only what is read** (R1, both engines). A road piece keeps the properties that the layers' expressions, the
+  page's modules (`static/dashboard/reads.json`), the popup and the tooltip read; a road keeps its fields and the stage values that are
+  read; the road table keeps the fields, the stage values that the page reads on a row, and the fills. The GeoJSON, the GeoParquet files
+  and the tiles follow the same rule. On Tartu: the page 16.0 MB to 14.5 MB, the `simple` source 58.9 MB to 40.3 MB, the `roads` source
+  64.7 MB to 53.4 MB. The level editor's update in place sends its features as the page has them.
 - **Every simple style can be driven by a dashboard.** The pieces have their road's row as their feature id (`promoteId: "__rs_edge"`
   on `simple`, `{simple: "__rs_edge"}` on the vector source of a tiled style), and the road layer has the glow of a selected or hovered
   road, in both engines and in every style: a page, `export_inline`, `export_style`, and a host that calls `makeStyle` or

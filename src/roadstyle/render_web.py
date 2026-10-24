@@ -1473,6 +1473,33 @@ def _by_palette(base, vals):
     return ["match", _gs("rs_palette"), *[x for n, v in vals.items() for x in (n, v)], base]
 
 
+def _drawn(layers, popup, tooltip):
+    """What a style's drawing reads (props::drawn in Rust): the names of the layers' ``["get", name]`` and ``["has", name]``, the popup
+    and tooltip fields, the page's declaration (static/dashboard/reads.json ``pieces``), ``name`` and ``kind``."""
+    from .tiles import page_reads
+
+    out = {"name", "kind", *page_reads()["pieces"]}
+
+    def walk(v):
+        if isinstance(v, list):
+            if len(v) == 2 and v[0] in ("get", "has") and isinstance(v[1], str):
+                out.add(v[1])
+            for x in v:
+                walk(x)
+        elif isinstance(v, dict):
+            for x in v.values():
+                walk(x)
+    walk(layers)
+    for fields in (popup, tooltip):
+        out |= {f for f in (fields if isinstance(fields, list) else []) if isinstance(f, str)}
+    return out
+
+
+def _slim_roads(features, read):
+    """The roads with the stage values that are read (R1), and all their fields: new features, the road table keeps its own."""
+    return [{**f, "properties": {k: v for k, v in (f.get("properties") or {}).items() if not k.startswith("__rs_") or k in read}} for f in features]
+
+
 def _merge_palettes(style, geo, slots, copies, base_name):
     """A view's palette in one page (docs/design/style_config.md, the view row ``palette``): ``copies`` {palette: the same build with that
     palette}. A paint or layout value that differs becomes one value per palette; a feature property that differs (a road's baked fill and
@@ -2447,7 +2474,23 @@ _TIE, _MAX_EDGES = 1e-8, 1_000_000
 _ITEM_STEP, _MAX_ITEMS = 0.01, 38
 
 
-def _edge_features(geo, edges, head_m, cols, fcol, slots, items=()):
+def _page_read(html):
+    """What a page that render wrote reads (``_drawn`` of its layers, its road popup and its tooltip)."""
+    dec = json.JSONDecoder()
+    style = dec.raw_decode(html, html.index("const style = ") + len("const style = "))[0]
+    opt = lambda k: dec.raw_decode(html, html.index("\n  " + k + ": ", html.index("rsDashboard(map, {")) + len(k) + 5)[0]      # noqa: E731
+    return _drawn(style["layers"], opt("road_popup"), opt("road_tooltip"))
+
+
+def _slim_pieces(features, read):
+    """R1: a piece keeps only the properties that are read; an item (__rs_k 5) also its own fields (its popup's)."""
+    for f in features:
+        p_ = f.get("properties") or {}
+        item_ = p_.get("__rs_k") == 5
+        f["properties"] = {k: v for k, v in p_.items() if k in read or (item_ and not k.startswith("__rs_"))}
+
+
+def _edge_features(geo, edges, head_m, cols, fcol, slots, items=(), read=None):
     """The features of the edges ``edges`` (their numbers) in each source a simple page draws them in, built as :func:`render` builds them for
     the whole page: ``roads`` (the edges), ``simple`` (their pieces) and, with ``slots``, the ``slots`` of their name groups (names and arrows:
     their chains follow the fill numbers, so one road can change them along a street) and ``slot_roads``, the roads whose slots they replace. The level editor's update in place (level_editor.Area). An edge of a
@@ -2460,6 +2503,10 @@ def _edge_features(geo, edges, head_m, cols, fcol, slots, items=()):
         fc = _annotation_slots(geo, (CONFIG.annotations or {}).get("slot_m", 100), cols[0], only=sorted(set(edges) | tw))
         out["slots"], out["slot_roads"] = fc["features"], fc["roads"]
     _mark_cls(geo, [v for k, v in out.items() if k != "slot_roads"], fcol)
+    if read is not None:        # R1: as the whole page has them (``read``: the page's read set; the roads as its road table)
+        from .tiles import table_keeps
+        _slim_pieces(out["simple"], read)
+        out["roads"] = [{**f, "properties": {k: v for k, v in f["properties"].items() if table_keeps(k)}} for f in out["roads"]]
     return out
 
 
@@ -2697,7 +2744,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            color_options=None, color_active=0, views=None, overlays=None, items=None, items_popup=None, compress: bool = True, tunnel_control: bool = False,
            tiles: bool = False, simple: bool = True,
            minzoom=None, legend: bool = True,
-           api_key: str | None = None, _edges=None, _palette_copy: bool = False, _export: bool = False, _parts: bool = False, **_ignore):
+           api_key: str | None = None, _edges=None, _read=None, _palette_copy: bool = False, _export: bool = False, _parts: bool = False, **_ignore):
     """Build a self-contained MapLibre map of the styled edges.
 
     Every edge is drawn by two **positions**, the number where its casing is drawn and the number where its fill is drawn
@@ -2945,7 +2992,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         if items is not None:               # the road's own items at the new fill numbers (overlays: the page is drawn again, level_editor)
             by_id = {_eid(ft["properties"].get(edge_id_col)): ft["properties"] for ft in geo["features"]}
             ritems = _road_items(items, by_id, edge_id_col, filter_col or highway_col, len(overlays or ()))
-        return _edge_features(geo, _edges, head_m, (highway_col, filter_col, width_m_col), filter_col or highway_col, arrows or labels, ritems)
+        return _edge_features(geo, _edges, head_m, (highway_col, filter_col, width_m_col), filter_col or highway_col, arrows or labels, ritems, _read)
     _tiler = tc = None
     if tiles:
         try:
@@ -3651,6 +3698,13 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                            for n in view_pals}
         flt["palettes"][style["state"]["rs_palette"]["default"]] = dict(swatches)
 
+    # R1 (docs/reference/contract.md, "What a page reads"): a piece keeps only the properties that are read, a road and an item (__rs_k 5)
+    # only the stage values that are read (an item's own fields are its popup's), as the Rust engine writes them
+    read = _drawn(style["layers"], popup_fields if popup_on else False, road_tooltip)
+    _slim_pieces((style["sources"].get("simple") or {}).get("data", {}).get("features", []), read)
+    if isinstance((style["sources"].get("roads") or {}).get("data"), dict):
+        style["sources"]["roads"]["data"] = {**style["sources"]["roads"]["data"], "features": _slim_roads(style["sources"]["roads"]["data"]["features"], read)}
+
     if _export:
         # the arrows: the page puts one per one-way chain into view (_rsArrows), a style cannot; number the arrow slots (the odd ones,
         # 200 m apart, else the chain's only slot) of each one-way chain, so the arrow layers can keep every n-th (docs/design/style_export.md)
@@ -3714,7 +3768,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                     if isinstance(v_, int) and not isinstance(v_, bool) and abs(v_) >= 2 ** 53:
                         p_[k_] = str(v_)
         pmt = _tiler.build_pmtiles(
-            {"type": "FeatureCollection", "features": []} if lean else geo, class_col=highway_col, keep=roads_keep,   # a page: no road lines
+            {"type": "FeatureCollection", "features": [] if lean else _slim_roads(geo["features"], read)}, class_col=highway_col, keep=roads_keep,   # a page: no road lines
             minzoom_table=mz, minzoom=tc["minzoom"], maxzoom=tc["maxzoom"],
             extent=tc["extent"], buffer_px=tc["buffer_px"], extra_layers=extra or None,
             line_layers=line_layers or None)

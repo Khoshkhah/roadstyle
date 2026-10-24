@@ -209,15 +209,30 @@ def _heading(cs):
     return round(math.degrees(math.atan2(dx, dy)) % 360, 1)
 
 
+def page_reads() -> dict:
+    """The page's declaration of the feature properties that its modules read (static/dashboard/reads.json: ``pieces`` and ``table``)."""
+    from pathlib import Path
+    return json.loads((Path(__file__).parent / "static" / "dashboard" / "reads.json").read_text())
+
+
+def table_keeps(k: str) -> bool:
+    """A property of a road that the road table keeps (R1, props::table_keeps in Rust): every public field, the stage values that the
+    page's modules read on a row (reads.json ``table``), and the fills (``__rs_fill*``: the filter's swatches of a view's palette)."""
+    return not k.startswith("__rs_") or k.startswith("__rs_fill") or k in _TABLE_READS
+
+
+_TABLE_READS = set(page_reads()["table"])
+
+
 def sidecar(fc: dict) -> dict:
-    """The road table of the page (gzipped), one row for each road: its full properties for rsQuery / popups, its midpoint (by length:
-    rsSelect's popup anchor and Street View's spot), its bbox for rsFocus, the way it runs at its midpoint (Street View's start) and its
-    line. stage 1 of the Rust engine makes the same table (roadstyle::road_table)."""
+    """The road table of the page (gzipped), one row for each road: its properties for rsQuery / popups (``table_keeps``), its midpoint
+    (by length: rsSelect's popup anchor and Street View's spot), its bbox for rsFocus, the way it runs at its midpoint (Street View's
+    start) and its line. stage 1 of the Rust engine makes the same table (roadstyle::road_table)."""
     from shapely.geometry import LineString
 
     props, mids, bboxes, headings, lines = [], [], [], [], []
     for ft in fc.get("features", []):
-        props.append(ft.get("properties") or {})
+        props.append({k: v for k, v in (ft.get("properties") or {}).items() if table_keeps(k)})
         g = ft.get("geometry") or {}
         cs = g.get("coordinates") or []
         if g.get("type") == "MultiLineString" and cs:

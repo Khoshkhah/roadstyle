@@ -139,10 +139,22 @@ impl IntoIterator for Props {
 /// feature (`pieces`) and on a row of the road table (`table`).
 pub const PAGE_READS: &str = include_str!("../../../src/roadstyle/static/dashboard/reads.json");
 
+fn declared(part: &str) -> Vec<String> {
+    let v: Value = serde_json::from_str(PAGE_READS).expect("reads.json is JSON");
+    v[part].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect()
+}
+
 /// The properties of a drawn feature that the page's modules read (PAGE_READS's `pieces`).
 pub fn page_reads() -> Vec<String> {
-    let v: Value = serde_json::from_str(PAGE_READS).expect("reads.json is JSON");
-    v["pieces"].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect()
+    declared("pieces")
+}
+
+/// A property of a road that the road table keeps (R1): every public field (the popup, the tooltip, an app's click), the stage
+/// values that the page's modules read on a row (PAGE_READS's `table`), and the fills (`__rs_fill*`: the filter's swatches of a view's
+/// palette).
+pub fn table_keeps(k: &str) -> bool {
+    static TABLE: std::sync::OnceLock<std::collections::HashSet<String>> = std::sync::OnceLock::new();
+    !k.starts_with("__rs_") || k.starts_with("__rs_fill") || TABLE.get_or_init(|| declared("table").into_iter().collect()).contains(k)
 }
 
 /// The feature properties that the expressions of `v` read: `["get", name]` and `["has", name]` (the forms with an object, `["get",

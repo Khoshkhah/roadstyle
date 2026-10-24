@@ -36,7 +36,8 @@ def test_color_table_dataframe():
 
 def test_color_table_keeps_casing_sandwich():
     # fill comes from the table; casing stays class/theme so junctions still read cleanly
-    p = _props(rs.render_edges(_edges(), color_table={"a": "#ff0000"}).html)
+    geo = rs.render_edges(_edges(), backend="web", color_table={"a": "#ff0000"}, _palette_copy=True)["geo"]      # the roads with their stage values
+    p = {f["properties"]["edge_id"]: f["properties"] for f in geo["features"]}
     assert p["a"]["__rs_casing"] not in (None, "#bbbbbb")
 
 

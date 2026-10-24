@@ -291,7 +291,7 @@ pub fn take_roads(mut sources: Vec<(String, Src)>) -> (Vec<(String, Src)>, Optio
     for (_, s) in sources.iter_mut() {
         if let Src::Roads(r) = s {
             let empty = road::RoadsSource { roads: Roads::new(RoadTable::empty()), tolerance: r.tolerance, maxzoom: r.maxzoom, names: Vec::new(),
-                                            in_style: r.in_style };
+                                            in_style: r.in_style, read: None };
             roads = Some(std::mem::replace(r, empty));
         }
     }

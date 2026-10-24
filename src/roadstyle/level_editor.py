@@ -35,7 +35,7 @@ PARTIAL_MAX = 1500      # more roads changed by an Apply than this: the whole pa
 
 class Area:
     def __init__(self, folder, items=None):
-        self.dir, self.items, self._overlays = Path(folder), items, []
+        self.dir, self.items, self._overlays, self._read = Path(folder), items, [], None
         self.roads = gpd.read_parquet(self.dir / "roads.parquet")
         self.pairs = pd.read_csv(self.dir / "pairs.csv", dtype=str, keep_default_na=False)
         self.edits_path = self.dir / "edits.csv"
@@ -141,7 +141,7 @@ class Area:
             self.reload = f"{len(roads)} roads changed, more than {PARTIAL_MAX}: the whole page again"
             return
         names = any(before[i][k] != self.drawn[i][k] for i in changed for k in (1, 3))   # a fill number (max of casing, fill) changed: the names and
-        feats = self._render(_edges=changed, arrows=names, labels=names)                    # arrows again (their chains follow it); both directions of a road
+        feats = self._render(_edges=changed, _read=self._reads(), arrows=names, labels=names)   # arrows again (their chains follow it); both directions of a road
         if self._overlays and names:                   # overlay items sit at their edge's fill number in layers of their own: a new one moves them,
             self.reload = "the overlays are drawn at the new levels: the whole page again"   # so the whole page. Road items (items=) come with their roads (2026-10-09)
             return
@@ -170,7 +170,15 @@ class Area:
             m = self._render()
             page = m.html if hasattr(m, "html") else str(m)
             self._page = page.replace("</body>", _EDITOR.replace("__STATS__", json.dumps(self.stats, default=str)) + "</body>", 1)
+            self._read = render_web._page_read(page)
         return self._page
+
+    def _reads(self):
+        """What the page reads (render_web._drawn): an update in place sends the features as the whole page has them (R1). Kept from the
+        first page (the editor opens it before any Apply); the layers do not change with the levels."""
+        if self._read is None:
+            self.page       # noqa: B018 - builds the page and keeps its read set
+        return self._read
 
     def change(self, edits, saved=None, caps=None, heads=None):
         """Solve with ``edits``; save them (and the drawing's ``caps``, road -> (start, end) of "" / "square" / "flat", and ``heads``, road ->
