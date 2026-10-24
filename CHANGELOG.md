@@ -7,6 +7,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Live data on the road layer** (`live_data=True`, the Rust engine only). The road layer reads its colour and its width factor from
+  MapLibre feature state on the road's row (`rs_c`, `rs_w`), with the baked values as the fallback. A host or the dashboard's
+  `rs.setData` changes them with no new build. The pieces have the road's row as their id (`promoteId: "__rs_edge"`, also on the vector
+  source), and the metadata `roadstyle:live` names the states, the default ramp and the no-data colour. Off by default: the styles of
+  today do not change. With the Python engine, `live_data=True` is a `ValueError`.
 - **The two stages of the Rust engine as their own calls** (docs/rust/architecture.md, "The three stages and the one call").
   Stage 1 makes the style and its sources; stage 2 cuts the vector tiles from them, with no roads and no look.
   - Python: `export_geojson(edges, out_dir, format="geojson" | "geoparquet", keep=None, **kwargs)` writes stage 1's files:

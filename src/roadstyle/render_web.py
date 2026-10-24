@@ -3744,7 +3744,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     if lean and not tiles:
         style["sources"].pop("roads", None)          # the page draws the pieces; the road table has the roads' fields and lines
     page = {"basemaps": bms, "basemap_switcher": bool(basemap_switcher), "tiles": bool(tiles), "simple": "roads-simple" if lean else False,
-            "sources": _roles(style["layers"]), "arrows": _arrow_kind(style["layers"]),
+            "sources": _roles(style["layers"]), "arrows": _arrow_kind(style["layers"]), "live": None,     # live_data: the Rust engine only
             "popup_mode": mode, "find_control": bool(find_control), "zoom_readout": bool(zoom_readout), "pitch_3d": cam["pitch_3d"],
             "street_view": street_view, "street_view_key": street_view_key or "", "google_3d": bool(google_3d), "select_color": select_color,
             "filter": flt, "color_options": color_opts_meta or [], "color_active": _active, "overlays": ov_meta,
@@ -3820,6 +3820,7 @@ def _page_html(style, page, *, name, cam, bounds, side_panel_html, host_panel_wi
             .replace("__RS_LEAN__", J("simple"))
             .replace("__RS_SOURCES__", J("sources"))
             .replace("__RS_ARROWS__", J("arrows"))
+            .replace("__RS_LIVE__", J("live"))
             .replace("__HOST_PANEL_HTML__", _host_panel(side_panel_html, host_panel_width, name)))     # the last: the host's own text may hold any other token
     parts = ""
     if tiles:

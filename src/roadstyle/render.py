@@ -124,6 +124,8 @@ def render_edges(
         why = (["a Styler object (style=)"] if style is not None else []) + (["simple=False (the full look)"] if kwargs.get("simple") is False else [])
         if why and _engine.fallback(engine, ", ".join(why) + " is Python's"):
             rust_page = False
+    if kwargs.get("live_data") and not rust_page:
+        raise ValueError("live_data=True needs the Rust engine's web page (engine='rust', backend='web', no style= and no simple=False)")
     if rust_page:
         _warn_unclassed(as_edges(gdf, class_col=highway_col).gdf, highway_col)
         data = {k: v for k, v in (("style", style), ("color_by", color_by), ("colors", colors), ("cmap", cmap), ("vmin", vmin), ("vmax", vmax),
