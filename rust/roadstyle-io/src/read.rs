@@ -1,6 +1,7 @@
 //! The roads from a GeoParquet file: every column an Arrow array of the table (as GeoPandas' GeoJSON writes its values), the
 //! geometry a LineString from WKB.
 
+use crate::Error;
 use arrow_array::{cast::AsArray, types::*, Array, ArrayRef};
 use arrow_schema::DataType;
 use bytes::Bytes;
@@ -9,34 +10,34 @@ use serde_json::{Map, Value};
 
 pub use roadstyle_model::{feature_table::FeatureTable, Lines, RoadTable, Row};
 
-pub fn read_roads(data: Vec<u8>, geom_col: &str) -> Result<RoadTable, String> {
+pub fn read_roads(data: Vec<u8>, geom_col: &str) -> Result<RoadTable, Error> {
     let mut lines = Lines::default();
     let (names, cols) = read_columns(data, geom_col, |g| {
         lines.push(g.and_then(wkb_line).as_deref());
         Ok(())
     })?;
-    RoadTable::new(names, cols, lines)
+    RoadTable::new(names, cols, lines).map_err(Error::Format)
 }
 
 /// The base map's (or any) features from a GeoParquet file: every column but the geometry an Arrow array, and the geometry of each row
 /// (WKB: a point, a line, a polygon or a Multi type) in one coordinate buffer (roadstyle-model's FeatureTable; audit R10).
-pub fn read_feature_table(data: Vec<u8>, geom_col: &str) -> Result<FeatureTable, String> {
+pub fn read_feature_table(data: Vec<u8>, geom_col: &str) -> Result<FeatureTable, Error> {
     let mut geoms = FeatureTable::geometries();
-    let (names, cols) = read_columns(data, geom_col, |g| geoms.push_wkb(g).map_err(|e| format!("{geom_col}: {e}")))?;
-    FeatureTable::new(names, cols, geoms)
+    let (names, cols) = read_columns(data, geom_col, |g| geoms.push_wkb(g).map_err(|e| Error::Format(format!("{geom_col}: {e}"))))?;
+    FeatureTable::new(names, cols, geoms).map_err(Error::Format)
 }
 
 /// The columns of a Parquet file but `geom_col` (each one Arrow array of every row), and `geom` called with each row's geometry bytes
 /// (None: no geometry column, or a null).
-fn read_columns(data: Vec<u8>, geom_col: &str, mut geom: impl FnMut(Option<&[u8]>) -> Result<(), String>)
-                -> Result<(Vec<String>, Vec<ArrayRef>), String> {
-    let builder = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data)).map_err(|e| format!("not a Parquet file: {e}"))?;
+fn read_columns(data: Vec<u8>, geom_col: &str, mut geom: impl FnMut(Option<&[u8]>) -> Result<(), Error>)
+                -> Result<(Vec<String>, Vec<ArrayRef>), Error> {
+    let builder = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data)).map_err(|e| Error::Format(format!("not a Parquet file: {e}")))?;
     let schema = builder.schema().clone();
-    let reader = builder.build().map_err(|e| format!("not a Parquet file: {e}"))?;
+    let reader = builder.build().map_err(|e| Error::Format(format!("not a Parquet file: {e}")))?;
     let names: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).filter(|n| n != geom_col).collect();
     let mut parts: Vec<Vec<ArrayRef>> = vec![Vec::new(); names.len()];
     for batch in reader {
-        let batch = batch.map_err(|e| e.to_string())?;
+        let batch = batch.map_err(|e| Error::Format(e.to_string()))?;
         let mut k = 0;
         for (field, col) in batch.schema().fields().iter().zip(batch.columns()) {
             if field.name() == geom_col {
@@ -56,16 +57,16 @@ fn read_columns(data: Vec<u8>, geom_col: &str, mut geom: impl FnMut(Option<&[u8]
     }
     let cols = parts.into_iter().zip(&schema.fields().iter().filter(|f| f.name() != geom_col).collect::<Vec<_>>()).map(|(p, f)| {
         let refs: Vec<&dyn Array> = p.iter().map(|a| a.as_ref()).collect();
-        if refs.is_empty() { Ok(arrow_array::new_empty_array(f.data_type())) } else { arrow_select::concat::concat(&refs).map_err(|e| e.to_string()) }
-    }).collect::<Result<Vec<_>, String>>()?;
+        if refs.is_empty() { Ok(arrow_array::new_empty_array(f.data_type())) } else { arrow_select::concat::concat(&refs).map_err(|e| Error::Format(e.to_string())) }
+    }).collect::<Result<Vec<_>, Error>>()?;
     Ok((names, cols))
 }
 
 /// A GeoParquet file of lines only (its `geo` metadata names LineString alone, as stage 1's roads and pieces) as a `RoadTable` (audit
 /// N5: the Arrow columns and the lines, no JSON per cell), with the names of its `roadstyle:json` columns (their text is JSON). None for
 /// another file.
-pub fn line_table(data: Vec<u8>) -> Result<Option<(RoadTable, std::collections::HashSet<String>)>, String> {
-    let builder = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data.clone())).map_err(|e| format!("not a Parquet file: {e}"))?;
+pub fn line_table(data: Vec<u8>) -> Result<Option<(RoadTable, std::collections::HashSet<String>)>, Error> {
+    let builder = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data.clone())).map_err(|e| Error::Format(format!("not a Parquet file: {e}")))?;
     let schema = builder.schema().clone();
     let geo: Value = schema.metadata().get("geo").and_then(|g| serde_json::from_str(g).ok()).unwrap_or(Value::Null);
     // a list column (a native Parquet list) is not a RoadTable's: that file takes the JSON path
@@ -78,13 +79,13 @@ pub fn line_table(data: Vec<u8>) -> Result<Option<(RoadTable, std::collections::
 }
 
 /// Any Parquet table as rows: the columns as properties, the binary column `blob` kept as its bytes.
-pub fn read_table(data: Vec<u8>, blob: &str) -> Result<Vec<Row>, String> {
+pub fn read_table(data: Vec<u8>, blob: &str) -> Result<Vec<Row>, Error> {
     let reader = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data))
         .and_then(|b| b.build())
-        .map_err(|e| format!("not a Parquet file: {e}"))?;
+        .map_err(|e| Error::Format(format!("not a Parquet file: {e}")))?;
     let mut out = Vec::new();
     for batch in reader {
-        let batch = batch.map_err(|e| e.to_string())?;
+        let batch = batch.map_err(|e| Error::Format(e.to_string()))?;
         let schema = batch.schema();
         let start = out.len();
         out.extend((0..batch.num_rows()).map(|_| Row { cols: Map::new(), blob: None }));
@@ -101,7 +102,7 @@ pub fn read_table(data: Vec<u8>, blob: &str) -> Result<Vec<Row>, String> {
     Ok(out)
 }
 
-fn value(col: &ArrayRef, r: usize) -> Result<Value, String> {
+fn value(col: &ArrayRef, r: usize) -> Result<Value, Error> {
     if col.is_null(r) {
         return Ok(Value::Null);
     }
@@ -124,7 +125,7 @@ fn value(col: &ArrayRef, r: usize) -> Result<Value, String> {
             let v = col.as_list::<i64>().value(r);
             Value::Array((0..v.len()).map(|i| value(&v, i)).collect::<Result<_, _>>()?)
         }
-        t => return Err(format!("column type {t} is not read")),
+        t => return Err(Error::Format(format!("column type {t} is not read"))),
     })
 }
 
@@ -166,13 +167,13 @@ pub fn wkb_line(b: &[u8]) -> Option<Vec<[f64; 2]>> {
 /// A GeoParquet file (as `write::parquet` writes it, or any with a WKB `geometry` column) as a GeoJSON FeatureCollection: each row a
 /// feature, `__fid` its id, the other columns its properties in their order (a null is left out; a `roadstyle:json` column's text is
 /// its JSON value).
-pub fn features(data: Vec<u8>) -> Result<Value, String> {
+pub fn features(data: Vec<u8>) -> Result<Value, Error> {
     let reader = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data))
         .and_then(|b| b.build())
-        .map_err(|e| format!("not a Parquet file: {e}"))?;
+        .map_err(|e| Error::Format(format!("not a Parquet file: {e}")))?;
     let mut out = Vec::new();
     for batch in reader {
-        let batch = batch.map_err(|e| e.to_string())?;
+        let batch = batch.map_err(|e| Error::Format(e.to_string()))?;
         let schema = batch.schema();
         let start = out.len();
         out.extend((0..batch.num_rows()).map(|_| (Map::new(), Value::Null, Value::Null)));
@@ -184,7 +185,7 @@ pub fn features(data: Vec<u8>) -> Result<Value, String> {
                     crate::write::FID => f.1 = value(col, r)?,
                     name => {
                         let v = value(col, r)?;
-                        let v = match v { Value::String(s) if json => serde_json::from_str(&s).map_err(|e| format!("{name}: {e}"))?, v => v };
+                        let v = match v { Value::String(s) if json => serde_json::from_str(&s).map_err(|e| Error::Data(format!("{name}: {e}")))?, v => v };
                         if !v.is_null() {
                             f.0.insert(name.to_string(), v);
                         }

@@ -5,6 +5,7 @@
 //! and a null are the same (null); in a list column they are an empty list.
 
 use crate::columns::Column;
+use crate::Error;
 use arrow_schema::{DataType, Field};
 use roadstyle_model::Cell;
 use serde_json::Value;
@@ -173,13 +174,13 @@ fn merge(a: Kind, b: Kind) -> Kind {
 }
 
 /// The rows as Parquet, in memory (`parquet_to`).
-pub fn parquet<'a, I: Iterator<Item = Row<'a>>>(rows: impl Fn() -> I, geometry: bool) -> Result<Vec<u8>, String> {
+pub fn parquet<'a, I: Iterator<Item = Row<'a>>>(rows: impl Fn() -> I, geometry: bool) -> Result<Vec<u8>, Error> {
     parquet_to(Vec::new(), rows, geometry)
 }
 
 /// The rows as Parquet, written to `w` a batch at a time: `rows()` gives them again for each pass (the types, then the batches).
 /// `geometry`: GeoParquet. Gives `w` back.
-pub fn parquet_to<'a, W: std::io::Write + Send, I: Iterator<Item = Row<'a>>>(w: W, rows: impl Fn() -> I, geometry: bool) -> Result<W, String> {
+pub fn parquet_to<'a, W: std::io::Write + Send, I: Iterator<Item = Row<'a>>>(w: W, rows: impl Fn() -> I, geometry: bool) -> Result<W, Error> {
     let (mut names, mut kinds, mut at): (Vec<String>, Vec<Kind>, HashMap<String, usize>) = (Vec::new(), Vec::new(), HashMap::new());
     let (mut ids, mut types) = (false, std::collections::BTreeSet::new());
     for r in rows() {

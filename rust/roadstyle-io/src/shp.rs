@@ -7,6 +7,7 @@
 //! - The line: a polyline of one part (its x and y; the z and m are left out), in EPSG:4326 (`crs`). A polyline of more parts or another
 //!   shape gives no line, as a MultiLineString in the other readers: that road is not drawn.
 
+use crate::Error;
 use std::io::Cursor;
 
 use shapefile::dbase::{self, FieldValue};
@@ -59,15 +60,15 @@ fn line(shape: &Shape) -> Option<Vec<[f64; 2]>> {
 
 /// The roads of a Shapefile: `shp` and `dbf` its two files, `prj` the text of its .prj file (None: the file has none, an error, as in
 /// Python). `what` names the file in the errors.
-pub fn read_roads(shp: &[u8], dbf: &[u8], prj: Option<&str>, what: &str) -> Result<RoadTable, String> {
+pub fn read_roads(shp: &[u8], dbf: &[u8], prj: Option<&str>, what: &str) -> Result<RoadTable, Error> {
     let to84 = ToWgs84::new(prj.map(|w| Crs::Wkt(w.to_string())), what)?;
     let fields = whole_number_fields(dbf);
-    let shapes = shapefile::ShapeReader::new(Cursor::new(shp)).map_err(|e| format!("{what}: not a Shapefile (.shp): {e}"))?;
-    let records = dbase::Reader::new(Cursor::new(dbf)).map_err(|e| format!("{what}: not a dBase file (.dbf): {e}"))?;
+    let shapes = shapefile::ShapeReader::new(Cursor::new(shp)).map_err(|e| Error::Format(format!("{what}: not a Shapefile (.shp): {e}")))?;
+    let records = dbase::Reader::new(Cursor::new(dbf)).map_err(|e| Error::Format(format!("{what}: not a dBase file (.dbf): {e}")))?;
     let mut reader = shapefile::Reader::new(shapes, records);
     let mut feats = Vec::new();
     for (i, r) in reader.iter_shapes_and_records().enumerate() {
-        let (shape, rec) = r.map_err(|e| format!("{what}: record {i}: {e}"))?;
+        let (shape, rec) = r.map_err(|e| Error::Format(format!("{what}: record {i}: {e}")))?;
         let props: Map<String, Value> = fields.iter().map(|(n, whole)| (n.clone(), rec.get(n).map_or(Value::Null, |v| value(v, *whole)))).collect();
         let geom = match line(&shape) {
             Some(mut l) => {
@@ -79,5 +80,5 @@ pub fn read_roads(shp: &[u8], dbf: &[u8], prj: Option<&str>, what: &str) -> Resu
         feats.push(json!({"type": "Feature", "properties": props, "geometry": geom}));
     }
     let fc = json!({"type": "FeatureCollection", "features": feats});
-    geojson::read_roads(&serde_json::to_vec(&fc).map_err(|e| e.to_string())?)
+    geojson::read_roads(&serde_json::to_vec(&fc).map_err(|e| Error::Format(e.to_string()))?)
 }

@@ -287,7 +287,7 @@ mod wasm {
         pub fn sources(&self, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<Sources, JsError> {
             let err = |e: String| JsError::new(&e);
             let features = features.map(roadstyle::read_features).transpose().map_err(err)?;
-            let planner = planner.map(|p| roadstyle::read::read_table(p, "")).transpose().map_err(err)?;
+            let planner = planner.map(|p| roadstyle::read::read_table(p, "")).transpose().map_err(String::from).map_err(err)?;
             roadstyle::sources_of(self.0.clone(), &look.0, features, planner, name).map(|inner| Sources { inner }).map_err(err)
         }
     }
@@ -322,7 +322,7 @@ mod wasm {
             Err(e) => (None, Some(e)),
         };
         Ok(serde_json::json!({"catalog": queries, "roads": roads, "roads_error": roads_error, "meta": (!tags).then_some(duckosm::LEVELS_META_SQL),
-                              "select": duckosm::roads_select(mode).map_err(err)?, "layers": layers,
+                              "select": duckosm::roads_select(mode).map_err(String::from).map_err(err)?, "layers": layers,
                               "subset": (only && !tags).then_some([duckosm::SUBSET_SQL, duckosm::IDS_SQL])}).to_string())
     }
 
@@ -334,7 +334,7 @@ mod wasm {
             (Some(s), Some(n), Some(h)) => Some((s.as_str(), n as i64, h.as_str())),
             _ => None,
         };
-        roadstyle::duckosm::levels_keyword(row).map(|v| v.to_string()).map_err(|e| JsError::new(&e))
+        roadstyle::duckosm::levels_keyword(row).map(|v| v.to_string()).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// duckosmSubsetLevels(source?, nEdges?, edgeHash?, missing, example?, ids) -> string: the look's keyword `levels` (JSON text) for a map
@@ -346,7 +346,7 @@ mod wasm {
             (Some(s), Some(n), Some(h)) => Some((s.as_str(), n as i64, h.as_str())),
             _ => None,
         };
-        roadstyle::duckosm::subset_levels_keyword(row, missing as i64, example, &ids).map(|v| v.to_string()).map_err(|e| JsError::new(&e))
+        roadstyle::duckosm::subset_levels_keyword(row, missing as i64, example, &ids).map(|v| v.to_string()).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// duckosmFeaturesSelect(specs: number[]) -> string | undefined: the base map's rows from the tables f<spec> that were made.
@@ -359,21 +359,21 @@ mod wasm {
     /// reads it). An error is a thrown Error.
     #[wasm_bindgen(js_name = readGeoParquet)]
     pub fn read_geoparquet(bytes: Vec<u8>) -> Result<Roads, JsError> {
-        roadstyle::read::read_roads(bytes, "geometry").map(Roads).map_err(|e| JsError::new(&e))
+        roadstyle::read::read_roads(bytes, "geometry").map(Roads).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// readGeoJson(bytes: Uint8Array) -> Roads: the roads of a GeoJSON file (a FeatureCollection in EPSG:4326; roadstyle-io's geojson.rs
     /// says how each property becomes a column). An error is a thrown Error.
     #[wasm_bindgen(js_name = readGeoJson)]
     pub fn read_geojson(bytes: &[u8]) -> Result<Roads, JsError> {
-        roadstyle::geojson::read_roads(bytes).map(Roads).map_err(|e| JsError::new(&e))
+        roadstyle::geojson::read_roads(bytes).map(Roads).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// readShp(shp: Uint8Array, dbf: Uint8Array, prj?: string, name?: string) -> Roads: the roads of a Shapefile, in EPSG:4326 (roadstyle-io's
     /// shp.rs; no prj: no CRS, an error). A GeoPackage is not read here: SQLite is C (the native programs read it). An error is a thrown Error.
     #[wasm_bindgen(js_name = readShp)]
     pub fn read_shp(shp: &[u8], dbf: &[u8], prj: Option<String>, name: Option<String>) -> Result<Roads, JsError> {
-        roadstyle::shp::read_roads(shp, dbf, prj.as_deref(), name.as_deref().unwrap_or("the Shapefile")).map(Roads).map_err(|e| JsError::new(&e))
+        roadstyle::shp::read_roads(shp, dbf, prj.as_deref(), name.as_deref().unwrap_or("the Shapefile")).map(Roads).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// tileSources(sources, prefix, keep): stage 2 from memory (the typed pieces, no GeoJSON text; the sources stay as they are). The

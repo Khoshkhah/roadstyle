@@ -385,6 +385,7 @@ impl Editor {
             },
             true,
         )
+        .map_err(String::from)
     }
 }
 

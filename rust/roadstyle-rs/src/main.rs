@@ -51,7 +51,7 @@ fn bench(look_path: &str, roads_path: &str, features_path: &str) {
         t = Instant::now();
     };
     let look = look_file(look_path);
-    let mut feats = roadstyle_rs::Roads::new(read::read_roads(fs::read(roads_path).unwrap(), "geometry").unwrap_or_else(|e| fail(e)));
+    let mut feats = roadstyle_rs::Roads::new(read::read_roads(fs::read(roads_path).unwrap(), "geometry").unwrap_or_else(|e| fail(e.into())));
     mark("read the roads");
     let colors = roads::mark_roads(&mut feats, &look.road, &look.args).unwrap_or_else(|e| fail(e));
     mark("mark the roads (colours, pairs, levels)");

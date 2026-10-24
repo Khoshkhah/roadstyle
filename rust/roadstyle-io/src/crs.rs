@@ -3,6 +3,7 @@
 //! through crs-definitions, a WKT text (a .prj file, a GeoPackage definition) through proj4wkt. A CRS that they cannot read is an error
 //! that names it: the reader does not guess.
 
+use crate::Error;
 use proj4rs::Proj;
 
 /// The CRS of a road file, as the file gives it.
@@ -27,31 +28,31 @@ fn is_wgs84(proj: &str) -> bool {
 
 impl ToWgs84 {
     /// `what` names the file in the errors.
-    pub fn new(crs: Option<Crs>, what: &str) -> Result<ToWgs84, String> {
+    pub fn new(crs: Option<Crs>, what: &str) -> Result<ToWgs84, Error> {
         let proj = match crs {
-            None => return Err(format!("{what} has no CRS, so it cannot be reprojected to EPSG:4326. Give the file a CRS (a .prj file, \
-                                        the GeoPackage's srs_id)")),
+            None => return Err(Error::Crs(format!("{what} has no CRS, so it cannot be reprojected to EPSG:4326. Give the file a CRS (a .prj file, \
+                                        the GeoPackage's srs_id)"))),
             Some(Crs::Epsg(4326)) => return Ok(ToWgs84(None)),
             Some(Crs::Epsg(c)) => crs_definitions::from_code(c).map(|d| d.proj4.to_string())
-                .ok_or_else(|| format!("{what}: its CRS EPSG:{c} is not known to the reader (crs-definitions)"))?,
+                .ok_or_else(|| Error::Crs(format!("{what}: its CRS EPSG:{c} is not known to the reader (crs-definitions)")))?,
             Some(Crs::Wkt(w)) => proj4wkt::wkt_to_projstring(&w)
-                .map_err(|e| format!("{what}: its CRS cannot be read ({e}): {}", w.chars().take(120).collect::<String>()))?,
+                .map_err(|e| Error::Crs(format!("{what}: its CRS cannot be read ({e}): {}", w.chars().take(120).collect::<String>())))?,
         };
         if is_wgs84(&proj) {
             return Ok(ToWgs84(None));
         }
-        let src = Proj::from_proj_string(&proj).map_err(|e| format!("{what}: its CRS {proj:?} cannot be used ({e})"))?;
-        let dst = Proj::from_proj_string("+proj=longlat +datum=WGS84 +no_defs").map_err(|e| e.to_string())?;
+        let src = Proj::from_proj_string(&proj).map_err(|e| Error::Crs(format!("{what}: its CRS {proj:?} cannot be used ({e})")))?;
+        let dst = Proj::from_proj_string("+proj=longlat +datum=WGS84 +no_defs").map_err(|e| Error::Crs(e.to_string()))?;
         Ok(ToWgs84(Some((src, dst))))
     }
 
     /// The points of a line in EPSG:4326.
-    pub fn line(&self, pts: &mut [[f64; 2]]) -> Result<(), String> {
+    pub fn line(&self, pts: &mut [[f64; 2]]) -> Result<(), Error> {
         let Some((src, dst)) = &self.0 else { return Ok(()) };
         for p in pts.iter_mut() {
             // proj4rs: the angles of a longlat CRS in radians
             let mut q = if src.is_latlong() { (p[0].to_radians(), p[1].to_radians()) } else { (p[0], p[1]) };
-            proj4rs::transform::transform(src, dst, &mut q).map_err(|e| format!("reprojection of ({}, {}): {e}", p[0], p[1]))?;
+            proj4rs::transform::transform(src, dst, &mut q).map_err(|e| Error::Crs(format!("reprojection of ({}, {}): {e}", p[0], p[1])))?;
             *p = [q.0.to_degrees(), q.1.to_degrees()];
         }
         Ok(())
@@ -77,7 +78,7 @@ mod tests {
         assert!(ToWgs84::new(Some(Crs::Epsg(4326)), "x").unwrap().0.is_none());
         let wgs84_prj = r#"GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]]"#;
         assert!(ToWgs84::new(Some(Crs::Wkt(wgs84_prj.into())), "x").unwrap().0.is_none());
-        assert!(ToWgs84::new(None, "roads.shp").err().unwrap().starts_with("roads.shp has no CRS"));
-        assert!(ToWgs84::new(Some(Crs::Wkt("NOT A CRS".into())), "x").err().unwrap().contains("NOT A CRS"));
+        assert!(matches!(ToWgs84::new(None, "roads.shp").err().unwrap(), Error::Crs(m) if m.starts_with("roads.shp has no CRS")));
+        assert!(matches!(ToWgs84::new(Some(Crs::Wkt("NOT A CRS".into())), "x").err().unwrap(), Error::Crs(m) if m.contains("NOT A CRS")));
     }
 }

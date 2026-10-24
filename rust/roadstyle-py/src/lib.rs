@@ -378,7 +378,7 @@ fn duckosm_plan(tables: Vec<(String, String)>, columns: Vec<(String, String, Str
         Ok(r) => (Some(r), None),
         Err(e) => (None, Some(e)),
     };
-    let select = duckosm::roads_select(mode).map_err(PyValueError::new_err)?;
+    let select = duckosm::roads_select(mode).map_err(|e| PyValueError::new_err(e.to_string()))?;
     let layers: Vec<serde_json::Value> = duckosm::features_sql(&cat, &specs).into_iter()
         .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "sql": l.sql})).collect();
     let meta = (!tags).then_some(duckosm::LEVELS_META_SQL);
@@ -391,7 +391,7 @@ fn duckosm_plan(tables: Vec<(String, String)>, columns: Vec<(String, String, Str
 #[pyfunction]
 #[pyo3(signature = (row=None))]
 fn duckosm_levels(row: Option<(String, i64, String)>) -> PyResult<String> {
-    roadstyle::duckosm::levels_keyword(row.as_ref().map(|(s, n, h)| (s.as_str(), *n, h.as_str()))).map(|v| v.to_string()).map_err(PyValueError::new_err)
+    roadstyle::duckosm::levels_keyword(row.as_ref().map(|(s, n, h)| (s.as_str(), *n, h.as_str()))).map(|v| v.to_string()).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
 /// duckosm_subset_levels(row, missing, example, ids) -> str: the look's keyword `levels` (JSON text) of the stored levels for a map of one
@@ -400,7 +400,7 @@ fn duckosm_levels(row: Option<(String, i64, String)>) -> PyResult<String> {
 #[pyo3(signature = (row, missing, example, ids))]
 fn duckosm_subset_levels(row: Option<(String, i64, String)>, missing: i64, example: Option<i64>, ids: Vec<i64>) -> PyResult<String> {
     roadstyle::duckosm::subset_levels_keyword(row.as_ref().map(|(s, n, h)| (s.as_str(), *n, h.as_str())), missing, example, &ids)
-        .map(|v| v.to_string()).map_err(PyValueError::new_err)
+        .map(|v| v.to_string()).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
 /// duckosm_features_select(specs) -> str | None: the base map's rows from the tables f<spec> that were made.

@@ -12,10 +12,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   gives the base map's queries also for a file with no network ("roads" is null, "roads_error" says why).
 
 ### Changed
-- **The look's errors are typed** (`roadstyle_look::Error`, Rust only): one kind for each cause (a saved look that is not read, a later
-  look version, wrong options, an unknown name, a YAML file that is not correct, an image that is not read), with the same message text
-  as before. `String::from(error)` gives the text, so a caller whose errors are text keeps its `?`. Python and JavaScript show the same
-  messages.
+- **The look's and the readers' errors are typed** (Rust only). `roadstyle_look::Error`: a saved look that is not read, a later look
+  version, wrong options, an unknown name, a YAML file that is not correct, an image that is not read. `roadstyle_io::Error`: bytes that
+  are not a file of the kind, data that the call cannot use, a wrong argument, stored levels that are missing or of other edges, a CRS
+  that is missing or not read, a Parquet writer that stopped. Each has the same message text as before; `String::from(error)` gives
+  it, so a caller whose errors are text keeps its `?`. Python and JavaScript show the same messages.
 - **The base map goes through stage 1 as typed tables** (audit R10, step 2; docs/design/r10_feature_table.md). The Rust engine reads
   features.parquet into one table (Arrow columns and one coordinate buffer), cuts the sea out of it, and keeps each base-map layer as a
   table until it writes the GeoJSON text, not a JSON tree for each feature. The output is the same bytes (the styles, the files and the

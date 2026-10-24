@@ -29,7 +29,7 @@ fn tables(parquet: Vec<u8>, features: Option<Vec<u8>>, planner: Option<Vec<u8>>)
 /// The base map's rows from their GeoParquet bytes (the duckOSM reader's features.parquet), the background's land without the sea
 /// (duckosm::cut_sea).
 pub fn read_features(features: Vec<u8>) -> Result<FeatureTable, String> {
-    duckosm::cut_sea(read::read_feature_table(features, "geometry")?)
+    Ok(duckosm::cut_sea(read::read_feature_table(features, "geometry")?)?)
 }
 
 /// The style as one JSON text (roadstyle's export_inline), from the roads and the other tables as GeoParquet bytes: the engine's
@@ -280,7 +280,7 @@ pub fn write_source_file<W: std::io::Write + Send>(s: &sources::Sources, file: &
         return Ok(w);
     }
     if file == ROAD_TABLE {
-        return roadstyle_io::write::parquet_to(w, || road_rows(s), true);
+        return Ok(roadstyle_io::write::parquet_to(w, || road_rows(s), true)?);
     }
     let name = file.strip_suffix(&format!(".{ext}")).ok_or_else(|| format!("{file}: not a .{ext} file"))?;
     let i = s.sources.iter().position(|(n, _)| n == name).ok_or_else(|| format!("{file}: no source {name}"))?;
@@ -296,17 +296,17 @@ pub fn write_source_file<W: std::io::Write + Send>(s: &sources::Sources, file: &
             id: Some(r.i as i64),
             props: s.roads.props(r, Some(drawn)).map(|(k, c)| (k.into(), Val::Cell(c))).collect(),
             geometry: r.line().filter(|_| lines).map(Geometry::Line),
-        }), true),
+        }), true).map_err(String::from),
         Src::Simple(p) => roadstyle_io::write::parquet_to(w, || p.features(&s.roads.roads).map(|(id, props, c)| PqRow {
             id: Some(id as i64), props: props.into_iter().map(|(k, v)| (k.into(), Val::Json(v))).collect(), geometry: c.map(Geometry::Line),
-        }), true),
+        }), true).map_err(String::from),
         Src::Json(v) => {
             let fs = v["data"]["features"].as_array().map(Vec::as_slice).unwrap_or_default();
             roadstyle_io::write::parquet_to(w, || fs.iter().map(|f| PqRow {
                 id: f["id"].as_i64(),
                 props: f["properties"].as_object().into_iter().flatten().map(|(k, v)| (k.as_str().into(), Val::Cell(Cell::Json(v)))).collect(),
                 geometry: Some(&f["geometry"]).filter(|g| !g.is_null()).map(|g| Geometry::Json(std::borrow::Cow::Borrowed(g))),
-            }), true)
+            }), true).map_err(String::from)
         }
         // a base-map layer: its table's cells (the keys of each GeoJSON feature) and each feature's geometry (R10)
         Src::Features(f) => {
@@ -315,7 +315,7 @@ pub fn write_source_file<W: std::io::Write + Send>(s: &sources::Sources, file: &
                 id: None,
                 props: t.names().iter().filter(|k| t.has_key(r, k)).filter_map(|k| t.get(r, k).map(|c| (k.as_str().into(), Val::Cell(c)))).collect(),
                 geometry: Some(t.geometries_of().to_geojson(r)).filter(|g| !g.is_null()).map(Geometry::from),
-            }), true)
+            }), true).map_err(String::from)
         }
     }
 }

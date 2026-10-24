@@ -5,6 +5,7 @@
 //! features_sql.js. The caller reads the catalog first (`Catalog`, from `information_schema`), then runs the statements in order;
 //! the outputs are the engine's inputs (roads.parquet, features.parquet).
 
+use crate::Error;
 use roadstyle_model::feature_table::{FeatureTable, GeomType, Geometries};
 use roadstyle_model::Cell;
 use serde_json::Value;
@@ -40,13 +41,13 @@ impl Catalog {
 }
 
 /// _roads_union: every mode's edges and private_edges (`only`: one mode's), NULL for an optional column that the file does not have.
-fn roads_union(cat: &Catalog, only: Option<&str>) -> Result<String, String> {
+fn roads_union(cat: &Catalog, only: Option<&str>) -> Result<String, Error> {
     if let Some(m) = only.filter(|m| !MODES.contains(m)) {
-        return Err(format!("only: a map of one mode needs the mode driving, walking or cycling, not {m}"));
+        return Err(Error::Options(format!("only: a map of one mode needs the mode driving, walking or cycling, not {m}")));
     }
     let modes: Vec<&str> = MODES.iter().copied().filter(|m| cat.has_table(m, "edges") && only.is_none_or(|o| o == *m)).collect();
     if modes.is_empty() {
-        return Err(format!("no <mode>.edges table (modes: {})", only.map_or_else(|| MODES.join(", "), String::from)));
+        return Err(Error::Options(format!("no <mode>.edges table (modes: {})", only.map_or_else(|| MODES.join(", "), String::from))));
     }
     let mut private: Vec<&str> = modes.iter().copied().filter(|m| cat.has_table(m, "private_edges")).collect();
     private.sort();
@@ -68,10 +69,10 @@ pub const LEVELS_META_SQL: &str = "SELECT source, n_edges, edge_hash FROM visual
 
 /// The look's keyword `levels` of the stored levels: {edge_hash, n_edges}, which the engine checks against the roads. `row`: the row of
 /// `LEVELS_META_SQL` (source, n_edges, edge_hash), or None when the file has no such table or row.
-pub fn levels_keyword(row: Option<(&str, i64, &str)>) -> Result<Value, String> {
-    let (source, n, hash) = row.ok_or("no visualization.edge_levels_meta in this file: make and solve its level area (duckosm levels)")?;
+pub fn levels_keyword(row: Option<(&str, i64, &str)>) -> Result<Value, Error> {
+    let (source, n, hash) = row.ok_or_else(|| Error::Levels("no visualization.edge_levels_meta in this file: make and solve its level area (duckosm levels)".into()))?;
     if !["area", "tags", "solve"].contains(&source) {
-        return Err("the stored levels are not from a level area: make and solve its level area again".into());
+        return Err(Error::Levels("the stored levels are not from a level area: make and solve its level area again".into()));
     }
     Ok(serde_json::json!({"edge_hash": hash, "n_edges": n}))
 }
@@ -85,11 +86,11 @@ pub const IDS_SQL: &str = "SELECT edge_id FROM r";
 /// The look's keyword `levels` of the stored levels for a map of one mode (roadstyle's load_area_levels(subset=True)): the levels were
 /// solved for the roads of every mode together, so each road of the map must have its stored row (`missing`, `example`: `SUBSET_SQL`'s
 /// row). Then the keyword names these roads (`ids`: their edge_ids), so that the engine's check of the roads holds for them.
-pub fn subset_levels_keyword(row: Option<(&str, i64, &str)>, missing: i64, example: Option<i64>, ids: &[i64]) -> Result<Value, String> {
+pub fn subset_levels_keyword(row: Option<(&str, i64, &str)>, missing: i64, example: Option<i64>, ids: &[i64]) -> Result<Value, Error> {
     levels_keyword(row)?;
     if missing > 0 {
-        return Err(format!("{missing} of the edges are not edges the stored levels were solved for (for example {}): make and solve the \
-                            level area again (duckosm levels)", example.map_or_else(|| "?".into(), |e| e.to_string())));
+        return Err(Error::Levels(format!("{missing} of the edges are not edges the stored levels were solved for (for example {}): make and solve the \
+                            level area again (duckosm levels)", example.map_or_else(|| "?".into(), |e| e.to_string()))));
     }
     Ok(serde_json::json!({"edge_hash": roadstyle_levels::edge_hash(ids), "n_edges": ids.len()}))
 }
@@ -136,9 +137,9 @@ pub fn roads_sql(cat: &Catalog, tags: bool, only: Option<&str>) -> Result<[Strin
 /// The roads of the map of `mode` ("all", or one network) from the table `r` of `roads_sql`, in the order of mapstyle's load_roads (an
 /// undirected edge on a street's own directed edge first, then by edge_id), with the columns that render_map adds: `access` (_access),
 /// `is_directed` (_is_directed) and `has_arrows`. A SELECT: the browser writes it as roads.parquet (`COPY (...) TO`).
-pub fn roads_select(mode: &str) -> Result<String, String> {
+pub fn roads_select(mode: &str) -> Result<String, Error> {
     if mode != "all" && !MODES.contains(&mode) {
-        return Err(format!("unknown mode {mode}"));
+        return Err(Error::Options(format!("unknown mode {mode}")));
     }
     let access = if mode != "all" { format!("CASE WHEN NOT {mode} THEN access_{mode} END") } else {
         "CASE WHEN access_driving = 'bus' THEN access_driving
@@ -206,7 +207,7 @@ pub fn features_select(specs: &[usize]) -> Option<String> {
 /// no sea layer does not paint the sea as land. In Rust (i_overlay), so that no reader needs DuckDB's spatial extension. The rings are
 /// closed (WKB and GeoJSON need it), in i_overlay's orientation, which is RFC 7946's (outer rings counter-clockwise, holes clockwise).
 /// Nothing changes when the rows have no background or no sea.
-pub fn cut_sea(t: FeatureTable) -> Result<FeatureTable, String> {
+pub fn cut_sea(t: FeatureTable) -> Result<FeatureTable, Error> {
     use i_overlay::core::{fill_rule::FillRule, overlay_rule::OverlayRule};
     use i_overlay::float::single::SingleFloatOverlay;
     let is = |r: usize, layer: &str, kind: Option<&str>| t.get(r, "layer").and_then(Cell::as_str) == Some(layer)
@@ -232,14 +233,14 @@ pub fn cut_sea(t: FeatureTable) -> Result<FeatureTable, String> {
         }).collect()).collect();
         out.push(GeomType::MultiPolygon, &closed);
     }
-    t.with_geometries(out)
+    t.with_geometries(out).map_err(Error::Data)
 }
 
 /// Every ring of the Polygon or MultiPolygon `row`.
-fn rings(g: &Geometries, row: usize) -> Result<Vec<Vec<[f64; 2]>>, String> {
+fn rings(g: &Geometries, row: usize) -> Result<Vec<Vec<[f64; 2]>>, Error> {
     match g.kind(row) {
         Some(GeomType::Polygon | GeomType::MultiPolygon) => Ok(g.parts(row).flatten().map(<[_]>::to_vec).collect()),
-        k => Err(format!("the base map: a background or sea row is a {}, not a polygon", k.map_or("geometry of no type", GeomType::name))),
+        k => Err(Error::Data(format!("the base map: a background or sea row is a {}, not a polygon", k.map_or("geometry of no type", GeomType::name)))),
     }
 }
 
