@@ -119,3 +119,36 @@ def test_a_live_page_gives_the_dashboard_the_states(part):
     assert _opt(on, "live")["color"] == "rs_c" and _opt(off, "live") is None
     road = next(l for l in _style(on)["layers"] if l["id"] == "roads-simple")
     assert '["feature-state", "rs_c"]' in json.dumps(road["paint"]["line-color"])
+
+
+def test_the_parquet_files_keep_big_ids_as_integers(part, keywords, tmp_path):
+    """N1: duckOSM's edge ids are past 2**53 - 1; the model keeps them as integers, so DuckDB reads the road table and the roads' file
+    with BIGINT ids (the BIGINT rule of the matchers), while every JSON form writes them as text (JavaScript would round them)."""
+    duckdb = pytest.importorskip("duckdb")
+    big = 2 ** 60
+    roads = part.assign(edge_id=[big + i for i in range(len(part))])        # ids as duckOSM hashes them (the fixture's are text)
+    rs.export_geojson(roads, tmp_path / "pq", format="geoparquet", **keywords)
+    for name in ("road_table.parquet", "roads.parquet"):
+        cols = {r[0]: r[1] for r in duckdb.sql(f"DESCRIBE SELECT * FROM '{tmp_path / 'pq' / name}'").fetchall()}
+        assert cols["edge_id"] == "BIGINT", (name, cols["edge_id"])
+    assert duckdb.sql(f"SELECT max(edge_id) FROM '{tmp_path / 'pq' / 'road_table.parquet'}'").fetchall()[0][0] == big + len(part) - 1
+    rs.export_geojson(roads, tmp_path / "gj", format="geojson", **keywords)
+    ids = [f["properties"]["edge_id"] for f in json.loads((tmp_path / "gj" / "roads.geojson").read_text())["features"]]
+    assert ids[:2] == [str(big), str(big + 1)]                                # the JSON form: text
+
+
+def test_the_tiled_style_says_its_tile_layers(part, keywords):
+    """N3, N7: stage 2's one style (tile_stage) has the pieces' promoteId on its vector source, and roadstyle:sources and
+    roadstyle:arrows say the final layers: the road layer on the tile layer simple of the source roads."""
+    from roadstyle import _engine
+
+    lk = _engine._look_of({**keywords, "state": "live", "live_data": True})
+    src = _engine.rust().make_sources(_engine._geoparquet(part), json.dumps(lk), None, None, "x")
+    inline = json.loads(src.style())["metadata"]
+    assert inline["roadstyle:sources"]["simple"] == {"source": "simple", "layer": None}
+    text, t = src.tile_stage(only=["roads", "simple", "slots"], at=json.dumps({"url": "pmtiles://roads"}))      # as a page
+    st = json.loads(text)
+    assert st["sources"]["roads"]["promoteId"] == {"simple": "__rs_edge"} and st["sources"]["roads"]["url"] == "pmtiles://roads"
+    assert st["metadata"]["roadstyle:sources"]["simple"] == {"source": "roads", "layer": "simple"}
+    assert st["metadata"]["roadstyle:arrows"] == inline["roadstyle:arrows"] and "simple" in t.layers()
+    assert json.loads(src.style())["metadata"] == inline          # stage 2 borrows the sources (N6)

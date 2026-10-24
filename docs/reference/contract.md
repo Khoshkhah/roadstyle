@@ -17,7 +17,7 @@ The export's style (`export_style`, `export_inline`: `state` baked) has `roadsty
 |---|---|
 | `roadstyle:contract` | the version of the contract: 1 |
 | `roadstyle:state` | each global state `rs_*` and its start value |
-| `roadstyle:controls` | the options of `rsDashboard` that come from the style (the next table) |
+| `roadstyle:controls` | the options of `rsDashboard` that come from the style (the next table), and `dashes`: the sorted dash patterns of the road layer's features, for the page's simple-mode script (not an option) |
 | `roadstyle:interaction` | `{popup, tooltip, hover_delay_ms}`: the road popup's fields, the hover tooltip, the hover delay |
 | `roadstyle:color_options` | `[{name, prop, legend}]`: the colour options and their legends |
 | `roadstyle:live` | with `live_data=True` only: `{color, width, types, ramp, nodata}`: the feature states that the road layer reads on the road's row (`rs_c` a colour, `rs_w` a width factor), the default ramp (9 colours of `cmap`) and the no-data colour; a page gives it to the dashboard as the option `live` (null without `live_data`) |
@@ -26,8 +26,8 @@ The export's style (`export_style`, `export_inline`: `state` baked) has `roadsty
 | layer `roadstyle:group` | the group of a layer: `roads`, or an overlay's label |
 | layer `roadstyle:over` | a base-map layer that goes over the roads (the 3D buildings) |
 | layer `roadstyle:position` | the drawing position of a layer of `export_look` |
-| `roadstyle:sources` | in `roadstyle:controls` (the page: the option `sources`): each role of the page (`simple`, `slots`, `arrows`, `decks`, `ov<i>`, ...) with its source and its source layer (null for GeoJSON) |
-| `roadstyle:arrows` | in `roadstyle:controls` (the page: the option `arrows`): `"points"` (the page's own arrows, the source `arrows`), `"line"` (along the slots) or null |
+| `roadstyle:sources` | each role of the style (`simple`, `slots`, `arrows`, `decks`, `ov<i>`, ...) with its source and its source layer (null for GeoJSON), from its final layers (`contract::describe`; after tiling the tile layers); the page gives it to the dashboard as the option `sources` |
+| `roadstyle:arrows` | `"points"` (the page's own arrows, the source `arrows`), `"line"` (along the slots) or null, from the final layers; the page's option `arrows` |
 | `roadstyle:tiles` | in stage 1's saved `style.json` only: the tile settings that stage 2 reads (`minzoom`, `maxzoom`, `buffer_px`, `extent`) |
 | `roadstyle:columns` | in stage 1's saved `style.json` only: the user's class, filter and metre width columns (`class`, `filter`, `width`) |
 | Parquet field `roadstyle:json` | stage 1's Parquet files (`save_sources`): a column whose values are JSON text (values of more than one type, lists or objects) |

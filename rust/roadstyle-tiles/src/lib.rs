@@ -113,6 +113,9 @@ fn val(v: &Value) -> Option<Val> {
         Value::String(s) => Val::Str(s.as_str().into()),
         Value::Bool(b) => Val::Bool(*b),
         Value::Number(n) => match (n.as_i64(), n.as_u64()) {
+            // an integer past 2**53 - 1 as text, as every JSON form writes it (JavaScript would round it; tiles.py's roads have text)
+            (Some(i), _) if i.unsigned_abs() > roadstyle_model::table::JS_MAX_SAFE_INT => Val::Str(i.to_string().into()),
+            (_, Some(u)) if u > roadstyle_model::table::JS_MAX_SAFE_INT => Val::Str(u.to_string().into()),
             (Some(i), _) => Val::Int(i),
             (_, Some(u)) => Val::UInt(u),
             _ => Val::Dbl(n.as_f64()?),
@@ -145,24 +148,15 @@ impl Tiles {
 
     /// Add a GeoJSON source of the style (`{"type": "geojson", "data": FeatureCollection, ...}`) as the layer `name`, and free its
     /// tree. The properties in `keep` and every `__rs_*` property go into the tiles, all of a whole layer's (tiles.py's tile_props). `whole`: see the module; `min_zoom`: the layer's first zoom.
-    pub fn add(&mut self, name: &str, source: Value, keep: &HashSet<String>, whole: bool, min_zoom: u32) {
-        let Value::Object(mut s) = source else { return };
-        let features = match s.remove("data").map(|mut d| d["features"].take()) {
-            Some(Value::Array(f)) => f,
-            _ => Vec::new(),
-        };
-        drop(s);
+    pub fn add(&mut self, name: &str, source: &Value, keep: &HashSet<String>, whole: bool, min_zoom: u32) {
+        let empty = Map::new();
         let mut b = Builder::default();
-        for (i, f) in features.into_iter().enumerate() {
-            let Value::Object(mut f) = f else { continue };
+        for (i, f) in source["data"]["features"].as_array().into_iter().flatten().enumerate() {
             let Some(g) = f.get("geometry").and_then(geom) else { continue };
             let id = Some(i as u64); // tiles.py: a feature's id is its index in its source
-            let props = match f.remove("properties") {
-                Some(Value::Object(p)) => p,
-                _ => Map::new(),
-            };
+            let props = f["properties"].as_object().unwrap_or(&empty);
             // tiles.py's tile_props: a whole layer (keep=None there) all its properties, else `keep` and every __rs_*
-            b.push(id, g, props.into_iter().filter(|(k, _)| whole || k.starts_with("__rs_") || keep.contains(k)));
+            b.push(id, g, props.iter().filter(|(k, _)| whole || k.starts_with("__rs_") || keep.contains(k.as_str())).map(|(k, v)| (k.as_str(), v.clone())));
         }
         self.layers.insert(name.to_string(), b.layer(whole, min_zoom));
     }
@@ -243,7 +237,7 @@ impl Tiles {
 
     /// The tile layers, in their order.
     pub fn layer_names(&self) -> Vec<String> {
-        self.layers.keys().cloned().collect()
+        self.layers.iter().filter(|(_, l)| l.tree.size() > 0).map(|(k, _)| k.clone()).collect()      // a layer with no feature is none
     }
 
     /// The first and the last zoom of the tiles.
@@ -725,7 +719,7 @@ mod tests {
     #[test]
     fn a_tile_has_the_feature_its_id_and_properties() {
         let mut t = Tiles::new(0, 15, 80.0);
-        t.add("roads", json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": [
+        t.add("roads", &json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": [
             {"type": "Feature", "id": 7, "properties": {"name": "A", "lanes": 2, "w": 1.5, "bridge": true, "gone": null, "n": -3},
              "geometry": {"type": "LineString", "coordinates": [[1.0, 1.0], [10.0, 10.0]]}}]}}), &keys(&["name", "lanes", "w", "bridge", "gone", "n"]), false, 0);
         let tile = t.tile(0, 0, 0);
@@ -744,7 +738,7 @@ mod tests {
     fn the_outer_ring_has_a_positive_area() {
         let mut t = Tiles::new(0, 15, 80.0);
         // a square around (1, 1) degrees, counterclockwise in lon / lat (clockwise on the screen after y goes down)
-        t.add("land", json!({"type": "geojson", "generateId": true, "data": {"type": "FeatureCollection", "features": [
+        t.add("land", &json!({"type": "geojson", "generateId": true, "data": {"type": "FeatureCollection", "features": [
             {"type": "Feature", "properties": {}, "geometry": {"type": "Polygon",
              "coordinates": [[[0.5, 0.5], [1.5, 0.5], [1.5, 1.5], [0.5, 1.5], [0.5, 0.5]]]}}]}}), &keys(&[]), false, 0);
         let f = &t.layers["land"].feats[0];
@@ -774,7 +768,7 @@ mod tests {
         let fc = json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": [
             {"type": "Feature", "id": 1, "properties": {}, "geometry": {"type": "LineString", "coordinates": [[1.0, 1.0], [1.01, 1.0]]}}]}});
         let mut t = Tiles::new(6, 15, 80.0);
-        t.add("slots", fc, &keys(&[]), true, 14);
+        t.add("slots", &fc, &keys(&[]), true, 14);
         let at = |z: u32| {
             let n = (1u64 << z) as f64;
             let [x, y] = merc(&json!([1.005, 1.0])).unwrap();

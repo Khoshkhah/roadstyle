@@ -426,14 +426,14 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
         views, pals = _views(src, kwargs, [b["key"] for b in bms], palette, profile, settings, highway_col) if a["views"] else ([], [])
     finally:
         _use(*prev)
-    style, table = json.loads(src.style()), src.road_table()
+    if tiled and any("palette" in v["set"] for v in views):
+        raise ValueError("engine='rust': tiles=True with a view's palette (the tiles have one palette); use engine='python'")
+    style, archive = _tiled_page(src, highway_col, kwargs) if tiled else (json.loads(src.style()), None)
+    table = src.road_table()
     _warn()
     if pals:
         _palette_swatches(style, json.loads(table)["props"], pals)
-    if tiled and any("palette" in v["set"] for v in views):
-        raise ValueError("engine='rust': tiles=True with a view's palette (the tiles have one palette); use engine='python'")
-    dashes = sorted({f["properties"].get("__rs_dash") for f in (style["sources"].get("simple") or {"data": {"features": []}})["data"]["features"]} - {None, ""})
-    archive = _tiled_page(src, lk, style, highway_col, kwargs) if tiled else None
+    dashes = style["metadata"]["roadstyle:controls"]["dashes"]
     meta = style.pop("metadata")
     ctl, inter = meta["roadstyle:controls"], meta["roadstyle:interaction"]
     for lyr in style["layers"]:
@@ -450,7 +450,7 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
         if a[k] is not None:
             cam[k] = a[k]
     page = {"basemaps": bms, "basemap_switcher": bool(a["basemap_switcher"]), "tiles": ctl["tiles"], "simple": ctl["simple"],
-            "sources": rw._roles(style["layers"]), "arrows": rw._arrow_kind(style["layers"]), "live": meta.get("roadstyle:live"), "popup_mode": mode,
+            "sources": meta["roadstyle:sources"], "arrows": meta["roadstyle:arrows"], "live": meta.get("roadstyle:live"), "popup_mode": mode,
             "find_control": bool(a["find_control"]), "zoom_readout": bool(a["zoom_readout"]), "pitch_3d": ctl["pitch_3d"],
             "street_view": a["street_view"], "street_view_key": key or "", "google_3d": bool(a["google_3d"]), "select_color": ctl["select_color"],
             "filter": ctl["filter"], "color_options": meta.get("roadstyle:color_options") or [], "color_active": ctl["color_active"],
@@ -504,33 +504,14 @@ def _palette_swatches(style, props, pals):
     flt["palettes"][style["metadata"]["roadstyle:state"]["rs_palette"]] = dict(flt["swatches"])
 
 
-def _tiled_page(src, lk, style, highway_col, kwargs):
-    """render(tiles=True) by the Rust engine: the PMTiles archive of the page, and ``style`` made as the tiled page's (render_web's tiled
-    branch): one vector source ``roads`` with the layers ``simple`` and ``slots``. The tiles are stage 2 of the same stage 1 (``src``, in
-    memory: no second build), with the columns of tiles.build_pmtiles (``keep`` and every ``__rs_*``; the slots whole, from zoom 14)."""
-    srcs = style["sources"]
-    tc = lk["config"]["tiles"]
-    z0, z1 = int(tc["minzoom"]), int(tc["maxzoom"])
+def _tiled_page(src, highway_col, kwargs):
+    """render(tiles=True) by the Rust engine: the page's style and its PMTiles archive, from stage 2 of the same stage 1 (``src``, in memory:
+    no second build; roadstyle::tile_stage). The style has one vector source ``roads`` (the embedded archive) with the layers ``simple``
+    and ``slots``, and the other sources inline; the tiles have the columns of tiles.build_pmtiles (``keep`` and every ``__rs_*``; the
+    slots whole, from zoom 14)."""
     keep = sorted({highway_col, kwargs.get("filter_col") or highway_col, "__rs_twoway", "__rs_edge", "lvl", kwargs.get("width_m_col")} - {None})
-    names = [n for n in ("roads", "simple", "slots") if n in srcs and srcs[n]["data"]["features"]]
-    t = src.tiles(names, keep)
-    def points(g):            # a LineString's points, a Point itself
-        c = (g or {}).get("coordinates") or []
-        return [c] if (g or {}).get("type") == "Point" else c
-    pts = [c for n in names for f in srcs[n]["data"]["features"] for c in points(f.get("geometry"))]
-    bounds = (min(p[0] for p in pts), min(p[1] for p in pts), max(p[0] for p in pts), max(p[1] for p in pts))
-    archive = _pmtiles(t, z0, z1, bounds, names)
-    # the style: the roads source a vector one; the pieces and the slots its layers
-    vector = {"type": "vector", "url": "pmtiles://roads", "minzoom": z0, "maxzoom": z1, "promoteId": {"simple": "__rs_edge"}}
-    style["sources"] = srcs = {"roads": vector, **{k: v for k, v in srcs.items() if k != "roads"}}      # the tiles first, as render_web's
-    for n in ("simple", "slots"):
-        srcs.pop(n, None)
-    for lyr in style["layers"]:
-        if lyr.get("source") in ("simple", "slots"):
-            lyr["source"], lyr["source-layer"] = "roads", lyr["source"]
-        elif lyr.get("source") == "roads":
-            lyr["source-layer"] = "roads"
-    return archive
+    text, t = src.tile_stage(only=["roads", "simple", "slots"], exact=keep, at=json.dumps({"url": "pmtiles://roads"}))
+    return json.loads(text), t.archive(list(t.bounds()), t.layers())
 
 
 def _pmtiles(t, z0, z1, bounds, names) -> bytes:

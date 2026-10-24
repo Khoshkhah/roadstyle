@@ -303,7 +303,8 @@ def test_live_style_and_contract(part, keywords, case):
     meta = ru.pop("metadata")
     assert meta["roadstyle:contract"] == 1
     assert diff(meta["roadstyle:state"], {k: v["default"] for k, v in py["state"].items()}) == []
-    controls = meta["roadstyle:controls"]
+    controls = dict(meta["roadstyle:controls"])
+    assert controls.pop("dashes") == (parts["simple_js"] or {}).get("dashes", [])     # the page script's dash patterns, not an option
     want = {k: page[k] for k in controls}
     want["tunnel"] = {**want["tunnel"], "bg": controls["tunnel"]["bg"]}      # the base map's canvas colour: the page's own
     assert diff(controls, want) == []

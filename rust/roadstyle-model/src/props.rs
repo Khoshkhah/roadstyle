@@ -101,7 +101,7 @@ impl Props {
             }
             serde_json::to_writer(&mut *out, k).unwrap();
             out.push(b':');
-            serde_json::to_writer(&mut *out, v).unwrap();
+            serde_json::to_writer(&mut *out, &crate::table::JsSafe(v)).unwrap();
         }
         out.push(b'}');
     }

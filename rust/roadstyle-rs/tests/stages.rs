@@ -24,7 +24,7 @@ fn same_tiles(area: &str) {
     let mut by_file = Vec::new();
     for (f, sub) in [(roadstyle_rs::Format::GeoJson, "geojson"), (roadstyle_rs::Format::GeoParquet, "geoparquet")] {
         roadstyle_rs::save_sources(&s, &dir.join(sub), f, &keep).unwrap();
-        by_file.push((sub, roadstyle_rs::tile_files(&dir.join(sub), &keep, None).unwrap().1));
+        by_file.push((sub, roadstyle_rs::tile_files(&dir.join(sub), &keep, None, &roadstyle_rs::xyz_at("")).unwrap().1));
     }
     let t = roadstyle_rs::read::read_roads(roads, "geometry").unwrap();
     let (mut x0, mut y0, mut x1, mut y1) = (f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
