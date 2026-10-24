@@ -1,11 +1,9 @@
 """A duckOSM file as the Rust engine's input (the mapstyle merge): the roads of every mode with their stored levels and the base map's
 tables (``features.*``), read with the SQL of the Rust engine (``roadstyle_io::duckosm``: the one copy, which the browser runs too) on a
-DuckDB connection of this process. The outputs are the engine's input files, as GeoParquet bytes."""
+DuckDB connection of this process. The outputs are the engine's input tables, as Arrow tables (the geometry as WKB)."""
 from __future__ import annotations
 
-import io
 import json
-import tempfile
 import warnings
 from pathlib import Path
 
@@ -20,10 +18,11 @@ def layer_specs() -> list[dict]:
 
 def read(db, mode: str = "all", *, levels: str = "stored", layers: bool = True):
     """``(roads, features, levels_kw)`` of the duckOSM file ``db`` for the map of ``mode`` ("all", "driving", "walking" or "cycling"):
-    the roads (GeoParquet bytes), the base map's rows (GeoParquet bytes, None with ``layers=False`` or when the file has none) and the
+    the roads (an Arrow table), the base map's rows (an Arrow table, None with ``layers=False`` or when the file has none) and the
     look's keyword ``levels``: the stored levels' check ({edge_hash, n_edges}) with ``levels="stored"``, or "tags" (the engine computes
     the levels with the tags rule). A base-map layer whose table or query fails is skipped, as mapstyle's load_layers does."""
     import duckdb
+    import pyarrow as pa
 
     from ._engine import rust
 
@@ -61,14 +60,9 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers: bool = True):
                     warnings.warn(f"{db}: base-map layer {lyr['name']}: no tags column (an older file): the heights of the kinds", stacklevel=2)
                 made.append(lyr["spec"])
                 break
-        with tempfile.TemporaryDirectory() as d:
-            def parquet(select, name):
-                p = Path(d) / name
-                con.execute(f"COPY ({select}) TO '{p}' (FORMAT parquet)")
-                return p.read_bytes()
-            roads = parquet(plan["select"], "roads.parquet")
-            fsel = r.duckosm_features_select(made)
-            features = parquet(fsel, "features.parquet") if fsel else None
+        roads = pa.table(con.execute(plan["select"]).arrow())       # in memory: the connection closes below
+        fsel = r.duckosm_features_select(made)
+        features = pa.table(con.execute(fsel).arrow()) if fsel else None
     finally:
         con.close()
     return roads, features, level_kw
@@ -104,7 +98,6 @@ def export_style(db, out_dir, *, base_url: str, mode: str = "all", theme: str = 
     """mapstyle's ``export_style`` on the Rust engine: the map of the duckOSM file ``db`` as style.json, its vector tiles (the roads
     and the base map; ``format``: "xyz" or "pmtiles"), the sprite and the popup's files in ``out_dir``, served at ``base_url``, for an
     app that draws a MapLibre style (GeoLibre, RustGIS, QGIS). The path of style.json."""
-    import pyarrow.parquet as pq
     import shapely
 
     from ._engine import _warn, _write_export, rust
@@ -113,11 +106,10 @@ def export_style(db, out_dir, *, base_url: str, mode: str = "all", theme: str = 
         raise ValueError(f"format must be 'xyz' or 'pmtiles', got {format!r}")
     roads, features, level_kw = read(db, mode, levels=levels, layers=layers)
     lk = look(db, mode, theme=theme, paths=paths, levels=level_kw, **{"view_3d": True, "export": True, "tiles": True, **kwargs})
-    table = pq.read_table(io.BytesIO(roads))
-    keep = [c for c in table.column_names if c != "geometry"]          # every column: a click shows the data
+    keep = [c for c in roads.column_names if c != "geometry"]          # every column: a click shows the data
     t = rust().Tiler(roads, lk, features, None, "", keep)
     _warn()
-    bounds = tuple(float(v) for v in shapely.total_bounds(shapely.from_wkb(table.column("geometry").to_numpy(zero_copy_only=False))))
+    bounds = tuple(float(v) for v in shapely.total_bounds(shapely.from_wkb(roads.column("geometry").to_numpy(zero_copy_only=False))))
     return _write_export(t, out_dir, base_url, format, json.loads(lk.part("args"))["name"], bounds)
 
 

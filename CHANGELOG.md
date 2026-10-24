@@ -7,6 +7,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **Python gives the roads to the Rust engine as an Arrow table, not as GeoParquet bytes** (audit R15). The binding
+  (`roadstyle._rust`: `make_style`, `make_sources`, `Tiler`, `compute_levels`, `make_area`) reads any object with
+  `__arrow_c_stream__` (GeoPandas' `to_arrow`, a pyarrow table, DuckDB's `arrow()`) through the Arrow C stream interface. Bytes are a
+  `TypeError`. The output does not change. On Tartu (64,828 edges), `compute_levels(method="tags")` takes 66 ms, not 123 ms: there is
+  no Parquet encode in Python and no Parquet decode in Rust. `duckosm.read` gives Arrow tables. In Rust, `roadstyle_io::read::roads_from`
+  and `table_from` read Arrow batches, and the facade has `tiled_of` and `features_of` for roads that a reader gave.
 - **Every style reads a road's colour and width from the feature state** (audit N8, both engines). The road layer reads
   `["coalesce", ["feature-state", "rs_c"], <baked colour>]` and each width and offset stop × `["coalesce", ["feature-state", "rs_w"], 1]`,
   in every style, not only with `live_data`; `live_data` now only adds the metadata `roadstyle:live` and the page's option `live`.
