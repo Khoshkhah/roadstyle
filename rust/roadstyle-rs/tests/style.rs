@@ -4,12 +4,12 @@
 //!   tag first): on 2026-10-23 the `height` of 15 buildings of Monaco and 355 of Tartu;
 //! - the slots have Python's key order (__rs_cls before __rs_arw, tests/colors.rs): the same data, other bytes;
 //! - design step (g), part 3 (2026-10-23): the export keeps the roads' pick and highlight layers shown (before: hidden when the data was
-//!   inline), and its pieces have no page glow (tests/common: as_decided). The tiles are the same (tests/areas.rs, decoded).
+//!   inline), and its pieces have no page glow (Python has it too: the goldens of goldens-2). The tiles are the same (tests/areas.rs, decoded).
 //! - 2026-10-24: every style's pieces have their road's row as their feature id (`promoteId: "__rs_edge"` on `simple`, and on the
 //!   vector source of the tiled style) and the glow of a selected or hovered road, so a dashboard drives any style, not only a page;
 //! - R1 (2026-10-24): a piece keeps only the properties that the road layer and the page read on it (props::piece_reads: the layers on
 //!   `simple`, static/dashboard/reads.json's `pieces`), a road only the stage values that a layer reads (its fields stay), in the GeoJSON,
-//!   GeoParquet and tiles (tests/common: as_decided);
+//!   GeoParquet and tiles (Python has it too: the goldens of goldens-2);
 //! - R8 (2026-10-24): the road layer's class tables are one lookup by each feature's class index (`["at", ["get", "__rs_ci"],
 //!   ["literal", [...]]]`; `__rs_ci` the last property of every feature of `simple`; layers::class_index);
 //! - N8 (2026-10-24): every style's road layer reads a road's colour and its width factor from the feature state on its row
@@ -21,7 +21,9 @@
 //!   (tiles.py's extra layers; before, it was clipped, and the sea at Monaco's west edge was missing from 5 tiles).
 //! - N8, part 2 (2026-10-24): the colour of rsColor and rsColorBase is only the feature state `rs_c`. The fill is the active option's,
 //!   an item's colour is `["coalesce", ["feature-state", "rs_c"], its own]`, a painted road sorts on top by the state `rs_top` (the
-//!   rows that rsColor painted), and the state has `rs_top` in place of `rs_colors` and `rs_base` (tests/common: as_decided).
+//!   rows that rsColor painted), and the state has `rs_top` in place of `rs_colors` and `rs_base` (Python has it too: the goldens of goldens-2).
+//! - audit 3, N27 (2026-10-24): an exported tiled style has `roadstyle:sources` (the road roles) and `roadstyle:controls.pick` (the layers
+//!   that a road is picked on), so an app's dashboard finds and picks the roads, as on a live style (Python has it too: goldens-2).
 //!
 //! The reference styles are too large for git (Monaco 26 MB, Tartu 151 MB), so the test compares their SHA-256. `tests/old_style.sh`
 //! makes 0806ac2's style again, to see a difference.
@@ -99,7 +101,7 @@ fn tiles_hash(area: &Path) -> String {
 #[test]
 fn monaco_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(tiles_hash(&area), "60cdf5e381162a6443eb2d4388d11904191f01002037d34f9bde6ce3ba00756f");
+    assert_eq!(tiles_hash(&area), "0974f3058c75fb6f4321d87ab3257199f054e8e21b8d6a66ee9a0fb11e8c345a");
 }
 
 /// tiles.py's extra layers: the sea of Monaco (a polygon) is in the tiles at its west edge, where only its box reaches.
@@ -123,5 +125,5 @@ fn the_sea_at_the_tile_edge() {
 fn tartu_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
-    assert_eq!(tiles_hash(&area), "3c91df4b72671741d0782933bcca694b5e03bc483c94c4ba6db01d17fd444c07");
+    assert_eq!(tiles_hash(&area), "c0d314c251dbc2926ad9e86e2098ede3588e0bdb0ec52962100c63526602ffa8");
 }

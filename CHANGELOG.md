@@ -25,6 +25,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   look, options, given?)` call it. Python gives only what it alone knows: the data steps, the look's options, the base maps' keys and the
   Google Maps key. A view's palette resolves its look in Rust (Python makes no extra looks). The page writer gzips the road table and
   the big sources itself; the two engines' pages are the same byte for byte but these blobs, which are the same when read back.
+- **An exported style tells an app's dashboard its roads** (audit 3, N27, both engines). `export_style`'s metadata has
+  `roadstyle:sources` (the road roles) and `roadstyle:controls.pick` (the layers that a road is picked on), from its final layers, as a
+  live style has them. A dashboard on an exported style finds and picks the roads with no layer-id prefix.
+- **The Rust tests compare with Python's own output again** (audit 3, N27). The goldens are made again with today's Python
+  (`goldens-2.tar` on the pre-release `rust-test-data`; `goldens-1.tar` stays for the older commits), and the test helper that
+  rewrote the old goldens (`as_decided`) is gone.
 - **The dashboard gets its road layers from the engine** (R7, both engines). `roadstyle:sources` has only the road roles: the
   overlays (`ov<i>`) are in their own list, `overlays`, and the boundary is not a road. The new control `pick` lists the layers that a
   road is picked on: `roads-simple` (the full look: its fill layers) and the 3D decks' tops, not their casing.
