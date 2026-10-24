@@ -13,7 +13,8 @@ The values in the Rust column:
 | **Python** | Only the Python engine has it. With `engine="rust"`: a `ValueError`. With `ROADSTYLE_ENGINE=rust`: the Python engine makes the call, with a warning ([Switch the engine](switch-engine.md)). |
 | **folium** | A keyword of the folium backend. The Rust engine makes only the web page. |
 
-The default of each keyword and what it does: [Every parameter](../reference/parameters.md).
+The default of each keyword and what it does: [Every parameter](../reference/parameters.md). The format of the roads, the level
+data and the look that the keywords name: [Inputs and outputs](../reference/formats.md).
 
 ## `render_edges`
 

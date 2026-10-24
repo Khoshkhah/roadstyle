@@ -46,7 +46,8 @@ The same engine is also a WebAssembly package for the browser, and a set of Rust
 
     [Keywords by engine](keywords.md) ·
     [The `rs` object](../reference/javascript.md#the-rs-object) ·
-    [Interaction contract](../reference/contract.md)
+    [Interaction contract](../reference/contract.md) ·
+    [Inputs and outputs](../reference/formats.md)
 
 -   :material-lightbulb-outline:{ .lg .middle } **Explanation**
 
