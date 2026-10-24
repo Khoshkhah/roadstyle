@@ -77,7 +77,7 @@ export function _sdata(s){ const d=s && s._data; if(!d) return null; if(d.geojso
   return d._rs || (d._rs={type:"FeatureCollection", features:Array.from(d.updateable.values())}); }
 // the features of an inline source of the roads style that has no table (decks, slots, overlays); src: the source's id in the map
 export function _sfeats(src){ const g=_sdata(src && map.getSource(src)); return (g && g.features)||[]; }
-// THE ROAD TABLE: each road's fields, midpoint, bbox, heading and line, keyed by the row ({props, mids, bboxes, headings, lines}, as stage 1
+// THE ROAD TABLE: each road's fields, midpoint, bbox and line, keyed by the row ({props, mids, bboxes, lines}, as stage 1
 // makes it). The page gives it (options.road_table, or window.RS_SIDE: the page loads it after the style and then sends rs:tableready).
 // RoadTable is the one port of every read of a road; null and {} where it has nothing (before the table has come).
 function _table(){ return O.road_table || window.RS_SIDE || null; }
