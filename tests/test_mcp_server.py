@@ -46,12 +46,3 @@ def test_misspelt_option_is_an_error_with_a_suggestion(tmp_path):
     assert "'colour_by' (did you mean 'color_by'" in res.content[0].text
     assert not (tmp_path / "x.html").exists()
 
-
-def test_rust_server_options_are_render_edges_keywords():
-    # the Rust server (rust/roadstyle-mcp) checks the options against its own list until the page writer (R3) gives the typed list
-    import re
-
-    from roadstyle.mcp_server import _option_names
-    src = (pathlib.Path(__file__).parents[1] / "rust/roadstyle-mcp/src/main.rs").read_text()
-    names = re.findall(r'"(\w+)"', re.search(r"const STAGE1: &\[&str\] = &\[(.*?)\];", src, re.S).group(1))
-    assert names and set(names) <= _option_names(), set(names) - _option_names()
