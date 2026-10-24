@@ -98,12 +98,12 @@ The page shows the roads colored by `lanes`, the legend, the Roads box, the sear
 
 ## Read the roads from a duckOSM file
 
-`writeRoads` in `js/roads_sql.js` is the SQL that writes `roads.parquet` from a duckOSM file in duckdb-wasm, with the columns that
-the engine reads. It is the only copy of this SQL: duckosm-rust and the GeoLibre plugin use the same file.
+`makeRoads` and `writeRoads` in `js/roads_sql.js` are the SQL that writes `roads.parquet` from a duckOSM file in duckdb-wasm, with
+the columns that the engine reads. It is the only copy of this SQL: duckosm-rust and the GeoLibre plugin use the same file.
 
 ```js
 import * as duckdb from "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.33.1-dev57.0/+esm";
-import {writeRoads} from "./js/roads_sql.js";
+import {makeRoads, writeRoads} from "./js/roads_sql.js";
 import init, {makeLook, makeStyle} from "./pkg/roadstyle_wasm.js";
 
 // duckdb-wasm in its own worker
@@ -118,18 +118,28 @@ const q = async (sql) => (await conn.query(sql)).toArray().map((r) => r.toJSON()
 const file = new Uint8Array(await (await fetch("monaco.duckdb")).arrayBuffer());
 await db.registerFileBuffer("monaco.duckdb", file);
 await q("ATTACH 'monaco.duckdb' AS monaco (READ_ONLY); USE monaco");
-await writeRoads(q, "monaco", "driving", {levels: "stored"});
+const levels = await makeRoads(q, "monaco", {levels: "stored"});   // the stored levels' {edge_hash, n_edges}
+await writeRoads(q, "driving");
 const roads = await db.copyFileToBuffer("roads.parquet");
 
 await init();
-const style = JSON.parse(makeStyle(roads, makeLook(JSON.stringify({args: {state: "live"}})), undefined, undefined, "Monaco"));
+const look = JSON.parse(makeLook(JSON.stringify({args: {state: "live", casing_level_col: "casing_level", fill_level_col: "fill_level",
+                                                         casing_start_col: "casing_start", casing_end_col: "casing_end"}})));
+look.args.levels = levels;                          // the engine checks that the stored levels are for these edges
+const style = JSON.parse(makeStyle(roads, JSON.stringify(look), undefined, undefined, "Monaco"));
 ```
 
-`writeRoads(q, catalog, mode, opts)`:
+`makeRoads(q, catalog, opts)` runs one time for each file. It makes the temporary table `r`: one row for each edge of all modes, with
+its levels. `writeRoads(q, mode)` runs for each mode, and writes only `roads.parquet` from `r`.
 
 - `mode`: `"all"`, `"driving"`, `"walking"` or `"cycling"`.
-- `opts.levels: "stored"` reads `visualization.edge_levels`, the levels of a solved level area. `writeRoads` checks that they were
-  solved for these edges, and stops with an error if not. `opts.levels: "tags"` computes the levels from the tags in SQL.
+- `opts.levels: "stored"` reads `visualization.edge_levels`, the levels of a solved level area. `makeRoads` returns their
+  `{edge_hash, n_edges}`. `opts.levels: "tags"` writes no levels, and `makeRoads` returns `"tags"`.
+- Put the value of `makeRoads` in the look as `args.levels`. With `"tags"`, the engine computes the levels with the tags rule of
+  `compute_levels(method="tags")`. With `{edge_hash, n_edges}`, the engine checks that the stored levels were solved for these edges
+  (roadstyle-levels' `edge_hash`), and stops with an error if not.
+- `edge_id`, `osm_id`, `source` and `target` are BIGINT, as in the duckOSM file. The engine writes an id that JavaScript cannot
+  hold exactly as text.
 
 `writeFeatures(q, catalog, specs)` in `js/features_sql.js` writes `features.parquet`, the base-map layers of mapstyle, for the
 argument `features` of `makeStyle` and `Tiler`.

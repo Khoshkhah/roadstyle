@@ -27,6 +27,9 @@ python -m http.server 8000
 
 Then open `http://localhost:8000/examples/dashboard_rust/`.
 
+The look's `args.levels` is the value that `roads_sql.js` `makeRoads` returns for a duckOSM file with stored levels: the engine checks
+that the levels in `roads.parquet` were solved for these edges. With `"tags"`, the engine computes the levels from the tags.
+
 The page gives `rsDashboard` only the options that the Rust style does not have: `simple` (the one road layer), the selection colour and the
 controls.
 The road popup fields, the hover tooltip and the hover delay come from the style's metadata `roadstyle:interaction`.
