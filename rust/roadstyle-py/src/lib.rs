@@ -107,6 +107,13 @@ impl Sources {
         Ok(roadstyle::file_names(&self.inner, self::format(format)?))
     }
 
+    /// road_table() -> str: the road table as the page loads it (tiles.sidecar's form: props, mids, bboxes, headings, lines).
+    fn road_table(&self, py: Python<'_>) -> String {
+        let mut out = Vec::new();
+        py.detach(|| roadstyle::write_road_table(&self.inner, &mut out)).expect("a Vec takes every byte");
+        String::from_utf8(out).expect("JSON text is UTF-8")
+    }
+
     /// file(name, format="geojson", keep=[]) -> bytes: one of stage 1's files.
     #[pyo3(signature = (name, format="geojson", keep=Vec::new()))]
     fn file<'py>(&self, py: Python<'py>, name: &str, format: &str, keep: Vec<String>) -> PyResult<Bound<'py, PyBytes>> {

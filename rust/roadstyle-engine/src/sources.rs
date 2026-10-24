@@ -39,16 +39,19 @@ impl Sources {
         roadstyle_model::props::drawn(&self.layers, &self.metadata, keep)
     }
 
-    /// The FeatureCollection of the source `i` as GeoJSON text. The roads have only the properties of `drawn` and their marks: their
-    /// fields are in the road table.
-    pub fn data(&self, i: usize, drawn: &HashSet<String>) -> Vec<u8> {
-        let mut out = Vec::new();
+    /// The FeatureCollection of the source `i` as GeoJSON text, written to `w`. The roads have only the properties of `drawn` and their
+    /// marks: their fields are in the road table, and their lines too when no layer draws the roads (`draws_roads`).
+    pub fn write_data<W: std::io::Write>(&self, i: usize, drawn: &HashSet<String>, w: &mut W) -> std::io::Result<()> {
         match &self.sources[i].1 {
-            Src::Roads(_) => self.roads.write_data(&mut out, Some(drawn)),
-            Src::Simple(s) => s.write_data(&mut out, &self.roads.roads),
-            Src::Json(v) => serde_json::to_writer(&mut out, &v["data"]).unwrap(),
+            Src::Roads(_) => self.roads.write_data(w, Some(drawn), self.draws_roads()),
+            Src::Simple(s) => s.write_data(w, &self.roads.roads),
+            Src::Json(v) => serde_json::to_writer(w, &v["data"]).map_err(std::io::Error::other),
         }
-        out
+    }
+
+    /// A layer that is shown draws the source `roads` (with no such layer, its features need no lines).
+    pub fn draws_roads(&self) -> bool {
+        self.layers.iter().any(|l| l["source"] == "roads" && l["layout"]["visibility"] != "none")
     }
 
     /// The style with each source's data at `url(name)` (a GeoJSON source can name its data by URL), in place of the data.

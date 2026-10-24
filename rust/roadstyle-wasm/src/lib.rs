@@ -142,6 +142,14 @@ mod wasm {
             Ok(roadstyle::file_names(&self.inner, self::format(format)?))
         }
 
+        /// roadTable(): the road table as the page loads it, JSON text (props, mids, bboxes, headings, lines: one item for each road).
+        #[wasm_bindgen(js_name = roadTable)]
+        pub fn road_table(&self) -> Vec<u8> {
+            let mut out = Vec::new();
+            roadstyle::write_road_table(&self.inner, &mut out).expect("a Vec takes every byte");
+            out
+        }
+
         /// file(name, format, keep): one of stage 1's files ("geojson" or "geoparquet"; the roads' file has their drawing values and
         /// `keep`, the road table every field of each road).
         pub fn file(&self, name: &str, format: &str, keep: Vec<String>) -> Result<Vec<u8>, JsError> {

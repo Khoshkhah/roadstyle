@@ -218,3 +218,62 @@ impl Centroid {
         }
     }
 }
+
+/// A road line's place for the road table (the page's sidecar, tiles.sidecar): its middle by length, the way it runs there and its box.
+pub mod line {
+    type P = [f64; 2];
+
+    /// GEOS's length of a line: the sum of each segment's sqrt(dx² + dy²), in the line's order.
+    pub fn length(c: &[P]) -> f64 {
+        c.windows(2).map(|w| ((w[1][0] - w[0][0]) * (w[1][0] - w[0][0]) + (w[1][1] - w[0][1]) * (w[1][1] - w[0][1])).sqrt()).sum()
+    }
+
+    /// The point at the distance `d` along the line and its segment, as GEOS's LengthIndexedLine finds it (shapely's interpolate).
+    pub fn along(c: &[P], d: f64) -> Option<(P, usize)> {
+        let first = *c.first()?;
+        if d <= 0.0 || c.len() < 2 {
+            return Some((first, 0));
+        }
+        let mut total = 0.0;
+        for (i, w) in c.windows(2).enumerate() {
+            let seg = ((w[1][0] - w[0][0]) * (w[1][0] - w[0][0]) + (w[1][1] - w[0][1]) * (w[1][1] - w[0][1])).sqrt();
+            if total + seg > d {
+                let f = (d - total) / seg;
+                let at = |k: usize| if f <= 0.0 { w[0][k] } else if f >= 1.0 { w[1][k] } else { (w[1][k] - w[0][k]) * f + w[0][k] };
+                return Some(([at(0), at(1)], i));
+            }
+            total += seg;
+        }
+        Some((c[c.len() - 1], c.len() - 2))
+    }
+
+    /// The middle of the line by its length (shapely's interpolate(0.5, normalized=True)); a line of one point is that point.
+    pub fn mid(c: &[P]) -> Option<P> {
+        if c.len() < 2 {
+            return c.first().copied();
+        }
+        along(c, 0.5 * length(c)).map(|m| m.0)
+    }
+
+    /// The way the line runs at its middle: degrees clockwise from north (0 to 360, to 0.1), in a flat frame at the middle's latitude.
+    pub fn heading(c: &[P]) -> Option<f64> {
+        if c.len() < 2 {
+            return None;
+        }
+        let (m, i) = along(c, 0.5 * length(c))?;
+        let (p, q) = (c[i], c[i + 1]);
+        let (dx, dy) = ((q[0] - p[0]) * m[1].to_radians().cos(), q[1] - p[1]);
+        if dx == 0.0 && dy == 0.0 {
+            return None;
+        }
+        let h = dx.atan2(dy).to_degrees().rem_euclid(360.0);
+        format!("{h:.1}").parse().ok()       // Python's round(h, 1): the correctly rounded decimal
+    }
+
+    /// [min lon, min lat, max lon, max lat].
+    pub fn bbox(c: &[P]) -> Option<[f64; 4]> {
+        c.first()?;
+        let f = |k: usize, max: bool| c.iter().map(|p| p[k]).fold(if max { f64::NEG_INFINITY } else { f64::INFINITY }, |a, b| if max { a.max(b) } else { a.min(b) });
+        Some([f(0, false), f(1, false), f(0, true), f(1, true)])
+    }
+}

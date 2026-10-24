@@ -24,9 +24,13 @@ fn monaco_sources_as_files() {
         let got: Value = serde_json::from_slice(&std::fs::read(dir.join(format!("geojson/{n}.geojson"))).unwrap()).unwrap();
         let mut want = style["sources"][n.as_str()]["data"].clone();
         if *n == "roads" {
-            // the roads' file: the drawing values only (their fields are in the road table)
+            // the roads' file: the drawing values only (their fields are in the road table), and no lines when no shown layer
+            // draws the roads (the road table has them)
             for f in want["features"].as_array_mut().unwrap() {
                 f["properties"].as_object_mut().unwrap().retain(|k, _| k.starts_with("__rs_") || drawn.contains(k));
+                if !s.draws_roads() {
+                    f["geometry"] = serde_json::Value::Null;
+                }
             }
         }
         assert!(got == want, "{n}.geojson is not the source's data");
@@ -41,9 +45,10 @@ fn monaco_sources_as_files() {
     let mut keys: Vec<&String> = roads.iter().flat_map(|f| f["properties"].as_object().unwrap().keys()).collect();
     keys.sort();
     keys.dedup();
-    let mut cols: Vec<&String> = table.names().iter().collect();
+    let mut cols: Vec<&String> = table.names().iter().filter(|n| !n.starts_with("__mid") && !n.starts_with("__bbox") && *n != "__heading").collect();
     cols.sort();
     assert_eq!(cols, keys);
+    assert!((0..table.len()).all(|i| table.line(i).is_some()), "the road table has every road's line");
     // GeoParquet: a row for each feature of each source
     roadstyle_rs::save_sources(&s, &dir.join("geoparquet"), roadstyle_rs::Format::GeoParquet, &[]).unwrap();
     for n in &names {

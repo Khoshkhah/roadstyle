@@ -94,8 +94,19 @@ pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[S
             continue;
         }
         let file = spec["data"].as_str().ok_or_else(|| format!("source {k}: its data is not a file name"))?;
-        let fc: Value = if file.ends_with(".parquet") { read::features(read(file)?)? }
-                        else { serde_json::from_slice(&read(file)?).map_err(|e| format!("{file}: {e}"))? };
+        let mut fc: Value = if file.ends_with(".parquet") { read::features(read(file)?)? }
+                            else { serde_json::from_slice(&read(file)?).map_err(|e| format!("{file}: {e}"))? };
+        // the roads' lines are in the road table when stage 1 left them out (no layer draws the roads)
+        let lineless = |fc: &Value| fc["features"].as_array().is_some_and(|f| f.iter().any(|x| x["geometry"].is_null()));
+        if k == "roads" && lineless(&fc) {
+            let table = read::features(read(ROAD_TABLE)?)?;
+            let lines = table["features"].as_array().map(Vec::as_slice).unwrap_or_default();
+            for (f, t) in fc["features"].as_array_mut().into_iter().flatten().zip(lines) {
+                if f["geometry"].is_null() {
+                    f["geometry"] = t["geometry"].clone();
+                }
+            }
+        }
         let src = json!({"type": "geojson", "data": fc});
         let (keep, whole, from) = o.rule(k, || src["data"]["features"].as_array().into_iter().flatten()
             .filter_map(|f| f["properties"].as_object()).flat_map(|p| p.keys().cloned()).collect());
@@ -126,37 +137,46 @@ fn ext(format: Format) -> &'static str {
     match format { Format::GeoJson => "geojson", Format::GeoParquet => "parquet" }
 }
 
-/// One of stage 1's files (a name of `file_names`): style.json (each source's data at its file), a source (the roads' file has only
-/// their drawing values: `drawn`), or the road table (every field of each road, by its row).
+/// One of stage 1's files (a name of `file_names`), in memory (`write_source_file`).
 pub fn source_file(s: &sources::Sources, file: &str, format: Format, drawn: &std::collections::HashSet<String>) -> Result<Vec<u8>, String> {
+    write_source_file(s, file, format, drawn, Vec::new())
+}
+
+/// One of stage 1's files, written to `w` a part at a time: style.json (each source's data at its file), a source (the roads' file has
+/// only their drawing values: `drawn`; their lines are in the road table when no layer draws them), or the road table (GeoParquet: every
+/// field of each road by its row, its line, its middle, its heading and its box: `road_rows`). Gives `w` back.
+pub fn write_source_file<W: std::io::Write + Send>(s: &sources::Sources, file: &str, format: Format, drawn: &std::collections::HashSet<String>,
+                                                  mut w: W) -> Result<W, String> {
     let ext = ext(format);
+    let io = |e: std::io::Error| format!("{file}: {e}");
     if file == "style.json" {
-        return serde_json::to_vec(&s.style(|n| format!("{n}.{ext}"))).map_err(|e| e.to_string());
+        serde_json::to_writer(&mut w, &s.style(|n| format!("{n}.{ext}"))).map_err(|e| e.to_string())?;
+        return Ok(w);
     }
     if file == ROAD_TABLE {
-        return roadstyle_io::write::parquet(|| s.road_rows().map(|r| roadstyle_io::write::Row {
-            id: None, props: r.into_iter().map(|(k, c)| (k.to_string(), c.to_value())).collect(), geometry: None,
-        }), false);
+        return roadstyle_io::write::parquet_to(w, || road_rows(s), true);
     }
     let name = file.strip_suffix(&format!(".{ext}")).ok_or_else(|| format!("{file}: not a .{ext} file"))?;
     let i = s.sources.iter().position(|(n, _)| n == name).ok_or_else(|| format!("{file}: no source {name}"))?;
     if format == Format::GeoJson {
-        return Ok(s.data(i, drawn));
+        s.write_data(i, drawn, &mut w).map_err(io)?;
+        return Ok(w);
     }
     let line = |c: Option<&[[f64; 2]]>| c.map(|c| json!({"type": "LineString", "coordinates": c}));
+    let lines = s.draws_roads();
     match &s.sources[i].1 {
-        Src::Roads(_) => roadstyle_io::write::parquet(|| s.roads.roads.iter().map(|r| roadstyle_io::write::Row {
+        Src::Roads(_) => roadstyle_io::write::parquet_to(w, || s.roads.roads.iter().map(|r| roadstyle_io::write::Row {
             id: Some(r.i as i64),
             props: r.iter().map(|(k, c)| (s.roads.out_name(k), c)).filter(|(k, _)| k.starts_with("__rs_") || drawn.contains(*k))
                 .map(|(k, c)| (k.to_string(), c.to_value())).collect(),
-            geometry: line(r.line()),
+            geometry: line(r.line().filter(|_| lines)),
         }), true),
-        Src::Simple(p) => roadstyle_io::write::parquet(|| p.features(&s.roads.roads).map(|(id, props, c)| roadstyle_io::write::Row {
+        Src::Simple(p) => roadstyle_io::write::parquet_to(w, || p.features(&s.roads.roads).map(|(id, props, c)| roadstyle_io::write::Row {
             id: Some(id as i64), props: props.into_iter().map(|(k, v)| (k.to_string(), v)).collect(), geometry: line(c),
         }), true),
         Src::Json(v) => {
             let fs = v["data"]["features"].as_array().map(Vec::as_slice).unwrap_or_default();
-            roadstyle_io::write::parquet(|| fs.iter().map(|f| roadstyle_io::write::Row {
+            roadstyle_io::write::parquet_to(w, || fs.iter().map(|f| roadstyle_io::write::Row {
                 id: f["id"].as_i64(),
                 props: f["properties"].as_object().into_iter().flatten().map(|(k, v)| (k.clone(), v.clone())).collect(),
                 geometry: Some(f["geometry"].clone()).filter(|g| !g.is_null()),
@@ -165,15 +185,60 @@ pub fn source_file(s: &sources::Sources, file: &str, format: Format, drawn: &std
     }
 }
 
+/// The road table's rows: each road's fields with the output's names, then its middle (`__mid_lon`, `__mid_lat`), its heading at the
+/// middle (`__heading`) and its box (`__bbox_*`), and its line as the geometry.
+fn road_rows(s: &sources::Sources) -> impl Iterator<Item = roadstyle_io::write::Row> + '_ {
+    use roadstyle_engine::geom::line;
+    s.roads.roads.iter().map(move |r| {
+        let c = r.line();
+        let mut props: Vec<(String, Value)> = r.iter().map(|(k, v)| (s.roads.out_name(k).to_string(), v.to_value())).collect();
+        let mid = c.and_then(line::mid);
+        let bb = c.and_then(line::bbox);
+        let num = |v: Option<f64>| v.map_or(Value::Null, Value::from);
+        props.extend([("__mid_lon".into(), num(mid.map(|m| m[0]))), ("__mid_lat".into(), num(mid.map(|m| m[1]))),
+                      ("__heading".into(), num(c.and_then(line::heading)))]);
+        props.extend(["__bbox_min_lon", "__bbox_min_lat", "__bbox_max_lon", "__bbox_max_lat"].iter().enumerate()
+            .map(|(k, n)| (n.to_string(), num(bb.map(|b| b[k])))));
+        roadstyle_io::write::Row { id: None, props, geometry: c.map(|c| json!({"type": "LineString", "coordinates": c})) }
+    })
+}
+
+/// The road table as the page loads it (tiles.sidecar's form, with Python's JSON text): `{"props", "mids", "bboxes", "headings",
+/// "lines"}`, each a list with one item for each road (its row), written to `w` a road at a time.
+pub fn write_road_table<W: std::io::Write>(s: &sources::Sources, w: &mut W) -> std::io::Result<()> {
+    use page::pyjson::dumps;
+    use roadstyle_engine::geom::line;
+    let roads = &s.roads.roads;
+    let list = |w: &mut W, key: &str, first: bool, item: &dyn Fn(roadstyle_engine::Road) -> String| -> std::io::Result<()> {
+        write!(w, "{}\"{key}\":[", if first { "{" } else { "," })?;
+        for r in roads.iter() {
+            if r.i > 0 {
+                w.write_all(b",")?;
+            }
+            w.write_all(item(r).as_bytes())?;
+        }
+        w.write_all(b"]")
+    };
+    let pts = |c: &[[f64; 2]]| dumps(&json!(c), true);
+    list(w, "props", true, &|r| dumps(&Value::Object(r.iter().map(|(k, v)| (s.roads.out_name(k).to_string(), v.to_value())).collect()), true))?;
+    list(w, "mids", false, &|r| r.line().and_then(line::mid).map_or("null".into(), |m| dumps(&json!(m), true)))?;
+    list(w, "bboxes", false, &|r| r.line().and_then(line::bbox).map_or("null".into(), |b| dumps(&json!(b), true)))?;
+    list(w, "headings", false, &|r| r.line().and_then(line::heading).map_or("null".into(), |h| dumps(&json!(h), true)))?;
+    list(w, "lines", false, &|r| r.line().filter(|c| !c.is_empty()).map_or("null".into(), pts))?;
+    w.write_all(b"}")
+}
+
 /// Stage 1's files in `dir` (`file_names`, `source_file`). `keep`: more columns for the roads' file. Gives each file's name and size.
 pub fn save_sources(s: &sources::Sources, dir: &std::path::Path, format: Format, keep: &[String]) -> Result<Vec<(String, usize)>, String> {
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let drawn = s.drawn(keep);
     let mut files = Vec::new();
     for name in file_names(s, format) {
-        let bytes = source_file(s, &name, format, &drawn)?;
-        std::fs::write(dir.join(&name), &bytes).map_err(|e| format!("{name}: {e}"))?;
-        files.push((name, bytes.len()));
+        let path = dir.join(&name);
+        let f = std::fs::File::create(&path).map_err(|e| format!("{name}: {e}"))?;
+        let mut w = write_source_file(s, &name, format, &drawn, std::io::BufWriter::new(f))?;
+        std::io::Write::flush(&mut w).map_err(|e| format!("{name}: {e}"))?;
+        files.push((name.clone(), std::fs::metadata(&path).map_err(|e| format!("{name}: {e}"))?.len() as usize));
     }
     Ok(files)
 }

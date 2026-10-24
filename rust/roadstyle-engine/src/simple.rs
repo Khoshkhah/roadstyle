@@ -416,7 +416,7 @@ impl SimpleSource {
     /// The JSON text: each feature as `{"type", "geometry", "properties", "id"}`.
     pub fn write_json(&self, out: &mut Vec<u8>, roads: &Roads) {
         out.extend_from_slice(br#"{"type":"geojson","data":"#);
-        self.write_data(out, roads);
+        self.write_data(out, roads).expect("a Vec takes every byte");
         out.extend_from_slice(br#","tolerance":"#);
         serde_json::to_writer(&mut *out, &self.tolerance).unwrap();
         if let Some(z) = self.maxzoom {
@@ -425,10 +425,15 @@ impl SimpleSource {
         out.push(b'}');
     }
 
-    /// The FeatureCollection.
-    pub fn write_data(&self, out: &mut Vec<u8>, roads: &Roads) {
+    /// The FeatureCollection, written to `w` a part at a time.
+    pub fn write_data<W: std::io::Write>(&self, w: &mut W, roads: &Roads) -> std::io::Result<()> {
+        let mut out = Vec::new();
         out.extend_from_slice(br#"{"type":"FeatureCollection","features":["#);
         for (i, (id, props, coords)) in self.features(roads).enumerate() {
+            if out.len() > 1 << 16 {
+                w.write_all(&out)?;
+                out.clear();
+            }
             if i > 0 {
                 out.push(b',');
             }
@@ -437,15 +442,16 @@ impl SimpleSource {
                 None => out.extend_from_slice(b"null"),
                 Some(c) => {
                     out.extend_from_slice(br#"{"type":"LineString","coordinates":"#);
-                    serde_json::to_writer(&mut *out, c).unwrap();
+                    serde_json::to_writer(&mut out, c).unwrap();
                     out.push(b'}');
                 }
             }
             out.extend_from_slice(br#","properties":"#);
-            props.write_json(out);
+            props.write_json(&mut out);
             out.extend_from_slice(format!(r#","id":{id}}}"#).as_bytes());
         }
         out.extend_from_slice(b"]}");
+        w.write_all(&out)
     }
 }
 
