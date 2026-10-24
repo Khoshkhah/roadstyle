@@ -140,7 +140,7 @@ With `state: baked` (the export, RustGIS), the engine writes the start values in
 
 ## The feature properties `__rs_*`
 
-66 names. None is public for a host page: a host reads the data columns and the API. "Dashboard" marks the names that the dashboard
+67 names. None is public for a host page: a host reads the data columns and the API. "Dashboard" marks the names that the dashboard
 reads (the internal contract between the engine and the dashboard of the same version). "Leaflet" marks the names of the Leaflet spec
 (`emit.to_spec`, `static/roadstyle.js`). Each one goes into a typed field of the render model, and the engine writes the property only
 when a layer reads it.
@@ -154,6 +154,7 @@ when a layer reads it.
 | `__rs_band` | always 0 since the positions | `_mark_levels` | engine | internal | removed |
 | `__rs_twoway`, `__rs_oneway`, `__rs_dup`, `__rs_twin`, `__rs_pair` | two directions, the arrow, the second edge of a single-line pair, the edge of the shared casing, the shared casing | `_mark_twoway`, `_mark_single_line`, `_mark_twin_casing` | engine, `arrows.js`, `svspot.js` (`__rs_twoway`), `select.js` (`__rs_dup`) | dashboard (`__rs_twoway`, `__rs_dup`) | `RoadDraw.direction` and the derived `twin`, `single_line` |
 | `__rs_bridge`, `__rs_tunnel`, `__rs_access`, `__rs_lvl` | the bridge look, the tunnel look, the access kind, the tag level of an attached item | `_mark_lvl`, `access_col`, `_edge_overlay` | engine, `filter.js` (`__rs_access`, `__rs_lvl`) | dashboard (`__rs_access`, `__rs_lvl`) | `RoadDraw.structure`, `RoadDraw.look.access` |
+| `__rs_ci` | the class index of every feature of `simple` (R8): its class's place in the profile's class list, else the list's length; the road layer reads its width and offset tables with `["at", ["get", "__rs_ci"], ["literal", [...]]]` | `layers::class_index`, `simple.rs`, `_class_index` | the layers | engine | |
 | `__rs_cls` | the class column of the edge on every piece, name and arrow (for the class filter) | `_mark_cls`, `roads.rs`, `slots.rs` | `filter.js` | dashboard | the edge label: the dashboard reads the class through the edge |
 | `__rs_kept_` (the prefix of `__rs_kept_<column>`) | a data column that has the engine's name of another keyword's column (a column `highway` when `highway_col` names another one), kept under this name in between | the column map (`lib.rs`, `ColumnMap`) | the engine | internal | |
 | `__rs_edge`, `__rs_edge2`, `__rs_edges` | the edge label: the edge's row, the twin's row, the rows of a shadow or a deck | every generator | `core.js`, `filter.js`, `select.js`, `arrows.js`, the level editor | dashboard | the edge label of each piece (render model) |
@@ -172,7 +173,8 @@ when a layer reads it.
 The page's dashboard modules and page scripts declare the feature properties that they read, in
 `src/roadstyle/static/dashboard/reads.json`:
 
-- `pieces`: the properties of a feature of a drawn layer (a road piece, an item, a deck or a shadow, a slot of the inline arrows).
+- `pieces`: the properties of a feature of the road layer (a road piece or an item); `decks`: of a 3D deck or shadow; `slots`: of a
+  name or arrow slot.
 - `table`: the properties of a row of the road table. A row also has the fields of the popup and the tooltip
   (`roadstyle:interaction`; every public field when the popup list is null), the `edge_id_col` and the road's line.
 
@@ -183,7 +185,8 @@ not a literal. A change to a module that reads a new property adds the property 
 
 Both engines write only what is read (R1, 2026-10-24), in the GeoJSON, the GeoParquet files and the tiles:
 
-- A piece keeps the properties of that set. An item (`__rs_k` 5) also keeps its own fields (a picked item's popup fields).
+- A piece keeps what the road layer (the layers on `simple`) and `pieces` read (`props::piece_reads`). An item (`__rs_k` 5) also keeps
+  its own fields (a picked item's popup fields).
 - A road of the `roads` source keeps all its fields and only the stage values (`__rs_*`) of that set.
 - A row of the road table keeps all its fields, the stage values of `table`, and the fills (`__rs_fill*`, which the filter's swatches of
   a view's palette read).

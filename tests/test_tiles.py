@@ -208,7 +208,7 @@ def test_simple_mode_tiles_carry_the_pieces():
     feats = mapbox_vector_tile.decode(gzip.decompress(Reader(MemorySource(_archive_of(html))).get(z, x, y)))["simple"]["features"]
     ps = [f["properties"] for f in feats]
     assert {p["__rs_k"] for p in ps} == {0, 1, 2}                       # casings, fills, the bridge's shadow
-    assert all({"__rs_s", "__rs_edge", "__rs_cls", "highway"} <= p.keys() for p in ps)
+    assert all({"__rs_s", "__rs_edge", "__rs_cls", "__rs_ci"} <= p.keys() for p in ps)        # the class as the filter's and as the index (R1, R8)
     assert any(isinstance(p.get("__rs_dash"), str) for p in ps)         # the footway's dash pattern, as text (the dasharray match)
     assert any(p.get("__rs_fill") for p in ps if p["__rs_k"] == 1)
 
@@ -228,7 +228,7 @@ def test_single_line_pair_rides_the_tiles():
     foot = [f["properties"] for f in roads_of(html)["features"] if f["properties"].get("highway") == "footway"]     # the road table
     assert sorted(bool(p.get("__rs_dup")) for p in foot) == [False, True] and {p["__rs_edge2"] for p in foot} == {7, 8}
     assert "roads" not in feats                         # a page's tiles have no road lines
-    assert {f["properties"]["__rs_edge"] for f in feats["simple"]["features"] if f["properties"]["highway"] == "footway"} == {7}
+    assert {f["properties"]["__rs_edge"] for f in feats["simple"]["features"] if f["properties"]["__rs_cls"] == "footway"} == {7}
 
 
 def test_tiles_carry_a_two_way_pairs_one_casing():

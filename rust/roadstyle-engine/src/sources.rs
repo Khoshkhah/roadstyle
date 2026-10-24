@@ -36,16 +36,17 @@ impl Sources {
         s
     }
 
-    /// R1: the drawn features (the pieces, the roads' stage values) keep only the properties that are read (`drawn` with no caller's
-    /// columns). Made again when the layers change (a view's palette: palettes.rs).
+    /// R1: the drawn features keep only the properties that are read: a piece what the road layer and the page read on it
+    /// (props::piece_reads), a road's stage values what any layer reads (`drawn` with no caller's columns). Made again when the layers
+    /// change (a view's palette: palettes.rs).
     pub fn set_reads(&mut self) {
-        let read = self.drawn(&[]);
+        let pieces = roadstyle_model::props::piece_reads(&self.layers);
         for (_, s) in self.sources.iter_mut() {
             if let Src::Simple(p) = s {
-                p.read = Some(read.clone());
+                p.read = Some(pieces.clone());
             }
         }
-        self.roads.read = Some(read);
+        self.roads.read = Some(self.drawn(&[]));
     }
 
     /// The properties that the drawing reads (tiles.py's tile_props): every text in the layers, the popup and tooltip fields, `name`,
