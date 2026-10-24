@@ -16,6 +16,10 @@ pub struct Rules {
     pub lifts: Vec<(usize, usize, usize)>,
     /// `(higher, lower)`: the fill of the higher road is over the fill of the lower road where they meet (a wish).
     pub orders: Vec<(usize, usize)>,
+    /// `(upper, lower, part)`: a casing part that only comes near the lower road (`near_rules`): the last wish.
+    pub near: Vec<(usize, usize, usize)>,
+    /// `(road, [casing_start, casing_level, casing_end, fill_level])`: numbers in the box `[0, steps]` that stay as they are.
+    pub fixed: Vec<(usize, [i64; 4])>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -26,9 +30,11 @@ pub struct Solved {
     pub given_up: Vec<(usize, usize)>,
     /// The order wishes that are not kept.
     pub orders_not_kept: Vec<(usize, usize)>,
+    /// The near parts `(upper, lower, part)` that are not over the lower fill.
+    pub near_not_kept: Vec<(usize, usize, usize)>,
     /// The best value of each stage (roadstyle's objectives): the steps by which the stack rules are broken, the
-    /// same for the order wishes, and the cost (the casings, and the span with its weight).
-    pub stages: [i64; 3],
+    /// same for the order wishes and for the near rules, and the cost (the casings, and the span with its weight).
+    pub stages: [i64; 4],
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -36,11 +42,13 @@ enum Kind {
     Hard,
     Stack,
     Order,
+    Near,
     Gone,
 }
 
-/// roadstyle's defaults: `max_level` 20 (the numbers are in a box of 2 * 20 + 1 values), `margin` 1, `min_positions`.
-pub fn solve(rules: &Rules, max_level: i64) -> Result<Solved, String> {
+/// The numbers are in a box of `steps + 1` values (roadstyle's `2 * max_level / margin`); `min_positions`: the span of the numbers is
+/// as small as possible.
+pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, String> {
     let n = rules.roads;
     if n == 0 {
         return Ok(Solved::default());
@@ -62,7 +70,7 @@ pub fn solve(rules: &Rules, max_level: i64) -> Result<Solved, String> {
         arcs.push((v, hi, 0, Kind::Hard)); // the span: every number between L and H
         arcs.push((lo, v, 0, Kind::Hard));
     }
-    arcs.push((hi, z, 2 * max_level, Kind::Hard)); // the box [0, 2 max_level]; z is 0
+    arcs.push((hi, z, steps, Kind::Hard)); // the box [0, steps]; z is 0
     arcs.push((z, lo, 0, Kind::Hard));
     let mut lifts = rules.lifts.clone();
     lifts.sort_unstable();
@@ -70,16 +78,40 @@ pub fn solve(rules: &Rules, max_level: i64) -> Result<Solved, String> {
     let mut orders = rules.orders.clone();
     orders.sort_unstable();
     orders.dedup();
+    // a part that is a stack and a near rule is a stack
+    let mut near: Vec<(usize, usize, usize)> = rules
+        .near
+        .iter()
+        .copied()
+        .filter(|p| lifts.binary_search(p).is_err())
+        .collect();
+    near.sort_unstable();
+    near.dedup();
+    for &(r, v) in &rules.fixed {
+        for (c, x) in [col(r, 0), col(r, 1), col(r, 2), r].into_iter().zip(v) {
+            arcs.push((c, z, x, Kind::Hard)); // x_c = x: x_c - x_z <= x and x_z - x_c <= -x
+            arcs.push((z, c, -x, Kind::Hard));
+        }
+    }
     for &(u, l, h) in &lifts {
         arcs.push((l, col(u, h), -1, Kind::Stack)); // H3: b_l + 1 <= a_(u, h)
+    }
+    for &(u, l, h) in &near {
+        arcs.push((l, col(u, h), -1, Kind::Near));
     }
     for &(x, y) in &orders {
         arcs.push((y, x, -1, Kind::Order)); // H4: b_y + 1 <= b_x
     }
     let nodes = 4 * n + 3;
     let mut pi = vec![0i64; nodes];
-    let mut stages = [0i64; 3];
-    for (s, soft) in [Kind::Stack, Kind::Order].into_iter().enumerate() {
+    if !rules.fixed.is_empty() {
+        pi = potentials(&arcs, nodes)?; // the arcs of the fixed numbers have negative costs
+    }
+    let mut stages = [0i64; 4];
+    for (s, soft) in [Kind::Stack, Kind::Order, Kind::Near]
+        .into_iter()
+        .enumerate()
+    {
         if !arcs.iter().any(|a| a.3 == soft) {
             continue;
         }
@@ -106,14 +138,15 @@ pub fn solve(rules: &Rules, max_level: i64) -> Result<Solved, String> {
         arcs.extend(more);
     }
     // the cost: the sum of (b - a) over all casing parts, and a large weight w4 on the span H - L. The weight is larger
-    // than any sum, so this is two steps: first the least span, then the least sum at that span. The least span is the
-    // longest chain of the rules (`least_span`); the box then has that size, and the flow carries only the casing
-    // parts. The best numbers are the same. (As a supply of w4 at H and L, the flow took 260 phases on Burnaby: 17 s.)
-    let w4 = 3 * n as i64 * 2 * max_level + 1;
-    let (span, start) = least_span(&arcs, 4 * n, &pi);
-    pi = start;
-    for a in arcs.iter_mut().filter(|a| a.0 == hi && a.1 == z) {
-        a.2 = span;
+    // than any sum, so this is two steps: first the least span, then the least sum at that span. The least span is minus
+    // the shortest distance from L to H in all the hard rules (also the rules through H, L and 0 that the stages made
+    // equalities, and the fixed numbers); an arc H -> L of that cost keeps it, and the flow carries only the casing parts.
+    // The best numbers are the same. (As a supply of w4 at H and L, the flow took 260 phases on Burnaby: 17 s.)
+    let w4 = 3 * n as i64 * steps + 1;
+    pi = from_node(&arcs, nodes, lo, &pi);
+    let span = -pi[hi];
+    if min_positions {
+        arcs.push((hi, lo, span, Kind::Hard));
     }
     let mut supply = vec![0i64; nodes];
     for r in 0..n {
@@ -124,7 +157,8 @@ pub fn solve(rules: &Rules, max_level: i64) -> Result<Solved, String> {
     }
     let (g, _) = network(&arcs, nodes, |k| (k == Kind::Hard).then_some(INF));
     let flow = g.solve(&supply, &mut pi)?;
-    stages[2] = w4 * span - (0..g.from.len()).map(|e| flow[e] * g.cost[e]).sum::<i64>();
+    let w4 = if min_positions { w4 } else { 0 };
+    stages[3] = w4 * span - (0..g.from.len()).map(|e| flow[e] * g.cost[e]).sum::<i64>();
     let x = least_numbers(&g, &flow, &pi);
     let parts = (0..n)
         .map(|r| [x[col(r, 0)], x[col(r, 1)], x[col(r, 2)], x[r]])
@@ -140,10 +174,16 @@ pub fn solve(rules: &Rules, max_level: i64) -> Result<Solved, String> {
         .copied()
         .filter(|&(a, b)| x[b] - x[a] > -1)
         .collect();
+    let near_not_kept = near
+        .iter()
+        .copied()
+        .filter(|&(u, l, h)| x[l] - x[col(u, h)] > -1)
+        .collect();
     Ok(Solved {
         parts,
         given_up,
         orders_not_kept,
+        near_not_kept,
         stages,
     })
 }
@@ -168,22 +208,57 @@ fn network(
     (g, idx)
 }
 
-/// The least span of the numbers of the `roads` first nodes (all except H, L and 0) under the hard rules: minus the
-/// shortest distance from a node to another one, with a Dijkstra on the costs reduced by `pi`. Also returns potentials
-/// for the last stage: the distances from an extra node with an arc of cost 0 to each node (they are 0 or less), with H
-/// at the least distance and L and 0 at 0 (the box of size `span`).
-fn least_span(arcs: &[(usize, usize, i64, Kind)], roads: usize, pi: &[i64]) -> (i64, Vec<i64>) {
-    let mut out: Vec<Vec<(u32, i64)>> = vec![Vec::new(); roads];
+/// Potentials for the hard rules (the reduced cost of each arc is not negative): the shortest distances from an extra
+/// node with an arc of cost 0 to each node, by a Bellman-Ford with a queue. An error when the rules have no solution.
+fn potentials(arcs: &[(usize, usize, i64, Kind)], nodes: usize) -> Result<Vec<i64>, String> {
+    let mut out: Vec<Vec<(usize, i64)>> = vec![Vec::new(); nodes];
     for &(i, j, w, kind) in arcs {
-        if kind == Kind::Hard && i < roads && j < roads {
+        if kind == Kind::Hard {
+            out[i].push((j, w));
+        }
+    }
+    let mut dist = vec![0i64; nodes];
+    let mut count = vec![0usize; nodes];
+    let mut queued = vec![true; nodes];
+    let mut queue: std::collections::VecDeque<usize> = (0..nodes).collect();
+    while let Some(u) = queue.pop_front() {
+        queued[u] = false;
+        for &(v, w) in &out[u] {
+            if dist[u] + w < dist[v] {
+                dist[v] = dist[u] + w;
+                if !queued[v] {
+                    count[v] += 1;
+                    if count[v] > nodes {
+                        return Err(
+                            "levels: the fixed numbers and the hard rules have no solution".into(),
+                        );
+                    }
+                    queued[v] = true;
+                    queue.push_back(v);
+                }
+            }
+        }
+    }
+    Ok(dist)
+}
+
+/// The shortest distances from `from` in the hard rules, with a Dijkstra on the costs reduced by `pi`: potentials for
+/// the last stage. Every node can be reached from L.
+fn from_node(
+    arcs: &[(usize, usize, i64, Kind)],
+    nodes: usize,
+    from: usize,
+    pi: &[i64],
+) -> Vec<i64> {
+    let mut out: Vec<Vec<(u32, i64)>> = vec![Vec::new(); nodes];
+    for &(i, j, w, kind) in arcs {
+        if kind == Kind::Hard {
             out[i].push((j as u32, w + pi[i] - pi[j]));
         }
     }
-    // an extra node with an arc of cost 0 to each node; `top` keeps its reduced costs not negative
-    let top = *pi[..roads].iter().max().unwrap();
-    let mut dist: Vec<i64> = pi[..roads].iter().map(|&p| top - p).collect();
-    let mut heap: BinaryHeap<Reverse<(i64, usize)>> =
-        (0..roads).map(|v| Reverse((dist[v], v))).collect();
+    let mut dist = vec![i64::MAX; nodes];
+    dist[from] = 0;
+    let mut heap = BinaryHeap::from([Reverse((0i64, from))]);
     while let Some(Reverse((d, u))) = heap.pop() {
         if d > dist[u] {
             continue;
@@ -197,10 +272,7 @@ fn least_span(arcs: &[(usize, usize, i64, Kind)], roads: usize, pi: &[i64]) -> (
             }
         }
     }
-    let mut start: Vec<i64> = (0..roads).map(|v| dist[v] - top + pi[v]).collect();
-    let span = -*start.iter().min().unwrap();
-    start.extend([-span, 0, 0]); // H, L and 0
-    (span, start)
+    (0..nodes).map(|v| dist[v] - pi[from] + pi[v]).collect()
 }
 
 /// roadstyle's numbers from the flow: the shortest distances from an extra node (an arc of cost 0 to each node) in
@@ -254,11 +326,30 @@ mod tests {
             lifts: vec![(0, 1, 1)],
             ..Default::default()
         };
-        let s = solve(&r, 20).unwrap();
+        let s = solve(&r, 20, true).unwrap();
         let [_, a0m, _, b0] = s.parts[0];
         let [_, _, _, b1] = s.parts[1];
         assert!(a0m > b1 && b0 >= a0m, "{:?}", s.parts);
         assert!(s.given_up.is_empty() && s.stages[0] == 0);
+    }
+
+    #[test]
+    fn four_bands_in_three_numbers() {
+        // four roads that cross at one point, each over the ones below it, in a box of 3 numbers: one stack pair gives way
+        let mut lifts = Vec::new();
+        for u in 0..4 {
+            for l in 0..u {
+                lifts.push((u, l, 1));
+            }
+        }
+        let r = Rules {
+            roads: 4,
+            lifts,
+            ..Default::default()
+        };
+        let s = solve(&r, 2, true).unwrap();
+        assert_eq!((s.given_up.len(), s.stages[0]), (1, 1), "{:?}", s.parts);
+        assert!(s.parts.iter().flatten().all(|&x| (0..=2).contains(&x)));
     }
 
     #[test]
@@ -270,7 +361,7 @@ mod tests {
             orders: vec![(0, 1), (1, 2), (2, 0)],
             ..Default::default()
         };
-        let s = solve(&r, 20).unwrap();
+        let s = solve(&r, 20, true).unwrap();
         assert!(!s.orders_not_kept.is_empty(), "{:?}", s.parts);
         assert_eq!(s.stages[1], 3); // around the ring the misses add up to 3 steps, however they are shared
     }

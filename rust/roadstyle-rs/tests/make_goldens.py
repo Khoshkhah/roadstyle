@@ -10,6 +10,8 @@ with. Run it in the conda environment roadstyle (roadstyle from this repository'
   <case>.json.gz = {"args", "style": export_inline's style, "color_options": the page's colour options (render_web's __COLOR_OPTIONS__)}.
 - looks: tests/data/looks.json.gz (tests/look.rs): the look of render_edges' palette, profile and settings, for each built-in profile x
   palette and settings sources in the older and the newer layout.
+- level_options_monaco, level_options_sodermalm: tests/data/<area>/golden_level_options.json.gz (tests/level_options.rs): compute_levels
+  with each keyword not at its default, and solve_levels with edits and with fixed numbers.
 - monaco, sodermalm, tartu: tests/data/<area>/golden_*.gz (tests/areas.rs): the roads-only style (export_inline), the tiles of
   export_style around the roads' centre, and the levels (compute_levels' tags rule; the solve with duckOSM's level-area defaults, not for
   Tartu: Python needs 4.8 GB and 85 s for Monaco). sodermalm also writes its input, tests/data/sodermalm/roads.parquet, from
@@ -237,10 +239,49 @@ def write_area(area):
         p.write_bytes(gzip.compress(json.dumps(v, separators=(",", ":")).encode(), 9, mtime=0))
         print(f"{area}: {p.name} {p.stat().st_size // 1000} KB")
 
+# compute_levels' keywords that are not at their defaults, one case each (tests/level_options.rs). rank_col: the row number modulo 5.
+LEVEL_OPTIONS = {"class": {"order": "class"}, "no_order": {"order": None}, "order_col": {"order": "rank_col"}, "band_col": {"band_col": "layer"},
+                 "band_dist": {"band_dist": 20.0}, "head_m": {"head_m": 10.0}, "max_level": {"max_level": 10},
+                 "no_min_positions": {"min_positions": False}, "near_rules": {"near_rules": True, "time_limit": 900.0}, "margin": {"margin": 2.0}}
+
+def write_level_options(area):
+    """tests/data/<area>/golden_level_options.json.gz (tests/level_options.rs): compute_levels for each case of LEVEL_OPTIONS, and solve_levels
+    with edits (the first stack rule off, the first order wish off and the other way) and with fixed numbers (every 50th road at the numbers
+    of the solve without them). Each case: its keywords and the rows [casing_start, casing_level, casing_end, fill_level] in the roads'
+    order; the edits name edges by their row number, as compute_levels' roads do."""
+    import pandas as pd
+    g = read_roads(DATA / area / "roads.parquet")
+    g["rank_col"] = [float(i % 5) for i in range(len(g))]
+    out = {}
+    for name, kw in LEVEL_OPTIONS.items():
+        r = rs.compute_levels(g, engine="python", **kw)
+        print(f"{area} {name}: {r.attrs.get('levels_info', {}).get('status')} {r.attrs.get('levels_info', {}).get('seconds')} s", flush=True)
+        out[name] = {"options": kw, "rows": r[LEVELS].to_numpy().tolist()}
+    from roadstyle.levels import _road_split
+    _, _, rid, same = _road_split(g, ("highway", "tunnel", "bridge", "layer"))
+    roads, pairs = rs.level_input(g, id_col=None)
+    def edge_rows(solved):
+        lv = solved[LEVELS].to_numpy().tolist()
+        return [lv[r] if same[i] else [lv[r][2], lv[r][1], lv[r][0], lv[r][3]] for i, r in enumerate(rid)]
+    stack = pairs[pairs.relation == "stack"].iloc[0]
+    order = pairs[pairs.relation == "order"].iloc[0]
+    edits = pd.DataFrame([{**stack.to_dict(), "enabled": "false"}, {**order.to_dict(), "enabled": "false"},
+                          {"relation": "order", "a": order.b, "b": order.a, "a_end": None, "b_end": None, "enabled": "true"}])
+    out["edits"] = {"edits": edits.astype(object).where(edits.notna(), None).to_dict("records"), "rows": edge_rows(rs.solve_levels(roads, pairs, edits=edits))}
+    base = rs.solve_levels(roads, pairs)
+    fixed = {r.road: (int(r.casing_start), int(r.casing_level), int(r.casing_end), int(r.fill_level)) for r in base.iloc[::50].itertuples()}
+    out["fixed"] = {"fixed": [[int(k), list(v)] for k, v in fixed.items()], "rows": edge_rows(rs.solve_levels(roads, pairs, fixed=fixed))}
+    p = DATA / area / "golden_level_options.json.gz"
+    p.write_bytes(gzip.compress(json.dumps(out, separators=(",", ":")).encode(), 9, mtime=0))
+    print(f"{area}: {p.name} {p.stat().st_size // 1000} KB")
+
 def main():
     parts = sys.argv[1:] or ["cmaps", "colors", "looks", "monaco", "sodermalm"]
     warnings.simplefilter("ignore", DeprecationWarning)
     for p in parts:
+        if p.startswith("level_options_"):           # level_options_monaco, level_options_sodermalm
+            write_level_options(p.removeprefix("level_options_"))
+            continue
         {"cmaps": write_cmaps, "colors": write_colors, "looks": write_looks}.get(p, lambda: write_area(p))()
 
 if __name__ == "__main__":

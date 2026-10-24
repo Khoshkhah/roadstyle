@@ -2004,7 +2004,7 @@ def test_twin_end_cap_ring_uses_the_head_number_and_flat_pairs_get_none():
 
 
 def test_compute_levels_lp_stages():
-    """The real LP (docs/design/levels_split_casing.md, section 7): nothing to violate is one LP (stage 0); a stack deeper than the range (max_level) is infeasible, so the
+    """Python's solver (HiGHS, its stages and time limit), so engine="python". The real LP (docs/design/levels_split_casing.md, section 7): nothing to violate is one LP (stage 0); a stack deeper than the range (max_level) is infeasible, so the
     stages 1-3 run with slacks, one pair is given up and a warning is raised; the margin only scales the numbers; the numbers stay integers with the default margin."""
     import pytest
     pytest.importorskip("scipy")
@@ -2015,21 +2015,21 @@ def test_compute_levels_lp_stages():
     rows = [LineString([(18 - 2 * d, 59), (18 + 2 * d, 59)]), LineString([(18, 58.998), (18, 59.002)]),
             LineString([(18 - 2 * d, 58.998), (18 + 2 * d, 59.002)]), LineString([(18 - 2 * d, 59.002), (18 + 2 * d, 58.998)])]     # four long roads crossing at one point
     g = gpd.GeoDataFrame({"highway": ["primary"] * 4, "band": [0, 1, 2, 3]}, geometry=rows, crs=4326)
-    ok = rs.compute_levels(g, method="solve", band_col="band")
+    ok = rs.compute_levels(g, engine="python", method="solve", band_col="band")
     assert ok.attrs["levels_info"]["solves"] == 1 and ok.attrs["levels_given_up"] == [] and list(ok.fill_level) == [0, 1, 2, 3]
-    half = rs.compute_levels(g, method="solve", band_col="band", margin=0.5)                  # another margin: the same order
+    half = rs.compute_levels(g, engine="python", method="solve", band_col="band", margin=0.5)                  # another margin: the same order
     assert list(half.fill_level) == [0, 1, 2, 3] and half.attrs["levels_given_up"] == []
     with _w.catch_warnings(record=True) as caught:
         _w.simplefilter("always")
-        tight = rs.compute_levels(g, method="solve", band_col="band", max_level=1)          # three positions only: a stack of four cannot fit
+        tight = rs.compute_levels(g, engine="python", method="solve", band_col="band", max_level=1)          # three positions only: a stack of four cannot fit
     assert tight.attrs["levels_info"]["solves"] == 3 and len(tight.attrs["levels_given_up"]) == 1      # no near rules: no stage 3
     assert any("could not be satisfied" in str(w.message) for w in caught)
     assert all(isinstance(v, int) for v in tight.fill_level)
-    fits = rs.compute_levels(g, method="solve", band_col="band", max_level=1, margin=0.5)    # a smaller margin: the same range holds four positions
+    fits = rs.compute_levels(g, engine="python", method="solve", band_col="band", max_level=1, margin=0.5)    # a smaller margin: the same range holds four positions
     assert fits.attrs["levels_given_up"] == [] and list(fits.fill_level) == [0, 1, 2, 3]
     for bad in (dict(margin=0), dict(max_level=0), dict(margin=-1)):
         with pytest.raises(ValueError):
-            rs.compute_levels(g, method="solve", band_col="band", **bad)
+            rs.compute_levels(g, engine="python", method="solve", band_col="band", **bad)
 
 
 def test_levels_are_saved_in_a_visualization_schema_and_read_back():
@@ -2116,9 +2116,9 @@ def test_stage_0_flow_has_the_optimum_of_the_lp():
 
 
 def test_the_solver_used_is_reported():
-    """levels_info["solver"] is "flow" when stage 0 is solved as a flow, "highs" when the slack stages are needed."""
+    """Python's solver (HiGHS, its stages and time limit), so engine="python". levels_info["solver"] is "flow" when stage 0 is solved as a flow, "highs" when the slack stages are needed."""
     g = _tunnel_world(True)
-    assert compute_levels(g, method="solve", order="class").attrs["levels_info"]["solver"] == "flow"
+    assert compute_levels(g, engine="python", method="solve", order="class").attrs["levels_info"]["solver"] == "flow"
 
 
 def test_the_example_of_the_design_document_7_5_1():
@@ -2133,7 +2133,7 @@ def test_the_example_of_the_design_document_7_5_1():
 
 
 def test_min_positions_keeps_the_requirements_and_never_uses_more_positions():
-    """docs/design/levels_split_casing.md, 7.3.1: the span term has a lower priority than a stack or an order wish, so nothing more is given up; the positions are never more than
+    """Python's solver (HiGHS, its stages and time limit), so engine="python". docs/design/levels_split_casing.md, 7.3.1: the span term has a lower priority than a stack or an order wish, so nothing more is given up; the positions are never more than
     without it; stage 0 is still a flow; the option is part of the stored parameters; the slack stages work with it."""
     import warnings as _w
 
@@ -2146,20 +2146,20 @@ def test_min_positions_keeps_the_requirements_and_never_uses_more_positions():
         pts = r.random((60, 2)) * 0.004 + [18.0, 59.3]
         g = gpd.GeoDataFrame({"highway": r.choice(["primary", "residential", "service", "secondary"], 60), "layer": r.choice([None, "1", "-1", "2"], 60, p=[.6, .15, .15, .1])},
                              geometry=[LS([pts[i], pts[(i * 7 + 3) % 60]]) for i in range(60)], crs=4326)
-        a, b = compute_levels(g, order="class", min_positions=False), compute_levels(g, order="class")        # the option is on by default
+        a, b = compute_levels(g, engine="python", order="class", min_positions=False), compute_levels(g, engine="python", order="class")        # the option is on by default
         assert len({v for c in cols for v in b[c]}) <= len({v for c in cols for v in a[c]})
         assert len(b.attrs["levels_given_up"]) == len(a.attrs["levels_given_up"])                # nothing more given up for fewer positions (random lines
         assert b.attrs["levels_info"]["order_violations"] == a.attrs["levels_info"]["order_violations"]   # cross near each other's heads: loops, docs/design/level_input.md)
     assert b.attrs["levels_params"]["min_positions"] is True and a.attrs["levels_params"]["min_positions"] is None
-    assert compute_levels(g, method="tags").attrs["levels_params"]["min_positions"] is None            # it does not apply to the tags method
+    assert compute_levels(g, engine="python", method="tags").attrs["levels_params"]["min_positions"] is None            # it does not apply to the tags method
     d = 0.001
     rows = [LS([(18 - 2 * d, 59), (18 + 2 * d, 59)]), LS([(18, 58.998), (18, 59.002)]),
             LS([(18 - 2 * d, 58.998), (18 + 2 * d, 59.002)]), LS([(18 - 2 * d, 59.002), (18 + 2 * d, 58.998)])]       # four roads crossing at one point, as in test_compute_levels_lp_stages
     cross = gpd.GeoDataFrame({"highway": ["primary"] * 4, "band": [0, 1, 2, 3]}, geometry=rows, crs=4326)
-    assert list(compute_levels(cross, band_col="band").fill_level) == [0, 1, 2, 3]
+    assert list(compute_levels(cross, engine="python", band_col="band").fill_level) == [0, 1, 2, 3]
     with _w.catch_warnings():
         _w.simplefilter("ignore")
-        tight = compute_levels(cross, band_col="band", max_level=1)      # the range is too small: the slack stages, with the span term in stage 3
+        tight = compute_levels(cross, engine="python", band_col="band", max_level=1)      # the range is too small: the slack stages, with the span term in stage 3
     assert tight.attrs["levels_info"]["solves"] == 3 and len(tight.attrs["levels_given_up"]) == 1      # no near rules: no stage 3
 
 
@@ -2716,7 +2716,7 @@ def test_the_last_solver_stage_at_its_time_limit_keeps_its_best_numbers(monkeypa
 
 
 def test_a_solver_stage_at_its_time_limit_without_an_answer_keeps_the_answer_of_the_stage_before(monkeypatch):
-    """There is always an answer: a stage stopped by its time limit before it found one keeps the answer of the stage before (it holds every
+    """Python's solver (HiGHS, its stages and time limit), so engine="python". There is always an answer: a stage stopped by its time limit before it found one keeps the answer of the stage before (it holds every
     row so far), with a warning naming the stage and levels_info status TIME_LIMIT (a GitHub test run of Monaco failed there, 2026-10-08)."""
     pytest.importorskip("scipy")
     import scipy.optimize as so
@@ -2729,7 +2729,7 @@ def test_a_solver_stage_at_its_time_limit_without_an_answer_keeps_the_answer_of_
     kw = dict(method="solve", band_col="band", max_level=1)                  # a stack of four in three positions: the staged solve
     real, calls = so.milp, []
     monkeypatch.setattr(so, "milp", lambda *a, **k: calls.append(1) or real(*a, **k))
-    ok = rs.compute_levels(g, **kw)
+    ok = rs.compute_levels(g, engine="python", **kw)
     n = len(calls)
     seen = []
 
@@ -2742,13 +2742,13 @@ def test_a_solver_stage_at_its_time_limit_without_an_answer_keeps_the_answer_of_
     monkeypatch.setattr(so, "milp", at_limit)
     stop = n                                                                 # the last stage: the answer of the stage before is kept
     with pytest.warns(UserWarning, match="time limit"):
-        out = rs.compute_levels(g, **kw)
+        out = rs.compute_levels(g, engine="python", **kw)
     assert out.attrs["levels_info"]["status"] == "TIME_LIMIT" and out["fill_level"].notna().all()
     assert len(out.attrs["levels_given_up"]) >= len(ok.attrs["levels_given_up"])
     seen.clear()
     stop = 2                                                                 # the first stage (after the plain solve): no answer to keep
     with pytest.raises(RuntimeError, match="Time limit"):
-        rs.compute_levels(g, **kw)
+        rs.compute_levels(g, engine="python", **kw)
 
 
 def test_level_editor_saves_only_what_the_solver_takes(tmp_path):

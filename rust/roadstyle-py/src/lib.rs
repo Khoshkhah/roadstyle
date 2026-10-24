@@ -141,27 +141,42 @@ fn tile_files(py: Python<'_>, dir: String, keep: Vec<String>, prefix: String) ->
     Ok(Tiler { style: roadstyle::vector_style(&style, &prefix, tiles.zooms()).to_string(), tiles })
 }
 
-/// compute_levels(roads, method, cols) -> (rows, info): roadstyle's compute_levels with its defaults, on the roads in their order (GeoParquet
-/// bytes). `method`: "tags" or "solve"; `cols`: the columns of the class, the layer, the bridge, the tunnel and the junction. `rows`: for
-/// each road (casing_start, casing_level, casing_end, fill_level); `info`: the counts of the solve.
+/// compute_levels(roads, method, cols, ...) -> (rows, info): roadstyle's compute_levels on the roads in their order (GeoParquet bytes), with
+/// its keywords. `method`: "tags" or "solve"; `cols`: the columns of the class, the layer, the bridge, the tunnel and the junction; `order`:
+/// "priority", "class", a column of numbers or None. `rows`: for each road (casing_start, casing_level, casing_end, fill_level); `info`:
+/// the counts of the solve.
 #[pyfunction]
-#[allow(clippy::type_complexity)]
-fn compute_levels(py: Python<'_>, roads: Vec<u8>, method: String, cols: [String; 5])
+#[pyo3(signature = (roads, method, cols, band_col=None, order=None, band_dist=10.0, head_m=5.0, max_level=20, margin=1.0,
+                    min_positions=true, near_rules=false))]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
+fn compute_levels(py: Python<'_>, roads: Vec<u8>, method: String, cols: [String; 5], band_col: Option<String>, order: Option<String>,
+                  band_dist: f64, head_m: f64, max_level: i64, margin: f64, min_positions: bool, near_rules: bool)
                   -> PyResult<(Vec<(i64, i64, i64, i64)>, String)> {
-    let m = roadstyle::levels::Method::parse(&method).filter(|m| *m != roadstyle::levels::Method::None)
+    use roadstyle::levels::{Method, Options, Order};
+    let m = Method::parse(&method).filter(|m| *m != Method::None)
         .ok_or_else(|| PyValueError::new_err(format!("method must be 'tags' or 'solve', not {method:?}")))?;
+    let (order, order_col) = match order.as_deref() {
+        None => (Order::None, ""),
+        Some("priority") => (Order::Priority, ""),
+        Some("class") => (Order::Class, ""),
+        Some(c) => (Order::Column, c),
+    };
+    let o = Options { method: m, band_col: band_col.is_some(), order, band_dist, head_m, max_level, margin, min_positions, near_rules,
+                      ..Default::default() };
     py.detach(|| {
         let feats = roadstyle::read::read_roads(roads, "geometry")?;
-        let c: [&str; 5] = [&cols[0], &cols[1], &cols[2], &cols[3], &cols[4]];
-        let edges = roadstyle::level_edges(&feats, c);
+        let edges = roadstyle::level_edges(&feats, [&cols[0], &cols[1], &cols[2], &cols[3], &cols[4], band_col.as_deref().unwrap_or(""), order_col]);
         let mut rows = vec![(0, 0, 0, 0); feats.len()];
-        let Some(levels) = roadstyle::levels::levels(&edges, &roadstyle::levels::Options { method: m })? else { return Ok((rows, "{}".into())) };
+        let Some(levels) = roadstyle::levels::levels(&edges, &o)? else { return Ok((rows, "{}".into())) };
         for r in &levels.rows {
             rows[r.edge_id as usize] = (r.casing_start, r.casing_level, r.casing_end, r.fill_level);
         }
-        // the counts, and the pairs (road numbers) that compute_levels gives as attrs
-        let info = serde_json::json!({"roads": levels.roads, "given_up": levels.given_up, "orders_not_kept": levels.orders_not_kept,
-                                      "given_up_pairs": levels.given_up_pairs, "orders_not_kept_pairs": levels.orders_not_kept_pairs});
+        // the counts, and the pairs and parts (road numbers) that compute_levels gives as attrs
+        // the names of Python's levels_info
+        let info = serde_json::json!({"roads": levels.roads, "pairs": levels.pairs, "order_pairs": levels.order_pairs,
+                                      "given_up": levels.given_up, "order_violations": levels.orders_not_kept,
+                                      "given_up_pairs": levels.given_up_pairs, "orders_not_kept_pairs": levels.orders_not_kept_pairs,
+                                      "near_not_kept": levels.near_not_kept});
         Ok((rows, info.to_string()))
     })
     .map_err(|e: String| PyValueError::new_err(e))

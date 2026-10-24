@@ -25,6 +25,7 @@ fn edges() -> LevelEdges {
             layer: text("layer"),
             junction: text("junction"),
             geometry: t.line(i).unwrap().iter().map(|&[x, y]| (x, y)).collect(),
+            ..Default::default()
         });
     }
     out
@@ -38,7 +39,7 @@ fn as_map(r: &Row) -> Map<String, Value> {
 }
 
 fn check(method: Method, golden: &str) -> std::sync::Arc<roadstyle_rs::levels::Levels> {
-    let lv = levels(&edges(), &Options { method }).unwrap().unwrap();
+    let lv = levels(&edges(), &Options { method, ..Default::default() }).unwrap().unwrap();
     let want: Vec<Map<String, Value>> = read_table(data(golden), "").unwrap().into_iter().map(|r| r.cols).collect();
     let got: Vec<Map<String, Value>> = lv.rows.iter().map(as_map).collect();
     assert_eq!(got.len(), want.len(), "number of rows");
@@ -57,5 +58,5 @@ fn monaco_tags_equal_duckosm_rust() {
 #[test]
 fn monaco_solve_equals_duckosm_rust() {
     let lv = check(Method::Solve, "levels_solve.parquet");
-    assert_eq!((lv.given_up, lv.orders_not_kept, lv.stages), (0, 16, [0, 37, 6562870]));
+    assert_eq!((lv.given_up, lv.orders_not_kept, lv.stages), (0, 16, [0, 37, 0, 6562870]));
 }

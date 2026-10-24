@@ -256,40 +256,28 @@ def _overlay_json(ov, styles) -> dict:
     return out
 
 
-# compute_levels' keywords that the Rust engine has only at their defaults
-_LEVEL_DEFAULTS = {"band_col": None, "order": "priority", "band_dist": 10.0, "head_m": 5.0, "max_level": 20, "margin": 1.0,
-                   "min_positions": True, "near_rules": False}
-
-
-def levels_other(**kw) -> list[str]:
-    """compute_levels' keywords that are not at the defaults the Rust engine has."""
-    return sorted(k for k, v in kw.items() if v != _LEVEL_DEFAULTS.get(k, object()))
-
-
 def compute_levels(edges, *, layer_col="layer", bridge_col="bridge", tunnel_col="tunnel", method="solve", highway_col="highway",
-                   junction_col="junction", time_limit=60.0, **kw):
+                   junction_col="junction", time_limit=60.0, band_col=None, order="priority", band_dist=10.0, head_m=5.0, max_level=20,
+                   margin=1.0, min_positions=True, near_rules=False):
     """``roadstyle.compute_levels`` by the Rust engine: the same four columns (casing_start, casing_level, casing_end, fill_level).
-    The attrs have ``levels_params`` and ``levels_info`` (with the counts; the lists of given-up pairs are Python's only)."""
-    other = {k: v for k, v in kw.items() if v != _LEVEL_DEFAULTS.get(k, object())}
-    if other:
-        raise ValueError(f"engine='rust': compute_levels has {', '.join(sorted(other))} only at the defaults; use engine='python'")
-    rows, info = rust().compute_levels(_geoparquet(edges), method, [highway_col, layer_col, bridge_col, tunnel_col, junction_col])
+    The attrs have ``levels_params`` and ``levels_info`` (with the counts). The Rust solver has no time limit: ``time_limit`` is not used."""
+    rows, info = rust().compute_levels(_geoparquet(edges), method, [highway_col, layer_col, bridge_col, tunnel_col, junction_col],
+                                       band_col=band_col, order=order, band_dist=band_dist, head_m=head_m, max_level=max_level, margin=margin,
+                                       min_positions=min_positions, near_rules=near_rules)
     info = json.loads(info)
-    pairs = {k: [tuple(p) for p in info.pop(k, [])] for k in ("given_up_pairs", "orders_not_kept_pairs")}
+    pairs = {k: [tuple(p) for p in info.pop(k, [])] for k in ("given_up_pairs", "orders_not_kept_pairs", "near_not_kept")}
     g = edges.copy()
     for i, c in enumerate(("casing_start", "casing_level", "casing_end", "fill_level")):
         g[c] = [r[i] for r in rows]
     from .levels_store import levels_params
-    d = _LEVEL_DEFAULTS
-    g.attrs["levels_params"] = levels_params(method, d["head_m"], d["band_dist"], d["margin"], d["max_level"], d["band_col"], d["order"],
-                                             d["min_positions"] and method == "solve")
+    g.attrs["levels_params"] = levels_params(method, head_m, band_dist, margin, max_level, band_col, order, min_positions and method == "solve")
     g.attrs["levels_info"] = {"engine": "rust", **info}
-    if method == "solve":         # as Python's: the pairs as road numbers (the parts of a given-up pair and the near rules are Python's)
+    if method == "solve":         # as Python's: the pairs and parts by road id (the parts of a given-up pair are Python's)
         g.attrs["levels_given_up"] = pairs["given_up_pairs"]
         g.attrs["levels_orders_not_kept"] = pairs["orders_not_kept_pairs"]
+        g.attrs["levels_near"] = sorted((u, l, ("start", "main", "end")[h]) for u, l, h in pairs["near_not_kept"])
         if not g.attrs["levels_given_up"]:
             g.attrs["levels_given_up_parts"] = []
-        g.attrs["levels_near"] = []
         if g.attrs["levels_given_up"]:
             import warnings
             warnings.warn(f"compute_levels: {len(g.attrs['levels_given_up'])} stack pair(s) could not be satisfied; see result.attrs['levels_given_up']",
