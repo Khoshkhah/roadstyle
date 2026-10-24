@@ -55,9 +55,9 @@ def _goldens():
     return gen, json.loads((here / "data" / "mapstyle_digests.json").read_text())
 
 
-# the maps of one mode (only=True) also differ in two engine rules (2026-10-24, the same roads in both engines): the name slots (slots.rs:
-# 87 of 2,111 slots of walking name another road row) and edge_attach (overlays.rs: 1 to 2 points of a layer on another road, a tie)
-_ONE_MODE = pytest.mark.xfail(strict=True, reason="a map of one mode: the Rust engine's slots and edge_attach differ from Python's")
+# the maps of one mode (only=True) also differ in one engine rule (2026-10-24, the same roads in both engines): edge_attach (overlays.rs:
+# 1 to 2 points of a layer on another road, a tie). Their slots name the same roads up to an undirected twin (normalised: the twin rule).
+_ONE_MODE = pytest.mark.xfail(strict=True, reason="a map of one mode: the Rust engine's edge_attach differs from Python's")
 
 
 @needs_db

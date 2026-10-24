@@ -60,7 +60,10 @@ def normalised(style):
     - the 3D decks without their geometry (Python makes the polygons with GEOS, Rust with its own offsets: tests/test_engine_parity.py's
       test_export_inline_decks compares them by shape);
     - a polygon by its rings, not by the order of its parts, the start point or the orientation of a ring (the background's land:
-      mapstyle cuts the sea out with GEOS, the Rust reader with i_overlay, which writes the same points in another order)."""
+      mapstyle cuts the sea out with GEOS, the Rust reader with i_overlay, which writes the same points in another order);
+    - a slot's road (`__rs_edge`, `__rs_edge2`) as the road or its undirected twin, the lower row of the two (the same line reversed, the
+      same class, both not directed): a tie between undirected twins: GEOS's tree order in Python, float rounding in Rust; same geometry."""
+    twin = _undirected_twins(style)
     def walk(o, key=None):
         if isinstance(o, dict):
             drop = ("source", "target") if key == "properties" else ()
@@ -69,12 +72,22 @@ def normalised(style):
             return [walk(v, key) for v in o]
         if key in ("osm_id", "edge_id") and isinstance(o, int) and not isinstance(o, bool):
             return str(o)
+        if key in ("__rs_edge", "__rs_edge2") and isinstance(o, int) and in_slots[0]:
+            return min(o, twin.get(o, o))
         if key == "coordinates" and isinstance(o, float):
             return round(o, 9)
         if isinstance(o, str) and o.startswith("data:image/png;base64,"):
             return _pixels(o)
         return o
-    out = walk(style)
+    in_slots = [False]
+    out = {k: v for k, v in style.items() if k != "sources"}
+    out = walk(out)
+    out["sources"] = {}
+    for name, src in style["sources"].items():
+        in_slots[0] = name == "slots"
+        out["sources"][name] = walk(src)
+    in_slots[0] = False
+    out = {k: out[k] for k in style}
     for f in out["sources"].get("decks", {}).get("data", {}).get("features", []):
         f.pop("geometry", None)
     for src in out["sources"].values():
@@ -82,6 +95,22 @@ def normalised(style):
             g = f.get("geometry") or {}
             if g.get("type") in ("Polygon", "MultiPolygon"):
                 f["geometry"] = {"type": "MultiPolygon", "rings": _rings(g)}
+    return out
+
+
+def _undirected_twins(style):
+    """{road row: its twin's row} for each pair of roads on the same line the other way round, of the same class, both not directed."""
+    feats = ((style["sources"].get("roads") or {}).get("data") or {}).get("features") or []
+    by_line, out = {}, {}
+    for f in feats:
+        p, g = f.get("properties") or {}, f.get("geometry") or {}
+        if p.get("is_directed") or g.get("type") != "LineString" or "__rs_edge" not in p:
+            continue
+        line = tuple(map(tuple, g["coordinates"]))
+        j = by_line.get((line[::-1], p.get("highway")))
+        if j is not None:
+            out[p["__rs_edge"]], out[j] = j, p["__rs_edge"]
+        by_line[(line, p.get("highway"))] = p["__rs_edge"]
     return out
 
 
