@@ -164,10 +164,9 @@ Library, in `rust/roadstyle-look/`. Public API: `basemap`, `widths`, `VERSION`, 
 | `basemap` | 366 | The base map's half of the look (mapstyle's styles, merged into roadstyle on 2026-10-23): a duckOSM map's travel mode, its theme and its path style give the roads' palette and settings (mapstyle's `mode_settings`) and the base map's part of the look (`features`: the layers of layers.yaml, the 3D heights, the base map's style in the theme's colours and its images) | `style.py` |
 | `error` | 38 | The errors of the look: one kind for each cause, each with the text that the bindings show (the same text as before the type) |  |
 | `png` | 96 | The PNG images of the look: a texture's mask (8-bit grey) read, and a texture in its colour (8-bit RGBA) written |  |
-| `ramp` | 118 | The colour ramps of data colours (render_edges' cmap): ports of roadstyle's colors.py ColorRamp over branca's LinearColormap | `colors.py` |
+| `ramp` | 118 | The colour ramps of data colours (render_edges' cmap): branca's LinearColormap, as roadstyle's colors.py ColorRamp makes it | `colors.py` |
 | `resolve` | 501 | The resolution of the look (look.json): what roadstyle renders a map with, made from render_edges' palette, profile and settings, as Python makes it | `_settings.py`, `style.py` |
 | `widths` | 183 | The road width model (render_web's _load_road_model: the look's "roads_model" and the theme's roads): the width of each class by zoom, its draw order and its two-way split | `render_web.py` |
-| `cmaps.json` | (data) | data read when the crate is built |  |
 
 #### `roadstyle-io` { #roadstyle-io }
 
