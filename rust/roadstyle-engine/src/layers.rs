@@ -773,6 +773,9 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
         if !ov.kinds.is_empty() {          // a base-map layer's kinds with their counts, most first (the page's kind filter)
             info.overlays.last_mut().unwrap()["kinds"] = json!(ov.kinds);
         }
+        if py_truth(&ov.l["extrude"]) {    // its 3D layer (the dashboard's 3D button; a page's layers have no metadata)
+            info.overlays.last_mut().unwrap()["extrude"] = ov_3d(i).into();
+        }
         ov_ids.push(ids);
     }
     let mut layers = under;
@@ -999,6 +1002,11 @@ fn ms_swap(expr: Option<&Value>, value: Value) -> Value {
     }
 }
 
+/// The id of the overlay `i`'s 3D layer (the fill-extrusion of a base-map layer with heights).
+fn ov_3d(i: usize) -> String {
+    format!("ov{i}-3d")
+}
+
 /// mapstyle.export._restyle: the base-map layers styled as layers.js styles them on the page (colour and outline by kind, dashes, textures,
 /// icons, 3D buildings, zoom ranges). A 3D layer goes under the arrows, names and highlight; the others right after the layer they belong to.
 fn restyle(layers: Vec<Value>, ovs: &[Overlay]) -> Vec<Value> {
@@ -1102,7 +1110,7 @@ fn restyle(layers: Vec<Value>, ovs: &[Overlay]) -> Vec<Value> {
         }
         if let Some(ex) = ll.get("extrude").filter(|v| py_truth(v)) {
             let last = news.last().map(|n| n.1["id"].as_str().unwrap().to_string()).unwrap_or_else(|| layers[*lys.last().unwrap()]["id"].as_str().unwrap().to_string());
-            news.push((last, new(json!({"id": format!("ov{i}-3d"), "type": "fill-extrusion", "metadata": {"roadstyle:group": "buildings 3D", "roadstyle:over": true},
+            news.push((last, new(json!({"id": ov_3d(*i), "type": "fill-extrusion", "metadata": {"roadstyle:group": "buildings 3D", "roadstyle:over": true},
                                         "layout": {"visibility": "none"},
                                         "paint": {"fill-extrusion-color": ex["color"], "fill-extrusion-height": ["get", "height"],
                                                   "fill-extrusion-base": ["coalesce", ["get", "base"], 0], "fill-extrusion-opacity": ex["opacity"]}}))));
