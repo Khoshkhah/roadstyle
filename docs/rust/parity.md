@@ -108,12 +108,14 @@ The input: stage 1 (`makeSources`) made the files of Monaco (13,298 roads with t
   `tolerance` 0.0625 (half a unit of 4,096).
 - **Rust** (`tileFiles`) reads the same files and cuts the tiles when MapLibre asks for them.
 
-A map of 1000 × 700 pixels with no base map, headless Chromium, 2026-10-24; the middle value of 3 runs, each in a new page.
+A map of 1000 × 700 pixels with no base map, headless Chromium, 2026-10-24; the middle value of 3 runs, each in a new page. The
+first view is the fair number to compare: both cutters parse the same GeoJSON, MapLibre in the first view and Rust before the map
+exists.
 
 | Stage 2 | MapLibre | Rust |
 |---|---|---|
-| The setup (before the map asks for tiles) | 0.02 s | 0.51 s: it reads and parses the GeoJSON |
-| The first complete view, zoom 14, the setup included | 0.98 s | 1.09 s |
+| Before the map exists: the data made ready for stage 2 | 0.02 s: the sources only point to the files | 0.51 s: `tileFiles` reads and parses the GeoJSON and indexes the pieces |
+| From the start until the whole first view (zoom 14) is drawn, the time above included | 0.98 s: MapLibre reads and parses the GeoJSON, cuts the tiles and draws | 1.09 s: Rust cuts the tiles that MapLibre asks for, and MapLibre draws |
 | A zoom to 16 | 0.39 s | 0.37 s |
 | A pan | 0.18 s | 0.17 s |
 | A zoom out to 12 | 0.21 s | 0.29 s |
@@ -138,8 +140,8 @@ read the files above, so it is not part of the comparison; it shows what the one
 | | Rust from memory |
 |---|---|
 | Stage 1 with no files (with the GeoJSON files: 0.95 s) | 0.29 s |
-| The setup of stage 2 | 0.20 s |
-| The first complete view, zoom 14, the setup included | 0.80 s |
+| Before the map exists: the data made ready for stage 2 | 0.20 s |
+| From the start until the whole first view (zoom 14) is drawn | 0.80 s |
 | A zoom to 16, a pan, a zoom out to 12 | 0.37 s, 0.19 s, 0.25 s |
 | The WebAssembly memory, the JavaScript heap | 83 MB, 79 MB |
 
