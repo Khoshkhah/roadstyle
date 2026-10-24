@@ -51,6 +51,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   has the key: a casing piece has no `__rs_fill@<palette>: null` any more. The map does not change.
 
 ### Added
+- **mapstyle's export_inline on the Rust engine**: `roadstyle.duckosm.export_inline(db, mode, theme=, paths=)` reads the duckOSM file
+  (`roadstyle.duckosm.read`), makes the base map's look (`roadstyle.duckosm.look`: with render_map's map options) and runs stage 1 in
+  Rust. On Monaco its style is today's mapstyle style in 6 choices of mode, theme and path style, with the differences that were decided
+  (ids as BIGINT, `source` and `target`, the last digit of a centroid, the PNG bytes) and one that is open: the 3D decks of the Rust
+  engine are not Python's on all of Monaco (1,312 against 1,311, for the same roads). The background's land is the boundary less the sea
+  in every path, as mapstyle makes it (the reader loads DuckDB's spatial extension; without it, the whole boundary and a warning).
 - **A duckOSM reader with one copy of its SQL** (the mapstyle merge, step 2): `roadstyle-io::duckosm` makes the SQL that reads a duckOSM
   file: the roads of every mode with their stored levels and the columns that `render_map` adds, and the base map's tables (`features.*`).
   It is the SQL of `roads_sql.js` and `features_sql.js`. Python runs it with `roadstyle.duckosm.read(db, mode)` (the engine's input files as

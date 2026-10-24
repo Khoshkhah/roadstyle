@@ -467,9 +467,11 @@ pub(crate) fn resolve(options: &Options) -> Result<LookData, String> {
     let styles = class_styles(&th, palette, &config)?;
     let roads_model = roads(&th);
     let mut args = if options.args.is_null() { json!({}) } else { options.args.clone() };
-    for (k, v) in bm.iter().flat_map(|b| &b.args) {          // the mode's map options, where the caller gives none
-        if let Some(a) = args.as_object_mut().filter(|a| !a.contains_key(k)) {
-            a.insert(k.clone(), v.clone());
+    let stored = bm.is_some() && args["levels"].is_object();       // the stored levels of a duckOSM file: their columns
+    let level_cols = crate::basemap::LEVEL_COLS.iter().filter(|_| stored).map(|c| (format!("{c}_col"), Value::from(*c)));
+    for (k, v) in bm.iter().flat_map(|b| b.args.clone()).chain(level_cols) {      // the base map's map options, where the caller gives none
+        if let Some(a) = args.as_object_mut().filter(|a| !a.contains_key(&k)) {
+            a.insert(k, v);
         }
     }
     let model = RoadModel::new(&roads_model, &th["roads"], &args)?;

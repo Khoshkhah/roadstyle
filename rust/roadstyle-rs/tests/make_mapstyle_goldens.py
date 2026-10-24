@@ -10,7 +10,8 @@ geolibre-roadstyle (its build.py), or in the folder $PROJECTS:
   this file change with each run; the test compares the keys in sorted order.
 - styles: mapstyle.export.export_inline of 6 choices into tests/data/mapstyle/ (not in git: about 2.8 MB each, gzipped), and
   tests/data/mapstyle_digests.json (in git): for each style, the sha256 of its canonical JSON (json.dumps with sort_keys and the
-  separators "," and ":"), its number of layers and the size of that text. The canonical text is the same with each hash seed."""
+  separators "," and ":"), its number of layers and the size of that text (the record), and the same three of its normalised form
+  (`normalised`: what tests/test_duckosm.py compares with the Rust engine's style). The canonical text is the same with each hash seed."""
 import gzip
 import hashlib
 import importlib.util
@@ -33,6 +34,49 @@ def canonical(obj) -> bytes:
     return json.dumps(obj, sort_keys=True, separators=(",", ":")).encode()
 
 
+def _pixels(url):
+    """A PNG data URL as its size and its RGBA pixels (sha256)."""
+    import base64
+    import io
+
+    from PIL import Image
+    im = Image.open(io.BytesIO(base64.b64decode(url.split(",", 1)[1]))).convert("RGBA")
+    return {"png": list(im.size), "rgba": hashlib.sha256(im.tobytes()).hexdigest()}
+
+
+def normalised(style):
+    """The style with the differences that were decided, each by its rule, so that the Rust engine's style of the same map has the same
+    digest:
+    - ids as text: `osm_id` and `edge_id` of every feature (mapstyle reads them as text; the Rust reader keeps them BIGINT: N1, R13);
+    - no `source` and `target` on a road (the Rust reader keeps them: R13);
+    - every coordinate to 9 places (the Rust engine computes a centroid, mapstyle uses shapely: the last digit can differ);
+    - each PNG image as its pixels (the Rust engine's PNG encoder writes other bytes for the same image);
+    - the 3D decks without their geometry (Python makes the polygons with GEOS, Rust with its own offsets: tests/test_engine_parity.py's
+      test_export_inline_decks compares them by shape)."""
+    def walk(o, key=None):
+        if isinstance(o, dict):
+            drop = ("source", "target") if key == "properties" else ()
+            return {k: walk(v, k) for k, v in o.items() if k not in drop}
+        if isinstance(o, list):
+            return [walk(v, key) for v in o]
+        if key in ("osm_id", "edge_id") and isinstance(o, int) and not isinstance(o, bool):
+            return str(o)
+        if key == "coordinates" and isinstance(o, float):
+            return round(o, 9)
+        if isinstance(o, str) and o.startswith("data:image/png;base64,"):
+            return _pixels(o)
+        return o
+    out = walk(style)
+    for f in out["sources"].get("decks", {}).get("data", {}).get("features", []):
+        f.pop("geometry", None)
+    return out
+
+
+def digest(style):
+    text = canonical(style)
+    return {"sha256": hashlib.sha256(text).hexdigest(), "layers": len(style["layers"]), "bytes": len(text)}
+
+
 def write_looks():
     spec = importlib.util.spec_from_file_location("glbuild", PROJECTS / "geolibre-roadstyle" / "build.py")
     build = importlib.util.module_from_spec(spec)
@@ -49,8 +93,7 @@ def write_styles():
         name = f"style_{mode}_{theme}_{paths}"
         style = export_inline(DB, mode=mode, theme=theme, paths=paths)
         gz(out / f"{name}.json.gz", style)
-        text = canonical(style)
-        digests[name] = {"sha256": hashlib.sha256(text).hexdigest(), "layers": len(style["layers"]), "bytes": len(text)}
+        digests[name] = {**digest(style), "normalised": digest(normalised(style))}
         print(name, digests[name])
     (HERE / "data" / "mapstyle_digests.json").write_text(json.dumps(digests, indent=1) + "\n")
 

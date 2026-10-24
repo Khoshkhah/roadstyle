@@ -294,7 +294,8 @@ mod wasm {
 
     /// duckosmPlan(catalog, mode, tags, specs) -> string: the SQL that reads a duckOSM file (roadstyle-io's duckosm.rs, the one copy that
     /// Python runs too), as JSON text: {"catalog": the 2 queries of the catalog, "roads": 3 statements, "meta": the stored levels' query or
-    /// null, "select": the roads of `mode`, "layers": [{spec, name, with_tags, without_tags}]}. `catalog`: the JSON text of {"name", "tables":
+    /// null, "select": the roads of `mode`, "spatial": the statements that load the spatial extension, "layers": [{spec, name, sql: the
+    /// queries in order}]}. `catalog`: the JSON text of {"name", "tables":
     /// [[schema, table]], "columns": [[schema, table, column]]} (with no tables: only "catalog" is in the answer); `specs`: layers.yaml's
     /// layers as JSON text.
     #[wasm_bindgen(js_name = duckosmPlan)]
@@ -312,9 +313,9 @@ mod wasm {
                                      columns: rows("columns").iter().map(|r| (text(&r[0]), text(&r[1]), text(&r[2]))).collect() };
         let specs: Vec<serde_json::Value> = serde_json::from_str(specs).map_err(|e| err(format!("specs: {e}")))?;
         let layers: Vec<serde_json::Value> = duckosm::features_sql(&cat, &specs).into_iter()
-            .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "with_tags": l.with_tags, "without_tags": l.without_tags})).collect();
+            .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "sql": l.sql})).collect();
         Ok(serde_json::json!({"catalog": queries, "roads": duckosm::roads_sql(&cat, tags).map_err(err)?, "meta": (!tags).then_some(duckosm::LEVELS_META_SQL),
-                              "select": duckosm::roads_select(mode).map_err(err)?, "layers": layers}).to_string())
+                              "select": duckosm::roads_select(mode).map_err(err)?, "spatial": duckosm::SPATIAL_SQL, "layers": layers}).to_string())
     }
 
     /// duckosmLevels(source?, nEdges?, edgeHash?) -> string: the look's keyword `levels` (JSON text) from the stored levels' metadata row

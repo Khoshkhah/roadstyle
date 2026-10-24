@@ -43,23 +43,29 @@ const PATTERNS: [(&str, &[u8]); 7] = [
 pub const LOOKS: [&str; 4] = ["all", "driving", "walking", "cycling"];
 
 /// One choice of a base map's look: the travel mode that stands out, the theme (the whole map's colours) and the path style (how
-/// walking and cycling paths look).
+/// walking and cycling paths look); `place`: the map's place (render_map: the database's file name), for the map's name.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct BaseMap {
     pub mode: String,
     pub theme: String,
     pub paths: String,
+    pub place: Option<String>,
 }
 
 impl Default for BaseMap {
     fn default() -> BaseMap {
-        BaseMap { mode: "all".into(), theme: "osm".into(), paths: "google".into() }
+        BaseMap { mode: "all".into(), theme: "osm".into(), paths: "google".into(), place: None }
     }
 }
 
+/// The columns of the stored levels (render_map's LEVEL_COLS, the heads and the ends), as the duckOSM reader gives them.
+pub const LEVEL_COLS: [&str; 8] = ["casing_start", "casing_level", "casing_end", "fill_level", "head_start_m", "head_end_m", "cap_start", "cap_end"];
+
 /// What a base map's choice gives the look: the roads' palette name and settings (one settings source), the base map's part of the
-/// look (`features`) and the map options of the mode (a mode with no lanes: one centred line for each road).
+/// look (`features`) and render_map's map options (`args`): the name, the tooltip, the copy field, the columns of the duckOSM reader
+/// (is_directed, has_arrows) and, for a mode with no lanes, one centred line for each road. The stored levels' columns come with the
+/// keyword `levels` (resolve.rs).
 pub struct BaseMapLook {
     pub palette: String,
     pub settings: Value,
@@ -317,6 +323,16 @@ pub fn base_map(b: &BaseMap) -> Result<BaseMapLook, String> {
     let features = json!({"layers_yaml": layers, "buildings_3d": style(CARTO)["features"]["buildings_3d"], "style": themed["features"],
                           "images": images(&themed, &specs)?});
     let mut args = Map::new();
+    if let Some(place) = &b.place {
+        let theme = if b.theme == "osm" { String::new() } else { format!(", {}", b.theme) };
+        args.insert("name".into(), format!("{place} ({}, {}{theme})", b.mode, b.paths).into());
+    }
+    args.insert("tooltip".into(), json!(["edge_id", "osm_id", "highway", "name", "access"]));
+    args.insert("copy_field".into(), "edge_id".into());
+    // duckOSM stores every path, and a one-way street's walking-only reverse, as a reverse edge too: a pair is two lanes only when both
+    // edges are directed; the arrows only on cars' one-ways (and a private or bus-only road)
+    args.insert("directed_col".into(), "is_directed".into());
+    args.insert("driving_col".into(), "has_arrows".into());
     if spec.get("lanes") == Some(&Value::Bool(false)) {          // one centred line for each road
         args.insert("offset_frac".into(), 0.into());
         args.insert("width_frac".into(), 1.into());

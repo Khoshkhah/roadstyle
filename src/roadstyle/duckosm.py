@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+import warnings
 from pathlib import Path
 
 
@@ -47,14 +48,25 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers: bool = True):
         con.execute(rows)
         con.execute(drop)
         made = []
+        if plan["layers"]:
+            try:                     # the background's land without the sea needs the spatial extension (load_layers' _spatial)
+                for sql in plan["spatial"]:
+                    con.execute(sql)
+            except duckdb.Error as e:
+                warnings.warn(f"{db}: no spatial extension of DuckDB ({e}): the background is the whole boundary", stacklevel=2)
         for lyr in plan["layers"]:
-            for sql in dict.fromkeys((lyr["with_tags"], lyr["without_tags"])):       # an older file has no tags: the height of the kind
+            for k, sql in enumerate(lyr["sql"]):          # mapstyle's query, then its fallbacks (no tags: the height of the kind; no spatial)
                 try:
                     con.execute(f"CREATE OR REPLACE TEMP TABLE f{lyr['spec']} AS {sql}")
-                    made.append(lyr["spec"])
-                    break
-                except duckdb.Error:
+                except duckdb.Error as e:
+                    if k == len(lyr["sql"]) - 1:
+                        warnings.warn(f"{db}: base-map layer {lyr['name']} skipped: {e}", stacklevel=2)
                     continue
+                if k:
+                    warnings.warn(f"{db}: base-map layer {lyr['name']}: query {k + 1} of {len(lyr['sql'])} (an older file, or no spatial extension)",
+                                  stacklevel=2)
+                made.append(lyr["spec"])
+                break
         with tempfile.TemporaryDirectory() as d:
             def parquet(select, name):
                 p = Path(d) / name
@@ -66,3 +78,28 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers: bool = True):
     finally:
         con.close()
     return roads, features, level_kw
+
+
+def look(db, mode: str = "all", *, theme: str = "osm", paths: str = "google", levels=None, **kwargs):
+    """The look of the map of the duckOSM file ``db`` (the Rust engine's ``Look``): the base map's look of ``mode``, ``theme`` and
+    ``paths`` (mapstyle's mode_settings and styles), render_map's map options (the name from the file's name, the tooltip, the reader's
+    columns, the stored levels' columns with ``levels``), and ``kwargs`` over them (render_edges' keywords)."""
+    from ._engine import rust
+
+    args = {**kwargs, **({"levels": levels} if levels is not None else {})}
+    o = {"base_map": {"mode": mode, "theme": theme, "paths": paths, "place": Path(db).stem}, "args": args}
+    return rust().resolve_look(json.dumps(o))
+
+
+def export_inline(db, mode: str = "all", *, theme: str = "osm", paths: str = "google", layers: bool = True, levels: str = "stored",
+                  **kwargs) -> dict:
+    """mapstyle's ``export_inline`` on the Rust engine: the map of the duckOSM file ``db`` (its roads in the style of ``mode``, the
+    base map of ``features.*`` with ``layers``) as one style with the data in it, for an app that draws a MapLibre style (the roadstyle
+    GeoLibre plugin). ``kwargs``: render_edges' keywords (``view_3d`` is on, as export_inline's)."""
+    from ._engine import _warn, rust
+
+    roads, features, level_kw = read(db, mode, levels=levels, layers=layers)
+    lk = look(db, mode, theme=theme, paths=paths, levels=level_kw, **{"view_3d": True, "export": True, **kwargs})
+    style = json.loads(rust().make_style(roads, lk, features, None, None))
+    _warn()
+    return style

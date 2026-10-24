@@ -1,32 +1,62 @@
 {
  "style_all_osm_google": {
-  "sha256": "87cb5ae7744bc66ba2bc0d8453c007a68ab1c9f33c240a3a51f95be77df6656f",
+  "sha256": "b7f4c967ff50b642ee4a5c30e6bf26c7a9c43f742aa68c753caab9e9cd8fc408",
   "layers": 61,
-  "bytes": 32258062
+  "bytes": 32259118,
+  "normalised": {
+   "sha256": "ae08986ef2723ff235830192ab284add57c373132678a0a4f4e43d38f4434b08",
+   "layers": 61,
+   "bytes": 31153002
+  }
  },
  "style_driving_osm_google": {
-  "sha256": "27d67d41fcf9664efb45dd7df3dacc125da9d86139e3ac0953b531333db8e66f",
+  "sha256": "5b57c353e3edddd28ae8c11692676da960046ecf992fb95260cf0aa6369a9b42",
   "layers": 61,
-  "bytes": 32286603
+  "bytes": 32287659,
+  "normalised": {
+   "sha256": "42ab7b4ca27c5f632224df4c0c8289d2e6ddc71f3d2f769bd48b27cce448cf87",
+   "layers": 61,
+   "bytes": 31181091
+  }
  },
  "style_walking_osm_google": {
-  "sha256": "e0776bd027e667f72e4e7fc5ecd89bdd21cf68bf328089e0c2e45a59c751e416",
+  "sha256": "dd35cbf78dd59df114b5956b8738d41e56d8b317eb0b938b379ccbfd82b5188f",
   "layers": 61,
-  "bytes": 32236663
+  "bytes": 32237719,
+  "normalised": {
+   "sha256": "03c2f21fe85233d8802a10a126a927001f4daa8c7b19ce86154e8c6f95659cb9",
+   "layers": 61,
+   "bytes": 31139327
+  }
  },
  "style_cycling_osm_google": {
-  "sha256": "572c65eb7054a7f8ca9b6028e19cbd6f5789209bb376783f49e264cd7b1f69d3",
+  "sha256": "6652edae60629093054240b33b545e0e545a3bd6c5c69134530681da56c8f36c",
   "layers": 61,
-  "bytes": 32283424
+  "bytes": 32284480,
+  "normalised": {
+   "sha256": "727394d047f016f17a71b40ff3e3eb65ab1a6461de5eecb363c1cfe432fdb45e",
+   "layers": 61,
+   "bytes": 31177845
+  }
  },
  "style_all_grey_google": {
-  "sha256": "dceea60a10f687a5536ab4173bf1380e808ce820db2aaec0799b0bddd93050e1",
+  "sha256": "f56ee0f090159b1fc4d9918872fb1b183cba2645ac59f8b208e3159df9dae1f4",
   "layers": 60,
-  "bytes": 32251492
+  "bytes": 32252548,
+  "normalised": {
+   "sha256": "d77aaa697ae61dc62f0e287fd646fb074a1d643fb760e04a7da0b544cbcba15b",
+   "layers": 60,
+   "bytes": 31150792
+  }
  },
  "style_walking_google_komoot": {
-  "sha256": "d46482b819555dee97081e5412153466b8f69f0b0cf2d74e1012a072b8188a1c",
+  "sha256": "959ac3f8759479cce24ef05fb7356f9ead0750765252b9bbab66aebbb8ce0302",
   "layers": 60,
-  "bytes": 32231483
+  "bytes": 32232539,
+  "normalised": {
+   "sha256": "73343d8a80a968dafb4f748b4508cd80829849b9b179b55875e5a69b262e3340",
+   "layers": 60,
+   "bytes": 31138507
+  }
  }
 }

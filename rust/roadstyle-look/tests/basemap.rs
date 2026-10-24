@@ -61,7 +61,7 @@ fn the_64_looks_of_mapstyle() {
         let want: serde_json::Map<String, Value> = idx.as_object().unwrap().iter()
             .map(|(k, i)| (k.clone(), g["parts"][k][i.as_u64().unwrap() as usize].clone())).collect();
         let [mode, theme, paths]: [&str; 3] = choice.split('|').collect::<Vec<_>>().try_into().unwrap();
-        let o = Options { base_map: Some(BaseMap { mode: mode.into(), theme: theme.into(), paths: paths.into() }), args: want["args"].clone(),
+        let o = Options { base_map: Some(BaseMap { mode: mode.into(), theme: theme.into(), paths: paths.into(), place: None }), args: want["args"].clone(),
                           ..Default::default() };
         let mut got = Look::resolve(&o).unwrap_or_else(|e| panic!("{choice}: {e}")).to_value();
         got.as_object_mut().unwrap().shift_remove("schema_version");

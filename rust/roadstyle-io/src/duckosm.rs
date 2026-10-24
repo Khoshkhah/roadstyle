@@ -126,14 +126,19 @@ pub fn roads_select(mode: &str) -> Result<String, String> {
     FROM a ORDER BY NOT und, edge_id"))
 }
 
-/// One base-map layer's query (`features_sql`): the layer's index in layers.yaml, its name, and its SELECT with the height tags of a
-/// building and without them (an older file has no tags). The caller makes `f<spec>` from the first that runs (`CREATE OR REPLACE TEMP
-/// TABLE f<spec> AS <select>`), and skips the layer when neither runs, as load_layers does.
+/// The statements that load DuckDB's spatial extension, before the base map's queries: the background's land is the boundary less the
+/// sea (ST_Difference, ST_Union_Agg), as mapstyle's load_layers makes it. A caller that cannot load it gets the background's next query.
+pub const SPATIAL_SQL: [&str; 2] = ["INSTALL spatial", "LOAD spatial"];
+
+/// One base-map layer's queries (`features_sql`): the layer's index in layers.yaml, its name, and its SELECTs in order: the first is
+/// mapstyle's query; each next one is mapstyle's fallback (a file with no `tags` column: no height tags, the height of the kind; a
+/// connection without the spatial extension: the whole boundary as the background). The caller makes `f<spec>` from the first that
+/// runs (`CREATE OR REPLACE TEMP TABLE f<spec> AS <select>`), says so when it is not the first, and skips the layer when none runs, as
+/// load_layers does.
 pub struct LayerSql {
     pub spec: usize,
     pub name: String,
-    pub with_tags: String,
-    pub without_tags: String,
+    pub sql: Vec<String>,
 }
 
 /// The queries of the base map's layers (`specs`: the look's features.layers_yaml.layers) that the file has, in layers.yaml's order.
@@ -153,16 +158,29 @@ pub fn features_sql(cat: &Catalog, specs: &[Value]) -> Vec<LayerSql> {
         // a table outside features.* (the boundary): the kind is the layer's name
         let kind = if schema.is_some() { format!("'{}'", q(name)) } else { "kind".into() };
         let bearing = if s["bearing"] == true { "CAST(bearing AS DOUBLE)" } else { "CAST(NULL AS DOUBLE)" };
-        let sql = |tag: &dyn Fn(&str) -> String| format!("SELECT {i} AS spec, '{layer}' AS layer, rowid AS rid, CAST(osm_id AS VARCHAR) AS osm_id, {kind} AS kind,
+        let sql = |geom: &str, tag: &dyn Fn(&str) -> String| format!("SELECT {i} AS spec, '{layer}' AS layer, rowid AS rid, CAST(osm_id AS VARCHAR) AS osm_id, {kind} AS kind,
         COALESCE(name, '') AS name, {bearing} AS bearing, CAST({} AS VARCHAR) AS levels,
         CAST({} AS VARCHAR) AS roof_levels, CAST({} AS VARCHAR) AS height, CAST({} AS VARCHAR) AS min_height,
-        CAST({} AS VARCHAR) AS min_level, ST_AsWKB(geom) AS geometry FROM {}.{table} WHERE geom IS NOT NULL
+        CAST({} AS VARCHAR) AS min_level, ST_AsWKB({geom}) AS geometry FROM {}.{table} WHERE geom IS NOT NULL
         {}{}", tag("building:levels"), tag("roof:levels"), tag("height"), tag("min_height"), tag("building:min_level"),
             schema.unwrap_or("features"), s["where"].as_str().map(|w| format!(" AND ({w})")).unwrap_or_default(),
             if s["outside_networks"] == true { format!(" AND osm_id NOT IN ({nets})") } else { String::new() });
         let none = |_: &str| "NULL".to_string();
         let tags = |k: &str| format!("tags['{k}'][1]");
-        out.push(LayerSql { spec: i, name: name.to_string(), with_tags: if s["height"] == true { sql(&tags) } else { sql(&none) }, without_tags: sql(&none) });
+        // the background: the land of the boundary without the sea, so that a map with no sea layer does not paint the sea as land
+        let geoms: &[&str] = if name == "background" && cat.has_table("features", "ocean") {
+            &["ST_Difference(geom, (SELECT ST_Union_Agg(geom) FROM features.ocean))", "geom"]
+        } else {
+            &["geom"]
+        };
+        let mut queries = Vec::new();
+        let heights: &[bool] = if s["height"] == true { &[true, false] } else { &[false] };
+        for g in geoms {
+            for &h in heights {
+                queries.push(if h { sql(g, &tags) } else { sql(g, &none) });
+            }
+        }
+        out.push(LayerSql { spec: i, name: name.to_string(), sql: queries });
     }
     out
 }
