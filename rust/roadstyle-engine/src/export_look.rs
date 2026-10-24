@@ -3,6 +3,7 @@
 //! the names, the hover layer, the popup, the outline of the area.
 
 use crate::layers::{by_feature, label_readable_filter, label_size_expr, minzoom_filter, swap, Exprs};
+use roadstyle_model::flags;
 use serde_json::{json, Map, Value};
 
 /// The columns that export_look reads (its keywords).
@@ -12,10 +13,6 @@ pub struct LookCols<'a> {
     pub tunnel: &'a str,
     pub bridge: &'a str,
     pub id: &'a str,
-}
-
-fn true_values(col: &str, values: &[&str]) -> Value {
-    json!(["in", ["to-string", ["get", col]], ["literal", values]])
 }
 
 /// _mix: "#rrggbb" `a` moved toward `b` by `t` (0 to 1).
@@ -34,9 +31,10 @@ pub fn export_look(look: &crate::Look, cols: &LookCols, positions: &[i64]) -> Re
         v => v.as_str().unwrap_or("").to_string(),
     };
     let classes = t["palettes"][&key].as_object().cloned().unwrap_or_default();
-    let two = json!(["!", true_values(cols.oneway, &["true", "yes", "1", "-1"])]);
-    let tun = true_values(cols.tunnel, &["true", "yes", "1", "building_passage", "culvert"]);
-    let bri = true_values(cols.bridge, &["true", "yes", "1", "viaduct", "aqueduct", "boardwalk", "cantilever", "covered", "movable"]);
+    // the yes/no tags by the engine's rule (roadstyle_model::flags): tunnel=covered is a tunnel here as on the map
+    let two = json!(["!", flags::maplibre_yes(json!(["get", cols.oneway]))]);
+    let tun = flags::maplibre_yes(json!(["get", cols.tunnel]));
+    let bri = flags::maplibre_yes(json!(["get", cols.bridge]));
     let tw = json!(["to-boolean", ["get", "__rs_twoway"]]);
     let fb = &t["roads"]["fallback"];
     let towards = cfg["tunnel_towards"].as_object().cloned().unwrap_or_default();
