@@ -578,3 +578,166 @@ fn worse(local: &AreaSolved, previous: &AreaSolved) -> Option<String> {
     }
     None
 }
+
+/// The level editor's solver in a page (roadstyle-wasm `LevelArea`): an area, the last answer (for the local re-solve) and the
+/// answers as JSON text, with the roads by their ids.
+pub struct Session {
+    pub area: Area,
+    last: Option<AreaSolved>,
+}
+
+/// The local re-solve frees the changed roads and their neighbours this many relations away (roadstyle's level_area.HOPS).
+pub const HOPS: usize = 3;
+
+impl Session {
+    pub fn new(area: Area) -> Session {
+        Session { area, last: None }
+    }
+
+    /// The whole solve with `edits` (edits.csv text).
+    pub fn solve(&mut self, edits: &str) -> Result<String, String> {
+        let s = self
+            .area
+            .solve(&read_rows(edits)?, &HashMap::new(), 20, 1.0)?;
+        let out = self.json(&s, Some("full"), None);
+        self.last = Some(s);
+        Ok(out)
+    }
+
+    /// The solve after a change that names the roads of `changed` (any edge ids): local when it can be, else the whole area.
+    pub fn solve_local(&mut self, edits: &str, changed: &[String]) -> Result<String, String> {
+        let Some(prev) = &self.last else {
+            return self.solve(edits);
+        };
+        let (s, why) = self
+            .area
+            .solve_local(&read_rows(edits)?, prev, changed, HOPS, 20, 1.0)?;
+        let out = self.json(
+            &s,
+            Some(if why.is_some() { "full" } else { "local" }),
+            why.as_deref(),
+        );
+        self.last = Some(s);
+        Ok(out)
+    }
+
+    /// The answer that the page starts from (levels.csv and levels_info.json, not solved again): the numbers of each road in its own
+    /// way (4 for each road, in the roads' order) and the given-up parts, order wishes not kept and near warnings as Python wrote them.
+    pub fn start_from(
+        &mut self,
+        levels: &[i64],
+        given_up_parts: &[(String, String, String)],
+        orders_not_kept: usize,
+        near: usize,
+    ) -> Result<(), String> {
+        let n = self.area.roads.len();
+        if levels.len() != 4 * n {
+            return Err(format!("levels: {} numbers for {n} roads", levels.len()));
+        }
+        let idx = |id: &str| {
+            self.area
+                .road_of(id)
+                .ok_or(format!("levels_info: '{id}' is not a road"))
+        };
+        let part = |p: &str| {
+            PARTS
+                .iter()
+                .position(|x| *x == p)
+                .ok_or(format!("levels_info: the part '{p}'"))
+        };
+        let parts = given_up_parts
+            .iter()
+            .map(|(u, l, h)| Ok((idx(u)?, idx(l)?, part(h)?)))
+            .collect::<Result<Vec<_>, String>>()?;
+        self.last = Some(AreaSolved {
+            levels: levels.chunks(4).map(|c| [c[0], c[1], c[2], c[3]]).collect(),
+            given_up_parts: parts,
+            orders_not_kept: vec![(0, 0); orders_not_kept],
+            near_parts: vec![(0, 0, 0); near],
+            ..Default::default()
+        });
+        Ok(())
+    }
+
+    /// The check before rules are added: `[[index, why, [rule rows]]]` for each of `rows` (CSV text with a header) that conflicts.
+    pub fn check(&self, edits: &str, rows: &str) -> Result<String, String> {
+        let found = self.area.conflicts(&read_rows(edits)?, &read_rows(rows)?)?;
+        let row = |r: &PairRow| {
+            format!(
+                "{{\"relation\":{},\"a\":{},\"b\":{},\"a_end\":{},\"b_end\":{}}}",
+                q(&r.relation),
+                q(&r.a),
+                q(&r.b),
+                q(&r.a_end),
+                q(&r.b_end)
+            )
+        };
+        let items: Vec<String> = found
+            .iter()
+            .map(|(i, why, with)| {
+                format!(
+                    "[{i},{},[{}]]",
+                    q(why),
+                    with.iter().map(row).collect::<Vec<_>>().join(",")
+                )
+            })
+            .collect();
+        Ok(format!("[{}]", items.join(",")))
+    }
+
+    fn json(&self, s: &AreaSolved, how: Option<&str>, why: Option<&str>) -> String {
+        let id = |r: usize| q(&self.area.roads[r].id);
+        let pairs = |v: &[(usize, usize)]| {
+            v.iter()
+                .map(|&(a, b)| format!("[{},{}]", id(a), id(b)))
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        let parts = |v: &[(usize, usize, usize)]| {
+            v.iter()
+                .map(|&(a, b, h)| format!("[{},{},{}]", id(a), id(b), q(PARTS[h])))
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        let levels = s
+            .levels
+            .iter()
+            .map(|v| format!("[{},{},{},{}]", v[0], v[1], v[2], v[3]))
+            .collect::<Vec<_>>()
+            .join(",");
+        let near_pairs: HashSet<(usize, usize)> =
+            s.near_parts.iter().map(|&(u, l, _)| (u, l)).collect();
+        format!(
+            "{{\"levels\":[{levels}],\"given_up\":[{}],\"given_up_parts\":[{}],\"near\":[{}],\"orders_not_kept\":[{}],\"info\":{{\"roads\":{},\
+             \"pairs\":{},\"meets\":{},\"order_pairs\":{},\"order_violations\":{},\"near_warnings\":{},\"solver\":\"rust\",\"status\":\"OPTIMAL\"}},\
+             \"resolve\":{{\"how\":{},\"why\":{}}}}}",
+            pairs(&s.given_up),
+            parts(&s.given_up_parts),
+            parts(&s.near_parts),
+            pairs(&s.orders_not_kept),
+            self.area.roads.len(),
+            s.pairs,
+            s.meets,
+            s.order_pairs,
+            s.orders_not_kept.len(),
+            near_pairs.len(),
+            how.map_or("null".into(), q),
+            why.map_or("null".into(), q),
+        )
+    }
+}
+
+/// A JSON string.
+fn q(s: &str) -> String {
+    let mut out = String::from("\"");
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
