@@ -31,9 +31,11 @@ flowchart TB
 roads are an ordinary style. The dashboard reads only the style. One call goes back to the engine: on a click, a browser page can
 ask the engine for the properties of one road (`engine.props`).*
 
-**1. The Rust engine makes the data.** From the roads and the look, it makes a MapLibre style: the sources, the layers and their
-paint expressions (the widths, the colors, the casings, the drawing order), and the `roadstyle:*` metadata for the dashboard. It
-also makes the vector tiles, one at a time on request or all in one PMTiles archive. The engine never draws.
+**1. The Rust engine makes the data.** From the roads and the look, it makes the pieces of the roads with their values (the
+color, the casing, the place in the drawing order), and a MapLibre style with the rules that read these values (the width for each
+zoom, the color, the sort order) and the `roadstyle:*` metadata for the dashboard. The pieces go into the vector tiles, one tile
+at a time on request or all in one PMTiles archive, or into GeoJSON. The engine never draws
+([the rules and the values](drawing.md#the-rules-are-in-the-style-the-values-are-in-the-data)).
 
 **2. MapLibre GL JS draws.** MapLibre is the JavaScript map library in the browser. It reads the style and the tiles and draws
 them with WebGL. It moves the camera, zooms and tilts the map. It asks for each tile that it needs.

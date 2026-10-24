@@ -27,10 +27,23 @@ flowchart TB
 
 The `"web"` backend makes:
 
-1. **A MapLibre style:** the layers and their paint expressions (the widths for each zoom, the colors, the casing under the fill,
-   the drawing order of bridges and tunnels), and the `roadstyle:*` metadata for the dashboard.
-2. **The road data**, as GeoJSON or as vector tiles (the next section).
+1. **A MapLibre style:** the layers and their rules (the width for each zoom, how to color a piece, how to sort the pieces), and
+   the `roadstyle:*` metadata for the dashboard.
+2. **The road data**, as GeoJSON or as vector tiles: the pieces of the roads (casings and fills) with their values, such as their
+   color and their place in the drawing order ([the next sections](#three-choices-for-the-road-data)).
 3. With `render_edges`: **one HTML page** that holds 1 and 2, MapLibre and the dashboard.
+
+### The rules are in the style, the values are in the data
+
+| | In the data (tiles or GeoJSON), for each piece | In the style, one time for all pieces |
+|---|---|---|
+| The drawing order | its numbers: `__rs_s` (the sort number), `__rs_cl`, `__rs_fl` (its positions) | the rule: `"line-sort-key": ["get", "__rs_s"]` (simple mode), or one layer for each position (full look) |
+| The casing | the casing pieces, with their kind (`__rs_k`) and their casing color (`__rs_casing`) | the rule: the casing width for each class and zoom, and the color from `__rs_casing` |
+| The color | the fill color of the road (`__rs_fill`) | the rule: `"line-color"` reads `__rs_fill`, or the state of the Colour by menu |
+
+roadstyle computes the values from the levels and the look, when it cuts the roads into pieces. MapLibre joins the two when it
+draws: it reads each piece's values from the data and applies the rules of the style. Thus the style has the same layers for 1,000
+roads or for 100,000 roads (Monaco, simple mode: 7 layers, 91 KB), and only the data grows.
 
 MapLibre reads the style and the data and draws them with WebGL. It draws a new frame each time that the view or a filter
 changes.
