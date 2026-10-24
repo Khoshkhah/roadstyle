@@ -1283,7 +1283,10 @@ reads the static files from `src/roadstyle/` when it is built; a crates.io packa
 - **Approved 2026-10-23, at the end of the design queue (below).** The Rust engine becomes roadstyle's default. Python's style code that
   Rust replaces is deleted, not kept as a second engine: most of `render_web.py` (3,802 lines today), the style parts of `levels.py`
   (826), `tiles.py` (240) and `stylers.py` (482): about 4,500 to 5,000 lines (an estimate). The Python API, folium, lonboard and the
-  notebook tools stay. Then a 1.0 release; the publish waits for Kaveh's last OK.
+  notebook tools stay. Then a 1.0 release; the publish waits for the owner's last OK.
+- **Packaging (audit 3, N25, 2026-10-24).** The crates read files from `src/roadstyle/` when they are built (the profiles, the palettes,
+  the templates, the dashboard), so no crate can be published alone. P7's packaging gives the crates their own copy of these files, or
+  one data crate.
 
 #### The design queue (2026-10-23)
 
@@ -1320,7 +1323,7 @@ R12, R13 and the `compute_levels` options belong to the levels session; R20 (the
 
 #### After P7: every part in Rust (2026-10-24)
 
-Kaveh's decision: "we rewrite every part by rust". The Python package becomes a thin binding with no logic of its own: the API
+The owner's decision: "we rewrite every part by rust". The Python package becomes a thin binding with no logic of its own: the API
 (`render_edges`, `export_inline`, `export_style`, `compute_levels`, ...) checks and passes its arguments to the Rust engine and gives back
 what it returns. folium and lonboard stay thin Python wrappers (they are Python libraries), and they take their data from the Rust engine.
 Each part below is its own step after P7:
@@ -1344,6 +1347,13 @@ EGL, GL and fontconfig (`-dev` packages). It is an option after P7, for pictures
 
 A1 to A4 touch other files (a program crate each, the studio's page) and can run as parallel sessions; each needs only the facade's
 public calls. A5 is the levels session's.
+
+Library switches (2026-10-24). Before P7: the PMTiles writer (`roadstyle-tiles/src/pmtiles.rs`) becomes the `pmtiles` crate's writer,
+in N22 (one tile writer), if it builds for wasm32. After P7, because they change bytes and must wait until Rust is the reference: the
+MVT encoder (`mvt` or `geozero`), the geometry helpers (`geo`: simplify, interpolate, line locate; `cavalier_contours` for offsets),
+the GeoParquet metadata (`geoparquet` or `geoarrow`, when they reach 1.0), and the removal of the Python-style JSON writer and rounding
+(`pyjson`, `py_round`). These stay as they are: the level solver, parquet and arrow, shapefile, proj4rs, i_overlay, rusqlite, rstar,
+sha2 and yaml-rust2.
 
 #### A2: the MCP server in Rust
 
@@ -1597,6 +1607,13 @@ Decisions 1 to 8 were agreed on 2026-10-23, each as recommended. Decision 9 is o
 | # | Open decision | Recommendation | The other choice |
 |---|---|---|---|
 | 9 | The runtime API of the dashboard | One typed `rs` object from `rsDashboard`, with `getState`, `setState` and `on()`; the `window.rs*` names as aliases for one minor version | Keep the `window.rs*` functions as the API |
+
+Later decisions:
+
+- 2026-10-24: duckosm-rust is made public.
+- 2026-10-24: P7 and 1.0 approved, on the condition that the coordinator reports the design steps done (R3, R1/R4, (d), (e), dead
+  code, the third audit and its top items), with both engine suites and CI green. The publish of 1.0 waits for the owner's answer to
+  that report.
 
 ## Found during the inventory
 

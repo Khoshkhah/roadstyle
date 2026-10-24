@@ -1660,19 +1660,29 @@ def _state_expressions(style, props, fill_ids, end_fill_ids, end_casing_ids, ov_
 
 
 # the roles of a page's sources (roadstyle:sources): roadstyle's own, not the base map's
-_ROLES = {"roads", "simple", "slots", "arrows", "decks", "shadows", "casings", "halves", "ends", "boundary"}
+_ROLES = {"roads", "simple", "slots", "arrows", "decks", "shadows", "casings", "halves", "ends"}     # roads, casings, halves, ends: the full look
 
 
 def _roles(layers):
-    """roadstyle:sources: each role of the page (a source's name in the GeoJSON way, a tile layer's in the tile way), in the order of its
-    first layer, with its source and its source layer (None for a GeoJSON source)."""
+    """roadstyle:sources: each road role of the page (a source's name in the GeoJSON way, a tile layer's in the tile way), in the order
+    of its first layer, with its source and its source layer (None for a GeoJSON source). The overlays are not roles: they have their
+    own list (the option ``overlays``), and the boundary is not a road (R7)."""
     out = {}
     for lyr in layers:
         src, sl = lyr.get("source"), lyr.get("source-layer")
         role = sl or src
-        if role and (role in _ROLES or (role.startswith("ov") and role[2:].isdigit())) and role not in out:
+        if role and role in _ROLES and role not in out:
             out[role] = {"source": src, "layer": sl}
     return out
+
+
+def _pick_layers(layers):
+    """The layers that a road is picked on (clicked, hovered), roadstyle:controls' ``pick`` (contract::pick_layers): the road layer of simple
+    mode (the full look: its fill layers, not the halves'), and the 3D decks' tops (not their casing). A caller's items are in ``overlays``."""
+    simple = any(lyr["id"] == "roads-simple" for lyr in layers)
+    fill = ("roads-fill", "roads-low-fill", "roads-high-fill", "roads-bridge-fill")
+    return [lyr["id"] for lyr in layers if (lyr["id"] == "roads-simple" if simple else lyr["id"].startswith(fill) and lyr.get("source") != "halves")
+            or lyr["id"].startswith("roads-bridge-decks")]
 
 
 def _arrow_kind(layers):
@@ -3867,7 +3877,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                        "steps": THEME["tunnels"]["steps"], "ratios": THEME["tunnels"]["ratios"],
                        "toward": tun_toward, "towards": CONFIG.tunnel_towards,
                        "to": {**_TUN_TO, "fill": tun_colour}, "control": bool(tunnel_control and tun_paint)},
-            "fill_layers": [] if lean else _fill_layer_ids(levels), "road_fill": {"on": bool(road_fill), "paint": fill_paint}, "views": view_list,
+            "fill_layers": [] if lean else _fill_layer_ids(levels), "pick": _pick_layers(style["layers"]), "road_fill": {"on": bool(road_fill), "paint": fill_paint}, "views": view_list,
             "items": {"label": "items", "popup": items_popup, "layer": "roads-simple"} if road_items is not None else None,
             "road_popup": popup_fields if popup_on else False, "road_tooltip": road_tooltip, "hover_delay_ms": int(hover_delay_ms),
             "edge_id_col": edge_id_col, "arrow_icon": arw["icon"], "arrow_color": arw["color"],

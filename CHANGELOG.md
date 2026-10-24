@@ -33,6 +33,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   look, options, given?)` call it. Python gives only what it alone knows: the data steps, the look's options, the base maps' keys and the
   Google Maps key. A view's palette resolves its look in Rust (Python makes no extra looks). The page writer gzips the road table and
   the big sources itself; the two engines' pages are the same byte for byte but these blobs, which are the same when read back.
+- **The dashboard gets its road layers from the engine** (R7, both engines). `roadstyle:sources` has only the road roles: the
+  overlays (`ov<i>`) are in their own list, `overlays`, and the boundary is not a road. The new control `pick` lists the layers that a
+  road is picked on: `roads-simple` (the full look: its fill layers) and the 3D decks' tops, not their casing.
 - **`roadstyle:controls` has no page keywords** (rule 5, R3). It has the facts of the look and of the roads that a host's dashboard
   needs (the filter panel, the overlays, the tunnel look, `select_color`, `pitch_3d`, ...). `tiles` and `views` are not in it any more:
   they are the caller's page keywords, which the page gives in `RS_OPTIONS` and a host gives to `rsDashboard` itself.
