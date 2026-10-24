@@ -2,6 +2,7 @@
 //! flow on the arcs of reduced cost 0). The costs of the levels are small (0, -1 and the span), so there are few
 //! rounds. docs/levels.md, "The finding".
 
+use crate::Error;
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, VecDeque};
 
@@ -34,14 +35,14 @@ impl Network {
     /// potential: the reduced cost `cost + pi[from] - pi[to]` of each arc without a limit must not be negative. The
     /// arcs with a limit and a negative reduced cost start full. Returns the flow, and the potentials in `pi`. After
     /// the solve, the flow and `pi` are checked: they agree (complementary slackness), so the flow is the best one.
-    pub fn solve(&self, supply: &[i64], pi: &mut [i64]) -> Result<Vec<i64>, String> {
+    pub fn solve(&self, supply: &[i64], pi: &mut [i64]) -> Result<Vec<i64>, Error> {
         let (n, m) = (self.nodes, self.from.len());
         let mut flow = vec![0i64; m];
         let mut excess = supply.to_vec();
         for k in 0..m {
             if self.reduced(k, pi) < 0 {
                 if self.cap[k] >= INF {
-                    return Err("the hard rules have no solution (a loop of rules)".into());
+                    return Err(Error::NoSolution("the hard rules have no solution (a loop of rules)".into()));
                 }
                 flow[k] = self.cap[k];
                 excess[self.from[k] as usize] -= flow[k];
@@ -103,7 +104,7 @@ impl Network {
                 }
             }
             let reach =
-                reach.ok_or("the supplies cannot be sent (no path to a node that takes them)")?;
+                reach.ok_or(Error::NoSolution("the supplies cannot be sent (no path to a node that takes them)".into()))?;
             for v in 0..n {
                 pi[v] += dist[v].min(reach);
             }
@@ -169,7 +170,7 @@ impl Network {
             }
         }
         if excess.iter().any(|&e| e != 0) {
-            return Err("the supplies do not sum to 0".into());
+            return Err(Error::Check("the supplies do not sum to 0".into()));
         }
         self.check(supply, &flow, pi)?;
         Ok(flow)
@@ -226,24 +227,24 @@ impl Network {
 
     /// The proof that `flow` is the best flow: it keeps the supplies and the capacities, and no arc has a reduced
     /// cost against it (negative with room, or positive with flow).
-    fn check(&self, supply: &[i64], flow: &[i64], pi: &[i64]) -> Result<(), String> {
+    fn check(&self, supply: &[i64], flow: &[i64], pi: &[i64]) -> Result<(), Error> {
         let mut net = supply.to_vec();
         for k in 0..self.from.len() {
             let f = flow[k];
             if f < 0 || f > self.cap[k] || f >= INF {
-                return Err(format!("flow check: arc {k} has the flow {f}"));
+                return Err(Error::Check(format!("flow check: arc {k} has the flow {f}")));
             }
             net[self.from[k] as usize] -= f;
             net[self.to[k] as usize] += f;
             let rc = self.reduced(k, pi);
             if (rc < 0 && f < self.cap[k]) || (rc > 0 && f > 0) {
-                return Err(format!(
+                return Err(Error::Check(format!(
                     "flow check: arc {k} has the reduced cost {rc} and the flow {f}"
-                ));
+                )));
             }
         }
         if net.iter().any(|&e| e != 0) {
-            return Err("flow check: a supply is not kept".into());
+            return Err(Error::Check("flow check: a supply is not kept".into()));
         }
         Ok(())
     }

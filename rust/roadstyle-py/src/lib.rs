@@ -330,7 +330,7 @@ fn solve_rules(py: Python<'_>, roads: usize, meets: Vec<(usize, usize, usize, us
                near: Vec<(usize, usize, usize)>, orders: Vec<(usize, usize)>, fixed: Vec<(usize, [i64; 4])>, steps: i64, min_positions: bool)
                -> PyResult<(Vec<[i64; 4]>, Vec<(usize, usize, usize)>, Vec<(usize, usize)>, Vec<(usize, usize, usize)>)> {
     let rules = roadstyle::levels::solve::Rules { roads, meets, lifts, orders, near, fixed };
-    let s = py.detach(|| roadstyle::levels::solve::solve(&rules, steps, min_positions)).map_err(PyValueError::new_err)?;
+    let s = py.detach(|| roadstyle::levels::solve::solve(&rules, steps, min_positions)).map_err(|e| PyValueError::new_err(e.to_string()))?;
     Ok((s.parts, s.given_up_parts, s.orders_not_kept, s.near_not_kept))
 }
 
@@ -400,7 +400,7 @@ fn make_area(py: Python<'_>, edges: &Bound<'_, PyAny>, folder: String, id_col: S
     let edges = stream(edges)?;
     py.detach(|| {
         let table = roadstyle::read::roads_from(edges, "geometry")?;
-        roadstyle::level_area::make_area(&table, std::path::Path::new(&folder), &o).map(|m| (m.roads, m.pairs, m.warnings))
+        roadstyle::level_area::make_area(&table, std::path::Path::new(&folder), &o).map(|f| (f.made.roads, f.made.pairs, f.made.warnings))
     }).map_err(|e: String| PyValueError::new_err(e))
 }
 
@@ -430,8 +430,8 @@ fn duckosm_catalog_sql(catalog: &str) -> [String; 2] {
 /// duckosm_plan(tables, columns, mode, tags, specs, only=False) -> str: the SQL that reads a duckOSM file (roadstyle_io::duckosm, the one
 /// copy of it), as JSON text: {"roads": [3 statements] (null when the file has no network of `mode`: "roads_error" says why), "meta": the stored levels' query or null (tags), "select": the roads of `mode`,
 /// "layers": [{"spec", "name", "sql": [the queries in order]}] for the base map (`specs`: layers.yaml's layers as JSON text), "subset":
-/// with `only` (the map of `mode` alone), the queries of its roads with no stored levels and of its edge_ids}. `tables` and `columns`: the rows of the
-/// catalog's information_schema.
+/// with `only` (the map of `mode` alone), the queries of its roads with no stored levels and of its edge_ids, "level_edges": the edges of the
+/// file's level area (duckOSM's load_roads)}. `tables` and `columns`: the rows of the catalog's information_schema.
 #[pyfunction]
 #[pyo3(signature = (tables, columns, mode, tags, specs, only=false))]
 fn duckosm_plan(tables: Vec<(String, String)>, columns: Vec<(String, String, String)>, mode: &str, tags: bool, specs: &str, only: bool)
@@ -449,7 +449,8 @@ fn duckosm_plan(tables: Vec<(String, String)>, columns: Vec<(String, String, Str
         .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "sql": l.sql})).collect();
     let meta = (!tags).then_some(duckosm::LEVELS_META_SQL);
     let subset = (only && !tags).then_some([duckosm::SUBSET_SQL, duckosm::IDS_SQL]);
-    Ok(serde_json::json!({"roads": roads, "roads_error": roads_error, "meta": meta, "select": select, "layers": layers, "subset": subset}).to_string())
+    Ok(serde_json::json!({"roads": roads, "roads_error": roads_error, "meta": meta, "select": select, "layers": layers, "subset": subset,
+                          "level_edges": duckosm::level_edges_sql(&cat).ok()}).to_string())
 }
 
 /// duckosm_levels(row) -> str: the look's keyword `levels` (JSON text) from the stored levels' metadata row (source, n_edges, edge_hash),
@@ -475,20 +476,20 @@ fn duckosm_features_select(specs: Vec<usize>) -> Option<String> {
     roadstyle::duckosm::features_select(&specs)
 }
 
-/// serve(area, port, page=None): roadstyle serve (roadstyle-cli) in a thread of its own: the level editor's page files (in the extension,
+/// serve(area, port, page=None): roadstyle serve (roadstyle-serve) in a thread of its own: the level editor's page files (in the extension,
 /// or the folder `page`) at / and the area folder at /area/, on 127.0.0.1. Returns at once; the server stops with the Python process
 /// (roadstyle-levels edit waits for Ctrl+C). An error when the extension has no editor WebAssembly package (build_editor.sh, then build).
 #[pyfunction]
 #[pyo3(signature = (area, port, page=None))]
 fn serve(area: String, port: u16, page: Option<String>) -> PyResult<()> {
-    let page = page.map_or(roadstyle_cli::Page::Embedded, |p| roadstyle_cli::Page::Dir(p.into()));
-    if matches!(page, roadstyle_cli::Page::Embedded) && !roadstyle_cli::EMBEDDED.iter().any(|(n, _)| n.ends_with("_bg.wasm")) {
+    let page = page.map_or(roadstyle_serve::Page::Embedded, |p| roadstyle_serve::Page::Dir(p.into()));
+    if matches!(page, roadstyle_serve::Page::Embedded) && !roadstyle_serve::EMBEDDED.iter().any(|(n, _)| n.ends_with("_bg.wasm")) {
         return Err(PyValueError::new_err("this build has no WebAssembly package of the level editor: run rust/roadstyle-wasm/build_editor.sh, \
                                           then build the extension again (python rust/roadstyle-py/build.py), or use --engine python"));
     }
     // bind here, so an error (the port in use) comes back to Python
     std::net::TcpListener::bind(("127.0.0.1", port)).map_err(|e| PyValueError::new_err(format!("127.0.0.1:{port}: {e}")))?;
-    std::thread::spawn(move || roadstyle_cli::serve(std::path::Path::new(&area), page, port));
+    std::thread::spawn(move || roadstyle_serve::serve(std::path::Path::new(&area), page, port));
     Ok(())
 }
 

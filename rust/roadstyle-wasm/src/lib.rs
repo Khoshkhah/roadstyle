@@ -104,6 +104,61 @@ mod wasm {
         roadstyle::make_style(parquet, &look.0, features, planner, name).map_err(|e| JsError::new(&e))
     }
 
+    /// makeArea(edges: Uint8Array, options?: string) -> AreaFiles: a level area's files in memory (roadstyle::level_area::make_files), for
+    /// a page with no server: `edges` is GeoParquet of the area's edges (the line in `geometry`, longitude and latitude; a duckOSM file's:
+    /// duckosmPlan's "level_edges"); `options` the JSON text of {"id_col", "highway_col", "layer_col", "bridge_col", "tunnel_col",
+    /// "junction_col", "band_col", "order" ("priority", "class", a column, or null), "band_dist", "head_m", "near_rules", "heads" (heads.csv
+    /// text)}, each optional (make_area's defaults).
+    #[wasm_bindgen(js_name = makeArea)]
+    pub fn make_area(edges: Vec<u8>, options: Option<String>) -> Result<AreaFiles, JsError> {
+        let o: serde_json::Value = serde_json::from_str(options.as_deref().unwrap_or("{}")).map_err(|e| JsError::new(&format!("options: {e}")))?;
+        let d = roadstyle::level_area::MakeOptions::default();
+        let text = |k: &str, d: String| o[k].as_str().map_or(d, String::from);
+        let num = |k: &str, d: f64| o[k].as_f64().unwrap_or(d);
+        let m = roadstyle::level_area::MakeOptions {
+            id_col: text("id_col", d.id_col), highway_col: text("highway_col", d.highway_col), layer_col: text("layer_col", d.layer_col),
+            bridge_col: text("bridge_col", d.bridge_col), tunnel_col: text("tunnel_col", d.tunnel_col), junction_col: text("junction_col", d.junction_col),
+            band_col: o["band_col"].as_str().map(String::from),
+            order: if o.get("order").is_some() { o["order"].as_str().filter(|v| *v != "none").map(String::from) } else { d.order },
+            band_dist: num("band_dist", d.band_dist), head_m: num("head_m", d.head_m), near_rules: o["near_rules"].as_bool().unwrap_or(d.near_rules),
+        };
+        let table = roadstyle::read::read_roads(edges, "geometry").map_err(|e| JsError::new(&e.to_string()))?;
+        roadstyle::level_area::make_files(&table, &m, o["heads"].as_str().unwrap_or("")).map(AreaFiles).map_err(|e| JsError::new(&e))
+    }
+
+    /// A level area's files (makeArea): `roads` (roads.parquet's bytes, for new LevelArea), `pairs` and `edits` (pairs.csv and an empty
+    /// edits.csv), the numbers of roads and pairs, and the warnings.
+    #[wasm_bindgen]
+    pub struct AreaFiles(roadstyle::level_area::AreaFiles);
+
+    #[wasm_bindgen]
+    impl AreaFiles {
+        #[wasm_bindgen(getter)]
+        pub fn roads(&self) -> Vec<u8> {
+            self.0.roads.clone()
+        }
+        #[wasm_bindgen(getter)]
+        pub fn pairs(&self) -> String {
+            self.0.pairs.clone()
+        }
+        #[wasm_bindgen(getter)]
+        pub fn edits(&self) -> String {
+            self.0.edits.clone()
+        }
+        #[wasm_bindgen(getter, js_name = roadCount)]
+        pub fn road_count(&self) -> usize {
+            self.0.made.roads
+        }
+        #[wasm_bindgen(getter, js_name = pairCount)]
+        pub fn pair_count(&self) -> usize {
+            self.0.made.pairs
+        }
+        #[wasm_bindgen(getter)]
+        pub fn warnings(&self) -> Vec<String> {
+            self.0.made.warnings.clone()
+        }
+    }
+
     /// The level editor in the page (roadstyle::level_editor): new LevelArea(roads.parquet of the area, pairs.csv text). Each answer is JSON
     /// text: the numbers of each road in the roads' order, the rules not kept (by road id) and the counts.
     #[wasm_bindgen]
@@ -117,12 +172,12 @@ mod wasm {
         }
         /// The whole solve with the edits (edits.csv text).
         pub fn solve(&mut self, edits: &str) -> Result<String, JsError> {
-            self.0.solve(edits).map_err(|e| JsError::new(&e))
+            self.0.solve(edits).map(|a| a.to_json().to_string()).map_err(|e| JsError::new(&e))
         }
         /// The solve after a change that names the roads of `changed` (edge ids): the roads around it, else the whole area.
         #[wasm_bindgen(js_name = solveLocal)]
         pub fn solve_local(&mut self, edits: &str, changed: Vec<String>) -> Result<String, JsError> {
-            self.0.solve_local(edits, &changed).map_err(|e| JsError::new(&e))
+            self.0.solve_local(edits, &changed).map(|a| a.to_json().to_string()).map_err(|e| JsError::new(&e))
         }
         /// The answer to start from (levels.csv, levels_info.json): 4 numbers for each road; the given-up parts as "upper|lower|part".
         #[wasm_bindgen(js_name = startFrom)]
@@ -136,7 +191,7 @@ mod wasm {
         }
         /// The check before rules are added (rows: CSV text with a header): [[index, why, [rule rows]]].
         pub fn check(&self, edits: &str, rows: &str) -> Result<String, JsError> {
-            self.0.check(edits, rows).map_err(|e| JsError::new(&e))
+            self.0.check(edits, rows).map(|c| roadstyle::level_editor::conflicts_json(&c).to_string()).map_err(|e| JsError::new(&e))
         }
         /// What the panel shows of each road, a list in the roads' order.
         pub fn facts(&self) -> String {
@@ -319,7 +374,7 @@ mod wasm {
     /// queries in order}]}. `catalog`: the JSON text of {"name", "tables":
     /// [[schema, table]], "columns": [[schema, table, column]]} (with no tables: only "catalog" is in the answer); `specs`: layers.yaml's
     /// layers as JSON text. `only`: the map of `mode` alone; then "subset" has the queries of its roads with no stored levels and
-    /// of its edge_ids (for duckosmSubsetLevels).
+    /// of its edge_ids (for duckosmSubsetLevels). "level_edges": the edges of the file's level area (duckosm::level_edges_sql), for makeArea.
     #[wasm_bindgen(js_name = duckosmPlan)]
     pub fn duckosm_plan(catalog: &str, mode: &str, tags: bool, specs: &str, only: Option<bool>) -> Result<String, JsError> {
         let only = only.unwrap_or(false);
@@ -344,7 +399,8 @@ mod wasm {
         };
         Ok(serde_json::json!({"catalog": queries, "roads": roads, "roads_error": roads_error, "meta": (!tags).then_some(duckosm::LEVELS_META_SQL),
                               "select": duckosm::roads_select(mode).map_err(String::from).map_err(err)?, "layers": layers,
-                              "subset": (only && !tags).then_some([duckosm::SUBSET_SQL, duckosm::IDS_SQL])}).to_string())
+                              "subset": (only && !tags).then_some([duckosm::SUBSET_SQL, duckosm::IDS_SQL]),
+                              "level_edges": duckosm::level_edges_sql(&cat).ok()}).to_string())
     }
 
     /// duckosmLevels(source?, nEdges?, edgeHash?) -> string: the look's keyword `levels` (JSON text) from the stored levels' metadata row

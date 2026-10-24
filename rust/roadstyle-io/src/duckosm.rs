@@ -244,6 +244,55 @@ fn rings(g: &Geometries, row: usize) -> Result<Vec<Vec<[f64; 2]>>, Error> {
     }
 }
 
+/// The optional columns of a level area's edges (duckOSM's levels.OPTIONAL).
+const LEVEL_OPTIONAL: [&str; 5] = ["walk_type", "junction", "name", "edge_ref", "lanes"];
+
+/// The edges of a level area of a duckOSM file (duckOSM's levels.load_roads, the input of `duckosm levels` and of make_area): one row for
+/// each edge_id of every mode's edges and private_edges, in edge_id order, the attributes of its first row (the modes in the order
+/// driving, walking, cycling, `edges` before `private_edges`); `driving` and `cycling` (in that mode's network); `oneway` (the driving
+/// network's, NULL off it); `modes` ("driving + walking"; a cycling edge where bikes are pushed is walked; a private road only: its
+/// modes with " (private)"; "bus" where a bus route runs); `bus_lines` (the refs of bus.route_edges, "1, 2, 5"); the line as WKB in
+/// `geometry`. A SELECT: a page writes it as Parquet (`COPY (...) TO`) for makeArea.
+pub fn level_edges_sql(cat: &Catalog) -> Result<String, Error> {
+    let modes: Vec<&str> = MODES.iter().copied().filter(|m| cat.has_table(m, "edges")).collect();
+    if modes.is_empty() {
+        return Err(Error::Options(format!("no <mode>.edges table in this file (modes: {})", MODES.join(", "))));
+    }
+    let col = |m: &str, t: &str, c: &str| if cat.has_column(m, t, c) { c.to_string() } else { "NULL".into() };
+    let part = |m: &str, t: &str, mode: &str, pmode: &str, rank: usize| format!(
+        "SELECT edge_id, highway, layer, bridge, tunnel, geometry, {}, {} AS oneway, {} AS dismount, {mode} AS mode, {pmode} AS pmode, {rank} AS rank FROM {m}.{t}",
+        LEVEL_OPTIONAL.iter().map(|c| format!("{} AS {c}", col(m, t, c))).collect::<Vec<_>>().join(", "), col(m, t, "oneway"), col(m, t, "dismount"));
+    let union = modes.iter().enumerate().map(|(i, m)| part(m, "edges", &format!("'{m}'"), "NULL", i))
+        .chain(modes.iter().enumerate().filter(|(_, m)| cat.has_table(m, "private_edges"))
+               .map(|(i, m)| part(m, "private_edges", "NULL", &format!("'{m}'"), MODES.len() + i)))
+        .collect::<Vec<_>>().join(" UNION ALL ");
+    // a cycling edge where bikes are pushed (dismount) is walked
+    let walked = |c: &str| format!("CASE WHEN {c} = 'cycling' AND coalesce(dismount, false) THEN 'walking' ELSE {c} END");
+    let has = |list: &str, m: &str, suffix: &str| format!("CASE WHEN list_contains({list}, '{m}') THEN '{m}{suffix}' END");
+    let joined = |list: &str, suffix: &str| format!("NULLIF(concat_ws(' + ', {}), '')", MODES.iter().map(|m| has(list, m, suffix)).collect::<Vec<_>>().join(", "));
+    let (bus_join, bus) = if cat.has_table("bus", "route_edges") {
+        // the bus lines in natural order: numbers before letters, 2 before 11
+        ("LEFT JOIN (SELECT edge_id, string_agg(x, ', ' ORDER BY NOT regexp_full_match(x, '[0-9]+'), \
+          CASE WHEN regexp_full_match(x, '[0-9]+') THEN CAST(x AS BIGINT) ELSE 0 END, x) AS bus_lines \
+          FROM (SELECT DISTINCT edge_id, coalesce(ref, CAST(route_id AS VARCHAR)) AS x FROM bus.route_edges) GROUP BY edge_id) b USING (edge_id)", "b.bus_lines")
+    } else {
+        ("", "CAST(NULL AS VARCHAR)")
+    };
+    Ok(format!("SELECT edge_id, highway, layer, bridge, tunnel, {}, driving, cycling, oneway,
+       NULLIF(concat_ws(' + ', coalesce({}, {}), CASE WHEN {bus} IS NOT NULL THEN 'bus' END), '') AS modes, {bus} AS bus_lines, geometry
+FROM (SELECT edge_id, first(highway ORDER BY rank) AS highway, first(layer ORDER BY rank) AS layer, first(bridge ORDER BY rank) AS bridge,
+             first(tunnel ORDER BY rank) AS tunnel, {},
+             list(DISTINCT {}) FILTER (WHERE mode IS NOT NULL) AS mode_list,
+             list(DISTINCT {}) FILTER (WHERE pmode IS NOT NULL) AS private_list,
+             coalesce(bool_or(mode = 'driving'), false) AS driving, coalesce(bool_or(mode = 'cycling'), false) AS cycling,
+             bool_or(oneway) FILTER (WHERE mode = 'driving') AS oneway, ST_AsWKB(first(geometry ORDER BY rank)) AS geometry
+      FROM ({union}) GROUP BY edge_id) {bus_join}
+ORDER BY edge_id",
+        LEVEL_OPTIONAL.join(", "), joined("mode_list", ""), joined("private_list", " (private)"),
+        LEVEL_OPTIONAL.iter().map(|c| format!("first({c} ORDER BY rank) AS {c}")).collect::<Vec<_>>().join(", "),
+        walked("mode"), walked("pmode")))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

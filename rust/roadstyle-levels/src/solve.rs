@@ -2,6 +2,7 @@
 //! flows. Each stage keeps the best value of the stage before it: a rule with flow holds as an equality, a soft rule
 //! that the stage did not break becomes hard, and a broken rule holds in the other direction.
 
+use crate::Error;
 use super::flow::{Network, INF};
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
@@ -50,7 +51,7 @@ enum Kind {
 
 /// The numbers are in a box of `steps + 1` values (roadstyle's `2 * max_level / margin`); `min_positions`: the span of the numbers is
 /// as small as possible.
-pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, String> {
+pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, Error> {
     let n = rules.roads;
     if n == 0 {
         return Ok(Solved::default());
@@ -197,10 +198,10 @@ pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, S
 /// The check of an answer: every hard rule holds. Each casing part is not over its fill, the heads of two roads that meet are not
 /// over the other road's fill, the fixed numbers are as given, and every number is in the box `[0, steps]` (all against node 0,
 /// the last node). The stack rules, the order wishes and the near rules can break: the solve gives the broken ones.
-fn feasible(rules: &Rules, x: &[i64], steps: i64) -> Result<(), String> {
+fn feasible(rules: &Rules, x: &[i64], steps: i64) -> Result<(), Error> {
     let n = rules.roads;
     let (col, z) = (|r: usize, h: usize| n + 3 * r + h, x[x.len() - 1]);
-    let bad = |what: String| Err(format!("levels: the answer breaks a hard rule ({what})"));
+    let bad = |what: String| Err(Error::Check(format!("levels: the answer breaks a hard rule ({what})")));
     for r in 0..n {
         for h in 0..3 {
             if x[col(r, h)] > x[r] {
@@ -252,7 +253,7 @@ fn network(
 
 /// Potentials for the hard rules (the reduced cost of each arc is not negative): the shortest distances from an extra
 /// node with an arc of cost 0 to each node, by a Bellman-Ford with a queue. An error when the rules have no solution.
-fn potentials(arcs: &[(usize, usize, i64, Kind)], nodes: usize) -> Result<Vec<i64>, String> {
+fn potentials(arcs: &[(usize, usize, i64, Kind)], nodes: usize) -> Result<Vec<i64>, Error> {
     let mut out: Vec<Vec<(usize, i64)>> = vec![Vec::new(); nodes];
     for &(i, j, w, kind) in arcs {
         if kind == Kind::Hard {
@@ -272,7 +273,7 @@ fn potentials(arcs: &[(usize, usize, i64, Kind)], nodes: usize) -> Result<Vec<i6
                     count[v] += 1;
                     if count[v] > nodes {
                         return Err(
-                            "levels: the fixed numbers and the hard rules have no solution".into(),
+                            Error::NoSolution("levels: the fixed numbers and the hard rules have no solution".into()),
                         );
                     }
                     queued[v] = true;

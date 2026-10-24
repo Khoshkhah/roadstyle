@@ -14,7 +14,7 @@ fn data(name: &str) -> PathBuf {
 
 fn area() -> Area {
     let rows = roadstyle_rs::read::read_table(std::fs::read(data("roads.parquet")).unwrap(), "geometry").unwrap();
-    let id = |v: &Value| v.as_str().unwrap().parse::<i64>().unwrap();
+    let id = |v: &Value| v.as_i64().unwrap();      // roads.parquet has the ids as Int64
     let ids = |v: &Value| v.as_array().unwrap().iter().map(id).collect();
     let roads = rows.iter().map(|r| AreaRoad { id: id(&r.cols["road"]), edges: ids(&r.cols["edges"]), reversed: ids(&r.cols["reversed"]) })
         .collect();
@@ -36,7 +36,7 @@ fn the_solve_with_edits_and_the_local_re_solve() {
     assert!(local.levels.iter().all(|v| v[0].max(v[1]).max(v[2]) <= v[3]), "{how:?}");
     // a rule that switches off a rule that is not there
     let off = PairRow { a: order.b, b: order.a, enabled: false, ..order };
-    assert!(a.merged(&[off]).unwrap_err().contains("to switch off"));
+    assert!(matches!(a.merged(&[off]).unwrap_err(), roadstyle_rs::levels::Error::Edits(m) if m.contains("to switch off")));
 }
 
 #[test]
@@ -60,7 +60,7 @@ fn the_check_before_a_rule_is_added_as_roadstyle() {
 fn make_gives_roadstyle_s_input() {
     let dir = std::env::temp_dir().join(format!("roadstyle-make-{}", std::process::id()));
     let table = roadstyle_rs::read::read_roads(std::fs::read(data("edges.parquet")).unwrap(), "geometry").unwrap();
-    let made = roadstyle_rs::level_area::make_area(&table, &dir, &Default::default()).unwrap();
+    let made = roadstyle_rs::level_area::make_area(&table, &dir, &Default::default()).unwrap().made;
     let lines = |p: PathBuf| {
         let mut l: Vec<String> = std::fs::read_to_string(p).unwrap().lines().map(String::from).collect();
         l.sort();
