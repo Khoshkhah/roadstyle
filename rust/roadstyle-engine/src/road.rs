@@ -117,20 +117,20 @@ impl<'a> Road<'a> {
         self.iter().map(|(k, v)| (k.to_string(), v.to_value())).collect()
     }
 
-    /// The JSON text of the properties, as serde_json writes the `Map` of `to_map`, with the output's names (`name`), those that
-    /// `keep` takes (by the output's name).
-    pub fn write_json<'n>(self, out: &mut Vec<u8>, name: impl Fn(&'n str) -> &'n str, keep: impl Fn(&str) -> bool) where 'a: 'n {
-        out.push(b'{');
-        for (n, (k, v)) in self.iter().map(|(k, v)| (name(k), v)).filter(|(k, _)| keep(k)).enumerate() {
-            if n > 0 {
-                out.push(b',');
-            }
-            serde_json::to_writer(&mut *out, k).unwrap();
-            out.push(b':');
-            serde_json::to_writer(&mut *out, &v).unwrap();
+}
+
+/// The JSON text of a road's properties, as serde_json writes them as a `Map`.
+fn write_props<'a>(out: &mut Vec<u8>, props: impl Iterator<Item = (&'a str, Cell<'a>)>) {
+    out.push(b'{');
+    for (n, (k, v)) in props.enumerate() {
+        if n > 0 {
+            out.push(b',');
         }
-        out.push(b'}');
+        serde_json::to_writer(&mut *out, k).unwrap();
+        out.push(b':');
+        serde_json::to_writer(&mut *out, &v).unwrap();
     }
+    out.push(b'}');
 }
 
 impl Get for Road<'_> {
@@ -150,6 +150,8 @@ pub struct RoadsSource {
     pub names: Vec<(&'static str, String)>,
     /// the style has the source `roads` (the export); a page has none: its pieces draw, and the road table has the fields and the lines
     pub in_style: bool,
+    /// R1: the only stage values (`__rs_*`) that a road keeps (`Sources::set_reads`), None: all; its fields stay
+    pub read: Option<std::collections::HashSet<String>>,
 }
 
 /// The name of a kept column (a column with an engine name that is not the named one) while the engine runs.
@@ -164,6 +166,14 @@ impl RoadsSource {
             return user;
         }
         k.strip_prefix("__rs_kept_").and_then(|o| self.names.iter().find(|(own, _)| *own == o)).map_or(k, |(own, _)| own)
+    }
+
+    /// A road's properties with the output's names, as the roads source writes them in every form (GeoJSON, GeoParquet, tiles): its
+    /// fields that `keep` takes (None: all), and the stage values that are read (R1: `read`).
+    pub fn props<'a>(&'a self, r: Road<'a>, keep: Option<&'a std::collections::HashSet<String>>) -> impl Iterator<Item = (&'a str, Cell<'a>)> + 'a {
+        r.iter().map(|(k, c)| (self.out_name(k), c)).filter(move |(k, _)| {
+            if k.starts_with("__rs_") { self.read.as_ref().is_none_or(|s| s.contains(*k)) } else { keep.is_none_or(|s| s.contains(*k)) }
+        })
     }
 
     /// The source as JSON text, written to `w` a part at a time.
@@ -192,7 +202,7 @@ impl RoadsSource {
                 out.push(b',');
             }
             out.extend_from_slice(format!(r#"{{"id":{},"type":"Feature","properties":"#, r.i).as_bytes());
-            r.write_json(&mut out, |k| self.out_name(k), |k| keep.is_none_or(|s| k.starts_with("__rs_") || s.contains(k)));
+            write_props(&mut out, self.props(r, keep));
             out.extend_from_slice(br#","geometry":"#);
             match r.line().filter(|_| lines) {
                 None => out.extend_from_slice(b"null"),

@@ -397,11 +397,13 @@ pub struct SimpleSource {
     pub promote: bool,
     /// a view's palettes (palettes.rs): the roads' `Extra` that the pieces differ in, in the order of the copies on each piece
     pub palette: Vec<usize>,
+    /// R1: the only properties that a piece keeps (what the layers and the page read; `Sources::set_reads`), None: all
+    pub read: Option<std::collections::HashSet<String>>,
 }
 
 impl SimpleSource {
     pub fn empty(cols: Cols) -> SimpleSource {
-        SimpleSource { pieces: Vec::new(), items: Vec::new(), cols, tolerance: 0.05, maxzoom: None, names: Vec::new(), promote: false, palette: Vec::new() }
+        SimpleSource { pieces: Vec::new(), items: Vec::new(), cols, tolerance: 0.05, maxzoom: None, names: Vec::new(), promote: false, palette: Vec::new(), read: None }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -423,9 +425,25 @@ impl SimpleSource {
             for (k, v) in self.palette_props(p, roads) {
                 q.insert(&k, v);
             }
-            (*id, q, p.coords.as_deref())
+            (*id, self.slim(q), p.coords.as_deref())
         })
-            .chain(self.items.iter().map(move |(id, it)| (*id, named(it.props.clone()), it.coords.as_deref())))
+            .chain(self.items.iter().map(move |(id, it)| (*id, self.slim_item(named(it.props.clone())), it.coords.as_deref())))
+    }
+
+    /// A piece's properties that are read (R1), in their order.
+    fn slim(&self, q: Props) -> Props {
+        match &self.read {
+            Some(r) => q.into_iter().filter(|(k, _)| r.contains(*k)).collect(),
+            None => q,
+        }
+    }
+
+    /// An item's: its own fields (a picked item's popup fields: the item has no others) and the stage values that are read.
+    fn slim_item(&self, q: Props) -> Props {
+        match &self.read {
+            Some(r) => q.into_iter().filter(|(k, _)| !k.starts_with("__rs_") || r.contains(*k)).collect(),
+            None => q,
+        }
     }
 
     /// The JSON text, written to `w` a part at a time: each feature as `{"type", "geometry", "properties", "id"}`.
@@ -581,7 +599,7 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
         }
         placed.push((id, f));
     }
-    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(width_col), tolerance: 0.05, maxzoom: None, names: Vec::new(), promote: false, palette: Vec::new() })
+    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(width_col), tolerance: 0.05, maxzoom: None, names: Vec::new(), promote: false, palette: Vec::new(), read: None })
 }
 
 // _mitre_ends: a flat end where another road with metre widths goes on is pushed on to close the corner with the road that goes on most

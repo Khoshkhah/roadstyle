@@ -38,16 +38,20 @@ fn monaco_sources_as_files() {
     let saved: Value = serde_json::from_slice(&std::fs::read(dir.join("geojson/style.json")).unwrap()).unwrap();
     assert_eq!(saved["sources"]["simple"]["data"], "simple.geojson");
     assert_eq!(saved["layers"], style["layers"]);
-    // the road table: a row for each road, a column for each field of the roads source
+    // the road table: a row for each road, a column for each field of the roads source, and the stage values that the page reads on a
+    // row (R1: props::table_keeps)
     let roads = style["sources"]["roads"]["data"]["features"].as_array().unwrap();
     let table = roadstyle_rs::read::read_roads(std::fs::read(dir.join("geojson/road_table.parquet")).unwrap(), "geometry").unwrap();
     assert_eq!(table.len(), roads.len());
-    let mut keys: Vec<&String> = roads.iter().flat_map(|f| f["properties"].as_object().unwrap().keys()).collect();
+    let mut keys: Vec<&String> = roads.iter().flat_map(|f| f["properties"].as_object().unwrap().keys()).filter(|k| !k.starts_with("__rs_")).collect();
     keys.sort();
     keys.dedup();
-    let mut cols: Vec<&String> = table.names().iter().filter(|n| !n.starts_with("__mid") && !n.starts_with("__bbox") && *n != "__heading").collect();
-    cols.sort();
-    assert_eq!(cols, keys);
+    let cols: Vec<&String> = table.names().iter().filter(|n| !n.starts_with("__mid") && !n.starts_with("__bbox") && *n != "__heading").collect();
+    let mut fields: Vec<&String> = cols.iter().copied().filter(|n| !n.starts_with("__rs_")).collect();
+    fields.sort();
+    assert_eq!(fields, keys);
+    assert!(cols.iter().all(|n| roadstyle_rs::props::table_keeps(n)), "{cols:?}");
+    assert!(cols.iter().any(|n| *n == "__rs_dup") && cols.iter().all(|n| *n != "__rs_cl"), "{cols:?}");
     assert!((0..table.len()).all(|i| table.line(i).is_some()), "the road table has every road's line");
     // GeoParquet: a row for each feature of each source
     roadstyle_rs::save_sources(&s, &dir.join("geoparquet"), roadstyle_rs::Format::GeoParquet, &[]).unwrap();

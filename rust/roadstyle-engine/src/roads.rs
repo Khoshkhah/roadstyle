@@ -139,7 +139,7 @@ pub fn roads_source(mut fs: Roads) -> crate::road::RoadsSource {
         let cls = crate::cls_of(fs.road(i));
         fs.draw[i].cls = Some(fs.values.id(&cls));
     }
-    crate::road::RoadsSource { roads: fs, tolerance: 0.05, maxzoom: None, names: Vec::new(), in_style: true }
+    crate::road::RoadsSource { roads: fs, tolerance: 0.05, maxzoom: None, names: Vec::new(), in_style: true, read: None }
 }
 
 // --- helpers: Python's values ---

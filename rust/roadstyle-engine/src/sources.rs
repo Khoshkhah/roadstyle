@@ -29,9 +29,23 @@ impl Sources {
     pub fn new(p: Parts) -> Sources {
         let (sources, roads) = take_roads(p.sources);
         let roads = roads.unwrap_or_else(|| RoadsSource { roads: Roads::new(RoadTable::empty()), tolerance: 0.05, maxzoom: None, names: Vec::new(),
-                                                          in_style: false });
-        Sources { name: p.name, center: p.center, zoom: p.zoom, layers: p.layers, metadata: p.metadata, glyphs: p.glyphs, state: p.state, sources, roads,
-                  saved: serde_json::Map::new() }
+                                                          in_style: false, read: None });
+        let mut s = Sources { name: p.name, center: p.center, zoom: p.zoom, layers: p.layers, metadata: p.metadata, glyphs: p.glyphs, state: p.state,
+                              sources, roads, saved: serde_json::Map::new() };
+        s.set_reads();
+        s
+    }
+
+    /// R1: the drawn features (the pieces, the roads' stage values) keep only the properties that are read (`drawn` with no caller's
+    /// columns). Made again when the layers change (a view's palette: palettes.rs).
+    pub fn set_reads(&mut self) {
+        let read = self.drawn(&[]);
+        for (_, s) in self.sources.iter_mut() {
+            if let Src::Simple(p) = s {
+                p.read = Some(read.clone());
+            }
+        }
+        self.roads.read = Some(read);
     }
 
     /// The properties that the drawing reads (tiles.py's tile_props): every text in the layers, the popup and tooltip fields, `name`,
@@ -127,6 +141,12 @@ impl Sources {
 
     /// The road table: the properties of each road (its row is its position), with the output's names.
     pub fn road_rows(&self) -> impl Iterator<Item = Vec<(&str, Cell<'_>)>> + '_ {
-        self.roads.roads.iter().map(|r| r.iter().map(|(k, c)| (self.roads.out_name(k), c)).collect())
+        self.roads.roads.iter().map(|r| self.road_row(r))
+    }
+
+    /// One road's row of the road table: its fields and the stage values that the page reads (R1: props::table_keeps), with the
+    /// output's names.
+    pub fn road_row<'a>(&'a self, r: crate::Road<'a>) -> Vec<(&'a str, Cell<'a>)> {
+        r.iter().filter(|(k, _)| roadstyle_model::props::table_keeps(k)).map(|(k, c)| (self.roads.out_name(k), c)).collect()
     }
 }

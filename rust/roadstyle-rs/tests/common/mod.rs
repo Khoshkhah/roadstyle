@@ -204,5 +204,20 @@ pub fn as_decided(mut want: Value) -> Value {
     if let Some(s) = want["sources"]["simple"].as_object_mut() {
         s.insert("promoteId".into(), "__rs_edge".into());
     }
+    // R1 (2026-10-24): a piece keeps only the properties that are read (the layers, the page's declaration, the popup), a road only
+    // the stage values that are read (and all its fields)
+    let read = drawn_of(&want);
+    for (src, all) in [("simple", true), ("roads", false)] {
+        for f in want["sources"][src]["data"]["features"].as_array_mut().into_iter().flatten() {
+            if let Some(p) = f["properties"].as_object_mut() {
+                p.retain(|k, _| read.contains(k) || (!all && !k.starts_with("__rs_")));
+            }
+        }
+    }
     want
+}
+
+/// What a style's drawing reads (props::drawn, with no caller's columns).
+pub fn drawn_of(style: &Value) -> std::collections::HashSet<String> {
+    roadstyle_rs::props::drawn(style["layers"].as_array().map(Vec::as_slice).unwrap_or_default(), &style["metadata"], &[])
 }

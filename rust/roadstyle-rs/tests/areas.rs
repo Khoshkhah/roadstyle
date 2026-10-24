@@ -84,12 +84,19 @@ fn tile_summary(area: &str) -> Vec<(String, [usize; 5])> {
     let style = common::gz_json(&format!("{area}/golden_style.json.gz"));
     let keep: Vec<String> = style["sources"]["roads"]["data"]["features"][0]["properties"].as_object().unwrap().keys()
         .filter(|k| !k.starts_with("__rs_")).cloned().collect();
-    let (_, tiles) = roadstyle_rs::make_tiled(roads, &look.to_string(), None, None, "rs://", &keep).unwrap();
+    let (tstyle, tiles) = roadstyle_rs::make_tiled(roads, &look.to_string(), None, None, "rs://", &keep).unwrap();
+    let read = common::drawn_of(&serde_json::from_str(&tstyle).unwrap());       // R1: the pieces keep only what is read
     use base64::Engine;
     let mut sums: indexmap::IndexMap<(String, String), [usize; 5]> = indexmap::IndexMap::new();
     for (name, b64) in golden.as_object().unwrap() {
         let zxy: Vec<u32> = name.split('/').map(|v| v.parse().unwrap()).collect();
-        let py = common::decode_tile(&base64::engine::general_purpose::STANDARD.decode(b64.as_str().unwrap()).unwrap());
+        let mut py = common::decode_tile(&base64::engine::general_purpose::STANDARD.decode(b64.as_str().unwrap()).unwrap());
+        for f in py.get_mut("simple").into_iter().flatten() {
+            f.1.retain(|k, _| read.contains(k));
+        }
+        for f in py.get_mut("roads").into_iter().flatten() {
+            f.1.retain(|k, _| !k.starts_with("__rs_") || read.contains(k));
+        }
         let rs = common::decode_tile(&tiles.tile(zxy[0], zxy[1], zxy[2]));
         for layer in py.keys().chain(rs.keys()).collect::<indexmap::IndexSet<_>>() {
             let (p, r) = (py.get(layer).map_or(&[][..], |v| v.as_slice()), rs.get(layer).map_or(&[][..], |v| v.as_slice()));
