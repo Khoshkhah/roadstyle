@@ -11,6 +11,8 @@ export let RS_TILED = false;
 // simple mode (the style has the role simple): the id of its one road layer in the map, else false (Python's full look). A road is picked
 // on the fill pieces of that layer (__rs_k 1, their __rs_edge is the road's row), and its hover / select glow is the feature-state of those
 // pieces (_fs).
+// RS_LEAN: the simple look's road layer (the id), or false for the full look (simple=False). The full look's paths (RS_LEAN false: core.js
+// _fs and _roadOfPiece, select.js's pick layers, svspot.js's road layer) go with simple=False in N16 (branch n16-full-look-js).
 export let RS_LEAN = false;
 // a dashboard event: document's CustomEvent `type` with `detail` (the rs:* events of docs/reference/javascript.md)
 export const _emit = (type, detail) => document.dispatchEvent(new CustomEvent(type, {detail}));
