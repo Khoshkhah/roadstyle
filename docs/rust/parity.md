@@ -96,6 +96,27 @@ and the time of the slowest one.
 The browser numbers are the middle of three runs. The headless browser measures only Monaco, the limit of this machine for a
 browser test. On Monaco the WebAssembly module is as fast as the native code.
 
+### In the browser: Rust or MapLibre cuts the tiles
+
+The same roads and the same look go to the browser in two ways. **MapLibre:** `makeStyle` gives the style with GeoJSON sources,
+and MapLibre cuts the tiles itself. **Rust:** `new Tiler` gives the style with a vector source, and `tiler.tile()` cuts each tile
+when MapLibre asks for it. Both include stage 1. Monaco (13,298 roads, with their 8 level columns), a map of 1000 × 700 pixels
+with no base map, headless Chromium; the middle value of 3 runs, each in a new page.
+
+| Step | MapLibre cuts the GeoJSON | Rust cuts the tiles |
+|---|---|---|
+| The engine (stage 1; for Rust also the tile index) | 0.65 s (`makeStyle`) | 0.65 s (`new Tiler`) |
+| The size of the style that MapLibre gets | 23.2 MB, with the GeoJSON | 0.09 MB, only the rules |
+| The first complete view, zoom 14 (MapLibre's `idle` event) | 1.16 s | 0.56 s |
+| A zoom to 16 | 0.49 s | 0.35 s |
+| A pan | 0.36 s | 0.21 s |
+| A zoom out to 12 | 0.25 s | 0.25 s |
+| The JavaScript heap of the page | 112 MB | 82 MB |
+
+With the Rust `Tiler`, the first view comes in half the time, and the zoom and the pan are faster. With GeoJSON, MapLibre first
+takes a 23 MB style and cuts all the roads; with the `Tiler` it gets only the rules and asks for the tiles in view. The test has
+limits: one area, one machine, software drawing in a headless browser, and no count of the memory of MapLibre's own workers.
+
 ### Small areas
 
 | Area | What | Python | Rust |
