@@ -9,7 +9,7 @@
 | Input | the level data | 8 columns in the roads, or a duckOSM file | [The level data](#the-level-data) |
 | Input | the look | a palette and a profile (YAML), settings (JSON or YAML), the keywords of `render_edges` | [The look](#the-look) |
 | Internal | the merged look | JSON, between the look and the engine | [The merged look](#the-merged-look) |
-| Output | the MapLibre style, the road data, the page | JSON, GeoJSON or vector tiles, HTML | [The outputs](#the-outputs) |
+| Output | the MapLibre style, the road data, the page: other files for each way (default, A, B, C) | JSON, GeoJSON or vector tiles, HTML | [The output of each way](#the-output-of-each-way) |
 
 How the parts work together: [How a map is drawn](../rust/drawing.md).
 
@@ -226,6 +226,80 @@ the engine.
 The rendering gives three outputs: **the MapLibre style** (the rules), **the road data** (the pieces of the roads with their
 values) and, with `render_edges`, **the page** that holds both. The examples below come from Monaco (849 drive edges from osmnx,
 simple mode, `view_3d=True`), made with `rs.export_inline(edges, engine="rust")` on 2026-10-23.
+
+### The output of each way
+
+Each way to the browser ([Three choices for the road data](../rust/drawing.md#three-choices-for-the-road-data)) gives other
+outputs. The style of each way is one of the forms in [The forms of the output style](#the-forms-of-the-output-style).
+
+#### The default: GeoJSON in one HTML file
+
+```python
+rs.render_edges(edges).save("map.html")
+```
+
+| Output | Content |
+|---|---|
+| `map.html` | one file: the live style with the road data inline as GeoJSON (gzipped with `compress=True`), MapLibre and the dashboard |
+
+The style: **inline** and **live**. The browser loads the whole file; MapLibre cuts the GeoJSON into tiles itself.
+
+#### Way A: vector tiles in one HTML file
+
+```python
+rs.render_edges(edges, tiles=True).save("map.html")
+```
+
+| Output | Content |
+|---|---|
+| `map.html` | one file: the live style, a PMTiles archive of all the tiles (base64 in the page), a side table, MapLibre and the dashboard |
+
+- The style: **tiled** and **live**. Its source `roads` is `{"type": "vector", "url": "pmtiles://roads"}`, and the page reads it
+  from the archive inside the file.
+- The side table (`window.RS_SIDE`) holds every column of every road, for the popups and for `rs.query`, because a tile holds
+  only the columns that the style needs.
+- The browser loads the whole file; MapLibre decodes only the tiles in view.
+
+#### Way B: vector tiles on a server
+
+```python
+rs.export_style(edges, "out", base_url="https://example.org/map")                     # XYZ folder
+rs.export_style(edges, "out", base_url="https://example.org/map", format="pmtiles")   # one PMTiles file
+```
+
+| Output | XYZ folder | One PMTiles file |
+|---|---|---|
+| `style.json` | yes | yes |
+| the tiles | `tiles/<z>/<x>/<y>.pbf`, one file for each tile | `roads.pmtiles`, one file |
+| the sprite (the one-way arrow) | `sprite.png`, `sprite.json`, `sprite@2x.png`, `sprite@2x.json` | the same |
+| the road popup for an app's plugin | `popup.js`, `popup.css` | the same |
+
+- The style: **tiled** and **baked**. Its source `roads` points to `<base_url>/tiles/{z}/{x}/{y}.pbf`, or to
+  `pmtiles://<base_url>/roads.pmtiles`. Every address in it starts with `base_url`.
+- It has the roads only, with no base map and no page: the map app (GeoLibre, QGIS, a MapLibre page) gives them.
+- `export_style` returns the path of `style.json`.
+
+#### Way C: vector tiles made in the browser
+
+```js
+const tiler = new Tiler(roads, look, undefined, "Monaco", "rs://1/", ["name", "highway"]);
+```
+
+| Output | Content |
+|---|---|
+| `tiler.style()` | the style, as JSON text |
+| `tiler.tile("roads", z, x, y)` | one vector tile (MVT bytes), made when MapLibre asks for it |
+| `tiler.props("roads", row)` | the properties of one road, for a click |
+| `tiler.archive(bounds, layers)` | only on request: one PMTiles archive of all tiles, as bytes |
+
+- The style: **tiled**, and **live** when the look has `args.state = "live"` (else baked). Its source `roads` points to
+  `rs://1/roads/{z}/{x}/{y}`, and the page answers this address with `tiler.tile`.
+- Nothing is written to a file. The page can write a whole HTML file with `makePage`, as `render_edges` does.
+
+#### Only the style
+
+`rs.export_inline(edges)` (in the browser: `makeStyle`) gives the style alone, as a dict or JSON text: **inline** and **baked**,
+with no page. A map app adds it to its own map.
 
 ### The output style
 
