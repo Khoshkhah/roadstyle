@@ -78,7 +78,7 @@ python 0.9 s
 rust 0.3 s
 ```
 
-Monaco is small. The difference is larger on a large area: Tartu (64,828 roads) takes 19.1 s with Python and 6.2 s with Rust.
+Monaco is small. The difference is larger on a large area: Tartu (64,828 roads) takes 19.5 s with Python and 6.1 s with Rust.
 
 ## Put the roads in vector tiles
 

@@ -60,15 +60,48 @@ Each difference that the goldens found has a cause and a decision. These stay:
 
 ## Speed
 
-`render_edges` from the GeoDataFrame to the HTML text, measured on 2026-10-23 on one machine: an Intel Core i5-13600K
-(20 threads), 23 GB of memory, Linux (WSL2), Python 3.11, Rust 1.99.1, the release build.
+Measured on 2026-10-23 on one machine: an Intel Core i5-13600K (20 threads), 23 GB of memory, Linux (WSL2), Python 3.11, Rust
+1.99.1, the release build. Each case ran in its own process; the memory is the peak resident memory of that process
+(`/usr/bin/time`), Python and its libraries included.
 
-| Area | Page | Python | Rust | Rust is faster by |
-|---|---|---|---|---|
-| Tartu (64,828 roads) | inline (the default) | 19.1 s | 6.2 s | 3.1 times |
-| Tartu | `tiles=True` | 147.5 s | 12.2 s | 12 times |
-| Monaco, a part (1,373 roads) | the style of `export_inline` | 0.57 s | 0.12 s | 4.8 times |
-| Monaco (osmnx, 849 drive edges) | inline | 0.9 to 1.3 s | 0.3 s | 3 to 4 times |
+### The ways to the browser, on Tartu
+
+Tartu has 64,828 roads with their 8 level columns. Each call has the same keywords (the level, head and cap columns,
+`directed_col`, `driving_col`, `access_col`). The ways are those of
+[How a map is drawn](drawing.md#three-choices-for-the-road-data).
+
+| Way | Call | Python | Rust | Peak memory, Python | Peak memory, Rust |
+|---|---|---|---|---|---|
+| GeoJSON (the default) | `render_edges(edges)` | 19.5 s | 6.1 s | 1.07 GB | 1.64 GB |
+| A. Tiles in one HTML file | `render_edges(edges, tiles=True)` | 137.4 s | 13.4 s | 1.33 GB | 1.64 GB |
+| B. Tiles on a server, XYZ folder | `export_style(..., format="xyz")` | 152.0 s | 4.6 s | 1.23 GB | 1.06 GB |
+| B. Tiles on a server, one PMTiles file | `export_style(..., format="pmtiles")` | 153.5 s | 9.2 s | 1.24 GB | 1.12 GB |
+| C. Tiles made in the browser | `new Tiler(...)`, then each tile on request | (none) | see the next table | | 1.05 GB |
+
+For the two pages, the Rust process has the higher peak memory. The plan's columnar road model is the step that cuts the memory
+of the engine ([Memory](#memory)).
+
+### Way C: the Tiler and the tiles of one view
+
+Way C exists only with the Rust engine, because the Python engine does not run in a browser. It makes no tile at the start
+(`new Tiler`), then each tile on request. A view is the 3 × 3 tiles around the center; each cell gives the time of the 9 tiles,
+and the time of the slowest one.
+
+| Area | Where | `new Tiler` | View at zoom 12 | View at zoom 14 | View at zoom 15 |
+|---|---|---|---|---|---|
+| Tartu (64,828 roads) | natively (the Python binding) | 2.7 s | 0.16 s (slowest 0.07 s) | 0.10 s (0.02 s) | 0.03 s (0.005 s) |
+| Monaco (13,298 roads) | natively (the Python binding) | 0.6 s | 0.035 s (0.035 s) | 0.039 s (0.023 s) | 0.037 s (0.010 s) |
+| Monaco (13,298 roads) | in the browser (WebAssembly, headless Chromium) | 0.5 s | 0.032 s (0.032 s) | 0.041 s (0.024 s) | 0.036 s (0.011 s) |
+
+The browser numbers are the middle of three runs. The headless browser measures only Monaco, the limit of this machine for a
+browser test. On Monaco the WebAssembly module is as fast as the native code.
+
+### Small areas
+
+| Area | What | Python | Rust |
+|---|---|---|---|
+| Monaco, a part (1,373 roads) | the style of `export_inline` | 0.57 s | 0.12 s |
+| Monaco (osmnx, 849 drive edges) | `render_edges` | 0.9 to 1.3 s | 0.3 s |
 
 ## Memory
 

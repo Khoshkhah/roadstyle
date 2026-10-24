@@ -1,6 +1,6 @@
 # The Rust engine
 
-<p class="lead">roadstyle 0.25 has a second engine, written in Rust. It makes the same maps as the Python engine, 3 to 12 times faster.</p>
+<p class="lead">roadstyle 0.25 has a second engine, written in Rust. It makes the same maps as the Python engine, 3 to 30 times faster on a large area.</p>
 
 !!! warning "Experimental"
     The Rust engine is experimental in 0.25. The Python API that selects it (`engine="rust"`, `ROADSTYLE_ENGINE`) is stable.
@@ -60,8 +60,8 @@ The same engine is also a WebAssembly package for the browser, and a set of Rust
 
 ## When to use it
 
-- **Large networks.** On Tartu (64,828 roads) the page takes 6.2 s with Rust and 19.1 s with Python. With `tiles=True` it takes
-  12.2 s and 147.5 s ([Parity and speed](parity.md)).
+- **Large networks.** On Tartu (64,828 roads) the page takes 6.1 s with Rust and 19.5 s with Python. With `tiles=True` it takes
+  13.4 s and 137.4 s, and a folder of tiles (`export_style`) 4.6 s and 152.0 s ([Parity and speed](parity.md#speed)).
 - **Nightly pages.** The output is the same as the Python output, byte for byte, so you can change the engine without a change
   to your pages.
 - **The browser.** A page can make the style and the tiles itself, from a duckOSM file or a GeoParquet file, with no Python.

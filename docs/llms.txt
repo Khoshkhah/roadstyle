@@ -18,7 +18,7 @@ Edges are directed: a two-way road is two edges with reversed geometry. JS calls
 
 ## Rust engine
 
-- [Overview](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/rust/index.md): engine="rust" or ROADSTYLE_ENGINE=rust; the same output as the Python engine, 3 to 12 times faster
+- [Overview](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/rust/index.md): engine="rust" or ROADSTYLE_ENGINE=rust; the same output as the Python engine, 3 to 30 times faster on a large area
 - [Switch the engine](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/rust/switch-engine.md): the keyword, the environment variable, the error and the warning when a part is Python only
 - [Keywords by engine](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/rust/keywords.md): every render_edges keyword and public function, with its state in each engine
 - [Use roadstyle in the browser](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/rust/browser.md): the WebAssembly package (makeLook, makeStyle, Tiler, makePage), the worker SQL, rsDashboard with style: null, prefix, tiles, engine.props
