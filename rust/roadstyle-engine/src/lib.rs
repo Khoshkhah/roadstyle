@@ -7,6 +7,7 @@
 pub mod colors;
 pub mod contract;
 pub mod decks;
+pub mod draw;
 pub mod export_look;
 pub mod features;
 pub mod full;

@@ -1,6 +1,7 @@
 //! The "roads" source: the stages of roadstyle's render_web.render that bake the `__rs_*` properties of each road, in the same
 //! order. Each function names the Python function it ports; the columns are the ones mapstyle passes (docs/design/rust-spike.md, S2).
 
+use crate::draw::Cap;
 use crate::road::Roads;
 use roadstyle_model::Cell;
 use serde_json::Value;
@@ -87,8 +88,8 @@ pub fn mark_roads(fs: &mut Roads, look: &Look, args: &Value) -> Result<crate::co
             return Err(format!("access_col {col:?} is not a column of the edges"));
         }
         for i in 0..fs.len() {
-            let kind = fs.get(i, col).and_then(Cell::as_str).filter(|k| ACCESS_KINDS.contains(k)).map_or(Value::Null, Value::from);
-            fs.marks[i].insert("__rs_access", kind);
+            let kind = fs.get(i, col).and_then(Cell::as_str).and_then(|k| ACCESS_KINDS.iter().find(|a| **a == k).copied());
+            fs.draw[i].access = Some(kind);
         }
     }
     let colors = crate::colors::bake(fs, look, args)?;
@@ -96,12 +97,14 @@ pub fn mark_roads(fs: &mut Roads, look: &Look, args: &Value) -> Result<crate::co
     let named = |k: &str| args[k].as_str().is_some_and(|c| !c.is_empty());
     mark_twoway(fs, named("directed_col"), named("driving_col"));
     // a road with an access kind has its kind's colour in every colour option (the palette's `access`)
-    for m in fs.marks.iter_mut().filter(|_| access_col.is_some()) {
-        let Some(c) = m.get("__rs_access").and_then(Value::as_str).and_then(|k| look.access.get(k)).filter(|c| !c.is_null()).cloned() else { continue };
-        let keys: Vec<&'static str> = m.iter().map(|(k, _)| k).filter(|k| k.starts_with("__rs_fill")).collect();
-        for k in keys {
-            m.insert(k, c.clone());
+    for i in (0..fs.len()).filter(|_| access_col.is_some()) {
+        let Some(c) = fs.draw[i].access.flatten().and_then(|k| look.access.get(k)).filter(|c| !c.is_null()) else { continue };
+        let c = fs.values.id(c);
+        let d = &mut fs.draw[i];
+        if let Some(s) = d.style.as_mut() {
+            s[0] = c;
         }
+        d.fills.iter_mut().for_each(|f| *f = c);
     }
     if !look.single_line.is_empty() {
         mark_single_line(fs, &look.single_line);
@@ -121,8 +124,8 @@ pub fn mark_roads(fs: &mut Roads, look: &Look, args: &Value) -> Result<crate::co
         mark_width_m(fs, col, args["casing_m"].as_f64().unwrap_or(look.casing_m));
     }
     stringify_unsafe_ints(fs);
-    for (i, m) in fs.marks.iter_mut().enumerate() {
-        m.insert("__rs_edge", i.into());
+    for (i, d) in fs.draw.iter_mut().enumerate() {
+        d.edge = Some(i as u32);
     }
     Ok(colors)
 }
@@ -132,7 +135,7 @@ pub fn mark_roads(fs: &mut Roads, look: &Look, args: &Value) -> Result<crate::co
 pub fn roads_source(mut fs: Roads) -> crate::road::RoadsSource {
     for i in 0..fs.len() {
         let cls = crate::cls_of(fs.road(i));
-        fs.marks[i].insert("__rs_cls", cls);
+        fs.draw[i].cls = Some(fs.values.id(&cls));
     }
     crate::road::RoadsSource { roads: fs, tolerance: 0.05, maxzoom: None }
 }
@@ -221,25 +224,23 @@ fn mark_twoway(fs: &mut Roads, directed: bool, driving: bool) {
         let n = count(&r);
         let two = if k.is_some() && r == *k { n >= 2 } else { n >= 1 };
         let ow = if missing(fs.get(i, "oneway")) { !two } else { truthy(fs.get(i, "oneway")) };
-        let p = &mut fs.marks[i];
-        p.insert("__rs_twoway", two.into());
-        p.insert("__rs_oneway", ow.into());
+        (fs.draw[i].twoway, fs.draw[i].oneway) = (Some(two), Some(ow));
     }
     if directed {
         // directed_col: a pair is two lanes only when neither edge is undirected (null = directed)
         let und = |f: crate::road::Road| !missing(f.get(DIRECTED)) && !truthy(f.get(DIRECTED));
         let undirected: Vec<bool> = fs.iter().map(und).collect();
         for (i, k) in keys.iter().enumerate() {
-            if fs.marks[i]["__rs_twoway"] != true {
+            if fs.draw[i].twoway != Some(true) {
                 continue;
             }
             let others_und = by.get(&rev(k)).is_none_or(|v| v.iter().filter(|&&t| t != i).all(|&t| undirected[t]));
             if undirected[i] || others_und {
                 let no_oneway = missing(fs.get(i, "oneway"));
-                let p = &mut fs.marks[i];
-                p.insert("__rs_twoway", false.into());
+                let d = &mut fs.draw[i];
+                d.twoway = Some(false);
                 if no_oneway {
-                    p.insert("__rs_oneway", (!undirected[i]).into());
+                    d.oneway = Some(!undirected[i]);
                 }
             }
         }
@@ -247,7 +248,7 @@ fn mark_twoway(fs: &mut Roads, directed: bool, driving: bool) {
     if driving {
         for i in 0..fs.len() {        // driving_col: no arrows where cars may not drive (null = driving)
             if !missing(fs.get(i, DRIVING)) && !truthy(fs.get(i, DRIVING)) {
-                fs.marks[i].insert("__rs_oneway", false.into());
+                fs.draw[i].oneway = Some(false);
             }
         }
     }
@@ -265,12 +266,11 @@ fn mark_single_line(fs: &mut Roads, classes: &HashSet<String>) {
                 first.entry((a, z, kind)).or_insert(i);
             }
             Some(j) => {
-                fs.marks[i].insert("__rs_dup", true.into());
-                fs.marks[i].insert("__rs_edge2", j.into());
-                fs.marks[j].insert("__rs_edge2", i.into());
+                fs.draw[i].dup = true;
+                fs.draw[i].edge2 = Some(j as u32);
+                fs.draw[j].edge2 = Some(i as u32);
                 for r in [i, j] {
-                    fs.marks[r].insert("__rs_twoway", false.into());
-                    fs.marks[r].insert("__rs_oneway", false.into());
+                    (fs.draw[r].twoway, fs.draw[r].oneway) = (Some(false), Some(false));
                 }
             }
         }
@@ -283,10 +283,8 @@ fn mark_lvl(fs: &mut Roads) {
         let ly = fs.get(i, LAYER).and_then(py_float).filter(|v| v.is_finite()).map_or(0, |v| v.trunc() as i64);
         let (br, tu) = (truthy(fs.get(i, BRIDGE)), truthy(fs.get(i, TUNNEL)));
         let lvl = if ly != 0 { ly } else if br { 1 } else if tu { -1 } else { 0 };
-        let p = &mut fs.marks[i];
-        p.insert("lvl", lvl.into());
-        p.insert("__rs_bridge", br.into());
-        p.insert("__rs_tunnel", tu.into());
+        let d = &mut fs.draw[i];
+        (d.lvl, d.bridge, d.tunnel) = (Some(lvl), Some(br), Some(tu));
     }
 }
 
@@ -328,16 +326,14 @@ fn mark_caps(fs: &mut Roads, caps: &CapCols) {
         let r = fs.road(i);
         let whole = caps.whole.as_deref().and_then(|c| r.get(c)).filter(|v| given(Some(*v))).map_or(Value::Null, cap_value);
         let end = |on: bool, col: &str| if on && given(r.get(col)) { cap_value(r.get(col).unwrap()) } else { whole.clone() };
-        let (s0, s1) = (end(caps.start, CAP_START), end(caps.end, CAP_END));
-        let p = &mut fs.marks[i];
+        let (s0, s1) = (Cap::from_value(&end(caps.start, CAP_START)), Cap::from_value(&end(caps.end, CAP_END)));
+        let d = &mut fs.draw[i];
         if s0 == s1 {
-            if !s0.is_null() {
-                p.insert("__rs_cap", s0);
+            if s0 != Cap::Round {
+                d.cap = Some(s0);
             }
         } else {
-            p.insert("__rs_cap0", s0);
-            p.insert("__rs_cap1", s1);
-            p.insert("__rs_split", true.into());
+            d.split = Some([s0, s1]);
         }
     }
 }
@@ -345,11 +341,8 @@ fn mark_caps(fs: &mut Roads, caps: &CapCols) {
 /// The head lengths of each edge (head_start_m_col / head_end_m_col): __rs_hs / __rs_he where the value is a number above 0.
 fn mark_heads(fs: &mut Roads) {
     for i in 0..fs.len() {
-        for (col, k) in [("head_start_m", "__rs_hs"), ("head_end_m", "__rs_he")] {
-            if let Some(v) = fs.get(i, col).and_then(py_float).filter(|v| *v > 0.0) {
-                fs.marks[i].insert(k, v.into());
-            }
-        }
+        let head = |col: &str| fs.get(i, col).and_then(py_float).filter(|v| *v > 0.0);
+        (fs.draw[i].head_start, fs.draw[i].head_end) = (head("head_start_m"), head("head_end_m"));
     }
 }
 
@@ -365,9 +358,7 @@ fn mark_levels(fs: &mut Roads, named: [bool; 4]) {
         let (c, fl) = (c.min(fl), c.max(fl));
         let cs = if named[2] { num(r.get("casing_start")).min(fl) } else { c };
         let ce = if named[3] { num(r.get("casing_end")).min(fl) } else { c };
-        for (k, v) in [("__rs_cl", c), ("__rs_fl", fl), ("__rs_cs", cs), ("__rs_ce", ce), ("__rs_band", 0)] {
-            fs.marks[i].insert(k, v.into());
-        }
+        fs.draw[i].levels = Some([c, fl, cs, ce]);
     }
 }
 
@@ -378,18 +369,18 @@ fn mark_twin_casing(fs: &mut Roads, head_m: f64, id_col: Option<&str>) -> bool {
     let pairs = twin_pairs(fs);
     let mut bad = Vec::new();
     for &(j, i) in &pairs {
-        fs.marks[i].insert("__rs_twin", j.into());
-        fs.marks[j].insert("__rs_twin", i.into());
-        let ends = |p: &crate::props::Props| {
-            let whole = p.get("__rs_cap").cloned().unwrap_or(Value::Null);
-            let f = |k: &str| p.get(k).cloned().unwrap_or(Value::Null);
-            let h = |k: &str| p.get(k).and_then(Value::as_f64).unwrap_or(head_m);
-            let cap = |k: &str| match p.get(k) { Some(v) => v.clone(), None => whole.clone() };
-            ((f("__rs_cs"), h("__rs_hs"), cap("__rs_cap0")), (f("__rs_ce"), h("__rs_he"), cap("__rs_cap1")))
+        fs.draw[i].twin = Some(j as u32);
+        fs.draw[j].twin = Some(i as u32);
+        // each end: its casing number, its head length and its cap
+        let ends = |d: &crate::draw::Draw| {
+            let whole = d.cap.unwrap_or(Cap::Round);
+            let [s0, s1] = d.split.unwrap_or([whole, whole]);
+            let lv = |k: usize| d.levels.map(|l| l[k]);
+            ((lv(2), d.head_start.unwrap_or(head_m), s0), (lv(3), d.head_end.unwrap_or(head_m), s1))
         };
-        let (p, q) = (&fs.marks[i], &fs.marks[j]);
+        let (p, q) = (&fs.draw[i], &fs.draw[j]);
         let (ep, eq) = (ends(p), ends(q));
-        if (eq.0 != ep.1 || eq.1 != ep.0) || q.get("__rs_cl") != p.get("__rs_cl") {
+        if (eq.0 != ep.1 || eq.1 != ep.0) || q.levels.map(|l| l[0]) != p.levels.map(|l| l[0]) {
             let name = |k: usize| match id_col.and_then(|c| fs.get(k, c)) {
                 Some(c) => c.as_str().map_or_else(|| c.to_value().to_string(), String::from),
                 None => k.to_string(),
@@ -409,7 +400,7 @@ fn twin_pairs(fs: &Roads) -> Vec<(usize, usize)> {
     let mut first: HashMap<(String, String), usize> = HashMap::new();
     let mut pairs = Vec::new();
     for i in 0..fs.len() {
-        if !truthy(fs.marks[i].cell("__rs_twoway")) {
+        if fs.draw[i].twoway != Some(true) {
             continue;
         }
         let Some(c) = fs.line(i).filter(|c| c.len() >= 2) else { continue };
@@ -437,13 +428,13 @@ fn mark_width_m(fs: &mut Roads, col: &str, casing_m: f64) {
             continue;
         }
         let sec = 1.0 / (pts.iter().map(|c| c[1]).sum::<f64>() / pts.len() as f64).to_radians().cos();
-        fs.marks[i].insert("__rs_wm", crate::layers::py_round(w * sec, 4).into());
-        fs.marks[i].insert("__rs_cm", crate::layers::py_round(casing_m * sec, 4).into());
+        fs.draw[i].width_m = Some(crate::layers::py_round(w * sec, 4));
+        fs.draw[i].casing_m = Some(crate::layers::py_round(casing_m * sec, 4));
     }
     for (i, j) in twin_pairs(fs) {
-        if let (Some(a), Some(b)) = (fs.marks[i].get("__rs_wm").cloned(), fs.marks[j].get("__rs_wm").cloned()) {
-            fs.marks[i].insert("__rs_twm", b);
-            fs.marks[j].insert("__rs_twm", a);
+        if let (Some(a), Some(b)) = (fs.draw[i].width_m, fs.draw[j].width_m) {
+            fs.draw[i].twin_width_m = Some(b);
+            fs.draw[j].twin_width_m = Some(a);
         }
     }
 }
@@ -458,36 +449,33 @@ fn mark_twin_dead_ends(fs: &mut Roads, caps: &CapCols) {
     }
     for i in 0..fs.len() {
         let Some((a, z)) = &cs[i] else { continue };
-        if missing(fs.marks[i].cell("__rs_twin")) {
+        if fs.draw[i].twin.is_none() {
             continue;
         }
         let r = fs.road(i);
         let whole_given = caps.whole.as_deref().is_some_and(|c| given(r.get(c)));
         let end_given = [(caps.start, CAP_START), (caps.end, CAP_END)].map(|(on, col)| on && given(r.get(col)));
-        let p = &mut fs.marks[i];
-        let get = |k: &str, d: &Value| p.get(k).cloned().unwrap_or_else(|| d.clone());
-        let whole = p.get("__rs_cap").cloned().unwrap_or(Value::Null);
-        let split = truthy(p.cell("__rs_split"));
-        let (s0, s1) = if split { (get("__rs_cap0", &whole), get("__rs_cap1", &whole)) } else { (whole.clone(), whole.clone()) };
-        let mut new = [s0.clone(), s1.clone()];
+        let d = &mut fs.draw[i];
+        let whole = d.cap.unwrap_or(Cap::Round);
+        let split = d.split.is_some();
+        let old = d.split.unwrap_or([whole, whole]);
+        let mut new = old;
         for (k, pnt) in [a, z].into_iter().enumerate() {
             if a != z && count.get(pnt) == Some(&2) && !end_given[k] && !whole_given {
-                new[k] = "square".into();
+                new[k] = Cap::Square;
             }
         }
+        // a cap property set new comes after the twin's (Python's dict: a key put back goes to the end)
         if new[0] == new[1] {
-            for k in ["__rs_cap0", "__rs_cap1", "__rs_split"] {
-                p.shift_remove(k);
+            d.split = None;
+            if new[0] != Cap::Round {
+                d.caps_late |= d.cap.is_none();
+                d.cap = Some(new[0]);
             }
-            if !new[0].is_null() {
-                p.insert("__rs_cap", new[0].clone());
-            }
-        } else if new != [s0, s1] || split {
-            p.shift_remove("__rs_cap");
-            let [n0, n1] = new;
-            p.insert("__rs_cap0", n0);
-            p.insert("__rs_cap1", n1);
-            p.insert("__rs_split", true.into());
+        } else if new != old || split {
+            d.cap = None;
+            d.caps_late |= !split;
+            d.split = Some(new);
         }
     }
 }

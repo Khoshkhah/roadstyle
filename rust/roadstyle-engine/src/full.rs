@@ -527,7 +527,7 @@ fn bridge_shadows(roads: &Roads, parts: Option<&[Piece]>, trim_m: f64, order: &[
         Some(ps) => ps.iter().filter(|p| p.props.get("__rs_edge").and_then(Value::as_u64).is_some_and(|e| br.contains(&(e as usize)))
                                           && !p.props.get("__rs_seam").is_some_and(py_truth) && p.coords.as_ref().is_some_and(|c| c.len() >= 2))
             .map(|p| (cl(&p.props), p.coords.clone().unwrap())).collect(),
-        None => br.iter().map(|&i| (cl(roads.marks(i)), line(i).to_vec())).collect(),
+        None => br.iter().map(|&i| (roads.draw[i].levels.map_or(0, |l| l[0]), line(i).to_vec())).collect(),
     };
     let mut lvls: Vec<i64> = pieces.iter().map(|p| p.0).collect();
     lvls.sort();

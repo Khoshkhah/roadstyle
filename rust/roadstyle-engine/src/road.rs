@@ -1,9 +1,10 @@
-//! The roads that the stages draw: the input table (roadstyle-model's `RoadTable`) and the marks of each road, the `__rs_*` properties
-//! and `lvl` in the order that the stages set them (render_web.render's order). A road's property is its mark, else its column: a
-//! mark takes the place of a column of the same name, as a dict's assignment does in Python. The output writes the columns in their
-//! order and then the other marks, so the text is the text of the old JSON object of each road.
+//! The roads that the stages draw: the input table (roadstyle-model's `RoadTable`) and the drawing values of each road (`Draw`), whose
+//! properties are the `__rs_*` marks and `lvl` in the order that the stages set them (render_web.render's order). A road's property is
+//! its mark, else its column: a mark takes the place of a column of the same name, as a dict's assignment does in Python. The output
+//! writes the columns in their order and then the other marks, so the text is the text of the old JSON object of each road.
 
-use crate::props::{Get, Props};
+use crate::draw::{Draw, Values};
+use crate::props::Get;
 use roadstyle_model::{Cell, RoadTable};
 use serde_json::{Map, Value};
 
@@ -11,13 +12,15 @@ pub type Pt = [f64; 2];
 
 pub struct Roads {
     pub table: RoadTable,
-    pub marks: Vec<Props>,
+    pub draw: Vec<Draw>,
+    /// the style values that the roads' `Draw` names by number
+    pub values: Values,
 }
 
 impl Roads {
     pub fn new(table: RoadTable) -> Roads {
-        let marks = vec![Props::default(); table.len()];
-        Roads { table, marks }
+        let draw = vec![Draw::default(); table.len()];
+        Roads { table, draw, values: Values::default() }
     }
 
     pub fn len(&self) -> usize {
@@ -29,7 +32,7 @@ impl Roads {
     }
 
     pub fn road(&self, i: usize) -> Road<'_> {
-        Road { t: &self.table, m: &self.marks[i], i }
+        Road { t: &self.table, d: &self.draw[i], v: &self.values, i }
     }
 
     /// The road `i`, or None past the last road.
@@ -49,43 +52,40 @@ impl Roads {
     pub fn line(&self, i: usize) -> Option<&[Pt]> {
         self.table.line(i)
     }
-
-    /// The marks of the road `i` (its `__rs_*` properties and `lvl`).
-    pub fn marks(&self, i: usize) -> &Props {
-        &self.marks[i]
-    }
 }
 
 /// One road: a view of its column values and its marks.
 #[derive(Clone, Copy)]
 pub struct Road<'a> {
     t: &'a RoadTable,
-    m: &'a Props,
+    d: &'a Draw,
+    v: &'a Values,
     pub i: usize,
 }
 
 impl<'a> Road<'a> {
     pub fn get(self, k: &str) -> Option<Cell<'a>> {
-        self.m.cell(k).or_else(|| self.t.get(self.i, k))
+        self.d.get(self.v, k).or_else(|| self.t.get(self.i, k))
     }
 
     pub fn contains_key(self, k: &str) -> bool {
-        self.m.contains_key(k) || self.t.col(k).is_some()
+        self.get(k).is_some()
     }
 
     pub fn line(self) -> Option<&'a [Pt]> {
         self.t.line(self.i)
     }
 
-    pub fn marks(self) -> &'a Props {
-        self.m
+    /// The road's drawing values.
+    pub fn draw(self) -> &'a Draw {
+        self.d
     }
 
     /// The properties in the output's order: the columns (a mark in the place of a column of its name), then the other marks.
     pub fn iter(self) -> impl Iterator<Item = (&'a str, Cell<'a>)> {
-        let (t, m, i) = (self.t, self.m, self.i);
-        t.names().iter().enumerate().map(move |(c, n)| (n.as_str(), m.cell(n).unwrap_or_else(|| t.cell(c, i))))
-            .chain(m.iter().filter(move |(k, _)| t.col(k).is_none()).map(|(k, v)| (k, Cell::Json(v))))
+        let (t, d, v, i) = (self.t, self.d, self.v, self.i);
+        t.names().iter().enumerate().map(move |(c, n)| (n.as_str(), d.get(v, n).unwrap_or_else(|| t.cell(c, i))))
+            .chain(d.marks(v).into_iter().filter(move |(k, _)| t.col(k).is_none()))
     }
 
     pub fn to_map(self) -> Map<String, Value> {

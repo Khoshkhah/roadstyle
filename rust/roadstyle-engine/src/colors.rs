@@ -314,11 +314,9 @@ fn resolve(fs: &Roads, look: &Look, o: &Value) -> Result<Frame, String> {
 
 /// bake_props: each edge's __rs_fill, __rs_w, __rs_op, __rs_dash, __rs_casing, __rs_cw, __rs_cop and __rs_class.
 fn bake_props(fs: &mut Roads, f: &Frame) {
-    for (i, p) in fs.marks.iter_mut().enumerate() {
-        for (k, v) in [("__rs_fill", &f.fill), ("__rs_w", &f.width), ("__rs_op", &f.opacity), ("__rs_dash", &f.dash), ("__rs_casing", &f.casing),
-                       ("__rs_cw", &f.casing_width), ("__rs_cop", &f.casing_opacity), ("__rs_class", &f.klass)] {
-            p.insert(k, v[i].clone());
-        }
+    for i in 0..fs.len() {
+        let style = [&f.fill, &f.width, &f.opacity, &f.dash, &f.casing, &f.casing_width, &f.casing_opacity, &f.klass].map(|v| fs.values.id(&v[i]));
+        fs.draw[i].style = Some(style);
     }
 }
 
@@ -334,7 +332,7 @@ pub fn bake(fs: &mut Roads, look: &Look, args: &Value) -> Result<Colors, String>
         }
         for i in 0..fs.len() {
             let c = fs.get(i, key).and_then(|k| t.get(&py_str(k))).cloned().unwrap_or(Value::Null);
-            fs.marks[i].insert("__rs_color", c);
+            fs.draw[i].color = Some(fs.values.id(&c));
         }
         Some(color_table(fs, look, "__rs_color"))
     } else if get(args, "style").is_some() || get(args, "color_by").is_some() {
@@ -363,9 +361,13 @@ pub fn bake(fs: &mut Roads, look: &Look, args: &Value) -> Result<Colors, String>
         for (idx, (name, f)) in frames.iter().enumerate() {
             let prop = if idx == 0 { "__rs_fill".to_string() } else { format!("__rs_fill__{idx}") };
             let miss = if idx == 0 || f.missing_self { None } else { f.missing.as_ref() };
-            for (i, m) in fs.marks.iter_mut().enumerate() {
-                let fill = if miss.is_some_and(|m| m[i]) { &base[i] } else { &f.fill[i] };
-                m.insert(&prop, fill.clone());
+            for i in 0..fs.len() {
+                let fill = fs.values.id(if miss.is_some_and(|m| m[i]) { &base[i] } else { &f.fill[i] });
+                let d = &mut fs.draw[i];
+                match d.style.as_mut() {
+                    Some(s) if idx == 0 => s[0] = fill,
+                    _ => d.fills.push(fill),
+                }
             }
             meta.push(json!({"name": name, "prop": prop, "legend": f.legend.clone()}));
             props.push(prop);
