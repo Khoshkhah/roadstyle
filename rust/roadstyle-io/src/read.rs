@@ -107,7 +107,7 @@ fn binary(col: &ArrayRef, r: usize) -> Option<&[u8]> {
 }
 
 /// The points of a 2D WKB LineString; None for any other geometry.
-fn wkb_line(b: &[u8]) -> Option<Vec<[f64; 2]>> {
+pub fn wkb_line(b: &[u8]) -> Option<Vec<[f64; 2]>> {
     let le = *b.first()? == 1;
     let u32_at = |i: usize| -> Option<u32> {
         let w: [u8; 4] = b.get(i..i + 4)?.try_into().ok()?;
