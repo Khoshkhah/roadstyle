@@ -429,7 +429,7 @@ an item shows "yes" when the code has it:
 | A typed render model in place of JSON trees | `Value` (serde_json) in `roadstyle-engine`: 748 times | no |
 | Typed fields in place of the `__rs_*` properties | 59 distinct `__rs_*` names in `rust/` | no |
 | Stage 2 (the tiles) has its own public call in Python and in the browser | `roadstyle-py`: none; `roadstyle-wasm`: none | no |
-| Stage 2 takes the typed pieces, not JSON | `Value` (serde_json) in `roadstyle-tiles`: 28 times | no |
+| Stage 2 takes the typed pieces, not JSON | `Value` (serde_json) in `roadstyle-tiles`: 29 times | no |
 <!-- /gen:gaps -->
 
 What each gap means and how the plan closes it: [the architecture](../design/rust_library.md#the-architecture),
