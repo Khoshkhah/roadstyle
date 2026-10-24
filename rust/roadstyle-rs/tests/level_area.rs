@@ -2,7 +2,8 @@
 //! solve is feasible (the solver checks its hard rules), with edits and with the local re-solve, and the check before a rule is added
 //! says what roadstyle's rule_conflicts says.
 
-use roadstyle_rs::levels::area::{read_rows, Area, AreaRoad, PairRow};
+use roadstyle_rs::level_editor::read_pairs;
+use roadstyle_rs::levels::area::{Area, AreaRoad, PairRow, Previous, Relation, Why};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -13,14 +14,11 @@ fn data(name: &str) -> PathBuf {
 
 fn area() -> Area {
     let rows = roadstyle_rs::read::read_table(std::fs::read(data("roads.parquet")).unwrap(), "geometry").unwrap();
-    let ids = |v: &Value| v.as_array().unwrap().iter().map(|x| x.as_str().unwrap().to_string()).collect();
-    let roads = rows.iter().map(|r| AreaRoad { id: r.cols["road"].as_str().unwrap().into(), edges: ids(&r.cols["edges"]), reversed: ids(&r.cols["reversed"]) })
+    let id = |v: &Value| v.as_str().unwrap().parse::<i64>().unwrap();
+    let ids = |v: &Value| v.as_array().unwrap().iter().map(id).collect();
+    let roads = rows.iter().map(|r| AreaRoad { id: id(&r.cols["road"]), edges: ids(&r.cols["edges"]), reversed: ids(&r.cols["reversed"]) })
         .collect();
-    Area::new(roads, read_rows(&std::fs::read_to_string(data("pairs.csv")).unwrap()).unwrap())
-}
-
-fn row(relation: &str, a: &str, b: &str, a_end: &str, enabled: &str) -> PairRow {
-    PairRow { relation: relation.into(), a: a.into(), b: b.into(), a_end: a_end.into(), enabled: enabled.into(), ..Default::default() }
+    Area::new(roads, read_pairs(&std::fs::read_to_string(data("pairs.csv")).unwrap()).unwrap()).unwrap()
 }
 
 #[test]
@@ -29,16 +27,16 @@ fn the_solve_with_edits_and_the_local_re_solve() {
     let base = a.solve(&[], &HashMap::new(), 20, 1.0).unwrap();
     assert_eq!(base.levels.len(), a.roads.len());
     assert!(base.levels.iter().all(|v| v[0].max(v[1]).max(v[2]) <= v[3]), "a casing over its fill");
-    let stack = a.pairs.iter().find(|r| r.relation == "stack").unwrap().clone();
-    let order = a.pairs.iter().find(|r| r.relation == "order").unwrap().clone();
-    let edits = [row("stack", &stack.a, &stack.b, &stack.a_end, "false"), row("order", &order.a, &order.b, "", "false"),
-                 row("order", &order.b, &order.a, "", "true")];
-    let merged = a.merged(&edits).unwrap();
-    assert_eq!(merged.len(), a.pairs.len() - 1, "two rules off, one on");
-    let (local, how) = a.solve_local(&edits, &base, &[stack.a.clone(), order.a.clone()], 3, 20, 1.0).unwrap();
+    let stack = a.pairs.iter().find(|r| r.relation == Relation::Stack).unwrap().clone();
+    let order = a.pairs.iter().find(|r| r.relation == Relation::Order).unwrap().clone();
+    let edits = [PairRow { enabled: false, ..stack.clone() }, PairRow { enabled: false, ..order.clone() },
+                 PairRow { a: order.b, b: order.a, ..order.clone() }];
+    assert_eq!(a.merged(&edits).unwrap().len(), a.pairs.len() - 1, "two rules off, one on");
+    let (local, how) = a.solve_local(&edits, &Previous::from(&base), &[stack.a, order.a], 3, 20, 1.0).unwrap();
     assert!(local.levels.iter().all(|v| v[0].max(v[1]).max(v[2]) <= v[3]), "{how:?}");
     // a rule that switches off a rule that is not there
-    assert!(a.merged(&[row("order", &order.b, &order.a, "", "false")]).unwrap_err().contains("to switch off"));
+    let off = PairRow { a: order.b, b: order.a, enabled: false, ..order };
+    assert!(a.merged(&[off]).unwrap_err().contains("to switch off"));
 }
 
 #[test]
@@ -46,12 +44,12 @@ fn the_check_before_a_rule_is_added_as_roadstyle() {
     let a = area();
     let checks: Value = serde_json::from_str(&std::fs::read_to_string(data("checks.json")).unwrap()).unwrap();
     let text = |v: &Value, k: &str| v[k].as_str().unwrap_or("").to_string();
-    let rows: Vec<PairRow> = checks["rows"].as_array().unwrap().iter().map(|r| PairRow {
-        relation: text(r, "relation"), a: text(r, "a"), b: text(r, "b"), a_end: text(r, "a_end"), b_end: text(r, "b_end"), enabled: text(r, "enabled"),
-    }).collect();
-    let got: Vec<Value> = a.conflicts(&[], &rows).unwrap().into_iter().map(|(i, why, with)| {
-        assert!(!with.is_empty());
-        serde_json::json!([i, why])
+    let csv = std::iter::once("relation,a,b,a_end,b_end,enabled".to_string())
+        .chain(checks["rows"].as_array().unwrap().iter().map(|r| ["relation", "a", "b", "a_end", "b_end", "enabled"].map(|k| text(r, k)).join(",")))
+        .collect::<Vec<_>>().join("\n");
+    let got: Vec<Value> = a.conflicts(&[], &read_pairs(&csv).unwrap()).unwrap().into_iter().map(|c| {
+        assert!(!c.with.is_empty());
+        serde_json::json!([c.row, match c.why { Why::Duplicate => "duplicate", Why::NotKept => "not kept", Why::Loop => "loop" }])
     }).collect();
     assert_eq!(Value::Array(got), checks["conflicts"]);
 }
