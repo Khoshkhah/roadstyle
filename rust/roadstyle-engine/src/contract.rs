@@ -102,6 +102,17 @@ pub fn roles(layers: &[Value]) -> Value {
     Value::Object(out)
 }
 
+/// The one writer of what the dashboard reads about a style's layers (audit N7): `roadstyle:sources` (`roles`) and `roadstyle:arrows`
+/// (`arrow_kind`) from its final layers, in a style with the interaction contract. Stage 2 calls it again on the tiled style.
+pub fn describe(style: &mut Value) {
+    if style["metadata"]["roadstyle:contract"].is_null() {
+        return;
+    }
+    let layers = style["layers"].as_array().cloned().unwrap_or_default();
+    style["metadata"]["roadstyle:sources"] = roles(&layers);
+    style["metadata"]["roadstyle:arrows"] = arrow_kind(&layers);
+}
+
 /// roadstyle:arrows: "points" (the page puts one arrow on each one-way road in view: the source "arrows"), "line" (along the slots), or
 /// null (no arrows); render_web._arrow_kind.
 pub fn arrow_kind(layers: &[Value]) -> Value {

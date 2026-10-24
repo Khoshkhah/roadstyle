@@ -122,6 +122,7 @@ pub fn tiled_style(mut style: Value, tiled: &[String], at: &Value, zooms: (u32, 
         }
     }
     style["sources"] = Value::Object(sources);
+    contract::describe(&mut style);        // the roles now name the tile layers
     style
 }
 

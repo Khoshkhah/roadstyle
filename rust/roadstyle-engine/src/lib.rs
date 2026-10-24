@@ -183,7 +183,7 @@ fn style_parts(table: RoadTable, look_json: &Value, features: Option<Vec<Row>>, 
     // a page has no roads source: its pieces draw and glow (one feature state for each road's row), and the road table has the roads
     // the pieces carry their road's row as the feature id in every style (the contract: the glow, rs.setData's states)
     (roads.in_style, simple.promote) = (!live, true);
-    let (mut contract, state) = if live {
+    let (contract, state) = if live {
         let st = contract::page_state(&look_json, colors.active, ovs.len());
         (Some((contract::controls(&look_json, &roads.roads, info, colors.active)?, st.clone())),
          Some(Value::Object(st.into_iter().map(|(k, v)| (k, json!({"default": v}))).collect())))
@@ -227,10 +227,6 @@ fn style_parts(table: RoadTable, look_json: &Value, features: Option<Vec<Row>>, 
                            "layout": {"line-cap": th["roads"]["cap"], "line-join": th["roads"]["join"]},
                            "paint": {"line-color": b["color"], "line-width": b["width"], "line-opacity": b["opacity"], "line-dasharray": b["dash"]}}));
     }
-    if let Some((controls, _)) = contract.as_mut() {        // the page's roles and arrows, from its final layers
-        controls["sources"] = contract::roles(&layers);
-        controls["arrows"] = contract::arrow_kind(&layers);
-    }
     images.insert("oneway".into(), look_json["oneway_image"].clone());
     let mut metadata = serde_json::Map::new();
     // the export's page metadata: the road popup's fields, the hover tooltip and the hover delay (roadstyle:interaction)
@@ -268,6 +264,9 @@ fn style_parts(table: RoadTable, look_json: &Value, features: Option<Vec<Row>>, 
             "ramp": (0..9).map(|i| ramp.hex(i as f64 / 8.0)).collect::<Vec<_>>(), "nodata": look_json["theme"]["data"]["nodata"]}));
     }
     if let Some((controls, st)) = contract {
+        // audit N7: the roles and the arrow kind from the final layers (contract::describe; tiled_style writes them again for the tiles)
+        metadata.insert("roadstyle:sources".into(), contract::roles(&layers));
+        metadata.insert("roadstyle:arrows".into(), contract::arrow_kind(&layers));
         metadata.insert("roadstyle:contract".into(), json!(contract::CONTRACT));
         metadata.insert("roadstyle:state".into(), Value::Object(st));
         metadata.insert("roadstyle:controls".into(), controls);
