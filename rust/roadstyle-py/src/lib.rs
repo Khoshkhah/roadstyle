@@ -312,6 +312,34 @@ fn make_page(style: String, page: String, parts: String, pmtiles: Option<Vec<u8>
     roadstyle::page::make_page(&style, &page, &parts, pmtiles.as_deref()).map_err(PyValueError::new_err)
 }
 
+/// page_from(roads, look, options, given) -> str: the page of the roads (GeoParquet bytes) in one call (roadstyle::page_options), as
+/// render_edges(backend="web"). `options`: the look's options (JSON text: palette, profile, settings, features, files), which a view's
+/// palette resolves again; `given`: the caller's values over the look's args (JSON text: basemap and basemaps as resolved entries,
+/// api_key, street_view_key). MapLibre stays a placeholder (WebMap puts it in).
+#[pyfunction]
+fn page_from(py: Python<'_>, roads: Vec<u8>, look: PyRef<'_, PyLook>, options: String, given: String) -> PyResult<String> {
+    let options: roadstyle::look::Options = serde_json::from_str(&options).map_err(|e| PyValueError::new_err(format!("options: {e}")))?;
+    let given: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&given).map_err(|e| PyValueError::new_err(format!("given: {e}")))?;
+    let look = &look.0;
+    let page = py.detach(|| roadstyle::read::read_roads(roads, "geometry").map_err(String::from).and_then(|r| roadstyle::page_options::page_from(r, look, &options, &given)))
+        .map_err(PyValueError::new_err)?;
+    warned(&page.warnings);
+    Ok(page.html)
+}
+
+/// page_defaults() -> str: the defaults of the keywords that only the page reads (JSON text), which page_from takes for a keyword that
+/// the caller did not give.
+#[pyfunction]
+fn page_defaults() -> String {
+    serde_json::Value::Object(roadstyle::page_options::page_defaults()).to_string()
+}
+
+/// sidebar_defaults() -> str: the keywords that each sidebar (sidebar=) changes when the caller gives none (JSON text).
+#[pyfunction]
+fn sidebar_defaults() -> String {
+    serde_json::Value::Object(roadstyle::page_options::sidebar_defaults()).to_string()
+}
+
 /// export_look(look, cols, positions) -> str: the simple look for another app's data layer (roadstyle_engine::export_look); `cols`: the
 /// columns [highway, oneway, tunnel, bridge, id].
 #[pyfunction]
@@ -436,6 +464,9 @@ fn take_warnings() -> Vec<String> {
 fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(take_warnings, m)?)?;
     m.add_function(wrap_pyfunction!(make_page, m)?)?;
+    m.add_function(wrap_pyfunction!(page_from, m)?)?;
+    m.add_function(wrap_pyfunction!(page_defaults, m)?)?;
+    m.add_function(wrap_pyfunction!(sidebar_defaults, m)?)?;
     m.add_function(wrap_pyfunction!(export_look, m)?)?;
     m.add_function(wrap_pyfunction!(make_style, m)?)?;
     m.add_function(wrap_pyfunction!(resolve_look, m)?)?;

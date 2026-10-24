@@ -9,9 +9,11 @@ import {setLiveColors} from "./color.js";
 let _liveRows = [];                  // the rows that have a live width now
 const _hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
 const _toHex = v => "#" + v.map(x => Math.round(x).toString(16).padStart(2, "0")).join("");
-// the colour at t (0..1) on a ramp of colours, linear between its stops (the engine's ramps: branca's LinearColormap, 9 stops)
-function _at(ramp, t){
+// the colour at t (0..1) on a ramp of colours, linear between its stops (the engine's ramps: branca's LinearColormap, 9 stops); stepped:
+// the nearest stop (SonoFlow's Daily page colours so)
+function _at(ramp, t, stepped){
   const x = Math.max(0, Math.min(1, t)) * (ramp.length - 1), i = Math.min(ramp.length - 2, Math.floor(x)), f = x - i;
+  if(stepped) return ramp[Math.round(x)];
   const a = _hex(ramp[i]), b = _hex(ramp[i + 1]);
   return _toHex(a.map((v, k) => v + (b[k] - v) * f)); }
 function _rows(table){
@@ -38,10 +40,10 @@ export async function setData(table, opts){
   if(o.colorBy){
     const vals = [...joined.values()].map(r => r[o.colorBy]), num = vals.some(v => typeof v === "number");
     if(num){ const [lo, hi] = _range(vals, o.vmin, o.vmax);
-      joined.forEach((r, i) => { const v = r[o.colorBy]; if(typeof v === "number" && isFinite(v)) cols.set(i, _at(ramp, hi > lo ? (v - lo) / (hi - lo) : 0.5)); });
-      legend = {kind: "continuous", title: o.colorBy, ramp: ramp, vmin: lo, vmax: hi}; }
+      joined.forEach((r, i) => { const v = r[o.colorBy]; if(typeof v === "number" && isFinite(v)) cols.set(i, _at(ramp, hi > lo ? (v - lo) / (hi - lo) : 0.5, o.stepped)); });
+      legend = {kind: "continuous", title: o.colorBy, ramp: ramp, vmin: lo, vmax: hi, stepped: !!o.stepped}; }
     else { const cats = [...new Set(vals.filter(v => v != null).map(String))].sort(), col = {};
-      cats.forEach((c, k) => { col[c] = _at(ramp, cats.length > 1 ? k / (cats.length - 1) : 0.5); });
+      cats.forEach((c, k) => { col[c] = _at(ramp, cats.length > 1 ? k / (cats.length - 1) : 0.5, o.stepped); });
       joined.forEach((r, i) => { const v = r[o.colorBy]; if(v != null) cols.set(i, col[String(v)]); });
       legend = {kind: "categorical", title: o.colorBy, entries: cats.map(c => [c, col[c]])}; }
     if(nodata) for(let i = 0, n = RoadTable.rows(); i < n; i++) if(!cols.has(i)) cols.set(i, nodata);

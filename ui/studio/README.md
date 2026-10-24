@@ -27,7 +27,8 @@ python -m http.server 8000
 ## What waits for other parts
 
 - Shapefile road files: `readShp` (branch readers-rs). GeoPackage stays with the native programs: SQLite is C.
-- The download of the page (`makePage`), and the Dashboard and Report pages: the page writer (R3).
+- The download of the page, and the Dashboard and Report pages: `makePage(roads, look, options)` makes them (R3; a sidebar with
+  `"sidebar": "dashboard"` in the args), but the studio has no button for it yet.
 
 Each change of a knob runs the look and stage 1 again in the worker (Södermalm driving, 4,563 roads: 0.3 to 0.5 s). All the calls
 of the look are in `worker.js`, so the look's typed handle changes one file.

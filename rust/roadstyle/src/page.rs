@@ -5,7 +5,8 @@
 //! WebMap.html: the caller inlines it or loads it from a CDN.
 
 use base64::Engine;
-use serde_json::{Map, Value};
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Number, Value};
 
 macro_rules! asset {
     ($p:literal) => {
@@ -24,11 +25,62 @@ const TILES: &str = asset!("static/page/tiles.html");
 const SIDE: &str = asset!("static/page/side.html");
 const PMTILES_JS: &str = asset!("vendor/pmtiles.js");
 
+/// The options of rsDashboard that the page gives (render_web.render's `page`, static/dashboard/index.js), in the page's order. Each has
+/// the name of a `render` keyword. A number stays as the caller gave it (`55` or `55.0`: the page is Python's byte for byte).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PageOptions {
+    pub basemaps: Vec<Value>,
+    pub basemap_switcher: bool,
+    /// a tiled page (the roads in the embedded PMTiles archive)
+    pub tiles: bool,
+    /// the road layer of simple mode ("roads-simple"), or false (the full look)
+    pub simple: Value,
+    /// roadstyle:sources and roadstyle:arrows (contract::roles, contract::arrow_kind); live: roadstyle:live, or null
+    pub sources: Value,
+    pub arrows: Value,
+    pub live: Value,
+    pub popup_mode: String,
+    pub find_control: bool,
+    pub zoom_readout: bool,
+    pub pitch_3d: Number,
+    /// true, false or "window"
+    pub street_view: Value,
+    pub street_view_key: String,
+    pub google_3d: bool,
+    pub select_color: Value,
+    pub filter: Value,
+    pub color_options: Value,
+    pub color_active: Value,
+    pub overlays: Value,
+    pub overlay_control: bool,
+    pub overlay_popup: bool,
+    pub tunnel: Value,
+    pub fill_layers: Value,
+    pub road_fill: Value,
+    pub views: Value,
+    pub items: Value,
+    pub road_popup: Value,
+    pub road_tooltip: Value,
+    pub hover_delay_ms: i64,
+    pub edge_id_col: String,
+    pub arrow_icon: Value,
+    pub arrow_color: Value,
+    pub arrow_rules: Value,
+}
+
+/// The page's start camera (the camera settings with the call's pitch, bearing and max_pitch).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Camera {
+    pub pitch: Number,
+    pub bearing: Number,
+    pub max_pitch: Number,
+}
+
 /// What the page needs besides the style and the options (render_web._page_html's keywords).
 pub struct PageParts<'a> {
     pub name: &'a str,
-    /// the camera: pitch, bearing, max_pitch
-    pub cam: &'a Value,
+    pub cam: Camera,
     /// [minx, miny, maxx, maxy] of the roads
     pub bounds: [f64; 4],
     pub side_panel_html: Option<&'a str>,
@@ -64,12 +116,25 @@ fn frame() -> String {
         .replace("__DASHBOARD_CSS__", DASH_CSS).replace("__DASHBOARD_JS__", &dashboard_js())
 }
 
+/// `text` with each token of `values` in it replaced, in one pass: a value is not searched again.
+fn fill(text: &str, values: &[(&str, String)]) -> String {
+    let mut out = String::with_capacity(text.len() + values.iter().map(|(_, v)| v.len()).sum::<usize>());
+    let mut rest = text;
+    while let Some((at, (k, v))) = values.iter().filter_map(|kv| rest.find(kv.0).map(|i| (i, kv))).min_by_key(|(i, _)| *i) {
+        out.push_str(&rest[..at]);
+        out.push_str(v);
+        rest = &rest[at + k.len()..];
+    }
+    out.push_str(rest);
+    out
+}
+
 /// html.escape (quote=True).
-fn escape(s: &str) -> String {
+pub(crate) fn escape(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;").replace('\'', "&#x27;")
 }
 
-fn gzip_b64(raw: &[u8]) -> String {
+pub(crate) fn gzip_b64(raw: &[u8]) -> String {
     use std::io::Write;
     let mut e = flate2::GzBuilder::new().mtime(0).write(Vec::new(), flate2::Compression::new(6));
     e.write_all(raw).unwrap();
@@ -103,36 +168,21 @@ fn host_panel(html: Option<&str>, width: f64, name: &str) -> String {
 }
 
 /// render_web._page_html: the page of `style` (the base map's and the roads' sources and layers) with the dashboard's options `page`.
-pub fn page_html(mut style: Value, page: &Value, p: &PageParts) -> String {
+pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String {
     let gz = match (&p.gz, p.compress) {
         (Some(g), _) => g.clone(),
         (None, true) => compress_sources(&mut style),
         (None, false) => Map::new(),
     };
-    let j = |k: &str| pyjson::dumps(&page[k], false);
     let [x0, y0, x1, y1] = p.bounds;
-    let num = |v: &Value| pyjson::dumps(v, false);
-    let reps: Vec<(&str, String)> = vec![
-        ("__TITLE__", escape(p.name)), ("__ARROW_COLOR__", j("arrow_color")), ("__ARROW_ICON__", j("arrow_icon")), ("__ARROW_RULES__", j("arrow_rules")),
-        ("__STYLE__", pyjson::dumps(&style, false)), ("__BASEMAPS__", j("basemaps")), ("__BM_SWITCHER__", j("basemap_switcher")),
-        ("__ZOOM_READOUT__", j("zoom_readout")), ("__FILTER__", j("filter")),
-        ("__CENTER__", pyjson::dumps(&serde_json::json!([(x0 + x1) / 2.0, (y0 + y1) / 2.0]), false)), ("__PITCH3D__", j("pitch_3d")),
-        ("__MAX_PITCH__", num(&p.cam["max_pitch"])), ("__SELECT_COLOR__", j("select_color")), ("__PITCH__", num(&p.cam["pitch"])),
-        ("__BEARING__", num(&p.cam["bearing"])), ("__BOUNDS__", pyjson::dumps(&serde_json::json!([[x0, y0], [x1, y1]]), false)),
-        ("__RS_FILL_LAYERS__", j("fill_layers")), ("__COLOR_OPTIONS__", j("color_options")), ("__CO_ACTIVE__", j("color_active")),
-        ("__OVERLAYS__", j("overlays")), ("__FIND_CONTROL__", j("find_control")), ("__OVERLAY_CONTROL__", j("overlay_control")),
-        ("__OVERLAY_POPUP__", j("overlay_popup")), ("__ROAD_ITEMS__", j("items")), ("__TUNNEL__", j("tunnel")), ("__VIEWS__", j("views")),
-        ("__RS_ROAD_FILL__", j("road_fill")), ("__ROAD_POPUP__", j("road_popup")), ("__ROAD_POPUP_MODE__", j("popup_mode")),
-        ("__EDGE_ID_COL__", j("edge_id_col")), ("__ROAD_TOOLTIP__", j("road_tooltip")), ("__HOVER_DELAY_MS__", j("hover_delay_ms")),
-        ("__STREET_VIEW__", j("street_view")), ("__SV_WINDOW_KEY__", j("street_view_key")), ("__GOOGLE_3D__", j("google_3d")),
-        ("__RS_TILED__", j("tiles")), ("__RS_LEAN__", j("simple")), ("__RS_SOURCES__", j("sources")), ("__RS_ARROWS__", j("arrows")), ("__RS_LIVE__", j("live")),
-        // the last: the host's own text may hold any other token
-        ("__HOST_PANEL_HTML__", host_panel(p.side_panel_html, p.host_panel_width, p.name)),
-    ];
-    let mut html = frame();
-    for (k, v) in reps {
-        html = html.replace(k, &v);
-    }
+    let Ok(Value::Object(mut opts)) = serde_json::to_value(page) else { unreachable!("PageOptions is a JSON object") };
+    let c = &p.cam;
+    opts.insert("camera".into(), serde_json::json!({"center": [(x0 + x1) / 2.0, (y0 + y1) / 2.0], "pitch": c.pitch, "bearing": c.bearing,
+                                                    "max_pitch": c.max_pitch, "bounds": [[x0, y0], [x1, y1]]}));
+    // the frame's tokens in one pass (audit R3): a value is not read again, so the host's own text may hold any token
+    let mut html = fill(&frame(), &[("__TITLE__", escape(p.name)), ("__STYLE__", pyjson::dumps(&style, false)),
+                                    ("__RS_OPTIONS__", pyjson::dumps(&Value::Object(opts), false)),
+                                    ("__HOST_PANEL_HTML__", host_panel(p.side_panel_html, p.host_panel_width, p.name))]);
     let mut parts = String::new();
     if let Some(pmt) = p.tiles {
         parts = format!("<script>{}</script>{}", PMTILES_JS.replace("</script>", "<\\/script>"),
@@ -156,10 +206,12 @@ pub fn page_html(mut style: Value, page: &Value, p: &PageParts) -> String {
 /// side_panel_html, host_panel_width, compress, gz, side, side_b64, simple_js}); `pmtiles`: the archive of a tiled page.
 pub fn make_page(style: &str, page: &str, parts: &str, pmtiles: Option<&[u8]>) -> Result<String, String> {
     let read = |t: &str, what: &str| serde_json::from_str::<Value>(t).map_err(|e| format!("{what}: not JSON: {e}"));
-    let (style, page, p) = (read(style, "style")?, read(page, "page")?, read(parts, "parts")?);
+    let (style, p) = (read(style, "style")?, read(parts, "parts")?);
+    let page: PageOptions = serde_json::from_str(page).map_err(|e| format!("page: {e}"))?;
+    let cam: Camera = serde_json::from_value(p["cam"].clone()).map_err(|e| format!("parts.cam: {e}"))?;
     let b = |i: usize| p["bounds"][i].as_f64().unwrap_or(0.0);
     let parts = PageParts {
-        name: p["name"].as_str().unwrap_or(""), cam: &p["cam"], bounds: [b(0), b(1), b(2), b(3)], side_panel_html: p["side_panel_html"].as_str(),
+        name: p["name"].as_str().unwrap_or(""), cam, bounds: [b(0), b(1), b(2), b(3)], side_panel_html: p["side_panel_html"].as_str(),
         host_panel_width: p["host_panel_width"].as_f64().unwrap_or(320.0), compress: p["compress"] == true, gz: p["gz"].as_object().cloned(),
         tiles: pmtiles, side: (p["side_b64"].is_string() || !p["side"].is_null()).then(|| (&p["side"], p["side_b64"].as_str())),
         simple_js: (!p["simple_js"].is_null()).then_some(&p["simple_js"]),

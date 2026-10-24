@@ -52,6 +52,13 @@ def _page(gdf, template: str, *, defaults: dict, edit=None, **kw):
     return m
 
 
+#: the keywords that each sidebar (``sidebar=``) changes when the call gives none (roadstyle::page_options::SIDEBARS, the same)
+SIDEBAR_DEFAULTS = {
+    "dashboard": {"name": "Roads dashboard", "basemap_switcher": False, "filter_control": False, "road_popup": False},
+    "report": {"name": "Roads report", "basemap_switcher": True, "filter_control": False, "road_popup": False},
+}
+
+
 def render_dashboard(gdf, **kw):
     """A self-contained **dashboard** page: the styled map with every built-in control off and the
     bundled dashboard sidebar injected — base-map + colour-by selects, a class filter with a legend,
@@ -60,9 +67,8 @@ def render_dashboard(gdf, **kw):
     Populate the *Colour by* picker with ``color_options={...}`` (see :func:`render_edges`); any
     other ``render_edges`` keyword passes through. Returns a :class:`WebMap`;
     ``.save("dashboard.html")`` writes the page."""
-    return _page(gdf, "dashboard",
-                 defaults=dict(name="Roads dashboard", basemap_switcher=False,
-                               filter_control=False, road_popup=False), **kw)
+    kw.pop("backend", None)                       # web only: the sidebar drives a MapLibre map
+    return render_edges(gdf, backend="web", sidebar="dashboard", **kw)
 
 
 def render_report(gdf, **kw):
@@ -72,9 +78,8 @@ def render_report(gdf, **kw):
 
     Same ``color_options=`` / ``render_edges`` keywords as :func:`render_dashboard`. Returns a
     :class:`WebMap`; ``.save("report.html")`` writes the page."""
-    return _page(gdf, "report",
-                 defaults=dict(name="Roads report", basemap_switcher=True,
-                               filter_control=False, road_popup=False), **kw)
+    kw.pop("backend", None)
+    return render_edges(gdf, backend="web", sidebar="report", **kw)
 
 
 def render_street_view(gdf, *, panel_width: float = 42, resizable: bool = True,

@@ -28,6 +28,23 @@ All notable changes to **roadstyle** are documented here. The format is based on
   features.parquet into one table (Arrow columns and one coordinate buffer), cuts the sea out of it, and keeps each base-map layer as a
   table until it writes the GeoJSON text, not a JSON tree for each feature. The output is the same bytes (the styles, the files and the
   tiles of Monaco and Tartu). On Tartu, stage 1 needs 284 MB, not 403 MB, and the base map's part of make_sources takes 58 ms, not 115 ms. Stage 2 cuts the tiles from the tables too: make_tiled takes 1,752 ms, not 2,074 ms, and 344 MB, not 483 MB.
+- **The Rust engine makes the whole page in one call** (audit R3). `roadstyle::page_options::page_from(roads, look, options, given)`
+  runs stage 1, the arrows or the tiles, the views and their palettes, builds the options of `rsDashboard` (typed: `page::PageOptions`)
+  and writes the page. Python's `render_edges(engine="rust")`, the new command `roadstyle page` and the browser's `makePage(roads,
+  look, options, given?)` call it. Python gives only what it alone knows: the data steps, the look's options, the base maps' keys and the
+  Google Maps key. A view's palette resolves its look in Rust (Python makes no extra looks). The page writer gzips the road table and
+  the big sources itself; the two engines' pages are the same byte for byte but these blobs, which are the same when read back.
+- **`roadstyle:controls` has no page keywords** (rule 5, R3). It has the facts of the look and of the roads that a host's dashboard
+  needs (the filter panel, the overlays, the tunnel look, `select_color`, `pitch_3d`, ...). `tiles` and `views` are not in it any more:
+  they are the caller's page keywords, which the page gives in `RS_OPTIONS` and a host gives to `rsDashboard` itself.
+- **`sidebar="dashboard"` or `"report"`**: the bundled sidebar of `render_dashboard` and `render_report`, in both engines. It sets
+  `name`, `basemap_switcher`, `filter_control` and `road_popup` where the call gives none (`pages.SIDEBAR_DEFAULTS`). The two
+  functions now pass `sidebar=` to `render_edges`, so the Rust engine makes these pages too, and the CLI with `--sidebar`.
+- **The page has its options in one object** (audit R3, step 1, both engines). The template's 38 placeholders of the dashboard's
+  options and the camera are one `__RS_OPTIONS__`: the JSON object `RS_OPTIONS` has the options of `rsDashboard` and `camera`
+  (`center`, `pitch`, `bearing`, `max_pitch`, `bounds`), and the page calls `rsDashboard(map, {...RS_OPTIONS, style})`. The page
+  writers fill in the frame's four tokens in one pass, so a value is not read again. A script that read the page's text
+  (`maxPitch:70`, `\n  tiles: true,`) reads `RS_OPTIONS` now.
 - **`js/roads_sql.js` and `js/features_sql.js` run the SQL of `duckosmPlan`** (roadstyle-io's `duckosm.rs`), the one copy that
   Python runs too. They have no SQL of their own now. Their functions and arguments do not change, and a new `readCatalog(q, catalog)`
   gives the catalog that `duckosmPlan` reads. Load the module (`init()`) before you call them. On Monaco they write the same
@@ -92,6 +109,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   (`[[mode, count], ...]`, from the map option `modes`); `roadstyle:controls.box_layout` is `"stack"` for a base map's page; and each
   base-map layer's entry in `roadstyle:controls.overlays` has its start `interactive` (mapstyle's rule: not for landcover, water, paved
   and the decoration lines) and its `kinds` with their counts, most first. On Monaco all 17 layers equal mapstyle's.
+- **`rs.setData(rows, {stepped: true})`**: each road gets the ramp's nearest stop, not a colour between two stops, and the legend shows the
+  same steps. SonoFlow's Daily page colours so, which lets it move to live data in the simple look with the same look.
 - **The dashboard has mapstyle's page functions** (docs/design/mapstyle_page_scripts.md), found by their roles in the metadata, not by
   layer ids: `rsSetModes` / `rsGetModes` / `RS_MODES` (the roads of some modes, from `roadstyle:controls.modes` and the road table's
   flags), `rsSetKinds` / `rsGetKinds` / `RS_KINDS` (a base-map layer's kinds), `rsSetInteraction` / `rsGetInteraction` (a layer's

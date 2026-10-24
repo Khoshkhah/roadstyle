@@ -50,7 +50,7 @@ Serve the folder over http. A module script does not load from a `file://` addre
 | `tiler.tile("roads", z, x, y)` | `Uint8Array` | one vector tile; empty when no road is in it |
 | `tiler.props("roads", row)` | JSON text | the properties of one road, or `null` |
 | `tiler.archive(bounds, layers)` | `Uint8Array` | a PMTiles archive of all tiles in `[min lon, min lat, max lon, max lat]` |
-| `makePage(style, options, parts, pmtiles?)` | HTML text | the whole page, as `render_edges` writes it |
+| `makePage(roads, look, options, given?)` | HTML text | the whole page, as `render_edges` writes it |
 | `exportLook(look, cols, positions)` | JSON text | the look for another app's data layer (as `export_look`) |
 | `memoryBytes()` | number | the size of the module's memory, in bytes |
 
@@ -215,23 +215,20 @@ page.
 
 ## Write the whole page
 
-`makePage` writes the same page as `render_edges`, from a live style. `options` holds the options of `rsDashboard`, and
-`parts` the frame of the page. The page has placeholders for MapLibre, which you replace:
+`makePage` writes the same page as `render_edges(backend="web")` in one call: stage 1, the arrows or the tiles, the views, the
+dashboard's options and the page. `look` is the result of `makeLook(options)`, with `"state": "live"` in its args. Give the same
+`options` text again: a view with another palette resolves its look from it. The page has placeholders for MapLibre, which you
+replace:
 
 ```js
-const m = style.metadata, ctl = m["roadstyle:controls"], ui = m["roadstyle:interaction"];
-const options = {...ctl, basemaps: [], basemap_switcher: false, popup_mode: "popup", find_control: false, zoom_readout: true,
-                 street_view: "window", street_view_key: "", google_3d: false, overlay_control: true, overlay_popup: true, views: [],
-                 color_options: m["roadstyle:color_options"] || [], road_popup: ui.popup, road_tooltip: ui.tooltip,
-                 hover_delay_ms: ui.hover_delay_ms};
-const parts = {name: "Monaco", cam: {pitch: 0, bearing: 0, max_pitch: 70}, bounds: [7.40, 43.72, 7.44, 43.75], compress: false};
-const html = makePage(JSON.stringify(style), JSON.stringify(options), JSON.stringify(parts))
+const options = JSON.stringify({palette: "amber", args: {state: "live", name: "Monaco", basemap: "osm", views: {plain: {road_fill: false}}}});
+const html = makePage(roads, makeLook(options), options)
   .replace("<style>__MAPLIBRE_CSS__</style>", '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">')
   .replace("<script>__MAPLIBRE_JS__</script>", '<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>');
 ```
 
-`parts` takes `name`, `cam` (`pitch`, `bearing`, `max_pitch`), `bounds` (the box of the roads), `side_panel_html`,
-`host_panel_width` and `compress`. For a tiled page, give the archive of `tiler.archive(...)` as `pmtiles`.
+`given` (JSON text) holds what only the host knows: `api_key` (the key of a CARTO base map), `street_view_key`, and
+`resolved_basemaps` (base map entries in the form of `data/basemaps.json`). The warnings of the stages go to `console.warn`.
 
 ## Keep the main thread free
 

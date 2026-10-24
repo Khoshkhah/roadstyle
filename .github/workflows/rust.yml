@@ -45,10 +45,11 @@ jobs:
           roadstyle-rs/tests/get_goldens.sh
 
       - name: Tests
-        # release for the speed of the goldens, with the overflow checks of a debug build (pmtiles.rs's overflow, 2026-10-24, panicked
-        # only in debug)
+        # release for the speed of the goldens, with the overflow checks and the debug_assert! of a debug build (pmtiles.rs's overflow,
+        # 2026-10-24, panicked only in debug)
         env:
           CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "true"
+          CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: "true"
         run: cargo test --offline --release
 
       - name: Clippy
@@ -139,4 +140,7 @@ jobs:
           roadstyle-rs/tests/get_goldens.sh
 
       - name: The ignored goldens (Tartu)
+        env:
+          CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "true"
+          CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: "true"
         run: cargo test --offline --release -- --ignored --skip monaco_solve_rows --skip slot_differences
