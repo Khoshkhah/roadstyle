@@ -34,8 +34,8 @@ PARTIAL_MAX = 1500      # more roads changed by an Apply than this: the whole pa
 
 
 class Area:
-    def __init__(self, folder, items=None):
-        self.dir, self.items, self._overlays = Path(folder), items, []
+    def __init__(self, folder, items=None, engine=None):
+        self.dir, self.items, self._overlays, self.engine = Path(folder), items, [], engine
         self.roads = gpd.read_parquet(self.dir / "roads.parquet")
         self.pairs = pd.read_csv(self.dir / "pairs.csv", dtype=str, keep_default_na=False)
         self.edits_path = self.dir / "edits.csv"
@@ -97,7 +97,8 @@ class Area:
         return pd.read_csv(self.edits_path, dtype=str, keep_default_na=False).reindex(columns=COLS, fill_value="")
 
     def solve(self, edits, heads=None):
-        return solve(self.roads, self.pairs, edits if len(edits) else None, self.heads if heads is None else heads, self.caps)[0]
+        return solve(self.roads, self.pairs, edits if len(edits) else None, self.heads if heads is None else heads, self.caps,
+                     engine=self.engine)[0]
 
     def build(self, edits, solved=None, save=False, in_place=False):
         """The map of ``solved`` (solved here if None): the automatic caps from its levels, yours on top; ``save``: levels.csv too.
@@ -184,7 +185,7 @@ class Area:
         else:
             new, hd = self.edits() if edits is None else edits, self.heads if heads is None else heads
             solved = solve_local(self.roads, self.pairs, new if len(new) else None, hd, self.caps, self.solved,
-                                 _changed(self.edits(), new, self.heads, hd, self.road_of))[0]                  # raises ValueError: nothing written
+                                 _changed(self.edits(), new, self.heads, hd, self.road_of), engine=self.engine)[0]                  # raises ValueError: nothing written
             r = solved.attrs["levels_info"]["resolve"]
             self.full = r["how"] == "full"
             self.said = (f"re-solved the {r['free']} roads around the change in {r['seconds']} s" if r["how"] == "local" else
@@ -499,8 +500,9 @@ def _handler(area):
 _EDITOR = (Path(__file__).resolve().parent / "static" / "level_editor.html").read_text()
 
 
-def serve(folder, port=8780, items=None):
-    """The editor of the area in ``folder`` at http://localhost:``port``/ until Ctrl+C; ``items``: see the module's docstring."""
-    area = Area(folder, items)
+def serve(folder, port=8780, items=None, engine=None):
+    """The editor of the area in ``folder`` at http://localhost:``port``/ until Ctrl+C; ``items``: see the module's docstring; ``engine``: the
+    solver of solve_levels ("python" or "rust")."""
+    area = Area(folder, items, engine)
     print(f"level editor: http://localhost:{port}/  ({folder}; Ctrl+C to stop)", flush=True)
     ThreadingHTTPServer(("127.0.0.1", port), _handler(area)).serve_forever()

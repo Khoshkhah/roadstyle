@@ -182,6 +182,19 @@ fn compute_levels(py: Python<'_>, roads: Vec<u8>, method: String, cols: [String;
     .map_err(|e: String| PyValueError::new_err(e))
 }
 
+/// solve_rules(roads, meets, lifts, near, orders, fixed, steps, min_positions) -> (parts, given_up_parts, orders_not_kept, near_not_kept):
+/// roadstyle's _solve_intervals by the Rust solver, on road indexes (solve_levels(engine="rust")). A meet is (x, x_end, y, y_end) with the
+/// ends 0 (start) or 2 (end); a stack or near rule (upper, lower, part 0, 1 or 2); a fixed road (road, its four numbers in [0, steps]).
+#[pyfunction]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
+fn solve_rules(py: Python<'_>, roads: usize, meets: Vec<(usize, usize, usize, usize)>, lifts: Vec<(usize, usize, usize)>,
+               near: Vec<(usize, usize, usize)>, orders: Vec<(usize, usize)>, fixed: Vec<(usize, [i64; 4])>, steps: i64, min_positions: bool)
+               -> PyResult<(Vec<[i64; 4]>, Vec<(usize, usize, usize)>, Vec<(usize, usize)>, Vec<(usize, usize, usize)>)> {
+    let rules = roadstyle::levels::solve::Rules { roads, meets, lifts, orders, near, fixed };
+    let s = py.detach(|| roadstyle::levels::solve::solve(&rules, steps, min_positions)).map_err(PyValueError::new_err)?;
+    Ok((s.parts, s.given_up_parts, s.orders_not_kept, s.near_not_kept))
+}
+
 /// render_web._page_html in Rust (roadstyle::page): the page of a live style with the dashboard's options. `parts`: name, cam, bounds,
 /// side_panel_html, host_panel_width, compress, gz (the blobs, made by Python's zlib), side_b64, side, simple_js; `pmtiles`: a tiled page.
 #[pyfunction]
@@ -213,6 +226,7 @@ fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(make_style, m)?)?;
     m.add_function(wrap_pyfunction!(make_look, m)?)?;
     m.add_function(wrap_pyfunction!(compute_levels, m)?)?;
+    m.add_function(wrap_pyfunction!(solve_rules, m)?)?;
     m.add_class::<Tiler>()?;
     m.add_class::<Sources>()?;
     m.add_function(wrap_pyfunction!(make_sources, m)?)?;

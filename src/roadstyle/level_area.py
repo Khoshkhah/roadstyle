@@ -75,8 +75,9 @@ def area_db(folder):
     return (Path(folder) / json.loads(f.read_text())["db"]).resolve() if f.exists() else None
 
 
-def solve_area(folder, auto_ends=False, max_positions=None):
-    """Solve the area in ``folder`` with your edits, heads and caps; write levels.csv and levels_info.json. Returns the solved roads."""
+def solve_area(folder, auto_ends=False, max_positions=None, engine=None):
+    """Solve the area in ``folder`` with your edits, heads and caps; write levels.csv and levels_info.json. Returns the solved roads.
+    ``engine``: the solver of solve_levels ("python" or "rust"; default ROADSTYLE_ENGINE, else Python)."""
     import geopandas as gpd
 
     folder = Path(folder)
@@ -84,7 +85,7 @@ def solve_area(folder, auto_ends=False, max_positions=None):
     edits = folder / "edits.csv"
     heads, caps = own(folder, roads)
     solved, drawn, _ = solve(roads, folder / "pairs.csv", edits if edits.exists() else None, heads, caps, auto=auto_ends,
-                             max_positions=max_positions)
+                             max_positions=max_positions, engine=engine)
     write(solved, folder, drawn)
     return solved
 
@@ -190,7 +191,7 @@ def around(roads, pairs, edits, changed, hops=HOPS):
     return seen
 
 
-def solve_local(roads, pairs, edits, heads, caps, previous, changed, hops=HOPS):
+def solve_local(roads, pairs, edits, heads, caps, previous, changed, hops=HOPS, engine=None):
     """The level editor's solve after a change: the roads within ``hops`` relations of the ``changed`` ones are solved again, every other road
     keeps its numbers of ``previous`` (the solved roads before the change), with the same rules as :func:`solve` (solve_levels(fixed=...)).
     Three relations deep, since a rule reaches its roads' neighbours through the meets (a head under the fills it joins) and the next ring is
@@ -201,7 +202,7 @@ def solve_local(roads, pairs, edits, heads, caps, previous, changed, hops=HOPS):
     t0 = time.time()
     free = around(roads, pairs, edits, changed, hops)
     if len(free) == len(roads):                         # the whole area is around the change: the whole solve, once
-        out = solve(roads, pairs, edits, heads, caps)
+        out = solve(roads, pairs, edits, heads, caps, engine=engine)
         out[0].attrs["levels_info"]["resolve"] = {"how": "full", "why": "every road is around the change", "free": len(free), "hops": hops,
                                                   "seconds": round(time.time() - t0, 1)}
         return out
@@ -209,7 +210,7 @@ def solve_local(roads, pairs, edits, heads, caps, previous, changed, hops=HOPS):
     fixed = {r: tuple(int(x) for x in v) for r, v in zip(prev.index, prev.to_numpy().tolist(), strict=True) if r not in free}
     why = None
     try:
-        out = solve(roads, pairs, edits, heads, caps, fixed=fixed)
+        out = solve(roads, pairs, edits, heads, caps, fixed=fixed, engine=engine)
         why = _worse(out[0], previous)
     except RuntimeError as err:                         # the solver failed (a time limit): not an error of the change
         why = f"the local solve failed ({err})"
@@ -217,7 +218,7 @@ def solve_local(roads, pairs, edits, heads, caps, previous, changed, hops=HOPS):
         _keep_fixed(out[0], fixed)
         out[0].attrs["levels_info"]["resolve"] = {"how": "local", "free": len(free), "hops": hops, "seconds": round(time.time() - t0, 1)}
         return out
-    out = solve(roads, pairs, edits, heads, caps)
+    out = solve(roads, pairs, edits, heads, caps, engine=engine)
     out[0].attrs["levels_info"]["resolve"] = {"how": "full", "why": why, "free": len(free), "hops": hops, "seconds": round(time.time() - t0, 1)}
     return out
 
@@ -292,6 +293,10 @@ def main(argv=None):
     ed = sub.add_parser("edit", help="the level editor: a local page that writes edits.csv / heads.csv / caps.csv and solves")
     ed.add_argument("folder", type=Path)
     ed.add_argument("--port", type=int, default=8780)
+    sv.add_argument("--engine", choices=["python", "rust"], help="the solver (default: ROADSTYLE_ENGINE, else python); rust: a "
+                                                                  "minimum-cost flow, no time limit, no --max-positions")
+    ed.add_argument("--engine", choices=["python", "rust"], default="rust", help="the solver of each Apply (default rust: a minimum-cost "
+                                                                                 "flow, no time limit)")
     ed.add_argument("--items", metavar="MODULE:FUNCTION", help="items drawn on the edges: FUNCTION(roads) -> (overlays, render_edges keywords), see level_editor")
     a = ap.parse_args(argv)
     if a.cmd == "make":
@@ -301,7 +306,7 @@ def main(argv=None):
         print(f"{len(edges)} edges -> {len(roads)} roads, {len(pairs)} pairs: "
               + ", ".join(f"{k} {v}" for k, v in pairs["relation"].value_counts().items()) + f" -> {a.folder}")
     elif a.cmd == "solve":
-        solved = solve_area(a.folder, auto_ends=a.auto_ends, max_positions=a.max_positions)
+        solved = solve_area(a.folder, auto_ends=a.auto_ends, max_positions=a.max_positions, engine=a.engine)
         info = solved.attrs["levels_info"]
         print(f"{len(solved)} roads -> {a.folder / 'levels.csv'}: {len(solved.attrs['levels_given_up'])} stack pair(s) given up, "
               f"{len({(u, lo) for u, lo, _ in solved.attrs.get('levels_near', [])})} near warning(s), "
@@ -313,7 +318,7 @@ def main(argv=None):
             import importlib
             mod, _, fn = a.items.partition(":")
             items = getattr(importlib.import_module(mod), fn)
-        serve(a.folder, a.port, items)
+        serve(a.folder, a.port, items, engine=a.engine)
 
 
 if __name__ == "__main__":

@@ -22,6 +22,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **`compute_levels(engine="rust")` takes all its keywords**: `band_col`, `order` (`"priority"`, `"class"`, a column or None),
   `band_dist`, `head_m`, `max_level`, `margin`, `min_positions` and `near_rules`. Before, a keyword not at its default went to the Python
   engine. The Rust solver has no time limit, so it does not use `time_limit`.
+- **The level editor solves with Rust**: `roadstyle-levels edit` uses the Rust solver by default (Monaco: a change in 0.4 s, the
+  whole area in 0.5 s); `--engine python` keeps the Python solver. `solve_levels(..., engine="rust")` and `roadstyle-levels solve
+  --engine rust` solve the same tables with the Rust solver (no `max_positions`, no time limit).
 - Rust: `roadstyle_levels::levels(edges, options)` replaces `compute(edges, method)`. `Options` has the keywords of `compute_levels`, and
   also `fixed` (numbers that stay as they are, as `solve_levels(fixed=...)`) and `edits` (the rows of `visualization.level_edits`, as
   `solve_levels(edits=...)`). `edge_hash(ids)` is public.

@@ -92,7 +92,8 @@ heads of that time.
 ![The level editor: two roads picked, their cards with ends and heads, the Issues tab](../img/level-editor.png)
 
 `roadstyle-levels edit out/area` opens a local page with the map and a panel. Click a road, or find it by edge id or `edge_ref`. Pick a
-second road to see every pair between the two.
+second road to see every pair between the two. The Rust solver solves each change (Monaco: 0.4 s); `--engine python` uses the Python
+solver.
 
 - **Add a rule**: *order* (whose fill is on top where they meet), *stack* (one road over the other: pick the parts of its casing) or
   *meet* (join two ends).

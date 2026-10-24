@@ -285,6 +285,27 @@ def compute_levels(edges, *, layer_col="layer", bridge_col="bridge", tunnel_col=
     return g
 
 
+def solve_intervals(n, meets, stacks, orders, max_level, margin, min_positions, near, fixed):
+    """``levels._solve_intervals`` by the Rust solver: the same rules on road indexes, the same ``(parts, given_up, info)``. ``fixed``:
+    {road index: its four numbers around the ground 0}. The parts are in steps of ``margin`` (only their order matters: solve_levels
+    makes them small consecutive numbers)."""
+    import math
+    import time
+    t0 = time.time()
+    ends, part = {"start": 0, "end": 2}, {"s": 0, "m": 1, "e": 2}
+    steps = math.floor(2 * max_level / margin + 1e-9)
+    parts, broken, not_kept, near_broken = rust().solve_rules(
+        n, [(x, ends[ex], y, ends[ey]) for x, ex, y, ey in meets], [(u, l, part[h]) for u, l, h in stacks],
+        [(u, l, part[h]) for u, l, h in near], list(orders), [(r, [x + max_level for x in v]) for r, v in fixed.items()], steps, min_positions)
+    word = ("start", "main", "end")
+    info = {"pairs": len({(u, l) for u, l, _ in [*stacks, *near]}), "roads": n, "meets": len(meets), "order_pairs": len(set(orders)),
+            "order_violations": len(not_kept), "orders_not_kept": [tuple(p) for p in not_kept],
+            "given_up_parts": sorted({(u, l, word[h]) for u, l, h in broken}), "near_parts": sorted({(u, l, word[h]) for u, l, h in near_broken}),
+            "near_warnings": len({(u, l) for u, l, _ in near_broken}), "solves": 1, "solver": "rust", "status": "OPTIMAL",
+            "seconds": round(time.time() - t0, 1)}
+    return [tuple(p) for p in parts], sorted({(u, l) for u, l, _ in broken}), info
+
+
 def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs):
     """``roadstyle.export_style`` by the Rust engine: the style and the tiles from ``Tiler``; the files around them as Python writes them.
     ``format``: "xyz" (a tile folder) or "pmtiles" (one archive, roads.pmtiles)."""

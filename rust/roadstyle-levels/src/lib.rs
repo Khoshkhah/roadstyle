@@ -7,7 +7,7 @@
 
 pub mod flow;
 mod input;
-mod solve;
+pub mod solve;
 
 use std::collections::{HashMap, HashSet};
 

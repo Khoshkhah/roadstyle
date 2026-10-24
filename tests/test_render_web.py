@@ -2686,14 +2686,14 @@ def test_data_tolerance_sets_the_simplification_of_the_road_tile_sources():
 
 
 def test_the_last_solver_stage_at_its_time_limit_keeps_its_best_numbers(monkeypatch):
-    """The last stage (cost, fewest positions) stopped by its time limit with numbers in hand: they are kept, with a warning and
+    """Python's solver (HiGHS, its stages and time limit), so engine="python". The last stage (cost, fewest positions) stopped by its time limit with numbers in hand: they are kept, with a warning and
     levels_info status TIME_LIMIT (a GitHub build of an all-modes area failed there, 2026-10-07); any other failure is still an error."""
     pytest.importorskip("scipy")
     import scipy.optimize as so
 
     import roadstyle as rs
     roads, pairs = rs.level_input(_edge_world())
-    first = rs.solve_levels(roads, pairs)
+    first = rs.solve_levels(roads, pairs, engine="python")
     fixed = {first["road"].iloc[0]: tuple(int(first[c].iloc[0]) for c in ("casing_start", "casing_level", "casing_end", "fill_level"))}
     real = so.milp
 
@@ -2703,7 +2703,7 @@ def test_the_last_solver_stage_at_its_time_limit_keeps_its_best_numbers(monkeypa
         return r
     monkeypatch.setattr(so, "milp", at_limit)
     with pytest.warns(UserWarning, match="time limit"):
-        out = rs.solve_levels(roads, pairs, fixed=fixed)                  # held numbers: HiGHS, not the flow
+        out = rs.solve_levels(roads, pairs, fixed=fixed, engine="python")                  # held numbers: HiGHS, not the flow
     assert out.attrs["levels_info"]["status"] == "TIME_LIMIT" and out["fill_level"].notna().all()
 
     def failed(*a, **k):
@@ -2712,7 +2712,7 @@ def test_the_last_solver_stage_at_its_time_limit_keeps_its_best_numbers(monkeypa
         return r
     monkeypatch.setattr(so, "milp", failed)
     with pytest.raises(RuntimeError, match="status 4"):
-        rs.solve_levels(roads, pairs, fixed=fixed)
+        rs.solve_levels(roads, pairs, fixed=fixed, engine="python")
 
 
 def test_a_solver_stage_at_its_time_limit_without_an_answer_keeps_the_answer_of_the_stage_before(monkeypatch):
@@ -2751,17 +2751,21 @@ def test_a_solver_stage_at_its_time_limit_without_an_answer_keeps_the_answer_of_
         rs.compute_levels(g, engine="python", **kw)
 
 
-def test_level_editor_saves_only_what_the_solver_takes(tmp_path):
-    """The level editor (roadstyle.level_editor): the pairs between two roads (by any edge id), an edit the solver refuses is not written, a
-    taken one is written with the file before it kept as edits.csv.bak, and levels.csv follows."""
+@pytest.mark.parametrize("engine", ["python", "rust"])
+def test_level_editor_saves_only_what_the_solver_takes(tmp_path, engine):
+    """The level editor (roadstyle.level_editor), with each solver: the pairs between two roads (by any edge id), an edit the solver refuses
+    is not written, a taken one is written with the file before it kept as edits.csv.bak, and levels.csv follows."""
     pytest.importorskip("scipy")
     import pandas as pd
 
+    from roadstyle import _engine
     from roadstyle.level_area import make_area
     from roadstyle.level_editor import Area
+    if engine == "rust" and not _engine.available():
+        pytest.skip("the Rust extension roadstyle._rust is not built")
     make_area(_edge_world(), tmp_path)
     (tmp_path / "edits.csv").unlink()                                   # as before: no edits.csv yet
-    area = Area(tmp_path)
+    area = Area(tmp_path, engine=engine)
     got = area.relations("12", "11")
     assert {(r["relation"], r["a"], r["b"]) for r in got["rows"] if r["section"] == "found"} >= {("order", "12", "11")}
     assert not [r for r in got["rows"] if r["section"] != "found"] and set(got["roads"]) >= {"11", "12"}

@@ -28,6 +28,8 @@ pub struct Solved {
     pub parts: Vec<[i64; 4]>,
     /// The stack pairs `(upper, lower)` with a lifted part that is not over the lower fill.
     pub given_up: Vec<(usize, usize)>,
+    /// The lifted parts `(upper, lower, part)` of those pairs that are not over the lower fill.
+    pub given_up_parts: Vec<(usize, usize, usize)>,
     /// The order wishes that are not kept.
     pub orders_not_kept: Vec<(usize, usize)>,
     /// The near parts `(upper, lower, part)` that are not over the lower fill.
@@ -164,11 +166,13 @@ pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, S
     let parts = (0..n)
         .map(|r| [x[col(r, 0)], x[col(r, 1)], x[col(r, 2)], x[r]])
         .collect();
-    let mut given_up: Vec<(usize, usize)> = lifts
+    let given_up_parts: Vec<(usize, usize, usize)> = lifts
         .iter()
-        .filter(|&&(u, l, h)| x[l] - x[col(u, h)] > -1)
-        .map(|&(u, l, _)| (u, l))
+        .copied()
+        .filter(|&(u, l, h)| x[l] - x[col(u, h)] > -1)
         .collect();
+    let mut given_up: Vec<(usize, usize)> =
+        given_up_parts.iter().map(|&(u, l, _)| (u, l)).collect();
     given_up.dedup();
     let orders_not_kept = orders
         .iter()
@@ -183,6 +187,7 @@ pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, S
     Ok(Solved {
         parts,
         given_up,
+        given_up_parts,
         orders_not_kept,
         near_not_kept,
         stages,
