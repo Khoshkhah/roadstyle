@@ -732,6 +732,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "roadstyle-cli"
+version = "0.25.0"
+
+[[package]]
 name = "roadstyle-engine"
 version = "0.25.0"
 dependencies = [

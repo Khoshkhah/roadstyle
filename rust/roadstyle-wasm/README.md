@@ -23,7 +23,7 @@ const tiled = JSON.parse(tiler.style());
 
 - `makeStyle`, `Tiler`, `makeSources`, `tileSources`, `tileFiles`, `makePage`, `makeLook`, `exportLook` and `memoryBytes`: the
   types (`index.d.ts`) come from the Rust signatures, with their descriptions.
-- `roadstyle-wasm/roads_sql.js` (`writeRoads`) and `roadstyle-wasm/features_sql.js` (`writeFeatures`): the SQL that writes the
+- `roadstyle-wasm/roads_sql.js` (`makeRoads`, `writeRoads`) and `roadstyle-wasm/features_sql.js` (`writeFeatures`): the SQL that writes the
   engine's inputs from a duckOSM file in duckdb-wasm.
 - TypeScript: 5.7 or later, with `lib` `esnext` (the classes have `Symbol.dispose`), or `skipLibCheck`.
 

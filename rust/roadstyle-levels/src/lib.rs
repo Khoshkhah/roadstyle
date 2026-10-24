@@ -5,9 +5,10 @@
 // Ported numeric code: index loops over parallel arrays and tuple types of the Python stages read as they are in Python.
 #![allow(clippy::needless_range_loop, clippy::type_complexity)]
 
+pub mod area;
 pub mod flow;
 mod input;
-mod solve;
+pub mod solve;
 
 use std::collections::{HashMap, HashSet};
 
@@ -44,7 +45,9 @@ impl Method {
     }
 }
 
-/// One edge as the levels read it: its id, the tags that the rules read, and its line.
+/// One edge as the levels read it: its id, the tags that the rules read, and its line. `band` and `order`: the values of
+/// `band_col` and of an `order` column, for `Options::band_col` and `Order::Column`.
+#[derive(Default)]
 pub struct LevelEdge {
     pub edge_id: i64,
     pub highway: String,
@@ -52,6 +55,8 @@ pub struct LevelEdge {
     pub bridge: Option<String>,
     pub layer: Option<String>,
     pub junction: Option<String>,
+    pub band: Option<String>,
+    pub order: Option<f64>,
     pub geometry: Vec<Pt>,
 }
 
@@ -95,55 +100,305 @@ pub struct Levels {
     /// roadstyle's hash of the edge ids: sha256 of the sorted ids (8 bytes each, little endian), 32 hex characters.
     pub edge_hash: String,
     pub roads: usize,
+    /// Solve only: the number of stack pairs (upper road, lower road), near rules included, and of order wishes.
+    pub pairs: usize,
+    pub order_pairs: usize,
     /// Solve only: the stack pairs that could not be kept, and the order wishes that were not kept.
     pub given_up: usize,
     pub orders_not_kept: usize,
-    /// Solve only: the pairs themselves, as (upper road, lower road) and (first road, second road), the road numbers of `input::road_split`.
-    pub given_up_pairs: Vec<(usize, usize)>,
-    pub orders_not_kept_pairs: Vec<(usize, usize)>,
+    /// Solve only: the pairs themselves, as (upper road, lower road) and (higher road, lower road). A road is the id of its first edge, as
+    /// Python's road ids.
+    pub given_up_pairs: Vec<(i64, i64)>,
+    pub orders_not_kept_pairs: Vec<(i64, i64)>,
+    /// Solve only: the near parts (upper road, lower road, part 0, 1 or 2) that are not over the lower road.
+    pub near_not_kept: Vec<(i64, i64, usize)>,
     /// Solve only: the best value of each stage (see `solve::Solved::stages`).
-    pub stages: [i64; 3],
+    pub stages: [i64; 4],
 }
 
-pub fn compute(edges: &LevelEdges, method: Method) -> Result<Option<Levels>, String> {
-    if method == Method::None {
+/// The wishes of `order`: the priority (roundabouts, tunnels, bridges, then the class), the class only, the edges'
+/// `order` value, or none.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Order {
+    #[default]
+    Priority,
+    Class,
+    Column,
+    None,
+}
+
+/// One row of `visualization.level_edits` (roadstyle's `solve_levels(edits=...)`): `relation` is meet, stack, near or
+/// order; `a` and `b` are any edges of their roads. `enabled` false removes the same rule of the roads, all other rows
+/// add a rule. A meet has the ends `start` or `end`; a stack or a near rule has the part of `a` (`start`, `main` or
+/// `end`) in `a_end`.
+#[derive(Clone, Debug)]
+pub struct Edit {
+    pub relation: String,
+    pub a: i64,
+    pub b: i64,
+    pub a_end: Option<String>,
+    pub b_end: Option<String>,
+    pub enabled: bool,
+}
+
+/// The options of roadstyle's `compute_levels` and `solve_levels`, with their defaults. `margin` changes only the scale
+/// of the numbers, so the rows do not change with it. `fixed`: numbers of an earlier result (around the ground 0) that
+/// stay as they are, by the id of an edge of the road, in that edge's direction.
+#[derive(Clone, Debug)]
+pub struct Options {
+    pub method: Method,
+    /// The edges' `band` is the band (else the level from the tags).
+    pub band_col: bool,
+    pub order: Order,
+    pub band_dist: f64,
+    pub head_m: f64,
+    pub max_level: i64,
+    pub margin: f64,
+    pub min_positions: bool,
+    pub near_rules: bool,
+    pub fixed: Vec<(i64, [i64; 4])>,
+    pub edits: Vec<Edit>,
+}
+
+impl Default for Options {
+    fn default() -> Options {
+        Options {
+            method: Method::Solve,
+            band_col: false,
+            order: Order::Priority,
+            band_dist: 10.0,
+            head_m: 5.0,
+            max_level: 20,
+            margin: 1.0,
+            min_positions: true,
+            near_rules: false,
+            fixed: Vec::new(),
+            edits: Vec::new(),
+        }
+    }
+}
+
+/// The levels of the last networks, by a hash of the edges and the options: a style, its tiles and each palette of one network
+/// solve one time.
+/// ponytail: the last 2 networks only; keep more when a caller alternates between more networks.
+static CACHE: std::sync::Mutex<Vec<(u64, std::sync::Arc<Levels>)>> =
+    std::sync::Mutex::new(Vec::new());
+
+/// The drawing levels of the edges (`compute_levels`), from the cache when the same edges and options were done before.
+pub fn levels(edges: &LevelEdges, o: &Options) -> Result<Option<std::sync::Arc<Levels>>, String> {
+    use std::hash::{Hash, Hasher};
+    if o.method == Method::None {
         return Ok(None);
     }
     let edges = edges.edges();
-    let roads = input::road_split(&edges)?;
-    let (mut given_up, mut orders_not_kept, mut stages) = (0, 0, [0; 3]);
-    let (mut given_up_pairs, mut orders_not_kept_pairs) = (Vec::new(), Vec::new());
-    let rows = match method {
-        Method::Tags => tags(&edges, &roads.ends),
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    format!("{o:?}").hash(&mut h);
+    for e in &edges {
+        (
+            e.edge_id,
+            &e.highway,
+            &e.tunnel,
+            &e.bridge,
+            &e.layer,
+            &e.junction,
+            &e.band,
+            e.order.map(f64::to_bits),
+        )
+            .hash(&mut h);
+        e.geometry
+            .iter()
+            .for_each(|p| (p.0.to_bits(), p.1.to_bits()).hash(&mut h));
+    }
+    let key = h.finish();
+    let mut cache = CACHE.lock().map_err(|e| e.to_string())?;
+    if let Some((_, lv)) = cache.iter().find(|(k, _)| *k == key) {
+        return Ok(Some(lv.clone()));
+    }
+    let lv = std::sync::Arc::new(compute(&edges, o)?);
+    if cache.len() == 2 {
+        cache.remove(0);
+    }
+    cache.push((key, lv.clone()));
+    Ok(Some(lv))
+}
+
+fn compute(edges: &[&LevelEdge], o: &Options) -> Result<Levels, String> {
+    if o.method == Method::Tags && (o.band_col || !matches!(o.order, Order::Priority | Order::None))
+    {
+        return Err("compute_levels: band_col and order are part of the optimization problem; use method='solve'".into());
+    }
+    if o.method == Method::Solve && !(o.margin > 0.0 && o.max_level > 0) {
+        return Err(format!(
+            "compute_levels: margin and max_level must be greater than 0, not {} and {}",
+            o.margin, o.max_level
+        ));
+    }
+    let roads = input::road_split(edges)?;
+    let (mut given_up, mut orders_not_kept, mut stages, mut pairs, mut order_pairs) =
+        (0, 0, [0; 4], 0, 0);
+    let (mut given_up_pairs, mut orders_not_kept_pairs, mut near_not_kept) =
+        (Vec::new(), Vec::new(), Vec::new());
+    let rows = match o.method {
+        Method::Tags => tags(edges, &roads.ends),
         _ => {
-            let (rules, _) = input::relations(&edges, &roads);
-            let s = solve::solve(&rules, 20)?;
+            let (mut rules, _) = input::relations(edges, &roads, o);
+            // each edge's road, and whether the edge runs against it
+            let at: HashMap<i64, (usize, bool)> = edges
+                .iter()
+                .enumerate()
+                .map(|(i, e)| (e.edge_id, (roads.road[i], !roads.same[i])))
+                .collect();
+            edit(&mut rules, &o.edits, &at)?;
+            for &(id, v) in &o.fixed {
+                let &(r, back) = at
+                    .get(&id)
+                    .ok_or(format!("fixed: {id} is not an edge of the roads"))?;
+                let v = if back { [v[2], v[1], v[0], v[3]] } else { v };
+                if v.iter().any(|x| x.abs() > o.max_level) {
+                    return Err(format!(
+                        "solve_levels: a fixed number is outside [-max_level, max_level] ({})",
+                        o.max_level
+                    ));
+                }
+                rules.fixed.push((r, v.map(|x| x + o.max_level)));
+            }
+            // in steps of the margin, as roadstyle's: the box [-max_level, max_level] holds 2 max_level / margin + 1 numbers
+            let steps = (2.0 * o.max_level as f64 / o.margin + 1e-9).floor() as i64;
+            let s = solve::solve(&rules, steps, o.min_positions)?;
+            let both: std::collections::BTreeSet<(usize, usize)> = rules
+                .lifts
+                .iter()
+                .chain(&rules.near)
+                .map(|&(u, l, _)| (u, l))
+                .collect();
+            pairs = both.len();
+            order_pairs = rules.orders.iter().collect::<HashSet<_>>().len();
             given_up = s.given_up.len();
             orders_not_kept = s.orders_not_kept.len();
-            given_up_pairs = s.given_up.clone();
-            orders_not_kept_pairs = s.orders_not_kept.clone();
+            let id = |r: usize| edges[roads.first[r]].edge_id; // a road by the id of its first edge, as Python's road ids
+            given_up_pairs = s.given_up.iter().map(|&(u, l)| (id(u), id(l))).collect();
+            orders_not_kept_pairs = s
+                .orders_not_kept
+                .iter()
+                .map(|&(x, y)| (id(x), id(y)))
+                .collect();
+            near_not_kept = s
+                .near_not_kept
+                .iter()
+                .map(|&(u, l, h)| (id(u), id(l), h))
+                .collect();
             stages = s.stages;
-            solved_rows(&edges, &roads, &rules, &s)
+            solved_rows(edges, &roads, &rules, &s, o.head_m)
         }
     };
     let ids: Vec<i64> = rows.iter().map(|r| r.edge_id).collect();
-    Ok(Some(Levels {
+    Ok(Levels {
         rows,
-        method,
+        method: o.method,
         edge_hash: edge_hash(&ids),
         roads: roads.first.len(),
+        pairs,
+        order_pairs,
         given_up,
         orders_not_kept,
         given_up_pairs,
         orders_not_kept_pairs,
+        near_not_kept,
         stages,
-    }))
+    })
 }
 
-fn edge_hash(sorted_ids: &[i64]) -> String {
+/// The edits on the rules (roadstyle's `merged_relations`): a row with `enabled` false removes its rule (an error when
+/// there is none), any other row adds it. An edge that runs against its road names the other end of the road.
+fn edit(
+    rules: &mut solve::Rules,
+    edits: &[Edit],
+    at: &HashMap<i64, (usize, bool)>,
+) -> Result<(), String> {
+    let road = |id: i64| {
+        at.get(&id)
+            .copied()
+            .ok_or(format!("edits: '{id}' is not an edge of the roads"))
+    };
+    for e in edits {
+        let ((a, ab), (b, bb)) = (road(e.a)?, road(e.b)?);
+        let side = |v: &Option<String>, back: bool, parts: &[&str]| -> Result<usize, String> {
+            let p = match v.as_deref() {
+                Some(s) if parts.contains(&s) => s,
+                other => {
+                    return Err(format!(
+                        "edits: a {} names {} in its end, not {:?} ({} and {})",
+                        e.relation,
+                        parts.join(", "),
+                        other.unwrap_or(""),
+                        e.a,
+                        e.b
+                    ))
+                }
+            };
+            let h = ["start", "main", "end"]
+                .iter()
+                .position(|x| *x == p)
+                .unwrap();
+            Ok(if back { 2 - h } else { h })
+        };
+        let found = match e.relation.as_str() {
+            "meet" => {
+                let (x, y) = (
+                    (a, side(&e.a_end, ab, &["start", "end"])?),
+                    (b, side(&e.b_end, bb, &["start", "end"])?),
+                );
+                let (x, y) = (x.min(y), x.max(y));
+                toggle(&mut rules.meets, (x.0, x.1, y.0, y.1), e.enabled)
+            }
+            "stack" => toggle(
+                &mut rules.lifts,
+                (a, b, side(&e.a_end, ab, &["start", "main", "end"])?),
+                e.enabled,
+            ),
+            "near" => toggle(
+                &mut rules.near,
+                (a, b, side(&e.a_end, ab, &["start", "main", "end"])?),
+                e.enabled,
+            ),
+            "order" => toggle(&mut rules.orders, (a, b), e.enabled),
+            r => {
+                return Err(format!(
+                    "pairs: the relation '{r}' is not meet, stack, near or order"
+                ))
+            }
+        };
+        if !found {
+            return Err(format!(
+                "edits: no {} pair {} {} to switch off",
+                e.relation, e.a, e.b
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Adds `rule` (when `on`), or removes it; false when there is no rule to remove.
+fn toggle<T: PartialEq>(rules: &mut Vec<T>, rule: T, on: bool) -> bool {
+    match rules.iter().position(|r| *r == rule) {
+        Some(i) if !on => {
+            rules.remove(i);
+        }
+        None if !on => return false,
+        None => rules.push(rule),
+        Some(_) => {}
+    }
+    true
+}
+
+/// roadstyle's hash of the edge ids (`edge_levels_meta.edge_hash`): sha256 of the sorted ids, 8 bytes each, little endian; the first
+/// 32 hex characters.
+pub fn edge_hash(ids: &[i64]) -> String {
     use sha2::{Digest, Sha256};
+    let mut sorted = ids.to_vec();
+    sorted.sort_unstable();
     let mut h = Sha256::new();
-    for id in sorted_ids {
+    for id in sorted {
         h.update(id.to_le_bytes());
     }
     h.finalize()
@@ -198,6 +453,7 @@ fn solved_rows(
     roads: &input::Roads,
     rules: &solve::Rules,
     s: &solve::Solved,
+    head_m: f64,
 ) -> Vec<Row> {
     let mut count: HashMap<i64, usize> = HashMap::new();
     for &r in &roads.road {
@@ -252,11 +508,48 @@ fn solved_rows(
                 casing_level: am,
                 casing_end,
                 fill_level: b,
-                head_start_m: Some(input::HEAD_M),
-                head_end_m: Some(input::HEAD_M),
+                head_start_m: Some(head_m),
+                head_end_m: Some(head_m),
                 cap_start: Some(cap_start),
                 cap_end: Some(cap_end),
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_second_call_is_from_the_cache() {
+        let mut edges = LevelEdges::default();
+        for (id, bridge) in [(7, None), (3, Some("yes".to_string()))] {
+            let geometry = vec![(0.0, id as f64 * 1e-4), (1e-3, 0.0)];
+            edges.add(
+                0,
+                LevelEdge {
+                    edge_id: id,
+                    highway: "residential".into(),
+                    bridge,
+                    geometry,
+                    ..Default::default()
+                },
+            );
+        }
+        let o = Options {
+            method: Method::Tags,
+            ..Default::default()
+        };
+        let (a, b) = (
+            levels(&edges, &o).unwrap().unwrap(),
+            levels(&edges, &o).unwrap().unwrap(),
+        );
+        assert!(std::sync::Arc::ptr_eq(&a, &b));
+        assert_eq!(a.edge_hash, edge_hash(&[7, 3]));
+        assert_eq!(
+            a.rows.iter().map(|r| r.fill_level).collect::<Vec<_>>(),
+            [1, 0]
+        );
+    }
 }

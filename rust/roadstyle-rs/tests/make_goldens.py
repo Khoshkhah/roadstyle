@@ -10,6 +10,8 @@ with. Run it in the conda environment roadstyle (roadstyle from this repository'
   <case>.json.gz = {"args", "style": export_inline's style, "color_options": the page's colour options (render_web's __COLOR_OPTIONS__)}.
 - looks: tests/data/looks.json.gz (tests/look.rs): the look of render_edges' palette, profile and settings, for each built-in profile x
   palette and settings sources in the older and the newer layout.
+- level_area: tests/data/level_area/ (tests/level_area.rs): a level area of Monaco in a box, and roadstyle's answers of the check before
+  a rule is added.
 - monaco, sodermalm, tartu: tests/data/<area>/golden_*.gz (tests/areas.rs): the roads-only style (export_inline), the tiles of
   export_style around the roads' centre, and the levels (compute_levels' tags rule; the solve with duckOSM's level-area defaults, not for
   Tartu: Python needs 4.8 GB and 85 s for Monaco). sodermalm also writes its input, tests/data/sodermalm/roads.parquet, from
@@ -237,11 +239,34 @@ def write_area(area):
         p.write_bytes(gzip.compress(json.dumps(v, separators=(",", ":")).encode(), 9, mtime=0))
         print(f"{area}: {p.name} {p.stat().st_size // 1000} KB")
 
+def write_level_area():
+    """tests/data/level_area/ (tests/level_area.rs): a level area of the roads of Monaco in BOX (make_area: roads.parquet, pairs.csv),
+    and checks.json: rules to add, and what roadstyle's rule_conflicts says of each (its index and why)."""
+    import pandas as pd
+
+    from roadstyle.level_area import make_area
+    from roadstyle.levels import rule_conflicts
+    g = read_roads(DATA / "monaco" / "roads.parquet")
+    b = g.geometry.bounds
+    g = g[(b.minx >= BOX[0]) & (b.maxx <= BOX[2]) & (b.miny >= BOX[1]) & (b.maxy <= BOX[3])].drop(
+        columns=["casing_start", "casing_level", "casing_end", "fill_level"], errors="ignore").reset_index(drop=True)
+    out = DATA / "level_area"
+    roads, pairs = make_area(g, out)
+    (out / "edits.csv").unlink(missing_ok=True)
+    order, stack = pairs[pairs.relation == "order"].iloc[0], pairs[pairs.relation == "stack"].iloc[0]
+    rows = [{**order.to_dict(), "enabled": "true"},                                                      # already there
+            {"relation": "order", "a": stack.b, "b": stack.a, "a_end": "", "b_end": "", "enabled": "true"},  # a loop with the stack
+            {"relation": "order", "a": roads.road.iat[0], "b": roads.road.iat[-1], "a_end": "", "b_end": "", "enabled": "true"}]
+    rows = [{k: ("" if v is None or v != v else str(v)) for k, v in r.items()} for r in rows]
+    found = rule_conflicts(roads, pairs, None, rows)
+    (out / "checks.json").write_text(json.dumps({"rows": rows, "conflicts": [[rows.index(r), why] for r, why, _ in found]}, indent=1))
+    print(f"level_area: {len(roads)} roads, {len(pairs)} pairs, conflicts {[why for _, why, _ in found]}")
+
 def main():
     parts = sys.argv[1:] or ["cmaps", "colors", "looks", "monaco", "sodermalm"]
     warnings.simplefilter("ignore", DeprecationWarning)
     for p in parts:
-        {"cmaps": write_cmaps, "colors": write_colors, "looks": write_looks}.get(p, lambda: write_area(p))()
+        {"cmaps": write_cmaps, "colors": write_colors, "looks": write_looks, "level_area": write_level_area}.get(p, lambda: write_area(p))()
 
 if __name__ == "__main__":
     main()

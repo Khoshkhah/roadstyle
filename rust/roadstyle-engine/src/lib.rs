@@ -294,18 +294,30 @@ fn source_features(source: &Value) -> &[Value] {
 
 /// render's level step: with no `casing_level_col` and no `fill_level_col` in the keywords, the drawing positions come from
 /// `compute_levels(method="solve")` with its defaults (render_web.render), on the roads in their order. It writes the columns that
-/// compute_levels writes: casing_start, casing_level, casing_end and fill_level.
+/// compute_levels writes: casing_start, casing_level, casing_end and fill_level. The browser's keyword `levels` (roads_sql.js makeRoads):
+/// "tags" computes them with the tags rule; `{edge_hash, n_edges}` (edge_levels_meta) checks that the stored levels are for these edges.
 fn compute_levels(table: &mut RoadTable, args: &Value, head_m: f64) -> Result<(), String> {
     let given = |k: &str| matches!(&args[k], Value::String(s) if !s.is_empty());
-    if given("casing_level_col") || given("fill_level_col") {
+    if let Some(meta) = args["levels"].as_object() {
+        let ids = (0..table.len()).map(|i| match table.get(i, "edge_id").map(Cell::to_value) {
+            Some(Value::Number(n)) => n.as_i64(),
+            Some(Value::String(s)) => s.parse().ok(),
+            _ => None,
+        }).collect::<Option<Vec<i64>>>().ok_or("levels: an edge_id that is not a whole number")?;
+        if Some(ids.len() as u64) != meta.get("n_edges").and_then(Value::as_u64)
+            || Some(roadstyle_levels::edge_hash(&ids).as_str()) != meta.get("edge_hash").and_then(Value::as_str) {
+            return Err(format!("the edges are not the edges the stored levels were solved for ({} given, {} stored, or other edge_id values): \
+                                run duckosm levels again", ids.len(), meta.get("n_edges").unwrap_or(&Value::Null)));
+        }
+    }
+    let tags = args["levels"] == "tags";
+    if !tags && (given("casing_level_col") || given("fill_level_col")) {
         return Ok(());
     }
-    if head_m != 5.0 {
-        return Err(format!("head_m={head_m}: the Rust engine computes the levels with head_m=5 only (compute them first, or use the Python engine)"));
-    }
     // the engine's own names: ColumnMap gave the user's columns these names before this step
-    let edges = level_edges(table, ["highway", "layer", "bridge", "tunnel", "junction"]);
-    let Some(levels) = roadstyle_levels::compute(&edges, roadstyle_levels::Method::Solve)? else { return Ok(()) };
+    let edges = level_edges(table, ["highway", "layer", "bridge", "tunnel", "junction", "", ""]);
+    let method = if tags { roadstyle_levels::Method::Tags } else { roadstyle_levels::Method::Solve };
+    let Some(levels) = roadstyle_levels::levels(&edges, &roadstyle_levels::Options { method, head_m, ..Default::default() })? else { return Ok(()) };
     // one row for each edge, in the edges' order (the edge id is the row)
     if levels.rows.len() != table.len() || levels.rows.iter().enumerate().any(|(i, r)| r.edge_id != i as i64) {
         return Err(format!("compute_levels: {} rows for {} roads, not one for each road in its order", levels.rows.len(), table.len()));
@@ -445,10 +457,10 @@ fn boundary_fc(b: &Value) -> Option<Value> {
 }
 
 /// The roads as the level solver reads them, in their order (the edge id is the row: compute_levels works on the frame's rows). `cols`:
-/// the columns of the class, the layer, the bridge, the tunnel and the junction. A value is the text that the tag rules read (Python's
-/// _truthy and int(float(layer)) on the GeoDataFrame's values).
-pub fn level_edges(table: &RoadTable, cols: [&str; 5]) -> roadstyle_levels::LevelEdges {
-    let [hw, layer, bridge, tunnel, junction] = cols;
+/// the columns of the class, the layer, the bridge, the tunnel, the junction, the band and the order ("" for none). A value is the text
+/// that the tag rules read (Python's _truthy and int(float(layer)) on the GeoDataFrame's values).
+pub fn level_edges(table: &RoadTable, cols: [&str; 7]) -> roadstyle_levels::LevelEdges {
+    let [hw, layer, bridge, tunnel, junction, band, order] = cols;
     let text = |v: Option<Cell>| -> Option<String> {
         match v?.to_value() {
             Value::Null => None,
@@ -467,6 +479,8 @@ pub fn level_edges(table: &RoadTable, cols: [&str; 5]) -> roadstyle_levels::Leve
             bridge: text(table.get(i, bridge)),
             layer: text(table.get(i, layer)),
             junction: text(table.get(i, junction)),
+            band: text(table.get(i, band)),
+            order: text(table.get(i, order)).and_then(|s| s.trim().parse::<f64>().ok()).filter(|x| !x.is_nan()),
             geometry: table.line(i).map_or_else(Vec::new, |c| c.iter().map(|p| (p[0], p[1])).collect()),
         });
     }

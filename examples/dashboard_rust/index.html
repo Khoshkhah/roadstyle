@@ -22,6 +22,9 @@ const [, roads, lookText] = await Promise.all([init(), bytes(DATA + "monaco/road
 // keywords from the look's args, and writes the legend data into the style's metadata roadstyle:color_options
 const look = JSON.parse(lookText);
 Object.assign(look.args, {color_by: "lanes", cmap: "YlOrRd", vmin: 1, vmax: 4});
+// the stored levels' metadata, the value of roads_sql.js makeRoads for a duckOSM file: the engine checks that the levels in roads.parquet
+// were solved for these edges (their number and the hash of their ids), and stops with an error if not
+look.args.levels = {edge_hash: "615c9155ab37a030dbfa80da2f7fcc09", n_edges: 13298};
 const style = JSON.parse(makeStyle(roads, JSON.stringify(look), undefined, undefined, "Monaco"));
 const theme = look.theme;
 

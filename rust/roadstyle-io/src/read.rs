@@ -76,6 +76,15 @@ fn value(col: &ArrayRef, r: usize) -> Result<Value, String> {
         DataType::Int64 => col.as_primitive::<Int64Type>().value(r).into(),
         DataType::Float32 => float(col.as_primitive::<Float32Type>().value(r) as f64),
         DataType::Float64 => float(col.as_primitive::<Float64Type>().value(r)),
+        // a list (a level area's edges and reversed): a JSON array
+        DataType::List(_) => {
+            let v = col.as_list::<i32>().value(r);
+            Value::Array((0..v.len()).map(|i| value(&v, i)).collect::<Result<_, _>>()?)
+        }
+        DataType::LargeList(_) => {
+            let v = col.as_list::<i64>().value(r);
+            Value::Array((0..v.len()).map(|i| value(&v, i)).collect::<Result<_, _>>()?)
+        }
         t => return Err(format!("column type {t} is not read")),
     })
 }
