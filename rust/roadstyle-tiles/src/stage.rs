@@ -63,7 +63,7 @@ impl TileOptions {
     pub fn rule(&self, name: &str, props: impl FnOnce() -> HashSet<String>) -> (HashSet<String>, bool, u32) {
         match name {
             "roads" => (self.exact.clone().unwrap_or_else(|| self.read.clone()), false, 0),
-            "simple" | "casings" => (self.exact.clone().unwrap_or_else(|| self.pieces.clone()), false, 0),
+            "simple" => (self.exact.clone().unwrap_or_else(|| self.pieces.clone()), false, 0),
             "slots" => (self.read.clone(), true, self.slots_from),
             _ => (self.read.iter().cloned().chain(props()).collect(), false, 0),
         }

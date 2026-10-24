@@ -90,7 +90,8 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", engine: 
                 kwargs.setdefault(k, c)
     kwargs.setdefault("view_3d", True)        # the bridge decks: the page has a 3D button, an app has only its own tilt
     from . import _engine
-    if _engine.engine(engine) == "rust":     # ``engine``: "python" (default) or "rust" (the style and the tiles of the Rust engine)
+    # ``engine``: "python" (default) or "rust" (the style and the tiles of the Rust engine); the full look is Python's
+    if _engine.engine(engine) == "rust" and not (kwargs.get("simple") is False and _engine.fallback(engine, "simple=False (the full look) is Python's")):
         return _engine.export_style(edges, out_dir, base_url=base_url, format=format, **{**kwargs, "name": name})
     out = render_edges(edges, **{**kwargs, "basemap": "blank", "tiles": True, "backend": "web", "_export": True})
     style, base = out["style"], base_url.rstrip("/")
@@ -178,7 +179,7 @@ def export_inline(edges, *, engine: str | None = None, **kwargs) -> dict:
     import base64
 
     from . import _engine
-    if _engine.engine(engine) == "rust":
+    if _engine.engine(engine) == "rust" and not (kwargs.get("simple") is False and _engine.fallback(engine, "simple=False (the full look) is Python's")):
         return _engine.export_inline(edges, **kwargs)
     from . import _settings
     from .render import render_edges

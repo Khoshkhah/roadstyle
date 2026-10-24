@@ -1,7 +1,7 @@
 # roadstyle as a Rust library: the design and the migration plan
 
 **Status:** agreed 2026-10-23: decisions 1 to 8 as recommended, decision 9 open. Built (2026-10-23, branch `rust-engine`): P0, P1, P2 (the
-crates), P4's style features (all of render's keywords that change the style, the full look too), P5 (the binding, the wheel, the whole test
+crates), P4's style features (all of render's keywords that change the style; the full look was ported and then removed again on 2026-10-23, decision 2), P5 (the binding, the wheel, the whole test
 suite with `ROADSTYLE_ENGINE=rust`), the output side of P3's contract (`roadstyle:contract`, `roadstyle:state`, `roadstyle:controls`,
 `docs/reference/contract.md`) and of P6 the page writer, the PMTiles writer, `export_look` and the runtime API (`rs`). Release 0.25.0 (2026-10-23): the Rust engine as an experimental option, with wheels for five platforms. Design phase: (a) the pure core is done (the engine takes the model types; the readers are the facade's). Open: P3's typed look
 and the layer roles, P6's npm packages and `Tiler.restyle`, the level options of `compute_levels` in Rust, P7. It continues [One Rust engine for roadstyle](rust_engine.md)
@@ -1489,7 +1489,7 @@ Decisions 1 to 8 were agreed on 2026-10-23, each as recommended. Decision 9 is o
 | # | Decision | Decided (2026-10-23) | Not chosen |
 |---|---|---|---|
 | 1 | The crates | The nine crates of [The crates](#the-crates) | Keep one crate with feature flags |
-| 2 | Full mode (`simple=False`) | It is not ported. Its one user (SonoFlow `viz/daily.py:179`) needs "change the color of each road from a property in the page": the dashboard module gets that call, and full mode is retired | Port full mode to Rust (more layers, more goldens) |
+| 2 | Full mode (`simple=False`) | It is not ported. Its one user (SonoFlow `viz/daily.py:179`) needs "change the color of each road from a property in the page": the dashboard module gets that call, and full mode is retired. 2026-10-23 (audit R5): simple mode (one road layer, ordered by the sort key) is the one drawing approach. The Rust port of full mode (`full.rs`) is removed; with `engine="rust"`, `simple=False` is an error that names the Python engine. Python's `simple=False` gives a deprecation warning and goes away in 0.27.0, after the SonoFlow page gets "colour from a property" in the dashboard | Port full mode to Rust (more layers, more goldens) |
 | 3 | The look file | Look v1: typed and versioned; the engine reads today's file as version 0 for one minor version | Keep today's file |
 | 4 | Unknown keywords | A warning for one minor version, then an error (today `**kwargs` ignores them; see below) | An error at once |
 | 5 | The Python package | One wheel `roadstyle` with the engine in it (maturin, abi3) | A pure Python `roadstyle` and a separate `roadstyle-engine` wheel |

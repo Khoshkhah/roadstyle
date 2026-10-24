@@ -245,8 +245,7 @@ def test_export_inline_decks(part, keywords, rename):
 
 
 @pytest.mark.parametrize("fmt", ["xyz", "pmtiles"])
-@pytest.mark.parametrize("case", ["plain", "numeric", "categorical", "road_popup", "view_3d", "kinds", "items and metre overlay", "other column names",
-                                  "full"])
+@pytest.mark.parametrize("case", ["plain", "numeric", "categorical", "road_popup", "view_3d", "kinds", "items and metre overlay", "other column names"])
 def test_export_style(part, keywords, case, fmt, tmp_path):
     """export_style: the same style.json and the same files; each tile has the same features when decoded (compare_engines.tile_diff:
     the numbers by value, the 3D decks by shape)."""
@@ -256,8 +255,6 @@ def test_export_style(part, keywords, case, fmt, tmp_path):
     if case == "other column names":
         part = part.rename(columns=_RENAME)
         kw.update(highway_col="fclass", tunnel_col="tun", bridge_col="brg", layer_col="lyr", edge_id_col="eid")
-    elif case == "full":
-        kw.update(simple=False, view_3d=True)
     else:
         kw.update(CASES[case] if case in CASES else {"view_3d": True} if case == "view_3d" else _overlays(part, case))
     py, ru = tmp_path / "python", tmp_path / "rust"
@@ -324,8 +321,7 @@ def test_live_style_and_contract(part, keywords, case):
 
 _PAGES = {"plain": {}, "controls": {"tunnel_control": True, "filter_control": True, "access_col": "access"},
           "numeric": {"color_by": "lanes", "cmap": "YlOrRd", "vmin": 1, "vmax": 4}, "colors": _LIVE["colors"], "compressed": {"compress": True},
-          "panel": {"road_popup": "panel"}, "base map": {"basemap": "osm", "basemaps": ["osm", "blank"]}, "classes": {"exclude": ["footway", "steps"]},
-          "full": {"simple": False}, "full controls": {"simple": False, "tunnel_control": True, "filter_control": True, "access_col": "access"}}
+          "panel": {"road_popup": "panel"}, "base map": {"basemap": "osm", "basemaps": ["osm", "blank"]}, "classes": {"exclude": ["footway", "steps"]}}
 
 
 @pytest.mark.parametrize("case", [*_PAGES, "kinds", "items and metre overlay", "decks"])
@@ -350,7 +346,7 @@ def test_render_edges_page(part, keywords, case, monkeypatch):
     assert diff(sr, sp) == [] and hr == hp
 
 
-@pytest.mark.parametrize("case", ["plain", "controls", "items and metre overlay", "full"])
+@pytest.mark.parametrize("case", ["plain", "controls", "items and metre overlay"])
 def test_render_edges_tiled_page(part, keywords, case, monkeypatch):
     """render_edges(tiles=True, engine="rust"): the same page as the Python engine's, but the embedded PMTiles archive, whose tiles are the
     same when decoded (compare_engines.tile_diff); the style, the sidecar table and the rest of the page are the same byte for byte."""
@@ -384,53 +380,20 @@ def test_render_edges_views(part, keywords, views, monkeypatch):
     assert rs.render_edges(part, engine="rust", **kw).html == rs.render_edges(part, engine="python", **kw).html
 
 
-def _full_roads(part, case):
-    """The roads and the keywords of a case of the full look."""
-    roads, kw = part, {}
-    if case in ("cap_col", "cap_col only"):
-        roads = part.copy()
-        roads["cap"] = [("square", "flat", "round", None)[i % 4] for i in range(len(roads))]
-        kw = {"cap_col": "cap", **({"cap_start_col": None, "cap_end_col": None} if case == "cap_col only" else {})}
-    elif case == "metres":
-        roads = part.copy()
-        roads["width_m"] = [3.5 * n if isinstance(n, int) and n > 0 else None for n in roads["lanes"]]
-        roads["cap"] = "flat"
-        kw = {"width_m_col": "width_m"}
-    elif case == "computed levels":
-        roads = part.drop(columns=[c for c in _LEVEL_COLS if c in part.columns])
-        kw = dict.fromkeys(_LEVEL_ARGS)
-    elif case == "other column names":
-        roads = part.rename(columns=_RENAME)
-        kw = {"highway_col": "fclass", "tunnel_col": "tun", "bridge_col": "brg", "layer_col": "lyr", "edge_id_col": "eid"}
-    elif case in ("kinds", "on edges"):
-        kw = _overlays(part, case)
-    elif case.startswith("twin ends"):      # twin_casing "each": a casing for each direction, and a road-wide end cap under a pair's two lanes
-        kw = {"settings": [_settings_of(), {"config": {"twin_casing": "each"}}], **(_LIVE["colors"] if case.endswith("colours") else {})}
-    else:
-        kw = {"decks": {"view_3d": True}, "colors": _LIVE["colors"], "minzoom": {"minzoom": True}, "access": {"access_col": "access"},
-              "road_fill off": {"road_fill": False}, "plain": {}}[case]
-    return roads, kw
-
-
-def _settings_of():
-    return json.loads((DATA / "look.json").read_text())["settings"]
-
-
-@pytest.mark.parametrize("case", ["plain", "decks", "cap_col", "cap_col only", "metres", "computed levels", "other column names", "colors",
-                                  "on edges", "kinds", "minzoom", "access", "road_fill off", "twin ends", "twin ends and colours"])
-def test_export_inline_full_look(part, keywords, case):
-    """simple=False, the full look: a casing and a fill layer for each position with their end-cap twins, the dashed classes, the bridge
-    look and its shadows (the engine's own line merge, in render_web's order), over the sources casings, halves and shadows."""
-    from compare_engines import diff
-
-    roads, opts = _full_roads(part, case)
-    kw = {k: v for k, v in {**keywords, **opts, "simple": False}.items() if v is not None}
-    py = rs.export_inline(roads, engine="python", **kw)
-    ru = rs.export_inline(roads, engine="rust", **kw)
-    if "decks" in py["sources"]:        # by shape: test_export_inline_decks
-        for st in (py, ru):
-            st["sources"]["decks"]["data"]["features"] = len(st["sources"]["decks"]["data"]["features"])
-    assert diff(ru, py) == []
+def test_the_full_look_is_the_python_engines(part, keywords, monkeypatch):
+    """simple=False (the full look) is the Python engine's only (plan decision 2, 2026-10-23): with engine="rust" an error that names the
+    Python engine; with ROADSTYLE_ENGINE=rust the Python engine makes it, with a warning; Python's own gives a deprecation warning."""
+    kw = {**keywords, "simple": False}
+    with pytest.raises(ValueError, match="use engine='python'"):
+        rs.export_inline(part, engine="rust", **kw)
+    with pytest.raises(ValueError, match="use engine='python'"):
+        rs.render_edges(part, backend="web", engine="rust", **kw)
+    monkeypatch.setenv("ROADSTYLE_ENGINE", "rust")
+    with pytest.warns(UserWarning, match="the Python engine makes this one"):
+        st = rs.export_inline(part, **kw)
+    assert not any(lyr["id"] == "roads-simple" for lyr in st["layers"])        # the full look: a layer for each position
+    with pytest.warns(DeprecationWarning, match="goes away in roadstyle 0.27.0"):
+        rs.export_inline(part, engine="python", **kw)
 
 
 def test_the_page_writer_gzips_by_itself(part, keywords):

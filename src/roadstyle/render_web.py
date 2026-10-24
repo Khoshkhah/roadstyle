@@ -2778,6 +2778,10 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     given and ``road_tooltip`` is unset, its value drives the hover tooltip here too, so the same
     call works across backends."""
     _args = dict(locals())        # this call's arguments: a view's palette is a second build with another palette (_palette_copies)
+    if not simple:              # plan decision 2 (2026-10-23): simple mode is the one drawing approach
+        import warnings
+        warnings.warn("simple=False (the full look) is deprecated and goes away in roadstyle 0.27.0: simple mode (the default) draws the "
+                      "same order with one road layer", DeprecationWarning, stacklevel=2)
     # the look keywords left out take the theme's values (docs/design/style_config.md)
     _sp, _cs, _sel = THEME["roads"]["split"], THEME["casing"], THEME["selection"]
     offset_frac = _sp["offset_frac"] if offset_frac is None else offset_frac
