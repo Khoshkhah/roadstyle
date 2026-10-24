@@ -25,6 +25,8 @@ fn check(case: &str) {
     let style = roadstyle_rs::make_style(roads, &look.to_string(), None, None, None).unwrap_or_else(|e| panic!("{case}: {e}"));
     let mut style: Value = serde_json::from_str(&style).unwrap();
     let options = style["metadata"].as_object_mut().unwrap().shift_remove("roadstyle:color_options").unwrap_or(Value::Array(vec![]));
+    let mut golden = golden;
+    golden["style"] = common::as_decided(golden["style"].take());
     // the top level: the engine writes mapstyle's export (its key order); below it, all must be the same
     let mut out = Vec::new();
     let (mut a, mut b): (Vec<&String>, Vec<&String>) = (style.as_object().unwrap().keys().collect(), golden["style"].as_object().unwrap().keys().collect());

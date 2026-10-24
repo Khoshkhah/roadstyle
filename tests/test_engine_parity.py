@@ -406,8 +406,7 @@ def test_the_page_writer_gzips_by_itself(part, keywords):
     parts = rs.render_edges(part, backend="web", _parts=True, **keywords)
     py = rs.render_edges(part, backend="web", engine="python", **keywords).html
     cam = {k: parts["camera"][k] for k in ("pitch", "bearing", "max_pitch")}
-    from roadstyle.tiles import sidecar
-    side = sidecar(parts["style"]["sources"]["roads"]["data"])      # the road table: the crate gzips it too
+    side = parts["side"]          # the road table: the crate gzips it too
     ru = _engine.rust().make_page(json.dumps(parts["style"]), json.dumps(parts["options"]), json.dumps(
         {"name": keywords.get("name") or "roadstyle", "cam": cam, "bounds": list(parts["bounds"]), "side_panel_html": None, "host_panel_width": 320,
          "compress": True, "simple_js": parts["simple_js"], "side": side}), None)

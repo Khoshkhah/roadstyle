@@ -28,7 +28,8 @@ pub struct Sources {
 impl Sources {
     pub fn new(p: Parts) -> Sources {
         let (sources, roads) = take_roads(p.sources);
-        let roads = roads.unwrap_or_else(|| RoadsSource { roads: Roads::new(RoadTable::empty()), tolerance: 0.05, maxzoom: None, names: Vec::new() });
+        let roads = roads.unwrap_or_else(|| RoadsSource { roads: Roads::new(RoadTable::empty()), tolerance: 0.05, maxzoom: None, names: Vec::new(),
+                                                          in_style: false });
         Sources { name: p.name, center: p.center, zoom: p.zoom, layers: p.layers, metadata: p.metadata, glyphs: p.glyphs, state: p.state, sources, roads,
                   saved: serde_json::Map::new() }
     }
@@ -54,6 +55,36 @@ impl Sources {
         self.layers.iter().any(|l| l["source"] == "roads" && l["layout"]["visibility"] != "none")
     }
 
+    /// The style as one JSON text (export_inline's), with each source's GeoJSON in it, written to `w` a part at a time. A page's style
+    /// has no `roads` source (`RoadsSource::in_style`).
+    pub fn write_style<W: std::io::Write>(&self, w: &mut W) -> std::io::Result<()> {
+        write!(w, r#"{{"version":8,"name":{},"center":{},"zoom":{},"layers":"#, self.name, self.center, self.zoom)?;
+        serde_json::to_writer(&mut *w, &self.layers)?;
+        w.write_all(br#","sources":{"#)?;
+        let shown = self.sources.iter().filter(|(_, s)| !matches!(s, Src::Roads(_)) || self.roads.in_style);
+        for (i, (k, s)) in shown.enumerate() {
+            if i > 0 {
+                w.write_all(b",")?;
+            }
+            serde_json::to_writer(&mut *w, k)?;
+            w.write_all(b":")?;
+            match s {
+                Src::Roads(_) => self.roads.write_json(w)?,
+                Src::Simple(p) => p.write_json(w, &self.roads.roads)?,
+                Src::Json(v) => serde_json::to_writer(&mut *w, v)?,
+            }
+        }
+        w.write_all(br#"},"metadata":"#)?;
+        serde_json::to_writer(&mut *w, &self.metadata)?;
+        if let Some(g) = &self.glyphs {
+            write!(w, r#","glyphs":{g}"#)?;
+        }
+        if let Some(st) = &self.state {
+            write!(w, r#","state":{st}"#)?;
+        }
+        w.write_all(b"}")
+    }
+
     /// The style with each source's data at `url(name)` (a GeoJSON source can name its data by URL), in place of the data.
     pub fn style(&self, url: impl Fn(&str) -> String) -> Value {
         let spec = |tolerance: f64, maxzoom: Option<i64>, url: String| {
@@ -66,7 +97,8 @@ impl Sources {
             }
             Value::Object(s)
         };
-        let sources: serde_json::Map<String, Value> = self.sources.iter().map(|(k, s)| (k.clone(), match s {
+        let sources: serde_json::Map<String, Value> = self.sources.iter().filter(|(_, s)| !matches!(s, Src::Roads(_)) || self.roads.in_style)
+            .map(|(k, s)| (k.clone(), match s {
             Src::Roads(_) => spec(self.roads.tolerance, self.roads.maxzoom, url(k)),
             Src::Simple(s) => spec(s.tolerance, s.maxzoom, url(k)),
             Src::Json(v) => {

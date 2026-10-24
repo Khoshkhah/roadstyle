@@ -142,7 +142,7 @@ pub fn make_parts(mut table: RoadTable, look: &str, features: Option<Vec<Row>>, 
             items.extend(overlays::road_items(&look_json["args"]["items"], &by_id, col, ovs.len(), &look_json)?);
         }
     }
-    let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow, width_col, items)?;
+    let mut simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow, width_col, items)?;
     // everything that reads the roads is done before this: the roads source takes them
     // export_inline(planner=True): the route planner's graphs, or the number of roads past the limit
     let planned = match planner {
@@ -151,7 +151,7 @@ pub fn make_parts(mut table: RoadTable, look: &str, features: Option<Vec<Row>>, 
         None => None,
     };
     let (center, zoom) = camera(&feats);
-    let roads = roads::roads_source(feats);
+    let mut roads = roads::roads_source(feats);
     // render's view_3d: the bridges' extruded decks (_bridge_decks)
     let decks = if look_json["args"]["view_3d"] == true {
         // a casing slab names the user's own `highway` column (Python's props.get("highway")): kept aside when highway_col is another
@@ -163,7 +163,9 @@ pub fn make_parts(mut table: RoadTable, look: &str, features: Option<Vec<Row>>, 
     // state "live" (a page with the dashboard, docs/design/rust_library.md "The interaction contract"): the state stays in the expressions,
     // and the style says what the controls show
     let live = look_json["args"]["state"] == "live";
-    let (contract, state) = if live {
+    // a page has no roads source: its pieces draw and glow (one feature state for each road's row), and the road table has the roads
+    (roads.in_style, simple.promote) = (!live, live);
+    let (mut contract, state) = if live {
         let st = contract::page_state(&look_json, colors.active, ovs.len());
         (Some((contract::controls(&look_json, &roads.roads, info, colors.active)?, st.clone())),
          Some(Value::Object(st.into_iter().map(|(k, v)| (k, json!({"default": v}))).collect())))
@@ -207,6 +209,10 @@ pub fn make_parts(mut table: RoadTable, look: &str, features: Option<Vec<Row>>, 
                            "layout": {"line-cap": th["roads"]["cap"], "line-join": th["roads"]["join"]},
                            "paint": {"line-color": b["color"], "line-width": b["width"], "line-opacity": b["opacity"], "line-dasharray": b["dash"]}}));
     }
+    if let Some((controls, _)) = contract.as_mut() {        // the page's roles and arrows, from its final layers
+        controls["sources"] = contract::roles(&layers);
+        controls["arrows"] = contract::arrow_kind(&layers);
+    }
     images.insert("oneway".into(), look_json["oneway_image"].clone());
     let mut metadata = serde_json::Map::new();
     // the export's page metadata: the road popup's fields, the hover tooltip and the hover delay (roadstyle:interaction)
@@ -245,32 +251,11 @@ pub fn make_parts(mut table: RoadTable, look: &str, features: Option<Vec<Row>>, 
     Ok(Parts { name, center, zoom, layers, sources, metadata: Value::Object(metadata), glyphs, state })
 }
 
-/// The style as one JSON text, with each source's GeoJSON in it (roadstyle's export_inline).
+/// The style as one JSON text, with each source's GeoJSON in it (roadstyle's export_inline): stage 1 (`sources::Sources`), written.
 pub fn make_style(table: RoadTable, look: &str, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<String, String> {
-    let Parts { name, center, zoom, layers, sources, metadata, glyphs, state } = make_parts(table, look, features, planner, name)?;
-    // The sources become text one at a time, and each is freed at once: a big area's sources are the most of the memory (Tartu: the
-    // peak went from 4.3 GB to 2.5 GB natively).
-    let metadata = metadata.to_string();
-    let mut out = format!(r#"{{"version":8,"name":{name},"center":{center},"zoom":{zoom},"layers":{},"sources":{{"#, Value::Array(layers)).into_bytes();
-    // the roads stay until the end: the simple pieces are written from them
-    let (mut sources, roads) = take_roads(sources);
-    for (i, (k, s)) in sources.drain(..).enumerate() {
-        out.extend_from_slice(format!("{}{}:", if i > 0 { "," } else { "" }, Value::from(k)).as_bytes());
-        match s {
-            Src::Roads(_) => roads.as_ref().expect("the roads source").write_json(&mut out),
-            Src::Simple(s) => s.write_json(&mut out, &roads.as_ref().ok_or("the simple pieces need the roads source")?.roads),
-            Src::Json(s) => serde_json::to_writer(&mut out, &s).unwrap(),
-        }
-    }
-    out.extend_from_slice(br#"},"metadata":"#);
-    out.extend_from_slice(metadata.as_bytes());
-    if let Some(g) = glyphs {
-        out.extend_from_slice(format!(r#","glyphs":{g}"#).as_bytes());
-    }
-    if let Some(st) = state {
-        out.extend_from_slice(format!(r#","state":{st}"#).as_bytes());
-    }
-    out.push(b'}');
+    let s = sources::Sources::new(make_parts(table, look, features, planner, name)?);
+    let mut out = Vec::new();
+    s.write_style(&mut out).expect("a Vec takes every byte");
     Ok(String::from_utf8(out).expect("serde_json writes UTF-8"))
 }
 
@@ -279,7 +264,8 @@ pub fn take_roads(mut sources: Vec<(String, Src)>) -> (Vec<(String, Src)>, Optio
     let mut roads = None;
     for (_, s) in sources.iter_mut() {
         if let Src::Roads(r) = s {
-            let empty = road::RoadsSource { roads: Roads::new(RoadTable::empty()), tolerance: r.tolerance, maxzoom: r.maxzoom, names: Vec::new() };
+            let empty = road::RoadsSource { roads: Roads::new(RoadTable::empty()), tolerance: r.tolerance, maxzoom: r.maxzoom, names: Vec::new(),
+                                            in_style: r.in_style };
             roads = Some(std::mem::replace(r, empty));
         }
     }

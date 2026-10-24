@@ -19,7 +19,7 @@ fn style(area: &str) -> Value {
 }
 
 fn style_differences(area: &str) -> Vec<(String, usize)> {
-    let (got, want) = (style(area), common::gz_json(&format!("{area}/golden_style.json.gz")));
+    let (got, want) = (style(area), common::as_decided(common::gz_json(&format!("{area}/golden_style.json.gz"))));
     // the top level: the engine writes mapstyle's export (its key order); below it, all is compared
     let mut keys: Vec<&String> = got.as_object().unwrap().keys().collect();
     keys.sort();

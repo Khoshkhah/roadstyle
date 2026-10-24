@@ -9,6 +9,7 @@ window.RS_SIDE=null;
     window.RS_SIDE=await new Response(new Blob([a]).stream()
       .pipeThrough(new DecompressionStream("gzip"))).json();
     el.textContent="";
+    document.dispatchEvent(new CustomEvent("rs:tableready"));
   }catch(e){ window.__rs_side={ok:false, error:String(e)}; }
 })();
 </script>

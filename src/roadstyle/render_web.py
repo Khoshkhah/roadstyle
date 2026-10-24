@@ -1590,6 +1590,35 @@ def _state_expressions(style, props, fill_ids, end_fill_ids, end_casing_ids, ov_
                 lyr["paint"][k] = ["coalesce", ["get", ["to-string", ["id"]], _gs(f"rs_ov_{i}")], lyr["paint"][k]]
 
 
+# the roles of a page's sources (roadstyle:sources): roadstyle's own, not the base map's
+_ROLES = {"roads", "simple", "slots", "arrows", "decks", "shadows", "casings", "halves", "ends", "boundary"}
+
+
+def _roles(layers):
+    """roadstyle:sources: each role of the page (a source's name in the GeoJSON way, a tile layer's in the tile way), in the order of its
+    first layer, with its source and its source layer (None for a GeoJSON source)."""
+    out = {}
+    for lyr in layers:
+        src, sl = lyr.get("source"), lyr.get("source-layer")
+        role = sl or src
+        if role and (role in _ROLES or (role.startswith("ov") and role[2:].isdigit())) and role not in out:
+            out[role] = {"source": src, "layer": sl}
+    return out
+
+
+def _arrow_kind(layers):
+    """roadstyle:arrows: "points" (the page puts one arrow on each one-way road in view, the "arrows" source), "line" (along the slots),
+    or None (no arrows)."""
+    lyr = next((l for l in layers if l["id"].startswith("roads-arrows")), None)
+    return None if lyr is None else "points" if lyr.get("source") == "arrows" else "line"
+
+
+def _tiler_sidecar(geo) -> bytes:
+    """The page's road table of ``geo`` (tiles.sidecar), as the JSON text that the page gzips."""
+    from .tiles import sidecar
+    return json.dumps(sidecar(geo), separators=(",", ":")).encode()
+
+
 def _fill_layer_ids(levels):
     """The layers the page recolours (colour-by, rsColor): every road fill layer, and the fill layers of each drawing-order position."""
     fills = ("roads-fill", "roads-fill-sq", "roads-fill-sx", "roads-fill-h", "roads-fill-hsq", "roads-fill-hsx")
@@ -2932,6 +2961,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         # as a second tile layer); the source just points at the embedded pmtiles:// protocol
         style["sources"]["roads"] = {"type": "vector", "url": "pmtiles://roads",
                                      "minzoom": tc["minzoom"], "maxzoom": tc["maxzoom"]}
+        if simple and not _export:      # the page: every piece of a road has its row (__rs_edge), so one feature state lights them all
+            style["sources"]["roads"]["promoteId"] = {"simple": "__rs_edge"}
     else:
         # tolerance 0.05 (default 0.375): the source re-tiles at every integer zoom and
         # re-simplifies the geometry — at the default tolerance the roads visibly ripple
@@ -3273,7 +3304,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                     l["maxzoom"] = dk["flat_below"]
                 elif l["id"].startswith(("roads-casing", "roads-fill")) and l.get("source") in ("roads", "casings"):
                     l["filter"] = ["all", l["filter"], ["any", ["<", ["zoom"], dk["flat_below"]], ["!", is_b]]]
-    lean = bool(simple) and not tiles       # simple mode, inline data: the roads source draws nothing, so it is cut into no tiles (see the hidden layers below)
+    # simple mode on a page, in both ways: the pieces draw, pick and glow; the page has no roads source (the road table has the fields and
+    # the lines). The export keeps the roads, with their pick and highlight layers, for an app's clicks (docs/design/rust_library.md, (g))
+    lean = bool(simple) and not _export
     end_fill_ids, end_casing_ids = ["roads-ends-low-fill", "roads-ends-fill", "roads-ends-high-fill"], ["roads-ends-low-casing", "roads-ends-casing", "roads-ends-high-casing"]
     if levels:        # position mode: a cap's casing is drawn right before its position's casing layers, its fill right before its position's fill layers
         end_fill_ids, end_casing_ids = [], []
@@ -3292,6 +3325,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         style["sources"]["simple"] = {"type": "geojson", "data": _simple_pieces(geo, parts, (highway_col, filter_col, width_m_col), CONFIG.bridge_shadow, items)}
         if not tiles:     # tiles=True: the pieces go into the archive as its "simple" layer
             style["sources"]["simple"]["tolerance"] = style["sources"]["roads"]["tolerance"]
+            if lean:      # every piece of a road has its row (__rs_edge), so one feature state lights them all
+                style["sources"]["simple"]["promoteId"] = "__rs_edge"
         for k in ("casings", "halves", "shadows", "ends"):
             style["sources"].pop(k, None)
         is_c, is_it = ["==", ["get", "__rs_k"], 0], ["==", ["get", "__rs_k"], 5]
@@ -3328,12 +3363,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                 "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], _FB["fill"]], "line-width": fw, "line-offset": off, "line-opacity": 0}}
         at = next(n for n, l in enumerate(style["layers"]) if l["id"].startswith(("roads-casing", "roads-fill")))
         style["layers"] = [l for l in style["layers"] if not l["id"].startswith(("roads-casing", "roads-fill", "roads-ends"))]
-        if lean:        # MapLibre cuts a source into tiles only while a layer of it is drawn, and every tile of the roads source cost the page a freeze (the 22k-entry colour state is
-            pick["layout"] = {**pick["layout"], "visibility": "none"}             # copied into each paint expression and back from the worker with each tile): the road is
-            for l in style["layers"]:                                              # picked on the fill pieces of roads-simple, and its glow is their state. The layers stay,
-                if l["id"].startswith("roads-highlight"):                          # hidden, for the page that reads their paint (roads-fill's line-offset)
-                    l["layout"] = {**l["layout"], "visibility": "none"}
-        style["layers"][at:at] = [road, pick]
+        style["layers"][at:at] = [road] if lean else [road, pick]       # the page: the road is picked on the fill pieces of roads-simple
 
     # oneway direction arrows (on edges with no reverse twin) + line-placed street names, on top.
     # Both read their cosmetics from data/style.json "config" (labels / arrows blocks), so a user
@@ -3524,6 +3554,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         if src.get("type") == "geojson" and isinstance(src.get("data"), dict):
             feats.setdefault(sid, src["data"].get("features", []))
     style["layers"] = _drop_empty_layers(style["layers"], feats)
+    if lean:        # the page: a road's glow is the feature state of its pieces (the arrows and names went in under the highlight)
+        style["layers"] = [l for l in style["layers"] if not l["id"].startswith("roads-highlight")]
 
     # the road's own fill: its layers and their opacity as drawn, so that rsSetRoadFill (and a view's road_fill) can put it back
     fill_paint = {}
@@ -3538,7 +3570,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         if lyr["id"] in fill_paint:
             lyr["paint"] = {**lyr["paint"], **{k: ["case", _gs("rs_fill_on"), 1 if v is None else v, 0] for k, v in fill_paint[lyr["id"]].items()}}
     if edge_layers and simple:     # one road layer: the items above all roads, position by position, before the arrows and names
-        at = next(n for n, l in enumerate(style["layers"]) if l["id"] in ("roads-arrows", "roads-labels", "roads-highlight"))
+        at = next((n for n, l in enumerate(style["layers"]) if l["id"] in ("roads-arrows", "roads-labels", "roads-highlight")), len(style["layers"]))
         style["layers"][at:at] = [lyr for _, _, _, group in sorted(edge_layers, key=lambda x: x[:3]) for lyr in group]
     elif edge_layers:       # the overlays attached to edges: after the fills of their position, before its arrows (docs/design/edge_overlays.md)
         style["layers"] = _place_edge_overlays(style["layers"], edge_layers, levels, pat_over=not road_fill)
@@ -3685,7 +3717,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                     if isinstance(v_, int) and not isinstance(v_, bool) and abs(v_) >= 2 ** 53:
                         p_[k_] = str(v_)
         pmt = _tiler.build_pmtiles(
-            geo, class_col=highway_col, keep=roads_keep,
+            {"type": "FeatureCollection", "features": []} if lean else geo, class_col=highway_col, keep=roads_keep,   # a page: no road lines
             minzoom_table=mz, minzoom=tc["minzoom"], maxzoom=tc["maxzoom"],
             extent=tc["extent"], buffer_px=tc["buffer_px"], extra_layers=extra or None,
             line_layers=line_layers or None)
@@ -3709,7 +3741,10 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         return {"style": style, "pmtiles": pmt, "bounds": (minx, miny, maxx, maxy), "interaction": inter,
                 "color_options": color_opts_meta or None}
     # the options of rsDashboard (static/dashboard/index.js), as the page gives them: each has the name of render's keyword
+    if lean and not tiles:
+        style["sources"].pop("roads", None)          # the page draws the pieces; the road table has the roads' fields and lines
     page = {"basemaps": bms, "basemap_switcher": bool(basemap_switcher), "tiles": bool(tiles), "simple": "roads-simple" if lean else False,
+            "sources": _roles(style["layers"]), "arrows": _arrow_kind(style["layers"]),
             "popup_mode": mode, "find_control": bool(find_control), "zoom_readout": bool(zoom_readout), "pitch_3d": cam["pitch_3d"],
             "street_view": street_view, "street_view_key": street_view_key or "", "google_3d": bool(google_3d), "select_color": select_color,
             "filter": flt, "color_options": color_opts_meta or [], "color_active": _active, "overlays": ov_meta,
@@ -3720,7 +3755,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                        "steps": THEME["tunnels"]["steps"], "ratios": THEME["tunnels"]["ratios"],
                        "toward": tun_toward, "towards": CONFIG.tunnel_towards,
                        "to": {**_TUN_TO, "fill": tun_colour}, "control": bool(tunnel_control and tun_paint)},
-            "fill_layers": _fill_layer_ids(levels), "road_fill": {"on": bool(road_fill), "paint": fill_paint}, "views": view_list,
+            "fill_layers": [] if lean else _fill_layer_ids(levels), "road_fill": {"on": bool(road_fill), "paint": fill_paint}, "views": view_list,
             "items": {"label": "items", "popup": items_popup, "layer": "roads-simple"} if road_items is not None else None,
             "road_popup": popup_fields if popup_on else False, "road_tooltip": road_tooltip, "hover_delay_ms": int(hover_delay_ms),
             "edge_id_col": edge_id_col, "arrow_icon": arw["icon"], "arrow_color": arw["color"],
@@ -3731,7 +3766,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     simple_js = {"layer": "roads-simple", "bridge": CONFIG.bridge_casing_color, "shadow": CONFIG.bridge_shadow_color,
                  "select": select_color, "hover": hover_color, "tunnels": bool(any_tunnel), "dashes": sdashes} if simple else None
     if _parts:      # the page's parts, not the page (the Rust engine's parity test, docs/design/rust_library.md "The interaction contract")
-        return {"style": style, "options": page, "bounds": (minx, miny, maxx, maxy), "camera": cam, "simple_js": simple_js}
+        from .tiles import sidecar
+        return {"style": style, "options": page, "bounds": (minx, miny, maxx, maxy), "camera": cam, "simple_js": simple_js, "side": sidecar(geo)}
     if not tiles:           # the road table of the inline roads: the page loads it the same way in both ways
         from .tiles import sidecar
         side = sidecar(geo)
@@ -3782,6 +3818,8 @@ def _page_html(style, page, *, name, cam, bounds, side_panel_html, host_panel_wi
             .replace("__GOOGLE_3D__", J("google_3d"))
             .replace("__RS_TILED__", J("tiles"))
             .replace("__RS_LEAN__", J("simple"))
+            .replace("__RS_SOURCES__", J("sources"))
+            .replace("__RS_ARROWS__", J("arrows"))
             .replace("__HOST_PANEL_HTML__", _host_panel(side_panel_html, host_panel_width, name)))     # the last: the host's own text may hold any other token
     parts = ""
     if tiles:

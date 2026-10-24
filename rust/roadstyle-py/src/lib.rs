@@ -107,6 +107,13 @@ impl Sources {
         Ok(roadstyle::file_names(&self.inner, self::format(format)?))
     }
 
+    /// style() -> str: the style as one JSON text with each source's GeoJSON in it (make_style's).
+    fn style(&self, py: Python<'_>) -> String {
+        let mut out = Vec::new();
+        py.detach(|| self.inner.write_style(&mut out)).expect("a Vec takes every byte");
+        String::from_utf8(out).expect("JSON text is UTF-8")
+    }
+
     /// road_table() -> str: the road table as the page loads it (tiles.sidecar's form: props, mids, bboxes, headings, lines).
     fn road_table(&self, py: Python<'_>) -> String {
         let mut out = Vec::new();

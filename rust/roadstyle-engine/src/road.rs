@@ -123,6 +123,8 @@ pub struct RoadsSource {
     pub maxzoom: Option<i64>,
     /// the column keywords (ColumnMap): each column with an engine name (`own`) and the user's name for it
     pub names: Vec<(&'static str, String)>,
+    /// the style has the source `roads` (the export); a page has none: its pieces draw, and the road table has the fields and the lines
+    pub in_style: bool,
 }
 
 /// The name of a kept column (a column with an engine name that is not the named one) while the engine runs.
@@ -139,16 +141,16 @@ impl RoadsSource {
         k.strip_prefix("__rs_kept_").and_then(|o| self.names.iter().find(|(own, _)| *own == o)).map_or(k, |(own, _)| own)
     }
 
-    pub fn write_json(&self, out: &mut Vec<u8>) {
-        out.extend_from_slice(br#"{"type":"geojson","data":"#);
-        self.write_data(out, None, true).expect("a Vec takes every byte");
-        out.extend_from_slice(br#","tolerance":"#);
-        serde_json::to_writer(&mut *out, &self.tolerance).unwrap();
+    /// The source as JSON text, written to `w` a part at a time.
+    pub fn write_json<W: std::io::Write>(&self, w: &mut W) -> std::io::Result<()> {
+        w.write_all(br#"{"type":"geojson","data":"#)?;
+        self.write_data(w, None, true)?;
+        w.write_all(br#","tolerance":"#)?;
+        serde_json::to_writer(&mut *w, &self.tolerance)?;
         if let Some(z) = self.maxzoom {
-            out.extend_from_slice(br#","maxzoom":"#);
-            out.extend_from_slice(z.to_string().as_bytes());
+            write!(w, r#","maxzoom":{z}"#)?;
         }
-        out.push(b'}');
+        w.write_all(b"}")
     }
 
     /// The FeatureCollection of the roads, written to `w` a part at a time; `keep`: only these properties (by the output's name) and

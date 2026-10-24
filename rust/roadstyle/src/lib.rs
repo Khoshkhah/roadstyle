@@ -58,7 +58,8 @@ pub fn tile_sources(s: &mut sources::Sources, o: &tiles::stage::TileOptions) -> 
             continue;
         }
         match src {
-            // the roads, from the table and the marks (no copy of their properties)
+            // the roads, from the table and the marks (no copy of their properties); a page has none
+            Src::Roads(_) if !s.roads.in_style => {}
             Src::Roads(_) => {
                 let (keep, whole, from) = o.rule(k, Default::default);
                 let r = &s.roads;
@@ -130,7 +131,8 @@ pub const ROAD_TABLE: &str = "road_table.parquet";
 /// The names of stage 1's files: style.json, one file for each source (`<name>.geojson` or `<name>.parquet`) and the road table.
 pub fn file_names(s: &sources::Sources, format: Format) -> Vec<String> {
     let ext = ext(format);
-    ["style.json".to_string()].into_iter().chain(s.sources.iter().map(|(n, _)| format!("{n}.{ext}"))).chain([ROAD_TABLE.to_string()]).collect()
+    let shown = s.sources.iter().filter(|(_, src)| !matches!(src, Src::Roads(_)) || s.roads.in_style);
+    ["style.json".to_string()].into_iter().chain(shown.map(|(n, _)| format!("{n}.{ext}"))).chain([ROAD_TABLE.to_string()]).collect()
 }
 
 fn ext(format: Format) -> &'static str {

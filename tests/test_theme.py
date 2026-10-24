@@ -20,8 +20,11 @@ def _edges():
 
 
 def _style(m):
+    from road_table import roads_of
     line = next(ln for ln in m.html.splitlines() if ln.startswith("const style = "))
-    return json.JSONDecoder().raw_decode(line[len("const style = "):])[0]
+    style = json.JSONDecoder().raw_decode(line[len("const style = "):])[0]
+    style["_roads"] = roads_of(m.html)        # the page's road table (a page in simple mode has no roads source)
+    return style
 
 
 def _layer(style, lid):
@@ -152,10 +155,10 @@ def test_a_view_can_switch_the_palette():
     m = rs.render_edges(_edges(), basemap="blank", views=views, simple=False)
     s = _style(m)
     assert s["state"]["rs_palette"]["default"] == "amber"
-    feats = s["sources"]["roads"]["data"]["features"]
+    feats = s["_roads"]["features"]
     assert all("__rs_fill@mono" in f["properties"] for f in feats)
     mono = rs.render_edges(_edges(), basemap="blank", palette="mono", simple=False)
-    assert [f["properties"]["__rs_fill@mono"] for f in feats] == [f["properties"]["__rs_fill"] for f in _style(mono)["sources"]["roads"]["data"]["features"]]
+    assert [f["properties"]["__rs_fill@mono"] for f in feats] == [f["properties"]["__rs_fill"] for f in _style(mono)["_roads"]["features"]]
     fill = json.dumps(_layer(s, "roads-fill")["paint"]["line-color"])
     assert '["global-state", "rs_palette"], "mono", ["get", "__rs_fill@mono"]' in fill
     assert '"palettes": {"mono":' in m.html                                           # the Roads panel's swatches per palette
