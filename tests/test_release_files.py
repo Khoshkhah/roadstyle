@@ -52,3 +52,40 @@ def test_every_dashboard_module_is_in_its_list():
     listed = [ln.strip() for ln in (d / "files.txt").read_text().splitlines() if ln.strip() and not ln.startswith("#")]
     assert sorted(listed) == sorted(p.stem for p in d.glob("*.js")) and len(set(listed)) == len(listed)
 
+
+def test_dashboard_modules_bundle_as_one_script():
+    """render_web.py and the Rust page writer put the modules in one script by line rules: they drop each line that starts with
+    `import ` and the word `export ` at a line's start. So an import must be on one line, and two modules must not declare the same
+    top-level name (in one script the second one is a syntax error, or silently replaces the first)."""
+    import re
+    d = ROOT / "src/roadstyle/static/dashboard"
+    seen, dup, multi = {}, [], []
+    for p in sorted(d.glob("*.js")):
+        lines = p.read_text().splitlines()
+        for i, ln in enumerate(lines):
+            if ln.startswith("import ") and not re.search(r"from\s+[\"'][^\"']+[\"'];\s*$", ln):
+                multi.append(f"{p.name}:{i + 1}")
+            m = re.match(r"(?:export )?(?:async )?(function\*?|class|let|const|var) (.*)", ln)
+            if not m:
+                continue
+            if m.group(1).startswith("function") or m.group(1) == "class":
+                names = [re.match(r"\s*([A-Za-z_$][\w$]*)", m.group(2)).group(1)]
+            else:     # let a = 1, b = [x, y], c;  -> a, b, c (the names before "=" or "," at the top level of the statement)
+                body, depth, cur, names = m.group(2).split(";")[0], 0, "", []
+                for ch in body + ",":
+                    if ch in "([{":
+                        depth += 1
+                    elif ch in ")]}":
+                        depth -= 1
+                    if ch == "," and depth == 0:
+                        names.append(re.match(r"\s*([A-Za-z_$][\w$]*)", cur).group(1))
+                        cur = ""
+                    else:
+                        cur += ch
+            for n in names:
+                if n in seen and seen[n] != p.name:
+                    dup.append(f"{n}: {seen[n]} and {p.name}")
+                seen.setdefault(n, p.name)
+    assert not multi, f"an import over more than one line: {multi}"
+    assert not dup, f"a top-level name in two modules: {dup}"
+
