@@ -57,6 +57,8 @@ pub struct PageOptions {
     pub overlay_popup: bool,
     pub tunnel: Value,
     pub fill_layers: Value,
+    /// the layers that a road is picked on (contract::pick_layers)
+    pub pick: Value,
     pub road_fill: Value,
     pub views: Value,
     pub items: Value,

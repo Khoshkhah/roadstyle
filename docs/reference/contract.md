@@ -26,7 +26,7 @@ The export's style (`export_style`, `export_inline`: `state` baked) has `roadsty
 | layer `roadstyle:group` | the group of a layer: `roads`, or an overlay's label |
 | layer `roadstyle:over` | a base-map layer that goes over the roads (the 3D buildings) |
 | layer `roadstyle:position` | the drawing position of a layer of `export_look` |
-| `roadstyle:sources` | each role of the style (`simple`, `slots`, `arrows`, `decks`, `ov<i>`, ...) with its source and its source layer (null for GeoJSON), from its final layers (`contract::describe`; after tiling the tile layers); the page gives it to the dashboard as the option `sources` |
+| `roadstyle:sources` | each road role of the style (`simple`, `slots`, `arrows`, `decks`, `shadows`; the full look also `roads`, `casings`, `halves`, `ends`) with its source and its source layer (null for GeoJSON), from its final layers (`contract::describe`; after tiling the tile layers); the page gives it to the dashboard as the option `sources` |
 | `roadstyle:arrows` | `"points"` (the page's own arrows, the source `arrows`), `"line"` (along the slots) or null, from the final layers; the page's option `arrows` |
 | `roadstyle:tiles` | in stage 1's saved `style.json` only: the tile settings that stage 2 reads (`minzoom`, `maxzoom`, `buffer_px`, `extent`) |
 | `roadstyle:columns` | in stage 1's saved `style.json` only: the user's class, filter and metre width columns (`class`, `filter`, `width`) |
@@ -52,6 +52,7 @@ host gives them to `rsDashboard` itself.
 | `overlays` | the Layers box: `[{label, source, layers, hit, visible, color, popup, popup_window, tooltip, under, base, select, interactive}]` |
 | `tunnel` | the tunnel look: `{layers, dash, casing, strength, palette, palettes, ratio, bg, steps, ratios, toward, towards, to, control}` |
 | `fill_layers` | the road fill layers that the page recolours |
+| `pick` | the layers that a road is picked on (clicked, hovered): `roads-simple` (the full look: its fill layers) and the 3D decks' tops (`roads-bridge-decks`), not their casing. A caller's items are in `overlays` |
 | `road_fill` | `{on, paint}`: the road fill switch and each fill layer's opacity without it |
 | `items` | `{label, popup, layer}` of render's `items=`, or null |
 | `edge_id_col` | the roads' id column |
