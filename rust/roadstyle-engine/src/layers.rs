@@ -374,6 +374,30 @@ fn metre_curve(like: &Value, prop: &str) -> Value {
 }
 
 /// R22's feature states on a road's row: its colour and the factor of its drawn width (metadata roadstyle:live).
+/// R8: each feature of the road layer's source has its class's place in the classes (`Model::classes`; their number: another class).
+pub const CLASS_INDEX: &str = "__rs_ci";
+
+/// R8: a class table, `["match", ["get", col], c0, v0, ..., fallback]` over the classes in their order with literal values, as one lookup
+/// by the feature's class index: `["at", ["get", "__rs_ci"], ["literal", [v0, ..., fallback]]]` (the road layer's width and offset have
+/// ~100 such tables).
+pub fn class_index(e: &mut Value, col: &str, classes: &[String]) {
+    let Value::Array(a) = e else {
+        if let Value::Object(o) = e {
+            o.values_mut().for_each(|x| class_index(x, col, classes));
+        }
+        return;
+    };
+    let n = classes.len();
+    let table = a.len() == 3 + 2 * n && a[0] == "match" && a[1] == json!(["get", col]) && classes.iter().enumerate().all(|(i, c)| a[2 + 2 * i] == c.as_str())
+        && (0..n).all(|i| !a[3 + 2 * i].is_array()) && !a[2 + 2 * n].is_array();
+    if table {
+        let vals: Vec<Value> = (0..classes.len()).map(|i| a[3 + 2 * i].clone()).chain([a[a.len() - 1].clone()]).collect();
+        *e = json!(["at", ["get", CLASS_INDEX], ["literal", vals]]);
+        return;
+    }
+    a.iter_mut().for_each(|x| class_index(x, col, classes));
+}
+
 pub const LIVE_COLOR: &str = "rs_c";
 pub const LIVE_WIDTH: &str = "rs_w";
 
@@ -516,6 +540,11 @@ fn ev(e: &Value, p: &dyn Get) -> Ev {
     let (op, a) = (arr[0].as_str().unwrap_or(""), &arr[1..]);
     match op {
         "literal" => Ev::V(a[0].clone()),
+        // R8's class index: an item of a literal list
+        "at" if a.len() == 2 => match (ev(&a[0], p), ev(&a[1], p)) {
+            (Ev::V(Value::Number(i)), Ev::V(Value::Array(arr))) => i.as_u64().and_then(|i| arr.get(i as usize)).map_or(Ev::Maybe, |v| Ev::V(v.clone())),
+            _ => Ev::Maybe,
+        },
         "get" if a.len() == 1 => Ev::V(a[0].as_str().and_then(|k| p.value(k)).unwrap_or(Value::Null)),
         "has" if a.len() == 1 => Ev::V(Value::Bool(a[0].as_str().is_some_and(|k| p.value(k).is_some()))),
         "all" | "any" => {
@@ -851,6 +880,8 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
     let mut simple_layout = lay.as_object().unwrap().clone();
     simple_layout.insert("line-cap".into(), simple_cap());
     simple_layout.insert("line-sort-key".into(), json!(["get", "__rs_s"]));
+    let mut paint = Value::Object(paint);
+    class_index(&mut paint, "highway", &m.classes);
     let road = json!({"id": "roads-simple", "type": "line", "source": "simple", "layout": simple_layout, "filter": flt, "paint": paint});
     let pick = json!({"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, "filter": flt,
                       "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], fb_fill], "line-width": fw, "line-offset": off, "line-opacity": 0}});

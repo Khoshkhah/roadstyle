@@ -204,17 +204,47 @@ pub fn as_decided(mut want: Value) -> Value {
     if let Some(s) = want["sources"]["simple"].as_object_mut() {
         s.insert("promoteId".into(), "__rs_edge".into());
     }
+    // R8 (2026-10-24): the road layer's class tables as one lookup by each feature's class index (__rs_ci, its last property)
+    let classes = classes_of(&want);
+    for l in want["layers"].as_array_mut().into_iter().flatten().filter(|l| l["id"] == "roads-simple") {
+        roadstyle_rs::layers::class_index(&mut l["paint"], "highway", &classes);
+    }
+    for f in want["sources"]["simple"]["data"]["features"].as_array_mut().into_iter().flatten() {
+        let ci = class_place(&classes, f["properties"]["highway"].as_str());
+        f["properties"]["__rs_ci"] = ci.into();
+    }
     // R1 (2026-10-24): a piece keeps only the properties that are read (the layers, the page's declaration, the popup), a road only
     // the stage values that are read (and all its fields)
-    let read = drawn_of(&want);
-    for (src, all) in [("simple", true), ("roads", false)] {
-        for f in want["sources"][src]["data"]["features"].as_array_mut().into_iter().flatten() {
-            if let Some(p) = f["properties"].as_object_mut() {
-                p.retain(|k, _| read.contains(k) || (!all && !k.starts_with("__rs_")));
-            }
+    let (read, pieces) = (drawn_of(&want), roadstyle_rs::props::piece_reads(want["layers"].as_array().map(Vec::as_slice).unwrap_or_default()));
+    for f in want["sources"]["simple"]["data"]["features"].as_array_mut().into_iter().flatten() {
+        let item = f["properties"]["__rs_k"] == 5;
+        if let Some(p) = f["properties"].as_object_mut() {
+            p.retain(|k, _| pieces.contains(k) || (item && !k.starts_with("__rs_")));
+        }
+    }
+    for f in want["sources"]["roads"]["data"]["features"].as_array_mut().into_iter().flatten() {
+        if let Some(p) = f["properties"].as_object_mut() {
+            p.retain(|k, _| read.contains(k) || !k.starts_with("__rs_"));
         }
     }
     want
+}
+
+/// The classes of a golden's road layer: the keys of its first class table (each table lists them in the same order).
+pub fn classes_of(style: &Value) -> Vec<String> {
+    fn first(v: &Value) -> Option<Vec<String>> {
+        let a = v.as_array()?;
+        if a.first() == Some(&json!("match")) && a.get(1) == Some(&json!(["get", "highway"])) {
+            return Some(a[2..a.len() - 1].iter().step_by(2).filter_map(|c| c.as_str().map(String::from)).collect());
+        }
+        a.iter().find_map(first)
+    }
+    style["layers"].as_array().into_iter().flatten().filter(|l| l["id"] == "roads-simple").find_map(|l| first(&l["paint"]["line-width"])).unwrap_or_default()
+}
+
+/// A class's place in `classes` (their number: another class), the class index.
+pub fn class_place(classes: &[String], c: Option<&str>) -> usize {
+    classes.iter().position(|x| Some(x.as_str()) == c).unwrap_or(classes.len())
 }
 
 /// What a style's drawing reads (props::drawn, with no caller's columns).

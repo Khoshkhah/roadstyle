@@ -399,11 +399,13 @@ pub struct SimpleSource {
     pub palette: Vec<usize>,
     /// R1: the only properties that a piece keeps (what the layers and the page read; `Sources::set_reads`), None: all
     pub read: Option<std::collections::HashSet<String>>,
+    /// R8: the classes of the road layer's class index (`__rs_ci`, the last property of every feature), None: no index
+    pub classes: Option<Vec<String>>,
 }
 
 impl SimpleSource {
     pub fn empty(cols: Cols) -> SimpleSource {
-        SimpleSource { pieces: Vec::new(), items: Vec::new(), cols, tolerance: 0.05, maxzoom: None, names: Vec::new(), promote: false, palette: Vec::new(), read: None }
+        SimpleSource { pieces: Vec::new(), items: Vec::new(), cols, tolerance: 0.05, maxzoom: None, names: Vec::new(), promote: false, palette: Vec::new(), read: None, classes: None }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -425,9 +427,20 @@ impl SimpleSource {
             for (k, v) in self.palette_props(p, roads) {
                 q.insert(&k, v);
             }
-            (*id, self.slim(q), p.coords.as_deref())
+            (*id, self.slim(self.with_index(q)), p.coords.as_deref())
         })
-            .chain(self.items.iter().map(move |(id, it)| (*id, self.slim_item(named(it.props.clone())), it.coords.as_deref())))
+            .chain(self.items.iter().map(move |(id, it)| (*id, self.slim_item(self.with_index(named(it.props.clone()))), it.coords.as_deref())))
+    }
+
+    /// The properties with the class index last (R8): the place of the feature's class (`highway`, the user's column by its own name at
+    /// the output) in the classes, else their number.
+    fn with_index(&self, mut q: Props) -> Props {
+        if let Some(cs) = &self.classes {
+            let col = self.names.iter().find(|(own, _)| *own == "highway").map_or("highway", |(_, user)| user.as_str());
+            let c = q.get(col).and_then(Value::as_str);
+            q.insert(crate::layers::CLASS_INDEX, cs.iter().position(|x| Some(x.as_str()) == c).unwrap_or(cs.len()).into());
+        }
+        q
     }
 
     /// A piece's properties that are read (R1), in their order.
@@ -599,7 +612,7 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
         }
         placed.push((id, f));
     }
-    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(width_col), tolerance: 0.05, maxzoom: None, names: Vec::new(), promote: false, palette: Vec::new(), read: None })
+    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(width_col), tolerance: 0.05, maxzoom: None, names: Vec::new(), promote: false, palette: Vec::new(), read: None, classes: None })
 }
 
 // _mitre_ends: a flat end where another road with metre widths goes on is pushed on to close the corner with the road that goes on most

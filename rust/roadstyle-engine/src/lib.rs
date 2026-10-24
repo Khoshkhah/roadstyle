@@ -176,6 +176,7 @@ fn style_parts(table: RoadTable, look_json: &Value, features: Option<Vec<Row>>, 
     } else { Vec::new() };
     let (layers, info) = layers::road_layers(&look_json, &roads.roads, &simple, source_features(&slots), !decks.is_empty(), &mut ovs,
                                              &colors.props, colors.active)?;
+    simple.classes = Some(layers::Model::from_look(&look_json)?.classes);     // R8: the road layer reads each feature's class index
     // state "live" (a page with the dashboard, docs/design/rust_library.md "The interaction contract"): the state stays in the expressions,
     // and the style says what the controls show
     let live = look_json["args"]["state"] == "live";

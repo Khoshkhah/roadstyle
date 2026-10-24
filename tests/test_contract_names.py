@@ -64,7 +64,7 @@ def test_the_page_reads_only_declared_properties():
     import json
 
     declared = json.loads((ROOT / "src/roadstyle/static/dashboard/reads.json").read_text())
-    known = set(declared["pieces"]) | set(declared["table"]) | {"__rs_fill", "__rs_fill__<i>"}      # the colour options' fills
+    known = {k for part in ("pieces", "decks", "slots", "table") for k in declared[part]} | {"__rs_fill", "__rs_fill__<i>"}      # the colour options' fills
     scripts = [*(ROOT / "src/roadstyle/static/dashboard").glob("*.js"), *(ROOT / "src/roadstyle/static/page").glob("*.html"),
                ROOT / "src/roadstyle/static/popup.js"]
     read = set()

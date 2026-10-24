@@ -1473,26 +1473,59 @@ def _by_palette(base, vals):
     return ["match", _gs("rs_palette"), *[x for n, v in vals.items() for x in (n, v)], base]
 
 
+def _expression_reads(v, out):
+    """The names of the ``["get", name]`` and ``["has", name]`` reads in ``v`` (props::expression_reads in Rust), added to ``out``."""
+    if isinstance(v, list):
+        if len(v) == 2 and v[0] in ("get", "has") and isinstance(v[1], str):
+            out.add(v[1])
+        for x in v:
+            _expression_reads(x, out)
+    elif isinstance(v, dict):
+        for x in v.values():
+            _expression_reads(x, out)
+    return out
+
+
 def _drawn(layers, popup, tooltip):
-    """What a style's drawing reads (props::drawn in Rust): the names of the layers' ``["get", name]`` and ``["has", name]``, the popup
-    and tooltip fields, the page's declaration (static/dashboard/reads.json ``pieces``), ``name`` and ``kind``."""
+    """What a style's drawing reads (props::drawn in Rust): the layers' reads, the popup and tooltip fields, the page's declaration for a
+    piece (static/dashboard/reads.json ``pieces``), ``name`` and ``kind``."""
     from .tiles import page_reads
 
-    out = {"name", "kind", *page_reads()["pieces"]}
-
-    def walk(v):
-        if isinstance(v, list):
-            if len(v) == 2 and v[0] in ("get", "has") and isinstance(v[1], str):
-                out.add(v[1])
-            for x in v:
-                walk(x)
-        elif isinstance(v, dict):
-            for x in v.values():
-                walk(x)
-    walk(layers)
+    out = _expression_reads(layers, {"name", "kind", *page_reads()["pieces"]})
     for fields in (popup, tooltip):
         out |= {f for f in (fields if isinstance(fields, list) else []) if isinstance(f, str)}
     return out
+
+
+def _piece_reads(layers):
+    """What a road piece keeps (R1, props::piece_reads in Rust): the reads of the layers on ``simple`` and the page's declaration for a
+    piece; a road's popup reads the road table, not its pieces."""
+    from .tiles import page_reads
+
+    return _expression_reads([lyr for lyr in layers if lyr.get("source") == "simple"], set(page_reads()["pieces"]))
+
+
+def _class_index(e, col):
+    """R8 (layers::class_index in Rust): a class table, ``["match", ["get", col], c0, v0, ..., fallback]`` over the classes in their order
+    (``_CLASSES``) with literal values, as one lookup by the feature's class index: ``["at", ["get", "__rs_ci"], ["literal", [v0, ...,
+    fallback]]]``."""
+    if isinstance(e, dict):
+        return {k: _class_index(v, col) for k, v in e.items()}
+    if not isinstance(e, list):
+        return e
+    n = len(_CLASSES)
+    if (len(e) == 3 + 2 * n and e[0] == "match" and e[1] == ["get", col] and e[2:2 + 2 * n:2] == list(_CLASSES)
+            and not any(isinstance(v, list) for v in e[3::2] + [e[-1]])):
+        return ["at", ["get", "__rs_ci"], ["literal", [*e[3:2 + 2 * n:2], e[-1]]]]
+    return [_class_index(x, col) for x in e]
+
+
+def _mark_class_index(features, col):
+    """R8: each feature's class index (``__rs_ci``, its last property): its class's place in ``_CLASSES``, else their number."""
+    place = {c: i for i, c in enumerate(_CLASSES)}
+    for f in features:
+        c = f["properties"].get(col)
+        f["properties"]["__rs_ci"] = place.get(c, len(_CLASSES)) if isinstance(c, str) else len(_CLASSES)
 
 
 def _slim_roads(features, read):
@@ -1747,6 +1780,11 @@ def _ev(e, p):
             if any(_same(v, x) for x in (lab if isinstance(lab, list) else [lab])):
                 return _ev(o, p)
         return _ev(a[-1], p)
+    if op == "at" and len(a) == 2:      # R8's class index: an item of a literal list
+        i, arr = _ev(a[0], p), _ev(a[1], p)
+        if i is _MAYBE or arr is _MAYBE or not isinstance(arr, list) or not isinstance(i, int) or isinstance(i, bool) or not 0 <= i < len(arr):
+            return _MAYBE
+        return arr[i]
     return _MAYBE                       # ["zoom"], and any operator not read here
 
 
@@ -2475,11 +2513,8 @@ _ITEM_STEP, _MAX_ITEMS = 0.01, 38
 
 
 def _page_read(html):
-    """What a page that render wrote reads (``_drawn`` of its layers, its road popup and its tooltip)."""
-    dec = json.JSONDecoder()
-    style = dec.raw_decode(html, html.index("const style = ") + len("const style = "))[0]
-    opt = lambda k: dec.raw_decode(html, html.index("\n  " + k + ": ", html.index("rsDashboard(map, {")) + len(k) + 5)[0]      # noqa: E731
-    return _drawn(style["layers"], opt("road_popup"), opt("road_tooltip"))
+    """What the pieces of a page that render wrote keep (``_piece_reads`` of its layers)."""
+    return _piece_reads(json.JSONDecoder().raw_decode(html, html.index("const style = ") + len("const style = "))[0]["layers"])
 
 
 def _slim_pieces(features, read):
@@ -2505,6 +2540,7 @@ def _edge_features(geo, edges, head_m, cols, fcol, slots, items=(), read=None):
     _mark_cls(geo, [v for k, v in out.items() if k != "slot_roads"], fcol)
     if read is not None:        # R1: as the whole page has them (``read``: the page's read set; the roads as its road table)
         from .tiles import table_keeps
+        _mark_class_index(out["simple"], cols[0])
         _slim_pieces(out["simple"], read)
         out["roads"] = [{**f, "properties": {k: v for k, v in f["properties"].items() if table_keeps(k)}} for f in out["roads"]]
     return out
@@ -3700,8 +3736,12 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
 
     # R1 (docs/reference/contract.md, "What a page reads"): a piece keeps only the properties that are read, a road and an item (__rs_k 5)
     # only the stage values that are read (an item's own fields are its popup's), as the Rust engine writes them
+    road = next((lyr for lyr in style["layers"] if lyr["id"] == "roads-simple"), None)
+    if road is not None:        # R8: the road layer's class tables read each feature's class index, its last property
+        road["paint"] = _class_index(road["paint"], highway_col)
+        _mark_class_index((style["sources"].get("simple") or {}).get("data", {}).get("features", []), highway_col)
     read = _drawn(style["layers"], popup_fields if popup_on else False, road_tooltip)
-    _slim_pieces((style["sources"].get("simple") or {}).get("data", {}).get("features", []), read)
+    _slim_pieces((style["sources"].get("simple") or {}).get("data", {}).get("features", []), _piece_reads(style["layers"]))
     if isinstance((style["sources"].get("roads") or {}).get("data"), dict):
         style["sources"]["roads"]["data"] = {**style["sources"]["roads"]["data"], "features": _slim_roads(style["sources"]["roads"]["data"]["features"], read)}
 

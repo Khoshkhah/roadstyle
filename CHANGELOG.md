@@ -7,6 +7,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **The road layer reads its class tables by an index** (R8, both engines). Each width and offset table over the classes is one
+  `["at", ["get", "__rs_ci"], ["literal", [...]]]`, and each feature of `simple` has its class index `__rs_ci`. A piece keeps only what
+  the road layer and the page read on it, so it has no `highway` any more (the page reads the class from the road table). On Tartu:
+  the road layer 63.5 KB to 31.7 KB, the `simple` source 40.3 MB to 39.5 MB.
 - **The features carry only what is read** (R1, both engines). A road piece keeps the properties that the layers' expressions, the
   page's modules (`static/dashboard/reads.json`), the popup and the tooltip read; a road keeps its fields and the stage values that are
   read; the road table keeps the fields, the stage values that the page reads on a row, and the fills. The GeoJSON, the GeoParquet files

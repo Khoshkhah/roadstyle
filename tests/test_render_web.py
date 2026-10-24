@@ -993,7 +993,7 @@ def test_two_way_footway_is_one_full_width_line_and_a_street_keeps_its_lanes():
         style = _style(html)
         if simple:
             pieces = style["sources"]["simple"]["data"]["features"]
-            assert {f["properties"]["__rs_edge"] for f in pieces if f["properties"]["highway"] == "footway"} == {7}
+            assert {f["properties"]["__rs_edge"] for f in pieces if f["properties"]["__rs_cls"] == "footway"} == {7}     # a piece's class (R1: no highway)
         else:
             nd = ["!", ["to-boolean", ["get", "__rs_dup"]]]
             assert all(l["filter"] == nd or l["filter"][-1] == nd for l in style["layers"] if l.get("source") in ("roads", "casings", "halves"))
@@ -1067,7 +1067,7 @@ def test_a_two_way_pair_has_one_casing_and_a_fill_per_direction():
         assert _num(offset[4 + 2 * z], pair) == 0 and _num(offset[4 + 2 * z], fill) > 0
         assert _num(width[4 + 2 * z], pair) == pytest.approx(_num(width[4 + 2 * z], lane) + 2 * _num(offset[4 + 2 * z], fill))
         if not extra:
-            outer = _num(_end_radius_expr("highway", casing=True)[4 + 2 * z], pair)       # the pair's outer half-width at zoom 18
+            outer = _num(_end_radius_expr("highway", casing=True)[4 + 2 * z], {**pair, "highway": pair["__rs_cls"]})   # the pair's outer half-width at zoom 18
             assert _num(width[4 + 2 * z], pair) == pytest.approx(2 * outer, abs=0.01)
     full = _style(render_edges(g, simple=False, **_TWIN_KW).html)
     pieces = [f["properties"] for f in full["sources"]["casings"]["data"]["features"]]

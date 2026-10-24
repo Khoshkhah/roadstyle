@@ -175,6 +175,15 @@ pub fn expression_reads(v: &Value, out: &mut std::collections::HashSet<String>, 
     }
 }
 
+/// What a road piece keeps (R1): the reads of the layers on the source `simple` (the road layer) and the page's declaration for a piece
+/// (PAGE_READS's `pieces`). A road's popup reads the road table, not its pieces.
+pub fn piece_reads(layers: &[Value]) -> std::collections::HashSet<String> {
+    let mut read: std::collections::HashSet<String> = page_reads().into_iter().collect();
+    let mut unknown = Vec::new();
+    layers.iter().filter(|l| l["source"] == "simple").for_each(|l| expression_reads(l, &mut read, &mut unknown));
+    read
+}
+
 /// The properties that a style's drawing reads (tiles.py's tile_props): the layers' expressions (`expression_reads`), the popup and
 /// tooltip fields of `roadstyle:interaction`, the page's modules (`page_reads`), `name`, `kind` and the caller's `keep`. Every `__rs_*`
 /// property goes too, apart from this set.
