@@ -53,17 +53,44 @@ def _goldens():
     return gen, json.loads((here / "data" / "mapstyle_digests.json").read_text())
 
 
+# the maps of one mode (only=True) also differ in two engine rules (2026-10-24, the same roads in both engines): the name slots (slots.rs:
+# 87 of 2,111 slots of walking name another road row) and edge_attach (overlays.rs: 1 to 2 points of a layer on another road, a tie)
+_ONE_MODE = pytest.mark.xfail(strict=True, reason="a map of one mode: the Rust engine's slots and edge_attach differ from Python's")
+
+
 # ponytail: xfail until the Rust engine's 3D decks equal Python's on all of Monaco (decks.rs, 2026-10-24: 1,312 decks, Python 1,311, other
 # slabs and properties for the same roads; tests/test_engine_parity.py's area does not show it). strict: the test fails when they match.
 @pytest.mark.xfail(strict=True, reason="the Rust engine's 3D decks differ from Python's on all of Monaco (decks.rs)")
 @pytest.mark.parametrize("choice", ["all osm google", "driving osm google", "walking osm google", "cycling osm google", "all grey google",
-                                    "walking google komoot"])
+                                    "walking google komoot", pytest.param("driving osm google only", marks=_ONE_MODE),
+                                    pytest.param("walking osm google only", marks=_ONE_MODE)])
 def test_the_style_is_mapstyles(choice):
     """The style of roadstyle.duckosm.export_inline (the reader, the base map's look and stage 1 in Rust) has the normalised digest of
     today's mapstyle export_inline of the same choice (tests/make_mapstyle_goldens.py: the rules of `normalised`, each with its reason)."""
     from roadstyle import duckosm
 
     gen, digests = _goldens()
-    mode, theme, paths = choice.split()
-    style = duckosm.export_inline(DB, mode, theme=theme, paths=paths)
-    assert gen.digest(gen.normalised(style)) == digests[f"style_{mode}_{theme}_{paths}"]["normalised"]
+    mode, theme, paths, *only = choice.split()
+    style = duckosm.export_inline(DB, mode, theme=theme, paths=paths, only=bool(only))
+    assert gen.digest(gen.normalised(style)) == digests[gen.name_of(mode, theme, paths, bool(only))]["normalised"]
+
+
+def test_a_map_of_one_mode_needs_a_mode_and_its_stored_levels(tmp_path):
+    """only=True: the roads of one network; the mode "all" is an error, and so is a road with no stored row (the levels were solved for
+    other roads)."""
+    import duckdb
+
+    from roadstyle import duckosm
+
+    with pytest.raises(ValueError, match="only: a map of one mode needs the mode driving, walking or cycling"):
+        duckosm.read(DB, "all", only=True)
+    db = tmp_path / "stale.duckdb"
+    con = duckdb.connect(str(db))
+    con.execute(f"ATTACH '{DB}' AS src (READ_ONLY)")
+    for s, t in con.execute("SELECT schema_name, table_name FROM duckdb_tables() WHERE database_name = 'src'").fetchall():
+        con.execute(f'CREATE SCHEMA IF NOT EXISTS "{s}"')
+        con.execute(f'CREATE TABLE "{s}"."{t}" AS SELECT * FROM src."{s}"."{t}"')
+    con.execute("DELETE FROM visualization.edge_levels WHERE edge_id = (SELECT min(edge_id) FROM driving.edges)")
+    con.close()
+    with pytest.raises(ValueError, match="1 of the edges are not edges the stored levels were solved for"):
+        duckosm.read(db, "driving", only=True)
