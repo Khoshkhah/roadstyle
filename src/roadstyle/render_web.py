@@ -1495,10 +1495,14 @@ def _merge_palettes(style, geo, slots, copies, base_name):
         if [len(x) for x in copy_lists] != [len(x) for x in base_lists]:
             raise ValueError(f"palette {n!r} makes other features than {base_name!r}: a palette holds only colours")
         for bf, cf in zip(base_lists, copy_lists, strict=True):
-            keys = {k for a, b in zip(bf, cf, strict=True) for k, v in (b.get("properties") or {}).items() if (a.get("properties") or {}).get(k) != v}
+            # the keys that differ, in the order they first differ; a feature gets a copy only when its feature of that palette has the key
+            keys = list(dict.fromkeys(k for a, b in zip(bf, cf, strict=True) for k, v in (b.get("properties") or {}).items()
+                                      if (a.get("properties") or {}).get(k) != v))
             for a, b in zip(bf, cf, strict=True):
+                bp = b.get("properties") or {}
                 for k in keys:
-                    a["properties"][f"{k}@{n}"] = (b.get("properties") or {}).get(k)
+                    if k in bp:
+                        a["properties"][f"{k}@{n}"] = bp[k]
             for k in keys:
                 differ.setdefault(k, []).append(n)
         for lyr, other in zip(style["layers"], cp["style"]["layers"], strict=True):
@@ -1611,12 +1615,6 @@ def _arrow_kind(layers):
     or None (no arrows)."""
     lyr = next((l for l in layers if l["id"].startswith("roads-arrows")), None)
     return None if lyr is None else "points" if lyr.get("source") == "arrows" else "line"
-
-
-def _tiler_sidecar(geo) -> bytes:
-    """The page's road table of ``geo`` (tiles.sidecar), as the JSON text that the page gzips."""
-    from .tiles import sidecar
-    return json.dumps(sidecar(geo), separators=(",", ":")).encode()
 
 
 def _fill_layer_ids(levels):

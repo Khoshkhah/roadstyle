@@ -1291,9 +1291,11 @@ The order of the design steps after the 0.25.0 release (the audit's items: [audi
 uses [review_checklist.md](review_checklist.md)):
 
 1. (a) the pure core, (b) the typed render model, (f) the two stages: done.
-2. (g) one path for GeoJSON and tiles: the road table in both ways, one source naming, one feature id, one tile rule, the typed tiled page.
-3. R22, the live data join: a page colours and sizes the roads from a table by MapLibre's feature state (`rs_c`, `rs_w`), with no new build.
-4. R2 (stage 1 once, its typed output kept; a view's palette as a restyle), R1 with R8 (each layer and dashboard module declares what it
+2. (g) one path for GeoJSON and tiles: the road table in both ways, one source naming, one feature id, one tile rule, the typed tiled page:
+   done.
+3. R22, the live data join: a page colours and sizes the roads from a table by MapLibre's feature state (`rs_c`, `rs_w`), with no new build:
+   done.
+4. R2 (stage 1 once, its typed output kept; a view's palette as a restyle: done, `roadstyle-engine::palettes`), R1 with R8 (each layer and dashboard module declares what it
    reads; one class index), R4 (one `Topology`), R3 (a typed stage 3, one `__RS_OPTIONS__`).
 5. (c) `roadstyle-look` (with R16, R17).
 6. **The mapstyle merge** (approved 2026-10-23): roadstyle gets a duckOSM reader for the roads of every mode and the base-map tables

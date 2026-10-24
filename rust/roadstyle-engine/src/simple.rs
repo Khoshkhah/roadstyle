@@ -87,6 +87,11 @@ impl Cols {
         k == "highway" || k == self.fcol || k == "lvl" || Some(k) == self.width.as_deref() || (k.starts_with("__rs_") && !k.starts_with("__rs_fill"))
     }
 
+    /// The piece of `part` has the road's property `k` (a fill's keys, else a casing's).
+    pub(crate) fn keeps(&self, part: Part, k: &str) -> bool {
+        if matches!(part, Part::Fill | Part::Half(_)) { self.fill(k) } else { self.casing(k) }
+    }
+
     /// A property of a fill piece in simple mode: the same, with the fills.
     fn fill(&self, k: &str) -> bool {
         k == "highway" || k == self.fcol || k == "lvl" || Some(k) == self.width.as_deref() || k.starts_with("__rs_")
@@ -96,7 +101,7 @@ impl Cols {
 /// The properties of a road as JSON values, those that `keep` takes. The road's own `__rs_cls` (set later, for the roads source) is
 /// not one: a piece marks its class itself, as the last property.
 fn road_props(r: Road, keep: impl Fn(&str) -> bool) -> Props {
-    r.iter().filter(|(k, _)| *k != "__rs_cls" && keep(k)).map(|(k, v)| (k, v.to_value())).collect()
+    r.own().filter(|(k, _)| *k != "__rs_cls" && keep(k)).map(|(k, v)| (k, v.to_value())).collect()
 }
 
 impl Piece {
@@ -390,11 +395,13 @@ pub struct SimpleSource {
     pub names: Vec<(&'static str, String)>,
     /// a page: `promoteId` "__rs_edge" (every piece of a road has its row, so one feature state lights them all)
     pub promote: bool,
+    /// a view's palettes (palettes.rs): the roads' `Extra` that the pieces differ in, in the order of the copies on each piece
+    pub palette: Vec<usize>,
 }
 
 impl SimpleSource {
     pub fn empty(cols: Cols) -> SimpleSource {
-        SimpleSource { pieces: Vec::new(), items: Vec::new(), cols, tolerance: 0.05, maxzoom: None, names: Vec::new(), promote: false }
+        SimpleSource { pieces: Vec::new(), items: Vec::new(), cols, tolerance: 0.05, maxzoom: None, names: Vec::new(), promote: false, palette: Vec::new() }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -411,7 +418,13 @@ impl SimpleSource {
             }
             p
         };
-        self.pieces.iter().map(move |(id, p)| (*id, named(p.props(roads, &self.cols)), p.coords.as_deref()))
+        self.pieces.iter().map(move |(id, p)| {
+            let mut q = named(p.props(roads, &self.cols));
+            for (k, v) in self.palette_props(p, roads) {
+                q.insert(&k, v);
+            }
+            (*id, q, p.coords.as_deref())
+        })
             .chain(self.items.iter().map(move |(id, it)| (*id, named(it.props.clone()), it.coords.as_deref())))
     }
 
@@ -568,7 +581,7 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
         }
         placed.push((id, f));
     }
-    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(width_col), tolerance: 0.05, maxzoom: None, names: Vec::new(), promote: false })
+    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(width_col), tolerance: 0.05, maxzoom: None, names: Vec::new(), promote: false, palette: Vec::new() })
 }
 
 // _mitre_ends: a flat end where another road with metre widths goes on is pushed on to close the corner with the road that goes on most

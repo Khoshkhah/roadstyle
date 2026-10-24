@@ -403,9 +403,6 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
     lk = _look_of({**kwargs, "palette": palette, "profile": profile, "settings": settings, "highway_col": highway_col, "state": "live"})
     pq = _geoparquet(g)
     src = rust().make_sources(pq, json.dumps(lk), None, None, kwargs.get("name"))      # stage 1, once: the style and the road table
-    style, table = json.loads(src.style()), src.road_table()
-    geo = _geo_of(json.loads(table))           # the roads, for the views' palettes (render_web._merge_palettes)
-    _warn()
     a = {k: p.default for k, p in inspect.signature(rw.render).parameters.items() if p.default is not inspect.Parameter.empty}
     a.update(kwargs)
     mode = "panel" if a["road_popup"] == "panel" else (a["popup_mode"] or "popup")
@@ -426,9 +423,13 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
         _use(*prev, *srcs)
         active_bm, bms, base = rw._page_basemaps(a["basemap"], a["basemaps"], a["api_key"], a["basemap_switcher"])
         bg = rw._bg_color(active_bm)
-        views = _views(style, geo, pq, kwargs, [b["key"] for b in bms], palette, profile, settings, highway_col) if a["views"] else []
+        views, pals = _views(src, kwargs, [b["key"] for b in bms], palette, profile, settings, highway_col) if a["views"] else ([], [])
     finally:
         _use(*prev)
+    style, table = json.loads(src.style()), src.road_table()
+    _warn()
+    if pals:
+        _palette_swatches(style, json.loads(table)["props"], pals)
     if tiled and any("palette" in v["set"] for v in views):
         raise ValueError("engine='rust': tiles=True with a view's palette (the tiles have one palette); use engine='python'")
     dashes = sorted({f["properties"].get("__rs_dash") for f in (style["sources"].get("simple") or {"data": {"features": []}})["data"]["features"]} - {None, ""})
@@ -467,45 +468,40 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
              "host_panel_width": a["host_panel_width"], "compress": False, "gz": gz, "simple_js": simple_js if a["simple"] else None}
     pmt = archive
     # the road table of stage 1, in both ways; a view's palette has put its fills (<key>@<palette>) into the roads
-    merged = any("palette" in v["set"] for v in views)
-    parts["side_b64"] = _b64gz(rw._tiler_sidecar(geo) if merged else table.encode())
+    parts["side_b64"] = _b64gz(table.encode())
     return rw.WebMap(rust().make_page(json.dumps(page_style), json.dumps(page), json.dumps(parts), pmt))
 
 
-def _geo_of(table):
-    """The roads as a FeatureCollection, from stage 1's road table: each road's properties and its line."""
-    return {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": p, "geometry": c and {"type": "LineString", "coordinates": c}}
-                                                      for p, c in zip(table["props"], table["lines"], strict=True)]}
-
-
-def _views(style, geo, pq, kwargs, basemaps, palette, profile, settings, highway_col):
-    """render's ``views``, checked (render_web._check_views), as the page reads them; a palette that a view names other than the page's
-    is merged into ``style`` (render_web._merge_palettes: the colours that differ, one copy per palette, picked by the state rs_palette),
-    from a Rust style of that palette, and the filter panel gets each class's colour in each palette."""
+def _views(src, kwargs, basemaps, palette, profile, settings, highway_col):
+    """render's ``views``, checked (render_web._check_views), as the page reads them, and the palettes that they name other than the page's.
+    Each such palette is merged into stage 1's output ``src`` in Rust (palettes.rs, as render_web._merge_palettes: the properties that
+    differ, a copy for each palette, picked by the state rs_palette), from the same roads with no second read or level solve."""
     from . import _settings as _s
     from . import render_web as rw
 
-    meta, ctl = style["metadata"], style["metadata"]["roadstyle:controls"]
+    meta = json.loads(src.metadata())
+    ctl = meta["roadstyle:controls"]
     colors = [o["name"] for o in meta.get("roadstyle:color_options") or []] if kwargs.get("color_options") else []
     views = rw._check_views(kwargs["views"], colors, [o["label"] for o in ctl["overlays"]], ctl["filter"]["classes"], basemaps,
                             _s.style_names("palettes"))
     pals = [p for p in dict.fromkeys(v["set"]["palette"] for v in views if "palette" in v["set"]) if p != palette]
     if pals:
-        def build(n):
-            lk = _look_of({**kwargs, "palette": n, "profile": profile, "settings": settings, "highway_col": highway_col, "state": "live"})
-            src = rust().make_sources(pq, json.dumps(lk), None, None, kwargs.get("name"))
-            st = json.loads(src.style())
-            return {"style": st, "geo": _geo_of(json.loads(src.road_table())), "slots": (st["sources"].get("slots") or {}).get("data") or {"features": []}}
-        slots = (style["sources"].get("slots") or {}).get("data") or {"features": []}
-        rw._merge_palettes(style, geo, slots, {n: build(n) for n in pals}, palette)
-        fb = rw._FB["fill"]
-        first = {}
-        for ft in geo["features"]:
-            first.setdefault(ft["properties"].get(ctl["filter"]["col"]), ft["properties"])
-        flt = ctl["filter"]
-        flt["palettes"] = {n: {c: first[c].get(f"__rs_fill@{n}", first[c].get("__rs_fill")) or fb for c in flt["classes"]} for n in pals}
-        flt["palettes"][style["metadata"]["roadstyle:state"]["rs_palette"]] = dict(flt["swatches"])
-    return views
+        looks = [(n, json.dumps(_look_of({**kwargs, "palette": n, "profile": profile, "settings": settings, "highway_col": highway_col,
+                                          "state": "live"}))) for n in pals]
+        src.add_palettes(str(palette), looks)
+    return views, pals
+
+
+def _palette_swatches(style, props, pals):
+    """The filter panel's colour of each class in each palette of the views: the fill of the class's first road in that palette."""
+    from . import render_web as rw
+
+    flt = style["metadata"]["roadstyle:controls"]["filter"]
+    first = {}
+    for p in props:
+        first.setdefault(p.get(flt["col"]), p)
+    flt["palettes"] = {n: {c: first[c].get(f"__rs_fill@{n}", first[c].get("__rs_fill")) or rw._FB["fill"] for c in flt["classes"]} for n in pals}
+    flt["palettes"][style["metadata"]["roadstyle:state"]["rs_palette"]] = dict(flt["swatches"])
 
 
 def _tiled_page(src, lk, style, highway_col, kwargs):

@@ -127,6 +127,18 @@ impl Sources {
         Ok(Tiler { style: String::new(), tiles })
     }
 
+    /// metadata() -> str: the style's metadata as JSON text (the controls, the interaction, the colour options), without the sources.
+    fn metadata(&self) -> String {
+        self.inner.metadata.to_string()
+    }
+
+    /// add_palettes(base, looks): a page's views with other palettes (looks: [(palette, look.json)]), merged into these Sources (the
+    /// palette `base`): each property that differs gets a copy for each palette, `<key>@<palette>`, read by the state rs_palette.
+    fn add_palettes(&mut self, py: Python<'_>, base: String, looks: Vec<(String, String)>) -> PyResult<()> {
+        let s = &mut self.inner;
+        py.detach(|| roadstyle::palettes::add(s, &base, &looks)).map_err(PyValueError::new_err)
+    }
+
     /// road_table() -> str: the road table as the page loads it (tiles.sidecar's form: props, mids, bboxes, headings, lines).
     fn road_table(&self, py: Python<'_>) -> String {
         let mut out = Vec::new();
