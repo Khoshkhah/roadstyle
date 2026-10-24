@@ -87,11 +87,14 @@ impl Sources {
 
     /// The style with each source's data at `url(name)` (a GeoJSON source can name its data by URL), in place of the data.
     pub fn style(&self, url: impl Fn(&str) -> String) -> Value {
-        let spec = |tolerance: f64, maxzoom: Option<i64>, url: String| {
+        let spec = |tolerance: f64, promote: bool, maxzoom: Option<i64>, url: String| {
             let mut s = serde_json::Map::new();
             s.insert("type".into(), "geojson".into());
             s.insert("data".into(), url.into());
             s.insert("tolerance".into(), tolerance.into());
+            if promote {
+                s.insert("promoteId".into(), "__rs_edge".into());
+            }
             if let Some(z) = maxzoom {
                 s.insert("maxzoom".into(), z.into());
             }
@@ -99,8 +102,8 @@ impl Sources {
         };
         let sources: serde_json::Map<String, Value> = self.sources.iter().filter(|(_, s)| !matches!(s, Src::Roads(_)) || self.roads.in_style)
             .map(|(k, s)| (k.clone(), match s {
-            Src::Roads(_) => spec(self.roads.tolerance, self.roads.maxzoom, url(k)),
-            Src::Simple(s) => spec(s.tolerance, s.maxzoom, url(k)),
+            Src::Roads(_) => spec(self.roads.tolerance, false, self.roads.maxzoom, url(k)),
+            Src::Simple(s) => spec(s.tolerance, s.promote, s.maxzoom, url(k)),
             Src::Json(v) => {
                 let mut v = v.clone();
                 v["data"] = url(k).into();

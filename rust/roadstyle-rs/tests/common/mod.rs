@@ -191,22 +191,18 @@ pub fn decode_tile(b: &[u8]) -> Tile {
     tile
 }
 
-/// The decided change of design step (g), part 3 (2026-10-23), on a golden of roadstyle 0.24.3 (the file does not change): the export
-/// (not a page) keeps the roads' pick and highlight layers shown in both ways (before: hidden when the data was inline), and its pieces
-/// have no page glow (a page's pieces glow by their feature state; the export's roads glow by roads-highlight).
+/// The decided changes of design step (g) (2026-10-23 and 2026-10-24), on a golden of roadstyle 0.24.3 (the file does not change):
+/// the export (not a page) keeps the roads' pick and highlight layers shown in both ways (before: hidden when the data was inline), and
+/// every style's pieces have their road's row as their feature id (`promoteId`), so a dashboard lights a road's pieces in any style
+/// (the glow of 0.24.3's inline styles is in every style).
 pub fn as_decided(mut want: Value) -> Value {
     for l in want["layers"].as_array_mut().into_iter().flatten() {
         if matches!(l["id"].as_str(), Some("roads-fill" | "roads-highlight")) {
             l["layout"].as_object_mut().map(|o| o.shift_remove("visibility"));
         }
-        if l["id"] == "roads-simple" {
-            // the colour's last case is the fill; with the glow it was ["case", select, mix, hover, mix, fill]
-            let c = l["paint"]["line-color"].as_array_mut().unwrap();
-            let fill = c.last_mut().unwrap();
-            if fill.as_array().is_some_and(|f| f.len() == 6 && f[0] == "case") {
-                *fill = fill[5].clone();
-            }
-        }
+    }
+    if let Some(s) = want["sources"]["simple"].as_object_mut() {
+        s.insert("promoteId".into(), "__rs_edge".into());
     }
     want
 }

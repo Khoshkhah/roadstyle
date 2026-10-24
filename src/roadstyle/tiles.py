@@ -189,7 +189,7 @@ def _heading(cs):
     latitude; the same numbers as roadstyle_model::geom::line::heading (GEOS's walk along the segments)."""
     if len(cs) < 2:
         return None
-    segs = [math.sqrt((q[0] - p[0]) * (q[0] - p[0]) + (q[1] - p[1]) * (q[1] - p[1])) for p, q in zip(cs, cs[1:])]
+    segs = [math.sqrt((q[0] - p[0]) * (q[0] - p[0]) + (q[1] - p[1]) * (q[1] - p[1])) for p, q in zip(cs, cs[1:], strict=False)]
     d = 0.5 * sum(segs)
     i, m = len(cs) - 2, cs[-1]
     if d <= 0:

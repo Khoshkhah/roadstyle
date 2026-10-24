@@ -65,7 +65,8 @@ rs.setStyle(style);
 - **The base map.** With no `basemaps` option the dashboard has no base map button and does not touch the map's own base map.
 - **The glow on tiles.** The engine's tiled style (`rust-engine` from `f92323f`) has one vector source `roads`; each layer names
   its source layer (`roads`, `simple`, `slots`), as in Python's tiles. The source layer `roads` has no lines: the map draws the
-  roads from the pieces in `simple`. The page adds the source with `promoteId: {simple: "__rs_edge"}`. Then all the pieces of a
+  roads from the pieces in `simple`. Every style of the engine has `promoteId: {simple: "__rs_edge"}` on that source (and
+  `promoteId: "__rs_edge"` on a GeoJSON `simple`), and its road layer has the select and hover glow (2026-10-24). Then all the pieces of a
   road have the road's id, and one feature state (`{source: "rs-roads", sourceLayer: "simple", id: road}`) lights the whole road,
   also in tiles that load later. Without `promoteId`, `setStyle` writes an error in the console. A road is picked on its fill
   pieces (`__rs_k` 1).

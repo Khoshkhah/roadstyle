@@ -760,8 +760,8 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
     let (cw, fw, bcw) = if items.is_empty() { (cw, fw, bcw) } else { (exp2(&cw), exp2(&fw), exp2(&bcw)) };
     let is_it = json!(["==", ["get", "__rs_k"], 5]);
     let soff = if items.is_empty() { off.clone() } else { by_feature(&[(is_it.clone(), metre_curve(&exp2(&off), "__rs_iom"))], &exp2(&off)) };
-    // a page (state "live"), in both ways: the pieces draw, pick and glow, and the page has no roads source (the road table has the
-    // fields and the lines); the export keeps the roads, with their pick and highlight layers, for an app's clicks
+    // a page (state "live"), in both ways: the pieces draw and pick, and the page has no roads source (the road table has the fields and
+    // the lines); the export keeps the roads, with their pick and highlight layers, for an app's clicks
     let page = args["state"] == "live";
 
     // roads-simple and the invisible roads-fill (simple mode)
@@ -826,10 +826,9 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
     }
     let (s_on, h_on) = (json!(["boolean", ["feature-state", "select"], false]), json!(["boolean", ["feature-state", "hover"], false]));
     item = json!(["case", s_on, select, h_on, hover, item]);
-    if page {
-        let mix = |c: &Value, f: &Value| json!(["interpolate", ["linear"], sel["opacity"], 0, f, 1, c]);
-        fill = json!(["case", s_on, mix(select, &fill), h_on, mix(hover, &fill), fill]);
-    }
+    // the glow of a selected or hovered road (its pieces' feature state, by its row: promoteId), in every style a dashboard can drive
+    let mix = |c: &Value, f: &Value| json!(["interpolate", ["linear"], sel["opacity"], 0, f, 1, c]);
+    fill = json!(["case", s_on, mix(select, &fill), h_on, mix(hover, &fill), fill]);
     let mut color = vec![json!("case")];
     color.extend(cases);
     color.extend([k(5), item, fill]);

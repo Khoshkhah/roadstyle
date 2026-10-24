@@ -56,8 +56,8 @@ def test_tiles_from_the_files_are_the_tiles_of_the_one_call(part, keywords, tmp_
     b = t.bounds()
     for z in range(t.zooms()[0], t.zooms()[1] + 1):
         n = 2 ** z
-        tx = lambda lon: int((lon + 180) / 360 * n)                                         # noqa: E731
-        ty = lambda lat: int((1 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2 * n)   # noqa: E731
+        tx = lambda lon, n=n: int((lon + 180) / 360 * n)                                         # noqa: E731
+        ty = lambda lat, n=n: int((1 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2 * n)   # noqa: E731
         for x in range(tx(b[0]), tx(b[2]) + 1):
             for y in range(ty(b[3]), ty(b[1]) + 1):
                 assert mvt.decode(f.tile(z, x, y)) == mvt.decode(t.tile(z, x, y)), f"{z}/{x}/{y}"
@@ -84,12 +84,13 @@ def test_the_road_table_of_rust_is_pythons(part, keywords):
 
 def test_live_data_reads_the_feature_state_of_the_road(part, keywords):
     """R22: with live_data the road layer reads its colour (rs_c) and its width factor (rs_w) from the feature state of the road's row,
-    over the baked values; the pieces have the row as their id (promoteId), and roadstyle:live names the states. Off, the style is as before."""
+    over the baked values (the pieces have the row as their id, promoteId, in every style), and roadstyle:live names the states. Off, the
+    style is as before."""
     off = rs.export_inline(part, engine="rust", **keywords)
     on = rs.export_inline(part, engine="rust", live_data=True, **keywords)
     road = lambda st: next(l for l in st["layers"] if l["id"] == "roads-simple")["paint"]      # noqa: E731
-    assert "roadstyle:live" not in off["metadata"] and "promoteId" not in off["sources"]["simple"]
-    assert on["sources"]["simple"]["promoteId"] == "__rs_edge"
+    assert "roadstyle:live" not in off["metadata"]
+    assert on["sources"]["simple"]["promoteId"] == off["sources"]["simple"]["promoteId"] == "__rs_edge"
     live = on["metadata"]["roadstyle:live"]
     assert (live["color"], live["width"], live["types"]) == ("rs_c", "rs_w", {"rs_c": "color", "rs_w": "factor"})
     assert len(live["ramp"]) == 9 and live["nodata"].startswith("#")
@@ -98,7 +99,6 @@ def test_live_data_reads_the_feature_state_of_the_road(part, keywords):
     # the width is still a zoom curve at the top (MapLibre), the factor in each stop
     assert road(on)["line-width"][:3] == road(off)["line-width"][:3]
     off.pop("metadata"), on.pop("metadata")
-    on["sources"]["simple"].pop("promoteId")
     for st in (off, on):
         for l in st["layers"]:
             if l["id"] == "roads-simple":

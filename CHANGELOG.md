@@ -7,6 +7,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **Every simple style can be driven by a dashboard.** The pieces have their road's row as their feature id (`promoteId: "__rs_edge"`
+  on `simple`, `{simple: "__rs_edge"}` on the vector source of a tiled style), and the road layer has the glow of a selected or hovered
+  road, in both engines and in every style: a page, `export_inline`, `export_style`, and a host that calls `makeStyle` or
+  `makeSources` directly. Before, only a page had them, so no road glowed on a host's map.
 - **A view's palette on a Rust page is a restyle in Rust.** Stage 1 runs one time. Each other palette of `views` restyles the same roads
   in memory (no second read, no second level solve, no JSON text), and the Rust engine merges the properties that differ
   (`roadstyle-engine::palettes`, as `render_web._merge_palettes`). On Tartu with two palettes: 13.4 s to 5.7 s, peak memory 1.84 GB to
