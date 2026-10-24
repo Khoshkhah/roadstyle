@@ -44,6 +44,59 @@ jobs:
           name: wheel-${{ matrix.os }}-${{ matrix.target }}
           path: dist/
 
+  # the Rust roadstyle-mcp as a wheel (rust/roadstyle-mcp/pyproject.toml, maturin bindings = "bin"), on the targets of the roadstyle wheel.
+  # Built and tested here, NOT published: packages/roadstyle-mcp (the Python server) stays roadstyle-mcp on PyPI until render_place is
+  # in Rust (docs/design/rust_library.md, A2). The artifacts are mcp-wheel-*, which the publish job does not download.
+  mcp-wheels:
+    strategy:
+      matrix:
+        include:
+          - {os: ubuntu-latest, target: x86_64}
+          - {os: ubuntu-latest, target: aarch64}
+          - {os: macos-latest, target: x86_64}
+          - {os: macos-latest, target: aarch64}
+          - {os: windows-latest, target: x64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --out dist -m rust/roadstyle-mcp/Cargo.toml
+          manylinux: auto
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcp-wheel-${{ matrix.os }}-${{ matrix.target }}
+          path: dist/
+
+  # the wheel as an MCP client starts it: uvx --from <wheel> roadstyle-mcp, then initialize, tools/list and one render_file on Monaco
+  mcp-wheel-test:
+    needs: mcp-wheels
+    strategy:
+      matrix:
+        include:
+          - {os: ubuntu-latest, artifact: mcp-wheel-ubuntu-latest-x86_64}
+          - {os: macos-latest, artifact: mcp-wheel-macos-latest-aarch64}
+          - {os: windows-latest, artifact: mcp-wheel-windows-latest-x64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: uvx --from <wheel> roadstyle-mcp, over stdio
+        shell: bash
+        run: python3 rust/roadstyle-mcp/tests/wheel_check.py dist/*.whl rust/roadstyle-rs/tests/data/monaco/roads.parquet
+
   sdist:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -78,10 +131,17 @@ jobs:
     permissions:
       id-token: write   # OIDC token for trusted publishing
     steps:
+      # roadstyle's wheels and the sdist (with packages/roadstyle-mcp), not the Rust roadstyle-mcp wheels (mcp-wheel-*: not published yet)
       - uses: actions/download-artifact@v4
         with:
+          pattern: wheel-*
           path: dist/
           merge-multiple: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist/
 
       - uses: pypa/gh-action-pypi-publish@release/v1
 
