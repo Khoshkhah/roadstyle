@@ -22,6 +22,7 @@ maplibregl.addProtocol("rs", async (p) => {
 const tiled = JSON.parse(tiler.style());
 ```
 
+- `readGeoParquet(bytes)`: the roads of a GeoParquet file as a `Roads` handle (the geometry in the column `geometry`).
 - `readGeoJson(bytes)`: the roads of a GeoJSON file as a `Roads` handle; `roads.sources(look)` is stage 1 of them.
 - `Look` (`resolveLook`, `Look.fromJson`, `toJson`), `makeStyle`, `Tiler`, `makeSources`, `tileSources`, `tileFiles`, `makePage`,
   `exportLook` and `memoryBytes`: the types (`index.d.ts`) come from the Rust signatures, with their descriptions. The calls take a

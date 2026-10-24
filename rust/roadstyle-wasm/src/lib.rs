@@ -335,6 +335,13 @@ mod wasm {
         roadstyle::duckosm::features_select(&specs.into_iter().map(|i| i as usize).collect::<Vec<_>>())
     }
 
+    /// readGeoParquet(bytes: Uint8Array) -> Roads: the roads of a GeoParquet file (the geometry in the column `geometry`, as makeSources
+    /// reads it). An error is a thrown Error.
+    #[wasm_bindgen(js_name = readGeoParquet)]
+    pub fn read_geoparquet(bytes: Vec<u8>) -> Result<Roads, JsError> {
+        roadstyle::read::read_roads(bytes, "geometry").map(Roads).map_err(|e| JsError::new(&e))
+    }
+
     /// readGeoJson(bytes: Uint8Array) -> Roads: the roads of a GeoJSON file (a FeatureCollection in EPSG:4326; roadstyle-io's geojson.rs
     /// says how each property becomes a column). An error is a thrown Error.
     #[wasm_bindgen(js_name = readGeoJson)]
