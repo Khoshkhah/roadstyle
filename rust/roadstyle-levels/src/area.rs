@@ -95,8 +95,12 @@ pub struct Previous {
 
 impl From<&AreaSolved> for Previous {
     fn from(s: &AreaSolved) -> Previous {
-        Previous { levels: s.levels.clone(), given_up_parts: s.given_up_parts.iter().copied().collect(), orders_not_kept: s.orders_not_kept.len(),
-                   near: s.near_parts.len() }
+        Previous {
+            levels: s.levels.clone(),
+            given_up_parts: s.given_up_parts.iter().copied().collect(),
+            orders_not_kept: s.orders_not_kept.len(),
+            near: s.near_parts.len(),
+        }
     }
 }
 
@@ -128,10 +132,15 @@ enum Key {
 fn key(r: &PairRow) -> Key {
     match r.relation {
         Relation::Meet => {
-            let (x, y) = ((r.a, r.a_end.unwrap_or(Side::Start)), (r.b, r.b_end.unwrap_or(Side::Start)));
+            let (x, y) = (
+                (r.a, r.a_end.unwrap_or(Side::Start)),
+                (r.b, r.b_end.unwrap_or(Side::Start)),
+            );
             Key::Meet(x.min(y), x.max(y))
         }
-        Relation::Stack | Relation::Near => Key::Part(r.relation, r.a, r.b, r.a_end.unwrap_or(Side::Main)),
+        Relation::Stack | Relation::Near => {
+            Key::Part(r.relation, r.a, r.b, r.a_end.unwrap_or(Side::Main))
+        }
         Relation::Order => Key::Order(r.a, r.b),
     }
 }
@@ -168,7 +177,11 @@ impl Area {
     /// The pairs with the edits on top (roadstyle's merged_relations), in their order: the row (on road ids, the ends in the road's own
     /// way) and whether it is an edit. A row with `enabled` false removes the same rule (an error when there is none), any other row adds it.
     pub fn merged(&self, edits: &[PairRow]) -> Result<Vec<(PairRow, bool)>, String> {
-        let mut out: Vec<(Key, PairRow, bool)> = self.pairs.iter().map(|p| (key(p), p.clone(), false)).collect();
+        let mut out: Vec<(Key, PairRow, bool)> = self
+            .pairs
+            .iter()
+            .map(|p| (key(p), p.clone(), false))
+            .collect();
         let mut at: HashMap<Key, usize> = HashMap::new();
         for (i, (k, _, _)) in out.iter().enumerate() {
             at.insert(*k, i); // a pair named twice: the last one, as a dict in Python
@@ -176,8 +189,14 @@ impl Area {
         for e in edits {
             check(e, "edits")?;
             let mut row = e.clone();
-            let &(ra, ba) = self.of.get(&row.a).ok_or(format!("edits: '{}' is not an edge of the roads", row.a))?;
-            let &(rb, bb) = self.of.get(&row.b).ok_or(format!("edits: '{}' is not an edge of the roads", row.b))?;
+            let &(ra, ba) = self
+                .of
+                .get(&row.a)
+                .ok_or(format!("edits: '{}' is not an edge of the roads", row.a))?;
+            let &(rb, bb) = self
+                .of
+                .get(&row.b)
+                .ok_or(format!("edits: '{}' is not an edge of the roads", row.b))?;
             // an edge that runs against its road names the road's other end (a meet: both ends; a stack: a's part)
             if ba {
                 row.a_end = row.a_end.map(Side::turned);
@@ -188,7 +207,13 @@ impl Area {
             (row.a, row.b) = (self.roads[ra].id, self.roads[rb].id);
             let k = key(&row);
             if !row.enabled {
-                let i = at.remove(&k).ok_or(format!("edits: no {:?} pair {} {} to switch off", row.relation, row.a, row.b).to_lowercase())?;
+                let i = at.remove(&k).ok_or(
+                    format!(
+                        "edits: no {:?} pair {} {} to switch off",
+                        row.relation, row.a, row.b
+                    )
+                    .to_lowercase(),
+                )?;
                 out.remove(i);
                 at.values_mut().filter(|v| **v > i).for_each(|v| *v -= 1);
             } else if let Some(&i) = at.get(&k) {
@@ -204,14 +229,25 @@ impl Area {
     /// The merged rows as the solver's rules (on road indexes), and the rows in the order of `difference_rules`: the meets, the stacks,
     /// the near rules, the orders.
     fn rules(&self, merged: &[(PairRow, bool)]) -> Result<(Rules, Vec<PairRow>), String> {
-        let idx = |id: i64| self.road_of(id).ok_or(format!("pairs: '{id}' is not a road"));
-        let mut r = Rules { roads: self.roads.len(), ..Default::default() };
+        let idx = |id: i64| {
+            self.road_of(id)
+                .ok_or(format!("pairs: '{id}' is not a road"))
+        };
+        let mut r = Rules {
+            roads: self.roads.len(),
+            ..Default::default()
+        };
         let mut rows: [Vec<PairRow>; 4] = Default::default();
         for (row, _) in merged {
             let (a, b) = (idx(row.a)?, idx(row.b)?);
             let part = row.a_end.unwrap_or(Side::Main).index();
             match row.relation {
-                Relation::Meet => r.meets.push((a, row.a_end.unwrap_or(Side::Start).index(), b, row.b_end.unwrap_or(Side::Start).index())),
+                Relation::Meet => r.meets.push((
+                    a,
+                    row.a_end.unwrap_or(Side::Start).index(),
+                    b,
+                    row.b_end.unwrap_or(Side::Start).index(),
+                )),
                 Relation::Stack => r.lifts.push((a, b, part)),
                 Relation::Near => r.near.push((a, b, part)),
                 Relation::Order => r.orders.push((a, b)),
@@ -222,11 +258,19 @@ impl Area {
     }
 
     /// Solves the area with `edits` (roadstyle's solve_levels): `fixed` roads keep their numbers (around the ground 0, in the road's way).
-    pub fn solve(&self, edits: &[PairRow], fixed: &HashMap<usize, [i64; 4]>, max_level: i64, margin: f64) -> Result<AreaSolved, String> {
+    pub fn solve(
+        &self,
+        edits: &[PairRow],
+        fixed: &HashMap<usize, [i64; 4]>,
+        max_level: i64,
+        margin: f64,
+    ) -> Result<AreaSolved, String> {
         let (mut rules, _) = self.rules(&self.merged(edits)?)?;
         for (&r, v) in fixed {
             if v.iter().any(|x| x.abs() > max_level) {
-                return Err(format!("solve_levels: a fixed number is outside [-max_level, max_level] ({max_level})"));
+                return Err(format!(
+                    "solve_levels: a fixed number is outside [-max_level, max_level] ({max_level})"
+                ));
             }
             rules.fixed.push((r, v.map(|x| x + max_level)));
         }
@@ -237,15 +281,27 @@ impl Area {
         for (r, road) in self.roads.iter().enumerate() {
             *count.entry(s.parts[r][1]).or_default() += road.edges.len() + road.reversed.len();
         }
-        let ground = count.iter().max_by_key(|(v, c)| (**c, -**v)).map_or(0, |(v, _)| *v);
+        let ground = count
+            .iter()
+            .max_by_key(|(v, c)| (**c, -**v))
+            .map_or(0, |(v, _)| *v);
         let mut values: Vec<i64> = s.parts.iter().flatten().map(|v| v - ground).collect();
         values.push(0);
         values.sort_unstable();
         values.dedup();
         let zero = values.binary_search(&0).unwrap() as i64;
         let small = |v: i64| values.binary_search(&(v - ground)).unwrap() as i64 - zero;
-        let both: HashSet<(usize, usize)> = rules.lifts.iter().chain(&rules.near).map(|&(u, l, _)| (u, l)).collect();
-        let side = |v: &[(usize, usize, usize)]| v.iter().map(|&(u, l, h)| (u, l, Side::from_index(h))).collect();
+        let both: HashSet<(usize, usize)> = rules
+            .lifts
+            .iter()
+            .chain(&rules.near)
+            .map(|&(u, l, _)| (u, l))
+            .collect();
+        let side = |v: &[(usize, usize, usize)]| {
+            v.iter()
+                .map(|&(u, l, h)| (u, l, Side::from_index(h)))
+                .collect()
+        };
         Ok(AreaSolved {
             levels: s.parts.iter().map(|p| p.map(small)).collect(),
             given_up: s.given_up.clone(),
@@ -270,7 +326,11 @@ impl Area {
         let mut seen: HashSet<usize> = changed.iter().filter_map(|&x| self.road_of(x)).collect();
         let mut ring = seen.clone();
         for _ in 0..hops {
-            ring = ring.iter().flat_map(|x| nb.get(x).into_iter().flatten().copied()).filter(|y| !seen.contains(y)).collect();
+            ring = ring
+                .iter()
+                .flat_map(|x| nb.get(x).into_iter().flatten().copied())
+                .filter(|y| !seen.contains(y))
+                .collect();
             seen.extend(&ring);
         }
         seen
@@ -280,31 +340,52 @@ impl Area {
     /// again, every other road keeps its numbers of `previous`. When the local answer gives up a crossing part that `previous` kept, has
     /// more order wishes not kept or more near warnings, or fails, the whole area is solved. Returns the answer and how: None (local) or
     /// why the whole area was solved.
-    pub fn solve_local(&self, edits: &[PairRow], previous: &Previous, changed: &[i64], hops: usize, max_level: i64, margin: f64)
-                       -> Result<(AreaSolved, Option<String>), String> {
+    pub fn solve_local(
+        &self,
+        edits: &[PairRow],
+        previous: &Previous,
+        changed: &[i64],
+        hops: usize,
+        max_level: i64,
+        margin: f64,
+    ) -> Result<(AreaSolved, Option<String>), String> {
         let free = self.around(edits, changed, hops);
         if free.len() == self.roads.len() {
-            return Ok((self.solve(edits, &HashMap::new(), max_level, margin)?, Some("every road is around the change".into())));
+            return Ok((
+                self.solve(edits, &HashMap::new(), max_level, margin)?,
+                Some("every road is around the change".into()),
+            ));
         }
-        let fixed: HashMap<usize, [i64; 4]> = (0..self.roads.len()).filter(|r| !free.contains(r)).map(|r| (r, previous.levels[r])).collect();
+        let fixed: HashMap<usize, [i64; 4]> = (0..self.roads.len())
+            .filter(|r| !free.contains(r))
+            .map(|r| (r, previous.levels[r]))
+            .collect();
         let why = match self.solve(edits, &fixed, max_level, margin) {
-            Ok(mut local) => match worse(&local, previous) {
-                None => {
-                    // the solver puts its ground at 0: shift the answer as a whole so that the fixed roads keep their numbers
-                    let shifts: HashSet<i64> = fixed.iter().map(|(&r, v)| v[0] - local.levels[r][0]).collect();
-                    if shifts.len() > 1 {
-                        return Err(format!("solve_local: the fixed roads moved by different amounts ({shifts:?})"));
+            Ok(mut local) => {
+                match worse(&local, previous) {
+                    None => {
+                        // the solver puts its ground at 0: shift the answer as a whole so that the fixed roads keep their numbers
+                        let shifts: HashSet<i64> = fixed
+                            .iter()
+                            .map(|(&r, v)| v[0] - local.levels[r][0])
+                            .collect();
+                        if shifts.len() > 1 {
+                            return Err(format!("solve_local: the fixed roads moved by different amounts ({shifts:?})"));
+                        }
+                        if let Some(&k) = shifts.iter().next() {
+                            local.levels.iter_mut().for_each(|v| *v = v.map(|x| x + k));
+                        }
+                        return Ok((local, None));
                     }
-                    if let Some(&k) = shifts.iter().next() {
-                        local.levels.iter_mut().for_each(|v| *v = v.map(|x| x + k));
-                    }
-                    return Ok((local, None));
+                    Some(why) => why,
                 }
-                Some(why) => why,
-            },
+            }
             Err(e) => format!("the local solve failed ({e})"),
         };
-        Ok((self.solve(edits, &HashMap::new(), max_level, margin)?, Some(why)))
+        Ok((
+            self.solve(edits, &HashMap::new(), max_level, margin)?,
+            Some(why),
+        ))
     }
 
     /// The check before rules are added (roadstyle's rule_conflicts): each of `rows` that conflicts with the enabled rules (the pairs,
@@ -312,7 +393,11 @@ impl Area {
     pub fn conflicts(&self, edits: &[PairRow], rows: &[PairRow]) -> Result<Vec<Conflict>, String> {
         let mut rel = self.merged(edits)?;
         let mut out = Vec::new();
-        let none = Area { roads: self.roads.clone(), pairs: Vec::new(), of: self.of.clone() };
+        let none = Area {
+            roads: self.roads.clone(),
+            pairs: Vec::new(),
+            of: self.of.clone(),
+        };
         for (i, row) in rows.iter().enumerate() {
             if !row.enabled {
                 continue;
@@ -320,15 +405,32 @@ impl Area {
             let (new, _) = none.merged(std::slice::from_ref(row))?.remove(0);
             let k = key(&new);
             if let Some(at) = rel.iter().position(|(r, _)| key(r) == k) {
-                let others: Vec<_> = rel.iter().enumerate().filter(|(j, _)| *j != at).map(|(_, x)| x.clone()).collect();
+                let others: Vec<_> = rel
+                    .iter()
+                    .enumerate()
+                    .filter(|(j, _)| *j != at)
+                    .map(|(_, x)| x.clone())
+                    .collect();
                 out.push(match self.cycle(&others, &new)? {
-                    None => Conflict { row: i, why: Why::Duplicate, with: vec![rel[at].0.clone()] },
-                    Some(path) => Conflict { row: i, why: Why::NotKept, with: path },
+                    None => Conflict {
+                        row: i,
+                        why: Why::Duplicate,
+                        with: vec![rel[at].0.clone()],
+                    },
+                    Some(path) => Conflict {
+                        row: i,
+                        why: Why::NotKept,
+                        with: path,
+                    },
                 });
                 continue;
             }
             if let Some(path) = self.cycle(&rel, &new)? {
-                out.push(Conflict { row: i, why: Why::Loop, with: path });
+                out.push(Conflict {
+                    row: i,
+                    why: Why::Loop,
+                    with: path,
+                });
             }
             rel.push((new, true));
         }
@@ -338,16 +440,24 @@ impl Area {
     /// The rows of a cycle of the rules of `rel` through the rule `new`, or None (roadstyle's _loop): a path in the graph of the rules
     /// `x_i - x_j <= w` (an arc j -> i) from the new rule's i back to its j with a strict step on it (a breadth-first search on (number,
     /// strict yet)).
-    fn cycle(&self, rel: &[(PairRow, bool)], new: &PairRow) -> Result<Option<Vec<PairRow>>, String> {
+    fn cycle(
+        &self,
+        rel: &[(PairRow, bool)],
+        new: &PairRow,
+    ) -> Result<Option<Vec<PairRow>>, String> {
         let (rules, rows) = self.rules(rel)?;
         let mut adj: HashMap<usize, Vec<(usize, bool, Option<usize>)>> = HashMap::new();
         for (i, j, w, src) in difference_rules(&rules) {
             adj.entry(j).or_default().push((i, w < 0, src));
         }
         let (mine, _) = self.rules(&[(new.clone(), true)])?;
-        for (i, j, w, _) in difference_rules(&mine).into_iter().filter(|r| r.3.is_some()) {
+        for (i, j, w, _) in difference_rules(&mine)
+            .into_iter()
+            .filter(|r| r.3.is_some())
+        {
             let start = (i, w < 0);
-            let mut prev: HashMap<(usize, bool), Option<((usize, bool), Option<usize>)>> = HashMap::from([(start, None)]);
+            let mut prev: HashMap<(usize, bool), Option<((usize, bool), Option<usize>)>> =
+                HashMap::from([(start, None)]);
             let mut q = VecDeque::from([start]);
             let mut end = None;
             'search: while let Some(s @ (v, f)) = q.pop_front() {
@@ -382,14 +492,24 @@ impl Area {
 /// A row's ends as its relation needs them: a meet the ends start or end of both roads; a stack or near rule a part of the upper road.
 fn check(r: &PairRow, file: &str) -> Result<(), String> {
     match r.relation {
-        Relation::Meet if !matches!(r.a_end, Some(Side::Start | Side::End)) || !matches!(r.b_end, Some(Side::Start | Side::End)) => {
-            Err(format!("{file}: a meet needs an end of each road (start / end): {} {}", r.a, r.b))
+        Relation::Meet
+            if !matches!(r.a_end, Some(Side::Start | Side::End))
+                || !matches!(r.b_end, Some(Side::Start | Side::End)) =>
+        {
+            Err(format!(
+                "{file}: a meet needs an end of each road (start / end): {} {}",
+                r.a, r.b
+            ))
         }
         Relation::Stack | Relation::Near if r.a_end.is_none() => Err(format!(
             "{file}: a stack names one part of the upper road (start, main or end): {} over {}{}",
             r.a,
             r.b,
-            if file == "pairs" { " (a pairs.csv made before 2026-10-08: make the area again)" } else { "" }
+            if file == "pairs" {
+                " (a pairs.csv made before 2026-10-08: make the area again)"
+            } else {
+                ""
+            }
         )),
         _ => Ok(()),
     }
@@ -401,7 +521,9 @@ fn check(r: &PairRow, file: &str) -> Result<(), String> {
 fn difference_rules(r: &Rules) -> Vec<(usize, usize, i64, Option<usize>)> {
     let n = r.roads;
     let col = |road: usize, h: usize| n + 3 * road + h;
-    let mut out: Vec<_> = (0..n).flat_map(|road| (0..3).map(move |h| (col(road, h), road, 0, None))).collect();
+    let mut out: Vec<_> = (0..n)
+        .flat_map(|road| (0..3).map(move |h| (col(road, h), road, 0, None)))
+        .collect();
     let mut k = 0;
     for &(x, ex, y, ey) in &r.meets {
         out.push((col(x, ex), y, 0, Some(k)));
@@ -421,15 +543,27 @@ fn difference_rules(r: &Rules) -> Vec<(usize, usize, i64, Option<usize>)> {
 
 /// Why a local answer cannot stand for the whole solve (roadstyle's _worse), or None.
 fn worse(local: &AreaSolved, previous: &Previous) -> Option<String> {
-    let new = local.given_up_parts.iter().filter(|p| !previous.given_up_parts.contains(p)).count();
+    let new = local
+        .given_up_parts
+        .iter()
+        .filter(|p| !previous.given_up_parts.contains(p))
+        .count();
     if new > 0 {
         return Some(format!("{new} crossing part(s) given up that were kept"));
     }
     if local.orders_not_kept.len() > previous.orders_not_kept {
-        return Some(format!("{} order wishes not kept, {} before", local.orders_not_kept.len(), previous.orders_not_kept));
+        return Some(format!(
+            "{} order wishes not kept, {} before",
+            local.orders_not_kept.len(),
+            previous.orders_not_kept
+        ));
     }
     if local.near_parts.len() > previous.near {
-        return Some(format!("{} near warnings, {} before", local.near_parts.len(), previous.near));
+        return Some(format!(
+            "{} near warnings, {} before",
+            local.near_parts.len(),
+            previous.near
+        ));
     }
     None
 }

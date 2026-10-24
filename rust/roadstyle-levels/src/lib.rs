@@ -71,6 +71,11 @@ impl LevelEdges {
         self.0.push((edge.edge_id, rank, edge));
     }
 
+    /// The edges in the order they were added (all ranks).
+    pub fn into_edges(self) -> Vec<LevelEdge> {
+        self.0.into_iter().map(|(_, _, e)| e).collect()
+    }
+
     fn edges(&self) -> Vec<&LevelEdge> {
         let mut order: Vec<&(i64, u8, LevelEdge)> = self.0.iter().collect();
         order.sort_by_key(|(id, rank, _)| (*id, *rank));
@@ -241,7 +246,7 @@ fn compute(edges: &[&LevelEdge], o: &Options) -> Result<Levels, String> {
     let rows = match o.method {
         Method::Tags => tags(edges, &roads.ends),
         _ => {
-            let (mut rules, _) = input::relations(edges, &roads, o);
+            let (mut rules, _, _) = input::relations(edges, &roads, o, &HashMap::new());
             // each edge's road, and whether the edge runs against it
             let at: HashMap<i64, (usize, bool)> = edges
                 .iter()
@@ -305,6 +310,77 @@ fn compute(edges: &[&LevelEdge], o: &Options) -> Result<Levels, String> {
         orders_not_kept_pairs,
         near_not_kept,
         stages,
+    })
+}
+
+/// A road of a level area's input: its first edge (its id is the road's id) and its edges its way and the other way, by their index in
+/// the edges.
+#[derive(Clone, Debug)]
+pub struct InputRoad {
+    pub first: usize,
+    pub edges: Vec<usize>,
+    pub reversed: Vec<usize>,
+}
+
+/// The solver's input of a level area (`make`): the roads, the band and the priority of each (None: no order wish), and the rules
+/// between them, on road indexes.
+pub struct AreaInput {
+    pub roads: Vec<InputRoad>,
+    pub band: Vec<i64>,
+    pub priority: Vec<Option<f64>>,
+    pub rules: solve::Rules,
+}
+
+/// The solver's input of a level area (roadstyle's `level_input`, `roadstyle-levels make`), from the edges in their order: two edges on
+/// one line (either way) of one kind are one road, named by its first edge. `heads`: heads.csv, `[start, end]` metres by any edge of a
+/// road, in that edge's way (None: `o.head_m`); they decide once which parts of a stack's upper road cross the road under it.
+pub fn make(
+    edges: &[LevelEdge],
+    o: &Options,
+    heads: &[(i64, [Option<f64>; 2])],
+) -> Result<AreaInput, String> {
+    let edges: Vec<&LevelEdge> = edges.iter().collect();
+    let roads = input::road_split(&edges)?;
+    let mut out: Vec<InputRoad> = roads
+        .first
+        .iter()
+        .map(|&first| InputRoad {
+            first,
+            edges: Vec::new(),
+            reversed: Vec::new(),
+        })
+        .collect();
+    for (i, &r) in roads.road.iter().enumerate() {
+        if roads.same[i] {
+            out[r].edges.push(i)
+        } else {
+            out[r].reversed.push(i)
+        }
+    }
+    let at: HashMap<i64, (usize, bool)> = edges
+        .iter()
+        .enumerate()
+        .map(|(i, e)| (e.edge_id, (roads.road[i], !roads.same[i])))
+        .collect();
+    let mut own: HashMap<usize, [f64; 2]> = HashMap::new();
+    for &(id, v) in heads {
+        let &(r, back) = at
+            .get(&id)
+            .ok_or(format!("heads: '{id}' is not an edge of the roads"))?;
+        if v.iter().flatten().any(|m| m.is_nan() || *m <= 0.0) {
+            return Err(format!(
+                "heads: the head lengths of {id} must be positive numbers of metres"
+            ));
+        }
+        let v = v.map(|m| m.unwrap_or(o.head_m));
+        own.insert(r, if back { [v[1], v[0]] } else { v });
+    }
+    let (rules, band, priority) = input::relations(&edges, &roads, o, &own);
+    Ok(AreaInput {
+        roads: out,
+        band,
+        priority,
+        rules,
     })
 }
 
