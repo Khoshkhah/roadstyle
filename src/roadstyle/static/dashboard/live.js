@@ -1,10 +1,12 @@
 // LIVE DATA (R22): rs.setData(table, options) joins a table to the roads, by edge_id or by the row, and gives each road its colour and its
 // width factor as feature state on its row (the names of the style's metadata roadstyle:live: rs_c and rs_w), which the road layer reads.
+// The colour goes through color.js, which also has rsColor's and rsColorBase's colours for rs_c (theirs win).
 // No new style and no tile reload: a second call replaces only the values. rs.clearData() takes them away. The legend shows the data, and
 // the popup and the panel show the joined fields (core.js, _joined).
 import {map, O, RoadTable, _src, _setJoined} from "./core.js";
 import {setLiveLegend} from "./legend.js";
-let _liveRows = [];                  // the rows that have a live state now
+import {setLiveColors} from "./color.js";
+let _liveRows = [];                  // the rows that have a live width now
 const _hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
 const _toHex = v => "#" + v.map(x => Math.round(x).toString(16).padStart(2, "0")).join("");
 // the colour at t (0..1) on a ramp of colours, linear between its stops (the engine's ramps: branca's LinearColormap, 9 stops)
@@ -31,28 +33,29 @@ export async function setData(table, opts){
     const at = new Map(); for(let i = 0, n = RoadTable.rows(); i < n; i++){ const v = RoadTable.props(i)[O.edge_id_col]; if(v != null) at.set(String(v), i); }
     rows.forEach(r => { const i = at.get(String(r[key])); if(i != null) joined.set(i, r); }); }
   // the colour: a number on the ramp from vmin to vmax (else the data's range), a text a ramp colour for each value; no value: nodata
-  const ramp = o.ramp || L.ramp, nodata = o.nodata !== undefined ? o.nodata : L.nodata, st = new Map();
+  const ramp = o.ramp || L.ramp, nodata = o.nodata !== undefined ? o.nodata : L.nodata, cols = new Map(), ws = new Map();
   let legend = null;
   if(o.colorBy){
     const vals = [...joined.values()].map(r => r[o.colorBy]), num = vals.some(v => typeof v === "number");
     if(num){ const [lo, hi] = _range(vals, o.vmin, o.vmax);
-      joined.forEach((r, i) => { const v = r[o.colorBy]; if(typeof v === "number" && isFinite(v)) st.set(i, {[L.color]: _at(ramp, hi > lo ? (v - lo) / (hi - lo) : 0.5)}); });
+      joined.forEach((r, i) => { const v = r[o.colorBy]; if(typeof v === "number" && isFinite(v)) cols.set(i, _at(ramp, hi > lo ? (v - lo) / (hi - lo) : 0.5)); });
       legend = {kind: "continuous", title: o.colorBy, ramp: ramp, vmin: lo, vmax: hi}; }
     else { const cats = [...new Set(vals.filter(v => v != null).map(String))].sort(), col = {};
       cats.forEach((c, k) => { col[c] = _at(ramp, cats.length > 1 ? k / (cats.length - 1) : 0.5); });
-      joined.forEach((r, i) => { const v = r[o.colorBy]; if(v != null) st.set(i, {[L.color]: col[String(v)]}); });
+      joined.forEach((r, i) => { const v = r[o.colorBy]; if(v != null) cols.set(i, col[String(v)]); });
       legend = {kind: "categorical", title: o.colorBy, entries: cats.map(c => [c, col[c]])}; }
-    if(nodata) for(let i = 0, n = RoadTable.rows(); i < n; i++) if(!st.has(i)) st.set(i, {[L.color]: nodata});
+    if(nodata) for(let i = 0, n = RoadTable.rows(); i < n; i++) if(!cols.has(i)) cols.set(i, nodata);
   }
   // the width: a factor of the drawn width, from widthRange[0] at the smallest value to widthRange[1] at the largest
   if(o.widthBy){
     const vals = [...joined.values()].map(r => r[o.widthBy]), [lo, hi] = _range(vals), [w0, w1] = o.widthRange || [1, 3];
     joined.forEach((r, i) => { const v = r[o.widthBy]; if(typeof v === "number" && isFinite(v))
-      st.set(i, {...(st.get(i) || {}), [L.width]: w0 + (hi > lo ? (v - lo) / (hi - lo) : 0.5) * (w1 - w0)}); }); }
+      ws.set(i, w0 + (hi > lo ? (v - lo) / (hi - lo) : 0.5) * (w1 - w0)); }); }
   // a second call replaces the values: a row that has none now loses the old ones
-  _liveRows.forEach(i => { const n = st.get(i) || {}; for(const k of [L.color, L.width]) if(!(k in n)) map.removeFeatureState({...s, id: i}, k); });
-  st.forEach((v, i) => map.setFeatureState({...s, id: i}, v));
-  _liveRows = [...st.keys()];
+  _liveRows.forEach(i => { if(!ws.has(i)) map.removeFeatureState({...s, id: i}, L.width); });
+  ws.forEach((v, i) => map.setFeatureState({...s, id: i}, {[L.width]: v}));
+  _liveRows = [...ws.keys()];
+  setLiveColors(cols);
   _setJoined(joined);
   setLiveLegend(o.legend === false ? null : legend && {...legend, ...(o.legend || {})});
   const ms = performance.now() - t0;
@@ -61,7 +64,7 @@ export async function setData(table, opts){
 }
 export function clearData(){
   const L = O.live, s = _src("simple");
-  if(L && s) _liveRows.forEach(i => { map.removeFeatureState({...s, id: i}, L.color); map.removeFeatureState({...s, id: i}, L.width); });
-  _liveRows = []; _setJoined(null); setLiveLegend(null);
+  if(L && s) _liveRows.forEach(i => map.removeFeatureState({...s, id: i}, L.width));
+  _liveRows = []; setLiveColors(null); _setJoined(null); setLiveLegend(null);
   document.dispatchEvent(new CustomEvent("rs:datachange", {detail: {rows: 0, matched: 0, colorBy: null, widthBy: null}}));
 }

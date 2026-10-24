@@ -35,9 +35,8 @@ select,input[type=text],input[type=file]{width:100%;box-sizing:border-box;font:i
   <details open><summary>Data</summary>
     <label for="sample">A sample network</label>
     <select id="sample"></select>
-    <label for="file">…or a road file (GeoParquet)</label>
-    <input id="file" type="file" accept=".parquet,.geoparquet">
-    <div class="note">GeoJSON and GPKG files: when the engine reads them (the look session's readers).</div>
+    <label for="file">…or a road file (GeoJSON or GeoParquet, in EPSG:4326)</label>
+    <input id="file" type="file" accept=".geojson,.json,.parquet,.geoparquet">
     <div id="count" class="note"></div>
   </details>
   <details open><summary>Look</summary>
@@ -50,8 +49,8 @@ select,input[type=text],input[type=file]{width:100%;box-sizing:border-box;font:i
     <label class="inline"><input id="tiles" type="checkbox"> Vector tiles (big networks)</label>
   </details>
   <details><summary>Colour by data</summary>
-    <div class="note">Columns with many numbers: a colour ramp from the 2nd to the 98th percentile. Columns with few values (categories):
-      when the engine gives the ramps' steps.</div>
+    <div class="note">A column with more than 12 numbers: a colour ramp from the 2nd to the 98th percentile. Another column: up to 5
+      stepped colours of the ramp.</div>
     <div id="colours" class="list"></div>
   </details>
   <details><summary>Filter</summary>
