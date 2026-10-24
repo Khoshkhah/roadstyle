@@ -27,6 +27,7 @@ const DASH_JS: [&str; 20] = [asset!("static/dashboard/core.js"), asset!("static/
 const INFLATE: &str = asset!("static/page/inflate.html");
 const SIMPLE: &str = asset!("static/page/simple.html");
 const TILES: &str = asset!("static/page/tiles.html");
+const SIDE: &str = asset!("static/page/side.html");
 const PMTILES_JS: &str = asset!("vendor/pmtiles.js");
 
 /// What the page needs besides the style and the options (render_web._page_html's keywords).
@@ -41,8 +42,10 @@ pub struct PageParts<'a> {
     /// gzip the big GeoJSON sources (_compress_sources); `gz`: the blobs made by the caller (Python's zlib), else the crate gzips
     pub compress: bool,
     pub gz: Option<Map<String, Value>>,
-    /// a tiled page: the PMTiles archive and the sidecar table (or its gzipped base64 made by the caller)
-    pub tiles: Option<(&'a [u8], &'a Value, Option<&'a str>)>,
+    /// a tiled page: the PMTiles archive
+    pub tiles: Option<&'a [u8]>,
+    /// the road table (tiles.sidecar's form), in both ways: the table, or its gzipped base64 made by the caller
+    pub side: Option<(&'a Value, Option<&'a str>)>,
     /// the settings of simple mode's recolouring script, when the page is in simple mode
     pub simple_js: Option<&'a Value>,
 }
@@ -136,14 +139,16 @@ pub fn page_html(mut style: Value, page: &Value, p: &PageParts) -> String {
     for (k, v) in reps {
         html = html.replace(k, &v);
     }
-    match p.tiles {
-        Some((pmt, side, side_b64)) => {
-            let side_b64 = side_b64.map_or_else(|| gzip_b64(pyjson::dumps(side, true).as_bytes()), String::from);
-            let setup = TILES.replace("__RS_PMTILES_B64__", &base64::engine::general_purpose::STANDARD.encode(pmt)).replace("__RS_SIDE_B64__", &side_b64);
-            html = html.replacen("<script>__RS_TILES__</script>", &format!("<script>{}</script>{setup}", PMTILES_JS.replace("</script>", "<\\/script>")), 1);
-        }
-        None => html = html.replacen("<script>__RS_TILES__</script>", "", 1),
+    let mut parts = String::new();
+    if let Some(pmt) = p.tiles {
+        parts = format!("<script>{}</script>{}", PMTILES_JS.replace("</script>", "<\\/script>"),
+                        TILES.replace("__RS_PMTILES_B64__", &base64::engine::general_purpose::STANDARD.encode(pmt)));
     }
+    if let Some((side, side_b64)) = p.side {
+        let side_b64 = side_b64.map_or_else(|| gzip_b64(pyjson::dumps(side, true).as_bytes()), String::from);
+        parts.push_str(&SIDE.replace("__RS_SIDE_B64__", &side_b64));
+    }
+    html = html.replacen("<script>__RS_TILES__</script>", &parts, 1);
     if let Some(s) = p.simple_js {
         html = html.replacen("</body>", &(SIMPLE.replace("__RS_SIMPLE__", &pyjson::dumps(s, false)) + "</body>"), 1);
     }
@@ -162,7 +167,8 @@ pub fn make_page(style: &str, page: &str, parts: &str, pmtiles: Option<&[u8]>) -
     let parts = PageParts {
         name: p["name"].as_str().unwrap_or(""), cam: &p["cam"], bounds: [b(0), b(1), b(2), b(3)], side_panel_html: p["side_panel_html"].as_str(),
         host_panel_width: p["host_panel_width"].as_f64().unwrap_or(320.0), compress: p["compress"] == true, gz: p["gz"].as_object().cloned(),
-        tiles: pmtiles.map(|t| (t, &p["side"], p["side_b64"].as_str())), simple_js: (!p["simple_js"].is_null()).then_some(&p["simple_js"]),
+        tiles: pmtiles, side: (p["side_b64"].is_string() || !p["side"].is_null()).then(|| (&p["side"], p["side_b64"].as_str())),
+        simple_js: (!p["simple_js"].is_null()).then_some(&p["simple_js"]),
     };
     Ok(page_html(style, &page, &parts))
 }

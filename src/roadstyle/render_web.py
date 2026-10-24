@@ -1842,6 +1842,8 @@ _SIMPLE_JS = _page_part("simple")
 # is constructed), and asynchronously inflate the sidecar table (full per-edge properties +
 # midpoints + bboxes) that keeps rsQuery / popups / rsFocus working without inline GeoJSON.
 _TILES_JS = _page_part("tiles")
+# the road table (the same in both ways: one row for each road, tiles.sidecar), inflated into window.RS_SIDE after the page loads
+_SIDE_JS = _page_part("side")
 
 
 def _minzoom_filter(col, table):
@@ -3730,12 +3732,16 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                  "select": select_color, "hover": hover_color, "tunnels": bool(any_tunnel), "dashes": sdashes} if simple else None
     if _parts:      # the page's parts, not the page (the Rust engine's parity test, docs/design/rust_library.md "The interaction contract")
         return {"style": style, "options": page, "bounds": (minx, miny, maxx, maxy), "camera": cam, "simple_js": simple_js}
+    if not tiles:           # the road table of the inline roads: the page loads it the same way in both ways
+        from .tiles import sidecar
+        side = sidecar(geo)
     return WebMap(_page_html(style, page, name=name, cam=cam, bounds=(minx, miny, maxx, maxy), side_panel_html=side_panel_html,
-                             host_panel_width=host_panel_width, compress=compress, tiles=(pmt, side) if tiles else None, simple_js=simple_js))
+                             host_panel_width=host_panel_width, compress=compress, tiles=pmt if tiles else None, side=side, simple_js=simple_js))
 
-def _page_html(style, page, *, name, cam, bounds, side_panel_html, host_panel_width, compress, tiles=None, simple_js=None):
+def _page_html(style, page, *, name, cam, bounds, side_panel_html, host_panel_width, compress, tiles=None, side=None, simple_js=None):
     """The page: the map with the style (base map and roads) and the dashboard with its options (``page``: the options of rsDashboard).
-    ``tiles``: (the PMTiles archive, the sidecar table) of a tiled page; ``simple_js``: the settings of simple mode's recolouring script."""
+    ``tiles``: the PMTiles archive of a tiled page; ``side``: the road table (tiles.sidecar), in both ways; ``simple_js``: the settings
+    of simple mode's recolouring script."""
     minx, miny, maxx, maxy = bounds
     gz = _compress_sources(style) if compress else {}
     J = lambda k: json.dumps(page[k])        # noqa: E731
@@ -3777,19 +3783,15 @@ def _page_html(style, page, *, name, cam, bounds, side_panel_html, host_panel_wi
             .replace("__RS_TILED__", J("tiles"))
             .replace("__RS_LEAN__", J("simple"))
             .replace("__HOST_PANEL_HTML__", _host_panel(side_panel_html, host_panel_width, name)))     # the last: the host's own text may hold any other token
+    parts = ""
     if tiles:
         import base64
-
-        from . import tiles as _tiler
-        pmt, side = tiles
-        setup = (_TILES_JS.replace("__RS_PMTILES_B64__", base64.b64encode(pmt).decode())
-                 .replace("__RS_SIDE_B64__", _tiler._b64gz(side)))
-        html = html.replace("<script>__RS_TILES__</script>",
-                            "<script>"
-                            + _asset("pmtiles.js").replace("</script>", "<\\/script>")
-                            + "</script>" + setup, 1)
-    else:
-        html = html.replace("<script>__RS_TILES__</script>", "", 1)
+        parts = ("<script>" + _asset("pmtiles.js").replace("</script>", "<\\/script>") + "</script>"
+                 + _TILES_JS.replace("__RS_PMTILES_B64__", base64.b64encode(tiles).decode()))
+    if side is not None:
+        from .tiles import _b64gz
+        parts += _SIDE_JS.replace("__RS_SIDE_B64__", _b64gz(side))
+    html = html.replace("<script>__RS_TILES__</script>", parts, 1)
     if simple_js:
         html = html.replace("</body>", _SIMPLE_JS.replace("__RS_SIMPLE__", json.dumps(simple_js)) + "</body>", 1)
     if gz:

@@ -110,7 +110,7 @@ contract makes changeable (or a value that is not used).
 | `simple`, `tiles`, `fill_layers` | the mode and the road fill layer ids | `render`; option | `core.js`, `select.js`, `svspot.js` | no | |
 | `compress`, `data_maxzoom`, `data_tolerance` | | `render` | engine | no | |
 | `boundary` | the outline | `render` | engine | no | |
-| page self-checks | `window.__rs_gz`, `window.__rs_tiles` | `_INFLATE_JS`, `_TILES_JS` | the page's banner | | |
+| page self-checks | `window.__rs_gz`, `window.__rs_tiles`, `window.__rs_side` | `_INFLATE_JS`, `_TILES_JS`, `_SIDE_JS` | the page's banner | | |
 | `window.map` | the map | the page | the level editor, host scripts | | |
 | URL parameters | none today | | | | new: `#rs=` (`getState`, `setState`) |
 
@@ -161,7 +161,7 @@ when a layer reads it.
 | `__rs_arw` | the number of an arrow slot (for the export's thinning) | `_annotation_slots`, `slots.rs` | engine | internal | the slot attachments |
 | `__rs_base`, `__rs_height`, `__rs_casing_slab`, `__rs_chain` | a 3D deck's base and height, its casing slab, its chain | `_bridge_decks` | engine, `select.js` (`__rs_casing_slab`) | dashboard (`__rs_casing_slab`) | the deck generator |
 | `__rs_fc_`, `__rs_fc_frame`, `__rs_fc_i`, `__rs_fc_id`, `__rs_fc_wkb` | not properties: temporary names in the DuckDB query of `fastjson.py` | `fastjson.py` | | internal | removed (the Rust readers) |
-| `__rs_gz`, `__rs_tiles` | not properties: the page's self-check globals (`window.__rs_gz`, `window.__rs_tiles`) | `_INFLATE_JS`, `_TILES_JS` | the page's banner | page | the page writer |
+| `__rs_gz`, `__rs_tiles`, `__rs_side` | not properties: the page's self-check globals (`window.__rs_gz`, `window.__rs_tiles`, `window.__rs_side`: the road table did not load) | `_INFLATE_JS`, `_TILES_JS`, `_SIDE_JS` | the page's banner | page | the page writer |
 | `__rs_fill__` | the prefix of `__rs_fill__<i>` in the code | | | | |
 
 ## The page's placeholders

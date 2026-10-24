@@ -449,14 +449,12 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
                  "hover": a["hover_color"] or th["selection"]["hover"], "tunnels": bool(ctl["tunnel"]["layers"]), "dashes": dashes}
     x0, y0, x1, y1 = (float(v) for v in g.total_bounds)
     # the page by the Rust page writer (roadstyle::page); the gzip blobs by Python's zlib, so the page is Python's byte for byte
+    from .tiles import _b64gz, sidecar
+    pmt, side = archive if archive else (None, sidecar(page_style["sources"]["roads"]["data"]))     # the road table, before the gzip
     gz = rw._compress_sources(page_style) if a["compress"] else {}
     parts = {"name": a["name"], "cam": cam, "bounds": [x0, y0, x1, y1], "side_panel_html": a["side_panel_html"],
              "host_panel_width": a["host_panel_width"], "compress": False, "gz": gz, "simple_js": simple_js if a["simple"] else None}
-    pmt = None
-    if archive:
-        from .tiles import _b64gz
-        pmt, side = archive
-        parts["side_b64"] = _b64gz(side)
+    parts["side_b64"] = _b64gz(side)       # the road table, in both ways
     return rw.WebMap(rust().make_page(json.dumps(page_style), json.dumps(page), json.dumps(parts), pmt))
 
 
