@@ -56,8 +56,8 @@ def test_tiles_from_the_files_are_the_tiles_of_the_one_call(part, keywords, tmp_
     b = t.bounds()
     for z in range(t.zooms()[0], t.zooms()[1] + 1):
         n = 2 ** z
-        tx = lambda lon: int((lon + 180) / 360 * n)                                         # noqa: E731
-        ty = lambda lat: int((1 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2 * n)   # noqa: E731
+        tx = lambda lon, n=n: int((lon + 180) / 360 * n)                                    # noqa: E731
+        ty = lambda lat, n=n: int((1 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2 * n)   # noqa: E731
         for x in range(tx(b[0]), tx(b[2]) + 1):
             for y in range(ty(b[3]), ty(b[1]) + 1):
                 assert mvt.decode(f.tile(z, x, y)) == mvt.decode(t.tile(z, x, y)), f"{z}/{x}/{y}"

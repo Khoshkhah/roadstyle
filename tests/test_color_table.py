@@ -1,6 +1,4 @@
 """Per-edge colour table (edge_id -> colour) + colors='self' literal colouring."""
-import json
-import re
 
 import geopandas as gpd
 import pandas as pd
