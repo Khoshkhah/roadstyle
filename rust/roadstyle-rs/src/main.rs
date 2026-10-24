@@ -151,7 +151,7 @@ fn main() {
         // the map with vector tiles (make_tiled), then every tile around the centre at zooms 12, 14 and 15: the times and sizes
         let read = |p: &str| if p == "-" { None } else { Some(fs::read(p).unwrap_or_else(|e| fail(format!("{p}: {e}")))) };
         let t = Instant::now();
-        let (style, tiles) = roadstyle_rs::make_tiled(read(&args[3]).unwrap(), &look_file(&args[2]), read(&args[4]), None,
+        let (style, tiles, _) = roadstyle_rs::make_tiled(read(&args[3]).unwrap(), &look_file(&args[2]), read(&args[4]), None,
                                                         "rs://", &["osm_id".into(), "access".into()]).unwrap_or_else(|e| fail(e));
         eprintln!("make_tiled {:.0} ms (style {:.1} KB)", t.elapsed().as_secs_f64() * 1e3, style.len() as f64 / 1e3);
         let style: Value = serde_json::from_str(&style).unwrap();

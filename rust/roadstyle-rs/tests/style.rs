@@ -66,7 +66,7 @@ fn tiles_hash(area: &Path) -> String {
         (x0, y0, x1, y1) = (x0.min(c[0]), y0.min(c[1]), x1.max(c[0]), y1.max(c[1]));
     }
     let keep = ["osm_id".to_string(), "access".to_string()];
-    let (style, tiles) = roadstyle_rs::make_tiled(roads, &look, Some(read(area.join("features.parquet"))), None, "rs://", &keep).unwrap();
+    let (style, tiles, _) = roadstyle_rs::make_tiled(roads, &look, Some(read(area.join("features.parquet"))), None, "rs://", &keep).unwrap();
     let mut h = Sha256::new();
     h.update(style.as_bytes());
     for z in [12u32, 14, 15] {

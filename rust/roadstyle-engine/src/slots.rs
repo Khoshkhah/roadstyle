@@ -418,7 +418,7 @@ pub fn slots_source(roads: &Roads, look: &SlotLook) -> Value {
     // order: __rs_cls before __rs_arw)
     for f in feats.iter_mut() {
         let e = f["properties"]["__rs_edge"].as_u64().unwrap() as usize;
-        f["properties"]["__rs_cls"] = crate::cls_of(roads.road(e));
+        f["properties"]["__rs_cls"] = roads.road(e).cls();
         if let Some(a) = roads.get(e, "__rs_access").filter(|a| !a.is_null()) {      // access_col: the same for the names and arrows
             f["properties"]["__rs_access"] = a.to_value();
         }

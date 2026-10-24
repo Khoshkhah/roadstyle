@@ -13,7 +13,7 @@ fn names() -> &'static Mutex<HashSet<&'static str>> {
 }
 
 /// The one copy of a key name (made the first time; a program has some hundred names).
-fn intern(k: &str) -> &'static str {
+pub fn intern(k: &str) -> &'static str {
     let mut t = names().lock().unwrap();
     if let Some(&s) = t.get(k) {
         return s;

@@ -33,6 +33,8 @@ pub struct Sources {
     pub roads: RoadsSource,
     /// the metadata that only a saved style has (what stage 2 reads from it: `roadstyle:tiles`, `roadstyle:columns`)
     pub saved: serde_json::Map<String, Value>,
+    /// the warnings of the stages (Python's warnings.warn in render_web), for the caller to give
+    pub warnings: Vec<String>,
 }
 
 impl Sources {
@@ -41,7 +43,7 @@ impl Sources {
         let roads = roads.unwrap_or_else(|| RoadsSource { roads: Roads::new(RoadTable::empty()), tolerance: 0.05, maxzoom: None, names: Vec::new(),
                                                           in_style: false, read: None });
         let mut s = Sources { name: p.name, center: p.center, zoom: p.zoom, layers: p.layers, metadata: p.metadata, glyphs: p.glyphs, state: p.state,
-                              sources, roads, saved: serde_json::Map::new() };
+                              sources, roads, saved: serde_json::Map::new(), warnings: p.warnings };
         s.set_reads();
         s
     }

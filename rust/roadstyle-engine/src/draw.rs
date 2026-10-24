@@ -215,13 +215,7 @@ impl Draw {
     }
 }
 
-/// The property of a colour option's fill (option 0: __rs_fill); each name is made once for the program.
+/// The property of a colour option's fill (option 0: __rs_fill), as the one copy of the property names (props::intern).
 pub fn fill_name(i: usize) -> &'static str {
-    static NAMES: std::sync::Mutex<Vec<&'static str>> = std::sync::Mutex::new(Vec::new());
-    let mut names = NAMES.lock().unwrap();
-    while names.len() <= i {
-        let n = names.len();
-        names.push(if n == 0 { "__rs_fill" } else { Box::leak(format!("__rs_fill__{n}").into_boxed_str()) });
-    }
-    names[i]
+    if i == 0 { "__rs_fill" } else { roadstyle_model::props::intern(&format!("__rs_fill__{i}")) }
 }

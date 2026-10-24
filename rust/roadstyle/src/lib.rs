@@ -302,9 +302,9 @@ pub fn tile_made(s: &sources::Sources, prefix: &str, keep: &[String]) -> Result<
 /// roadstyle's tiles.py, the zooms and the buffer from the look's `config.tiles`). The layers, the metadata and the camera are those of
 /// `make_style`; each layer draws the tile layer of its old source (`source-layer`). The tiles keep only the properties that are read:
 /// the texts in the layers (all their keys, and more), the popup and tooltip fields of the metadata, the overlays' popup fields (name,
-/// kind) and `keep` (the caller's own, for example its popup's).
+/// kind) and `keep` (the caller's own, for example its popup's). The warnings of stage 1 come back last.
 pub fn make_tiled(parquet: Vec<u8>, look: &Look, features: Option<Vec<u8>>, name: Option<String>, prefix: &str, keep: &[String])
-                  -> Result<(String, tiles::Tiles), String> {
+                  -> Result<(String, tiles::Tiles, Vec<String>), String> {
     let (feats, features, _) = tables(parquet, features, None)?;
     let s = sources::Sources::new(make_parts(feats, look, features, None, name)?);
     let mut o = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &look.config["tiles"], &columns(look), keep)
@@ -314,6 +314,6 @@ pub fn make_tiled(parquet: Vec<u8>, look: &Look, features: Option<Vec<u8>>, name
     o.exact = look.args["tile_keep"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
     o.only = look.args["tile_layers"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
     let (style, tiled) = tile_stage(&s, &o, &xyz_at(prefix));
-    Ok((style.to_string(), tiled))
+    Ok((style.to_string(), tiled, s.warnings))
 }
 

@@ -55,7 +55,7 @@ fn filter_panel(look: &crate::Look, roads: &Roads, m: &Model) -> Value {
                                                                std::collections::HashSet::new());
     let restricted = |p: Road| p.get("__rs_access").map(Cell::to_value).is_some_and(|a| !a.is_null() && a != false && a != "");
     for p in roads.iter() {
-        let cls = crate::cls_of(p);
+        let cls = p.cls();
         let Some(c) = cls.as_str().filter(|c| !c.is_empty()) else { continue };
         if !seen.contains(c) || (by_access.contains(c) && !restricted(p)) {
             if !seen.contains(c) {
@@ -77,7 +77,7 @@ fn filter_panel(look: &crate::Look, roads: &Roads, m: &Model) -> Value {
         // driving's pedestrian streets that cars may not use have their own row: where no usable road is of the class, a class row would
         // be a second switch for them
         if n("pedestrian") > 0 && classes.iter().any(|c| c == "pedestrian")
-            && !roads.iter().any(|f| !restricted(f) && crate::cls_of(f).as_str() == Some("pedestrian")) {
+            && !roads.iter().any(|f| !restricted(f) && f.cls().as_str() == Some("pedestrian")) {
             classes.retain(|c| c != "pedestrian");
         }
     }

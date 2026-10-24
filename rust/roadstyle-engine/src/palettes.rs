@@ -12,17 +12,15 @@ use roadstyle_model::Cell;
 use serde_json::{json, Value};
 
 /// The palettes `looks` ({palette: the look of the same call with that palette}) of a page's views, merged into stage 1's output `s`
-/// (the palette `base_name`). A warning of a palette that the first palette gave too is given one time.
+/// (the palette `base_name`). A warning of a palette that the first palette gave too is given one time (`s.warnings`).
 pub fn add(s: &mut Sources, base_name: &str, looks: &[(String, crate::Look)]) -> Result<(), String> {
-    let mut all = crate::take_warnings();
-    let copies = looks.iter().map(|(n, l)| Ok((n.clone(), crate::restyle(s, l)?))).collect::<Result<Vec<_>, String>>();
-    for w in crate::take_warnings() {
-        if !all.contains(&w) {
-            all.push(w);
+    let copies = looks.iter().map(|(n, l)| Ok((n.clone(), crate::restyle(s, l)?))).collect::<Result<Vec<_>, String>>()?;
+    for w in copies.iter().flat_map(|(_, c)| &c.warnings) {
+        if !s.warnings.contains(w) {
+            s.warnings.push(w.clone());
         }
     }
-    all.into_iter().for_each(crate::warn);
-    merge(s, base_name, &copies?)
+    merge(s, base_name, &copies)
 }
 
 /// Merge the palettes `copies` (each made by `crate::restyle` from `base`'s roads) into `base` (the palette `base_name`).
