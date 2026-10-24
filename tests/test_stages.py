@@ -131,7 +131,7 @@ def test_the_parquet_files_keep_big_ids_as_integers(part, keywords, tmp_path):
     for name in ("road_table.parquet", "roads.parquet"):
         cols = {r[0]: r[1] for r in duckdb.sql(f"DESCRIBE SELECT * FROM '{tmp_path / 'pq' / name}'").fetchall()}
         assert cols["edge_id"] == "BIGINT", (name, cols["edge_id"])
-    assert duckdb.sql(f"SELECT max(edge_id) FROM '{tmp_path / 'pq' / 'road_table.parquet'}'").fetchone()[0] == big + len(part) - 1
+    assert duckdb.sql(f"SELECT max(edge_id) FROM '{tmp_path / 'pq' / 'road_table.parquet'}'").fetchall()[0][0] == big + len(part) - 1
     rs.export_geojson(roads, tmp_path / "gj", format="geojson", **keywords)
     ids = [f["properties"]["edge_id"] for f in json.loads((tmp_path / "gj" / "roads.geojson").read_text())["features"]]
     assert ids[:2] == [str(big), str(big + 1)]                                # the JSON form: text
