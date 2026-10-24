@@ -1,6 +1,6 @@
 <style>
 :root{--lv-w:400px;--lv-bg:#f6f7f9;--lv-card:#fff;--lv-line:#e4e7ec;--lv-line2:#d0d5dd;--lv-ink:#1d2433;--lv-ink2:#3b4252;--lv-mute:#6b7280;
-  --lv-soft:var(--lv-soft);--lv-hover:#f2f6fc;--lv-r1:#e8590c;--lv-r2:#1971c2;--lv-found:#868e96;--lv-saved:#7048e8;--lv-new:#2f9e44;--lv-bad:#e03131;
+  --lv-soft:#eef1f6;--lv-hover:#f2f6fc;--lv-r1:#e8590c;--lv-r2:#1971c2;--lv-found:#868e96;--lv-saved:#7048e8;--lv-new:#2f9e44;--lv-bad:#e03131;
   --lv-bad-bg:#ffe3e3;--lv-warn-bg:#fff4e6;--lv-warn-ink:#b35c00;--lv-warn-line:#ffc078;--lv-queue-line:#fde68a}
 /* the dark theme, by the stack's rule: the system's, unless the page sets data-theme on <html> */
 @media (prefers-color-scheme: dark){:root:not([data-theme=light]){--lv-bg:#1b1f27;--lv-card:#242a34;--lv-line:#343b47;--lv-line2:#465061;
@@ -69,7 +69,7 @@ body:not(.lv-open) #lv{transform:translateX(100%)}
 #lv .hd{margin-top:8px;padding:7px 8px 6px;border:1px solid var(--lv-line);border-radius:8px}
 #lv .hd-h{display:flex;justify-content:space-between;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
 #lv .hbar{display:flex;height:12px;border-radius:3px;overflow:hidden;margin-bottom:4px;font-size:9px;line-height:12px;color:#fff;text-align:center}
-#lv .hbar i{display:block;font-style:normal;overflow:hidden;white-space:nowrap} #lv .hbar .s,#lv .hbar .e{background:#6b7686} #lv .hbar .m{background:#c3c9d2;color:var(--lv-ink2)}
+#lv .hbar i{display:block;font-style:normal;overflow:hidden;white-space:nowrap} #lv .hbar .s,#lv .hbar .e{background:#6b7686} #lv .hbar .m{background:#c3c9d2;color:#3b4252}
 #lv .hd label{display:grid;grid-template-columns:52px 1fr 52px;row-gap:0;align-items:center;gap:6px;font-size:12px;color:var(--lv-mute)}
 #lv .hd input[type=range]{width:100%;accent-color:var(--lv-r2)} #lv .hd label b{text-align:right;color:var(--lv-ink);font-variant-numeric:tabular-nums}
 #lv .lvls{display:flex;gap:4px;margin-top:8px} #lv .lvls div{flex:1;text-align:center;background:var(--lv-bg);border-radius:6px;padding:3px 0}
