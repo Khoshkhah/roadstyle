@@ -785,6 +785,7 @@ version = "0.25.0"
 dependencies = [
  "pyo3",
  "roadstyle",
+ "roadstyle-cli",
  "serde_json",
 ]
 
