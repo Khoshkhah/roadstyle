@@ -232,25 +232,38 @@ Python, `render_edges`) is the one call that runs them in order.
 ```mermaid
 flowchart TB
     inp["Roads + look"]
-    facade["The one call<br/>roadstyle facade,<br/>render_edges"]
     s1["Stage 1<br/>roadstyle-engine<br/>style + sources"]
+    pick{"GeoJSON<br/>or tiles?"}
     s2["Stage 2<br/>roadstyle-tiles<br/>vector tiles"]
-    s3["Stage 3<br/>roadstyle::page<br/>HTML page"]
+    side["Road fields<br/>side table, or<br/>one road on request"]
+    dash["Dashboard<br/>popup, find, filters"]
     ml["MapLibre<br/>draws"]
-    inp --> facade
-    facade -.->|"runs"| s1
-    facade -.->|"runs"| s2
-    facade -.->|"runs"| s3
-    s1 -->|"sources"| s2
-    s1 -->|"style"| s3
-    s2 -->|"archive"| s3
-    s1 -->|"GeoJSON sources"| ml
-    s2 -->|"tiles"| ml
-    s3 -->|"one HTML file"| ml
+    inp --> s1
+    s1 --> pick
+    pick -->|"GeoJSON:<br/>MapLibre cuts<br/>the tiles"| ml
+    pick -->|"tiles"| s2
+    pick -->|"tiles"| side
+    s2 -->|"vector tiles"| ml
+    side --> dash
+    dash -->|"MapLibre calls"| ml
 ```
 
-*Stage 2 is not always used. With the GeoJSON sources of stage 1 (the default page), MapLibre cuts the tiles itself in the
-browser. Thus the same sources can go to stage 2 (Rust) or to MapLibre, and the two can be compared.*
+*A map uses one of the two forms, never both. With **GeoJSON** (the default page), stage 1's sources go to MapLibre with all
+the road fields in them, and MapLibre cuts the tiles in the browser. With **vector tiles** (ways A, B and C), stage 2 cuts them
+first.*
+
+The road fields (the name, the class, your columns) are a separate, small input for the interaction: the popup, the search and
+the filters. Drawing does not need them. In the tiles they repeat in each tile and at each zoom: on Tartu, the 26 road fields make
+the 9 tiles of one zoom-12 view 17.9 MB in place of 16.2 MB. Thus each tiled way gives the fields in its own way:
+
+| Way | The fields in the tiles | The fields for the dashboard |
+|---|---|---|
+| A. Tiles in one HTML file | none | the side table (`window.RS_SIDE`), loaded one time with the page: the popup, the search and the filters work |
+| B. Tiles on a server | every column, because a map app has no side table | from the tiles, for the app's own popup |
+| C. Tiles made in the browser | only the columns of `keep` | one road on request (`engine.props`): the popup works, but `rs.find` and `rs.query` find nothing, because the page does not have all the fields |
+
+The one call (the facade, `render_edges`) runs the stages in order. Stage 3 puts the style and the data of the selected form into
+one HTML file.
 
 | Stage | Crate | Input → output | Public call today |
 |---|---|---|---|
