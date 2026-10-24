@@ -95,7 +95,8 @@ def crates() -> dict[str, dict]:
 
 
 def public_api(c: dict) -> list[str]:
-    lib = (c["src"] / "lib.rs").read_text(encoding="utf-8")
+    root = c["src"] / "lib.rs"
+    lib = (root if root.exists() else c["src"] / "main.rs").read_text(encoding="utf-8")      # a program (roadstyle-mcp): its main.rs
     names = re.findall(r"js_name\s*=\s*(\w+)", lib)                                          # wasm-bindgen
     names += re.findall(r"#\[pyfunction\][^\n]*\n(?:#\[[^\n]*\n)*fn (\w+)", lib)               # PyO3
     names += re.findall(r"#\[pyclass[^\n]*\]\s*\n(?:#\[[^\n]*\n)*(?:pub )?struct (\w+)", lib)
