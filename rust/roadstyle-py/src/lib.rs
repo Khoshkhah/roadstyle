@@ -464,20 +464,20 @@ fn duckosm_features_select(specs: Vec<usize>) -> Option<String> {
     roadstyle::duckosm::features_select(&specs)
 }
 
-/// serve(area, port, page=None): roadstyle serve (roadstyle-cli) in a thread of its own: the level editor's page files (in the extension,
+/// serve(area, port, page=None): roadstyle serve (roadstyle-serve) in a thread of its own: the level editor's page files (in the extension,
 /// or the folder `page`) at / and the area folder at /area/, on 127.0.0.1. Returns at once; the server stops with the Python process
 /// (roadstyle-levels edit waits for Ctrl+C). An error when the extension has no editor WebAssembly package (build_editor.sh, then build).
 #[pyfunction]
 #[pyo3(signature = (area, port, page=None))]
 fn serve(area: String, port: u16, page: Option<String>) -> PyResult<()> {
-    let page = page.map_or(roadstyle_cli::Page::Embedded, |p| roadstyle_cli::Page::Dir(p.into()));
-    if matches!(page, roadstyle_cli::Page::Embedded) && !roadstyle_cli::EMBEDDED.iter().any(|(n, _)| n.ends_with("_bg.wasm")) {
+    let page = page.map_or(roadstyle_serve::Page::Embedded, |p| roadstyle_serve::Page::Dir(p.into()));
+    if matches!(page, roadstyle_serve::Page::Embedded) && !roadstyle_serve::EMBEDDED.iter().any(|(n, _)| n.ends_with("_bg.wasm")) {
         return Err(PyValueError::new_err("this build has no WebAssembly package of the level editor: run rust/roadstyle-wasm/build_editor.sh, \
                                           then build the extension again (python rust/roadstyle-py/build.py), or use --engine python"));
     }
     // bind here, so an error (the port in use) comes back to Python
     std::net::TcpListener::bind(("127.0.0.1", port)).map_err(|e| PyValueError::new_err(format!("127.0.0.1:{port}: {e}")))?;
-    std::thread::spawn(move || roadstyle_cli::serve(std::path::Path::new(&area), page, port));
+    std::thread::spawn(move || roadstyle_serve::serve(std::path::Path::new(&area), page, port));
     Ok(())
 }
 

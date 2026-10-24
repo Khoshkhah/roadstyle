@@ -179,10 +179,10 @@ pub fn run(args: &[String]) -> Result<(), String> {
         ("levels", [sub, rest @ ..]) => levels(sub, rest, opts),
         ("serve", [area]) => {
             let port: u16 = take(&mut opts, "port").map_or(Ok(8780), |p| p.parse().map_err(|_| "--port needs a number"))?;
-            let page = take(&mut opts, "page").map_or(crate::Page::Embedded, |p| crate::Page::Dir(p.into()));
+            let page = take(&mut opts, "page").map_or(roadstyle_serve::Page::Embedded, |p| roadstyle_serve::Page::Dir(p.into()));
             no_more(&opts)?;
             println!("level editor: http://127.0.0.1:{port}/level_editor/  ({area}; Ctrl+C to stop)");
-            crate::serve(Path::new(area), page, port)
+            roadstyle_serve::serve(Path::new(area), page, port)
         }
         ("snapshot", [page, out]) => snapshot(page, out, opts),
         ("help" | "-h", _) => {

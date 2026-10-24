@@ -11,6 +11,7 @@ description = "The roadstyle program: one command for each job (serve: the level
 roadstyle = { workspace = true, features = ["gpkg"] }   # the native program reads GeoPackage files too
 serde_json.workspace = true
 roadstyle-snapshot.workspace = true
+roadstyle-serve.workspace = true
 
 [lib]
 name = "roadstyle_cli"

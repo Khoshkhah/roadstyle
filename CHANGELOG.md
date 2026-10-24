@@ -7,6 +7,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **`serve` is a crate of its own, `roadstyle-serve`** (audit N17). The program (`roadstyle serve`) and the Python binding
+  (`roadstyle._rust.serve`) call it, so the Python extension no longer builds roadstyle-cli: 105 crates, not 170, with no
+  headless_chrome and no C SQLite. httparse (=1.10.1) parses the request line and the headers in place of the hand-written parser;
+  tiny_http 0.12.0 was not used, because it has no limit on them. The limits and checks do not change (127.0.0.1, Host, Origin, 64 KB
+  of headers, 16 MB of body). New: more than 64 headers is 431, a PUT with no Content-Length (a chunked body) is 411, a request that is
+  not HTTP is 400, and each `serve` call answers with its own area's name (before, a second call in one process kept the first name).
 - **export_look: the yes/no tags use the engine's rule** (audit R6, both engines). A oneway, tunnel or bridge value is yes unless it
   is missing or "", "no", "false" or "0" (lower-cased), as on the map that the engine draws. Before, the exported look had lists of
   yes values, so tunnel=covered and other values not in the lists were not tunnels in it. Of Monaco, Södermalm and Tartu, only

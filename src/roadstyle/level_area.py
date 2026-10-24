@@ -292,7 +292,7 @@ def write(solved, folder, ends_table):
 
 
 def serve_rust(folder, port=8780, items=None):
-    """The level editor in Rust: the solver runs in the page, and the Rust server (roadstyle-cli's serve, in the extension with the
+    """The level editor in Rust: the solver runs in the page, and the Rust server (roadstyle-serve, in the extension with the
     editor's page files) gives it the area's files and saves your changes. Waits until Ctrl+C."""
     import time
 
