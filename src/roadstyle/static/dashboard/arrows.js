@@ -35,6 +35,25 @@ function _rsArrowLane(ft){
   ft.geometry.coordinates = [ll.lng, ll.lat]; return ft;
 }
 let _RS_ARROW = null;     // the profile's arrows.place, main_below and main, and labels.base_size
+// the one-way slots, indexed once for each slots data (N12): each piece's line and box, and each chain's pieces; made again when the data
+// changes (a new array of features: setData, or the level editor's update)
+let _slotIdx = {fs: null, pieces: [], chains: new Map()};
+function _slotIndex(){
+  const fs = _sfeats((_src("slots")||{}).source);
+  if(_slotIdx.fs === fs) return _slotIdx;
+  const pieces = [], chains = new Map();
+  for(const f of fs){
+    const p = f.properties || {}; if(!p.oneway) continue;
+    const c = f.geometry && f.geometry.coordinates; if(!c) continue;
+    const box = [Infinity, Infinity, -Infinity, -Infinity];
+    for(const [x, y] of c){ if(x < box[0]) box[0] = x; if(y < box[1]) box[1] = y; if(x > box[2]) box[2] = x; if(y > box[3]) box[3] = y; }
+    const q = {c: c, p: p, box: box, main: _RS_ARROW.main.has(String(p.highway || "").replace(/_link$/, ""))};
+    pieces.push(q);
+    if(!chains.has(p.chain)) chains.set(p.chain, []);
+    chains.get(p.chain).push(q);
+  }
+  return _slotIdx = {fs: fs, pieces: pieces, chains: chains};
+}
 export function _rsArrows(){
   // the style's arrows (roadstyle:arrows): "points", one arrow per one-way chain placed here, on the arrows source; "line" or "line-center": the
   // style's own symbol layers place them. A style without the key: points when it has an arrows source.
@@ -49,14 +68,16 @@ export function _rsArrows(){
     const pxPerDeg = 111320 / (78271.51696 * Math.cos(ctr.lat * Math.PI / 180) / Math.pow(2, map.getZoom()));
     const mainOnly = map.getZoom() < _RS_ARROW.mainBelow;
     const vis = new Map(), pieces = new Map();                   // chain -> its visible parts [{slot, lo, hi}] / its pieces [{slot, c, cum, len, p}]
-    for(const f of _sfeats((_src("slots")||{}).source)){
-      const p = f.properties || {}; if(!p.oneway) continue;
-      if(mainOnly && !_RS_ARROW.main.has(String(p.highway || "").replace(/_link$/, ""))) continue;
-      const c = f.geometry && f.geometry.coordinates; if(!c) continue;
-      const cum = [0];                                          // lengths along the piece, in degrees of latitude
+    // only the pieces whose box meets the window, and the lengths only of the chains in view (N12): the one-way slots' index
+    const idx = _slotIndex(), seen = [];
+    for(const q of idx.pieces) if(q.box[0] <= E && q.box[2] >= W && q.box[1] <= N && q.box[3] >= S && (!mainOnly || q.main)) seen.push(q);
+    const measure = q => {                                       // lengths along the piece, in degrees of latitude (the view's scale)
+      const c = q.c, cum = [0];
       for(let i = 0; i < c.length - 1; i++) cum.push(cum[i] + Math.hypot((c[i + 1][0] - c[i][0]) * kx, c[i + 1][1] - c[i][1]));
-      if(!pieces.has(p.chain)) pieces.set(p.chain, []);
-      pieces.get(p.chain).push({slot: p.slot, c: c, cum: cum, len: cum[cum.length - 1], p: p});
+      return {slot: q.p.slot, c: c, cum: cum, len: cum[cum.length - 1], p: q.p}; };
+    for(const q of seen) if(!pieces.has(q.p.chain)) pieces.set(q.p.chain, idx.chains.get(q.p.chain).map(measure));
+    for(const q of seen){
+      const p = q.p, c = q.c, cum = pieces.get(p.chain).find(u => u.slot === p.slot && u.c === c).cum;
       for(let i = 0; i < c.length - 1; i++){
         let [x0, y0] = c[i], [x1, y1] = c[i + 1], t0 = 0, t1 = 1;   // Liang-Barsky: the part of the segment inside the window
         const dx = x1 - x0, dy = y1 - y0, P = [-dx, dx, -dy, dy], Q = [x0 - W, E - x0, y0 - S, N - y0];
