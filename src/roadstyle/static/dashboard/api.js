@@ -43,7 +43,7 @@ export function makeApi(extra){
   });
   track("rs:filterchange", d => {
     const f = state.filter;
-    if(d.visible) f.classes = d.visible.slice();
+    if(Array.isArray(d.visible)) f.classes = d.visible.slice();      // rsSetClasses; rsSetAccess sends visible: true or false with access
     if("bridges" in d) f.bridges = !!d.bridges;
     if("tunnels" in d) f.tunnels = !!d.tunnels;
     if("access" in d && window.rsGetAccess){ const a = window.rsGetAccess(); f.access = Object.keys(a).filter(k => !a[k]); }

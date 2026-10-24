@@ -20,9 +20,23 @@ All notable changes to **roadstyle** are documented here. The format is based on
   features.parquet into one table (Arrow columns and one coordinate buffer), cuts the sea out of it, and keeps each base-map layer as a
   table until it writes the GeoJSON text, not a JSON tree for each feature. The output is the same bytes (the styles, the files and the
   tiles of Monaco and Tartu). On Tartu, stage 1 needs 284 MB, not 403 MB, and the base map's part of make_sources takes 58 ms, not 115 ms. Stage 2 cuts the tiles from the tables too: make_tiled takes 1,752 ms, not 2,074 ms, and 344 MB, not 483 MB.
+- **`js/roads_sql.js` and `js/features_sql.js` run the SQL of `duckosmPlan`** (roadstyle-io's `duckosm.rs`), the one copy that
+  Python runs too. They have no SQL of their own now. Their functions and arguments do not change, and a new `readCatalog(q, catalog)`
+  gives the catalog that `duckosmPlan` reads. Load the module (`init()`) before you call them. On Monaco they write the same
+  `roads.parquet` (stored levels and tags, every mode) and `features.parquet`, byte for byte, as before.
+- **The simple look reads the colour of `rsColor` and `rsColorBase` from the feature state `rs_c` only** (audit N8, part 2, both
+  engines). The fill is the active option's colour under `rs_c`; an item's colour is `rs_c`, else its own; a painted road sorts on top
+  by the global state `rs_top` (the rows that `rsColor` painted, start value `[]`). The state has `rs_top` in place of `rs_colors` and
+  `rs_base`. The full look (`simple=False`, Python only) keeps `rs_colors` and `rs_base`.
 - **Every style reads a road's colour and width from the feature state** (audit N8, both engines). The road layer reads
   `["coalesce", ["feature-state", "rs_c"], <baked colour>]` and each width and offset stop × `["coalesce", ["feature-state", "rs_w"], 1]`,
   in every style, not only with `live_data`; `live_data` now only adds the metadata `roadstyle:live` and the page's option `live`.
+- **`rsColor` and `rsColorBase` write the feature state `rs_c`** (audit N8, the dashboard). A road gets one colour on the row that draws
+  it: the colour of `rsColor`, else that of `rsColorBase`, else that of `rs.setData`. A road of a two-way pair drawn as one line
+  (`__rs_dup`) gets its colour on its twin's row. The rows that `rsColor` painted are in the global state `rs_top` (a list of rows, with
+  no colours), which the sort key reads: a painted road stays on top of the others of its level. The global states `rs_colors` and
+  `rs_base` (a colour for each road, which made MapLibre lay out every tile again) are not written any more on the simple look. The full
+  look (`simple=False`) keeps them until it is removed.
 - **The base maps are a data file**, `src/roadstyle/data/basemaps.json`: one list for Python (`roadstyle.basemaps.BASEMAPS` and the
   switcher's default set) and the studio in the browser. The values are the same as before.
 - **The look is a crate of its own, typed and versioned** (`rust/roadstyle-look`, design step (c), audit R16). `Look::resolve` makes
@@ -70,6 +84,19 @@ All notable changes to **roadstyle** are documented here. The format is based on
   (`[[mode, count], ...]`, from the map option `modes`); `roadstyle:controls.box_layout` is `"stack"` for a base map's page; and each
   base-map layer's entry in `roadstyle:controls.overlays` has its start `interactive` (mapstyle's rule: not for landcover, water, paved
   and the decoration lines) and its `kinds` with their counts, most first. On Monaco all 17 layers equal mapstyle's.
+- **The dashboard has mapstyle's page functions** (docs/design/mapstyle_page_scripts.md), found by their roles in the metadata, not by
+  layer ids: `rsSetModes` / `rsGetModes` / `RS_MODES` (the roads of some modes, from `roadstyle:controls.modes` and the road table's
+  flags), `rsSetKinds` / `rsGetKinds` / `RS_KINDS` (a base-map layer's kinds), `rsSetInteraction` / `rsGetInteraction` (a layer's
+  clicks, tooltip and popup), `rsSetBuildings3D` / `rsGetBuildings3D` (the layers with `roadstyle:group` "buildings 3D", with a button
+  and a Layers row), and `box_layout: "stack"` (the Roads and Layers boxes folded, Layers under Roads). `rsFilter` on an overlay now
+  keeps each layer's own filter. The engine writes the new metadata (`modes`, the overlays' `interactive` and `kinds`, `box_layout`)
+  in a later change.
+- **The Rust engine reads Shapefile and GeoPackage road files** (`roadstyle-io`: `shp.rs`, `gpkg.rs`, `crs.rs`). Each gives the
+  `RoadTable` of the GeoJSON reader, with the same column types. A file's CRS goes to EPSG:4326 with the rule of Python's
+  `validate.to_wgs84`: no CRS is an error, EPSG:4326 stays as it is, another CRS is reprojected (proj4rs, pure Rust; an EPSG code
+  through crs-definitions, a WKT text through proj4wkt). A CRS that the reader cannot read is an error that names it. GeoPackage is
+  SQLite (C), so it is the feature `gpkg`, for the native programs only. The wasm package has `readShp(shp, dbf, prj?, name?)`, and
+  CI fails if `roadstyle-wasm` depends on SQLite.
 - **The map of one mode from a duckOSM file** (`only=True` in `roadstyle.duckosm.read`, `export_inline` and `export_style`, as mapstyle's
   `render_map(only=True)`): the `edges` and `private_edges` of one network. The stored levels were solved for every mode together, so each
   road must have its stored row (as Python's `load_area_levels(subset=True)`), else an error that names how many and one of them; then the

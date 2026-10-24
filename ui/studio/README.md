@@ -8,8 +8,7 @@ dashboard (`preview.html`, in an iframe) and the `render_edges(...)` code of the
 
 1. Build the engine's WebAssembly files once: `npm run build` in `rust/roadstyle-wasm/` (needs Rust with the target
    `wasm32-unknown-unknown` and `wasm-bindgen-cli`).
-2. Make the sample networks as GeoParquet (until the engine reads GeoJSON): `python ui/studio/make_samples.py`.
-3. Serve the repository's root and open `/ui/studio/`:
+2. Serve the repository's root and open `/ui/studio/`:
 
 ```bash
 python -m http.server 8000
@@ -17,19 +16,17 @@ python -m http.server 8000
 
 ## What it does now
 
-- Data: the three Södermalm samples, or a GeoParquet road file.
-- Look: palette, base map, 3D bridges, vector tiles (the engine's tiles, made in the worker when the map asks for them).
-- Colour by data: numeric columns with more than 12 values (a ramp from the 2nd to the 98th percentile).
+- Data: the three Södermalm samples (GeoJSON), or a GeoJSON or GeoParquet road file in EPSG:4326.
+- Look: palette, base map (all of `src/roadstyle/data/basemaps.json`; the map's switcher has the active one and the default set), 3D bridges, vector tiles (the engine's tiles, made in the worker when the map asks for them).
+- Colour by data, as the Python studio: a numeric column with more than 12 values is a ramp from its 2nd to its 98th percentile; another
+  column with 1 to 12 values is up to 5 stepped colours of the ramp (`rampStops`), its sorted values in even groups.
 - Filter (the road classes, through the dashboard), minor roads hidden when zoomed out, street names, one-way arrows.
 - Click popup (curated fields, chosen columns, side panel, all columns, off) and hover tooltip columns.
 - Overlays: GeoJSON files and the sample overlays, each with its label, colour, place and popup and tooltip columns.
 
 ## What waits for other parts
 
-- GeoJSON and GPKG road files: a GeoJSON reader in the engine (the look session).
-- Columns with few values (categories) in Colour by data: the ramp steps from the engine (the look session).
-- The base maps: `src/roadstyle/data/basemaps.json`, one list for Python and the studio (the look session). Without it the map has
-  no base map, and the studio says so.
+- Shapefile road files: `readShp` (branch readers-rs). GeoPackage stays with the native programs: SQLite is C.
 - The download of the page (`makePage`), and the Dashboard and Report pages: the page writer (R3).
 
 Each change of a knob runs the look and stage 1 again in the worker (Södermalm driving, 4,563 roads: 0.3 to 0.5 s). All the calls

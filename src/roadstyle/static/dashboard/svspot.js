@@ -1,6 +1,6 @@
 // GOOGLE STREET VIEW of the clicked edge (the window, the side-by-side page, or a plain link),
 // looking the way the edge runs. A plain maps URL, no API key; where it stands is below.
-import {map, O, RS_PREFIX, RS_LEAN, _road, _roadOfPiece} from "./core.js";
+import {map, O, RS_PREFIX, RS_LEAN, _road, _roadOfPiece, _emit} from "./core.js";
 import {_svWindow} from "./streetview.js";
 import {srcOf} from "./select.js";
 let _streetView = false;
@@ -151,8 +151,7 @@ export function rsStreetViewStep(m){
   const p=_svAt(_svPos.f, _svPos.m+m); if(!p) return null;
   _svFree=null; _svLast=null; _svPos.m=p.m; _svMark(); const url=_svUrlOf(p);
   _svKeepInView(p.lng, p.lat);                  // keep the marker on screen while walking
-  document.dispatchEvent(new CustomEvent("rs:streetviewmove",
-    {detail:{id:_svPos.id, streetView:url, atStart:p.m<=0.01, atEnd:p.m>=p.len-0.01}}));
+  _emit("rs:streetviewmove", {id:_svPos.id, streetView:url, atStart:p.m<=0.01, atEnd:p.m>=p.len-0.01});
   _svSpotEvent();
   return url; }
 // WHERE THE STREET VIEW SPOT IS, for placing something at an exact spot and direction:
@@ -172,7 +171,7 @@ export function rsGetStreetViewSpot(){
           heading:_svFree ? _svFree.h : p.h, roadHeading:p.h, onRoad:true, source:_svFree ? "panorama" : "map"}; }
 // the same, as an event on every change: a pick, a step, a walk or turn in the panorama
 function _svSpotEvent(){
-  document.dispatchEvent(new CustomEvent("rs:streetviewspot", {detail:rsGetStreetViewSpot()})); }
+  _emit("rs:streetviewspot", rsGetStreetViewSpot()); }
 export function _sv(ll, f){
   const u = _svUrl(ll, f);
   if(u && _svWindow)                          // the window mode opens its window, not a new tab

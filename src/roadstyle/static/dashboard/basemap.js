@@ -1,7 +1,7 @@
 // base-layer switching: window.rsSetBasemap(key|index) is the API (swaps the raster source's
 // tiles; the road layers stay put); the dropdown is just UI over it and stays in sync.
 // A tile-less entry (blank) hides the raster layer and shows the plain background colour.
-import {map, style, O} from "./core.js";
+import {map, style, O, _emit} from "./core.js";
 let BASEMAPS = [];
 export function rsSetBasemap(keyOrIdx){
   const idx = typeof keyOrIdx==="number" ? keyOrIdx
@@ -20,7 +20,7 @@ export function rsSetBasemap(keyOrIdx){
   map.setPaintProperty("bg","background-color", b.bg);
   const m = document.querySelector(".bm-menu");
   if(m) Array.from(m.children).forEach((el,i)=>el.classList.toggle("on", i===idx));
-  document.dispatchEvent(new CustomEvent("rs:basemapchange",{detail:{basemap:b.key, index:idx}}));
+  _emit("rs:basemapchange", {basemap:b.key, index:idx});
 }
 export function initBasemap(){
   BASEMAPS = O.basemaps;

@@ -60,6 +60,27 @@ export function initPanelTab(){
 export function rsInfoClear(){ if(_sideBd) _sideBd.innerHTML='<div class="rs-empty">Click a road to see its full record here.</div>'; }
 export function rsInfoShow(html){ if(_sideBd) _sideBd.innerHTML=html; }
 // non-panel: one top-left stack hosts the colour-by + filter cards (panel mode docks them instead)
+// the controls' parts: an element with a class; a box with a header and a body (cls-hd, cls-body) that folds when the header is clicked
+// (folded: true or false, the start; null: it does not fold); a checkbox row (o: id, cls, rule: the first row of a group, ruled off;
+// sw: a swatch of this colour, swCls its class)
+export const _el = (tag, cls) => { const e = document.createElement(tag); if(cls) e.className = cls; return e; };
+export function _box(cls, pre, title, folded){
+  const box = _el("div", cls), hd = _el("div", pre+"-hd"), body = _el("div", pre+"-body");
+  const set = c => { box.classList.toggle("collapsed", c); hd.textContent = title+" "+(c ? "▸" : "▾"); };
+  if(folded == null) hd.textContent = title; else { set(folded); hd.onclick = () => set(!box.classList.contains("collapsed")); }
+  box.append(hd, body);
+  return {box, hd, body};
+}
+export function _check(text, on, change, o = {}){
+  const lab = _el("label", o.cls), cb = _el("input"), sw = o.sw != null ? _el("span", o.swCls || "flt-sw") : null;
+  cb.type = "checkbox"; cb.checked = on; if(o.id) cb.id = o.id;
+  cb.onchange = () => change(cb.checked);
+  if(o.rule) lab.classList.add("rs-rule");
+  lab.append(cb);
+  if(sw){ sw.style.background = o.sw; lab.append(sw); }
+  lab.append(" "+text);
+  return {lab, cb, sw};
+}
 export function _tlHost(){
   if(_sideCtl) return _sideCtl;
   let h=document.getElementById("rs-tl");

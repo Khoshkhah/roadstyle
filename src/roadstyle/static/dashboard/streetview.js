@@ -2,7 +2,7 @@
 // rsSetStreetView(true)) opens it; then a draggable, resizable window over the map that follows
 // every road selection. Nothing is loaded from Google while it is closed. Whether it is open, its
 // position and its size are remembered in this browser.
-import {map, O} from "./core.js";
+import {map, O, _emit} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
 import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep} from "./svspot.js";
 export let _svWindow = false;
@@ -98,7 +98,7 @@ export function initStreetView(){
         last=null; fr.hidden=true; msg.hidden=false; msg.textContent="Click a road to see it in Street View."; ttl.textContent="Street View"; }
       w.hidden=!on; if(on && innerWidth>520) place(); rsSetStreetViewMarker(!!on);
       st.open=!!on; save(); if(btn) btn.classList.toggle("rs-on", !!on); show();
-      document.dispatchEvent(new CustomEvent("rs:streetviewchange", {detail:{open:!!on}}));
+      _emit("rs:streetviewchange", {open:!!on});
     };
     bar.lastChild.onclick=()=>rsSetStreetView(false);
     map.addControl({onAdd(){
