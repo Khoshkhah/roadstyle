@@ -33,8 +33,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **The level editor in Rust**: `roadstyle-levels edit` opens the editor page of `static/level_editor/`. The solver runs in the page
   (roadstyle-wasm `LevelArea`: Monaco loads in 75 ms, solves in 0.1 s), and the Rust program `roadstyle serve <area folder>` (the new
   crate `roadstyle-cli`) gives it the area's files and saves your changes (only `edits.csv`, `heads.csv`, `caps.csv`, `levels.csv`,
-  `levels_info.json`). The panel is the same. `--engine python` opens the Python editor. Build the page's WebAssembly package with
-  `rust/roadstyle-wasm/build_editor.sh`. `solve_levels(..., engine="rust")` and `roadstyle-levels solve
+  `levels_info.json`). The panel is the same. `--engine python` opens the Python editor. The page's files are in the program (and in the
+  Python extension); build the page's WebAssembly package with `rust/roadstyle-wasm/build_editor.sh` before you build them. The server
+  answers only to its own address (`Host`, against DNS rebinding), saves only the page's own changes (`Origin`), and takes at most 16 MB. `solve_levels(..., engine="rust")` and `roadstyle-levels solve
   --engine rust` solve the same tables with the Rust solver (no `max_positions`, no time limit).
 - Rust: `roadstyle_levels::levels(edges, options)` replaces `compute(edges, method)`. `Options` has the keywords of `compute_levels`, and
   also `fixed` (numbers that stay as they are, as `solve_levels(fixed=...)`) and `edits` (the rows of `visualization.level_edits`, as

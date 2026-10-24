@@ -232,13 +232,20 @@ fn export_look(look: String, cols: [String; 5], positions: Vec<i64>) -> PyResult
     roadstyle::export_look::export_look(&look, &c, &positions).map(|v| v.to_string()).map_err(PyValueError::new_err)
 }
 
-/// serve(area, page, port): roadstyle serve (roadstyle-cli) in a thread of its own: the level editor's page folder at / and the area folder
-/// at /area/, on 127.0.0.1. Returns at once; the server stops with the Python process (roadstyle-levels edit waits for Ctrl+C).
+/// serve(area, port, page=None): roadstyle serve (roadstyle-cli) in a thread of its own: the level editor's page files (in the extension,
+/// or the folder `page`) at / and the area folder at /area/, on 127.0.0.1. Returns at once; the server stops with the Python process
+/// (roadstyle-levels edit waits for Ctrl+C). An error when the extension has no editor WebAssembly package (build_editor.sh, then build).
 #[pyfunction]
-fn serve(area: String, page: String, port: u16) -> PyResult<()> {
+#[pyo3(signature = (area, port, page=None))]
+fn serve(area: String, port: u16, page: Option<String>) -> PyResult<()> {
+    let page = page.map_or(roadstyle_cli::Page::Embedded, |p| roadstyle_cli::Page::Dir(p.into()));
+    if matches!(page, roadstyle_cli::Page::Embedded) && !roadstyle_cli::EMBEDDED.iter().any(|(n, _)| n.ends_with("_bg.wasm")) {
+        return Err(PyValueError::new_err("this build has no WebAssembly package of the level editor: run rust/roadstyle-wasm/build_editor.sh, \
+                                          then build the extension again (python rust/roadstyle-py/build.py), or use --engine python"));
+    }
     // bind here, so an error (the port in use) comes back to Python
     std::net::TcpListener::bind(("127.0.0.1", port)).map_err(|e| PyValueError::new_err(format!("127.0.0.1:{port}: {e}")))?;
-    std::thread::spawn(move || roadstyle_cli::serve(std::path::Path::new(&area), std::path::Path::new(&page), port));
+    std::thread::spawn(move || roadstyle_cli::serve(std::path::Path::new(&area), page, port));
     Ok(())
 }
 
