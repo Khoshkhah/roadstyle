@@ -269,7 +269,8 @@ stage 1 gives two outputs: the drawing sources (the pieces, the slots, the decks
 row, and **one road table** with the fields of each road, keyed by its row. Stage 2 cuts only the drawing sources into tiles. The
 page or the worker gives the dashboard the road table, whole (as the side table does now) or one road at a time (as
 `engine.props` does now). Way B can keep every column in its tiles, as an option of stage 2, for map apps. The row "One road
-table" of [Known design gaps](#known-design-gaps) shows when this is built.
+table" of [Known design gaps](#known-design-gaps) shows when this is built. A proposal on top of it: keep the data in a DuckDB
+file on a server, and serve the tiles and the roads on request ([the design note](../design/duckdb_server.md)).
 
 The one call (the facade, `render_edges`) runs the stages in order. Stage 3 puts the style and the data of the selected form into
 one HTML file.
