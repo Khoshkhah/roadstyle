@@ -25,6 +25,8 @@ The export's style (`export_style`, `export_inline`: `state` baked) has `roadsty
 | layer `roadstyle:group` | the group of a layer: `roads`, or an overlay's label |
 | layer `roadstyle:over` | a base-map layer that goes over the roads (the 3D buildings) |
 | layer `roadstyle:position` | the drawing position of a layer of `export_look` |
+| `roadstyle:tiles` | in stage 1's saved `style.json` only: the tile settings that stage 2 reads (`minzoom`, `maxzoom`, `buffer_px`, `extent`) |
+| `roadstyle:columns` | in stage 1's saved `style.json` only: the user's class, filter and metre width columns (`class`, `filter`, `width`) |
 | Parquet field `roadstyle:json` | stage 1's Parquet files (`save_sources`): a column whose values are JSON text (values of more than one type, lists or objects) |
 
 ## The dashboard's options from the style

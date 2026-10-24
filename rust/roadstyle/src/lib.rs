@@ -29,10 +29,74 @@ pub fn make_style(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
 }
 
 /// Stage 1 from GeoParquet bytes: the style and its sources, typed in memory (docs/rust/architecture.md, "The three stages and the one
-/// call"). `save_sources` writes them as files.
+/// call"). `save_sources` writes them as files; the saved style has what stage 2 reads (`roadstyle:tiles`: the look's tile settings,
+/// `roadstyle:columns`: the class, filter and metre width columns).
 pub fn make_sources(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<sources::Sources, String> {
+    let look_json: Value = serde_json::from_str(look).map_err(|e| format!("look: not JSON: {e}"))?;
     let (feats, features, planner) = tables(parquet, features, planner)?;
-    Ok(sources::Sources::new(make_parts(feats, look, features, planner, name)?))
+    let mut s = sources::Sources::new(make_parts(feats, look, features, planner, name)?);
+    s.saved.insert(tiles::stage::TILES.into(), look_json["config"]["tiles"].clone());
+    s.saved.insert(tiles::stage::COLUMNS.into(), columns(&look_json));
+    Ok(s)
+}
+
+/// `roadstyle:columns`: the user's class, filter and metre width columns (render's highway_col, filter_col, width_m_col).
+fn columns(look: &Value) -> Value {
+    let arg = |k: &str| look["args"][k].as_str().filter(|c| !c.is_empty()).map_or(Value::Null, Value::from);
+    json!({"class": arg("highway_col"), "filter": arg("filter_col"), "width": arg("width_m_col")})
+}
+
+/// Stage 2 from memory: the tiles of stage 1's sources (`o`: the rules). The JSON sources go into the tiles (and out of `s`); the roads
+/// and the pieces stay.
+pub fn tile_sources(s: &mut sources::Sources, o: &tiles::stage::TileOptions) -> tiles::Tiles {
+    let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px);
+    let keys = |v: &Value| -> std::collections::HashSet<String> {
+        v["data"]["features"].as_array().into_iter().flatten().filter_map(|f| f["properties"].as_object()).flat_map(|p| p.keys().cloned()).collect()
+    };
+    for (k, src) in s.sources.iter_mut() {
+        if !o.wants(k) {
+            continue;
+        }
+        match src {
+            // the roads, from the table and the marks (no copy of their properties)
+            Src::Roads(_) => {
+                let (keep, whole, from) = o.rule(k, Default::default);
+                let r = &s.roads;
+                tiled.add_lines(k, r.roads.iter().map(|x| (x.line(), x.iter().map(|(n, c)| (r.out_name(n), c.to_value())))), &keep, whole, from)
+            }
+            Src::Simple(p) => {
+                let (keep, whole, from) = o.rule(k, Default::default);
+                tiled.add_lines(k, p.features(&s.roads.roads).map(|(_, props, c)| (c, props.into_iter())), &keep, whole, from)
+            }
+            Src::Json(v) => {
+                let (keep, whole, from) = o.rule(k, || keys(v));
+                tiled.add(k, std::mem::take(v), &keep, whole, from) // frees the source's tree
+            }
+        }
+    }
+    tiled
+}
+
+/// Stage 2 from stage 1's files in `dir` (GeoJSON or GeoParquet, as style.json names them): the saved style and the tiles. `o`: other
+/// rules than the style's.
+pub fn tile_files(dir: &std::path::Path, keep: &[String], o: Option<tiles::stage::TileOptions>) -> Result<(Value, tiles::Tiles), String> {
+    let read = |name: &str| std::fs::read(dir.join(name)).map_err(|e| format!("{name}: {e}"));
+    let style: Value = serde_json::from_slice(&read("style.json")?).map_err(|e| format!("style.json: {e}"))?;
+    let o = match o { Some(o) => o, None => tiles::stage::TileOptions::from_style(&style, keep)? };
+    let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px);
+    for (k, spec) in style["sources"].as_object().into_iter().flatten() {
+        if !o.wants(k) || spec["type"] != "geojson" {
+            continue;
+        }
+        let file = spec["data"].as_str().ok_or_else(|| format!("source {k}: its data is not a file name"))?;
+        let fc: Value = if file.ends_with(".parquet") { read::features(read(file)?)? }
+                        else { serde_json::from_slice(&read(file)?).map_err(|e| format!("{file}: {e}"))? };
+        let src = json!({"type": "geojson", "data": fc});
+        let (keep, whole, from) = o.rule(k, || src["data"]["features"].as_array().into_iter().flatten()
+            .filter_map(|f| f["properties"].as_object()).flat_map(|p| p.keys().cloned()).collect());
+        tiled.add(k, src, &keep, whole, from);
+    }
+    Ok((style, tiled))
 }
 
 /// The file format of stage 1's sources.
@@ -105,78 +169,17 @@ pub fn save_sources(s: &sources::Sources, dir: &std::path::Path, format: Format,
 pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name: Option<String>, prefix: &str, keep: &[String])
                   -> Result<(String, tiles::Tiles), String> {
     let cfg_all: Value = serde_json::from_str(look).map_err(|e| format!("look: not JSON: {e}"))?;
-    let cfg = &cfg_all["config"]["tiles"];
-    let num = |k: &str| cfg[k].as_f64().ok_or_else(|| format!("look: config.tiles.{k} is not a number"));
-    if num("extent")? != tiles::EXTENT {
-        return Err(format!("look: config.tiles.extent is {}, the tiles are made with {}", num("extent")?, tiles::EXTENT));
-    }
-    let (min_zoom, max_zoom) = (num("minzoom")? as u32, num("maxzoom")? as u32);
-    let mut tiled = tiles::Tiles::new(min_zoom, max_zoom, num("buffer_px")?);
-    let arg = |k: &str| cfg_all["args"][k].as_str().filter(|c| !c.is_empty()).map(String::from);
-    let (width_col, highway_col) = (arg("width_m_col"), arg("highway_col").unwrap_or_else(|| "highway".into()));
-    let filter_col = arg("filter_col");
     let (feats, features, _) = tables(parquet, features, None)?;
-    let Parts { name, center, zoom, mut layers, sources, metadata, glyphs, state } = make_parts(feats, look, features, None, name)?;
-    let mut read: std::collections::HashSet<String> = keep.iter().cloned().chain(["name".to_string(), "kind".to_string()]).collect();
-    fn texts(v: &Value, out: &mut std::collections::HashSet<String>) {
-        match v {
-            Value::String(s) => {
-                out.insert(s.clone());
-            }
-            Value::Array(a) => a.iter().for_each(|x| texts(x, out)),
-            Value::Object(o) => o.values().for_each(|x| texts(x, out)),
-            _ => {}
-        }
-    }
-    layers.iter().for_each(|l| texts(l, &mut read));
-    texts(&metadata["roadstyle:interaction"], &mut read);
-    // the name and arrow slots go whole into the tiles, from the first zoom of their layers (tiles.py: 14, their symbols' minzoom)
-    let slots_from = layers.iter().filter(|l| l["source"] == "slots").map(|l| l["minzoom"].as_f64().unwrap_or(0.0) as u32).min().unwrap_or(0);
+    let mut s = sources::Sources::new(make_parts(feats, look, features, None, name)?);
+    let mut o = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &cfg_all["config"]["tiles"], &columns(&cfg_all), keep)
+        .map_err(|e| format!("look: config.{e}"))?;
     // render(tiles=True)'s page (the Python binding): the columns of its road and simple tiles (`tile_keep`; every __rs_* goes too) and
     // the sources in its tiles (`tile_layers`: roads, simple, slots; the page keeps the others inline)
-    let exact: Option<std::collections::HashSet<String>> = cfg_all["args"]["tile_keep"].as_array()
-        .map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
-    let only: Option<Vec<&str>> = cfg_all["args"]["tile_layers"].as_array().map(|a| a.iter().filter_map(Value::as_str).collect());
-    // the roads stay until the end: the simple pieces are made from them
-    let (sources, roads) = take_roads(sources);
-    for (k, s) in sources {
-        let slots = k == "slots";
-        let from = if slots { slots_from } else { 0 };
-        if only.as_ref().is_some_and(|o| !o.contains(&k.as_str())) {
-            continue;
-        }
-        match s {
-            // the roads, from the table and the marks (no copy of their properties)
-            Src::Roads(_) => {
-                let s = roads.as_ref().ok_or("no roads source")?;
-                let feats = s.roads.iter().map(|r| (r.line(), r.iter().map(|(k, c)| (s.out_name(k), c.to_value()))));
-                tiled.add_lines(&k, feats, exact.as_ref().unwrap_or(&read), slots, from)
-            }
-            Src::Simple(s) => {
-                let r = &roads.as_ref().ok_or("the simple pieces need the roads source")?.roads;
-                // render's tiles: the pieces of `simple` keep the class, lvl, the metre width column and the __rs_* marks (not a picked item's fields)
-                let own: std::collections::HashSet<String> = [highway_col.clone(), "lvl".into()].into_iter().chain(width_col.clone()).chain(filter_col.clone()).collect();
-                tiled.add_lines(&k, s.features(r).map(|(_, p, c)| (c, p.into_iter())), exact.as_ref().unwrap_or(&own), slots, from)
-            }
-            // the full look's casing pieces: the columns of the simple pieces (tiles.py's line layers with `keep`)
-            Src::Json(s) if k == "casings" => {
-                let keep: std::collections::HashSet<String> = exact.clone().unwrap_or_else(|| {
-                    [highway_col.clone(), "lvl".into()].into_iter().chain(width_col.clone()).chain(filter_col.clone()).collect()
-                });
-                tiled.add(&k, s, &keep, false, from)
-            }
-            Src::Json(s) => {
-                // render's export: another GeoJSON source (the 3D decks, an overlay) keeps all its properties (keep=None). Python writes
-                // its points and polygons whole; the engine clips them with the buffer, as the lines (docs/design/rust_library.md, P0)
-                let mut keep = read.clone();
-                if !slots {
-                    let fs = s["data"]["features"].as_array().map(Vec::as_slice).unwrap_or_default();
-                    keep.extend(fs.iter().filter_map(|f| f["properties"].as_object()).flat_map(|p| p.keys().cloned()));
-                }
-                tiled.add(&k, s, &keep, slots, from) // frees the source's tree
-            }
-        }
-    }
+    o.exact = cfg_all["args"]["tile_keep"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
+    o.only = cfg_all["args"]["tile_layers"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
+    let tiled = tile_sources(&mut s, &o);
+    let (min_zoom, max_zoom) = (o.min_zoom, o.max_zoom);
+    let sources::Sources { name, center, zoom, mut layers, metadata, glyphs, state, .. } = s;
     for l in layers.iter_mut() {
         if let Some(src) = l.get("source").cloned() {
             l["source-layer"] = src;

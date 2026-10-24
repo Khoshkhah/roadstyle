@@ -135,6 +135,25 @@ impl IntoIterator for Props {
     }
 }
 
+/// The properties that a style's drawing reads (tiles.py's tile_props): every text in its layers, the popup and tooltip fields of
+/// `roadstyle:interaction`, `name`, `kind` and the caller's `keep`. Every `__rs_*` property goes too, apart from this set.
+pub fn drawn(layers: &[Value], metadata: &Value, keep: &[String]) -> std::collections::HashSet<String> {
+    fn texts(v: &Value, out: &mut std::collections::HashSet<String>) {
+        match v {
+            Value::String(s) => {
+                out.insert(s.clone());
+            }
+            Value::Array(a) => a.iter().for_each(|x| texts(x, out)),
+            Value::Object(o) => o.values().for_each(|x| texts(x, out)),
+            _ => {}
+        }
+    }
+    let mut read: std::collections::HashSet<String> = keep.iter().cloned().chain(["name".to_string(), "kind".to_string()]).collect();
+    layers.iter().for_each(|l| texts(l, &mut read));
+    texts(&metadata["roadstyle:interaction"], &mut read);
+    read
+}
+
 /// Read a property of a road, of a typed feature or of a JSON one (the layers read all three).
 pub trait Get {
     fn value(&self, k: &str) -> Option<Value>;

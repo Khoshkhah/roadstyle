@@ -114,3 +114,86 @@ fn wkb_line(b: &[u8]) -> Option<Vec<[f64; 2]>> {
     let n = u32_at(5)? as usize;
     (0..n).map(|k| Some([f64_at(9 + 16 * k)?, f64_at(17 + 16 * k)?])).collect()
 }
+
+/// A GeoParquet file (as `write::parquet` writes it, or any with a WKB `geometry` column) as a GeoJSON FeatureCollection: each row a
+/// feature, `__fid` its id, the other columns its properties in their order (a null is left out; a `roadstyle:json` column's text is
+/// its JSON value).
+pub fn features(data: Vec<u8>) -> Result<Value, String> {
+    let reader = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data))
+        .and_then(|b| b.build())
+        .map_err(|e| format!("not a Parquet file: {e}"))?;
+    let mut out = Vec::new();
+    for batch in reader {
+        let batch = batch.map_err(|e| e.to_string())?;
+        let schema = batch.schema();
+        let start = out.len();
+        out.extend((0..batch.num_rows()).map(|_| (Map::new(), Value::Null, Value::Null)));
+        for (field, col) in schema.fields().iter().zip(batch.columns()) {
+            let json = field.metadata().get("roadstyle:json").is_some_and(|v| v == "true");
+            for (r, f) in out[start..].iter_mut().enumerate() {
+                match field.name().as_str() {
+                    "geometry" => f.2 = binary(col, r).and_then(wkb_geometry).unwrap_or(Value::Null),
+                    crate::write::FID => f.1 = value(col, r)?,
+                    name => {
+                        let v = value(col, r)?;
+                        let v = match v { Value::String(s) if json => serde_json::from_str(&s).map_err(|e| format!("{name}: {e}"))?, v => v };
+                        if !v.is_null() {
+                            f.0.insert(name.to_string(), v);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let features: Vec<Value> = out.into_iter().map(|(p, id, g)| {
+        let mut f = Map::new();
+        f.insert("type".into(), "Feature".into());
+        if !id.is_null() {
+            f.insert("id".into(), id);
+        }
+        f.insert("properties".into(), Value::Object(p));
+        f.insert("geometry".into(), g);
+        Value::Object(f)
+    }).collect();
+    Ok(serde_json::json!({"type": "FeatureCollection", "features": features}))
+}
+
+/// A 2D WKB geometry as GeoJSON (Point, LineString, Polygon and their Multi kinds); None for another.
+fn wkb_geometry(b: &[u8]) -> Option<Value> {
+    fn at(b: &[u8], i: &mut usize, le: bool) -> Option<u32> {
+        let w: [u8; 4] = b.get(*i..*i + 4)?.try_into().ok()?;
+        *i += 4;
+        Some(if le { u32::from_le_bytes(w) } else { u32::from_be_bytes(w) })
+    }
+    fn f(b: &[u8], i: &mut usize, le: bool) -> Option<f64> {
+        let w: [u8; 8] = b.get(*i..*i + 8)?.try_into().ok()?;
+        *i += 8;
+        Some(if le { f64::from_le_bytes(w) } else { f64::from_be_bytes(w) })
+    }
+    fn pt(b: &[u8], i: &mut usize, le: bool) -> Option<Value> {
+        Some(serde_json::json!([f(b, i, le)?, f(b, i, le)?]))
+    }
+    fn pts(b: &[u8], i: &mut usize, le: bool) -> Option<Value> {
+        let n = at(b, i, le)?;
+        (0..n).map(|_| pt(b, i, le)).collect::<Option<Vec<_>>>().map(Value::Array)
+    }
+    fn one(b: &[u8], i: &mut usize) -> Option<(&'static str, Value)> {
+        let le = *b.get(*i)? == 1;
+        *i += 1;
+        let t = at(b, i, le)?;
+        let rings = |i: &mut usize| -> Option<Value> { let n = at(b, i, le)?; (0..n).map(|_| pts(b, i, le)).collect::<Option<Vec<_>>>().map(Value::Array) };
+        Some(match t {
+            1 => ("Point", pt(b, i, le)?),
+            2 => ("LineString", pts(b, i, le)?),
+            3 => ("Polygon", rings(i)?),
+            4..=6 => {
+                let n = at(b, i, le)?;
+                let parts = (0..n).map(|_| one(b, i).map(|p| p.1)).collect::<Option<Vec<_>>>()?;
+                ([("MultiPoint"), "MultiLineString", "MultiPolygon"][t as usize - 4], Value::Array(parts))
+            }
+            _ => return None,
+        })
+    }
+    let (t, c) = one(b, &mut 0)?;
+    Some(serde_json::json!({"type": t, "coordinates": c}))
+}

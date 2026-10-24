@@ -21,32 +21,22 @@ pub struct Sources {
     /// the sources in the style's order; the roads' place holds an empty `Src::Roads`
     pub sources: Vec<(String, Src)>,
     pub roads: RoadsSource,
+    /// the metadata that only a saved style has (what stage 2 reads from it: `roadstyle:tiles`, `roadstyle:columns`)
+    pub saved: serde_json::Map<String, Value>,
 }
 
 impl Sources {
     pub fn new(p: Parts) -> Sources {
         let (sources, roads) = take_roads(p.sources);
         let roads = roads.unwrap_or_else(|| RoadsSource { roads: Roads::new(RoadTable::empty()), tolerance: 0.05, maxzoom: None, names: Vec::new() });
-        Sources { name: p.name, center: p.center, zoom: p.zoom, layers: p.layers, metadata: p.metadata, glyphs: p.glyphs, state: p.state, sources, roads }
+        Sources { name: p.name, center: p.center, zoom: p.zoom, layers: p.layers, metadata: p.metadata, glyphs: p.glyphs, state: p.state, sources, roads,
+                  saved: serde_json::Map::new() }
     }
 
     /// The properties that the drawing reads (tiles.py's tile_props): every text in the layers, the popup and tooltip fields, `name`,
     /// `kind` and `keep`; every `__rs_*` property goes too.
     pub fn drawn(&self, keep: &[String]) -> HashSet<String> {
-        fn texts(v: &Value, out: &mut HashSet<String>) {
-            match v {
-                Value::String(s) => {
-                    out.insert(s.clone());
-                }
-                Value::Array(a) => a.iter().for_each(|x| texts(x, out)),
-                Value::Object(o) => o.values().for_each(|x| texts(x, out)),
-                _ => {}
-            }
-        }
-        let mut read: HashSet<String> = keep.iter().cloned().chain(["name".to_string(), "kind".to_string()]).collect();
-        self.layers.iter().for_each(|l| texts(l, &mut read));
-        texts(&self.metadata["roadstyle:interaction"], &mut read);
-        read
+        roadstyle_model::props::drawn(&self.layers, &self.metadata, keep)
     }
 
     /// The FeatureCollection of the source `i` as GeoJSON text. The roads have only the properties of `drawn` and their marks: their
@@ -82,8 +72,12 @@ impl Sources {
                 v
             }
         })).collect();
+        let mut metadata = self.metadata.clone();
+        if let Some(m) = metadata.as_object_mut() {
+            m.extend(self.saved.iter().map(|(k, v)| (k.clone(), v.clone())));
+        }
         let mut style = serde_json::json!({"version": 8, "name": self.name, "center": self.center, "zoom": self.zoom, "layers": self.layers,
-                                           "sources": sources, "metadata": self.metadata});
+                                           "sources": sources, "metadata": metadata});
         if let Some(g) = &self.glyphs {
             style["glyphs"] = g.clone();
         }

@@ -13,6 +13,7 @@
 #![allow(clippy::needless_range_loop, clippy::type_complexity)]
 
 pub mod pmtiles;
+pub mod stage;
 
 use rstar::{primitives::GeomWithData, primitives::Rectangle, RTree, AABB};
 use serde_json::{Map, Value};

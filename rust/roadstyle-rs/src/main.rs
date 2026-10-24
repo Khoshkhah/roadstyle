@@ -114,6 +114,28 @@ fn main() {
         println!("total\t{}", files.iter().map(|f| f.1).sum::<usize>());
         return;
     }
+    if args.len() == 3 && args[1] == "--tile-files" {
+        // stage 2 from stage 1's files: the time, and the tiles of zoom 15 around the roads (their number and size)
+        let t = Instant::now();
+        let (style, tiles) = roadstyle_rs::tile_files(std::path::Path::new(&args[2]), &[], None).unwrap_or_else(|e| fail(e));
+        let made = t.elapsed();
+        let c = &style["center"];
+        let (lon, lat) = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
+        let n = (1u64 << 15) as f64;
+        let (x, y) = (((lon + 180.0) / 360.0 * n) as i64, ((1.0 - lat.to_radians().tan().asinh() / std::f64::consts::PI) / 2.0 * n) as i64);
+        let t2 = Instant::now();
+        let (mut count, mut bytes) = (0, 0);
+        for dx in -8..=8 {
+            for dy in -8..=8 {
+                let b = tiles.tile(15, (x + dx) as u32, (y + dy) as u32);
+                count += !b.is_empty() as usize;
+                bytes += b.len();
+            }
+        }
+        eprintln!("tile_files {:.0} ms; z15 around the centre: {count} tiles, {:.1} MB, {:.0} ms", made.as_secs_f64() * 1e3,
+                  bytes as f64 / 1e6, t2.elapsed().as_secs_f64() * 1e3);
+        return;
+    }
     if args.len() == 4 && args[1] == "--features" {
         // step 3 check: the base-map feature collections from the worker's features.parquet, as {name: FeatureCollection}
         let data = fs::read(&args[3]).unwrap_or_else(|e| fail(format!("{}: {e}", args[3])));
