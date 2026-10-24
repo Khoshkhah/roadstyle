@@ -109,19 +109,20 @@ impl Server {
         let html = std::path::absolute(expand(&a.html_path)).unwrap_or_else(|_| expand(&a.html_path));
         // headless_chrome waits on its own thread: away from the runtime that answers the agent
         match tokio::task::spawn_blocking(move || preview(&html, &cam)).await {
-            Ok(c) => CallToolResult::success(vec![c]),
+            Ok(c) => CallToolResult::success(c),
             Err(e) => result(Err(e.to_string())),
         }
     }
 }
 
-/// The PNG of a saved page beside it (<page>.png), as an image for the agent. Without a browser it is a note, not an error: the map
-/// still stands (as in the Python server).
-fn preview(html: &Path, cam: &Camera) -> ContentBlock {
+/// The PNG of a saved page beside it (<page>.png), as an image for the agent, and its warning (a map that did not load). Without a
+/// browser it is a note, not an error: the map still stands (as in the Python server).
+fn preview(html: &Path, cam: &Camera) -> Vec<ContentBlock> {
     let png = html.with_extension("png");
-    match roadstyle_snapshot::snapshot(html, &png, cam, &Shot::default()).and_then(|p| Ok(std::fs::read(p)?)) {
-        Ok(bytes) => ContentBlock::image(base64::engine::general_purpose::STANDARD.encode(bytes), "image/png"),
-        Err(e) => ContentBlock::text(format!("(no preview: {e})")),
+    match roadstyle_snapshot::snapshot(html, &png, cam, &Shot::default()).and_then(|p| Ok((std::fs::read(&p.path)?, p.warning))) {
+        Ok((bytes, warning)) => std::iter::once(ContentBlock::image(base64::engine::general_purpose::STANDARD.encode(bytes), "image/png"))
+            .chain(warning.map(|w| ContentBlock::text(format!("warning: {w}")))).collect(),
+        Err(e) => vec![ContentBlock::text(format!("(no preview: {e})"))],
     }
 }
 
