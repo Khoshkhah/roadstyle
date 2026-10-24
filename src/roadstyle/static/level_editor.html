@@ -499,7 +499,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
       said: said + (why ? " · " + why : ""), full: j.full || !!why, open: document.body.classList.contains("lv-open")}));
     location.reload();
   };
-  // the update in place (level_editor.Area.build): the changed roads' features as a whole rebuild would draw them, by feature id (GeoJSONSource.updateData):
+  // the update in place (level_editor.Area.build): the changed roads' features as a whole rebuild would draw them (the source simple again, setData):
   // the roads themselves (pick, hover), their pieces in the one road layer (the ids of a road's pieces it has no more taken out), the
   // names and arrows again when a fill number changed; then the panel's facts
   function patch(u){
