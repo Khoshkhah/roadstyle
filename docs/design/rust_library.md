@@ -1285,6 +1285,38 @@ reads the static files from `src/roadstyle/` when it is built; a crates.io packa
   (826), `tiles.py` (240) and `stylers.py` (482): about 4,500 to 5,000 lines (an estimate). The Python API, folium, lonboard and the
   notebook tools stay. Then a 1.0 release; the publish waits for Kaveh's last OK.
 
+#### P7's CLI: one `roadstyle` program (audit N31, approved 2026-10-24)
+
+Two programs have the name `roadstyle` today, with two grammars:
+
+| | Python `roadstyle` (`cli.py`, argparse) | Rust `roadstyle` (`roadstyle-cli`, `commands.rs`) |
+|---|---|---|
+| Form | `roadstyle <input> [-o OUT] [-f web\|folium\|rsjs\|spec\|geojson] [options]`, no command | `roadstyle <command> <arguments> [--key VALUE] [--no-key]` |
+| The page | the default (`-f web`); OUT is the input's name with `.html` | `page <roads> <out.html>` |
+| Stage 1 and 2 | none (`-f geojson` is a styled GeoJSON, another output) | `sources <roads> <dir>`, `tiles <dir> <out>` |
+| Other outputs | `-f folium`, `rsjs`, `spec`, `geojson`; `roadstyle studio` (Streamlit) | `snapshot <page.html> <out.png>` |
+| The levels | a second program, `roadstyle-levels make\|solve\|edit` | `levels make\|solve`, `serve` (the editor) |
+| Inputs | any file that GeoPandas reads; `--layer` for a GeoPackage | `.parquet`, `.geojson`, `.shp`, `.gpkg` (the first feature table) |
+| Option syntax | short `-o` and `-f`, choices, lists as more words (`--include motorway trunk`, `--width-by 1 6`), named flags | one value for each option, JSON when it parses, `--no-<keyword>` is false, `-` is `_` |
+| Different names | `--no-filter`, `--tooltip`, `--page dashboard\|report\|street-view`, `--no-compress`, `--colors`, `--version` | each keyword of render by its own name (`--filter-control false`), `--sidebar dashboard` |
+
+The plan, in P7 (after the design steps):
+
+1. The Rust program keeps its commands and also takes Python's form: when the first argument is a file and not a command, the
+   command is `page`, with `-o`/`--output` (default: the input's name with `.html`) and `-f`/`--format` (`web` only).
+2. Python's option names are aliases in one table in `commands.rs`: `--no-filter` (`filter_control` false), `--tooltip`
+   (`road_tooltip`), `--no-compress`, `--page dashboard`, `--version`, and lists of more words for `--include`, `--exclude`, `--tooltip`
+   and `--width-by` (up to the next option).
+3. `levels edit` is the editor's name (`serve` stays as an alias). Python's levels options come where the Rust code has them
+   (`--auto-ends`, `--max-positions`). `--query`/`--geometry` (a `.duckdb` source), `--engine python` and `--items` are errors.
+4. An output that only Python has (`-f folium`, `rsjs`, `spec`, `geojson`, `studio`, and a page that Rust does not make) is an error
+   that names the Python call that still makes it, for example `rs.render_folium(...)`.
+5. One program on PATH: the Python package's console script `roadstyle` calls the Rust program (`_rust.cli(argv)`, which runs
+   `commands::run`) for each command that Rust has, and keeps Python's code only for the outputs of step 4. `cargo install roadstyle-cli`
+   gives the same program. `roadstyle-levels` stays for one version as an alias of `roadstyle levels`, with a deprecation message.
+6. Tests: one table of command lines in both forms that must give the same page on Monaco (the Python program against the Rust
+   program), and one error test for each output of step 4.
+
 #### The design queue (2026-10-23)
 
 The order of the design steps after the 0.25.0 release (the audit's items: [audit_2026-10-23.md](audit_2026-10-23.md); each step's report
