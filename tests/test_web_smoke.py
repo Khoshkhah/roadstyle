@@ -383,11 +383,11 @@ def test_an_item_attached_to_a_road_follows_its_road(tmp_path):
         x, y = page.evaluate("(() => { const p = map.project([18.002, 59.3015 + 0.00027]); return [p.x, p.y]; })()")
         page.mouse.move(x, y)
         page.wait_for_timeout(700)                                           # past hover_delay_ms (300)
-        hover = page.evaluate("[0, 1, 2].map(i => _pieces(i).some(id => !!map.getFeatureState({source: 'simple', id}).hover))")      # a road glows through the state of its pieces
+        hover = page.evaluate("[0, 1, 2].map(i => !!map.getFeatureState({source: 'simple', id: i}).hover)")      # a road glows through its row: the id of its pieces
         page.mouse.click(x, y)
         page.wait_for_timeout(300)
         sel = page.evaluate("__sel")
-        selected = page.evaluate("[0, 1, 2].map(i => _pieces(i).some(id => !!map.getFeatureState({source: 'simple', id}).select))")
+        selected = page.evaluate("[0, 1, 2].map(i => !!map.getFeatureState({source: 'simple', id: i}).select)")
         browser.close()
     assert errors == []
     assert steps["0"] == ([100, 101, 102], [1, 2])
@@ -449,11 +449,11 @@ def test_each_direction_and_each_item_selects_its_own_edge_or_itself(tmp_path):
         lane = at(18.0015, y1)
         page.mouse.move(*lane)
         page.wait_for_timeout(700)
-        hover = (fs("ov1", 0).get("hover"), fs("roads", 2).get("hover"))
+        hover = (fs("ov1", 0).get("hover"), fs("simple", 2).get("hover"))
         page.mouse.click(*lane)
         page.wait_for_timeout(300)
         got["lane"] = page.evaluate("__sel[__sel.length - 1]")
-        selected = (fs("ov1", 0).get("select"), fs("roads", 2).get("select"))
+        selected = (fs("ov1", 0).get("select"), fs("simple", 2).get("select"))
         popup = page.evaluate("[...document.querySelectorAll('.maplibregl-popup-content')].map(e => e.textContent).join('|')")
         page.evaluate("document.querySelectorAll('.maplibregl-popup').forEach(e => e.remove())")
         page.mouse.click(*at(18.0015, y0 - 0.00025))                                  # nothing there

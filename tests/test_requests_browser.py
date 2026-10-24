@@ -212,8 +212,8 @@ def test_overlay_hover_lights_one_feature(tmp_path):
 
 
 def test_simple_mode_cuts_no_tiles_of_the_roads_source(tmp_path):
-    """Simple mode (inline data) draws the roads from their pieces: the roads source is cut into no tiles (each one cost the page a
-    freeze), a road is picked on a fill piece, and its select glow is the feature-state of its pieces."""
+    """Simple mode (inline data) draws the roads from their pieces: the page has no roads source (no tiles of it, each one cost the page a
+    freeze), a road is picked on a fill piece, and its select glow is one feature-state: its row, the id of all its pieces (promoteId)."""
     path = _page(tmp_path, "lean")
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, path)
@@ -223,15 +223,15 @@ def test_simple_mode_cuts_no_tiles_of_the_roads_source(tmp_path):
         tiles = page.evaluate("""Object.fromEntries(['roads', 'simple'].map(k => { const t = (map.style.sourceCaches || map.style.tileManagers)[k];
             return [k, Object.keys((t && t._inViewTiles && t._inViewTiles._tiles) || {}).length]; }))""")
         hit = page.evaluate("(() => { const f = pick(map.project([18.0, 59.305])); return f && [f.id, f.layer.id, Object.keys(f.properties).length > 3]; })()")
-        pieces = page.evaluate("_pieces(0).length")
+        ids = page.evaluate("[...new Set(map.querySourceFeatures('simple').filter(f => f.properties.__rs_edge === 0).map(f => f.id))]")
         page.evaluate("rsSelect(0)")
-        lit = page.evaluate("_pieces(0).map(id => !!map.getFeatureState({source: 'simple', id}).select)")
+        lit = page.evaluate("!!map.getFeatureState({source: 'simple', id: 0}).select")
         page.evaluate("rsDeselect()")
-        off = page.evaluate("_pieces(0).map(id => !!map.getFeatureState({source: 'simple', id}).select)")
+        off = page.evaluate("!!map.getFeatureState({source: 'simple', id: 0}).select")
         browser.close()
     assert tiles["roads"] == 0 and tiles["simple"] > 0
     assert hit == [0, "roads-fill", True]                      # the road, with its full properties, as when it was picked on its own layer
-    assert pieces > 0 and lit == [True] * pieces and off == [False] * pieces and not errors
+    assert ids == [0] and lit and not off and not errors                # every piece of road 0 has its row as its id
 
 
 def test_one_tile_zoom_in_a_tilted_view(tmp_path):
@@ -248,18 +248,20 @@ def test_one_tile_zoom_in_a_tilted_view(tmp_path):
 
 
 def test_simple_mode_glow_follows_the_pieces_after_an_update_in_place(tmp_path):
-    """The level editor swaps a road's pieces (GeoJSONSource.updateData): the pieces a road glows through are the new ones."""
+    """The level editor swaps a road's pieces (GeoJSONSource.updateData): the road still glows, through its new pieces (the glow is the
+    state of the row, which every piece of the road has as its id)."""
     path = _page(tmp_path, "inplace")
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, path)
         page.evaluate("map.jumpTo({center: [18.0005, 59.305], zoom: 15, pitch: 0})")
         page.wait_for_function("map.loaded()", timeout=60_000)
-        old = page.evaluate("_pieces(0)")
-        page.evaluate("""(() => { const f = _sfeats('simple').find(x => x.id === _pieces(0)[0]);
-            map.getSource('simple').updateData({remove: _pieces(0), add: [{...f, id: 987654321}]}); })()""")
+        old = page.evaluate("map.querySourceFeatures('simple').filter(f => f.properties.__rs_edge === 0).length")
+        page.evaluate("""(() => { const old = _sfeats('simple').filter(x => x.properties.__rs_edge === 0);   // the road's pieces, by their own ids
+            map.getSource('simple').updateData({remove: old.map(x => x.id),
+                                                add: old.map((x, k) => ({...x, id: 987654321 + k, properties: {...x.properties, __rs_new: true}}))}); })()""")
         page.wait_for_timeout(1500)
-        new = page.evaluate("_pieces(0)")
+        new = page.evaluate("map.querySourceFeatures('simple').filter(f => f.properties.__rs_edge === 0).map(f => !!f.properties.__rs_new)")
         page.evaluate("rsSelect(0)")
-        lit = page.evaluate("_pieces(0).map(id => !!map.getFeatureState({source: 'simple', id}).select)")
+        lit = page.evaluate("!!map.getFeatureState({source: 'simple', id: 0}).select")
         browser.close()
-    assert old and new == [987654321] and lit == [True] and not errors
+    assert old and new and all(new) and lit and not errors

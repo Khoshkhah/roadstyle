@@ -20,6 +20,8 @@ export interface DashboardOptions {
   sources?: Record<string, { source: string; layer: string | null }> | null;
   /** The style's arrows (roadstyle:arrows): "points" (the dashboard places them), "line", "line-center", or null (none). */
   arrows?: "points" | "line" | "line-center" | null;
+  /** The live data that the road layer reads (render's live_data=True): the feature-state names and the ramp; null: none. */
+  live?: { color: string; width: string; types?: Record<string, unknown>; ramp?: string[]; nodata?: string } | null;
   /** The base maps of the switcher: {key, label, tiles, bg, maxzoom, attr}. None: the dashboard does not touch the map's base map. */
   basemaps?: Array<{ key: string; label: string; tiles: string[]; bg: string; maxzoom?: number; attr?: string }>;
   basemap_switcher?: boolean;

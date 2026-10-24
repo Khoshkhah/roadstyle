@@ -27,6 +27,7 @@ const RS_DEFAULTS = {
   road_table: null,            // the road table {props, mids, bboxes, headings, lines} by row (stage 1); null: window.RS_SIDE, else none
   sources: null,               // role -> {source, layer} (roadstyle:sources); null: the style's metadata, else its layers
   arrows: undefined,           // "points" | "line" | "line-center" | null (roadstyle:arrows); undefined: the metadata, else the style
+  live: null,                  // the live data (R22): {color: "rs_c", width: "rs_w", types, ramp, nodata}, or null (the page has none)
   basemaps: [], basemap_switcher: true,
   tiles: false,                // the roads are a vector source (the template's no-roads message); simple mode comes from the style
   popup_mode: "popup", find_control: false, zoom_readout: true, pitch_3d: 55,

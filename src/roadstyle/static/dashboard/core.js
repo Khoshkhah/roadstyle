@@ -19,6 +19,7 @@ export function initCore(m, opts){
   map = m; O = opts; RS_PREFIX = opts.prefix;
   RS_TILED = opts.tiles; OVERLAYS = opts.overlays;
   useStyle(opts.style);
+  map.once("load", _checkPromote);
   map.on("sourcedata", e=>{ const s=map.getSource(e.sourceId); if(s && s._data) delete s._data._rs; if(_SRC.decks && e.sourceId===RS_PREFIX+_SRC.decks.source) _decks=null; });
   window.rsQuery = rsQuery; window.rsGetProps = rsGetProps; window.rsHighlight = rsHighlight; window.rsFocus = rsFocus;
 }
@@ -31,6 +32,11 @@ export function useStyle(st){
   RS_LEAN = lean ? RS_PREFIX+lean.id : false;
   RS_DECK_LAYERS = style.layers.filter(l=>l.id.indexOf("roads-bridge-decks")===0).map(l=>RS_PREFIX+l.id);
   _pcache.clear(); _decks = null;
+  _checkPromote();
+}
+// simple mode needs the pieces' row as their id (promoteId "__rs_edge"): else the glow by row lights other pieces. Checked when the map has
+// the source (at the start: on "load")
+function _checkPromote(){
   if(RS_LEAN && map.getSource(_src("simple").source) && !_promoted("simple"))
     console.error('rs: the source of the role simple needs promoteId "__rs_edge" (addSource), or a road does not glow');
 }

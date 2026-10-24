@@ -58,9 +58,9 @@ async function showRoads(colorBy) {
   for (const [id, im] of Object.entries(style.metadata["roadstyle:images"] || {})) {
     if (!map.hasImage("rs-" + id)) map.addImage("rs-" + id, (await map.loadImage(im.url)).data, {sdf: im.sdf, pixelRatio: im.pixelRatio});
   }
-  // the one vector source "roads" (its source layers: simple, slots); the engine gives it promoteId "__rs_edge", so the pieces of a road
-  // have the road's row as their id and one feature state lights them all
-  for (const [id, src] of Object.entries(style.sources)) map.addSource("rs-" + id, src);
+  // the one vector source "roads" (its source layers: simple, slots). promoteId: the pieces of a road have the road's row as their id, so
+  // one feature state lights them all (the engine sets it only on its own pages)
+  for (const [id, src] of Object.entries(style.sources)) map.addSource("rs-" + id, id === "roads" ? {...src, promoteId: {simple: "__rs_edge"}} : src);
   for (const l of style.layers) {
     const layer = JSON.parse(JSON.stringify(l).replaceAll('"oneway"', '"rs-oneway"'));   // the image name in the layout
     map.addLayer({...layer, id: "rs-" + l.id, source: "rs-" + l.source});
