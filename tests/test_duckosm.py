@@ -64,8 +64,10 @@ def test_the_style_is_mapstyles(choice):
 
     gen, digests = _goldens()
     mode, theme, paths, *only = choice.split()
-    style = duckosm.export_inline(DB, mode, theme=theme, paths=paths, only=bool(only))
     name = gen.name_of(mode, theme, paths, bool(only))
+    if not (gen.HERE / "data" / "mapstyle" / f"{name}.json.gz").is_file():
+        pytest.skip("the stored mapstyle styles are local only: run rust/roadstyle-rs/tests/make_mapstyle_goldens.py styles")
+    style = duckosm.export_inline(DB, mode, theme=theme, paths=paths, only=bool(only))
     # the stored mapstyle style (local, as the digests), normalised: the same, a colour within 1 in each channel (review D4); the digests
     # stay as the record of the stored styles
     want = gen.stored(name)
