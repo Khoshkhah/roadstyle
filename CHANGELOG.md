@@ -14,7 +14,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   its own, with `browserStore` (the files in the browser) or `httpStore` (`roadstyle serve`), the event `"solved"` (levels.csv and the
   map's table) and downloads of edits.csv and levels.csv. `roadstyle serve`'s page uses the same module. On a host map the editor's
   sources have names of their own (a host whose base map shares the roads' tile source keeps it), and the panel follows the page's
-  theme (dark with the system, unless `data-theme` on `<html>` says otherwise).
+  theme (dark with the system, unless `data-theme` on `<html>` says otherwise). The engine runs in a Web Worker
+  (`editor/level_worker.js`): on Tartu (64,828 edges) the longest main-thread task is 0.3 s, not 4.4 s. **A host changes one argument:**
+  `levelEditor({..., pkgUrl})` (the URL of `roadstyle_wasm.js`) in place of `pkg`; the event's `draw()` gives a Promise, and `editor.roads`
+  (the roads) takes the place of `editor.area`. The worker's calls are `static/dashboard/worker/call.js` (`caller`, `answer`), which the
+  browser studio (`ui/studio`) uses too; a worker that stops rejects its waiting calls.
 
 ### Changed
 - **`cargo test` at `rust/` builds 113 crates in about 1 minute, not 195 in 5** (review D1). The programs `roadstyle-cli` and

@@ -103,7 +103,7 @@ const host = rsDashboard(map, {style: own, prefix: "host-", basemap_switcher: fa
 window.host = host;
 const panel = document.getElementById("panel");
 if(location.search === "?no-dashboard"){                         // the host's dashboard not given: an error, no second dashboard
-  try { await levelEditor({map, container: panel, pkg, store}); window.ready = "made a second dashboard"; }
+  try { await levelEditor({map, container: panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store}); window.ready = "made a second dashboard"; }
   catch(e){ window.ready = e.message; }
   throw new Error("stop");
 }
@@ -113,8 +113,8 @@ window.counts = () => JSON.stringify(Object.fromEntries(Object.entries(listening
 window.before = counts();
 window.solved = [];
 window.openEditor = async () => {
-  const ed = await levelEditor({map, container: panel, pkg, store, dashboard: host, prefix: "host-"});
-  ed.addEventListener("solved", e => window.solved.push({rows: e.detail.levelsCsv.trim().split("\\n").length - 1, draw: e.detail.draw().length}));
+  const ed = await levelEditor({map, container: panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store, dashboard: host, prefix: "host-"});
+  ed.addEventListener("solved", async e => window.solved.push({rows: e.detail.levelsCsv.trim().split("\\n").length - 1, draw: (await e.detail.draw()).length}));
   window.editor = ed;
 };
 await window.openEditor();
@@ -176,9 +176,12 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             assert stored and len(stored.strip().split("\n")) > roads, "the first solve saved levels.csv in the browser"
             assert page.locator("#lv").count() == 1, "the panel is in the host's container"
             # a head's length through the panel's API: solved again, the host hears it, the store has heads.csv
-            road = page.evaluate("JSON.parse(window.editor.area.facts())[0].road")
+            road = page.evaluate("window.editor.roads[0].road")
+            # the engine is in the worker: the page has no LevelArea of its own
+            assert page.evaluate("!!window.editor && !('area' in window.editor)")
             said = page.evaluate("r => window.lvApi('/api/apply', {ops: [{op: 'head', road: r, end: 'end', m: '7'}]})", road)
             assert said["ok"] and said["redrawn"], said
+            page.wait_for_function("window.solved.length === 1", timeout=30000)
             solved = page.evaluate("window.solved")
             assert len(solved) == 1 and solved[0]["rows"] > roads and solved[0]["draw"] > 0, solved
             assert road in page.evaluate("localStorage.getItem('lv:test-area:heads.csv')")
@@ -195,6 +198,11 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
                 page.evaluate("window.openEditor()")
                 page.wait_for_function("!!document.getElementById('lv') && !!window.lvApi", timeout=60000)
                 assert page.evaluate("counts()") == opened, "one listener of each kind after each open"
+            # a worker that stops (here: its script throws as it loads) rejects the waiting call (worker/call.js), not a call that never settles
+            said = page.evaluate("""async () => { const {caller} = await import('/dashboard/worker/call.js');
+              const w = new Worker(URL.createObjectURL(new Blob(['throw new Error("boom")'], {type: 'text/javascript'})), {type: 'module'});
+              try { await caller(w)({type: 'x'}); return 'settled'; } catch(e){ return e.message; } }""")
+            assert said.startswith("the worker stopped"), said
             # the panel follows the page's theme: the system's dark, unless the page sets data-theme on <html>
             bg = "getComputedStyle(document.querySelector('#lv header')).backgroundColor"
             assert page.evaluate(bg) == "rgb(255, 255, 255)"
@@ -202,7 +210,7 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             assert page.evaluate(bg) == "rgb(36, 42, 52)"
             page.evaluate("document.documentElement.dataset.theme = 'light'")
             assert page.evaluate(bg) == "rgb(255, 255, 255)"
-            assert not errors, errors
+            assert not [e for e in errors if e != "boom"], errors      # "boom": the stopped worker's own error, which the page reports too
             b.close()
     finally:
         server.shutdown()

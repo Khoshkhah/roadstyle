@@ -256,11 +256,13 @@ await init();
 const a = pkg.makeArea(edges, JSON.stringify({id_col: "edge_id"}));
 const store = browserStore("monaco", "Monaco");          // localStorage for the texts, the private file system for roads.parquet
 for (const [n, v] of [["roads.parquet", a.roads], ["pairs.csv", a.pairs], ["edits.csv", a.edits]]) await store.save(n, v);
-const editor = await levelEditor({map, container: document.getElementById("panel"), pkg, store});
-editor.addEventListener("solved", (e) => apply(e.detail.levelsCsv, e.detail.draw()));
+const pkgUrl = new URL("roadstyle-wasm/pkg/roadstyle_wasm.js", import.meta.url);   // the package's module, for the editor's worker
+const editor = await levelEditor({map, container: document.getElementById("panel"), pkgUrl, store});
+editor.addEventListener("solved", async (e) => apply(e.detail.levelsCsv, await e.detail.draw()));
 ```
 
-`levelEditor({map, container, pkg, store})` draws the area on `map` (your MapLibre map; without it, a map of its own in `container`)
+`levelEditor({map, container, pkgUrl, store})` runs the engine (the solver, the map's sources and its tiles) in a Web Worker
+(`editor/level_worker.js`, which loads the package from `pkgUrl`), so the page does not stop while it works. It draws the area on `map` (your MapLibre map; without it, a map of its own in `container`)
 and puts the editor's panel in `container`. Its tiles have the protocol `lv://`, apart from yours. A page has one dashboard (its state
 is the module's): when your map has one, give it as `levelEditor({..., dashboard, prefix})` with the prefix it was made with. The editor
 then takes your roads off the map (the layers of the roles in your style's `roadstyle:sources`, by source and source layer; your base
@@ -270,8 +272,8 @@ the page has one and you do not give it, `levelEditor` throws an error. `editor.
 its listeners, its roads, tiles and images, and puts your roads, your road table and your dashboard's style back. Your files stay in
 the store. A store is `{load(name, bytes), save(name, data)}`: `browserStore(key)` keeps the files
 in this browser, `httpStore(base)` uses `roadstyle serve`. After each solve the editor sends the event `"solved"` with `levelsCsv`
-(one row for each edge: its four drawing numbers, its head lengths and its caps), `levelsInfo` and `draw()` (the map's table,
-GeoParquet). `editor.download(name)` downloads edits.csv, heads.csv, caps.csv or levels.csv as they are now. The panel follows the
+(one row for each edge: its four drawing numbers, its head lengths and its caps), `levelsInfo` and `draw()` (a Promise of the map's
+table, GeoParquet). `editor.roads` is the area's roads, as the panel shows them. `editor.download(name)` downloads edits.csv, heads.csv, caps.csv or levels.csv as they are now. The panel follows the
 page's theme: dark when the system is dark, unless the page sets `data-theme="light"` or `"dark"` on `<html>`. The module needs these
 files of `static/` beside it: `dashboard/` with its subfolders, `level_editor.html` (the panel), `dashboard.css` and `popup.css`.
 
