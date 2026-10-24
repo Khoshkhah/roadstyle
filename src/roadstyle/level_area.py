@@ -66,7 +66,7 @@ def make_area(edges, folder, db=None, engine=None, **level_input_kw):
             raise ValueError("engine='rust': make_area reads the folder's heads.csv; heads= is in the Python engine only")
         if edges.crs is not None and edges.crs.to_epsg() != 4326:      # Rust reads longitude and latitude
             edges = edges.to_crs(4326)
-        _, _, said = _engine.rust().make_area(_engine._geoparquet(edges), str(folder), **kw)
+        _, _, said = _engine.rust().make_area(_engine._arrow(edges), str(folder), **kw)
         for w in said:
             warnings.warn(w, stacklevel=2)
         roads, pairs = gpd.read_parquet(folder / "roads.parquet"), pd.read_csv(folder / "pairs.csv", dtype=str, keep_default_na=False)
