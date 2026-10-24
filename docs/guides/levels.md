@@ -96,8 +96,9 @@ second road to see every pair between the two.
 
 The editor is in Rust: the solver runs in the page (WebAssembly), and a small Rust server (`roadstyle serve out/area`) gives the page
 the area's files and saves your changes. Monaco solves in 0.1 s in the page. `--engine python` opens the earlier editor with its Python
-server. Build the page's WebAssembly package once with `rust/roadstyle-wasm/build_editor.sh`. On any other web server the page shows
-the area and saves nothing.
+server. The server answers only on 127.0.0.1, only to its own address (`Host`), and saves only the page's own changes (`Origin`) of at
+most 16 MB. Its page files are in the program; build them in with `rust/roadstyle-wasm/build_editor.sh` before you build roadstyle.
+On any other web server the page shows the area and saves nothing.
 
 - **Add a rule**: *order* (whose fill is on top where they meet), *stack* (one road over the other: pick the parts of its casing) or
   *meet* (join two ends).

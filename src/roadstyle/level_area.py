@@ -274,20 +274,16 @@ def write(solved, folder, ends_table):
 
 
 def serve_rust(folder, port=8780, items=None):
-    """The level editor in Rust (static/level_editor/): the solver runs in the page; the Rust server (roadstyle-cli's serve) gives it the
-    page and the area's files and saves your changes. Waits until Ctrl+C. The page needs its WebAssembly package (static/level_editor/pkg/)."""
+    """The level editor in Rust: the solver runs in the page, and the Rust server (roadstyle-cli's serve, in the extension with the
+    editor's page files) gives it the area's files and saves your changes. Waits until Ctrl+C."""
     import time
 
     from ._engine import rust
     if items is not None:
         raise ValueError("--items is in the Python editor only: use --engine python")
-    page = Path(__file__).resolve().parent / "static"
-    if not (page / "level_editor" / "pkg" / "roadstyle_wasm_bg.wasm").exists():
-        raise ValueError("the Rust level editor's WebAssembly package is missing (static/level_editor/pkg/): build it with "
-                         "rust/roadstyle-wasm/build_editor.sh, or use --engine python")
     if not (Path(folder) / "roads.parquet").exists():
         raise ValueError(f"{folder}: no roads.parquet: make the area first (roadstyle-levels make)")
-    rust().serve(str(Path(folder).resolve()), str(page), port)
+    rust().serve(str(Path(folder).resolve()), port)
     print(f"level editor: http://127.0.0.1:{port}/level_editor/  ({folder}; Ctrl+C to stop)", flush=True)
     try:
         while True:

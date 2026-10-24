@@ -5,7 +5,7 @@
 
 use roadstyle_io::read::{read_table, wkb_line};
 use roadstyle_io::write;
-use roadstyle_levels::area::{read_rows, Area, AreaRoad, Session};
+use roadstyle_levels::area::{Area, AreaRoad, AreaSolved, PairRow, Previous, Relation, Side, Why, HOPS};
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
 
@@ -26,7 +26,9 @@ const HEAD_M: f64 = 5.0;
 pub type Ends = ([f64; 2], [String; 2], [String; 2], [String; 2]);
 
 pub struct Editor {
-    pub session: Session,
+    pub area: Area,
+    /// the last answer, for the local re-solve
+    last: Option<Previous>,
     /// each road's columns (no list of its edges), its line, and its edges' own values (PER_EDGE) both ways
     cols: Vec<Map<String, Value>>,
     lines: Vec<Vec<[f64; 2]>>,
@@ -39,9 +41,8 @@ impl Editor {
     /// The area of roads.parquet (bytes) and pairs.csv (text).
     pub fn new(roads: Vec<u8>, pairs: &str) -> Result<Editor, String> {
         let rows = read_table(roads, "geometry")?;
-        let pairs = read_rows(pairs)?;
-        let ids =
-            |v: &Value| -> Vec<String> { v.as_array().into_iter().flatten().map(text).collect() };
+        let pairs = read_pairs(pairs)?;
+        let ids = |v: &Value| -> Result<Vec<i64>, String> { v.as_array().into_iter().flatten().map(|x| id(&text(x))).collect() };
         let (mut cols, mut lines, mut own, mut roads) =
             (Vec::new(), Vec::new(), Vec::new(), Vec::new());
         for r in rows {
@@ -51,9 +52,9 @@ impl Editor {
                 .and_then(wkb_line)
                 .ok_or("roads.parquet: a road with no line")?;
             let road = AreaRoad {
-                id: text(&r.cols["road"]),
-                edges: ids(&r.cols["edges"]),
-                reversed: ids(&r.cols["reversed"]),
+                id: id(&text(&r.cols["road"]))?,
+                edges: ids(&r.cols["edges"])?,
+                reversed: ids(&r.cols["reversed"])?,
             };
             let mut ways: [Map<String, Value>; 2] = Default::default();
             for (name, fw, bw) in PER_EDGE {
@@ -79,12 +80,12 @@ impl Editor {
                 return Err(format!("this area's roads.parquet has no per-edge {name} ({fw}): make the area again from edges with that column"));
             }
         }
-        let area = Area::new(roads, pairs);
+        let area = Area::new(roads, pairs)?;
         let mut met = HashSet::new();
-        for p in area.pairs.iter().filter(|p| p.relation == "meet") {
-            if let (Some(a), Some(b)) = (area.road_of(&p.a), area.road_of(&p.b)) {
-                met.insert((a, if p.a_end == "end" { 1 } else { 0 }));
-                met.insert((b, if p.b_end == "end" { 1 } else { 0 }));
+        for p in area.pairs.iter().filter(|p| p.relation == Relation::Meet) {
+            if let (Some(a), Some(b)) = (area.road_of(p.a), area.road_of(p.b)) {
+                met.insert((a, usize::from(p.a_end == Some(Side::End))));
+                met.insert((b, usize::from(p.b_end == Some(Side::End))));
             }
         }
         let dead_square = area
@@ -96,7 +97,8 @@ impl Editor {
             .filter(|e| !met.contains(e))
             .collect();
         Ok(Editor {
-            session: Session::new(area),
+            area,
+            last: None,
             cols,
             lines,
             own,
@@ -105,7 +107,7 @@ impl Editor {
     }
 
     fn roads(&self) -> &[AreaRoad] {
-        &self.session.area.roads
+        &self.area.roads
     }
 
     /// What the panel shows of each road, a list in the roads' order (level_editor.Area.facts): its names and class, its look, its length in metres, its
@@ -146,7 +148,7 @@ impl Editor {
                         None if *e == r.id => get("edge_ref"),
                         None => String::new(),
                     };
-                    directions.push(json!({"edge": e, "edge_ref": opt(edge_ref), "way": way, "lanes": opt(at("lanes")), "modes": opt(at("modes"))}));
+                    directions.push(json!({"edge": e.to_string(), "edge_ref": opt(edge_ref), "way": way, "lanes": opt(at("lanes")), "modes": opt(at("modes"))}));
                 }
             }
             let flag = |name: &str| {
@@ -165,7 +167,7 @@ impl Editor {
             let two_way = !r.reversed.is_empty() && flag("directed").iter().all(yes);
             let truthy = |k: &str| !matches!(get(k).as_str(), "" | "no" | "false" | "0");
             out.push(json!({
-                "road": r.id, "name": opt(get("name")), "highway": opt(get("highway")), "edge_ref": opt(get("edge_ref")), "lanes": opt(get("lanes")),
+                "road": r.id.to_string(), "name": opt(get("name")), "highway": opt(get("highway")), "edge_ref": opt(get("edge_ref")), "lanes": opt(get("lanes")),
                 "modes": opt(get("modes")), "bus_lines": opt(get("bus_lines")), "band": c.get("band").cloned().unwrap_or(Value::Null),
                 "priority": c.get("priority").cloned().unwrap_or(Value::Null), "edges": driving, "two_way": two_way,
                 "length_m": (metres(&self.lines[i]) * 10.0).round() / 10.0, "directions": directions,
@@ -298,13 +300,10 @@ impl Editor {
                     .map(|v| v.trim().to_string())
                     .unwrap_or_default()
             };
-            let id = get(Some(r));
-            let road = self
-                .session
-                .area
-                .road_of(&id)
-                .ok_or(format!("{}: '{id}' names no road of this area", names.0))?;
-            let back = self.roads()[road].reversed.contains(&id);
+            let text = get(Some(r));
+            let road = id(&text).ok().and_then(|i| self.area.road_of(i))
+                .ok_or(format!("{}: '{text}' names no road of this area", names.0))?;
+            let back = id(&text).is_ok_and(|i| self.roads()[road].reversed.contains(&i));
             let v = if back {
                 [get(e), get(s)]
             } else {
@@ -345,8 +344,8 @@ impl Editor {
                     let (hd, cp) = (&ends[i].0, &ends[i].1);
                     let (a, b) = if back { (1, 0) } else { (0, 1) };
                     props.extend([
-                        ("edge".into(), json!(id)),
-                        ("road".into(), json!(r.id)),
+                        ("edge".into(), json!(id.to_string())), // text: JavaScript holds no 64-bit integer exactly
+                        ("road".into(), json!(r.id.to_string())),
                         (
                             "casing_start".into(),
                             json!(if back { lv[2] } else { lv[0] }),
@@ -387,6 +386,136 @@ impl Editor {
             true,
         )
     }
+}
+
+impl Editor {
+    /// The whole solve with the edits (edits.csv text), as JSON (`answer`).
+    pub fn solve(&mut self, edits: &str) -> Result<String, String> {
+        let s = self.area.solve(&read_pairs(edits)?, &HashMap::new(), 20, 1.0)?;
+        self.last = Some(Previous::from(&s));
+        Ok(self.answer(&s, "full", None).to_string())
+    }
+
+    /// The solve after a change that names the roads of `changed` (edge ids): the roads around it (local), else the whole area.
+    pub fn solve_local(&mut self, edits: &str, changed: &[String]) -> Result<String, String> {
+        let Some(prev) = &self.last else { return self.solve(edits) };
+        let changed = changed.iter().map(|c| id(c)).collect::<Result<Vec<_>, _>>()?;
+        let (s, why) = self.area.solve_local(&read_pairs(edits)?, prev, &changed, HOPS, 20, 1.0)?;
+        self.last = Some(Previous::from(&s));
+        Ok(self.answer(&s, if why.is_some() { "full" } else { "local" }, why).to_string())
+    }
+
+    /// The answer that the page starts from (levels.csv and levels_info.json, not solved again): 4 numbers for each road in its own way,
+    /// the given-up parts (upper, lower, part) as levels_info.json has them, and the numbers of order wishes not kept and near warnings.
+    pub fn start_from(&mut self, levels: &[i64], given_up_parts: &[(String, String, String)], orders_not_kept: usize, near: usize) -> Result<(), String> {
+        let n = self.roads().len();
+        if levels.len() != 4 * n {
+            return Err(format!("levels: {} numbers for {n} roads", levels.len()));
+        }
+        let road = |t: &str| id(t).ok().and_then(|i| self.area.road_of(i)).ok_or(format!("levels_info: '{t}' is not a road"));
+        let parts = given_up_parts.iter().map(|(u, l, h)| Ok((road(u)?, road(l)?, side(h)?.ok_or("levels_info: a part with no name")?)))
+            .collect::<Result<_, String>>()?;
+        self.last = Some(Previous { levels: levels.chunks(4).map(|c| [c[0], c[1], c[2], c[3]]).collect(), given_up_parts: parts, orders_not_kept, near });
+        Ok(())
+    }
+
+    /// The check before rules are added (rows: CSV text with a header): `[[index, why, [rule rows]]]`, why "duplicate", "not kept" or
+    /// "loop".
+    pub fn check(&self, edits: &str, rows: &str) -> Result<String, String> {
+        let found = self.area.conflicts(&read_pairs(edits)?, &read_pairs(rows)?)?;
+        let why = |w: Why| match w {
+            Why::Duplicate => "duplicate",
+            Why::NotKept => "not kept",
+            Why::Loop => "loop",
+        };
+        Ok(Value::Array(found.iter().map(|c| json!([c.row, why(c.why), c.with.iter().map(row_json).collect::<Vec<_>>()])).collect()).to_string())
+    }
+
+    /// An answer as the page reads it: the numbers of each road (the roads' order), the rules not kept by road id (text), the counts and how
+    /// it was solved ("full" or "local", and why the whole area).
+    fn answer(&self, s: &AreaSolved, how: &str, why: Option<String>) -> Value {
+        let id = |r: usize| self.roads()[r].id.to_string();
+        let pairs = |v: &[(usize, usize)]| v.iter().map(|&(a, b)| json!([id(a), id(b)])).collect::<Vec<_>>();
+        let parts = |v: &[(usize, usize, Side)]| v.iter().map(|&(a, b, h)| json!([id(a), id(b), side_name(h)])).collect::<Vec<_>>();
+        let near: HashSet<(usize, usize)> = s.near_parts.iter().map(|&(u, l, _)| (u, l)).collect();
+        json!({"levels": s.levels, "given_up": pairs(&s.given_up), "given_up_parts": parts(&s.given_up_parts), "near": parts(&s.near_parts),
+               "orders_not_kept": pairs(&s.orders_not_kept),
+               "info": {"roads": self.roads().len(), "pairs": s.pairs, "meets": s.meets, "order_pairs": s.order_pairs,
+                        "order_violations": s.orders_not_kept.len(), "near_warnings": near.len(), "solver": "rust"},
+               "resolve": {"how": how, "why": why}})
+    }
+}
+
+/// The rows of pairs.csv or edits.csv (a header, then relation, a, b, a_end, b_end and enabled by name; pandas' quotes).
+pub fn read_pairs(csv: &str) -> Result<Vec<PairRow>, String> {
+    let mut lines = csv.lines().filter(|l| !l.trim().is_empty());
+    let Some(head) = lines.next() else { return Ok(Vec::new()) };
+    let head = fields(head);
+    let at = |name: &str| head.iter().position(|h| h == name);
+    if at("relation").is_none() || at("a").is_none() || at("b").is_none() {
+        return Err("pairs: the columns relation, a and b are missing".into());
+    }
+    lines.map(|l| {
+        let f = fields(l);
+        let col = |name: &str| at(name).and_then(|i| f.get(i)).map_or("", |s| s.as_str()).trim().to_string();
+        let relation = match col("relation").as_str() {
+            "meet" => Relation::Meet,
+            "stack" => Relation::Stack,
+            "near" => Relation::Near,
+            "order" => Relation::Order,
+            r => return Err(format!("pairs: the relation '{r}' is not meet, stack, near or order")),
+        };
+        Ok(PairRow { relation, a: id(&col("a"))?, b: id(&col("b"))?, a_end: side(&col("a_end"))?, b_end: side(&col("b_end"))?,
+                     enabled: !matches!(col("enabled").to_lowercase().as_str(), "false" | "0" | "no") })
+    }).collect()
+}
+
+/// A row as JSON, as the panel shows a rule.
+fn row_json(r: &PairRow) -> Value {
+    let rel = match r.relation {
+        Relation::Meet => "meet",
+        Relation::Stack => "stack",
+        Relation::Near => "near",
+        Relation::Order => "order",
+    };
+    json!({"relation": rel, "a": r.a.to_string(), "b": r.b.to_string(), "a_end": r.a_end.map_or("", side_name), "b_end": r.b_end.map_or("", side_name)})
+}
+
+fn side(s: &str) -> Result<Option<Side>, String> {
+    match s {
+        "" => Ok(None),
+        "start" => Ok(Some(Side::Start)),
+        "main" => Ok(Some(Side::Main)),
+        "end" => Ok(Some(Side::End)),
+        s => Err(format!("pairs: the end '{s}' is not start, main or end")),
+    }
+}
+
+fn side_name(s: Side) -> &'static str {
+    ["start", "main", "end"][s.index()]
+}
+
+/// An edge or road id: a whole number (duckOSM's edge ids are BIGINT).
+fn id(s: &str) -> Result<i64, String> {
+    s.trim().parse().map_err(|_| format!("'{s}' is not an edge id (a whole number)"))
+}
+
+/// The fields of a CSV line, with quotes as pandas writes them.
+fn fields(line: &str) -> Vec<String> {
+    let (mut out, mut cur, mut quoted, mut chars) = (Vec::new(), String::new(), false, line.chars().peekable());
+    while let Some(c) = chars.next() {
+        match c {
+            '"' if quoted && chars.peek() == Some(&'"') => {
+                cur.push('"');
+                chars.next();
+            }
+            '"' => quoted = !quoted,
+            ',' if !quoted => out.push(std::mem::take(&mut cur)),
+            _ => cur.push(c),
+        }
+    }
+    out.push(cur);
+    out
 }
 
 /// A value as the text of the files (a number without ".0" when it is whole).
