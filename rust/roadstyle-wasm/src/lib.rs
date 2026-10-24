@@ -197,7 +197,7 @@ mod wasm {
             Ok(roadstyle::file_names(&self.inner, self::format(format)?))
         }
 
-        /// roadTable(): the road table as the page loads it, JSON text (props, mids, bboxes, headings, lines: one item for each road).
+        /// roadTable(): the road table as the page loads it, JSON text (props, mids, bboxes, lines: one item for each road).
         #[wasm_bindgen(js_name = roadTable)]
         pub fn road_table(&self) -> Vec<u8> {
             let mut out = Vec::new();

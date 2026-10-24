@@ -151,7 +151,7 @@ impl Sources {
         py.detach(|| roadstyle::palettes::add(s, &base, &looks)).map_err(PyValueError::new_err)
     }
 
-    /// road_table() -> str: the road table as the page loads it (tiles.sidecar's form: props, mids, bboxes, headings, lines).
+    /// road_table() -> str: the road table as the page loads it (tiles.sidecar's form: props, mids, bboxes, lines).
     fn road_table(&self, py: Python<'_>) -> String {
         let mut out = Vec::new();
         py.detach(|| roadstyle::write_road_table(&self.inner, &mut out)).expect("a Vec takes every byte");

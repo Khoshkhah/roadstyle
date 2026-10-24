@@ -255,21 +255,6 @@ pub mod line {
         along(c, 0.5 * length(c)).map(|m| m.0)
     }
 
-    /// The way the line runs at its middle: degrees clockwise from north (0 to 360, to 0.1), in a flat frame at the middle's latitude.
-    pub fn heading(c: &[P]) -> Option<f64> {
-        if c.len() < 2 {
-            return None;
-        }
-        let (m, i) = along(c, 0.5 * length(c))?;
-        let (p, q) = (c[i], c[i + 1]);
-        let (dx, dy) = ((q[0] - p[0]) * m[1].to_radians().cos(), q[1] - p[1]);
-        if dx == 0.0 && dy == 0.0 {
-            return None;
-        }
-        let h = dx.atan2(dy).to_degrees().rem_euclid(360.0);
-        format!("{h:.1}").parse().ok()       // Python's round(h, 1): the correctly rounded decimal
-    }
-
     /// [min lon, min lat, max lon, max lat].
     pub fn bbox(c: &[P]) -> Option<[f64; 4]> {
         c.first()?;

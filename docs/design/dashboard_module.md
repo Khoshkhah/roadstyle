@@ -86,7 +86,7 @@ of `core.js` do it; the other files call them.
   `source-layer`, else its source, is its role. `_src(role)` gives the map's source id (with the prefix) and the source layer
   only for a vector source. Filters, picking, the glow, the decks, the slots and Street View use it, with no branch on tiles.
 - **The road table (`RoadTable`).** One port for every read of a road: `has(i)`, `props(i)`, `line(i)`, `mid(i)`, `bbox(i)`,
-  `rows()`, by the road's row. The data is the road table of stage 1 (`{props, mids, bboxes, headings, lines}`), from the option
+  `rows()`, by the road's row. The data is the road table of stage 1 (`{props, mids, bboxes, lines}`), from the option
   `road_table` or from `window.RS_SIDE`. `_road(i)` makes a
   feature with the road's whole line for Street View and Google 3D. `rsQuery`, `rsFind`, `rsGetProps` and `rsFocus` read the
   table, so they work with tiles when the page has the table.

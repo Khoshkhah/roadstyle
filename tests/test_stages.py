@@ -79,8 +79,7 @@ def test_the_road_table_of_rust_is_pythons(part, keywords):
     got = s.road_table()
     assert got == want
     t = json.loads(got)
-    assert len(t["props"]) == len(t["lines"]) == len(t["headings"]) == len(part)
-    assert all(h is None or 0 <= h < 360 for h in t["headings"])
+    assert len(t["props"]) == len(t["lines"]) == len(t["mids"]) == len(part) and "headings" not in t       # N4: no JS reads a heading
 
 
 def test_live_data_reads_the_feature_state_of_the_road(part, keywords):

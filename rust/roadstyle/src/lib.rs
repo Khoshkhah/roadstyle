@@ -241,46 +241,38 @@ pub fn write_source_file<W: std::io::Write + Send>(s: &sources::Sources, file: &
     }
 }
 
-/// The road table's rows: each road's fields with the output's names, then its middle (`__mid_lon`, `__mid_lat`), its heading at the
-/// middle (`__heading`) and its box (`__bbox_*`), and its line as the geometry.
+/// The road table's rows as Parquet rows (`Sources::table_rows`): each road's fields, then its middle (`__mid_lon`, `__mid_lat`) and its
+/// box (`__bbox_*`), and its line as the geometry.
 fn road_rows(s: &sources::Sources) -> impl Iterator<Item = roadstyle_io::write::Row> + '_ {
-    use roadstyle_engine::geom::line;
-    s.roads.roads.iter().zip(s.road_rows()).map(move |(r, row)| {
-        let c = r.line();
-        let mut props: Vec<(String, Value)> = row.into_iter().map(|(k, v)| (k.to_string(), v.to_value())).collect();
-        let mid = c.and_then(line::mid);
-        let bb = c.and_then(line::bbox);
+    s.table_rows().into_iter().map(|t| {
         let num = |v: Option<f64>| v.map_or(Value::Null, Value::from);
-        props.extend([("__mid_lon".into(), num(mid.map(|m| m[0]))), ("__mid_lat".into(), num(mid.map(|m| m[1]))),
-                      ("__heading".into(), num(c.and_then(line::heading)))]);
+        let mut props: Vec<(String, Value)> = t.props.into_iter().map(|(k, v)| (k.to_string(), v.to_value())).collect();
+        props.extend([("__mid_lon".into(), num(t.mid.map(|m| m[0]))), ("__mid_lat".into(), num(t.mid.map(|m| m[1])))]);
         props.extend(["__bbox_min_lon", "__bbox_min_lat", "__bbox_max_lon", "__bbox_max_lat"].iter().enumerate()
-            .map(|(k, n)| (n.to_string(), num(bb.map(|b| b[k])))));
-        roadstyle_io::write::Row { id: None, props, geometry: c.map(|c| json!({"type": "LineString", "coordinates": c})) }
+            .map(|(k, n)| (n.to_string(), num(t.bbox.map(|b| b[k])))));
+        roadstyle_io::write::Row { id: None, props, geometry: t.line.map(|c| json!({"type": "LineString", "coordinates": c})) }
     })
 }
 
-/// The road table as the page loads it (tiles.sidecar's form, with Python's JSON text): `{"props", "mids", "bboxes", "headings",
-/// "lines"}`, each a list with one item for each road (its row), written to `w` a road at a time.
+/// The road table as the page loads it (tiles.sidecar's form, with Python's JSON text; `Sources::table_rows`): `{"props", "mids",
+/// "bboxes", "lines"}`, each a list with one item for each road (its row).
 pub fn write_road_table<W: std::io::Write>(s: &sources::Sources, w: &mut W) -> std::io::Result<()> {
     use page::pyjson::dumps;
-    use roadstyle_engine::geom::line;
-    let roads = &s.roads.roads;
-    let list = |w: &mut W, key: &str, first: bool, item: &dyn Fn(roadstyle_engine::Road) -> String| -> std::io::Result<()> {
+    let rows = s.table_rows();
+    let list = |w: &mut W, key: &str, first: bool, item: &dyn Fn(&sources::TableRow) -> String| -> std::io::Result<()> {
         write!(w, "{}\"{key}\":[", if first { "{" } else { "," })?;
-        for r in roads.iter() {
-            if r.i > 0 {
+        for (i, t) in rows.iter().enumerate() {
+            if i > 0 {
                 w.write_all(b",")?;
             }
-            w.write_all(item(r).as_bytes())?;
+            w.write_all(item(t).as_bytes())?;
         }
         w.write_all(b"]")
     };
-    let pts = |c: &[[f64; 2]]| dumps(&json!(c), true);
-    list(w, "props", true, &|r| dumps(&Value::Object(s.road_row(r).into_iter().map(|(k, v)| (k.to_string(), js_value(v.to_value()))).collect()), true))?;
-    list(w, "mids", false, &|r| r.line().and_then(line::mid).map_or("null".into(), |m| dumps(&json!(m), true)))?;
-    list(w, "bboxes", false, &|r| r.line().and_then(line::bbox).map_or("null".into(), |b| dumps(&json!(b), true)))?;
-    list(w, "headings", false, &|r| r.line().and_then(line::heading).map_or("null".into(), |h| dumps(&json!(h), true)))?;
-    list(w, "lines", false, &|r| r.line().filter(|c| !c.is_empty()).map_or("null".into(), pts))?;
+    list(w, "props", true, &|t| dumps(&Value::Object(t.props.iter().map(|(k, v)| (k.to_string(), js_value(v.to_value()))).collect()), true))?;
+    list(w, "mids", false, &|t| t.mid.map_or("null".into(), |m| dumps(&json!(m), true)))?;
+    list(w, "bboxes", false, &|t| t.bbox.map_or("null".into(), |b| dumps(&json!(b), true)))?;
+    list(w, "lines", false, &|t| t.line.map_or("null".into(), |c| dumps(&json!(c), true)))?;
     w.write_all(b"}")
 }
 

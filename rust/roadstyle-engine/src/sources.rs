@@ -10,6 +10,15 @@ use roadstyle_model::Cell;
 use serde_json::Value;
 use std::collections::HashSet;
 
+/// One road's row of the road table: its fields and the stage values that the page reads (`road_row`), the middle of its line by length
+/// (a popup's anchor, Street View's spot), its box (rsFocus) and its line.
+pub struct TableRow<'a> {
+    pub props: Vec<(&'a str, Cell<'a>)>,
+    pub mid: Option<[f64; 2]>,
+    pub bbox: Option<[f64; 4]>,
+    pub line: Option<&'a [[f64; 2]]>,
+}
+
 /// Stage 1's output.
 pub struct Sources {
     pub name: Value,
@@ -160,9 +169,14 @@ impl Sources {
         style
     }
 
-    /// The road table: the properties of each road (its row is its position), with the output's names.
-    pub fn road_rows(&self) -> impl Iterator<Item = Vec<(&str, Cell<'_>)>> + '_ {
-        self.roads.roads.iter().map(|r| self.road_row(r))
+    /// The road table (audit N4): one typed row for each road (its row is its position), which the page's JSON and the Parquet file
+    /// encode.
+    pub fn table_rows(&self) -> Vec<TableRow<'_>> {
+        use roadstyle_model::geom::line;
+        self.roads.roads.iter().map(|r| {
+            let c = r.line();
+            TableRow { props: self.road_row(r), mid: c.and_then(line::mid), bbox: c.and_then(line::bbox), line: c.filter(|c| !c.is_empty()) }
+        }).collect()
     }
 
     /// One road's row of the road table: its fields and the stage values that the page reads (R1: props::table_keeps), with the
