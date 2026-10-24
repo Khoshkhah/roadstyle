@@ -61,3 +61,22 @@ def test_tiles_from_the_files_are_the_tiles_of_the_one_call(part, keywords, tmp_
         for x in range(tx(b[0]), tx(b[2]) + 1):
             for y in range(ty(b[3]), ty(b[1]) + 1):
                 assert mvt.decode(f.tile(z, x, y)) == mvt.decode(t.tile(z, x, y)), f"{z}/{x}/{y}"
+
+
+def test_the_road_table_of_rust_is_pythons(part, keywords):
+    """The road table of stage 1 (roadstyle::write_road_table) is tiles.sidecar of the roads source, the page's table, byte for byte:
+    every field, the middle by length (shapely's interpolate), the box, the heading at the middle and the line of each road."""
+    from roadstyle import _engine
+    from roadstyle.tiles import sidecar
+
+    kw = dict(keywords)
+    kw.setdefault("view_3d", True)
+    lk = _engine._look_of(kw)
+    s = _engine.rust().make_sources(_engine._geoparquet(part), json.dumps(lk), None, None, "roads")
+    roads = rs.export_inline(part, engine="rust", **keywords)["sources"]["roads"]["data"]
+    want = json.dumps(sidecar(roads), separators=(",", ":"))
+    got = s.road_table()
+    assert got == want
+    t = json.loads(got)
+    assert len(t["props"]) == len(t["lines"]) == len(t["headings"]) == len(part)
+    assert all(h is None or 0 <= h < 360 for h in t["headings"])

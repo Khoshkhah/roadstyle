@@ -1279,6 +1279,32 @@ reads the static files from `src/roadstyle/` when it is built; a crates.io packa
 - **Content.** Remove the Python code of each part that is at parity for one minor version with no difference. scipy, ortools,
   mapbox-vector-tile and pmtiles leave the dependencies. Version 1.0.
 - **Exit.** Python roadstyle has the API, folium, lonboard and the tools. The Rust goldens become the reference.
+- **Approved 2026-10-23, at the end of the design queue (below).** The Rust engine becomes roadstyle's default. Python's style code that
+  Rust replaces is deleted, not kept as a second engine: most of `render_web.py` (3,802 lines today), the style parts of `levels.py`
+  (826), `tiles.py` (240) and `stylers.py` (482): about 4,500 to 5,000 lines (an estimate). The Python API, folium, lonboard and the
+  notebook tools stay. Then a 1.0 release; the publish waits for Kaveh's last OK.
+
+#### The design queue (2026-10-23)
+
+The order of the design steps after the 0.25.0 release (the audit's items: [audit_2026-10-23.md](audit_2026-10-23.md); each step's report
+uses [review_checklist.md](review_checklist.md)):
+
+1. (a) the pure core, (b) the typed render model, (f) the two stages: done.
+2. (g) one path for GeoJSON and tiles: the road table in both ways, one source naming, one feature id, one tile rule, the typed tiled page.
+3. R22, the live data join: a page colours and sizes the roads from a table by MapLibre's feature state (`rs_c`, `rs_w`), with no new build.
+4. R2 (stage 1 once, its typed output kept; a view's palette as a restyle), R1 with R8 (each layer and dashboard module declares what it
+   reads; one class index), R4 (one `Topology`), R3 (a typed stage 3, one `__RS_OPTIONS__`).
+5. (c) `roadstyle-look` (with R16, R17).
+6. **The mapstyle merge** (approved 2026-10-23): roadstyle gets a duckOSM reader for the roads of every mode and the base-map tables
+   (`features.*`) in `roadstyle-io`; mapstyle's look (`styles/*.yaml`: layers, modes, paths, osm_carto, themes, the icons, the patterns,
+   the building heights) becomes part of `roadstyle-look`; mapstyle's `dashboard.js` and `layers.js` are replaced by the shared
+   dashboard; `render_map` and `export.py` become roadstyle calls on the two stages. The `mapstyle` package (about 1,000 lines of
+   Python) stays for one version as a shim that calls roadstyle, then retires. Goldens: today's mapstyle output. Its users (duckOSM's
+   `viz.py`, `levels_edit.py`, `route_map.py`, `scripts/multimodal_route_map.py`, and GeoLibre's build) move at the end of the freeze.
+7. (d) error enums and layer roles (with R7, R6, R10, R11, R14, R15), (e) the large files split (with R21), the dead-code step, the second
+   audit, then P7.
+
+R12, R13 and the `compute_levels` options belong to the levels session; R20 (the duckosm-rust consumer) waits for the end of the freeze.
 
 ### Parallel work without two sessions in one file
 

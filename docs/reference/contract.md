@@ -25,6 +25,8 @@ The export's style (`export_style`, `export_inline`: `state` baked) has `roadsty
 | layer `roadstyle:group` | the group of a layer: `roads`, or an overlay's label |
 | layer `roadstyle:over` | a base-map layer that goes over the roads (the 3D buildings) |
 | layer `roadstyle:position` | the drawing position of a layer of `export_look` |
+| `roadstyle:sources` | in `roadstyle:controls` (the page: the option `sources`): each role of the page (`simple`, `slots`, `arrows`, `decks`, `ov<i>`, ...) with its source and its source layer (null for GeoJSON) |
+| `roadstyle:arrows` | in `roadstyle:controls` (the page: the option `arrows`): `"points"` (the page's own arrows, the source `arrows`), `"line"` (along the slots) or null |
 | `roadstyle:tiles` | in stage 1's saved `style.json` only: the tile settings that stage 2 reads (`minzoom`, `maxzoom`, `buffer_px`, `extent`) |
 | `roadstyle:columns` | in stage 1's saved `style.json` only: the user's class, filter and metre width columns (`class`, `filter`, `width`) |
 | Parquet field `roadstyle:json` | stage 1's Parquet files (`save_sources`): a column whose values are JSON text (values of more than one type, lists or objects) |
@@ -110,7 +112,7 @@ contract makes changeable (or a value that is not used).
 | `simple`, `tiles`, `fill_layers` | the mode and the road fill layer ids | `render`; option | `core.js`, `select.js`, `svspot.js` | no | |
 | `compress`, `data_maxzoom`, `data_tolerance` | | `render` | engine | no | |
 | `boundary` | the outline | `render` | engine | no | |
-| page self-checks | `window.__rs_gz`, `window.__rs_tiles` | `_INFLATE_JS`, `_TILES_JS` | the page's banner | | |
+| page self-checks | `window.__rs_gz`, `window.__rs_tiles`, `window.__rs_side` | `_INFLATE_JS`, `_TILES_JS`, `_SIDE_JS` | the page's banner | | |
 | `window.map` | the map | the page | the level editor, host scripts | | |
 | URL parameters | none today | | | | new: `#rs=` (`getState`, `setState`) |
 
@@ -161,7 +163,7 @@ when a layer reads it.
 | `__rs_arw` | the number of an arrow slot (for the export's thinning) | `_annotation_slots`, `slots.rs` | engine | internal | the slot attachments |
 | `__rs_base`, `__rs_height`, `__rs_casing_slab`, `__rs_chain` | a 3D deck's base and height, its casing slab, its chain | `_bridge_decks` | engine, `select.js` (`__rs_casing_slab`) | dashboard (`__rs_casing_slab`) | the deck generator |
 | `__rs_fc_`, `__rs_fc_frame`, `__rs_fc_i`, `__rs_fc_id`, `__rs_fc_wkb` | not properties: temporary names in the DuckDB query of `fastjson.py` | `fastjson.py` | | internal | removed (the Rust readers) |
-| `__rs_gz`, `__rs_tiles` | not properties: the page's self-check globals (`window.__rs_gz`, `window.__rs_tiles`) | `_INFLATE_JS`, `_TILES_JS` | the page's banner | page | the page writer |
+| `__rs_gz`, `__rs_tiles`, `__rs_side` | not properties: the page's self-check globals (`window.__rs_gz`, `window.__rs_tiles`, `window.__rs_side`: the road table did not load) | `_INFLATE_JS`, `_TILES_JS`, `_SIDE_JS` | the page's banner | page | the page writer |
 | `__rs_fill__` | the prefix of `__rs_fill__<i>` in the code | | | | |
 
 ## The page's placeholders
@@ -169,7 +171,7 @@ when a layer reads it.
 `static/web_template.html` has one placeholder for each value that `render_web._page_html` puts in the page:
 `__TITLE__`, `__MAPLIBRE_CSS__`, `__MAPLIBRE_JS__`, `__RS_TILES__`, `__DASHBOARD_CSS__`, `__POPUP_CSS__`, `__HOST_PANEL_HTML__`,
 `__POPUP_JS__`, `__DASHBOARD_JS__`, `__STYLE__`, `__CENTER__`, `__PITCH__`, `__BEARING__`, `__MAX_PITCH__`, `__BASEMAPS__`,
-`__BM_SWITCHER__`, `__RS_TILED__`, `__RS_LEAN__`, `__ROAD_POPUP_MODE__`, `__FIND_CONTROL__`, `__ZOOM_READOUT__`, `__PITCH3D__`,
+`__BM_SWITCHER__`, `__RS_TILED__`, `__RS_LEAN__`, `__RS_SOURCES__`, `__RS_ARROWS__`, `__ROAD_POPUP_MODE__`, `__FIND_CONTROL__`, `__ZOOM_READOUT__`, `__PITCH3D__`,
 `__STREET_VIEW__`, `__SV_WINDOW_KEY__`, `__GOOGLE_3D__`, `__SELECT_COLOR__`, `__FILTER__`, `__COLOR_OPTIONS__`, `__CO_ACTIVE__`,
 `__OVERLAYS__`, `__OVERLAY_CONTROL__`, `__OVERLAY_POPUP__`, `__TUNNEL__`, `__RS_FILL_LAYERS__`, `__RS_ROAD_FILL__`, `__VIEWS__`,
 `__ROAD_ITEMS__`, `__ROAD_POPUP__`, `__ROAD_TOOLTIP__`, `__HOVER_DELAY_MS__`, `__EDGE_ID_COL__`, `__ARROW_ICON__`, `__ARROW_COLOR__`,

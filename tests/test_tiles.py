@@ -146,7 +146,7 @@ def test_render_without_tiles_is_unchanged():
     assert "pmtiles.Protocol" not in html
     i = html.index("const style = ") + len("const style = ")
     style = json.JSONDecoder().raw_decode(html, i)[0]
-    assert style["sources"]["roads"]["type"] == "geojson"
+    assert style["sources"]["simple"]["type"] == "geojson" and "roads" not in style["sources"]     # a page: the pieces; the road table
 
 
 def test_sidecar_mid_is_half_the_length():
@@ -200,7 +200,7 @@ def test_simple_mode_tiles_carry_the_pieces():
     assert "simple" not in style["sources"]
     lyr = {l["id"]: l for l in style["layers"]}
     assert (lyr["roads-simple"]["source"], lyr["roads-simple"]["source-layer"]) == ("roads", "simple")
-    assert (lyr["roads-fill"]["source"], lyr["roads-fill"]["source-layer"]) == ("roads", "roads")
+    assert "roads-fill" not in lyr and style["sources"]["roads"]["promoteId"] == {"simple": "__rs_edge"}      # the pieces pick and glow
     z = 15
     n = 1 << z
     x = int((18.001 + 180) / 360 * n)
@@ -224,8 +224,10 @@ def test_single_line_pair_rides_the_tiles():
     x = int((18.04 + 180) / 360 * n)
     y = int((1 - math.asinh(math.tan(math.radians(59.305))) / math.pi) / 2 * n)
     feats = mapbox_vector_tile.decode(gzip.decompress(Reader(MemorySource(_archive_of(html))).get(z, x, y)))
-    foot = [f["properties"] for f in feats["roads"]["features"] if f["properties"].get("highway") == "footway"]
+    from road_table import roads_of
+    foot = [f["properties"] for f in roads_of(html)["features"] if f["properties"].get("highway") == "footway"]     # the road table
     assert sorted(bool(p.get("__rs_dup")) for p in foot) == [False, True] and {p["__rs_edge2"] for p in foot} == {7, 8}
+    assert "roads" not in feats                         # a page's tiles have no road lines
     assert {f["properties"]["__rs_edge"] for f in feats["simple"]["features"] if f["properties"]["highway"] == "footway"} == {7}
 
 

@@ -72,8 +72,8 @@ fn bench(look_path: &str, roads_path: &str, features_path: &str) {
     let layers = layers::road_layers(&look_json, &roads.roads, &simple, features(&slots), false, &mut ovs, &colors.props, colors.active).unwrap_or_else(|e| fail(e)).0;
     mark("layers");
     let mut text = Vec::new();
-    roads.write_json(&mut text);
-    simple.write_json(&mut text, &roads.roads);
+    roads.write_json(&mut text).unwrap();
+    simple.write_json(&mut text, &roads.roads).unwrap();
     serde_json::to_writer(&mut text, &slots).unwrap();
     mark(&format!("the text of the sources ({} MB, {} layers)", text.len() >> 20, layers.len()));
 }

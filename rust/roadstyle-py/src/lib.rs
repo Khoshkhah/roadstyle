@@ -78,7 +78,7 @@ impl Tiler {
 }
 
 /// Stage 1 (docs/rust/architecture.md, "The three stages and the one call"): the style and its sources in memory (make_sources).
-#[pyclass(frozen)]
+#[pyclass]
 struct Sources {
     inner: roadstyle::sources::Sources,
 }
@@ -105,6 +105,33 @@ impl Sources {
     #[pyo3(signature = (format="geojson"))]
     fn file_names(&self, format: &str) -> PyResult<Vec<String>> {
         Ok(roadstyle::file_names(&self.inner, self::format(format)?))
+    }
+
+    /// style() -> str: the style as one JSON text with each source's GeoJSON in it (make_style's).
+    fn style(&self, py: Python<'_>) -> String {
+        let mut out = Vec::new();
+        py.detach(|| self.inner.write_style(&mut out)).expect("a Vec takes every byte");
+        String::from_utf8(out).expect("JSON text is UTF-8")
+    }
+
+    /// tiles(only, exact=None, keep=[]) -> Tiler: stage 2 from memory, with the look's tile settings (make_sources saves them): the
+    /// sources `only` (render(tiles=True)'s tile_layers), the columns `exact` of the roads and the pieces (its tile_keep), `keep` more
+    /// columns. It takes the JSON sources out of these Sources: read style() first.
+    #[pyo3(signature = (only, exact=None, keep=Vec::new()))]
+    fn tiles(&mut self, py: Python<'_>, only: Vec<String>, exact: Option<Vec<String>>, keep: Vec<String>) -> PyResult<Tiler> {
+        use roadstyle::tiles::stage::{TileOptions, COLUMNS, TILES};
+        let s = &mut self.inner;
+        let mut o = TileOptions::new(&s.layers, &s.metadata, &s.saved[TILES], &s.saved[COLUMNS], &keep).map_err(PyValueError::new_err)?;
+        (o.exact, o.only) = (exact.map(|e| e.into_iter().collect()), Some(only));
+        let tiles = py.detach(|| roadstyle::tile_sources(s, &o));
+        Ok(Tiler { style: String::new(), tiles })
+    }
+
+    /// road_table() -> str: the road table as the page loads it (tiles.sidecar's form: props, mids, bboxes, headings, lines).
+    fn road_table(&self, py: Python<'_>) -> String {
+        let mut out = Vec::new();
+        py.detach(|| roadstyle::write_road_table(&self.inner, &mut out)).expect("a Vec takes every byte");
+        String::from_utf8(out).expect("JSON text is UTF-8")
     }
 
     /// file(name, format="geojson", keep=[]) -> bytes: one of stage 1's files.

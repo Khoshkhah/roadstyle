@@ -123,6 +123,8 @@ pub struct RoadsSource {
     pub maxzoom: Option<i64>,
     /// the column keywords (ColumnMap): each column with an engine name (`own`) and the user's name for it
     pub names: Vec<(&'static str, String)>,
+    /// the style has the source `roads` (the export); a page has none: its pieces draw, and the road table has the fields and the lines
+    pub in_style: bool,
 }
 
 /// The name of a kept column (a column with an engine name that is not the named one) while the engine runs.
@@ -139,38 +141,45 @@ impl RoadsSource {
         k.strip_prefix("__rs_kept_").and_then(|o| self.names.iter().find(|(own, _)| *own == o)).map_or(k, |(own, _)| own)
     }
 
-    pub fn write_json(&self, out: &mut Vec<u8>) {
-        out.extend_from_slice(br#"{"type":"geojson","data":"#);
-        self.write_data(out, None);
-        out.extend_from_slice(br#","tolerance":"#);
-        serde_json::to_writer(&mut *out, &self.tolerance).unwrap();
+    /// The source as JSON text, written to `w` a part at a time.
+    pub fn write_json<W: std::io::Write>(&self, w: &mut W) -> std::io::Result<()> {
+        w.write_all(br#"{"type":"geojson","data":"#)?;
+        self.write_data(w, None, true)?;
+        w.write_all(br#","tolerance":"#)?;
+        serde_json::to_writer(&mut *w, &self.tolerance)?;
         if let Some(z) = self.maxzoom {
-            out.extend_from_slice(br#","maxzoom":"#);
-            out.extend_from_slice(z.to_string().as_bytes());
+            write!(w, r#","maxzoom":{z}"#)?;
         }
-        out.push(b'}');
+        w.write_all(b"}")
     }
 
-    /// The FeatureCollection of the roads; `keep`: only these properties (by the output's name) and every `__rs_*` one.
-    pub fn write_data(&self, out: &mut Vec<u8>, keep: Option<&std::collections::HashSet<String>>) {
+    /// The FeatureCollection of the roads, written to `w` a part at a time; `keep`: only these properties (by the output's name) and
+    /// every `__rs_*` one; `lines`: the roads' lines (else each geometry is null: the road table has them).
+    pub fn write_data<W: std::io::Write>(&self, w: &mut W, keep: Option<&std::collections::HashSet<String>>, lines: bool) -> std::io::Result<()> {
+        let mut out = Vec::new();
         out.extend_from_slice(br#"{"type":"FeatureCollection","features":["#);
         for r in self.roads.iter() {
+            if out.len() > 1 << 16 {
+                w.write_all(&out)?;
+                out.clear();
+            }
             if r.i > 0 {
                 out.push(b',');
             }
             out.extend_from_slice(format!(r#"{{"id":{},"type":"Feature","properties":"#, r.i).as_bytes());
-            r.write_json(out, |k| self.out_name(k), |k| keep.is_none_or(|s| k.starts_with("__rs_") || s.contains(k)));
+            r.write_json(&mut out, |k| self.out_name(k), |k| keep.is_none_or(|s| k.starts_with("__rs_") || s.contains(k)));
             out.extend_from_slice(br#","geometry":"#);
-            match r.line() {
+            match r.line().filter(|_| lines) {
                 None => out.extend_from_slice(b"null"),
                 Some(c) => {
                     out.extend_from_slice(br#"{"type":"LineString","coordinates":"#);
-                    serde_json::to_writer(&mut *out, c).unwrap();
+                    serde_json::to_writer(&mut out, c).unwrap();
                     out.push(b'}');
                 }
             }
             out.push(b'}');
         }
         out.extend_from_slice(b"]}");
+        w.write_all(&out)
     }
 }

@@ -393,7 +393,9 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
     tiled = bool(kwargs.get("tiles"))
     lk = _look_of({**kwargs, "palette": palette, "profile": profile, "settings": settings, "highway_col": highway_col, "state": "live"})
     pq = _geoparquet(g)
-    style = json.loads(rust().make_style(pq, json.dumps(lk), None, None, kwargs.get("name")))
+    src = rust().make_sources(pq, json.dumps(lk), None, None, kwargs.get("name"))      # stage 1, once: the style and the road table
+    style, table = json.loads(src.style()), src.road_table()
+    geo = _geo_of(json.loads(table))           # the roads, for the views' palettes (render_web._merge_palettes)
     _warn()
     a = {k: p.default for k, p in inspect.signature(rw.render).parameters.items() if p.default is not inspect.Parameter.empty}
     a.update(kwargs)
@@ -415,13 +417,13 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
         _use(*prev, *srcs)
         active_bm, bms, base = rw._page_basemaps(a["basemap"], a["basemaps"], a["api_key"], a["basemap_switcher"])
         bg = rw._bg_color(active_bm)
-        views = _views(style, pq, kwargs, [b["key"] for b in bms], palette, profile, settings, highway_col) if a["views"] else []
+        views = _views(style, geo, pq, kwargs, [b["key"] for b in bms], palette, profile, settings, highway_col) if a["views"] else []
     finally:
         _use(*prev)
     if tiled and any("palette" in v["set"] for v in views):
         raise ValueError("engine='rust': tiles=True with a view's palette (the tiles have one palette); use engine='python'")
     dashes = sorted({f["properties"].get("__rs_dash") for f in (style["sources"].get("simple") or {"data": {"features": []}})["data"]["features"]} - {None, ""})
-    archive = _tiled_page(pq, lk, style, highway_col, kwargs) if tiled else None
+    archive = _tiled_page(src, lk, style, highway_col, kwargs) if tiled else None
     meta = style.pop("metadata")
     ctl, inter = meta["roadstyle:controls"], meta["roadstyle:interaction"]
     for lyr in style["layers"]:
@@ -437,7 +439,8 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
     for k in ("pitch", "max_pitch", "bearing"):
         if a[k] is not None:
             cam[k] = a[k]
-    page = {"basemaps": bms, "basemap_switcher": bool(a["basemap_switcher"]), "tiles": ctl["tiles"], "simple": ctl["simple"], "popup_mode": mode,
+    page = {"basemaps": bms, "basemap_switcher": bool(a["basemap_switcher"]), "tiles": ctl["tiles"], "simple": ctl["simple"],
+            "sources": rw._roles(style["layers"]), "arrows": rw._arrow_kind(style["layers"]), "popup_mode": mode,
             "find_control": bool(a["find_control"]), "zoom_readout": bool(a["zoom_readout"]), "pitch_3d": ctl["pitch_3d"],
             "street_view": a["street_view"], "street_view_key": key or "", "google_3d": bool(a["google_3d"]), "select_color": ctl["select_color"],
             "filter": ctl["filter"], "color_options": meta.get("roadstyle:color_options") or [], "color_active": ctl["color_active"],
@@ -449,18 +452,24 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
                  "hover": a["hover_color"] or th["selection"]["hover"], "tunnels": bool(ctl["tunnel"]["layers"]), "dashes": dashes}
     x0, y0, x1, y1 = (float(v) for v in g.total_bounds)
     # the page by the Rust page writer (roadstyle::page); the gzip blobs by Python's zlib, so the page is Python's byte for byte
+    from .tiles import _b64gz
     gz = rw._compress_sources(page_style) if a["compress"] else {}
     parts = {"name": a["name"], "cam": cam, "bounds": [x0, y0, x1, y1], "side_panel_html": a["side_panel_html"],
              "host_panel_width": a["host_panel_width"], "compress": False, "gz": gz, "simple_js": simple_js if a["simple"] else None}
-    pmt = None
-    if archive:
-        from .tiles import _b64gz
-        pmt, side = archive
-        parts["side_b64"] = _b64gz(side)
+    pmt = archive
+    # the road table of stage 1, in both ways; a view's palette has put its fills (<key>@<palette>) into the roads
+    merged = any("palette" in v["set"] for v in views)
+    parts["side_b64"] = _b64gz(rw._tiler_sidecar(geo) if merged else table.encode())
     return rw.WebMap(rust().make_page(json.dumps(page_style), json.dumps(page), json.dumps(parts), pmt))
 
 
-def _views(style, pq, kwargs, basemaps, palette, profile, settings, highway_col):
+def _geo_of(table):
+    """The roads as a FeatureCollection, from stage 1's road table: each road's properties and its line."""
+    return {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": p, "geometry": c and {"type": "LineString", "coordinates": c}}
+                                                      for p, c in zip(table["props"], table["lines"], strict=True)]}
+
+
+def _views(style, geo, pq, kwargs, basemaps, palette, profile, settings, highway_col):
     """render's ``views``, checked (render_web._check_views), as the page reads them; a palette that a view names other than the page's
     is merged into ``style`` (render_web._merge_palettes: the colours that differ, one copy per palette, picked by the state rs_palette),
     from a Rust style of that palette, and the filter panel gets each class's colour in each palette."""
@@ -475,13 +484,14 @@ def _views(style, pq, kwargs, basemaps, palette, profile, settings, highway_col)
     if pals:
         def build(n):
             lk = _look_of({**kwargs, "palette": n, "profile": profile, "settings": settings, "highway_col": highway_col, "state": "live"})
-            st = json.loads(rust().make_style(pq, json.dumps(lk), None, None, kwargs.get("name")))
-            return {"style": st, "geo": st["sources"]["roads"]["data"], "slots": (st["sources"].get("slots") or {}).get("data") or {"features": []}}
+            src = rust().make_sources(pq, json.dumps(lk), None, None, kwargs.get("name"))
+            st = json.loads(src.style())
+            return {"style": st, "geo": _geo_of(json.loads(src.road_table())), "slots": (st["sources"].get("slots") or {}).get("data") or {"features": []}}
         slots = (style["sources"].get("slots") or {}).get("data") or {"features": []}
-        rw._merge_palettes(style, style["sources"]["roads"]["data"], slots, {n: build(n) for n in pals}, palette)
+        rw._merge_palettes(style, geo, slots, {n: build(n) for n in pals}, palette)
         fb = rw._FB["fill"]
         first = {}
-        for ft in style["sources"]["roads"]["data"]["features"]:
+        for ft in geo["features"]:
             first.setdefault(ft["properties"].get(ctl["filter"]["col"]), ft["properties"])
         flt = ctl["filter"]
         flt["palettes"] = {n: {c: first[c].get(f"__rs_fill@{n}", first[c].get("__rs_fill")) or fb for c in flt["classes"]} for n in pals}
@@ -489,20 +499,16 @@ def _views(style, pq, kwargs, basemaps, palette, profile, settings, highway_col)
     return views
 
 
-def _tiled_page(pq, lk, style, highway_col, kwargs):
-    """render(tiles=True) by the Rust engine: (the PMTiles archive, the sidecar table) of the page, and ``style`` made as the tiled page's
-    (render_web's tiled branch): one vector source ``roads`` with the layers ``roads``, ``simple`` and ``slots``. The tiles are the Rust
-    Tiler's, with the columns of tiles.build_pmtiles (``keep`` and every ``__rs_*``; the slots whole, from zoom 14); the sidecar is
-    tiles.sidecar of the roads (every column, for the popups)."""
-    from .tiles import sidecar
-
+def _tiled_page(src, lk, style, highway_col, kwargs):
+    """render(tiles=True) by the Rust engine: the PMTiles archive of the page, and ``style`` made as the tiled page's (render_web's tiled
+    branch): one vector source ``roads`` with the layers ``simple`` and ``slots``. The tiles are stage 2 of the same stage 1 (``src``, in
+    memory: no second build), with the columns of tiles.build_pmtiles (``keep`` and every ``__rs_*``; the slots whole, from zoom 14)."""
     srcs = style["sources"]
-    side = sidecar(srcs["roads"]["data"])
     tc = lk["config"]["tiles"]
     z0, z1 = int(tc["minzoom"]), int(tc["maxzoom"])
     keep = sorted({highway_col, kwargs.get("filter_col") or highway_col, "__rs_twoway", "__rs_edge", "lvl", kwargs.get("width_m_col")} - {None})
     names = [n for n in ("roads", "simple", "slots") if n in srcs and srcs[n]["data"]["features"]]
-    t = rust().Tiler(pq, json.dumps({**lk, "args": {**lk["args"], "tile_keep": keep, "tile_layers": names}}), None, None, "", [])
+    t = src.tiles(names, keep)
     def points(g):            # a LineString's points, a Point itself
         c = (g or {}).get("coordinates") or []
         return [c] if (g or {}).get("type") == "Point" else c
@@ -510,7 +516,8 @@ def _tiled_page(pq, lk, style, highway_col, kwargs):
     bounds = (min(p[0] for p in pts), min(p[1] for p in pts), max(p[0] for p in pts), max(p[1] for p in pts))
     archive = _pmtiles(t, z0, z1, bounds, names)
     # the style: the roads source a vector one; the pieces and the slots its layers
-    srcs["roads"] = {"type": "vector", "url": "pmtiles://roads", "minzoom": z0, "maxzoom": z1}
+    vector = {"type": "vector", "url": "pmtiles://roads", "minzoom": z0, "maxzoom": z1, "promoteId": {"simple": "__rs_edge"}}
+    style["sources"] = srcs = {"roads": vector, **{k: v for k, v in srcs.items() if k != "roads"}}      # the tiles first, as render_web's
     for n in ("simple", "slots"):
         srcs.pop(n, None)
     for lyr in style["layers"]:
@@ -518,7 +525,7 @@ def _tiled_page(pq, lk, style, highway_col, kwargs):
             lyr["source"], lyr["source-layer"] = "roads", lyr["source"]
         elif lyr.get("source") == "roads":
             lyr["source-layer"] = "roads"
-    return archive, side
+    return archive
 
 
 def _pmtiles(t, z0, z1, bounds, names) -> bytes:

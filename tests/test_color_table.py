@@ -18,8 +18,9 @@ def _edges():
 
 
 def _props(html):
-    geo = json.loads(re.search(r'"data":\s*(\{.*?\}),\s*"tolerance"', html, re.S).group(1))
-    return {f["properties"]["edge_id"]: f["properties"] for f in geo["features"]}
+    """Each road's properties from the page's road table (a page has no roads source)."""
+    from road_table import roads_of
+    return {f["properties"]["edge_id"]: f["properties"] for f in roads_of(html)["features"]}
 
 
 def test_color_table_dict_with_gray_fallback():

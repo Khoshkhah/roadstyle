@@ -86,18 +86,30 @@ fn filter_panel(look: &Value, roads: &Roads, m: &Model) -> Value {
            "bridges": roads.iter().any(|f| lvl(f) > 0.0), "tunnels": roads.iter().any(|f| lvl(f) < 0.0)})
 }
 
-/// _fill_layer_ids: the layers the page recolours: every road fill layer, and the fill layers of each drawing position.
-pub(crate) fn fill_layer_ids(roads: &Roads) -> Vec<String> {
-    let fills = ["roads-fill", "roads-fill-sq", "roads-fill-sx", "roads-fill-h", "roads-fill-hsq", "roads-fill-hsx"];
-    let mut levels: Vec<i64> = roads.iter().flat_map(|f| ["__rs_cl", "__rs_fl", "__rs_cs", "__rs_ce"].map(|k| f.get(k).and_then(Cell::as_i64)))
-        .flatten().chain([0]).collect();
-    levels.sort();
-    levels.dedup();
-    let mut ids: Vec<String> = fills.iter().map(|s| s.to_string()).collect();
-    for l in levels.into_iter().filter(|&l| l != 0) {
-        ids.extend(fills.iter().map(|f| format!("roads-fill-lv{l}{}", &f["roads-fill".len()..])));
+/// roadstyle:sources: each role of the page (a source's name in the GeoJSON way, a tile layer's in the tile way), in the order of its
+/// first layer, with its source and its source layer (null for a GeoJSON source); render_web._roles.
+pub fn roles(layers: &[Value]) -> Value {
+    const ROLES: [&str; 10] = ["roads", "simple", "slots", "arrows", "decks", "shadows", "casings", "halves", "ends", "boundary"];
+    let mut out = Map::new();
+    for l in layers {
+        let (src, sl) = (l["source"].as_str(), l["source-layer"].as_str());
+        let Some(role) = sl.or(src) else { continue };
+        let ours = ROLES.contains(&role) || role.strip_prefix("ov").is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()));
+        if ours && !out.contains_key(role) {
+            out.insert(role.into(), json!({"source": src, "layer": sl}));
+        }
     }
-    ids
+    Value::Object(out)
+}
+
+/// roadstyle:arrows: "points" (the page puts one arrow on each one-way road in view: the source "arrows"), "line" (along the slots), or
+/// null (no arrows); render_web._arrow_kind.
+pub fn arrow_kind(layers: &[Value]) -> Value {
+    match layers.iter().find(|l| l["id"].as_str().is_some_and(|i| i.starts_with("roads-arrows"))) {
+        None => Value::Null,
+        Some(l) if l["source"] == "arrows" => "points".into(),
+        Some(_) => "line".into(),
+    }
 }
 
 /// roadstyle:controls: the options of rsDashboard that the style gives (render_web.render's `page`, in its order).
@@ -123,11 +135,10 @@ pub fn controls(look: &Value, roads: &Roads, info: PageInfo, active: usize) -> R
         "toward": toward, "towards": cfg["tunnel_towards"], "to": to, "control": control});
     let views: Vec<Value> = args["views"].as_object().into_iter().flatten().map(|(n, s)| json!({"name": n, "set": s})).collect();
     let items = if args["items"].is_null() { Value::Null } else { json!({"label": "items", "popup": args["items_popup"], "layer": "roads-simple"}) };
-    // render's lean mode: simple mode with inline data
-    let lean = !tiles && args["simple"] != false;
-    Ok(json!({"tiles": tiles, "simple": if lean { json!("roads-simple") } else { json!(false) }, "pitch_3d": cam["pitch_3d"],
+    // a page is in simple mode, in both ways: the pieces pick and glow (the road layer roads-simple), and there are no fill layers
+    Ok(json!({"tiles": tiles, "simple": "roads-simple", "pitch_3d": cam["pitch_3d"],
         "select_color": select, "filter": filter_panel(look, roads, &m), "color_active": active, "overlays": info.overlays, "tunnel": tunnel,
-        "fill_layers": fill_layer_ids(roads), "road_fill": {"on": args["road_fill"] != false, "paint": info.fill_paint}, "views": views,
+        "fill_layers": [], "road_fill": {"on": args["road_fill"] != false, "paint": info.fill_paint}, "views": views,
         "items": items, "edge_id_col": args["edge_id_col"].as_str().unwrap_or("edge_id"), "arrow_icon": arw["icon"], "arrow_color": arw["color"],
         "arrow_rules": {"mainBelow": arw["main_below"], "main": arw["main"], "minLenPx": place["min_len_px"], "minGapPx": place["min_gap_px"],
                         "nameGapPx": place["name_gap_px"], "edgePx": place["edge_px"], "charWidth": place["char_width"],

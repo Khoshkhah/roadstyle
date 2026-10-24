@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// The rows of one write.
-const BATCH: usize = 65_536;
+const BATCH: usize = 8_192;
 
 /// The name of the column of a GeoJSON feature's `id`.
 pub const FID: &str = "__fid";
@@ -54,8 +54,14 @@ fn merge(a: Kind, b: Kind) -> Kind {
     }
 }
 
-/// The rows as Parquet: `rows()` gives them again for each pass (the types, then the batches). `geometry`: GeoParquet.
+/// The rows as Parquet, in memory (`parquet_to`).
 pub fn parquet<I: Iterator<Item = Row>>(rows: impl Fn() -> I, geometry: bool) -> Result<Vec<u8>, String> {
+    parquet_to(Vec::new(), rows, geometry)
+}
+
+/// The rows as Parquet, written to `w` a batch at a time: `rows()` gives them again for each pass (the types, then the batches).
+/// `geometry`: GeoParquet. Gives `w` back.
+pub fn parquet_to<W: std::io::Write + Send, I: Iterator<Item = Row>>(w: W, rows: impl Fn() -> I, geometry: bool) -> Result<W, String> {
     let (mut names, mut kinds, mut at): (Vec<String>, Vec<Kind>, HashMap<String, usize>) = (Vec::new(), Vec::new(), HashMap::new());
     let (mut ids, mut types) = (false, std::collections::BTreeSet::new());
     for r in rows() {
@@ -97,9 +103,8 @@ pub fn parquet<I: Iterator<Item = Row>>(rows: impl Fn() -> I, geometry: bool) ->
         meta.insert("geo".to_string(), geo.to_string());
     }
     let schema = Arc::new(Schema::new_with_metadata(fields, meta));
-    let mut out = Vec::new();
     let props = WriterProperties::builder().set_compression(parquet::basic::Compression::SNAPPY).build();
-    let mut w = ArrowWriter::try_new(&mut out, schema.clone(), Some(props)).map_err(|e| e.to_string())?;
+    let mut w = ArrowWriter::try_new(w, schema.clone(), Some(props)).map_err(|e| e.to_string())?;
     let mut it = rows().peekable();
     while it.peek().is_some() {
         let chunk: Vec<Row> = it.by_ref().take(BATCH).collect();
@@ -151,8 +156,7 @@ pub fn parquet<I: Iterator<Item = Row>>(rows: impl Fn() -> I, geometry: bool) ->
         }
         w.write(&RecordBatch::try_new(schema.clone(), cols).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     }
-    w.close().map_err(|e| e.to_string())?;
-    Ok(out)
+    w.into_inner().map_err(|e| e.to_string())
 }
 
 /// A GeoJSON geometry as WKB (little endian, 2D); None for a geometry that it does not read.

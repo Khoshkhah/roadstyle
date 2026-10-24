@@ -733,15 +733,9 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
     let (cw, fw, bcw) = if items.is_empty() { (cw, fw, bcw) } else { (exp2(&cw), exp2(&fw), exp2(&bcw)) };
     let is_it = json!(["==", ["get", "__rs_k"], 5]);
     let soff = if items.is_empty() { off.clone() } else { by_feature(&[(is_it.clone(), metre_curve(&exp2(&off), "__rs_iom"))], &exp2(&off)) };
-    // render's lean mode (inline data): the roads source draws nothing, so MapLibre cuts it into no tiles; with tiles=True its layers are drawn
-    let lean = args["tiles"] != true;
-    let lean_layout = |l: &Value| {
-        let mut o = l.as_object().unwrap().clone();
-        if lean {
-            o.insert("visibility".into(), "none".into());
-        }
-        Value::Object(o)
-    };
+    // a page (state "live"), in both ways: the pieces draw, pick and glow, and the page has no roads source (the road table has the
+    // fields and the lines); the export keeps the roads, with their pick and highlight layers, for an app's clicks
+    let page = args["state"] == "live";
 
     // roads-simple and the invisible roads-fill (simple mode)
     // render's minzoom: true the config's table of the classes' first zooms, a mapping that table with changes, else none (_minzoom_filter)
@@ -799,7 +793,7 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
     }
     let (s_on, h_on) = (json!(["boolean", ["feature-state", "select"], false]), json!(["boolean", ["feature-state", "hover"], false]));
     item = json!(["case", s_on, select, h_on, hover, item]);
-    if lean {
+    if page {
         let mix = |c: &Value, f: &Value| json!(["interpolate", ["linear"], sel["opacity"], 0, f, 1, c]);
         fill = json!(["case", s_on, mix(select, &fill), h_on, mix(hover, &fill), fill]);
     }
@@ -824,9 +818,9 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
     simple_layout.insert("line-cap".into(), simple_cap());
     simple_layout.insert("line-sort-key".into(), json!(["get", "__rs_s"]));
     let road = json!({"id": "roads-simple", "type": "line", "source": "simple", "layout": simple_layout, "filter": flt, "paint": paint});
-    let pick = json!({"id": "roads-fill", "type": "line", "source": "roads", "layout": lean_layout(&lay), "filter": flt,
+    let pick = json!({"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, "filter": flt,
                       "paint": {"line-color": ["coalesce", ["get", "__rs_fill"], fb_fill], "line-width": fw, "line-offset": off, "line-opacity": 0}});
-    let mut highlight = json!({"id": "roads-highlight", "type": "line", "source": "roads", "layout": lean_layout(&lay),
+    let mut highlight = json!({"id": "roads-highlight", "type": "line", "source": "roads", "layout": lay,
                                "paint": {"line-color": ["case", s_on, select, hover],
                                          "line-opacity": ["case", ["any", h_on, s_on], sel["opacity"], 0], "line-width": fw0, "line-offset": off0}});
     if decks {        // a bridge glows on its deck from flat_below up; in position mode the flat bridge layers do not exist
@@ -878,7 +872,10 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
         ov_ids.push(ids);
     }
     let mut layers = under;
-    layers.extend([road, pick]);
+    layers.push(road);
+    if !page {
+        layers.push(pick);
+    }
 
     // the arrows and the names (simple mode: one layer each, above all roads, under the highlight)
     let sort = json!(["*", -1, m.sort_key("highway")]);
@@ -932,7 +929,9 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
             layers.push(label_layer("roads-labels", Value::Array(lf)));
         }
     }
-    layers.push(highlight);
+    if !page {
+        layers.push(highlight);
+    }
     if decks {
         let deck = |id: &str, flt: Value, color: Value, base: &str, height: &str| json!({"id": id, "type": "fill-extrusion", "source": "decks",
             "minzoom": dk.flat_below, "filter": flt, "paint": {"fill-extrusion-color": color, "fill-extrusion-base": ["get", base],
@@ -981,9 +980,9 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
     // _state_expressions: a road fill reads the colours of rsColor; a painted road sorts on top
     let base = json!(["coalesce", ["get", "__rs_fill"], fb_fill]);
     let has = |key: &str| json!(["has", ["to-string", ["get", key]], gs("rs_colors")]);
-    // the layers the page recolours (_fill_layer_ids) and their dashed fills
-    let fill_ids: HashSet<String> = crate::contract::fill_layer_ids(roads).into_iter().collect();
-    let is_fill = |lid: &str| fill_ids.contains(lid) || fill_ids.iter().any(|b| lid.starts_with(&format!("{b}-dash")));
+    // the road fill layers (_fill_layer_ids: in simple mode the export's pick layer roads-fill) and their dashed fills
+    const FILLS: [&str; 6] = ["roads-fill", "roads-fill-sq", "roads-fill-sx", "roads-fill-h", "roads-fill-hsq", "roads-fill-hsx"];
+    let is_fill = |lid: &str| FILLS.contains(&lid) || FILLS.iter().any(|b| lid.starts_with(&format!("{b}-dash")));
     for l in layers.iter_mut() {
         if l["id"].as_str().is_some_and(is_fill) {
             l["paint"]["line-color"] = swap(&l["paint"]["line-color"], &base, &fill_expr(fills, fb_fill));

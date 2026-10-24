@@ -388,11 +388,13 @@ pub struct SimpleSource {
     pub maxzoom: Option<i64>,
     /// the column keywords (ColumnMap): an engine column's user name at the output; a kept column goes away
     pub names: Vec<(&'static str, String)>,
+    /// a page: `promoteId` "__rs_edge" (every piece of a road has its row, so one feature state lights them all)
+    pub promote: bool,
 }
 
 impl SimpleSource {
     pub fn empty(cols: Cols) -> SimpleSource {
-        SimpleSource { pieces: Vec::new(), items: Vec::new(), cols, tolerance: 0.05, maxzoom: None, names: Vec::new() }
+        SimpleSource { pieces: Vec::new(), items: Vec::new(), cols, tolerance: 0.05, maxzoom: None, names: Vec::new(), promote: false }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -413,22 +415,30 @@ impl SimpleSource {
             .chain(self.items.iter().map(move |(id, it)| (*id, named(it.props.clone()), it.coords.as_deref())))
     }
 
-    /// The JSON text: each feature as `{"type", "geometry", "properties", "id"}`.
-    pub fn write_json(&self, out: &mut Vec<u8>, roads: &Roads) {
-        out.extend_from_slice(br#"{"type":"geojson","data":"#);
-        self.write_data(out, roads);
-        out.extend_from_slice(br#","tolerance":"#);
-        serde_json::to_writer(&mut *out, &self.tolerance).unwrap();
-        if let Some(z) = self.maxzoom {
-            out.extend_from_slice(format!(r#","maxzoom":{z}"#).as_bytes());
+    /// The JSON text, written to `w` a part at a time: each feature as `{"type", "geometry", "properties", "id"}`.
+    pub fn write_json<W: std::io::Write>(&self, w: &mut W, roads: &Roads) -> std::io::Result<()> {
+        w.write_all(br#"{"type":"geojson","data":"#)?;
+        self.write_data(w, roads)?;
+        w.write_all(br#","tolerance":"#)?;
+        serde_json::to_writer(&mut *w, &self.tolerance)?;
+        if self.promote {
+            w.write_all(br#","promoteId":"__rs_edge""#)?;
         }
-        out.push(b'}');
+        if let Some(z) = self.maxzoom {
+            write!(w, r#","maxzoom":{z}"#)?;
+        }
+        w.write_all(b"}")
     }
 
-    /// The FeatureCollection.
-    pub fn write_data(&self, out: &mut Vec<u8>, roads: &Roads) {
+    /// The FeatureCollection, written to `w` a part at a time.
+    pub fn write_data<W: std::io::Write>(&self, w: &mut W, roads: &Roads) -> std::io::Result<()> {
+        let mut out = Vec::new();
         out.extend_from_slice(br#"{"type":"FeatureCollection","features":["#);
         for (i, (id, props, coords)) in self.features(roads).enumerate() {
+            if out.len() > 1 << 16 {
+                w.write_all(&out)?;
+                out.clear();
+            }
             if i > 0 {
                 out.push(b',');
             }
@@ -437,15 +447,16 @@ impl SimpleSource {
                 None => out.extend_from_slice(b"null"),
                 Some(c) => {
                     out.extend_from_slice(br#"{"type":"LineString","coordinates":"#);
-                    serde_json::to_writer(&mut *out, c).unwrap();
+                    serde_json::to_writer(&mut out, c).unwrap();
                     out.push(b'}');
                 }
             }
             out.extend_from_slice(br#","properties":"#);
-            props.write_json(out);
+            props.write_json(&mut out);
             out.extend_from_slice(format!(r#","id":{id}}}"#).as_bytes());
         }
         out.extend_from_slice(b"]}");
+        w.write_all(&out)
     }
 }
 
@@ -557,7 +568,7 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
         }
         placed.push((id, f));
     }
-    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(width_col), tolerance: 0.05, maxzoom: None, names: Vec::new() })
+    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(width_col), tolerance: 0.05, maxzoom: None, names: Vec::new(), promote: false })
 }
 
 // _mitre_ends: a flat end where another road with metre widths goes on is pushed on to close the corner with the road that goes on most

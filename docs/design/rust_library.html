@@ -28,7 +28,7 @@ p > em:only-child { color: var(--muted); }
 <main>
 <h1 id="roadstyle-as-a-rust-library-the-design-and-the-migration-plan">roadstyle as a Rust library: the design and the migration plan</h1>
 <p><strong>Status:</strong> agreed 2026-10-23: decisions 1 to 8 as recommended, decision 9 open. Built (2026-10-23, branch <code>rust-engine</code>): P0, P1, P2 (the
-crates), P4's style features (all of render's keywords that change the style, the full look too), P5 (the binding, the wheel, the whole test
+crates), P4's style features (all of render's keywords that change the style; the full look was ported and then removed again on 2026-10-23, decision 2), P5 (the binding, the wheel, the whole test
 suite with <code>ROADSTYLE_ENGINE=rust</code>), the output side of P3's contract (<code>roadstyle:contract</code>, <code>roadstyle:state</code>, <code>roadstyle:controls</code>,
 <code>docs/reference/contract.md</code>) and of P6 the page writer, the PMTiles writer, <code>export_look</code> and the runtime API (<code>rs</code>). Release 0.25.0 (2026-10-23): the Rust engine as an experimental option, with wheels for five platforms. Design phase: (a) the pure core is done (the engine takes the model types; the readers are the facade's). Open: P3's typed look
 and the layer roles, P6's npm packages and <code>Tiler.restyle</code>, the level options of <code>compute_levels</code> in Rust, P7. It continues <a href="rust_engine.md">One Rust engine for roadstyle</a>
@@ -2360,7 +2360,31 @@ reads the static files from <code>src/roadstyle/</code> when it is built; a crat
 <li><strong>Content.</strong> Remove the Python code of each part that is at parity for one minor version with no difference. scipy, ortools,
   mapbox-vector-tile and pmtiles leave the dependencies. Version 1.0.</li>
 <li><strong>Exit.</strong> Python roadstyle has the API, folium, lonboard and the tools. The Rust goldens become the reference.</li>
+<li><strong>Approved 2026-10-23, at the end of the design queue (below).</strong> The Rust engine becomes roadstyle's default. Python's style code that
+  Rust replaces is deleted, not kept as a second engine: most of <code>render_web.py</code> (3,802 lines today), the style parts of <code>levels.py</code>
+  (826), <code>tiles.py</code> (240) and <code>stylers.py</code> (482): about 4,500 to 5,000 lines (an estimate). The Python API, folium, lonboard and the
+  notebook tools stay. Then a 1.0 release; the publish waits for Kaveh's last OK.</li>
 </ul>
+<h4 id="the-design-queue-2026-10-23">The design queue (2026-10-23)</h4>
+<p>The order of the design steps after the 0.25.0 release (the audit's items: <a href="audit_2026-10-23.md">audit_2026-10-23.md</a>; each step's report
+uses <a href="review_checklist.md">review_checklist.md</a>):</p>
+<ol>
+<li>(a) the pure core, (b) the typed render model, (f) the two stages: done.</li>
+<li>(g) one path for GeoJSON and tiles: the road table in both ways, one source naming, one feature id, one tile rule, the typed tiled page.</li>
+<li>R22, the live data join: a page colours and sizes the roads from a table by MapLibre's feature state (<code>rs_c</code>, <code>rs_w</code>), with no new build.</li>
+<li>R2 (stage 1 once, its typed output kept; a view's palette as a restyle), R1 with R8 (each layer and dashboard module declares what it
+   reads; one class index), R4 (one <code>Topology</code>), R3 (a typed stage 3, one <code>__RS_OPTIONS__</code>).</li>
+<li>(c) <code>roadstyle-look</code> (with R16, R17).</li>
+<li><strong>The mapstyle merge</strong> (approved 2026-10-23): roadstyle gets a duckOSM reader for the roads of every mode and the base-map tables
+   (<code>features.*</code>) in <code>roadstyle-io</code>; mapstyle's look (<code>styles/*.yaml</code>: layers, modes, paths, osm_carto, themes, the icons, the patterns,
+   the building heights) becomes part of <code>roadstyle-look</code>; mapstyle's <code>dashboard.js</code> and <code>layers.js</code> are replaced by the shared
+   dashboard; <code>render_map</code> and <code>export.py</code> become roadstyle calls on the two stages. The <code>mapstyle</code> package (about 1,000 lines of
+   Python) stays for one version as a shim that calls roadstyle, then retires. Goldens: today's mapstyle output. Its users (duckOSM's
+   <code>viz.py</code>, <code>levels_edit.py</code>, <code>route_map.py</code>, <code>scripts/multimodal_route_map.py</code>, and GeoLibre's build) move at the end of the freeze.</li>
+<li>(d) error enums and layer roles (with R7, R6, R10, R11, R14, R15), (e) the large files split (with R21), the dead-code step, the second
+   audit, then P7.</li>
+</ol>
+<p>R12, R13 and the <code>compute_levels</code> options belong to the levels session; R20 (the duckosm-rust consumer) waits for the end of the freeze.</p>
 <h3 id="parallel-work-without-two-sessions-in-one-file">Parallel work without two sessions in one file</h3>
 <table>
 <thead>
@@ -3282,7 +3306,7 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 <tr>
 <td>2</td>
 <td>Full mode (<code>simple=False</code>)</td>
-<td>It is not ported. Its one user (SonoFlow <code>viz/daily.py:179</code>) needs "change the color of each road from a property in the page": the dashboard module gets that call, and full mode is retired</td>
+<td>It is not ported. Its one user (SonoFlow <code>viz/daily.py:179</code>) needs "change the color of each road from a property in the page": the dashboard module gets that call, and full mode is retired. 2026-10-23 (audit R5): simple mode (one road layer, ordered by the sort key) is the one drawing approach. The Rust port of full mode (<code>full.rs</code>) is removed; with <code>engine="rust"</code>, <code>simple=False</code> is an error that names the Python engine. Python's <code>simple=False</code> gives a deprecation warning and goes away in 0.27.0, after the SonoFlow page gets "colour from a property" in the dashboard</td>
 <td>Port full mode to Rust (more layers, more goldens)</td>
 </tr>
 <tr>
