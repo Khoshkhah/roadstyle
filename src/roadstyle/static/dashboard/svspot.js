@@ -1,5 +1,6 @@
 // GOOGLE STREET VIEW of the clicked edge (the window, the side-by-side page, or a plain link),
 // looking the way the edge runs. A plain maps URL, no API key; where it stands is below.
+import {_esc} from "../popup.js";
 import {map, O, RS_PREFIX, RS_LEAN, _road, _roadOfPiece, _emit} from "./core.js";
 import {_svWindow} from "./streetview.js";
 import {srcOf} from "./select.js";
@@ -177,7 +178,7 @@ export function _sv(ll, f){
   if(u && _svWindow)                          // the window mode opens its window, not a new tab
     return '<div class="rs-sv" style="margin-top:4px"><a href="#" onclick="rsSetStreetView(true);return false">Street View</a></div>';
   return !u ? "" : '<div class="rs-sv" style="margin-top:4px"><a target="_blank" rel="noopener" href="'+
-    u.replace(/&/g, "&amp;")+'">Street View &#8599;</a></div>'; }
+    _esc(u)+'">Street View &#8599;</a></div>'; }
 export function initSpot(){
   _streetView = !!O.street_view; RS_FILL_LAYERS = O.fill_layers.map(id=>RS_PREFIX+id);
   window.rsSetStreetViewMarkerAt = rsSetStreetViewMarkerAt;
