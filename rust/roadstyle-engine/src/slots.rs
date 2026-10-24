@@ -48,18 +48,7 @@ impl SlotLook {
     }
 }
 
-/// Python's round(x, 6) as a float: the nearest double to the correctly rounded decimal (no tie can occur at 6 places).
-fn round6(x: f64) -> f64 {
-    let v: f64 = format!("{x:.6}").parse().unwrap();
-    if v == 0.0 { 0.0 } else { v }
-}
-
-type Node = (u64, u64); // a rounded point as a key (the bits of the two floats)
-
-fn node(c: &Pt) -> (Node, (f64, f64)) {
-    let (x, y) = (round6(c[0]), round6(c[1]));
-    ((x.to_bits(), y.to_bits()), (x, y))
-}
+type Node = u32; // a road end's node (roadstyle-model's Topology: the point rounded to 6 places)
 
 fn class_key(v: Option<Cell>) -> String {
     match v {
@@ -212,19 +201,19 @@ struct Rep {
 /// The "slots" source.
 pub fn slots_source(roads: &Roads, look: &SlotLook) -> Value {
     let hw_of = |i: usize| roads.get(i, "highway");
-    // every road's line: what a name or an arrow keeps away from
-    let tree: RTree<GeomWithData<Rectangle<[f64; 2]>, usize>> = RTree::bulk_load(roads.iter().enumerate()
-        .filter_map(|(i, f)| f.line().filter(|c| c.len() >= 2).map(|c| {
-            let (lo, hi) = bbox(c);
-            GeomWithData::new(Rectangle::from_corners(lo, hi), i)
-        })).collect());
+    // every road's line: what a name or an arrow keeps away from (the Topology's R-tree); the nodes of the road ends
+    let topo = roads.topo();
+    let node = |i: usize, k: usize| -> (Node, (f64, f64)) {
+        let n = topo.ends[i].expect("a line of two points or more")[k];
+        let p = topo.points[n as usize];
+        (n, (p[0], p[1]))
+    };
 
     // one representative per two-way pair; owner: the road and its twin (or its single-line partner)
     let mut by_ends: HashMap<(Node, Node, String), usize> = HashMap::new();
     let mut lines = Vec::new();
-    for (i, f) in roads.iter().enumerate() {
-        let Some(c) = f.line().filter(|c| c.len() >= 2) else { continue };
-        let (a, z) = (node(&c[0]), node(&c[c.len() - 1]));
+    for i in (0..roads.len()).filter(|&i| topo.ends[i].is_some()) {
+        let (a, z) = (node(i, 0), node(i, 1));
         by_ends.insert((a.0, z.0, class_key(hw_of(i))), i);
         lines.push((i, a, z));
     }
@@ -338,8 +327,7 @@ pub fn slots_source(roads: &Roads, look: &SlotLook) -> Value {
             // a long chain: an R-tree of its segments, else every road in its box is checked against all of them (Tartu: 2 s)
             let segs = (chain.len() > 16).then(|| RTree::bulk_load(chain.windows(2).enumerate()
                 .map(|(i, w)| { let (lo, hi) = bbox(w); GeomWithData::new(Rectangle::from_corners(lo, hi), i) }).collect()));
-            for hit in tree.locate_in_envelope_intersecting(&AABB::from_corners(lo, hi)) {
-                let k = hit.data;
+            for k in topo.near(lo, hi) {
                 let kc = roads.line(k).unwrap();
                 if mine.contains(&k) || back.contains(&kc.iter().map(|p| (p[0].to_bits(), p[1].to_bits())).collect::<Vec<_>>()) {
                     continue;

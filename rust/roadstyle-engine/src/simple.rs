@@ -640,7 +640,7 @@ fn push(c: &mut Vec<Pt>, first: bool, m: f64) {
 }
 
 fn mitre_ends(out: &mut [Piece], line_of: &[Option<&[Pt]>], roads: &Roads, items: &mut [Item]) {
-    let snap = |p: &Pt| (format!("{:.6}", p[0]), format!("{:.6}", p[1]));
+    let topo = roads.topo();
     let mut wide: indexmap::IndexMap<i64, (f64, f64)> = indexmap::IndexMap::new();
     for p in roads.iter() {
         let (Some(wm), Some(c)) = (p.get("__rs_wm").and_then(Cell::as_f64), p.line().filter(|c| c.len() >= 2)) else { continue };
@@ -652,11 +652,15 @@ fn mitre_ends(out: &mut [Piece], line_of: &[Option<&[Pt]>], roads: &Roads, items
         wide.insert(p.get("__rs_edge").and_then(Cell::as_i64).unwrap_or(p.i as i64), (wm * k, (wm - 2.0 * cm) * k));
     }
     let line = |e: i64| line_of.get(e as usize).copied().flatten();
-    let mut ends: HashMap<(String, String), Vec<(i64, bool)>> = HashMap::new();
+    // the ends of the metre roads at each node (a road end's node: Topology)
+    let node_of = |e: i64, first: bool| topo.ends.get(e as usize).copied().flatten().map(|n| n[usize::from(!first)]);
+    let mut ends: HashMap<u32, Vec<(i64, bool)>> = HashMap::new();
     for &e in wide.keys() {
-        let Some(c) = line(e) else { continue };
-        ends.entry(snap(&c[0])).or_default().push((e, true));
-        ends.entry(snap(&c[c.len() - 1])).or_default().push((e, false));
+        for first in [true, false] {
+            if let Some(n) = node_of(e, first) {
+                ends.entry(n).or_default().push((e, first));
+            }
+        }
     }
     let at = |a: &Pt, b: &Pt| (a[0] - b[0]).abs() < 1e-6 && (a[1] - b[1]).abs() < 1e-6;
     // one latitude for all the metres (two points' own ones put them metres apart): the first item's, else the first road's
@@ -680,7 +684,7 @@ fn mitre_ends(out: &mut [Piece], line_of: &[Option<&[Pt]>], roads: &Roads, items
             let u = heading(e, first);
             let u = if first { (-u.0, -u.1) } else { u };
             let mut best: Option<(f64, f64)> = None;
-            for &(o, ofirst) in ends.get(&snap(&node)).into_iter().flatten() {
+            for &(o, ofirst) in node_of(edge, first).and_then(|n| ends.get(&n)).into_iter().flatten() {
                 if o == edge {
                     continue;
                 }

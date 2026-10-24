@@ -5,8 +5,7 @@
 use crate::road::{Road, Roads};
 use roadstyle_model::Cell;
 use crate::roads::truthy;
-use crate::slots::{bbox, point_line_dist};
-use rstar::{primitives::GeomWithData, primitives::Rectangle, RTree, AABB};
+use crate::slots::point_line_dist;
 use serde_json::{json, Map, Value};
 
 const EDGE_ATTACHED: [&str; 2] = ["crossings", "traffic_signals"];
@@ -70,13 +69,10 @@ pub fn edge_attach(fcs: &mut Map<String, Value>, roads: &Roads) -> Vec<String> {
         rank[i] = k;
     }
     let street: Vec<bool> = roads.iter().map(|r| !r.get("highway").and_then(Cell::as_str).is_some_and(|h| PATH_CLASSES.contains(&h))).collect();
-    let tree: RTree<GeomWithData<Rectangle<[f64; 2]>, usize>> = RTree::bulk_load(roads.iter().enumerate()
-        .filter_map(|(i, r)| r.line().filter(|c| !c.is_empty()).map(|c| { let (lo, hi) = bbox(c); GeomWithData::new(Rectangle::from_corners(lo, hi), i) }))
-        .collect());
+    let topo = roads.topo();        // its R-tree: every road with a point or more
     let dist = |p: [f64; 2], i: usize| roads.line(i).map_or(f64::INFINITY, |c| point_line_dist(p, c));
     let within = |p: [f64; 2], d: f64| -> Vec<usize> {
-        let mut v: Vec<usize> = tree.locate_in_envelope_intersecting(&AABB::from_corners([p[0] - d, p[1] - d], [p[0] + d, p[1] + d]))
-            .map(|g| g.data).filter(|&i| dist(p, i) <= d).collect();
+        let mut v: Vec<usize> = topo.near([p[0] - d, p[1] - d], [p[0] + d, p[1] + d]).filter(|&i| dist(p, i) <= d).collect();
         v.sort();
         v
     };

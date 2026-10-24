@@ -771,6 +771,7 @@ version = "0.25.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
+ "rstar",
  "serde",
  "serde_json",
 ]

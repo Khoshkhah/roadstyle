@@ -116,12 +116,14 @@ pub fn mark_roads(fs: &mut Roads, look: &Look, args: &Value) -> Result<crate::co
     let named = |k: &str| args[k].as_str().is_some_and(|c| !c.is_empty());
     let computed = !named("casing_level_col") && !named("fill_level_col");      // render computes all four (compute_levels)
     mark_levels(fs, ["casing_level_col", "fill_level_col", "casing_start_col", "casing_end_col"].map(|k| computed || named(k)));
-    if look.twin_one && mark_twin_casing(fs, look.head_m, Some("edge_id")) {        // render passes its edge_id_col (the engine's edge_id)
+    // render's width_m_col: metre widths (docs/design/metre_widths.md); casing_m, else the theme's casing.m
+    let width_col = args["width_m_col"].as_str().filter(|c| !c.is_empty());
+    let pairs = if look.twin_one || width_col.is_some() { twin_pairs(fs) } else { Vec::new() };       // one time for both stages
+    if look.twin_one && mark_twin_casing(fs, &pairs, look.head_m, Some("edge_id")) {        // render passes its edge_id_col (the engine's edge_id)
         mark_twin_dead_ends(fs, &caps);
     }
-    // render's width_m_col: metre widths (docs/design/metre_widths.md); casing_m, else the theme's casing.m
-    if let Some(col) = args["width_m_col"].as_str().filter(|c| !c.is_empty()) {
-        mark_width_m(fs, col, args["casing_m"].as_f64().unwrap_or(look.casing_m));
+    if let Some(col) = width_col {
+        mark_width_m(fs, &pairs, col, args["casing_m"].as_f64().unwrap_or(look.casing_m));
     }
     stringify_unsafe_ints(fs);
     for (i, d) in fs.draw.iter_mut().enumerate() {
@@ -178,17 +180,6 @@ fn py_float(v: Cell) -> Option<f64> {
     }
 }
 
-/// round(x, digits) as a key: the text of the correctly rounded decimal is the same as Python's round (a tie cannot occur at 6 or 7
-/// places: half of 1e-6 has no exact binary value), and -0 is 0.
-fn round_key(x: f64, digits: usize) -> String {
-    let s = format!("{x:.digits$}");
-    if s.starts_with('-') && s[1..].bytes().all(|c| c == b'0' || c == b'.') { s[1..].to_string() } else { s }
-}
-
-fn point_key(c: &[f64; 2]) -> (String, String) {
-    (round_key(c[0], 6), round_key(c[1], 6))
-}
-
 /// _class_key: a missing class is "".
 fn class_key(v: Option<Cell>) -> String {
     match v {
@@ -198,20 +189,15 @@ fn class_key(v: Option<Cell>) -> String {
     }
 }
 
-/// The road's two end points, for a LineString of two points or more.
-fn ends(c: Option<&[[f64; 2]]>) -> Option<([f64; 2], [f64; 2])> {
-    let c = c?;
-    (c.len() >= 2).then(|| (c[0], c[c.len() - 1]))
-}
-
 // --- the stages ---
 
-type EndKey = Option<((String, String), (String, String), String)>;
+type EndKey = Option<(u32, u32, String)>;
 
 /// _mark_twoway: __rs_twoway (a reverse twin of the same class, both directed) and __rs_oneway (the arrows).
 fn mark_twoway(fs: &mut Roads, directed: bool, driving: bool) {
-    let keys: Vec<EndKey> = fs.iter().map(|f| ends(f.line()).map(|(a, z)| (point_key(&a), point_key(&z), class_key(f.get(HIGHWAY))))).collect();
-    let rev = |k: &EndKey| k.as_ref().map(|(a, z, c)| (z.clone(), a.clone(), c.clone()));
+    let topo = fs.topo();
+    let keys: Vec<EndKey> = fs.iter().map(|f| topo.ends[f.i].map(|[a, z]| (a, z, class_key(f.get(HIGHWAY))))).collect();
+    let rev = |k: &EndKey| k.as_ref().map(|(a, z, c)| (*z, *a, c.clone()));
     let mut by: HashMap<EndKey, Vec<usize>> = HashMap::new();
     for (i, k) in keys.iter().enumerate() {
         if k.is_some() {        // not a line: a key of its own (Python: id(ft)), never a twin
@@ -256,12 +242,11 @@ fn mark_twoway(fs: &mut Roads, directed: bool, driving: bool) {
 
 /// _mark_single_line: a reverse pair of a single-line class is one line; the later edge is __rs_dup, both name the other in __rs_edge2.
 fn mark_single_line(fs: &mut Roads, classes: &HashSet<String>) {
-    let mut first: HashMap<((String, String), (String, String), String), usize> = HashMap::new();
+    let mut first: HashMap<(u32, u32, String), usize> = HashMap::new();
     for i in 0..fs.len() {
         let kind = match fs.get(i, HIGHWAY).and_then(Cell::as_str) { Some(s) if classes.contains(s) => s.to_string(), _ => continue };
-        let Some((a, z)) = ends(fs.line(i)) else { continue };
-        let (a, z) = (point_key(&a), point_key(&z));
-        match first.remove(&(z.clone(), a.clone(), kind.clone())) {
+        let Some([a, z]) = fs.topo().ends[i] else { continue };
+        match first.remove(&(z, a, kind.clone())) {
             None => {
                 first.entry((a, z, kind)).or_insert(i);
             }
@@ -365,10 +350,9 @@ fn mark_levels(fs: &mut Roads, named: [bool; 4]) {
 /// _twin_pairs + _mark_twin_casing: a two-way edge and a reverse edge of its class on the same line backwards share one casing
 /// (__rs_twin: the other's position). Returns whether any pair was found. The two must agree, reversed (casing numbers, heads and end
 /// shapes); a pair that does not is named in a warning, by `id_col` (render's edge_id_col), else by position.
-fn mark_twin_casing(fs: &mut Roads, head_m: f64, id_col: Option<&str>) -> bool {
-    let pairs = twin_pairs(fs);
+fn mark_twin_casing(fs: &mut Roads, pairs: &[(usize, usize)], head_m: f64, id_col: Option<&str>) -> bool {
     let mut bad = Vec::new();
-    for &(j, i) in &pairs {
+    for &(j, i) in pairs {
         fs.draw[i].twin = Some(j as u32);
         fs.draw[j].twin = Some(i as u32);
         // each end: its casing number, its head length and its cap
@@ -397,16 +381,17 @@ fn mark_twin_casing(fs: &mut Roads, head_m: f64, id_col: Option<&str>) -> bool {
 
 /// _twin_pairs: a two-way edge and a reverse edge of its class on the same line backwards, as (first, second).
 fn twin_pairs(fs: &Roads) -> Vec<(usize, usize)> {
-    let mut first: HashMap<(String, String), usize> = HashMap::new();
+    let mut first: HashMap<(Vec<(u64, u64)>, String), usize> = HashMap::new();
     let mut pairs = Vec::new();
     for i in 0..fs.len() {
         if fs.draw[i].twoway != Some(true) {
             continue;
         }
         let Some(c) = fs.line(i).filter(|c| c.len() >= 2) else { continue };
-        let pts: Vec<String> = c.iter().map(|x| format!("{},{}", round_key(x[0], 7), round_key(x[1], 7))).collect();
-        let line = pts.join(";");
-        let back = pts.iter().rev().cloned().collect::<Vec<_>>().join(";");
+        // each point rounded to 7 places (the correctly rounded decimal, as Python's round; -0 is 0), as the bits of its float
+        let r7 = |x: f64| { let v: f64 = format!("{x:.7}").parse().unwrap(); if v == 0.0 { 0u64 } else { v.to_bits() } };
+        let line: Vec<(u64, u64)> = c.iter().map(|x| (r7(x[0]), r7(x[1]))).collect();
+        let back: Vec<(u64, u64)> = line.iter().rev().copied().collect();
         let ck = class_key(fs.get(i, HIGHWAY));
         match first.remove(&(back, ck.clone())) {
             None => {
@@ -420,7 +405,7 @@ fn twin_pairs(fs: &Roads) -> Vec<(usize, usize)> {
 
 /// _mark_width_m: __rs_wm / __rs_cm, the line's width and casing in metres over cos(latitude) at its mean latitude, for a finite width
 /// above 0 (any other value keeps the class width). Then a pair with metres on both gets the other direction's in __rs_twm.
-fn mark_width_m(fs: &mut Roads, col: &str, casing_m: f64) {
+fn mark_width_m(fs: &mut Roads, pairs: &[(usize, usize)], col: &str, casing_m: f64) {
     for i in 0..fs.len() {
         let Some(w) = fs.get(i, col).and_then(py_float) else { continue };
         let pts = fs.line(i).unwrap_or(&[]);
@@ -431,7 +416,7 @@ fn mark_width_m(fs: &mut Roads, col: &str, casing_m: f64) {
         fs.draw[i].width_m = Some(crate::layers::py_round(w * sec, 4));
         fs.draw[i].casing_m = Some(crate::layers::py_round(casing_m * sec, 4));
     }
-    for (i, j) in twin_pairs(fs) {
+    for &(i, j) in pairs {
         if let (Some(a), Some(b)) = (fs.draw[i].width_m, fs.draw[j].width_m) {
             fs.draw[i].twin_width_m = Some(b);
             fs.draw[j].twin_width_m = Some(a);
@@ -441,14 +426,10 @@ fn mark_width_m(fs: &mut Roads, col: &str, casing_m: f64) {
 
 /// _mark_twin_dead_ends: a twin pair's dead end (no other edge ends there) without a given cap is square.
 fn mark_twin_dead_ends(fs: &mut Roads, caps: &CapCols) {
-    let mut count: HashMap<(String, String), usize> = HashMap::new();
-    let cs: Vec<Option<((String, String), (String, String))>> = fs.iter().map(|f| ends(f.line()).map(|(a, z)| (point_key(&a), point_key(&z)))).collect();
-    for (a, z) in cs.iter().flatten() {
-        *count.entry(a.clone()).or_default() += 1;
-        *count.entry(z.clone()).or_default() += 1;
-    }
+    let cs = fs.topo().ends.clone();
+    let count = fs.topo().degree.clone();
     for i in 0..fs.len() {
-        let Some((a, z)) = &cs[i] else { continue };
+        let Some([a, z]) = &cs[i] else { continue };
         if fs.draw[i].twin.is_none() {
             continue;
         }
@@ -461,7 +442,7 @@ fn mark_twin_dead_ends(fs: &mut Roads, caps: &CapCols) {
         let old = d.split.unwrap_or([whole, whole]);
         let mut new = old;
         for (k, pnt) in [a, z].into_iter().enumerate() {
-            if a != z && count.get(pnt) == Some(&2) && !end_given[k] && !whole_given {
+            if a != z && count[*pnt as usize] == 2 && !end_given[k] && !whole_given {
                 new[k] = Cap::Square;
             }
         }
