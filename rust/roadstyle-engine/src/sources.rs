@@ -71,7 +71,12 @@ impl Sources {
         m.extend(old.into_iter().filter(|(k, _)| k != "symbol-placement" && k != "symbol-spacing"));
         l["layout"] = layout;
         let at = self.sources.iter().position(|(k, _)| k == "slots").map_or(self.sources.len(), |i| i + 1);
-        self.sources.insert(at, ("arrows".into(), Src::Json(serde_json::json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": []}}))));
+        let mut arrows = serde_json::json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": []}});
+        // render's data_maxzoom, as every GeoJSON source of the page has it (stage 1 gave it to the pieces)
+        if let Some(z) = self.sources.iter().find_map(|(_, s)| if let Src::Simple(p) = s { p.maxzoom } else { None }) {
+            arrows["maxzoom"] = z.into();
+        }
+        self.sources.insert(at, ("arrows".into(), Src::Json(arrows)));
         if let Some(m) = self.metadata.as_object_mut().filter(|m| m.contains_key("roadstyle:contract")) {
             m.insert("roadstyle:sources".into(), crate::contract::roles(&self.layers));
             m.insert("roadstyle:arrows".into(), crate::contract::arrow_kind(&self.layers));
