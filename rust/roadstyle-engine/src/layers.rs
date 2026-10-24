@@ -1179,3 +1179,61 @@ pub(crate) fn label_readable_filter(m: &Model, th: &Value) -> Value {
     mm.push(json!(first(None)));
     json!([">=", ["zoom"], mm])
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `ev` of `e` on the properties `p`: Some(value), or None where only the page can tell (Ev::Maybe).
+    fn ev_of(e: Value, p: Value) -> Option<Value> {
+        match ev(&e, p.as_object().unwrap()) {
+            Ev::V(v) => Some(v),
+            Ev::Maybe => None,
+        }
+    }
+
+    #[test]
+    fn ev_reads_the_properties() {
+        let p = json!({"highway": "primary", "lanes": 2, "bridge": "no", "oneway": true});
+        assert_eq!(ev_of(json!(["get", "highway"]), p.clone()), Some(json!("primary")));
+        assert_eq!(ev_of(json!(["get", "name"]), p.clone()), Some(Value::Null));
+        assert_eq!(ev_of(json!(["has", "lanes"]), p.clone()), Some(json!(true)));
+        assert_eq!(ev_of(json!(["literal", [1, 2]]), p.clone()), Some(json!([1, 2])));
+        assert_eq!(ev_of(json!(["at", 1, ["literal", ["a", "b"]]]), p.clone()), Some(json!("b")));
+        assert_eq!(ev_of(json!(["at", 5, ["literal", ["a", "b"]]]), p.clone()), None, "an index past the list: the page tells");
+        // the one road-flag rule (roadstyle_model::flags): "no" is no, a text that is set is yes
+        assert_eq!(ev_of(json!(["to-boolean", ["get", "bridge"]]), p.clone()), Some(json!(false)));
+        assert_eq!(ev_of(json!(["to-boolean", ["get", "highway"]]), p.clone()), Some(json!(true)));
+        assert_eq!(ev_of(json!(["!", ["get", "name"]]), p), Some(json!(true)));
+    }
+
+    #[test]
+    fn ev_compares_as_maplibre() {
+        let p = json!({"lanes": 2, "oneway": true, "highway": "primary"});
+        // a boolean never equals a number; 2 and 2.0 are the same number
+        assert_eq!(ev_of(json!(["==", ["get", "oneway"], 1]), p.clone()), Some(json!(false)));
+        assert_eq!(ev_of(json!(["==", ["get", "lanes"], 2.0]), p.clone()), Some(json!(true)));
+        assert_eq!(ev_of(json!(["!=", ["get", "highway"], "primary"]), p.clone()), Some(json!(false)));
+        assert_eq!(ev_of(json!(["<", "primary", "residential"]), p.clone()), Some(json!(true)));
+        assert_eq!(ev_of(json!(["+", "a", "b"]), p.clone()), Some(json!("ab")));
+        assert_eq!(ev_of(json!(["%", -1, 3]), p.clone()), Some(json!(2.0)), "the remainder has the sign of the divisor");
+        assert_eq!(ev_of(json!(["%", 1, 0]), p.clone()), None);
+        assert_eq!(ev_of(json!(["*", ["get", "lanes"], 1.5]), p), Some(json!(3.0)));
+    }
+
+    #[test]
+    fn ev_gives_maybe_where_only_the_page_can_tell() {
+        let p = json!({"highway": "primary"});
+        assert_eq!(ev_of(json!(["zoom"]), p.clone()), None);
+        // all / any stop at an answer that the rest cannot change, else Maybe stays
+        assert_eq!(ev_of(json!(["all", false, ["zoom"]]), p.clone()), Some(json!(false)));
+        assert_eq!(ev_of(json!(["all", true, ["zoom"]]), p.clone()), None);
+        assert_eq!(ev_of(json!(["any", ["zoom"], true]), p.clone()), Some(json!(true)));
+        assert_eq!(ev_of(json!(["==", ["zoom"], 3]), p.clone()), None);
+        assert_eq!(ev_of(json!(["coalesce", ["get", "name"], ["get", "highway"]]), p.clone()), Some(json!("primary")));
+        assert_eq!(ev_of(json!(["coalesce", ["zoom"], "x"]), p.clone()), None);
+        assert_eq!(ev_of(json!(["case", ["==", ["get", "highway"], "trunk"], 1, ["has", "highway"], 2, 3]), p.clone()), Some(json!(2)));
+        assert_eq!(ev_of(json!(["match", ["get", "highway"], ["trunk", "primary"], "big", "small"]), p.clone()), Some(json!("big")));
+        assert_eq!(ev_of(json!(["match", ["get", "highway"], "trunk", "big", "small"]), p), Some(json!("small")));
+    }
+}

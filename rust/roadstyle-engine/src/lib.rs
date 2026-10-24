@@ -480,3 +480,44 @@ pub fn level_edges(table: &RoadTable, cols: [&str; 7]) -> roadstyle_levels::Leve
     }
     edges
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Two roads with whole-number columns of these names.
+    fn table(names: &[&str]) -> RoadTable {
+        let mut lines = table::Lines::default();
+        lines.push(Some(&[[0.0, 0.0], [1.0, 0.0]]));
+        lines.push(Some(&[[0.0, 1.0], [1.0, 1.0]]));
+        let mut t = RoadTable::new(Vec::new(), Vec::new(), lines).unwrap();
+        for (i, n) in names.iter().enumerate() {
+            t.set_ints(n, vec![i as i64, 10 + i as i64]);
+        }
+        t
+    }
+
+    #[test]
+    fn column_map_gives_the_engine_its_names_and_the_user_theirs() {
+        // only a column keyword with another name than the engine's own: tunnel_col "tunnel" and an empty one change nothing
+        let m = ColumnMap::from_args(&json!({"highway_col": "fclass", "tunnel_col": "tunnel", "edge_id_col": "", "cap_start_col": "cs"}));
+        assert_eq!(m.0, vec![("highway", "fclass".to_string()), ("cap_start", "cs".to_string())]);
+        // the user's column gets the engine's name; a column that already has it is kept under another name in between
+        let mut t = table(&["highway", "fclass"]);
+        m.to_engine(&mut t);
+        assert_eq!(t.names(), [ColumnMap::kept("highway"), "highway".to_string()]);
+        assert_eq!(t.get(0, "highway").map(|c| c.to_value()), Some(json!(1)), "the user's fclass is the engine's highway");
+        // a named column that the table does not have: nothing changes
+        let mut t = table(&["highway"]);
+        m.to_engine(&mut t);
+        assert_eq!(t.names(), ["highway".to_string()]);
+        // the expressions of the roads and simple layers read the user's names again; another source's layer keeps its names
+        let mut layers = vec![json!({"id": "a", "source": "roads", "filter": ["==", ["get", "highway"], "primary"],
+                                     "paint": {"line-color": ["case", ["has", "cap_start"], "#000000", "#ffffff"]}}),
+                              json!({"id": "b", "source": "slots", "filter": ["get", "highway"]})];
+        m.to_user(&mut [], &mut layers);
+        assert_eq!(layers[0]["filter"], json!(["==", ["get", "fclass"], "primary"]));
+        assert_eq!(layers[0]["paint"]["line-color"][1], json!(["has", "cs"]));
+        assert_eq!(layers[1]["filter"], json!(["get", "highway"]));
+    }
+}

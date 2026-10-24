@@ -1,0 +1,100 @@
+{
+  "keys": [
+    "version",
+    "name",
+    "center",
+    "zoom",
+    "layers",
+    "sources",
+    "metadata",
+    "glyphs"
+  ],
+  "layers": [
+    [
+      "roads-simple",
+      "line",
+      "simple",
+      "a0894aa3fdcc8faf",
+      "6ca30948e440fa6a",
+      "c57eb06c5a87ff06"
+    ],
+    [
+      "roads-arrows",
+      "symbol",
+      "slots",
+      "b6fe0bd5e873ecd9",
+      "b9e63a214b296e3e",
+      "7d902068fb67d6a8"
+    ],
+    [
+      "roads-labels",
+      "symbol",
+      "slots",
+      "fa31f5cc7748bc7d",
+      "e66f1480f0ee2761",
+      "bc66e941e4f8c5a1"
+    ],
+    [
+      "ov0-text",
+      "symbol",
+      "ov0",
+      "74234e98afe7498f",
+      "2749705a2cab01be",
+      "744fd1e52f7594b6"
+    ]
+  ],
+  "sources": {
+    "ov0": [
+      "geojson",
+      40,
+      "503ce443d5d52d2f"
+    ],
+    "simple": [
+      "geojson",
+      1855,
+      "97ada68ec9b11f6c"
+    ],
+    "slots": [
+      "geojson",
+      243,
+      "2e27b959f18c2039"
+    ]
+  },
+  "metadata": {
+    "roadstyle:interaction": "a911c29a8eeae5d8",
+    "roadstyle:images": "e9049aa3d5b18840"
+  },
+  "hash": "cf12b4318ccbe799",
+  "road_table": {
+    "rows": 1373,
+    "columns": [
+      "edge_id",
+      "osm_id",
+      "highway",
+      "name",
+      "oneway",
+      "walk_type",
+      "edge_ref",
+      "driving",
+      "walking",
+      "cycling",
+      "casing_start",
+      "casing_level",
+      "casing_end",
+      "fill_level",
+      "is_directed",
+      "has_arrows",
+      "junction",
+      "bridge",
+      "layer",
+      "lanes",
+      "tunnel",
+      "access",
+      "__rs_fill",
+      "__rs_twoway",
+      "lvl",
+      "__rs_cls"
+    ],
+    "hash": "f768b6d65f9a5bc7"
+  }
+}
