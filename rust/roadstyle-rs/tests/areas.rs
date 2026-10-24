@@ -177,13 +177,6 @@ fn levels_against_python() {
     assert_eq!(level_rows("sodermalm", Solve, "golden_levels_solve.json.gz"), (4_563, 4_563, 4_563));
 }
 
-#[test]
-#[ignore = "writes the engine's solve rows of Monaco to $ROWS, for a check with roadstyle's rules (P0's list of differences)"]
-fn monaco_solve_rows() {
-    let rows = levels("monaco", roadstyle_rs::levels::Method::Solve);
-    std::fs::write(std::env::var("ROWS").unwrap(), Value::Array(rows).to_string()).unwrap();
-}
-
 /// Tartu (inputs and goldens from the pre-release: tests/get_goldens.sh): the style, the tiles and the tags rule (no solve: Python
 /// needs too much memory for it).
 #[test]
