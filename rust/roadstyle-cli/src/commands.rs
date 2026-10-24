@@ -289,7 +289,14 @@ fn tile_of(lon: f64, lat: f64, z: u32) -> [u32; 2] {
     [x as u32, y as u32]
 }
 
+/// `snapshot` in a build without the feature "snapshot": an error.
+#[cfg(not(feature = "snapshot"))]
+fn snapshot(_: &str, _: &str, _: Vec<(String, Option<String>)>) -> Result<(), Error> {
+    Err(Error::Usage("snapshot: this roadstyle is built without the feature \"snapshot\"".into()))
+}
+
 /// `snapshot`: the PNG of a saved page; a map that did not load in the time is taken with a warning (on stderr), as in Python.
+#[cfg(feature = "snapshot")]
 fn snapshot(page: &str, out: &str, mut opts: Vec<(String, Option<String>)>) -> Result<(), Error> {
     use roadstyle_snapshot::{Camera, Shot};
     let num = |k: &str, v: Option<String>| -> Result<Option<f64>, Error> {

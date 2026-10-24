@@ -65,9 +65,13 @@ cargo install wasm-bindgen-cli --version 0.2.129
 Build the module and make its JavaScript glue:
 
 ```bash
-cargo build --release --target wasm32-unknown-unknown --manifest-path rust/Cargo.toml -p roadstyle-wasm
-wasm-bindgen --target web --out-dir pkg rust/target/wasm32-unknown-unknown/release/roadstyle_wasm.wasm
+cargo build --profile dist --target wasm32-unknown-unknown --manifest-path rust/Cargo.toml -p roadstyle-wasm
+wasm-bindgen --target web --out-dir pkg rust/target/wasm32-unknown-unknown/dist/roadstyle_wasm.wasm
 ```
+
+The profile `dist` is release with fat LTO and one codegen unit (`rust/Cargo.toml`): the wheels and the wasm packages use it. The tests
+and the development builds use `release`, which builds much faster. `cargo test` at `rust/` tests the libraries; the programs are not
+default members, so test them by name: `cargo test --release -p roadstyle-cli -p roadstyle-snapshot`.
 
 `pkg/` then has `roadstyle_wasm.js`, `roadstyle_wasm_bg.wasm` (about 6 MB) and the TypeScript types. How to use them:
 [Use roadstyle in the browser](browser.md).

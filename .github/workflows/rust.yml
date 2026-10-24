@@ -52,16 +52,22 @@ jobs:
           CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: "true"
         run: cargo test --offline --release
 
+      - name: The programs (roadstyle-cli and roadstyle-snapshot are not default members)
+        env:
+          CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "true"
+          CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: "true"
+        run: cargo test --offline --release -p roadstyle-cli -p roadstyle-snapshot
+
       - name: Clippy
-        run: cargo clippy --offline --all-targets -- -D warnings
+        run: cargo clippy --offline --workspace --exclude roadstyle-py --all-targets -- -D warnings
 
       - name: Long files (a warning, not a failure)
         run: python3 ../docs/gen_architecture.py --long
 
       - name: WebAssembly
         run: |
-          cargo build --offline --release --target wasm32-unknown-unknown -p roadstyle-wasm
-          ls -l target/wasm32-unknown-unknown/release/roadstyle_wasm.wasm
+          cargo build --offline --profile dist --target wasm32-unknown-unknown -p roadstyle-wasm
+          ls -l target/wasm32-unknown-unknown/dist/roadstyle_wasm.wasm
           # the core builds for wasm32 with no features, and it has no I/O (the Arrow arrays are the model's data, the Parquet reader is I/O) (docs/design/rust_library.md, rule 3 of the layers)
           core="-p roadstyle-model -p roadstyle-levels -p roadstyle-engine -p roadstyle-tiles"
           cargo build --offline --release --target wasm32-unknown-unknown $core --no-default-features

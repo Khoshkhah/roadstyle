@@ -7,6 +7,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **`cargo test` at `rust/` builds 113 crates in about 1 minute, not 195 in 5** (review D1). The programs `roadstyle-cli` and
+  `roadstyle-snapshot` (bundled SQLite, headless_chrome) are not default members: CI tests them in a step of their own (`-p`). Fat LTO
+  and one codegen unit moved from `release` to a new profile `dist` (`inherits = "release"`), which the wheels (`maturin --profile
+  dist`) and the wasm packages (`build_editor.sh`, `npm run build`) use. `roadstyle snapshot` is the default feature `snapshot` of
+  roadstyle-cli.
 - **`roadstyle_levels::ROADSTYLE_VERSION` is the crate's version** (review D13): it said 0.24.2 in 0.25.0, and duckosm-rust writes
   it into `edge_levels_meta.roadstyle_version`. No level check reads that value (they compare `edge_hash` and `n_edges`).
 - **A level area's roads.parquet has the ids as Int64** (audit N28, both engines). `road`, `edges` and `reversed` are Int64 and
