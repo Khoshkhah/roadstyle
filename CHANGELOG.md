@@ -49,6 +49,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   has the key: a casing piece has no `__rs_fill@<palette>: null` any more. The map does not change.
 
 ### Added
+- **Roads from a GeoJSON file in Rust** (`roadstyle-io::geojson::read_roads`, for the studio in the browser). It gives a `RoadTable`, as the
+  GeoParquet reader does: one row for each feature, a column for each property (Boolean, Int64, Float64, else text), and a LineString's
+  points as the line. The facade's `sources_of(roads, look, ...)` is stage 1 of the roads that any reader gave. JavaScript:
+  `readGeoJson(bytes)` gives a `Roads` handle (`length`, `columns()`, `sources(look, features?, planner?, name?)`). Monaco's roads as
+  GeoJSON make the same style as their GeoParquet file.
 - **The base map's look in Rust** (the mapstyle merge, step 1): `Look::resolve` takes `base_map: {mode, theme, paths}` (a duckOSM map's
   travel mode, its theme and its path style) and makes mapstyle's look with no Python: the mode's palette and settings (`mode_settings`),
   the theme's colours, and the base map's part of the look (the layers of `layers.yaml`, the 3D heights, the base map's style, the

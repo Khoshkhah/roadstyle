@@ -4,7 +4,7 @@
 //! needs both the engine and the tiles. A Rust user adds only this crate.
 
 pub use roadstyle_engine::*;
-pub use roadstyle_io::read;
+pub use roadstyle_io::{geojson, read};
 pub mod level_area;
 pub mod level_editor;
 pub mod page;
@@ -36,7 +36,13 @@ pub fn make_style(parquet: Vec<u8>, look: &Look, features: Option<Vec<u8>>, plan
 /// `roadstyle:columns`: the class, filter and metre width columns).
 pub fn make_sources(parquet: Vec<u8>, look: &Look, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<sources::Sources, String> {
     let (feats, features, planner) = tables(parquet, features, planner)?;
-    let mut s = sources::Sources::new(make_parts(feats, look, features, planner, name)?);
+    sources_of(feats, look, features, planner, name)
+}
+
+/// Stage 1 of roads that a reader gave (`read::read_roads`, `geojson::read_roads`, ...), as `make_sources`.
+pub fn sources_of(roads: RoadTable, look: &Look, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>)
+                  -> Result<sources::Sources, String> {
+    let mut s = sources::Sources::new(make_parts(roads, look, features, planner, name)?);
     s.saved.insert(tiles::stage::TILES.into(), look.config["tiles"].clone());
     s.saved.insert(tiles::stage::COLUMNS.into(), columns(look));
     Ok(s)

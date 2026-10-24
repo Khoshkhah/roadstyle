@@ -252,6 +252,40 @@ mod wasm {
         roadstyle::make_sources(parquet, &look.0, features, planner, name).map(|inner| Sources { inner }).map_err(|e| JsError::new(&e))
     }
 
+    /// Roads that a reader of a road file gave (roadstyle-io: a RoadTable, one row for each road): `readGeoJson(bytes)` makes them. `length`
+    /// and `columns()` describe them; `sources(look, features?, planner?, name?)` is stage 1 of them (makeSources' arguments after the roads).
+    #[wasm_bindgen]
+    pub struct Roads(roadstyle::RoadTable);
+
+    #[wasm_bindgen]
+    impl Roads {
+        /// The number of roads (the file's features).
+        #[wasm_bindgen(getter)]
+        pub fn length(&self) -> usize {
+            self.0.len()
+        }
+
+        /// The names of the roads' columns (the file's properties), in order.
+        pub fn columns(&self) -> Vec<String> {
+            self.0.names().to_vec()
+        }
+
+        /// sources(look, features?, planner?, name?): stage 1 of these roads, as makeSources; `features` and `planner` are Parquet bytes.
+        pub fn sources(&self, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<Sources, JsError> {
+            let err = |e: String| JsError::new(&e);
+            let features = features.map(|f| roadstyle::read::read_table(f, "geometry")).transpose().map_err(err)?;
+            let planner = planner.map(|p| roadstyle::read::read_table(p, "")).transpose().map_err(err)?;
+            roadstyle::sources_of(self.0.clone(), &look.0, features, planner, name).map(|inner| Sources { inner }).map_err(err)
+        }
+    }
+
+    /// readGeoJson(bytes: Uint8Array) -> Roads: the roads of a GeoJSON file (a FeatureCollection in EPSG:4326; roadstyle-io's geojson.rs
+    /// says how each property becomes a column). An error is a thrown Error.
+    #[wasm_bindgen(js_name = readGeoJson)]
+    pub fn read_geojson(bytes: &[u8]) -> Result<Roads, JsError> {
+        roadstyle::geojson::read_roads(bytes).map(Roads).map_err(|e| JsError::new(&e))
+    }
+
     /// tileSources(sources, prefix, keep): stage 2 from memory (the typed pieces, no GeoJSON text; the sources stay as they are). The
     /// Tiler's style has the one vector source `<prefix>roads/{z}/{x}/{y}`, with the pieces' promoteId (roadstyle::tile_stage).
     #[wasm_bindgen(js_name = tileSources)]
