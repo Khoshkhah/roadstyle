@@ -8,7 +8,9 @@ use std::path::{Path, PathBuf};
 
 use rmcp::handler::server::{router::tool::ToolRouter, wrapper::Parameters};
 use rmcp::model::{CallToolResult, ContentBlock, Implementation, ServerCapabilities, ServerConfig};
+use base64::Engine;
 use rmcp::{schemars, tool, tool_handler, tool_router, ServerHandler, ServiceExt};
+use roadstyle_snapshot::{Camera, Shot};
 use serde_json::{json, Map, Value};
 
 const INSTRUCTIONS: &str = "\
@@ -23,7 +25,7 @@ roadstyle draws road networks as styled, interactive, offline HTML maps (MapLibr
 - Edges are directed: a two-way street is two edges drawn side by side. Don't merge them.
 Docs: https://khoshkhah.github.io/roadstyle/ (every keyword: /reference/parameters/).";
 
-/// The Python server that has what this one does not have yet (render_place, the page, the PNG).
+/// The Python server that has what this one does not have yet (render_place, the page).
 const PYTHON: &str = "the Python server (pip install roadstyle-mcp==0.25.0)";
 
 /// The options that stage 1 (the look and the sources) reads: render_edges keywords. TODO(R3): replace this list with R3's typed page
@@ -102,10 +104,24 @@ impl Server {
     #[tool(description = "PNG of a saved roadstyle map, optionally with a camera (centre lon/lat, zoom 0-22).\n\nStreet names: main roads \
         from zoom 15-16, side streets from 17; one-way arrows: main roads from 15, side streets from 17.\nWithout a camera the map's own \
         opening view is captured.")]
-    fn snapshot(&self, Parameters(a): Parameters<Snapshot>) -> CallToolResult {
-        let _ = (a.html_path, a.lon, a.lat, a.zoom, a.bearing, a.pitch);
-        // TODO(A4): the PNG from the page's style, without a browser
-        result(Err(format!("snapshot is not in the Rust server yet (plan step A4). Use {PYTHON}.")))
+    async fn snapshot(&self, Parameters(a): Parameters<Snapshot>) -> CallToolResult {
+        let cam = Camera { center: a.lon.zip(a.lat).map(|(lon, lat)| [lon, lat]), zoom: a.zoom, pitch: a.pitch, bearing: a.bearing };
+        let html = std::path::absolute(expand(&a.html_path)).unwrap_or_else(|_| expand(&a.html_path));
+        // headless_chrome waits on its own thread: away from the runtime that answers the agent
+        match tokio::task::spawn_blocking(move || preview(&html, &cam)).await {
+            Ok(c) => CallToolResult::success(vec![c]),
+            Err(e) => result(Err(e.to_string())),
+        }
+    }
+}
+
+/// The PNG of a saved page beside it (<page>.png), as an image for the agent. Without a browser it is a note, not an error: the map
+/// still stands (as in the Python server).
+fn preview(html: &Path, cam: &Camera) -> ContentBlock {
+    let png = html.with_extension("png");
+    match roadstyle_snapshot::snapshot(html, &png, cam, &Shot::default()).and_then(|p| Ok(std::fs::read(p)?)) {
+        Ok(bytes) => ContentBlock::image(base64::engine::general_purpose::STANDARD.encode(bytes), "image/png"),
+        Err(e) => ContentBlock::text(format!("(no preview: {e})")),
     }
 }
 
@@ -229,8 +245,8 @@ fn render_file(a: RenderFile) -> Result<String, String> {
     let look = roadstyle::look::make_look(&look)?.to_string();
     let name = options.get("name").and_then(Value::as_str).map(str::to_string);
     roadstyle::make_sources(bytes, &look, None, None, name)?;
-    // TODO(R3): the page from the sources (with the keyless base map note: esri_street without CARTO_API_KEY), saved at `out`, and the
-    // preview (A4); then the answer is "Saved <out>\n<summary>" and the PNG
+    // TODO(R3): the page from the sources (with the keyless base map note: esri_street without CARTO_API_KEY), saved at `out`; then the
+    // answer is "Saved <out>\n<summary>" and `preview(&out, &Camera::default())`
     Err(format!("{text}\nno map: the Rust engine has no page writer yet (plan step R3), so {} is not written. Use {PYTHON}.", out.display()))
 }
 

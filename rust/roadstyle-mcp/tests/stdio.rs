@@ -69,10 +69,21 @@ fn a_file_that_is_not_read_yet_is_an_error_that_says_so() {
 }
 
 #[test]
-fn render_place_and_snapshot_send_the_agent_to_the_python_server() {
-    for (tool, args) in [("render_place", json!({"place": "Monaco"})), ("snapshot", json!({"html_path": "x.html"}))] {
-        let (_, res) = call(tool, args);
-        assert_eq!(res["isError"], true);
-        assert!(text(&res).contains("roadstyle-mcp==0.25.0"), "{res}");
-    }
+fn render_place_sends_the_agent_to_the_python_server() {
+    let (_, res) = call("render_place", json!({"place": "Monaco"}));
+    assert_eq!(res["isError"], true);
+    assert!(text(&res).contains("roadstyle-mcp==0.25.0"), "{res}");
+}
+
+#[test]
+fn snapshot_is_a_png_or_a_note_without_a_browser() {
+    let dir = std::env::temp_dir().join("roadstyle-mcp-test");
+    std::fs::create_dir_all(&dir).unwrap();
+    let page = dir.join("page.html");
+    std::fs::write(&page, "<!doctype html><body style='background:#2a6'><h1>roadstyle</h1></body>").unwrap();
+    let (_, res) = call("snapshot", json!({"html_path": page}));
+    assert_ne!(res["isError"], true, "{res}");
+    // as the Python test: a PNG when Chromium is there, else a note that says how to get it
+    let c = &res["content"][0];
+    assert!(c["type"] == "image" && c["mimeType"] == "image/png" || text(&res).starts_with("(no preview: no Chromium found"), "{res}");
 }
