@@ -115,7 +115,7 @@ window.map = map;
 map.addControl(new maplibregl.NavigationControl({visualizePitch: true}));
 map.addControl(new maplibregl.ScaleControl({maxWidth: 120, unit: "metric"}), "bottom-left");
 const rs = rsDashboard(map, {style: null, prefix: "rs-", tiles: true, simple: "roads-simple", edge_id_col: "edge", basemap_switcher: false,
-  select_color: "rgba(0,0,0,0)", engine: {props: async (id) => JSON.parse(tiler.props("roads", id))}});
+  select_color: "rgba(0,0,0,0)"});                                 // the road fields: the road table RS_SIDE
 window.rs = rs;
 async function showRoads(st){                                      // the roads style on the map, in place of the one before (prefix rs-)
   for(const l of map.getStyle().layers) if(l.id.startsWith("rs-")) map.removeLayer(l.id);
