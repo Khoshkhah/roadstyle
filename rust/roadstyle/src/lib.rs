@@ -69,12 +69,21 @@ fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> tiles::T
                 tiled.add_lines(k, p.features(&s.roads.roads).map(|(_, props, c)| (c, props.into_iter())), &keep, whole, from)
             }
             Src::Json(v) => {
-                let (keep, whole, from) = o.rule(k, || keys(v));
+                let (keep, whole, from) = whole_unless_lines(v, o.rule(k, || keys(v)), o.min_zoom);
                 tiled.add(k, v, &keep, whole, from)
             }
         }
     }
     tiled
+}
+
+/// tiles.py's rule for a source other than the roads, the pieces and the slots: lines are clipped to each tile; points and polygons go
+/// whole into every tile their box touches, from the first zoom (its extra layers). A polygon at a tile's edge whose clipped part has
+/// no area was left out of that tile before (the sea at Monaco's west edge, 2026-10-24).
+fn whole_unless_lines(src: &Value, rule: (std::collections::HashSet<String>, bool, u32), first: u32) -> (std::collections::HashSet<String>, bool, u32) {
+    let lines = src["data"]["features"].as_array().into_iter().flatten()
+        .all(|f| matches!(f["geometry"]["type"].as_str(), Some("LineString" | "MultiLineString")));
+    if rule.1 || lines { rule } else { (rule.0, true, first) }
 }
 
 /// Stage 2 from memory (audit N3): the tiles of stage 1's sources and the one style that draws them (`tiled_style`), the tiles at `at`
@@ -183,8 +192,9 @@ pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[S
             }
         }
         let src = json!({"type": "geojson", "data": fc});
-        let (keep, whole, from) = o.rule(k, || src["data"]["features"].as_array().into_iter().flatten()
+        let rule = o.rule(k, || src["data"]["features"].as_array().into_iter().flatten()
             .filter_map(|f| f["properties"].as_object()).flat_map(|p| p.keys().cloned()).collect());
+        let (keep, whole, from) = whole_unless_lines(&src, rule, o.min_zoom);
         tiled.add(k, &src, &keep, whole, from);
     }
     Ok((tiled_style(style, &names, at, (o.min_zoom, o.max_zoom)), tiled))

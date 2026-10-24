@@ -317,7 +317,9 @@ impl Tiles {
                     let mut rings = Vec::new();
                     for poly in ps {
                         for (k, r) in poly.iter().enumerate() {
-                            let mut r = dedup(clip_ring(&r.iter().map(to).collect::<Vec<_>>(), lo, hi).into_iter().map(round));
+                            // tiles.py: a whole layer's polygon goes into every tile its box touches as it is, not clipped
+                            let r: Vec<P> = r.iter().map(to).collect();
+                            let mut r = dedup(if layer.whole { r } else { clip_ring(&r, lo, hi) }.into_iter().map(round));
                             if r.len() > 1 && r[0] == r[r.len() - 1] {
                                 r.pop();
                             }
