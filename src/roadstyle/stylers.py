@@ -237,7 +237,7 @@ class NumericStyler:
     column via ``width_by=(min_px, max_px)``. Backed by :class:`roadstyle.colors.ColorRamp`.
     """
     column: str = ""
-    cmap: object = "viridis"           # branca scheme name, matplotlib name, or list of hex stops
+    cmap: object = "viridis"           # branca scheme name, matplotlib name (data/cmaps.json), or list of hex stops
     vmin: float | None = None
     vmax: float | None = None
     width: float = _theme("data.width")   # constant width unless width_by is given

@@ -5,6 +5,7 @@
 //! patterns.py (the textures: their masks are drawn one time, in data/basemap/patterns/). The files are roadstyle's own:
 //! src/roadstyle/data/basemap/, read at build time, so there is one copy of them.
 
+use crate::Error;
 use crate::resolve::{carto_entries, yaml};
 use base64::Engine;
 use serde::Deserialize;
@@ -14,6 +15,7 @@ const LAYERS: &str = include_str!("../../../src/roadstyle/data/basemap/layers.ya
 const MODES: &str = include_str!("../../../src/roadstyle/data/basemap/modes.yaml");
 const PATHS: &str = include_str!("../../../src/roadstyle/data/basemap/paths.yaml");
 const CARTO: &str = include_str!("../../../src/roadstyle/data/basemap/osm_carto.yaml");
+const BASEMAPS: &str = include_str!("../../../src/roadstyle/data/basemaps.json");
 /// the themes other than "osm" (osm_carto.yaml as it is), by name
 const THEMES: [(&str, &str); 3] = [
     ("google", include_str!("../../../src/roadstyle/data/basemap/themes/google.yaml")),
@@ -64,7 +66,7 @@ pub const LEVEL_COLS: [&str; 8] = ["casing_start", "casing_level", "casing_end",
 
 /// What a base map's choice gives the look: the roads' palette name and settings (one settings source), the base map's part of the
 /// look (`features`) and render_map's map options (`args`): the name, the tooltip, the copy field, the columns of the duckOSM reader
-/// (is_directed, has_arrows) and, for a mode with no lanes, one centred line for each road. The stored levels' columns come with the
+/// (is_directed, has_arrows, access, the mode flags), the page's box layout and, for a mode with no lanes, one centred line for each road. The stored levels' columns come with the
 /// keyword `levels` (resolve.rs).
 pub struct BaseMapLook {
     pub palette: String,
@@ -172,13 +174,13 @@ fn merge(a: Option<&Value>, b: &Value) -> Value {
 
 /// A theme: osm_carto.yaml in its colours (its transform on every colour, then its own colours), the theme file itself (empty for
 /// "osm") and its transform (saturation, lighten), for the colours that come from elsewhere.
-pub fn load_theme(theme: &str) -> Result<(Value, Value, (f64, f64)), String> {
+pub fn load_theme(theme: &str) -> Result<(Value, Value, (f64, f64)), Error> {
     let base = style(CARTO);
     if theme == "osm" {
         return Ok((base, json!({}), (1.0, 0.0)));
     }
     let text = THEMES.iter().find(|t| t.0 == theme).map(|t| t.1)
-        .ok_or_else(|| format!("unknown theme '{theme}'; choose from {}", pyrepr(&themes())))?;
+        .ok_or_else(|| Error::Unknown(format!("unknown theme '{theme}'; choose from {}", pyrepr(&themes()))))?;
     let t = style(text);
     let tr = &t["transform"];
     let tr = (tr["saturation"].as_f64().unwrap_or(1.0), tr["lighten"].as_f64().unwrap_or(0.0));
@@ -205,10 +207,10 @@ fn data_url(mime: &str, data: &[u8]) -> String {
 
 /// pattern_png: one 64 px tile of the texture `name` in `color` on transparent (MapLibre's fill-pattern cannot tint an image, so each
 /// colour is an image of its own).
-fn pattern_png(name: &str, color: &str) -> Result<Vec<u8>, String> {
-    let mask = PATTERNS.iter().find(|p| p.0 == name).ok_or_else(|| format!("no texture named '{name}'"))?.1;
+fn pattern_png(name: &str, color: &str) -> Result<Vec<u8>, Error> {
+    let mask = PATTERNS.iter().find(|p| p.0 == name).ok_or_else(|| Error::Unknown(format!("no texture named '{name}'")))?.1;
     let (w, h, ch, px) = crate::png::decode(mask)?;
-    let c = hex(color).ok_or_else(|| format!("texture {name}: {color} is not a '#rrggbb' colour"))?;
+    let c = hex(color).ok_or_else(|| Error::Options(format!("texture {name}: {color} is not a '#rrggbb' colour")))?;
     let rgba: Vec<u8> = px.chunks(ch).flat_map(|p| [c[0] as u8, c[1] as u8, c[2] as u8, p[ch - 1]]).collect();
     Ok(crate::png::encode_rgba(w, h, &rgba))
 }
@@ -219,7 +221,7 @@ fn kind_of<'a>(specs: &'a [Value], name: &str) -> &'a str {
 
 /// The images of the base map that feature_overlays puts in roadstyle:images, for each layer of layers.yaml that is drawn on its own:
 /// the landcover textures (`ms-pat-<kind>`) and the point layers' icons (`ms-icon-<layer>`), as data URLs.
-fn images(st: &Value, specs: &[Value]) -> Result<Map<String, Value>, String> {
+fn images(st: &Value, specs: &[Value]) -> Result<Map<String, Value>, Error> {
     let f = &st["features"];
     let mut out = Map::new();
     for s in specs.iter().filter(|s| s["show"] != false && s.get("merge_into").is_none()) {
@@ -236,7 +238,7 @@ fn images(st: &Value, specs: &[Value]) -> Result<Map<String, Value>, String> {
             let mut p = f["points"]["default"].as_object().cloned().unwrap_or_default();
             p.extend(f["points"][name].as_object().cloned().unwrap_or_default());
             if let Some(icon) = p.get("icon").and_then(Value::as_str).filter(|i| !i.is_empty()) {
-                let svg = ICONS.iter().find(|i| i.0 == icon).ok_or_else(|| format!("no icon named '{icon}'"))?.1;
+                let svg = ICONS.iter().find(|i| i.0 == icon).ok_or_else(|| Error::Unknown(format!("no icon named '{icon}'")))?.1;
                 let color = p.get("color").and_then(Value::as_str).unwrap_or_default();
                 let svg = svg.replacen("<svg ", &format!("<svg fill=\"{color}\" "), 1);
                 out.insert(format!("ms-icon-{name}"), data_url("image/svg+xml", svg.as_bytes()).into());
@@ -247,14 +249,14 @@ fn images(st: &Value, specs: &[Value]) -> Result<Map<String, Value>, String> {
 }
 
 /// mode_settings and the base map's part of the look for one choice (render_map's mode, theme and paths).
-pub fn base_map(b: &BaseMap) -> Result<BaseMapLook, String> {
+pub fn base_map(b: &BaseMap) -> Result<BaseMapLook, Error> {
     if !LOOKS.contains(&b.mode.as_str()) {
-        return Err(format!("unknown mode '{}'; choose from {}", b.mode, pyrepr(&LOOKS)));
+        return Err(Error::Unknown(format!("unknown mode '{}'; choose from {}", b.mode, pyrepr(&LOOKS))));
     }
     let styles = style(PATHS);
     let st = styles.get(&b.paths).ok_or_else(|| {
         let names: Vec<&str> = styles.as_object().into_iter().flatten().map(|(k, _)| k.as_str()).collect();
-        format!("unknown path style '{}'; choose from {}", b.paths, pyrepr(&names))
+        Error::Unknown(format!("unknown path style '{}'; choose from {}", b.paths, pyrepr(&names)))
     })?;
     let modes = style(MODES);
     let spec = modes.get(&b.mode).filter(|s| !s.is_null()).cloned().unwrap_or_else(|| json!({}));
@@ -333,6 +335,28 @@ pub fn base_map(b: &BaseMap) -> Result<BaseMapLook, String> {
     // edges are directed; the arrows only on cars' one-ways (and a private or bus-only road)
     args.insert("directed_col".into(), "is_directed".into());
     args.insert("driving_col".into(), "has_arrows".into());
+    // a road that a mode may not use (private, bus, pedestrian, delivery: the reader's `access`) has its kind's colour in every colour
+    // option and a row in the Roads box (render's access_col), as mapstyle's layers.js painted it on the page
+    args.insert("access_col".into(), "access".into());
+    // the page's Modes filter (roadstyle:controls.modes) reads these columns of the road table, and the page stacks the Roads and Layers
+    // boxes as mapstyle's page did
+    args.insert("modes".into(), json!(["driving", "walking", "cycling"]));
+    args.insert("box_layout".into(), "stack".into());
+    // the page's base map is blank (the map is the file's own layers), in the theme's land colour when the theme has one; the raster maps
+    // stay in the switcher (mapstyle's render_map)
+    let bg = match th["background"].as_str() {
+        None => json!("blank"),
+        Some(c) => {
+            let all: Value = serde_json::from_str(BASEMAPS).expect("data/basemaps.json is JSON");
+            let mut e = all["basemaps"].as_array().and_then(|l| l.iter().find(|b| b["key"] == "blank")).cloned().expect("basemaps.json has blank");
+            e["key"] = format!("blank_{}", b.theme).into();
+            e["label"] = format!("Blank ({})", b.theme).into();
+            e["bg"] = c.into();
+            e
+        }
+    };
+    args.insert("basemaps".into(), json!([bg, "voyager_nolabels", "voyager", "positron", "osm", "satellite"]));
+    args.insert("basemap".into(), bg);
     if spec.get("lanes") == Some(&Value::Bool(false)) {          // one centred line for each road
         args.insert("offset_frac".into(), 0.into());
         args.insert("width_frac".into(), 1.into());
