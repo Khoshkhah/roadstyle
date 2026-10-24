@@ -121,6 +121,31 @@ def test_a_live_page_gives_the_dashboard_the_states(part):
     assert '["feature-state", "rs_c"]' in json.dumps(road["paint"]["line-color"])
 
 
+def test_live_data_can_take_the_nearest_stop(part, tmp_path):
+    """rs.setData(rows, {stepped: true}) gives each road the ramp's nearest stop, not a colour between two (SonoFlow's Daily page colours
+    so); its legend draws the same steps."""
+    pw = pytest.importorskip("playwright.sync_api")
+    page_file = tmp_path / "live.html"
+    page_file.write_text(rs.render_edges(part, engine="rust", live_data=True, basemap="blank").html)
+    ids = [str(e) for e in part["edge_id"][:2]]
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(page_file.as_uri())
+        page.wait_for_function("window.rs && window.map && map.isStyleLoaded() && window.RS_SIDE", timeout=60000)
+        got = page.evaluate("""async ids => {
+          const L = map.getLayer('roads-simple'), at = i => map.getFeatureState({source: L.source, sourceLayer: L.sourceLayer, id: i}).rs_c;
+          const rows = [{edge_id: ids[0], v: 0.4}, {edge_id: ids[1], v: 0.6}], o = {colorBy: 'v', vmin: 0, vmax: 1, ramp: ['#000000', '#ffffff']};
+          await rs.setData(rows, {...o, stepped: true});
+          const stepped = [at(0), at(1)], bar = document.querySelector('.lg-bar').getAttribute('style');
+          await rs.setData(rows, o);
+          return {stepped, bar, linear: at(0)}; }""", ids)
+        browser.close()
+    assert got["stepped"] == ["#000000", "#ffffff"]          # 0.4 and 0.6 between the two stops: the nearer one
+    assert got["linear"] == "#666666"                        # without it: the colour 40 % of the way
+    assert "#000000 0%" in got["bar"] and "#ffffff 50.00%" in got["bar"]     # the legend's hard step half-way
+
+
 def test_the_parquet_files_keep_big_ids_as_integers(part, keywords, tmp_path):
     """N1: duckOSM's edge ids are past 2**53 - 1; the model keeps them as integers, so DuckDB reads the road table and the roads' file
     with BIGINT ids (the BIGINT rule of the matchers), while every JSON form writes them as text (JavaScript would round them)."""
