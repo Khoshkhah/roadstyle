@@ -777,7 +777,11 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
         info.overlays.push(json!({"label": label, "source": sid, "layers": ids, "hit": ids.first(), "visible": ov.visible, "color": ov.color,
             "popup": if u["popup"].is_array() { u["popup"].clone() } else { Value::Null }, "popup_window": u["popup_window"] != false,
             "tooltip": list(&u["tooltip"]), "under": ov.under && !ov.edge, "base": if ov.edge { Value::Object(base) } else { Value::Null },
-            "select": u["select"].as_str().unwrap_or("road"), "interactive": !u["popup"].is_array() || list(&u["popup"]) != Value::Null}));
+            "select": u["select"].as_str().unwrap_or("road"),
+            "interactive": ov.clickable.unwrap_or(!u["popup"].is_array() || list(&u["popup"]) != Value::Null)}));
+        if !ov.kinds.is_empty() {          // a base-map layer's kinds with their counts, most first (the page's kind filter)
+            info.overlays.last_mut().unwrap()["kinds"] = json!(ov.kinds);
+        }
         ov_ids.push(ids);
     }
     let mut layers = under;

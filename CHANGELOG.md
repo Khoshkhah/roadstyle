@@ -56,6 +56,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   has the key: a casing piece has no `__rs_fill@<palette>: null` any more. The map does not change.
 
 ### Added
+- **What the dashboard needs to draw a duckOSM map's page** (for its port of mapstyle's page scripts): the base map's look bakes the
+  restricted roads' colour (private, bus, pedestrian, delivery) into every colour option's fill (`access_col: "access"`; mapstyle's
+  `layers.js` painted the same colours on the page); `roadstyle:controls.modes` gives the map's modes with their counts of roads
+  (`[[mode, count], ...]`, from the map option `modes`); `roadstyle:controls.box_layout` is `"stack"` for a base map's page; and each
+  base-map layer's entry in `roadstyle:controls.overlays` has its start `interactive` (mapstyle's rule: not for landcover, water, paved
+  and the decoration lines) and its `kinds` with their counts, most first. On Monaco all 17 layers equal mapstyle's.
 - **The map of one mode from a duckOSM file** (`only=True` in `roadstyle.duckosm.read`, `export_inline` and `export_style`, as mapstyle's
   `render_map(only=True)`): the `edges` and `private_edges` of one network. The stored levels were solved for every mode together, so each
   road must have its stored row (as Python's `load_area_levels(subset=True)`), else an error that names how many and one of them; then the

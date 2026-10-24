@@ -29,6 +29,10 @@ pub struct Overlay {
     /// A caller's overlay: the fields of its rs.Overlay (popup, color_col, width_m, dash, min_zoom, text_col, edge_col, ...); null for the
     /// base map's.
     pub user: Value,
+    /// A base-map layer's start value of "clickable" for the page (mapstyle's rule); None: the overlay's own rule
+    pub clickable: Option<bool>,
+    /// A base-map layer's kinds with their counts, most first (mapstyle's Counter.most_common); empty: none
+    pub kinds: Vec<(String, usize)>,
 }
 
 /// _band: below (-1 ...), on (0) or over (1 ...) the ground: the OSM layer if it is a number, else 1 for a bridge, -1 for a tunnel.
@@ -130,7 +134,8 @@ pub fn feature_overlays(fcs: Map<String, Value>, look: &crate::Look, edge_attach
         let ticked = spec.get("ticked").is_none_or(|v| v != false);
         let mut l = json!({"label": name, "kind": ov_kind, "ticked": ticked});
         let mut ov = Overlay { name: name.clone(), kind: ov_kind, under: kind != "point", edge: edge_attached.contains(&name), color: Value::Null,
-                               outline: Value::Null, opacity: Value::Null, width: Value::Null, radius: Value::Null, visible: ticked, fc: Value::Null, l: Value::Null, user: Value::Null };
+                               outline: Value::Null, opacity: Value::Null, width: Value::Null, radius: Value::Null, visible: ticked, fc: Value::Null, l: Value::Null, user: Value::Null,
+                               clickable: Some(clickable(&name, kind)), kinds: kinds(&fc) };
         if name == "landcover" {
             let mut fills = areas["landcover"].as_object().cloned().unwrap_or_default();
             let default = fills.shift_remove("default").unwrap_or(Value::Null);
@@ -194,6 +199,25 @@ pub fn feature_overlays(fcs: Map<String, Value>, look: &crate::Look, edge_attach
         out.push(ov);
     }
     (out, images)
+}
+
+/// mapstyle's start value of a base-map layer's clickable: the decoration (landcover, water, paved and the lines but the raceway and the
+/// other ways) is not, so that a click reaches the road under it.
+fn clickable(name: &str, kind: &str) -> bool {
+    !(matches!(name, "landcover" | "water" | "paved") || (kind == "line" && !matches!(name, "raceway" | "other_ways")))
+}
+
+/// The kinds of a layer's features with their counts, most first, a tie in the order in which they come first (Counter.most_common).
+fn kinds(fc: &Value) -> Vec<(String, usize)> {
+    let mut out: Vec<(String, usize)> = Vec::new();
+    for k in fc["features"].as_array().into_iter().flatten().filter_map(|f| f["properties"]["kind"].as_str()) {
+        match out.iter_mut().find(|(x, _)| x == k) {
+            Some(e) => e.1 += 1,
+            None => out.push((k.to_string(), 1)),
+        }
+    }
+    out.sort_by_key(|k| std::cmp::Reverse(k.1));
+    out
 }
 
 /// _ov_hl: an interactive overlay's colour lights up on hover and select (feature-state).
@@ -263,7 +287,8 @@ pub fn user_overlays(specs: &Value, first: usize) -> Result<Vec<Overlay>, String
         let name = u["label"].as_str().filter(|l| !l.is_empty()).map_or_else(|| format!("overlay {}", first + k), String::from);
         out.push(Overlay { name, kind, under: u["placement"] == "under", edge: u["edge_col"].as_str().is_some_and(|c| !c.is_empty()),
                            color: u["color"].clone(), outline: u["outline"].clone(), opacity: u["opacity"].clone(), width: u["width"].clone(),
-                           radius: u["radius"].clone(), visible: u["visible"] != false, fc, l: Value::Null, user });
+                           radius: u["radius"].clone(), visible: u["visible"] != false, fc, l: Value::Null, user, clickable: None,
+                           kinds: Vec::new() });
     }
     Ok(out)
 }
@@ -486,7 +511,7 @@ pub fn item_pieces(ov: &mut Overlay, i: usize, look: &crate::Look) -> Result<Vec
 pub fn road_items(fc: &Value, roads: &std::collections::HashMap<String, Road>, edge_col: &str, k: usize, look: &crate::Look)
                   -> Result<Vec<crate::simple::Item>, String> {
     let mut ov = Overlay { name: "items".into(), kind: "line", under: false, edge: true, color: Value::Null, outline: Value::Null, opacity: Value::Null,
-                           width: Value::Null, radius: Value::Null, visible: true, fc: fc.clone(), l: Value::Null,
+                           width: Value::Null, radius: Value::Null, visible: true, fc: fc.clone(), l: Value::Null, clickable: None, kinds: Vec::new(),
                            user: json!({"edge_col": edge_col, "order_col": "order", "color_col": "color", "width_m_col": "width_m",
                                         "offset_m_col": "offset_m", "dash_col": "dash", "label": "items"}) };
     edge_overlay(&mut ov, roads)?;

@@ -8,7 +8,8 @@ geolibre-roadstyle (its build.py), or in the folder $PROJECTS:
 - looks: rust/roadstyle-look/tests/data/mapstyle_looks.json.gz (tests/basemap.rs of roadstyle-look): the 64 looks of geolibre-roadstyle's
   look_of (each mode x theme x path style), each part once (build.looks()). mapstyle makes a mode's palette from a set, so the bytes of
   this file change with each run; the test compares the keys in sorted order.
-- styles: mapstyle.export.export_inline of 8 choices (2 of them the map of one mode, only=True) into tests/data/mapstyle/ (not in git: about 2.8 MB each, gzipped), and
+- styles: mapstyle.export.export_inline of 8 choices (2 of them the map of one mode, only=True), with access_col="access", into
+  tests/data/mapstyle/ (not in git: about 2.8 MB each, gzipped), and
   tests/data/mapstyle_digests.json (in git): for each style, the sha256 of its canonical JSON (json.dumps with sort_keys and the
   separators "," and ":"), its number of layers and the size of that text (the record), and the same three of its normalised form
   (`normalised`: what tests/test_duckosm.py compares with the Rust engine's style). The canonical text is the same with each hash seed."""
@@ -148,7 +149,9 @@ def write_styles():
     digests = {}
     for mode, theme, paths, only in CHOICES:
         name = name_of(mode, theme, paths, only)
-        style = export_inline(DB, mode=mode, theme=theme, paths=paths, **({"only": True} if only else {}))
+        # access_col: the restricted roads' colour baked into the fills by Python's render (2026-10-24, for the dashboard's port of
+        # mapstyle's page scripts; mapstyle's layers.js painted the same colours on the page, so the picture is the same)
+        style = export_inline(DB, mode=mode, theme=theme, paths=paths, access_col="access", **({"only": True} if only else {}))
         gz(out / f"{name}.json.gz", style)
         digests[name] = {**digest(style), "normalised": digest(normalised(style))}
         print(name, digests[name])
