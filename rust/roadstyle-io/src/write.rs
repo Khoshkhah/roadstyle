@@ -8,6 +8,7 @@ use arrow_array::{ArrayRef, RecordBatch};
 use arrow_schema::{DataType, Field, Schema};
 use parquet::arrow::ArrowWriter;
 use parquet::file::properties::WriterProperties;
+use roadstyle_model::Cell;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -18,11 +19,94 @@ const BATCH: usize = 8_192;
 /// The name of the column of a GeoJSON feature's `id`.
 pub const FID: &str = "__fid";
 
-/// One row: its feature id (a GeoJSON `id`), its properties in their order, and its geometry (GeoJSON; None: no geometry column).
-pub struct Row {
+/// A value of a row (audit N5): a cell of the roads' Arrow columns, with no copy, or a JSON value (a piece's, a JSON source's).
+#[derive(Clone, Debug)]
+pub enum Val<'a> {
+    Cell(Cell<'a>),
+    Json(Value),
+}
+
+impl From<Value> for Val<'_> {
+    fn from(v: Value) -> Self {
+        Val::Json(v)
+    }
+}
+
+impl Val<'_> {
+    fn json(&self) -> Option<&Value> {
+        match self {
+            Val::Json(v) => Some(v),
+            Val::Cell(Cell::Json(v)) => Some(v),
+            _ => None,
+        }
+    }
+
+    fn kind(&self) -> Kind {
+        match self {
+            Val::Cell(Cell::Null) => Kind::Null,
+            Val::Cell(Cell::Bool(_)) => Kind::Bool,
+            Val::Cell(Cell::Int(_)) => Kind::Int,
+            Val::Cell(Cell::Float(f)) => if f.is_nan() { Kind::Null } else { Kind::Float },
+            Val::Cell(Cell::Str(_)) => Kind::Text,
+            v => kind(v.json().unwrap()),
+        }
+    }
+
+    fn as_bool(&self) -> Option<bool> {
+        match self { Val::Cell(Cell::Bool(b)) => Some(*b), v => v.json().and_then(Value::as_bool) }
+    }
+
+    fn as_i64(&self) -> Option<i64> {
+        match self { Val::Cell(Cell::Int(i)) => Some(*i), v => v.json().and_then(Value::as_i64) }
+    }
+
+    fn as_f64(&self) -> Option<f64> {
+        match self { Val::Cell(Cell::Float(f)) => Some(*f).filter(|f| !f.is_nan()), v => v.json().and_then(Value::as_f64) }
+    }
+
+    fn as_str(&self) -> Option<&str> {
+        match self { Val::Cell(Cell::Str(s)) => Some(s), v => v.json().and_then(Value::as_str) }
+    }
+
+    /// The JSON text of a value in a column of mixed values (the value itself, not its JSON form for JavaScript).
+    fn text(&self) -> String {
+        match self { Val::Cell(c) => c.to_value().to_string(), Val::Json(v) => v.to_string() }
+    }
+
+    fn is_null(&self) -> bool {
+        self.kind() == Kind::Null
+    }
+}
+
+/// A row's geometry: a road's or a piece's line (written as WKB with no copy), or a GeoJSON geometry.
+#[derive(Clone, Debug)]
+pub enum Geometry<'a> {
+    Line(&'a [[f64; 2]]),
+    Json(std::borrow::Cow<'a, Value>),
+}
+
+impl From<Value> for Geometry<'_> {
+    fn from(v: Value) -> Self {
+        Geometry::Json(std::borrow::Cow::Owned(v))
+    }
+}
+
+impl Geometry<'_> {
+    fn kind(&self) -> Option<&str> {
+        match self { Geometry::Line(_) => Some("LineString"), Geometry::Json(g) => g["type"].as_str() }
+    }
+
+    fn wkb(&self) -> Option<Vec<u8>> {
+        match self { Geometry::Line(c) => Some(wkb_line(c)), Geometry::Json(g) => wkb(g) }
+    }
+}
+
+/// One row: its feature id (a GeoJSON `id`), its properties in their order, and its geometry (None: no geometry column).
+#[derive(Clone, Debug)]
+pub struct Row<'a> {
     pub id: Option<i64>,
-    pub props: Vec<(String, Value)>,
-    pub geometry: Option<Value>,
+    pub props: Vec<(std::borrow::Cow<'a, str>, Val<'a>)>,
+    pub geometry: Option<Geometry<'a>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -55,27 +139,27 @@ fn merge(a: Kind, b: Kind) -> Kind {
 }
 
 /// The rows as Parquet, in memory (`parquet_to`).
-pub fn parquet<I: Iterator<Item = Row>>(rows: impl Fn() -> I, geometry: bool) -> Result<Vec<u8>, String> {
+pub fn parquet<'a, I: Iterator<Item = Row<'a>>>(rows: impl Fn() -> I, geometry: bool) -> Result<Vec<u8>, String> {
     parquet_to(Vec::new(), rows, geometry)
 }
 
 /// The rows as Parquet, written to `w` a batch at a time: `rows()` gives them again for each pass (the types, then the batches).
 /// `geometry`: GeoParquet. Gives `w` back.
-pub fn parquet_to<W: std::io::Write + Send, I: Iterator<Item = Row>>(w: W, rows: impl Fn() -> I, geometry: bool) -> Result<W, String> {
+pub fn parquet_to<'a, W: std::io::Write + Send, I: Iterator<Item = Row<'a>>>(w: W, rows: impl Fn() -> I, geometry: bool) -> Result<W, String> {
     let (mut names, mut kinds, mut at): (Vec<String>, Vec<Kind>, HashMap<String, usize>) = (Vec::new(), Vec::new(), HashMap::new());
     let (mut ids, mut types) = (false, std::collections::BTreeSet::new());
     for r in rows() {
         ids |= r.id.is_some();
-        if let Some(t) = r.geometry.as_ref().and_then(|g| g["type"].as_str()) {
+        if let Some(t) = r.geometry.as_ref().and_then(Geometry::kind) {
             types.insert(t.to_string());
         }
         for (k, v) in &r.props {
-            let i = *at.entry(k.clone()).or_insert_with(|| {
-                names.push(k.clone());
+            let i = *at.entry(k.to_string()).or_insert_with(|| {
+                names.push(k.to_string());
                 kinds.push(Kind::Null);
                 names.len() - 1
             });
-            kinds[i] = merge(kinds[i], kind(v));
+            kinds[i] = merge(kinds[i], v.kind());
         }
     }
     let mut fields: Vec<Field> = Vec::new();
@@ -114,34 +198,34 @@ pub fn parquet_to<W: std::io::Write + Send, I: Iterator<Item = Row>>(w: W, rows:
             chunk.iter().for_each(|r| b.append_option(r.id));
             cols.push(Arc::new(b.finish()));
         }
-        let index: Vec<HashMap<&str, &Value>> = chunk.iter().map(|r| r.props.iter().map(|(k, v)| (k.as_str(), v)).collect()).collect();
+        let index: Vec<HashMap<&str, &Val>> = chunk.iter().map(|r| r.props.iter().map(|(k, v)| (k.as_ref(), v)).collect()).collect();
         for (n, k) in names.iter().zip(&kinds) {
             let get = |i: usize| index[i].get(n.as_str()).copied().filter(|v| !v.is_null());
             let a: ArrayRef = match k {
                 Kind::Bool => {
                     let mut b = BooleanBuilder::new();
-                    (0..chunk.len()).for_each(|i| b.append_option(get(i).and_then(Value::as_bool)));
+                    (0..chunk.len()).for_each(|i| b.append_option(get(i).and_then(Val::as_bool)));
                     Arc::new(b.finish())
                 }
                 Kind::Int => {
                     let mut b = Int64Builder::new();
-                    (0..chunk.len()).for_each(|i| b.append_option(get(i).and_then(Value::as_i64)));
+                    (0..chunk.len()).for_each(|i| b.append_option(get(i).and_then(Val::as_i64)));
                     Arc::new(b.finish())
                 }
                 Kind::Float => {
                     let mut b = Float64Builder::new();
-                    (0..chunk.len()).for_each(|i| b.append_option(get(i).and_then(Value::as_f64)));
+                    (0..chunk.len()).for_each(|i| b.append_option(get(i).and_then(Val::as_f64)));
                     Arc::new(b.finish())
                 }
                 Kind::Null => Arc::new(arrow_array::NullArray::new(chunk.len())),
                 Kind::Text => {
                     let mut b = StringBuilder::new();
-                    (0..chunk.len()).for_each(|i| b.append_option(get(i).and_then(Value::as_str)));
+                    (0..chunk.len()).for_each(|i| b.append_option(get(i).and_then(Val::as_str)));
                     Arc::new(b.finish())
                 }
                 Kind::Json => {
                     let mut b = StringBuilder::new();
-                    (0..chunk.len()).for_each(|i| b.append_option(get(i).map(Value::to_string)));
+                    (0..chunk.len()).for_each(|i| b.append_option(get(i).map(Val::text)));
                     Arc::new(b.finish())
                 }
             };
@@ -150,13 +234,23 @@ pub fn parquet_to<W: std::io::Write + Send, I: Iterator<Item = Row>>(w: W, rows:
         if geometry {
             let mut b = BinaryBuilder::new();
             for r in &chunk {
-                b.append_option(r.geometry.as_ref().and_then(wkb));
+                b.append_option(r.geometry.as_ref().and_then(Geometry::wkb));
             }
             cols.push(Arc::new(b.finish()));
         }
         w.write(&RecordBatch::try_new(schema.clone(), cols).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     }
     w.into_inner().map_err(|e| e.to_string())
+}
+
+/// A line as WKB (little endian, 2D), with no GeoJSON in between.
+pub fn wkb_line(c: &[[f64; 2]]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(9 + 16 * c.len());
+    out.push(1);
+    out.extend_from_slice(&2u32.to_le_bytes());
+    out.extend_from_slice(&(c.len() as u32).to_le_bytes());
+    c.iter().for_each(|q| q.iter().for_each(|x| out.extend_from_slice(&x.to_le_bytes())));
+    out
 }
 
 /// A GeoJSON geometry as WKB (little endian, 2D); None for a geometry that it does not read.

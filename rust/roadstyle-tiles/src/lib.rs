@@ -33,8 +33,9 @@ enum Geom {
     Polygons(Vec<Vec<Vec<P>>>),
 }
 
+/// A value of a tile feature (the vector tile spec's value kinds that the tiles use).
 #[derive(Clone, PartialEq)]
-enum Val {
+pub enum Val {
     Str(Box<str>),
     Bool(bool),
     Int(i64),
@@ -108,6 +109,34 @@ fn geom(g: &Value) -> Option<Geom> {
     })
 }
 
+/// A property's value as the tiles keep it: a JSON value, or a cell of the roads' Arrow columns (audit N5: no JSON copy of each cell).
+pub trait TileValue {
+    fn tile_val(&self) -> Option<Val>;
+}
+
+impl TileValue for Value {
+    fn tile_val(&self) -> Option<Val> {
+        val(self)
+    }
+}
+
+impl TileValue for roadstyle_model::Cell<'_> {
+    fn tile_val(&self) -> Option<Val> {
+        use roadstyle_model::Cell;
+        Some(match *self {
+            Cell::Null => return None,
+            Cell::Bool(b) => Val::Bool(b),
+            // an integer past 2**53 - 1 as text, as every JSON form writes it
+            Cell::Int(i) if i.unsigned_abs() > roadstyle_model::table::JS_MAX_SAFE_INT => Val::Str(i.to_string().into()),
+            Cell::Int(i) => Val::Int(i),
+            Cell::Float(f) if f.is_finite() => Val::Dbl(f),
+            Cell::Float(_) => return None,
+            Cell::Str(s) => Val::Str(s.into()),
+            Cell::Json(v) => return val(v),
+        })
+    }
+}
+
 fn val(v: &Value) -> Option<Val> {
     Some(match v {
         Value::String(s) => Val::Str(s.as_str().into()),
@@ -168,8 +197,8 @@ impl Tiles {
 
     /// A layer of lines, each with its properties (a feature's id is its index; a feature with no line is left out, and keeps its
     /// index). The properties are the `__rs_*` ones and those in `keep` (all of them when `whole`).
-    pub fn add_lines<L, K, P>(&mut self, name: &str, feats: impl Iterator<Item = (Option<L>, P)>, keep: &HashSet<String>, whole: bool, min_zoom: u32)
-    where L: AsRef<[[f64; 2]]>, K: AsRef<str>, P: Iterator<Item = (K, Value)> {
+    pub fn add_lines<L, K, V, P>(&mut self, name: &str, feats: impl Iterator<Item = (Option<L>, P)>, keep: &HashSet<String>, whole: bool, min_zoom: u32)
+    where L: AsRef<[[f64; 2]]>, K: AsRef<str>, V: TileValue, P: Iterator<Item = (K, V)> {
         let mut b = Builder::default();
         for (i, (c, props)) in feats.enumerate() {
             let Some(c) = c else { continue };
@@ -331,12 +360,12 @@ struct Builder {
 
 impl Builder {
     /// A feature without a point (bounds) is left out; a null value is not in the tiles.
-    fn push<K: AsRef<str>>(&mut self, id: Option<u64>, g: Geom, props: impl Iterator<Item = (K, Value)>) {
+    fn push<K: AsRef<str>, V: TileValue>(&mut self, id: Option<u64>, g: Geom, props: impl Iterator<Item = (K, V)>) {
         let Some((lo, hi)) = bounds(&g) else { return };
         let (keys, key_at, vals, encoded, val_at) = (&mut self.keys, &mut self.key_at, &mut self.vals, &mut self.encoded, &mut self.val_at);
         let props = props
             .filter_map(|(k, v)| {
-                let v = val(&v)?;
+                let v = v.tile_val()?;
                 let m = encode(&v);
                 let v = match val_at.get(&m) {
                     Some(&at) => at,

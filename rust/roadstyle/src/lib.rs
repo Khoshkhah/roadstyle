@@ -61,7 +61,7 @@ fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> tiles::T
             Src::Roads(_) => {
                 let (keep, whole, from) = o.rule(k, Default::default);
                 let r = &s.roads;
-                tiled.add_lines(k, r.roads.iter().map(|x| (x.line(), r.props(x, None).map(|(n, c)| (n, c.to_value())))), &keep, whole, from)
+                tiled.add_lines(k, r.roads.iter().map(|x| (x.line(), r.props(x, None))), &keep, whole, from)        // the cells, no JSON copy
             }
             Src::Simple(p) => {
                 let (keep, whole, from) = o.rule(k, Default::default);
@@ -150,6 +150,24 @@ pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[S
         }
         names.push(k.clone());
         let file = spec["data"].as_str().ok_or_else(|| format!("source {k}: its data is not a file name"))?;
+        // audit N5: a GeoParquet file of lines (the roads, the pieces) goes to the tiles as its Arrow columns, with no JSON per cell
+        if let Some((t, json)) = if file.ends_with(".parquet") { read::line_table(read(file)?)? } else { None } {
+            let cols: Vec<(usize, &String)> = t.names().iter().enumerate().filter(|(_, n)| *n != roadstyle_io::write::FID).collect();
+            // the roads' lines are in the road table when stage 1 left them out (no layer draws the roads)
+            let table = if k == "roads" && (0..t.len()).any(|i| t.line(i).is_none()) { Some(read::read_roads(read(ROAD_TABLE)?, "geometry")?) } else { None };
+            let (keep, whole, from) = o.rule(k, || cols.iter().map(|(_, n)| n.to_string()).collect());
+            let cell = |c: usize, i: usize, n: &str| -> FileValue {
+                let v = t.cell(c, i);
+                match v.as_str().filter(|_| json.contains(n)) {
+                    Some(s) => FileValue::Json(serde_json::from_str(s).unwrap_or(Value::Null)),
+                    None => FileValue::Cell(v),
+                }
+            };
+            let feats = (0..t.len()).map(|i| (t.line(i).or_else(|| table.as_ref().and_then(|r| r.line(i))),
+                                              cols.iter().map(move |&(c, n)| (n.as_str(), cell(c, i, n)))));
+            tiled.add_lines(k, feats, &keep, whole, from);
+            continue;
+        }
         let mut fc: Value = if file.ends_with(".parquet") { read::features(read(file)?)? }
                             else { serde_json::from_slice(&read(file)?).map_err(|e| format!("{file}: {e}"))? };
         // the roads' lines are in the road table when stage 1 left them out (no layer draws the roads)
@@ -169,6 +187,21 @@ pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[S
         tiled.add(k, &src, &keep, whole, from);
     }
     Ok((tiled_style(style, &names, at, (o.min_zoom, o.max_zoom)), tiled))
+}
+
+/// A value of a stage-1 file for the tiles: an Arrow cell, or the JSON value of a `roadstyle:json` column's text.
+enum FileValue<'a> {
+    Cell(Cell<'a>),
+    Json(Value),
+}
+
+impl tiles::TileValue for FileValue<'_> {
+    fn tile_val(&self) -> Option<tiles::Val> {
+        match self {
+            FileValue::Cell(c) => c.tile_val(),
+            FileValue::Json(v) => v.tile_val(),
+        }
+    }
 }
 
 /// The file format of stage 1's sources.
@@ -219,23 +252,24 @@ pub fn write_source_file<W: std::io::Write + Send>(s: &sources::Sources, file: &
         s.write_data(i, drawn, &mut w).map_err(io)?;
         return Ok(w);
     }
-    let line = |c: Option<&[[f64; 2]]>| c.map(|c| json!({"type": "LineString", "coordinates": c}));
+    use roadstyle_io::write::{Geometry, Row as PqRow, Val};
     let lines = s.draws_roads();
     match &s.sources[i].1 {
-        Src::Roads(_) => roadstyle_io::write::parquet_to(w, || s.roads.roads.iter().map(|r| roadstyle_io::write::Row {
+        // audit N5: the roads' Arrow cells and lines go into the file with no JSON copy; the pieces' values are their own
+        Src::Roads(_) => roadstyle_io::write::parquet_to(w, || s.roads.roads.iter().map(|r| PqRow {
             id: Some(r.i as i64),
-            props: s.roads.props(r, Some(drawn)).map(|(k, c)| (k.to_string(), c.to_value())).collect(),
-            geometry: line(r.line().filter(|_| lines)),
+            props: s.roads.props(r, Some(drawn)).map(|(k, c)| (k.into(), Val::Cell(c))).collect(),
+            geometry: r.line().filter(|_| lines).map(Geometry::Line),
         }), true),
-        Src::Simple(p) => roadstyle_io::write::parquet_to(w, || p.features(&s.roads.roads).map(|(id, props, c)| roadstyle_io::write::Row {
-            id: Some(id as i64), props: props.into_iter().map(|(k, v)| (k.to_string(), v)).collect(), geometry: line(c),
+        Src::Simple(p) => roadstyle_io::write::parquet_to(w, || p.features(&s.roads.roads).map(|(id, props, c)| PqRow {
+            id: Some(id as i64), props: props.into_iter().map(|(k, v)| (k.into(), Val::Json(v))).collect(), geometry: c.map(Geometry::Line),
         }), true),
         Src::Json(v) => {
             let fs = v["data"]["features"].as_array().map(Vec::as_slice).unwrap_or_default();
-            roadstyle_io::write::parquet_to(w, || fs.iter().map(|f| roadstyle_io::write::Row {
+            roadstyle_io::write::parquet_to(w, || fs.iter().map(|f| PqRow {
                 id: f["id"].as_i64(),
-                props: f["properties"].as_object().into_iter().flatten().map(|(k, v)| (k.clone(), v.clone())).collect(),
-                geometry: Some(f["geometry"].clone()).filter(|g| !g.is_null()),
+                props: f["properties"].as_object().into_iter().flatten().map(|(k, v)| (k.as_str().into(), Val::Cell(Cell::Json(v)))).collect(),
+                geometry: Some(&f["geometry"]).filter(|g| !g.is_null()).map(|g| Geometry::Json(std::borrow::Cow::Borrowed(g))),
             }), true)
         }
     }
@@ -243,14 +277,15 @@ pub fn write_source_file<W: std::io::Write + Send>(s: &sources::Sources, file: &
 
 /// The road table's rows as Parquet rows (`Sources::table_rows`): each road's fields, then its middle (`__mid_lon`, `__mid_lat`) and its
 /// box (`__bbox_*`), and its line as the geometry.
-fn road_rows(s: &sources::Sources) -> impl Iterator<Item = roadstyle_io::write::Row> + '_ {
+fn road_rows(s: &sources::Sources) -> impl Iterator<Item = roadstyle_io::write::Row<'_>> + '_ {
+    use roadstyle_io::write::{Geometry, Row as PqRow, Val};
     s.table_rows().into_iter().map(|t| {
-        let num = |v: Option<f64>| v.map_or(Value::Null, Value::from);
-        let mut props: Vec<(String, Value)> = t.props.into_iter().map(|(k, v)| (k.to_string(), v.to_value())).collect();
+        let num = |v: Option<f64>| Val::Cell(v.map_or(Cell::Null, Cell::Float));
+        let mut props: Vec<(std::borrow::Cow<str>, Val)> = t.props.into_iter().map(|(k, v)| (k.into(), Val::Cell(v))).collect();
         props.extend([("__mid_lon".into(), num(t.mid.map(|m| m[0]))), ("__mid_lat".into(), num(t.mid.map(|m| m[1])))]);
         props.extend(["__bbox_min_lon", "__bbox_min_lat", "__bbox_max_lon", "__bbox_max_lat"].iter().enumerate()
-            .map(|(k, n)| (n.to_string(), num(t.bbox.map(|b| b[k])))));
-        roadstyle_io::write::Row { id: None, props, geometry: t.line.map(|c| json!({"type": "LineString", "coordinates": c})) }
+            .map(|(k, n)| ((*n).into(), num(t.bbox.map(|b| b[k])))));
+        PqRow { id: None, props, geometry: t.line.map(Geometry::Line) }
     })
 }
 

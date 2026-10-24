@@ -369,8 +369,8 @@ impl Editor {
                     };
                     rows.push(write::Row {
                         id: None,
-                        props,
-                        geometry: Some(json!({"type": "LineString", "coordinates": coords})),
+                        props: props.into_iter().map(|(k, v)| (k.into(), v.into())).collect(),
+                        geometry: Some(json!({"type": "LineString", "coordinates": coords}).into()),
                     });
                 }
             }
