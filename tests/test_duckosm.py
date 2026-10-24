@@ -55,18 +55,12 @@ def _goldens():
     return gen, json.loads((here / "data" / "mapstyle_digests.json").read_text())
 
 
-# the maps of one mode (only=True) also differ in one engine rule (2026-10-24, the same roads in both engines): edge_attach (overlays.rs:
-# 1 to 2 points of a layer on another road, a tie). Their slots name the same roads up to an undirected twin (normalised: the twin rule).
-_ONE_MODE = pytest.mark.xfail(strict=True, reason="a map of one mode: the Rust engine's edge_attach differs from Python's")
-
-
 @needs_db
 # ponytail: xfail until the Rust engine's 3D decks equal Python's on all of Monaco (decks.rs, 2026-10-24: 1,312 decks, Python 1,311, other
 # slabs and properties for the same roads; tests/test_engine_parity.py's area does not show it). strict: the test fails when they match.
 @pytest.mark.xfail(strict=True, reason="the Rust engine's 3D decks differ from Python's on all of Monaco (decks.rs)")
 @pytest.mark.parametrize("choice", ["all osm google", "driving osm google", "walking osm google", "cycling osm google", "all grey google",
-                                    "walking google komoot", pytest.param("driving osm google only", marks=_ONE_MODE),
-                                    pytest.param("walking osm google only", marks=_ONE_MODE)])
+                                    "walking google komoot", "driving osm google only", "walking osm google only"])
 def test_the_style_is_mapstyles(choice):
     """The style of roadstyle.duckosm.export_inline (the reader, the base map's look and stage 1 in Rust) has the normalised digest of
     today's mapstyle export_inline of the same choice (tests/make_mapstyle_goldens.py: the rules of `normalised`, each with its reason)."""
