@@ -10,6 +10,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **Every style reads a road's colour and width from the feature state** (audit N8, both engines). The road layer reads
   `["coalesce", ["feature-state", "rs_c"], <baked colour>]` and each width and offset stop × `["coalesce", ["feature-state", "rs_w"], 1]`,
   in every style, not only with `live_data`; `live_data` now only adds the metadata `roadstyle:live` and the page's option `live`.
+- **The base maps are a data file**, `src/roadstyle/data/basemaps.json`: one list for Python (`roadstyle.basemaps.BASEMAPS` and the
+  switcher's default set) and the studio in the browser. The values are the same as before.
 - **The look is a crate of its own, typed and versioned** (`rust/roadstyle-look`, design step (c), audit R16). `Look::resolve` makes
   the look one time from the palette, the profile, the settings and the keywords; `Look::from_json` reads a saved look of version 1 or of
   version 0 (the `look.json` of 0.25.0, with no `schema_version`). A look of a later version, or an unknown key, is an error that names
