@@ -5,7 +5,7 @@
 // click (rs:select detail.overlays), so a sidebar can show the road AND its zone together.
 import {POPUP, _rfields} from "../popup.js";
 import {map, O, OVERLAYS, _emit} from "./core.js";
-import {_popupMode, rsInfoShow, _tlHost} from "./panel.js";
+import {_popupMode, rsInfoShow, _tlHost, _box, _check} from "./panel.js";
 import {rsDeselect, _rrows, _TIP_DELAY} from "./select.js";
 let _OV_POPUP = true;       // overlay_popup=False: no overlay shows a popup (an Overlay's popup_window=False: that one); a click still selects and fires rs:select
 export const _ovWin = ov => ov.popup_window!==false && _OV_POPUP;
@@ -69,15 +69,10 @@ export function rsSetOverlay(labelOrIdx, on){
   if(_ovCbs[ov.label]) _ovCbs[ov.label].checked = !!on;
   _emit("rs:overlaychange", {overlay:ov.label, visible:!!on});
 }
-function _ovRow(ov){
-  const lab=document.createElement("label");
-  const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=ov.visible!==false;
-  cb.onchange=()=> rsSetOverlay(ov.label, cb.checked);
-  _ovCbs[ov.label]=cb; lab.appendChild(cb);
-  if(ov.color){ const sw=document.createElement("span"); sw.className="ov-sw";
-    sw.style.background=ov.color; lab.appendChild(sw); }
-  lab.appendChild(document.createTextNode(" "+ov.label));
-  return lab;
+function _ovRow(ov, rule){
+  const r=_check(ov.label, ov.visible!==false, on=>rsSetOverlay(ov.label, on), {rule, ...(ov.color ? {sw:ov.color, swCls:"ov-sw"} : {})});
+  _ovCbs[ov.label]=r.cb;
+  return r.lab;
 }
 export function initOverlays(){
   _OV_POPUP = O.overlay_popup;
@@ -112,27 +107,11 @@ export function initOverlays(){
     // second floating "Layers" box on the map competes with the panel that hosts everything else.
     // Non-panel keeps the standalone Layers control.
     const host=_popupMode==="panel" ? document.querySelector(".flt-ctrl .flt-body") : null;
-    if(O.box_layout==="stack" && !host){   // a base map's page (mapstyle's layout): the Layers box under the Roads box, both folded
-      const box=document.createElement("div"); box.className="ov-ctrl collapsed";
-      const hd=document.createElement("div"); hd.className="ov-hd"; hd.textContent="Layers ▸";
-      const body=document.createElement("div"); body.className="ov-body";
-      hd.onclick=()=>{ const c=box.classList.toggle("collapsed"); hd.textContent="Layers "+(c?"▸":"▾"); };
-      box.appendChild(hd); box.appendChild(body);
+    if(host) OVERLAYS.forEach((ov,i)=> host.appendChild(_ovRow(ov, i===0)));
+    else{   // its own Layers box; a base map's page (box_layout "stack"): under the Roads box, folded like it
+      const stack=O.box_layout==="stack", {box, body}=_box("ov-ctrl", "ov", "Layers", stack ? true : null);
       OVERLAYS.forEach(ov=> body.appendChild(_ovRow(ov)));
-      _tlHost().appendChild(box);
-    } else if(host){
-      OVERLAYS.forEach((ov,i)=>{
-        const lab=_ovRow(ov);
-        if(i===0) lab.style.cssText="margin-top:4px;padding-top:4px;border-top:1px solid #ddd";
-        host.appendChild(lab);
-      });
-    } else {
-      const box=document.createElement("div"); box.className="ov-ctrl";
-      const hd=document.createElement("div"); hd.className="ov-hd"; hd.textContent="Layers";
-      const body=document.createElement("div"); body.className="ov-body";
-      box.appendChild(hd); box.appendChild(body);
-      OVERLAYS.forEach(ov=> body.appendChild(_ovRow(ov)));
-      document.body.appendChild(box);
+      (stack ? _tlHost() : document.body).appendChild(box);
     }
   }
 }

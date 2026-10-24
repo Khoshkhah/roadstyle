@@ -2,7 +2,7 @@
 // rest across every road layer; the collapsible checkbox panel is just UI over it. The class
 // filter composes (AND) with the id filter from rsFilter below.
 import {map, O, OVERLAYS, RS_PREFIX, RoadTable, _has, _itemOv, _rprops, _sfeats, _src, _role, _lyr, _emit} from "./core.js";
-import {_popupMode, _tlHost} from "./panel.js";
+import {_popupMode, _tlHost, _box, _check} from "./panel.js";
 export let FILTER = {on:false, classes:[]};
 const _fltCbs={}, _fltBase={};
 let _fltVis=null;   // Set of visible classes; null = all
@@ -144,42 +144,17 @@ export function initFilter(){
 // the Roads box: a checkbox for each class, then Bridges / Tunnels and the access kinds
 export function initFilterBox(){
   if(FILTER.on){
-    const box=document.createElement("div"); box.className="flt-ctrl";
-    const hd=document.createElement("div"); hd.className="flt-hd"; hd.textContent="Roads ▾";
-    const body=document.createElement("div"); body.className="flt-body";
-    hd.onclick=()=>{ const c=box.classList.toggle("collapsed"); hd.textContent="Roads "+(c?"▸":"▾"); };
-    // panel: collapse to save space; a base map's page (box_layout "stack", mapstyle's layout): folded at the start too
-    if(_popupMode==="panel" || O.box_layout==="stack"){ box.classList.add("collapsed"); hd.textContent="Roads ▸"; }
-    box.appendChild(hd); box.appendChild(body);
+    // panel: folded to save space; a base map's page (box_layout "stack", mapstyle's layout): folded at the start too
+    const {box, body}=_box("flt-ctrl", "flt", "Roads", _popupMode==="panel" || O.box_layout==="stack");
     FILTER.classes.forEach(c=>{      // _fltSw: the swatch of each class (a view's palette sets their colours, FILTER.palettes)
-      const lab=document.createElement("label");
-      const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=true;
-      cb.onchange=()=> rsSetClasses(FILTER.classes.filter(k=>_fltCbs[k].checked));
-      _fltCbs[c]=cb; lab.appendChild(cb);
-      const sw=document.createElement("span"); sw.className="flt-sw"; _fltSw[c]=sw;
-      sw.style.background=(FILTER.swatches||{})[c]||"#888"; lab.appendChild(sw);
-      lab.appendChild(document.createTextNode(" "+c)); body.appendChild(lab);
+      const r=_check(c, true, ()=>rsSetClasses(FILTER.classes.filter(k=>_fltCbs[k].checked)), {sw:(FILTER.swatches||{})[c]||"#888"});
+      _fltCbs[c]=r.cb; _fltSw[c]=r.sw; body.append(r.lab);
     });
-    // grade-separated data: Bridges / Tunnels on/off rows under the classes (the first one ruled off)
-    [["bridges","rs-flt-br"," Bridges",rsSetBridges],["tunnels","rs-flt-tn"," Tunnels",rsSetTunnels]]
-      .filter(r=>FILTER[r[0]]).forEach((r,i)=>{
-        const lab=document.createElement("label"); lab.className="flt-grade";
-        if(i===0) lab.style.cssText="margin-top:4px;padding-top:4px;border-top:1px solid #ddd";
-        const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=true; cb.id=r[1];
-        cb.onchange=()=> r[3](cb.checked);
-        lab.appendChild(cb); lab.appendChild(document.createTextNode(r[2]));
-        body.appendChild(lab);
-      });
-    // restricted roads (access_col): a row each after Bridges / Tunnels, with the kind's colour
-    ACCESS.forEach((a,i)=>{
-      const lab=document.createElement("label"); lab.className="flt-grade";
-      if(i===0) lab.style.cssText="margin-top:4px;padding-top:4px;border-top:1px solid #ddd";
-      const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=true; cb.id="rs-flt-acc-"+a[0];
-      cb.onchange=()=> rsSetAccess(a[0], cb.checked);
-      const sw=document.createElement("span"); sw.className="flt-sw"; sw.style.background=a[1];
-      lab.appendChild(cb); lab.appendChild(sw); lab.appendChild(document.createTextNode(" "+a[2]));
-      body.appendChild(lab);
-    });
+    // grade-separated data: Bridges / Tunnels rows under the classes, then the restricted roads (access_col) with the kind's colour;
+    // the first row of each group ruled off
+    [["bridges","rs-flt-br","Bridges",rsSetBridges],["tunnels","rs-flt-tn","Tunnels",rsSetTunnels]].filter(r=>FILTER[r[0]])
+      .forEach((r,i)=>body.append(_check(r[2], true, r[3], {id:r[1], cls:"flt-grade", rule:i===0}).lab));
+    ACCESS.forEach((a,i)=>body.append(_check(a[2], true, on=>rsSetAccess(a[0], on), {id:"rs-flt-acc-"+a[0], cls:"flt-grade", rule:i===0, sw:a[1]}).lab));
     _tlHost().appendChild(box);
   }
   window.rsSetAccess = rsSetAccess;

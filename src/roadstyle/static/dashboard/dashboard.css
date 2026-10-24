@@ -31,6 +31,7 @@ font:13px system-ui,sans-serif;color:#334155;max-height:70%;overflow:auto}
 .flt-sw{display:inline-block;width:16px;height:5px;border-radius:2px;margin:0 2px 0 5px;
   vertical-align:middle;border:1px solid rgba(0,0,0,.15)}
 .flt-ctrl.collapsed .flt-body{display:none}
+.rs-rule{margin-top:4px;padding-top:4px;border-top:1px solid #ddd}   /* the first row of a group in a box (_check's rule) */
 .flt-ctrl label{cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px}
 .flt-ctrl label:hover{color:#1a6bd6}
 .rs-find{background:#fff;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);

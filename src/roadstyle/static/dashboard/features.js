@@ -5,6 +5,7 @@
 import {map, O, OVERLAYS, RS_PREFIX, _emit} from "./core.js";
 import {_ovCbs} from "./overlays.js";
 import {VIEW_CTRL} from "./view3d.js";
+import {_check} from "./panel.js";
 let _b3d = [], _b3dOv = null, _b3dOn = false;     // the 3D layers' ids, their overlay, the switch
 // the 3D buildings show while the switch is on and their overlay (the buildings) is shown
 function _show3d(){
@@ -60,10 +61,8 @@ export function initFeatures(){
   // its row in the Layers box, under the buildings' row
   const row = _b3dOv && _ovCbs[_b3dOv.label] && _ovCbs[_b3dOv.label].parentNode;
   if(row){
-    const lab = document.createElement("label"), cb = document.createElement("input");
-    cb.type = "checkbox"; cb.id = "rs-b3d"; cb.onchange = () => rsSetBuildings3D(cb.checked);
+    const {lab} = _check("Buildings 3D", false, rsSetBuildings3D, {id: "rs-b3d"});
     lab.style.paddingLeft = "18px";
-    lab.append(cb, document.createTextNode(" Buildings 3D"));
     row.after(lab);
   }
 }
