@@ -160,6 +160,7 @@ pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, S
     let w4 = if min_positions { w4 } else { 0 };
     stages[3] = w4 * span - (0..g.from.len()).map(|e| flow[e] * g.cost[e]).sum::<i64>();
     let x = least_numbers(&g, &flow, &pi);
+    feasible(rules, &x, steps)?;
     let parts = (0..n)
         .map(|r| [x[col(r, 0)], x[col(r, 1)], x[col(r, 2)], x[r]])
         .collect();
@@ -186,6 +187,42 @@ pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, S
         near_not_kept,
         stages,
     })
+}
+
+/// The check of an answer: every hard rule holds. Each casing part is not over its fill, the heads of two roads that meet are not
+/// over the other road's fill, the fixed numbers are as given, and every number is in the box `[0, steps]` (all against node 0,
+/// the last node). The stack rules, the order wishes and the near rules can break: the solve gives the broken ones.
+fn feasible(rules: &Rules, x: &[i64], steps: i64) -> Result<(), String> {
+    let n = rules.roads;
+    let (col, z) = (|r: usize, h: usize| n + 3 * r + h, x[x.len() - 1]);
+    let bad = |what: String| Err(format!("levels: the answer breaks a hard rule ({what})"));
+    for r in 0..n {
+        for h in 0..3 {
+            if x[col(r, h)] > x[r] {
+                return bad(format!("road {r}: casing part {h} over its fill"));
+            }
+        }
+    }
+    for &(a, ea, b, eb) in &rules.meets {
+        if x[col(a, ea)] > x[b] || x[col(b, eb)] > x[a] {
+            return bad(format!(
+                "roads {a} and {b} meet: a head over the other's fill"
+            ));
+        }
+    }
+    for &(r, v) in &rules.fixed {
+        if [col(r, 0), col(r, 1), col(r, 2), r]
+            .iter()
+            .zip(v)
+            .any(|(&c, v)| x[c] - z != v)
+        {
+            return bad(format!("road {r}: not at its fixed numbers"));
+        }
+    }
+    if x[..4 * n].iter().any(|&v| v - z < 0 || v - z > steps) {
+        return bad(format!("a number out of the box [0, {steps}]"));
+    }
+    Ok(())
 }
 
 /// The arcs whose kind has a capacity, as a network; and the index into `arcs` of each of its arcs.
