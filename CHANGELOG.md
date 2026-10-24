@@ -15,6 +15,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `docs/design/dashboard_module.md`, "Trusted inputs".
 
 ### Changed
+- **export_look: the yes/no tags use the engine's rule** (audit R6, both engines). A oneway, tunnel or bridge value is yes unless it
+  is missing or "", "no", "false" or "0" (lower-cased), as on the map that the engine draws. Before, the exported look had lists of
+  yes values, so tunnel=covered and other values not in the lists were not tunnels in it. Of Monaco, Södermalm and Tartu, only
+  Tartu's 6 edges with tunnel=covered change (edge_id 362803906715553762, 2028099516943553165, 2430057063666112407,
+  4366746885451034747, 6872884880915285120, 7467383434792342616): they are now tunnels in the exported look. The engine's own
+  yes/no check (roads.rs) uses the same rule (`roadstyle_model::flags`).
 - **Python gives the roads to the Rust engine as an Arrow table, not as GeoParquet bytes** (audit R15). The binding
   (`roadstyle._rust`: `make_style`, `make_sources`, `Tiler`, `compute_levels`, `make_area`) reads any object with
   `__arrow_c_stream__` (GeoPandas' `to_arrow`, a pyarrow table, DuckDB's `arrow()`) through the Arrow C stream interface. Bytes are a
