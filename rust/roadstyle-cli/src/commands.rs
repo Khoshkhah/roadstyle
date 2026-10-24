@@ -10,18 +10,18 @@ use std::path::{Path, PathBuf};
 pub const USAGE: &str = "roadstyle: road networks as styled maps (https://khoshkhah.github.io/roadstyle/)
 
 usage:
-  roadstyle sources <roads.parquet> <out dir> [--format geojson|geoparquet] [--keep COL,COL] [--name NAME]
+  roadstyle sources <roads> <out dir> [--format geojson|geoparquet] [--keep COL,COL] [--name NAME]
                     [--palette P] [--profile P] [--settings FILE.json] [--<keyword> VALUE] [--no-<keyword>]
-      stage 1: the style and one file for each source, and the road table (export_geojson). The roads: GeoParquet, the line in
-      the column geometry, longitude and latitude. Any other option is a keyword of render (--color-by lanes, --no-arrows).
-  roadstyle page <roads.parquet> <out.html> [--palette P] [--profile P] [--settings FILE.json] [--api-key KEY]
+      stage 1: the style and one file for each source, and the road table (export_geojson). Any other option is a keyword of
+      render (--color-by lanes, --no-arrows).
+  roadstyle page <roads> <out.html> [--palette P] [--profile P] [--settings FILE.json] [--api-key KEY]
                  [--street-view-key KEY] [--<keyword> VALUE] [--no-<keyword>]
       the page in one file (render_edges(backend=\"web\")): the map, its dashboard and MapLibre, offline. The base map's key:
       --api-key, else $ROADSTYLE_API_KEY; the Google Maps key: --street-view-key, else $GOOGLE_MAPS_KEY. Any other option is a
       keyword of render (--tiles, --views '{\"plain\": {\"road_fill\": false}}').
   roadstyle tiles <stage 1 dir> <out> [--format pmtiles|xyz] [--keep COL,COL] [--base-url URL]
       stage 2: the vector tiles of stage 1's files (tile_geojson): one PMTiles file, or <out>/roads/{z}/{x}/{y} and style.json.
-  roadstyle levels make <edges.parquet> <area folder> [--id-col edge_id] [--band-col C] [--order priority|class|none|C]
+  roadstyle levels make <edges> <area folder> [--id-col edge_id] [--band-col C] [--order priority|class|none|C]
                     [--band-dist 10] [--head-m 5] [--near-rules] [--highway-col highway] [--layer-col layer] [--bridge-col bridge]
                     [--tunnel-col tunnel] [--junction-col junction]
       a level area's input: roads.parquet, pairs.csv and edits.csv (roadstyle-levels make).
@@ -31,7 +31,10 @@ usage:
       the level editor at http://127.0.0.1:<port>/level_editor/ (roadstyle-levels edit).
   roadstyle snapshot <page.html> <out.png> [--center LON,LAT] [--zoom Z] [--pitch P] [--bearing B] [--width 1200] [--height 800]
                     [--scale 1] [--settle 2.5] [--timeout 40]
-      a PNG of a saved page, drawn by Chromium (roadstyle-snapshot; Python's rs.snapshot).";
+      a PNG of a saved page, drawn by Chromium (roadstyle-snapshot; Python's rs.snapshot).
+
+<roads> and <edges>: a .parquet (GeoParquet, the line in the column geometry), .geojson, .shp (with its .dbf and .prj beside it)
+or .gpkg file.";
 
 /// The positional arguments and the options (`--name value`, or a flag with no value), the names with `_` for `-`.
 fn split(args: &[String]) -> (Vec<String>, Vec<(String, Option<String>)>) {
@@ -90,6 +93,30 @@ fn read(path: &str) -> Result<Vec<u8>, String> {
     std::fs::read(path).map_err(|e| format!("{path}: {e}"))
 }
 
+/// The roads of a file by its extension (roadstyle-io's readers): GeoParquet (.parquet, the line in `geometry`), GeoJSON (.geojson,
+/// .json), a Shapefile (.shp, with its .dbf and .prj beside it) or a GeoPackage (.gpkg, its first feature table). The lines in
+/// EPSG:4326 (a Shapefile or GeoPackage in another CRS is reprojected).
+fn roads(path: &str) -> Result<roadstyle::RoadTable, String> {
+    let p = Path::new(path);
+    let beside = |ext: &str| p.with_extension(ext).to_string_lossy().into_owned();
+    match p.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref() {
+        Some("parquet" | "geoparquet") => roadstyle::read::read_roads(read(path)?, "geometry"),
+        Some("geojson" | "json") => roadstyle::geojson::read_roads(&read(path)?),
+        Some("shp") => {
+            let prj = std::fs::read_to_string(beside("prj")).ok();
+            roadstyle::shp::read_roads(&read(path)?, &read(&beside("dbf"))?, prj.as_deref(), path)
+        }
+        Some("gpkg") => {
+            let (t, warning) = roadstyle::gpkg::read_roads(&read(path)?, path)?;
+            if let Some(w) = warning {
+                eprintln!("warning: {w}");
+            }
+            Ok(t)
+        }
+        _ => Err(format!("{path}: the roads must be a .parquet, .geojson, .shp or .gpkg file")),
+    }
+}
+
 /// Runs one command (`args` without the program's name).
 pub fn run(args: &[String]) -> Result<(), String> {
     let (cmd, rest) = args.split_first().ok_or(USAGE)?;
@@ -108,7 +135,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
                 kw.entry("view_3d").or_insert(Value::Bool(true)); // as export_inline and export_geojson
             })?;
             let look = roadstyle::Look::resolve(&o)?;
-            let s = roadstyle::make_sources(read(roads)?, &look, None, None, name)?;
+            let s = roadstyle::sources_of(self::roads(roads)?, &look, None, None, name)?;
             for (file, size) in roadstyle::save_sources(&s, Path::new(out), format, &keep)? {
                 println!("{file} {size} bytes");
             }
@@ -124,8 +151,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
                 kw.insert("state".into(), "live".into()); // a page's style: the state in the expressions, the interaction contract
             })?;
             let look = roadstyle::Look::resolve(&o)?;
-            let roads = roadstyle::read::read_roads(read(roads)?, "geometry")?;
-            let page = roadstyle::page_options::page_from(roads, &look, &o, &given)?;
+            let page = roadstyle::page_options::page_from(self::roads(roads)?, &look, &o, &given)?;
             for w in &page.warnings {
                 eprintln!("warning: {w}");
             }
@@ -213,7 +239,7 @@ fn levels(sub: &str, pos: &[String], mut opts: Vec<(String, Option<String>)>) ->
                 o.near_rules = true;
             }
             no_more(&opts)?;
-            let table = roadstyle::read::read_roads(read(edges)?, "geometry")?;
+            let table = roads(edges)?;
             let made = make_area(&table, Path::new(folder), &o)?;
             for w in &made.warnings {
                 eprintln!("warning: {w}");

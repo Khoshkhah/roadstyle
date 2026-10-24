@@ -7,6 +7,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **The program reads GeoJSON, Shapefile and GeoPackage roads** (audit N18). `roadstyle sources`, `page` and `levels make` read
+  the roads by the file's extension (`.parquet`, `.geojson`, `.shp` with its `.dbf` and `.prj`, `.gpkg`) through roadstyle-io's
+  readers. Before, they read only GeoParquet, though the program was built with the GeoPackage reader. Another extension is an error
+  that names the file.
 - **`serve` is a crate of its own, `roadstyle-serve`** (audit N17). The program (`roadstyle serve`) and the Python binding
   (`roadstyle._rust.serve`) call it, so the Python extension no longer builds roadstyle-cli: 105 crates, not 170, with no
   headless_chrome and no C SQLite. httparse (=1.10.1) parses the request line and the headers in place of the hand-written parser;

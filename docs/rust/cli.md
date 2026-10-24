@@ -28,8 +28,10 @@ window take `--street-view-key KEY`, else `GOOGLE_MAPS_KEY`. The program writes 
 
 ## Draw a map in two stages
 
-Stage 1 makes the style, one file for each source, and the road table. The roads are a GeoParquet file, with the line in the column
-`geometry` in longitude and latitude.
+Stage 1 makes the style, one file for each source, and the road table. The program reads the roads by the file's extension:
+GeoParquet (`.parquet`, the line in the column `geometry` in longitude and latitude), GeoJSON (`.geojson`), a Shapefile (`.shp`,
+with its `.dbf` and `.prj` beside it) or a GeoPackage (`.gpkg`, its first feature table). It reprojects a Shapefile or a GeoPackage
+in another CRS to longitude and latitude. `page` and `levels make` read the same files.
 
 ```bash
 roadstyle sources roads.parquet out/stage1 --format geoparquet --color-by lanes
