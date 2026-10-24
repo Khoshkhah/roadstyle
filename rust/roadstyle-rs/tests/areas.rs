@@ -120,11 +120,12 @@ fn tiles_against_python() {
 fn levels(area: &str, method: roadstyle_rs::levels::Method) -> Vec<Value> {
     use roadstyle_rs::levels::{compute, LevelEdge, LevelEdges};
     let mut edges = LevelEdges::default();
-    for f in roadstyle_rs::read::read_roads(std::fs::read(data(&format!("{area}/roads.parquet"))).unwrap(), "geometry").unwrap() {
-        let text = |k: &str| f.props.get(k).and_then(Value::as_str).map(String::from);
-        let id = match f.props.get("edge_id") { Some(Value::String(s)) => s.parse().unwrap(), Some(v) => v.as_i64().unwrap(), None => panic!("no edge_id") };
+    let t = roadstyle_rs::read::read_roads(std::fs::read(data(&format!("{area}/roads.parquet"))).unwrap(), "geometry").unwrap();
+    for i in 0..t.len() {
+        let text = |k: &str| t.get(i, k).and_then(roadstyle_rs::Cell::as_str).map(String::from);
+        let id = match t.get(i, "edge_id").map(roadstyle_rs::Cell::to_value) { Some(Value::String(s)) => s.parse().unwrap(), Some(v) => v.as_i64().unwrap(), None => panic!("no edge_id") };
         edges.add(0, LevelEdge { edge_id: id, highway: text("highway").unwrap_or_default(), tunnel: text("tunnel"), bridge: text("bridge"),
-                                 layer: text("layer"), junction: text("junction"), geometry: f.coords.unwrap().into_iter().map(|[x, y]| (x, y)).collect() });
+                                 layer: text("layer"), junction: text("junction"), geometry: t.line(i).unwrap().iter().map(|&[x, y]| (x, y)).collect() });
     }
     compute(&edges, method).unwrap().unwrap().rows.iter().map(|r| match method {
         roadstyle_rs::levels::Method::Tags => json!([r.edge_id.to_string(), r.casing_start, r.casing_level, r.casing_end, r.fill_level]),

@@ -3,6 +3,7 @@
 
 use crate::overlays::{edge_overlay, overlay_layers, Overlay};
 use crate::props::{Feat, Get, Props};
+use roadstyle_model::Cell;
 use indexmap::IndexMap;
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
@@ -463,15 +464,23 @@ fn simple_dasharray(dashes: &[String]) -> Value {
     json!(["case", ["==", ["get", "__rs_k"], 4], gs("rs_tun_ratio"), by])
 }
 
-/// Python's truthiness of a JSON value (bool(v)).
-pub(crate) fn py_truth(v: &Value) -> bool {
-    match v {
-        Value::Null => false,
-        Value::Bool(b) => *b,
-        Value::Number(n) => n.as_f64() != Some(0.0),
-        Value::String(s) => !s.is_empty(),
-        Value::Array(a) => !a.is_empty(),
-        Value::Object(o) => !o.is_empty(),
+/// Python's truthiness of a JSON value or of a road's cell (bool(v)).
+pub(crate) fn py_truth<'a>(v: impl Into<Cell<'a>>) -> bool {
+    match v.into() {
+        Cell::Null => false,
+        Cell::Bool(b) => b,
+        Cell::Int(i) => i != 0,
+        Cell::Float(f) => f != 0.0 && !f.is_nan(),
+        Cell::Str(s) => !s.is_empty(),
+        Cell::IntText(_) => true,
+        Cell::Json(v) => match v {
+            Value::Null => false,
+            Value::Bool(b) => *b,
+            Value::Number(n) => n.as_f64() != Some(0.0),
+            Value::String(s) => !s.is_empty(),
+            Value::Array(a) => !a.is_empty(),
+            Value::Object(o) => !o.is_empty(),
+        },
     }
 }
 
@@ -505,7 +514,7 @@ fn ev(e: &Value, p: &dyn Get) -> Ev {
     let (op, a) = (arr[0].as_str().unwrap_or(""), &arr[1..]);
     match op {
         "literal" => Ev::V(a[0].clone()),
-        "get" if a.len() == 1 => Ev::V(a[0].as_str().and_then(|k| p.value(k)).cloned().unwrap_or(Value::Null)),
+        "get" if a.len() == 1 => Ev::V(a[0].as_str().and_then(|k| p.value(k)).unwrap_or(Value::Null)),
         "has" if a.len() == 1 => Ev::V(Value::Bool(a[0].as_str().is_some_and(|k| p.value(k).is_some()))),
         "all" | "any" => {
             let all = op == "all";
@@ -529,7 +538,7 @@ fn ev(e: &Value, p: &dyn Get) -> Ev {
             }
             match op {
                 "!" => Ev::V(Value::Bool(!py_truth(&vals[0]))),
-                "to-boolean" => Ev::V(Value::Bool(crate::roads::truthy(Some(&vals[0])))),
+                "to-boolean" => Ev::V(Value::Bool(crate::roads::truthy(Some(roadstyle_model::Cell::Json(&vals[0]))))),
                 "==" => Ev::V(Value::Bool(same(&vals[0], &vals[1]))),
                 "!=" => Ev::V(Value::Bool(!same(&vals[0], &vals[1]))),
                 _ => {
@@ -701,13 +710,13 @@ pub struct PageInfo {
 }
 
 #[allow(clippy::too_many_arguments)] // the sources of the style, as make_parts has them
-pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value], decks: bool, ovs: &mut [Overlay], fills: &[String], active: usize,
+pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &[Feat], slots: &[Value], decks: bool, ovs: &mut [Overlay], fills: &[String], active: usize,
                    full: Option<&crate::full::FullSources>) -> Result<(Vec<Value>, PageInfo), String> {
     let mut info = PageInfo::default();
     let m = Model::from_look(look)?;
     let (th, cfg) = (&look["theme"], &look["config"]);
     let empty = Map::new();
-    let (rp, sp, lp) = (typed_props(roads), typed_props(simple), props_of(slots, &empty));
+    let (rp, sp, lp) = (roads, typed_props(simple), props_of(slots, &empty));
     let fb_fill = &th["roads"]["fallback"]["fill"];
     let fb_casing = &th["roads"]["fallback"]["casing"];
     let sel = &th["selection"];
@@ -721,7 +730,7 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
     }
     let pairs = rp.iter().any(|p| p.contains_key("__rs_twin"));
     let any_dup = rp.iter().any(|p| p.get("__rs_dup").is_some_and(py_truth));
-    let mut dashes: Vec<String> = rp.iter().filter_map(|p| p.get("__rs_dash").and_then(Value::as_str)).filter(|s| !s.is_empty()).map(String::from).collect();
+    let mut dashes: Vec<String> = rp.iter().filter_map(|p| p.get("__rs_dash").and_then(Cell::as_str)).filter(|s| !s.is_empty()).map(String::from).collect();
     dashes.sort();
     dashes.dedup();
     let minor: Vec<Value> = th["roads"]["classes"].as_object().into_iter().flatten()
@@ -852,7 +861,7 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
         highlight["filter"] = json!(["!", ["!", ["to-boolean", 1]]]);
     }
     // the base map's overlays (_build_overlays): under the roads, over them, or on a street (_edge_overlay: one copy per fill number)
-    let by_id: HashMap<String, &Props> = rp.iter().filter_map(|p| p.get("edge_id").map(|e| (crate::overlays::eid(e), *p))).collect();
+    let by_id: HashMap<String, crate::road::Road> = rp.iter().filter_map(|p| p.get("edge_id").map(|e| (crate::overlays::eid(e), p))).collect();
     let (mut under, mut over, mut edge, mut ov_ids) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     for (i, ov) in ovs.iter_mut().enumerate() {
         let sid = format!("ov{i}");
@@ -897,11 +906,11 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
         ov_ids.push(ids);
     }
     let mut layers = under;
-    let levels = crate::full::levels_of(&rp);
+    let levels = crate::full::levels_of(rp);
     let full_layers = full.map(|fs| {
         let casings: Vec<&Value> = fs.casings.iter().flatten().collect();
         crate::full::layers(&crate::full::FullIn {
-            look, rp: &rp, levels: &levels, cw: cw.clone(), fw: fw.clone(), bcw: bcw.clone(), off: off.clone(),
+            look, rp, levels: &levels, cw: cw.clone(), fw: fw.clone(), bcw: bcw.clone(), off: off.clone(),
             shadow_w: m.width_expr("highway", true, th["bridges"]["shadow"]["width_scale"].as_f64().unwrap_or(1.0)), lay: lay.clone(),
             mz: mz_filter("highway"), divided: fs.casings.is_some(),
             parts_caps: casings.iter().any(|f| f["properties"].get("__rs_cap").is_some_and(py_truth)), shadows: !fs.shadows.is_empty(),
@@ -993,7 +1002,8 @@ pub fn road_layers(look: &Value, roads: &[Feat], simple: &[Feat], slots: &[Value
             l["filter"] = match l.get("filter") { Some(f) => json!(["all", f, nd]), None => nd.clone() };
         }
     }
-    let rd: Vec<&dyn Get> = rp.iter().map(|p| *p as &dyn Get).collect();
+    let road_views: Vec<crate::road::Road> = rp.iter().collect();
+    let rd: Vec<&dyn Get> = road_views.iter().map(|p| p as &dyn Get).collect();
     let sd: Vec<&dyn Get> = sp.iter().map(|p| *p as &dyn Get).collect();
     let ld: Vec<&dyn Get> = lp.iter().map(|p| *p as &dyn Get).collect();
     let empty_map = Map::new();

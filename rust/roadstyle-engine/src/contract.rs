@@ -4,7 +4,8 @@
 //! the tunnel look, the road fill, the arrows' rules, ...). The page's own options (the base maps, Street View, the panel) are not here.
 
 use crate::layers::{Model, PageInfo};
-use crate::props::Feat;
+use crate::road::{Road, Roads};
+use roadstyle_model::Cell;
 use serde_json::{json, Map, Value};
 
 /// The version of the contract (metadata roadstyle:contract).
@@ -46,15 +47,14 @@ pub fn page_state(look: &Value, active: usize, n_overlays: usize) -> Map<String,
 
 /// The filter panel (render_web: `flt`): the classes present, most important first, a swatch for each (a road of the class that is not a
 /// restricted one), the access kinds with their counts (access_col), and whether there are bridges and tunnels.
-fn filter_panel(look: &Value, roads: &[Feat], m: &Model) -> Value {
+fn filter_panel(look: &Value, roads: &Roads, m: &Model) -> Value {
     let args = &look["args"];
     let fb_fill = &look["theme"]["roads"]["fallback"]["fill"];
     let col = args["filter_col"].as_str().or_else(|| args["highway_col"].as_str()).filter(|c| !c.is_empty()).unwrap_or("highway");
     let (mut classes, mut seen, mut swatches, mut by_access) = (Vec::<String>::new(), std::collections::HashSet::new(), Map::new(),
                                                                std::collections::HashSet::new());
-    let restricted = |p: &crate::props::Props| p.get("__rs_access").is_some_and(|a| !a.is_null() && a != false && a != "");
-    for f in roads {
-        let p = &f.props;
+    let restricted = |p: Road| p.get("__rs_access").map(Cell::to_value).is_some_and(|a| !a.is_null() && a != false && a != "");
+    for p in roads.iter() {
         let cls = crate::cls_of(p);
         let Some(c) = cls.as_str().filter(|c| !c.is_empty()) else { continue };
         if !seen.contains(c) || (by_access.contains(c) && !restricted(p)) {
@@ -66,30 +66,30 @@ fn filter_panel(look: &Value, roads: &[Feat], m: &Model) -> Value {
             if restricted(p) {
                 by_access.insert(c.to_string());
             }
-            swatches.insert(c.into(), p.get("__rs_fill").filter(|v| crate::layers::py_truth(v)).cloned().unwrap_or_else(|| fb_fill.clone()));
+            swatches.insert(c.into(), p.get("__rs_fill").filter(|v| crate::layers::py_truth(*v)).map_or_else(|| fb_fill.clone(), Cell::to_value));
         }
     }
     classes.sort_by(|a, b| m.z_of(b).total_cmp(&m.z_of(a)).then_with(|| a.cmp(b)));
     let mut access = Vec::new();
     if args["access_col"].as_str().is_some_and(|c| !c.is_empty()) {
-        let n = |k: &str| roads.iter().filter(|f| f.props.get("__rs_access").and_then(Value::as_str) == Some(k)).count();
+        let n = |k: &str| roads.iter().filter(|f| f.get("__rs_access").and_then(Cell::as_str) == Some(k)).count();
         access = ACCESS.iter().filter(|(k, _)| n(k) > 0).map(|(k, label)| json!([k, look["theme"]["access"][*k], label, n(k)])).collect();
         // driving's pedestrian streets that cars may not use have their own row: where no usable road is of the class, a class row would
         // be a second switch for them
         if n("pedestrian") > 0 && classes.iter().any(|c| c == "pedestrian")
-            && !roads.iter().any(|f| !restricted(&f.props) && crate::cls_of(&f.props).as_str() == Some("pedestrian")) {
+            && !roads.iter().any(|f| !restricted(f) && crate::cls_of(f).as_str() == Some("pedestrian")) {
             classes.retain(|c| c != "pedestrian");
         }
     }
-    let lvl = |f: &Feat| f.props.get("lvl").and_then(Value::as_f64).unwrap_or(0.0);
+    let lvl = |f: Road| f.get("lvl").and_then(Cell::as_f64).unwrap_or(0.0);
     json!({"on": args["filter_control"] != false && !classes.is_empty(), "col": col, "classes": classes, "access": access, "swatches": swatches,
            "bridges": roads.iter().any(|f| lvl(f) > 0.0), "tunnels": roads.iter().any(|f| lvl(f) < 0.0)})
 }
 
 /// _fill_layer_ids: the layers the page recolours: every road fill layer, and the fill layers of each drawing position.
-pub(crate) fn fill_layer_ids(roads: &[Feat]) -> Vec<String> {
+pub(crate) fn fill_layer_ids(roads: &Roads) -> Vec<String> {
     let fills = ["roads-fill", "roads-fill-sq", "roads-fill-sx", "roads-fill-h", "roads-fill-hsq", "roads-fill-hsx"];
-    let mut levels: Vec<i64> = roads.iter().flat_map(|f| ["__rs_cl", "__rs_fl", "__rs_cs", "__rs_ce"].map(|k| f.props.get(k).and_then(Value::as_i64)))
+    let mut levels: Vec<i64> = roads.iter().flat_map(|f| ["__rs_cl", "__rs_fl", "__rs_cs", "__rs_ce"].map(|k| f.get(k).and_then(Cell::as_i64)))
         .flatten().chain([0]).collect();
     levels.sort();
     levels.dedup();
@@ -101,7 +101,7 @@ pub(crate) fn fill_layer_ids(roads: &[Feat]) -> Vec<String> {
 }
 
 /// roadstyle:controls: the options of rsDashboard that the style gives (render_web.render's `page`, in its order).
-pub fn controls(look: &Value, roads: &[Feat], info: PageInfo, active: usize) -> Result<Value, String> {
+pub fn controls(look: &Value, roads: &Roads, info: PageInfo, active: usize) -> Result<Value, String> {
     let (th, cfg, args) = (&look["theme"], &look["config"], &look["args"]);
     let m = Model::from_look(look)?;
     let tiles = args["tiles"] == true;

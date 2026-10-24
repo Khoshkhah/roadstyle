@@ -41,6 +41,11 @@ impl Props {
         self.at(k).map(|i| &self.0[i].1)
     }
 
+    /// The property as a cell (the type that the stages read the roads' columns with).
+    pub fn cell(&self, k: &str) -> Option<crate::Cell<'_>> {
+        self.get(k).map(crate::Cell::Json)
+    }
+
     pub fn get_mut(&mut self, k: &str) -> Option<&mut Value> {
         self.at(k).map(|i| &mut self.0[i].1)
     }
@@ -130,20 +135,20 @@ impl IntoIterator for Props {
     }
 }
 
-/// Read a property of a typed feature or of a JSON one (the layers read both).
+/// Read a property of a road, of a typed feature or of a JSON one (the layers read all three).
 pub trait Get {
-    fn value(&self, k: &str) -> Option<&Value>;
+    fn value(&self, k: &str) -> Option<Value>;
 }
 
 impl Get for Props {
-    fn value(&self, k: &str) -> Option<&Value> {
-        self.get(k)
+    fn value(&self, k: &str) -> Option<Value> {
+        self.get(k).cloned()
     }
 }
 
 impl Get for Map<String, Value> {
-    fn value(&self, k: &str) -> Option<&Value> {
-        self.get(k)
+    fn value(&self, k: &str) -> Option<Value> {
+        self.get(k).cloned()
     }
 }
 

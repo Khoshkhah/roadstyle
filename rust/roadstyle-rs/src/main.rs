@@ -52,7 +52,7 @@ fn bench(look_path: &str, roads_path: &str, features_path: &str) {
     };
     let look_json = json_file(look_path);
     let look = roads::Look::from_json(&look_json).unwrap_or_else(|e| fail(e));
-    let mut feats = read::read_roads(fs::read(roads_path).unwrap(), "geometry").unwrap_or_else(|e| fail(e));
+    let mut feats = roadstyle_rs::Roads::new(read::read_roads(fs::read(roads_path).unwrap(), "geometry").unwrap_or_else(|e| fail(e)));
     mark("read the roads");
     let colors = roads::mark_roads(&mut feats, &look, &look_json["args"]).unwrap_or_else(|e| fail(e));
     mark("mark the roads (colours, pairs, levels)");
@@ -69,7 +69,7 @@ fn bench(look_path: &str, roads_path: &str, features_path: &str) {
     mark("base map");
     let roads = roads::roads_source(feats);
     mark("roads source");
-    let layers = layers::road_layers(&look_json, &roads.feats, &simple.feats, features(&slots), false, &mut ovs, &colors.props, colors.active, None).unwrap_or_else(|e| fail(e)).0;
+    let layers = layers::road_layers(&look_json, &roads.roads, &simple.feats, features(&slots), false, &mut ovs, &colors.props, colors.active, None).unwrap_or_else(|e| fail(e)).0;
     mark("layers");
     let mut text = Vec::new();
     roads.write_json(&mut text);
@@ -159,11 +159,11 @@ fn main() {
         return;
     }
     // --layers: the road layers alone, for the 12 subsets of tools/make_layer_goldens.py (no base map)
-    let mut feats = read::read_roads(data, "geometry").unwrap_or_else(|e| fail(format!("{roads_path}: {e}")));
+    let mut feats = roadstyle_rs::Roads::new(read::read_roads(data, "geometry").unwrap_or_else(|e| fail(format!("{roads_path}: {e}"))));
     let colors = roads::mark_roads(&mut feats, &look, &look_json["args"]).unwrap_or_else(|e| fail(e));
     let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow, None, Vec::new()).unwrap_or_else(|e| fail(e));
     let slots = slots::slots_source(&feats, &slot_look);
     let roads = roads::roads_source(feats);
-    let layers = layers::road_layers(&look_json, &roads.feats, &simple.feats, features(&slots), false, &mut [], &colors.props, colors.active, None).unwrap_or_else(|e| fail(e)).0;
+    let layers = layers::road_layers(&look_json, &roads.roads, &simple.feats, features(&slots), false, &mut [], &colors.props, colors.active, None).unwrap_or_else(|e| fail(e)).0;
     println!("{}", json!({"layers": layers}));
 }

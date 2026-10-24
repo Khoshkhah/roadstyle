@@ -4,8 +4,9 @@
 //! of render_web.render's colouring and of colors.py's ColorRamp over branca's LinearColormap. The ramps are data (cmaps.json, made by
 //! tests/make_goldens.py from branca and matplotlib).
 
-use crate::Feature;
+use crate::road::Roads;
 use crate::roads::Look;
+use roadstyle_model::Cell;
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
 use std::sync::OnceLock;
@@ -41,7 +42,17 @@ fn get<'a>(o: &'a Value, k: &str) -> Option<&'a Value> {
 
 /// Python's str() of a column value (pandas: integers stay integers with integer_object_nulls).
 /// ponytail: a float is written as Python writes it only without an exponent (no 1e-05 or 1e+16); add it if a categorical column has such floats.
-fn py_str(v: &Value) -> String {
+fn py_str(c: Cell) -> String {
+    let v = match c {
+        Cell::Null => return "None".into(),
+        Cell::Bool(b) => return if b { "True" } else { "False" }.into(),
+        Cell::Str(s) => return s.to_string(),
+        Cell::Int(i) | Cell::IntText(i) => return i.to_string(),
+        Cell::Float(f) if f.is_nan() => return "None".into(),
+        Cell::Float(f) if f.fract() == 0.0 && f.abs() < 1e16 => return format!("{f:.1}"),
+        Cell::Float(f) => return format!("{f}"),
+        Cell::Json(v) => v,
+    };
     match v {
         Value::Null => "None".into(),
         Value::Bool(b) => if *b { "True" } else { "False" }.into(),
@@ -59,20 +70,22 @@ fn py_str(v: &Value) -> String {
 
 /// _keystr: a categorical value as a key (str, stripped, lower case). A missing value is "nan": pandas 3 holds a missing value of a
 /// text or float column as NaN, and str(NaN) is "nan" (only a column of Python objects holds None, whose key is "").
-fn keystr(v: Option<&Value>) -> String {
+fn keystr(v: Option<Cell>) -> String {
     match v {
-        None | Some(Value::Null) => "nan".into(),
-        Some(v) => py_str(v).trim().to_lowercase(),
+        None => "nan".into(),
+        Some(c) if c.is_null() => "nan".into(),
+        Some(c) => py_str(c).trim().to_lowercase(),
     }
 }
 
 /// _as_float: a number, or None for missing, NaN and what float() does not take.
-fn as_float(v: Option<&Value>) -> Option<f64> {
+fn as_float(v: Option<Cell>) -> Option<f64> {
     let f = match v? {
-        Value::Bool(b) => *b as u8 as f64,
-        Value::Number(n) => n.as_f64()?,
-        Value::String(s) => s.trim().parse::<f64>().ok()?,
-        _ => return None,
+        Cell::Bool(b) | Cell::Json(&Value::Bool(b)) => b as u8 as f64,
+        Cell::Str(s) => s.trim().parse::<f64>().ok()?,
+        Cell::Json(Value::String(s)) => s.trim().parse::<f64>().ok()?,
+        Cell::IntText(i) => i as f64,
+        c => c.as_f64()?,
     };
     (!f.is_nan()).then_some(f)
 }
@@ -83,7 +96,7 @@ fn num(v: f64) -> Value {
 
 /// float(x) of a theme or option value.
 fn float(v: &Value) -> Result<f64, String> {
-    as_float(Some(v)).ok_or_else(|| format!("not a number: {v}"))
+    as_float(Some(Cell::Json(v))).ok_or_else(|| format!("not a number: {v}"))
 }
 
 // --- the ramps: branca's LinearColormap ---
@@ -171,10 +184,10 @@ fn parse_color(x: &str) -> Result<[f64; 4], String> {
 // --- the stylers ---
 
 /// ClassStyler: each edge by its class through the look's palette (the classes resolved at build time).
-fn class_frame(fs: &[Feature], look: &Look) -> Frame {
+fn class_frame(fs: &Roads, look: &Look) -> Frame {
     let mut f = Frame::empty(fs.len());
-    for ft in fs {
-        let (s, base) = look.class_style(ft.props.get("highway"));
+    for ft in fs.iter() {
+        let (s, base) = look.class_style(ft.get("highway"));
         f.push(&s["fill"], &s["width"], &s["opacity"], &s["dash"], &s["casing"], &s["casing_width"], &s["casing_opacity"], &Value::from(base));
     }
     f
@@ -201,20 +214,20 @@ impl Frame {
 }
 
 /// CategoricalStyler: a {value: colour} map on a column; an unmapped value gets the theme's data.nodata. No casing.
-fn categorical(fs: &[Feature], look: &Look, column: &str, colors: &Map<String, Value>, missing_self: bool) -> Result<Frame, String> {
+fn categorical(fs: &Roads, look: &Look, column: &str, colors: &Map<String, Value>, missing_self: bool) -> Result<Frame, String> {
     let d = &look.data;
     let fallback = &d["nodata"];
-    let map: HashMap<String, &Value> = colors.iter().map(|(k, v)| (keystr(Some(&Value::from(k.as_str()))), v)).collect();
+    let map: HashMap<String, &Value> = colors.iter().map(|(k, v)| (keystr(Some(Cell::Str(k))), v)).collect();
     let (width, zero, null) = (num(float(&d["width"])?), num(0.0), Value::Null);
     let mut f = Frame::empty(fs.len());
     let mut miss = Vec::with_capacity(fs.len());
-    for ft in fs {
-        let k = keystr(ft.props.get(column));
+    for ft in fs.iter() {
+        let k = keystr(ft.get(column));
         f.push(map.get(&k).copied().unwrap_or(fallback), &width, &d["opacity"], &null, &null, &zero, &d["casing_opacity"], &Value::from(k.as_str()));
         miss.push(!map.contains_key(&k));
     }
     let present: HashSet<&Value> = f.klass.iter().collect();
-    let entries: Vec<Value> = colors.iter().filter(|(k, _)| present.contains(&Value::from(keystr(Some(&Value::from(k.as_str())))))).map(|(k, v)| json!([k, v])).collect();
+    let entries: Vec<Value> = colors.iter().filter(|(k, _)| present.contains(&Value::from(keystr(Some(Cell::Str(k)))))).map(|(k, v)| json!([k, v])).collect();
     f.legend = Some(json!({"kind": "categorical", "title": column, "entries": entries}));
     f.missing = Some(miss);
     f.missing_self = missing_self;
@@ -222,9 +235,9 @@ fn categorical(fs: &[Feature], look: &Look, column: &str, colors: &Map<String, V
 }
 
 /// NumericStyler: a continuous ramp over [vmin, vmax] (the data's range where not given); width_by (min_px, max_px) over the data's range.
-fn numeric(fs: &[Feature], look: &Look, column: &str, o: &Value) -> Result<Frame, String> {
+fn numeric(fs: &Roads, look: &Look, column: &str, o: &Value) -> Result<Frame, String> {
     let d = &look.data;
-    let nums: Vec<Option<f64>> = fs.iter().map(|ft| as_float(ft.props.get(column))).collect();
+    let nums: Vec<Option<f64>> = fs.iter().map(|ft| as_float(ft.get(column))).collect();
     let present: Vec<f64> = nums.iter().flatten().copied().collect();
     let low = present.iter().copied().reduce(f64::min);
     let high = present.iter().copied().reduce(f64::max);
@@ -265,12 +278,12 @@ fn numeric(fs: &[Feature], look: &Look, column: &str, o: &Value) -> Result<Frame
 
 /// ColorTableStyler: the class widths and casing, and each edge's own colour from `column` (a colour text; else the theme's
 /// data.color_table). No legend.
-fn color_table(fs: &[Feature], look: &Look, column: &str) -> Frame {
+fn color_table(fs: &Roads, look: &Look, column: &str) -> Frame {
     let mut f = class_frame(fs, look);
     let fallback = &look.data["color_table"];
     let mut miss = Vec::with_capacity(fs.len());
     for (i, ft) in fs.iter().enumerate() {
-        let c = ft.props.get(column).and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty());
+        let c = ft.get(column).and_then(Cell::as_str).map(str::trim).filter(|s| !s.is_empty());
         f.fill[i] = c.map_or_else(|| fallback.clone(), Value::from);
         miss.push(c.is_none());
     }
@@ -279,7 +292,7 @@ fn color_table(fs: &[Feature], look: &Look, column: &str) -> Frame {
 }
 
 /// build_styler (option_styler for a colour option): `o` holds color_by, colors, cmap, vmin, vmax, width_by, missing, palette.
-fn resolve(fs: &[Feature], look: &Look, o: &Value) -> Result<Frame, String> {
+fn resolve(fs: &Roads, look: &Look, o: &Value) -> Result<Frame, String> {
     if get(o, "style").is_some() {
         return Err("style= (a Styler object) is not in the engine: use color_by, colors, cmap, vmin, vmax or width_by".into());
     }
@@ -288,7 +301,7 @@ fn resolve(fs: &[Feature], look: &Look, o: &Value) -> Result<Frame, String> {
     }
     let Some(column) = get(o, "color_by") else { return Ok(class_frame(fs, look)) };
     let column = column.as_str().ok_or("color_by: a column name")?;
-    if fs.first().is_some_and(|f| !f.props.contains_key(column)) {
+    if fs.at(0).is_some_and(|f| !f.contains_key(column)) {
         return Err(format!("color_by: no column {column:?} in the roads"));
     }
     match get(o, "colors") {
@@ -300,9 +313,8 @@ fn resolve(fs: &[Feature], look: &Look, o: &Value) -> Result<Frame, String> {
 }
 
 /// bake_props: each edge's __rs_fill, __rs_w, __rs_op, __rs_dash, __rs_casing, __rs_cw, __rs_cop and __rs_class.
-fn bake_props(fs: &mut [Feature], f: &Frame) {
-    for (i, ft) in fs.iter_mut().enumerate() {
-        let p = &mut ft.props;
+fn bake_props(fs: &mut Roads, f: &Frame) {
+    for (i, p) in fs.marks.iter_mut().enumerate() {
         for (k, v) in [("__rs_fill", &f.fill), ("__rs_w", &f.width), ("__rs_op", &f.opacity), ("__rs_dash", &f.dash), ("__rs_casing", &f.casing),
                        ("__rs_cw", &f.casing_width), ("__rs_cop", &f.casing_opacity), ("__rs_class", &f.klass)] {
             p.insert(k, v[i].clone());
@@ -312,17 +324,17 @@ fn bake_props(fs: &mut [Feature], f: &Frame) {
 
 /// render_edges' colouring and render_web.render's: the per-edge props of the class styles, of a data styler (color_by, color_table), or
 /// of colour options (color_options: one fill per option, the shared width and casing from the class styles or the data styler).
-pub fn bake(fs: &mut [Feature], look: &Look, args: &Value) -> Result<Colors, String> {
+pub fn bake(fs: &mut Roads, look: &Look, args: &Value) -> Result<Colors, String> {
     // render_edges: color_table, an edge_id -> colour map, as the column __rs_color (keys as text, as str(id) in Python)
     let main = if let Some(t) = get(args, "color_table") {
         let key = get(args, "color_key").and_then(Value::as_str).unwrap_or("edge_id");
         let t = t.as_object().ok_or("color_table: a {edge_id: colour} map")?;
-        if fs.first().is_some_and(|f| !f.props.contains_key(key)) {
+        if fs.at(0).is_some_and(|f| !f.contains_key(key)) {
             return Err(format!("color_key {key:?} not found in the edges"));
         }
-        for f in fs.iter_mut() {
-            let c = f.props.get(key).and_then(|k| t.get(&py_str(k))).cloned().unwrap_or(Value::Null);
-            f.props.insert("__rs_color", c);
+        for i in 0..fs.len() {
+            let c = fs.get(i, key).and_then(|k| t.get(&py_str(k))).cloned().unwrap_or(Value::Null);
+            fs.marks[i].insert("__rs_color", c);
         }
         Some(color_table(fs, look, "__rs_color"))
     } else if get(args, "style").is_some() || get(args, "color_by").is_some() {
@@ -351,9 +363,9 @@ pub fn bake(fs: &mut [Feature], look: &Look, args: &Value) -> Result<Colors, Str
         for (idx, (name, f)) in frames.iter().enumerate() {
             let prop = if idx == 0 { "__rs_fill".to_string() } else { format!("__rs_fill__{idx}") };
             let miss = if idx == 0 || f.missing_self { None } else { f.missing.as_ref() };
-            for (i, ft) in fs.iter_mut().enumerate() {
+            for (i, m) in fs.marks.iter_mut().enumerate() {
                 let fill = if miss.is_some_and(|m| m[i]) { &base[i] } else { &f.fill[i] };
-                ft.props.insert(&prop, fill.clone());
+                m.insert(&prop, fill.clone());
             }
             meta.push(json!({"name": name, "prop": prop, "legend": f.legend.clone()}));
             props.push(prop);

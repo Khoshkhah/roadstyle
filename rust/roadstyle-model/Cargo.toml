@@ -8,4 +8,7 @@ license.workspace = true
 description = "roadstyle's road model: the roads as features with typed properties, and the geometry helpers"
 
 [dependencies]
+serde.workspace = true
 serde_json.workspace = true
+arrow-array.workspace = true
+arrow-schema.workspace = true

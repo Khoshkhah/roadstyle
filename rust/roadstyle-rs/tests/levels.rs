@@ -14,16 +14,17 @@ fn data(name: &str) -> Vec<u8> {
 
 fn edges() -> LevelEdges {
     let mut out = LevelEdges::default();
-    for f in read_roads(data("level_edges.parquet"), "geometry").unwrap() {
-        let text = |k: &str| f.props[k].as_str().map(String::from);
-        out.add(f.props["rank"].as_u64().unwrap() as u8, LevelEdge {
-            edge_id: f.props["edge_id"].as_i64().unwrap(),
+    let t = read_roads(data("level_edges.parquet"), "geometry").unwrap();
+    for i in 0..t.len() {
+        let text = |k: &str| t.get(i, k).unwrap().as_str().map(String::from);
+        out.add(t.get(i, "rank").unwrap().as_u64().unwrap() as u8, LevelEdge {
+            edge_id: t.get(i, "edge_id").unwrap().as_i64().unwrap(),
             highway: text("highway").unwrap(),
             tunnel: text("tunnel"),
             bridge: text("bridge"),
             layer: text("layer"),
             junction: text("junction"),
-            geometry: f.coords.unwrap().into_iter().map(|[x, y]| (x, y)).collect(),
+            geometry: t.line(i).unwrap().iter().map(|&[x, y]| (x, y)).collect(),
         });
     }
     out

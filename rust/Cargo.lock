@@ -750,6 +750,7 @@ version = "0.25.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
+ "arrow-select",
  "bytes",
  "parquet",
  "roadstyle-model",
@@ -768,6 +769,9 @@ dependencies = [
 name = "roadstyle-model"
 version = "0.25.0"
 dependencies = [
+ "arrow-array",
+ "arrow-schema",
+ "serde",
  "serde_json",
 ]
 

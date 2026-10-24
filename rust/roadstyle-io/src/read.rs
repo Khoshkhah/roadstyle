@@ -1,4 +1,5 @@
-//! The roads from a GeoParquet file: every column a property (as GeoPandas' GeoJSON writes it), the geometry a LineString from WKB.
+//! The roads from a GeoParquet file: every column an Arrow array of the table (as GeoPandas' GeoJSON writes its values), the
+//! geometry a LineString from WKB.
 
 use arrow_array::{cast::AsArray, types::*, Array, ArrayRef};
 use arrow_schema::DataType;
@@ -6,29 +7,35 @@ use bytes::Bytes;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use serde_json::{Map, Value};
 
-pub use roadstyle_model::{Feature, Row};
+pub use roadstyle_model::{Lines, RoadTable, Row};
 
-pub fn read_roads(data: Vec<u8>, geom_col: &str) -> Result<Vec<Feature>, String> {
-    let reader = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data))
-        .and_then(|b| b.build())
-        .map_err(|e| format!("not a Parquet file: {e}"))?;
-    let mut out = Vec::new();
+pub fn read_roads(data: Vec<u8>, geom_col: &str) -> Result<RoadTable, String> {
+    let builder = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data)).map_err(|e| format!("not a Parquet file: {e}"))?;
+    let schema = builder.schema().clone();
+    let reader = builder.build().map_err(|e| format!("not a Parquet file: {e}"))?;
+    let names: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).filter(|n| n != geom_col).collect();
+    let mut parts: Vec<Vec<ArrayRef>> = vec![Vec::new(); names.len()];
+    let mut lines = Lines::default();
     for batch in reader {
         let batch = batch.map_err(|e| e.to_string())?;
-        let schema = batch.schema();
-        let start = out.len();
-        out.extend((0..batch.num_rows()).map(|_| Feature { props: Default::default(), coords: None }));
-        for (field, col) in schema.fields().iter().zip(batch.columns()) {
-            for (r, f) in out[start..].iter_mut().enumerate() {
-                if field.name() == geom_col {
-                    f.coords = binary(col, r).and_then(wkb_line);
-                } else {
-                    f.props.insert(field.name(), value(col, r)?);
-                }
+        let mut k = 0;
+        for (field, col) in batch.schema().fields().iter().zip(batch.columns()) {
+            if field.name() == geom_col {
+                (0..batch.num_rows()).for_each(|r| lines.push(binary(col, r).and_then(wkb_line).as_deref()));
+            } else {
+                parts[k].push(col.clone());
+                k += 1;
             }
         }
+        if !schema.fields().iter().any(|f| f.name() == geom_col) {
+            (0..batch.num_rows()).for_each(|_| lines.push(None));
+        }
     }
-    Ok(out)
+    let cols = parts.into_iter().zip(&schema.fields().iter().filter(|f| f.name() != geom_col).collect::<Vec<_>>()).map(|(p, f)| {
+        let refs: Vec<&dyn Array> = p.iter().map(|a| a.as_ref()).collect();
+        if refs.is_empty() { Ok(arrow_array::new_empty_array(f.data_type())) } else { arrow_select::concat::concat(&refs).map_err(|e| e.to_string()) }
+    }).collect::<Result<Vec<_>, String>>()?;
+    RoadTable::new(names, cols, lines)
 }
 
 /// Any Parquet table as rows: the columns as properties, the binary column `blob` kept as its bytes.

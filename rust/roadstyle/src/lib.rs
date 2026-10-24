@@ -12,7 +12,7 @@ pub use roadstyle_tiles as tiles;
 use serde_json::{json, Value};
 
 /// The roads, the base map's rows and the route planner's rows.
-type Tables = (Vec<Feature>, Option<Vec<Row>>, Option<Vec<Row>>);
+type Tables = (RoadTable, Option<Vec<Row>>, Option<Vec<Row>>);
 
 /// The roads and the other tables from their GeoParquet bytes: the roads' lines and the base map's geometries in the column `geometry`.
 fn tables(parquet: Vec<u8>, features: Option<Vec<u8>>, planner: Option<Vec<u8>>) -> Result<Tables, String> {
@@ -75,6 +75,11 @@ pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name:
             continue;
         }
         match s {
+            // the roads, from the table and the marks (no copy of their properties)
+            Src::Roads(s) => {
+                let feats = s.roads.iter().map(|r| (r.line(), r.iter().map(|(k, c)| (k, c.to_value()))));
+                tiled.add_lines(&k, feats, exact.as_ref().unwrap_or(&read), slots, from)
+            }
             Src::Typed(s) if exact.is_some() => tiled.add_typed(&k, s, exact.as_ref().unwrap(), slots, from),
             // render's tiles: the pieces of `simple` keep the class, lvl, the metre width column and the __rs_* marks (not a picked item's fields)
             Src::Typed(s) if k == "simple" => {

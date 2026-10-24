@@ -16,11 +16,13 @@ edition = "2021"
 license = "MIT"
 
 [workspace.dependencies]
+serde = "1"                         # the JSON text of a road's cell (roadstyle-model, Cell)
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }   # float_roundtrip: parse floats exactly, as Python
 # the versions of duckosm-rust (offline from the same cache); snap, not zstd: GeoPandas writes Snappy, and snap is pure Rust (wasm)
 parquet = { version = "=60.0.0", default-features = false, features = ["arrow", "snap"] }
 arrow-array = "=60.0.0"
 arrow-schema = "=60.0.0"
+arrow-select = "=60.0.0"            # the reader joins the batches of a column into one array
 bytes = "1"
 indexmap = "2"                      # the order of Python's dicts (the slots' groups)
 rstar = "0.12"                      # the R-tree for the crossings (shapely STRtree) and the levels

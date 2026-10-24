@@ -1,0 +1,320 @@
+//! The roads as columns (docs/design/rust_library.md, "The render model"): `RoadTable` keeps each column of the input as one Arrow
+//! array and every line in one coordinate buffer, not a map of JSON values for each road. A value is read as a `Cell`, which borrows
+//! from the table. The JSON text of a cell is the text of the `serde_json::Value` that the reader made before (GeoPandas' GeoJSON).
+
+use arrow_array::{cast::AsArray, types::*, Array, ArrayRef, Int64Array};
+use arrow_schema::DataType;
+use serde_json::Value;
+use std::sync::Arc;
+
+/// An integer past 2**53 - 1: JavaScript rounds it (render_web._stringify_unsafe_ints writes it as text).
+const JS_MAX_SAFE_INT: u64 = (1 << 53) - 1;
+
+/// One value of a road: a cell of a column, or a value of the engine's (a JSON value).
+#[derive(Clone, Copy, Debug)]
+pub enum Cell<'a> {
+    Null,
+    Bool(bool),
+    Int(i64),
+    Float(f64),
+    Str(&'a str),
+    /// an integer that the output writes as text (past 2**53 - 1, after `RoadTable::stringify_unsafe_ints`)
+    IntText(i64),
+    Json(&'a Value),
+}
+
+impl<'a> Cell<'a> {
+    /// The value as the reader wrote it into the JSON tree (a float NaN is null, as GeoPandas writes it).
+    pub fn to_value(self) -> Value {
+        match self {
+            Cell::Null => Value::Null,
+            Cell::Bool(b) => b.into(),
+            Cell::Int(i) => i.into(),
+            Cell::Float(f) => serde_json::Number::from_f64(f).map_or(Value::Null, Value::Number),
+            Cell::Str(s) => s.into(),
+            Cell::IntText(i) => i.to_string().into(),
+            Cell::Json(v) => v.clone(),
+        }
+    }
+
+    pub fn is_null(self) -> bool {
+        match self {
+            Cell::Null => true,
+            Cell::Float(f) => f.is_nan(),
+            Cell::Json(v) => v.is_null(),
+            _ => false,
+        }
+    }
+
+    pub fn as_str(self) -> Option<&'a str> {
+        match self {
+            Cell::Str(s) => Some(s),
+            Cell::Json(v) => v.as_str(),
+            _ => None,
+        }
+    }
+
+    pub fn as_bool(self) -> Option<bool> {
+        match self {
+            Cell::Bool(b) => Some(b),
+            Cell::Json(v) => v.as_bool(),
+            _ => None,
+        }
+    }
+
+    /// As `Value::as_f64`: a number (not a text that is one).
+    pub fn as_f64(self) -> Option<f64> {
+        match self {
+            Cell::Int(i) => Some(i as f64),
+            Cell::Float(f) => (!f.is_nan()).then_some(f),
+            Cell::Json(v) => v.as_f64(),
+            _ => None,
+        }
+    }
+
+    /// As `Value::as_i64`: an integer (a float is not one).
+    pub fn as_i64(self) -> Option<i64> {
+        match self {
+            Cell::Int(i) => Some(i),
+            Cell::Json(v) => v.as_i64(),
+            _ => None,
+        }
+    }
+
+    pub fn as_u64(self) -> Option<u64> {
+        match self {
+            Cell::Int(i) => u64::try_from(i).ok(),
+            Cell::Json(v) => v.as_u64(),
+            _ => None,
+        }
+    }
+}
+
+impl<'a> From<&'a Value> for Cell<'a> {
+    fn from(v: &'a Value) -> Cell<'a> {
+        Cell::Json(v)
+    }
+}
+
+impl<'a> From<&&'a Value> for Cell<'a> {
+    fn from(v: &&'a Value) -> Cell<'a> {
+        Cell::Json(v)
+    }
+}
+
+/// The same value (as the two JSON values are the same).
+impl PartialEq for Cell<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Cell::Str(a), Cell::Str(b)) => a == b,
+            (Cell::Int(a), Cell::Int(b)) => a == b,
+            (Cell::Bool(a), Cell::Bool(b)) => a == b,
+            _ => self.to_value() == other.to_value(),
+        }
+    }
+}
+
+impl PartialEq<Value> for Cell<'_> {
+    fn eq(&self, other: &Value) -> bool {
+        self.to_value() == *other
+    }
+}
+
+impl serde::Serialize for Cell<'_> {
+    /// The text of `to_value()`, with no copy of the value.
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        match *self {
+            Cell::Null => s.serialize_unit(),
+            Cell::Bool(b) => s.serialize_bool(b),
+            Cell::Int(i) => s.serialize_i64(i),
+            Cell::Float(f) if f.is_finite() => s.serialize_f64(f),
+            Cell::Float(_) => s.serialize_unit(),
+            Cell::Str(t) => s.serialize_str(t),
+            Cell::IntText(i) => s.collect_str(&i),
+            Cell::Json(v) => v.serialize(s),
+        }
+    }
+}
+
+/// The lines of the roads: one coordinate buffer, with the end of each road's line in it. A road whose geometry is not a LineString
+/// has none (the stages skip it, as roadstyle does).
+#[derive(Clone, Debug, Default)]
+pub struct Lines {
+    pts: Vec<[f64; 2]>,
+    end: Vec<u32>,
+    some: Vec<bool>,
+}
+
+impl Lines {
+    pub fn push(&mut self, line: Option<&[[f64; 2]]>) {
+        if let Some(l) = line {
+            self.pts.extend_from_slice(l);
+        }
+        self.end.push(self.pts.len() as u32);
+        self.some.push(line.is_some());
+    }
+
+    pub fn len(&self) -> usize {
+        self.end.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.end.is_empty()
+    }
+
+    /// The line of the road `row` (None: not a LineString).
+    pub fn get(&self, row: usize) -> Option<&[[f64; 2]]> {
+        if !self.some[row] {
+            return None;
+        }
+        let start = if row == 0 { 0 } else { self.end[row - 1] as usize };
+        Some(&self.pts[start..self.end[row] as usize])
+    }
+}
+
+/// The roads: their columns (Arrow arrays, in the input's order) and their lines.
+#[derive(Clone, Debug)]
+pub struct RoadTable {
+    names: Vec<String>,
+    cols: Vec<ArrayRef>,
+    lines: Lines,
+    /// the integers past 2**53 - 1 are text (`stringify_unsafe_ints`)
+    js_safe: bool,
+}
+
+/// The column types that the reader takes (the types of GeoPandas' GeoParquet).
+fn readable(t: &DataType) -> bool {
+    matches!(t, DataType::Null | DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View | DataType::Boolean | DataType::Int32
+                | DataType::Int64 | DataType::Float32 | DataType::Float64)
+}
+
+impl RoadTable {
+    /// The table of the columns `names` (each as long as `lines`). An error for a column of another type or length.
+    pub fn new(names: Vec<String>, cols: Vec<ArrayRef>, lines: Lines) -> Result<RoadTable, String> {
+        for (n, c) in names.iter().zip(&cols) {
+            if !readable(c.data_type()) {
+                return Err(format!("column type {} is not read", c.data_type()));
+            }
+            if c.len() != lines.len() {
+                return Err(format!("column {n}: {} rows, the roads have {}", c.len(), lines.len()));
+            }
+        }
+        Ok(RoadTable { names, cols, lines, js_safe: false })
+    }
+
+    pub fn len(&self) -> usize {
+        self.lines.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.lines.is_empty()
+    }
+
+    /// The column names, in their order.
+    pub fn names(&self) -> &[String] {
+        &self.names
+    }
+
+    pub fn col(&self, name: &str) -> Option<usize> {
+        self.names.iter().position(|n| n == name)
+    }
+
+    pub fn line(&self, row: usize) -> Option<&[[f64; 2]]> {
+        self.lines.get(row)
+    }
+
+    /// The value of the column `col` of the road `row`.
+    pub fn cell(&self, col: usize, row: usize) -> Cell<'_> {
+        let c = &self.cols[col];
+        if c.is_null(row) {
+            return Cell::Null;
+        }
+        match c.data_type() {
+            DataType::Utf8 => Cell::Str(c.as_string::<i32>().value(row)),
+            DataType::LargeUtf8 => Cell::Str(c.as_string::<i64>().value(row)),
+            DataType::Utf8View => Cell::Str(c.as_string_view().value(row)),
+            DataType::Boolean => Cell::Bool(c.as_boolean().value(row)),
+            DataType::Int32 => Cell::Int(c.as_primitive::<Int32Type>().value(row) as i64),
+            DataType::Int64 => {
+                let i = c.as_primitive::<Int64Type>().value(row);
+                if self.js_safe && i.unsigned_abs() > JS_MAX_SAFE_INT { Cell::IntText(i) } else { Cell::Int(i) }
+            }
+            DataType::Float32 => Cell::Float(c.as_primitive::<Float32Type>().value(row) as f64),
+            DataType::Float64 => Cell::Float(c.as_primitive::<Float64Type>().value(row)),
+            _ => Cell::Null, // DataType::Null: a column that is null in every row (pyarrow writes it so)
+        }
+    }
+
+    /// The value of the column `name` of the road `row`; None: no such column.
+    pub fn get(&self, row: usize, name: &str) -> Option<Cell<'_>> {
+        self.col(name).map(|c| self.cell(c, row))
+    }
+
+    /// Give the column `from` the name `to`, in its place (a column `to` that is there goes away). False: no column `from`.
+    pub fn rename(&mut self, from: &str, to: &str) -> bool {
+        let Some(i) = self.col(from) else { return false };
+        if let Some(j) = self.col(to).filter(|&j| j != i) {
+            self.names.remove(j);
+            self.cols.remove(j);
+            return self.rename(from, to);
+        }
+        self.names[i] = to.to_string();
+        true
+    }
+
+    /// Set the column `name` to integers: in its place when it is there, else as the last column.
+    pub fn set_ints(&mut self, name: &str, values: Vec<i64>) {
+        assert_eq!(values.len(), self.len(), "a column of {name} for each road");
+        let a: ArrayRef = Arc::new(Int64Array::from(values));
+        match self.col(name) {
+            Some(i) => self.cols[i] = a,
+            None => {
+                self.names.push(name.to_string());
+                self.cols.push(a);
+            }
+        }
+    }
+
+    /// _stringify_unsafe_ints: from now on, an integer past 2**53 - 1 is text (JavaScript would round it).
+    pub fn stringify_unsafe_ints(&mut self) {
+        self.js_safe = true;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arrow_array::{BooleanArray, Float64Array, StringArray};
+
+    fn table() -> RoadTable {
+        let mut lines = Lines::default();
+        lines.push(Some(&[[1.0, 2.0], [3.0, 4.0]]));
+        lines.push(None);
+        let cols: Vec<ArrayRef> = vec![Arc::new(StringArray::from(vec![Some("primary"), None])),
+                                       Arc::new(Int64Array::from(vec![1i64 << 60, 7])),
+                                       Arc::new(Float64Array::from(vec![f64::NAN, 2.5])),
+                                       Arc::new(BooleanArray::from(vec![true, false]))];
+        RoadTable::new(["highway", "edge_id", "w", "bridge"].map(String::from).to_vec(), cols, lines).unwrap()
+    }
+
+    #[test]
+    fn the_cells_are_the_json_values_of_the_reader() {
+        let mut t = table();
+        assert_eq!(t.line(0), Some(&[[1.0, 2.0], [3.0, 4.0]][..]));
+        assert_eq!(t.line(1), None);
+        assert_eq!(t.get(0, "highway").and_then(Cell::as_str), Some("primary"));
+        assert!(t.get(1, "highway").unwrap().is_null() && t.get(0, "nothing").is_none());
+        assert_eq!(t.get(0, "w").unwrap().to_value(), Value::Null, "NaN is null");
+        let text = |c: Cell| serde_json::to_string(&c).unwrap();
+        assert_eq!((text(t.cell(1, 0)), text(t.cell(2, 1)), text(t.cell(3, 0))), ("1152921504606846976".into(), "2.5".into(), "true".into()));
+        t.stringify_unsafe_ints();
+        assert_eq!(text(t.cell(1, 0)), "\"1152921504606846976\"");
+        assert_eq!(t.cell(1, 0).to_value(), Value::from("1152921504606846976"));
+        assert_eq!(text(t.cell(1, 1)), "7");
+        assert!(t.rename("w", "highway") && t.names() == ["edge_id", "highway", "bridge"]);
+        t.set_ints("lvl", vec![1, 2]);
+        t.set_ints("edge_id", vec![3, 4]);
+        assert_eq!(t.names(), ["edge_id", "highway", "bridge", "lvl"]);
+        assert_eq!(t.get(1, "edge_id").and_then(Cell::as_i64), Some(4));
+    }
+}
