@@ -61,7 +61,7 @@ fn a_monaco_shapefile_is_its_roads() {
         assert_eq!(t.get(r, "maxspeed").unwrap().as_f64(), Some(*speed));
     }
     // no .prj: no CRS, an error as in Python (validate.to_wgs84)
-    assert!(shp::read_roads(&s, &d, None, "monaco.shp").unwrap_err().starts_with("monaco.shp has no CRS"));
+    assert!(matches!(shp::read_roads(&s, &d, None, "monaco.shp").unwrap_err(), roadstyle_io::Error::Crs(m) if m.starts_with("monaco.shp has no CRS")));
 }
 
 #[test]
@@ -137,6 +137,6 @@ mod gpkg {
         let (t, warning) = gpkg::read_roads(&geopackage(3006, &SWEREF, &["b", "a"]), "two.gpkg").unwrap();
         assert_eq!(t.get(0, "highway").unwrap().as_str(), Some("b-road"));
         assert_eq!(warning.as_deref(), Some("More than one layer found in 'two.gpkg': 'b' (default), 'a'. Specify layer parameter to avoid this warning."));
-        assert!(gpkg::read_roads(b"not a file", "x.gpkg").unwrap_err().starts_with("x.gpkg: not a GeoPackage"));
+        assert!(matches!(gpkg::read_roads(b"not a file", "x.gpkg").unwrap_err(), roadstyle_io::Error::Format(m) if m.starts_with("x.gpkg: not a GeoPackage")));
     }
 }

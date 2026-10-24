@@ -50,7 +50,7 @@ Serve the folder over http. A module script does not load from a `file://` addre
 | `tiler.tile("roads", z, x, y)` | `Uint8Array` | one vector tile; empty when no road is in it |
 | `tiler.props("roads", row)` | JSON text | the properties of one road, or `null` |
 | `tiler.archive(bounds, layers)` | `Uint8Array` | a PMTiles archive of all tiles in `[min lon, min lat, max lon, max lat]` |
-| `makePage(roads, look, options, given?)` | HTML text | the whole page, as `render_edges` writes it |
+| `makePage(roads, look, options, given?, features?)` | HTML text | the whole page, as `render_edges` writes it |
 | `exportLook(look, cols, positions)` | JSON text | the look for another app's data layer (as `export_look`) |
 | `memoryBytes()` | number | the size of the module's memory, in bytes |
 

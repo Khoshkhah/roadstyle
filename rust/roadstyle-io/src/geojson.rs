@@ -7,6 +7,7 @@
 //! - The line: a LineString's points (x, y; a third number is left out). Another geometry, or none, gives no line, as in the GeoParquet
 //!   reader: that road is not drawn.
 
+use crate::Error;
 use arrow_array::{ArrayRef, BooleanArray, Float64Array, Int64Array, StringArray};
 use serde_json::Value;
 use std::sync::Arc;
@@ -50,12 +51,12 @@ fn line(g: &Value) -> Option<Vec<[f64; 2]>> {
 }
 
 /// The roads of the GeoJSON text `data`: a FeatureCollection (or one Feature). An error for text that is not JSON or not GeoJSON.
-pub fn read_roads(data: &[u8]) -> Result<RoadTable, String> {
-    let fc: Value = serde_json::from_slice(data).map_err(|e| format!("not a GeoJSON file: {e}"))?;
+pub fn read_roads(data: &[u8]) -> Result<RoadTable, Error> {
+    let fc: Value = serde_json::from_slice(data).map_err(|e| Error::Format(format!("not a GeoJSON file: {e}")))?;
     let feats: Vec<&Value> = match fc["type"].as_str() {
-        Some("FeatureCollection") => fc["features"].as_array().ok_or("GeoJSON: a FeatureCollection with no features list")?.iter().collect(),
+        Some("FeatureCollection") => fc["features"].as_array().ok_or_else(|| Error::Format("GeoJSON: a FeatureCollection with no features list".into()))?.iter().collect(),
         Some("Feature") => vec![&fc],
-        _ => return Err("GeoJSON: not a FeatureCollection or a Feature".into()),
+        _ => return Err(Error::Format("GeoJSON: not a FeatureCollection or a Feature".into())),
     };
     let mut names: Vec<String> = Vec::new();
     let mut kinds: Vec<Kind> = Vec::new();
@@ -64,7 +65,7 @@ pub fn read_roads(data: &[u8]) -> Result<RoadTable, String> {
         let props = match &f["properties"] {
             Value::Object(p) => p,
             Value::Null => &serde_json::Map::new(),
-            _ => return Err(format!("GeoJSON feature {i}: its properties are not a mapping")),
+            _ => return Err(Error::Format(format!("GeoJSON feature {i}: its properties are not a mapping"))),
         };
         for (k, v) in props {
             match names.iter().position(|n| n == k) {
@@ -88,7 +89,7 @@ pub fn read_roads(data: &[u8]) -> Result<RoadTable, String> {
         };
         col
     }).collect();
-    RoadTable::new(names, cols, lines)
+    RoadTable::new(names, cols, lines).map_err(Error::Format)
 }
 
 #[cfg(test)]
@@ -112,7 +113,7 @@ mod tests {
         assert_eq!(t.get(0, "oneway").unwrap().as_bool(), Some(true));
         assert_eq!(t.get(1, "tags").unwrap().as_str(), Some(r#"{"x":1}"#));
         assert!(t.get(2, "highway").unwrap().is_null());
-        assert!(read_roads(b"[1, 2]").unwrap_err().contains("not a FeatureCollection"));
-        assert!(read_roads(b"{").unwrap_err().contains("not a GeoJSON file"));
+        assert!(matches!(read_roads(b"[1, 2]").unwrap_err(), Error::Format(m) if m.contains("not a FeatureCollection")));
+        assert!(matches!(read_roads(b"{").unwrap_err(), Error::Format(m) if m.contains("not a GeoJSON file")));
     }
 }

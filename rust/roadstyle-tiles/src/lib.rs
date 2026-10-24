@@ -15,6 +15,7 @@
 pub mod pmtiles;
 pub mod stage;
 
+use roadstyle_model::feature_table::FeatureTable;
 use rstar::{primitives::GeomWithData, primitives::Rectangle, RTree, AABB};
 use serde_json::{Map, Value};
 use indexmap::IndexMap;
@@ -206,6 +207,32 @@ impl Tiles {
             let props = f["properties"].as_object().unwrap_or(&empty);
             // tiles.py's tile_props: a whole layer (keep=None there) all its properties, else `keep` and every __rs_*
             b.push(id, g, props.iter().filter(|(k, _)| whole || k.starts_with("__rs_") || keep.contains(k.as_str())).map(|(k, v)| (k.as_str(), v.clone())));
+        }
+        self.put(name, b.layer(whole, min_zoom));
+    }
+
+    /// Add a typed table of features (a base-map layer, audit R10) as the layer `name`, as `add` adds the same features as GeoJSON: each
+    /// feature's id is its row, and its properties are the keys of its GeoJSON feature (`FeatureTable::has_key`).
+    pub fn add_features(&mut self, name: &str, t: &FeatureTable, keep: &HashSet<String>, whole: bool, min_zoom: u32) {
+        use roadstyle_model::feature_table::GeomType;
+        let g = t.geometries_of();
+        let names: Vec<&str> = t.names().iter().map(String::as_str).filter(|k| whole || k.starts_with("__rs_") || keep.contains(*k)).collect();
+        let mut b = Builder::default();
+        for row in 0..t.len() {
+            let Some(kind) = g.kind(row) else { continue };
+            let pts = |r: &[[f64; 2]]| r.iter().filter_map(|p| merc_ll(p[0], p[1])).collect::<Vec<P>>();
+            let geom = match kind {
+                // a point that is not finite is null in GeoJSON, and `add` leaves that feature out
+                GeomType::Point => match g.parts(row).next().and_then(|mut r| r.next()).and_then(|r| r.first()).and_then(|p| merc_ll(p[0], p[1])) {
+                    Some(p) => Geom::Points(vec![p]),
+                    None => continue,
+                },
+                GeomType::MultiPoint => Geom::Points(g.parts(row).flat_map(|mut r| r.next().map(pts)).flatten().collect()),
+                GeomType::LineString | GeomType::MultiLineString => Geom::Lines(g.parts(row).flat_map(|r| r.map(pts)).collect()),
+                GeomType::Polygon | GeomType::MultiPolygon => Geom::Polygons(g.parts(row).map(|r| r.map(pts).collect()).collect()),
+            };
+            let props = names.iter().filter(|k| t.has_key(row, k)).filter_map(|k| t.get(row, k).map(|c| (*k, c)));
+            b.push(Some(row as u64), geom, props);
         }
         self.put(name, b.layer(whole, min_zoom));
     }

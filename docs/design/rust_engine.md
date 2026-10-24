@@ -92,7 +92,7 @@ The engine reads the colour options of `render_edges` from `look["args"]`: `colo
 
 | Part | In the engine |
 |---|---|
-| Ramps (`cmap`) | branca's `LinearColormap`: the same lookup (an exact branca name, then the first name in order that is the same without case or starts with `<name>_`, then matplotlib at 9 stops) and the same arithmetic (`int(u * 255.9999)` for each channel). The schemes, the matplotlib stops and the colour names are data, `src/cmaps.json` (branca 0.8.2, matplotlib 3.10.9) |
+| Ramps (`cmap`) | branca's `LinearColormap`: the same lookup (an exact branca name, then the first name in order that is the same without case or starts with `<name>_`, then matplotlib at 9 stops) and the same arithmetic (`int(u * 255.9999)` for each channel). The schemes, the matplotlib stops and the colour names are data, `src/roadstyle/data/cmaps.json` (branca 0.8.2, matplotlib 3.10.9), which colors.py reads too |
 | Values given by the caller | Keep their JSON form, as in Python: `vmin: 1` stays an integer in the legend, a computed one is a float |
 | Missing values | A missing categorical value is the key `"nan"`, as pandas 3 gives it (a text column holds NaN) |
 | The layers | The fill expression of each colour option and the state `rs_co` (the active option) |

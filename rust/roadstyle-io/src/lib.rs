@@ -9,9 +9,12 @@
 pub mod columns;
 pub mod crs;
 pub mod duckosm;
+mod error;
 pub mod geojson;
 #[cfg(feature = "gpkg")]
 pub mod gpkg;
 pub mod read;
 pub mod shp;
 pub mod write;
+
+pub use error::Error;

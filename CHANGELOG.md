@@ -14,7 +14,28 @@ All notable changes to **roadstyle** are documented here. The format is based on
   either. The HTML that the page's author gives (`side_panel_html`, a sidebar's template, `rsInfoShow(html)`) is not escaped:
   `docs/design/dashboard_module.md`, "Trusted inputs".
 
+### Fixed
+- **The duckOSM reader reads a file with no `private_edges`** (an older file, granville_island): the union typed its `access` as an
+  integer, and the roads failed with "Could not convert string 'bus' to INT32". mapstyle's SQL had the same fault. And the reader's plan
+  gives the base map's queries also for a file with no network ("roads" is null, "roads_error" says why).
+
+### Dependencies
+- **The `numeric` extra no longer installs matplotlib.** Only the colour ramps used it, and they are data now
+  (`data/cmaps.json`). A matplotlib colormap name still works for `cmap`. branca stays: folium's page elements use it.
+
 ### Changed
+- **The colour ramps have one source for both engines**: `src/roadstyle/data/cmaps.json` (branca's 269 schemes and colour names, and the
+  180 matplotlib colormaps at 9 stops). Python's `ColorRamp` reads it, as roadstyle-look does, and no longer asks branca or matplotlib:
+  all 445 ramps give the same colours as before (tests/test_colors.py).
+- **The look's and the readers' errors are typed** (Rust only). `roadstyle_look::Error`: a saved look that is not read, a later look
+  version, wrong options, an unknown name, a YAML file that is not correct, an image that is not read. `roadstyle_io::Error`: bytes that
+  are not a file of the kind, data that the call cannot use, a wrong argument, stored levels that are missing or of other edges, a CRS
+  that is missing or not read, a Parquet writer that stopped. Each has the same message text as before; `String::from(error)` gives
+  it, so a caller whose errors are text keeps its `?`. Python and JavaScript show the same messages.
+- **The base map goes through stage 1 as typed tables** (audit R10, step 2; docs/design/r10_feature_table.md). The Rust engine reads
+  features.parquet into one table (Arrow columns and one coordinate buffer), cuts the sea out of it, and keeps each base-map layer as a
+  table until it writes the GeoJSON text, not a JSON tree for each feature. The output is the same bytes (the styles, the files and the
+  tiles of Monaco and Tartu). On Tartu, stage 1 needs 284 MB, not 403 MB, and the base map's part of make_sources takes 58 ms, not 115 ms. Stage 2 cuts the tiles from the tables too: make_tiled takes 1,752 ms, not 2,074 ms, and 344 MB, not 483 MB.
 - **export_look: the yes/no tags use the engine's rule** (audit R6, both engines). A oneway, tunnel or bridge value is yes unless it
   is missing or "", "no", "false" or "0" (lower-cased), as on the map that the engine draws. Before, the exported look had lists of
   yes values, so tunnel=covered and other values not in the lists were not tunnels in it. Of Monaco, Södermalm and Tartu, only
@@ -105,6 +126,23 @@ All notable changes to **roadstyle** are documented here. The format is based on
   has the key: a casing piece has no `__rs_fill@<palette>: null` any more. The map does not change.
 
 ### Added
+- **`roadstyle.duckosm.page(db, mode, ...)`: mapstyle's `render_map` on the Rust engine.** The page of a duckOSM file: its roads, its
+  base map and the shared dashboard with the base map's controls (modes, kinds, each layer's clicks, tooltip and popup). The keywords of
+  render_map: `theme`, `paths`, `layers`, `only`, `interaction` (a layer's start `{clickable, tooltip, popup}`; a layer that the map does
+  not have is a warning) and `dashboard=True` (the report page with the colour option "Modes"); the others are render_edges' keywords.
+  The base map's look gives the page its base map: blank, in the theme's land colour, with the raster maps in the switcher. The route
+  planner stays mapstyle's. In Rust, `page_options::page_from` takes the base map's rows (`features`), and so do the Python binding's
+  `page_from` and the browser's `makePage`.
+- **`duckosm.read(levels="auto")`, the default of `duckosm.page`** (render_map's rule): the stored levels when the file has
+  `visualization.edge_levels`, else the engine solves them, with the warning "no visualization.edge_levels in this file: roadstyle solved
+  the levels; run duckosm levels to store them". Stored levels of other roads stay an error, and `levels="stored"` stays strict (now with
+  the reader's message, not DuckDB's, when the file has no table). `layers` can be a list of layer names, as in render_map.
+- **What the dashboard needs to draw a duckOSM map's page** (for its port of mapstyle's page scripts): the base map's look bakes the
+  restricted roads' colour (private, bus, pedestrian, delivery) into every colour option's fill (`access_col: "access"`; mapstyle's
+  `layers.js` painted the same colours on the page); `roadstyle:controls.modes` gives the map's modes with their counts of roads
+  (`[[mode, count], ...]`, from the map option `modes`); `roadstyle:controls.box_layout` is `"stack"` for a base map's page; and each
+  base-map layer's entry in `roadstyle:controls.overlays` has its start `interactive` (mapstyle's rule: not for landcover, water, paved
+  and the decoration lines) and its `kinds` with their counts, most first. On Monaco all 17 layers equal mapstyle's.
 - **`rs.setData(rows, {stepped: true})`**: each road gets the ramp's nearest stop, not a colour between two stops, and the legend shows the
   same steps. SonoFlow's Daily page colours so, which lets it move to live data in the simple look with the same look.
 - **The dashboard has mapstyle's page functions** (docs/design/mapstyle_page_scripts.md), found by their roles in the metadata, not by
