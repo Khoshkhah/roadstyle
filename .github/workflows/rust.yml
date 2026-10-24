@@ -4,7 +4,7 @@ name: Rust
 # The large goldens come from the pre-release rust-test-data (rust/roadstyle-rs/tests/get_goldens.sh).
 on:
   push:
-    branches: [main, rust-engine]
+    branches: [main, rust-engine, "design-*"]
     paths: ["rust/**", "src/roadstyle/**", "tests/test_engine_parity.py", ".github/workflows/rust.yml"]
   pull_request:
     paths: ["rust/**", "src/roadstyle/**", "tests/test_engine_parity.py", ".github/workflows/rust.yml"]
@@ -85,8 +85,10 @@ jobs:
             rust/target
           key: rust-py-${{ env.RUST }}-${{ hashFiles('rust/Cargo.lock') }}
 
-      - name: Install roadstyle (maturin builds the extension roadstyle._rust)
-        run: pip install -e ".[dev]"
+      - name: Install roadstyle (maturin builds the extension roadstyle._rust) and a headless Chromium for the browser tests
+        run: |
+          pip install -e ".[dev]" playwright
+          playwright install --with-deps chromium
 
       - name: Clippy of the binding
         run: |
@@ -96,7 +98,7 @@ jobs:
       - name: The two engines
         run: pytest -q tests/test_engine_parity.py
 
-      - name: The whole suite with the Rust engine as the default (docs/design/rust_library.md, P5's golden test)
+      - name: The whole suite with the Rust engine as the default, with the browser tests (docs/design/rust_library.md, P5's golden test)
         run: ROADSTYLE_ENGINE=rust pytest -q
 
   tartu:
