@@ -80,14 +80,17 @@ fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> tiles::T
                 tiled.add_lines(k, p.features(&s.roads.roads).map(|(_, props, c)| (c, props.into_iter())), &keep, whole, from)
             }
             Src::Json(v) => {
-                let (keep, whole, from) = whole_unless_lines(v, o.rule(k, || keys(v)), o.min_zoom);
+                let (keep, whole, from) = whole_unless_lines(json_lines(v), o.rule(k, || keys(v)), o.min_zoom);
                 tiled.add(k, v, &keep, whole, from)
             }
-            // R10: a base-map layer goes into the tiles as JSON until the tiles read the table (step 6)
+            // a base-map layer, from its table (audit R10)
             Src::Features(f) => {
-                let v = f.to_value();
-                let (keep, whole, from) = whole_unless_lines(&v, o.rule(k, || keys(&v)), o.min_zoom);
-                tiled.add(k, &v, &keep, whole, from)
+                use roadstyle_engine::feature_table::GeomType;
+                let t = &f.table;
+                let lines = (0..t.len()).all(|r| matches!(t.geometries_of().kind(r), Some(GeomType::LineString | GeomType::MultiLineString)));
+                let keys = || t.names().iter().filter(|n| (0..t.len()).any(|r| t.has_key(r, n))).cloned().collect();
+                let (keep, whole, from) = whole_unless_lines(lines, o.rule(k, keys), o.min_zoom);
+                tiled.add_features(k, t, &keep, whole, from)
             }
         }
     }
@@ -97,10 +100,13 @@ fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> tiles::T
 /// tiles.py's rule for a source other than the roads, the pieces and the slots: lines are clipped to each tile; points and polygons go
 /// whole into every tile their box touches, from the first zoom (its extra layers). A polygon at a tile's edge whose clipped part has
 /// no area was left out of that tile before (the sea at Monaco's west edge, 2026-10-24).
-fn whole_unless_lines(src: &Value, rule: (std::collections::HashSet<String>, bool, u32), first: u32) -> (std::collections::HashSet<String>, bool, u32) {
-    let lines = src["data"]["features"].as_array().into_iter().flatten()
-        .all(|f| matches!(f["geometry"]["type"].as_str(), Some("LineString" | "MultiLineString")));
+fn whole_unless_lines(lines: bool, rule: (std::collections::HashSet<String>, bool, u32), first: u32) -> (std::collections::HashSet<String>, bool, u32) {
     if rule.1 || lines { rule } else { (rule.0, true, first) }
+}
+
+/// Every feature of a GeoJSON source is a line.
+fn json_lines(src: &Value) -> bool {
+    src["data"]["features"].as_array().into_iter().flatten().all(|f| matches!(f["geometry"]["type"].as_str(), Some("LineString" | "MultiLineString")))
 }
 
 /// Stage 2 from memory (audit N3): the tiles of stage 1's sources and the one style that draws them (`tiled_style`), the tiles at `at`
@@ -211,7 +217,7 @@ pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[S
         let src = json!({"type": "geojson", "data": fc});
         let rule = o.rule(k, || src["data"]["features"].as_array().into_iter().flatten()
             .filter_map(|f| f["properties"].as_object()).flat_map(|p| p.keys().cloned()).collect());
-        let (keep, whole, from) = whole_unless_lines(&src, rule, o.min_zoom);
+        let (keep, whole, from) = whole_unless_lines(json_lines(&src), rule, o.min_zoom);
         tiled.add(k, &src, &keep, whole, from);
     }
     Ok((tiled_style(style, &names, at, (o.min_zoom, o.max_zoom)), tiled))

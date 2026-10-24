@@ -15,7 +15,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **The base map goes through stage 1 as typed tables** (audit R10, step 2; docs/design/r10_feature_table.md). The Rust engine reads
   features.parquet into one table (Arrow columns and one coordinate buffer), cuts the sea out of it, and keeps each base-map layer as a
   table until it writes the GeoJSON text, not a JSON tree for each feature. The output is the same bytes (the styles, the files and the
-  tiles of Monaco and Tartu). On Tartu, stage 1 needs 284 MB, not 403 MB, and the base map's part of make_sources takes 58 ms, not 115 ms.
+  tiles of Monaco and Tartu). On Tartu, stage 1 needs 284 MB, not 403 MB, and the base map's part of make_sources takes 58 ms, not 115 ms. Stage 2 cuts the tiles from the tables too: make_tiled takes 1,752 ms, not 2,074 ms, and 344 MB, not 483 MB.
 - **Every style reads a road's colour and width from the feature state** (audit N8, both engines). The road layer reads
   `["coalesce", ["feature-state", "rs_c"], <baked colour>]` and each width and offset stop × `["coalesce", ["feature-state", "rs_w"], 1]`,
   in every style, not only with `live_data`; `live_data` now only adds the metadata `roadstyle:live` and the page's option `live`.

@@ -1,4 +1,4 @@
-# R10: the base map and the overlays as a typed FeatureTable (plan; steps 1 and 2 done)
+# R10: the base map and the overlays as a typed FeatureTable (plan; steps 1, 2 and 6 done)
 
 Audit R10 (audit_2026-10-23.md; refined by N5 of audit_2026-10-24.md): the base map and the overlays go through the engine as
 `serde_json` trees. This note gives the plan for the base map's and the overlays' part of R10. The slots and the 3D decks stay with
@@ -93,3 +93,18 @@ Tartu, the same method as above, rust-engine at e9e57e0 against this step (each 
 
 The files of stage 1 (GeoJSON and GeoParquet, 22 files) and every golden are the same bytes. Stage 2 keeps 40 MB for the base map: the
 JSON value of each typed source for `Tiles::add`, which step 6 removes.
+
+## Step 6, done (2026-10-24)
+
+`Tiles::add_features` cuts a typed source into tiles from its table: the same ids (the row), the same properties (the keys of each
+GeoJSON feature, `FeatureTable::has_key`) and the same geometries as `Tiles::add` of its GeoJSON, with no JSON value between. The
+tiles of Monaco and Tartu are the same bytes (tests/style.rs, tests/stages.rs). Tartu, make_tiled with the base map (roads only: 311 MB,
+1,690 ms):
+
+| | Step 2 | Step 6 |
+|---|---|---|
+| Peak memory | 351 MB | 344 MB |
+| Time | 2,060 ms | 1,752 ms |
+
+The base map's 33 MB that stay are its tile layers (each feature's geometry in Web Mercator and its value numbers).
+

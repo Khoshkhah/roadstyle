@@ -73,8 +73,8 @@ flowchart TB
     roadstyle_io["roadstyle-io<br/>1,114 lines"]
     roadstyle_levels["roadstyle-levels<br/>2,555 lines"]
     roadstyle_engine["roadstyle-engine<br/>6,129 lines"]
-    roadstyle_tiles["roadstyle-tiles<br/>1,100 lines"]
-    roadstyle["roadstyle<br/>1,518 lines"]
+    roadstyle_tiles["roadstyle-tiles<br/>1,127 lines"]
+    roadstyle["roadstyle<br/>1,524 lines"]
     roadstyle_rs["roadstyle-rs<br/>216 lines"]
     roadstyle_wasm["roadstyle-wasm<br/>406 lines"]
     roadstyle_py["roadstyle-py<br/>461 lines"]
@@ -109,14 +109,14 @@ step) takes this crate alone.
 | [`roadstyle-io`](#roadstyle-io) | roadstyle's readers: the roads and other tables from GeoParquet | 1,114 | `roadstyle-levels`, `roadstyle-model`, arrow-array, arrow-schema, arrow-select, bytes, i_overlay, parquet, serde_json |
 | [`roadstyle-levels`](#roadstyle-levels) | roadstyle's drawing levels: the tags rule and the solver (on roadstyle-model only, for the road flags) | 2,555 | `roadstyle-model`, rstar, sha2 |
 | [`roadstyle-engine`](#roadstyle-engine) | roadstyle's rendering engine: the style of a map, the data-driven paint, the legend data, the base-map layers | 6,129 | `roadstyle-levels`, `roadstyle-look`, `roadstyle-model`, indexmap, rstar, serde_json |
-| [`roadstyle-tiles`](#roadstyle-tiles) | roadstyle's vector tiles on request (the rules of tiles.py) | 1,100 | `roadstyle-model`, flate2, indexmap, rstar, serde_json |
-| [`roadstyle`](#roadstyle) | roadstyle as a Rust library: the facade over the model, the readers, the levels, the engine and the tiles | 1,518 | `roadstyle-engine`, `roadstyle-io`, `roadstyle-levels`, `roadstyle-tiles`, base64, flate2, serde_json |
+| [`roadstyle-tiles`](#roadstyle-tiles) | roadstyle's vector tiles on request (the rules of tiles.py) | 1,127 | `roadstyle-model`, flate2, indexmap, rstar, serde_json |
+| [`roadstyle`](#roadstyle) | roadstyle as a Rust library: the facade over the model, the readers, the levels, the engine and the tiles | 1,524 | `roadstyle-engine`, `roadstyle-io`, `roadstyle-levels`, `roadstyle-tiles`, base64, flate2, serde_json |
 | [`roadstyle-rs`](#roadstyle-rs) | The old name of the facade crate roadstyle, kept for one version | 216 | `roadstyle`, serde_json |
 | [`roadstyle-wasm`](#roadstyle-wasm) | The browser's front-end of roadstyle-rs: makeStyle, Tiler, memoryBytes | 406 | `roadstyle`, serde_json, wasm-bindgen |
 | [`roadstyle-py`](#roadstyle-py) | The Python binding of roadstyle's Rust engine: the module roadstyle._rust (PyO3, abi3) | 461 | `roadstyle`, `roadstyle-cli`, pyo3, serde_json |
 | [`roadstyle-cli`](#roadstyle-cli) | The roadstyle program: one command for each job (serve: the level editor's files) | 467 | `roadstyle`, serde_json |
 
-All crates: 17,002 lines of Rust in `rust/*/src/`.
+All crates: 17,035 lines of Rust in `rust/*/src/`.
 <!-- /gen:crates -->
 
 The crates read roadstyle's data (`src/roadstyle/data/`: the palettes, the profiles, the sprite) and the page files
@@ -218,7 +218,7 @@ Library, in `rust/roadstyle-tiles/`. Public API: `pmtiles`, `stage`, `EXTENT`, `
 
 | Module | Lines | What it does | Python counterpart |
 |---|---|---|---|
-| `lib` | 845 | The style's sources as vector tiles (Mapbox Vector Tile 2.1), made when the map asks for them, with the rules of roadstyle's tiles.py: the page gives MapLibre one source, `{"type": "vector", "tiles": ["<prefix>roads/{z}/{x}/{y}"]}`, and each of the style's sources is a layer in its tiles (the layers' `source-layer`) | `tiles.py` |
+| `lib` | 872 | The style's sources as vector tiles (Mapbox Vector Tile 2.1), made when the map asks for them, with the rules of roadstyle's tiles.py: the page gives MapLibre one source, `{"type": "vector", "tiles": ["<prefix>roads/{z}/{x}/{y}"]}`, and each of the style's sources is a layer in its tiles (the layers' `source-layer`) | `tiles.py` |
 | `pmtiles` | 184 | A PMTiles v3 archive (the format of the `pmtiles` package's Writer, which tiles.py and the export use): the tiles gzipped, each content once (a run of one content on consecutive tile ids is one entry), the directory in one root (or a root of leaves when it is more than 16 KB), the metadata as gzipped JSON | `tiles.py` |
 | `stage` | 71 | Stage 2's rules: which properties of each source go into the tiles, from which zoom, with which zooms and buffer | `tiles.py` |
 
@@ -228,7 +228,7 @@ Library, in `rust/roadstyle/`. Public API: `level_area`, `level_editor`, `page`,
 
 | Module | Lines | What it does | Python counterpart |
 |---|---|---|---|
-| `lib` | 393 | roadstyle as a Rust library: the facade |  |
+| `lib` | 399 | roadstyle as a Rust library: the facade |  |
 | `level_area` | 295 | A level area's input in Rust (roadstyle's level_area.make_area and level_input, `roadstyle-levels make`): from the edges, the folder's roads.parquet (one row for each road: its edges both ways, its band and priority, the fields the editor shows, each edge's own oneway, driving, directed, edge_ref, lanes and modes, the first edge's line), pairs.csv (the rules between the roads) and an empty edits.csv the first time | `level_area.py` |
 | `level_editor` | 545 | The level editor in a page: an area folder's roads (roads.parquet, one row for each road with its edges both ways) and pairs, the solver of roadstyle-levels' `area`, and what the page draws and shows | `level_editor.py` |
 | `page` | 285 | The page writer: the HTML page of a live style (state "live") and the options of its dashboard (`page`: the options of rsDashboard, as render_web.render's `page`) | `render_web.py` |
