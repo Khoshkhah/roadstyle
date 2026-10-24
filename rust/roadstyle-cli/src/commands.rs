@@ -98,7 +98,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
             let keep = list(take(&mut opts, "keep"));
             let base = take(&mut opts, "base_url").map(|b| format!("{}/", b.trim_end_matches('/'))).unwrap_or_default();
             no_more(&opts)?;
-            let (style, tiles) = roadstyle::tile_files(Path::new(src), &keep, None)?;
+            let (style, tiles) = roadstyle::tile_files(Path::new(src), &keep, None, &roadstyle::xyz_at(&base))?;
             let bounds = tiles.bounds().ok_or(format!("tiles: no feature in the files of {src}"))?;
             let out = PathBuf::from(out);
             match format.as_str() {
@@ -127,8 +127,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
                             }
                         }
                     }
-                    let st = roadstyle::vector_style(&style, &base, tiles.zooms());
-                    std::fs::write(out.join("style.json"), st.to_string()).map_err(|e| e.to_string())?;
+                    std::fs::write(out.join("style.json"), style.to_string()).map_err(|e| e.to_string())?;
                     println!("{} tiles and style.json in {}", n, out.display());
                 }
                 f => return Err(format!("--format must be pmtiles or xyz, not {f}")),
