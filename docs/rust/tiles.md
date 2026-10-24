@@ -1,59 +1,74 @@
 # Make tiles and PMTiles
 
-<p class="lead">Write the roads as vector tiles with the Rust engine: in the page, as a folder of tiles, or as one PMTiles file
-for another map app.</p>
+<p class="lead">Make the roads as vector tiles with the Rust engine, and get them to the browser in one of three ways: in one
+HTML file, on a server, or made in the browser.</p>
 
 The Rust engine makes the tiles with the rules of the Python engine (`tiles.py`): one vector source `roads`, zooms 6 to 15, a
 buffer of 80 units, and simplified lines below the last zoom. The tiles have the same features as the tiles of the Python
 engine. The bytes can differ: a number can be an integer in one engine and a float in the other.
 
-## Put the tiles in the page
+To select a way, see [Three choices for the road data](drawing.md#three-choices-for-the-road-data). In short:
+
+| Way | Use it for | Call |
+|---|---|---|
+| [A. In one HTML file](#a-put-the-tiles-in-one-html-file) | a file to send or to open from disk | `render_edges(edges, tiles=True)` |
+| [B. On a server](#b-put-the-tiles-on-a-server) | a large area, or another map app | `export_style(...)` |
+| [C. Made in the browser](#c-make-the-tiles-in-the-browser) | a page that makes its maps itself | `new Tiler(...)` |
+
+## A. Put the tiles in one HTML file
 
 ```python
 rs.render_edges(edges, engine="rust", tiles=True).save("map.html")
 ```
 
-The page has an embedded PMTiles archive and still opens from disk. The Rust engine writes the archive itself, so the `tiles`
-extra (`roadstyle[tiles]`) is not necessary.
+The page has a PMTiles archive inside it, and it opens from disk with no server. The browser loads the whole file with the page;
+MapLibre then decodes only the tiles in view. The Rust engine writes the archive itself, so the `tiles` extra
+(`roadstyle[tiles]`) is not necessary.
 
-## Write a folder of XYZ tiles
+## B. Put the tiles on a server
+
+`export_style` writes a folder: `style.json`, the tiles, the sprite (the one-way arrow) and `popup.js` and `popup.css` (the road
+popup for an app's plugin). Put the folder on a web server at `base_url`. A map app opens `style.json` by its URL, and the style
+leads it to the tiles and the sprite, so every URL in it starts with `base_url`. The style has the roads only: the base map
+comes from the app.
+
+The tiles can be in one of two forms. In both forms the map downloads only the tiles of its view.
+
+### As a folder of XYZ tiles
 
 ```python
 rs.export_style(edges, "monaco_xyz", base_url="https://example.org/monaco", engine="rust")
 ```
 
-The folder has `style.json`, the tiles in `tiles/<z>/<x>/<y>.pbf`, the sprite (`sprite.png`, `sprite.json`, and the `@2x` files),
-`popup.js` and `popup.css`. Put the folder on a web server at `base_url`.
+The tiles are one file each: `tiles/<z>/<x>/<y>.pbf`. The map gets each tile with one request for its file. Every web server and
+every map app can use this form.
 
-## Write one PMTiles file
+### As one PMTiles file
 
 ```python
 rs.export_style(edges, "monaco_pm", base_url="https://example.org/monaco", format="pmtiles", engine="rust")
 ```
 
-The folder has `style.json`, `roads.pmtiles` (all tiles in one file), the sprite, `popup.js` and `popup.css`. The same map gives
-the same archive each time: the archive has no time in its gzip streams. A map app reads the archive with the
-[pmtiles](https://github.com/protomaps/PMTiles) protocol.
+All tiles are in one file, `roads.pmtiles`, with an index at its start. The map reads the index, then gets each tile with a
+request for a part of the file (an HTTP range request). The server must answer range requests (most static servers and cloud
+storage do), and the map page must load the [pmtiles](https://github.com/protomaps/PMTiles) library for the `pmtiles://`
+protocol. The same map gives the same archive each time: the archive has no time in its gzip streams.
 
-The two forms hold the same tiles, and in both forms a map reads only the tiles of its view:
+On Monaco (849 edges), the XYZ form has 31 tile files (3.1 MB), and the PMTiles form is one file of 1.1 MB, because its tiles
+are gzipped.
 
-| | XYZ folder | One PMTiles file |
-|---|---|---|
-| The files | one file for each tile | one file; an index at its start tells where each tile is |
-| How a map gets one tile | one request for that tile's file | one request for a part of the file (an HTTP range request) |
-| What the server must do | serve static files | serve static files and answer range requests (most servers and cloud storage do) |
-| What the map page needs | nothing more | the `pmtiles` library for the `pmtiles://` protocol |
+### The input of `export_style`
 
-On Monaco (849 edges), the XYZ folder has 31 tile files (3.1 MB) and the PMTiles file is 1.1 MB, because its tiles are gzipped.
+`export_style` takes the keywords of `render_edges` that change the style. In place of a GeoDataFrame, it also takes the path of
+a duckOSM GeoParquet export (`duckosm export-gis --format geoparquet`). That file must have the drawing levels, else the call
+stops with an error that tells you how to save them.
 
-`export_style` takes the keywords of `render_edges` that change the style. The style has the roads only: the base map comes
-from the app. In place of a GeoDataFrame, `export_style` also takes the path of a duckOSM GeoParquet export
-(`duckosm export-gis --format geoparquet`). That file must have the drawing levels, else the call stops with an error that tells
-you how to save them.
+## C. Make the tiles in the browser
 
-## Make tiles in the browser
+`Tiler` in the WebAssembly package makes each tile when MapLibre asks for it, so no tile is stored. The page gives MapLibre a
+tile address `rs://...` and answers it with `tiler.tile(z, x, y)`. `tiler.archive(bounds, layers)` makes a PMTiles archive of
+the same tiles, for a page that saves its map. See
+[Use roadstyle in the browser](browser.md#add-roads-that-come-later-as-vector-tiles).
 
-`Tiler` in the WebAssembly package makes the same tiles on request, and `tiler.archive(bounds, layers)` makes the PMTiles
-archive. See [Use roadstyle in the browser](browser.md#add-roads-that-come-later-as-vector-tiles).
-
-**See also:** [Big networks](../guides/big-networks.md) · [Put it on a website](../guides/website.md)
+**See also:** [How a map is drawn](drawing.md) · [Big networks](../guides/big-networks.md) ·
+[Put it on a website](../guides/website.md)

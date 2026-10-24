@@ -89,8 +89,9 @@ t = rs.render_edges(edges, name="Monaco", engine="rust", tiles=True)
 t.save("monaco_tiles.html")
 ```
 
-Run the file and open `monaco_tiles.html`. The map looks the same as `monaco_rust.html`. The browser reads only the tiles that
-it shows.
+Run the file and open `monaco_tiles.html`. The map looks the same as `monaco_rust.html`. The file has all the tiles in it, but
+MapLibre decodes only the tiles that it shows, so a large network opens fast. The other ways to get tiles to the browser are in
+[Make tiles and PMTiles](tiles.md).
 
 ## What we did
 
