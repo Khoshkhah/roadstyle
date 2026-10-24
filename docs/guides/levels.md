@@ -92,8 +92,12 @@ heads of that time.
 ![The level editor: two roads picked, their cards with ends and heads, the Issues tab](../img/level-editor.png)
 
 `roadstyle-levels edit out/area` opens a local page with the map and a panel. Click a road, or find it by edge id or `edge_ref`. Pick a
-second road to see every pair between the two. The Rust solver solves each change (Monaco: 0.4 s); `--engine python` uses the Python
-solver.
+second road to see every pair between the two.
+
+The editor is in Rust: the solver runs in the page (WebAssembly), and a small Rust server (`roadstyle serve out/area`) gives the page
+the area's files and saves your changes. Monaco solves in 0.1 s in the page. `--engine python` opens the earlier editor with its Python
+server. Build the page's WebAssembly package once with `rust/roadstyle-wasm/build_editor.sh`. On any other web server the page shows
+the area and saves nothing.
 
 - **Add a rule**: *order* (whose fill is on top where they meet), *stack* (one road over the other: pick the parts of its casing) or
   *meet* (join two ends).

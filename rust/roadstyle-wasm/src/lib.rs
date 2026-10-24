@@ -63,30 +63,25 @@ mod wasm {
         roadstyle::make_style(parquet, look, features, planner, name).map_err(|e| JsError::new(&e))
     }
 
-    /// The level editor's solver in the page (roadstyle_levels::area::Session): new LevelArea(roads.parquet of the area, pairs.csv text).
-    /// Each answer is JSON text: the numbers of each road in the roads' order, the rules not kept (by road id) and the counts.
+    /// The level editor in the page (roadstyle::level_editor): new LevelArea(roads.parquet of the area, pairs.csv text). Each answer is JSON
+    /// text: the numbers of each road in the roads' order, the rules not kept (by road id) and the counts.
     #[wasm_bindgen]
-    pub struct LevelArea(roadstyle::levels::area::Session);
+    pub struct LevelArea(roadstyle::level_editor::Editor);
 
     #[wasm_bindgen]
     impl LevelArea {
         #[wasm_bindgen(constructor)]
         pub fn new(roads: Vec<u8>, pairs: &str) -> Result<LevelArea, JsError> {
-            use roadstyle::levels::area::{read_rows, Area, AreaRoad, Session};
-            let ids = |v: &serde_json::Value| v.as_array().into_iter().flatten().filter_map(|x| x.as_str().map(String::from)).collect();
-            let roads = roadstyle::read::read_table(roads, "geometry").map_err(|e| JsError::new(&e))?.iter()
-                .map(|r| AreaRoad { id: r.cols["road"].as_str().unwrap_or_default().into(), edges: ids(&r.cols["edges"]), reversed: ids(&r.cols["reversed"]) })
-                .collect();
-            Ok(LevelArea(Session::new(Area::new(roads, read_rows(pairs).map_err(|e| JsError::new(&e))?))))
+            roadstyle::level_editor::Editor::new(roads, pairs).map(LevelArea).map_err(|e| JsError::new(&e))
         }
         /// The whole solve with the edits (edits.csv text).
         pub fn solve(&mut self, edits: &str) -> Result<String, JsError> {
-            self.0.solve(edits).map_err(|e| JsError::new(&e))
+            self.0.session.solve(edits).map_err(|e| JsError::new(&e))
         }
         /// The solve after a change that names the roads of `changed` (edge ids): the roads around it, else the whole area.
         #[wasm_bindgen(js_name = solveLocal)]
         pub fn solve_local(&mut self, edits: &str, changed: Vec<String>) -> Result<String, JsError> {
-            self.0.solve_local(edits, &changed).map_err(|e| JsError::new(&e))
+            self.0.session.solve_local(edits, &changed).map_err(|e| JsError::new(&e))
         }
         /// The answer to start from (levels.csv, levels_info.json): 4 numbers for each road; the given-up parts as "upper|lower|part".
         #[wasm_bindgen(js_name = startFrom)]
@@ -96,11 +91,30 @@ mod wasm {
                 (f.next().unwrap_or_default(), f.next().unwrap_or_default(), f.next().unwrap_or_default())
             }).collect();
             let levels: Vec<i64> = levels.into_iter().map(i64::from).collect();
-            self.0.start_from(&levels, &parts, orders_not_kept, near).map_err(|e| JsError::new(&e))
+            self.0.session.start_from(&levels, &parts, orders_not_kept, near).map_err(|e| JsError::new(&e))
         }
         /// The check before rules are added (rows: CSV text with a header): [[index, why, [rule rows]]].
         pub fn check(&self, edits: &str, rows: &str) -> Result<String, JsError> {
-            self.0.check(edits, rows).map_err(|e| JsError::new(&e))
+            self.0.session.check(edits, rows).map_err(|e| JsError::new(&e))
+        }
+        /// What the panel shows of each road, a list in the roads' order.
+        pub fn facts(&self) -> String {
+            self.0.facts()
+        }
+        /// Each road end as drawn, a list in the roads' order: heads, caps, and yours (heads.csv, caps.csv).
+        pub fn ends(&self, heads: &str, caps: &str) -> Result<String, JsError> {
+            self.0.ends_json(heads, caps).map_err(|e| JsError::new(&e))
+        }
+        /// levels.csv: one row for each edge with its four numbers and its ends as drawn (4 numbers for each road).
+        #[wasm_bindgen(js_name = levelsCsv)]
+        pub fn levels_csv(&self, levels: Vec<i32>, heads: &str, caps: &str) -> Result<String, JsError> {
+            let levels: Vec<i64> = levels.into_iter().map(i64::from).collect();
+            self.0.levels_csv(&levels, heads, caps).map_err(|e| JsError::new(&e))
+        }
+        /// The map's table (GeoParquet, one row for each edge) for makeStyle: 4 numbers for each road.
+        pub fn draw(&self, levels: Vec<i32>, heads: &str, caps: &str) -> Result<Vec<u8>, JsError> {
+            let levels: Vec<i64> = levels.into_iter().map(i64::from).collect();
+            self.0.draw(&levels, heads, caps).map_err(|e| JsError::new(&e))
         }
     }
 

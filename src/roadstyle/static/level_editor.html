@@ -194,6 +194,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     if(bad){ console.error("level editor:", t); e.onclick = () => { if(!String(getSelection())) e.className = ""; }; }
     else e._t = setTimeout(() => e.className = "", Math.max(4000, 60 * t.length)); }      // time to read it (a loop's rules are long)
   async function api(path, body){
+    if(window.lvApi) return window.lvApi(path, body);           // the Rust page (static/level_editor/): the solver is in the page, no server
     const r = await fetch(path, body ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)} : {});
     const j = await r.json(); if(!r.ok) throw new Error(j.error || r.statusText); return j;
   }
@@ -484,6 +485,10 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     catch(err){ busy(null); toast(err.message + " · nothing saved", true); $("lv-apply").disabled = false; return; }
     let said = `Applied ${queue.length} change${queue.length > 1 ? "s" : ""} · ${j.said}`, why = j.reload;
     queue = []; showQueue();
+    if(j.redrawn){                                            // the Rust page drew the new map itself: the panel's facts and lists again
+      Object.assign(facts, j.facts); STATS = j.stats; showStats(); busy(null); $("lv-apply").disabled = false;
+      update(); lists(); givenUp(); return toast(said);
+    }
     if(j.update){                                             // the roads that changed, in place: no reload
       try { patch(j.update); busy(null); $("lv-apply").disabled = false;
         return toast(`${said} · ${j.update.roads.length} road${j.update.roads.length === 1 ? "" : "s"} redrawn in place`); }        // a full solve is a note, not an error
@@ -494,15 +499,17 @@ body.lv-open #lv-busy{right:var(--lv-w)}
       said: said + (why ? " · " + why : ""), full: j.full || !!why, open: document.body.classList.contains("lv-open")}));
     location.reload();
   };
-  // the update in place (level_editor.Area.build): the changed roads' features as a whole rebuild would draw them, by feature id (GeoJSONSource.updateData):
+  // the update in place (level_editor.Area.build): the changed roads' features as a whole rebuild would draw them (the source simple again, setData):
   // the roads themselves (pick, hover), their pieces in the one road layer (the ids of a road's pieces it has no more taken out), the
   // names and arrows again when a fill number changed; then the panel's facts
   function patch(u){
     const f = u.features, P = u.pieces, ids = new Set(f.simple.map(x => x.id)), gone = [], [I, M] = u.items || [0, 0];
     f.roads.forEach(r => { for(let k = 0; k < P; k++) if(!ids.has(r.id * P + k)) gone.push(r.id * P + k);
       for(let k = 0; k < M; k++) if(!ids.has(I + r.id * M + k)) gone.push(I + r.id * M + k); });   // its road items (lanes, lines, marks) too
-    map.getSource("roads").updateData({add: f.roads});
-    map.getSource("simple").updateData({remove: gone, add: f.simple});
+    if(map.getSource("roads")) map.getSource("roads").updateData({add: f.roads});     // a page with the roads source (before g3)
+    // simple has promoteId "__rs_edge" (all pieces of a road have its id): MapLibre refuses updateData on it, so the area's pieces again
+    const drop = new Set([...gone, ...ids]);
+    map.getSource("simple").setData({type: "FeatureCollection", features: _sfeats("simple").filter(x => !drop.has(x.id)).concat(f.simple)});
     if(f.slots){                                             // the slots of the changed roads' name groups, in place of theirs (2026-10-09)
       const drop = new Set(f.slot_roads || []), keep = f.slot_roads ? _sfeats("slots").filter(s => !drop.has(s.properties.__rs_edge)) : [];
       map.getSource("slots").setData({type: "FeatureCollection", features: keep.concat(f.slots)}); _rsArrowAt.clear(); _rsArrows(); }
@@ -576,6 +583,6 @@ body.lv-open #lv-busy{right:var(--lv-w)}
       if(!v.open){ document.body.classList.remove("lv-open"); $("lv-toggle").textContent = "‹"; resize(); } }
     update(); lists(); givenUp(); showQueue();
   }
-  if(map.loaded()) start(); else map.once("load", start);
+  if(map.isStyleLoaded()) start(); else map.once("load", start);     // the Rust page loads this after the map's load (its tiles can still load)
 })();
 </script>
