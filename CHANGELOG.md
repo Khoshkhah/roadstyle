@@ -27,8 +27,8 @@ default stays the Python engine: a map made with 0.24.3 is the same with 0.25.0,
 - **For the users of the Rust engine in the browser** (duckosm-rust's page, the GeoLibre plugin): the engine now follows `labels=False` and
   `arrows=False` in the look's `args`. Before, it always drew the names and the arrows (see "Added").
 - **Docs for the Rust engine** (`docs/rust/`, the "Rust engine" part of the site): a first map, how to switch the engine, use it in
-  the browser, make tiles and build from source, the keywords of each engine, the crates, and how the engine is built, with its parity
-  and speed.
+  the browser, make tiles and build from source, the keywords of each engine, the crates, how a map is drawn (GeoJSON or tiles, XYZ or PMTiles), and how the
+  engine is built, with its parity and speed.
 - **Python fixes** (they change the output of the Python engine too): the title of a tiled page, the paint order of a painted road in a
   tiled style, the width of a 3D bridge deck with another class column, the order of `export_look`'s no-casing classes, and the order of
   the bridge shadows. See "Fixed" and "Changed (output)".

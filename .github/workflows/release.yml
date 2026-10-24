@@ -5,11 +5,11 @@ name: Release to PyPI
 # (project: roadstyle, owner: Khoshkhah, workflow: release.yml, environment: pypi), and the same
 # for the project roadstyle-mcp (packages/roadstyle-mcp, released with roadstyle).
 # Then the MCP server is listed in the MCP Registry (server.json) via GitHub OIDC.
-# A release branch (release-*) and a run by hand build the wheels and the sdist only, to check them before the tag.
+# A release branch (release-* or release/*) and a run by hand build the wheels and the sdist only, to check them before the tag.
 on:
   push:
     tags: ["v*"]
-    branches: ["release-*"]
+    branches: ["release-*", "release/*"]
   workflow_dispatch:
 
 jobs:
