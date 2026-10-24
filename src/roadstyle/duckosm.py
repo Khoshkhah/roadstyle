@@ -38,6 +38,8 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers: bool = True, 
         tq, cq = r.duckosm_catalog_sql(catalog)
         tables, columns = con.execute(tq).fetchall(), con.execute(cq).fetchall()
         plan = json.loads(r.duckosm_plan(tables, columns, mode, levels == "tags", json.dumps(layer_specs() if layers else []), only))
+        if plan["roads"] is None:
+            raise ValueError(f"{db}: {plan['roads_error']}")
         e, rows, drop = plan["roads"]
         con.execute(e)
         if plan["meta"]:
