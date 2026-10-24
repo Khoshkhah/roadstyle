@@ -51,6 +51,7 @@ PAGE = """<!DOCTYPE html><html><head><meta charset="utf-8">
 <script type="module">
 import init, * as pkg from "/level_editor/pkg/roadstyle_wasm.js";
 import {levelEditor, browserStore} from "/dashboard/editor/level_editor.js";
+import {rsDashboard} from "/dashboard/index.js";
 await init();
 // the host's part: the area made in the page and kept in the browser, and the host's own map
 const a = pkg.makeArea(new Uint8Array(await (await fetch("/edges.parquet")).arrayBuffer()), JSON.stringify({id_col: "edge_id"}));
@@ -58,7 +59,16 @@ const store = browserStore("test-area", "Monaco test");
 for(const [n, v] of [["roads.parquet", a.roads], ["pairs.csv", a.pairs], ["edits.csv", a.edits]]) await store.save(n, v);
 const map = new maplibregl.Map({container: "map", style: {version: 8, glyphs: "/fonts/{fontstack}/{range}.pbf", sources: {}, layers: []},
   center: [7.42, 43.73], zoom: 15});
-const ed = await levelEditor({map, container: document.getElementById("panel"), pkg, store});
+// the host's own dashboard (the page's one), as duckosm-rust's page has it
+const host = rsDashboard(map, {style: null, prefix: "host-", tiles: true, simple: "roads-simple", edge_id_col: "edge", basemap_switcher: false});
+window.host = host;
+const panel = document.getElementById("panel");
+if(location.search === "?no-dashboard"){                         // the host's dashboard not given: an error, no second dashboard
+  try { await levelEditor({map, container: panel, pkg, store}); window.ready = "made a second dashboard"; }
+  catch(e){ window.ready = e.message; }
+  throw new Error("stop");
+}
+const ed = await levelEditor({map, container: panel, pkg, store, dashboard: host, prefix: "host-"});
 window.solved = [];
 ed.addEventListener("solved", e => window.solved.push({rows: e.detail.levelsCsv.trim().split("\\n").length - 1, draw: e.detail.draw().length}));
 window.editor = ed;
@@ -77,7 +87,7 @@ class _Files(SimpleHTTPRequestHandler):
         return super().translate_path(path)
 
     def do_GET(self):
-        if self.path == "/test.html":
+        if self.path.split("?")[0] == "/test.html":
             body = PAGE.encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
@@ -91,7 +101,7 @@ class _Files(SimpleHTTPRequestHandler):
         pass
 
 
-def test_the_editor_module_edits_an_area_kept_in_the_browser():
+def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dashboard():
     pw = pytest.importorskip("playwright.sync_api")
     server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -101,9 +111,16 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser():
             page = b.new_page(viewport={"width": 1300, "height": 850})
             errors = []
             page.on("pageerror", lambda e: errors.append(str(e)))
-            page.goto(f"http://127.0.0.1:{server.server_address[1]}/test.html")
+            base = f"http://127.0.0.1:{server.server_address[1]}/test.html"
+            page.goto(base + "?no-dashboard")
             page.wait_for_function("window.ready", timeout=60000)
+            assert page.evaluate("window.ready").startswith("level editor: this page has a dashboard"), page.evaluate("window.ready")
+            page.goto(base)
+            page.wait_for_function("window.ready", timeout=60000)
+            errors.clear()
             roads = page.evaluate("window.ready")
+            assert page.evaluate("window.rs === window.host"), "the editor uses the host's dashboard, not a second one"
+            assert page.evaluate("map.getStyle().layers.some(l => l.id.startsWith('host-roads'))"), "the editor's roads with the host's prefix"
             stored = page.evaluate("localStorage.getItem('lv:test-area:levels.csv')")
             assert stored and len(stored.strip().split("\n")) > roads, "the first solve saved levels.csv in the browser"
             assert page.locator("#lv").count() == 1, "the panel is in the host's container"

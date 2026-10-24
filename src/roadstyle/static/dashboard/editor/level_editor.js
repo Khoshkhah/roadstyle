@@ -68,11 +68,20 @@ function csvRows(text){                                          // the rows of 
 const cell = v => /[",\n]/.test(String(v ?? "")) ? `"${String(v).replaceAll('"', '""')}"` : String(v ?? "");
 const toCsv = (rows, cols = COLS) => cols.join(",") + "\n" + rows.map(r => cols.map(c => cell(r[c])).join(",")).join("\n") + (rows.length ? "\n" : "");
 
-/** The level editor on `map` (or a map of its own in `container`), with the panel in `container`; see the file's head. Gives an
+/** The level editor on `map` (or a map of its own in `container`), with the panel in `container`; see the file's head. A page has one
+ * dashboard (its state is the module's): on a host map that has one, give it as `dashboard` with the `prefix` it was made with; the
+ * editor then draws its roads with that prefix (take your own roads off first) and gives the dashboard its style (setStyle). Gives an
  * EventTarget (event "solved") with `map`, `area` (the LevelArea), `download(name)` (edits.csv, heads.csv, caps.csv or levels.csv as they
  * are now), `files` (those names) and `answer()` (the last answer of the solver). */
-export async function levelEditor({map = null, container = document.body, pkg, store, maplibregl: ml = globalThis.maplibregl, prefix = "lv-rs-"}){
-const P = map ? prefix : "rs-";                                  // a host map: the editor's layers and sources apart from the host's
+export async function levelEditor({map = null, container = document.body, pkg, store, maplibregl: ml = globalThis.maplibregl, dashboard = null,
+                                   prefix = dashboard ? null : "lv-rs-"}){
+if(map && !dashboard && window.rs)
+  throw new Error("level editor: this page has a dashboard (window.rs): give it as levelEditor({dashboard, prefix}), so that the editor uses it; a second dashboard takes the first one's state");
+if(dashboard && !prefix)
+  throw new Error("level editor: give the prefix of your dashboard (its layers and sources); the editor takes the layers with it off the map before it draws");
+if(map && window.map instanceof ml.Map && window.map !== map)     // (an element with the id "map" is window.map too: not a map)
+  throw new Error("level editor: window.map is another map; the panel draws on window.map");
+const P = map ? prefix : "rs-";                                  // a host map: the editor's layers and sources with the prefix given
 const {LevelArea} = pkg;
 const events = new EventTarget();
 const get = (n, bytes) => store.load(n, bytes);
@@ -160,8 +169,9 @@ if(own){
   map.addControl(new ml.ScaleControl({maxWidth: 120, unit: "metric"}), "bottom-left");
 } else map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], {padding: 40, duration: 0});
 window.map = map;                                                // the panel (level_editor.html) draws on the global map
-const rs = rsDashboard(map, {style: null, prefix: P, tiles: true, simple: "roads-simple", edge_id_col: "edge", basemap_switcher: false,
-  select_color: "rgba(0,0,0,0)"});                                 // the road fields: the road table RS_SIDE
+// the page's one dashboard: the host's, else one for the editor (the road fields: the road table RS_SIDE)
+const rs = dashboard || rsDashboard(map, {style: null, prefix: P, tiles: true, simple: "roads-simple", edge_id_col: "edge", basemap_switcher: false,
+  select_color: "rgba(0,0,0,0)"});
 async function showRoads(st){                                      // the roads style on the map, in place of the one before (prefix P)
   for(const l of map.getStyle().layers) if(l.id.startsWith(P)) map.removeLayer(l.id);
   for(const id of Object.keys(map.getStyle().sources)) if(id.startsWith(P)) map.removeSource(id);

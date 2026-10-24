@@ -261,8 +261,11 @@ editor.addEventListener("solved", (e) => apply(e.detail.levelsCsv, e.detail.draw
 ```
 
 `levelEditor({map, container, pkg, store})` draws the area on `map` (your MapLibre map; without it, a map of its own in `container`)
-and puts the editor's panel in `container`. Its layers and sources have the prefix `lv-rs-` and its tiles the protocol `lv://`, apart
-from yours; hide your own roads while you edit. A store is `{load(name, bytes), save(name, data)}`: `browserStore(key)` keeps the files
+and puts the editor's panel in `container`. Its tiles have the protocol `lv://`, apart from yours. A page has one dashboard (its state
+is the module's): when your map has one, give it as `levelEditor({..., dashboard, prefix})` with the prefix it was made with. The editor
+then takes the layers with that prefix off the map, draws its roads with it and gives your dashboard its style, so put your roads back
+and call `dashboard.setStyle` with your style when the editor closes. Without a dashboard of yours, the editor makes one with the prefix
+`lv-rs-`; when the page has one and you do not give it, `levelEditor` throws an error. A store is `{load(name, bytes), save(name, data)}`: `browserStore(key)` keeps the files
 in this browser, `httpStore(base)` uses `roadstyle serve`. After each solve the editor sends the event `"solved"` with `levelsCsv`
 (one row for each edge: its four drawing numbers, its head lengths and its caps), `levelsInfo` and `draw()` (the map's table,
 GeoParquet). `editor.download(name)` downloads edits.csv, heads.csv, caps.csv or levels.csv as they are now. The module needs the
