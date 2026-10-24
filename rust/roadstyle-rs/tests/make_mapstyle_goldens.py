@@ -63,8 +63,12 @@ def normalised(style):
     - a polygon by its rings, not by the order of its parts, the start point or the orientation of a ring (the background's land:
       mapstyle cuts the sea out with GEOS, the Rust reader with i_overlay, which writes the same points in another order);
     - a slot's road (`__rs_edge`, `__rs_edge2`) as the road or its undirected twin, the lower row of the two (the same line reversed, the
-      same class, both not directed): a tie between undirected twins: GEOS's tree order in Python, float rounding in Rust; same geometry."""
+      same class, both not directed): a tie between undirected twins: GEOS's tree order in Python, float rounding in Rust; same geometry;
+    - an attached point's road (`edge_id`, `__rs_edge` of a crossing or a traffic signal) as the lowest row of the roads at its smallest
+      distance, when its road is one of them: a tie of edge_attach's "the nearest road" (no road within 3e-5 deg): GEOS's tree order in
+      Python (STRtree.query_nearest), the first row in Rust; the same distance."""
     twin = _undirected_twins(style)
+    attached = _attached_ties(style)
     def walk(o, key=None):
         if isinstance(o, dict):
             drop = ("source", "target") if key == "properties" else ()
@@ -89,6 +93,10 @@ def normalised(style):
         out["sources"][name] = walk(src)
     in_slots[0] = False
     out = {k: out[k] for k in style}
+    for name, rows in attached.items():
+        for k, (row, edge_id) in rows.items():
+            props = out["sources"][name]["data"]["features"][k]["properties"]
+            props["__rs_edge"], props["edge_id"] = row, edge_id
     for f in out["sources"].get("decks", {}).get("data", {}).get("features", []):
         f.pop("geometry", None)
     for src in out["sources"].values():
@@ -96,6 +104,30 @@ def normalised(style):
             g = f.get("geometry") or {}
             if g.get("type") in ("Polygon", "MultiPolygon"):
                 f["geometry"] = {"type": "MultiPolygon", "rings": _rings(g)}
+    return out
+
+
+def _attached_ties(style):
+    """{source: {feature index: (road row, edge_id)}} for each point of a base-map layer that names a road (edge_attach) when that road is
+    one of two or more roads at the point's smallest distance: the lowest row of them and its edge_id (as text)."""
+    import shapely
+    roads = ((style["sources"].get("roads") or {}).get("data") or {}).get("features") or []
+    rows = [f["properties"].get("__rs_edge") for f in roads]
+    lines = shapely.from_geojson([json.dumps(f["geometry"]) for f in roads]) if roads else []
+    tree = shapely.STRtree(lines) if roads else None
+    out = {}
+    for name, src in style["sources"].items():
+        if not name.startswith("ov") or tree is None:
+            continue
+        for k, f in enumerate((src.get("data") or {}).get("features") or []):
+            p, g = f.get("properties") or {}, f.get("geometry") or {}
+            if g.get("type") != "Point" or "__rs_edge" not in p:
+                continue
+            idx, d = tree.query_nearest(shapely.Point(g["coordinates"]), all_matches=True, return_distance=True)
+            tied = sorted(rows[i] for i in idx)
+            if len(tied) > 1 and p["__rs_edge"] in tied:
+                low = tied[0]
+                out.setdefault(name, {})[k] = (low, str(roads[rows.index(low)]["properties"]["edge_id"]))
     return out
 
 

@@ -4,9 +4,9 @@
   "layers": 61,
   "bytes": 33418385,
   "normalised": {
-   "sha256": "55bd0240671ba3689d29cd94f08c3f3b1c11fe0923771b87541e4d0d375db2bf",
+   "sha256": "3275683cabf5dc0b9c0422d0bbf7d18b6541a12273d056ed5ba91513173c1887",
    "layers": 61,
-   "bytes": 32272350
+   "bytes": 32271560
   }
  },
  "style_driving_osm_google": {
@@ -14,9 +14,9 @@
   "layers": 61,
   "bytes": 33472434,
   "normalised": {
-   "sha256": "6cedb5b4f60f4cbbe361779ed0847649a3d7b2f6c55e770d533ecd0f38623a2d",
+   "sha256": "d64d536eeb60c4ac8850ee44e2ef6671fed74dac7627cf21b41f4a193571f155",
    "layers": 61,
-   "bytes": 32325947
+   "bytes": 32325157
   }
  },
  "style_walking_osm_google": {
@@ -24,9 +24,9 @@
   "layers": 61,
   "bytes": 33396911,
   "normalised": {
-   "sha256": "778ceee687e5d582e21289e722ea78acea66bf5a18a0d7a762253328fe8e73fb",
+   "sha256": "479c4e7e9f37248c2dd2ce796ccb502862f0255b004acf62e542a89579158286",
    "layers": 61,
-   "bytes": 32258594
+   "bytes": 32257804
   }
  },
  "style_cycling_osm_google": {
@@ -34,9 +34,9 @@
   "layers": 61,
   "bytes": 33444548,
   "normalised": {
-   "sha256": "153fc222bf2db33a7556086cb9aa7fbdb487e1d296e2ece9ebbd85def709182a",
+   "sha256": "36b4afa21c3f53c2dd4f86726610732843660b00be81963be1e72f44aa39f42c",
    "layers": 61,
-   "bytes": 32297993
+   "bytes": 32297203
   }
  },
  "style_all_grey_google": {
@@ -44,9 +44,9 @@
   "layers": 60,
   "bytes": 33411815,
   "normalised": {
-   "sha256": "c188ddbec5c5a79ccf8dcbbb1e7c55f1e46b7d92da9f6cc329ce3e25cb841f44",
+   "sha256": "f93e90d2d0249bf135a5112b7eb26c06107cd891db2844f8d1ed8751207894de",
    "layers": 60,
-   "bytes": 32270140
+   "bytes": 32269350
   }
  },
  "style_walking_google_komoot": {
@@ -54,9 +54,9 @@
   "layers": 60,
   "bytes": 33391731,
   "normalised": {
-   "sha256": "e904a7c2742e193891e5c6da373be94aedb3d3d2a0449912de30d1946e07bc84",
+   "sha256": "c46ac68f44c98122821097434a3ba469ed4ed6fed60a50c2d08243ec412cf44a",
    "layers": 60,
-   "bytes": 32257775
+   "bytes": 32256985
   }
  },
  "style_driving_osm_google_only": {
@@ -64,9 +64,9 @@
   "layers": 61,
   "bytes": 13828593,
   "normalised": {
-   "sha256": "84c013b41fa561e2d8446a31cf1459fd37392bdf66fa50f6f693666de4f18c47",
+   "sha256": "ec6e2225e85a3df42892a79b1d29488aa5d14301b25b21d465d1fd6317b79eba",
    "layers": 61,
-   "bytes": 13232115
+   "bytes": 13231703
   }
  },
  "style_walking_osm_google_only": {
@@ -74,9 +74,9 @@
   "layers": 60,
   "bytes": 31077596,
   "normalised": {
-   "sha256": "0cc77a96106f8b8e60512fbf5663bf6a49d56a7ffdbea5cb928ca62ea8b3f5df",
+   "sha256": "b6cec0c9ed40a765051d056628baab01f0dbf8f18c7b1fbcff542bee4e0f2c09",
    "layers": 60,
-   "bytes": 30050694
+   "bytes": 30049943
   }
  }
 }
