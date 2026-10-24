@@ -65,10 +65,18 @@ stops with an error that tells you how to save them.
 
 ## C. Make the tiles in the browser
 
-`Tiler` in the WebAssembly package makes each tile when MapLibre asks for it, so no tile is stored. The page gives MapLibre a
-tile address `rs://...` and answers it with `tiler.tile(z, x, y)`. `tiler.archive(bounds, layers)` makes a PMTiles archive of
-the same tiles, for a page that saves its map. See
-[Use roadstyle in the browser](browser.md#add-roads-that-come-later-as-vector-tiles).
+`Tiler` in the WebAssembly package makes each tile when MapLibre asks for it. No tile is written at the start, and there is no
+file and no folder:
+
+1. `new Tiler(roads, look, ...)` makes the style and the pieces of the roads (the casings, the fills, the names and the arrows),
+   and keeps them in memory with a spatial index. It makes no tile.
+2. When MapLibre needs a tile, it asks for an address `rs://<generation>/roads/<z>/<x>/<y>`. The page answers with
+   `tiler.tile(z, x, y)`: the engine cuts the pieces in that square and encodes the tile.
+3. The engine does not keep the tile. MapLibre keeps the tiles that it has in its own cache.
+
+A new look gives a new `Tiler` and a new generation in the address, so MapLibre does not mix old tiles with the new style.
+`tiler.archive(bounds, layers)` is the exception: it makes all tiles in the bounds at once, as one PMTiles archive in memory, for
+a page that saves its map as a file. See [Use roadstyle in the browser](browser.md#add-roads-that-come-later-as-vector-tiles).
 
 **See also:** [How a map is drawn](drawing.md) · [Big networks](../guides/big-networks.md) ·
 [Put it on a website](../guides/website.md)
