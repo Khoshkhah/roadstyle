@@ -1,0 +1,12 @@
+[package]
+name = "roadstyle-snapshot"
+version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "PNG pictures of saved roadstyle pages: Chromium over CDP draws the page, as roadstyle's Python snapshot does"
+
+[dependencies]
+headless_chrome = "=1.0.22"            # Chromium over CDP; the default features have no "fetch" (no browser download)
+serde_json.workspace = true
