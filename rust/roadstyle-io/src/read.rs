@@ -7,35 +7,58 @@ use bytes::Bytes;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use serde_json::{Map, Value};
 
-pub use roadstyle_model::{Lines, RoadTable, Row};
+pub use roadstyle_model::{feature_table::FeatureTable, Lines, RoadTable, Row};
 
 pub fn read_roads(data: Vec<u8>, geom_col: &str) -> Result<RoadTable, String> {
+    let mut lines = Lines::default();
+    let (names, cols) = read_columns(data, geom_col, |g| {
+        lines.push(g.and_then(wkb_line).as_deref());
+        Ok(())
+    })?;
+    RoadTable::new(names, cols, lines)
+}
+
+/// The base map's (or any) features from a GeoParquet file: every column but the geometry an Arrow array, and the geometry of each row
+/// (WKB: a point, a line, a polygon or a Multi type) in one coordinate buffer (roadstyle-model's FeatureTable; audit R10).
+pub fn read_feature_table(data: Vec<u8>, geom_col: &str) -> Result<FeatureTable, String> {
+    let mut geoms = FeatureTable::geometries();
+    let (names, cols) = read_columns(data, geom_col, |g| geoms.push_wkb(g).map_err(|e| format!("{geom_col}: {e}")))?;
+    FeatureTable::new(names, cols, geoms)
+}
+
+/// The columns of a Parquet file but `geom_col` (each one Arrow array of every row), and `geom` called with each row's geometry bytes
+/// (None: no geometry column, or a null).
+fn read_columns(data: Vec<u8>, geom_col: &str, mut geom: impl FnMut(Option<&[u8]>) -> Result<(), String>)
+                -> Result<(Vec<String>, Vec<ArrayRef>), String> {
     let builder = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data)).map_err(|e| format!("not a Parquet file: {e}"))?;
     let schema = builder.schema().clone();
     let reader = builder.build().map_err(|e| format!("not a Parquet file: {e}"))?;
     let names: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).filter(|n| n != geom_col).collect();
     let mut parts: Vec<Vec<ArrayRef>> = vec![Vec::new(); names.len()];
-    let mut lines = Lines::default();
     for batch in reader {
         let batch = batch.map_err(|e| e.to_string())?;
         let mut k = 0;
         for (field, col) in batch.schema().fields().iter().zip(batch.columns()) {
             if field.name() == geom_col {
-                (0..batch.num_rows()).for_each(|r| lines.push(binary(col, r).and_then(wkb_line).as_deref()));
+                for r in 0..batch.num_rows() {
+                    geom(binary(col, r))?;
+                }
             } else {
                 parts[k].push(col.clone());
                 k += 1;
             }
         }
         if !schema.fields().iter().any(|f| f.name() == geom_col) {
-            (0..batch.num_rows()).for_each(|_| lines.push(None));
+            for _ in 0..batch.num_rows() {
+                geom(None)?;
+            }
         }
     }
     let cols = parts.into_iter().zip(&schema.fields().iter().filter(|f| f.name() != geom_col).collect::<Vec<_>>()).map(|(p, f)| {
         let refs: Vec<&dyn Array> = p.iter().map(|a| a.as_ref()).collect();
         if refs.is_empty() { Ok(arrow_array::new_empty_array(f.data_type())) } else { arrow_select::concat::concat(&refs).map_err(|e| e.to_string()) }
     }).collect::<Result<Vec<_>, String>>()?;
-    RoadTable::new(names, cols, lines)
+    Ok((names, cols))
 }
 
 /// A GeoParquet file of lines only (its `geo` metadata names LineString alone, as stage 1's roads and pieces) as a `RoadTable` (audit
