@@ -1,5 +1,5 @@
 // hover + click-to-select + info popup (feature-state, tolerance box, throttled to one query/frame)
-import {POPUP, _rpairs, _rfields} from "../popup.js";
+import {POPUP, _rpairs, _rfields, _esc} from "../popup.js";
 import {map, style, O, RS_PREFIX, RS_LEAN, RS_DECK_LAYERS, OVERLAYS, _itemOv, _side, _rprops, RoadTable, _road, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad, _joinedKeys, _emit} from "./core.js";
 import {_popupMode, rsInfoShow, rsInfoClear} from "./panel.js";
 import {_ovUnder, _ovWin, clearOvSel, _ovAt, _ovSections, handleOverlayClick} from "./overlays.js";
@@ -56,8 +56,8 @@ function _both(p, rows, only){ const f=rows?_rrows:_rfields, t=p.__rs_edge2!=nul
   return p.__rs_dup ? sec(1,t)+sec(2,p) : sec(1,p)+sec(2,t); }
 export function _rrows(p, only){   // the side panel's layout: big name, then aligned key/value rows
   const [name, kv]=_rpairs(p, only);
-  return (name ? '<div class="rs-name">'+name+'</div>' : "")+
-    kv.map(([k,s])=>'<div class="rs-kv"><span>'+k+'</span><b>'+s+'</b></div>').join(""); }
+  return (name ? '<div class="rs-name">'+_esc(name)+'</div>' : "")+
+    kv.map(([k,s])=>'<div class="rs-kv"><span>'+_esc(k)+'</span><b>'+_esc(s)+'</b></div>').join(""); }
 export let _popupFields = null;   // curated field list, or null => all columns
 export let _ID_KEYS = [];         // the road's id fields: the panel search always reads them
 let _roadPopup = true;            // road_popup=False: a click selects and fires rs:select, no popup
@@ -162,9 +162,9 @@ export function initSelect(){
                streetView:_svPick(e.lngLat, f, f.id)});
     const sv = _sv(e.lngLat, f);
     if(io){ if(io.interactive && _ovWin(io)){             // the item's own popup (its popup fields), the road's Street View below it
-        if(_popupMode === "panel") rsInfoShow('<div class="rs-name">'+io.label+'</div>'+_rrows(item.properties, io.popup) + sv + _ovSections(ovs));
+        if(_popupMode === "panel") rsInfoShow('<div class="rs-name">'+_esc(io.label)+'</div>'+_rrows(item.properties, io.popup) + sv + _ovSections(ovs));
         else new maplibregl.Popup({closeButton:true, maxWidth:POPUP.maxWidth}).setLngLat(e.lngLat)
-          .setHTML('<span style="color:#777">'+io.label+'</span><br>'+_rfields(item.properties, io.popup) + sv + _ovSections(ovs)).addTo(map); } }
+          .setHTML('<span style="color:#777">'+_esc(io.label)+'</span><br>'+_rfields(item.properties, io.popup) + sv + _ovSections(ovs)).addTo(map); } }
     else if(_roadPopup){
       if(_popupMode === "panel"){ rsInfoShow(_both(props, true, _popupFields) + sv + _ovSections(ovs)); }
       else new maplibregl.Popup({closeButton:true, maxWidth:POPUP.maxWidth})

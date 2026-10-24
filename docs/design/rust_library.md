@@ -1330,10 +1330,17 @@ Each part below is its own step after P7:
 | A1 | The CLI (`roadstyle ...`) | a Rust program on the facade crate (the two stages, the page, the levels) | A2, A3, A4 |
 | A2 | The MCP server (`roadstyle-mcp`) | a Rust program with the MCP protocol, on the facade crate | A1, A3, A4 |
 | A3 | The studio | the page and its engine in the browser package (wasm) and the dashboard; no Python server | A1, A2, A4 |
-| A4 | Snapshots (static images) | `headless_chrome` drives Chromium over CDP and draws the saved page (the same PNG as Python's Playwright path); `maplibre_native` is a later option for pictures from a style with no page | A1, A2, A3 |
+| A4 | Snapshots (static images) | `headless_chrome` drives Chromium over CDP and draws the saved page: the same PNG as Python's Playwright path (0 pixels differ on Monaco). `maplibre_native` draws only a style, not the page, and needs 7 more system libraries; it is a later option for pictures from a style with no page | A1, A2, A3 |
 | A5 | The level editor | the levels session builds it now: the page runs the solver through wasm, no Python server | runs now |
 
 Changed 2026-10-24 by the coordinator: the A4 row first said maplibre_native.
+
+A4's cost, measured on 2026-10-24 (one `roadstyle snapshot` at the default size, 1200 x 800; the program and its Chromium processes,
+7 of them; one run at a time): Monaco (13,298 roads, a 4.4 MB page) 657 MiB PSS (918 MiB as a sum of RSS), 8 s; Tartu (64,828 roads,
+17.8 MB) 1,960 MiB PSS (2,169 MiB RSS), 17 s. Each machine that takes a snapshot needs a Chromium. `maplibre_native` 0.10.0 with its
+prebuilt core (`MLN_PRECOMPILE=1`) and the OpenGL backend on Mesa's software renderer (llvmpipe, EGL): the runtime libraries are on a
+plain Ubuntu machine, but the build needs `libssl-dev` (its build script downloads the core) and the link files of curl, png, jpeg, webp,
+EGL, GL and fontconfig (`-dev` packages). It is an option after P7, for pictures from a style with no page.
 
 A1 to A4 touch other files (a program crate each, the studio's page) and can run as parallel sessions; each needs only the facade's
 public calls. A5 is the levels session's.
