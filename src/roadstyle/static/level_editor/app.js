@@ -1,7 +1,7 @@
 // The level editor in Rust (index.html): the area's files from /area/, the solver in the page (roadstyle-wasm LevelArea), the map of the
 // engine's vector tiles with roadstyle's dashboard, and the panel of static/level_editor.html, whose api() calls lvApi here (in place of
 // the Python server's /api/...: roadstyle's level_editor.Area). Your changes are saved with a PUT to /area/<file> (roadstyle serve).
-import init, {LevelArea, makeLook, makeSources, tileSources} from "./pkg/roadstyle_wasm.js";
+import init, {LevelArea, resolveLook, makeSources, tileSources} from "./pkg/roadstyle_wasm.js";
 import {rsDashboard} from "../dashboard/index.js";
 
 const AREA = "/area/", COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"];
@@ -92,7 +92,7 @@ const stats = () => ({area: areaName, roads: order.length,
   ...res.info, given_up: res.given_up});
 
 // --- the map: the engine's tiles of one row for each edge, a new generation for each answer
-const look = makeLook(JSON.stringify({args: LOOK}));
+const look = resolveLook(JSON.stringify({args: LOOK}));
 let tiler = null, gen = 0;
 function build(){
   const src = makeSources(area.draw(Int32Array.from(res.levels.flat()), headsText, capsText), look, undefined, undefined, "Level editor");

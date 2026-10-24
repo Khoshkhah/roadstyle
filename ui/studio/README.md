@@ -1,8 +1,9 @@
 # roadstyle studio in the browser
 
-The studio's Map page with no Python: the knobs, roadstyle's Rust engine in a Web Worker (`worker.js`), the map with the shared
-dashboard (`preview.html`, in an iframe) and the `render_edges(...)` code of the knobs (`code.js`). The Python studio
-(`src/roadstyle/studio/`, Streamlit) is the model: the same knobs in the same sections.
+The Python studio's Map, Dashboard and Report pages with no Python: the knobs, roadstyle's Rust engine in a Web Worker (`worker.js`)
+that makes the whole page for each change (`Roads.page`: `page_from`, as `render_edges(backend="web")` with the Rust engine), that page in
+an iframe, and the Python code of the knobs (`code.js`). The Python studio (`src/roadstyle/studio/`, Streamlit) is the model: the same
+knobs in the same sections.
 
 ## Open it
 
@@ -14,21 +15,19 @@ dashboard (`preview.html`, in an iframe) and the `render_edges(...)` code of the
 python -m http.server 8000
 ```
 
-## What it does now
+## What it does
 
-- Data: the three Södermalm samples (GeoJSON), or a GeoJSON or GeoParquet road file in EPSG:4326.
-- Look: palette, base map (all of `src/roadstyle/data/basemaps.json`; the map's switcher has the active one and the default set), 3D bridges, vector tiles (the engine's tiles, made in the worker when the map asks for them).
+- Page: Map (`render_edges`), Dashboard (`render_dashboard`) or Report (`render_report`). A Dashboard or Report page has its sidebar
+  (`sidebar=`), a title and the base maps it offers.
+- Data: the three Södermalm samples (GeoJSON), a GeoJSON or GeoParquet road file in EPSG:4326, or a Shapefile (its `.shp`, `.dbf` and
+  `.prj`, picked together; reprojected to EPSG:4326). A GeoPackage is read only by the native programs: SQLite is C.
+- Look: palette, base map (all of `src/roadstyle/data/basemaps.json`), 3D bridges, vector tiles (in the page, as PMTiles).
 - Colour by data, as the Python studio: a numeric column with more than 12 values is a ramp from its 2nd to its 98th percentile; another
   column with 1 to 12 values is up to 5 stepped colours of the ramp (`rampStops`), its sorted values in even groups.
 - Filter (the road classes, through the dashboard), minor roads hidden when zoomed out, street names, one-way arrows.
-- Click popup (curated fields, chosen columns, side panel, all columns, off) and hover tooltip columns.
+- Click popup (Map page: curated fields, chosen columns, side panel, all columns, off) and hover tooltip columns.
 - Overlays: GeoJSON files and the sample overlays, each with its label, colour, place and popup and tooltip columns.
+- Download: the page in the iframe, with MapLibre inlined (`src/roadstyle/vendor`), so it works offline, as `WebMap.save` writes it.
 
-## What waits for other parts
-
-- Shapefile road files: `readShp` (branch readers-rs). GeoPackage stays with the native programs: SQLite is C.
-- The download of the page, and the Dashboard and Report pages: `makePage(roads, look, options)` makes them (R3; a sidebar with
-  `"sidebar": "dashboard"` in the args), but the studio has no button for it yet.
-
-Each change of a knob runs the look and stage 1 again in the worker (Södermalm driving, 4,563 roads: 0.3 to 0.5 s). All the calls
-of the look are in `worker.js`, so the look's typed handle changes one file.
+Each change of a knob makes the page again in the worker (Södermalm driving, 4,563 roads: about 1 s) and keeps the camera
+(`rs.getState` / `rs.setState`). All the calls of the look are in `worker.js`.

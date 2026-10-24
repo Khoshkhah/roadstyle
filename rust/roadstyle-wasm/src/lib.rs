@@ -85,12 +85,6 @@ mod wasm {
         roadstyle::look::Options::from_value(&o).and_then(|o| roadstyle::Look::resolve(&o)).map(JsLook).map_err(|e| JsError::new(&e.to_string()))
     }
 
-    /// makeLook(options: string) -> Look: the old name of resolveLook, for one version.
-    #[wasm_bindgen(js_name = makeLook)]
-    pub fn make_look(options: &str) -> Result<JsLook, JsError> {
-        resolve_look(options)
-    }
-
     /// rampStops(cmap: string, n: number) -> string[]: `n` colours ("#rrggbb") at even steps along a ramp (render_edges' cmap: a branca
     /// scheme or a matplotlib colormap name, or the JSON text of a list of colours), from the first colour to the last (at least 2), as
     /// roadstyle's ColorRamp.stops: for example a colour for each category of a column. An error is a thrown Error.
@@ -166,17 +160,21 @@ mod wasm {
     }
 
     /// makePage(roads: Uint8Array, look: Look, options: string, given?: string) -> string: the page of the roads (GeoParquet) in one
-    /// call, as render_edges(backend="web") (roadstyle::page_options::page_from; MapLibre stays a placeholder). `look`: makeLook's of
+    /// call, as render_edges(backend="web") (roadstyle::page_options::page_from; MapLibre stays a placeholder). `look`: resolveLook's of
     /// `options` (its JSON text, which a view's palette resolves again), with "state": "live" in its args; `given`: the caller's values
     /// over the look's args (JSON text: api_key, street_view_key, resolved_basemaps); `features`: a duckOSM map's base map (Parquet bytes).
     #[wasm_bindgen(js_name = makePage)]
     pub fn make_page(roads: Vec<u8>, look: &JsLook, options: &str, given: Option<String>, features: Option<Vec<u8>>) -> Result<String, JsError> {
+        page_of(roadstyle::read::read_roads(roads, "geometry").map_err(|e| JsError::new(&e.to_string()))?, features, look, options, given)
+    }
+
+    /// makePage and Roads.page: the page of read roads.
+    fn page_of(roads: roadstyle::RoadTable, features: Option<Vec<u8>>, look: &JsLook, options: &str, given: Option<String>) -> Result<String, JsError> {
         let o: roadstyle::look::Options = serde_json::from_str(options).map_err(|e| JsError::new(&format!("options: {e}")))?;
         let given: serde_json::Map<String, serde_json::Value> = match given {
             Some(g) => serde_json::from_str(&g).map_err(|e| JsError::new(&format!("given: {e}")))?,
             None => serde_json::Map::new(),
         };
-        let roads = roadstyle::read::read_roads(roads, "geometry").map_err(|e| JsError::new(&e.to_string()))?;
         let features = features.map(roadstyle::read_features).transpose().map_err(|e| JsError::new(&e))?;
         let page = roadstyle::page_options::page_from(roads, features, &look.0, &o, &given).map_err(|e| JsError::new(&e))?;
         page.warnings.iter().for_each(|w| console_warn(w));
@@ -299,6 +297,11 @@ mod wasm {
         /// The names of the roads' columns (the file's properties), in order.
         pub fn columns(&self) -> Vec<String> {
             self.0.names().to_vec()
+        }
+
+        /// page(look, options, given?, features?): the page of these roads in one call, as makePage (its arguments after the roads).
+        pub fn page(&self, look: &JsLook, options: &str, given: Option<String>, features: Option<Vec<u8>>) -> Result<String, JsError> {
+            page_of(self.0.clone(), features, look, options, given)
         }
 
         /// sources(look, features?, planner?, name?): stage 1 of these roads, as makeSources; `features` and `planner` are Parquet bytes.

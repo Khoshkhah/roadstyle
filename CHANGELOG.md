@@ -6,6 +6,14 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Security
+- **The page does not run a script from its data** (audit N23), in both engines. The dashboard put road names, column values and the
+  labels of overlays and legends into HTML with no escape, so a road named `<img src=x onerror=...>` ran a script on every page. Now one
+  `_esc` (`static/popup.js`) escapes them, at each place. The page writers (`render_web._script_json`, `page.rs` `script_json`) write each
+  `<` of the JSON in a page's `<script>` as `\u003c`, so a data value with `</script>` in it (a legend's label) cannot end the script
+  either. The HTML that the page's author gives (`side_panel_html`, a sidebar's template, `rsInfoShow(html)`) is not escaped:
+  `docs/design/dashboard_module.md`, "Trusted inputs".
+
 ### Fixed
 - **A look colour "#fff" no longer crashes `export_look`** (review D4: a panic in Rust, an abort in the browser). One colour module in the
   look crate (`roadstyle_look::color`) reads every colour of the look: "#rrggbb", "#rgb" and a CSS colour name; any other "#..." text is

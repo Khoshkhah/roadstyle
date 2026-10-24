@@ -226,6 +226,22 @@ into the expressions, as `export_style` does. Thus on that style the legend show
 work, because they use feature-state. For a page that switches colours, the engine must keep these states as `global-state`.
 The legend is correct only for option 0, because the metadata does not give the active option.
 
+## Trusted inputs (audit N23)
+
+The page puts the data into HTML only as text. `_esc` in `static/popup.js` escapes `&`, `<`, `>`, `"` and `'`, and every module uses it
+for a data value that goes into HTML: a road's fields in the popup, the hover tooltip and the side panel, the search results, the
+overlays' labels and fields, the legend's title, labels, colours and ends, the page's title in the side panel, and an error text. A road
+name such as `<img src=x onerror=...>` shows as that text. The bundled sidebars (`templates/dashboard.html`, `report.html`) have their
+own `esc` for the same values.
+
+These inputs are HTML on purpose, from the page's author, and are not escaped:
+
+- `side_panel_html`, the HTML of a host panel;
+- the bundled sidebars' templates (`sidebar=`), and a host's own sidebar;
+- the HTML that a host page gives to `rsInfoShow(html)` (the side panel's API).
+
+Put data into these through `_esc`, or through `textContent`.
+
 ## Checks
 
 - `pytest`: the tests read the options from the page's `RS_OPTIONS` object (`_opt(html, key)`).

@@ -1333,10 +1333,17 @@ Each part below is its own step after P7:
 | A1 | The CLI (`roadstyle ...`) | a Rust program on the facade crate (the two stages, the page, the levels) | A2, A3, A4 |
 | A2 | The MCP server (`roadstyle-mcp`) | a Rust program with the MCP protocol, on the facade crate | A1, A3, A4 |
 | A3 | The studio | the page and its engine in the browser package (wasm) and the dashboard; no Python server | A1, A2, A4 |
-| A4 | Snapshots (static images) | `headless_chrome` drives Chromium over CDP and draws the saved page (the same PNG as Python's Playwright path); `maplibre_native` is a later option for pictures from a style with no page | A1, A2, A3 |
+| A4 | Snapshots (static images) | `headless_chrome` drives Chromium over CDP and draws the saved page: the same PNG as Python's Playwright path (0 pixels differ on Monaco). `maplibre_native` draws only a style, not the page, and needs 7 more system libraries; it is a later option for pictures from a style with no page | A1, A2, A3 |
 | A5 | The level editor | the levels session builds it now: the page runs the solver through wasm, no Python server | runs now |
 
 Changed 2026-10-24 by the coordinator: the A4 row first said maplibre_native.
+
+A4's cost, measured on 2026-10-24 (one `roadstyle snapshot` at the default size, 1200 x 800; the program and its Chromium processes,
+7 of them; one run at a time): Monaco (13,298 roads, a 4.4 MB page) 657 MiB PSS (918 MiB as a sum of RSS), 8 s; Tartu (64,828 roads,
+17.8 MB) 1,960 MiB PSS (2,169 MiB RSS), 17 s. Each machine that takes a snapshot needs a Chromium. `maplibre_native` 0.10.0 with its
+prebuilt core (`MLN_PRECOMPILE=1`) and the OpenGL backend on Mesa's software renderer (llvmpipe, EGL): the runtime libraries are on a
+plain Ubuntu machine, but the build needs `libssl-dev` (its build script downloads the core) and the link files of curl, png, jpeg, webp,
+EGL, GL and fontconfig (`-dev` packages). It is an option after P7, for pictures from a style with no page.
 
 A1 to A4 touch other files (a program crate each, the studio's page) and can run as parallel sessions; each needs only the facade's
 public calls. A5 is the levels session's.
@@ -1347,6 +1354,38 @@ MVT encoder (`mvt` or `geozero`), the geometry helpers (`geo`: simplify, interpo
 the GeoParquet metadata (`geoparquet` or `geoarrow`, when they reach 1.0), and the removal of the Python-style JSON writer and rounding
 (`pyjson`, `py_round`). These stay as they are: the level solver, parquet and arrow, shapefile, proj4rs, i_overlay, rusqlite, rstar,
 sha2 and yaml-rust2.
+
+#### A2: the MCP server in Rust
+
+The program `roadstyle-mcp` is the crate `rust/roadstyle-mcp`. It uses the official Rust MCP SDK `rmcp` (pinned to 3.5.1) over stdio.
+It has the Python server's tools (`src/roadstyle/mcp_server.py`) with the same names, inputs and outputs.
+
+| Tool | In Python | In Rust | Waits for |
+|---|---|---|---|
+| `render_file` | geopandas reads the file, `render_edges` writes the page | the readers (GeoParquet, GeoJSON, Shapefile, GeoPackage), `page_from` writes the page with MapLibre in it, the preview of `roadstyle-snapshot` | |
+| `render_place` | osmnx downloads the place, `render_edges` writes the page | an error that sends the agent to the Python server | a road download in Rust |
+| `snapshot` | Playwright makes a PNG of a saved page | `roadstyle-snapshot` (Chromium over CDP), the same PNG | |
+
+Decisions (2026-10-24):
+
+- **`render_place` stays on the Python path.** duckosm-rust does not change until roadstyle is finished, so it cannot clip a `.pbf`
+  file to a place's polygon now. A Geofabrik region file for each place is too large. A download and a graph simplification written
+  in this crate is a second rule set for the roads ("one rule, every path"). When the duckosm-rust freeze ends: Nominatim gives the
+  polygon, duckosm-rust clips the region's `.pbf` file and makes the network. Until then the Python server does not retire.
+- **The readers of `render_file`:** GeoParquet, GeoJSON (`roadstyle-io/src/geojson.rs`), a Shapefile (`shp.rs`, the `shapefile`
+  crate, with its `.dbf` and `.prj` beside it) and a GeoPackage (`gpkg.rs`, rusqlite bundled; the feature `gpkg`, native only), with the
+  same return shape. The reprojection to EPSG:4326 uses `proj4rs` (pure Rust, no C proj). The CRS comes
+  from `gpkg_spatial_ref_sys` or the `.prj` file. A CRS that `proj4rs` cannot read is an error that names it.
+- **The option check:** a misspelt option is an error with the close names, as in Python. The server checks the options against the
+  keys that stage 1 reads (`STAGE1` in `main.rs`) and the page's keywords (`page_options::page_defaults`). `tests/test_mcp_rs_options.py`
+  checks that each key of `STAGE1` is a `render_edges` keyword.
+- **The base map:** with no `CARTO_API_KEY` (or `ROADSTYLE_API_KEY`) and no `basemap` option, the page takes `esri_street` and the
+  answer says so, as in Python.
+- **The package:** `roadstyle-mcp` on PyPI becomes a maturin `bindings = "bin"` wheel that holds the Rust program. `uvx roadstyle-mcp`,
+  `server.json` and `.claude-plugin/plugin.json` do not change. `mcp_server.py` and the `roadstyle[mcp]` extra retire when the three
+  tools are in Rust.
+- **The tests:** `rust/roadstyle-mcp/tests/stdio.rs` drives the program over stdio, as `tests/test_mcp_server.py` drives the Python
+  server, on Monaco.
 
 ### Parallel work without two sessions in one file
 
