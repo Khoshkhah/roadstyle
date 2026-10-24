@@ -62,3 +62,15 @@ def test_no_browser_is_an_error_that_names_where_it_looked(page, tmp_path):
                        env={**os.environ, "CHROME": "/nowhere/chrome"})
     assert r.returncode == 2 and "no Chromium found (searched: CHROME=/nowhere/chrome)" in r.stderr, r.stderr
     assert not (tmp_path / "x.png").exists()
+
+
+def test_a_map_that_does_not_load_is_taken_with_a_warning(tmp_path):
+    # as Python: the picture is taken when the time is over; Rust also says why the picture can be incomplete
+    page = tmp_path / "never.html"
+    page.write_text("<!doctype html><body style='background:#2a6'><script>window.map = {loaded: () => false}</script></body>")
+    out = tmp_path / "never.png"
+    r = subprocess.run([BIN, "snapshot", str(page), str(out), "--timeout", "1", "--settle", "0"], capture_output=True, text=True,
+                       timeout=60)
+    assert r.returncode == 0, r.stderr
+    assert "warning: the map did not load in 1 s" in r.stderr
+    assert out.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"

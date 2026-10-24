@@ -47,7 +47,7 @@ pub enum SnapshotError {
     NoBrowser { searched: Vec<String> },
     /// Chromium did not start
     Launch(String),
-    /// the page has a map that did not load in this time
+    /// the page or the browser did not answer in this time
     Timeout(Duration),
     /// the page did not open, or the browser failed while it drew the page
     Page(String),
@@ -60,7 +60,7 @@ impl fmt::Display for SnapshotError {
             SnapshotError::NoBrowser { searched } => write!(f, "no Chromium found (searched: {}). Install one with: npx playwright \
                 install chromium-headless-shell, or set CHROME to a Chrome or Chromium program", searched.join("; ")),
             SnapshotError::Launch(e) => write!(f, "Chromium did not start: {e}"),
-            SnapshotError::Timeout(t) => write!(f, "the map did not load in {} s", t.as_secs_f64()),
+            SnapshotError::Timeout(t) => write!(f, "the page or the browser did not answer in {} s", t.as_secs_f64()),
             SnapshotError::Page(e) => write!(f, "the page: {e}"),
             SnapshotError::Io(e) => write!(f, "{e}"),
         }
@@ -74,6 +74,10 @@ impl From<std::io::Error> for SnapshotError {
         SnapshotError::Io(e)
     }
 }
+
+/// The time for the page and the browser to answer (open the page, run a script, take the picture): Playwright's default, as in Python.
+/// `Shot::timeout` is only the time for the map to load.
+const ANSWER: Duration = Duration::from_secs(30);
 
 const PATH_NAMES: [&str; 5] = ["chromium", "chromium-browser", "chrome", "google-chrome", "google-chrome-stable"];
 
@@ -111,36 +115,49 @@ pub fn find_browser() -> Result<PathBuf, SnapshotError> {
     Err(SnapshotError::NoBrowser { searched })
 }
 
-fn page_err(e: impl fmt::Display) -> SnapshotError {
-    SnapshotError::Page(e.to_string())
+/// A picture that was written.
+#[derive(Debug)]
+pub struct Picture {
+    pub path: PathBuf,
+    /// what the picture can be missing: a map that did not load in the time (the picture shows it as it was, as Python does)
+    pub warning: Option<String>,
 }
 
 /// The PNG of the saved page `page`, written to `out`.
-pub fn snapshot(page: &Path, out: &Path, camera: &Camera, shot: &Shot) -> Result<PathBuf, SnapshotError> {
+pub fn snapshot(page: &Path, out: &Path, camera: &Camera, shot: &Shot) -> Result<Picture, SnapshotError> {
     let url = format!("file://{}", std::path::absolute(page)?.display());
     let options = LaunchOptions::default_builder().path(Some(find_browser()?)).headless(true)
         // as Playwright's launch: no sandbox, no scroll bars in the picture
         .sandbox(false).args(vec![std::ffi::OsStr::new("--hide-scrollbars")])
-        .window_size(Some((shot.width, shot.height))).idle_browser_timeout(shot.timeout + shot.settle + Duration::from_secs(30))
+        .window_size(Some((shot.width, shot.height))).idle_browser_timeout(shot.timeout + shot.settle + ANSWER)
         .build().map_err(|e| SnapshotError::Launch(e.to_string()))?;
     let browser = Browser::new(options).map_err(|e| SnapshotError::Launch(e.to_string()))?;
+    // headless_chrome's own time limit (a page or a browser that does not answer) is a Timeout; any other failure is the page's
+    let page_err = |e: anyhow::Error| match e.is::<headless_chrome::util::Timeout>() {
+        true => SnapshotError::Timeout(ANSWER),
+        false => SnapshotError::Page(e.to_string()),
+    };
     let tab = browser.new_tab().map_err(page_err)?;
-    tab.set_default_timeout(shot.timeout);
+    tab.set_default_timeout(ANSWER);
     tab.call_method(Emulation::SetDeviceMetricsOverride {
         width: shot.width, height: shot.height, device_scale_factor: shot.scale, mobile: false, scale: None, screen_width: None,
         screen_height: None, position_x: None, position_y: None, dont_set_visible_size: None, screen_orientation: None, viewport: None,
         display_feature: None, device_posture: None,
     }).map_err(page_err)?;
     tab.navigate_to(&url).map_err(page_err)?.wait_until_navigated().map_err(page_err)?;
-    // a MapLibre page: wait until the map has loaded. A page with no `map` (folium, other pages) only gets the settle time, as in Python.
-    let start = Instant::now();
+    // a MapLibre page: wait until the map has loaded. A page with no `map` (folium, other pages) only gets the settle time, and a map that
+    // does not load in the time is taken as it is, with a warning, as in Python.
+    let (start, mut warning) = (Instant::now(), None);
     loop {
         let state = tab.evaluate("window.map && typeof window.map.loaded === 'function' ? window.map.loaded() : null", false)
             .map_err(page_err)?.value.unwrap_or(Value::Null);
         match state {
             Value::Bool(true) => break,
             Value::Null if start.elapsed() > Duration::from_secs(2) => break,
-            _ if start.elapsed() > shot.timeout => return Err(SnapshotError::Timeout(shot.timeout)),
+            _ if start.elapsed() > shot.timeout => {
+                warning = Some(format!("the map did not load in {} s: the picture shows it as it was then", shot.timeout.as_secs_f64()));
+                break;
+            }
             _ => std::thread::sleep(Duration::from_millis(100)),
         }
     }
@@ -159,5 +176,5 @@ pub fn snapshot(page: &Path, out: &Path, camera: &Camera, shot: &Shot) -> Result
     std::thread::sleep(shot.settle);
     let png = tab.capture_screenshot(Page::CaptureScreenshotFormatOption::Png, None, None, true).map_err(page_err)?;
     std::fs::write(out, png)?;
-    Ok(out.to_path_buf())
+    Ok(Picture { path: out.to_path_buf(), warning })
 }
