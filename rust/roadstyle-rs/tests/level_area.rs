@@ -53,3 +53,26 @@ fn the_check_before_a_rule_is_added_as_roadstyle() {
     }).collect();
     assert_eq!(Value::Array(got), checks["conflicts"]);
 }
+
+/// make (roadstyle-levels make) on make's input of the fixture: the same roads.parquet (every column but the line, which is the first
+/// edge's) and the same pairs.csv rows as roadstyle's make_area.
+#[test]
+fn make_gives_roadstyle_s_input() {
+    let dir = std::env::temp_dir().join(format!("roadstyle-make-{}", std::process::id()));
+    let table = roadstyle_rs::read::read_roads(std::fs::read(data("edges.parquet")).unwrap(), "geometry").unwrap();
+    let made = roadstyle_rs::level_area::make_area(&table, &dir, &Default::default()).unwrap();
+    let lines = |p: PathBuf| {
+        let mut l: Vec<String> = std::fs::read_to_string(p).unwrap().lines().map(String::from).collect();
+        l.sort();
+        l
+    };
+    assert_eq!(lines(dir.join("pairs.csv")), lines(data("pairs.csv")));
+    let rows = |p: PathBuf| roadstyle_rs::read::read_table(std::fs::read(p).unwrap(), "geometry").unwrap();
+    let (got, want) = (rows(dir.join("roads.parquet")), rows(data("roads.parquet")));
+    assert_eq!((made.roads, got.len()), (want.len(), want.len()));
+    for (g, w) in got.iter().zip(&want) {
+        assert_eq!(g.cols, w.cols, "road {}", w.cols["road"]);
+        assert_eq!(g.blob.is_some(), w.blob.is_some());
+    }
+    std::fs::remove_dir_all(&dir).ok();
+}

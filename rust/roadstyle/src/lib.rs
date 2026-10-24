@@ -5,6 +5,7 @@
 
 pub use roadstyle_engine::*;
 pub use roadstyle_io::read;
+pub mod level_area;
 pub mod level_editor;
 pub mod page;
 pub use roadstyle_levels as levels;
