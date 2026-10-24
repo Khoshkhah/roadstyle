@@ -57,3 +57,14 @@ fn monaco_sources_as_files() {
     }
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+/// R1: the layers read the features' properties only by name (`["get", name]`, `["has", name]`), so props::drawn knows each one.
+#[test]
+fn the_layers_read_properties_by_name() {
+    let look = String::from_utf8(data("look.json")).unwrap();
+    let s = roadstyle_rs::make_sources(data("monaco/roads.parquet"), &look, Some(data("monaco/features.parquet")), None, None).unwrap();
+    let (mut read, mut unknown) = (std::collections::HashSet::new(), Vec::new());
+    s.layers.iter().for_each(|l| roadstyle_rs::props::expression_reads(l, &mut read, &mut unknown));
+    assert!(unknown.is_empty(), "a layer reads a property whose name is not a literal: {unknown:?}");
+    assert!(read.contains("__rs_fill") && read.contains("__rs_s"), "{read:?}");
+}

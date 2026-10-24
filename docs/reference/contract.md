@@ -167,6 +167,20 @@ when a layer reads it.
 | `__rs_gz`, `__rs_tiles`, `__rs_side` | not properties: the page's self-check globals (`window.__rs_gz`, `window.__rs_tiles`, `window.__rs_side`: the road table did not load) | `_INFLATE_JS`, `_TILES_JS`, `_SIDE_JS` | the page's banner | page | the page writer |
 | `__rs_fill__` | the prefix of `__rs_fill__<i>` in the code | | | | |
 
+## What a page reads
+
+The page's dashboard modules and page scripts declare the feature properties that they read, in
+`src/roadstyle/static/dashboard/reads.json`:
+
+- `pieces`: the properties of a feature of a drawn layer (a road piece, an item, a deck or a shadow, a slot of the inline arrows).
+- `table`: the properties of a row of the road table. A row also has the fields of the popup and the tooltip
+  (`roadstyle:interaction`; every public field when the popup list is null), the `edge_id_col` and the road's line.
+
+The layers' own expressions read the properties that they name in `["get", name]` and `["has", name]`. The Rust engine collects these
+(`props::drawn`), with the declaration, the popup and tooltip fields, `name` and `kind`. `tests/test_contract_names.py` fails when a module
+reads a `__rs_*` property that is not declared, and `rust/roadstyle-rs/tests/sources.rs` fails when a layer reads a property whose name is
+not a literal. A change to a module that reads a new property adds the property to `reads.json`.
+
 ## The page's placeholders
 
 `static/web_template.html` has one placeholder for each value that `render_web._page_html` puts in the page:

@@ -55,3 +55,20 @@ def test_the_storage_keys_and_css_variables():
     doc = DOC.read_text()
     for name in ("rs-street-view-mode", "rs-street-view-window", "rs-google-3d-window", "rs-host-panel:", "--rs-side"):
         assert name in code and name in doc, name
+
+
+def test_the_page_reads_only_declared_properties():
+    """R1: every __rs_* property that a dashboard module or a page script reads is in its declaration, static/dashboard/reads.json (a
+    piece's or a road table row's). The layers' own reads are collected from their expressions (props::reads in Rust); the window's own
+    __rs_* names (the page's checks) are not properties."""
+    import json
+
+    declared = json.loads((ROOT / "src/roadstyle/static/dashboard/reads.json").read_text())
+    known = set(declared["pieces"]) | set(declared["table"]) | {"__rs_fill", "__rs_fill__<i>"}      # the colour options' fills
+    scripts = [*(ROOT / "src/roadstyle/static/dashboard").glob("*.js"), *(ROOT / "src/roadstyle/static/page").glob("*.html"),
+               ROOT / "src/roadstyle/static/popup.js"]
+    read = set()
+    for p in scripts:
+        text = re.sub(r"window\.__rs_[a-z]+", "", p.read_text())
+        read |= {_norm(m) for m in re.findall(KINDS["property"], text)}
+    assert read - known == set(), f"read by the page but not declared in reads.json: {sorted(read - known)}"
