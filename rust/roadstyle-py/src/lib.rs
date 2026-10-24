@@ -34,13 +34,18 @@ impl PyLook {
         self.0.to_json()
     }
 
-    /// part(key) -> str: the JSON text of one part of the look: "args" (the map options), "config" or "theme".
+    /// part(key) -> str: the JSON text of one part of the look: "args" (the map options), "config", "theme", "palette" (its name),
+    /// "settings" (the settings sources as given) or "features" (the base map's part).
     fn part(&self, key: &str) -> PyResult<String> {
+        let l = &self.0;
         match key {
-            "args" => Ok(self.0.args.to_string()),
-            "config" => Ok(self.0.config.to_string()),
-            "theme" => Ok(self.0.theme.to_string()),
-            _ => Err(PyValueError::new_err(format!("part {key:?}: the parts are \"args\", \"config\" and \"theme\""))),
+            "args" => Ok(l.args.to_string()),
+            "config" => Ok(l.config.to_string()),
+            "theme" => Ok(l.theme.to_string()),
+            "palette" => Ok(serde_json::Value::from(l.palette.as_str()).to_string()),
+            "settings" => Ok(l.settings.to_string()),
+            "features" => Ok(l.features.to_string()),
+            _ => Err(PyValueError::new_err(format!("part {key:?}: the parts are args, config, theme, palette, settings and features"))),
         }
     }
 
@@ -333,6 +338,22 @@ fn make_area(py: Python<'_>, edges: Vec<u8>, folder: String, id_col: String, hig
     }).map_err(|e: String| PyValueError::new_err(e))
 }
 
+/// base_map_theme(theme) -> str: a base map's theme (roadstyle-look's basemap::load_theme) as JSON text: [osm_carto.yaml in the theme's
+/// colours, the theme file itself, [saturation, lighten] of its transform]. An unknown theme is a ValueError that names the themes.
+#[pyfunction]
+fn base_map_theme(theme: &str) -> PyResult<String> {
+    let (style, file, (s, l)) = roadstyle::look::basemap::load_theme(theme).map_err(PyValueError::new_err)?;
+    Ok(serde_json::json!([style, file, [s, l]]).to_string())
+}
+
+/// base_map_recolor(colour, saturation, lighten) -> str: a "#rrggbb" colour with a theme's transform (basemap::recolor); another
+/// value (JSON text) as it is. Gives JSON text.
+#[pyfunction]
+fn base_map_recolor(colour: &str, saturation: f64, lighten: f64) -> PyResult<String> {
+    let v: serde_json::Value = serde_json::from_str(colour).map_err(|e| PyValueError::new_err(format!("colour: not JSON: {e}")))?;
+    Ok(roadstyle::look::basemap::recolor(&v, saturation, lighten).to_string())
+}
+
 /// duckosm_catalog_sql(catalog) -> [str, str]: the queries of the tables (schema, table) and the columns (schema, table, column) of a
 /// duckOSM file, for duckosm_plan.
 #[pyfunction]
@@ -405,6 +426,8 @@ fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(solve_rules, m)?)?;
     m.add_function(wrap_pyfunction!(serve, m)?)?;
     m.add_function(wrap_pyfunction!(make_area, m)?)?;
+    m.add_function(wrap_pyfunction!(base_map_theme, m)?)?;
+    m.add_function(wrap_pyfunction!(base_map_recolor, m)?)?;
     m.add_function(wrap_pyfunction!(duckosm_catalog_sql, m)?)?;
     m.add_function(wrap_pyfunction!(duckosm_plan, m)?)?;
     m.add_function(wrap_pyfunction!(duckosm_levels, m)?)?;

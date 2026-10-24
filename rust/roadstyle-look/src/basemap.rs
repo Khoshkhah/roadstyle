@@ -140,7 +140,7 @@ fn hls_to_rgb(h: f64, l: f64, s: f64) -> [f64; 3] {
 }
 
 /// recolor: a "#rrggbb" colour with `saturation` times its saturation, then `lighten` of the way to white; anything else as it is.
-fn recolor(v: &Value, saturation: f64, lighten: f64) -> Value {
+pub fn recolor(v: &Value, saturation: f64, lighten: f64) -> Value {
     let Some(c) = v.as_str().and_then(hex) else { return v.clone() };
     let (h, l, s) = rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0);
     let rgb = hls_to_rgb(h, l, s * saturation).map(|x| x + (1.0 - x) * lighten);
@@ -172,7 +172,7 @@ fn merge(a: Option<&Value>, b: &Value) -> Value {
 
 /// A theme: osm_carto.yaml in its colours (its transform on every colour, then its own colours), the theme file itself (empty for
 /// "osm") and its transform (saturation, lighten), for the colours that come from elsewhere.
-fn load_theme(theme: &str) -> Result<(Value, Value, (f64, f64)), String> {
+pub fn load_theme(theme: &str) -> Result<(Value, Value, (f64, f64)), String> {
     let base = style(CARTO);
     if theme == "osm" {
         return Ok((base, json!({}), (1.0, 0.0)));

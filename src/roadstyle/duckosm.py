@@ -119,3 +119,29 @@ def export_style(db, out_dir, *, base_url: str, mode: str = "all", theme: str = 
     _warn()
     bounds = tuple(float(v) for v in shapely.total_bounds(shapely.from_wkb(table.column("geometry").to_numpy(zero_copy_only=False))))
     return _write_export(t, out_dir, base_url, format, json.loads(lk.part("args"))["name"], bounds)
+
+
+def base_map(mode: str = "all", *, theme: str = "osm", paths: str = "google") -> dict:
+    """The base map's look of one choice (roadstyle-look's basemap.rs; mapstyle's mode_settings and styles): {"palette": the roads'
+    palette name, "settings": its settings source, "features": the base map's part of the look (its layers, 3D heights, style and
+    images), "args": the mode's map options}."""
+    from ._engine import rust
+
+    lk = rust().resolve_look(json.dumps({"base_map": {"mode": mode, "theme": theme, "paths": paths}}))
+    return {k: json.loads(lk.part(k)) for k in ("palette", "settings", "features", "args")}
+
+
+def theme(name: str = "osm"):
+    """``(style, file, transform)`` of a base map's theme: osm_carto.yaml in the theme's colours, the theme file ({} for "osm") and its
+    transform (saturation, lighten), for ``recolor``."""
+    from ._engine import rust
+
+    style, file, transform = json.loads(rust().base_map_theme(name))
+    return style, file, tuple(transform)
+
+
+def recolor(colour, transform):
+    """A "#rrggbb" colour in a theme's colours (``transform``: theme()'s third value); any other value as it is."""
+    from ._engine import rust
+
+    return json.loads(rust().base_map_recolor(json.dumps(colour), *transform))
