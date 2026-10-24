@@ -720,11 +720,12 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "roadstyle"
-version = "0.0.1"
+version = "0.25.0"
 dependencies = [
  "base64 0.22.1",
  "flate2",
  "roadstyle-engine",
+ "roadstyle-io",
  "roadstyle-levels",
  "roadstyle-tiles",
  "serde_json",
@@ -732,11 +733,10 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-engine"
-version = "0.0.1"
+version = "0.25.0"
 dependencies = [
  "base64 0.22.1",
  "indexmap",
- "roadstyle-io",
  "roadstyle-levels",
  "roadstyle-model",
  "rstar",
@@ -746,10 +746,11 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-io"
-version = "0.0.1"
+version = "0.25.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
+ "arrow-select",
  "bytes",
  "parquet",
  "roadstyle-model",
@@ -758,7 +759,7 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-levels"
-version = "0.0.1"
+version = "0.25.0"
 dependencies = [
  "rstar",
  "sha2",
@@ -766,14 +767,17 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-model"
-version = "0.0.1"
+version = "0.25.0"
 dependencies = [
+ "arrow-array",
+ "arrow-schema",
+ "serde",
  "serde_json",
 ]
 
 [[package]]
 name = "roadstyle-py"
-version = "0.0.1"
+version = "0.25.0"
 dependencies = [
  "pyo3",
  "roadstyle",
@@ -782,7 +786,7 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-rs"
-version = "0.0.1"
+version = "0.25.0"
 dependencies = [
  "base64 0.22.1",
  "flate2",
@@ -795,7 +799,7 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-tiles"
-version = "0.0.1"
+version = "0.25.0"
 dependencies = [
  "flate2",
  "indexmap",
@@ -806,7 +810,7 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-wasm"
-version = "0.0.1"
+version = "0.25.0"
 dependencies = [
  "roadstyle",
  "serde_json",

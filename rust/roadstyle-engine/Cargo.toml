@@ -1,13 +1,14 @@
 [package]
 name = "roadstyle-engine"
 version.workspace = true
+repository.workspace = true
+homepage.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "roadstyle's rendering engine: the style of a map, the data-driven paint, the legend data, the base-map layers"
 
 [dependencies]
 roadstyle-model.workspace = true
-roadstyle-io.workspace = true
 roadstyle-levels.workspace = true
 serde_json.workspace = true
 indexmap.workspace = true

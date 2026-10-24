@@ -1,6 +1,8 @@
 [package]
 name = "roadstyle-wasm"
-version = "0.0.1"
+version.workspace = true
+repository.workspace = true
+homepage.workspace = true
 edition = "2021"
 license = "MIT"
 description = "The browser's front-end of roadstyle-rs: makeStyle, Tiler, memoryBytes (docs/design/rust_engine.md)"

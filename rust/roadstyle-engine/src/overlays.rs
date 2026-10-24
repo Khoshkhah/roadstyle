@@ -2,7 +2,8 @@
 //! `overlays=`, `user_overlays`), then roadstyle's _edge_overlay and _overlay_layers: the overlay sources and their layers before the
 //! placement and the passes (layers.rs).
 
-use crate::read::Feature;
+use crate::road::{Road, Roads};
+use roadstyle_model::Cell;
 use crate::roads::truthy;
 use crate::slots::{bbox, point_line_dist};
 use rstar::{primitives::GeomWithData, primitives::Rectangle, RTree, AABB};
@@ -32,7 +33,8 @@ pub struct Overlay {
 }
 
 /// _band: below (-1 ...), on (0) or over (1 ...) the ground: the OSM layer if it is a number, else 1 for a bridge, -1 for a tunnel.
-fn band(p: &crate::props::Props) -> f64 {
+fn band(r: Road) -> f64 {
+    let p: std::collections::HashMap<&str, Value> = ["layer", "bridge", "tunnel"].into_iter().filter_map(|k| r.get(k).map(|c| (k, c.to_value()))).collect();
     let layer = match p.get("layer") {
         Some(Value::String(s)) => s.trim().parse::<f64>().ok(),
         Some(Value::Number(n)) => n.as_f64(),
@@ -51,15 +53,15 @@ fn band(p: &crate::props::Props) -> f64 {
 /// edge_attach: `edge_id` on every crossing and traffic signal: of the streets within 1e-5 deg, the one drawn on top (the highest fill
 /// number, then band, then class); else the nearest street within 3e-5 deg (within 2e-6 of the nearest); else the nearest road.
 /// Returns the names of the layers that got one.
-pub fn edge_attach(fcs: &mut Map<String, Value>, roads: &[Feature]) -> Vec<String> {
+pub fn edge_attach(fcs: &mut Map<String, Value>, roads: &Roads) -> Vec<String> {
     let n = roads.len();
     let klass: Vec<f64> = roads.iter().map(|r| {
-        let h = r.props.get("highway").and_then(Value::as_str).unwrap_or("");
+        let h = r.get("highway").and_then(Cell::as_str).unwrap_or("");
         let h = h.strip_suffix("_link").unwrap_or(h);
         CLASS_RANK.iter().position(|c| *c == h).map_or(99.0, |i| (i + 1) as f64)
     }).collect();
-    let fill: Vec<f64> = roads.iter().map(|r| r.props.get("fill_level").and_then(Value::as_f64).unwrap_or(0.0)).collect();
-    let bands: Vec<f64> = roads.iter().map(|r| band(&r.props)).collect();
+    let fill: Vec<f64> = roads.iter().map(|r| r.get("fill_level").and_then(Cell::as_f64).unwrap_or(0.0)).collect();
+    let bands: Vec<f64> = roads.iter().map(band).collect();
     // np.lexsort((-klass, band, fill))[::-1]: by fill, then band, then -klass, ascending and stable; reversed
     let mut order: Vec<usize> = (0..n).collect();
     order.sort_by(|&a, &b| fill[a].total_cmp(&fill[b]).then(bands[a].total_cmp(&bands[b])).then((-klass[a]).total_cmp(&-klass[b])).then(a.cmp(&b)));
@@ -67,11 +69,11 @@ pub fn edge_attach(fcs: &mut Map<String, Value>, roads: &[Feature]) -> Vec<Strin
     for (k, &i) in order.iter().rev().enumerate() {
         rank[i] = k;
     }
-    let street: Vec<bool> = roads.iter().map(|r| !r.props.get("highway").and_then(Value::as_str).is_some_and(|h| PATH_CLASSES.contains(&h))).collect();
+    let street: Vec<bool> = roads.iter().map(|r| !r.get("highway").and_then(Cell::as_str).is_some_and(|h| PATH_CLASSES.contains(&h))).collect();
     let tree: RTree<GeomWithData<Rectangle<[f64; 2]>, usize>> = RTree::bulk_load(roads.iter().enumerate()
-        .filter_map(|(i, r)| r.coords.as_ref().filter(|c| !c.is_empty()).map(|c| { let (lo, hi) = bbox(c); GeomWithData::new(Rectangle::from_corners(lo, hi), i) }))
+        .filter_map(|(i, r)| r.line().filter(|c| !c.is_empty()).map(|c| { let (lo, hi) = bbox(c); GeomWithData::new(Rectangle::from_corners(lo, hi), i) }))
         .collect());
-    let dist = |p: [f64; 2], i: usize| roads[i].coords.as_ref().map_or(f64::INFINITY, |c| point_line_dist(p, c));
+    let dist = |p: [f64; 2], i: usize| roads.line(i).map_or(f64::INFINITY, |c| point_line_dist(p, c));
     let within = |p: [f64; 2], d: f64| -> Vec<usize> {
         let mut v: Vec<usize> = tree.locate_in_envelope_intersecting(&AABB::from_corners([p[0] - d, p[1] - d], [p[0] + d, p[1] + d]))
             .map(|g| g.data).filter(|&i| dist(p, i) <= d).collect();
@@ -99,7 +101,7 @@ pub fn edge_attach(fcs: &mut Map<String, Value>, roads: &[Feature]) -> Vec<Strin
             } else {
                 *hits.iter().min_by_key(|&&i| rank[i]).unwrap()
             };
-            let id = match roads[j].props.get("edge_id") { Some(Value::String(s)) => s.clone(), Some(v) => v.to_string(), None => String::new() };
+            let id = match roads.get(j, "edge_id").map(Cell::to_value) { Some(Value::String(s)) => s, Some(v) => v.to_string(), None => String::new() };
             f["properties"]["edge_id"] = id.into();
         }
         done.push(name.to_string());
@@ -373,8 +375,8 @@ pub fn overlay_layers(sid: &str, ov: &Overlay, look: &Value) -> Vec<Value> {
 }
 
 /// _eid: an edge id as text, the same for an integer, a float with a whole value and a text (ids past 2**53 match).
-pub fn eid(v: &Value) -> String {
-    match v {
+pub fn eid<'a>(v: impl Into<Cell<'a>>) -> String {
+    match &v.into().to_value() {
         Value::String(s) => s.clone(),
         Value::Number(n) if n.is_f64() && n.as_f64().is_some_and(|f| f.fract() == 0.0 && f.abs() < 1e18) => (n.as_f64().unwrap() as i64).to_string(),
         Value::Null => "None".into(),
@@ -385,7 +387,7 @@ pub fn eid(v: &Value) -> String {
 /// _edge_overlay: on each feature of an overlay on a street, what it takes from its edge (`roads`: the roads source's properties, by edge id
 /// as text, _eid); returns the (fill number, order) pairs, sorted. The base map's overlays name their edge in `edge_id`, a caller's in its
 /// `edge_col` (and its order in `order_col`).
-pub fn edge_overlay(ov: &mut Overlay, roads: &std::collections::HashMap<String, &crate::props::Props>) -> Result<Vec<(i64, i64)>, String> {
+pub fn edge_overlay(ov: &mut Overlay, roads: &std::collections::HashMap<String, Road>) -> Result<Vec<(i64, i64)>, String> {
     let col = ov.user["edge_col"].as_str().unwrap_or("edge_id").to_string();
     if roads.is_empty() && !ov.user.is_null() {
         let id = ov.user["edge_id_col"].as_str().unwrap_or("edge_id");
@@ -400,18 +402,18 @@ pub fn edge_overlay(ov: &mut Overlay, roads: &std::collections::HashMap<String, 
         }
         let p = f["properties"].as_object_mut().unwrap();
         let e = eid(p.get(&col).unwrap_or(&Value::Null));
-        let Some(r) = roads.get(&e) else {
+        let Some(&r) = roads.get(&e) else {
             unknown.push(e);
             continue;
         };
         let o = order_col.as_ref().and_then(|c| p.get(c)).and_then(Value::as_f64).filter(|o| o.is_finite()).map_or(0, |o| o.trunc() as i64);
-        let fl = r.get("__rs_fl").and_then(Value::as_i64).unwrap_or(0);
-        p.insert("__rs_edge".into(), r["__rs_edge"].clone());
+        let fl = r.get("__rs_fl").and_then(Cell::as_i64).unwrap_or(0);
+        p.insert("__rs_edge".into(), r.get("__rs_edge").map_or(Value::Null, Cell::to_value));
         p.insert("__rs_fl".into(), fl.into());
         p.insert("__rs_ord".into(), o.into());
         p.insert("__rs_cls".into(), crate::cls_of(r));
-        p.insert("__rs_lvl".into(), r.get("lvl").cloned().unwrap_or(json!(0)));
-        if r.get("__rs_tunnel").is_some_and(|v| truthy(Some(v))) {
+        p.insert("__rs_lvl".into(), r.get("lvl").map_or(json!(0), Cell::to_value));
+        if truthy(r.get("__rs_tunnel")) {
             p.insert("__rs_tunnel".into(), true.into());
         }
         orders.insert((fl, o));
@@ -437,7 +439,7 @@ pub fn metre_items(ov: &Overlay) -> bool {
 /// _item_pieces: the line items of the overlay `i` on its edges (after edge_overlay) as pieces of the one road layer (`__rs_k` 5): what the
 /// filters read from their edge, `lvl`, their colour `__rs_ic`, their width and offset in metres over cos(latitude) (`__rs_iwm`,
 /// `__rs_iom`, also on the overlay's own features) and their dash as text.
-pub fn item_pieces(ov: &mut Overlay, i: usize, look: &Value) -> Result<Vec<crate::simple::Piece>, String> {
+pub fn item_pieces(ov: &mut Overlay, i: usize, look: &Value) -> Result<Vec<crate::simple::Item>, String> {
     let default = match &look["config"]["overlays"]["color"] { Value::Null => look["theme"]["overlays"]["color"].clone(), c => c.clone() };
     let u = ov.user.clone();
     let col = |k: &str| u[k].as_str().filter(|c| !c.is_empty()).map(String::from);
@@ -477,7 +479,7 @@ pub fn item_pieces(ov: &mut Overlay, i: usize, look: &Value) -> Result<Vec<crate
         if !dash.is_empty() {
             q.insert("__rs_dash", json!(dash.join(",")));
         }
-        out.push(crate::simple::Piece { props: q, coords: (!line.is_empty()).then_some(line) });
+        out.push(crate::simple::Item { props: q, coords: (!line.is_empty()).then_some(line) });
     }
     Ok(out)
 }
@@ -485,8 +487,8 @@ pub fn item_pieces(ov: &mut Overlay, i: usize, look: &Value) -> Result<Vec<crate
 /// _road_items: render's `items=` (the road's own line items, as a FeatureCollection) as pieces of the road layer, with no source or layer
 /// of their own: each names its road in the roads' id column and has `width_m`, and can have `order`, `offset_m`, `color`, `dash`, `pick` (a
 /// picked item is clicked and lit as itself, with its own fields) and `minzoom` (`__rs_imz`). `k`: the items' overlay number.
-pub fn road_items(fc: &Value, roads: &std::collections::HashMap<String, &crate::props::Props>, edge_col: &str, k: usize, look: &Value)
-                  -> Result<Vec<crate::simple::Piece>, String> {
+pub fn road_items(fc: &Value, roads: &std::collections::HashMap<String, Road>, edge_col: &str, k: usize, look: &Value)
+                  -> Result<Vec<crate::simple::Item>, String> {
     let mut ov = Overlay { name: "items".into(), kind: "line", under: false, edge: true, color: Value::Null, outline: Value::Null, opacity: Value::Null,
                            width: Value::Null, radius: Value::Null, visible: true, fc: fc.clone(), l: Value::Null,
                            user: json!({"edge_col": edge_col, "order_col": "order", "color_col": "color", "width_m_col": "width_m",

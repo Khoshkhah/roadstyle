@@ -6,8 +6,9 @@
 //! (the first nearest segment wins a tie; lengths along a line are sums of `sqrt(dx * dx + dy * dy)`). Intersection points are not computed
 //! with GEOS's arithmetic, so a slot can differ from Python's by a rounding step of its 6 decimals.
 
-use crate::read::Feature;
+use crate::road::Roads;
 use crate::roads::truthy;
+use roadstyle_model::Cell;
 use crate::simple::{Line, Pt, KY};
 use indexmap::IndexMap;
 use rstar::{primitives::GeomWithData, primitives::Rectangle, RTree, AABB};
@@ -60,11 +61,11 @@ fn node(c: &Pt) -> (Node, (f64, f64)) {
     ((x.to_bits(), y.to_bits()), (x, y))
 }
 
-fn class_key(v: Option<&Value>) -> String {
+fn class_key(v: Option<Cell>) -> String {
     match v {
-        None | Some(Value::Null) => String::new(),
-        Some(Value::String(s)) => s.clone(),
-        Some(v) => v.to_string(),
+        None => String::new(),
+        Some(c) if c.is_null() => String::new(),
+        Some(c) => c.as_str().map_or_else(|| c.to_value().to_string(), String::from),
     }
 }
 
@@ -209,11 +210,11 @@ struct Rep {
 }
 
 /// The "slots" source.
-pub fn slots_source(roads: &[Feature], look: &SlotLook) -> Value {
-    let hw_of = |i: usize| roads[i].props.get("highway");
+pub fn slots_source(roads: &Roads, look: &SlotLook) -> Value {
+    let hw_of = |i: usize| roads.get(i, "highway");
     // every road's line: what a name or an arrow keeps away from
     let tree: RTree<GeomWithData<Rectangle<[f64; 2]>, usize>> = RTree::bulk_load(roads.iter().enumerate()
-        .filter_map(|(i, f)| f.coords.as_ref().filter(|c| c.len() >= 2).map(|c| {
+        .filter_map(|(i, f)| f.line().filter(|c| c.len() >= 2).map(|c| {
             let (lo, hi) = bbox(c);
             GeomWithData::new(Rectangle::from_corners(lo, hi), i)
         })).collect());
@@ -222,39 +223,39 @@ pub fn slots_source(roads: &[Feature], look: &SlotLook) -> Value {
     let mut by_ends: HashMap<(Node, Node, String), usize> = HashMap::new();
     let mut lines = Vec::new();
     for (i, f) in roads.iter().enumerate() {
-        let Some(c) = f.coords.as_ref().filter(|c| c.len() >= 2) else { continue };
+        let Some(c) = f.line().filter(|c| c.len() >= 2) else { continue };
         let (a, z) = (node(&c[0]), node(&c[c.len() - 1]));
         by_ends.insert((a.0, z.0, class_key(hw_of(i))), i);
         lines.push((i, a, z));
     }
     let mut reps: Vec<Rep> = Vec::new();
     for (i, a, z) in lines {
-        let p = &roads[i].props;
+        let p = roads.road(i);
         if truthy(p.get("__rs_dup")) {
             continue;
         }
         let ck = class_key(hw_of(i));
         let twin = by_ends.get(&(z.0, a.0, ck.clone())).copied();
         if truthy(p.get("__rs_twoway")) {
-            let q_one = twin.is_some_and(|j| truthy(roads[j].props.get("__rs_oneway")));
+            let q_one = twin.is_some_and(|j| truthy(roads.get(j, "__rs_oneway")));
             let mine = (!truthy(p.get("__rs_oneway")), a.1, z.1);
             let other = (!q_one, z.1, a.1);
             if other.partial_cmp(&mine) == Some(std::cmp::Ordering::Less) {
                 continue;
             }
         }
-        let partner = if truthy(p.get("__rs_twoway")) { twin } else { p.get("__rs_edge2").and_then(Value::as_u64).map(|x| x as usize) };
-        reps.push(Rep { a, z, c: roads[i].coords.clone().unwrap(), p: i, owner: (i, partner) });
+        let partner = if truthy(p.get("__rs_twoway")) { twin } else { p.get("__rs_edge2").and_then(Cell::as_u64).map(|x| x as usize) };
+        reps.push(Rep { a, z, c: roads.line(i).unwrap().to_vec(), p: i, owner: (i, partner) });
     }
 
     // groups by (name, level, one-way, class, fill number, tunnel), in the order Python's dict keeps
     let mut groups: IndexMap<String, (Option<String>, Value, bool, Value, bool, Vec<usize>)> = IndexMap::new();
     for (r, rep) in reps.iter().enumerate() {
-        let p = &roads[rep.p].props;
-        let name = p.get("name").and_then(Value::as_str).filter(|s| !s.is_empty()).map(String::from);
-        let lvl = p.get("lvl").cloned().unwrap_or(json!(0));
+        let p = roads.road(rep.p);
+        let name = p.get("name").and_then(Cell::as_str).filter(|s| !s.is_empty()).map(String::from);
+        let lvl = p.get("lvl").map_or(json!(0), Cell::to_value);
         let one = truthy(p.get("__rs_oneway"));
-        let fl = p.get("__rs_fl").cloned().unwrap_or(Value::Null);
+        let fl = p.get("__rs_fl").map_or(Value::Null, Cell::to_value);
         let tun = truthy(p.get("__rs_tunnel"));
         let key = json!([name, lvl, one as u8, class_key(hw_of(rep.p)), fl, tun]).to_string();
         groups.entry(key).or_insert_with(|| (name, lvl, one, fl, tun, Vec::new())).5.push(r);
@@ -309,7 +310,7 @@ pub fn slots_source(roads: &[Feature], look: &SlotLook) -> Value {
         // the group's class: the most common (the first of equal counts)
         let mut count: IndexMap<String, (usize, Value)> = IndexMap::new();
         for e in &edges {
-            let v = roads[e.p].props.get("highway").cloned().unwrap_or(Value::Null);
+            let v = roads.get(e.p, "highway").map_or(Value::Null, Cell::to_value);
             count.entry(v.to_string()).or_insert((0, v)).0 += 1;
         }
         let mut hw = Value::Null;
@@ -339,11 +340,11 @@ pub fn slots_source(roads: &[Feature], look: &SlotLook) -> Value {
                 .map(|(i, w)| { let (lo, hi) = bbox(w); GeomWithData::new(Rectangle::from_corners(lo, hi), i) }).collect()));
             for hit in tree.locate_in_envelope_intersecting(&AABB::from_corners(lo, hi)) {
                 let k = hit.data;
-                let kc = roads[k].coords.as_ref().unwrap();
+                let kc = roads.line(k).unwrap();
                 if mine.contains(&k) || back.contains(&kc.iter().map(|p| (p[0].to_bits(), p[1].to_bits())).collect::<Vec<_>>()) {
                     continue;
                 }
-                let half = look.crossing_half_m(hw_of(k).and_then(Value::as_str), line.lat0);
+                let half = look.crossing_half_m(hw_of(k).and_then(Cell::as_str), line.lat0);
                 let mut meet = |w: &[Pt], v: &[Pt]| {
                     let pts = seg_meet(w[0], w[1], v[0], v[1]);
                     if !pts.is_empty() {
@@ -447,9 +448,9 @@ pub fn slots_source(roads: &[Feature], look: &SlotLook) -> Value {
     // order: __rs_cls before __rs_arw)
     for f in feats.iter_mut() {
         let e = f["properties"]["__rs_edge"].as_u64().unwrap() as usize;
-        f["properties"]["__rs_cls"] = crate::cls_of(&roads[e].props);
-        if let Some(a) = roads[e].props.get("__rs_access").filter(|a| !a.is_null()) {      // access_col: the same for the names and arrows
-            f["properties"]["__rs_access"] = a.clone();
+        f["properties"]["__rs_cls"] = crate::cls_of(roads.road(e));
+        if let Some(a) = roads.get(e, "__rs_access").filter(|a| !a.is_null()) {      // access_col: the same for the names and arrows
+            f["properties"]["__rs_access"] = a.to_value();
         }
     }
     let mut by_chain: IndexMap<i64, Vec<usize>> = IndexMap::new();

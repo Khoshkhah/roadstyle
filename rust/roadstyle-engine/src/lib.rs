@@ -7,6 +7,7 @@
 pub mod colors;
 pub mod contract;
 pub mod decks;
+pub mod draw;
 pub mod export_look;
 pub mod features;
 pub mod full;
@@ -14,13 +15,15 @@ pub mod layers;
 pub mod look;
 pub mod overlays;
 pub mod planner;
+pub mod road;
 pub mod roads;
 pub mod simple;
 pub mod slots;
 
-// The model and the reader keep their paths in this crate (crate::props, crate::read, ...): phase P2 moves files only.
-pub use roadstyle_io::read;
-pub use roadstyle_model::{geom, props};
+// The core has no I/O (docs/design/rust_library.md, rule 3 of the layers): the engine takes the model's types, and the readers
+// (roadstyle-io) are the facade's.
+pub use roadstyle_model::{geom, props, Cell, RoadTable, Row};
+pub use road::{Road, Roads};
 pub(crate) use roadstyle_model::obj;
 
 use serde_json::{json, Value};
@@ -44,8 +47,8 @@ pub(crate) fn cls_col() -> String {
 }
 
 /// The class filter's value of a road (render's fcol).
-pub(crate) fn cls_of(p: &props::Props) -> Value {
-    CLS.with(|c| p.get(&c.borrow()).cloned().unwrap_or(Value::Null))
+pub(crate) fn cls_of(r: Road) -> Value {
+    CLS.with(|c| r.get(&c.borrow()).map_or(Value::Null, Cell::to_value))
 }
 
 /// The warnings of the last calls on this thread, and none after.
@@ -59,9 +62,11 @@ pub fn take_warnings() -> Vec<String> {
 /// ponytail: an estimate from Tartu only; measure a larger area in a browser before the limit goes higher.
 pub const MAX_ROADS: usize = 200_000;
 
-/// A source of the style: typed features (roads, simple) or a GeoJSON source as JSON (the base map, slots).
+/// A source of the style: the roads, the simple pieces (both typed, written from the roads) or a GeoJSON source as JSON (the base
+/// map, slots).
 pub enum Src {
-    Typed(props::Source),
+    Roads(road::RoadsSource),
+    Simple(simple::SimpleSource),
     Json(Value),
 }
 
@@ -80,18 +85,17 @@ pub struct Parts {
 }
 
 /// The style's layers and sources: the roads ("roads", "simple", "slots") and, with `features` (the base-map tables as the worker's SQL
-/// writes them), the base map ("ov<i>"). `look`: look.json (the resolved look); `parquet`: the roads as tools/make_spike_fixture.py (or
-/// the worker's SQL) writes them.
-pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<Parts, String> {
+/// writes them), the base map ("ov<i>"). `look`: look.json (the resolved look); `table`: the roads (roadstyle-io reads them from the
+/// GeoParquet of tools/make_spike_fixture.py or the worker's SQL); `planner`: the route planner's rows.
+pub fn make_parts(mut table: RoadTable, look: &str, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, String> {
     let look_json: Value = serde_json::from_str(look).map_err(|e| format!("look: not JSON: {e}"))?;
     let look = roads::Look::from_json(&look_json)?;
-    let mut feats = read::read_roads(parquet, "geometry")?;
-    if feats.len() > MAX_ROADS {
+    if table.len() > MAX_ROADS {
         return Err(format!("this area has {} roads, and the plugin draws at most {MAX_ROADS} (the browser's memory): use a smaller area",
-                           feats.len()));
+                           table.len()));
     }
     let cols = ColumnMap::from_args(&look_json["args"]);
-    cols.to_engine(&mut feats);
+    cols.to_engine(&mut table);
     // render's filter_col: in the engine's names (a keyword's column has the engine's name; a column with an engine name is kept aside)
     let fcol = look_json["args"]["filter_col"].as_str().filter(|c| !c.is_empty()).map_or_else(|| "highway".to_string(), |f| {
         cols.0.iter().find(|(_, user)| user == f).map(|(own, _)| own.to_string())
@@ -99,7 +103,8 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
             .unwrap_or_else(|| f.to_string())
     });
     CLS.with(|c| *c.borrow_mut() = fcol);
-    compute_levels(&mut feats, &look_json["args"], look.head_m)?;
+    compute_levels(&mut table, &look_json["args"], look.head_m)?;
+    let mut feats = Roads::new(table);
     let colors = roads::mark_roads(&mut feats, &look, &look_json["args"])?;
     let width_col = look_json["args"]["width_m_col"].as_str().filter(|c| !c.is_empty());
     // render's arrows and labels (both on by default): the slots exist only for them
@@ -124,8 +129,8 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     // the line items on the edges (an overlay's lines in metres, render's items=): pieces of the one road layer
     let mut items = Vec::new();
     if (!full && ovs.iter().any(overlays::metre_items)) || !look_json["args"]["items"].is_null() {
-        let by_id: std::collections::HashMap<String, &props::Props> =
-            feats.iter().filter_map(|f| f.props.get("edge_id").map(|e| (overlays::eid(e), &f.props))).collect();
+        let by_id: std::collections::HashMap<String, Road> =
+            feats.iter().filter_map(|f| f.get("edge_id").map(|e| (overlays::eid(e), f))).collect();
         for (i, ov) in ovs.iter_mut().enumerate().filter(|(_, o)| !full && overlays::metre_items(o)) {
             overlays::edge_overlay(ov, &by_id)?;
             items.extend(overlays::item_pieces(ov, i, &look_json)?);
@@ -142,11 +147,11 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
         }
         let named = |k: &str| look_json["args"][k].as_str().is_some_and(|c| !c.is_empty());
         let computed = !named("casing_level_col") && !named("fill_level_col");        // render computes them with the heads
-        let some = |k: &str| feats.iter().any(|f| f.props.get(k).is_some_and(layers::py_truth));
-        let divided = named("casing_start_col") || named("casing_end_col") || computed || some("__rs_split") || feats.iter().any(|f| f.props.contains_key("__rs_twin"));
+        let some = |k: &str| feats.iter().any(|f| f.get(k).is_some_and(layers::py_truth));
+        let divided = named("casing_start_col") || named("casing_end_col") || computed || some("__rs_split") || feats.iter().any(|f| f.contains_key("__rs_twin"));
         Some(full::sources(&feats, &look_json, look.head_m, width_col, divided, &layers::Model::from_look(&look_json)?.classes))
     } else { None };
-    let simple = if full { props::Source { feats: Vec::new(), id_first: false, tolerance: 0.05, maxzoom: None } }
+    let simple = if full { simple::SimpleSource::empty(simple::Cols::new(width_col)) }
                  else { simple::simple_source(&feats, look.head_m, look.bridge_shadow, width_col, items)? };
     // everything that reads the roads is done before this: the roads source takes them
     // export_inline(planner=True): the route planner's graphs, or the number of roads past the limit
@@ -161,16 +166,16 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     let decks = if look_json["args"]["view_3d"] == true {
         // a casing slab names the user's own `highway` column (Python's props.get("highway")): kept aside when highway_col is another
         let hw = if cols.0.iter().any(|(own, _)| *own == "highway") { ColumnMap::kept("highway") } else { "highway".into() };
-        decks::bridge_decks(&roads.feats, &decks::DeckLook::from_config(&look_json["config"]["bridge_decks"]), &layers::Model::from_look(&look_json)?, &hw)
+        decks::bridge_decks(&roads.roads, &decks::DeckLook::from_config(&look_json["config"]["bridge_decks"]), &layers::Model::from_look(&look_json)?, &hw)
     } else { Vec::new() };
-    let (layers, info) = layers::road_layers(&look_json, &roads.feats, &simple.feats, source_features(&slots), !decks.is_empty(), &mut ovs,
+    let (layers, info) = layers::road_layers(&look_json, &roads.roads, &simple, source_features(&slots), !decks.is_empty(), &mut ovs,
                                              &colors.props, colors.active, fsrc.as_ref())?;
     // state "live" (a page with the dashboard, docs/design/rust_library.md "The interaction contract"): the state stays in the expressions,
     // and the style says what the controls show
     let live = look_json["args"]["state"] == "live";
     let (contract, state) = if live {
         let st = contract::page_state(&look_json, colors.active, ovs.len());
-        (Some((contract::controls(&look_json, &roads.feats, info, colors.active)?, st.clone())),
+        (Some((contract::controls(&look_json, &roads.roads, info, colors.active)?, st.clone())),
          Some(Value::Object(st.into_iter().map(|(k, v)| (k, json!({"default": v}))).collect())))
     } else { (None, None) };
     let mut glyphs = (labels && !source_features(&slots).is_empty()).then(|| look_json["theme"]["labels"]["glyphs"].clone());
@@ -178,7 +183,7 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
         glyphs = Some(json!("https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"));
     }
     // render's order: the roads, the two-way end caps (the full look), the overlays (_build_overlays), the 3D decks
-    let mut sources = vec![("roads".to_string(), Src::Typed(roads))];
+    let mut sources = vec![("roads".to_string(), Src::Roads(roads))];
     if let Some(fs) = fsrc.as_mut().filter(|fs| !fs.ends.is_empty()) {
         sources.push(("ends".into(), Src::Json(json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": std::mem::take(&mut fs.ends)}}))));
     }
@@ -208,7 +213,7 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
                 sources.push(("shadows".into(), Src::Json(json!({"type": "geojson", "data": fc(fs.shadows), "generateId": true, "tolerance": tol}))));
             }
         }
-        None => sources.push(("simple".into(), Src::Typed(simple))),
+        None => sources.push(("simple".into(), Src::Simple(simple))),
     }
     if !source_features(&slots).is_empty() {        // as Python: no slots source without slots
         let mut slots = slots;
@@ -271,16 +276,19 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
 }
 
 /// The style as one JSON text, with each source's GeoJSON in it (roadstyle's export_inline).
-pub fn make_style(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, String> {
-    let Parts { name, center, zoom, layers, sources, metadata, glyphs, state } = make_parts(parquet, look, features, planner, name)?;
+pub fn make_style(table: RoadTable, look: &str, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<String, String> {
+    let Parts { name, center, zoom, layers, sources, metadata, glyphs, state } = make_parts(table, look, features, planner, name)?;
     // The sources become text one at a time, and each is freed at once: a big area's sources are the most of the memory (Tartu: the
     // peak went from 4.3 GB to 2.5 GB natively).
     let metadata = metadata.to_string();
     let mut out = format!(r#"{{"version":8,"name":{name},"center":{center},"zoom":{zoom},"layers":{},"sources":{{"#, Value::Array(layers)).into_bytes();
-    for (i, (k, s)) in sources.into_iter().enumerate() {
+    // the roads stay until the end: the simple pieces are written from them
+    let (mut sources, roads) = take_roads(sources);
+    for (i, (k, s)) in sources.drain(..).enumerate() {
         out.extend_from_slice(format!("{}{}:", if i > 0 { "," } else { "" }, Value::from(k)).as_bytes());
         match s {
-            Src::Typed(s) => s.write_json(&mut out),
+            Src::Roads(_) => roads.as_ref().expect("the roads source").write_json(&mut out),
+            Src::Simple(s) => s.write_json(&mut out, &roads.as_ref().ok_or("the simple pieces need the roads source")?.roads),
             Src::Json(s) => serde_json::to_writer(&mut out, &s).unwrap(),
         }
     }
@@ -296,10 +304,22 @@ pub fn make_style(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     Ok(String::from_utf8(out).expect("serde_json writes UTF-8"))
 }
 
+/// The roads source out of the sources (its place keeps an empty `Src::Roads` mark): the other typed sources are written from it.
+pub fn take_roads(mut sources: Vec<(String, Src)>) -> (Vec<(String, Src)>, Option<road::RoadsSource>) {
+    let mut roads = None;
+    for (_, s) in sources.iter_mut() {
+        if let Src::Roads(r) = s {
+            let empty = road::RoadsSource { roads: Roads::new(RoadTable::empty()), tolerance: r.tolerance, maxzoom: r.maxzoom, names: Vec::new() };
+            roads = Some(std::mem::replace(r, empty));
+        }
+    }
+    (sources, roads)
+}
+
 /// roadstyle.export._camera: the centre and the zoom that fit the roads' bounds in a 1024 x 768 px view, as the page's fitBounds.
-fn camera(feats: &[read::Feature]) -> (Value, Value) {
+fn camera(feats: &Roads) -> (Value, Value) {
     let (mut x0, mut y0, mut x1, mut y1) = (f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
-    for c in feats.iter().filter_map(|f| f.coords.as_ref()).flatten() {
+    for c in feats.iter().filter_map(|f| f.line()).flatten() {
         x0 = x0.min(c[0]);
         y0 = y0.min(c[1]);
         x1 = x1.max(c[0]);
@@ -319,7 +339,7 @@ fn source_features(source: &Value) -> &[Value] {
 /// render's level step: with no `casing_level_col` and no `fill_level_col` in the keywords, the drawing positions come from
 /// `compute_levels(method="solve")` with its defaults (render_web.render), on the roads in their order. It writes the columns that
 /// compute_levels writes: casing_start, casing_level, casing_end and fill_level.
-fn compute_levels(feats: &mut [read::Feature], args: &Value, head_m: f64) -> Result<(), String> {
+fn compute_levels(table: &mut RoadTable, args: &Value, head_m: f64) -> Result<(), String> {
     let given = |k: &str| matches!(&args[k], Value::String(s) if !s.is_empty());
     if given("casing_level_col") || given("fill_level_col") {
         return Ok(());
@@ -328,14 +348,17 @@ fn compute_levels(feats: &mut [read::Feature], args: &Value, head_m: f64) -> Res
         return Err(format!("head_m={head_m}: the Rust engine computes the levels with head_m=5 only (compute them first, or use the Python engine)"));
     }
     // the engine's own names: ColumnMap gave the user's columns these names before this step
-    let edges = level_edges(feats, ["highway", "layer", "bridge", "tunnel", "junction"]);
+    let edges = level_edges(table, ["highway", "layer", "bridge", "tunnel", "junction"]);
     let Some(levels) = roadstyle_levels::compute(&edges, roadstyle_levels::Method::Solve)? else { return Ok(()) };
-    for r in levels.rows {
-        let p = &mut feats[r.edge_id as usize].props;
-        for (k, v) in [("casing_start", r.casing_start), ("casing_level", r.casing_level), ("casing_end", r.casing_end), ("fill_level", r.fill_level)] {
-            p.insert(k, v.into());
-        }
+    // one row for each edge, in the edges' order (the edge id is the row)
+    if levels.rows.len() != table.len() || levels.rows.iter().enumerate().any(|(i, r)| r.edge_id != i as i64) {
+        return Err(format!("compute_levels: {} rows for {} roads, not one for each road in its order", levels.rows.len(), table.len()));
     }
+    let col = |f: fn(&roadstyle_levels::Row) -> i64| levels.rows.iter().map(f).collect::<Vec<i64>>();
+    table.set_ints("casing_start", col(|r| r.casing_start));
+    table.set_ints("casing_level", col(|r| r.casing_level));
+    table.set_ints("casing_end", col(|r| r.casing_end));
+    table.set_ints("fill_level", col(|r| r.fill_level));
     Ok(())
 }
 
@@ -360,16 +383,14 @@ impl ColumnMap {
     }
 
     fn kept(own: &str) -> String {
-        format!("__rs_kept_{own}")
+        road::kept(own)
     }
 
-    fn to_engine(&self, feats: &mut [read::Feature]) {
-        for f in feats.iter_mut() {
-            for (own, user) in &self.0 {
-                if f.props.contains_key(user) {
-                    f.props.rename(own, &Self::kept(own));
-                    f.props.rename(user, own);
-                }
+    fn to_engine(&self, table: &mut RoadTable) {
+        for (own, user) in &self.0 {
+            if table.col(user).is_some() {
+                table.rename(own, &Self::kept(own));
+                table.rename(user, own);
             }
         }
     }
@@ -380,22 +401,11 @@ impl ColumnMap {
         }
         for (name, src) in sources.iter_mut() {
             match src {
-                // the roads keep every column: a kept one gets its own name back; the pieces of `simple` have only the class and
-                // the __rs_* marks, so a kept column (an __rs_ name in between) goes away there
-                Src::Typed(s) if name == "roads" || name == "simple" => {
-                    for f in s.feats.iter_mut() {
-                        for (own, user) in &self.0 {
-                            if f.props.rename(own, user) {
-                                if name == "roads" {
-                                    f.props.rename(&Self::kept(own), own);
-                                } else {
-                                    f.props.shift_remove(&Self::kept(own));
-                                }
-                            }
-                        }
-                    }
-                }
-                Src::Typed(s) => s.feats.iter_mut().for_each(|f| self.0.iter().for_each(|(own, _)| { f.props.shift_remove(&Self::kept(own)); })),
+                // the roads keep every column, with the user's names at the output; a kept one gets its own name back
+                Src::Roads(s) => s.names = self.0.clone(),
+                // the pieces of `simple` have only the class and the __rs_* marks: the user's names at the output, and a kept column
+                // (an __rs_ name in between) goes away there
+                Src::Simple(s) => s.names = self.0.clone(),
                 // the 3D decks and the halves are copies of the roads' properties: the user's names, as the roads; the casing pieces
                 // and the bridge shadows have the class and the __rs_* marks: the class's name, and a kept column goes away
                 Src::Json(s) if matches!(name.as_str(), "casings" | "shadows" | "ends") => {
@@ -458,7 +468,11 @@ fn data_settings(sources: &mut [(String, Src)], args: &Value) {
     let tolerance = args["data_tolerance"].as_f64();
     for (_, src) in sources.iter_mut() {
         match src {
-            Src::Typed(s) => {
+            Src::Roads(s) => {
+                s.maxzoom = maxzoom.or(s.maxzoom);
+                s.tolerance = tolerance.unwrap_or(s.tolerance);
+            }
+            Src::Simple(s) => {
                 s.maxzoom = maxzoom.or(s.maxzoom);
                 s.tolerance = tolerance.unwrap_or(s.tolerance);
             }
@@ -490,27 +504,27 @@ fn boundary_fc(b: &Value) -> Option<Value> {
 /// The roads as the level solver reads them, in their order (the edge id is the row: compute_levels works on the frame's rows). `cols`:
 /// the columns of the class, the layer, the bridge, the tunnel and the junction. A value is the text that the tag rules read (Python's
 /// _truthy and int(float(layer)) on the GeoDataFrame's values).
-pub fn level_edges(feats: &[read::Feature], cols: [&str; 5]) -> roadstyle_levels::LevelEdges {
+pub fn level_edges(table: &RoadTable, cols: [&str; 5]) -> roadstyle_levels::LevelEdges {
     let [hw, layer, bridge, tunnel, junction] = cols;
-    let text = |v: Option<&Value>| -> Option<String> {
-        match v? {
+    let text = |v: Option<Cell>| -> Option<String> {
+        match v?.to_value() {
             Value::Null => None,
-            Value::Bool(b) => Some(if *b { "1" } else { "0" }.to_string()),
+            Value::Bool(b) => Some(if b { "1" } else { "0" }.to_string()),
             Value::Number(n) => n.as_f64().filter(|x| !x.is_nan()).map(|_| n.to_string()),
-            Value::String(s) => Some(s.clone()),
+            Value::String(s) => Some(s),
             other => Some(other.to_string()),
         }
     };
     let mut edges = roadstyle_levels::LevelEdges::default();
-    for (i, f) in feats.iter().enumerate() {
+    for i in 0..table.len() {
         edges.add(0, roadstyle_levels::LevelEdge {
             edge_id: i as i64,
-            highway: text(f.props.get(hw)).unwrap_or_default(),
-            tunnel: text(f.props.get(tunnel)),
-            bridge: text(f.props.get(bridge)),
-            layer: text(f.props.get(layer)),
-            junction: text(f.props.get(junction)),
-            geometry: f.coords.as_ref().map_or_else(Vec::new, |c| c.iter().map(|p| (p[0], p[1])).collect()),
+            highway: text(table.get(i, hw)).unwrap_or_default(),
+            tunnel: text(table.get(i, tunnel)),
+            bridge: text(table.get(i, bridge)),
+            layer: text(table.get(i, layer)),
+            junction: text(table.get(i, junction)),
+            geometry: table.line(i).map_or_else(Vec::new, |c| c.iter().map(|p| (p[0], p[1])).collect()),
         });
     }
     edges

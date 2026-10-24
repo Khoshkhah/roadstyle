@@ -54,8 +54,12 @@ jobs:
         run: |
           cargo build --offline --release --target wasm32-unknown-unknown -p roadstyle-wasm
           ls -l target/wasm32-unknown-unknown/release/roadstyle_wasm.wasm
-          # the core builds for wasm32 with no features (docs/design/rust_library.md, rule 3 of the layers)
+          # the core builds for wasm32 with no features, and it has no I/O (the Arrow arrays are the model's data, the Parquet reader is I/O) (docs/design/rust_library.md, rule 3 of the layers)
+          core="-p roadstyle-model -p roadstyle-levels -p roadstyle-engine -p roadstyle-tiles"
+          cargo build --offline --release --target wasm32-unknown-unknown $core --no-default-features
           cargo build --offline --release --target wasm32-unknown-unknown -p roadstyle --no-default-features
+          io=$(cargo tree --offline -e normal --prefix none $core | grep -E '^(roadstyle-io|parquet) ' || true)
+          if [ -n "$io" ]; then echo "the core depends on a reader: $io"; exit 1; fi
 
   python:
     # the Python binding (phase P5): build roadstyle._rust and check that the two engines give the same style

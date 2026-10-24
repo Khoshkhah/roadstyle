@@ -52,7 +52,7 @@ fn bench(look_path: &str, roads_path: &str, features_path: &str) {
     };
     let look_json = json_file(look_path);
     let look = roads::Look::from_json(&look_json).unwrap_or_else(|e| fail(e));
-    let mut feats = read::read_roads(fs::read(roads_path).unwrap(), "geometry").unwrap_or_else(|e| fail(e));
+    let mut feats = roadstyle_rs::Roads::new(read::read_roads(fs::read(roads_path).unwrap(), "geometry").unwrap_or_else(|e| fail(e)));
     mark("read the roads");
     let colors = roads::mark_roads(&mut feats, &look, &look_json["args"]).unwrap_or_else(|e| fail(e));
     mark("mark the roads (colours, pairs, levels)");
@@ -62,18 +62,18 @@ fn bench(look_path: &str, roads_path: &str, features_path: &str) {
     mark("names and arrows (slots)");
     let mut ovs = Vec::new();
     if features_path != "-" {
-        let mut fcs = roadstyle_rs::features::feature_collections(fs::read(features_path).unwrap(), &look_json).unwrap_or_else(|e| fail(e));
+        let mut fcs = roadstyle_rs::features::feature_collections(read::read_table(fs::read(features_path).unwrap(), "geometry").unwrap_or_else(|e| fail(e)), &look_json).unwrap_or_else(|e| fail(e));
         let attached = roadstyle_rs::overlays::edge_attach(&mut fcs, &feats);
         ovs = roadstyle_rs::overlays::feature_overlays(fcs, &look_json, &attached).0;
     }
     mark("base map");
     let roads = roads::roads_source(feats);
     mark("roads source");
-    let layers = layers::road_layers(&look_json, &roads.feats, &simple.feats, features(&slots), false, &mut ovs, &colors.props, colors.active, None).unwrap_or_else(|e| fail(e)).0;
+    let layers = layers::road_layers(&look_json, &roads.roads, &simple, features(&slots), false, &mut ovs, &colors.props, colors.active, None).unwrap_or_else(|e| fail(e)).0;
     mark("layers");
     let mut text = Vec::new();
     roads.write_json(&mut text);
-    simple.write_json(&mut text);
+    simple.write_json(&mut text, &roads.roads);
     serde_json::to_writer(&mut text, &slots).unwrap();
     mark(&format!("the text of the sources ({} MB, {} layers)", text.len() >> 20, layers.len()));
 }
@@ -101,7 +101,7 @@ fn main() {
     if args.len() == 4 && args[1] == "--features" {
         // step 3 check: the base-map feature collections from the worker's features.parquet, as {name: FeatureCollection}
         let data = fs::read(&args[3]).unwrap_or_else(|e| fail(format!("{}: {e}", args[3])));
-        let fcs = roadstyle_rs::features::feature_collections(data, &json_file(&args[2])).unwrap_or_else(|e| fail(e));
+        let fcs = roadstyle_rs::features::feature_collections(read::read_table(data, "geometry").unwrap_or_else(|e| fail(e)), &json_file(&args[2])).unwrap_or_else(|e| fail(e));
         println!("{}", serde_json::to_string(&fcs).unwrap());
         return;
     }
@@ -159,11 +159,11 @@ fn main() {
         return;
     }
     // --layers: the road layers alone, for the 12 subsets of tools/make_layer_goldens.py (no base map)
-    let mut feats = read::read_roads(data, "geometry").unwrap_or_else(|e| fail(format!("{roads_path}: {e}")));
+    let mut feats = roadstyle_rs::Roads::new(read::read_roads(data, "geometry").unwrap_or_else(|e| fail(format!("{roads_path}: {e}"))));
     let colors = roads::mark_roads(&mut feats, &look, &look_json["args"]).unwrap_or_else(|e| fail(e));
     let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow, None, Vec::new()).unwrap_or_else(|e| fail(e));
     let slots = slots::slots_source(&feats, &slot_look);
     let roads = roads::roads_source(feats);
-    let layers = layers::road_layers(&look_json, &roads.feats, &simple.feats, features(&slots), false, &mut [], &colors.props, colors.active, None).unwrap_or_else(|e| fail(e)).0;
+    let layers = layers::road_layers(&look_json, &roads.roads, &simple, features(&slots), false, &mut [], &colors.props, colors.active, None).unwrap_or_else(|e| fail(e)).0;
     println!("{}", json!({"layers": layers}));
 }

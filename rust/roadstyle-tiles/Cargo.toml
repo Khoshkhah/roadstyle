@@ -1,6 +1,8 @@
 [package]
 name = "roadstyle-tiles"
 version.workspace = true
+repository.workspace = true
+homepage.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "roadstyle's vector tiles on request (the rules of tiles.py)"

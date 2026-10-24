@@ -27,7 +27,11 @@ p > em:only-child { color: var(--muted); }
 <body>
 <main>
 <h1 id="roadstyle-as-a-rust-library-the-design-and-the-migration-plan">roadstyle as a Rust library: the design and the migration plan</h1>
-<p><strong>Status:</strong> agreed 2026-10-23: decisions 1 to 8 as recommended, decision 9 open. Nothing in this document is built. It continues <a href="rust_engine.md">One Rust engine for roadstyle</a>
+<p><strong>Status:</strong> agreed 2026-10-23: decisions 1 to 8 as recommended, decision 9 open. Built (2026-10-23, branch <code>rust-engine</code>): P0, P1, P2 (the
+crates), P4's style features (all of render's keywords that change the style, the full look too), P5 (the binding, the wheel, the whole test
+suite with <code>ROADSTYLE_ENGINE=rust</code>), the output side of P3's contract (<code>roadstyle:contract</code>, <code>roadstyle:state</code>, <code>roadstyle:controls</code>,
+<code>docs/reference/contract.md</code>) and of P6 the page writer, the PMTiles writer, <code>export_look</code> and the runtime API (<code>rs</code>). Release 0.25.0 (2026-10-23): the Rust engine as an experimental option, with wheels for five platforms. Design phase: (a) the pure core is done (the engine takes the model types; the readers are the facade's). Open: P3's typed look
+and the layer roles, P6's npm packages and <code>Tiler.restyle</code>, the level options of <code>compute_levels</code> in Rust, P7. It continues <a href="rust_engine.md">One Rust engine for roadstyle</a>
 (steps 1 and 3 are done) and uses <a href="style_config.md">The style in a config file</a> and
 <a href="core_model_and_views.md">A general core: roads, items, and views</a>. The decisions are in
 <a href="#decisions">Decisions</a>.</p>
@@ -1703,764 +1707,11 @@ git grep -ohE 'roadstyle:[a-z_]+' -- src rust | sort -u                         
 git grep -ohE '__[A-Z][A-Z0-9_]+__' -- src/roadstyle/static/web_template.html | sort -u   # the page placeholders
 git grep -nE 'localStorage|--rs-' -- src/roadstyle/static                          # the stored keys and the CSS variables
 </code></pre>
-<p>In P3 these tables move to <code>docs/reference/contract.md</code>, and a test (<code>tests/test_contract_names.py</code>) runs the same searches and fails
+<p>These tables are in <code>docs/reference/contract.md</code> now, and a test (<code>tests/test_contract_names.py</code>) runs the same searches and fails
 when the code has a name that the reference does not have, or the reverse.</p>
-<h4 id="the-page-and-control-variables">The page and control variables</h4>
-<p>"Run time" says whether a page can change the value after it opens. "Gap" marks a value that a page cannot change today and that the
-contract makes changeable (or a value that is not used).</p>
-<table>
-<thead>
-<tr>
-<th>Variable</th>
-<th>Type, default</th>
-<th>Set in</th>
-<th>Read by</th>
-<th>Run time</th>
-<th>API</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>name</code> (title)</td>
-<td>text, <code>"roadstyle"</code></td>
-<td><code>render</code> keyword; look <code>args.name</code>; style <code>name</code></td>
-<td>page title, host panel</td>
-<td>no</td>
-<td></td>
-</tr>
-<tr>
-<td><code>style</code></td>
-<td>the style object, or null (the roads come later)</td>
-<td><code>rsDashboard</code> option</td>
-<td>every control</td>
-<td>yes</td>
-<td><code>setStyle</code>; <code>restyle</code> (planned)</td>
-</tr>
-<tr>
-<td><code>prefix</code></td>
-<td>text, <code>""</code></td>
-<td><code>rsDashboard</code> option</td>
-<td>every control that finds a roads layer or source</td>
-<td>no</td>
-<td></td>
-</tr>
-<tr>
-<td><code>engine.props</code></td>
-<td><code>(row) =&gt; Promise&lt;props&gt;</code></td>
-<td><code>rsDashboard</code> option</td>
-<td><code>select.js</code> (click, <code>rsSelect</code>, the tooltip, the twin <code>__rs_edge2</code>)</td>
-<td></td>
-<td>the engine port</td>
-</tr>
-<tr>
-<td><code>engine.restyle</code></td>
-<td><code>(change) =&gt; Promise&lt;StylePatch&gt;</code></td>
-<td><code>rsDashboard</code> option</td>
-<td>the controls that need the engine</td>
-<td></td>
-<td>the engine port (planned)</td>
-</tr>
-<tr>
-<td><code>basemaps</code>, <code>basemap</code></td>
-<td>keys, <code>DEFAULT_SWITCHER</code>, <code>"voyager"</code></td>
-<td><code>render</code>; <code>rsDashboard</code> option (<code>BASEMAPS</code>)</td>
-<td><code>basemap.js</code></td>
-<td>yes</td>
-<td><code>rsSetBasemap</code>; <code>rs:basemapchange</code>; <code>window.RS_BASEMAPS</code></td>
-</tr>
-<tr>
-<td><code>basemap_switcher</code></td>
-<td>bool, true</td>
-<td><code>render</code>; option</td>
-<td><code>basemap.js</code></td>
-<td>no</td>
-<td></td>
-</tr>
-<tr>
-<td><code>api_key</code></td>
-<td>text</td>
-<td><code>render</code>, <code>set_api_key</code></td>
-<td>the base-map URL</td>
-<td>no</td>
-<td></td>
-</tr>
-<tr>
-<td><code>zoom_readout</code></td>
-<td>bool, true</td>
-<td><code>render</code>; option</td>
-<td><code>zoom.js</code></td>
-<td>no</td>
-<td></td>
-</tr>
-<tr>
-<td><code>pitch</code>, <code>bearing</code>, <code>max_pitch</code></td>
-<td>numbers, none, none, 70</td>
-<td><code>render</code>; <code>defaults.json</code> camera</td>
-<td>the map</td>
-<td>the camera: yes; <code>max_pitch</code>: no</td>
-<td>gap: no getter or setter of the camera (only <code>rsFocus</code>)</td>
-</tr>
-<tr>
-<td><code>pitch_3d</code></td>
-<td>number, 55</td>
-<td><code>defaults.json</code>; option</td>
-<td><code>view3d.js</code></td>
-<td>yes</td>
-<td><code>rsSetView3D</code>; <code>rs:viewchange</code></td>
-</tr>
-<tr>
-<td><code>view_3d</code> (bridge decks)</td>
-<td>bool, false</td>
-<td><code>render</code>; look <code>args.view_3d</code></td>
-<td>engine (deck layers)</td>
-<td>no: the decks are in the style or not</td>
-<td></td>
-</tr>
-<tr>
-<td>3D buildings</td>
-<td>an overlay (<code>roadstyle:group</code> = <code>buildings 3D</code>)</td>
-<td>engine (mapstyle features)</td>
-<td>the Layers box only when Python gives <code>overlays</code></td>
-<td>gap: a Rust style has no overlay list for the dashboard</td>
-<td><code>rsSetOverlay</code></td>
-</tr>
-<tr>
-<td><code>find_control</code></td>
-<td>bool, false</td>
-<td><code>render</code>; option</td>
-<td><code>find.js</code></td>
-<td>no</td>
-<td><code>rsFind</code></td>
-</tr>
-<tr>
-<td>find fields</td>
-<td>the popup fields, and <code>edge_id_col</code> and <code>edge_ref</code> (<code>_ID_KEYS</code>)</td>
-<td><code>road_popup</code>, <code>edge_id_col</code></td>
-<td><code>find.js</code></td>
-<td>no</td>
-<td><code>rsFind</code></td>
-</tr>
-<tr>
-<td><code>edge_id_col</code></td>
-<td>text, <code>"edge_id"</code></td>
-<td><code>render</code>; option</td>
-<td><code>find.js</code>, <code>select.js</code></td>
-<td>no</td>
-<td></td>
-</tr>
-<tr>
-<td><code>road_popup</code></td>
-<td>false, null (every field) or fields; <code>DEFAULT_ROAD_POPUP</code></td>
-<td><code>render</code>; <code>roadstyle:interaction.popup</code>; option</td>
-<td><code>select.js</code>, <code>find.js</code></td>
-<td>gap</td>
-<td></td>
-</tr>
-<tr>
-<td><code>popup_mode</code></td>
-<td><code>"popup"</code> or <code>"panel"</code></td>
-<td><code>render</code>; option</td>
-<td><code>panel.js</code> and every docked control</td>
-<td>no</td>
-<td></td>
-</tr>
-<tr>
-<td><code>road_tooltip</code>, <code>tooltip</code></td>
-<td>false, true or fields</td>
-<td><code>render</code>; look <code>args.tooltip</code>; <code>roadstyle:interaction.tooltip</code></td>
-<td><code>select.js</code></td>
-<td>gap</td>
-<td></td>
-</tr>
-<tr>
-<td><code>hover_delay_ms</code></td>
-<td>ms, 300</td>
-<td><code>render</code>; <code>roadstyle:interaction</code>; option; <code>_TIP_DELAY</code></td>
-<td><code>select.js</code>, <code>overlays.js</code></td>
-<td>gap</td>
-<td></td>
-</tr>
-<tr>
-<td><code>copy_field</code></td>
-<td>text, <code>"edge_id"</code></td>
-<td>look <code>args.copy_field</code> (mapstyle passes it)</td>
-<td>folium only</td>
-<td>gap: not used by the web page</td>
-<td></td>
-</tr>
-<tr>
-<td><code>hover_color</code></td>
-<td>color, <code>selection.hover</code> (<code>#b388ff</code>)</td>
-<td><code>render</code>; the palette</td>
-<td>engine: a literal in each highlight expression</td>
-<td>gap: fixed in the style; <code>__HOVER_COLOR__</code> is replaced (<code>render_web.py:3784</code>) but the template has no such placeholder</td>
-<td>new: <code>rs_hover</code></td>
-</tr>
-<tr>
-<td><code>select_color</code></td>
-<td>color, <code>selection.select</code> (<code>#7c4dff</code>)</td>
-<td><code>render</code>; the palette; option (Google 3D line)</td>
-<td>engine (literal), <code>google3d.js</code></td>
-<td>gap: fixed in the style</td>
-<td>new: <code>rs_select</code></td>
-</tr>
-<tr>
-<td>the glow</td>
-<td><code>selection.opacity</code> 0.85, <code>glow_opacity</code> 0.35 (palette); the width of the fill (simple mode)</td>
-<td>the palette</td>
-<td>engine (<code>_simple_color(glow=...)</code>)</td>
-<td>gap: fixed</td>
-<td>new: <code>rs_glow</code></td>
-</tr>
-<tr>
-<td><code>filter</code></td>
-<td><code>{on, col, classes, swatches, palettes, bridges, tunnels, access}</code>, off</td>
-<td><code>render</code> (<code>filter_control</code>, <code>filter_col</code>, <code>access_col</code>); option</td>
-<td><code>filter.js</code>, <code>views.js</code></td>
-<td>yes</td>
-<td><code>rsSetClasses</code>, <code>rsSetBridges</code>, <code>rsSetTunnels</code>, <code>rsSetAccess</code>, <code>rsGetAccess</code>, <code>rsFilter</code>; <code>rs:filterchange</code>; <code>window.RS_CLASSES</code>, <code>RS_CLASS_COL</code>, <code>RS_CLASS_COLORS</code>, <code>RS_ACCESS</code></td>
-</tr>
-<tr>
-<td>access colors</td>
-<td><code>access.private</code>, <code>bus</code>, <code>pedestrian</code>, <code>delivery</code> (palette)</td>
-<td>the palette</td>
-<td>engine (<code>__rs_access</code> colors)</td>
-<td>no</td>
-<td></td>
-</tr>
-<tr>
-<td><code>color_options</code></td>
-<td><code>[{name, prop, legend}]</code></td>
-<td><code>render</code>; <code>roadstyle:color_options</code>; option</td>
-<td><code>color.js</code>, <code>legend.js</code>, <code>views.js</code></td>
-<td>the choice: yes; a new option: <code>restyle</code></td>
-<td><code>rsSetColorField</code>; <code>rs:colorchange</code>; <code>window.RS_COLOR_OPTIONS</code></td>
-</tr>
-<tr>
-<td>the legend</td>
-<td><code>{title, kind, entries}</code> or <code>{title, kind, ramp, vmin, vmax}</code></td>
-<td>the data styler (<code>bake_color_options</code>)</td>
-<td><code>legend.js</code></td>
-<td>follows the option</td>
-<td>gap: the metadata does not give the active option</td>
-</tr>
-<tr>
-<td><code>color_active</code></td>
-<td>index or name, 0</td>
-<td><code>render</code>; option</td>
-<td><code>color.js</code></td>
-<td>yes</td>
-<td><code>rs_co</code></td>
-</tr>
-<tr>
-<td>host colors</td>
-<td><code>[{color, ids}]</code></td>
-<td>the host page</td>
-<td>the fill and item expressions</td>
-<td>yes</td>
-<td><code>rsColor</code>, <code>rsColorBase</code>; <code>rs:colorchange</code></td>
-</tr>
-<tr>
-<td><code>road_fill</code></td>
-<td><code>{on, paint}</code>, on</td>
-<td><code>render</code>; option</td>
-<td><code>color.js</code></td>
-<td>yes</td>
-<td><code>rsSetRoadFill</code>; <code>rs:roadfillchange</code></td>
-</tr>
-<tr>
-<td><code>overlays</code></td>
-<td><code>[{label, source, layers, popup, tooltip, interactive, under, base, select, color, visible, popup_window}]</code></td>
-<td><code>render</code> (<code>Overlay</code>); option</td>
-<td><code>core.js</code>, <code>overlays.js</code>, <code>filter.js</code>, <code>select.js</code></td>
-<td>visibility, color: yes</td>
-<td><code>rsSetOverlay</code>; <code>rs:overlaychange</code>; <code>window.RS_OVERLAYS</code></td>
-</tr>
-<tr>
-<td><code>overlay_control</code>, <code>overlay_popup</code></td>
-<td>bool, true</td>
-<td><code>render</code>; option</td>
-<td><code>overlays.js</code></td>
-<td>no</td>
-<td></td>
-</tr>
-<tr>
-<td><code>items</code>, <code>items_popup</code></td>
-<td><code>{label, popup, layer}</code> or null</td>
-<td><code>render</code>; option</td>
-<td><code>select.js</code></td>
-<td>no</td>
-<td></td>
-</tr>
-<tr>
-<td><code>tunnel</code></td>
-<td><code>{layers, control, strength, palette, palettes, ratio, ratios, toward, towards, to, steps}</code></td>
-<td><code>render</code> (<code>tunnel_control</code>) and the look (<code>tunnels</code>)</td>
-<td><code>tunnel.js</code>, <code>arrows.js</code></td>
-<td>yes</td>
-<td><code>rsSetTunnelStyle</code>; <code>rs:tunnelchange</code>; <code>window.RS_TUNNEL_PALETTES</code>, <code>RS_TUNNEL_TOWARDS</code></td>
-</tr>
-<tr>
-<td>the bridge look</td>
-<td>casing color and width, shadow, deck (look <code>bridges</code>)</td>
-<td>the look</td>
-<td>engine</td>
-<td>no</td>
-<td></td>
-</tr>
-<tr>
-<td><code>views</code></td>
-<td><code>{name: {setting: value}}</code></td>
-<td><code>render</code>; option</td>
-<td><code>views.js</code></td>
-<td>yes</td>
-<td><code>rsSetView</code>; <code>rs:viewselect</code>; <code>window.RS_VIEWS</code></td>
-</tr>
-<tr>
-<td><code>palette</code> (views)</td>
-<td>text</td>
-<td><code>render</code>; views</td>
-<td>engine (<code>rs_palette</code>)</td>
-<td>yes, among the palettes that the views name</td>
-<td><code>rsSetView</code></td>
-</tr>
-<tr>
-<td><code>arrows</code>, <code>labels</code></td>
-<td>bool, true</td>
-<td><code>render</code>; look <code>args</code></td>
-<td>engine</td>
-<td>gap: no switch at run time (a visibility change is enough)</td>
-<td></td>
-</tr>
-<tr>
-<td><code>arrow_icon</code>, <code>arrow_color</code>, <code>arrow_rules</code></td>
-<td>the look (<code>arrows</code>, <code>labels.base_size</code>)</td>
-<td>option</td>
-<td><code>arrows.js</code></td>
-<td>no</td>
-<td></td>
-</tr>
-<tr>
-<td><code>street_view</code></td>
-<td><code>"window"</code>, true, false</td>
-<td><code>render</code>; option</td>
-<td><code>streetview.js</code>, <code>svspot.js</code></td>
-<td>yes</td>
-<td><code>rsSetStreetView</code>; <code>rs:streetviewchange</code></td>
-</tr>
-<tr>
-<td>Street View mode</td>
-<td><code>"linked"</code> or classic</td>
-<td><code>localStorage</code> <code>rs-street-view-mode</code></td>
-<td><code>streetview.js</code></td>
-<td>yes</td>
-<td>the window's buttons</td>
-</tr>
-<tr>
-<td><code>street_view_key</code></td>
-<td>text, <code>GOOGLE_MAPS_KEY</code></td>
-<td><code>render</code>; option</td>
-<td><code>streetview.js</code>, <code>google3d.js</code></td>
-<td>no</td>
-<td></td>
-</tr>
-<tr>
-<td>Street View spot and marker</td>
-<td><code>{edge, m}</code></td>
-<td>the click; the host</td>
-<td><code>svspot.js</code></td>
-<td>yes</td>
-<td><code>rsSetStreetViewMarkerAt</code>, <code>rsSetStreetViewMarker</code>, <code>rsStreetViewStep</code>, <code>rsGetStreetViewSpot</code>; <code>rs:streetviewmove</code>, <code>rs:streetviewspot</code></td>
-</tr>
-<tr>
-<td><code>google_3d</code></td>
-<td>bool, false</td>
-<td><code>render</code>; option</td>
-<td><code>google3d.js</code></td>
-<td>yes</td>
-<td><code>rsSetGoogle3D</code>; <code>rs:google3dchange</code></td>
-</tr>
-<tr>
-<td>the place of the two windows</td>
-<td><code>{left, top, width, height}</code></td>
-<td><code>localStorage</code> <code>rs-street-view-window:&lt;path&gt;</code>, <code>rs-google-3d-window:&lt;path&gt;</code></td>
-<td><code>float.js</code></td>
-<td>yes</td>
-<td></td>
-</tr>
-<tr>
-<td><code>side_panel_html</code>, <code>host_panel_width</code></td>
-<td>HTML, 320 px</td>
-<td><code>render</code></td>
-<td>the page, <code>panel.js</code></td>
-<td>open or closed: yes</td>
-<td><code>rsPanelShow</code>; <code>localStorage</code> <code>rs-host-panel:&lt;path&gt;</code></td>
-</tr>
-<tr>
-<td><code>--rs-side</code></td>
-<td>CSS length</td>
-<td><code>panel.js</code></td>
-<td><code>dashboard.css</code> (the controls on the right move with the panel)</td>
-<td>yes</td>
-<td></td>
-</tr>
-<tr>
-<td>the theme of the page (light, dark)</td>
-<td>none on the map page; <code>data-theme</code> on the sidebars of <code>render_dashboard</code> and <code>render_report</code></td>
-<td><code>templates/*.html</code></td>
-<td>the sidebars</td>
-<td>the sidebars: yes</td>
-<td>gap: <code>dashboard.css</code> and <code>popup.css</code> have literal colors and one CSS variable (<code>--rs-side</code>)</td>
-</tr>
-<tr>
-<td><code>simple</code>, <code>tiles</code>, <code>fill_layers</code></td>
-<td>the mode and the road fill layer ids</td>
-<td><code>render</code>; option</td>
-<td><code>core.js</code>, <code>select.js</code>, <code>svspot.js</code></td>
-<td>no</td>
-<td></td>
-</tr>
-<tr>
-<td><code>compress</code>, <code>data_maxzoom</code>, <code>data_tolerance</code></td>
-<td></td>
-<td><code>render</code></td>
-<td>engine</td>
-<td>no</td>
-<td></td>
-</tr>
-<tr>
-<td><code>boundary</code></td>
-<td>the outline</td>
-<td><code>render</code></td>
-<td>engine</td>
-<td>no</td>
-<td></td>
-</tr>
-<tr>
-<td>page self-checks</td>
-<td><code>window.__rs_gz</code>, <code>window.__rs_tiles</code></td>
-<td><code>_INFLATE_JS</code>, <code>_TILES_JS</code></td>
-<td>the page's banner</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td><code>window.map</code></td>
-<td>the map</td>
-<td>the page</td>
-<td>the level editor, host scripts</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td>URL parameters</td>
-<td>none today</td>
-<td></td>
-<td></td>
-<td></td>
-<td>new: <code>#rs=</code> (<code>getState</code>, <code>setState</code>)</td>
-</tr>
-</tbody>
-</table>
-<h4 id="the-global-state-rs_">The global state <code>rs_*</code></h4>
-<p>The style reads each one with <code>["global-state", name]</code> (<code>_gs()</code> in <code>render_web.py</code>, <code>gs()</code> in <code>layers.rs</code>). In P3 the engine lists them
-with their start values in <code>roadstyle:state</code>.</p>
-<table>
-<thead>
-<tr>
-<th>Name</th>
-<th>Type</th>
-<th>Start value</th>
-<th>Values</th>
-<th>Read by</th>
-<th>Set by</th>
-<th>API</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>rs_co</code></td>
-<td>integer</td>
-<td><code>color_active</code></td>
-<td>0 to the number of options - 1</td>
-<td>the fill pieces and items (<code>match</code> on the option)</td>
-<td>Colour by menu, views</td>
-<td><code>rsSetColorField</code>; <code>rs:colorchange</code></td>
-</tr>
-<tr>
-<td><code>rs_colors</code></td>
-<td>object: edge index to color</td>
-<td><code>{}</code></td>
-<td>colors</td>
-<td>the fills, items, end caps, attached overlays (<code>_painted</code>)</td>
-<td>host page</td>
-<td><code>rsColor</code>; <code>rs:colorchange</code></td>
-</tr>
-<tr>
-<td><code>rs_base</code></td>
-<td>object: edge index to color</td>
-<td><code>{}</code></td>
-<td>colors</td>
-<td>the same, under <code>rs_colors</code></td>
-<td>host page</td>
-<td><code>rsColorBase</code></td>
-</tr>
-<tr>
-<td><code>rs_fill_on</code></td>
-<td>bool</td>
-<td><code>road_fill</code></td>
-<td></td>
-<td>the fill pieces' opacity</td>
-<td>road fill switch, views</td>
-<td><code>rsSetRoadFill</code>; <code>rs:roadfillchange</code></td>
-</tr>
-<tr>
-<td><code>rs_ov_&lt;i&gt;</code></td>
-<td>object: feature id to color</td>
-<td><code>{}</code></td>
-<td>colors</td>
-<td>the paint of overlay <code>i</code></td>
-<td>host page</td>
-<td><code>rsColor(..., overlay)</code></td>
-</tr>
-<tr>
-<td><code>rs_palette</code></td>
-<td>text</td>
-<td>the start palette</td>
-<td>the palettes that the views name</td>
-<td>each color that differs between these palettes (<code>__rs_fill@&lt;palette&gt;</code> and the paint values)</td>
-<td>View menu</td>
-<td><code>rsSetView</code>; <code>rs:viewselect</code></td>
-</tr>
-<tr>
-<td><code>rs_tun_strength</code></td>
-<td>number</td>
-<td><code>tunnel_strength</code> (60)</td>
-<td>0 to 100 (<code>steps</code>)</td>
-<td>each tunnel color</td>
-<td>Tunnels box</td>
-<td><code>rsSetTunnelStyle</code>; <code>rs:tunnelchange</code></td>
-</tr>
-<tr>
-<td><code>rs_tun_toward</code></td>
-<td>color</td>
-<td><code>tunnel_toward</code> (Sand <code>#d6cfc4</code>)</td>
-<td><code>towards</code>, or any <code>#rrggbb</code></td>
-<td>the same</td>
-<td>Tunnels box</td>
-<td>the same</td>
-</tr>
-<tr>
-<td><code>rs_tun_two</code></td>
-<td>bool</td>
-<td>the palette has two colors</td>
-<td></td>
-<td>the tunnel casing</td>
-<td>Tunnels box</td>
-<td>the same</td>
-</tr>
-<tr>
-<td><code>rs_tun_c0</code>, <code>rs_tun_c1</code></td>
-<td>colors</td>
-<td><code>tunnel_palettes[tunnel_palette]</code></td>
-<td>the palettes</td>
-<td>the tunnel casing dash and gap</td>
-<td>Tunnels box</td>
-<td>the same</td>
-</tr>
-<tr>
-<td><code>rs_tun_ratio</code></td>
-<td><code>[dash, gap]</code></td>
-<td><code>tunnel_casing_dash</code> (<code>[1, 1]</code>)</td>
-<td><code>ratios</code></td>
-<td>the tunnel casing dash layer</td>
-<td>Tunnels box</td>
-<td>the same</td>
-</tr>
-<tr>
-<td>new: <code>rs_hover</code>, <code>rs_select</code></td>
-<td>colors</td>
-<td><code>selection.hover</code>, <code>selection.select</code></td>
-<td>colors</td>
-<td>every highlight expression</td>
-<td>host page</td>
-<td><code>setSelectionStyle</code></td>
-</tr>
-<tr>
-<td>new: <code>rs_glow</code></td>
-<td>number</td>
-<td><code>selection.glow_opacity</code></td>
-<td>0 to 1</td>
-<td>the simple-mode glow</td>
-<td>host page</td>
-<td><code>setSelectionStyle</code></td>
-</tr>
-</tbody>
-</table>
-<p>With <code>state: baked</code> (the export, RustGIS), the engine writes the start values in place of these expressions.</p>
-<h4 id="the-feature-properties-__rs_">The feature properties <code>__rs_*</code></h4>
-<p>66 names. None is public for a host page: a host reads the data columns and the API. "Dashboard" marks the names that the dashboard
-reads (the internal contract between the engine and the dashboard of the same version). "Leaflet" marks the names of the Leaflet spec
-(<code>emit.to_spec</code>, <code>static/roadstyle.js</code>). Each one goes into a typed field of the render model, and the engine writes the property only
-when a layer reads it.</p>
-<table>
-<thead>
-<tr>
-<th>Names</th>
-<th>Meaning</th>
-<th>Written by</th>
-<th>Read by</th>
-<th>Kind</th>
-<th>Replaced by</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>__rs_fill</code>, <code>__rs_w</code>, <code>__rs_op</code>, <code>__rs_dash</code>, <code>__rs_casing</code>, <code>__rs_cw</code>, <code>__rs_cop</code>, <code>__rs_class</code></td>
-<td>the class style of the edge: fill color, width, opacity, dash, casing color, casing width, casing opacity, class</td>
-<td><code>stylers.bake_props</code>, <code>roads.rs</code></td>
-<td>engine layers, <code>color.js</code> (<code>__rs_fill</code>), Leaflet</td>
-<td>dashboard (<code>__rs_fill</code>), Leaflet</td>
-<td><code>RoadDraw.class</code> + the look; the layer expressions read the class</td>
-</tr>
-<tr>
-<td><code>__rs_fill__&lt;i&gt;</code> (<code>__rs_fill__1</code>, ...), <code>__rs_fill@&lt;palette&gt;</code>, <code>__rs_fill__b</code>, <code>__rs_color</code></td>
-<td>the fill of color option <code>i</code>, of a palette of a view, the twin's fill (end caps), the <code>color_table</code> column</td>
-<td><code>bake_color_options</code>, <code>_merge_palettes</code>, <code>render.py</code></td>
-<td>engine, <code>color.js</code></td>
-<td>dashboard (<code>__rs_fill__&lt;i&gt;</code>)</td>
-<td><code>RoadDraw.look</code> paint columns (task 1)</td>
-</tr>
-<tr>
-<td><code>__rs_cl</code>, <code>__rs_fl</code>, <code>__rs_cs</code>, <code>__rs_ce</code></td>
-<td>the casing (main), fill, casing start and casing end numbers</td>
-<td><code>_mark_levels</code>, <code>roads.rs</code></td>
-<td>engine</td>
-<td>internal</td>
-<td><code>RoadDraw.levels</code></td>
-</tr>
-<tr>
-<td><code>__rs_hs</code>, <code>__rs_he</code>, <code>__rs_cap</code>, <code>__rs_cap0</code>, <code>__rs_cap1</code>, <code>__rs_split</code></td>
-<td>the head lengths, the cap of both ends, of each end, two different ends</td>
-<td><code>render</code> (the head columns), <code>_mark_caps</code></td>
-<td>engine</td>
-<td>internal</td>
-<td><code>RoadDraw.ends</code></td>
-</tr>
-<tr>
-<td><code>__rs_band</code></td>
-<td>always 0 since the positions</td>
-<td><code>_mark_levels</code></td>
-<td>engine</td>
-<td>internal</td>
-<td>removed</td>
-</tr>
-<tr>
-<td><code>__rs_twoway</code>, <code>__rs_oneway</code>, <code>__rs_dup</code>, <code>__rs_twin</code>, <code>__rs_pair</code></td>
-<td>two directions, the arrow, the second edge of a single-line pair, the edge of the shared casing, the shared casing</td>
-<td><code>_mark_twoway</code>, <code>_mark_single_line</code>, <code>_mark_twin_casing</code></td>
-<td>engine, <code>arrows.js</code>, <code>svspot.js</code> (<code>__rs_twoway</code>), <code>select.js</code> (<code>__rs_dup</code>)</td>
-<td>dashboard (<code>__rs_twoway</code>, <code>__rs_dup</code>)</td>
-<td><code>RoadDraw.direction</code> and the derived <code>twin</code>, <code>single_line</code></td>
-</tr>
-<tr>
-<td><code>__rs_bridge</code>, <code>__rs_tunnel</code>, <code>__rs_access</code>, <code>__rs_lvl</code></td>
-<td>the bridge look, the tunnel look, the access kind, the tag level of an attached item</td>
-<td><code>_mark_lvl</code>, <code>access_col</code>, <code>_edge_overlay</code></td>
-<td>engine, <code>filter.js</code> (<code>__rs_access</code>, <code>__rs_lvl</code>)</td>
-<td>dashboard (<code>__rs_access</code>, <code>__rs_lvl</code>)</td>
-<td><code>RoadDraw.structure</code>, <code>RoadDraw.look.access</code></td>
-</tr>
-<tr>
-<td><code>__rs_cls</code></td>
-<td>the class column of the edge on every piece, name and arrow (for the class filter)</td>
-<td><code>_mark_cls</code>, <code>roads.rs</code>, <code>slots.rs</code></td>
-<td><code>filter.js</code></td>
-<td>dashboard</td>
-<td>the edge label: the dashboard reads the class through the edge</td>
-</tr>
-<tr>
-<td><code>__rs_edge</code>, <code>__rs_edge2</code>, <code>__rs_edges</code></td>
-<td>the edge label: the edge's row, the twin's row, the rows of a shadow or a deck</td>
-<td>every generator</td>
-<td><code>core.js</code>, <code>filter.js</code>, <code>select.js</code>, <code>arrows.js</code>, the level editor</td>
-<td>dashboard</td>
-<td>the edge label of each piece (render model)</td>
-</tr>
-<tr>
-<td><code>__rs_k</code>, <code>__rs_s</code></td>
-<td>the kind of piece (0 casing, 1 fill, 2 shadow, 3 tunnel gap, 4 tunnel dash, 5 item) and its sort key</td>
-<td><code>_simple_pieces</code>, <code>simple.rs</code></td>
-<td>engine, <code>core.js</code>, <code>svspot.js</code> (<code>__rs_k</code>)</td>
-<td>dashboard (<code>__rs_k</code>)</td>
-<td><code>DrawKey</code></td>
-</tr>
-<tr>
-<td><code>__rs_main</code>, <code>__rs_seam</code>, <code>__rs_lap</code>, <code>__rs_stub</code>, <code>__rs_nocase</code></td>
-<td>the main casing piece, a seam, a lap, an end stub, an end cap with no casing ring</td>
-<td><code>_casing_parts</code>, <code>simple.rs</code>, <code>_twin_ends</code></td>
-<td>engine</td>
-<td>internal</td>
-<td>the piece generators</td>
-</tr>
-<tr>
-<td><code>__rs_wm</code>, <code>__rs_cm</code>, <code>__rs_twm</code></td>
-<td>the width, the casing and the pair width in metres (over cos of the latitude)</td>
-<td><code>_mark_width_m</code></td>
-<td>engine</td>
-<td>internal</td>
-<td><code>RoadDraw.look.width_m</code></td>
-</tr>
-<tr>
-<td><code>__rs_ord</code>, <code>__rs_ov</code>, <code>__rs_item</code>, <code>__rs_ic</code>, <code>__rs_iwm</code>, <code>__rs_iom</code>, <code>__rs_imz</code>, <code>__rs_pick</code></td>
-<td>an attached object's order, its overlay, its row, color, width and offset in metres, minzoom, and "pick it as itself"</td>
-<td><code>_edge_overlay</code>, <code>_item_pieces</code>, <code>_road_items</code></td>
-<td>engine, <code>select.js</code> (<code>__rs_pick</code>)</td>
-<td>dashboard (<code>__rs_pick</code>)</td>
-<td><code>Attachment</code></td>
-</tr>
-<tr>
-<td><code>__rs_arw</code></td>
-<td>the number of an arrow slot (for the export's thinning)</td>
-<td><code>_annotation_slots</code>, <code>slots.rs</code></td>
-<td>engine</td>
-<td>internal</td>
-<td>the slot attachments</td>
-</tr>
-<tr>
-<td><code>__rs_base</code>, <code>__rs_height</code>, <code>__rs_casing_slab</code>, <code>__rs_chain</code></td>
-<td>a 3D deck's base and height, its casing slab, its chain</td>
-<td><code>_bridge_decks</code></td>
-<td>engine, <code>select.js</code> (<code>__rs_casing_slab</code>)</td>
-<td>dashboard (<code>__rs_casing_slab</code>)</td>
-<td>the deck generator</td>
-</tr>
-<tr>
-<td><code>__rs_fc_</code>, <code>__rs_fc_frame</code>, <code>__rs_fc_i</code>, <code>__rs_fc_id</code>, <code>__rs_fc_wkb</code></td>
-<td>not properties: temporary names in the DuckDB query of <code>fastjson.py</code></td>
-<td><code>fastjson.py</code></td>
-<td></td>
-<td>internal</td>
-<td>removed (the Rust readers)</td>
-</tr>
-<tr>
-<td><code>__rs_gz</code>, <code>__rs_tiles</code></td>
-<td>not properties: the page's self-check globals (<code>window.__rs_gz</code>, <code>window.__rs_tiles</code>)</td>
-<td><code>_INFLATE_JS</code>, <code>_TILES_JS</code></td>
-<td>the page's banner</td>
-<td>page</td>
-<td>the page writer</td>
-</tr>
-<tr>
-<td><code>__rs_fill__</code></td>
-<td>the prefix of <code>__rs_fill__&lt;i&gt;</code> in the code</td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-</tr>
-</tbody>
-</table>
+<p>The tables are in <a href="../reference/contract.md">the contract reference</a> (P3): the page and control variables, the global state <code>rs_*</code>
+and the feature properties <code>__rs_*</code>, with the metadata keys, the dashboard's options from the style, the page's placeholders and the
+storage keys. <code>tests/test_contract_names.py</code> checks them against the code.</p>
 <h4 id="the-gaps-that-the-contract-closes">The gaps that the contract closes</h4>
 <ol>
 <li>The hover color, the select color and the glow are literals in the style: the global states <code>rs_hover</code>, <code>rs_select</code>, <code>rs_glow</code> and
@@ -2843,6 +2094,184 @@ measurements. <code>MAX_ROADS</code> = 200,000 is an estimate from Tartu only.</
 <li><strong>Risk.</strong> glibc's <code>cos</code> and <code>hypot</code> differ between machines (see <code>tests/test_render_web.py:1898</code>). Mitigation: the goldens come from
   one machine type (Linux x86_64), and the Rust code rounds where Python rounds (<code>py_round</code>).</li>
 </ul>
+<h4 id="p0-result-2026-10-23">P0: result (2026-10-23)</h4>
+<p><strong>The goldens.</strong> <code>rust/roadstyle-rs/tests/make_goldens.py</code> is the one generator (Python roadstyle 0.24.3 from <code>src/</code>). For Monaco
+(13,298 roads), the Södermalm sample (4,563 driving edges, with duckOSM's solved levels) and Tartu (64,828 roads) it writes the roads-only
+style of <code>export_inline</code>, the tiles of <code>export_style</code> (the 3 x 3 tiles around the centre at zooms 12, 14 and 15) and the levels (the tags
+rule; the solve with duckOSM's level-area defaults, not for Tartu: Python's solve needs too much memory there). The files over 1 MB and
+Tartu's inputs are on the pre-release <code>rust-test-data</code> (<code>goldens-1.tar</code>, 42.5 MB); <code>tests/get_goldens.sh</code> gets them and checks their
+SHA-256. The colour cases and the looks of tasks 1 and 3 come from the same script. <code>tests/areas.rs</code> compares the engine with them.</p>
+<p><strong>Differences found and fixed</strong> (the engine now does what Python does):</p>
+<table>
+<thead>
+<tr>
+<th>Difference</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The slots wrote <code>__rs_arw</code> before <code>__rs_cls</code></td>
+<td>Python's order (task 1)</td>
+</tr>
+<tr>
+<td>A tile had the features within its buffer</td>
+<td><code>tiles.py</code>: a feature is in the tiles its box touches; the buffer is for the clipping only</td>
+</tr>
+<tr>
+<td>The ids of <code>simple</code> were <code>16 x edge + piece</code>, the slots had none</td>
+<td><code>tiles.py</code>: a feature's id is its index in its source</td>
+</tr>
+<tr>
+<td>A tile kept only the properties the layers read</td>
+<td><code>tiles.py</code>'s <code>tile_props</code>: every <code>__rs_*</code> property and <code>keep</code>; all the properties of a whole layer (the slots)</td>
+</tr>
+<tr>
+<td>A line shorter than half a tile unit stayed at the last zoom</td>
+<td><code>tiles.py</code>: it is left out at every zoom</td>
+</tr>
+</tbody>
+</table>
+<p>After these fixes, every golden tile of the three areas has the same features, ids, properties and geometry as Python's (decoded), and
+the styles are the same below the top level, key order included, except the items below.</p>
+<p><strong>Differences that stay, each with its cause and a decision:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Difference</th>
+<th>Cause</th>
+<th>Decision</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The nearest road of a slot: 4 slots of Monaco, 10 of Tartu, none of Södermalm (and 2 or 3 of them get a twin <code>__rs_edge2</code> as a result)</td>
+<td>Each is the two directions of one way, with the same line: the slot's middle is at distance 0 from both. GEOS's <code>STRtree.nearest</code> takes the one its tree reaches first; the engine the lower index. "The higher index" does not match either (8 differ on Monaco then)</td>
+<td>Keep. The two edges are one way; the name and the arrow are the same. An exact copy needs GEOS's tree (its build and its search)</td>
+</tr>
+<tr>
+<td>The solve of Monaco: 8 of 13,298 rows</td>
+<td>Python's LP (OR-tools) and the engine's min-cost flow take different answers among equal best ones: both have 0 hard rules broken, 0 stack parts not lifted, 16 order wishes not kept, 9 numbers. Södermalm is equal in all rows</td>
+<td>Keep: equal quality by roadstyle's own rules</td>
+</tr>
+<tr>
+<td>The bytes of a tile</td>
+<td>Python's encoder (mapbox_vector_tile) writes a negative integer as <code>int_value</code> and a float with no fraction as an integer; the engine writes <code>sint_value</code> and a double. MapLibre reads the same numbers</td>
+<td>Keep: the tests compare decoded tiles, not bytes</td>
+</tr>
+<tr>
+<td>No Python solve golden for Tartu</td>
+<td>Python's solve needs more memory than the machine can give</td>
+<td>Keep: Monaco and Södermalm cover the solve; Tartu has the tags rule</td>
+</tr>
+<tr>
+<td>The base map in tiles (<code>export_style</code>): Python writes the points and polygons whole, the engine clips the polygons</td>
+<td>Not in the goldens (the export goldens have no base map)</td>
+<td>Open: P4, with the base map in the export goldens</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The benchmark</strong> (<code>main.rs --bench</code>, native release build, 2026-10-23):</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Monaco: ms</th>
+<th>in use after, MB</th>
+<th>peak in it, MB</th>
+<th>Tartu: ms</th>
+<th>in use after, MB</th>
+<th>peak in it, MB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Read the roads</td>
+<td>43</td>
+<td>38</td>
+<td>41</td>
+<td>210</td>
+<td>185</td>
+<td>198</td>
+</tr>
+<tr>
+<td>Mark the roads (colours, pairs, levels)</td>
+<td>152</td>
+<td>74</td>
+<td>82</td>
+<td>825</td>
+<td>361</td>
+<td>404</td>
+</tr>
+<tr>
+<td>Pieces (<code>simple</code>)</td>
+<td>85</td>
+<td>126</td>
+<td>128</td>
+<td>508</td>
+<td>711</td>
+<td>719</td>
+</tr>
+<tr>
+<td>Names and arrows (<code>slots</code>)</td>
+<td>111</td>
+<td>134</td>
+<td>138</td>
+<td>658</td>
+<td>764</td>
+<td>788</td>
+</tr>
+<tr>
+<td>Base map</td>
+<td>24</td>
+<td>143</td>
+<td>145</td>
+<td>196</td>
+<td>871</td>
+<td>881</td>
+</tr>
+<tr>
+<td>Roads source</td>
+<td>8</td>
+<td>143</td>
+<td>144</td>
+<td>25</td>
+<td>871</td>
+<td>874</td>
+</tr>
+<tr>
+<td>Layers</td>
+<td>58</td>
+<td>145</td>
+<td>149</td>
+<td>83</td>
+<td>874</td>
+<td>887</td>
+</tr>
+<tr>
+<td>The text of the sources</td>
+<td>39</td>
+<td>177</td>
+<td>177</td>
+<td>225</td>
+<td>1,134</td>
+<td>1,134</td>
+</tr>
+<tr>
+<td>Whole process (<code>/usr/bin/time</code>)</td>
+<td>550</td>
+<td></td>
+<td>194 (resident)</td>
+<td>2,890</td>
+<td></td>
+<td>1,128 (resident)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>CI.</strong> <code>.github/workflows/rust.yml</code>: on each push to <code>main</code> or <code>rust-engine</code> that changes <code>rust/</code> or roadstyle's data, and on pull
+requests: the goldens from the pre-release, <code>cargo test --offline --release</code>, <code>cargo clippy -D warnings</code>, the wasm32 build. Each night
+and by hand: the ignored Tartu goldens. Clippy: the <code>.into()</code> calls of <code>&amp;str</code> are gone; <code>needless_range_loop</code> and <code>type_complexity</code> are
+allowed in the crate (ported numeric code).</p>
 <h4 id="p1-merge-the-work-in-progress">P1: merge the work in progress</h4>
 <ul>
 <li><strong>Content.</strong> <code>rust-tile-speed</code>, then <code>rust-tiles</code> (they conflict in <code>tiles.rs</code>), task 1 (<code>rust-colors</code>), task 2 (the dashboard
@@ -2889,6 +2318,16 @@ measurements. <code>MAX_ROADS</code> = 200,000 is an estimate from Tartu only.</
 <li><strong>Risk.</strong> The model work and the feature work both edit <code>roadstyle-engine</code>. The model API comes first, in one small change.</li>
 </ul>
 <h4 id="p5-the-python-binding">P5: the Python binding</h4>
+<p><strong>State (2026-10-23):</strong> step 1 is done. <code>rust/roadstyle-py</code> makes <code>roadstyle._rust</code> (<code>make_style</code>, <code>make_look</code>, <code>Tiler</code>; abi3, the GIL is free
+while Rust works). <code>roadstyle._engine</code> has the switch, and <code>export_inline(engine="rust")</code> gives the same style as Python for the 7 cases of
+<code>tests/test_engine_parity.py</code> (Rust 0.12 s, Python 0.57 s on 1,373 roads). <code>compute_levels(engine="rust")</code> and
+<code>export_style(engine="rust", format="xyz")</code> are done too: the same <code>style.json</code> byte for byte, the same files, and each tile with the same features when
+decoded (a number can be an integer in one engine and a float in the other). <code>render_edges(engine="rust")</code> is done too: the Rust engine makes
+the live style (<code>args.state = "live"</code>) and Python writes the page with the same page writer (<code>render_web._page_html</code>); the page is the same
+byte for byte (tiled pages and <code>export_style(format="pmtiles")</code> too, with the Rust tiles; Tartu: 19.1 s with Python and 6.2 s with
+Rust, tiled 147.5 s and 12.2 s). The output side of the P3 contract is in it: <code>roadstyle:contract</code>, <code>roadstyle:state</code> and <code>roadstyle:controls</code> (the options of
+<code>rsDashboard</code> from the style, checked against <code>render(_parts=True)</code>), and the dashboard reads them. Next: the wheels with maturin, the typed
+look (P3), the layer roles, <code>docs/reference/contract.md</code>.</p>
 <ul>
 <li><strong>Content.</strong> <code>roadstyle-py</code> (PyO3, maturin, abi3 wheels for Linux x86_64 and aarch64, macOS, Windows). Python calls Rust part by
   part, in this order: the style of <code>export_inline</code>, the tiles (<code>tiles.py</code>), the levels (<code>compute_levels</code>), the look
@@ -2901,6 +2340,11 @@ measurements. <code>MAX_ROADS</code> = 200,000 is an estimate from Tartu only.</
 <li><strong>Risk.</strong> Wheels for each platform make the release longer. maturin's GitHub action builds them.</li>
 </ul>
 <h4 id="p6-the-page-and-the-export-in-rust">P6: the page and the export in Rust</h4>
+<p><strong>State (2026-10-23):</strong> the page writer is done (<code>rust/roadstyle/src/page.rs</code>, <code>make_page</code> in the Python binding, <code>makePage</code> in the browser
+package): the pages of <code>tests/test_engine_parity.py</code> are byte for byte the Python pages. <code>export_style</code> (XYZ and PMTiles) is done through
+the binding, and the crate writes the PMTiles archive (<code>roadstyle_tiles::pmtiles</code>, <code>Tiler.archive</code>). Open: the npm packages,
+the runtime API (<code>getState</code>, <code>setState</code>, the events), <code>Tiler.restyle</code>, the sidebars of <code>render_dashboard</code> and <code>render_report</code>. The crate
+reads the static files from <code>src/roadstyle/</code> when it is built; a crates.io package needs them in the crate (a build step copies them).</p>
 <ul>
 <li><strong>Content.</strong> The page writer in <code>roadstyle-io</code> (feature <code>page</code>): the HTML frame, the dashboard bundle, the style, the page options,
   the gzip of the sources (<code>compress</code>), the host panel. <code>export_style</code> (style.json, XYZ tiles, PMTiles, sprite). The three page
@@ -3010,8 +2454,8 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 <tr>
 <td>3</td>
 <td><code>highway_col</code></td>
-<td>P4</td>
-<td>Rust reads the column <code>highway</code></td>
+<td>done</td>
+<td>the engine's column map (<code>ColumnMap</code>): the user's names in the data and the road layers</td>
 </tr>
 <tr>
 <td>4</td>
@@ -3028,14 +2472,14 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 <tr>
 <td>6</td>
 <td><code>basemap</code></td>
-<td>task 2</td>
-<td>the page</td>
+<td>done</td>
+<td>the dashboard module (task 2, <code>src/roadstyle/static/dashboard/</code>)</td>
 </tr>
 <tr>
 <td>7</td>
 <td><code>basemaps</code></td>
-<td>task 2</td>
-<td></td>
+<td>done</td>
+<td>the dashboard module (task 2, <code>src/roadstyle/static/dashboard/</code>)</td>
 </tr>
 <tr>
 <td>8</td>
@@ -3058,44 +2502,44 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 <tr>
 <td>11</td>
 <td><code>offset_zoom</code></td>
-<td>look</td>
-<td></td>
+<td>done</td>
+<td>the same style as Python (<code>tests/test_engine_parity.py</code>)</td>
 </tr>
 <tr>
 <td>12</td>
 <td><code>tunnel_col</code></td>
-<td>P4</td>
-<td>Rust reads <code>tunnel</code></td>
+<td>done</td>
+<td>the engine's column map (<code>ColumnMap</code>): the user's names in the data and the road layers</td>
 </tr>
 <tr>
 <td>13</td>
 <td><code>bridge_col</code></td>
-<td>P4</td>
-<td>Rust reads <code>bridge</code></td>
+<td>done</td>
+<td>the engine's column map (<code>ColumnMap</code>): the user's names in the data and the road layers</td>
 </tr>
 <tr>
 <td>14</td>
 <td><code>layer_col</code></td>
-<td>P4</td>
-<td>Rust reads <code>layer</code></td>
+<td>done</td>
+<td>the engine's column map (<code>ColumnMap</code>): the user's names in the data and the road layers</td>
 </tr>
 <tr>
 <td>15</td>
 <td><code>edge_id_col</code></td>
-<td>P4</td>
-<td></td>
+<td>done</td>
+<td>the engine's column map (<code>ColumnMap</code>): the user's names in the data and the road layers</td>
 </tr>
 <tr>
 <td>16</td>
 <td><code>road_fill</code></td>
 <td>done</td>
-<td>state <code>rs_fill_on</code></td>
+<td>the same style as Python (<code>tests/test_engine_parity.py</code>)</td>
 </tr>
 <tr>
 <td>17</td>
 <td><code>cap_col</code></td>
-<td>P4</td>
-<td></td>
+<td>done</td>
+<td>the same style as Python (<code>tests/test_engine_parity.py</code>)</td>
 </tr>
 <tr>
 <td>18</td>
@@ -3113,7 +2557,7 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 <td>20</td>
 <td><code>casing_level_col</code></td>
 <td>done</td>
-<td>with stored levels; without them, P4 (the solver is in Rust)</td>
+<td>with stored levels; without them the engine computes them, as <code>render</code> (<code>compute_levels</code>, solve)</td>
 </tr>
 <tr>
 <td>21</td>
@@ -3137,7 +2581,7 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 <td>24</td>
 <td><code>head_m</code></td>
 <td>done</td>
-<td></td>
+<td>the same style as Python (<code>tests/test_engine_parity.py</code>)</td>
 </tr>
 <tr>
 <td>25</td>
@@ -3166,44 +2610,44 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 <tr>
 <td>29</td>
 <td><code>width_m_col</code></td>
-<td>P4</td>
-<td>no metre widths in Rust</td>
+<td>done</td>
+<td>the same style as Python (<code>tests/test_engine_parity.py</code>), with the mitre ends</td>
 </tr>
 <tr>
 <td>30</td>
 <td><code>width_m_zoom</code></td>
-<td>P4</td>
-<td></td>
+<td>done</td>
+<td>the same style as Python (<code>tests/test_engine_parity.py</code>), with the mitre ends</td>
 </tr>
 <tr>
 <td>31</td>
 <td><code>casing_m</code></td>
-<td>P4</td>
-<td></td>
+<td>done</td>
+<td>the same style as Python (<code>tests/test_engine_parity.py</code>), with the mitre ends</td>
 </tr>
 <tr>
 <td>32</td>
 <td><code>casing_min_px</code></td>
-<td>P4</td>
-<td></td>
+<td>done</td>
+<td>the same style as Python (<code>tests/test_engine_parity.py</code>), with the mitre ends</td>
 </tr>
 <tr>
 <td>33</td>
 <td><code>pitch</code></td>
-<td>task 2; P6</td>
-<td></td>
+<td>done</td>
+<td>the export gives the same style as Python; the page: the dashboard module</td>
 </tr>
 <tr>
 <td>34</td>
 <td><code>bearing</code></td>
-<td>task 2; P6</td>
-<td></td>
+<td>done</td>
+<td>the export gives the same style as Python; the page: the dashboard module</td>
 </tr>
 <tr>
 <td>35</td>
 <td><code>max_pitch</code></td>
-<td>task 2; P6</td>
-<td></td>
+<td>done</td>
+<td>the export gives the same style as Python; the page: the dashboard module</td>
 </tr>
 <tr>
 <td>36</td>
@@ -3215,43 +2659,43 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 <td>37</td>
 <td><code>arrows</code></td>
 <td>done</td>
-<td></td>
+<td>the same style as Python (<code>tests/test_engine_parity.py</code>)</td>
 </tr>
 <tr>
 <td>38</td>
 <td><code>labels</code></td>
 <td>done</td>
-<td></td>
+<td>the same style as Python (<code>tests/test_engine_parity.py</code>)</td>
 </tr>
 <tr>
 <td>39</td>
 <td><code>filter_control</code></td>
-<td>task 2</td>
-<td></td>
+<td>done</td>
+<td>the dashboard module (task 2, <code>src/roadstyle/static/dashboard/</code>)</td>
 </tr>
 <tr>
 <td>40</td>
 <td><code>find_control</code></td>
-<td>task 2</td>
-<td></td>
+<td>done</td>
+<td>the dashboard module (task 2, <code>src/roadstyle/static/dashboard/</code>)</td>
 </tr>
 <tr>
 <td>41</td>
 <td><code>overlay_control</code></td>
-<td>task 2</td>
-<td></td>
+<td>done</td>
+<td>the dashboard module (task 2, <code>src/roadstyle/static/dashboard/</code>)</td>
 </tr>
 <tr>
 <td>42</td>
 <td><code>overlay_popup</code></td>
-<td>task 2</td>
-<td></td>
+<td>done</td>
+<td>the dashboard module (task 2, <code>src/roadstyle/static/dashboard/</code>)</td>
 </tr>
 <tr>
 <td>43</td>
 <td><code>access_col</code></td>
-<td>P4 (colors); task 2 (rows)</td>
-<td></td>
+<td>done</td>
+<td>the same style as Python (<code>tests/test_engine_parity.py</code>)</td>
 </tr>
 <tr>
 <td>44</td>
@@ -3268,68 +2712,68 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 <tr>
 <td>46</td>
 <td><code>basemap_switcher</code></td>
-<td>task 2</td>
-<td></td>
+<td>done</td>
+<td>the dashboard module (task 2, <code>src/roadstyle/static/dashboard/</code>)</td>
 </tr>
 <tr>
 <td>47</td>
 <td><code>zoom_readout</code></td>
-<td>task 2</td>
-<td></td>
+<td>done</td>
+<td>the dashboard module (task 2, <code>src/roadstyle/static/dashboard/</code>)</td>
 </tr>
 <tr>
 <td>48</td>
 <td><code>road_popup</code></td>
-<td>done (metadata); task 2</td>
-<td></td>
+<td>done</td>
+<td>the same style as Python (<code>tests/test_engine_parity.py</code>)</td>
 </tr>
 <tr>
 <td>49</td>
 <td><code>road_tooltip</code></td>
-<td>done (metadata)</td>
-<td></td>
+<td>done</td>
+<td>the same style as Python (<code>tests/test_engine_parity.py</code>)</td>
 </tr>
 <tr>
 <td>50</td>
 <td><code>hover_delay_ms</code></td>
-<td>done (metadata)</td>
-<td></td>
+<td>done</td>
+<td>the same style as Python (<code>tests/test_engine_parity.py</code>)</td>
 </tr>
 <tr>
 <td>51</td>
 <td><code>data_maxzoom</code></td>
-<td>check</td>
-<td></td>
+<td>done</td>
+<td>the same style as Python (<code>tests/test_engine_parity.py</code>)</td>
 </tr>
 <tr>
 <td>52</td>
 <td><code>data_tolerance</code></td>
-<td>check</td>
-<td></td>
+<td>done</td>
+<td>the same style as Python (<code>tests/test_engine_parity.py</code>)</td>
 </tr>
 <tr>
 <td>53</td>
 <td><code>popup_mode</code></td>
-<td>task 2</td>
-<td></td>
+<td>done</td>
+<td>the export gives the same style as Python; the page: the dashboard module</td>
 </tr>
 <tr>
 <td>54</td>
 <td><code>street_view</code></td>
-<td>task 2</td>
-<td></td>
+<td>done</td>
+<td>the dashboard module (task 2, <code>src/roadstyle/static/dashboard/</code>)</td>
 </tr>
 <tr>
 <td>55</td>
 <td><code>street_view_key</code></td>
-<td>task 2</td>
-<td></td>
+<td>done</td>
+<td>the dashboard module (task 2, <code>src/roadstyle/static/dashboard/</code>)</td>
 </tr>
 <tr>
 <td>56</td>
 <td><code>google_3d</code></td>
-<td>task 2</td>
-<td></td>
+<td>done</td>
+<td>the dashboard module (task 2, <code>src/roadstyle/static/dashboard/</code>)</td>
 </tr>
 <tr>
 <td>57</td>
@@ -3340,32 +2784,32 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 <tr>
 <td>58</td>
 <td><code>hover_color</code></td>
-<td>look</td>
-<td><code>__HOVER_COLOR__</code> is replaced, but the template has no such placeholder</td>
+<td>done</td>
+<td>the overlays too</td>
 </tr>
 <tr>
 <td>59</td>
 <td><code>select_color</code></td>
-<td>look</td>
-<td></td>
+<td>done</td>
+<td>the overlays too</td>
 </tr>
 <tr>
 <td>60</td>
 <td><code>boundary</code></td>
-<td>P4</td>
-<td></td>
+<td>done</td>
+<td>the same style as Python (<code>tests/test_engine_parity.py</code>); the binding converts shapely and GeoPandas</td>
 </tr>
 <tr>
 <td>61</td>
 <td><code>color_options</code></td>
-<td>task 1</td>
-<td></td>
+<td>done</td>
+<td>task 1 (<code>colors.rs</code>); the same style as Python</td>
 </tr>
 <tr>
 <td>62</td>
 <td><code>color_active</code></td>
-<td>task 1</td>
-<td></td>
+<td>done</td>
+<td>task 1 (<code>colors.rs</code>); the same style as Python</td>
 </tr>
 <tr>
 <td>63</td>
@@ -3400,8 +2844,8 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 <tr>
 <td>68</td>
 <td><code>tunnel_control</code></td>
-<td>task 2</td>
-<td></td>
+<td>done</td>
+<td>the dashboard module (task 2, <code>src/roadstyle/static/dashboard/</code>)</td>
 </tr>
 <tr>
 <td>69</td>
@@ -3418,14 +2862,14 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 <tr>
 <td>71</td>
 <td><code>minzoom</code></td>
-<td>check</td>
-<td></td>
+<td>done</td>
+<td>the same style as Python (<code>tests/test_engine_parity.py</code>)</td>
 </tr>
 <tr>
 <td>72</td>
 <td><code>legend</code></td>
-<td>task 1</td>
-<td></td>
+<td>done</td>
+<td>task 1 (<code>colors.rs</code>); the same style as Python</td>
 </tr>
 <tr>
 <td>73</td>
@@ -3614,7 +3058,7 @@ the P0 golden run decides), <strong>Python</strong> (stays in Python), <strong>i
 </tr>
 <tr>
 <td><code>export_style</code> (XYZ, PMTiles, sprite, popup files)</td>
-<td>P6</td>
+<td>XYZ done (<code>Tiler</code>); PMTiles P6</td>
 <td></td>
 </tr>
 <tr>

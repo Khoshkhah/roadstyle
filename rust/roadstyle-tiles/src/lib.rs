@@ -168,11 +168,18 @@ impl Tiles {
 
     /// Add a source of typed features (roads, simple), as `add` adds its JSON.
     pub fn add_typed(&mut self, name: &str, source: roadstyle_model::props::Source, keep: &HashSet<String>, whole: bool, min_zoom: u32) {
+        self.add_lines(name, source.feats.into_iter().map(|f| (f.coords, f.props.into_iter())), keep, whole, min_zoom);
+    }
+
+    /// A layer of lines, each with its properties (a feature's id is its index; a feature with no line is left out, and keeps its
+    /// index). The properties are the `__rs_*` ones and those in `keep` (all of them when `whole`).
+    pub fn add_lines<L, K, P>(&mut self, name: &str, feats: impl Iterator<Item = (Option<L>, P)>, keep: &HashSet<String>, whole: bool, min_zoom: u32)
+    where L: AsRef<[[f64; 2]]>, K: AsRef<str>, P: Iterator<Item = (K, Value)> {
         let mut b = Builder::default();
-        for (i, f) in source.feats.into_iter().enumerate() {
-            let Some(c) = f.coords else { continue };
-            let g = Geom::Lines(vec![c.iter().filter_map(|p| merc_ll(p[0], p[1])).collect()]);
-            b.push(Some(i as u64), g, f.props.into_iter().filter(|(k, _)| whole || k.starts_with("__rs_") || keep.contains(*k)));
+        for (i, (c, props)) in feats.enumerate() {
+            let Some(c) = c else { continue };
+            let g = Geom::Lines(vec![c.as_ref().iter().filter_map(|p| merc_ll(p[0], p[1])).collect()]);
+            b.push(Some(i as u64), g, props.filter(|(k, _)| whole || k.as_ref().starts_with("__rs_") || keep.contains(k.as_ref())));
         }
         self.layers.insert(name.to_string(), b.layer(whole, min_zoom));
     }

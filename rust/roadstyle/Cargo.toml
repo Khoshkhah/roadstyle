@@ -1,12 +1,15 @@
 [package]
 name = "roadstyle"
 version.workspace = true
+repository.workspace = true
+homepage.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "roadstyle as a Rust library: the facade over the model, the levels, the engine and the tiles"
+description = "roadstyle as a Rust library: the facade over the model, the readers, the levels, the engine and the tiles"
 
 [dependencies]
 roadstyle-engine.workspace = true
+roadstyle-io.workspace = true
 roadstyle-levels.workspace = true
 roadstyle-tiles.workspace = true
 serde_json.workspace = true

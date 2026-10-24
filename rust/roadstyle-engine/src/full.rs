@@ -3,9 +3,9 @@
 //! different ends) and `shadows` (the bridge shadows). Each function names the part of render_web.render it ports.
 
 use crate::layers::py_truth;
-use crate::props::Props;
-use crate::read::Feature;
-use crate::simple::{Piece, Pt};
+use crate::road::Roads;
+use roadstyle_model::Cell;
+use crate::simple::{Cols, Piece, Pt};
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 
@@ -36,8 +36,8 @@ pub(crate) fn level_id(lid: &str, level: i64) -> String {
 }
 
 /// The drawing positions of the roads (_mark_levels): 0 and every casing, fill and head number, in order.
-pub(crate) fn levels_of(rp: &[&Props]) -> Vec<i64> {
-    let mut v: Vec<i64> = rp.iter().flat_map(|p| ["__rs_cl", "__rs_fl", "__rs_cs", "__rs_ce"].map(|k| p.get(k).and_then(Value::as_i64)))
+pub(crate) fn levels_of(roads: &Roads) -> Vec<i64> {
+    let mut v: Vec<i64> = roads.iter().flat_map(|p| ["__rs_cl", "__rs_fl", "__rs_cs", "__rs_ce"].map(|k| p.get(k).and_then(Cell::as_i64)))
         .flatten().chain([0]).collect();
     v.sort();
     v.dedup();
@@ -54,40 +54,31 @@ pub struct FullSources {
     pub ends: Vec<Value>,
 }
 
-fn feature(p: Piece) -> Value {
-    json!({"type": "Feature", "properties": Value::Object(p.props.to_map()), "geometry": {"type": "LineString", "coordinates": p.coords}})
-}
-
-/// _mark_cls on a piece: the class and the access kind of its edge.
-fn mark_cls(mut p: Piece, roads: &[Feature]) -> Piece {
-    let e = p.props.get("__rs_edge").and_then(Value::as_u64).unwrap_or(0) as usize;
-    let road = roads.get(e).map(|r| &r.props);
-    p.props.insert("__rs_cls", road.map(crate::cls_of).unwrap_or(Value::Null));
-    if let Some(a) = road.and_then(|r| r.get("__rs_access")).filter(|a| !a.is_null()) {
-        p.props.insert("__rs_access", a.clone());
-    }
-    p
+/// A piece as a GeoJSON feature, with _mark_cls's class and access kind of its edge.
+fn feature(p: &Piece, roads: &Roads, cols: &Cols) -> Value {
+    json!({"type": "Feature", "properties": Value::Object(p.props(roads, cols, false).to_map()), "geometry": {"type": "LineString", "coordinates": p.coords}})
 }
 
 /// render's divided casing (_casing_parts, when the casing has heads, two different ends or a two-way pair's one casing), its halves
 /// (_halves) and its bridge shadows (_bridge_shadows, when the config has bridge_shadow).
-pub fn sources(roads: &[Feature], look: &Value, head_m: f64, width_col: Option<&str>, divided: bool, order: &[String]) -> FullSources {
+pub fn sources(roads: &Roads, look: &Value, head_m: f64, width_col: Option<&str>, divided: bool, order: &[String]) -> FullSources {
     let cfg = &look["config"];
-    let parts: Option<Vec<Piece>> = divided.then(|| crate::simple::casing_parts(roads, head_m, width_col));
-    let splits = roads.iter().any(|f| f.props.get("__rs_split").is_some_and(py_truth));
+    let cols = Cols::new(width_col);
+    let parts: Option<Vec<Piece>> = divided.then(|| crate::simple::casing_parts(roads, head_m));
+    let splits = roads.iter().any(|f| f.get("__rs_split").is_some_and(py_truth));
     let halves = splits.then(|| {
         let mut by = crate::simple::halves(roads);
         let mut out = Vec::new();
-        for (i, f) in roads.iter().enumerate() {
-            let e = f.props.get("__rs_edge").and_then(Value::as_i64).unwrap_or(i as i64);
-            out.extend(by.remove(&e).unwrap_or_default().into_iter().map(|p| feature(mark_cls(p, roads))));
+        for f in roads.iter() {
+            let e = f.get("__rs_edge").and_then(Cell::as_i64).unwrap_or(f.i as i64);
+            out.extend(by.remove(&e).unwrap_or_default().iter().map(|p| feature(p, roads, &cols)));
         }
         out
     });
     let shadows = if cfg["bridge_shadow"].as_bool().unwrap_or(false) {
         bridge_shadows(roads, parts.as_deref(), cfg["bridge_shadow_trim_m"].as_f64().unwrap_or(0.0), order)
     } else { Vec::new() };
-    let casings = parts.map(|ps| ps.into_iter().map(|p| feature(mark_cls(p, roads))).collect());
+    let casings = parts.map(|ps| ps.iter().map(|p| feature(p, roads, &cols)).collect());
     let ends = if cfg["twin_end_caps"] == true && cfg["twin_casing"] == "each" { twin_ends(roads) } else { Vec::new() };
     FullSources { casings, halves, shadows, ends }
 }
@@ -95,13 +86,13 @@ pub fn sources(roads: &[Feature], look: &Value, head_m: f64, width_col: Option<&
 /// _twin_ends: a point at each end of each plain two-way pair (no bridge, tunnel, dash or end shape), with the pair's styling and both
 /// twins' fills (`<prop>__b`): a road-wide round cap under the two lanes, drawn where both have one colour. Where a road of a lower
 /// position meets the end, the cap has no casing ring (`__rs_nocase`).
-fn twin_ends(roads: &[Feature]) -> Vec<Value> {
+fn twin_ends(roads: &Roads) -> Vec<Value> {
     let key = |p: &Pt| ((p[0] * 1e6).round() as i64, (p[1] * 1e6).round() as i64);
     type K = ((i64, i64), (i64, i64));
     let mut keys: Vec<Option<K>> = Vec::new();
     let (mut wh, mut at): (HashMap<K, Vec<usize>>, HashMap<(i64, i64), Vec<usize>>) = (HashMap::new(), HashMap::new());
     for (i, f) in roads.iter().enumerate() {
-        let k = f.coords.as_ref().filter(|c| c.len() >= 2).map(|c| (key(&c[0]), key(&c[c.len() - 1])));
+        let k = f.line().filter(|c| c.len() >= 2).map(|c| (key(&c[0]), key(&c[c.len() - 1])));
         if let Some(k) = k {
             if k.0 != k.1 {
                 wh.entry(k).or_default().push(i);
@@ -111,39 +102,39 @@ fn twin_ends(roads: &[Feature]) -> Vec<Value> {
         }
         keys.push(k);
     }
-    let t = |p: &Props, k: &str| p.get(k).is_some_and(py_truth);
-    let num = |p: &Props, k: &str| p.get(k).and_then(Value::as_i64);
+    let t = |p: crate::road::Road, k: &str| p.get(k).is_some_and(py_truth);
+    let num = |p: crate::road::Road, k: &str| p.get(k).and_then(Cell::as_i64);
     let mut used = std::collections::HashSet::new();
     let mut out = Vec::new();
     for (i, f) in roads.iter().enumerate() {
-        let (p, Some(k)) = (&f.props, keys[i]) else { continue };
+        let (p, Some(k)) = (f, keys[i]) else { continue };
         if used.contains(&i) || !t(p, "__rs_twoway") || ["__rs_bridge", "__rs_tunnel", "__rs_dash", "__rs_cap", "__rs_split"].iter().any(|x| t(p, x)) {
             continue;
         }
         let Some(j) = wh.get(&(k.1, k.0)).into_iter().flatten().copied()
-            .find(|&j| j != i && !used.contains(&j) && t(&roads[j].props, "__rs_twoway") && roads[j].props.get("highway") == p.get("highway")) else { continue };
+            .find(|&j| j != i && !used.contains(&j) && t(roads.road(j), "__rs_twoway") && roads.get(j, "highway") == p.get("highway")) else { continue };
         used.extend([i, j]);
         let mut props = Map::new();
         let fcol = crate::cls_col();
         for c in ["highway", fcol.as_str(), "lvl", "__rs_band", "__rs_cl", "__rs_fl"] {
             if let Some(v) = p.get(c).filter(|v| !v.is_null()) {
-                props.insert(c.into(), v.clone());
+                props.insert(c.into(), v.to_value());
             }
         }
         for (c, v) in p.iter().filter(|(c, _)| c.starts_with("__rs_fill") || *c == "__rs_casing") {
-            props.insert(c.into(), v.clone());
+            props.insert(c.into(), v.to_value());
         }
-        let q = &roads[j].props;
+        let q = roads.road(j);
         let fills: Vec<String> = props.keys().filter(|c| c.starts_with("__rs_fill")).cloned().collect();
         for c in fills {
-            props.insert(format!("{c}__b"), q.get(&c).cloned().unwrap_or(Value::Null));
+            props.insert(format!("{c}__b"), q.get(&c).map_or(Value::Null, Cell::to_value));
         }
         props.insert("__rs_edge".into(), json!(i));
         props.insert("__rs_edge2".into(), json!(j));
-        let c = f.coords.as_ref().unwrap();
+        let c = f.line().unwrap();
         for (end, (pt, kp)) in [(c[0], k.0), (c[c.len() - 1], k.1)].into_iter().enumerate() {
             let head = num(p, if end == 0 { "__rs_cs" } else { "__rs_ce" }).or_else(|| num(p, "__rs_cl")).unwrap_or(0);
-            let low = at[&kp].iter().any(|&n| n != i && n != j && num(&roads[n].props, "__rs_fl").unwrap_or(0) < head);
+            let low = at[&kp].iter().any(|&n| n != i && n != j && num(roads.road(n), "__rs_fl").unwrap_or(0) < head);
             let mut e = props.clone();
             if low {
                 e.insert("__rs_nocase".into(), json!(true));
@@ -152,7 +143,7 @@ fn twin_ends(roads: &[Feature]) -> Vec<Value> {
             // _mark_cls
             e.insert("__rs_cls".into(), crate::cls_of(p));
             if let Some(a) = p.get("__rs_access").filter(|a| !a.is_null()) {
-                e.insert("__rs_access".into(), a.clone());
+                e.insert("__rs_access".into(), a.to_value());
             }
             out.push(json!({"type": "Feature", "properties": e, "geometry": {"type": "Point", "coordinates": [pt[0], pt[1]]}}));
         }
@@ -163,7 +154,7 @@ fn twin_ends(roads: &[Feature]) -> Vec<Value> {
 /// What the full look's layers read (render's locals).
 pub struct FullIn<'a> {
     pub look: &'a Value,
-    pub rp: &'a [&'a Props],
+    pub rp: &'a Roads,
     pub levels: &'a [i64],
     pub cw: Value,
     pub fw: Value,
@@ -207,11 +198,11 @@ pub fn layers(f: &FullIn) -> Vec<Value> {
     let (tunnel, tunnel_g, tunnel_h) = (json!(["all", low, is_t]), json!(["all", surface, is_t]), json!(["all", high, is_t]));
     let (surface, low, bridge, high, tunnel, tunnel_g, tunnel_h) = (z(surface), z(low), z(bridge), z(high), z(tunnel), z(tunnel_g), z(tunnel_h));
     // a tunnel's band (in position mode every road is in band 0)
-    let band = |p: &Props| {
-        let b = p.get("__rs_band").filter(|b| !b.is_null()).or_else(|| p.get("lvl")).and_then(Value::as_f64).unwrap_or(0.0);
+    let band = |p: crate::road::Road| {
+        let b = p.get("__rs_band").filter(|b| !b.is_null()).or_else(|| p.get("lvl")).and_then(Cell::as_f64).unwrap_or(0.0);
         (b > 0.0) as i64 - (b < 0.0) as i64
     };
-    let tuns: Vec<i64> = f.rp.iter().filter(|p| p.get("__rs_tunnel").is_some_and(py_truth)).map(|p| band(p)).collect();
+    let tuns: Vec<i64> = f.rp.iter().filter(|p| p.get("__rs_tunnel").is_some_and(py_truth)).map(band).collect();
     let (tun_g, tun_h) = (tuns.contains(&0), tuns.contains(&1));
     let casing = |lid: &str, flt: &Value| json!({"id": lid, "type": "line", "source": "roads", "layout": lay, "filter": flt,
         "paint": {"line-color": ["coalesce", ["get", "__rs_casing"], fb_casing], "line-width": cw, "line-offset": off}});
@@ -318,7 +309,7 @@ pub fn layers(f: &FullIn) -> Vec<Value> {
     if splits || p_true("__rs_cap") || f.parts_caps {
         let sq = json!(["to-boolean", ["get", "__rs_cap"]]);
         let sx = json!(["==", ["get", "__rs_cap"], "square"]);
-        let squares = f.rp.iter().any(|p| ["__rs_cap", "__rs_cap0", "__rs_cap1"].iter().any(|k| p.get(k).is_some_and(|v| v == "square")));
+        let squares = f.rp.iter().any(|p| ["__rs_cap", "__rs_cap0", "__rs_cap1"].iter().any(|k| p.get(k).and_then(Cell::as_str) == Some("square")));
         let whole = json!(["!", ["to-boolean", ["get", "__rs_split"]]]);
         let mut out = Vec::new();
         for l in ls {
@@ -514,19 +505,17 @@ pub fn place_edge_overlays(layers: &mut Vec<Value>, edge: &[(i64, i64, usize, Ve
 /// number that touch are one line, and where three or more meet the two going on most straight (45 degrees at most) go on through; no
 /// shadow over the last `trim_m` metres where the bridge comes down to the road. The union and the line merge are the engine's own, not
 /// GEOS's: the lines have the same shape, their order and direction can differ.
-fn bridge_shadows(roads: &[Feature], parts: Option<&[Piece]>, trim_m: f64, order: &[String]) -> Vec<Value> {
-    let br: Vec<usize> = roads.iter().enumerate()
-        .filter(|(_, f)| f.props.get("__rs_bridge").is_some_and(py_truth) && f.coords.as_ref().is_some_and(|c| c.len() >= 2)).map(|(i, _)| i).collect();
+fn bridge_shadows(roads: &Roads, parts: Option<&[Piece]>, trim_m: f64, order: &[String]) -> Vec<Value> {
+    let br: Vec<usize> = roads.iter()
+        .filter(|f| f.get("__rs_bridge").is_some_and(py_truth) && f.line().is_some_and(|c| c.len() >= 2)).map(|f| f.i).collect();
     if br.is_empty() {
         return Vec::new();
     }
-    let line = |i: usize| roads[i].coords.as_ref().unwrap();
-    let cl = |p: &Props| p.get("__rs_cl").and_then(Value::as_i64).unwrap_or(0);
+    let line = |i: usize| roads.line(i).unwrap();
     let pieces: Vec<(i64, Vec<Pt>)> = match parts {
-        Some(ps) => ps.iter().filter(|p| p.props.get("__rs_edge").and_then(Value::as_u64).is_some_and(|e| br.contains(&(e as usize)))
-                                          && !p.props.get("__rs_seam").is_some_and(py_truth) && p.coords.as_ref().is_some_and(|c| c.len() >= 2))
-            .map(|p| (cl(&p.props), p.coords.clone().unwrap())).collect(),
-        None => br.iter().map(|&i| (cl(&roads[i].props), line(i).clone())).collect(),
+        Some(ps) => ps.iter().filter(|p| br.contains(&(p.edge as usize)) && !p.seam() && p.coords.as_ref().is_some_and(|c| c.len() >= 2))
+            .map(|p| (p.cl(roads), p.coords.clone().unwrap())).collect(),
+        None => br.iter().map(|&i| (roads.draw[i].levels.map_or(0, |l| l[0]), line(i).to_vec())).collect(),
     };
     let mut lvls: Vec<i64> = pieces.iter().map(|p| p.0).collect();
     lvls.sort();
@@ -657,8 +646,8 @@ fn bridge_shadows(roads: &[Feature], parts: Option<&[Piece]>, trim_m: f64, order
             continue;
         }
         let pts = part(&xy, &cum, a, b);
-        let rank = |i: &usize| roads[*i].props.get("highway").and_then(Value::as_str).and_then(|h| order.iter().position(|o| o == h)).unwrap_or(order.len());
-        let cls = member.iter().min_by_key(|i| rank(i)).map(|&i| roads[i].props.get("highway").cloned().unwrap_or(Value::Null)).unwrap_or(Value::Null);
+        let rank = |i: &usize| roads.get(*i, "highway").and_then(Cell::as_str).and_then(|h| order.iter().position(|o| o == h)).unwrap_or(order.len());
+        let cls = member.iter().min_by_key(|i| rank(i)).map(|&i| roads.get(i, "highway").map_or(Value::Null, Cell::to_value)).unwrap_or(Value::Null);
         let r7 = |x: f64| (x * 1e7).round_ties_even() / 1e7;        // numpy's round(x, 7)
         let coords: Vec<[f64; 2]> = pts.iter().map(|p| [r7(p[0] / kx + lon0), r7(p[1] / ky + lat0)]).collect();
         let mut props = Map::new();

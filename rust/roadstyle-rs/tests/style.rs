@@ -51,7 +51,8 @@ fn tiles_hash(area: &Path) -> String {
     let look = plugin_look(&read(data.join("look.json")));
     let roads = read(area.join("roads.parquet"));
     let (mut x0, mut y0, mut x1, mut y1) = (f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
-    for c in roadstyle_rs::read::read_roads(roads.clone(), "geometry").unwrap().iter().filter_map(|f| f.coords.as_ref()).flatten() {
+    let t = roadstyle_rs::read::read_roads(roads.clone(), "geometry").unwrap();
+    for c in (0..t.len()).filter_map(|i| t.line(i)).flatten() {
         (x0, y0, x1, y1) = (x0.min(c[0]), y0.min(c[1]), x1.max(c[0]), y1.max(c[1]));
     }
     let keep = ["osm_id".to_string(), "access".to_string()];

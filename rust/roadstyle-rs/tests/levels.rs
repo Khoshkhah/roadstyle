@@ -14,16 +14,17 @@ fn data(name: &str) -> Vec<u8> {
 
 fn edges() -> LevelEdges {
     let mut out = LevelEdges::default();
-    for f in read_roads(data("level_edges.parquet"), "geometry").unwrap() {
-        let text = |k: &str| f.props[k].as_str().map(String::from);
-        out.add(f.props["rank"].as_u64().unwrap() as u8, LevelEdge {
-            edge_id: f.props["edge_id"].as_i64().unwrap(),
+    let t = read_roads(data("level_edges.parquet"), "geometry").unwrap();
+    for i in 0..t.len() {
+        let text = |k: &str| t.get(i, k).unwrap().as_str().map(String::from);
+        out.add(t.get(i, "rank").unwrap().as_u64().unwrap() as u8, LevelEdge {
+            edge_id: t.get(i, "edge_id").unwrap().as_i64().unwrap(),
             highway: text("highway").unwrap(),
             tunnel: text("tunnel"),
             bridge: text("bridge"),
             layer: text("layer"),
             junction: text("junction"),
-            geometry: f.coords.unwrap().into_iter().map(|[x, y]| (x, y)).collect(),
+            geometry: t.line(i).unwrap().iter().map(|&[x, y]| (x, y)).collect(),
         });
     }
     out
@@ -38,7 +39,7 @@ fn as_map(r: &Row) -> Map<String, Value> {
 
 fn check(method: Method, golden: &str) -> roadstyle_rs::levels::Levels {
     let lv = compute(&edges(), method).unwrap().unwrap();
-    let want: Vec<Map<String, Value>> = read_table(data(golden), "").unwrap().into_iter().map(|(m, _)| m).collect();
+    let want: Vec<Map<String, Value>> = read_table(data(golden), "").unwrap().into_iter().map(|r| r.cols).collect();
     let got: Vec<Map<String, Value>> = lv.rows.iter().map(as_map).collect();
     assert_eq!(got.len(), want.len(), "number of rows");
     let bad: Vec<_> = got.iter().zip(&want).filter(|(g, w)| g != w).collect();

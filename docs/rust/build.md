@@ -1,0 +1,102 @@
+# Build from source
+
+<p class="lead">Build the Rust engine from a roadstyle checkout: the Python wheel, the development module, the WebAssembly package
+and the crate documentation.</p>
+
+You need this page only for a source install or for work on the engine. The wheels on PyPI have the engine in them.
+
+## Install a Rust toolchain
+
+Install Rust with [rustup](https://rustup.rs). CI uses Rust 1.99.1, the version that the golden tests were checked with:
+
+```bash
+rustup toolchain install 1.99.1
+```
+
+On a machine with little memory, set the number of parallel compiler jobs. The release build uses link-time optimization, which
+needs much memory for each job:
+
+```bash
+export CARGO_BUILD_JOBS=4
+```
+
+## Install roadstyle from the source
+
+The package builds with [maturin](https://www.maturin.rs) (`pyproject.toml`: `build-backend = "maturin"`). pip gets maturin and
+builds the module `roadstyle._rust`:
+
+```bash
+git clone https://github.com/Khoshkhah/roadstyle.git && cd roadstyle
+pip install ".[dev]"
+```
+
+To make a wheel and not install it:
+
+```bash
+pip wheel . --no-deps -w dist
+```
+
+The result is one wheel for your platform, for example `roadstyle-0.25.0-cp39-abi3-linux_x86_64.whl`. The tag `abi3` means
+that one wheel works with each Python version that roadstyle supports (3.10 and newer). The source distribution (sdist) builds
+the same way, so it also needs a Rust toolchain.
+
+## Build the module for development
+
+To work on the engine with `PYTHONPATH=src` and no install, build the module and copy it next to the Python package:
+
+```bash
+python rust/roadstyle-py/build.py
+```
+
+The script writes `src/roadstyle/_rust.abi3.so` (`_rust.pyd` on Windows) for the Python that runs it. Git ignores this file. Run
+the script again after each change in `rust/` or in `src/roadstyle/data/` and `src/roadstyle/static/`, because the crates read
+these files when they are built.
+
+## Build the WebAssembly package
+
+Add the WebAssembly target and the `wasm-bindgen` program. Its version must be the version of the `wasm-bindgen` crate in
+`rust/roadstyle-wasm/Cargo.toml` (0.2.129):
+
+```bash
+rustup target add wasm32-unknown-unknown
+cargo install wasm-bindgen-cli --version 0.2.129
+```
+
+Build the module and make its JavaScript glue:
+
+```bash
+cargo build --release --target wasm32-unknown-unknown --manifest-path rust/Cargo.toml -p roadstyle-wasm
+wasm-bindgen --target web --out-dir pkg rust/target/wasm32-unknown-unknown/release/roadstyle_wasm.wasm
+```
+
+`pkg/` then has `roadstyle_wasm.js`, `roadstyle_wasm_bg.wasm` (about 6 MB) and the TypeScript types. How to use them:
+[Use roadstyle in the browser](browser.md).
+
+## Run the tests
+
+The Rust tests compare the engine with the outputs of the Python engine (the goldens). The large goldens are on the GitHub
+pre-release `rust-test-data`. `get_goldens.sh` gets them and checks their SHA-256:
+
+```bash
+cd rust
+roadstyle-rs/tests/get_goldens.sh
+cargo test --release
+```
+
+The Python tests compare the two engines, then run the whole suite with the Rust engine as the default:
+
+```bash
+pytest tests/test_engine_parity.py
+ROADSTYLE_ENGINE=rust pytest
+```
+
+## Read the crate documentation
+
+The crates are not on crates.io yet, so docs.rs does not have them. Make the documentation from the source:
+
+```bash
+cd rust
+cargo doc --no-deps --open
+```
+
+**See also:** [Architecture of the Rust version](architecture.md) · [Parity and speed](parity.md)

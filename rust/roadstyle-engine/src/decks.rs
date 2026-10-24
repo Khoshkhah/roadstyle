@@ -3,7 +3,8 @@
 //! other vertices than GEOS gives, but it covers the same ground (tests/test_engine_parity.py compares them by shape).
 
 use crate::layers::{py_round, py_truth, Model};
-use crate::props::Feat;
+use crate::road::Roads;
+use roadstyle_model::Cell;
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 
@@ -140,13 +141,12 @@ struct Rep<'a> {
 
 /// _bridge_decks: the deck features of the roads (the roads source's features, in its order: a feature's index is its id).
 /// `hw`: the property that has the user's `highway` column (a casing slab's `highway`).
-pub fn bridge_decks(roads: &[Feat], dk: &DeckLook, m: &Model, hw: &str) -> Vec<Value> {
+pub fn bridge_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str) -> Vec<Value> {
     let mut reps: Vec<Rep> = Vec::new();
     let mut pair_edges: HashMap<((u64, u64), (u64, u64)), Vec<usize>> = HashMap::new();
-    for (fi, f) in roads.iter().enumerate() {
-        let p = &f.props;
-        let Some(c) = f.coords.as_deref() else { continue };
-        let lvl = p.get("lvl").and_then(Value::as_f64).unwrap_or(0.0);
+    for (fi, p) in roads.iter().enumerate() {
+        let Some(c) = p.line() else { continue };
+        let lvl = p.get("lvl").and_then(Cell::as_f64).unwrap_or(0.0);
         if !p.get("__rs_bridge").is_some_and(py_truth) || lvl < 1.0 || c.len() < 2 {
             continue;
         }
@@ -258,8 +258,8 @@ pub fn bridge_decks(roads: &[Feat], dk: &DeckLook, m: &Model, hw: &str) -> Vec<V
             let part = substring(&pts, d0, d1);
             let mid = (d0 + d1) / 2.0;
             let (pp, ffi, rfi) = props_at(mid);
-            let pprops = &roads[pp].props;
-            let cls = pprops.get("highway").and_then(Value::as_str).unwrap_or("");
+            let pprops = roads.road(pp);
+            let cls = pprops.get("highway").and_then(Cell::as_str).unwrap_or("");
             let px = m.gwidth(m.group_of(cls), dk.match_zoom);
             let half = (px * mpp / 2.0).max(2.0) * dk.width_scale;
             let up = if ramp_head { mid / ramp } else { 1.0 };
@@ -282,7 +282,7 @@ pub fn bridge_decks(roads: &[Feat], dk: &DeckLook, m: &Model, hw: &str) -> Vec<V
                 if ring.len() < 4 {
                     continue;
                 }
-                let mut props: Map<String, Value> = match fdir { Some(f) => roads[*f].props.to_map(), None => pprops.to_map() };
+                let mut props: Map<String, Value> = match fdir { Some(f) => roads.road(*f).to_map(), None => pprops.to_map() };
                 props.shift_remove("__rs_cls");          // Python marks the class (_mark_cls) after it makes the decks
                 props.insert("__rs_base".into(), json!(py_round(base_m * t, 2)));
                 props.insert("__rs_height".into(), json!(py_round(base_m * t + thick, 2)));
@@ -302,7 +302,7 @@ pub fn bridge_decks(roads: &[Feat], dk: &DeckLook, m: &Model, hw: &str) -> Vec<V
                         continue;
                     }
                     feats.push(json!({"type": "Feature", "properties": {
-                        "highway": pprops.get(hw).cloned().unwrap_or(Value::Null), "__rs_chain": chain_i, "__rs_casing_slab": 1,
+                        "highway": pprops.get(hw).map_or(Value::Null, Cell::to_value), "__rs_chain": chain_i, "__rs_casing_slab": 1,
                         "__rs_edges": edges, "__rs_base": py_round((base_m * t - 0.5).max(0.0), 2),
                         "__rs_height": py_round(base_m * t + thick * 0.35, 2)},
                         "geometry": {"type": "Polygon", "coordinates": [to_lonlat(&ring)]}}));

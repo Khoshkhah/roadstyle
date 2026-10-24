@@ -1,6 +1,8 @@
 [package]
 name = "roadstyle-io"
 version.workspace = true
+repository.workspace = true
+homepage.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "roadstyle's readers: the roads and other tables from GeoParquet"
@@ -11,4 +13,5 @@ serde_json.workspace = true
 parquet.workspace = true
 arrow-array.workspace = true
 arrow-schema.workspace = true
+arrow-select.workspace = true
 bytes.workspace = true

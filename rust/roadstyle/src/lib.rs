@@ -1,13 +1,32 @@
 //! roadstyle as a Rust library (docs/design/rust_library.md): the facade. It re-exports the crates of the core with the module paths
 //! of the old single crate (`roadstyle::props`, `roadstyle::read`, `roadstyle::levels`, `roadstyle::tiles`, `roadstyle::make_style`,
-//! ...), and it has `make_tiled`, which needs both the engine and the tiles. A Rust user adds only this crate.
+//! ...), and it has the functions that read GeoParquet bytes (roadstyle-io) and call the engine: `make_style` and `make_tiled`, which
+//! needs both the engine and the tiles. A Rust user adds only this crate.
 
 pub use roadstyle_engine::*;
+pub use roadstyle_io::read;
 pub mod page;
 pub use roadstyle_levels as levels;
 pub use roadstyle_tiles as tiles;
 
 use serde_json::{json, Value};
+
+/// The roads, the base map's rows and the route planner's rows.
+type Tables = (RoadTable, Option<Vec<Row>>, Option<Vec<Row>>);
+
+/// The roads and the other tables from their GeoParquet bytes: the roads' lines and the base map's geometries in the column `geometry`.
+fn tables(parquet: Vec<u8>, features: Option<Vec<u8>>, planner: Option<Vec<u8>>) -> Result<Tables, String> {
+    Ok((read::read_roads(parquet, "geometry")?,
+        features.map(|f| read::read_table(f, "geometry")).transpose()?,
+        planner.map(|p| read::read_table(p, "")).transpose()?))
+}
+
+/// The style as one JSON text (roadstyle's export_inline), from the roads and the other tables as GeoParquet bytes: the engine's
+/// `make_style` after roadstyle-io's readers.
+pub fn make_style(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, String> {
+    let (feats, features, planner) = tables(parquet, features, planner)?;
+    roadstyle_engine::make_style(feats, look, features, planner, name)
+}
 
 /// The style with one vector-tile source, `roads` (`<prefix>roads/{z}/{x}/{y}`), and the tiles to answer it with (tiles.rs: the rules of
 /// roadstyle's tiles.py, the zooms and the buffer from `look["config"]["tiles"]`). The layers, the metadata and the camera are those of
@@ -27,7 +46,8 @@ pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name:
     let arg = |k: &str| cfg_all["args"][k].as_str().filter(|c| !c.is_empty()).map(String::from);
     let (width_col, highway_col) = (arg("width_m_col"), arg("highway_col").unwrap_or_else(|| "highway".into()));
     let filter_col = arg("filter_col");
-    let Parts { name, center, zoom, mut layers, sources, metadata, glyphs, state } = make_parts(parquet, look, features, None, name)?;
+    let (feats, features, _) = tables(parquet, features, None)?;
+    let Parts { name, center, zoom, mut layers, sources, metadata, glyphs, state } = make_parts(feats, look, features, None, name)?;
     let mut read: std::collections::HashSet<String> = keep.iter().cloned().chain(["name".to_string(), "kind".to_string()]).collect();
     fn texts(v: &Value, out: &mut std::collections::HashSet<String>) {
         match v {
@@ -48,6 +68,8 @@ pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name:
     let exact: Option<std::collections::HashSet<String>> = cfg_all["args"]["tile_keep"].as_array()
         .map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
     let only: Option<Vec<&str>> = cfg_all["args"]["tile_layers"].as_array().map(|a| a.iter().filter_map(Value::as_str).collect());
+    // the roads stay until the end: the simple pieces are made from them
+    let (sources, roads) = take_roads(sources);
     for (k, s) in sources {
         let slots = k == "slots";
         let from = if slots { slots_from } else { 0 };
@@ -55,13 +77,18 @@ pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name:
             continue;
         }
         match s {
-            Src::Typed(s) if exact.is_some() => tiled.add_typed(&k, s, exact.as_ref().unwrap(), slots, from),
-            // render's tiles: the pieces of `simple` keep the class, lvl, the metre width column and the __rs_* marks (not a picked item's fields)
-            Src::Typed(s) if k == "simple" => {
-                let keep: std::collections::HashSet<String> = [highway_col.clone(), "lvl".into()].into_iter().chain(width_col.clone()).chain(filter_col.clone()).collect();
-                tiled.add_typed(&k, s, &keep, slots, from)
+            // the roads, from the table and the marks (no copy of their properties)
+            Src::Roads(_) => {
+                let s = roads.as_ref().ok_or("no roads source")?;
+                let feats = s.roads.iter().map(|r| (r.line(), r.iter().map(|(k, c)| (s.out_name(k), c.to_value()))));
+                tiled.add_lines(&k, feats, exact.as_ref().unwrap_or(&read), slots, from)
             }
-            Src::Typed(s) => tiled.add_typed(&k, s, &read, slots, from),
+            Src::Simple(s) => {
+                let r = &roads.as_ref().ok_or("the simple pieces need the roads source")?.roads;
+                // render's tiles: the pieces of `simple` keep the class, lvl, the metre width column and the __rs_* marks (not a picked item's fields)
+                let own: std::collections::HashSet<String> = [highway_col.clone(), "lvl".into()].into_iter().chain(width_col.clone()).chain(filter_col.clone()).collect();
+                tiled.add_lines(&k, s.features(r).map(|(_, p, c)| (c, p.into_iter())), exact.as_ref().unwrap_or(&own), slots, from)
+            }
             // the full look's casing pieces: the columns of the simple pieces (tiles.py's line layers with `keep`)
             Src::Json(s) if k == "casings" => {
                 let keep: std::collections::HashSet<String> = exact.clone().unwrap_or_else(|| {

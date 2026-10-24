@@ -2,7 +2,7 @@
 //! per feature with its layer, osm_id, kind, name, bearing, the height tags and the WKB), as `{layer: FeatureCollection}` in draw order.
 
 use crate::geom::{from_wkb, Geom};
-use crate::read::read_table;
+use crate::Row;
 use indexmap::IndexMap;
 use serde_json::{json, Map, Value};
 
@@ -61,13 +61,12 @@ fn building_base(min_height: Option<&str>, min_level: Option<&str>, cfg: &Value)
 }
 
 /// load_layers: `{name: FeatureCollection}`, in the order of the first row of each layer; a polygon layer's features largest first.
-pub fn feature_collections(parquet: Vec<u8>, look: &Value) -> Result<Map<String, Value>, String> {
-    let rows = read_table(parquet, "geometry")?;
+pub fn feature_collections(rows: Vec<Row>, look: &Value) -> Result<Map<String, Value>, String> {
     let specs = look["features"]["layers_yaml"]["layers"].as_array().ok_or("look.json: no features.layers_yaml.layers")?;
     let kind_of = |name: &str| specs.iter().find(|s| s["name"] == name).and_then(|s| s["kind"].as_str()).unwrap_or("");
     let b3d = &look["features"]["buildings_3d"];
     let mut out: IndexMap<String, Vec<(f64, Value)>> = IndexMap::new();
-    for (r, wkb) in rows {
+    for Row { cols: r, blob: wkb } in rows {
         let spec = &specs[r["spec"].as_u64().ok_or("features.parquet: no spec")? as usize];
         let Some(g) = wkb.as_deref().and_then(from_wkb) else { return Err(format!("features.parquet: a geometry of {} is not read", r["layer"])) };
         let area = g.area();
