@@ -4,6 +4,7 @@ gaps. Each fact goes between the page's markers <!-- gen:NAME --> and <!-- /gen:
 
     python docs/gen_architecture.py            # write the facts into the page
     python docs/gen_architecture.py --check    # exit 1 if the page in git is not the code's
+    python docs/gen_architecture.py --long     # a GitHub warning for each source file over LONG lines (CI; it does not fail)
 
 mkdocs.yml runs this file as a hook (on_page_markdown), so the site always has the facts of the code it is built from.
 """
@@ -18,6 +19,9 @@ ROOT = Path(__file__).resolve().parents[1]
 RUST = ROOT / "rust"
 PAGE = ROOT / "docs" / "rust" / "architecture.md"
 PY = {p.stem for p in (ROOT / "src" / "roadstyle").glob("*.py")}
+
+
+LONG = 600       # a file longer than this is a candidate to split (audit R21)
 
 
 def lines(p: Path) -> int:
@@ -242,7 +246,18 @@ def on_page_markdown(markdown, page, **kwargs):
     return fill(markdown) if page.file.src_uri == "rust/architecture.md" else markdown
 
 
+def long_files() -> list[tuple[Path, int]]:
+    """The source files (Rust, Python, the page's JavaScript) over LONG lines, the longest first."""
+    files = [*RUST.glob("*/src/**/*.rs"), *(ROOT / "src" / "roadstyle").rglob("*.py"), *(ROOT / "src" / "roadstyle" / "static").rglob("*.js")]
+    found = [(f, lines(f)) for f in files if "vendor" not in f.parts and not f.name.endswith(".min.js")]
+    return sorted([(f, n) for f, n in found if n > LONG], key=lambda x: -x[1])
+
+
 if __name__ == "__main__":
+    if "--long" in sys.argv:
+        for f, n in long_files():
+            print(f"::warning file={f.relative_to(ROOT)}::{n:,} lines, more than {LONG}: a candidate to split (audit R21)")
+        sys.exit(0)
     old = PAGE.read_text(encoding="utf-8")
     new = fill(old)
     if "--check" in sys.argv:

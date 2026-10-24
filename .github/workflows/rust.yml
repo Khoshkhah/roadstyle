@@ -50,6 +50,9 @@ jobs:
       - name: Clippy
         run: cargo clippy --offline --all-targets -- -D warnings
 
+      - name: Long files (a warning, not a failure)
+        run: python3 ../docs/gen_architecture.py --long
+
       - name: WebAssembly
         run: |
           cargo build --offline --release --target wasm32-unknown-unknown -p roadstyle-wasm
