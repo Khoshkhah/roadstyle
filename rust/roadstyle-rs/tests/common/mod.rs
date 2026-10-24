@@ -204,8 +204,28 @@ pub fn as_decided(mut want: Value) -> Value {
     if let Some(s) = want["sources"]["simple"].as_object_mut() {
         s.insert("promoteId".into(), "__rs_edge".into());
     }
-    // R8 (2026-10-24): the road layer's class tables as one lookup by each feature's class index (__rs_ci, its last property)
+    // N8 (2026-10-24): every style reads a road's colour and its width factor from the feature state on its row: the fill (the glow's
+    // last case, inside the tunnel look) is ["coalesce", ["feature-state", "rs_c"], fill], each stop of the width and the offset × rs_w
     let classes = classes_of(&want);
+    let factor = json!(["coalesce", ["feature-state", "rs_w"], 1]);
+    for l in want["layers"].as_array_mut().into_iter().flatten().filter(|l| l["id"] == "roads-simple") {
+        let color = l["paint"]["line-color"].as_array().unwrap();
+        let glow = color.last().unwrap();
+        let f = &glow[5];
+        let fill = if f[0] == "case" && f[1] == json!(["to-boolean", ["get", "__rs_tunnel"]]) { f[3].clone() } else { f.clone() };
+        let live = json!(["coalesce", ["feature-state", "rs_c"], fill.clone()]);
+        fn swap(v: &mut Value, from: &Value, to: &Value) {
+            if v == from {
+                *v = to.clone();
+            } else if let Value::Array(a) = v {
+                a.iter_mut().for_each(|x| swap(x, from, to));
+            }
+        }
+        swap(l["paint"]["line-color"].as_array_mut().unwrap().last_mut().unwrap(), &fill, &live);
+        for k in ["line-width", "line-offset"] {
+            l["paint"][k] = roadstyle_rs::layers::times_each_stop(&l["paint"][k], &factor);
+        }
+    }
     for l in want["layers"].as_array_mut().into_iter().flatten().filter(|l| l["id"] == "roads-simple") {
         roadstyle_rs::layers::class_index(&mut l["paint"], "highway", &classes);
     }

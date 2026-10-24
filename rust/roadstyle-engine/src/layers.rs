@@ -403,7 +403,7 @@ pub const LIVE_WIDTH: &str = "rs_w";
 
 /// `e` with each output of its zoom curve times `f`: a zoom curve must stay at the top of a paint value (MapLibre), so the factor goes
 /// into each stop.
-pub(crate) fn times_each_stop(e: &Value, f: &Value) -> Value {
+pub fn times_each_stop(e: &Value, f: &Value) -> Value {
     let times = |v: &Value| json!(["*", v, f]);
     match e.as_array().map(Vec::as_slice) {
         Some([op, how, input, rest @ ..]) if op == "interpolate" && input == &json!(["zoom"]) => {
@@ -839,12 +839,9 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
     let op = json!(["case", ["all", ["!", gs("rs_fill_on")], k(1)], 0, 1]);
     // _simple_color, with the glow of lean mode
     let mut fill = fill_expr(fills, fb_fill);
-    // R22, live data (render's live_data): a road's colour and its width factor from the page's feature state on its row (rs.setData),
-    // over the baked ones; no new build for a new value
-    let live_data = args["live_data"] == true;
-    if live_data {
-        fill = json!(["coalesce", ["feature-state", LIVE_COLOR], fill]);
-    }
+    // R22 and audit N8 (2026-10-24), in every style: a road's colour and its width factor from the feature state on its row (rs.setData,
+    // the dashboard's colouring), over the baked ones; no new build for a new value
+    fill = json!(["coalesce", ["feature-state", LIVE_COLOR], fill]);
     let mut item = json!(["coalesce", painted("__rs_edge", "rs_colors"), painted("__rs_edge2", "rs_colors"), painted("__rs_edge", "rs_base"),
                           painted("__rs_edge2", "rs_base"), ["coalesce", ["get", "__rs_ic"], fb_fill]]);
     let mut cases = vec![k(2), cfg["bridge_shadow_color"].clone(), is_c.clone(),
@@ -875,8 +872,8 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
     let width = by_feature(&wide, &fw);
     let width = if pairs { m.pair_width(&width, if metres { wmz.as_f64() } else { None }) } else { width };
     let factor = json!(["coalesce", ["feature-state", LIVE_WIDTH], 1]);
-    paint.insert("line-width".into(), if live_data { times_each_stop(&width, &factor) } else { width });
-    paint.insert("line-offset".into(), if live_data { times_each_stop(&soff, &factor) } else { soff });
+    paint.insert("line-width".into(), times_each_stop(&width, &factor));
+    paint.insert("line-offset".into(), times_each_stop(&soff, &factor));
     paint.insert("line-blur".into(), json!(["interpolate", ["linear"], ["zoom"], r0v, 0, r1v, ["case", is_sh, blur, 0]]));
     paint.insert("line-opacity".into(), json!(["interpolate", ["linear"], ["zoom"], r0v, ["case", is_sh, 0, op], r1v, op]));
     let mut simple_layout = lay.as_object().unwrap().clone();
