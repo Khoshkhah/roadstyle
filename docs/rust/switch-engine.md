@@ -2,6 +2,11 @@
 
 <p class="lead">Select the Rust engine for one call with a keyword, or for a whole process with an environment variable.</p>
 
+!!! warning "Experimental"
+    The Rust engine is experimental in 0.25. The Python API that selects it (`engine="rust"`, `ROADSTYLE_ENGINE`) is stable.
+    The engine's inside, the `roadstyle:*` metadata in the style and the `__rs_*` property names can change in the next
+    versions. The default engine stays Python.
+
 ## Select the engine for one call
 
 Give `engine="rust"` to the functions that take it:

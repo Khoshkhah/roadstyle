@@ -12,6 +12,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 default stays the Python engine: a map made with 0.24.3 is the same with 0.25.0, except for the Python fixes below. Select the Rust engine for one call with
 `engine="rust"`, or for all calls with the environment variable `ROADSTYLE_ENGINE=rust`.
 
+**The Rust engine is experimental.** The Python API that selects it (`engine="rust"`, `ROADSTYLE_ENGINE`) is stable. The engine's inside
+(the crates and the functions of the WebAssembly package), the `roadstyle:*` metadata in the style and the `__rs_*` property names can
+change in the next versions.
+
 - **What the Rust engine does:** `render_edges` (the web page, also `tiles=True`, `simple=False`, `views=`, overlays and items),
   `export_inline`, `export_style` (XYZ and PMTiles), `export_look`, `compute_levels` (`method="tags"` and `"solve"`, with the defaults), the
   data colours (`color_by`, `color_table`, `color_options`, the legend) and the look (`palette`, `profile`, `settings`). Its output is the

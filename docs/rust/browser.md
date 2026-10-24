@@ -3,6 +3,10 @@
 <p class="lead">Make the style, the vector tiles or the whole page in a web page, with the WebAssembly package and the dashboard
 modules. No Python runs.</p>
 
+!!! warning "Experimental"
+    The Rust engine is experimental in 0.25. The functions of the WebAssembly package, the `roadstyle:*` metadata in the style
+    and the `__rs_*` property names can change in the next versions. Use one exact version of the package.
+
 duckosm-rust's browser page and the GeoLibre plugin use roadstyle this way. The examples on this page use Monaco.
 
 ## Get the files

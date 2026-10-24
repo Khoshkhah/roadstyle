@@ -2,6 +2,11 @@
 
 <p class="lead">roadstyle 0.25 has a second engine, written in Rust. It makes the same maps as the Python engine, 3 to 12 times faster.</p>
 
+!!! warning "Experimental"
+    The Rust engine is experimental in 0.25. The Python API that selects it (`engine="rust"`, `ROADSTYLE_ENGINE`) is stable.
+    The engine's inside, the `roadstyle:*` metadata in the style and the `__rs_*` property names can change in the next
+    versions. The default engine stays Python.
+
 The Rust engine makes the style of a map, its vector tiles, the drawing levels and the HTML page. It is in the roadstyle wheel
 on PyPI, so `pip install roadstyle` gives you both engines. The default engine is Python. You select the Rust engine for each
 call or for the whole process:
