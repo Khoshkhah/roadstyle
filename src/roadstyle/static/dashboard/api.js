@@ -16,6 +16,7 @@ export function makeApi(extra){
     rowOf = new Map(); edgeOf = new Map();
     rows.forEach((r, i) => { const e = props[i] && props[i][O.edge_id_col]; const k = e == null ? String(r) : String(e); rowOf.set(k, r); edgeOf.set(r, k); });
   };
+  document.addEventListener("rs:tableready", () => { rowOf = null; edgeOf = null; });   // the road table came after a first use
   const row = id => { index(); return rowOf.has(String(id)) ? rowOf.get(String(id)) : id; };
   const edge = r => { index(); return edgeOf.has(r) ? edgeOf.get(r) : (r == null ? null : String(r)); };
   const rows = ids => ids == null ? null : Array.from(ids, row);

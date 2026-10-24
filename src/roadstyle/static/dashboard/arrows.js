@@ -38,7 +38,7 @@ let _RS_ARROW = null;     // the profile's arrows.place, main_below and main, an
 export function _rsArrows(){
   // the style's arrows (roadstyle:arrows): "points", one arrow per one-way chain placed here, on the arrows source; "line" or "line-center": the
   // style's own symbol layers place them. A style without the key: points when it has an arrows source.
-  const kind = (style.metadata || {})["roadstyle:arrows"]; if(kind && kind !== "points") return;
+  const kind = O.arrows !== undefined ? O.arrows : (style.metadata || {})["roadstyle:arrows"]; if(kind !== undefined && kind !== "points") return;
   const src = _src("arrows") && map.getSource(_src("arrows").source); if(!src) return;
   const out = [];
   if(map.getZoom() >= 15){

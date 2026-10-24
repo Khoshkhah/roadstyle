@@ -14,7 +14,6 @@ pick = function(p){
   if(!hit.length) return own;
   const top = hit.reduce((a, b)=>b.properties.__rs_s > a.properties.__rs_s ? b : a);
   if(top.properties.__rs_k===5) return _roadOf(top);
-  const e = top.properties.__rs_edge;
-  return {id:e, properties:_rprops(e), layer:{id:"roads-fill"}, get geometry(){ const r=_feats()[e] || _svTiled(e); return r && r.geometry; }};
+  return _roadOfPiece(top);
 };
 </script>

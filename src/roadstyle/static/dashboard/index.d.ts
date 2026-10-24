@@ -14,10 +14,12 @@ export interface DashboardOptions {
   /** The road table of stage 1, by row: each road's fields, midpoint, bbox, heading and line. null: window.RS_SIDE, else none
    *  (then the inline roads source, or engine.props for one road). */
   road_table?: RoadTableData | null;
-  /** The roads are a vector source (tiles). */
+  /** The roads are a vector source (tiles). Simple mode and its road layer come from the style. */
   tiles?: boolean;
-  /** Simple mode: the id of the one road layer ("roads-simple"), else false. */
-  simple?: string | false;
+  /** Role -> {source, layer} (roadstyle:sources): the roads style's sources by role; layer null for a GeoJSON source. */
+  sources?: Record<string, { source: string; layer: string | null }> | null;
+  /** The style's arrows (roadstyle:arrows): "points" (the dashboard places them), "line", "line-center", or null (none). */
+  arrows?: "points" | "line" | "line-center" | null;
   /** The base maps of the switcher: {key, label, tiles, bg, maxzoom, attr}. None: the dashboard does not touch the map's base map. */
   basemaps?: Array<{ key: string; label: string; tiles: string[]; bg: string; maxzoom?: number; attr?: string }>;
   basemap_switcher?: boolean;
@@ -106,8 +108,8 @@ export type DashboardEvent = "state" | "select" | "deselect" | "filter" | "color
 /** The object that rsDashboard returns (the Python page sets window.rs to it). */
 export interface Dashboard {
   readonly contract: number;
-  /** A new roads style: add its sources and layers to the map first (with the prefix). The controls stay. */
-  setStyle(style: StyleSpecification): void;
+  /** A new roads style: add its sources and layers to the map first (with the prefix). The controls stay. more.road_table: its road table. */
+  setStyle(style: StyleSpecification, more?: { road_table?: RoadTableData | null }): void;
   select(id: EdgeId | null): void;
   highlight(ids: EdgeId[]): void;
   focus(ids: EdgeId | EdgeId[]): void;

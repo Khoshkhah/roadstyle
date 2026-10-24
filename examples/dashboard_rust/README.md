@@ -27,8 +27,8 @@ python -m http.server 8000
 
 Then open `http://localhost:8000/examples/dashboard_rust/`.
 
-The page gives `rsDashboard` only the options that the Rust style does not have: `simple` (the one road layer), the selection colour and the
-controls.
+The page gives `rsDashboard` only what the Rust style does not have: the road table (`makeSources(...).roadTable()`), the selection
+colour and the controls.
 The road popup fields, the hover tooltip and the hover delay come from the style's metadata `roadstyle:interaction`.
 The page colours the roads by their lane count (`color_by="lanes"` in the look's `args`). The legend comes from the style's metadata
 `roadstyle:color_options`.
@@ -37,5 +37,5 @@ The page colours the roads by their lane count (`color_by="lanes"` in the look's
 
 `tiles.html` adds the roads later, as vector tiles of the engine's `Tiler`, on an OpenFreeMap base map. It uses the dashboard
 as duckosm-rust's page does: `style: null` and `prefix: "rs-"` at the start, `rs.setStyle(style)` after the roads are on the map,
-and `engine.props` for a road's properties. The button replaces the roads style with another colouring.
+and the road table of each style (`rs.setStyle(style, {road_table})`). The button replaces the roads style with another colouring.
 Open `http://localhost:8000/examples/dashboard_rust/tiles.html`. It needs the internet for MapLibre and the base map.

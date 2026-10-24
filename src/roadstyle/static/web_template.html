@@ -66,10 +66,11 @@ rsDashboard(map, {
 // the inflate state so a screenshot alone pinpoints the failing stage.
 map.on("load", function(){ var tries=0; (function check(){ setTimeout(function(){
   try{
-    var n;
-    if(RS_TILED){ n = map.querySourceFeatures("roads",{sourceLayer:"roads"}).length; }
+    var s = _src("simple") || _src("roads"), n;   // the role that draws the roads: simple, or roads in the full look
+    if(!s) n = 0;
+    else if(s.sourceLayer){ n = map.querySourceFeatures(s.source, {sourceLayer:s.sourceLayer}).length; }
     else{
-      n = _sfeats("roads").length; }
+      n = _sfeats(s.source).length; }
     if(n) return;
     if(RS_TILED && ++tries < 3) return check();          // tiles may still be decoding/loading
     var st = RS_TILED

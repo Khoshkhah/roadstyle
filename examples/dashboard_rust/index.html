@@ -12,7 +12,7 @@
 </head><body>
 <div id="map"></div>
 <script type="module">
-import init, {makeStyle} from "./pkg/roadstyle_wasm.js";
+import init, {makeStyle, makeSources} from "./pkg/roadstyle_wasm.js";
 import {rsDashboard} from "../../src/roadstyle/static/dashboard/index.js";
 
 const DATA = "../../rust/roadstyle-rs/tests/data/";
@@ -23,6 +23,8 @@ const [, roads, lookText] = await Promise.all([init(), bytes(DATA + "monaco/road
 const look = JSON.parse(lookText);
 Object.assign(look.args, {color_by: "lanes", cmap: "YlOrRd", vmin: 1, vmax: 4});
 const style = JSON.parse(makeStyle(roads, JSON.stringify(look), undefined, undefined, "Monaco"));
+// the road table of stage 1 (each road's fields, midpoint, bbox, heading and line, by row): the popup, the search and Street View read it
+const road_table = JSON.parse(new TextDecoder().decode(makeSources(roads, JSON.stringify(look), undefined, undefined, "Monaco").roadTable()));
 const theme = look.theme;
 
 const map = new maplibregl.Map({container: "map", style, attributionControl: {compact: true}});
@@ -36,7 +38,7 @@ for (const [id, im] of Object.entries(style.metadata["roadstyle:images"] || {}))
 // roadstyle:color_options
 rsDashboard(map, {
   style,
-  simple: "roads-simple",     // the engine's style is simple mode: the roads are drawn by this one layer
+  road_table,
   select_color: theme.selection.select,
   street_view: "window",
   find_control: true,

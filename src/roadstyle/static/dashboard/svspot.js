@@ -69,10 +69,11 @@ export function _svPick(ll, f, id){
   return _svUrl(ll, f); }
 // the map marker: a dot where Street View stands and a cone the way it looks. Shown while a
 // Street View is on screen (the window open, or the side-by-side page); rsSetStreetViewMarker(on)
-// the drawn lane offset (px) of an edge at this zoom: roads-fill's own line-offset expression,
+// the drawn lane offset (px) of an edge at this zoom: the road layer's own line-offset expression,
 // ["interpolate",["linear"],["zoom"], z, ["case", two-way?, ["match",["get",class], ..., dflt], 0], ...]
 export function _svLanePx(props){
-  const e=map.getPaintProperty(RS_PREFIX+"roads-fill", "line-offset");
+  const lay=RS_LEAN || RS_PREFIX+"roads-fill"; if(!map.getLayer(lay)) return 0;     // the road layer: simple mode's one layer, or the full look's fill
+  const e=map.getPaintProperty(lay, "line-offset");
   if(!Array.isArray(e) || e[0]!=="interpolate") return typeof e==="number" ? e : 0;
   const val=x=>{ if(typeof x==="number") return x;
     if(!Array.isArray(x)) return 0;

@@ -31,7 +31,7 @@ rsDashboard(map, {style, select_color: "#7c4dff"});
 - The page must have the global `maplibregl` (MapLibre's UMD script).
 - The page adds MapLibre's navigation and scale controls before `rsDashboard`, if it wants them. The dashboard's buttons
   (2D/3D, Street View, Google 3D, base map) go below them in the top-right column.
-- A style from the Rust engine is simple mode. Give `simple: "roads-simple"`, or the hover and select glow do not show.
+- Give the road table (`road_table`, or `window.RS_SIDE`): the popup, the search, `rsFocus` and Street View read it.
 - `examples/dashboard_rust/` is a working page on a style from `rust/roadstyle-wasm` (Monaco).
 
 The Python page (`render_web.render`) does not load modules. When `render_web.py` is imported, it reads the files in a fixed order
@@ -46,10 +46,9 @@ duckosm-rust's page adds the roads only after a build, as vector tiles of the en
 roadstyle's (OpenFreeMap). Each network change gives a new roads style. `examples/dashboard_rust/tiles.html` does the same on Monaco.
 
 ```js
-const rs = rsDashboard(map, {style: null, prefix: "rs-", tiles: true, simple: "roads-simple",
-                             engine: {props: (id) => worker.roadProps(id)}});
+const rs = rsDashboard(map, {style: null, prefix: "rs-", tiles: true});
 // after each build: remove the old rs- layers and sources, add the new ones with the prefix, then
-rs.setStyle(style);
+rs.setStyle(style, {road_table});
 ```
 
 - **`rsDashboard` returns an object.** Today it has one method, `setStyle(style)`. The plan for the runtime API
@@ -63,10 +62,9 @@ rs.setStyle(style);
 - **`prefix`.** The page adds the roads style's sources and layers with this prefix (`"rs-"`). The dashboard adds it to each
   source and layer id that it uses. The names in the style itself stay as they are: a layer's `source-layer`, the metadata.
 - **The base map.** With no `basemaps` option the dashboard has no base map button and does not touch the map's own base map.
-- **The glow on tiles.** The engine's tiled style (`rust-engine` from `f92323f`) has one vector source `roads`; each layer names
-  its source layer (`roads`, `simple`, `slots`), as in Python's tiles. The source layer `roads` has no lines: the map draws the
-  roads from the pieces in `simple`. The page adds the source with `promoteId: {simple: "__rs_edge"}`. Then all the pieces of a
-  road have the road's id, and one feature state (`{source: "rs-roads", sourceLayer: "simple", id: road}`) lights the whole road,
+- **The glow on tiles.** The engine's tiled style has one vector source `roads`; each layer names its source layer (`simple`,
+  `slots`), as in Python's tiles. The engine gives the source `promoteId` `"__rs_edge"`, so all the pieces of a road have the
+  road's row as their id, and one feature state (`{source: "rs-roads", sourceLayer: "simple", id: row}`) lights the whole road,
   also in tiles that load later. Without `promoteId`, `setStyle` writes an error in the console. A road is picked on its fill
   pieces (`__rs_k` 1).
 - **`engine.props(id)`.** A function that returns a Promise of one road's properties (`id`: the road's row, the `__rs_edge` of its
@@ -97,20 +95,21 @@ of `core.js` do it; the other files call them.
   feature with the road's whole line for Street View and Google 3D. `rsQuery`, `rsFind`, `rsGetProps` and `rsFocus` read the
   table, so they work with tiles when the page has the table.
 - **The glow (`_fs`).** The feature state of a road by its row. In simple mode the state goes on the pieces of the role
-  `simple`, which all have the row as their id when the source has `promoteId` `"__rs_edge"` (GeoJSON) or
-  `{simple: "__rs_edge"}` (vector). In the full look it goes on the road in the role `roads`. A road's 3D decks come from one
+  `simple`, which all have the row as their id (the source has `promoteId` `"__rs_edge"`, GeoJSON and vector alike). In
+  Python's full look it goes on the road in the role `roads`. Simple mode and its one road layer come from the style (a line
+  layer of the role `simple`), so a later style can change them. A road's 3D decks come from one
   index road to decks, made again when the decks' data changes.
 - **The arrows.** The metadata `roadstyle:arrows` says which arrows the style has: `"points"` (the dashboard places one arrow for
   each one-way chain, on the `arrows` source), `"line"` or `"line-center"` (the style's own symbol layers). A style without the
   key: points when it has an `arrows` source.
 
-Two reads stay until the page writers of step (g) give every page a road table and `promoteId` (marked "until (g)" in
-`core.js`): the roads' features of an inline page as its road table (`_feats`), and the index of a road's pieces for a `simple`
-source without `promoteId` (`_pieces`). `_sdata` (MapLibre's private `_data`) then stays only for the inline sources that have
-no table: the decks, the slots and the overlays.
+Every page of roadstyle embeds the road table (`static/page/side.html`) and sends `rs:tableready` when it has loaded it; the
+dashboard reads it when it needs it, and `api.js` makes its edge id index again then. A page has no `roads` source in simple
+mode. `_sdata` (MapLibre's private `_data`) stays only for the inline sources that have no table: the decks (the road-to-decks
+index), the slots (the arrows) and the overlays.
 
-The names that other page scripts call stay: `_rprops`, `_feats`, `_svTiled`, `_roadOf`, `pick`, `ITEM_PICK`, `_sfeats`,
-`_rsArrows`, `_rsArrowAt` (the simple-mode script, the level editor).
+The names that other page scripts call stay: `_rprops`, `_svTiled`, `_roadOf`, `_roadOfPiece`, `pick`, `ITEM_PICK`, `_sfeats`,
+`_src`, `_rsArrows`, `_rsArrowAt` (the simple-mode script, the no-roads message, the level editor).
 
 ## The options
 
@@ -126,7 +125,8 @@ values that the page reads, which `render` makes from its keywords. The template
 | `basemaps` | `basemaps` | `[]` | `basemap.js` |
 | `basemap_switcher` | `basemap_switcher` | `true` | `basemap.js` |
 | `tiles` | `tiles` | `false` | `core.js` (the sidecar table `window.RS_SIDE`) |
-| `simple` | `simple` with inline data: the id of the one road layer (the Rust engine: also with tiles) | `false` | `core.js`, `select.js`, `svspot.js` |
+| `sources` | the page's roles (`roadstyle:sources`) | `null`: the metadata, else the style's layers | `core.js` (`_src`) |
+| `arrows` | the page's arrows (`roadstyle:arrows`) | the metadata, else `"points"` with an `arrows` source | `arrows.js` |
 | `popup_mode` | `popup_mode` (or `road_popup="panel"`) | `"popup"` | `panel.js`, and each control that docks in the panel |
 | `find_control` | `find_control` | `false` | `find.js` |
 | `zoom_readout` | `zoom_readout` | `true` | `zoom.js` |

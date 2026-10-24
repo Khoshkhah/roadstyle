@@ -14,7 +14,7 @@
 </head><body>
 <div id="map"></div><button id="next" type="button">Colour by lanes</button>
 <script type="module">
-import init, {Tiler} from "./pkg/roadstyle_wasm.js";
+import init, {makeSources, tileSources} from "./pkg/roadstyle_wasm.js";
 import {rsDashboard} from "../../src/roadstyle/static/dashboard/index.js";
 
 const DATA = "../../rust/roadstyle-rs/tests/data/";
@@ -34,37 +34,38 @@ maplibregl.addProtocol("rs", async (params) => {
   const [g, source, z, x, y] = params.url.slice("rs://".length).split("/");
   return {data: +g === gen ? tiler.tile(source, +z, +x, +y) : new Uint8Array()};
 });
-// the dashboard before the roads: no style yet; the roads' properties come from the engine, one road at a time
+// the dashboard before the roads: no style yet
 const rs = rsDashboard(map, {
   style: null,
   prefix: "rs-",
   tiles: true,
-  simple: "roads-simple",     // the engine's style is simple mode: the roads are drawn by this one layer (source-layer "simple")
-  engine: {props: async (id) => JSON.parse(tiler.props("roads", id))},
   select_color: theme.selection.select,
   street_view: "window",
 });
 window.rs = rs;
 
-// a roads style on the map, in place of the one before: its images, sources and layers with the prefix rs-, then rs.setStyle
+// a roads style on the map, in place of the one before: its images, sources and layers with the prefix rs-, then rs.setStyle with the
+// style and its road table (stage 1 gives both: the table, then the tiles from the same sources)
 async function showRoads(colorBy) {
   const look = JSON.parse(lookText);
   if (colorBy) Object.assign(look.args, colorBy);
-  tiler = new Tiler(roads, JSON.stringify(look), undefined, "Monaco", `rs://${++gen}/`, ["name", "edge_id", "highway"]);
+  const sources = makeSources(roads, JSON.stringify(look), undefined, undefined, "Monaco");
+  const road_table = JSON.parse(new TextDecoder().decode(sources.roadTable()));
+  tiler = tileSources(sources, `rs://${++gen}/`, ["name", "edge_id", "highway"]);
   const style = JSON.parse(tiler.style());
   for (const l of map.getStyle().layers) if (l.id.startsWith("rs-")) map.removeLayer(l.id);
   for (const id of Object.keys(map.getStyle().sources)) if (id.startsWith("rs-")) map.removeSource(id);
   for (const [id, im] of Object.entries(style.metadata["roadstyle:images"] || {})) {
     if (!map.hasImage("rs-" + id)) map.addImage("rs-" + id, (await map.loadImage(im.url)).data, {sdf: im.sdf, pixelRatio: im.pixelRatio});
   }
-  // the one vector source "roads" (its source layers: roads, simple, slots). promoteId: the pieces of a road have the road's id in the
-  // map, so the dashboard lights them all with one feature state
-  for (const [id, src] of Object.entries(style.sources)) map.addSource("rs-" + id, id === "roads" ? {...src, promoteId: {simple: "__rs_edge"}} : src);
+  // the one vector source "roads" (its source layers: simple, slots); the engine gives it promoteId "__rs_edge", so the pieces of a road
+  // have the road's row as their id and one feature state lights them all
+  for (const [id, src] of Object.entries(style.sources)) map.addSource("rs-" + id, src);
   for (const l of style.layers) {
     const layer = JSON.parse(JSON.stringify(l).replaceAll('"oneway"', '"rs-oneway"'));   // the image name in the layout
     map.addLayer({...layer, id: "rs-" + l.id, source: "rs-" + l.source});
   }
-  rs.setStyle(style);
+  rs.setStyle(style, {road_table});
 }
 await map.once("load");
 await showRoads(null);

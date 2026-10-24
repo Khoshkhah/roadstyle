@@ -8,15 +8,16 @@ export let RS_PREFIX = "";
 // tiles=True: the roads are a vector source (the template's no-roads message reads it). The modules do not branch on it: they read the
 // source map (_src) and the road table (RoadTable).
 export let RS_TILED = false;
-// simple mode: the id of the one road layer, else false. A road is picked on the fill pieces of that layer (__rs_k 1, their __rs_edge is the
-// road's row), and its hover / select glow is the feature-state of those pieces (_fs).
+// simple mode (the style has the role simple): the id of its one road layer in the map, else false (Python's full look). A road is picked
+// on the fill pieces of that layer (__rs_k 1, their __rs_edge is the road's row), and its hover / select glow is the feature-state of those
+// pieces (_fs).
 export let RS_LEAN = false;
 export let RS_DECK_LAYERS = [];
 // extra overlay layers (zones / POIs / lines), their metadata: label, source, layers, popup, tooltip, interactive, under, base, ...
 export let OVERLAYS = [];
 export function initCore(m, opts){
   map = m; O = opts; RS_PREFIX = opts.prefix;
-  RS_TILED = opts.tiles; RS_LEAN = opts.simple && RS_PREFIX+opts.simple; OVERLAYS = opts.overlays;
+  RS_TILED = opts.tiles; OVERLAYS = opts.overlays;
   useStyle(opts.style);
   map.on("sourcedata", e=>{ const s=map.getSource(e.sourceId); if(s && s._data) delete s._data._rs; if(_SRC.decks && e.sourceId===RS_PREFIX+_SRC.decks.source) _decks=null; });
   window.rsQuery = rsQuery; window.rsGetProps = rsGetProps; window.rsHighlight = rsHighlight; window.rsFocus = rsFocus;
@@ -25,16 +26,18 @@ export function initCore(m, opts){
 // no road layers, nothing to pick
 export function useStyle(st){
   style = st || {layers:[], sources:{}, metadata:{}};
-  _SRC = (style.metadata || {})["roadstyle:sources"] || _sourcesOf(style);
+  _SRC = O.sources || (style.metadata || {})["roadstyle:sources"] || _sourcesOf(style);
+  const lean = style.layers.find(l=>(l["source-layer"] || l.source)==="simple" && l.type==="line");
+  RS_LEAN = lean ? RS_PREFIX+lean.id : false;
   RS_DECK_LAYERS = style.layers.filter(l=>l.id.indexOf("roads-bridge-decks")===0).map(l=>RS_PREFIX+l.id);
   _pcache.clear(); _decks = null;
-  const s = RS_LEAN && _src("simple");
-  if(s && s.sourceLayer && map.getSource(s.source) && !_promoted("simple"))
-    console.error('rs: the roads source needs promoteId {simple: "__rs_edge"} (addSource), or a road does not glow');
+  if(RS_LEAN && map.getSource(_src("simple").source) && !_promoted("simple"))
+    console.error('rs: the source of the role simple needs promoteId "__rs_edge" (addSource), or a road does not glow');
 }
-// THE ROADS STYLE'S SOURCES BY ROLE: role -> {source, layer}. The roles are the names of the roads style's sources (roads, simple, slots,
-// arrows, decks, shadows, ov<i>); with tiles a role is a source layer of a vector source. The metadata roadstyle:sources gives them; a style
-// without it gives them by its layers (a layer's source-layer, else its source, is its role): the same map.
+// THE ROADS STYLE'S SOURCES BY ROLE: role -> {source, layer}. The roles are the names of the roads style's sources (simple, slots, arrows,
+// decks, shadows, boundary, ov<i>, and roads in Python's full look); with tiles a role is a source layer of a vector source. The option
+// sources (the page) or the metadata roadstyle:sources gives them; a style without them gives them by its layers (a layer's source-layer,
+// else its source, is its role): the same map.
 let _SRC = {};
 function _sourcesOf(st){ const out = {};
   for(const l of st.layers) if(l.source) out[l["source-layer"] || l.source] = {source:l.source, layer:l["source-layer"] || null};
@@ -64,25 +67,20 @@ export function _itemOv(id){ return OVERLAYS.find(o=>o.base && id in o.base) || 
 // keeps its place): read as a FeatureCollection, kept until the source's data changes again
 export function _sdata(s){ const d=s && s._data; if(!d) return null; if(d.geojson || !d.updateable) return d.geojson;
   return d._rs || (d._rs={type:"FeatureCollection", features:Array.from(d.updateable.values())}); }
-export function _sfeats(src){ const g=_sdata(src && map.getSource(src)); return (g && g.features)||[]; }   // src: the source's id in the map
-// until (g): the roads' features of an inline page that has no road table (RoadTable reads them); [] with tiles
-export function _feats(){ const s=_src("roads"); return s && !s.sourceLayer ? _sfeats(s.source) : []; }
+// the features of an inline source of the roads style that has no table (decks, slots, overlays); src: the source's id in the map
+export function _sfeats(src){ const g=_sdata(src && map.getSource(src)); return (g && g.features)||[]; }
 // THE ROAD TABLE: each road's fields, midpoint, bbox, heading and line, keyed by the row ({props, mids, bboxes, headings, lines}, as stage 1
-// makes it). The page gives it (options.road_table, or window.RS_SIDE once the page has inflated it), or one road's fields at a time
-// (engine.props). RoadTable is the one port of every read of a road; null and {} where it has nothing.
+// makes it). The page gives it (options.road_table, or window.RS_SIDE: the page loads it after the style and then sends rs:tableready), or
+// one road's fields at a time (engine.props). RoadTable is the one port of every read of a road; null and {} where it has nothing.
 function _table(){ return O.road_table || window.RS_SIDE || null; }
 export function _side(){ return _table(); }
-function _coords(g){ return !g ? null : g.type==="LineString" ? g.coordinates : g.type==="MultiLineString" ? [].concat(...g.coordinates) : null; }
 export const RoadTable = {
-  has(i){ const t=_table(); return t ? t.props[i]!=null : _pcache.has(i) || !!_feats()[i]; },
-  props(i){ const t=_table(); if(t) return t.props[i]||{}; if(_pcache.has(i)) return _pcache.get(i);
-    const f=_feats()[i]; return (f && f.properties)||{}; },
-  line(i){ const t=_table(); if(t && t.lines) return t.lines[i] || null; const f=_feats()[i]; return f ? _coords(f.geometry) : null; },
-  mid(i){ const t=_table(); return t && t.mids ? t.mids[i] || null : null; },
-  bbox(i){ const t=_table(); if(t && t.bboxes) return t.bboxes[i] || null;
-    const c=RoadTable.line(i); if(!c || !c.length) return null; const bb={ok:false, minx:1/0, miny:1/0, maxx:-1/0, maxy:-1/0}; _bbExtend(c, bb);
-    return [bb.minx, bb.miny, bb.maxx, bb.maxy]; },
-  rows(){ const t=_table(); return t ? t.props.length : _feats().length; },
+  has(i){ const t=_table(); return t ? t.props[i]!=null : _pcache.has(i); },
+  props(i){ const t=_table(); return (t ? t.props[i] : _pcache.get(i)) || {}; },
+  line(i){ const t=_table(); return (t && t.lines && t.lines[i]) || null; },
+  mid(i){ const t=_table(); return (t && t.mids && t.mids[i]) || null; },
+  bbox(i){ const t=_table(); return (t && t.bboxes && t.bboxes[i]) || null; },
+  rows(){ const t=_table(); return t ? t.props.length : 0; },
 };
 export function _rprops(i){ return RoadTable.props(i); }
 // a road as a feature with its whole line ({id, properties, geometry}), for Street View and Google 3D; null without a line
@@ -96,14 +94,6 @@ export function _withProps(ids, go){
   const one = i => _pcache.has(i) ? Promise.resolve(_pcache.get(i)) : Promise.resolve(get(i)).then(p=>{ p=p||{}; _pcache.set(i, p); return p; });
   Promise.all(ids.filter(i=>i!=null).map(i=>one(i).then(p=>p.__rs_edge2!=null ? one(p.__rs_edge2) : null)))
     .then(go, e=>console.error("rs: engine.props failed", e)); }
-let _pcIdx = null, _pcFs = null;         // until (g): a road's row -> the ids of its fill pieces (a simple source without promoteId), and their list
-export function _pieces(e){
-  const fs=_sfeats((_src("simple")||{}).source);            // a new list after the data changes (setData, or the level editor's updateData): the index is made again
-  if(!_pcIdx || _pcFs!==fs){ const m=new Map();
-    fs.forEach((f,i)=>{ const p=f.properties||{}; if(p.__rs_k===1){ let a=m.get(p.__rs_edge); if(!a) m.set(p.__rs_edge, a=[]); a.push(f.id!=null ? f.id : i); } });
-    if(!fs.length) return [];
-    _pcIdx=m; _pcFs=fs; }
-  return _pcIdx.get(e) || []; }
 // a fill piece, as the road feature it belongs to. Its line: the road's whole line (the road table), else the piece's own (a page with
 // engine.props only: the piece under the click, cut at its tile) - Street View's spot, marker and steps need one
 export function _roadOfPiece(f){ const e=f.properties.__rs_edge;
@@ -114,10 +104,7 @@ export const _FILL_PIECE = ["any", ["==", ["get", "__rs_k"], 1], ["!", ["has", "
 // Simple mode: the road's pieces in the role simple, which all have the row as their id (promoteId "__rs_edge"); the full look: the road in
 // the role roads. The source layer only where the role is in a vector source.
 export function _fs(ref, st){
-  if(ref.source==="roads" && RS_LEAN){ const s=_src("simple"); if(!s) return;
-    if(_promoted("simple")) map.setFeatureState({...s, id:ref.id}, st);
-    else _pieces(ref.id).forEach(id=>map.setFeatureState({...s, id:id}, st));   // until (g): pieces without promoteId
-    return; }
+  if(ref.source==="roads" && RS_LEAN){ const s=_src("simple"); if(s) map.setFeatureState({...s, id:ref.id}, st); return; }
   if(ref.source==="roads" || ref.source==="decks"){ const s=_src(ref.source); if(!s) return; ref={...s, id:ref.id}; }
   map.setFeatureState(ref, st); }
 export function _lyr(name){   // -> {src, ov} | null; ov null = the roads (the road table)

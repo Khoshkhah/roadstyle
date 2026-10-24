@@ -25,8 +25,10 @@ const RS_DEFAULTS = {
   prefix: "",                  // the prefix of the roads style's source and layer ids in the map ("rs-": the page added them so)
   engine: null,                // {props: id => Promise of the road's properties}: a page whose roads are only in vector tiles
   road_table: null,            // the road table {props, mids, bboxes, headings, lines} by row (stage 1); null: window.RS_SIDE, else none
+  sources: null,               // role -> {source, layer} (roadstyle:sources); null: the style's metadata, else its layers
+  arrows: undefined,           // "points" | "line" | "line-center" | null (roadstyle:arrows); undefined: the metadata, else the style
   basemaps: [], basemap_switcher: true,
-  tiles: false, simple: false, // simple: the id of the one road layer of simple mode with inline data, else false
+  tiles: false,                // the roads are a vector source (the template's no-roads message); simple mode comes from the style
   popup_mode: "popup", find_control: false, zoom_readout: true, pitch_3d: 55,
   street_view: "window", street_view_key: "", google_3d: false,
   filter: {on: false, classes: []}, color_active: 0,
@@ -76,8 +78,9 @@ export function rsDashboard(map, options){
   const rs = makeApi({
     // a new roads style: the page added its sources and layers to the map first (with the prefix). The controls stay; they read the
     // new style, its metadata and its layers. The selection, the hover and the properties of engine.props go: they were the old roads'.
-    setStyle(style){
+    setStyle(style, more){
       o.style = style; fromStyle(o, given);
+      if(more && "road_table" in more) o.road_table = more.road_table;      // the new style's road table (stage 1)
       useStyle(style); useSelect(); useFilter(); useColor(); useLegend();
     },
   });
