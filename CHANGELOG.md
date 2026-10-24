@@ -110,6 +110,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   The base map's look gives the page its base map: blank, in the theme's land colour, with the raster maps in the switcher. The route
   planner stays mapstyle's. In Rust, `page_options::page_from` takes the base map's rows (`features`), and so do the Python binding's
   `page_from` and the browser's `makePage`.
+- **`duckosm.read(levels="auto")`, the default of `duckosm.page`** (render_map's rule): the stored levels when the file has
+  `visualization.edge_levels`, else the engine solves them, with the warning "no visualization.edge_levels in this file: roadstyle solved
+  the levels; run duckosm levels to store them". Stored levels of other roads stay an error, and `levels="stored"` stays strict (now with
+  the reader's message, not DuckDB's, when the file has no table). `layers` can be a list of layer names, as in render_map.
 - **What the dashboard needs to draw a duckOSM map's page** (for its port of mapstyle's page scripts): the base map's look bakes the
   restricted roads' colour (private, bus, pedestrian, delivery) into every colour option's fill (`access_col: "access"`; mapstyle's
   `layers.js` painted the same colours on the page); `roadstyle:controls.modes` gives the map's modes with their counts of roads

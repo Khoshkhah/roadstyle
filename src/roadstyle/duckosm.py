@@ -18,26 +18,37 @@ def layer_specs() -> list[dict]:
     return yaml.safe_load(files("roadstyle").joinpath("data/basemap/layers.yaml").read_text(encoding="utf-8"))["layers"]
 
 
-def read(db, mode: str = "all", *, levels: str = "stored", layers: bool = True, only: bool = False):
+def read(db, mode: str = "all", *, levels: str = "stored", layers=True, only: bool = False):
     """``(roads, features, levels_kw)`` of the duckOSM file ``db`` for the map of ``mode`` ("all", "driving", "walking" or "cycling"):
-    the roads (GeoParquet bytes), the base map's rows (GeoParquet bytes, None with ``layers=False`` or when the file has none) and the
-    look's keyword ``levels``: the stored levels' check ({edge_hash, n_edges}) with ``levels="stored"``, or "tags" (the engine computes
-    the levels with the tags rule). A base-map layer whose table or query fails is skipped, as mapstyle's load_layers does. ``only``:
+    the roads (GeoParquet bytes), the base map's rows (GeoParquet bytes, None with ``layers=False`` or when the file has none; a list of
+    names: those layers) and the look's keyword ``levels``: the stored levels' check ({edge_hash, n_edges}) with ``levels="stored"`` (an
+    error when the file has none), "tags" (the engine computes the levels with the tags rule), or with "auto" (render_map's rule, the
+    page's default) the stored levels when the file has them, else None (the engine solves them, with a warning). Stored levels for
+    other roads are an error. A base-map layer whose table or query fails is skipped, as mapstyle's load_layers does. ``only``:
     the roads of ``mode`` alone (its edges and private_edges; render_map(only=True)); the stored levels were solved for every mode
     together, so each of these roads must have its stored row (load_area_levels(subset=True))."""
     import duckdb
 
     from ._engine import rust
 
-    if levels not in ("stored", "tags"):
-        raise ValueError(f'levels must be "stored" or "tags", got {levels!r}')
+    if levels not in ("stored", "tags", "auto"):
+        raise ValueError(f'levels must be "stored", "tags" or "auto", got {levels!r}')
     r = rust()
     con = duckdb.connect(str(db), read_only=True)
     try:
         catalog = con.execute("SELECT current_database()").fetchone()[0]
         tq, cq = r.duckosm_catalog_sql(catalog)
         tables, columns = con.execute(tq).fetchall(), con.execute(cq).fetchall()
-        plan = json.loads(r.duckosm_plan(tables, columns, mode, levels == "tags", json.dumps(layer_specs() if layers else []), only))
+        # "auto" (render_map's rule, docs/design/stored_levels.md of mapstyle): the stored levels when the file has them, else the
+        # engine solves them, with a warning
+        stored = ("visualization", "edge_levels") in {tuple(t) for t in tables}
+        if levels == "stored" and not stored:
+            r.duckosm_levels(None)                          # the reader's error: no stored levels in this file (duckosm levels)
+        solve = levels == "auto" and not stored
+        if solve:
+            warnings.warn(f"{db}: no visualization.edge_levels in this file: roadstyle solved the levels; run duckosm levels to store them",
+                          stacklevel=2)
+        plan = json.loads(r.duckosm_plan(tables, columns, mode, levels == "tags" or solve, json.dumps(layer_specs() if layers else []), only))
         if plan["roads"] is None:
             raise ValueError(f"{db}: {plan['roads_error']}")
         e, rows, drop = plan["roads"]
@@ -58,10 +69,11 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers: bool = True, 
         elif plan["meta"]:
             level_kw = json.loads(r.duckosm_levels(tuple(row) if row else None))
         else:
-            level_kw = "tags"
+            level_kw = None if solve else "tags"
         con.execute(drop)
         made = []
-        for lyr in plan["layers"]:
+        # a list of names: those layers only (each row's spec is its place in layers.yaml, so the plan has all of them)
+        for lyr in (x for x in plan["layers"] if layers is True or x["name"] in layers):
             for k, sql in enumerate(lyr["sql"]):          # mapstyle's query, then its fallback (no tags: the height of the kind)
                 try:
                     con.execute(f"CREATE OR REPLACE TEMP TABLE f{lyr['spec']} AS {sql}")
@@ -116,7 +128,7 @@ def export_inline(db, mode: str = "all", *, theme: str = "osm", paths: str = "go
     return style
 
 
-def page(db, mode: str = "all", *, theme: str = "osm", paths: str = "google", layers: bool = True, levels: str = "stored",
+def page(db, mode: str = "all", *, theme: str = "osm", paths: str = "google", layers=True, levels: str = "auto",
          only: bool = False, interaction: dict = None, dashboard: bool = False, **kwargs):
     """mapstyle's ``render_map`` on the Rust engine: the page of the duckOSM file ``db`` (``read``, its roads in the style of ``mode``, the
     base map of ``features.*`` with ``layers``, the shared dashboard with the base map's controls: modes, kinds, each layer's clicks,

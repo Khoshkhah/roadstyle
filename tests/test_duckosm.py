@@ -172,3 +172,22 @@ def test_the_modes_column_names_the_modes_of_each_road():
     pq.write_table(t, buf)
     got = pq.read_table(io.BytesIO(duckosm._with_modes(buf.getvalue()))).column("modes").to_pylist()
     assert got == ["all modes", "driving + walking", "walking + cycling", ""]
+
+
+def test_auto_levels_solve_a_file_with_no_stored_levels(tmp_path):
+    """levels="auto" (render_map's rule, the page's default): a file with no visualization.edge_levels is drawn with the levels that the
+    engine solves, and a warning says so; levels="stored" stays an error for that file."""
+    import duckdb
+
+    from roadstyle import duckosm
+
+    db = _tiny(tmp_path / "a.duckdb")
+    con = duckdb.connect(str(db))
+    con.execute("DROP TABLE IF EXISTS visualization.edge_levels; DROP TABLE IF EXISTS visualization.edge_levels_meta")
+    con.close()
+    with pytest.warns(UserWarning, match="no visualization.edge_levels in this file: roadstyle solved the levels; run duckosm levels to "
+                                         "store them"):
+        _, _, level_kw = duckosm.read(db, "driving", levels="auto")
+    assert level_kw is None
+    with pytest.raises(ValueError, match="duckosm levels"):
+        duckosm.read(db, "driving", levels="stored")
