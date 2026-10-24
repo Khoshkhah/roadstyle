@@ -122,7 +122,7 @@ mod wasm {
             order: if o.get("order").is_some() { o["order"].as_str().filter(|v| *v != "none").map(String::from) } else { d.order },
             band_dist: num("band_dist", d.band_dist), head_m: num("head_m", d.head_m), near_rules: o["near_rules"].as_bool().unwrap_or(d.near_rules),
         };
-        let table = roadstyle::read::read_roads(edges, "geometry").map_err(|e| JsError::new(&e))?;
+        let table = roadstyle::read::read_roads(edges, "geometry").map_err(|e| JsError::new(&e.to_string()))?;
         roadstyle::level_area::make_files(&table, &m, o["heads"].as_str().unwrap_or("")).map(AreaFiles).map_err(|e| JsError::new(&e))
     }
 
