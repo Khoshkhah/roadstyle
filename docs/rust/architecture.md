@@ -287,9 +287,14 @@ worker writes from a duckOSM file (`writeRoads`). The look comes from `make_look
 stages run natively; in the browser they run in the page or in a worker, and the page only draws. Then the dashboard reads the
 metadata and adds the controls, and the `rs` object is the API for a host page.
 
-**What the design phase adds** (the last rows of [Known design gaps](#known-design-gaps)): a public call for each stage alone in
-Python and in the browser, so that a saved GeoJSON can go to stage 2; and a typed border, so that stage 1 gives stage 2 the
-typed pieces in memory, with GeoJSON only as a file format at the border.
+**What the design phase adds** (step (f) of the roadstyle-rs session; the last rows of [Known design gaps](#known-design-gaps)):
+
+- **A public call for each stage alone**, in Rust, Python and the browser.
+- **The border between stage 1 and stage 2.** Stage 1 returns its output in memory, as typed values. You can save it as a file,
+  and stage 2 takes it from memory or reads it from a file. The one call passes it in memory, with no file.
+- **Two file formats at the border:** GeoJSON, which MapLibre reads directly and people can read, and GeoParquet, a binary format
+  for large areas (much smaller than Tartu's GeoJSON text of about 150 MB) that DuckDB also reads directly.
+- **The road table as its own Parquet file**, next to the pieces, not inside the GeoJSON.
 
 The metadata keys between the engine and the dashboard, and the modules that write or read them:
 

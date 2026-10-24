@@ -57,7 +57,7 @@ The names are a proposal.
 | the roads (duckOSM's `<mode>.edges`) | the roads as they are today | duckOSM |
 | `visualization.edge_levels` | the drawing levels, as today | the level step |
 | `roadstyle.looks` | each look (its JSON) and its hash | stage 1 |
-| `roadstyle.pieces` | stage 1's drawing sources (`simple`, `slots`, `decks`): the geometry and the drawing values of each piece, the road's row, the look hash | stage 1 |
+| `roadstyle.pieces` | stage 1's drawing sources (`simple`, `slots`, `decks`): the geometry and the drawing values of each piece, the road's row, the look hash. Stage 1 can also save them as GeoParquet, the second file format of the stage border, which DuckDB reads directly | stage 1 |
 | `roadstyle.road_table` | the fields of each road, keyed by its row and `edge_id` (the road table of the design phase) | stage 1 |
 | `roadstyle.tiles` | the tile cache: the look hash, the data version, `z`, `x`, `y`, the tile bytes | the server |
 
