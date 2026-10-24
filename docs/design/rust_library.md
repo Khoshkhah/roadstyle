@@ -1287,6 +1287,8 @@ reads the static files from `src/roadstyle/` when it is built; a crates.io packa
 
 #### P7's CLI: one `roadstyle` program (audit N31, approved 2026-10-24)
 
+This plan waits for the target-architecture document.
+
 Two programs have the name `roadstyle` today, with two grammars:
 
 | | Python `roadstyle` (`cli.py`, argparse) | Rust `roadstyle` (`roadstyle-cli`, `commands.rs`) |
