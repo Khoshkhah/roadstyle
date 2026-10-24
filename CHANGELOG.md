@@ -55,6 +55,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   has the key: a casing piece has no `__rs_fill@<palette>: null` any more. The map does not change.
 
 ### Added
+- **The map of one mode from a duckOSM file** (`only=True` in `roadstyle.duckosm.read`, `export_inline` and `export_style`, as mapstyle's
+  `render_map(only=True)`): the `edges` and `private_edges` of one network. The stored levels were solved for every mode together, so each
+  road must have its stored row (as Python's `load_area_levels(subset=True)`), else an error that names how many and one of them; then the
+  look's `levels` keyword names these roads. JavaScript: `duckosmPlan(..., only)` and `duckosmSubsetLevels`. On Monaco the driving and
+  walking maps are mapstyle's but for the 3D decks and, in these maps only, 87 name slots and 1 to 2 attached points of the Rust engine.
 - **The base map's look for Python callers**: `roadstyle.duckosm.base_map(mode, theme=, paths=)` (the palette, the settings, the base
   map's part and the mode's map options), `roadstyle.duckosm.theme(name)` and `roadstyle.duckosm.recolor(colour, transform)`, all made
   by the Rust engine. The mapstyle shim reads them. `Look.part` also gives `palette`, `settings` and `features`.

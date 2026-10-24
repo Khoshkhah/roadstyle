@@ -9,6 +9,7 @@ description = "roadstyle's readers: the roads and other tables from GeoParquet"
 
 [dependencies]
 roadstyle-model.workspace = true
+roadstyle-levels.workspace = true      # duckosm: the hash of a map's edge ids (edge_hash), for the stored levels of one mode
 serde_json.workspace = true
 parquet.workspace = true
 arrow-array.workspace = true

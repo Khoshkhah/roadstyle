@@ -297,9 +297,11 @@ mod wasm {
     /// null, "select": the roads of `mode`, "layers": [{spec, name, sql: the
     /// queries in order}]}. `catalog`: the JSON text of {"name", "tables":
     /// [[schema, table]], "columns": [[schema, table, column]]} (with no tables: only "catalog" is in the answer); `specs`: layers.yaml's
-    /// layers as JSON text.
+    /// layers as JSON text. `only`: the map of `mode` alone; then "subset" has the queries of its roads with no stored levels and
+    /// of its edge_ids (for duckosmSubsetLevels).
     #[wasm_bindgen(js_name = duckosmPlan)]
-    pub fn duckosm_plan(catalog: &str, mode: &str, tags: bool, specs: &str) -> Result<String, JsError> {
+    pub fn duckosm_plan(catalog: &str, mode: &str, tags: bool, specs: &str, only: Option<bool>) -> Result<String, JsError> {
+        let only = only.unwrap_or(false);
         use roadstyle::duckosm;
         let err = |e: String| JsError::new(&e);
         let c: serde_json::Value = serde_json::from_str(catalog).map_err(|e| err(format!("catalog: {e}")))?;
@@ -314,8 +316,9 @@ mod wasm {
         let specs: Vec<serde_json::Value> = serde_json::from_str(specs).map_err(|e| err(format!("specs: {e}")))?;
         let layers: Vec<serde_json::Value> = duckosm::features_sql(&cat, &specs).into_iter()
             .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "sql": l.sql})).collect();
-        Ok(serde_json::json!({"catalog": queries, "roads": duckosm::roads_sql(&cat, tags).map_err(err)?, "meta": (!tags).then_some(duckosm::LEVELS_META_SQL),
-                              "select": duckosm::roads_select(mode).map_err(err)?, "layers": layers}).to_string())
+        Ok(serde_json::json!({"catalog": queries, "roads": duckosm::roads_sql(&cat, tags, only.then_some(mode)).map_err(err)?, "meta": (!tags).then_some(duckosm::LEVELS_META_SQL),
+                              "select": duckosm::roads_select(mode).map_err(err)?, "layers": layers,
+                              "subset": (only && !tags).then_some([duckosm::SUBSET_SQL, duckosm::IDS_SQL])}).to_string())
     }
 
     /// duckosmLevels(source?, nEdges?, edgeHash?) -> string: the look's keyword `levels` (JSON text) from the stored levels' metadata row
@@ -327,6 +330,18 @@ mod wasm {
             _ => None,
         };
         roadstyle::duckosm::levels_keyword(row).map(|v| v.to_string()).map_err(|e| JsError::new(&e))
+    }
+
+    /// duckosmSubsetLevels(source?, nEdges?, edgeHash?, missing, example?, ids) -> string: the look's keyword `levels` (JSON text) for a map
+    /// of one mode: the stored levels' metadata row, the row of the plan's "subset" query, and the map's edge_ids (a BigInt64Array).
+    #[wasm_bindgen(js_name = duckosmSubsetLevels)]
+    pub fn duckosm_subset_levels(source: Option<String>, n_edges: Option<f64>, edge_hash: Option<String>, missing: f64, example: Option<i64>,
+                                 ids: Vec<i64>) -> Result<String, JsError> {
+        let row = match (&source, n_edges, &edge_hash) {
+            (Some(s), Some(n), Some(h)) => Some((s.as_str(), n as i64, h.as_str())),
+            _ => None,
+        };
+        roadstyle::duckosm::subset_levels_keyword(row, missing as i64, example, &ids).map(|v| v.to_string()).map_err(|e| JsError::new(&e))
     }
 
     /// duckosmFeaturesSelect(specs: number[]) -> string | undefined: the base map's rows from the tables f<spec> that were made.
