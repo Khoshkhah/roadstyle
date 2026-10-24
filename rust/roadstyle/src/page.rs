@@ -123,6 +123,12 @@ fn frame() -> String {
         .replace("__DASHBOARD_CSS__", DASH_CSS).replace("__DASHBOARD_JS__", &dashboard_js())
 }
 
+/// JSON text for a <script> of the page (audit N23): each "<" as \u003c, the same value in JSON and in JavaScript. A data value with
+/// "</script>" in it (a legend's label, a road's field) cannot end the script and run what follows (render_web._script_json).
+fn script_json(v: &Value) -> String {
+    pyjson::dumps(v, false).replace('<', "\\u003c")
+}
+
 /// `text` with each token of `values` in it replaced, in one pass: a value is not searched again.
 fn fill(text: &str, values: &[(&str, String)]) -> String {
     let mut out = String::with_capacity(text.len() + values.iter().map(|(_, v)| v.len()).sum::<usize>());
@@ -187,8 +193,8 @@ pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String 
     opts.insert("camera".into(), serde_json::json!({"center": [(x0 + x1) / 2.0, (y0 + y1) / 2.0], "pitch": c.pitch, "bearing": c.bearing,
                                                     "max_pitch": c.max_pitch, "bounds": [[x0, y0], [x1, y1]]}));
     // the frame's tokens in one pass (audit R3): a value is not read again, so the host's own text may hold any token
-    let mut html = fill(&frame(), &[("__TITLE__", escape(p.name)), ("__STYLE__", pyjson::dumps(&style, false)),
-                                    ("__RS_OPTIONS__", pyjson::dumps(&Value::Object(opts), false)),
+    let mut html = fill(&frame(), &[("__TITLE__", escape(p.name)), ("__STYLE__", script_json(&style)),
+                                    ("__RS_OPTIONS__", script_json(&Value::Object(opts))),
                                     ("__HOST_PANEL_HTML__", host_panel(p.side_panel_html, p.host_panel_width, p.name))]);
     let mut parts = String::new();
     if let Some(pmt) = p.tiles {
@@ -201,10 +207,10 @@ pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String 
     }
     html = html.replacen("<script>__RS_TILES__</script>", &parts, 1);
     if let Some(s) = p.simple_js {
-        html = html.replacen("</body>", &(SIMPLE.replace("__RS_SIMPLE__", &pyjson::dumps(s, false)) + "</body>"), 1);
+        html = html.replacen("</body>", &(SIMPLE.replace("__RS_SIMPLE__", &script_json(s)) + "</body>"), 1);
     }
     if !gz.is_empty() {
-        html = html.replacen("</body>", &(INFLATE.replace("__RS_GZ__", &pyjson::dumps(&Value::Object(gz), false)) + "</body>"), 1);
+        html = html.replacen("</body>", &(INFLATE.replace("__RS_GZ__", &script_json(&Value::Object(gz))) + "</body>"), 1);
     }
     html
 }

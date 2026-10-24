@@ -4,6 +4,7 @@
 // to its center: the map's own camera distance at that zoom). A clicked road is drawn in the 3D view
 // and the camera flies along it (the map follows). Google's 3D map exists only while the window is
 // open: closing it drops it, as nothing is loaded from Google while it is closed.
+import {_esc} from "../popup.js";
 import {map, O, _road, _emit} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
 import {_svKey} from "./streetview.js";
@@ -100,7 +101,7 @@ export function initGoogle3D(){
         lib=l; m3=new l.Map3DElement(Object.assign(toGoogle(), {mode:l.MapMode.HYBRID}));
         for(const ev of ["gmp-centerchange", "gmp-headingchange", "gmp-tiltchange", "gmp-rangechange"]) m3.addEventListener(ev, fromGoogle);
         msg.hidden=true; w.appendChild(m3);
-      }).catch(e=>{ console.warn("rs google 3d:", e); say("<b>Google 3D did not load.</b><span>"+String(e.message||e)+"</span>"+SETUP); });
+      }).catch(e=>{ console.warn("rs google 3d:", e); say("<b>Google 3D did not load.</b><span>"+_esc(e.message||e)+"</span>"+SETUP); });
     };
     document.addEventListener("rs:select", e=>{  // a road: draw it in the 3D view and fly along it
       const d=e.detail; if(d.overlay || !m3) return;

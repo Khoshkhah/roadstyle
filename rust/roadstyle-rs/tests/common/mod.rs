@@ -191,109 +191,37 @@ pub fn decode_tile(b: &[u8]) -> Tile {
     tile
 }
 
-/// The decided changes of design step (g) (2026-10-23 and 2026-10-24), on a golden of roadstyle 0.24.3 (the file does not change):
-/// the export (not a page) keeps the roads' pick and highlight layers shown in both ways (before: hidden when the data was inline), and
-/// every style's pieces have their road's row as their feature id (`promoteId`), so a dashboard lights a road's pieces in any style
-/// (the glow of 0.24.3's inline styles is in every style).
-pub fn as_decided(mut want: Value) -> Value {
-    for l in want["layers"].as_array_mut().into_iter().flatten() {
-        if matches!(l["id"].as_str(), Some("roads-fill" | "roads-highlight")) {
-            l["layout"].as_object_mut().map(|o| o.shift_remove("visibility"));
-        }
-    }
-    if let Some(s) = want["sources"]["simple"].as_object_mut() {
-        s.insert("promoteId".into(), "__rs_edge".into());
-    }
-    // N8 (2026-10-24, part 2): a road's colour from rsColor or rsColorBase is the feature state rs_c (the dashboard writes it), not the
-    // state maps rs_colors and rs_base: the fill is the active option's (_fill_base), an item's coalesce(rs_c, its own), a painted road
-    // sorts on top by the state rs_top; the state has rs_top [] in place of the two maps. A style that is not live has each state's start
-    // value in place of ["global-state", ...]
-    fn unpaint(v: &mut Value) {
-        let map = |m: &Value| [json!(["global-state", "rs_colors"]), json!(["global-state", "rs_base"]), json!(["literal", {}])].contains(m);
-        let painted = |v: &Value| v.get(2).is_some_and(map);
-        let has = |v: &Value, k: &str| v.get(0) == Some(&json!("has")) && v.get(1) == Some(&json!(["to-string", ["get", k]])) && painted(v);
-        let sort = |a: &[Value]| a.len() == 3 && a[0] == "any" && has(&a[1], "__rs_edge") && has(&a[2], "__rs_edge2");
-        if let Some(a) = v.as_array().filter(|a| sort(a)) {
-            let top = if a[1][2][0] == "literal" { json!(["literal", []]) } else { json!(["global-state", "rs_top"]) };
-            *v = json!(["in", ["get", "__rs_edge"], top]);
-        } else if let Some(a) = v.as_array().filter(|a| a.len() == 6 && a[0] == "coalesce" && a[1..5].iter().all(painted)) {
-            let rest = a[5].clone();
-            *v = if rest.get(1) == Some(&json!(["get", "__rs_ic"])) { json!(["coalesce", ["feature-state", "rs_c"], rest]) } else { rest };
-        } else if let Value::Array(a) = v {
-            a.iter_mut().for_each(unpaint);
-        } else if let Value::Object(o) = v {
-            o.values_mut().for_each(unpaint);
-        }
-    }
-    want["layers"].as_array_mut().into_iter().flatten().for_each(unpaint);
-    if let Some(st) = want.get_mut("state").and_then(Value::as_object_mut).filter(|st| st.contains_key("rs_colors")) {
-        *st = std::mem::take(st).into_iter().filter(|(k, _)| k != "rs_base")
-            .map(|(k, v)| if k == "rs_colors" { ("rs_top".into(), json!({"default": []})) } else { (k, v) }).collect();
-    }
-    // N8 (2026-10-24): every style reads a road's colour and its width factor from the feature state on its row: the fill (the glow's
-    // last case, inside the tunnel look) is ["coalesce", ["feature-state", "rs_c"], fill], each stop of the width and the offset × rs_w
-    let classes = classes_of(&want);
-    let factor = json!(["coalesce", ["feature-state", "rs_w"], 1]);
-    for l in want["layers"].as_array_mut().into_iter().flatten().filter(|l| l["id"] == "roads-simple") {
-        let color = l["paint"]["line-color"].as_array().unwrap();
-        let glow = color.last().unwrap();
-        let f = &glow[5];
-        let fill = if f[0] == "case" && f[1] == json!(["to-boolean", ["get", "__rs_tunnel"]]) { f[3].clone() } else { f.clone() };
-        let live = json!(["coalesce", ["feature-state", "rs_c"], fill.clone()]);
-        fn swap(v: &mut Value, from: &Value, to: &Value) {
-            if v == from {
-                *v = to.clone();
-            } else if let Value::Array(a) = v {
-                a.iter_mut().for_each(|x| swap(x, from, to));
-            }
-        }
-        swap(l["paint"]["line-color"].as_array_mut().unwrap().last_mut().unwrap(), &fill, &live);
-        for k in ["line-width", "line-offset"] {
-            l["paint"][k] = roadstyle_rs::layers::times_each_stop(&l["paint"][k], &factor);
-        }
-    }
-    for l in want["layers"].as_array_mut().into_iter().flatten().filter(|l| l["id"] == "roads-simple") {
-        roadstyle_rs::layers::class_index(&mut l["paint"], "highway", &classes);
-    }
-    for f in want["sources"]["simple"]["data"]["features"].as_array_mut().into_iter().flatten() {
-        let ci = class_place(&classes, f["properties"]["highway"].as_str());
-        f["properties"]["__rs_ci"] = ci.into();
-    }
-    // R1 (2026-10-24): a piece keeps only the properties that are read (the layers, the page's declaration, the popup), a road only
-    // the stage values that are read (and all its fields)
-    let (read, pieces) = (drawn_of(&want), roadstyle_rs::props::piece_reads(want["layers"].as_array().map(Vec::as_slice).unwrap_or_default()));
-    for f in want["sources"]["simple"]["data"]["features"].as_array_mut().into_iter().flatten() {
-        let item = f["properties"]["__rs_k"] == 5;
-        if let Some(p) = f["properties"].as_object_mut() {
-            p.retain(|k, _| pieces.contains(k) || (item && !k.starts_with("__rs_")));
-        }
-    }
-    for f in want["sources"]["roads"]["data"]["features"].as_array_mut().into_iter().flatten() {
-        if let Some(p) = f["properties"].as_object_mut() {
-            p.retain(|k, _| read.contains(k) || !k.starts_with("__rs_"));
-        }
-    }
-    want
+/// The first 16 hex characters of the SHA-256 of a value's JSON text (a short name for a part of an output in a golden).
+pub fn hash16(v: &Value) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(v.to_string().as_bytes()).iter().take(8).map(|b| format!("{b:02x}")).collect()
 }
 
-/// The classes of a golden's road layer: the keys of its first class table (each table lists them in the same order).
-pub fn classes_of(style: &Value) -> Vec<String> {
-    fn first(v: &Value) -> Option<Vec<String>> {
-        let a = v.as_array()?;
-        if a.first() == Some(&json!("match")) && a.get(1) == Some(&json!(["get", "highway"])) {
-            return Some(a[2..a.len() - 1].iter().step_by(2).filter_map(|c| c.as_str().map(String::from)).collect());
-        }
-        a.iter().find_map(first)
+/// A style as a golden sees it (review D5): each layer's id, type and source with short hashes of its filter, paint and layout; each
+/// source's type, feature count and hash; the metadata's keys with the hash of each value; and the hash of the whole style. A change
+/// names the layer, source or metadata key that changed, and the golden stays a few KB.
+pub fn summary(style: &Value) -> Value {
+    let layers: Vec<Value> = style["layers"].as_array().into_iter().flatten().map(|l| json!([l["id"], l["type"], l["source"],
+        hash16(&l["filter"]), hash16(&l["paint"]), hash16(&l["layout"])])).collect();
+    let sources: serde_json::Map<String, Value> = style["sources"].as_object().into_iter().flatten().map(|(k, s)| (k.clone(), json!([
+        s["type"], s["data"]["features"].as_array().map(Vec::len), hash16(s)]))).collect();
+    let metadata: serde_json::Map<String, Value> = style["metadata"].as_object().into_iter().flatten().map(|(k, v)| (k.clone(), json!(hash16(v)))).collect();
+    let keys: Vec<&String> = style.as_object().map(|o| o.keys().collect()).unwrap_or_default();
+    json!({"keys": keys, "layers": layers, "sources": sources, "metadata": metadata, "hash": hash16(style)})
+}
+
+/// A golden (tests/data/<name>): with ROADSTYLE_BLESS=1 the test writes `got` there; otherwise it compares, and a difference fails with
+/// the paths of the first differences. One mechanism for every golden that the Rust engine makes (no Python, no program of its own).
+pub fn golden(name: &str, got: &Value) {
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data").join(name);
+    if std::env::var_os("ROADSTYLE_BLESS").is_some() {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, serde_json::to_string_pretty(got).unwrap() + "\n").unwrap();
+        return;
     }
-    style["layers"].as_array().into_iter().flatten().filter(|l| l["id"] == "roads-simple").find_map(|l| first(&l["paint"]["line-width"])).unwrap_or_default()
-}
-
-/// A class's place in `classes` (their number: another class), the class index.
-pub fn class_place(classes: &[String], c: Option<&str>) -> usize {
-    classes.iter().position(|x| Some(x.as_str()) == c).unwrap_or(classes.len())
-}
-
-/// What a style's drawing reads (props::drawn, with no caller's columns).
-pub fn drawn_of(style: &Value) -> std::collections::HashSet<String> {
-    roadstyle_rs::props::drawn(style["layers"].as_array().map(Vec::as_slice).unwrap_or_default(), &style["metadata"], &[])
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e} (ROADSTYLE_BLESS=1 cargo test writes it)", path.display()));
+    let want: Value = serde_json::from_str(&text).unwrap();
+    let mut out = Vec::new();
+    diff(got, &want, "$", &mut out);
+    assert!(out.is_empty(), "{name}: not the golden (got | golden); ROADSTYLE_BLESS=1 writes it again:\n{}", out[..out.len().min(12)].join("\n"));
 }

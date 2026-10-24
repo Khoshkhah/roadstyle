@@ -4,6 +4,7 @@
 // whatever the popup lists: a page with its own popup fields (road_popup=[...] without edge_id)
 // found no road by its id, the one search a review needs. rsFind(text) returns the matching ids
 // (as rsQuery does); the search box of the panel and of find_control=True is UI over it.
+import {_esc} from "../popup.js";
 import {O, rsQuery, rsFocus} from "./core.js";
 import {_popupMode, _tlHost} from "./panel.js";
 import {_popupFields, _ID_KEYS, rsSelect} from "./select.js";
@@ -32,7 +33,7 @@ export function _findWire(qin, qres){
     const n=Math.min(ids.length,30); let h="";
     for(let i=0;i<n;i++){ const k=info[i][0], v=info[i][1], nm=info[i][2];
       const lab=(nm&&nm.toLowerCase()!=="nan")?nm:v;
-      h+='<div class="rs-qrow" data-id="'+ids[i]+'"><b>'+lab+'</b><span>'+k+': '+v+'</span></div>'; }
+      h+='<div class="rs-qrow" data-id="'+_esc(ids[i])+'"><b>'+_esc(lab)+'</b><span>'+_esc(k)+': '+_esc(v)+'</span></div>'; }
     if(!ids.length) h='<div class="rs-qmore">no match</div>';
     else if(ids.length>n) h+='<div class="rs-qmore">'+ids.length+' matches \u2014 showing '+n+'</div>';
     qres.innerHTML=h;

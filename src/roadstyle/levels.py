@@ -359,7 +359,8 @@ def level_input(edges, id_col="edge_id", layer_col="layer", bridge_col="bridge",
     """The solver's input (docs/design/level_input.md), from any edges roadstyle draws: ``(roads, pairs)``.
 
     ``roads``: one row per road (both directions of a segment together): ``road`` (the ``id_col`` of its first edge, as text; the row number
-    without ``id_col``), ``edges`` / ``reversed`` (the ids of its edges in its own direction / the other way), ``band`` (``band_col``, else the
+    without ``id_col``; roads.parquet has the ids as Int64, see :func:`roadstyle.level_area.write_roads`; they stay text here because
+    duckosm-rust/tools compares them as text, a frozen repo), ``edges`` / ``reversed`` (the ids of its edges in its own direction / the other way), ``band`` (``band_col``, else the
     level from the tags), ``priority`` (the ``order``: ``"priority"``, ``"class"``, a column of numbers, or None) and the geometry of its first
     edge, and its ``highway_col``, ``name``, ``edge_ref`` (and ``edge_refs`` / ``reversed_refs``, and ``edges_oneway`` / ``reversed_oneway`` and ``edges_driving`` / ``reversed_driving`` and ``edges_directed`` / ``reversed_directed`` (:func:`roadstyle.is_directed`, from the edges' ``driving``, ``cycling`` and ``highway_col``), ``edges_lanes`` / ``reversed_lanes`` and ``edges_modes`` / ``reversed_modes``: each edge's own, null where the edges have no such column, as ``edges`` / ``reversed``), ``lanes``, ``modes`` (who may use it, e.g. duckOSM's travel modes), ``tunnel_col``, ``bridge_col`` and ``layer_col`` when the edges have them. ``pairs``: one row per relation, ``relation`` / ``a`` / ``b`` / ``a_end`` / ``b_end``: ``meet`` (the end ``a_end`` of ``a`` is the end
     ``b_end`` of ``b``), ``stack`` (``a`` is over ``b``: different bands, crossing or near away from a shared node) and ``order`` (``a``'s fill

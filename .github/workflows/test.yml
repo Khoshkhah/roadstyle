@@ -6,6 +6,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# a new push to a branch cancels its older runs (the runners are shared)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -45,9 +50,9 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
-      - name: Install (+ headless Chromium)
+      - name: Install (+ headless Chromium, + mcp for the Python MCP server's tests until it retires)
         run: |
-          pip install -e ".[dev]" playwright
+          pip install -e ".[dev]" playwright "mcp>=2.2,<3"
           playwright install --with-deps chromium
 
       - name: The Rust program roadstyle, for the Rust snapshot's test (tests/test_snapshot_rust.py)

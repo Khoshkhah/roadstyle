@@ -139,6 +139,10 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", engine: 
     style.setdefault("metadata", {})["roadstyle:interaction"] = {**out["interaction"], "css": f"{base}/popup.css", "js": f"{base}/popup.js"}
     if out.get("color_options"):     # the legend data, as in export_inline
         style["metadata"]["roadstyle:color_options"] = json.loads(json.dumps(out["color_options"]))
+    # an app's dashboard on this style: the road roles and the pick layers of its final layers, as a live style has them (audit 3, N27)
+    from .render_web import _pick_layers, _roles
+    style["metadata"]["roadstyle:sources"] = _roles(style["layers"])
+    style["metadata"]["roadstyle:controls"] = {"pick": _pick_layers(style["layers"])}
     png = files("roadstyle").joinpath("data/sprite.png").read_bytes()
     from . import _settings
     icon = _settings.theme_value("arrows.icon")          # the profile's arrow; sprite.png is drawn from the default path

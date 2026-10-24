@@ -10,7 +10,13 @@ description = "The roadstyle program: one command for each job (serve: the level
 [dependencies]
 roadstyle = { workspace = true, features = ["gpkg"] }   # the native program reads GeoPackage files too
 serde_json.workspace = true
-roadstyle-snapshot.workspace = true
+roadstyle-snapshot = { workspace = true, optional = true }
+roadstyle-serve.workspace = true
+
+[features]
+# `roadstyle snapshot` (Chromium through headless_chrome)
+default = ["snapshot"]
+snapshot = ["dep:roadstyle-snapshot"]
 
 [lib]
 name = "roadstyle_cli"

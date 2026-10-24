@@ -20,7 +20,7 @@ fn style(area: &str) -> Value {
 }
 
 fn style_differences(area: &str) -> Vec<(String, usize)> {
-    let (got, want) = (style(area), common::as_decided(common::gz_json(&format!("{area}/golden_style.json.gz"))));
+    let (got, want) = (style(area), common::gz_json(&format!("{area}/golden_style.json.gz")));
     // the top level: the engine writes mapstyle's export (its key order); below it, all is compared
     let mut keys: Vec<&String> = got.as_object().unwrap().keys().collect();
     keys.sort();
@@ -70,30 +70,12 @@ fn tile_summary(area: &str) -> Vec<(String, [usize; 5])> {
     let style = common::gz_json(&format!("{area}/golden_style.json.gz"));
     let keep: Vec<String> = style["sources"]["roads"]["data"]["features"][0]["properties"].as_object().unwrap().keys()
         .filter(|k| !k.starts_with("__rs_")).cloned().collect();
-    let (tstyle, tiles, _) = roadstyle_rs::make_tiled(roads, &roadstyle_rs::Look::from_value(look.clone()).unwrap(), None, None, "rs://", &keep).unwrap();
-    let tstyle: Value = serde_json::from_str(&tstyle).unwrap();
-    let read = common::drawn_of(&tstyle);       // R1: the roads' stage values that are read, and the pieces' (on the tile layer "simple")
-    let layers: Vec<Value> = tstyle["layers"].as_array().unwrap().iter().map(|l| {
-        let mut l = l.clone();
-        if l["source-layer"] == "simple" { l["source"] = "simple".into(); }
-        l
-    }).collect();
-    let pieces = roadstyle_rs::props::piece_reads(&layers);
-    let classes = common::classes_of(&style);
+    let (_, tiles, _) = roadstyle_rs::make_tiled(roads, &roadstyle_rs::Look::from_value(look.clone()).unwrap(), None, None, "rs://", &keep).unwrap();
     use base64::Engine;
     let mut sums: indexmap::IndexMap<(String, String), [usize; 5]> = indexmap::IndexMap::new();
     for (name, b64) in golden.as_object().unwrap() {
         let zxy: Vec<u32> = name.split('/').map(|v| v.parse().unwrap()).collect();
-        let mut py = common::decode_tile(&base64::engine::general_purpose::STANDARD.decode(b64.as_str().unwrap()).unwrap());
-        for f in py.get_mut("simple").into_iter().flatten() {
-            let ci = common::class_place(&classes, f.1.get("highway").and_then(Value::as_str));
-            f.1.insert("__rs_ci".into(), ci.into());        // R8: the class index
-            let item = f.1.get("__rs_k") == Some(&Value::from(5));
-            f.1.retain(|k, _| pieces.contains(k) || (item && !k.starts_with("__rs_")));
-        }
-        for f in py.get_mut("roads").into_iter().flatten() {
-            f.1.retain(|k, _| !k.starts_with("__rs_") || read.contains(k));
-        }
+        let py = common::decode_tile(&base64::engine::general_purpose::STANDARD.decode(b64.as_str().unwrap()).unwrap());
         let rs = common::decode_tile(&tiles.tile(zxy[0], zxy[1], zxy[2]));
         for layer in py.keys().chain(rs.keys()).collect::<indexmap::IndexSet<_>>() {
             let (p, r) = (py.get(layer).map_or(&[][..], |v| v.as_slice()), rs.get(layer).map_or(&[][..], |v| v.as_slice()));

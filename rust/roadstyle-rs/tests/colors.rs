@@ -24,10 +24,9 @@ fn check(case: &str) {
     }
     let roads = std::fs::read(data("monaco_part/roads.parquet")).unwrap();
     let style = roadstyle_rs::make_style(roads, &roadstyle_rs::Look::from_value(look.clone()).unwrap(), None, None, None).unwrap_or_else(|e| panic!("{case}: {e}"));
-    let mut style: Value = serde_json::from_str(&style).unwrap();
-    let options = style["metadata"].as_object_mut().unwrap().shift_remove("roadstyle:color_options").unwrap_or(Value::Array(vec![]));
-    let mut golden = golden;
-    golden["style"] = common::as_decided(golden["style"].take());
+    let style: Value = serde_json::from_str(&style).unwrap();
+    // the page's colour options are the export's roadstyle:color_options (both engines write them; none: [])
+    let options = style["metadata"].get("roadstyle:color_options").cloned().unwrap_or(Value::Array(vec![]));
     // the top level: the engine writes mapstyle's export (its key order); below it, all must be the same
     let mut out = Vec::new();
     let (mut a, mut b): (Vec<&String>, Vec<&String>) = (style.as_object().unwrap().keys().collect(), golden["style"].as_object().unwrap().keys().collect());
