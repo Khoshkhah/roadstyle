@@ -27,7 +27,9 @@ export function initCore(m, opts){
 // no road layers, nothing to pick
 export function useStyle(st){
   style = st || {layers:[], sources:{}, metadata:{}};
-  _SRC = O.sources || (style.metadata || {})["roadstyle:sources"] || _sourcesOf(style);
+  // the layers decide (they are what the map draws); the given map only for a role with no layer: a style made again for tiles can keep the
+  // role map of its GeoJSON stage in its metadata
+  _SRC = {...(O.sources || (style.metadata || {})["roadstyle:sources"] || {}), ..._sourcesOf(style)};
   const lean = style.layers.find(l=>(l["source-layer"] || l.source)==="simple" && l.type==="line");
   RS_LEAN = lean ? RS_PREFIX+lean.id : false;
   RS_DECK_LAYERS = style.layers.filter(l=>l.id.indexOf("roads-bridge-decks")===0).map(l=>RS_PREFIX+l.id);

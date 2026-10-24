@@ -12,7 +12,7 @@ const ID_COLS = new Set(["id", "fid", "gid", "uid", "objectid"]);
 // the state of the knobs
 const st = {data: null, loader: "", palette: "amber", basemap: "", view3d: false, tiles: false, colours: {}, classes: null, minzoom: false,
             labels: true, arrows: true, popup: "curated", popupCols: [], hover: [], overlays: []};
-let table = null, columns = [], allClasses = [], basemaps = [], built = null, gen = 0, dashKey = "";
+let table = null, columns = [], allClasses = [], basemaps = [], gen = 0, dashKey = "";
 
 // ---------------------------------------------------------------- the engine in its worker
 const worker = new Worker(new URL("./worker.js", import.meta.url), {type: "module"});
@@ -23,9 +23,7 @@ const call = (msg, transfer) => new Promise((ok, no) => { const id = ++callId; p
 
 // ---------------------------------------------------------------- what the preview asks for
 window.studio = {
-  dashboardOptions: () => ({basemaps, basemap: st.basemap, center: built ? built.center : [0, 0], zoom: built ? built.zoom : 1,
-    dashboard: {popup_mode: st.popup === "panel" ? "panel" : "popup", select_color: built ? built.select : undefined, street_view: "window",
-                filter: {on: false, col: "highway", classes: allClasses}}}),
+  dashboardOptions: () => ({basemaps, basemap: st.basemap, dashboard: {popup_mode: st.popup === "panel" ? "panel" : "popup", street_view: "window"}}),
   tile: async (url) => {                               // rs://<gen>/<source>/<z>/<x>/<y>, from the worker's Tiler
     const [g, source, z, x, y] = url.slice("rs://".length).split("/");
     if (+g !== gen) return new Uint8Array();
@@ -39,7 +37,8 @@ const previewWaiters = [];
 // ---------------------------------------------------------------- the look's options, the code's keywords
 // The knobs as the look's options (makeLook's input in the worker): render_edges' keywords that the engine reads.
 function lookOptions(){
-  const args = {name: "roadstyle"};
+  // state "live": the global states stay in the expressions and the style has the dashboard's options (roadstyle:controls), as a page
+  const args = {name: "roadstyle", state: "live"};
   if (st.view3d) args.view_3d = true;
   if (st.tiles) args.tiles = true;
   const co = colourOptions();
@@ -104,11 +103,11 @@ async function build(){
     table = t;
     if (first) dataKnown();
     const b = bounds(table.bboxes);
-    built = {select: r.select, center: [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], zoom: 12};
     interaction(r.style);
     const key = [st.data.name, st.popup].join("|");             // the dashboard is made again for new data or another popup mode
-    if (key !== dashKey) { dashKey = key; await reloadPreview(); }
-    await $("preview").contentWindow.show({style: r.style, table, files: r.files, fit: first ? [[b[0], b[1]], [b[2], b[3]]] : null});
+    const fresh = key !== dashKey;
+    if (fresh) { dashKey = key; await reloadPreview(); }
+    await $("preview").contentWindow.show({style: r.style, table, files: r.files, fit: first || fresh ? [[b[0], b[1]], [b[2], b[3]]] : null});
     if (st.classes) $("preview").contentWindow.rs.setFilter({classes: st.classes});
     $("status").textContent = `${table.props.length.toLocaleString()} roads, made in ${(r.ms / 1000).toFixed(1)} s`;
     $("status").dataset.built = gen;                            // the number of the last build (a test waits for it)

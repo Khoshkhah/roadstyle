@@ -1,7 +1,7 @@
 // The studio's engine, in a Web Worker so the page does not freeze: roadstyle's Rust engine (rust/roadstyle-wasm, `npm run build`). It keeps
 // the roads (a GeoParquet file) and makes, for each set of knobs, the look and stage 1 (the style, its sources and the road table) and,
 // with tiles, stage 2. Every call of the look is here (makeLook, and the look given to makeSources): the page sends only plain options.
-// Messages: {type: "roads", bytes} -> {}; {type: "build", options, name, tiles, keep, gen} -> {style, table, files, select};
+// Messages: {type: "roads", bytes} -> {}; {type: "build", options, name, tiles, keep, gen} -> {style, table, files};
 // {type: "tile", source, z, x, y} -> {bytes}. Every answer has the message's id, and ok or error.
 import init, {makeLook, makeSources, tileSources} from "../../rust/roadstyle-wasm/pkg/roadstyle_wasm.js";
 
@@ -19,7 +19,6 @@ onmessage = async (e) => {
     } else if (m.type === "build") {
       const t0 = performance.now();
       const look = makeLook(JSON.stringify(m.options));
-      const select = JSON.parse(look).theme.selection.select;    // the selection colour of the look's theme, for the dashboard
       const sources = makeSources(roads, look, undefined, undefined, m.name);
       const table = text(sources.roadTable());
       const files = {}, transfer = [];
@@ -37,7 +36,7 @@ onmessage = async (e) => {
           transfer.push(b.buffer);
         }
       }
-      postMessage({id: m.id, ok: true, style, table, files, select, ms: performance.now() - t0}, transfer);
+      postMessage({id: m.id, ok: true, style, table, files, ms: performance.now() - t0}, transfer);
     } else if (m.type === "tile") {
       const b = tiler ? tiler.tile(m.source, m.z, m.x, m.y) : new Uint8Array();
       postMessage({id: m.id, ok: true, bytes: b}, [b.buffer]);
