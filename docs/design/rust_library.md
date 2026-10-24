@@ -1576,6 +1576,14 @@ Later decisions:
 - 2026-10-24: P7 and 1.0 approved, on the condition that the coordinator reports the design steps done (R3, R1/R4, (d), (e), dead
   code, the third audit and its top items), with both engine suites and CI green. The publish of 1.0 waits for the owner's answer to
   that report.
+- 2026-10-24: **The Rust API is the design; Python is a thin binding.** The owner's words: "The aim is make this rust version the real
+  and main library instead of python version. So I need to make it independent. I don't want because wrong design of its python
+  version we have the same issues in rust version." So the rule "Python is the reference" ends: the Rust engine is not made to copy a
+  Python design, and byte parity with Python is no goal. The Python package adapts its keywords to the Rust types at its border. These
+  contracts stay fixed: duckOSM's `edge_id` hash and column names, the observation formats of sensor-matching and SonoFlow, and the
+  border formats (GeoJSON, GeoParquet, PMTiles). After N27 (the last check against Python), the goldens are made with the Rust engine,
+  and the parity tests become checks of the structure (layers, sources, metadata, road-table rows) plus one test that the Python
+  binding passes the data through unchanged.
 
 ## Found during the inventory
 
