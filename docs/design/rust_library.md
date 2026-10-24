@@ -988,7 +988,7 @@ The level solver alone (duckosm-core):
 use roadstyle_levels::{levels, LevelEdges, Options};
 let mut edges = LevelEdges::default();
 edges.add(0, edge);                                 // rank 0 = driving
-let lv = levels(&edges, &Options::default())?;     // compute_levels' defaults (the solve); a second call with the same edges is cached
+let lv = levels(&edges, &Options::default())?;     // compute_levels' defaults (the solve)
 ```
 
 ### JavaScript

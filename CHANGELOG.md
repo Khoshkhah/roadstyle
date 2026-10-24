@@ -68,8 +68,6 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `solve_levels(edits=...)`). `edge_hash(ids)` is public.
 
 ### Changed
-- The Rust engine solves the levels of one network one time: `levels()` keeps the result of the last 2 networks. The style, its tiles
-  and each palette of a view use the same result (Tartu: 3.1 s for the first solve, 0.1 s after).
 - Browser package: `roads_sql.js` has `makeRoads(q, catalog, opts)`, one time for each file, and `writeRoads(q, mode)`, which writes
   only `roads.parquet` for each mode. `edge_id` and `osm_id` stay BIGINT, and `source` and `target` (duckOSM's node ids) stay in
   `roads.parquet`. The SQL copy of the tags rule and the JavaScript copy of the edge hash are gone: `makeRoads` returns the look's

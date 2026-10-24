@@ -183,48 +183,12 @@ impl Default for Options {
     }
 }
 
-/// The levels of the last networks, by a hash of the edges and the options: a style, its tiles and each palette of one network
-/// solve one time.
-/// ponytail: the last 2 networks only; keep more when a caller alternates between more networks.
-static CACHE: std::sync::Mutex<Vec<(u64, std::sync::Arc<Levels>)>> =
-    std::sync::Mutex::new(Vec::new());
-
-/// The drawing levels of the edges (`compute_levels`), from the cache when the same edges and options were done before.
-pub fn levels(edges: &LevelEdges, o: &Options) -> Result<Option<std::sync::Arc<Levels>>, String> {
-    use std::hash::{Hash, Hasher};
+/// The drawing levels of the edges (`compute_levels`). A caller that needs them two times keeps the value.
+pub fn levels(edges: &LevelEdges, o: &Options) -> Result<Option<Levels>, String> {
     if o.method == Method::None {
         return Ok(None);
     }
-    let edges = edges.edges();
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    format!("{o:?}").hash(&mut h);
-    for e in &edges {
-        (
-            e.edge_id,
-            &e.highway,
-            &e.tunnel,
-            &e.bridge,
-            &e.layer,
-            &e.junction,
-            &e.band,
-            e.order.map(f64::to_bits),
-        )
-            .hash(&mut h);
-        e.geometry
-            .iter()
-            .for_each(|p| (p.0.to_bits(), p.1.to_bits()).hash(&mut h));
-    }
-    let key = h.finish();
-    let mut cache = CACHE.lock().map_err(|e| e.to_string())?;
-    if let Some((_, lv)) = cache.iter().find(|(k, _)| *k == key) {
-        return Ok(Some(lv.clone()));
-    }
-    let lv = std::sync::Arc::new(compute(&edges, o)?);
-    if cache.len() == 2 {
-        cache.remove(0);
-    }
-    cache.push((key, lv.clone()));
-    Ok(Some(lv))
+    compute(&edges.edges(), o).map(Some)
 }
 
 fn compute(edges: &[&LevelEdge], o: &Options) -> Result<Levels, String> {
@@ -598,7 +562,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_second_call_is_from_the_cache() {
+    fn the_tags_rule_on_two_edges() {
         let mut edges = LevelEdges::default();
         for (id, bridge) in [(7, None), (3, Some("yes".to_string()))] {
             let geometry = vec![(0.0, id as f64 * 1e-4), (1e-3, 0.0)];
@@ -617,11 +581,7 @@ mod tests {
             method: Method::Tags,
             ..Default::default()
         };
-        let (a, b) = (
-            levels(&edges, &o).unwrap().unwrap(),
-            levels(&edges, &o).unwrap().unwrap(),
-        );
-        assert!(std::sync::Arc::ptr_eq(&a, &b));
+        let a = levels(&edges, &o).unwrap().unwrap();
         assert_eq!(a.edge_hash, edge_hash(&[7, 3]));
         assert_eq!(
             a.rows.iter().map(|r| r.fill_level).collect::<Vec<_>>(),

@@ -38,7 +38,7 @@ fn as_map(r: &Row) -> Map<String, Value> {
     m
 }
 
-fn check(method: Method, golden: &str) -> std::sync::Arc<roadstyle_rs::levels::Levels> {
+fn check(method: Method, golden: &str) -> roadstyle_rs::levels::Levels {
     let lv = levels(&edges(), &Options { method, ..Default::default() }).unwrap().unwrap();
     let want: Vec<Map<String, Value>> = read_table(data(golden), "").unwrap().into_iter().map(|r| r.cols).collect();
     let got: Vec<Map<String, Value>> = lv.rows.iter().map(as_map).collect();
