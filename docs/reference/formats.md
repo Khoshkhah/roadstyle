@@ -223,14 +223,124 @@ the engine.
 
 ## The outputs
 
-| Output | Format | Made by |
-|---|---|---|
-| **The MapLibre style** | [MapLibre style JSON](https://maplibre.org/maplibre-style-spec/): the sources, the layers and their rules, and the `roadstyle:*` metadata | `export_inline`, `export_style` (`style.json`), `makeStyle`, `tiler.style()`, inside the page |
-| **The road data** | GeoJSON sources inside the style, or vector tiles (MVT 2.1) with one source `roads` and the tile layers `roads`, `simple`, `slots` and `decks`; a folder `tiles/<z>/<x>/<y>.pbf` or one PMTiles file | the same calls ([Make tiles and PMTiles](../rust/tiles.md)) |
-| **The page** | one HTML file with the style, the data, MapLibre and the dashboard | `render_edges`, `makePage` |
+The rendering gives three outputs: **the MapLibre style** (the rules), **the road data** (the pieces of the roads with their
+values) and, with `render_edges`, **the page** that holds both. The examples below come from Monaco (849 drive edges from osmnx,
+simple mode, `view_3d=True`), made with `rs.export_inline(edges, engine="rust")` on 2026-10-23.
 
-Each piece of a road carries its values as `__rs_*` properties, and the style's rules read them
+### The output style
+
+The output style is a [MapLibre style](https://maplibre.org/maplibre-style-spec/) (version 8): one JSON object that MapLibre reads
+to draw the roads. It is not the look: the look holds the choices (colors, widths by zoom), and the style holds the rules that
+MapLibre applies to each piece at each frame.
+
+#### Its top keys
+
+| Key | Content |
+|---|---|
+| `version` | `8`, the MapLibre style version |
+| `name`, `center`, `zoom` | the map's name (the `name` keyword), the center of the roads and the start zoom |
+| `sources` | where the road data is: GeoJSON inside the style, or the address of the vector tiles (next table) |
+| `layers` | the drawing rules, in drawing order: each layer takes some features of one source and says how to draw them |
+| `glyphs` | the address of the fonts for the street names (MapLibre's font server) |
+| `sprite` | the address of the one-way arrow image: only in the tiled style of `export_style`. The inline style gives the image in the metadata (`roadstyle:images`), and the page adds it |
+| `state` | only in a live style (the page): the start value of each global state that the controls change (`rs_co`, `rs_colors`, `rs_fill_on`, `rs_tun_*`, `rs_palette`) |
+| `metadata` | the `roadstyle:*` keys for the page and the dashboard (below) |
+
+#### Its sources
+
+Each source holds one kind of feature. Inline, each is a GeoJSON source; tiled, there is one vector source `roads`, and each of
+these is a layer in its tiles (a layer's `source-layer`).
+
+| Source (or tile layer) | One feature for each | Monaco | Main properties |
+|---|---|---|---|
+| `roads` | edge (the whole road) | 849 | the class style (`__rs_fill`, `__rs_w`, `__rs_casing`, `__rs_cw`, `__rs_dash`, `__rs_op`), the levels (`__rs_cl`, `__rs_fl`, `__rs_cs`, `__rs_ce`), `__rs_bridge`, `__rs_tunnel`, `__rs_oneway`, `__rs_edge` (its row), and every column of your data |
+| `simple` | piece of a road: a casing part, a fill, a bridge shadow, a tunnel dash, an item | 4,607 | `__rs_k` (the kind: 0 casing, 1 fill, 2 shadow, 3 tunnel gap, 4 tunnel dash, 5 item), `__rs_s` (the sort number), `__rs_cap`, `__rs_edge` and `__rs_edge2` (its road and the road's twin), `highway` |
+| `slots` | place of a street name or a one-way arrow along a road | 646 | `name`, `oneway`, `slot`, `rank`, `lvl`, `__rs_edge` |
+| `decks` | part of a 3D bridge deck (only with `view_3d=True`) | 588 | `__rs_height`, `__rs_base`, `__rs_edges` |
+
+In the full look (`simple=False`), the sources `casings`, `halves` and `shadows` take the place of `simple`.
+
+#### Its layers
+
+The Monaco style has 7 layers, in this drawing order (the first is at the bottom):
+
+| Layer | Type | Source | What it draws |
+|---|---|---|---|
+| `roads-simple` | line | `simple` | every casing and fill piece of every road, in one layer, sorted by `__rs_s` |
+| `roads-fill` | line | `roads` | the whole roads, one line each. Hidden in simple mode (`visibility: none`), where `roads-simple` draws the roads |
+| `roads-arrows` | symbol | `slots` | the one-way arrows |
+| `roads-labels` | symbol | `slots` | the street names along the roads |
+| `roads-highlight` | line | `roads` | the glow of a hovered or selected road. Hidden in simple mode, where the pieces of `roads-simple` glow through their feature state |
+| `roads-deck-casing`, `roads-bridge-decks` | fill-extrusion | `decks` | the 3D bridge decks |
+
+In the full look, one casing layer and one fill layer for each drawing position take the place of `roads-simple`. Each layer has
+`metadata["roadstyle:group"]`: `roads`, or the label of an overlay for the layers of an `Overlay`.
+
+#### The rules in a layer
+
+A layer's rules are MapLibre expressions that read the properties of each piece. For example, in `roads-simple`:
+
+- `"line-sort-key": ["get", "__rs_s"]` draws each piece by its sort number, so a bridge goes over the road under it.
+- `"line-color"` picks by the kind: a casing piece (`__rs_k` 0) takes `__rs_casing` (or the bridge casing color on a bridge), a
+  shadow (2) a transparent black, a tunnel dash (4) the tunnel color, and so on.
+- `"line-width"` interpolates on the zoom for the class of the piece, and `"line-offset"` moves each direction of a two-way road
+  to its side.
+- A hover or a selection reads the feature state (`["feature-state", "hover"]`, `"select"`), so the glow needs no new style.
+
+A filter (`"filter"`) takes only the features of the layer: for example, `roads-arrows` takes only the slots of one-way roads.
+
+#### The metadata
+
+| Key | In | Content |
+|---|---|---|
+| `roadstyle:interaction` | every style | the popup fields, the hover tooltip and the hover delay. In `export_style`, also the addresses of `popup.js` and `popup.css` |
+| `roadstyle:images` | the inline style | the images that the page adds to the map: the one-way arrow (`oneway`) as a data URL, with `sdf` and `pixelRatio` |
+| `roadstyle:color_options` | a map with data colors | the Colour by options and their legends: `[{name, prop, legend}]` |
+| `roadstyle:contract`, `roadstyle:state`, `roadstyle:controls` | a live style | the contract version, the start value of each state, and the options of the dashboard |
+| `roadstyle:planner`, `roadstyle:planner_skipped` | a map with mapstyle's route planner | the planner's graphs |
+
+The full list of names, with the code that writes and reads each one: [The interaction contract](contract.md).
+
+#### The forms of the output style
+
+Two separate choices give the form of a style.
+
+**Where the data is:**
+
+| Form | Made by | Sources |
+|---|---|---|
+| **Inline** | `export_inline`, `makeStyle`, `render_edges` | GeoJSON sources with all the data inside the style |
+| **Tiled** | `export_style` (`style.json`), `tiler.style()`, `render_edges(tiles=True)` | one vector source `roads` with the address of the tiles: `<base_url>/tiles/{z}/{x}/{y}.pbf`, `pmtiles://...` or `rs://...`; zooms 6 to 15 |
+
+**Whether the controls can change it:**
+
+| State | Made by | Content |
+|---|---|---|
+| **Baked** (the default) | `export_inline`, `export_style`, and the browser calls without `state` | the start values written into the expressions. The colors and the tunnel look are fixed; the hover and the filters still work |
+| **Live** | `render_edges` (the style inside the page), or the look's `args.state = "live"` | the `state` block and `["global-state", ...]` in the expressions, and the metadata `roadstyle:contract`, `roadstyle:state` and `roadstyle:controls`, so the dashboard changes the map at run time |
+
+### The road data
+
+The road data is the features of the four sources above, with their properties. It is in one of two forms
+([Three choices for the road data](../rust/drawing.md#three-choices-for-the-road-data)):
+
+- **GeoJSON** inside the style (`sources.<name>.data`).
+- **Vector tiles** (Mapbox Vector Tile 2.1): one source `roads`, with the tile layers `roads`, `simple`, `slots` and `decks`, zooms
+  6 to 15 and a buffer of 80 units. A feature's id is its index in its source. A tile keeps every `__rs_*` property and the columns
+  named in `keep`. Below the last zoom, a line is simplified to half a tile unit.
+
+Each piece carries its values as `__rs_*` properties, and the style's rules read them
 ([The rules are in the style, the values are in the data](../rust/drawing.md#the-rules-are-in-the-style-the-values-are-in-the-data)).
-The names of the metadata keys, the properties and the global state: [The interaction contract](contract.md).
+
+### The page
+
+`render_edges` and `makePage` write one HTML file. It holds:
+
+- the live style, with the data inline (gzipped, `compress=True`) or with the PMTiles archive (`tiles=True`);
+- MapLibre GL JS 5.24 (inside the file, or from a CDN);
+- the dashboard: the modules of `static/dashboard/` as one script, the popup (`popup.js`, `popup.css`) and `dashboard.css`;
+- the options of the dashboard: the `rsDashboard(map, {...})` call, with the values of the page keywords.
+
+The file opens from disk. It needs a server only for Street View and Google 3D.
 
 **See also:** [Every parameter](parameters.md) · [Settings & palettes](settings.md) · [Which road is on top](../guides/levels.md)
