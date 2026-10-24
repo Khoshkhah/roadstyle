@@ -97,13 +97,19 @@ mod wasm {
         pub fn check(&self, edits: &str, rows: &str) -> Result<String, JsError> {
             self.0.session.check(edits, rows).map_err(|e| JsError::new(&e))
         }
-        /// What the panel shows of each road, by road id.
+        /// What the panel shows of each road, a list in the roads' order.
         pub fn facts(&self) -> String {
             self.0.facts()
         }
-        /// Each road end as drawn, by road id: heads, caps, and yours (heads.csv, caps.csv).
+        /// Each road end as drawn, a list in the roads' order: heads, caps, and yours (heads.csv, caps.csv).
         pub fn ends(&self, heads: &str, caps: &str) -> Result<String, JsError> {
             self.0.ends_json(heads, caps).map_err(|e| JsError::new(&e))
+        }
+        /// levels.csv: one row for each edge with its four numbers and its ends as drawn (4 numbers for each road).
+        #[wasm_bindgen(js_name = levelsCsv)]
+        pub fn levels_csv(&self, levels: Vec<i32>, heads: &str, caps: &str) -> Result<String, JsError> {
+            let levels: Vec<i64> = levels.into_iter().map(i64::from).collect();
+            self.0.levels_csv(&levels, heads, caps).map_err(|e| JsError::new(&e))
         }
         /// The map's table (GeoParquet, one row for each edge) for makeStyle: 4 numbers for each road.
         pub fn draw(&self, levels: Vec<i32>, heads: &str, caps: &str) -> Result<Vec<u8>, JsError> {

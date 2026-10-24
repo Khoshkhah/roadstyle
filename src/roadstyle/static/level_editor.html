@@ -194,6 +194,7 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     if(bad){ console.error("level editor:", t); e.onclick = () => { if(!String(getSelection())) e.className = ""; }; }
     else e._t = setTimeout(() => e.className = "", Math.max(4000, 60 * t.length)); }      // time to read it (a loop's rules are long)
   async function api(path, body){
+    if(window.lvApi) return window.lvApi(path, body);           // the Rust page (static/level_editor/): the solver is in the page, no server
     const r = await fetch(path, body ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)} : {});
     const j = await r.json(); if(!r.ok) throw new Error(j.error || r.statusText); return j;
   }
@@ -576,6 +577,6 @@ body.lv-open #lv-busy{right:var(--lv-w)}
       if(!v.open){ document.body.classList.remove("lv-open"); $("lv-toggle").textContent = "‹"; resize(); } }
     update(); lists(); givenUp(); showQueue();
   }
-  if(map.loaded()) start(); else map.once("load", start);
+  if(map.isStyleLoaded()) start(); else map.once("load", start);     // the Rust page loads this after the map's load (its tiles can still load)
 })();
 </script>

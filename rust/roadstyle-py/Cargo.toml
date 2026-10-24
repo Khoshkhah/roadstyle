@@ -13,5 +13,6 @@ crate-type = ["cdylib"]
 
 [dependencies]
 roadstyle.workspace = true
+roadstyle-cli = { path = "../roadstyle-cli" }
 serde_json.workspace = true
 pyo3 = { version = "0.30", features = ["abi3-py39", "extension-module"] }

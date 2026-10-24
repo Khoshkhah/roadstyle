@@ -5,12 +5,17 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Component, Path, PathBuf};
 
+/// The name of the area folder (the header X-Area of each answer: the editor shows it).
+static AREA_NAME: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
 /// The files of an area folder that the editor writes: your edits, heads and caps, and the solved levels.
 pub const WRITABLE: [&str; 5] = ["edits.csv", "heads.csv", "caps.csv", "levels.csv", "levels_info.json"];
 
 /// Serves `page` (the editor's files) at `/` and `area` at `/area/` on 127.0.0.1:`port`, until the program stops. A PUT of one of
 /// `WRITABLE` to `/area/<name>` writes that file (the edits.csv before it is kept as edits.csv.bak).
 pub fn serve(area: &Path, page: &Path, port: u16) -> Result<(), String> {
+    let name = std::fs::canonicalize(area).ok().and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned())).unwrap_or_default();
+    AREA_NAME.get_or_init(|| name.chars().filter(|c| !c.is_control()).collect());
     let listener = TcpListener::bind(("127.0.0.1", port)).map_err(|e| format!("serve: 127.0.0.1:{port}: {e}"))?;
     let (area, page) = (area.to_path_buf(), page.to_path_buf());
     for stream in listener.incoming().flatten() {
@@ -48,15 +53,21 @@ fn answer(stream: TcpStream, area: &Path, page: &Path) -> Result<(), String> {
         Some(rel) => (area, rel),
         None => (page, path.trim_start_matches('/')),
     };
-    let rel = if rel.is_empty() { "index.html" } else { rel };
+    let index = format!("{rel}index.html"); // a folder: its index.html
+    let rel = if rel.is_empty() || rel.ends_with('/') { index.as_str() } else { rel };
     let mut out = stream;
     let Some(file) = inside(root, rel) else {
-        return reply(&mut out, "404 Not Found", "text/plain", b"not found");
+        return reply(&mut out, "404 Not Found", "text/plain", b"not found", 0);
     };
     match method {
         "GET" | "HEAD" => match std::fs::read(&file) {
-            Ok(body) => reply(&mut out, "200 OK", kind(&file), if method == "HEAD" { &[] } else { &body }),
-            Err(_) => reply(&mut out, "404 Not Found", "text/plain", b"not found"),
+            Ok(body) => {
+                // X-Mtime: the file's time in seconds, for the editor (levels.csv older than an input is solved again)
+                let mtime = std::fs::metadata(&file).and_then(|m| m.modified()).ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| d.as_secs());
+                reply(&mut out, "200 OK", kind(&file), if method == "HEAD" { &[] } else { &body }, mtime)
+            }
+            Err(_) => reply(&mut out, "404 Not Found", "text/plain", b"not found", 0),
         },
         "PUT" if root == area && WRITABLE.contains(&rel) => {
             let mut body = vec![0u8; length];
@@ -65,9 +76,9 @@ fn answer(stream: TcpStream, area: &Path, page: &Path) -> Result<(), String> {
                 std::fs::copy(&file, area.join("edits.csv.bak")).map_err(|e| e.to_string())?;
             }
             std::fs::write(&file, &body).map_err(|e| format!("{}: {e}", file.display()))?;
-            reply(&mut out, "200 OK", "text/plain", b"saved")
+            reply(&mut out, "200 OK", "text/plain", b"saved", 0)
         }
-        _ => reply(&mut out, "405 Method Not Allowed", "text/plain", b"only GET, and PUT of the area's own files"),
+        _ => reply(&mut out, "405 Method Not Allowed", "text/plain", b"only GET, and PUT of the area's own files", 0),
     }
 }
 
@@ -91,8 +102,9 @@ fn kind(file: &Path) -> &'static str {
     }
 }
 
-fn reply(out: &mut TcpStream, status: &str, kind: &str, body: &[u8]) -> Result<(), String> {
-    let head = format!("HTTP/1.1 {status}\r\nContent-Type: {kind}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n", body.len());
+fn reply(out: &mut TcpStream, status: &str, kind: &str, body: &[u8], mtime: u64) -> Result<(), String> {
+    let head = format!("HTTP/1.1 {status}\r\nContent-Type: {kind}\r\nContent-Length: {}\r\nX-Mtime: {mtime}\r\nX-Area: {}\r\nCache-Control: no-store\r\n\
+                        Connection: close\r\n\r\n", body.len(), AREA_NAME.get().map_or("", String::as_str));
     out.write_all(head.as_bytes()).and_then(|_| out.write_all(body)).map_err(|e| e.to_string())
 }
 

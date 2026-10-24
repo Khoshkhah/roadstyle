@@ -108,10 +108,10 @@ impl Editor {
         &self.session.area.roads
     }
 
-    /// What the panel shows of each road, by road id (level_editor.Area.facts): its names and class, its look, its length in metres, its
+    /// What the panel shows of each road, a list in the roads' order (level_editor.Area.facts): its names and class, its look, its length in metres, its
     /// directions with their own edge_ref, lanes and modes, and how many of its edges cars may drive.
     pub fn facts(&self) -> String {
-        let mut out = Map::new();
+        let mut out = Vec::new();
         for (i, r) in self.roads().iter().enumerate() {
             let c = &self.cols[i];
             let get = |k: &str| {
@@ -120,6 +120,13 @@ impl Editor {
                     .map(text)
                     .unwrap_or_default()
             };
+            let opt = |s: String| {
+                if s.is_empty() {
+                    Value::Null
+                } else {
+                    Value::String(s)
+                }
+            }; // a missing value is null, as Python's _txt
             let mut directions = Vec::new();
             for (k, (way, ids)) in [("along", &r.edges), ("against", &r.reversed)]
                 .into_iter()
@@ -139,7 +146,7 @@ impl Editor {
                         None if *e == r.id => get("edge_ref"),
                         None => String::new(),
                     };
-                    directions.push(json!({"edge": e, "edge_ref": edge_ref, "way": way, "lanes": at("lanes"), "modes": at("modes")}));
+                    directions.push(json!({"edge": e, "edge_ref": opt(edge_ref), "way": way, "lanes": opt(at("lanes")), "modes": opt(at("modes"))}));
                 }
             }
             let flag = |name: &str| {
@@ -157,16 +164,16 @@ impl Editor {
             let driving = flag("driving").iter().filter(|v| yes(v)).count();
             let two_way = !r.reversed.is_empty() && flag("directed").iter().all(yes);
             let truthy = |k: &str| !matches!(get(k).as_str(), "" | "no" | "false" | "0");
-            out.insert(r.id.clone(), json!({
-                "road": r.id, "name": get("name"), "highway": get("highway"), "edge_ref": get("edge_ref"), "lanes": get("lanes"),
-                "modes": get("modes"), "bus_lines": get("bus_lines"), "band": c.get("band").cloned().unwrap_or(Value::Null),
+            out.push(json!({
+                "road": r.id, "name": opt(get("name")), "highway": opt(get("highway")), "edge_ref": opt(get("edge_ref")), "lanes": opt(get("lanes")),
+                "modes": opt(get("modes")), "bus_lines": opt(get("bus_lines")), "band": c.get("band").cloned().unwrap_or(Value::Null),
                 "priority": c.get("priority").cloned().unwrap_or(Value::Null), "edges": driving, "two_way": two_way,
                 "length_m": (metres(&self.lines[i]) * 10.0).round() / 10.0, "directions": directions,
                 "look": if truthy("tunnel") { "tunnel" } else if truthy("bridge") { "bridge" } else { "ground" },
                 "width_px": Value::Null,
             }));
         }
-        Value::Object(out).to_string()
+        Value::Array(out).to_string()
     }
 
     /// Each road end as drawn (level_area.ends): your heads.csv and caps.csv (a row may name any edge of a road) over the defaults (5 m
@@ -207,21 +214,64 @@ impl Editor {
             .collect())
     }
 
-    /// `ends` as JSON text by road id: `{"heads", "caps", "heads_own", "caps_own"}`.
+    /// `ends` as JSON text, a list in the roads' order: `{"heads", "caps", "heads_own", "caps_own"}`.
     pub fn ends_json(&self, heads: &str, caps: &str) -> Result<String, String> {
         let ends = self.ends(heads, caps)?;
-        let out: Map<String, Value> = self
-            .roads()
-            .iter()
-            .zip(ends)
-            .map(|(r, (h, c, oh, oc))| {
-                (
-                    r.id.clone(),
-                    json!({"heads": h, "caps": c, "heads_own": oh, "caps_own": oc}),
-                )
-            })
+        let out: Vec<Value> = ends
+            .into_iter()
+            .map(|(h, c, oh, oc)| json!({"heads": h, "caps": c, "heads_own": oh, "caps_own": oc}))
             .collect();
-        Ok(Value::Object(out).to_string())
+        Ok(Value::Array(out).to_string())
+    }
+
+    /// levels.csv (level_area.write): one row for each edge, its four numbers and its ends as drawn, in its own way.
+    pub fn levels_csv(&self, levels: &[i64], heads: &str, caps: &str) -> Result<String, String> {
+        if levels.len() != 4 * self.roads().len() {
+            return Err(format!(
+                "levels: {} numbers for {} roads",
+                levels.len(),
+                self.roads().len()
+            ));
+        }
+        let ends = self.ends(heads, caps)?;
+        let mut out = String::from("edge,casing_start,casing_level,casing_end,fill_level,head_start_m,head_end_m,cap_start,cap_end\n");
+        let num = |v: f64| {
+            if v.fract() == 0.0 {
+                format!("{v:.1}")
+            } else {
+                format!("{v}")
+            }
+        };
+        for (i, r) in self.roads().iter().enumerate() {
+            let (l, (h, c, _, _)) = (&levels[4 * i..4 * i + 4], &ends[i]);
+            for e in &r.edges {
+                out += &format!(
+                    "{e},{},{},{},{},{},{},{},{}\n",
+                    l[0],
+                    l[1],
+                    l[2],
+                    l[3],
+                    num(h[0]),
+                    num(h[1]),
+                    c[0],
+                    c[1]
+                );
+            }
+            for e in &r.reversed {
+                out += &format!(
+                    "{e},{},{},{},{},{},{},{},{}\n",
+                    l[2],
+                    l[1],
+                    l[0],
+                    l[3],
+                    num(h[1]),
+                    num(h[0]),
+                    c[1],
+                    c[0]
+                );
+            }
+        }
+        Ok(out)
     }
 
     /// heads.csv or caps.csv as {road: [start, end]} ("" = not set), each row by any edge of its road (an edge against its road: the two

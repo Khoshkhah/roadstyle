@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
+<title>Level editor</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<!-- The level editor in Rust (docs/guides/levels.md, "Fix it by hand"): the solver runs in the page (roadstyle-wasm LevelArea), the map is
+     the engine's vector tiles with roadstyle's dashboard, and the panel is static/level_editor.html. `roadstyle serve <area folder>` serves
+     this folder and the area under /area/, and saves your changes; on any other host the page shows the area and saves nothing. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<link rel="stylesheet" href="../dashboard/dashboard.css">
+<link rel="stylesheet" href="../popup.css">
+<style>html,body{margin:0;height:100%}#map{position:absolute;inset:0}
+#lv-boot{position:absolute;inset:0;display:grid;place-items:center;font:14px system-ui,sans-serif;color:#555;background:#f6f7f9;z-index:9}</style>
+</head><body>
+<div id="map"></div><div id="lv-boot">Loading the area …</div>
+<script type="module" src="app.js"></script>
+</body></html>
