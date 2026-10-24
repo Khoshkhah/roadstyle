@@ -65,6 +65,7 @@ nav:
       - Every parameter: reference/parameters.md
       - JavaScript API: reference/javascript.md
       - Interaction contract: reference/contract.md
+      - Inputs and outputs: reference/formats.md
       - Settings & palettes: reference/settings.md
       - Command line: reference/cli.md
   - Rust engine:
@@ -106,6 +107,7 @@ plugins:
 # docs/rust/architecture.md: its tables of crates, modules and design gaps, made from the code at each build
 hooks:
   - docs/gen_architecture.py
+  - docs/gen_formats.py            # docs/reference/formats.md: the keys of the bundled profile and palette
 
 markdown_extensions:
   - admonition
