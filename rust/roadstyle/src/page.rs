@@ -16,14 +16,8 @@ const TEMPLATE: &str = asset!("static/web_template.html");
 const POPUP_CSS: &str = asset!("static/popup.css");
 const POPUP_JS: &str = asset!("static/popup.js");
 const DASH_CSS: &str = asset!("static/dashboard/dashboard.css");
-/// render_web._DASH_FILES, in its order
-const DASH_JS: [&str; 20] = [asset!("static/dashboard/core.js"), asset!("static/dashboard/panel.js"), asset!("static/dashboard/find.js"),
-    asset!("static/dashboard/zoom.js"), asset!("static/dashboard/view3d.js"), asset!("static/dashboard/float.js"),
-    asset!("static/dashboard/streetview.js"), asset!("static/dashboard/google3d.js"), asset!("static/dashboard/basemap.js"),
-    asset!("static/dashboard/filter.js"), asset!("static/dashboard/color.js"), asset!("static/dashboard/legend.js"),
-    asset!("static/dashboard/overlays.js"), asset!("static/dashboard/tunnel.js"), asset!("static/dashboard/views.js"),
-    asset!("static/dashboard/arrows.js"), asset!("static/dashboard/svspot.js"), asset!("static/dashboard/select.js"),
-    asset!("static/dashboard/api.js"), asset!("static/dashboard/index.js")];
+// DASH_JS: the dashboard's modules in the order of static/dashboard/files.txt (build.rs writes it)
+include!(concat!(env!("OUT_DIR"), "/dash_files.rs"));
 const INFLATE: &str = asset!("static/page/inflate.html");
 const SIMPLE: &str = asset!("static/page/simple.html");
 const TILES: &str = asset!("static/page/tiles.html");

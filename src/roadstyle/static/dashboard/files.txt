@@ -1,0 +1,23 @@
+# The dashboard's modules, in the order that the page puts them in one script (render_web._DASH_FILES, and rust/roadstyle/build.rs for the
+# Rust page writer). A new module: add its name here. tests/test_release_files.py checks that each .js file of this folder is here.
+core
+panel
+find
+zoom
+view3d
+float
+streetview
+google3d
+basemap
+filter
+color
+legend
+overlays
+tunnel
+views
+arrows
+svspot
+select
+api
+live
+index

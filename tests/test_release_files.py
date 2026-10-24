@@ -43,3 +43,12 @@ def test_one_version_everywhere():
     } == dict.fromkeys(["roadstyle-mcp version", "roadstyle-mcp pin", "server.json version",
                         "server.json package", "plugin.json version", "Rust crates version",
                         "roadstyle-dashboard version", "roadstyle-wasm version"], v)
+
+
+def test_every_dashboard_module_is_in_its_list():
+    """static/dashboard/files.txt is the one list of the dashboard's modules (render_web.py and the Rust page writer read it): a module
+    file that is not in it would be left out of every page."""
+    d = ROOT / "src/roadstyle/static/dashboard"
+    listed = [ln.strip() for ln in (d / "files.txt").read_text().splitlines() if ln.strip() and not ln.startswith("#")]
+    assert sorted(listed) == sorted(p.stem for p in d.glob("*.js")) and len(set(listed)) == len(listed)
+
