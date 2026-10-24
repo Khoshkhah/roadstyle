@@ -405,6 +405,8 @@ The road data is the features of the four sources above, with their properties. 
 
 Each piece carries its values as `__rs_*` properties, and the style's rules read them
 ([The rules are in the style, the values are in the data](../rust/drawing.md#the-rules-are-in-the-style-the-values-are-in-the-data)).
+The road fields are in the source `roads` (GeoJSON) or in the side table (tiles). One road table for both forms is planned:
+[The three stages and the one call](../rust/architecture.md#the-three-stages-and-the-one-call).
 
 ### The page
 

@@ -211,6 +211,11 @@ def gen_gaps(cs) -> str:
     stage2 = {b: [n for n in public_api(cs[b]) if re.search(r"(?i)make_?tiles|tile_?sources", n)] for b in ("roadstyle-py", "roadstyle-wasm")}
     found = "; ".join(f"`{b}`: " + (", ".join(f"`{n}`" for n in v) or "none") for b, v in stage2.items())
     rows.append(["Stage 2 (the tiles) has its own public call in Python and in the browser", found, "yes" if all(stage2.values()) else "no"])
+    # one road table for the fields in every form (stage 1's second output): a call that gives it, in each binding
+    table_calls = {b: [n for n in public_api(cs[b]) if re.search(r"(?i)road_?table", n)] for b in ("roadstyle-py", "roadstyle-wasm")}
+    found_t = "; ".join(f"`{b}`: " + (", ".join(f"`{n}`" for n in v) or "none") for b, v in table_calls.items())
+    rows.append(["One road table for the fields, in GeoJSON and in tiles alike", "a call for the road table: " + found_t
+                 + ". Today GeoJSON has the fields in its source `roads`, the tiled page in the side table", "yes" if all(table_calls.values()) else "no"])
     tiles = [f for f in src if "roadstyle-tiles" in str(f)]
     tv = sum(len(re.findall(r"\bValue\b", text[f])) for f in tiles)
     rows.append(["Stage 2 takes the typed pieces, not JSON", f"`Value` (serde_json) in `roadstyle-tiles`: {tv} times", "no" if tv else "yes"])

@@ -256,11 +256,19 @@ The road fields (the name, the class, your columns) are a separate, small input 
 the filters. Drawing does not need them. In the tiles they repeat in each tile and at each zoom: on Tartu, the 26 road fields make
 the 9 tiles of one zoom-12 view 17.9 MB in place of 16.2 MB. Thus each tiled way gives the fields in its own way:
 
-| Way | The fields in the tiles | The fields for the dashboard |
+| Form | The fields in the drawing data | The fields for the dashboard |
 |---|---|---|
+| GeoJSON (the default) | in the source `roads`: one feature for each road, with its line and all its fields. The pieces in `simple` hold only `__rs_edge`, the road's row | from the source `roads` |
 | A. Tiles in one HTML file | none | the side table (`window.RS_SIDE`), loaded one time with the page: the popup, the search and the filters work |
 | B. Tiles on a server | every column, because a map app has no side table | from the tiles, for the app's own popup |
 | C. Tiles made in the browser | only the columns of `keep` | one road on request (`engine.props`): the popup works, but `rs.find` and `rs.query` find nothing, because the page does not have all the fields |
+
+**Planned: one road table for every form.** Today GeoJSON and tiles keep the fields in two different ways. In the design phase,
+stage 1 gives two outputs: the drawing sources (the pieces, the slots, the decks), with only the drawing values and the road's
+row, and **one road table** with the fields of each road, keyed by its row. Stage 2 cuts only the drawing sources into tiles. The
+page or the worker gives the dashboard the road table, whole (as the side table does now) or one road at a time (as
+`engine.props` does now). Way B can keep every column in its tiles, as an option of stage 2, for map apps. The row "One road
+table" of [Known design gaps](#known-design-gaps) shows when this is built.
 
 The one call (the facade, `render_edges`) runs the stages in order. Stage 3 puts the style and the data of the selected form into
 one HTML file.
@@ -442,6 +450,7 @@ an item shows "yes" when the code has it:
 | A typed render model in place of JSON trees | `Value` (serde_json) in `roadstyle-engine`: 748 times | no |
 | Typed fields in place of the `__rs_*` properties | 59 distinct `__rs_*` names in `rust/` | no |
 | Stage 2 (the tiles) has its own public call in Python and in the browser | `roadstyle-py`: none; `roadstyle-wasm`: none | no |
+| One road table for the fields, in GeoJSON and in tiles alike | a call for the road table: `roadstyle-py`: none; `roadstyle-wasm`: none. Today GeoJSON has the fields in its source `roads`, the tiled page in the side table | no |
 | Stage 2 takes the typed pieces, not JSON | `Value` (serde_json) in `roadstyle-tiles`: 29 times | no |
 <!-- /gen:gaps -->
 
