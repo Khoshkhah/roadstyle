@@ -162,11 +162,21 @@ pub fn controls(look: &crate::Look, roads: &Roads, info: PageInfo, active: usize
     // a page is in simple mode, in both ways: the pieces pick and glow (the road layer roads-simple), and there are no fill layers
     // the facts of the look and of the roads that a host's dashboard needs; the caller's page keywords (tiles, views, the base maps, ...)
     // are not here: the page gives them (RS_OPTIONS, page_options::page_from), as a host does (rule 5, R3)
-    Ok(json!({"simple": "roads-simple", "pitch_3d": cam["pitch_3d"],
+    let mut out = json!({"simple": "roads-simple", "pitch_3d": cam["pitch_3d"],
         "select_color": select, "filter": filter_panel(look, roads, m), "color_active": active, "overlays": info.overlays, "tunnel": tunnel,
         "fill_layers": [], "road_fill": {"on": args["road_fill"] != false, "paint": info.fill_paint}, "dashes": info.dashes,
         "items": items, "edge_id_col": args["edge_id_col"].as_str().unwrap_or("edge_id"), "arrow_icon": arw["icon"], "arrow_color": arw["color"],
         "arrow_rules": {"mainBelow": arw["main_below"], "main": arw["main"], "minLenPx": place["min_len_px"], "minGapPx": place["min_gap_px"],
                         "nameGapPx": place["name_gap_px"], "edgePx": place["edge_px"], "charWidth": place["char_width"],
-                        "baseSize": th["labels"]["base_size"]}}))
+                        "baseSize": th["labels"]["base_size"]}});
+    // the map option `modes` (a base map's look: the road table's mode columns): each mode that some road has, with its count, in order
+    if let Some(modes) = args["modes"].as_array() {
+        let yes = |c: Option<Cell>| matches!(c, Some(Cell::Bool(true))) || c.and_then(Cell::as_str) == Some("true");
+        out["modes"] = modes.iter().filter_map(Value::as_str)
+            .map(|m| (m, roads.iter().filter(|r| yes(r.get(m))).count())).filter(|(_, n)| *n > 0).map(|(m, n)| json!([m, n])).collect();
+    }
+    if let Some(b) = args["box_layout"].as_str() {      // a base map's page: the Roads and Layers boxes in one stack
+        out["box_layout"] = b.into();
+    }
+    Ok(out)
 }

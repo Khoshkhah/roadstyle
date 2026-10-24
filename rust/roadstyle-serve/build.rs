@@ -9,7 +9,7 @@ fn main() {
     for single in ["level_editor.html", "popup.css", "popup.js"] {
         files.push((single.into(), root.join(single)));
     }
-    for (dir, exts) in [("level_editor", &["html", "js"][..]), ("level_editor/pkg", &["js", "wasm"][..]), ("dashboard", &["js", "css"][..])] {
+    for (dir, exts) in [("level_editor", &["html", "js"][..]), ("level_editor/pkg", &["js", "wasm"][..]), ("dashboard", &["js", "css"][..]), ("dashboard/editor", &["js"][..])] {
         let d = root.join(dir);
         println!("cargo:rerun-if-changed={}", d.display());
         let Ok(list) = std::fs::read_dir(&d) else { continue };   // pkg/: only when it was built

@@ -65,6 +65,11 @@ fn the_64_looks_of_mapstyle() {
                           ..Default::default() };
         let mut got = Look::resolve(&o).unwrap_or_else(|e| panic!("{choice}: {e}")).to_value();
         got.as_object_mut().unwrap().shift_remove("schema_version");
+        // added on 2026-10-24 for the dashboard's port of mapstyle's page scripts: the restricted roads' colour baked into the fills
+        // (access_col), the Modes filter's columns and the page's box layout; mapstyle's look had them in its page script
+        for k in ["access_col", "modes", "box_layout"] {
+            got["args"].as_object_mut().unwrap().shift_remove(k);
+        }
         let mut out = Vec::new();
         first_differences(&canon(&got), &canon(&Value::Object(want)), choice, &mut out);
         bad.extend(out);
@@ -74,7 +79,11 @@ fn the_64_looks_of_mapstyle() {
 
 #[test]
 fn a_wrong_choice_names_the_choices() {
-    let err = |b: BaseMap| Look::resolve(&Options { base_map: Some(b), ..Default::default() }).unwrap_err();
+    // an unknown name, with the text that Python and JavaScript show
+    let err = |b: BaseMap| match Look::resolve(&Options { base_map: Some(b), ..Default::default() }).unwrap_err() {
+        roadstyle_look::Error::Unknown(m) => m,
+        e => panic!("not an unknown name: {e:?}"),
+    };
     assert!(err(BaseMap { mode: "boat".into(), ..Default::default() }).contains("choose from ('all', 'driving', 'walking', 'cycling')"));
     assert!(err(BaseMap { theme: "dark".into(), ..Default::default() }).contains("choose from ('osm', 'google', 'grey', 'roadstyle')"));
     assert!(err(BaseMap { paths: "x".into(), ..Default::default() }).contains("unknown path style 'x'"));

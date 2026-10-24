@@ -411,3 +411,35 @@ fn mark_twin_dead_ends(fs: &mut Roads, caps: &CapCols) {
     }
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Roads of these lines and classes (whole numbers in `highway`), `twoway` as given.
+    fn roads(rows: &[(&[[f64; 2]], i64, bool)]) -> Roads {
+        let mut lines = roadstyle_model::table::Lines::default();
+        rows.iter().for_each(|(l, _, _)| lines.push(Some(l)));
+        let mut t = roadstyle_model::RoadTable::new(Vec::new(), Vec::new(), lines).unwrap();
+        t.set_ints(HIGHWAY, rows.iter().map(|r| r.1).collect());
+        let mut fs = Roads::new(t);
+        for (d, r) in fs.draw.iter_mut().zip(rows) {
+            d.twoway = Some(r.2);
+        }
+        fs
+    }
+
+    #[test]
+    fn twin_pairs_are_two_way_roads_of_one_class_on_the_same_line_backwards() {
+        let fs = roads(&[
+            (&[[0.0, 0.0], [1.0, 0.0]], 5, true),
+            (&[[1.0, 0.0], [0.0, 0.0]], 5, true),           // the twin of 0
+            (&[[1.0, 0.0], [0.0, 0.0]], 6, true),           // the same line backwards, another class: no twin
+            (&[[0.0, 1.0], [1.0, 1.0]], 5, false),          // not two-way
+            (&[[1.0, 1.0], [0.0, 1.0]], 5, true),           // its line's other way is not two-way: no twin
+            (&[[0.0, 2.0], [1.0, 2.000_000_01]], 5, true),  // the points rounded to 7 places, as Python's round
+            (&[[1.0, 2.0], [0.0, 2.0]], 5, true),
+        ]);
+        assert_eq!(twin_pairs(&fs), vec![(0, 1), (5, 6)]);
+    }
+}

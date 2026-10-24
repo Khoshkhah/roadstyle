@@ -43,15 +43,17 @@ Serve the folder over http. A module script does not load from a `file://` addre
 | Function | Returns | What it does |
 |---|---|---|
 | `init()` | a Promise | loads the WebAssembly module; call it one time, first |
-| `makeLook(options)` | JSON text | the look: `render_edges`' `palette`, `profile`, `settings` and keywords (`args`), from the JSON text `options` |
+| `resolveLook(options)` | a `Look` | the look: `render_edges`' `palette`, `profile`, `settings` and keywords (`args`), from the JSON text `options` |
 | `makeStyle(roads, look, features?, planner?, name?)` | JSON text | the style with the roads in it (as `export_inline`) |
 | `new Tiler(roads, look, features?, name?, prefix, keep)` | a `Tiler` | the style with vector-tile sources, and the tiles on request |
 | `tiler.style()` | JSON text | the style of the `Tiler` |
 | `tiler.tile("roads", z, x, y)` | `Uint8Array` | one vector tile; empty when no road is in it |
 | `tiler.props("roads", row)` | JSON text | the properties of one road, or `null` |
 | `tiler.archive(bounds, layers)` | `Uint8Array` | a PMTiles archive of all tiles in `[min lon, min lat, max lon, max lat]` |
-| `makePage(roads, look, options, given?)` | HTML text | the whole page, as `render_edges` writes it |
+| `makePage(roads, look, options, given?, features?)` | HTML text | the whole page, as `render_edges` writes it |
 | `exportLook(look, cols, positions)` | JSON text | the look for another app's data layer (as `export_look`) |
+| `makeArea(edges, options?)` | an `AreaFiles` | a level area's files in memory ([The level editor in a page](#the-level-editor-in-a-page)) |
+| `new LevelArea(roads, pairs)` | a `LevelArea` | the level editor's solver on an area (`solve`, `solveLocal`, `check`, `draw`, `levelsCsv`) |
 | `memoryBytes()` | number | the size of the module's memory, in bytes |
 
 `roads` is the bytes of a GeoParquet file: the geometry as WKB in EPSG:4326, and the columns of
@@ -69,13 +71,13 @@ rs.as_edges(edges).gdf.to_parquet("monaco_roads.parquet", index=False)   # edges
 ```html
 <div id="map" style="position:absolute;inset:0"></div>
 <script type="module">
-import init, {makeLook, makeStyle} from "./pkg/roadstyle_wasm.js";
+import init, {resolveLook, makeStyle} from "./pkg/roadstyle_wasm.js";
 import {rsDashboard} from "./dashboard/index.js";
 
 await init();
 const roads = new Uint8Array(await (await fetch("monaco_roads.parquet")).arrayBuffer());
 // the look: render_edges' palette, profile, settings and keywords; state "live" keeps the controls' state in the style
-const look = makeLook(JSON.stringify({palette: "amber", args: {state: "live", color_by: "lanes", cmap: "YlOrRd"}}));
+const look = resolveLook(JSON.stringify({palette: "amber", args: {state: "live", color_by: "lanes", cmap: "YlOrRd"}}));
 const style = JSON.parse(makeStyle(roads, look, undefined, undefined, "Monaco"));
 
 const map = new maplibregl.Map({container: "map", style});
@@ -154,7 +156,7 @@ Use this form when the map has its own base map and the roads come later or chan
 the roads style's sources and layers with a prefix, and gives the dashboard the new style each time.
 
 ```js
-import init, {makeLook, Tiler} from "./pkg/roadstyle_wasm.js";
+import init, {resolveLook, Tiler} from "./pkg/roadstyle_wasm.js";
 import {rsDashboard} from "./dashboard/index.js";
 
 await init();
@@ -173,7 +175,7 @@ const rs = rsDashboard(map, {style: null, prefix: "rs-", tiles: true, simple: "r
                              engine: {props: async (row) => JSON.parse(tiler.props("roads", row))}});
 
 async function showRoads(args) {
-  const look = makeLook(JSON.stringify({palette: "amber", args: {state: "live", ...args}}));
+  const look = resolveLook(JSON.stringify({palette: "amber", args: {state: "live", ...args}}));
   tiler = new Tiler(roads, look, undefined, "Monaco", `rs://${++gen}/`, ["name", "highway", "lanes"]);
   const style = JSON.parse(tiler.style());
   for (const l of map.getStyle().layers) if (l.id.startsWith("rs-")) map.removeLayer(l.id);
@@ -216,19 +218,60 @@ page.
 ## Write the whole page
 
 `makePage` writes the same page as `render_edges(backend="web")` in one call: stage 1, the arrows or the tiles, the views, the
-dashboard's options and the page. `look` is the result of `makeLook(options)`, with `"state": "live"` in its args. Give the same
+dashboard's options and the page. `look` is the result of `resolveLook(options)`, with `"state": "live"` in its args. Give the same
 `options` text again: a view with another palette resolves its look from it. The page has placeholders for MapLibre, which you
 replace:
 
 ```js
 const options = JSON.stringify({palette: "amber", args: {state: "live", name: "Monaco", basemap: "osm", views: {plain: {road_fill: false}}}});
-const html = makePage(roads, makeLook(options), options)
+const html = makePage(roads, resolveLook(options), options)
   .replace("<style>__MAPLIBRE_CSS__</style>", '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">')
   .replace("<script>__MAPLIBRE_JS__</script>", '<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>');
 ```
 
 `given` (JSON text) holds what only the host knows: `api_key` (the key of a CARTO base map), `street_view_key`, and
 `resolved_basemaps` (base map entries in the form of `data/basemaps.json`). The warnings of the stages go to `console.warn`.
+
+## The level editor in a page
+
+A page with no server can hold roadstyle's level editor: the page makes the area, the solver runs in the page, and the browser keeps
+your changes.
+
+1. Make the area's edges. For a duckOSM file, `duckosmPlan(...)` gives the query `"level_edges"`: run it with duckdb-wasm and write
+   it as Parquet (`COPY (...) TO 'edges.parquet' (FORMAT parquet)`). It is the input of `duckosm levels`: one row for each `edge_id` of
+   every mode's `edges` and `private_edges`, with `highway`, `layer`, `bridge`, `tunnel`, `walk_type`, `junction`, `name`, `edge_ref`,
+   `lanes`, `driving`, `cycling`, `oneway` (the driving network's), `modes`, `bus_lines` and the line as WKB in `geometry`. The stored
+   levels of `visualization.edge_levels` are for these edges.
+2. Make the area's files with `makeArea(edges, options)`. `options` is JSON text with the keywords of `make_area`, each optional:
+   `id_col` (default `edge_id`), `highway_col`, `layer_col`, `bridge_col`, `tunnel_col`, `junction_col`, `band_col`, `order`
+   (`"priority"`, `"class"`, a column or `null`), `band_dist`, `head_m`, `near_rules`, and `heads` (the text of heads.csv). It gives
+   `roads` (roads.parquet), `pairs` and `edits` (pairs.csv and an empty edits.csv), `roadCount`, `pairCount` and `warnings`.
+3. Keep them in a store and start the editor:
+
+```js
+import init, * as pkg from "roadstyle-wasm";
+import {levelEditor, browserStore} from "roadstyle/static/dashboard/editor/level_editor.js";
+
+await init();
+const a = pkg.makeArea(edges, JSON.stringify({id_col: "edge_id"}));
+const store = browserStore("monaco", "Monaco");          // localStorage for the texts, the private file system for roads.parquet
+for (const [n, v] of [["roads.parquet", a.roads], ["pairs.csv", a.pairs], ["edits.csv", a.edits]]) await store.save(n, v);
+const editor = await levelEditor({map, container: document.getElementById("panel"), pkg, store});
+editor.addEventListener("solved", (e) => apply(e.detail.levelsCsv, e.detail.draw()));
+```
+
+`levelEditor({map, container, pkg, store})` draws the area on `map` (your MapLibre map; without it, a map of its own in `container`)
+and puts the editor's panel in `container`. Its tiles have the protocol `lv://`, apart from yours. A page has one dashboard (its state
+is the module's): when your map has one, give it as `levelEditor({..., dashboard, prefix})` with the prefix it was made with. The editor
+then takes your roads off the map (the layers of the roles in your style's `roadstyle:sources`; your base map stays), draws its roads
+with your prefix and gives your dashboard its style. Without a dashboard of yours, the editor makes one with the prefix `lv-rs-`; when
+the page has one and you do not give it, `levelEditor` throws an error. `editor.destroy()` closes the editor: it takes off its panel,
+its listeners, its roads, tiles and images, and puts your roads, your road table and your dashboard's style back. Your files stay in
+the store. A store is `{load(name, bytes), save(name, data)}`: `browserStore(key)` keeps the files
+in this browser, `httpStore(base)` uses `roadstyle serve`. After each solve the editor sends the event `"solved"` with `levelsCsv`
+(one row for each edge: its four drawing numbers, its head lengths and its caps), `levelsInfo` and `draw()` (the map's table,
+GeoParquet). `editor.download(name)` downloads edits.csv, heads.csv, caps.csv or levels.csv as they are now. The module needs the
+files of `static/` beside it: `dashboard/` with its subfolders, `level_editor.html` (the panel), `dashboard.css` and `popup.css`.
 
 ## Keep the main thread free
 

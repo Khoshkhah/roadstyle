@@ -190,3 +190,38 @@ pub fn decode_tile(b: &[u8]) -> Tile {
     }
     tile
 }
+
+/// The first 16 hex characters of the SHA-256 of a value's JSON text (a short name for a part of an output in a golden).
+pub fn hash16(v: &Value) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(v.to_string().as_bytes()).iter().take(8).map(|b| format!("{b:02x}")).collect()
+}
+
+/// A style as a golden sees it (review D5): each layer's id, type and source with short hashes of its filter, paint and layout; each
+/// source's type, feature count and hash; the metadata's keys with the hash of each value; and the hash of the whole style. A change
+/// names the layer, source or metadata key that changed, and the golden stays a few KB.
+pub fn summary(style: &Value) -> Value {
+    let layers: Vec<Value> = style["layers"].as_array().into_iter().flatten().map(|l| json!([l["id"], l["type"], l["source"],
+        hash16(&l["filter"]), hash16(&l["paint"]), hash16(&l["layout"])])).collect();
+    let sources: serde_json::Map<String, Value> = style["sources"].as_object().into_iter().flatten().map(|(k, s)| (k.clone(), json!([
+        s["type"], s["data"]["features"].as_array().map(Vec::len), hash16(s)]))).collect();
+    let metadata: serde_json::Map<String, Value> = style["metadata"].as_object().into_iter().flatten().map(|(k, v)| (k.clone(), json!(hash16(v)))).collect();
+    let keys: Vec<&String> = style.as_object().map(|o| o.keys().collect()).unwrap_or_default();
+    json!({"keys": keys, "layers": layers, "sources": sources, "metadata": metadata, "hash": hash16(style)})
+}
+
+/// A golden (tests/data/<name>): with ROADSTYLE_BLESS=1 the test writes `got` there; otherwise it compares, and a difference fails with
+/// the paths of the first differences. One mechanism for every golden that the Rust engine makes (no Python, no program of its own).
+pub fn golden(name: &str, got: &Value) {
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data").join(name);
+    if std::env::var_os("ROADSTYLE_BLESS").is_some() {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, serde_json::to_string_pretty(got).unwrap() + "\n").unwrap();
+        return;
+    }
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e} (ROADSTYLE_BLESS=1 cargo test writes it)", path.display()));
+    let want: Value = serde_json::from_str(&text).unwrap();
+    let mut out = Vec::new();
+    diff(got, &want, "$", &mut out);
+    assert!(out.is_empty(), "{name}: not the golden (got | golden); ROADSTYLE_BLESS=1 writes it again:\n{}", out[..out.len().min(12)].join("\n"));
+}

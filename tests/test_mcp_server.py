@@ -45,3 +45,4 @@ def test_misspelt_option_is_an_error_with_a_suggestion(tmp_path):
     assert res.is_error
     assert "'colour_by' (did you mean 'color_by'" in res.content[0].text
     assert not (tmp_path / "x.html").exists()
+

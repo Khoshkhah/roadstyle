@@ -6,6 +6,7 @@ use crate::road::{Road, Roads};
 use roadstyle_model::Cell;
 use crate::roads::truthy;
 use crate::slots::point_line_dist;
+use roadstyle_model::feature_table::{FeatureTable, GeomType};
 use serde_json::{json, Map, Value};
 
 const EDGE_ATTACHED: [&str; 2] = ["crossings", "traffic_signals"];
@@ -24,11 +25,42 @@ pub struct Overlay {
     pub width: Value,
     pub radius: Value,
     pub visible: bool,
-    pub fc: Value,
+    pub data: Data,
     pub l: Value,
     /// A caller's overlay: the fields of its rs.Overlay (popup, color_col, width_m, dash, min_zoom, text_col, edge_col, ...); null for the
     /// base map's.
     pub user: Value,
+    /// A base-map layer's start value of "clickable" for the page (mapstyle's rule); None: the overlay's own rule
+    pub clickable: Option<bool>,
+    /// A base-map layer's kinds with their counts, most first (mapstyle's Counter.most_common); empty: none
+    pub kinds: Vec<(String, usize)>,
+    /// A base-map layer's start values of its hover tooltip and its click popup (render_map's `interaction`); None: the overlay's own
+    pub tooltip_on: Option<bool>,
+    pub popup_on: Option<bool>,
+}
+
+/// An overlay's features: a caller's as a FeatureCollection, the base map's as a typed table (audit R10).
+pub enum Data {
+    Json(Value),
+    Table(Box<FeatureTable>),
+}
+
+impl Data {
+    /// detect_kind: the kind of the first feature with a geometry (polygon: fill, line: line, point: circle; else fill).
+    fn detect_kind(&self) -> &'static str {
+        match self {
+            Data::Json(fc) => detect_kind(fc),
+            Data::Table(t) => (0..t.len()).find_map(|r| t.geometries_of().kind(r).and_then(|k| kind_of_type(k.name()))).unwrap_or("fill"),
+        }
+    }
+}
+
+fn detect_kind(fc: &Value) -> &'static str {
+    fc["features"].as_array().into_iter().flatten().find_map(|f| kind_of_type(f["geometry"]["type"].as_str().unwrap_or(""))).unwrap_or("fill")
+}
+
+fn kind_of_type(t: &str) -> Option<&'static str> {
+    if t.contains("Polygon") { Some("fill") } else if t.contains("Line") { Some("line") } else if t.contains("Point") { Some("circle") } else { None }
 }
 
 /// _band: below (-1 ...), on (0) or over (1 ...) the ground: the OSM layer if it is a number, else 1 for a bridge, -1 for a tunnel.
@@ -52,7 +84,7 @@ fn band(r: Road) -> f64 {
 /// edge_attach: `edge_id` on every crossing and traffic signal: of the streets within 1e-5 deg, the one drawn on top (the highest fill
 /// number, then band, then class); else the nearest street within 3e-5 deg (within 2e-6 of the nearest); else the nearest road.
 /// Returns the names of the layers that got one.
-pub fn edge_attach(fcs: &mut Map<String, Value>, roads: &Roads) -> Vec<String> {
+pub fn edge_attach(tables: &mut [(String, FeatureTable)], roads: &Roads) -> Result<Vec<String>, String> {
     let n = roads.len();
     let klass: Vec<f64> = roads.iter().map(|r| {
         let h = r.get("highway").and_then(Cell::as_str).unwrap_or("");
@@ -78,10 +110,12 @@ pub fn edge_attach(fcs: &mut Map<String, Value>, roads: &Roads) -> Vec<String> {
     };
     let mut done = Vec::new();
     for name in EDGE_ATTACHED {
-        let Some(feats) = fcs.get_mut(name).and_then(|fc| fc["features"].as_array_mut()).filter(|f| !f.is_empty()) else { continue };
-        for f in feats.iter_mut() {
-            let c = &f["geometry"]["coordinates"];
-            let p = [c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0)];
+        let Some((_, t)) = tables.iter_mut().find(|(n, _)| n == name).filter(|(_, t)| !t.is_empty()) else { continue };
+        let g = t.geometries_of();
+        let mut ids = Vec::with_capacity(t.len());
+        for row in 0..t.len() {
+            // a point's coordinates (another geometry: 0, 0, as Python's coordinates[0] of a line is no number)
+            let p = match g.kind(row) { Some(GeomType::Point) => g.parts(row).next().and_then(|mut r| r.next()).map_or([0.0, 0.0], |r| r[0]), _ => [0.0, 0.0] };
             let mut hits: Vec<usize> = within(p, 1e-5).into_iter().filter(|&i| street[i]).collect();
             if hits.is_empty() {
                 let near = within(p, 3e-5);
@@ -97,12 +131,12 @@ pub fn edge_attach(fcs: &mut Map<String, Value>, roads: &Roads) -> Vec<String> {
             } else {
                 *hits.iter().min_by_key(|&&i| rank[i]).unwrap()
             };
-            let id = match roads.get(j, "edge_id").map(Cell::to_value) { Some(Value::String(s)) => s, Some(v) => v.to_string(), None => String::new() };
-            f["properties"]["edge_id"] = id.into();
+            ids.push(match roads.get(j, "edge_id").map(Cell::to_value) { Some(Value::String(s)) => s, Some(v) => v.to_string(), None => String::new() });
         }
+        t.set_column("edge_id", &ids.iter().map(|s| Cell::Str(s)).collect::<Vec<_>>(), true)?;
         done.push(name.to_string());
     }
-    done
+    Ok(done)
 }
 
 /// A table of the style keyed by zoom (YAML numbers, text in JSON) as [[zoom, value], ...], the zooms as numbers.
@@ -116,21 +150,38 @@ fn zoom_pairs(t: &Value, f: impl Fn(f64) -> f64) -> Value {
 
 /// feature_overlays: one overlay per layer (in the collections' order), its look from the theme's "features" style, and what the restyle adds
 /// (colour by kind, outlines, textures, icons, zoom ranges, 3D); and the images of the layers there are.
-pub fn feature_overlays(fcs: Map<String, Value>, look: &crate::Look, edge_attached: &[String]) -> (Vec<Overlay>, Map<String, Value>) {
+/// render_map's `interaction` (`{layer: {clickable, tooltip, popup}}`) sets a layer's start values; a layer that the map does not have is
+/// a warning, as mapstyle's.
+pub fn feature_overlays(tables: Vec<(String, FeatureTable)>, look: &crate::Look, edge_attached: &[String], warnings: &mut Vec<String>)
+                        -> (Vec<Overlay>, Map<String, Value>) {
+    let interaction = look.args["interaction"].as_object().cloned().unwrap_or_default();
+    let mut unknown: Vec<&String> = interaction.keys().filter(|k| !tables.iter().any(|(n, _)| n == *k)).collect();
+    if !unknown.is_empty() {
+        unknown.sort();
+        warnings.push(format!("interaction: no layer {} on this map", unknown.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")));
+    }
     let st = &look.features["style"];
     let specs = look.features["layers_yaml"]["layers"].as_array().cloned().unwrap_or_default();
     let all_images = look.features["images"].as_object().cloned().unwrap_or_default();
     let (areas, lines, points, icon) = (&st["areas"], &st["lines"], &st["points"], &st["icon"]);
     let mut out = Vec::new();
     let mut images = Map::new();
-    for (name, fc) in fcs {
+    for (name, t) in tables {
         let spec = specs.iter().find(|s| s["name"] == name.as_str()).cloned().unwrap_or(Value::Null);
         let kind = spec["kind"].as_str().unwrap_or("");
         let ov_kind = match kind { "polygon" => "fill", "line" => "line", _ => "circle" };
         let ticked = spec.get("ticked").is_none_or(|v| v != false);
         let mut l = json!({"label": name, "kind": ov_kind, "ticked": ticked});
         let mut ov = Overlay { name: name.clone(), kind: ov_kind, under: kind != "point", edge: edge_attached.contains(&name), color: Value::Null,
-                               outline: Value::Null, opacity: Value::Null, width: Value::Null, radius: Value::Null, visible: ticked, fc: Value::Null, l: Value::Null, user: Value::Null };
+                               outline: Value::Null, opacity: Value::Null, width: Value::Null, radius: Value::Null, visible: ticked, data: Data::Json(Value::Null),
+                               l: Value::Null, user: Value::Null, clickable: Some(clickable(&name, kind)), kinds: kinds(&t),
+                               tooltip_on: None, popup_on: None };
+        // mapstyle's start values (clickable by the rule above, no tooltip, the popup), with the layer's `interaction` over them
+        if let Some(i) = interaction.get(&name) {
+            let set = |k: &str| i.get(k).map(|v| truthy(Some(v)));
+            ov.clickable = set("clickable").or(ov.clickable);
+            (ov.tooltip_on, ov.popup_on) = (set("tooltip"), set("popup"));
+        }
         if name == "landcover" {
             let mut fills = areas["landcover"].as_object().cloned().unwrap_or_default();
             let default = fills.shift_remove("default").unwrap_or(Value::Null);
@@ -155,7 +206,7 @@ pub fn feature_overlays(fcs: Map<String, Value>, look: &crate::Look, edge_attach
             ov.opacity = a.get("opacity").cloned().unwrap_or(json!(1.0));
             ov.width = json!(0.5);
             l["min_zoom"] = a.get("min_zoom").cloned().unwrap_or(Value::Null);
-            if fc["features"].get(0).is_some_and(|f| f["properties"].get("height").is_some()) {
+            if !t.is_empty() && t.has_key(0, "height") {
                 l["extrude"] = json!({"color": a.get("fill").cloned().unwrap_or(Value::Null), "opacity": st["buildings_3d"]["opacity"]});
             }
         } else if kind == "line" {
@@ -189,11 +240,30 @@ pub fn feature_overlays(fcs: Map<String, Value>, look: &crate::Look, edge_attach
                 l["icon"] = json!({"image": id, "opacity": icon["opacity"], "size": zoom_pairs(&icon["size"], |px| px * size / 48.0)});
             }
         }
-        ov.fc = fc;
+        ov.data = Data::Table(Box::new(t));
         ov.l = l;
         out.push(ov);
     }
     (out, images)
+}
+
+/// mapstyle's start value of a base-map layer's clickable: the decoration (landcover, water, paved and the lines but the raceway and the
+/// other ways) is not, so that a click reaches the road under it.
+fn clickable(name: &str, kind: &str) -> bool {
+    !(matches!(name, "landcover" | "water" | "paved") || (kind == "line" && !matches!(name, "raceway" | "other_ways")))
+}
+
+/// The kinds of a layer's features with their counts, most first, a tie in the order in which they come first (Counter.most_common).
+fn kinds(t: &FeatureTable) -> Vec<(String, usize)> {
+    let mut out: Vec<(String, usize)> = Vec::new();
+    for k in (0..t.len()).filter_map(|r| t.get(r, "kind").and_then(Cell::as_str)) {
+        match out.iter_mut().find(|(x, _)| x == k) {
+            Some(e) => e.1 += 1,
+            None => out.push((k.to_string(), 1)),
+        }
+    }
+    out.sort_by_key(|k| std::cmp::Reverse(k.1));
+    out
 }
 
 /// _ov_hl: an interactive overlay's colour lights up on hover and select (feature-state).
@@ -203,23 +273,6 @@ fn ov_hl(base: &Value, hover: &Value, select: &Value) -> Value {
 
 fn or(v: &Value, d: &Value) -> Value {
     if v.is_null() || v.as_str() == Some("") { d.clone() } else { v.clone() }
-}
-
-/// detect_kind: the kind of the first feature with a geometry (polygon: fill, line: line, point: circle; else fill).
-fn detect_kind(fc: &Value) -> &'static str {
-    for f in fc["features"].as_array().into_iter().flatten() {
-        let t = f["geometry"]["type"].as_str().unwrap_or("");
-        if t.contains("Polygon") {
-            return "fill";
-        }
-        if t.contains("Line") {
-            return "line";
-        }
-        if t.contains("Point") {
-            return "circle";
-        }
-    }
-    "fill"
 }
 
 /// The first point of a GeoJSON geometry's coordinates.
@@ -263,7 +316,8 @@ pub fn user_overlays(specs: &Value, first: usize) -> Result<Vec<Overlay>, String
         let name = u["label"].as_str().filter(|l| !l.is_empty()).map_or_else(|| format!("overlay {}", first + k), String::from);
         out.push(Overlay { name, kind, under: u["placement"] == "under", edge: u["edge_col"].as_str().is_some_and(|c| !c.is_empty()),
                            color: u["color"].clone(), outline: u["outline"].clone(), opacity: u["opacity"].clone(), width: u["width"].clone(),
-                           radius: u["radius"].clone(), visible: u["visible"] != false, fc, l: Value::Null, user });
+                           radius: u["radius"].clone(), visible: u["visible"] != false, data: Data::Json(fc), l: Value::Null, user, clickable: None,
+                           kinds: Vec::new(), tooltip_on: None, popup_on: None });
     }
     Ok(out)
 }
@@ -336,7 +390,7 @@ pub fn overlay_layers(sid: &str, ov: &Overlay, look: &crate::Look) -> Vec<Value>
     let pm = |v: Value| v.as_object().cloned().unwrap();
     match ov.kind {
         "text" => {
-            let along = detect_kind(&ov.fc) != "circle";
+            let along = ov.data.detect_kind() != "circle";
             let mut layout = pm(lay);
             layout.insert("symbol-placement".into(), if along { "line-center" } else { "point" }.into());
             layout.insert("text-field".into(), json!(["get", u["text_col"]]));
@@ -392,27 +446,43 @@ pub fn edge_overlay(ov: &mut Overlay, roads: &std::collections::HashMap<String, 
     let order_col = ov.user["order_col"].as_str().map(String::from);
     let mut orders = std::collections::BTreeSet::new();
     let mut unknown = Vec::new();
-    for f in ov.fc["features"].as_array_mut().into_iter().flatten() {
-        if !f["properties"].is_object() {
-            f["properties"] = json!({});
-        }
-        let p = f["properties"].as_object_mut().unwrap();
-        let e = eid(p.get(&col).unwrap_or(&Value::Null));
+    // what a feature takes from its edge (`e`: its edge id; `order`: its order_col value), in the order of the keys; None: no such edge
+    let mut marks = |e: String, order: Option<f64>| -> Option<[Value; 6]> {
         let Some(&r) = roads.get(&e) else {
             unknown.push(e);
-            continue;
+            return None;
         };
-        let o = order_col.as_ref().and_then(|c| p.get(c)).and_then(Value::as_f64).filter(|o| o.is_finite()).map_or(0, |o| o.trunc() as i64);
+        let o = order.filter(|o| o.is_finite()).map_or(0, |o| o.trunc() as i64);
         let fl = r.get("__rs_fl").and_then(Cell::as_i64).unwrap_or(0);
-        p.insert("__rs_edge".into(), r.get("__rs_edge").map_or(Value::Null, Cell::to_value));
-        p.insert("__rs_fl".into(), fl.into());
-        p.insert("__rs_ord".into(), o.into());
-        p.insert("__rs_cls".into(), r.cls());
-        p.insert("__rs_lvl".into(), r.get("lvl").map_or(json!(0), Cell::to_value));
-        if truthy(r.get("__rs_tunnel")) {
-            p.insert("__rs_tunnel".into(), true.into());
-        }
         orders.insert((fl, o));
+        Some([r.get("__rs_edge").map_or(Value::Null, Cell::to_value), fl.into(), o.into(), r.cls(), r.get("lvl").map_or(json!(0), Cell::to_value),
+              if truthy(r.get("__rs_tunnel")) { true.into() } else { Value::Null }])
+    };
+    const KEYS: [&str; 6] = ["__rs_edge", "__rs_fl", "__rs_ord", "__rs_cls", "__rs_lvl", "__rs_tunnel"];
+    match &mut ov.data {
+        Data::Json(fc) => for f in fc["features"].as_array_mut().into_iter().flatten() {
+            if !f["properties"].is_object() {
+                f["properties"] = json!({});
+            }
+            let p = f["properties"].as_object_mut().unwrap();
+            let order = order_col.as_ref().and_then(|c| p.get(c)).and_then(Value::as_f64);
+            let Some(m) = marks(eid(p.get(&col).unwrap_or(&Value::Null)), order) else { continue };
+            for (k, v) in KEYS.into_iter().zip(m).filter(|(k, v)| *k != "__rs_tunnel" || !v.is_null()) {      // __rs_tunnel only when true
+                p.insert(k.into(), v);
+            }
+        },
+        Data::Table(t) => {
+            let rows: Vec<Option<[Value; 6]>> = (0..t.len()).map(|r| {
+                let order = order_col.as_ref().and_then(|c| t.get(r, c)).and_then(Cell::as_f64);
+                marks(eid(t.get(r, &col).unwrap_or(Cell::Null)), order)
+            }).collect();
+            if unknown.is_empty() {
+                for (k, key) in KEYS.into_iter().enumerate() {
+                    let cells: Vec<Cell> = rows.iter().map(|m| m.as_ref().map_or(Cell::Null, |m| Cell::from(&m[k]))).collect();
+                    t.set_column(key, &cells, key != "__rs_tunnel")?;
+                }
+            }
+        }
     }
     if !unknown.is_empty() {        // Python's text: the names as its repr writes them
         let label = ov.user["label"].as_str().unwrap_or("");
@@ -442,7 +512,8 @@ pub fn item_pieces(ov: &mut Overlay, i: usize, look: &crate::Look) -> Result<Vec
     let (wcol, ocol, dcol, ccol) = (col("width_m_col"), col("offset_m_col"), col("dash_col"), col("color_col"));
     let label = u["label"].as_str().filter(|l| !l.is_empty()).map_or_else(|| i.to_string(), String::from);
     let mut out = Vec::new();
-    for (j, f) in ov.fc["features"].as_array_mut().into_iter().flatten().enumerate() {
+    let Data::Json(fc) = &mut ov.data else { return Err(format!("overlay {label}: line items from a typed table are not made (only a caller's overlay has items)")) };
+    for (j, f) in fc["features"].as_array_mut().into_iter().flatten().enumerate() {
         let g = f["geometry"].clone();
         let p = f["properties"].as_object_mut().ok_or("an overlay feature with no properties")?;
         let w = match &wcol { Some(c) => p.get(c).cloned().unwrap_or(Value::Null), None => u["width_m"].clone() };
@@ -486,12 +557,13 @@ pub fn item_pieces(ov: &mut Overlay, i: usize, look: &crate::Look) -> Result<Vec
 pub fn road_items(fc: &Value, roads: &std::collections::HashMap<String, Road>, edge_col: &str, k: usize, look: &crate::Look)
                   -> Result<Vec<crate::simple::Item>, String> {
     let mut ov = Overlay { name: "items".into(), kind: "line", under: false, edge: true, color: Value::Null, outline: Value::Null, opacity: Value::Null,
-                           width: Value::Null, radius: Value::Null, visible: true, fc: fc.clone(), l: Value::Null,
+                           width: Value::Null, radius: Value::Null, visible: true, data: Data::Json(fc.clone()), l: Value::Null, clickable: None, kinds: Vec::new(), tooltip_on: None, popup_on: None,
                            user: json!({"edge_col": edge_col, "order_col": "order", "color_col": "color", "width_m_col": "width_m",
                                         "offset_m_col": "offset_m", "dash_col": "dash", "label": "items"}) };
     edge_overlay(&mut ov, roads)?;
     let mut out = item_pieces(&mut ov, k, look)?;
-    let feats = ov.fc["features"].as_array().cloned().unwrap_or_default();
+    let Data::Json(fc) = &ov.data else { unreachable!("road_items makes a JSON overlay") };
+    let feats = fc["features"].as_array().cloned().unwrap_or_default();
     for q in out.iter_mut() {
         let j = q.props.get("__rs_item").and_then(Value::as_u64).unwrap_or(0) as usize;
         let src = feats[j]["properties"].as_object().cloned().unwrap_or_default();

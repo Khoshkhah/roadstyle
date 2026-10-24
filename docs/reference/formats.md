@@ -202,12 +202,12 @@ Bundled: `amber`, `carto`, `highsat`, `mono`. The table shows `amber`; the other
 
 ## The merged look
 
-`make_look` (Python: `roadstyle._engine.look`; the browser: `makeLook`) merges the four parts into one JSON object, the input of
+`make_look` (Python: `roadstyle._engine.look`; the browser: `resolveLook`) merges the four parts into one JSON object, the input of
 the engine.
 
 !!! warning "Internal"
     The merged look has no schema and no version yet, and it changes with the design of the Rust engine (the plan's typed look,
-    `roadstyle-look`). Make it with `make_look` or `makeLook`; do not write it by hand.
+    `roadstyle-look`). Make it with `make_look` or `resolveLook`; do not write it by hand.
 
 | Key | Content |
 |---|---|

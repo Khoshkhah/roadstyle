@@ -27,7 +27,7 @@ const tiled = JSON.parse(tiler.style());
 - `readShp(shp, dbf, prj?, name?)`: the roads of a Shapefile (its .shp and .dbf bytes and its .prj text), in EPSG:4326, as a `Roads` handle. A GeoPackage is read only by the native programs (SQLite is C).
 - `Look` (`resolveLook`, `Look.fromJson`, `toJson`), `makeStyle`, `Tiler`, `makeSources`, `tileSources`, `tileFiles`, `makePage`,
   `exportLook` and `memoryBytes`: the types (`index.d.ts`) come from the Rust signatures, with their descriptions. The calls take a
-  `Look`, not the look's text. `makeLook` is the old name of `resolveLook`, for one version.
+  `Look`, not the look's text.
 - `roadstyle-wasm/roads_sql.js` (`makeRoads`, `writeRoads`) and `roadstyle-wasm/features_sql.js` (`writeFeatures`): the SQL that writes the
   engine's inputs from a duckOSM file in duckdb-wasm.
 - TypeScript: 5.7 or later, with `lib` `esnext` (the classes have `Symbol.dispose`), or `skipLibCheck`.

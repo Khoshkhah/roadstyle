@@ -1,0 +1,22 @@
+# The Rust roadstyle-mcp as a wheel (maturin, bindings = "bin"): the program `roadstyle-mcp`, no Python in it, so `uvx roadstyle-mcp`,
+# server.json and .claude-plugin/plugin.json stay as they are. NOT PUBLISHED: packages/roadstyle-mcp (the Python server) is roadstyle-mcp
+# on PyPI until render_place is in Rust (docs/design/rust_library.md, A2), and a publish waits for 1.0. CI builds and tests this wheel
+# (.github/workflows/release.yml, mcp-wheels).
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "roadstyle-mcp"
+dynamic = ["version"]
+description = "MCP server for roadstyle: AI agents draw styled, interactive road maps of road files (the Rust program)"
+requires-python = ">=3.8"
+license = "MIT"
+keywords = ["mcp", "model-context-protocol", "openstreetmap", "roads", "map", "ai-agents"]
+
+[project.urls]
+Homepage = "https://github.com/Khoshkhah/roadstyle"
+Documentation = "https://khoshkhah.github.io/roadstyle/guides/agents/"
+
+[tool.maturin]
+bindings = "bin"

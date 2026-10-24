@@ -6,17 +6,20 @@
 #![allow(clippy::needless_range_loop, clippy::type_complexity)]
 
 pub mod area;
+mod error;
 pub mod flow;
 mod input;
 pub mod solve;
+
+pub use error::Error;
 
 use std::collections::{HashMap, HashSet};
 
 /// A point (lon, lat).
 pub type Pt = (f64, f64);
 
-/// The roadstyle version whose rules and defaults this port follows (`edge_levels_meta.roadstyle_version`).
-pub const ROADSTYLE_VERSION: &str = "0.24.2";
+/// The roadstyle version of these rules and defaults (`edge_levels_meta.roadstyle_version`): this crate's version, which is roadstyle's.
+pub const ROADSTYLE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Method {
@@ -184,23 +187,23 @@ impl Default for Options {
 }
 
 /// The drawing levels of the edges (`compute_levels`). A caller that needs them two times keeps the value.
-pub fn levels(edges: &LevelEdges, o: &Options) -> Result<Option<Levels>, String> {
+pub fn levels(edges: &LevelEdges, o: &Options) -> Result<Option<Levels>, Error> {
     if o.method == Method::None {
         return Ok(None);
     }
     compute(&edges.edges(), o).map(Some)
 }
 
-fn compute(edges: &[&LevelEdge], o: &Options) -> Result<Levels, String> {
+fn compute(edges: &[&LevelEdge], o: &Options) -> Result<Levels, Error> {
     if o.method == Method::Tags && (o.band_col || !matches!(o.order, Order::Priority | Order::None))
     {
-        return Err("compute_levels: band_col and order are part of the optimization problem; use method='solve'".into());
+        return Err(Error::Options("compute_levels: band_col and order are part of the optimization problem; use method='solve'".into()));
     }
     if o.method == Method::Solve && !(o.margin > 0.0 && o.max_level > 0) {
-        return Err(format!(
+        return Err(Error::Options(format!(
             "compute_levels: margin and max_level must be greater than 0, not {} and {}",
             o.margin, o.max_level
-        ));
+        )));
     }
     let roads = input::road_split(edges)?;
     let (mut given_up, mut orders_not_kept, mut stages, mut pairs, mut order_pairs) =
@@ -221,13 +224,13 @@ fn compute(edges: &[&LevelEdge], o: &Options) -> Result<Levels, String> {
             for &(id, v) in &o.fixed {
                 let &(r, back) = at
                     .get(&id)
-                    .ok_or(format!("fixed: {id} is not an edge of the roads"))?;
+                    .ok_or(Error::Options(format!("fixed: {id} is not an edge of the roads")))?;
                 let v = if back { [v[2], v[1], v[0], v[3]] } else { v };
                 if v.iter().any(|x| x.abs() > o.max_level) {
-                    return Err(format!(
+                    return Err(Error::Options(format!(
                         "solve_levels: a fixed number is outside [-max_level, max_level] ({})",
                         o.max_level
-                    ));
+                    )));
                 }
                 rules.fixed.push((r, v.map(|x| x + o.max_level)));
             }
@@ -302,7 +305,7 @@ pub fn make(
     edges: &[LevelEdge],
     o: &Options,
     heads: &[(i64, [Option<f64>; 2])],
-) -> Result<AreaInput, String> {
+) -> Result<AreaInput, Error> {
     let edges: Vec<&LevelEdge> = edges.iter().collect();
     let roads = input::road_split(&edges)?;
     let mut out: Vec<InputRoad> = roads
@@ -330,11 +333,11 @@ pub fn make(
     for &(id, v) in heads {
         let &(r, back) = at
             .get(&id)
-            .ok_or(format!("heads: '{id}' is not an edge of the roads"))?;
+            .ok_or(Error::Edits(format!("heads: '{id}' is not an edge of the roads")))?;
         if v.iter().flatten().any(|m| m.is_nan() || *m <= 0.0) {
-            return Err(format!(
+            return Err(Error::Edits(format!(
                 "heads: the head lengths of {id} must be positive numbers of metres"
-            ));
+            )));
         }
         let v = v.map(|m| m.unwrap_or(o.head_m));
         own.insert(r, if back { [v[1], v[0]] } else { v });
@@ -354,26 +357,26 @@ fn edit(
     rules: &mut solve::Rules,
     edits: &[Edit],
     at: &HashMap<i64, (usize, bool)>,
-) -> Result<(), String> {
+) -> Result<(), Error> {
     let road = |id: i64| {
         at.get(&id)
             .copied()
-            .ok_or(format!("edits: '{id}' is not an edge of the roads"))
+            .ok_or(Error::Edits(format!("edits: '{id}' is not an edge of the roads")))
     };
     for e in edits {
         let ((a, ab), (b, bb)) = (road(e.a)?, road(e.b)?);
-        let side = |v: &Option<String>, back: bool, parts: &[&str]| -> Result<usize, String> {
+        let side = |v: &Option<String>, back: bool, parts: &[&str]| -> Result<usize, Error> {
             let p = match v.as_deref() {
                 Some(s) if parts.contains(&s) => s,
                 other => {
-                    return Err(format!(
+                    return Err(Error::Edits(format!(
                         "edits: a {} names {} in its end, not {:?} ({} and {})",
                         e.relation,
                         parts.join(", "),
                         other.unwrap_or(""),
                         e.a,
                         e.b
-                    ))
+                    )))
                 }
             };
             let h = ["start", "main", "end"]
@@ -403,16 +406,16 @@ fn edit(
             ),
             "order" => toggle(&mut rules.orders, (a, b), e.enabled),
             r => {
-                return Err(format!(
+                return Err(Error::Edits(format!(
                     "pairs: the relation '{r}' is not meet, stack, near or order"
-                ))
+                )))
             }
         };
         if !found {
-            return Err(format!(
+            return Err(Error::Edits(format!(
                 "edits: no {} pair {} {} to switch off",
                 e.relation, e.a, e.b
-            ));
+            )));
         }
     }
     Ok(())

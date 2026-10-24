@@ -1,5 +1,6 @@
 // panel mode: a full-height side panel hosts the map controls (colour-by, road filter, legend,
 // host tools) and the selected road's record. Built BEFORE the controls, so they mount into it.
+import {_esc} from "../popup.js";
 import {map, O} from "./core.js";
 import {_findWire} from "./find.js";
 import {rsDeselect} from "./select.js";
@@ -17,7 +18,7 @@ function _sideInit(){
   if(_sideBd || _popupMode!=="panel") return;
   document.body.classList.add("rs-panel");
   const sd=document.createElement("div"); sd.className="rs-side"; _sideEl=sd;
-  sd.innerHTML='<div class="rs-side-hd"><span>'+(document.title||"Map")+'</span>'+
+  sd.innerHTML='<div class="rs-side-hd"><span>'+_esc(document.title||"Map")+'</span>'+
     '<span class="rs-side-min" title="Hide panel">&raquo;</span></div>'+
     '<div class="rs-side-q"><input type="search" placeholder="Search roads\u2026" spellcheck="false">'+
     '<div class="rs-side-q-res"></div></div>'+
