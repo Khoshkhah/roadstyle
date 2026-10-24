@@ -114,3 +114,11 @@ The base map's 33 MB that stay are its tile layers (each feature's geometry in W
 keys of each GeoJSON feature, and each feature's geometry. Before, it made one JSON value of the whole source. The 22 GeoParquet files of
 Tartu are the same bytes, and saving them needs no more memory than stage 1 (284 MB).
 
+## Step 4: proposed not to do (2026-10-24)
+
+A caller's overlays and items (`overlays=`, `items=`) are in the look's args as JSON, and the engine reads them there: their JSON stays
+in memory with a table or without one, so a table saves only the copy that `user_overlays` makes of each FeatureCollection. And a
+table cannot give back the same GeoJSON for every caller's data: its one column order cannot keep each feature's own key order, and a
+nested value, a feature's `id` or another member of a feature needs JSON. So they stay `overlays::Data::Json`. The JSON path of the base
+map is gone already (landing step 5): the base map has no `Row` and no `Tiles::add`.
+
