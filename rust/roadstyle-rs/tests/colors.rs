@@ -18,11 +18,12 @@ fn check(case: &str) {
     let mut look: Value = serde_json::from_str(&std::fs::read_to_string(data("look.json")).unwrap()).unwrap();
     look["args"]["arrows"] = true.into(); // as tests/make_goldens.py: the engine always makes the names and arrows
     look["args"]["labels"] = true.into();
+    look["args"]["export"] = true.into(); // the goldens are exports (audit N2)
     for (k, v) in golden["args"].as_object().unwrap() {
         look["args"][k] = v.clone();
     }
     let roads = std::fs::read(data("monaco_part/roads.parquet")).unwrap();
-    let style = roadstyle_rs::make_style(roads, &look.to_string(), None, None, None).unwrap_or_else(|e| panic!("{case}: {e}"));
+    let style = roadstyle_rs::make_style(roads, &roadstyle_rs::Look::from_value(look.clone()).unwrap(), None, None, None).unwrap_or_else(|e| panic!("{case}: {e}"));
     let mut style: Value = serde_json::from_str(&style).unwrap();
     let options = style["metadata"].as_object_mut().unwrap().shift_remove("roadstyle:color_options").unwrap_or(Value::Array(vec![]));
     let mut golden = golden;

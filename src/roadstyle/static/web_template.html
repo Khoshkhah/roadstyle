@@ -12,11 +12,13 @@ __POPUP_CSS__
 __POPUP_JS__
 __DASHBOARD_JS__
 // the page: its map, and roadstyle's dashboard on it (static/dashboard/, docs/design/dashboard_module.md). Each option has the name of
-// render's keyword; render_web.render fills in the values.
+// render's keyword; render_web.render fills in the values (RS_OPTIONS).
 {
 const style = __STYLE__;
-const map = new maplibregl.Map({container:"map", style:style, center:__CENTER__, zoom:13,
-  pitch:__PITCH__, bearing:__BEARING__, maxPitch:__MAX_PITCH__,
+// the options of rsDashboard, and the page's camera (center, pitch, bearing, max_pitch, bounds)
+const RS_OPTIONS = __RS_OPTIONS__, cam = RS_OPTIONS.camera;
+const map = new maplibregl.Map({container:"map", style:style, center:cam.center, zoom:13,
+  pitch:cam.pitch, bearing:cam.bearing, maxPitch:cam.max_pitch,
   attributionControl:{compact:true}});
 // One tile zoom on the whole screen. In a tilted view MapLibre loads the near tiles at a higher zoom than the far ones. A width that
 // depends on the zoom AND on the feature is baked per tile for [tile zoom, tile zoom + 1] and clamped there, so every road changed
@@ -26,42 +28,7 @@ function _flatTiles(){ Object.keys(style.sources).forEach(id=>{ const s=map.getS
 map.on("styledata", _flatTiles);
 map.addControl(new maplibregl.NavigationControl({visualizePitch:true}));
 map.addControl(new maplibregl.ScaleControl({maxWidth:120, unit:"metric"}), "bottom-left");
-rsDashboard(map, {
-  style: style,
-  basemaps: __BASEMAPS__,
-  basemap_switcher: __BM_SWITCHER__,
-  tiles: __RS_TILED__,
-  simple: __RS_LEAN__,
-  sources: __RS_SOURCES__,
-  arrows: __RS_ARROWS__,
-  live: __RS_LIVE__,
-  popup_mode: __ROAD_POPUP_MODE__,
-  find_control: __FIND_CONTROL__,
-  zoom_readout: __ZOOM_READOUT__,
-  pitch_3d: __PITCH3D__,
-  street_view: __STREET_VIEW__,
-  street_view_key: __SV_WINDOW_KEY__,
-  google_3d: __GOOGLE_3D__,
-  select_color: __SELECT_COLOR__,
-  filter: __FILTER__,
-  color_options: __COLOR_OPTIONS__,
-  color_active: __CO_ACTIVE__,
-  overlays: __OVERLAYS__,
-  overlay_control: __OVERLAY_CONTROL__,
-  overlay_popup: __OVERLAY_POPUP__,
-  tunnel: __TUNNEL__,
-  fill_layers: __RS_FILL_LAYERS__,
-  road_fill: __RS_ROAD_FILL__,
-  views: __VIEWS__,
-  items: __ROAD_ITEMS__,
-  road_popup: __ROAD_POPUP__,
-  road_tooltip: __ROAD_TOOLTIP__,
-  hover_delay_ms: __HOVER_DELAY_MS__,
-  edge_id_col: __EDGE_ID_COL__,
-  arrow_icon: __ARROW_ICON__,
-  arrow_color: __ARROW_COLOR__,
-  arrow_rules: __ARROW_RULES__,
-});
+rsDashboard(map, {...RS_OPTIONS, style: style});
 // Self-diagnosis: a map with zero road features is a broken page, not an empty area — say WHY
 // on the map itself (frontends like notebook webviews surface no console). Amber banner reports
 // the inflate state so a screenshot alone pinpoints the failing stage.
@@ -83,8 +50,8 @@ map.on("load", function(){ var tries=0; (function check(){ setTimeout(function()
       ' | DecompressionStream: '+(typeof DecompressionStream)+'</div>');
   }catch(e){}
 }, 2500); })(); });
-map.on("load", ()=>{ try{ map.fitBounds(__BOUNDS__,
-  {padding:30, duration:0, pitch:__PITCH__, bearing:__BEARING__}); }catch(e){} });
+map.on("load", ()=>{ try{ map.fitBounds(cam.bounds,
+  {padding:30, duration:0, pitch:cam.pitch, bearing:cam.bearing}); }catch(e){} });
 window.map = map;
 }
 </script></body></html>

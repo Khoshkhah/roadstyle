@@ -43,9 +43,9 @@ def _stages(gdf, **kw):
 
 
 def _opt(html, key):
-    """One option of the page's rsDashboard(map, {...}) call (static/web_template.html), as a Python value."""
-    at = html.index("\n  " + key + ": ", html.index("rsDashboard(map, {"))
-    return json.JSONDecoder().raw_decode(html, at + len(key) + 5)[0]
+    """One option of the page's rsDashboard call (RS_OPTIONS in static/web_template.html), as a Python value."""
+    at = html.index("const RS_OPTIONS = ") + len("const RS_OPTIONS = ")
+    return json.JSONDecoder().raw_decode(html, at)[0][key]
 
 
 def test_web_color_options_bake_variants_and_wire_recolour():
@@ -388,10 +388,10 @@ def test_web_camera_pitch_and_bearing():
     """pitch=/bearing= set the starting camera (and survive the bounds fit); defaults come from
     the `camera` settings block (0/0)."""
     flat = render_edges(_edges(), backend="web").html
-    assert "pitch:0, bearing:0," in flat
+    assert (_opt(flat, "camera")["pitch"], _opt(flat, "camera")["bearing"]) == (0, 0)
     tilted = render_edges(_edges(), backend="web", pitch=55, bearing=30).html
-    assert "pitch:55, bearing:30," in tilted
-    assert tilted.count("pitch:55") == 2          # map init AND the fitBounds camera
+    assert (_opt(tilted, "camera")["pitch"], _opt(tilted, "camera")["bearing"]) == (55, 30)
+    assert "pitch:cam.pitch, bearing:cam.bearing" in tilted and tilted.count("pitch:cam.pitch") == 2    # map init AND the fitBounds camera
 
 
 def test_web_view_3d_flag():
@@ -401,9 +401,9 @@ def test_web_view_3d_flag():
     style = _style(wm.html)
     assert "terrain" not in style and "dem" not in style["sources"]
     assert "hillshade" not in [l["id"] for l in style["layers"]]
-    assert "pitch:55" in wm.html
+    assert _opt(wm.html, "camera")["pitch"] == 55
     flat = render_edges(_edges(), backend="web").html
-    assert "pitch:0" in flat
+    assert _opt(flat, "camera")["pitch"] == 0
 
 
 def test_web_camera_toggle_control():
@@ -490,8 +490,8 @@ def test_web_camera_max_pitch():
     meet, and past ~72 the tile cover explodes on large GeoJSON sources (roads stop rendering and hover/select
     dies with them). So 70 is the most a page tilts by default, and max_pitch=60 is the option that keeps the width exact."""
     html = render_edges(_edges(), backend="web").html
-    assert "maxPitch:70" in html
-    assert "maxPitch:60" in render_edges(_edges(), backend="web", max_pitch=60).html
+    assert _opt(html, "camera")["max_pitch"] == 70
+    assert _opt(render_edges(_edges(), backend="web", max_pitch=60).html, "camera")["max_pitch"] == 60
     assert "calculateTileZoom=z=>z" in html                              # one tile zoom on the whole screen: a road has one width in a tilted view
     from roadstyle.config import StyleConfig as _C
     assert _C().camera["max_pitch"] == 70
@@ -583,7 +583,7 @@ def test_web_panel_popup_mode_and_select_events():
     default = render_edges(_edges(), backend="web").html
     assert _opt(default, "popup_mode") == "popup"
     for html in (panel, default):
-        assert 'CustomEvent("rs:select"' in html and 'CustomEvent("rs:deselect"' in html
+        assert '_emit("rs:select"' in html and '_emit("rs:deselect"' in html          # the page sends both events (core.js, _emit)
 
 
 def test_render_edges_scoped_settings():
@@ -1021,9 +1021,23 @@ _TWIN_KW = dict(backend="web", casing_start_col="cs", casing_level_col="cm", cas
                 cap_start_col="cap_s", cap_end_col="cap_e", head_m=5.0)
 
 
+def _bare(e):
+    """A zoom curve without the width factor of N8 in its stops (each ``["*", stop, rs_w]``: no feature state set, the factor is 1)."""
+    from roadstyle.render_web import _RS_W
+    return [x[1] if isinstance(x, list) and len(x) == 3 and x[0] == "*" and x[2] == _RS_W else x for x in e] if isinstance(e, list) else e
+
+
 def _num(e, p):
-    """A width or offset stop on a feature's properties (+, * and what render_web._ev reads)."""
+    """A width or offset stop on a feature's properties (+, * and what render_web._ev reads; no feature state set)."""
     from roadstyle.render_web import _ev
+    if isinstance(e, list) and e and e[0] == "coalesce":
+        for x in e[1:]:
+            if isinstance(x, list) and x and x[0] == "feature-state":
+                continue
+            v = _num(x, p)
+            if v is not None:
+                return v
+        return None
     if isinstance(e, list) and e and e[0] in ("+", "*", "-", "max"):
         v = [_num(x, p) for x in e[1:]]
         return {"+": sum(v), "*": v[0] * v[1] if len(v) == 2 else None, "-": v[0] - v[1] if len(v) == 2 else -v[0], "max": max(v)}[e[0]]
@@ -1247,7 +1261,7 @@ def test_a_two_way_pair_that_disagrees_is_named_in_a_warning():
 
 def test_end_caps_follow_filters_and_recolour_and_can_be_turned_off():
     html = render_edges(_pairs(), backend="web").html
-    assert '["any",_has(["get","__rs_edge"],_qIds),_has(["get","__rs_edge2"],_qIds)]' in html     # id filters: a cap shows while either twin does
+    assert '["any",_has(["get","__rs_edge"],ids),_has(["get","__rs_edge2"],ids)]' in html     # id filters: a cap shows while either twin does
     caps = [l for l in _style(render_edges(_pairs(), backend="web", simple=False, settings={"config": {"twin_casing": "each"}}).html)["layers"]
             if l["id"].startswith("roads-ends-fill")]
     assert caps and all("rs_colors" in json.dumps(l["paint"]["circle-color"]) for l in caps)        # a cap takes the rsColor colour of its two lanes
@@ -1952,7 +1966,7 @@ def test_divided_casing_is_drawn_as_head_and_main_pieces():
     assert all(l["source"] == "casings" for i, l in lay.items() if i.startswith("roads-casing") and "-lv" in i or i == "roads-casing")
     assert lay["roads-fill"]["source"] == "roads" and "roads-fill-lv-1" not in lay        # every fill is at 0
     assert style["_roads"]["features"][0]["geometry"]["coordinates"][-1] == [18 + d, 59.0]       # the fill line is the whole edge
-    assert '_has(["get","__rs_edge"],_qIds)' in html                       # the pieces follow rsFilter by their edge
+    assert '_has(["get","__rs_edge"],ids)' in html                       # the pieces follow rsFilter by their edge
     # without the head columns nothing changes: no casing source
     assert "casings" not in _style(render_edges(g, backend="web", casing_level_col="cm", fill_level_col="fl", simple=False).html)["sources"]
 
@@ -3546,6 +3560,7 @@ def test_simple_draws_every_road_piece_in_one_layer_in_the_full_order():
     assert paint["line-blur"][:3] == ["interpolate", ["linear"], ["zoom"]] and paint["line-blur"][3:5] == [14, 0] and paint["line-blur"][5] == 17 and paint["line-blur"][6][0] == "case"
     op = paint["line-opacity"]
     assert op[:3] == ["interpolate", ["linear"], ["zoom"]] and op[3] == 14 and op[4][:3] == ["case", ["==", ["get", "__rs_k"], 2], 0] and op[5] == 17
+    paint = {**paint, "line-width": _bare(paint["line-width"])}       # N8: each stop × the width factor
     stops = dict(zip(paint["line-width"][3::2], paint["line-width"][4::2], strict=True))
     extra = lambda z: stops[z][4][2]                                # noqa: E731 - the bridge casing's extra px at a stop: (case, shadow cond, shadow, bridge cond, bridge, ...)
     assert extra(14) == 0.0 and extra(15) == 1.0 and extra(17) == 3.0 and extra(20) == 3.0

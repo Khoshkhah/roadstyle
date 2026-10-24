@@ -184,31 +184,6 @@ def build_pmtiles(fc: dict, *, class_col: str, keep: set, minzoom_table: dict | 
     return buf.getvalue()
 
 
-def _heading(cs):
-    """The way a line runs at its middle by length: degrees clockwise from north (0 to 360, to 0.1), in a flat frame at the middle's
-    latitude; the same numbers as roadstyle_model::geom::line::heading (GEOS's walk along the segments)."""
-    if len(cs) < 2:
-        return None
-    segs = [math.sqrt((q[0] - p[0]) * (q[0] - p[0]) + (q[1] - p[1]) * (q[1] - p[1])) for p, q in zip(cs, cs[1:], strict=False)]
-    d = 0.5 * sum(segs)
-    i, m = len(cs) - 2, cs[-1]
-    if d <= 0:
-        i, m = 0, cs[0]
-    else:
-        acc = 0.0
-        for k, s in enumerate(segs):
-            if acc + s > d:
-                f, p, q = (d - acc) / s, cs[k], cs[k + 1]
-                i, m = k, (p if f <= 0 else q if f >= 1 else [(q[0] - p[0]) * f + p[0], (q[1] - p[1]) * f + p[1]])
-                break
-            acc += s
-    p, q = cs[i], cs[i + 1]
-    dx, dy = (q[0] - p[0]) * math.cos(math.radians(m[1])), q[1] - p[1]
-    if dx == 0 and dy == 0:
-        return None
-    return round(math.degrees(math.atan2(dx, dy)) % 360, 1)
-
-
 def page_reads() -> dict:
     """The page's declaration of the feature properties that its modules read (static/dashboard/reads.json: ``pieces`` and ``table``)."""
     from pathlib import Path
@@ -226,11 +201,11 @@ _TABLE_READS = set(page_reads()["table"])
 
 def sidecar(fc: dict) -> dict:
     """The road table of the page (gzipped), one row for each road: its properties for rsQuery / popups (``table_keeps``), its midpoint
-    (by length: rsSelect's popup anchor and Street View's spot), its bbox for rsFocus, the way it runs at its midpoint (Street View's
-    start) and its line. stage 1 of the Rust engine makes the same table (roadstyle::road_table)."""
+    (by length: rsSelect's popup anchor and Street View's spot), its bbox for rsFocus and its line (Street View's heading comes from it).
+    Stage 1 of the Rust engine makes the same table (roadstyle::write_road_table)."""
     from shapely.geometry import LineString
 
-    props, mids, bboxes, headings, lines = [], [], [], [], []
+    props, mids, bboxes, lines = [], [], [], []
     for ft in fc.get("features", []):
         props.append({k: v for k, v in (ft.get("properties") or {}).items() if table_keeps(k)})
         g = ft.get("geometry") or {}
@@ -243,9 +218,8 @@ def sidecar(fc: dict) -> dict:
         xs = [c[0] for c in (cs or [])]
         ys = [c[1] for c in (cs or [])]
         bboxes.append([min(xs), min(ys), max(xs), max(ys)] if xs else None)
-        headings.append(_heading(cs))
         lines.append(cs or None)
-    return {"props": props, "mids": mids, "bboxes": bboxes, "headings": headings, "lines": lines}
+    return {"props": props, "mids": mids, "bboxes": bboxes, "lines": lines}
 
 
 def _b64gz(obj) -> str:

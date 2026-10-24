@@ -1628,10 +1628,14 @@ def _state_expressions(style, props, fill_ids, end_fill_ids, end_casing_ids, ov_
             ["==", ["get", props[0]], ["get", props[0] + "__b"]]] if len(props) > 1 else ["==", ["get", props[0]], ["get", props[0] + "__b"]]
     both = ["all", has("__rs_edge"), has("__rs_edge2"), ["==", _painted("__rs_edge"), _painted("__rs_edge2")]]
     clear = "rgba(0,0,0,0)"
+    # audit N8: in simple mode a painted road is on top by the ids that rsColor painted (state rs_top: layout reads no feature state), and
+    # the fill reads the feature state rs_c (_simple_color); the full look keeps rs_colors and rs_base until it goes (0.27.0)
+    simple = any(lyr["id"] == "roads-simple" for lyr in style["layers"])
+    top = ["in", ["get", "__rs_edge"], _gs("rs_top")]
     for lyr in style["layers"]:
         lid, paint, layout = lyr["id"], lyr.setdefault("paint", {}), lyr.get("layout") or {}
         if lid in fill_ids or any(lid.startswith(b + "-dash") for b in fill_ids):
-            paint["line-color"] = _swap(paint["line-color"], base, _fill_expr(props))
+            paint["line-color"] = _swap(paint["line-color"], base, _fill_base(props) if simple else _fill_expr(props))
         elif lid.startswith("roads-bridge-decks"):
             paint["fill-extrusion-color"] = _swap(paint["fill-extrusion-color"], base, _fill_base(props))     # decks: the option's colour
         elif lid in end_fill_ids:
@@ -1641,10 +1645,11 @@ def _state_expressions(style, props, fill_ids, end_fill_ids, end_casing_ids, ov_
         if lyr.get("type") == "line" and layout.get("line-sort-key") is not None:
             layout = lyr["layout"] = dict(layout)      # layers can share one layout dict (tiles=True: roads-fill, roads-highlight): add the key once to each
             if lyr.get("source") == "roads":
-                layout["line-sort-key"] = ["+", layout["line-sort-key"], ["case", ["any", has("__rs_edge"), has("__rs_edge2")], 500, 0]]
+                painted = top if simple else ["any", has("__rs_edge"), has("__rs_edge2")]
+                layout["line-sort-key"] = ["+", layout["line-sort-key"], ["case", painted, 500, 0]]
             elif lid == "roads-simple":
                 layout["line-sort-key"] = ["+", layout["line-sort-key"], ["case", ["all", ["any", ["==", ["get", "__rs_k"], 1], ["==", ["get", "__rs_k"], 5]],
-                                                                                  ["any", has("__rs_edge"), has("__rs_edge2")]], 0.5, 0]]
+                                                                                  top], 0.5, 0]]
     by_id = {lyr["id"]: lyr for lyr in style["layers"]}
     for i, ov in enumerate(ov_meta or ()):
         for lid in ov.get("layers", ()):
@@ -2595,10 +2600,13 @@ def _simple_color(bridge_color, tunnels=False, select_color=None, hover_color=No
     two colours moved the same way (gap ``__rs_k`` 3, dashes 4; the gap clear for "One colour"). The page builds the same again on every
     recolouring (the simple-mode script)."""
     c, b = ["==", ["get", "__rs_k"], 0], ["to-boolean", ["get", "__rs_bridge"]]
-    base, fill = ["coalesce", ["get", "__rs_casing"], _FB["casing"]], _fill_expr(list(props))
-    # an item (__rs_k 5) its own colour, not the road's colouring; a road painted by rsColor shows it on its items too: where items replace
-    # a road's fill (lanes), the fill alone would show nothing (2026-10-10: the level editor's picked roads were not visible with lanes)
-    item = ["coalesce", _painted("__rs_edge"), _painted("__rs_edge2"), _painted("__rs_edge", "rs_base"), _painted("__rs_edge2", "rs_base"), ["coalesce", ["get", "__rs_ic"], _FB["fill"]]]
+    base, fill = ["coalesce", ["get", "__rs_casing"], _FB["casing"]], _fill_base(list(props))
+    # audit N8: a road's colour (rsColor, rsColorBase, rs.setData: the dashboard writes the one that wins) is the feature state rs_c on its
+    # row, over the baked fill of the active option
+    fill = ["coalesce", ["feature-state", "rs_c"], fill]
+    # an item (__rs_k 5) its own colour, not the road's colouring; a road painted by rsColor shows it on its items too (they share the
+    # road's row, promoteId): where items replace a road's fill (lanes), the fill alone would show nothing (2026-10-10)
+    item = ["coalesce", ["feature-state", "rs_c"], ["coalesce", ["get", "__rs_ic"], _FB["fill"]]]
     cases = [["==", ["get", "__rs_k"], 2], CONFIG.bridge_shadow_color, c, ["case", b, bridge_color, base]]
     if tunnels:
         fill, item = _tun_mix(fill), _tun_mix(item)            # the tunnel look, from the state the Tunnels box sets
@@ -2610,6 +2618,18 @@ def _simple_color(bridge_color, tunnels=False, select_color=None, hover_color=No
         mix = lambda c: ["interpolate", ["linear"], op, 0, fill, 1, c]        # noqa: E731
         fill = ["case", ["boolean", ["feature-state", "select"], False], mix(sel), ["boolean", ["feature-state", "hover"], False], mix(hov), fill]
     return ["case", *cases, ["==", ["get", "__rs_k"], 5], item, fill]
+
+
+def _times_each_stop(e, f):
+    """``e`` times ``f`` (layers::times_each_stop in Rust): in each stop of a zoom curve (MapLibre takes the zoom only at the top)."""
+    if isinstance(e, list) and len(e) > 3 and e[0] == "interpolate" and e[2] == ["zoom"]:
+        return [*e[:3], *[x if i % 2 == 0 else ["*", x, f] for i, x in enumerate(e[3:])]]
+    if isinstance(e, list) and len(e) > 2 and e[0] == "step" and e[1] == ["zoom"]:
+        return [e[0], e[1], ["*", e[2], f], *[x if i % 2 == 0 else ["*", x, f] for i, x in enumerate(e[3:])]]
+    return ["*", e, f]
+
+
+_RS_W = ["coalesce", ["feature-state", "rs_w"], 1]        # audit N8: a road's width factor from the feature state on its row
 
 
 def _by_feature(cases, default):
@@ -2777,7 +2797,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            road_popup=True, road_tooltip=False, hover_delay_ms: int = 300, data_maxzoom: int = None, data_tolerance: float = None, popup_mode: str = None,
            street_view: bool | str = "window", street_view_key: str | None = None, google_3d: bool = False,
            tooltip=None, hover_color: str = None, select_color: str = None, boundary=None,
-           color_options=None, color_active=0, views=None, overlays=None, items=None, items_popup=None, compress: bool = True, tunnel_control: bool = False,
+           color_options=None, color_active=0, views=None, sidebar: str = None, overlays=None, items=None, items_popup=None, compress: bool = True, tunnel_control: bool = False,
            tiles: bool = False, simple: bool = True,
            minzoom=None, legend: bool = True,
            api_key: str | None = None, _edges=None, _read=None, _palette_copy: bool = False, _export: bool = False, _parts: bool = False, **_ignore):
@@ -3435,7 +3455,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         road = {"id": "roads-simple", "type": "line", "source": "simple", "layout": {**lay, "line-cap": _simple_cap(), "line-sort-key": ["get", "__rs_s"]}, **flt,
                 "paint": {**sdash, "line-color": _simple_color(CONFIG.bridge_casing_color, bool(any_tunnel), select_color, hover_color, _fill_props(color_opts_meta),
                                                  (select_color, hover_color, THEME["selection"]["opacity"])),
-                          "line-width": _pair_width(_by_feature(wide, fw), highway_col, offset_frac, offset_zoom, wmz) if pairs else _by_feature(wide, fw), "line-offset": soff,
+                          "line-width": _times_each_stop(_pair_width(_by_feature(wide, fw), highway_col, offset_frac, offset_zoom, wmz) if pairs else _by_feature(wide, fw), _RS_W),
+                          "line-offset": _times_each_stop(soff, _RS_W),
                           "line-blur": ["interpolate", ["linear"], ["zoom"], r0, 0, r1, ["case", is_sh, blur, 0]],
                           "line-opacity": ["interpolate", ["linear"], ["zoom"], r0, ["case", is_sh, 0, op], r1, op]}}
         # the edges themselves, invisible: what a click, a hover, Street View and the page's fill code find (the roads source, its ids)
@@ -3668,7 +3689,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                        ov_meta)
     pair = CONFIG.tunnel_palettes.get(CONFIG.tunnel_palette)
     style["state"] = {**{k: {"default": v} for k, v in {
-        "rs_co": _active, "rs_colors": {}, "rs_base": {}, "rs_fill_on": bool(road_fill),
+        "rs_co": _active, **({"rs_top": []} if simple else {"rs_colors": {}, "rs_base": {}}), "rs_fill_on": bool(road_fill),
         "rs_tun_strength": tun_strength, "rs_tun_toward": tun_colour, "rs_tun_two": bool(pair),
         "rs_tun_c0": pair[0] if pair else _TUN_TO["dash"], "rs_tun_c1": pair[1] if pair else _TUN_TO["dash"],
         "rs_tun_ratio": [float(x) for x in CONFIG.tunnel_casing_dash or [1, 1]]}.items()},
@@ -3862,8 +3883,19 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     if not tiles:           # the road table of the inline roads: the page loads it the same way in both ways
         from .tiles import sidecar
         side = sidecar(geo)
-    return WebMap(_page_html(style, page, name=name, cam=cam, bounds=(minx, miny, maxx, maxy), side_panel_html=side_panel_html,
-                             host_panel_width=host_panel_width, compress=compress, tiles=pmt if tiles else None, side=side, simple_js=simple_js))
+    html = _page_html(style, page, name=name, cam=cam, bounds=(minx, miny, maxx, maxy), side_panel_html=side_panel_html,
+                      host_panel_width=host_panel_width, compress=compress, tiles=pmt if tiles else None, side=side, simple_js=simple_js)
+    return WebMap(_add_sidebar(html, sidebar, name) if sidebar is not None else html)
+
+
+def _add_sidebar(html, sidebar, name):
+    """``sidebar=`` (render_dashboard, render_report): the bundled sidebar's template, with the page's name as its heading (its first
+    <h2>), before the end of the body (roadstyle::page_options::add_sidebar)."""
+    from .pages import SIDEBAR_DEFAULTS, sidebar_html
+    if sidebar not in SIDEBAR_DEFAULTS:
+        raise ValueError(f'sidebar must be "dashboard" or "report", got {sidebar!r}')
+    frag = re.sub(r"<h2>.*?</h2>", f"<h2>{_html.escape(str(name))}</h2>", sidebar_html(sidebar), count=1)
+    return html.replace("</body>", frag + "</body>", 1)
 
 def _page_html(style, page, *, name, cam, bounds, side_panel_html, host_panel_width, compress, tiles=None, side=None, simple_js=None):
     """The page: the map with the style (base map and roads) and the dashboard with its options (``page``: the options of rsDashboard).
@@ -3871,48 +3903,12 @@ def _page_html(style, page, *, name, cam, bounds, side_panel_html, host_panel_wi
     of simple mode's recolouring script."""
     minx, miny, maxx, maxy = bounds
     gz = _compress_sources(style) if compress else {}
-    J = lambda k: json.dumps(page[k])        # noqa: E731
-    html = (_HTML.replace("__TITLE__", _html.escape(name))
-            .replace("__ARROW_COLOR__", J("arrow_color"))
-            .replace("__ARROW_ICON__", J("arrow_icon"))
-            .replace("__ARROW_RULES__", J("arrow_rules"))
-            .replace("__STYLE__", json.dumps(style))
-            .replace("__BASEMAPS__", J("basemaps"))
-            .replace("__BM_SWITCHER__", J("basemap_switcher"))
-            .replace("__ZOOM_READOUT__", J("zoom_readout"))
-            .replace("__FILTER__", J("filter"))
-            .replace("__CENTER__", json.dumps([(minx + maxx) / 2, (miny + maxy) / 2]))
-            .replace("__PITCH3D__", J("pitch_3d"))
-            .replace("__MAX_PITCH__", json.dumps(cam["max_pitch"]))
-            .replace("__SELECT_COLOR__", J("select_color"))
-            .replace("__PITCH__", json.dumps(cam["pitch"]))
-            .replace("__BEARING__", json.dumps(cam["bearing"]))
-            .replace("__BOUNDS__", json.dumps([[minx, miny], [maxx, maxy]]))
-            .replace("__RS_FILL_LAYERS__", J("fill_layers"))
-            .replace("__COLOR_OPTIONS__", J("color_options"))
-            .replace("__CO_ACTIVE__", J("color_active"))
-            .replace("__OVERLAYS__", J("overlays"))
-            .replace("__FIND_CONTROL__", J("find_control"))
-            .replace("__OVERLAY_CONTROL__", J("overlay_control"))
-            .replace("__OVERLAY_POPUP__", J("overlay_popup"))
-            .replace("__ROAD_ITEMS__", J("items"))
-            .replace("__TUNNEL__", J("tunnel"))
-            .replace("__VIEWS__", J("views"))
-            .replace("__RS_ROAD_FILL__", J("road_fill"))
-            .replace("__ROAD_POPUP__", J("road_popup"))
-            .replace("__ROAD_POPUP_MODE__", J("popup_mode"))
-            .replace("__EDGE_ID_COL__", J("edge_id_col"))
-            .replace("__ROAD_TOOLTIP__", J("road_tooltip"))
-            .replace("__HOVER_DELAY_MS__", J("hover_delay_ms"))
-            .replace("__STREET_VIEW__", J("street_view"))
-            .replace("__SV_WINDOW_KEY__", J("street_view_key"))
-            .replace("__GOOGLE_3D__", J("google_3d"))
-            .replace("__RS_TILED__", J("tiles"))
-            .replace("__RS_LEAN__", J("simple"))
-            .replace("__RS_SOURCES__", J("sources"))
-            .replace("__RS_ARROWS__", J("arrows"))
-            .replace("__RS_LIVE__", J("live"))
-            .replace("__HOST_PANEL_HTML__", _host_panel(side_panel_html, host_panel_width, name)))     # the last: the host's own text may hold any other token
+    cam = {"center": [(minx + maxx) / 2, (miny + maxy) / 2], "pitch": cam["pitch"], "bearing": cam["bearing"], "max_pitch": cam["max_pitch"],
+           "bounds": [[minx, miny], [maxx, maxy]]}
+    # the frame's tokens in one pass (audit R3): a value is not read again, so the host's own text may hold any token
+    vals = {"TITLE": _html.escape(name), "STYLE": json.dumps(style), "RS_OPTIONS": json.dumps({**page, "camera": cam}),
+            "HOST_PANEL_HTML": _host_panel(side_panel_html, host_panel_width, name)}
+    html = re.sub(r"__(TITLE|STYLE|RS_OPTIONS|HOST_PANEL_HTML)__", lambda m: vals[m.group(1)], _HTML)
     parts = ""
     if tiles:
         import base64

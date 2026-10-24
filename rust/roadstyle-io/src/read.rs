@@ -1,18 +1,26 @@
 //! The roads from a GeoParquet file: every column an Arrow array of the table (as GeoPandas' GeoJSON writes its values), the
 //! geometry a LineString from WKB.
 
-use arrow_array::{cast::AsArray, types::*, Array, ArrayRef};
+use arrow_array::{cast::AsArray, types::*, Array, ArrayRef, RecordBatchReader};
 use arrow_schema::DataType;
 use bytes::Bytes;
-use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use parquet::arrow::arrow_reader::{ParquetRecordBatchReader, ParquetRecordBatchReaderBuilder};
 use serde_json::{Map, Value};
 
 pub use roadstyle_model::{Lines, RoadTable, Row};
 
 pub fn read_roads(data: Vec<u8>, geom_col: &str) -> Result<RoadTable, String> {
-    let builder = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data)).map_err(|e| format!("not a Parquet file: {e}"))?;
-    let schema = builder.schema().clone();
-    let reader = builder.build().map_err(|e| format!("not a Parquet file: {e}"))?;
+    roads_from(parquet(data)?, geom_col)
+}
+
+/// The batches of a Parquet file.
+fn parquet(data: Vec<u8>) -> Result<ParquetRecordBatchReader, String> {
+    ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data)).and_then(|b| b.build()).map_err(|e| format!("not a Parquet file: {e}"))
+}
+
+/// The roads from Arrow batches: a Parquet file's, or an Arrow stream's from Python (GeoPandas' to_arrow, the geometry as WKB).
+pub fn roads_from(reader: impl RecordBatchReader, geom_col: &str) -> Result<RoadTable, String> {
+    let schema = reader.schema();
     let names: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).filter(|n| n != geom_col).collect();
     let mut parts: Vec<Vec<ArrayRef>> = vec![Vec::new(); names.len()];
     let mut lines = Lines::default();
@@ -38,11 +46,29 @@ pub fn read_roads(data: Vec<u8>, geom_col: &str) -> Result<RoadTable, String> {
     RoadTable::new(names, cols, lines)
 }
 
+/// A GeoParquet file of lines only (its `geo` metadata names LineString alone, as stage 1's roads and pieces) as a `RoadTable` (audit
+/// N5: the Arrow columns and the lines, no JSON per cell), with the names of its `roadstyle:json` columns (their text is JSON). None for
+/// another file.
+pub fn line_table(data: Vec<u8>) -> Result<Option<(RoadTable, std::collections::HashSet<String>)>, String> {
+    let builder = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data.clone())).map_err(|e| format!("not a Parquet file: {e}"))?;
+    let schema = builder.schema().clone();
+    let geo: Value = schema.metadata().get("geo").and_then(|g| serde_json::from_str(g).ok()).unwrap_or(Value::Null);
+    // a list column (a native Parquet list) is not a RoadTable's: that file takes the JSON path
+    if geo["columns"]["geometry"]["geometry_types"] != serde_json::json!(["LineString"])
+        || schema.fields().iter().any(|f| matches!(f.data_type(), arrow_schema::DataType::List(_) | arrow_schema::DataType::LargeList(_))) {
+        return Ok(None);
+    }
+    let json = schema.fields().iter().filter(|f| f.metadata().get("roadstyle:json").is_some_and(|v| v == "true")).map(|f| f.name().clone()).collect();
+    Ok(Some((read_roads(data, "geometry")?, json)))
+}
+
 /// Any Parquet table as rows: the columns as properties, the binary column `blob` kept as its bytes.
 pub fn read_table(data: Vec<u8>, blob: &str) -> Result<Vec<Row>, String> {
-    let reader = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data))
-        .and_then(|b| b.build())
-        .map_err(|e| format!("not a Parquet file: {e}"))?;
+    table_from(parquet(data)?, blob)
+}
+
+/// Any table of Arrow batches as rows, as `read_table`.
+pub fn table_from(reader: impl RecordBatchReader, blob: &str) -> Result<Vec<Row>, String> {
     let mut out = Vec::new();
     for batch in reader {
         let batch = batch.map_err(|e| e.to_string())?;
@@ -168,7 +194,7 @@ pub fn features(data: Vec<u8>) -> Result<Value, String> {
 }
 
 /// A 2D WKB geometry as GeoJSON (Point, LineString, Polygon and their Multi kinds); None for another.
-fn wkb_geometry(b: &[u8]) -> Option<Value> {
+pub(crate) fn wkb_geometry(b: &[u8]) -> Option<Value> {
     fn at(b: &[u8], i: &mut usize, le: bool) -> Option<u32> {
         let w: [u8; 4] = b.get(*i..*i + 4)?.try_into().ok()?;
         *i += 4;

@@ -61,10 +61,10 @@ fn building_base(min_height: Option<&str>, min_level: Option<&str>, cfg: &Value)
 }
 
 /// load_layers: `{name: FeatureCollection}`, in the order of the first row of each layer; a polygon layer's features largest first.
-pub fn feature_collections(rows: Vec<Row>, look: &Value) -> Result<Map<String, Value>, String> {
-    let specs = look["features"]["layers_yaml"]["layers"].as_array().ok_or("look.json: no features.layers_yaml.layers")?;
+pub fn feature_collections(rows: Vec<Row>, look: &crate::Look) -> Result<Map<String, Value>, String> {
+    let specs = look.features["layers_yaml"]["layers"].as_array().ok_or("look.json: no features.layers_yaml.layers")?;
     let kind_of = |name: &str| specs.iter().find(|s| s["name"] == name).and_then(|s| s["kind"].as_str()).unwrap_or("");
-    let b3d = &look["features"]["buildings_3d"];
+    let b3d = &look.features["buildings_3d"];
     let mut out: IndexMap<String, Vec<(f64, Value)>> = IndexMap::new();
     for Row { cols: r, blob: wkb } in rows {
         let spec = &specs[r["spec"].as_u64().ok_or("features.parquet: no spec")? as usize];

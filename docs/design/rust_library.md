@@ -988,7 +988,7 @@ The level solver alone (duckosm-core):
 use roadstyle_levels::{levels, LevelEdges, Options};
 let mut edges = LevelEdges::default();
 edges.add(0, edge);                                 // rank 0 = driving
-let lv = levels(&edges, &Options::default())?;     // compute_levels' defaults (the solve); a second call with the same edges is cached
+let lv = levels(&edges, &Options::default())?;     // compute_levels' defaults (the solve)
 ```
 
 ### JavaScript
@@ -1297,8 +1297,11 @@ uses [review_checklist.md](review_checklist.md)):
    done.
 4. R2 (stage 1 once, its typed output kept; a view's palette as a restyle: done, `roadstyle-engine::palettes`), R1 with R8 (each layer
    and dashboard module declares what it reads; one class index: done), R4 (one `Topology`: done), then the second audit's items
-   ([audit_2026-10-24.md](audit_2026-10-24.md)) in this order: N1 (integers past 2^53 stay Int64 in the model), N3 (one `tile_stage`),
-   N7 (one writer of `roadstyle:sources`, `roadstyle:arrows`, `roadstyle:live`), N2 (stage 1 without the `tiles` and `state` switches),
+   ([audit_2026-10-24.md](audit_2026-10-24.md)) in this order: N1 (integers past 2^53 stay Int64 in the model: done), N3 (one `tile_stage`: done),
+   N7 (one writer of `roadstyle:sources`, `roadstyle:arrows`, `roadstyle:live`: done), N2 (stage 1 without the `tiles` and `state`
+   switches: done; decided 2026-10-24: only `export_inline`, `export_style` and its first stage `export_geojson`, apps with no road table,
+   keep a `roads` source with its pick and highlight layers, through an internal `export` flag; every other style is the road-table form;
+   stage 3 picks the arrow kind),
    N4 with R1 (one typed road table), N6 then N5 (stage 2 borrows the sources; the border files from Arrow), the engine side of N8 (every
    style reads `rs_c` and `rs_w`); then R3 (a typed stage 3, one `__RS_OPTIONS__`; with it rule 5, the page options in the engine,
    `contract.rs`). Rust only, with no Python golden: `live_data`, `export_geojson` / `tile_geojson` and the GeoParquet road table. R17 grew:
@@ -1338,14 +1341,13 @@ public calls. A5 is the levels session's.
 #### A2: the MCP server in Rust
 
 The program `roadstyle-mcp` is the crate `rust/roadstyle-mcp`. It uses the official Rust MCP SDK `rmcp` (pinned to 3.5.1) over stdio.
-It has the Python server's tools (`src/roadstyle/mcp_server.py`) with the same names, inputs and outputs. The branch `mcp-rs` stays off
-`rust-engine` until the server can write a map.
+It has the Python server's tools (`src/roadstyle/mcp_server.py`) with the same names, inputs and outputs.
 
 | Tool | In Python | In Rust | Waits for |
 |---|---|---|---|
-| `render_file` | geopandas reads the file, `render_edges` writes the page | reads GeoParquet, makes stage 1 | R3 (the page), A4 (the preview) |
+| `render_file` | geopandas reads the file, `render_edges` writes the page | the readers (GeoParquet, GeoJSON, Shapefile, GeoPackage), `page_from` writes the page with MapLibre in it, the preview of `roadstyle-snapshot` | |
 | `render_place` | osmnx downloads the place, `render_edges` writes the page | an error that sends the agent to the Python server | a road download in Rust |
-| `snapshot` | Playwright makes a PNG of a saved page | an error that sends the agent to the Python server | A4 |
+| `snapshot` | Playwright makes a PNG of a saved page | `roadstyle-snapshot` (Chromium over CDP), the same PNG | |
 
 Decisions (2026-10-24):
 
@@ -1353,13 +1355,15 @@ Decisions (2026-10-24):
   file to a place's polygon now. A Geofabrik region file for each place is too large. A download and a graph simplification written
   in this crate is a second rule set for the roads ("one rule, every path"). When the duckosm-rust freeze ends: Nominatim gives the
   polygon, duckosm-rust clips the region's `.pbf` file and makes the network. Until then the Python server does not retire.
-- **The readers of `render_file`:** GeoParquet now; GeoJSON from the look session (`roadstyle-io/src/geojson.rs`). After it lands,
-  `roadstyle-io/src/gpkg.rs` (rusqlite, bundled; a GeoPackage geometry is a header and WKB) and `roadstyle-io/src/shp.rs` (the
-  `shapefile` crate), with the same return shape. The reprojection to EPSG:4326 uses `proj4rs` (pure Rust, no C proj). The CRS comes
+- **The readers of `render_file`:** GeoParquet, GeoJSON (`roadstyle-io/src/geojson.rs`), a Shapefile (`shp.rs`, the `shapefile`
+  crate, with its `.dbf` and `.prj` beside it) and a GeoPackage (`gpkg.rs`, rusqlite bundled; the feature `gpkg`, native only), with the
+  same return shape. The reprojection to EPSG:4326 uses `proj4rs` (pure Rust, no C proj). The CRS comes
   from `gpkg_spatial_ref_sys` or the `.prj` file. A CRS that `proj4rs` cannot read is an error that names it.
-- **The option check:** a misspelt option is an error with the close names, as in Python. Until R3 gives the typed page options, the
-  server checks the options against the keys that stage 1 reads (`STAGE1` in `main.rs`). `tests/test_mcp_server.py` checks that each
-  of them is a `render_edges` keyword.
+- **The option check:** a misspelt option is an error with the close names, as in Python. The server checks the options against the
+  keys that stage 1 reads (`STAGE1` in `main.rs`) and the page's keywords (`page_options::page_defaults`). `tests/test_mcp_rs_options.py`
+  checks that each key of `STAGE1` is a `render_edges` keyword.
+- **The base map:** with no `CARTO_API_KEY` (or `ROADSTYLE_API_KEY`) and no `basemap` option, the page takes `esri_street` and the
+  answer says so, as in Python.
 - **The package:** `roadstyle-mcp` on PyPI becomes a maturin `bindings = "bin"` wheel that holds the Rust program. `uvx roadstyle-mcp`,
   `server.json` and `.claude-plugin/plugin.json` do not change. `mcp_server.py` and the `roadstyle[mcp]` extra retire when the three
   tools are in Rust.

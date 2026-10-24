@@ -4,9 +4,13 @@
 //! needs both the engine and the tiles. A Rust user adds only this crate.
 
 pub use roadstyle_engine::*;
-pub use roadstyle_io::read;
+pub use roadstyle_io::{crs, duckosm, geojson, read, shp};
+#[cfg(feature = "gpkg")]
+pub use roadstyle_io::gpkg;
+pub mod level_area;
 pub mod level_editor;
 pub mod page;
+pub mod page_options;
 pub use roadstyle_levels as levels;
 pub use roadstyle_tiles as tiles;
 
@@ -19,13 +23,25 @@ type Tables = (RoadTable, Option<Vec<Row>>, Option<Vec<Row>>);
 /// The roads and the other tables from their GeoParquet bytes: the roads' lines and the base map's geometries in the column `geometry`.
 fn tables(parquet: Vec<u8>, features: Option<Vec<u8>>, planner: Option<Vec<u8>>) -> Result<Tables, String> {
     Ok((read::read_roads(parquet, "geometry")?,
-        features.map(|f| read::read_table(f, "geometry")).transpose()?,
+        features.map(read_features).transpose()?,
         planner.map(|p| read::read_table(p, "")).transpose()?))
+}
+
+/// The base map's rows from their GeoParquet bytes (the duckOSM reader's features.parquet), the background's land without the sea
+/// (duckosm::cut_sea).
+pub fn read_features(features: Vec<u8>) -> Result<Vec<Row>, String> {
+    features_of(read::read_table(features, "geometry")?)
+}
+
+/// The base map's rows that a reader gave (`read::table_from`, ...), as `read_features`.
+pub fn features_of(mut rows: Vec<Row>) -> Result<Vec<Row>, String> {
+    duckosm::cut_sea(&mut rows)?;
+    Ok(rows)
 }
 
 /// The style as one JSON text (roadstyle's export_inline), from the roads and the other tables as GeoParquet bytes: the engine's
 /// `make_style` after roadstyle-io's readers.
-pub fn make_style(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, String> {
+pub fn make_style(parquet: Vec<u8>, look: &Look, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, String> {
     let (feats, features, planner) = tables(parquet, features, planner)?;
     roadstyle_engine::make_style(feats, look, features, planner, name)
 }
@@ -33,18 +49,23 @@ pub fn make_style(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
 /// Stage 1 from GeoParquet bytes: the style and its sources, typed in memory (docs/rust/architecture.md, "The three stages and the one
 /// call"). `save_sources` writes them as files; the saved style has what stage 2 reads (`roadstyle:tiles`: the look's tile settings,
 /// `roadstyle:columns`: the class, filter and metre width columns).
-pub fn make_sources(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<sources::Sources, String> {
-    let look_json: Value = serde_json::from_str(look).map_err(|e| format!("look: not JSON: {e}"))?;
+pub fn make_sources(parquet: Vec<u8>, look: &Look, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<sources::Sources, String> {
     let (feats, features, planner) = tables(parquet, features, planner)?;
-    let mut s = sources::Sources::new(make_parts(feats, look, features, planner, name)?);
-    s.saved.insert(tiles::stage::TILES.into(), look_json["config"]["tiles"].clone());
-    s.saved.insert(tiles::stage::COLUMNS.into(), columns(&look_json));
+    sources_of(feats, look, features, planner, name)
+}
+
+/// Stage 1 of roads that a reader gave (`read::read_roads`, `geojson::read_roads`, ...), as `make_sources`.
+pub fn sources_of(roads: RoadTable, look: &Look, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>)
+                  -> Result<sources::Sources, String> {
+    let mut s = sources::Sources::new(make_parts(roads, look, features, planner, name)?);
+    s.saved.insert(tiles::stage::TILES.into(), look.config["tiles"].clone());
+    s.saved.insert(tiles::stage::COLUMNS.into(), columns(look));
     Ok(s)
 }
 
 /// `roadstyle:columns`: the user's class, filter and metre width columns (render's highway_col, filter_col, width_m_col).
-fn columns(look: &Value) -> Value {
-    let arg = |k: &str| look["args"][k].as_str().filter(|c| !c.is_empty()).map_or(Value::Null, Value::from);
+fn columns(look: &Look) -> Value {
+    let arg = |k: &str| look.args[k].as_str().filter(|c| !c.is_empty()).map_or(Value::Null, Value::from);
     json!({"class": arg("highway_col"), "filter": arg("filter_col"), "width": arg("width_m_col")})
 }
 
@@ -61,19 +82,28 @@ fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> tiles::T
             Src::Roads(_) => {
                 let (keep, whole, from) = o.rule(k, Default::default);
                 let r = &s.roads;
-                tiled.add_lines(k, r.roads.iter().map(|x| (x.line(), r.props(x, None).map(|(n, c)| (n, c.to_value())))), &keep, whole, from)
+                tiled.add_lines(k, r.roads.iter().map(|x| (x.line(), r.props(x, None))), &keep, whole, from)        // the cells, no JSON copy
             }
             Src::Simple(p) => {
                 let (keep, whole, from) = o.rule(k, Default::default);
                 tiled.add_lines(k, p.features(&s.roads.roads).map(|(_, props, c)| (c, props.into_iter())), &keep, whole, from)
             }
             Src::Json(v) => {
-                let (keep, whole, from) = o.rule(k, || keys(v));
+                let (keep, whole, from) = whole_unless_lines(v, o.rule(k, || keys(v)), o.min_zoom);
                 tiled.add(k, v, &keep, whole, from)
             }
         }
     }
     tiled
+}
+
+/// tiles.py's rule for a source other than the roads, the pieces and the slots: lines are clipped to each tile; points and polygons go
+/// whole into every tile their box touches, from the first zoom (its extra layers). A polygon at a tile's edge whose clipped part has
+/// no area was left out of that tile before (the sea at Monaco's west edge, 2026-10-24).
+fn whole_unless_lines(src: &Value, rule: (std::collections::HashSet<String>, bool, u32), first: u32) -> (std::collections::HashSet<String>, bool, u32) {
+    let lines = src["data"]["features"].as_array().into_iter().flatten()
+        .all(|f| matches!(f["geometry"]["type"].as_str(), Some("LineString" | "MultiLineString")));
+    if rule.1 || lines { rule } else { (rule.0, true, first) }
 }
 
 /// Stage 2 from memory (audit N3): the tiles of stage 1's sources and the one style that draws them (`tiled_style`), the tiles at `at`
@@ -150,6 +180,24 @@ pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[S
         }
         names.push(k.clone());
         let file = spec["data"].as_str().ok_or_else(|| format!("source {k}: its data is not a file name"))?;
+        // audit N5: a GeoParquet file of lines (the roads, the pieces) goes to the tiles as its Arrow columns, with no JSON per cell
+        if let Some((t, json)) = if file.ends_with(".parquet") { read::line_table(read(file)?)? } else { None } {
+            let cols: Vec<(usize, &String)> = t.names().iter().enumerate().filter(|(_, n)| *n != roadstyle_io::write::FID).collect();
+            // the roads' lines are in the road table when stage 1 left them out (no layer draws the roads)
+            let table = if k == "roads" && (0..t.len()).any(|i| t.line(i).is_none()) { Some(read::read_roads(read(ROAD_TABLE)?, "geometry")?) } else { None };
+            let (keep, whole, from) = o.rule(k, || cols.iter().map(|(_, n)| n.to_string()).collect());
+            let cell = |c: usize, i: usize, n: &str| -> FileValue {
+                let v = t.cell(c, i);
+                match v.as_str().filter(|_| json.contains(n)) {
+                    Some(s) => FileValue::Json(serde_json::from_str(s).unwrap_or(Value::Null)),
+                    None => FileValue::Cell(v),
+                }
+            };
+            let feats = (0..t.len()).map(|i| (t.line(i).or_else(|| table.as_ref().and_then(|r| r.line(i))),
+                                              cols.iter().map(move |&(c, n)| (n.as_str(), cell(c, i, n)))));
+            tiled.add_lines(k, feats, &keep, whole, from);
+            continue;
+        }
         let mut fc: Value = if file.ends_with(".parquet") { read::features(read(file)?)? }
                             else { serde_json::from_slice(&read(file)?).map_err(|e| format!("{file}: {e}"))? };
         // the roads' lines are in the road table when stage 1 left them out (no layer draws the roads)
@@ -164,11 +212,27 @@ pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[S
             }
         }
         let src = json!({"type": "geojson", "data": fc});
-        let (keep, whole, from) = o.rule(k, || src["data"]["features"].as_array().into_iter().flatten()
+        let rule = o.rule(k, || src["data"]["features"].as_array().into_iter().flatten()
             .filter_map(|f| f["properties"].as_object()).flat_map(|p| p.keys().cloned()).collect());
+        let (keep, whole, from) = whole_unless_lines(&src, rule, o.min_zoom);
         tiled.add(k, &src, &keep, whole, from);
     }
     Ok((tiled_style(style, &names, at, (o.min_zoom, o.max_zoom)), tiled))
+}
+
+/// A value of a stage-1 file for the tiles: an Arrow cell, or the JSON value of a `roadstyle:json` column's text.
+enum FileValue<'a> {
+    Cell(Cell<'a>),
+    Json(Value),
+}
+
+impl tiles::TileValue for FileValue<'_> {
+    fn tile_val(&self) -> Option<tiles::Val> {
+        match self {
+            FileValue::Cell(c) => c.tile_val(),
+            FileValue::Json(v) => v.tile_val(),
+        }
+    }
 }
 
 /// The file format of stage 1's sources.
@@ -219,68 +283,62 @@ pub fn write_source_file<W: std::io::Write + Send>(s: &sources::Sources, file: &
         s.write_data(i, drawn, &mut w).map_err(io)?;
         return Ok(w);
     }
-    let line = |c: Option<&[[f64; 2]]>| c.map(|c| json!({"type": "LineString", "coordinates": c}));
+    use roadstyle_io::write::{Geometry, Row as PqRow, Val};
     let lines = s.draws_roads();
     match &s.sources[i].1 {
-        Src::Roads(_) => roadstyle_io::write::parquet_to(w, || s.roads.roads.iter().map(|r| roadstyle_io::write::Row {
+        // audit N5: the roads' Arrow cells and lines go into the file with no JSON copy; the pieces' values are their own
+        Src::Roads(_) => roadstyle_io::write::parquet_to(w, || s.roads.roads.iter().map(|r| PqRow {
             id: Some(r.i as i64),
-            props: s.roads.props(r, Some(drawn)).map(|(k, c)| (k.to_string(), c.to_value())).collect(),
-            geometry: line(r.line().filter(|_| lines)),
+            props: s.roads.props(r, Some(drawn)).map(|(k, c)| (k.into(), Val::Cell(c))).collect(),
+            geometry: r.line().filter(|_| lines).map(Geometry::Line),
         }), true),
-        Src::Simple(p) => roadstyle_io::write::parquet_to(w, || p.features(&s.roads.roads).map(|(id, props, c)| roadstyle_io::write::Row {
-            id: Some(id as i64), props: props.into_iter().map(|(k, v)| (k.to_string(), v)).collect(), geometry: line(c),
+        Src::Simple(p) => roadstyle_io::write::parquet_to(w, || p.features(&s.roads.roads).map(|(id, props, c)| PqRow {
+            id: Some(id as i64), props: props.into_iter().map(|(k, v)| (k.into(), Val::Json(v))).collect(), geometry: c.map(Geometry::Line),
         }), true),
         Src::Json(v) => {
             let fs = v["data"]["features"].as_array().map(Vec::as_slice).unwrap_or_default();
-            roadstyle_io::write::parquet_to(w, || fs.iter().map(|f| roadstyle_io::write::Row {
+            roadstyle_io::write::parquet_to(w, || fs.iter().map(|f| PqRow {
                 id: f["id"].as_i64(),
-                props: f["properties"].as_object().into_iter().flatten().map(|(k, v)| (k.clone(), v.clone())).collect(),
-                geometry: Some(f["geometry"].clone()).filter(|g| !g.is_null()),
+                props: f["properties"].as_object().into_iter().flatten().map(|(k, v)| (k.as_str().into(), Val::Cell(Cell::Json(v)))).collect(),
+                geometry: Some(&f["geometry"]).filter(|g| !g.is_null()).map(|g| Geometry::Json(std::borrow::Cow::Borrowed(g))),
             }), true)
         }
     }
 }
 
-/// The road table's rows: each road's fields with the output's names, then its middle (`__mid_lon`, `__mid_lat`), its heading at the
-/// middle (`__heading`) and its box (`__bbox_*`), and its line as the geometry.
-fn road_rows(s: &sources::Sources) -> impl Iterator<Item = roadstyle_io::write::Row> + '_ {
-    use roadstyle_engine::geom::line;
-    s.roads.roads.iter().zip(s.road_rows()).map(move |(r, row)| {
-        let c = r.line();
-        let mut props: Vec<(String, Value)> = row.into_iter().map(|(k, v)| (k.to_string(), v.to_value())).collect();
-        let mid = c.and_then(line::mid);
-        let bb = c.and_then(line::bbox);
-        let num = |v: Option<f64>| v.map_or(Value::Null, Value::from);
-        props.extend([("__mid_lon".into(), num(mid.map(|m| m[0]))), ("__mid_lat".into(), num(mid.map(|m| m[1]))),
-                      ("__heading".into(), num(c.and_then(line::heading)))]);
+/// The road table's rows as Parquet rows (`Sources::table_rows`): each road's fields, then its middle (`__mid_lon`, `__mid_lat`) and its
+/// box (`__bbox_*`), and its line as the geometry.
+fn road_rows(s: &sources::Sources) -> impl Iterator<Item = roadstyle_io::write::Row<'_>> + '_ {
+    use roadstyle_io::write::{Geometry, Row as PqRow, Val};
+    s.table_rows().into_iter().map(|t| {
+        let num = |v: Option<f64>| Val::Cell(v.map_or(Cell::Null, Cell::Float));
+        let mut props: Vec<(std::borrow::Cow<str>, Val)> = t.props.into_iter().map(|(k, v)| (k.into(), Val::Cell(v))).collect();
+        props.extend([("__mid_lon".into(), num(t.mid.map(|m| m[0]))), ("__mid_lat".into(), num(t.mid.map(|m| m[1])))]);
         props.extend(["__bbox_min_lon", "__bbox_min_lat", "__bbox_max_lon", "__bbox_max_lat"].iter().enumerate()
-            .map(|(k, n)| (n.to_string(), num(bb.map(|b| b[k])))));
-        roadstyle_io::write::Row { id: None, props, geometry: c.map(|c| json!({"type": "LineString", "coordinates": c})) }
+            .map(|(k, n)| ((*n).into(), num(t.bbox.map(|b| b[k])))));
+        PqRow { id: None, props, geometry: t.line.map(Geometry::Line) }
     })
 }
 
-/// The road table as the page loads it (tiles.sidecar's form, with Python's JSON text): `{"props", "mids", "bboxes", "headings",
-/// "lines"}`, each a list with one item for each road (its row), written to `w` a road at a time.
+/// The road table as the page loads it (tiles.sidecar's form, with Python's JSON text; `Sources::table_rows`): `{"props", "mids",
+/// "bboxes", "lines"}`, each a list with one item for each road (its row).
 pub fn write_road_table<W: std::io::Write>(s: &sources::Sources, w: &mut W) -> std::io::Result<()> {
     use page::pyjson::dumps;
-    use roadstyle_engine::geom::line;
-    let roads = &s.roads.roads;
-    let list = |w: &mut W, key: &str, first: bool, item: &dyn Fn(roadstyle_engine::Road) -> String| -> std::io::Result<()> {
+    let rows = s.table_rows();
+    let list = |w: &mut W, key: &str, first: bool, item: &dyn Fn(&sources::TableRow) -> String| -> std::io::Result<()> {
         write!(w, "{}\"{key}\":[", if first { "{" } else { "," })?;
-        for r in roads.iter() {
-            if r.i > 0 {
+        for (i, t) in rows.iter().enumerate() {
+            if i > 0 {
                 w.write_all(b",")?;
             }
-            w.write_all(item(r).as_bytes())?;
+            w.write_all(item(t).as_bytes())?;
         }
         w.write_all(b"]")
     };
-    let pts = |c: &[[f64; 2]]| dumps(&json!(c), true);
-    list(w, "props", true, &|r| dumps(&Value::Object(s.road_row(r).into_iter().map(|(k, v)| (k.to_string(), js_value(v.to_value()))).collect()), true))?;
-    list(w, "mids", false, &|r| r.line().and_then(line::mid).map_or("null".into(), |m| dumps(&json!(m), true)))?;
-    list(w, "bboxes", false, &|r| r.line().and_then(line::bbox).map_or("null".into(), |b| dumps(&json!(b), true)))?;
-    list(w, "headings", false, &|r| r.line().and_then(line::heading).map_or("null".into(), |h| dumps(&json!(h), true)))?;
-    list(w, "lines", false, &|r| r.line().filter(|c| !c.is_empty()).map_or("null".into(), pts))?;
+    list(w, "props", true, &|t| dumps(&Value::Object(t.props.iter().map(|(k, v)| (k.to_string(), js_value(v.to_value()))).collect()), true))?;
+    list(w, "mids", false, &|t| t.mid.map_or("null".into(), |m| dumps(&json!(m), true)))?;
+    list(w, "bboxes", false, &|t| t.bbox.map_or("null".into(), |b| dumps(&json!(b), true)))?;
+    list(w, "lines", false, &|t| t.line.map_or("null".into(), |c| dumps(&json!(c), true)))?;
     w.write_all(b"}")
 }
 
@@ -308,22 +366,27 @@ pub fn tile_made(s: &sources::Sources, prefix: &str, keep: &[String]) -> Result<
 }
 
 /// The style with one vector-tile source, `roads` (`<prefix>roads/{z}/{x}/{y}`), and the tiles to answer it with (tiles.rs: the rules of
-/// roadstyle's tiles.py, the zooms and the buffer from `look["config"]["tiles"]`). The layers, the metadata and the camera are those of
+/// roadstyle's tiles.py, the zooms and the buffer from the look's `config.tiles`). The layers, the metadata and the camera are those of
 /// `make_style`; each layer draws the tile layer of its old source (`source-layer`). The tiles keep only the properties that are read:
 /// the texts in the layers (all their keys, and more), the popup and tooltip fields of the metadata, the overlays' popup fields (name,
-/// kind) and `keep` (the caller's own, for example its popup's).
-pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name: Option<String>, prefix: &str, keep: &[String])
-                  -> Result<(String, tiles::Tiles), String> {
-    let cfg_all: Value = serde_json::from_str(look).map_err(|e| format!("look: not JSON: {e}"))?;
+/// kind) and `keep` (the caller's own, for example its popup's). The warnings of stage 1 come back last.
+pub fn make_tiled(parquet: Vec<u8>, look: &Look, features: Option<Vec<u8>>, name: Option<String>, prefix: &str, keep: &[String])
+                  -> Result<(String, tiles::Tiles, Vec<String>), String> {
     let (feats, features, _) = tables(parquet, features, None)?;
-    let s = sources::Sources::new(make_parts(feats, look, features, None, name)?);
-    let mut o = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &cfg_all["config"]["tiles"], &columns(&cfg_all), keep)
+    tiled_of(feats, look, features, name, prefix, keep)
+}
+
+/// The map with vector tiles of roads and base-map rows that a reader gave, as `make_tiled`.
+pub fn tiled_of(roads: RoadTable, look: &Look, features: Option<Vec<Row>>, name: Option<String>, prefix: &str, keep: &[String])
+                -> Result<(String, tiles::Tiles, Vec<String>), String> {
+    let s = sources::Sources::new(make_parts(roads, look, features, None, name)?);
+    let mut o = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &look.config["tiles"], &columns(look), keep)
         .map_err(|e| format!("look: config.{e}"))?;
     // render(tiles=True)'s page (the Python binding): the columns of its road and simple tiles (`tile_keep`; every __rs_* goes too) and
     // the sources in its tiles (`tile_layers`: roads, simple, slots; the page keeps the others inline)
-    o.exact = cfg_all["args"]["tile_keep"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
-    o.only = cfg_all["args"]["tile_layers"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
+    o.exact = look.args["tile_keep"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
+    o.only = look.args["tile_layers"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
     let (style, tiled) = tile_stage(&s, &o, &xyz_at(prefix));
-    Ok((style.to_string(), tiled))
+    Ok((style.to_string(), tiled, s.warnings))
 }
 

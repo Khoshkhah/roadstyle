@@ -13,9 +13,10 @@ fn data(p: &str) -> PathBuf {
 /// The engine's roads-only style for an area, with the look made from the golden's options.
 fn style(area: &str) -> Value {
     let o = common::gz_json(&format!("{area}/golden_options.json.gz"));
-    let look = roadstyle_rs::look::make_look(&o).unwrap();
+    let mut look = roadstyle_rs::look::make_look(&o).unwrap();
+    look["args"]["export"] = true.into();        // the goldens are exports: the roads source too (audit N2)
     let roads = std::fs::read(data(&format!("{area}/roads.parquet"))).unwrap();
-    serde_json::from_str(&roadstyle_rs::make_style(roads, &look.to_string(), None, None, None).unwrap()).unwrap()
+    serde_json::from_str(&roadstyle_rs::make_style(roads, &roadstyle_rs::Look::from_value(look.clone()).unwrap(), None, None, None).unwrap()).unwrap()
 }
 
 fn style_differences(area: &str) -> Vec<(String, usize)> {
@@ -49,22 +50,6 @@ fn sodermalm_style_against_python() {
     assert!(d.is_empty(), "{d:#?}");
 }
 
-#[test]
-#[ignore = "a look at the slots that differ, of the area $AREA (default monaco; P0's list of differences)"]
-fn slot_differences() {
-    let area = std::env::var("AREA").unwrap_or_else(|_| "monaco".into());
-    let (got, want) = (style(&area), common::gz_json(&format!("{area}/golden_style.json.gz")));
-    let (g, w) = (got["sources"]["slots"]["data"]["features"].as_array().unwrap(), want["sources"]["slots"]["data"]["features"].as_array().unwrap());
-    let roads = &got["sources"]["roads"]["data"]["features"];
-    for (a, b) in g.iter().zip(w) {
-        if a["properties"]["__rs_edge"] != b["properties"]["__rs_edge"] {
-            let (ea, eb) = (a["properties"]["__rs_edge"].as_u64().unwrap() as usize, b["properties"]["__rs_edge"].as_u64().unwrap() as usize);
-            println!("slot {} chain {} name {}: Rust edge {ea} ({}), Python edge {eb} ({}); the slot {}", a["properties"]["slot"], a["properties"]["chain"],
-                     a["properties"]["name"], roads[ea]["properties"]["edge_ref"], roads[eb]["properties"]["edge_ref"], a["geometry"]["coordinates"]);
-        }
-    }
-}
-
 /// Two features' properties are the same: the same keys, and the same values, a number by its value (MapLibre reads 0 and 0.0, an
 /// int_value -1 and a sint_value -1, as the same number).
 fn same_props(a: &serde_json::Map<String, Value>, b: &serde_json::Map<String, Value>) -> bool {
@@ -78,13 +63,14 @@ fn same_props(a: &serde_json::Map<String, Value>, b: &serde_json::Map<String, Va
 /// properties, same geometry), summed over the golden tiles of each zoom.
 fn tile_summary(area: &str) -> Vec<(String, [usize; 5])> {
     let o = common::gz_json(&format!("{area}/golden_options.json.gz"));
-    let look = roadstyle_rs::look::make_look(&o).unwrap();
+    let mut look = roadstyle_rs::look::make_look(&o).unwrap();
+    look["args"]["export"] = true.into();        // export_style's tiles (audit N2)
     let roads = std::fs::read(data(&format!("{area}/roads.parquet"))).unwrap();
     let golden = common::gz_json(&format!("{area}/golden_tiles.json.gz"));
     let style = common::gz_json(&format!("{area}/golden_style.json.gz"));
     let keep: Vec<String> = style["sources"]["roads"]["data"]["features"][0]["properties"].as_object().unwrap().keys()
         .filter(|k| !k.starts_with("__rs_")).cloned().collect();
-    let (tstyle, tiles) = roadstyle_rs::make_tiled(roads, &look.to_string(), None, None, "rs://", &keep).unwrap();
+    let (tstyle, tiles, _) = roadstyle_rs::make_tiled(roads, &roadstyle_rs::Look::from_value(look.clone()).unwrap(), None, None, "rs://", &keep).unwrap();
     let tstyle: Value = serde_json::from_str(&tstyle).unwrap();
     let read = common::drawn_of(&tstyle);       // R1: the roads' stage values that are read, and the pieces' (on the tile layer "simple")
     let layers: Vec<Value> = tstyle["layers"].as_array().unwrap().iter().map(|l| {
@@ -173,13 +159,6 @@ fn levels_against_python() {
     assert_eq!(level_rows("sodermalm", Tags, "golden_levels_tags.json.gz"), (4_563, 4_563, 4_563));
     assert_eq!(level_rows("monaco", Solve, "golden_levels_solve.json.gz"), (13_298, 13_298, 13_298 - MONACO_SOLVE_OTHER_ROWS));
     assert_eq!(level_rows("sodermalm", Solve, "golden_levels_solve.json.gz"), (4_563, 4_563, 4_563));
-}
-
-#[test]
-#[ignore = "writes the engine's solve rows of Monaco to $ROWS, for a check with roadstyle's rules (P0's list of differences)"]
-fn monaco_solve_rows() {
-    let rows = levels("monaco", roadstyle_rs::levels::Method::Solve);
-    std::fs::write(std::env::var("ROWS").unwrap(), Value::Array(rows).to_string()).unwrap();
 }
 
 /// Tartu (inputs and goldens from the pre-release: tests/get_goldens.sh): the style, the tiles and the tags rule (no solve: Python

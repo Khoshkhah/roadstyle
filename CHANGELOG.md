@@ -7,6 +7,65 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **Python gives the roads to the Rust engine as an Arrow table, not as GeoParquet bytes** (audit R15). The binding
+  (`roadstyle._rust`: `make_style`, `make_sources`, `Tiler`, `compute_levels`, `make_area`) reads any object with
+  `__arrow_c_stream__` (GeoPandas' `to_arrow`, a pyarrow table, DuckDB's `arrow()`) through the Arrow C stream interface. Bytes are a
+  `TypeError`. The output does not change. On Tartu (64,828 edges), `compute_levels(method="tags")` takes 66 ms, not 123 ms: there is
+  no Parquet encode in Python and no Parquet decode in Rust. `duckosm.read` gives Arrow tables. In Rust, `roadstyle_io::read::roads_from`
+  and `table_from` read Arrow batches, and the facade has `tiled_of` and `features_of` for roads that a reader gave.
+- **The Rust engine makes the whole page in one call** (audit R3). `roadstyle::page_options::page_from(roads, look, options, given)`
+  runs stage 1, the arrows or the tiles, the views and their palettes, builds the options of `rsDashboard` (typed: `page::PageOptions`)
+  and writes the page. Python's `render_edges(engine="rust")`, the new command `roadstyle page` and the browser's `makePage(roads,
+  look, options, given?)` call it. Python gives only what it alone knows: the data steps, the look's options, the base maps' keys and the
+  Google Maps key. A view's palette resolves its look in Rust (Python makes no extra looks). The page writer gzips the road table and
+  the big sources itself; the two engines' pages are the same byte for byte but these blobs, which are the same when read back.
+- **`roadstyle:controls` has no page keywords** (rule 5, R3). It has the facts of the look and of the roads that a host's dashboard
+  needs (the filter panel, the overlays, the tunnel look, `select_color`, `pitch_3d`, ...). `tiles` and `views` are not in it any more:
+  they are the caller's page keywords, which the page gives in `RS_OPTIONS` and a host gives to `rsDashboard` itself.
+- **`sidebar="dashboard"` or `"report"`**: the bundled sidebar of `render_dashboard` and `render_report`, in both engines. It sets
+  `name`, `basemap_switcher`, `filter_control` and `road_popup` where the call gives none (`pages.SIDEBAR_DEFAULTS`). The two
+  functions now pass `sidebar=` to `render_edges`, so the Rust engine makes these pages too, and the CLI with `--sidebar`.
+- **The page has its options in one object** (audit R3, step 1, both engines). The template's 38 placeholders of the dashboard's
+  options and the camera are one `__RS_OPTIONS__`: the JSON object `RS_OPTIONS` has the options of `rsDashboard` and `camera`
+  (`center`, `pitch`, `bearing`, `max_pitch`, `bounds`), and the page calls `rsDashboard(map, {...RS_OPTIONS, style})`. The page
+  writers fill in the frame's four tokens in one pass, so a value is not read again. A script that read the page's text
+  (`maxPitch:70`, `\n  tiles: true,`) reads `RS_OPTIONS` now.
+- **`js/roads_sql.js` and `js/features_sql.js` run the SQL of `duckosmPlan`** (roadstyle-io's `duckosm.rs`), the one copy that
+  Python runs too. They have no SQL of their own now. Their functions and arguments do not change, and a new `readCatalog(q, catalog)`
+  gives the catalog that `duckosmPlan` reads. Load the module (`init()`) before you call them. On Monaco they write the same
+  `roads.parquet` (stored levels and tags, every mode) and `features.parquet`, byte for byte, as before.
+- **The simple look reads the colour of `rsColor` and `rsColorBase` from the feature state `rs_c` only** (audit N8, part 2, both
+  engines). The fill is the active option's colour under `rs_c`; an item's colour is `rs_c`, else its own; a painted road sorts on top
+  by the global state `rs_top` (the rows that `rsColor` painted, start value `[]`). The state has `rs_top` in place of `rs_colors` and
+  `rs_base`. The full look (`simple=False`, Python only) keeps `rs_colors` and `rs_base`.
+- **Every style reads a road's colour and width from the feature state** (audit N8, both engines). The road layer reads
+  `["coalesce", ["feature-state", "rs_c"], <baked colour>]` and each width and offset stop × `["coalesce", ["feature-state", "rs_w"], 1]`,
+  in every style, not only with `live_data`; `live_data` now only adds the metadata `roadstyle:live` and the page's option `live`.
+- **`rsColor` and `rsColorBase` write the feature state `rs_c`** (audit N8, the dashboard). A road gets one colour on the row that draws
+  it: the colour of `rsColor`, else that of `rsColorBase`, else that of `rs.setData`. A road of a two-way pair drawn as one line
+  (`__rs_dup`) gets its colour on its twin's row. The rows that `rsColor` painted are in the global state `rs_top` (a list of rows, with
+  no colours), which the sort key reads: a painted road stays on top of the others of its level. The global states `rs_colors` and
+  `rs_base` (a colour for each road, which made MapLibre lay out every tile again) are not written any more on the simple look. The full
+  look (`simple=False`) keeps them until it is removed.
+- **The base maps are a data file**, `src/roadstyle/data/basemaps.json`: one list for Python (`roadstyle.basemaps.BASEMAPS` and the
+  switcher's default set) and the studio in the browser. The values are the same as before.
+- **The look is a crate of its own, typed and versioned** (`rust/roadstyle-look`, design step (c), audit R16). `Look::resolve` makes
+  the look one time from the palette, the profile, the settings and the keywords; `Look::from_json` reads a saved look of version 1 or of
+  version 0 (the `look.json` of 0.25.0, with no `schema_version`). A look of a later version, or an unknown key, is an error that names
+  it. The look has `schema_version: 1`; all else in it is as before, and every style is the same (the Rust goldens, Monaco and Tartu).
+  The engine reads the typed parts that the look makes one time (the road width model, the class styles, the slots and the decks), not
+  the JSON again in each stage: before, one `make_tiled` parsed the look 3 times and made the width model 4 times. The look crate and
+  the road model do not depend on each other.
+- **The bindings take a look handle, not its text.** JavaScript: `resolveLook(options)` gives a `Look` (`makeLook` is its old name for
+  one version), `Look.fromJson(text)` reads a saved look, and `makeStyle`, `makeSources`, `new Tiler` and `exportLook` take the `Look`.
+  Python (`roadstyle._rust`): `resolve_look(options)` and `Look.from_json(text)`, with `json()`, `part(key)` and `with_arg(key, value)`.
+  **A host that passes the look's text** (the duckosm-rust map worker, the GeoLibre plugin's worker) changes one line when it moves to
+  this version: `makeStyle(roads, Look.fromJson(lookText), ...)`, and the same for `new Tiler(...)`.
+- **The engine has no hidden state between calls** (audit R17). The class filter's column goes with the roads through the stages, and
+  the warnings come back with the output (`Sources::warnings`, the third value of `make_tiled`), not in thread-locals; the user's own
+  profiles and palettes go through the look's resolution. A colour option's fill name uses the one table of property names. The Python
+  binding keeps the warnings of its calls for `take_warnings()`, so the Python warnings do not change. The property names' table
+  (`props::intern`) and the level solver's cache stay global for now: the first is part of R11, the second belongs to the level solver.
 - **The road layer reads its class tables by an index** (R8, both engines). Each width and offset table over the classes is one
   `["at", ["get", "__rs_ci"], ["literal", [...]]]`, and each feature of `simple` has its class index `__rs_ci`. A piece keeps only what
   the road layer and the page read on it, so it has no `highway` any more (the page reads the class from the road table). On Tartu:
@@ -29,6 +88,61 @@ All notable changes to **roadstyle** are documented here. The format is based on
   has the key: a casing piece has no `__rs_fill@<palette>: null` any more. The map does not change.
 
 ### Added
+- **`rs.setData(rows, {stepped: true})`**: each road gets the ramp's nearest stop, not a colour between two stops, and the legend shows the
+  same steps. SonoFlow's Daily page colours so, which lets it move to live data in the simple look with the same look.
+- **The dashboard has mapstyle's page functions** (docs/design/mapstyle_page_scripts.md), found by their roles in the metadata, not by
+  layer ids: `rsSetModes` / `rsGetModes` / `RS_MODES` (the roads of some modes, from `roadstyle:controls.modes` and the road table's
+  flags), `rsSetKinds` / `rsGetKinds` / `RS_KINDS` (a base-map layer's kinds), `rsSetInteraction` / `rsGetInteraction` (a layer's
+  clicks, tooltip and popup), `rsSetBuildings3D` / `rsGetBuildings3D` (the layers with `roadstyle:group` "buildings 3D", with a button
+  and a Layers row), and `box_layout: "stack"` (the Roads and Layers boxes folded, Layers under Roads). `rsFilter` on an overlay now
+  keeps each layer's own filter. The engine writes the new metadata (`modes`, the overlays' `interactive` and `kinds`, `box_layout`)
+  in a later change.
+- **The Rust engine reads Shapefile and GeoPackage road files** (`roadstyle-io`: `shp.rs`, `gpkg.rs`, `crs.rs`). Each gives the
+  `RoadTable` of the GeoJSON reader, with the same column types. A file's CRS goes to EPSG:4326 with the rule of Python's
+  `validate.to_wgs84`: no CRS is an error, EPSG:4326 stays as it is, another CRS is reprojected (proj4rs, pure Rust; an EPSG code
+  through crs-definitions, a WKT text through proj4wkt). A CRS that the reader cannot read is an error that names it. GeoPackage is
+  SQLite (C), so it is the feature `gpkg`, for the native programs only. The wasm package has `readShp(shp, dbf, prj?, name?)`, and
+  CI fails if `roadstyle-wasm` depends on SQLite.
+- **The map of one mode from a duckOSM file** (`only=True` in `roadstyle.duckosm.read`, `export_inline` and `export_style`, as mapstyle's
+  `render_map(only=True)`): the `edges` and `private_edges` of one network. The stored levels were solved for every mode together, so each
+  road must have its stored row (as Python's `load_area_levels(subset=True)`), else an error that names how many and one of them; then the
+  look's `levels` keyword names these roads. JavaScript: `duckosmPlan(..., only)` and `duckosmSubsetLevels`. On Monaco the driving and
+  walking maps are mapstyle's but for the 3D decks and, in these maps only, 87 name slots and 1 to 2 attached points of the Rust engine.
+- **The base map's look for Python callers**: `roadstyle.duckosm.base_map(mode, theme=, paths=)` (the palette, the settings, the base
+  map's part and the mode's map options), `roadstyle.duckosm.theme(name)` and `roadstyle.duckosm.recolor(colour, transform)`, all made
+  by the Rust engine. The mapstyle shim reads them. `Look.part` also gives `palette`, `settings` and `features`.
+- **mapstyle's export_style on the Rust engine**: `roadstyle.duckosm.export_style(db, out_dir, base_url=, mode=, theme=, paths=)` writes
+  the map of a duckOSM file as style.json, vector tiles (the roads and the base map), the sprite and the popup's files. On Monaco its
+  style.json has mapstyle's layers and sources. The Rust engine's `export_style` now writes, as Python's does, every tile with data
+  (the base map can reach past the roads) and an empty file for each other tile in the roads' box, and keeps the base map's images.
+- **mapstyle's export_inline on the Rust engine**: `roadstyle.duckosm.export_inline(db, mode, theme=, paths=)` reads the duckOSM file
+  (`roadstyle.duckosm.read`), makes the base map's look (`roadstyle.duckosm.look`: with render_map's map options) and runs stage 1 in
+  Rust. On Monaco its style is today's mapstyle style in 6 choices of mode, theme and path style, with the differences that were decided
+  (ids as BIGINT, `source` and `target`, the last digit of a centroid, the PNG bytes) and one that is open: the 3D decks of the Rust
+  engine are not Python's on all of Monaco (1,312 against 1,311, for the same roads). The background's land is the boundary less the sea
+  in every path, as mapstyle makes it, cut in Rust (`duckosm::cut_sea`, i_overlay 9.0.1): no reader needs DuckDB's spatial extension
+  (in the browser it is 6 MB and about 1.2 s). On Monaco its points are mapstyle's to 9 places; 0.2 ms.
+- **A duckOSM reader with one copy of its SQL** (the mapstyle merge, step 2): `roadstyle-io::duckosm` makes the SQL that reads a duckOSM
+  file: the roads of every mode with their stored levels and the columns that `render_map` adds, and the base map's tables (`features.*`).
+  It is the SQL of `roads_sql.js` and `features_sql.js`. Python runs it with `roadstyle.duckosm.read(db, mode)` (the engine's input files as
+  GeoParquet bytes, and the look's `levels` keyword); JavaScript gets it from `duckosmPlan`, `duckosmLevels` and `duckosmFeaturesSelect`.
+  On Monaco the roads are mapstyle's roads, value for value and in the same order (plus `source` and `target`), and the base map's rows are
+  the browser's `features.parquet`.
+- **`rampStops(cmap, n)` in JavaScript**: `n` colours at even steps along a ramp (a branca scheme, a matplotlib colormap, or a list of
+  colours), as Python's `ColorRamp(cmap).stops(n)`: for example a colour for each category of a column in the studio. The ramps and their
+  data (`cmaps.json`) are now in the look crate (`roadstyle-look::Ramp`); the engine's legends use the same `stops`.
+- **Roads from a GeoJSON file in Rust** (`roadstyle-io::geojson::read_roads`, for the studio in the browser). It gives a `RoadTable`, as the
+  GeoParquet reader does: one row for each feature, a column for each property (Boolean, Int64, Float64, else text), and a LineString's
+  points as the line. The facade's `sources_of(roads, look, ...)` is stage 1 of the roads that any reader gave. JavaScript:
+  `readGeoJson(bytes)` gives a `Roads` handle (`length`, `columns()`, `sources(look, features?, planner?, name?)`). Monaco's roads as
+  GeoJSON make the same style as their GeoParquet file.
+- **The base map's look in Rust** (the mapstyle merge, step 1): `Look::resolve` takes `base_map: {mode, theme, paths}` (a duckOSM map's
+  travel mode, its theme and its path style) and makes mapstyle's look with no Python: the mode's palette and settings (`mode_settings`),
+  the theme's colours, and the base map's part of the look (the layers of `layers.yaml`, the 3D heights, the base map's style, the
+  texture and icon images). mapstyle's style files are now roadstyle's (`src/roadstyle/data/basemap/`); the textures are colour masks
+  drawn one time from mapstyle's `patterns.py`, coloured by the engine. The 64 looks of the GeoLibre plugin (4 modes x 4 themes x 4 path
+  styles) are equal to mapstyle's (`rust/roadstyle-look/tests/basemap.rs`; a texture by its pixels). A mode's palette has a fixed class
+  order; mapstyle's came from a Python set and changed with each run.
 - **Live data on the web page** (R22, `dashboard_module.md`): `rs.setData(table, {key, colorBy, widthBy, ...})` joins a table to the roads by
   `edge_id` or the row and colours and sizes them through feature state, with no new style; `rs.clearData()` takes it away. It needs a style
   made with `live_data=True`. Tartu, 64,828 roads: 78 ms to set a colour on each road.
@@ -59,13 +173,15 @@ All notable changes to **roadstyle** are documented here. The format is based on
   Python extension); build the page's WebAssembly package with `rust/roadstyle-wasm/build_editor.sh` before you build them. The server
   answers only to its own address (`Host`, against DNS rebinding), saves only the page's own changes (`Origin`), and takes at most 16 MB. `solve_levels(..., engine="rust")` and `roadstyle-levels solve
   --engine rust` solve the same tables with the Rust solver (no `max_positions`, no time limit).
+- **The roadstyle program** (`rust/roadstyle-cli`, docs/rust/cli.md): `roadstyle sources` (stage 1), `roadstyle tiles` (stage 2, PMTiles
+  or XYZ), `roadstyle levels make|solve` and `roadstyle serve`, with the option names of the Python keywords.
+- **The levels' make in Rust**: `make_area(engine="rust")` and `roadstyle-levels make` (default `--engine rust`) write the same
+  roads.parquet and pairs.csv as Python's `level_input`, faster (Tartu 0.7 s, Python 13.2 s).
 - Rust: `roadstyle_levels::levels(edges, options)` replaces `compute(edges, method)`. `Options` has the keywords of `compute_levels`, and
   also `fixed` (numbers that stay as they are, as `solve_levels(fixed=...)`) and `edits` (the rows of `visualization.level_edits`, as
   `solve_levels(edits=...)`). `edge_hash(ids)` is public.
 
 ### Changed
-- The Rust engine solves the levels of one network one time: `levels()` keeps the result of the last 2 networks. The style, its tiles
-  and each palette of a view use the same result (Tartu: 3.1 s for the first solve, 0.1 s after).
 - Browser package: `roads_sql.js` has `makeRoads(q, catalog, opts)`, one time for each file, and `writeRoads(q, mode)`, which writes
   only `roads.parquet` for each mode. `edge_id` and `osm_id` stay BIGINT, and `source` and `target` (duckOSM's node ids) stay in
   `roads.parquet`. The SQL copy of the tags rule and the JavaScript copy of the edge hash are gone: `makeRoads` returns the look's

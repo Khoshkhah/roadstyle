@@ -40,16 +40,35 @@ fn text(res: &Value) -> &str {
     res["content"][0]["text"].as_str().unwrap()
 }
 
+const SODERMALM: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../notebooks/data/sodermalm_edges.gpkg");
+
+/// The tool's preview, as the Python test reads it: a PNG where Chromium is, else a note that says how to get one.
+fn preview_ok(res: &Value) -> bool {
+    let c = &res["content"][1];
+    c["type"] == "image" && c["mimeType"] == "image/png" || c["text"].as_str().is_some_and(|t| t.starts_with("(no preview:"))
+}
+
 #[test]
-fn render_file_reads_and_reports() {
+fn render_file_saves_the_map_and_reports() {
     let out = std::env::temp_dir().join("roadstyle-mcp-test/monaco.html");
-    let (tools, res) = call("render_file", json!({"path": MONACO, "output_path": out, "options": {"color_by": "highway"}}));
+    let _ = std::fs::remove_file(&out);
+    let (tools, res) = call("render_file", json!({"path": MONACO, "output_path": out, "options": {"basemap": "blank", "color_by": "highway"}}));
     assert_eq!(tools, ["render_file", "render_place", "snapshot"]);
-    // TODO(R3): not an error, "Saved <out>" first, the file written and the preview (A4) after it
-    assert_eq!(res["isError"], true, "{res}");
+    assert_ne!(res["isError"], true, "{res}");
+    assert!(text(&res).starts_with(&format!("Saved {}", out.display())), "{res}");
     assert!(text(&res).contains(" edges; classes: ") && text(&res).contains("bounds (w, s, e, n): 7."), "{res}");
-    assert!(text(&res).contains("no page writer yet"), "{res}");
-    assert!(!out.exists());
+    let html = std::fs::read_to_string(&out).unwrap();
+    assert!(html.len() > 10_000 && !html.contains("__MAPLIBRE_JS__"), "a page with MapLibre in it");
+    assert!(preview_ok(&res), "{res}");
+}
+
+#[test]
+fn render_file_reads_a_geopackage() {
+    let out = std::env::temp_dir().join("roadstyle-mcp-test/sodermalm.html");
+    let (_, res) = call("render_file", json!({"path": SODERMALM, "output_path": out, "options": {"basemap": "blank"}}));
+    assert_ne!(res["isError"], true, "{res}");
+    assert!(text(&res).contains("4,563 edges; classes: "), "{res}");
+    assert!(out.exists());
 }
 
 #[test]
@@ -62,10 +81,10 @@ fn misspelt_option_is_an_error_with_a_suggestion() {
 }
 
 #[test]
-fn a_file_that_is_not_read_yet_is_an_error_that_says_so() {
-    let (_, res) = call("render_file", json!({"path": "roads.gpkg"}));
+fn a_file_of_another_kind_is_an_error_that_says_so() {
+    let (_, res) = call("render_file", json!({"path": "roads.csv"}));
     assert_eq!(res["isError"], true);
-    assert!(text(&res).contains("GeoParquet files only"), "{res}");
+    assert!(text(&res).contains("a .csv file is not read: GeoParquet, GeoJSON, a Shapefile or a GeoPackage"), "{res}");
 }
 
 #[test]

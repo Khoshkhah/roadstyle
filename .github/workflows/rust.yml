@@ -45,6 +45,11 @@ jobs:
           roadstyle-rs/tests/get_goldens.sh
 
       - name: Tests
+        # release for the speed of the goldens, with the overflow checks and the debug_assert! of a debug build (pmtiles.rs's overflow,
+        # 2026-10-24, panicked only in debug)
+        env:
+          CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "true"
+          CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: "true"
         run: cargo test --offline --release
 
       - name: Clippy
@@ -63,6 +68,8 @@ jobs:
           cargo build --offline --release --target wasm32-unknown-unknown -p roadstyle --no-default-features
           io=$(cargo tree --offline -e normal --prefix none $core | grep -E '^(roadstyle-io|parquet) ' || true)
           if [ -n "$io" ]; then echo "the core depends on a reader: $io"; exit 1; fi
+          # GeoPackage (rusqlite, SQLite in C) is for the native programs only: the browser package must not have it
+          if cargo tree --offline --target wasm32-unknown-unknown -e normal -p roadstyle-wasm -i rusqlite >/dev/null 2>&1; then echo "roadstyle-wasm depends on rusqlite (the gpkg feature)"; exit 1; fi
 
   python:
     # the Python binding (phase P5): build roadstyle._rust and check that the two engines give the same style
@@ -133,4 +140,7 @@ jobs:
           roadstyle-rs/tests/get_goldens.sh
 
       - name: The ignored goldens (Tartu)
-        run: cargo test --offline --release -- --ignored --skip monaco_solve_rows --skip slot_differences
+        env:
+          CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "true"
+          CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: "true"
+        run: cargo test --offline --release -- --ignored

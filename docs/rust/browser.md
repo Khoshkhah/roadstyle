@@ -50,7 +50,7 @@ Serve the folder over http. A module script does not load from a `file://` addre
 | `tiler.tile("roads", z, x, y)` | `Uint8Array` | one vector tile; empty when no road is in it |
 | `tiler.props("roads", row)` | JSON text | the properties of one road, or `null` |
 | `tiler.archive(bounds, layers)` | `Uint8Array` | a PMTiles archive of all tiles in `[min lon, min lat, max lon, max lat]` |
-| `makePage(style, options, parts, pmtiles?)` | HTML text | the whole page, as `render_edges` writes it |
+| `makePage(roads, look, options, given?)` | HTML text | the whole page, as `render_edges` writes it |
 | `exportLook(look, cols, positions)` | JSON text | the look for another app's data layer (as `export_look`) |
 | `memoryBytes()` | number | the size of the module's memory, in bytes |
 
@@ -89,7 +89,7 @@ The page shows the roads colored by `lanes`, the legend, the Roads box, the sear
 
 - `args` takes the keywords of `render_edges` that change the style, with their Python names: `color_by`, `cmap`, `arrows`,
   `labels`, `view_3d`, `highway_col`, ... ([Keywords by engine](keywords.md)).
-- `state: "live"` keeps the global state (`rs_co`, `rs_colors`, ...) in the expressions, so the controls can change the map.
+- `state: "live"` keeps the global state (`rs_co`, `rs_top`, ...) in the expressions, so the controls can change the map.
   Without it, the engine writes the start values, as `export_style` does.
 - `rsDashboard` reads its options from the style's metadata (`roadstyle:controls`, `roadstyle:interaction`,
   `roadstyle:color_options`). An option that you give has priority.
@@ -98,13 +98,16 @@ The page shows the roads colored by `lanes`, the legend, the Roads box, the sear
 
 ## Read the roads from a duckOSM file
 
-`makeRoads` and `writeRoads` in `js/roads_sql.js` are the SQL that writes `roads.parquet` from a duckOSM file in duckdb-wasm, with
-the columns that the engine reads. It is the only copy of this SQL: duckosm-rust and the GeoLibre plugin use the same file.
+`makeRoads` and `writeRoads` in `js/roads_sql.js` write `roads.parquet` from a duckOSM file in duckdb-wasm, with the columns that the
+engine reads. They run the statements of `duckosmPlan` (roadstyle-io's `duckosm.rs`), the only copy of this SQL, which Python runs
+too. duckosm-rust and the GeoLibre plugin use the same file. Load the module (`init()`) before you call them.
 
 ```js
 import * as duckdb from "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.33.1-dev57.0/+esm";
 import {makeRoads, writeRoads} from "./js/roads_sql.js";
-import init, {makeLook, makeStyle} from "./pkg/roadstyle_wasm.js";
+import init, {resolveLook, makeStyle} from "./pkg/roadstyle_wasm.js";
+
+await init();                                       // roads_sql.js asks the module for its SQL
 
 // duckdb-wasm in its own worker
 const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
@@ -122,11 +125,10 @@ const levels = await makeRoads(q, "monaco", {levels: "stored"});   // the stored
 await writeRoads(q, "driving");
 const roads = await db.copyFileToBuffer("roads.parquet");
 
-await init();
-const look = JSON.parse(makeLook(JSON.stringify({args: {state: "live", casing_level_col: "casing_level", fill_level_col: "fill_level",
-                                                         casing_start_col: "casing_start", casing_end_col: "casing_end"}})));
-look.args.levels = levels;                          // the engine checks that the stored levels are for these edges
-const style = JSON.parse(makeStyle(roads, JSON.stringify(look), undefined, undefined, "Monaco"));
+// levels: the engine checks that the stored levels are for these edges
+const look = resolveLook(JSON.stringify({args: {state: "live", casing_level_col: "casing_level", fill_level_col: "fill_level",
+                                                 casing_start_col: "casing_start", casing_end_col: "casing_end", levels}}));
+const style = JSON.parse(makeStyle(roads, look, undefined, undefined, "Monaco"));
 ```
 
 `makeRoads(q, catalog, opts)` runs one time for each file. It makes the temporary table `r`: one row for each edge of all modes, with
@@ -142,7 +144,9 @@ its levels. `writeRoads(q, mode)` runs for each mode, and writes only `roads.par
   hold exactly as text.
 
 `writeFeatures(q, catalog, specs)` in `js/features_sql.js` writes `features.parquet`, the base-map layers of mapstyle, for the
-argument `features` of `makeStyle` and `Tiler`.
+argument `features` of `makeStyle` and `Tiler`. It runs the layers' queries of `duckosmPlan`; a layer whose queries all fail is skipped,
+as mapstyle's `load_layers` does. The background is the whole boundary: the engine cuts the sea out of it when it reads
+`features.parquet`, so duckdb-wasm needs no spatial extension.
 
 ## Add roads that come later, as vector tiles
 
@@ -211,23 +215,20 @@ page.
 
 ## Write the whole page
 
-`makePage` writes the same page as `render_edges`, from a live style. `options` holds the options of `rsDashboard`, and
-`parts` the frame of the page. The page has placeholders for MapLibre, which you replace:
+`makePage` writes the same page as `render_edges(backend="web")` in one call: stage 1, the arrows or the tiles, the views, the
+dashboard's options and the page. `look` is the result of `makeLook(options)`, with `"state": "live"` in its args. Give the same
+`options` text again: a view with another palette resolves its look from it. The page has placeholders for MapLibre, which you
+replace:
 
 ```js
-const m = style.metadata, ctl = m["roadstyle:controls"], ui = m["roadstyle:interaction"];
-const options = {...ctl, basemaps: [], basemap_switcher: false, popup_mode: "popup", find_control: false, zoom_readout: true,
-                 street_view: "window", street_view_key: "", google_3d: false, overlay_control: true, overlay_popup: true, views: [],
-                 color_options: m["roadstyle:color_options"] || [], road_popup: ui.popup, road_tooltip: ui.tooltip,
-                 hover_delay_ms: ui.hover_delay_ms};
-const parts = {name: "Monaco", cam: {pitch: 0, bearing: 0, max_pitch: 70}, bounds: [7.40, 43.72, 7.44, 43.75], compress: false};
-const html = makePage(JSON.stringify(style), JSON.stringify(options), JSON.stringify(parts))
+const options = JSON.stringify({palette: "amber", args: {state: "live", name: "Monaco", basemap: "osm", views: {plain: {road_fill: false}}}});
+const html = makePage(roads, makeLook(options), options)
   .replace("<style>__MAPLIBRE_CSS__</style>", '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">')
   .replace("<script>__MAPLIBRE_JS__</script>", '<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>');
 ```
 
-`parts` takes `name`, `cam` (`pitch`, `bearing`, `max_pitch`), `bounds` (the box of the roads), `side_panel_html`,
-`host_panel_width` and `compress`. For a tiled page, give the archive of `tiler.archive(...)` as `pmtiles`.
+`given` (JSON text) holds what only the host knows: `api_key` (the key of a CARTO base map), `street_view_key`, and
+`resolved_basemaps` (base map entries in the form of `data/basemaps.json`). The warnings of the stages go to `console.warn`.
 
 ## Keep the main thread free
 

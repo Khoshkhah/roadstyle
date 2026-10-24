@@ -317,7 +317,7 @@ MapLibre applies to each piece at each frame.
 | `layers` | the drawing rules, in drawing order: each layer takes some features of one source and says how to draw them |
 | `glyphs` | the address of the fonts for the street names (MapLibre's font server) |
 | `sprite` | the address of the one-way arrow image: only in the tiled style of `export_style`. The inline style gives the image in the metadata (`roadstyle:images`), and the page adds it |
-| `state` | only in a live style (the page): the start value of each global state that the controls change (`rs_co`, `rs_colors`, `rs_fill_on`, `rs_tun_*`, `rs_palette`) |
+| `state` | only in a live style (the page): the start value of each global state that the controls change (`rs_co`, `rs_top`, `rs_fill_on`, `rs_tun_*`, `rs_palette`; the full look has `rs_colors` and `rs_base` in place of `rs_top`) |
 | `metadata` | the `roadstyle:*` keys for the page and the dashboard (below) |
 
 #### Its sources
@@ -415,7 +415,7 @@ The road fields are in the source `roads` (GeoJSON) or in the side table (tiles)
 - the live style, with the data inline (gzipped, `compress=True`) or with the PMTiles archive (`tiles=True`);
 - MapLibre GL JS 5.24 (inside the file, or from a CDN);
 - the dashboard: the modules of `static/dashboard/` as one script, the popup (`popup.js`, `popup.css`) and `dashboard.css`;
-- the options of the dashboard: the `rsDashboard(map, {...})` call, with the values of the page keywords.
+- the options of the dashboard: the object `RS_OPTIONS`, with the values of the page keywords and the camera (`camera`).
 
 The file opens from disk. It needs a server only for Street View and Google 3D.
 

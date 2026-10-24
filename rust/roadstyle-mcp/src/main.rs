@@ -11,7 +11,7 @@ use rmcp::model::{CallToolResult, ContentBlock, Implementation, ServerCapabiliti
 use base64::Engine;
 use rmcp::{schemars, tool, tool_handler, tool_router, ServerHandler, ServiceExt};
 use roadstyle_snapshot::{Camera, Shot};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value};
 
 const INSTRUCTIONS: &str = "\
 roadstyle draws road networks as styled, interactive, offline HTML maps (MapLibre, one file).
@@ -25,11 +25,15 @@ roadstyle draws road networks as styled, interactive, offline HTML maps (MapLibr
 - Edges are directed: a two-way street is two edges drawn side by side. Don't merge them.
 Docs: https://khoshkhah.github.io/roadstyle/ (every keyword: /reference/parameters/).";
 
-/// The Python server that has what this one does not have yet (render_place, the page).
+/// The Python server that has what this one does not have yet (render_place).
 const PYTHON: &str = "the Python server (pip install roadstyle-mcp==0.25.0)";
 
-/// The options that stage 1 (the look and the sources) reads: render_edges keywords. TODO(R3): replace this list with R3's typed page
-/// options, which also have the page's keywords (basemap, popup_mode, ...). `overlays` and `items` are not here: they are GeoDataFrames.
+/// The vendored MapLibre (WebMap.save and the CLI's `roadstyle page` put the same in), so a saved map works offline.
+const MAPLIBRE_JS: &str = include_str!("../../../src/roadstyle/vendor/maplibre-gl.js");
+const MAPLIBRE_CSS: &str = include_str!("../../../src/roadstyle/vendor/maplibre-gl.css");
+
+/// The options that stage 1 (the look and the sources) reads: render_edges keywords. The page's own keywords (basemap, popup_mode, ...)
+/// are page_from's (`page_options::page_defaults`). `overlays` and `items` are not here: they are GeoDataFrames.
 const STAGE1: &[&str] = &[
     "access_col", "arrows", "boundary", "bridge_col", "cap_col", "cap_end_col", "cap_start_col", "casing_end_col", "casing_level_col",
     "casing_m", "casing_min_px", "casing_start_col", "cmap", "color_active", "color_by", "color_col", "color_key", "color_options",
@@ -42,7 +46,7 @@ const STAGE1: &[&str] = &[
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 struct RenderFile {
-    /// The road file: GeoParquet (GeoJSON, GeoPackage and Shapefile come next).
+    /// The road file: GeoParquet, GeoJSON, a Shapefile (its .dbf and .prj beside it) or a GeoPackage.
     path: String,
     /// render_edges keywords, e.g. {"color_by": "speed", "cmap": "viridis", "legend": true}.
     options: Option<Map<String, Value>>,
@@ -86,11 +90,17 @@ struct Server {
 
 #[tool_router]
 impl Server {
-    #[tool(description = "Draw the road edges in a file as an interactive HTML map.\n\nThe file needs line geometry in EPSG:4326 and a \
-        road-class column, \"highway\" by default (another name: options={\"highway_col\": \"...\"}).\nReturns the saved path, a summary \
-        and a PNG preview.")]
-    fn render_file(&self, Parameters(a): Parameters<RenderFile>) -> CallToolResult {
-        result(render_file(a))
+    #[tool(description = "Draw the road edges in a file (GeoParquet, GeoJSON, Shapefile or GeoPackage) as an interactive HTML map.\n\nThe \
+        file needs line geometry (any CRS) and a road-class column, \"highway\" by default (another name: options={\"highway_col\": \"...\"}).\n\
+        options: render_edges keywords, e.g. {\"color_by\": \"speed\", \"cmap\": \"viridis\", \"legend\": true}.\nReturns the saved path, a \
+        summary and a PNG preview.")]
+    async fn render_file(&self, Parameters(a): Parameters<RenderFile>) -> CallToolResult {
+        // the page and its preview (Chromium) take seconds: on a thread of their own, away from the runtime that answers the agent
+        match tokio::task::spawn_blocking(move || render_file(a)).await {
+            Ok(Ok((text, out))) => CallToolResult::success(std::iter::once(ContentBlock::text(text)).chain(preview(&out, &Camera::default())).collect()),
+            Ok(Err(e)) => result(Err(e)),
+            Err(e) => result(Err(e.to_string())),
+        }
     }
 
     #[tool(description = "Download the OpenStreetMap road network of a place and draw it as an interactive HTML map.\n\nKeep the place \
@@ -142,22 +152,41 @@ fn result(r: Result<String, String>) -> CallToolResult {
     }
 }
 
-/// render_edges ignores a misspelt keyword; an agent needs to hear about it (with the close names, as Python's difflib gives them).
+/// render_edges ignores a misspelt keyword; an agent needs to hear about it (with the close names, as Python's difflib gives them). The
+/// keywords: stage 1's and the page's (page_from's defaults).
 fn check_options(options: &Map<String, Value>) -> Result<(), String> {
-    let mut bad: Vec<&String> = options.keys().filter(|k| !STAGE1.contains(&k.as_str())).collect();
+    let page = roadstyle::page_options::page_defaults();
+    let mut valid: Vec<&str> = STAGE1.iter().copied().chain(page.keys().map(String::as_str)).collect();
+    valid.sort();
+    valid.dedup();
+    let mut bad: Vec<&String> = options.keys().filter(|k| !valid.contains(&k.as_str())).collect();
     if bad.is_empty() {
         return Ok(());
     }
     bad.sort();
     let hints: Vec<String> = bad.iter().map(|k| {
-        let mut close: Vec<(f64, &str)> = STAGE1.iter().map(|v| (strsim::normalized_levenshtein(k, v), *v)).filter(|(s, _)| *s >= 0.6).collect();
+        let mut close: Vec<(f64, &str)> = valid.iter().map(|v| (strsim::normalized_levenshtein(k, v), *v)).filter(|(s, _)| *s >= 0.6).collect();
         close.sort_by(|a, b| b.0.total_cmp(&a.0));
         let close: Vec<String> = close.iter().take(3).map(|(_, v)| format!("'{v}'")).collect();
         if close.is_empty() { format!("'{k}'") } else { format!("'{k}' (did you mean {}?)", close.join(", ")) }
     }).collect();
-    let mut valid = STAGE1.to_vec();
-    valid.sort();
     Err(format!("unknown option(s): {}. Valid options: {}", hints.join("; "), valid.join(", ")))
+}
+
+/// The roads of a road file, by its extension, and a reader's warning (a GeoPackage with more tables: geopandas' words).
+fn read_file(src: &Path) -> Result<(roadstyle::RoadTable, Option<String>), String> {
+    let what = src.file_name().unwrap_or_default().to_string_lossy().to_string();
+    let read = |p: &Path| std::fs::read(p).map_err(|e| format!("{}: {e}", p.display()));
+    match src.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase().as_str() {
+        "parquet" | "geoparquet" => Ok((roadstyle::read::read_roads(read(src)?, "geometry")?, None)),
+        "geojson" | "json" => Ok((roadstyle::geojson::read_roads(&read(src)?)?, None)),
+        "shp" => {
+            let prj = std::fs::read_to_string(src.with_extension("prj")).ok();     // no .prj: no CRS, the reader's error (as Python)
+            Ok((roadstyle::shp::read_roads(&read(src)?, &read(&src.with_extension("dbf"))?, prj.as_deref(), &what)?, None))
+        }
+        "gpkg" => Ok(roadstyle::gpkg::read_roads(&read(src)?, &what)?),
+        e => Err(format!("{}: a .{e} file is not read: GeoParquet, GeoJSON, a Shapefile or a GeoPackage", src.display())),
+    }
 }
 
 fn expand(p: &str) -> PathBuf {
@@ -219,36 +248,53 @@ fn thousands(n: usize) -> String {
     out
 }
 
-fn render_file(a: RenderFile) -> Result<String, String> {
-    let options = a.options.unwrap_or_default();
+/// The page of a road file, saved; its answer for the agent (Python's mcp_server._render) and the page's path (for the preview).
+fn render_file(a: RenderFile) -> Result<(String, PathBuf), String> {
+    let mut options = a.options.unwrap_or_default();
     check_options(&options)?;
     let src = expand(&a.path);
-    let ext = src.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
-    if ext != "parquet" && ext != "geoparquet" {
-        return Err(format!("{}: the Rust server reads GeoParquet files only (GeoJSON, GeoPackage and Shapefile come next). Use {PYTHON}.",
-                           src.display()));
-    }
-    let bytes = std::fs::read(&src).map_err(|e| format!("{}: {e}", src.display()))?;
+    let (roads, read_warning) = read_file(&src)?;
     let class_col = options.get("highway_col").and_then(Value::as_str).unwrap_or("highway").to_string();
-    let text = summary(&roadstyle::read::read_roads(bytes.clone(), "geometry")?, &class_col)?;
+    let text = summary(&roads, &class_col)?;
     let out = out_path(a.output_path.as_deref(), &src.file_stem().unwrap_or_default().to_string_lossy())?;
+    // the default CARTO tiles come back stamped "API KEY REQUIRED" without a key: then a keyless base map, as the Python server
+    let key = ["CARTO_API_KEY", "ROADSTYLE_API_KEY"].iter().find_map(|k| std::env::var(k).ok().filter(|v| !v.is_empty()));
+    let mut notes = Vec::new();
+    if !options.contains_key("basemap") && key.is_none() {
+        options.insert("basemap".into(), "esri_street".into());
+        notes.push("basemap: esri_street (the default CARTO map needs CARTO_API_KEY)".to_string());
+    }
     // the look of render_page: palette, profile and settings apart, the rest as the render's keywords, with state "live"
-    let mut args = options.clone();
-    let mut pick = |k: &str| args.remove(k).unwrap_or(Value::Null);
-    let look = json!({"palette": pick("palette"), "profile": pick("profile"), "settings": pick("settings")});
+    let mut args = options;
+    let mut look = Map::new();
+    for k in ["palette", "profile", "settings"] {
+        if let Some(v) = args.remove(k) {
+            look.insert(k.into(), v);
+        }
+    }
     args.insert("highway_col".into(), class_col.into());
     args.insert("state".into(), "live".into());
-    let mut look = look;
-    look["args"] = Value::Object(args);
-    if look["palette"].is_null() {
-        look.as_object_mut().unwrap().remove("palette");
+    look.insert("args".into(), Value::Object(args));
+    let o = roadstyle::look::Options::from_value(&Value::Object(look))?;
+    let resolved = roadstyle::Look::resolve(&o)?;
+    let mut given = Map::new();
+    given.insert("api_key".into(), key.map_or(Value::Null, Value::String));
+    given.insert("street_view_key".into(), std::env::var("GOOGLE_MAPS_KEY").ok().filter(|v| !v.is_empty()).map_or(Value::Null, Value::String));
+    let page = roadstyle::page_options::page_from(roads, &resolved, &o, &given)?;
+    let html = page.html.replacen("__MAPLIBRE_CSS__", MAPLIBRE_CSS, 1).replacen("__MAPLIBRE_JS__", &MAPLIBRE_JS.replace("</script>", "<\\/script>"), 1);
+    if let Some(d) = out.parent() {
+        std::fs::create_dir_all(d).map_err(|e| format!("{}: {e}", d.display()))?;
     }
-    let look = roadstyle::look::make_look(&look)?.to_string();
-    let name = options.get("name").and_then(Value::as_str).map(str::to_string);
-    roadstyle::make_sources(bytes, &look, None, None, name)?;
-    // TODO(R3): the page from the sources (with the keyless base map note: esri_street without CARTO_API_KEY), saved at `out`; then the
-    // answer is "Saved <out>\n<summary>" and `preview(&out, &Camera::default())`
-    Err(format!("{text}\nno map: the Rust engine has no page writer yet (plan step R3), so {} is not written. Use {PYTHON}.", out.display()))
+    std::fs::write(&out, &html).map_err(|e| format!("{}: {e}", out.display()))?;
+    // the warnings once each, in order; with our keyless base map, CARTO's warning is about the switcher's other entries
+    let mut warnings: Vec<String> = read_warning.into_iter().chain(page.warnings).collect();
+    warnings.dedup();
+    if !notes.is_empty() {
+        warnings.retain(|w| !w.starts_with("CARTO base map requested"));
+    }
+    let lines: Vec<String> = std::iter::once(format!("Saved {}", out.display())).chain(std::iter::once(text)).chain(notes)
+        .chain(warnings.into_iter().map(|w| format!("warning: {w}"))).collect();
+    Ok((lines.join("\n"), out))
 }
 
 #[tokio::main(flavor = "current_thread")]

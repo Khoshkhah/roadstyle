@@ -136,7 +136,7 @@ export interface Dashboard {
    *  column row), and colour (colorBy) or size (widthBy) the roads from it, with no new style. A second call replaces the values. */
   setData(table: Array<Record<string, unknown>> | { toArray(): unknown[] } | string, options?: {
     key?: string; colorBy?: string; vmin?: number; vmax?: number; ramp?: string[]; widthBy?: string; widthRange?: [number, number];
-    nodata?: string | null; legend?: false | { title?: string };
+    nodata?: string | null; legend?: false | { title?: string }; stepped?: boolean;
   }): Promise<{ rows: number; matched: number; ms: number }>;
   clearData(): void;
 }

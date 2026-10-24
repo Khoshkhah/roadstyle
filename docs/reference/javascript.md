@@ -50,6 +50,10 @@ rs.setState({colorBy: "speed", filter: {bridges: false}});
 | `rsColorBase([[idsA, "#f80"], ...])` / `rsColorBase(null)` | recolour groups UNDER those of `rsColor`, for a host that paints its own roads: `rsColor` and `rsColor(null)` leave them | `rs:colorchange` (`base: true`) |
 | `rsFind(text)` | the ids of the roads that match the text (a part of a popup field value or of an id; the docked panel's search); always defined, `find_control=True` adds the box | |
 | `rsSetAccess(kind, on)` / `rsGetAccess()` / `RS_ACCESS` | with `access_col`: show / hide the roads of one access kind; `{kind: shown}`; `{kind: count}` | `rs:filterchange` (`access`) |
+| `rsSetModes(list)` / `rsGetModes()` / `RS_MODES` | a duckOSM map: show only the roads that one of these modes (`driving`, `walking`, `cycling`) can use, from the road table's flags; `null` shows all. It combines with the other road filters. `RS_MODES`: `{mode: count}` from `roadstyle:controls.modes` | `rs:filterchange` (`modes`) |
+| `rsSetKinds(label, list)` / `rsGetKinds(label)` / `RS_KINDS` | a base-map layer: show only these `kind` values (`null`: all), with the layer's own filter and `rsFilter`; `RS_KINDS`: `{label: {kind: count}}` from each overlay entry's `kinds` | `rs:filterchange` (`overlay`, `kinds`) |
+| `rsSetInteraction(label, {clickable, tooltip, popup})` / `rsGetInteraction(label)` | a base-map layer: its clicks (and its hover colour), its hover tooltip (its field list, else its popup's, else every field) and its click popup. The start values are the overlay entry's `interactive`, `tooltip` and `popup_window` | `rs:interactionchange` (`overlay`, `clickable`, `tooltip`, `popup`) |
+| `rsSetBuildings3D(on)` / `rsGetBuildings3D()` | the 3D buildings (the layers with `roadstyle:group` "buildings 3D"): they show while this is on and their buildings layer is shown. A button under the 2D/3D button and a row under the buildings in the Layers box | `rs:buildings3dchange` (`on`) |
 | `rsHighlight(ids, layer?)` | selection glow on the set; `[]` clears | `rs:highlightchange` |
 | `rsFocus(ids, opt?, layer?)` | fit the camera to one id or a set; `opt` goes to MapLibre `fitBounds` (default `padding` 80, `maxZoom` 17) | |
 | **Selection** | | |
@@ -88,12 +92,15 @@ All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
 | | `rsSetBridges` | `bridges` |
 | | `rsSetTunnels` | `tunnels` |
 | | `rsFilter` on roads / an overlay | `ids` / `overlay`, `ids` |
+| | `rsSetAccess` / `rsSetModes` / `rsSetKinds` | `access`, `visible` / `modes` / `overlay`, `kinds` |
 | `rs:colorchange` | `rsSetColorField` | `option` (the `RS_COLOR_OPTIONS` entry), `index` |
 | | `rsColor` with one set / several | `ids`, `color` / `groups: [{ids, color}]` |
 | | `rsColor` on an overlay | `overlay`, `ids`, `color` |
 | `rs:highlightchange` | `rsHighlight` | `ids` (plus `overlay` on an overlay) |
 | `rs:basemapchange` | `rsSetBasemap` | `basemap` (key), `index` |
 | `rs:overlaychange` | `rsSetOverlay` | `overlay` (label), `visible` |
+| `rs:interactionchange` | `rsSetInteraction` | `overlay` (label), `clickable`, `tooltip`, `popup` |
+| `rs:buildings3dchange` | `rsSetBuildings3D` | `on` |
 | `rs:viewchange` | `rsSetView3D` | `view3d` |
 | `rs:tunnelchange` | `rsSetTunnelStyle` | `strength`, `palette`, `ratio`, `toward` |
 | `rs:viewselect` | `rsSetView` | `view` (name), `index` |

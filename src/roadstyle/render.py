@@ -113,6 +113,10 @@ def render_edges(
     """
     if "order_col" in kwargs:
         raise ValueError("order_col is removed: roadstyle draws by positions (docs/design/levels_split_casing.md, section 12)")
+    if kwargs.get("sidebar") is not None:      # render_dashboard, render_report: the sidebar's keywords where the call gives none
+        from .pages import SIDEBAR_DEFAULTS
+        for k, v in SIDEBAR_DEFAULTS.get(kwargs["sidebar"], {}).items():
+            kwargs.setdefault(k, v)
     from . import _engine
     hooks = [k for k in ("_export", "_parts", "_edges", "_palette_copy") if kwargs.get(k) is not None and kwargs.get(k) is not False]
     # ``engine``: "python" (default) or "rust" (the roads' style from the Rust engine, the page from Python). The internal hooks of the

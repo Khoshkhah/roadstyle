@@ -13,6 +13,7 @@ import {initFind} from "./find.js";
 import {initColor, useColor} from "./color.js";
 import {useLegend} from "./legend.js";
 import {initOverlays} from "./overlays.js";
+import {initFeatures} from "./features.js";
 import {initTunnel} from "./tunnel.js";
 import {initViews} from "./views.js";
 import {initArrows} from "./arrows.js";
@@ -34,6 +35,7 @@ const RS_DEFAULTS = {
   street_view: "window", street_view_key: "", google_3d: false,
   filter: {on: false, classes: []}, color_active: 0,
   overlays: [], overlay_control: true, overlay_popup: true,
+  modes: [], box_layout: "corner",   // roadstyle:controls.modes [[mode, count], ...]; "stack": a base map's page (Layers under Roads, folded)
   tunnel: {layers: {}, steps: [], control: false}, fill_layers: [], road_fill: {on: true, paint: {}},
   views: [], items: null, edge_id_col: "edge_id", arrow_icon: null,
 };
@@ -73,6 +75,7 @@ export function rsDashboard(map, options){
   initColor();
   useLegend();
   initOverlays();
+  initFeatures();
   initTunnel();
   initViews();
   initArrows();

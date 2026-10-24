@@ -78,7 +78,7 @@ fn the_look_keyword_levels() {
     let style = |levels: Value| {
         let mut look = roadstyle_rs::look::make_look(&o).unwrap();
         look["args"]["levels"] = levels;
-        roadstyle_rs::make_style(roads.clone(), &look.to_string(), None, None, None)
+        roadstyle_rs::make_style(roads.clone(), &roadstyle_rs::Look::from_value(look.clone()).unwrap(), None, None, None)
     };
     let meta = |hash: &str| serde_json::json!({"edge_hash": hash, "n_edges": ids.len()});
     assert!(style(meta(&roadstyle_rs::levels::edge_hash(&ids))).is_ok());

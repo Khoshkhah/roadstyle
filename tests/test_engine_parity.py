@@ -244,6 +244,43 @@ def test_export_inline_decks(part, keywords, rename):
     assert diff(ru, py) == []
 
 
+# The decks' rule where a slice is curved (2026-10-24): GEOS's offset curve splits slices into 0 to n parts; Rust draws one mitre strip for
+# each side; same chains, edges and heights. So the slice count and the ring vertices are not compared, and each chain's union area is
+# within these tolerances, measured on all of Monaco (mapstyle's roads of every mode, 49 chains): decks 0.38 %, casing slabs 4.2 %.
+_DECK_AREA, _SLAB_AREA = 0.005, 0.05
+
+
+def test_export_inline_decks_on_curves():
+    """The bridges of all of Monaco around two chains (rust/roadstyle-rs/tests/data/monaco_decks: 18 bridge roads; a reverse pair, curved
+    slabs): the same chains, edges, heights and heads in both engines, and each chain's union area within the measured tolerance."""
+    import collections
+
+    import geopandas as gpd
+    from shapely import make_valid
+    from shapely.geometry import shape
+    from shapely.ops import unary_union
+
+    roads = gpd.read_parquet(Path(__file__).resolve().parents[1] / "rust/roadstyle-rs/tests/data/monaco_decks/roads.parquet")
+    fp, fr = (rs.export_inline(roads, engine=e, view_3d=True)["sources"]["decks"]["data"]["features"] for e in ("python", "rust"))
+
+    def chains(fs):
+        out = collections.defaultdict(list)
+        for f in fs:
+            out[f["properties"]["__rs_chain"]].append(f)
+        return out
+
+    cp, cr = chains(fp), chains(fr)
+    assert set(cp) == set(cr) and len(cp) >= 2
+    keys = ("__rs_edges", "__rs_casing_slab", "__rs_base", "__rs_height", "__rs_hs", "__rs_he")
+    for c in cp:
+        key = lambda fs: sorted({tuple(json.dumps(f["properties"].get(k)) for k in keys) for f in fs})   # noqa: E731
+        assert key(cr[c]) == key(cp[c]), f"chain {c}: its edges, heights or heads"
+        for slab, tol in ((False, _DECK_AREA), (True, _SLAB_AREA)):
+            area = lambda fs, slab=slab: unary_union([make_valid(shape(f["geometry"])) for f in fs if bool(f["properties"].get("__rs_casing_slab")) == slab]).area  # noqa: E731
+            a, b = area(cp[c]), area(cr[c])
+            assert abs(a - b) <= tol * a, f"chain {c} ({'slabs' if slab else 'decks'}): area {b} against {a}"
+
+
 @pytest.mark.parametrize("fmt", ["xyz", "pmtiles"])
 @pytest.mark.parametrize("case", ["plain", "numeric", "categorical", "road_popup", "view_3d", "kinds", "items and metre overlay", "other column names"])
 def test_export_style(part, keywords, case, fmt, tmp_path):
@@ -299,7 +336,9 @@ def test_live_style_and_contract(part, keywords, case):
     parts = rs.render_edges(part, backend="web", _parts=True, **{**keywords, **opts})
     py, page = parts["style"], parts["options"]
     lk = _engine._look_of({**keywords, "view_3d": False, **opts, "state": "live"})
-    ru = json.loads(_engine.rust().make_style(_engine._geoparquet(part), json.dumps(lk), None, None, None))
+    src = _engine.rust().make_sources(_engine._arrow(part), lk, None, None, None)
+    src.page_arrows()           # stage 3 of the inline page (audit N2): the arrows as points
+    ru = json.loads(src.style())
     meta = ru.pop("metadata")
     assert meta["roadstyle:contract"] == 1
     assert diff(meta["roadstyle:state"], {k: v["default"] for k, v in py["state"].items()}) == []
@@ -320,6 +359,27 @@ def test_live_style_and_contract(part, keywords, case):
     assert diff(ru, py) == []
 
 
+def _same_page(ru, py):
+    """The two engines' pages are the same: byte for byte but the gzipped blobs (the road table, the big sources), which two gzip writers
+    write in their own bytes (R3, 2026-10-24: the Rust page writer gzips them); those are the same when they are read back."""
+    import base64
+    import gzip
+    import re
+
+    pat = r'(id="rs-(?:gz|side)" type="application/json">)(.*?)(</script>)'
+    def blobs(html):
+        out = []
+        for m in re.finditer(pat, html, re.S):
+            v = m.group(2)
+            out.append({k: json.loads(gzip.decompress(base64.b64decode(b))) for k, b in json.loads(v).items()} if v.startswith("{")
+                       else json.loads(gzip.decompress(base64.b64decode(v))))
+        return out
+    cut = lambda html: re.sub(pat, r"\1\3", html, flags=re.S)        # noqa: E731
+    assert cut(ru) == cut(py)
+    assert blobs(ru) == blobs(py)
+    return True
+
+
 _PAGES = {"plain": {}, "controls": {"tunnel_control": True, "filter_control": True, "access_col": "access"},
           "numeric": {"color_by": "lanes", "cmap": "YlOrRd", "vmin": 1, "vmax": 4}, "colors": _LIVE["colors"], "compressed": {"compress": True},
           "panel": {"road_popup": "panel"}, "base map": {"basemap": "osm", "basemaps": ["osm", "blank"]}, "classes": {"exclude": ["footway", "steps"]}}
@@ -334,7 +394,7 @@ def test_render_edges_page(part, keywords, case, monkeypatch):
     py = rs.render_edges(part, backend="web", engine="python", **{**keywords, **opts}).html
     ru = rs.render_edges(part, backend="web", engine="rust", **{**keywords, **opts}).html
     if case != "decks":
-        assert ru == py
+        assert _same_page(ru, py)
         return
     from compare_engines import diff
 
@@ -344,7 +404,7 @@ def test_render_edges_page(part, keywords, case, monkeypatch):
         st["sources"]["decks"]["data"]["features"] = len(st["sources"]["decks"]["data"]["features"])
         return st, html[:at] + html[at + end:]
     (sr, hr), (sp, hp) = cut(ru), cut(py)
-    assert diff(sr, sp) == [] and hr == hp
+    assert diff(sr, sp) == [] and _same_page(hr, hp)
 
 
 @pytest.mark.parametrize("case", ["plain", "controls", "items and metre overlay"])
@@ -378,7 +438,33 @@ def test_render_edges_views(part, keywords, views, monkeypatch):
     monkeypatch.delenv("GOOGLE_MAPS_KEY", raising=False)
     kw = {**{k: v for k, v in keywords.items() if k not in ("palette", "settings", "basemap", "basemaps")}, "palette": "amber", "compress": False,
           "views": views}
-    assert rs.render_edges(part, engine="rust", **kw).html == rs.render_edges(part, engine="python", **kw).html
+    assert _same_page(rs.render_edges(part, engine="rust", **kw).html, rs.render_edges(part, engine="python", **kw).html)
+
+
+def test_the_page_defaults_are_renders():
+    """page_from's defaults of the page's own keywords (roadstyle::page_options) are render's: one value for each in both engines."""
+    import inspect
+
+    from roadstyle import render_web as rw
+    rust = json.loads(_engine.rust().page_defaults())
+    sig = inspect.signature(rw.render).parameters
+    assert {k: sig[k].default for k in rust} == rust
+
+
+@pytest.mark.parametrize("sidebar", ["dashboard", "report"])
+def test_render_edges_sidebar(part, keywords, sidebar, monkeypatch):
+    """render_dashboard and render_report (sidebar=): the Rust engine's page is the Python engine's, with the sidebar and its keywords."""
+    monkeypatch.delenv("GOOGLE_MAPS_KEY", raising=False)
+    page = getattr(rs, f"render_{sidebar}")
+    kw = {k: v for k, v in keywords.items() if k != "name"}
+    ru, py = page(part, engine="rust", compress=False, **kw).html, page(part, engine="python", compress=False, **kw).html
+    assert _same_page(ru, py) and '<h2>Roads ' in ru
+
+
+def test_the_sidebar_defaults_are_pages():
+    """page_from's keywords of each sidebar (roadstyle::page_options::SIDEBARS) are pages.SIDEBAR_DEFAULTS."""
+    from roadstyle.pages import SIDEBAR_DEFAULTS
+    assert json.loads(_engine.rust().sidebar_defaults()) == SIDEBAR_DEFAULTS
 
 
 def test_the_full_look_is_the_python_engines(part, keywords, monkeypatch):
@@ -435,7 +521,7 @@ def test_the_pmtiles_writer_is_the_pmtiles_packages(part, keywords):
 
     from roadstyle.tiles import _merc, _tile_range
     lk = _engine._look_of({**keywords, "tiles": True})
-    t = _engine.rust().Tiler(_engine._geoparquet(part), json.dumps(lk), None, None, "", [])
+    t = _engine.rust().Tiler(_engine._arrow(part), lk, None, None, "", [])
     b = [float(v) for v in part.total_bounds]
     ru = t.archive(b, ["roads", "simple", "slots"])
     buf = io.BytesIO()

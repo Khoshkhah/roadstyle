@@ -1,0 +1,68 @@
+# Path styles: how walking and cycling paths look (render_map(paths=...), mapstyle --paths),
+# on top of the carto road colours (osm_carto.yaml). Independent of the mode (modes.yaml), which
+# picks the network drawn in the `em` width group, on top.
+#   palette          overrides per path class (fill, casing, dash, ...). A white casing is a halo.
+#                    A dashed class can't have a casing and always draws under the road casings
+#                    (roadstyle), so the halo looks are solid.
+#   em               the `em` width group (px by zoom) and its casing ratio (casing = fill x ratio)
+#   group            extra class -> width group (e.g. pedestrian streets stay road-wide)
+#   minor_no_casing  the classes drawn with no casing (roadstyle's config; its default leaves
+#                    footway / path / cycleway / pedestrian / track / service / living_street bare)
+#   fade             how far the roads for cars go towards white in the walking / cycling looks
+
+komoot:           # bold solid colours with a white halo, by type (Komoot, outdoor apps)
+  palette:
+    footway:    {fill: "#e3503c", casing: "#ffffff", dash: null}
+    corridor:   {fill: "#e3503c", casing: "#ffffff", dash: null}
+    pedestrian: {fill: "#ee8a79", casing: "#ffffff", dash: null}
+    platform:   {fill: "#9a9a9a", casing: "#ffffff", dash: null}
+    path:       {fill: "#9b6a3a", casing: "#ffffff", dash: null}
+    track:      {fill: "#a8834f", casing: "#ffffff", dash: null}
+    bridleway:  {fill: "#3f8f3f", casing: "#ffffff", dash: null}
+    steps:      {fill: "#b3301e", dash: [0.7, 0.45]}                 # a ladder: short thick ticks
+    cycleway:   {fill: "#2266d4", casing: "#ffffff", dash: null}
+  em: {width: {12: 1.2, 13: 1.8, 14: 2.6, 15: 3.2, 16: 4, 17: 5, 18: 6.5}, casing_ratio: 1.7}
+  minor_no_casing: [service, living_street]
+  fade: 0.55
+
+osm:              # openstreetmap.org (openstreetmap-carto): thin dotted / dashed paths
+  palette:
+    footway:    {fill: "#fa8072", dash: [1, 2.5]}
+    corridor:   {fill: "#fa8072", dash: [1, 2.5]}
+    path:       {fill: "#fa8072", dash: [3, 3]}
+    steps:      {fill: "#fa8072", dash: [0.6, 0.6]}
+    cycleway:   {fill: "#4747ff", dash: [1, 2.5]}
+    bridleway:  {fill: "#1c8b3c", dash: [3, 2]}
+    track:      {fill: "#ac8327", dash: [4, 2]}
+  em: {width: {12: 0.8, 13: 1, 14: 1.4, 15: 1.8, 16: 2.3, 17: 3, 18: 3.8}, casing_ratio: 1.0}
+  group: {pedestrian: pedestrian}                                   # pale lavender, road-wide
+  fade: 0
+
+cyclosm:          # the CyclOSM cycling map: solid blue cycleways, thin dark dashed footways
+  palette:
+    cycleway:   {fill: "#1a5cff", casing: "#ffffff", dash: null}
+    footway:    {fill: "#8a4b41", dash: [2, 2]}
+    corridor:   {fill: "#8a4b41", dash: [2, 2]}
+    path:       {fill: "#8a4b41", dash: [3, 2.5]}
+    steps:      {fill: "#8a4b41", dash: [0.6, 0.5]}
+    pedestrian: {fill: "#e6e1f0", casing: "#b9b2cc", dash: null}
+    track:      {fill: "#8a6a3a", dash: [4, 2]}
+    bridleway:  {fill: "#3f7f3f", dash: [3, 2]}
+  em: {width: {12: 1, 13: 1.5, 14: 2, 15: 2.6, 16: 3.2, 17: 4, 18: 5.2}, casing_ratio: 1.6}
+  minor_no_casing: [service, living_street, footway, corridor, path, track, bridleway]
+  fade: 0.45
+
+google:           # Google / Apple Maps: calm, thin solid light lines, no dashes
+  palette:
+    footway:    {fill: "#ffffff", casing: "#c4c4c4", dash: null}
+    corridor:   {fill: "#ffffff", casing: "#c4c4c4", dash: null}
+    path:       {fill: "#ffffff", casing: "#c4c4c4", dash: null}
+    pedestrian: {fill: "#f6f6f6", casing: "#cfcfcf", dash: null}
+    platform:   {fill: "#e4e4e4", casing: "#c4c4c4", dash: null}
+    track:      {fill: "#f2ecdc", casing: "#c9bb9a", dash: null}
+    bridleway:  {fill: "#eef5e8", casing: "#a9c79a", dash: null}
+    steps:      {fill: "#b8b8b8", dash: [0.6, 0.5]}
+    cycleway:   {fill: "#1e8e3e", casing: "#ffffff", dash: null}
+  em: {width: {12: 0.8, 13: 1.2, 14: 1.8, 15: 2.4, 16: 3, 17: 3.8, 18: 4.8}, casing_ratio: 1.5}
+  minor_no_casing: [service, living_street]
+  fade: 0.3

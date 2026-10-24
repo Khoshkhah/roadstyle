@@ -41,8 +41,9 @@ def test_tiles_from_the_files_are_the_tiles_of_the_one_call(part, keywords, tmp_
     # the one call: the same look, the tiles of the Tiler (render(tiles=True), export_style)
     kw = dict(keywords)
     kw.setdefault("view_3d", True)          # as export_geojson
+    kw["export"] = True                     # an export: the roads source too (audit N2)
     lk = _engine._look_of(kw)
-    t = _engine.rust().Tiler(_engine._geoparquet(part), json.dumps(lk), None, "roads", "", [])
+    t = _engine.rust().Tiler(_engine._arrow(part), lk, None, "roads", "", [])
     one = t.archive(list(t.bounds()), t.layers())
     if fmt == "geojson":
         assert out.read_bytes() == one          # the same text: the same bytes
@@ -72,14 +73,13 @@ def test_the_road_table_of_rust_is_pythons(part, keywords):
     kw = dict(keywords)
     kw.setdefault("view_3d", True)
     lk = _engine._look_of(kw)
-    s = _engine.rust().make_sources(_engine._geoparquet(part), json.dumps(lk), None, None, "roads")
+    s = _engine.rust().make_sources(_engine._arrow(part), lk, None, None, "roads")
     roads = rs.export_inline(part, engine="rust", **keywords)["sources"]["roads"]["data"]
     want = json.dumps(sidecar(roads), separators=(",", ":"))
     got = s.road_table()
     assert got == want
     t = json.loads(got)
-    assert len(t["props"]) == len(t["lines"]) == len(t["headings"]) == len(part)
-    assert all(h is None or 0 <= h < 360 for h in t["headings"])
+    assert len(t["props"]) == len(t["lines"]) == len(t["mids"]) == len(part) and "headings" not in t       # N4: no JS reads a heading
 
 
 def test_live_data_reads_the_feature_state_of_the_road(part, keywords):
@@ -121,6 +121,31 @@ def test_a_live_page_gives_the_dashboard_the_states(part):
     assert '["feature-state", "rs_c"]' in json.dumps(road["paint"]["line-color"])
 
 
+def test_live_data_can_take_the_nearest_stop(part, tmp_path):
+    """rs.setData(rows, {stepped: true}) gives each road the ramp's nearest stop, not a colour between two (SonoFlow's Daily page colours
+    so); its legend draws the same steps."""
+    pw = pytest.importorskip("playwright.sync_api")
+    page_file = tmp_path / "live.html"
+    page_file.write_text(rs.render_edges(part, engine="rust", live_data=True, basemap="blank").html)
+    ids = [str(e) for e in part["edge_id"][:2]]
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(page_file.as_uri())
+        page.wait_for_function("window.rs && window.map && map.isStyleLoaded() && window.RS_SIDE", timeout=60000)
+        got = page.evaluate("""async ids => {
+          const L = map.getLayer('roads-simple'), at = i => map.getFeatureState({source: L.source, sourceLayer: L.sourceLayer, id: i}).rs_c;
+          const rows = [{edge_id: ids[0], v: 0.4}, {edge_id: ids[1], v: 0.6}], o = {colorBy: 'v', vmin: 0, vmax: 1, ramp: ['#000000', '#ffffff']};
+          await rs.setData(rows, {...o, stepped: true});
+          const stepped = [at(0), at(1)], bar = document.querySelector('.lg-bar').getAttribute('style');
+          await rs.setData(rows, o);
+          return {stepped, bar, linear: at(0)}; }""", ids)
+        browser.close()
+    assert got["stepped"] == ["#000000", "#ffffff"]          # 0.4 and 0.6 between the two stops: the nearer one
+    assert got["linear"] == "#666666"                        # without it: the colour 40 % of the way
+    assert "#000000 0%" in got["bar"] and "#ffffff 50.00%" in got["bar"]     # the legend's hard step half-way
+
+
 def test_the_parquet_files_keep_big_ids_as_integers(part, keywords, tmp_path):
     """N1: duckOSM's edge ids are past 2**53 - 1; the model keeps them as integers, so DuckDB reads the road table and the roads' file
     with BIGINT ids (the BIGINT rule of the matchers), while every JSON form writes them as text (JavaScript would round them)."""
@@ -143,7 +168,7 @@ def test_the_tiled_style_says_its_tile_layers(part, keywords):
     from roadstyle import _engine
 
     lk = _engine._look_of({**keywords, "state": "live", "live_data": True})
-    src = _engine.rust().make_sources(_engine._geoparquet(part), json.dumps(lk), None, None, "x")
+    src = _engine.rust().make_sources(_engine._arrow(part), lk, None, None, "x")
     inline = json.loads(src.style())["metadata"]
     assert inline["roadstyle:sources"]["simple"] == {"source": "simple", "layer": None}
     text, t = src.tile_stage(only=["roads", "simple", "slots"], at=json.dumps({"url": "pmtiles://roads"}))      # as a page
@@ -152,3 +177,54 @@ def test_the_tiled_style_says_its_tile_layers(part, keywords):
     assert st["metadata"]["roadstyle:sources"]["simple"] == {"source": "roads", "layer": "simple"}
     assert st["metadata"]["roadstyle:arrows"] == inline["roadstyle:arrows"] and "simple" in t.layers()
     assert json.loads(src.style())["metadata"] == inline          # stage 2 borrows the sources (N6)
+
+
+def test_stage_1_is_the_road_table_form_and_only_an_export_has_the_roads(part, keywords):
+    """N2 (2026-10-24): stage 1 reads neither `state` nor `tiles`. A host's style (live or not) has no roads source, no pick or highlight
+    layer, and the pieces' promoteId; only an export (export_inline, export_style: an app with no road table) has the roads source with
+    its pick and highlight layers; the inline page's stage 3 makes the arrows points (page_arrows)."""
+    from roadstyle import _engine
+
+    def style(**kw):
+        return json.loads(_engine.rust().make_style(_engine._arrow(part), _engine._look_of({**keywords, **kw}), None, None, None))
+
+    for kw in ({}, {"state": "live"}, {"state": "live", "tiles": True}):
+        st = style(**kw)
+        ids = [lyr["id"] for lyr in st["layers"]]
+        assert "roads" not in st["sources"] and "roads-fill" not in ids and "roads-highlight" not in ids, kw
+        assert st["sources"]["simple"]["promoteId"] == "__rs_edge"
+        assert next(lyr for lyr in st["layers"] if lyr["id"] == "roads-arrows")["source"] == "slots", kw
+    ex = rs.export_inline(part, engine="rust", **keywords)
+    assert "roads" in ex["sources"] and {"roads-fill", "roads-highlight"} <= {lyr["id"] for lyr in ex["layers"]}
+    src = _engine.rust().make_sources(_engine._arrow(part), _engine._look_of({**keywords, "state": "live"}), None, None, None)
+    src.page_arrows()
+    st = json.loads(src.style())
+    assert next(lyr for lyr in st["layers"] if lyr["id"] == "roads-arrows")["source"] == "arrows" and st["metadata"]["roadstyle:arrows"] == "points"
+
+
+def test_a_warning_of_the_rust_engine_is_a_python_warning():
+    """R17: the engine gives its warnings back with its output (no thread-local in the engine); the binding gives them to Python. A
+    two-way pair whose two directions have other casing numbers gets the twin_casing warning."""
+    import geopandas as gpd
+    from shapely.geometry import LineString
+
+    a, b = (18.0, 59.30), (18.0, 59.301)
+    g = gpd.GeoDataFrame({"edge_id": [1, 2], "highway": "primary", "cs": [1, 1], "cm": [1, 2], "ce": [1, 1], "fl": [3, 3]},
+                         geometry=[LineString([a, b]), LineString([b, a])], crs=4326)
+    kw = dict(casing_start_col="cs", casing_level_col="cm", casing_end_col="ce", fill_level_col="fl", engine="rust")
+    with pytest.warns(UserWarning, match="twin_casing: 1 two-way pair"):
+        rs.export_inline(g, **kw)
+
+
+def test_the_binding_takes_arrow_tables_only(part, keywords):
+    """The roads go to Rust as an Arrow stream (audit R15): a pyarrow table and GeoPandas' to_arrow give the same style; bytes are a
+    TypeError."""
+    import pyarrow as pa
+
+    from roadstyle import _engine
+
+    lk = _engine._look_of(keywords)
+    t = _engine._arrow(part)
+    assert _engine.rust().make_style(pa.table(t), lk, None, None, None) == _engine.rust().make_style(t, lk, None, None, None)
+    with pytest.raises(TypeError, match="__arrow_c_stream__"):
+        _engine.rust().make_style(b"PAR1", lk, None, None, None)
