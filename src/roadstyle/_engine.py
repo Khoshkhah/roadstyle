@@ -94,13 +94,18 @@ def _check_tunnels(cfg):
 def look(*, palette=None, profile=None, settings=None, args=None, features=None):
     """The resolved look of render_edges' palette, profile and settings, made by the Rust engine: a ``Look`` handle (roadstyle-look),
     parsed one time; ``.json()`` gives its text, ``.part("config")`` the JSON text of one part."""
+    return rust().resolve_look(json.dumps(_look_options(palette, profile, settings, args, features)))
+
+
+def _look_options(palette, profile, settings, args, features):
+    """The options that ``look`` resolves (roadstyle-look's Options), with the user's own profiles and palettes as text."""
     o = {"palette": palette, "profile": profile, "settings": settings, "args": args or {}}
     if features is not None:
         o["features"] = features
     files = _own_files()
     if files:
         o["files"] = files
-    return rust().resolve_look(json.dumps(o))
+    return o
 
 
 def export_inline(edges, **kwargs) -> dict:
@@ -174,6 +179,11 @@ def _look_of(kwargs):
     """The resolved look of render's keywords (a ``Look`` handle), with what the engine reads as JSON: the boundary as GeoJSON
     (_boundary_fc) and each overlay as its fields, its style of the settings filled in (_styled), its data as a FeatureCollection
     (``fc``)."""
+    return _look_and_options(kwargs)[0]
+
+
+def _look_and_options(kwargs):
+    """_look_of's look and the options that it was resolved from (their args: the look's, ``page_from`` takes them from the look)."""
     kwargs = dict(kwargs)
     palette, profile, settings = kwargs.pop("palette", None), kwargs.pop("profile", None), kwargs.pop("settings", None)
     features, overlays, items = kwargs.pop("features", None), kwargs.pop("overlays", None), kwargs.pop("items", None)
@@ -186,17 +196,18 @@ def _look_of(kwargs):
     active = _s._sources()
     if active:
         given = [*active, *(given if isinstance(given, list) else [given] if given is not None else [])]
-    lk = look(palette=palette, profile=profile, settings=given, args=kwargs, features=features)
+    o = _look_options(palette, profile, given, kwargs, features)
+    lk = rust().resolve_look(json.dumps(o))
     cfg = json.loads(lk.part("config"))
     _check_tunnels(cfg)
     if cfg.get("twin_casing") not in ("one", "each"):
         raise ValueError(f'twin_casing must be "one" or "each", got {cfg.get("twin_casing")!r}')
     if overlays:
-        lk = lk.with_arg("overlays", json.dumps([_overlay_json(o, (cfg.get("overlays") or {}).get("styles") or {}) for o in overlays]))
+        lk = lk.with_arg("overlays", json.dumps([_overlay_json(ov, (cfg.get("overlays") or {}).get("styles") or {}) for ov in overlays]))
     if items is not None:          # render's items=: the road's own line items, as GeoJSON
         from .overlays import to_fc
         lk = lk.with_arg("items", json.dumps(to_fc(items)))
-    return lk
+    return lk, o
 
 
 def _settings_data(settings):
@@ -390,12 +401,11 @@ def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds):
 
 def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="highway", include=None, exclude=None, match_links=True,
                 levels_db=None, engine=None, **kwargs):
-    """``render_edges(backend="web", engine="rust")``: the roads' style from the Rust engine (state "live": the state in the expressions and
-    the interaction contract in the metadata), the base map and the page as Python writes them (render_web._page_basemaps, _page_html),
-    with the settings of the call in force. ``tiles=True``: the roads, their pieces and their names in an embedded PMTiles archive of the
-    Rust engine's tiles (_tiled_page)."""
-    import inspect
-    import os
+    """``render_edges(backend="web", engine="rust")``: the page in one call of the Rust engine (roadstyle::page_options::page_from, audit
+    R3): the roads' style (state "live"), the base map, the views and their palettes, the dashboard's options and the page. ``tiles=True``:
+    the roads, their pieces and their names in an embedded PMTiles archive. Python gives what only it knows: the data steps (include,
+    exclude, levels_db), the look's options, and the keys (base maps, Google Maps)."""
+    import dataclasses
 
     from . import _settings as _s
     from . import render_web as rw
@@ -419,121 +429,27 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
         from .levels_store import stored_levels
         g, level_kw = stored_levels(levels_db, g, kwargs.get("edge_id_col", "edge_id"))
         kwargs = {**kwargs, **level_kw}
-    tiled = bool(kwargs.get("tiles"))
-    lk = _look_of({**kwargs, "palette": palette, "profile": profile, "settings": settings, "highway_col": highway_col, "state": "live"})
-    pq = _geoparquet(g)
-    src = rust().make_sources(pq, lk, None, None, kwargs.get("name"))      # stage 1, once: the style and the road table
-    a = {k: p.default for k, p in inspect.signature(rw.render).parameters.items() if p.default is not inspect.Parameter.empty}
-    a.update(kwargs)
-    mode = "panel" if a["road_popup"] == "panel" else (a["popup_mode"] or "popup")
-    if a["side_panel_html"] is not None and mode == "panel":
-        raise ValueError("side_panel_html and popup_mode='panel' are two panels on the right: use one")
-    if a["street_view"] not in (True, False, "window"):
-        raise ValueError(f'street_view must be True, False or "window", got {a["street_view"]!r}')
-    key = a["street_view_key"] or os.environ.get("GOOGLE_MAPS_KEY") or None
-    if a["google_3d"] and not key:
-        raise ValueError("google_3d=True needs a Google Maps JavaScript API key: pass street_view_key=... or set GOOGLE_MAPS_KEY")
-    # the page's own parts with the settings of the call in force (the base map, its canvas colour, the views' names), as render_edges
-    # applies them
+    lk, o = _look_and_options({**kwargs, "palette": palette, "profile": profile, "settings": settings, "highway_col": highway_col,
+                               "state": "live"})
+    # what only Python knows (roadstyle::page_options makes the rest of the page): the Google Maps key of the environment, and each base
+    # map key with its API key of roadstyle.json, of set_api_key or of the environment (basemaps.get_api_key, by provider), in force with
+    # the settings of the call as render_edges applies them
+    a = {k: kwargs.get(k) for k in ("basemap", "basemaps", "api_key", "street_view_key")}
     pick = {k: v for k, v in (("profile", profile), ("palette", palette)) if v is not None and v != _s.theme()["active"][k]
             and (k == "profile" or v in _s.style_names("palettes"))}
     srcs = [*(settings if isinstance(settings, list) else [settings] if settings is not None else []), *([pick] if pick else [])]
     prev = list(_s._EXTRA)
     try:
         _use(*prev, *srcs)
-        active_bm, bms, base = rw._page_basemaps(a["basemap"], a["basemaps"], a["api_key"], a["basemap_switcher"])
-        bg = rw._bg_color(active_bm)
-        views, pals = _views(src, kwargs, [b["key"] for b in bms], palette, profile, settings, highway_col) if a["views"] else ([], [])
+        from .basemaps import DEFAULT_SWITCHER, get_basemap
+        keys = [k for k in dict.fromkeys([a["basemap"] or rw.CONFIG.basemap, *(a["basemaps"] or DEFAULT_SWITCHER)]) if isinstance(k, str)]
+        resolved = [dataclasses.asdict(get_basemap(k, api_key=a["api_key"])) for k in keys]
     finally:
         _use(*prev)
-    if tiled and any("palette" in v["set"] for v in views):
-        raise ValueError("engine='rust': tiles=True with a view's palette (the tiles have one palette); use engine='python'")
-    if not tiled:
-        src.page_arrows()           # stage 3 of the inline page: the arrows are points that the page puts itself (audit N2)
-    style, archive = _tiled_page(src, highway_col, kwargs) if tiled else (json.loads(src.style()), None)
-    table = src.road_table()
+    given = {"resolved_basemaps": resolved, "street_view_key": a["street_view_key"] or os.environ.get("GOOGLE_MAPS_KEY") or None}
+    html = rust().page_from(_geoparquet(g), lk, json.dumps(o), json.dumps(given))
     _warn()
-    if pals:
-        _palette_swatches(style, json.loads(table)["props"], pals)
-    dashes = style["metadata"]["roadstyle:controls"]["dashes"]
-    meta = style.pop("metadata")
-    ctl, inter = meta["roadstyle:controls"], meta["roadstyle:interaction"]
-    for lyr in style["layers"]:
-        lyr.pop("metadata", None)          # the page gives the dashboard its options; its style has no metadata
-    for lyr in base["layers"]:
-        lyr.setdefault("paint", {})        # as render_web._state_expressions gives every layer of the page
-    page_style = {"version": 8, "sources": {**base["sources"], **style["sources"]}, "layers": base["layers"] + style["layers"],
-                  **{k: style[k] for k in ("glyphs", "state") if k in style}}
-    cfg, th = json.loads(lk.part("config")), json.loads(lk.part("theme"))
-    cam = {"pitch": 0, "bearing": 0, "pitch_3d": 55, "max_pitch": 70, **(cfg.get("camera") or {})}
-    if a["view_3d"]:
-        cam["pitch"] = cam["pitch_3d"]
-    for k in ("pitch", "max_pitch", "bearing"):
-        if a[k] is not None:
-            cam[k] = a[k]
-    page = {"basemaps": bms, "basemap_switcher": bool(a["basemap_switcher"]), "tiles": ctl["tiles"], "simple": ctl["simple"],
-            "sources": meta["roadstyle:sources"], "arrows": meta["roadstyle:arrows"], "live": meta.get("roadstyle:live"), "popup_mode": mode,
-            "find_control": bool(a["find_control"]), "zoom_readout": bool(a["zoom_readout"]), "pitch_3d": ctl["pitch_3d"],
-            "street_view": a["street_view"], "street_view_key": key or "", "google_3d": bool(a["google_3d"]), "select_color": ctl["select_color"],
-            "filter": ctl["filter"], "color_options": meta.get("roadstyle:color_options") or [], "color_active": ctl["color_active"],
-            "overlays": ctl["overlays"], "overlay_control": bool(a["overlay_control"]), "overlay_popup": bool(a["overlay_popup"]),
-            "tunnel": {**ctl["tunnel"], "bg": bg}, "fill_layers": ctl["fill_layers"], "road_fill": ctl["road_fill"], "views": views,
-            "items": ctl["items"], "road_popup": inter["popup"], "road_tooltip": inter["tooltip"], "hover_delay_ms": inter["hover_delay_ms"],
-            "edge_id_col": ctl["edge_id_col"], "arrow_icon": ctl["arrow_icon"], "arrow_color": ctl["arrow_color"], "arrow_rules": ctl["arrow_rules"]}
-    simple_js = {"layer": "roads-simple", "bridge": cfg["bridge_casing_color"], "shadow": cfg["bridge_shadow_color"], "select": ctl["select_color"],
-                 "hover": a["hover_color"] or th["selection"]["hover"], "tunnels": bool(ctl["tunnel"]["layers"]), "dashes": dashes}
-    x0, y0, x1, y1 = (float(v) for v in g.total_bounds)
-    # the page by the Rust page writer (roadstyle::page); the gzip blobs by Python's zlib, so the page is Python's byte for byte
-    from .tiles import _b64gz
-    gz = rw._compress_sources(page_style) if a["compress"] else {}
-    parts = {"name": a["name"], "cam": cam, "bounds": [x0, y0, x1, y1], "side_panel_html": a["side_panel_html"],
-             "host_panel_width": a["host_panel_width"], "compress": False, "gz": gz, "simple_js": simple_js if a["simple"] else None}
-    pmt = archive
-    # the road table of stage 1, in both ways; a view's palette has put its fills (<key>@<palette>) into the roads
-    parts["side_b64"] = _b64gz(table.encode())
-    return rw.WebMap(rust().make_page(json.dumps(page_style), json.dumps(page), json.dumps(parts), pmt))
-
-
-def _views(src, kwargs, basemaps, palette, profile, settings, highway_col):
-    """render's ``views``, checked (render_web._check_views), as the page reads them, and the palettes that they name other than the page's.
-    Each such palette is merged into stage 1's output ``src`` in Rust (palettes.rs, as render_web._merge_palettes: the properties that
-    differ, a copy for each palette, picked by the state rs_palette), from the same roads with no second read or level solve."""
-    from . import _settings as _s
-    from . import render_web as rw
-
-    meta = json.loads(src.metadata())
-    ctl = meta["roadstyle:controls"]
-    colors = [o["name"] for o in meta.get("roadstyle:color_options") or []] if kwargs.get("color_options") else []
-    views = rw._check_views(kwargs["views"], colors, [o["label"] for o in ctl["overlays"]], ctl["filter"]["classes"], basemaps,
-                            _s.style_names("palettes"))
-    pals = [p for p in dict.fromkeys(v["set"]["palette"] for v in views if "palette" in v["set"]) if p != palette]
-    if pals:
-        looks = [(n, _look_of({**kwargs, "palette": n, "profile": profile, "settings": settings, "highway_col": highway_col,
-                               "state": "live"})) for n in pals]
-        src.add_palettes(str(palette), looks)
-    return views, pals
-
-
-def _palette_swatches(style, props, pals):
-    """The filter panel's colour of each class in each palette of the views: the fill of the class's first road in that palette."""
-    from . import render_web as rw
-
-    flt = style["metadata"]["roadstyle:controls"]["filter"]
-    first = {}
-    for p in props:
-        first.setdefault(p.get(flt["col"]), p)
-    flt["palettes"] = {n: {c: first[c].get(f"__rs_fill@{n}", first[c].get("__rs_fill")) or rw._FB["fill"] for c in flt["classes"]} for n in pals}
-    flt["palettes"][style["metadata"]["roadstyle:state"]["rs_palette"]] = dict(flt["swatches"])
-
-
-def _tiled_page(src, highway_col, kwargs):
-    """render(tiles=True) by the Rust engine: the page's style and its PMTiles archive, from stage 2 of the same stage 1 (``src``, in memory:
-    no second build; roadstyle::tile_stage). The style has one vector source ``roads`` (the embedded archive) with the layers ``simple``
-    and ``slots``, and the other sources inline; the tiles have the columns of tiles.build_pmtiles (``keep`` and every ``__rs_*``; the
-    slots whole, from zoom 14)."""
-    keep = sorted({highway_col, kwargs.get("filter_col") or highway_col, "__rs_twoway", "__rs_edge", "lvl", kwargs.get("width_m_col")} - {None})
-    text, t = src.tile_stage(only=["roads", "simple", "slots"], exact=keep, at=json.dumps({"url": "pmtiles://roads"}))
-    return json.loads(text), t.archive(list(t.bounds()), t.layers())
+    return rw.WebMap(html)
 
 
 def _pmtiles(t, z0, z1, bounds, names) -> bytes:

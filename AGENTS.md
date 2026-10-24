@@ -26,7 +26,8 @@ A consumer project that does not install it runs with `PYTHONPATH=<this repo>/sr
   page as one script (in the order of `static/dashboard/files.txt`, which the Rust page writer reads too, without `import` lines and
   `export` words). A new module: a line in `files.txt`. A top-level name must be unique in the folder.
   Design: `docs/design/dashboard_module.md`.
-- A new web option = the keyword + a key in `render`'s `page` dict (and in `_engine.render_page`'s, the Rust engine) + its default in
+- A new web option = the keyword + a key in `render`'s `page` dict and in `PageOptions` (`rust/roadstyle/src/page.rs`, built by
+  `page_options::page_from`; a page-only keyword's default goes in its `DEFAULTS`) + its default in
   `dashboard/index.js` + the module that reads `O.<key>` + a test in `tests/test_render_web.py` (`_opt(html, key)`) + a row in
   `docs/reference/parameters.md`, `docs/reference/javascript.md` and `docs/design/dashboard_module.md` + CHANGELOG. If agents
   calling the library need to know it, also `skills/roadstyle/SKILL.md`.

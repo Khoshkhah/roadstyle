@@ -2790,7 +2790,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            road_popup=True, road_tooltip=False, hover_delay_ms: int = 300, data_maxzoom: int = None, data_tolerance: float = None, popup_mode: str = None,
            street_view: bool | str = "window", street_view_key: str | None = None, google_3d: bool = False,
            tooltip=None, hover_color: str = None, select_color: str = None, boundary=None,
-           color_options=None, color_active=0, views=None, overlays=None, items=None, items_popup=None, compress: bool = True, tunnel_control: bool = False,
+           color_options=None, color_active=0, views=None, sidebar: str = None, overlays=None, items=None, items_popup=None, compress: bool = True, tunnel_control: bool = False,
            tiles: bool = False, simple: bool = True,
            minzoom=None, legend: bool = True,
            api_key: str | None = None, _edges=None, _read=None, _palette_copy: bool = False, _export: bool = False, _parts: bool = False, **_ignore):
@@ -3876,8 +3876,19 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     if not tiles:           # the road table of the inline roads: the page loads it the same way in both ways
         from .tiles import sidecar
         side = sidecar(geo)
-    return WebMap(_page_html(style, page, name=name, cam=cam, bounds=(minx, miny, maxx, maxy), side_panel_html=side_panel_html,
-                             host_panel_width=host_panel_width, compress=compress, tiles=pmt if tiles else None, side=side, simple_js=simple_js))
+    html = _page_html(style, page, name=name, cam=cam, bounds=(minx, miny, maxx, maxy), side_panel_html=side_panel_html,
+                      host_panel_width=host_panel_width, compress=compress, tiles=pmt if tiles else None, side=side, simple_js=simple_js)
+    return WebMap(_add_sidebar(html, sidebar, name) if sidebar is not None else html)
+
+
+def _add_sidebar(html, sidebar, name):
+    """``sidebar=`` (render_dashboard, render_report): the bundled sidebar's template, with the page's name as its heading (its first
+    <h2>), before the end of the body (roadstyle::page_options::add_sidebar)."""
+    from .pages import SIDEBAR_DEFAULTS, sidebar_html
+    if sidebar not in SIDEBAR_DEFAULTS:
+        raise ValueError(f'sidebar must be "dashboard" or "report", got {sidebar!r}')
+    frag = re.sub(r"<h2>.*?</h2>", f"<h2>{_html.escape(str(name))}</h2>", sidebar_html(sidebar), count=1)
+    return html.replace("</body>", frag + "</body>", 1)
 
 def _page_html(style, page, *, name, cam, bounds, side_panel_html, host_panel_width, compress, tiles=None, side=None, simple_js=None):
     """The page: the map with the style (base map and roads) and the dashboard with its options (``page``: the options of rsDashboard).

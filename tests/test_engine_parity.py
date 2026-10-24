@@ -359,6 +359,27 @@ def test_live_style_and_contract(part, keywords, case):
     assert diff(ru, py) == []
 
 
+def _same_page(ru, py):
+    """The two engines' pages are the same: byte for byte but the gzipped blobs (the road table, the big sources), which two gzip writers
+    write in their own bytes (R3, 2026-10-24: the Rust page writer gzips them); those are the same when they are read back."""
+    import base64
+    import gzip
+    import re
+
+    pat = r'(id="rs-(?:gz|side)" type="application/json">)(.*?)(</script>)'
+    def blobs(html):
+        out = []
+        for m in re.finditer(pat, html, re.S):
+            v = m.group(2)
+            out.append({k: json.loads(gzip.decompress(base64.b64decode(b))) for k, b in json.loads(v).items()} if v.startswith("{")
+                       else json.loads(gzip.decompress(base64.b64decode(v))))
+        return out
+    cut = lambda html: re.sub(pat, r"\1\3", html, flags=re.S)        # noqa: E731
+    assert cut(ru) == cut(py)
+    assert blobs(ru) == blobs(py)
+    return True
+
+
 _PAGES = {"plain": {}, "controls": {"tunnel_control": True, "filter_control": True, "access_col": "access"},
           "numeric": {"color_by": "lanes", "cmap": "YlOrRd", "vmin": 1, "vmax": 4}, "colors": _LIVE["colors"], "compressed": {"compress": True},
           "panel": {"road_popup": "panel"}, "base map": {"basemap": "osm", "basemaps": ["osm", "blank"]}, "classes": {"exclude": ["footway", "steps"]}}
@@ -373,7 +394,7 @@ def test_render_edges_page(part, keywords, case, monkeypatch):
     py = rs.render_edges(part, backend="web", engine="python", **{**keywords, **opts}).html
     ru = rs.render_edges(part, backend="web", engine="rust", **{**keywords, **opts}).html
     if case != "decks":
-        assert ru == py
+        assert _same_page(ru, py)
         return
     from compare_engines import diff
 
@@ -383,7 +404,7 @@ def test_render_edges_page(part, keywords, case, monkeypatch):
         st["sources"]["decks"]["data"]["features"] = len(st["sources"]["decks"]["data"]["features"])
         return st, html[:at] + html[at + end:]
     (sr, hr), (sp, hp) = cut(ru), cut(py)
-    assert diff(sr, sp) == [] and hr == hp
+    assert diff(sr, sp) == [] and _same_page(hr, hp)
 
 
 @pytest.mark.parametrize("case", ["plain", "controls", "items and metre overlay"])
@@ -417,7 +438,33 @@ def test_render_edges_views(part, keywords, views, monkeypatch):
     monkeypatch.delenv("GOOGLE_MAPS_KEY", raising=False)
     kw = {**{k: v for k, v in keywords.items() if k not in ("palette", "settings", "basemap", "basemaps")}, "palette": "amber", "compress": False,
           "views": views}
-    assert rs.render_edges(part, engine="rust", **kw).html == rs.render_edges(part, engine="python", **kw).html
+    assert _same_page(rs.render_edges(part, engine="rust", **kw).html, rs.render_edges(part, engine="python", **kw).html)
+
+
+def test_the_page_defaults_are_renders():
+    """page_from's defaults of the page's own keywords (roadstyle::page_options) are render's: one value for each in both engines."""
+    import inspect
+
+    from roadstyle import render_web as rw
+    rust = json.loads(_engine.rust().page_defaults())
+    sig = inspect.signature(rw.render).parameters
+    assert {k: sig[k].default for k in rust} == rust
+
+
+@pytest.mark.parametrize("sidebar", ["dashboard", "report"])
+def test_render_edges_sidebar(part, keywords, sidebar, monkeypatch):
+    """render_dashboard and render_report (sidebar=): the Rust engine's page is the Python engine's, with the sidebar and its keywords."""
+    monkeypatch.delenv("GOOGLE_MAPS_KEY", raising=False)
+    page = getattr(rs, f"render_{sidebar}")
+    kw = {k: v for k, v in keywords.items() if k != "name"}
+    ru, py = page(part, engine="rust", compress=False, **kw).html, page(part, engine="python", compress=False, **kw).html
+    assert _same_page(ru, py) and '<h2>Roads ' in ru
+
+
+def test_the_sidebar_defaults_are_pages():
+    """page_from's keywords of each sidebar (roadstyle::page_options::SIDEBARS) are pages.SIDEBAR_DEFAULTS."""
+    from roadstyle.pages import SIDEBAR_DEFAULTS
+    assert json.loads(_engine.rust().sidebar_defaults()) == SIDEBAR_DEFAULTS
 
 
 def test_the_full_look_is_the_python_engines(part, keywords, monkeypatch):

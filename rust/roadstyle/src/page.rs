@@ -130,11 +130,11 @@ fn fill(text: &str, values: &[(&str, String)]) -> String {
 }
 
 /// html.escape (quote=True).
-fn escape(s: &str) -> String {
+pub(crate) fn escape(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;").replace('\'', "&#x27;")
 }
 
-fn gzip_b64(raw: &[u8]) -> String {
+pub(crate) fn gzip_b64(raw: &[u8]) -> String {
     use std::io::Write;
     let mut e = flate2::GzBuilder::new().mtime(0).write(Vec::new(), flate2::Compression::new(6));
     e.write_all(raw).unwrap();

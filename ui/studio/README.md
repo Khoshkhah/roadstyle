@@ -30,7 +30,8 @@ python -m http.server 8000
 - Columns with few values (categories) in Colour by data: the ramp steps from the engine (the look session).
 - The base maps: `src/roadstyle/data/basemaps.json`, one list for Python and the studio (the look session). Without it the map has
   no base map, and the studio says so.
-- The download of the page (`makePage`), and the Dashboard and Report pages: the page writer (R3).
+- The download of the page, and the Dashboard and Report pages: `makePage(roads, look, options)` makes them (R3; a sidebar with
+  `"sidebar": "dashboard"` in the args), but the studio has no button for it yet.
 
 Each change of a knob runs the look and stage 1 again in the worker (Södermalm driving, 4,563 roads: 0.3 to 0.5 s). All the calls
 of the look are in `worker.js`, so the look's typed handle changes one file.

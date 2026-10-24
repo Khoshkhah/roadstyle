@@ -12,6 +12,20 @@ cargo build --release --manifest-path rust/Cargo.toml -p roadstyle-cli
 
 The program is `rust/target/release/roadstyle`. `roadstyle help` lists the commands.
 
+## Make the page
+
+`roadstyle page` makes the same page as `render_edges(backend="web")`: the map, its dashboard and MapLibre, in one file that works
+offline. Any other option is a keyword of `render`:
+
+```bash
+roadstyle page roads.parquet out/map.html --basemap osm --views '{"plain": {"road_fill": false}}'
+roadstyle page roads.parquet out/tiled.html --tiles
+roadstyle page roads.parquet out/dashboard.html --sidebar dashboard
+```
+
+A CARTO base map needs a key: `--api-key KEY`, else the environment variable `ROADSTYLE_API_KEY`. Google 3D and the Street View
+window take `--street-view-key KEY`, else `GOOGLE_MAPS_KEY`. The program writes a key into the page only when you give one.
+
 ## Draw a map in two stages
 
 Stage 1 makes the style, one file for each source, and the road table. The roads are a GeoParquet file, with the line in the column
