@@ -491,7 +491,7 @@ def _views(style, pq, kwargs, basemaps, palette, profile, settings, highway_col)
 
 def _tiled_page(pq, lk, style, highway_col, kwargs):
     """render(tiles=True) by the Rust engine: (the PMTiles archive, the sidecar table) of the page, and ``style`` made as the tiled page's
-    (render_web's tiled branch): one vector source ``roads`` with the layers ``roads``, ``casings`` (the full look), ``simple`` and ``slots``. The tiles are the Rust
+    (render_web's tiled branch): one vector source ``roads`` with the layers ``roads``, ``simple`` and ``slots``. The tiles are the Rust
     Tiler's, with the columns of tiles.build_pmtiles (``keep`` and every ``__rs_*``; the slots whole, from zoom 14); the sidecar is
     tiles.sidecar of the roads (every column, for the popups)."""
     from .tiles import sidecar
@@ -501,7 +501,7 @@ def _tiled_page(pq, lk, style, highway_col, kwargs):
     tc = lk["config"]["tiles"]
     z0, z1 = int(tc["minzoom"]), int(tc["maxzoom"])
     keep = sorted({highway_col, kwargs.get("filter_col") or highway_col, "__rs_twoway", "__rs_edge", "lvl", kwargs.get("width_m_col")} - {None})
-    names = [n for n in ("roads", "casings", "simple", "slots", "ends") if n in srcs and srcs[n]["data"]["features"]]
+    names = [n for n in ("roads", "simple", "slots") if n in srcs and srcs[n]["data"]["features"]]
     t = rust().Tiler(pq, json.dumps({**lk, "args": {**lk["args"], "tile_keep": keep, "tile_layers": names}}), None, None, "", [])
     def points(g):            # a LineString's points, a Point itself
         c = (g or {}).get("coordinates") or []
@@ -511,10 +511,10 @@ def _tiled_page(pq, lk, style, highway_col, kwargs):
     archive = _pmtiles(t, z0, z1, bounds, names)
     # the style: the roads source a vector one; the pieces and the slots its layers
     srcs["roads"] = {"type": "vector", "url": "pmtiles://roads", "minzoom": z0, "maxzoom": z1}
-    for n in ("casings", "simple", "slots", "ends"):        # the halves and the bridge shadows stay inline, as render's tiled branch keeps them
+    for n in ("simple", "slots"):
         srcs.pop(n, None)
     for lyr in style["layers"]:
-        if lyr.get("source") in ("casings", "simple", "slots", "ends"):
+        if lyr.get("source") in ("simple", "slots"):
             lyr["source"], lyr["source-layer"] = "roads", lyr["source"]
         elif lyr.get("source") == "roads":
             lyr["source-layer"] = "roads"

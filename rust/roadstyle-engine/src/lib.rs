@@ -10,7 +10,6 @@ pub mod decks;
 pub mod draw;
 pub mod export_look;
 pub mod features;
-pub mod full;
 pub mod layers;
 pub mod look;
 pub mod overlays;
@@ -125,14 +124,16 @@ pub fn make_parts(mut table: RoadTable, look: &str, features: Option<Vec<Row>>, 
     for ov in ovs[first_user..].iter_mut() {
         ov.user["edge_id_col"] = look_json["args"]["edge_id_col"].clone();
     }
-    // the full look draws an overlay's lines in metres as an overlay, not as items of the one road layer
-    let full = look_json["args"]["simple"] == false;
+    // render's simple=False (the full look: a layer for each drawing position) is the Python engine's only (plan decision 2)
+    if look_json["args"]["simple"] == false {
+        return Err("simple=False (the full look) is in the Python engine only: use engine=\"python\", or simple mode (the default)".into());
+    }
     // the line items on the edges (an overlay's lines in metres, render's items=): pieces of the one road layer
     let mut items = Vec::new();
-    if (!full && ovs.iter().any(overlays::metre_items)) || !look_json["args"]["items"].is_null() {
+    if ovs.iter().any(overlays::metre_items) || !look_json["args"]["items"].is_null() {
         let by_id: std::collections::HashMap<String, Road> =
             feats.iter().filter_map(|f| f.get("edge_id").map(|e| (overlays::eid(e), f))).collect();
-        for (i, ov) in ovs.iter_mut().enumerate().filter(|(_, o)| !full && overlays::metre_items(o)) {
+        for (i, ov) in ovs.iter_mut().enumerate().filter(|(_, o)| overlays::metre_items(o)) {
             overlays::edge_overlay(ov, &by_id)?;
             items.extend(overlays::item_pieces(ov, i, &look_json)?);
         }
@@ -141,19 +142,7 @@ pub fn make_parts(mut table: RoadTable, look: &str, features: Option<Vec<Row>>, 
             items.extend(overlays::road_items(&look_json["args"]["items"], &by_id, col, ovs.len(), &look_json)?);
         }
     }
-    // render's simple=False: the full look (full.rs): its casing pieces, its halves and its bridge shadows, no pieces of one road layer
-    let mut fsrc = if full {
-        if !items.is_empty() {
-            return Err("items=: only in simple mode (simple=True)".into());
-        }
-        let named = |k: &str| look_json["args"][k].as_str().is_some_and(|c| !c.is_empty());
-        let computed = !named("casing_level_col") && !named("fill_level_col");        // render computes them with the heads
-        let some = |k: &str| feats.iter().any(|f| f.get(k).is_some_and(layers::py_truth));
-        let divided = named("casing_start_col") || named("casing_end_col") || computed || some("__rs_split") || feats.iter().any(|f| f.contains_key("__rs_twin"));
-        Some(full::sources(&feats, &look_json, look.head_m, width_col, divided, &layers::Model::from_look(&look_json)?.classes))
-    } else { None };
-    let simple = if full { simple::SimpleSource::empty(simple::Cols::new(width_col)) }
-                 else { simple::simple_source(&feats, look.head_m, look.bridge_shadow, width_col, items)? };
+    let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow, width_col, items)?;
     // everything that reads the roads is done before this: the roads source takes them
     // export_inline(planner=True): the route planner's graphs, or the number of roads past the limit
     let planned = match planner {
@@ -170,7 +159,7 @@ pub fn make_parts(mut table: RoadTable, look: &str, features: Option<Vec<Row>>, 
         decks::bridge_decks(&roads.roads, &decks::DeckLook::from_config(&look_json["config"]["bridge_decks"]), &layers::Model::from_look(&look_json)?, &hw)
     } else { Vec::new() };
     let (layers, info) = layers::road_layers(&look_json, &roads.roads, &simple, source_features(&slots), !decks.is_empty(), &mut ovs,
-                                             &colors.props, colors.active, fsrc.as_ref())?;
+                                             &colors.props, colors.active)?;
     // state "live" (a page with the dashboard, docs/design/rust_library.md "The interaction contract"): the state stays in the expressions,
     // and the style says what the controls show
     let live = look_json["args"]["state"] == "live";
@@ -183,11 +172,8 @@ pub fn make_parts(mut table: RoadTable, look: &str, features: Option<Vec<Row>>, 
     if glyphs.is_none() && ovs.iter().any(|o| o.kind == "text") {      // _build_overlays: a text overlay needs a font
         glyphs = Some(json!("https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"));
     }
-    // render's order: the roads, the two-way end caps (the full look), the overlays (_build_overlays), the 3D decks
+    // render's order: the roads, the overlays (_build_overlays), the 3D decks, the pieces
     let mut sources = vec![("roads".to_string(), Src::Roads(roads))];
-    if let Some(fs) = fsrc.as_mut().filter(|fs| !fs.ends.is_empty()) {
-        sources.push(("ends".into(), Src::Json(json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": std::mem::take(&mut fs.ends)}}))));
-    }
     for (i, ov) in ovs.into_iter().enumerate() {
         let mut s = serde_json::Map::new();
         s.insert("type".into(), "geojson".into());
@@ -198,24 +184,7 @@ pub fn make_parts(mut table: RoadTable, look: &str, features: Option<Vec<Row>>, 
     if !decks.is_empty() {
         sources.push(("decks".into(), Src::Json(json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": decks}, "generateId": true}))));
     }
-    match fsrc {
-        // render's order in the full look: the halves (the end caps), the casing pieces and the bridge shadows (the positions)
-        Some(fs) => {
-            let fc = |f: Vec<Value>| json!({"type": "FeatureCollection", "features": f});
-            // the roads' tolerance; tiled roads have none, so MapLibre's default
-            let tol = if look_json["args"]["tiles"] == true { 0.375 } else { 0.05 };
-            if let Some(h) = fs.halves {
-                sources.push(("halves".into(), Src::Json(json!({"type": "geojson", "data": fc(h), "tolerance": tol}))));
-            }
-            if let Some(c) = fs.casings {
-                sources.push(("casings".into(), Src::Json(json!({"type": "geojson", "data": fc(c), "tolerance": tol}))));
-            }
-            if !fs.shadows.is_empty() {
-                sources.push(("shadows".into(), Src::Json(json!({"type": "geojson", "data": fc(fs.shadows), "generateId": true, "tolerance": tol}))));
-            }
-        }
-        None => sources.push(("simple".into(), Src::Simple(simple))),
-    }
+    sources.push(("simple".into(), Src::Simple(simple)));
     if !source_features(&slots).is_empty() {        // as Python: no slots source without slots
         let mut slots = slots;
         if live {        // the arrow slots' numbers are for the export's thinning; the page puts the arrows itself
@@ -407,21 +376,8 @@ impl ColumnMap {
                 // the pieces of `simple` have only the class and the __rs_* marks: the user's names at the output, and a kept column
                 // (an __rs_ name in between) goes away there
                 Src::Simple(s) => s.names = self.0.clone(),
-                // the 3D decks and the halves are copies of the roads' properties: the user's names, as the roads; the casing pieces
-                // and the bridge shadows have the class and the __rs_* marks: the class's name, and a kept column goes away
-                Src::Json(s) if matches!(name.as_str(), "casings" | "shadows" | "ends") => {
-                    for f in s["data"]["features"].as_array_mut().into_iter().flatten() {
-                        if let Some(p) = f["properties"].as_object_mut() {
-                            for (own, user) in &self.0 {
-                                p.shift_remove(&Self::kept(own));
-                                if p.contains_key(*own) {
-                                    *p = std::mem::take(p).into_iter().map(|(k, v)| (if k == *own { user.clone() } else { k }, v)).collect();
-                                }
-                            }
-                        }
-                    }
-                }
-                Src::Json(s) if matches!(name.as_str(), "decks" | "halves") => {
+                // the 3D decks are copies of the roads' properties: the user's names, as the roads
+                Src::Json(s) if name == "decks" => {
                     for f in s["data"]["features"].as_array_mut().into_iter().flatten() {
                         if let Some(p) = f["properties"].as_object_mut().filter(|p| !p.contains_key("__rs_casing_slab")) {
                             for (own, user) in &self.0 {
@@ -455,7 +411,7 @@ impl ColumnMap {
                 _ => {}
             }
         }
-        for l in layers.iter_mut().filter(|l| matches!(l["source"].as_str(), Some("roads" | "simple" | "casings" | "halves" | "shadows" | "ends"))) {
+        for l in layers.iter_mut().filter(|l| matches!(l["source"].as_str(), Some("roads" | "simple"))) {
             for (own, user) in &self.0 {
                 gets(l, own, user);
             }

@@ -133,9 +133,9 @@ impl Piece {
         }
     }
 
-    /// The properties of the piece as render_web makes them, with its keys in its order. `simple`: the road layer's (`__rs_k`, `__rs_s`
-    /// with the edge's tie-breaker, `__rs_cls`); else the full look's (_mark_cls: `__rs_cls` and `__rs_access`).
-    pub fn props(&self, roads: &Roads, cols: &Cols, simple: bool) -> Props {
+    /// The properties of the piece as render_web makes them, with its keys in its order, and the road layer's `__rs_k`, `__rs_s` (with
+    /// the edge's tie-breaker) and `__rs_cls`.
+    pub fn props(&self, roads: &Roads, cols: &Cols) -> Props {
         let r = self.road(roads);
         let d = r.draw();
         let edge = self.edge as i64;
@@ -190,21 +190,14 @@ impl Piece {
             End::Stub => drop(q.insert("__rs_stub", true.into())),
             End::AsIs => {}
         }
-        if simple {
-            if matches!(self.part, Part::Half(_)) {
-                q = q.into_iter().filter(|(k, _)| cols.fill(k)).collect();
-            }
-            if let Some(dk) = self.draw {
-                q.insert("__rs_k", dk.kind.into());
-                q.insert("__rs_s", (dk.key + edge as f64 * TIE).into());
-            }
-            q.insert("__rs_cls", crate::cls_of(r));
-        } else {
-            q.insert("__rs_cls", crate::cls_of(r));
-            if let Some(a) = r.get("__rs_access").filter(|a| !a.is_null()) {
-                q.insert("__rs_access", a.to_value());
-            }
+        if matches!(self.part, Part::Half(_)) {
+            q = q.into_iter().filter(|(k, _)| cols.fill(k)).collect();
         }
+        if let Some(dk) = self.draw {
+            q.insert("__rs_k", dk.kind.into());
+            q.insert("__rs_s", (dk.key + edge as f64 * TIE).into());
+        }
+        q.insert("__rs_cls", crate::cls_of(r));
         q
     }
 }
@@ -416,7 +409,7 @@ impl SimpleSource {
             }
             p
         };
-        self.pieces.iter().map(move |(id, p)| (*id, named(p.props(roads, &self.cols, true)), p.coords.as_deref()))
+        self.pieces.iter().map(move |(id, p)| (*id, named(p.props(roads, &self.cols)), p.coords.as_deref()))
             .chain(self.items.iter().map(move |(id, it)| (*id, named(it.props.clone()), it.coords.as_deref())))
     }
 
@@ -466,7 +459,7 @@ pub struct SimpleFeature<'a> {
 impl Get for SimpleFeature<'_> {
     fn value(&self, k: &str) -> Option<Value> {
         match self.src.pieces.get(self.i) {
-            Some((_, p)) => p.props(self.roads, &self.src.cols, true).get(k).cloned(),
+            Some((_, p)) => p.props(self.roads, &self.src.cols).get(k).cloned(),
             None => self.src.items[self.i - self.src.pieces.len()].1.props.get(k).cloned(),
         }
     }
