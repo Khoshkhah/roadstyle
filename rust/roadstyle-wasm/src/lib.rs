@@ -292,6 +292,48 @@ mod wasm {
         }
     }
 
+    /// duckosmPlan(catalog, mode, tags, specs) -> string: the SQL that reads a duckOSM file (roadstyle-io's duckosm.rs, the one copy that
+    /// Python runs too), as JSON text: {"catalog": the 2 queries of the catalog, "roads": 3 statements, "meta": the stored levels' query or
+    /// null, "select": the roads of `mode`, "layers": [{spec, name, with_tags, without_tags}]}. `catalog`: the JSON text of {"name", "tables":
+    /// [[schema, table]], "columns": [[schema, table, column]]} (with no tables: only "catalog" is in the answer); `specs`: layers.yaml's
+    /// layers as JSON text.
+    #[wasm_bindgen(js_name = duckosmPlan)]
+    pub fn duckosm_plan(catalog: &str, mode: &str, tags: bool, specs: &str) -> Result<String, JsError> {
+        use roadstyle::duckosm;
+        let err = |e: String| JsError::new(&e);
+        let c: serde_json::Value = serde_json::from_str(catalog).map_err(|e| err(format!("catalog: {e}")))?;
+        let text = |v: &serde_json::Value| v.as_str().unwrap_or_default().to_string();
+        let rows = |k: &str| c[k].as_array().cloned().unwrap_or_default();
+        let queries = duckosm::catalog_sql(c["name"].as_str().unwrap_or_default());
+        if rows("tables").is_empty() {
+            return Ok(serde_json::json!({"catalog": queries}).to_string());
+        }
+        let cat = duckosm::Catalog { tables: rows("tables").iter().map(|r| (text(&r[0]), text(&r[1]))).collect(),
+                                     columns: rows("columns").iter().map(|r| (text(&r[0]), text(&r[1]), text(&r[2]))).collect() };
+        let specs: Vec<serde_json::Value> = serde_json::from_str(specs).map_err(|e| err(format!("specs: {e}")))?;
+        let layers: Vec<serde_json::Value> = duckosm::features_sql(&cat, &specs).into_iter()
+            .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "with_tags": l.with_tags, "without_tags": l.without_tags})).collect();
+        Ok(serde_json::json!({"catalog": queries, "roads": duckosm::roads_sql(&cat, tags).map_err(err)?, "meta": (!tags).then_some(duckosm::LEVELS_META_SQL),
+                              "select": duckosm::roads_select(mode).map_err(err)?, "layers": layers}).to_string())
+    }
+
+    /// duckosmLevels(source?, nEdges?, edgeHash?) -> string: the look's keyword `levels` (JSON text) from the stored levels' metadata row
+    /// (none: the file has no such row); an error says what to do.
+    #[wasm_bindgen(js_name = duckosmLevels)]
+    pub fn duckosm_levels(source: Option<String>, n_edges: Option<f64>, edge_hash: Option<String>) -> Result<String, JsError> {
+        let row = match (&source, n_edges, &edge_hash) {
+            (Some(s), Some(n), Some(h)) => Some((s.as_str(), n as i64, h.as_str())),
+            _ => None,
+        };
+        roadstyle::duckosm::levels_keyword(row).map(|v| v.to_string()).map_err(|e| JsError::new(&e))
+    }
+
+    /// duckosmFeaturesSelect(specs: number[]) -> string | undefined: the base map's rows from the tables f<spec> that were made.
+    #[wasm_bindgen(js_name = duckosmFeaturesSelect)]
+    pub fn duckosm_features_select(specs: Vec<u32>) -> Option<String> {
+        roadstyle::duckosm::features_select(&specs.into_iter().map(|i| i as usize).collect::<Vec<_>>())
+    }
+
     /// readGeoJson(bytes: Uint8Array) -> Roads: the roads of a GeoJSON file (a FeatureCollection in EPSG:4326; roadstyle-io's geojson.rs
     /// says how each property becomes a column). An error is a thrown Error.
     #[wasm_bindgen(js_name = readGeoJson)]

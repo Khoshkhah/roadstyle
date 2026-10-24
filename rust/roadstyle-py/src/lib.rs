@@ -333,6 +333,44 @@ fn make_area(py: Python<'_>, edges: Vec<u8>, folder: String, id_col: String, hig
     }).map_err(|e: String| PyValueError::new_err(e))
 }
 
+/// duckosm_catalog_sql(catalog) -> [str, str]: the queries of the tables (schema, table) and the columns (schema, table, column) of a
+/// duckOSM file, for duckosm_plan.
+#[pyfunction]
+fn duckosm_catalog_sql(catalog: &str) -> [String; 2] {
+    roadstyle::duckosm::catalog_sql(catalog)
+}
+
+/// duckosm_plan(tables, columns, mode, tags, specs) -> str: the SQL that reads a duckOSM file (roadstyle_io::duckosm, the one copy of it),
+/// as JSON text: {"roads": [3 statements], "meta": the stored levels' query or null (tags), "select": the roads of `mode`, "layers":
+/// [{"spec", "name", "with_tags", "without_tags"}] for the base map (`specs`: layers.yaml's layers as JSON text)}. `tables` and
+/// `columns`: the rows of the catalog's information_schema.
+#[pyfunction]
+fn duckosm_plan(tables: Vec<(String, String)>, columns: Vec<(String, String, String)>, mode: &str, tags: bool, specs: &str) -> PyResult<String> {
+    use roadstyle::duckosm;
+    let cat = duckosm::Catalog { tables, columns };
+    let specs: Vec<serde_json::Value> = serde_json::from_str(specs).map_err(|e| PyValueError::new_err(format!("specs: {e}")))?;
+    let roads = duckosm::roads_sql(&cat, tags).map_err(PyValueError::new_err)?;
+    let select = duckosm::roads_select(mode).map_err(PyValueError::new_err)?;
+    let layers: Vec<serde_json::Value> = duckosm::features_sql(&cat, &specs).into_iter()
+        .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "with_tags": l.with_tags, "without_tags": l.without_tags})).collect();
+    let meta = (!tags).then_some(duckosm::LEVELS_META_SQL);
+    Ok(serde_json::json!({"roads": roads, "meta": meta, "select": select, "layers": layers}).to_string())
+}
+
+/// duckosm_levels(row) -> str: the look's keyword `levels` (JSON text) from the stored levels' metadata row (source, n_edges, edge_hash),
+/// or a ValueError that says what to do.
+#[pyfunction]
+#[pyo3(signature = (row=None))]
+fn duckosm_levels(row: Option<(String, i64, String)>) -> PyResult<String> {
+    roadstyle::duckosm::levels_keyword(row.as_ref().map(|(s, n, h)| (s.as_str(), *n, h.as_str()))).map(|v| v.to_string()).map_err(PyValueError::new_err)
+}
+
+/// duckosm_features_select(specs) -> str | None: the base map's rows from the tables f<spec> that were made.
+#[pyfunction]
+fn duckosm_features_select(specs: Vec<usize>) -> Option<String> {
+    roadstyle::duckosm::features_select(&specs)
+}
+
 /// serve(area, port, page=None): roadstyle serve (roadstyle-cli) in a thread of its own: the level editor's page files (in the extension,
 /// or the folder `page`) at / and the area folder at /area/, on 127.0.0.1. Returns at once; the server stops with the Python process
 /// (roadstyle-levels edit waits for Ctrl+C). An error when the extension has no editor WebAssembly package (build_editor.sh, then build).
@@ -368,6 +406,10 @@ fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(solve_rules, m)?)?;
     m.add_function(wrap_pyfunction!(serve, m)?)?;
     m.add_function(wrap_pyfunction!(make_area, m)?)?;
+    m.add_function(wrap_pyfunction!(duckosm_catalog_sql, m)?)?;
+    m.add_function(wrap_pyfunction!(duckosm_plan, m)?)?;
+    m.add_function(wrap_pyfunction!(duckosm_levels, m)?)?;
+    m.add_function(wrap_pyfunction!(duckosm_features_select, m)?)?;
     m.add_class::<Tiler>()?;
     m.add_class::<Sources>()?;
     m.add_function(wrap_pyfunction!(make_sources, m)?)?;
