@@ -156,9 +156,10 @@ def _mix(a, b, t):
     return "#" + "".join(f"{int(x * (1 - t) + y * t + 0.5):02x}" for x, y in zip(bytes.fromhex(a[1:7]), bytes.fromhex(b[1:7]), strict=True))
 
 
-def _true_values(col, values):
-    """A column read as yes / no from the values a raw OSM or duckOSM column can hold (true, "yes", 1, ...)."""
-    return ["in", ["to-string", ["get", col]], ["literal", list(values)]]
+def _yes(col):
+    """A column read as yes / no by the engine's rule (render_web._truthy; the Rust engine's roadstyle_model::flags::maplibre_yes): yes
+    unless it is missing or "", "no", "false" or "0", so tunnel=covered is a tunnel in the exported look as on the map."""
+    return ["!", ["in", ["downcase", ["to-string", ["get", col]]], ["literal", ["", "no", "false", "0"]]]]
 
 
 def _tag_groups(style, overlays):
@@ -253,9 +254,8 @@ def export_look(path=None, *, profile=None, palette=None, edges=None, highway_co
             lv = [int(v) for c in ("casing_level", "fill_level") if c in g.columns for v in g[c].dropna().unique()]
             positions = range(min(lv, default=0), max(lv, default=0) + 1)
         positions = list(positions if positions is not None else range(-10, 11))
-        two = ["!", _true_values(oneway_col, ("true", "yes", "1", "-1"))]
-        tun = _true_values(tunnel_col, ("true", "yes", "1", "building_passage", "culvert"))
-        bri = _true_values(bridge_col, ("true", "yes", "1", "viaduct", "aqueduct", "boardwalk", "cantilever", "covered", "movable"))
+        two = ["!", _yes(oneway_col)]
+        tun, bri = _yes(tunnel_col), _yes(bridge_col)
         tw = ["to-boolean", ["get", "__rs_twoway"]]
         fb = t["roads"]["fallback"]
 

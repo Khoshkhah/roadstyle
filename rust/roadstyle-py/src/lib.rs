@@ -1,9 +1,11 @@
 //! The Python binding of roadstyle's Rust engine (docs/design/rust_library.md, phase P5): the module `roadstyle._rust`.
 //! Python roadstyle calls it when the engine is "rust" (`roadstyle/_engine.py`). Each call releases the GIL while Rust works.
 
-use pyo3::exceptions::PyValueError;
+use arrow_array::ffi_stream::{ArrowArrayStreamReader, FFI_ArrowArrayStream};
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::PyBytes;
+use pyo3::types::{PyBytes, PyCapsule, PyCapsuleMethods};
+use roadstyle::read::{RoadTable, Row};
 use std::cell::RefCell;
 
 thread_local! {
@@ -14,6 +16,29 @@ thread_local! {
 
 fn warned(w: &[String]) {
     PENDING.with(|p| p.borrow_mut().extend_from_slice(w));
+}
+
+/// A table from Python: an object with `__arrow_c_stream__` (pyarrow's Table, GeoPandas' to_arrow with the geometry as WKB, DuckDB's
+/// arrow()), read as Arrow batches through the Arrow C stream interface (audit R15: no Parquet bytes between Python and Rust).
+fn stream(obj: &Bound<'_, PyAny>) -> PyResult<ArrowArrayStreamReader> {
+    if !obj.hasattr("__arrow_c_stream__")? {
+        return Err(PyTypeError::new_err(format!("{}: not an Arrow table (it has no __arrow_c_stream__)", obj.get_type().name()?)));
+    }
+    let cap = obj.call_method0("__arrow_c_stream__")?;
+    let ptr = cap.cast::<PyCapsule>()?.pointer_checked(Some(c"arrow_array_stream"))?.as_ptr() as *mut FFI_ArrowArrayStream;
+    // the stream moves out of the capsule; the empty stream that stays has no release, so the capsule's destructor does nothing
+    unsafe { ArrowArrayStreamReader::from_raw(ptr) }.map_err(|e| PyValueError::new_err(e.to_string()))
+}
+
+/// The roads, the base map's rows and the planner's rows.
+type Tables = (RoadTable, Option<Vec<Row>>, Option<Vec<Row>>);
+
+/// The roads (their lines in `geometry`), the base map's rows (features_of: the land without the sea) and the planner's rows.
+fn tables(roads: ArrowArrayStreamReader, features: Option<ArrowArrayStreamReader>, planner: Option<ArrowArrayStreamReader>)
+          -> Result<Tables, String> {
+    Ok((roadstyle::read::roads_from(roads, "geometry")?,
+        features.map(|f| roadstyle::read::table_from(f, "geometry").and_then(roadstyle::features_of)).transpose()?,
+        planner.map(|p| roadstyle::read::table_from(p, "")).transpose()?))
 }
 
 /// A resolved look (roadstyle-look), parsed one time: `resolve_look(options)` makes it, `Look.from_json(text)` reads a saved look
@@ -69,14 +94,15 @@ fn resolve_look(py: Python<'_>, options: String) -> PyResult<PyLook> {
 }
 
 /// make_style(roads, look, features=None, planner=None, name=None) -> str: the style's JSON text (roadstyle.export_inline's
-/// style). `roads` and `features` are GeoParquet bytes (the geometry as WKB), `planner` the planner's Parquet bytes, `look` a Look.
-/// An error is a ValueError.
+/// style). `roads`, `features` and `planner` are Arrow tables (`__arrow_c_stream__`; the geometry as WKB), `look` a Look. An error is
+/// a ValueError; a value that is not an Arrow table is a TypeError.
 #[pyfunction]
 #[pyo3(signature = (roads, look, features=None, planner=None, name=None))]
-fn make_style(py: Python<'_>, roads: Vec<u8>, look: PyRef<'_, PyLook>, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>)
-              -> PyResult<String> {
+fn make_style(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook>, features: Option<&Bound<'_, PyAny>>,
+              planner: Option<&Bound<'_, PyAny>>, name: Option<String>) -> PyResult<String> {
     let look = &look.0;
-    let s = py.detach(|| roadstyle::make_sources(roads, look, features, planner, name)).map_err(PyValueError::new_err)?;
+    let (r, f, p) = (stream(roads)?, features.map(stream).transpose()?, planner.map(stream).transpose()?);
+    let s = py.detach(|| tables(r, f, p).and_then(|(r, f, p)| roadstyle::sources_of(r, look, f, p, name))).map_err(PyValueError::new_err)?;
     warned(&s.warnings);
     let mut out = Vec::new();
     py.detach(|| s.write_style(&mut out)).expect("a Vec takes every byte");
@@ -97,10 +123,12 @@ struct Tiler {
 impl Tiler {
     #[new]
     #[pyo3(signature = (roads, look, features=None, name=None, prefix=String::new(), keep=Vec::new()))]
-    fn new(py: Python<'_>, roads: Vec<u8>, look: PyRef<'_, PyLook>, features: Option<Vec<u8>>, name: Option<String>, prefix: String,
-           keep: Vec<String>) -> PyResult<Self> {
+    fn new(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook>, features: Option<&Bound<'_, PyAny>>, name: Option<String>,
+           prefix: String, keep: Vec<String>) -> PyResult<Self> {
         let look = &look.0;
-        let (style, tiles, w) = py.detach(|| roadstyle::make_tiled(roads, look, features, name, &prefix, &keep)).map_err(PyValueError::new_err)?;
+        let (r, f) = (stream(roads)?, features.map(stream).transpose()?);
+        let (style, tiles, w) = py.detach(|| tables(r, f, None).and_then(|(r, f, _)| roadstyle::tiled_of(r, look, f, name, &prefix, &keep)))
+            .map_err(PyValueError::new_err)?;
         warned(&w);
         Ok(Tiler { style, tiles })
     }
@@ -233,10 +261,11 @@ impl Sources {
 /// make_sources(roads, look, features=None, planner=None, name=None) -> Sources: stage 1, as make_style's arguments.
 #[pyfunction]
 #[pyo3(signature = (roads, look, features=None, planner=None, name=None))]
-fn make_sources(py: Python<'_>, roads: Vec<u8>, look: PyRef<'_, PyLook>, features: Option<Vec<u8>>, planner: Option<Vec<u8>>,
-                name: Option<String>) -> PyResult<Sources> {
+fn make_sources(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook>, features: Option<&Bound<'_, PyAny>>,
+                planner: Option<&Bound<'_, PyAny>>, name: Option<String>) -> PyResult<Sources> {
     let look = &look.0;
-    let inner = py.detach(|| roadstyle::make_sources(roads, look, features, planner, name)).map_err(PyValueError::new_err)?;
+    let (r, f, p) = (stream(roads)?, features.map(stream).transpose()?, planner.map(stream).transpose()?);
+    let inner = py.detach(|| tables(r, f, p).and_then(|(r, f, p)| roadstyle::sources_of(r, look, f, p, name))).map_err(PyValueError::new_err)?;
     warned(&inner.warnings);
     Ok(Sources { inner })
 }
@@ -250,7 +279,7 @@ fn tile_files(py: Python<'_>, dir: String, keep: Vec<String>, prefix: String) ->
     Ok(Tiler { style: style.to_string(), tiles })
 }
 
-/// compute_levels(roads, method, cols, ...) -> (rows, info): roadstyle's compute_levels on the roads in their order (GeoParquet bytes), with
+/// compute_levels(roads, method, cols, ...) -> (rows, info): roadstyle's compute_levels on the roads in their order (an Arrow table), with
 /// its keywords. `method`: "tags" or "solve"; `cols`: the columns of the class, the layer, the bridge, the tunnel and the junction; `order`:
 /// "priority", "class", a column of numbers or None. `rows`: for each road (casing_start, casing_level, casing_end, fill_level); `info`:
 /// the counts of the solve.
@@ -258,7 +287,7 @@ fn tile_files(py: Python<'_>, dir: String, keep: Vec<String>, prefix: String) ->
 #[pyo3(signature = (roads, method, cols, band_col=None, order=None, band_dist=10.0, head_m=5.0, max_level=20, margin=1.0,
                     min_positions=true, near_rules=false))]
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
-fn compute_levels(py: Python<'_>, roads: Vec<u8>, method: String, cols: [String; 5], band_col: Option<String>, order: Option<String>,
+fn compute_levels(py: Python<'_>, roads: &Bound<'_, PyAny>, method: String, cols: [String; 5], band_col: Option<String>, order: Option<String>,
                   band_dist: f64, head_m: f64, max_level: i64, margin: f64, min_positions: bool, near_rules: bool)
                   -> PyResult<(Vec<(i64, i64, i64, i64)>, String)> {
     use roadstyle::levels::{Method, Options, Order};
@@ -272,8 +301,9 @@ fn compute_levels(py: Python<'_>, roads: Vec<u8>, method: String, cols: [String;
     };
     let o = Options { method: m, band_col: band_col.is_some(), order, band_dist, head_m, max_level, margin, min_positions, near_rules,
                       ..Default::default() };
+    let roads = stream(roads)?;
     py.detach(|| {
-        let feats = roadstyle::read::read_roads(roads, "geometry")?;
+        let feats = roadstyle::read::roads_from(roads, "geometry")?;
         let edges = roadstyle::level_edges(&feats, [&cols[0], &cols[1], &cols[2], &cols[3], &cols[4], band_col.as_deref().unwrap_or(""), order_col]);
         let mut rows = vec![(0, 0, 0, 0); feats.len()];
         let Some(levels) = roadstyle::levels::levels(&edges, &o)? else { return Ok((rows, "{}".into())) };
@@ -312,16 +342,16 @@ fn make_page(style: String, page: String, parts: String, pmtiles: Option<Vec<u8>
     roadstyle::page::make_page(&style, &page, &parts, pmtiles.as_deref()).map_err(PyValueError::new_err)
 }
 
-/// page_from(roads, look, options, given) -> str: the page of the roads (GeoParquet bytes) in one call (roadstyle::page_options), as
+/// page_from(roads, look, options, given) -> str: the page of the roads (an Arrow table) in one call (roadstyle::page_options), as
 /// render_edges(backend="web"). `options`: the look's options (JSON text: palette, profile, settings, features, files), which a view's
 /// palette resolves again; `given`: the caller's values over the look's args (JSON text: basemap and basemaps as resolved entries,
 /// api_key, street_view_key). MapLibre stays a placeholder (WebMap puts it in).
 #[pyfunction]
-fn page_from(py: Python<'_>, roads: Vec<u8>, look: PyRef<'_, PyLook>, options: String, given: String) -> PyResult<String> {
+fn page_from(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook>, options: String, given: String) -> PyResult<String> {
     let options: roadstyle::look::Options = serde_json::from_str(&options).map_err(|e| PyValueError::new_err(format!("options: {e}")))?;
     let given: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&given).map_err(|e| PyValueError::new_err(format!("given: {e}")))?;
-    let look = &look.0;
-    let page = py.detach(|| roadstyle::read::read_roads(roads, "geometry").and_then(|r| roadstyle::page_options::page_from(r, look, &options, &given)))
+    let (look, roads) = (&look.0, stream(roads)?);
+    let page = py.detach(|| roadstyle::read::roads_from(roads, "geometry").and_then(|r| roadstyle::page_options::page_from(r, look, &options, &given)))
         .map_err(PyValueError::new_err)?;
     warned(&page.warnings);
     Ok(page.html)
@@ -349,19 +379,20 @@ fn export_look(look: PyRef<'_, PyLook>, cols: [String; 5], positions: Vec<i64>) 
 }
 
 /// make_area(edges, folder, ...) -> (roads, pairs, warnings): roadstyle's make_area (level_input) in Rust (roadstyle::level_area): writes
-/// roads.parquet, pairs.csv and, the first time, edits.csv in `folder`, from the edges (GeoParquet bytes); the keywords of level_input.
+/// roads.parquet, pairs.csv and, the first time, edits.csv in `folder`, from the edges (an Arrow table); the keywords of level_input.
 #[pyfunction]
 #[pyo3(signature = (edges, folder, id_col="edge_id".to_string(), highway_col="highway".to_string(), layer_col="layer".to_string(),
                     bridge_col="bridge".to_string(), tunnel_col="tunnel".to_string(), junction_col="junction".to_string(), band_col=None,
                     order=Some("priority".to_string()), band_dist=10.0, head_m=5.0, near_rules=false))]
 #[allow(clippy::too_many_arguments)]
-fn make_area(py: Python<'_>, edges: Vec<u8>, folder: String, id_col: String, highway_col: String, layer_col: String, bridge_col: String,
+fn make_area(py: Python<'_>, edges: &Bound<'_, PyAny>, folder: String, id_col: String, highway_col: String, layer_col: String, bridge_col: String,
              tunnel_col: String, junction_col: String, band_col: Option<String>, order: Option<String>, band_dist: f64, head_m: f64,
              near_rules: bool) -> PyResult<(usize, usize, Vec<String>)> {
     let o = roadstyle::level_area::MakeOptions { id_col, highway_col, layer_col, bridge_col, tunnel_col, junction_col, band_col, order, band_dist,
                                                  head_m, near_rules };
+    let edges = stream(edges)?;
     py.detach(|| {
-        let table = roadstyle::read::read_roads(edges, "geometry")?;
+        let table = roadstyle::read::roads_from(edges, "geometry")?;
         roadstyle::level_area::make_area(&table, std::path::Path::new(&folder), &o).map(|m| (m.roads, m.pairs, m.warnings))
     }).map_err(|e: String| PyValueError::new_err(e))
 }

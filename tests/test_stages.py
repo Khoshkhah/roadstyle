@@ -43,7 +43,7 @@ def test_tiles_from_the_files_are_the_tiles_of_the_one_call(part, keywords, tmp_
     kw.setdefault("view_3d", True)          # as export_geojson
     kw["export"] = True                     # an export: the roads source too (audit N2)
     lk = _engine._look_of(kw)
-    t = _engine.rust().Tiler(_engine._geoparquet(part), lk, None, "roads", "", [])
+    t = _engine.rust().Tiler(_engine._arrow(part), lk, None, "roads", "", [])
     one = t.archive(list(t.bounds()), t.layers())
     if fmt == "geojson":
         assert out.read_bytes() == one          # the same text: the same bytes
@@ -73,7 +73,7 @@ def test_the_road_table_of_rust_is_pythons(part, keywords):
     kw = dict(keywords)
     kw.setdefault("view_3d", True)
     lk = _engine._look_of(kw)
-    s = _engine.rust().make_sources(_engine._geoparquet(part), lk, None, None, "roads")
+    s = _engine.rust().make_sources(_engine._arrow(part), lk, None, None, "roads")
     roads = rs.export_inline(part, engine="rust", **keywords)["sources"]["roads"]["data"]
     want = json.dumps(sidecar(roads), separators=(",", ":"))
     got = s.road_table()
@@ -168,7 +168,7 @@ def test_the_tiled_style_says_its_tile_layers(part, keywords):
     from roadstyle import _engine
 
     lk = _engine._look_of({**keywords, "state": "live", "live_data": True})
-    src = _engine.rust().make_sources(_engine._geoparquet(part), lk, None, None, "x")
+    src = _engine.rust().make_sources(_engine._arrow(part), lk, None, None, "x")
     inline = json.loads(src.style())["metadata"]
     assert inline["roadstyle:sources"]["simple"] == {"source": "simple", "layer": None}
     text, t = src.tile_stage(only=["roads", "simple", "slots"], at=json.dumps({"url": "pmtiles://roads"}))      # as a page
@@ -186,7 +186,7 @@ def test_stage_1_is_the_road_table_form_and_only_an_export_has_the_roads(part, k
     from roadstyle import _engine
 
     def style(**kw):
-        return json.loads(_engine.rust().make_style(_engine._geoparquet(part), _engine._look_of({**keywords, **kw}), None, None, None))
+        return json.loads(_engine.rust().make_style(_engine._arrow(part), _engine._look_of({**keywords, **kw}), None, None, None))
 
     for kw in ({}, {"state": "live"}, {"state": "live", "tiles": True}):
         st = style(**kw)
@@ -196,7 +196,7 @@ def test_stage_1_is_the_road_table_form_and_only_an_export_has_the_roads(part, k
         assert next(lyr for lyr in st["layers"] if lyr["id"] == "roads-arrows")["source"] == "slots", kw
     ex = rs.export_inline(part, engine="rust", **keywords)
     assert "roads" in ex["sources"] and {"roads-fill", "roads-highlight"} <= {lyr["id"] for lyr in ex["layers"]}
-    src = _engine.rust().make_sources(_engine._geoparquet(part), _engine._look_of({**keywords, "state": "live"}), None, None, None)
+    src = _engine.rust().make_sources(_engine._arrow(part), _engine._look_of({**keywords, "state": "live"}), None, None, None)
     src.page_arrows()
     st = json.loads(src.style())
     assert next(lyr for lyr in st["layers"] if lyr["id"] == "roads-arrows")["source"] == "arrows" and st["metadata"]["roadstyle:arrows"] == "points"
@@ -214,3 +214,17 @@ def test_a_warning_of_the_rust_engine_is_a_python_warning():
     kw = dict(casing_start_col="cs", casing_level_col="cm", casing_end_col="ce", fill_level_col="fl", engine="rust")
     with pytest.warns(UserWarning, match="twin_casing: 1 two-way pair"):
         rs.export_inline(g, **kw)
+
+
+def test_the_binding_takes_arrow_tables_only(part, keywords):
+    """The roads go to Rust as an Arrow stream (audit R15): a pyarrow table and GeoPandas' to_arrow give the same style; bytes are a
+    TypeError."""
+    import pyarrow as pa
+
+    from roadstyle import _engine
+
+    lk = _engine._look_of(keywords)
+    t = _engine._arrow(part)
+    assert _engine.rust().make_style(pa.table(t), lk, None, None, None) == _engine.rust().make_style(t, lk, None, None, None)
+    with pytest.raises(TypeError, match="__arrow_c_stream__"):
+        _engine.rust().make_style(b"PAR1", lk, None, None, None)
