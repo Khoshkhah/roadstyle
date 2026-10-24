@@ -52,7 +52,9 @@ def normalised(style):
     - every coordinate to 9 places (the Rust engine computes a centroid, mapstyle uses shapely: the last digit can differ);
     - each PNG image as its pixels (the Rust engine's PNG encoder writes other bytes for the same image);
     - the 3D decks without their geometry (Python makes the polygons with GEOS, Rust with its own offsets: tests/test_engine_parity.py's
-      test_export_inline_decks compares them by shape)."""
+      test_export_inline_decks compares them by shape);
+    - a polygon by its rings, not by the order of its parts, the start point or the orientation of a ring (the background's land:
+      mapstyle cuts the sea out with GEOS, the Rust reader with i_overlay, which writes the same points in another order)."""
     def walk(o, key=None):
         if isinstance(o, dict):
             drop = ("source", "target") if key == "properties" else ()
@@ -69,7 +71,27 @@ def normalised(style):
     out = walk(style)
     for f in out["sources"].get("decks", {}).get("data", {}).get("features", []):
         f.pop("geometry", None)
+    for src in out["sources"].values():
+        for f in (src.get("data") or {}).get("features", []) if isinstance(src.get("data"), dict) else []:
+            g = f.get("geometry") or {}
+            if g.get("type") in ("Polygon", "MultiPolygon"):
+                f["geometry"] = {"type": "MultiPolygon", "rings": _rings(g)}
     return out
+
+
+def _rings(g):
+    """A polygon's parts as sorted lists of rings, each ring open, from its smallest point, in the direction of its smaller second point."""
+    def ring(r):
+        r = [tuple(p) for p in r]
+        if len(r) > 1 and r[0] == r[-1]:
+            r = r[:-1]
+        forms = []
+        for q in (r, r[::-1]):
+            k = q.index(min(q))
+            forms.append(q[k:] + q[:k])
+        return [list(p) for p in min(forms)]
+    parts = [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"]
+    return sorted(sorted(ring(r) for r in part) for part in parts)
 
 
 def digest(style):

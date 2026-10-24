@@ -48,14 +48,8 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers: bool = True):
         con.execute(rows)
         con.execute(drop)
         made = []
-        if plan["layers"]:
-            try:                     # the background's land without the sea needs the spatial extension (load_layers' _spatial)
-                for sql in plan["spatial"]:
-                    con.execute(sql)
-            except duckdb.Error as e:
-                warnings.warn(f"{db}: no spatial extension of DuckDB ({e}): the background is the whole boundary", stacklevel=2)
         for lyr in plan["layers"]:
-            for k, sql in enumerate(lyr["sql"]):          # mapstyle's query, then its fallbacks (no tags: the height of the kind; no spatial)
+            for k, sql in enumerate(lyr["sql"]):          # mapstyle's query, then its fallback (no tags: the height of the kind)
                 try:
                     con.execute(f"CREATE OR REPLACE TEMP TABLE f{lyr['spec']} AS {sql}")
                 except duckdb.Error as e:
@@ -63,8 +57,7 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers: bool = True):
                         warnings.warn(f"{db}: base-map layer {lyr['name']} skipped: {e}", stacklevel=2)
                     continue
                 if k:
-                    warnings.warn(f"{db}: base-map layer {lyr['name']}: query {k + 1} of {len(lyr['sql'])} (an older file, or no spatial extension)",
-                                  stacklevel=2)
+                    warnings.warn(f"{db}: base-map layer {lyr['name']}: no tags column (an older file): the heights of the kinds", stacklevel=2)
                 made.append(lyr["spec"])
                 break
         with tempfile.TemporaryDirectory() as d:

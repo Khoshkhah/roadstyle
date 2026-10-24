@@ -20,8 +20,16 @@ type Tables = (RoadTable, Option<Vec<Row>>, Option<Vec<Row>>);
 /// The roads and the other tables from their GeoParquet bytes: the roads' lines and the base map's geometries in the column `geometry`.
 fn tables(parquet: Vec<u8>, features: Option<Vec<u8>>, planner: Option<Vec<u8>>) -> Result<Tables, String> {
     Ok((read::read_roads(parquet, "geometry")?,
-        features.map(|f| read::read_table(f, "geometry")).transpose()?,
+        features.map(read_features).transpose()?,
         planner.map(|p| read::read_table(p, "")).transpose()?))
+}
+
+/// The base map's rows from their GeoParquet bytes (the duckOSM reader's features.parquet), the background's land without the sea
+/// (duckosm::cut_sea).
+pub fn read_features(features: Vec<u8>) -> Result<Vec<Row>, String> {
+    let mut rows = read::read_table(features, "geometry")?;
+    duckosm::cut_sea(&mut rows)?;
+    Ok(rows)
 }
 
 /// The style as one JSON text (roadstyle's export_inline), from the roads and the other tables as GeoParquet bytes: the engine's

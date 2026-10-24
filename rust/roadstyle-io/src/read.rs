@@ -182,7 +182,7 @@ pub fn features(data: Vec<u8>) -> Result<Value, String> {
 }
 
 /// A 2D WKB geometry as GeoJSON (Point, LineString, Polygon and their Multi kinds); None for another.
-fn wkb_geometry(b: &[u8]) -> Option<Value> {
+pub(crate) fn wkb_geometry(b: &[u8]) -> Option<Value> {
     fn at(b: &[u8], i: &mut usize, le: bool) -> Option<u32> {
         let w: [u8; 4] = b.get(*i..*i + 4)?.try_into().ok()?;
         *i += 4;

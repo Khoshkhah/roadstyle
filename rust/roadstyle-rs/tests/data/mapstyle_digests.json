@@ -4,9 +4,9 @@
   "layers": 61,
   "bytes": 32259118,
   "normalised": {
-   "sha256": "ae08986ef2723ff235830192ab284add57c373132678a0a4f4e43d38f4434b08",
+   "sha256": "4dc4c808aad20a75c90db9c33296b5556916a3fe7a498949f35f0bf60c988ea5",
    "layers": 61,
-   "bytes": 31153002
+   "bytes": 31113465
   }
  },
  "style_driving_osm_google": {
@@ -14,9 +14,9 @@
   "layers": 61,
   "bytes": 32287659,
   "normalised": {
-   "sha256": "42ab7b4ca27c5f632224df4c0c8289d2e6ddc71f3d2f769bd48b27cce448cf87",
+   "sha256": "c3248b559ada63b16ff3ae1dcc2475310397ed47188ef68de87d67fdd104f225",
    "layers": 61,
-   "bytes": 31181091
+   "bytes": 31141554
   }
  },
  "style_walking_osm_google": {
@@ -24,9 +24,9 @@
   "layers": 61,
   "bytes": 32237719,
   "normalised": {
-   "sha256": "03c2f21fe85233d8802a10a126a927001f4daa8c7b19ce86154e8c6f95659cb9",
+   "sha256": "3c318a51decc2f07fcbfaedc44cb2dd434d76e42278ba1d898ae0a6a00b4d5c6",
    "layers": 61,
-   "bytes": 31139327
+   "bytes": 31099790
   }
  },
  "style_cycling_osm_google": {
@@ -34,9 +34,9 @@
   "layers": 61,
   "bytes": 32284480,
   "normalised": {
-   "sha256": "727394d047f016f17a71b40ff3e3eb65ab1a6461de5eecb363c1cfe432fdb45e",
+   "sha256": "2bbf2cb2867192294da6bf3733dc759182482267f70e272ac1b5747244de20e3",
    "layers": 61,
-   "bytes": 31177845
+   "bytes": 31138308
   }
  },
  "style_all_grey_google": {
@@ -44,9 +44,9 @@
   "layers": 60,
   "bytes": 32252548,
   "normalised": {
-   "sha256": "d77aaa697ae61dc62f0e287fd646fb074a1d643fb760e04a7da0b544cbcba15b",
+   "sha256": "db282772ff4089d946b27b0eb566aec03e94644dcb3cd912f40a0823efb77157",
    "layers": 60,
-   "bytes": 31150792
+   "bytes": 31111255
   }
  },
  "style_walking_google_komoot": {
@@ -54,9 +54,9 @@
   "layers": 60,
   "bytes": 32232539,
   "normalised": {
-   "sha256": "73343d8a80a968dafb4f748b4508cd80829849b9b179b55875e5a69b262e3340",
+   "sha256": "d4359aa43ef90cd5211358a0b474d6f28bf84a6c4c626f33d5f46b01d71887f9",
    "layers": 60,
-   "bytes": 31138507
+   "bytes": 31098970
   }
  }
 }

@@ -286,7 +286,7 @@ mod wasm {
         /// sources(look, features?, planner?, name?): stage 1 of these roads, as makeSources; `features` and `planner` are Parquet bytes.
         pub fn sources(&self, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<Sources, JsError> {
             let err = |e: String| JsError::new(&e);
-            let features = features.map(|f| roadstyle::read::read_table(f, "geometry")).transpose().map_err(err)?;
+            let features = features.map(roadstyle::read_features).transpose().map_err(err)?;
             let planner = planner.map(|p| roadstyle::read::read_table(p, "")).transpose().map_err(err)?;
             roadstyle::sources_of(self.0.clone(), &look.0, features, planner, name).map(|inner| Sources { inner }).map_err(err)
         }
@@ -294,7 +294,7 @@ mod wasm {
 
     /// duckosmPlan(catalog, mode, tags, specs) -> string: the SQL that reads a duckOSM file (roadstyle-io's duckosm.rs, the one copy that
     /// Python runs too), as JSON text: {"catalog": the 2 queries of the catalog, "roads": 3 statements, "meta": the stored levels' query or
-    /// null, "select": the roads of `mode`, "spatial": the statements that load the spatial extension, "layers": [{spec, name, sql: the
+    /// null, "select": the roads of `mode`, "layers": [{spec, name, sql: the
     /// queries in order}]}. `catalog`: the JSON text of {"name", "tables":
     /// [[schema, table]], "columns": [[schema, table, column]]} (with no tables: only "catalog" is in the answer); `specs`: layers.yaml's
     /// layers as JSON text.
@@ -315,7 +315,7 @@ mod wasm {
         let layers: Vec<serde_json::Value> = duckosm::features_sql(&cat, &specs).into_iter()
             .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "sql": l.sql})).collect();
         Ok(serde_json::json!({"catalog": queries, "roads": duckosm::roads_sql(&cat, tags).map_err(err)?, "meta": (!tags).then_some(duckosm::LEVELS_META_SQL),
-                              "select": duckosm::roads_select(mode).map_err(err)?, "spatial": duckosm::SPATIAL_SQL, "layers": layers}).to_string())
+                              "select": duckosm::roads_select(mode).map_err(err)?, "layers": layers}).to_string())
     }
 
     /// duckosmLevels(source?, nEdges?, edgeHash?) -> string: the look's keyword `levels` (JSON text) from the stored levels' metadata row
