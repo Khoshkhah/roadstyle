@@ -113,6 +113,9 @@ fn val(v: &Value) -> Option<Val> {
         Value::String(s) => Val::Str(s.as_str().into()),
         Value::Bool(b) => Val::Bool(*b),
         Value::Number(n) => match (n.as_i64(), n.as_u64()) {
+            // an integer past 2**53 - 1 as text, as every JSON form writes it (JavaScript would round it; tiles.py's roads have text)
+            (Some(i), _) if i.unsigned_abs() > roadstyle_model::table::JS_MAX_SAFE_INT => Val::Str(i.to_string().into()),
+            (_, Some(u)) if u > roadstyle_model::table::JS_MAX_SAFE_INT => Val::Str(u.to_string().into()),
             (Some(i), _) => Val::Int(i),
             (_, Some(u)) => Val::UInt(u),
             _ => Val::Dbl(n.as_f64()?),

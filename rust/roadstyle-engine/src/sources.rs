@@ -5,6 +5,7 @@
 
 use crate::road::RoadsSource;
 use crate::{take_roads, Parts, Roads, RoadTable, Src};
+use roadstyle_model::table::JsSafe;
 use roadstyle_model::Cell;
 use serde_json::Value;
 use std::collections::HashSet;
@@ -61,7 +62,7 @@ impl Sources {
         match &self.sources[i].1 {
             Src::Roads(_) => self.roads.write_data(w, Some(drawn), self.draws_roads()),
             Src::Simple(s) => s.write_data(w, &self.roads.roads),
-            Src::Json(v) => serde_json::to_writer(w, &v["data"]).map_err(std::io::Error::other),
+            Src::Json(v) => serde_json::to_writer(w, &JsSafe(&v["data"])).map_err(std::io::Error::other),
         }
     }
 
@@ -74,7 +75,7 @@ impl Sources {
     /// has no `roads` source (`RoadsSource::in_style`).
     pub fn write_style<W: std::io::Write>(&self, w: &mut W) -> std::io::Result<()> {
         write!(w, r#"{{"version":8,"name":{},"center":{},"zoom":{},"layers":"#, self.name, self.center, self.zoom)?;
-        serde_json::to_writer(&mut *w, &self.layers)?;
+        serde_json::to_writer(&mut *w, &self.layers.iter().map(JsSafe).collect::<Vec<_>>())?;
         w.write_all(br#","sources":{"#)?;
         let shown = self.sources.iter().filter(|(_, s)| !matches!(s, Src::Roads(_)) || self.roads.in_style);
         for (i, (k, s)) in shown.enumerate() {
@@ -86,11 +87,11 @@ impl Sources {
             match s {
                 Src::Roads(_) => self.roads.write_json(w)?,
                 Src::Simple(p) => p.write_json(w, &self.roads.roads)?,
-                Src::Json(v) => serde_json::to_writer(&mut *w, v)?,
+                Src::Json(v) => serde_json::to_writer(&mut *w, &JsSafe(v))?,
             }
         }
         w.write_all(br#"},"metadata":"#)?;
-        serde_json::to_writer(&mut *w, &self.metadata)?;
+        serde_json::to_writer(&mut *w, &JsSafe(&self.metadata))?;
         if let Some(g) = &self.glyphs {
             write!(w, r#","glyphs":{g}"#)?;
         }

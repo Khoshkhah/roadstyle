@@ -47,7 +47,7 @@ fn py_str(c: Cell) -> String {
         Cell::Null => return "None".into(),
         Cell::Bool(b) => return if b { "True" } else { "False" }.into(),
         Cell::Str(s) => return s.to_string(),
-        Cell::Int(i) | Cell::IntText(i) => return i.to_string(),
+        Cell::Int(i) => return i.to_string(),
         Cell::Float(f) if f.is_nan() => return "None".into(),
         Cell::Float(f) if f.fract() == 0.0 && f.abs() < 1e16 => return format!("{f:.1}"),
         Cell::Float(f) => return format!("{f}"),
@@ -84,7 +84,6 @@ fn as_float(v: Option<Cell>) -> Option<f64> {
         Cell::Bool(b) | Cell::Json(&Value::Bool(b)) => b as u8 as f64,
         Cell::Str(s) => s.trim().parse::<f64>().ok()?,
         Cell::Json(Value::String(s)) => s.trim().parse::<f64>().ok()?,
-        Cell::IntText(i) => i as f64,
         c => c.as_f64()?,
     };
     (!f.is_nan()).then_some(f)

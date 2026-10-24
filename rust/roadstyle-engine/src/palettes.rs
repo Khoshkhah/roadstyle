@@ -101,7 +101,7 @@ fn same(a: Cell, b: Cell) -> bool {
     match (a, b) {
         (Cell::Null, Cell::Null) => true,
         (Cell::Bool(x), Cell::Bool(y)) => x == y,
-        (Cell::Int(x), Cell::Int(y)) | (Cell::IntText(x), Cell::IntText(y)) => x == y,
+        (Cell::Int(x), Cell::Int(y)) => x == y,
         (Cell::Float(x), Cell::Float(y)) => x == y,
         (Cell::Str(x), Cell::Str(y)) => x == y,
         (Cell::Json(x), Cell::Json(y)) => x == y,

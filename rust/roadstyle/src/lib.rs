@@ -10,6 +10,7 @@ pub mod page;
 pub use roadstyle_levels as levels;
 pub use roadstyle_tiles as tiles;
 
+use roadstyle_engine::table::js_value;
 use serde_json::{json, Value};
 
 /// The roads, the base map's rows and the route planner's rows.
@@ -222,7 +223,7 @@ pub fn write_road_table<W: std::io::Write>(s: &sources::Sources, w: &mut W) -> s
         w.write_all(b"]")
     };
     let pts = |c: &[[f64; 2]]| dumps(&json!(c), true);
-    list(w, "props", true, &|r| dumps(&Value::Object(s.road_row(r).into_iter().map(|(k, v)| (k.to_string(), v.to_value())).collect()), true))?;
+    list(w, "props", true, &|r| dumps(&Value::Object(s.road_row(r).into_iter().map(|(k, v)| (k.to_string(), js_value(v.to_value()))).collect()), true))?;
     list(w, "mids", false, &|r| r.line().and_then(line::mid).map_or("null".into(), |m| dumps(&json!(m), true)))?;
     list(w, "bboxes", false, &|r| r.line().and_then(line::bbox).map_or("null".into(), |b| dumps(&json!(b), true)))?;
     list(w, "headings", false, &|r| r.line().and_then(line::heading).map_or("null".into(), |h| dumps(&json!(h), true)))?;

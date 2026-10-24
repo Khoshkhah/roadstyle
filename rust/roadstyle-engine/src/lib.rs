@@ -23,7 +23,7 @@ pub mod sources;
 
 // The core has no I/O (docs/design/rust_library.md, rule 3 of the layers): the engine takes the model's types, and the readers
 // (roadstyle-io) are the facade's.
-pub use roadstyle_model::{geom, props, Cell, RoadTable, Row};
+pub use roadstyle_model::{geom, props, table, Cell, RoadTable, Row};
 pub use road::{Road, Roads};
 pub(crate) use roadstyle_model::obj;
 

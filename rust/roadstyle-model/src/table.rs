@@ -7,8 +7,35 @@ use arrow_schema::DataType;
 use serde_json::Value;
 use std::sync::Arc;
 
-/// An integer past 2**53 - 1: JavaScript rounds it (render_web._stringify_unsafe_ints writes it as text).
-const JS_MAX_SAFE_INT: u64 = (1 << 53) - 1;
+/// An integer past 2**53 - 1: JavaScript rounds it, so the JSON forms write it as text (render_web._stringify_unsafe_ints; `JsSafe`).
+/// The model and the Parquet files keep it as an integer (audit N1: duckOSM's edge ids stay BIGINT).
+pub const JS_MAX_SAFE_INT: u64 = (1 << 53) - 1;
+
+/// A JSON value as the JSON forms write it (GeoJSON text, the page's road table, the tiles): an integer past 2**53 - 1 as text.
+pub struct JsSafe<'a>(pub &'a Value);
+
+impl serde::Serialize for JsSafe<'_> {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        match self.0 {
+            Value::Number(n) => match (n.as_i64(), n.as_u64()) {
+                (Some(i), _) if i.unsigned_abs() > JS_MAX_SAFE_INT => s.collect_str(&i),
+                (None, Some(u)) if u > JS_MAX_SAFE_INT => s.collect_str(&u),
+                _ => n.serialize(s),
+            },
+            Value::Array(a) => s.collect_seq(a.iter().map(JsSafe)),
+            Value::Object(o) => s.collect_map(o.iter().map(|(k, v)| (k, JsSafe(v)))),
+            v => v.serialize(s),
+        }
+    }
+}
+
+/// `JsSafe` as a value (an integer past 2**53 - 1 as text), for the writers that take a `Value`.
+pub fn js_value(v: Value) -> Value {
+    match &v {
+        Value::Number(n) if n.as_i64().map_or(n.as_u64().is_some(), |i| i.unsigned_abs() > JS_MAX_SAFE_INT) => Value::String(n.to_string()),
+        _ => v,
+    }
+}
 
 /// One value of a road: a cell of a column, or a value of the engine's (a JSON value).
 #[derive(Clone, Copy, Debug)]
@@ -18,8 +45,6 @@ pub enum Cell<'a> {
     Int(i64),
     Float(f64),
     Str(&'a str),
-    /// an integer that the output writes as text (past 2**53 - 1, after `RoadTable::stringify_unsafe_ints`)
-    IntText(i64),
     Json(&'a Value),
 }
 
@@ -32,7 +57,6 @@ impl<'a> Cell<'a> {
             Cell::Int(i) => i.into(),
             Cell::Float(f) => serde_json::Number::from_f64(f).map_or(Value::Null, Value::Number),
             Cell::Str(s) => s.into(),
-            Cell::IntText(i) => i.to_string().into(),
             Cell::Json(v) => v.clone(),
         }
     }
@@ -126,11 +150,11 @@ impl serde::Serialize for Cell<'_> {
         match *self {
             Cell::Null => s.serialize_unit(),
             Cell::Bool(b) => s.serialize_bool(b),
+            Cell::Int(i) if i.unsigned_abs() > JS_MAX_SAFE_INT => s.collect_str(&i),      // the JSON form: as text (`JsSafe`)
             Cell::Int(i) => s.serialize_i64(i),
             Cell::Float(f) if f.is_finite() => s.serialize_f64(f),
             Cell::Float(_) => s.serialize_unit(),
             Cell::Str(t) => s.serialize_str(t),
-            Cell::IntText(i) => s.collect_str(&i),
             Cell::Json(v) => v.serialize(s),
         }
     }
@@ -178,8 +202,6 @@ pub struct RoadTable {
     names: Vec<String>,
     cols: Vec<ArrayRef>,
     lines: Lines,
-    /// the integers past 2**53 - 1 are text (`stringify_unsafe_ints`)
-    js_safe: bool,
 }
 
 /// The column types that the reader takes (the types of GeoPandas' GeoParquet).
@@ -199,12 +221,12 @@ impl RoadTable {
                 return Err(format!("column {n}: {} rows, the roads have {}", c.len(), lines.len()));
             }
         }
-        Ok(RoadTable { names, cols, lines, js_safe: false })
+        Ok(RoadTable { names, cols, lines })
     }
 
     /// A table of no roads.
     pub fn empty() -> RoadTable {
-        RoadTable { names: Vec::new(), cols: Vec::new(), lines: Lines::default(), js_safe: false }
+        RoadTable { names: Vec::new(), cols: Vec::new(), lines: Lines::default() }
     }
 
     pub fn len(&self) -> usize {
@@ -242,7 +264,7 @@ impl RoadTable {
             DataType::Int32 => Cell::Int(c.as_primitive::<Int32Type>().value(row) as i64),
             DataType::Int64 => {
                 let i = c.as_primitive::<Int64Type>().value(row);
-                if self.js_safe && i.unsigned_abs() > JS_MAX_SAFE_INT { Cell::IntText(i) } else { Cell::Int(i) }
+                Cell::Int(i)
             }
             DataType::Float32 => Cell::Float(c.as_primitive::<Float32Type>().value(row) as f64),
             DataType::Float64 => Cell::Float(c.as_primitive::<Float64Type>().value(row)),
@@ -280,10 +302,6 @@ impl RoadTable {
         }
     }
 
-    /// _stringify_unsafe_ints: from now on, an integer past 2**53 - 1 is text (JavaScript would round it).
-    pub fn stringify_unsafe_ints(&mut self) {
-        self.js_safe = true;
-    }
 }
 
 #[cfg(test)]
@@ -311,10 +329,10 @@ mod tests {
         assert!(t.get(1, "highway").unwrap().is_null() && t.get(0, "nothing").is_none());
         assert_eq!(t.get(0, "w").unwrap().to_value(), Value::Null, "NaN is null");
         let text = |c: Cell| serde_json::to_string(&c).unwrap();
-        assert_eq!((text(t.cell(1, 0)), text(t.cell(2, 1)), text(t.cell(3, 0))), ("1152921504606846976".into(), "2.5".into(), "true".into()));
-        t.stringify_unsafe_ints();
-        assert_eq!(text(t.cell(1, 0)), "\"1152921504606846976\"");
-        assert_eq!(t.cell(1, 0).to_value(), Value::from("1152921504606846976"));
+        // N1: the model keeps an integer past 2**53 - 1 (the Parquet files write it as one); its JSON form is text (JavaScript)
+        assert_eq!((text(t.cell(1, 0)), text(t.cell(2, 1)), text(t.cell(3, 0))), ("\"1152921504606846976\"".into(), "2.5".into(), "true".into()));
+        assert_eq!(t.cell(1, 0).to_value(), Value::from(1152921504606846976_i64));
+        assert_eq!(serde_json::to_string(&crate::table::JsSafe(&serde_json::json!([1152921504606846976_i64, 7]))).unwrap(), "[\"1152921504606846976\",7]");
         assert_eq!(text(t.cell(1, 1)), "7");
         assert!(t.rename("w", "highway") && t.names() == ["edge_id", "highway", "bridge"]);
         t.set_ints("lvl", vec![1, 2]);

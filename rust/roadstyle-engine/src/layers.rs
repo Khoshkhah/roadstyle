@@ -498,7 +498,6 @@ pub(crate) fn py_truth<'a>(v: impl Into<Cell<'a>>) -> bool {
         Cell::Int(i) => i != 0,
         Cell::Float(f) => f != 0.0 && !f.is_nan(),
         Cell::Str(s) => !s.is_empty(),
-        Cell::IntText(_) => true,
         Cell::Json(v) => match v {
             Value::Null => false,
             Value::Bool(b) => *b,

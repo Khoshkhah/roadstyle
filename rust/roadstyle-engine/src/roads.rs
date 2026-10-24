@@ -125,7 +125,6 @@ pub fn mark_roads(fs: &mut Roads, look: &Look, args: &Value) -> Result<crate::co
     if let Some(col) = width_col {
         mark_width_m(fs, &pairs, col, args["casing_m"].as_f64().unwrap_or(look.casing_m));
     }
-    stringify_unsafe_ints(fs);
     for (i, d) in fs.draw.iter_mut().enumerate() {
         d.edge = Some(i as u32);
     }
@@ -157,7 +156,6 @@ pub(crate) fn truthy<'a, C: Into<Cell<'a>>>(v: Option<C>) -> bool {
         Some(Cell::Int(i)) => i != 0,
         Some(Cell::Float(f)) => f != 0.0,
         Some(Cell::Str(s)) => !matches!(s, "" | "no" | "false" | "0"),
-        Some(Cell::IntText(_)) => true,
         Some(Cell::Json(v)) => match v {
             Value::Bool(b) => *b,
             Value::Number(n) => n.as_f64() != Some(0.0),
@@ -173,7 +171,6 @@ fn py_float(v: Cell) -> Option<f64> {
     match v {
         Cell::Bool(b) => Some(b as u8 as f64),
         Cell::Str(s) => s.trim().parse::<f64>().ok(),
-        Cell::IntText(i) => Some(i as f64),
         Cell::Json(Value::Bool(b)) => Some(*b as u8 as f64),
         Cell::Json(Value::String(s)) => s.trim().parse::<f64>().ok(),
         c => c.as_f64(),
@@ -461,7 +458,3 @@ fn mark_twin_dead_ends(fs: &mut Roads, caps: &CapCols) {
     }
 }
 
-/// _stringify_unsafe_ints: an integer past 2**53 - 1 as text (JavaScript would round it). The marks have none.
-fn stringify_unsafe_ints(fs: &mut Roads) {
-    fs.table.stringify_unsafe_ints();
-}
