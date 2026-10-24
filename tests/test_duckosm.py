@@ -186,3 +186,30 @@ def test_auto_levels_solve_a_file_with_no_stored_levels(tmp_path):
     assert level_kw is None
     with pytest.raises(ValueError, match="duckosm levels"):
         duckosm.read(db, "driving", levels="stored")
+
+
+@needs_db
+def test_the_buildings_3d_button_shows_and_hides_them(tmp_path):
+    """rsSetBuildings3D on duckosm.page: the dashboard finds the 3D layer by its overlay's `extrude` (the page's layers have no metadata),
+    and the button under the 2D/3D button shows and hides it. Before, the button did nothing on this page."""
+    pw = pytest.importorskip("playwright.sync_api")
+    from roadstyle import duckosm
+
+    out = tmp_path / "monaco.html"
+    duckosm.page(DB, "all").save(str(out))
+    html = out.read_text()
+    ovs = json.JSONDecoder().raw_decode(html, html.index("const RS_OPTIONS = ") + len("const RS_OPTIONS = "))[0]["overlays"]
+    ids = [ov["extrude"] for ov in ovs if ov.get("extrude")]
+    assert ids, "Monaco has buildings with heights"
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        pg = browser.new_page()
+        pg.goto(out.as_uri())
+        pg.wait_for_selector("#rs-b3d-btn", timeout=120000)         # the dashboard has found the 3D layer
+        shown = lambda: pg.evaluate("ids => ids.map(id => map.getLayoutProperty(id, 'visibility'))", ids)  # noqa: E731
+        assert shown() == ["none"] * len(ids)
+        pg.click("#rs-b3d-btn")
+        assert shown() == ["visible"] * len(ids) and pg.evaluate("rsGetBuildings3D()")
+        pg.click("#rs-b3d-btn")
+        assert shown() == ["none"] * len(ids)
+        browser.close()

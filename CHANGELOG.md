@@ -119,7 +119,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Added
 - **A base-map layer's overlay entry names its 3D layer** (`roadstyle:controls.overlays[].extrude`, the fill-extrusion's id), so a host's
-  dashboard finds the 3D buildings on a page, whose layers have no metadata.
+  dashboard finds the 3D buildings on a page, whose layers have no metadata. The dashboard reads it (`features.js`, with the page's
+  prefix), not the layer metadata: before, `rsSetBuildings3D(true)` did nothing on `roadstyle.duckosm.page`.
 - **`roadstyle.duckosm.page(db, mode, ...)`: mapstyle's `render_map` on the Rust engine.** The page of a duckOSM file: its roads, its
   base map and the shared dashboard with the base map's controls (modes, kinds, each layer's clicks, tooltip and popup). The keywords of
   render_map: `theme`, `paths`, `layers`, `only`, `interaction` (a layer's start `{clickable, tooltip, popup}`; a layer that the map does
