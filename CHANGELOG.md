@@ -51,6 +51,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
   has the key: a casing piece has no `__rs_fill@<palette>: null` any more. The map does not change.
 
 ### Added
+- **The dashboard has mapstyle's page functions** (docs/design/mapstyle_page_scripts.md), found by their roles in the metadata, not by
+  layer ids: `rsSetModes` / `rsGetModes` / `RS_MODES` (the roads of some modes, from `roadstyle:controls.modes` and the road table's
+  flags), `rsSetKinds` / `rsGetKinds` / `RS_KINDS` (a base-map layer's kinds), `rsSetInteraction` / `rsGetInteraction` (a layer's
+  clicks, tooltip and popup), `rsSetBuildings3D` / `rsGetBuildings3D` (the layers with `roadstyle:group` "buildings 3D", with a button
+  and a Layers row), and `box_layout: "stack"` (the Roads and Layers boxes folded, Layers under Roads). `rsFilter` on an overlay now
+  keeps each layer's own filter. The engine writes the new metadata (`modes`, the overlays' `interactive` and `kinds`, `box_layout`)
+  in a later change.
 - **The map of one mode from a duckOSM file** (`only=True` in `roadstyle.duckosm.read`, `export_inline` and `export_style`, as mapstyle's
   `render_map(only=True)`): the `edges` and `private_edges` of one network. The stored levels were solved for every mode together, so each
   road must have its stored row (as Python's `load_area_levels(subset=True)`), else an error that names how many and one of them; then the
