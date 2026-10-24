@@ -42,3 +42,8 @@ The page colours the roads by their lane count (`color_by="lanes"` in the look's
 as duckosm-rust's page does: `style: null` and `prefix: "rs-"` at the start, `rs.setStyle(style)` after the roads are on the map,
 and the road table of each style (`rs.setStyle(style, {road_table})`). The button replaces the roads style with another colouring.
 Open `http://localhost:8000/examples/dashboard_rust/tiles.html`. It needs the internet for MapLibre and the base map.
+
+## The live data example
+
+`live.html` makes the roads with `live_data` and colours and sizes them from a table of random values with `rs.setData`, with no new
+style. `live.html?area=tartu` does the same on Tartu (about 65,000 roads; the tiles take some minutes to make in the browser).

@@ -111,6 +111,30 @@ index), the slots (the arrows) and the overlays.
 The names that other page scripts call stay: `_rprops`, `_svTiled`, `_roadOf`, `_roadOfPiece`, `pick`, `ITEM_PICK`, `_sfeats`,
 `_src`, `_rsArrows`, `_rsArrowAt` (the simple-mode script, the no-roads message, the level editor).
 
+## Live data (R22)
+
+Date: 2026-10-24. `rs.setData(table, options)` (`live.js`) colours and sizes the roads from a table, with no new style and no tile reload.
+
+- **The style.** Made with `live_data=True`: the road layer reads the feature states that the metadata `roadstyle:live` names
+  (`rs_c`, the colour; `rs_w`, a factor of the drawn width) on the road's row, with the baked value when there is no state. The
+  metadata also gives the ramp (9 colours of the call's `cmap`, else viridis) and the no-data colour. The option `live` gives the
+  same; without it `rsDashboard` reads the metadata.
+- **The table.** An array of rows, an Arrow table (`toArray()`) or the URL of a JSON array. `key` names the column that is joined to
+  the roads' `edge_id_col` (default), or `"row"` (the table's column `row` is the road's row).
+- **The values.** `colorBy`: a number goes on the ramp from `vmin` to `vmax` (default: the data's range); a text gets a ramp colour
+  for each value. A road without a value gets the no-data colour (`nodata: null` keeps its own colour). `widthBy`: a factor from
+  `widthRange[0]` to `widthRange[1]` (default 1 to 3). `ramp` replaces the style's ramp.
+- **The states.** `setFeatureState` on the role `simple` by row (`sourceLayer` only for a vector source). A vector source keeps the
+  states for the tiles that load later. A second call replaces the values: a road with no new value loses the old one.
+  `rs.clearData()` takes all of them away.
+- **The legend and the popup.** The legend box shows the data's legend (`legend: false`: none; `legend: {title}`: another title),
+  and the colour option's legend again after `clearData`. A road's properties include the joined fields (`RoadTable.props`), so the
+  popup, the panel and the tooltip show them; a popup with a field list shows them after its fields.
+- **The event.** `rs:datachange` (`rs.on("data", ...)`): `{rows, matched, colorBy, widthBy, ms}`.
+- **Time** (`examples/dashboard_rust/live.html`, headless Chromium with software GL): Monaco, 13,298 roads: 14 ms for a colour,
+  23 ms for a colour and a width, the map idle again 30 to 250 ms later. Tartu, 64,828 roads: 78 ms and 108 ms, idle about 100 ms
+  later.
+
 ## The options
 
 `rsDashboard(map, options)` takes one object. Each key has the name of a `render` keyword where one exists. The values are the
@@ -122,6 +146,7 @@ values that the page reads, which `render` makes from its keywords. The template
 | `prefix` | (none: the Python page adds the style as it is) | `""` | `core.js`, and each file that names a source or a layer |
 | `engine` | (none) | `null`; `{props: id => Promise}` | `core.js` (`_withProps`), `select.js` |
 | `road_table` | (none: the tiled page sets `window.RS_SIDE`) | `null` | `core.js` (`RoadTable`) |
+| `live` | `live_data=True` (the Rust engine): `{color, width, types, ramp, nodata}` | the metadata `roadstyle:live`, else `null` | `live.js` |
 | `basemaps` | `basemaps` | `[]` | `basemap.js` |
 | `basemap_switcher` | `basemap_switcher` | `true` | `basemap.js` |
 | `tiles` | `tiles` | `false` | `core.js` (the sidecar table `window.RS_SIDE`) |

@@ -80,9 +80,13 @@ export function _sfeats(src){ const g=_sdata(src && map.getSource(src)); return 
 // one road's fields at a time (engine.props). RoadTable is the one port of every read of a road; null and {} where it has nothing.
 function _table(){ return O.road_table || window.RS_SIDE || null; }
 export function _side(){ return _table(); }
+// live data (live.js, rs.setData): row -> the joined row's fields, which a road's properties show too (the popup, the panel); null: none
+export let _joined = null, _joinedKeys = [];
+export function _setJoined(m){ _joined = m;
+  _joinedKeys = m ? [...new Set([].concat(...[...m.values()].slice(0, 100).map(r => Object.keys(r))))] : []; }
 export const RoadTable = {
   has(i){ const t=_table(); return t ? t.props[i]!=null : _pcache.has(i); },
-  props(i){ const t=_table(); return (t ? t.props[i] : _pcache.get(i)) || {}; },
+  props(i){ const t=_table(), p=(t ? t.props[i] : _pcache.get(i)) || {}, j=_joined && _joined.get(i); return j ? {...p, ...j} : p; },
   line(i){ const t=_table(); return (t && t.lines && t.lines[i]) || null; },
   mid(i){ const t=_table(); return (t && t.mids && t.mids[i]) || null; },
   bbox(i){ const t=_table(); return (t && t.bboxes && t.bboxes[i]) || null; },

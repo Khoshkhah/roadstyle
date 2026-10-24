@@ -18,6 +18,7 @@ import {initViews} from "./views.js";
 import {initArrows} from "./arrows.js";
 import {initSelect, useSelect} from "./select.js";
 import {makeApi, fromUrl} from "./api.js";
+import {setData, clearData} from "./live.js";
 // an option left out: render's default. The theme's values (select_color, arrow_icon, arrow_color, arrow_rules) have none:
 // they come from the look (roadstyle's profile and palette).
 const RS_DEFAULTS = {
@@ -53,6 +54,7 @@ function fromStyle(o, given){
   if(!given.has("road_tooltip")) o.road_tooltip = it.tooltip || false;                   // false | true | [fields]
   if(!given.has("hover_delay_ms")) o.hover_delay_ms = it.hover_delay_ms != null ? it.hover_delay_ms : 300;
   if(!given.has("color_options")) o.color_options = meta["roadstyle:color_options"] || [];
+  if(!given.has("live")) o.live = meta["roadstyle:live"] || null;
 }
 // returns the dashboard object (docs/design/rust_library.md, "The runtime API", api.js): setStyle, and the methods of the API
 export function rsDashboard(map, options){
@@ -84,6 +86,8 @@ export function rsDashboard(map, options){
       if(more && "road_table" in more) o.road_table = more.road_table;      // the new style's road table (stage 1)
       useStyle(style); useSelect(); useFilter(); useColor(); useLegend();
     },
+    // R22, live data: join a table to the roads and colour or size them from it, with no new style; clearData takes it away (live.js)
+    setData, clearData,
   });
   window.rs = rs;                 // the page's one object (the window.rs* functions stay as they are)
   fromUrl(rs);

@@ -6,7 +6,7 @@ import {map, O} from "./core.js";
 
 const EVENTS = {select: "rs:select", deselect: "rs:deselect", filter: "rs:filterchange", color: "rs:colorchange", overlay: "rs:overlaychange",
                 tunnel: "rs:tunnelchange", view: "rs:viewselect", view3d: "rs:viewchange", basemap: "rs:basemapchange", highlight: "rs:highlightchange",
-                roadfill: "rs:roadfillchange", streetview: "rs:streetviewchange", google3d: "rs:google3dchange"};
+                roadfill: "rs:roadfillchange", streetview: "rs:streetviewchange", google3d: "rs:google3dchange", data: "rs:datachange"};
 
 export function makeApi(extra){
   let rowOf = null, edgeOf = null;                    // edge id <-> row, made on the first use (every road's properties, once)

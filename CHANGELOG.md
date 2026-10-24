@@ -7,6 +7,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Live data on the web page** (R22, `dashboard_module.md`): `rs.setData(table, {key, colorBy, widthBy, ...})` joins a table to the roads by
+  `edge_id` or the row and colours and sizes them through feature state, with no new style; `rs.clearData()` takes it away. It needs a style
+  made with `live_data=True`. Tartu, 64,828 roads: 78 ms to set a colour on each road.
 - **Live data on the road layer** (`live_data=True`, the Rust engine only). The road layer reads its colour and its width factor from
   MapLibre feature state on the road's row (`rs_c`, `rs_w`), with the baked values as the fallback. A host or the dashboard's
   `rs.setData` changes them with no new build. The pieces have the road's row as their id (`promoteId: "__rs_edge"`, also on the vector

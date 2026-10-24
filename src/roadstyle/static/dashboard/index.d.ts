@@ -105,7 +105,7 @@ export interface DashboardState {
 }
 
 export type DashboardEvent = "state" | "select" | "deselect" | "filter" | "color" | "overlay" | "tunnel" | "view" | "view3d"
-  | "basemap" | "highlight" | "roadfill" | "streetview" | "google3d";
+  | "basemap" | "highlight" | "roadfill" | "streetview" | "google3d" | "data";
 
 /** The object that rsDashboard returns (the Python page sets window.rs to it). */
 export interface Dashboard {
@@ -135,6 +135,13 @@ export interface Dashboard {
   /** Returns the function that removes the listener. */
   on(event: DashboardEvent, fn: (detail: any) => void): () => void;
   destroy(): void;
+  /** Live data (R22): join a table to the roads by edge_id (key: a column, default edge_id_col) or by the row (key "row", the table's
+   *  column row), and colour (colorBy) or size (widthBy) the roads from it, with no new style. A second call replaces the values. */
+  setData(table: Array<Record<string, unknown>> | { toArray(): unknown[] } | string, options?: {
+    key?: string; colorBy?: string; vmin?: number; vmax?: number; ramp?: string[]; widthBy?: string; widthRange?: [number, number];
+    nodata?: string | null; legend?: false | { title?: string };
+  }): Promise<{ rows: number; matched: number; ms: number }>;
+  clearData(): void;
 }
 
 /** Add roadstyle's controls and road interaction to a MapLibre map. Call it right after new maplibregl.Map(...), before "load". */

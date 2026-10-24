@@ -2,7 +2,7 @@
 // or {title, kind: "continuous", ramp: [colour, ...], vmin, vmax} (stylers.bake_color_options). An option with no legend hides the box.
 import {_popupMode, _sideCtl} from "./panel.js";
 import {COLOR_OPTIONS, _coActive} from "./color.js";
-let _coLegendEl = null, _coLegendBox = null;
+let _coLegendEl = null, _coLegendBox = null, _liveLegend = null;   // _liveLegend: the legend of rs.setData, over the colour option's
 export function coLegendHtml(lg){
   if(!lg) return "";
   let h = lg.title ? '<div class="lg-title">'+lg.title+'</div>' : "";
@@ -15,13 +15,13 @@ export function coLegendHtml(lg){
 }
 export function coUpdateLegend(){
   if(!_coLegendEl) return;
-  const h = coLegendHtml((COLOR_OPTIONS[_coActive]||{}).legend);
+  const h = coLegendHtml(_liveLegend || (COLOR_OPTIONS[_coActive]||{}).legend);
   _coLegendEl.innerHTML = h;
   if(_coLegendBox) _coLegendBox.style.display = h ? "" : "none";
 }
 // the box once an option has a legend (at the start, or with a later style: rs.setStyle), then the active option's legend
 export function useLegend(){
-  if(!_coLegendBox && COLOR_OPTIONS.some(o=>o.legend)){
+  if(!_coLegendBox && (_liveLegend || COLOR_OPTIONS.some(o=>o.legend))){
     _coLegendBox=document.createElement("div"); _coLegendBox.className="co-lg";
     const hd=document.createElement("div"); hd.className="co-lg-hd"; hd.textContent="Legend ▾";
     hd.onclick=()=>{ const c=_coLegendBox.classList.toggle("collapsed"); hd.textContent="Legend "+(c?"▸":"▾"); };
@@ -32,3 +32,5 @@ export function useLegend(){
   }
   coUpdateLegend();
 }
+// live data (rs.setData): its legend in the box, in place of the colour option's; null: the colour option's again
+export function setLiveLegend(lg){ _liveLegend = lg; useLegend(); }

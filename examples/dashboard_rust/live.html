@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
+<title>roadstyle live data, Rust engine</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<!-- An example of live data (R22): the engine's vector tiles with live_data, and rs.setData colours and sizes the roads from a table, with
+     no new style. ?area=tartu: Tartu (about 65,000 roads) in place of Monaco. README.md in this folder. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<link rel="stylesheet" href="../../src/roadstyle/static/dashboard/dashboard.css">
+<link rel="stylesheet" href="../../src/roadstyle/static/popup.css">
+<style>html,body{margin:0;height:100%}#map{position:absolute;inset:0}
+#bar{position:absolute;left:50%;transform:translateX(-50%);top:10px;z-index:2;display:flex;gap:6px;align-items:center;font:13px system-ui,sans-serif}
+#bar button{padding:6px 10px;font:inherit}#ms{background:#fff;padding:4px 8px;border-radius:4px}</style>
+</head><body>
+<div id="map"></div>
+<div id="bar"><button id="a" type="button">Value A</button><button id="b" type="button">Value B, width C</button>
+  <button id="c" type="button">Clear</button><span id="ms"></span></div>
+<script type="module">
+import init, {makeSources, tileSources} from "./pkg/roadstyle_wasm.js";
+import {rsDashboard} from "../../src/roadstyle/static/dashboard/index.js";
+
+const area = new URLSearchParams(location.search).get("area") || "monaco";
+const DATA = "../../rust/roadstyle-rs/tests/data/";
+const bytes = (u) => fetch(u).then((r) => r.arrayBuffer()).then((b) => new Uint8Array(b));
+const [, roads, lookText] = await Promise.all([init(), bytes(DATA + area + "/roads.parquet"), fetch(DATA + "look.json").then((r) => r.text())]);
+const look = JSON.parse(lookText);
+look.args.live_data = true;                       // the road layer reads the feature states rs_c and rs_w (metadata roadstyle:live)
+const sources = makeSources(roads, JSON.stringify(look), undefined, undefined, area);
+const road_table = JSON.parse(new TextDecoder().decode(sources.roadTable()));
+const tiler = tileSources(sources, "rs://1/", ["name", "edge_id", "highway"]);
+const style = JSON.parse(tiler.style());
+// the pieces' row as their id (the feature states are by row): the engine does not set it on tileSources' style yet
+style.sources.roads.promoteId = {simple: "__rs_edge"};
+maplibregl.addProtocol("rs", async (p) => {
+  const [, source, z, x, y] = p.url.slice("rs://".length).split("/");
+  return {data: tiler.tile(source, +z, +x, +y)};
+});
+const map = new maplibregl.Map({container: "map", style, attributionControl: {compact: true}});
+window.map = map;
+map.addControl(new maplibregl.NavigationControl({visualizePitch: true}));
+const rs = rsDashboard(map, {style, road_table, tiles: true});
+window.rs = rs;
+// a table of random values by edge_id, as a page's own data would come (a sensor table, a model's output)
+const table = (cols) => road_table.props.map((p) => Object.fromEntries([["edge_id", p.edge_id], ...cols.map((c) => [c, Math.round(Math.random() * 1000) / 10])]));
+const show = (r) => { document.getElementById("ms").textContent = `${r.matched} of ${r.rows} roads, ${r.ms.toFixed(0)} ms`; return r; };
+window.demo = {
+  a: () => rs.setData(table(["a"]), {colorBy: "a"}).then(show),
+  b: () => rs.setData(table(["b", "c"]), {colorBy: "b", widthBy: "c", widthRange: [0.5, 3]}).then(show),
+  clear: () => { rs.clearData(); document.getElementById("ms").textContent = ""; },
+};
+document.getElementById("a").onclick = window.demo.a;
+document.getElementById("b").onclick = window.demo.b;
+document.getElementById("c").onclick = window.demo.clear;
+</script>
+</body></html>

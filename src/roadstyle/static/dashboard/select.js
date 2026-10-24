@@ -1,6 +1,6 @@
 // hover + click-to-select + info popup (feature-state, tolerance box, throttled to one query/frame)
 import {POPUP, _rpairs, _rfields} from "../popup.js";
-import {map, style, O, RS_PREFIX, RS_LEAN, RS_DECK_LAYERS, OVERLAYS, _itemOv, _side, _rprops, _pcache, _withProps, RoadTable, _road, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad} from "./core.js";
+import {map, style, O, RS_PREFIX, RS_LEAN, RS_DECK_LAYERS, OVERLAYS, _itemOv, _side, _rprops, _pcache, _withProps, RoadTable, _road, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad, _joinedKeys} from "./core.js";
 import {_popupMode, rsInfoShow, rsInfoClear} from "./panel.js";
 import {_ovUnder, _ovWin, clearOvSel, _ovAt, _ovSections, handleOverlayClick} from "./overlays.js";
 import {_svLine, _svDist, _svTiled, _svPick, _sv, initSpot} from "./svspot.js";
@@ -34,7 +34,7 @@ export function srcOf(f){ return f && f.layer && f.layer.id.indexOf(RS_PREFIX+"r
 // full properties of a picked feature: tiles carry only the style props, so road hits read the
 // sidecar row behind the feature id (or the properties that engine.props gave); decks (and inline mode) keep the feature's own properties
 function _pickProps(f){ const t=_side();
-  if(srcOf(f)==="roads" && f.id!=null){ if(t) return t.props[f.id]||f.properties||{}; if(_pcache.has(f.id)) return _pcache.get(f.id); }
+  if(srcOf(f)==="roads" && f.id!=null){ if(t) return t.props[f.id] ? RoadTable.props(f.id) : f.properties||{}; if(_pcache.has(f.id)) return _pcache.get(f.id); }
   return f.properties||{}; }
 function _selItem(f){ if(ITEM_PICK && f && f.item && f.item.layer.id===ROAD_ITEMS.layer) return ITEM_PICK;   // a road item of items=
   const o = f && f.item && _itemOv(f.item.layer.id); return o && o.select==="item" ? o : null; }   // its overlay
@@ -50,6 +50,7 @@ let _hov=null, _pt=null, _raf=0;
 // a reverse pair drawn as one line (config single_line_classes): its edge names the other direction in __rs_edge2, and the line's popup, panel and tooltip show both
 function _twinDetail(p){ return p && p.__rs_edge2!=null ? {id:p.__rs_edge2, properties:_rprops(p.__rs_edge2)} : undefined; }   // rs:select detail.twin
 function _both(p, rows, only){ const f=rows?_rrows:_rfields, t=p.__rs_edge2!=null ? _rprops(p.__rs_edge2) : null;
+  if(only && _joinedKeys.length) only = only.concat(_joinedKeys.filter(k => only.indexOf(k) < 0));   // live data: its fields too
   if(!t || !Object.keys(t).length) return f(p, only);
   const sec=(n,q)=>'<div style="color:#777;margin-top:.3em">Direction '+n+'</div>'+f(q, only);
   return p.__rs_dup ? sec(1,t)+sec(2,p) : sec(1,p)+sec(2,t); }
