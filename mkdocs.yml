@@ -81,6 +81,7 @@ nav:
       - Explanation:
           - Architecture of the Rust version: rust/architecture.md
           - How a map is drawn: rust/drawing.md
+          - How the levels are solved: rust/levels-solver.md
           - Parity and speed: rust/parity.md
   - Studio: studio.md
 
