@@ -231,8 +231,10 @@ fn style_parts(table: RoadTable, look: &Look, features: Option<Vec<Row>>, planne
             "color": layers::LIVE_COLOR, "width": layers::LIVE_WIDTH, "types": {layers::LIVE_COLOR: "color", layers::LIVE_WIDTH: "factor"},
             "ramp": ramp.stops(9), "nodata": look.theme["data"]["nodata"]}));
     }
-    if let Some((controls, st)) = contract {
-        // audit N7: the roles and the arrow kind from the final layers (contract::describe; tiled_style writes them again for the tiles)
+    if let Some((mut controls, st)) = contract {
+        // audit N7: the roles, the arrow kind and the pick layers from the final layers (contract::describe; tiled_style writes them
+        // again for the tiles)
+        controls["pick"] = contract::pick_layers(&layers);
         metadata.insert("roadstyle:sources".into(), contract::roles(&layers));
         metadata.insert("roadstyle:arrows".into(), contract::arrow_kind(&layers));
         metadata.insert("roadstyle:contract".into(), json!(contract::CONTRACT));
