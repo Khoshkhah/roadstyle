@@ -59,6 +59,21 @@ pub struct DrawKey {
     pub key: f64,
 }
 
+/// A piece's line (audit R11): its road's line, with no copy, or a line of its own (a cut, a half, a seam, a stub, a mitred end),
+/// shared by the pieces of one cut (the bridge shadow, the tunnel's gap and dashes).
+#[derive(Clone, Debug)]
+pub enum PieceLine {
+    None,
+    Road,
+    Own(std::sync::Arc<Vec<Pt>>),
+}
+
+impl PieceLine {
+    fn own(c: Vec<Pt>) -> PieceLine {
+        PieceLine::Own(std::sync::Arc::new(c))
+    }
+}
+
 /// A piece of a road: the road's row, what it draws, its line, and its place in the road layer (simple mode only).
 #[derive(Clone, Debug)]
 pub struct Piece {
@@ -66,7 +81,7 @@ pub struct Piece {
     pub part: Part,
     pub end: End,
     pub draw: Option<DrawKey>,
-    pub coords: Option<Vec<Pt>>,
+    pub coords: PieceLine,
 }
 
 /// The columns that the pieces keep besides the class and the marks: the class filter's (render's filter_col, in the engine's names)
@@ -107,6 +122,15 @@ fn road_props(r: Road, keep: impl Fn(&str) -> bool) -> Props {
 impl Piece {
     fn road<'a>(&self, roads: &'a Roads) -> Road<'a> {
         roads.road(self.edge as usize)
+    }
+
+    /// The piece's line: its own, or its road's.
+    pub fn points<'a>(&'a self, roads: &'a Roads) -> Option<&'a [Pt]> {
+        match &self.coords {
+            PieceLine::None => None,
+            PieceLine::Road => roads.line(self.edge as usize),
+            PieceLine::Own(c) => Some(c),
+        }
     }
 
     /// The cap of the piece (None: round, there is no `__rs_cap`).
@@ -293,13 +317,13 @@ pub(crate) fn casing_parts(roads: &Roads, head_m: f64) -> Vec<Piece> {
         if d.twin.is_some_and(|tw| tw < edge) {
             continue; // a two-way pair's one casing: the first edge's pieces
         }
-        let piece = |part: Part, coords: Option<Vec<Pt>>| Piece { edge, part, end: End::AsIs, draw: None, coords };
+        let piece = |part: Part, coords: PieceLine| Piece { edge, part, end: End::AsIs, draw: None, coords };
         let [cm, _, cs, ce] = d.levels.unwrap_or_default();
         let split = d.split.is_some();
         let c = match p.line() {
             Some(c) if c.len() >= 2 && !(cs == cm && cm == ce && !split) => c,
             _ => {
-                out.push(piece(Part::Casing, p.line().map(<[Pt]>::to_vec)));
+                out.push(piece(Part::Casing, if p.line().is_some() { PieceLine::Road } else { PieceLine::None }));
                 continue;
             }
         };
@@ -319,7 +343,7 @@ pub(crate) fn casing_parts(roads: &Roads, head_m: f64) -> Vec<Piece> {
             if pts.len() < 2 || !pts.windows(2).any(|w| w[0] != w[1]) {
                 continue;
             }
-            out.push(piece(Part::Cut(k, num), Some(line.lonlat(&pts, 1e7))));
+            out.push(piece(Part::Cut(k, num), PieceLine::own(line.lonlat(&pts, 1e7))));
         }
         // a seam at each cut inside the edge, at the lower of the two pieces' numbers; below zoom 17 a flat lap instead
         let mut cut_at: Vec<f64> = cuts[1..].iter().map(|c| c.0).collect();
@@ -335,13 +359,13 @@ pub(crate) fn casing_parts(roads: &Roads, head_m: f64) -> Vec<Piece> {
                 continue;
             }
             let num = near.iter().map(|x| x.2).min().unwrap();
-            out.push(piece(Part::Seam(num), Some(line.lonlat(&pts, 1e8))));
+            out.push(piece(Part::Seam(num), PieceLine::own(line.lonlat(&pts, 1e8))));
             if !solid {
                 continue; // a solid lap would fill a dashed casing's gaps
             }
             let half = near.iter().map(|(a, b, _, _)| (b - a) / 2.0).fold(LAP_M, f64::min);
             let pts = line.part((cut - half).max(0.0), (cut + half).min(n));
-            out.push(piece(Part::Lap(num), Some(line.lonlat(&pts, 1e7))));
+            out.push(piece(Part::Lap(num), PieceLine::own(line.lonlat(&pts, 1e7))));
         }
     }
     out
@@ -359,7 +383,7 @@ pub(crate) fn halves(roads: &Roads) -> HashMap<i64, Vec<Piece>> {
         let n = line.len();
         for (k, (a, b)) in [(0.0, n / 2.0), (n / 2.0, n)].into_iter().enumerate() {
             out.entry(p.i as i64).or_default().push(Piece { edge: p.i as u32, part: Part::Half(k as u8), end: End::AsIs, draw: None,
-                                                             coords: Some(line.lonlat(&line.part(a, b), 1e7)) });
+                                                             coords: PieceLine::own(line.lonlat(&line.part(a, b), 1e7)) });
         }
     }
     out
@@ -369,7 +393,7 @@ pub(crate) fn halves(roads: &Roads) -> HashMap<i64, Vec<Piece>> {
 /// carries the end's shape (0.5 m for a square end, 5 cm for a round one). Any other piece as it is.
 fn end_stub(q: Piece, roads: &Roads) -> Vec<Piece> {
     let at = |a: &Pt, b: &Pt| (a[0] - b[0]).abs() < 1e-6 && (a[1] - b[1]).abs() < 1e-6;
-    let (Some(c), Some(e)) = (q.coords.as_ref(), roads.line(q.edge as usize)) else { return vec![q] };
+    let (Some(c), Some(e)) = (q.points(roads), roads.line(q.edge as usize)) else { return vec![q] };
     if c.len() < 2 || e.len() < 2 || at(&c[0], &e[0]) == at(&c[c.len() - 1], &e[e.len() - 1]) {
         return vec![q];
     }
@@ -380,7 +404,7 @@ fn end_stub(q: Piece, roads: &Roads) -> Vec<Piece> {
     let k = (m / d.max(1e-6)).min(1.0);
     let inner = [end[0] + (prev[0] - end[0]) * k, end[1] + (prev[1] - end[1]) * k];
     let stub = if first { vec![end, inner] } else { vec![inner, end] };
-    vec![Piece { end: End::Flat, ..q.clone() }, Piece { end: End::Stub, coords: Some(stub), ..q }]
+    vec![Piece { end: End::Flat, ..q.clone() }, Piece { end: End::Stub, coords: PieceLine::own(stub), ..q }]
 }
 
 /// The "simple" source: simple mode's pieces with their feature ids (edge * PIECES + n), then the items.
@@ -427,7 +451,7 @@ impl SimpleSource {
             for (k, v) in self.palette_props(p, roads) {
                 q.insert(&k, v);
             }
-            (*id, self.slim(self.with_index(q)), p.coords.as_deref())
+            (*id, self.slim(self.with_index(q)), p.points(roads))
         })
             .chain(self.items.iter().map(move |(id, it)| (*id, self.slim_item(self.with_index(named(it.props.clone()))), it.coords.as_deref())))
     }
@@ -567,7 +591,8 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
             halves.remove(&(p.i as i64)).unwrap_or_default().into_iter()
                 .flat_map(|h| if h.cap(roads) == Some(Cap::Flat) { vec![h] } else { end_stub(h, roads) }).collect()
         } else {
-            vec![Piece { edge: p.i as u32, part: Part::Fill, end: End::AsIs, draw: None, coords: p.line().map(<[Pt]>::to_vec) }]
+            vec![Piece { edge: p.i as u32, part: Part::Fill, end: End::AsIs, draw: None,
+                         coords: if p.line().is_some() { PieceLine::Road } else { PieceLine::None } }]
         };
         let fl = p.draw().levels.map_or(0, |l| l[1]);
         let s = 2.0 * fl as f64 + if truthy(p.get("__rs_dash")) { -0.5 } else { 1.0 };
@@ -705,7 +730,8 @@ fn mitre_ends(out: &mut [Piece], line_of: &[Option<&[Pt]>], roads: &Roads, items
             continue;
         }
         let j = if f.draw.map(|d| d.kind) == Some(1) { 1 } else { 0 };
-        let (Some(c), Some(e)) = (f.coords.as_mut().filter(|c| c.len() >= 2), line(edge)) else { continue };
+        let (Some(c), Some(e)) = (f.points(roads).filter(|c| c.len() >= 2), line(edge)) else { continue };
+        let mut pushes = Vec::new();        // the ends that reach further, put on the piece's own copy after (R11)
         for first in [true, false] {
             let (cp, ep) = if first { (&c[0], &e[0]) } else { (&c[c.len() - 1], &e[e.len() - 1]) };
             if !at(cp, ep) {
@@ -732,8 +758,15 @@ fn mitre_ends(out: &mut [Piece], line_of: &[Option<&[Pt]>], roads: &Roads, items
                 }
             }
             if let Some((_, m)) = best.filter(|b| b.1 > 0.0) {
-                push(c, first, m);
+                pushes.push((first, m));
             }
+        }
+        if !pushes.is_empty() {
+            let mut own = f.points(roads).unwrap_or_default().to_vec();
+            for (first, m) in pushes {
+                push(&mut own, first, m);
+            }
+            f.coords = PieceLine::own(own);
         }
     }
     // the items: an end with the items of its colour and dash that start within ITEM_JOIN_M (and a start with those that end there)
