@@ -769,6 +769,7 @@ dependencies = [
 name = "roadstyle-levels"
 version = "0.25.0"
 dependencies = [
+ "roadstyle-model",
  "rstar",
  "sha2",
 ]
