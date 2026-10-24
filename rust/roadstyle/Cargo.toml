@@ -12,6 +12,7 @@ roadstyle-engine.workspace = true
 roadstyle-io.workspace = true
 roadstyle-levels.workspace = true
 roadstyle-tiles.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 base64.workspace = true
 flate2 = "1"                        # the page writer: the gzipped sources
