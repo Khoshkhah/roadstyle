@@ -22,7 +22,8 @@ pub mod sources;
 
 // The core has no I/O (docs/design/rust_library.md, rule 3 of the layers): the engine takes the model's types, and the readers
 // (roadstyle-io) are the facade's.
-pub use roadstyle_model::{geom, props, table, Cell, RoadTable, Row};
+pub use roadstyle_model::{feature_table, geom, props, table, Cell, RoadTable, Row};
+pub use roadstyle_model::feature_table::FeatureTable;
 pub use road::{Road, Roads};
 pub use roadstyle_look::{self as look, Look};
 pub(crate) use roadstyle_model::obj;
@@ -35,11 +36,12 @@ use serde_json::{json, Value};
 /// ponytail: an estimate from Tartu only; measure a larger area in a browser before the limit goes higher.
 pub const MAX_ROADS: usize = 200_000;
 
-/// A source of the style: the roads, the simple pieces (both typed, written from the roads) or a GeoJSON source as JSON (the base
-/// map, slots).
+/// A source of the style: the roads, the simple pieces (both typed, written from the roads), a base-map layer (typed, audit R10) or a
+/// GeoJSON source as JSON (a caller's overlays, slots, decks).
 pub enum Src {
     Roads(road::RoadsSource),
     Simple(simple::SimpleSource),
+    Features(features::FeatureSource),
     Json(Value),
 }
 
@@ -59,10 +61,10 @@ pub struct Parts {
     pub warnings: Vec<String>,
 }
 
-/// The style's layers and sources: the roads ("roads", "simple", "slots") and, with `features` (the base-map tables as the worker's SQL
-/// writes them), the base map ("ov<i>"). `look`: look.json (the resolved look); `table`: the roads (roadstyle-io reads them from the
+/// The style's layers and sources: the roads ("roads", "simple", "slots") and, with `features` (the base map's rows as the worker's SQL
+/// writes them, `read::read_feature_table`), the base map ("ov<i>"). `look`: look.json (the resolved look); `table`: the roads (roadstyle-io reads them from the
 /// GeoParquet of tools/make_spike_fixture.py or the worker's SQL); `planner`: the route planner's rows.
-pub fn make_parts(mut table: RoadTable, look: &Look, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, String> {
+pub fn make_parts(mut table: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, String> {
     if table.len() > MAX_ROADS {
         return Err(format!("this area has {} roads, and the plugin draws at most {MAX_ROADS} (the browser's memory): use a smaller area",
                            table.len()));
@@ -80,7 +82,7 @@ pub fn restyle(s: &sources::Sources, look: &Look) -> Result<sources::Sources, St
 }
 
 /// make_parts after the roads are prepared (the engine's column names, the levels).
-fn style_parts(table: RoadTable, look: &Look, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, String> {
+fn style_parts(table: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, String> {
     let cols = ColumnMap::from_args(&look.args);
     // render's filter_col: in the engine's names (a keyword's column has the engine's name; a column with an engine name is kept aside)
     let fcol = look.args["filter_col"].as_str().filter(|c| !c.is_empty()).map_or_else(|| "highway".to_string(), |f| {
@@ -99,9 +101,10 @@ fn style_parts(table: RoadTable, look: &Look, features: Option<Vec<Row>>, planne
     let mut ovs = Vec::new();
     let mut images = serde_json::Map::new();
     if let Some(f) = features {
-        let mut fcs = features::feature_collections(f, look)?;
-        let attached = overlays::edge_attach(&mut fcs, &feats);
-        (ovs, images) = overlays::feature_overlays(fcs, look, &attached);
+        let mut tables = features::feature_tables(&f, look)?;
+        drop(f);
+        let attached = overlays::edge_attach(&mut tables, &feats)?;
+        (ovs, images) = overlays::feature_overlays(tables, look, &attached, &mut feats.warnings);
     }
     // render's overlays=: the caller's own, after the base map's (each knows the roads' id column, for its error)
     let first_user = ovs.len();
@@ -166,11 +169,17 @@ fn style_parts(table: RoadTable, look: &Look, features: Option<Vec<Row>>, planne
     // render's order: the roads, the overlays (_build_overlays), the 3D decks, the pieces
     let mut sources = vec![("roads".to_string(), Src::Roads(roads))];
     for (i, ov) in ovs.into_iter().enumerate() {
-        let mut s = serde_json::Map::new();
-        s.insert("type".into(), "geojson".into());
-        s.insert("data".into(), ov.fc);
-        s.insert("generateId".into(), true.into());
-        sources.push((format!("ov{i}"), Src::Json(Value::Object(s))));
+        let src = match ov.data {
+            overlays::Data::Table(table) => Src::Features(features::FeatureSource { table: *table, maxzoom: None }),
+            overlays::Data::Json(fc) => {
+                let mut s = serde_json::Map::new();
+                s.insert("type".into(), "geojson".into());
+                s.insert("data".into(), fc);
+                s.insert("generateId".into(), true.into());
+                Src::Json(Value::Object(s))
+            }
+        };
+        sources.push((format!("ov{i}"), src));
     }
     if !decks.is_empty() {
         sources.push(("decks".into(), Src::Json(json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": decks}, "generateId": true}))));
@@ -248,7 +257,7 @@ fn style_parts(table: RoadTable, look: &Look, features: Option<Vec<Row>>, planne
 }
 
 /// The style as one JSON text, with each source's GeoJSON in it (roadstyle's export_inline): stage 1 (`sources::Sources`), written.
-pub fn make_style(table: RoadTable, look: &Look, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<String, String> {
+pub fn make_style(table: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<String, String> {
     let s = sources::Sources::new(make_parts(table, look, features, planner, name)?);
     let mut out = Vec::new();
     s.write_style(&mut out).expect("a Vec takes every byte");
@@ -391,6 +400,8 @@ impl ColumnMap {
                         }
                     }
                 }
+                // the base map's layers have no road column
+                Src::Features(_) => {}
             }
         }
         fn gets(v: &mut Value, own: &str, user: &str) {
@@ -427,6 +438,7 @@ fn data_settings(sources: &mut [(String, Src)], args: &Value) {
                 s.maxzoom = maxzoom.or(s.maxzoom);
                 s.tolerance = tolerance.unwrap_or(s.tolerance);
             }
+            Src::Features(s) => s.maxzoom = maxzoom.or(s.maxzoom),
             Src::Json(s) if s["type"] == "geojson" => {
                 if let (Some(t), Some(o)) = (tolerance, s.as_object_mut()) {
                     if o.contains_key("tolerance") {

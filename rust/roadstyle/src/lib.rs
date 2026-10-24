@@ -18,7 +18,7 @@ use roadstyle_engine::table::js_value;
 use serde_json::{json, Value};
 
 /// The roads, the base map's rows and the route planner's rows.
-type Tables = (RoadTable, Option<Vec<Row>>, Option<Vec<Row>>);
+type Tables = (RoadTable, Option<FeatureTable>, Option<Vec<Row>>);
 
 /// The roads and the other tables from their GeoParquet bytes: the roads' lines and the base map's geometries in the column `geometry`.
 fn tables(parquet: Vec<u8>, features: Option<Vec<u8>>, planner: Option<Vec<u8>>) -> Result<Tables, String> {
@@ -29,14 +29,13 @@ fn tables(parquet: Vec<u8>, features: Option<Vec<u8>>, planner: Option<Vec<u8>>)
 
 /// The base map's rows from their GeoParquet bytes (the duckOSM reader's features.parquet), the background's land without the sea
 /// (duckosm::cut_sea).
-pub fn read_features(features: Vec<u8>) -> Result<Vec<Row>, String> {
-    features_of(read::read_table(features, "geometry")?)
+pub fn read_features(features: Vec<u8>) -> Result<FeatureTable, String> {
+    features_of(read::read_feature_table(features, "geometry")?)
 }
 
-/// The base map's rows that a reader gave (`read::table_from`, ...), as `read_features`.
-pub fn features_of(mut rows: Vec<Row>) -> Result<Vec<Row>, String> {
-    duckosm::cut_sea(&mut rows)?;
-    Ok(rows)
+/// The base map's rows that a reader gave (`read::feature_table_from`, ...), as `read_features`.
+pub fn features_of(t: FeatureTable) -> Result<FeatureTable, String> {
+    Ok(duckosm::cut_sea(t)?)
 }
 
 /// The style as one JSON text (roadstyle's export_inline), from the roads and the other tables as GeoParquet bytes: the engine's
@@ -55,7 +54,7 @@ pub fn make_sources(parquet: Vec<u8>, look: &Look, features: Option<Vec<u8>>, pl
 }
 
 /// Stage 1 of roads that a reader gave (`read::read_roads`, `geojson::read_roads`, ...), as `make_sources`.
-pub fn sources_of(roads: RoadTable, look: &Look, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>)
+pub fn sources_of(roads: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>)
                   -> Result<sources::Sources, String> {
     let mut s = sources::Sources::new(make_parts(roads, look, features, planner, name)?);
     s.saved.insert(tiles::stage::TILES.into(), look.config["tiles"].clone());
@@ -89,8 +88,17 @@ fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> tiles::T
                 tiled.add_lines(k, p.features(&s.roads.roads).map(|(_, props, c)| (c, props.into_iter())), &keep, whole, from)
             }
             Src::Json(v) => {
-                let (keep, whole, from) = whole_unless_lines(v, o.rule(k, || keys(v)), o.min_zoom);
+                let (keep, whole, from) = whole_unless_lines(json_lines(v), o.rule(k, || keys(v)), o.min_zoom);
                 tiled.add(k, v, &keep, whole, from)
+            }
+            // a base-map layer, from its table (audit R10)
+            Src::Features(f) => {
+                use roadstyle_engine::feature_table::GeomType;
+                let t = &f.table;
+                let lines = (0..t.len()).all(|r| matches!(t.geometries_of().kind(r), Some(GeomType::LineString | GeomType::MultiLineString)));
+                let keys = || t.names().iter().filter(|n| (0..t.len()).any(|r| t.has_key(r, n))).cloned().collect();
+                let (keep, whole, from) = whole_unless_lines(lines, o.rule(k, keys), o.min_zoom);
+                tiled.add_features(k, t, &keep, whole, from)
             }
         }
     }
@@ -100,10 +108,13 @@ fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> tiles::T
 /// tiles.py's rule for a source other than the roads, the pieces and the slots: lines are clipped to each tile; points and polygons go
 /// whole into every tile their box touches, from the first zoom (its extra layers). A polygon at a tile's edge whose clipped part has
 /// no area was left out of that tile before (the sea at Monaco's west edge, 2026-10-24).
-fn whole_unless_lines(src: &Value, rule: (std::collections::HashSet<String>, bool, u32), first: u32) -> (std::collections::HashSet<String>, bool, u32) {
-    let lines = src["data"]["features"].as_array().into_iter().flatten()
-        .all(|f| matches!(f["geometry"]["type"].as_str(), Some("LineString" | "MultiLineString")));
+fn whole_unless_lines(lines: bool, rule: (std::collections::HashSet<String>, bool, u32), first: u32) -> (std::collections::HashSet<String>, bool, u32) {
     if rule.1 || lines { rule } else { (rule.0, true, first) }
+}
+
+/// Every feature of a GeoJSON source is a line.
+fn json_lines(src: &Value) -> bool {
+    src["data"]["features"].as_array().into_iter().flatten().all(|f| matches!(f["geometry"]["type"].as_str(), Some("LineString" | "MultiLineString")))
 }
 
 /// Stage 2 from memory (audit N3): the tiles of stage 1's sources and the one style that draws them (`tiled_style`), the tiles at `at`
@@ -214,7 +225,7 @@ pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[S
         let src = json!({"type": "geojson", "data": fc});
         let rule = o.rule(k, || src["data"]["features"].as_array().into_iter().flatten()
             .filter_map(|f| f["properties"].as_object()).flat_map(|p| p.keys().cloned()).collect());
-        let (keep, whole, from) = whole_unless_lines(&src, rule, o.min_zoom);
+        let (keep, whole, from) = whole_unless_lines(json_lines(&src), rule, o.min_zoom);
         tiled.add(k, &src, &keep, whole, from);
     }
     Ok((tiled_style(style, &names, at, (o.min_zoom, o.max_zoom)), tiled))
@@ -275,7 +286,7 @@ pub fn write_source_file<W: std::io::Write + Send>(s: &sources::Sources, file: &
         return Ok(w);
     }
     if file == ROAD_TABLE {
-        return roadstyle_io::write::parquet_to(w, || road_rows(s), true);
+        return Ok(roadstyle_io::write::parquet_to(w, || road_rows(s), true)?);
     }
     let name = file.strip_suffix(&format!(".{ext}")).ok_or_else(|| format!("{file}: not a .{ext} file"))?;
     let i = s.sources.iter().position(|(n, _)| n == name).ok_or_else(|| format!("{file}: no source {name}"))?;
@@ -291,17 +302,26 @@ pub fn write_source_file<W: std::io::Write + Send>(s: &sources::Sources, file: &
             id: Some(r.i as i64),
             props: s.roads.props(r, Some(drawn)).map(|(k, c)| (k.into(), Val::Cell(c))).collect(),
             geometry: r.line().filter(|_| lines).map(Geometry::Line),
-        }), true),
+        }), true).map_err(String::from),
         Src::Simple(p) => roadstyle_io::write::parquet_to(w, || p.features(&s.roads.roads).map(|(id, props, c)| PqRow {
             id: Some(id as i64), props: props.into_iter().map(|(k, v)| (k.into(), Val::Json(v))).collect(), geometry: c.map(Geometry::Line),
-        }), true),
+        }), true).map_err(String::from),
         Src::Json(v) => {
             let fs = v["data"]["features"].as_array().map(Vec::as_slice).unwrap_or_default();
             roadstyle_io::write::parquet_to(w, || fs.iter().map(|f| PqRow {
                 id: f["id"].as_i64(),
                 props: f["properties"].as_object().into_iter().flatten().map(|(k, v)| (k.as_str().into(), Val::Cell(Cell::Json(v)))).collect(),
                 geometry: Some(&f["geometry"]).filter(|g| !g.is_null()).map(|g| Geometry::Json(std::borrow::Cow::Borrowed(g))),
-            }), true)
+            }), true).map_err(String::from)
+        }
+        // a base-map layer: its table's cells (the keys of each GeoJSON feature) and each feature's geometry (R10)
+        Src::Features(f) => {
+            let t = &f.table;
+            roadstyle_io::write::parquet_to(w, || (0..t.len()).map(|r| PqRow {
+                id: None,
+                props: t.names().iter().filter(|k| t.has_key(r, k)).filter_map(|k| t.get(r, k).map(|c| (k.as_str().into(), Val::Cell(c)))).collect(),
+                geometry: Some(t.geometries_of().to_geojson(r)).filter(|g| !g.is_null()).map(Geometry::from),
+            }), true).map_err(String::from)
         }
     }
 }
@@ -377,7 +397,7 @@ pub fn make_tiled(parquet: Vec<u8>, look: &Look, features: Option<Vec<u8>>, name
 }
 
 /// The map with vector tiles of roads and base-map rows that a reader gave, as `make_tiled`.
-pub fn tiled_of(roads: RoadTable, look: &Look, features: Option<Vec<Row>>, name: Option<String>, prefix: &str, keep: &[String])
+pub fn tiled_of(roads: RoadTable, look: &Look, features: Option<FeatureTable>, name: Option<String>, prefix: &str, keep: &[String])
                 -> Result<(String, tiles::Tiles, Vec<String>), String> {
     let s = sources::Sources::new(make_parts(roads, look, features, None, name)?);
     let mut o = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &look.config["tiles"], &columns(look), keep)
