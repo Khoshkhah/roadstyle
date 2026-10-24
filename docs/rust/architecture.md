@@ -77,7 +77,7 @@ flowchart TB
     roadstyle_tiles["roadstyle-tiles<br/>1,100 lines"]
     roadstyle["roadstyle<br/>2,008 lines"]
     roadstyle_rs["roadstyle-rs<br/>213 lines"]
-    roadstyle_wasm["roadstyle-wasm<br/>441 lines"]
+    roadstyle_wasm["roadstyle-wasm<br/>435 lines"]
     roadstyle_py["roadstyle-py<br/>519 lines"]
     roadstyle_cli["roadstyle-cli<br/>542 lines"]
     roadstyle_mcp["roadstyle-mcp<br/>305 lines"]
@@ -118,13 +118,13 @@ step) takes this crate alone.
 | [`roadstyle-tiles`](#roadstyle-tiles) | roadstyle's vector tiles on request (the rules of tiles.py) | 1,100 | `roadstyle-model`, flate2, indexmap, rstar, serde_json |
 | [`roadstyle`](#roadstyle) | roadstyle as a Rust library: the facade over the model, the readers, the levels, the engine and the tiles | 2,008 | `roadstyle-engine`, `roadstyle-io`, `roadstyle-levels`, `roadstyle-tiles`, base64, flate2, serde, serde_json |
 | [`roadstyle-rs`](#roadstyle-rs) | The old name of the facade crate roadstyle, kept for one version | 213 | `roadstyle`, serde_json |
-| [`roadstyle-wasm`](#roadstyle-wasm) | The browser's front-end of roadstyle-rs: makeStyle, Tiler, memoryBytes | 441 | `roadstyle`, serde_json, wasm-bindgen |
+| [`roadstyle-wasm`](#roadstyle-wasm) | The browser's front-end of roadstyle-rs: makeStyle, Tiler, memoryBytes | 435 | `roadstyle`, serde_json, wasm-bindgen |
 | [`roadstyle-py`](#roadstyle-py) | The Python binding of roadstyle's Rust engine: the module roadstyle._rust (PyO3, abi3) | 519 | `roadstyle`, `roadstyle-cli`, arrow-array, pyo3, serde_json |
 | [`roadstyle-cli`](#roadstyle-cli) | The roadstyle program: one command for each job (serve: the level editor's files; snapshot: a PNG of a saved page) | 542 | `roadstyle`, `roadstyle-snapshot`, serde_json |
 | [`roadstyle-mcp`](#roadstyle-mcp) | MCP server for roadstyle: AI agents draw styled, interactive road maps of road files | 305 | `roadstyle`, `roadstyle-snapshot`, base64, rmcp, schemars, serde, serde_json, strsim, tokio |
 | [`roadstyle-snapshot`](#roadstyle-snapshot) | PNG pictures of saved roadstyle pages: Chromium over CDP draws the page, as roadstyle's Python snapshot does | 180 | anyhow, headless_chrome, serde_json |
 
-All crates: 17,832 lines of Rust in `rust/*/src/`.
+All crates: 17,826 lines of Rust in `rust/*/src/`.
 <!-- /gen:crates -->
 
 The crates read roadstyle's data (`src/roadstyle/data/`: the palettes, the profiles, the sprite) and the page files
@@ -257,11 +257,11 @@ Library and program, in `rust/roadstyle-rs/`. Public API: `roadstyle::*`.
 
 #### `roadstyle-wasm` { #roadstyle-wasm }
 
-Cdylib, in `rust/roadstyle-wasm/`. Public API: `Look`, `fromJson`, `toJson`, `resolveLook`, `makeLook`, `rampStops`, `makeStyle`, `solveLocal`, `startFrom`, `levelsCsv`, `makePage`, `warn`, `exportLook`, `fileNames`, `roadTable`, `makeSources`, `duckosmPlan`, `duckosmLevels`, `duckosmSubsetLevels`, `duckosmFeaturesSelect`, `readGeoParquet`, `readGeoJson`, `readShp`, `tileSources`, `tileFiles`, `memoryBytes`, `LevelArea`, `Tiler`, `Sources`, `Roads`.
+Cdylib, in `rust/roadstyle-wasm/`. Public API: `Look`, `fromJson`, `toJson`, `resolveLook`, `rampStops`, `makeStyle`, `solveLocal`, `startFrom`, `levelsCsv`, `makePage`, `warn`, `exportLook`, `fileNames`, `roadTable`, `makeSources`, `duckosmPlan`, `duckosmLevels`, `duckosmSubsetLevels`, `duckosmFeaturesSelect`, `readGeoParquet`, `readGeoJson`, `readShp`, `tileSources`, `tileFiles`, `memoryBytes`, `LevelArea`, `Tiler`, `Sources`, `Roads`.
 
 | Module | Lines | What it does | Python counterpart |
 |---|---|---|---|
-| `lib` | 441 | The browser's front-end of roadstyle-rs: `Look`, `makeStyle`, `makePage`, `Tiler` and `memoryBytes` through wasm-bindgen, and the allocator that grows the memory in large steps |  |
+| `lib` | 435 | The browser's front-end of roadstyle-rs: `Look`, `makeStyle`, `makePage`, `Tiler` and `memoryBytes` through wasm-bindgen, and the allocator that grows the memory in large steps |  |
 
 #### `roadstyle-py` { #roadstyle-py }
 
@@ -495,13 +495,12 @@ saved page still works offline.*
 | `fromJson` | Look.fromJson(text): a saved look (version 1 or 0). An error is a thrown Error. |
 | `toJson` | toJson(): the look's text (version 1). |
 | `resolveLook` | resolveLook(options: string) -> Look: the look of render_edges' palette, profile and settings; options: {"palette", "profile", "settings", "args", "features", "files"} as JSON text. An error is a thrown Error. |
-| `makeLook` | makeLook(options: string) -> Look: the old name of resolveLook, for one version. |
 | `rampStops` | rampStops(cmap: string, n: number) -> string[]: `n` colours ("#rrggbb") at even steps along a ramp (render_edges' cmap: a branca scheme or a matplotlib colormap name, or the JSON text of a list of colours), from the first colour to the last (at least 2), as roadstyle's ColorRamp.stops: for example a colour for each category of a column. An error is a thrown Error. |
 | `makeStyle` | makeStyle(roads: Uint8Array, look: Look, features?: Uint8Array, planner?: Uint8Array, name?: string) -> string; an error is a thrown Error. |
 | `solveLocal` | The solve after a change that names the roads of `changed` (edge ids): the roads around it, else the whole area. |
 | `startFrom` | The answer to start from (levels.csv, levels_info.json): 4 numbers for each road; the given-up parts as "upper\|lower\|part". |
 | `levelsCsv` | levels.csv: one row for each edge with its four numbers and its ends as drawn (4 numbers for each road). |
-| `makePage` | makePage(roads: Uint8Array, look: Look, options: string, given?: string) -> string: the page of the roads (GeoParquet) in one call, as render_edges(backend="web") (roadstyle::page_options::page_from; MapLibre stays a placeholder). `look`: makeLook's of `options` (its JSON text, which a view's palette resolves again), with "state": "live" in its args; `given`: the caller's values over the look's args (JSON text: api_key, street_view_key, resolved_basemaps). |
+| `makePage` | makePage(roads: Uint8Array, look: Look, options: string, given?: string) -> string: the page of the roads (GeoParquet) in one call, as render_edges(backend="web") (roadstyle::page_options::page_from; MapLibre stays a placeholder). `look`: resolveLook's of `options` (its JSON text, which a view's palette resolves again), with "state": "live" in its args; `given`: the caller's values over the look's args (JSON text: api_key, street_view_key, resolved_basemaps). |
 | `exportLook` | exportLook(look: Look, cols: string[] (highway, oneway, tunnel, bridge, id), positions: number[]) -> string: the simple look for another app's data layer (roadstyle's export_look) from a resolved look. |
 | `fileNames` | fileNames(format): the names of stage 1's files (style.json, a file for each source, road_table.parquet). |
 | `roadTable` | roadTable(): the road table as the page loads it, JSON text (props, mids, bboxes, lines: one item for each road). |

@@ -85,12 +85,6 @@ mod wasm {
         roadstyle::look::Options::from_value(&o).and_then(|o| roadstyle::Look::resolve(&o)).map(JsLook).map_err(|e| JsError::new(&e))
     }
 
-    /// makeLook(options: string) -> Look: the old name of resolveLook, for one version.
-    #[wasm_bindgen(js_name = makeLook)]
-    pub fn make_look(options: &str) -> Result<JsLook, JsError> {
-        resolve_look(options)
-    }
-
     /// rampStops(cmap: string, n: number) -> string[]: `n` colours ("#rrggbb") at even steps along a ramp (render_edges' cmap: a branca
     /// scheme or a matplotlib colormap name, or the JSON text of a list of colours), from the first colour to the last (at least 2), as
     /// roadstyle's ColorRamp.stops: for example a colour for each category of a column. An error is a thrown Error.
@@ -166,7 +160,7 @@ mod wasm {
     }
 
     /// makePage(roads: Uint8Array, look: Look, options: string, given?: string) -> string: the page of the roads (GeoParquet) in one
-    /// call, as render_edges(backend="web") (roadstyle::page_options::page_from; MapLibre stays a placeholder). `look`: makeLook's of
+    /// call, as render_edges(backend="web") (roadstyle::page_options::page_from; MapLibre stays a placeholder). `look`: resolveLook's of
     /// `options` (its JSON text, which a view's palette resolves again), with "state": "live" in its args; `given`: the caller's values
     /// over the look's args (JSON text: api_key, street_view_key, resolved_basemaps).
     #[wasm_bindgen(js_name = makePage)]
