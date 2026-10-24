@@ -290,9 +290,9 @@ metadata and adds the controls, and the `rs` object is the API for a host page.
 **What the design phase adds** (step (f) of the roadstyle-rs session; the last rows of [Known design gaps](#known-design-gaps)):
 
 - **A public call for each stage alone**, in Rust, Python and the browser.
-- **The border between stage 1 and stage 2.** Stage 1 returns its output in memory, as typed values. You can save it as a file,
+- **The output of stage 1 as the input of stage 2.** Stage 1 returns its output in memory, as typed values. You can save it as a file,
   and stage 2 takes it from memory or reads it from a file. The one call passes it in memory, with no file.
-- **Two file formats at the border:** GeoJSON, which MapLibre reads directly and people can read, and GeoParquet, a binary format
+- **Two file formats between stage 1 and stage 2:** GeoJSON, which MapLibre reads directly and people can read, and GeoParquet, a binary format
   for large areas (much smaller than Tartu's GeoJSON text of about 150 MB) that DuckDB also reads directly.
 - **The road table as its own Parquet file**, next to the pieces, not inside the GeoJSON.
 
