@@ -5,11 +5,12 @@ repository.workspace = true
 homepage.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "The roadstyle program: one command for each job (serve: the level editor's files)"
+description = "The roadstyle program: one command for each job (serve: the level editor's files; snapshot: a PNG of a saved page)"
 
 [dependencies]
-roadstyle.workspace = true
+roadstyle = { workspace = true, features = ["gpkg"] }   # the native program reads GeoPackage files too
 serde_json.workspace = true
+roadstyle-snapshot.workspace = true
 
 [lib]
 name = "roadstyle_cli"

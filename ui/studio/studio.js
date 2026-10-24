@@ -12,7 +12,8 @@ const ID_COLS = new Set(["id", "fid", "gid", "uid", "objectid"]);
 // the state of the knobs
 const st = {data: null, loader: "", palette: "amber", basemap: "", view3d: false, tiles: false, colours: {}, classes: null, minzoom: false,
             labels: true, arrows: true, popup: "curated", popupCols: [], hover: [], overlays: []};
-let table = null, columns = [], allClasses = [], basemaps = [], gen = 0, dashKey = "";
+let table = null, columns = [], numeric = new Set(), allClasses = [], gen = 0, dashKey = "";
+let BM = {basemaps: [], switcher: []}, background = null, colourOpts = [{name: "Class"}];   // basemaps.json; the look's canvas colours; the last options
 
 // ---------------------------------------------------------------- the engine in its worker
 const worker = new Worker(new URL("./worker.js", import.meta.url), {type: "module"});
@@ -23,7 +24,7 @@ const call = (msg, transfer) => new Promise((ok, no) => { const id = ++callId; p
 
 // ---------------------------------------------------------------- what the preview asks for
 window.studio = {
-  dashboardOptions: () => ({basemaps, basemap: st.basemap, dashboard: {popup_mode: st.popup === "panel" ? "panel" : "popup", street_view: "window"}}),
+  dashboardOptions: () => ({basemaps: pageBasemaps(), basemap: st.basemap, dashboard: {popup_mode: st.popup === "panel" ? "panel" : "popup", street_view: "window"}}),
   tile: async (url) => {                               // rs://<gen>/<source>/<z>/<x>/<y>, from the worker's Tiler
     const [g, source, z, x, y] = url.slice("rs://".length).split("/");
     if (+g !== gen) return new Uint8Array();
@@ -36,13 +37,13 @@ const previewWaiters = [];
 
 // ---------------------------------------------------------------- the look's options, the code's keywords
 // The knobs as the look's options (makeLook's input in the worker): render_edges' keywords that the engine reads.
-function lookOptions(){
+function lookOptions(co){
   // state "live": the global states stay in the expressions and the style has the dashboard's options (roadstyle:controls), as a page
   const args = {name: "roadstyle", state: "live"};
   if (st.view3d) args.view_3d = true;
   if (st.tiles) args.tiles = true;
-  const co = colourOptions();
-  if (co.length > 1) args.color_options = co;
+  // the look's options are JSON: a value is a text key there, as in Python's json.dumps of the dict
+  if (co.length > 1) args.color_options = co.map((o) => o.colors ? {...o, colors: Object.fromEntries([...o.colors].map(([k, c]) => [String(k), c]))} : o);
   if (st.minzoom) args.minzoom = true;
   if (!st.labels) args.labels = false;
   if (!st.arrows) args.arrows = false;
@@ -51,14 +52,24 @@ function lookOptions(){
     popup: o.popup, ...(o.tooltip.length ? {tooltip: o.tooltip} : {}), fc: o.fc}));
   return {palette: st.palette, args};
 }
-// the colour options of the picked columns: a ramp from the 2nd to the 98th percentile (studio/common.py, _colour_opt's numeric case)
-function colourOptions(){
+// the colour options of the picked columns, as the Python studio makes them (studio/common.py, _colour_opt): a numeric column with more
+// than 12 values is a ramp from its 2nd to its 98th percentile (pandas' quantile: linear between the ranks); another column is min(5, n)
+// stepped colours of the ramp, its sorted values split into even groups (a categorical legend)
+async function colourOptions(){
   const out = [{name: "Class"}];
   for (const [col, cmap] of Object.entries(st.colours)) {
-    const v = table.props.map((p) => p && p[col]).filter((x) => typeof x === "number" && isFinite(x)).sort((a, b) => a - b);
-    if (!v.length) continue;
-    const q = (f) => v[Math.min(v.length - 1, Math.max(0, Math.round(f * (v.length - 1))))];
-    out.push({name: col, color_by: col, cmap, vmin: q(0.02), vmax: q(0.98), missing: "self"});
+    const all = table.props.map((p) => p && p[col]).filter((x) => x != null && !(typeof x === "number" && !isFinite(x)));
+    const vals = [...new Set(all)].sort((a, b) => a < b ? -1 : a > b ? 1 : 0), n = vals.length;
+    if (!n) continue;
+    if (numeric.has(col) && n > 12) {
+      const v = all.slice().sort((a, b) => a - b);
+      const q = (f) => { const x = f * (v.length - 1), i = Math.floor(x), j = Math.min(i + 1, v.length - 1); return v[i] + (v[j] - v[i]) * (x - i); };
+      out.push({name: col, color_by: col, cmap, vmin: q(0.02), vmax: q(0.98), missing: "self"});
+    } else {
+      const k = Math.min(5, n), stops = (await call({type: "ramp", cmap, n: k})).stops, colors = new Map();
+      for (let i = 0; i < k; i++) for (const v of vals.slice(Math.floor(i * n / k), Math.floor((i + 1) * n / k))) colors.set(v, stops[i]);
+      out.push({name: col, color_by: col, missing: "self", colors});         // a Map: the code keeps each value's type (1, True)
+    }
   }
   return out;
 }
@@ -66,8 +77,7 @@ function codeKeywords(){
   const kw = {palette: st.palette, basemap: st.basemap};
   if (st.view3d) kw.view_3d = true;
   if (st.tiles) kw.tiles = true;
-  const co = colourOptions();
-  if (co.length > 1) kw.color_options = Object.fromEntries(co.map(({name, ...o}) => [name, o]));
+  if (colourOpts.length > 1) kw.color_options = Object.fromEntries(colourOpts.map(({name, ...o}) => [name, o]));
   if (st.classes && st.classes.length !== allClasses.length) kw.include = st.classes;
   if (st.minzoom) kw.minzoom = true;
   if (!st.labels) kw.labels = false;
@@ -97,14 +107,15 @@ async function build(){
   busy = true; $("status").textContent = "making the map…";
   try {
     gen += 1;
-    const r = await call({type: "build", options: lookOptions(), name: "roadstyle", tiles: st.tiles, gen,
+    if (table) colourOpts = await colourOptions();
+    const r = await call({type: "build", options: lookOptions(colourOpts), name: "roadstyle", tiles: st.tiles, gen,
                           keep: ["name", "highway", "edge_id"].concat(st.hover)});
     const t = JSON.parse(r.table), first = !table || t.props.length !== table.props.length;
-    table = t;
+    table = t; background = r.background;
     if (first) dataKnown();
     const b = bounds(table.bboxes);
     interaction(r.style);
-    const key = [st.data.name, st.popup].join("|");             // the dashboard is made again for new data or another popup mode
+    const key = [st.data.name, st.popup, st.basemap].join("|"); // the dashboard is made again for new data, a popup mode, a base map
     const fresh = key !== dashKey;
     if (fresh) { dashKey = key; await reloadPreview(); }
     await $("preview").contentWindow.show({style: r.style, table, files: r.files, fit: first || fresh ? [[b[0], b[1]], [b[2], b[3]]] : null});
@@ -129,29 +140,27 @@ function bounds(bbs){
 
 // ---------------------------------------------------------------- the knobs that the data decides
 function dataKnown(){
-  const keys = new Set();
-  for (const p of table.props.slice(0, 2000)) if (p) for (const k of Object.keys(p)) if (k[0] !== "_" && k !== "lvl") keys.add(k);
-  columns = [...keys];
+  // columns: the file's own columns (the worker's answer to "roads"), as the Python studio lists the GeoDataFrame's
   allClasses = [...new Set(table.props.map((p) => p && p.highway).filter((h) => h != null))].sort();
   st.classes = null; st.colours = {}; st.popupCols = columns.filter((c) => ["name", "edge_id", "highway", "lanes", "maxspeed_kmh"].includes(c));
   $("count").textContent = `${table.props.length.toLocaleString()} edges`;
-  // colour by: numeric columns with many values (not the id columns); the others wait for the engine's ramp steps
-  const numeric = (c) => table.props.some((p) => p && typeof p[c] === "number");
-  const distinct = (c) => new Set(table.props.slice(0, 5000).map((p) => p && p[c]).filter((v) => v != null)).size;
+  // colour by (studio/common.py, colour_by_section): the numeric columns and the other columns with 1 to 12 values, not the id columns
+  const values = (c) => table.props.map((p) => p && p[c]).filter((v) => v != null);
+  numeric = new Set(columns.filter((c) => { const v = values(c); return v.length && v.every((x) => typeof x === "number"); }));
   $("colours").innerHTML = "";
+  let picked = 0;
   for (const c of columns) {
     if (ID_COLS.has(c.toLowerCase()) || c.toLowerCase().endsWith("_id")) continue;
-    const n = distinct(c), ramp = numeric(c) && n > 12;
-    if (!ramp && !(n > 0 && n <= 12)) continue;
+    const n = new Set(values(c)).size;
+    if (!numeric.has(c) && !(n > 0 && n <= 12)) continue;
     const row = document.createElement("div");
-    row.innerHTML = `<label class="inline"><input type="checkbox" ${ramp ? "" : "disabled"}> ${c}</label>` +
-      (ramp ? `<select hidden>${CMAPS.map((m) => `<option>${m}</option>`).join("")}</select>` : `<span class="note">(categories: later)</span>`);
+    row.innerHTML = `<label class="inline"><input type="checkbox"> ${c}</label><select hidden>${CMAPS.map((m) => `<option>${m}</option>`).join("")}</select>`;
     const [cb, sel] = [row.querySelector("input"), row.querySelector("select")];
-    if (sel) {
-      sel.selectedIndex = (Object.keys(st.colours).length + 1) % CMAPS.length;
-      cb.onchange = () => { sel.hidden = !cb.checked; if (cb.checked) st.colours[c] = sel.value; else delete st.colours[c]; later(); };
-      sel.onchange = () => { st.colours[c] = sel.value; later(); };
-    }
+    cb.onchange = () => {
+      if (cb.checked && !(c in st.colours)) sel.selectedIndex = (++picked) % CMAPS.length;   // the Python studio: the i-th pick's map is CMAPS[(i + 1) % n]
+      sel.hidden = !cb.checked; if (cb.checked) st.colours[c] = sel.value; else delete st.colours[c]; later();
+    };
+    sel.onchange = () => { st.colours[c] = sel.value; later(); };
     $("colours").appendChild(row);
   }
   checklist($("classes"), allClasses, allClasses, (v) => { st.classes = v; $("preview").contentWindow.rs.setFilter({classes: v}); code(); });
@@ -170,22 +179,25 @@ function checklist(box, items, on, change){
 const code = () => { $("code").textContent = pythonCode(codeKeywords(), st.loader, st.overlays.map((o) => ({path: o.path, args: o.args()}))); };
 
 // ---------------------------------------------------------------- the data
-async function loadRoads(bytes, name, loader){
-  st.data = {name}; st.loader = loader; table = null;
+async function loadRoads(bytes, kind, name, loader){
+  st.data = {name}; st.loader = loader; table = null; colourOpts = [{name: "Class"}];
   $("status").textContent = "reading the roads…";
-  await call({type: "roads", bytes}, [bytes]);
+  try { columns = (await call({type: "roads", bytes, kind}, [bytes])).columns.filter((c) => c !== "geometry"); }
+  catch (e) { $("status").innerHTML = `<span class="err">${name}: ${e.message}</span>`; return; }
   build();
 }
 for (const k of Object.keys(SAMPLES)) $("sample").add(new Option(k, k));
 $("sample").onchange = async () => {
   const f = SAMPLES[$("sample").value];
-  const r = await fetch(`samples/${f}.parquet`);
-  if (!r.ok) { $("status").innerHTML = `<span class="err">samples/${f}.parquet is not there: make it with ui/studio/make_samples.py</span>`; return; }
-  loadRoads(await r.arrayBuffer(), $("sample").value, `edges = gpd.read_file("ui/studio/samples/${f}.geojson")`);
+  const r = await fetch(`samples/${f}.geojson`);
+  if (!r.ok) { $("status").innerHTML = `<span class="err">samples/${f}.geojson: ${r.status}</span>`; return; }
+  loadRoads(await r.arrayBuffer(), "geojson", $("sample").value, `edges = gpd.read_file("ui/studio/samples/${f}.geojson")`);
 };
 $("file").onchange = async () => {
   const f = $("file").files[0]; if (!f) return;
-  loadRoads(await f.arrayBuffer(), f.name, `edges = gpd.read_parquet("${f.name}")`);
+  const parquet = /\.(geo)?parquet$/i.test(f.name);
+  loadRoads(await f.arrayBuffer(), parquet ? "parquet" : "geojson", f.name,
+            parquet ? `edges = gpd.read_parquet("${f.name}")` : `edges = gpd.read_file("${f.name}")`);
 };
 
 // ---------------------------------------------------------------- the look and the other knobs
@@ -193,18 +205,27 @@ const knob = (id, key, prop = "value") => { $(id).onchange = () => { st[key] = $
 knob("palette", "palette"); knob("view3d", "view3d", "checked"); knob("tiles", "tiles", "checked"); knob("minzoom", "minzoom", "checked");
 knob("labels", "labels", "checked"); knob("arrows", "arrows", "checked");
 $("popup").onchange = () => { st.popup = $("popup").value; $("popupcols").hidden = st.popup !== "choose"; later(); };
-$("basemap").onchange = () => { st.basemap = $("basemap").value; $("preview").contentWindow.rs.setBasemap(st.basemap); code(); };
+$("basemap").onchange = () => { st.basemap = $("basemap").value; later(); };   // the page's list starts with the active one: a new dashboard
 $("copy").onclick = () => navigator.clipboard.writeText($("code").textContent);
 
-// the base maps: one list for Python and the studio (src/roadstyle/data/basemaps.json, the look session's)
-fetch("../../src/roadstyle/data/basemaps.json").then((r) => r.ok ? r.json() : Promise.reject(new Error(r.status))).then((list) => {
-  basemaps = list;
-  for (const b of list) $("basemap").add(new Option(b.label, b.key));
-  st.basemap = list.length ? list[0].key : "";
-}).catch(() => {
-  basemaps = [];
-  $("bmnote").innerHTML = '<span class="err">The base-map list (src/roadstyle/data/basemaps.json) is not there yet: no base map.</span>';
-}).finally(() => $("sample").onchange());
+// the base maps: one list for Python and the studio (src/roadstyle/data/basemaps.json). The menu has all of them, as the Python studio
+// (rs.BASEMAPS); the page's switcher has the active one and then the default set.
+// TODO(R3): a copy of render_web._page_basemaps, _tiles and _bg_color. Remove it in the change that uses the page writer.
+function pageBasemaps(){
+  const by = Object.fromEntries(BM.basemaps.map((b) => [b.key, b])), active = by[st.basemap] || BM.basemaps[0];
+  if (!active) return [];
+  const tiles = (b) => !b.url ? [] : b.url.includes("{s}") ? [...(b.subdomains || "a")].map((s) => b.url.replace("{s}", s).replace("{r}", ""))
+                                                            : [b.url.replace("{r}", "")];
+  const bg = (b) => b.bg.startsWith("#") ? b.bg : background[b.is_dark ? "dark" : "light"];
+  return [active, ...BM.switcher.filter((k) => k !== active.key && by[k]).map((k) => by[k])]
+    .map((b) => ({key: b.key, label: b.label, tiles: tiles(b), bg: bg(b), maxzoom: b.maxzoom, attr: b.attr}));
+}
+fetch("../../src/roadstyle/data/basemaps.json").then((r) => r.ok ? r.json() : Promise.reject(new Error(`basemaps.json: ${r.status}`))).then((j) => {
+  BM = j;
+  for (const b of BM.basemaps) $("basemap").add(new Option(b.label, b.key));
+  st.basemap = BM.basemaps.length ? BM.basemaps[0].key : "";
+  $("sample").onchange();
+}).catch((e) => { $("bmnote").innerHTML = `<span class="err">The base maps: ${e.message}</span>`; });
 
 // ---------------------------------------------------------------- overlays: GeoJSON files, each one an rs.Overlay
 async function addOverlay(name, text, path){

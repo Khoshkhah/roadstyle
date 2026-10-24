@@ -1,6 +1,6 @@
 // hover + click-to-select + info popup (feature-state, tolerance box, throttled to one query/frame)
 import {POPUP, _rpairs, _rfields} from "../popup.js";
-import {map, style, O, RS_PREFIX, RS_LEAN, RS_DECK_LAYERS, OVERLAYS, _itemOv, _side, _rprops, RoadTable, _road, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad, _joinedKeys} from "./core.js";
+import {map, style, O, RS_PREFIX, RS_LEAN, RS_DECK_LAYERS, OVERLAYS, _itemOv, _side, _rprops, RoadTable, _road, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad, _joinedKeys, _emit} from "./core.js";
 import {_popupMode, rsInfoShow, rsInfoClear} from "./panel.js";
 import {_ovUnder, _ovWin, clearOvSel, _ovAt, _ovSections, handleOverlayClick} from "./overlays.js";
 import {_svLine, _svDist, _svPick, _sv, initSpot} from "./svspot.js";
@@ -66,7 +66,7 @@ export function rsDeselect(){
     if(_sel.road!=null) _fs({source:"roads", id:_sel.road},{select:false});
     _sel=null; }
   rsInfoClear();
-  document.dispatchEvent(new CustomEvent("rs:deselect"));
+  _emit("rs:deselect");
 }
 // programmatic selection by id (same id space as rsQuery / rs:select): highlight + popup/panel
 // + rs:select, exactly like a click. The floating popup anchors at the edge's midpoint.
@@ -91,8 +91,7 @@ export function rsSelect(id){
   const c = RoadTable.mid(id) || _midOf((_road(id) || {}).geometry);
   let ovs=[]; if(c){ try{ ovs=_ovAt(map.project({lng:c[0], lat:c[1]})); }catch(err){} }
   const cll = c ? {lng:c[0], lat:c[1]} : null;
-  document.dispatchEvent(new CustomEvent("rs:select",
-    {detail:{id:id, layer:null, properties:props || {}, twin:_twinDetail(props), overlays:ovs, streetView:_svPick(cll, _road(id), id)}}));
+  _emit("rs:select", {id:id, layer:null, properties:props || {}, twin:_twinDetail(props), overlays:ovs, streetView:_svPick(cll, _road(id), id)});
   const sv = _sv(cll, _road(id));
   if(_roadPopup){
     if(_popupMode === "panel"){ rsInfoShow(_both(props||{}, true, _popupFields) + sv + _ovSections(ovs)); }
@@ -159,9 +158,8 @@ export function initSelect(){
     const item = io ? {overlay:io.label, id:f.item.id, properties:f.item.properties||{}} : undefined;   // the item selected itself
     const ovs = _ovAt(e.point).filter(o=>!io || o.label!==io.label);   // interactive overlays under the click (e.g. the zone)
     // structured click-data for host pages / dashboards (fires in every popup mode, incl. False)
-    document.dispatchEvent(new CustomEvent("rs:select",
-      {detail:{id:f.id, layer:f.layer && f.layer.id, properties:props, twin:_twinDetail(props), overlays:ovs, item:item,
-               streetView:_svPick(e.lngLat, f, f.id)}}));
+    _emit("rs:select", {id:f.id, layer:f.layer && f.layer.id, properties:props, twin:_twinDetail(props), overlays:ovs, item:item,
+               streetView:_svPick(e.lngLat, f, f.id)});
     const sv = _sv(e.lngLat, f);
     if(io){ if(io.interactive && _ovWin(io)){             // the item's own popup (its popup fields), the road's Street View below it
         if(_popupMode === "panel") rsInfoShow('<div class="rs-name">'+io.label+'</div>'+_rrows(item.properties, io.popup) + sv + _ovSections(ovs));
