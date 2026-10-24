@@ -7,9 +7,11 @@
 
 pub mod basemap;
 mod png;
+mod ramp;
 mod resolve;
 pub mod widths;
 
+pub use ramp::Ramp;
 pub use resolve::{make_look, theme, Options};
 pub use widths::{py_round, RoadModel};
 

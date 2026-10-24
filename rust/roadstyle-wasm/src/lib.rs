@@ -91,6 +91,19 @@ mod wasm {
         resolve_look(options)
     }
 
+    /// rampStops(cmap: string, n: number) -> string[]: `n` colours ("#rrggbb") at even steps along a ramp (render_edges' cmap: a branca
+    /// scheme or a matplotlib colormap name, or the JSON text of a list of colours), from the first colour to the last (at least 2), as
+    /// roadstyle's ColorRamp.stops: for example a colour for each category of a column. An error is a thrown Error.
+    #[wasm_bindgen(js_name = rampStops)]
+    pub fn ramp_stops(cmap: &str, n: usize) -> Result<Vec<String>, JsError> {
+        let c: serde_json::Value = if cmap.trim_start().starts_with('[') {
+            serde_json::from_str(cmap).map_err(|e| JsError::new(&format!("cmap: not a JSON list: {e}")))?
+        } else {
+            cmap.into()
+        };
+        roadstyle::look::Ramp::new(&c).map(|r| r.stops(n)).map_err(|e| JsError::new(&e))
+    }
+
     /// makeStyle(roads: Uint8Array, look: Look, features?: Uint8Array, planner?: Uint8Array, name?: string) -> string; an error is a thrown Error.
     #[wasm_bindgen(js_name = makeStyle)]
     pub fn make_style(parquet: Vec<u8>, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, JsError> {

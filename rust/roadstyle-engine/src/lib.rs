@@ -229,7 +229,7 @@ fn style_parts(table: RoadTable, look: &Look, features: Option<Vec<Row>>, planne
         let ramp = colors::Ramp::new(&cmap)?;
         metadata.insert("roadstyle:live".into(), json!({
             "color": layers::LIVE_COLOR, "width": layers::LIVE_WIDTH, "types": {layers::LIVE_COLOR: "color", layers::LIVE_WIDTH: "factor"},
-            "ramp": (0..9).map(|i| ramp.hex(i as f64 / 8.0)).collect::<Vec<_>>(), "nodata": look.theme["data"]["nodata"]}));
+            "ramp": ramp.stops(9), "nodata": look.theme["data"]["nodata"]}));
     }
     if let Some((controls, st)) = contract {
         // audit N7: the roles and the arrow kind from the final layers (contract::describe; tiled_style writes them again for the tiles)

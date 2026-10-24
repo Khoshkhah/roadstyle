@@ -1,15 +1,13 @@
 //! Data-driven colour and width (docs/design/rust_engine.md): render_edges' color_by, colors, cmap, vmin, vmax, width_by, color_table,
 //! color_key, color_options, color_active and legend, read from look["args"]. Ports of roadstyle's stylers.py (ClassStyler,
 //! CategoricalStyler, NumericStyler, ColorTableStyler, bake_props, bake_color_options, build_styler), of render_edges' color_table step,
-//! of render_web.render's colouring and of colors.py's ColorRamp over branca's LinearColormap. The ramps are data (cmaps.json, made by
-//! tests/make_goldens.py from branca and matplotlib).
+//! and of render_web.render's colouring. The ramps (colors.py's ColorRamp) are the look's (roadstyle-look `Ramp`).
 
 use crate::road::Roads;
 use crate::roads::Look;
 use roadstyle_model::Cell;
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
-use std::sync::OnceLock;
 
 /// The colouring of a map: the baked fill property of each colour option (option 0: __rs_fill), the active option (state rs_co) and the
 /// legend data, the page's COLOR_OPTIONS ({name, prop, legend} for each option; empty for class colours).
@@ -98,87 +96,8 @@ fn float(v: &Value) -> Result<f64, String> {
     as_float(Some(Cell::Json(v))).ok_or_else(|| format!("not a number: {v}"))
 }
 
-// --- the ramps: branca's LinearColormap ---
-
-struct Cmaps {
-    branca: Map<String, Value>,
-    css: Map<String, Value>,
-    matplotlib: Map<String, Value>,
-}
-
-fn cmaps() -> &'static Cmaps {
-    static C: OnceLock<Cmaps> = OnceLock::new();
-    C.get_or_init(|| {
-        let v: Value = serde_json::from_str(include_str!("cmaps.json")).expect("cmaps.json");
-        let m = |k: &str| v[k].as_object().cloned().unwrap_or_default();
-        Cmaps { branca: m("branca"), css: m("css"), matplotlib: m("matplotlib") }
-    })
-}
-
-/// A LinearColormap over [0, 1]: the colours (RGBA, 0 to 1) and their index.
-pub struct Ramp {
-    colors: Vec<[f64; 4]>,
-    index: Vec<f64>,
-}
-
-impl Ramp {
-    /// _branca_linear: a branca scheme (exact, then the first of the names in order that is the same ignoring case or starts with
-    /// "<name>_"), else a matplotlib colormap (9 stops); or a list of colours (hex or a colour name).
-    pub fn new(cmap: &Value) -> Result<Ramp, String> {
-        let c = cmaps();
-        let list: Vec<String> = match cmap {
-            Value::Array(a) => a.iter().map(|x| x.as_str().map(String::from).ok_or_else(|| format!("cmap: not a colour: {x}"))).collect::<Result<_, _>>()?,
-            Value::String(name) => {
-                let lower = name.to_lowercase();
-                let mut names: Vec<&String> = c.branca.keys().collect();
-                names.sort();
-                let found = c.branca.get(name).or_else(|| {
-                    names.into_iter().find(|n| n.to_lowercase() == lower || n.to_lowercase().starts_with(&format!("{lower}_"))).map(|n| &c.branca[n])
-                }).or_else(|| c.matplotlib.get(name));
-                let found = found.ok_or_else(|| format!("unknown cmap {name:?}; use a branca scheme name (e.g. 'viridis', 'YlOrRd'), a list of hex \
-                                                          colour stops, or a matplotlib colormap name"))?;
-                found.as_array().unwrap().iter().map(|x| x.as_str().unwrap().to_string()).collect()
-            }
-            other => return Err(format!("cmap: a name or a list of colours, not {other}")),
-        };
-        if list.len() < 2 {
-            return Err("You must provide at least 2 colors.".into());
-        }
-        let n = list.len();
-        let colors = list.iter().map(|x| parse_color(x)).collect::<Result<Vec<_>, _>>()?;
-        Ok(Ramp { colors, index: (0..n).map(|i| i as f64 * 1.0 / (n - 1) as f64).collect() })
-    }
-
-    fn rgba(&self, x: f64) -> [f64; 4] {
-        let (ix, cs) = (&self.index, &self.colors);
-        if x <= ix[0] {
-            return cs[0];
-        }
-        if x >= ix[ix.len() - 1] {
-            return cs[cs.len() - 1];
-        }
-        let i = ix.iter().filter(|&&u| u < x).count();
-        let p = if ix[i - 1] < ix[i] { (x - ix[i - 1]) * 1.0 / (ix[i] - ix[i - 1]) } else { 1.0 };
-        std::array::from_fn(|j| (1.0 - p) * cs[i - 1][j] + p * cs[i][j])
-    }
-
-    /// rgb_hex_str: "#rrggbb", each channel int(u * 255.9999).
-    pub fn hex(&self, x: f64) -> String {
-        let c = self.rgba(x);
-        format!("#{:02x}{:02x}{:02x}", (c[0] * 255.9999) as i64, (c[1] * 255.9999) as i64, (c[2] * 255.9999) as i64)
-    }
-}
-
-/// _parse_color: "#rrggbb" or a colour name.
-fn parse_color(x: &str) -> Result<[f64; 4], String> {
-    let hex = if x.starts_with('#') && x.len() == 7 {
-        x.to_string()
-    } else {
-        cmaps().css.get(&x.to_lowercase()).and_then(Value::as_str).map(String::from).ok_or_else(|| format!("Unknown color {x:?}."))?
-    };
-    let ch = |a: usize| u8::from_str_radix(&hex[a..a + 2], 16).map(|v| v as f64 / 255.0).map_err(|_| format!("Unknown color {x:?}."));
-    Ok([ch(1)?, ch(3)?, ch(5)?, 1.0])
-}
+// the ramps: branca's LinearColormap (roadstyle-look: the ramps are look data)
+pub use roadstyle_look::Ramp;
 
 // --- the stylers ---
 
@@ -268,7 +187,7 @@ fn numeric(fs: &Roads, look: &Look, column: &str, o: &Value) -> Result<Frame, St
     for (v, w) in nums.iter().zip(&widths) {
         f.push(&Value::from(color(*v)), w, &d["opacity"], &null, &null, &zero, &d["casing_opacity"], &null);
     }
-    let stops: Vec<Value> = (0..9).map(|i| Value::from(ramp.hex(i as f64 / 8.0))).collect();
+    let stops: Vec<Value> = ramp.stops(9).into_iter().map(Value::from).collect();
     f.legend = Some(json!({"kind": "continuous", "title": column, "vmin": vmin, "vmax": vmax, "ramp": stops}));
     f.missing = Some(nums.iter().map(Option::is_none).collect());
     f.missing_self = get(o, "missing").and_then(Value::as_str) == Some("self");
@@ -393,16 +312,6 @@ pub fn bake(fs: &mut Roads, look: &Look, args: &Value) -> Result<Colors, String>
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn a_ramp_as_branca() {
-        // roadstyle's ColorRamp: "YlOrRd" is branca's first name with that prefix (YlOrRd_03); a list of two colours at a quarter
-        let r = Ramp::new(&json!("YlOrRd")).unwrap();
-        assert_eq!((r.hex(0.0), r.hex(0.5), r.hex(1.0)), ("#ffeda0".into(), "#feb24c".into(), "#f03b20".into()));
-        let two = Ramp::new(&json!(["#000000", "white"])).unwrap();
-        assert_eq!(two.hex(0.25), "#3f3f3f", "int(0.25 * 255.9999) = 63");
-        assert!(Ramp::new(&json!("no such ramp")).is_err());
-    }
 
     #[test]
     fn a_missing_category_is_empty_text() {

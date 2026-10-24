@@ -49,6 +49,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   has the key: a casing piece has no `__rs_fill@<palette>: null` any more. The map does not change.
 
 ### Added
+- **`rampStops(cmap, n)` in JavaScript**: `n` colours at even steps along a ramp (a branca scheme, a matplotlib colormap, or a list of
+  colours), as Python's `ColorRamp(cmap).stops(n)`: for example a colour for each category of a column in the studio. The ramps and their
+  data (`cmaps.json`) are now in the look crate (`roadstyle-look::Ramp`); the engine's legends use the same `stops`.
 - **Roads from a GeoJSON file in Rust** (`roadstyle-io::geojson::read_roads`, for the studio in the browser). It gives a `RoadTable`, as the
   GeoParquet reader does: one row for each feature, a column for each property (Boolean, Int64, Float64, else text), and a LineString's
   points as the line. The facade's `sources_of(roads, look, ...)` is stage 1 of the roads that any reader gave. JavaScript:
