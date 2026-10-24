@@ -1,7 +1,8 @@
 //! The roads from a GeoPackage (the feature "gpkg": SQLite through rusqlite, a C build, so not in wasm). The same `RoadTable` as the
 //! other readers: the features become GeoJSON for `geojson::read_roads`, so that every reader types a column by one rule.
 //!
-//! - The layer: the file's one feature table (gpkg_contents). A file with more feature tables is an error that names them.
+//! - The layer: the first feature table in gpkg_contents' order, as geopandas reads it. A file with more feature tables also gives
+//!   geopandas' warning, which names them.
 //! - The columns: the table's columns in their order, without its primary key (the fid, as GDAL reads it) and the geometry column.
 //!   BOOLEAN gives true and false, the integer types whole numbers, REAL, FLOAT and DOUBLE numbers, the others text (a BLOB as hex).
 //! - The line: a LineString (2D, Z, M or ZM; its x and y), in EPSG:4326 (`crs`, the CRS of gpkg_spatial_ref_sys: its EPSG code, else
@@ -59,18 +60,20 @@ fn sql_err(what: &str) -> impl Fn(rusqlite::Error) -> String + '_ {
     move |e| format!("{what}: {e}")
 }
 
-/// The roads of the GeoPackage `data` (the file's bytes). `what` names the file in the errors.
-pub fn read_roads(data: &[u8], what: &str) -> Result<RoadTable, String> {
+/// The roads of the GeoPackage `data` (the file's bytes), and the warning when the file has more than one feature table. `what` names
+/// the file in the errors and the warning.
+pub fn read_roads(data: &[u8], what: &str) -> Result<(RoadTable, Option<String>), String> {
     let mut db = Connection::open_in_memory().map_err(sql_err(what))?;
     db.deserialize_read_exact(MAIN_DB, data, data.len(), true).map_err(|e| format!("{what}: not a GeoPackage: {e}"))?;
     let err = sql_err(what);
-    let tables: Vec<String> = db.prepare("SELECT table_name FROM gpkg_contents WHERE data_type = 'features' ORDER BY table_name")
+    let tables: Vec<String> = db.prepare("SELECT table_name FROM gpkg_contents WHERE data_type = 'features' ORDER BY rowid")
         .and_then(|mut s| s.query_map([], |r| r.get(0))?.collect()).map_err(|e| format!("{what}: not a GeoPackage: {e}"))?;
-    let table = match tables.as_slice() {
-        [t] => t.clone(),
-        [] => return Err(format!("{what}: the GeoPackage has no feature table")),
-        _ => return Err(format!("{what}: the GeoPackage has {} feature tables ({}); the reader reads a file with one", tables.len(), tables.join(", "))),
-    };
+    let table = tables.first().cloned().ok_or_else(|| format!("{what}: the GeoPackage has no feature table"))?;
+    // geopandas' (pyogrio's) warning, in its words
+    let warning = (tables.len() > 1).then(|| {
+        let names: Vec<String> = tables.iter().enumerate().map(|(i, t)| if i == 0 { format!("'{t}' (default)") } else { format!("'{t}'") }).collect();
+        format!("More than one layer found in '{what}': {}. Specify layer parameter to avoid this warning.", names.join(", "))
+    });
     let (geom, srs): (String, i64) = db.query_row("SELECT column_name, srs_id FROM gpkg_geometry_columns WHERE table_name = ?1", [&table],
                                                   |r| Ok((r.get(0)?, r.get(1)?))).map_err(&err)?;
     let crs = db.query_row("SELECT organization, organization_coordsys_id, definition FROM gpkg_spatial_ref_sys WHERE srs_id = ?1", [srs],
@@ -119,5 +122,5 @@ pub fn read_roads(data: &[u8], what: &str) -> Result<RoadTable, String> {
         feats.push(json!({"type": "Feature", "properties": props, "geometry": geom}));
     }
     let fc = json!({"type": "FeatureCollection", "features": feats});
-    geojson::read_roads(&serde_json::to_vec(&fc).map_err(|e| e.to_string())?)
+    Ok((geojson::read_roads(&serde_json::to_vec(&fc).map_err(|e| e.to_string())?)?, warning))
 }

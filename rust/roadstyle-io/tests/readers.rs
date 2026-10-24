@@ -81,7 +81,8 @@ mod gpkg {
 
     #[test]
     fn the_sodermalm_geopackage_is_what_geopandas_reads() {
-        let t = gpkg::read_roads(&std::fs::read(SODERMALM).unwrap(), "sodermalm_edges.gpkg").unwrap();
+        let (t, warning) = gpkg::read_roads(&std::fs::read(SODERMALM).unwrap(), "sodermalm_edges.gpkg").unwrap();
+        assert_eq!(warning, None);
         // geopandas.read_file: 4563 rows, these columns (the fid is the index), every geometry a LineString
         assert_eq!(t.len(), 4563);
         assert_eq!(t.names(), ["edge_id", "osm_id", "edge_ref", "highway", "name", "lanes", "oneway", "maxspeed_kmh", "length_m", "tunnel",
@@ -121,18 +122,21 @@ mod gpkg {
                                        speed FLOAT);")).unwrap();
             db.execute(&format!("INSERT INTO gpkg_contents VALUES ('{t}', 'features', '{t}', ?1)"), [srs]).unwrap();
             db.execute(&format!("INSERT INTO gpkg_geometry_columns VALUES ('{t}', 'geom', 'LINESTRING', ?1, 0, 0)"), [srs]).unwrap();
-            db.execute(&format!("INSERT INTO {t} VALUES (1, ?1, 'primary', 2, 1, 50)"), [&blob]).unwrap();
+            db.execute(&format!("INSERT INTO {t} VALUES (1, ?1, '{t}-road', 2, 1, 50)"), [&blob]).unwrap();
         }
         db.serialize(rusqlite::MAIN_DB).unwrap().to_vec()
     }
 
     #[test]
     fn a_sweref99_geopackage_is_reprojected_as_pyproj() {
-        let t = gpkg::read_roads(&geopackage(3006, &SWEREF, &["roads"]), "x.gpkg").unwrap();
-        assert_eq!(t.names(), ["highway", "lanes", "oneway", "speed"]);
+        let (t, warning) = gpkg::read_roads(&geopackage(3006, &SWEREF, &["roads"]), "x.gpkg").unwrap();
+        assert_eq!((t.names(), warning), (&["highway", "lanes", "oneway", "speed"].map(String::from)[..], None));
         assert!(near(t.line(0).unwrap(), &PYPROJ, 1e-8), "{:?}", t.line(0));
         assert_eq!((t.get(0, "oneway").unwrap().as_bool(), t.get(0, "speed").unwrap().as_f64()), (Some(true), Some(50.0)));
-        assert!(gpkg::read_roads(&geopackage(3006, &SWEREF, &["a", "b"]), "x.gpkg").unwrap_err().contains("2 feature tables (a, b)"));
+        // two tables, written b then a: geopandas reads b (gpkg_contents' order, not the names') and warns with these words
+        let (t, warning) = gpkg::read_roads(&geopackage(3006, &SWEREF, &["b", "a"]), "two.gpkg").unwrap();
+        assert_eq!(t.get(0, "highway").unwrap().as_str(), Some("b-road"));
+        assert_eq!(warning.as_deref(), Some("More than one layer found in 'two.gpkg': 'b' (default), 'a'. Specify layer parameter to avoid this warning."));
         assert!(gpkg::read_roads(b"not a file", "x.gpkg").unwrap_err().starts_with("x.gpkg: not a GeoPackage"));
     }
 }
