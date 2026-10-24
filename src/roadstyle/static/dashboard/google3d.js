@@ -4,7 +4,7 @@
 // to its center: the map's own camera distance at that zoom). A clicked road is drawn in the 3D view
 // and the camera flies along it (the map follows). Google's 3D map exists only while the window is
 // open: closing it drops it, as nothing is loaded from Google while it is closed.
-import {map, O, _feats} from "./core.js";
+import {map, O, _road} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
 import {_svKey} from "./streetview.js";
 import {_svLine, _svTiled, _svDist, _svAt} from "./svspot.js";
@@ -104,7 +104,7 @@ export function initGoogle3D(){
     };
     document.addEventListener("rs:select", e=>{  // a road: draw it in the 3D view and fly along it
       const d=e.detail; if(d.overlay || !m3) return;
-      const F=_feats(), cs=_svLine((F && F[d.id]) || _svTiled(d.id)); if(cs.length<2) return;
+      const cs=_svLine(_road(d.id) || _svTiled(d.id)); if(cs.length<2) return;
       const p=d.properties||{}; ttl.textContent=p.name||p.highway||"Unnamed road";
       if(line) line.remove();
       line=new lib.Polyline3DElement({path:cs.map(c=>({lat:c[1], lng:c[0]})), strokeColor:O.select_color, strokeWidth:8,

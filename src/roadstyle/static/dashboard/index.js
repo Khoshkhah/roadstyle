@@ -24,6 +24,7 @@ const RS_DEFAULTS = {
   style: null,                 // the roads style (the layer ids, the base map layer, the metadata); null: it comes later (rs.setStyle)
   prefix: "",                  // the prefix of the roads style's source and layer ids in the map ("rs-": the page added them so)
   engine: null,                // {props: id => Promise of the road's properties}: a page whose roads are only in vector tiles
+  road_table: null,            // the road table {props, mids, bboxes, headings, lines} by row (stage 1); null: window.RS_SIDE, else none
   basemaps: [], basemap_switcher: true,
   tiles: false, simple: false, // simple: the id of the one road layer of simple mode with inline data, else false
   popup_mode: "popup", find_control: false, zoom_readout: true, pitch_3d: 55,

@@ -1,7 +1,7 @@
 // road-class filtering: window.rsSetClasses([...]) shows exactly those classes and hides the
 // rest across every road layer; the collapsible checkbox panel is just UI over it. The class
 // filter composes (AND) with the id filter from rsFilter below.
-import {map, O, RS_PREFIX, RS_TILED, _has, _itemOv, _rprops, _sfeats, _lyr} from "./core.js";
+import {map, O, RS_PREFIX, _has, _itemOv, _rprops, _sfeats, _src, _role, _lyr} from "./core.js";
 import {_popupMode, _tlHost} from "./panel.js";
 export let FILTER = {on:false, classes:[]};
 const _fltCbs={}, _fltBase={};
@@ -25,7 +25,7 @@ export function _applyRoadFilters(){
     return !hid.has(p.__rs_cls) && !(p.__rs_access && _accHid.has(p.__rs_access)) && (_bridgesOn || v<1) && (_tunnelsOn || v>=0) && (!q || q.has(i)); };
   const multi = {};   // decks / shadows: the ids of the features with at least one edge shown (null = no switch is on)
   ["decks","shadows"].forEach(src=>{ multi[src] = !_bridgesOn ? [] : (hidden.length || q || !_tunnelsOn || _accHid.size)
-    ? _sfeats(RS_PREFIX+src).map((f,k)=>(f.properties.__rs_edges||[]).some(edgeOn) ? k : -1).filter(k=>k>=0) : null; });
+    ? _sfeats((_src(src)||{}).source).map((f,k)=>(f.properties.__rs_edges||[]).some(edgeOn) ? k : -1).filter(k=>k>=0) : null; });
   const and = (f,c)=>f?["all",f,c]:c;
   const qr = q && ["any",_has(["id"],_qIds),_has(["get","__rs_edge2"],_qIds)], qe = q && ["any",_has(["get","__rs_edge"],_qIds),_has(["get","__rs_edge2"],_qIds)];   // once per change
   _fltLayers().forEach(l=>{
@@ -33,7 +33,7 @@ export function _applyRoadFilters(){
     let f=_fltBase[l.id];
     // the layer's data: roads, casings, halves, ends, slots, arrows, decks, shadows or an overlay; in tiles mode the slots share the archive
     // source, so the tile layer name is what separates them
-    const kind = RS_TILED && l.source===RS_PREFIX+"roads" ? l["source-layer"] : l.source.slice(l.source.indexOf(RS_PREFIX)===0 ? RS_PREFIX.length : 0), ov=_itemOv(l.id);
+    const kind = _role(l), ov=_itemOv(l.id);
     if(kind==="decks" || kind==="shadows"){
       if(multi[kind]) f=and(f, multi[kind].length ? _has(["id"], multi[kind]) : false);
     }else{

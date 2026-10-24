@@ -81,6 +81,37 @@ rs.setStyle(style);
   piece in the loaded tiles. A step stops at the end of that piece. In Linked mode the marker goes to the next piece on the screen
   when the viewer walks past the end. The marker is a MapLibre marker, not a layer: a new roads style (`setStyle`) does not remove it.
 
+## One way for GeoJSON and tiles (design step g)
+
+Date: 2026-10-24. The dashboard reads the roads in one way, whether the roads style has GeoJSON sources or vector tiles. Three parts
+of `core.js` do it; the other files call them.
+
+- **The sources by role (`_src`, `_role`).** A role is the name of a source of the roads style: `roads`, `simple`, `slots`,
+  `arrows`, `decks`, `shadows`, `ov<i>`. With tiles, a role is a source layer of a vector source. The metadata
+  `roadstyle:sources` (role to `{source, layer}`) gives the map. A style without it gives the same map from its layers: a layer's
+  `source-layer`, else its source, is its role. `_src(role)` gives the map's source id (with the prefix) and the source layer
+  only for a vector source. Filters, picking, the glow, the decks, the slots and Street View use it, with no branch on tiles.
+- **The road table (`RoadTable`).** One port for every read of a road: `has(i)`, `props(i)`, `line(i)`, `mid(i)`, `bbox(i)`,
+  `rows()`, by the road's row. The data is the road table of stage 1 (`{props, mids, bboxes, headings, lines}`), from the option
+  `road_table` or from `window.RS_SIDE`. A page with no table gives one road's fields with `engine.props`. `_road(i)` makes a
+  feature with the road's whole line for Street View and Google 3D. `rsQuery`, `rsFind`, `rsGetProps` and `rsFocus` read the
+  table, so they work with tiles when the page has the table.
+- **The glow (`_fs`).** The feature state of a road by its row. In simple mode the state goes on the pieces of the role
+  `simple`, which all have the row as their id when the source has `promoteId` `"__rs_edge"` (GeoJSON) or
+  `{simple: "__rs_edge"}` (vector). In the full look it goes on the road in the role `roads`. A road's 3D decks come from one
+  index road to decks, made again when the decks' data changes.
+- **The arrows.** The metadata `roadstyle:arrows` says which arrows the style has: `"points"` (the dashboard places one arrow for
+  each one-way chain, on the `arrows` source), `"line"` or `"line-center"` (the style's own symbol layers). A style without the
+  key: points when it has an `arrows` source.
+
+Two reads stay until the page writers of step (g) give every page a road table and `promoteId` (marked "until (g)" in
+`core.js`): the roads' features of an inline page as its road table (`_feats`), and the index of a road's pieces for a `simple`
+source without `promoteId` (`_pieces`). `_sdata` (MapLibre's private `_data`) then stays only for the inline sources that have
+no table: the decks, the slots and the overlays.
+
+The names that other page scripts call stay: `_rprops`, `_feats`, `_svTiled`, `_roadOf`, `pick`, `ITEM_PICK`, `_sfeats`,
+`_rsArrows`, `_rsArrowAt` (the simple-mode script, the level editor).
+
 ## The options
 
 `rsDashboard(map, options)` takes one object. Each key has the name of a `render` keyword where one exists. The values are the
@@ -91,6 +122,7 @@ values that the page reads, which `render` makes from its keywords. The template
 | `style` | the style object | `null`: the roads come later (`setStyle`) | `core.js` (deck layers), `select.js` (pick layers), `basemap.js` (the base map layer) |
 | `prefix` | (none: the Python page adds the style as it is) | `""` | `core.js`, and each file that names a source or a layer |
 | `engine` | (none) | `null`; `{props: id => Promise}` | `core.js` (`_withProps`), `select.js` |
+| `road_table` | (none: the tiled page sets `window.RS_SIDE`) | `null` | `core.js` (`RoadTable`) |
 | `basemaps` | `basemaps` | `[]` | `basemap.js` |
 | `basemap_switcher` | `basemap_switcher` | `true` | `basemap.js` |
 | `tiles` | `tiles` | `false` | `core.js` (the sidecar table `window.RS_SIDE`) |

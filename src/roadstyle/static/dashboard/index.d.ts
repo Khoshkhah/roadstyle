@@ -11,6 +11,9 @@ export interface DashboardOptions {
   prefix?: string;
   /** The engine port: one road's properties on request, for a page whose roads are only in vector tiles. id: the road's row. */
   engine?: { props?: (id: number) => Promise<Record<string, unknown> | null> } | null;
+  /** The road table of stage 1, by row: each road's fields, midpoint, bbox, heading and line. null: window.RS_SIDE, else none
+   *  (then the inline roads source, or engine.props for one road). */
+  road_table?: RoadTableData | null;
   /** The roads are a vector source (tiles). */
   tiles?: boolean;
   /** Simple mode: the id of the one road layer ("roads-simple"), else false. */
@@ -56,6 +59,14 @@ export interface DashboardOptions {
   arrow_icon?: Record<string, unknown> | null;
   arrow_color?: string;
   arrow_rules?: Record<string, unknown>;
+}
+
+export interface RoadTableData {
+  props: Array<Record<string, unknown> | null>;
+  mids?: Array<[number, number] | null>;
+  bboxes?: Array<[number, number, number, number] | null>;
+  headings?: Array<number | null>;
+  lines?: Array<Array<[number, number]> | null>;
 }
 
 export interface ColorOption {

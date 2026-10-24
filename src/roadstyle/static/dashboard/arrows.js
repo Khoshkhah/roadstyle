@@ -1,5 +1,5 @@
 // oneway direction-arrow icon (openstreetmap-carto)
-import {map, O, RS_PREFIX, _sfeats, _feats} from "./core.js";
+import {map, style, O, _src, _sfeats, RoadTable} from "./core.js";
 import {_tunOn} from "./tunnel.js";
 import {_svLanePx} from "./svspot.js";
 export function addArrow(){
@@ -27,7 +27,7 @@ export const _rsArrowAt = new Map();                  // chain -> its arrow feat
 // half as drawn at this zoom, right of travel by the half's offset (roads-fill's line-offset, _svLanePx), not on the pair's centre line.
 // ft._c is the point on the centre line, ft._a -> ft._z the chain's segment there (the travel direction)
 function _rsArrowLane(ft){
-  const e = _feats()[ft.properties.__rs_edge], px = e && e.properties && e.properties.__rs_twoway ? _svLanePx(e.properties) : 0;
+  const p = RoadTable.props(ft.properties.__rs_edge), px = p.__rs_twoway ? _svLanePx(p) : 0;
   if(!px){ ft.geometry.coordinates = ft._c; return ft; }
   const a = map.project(ft._a), b = map.project(ft._z), c = map.project(ft._c);
   const dx = b.x - a.x, dy = b.y - a.y, n = Math.hypot(dx, dy) || 1;     // screen: y down, right of travel = (-dy, dx)
@@ -36,7 +36,10 @@ function _rsArrowLane(ft){
 }
 let _RS_ARROW = null;     // the profile's arrows.place, main_below and main, and labels.base_size
 export function _rsArrows(){
-  const src = map.getSource(RS_PREFIX+"arrows"); if(!src) return;
+  // the style's arrows (roadstyle:arrows): "points", one arrow per one-way chain placed here, on the arrows source; "line" or "line-center": the
+  // style's own symbol layers place them. A style without the key: points when it has an arrows source.
+  const kind = (style.metadata || {})["roadstyle:arrows"]; if(kind && kind !== "points") return;
+  const src = _src("arrows") && map.getSource(_src("arrows").source); if(!src) return;
   const out = [];
   if(map.getZoom() >= 15){
     const bb = map.getBounds(), W = bb.getWest(), E = bb.getEast(), S = bb.getSouth(), N = bb.getNorth();
@@ -46,7 +49,7 @@ export function _rsArrows(){
     const pxPerDeg = 111320 / (78271.51696 * Math.cos(ctr.lat * Math.PI / 180) / Math.pow(2, map.getZoom()));
     const mainOnly = map.getZoom() < _RS_ARROW.mainBelow;
     const vis = new Map(), pieces = new Map();                   // chain -> its visible parts [{slot, lo, hi}] / its pieces [{slot, c, cum, len, p}]
-    for(const f of _sfeats(RS_PREFIX+"slots")){
+    for(const f of _sfeats((_src("slots")||{}).source)){
       const p = f.properties || {}; if(!p.oneway) continue;
       if(mainOnly && !_RS_ARROW.main.has(String(p.highway || "").replace(/_link$/, ""))) continue;
       const c = f.geometry && f.geometry.coordinates; if(!c) continue;
@@ -126,6 +129,6 @@ export function initArrows(){
   map.on("load", addArrow);
   map.on("load", _rsArrows);
   map.on("moveend", _rsArrows);
-  map.on("sourcedata", e => { if(e.sourceId !== RS_PREFIX+"slots") return; const n = _sfeats(RS_PREFIX+"slots").length; if(n !== _rsSlotsN){ _rsSlotsN = n; _rsArrows(); } });
+  map.on("sourcedata", e => { const s = _src("slots"); if(!s || e.sourceId !== s.source) return; const n = _sfeats(s.source).length; if(n !== _rsSlotsN){ _rsSlotsN = n; _rsArrows(); } });
   map.on("styleimagemissing", e=>{ if(e.id==="oneway") addArrow(); });
 }

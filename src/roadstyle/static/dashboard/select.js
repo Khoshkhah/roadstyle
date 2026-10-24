@@ -1,6 +1,6 @@
 // hover + click-to-select + info popup (feature-state, tolerance box, throttled to one query/frame)
 import {POPUP, _rpairs, _rfields} from "../popup.js";
-import {map, style, O, RS_PREFIX, RS_LEAN, RS_DECK_LAYERS, OVERLAYS, _itemOv, _feats, _side, _rprops, _pcache, _withProps, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad} from "./core.js";
+import {map, style, O, RS_PREFIX, RS_LEAN, RS_DECK_LAYERS, OVERLAYS, _itemOv, _side, _rprops, _pcache, _withProps, RoadTable, _road, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad} from "./core.js";
 import {_popupMode, rsInfoShow, rsInfoClear} from "./panel.js";
 import {_ovUnder, _ovWin, clearOvSel, _ovAt, _ovSections, handleOverlayClick} from "./overlays.js";
 import {_svLine, _svDist, _svTiled, _svPick, _sv, initSpot} from "./svspot.js";
@@ -19,7 +19,7 @@ let ROAD_ITEMS = null;   // {label, popup, layer: the one road layer} or null
 let ITEM_PICK = null, PICK_LAYERS = [];
 export function _roadOf(f){ const e=f.properties.__rs_edge;   // the road an item belongs to, as a picked road feature
   return {id:e, properties:_rprops(e), layer:f.layer, item:f,
-          get geometry(){ const r=_feats()[e] || _svTiled(e); return r && r.geometry; }}; }   // tiles: only when Street View asks
+          get geometry(){ const r=_road(e) || _svTiled(e); return r && r.geometry; }}; }   // tiles: only when Street View asks
 // the feature right under the cursor first, the tolerance box only when there is none: a two-way road's two directions lie side by
 // side, and the box reaches both, where the one drawn last would win (a click near the middle selected the other direction)
 export function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id)); if(!ids.length) return null;
@@ -33,9 +33,9 @@ export function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id)); i
 export function srcOf(f){ return f && f.layer && f.layer.id.indexOf(RS_PREFIX+"roads-bridge-decks")===0 ? "decks" : "roads"; }
 // full properties of a picked feature: tiles carry only the style props, so road hits read the
 // sidecar row behind the feature id (or the properties that engine.props gave); decks (and inline mode) keep the feature's own properties
-function _pickProps(f){ const s=_side();
-  if(!s && srcOf(f)==="roads" && _pcache.has(f.id)) return _pcache.get(f.id);
-  return (s && srcOf(f)==="roads" && f.id!=null) ? (s.props[f.id]||f.properties||{}) : (f.properties||{}); }
+function _pickProps(f){ const t=_side();
+  if(srcOf(f)==="roads" && f.id!=null){ if(t) return t.props[f.id]||f.properties||{}; if(_pcache.has(f.id)) return _pcache.get(f.id); }
+  return f.properties||{}; }
 function _selItem(f){ if(ITEM_PICK && f && f.item && f.item.layer.id===ROAD_ITEMS.layer) return ITEM_PICK;   // a road item of items=
   const o = f && f.item && _itemOv(f.item.layer.id); return o && o.select==="item" ? o : null; }   // its overlay
 function hitOf(f){ if(!f || f.id==null) return null;
@@ -76,8 +76,7 @@ function _midOf(g){                         // the middle of the length (a middl
   return [cs[i][0]+t*(cs[i+1][0]-cs[i][0]), cs[i][1]+t*(cs[i+1][1]-cs[i][1])]; }
 export function rsSelect(id){ _withProps([id], ()=>_select(id)); }
 function _select(id){
-  const s=_side();
-  const props = s ? s.props[id] : _pcache.has(id) ? _pcache.get(id) : (_feats()[id]||{}).properties;
+  const props = RoadTable.has(id) ? RoadTable.props(id) : null;
   if(props==null) return;
   clearOvSel();
   if(_sel) setS(_sel,{select:false});
@@ -89,12 +88,12 @@ function _select(id){
   setS(_sel,{select:true});
   if(_sel.road!=null) _fs({source:"roads", id:_sel.road},{select:true});
   // best effort for programmatic selection: overlays at the edge's midpoint (when on screen)
-  const c = s ? s.mids[id] : _midOf((_feats()[id] || _svTiled(id) || {}).geometry);
+  const c = RoadTable.mid(id) || _midOf((_road(id) || _svTiled(id) || {}).geometry);
   let ovs=[]; if(c){ try{ ovs=_ovAt(map.project({lng:c[0], lat:c[1]})); }catch(err){} }
   const cll = c ? {lng:c[0], lat:c[1]} : null;
   document.dispatchEvent(new CustomEvent("rs:select",
-    {detail:{id:id, layer:null, properties:props || {}, twin:_twinDetail(props), overlays:ovs, streetView:_svPick(cll, _feats()[id] || _svTiled(id), id)}}));
-  const sv = _sv(cll, _feats()[id] || _svTiled(id));
+    {detail:{id:id, layer:null, properties:props || {}, twin:_twinDetail(props), overlays:ovs, streetView:_svPick(cll, _road(id) || _svTiled(id), id)}}));
+  const sv = _sv(cll, _road(id) || _svTiled(id));
   if(_roadPopup){
     if(_popupMode === "panel"){ rsInfoShow(_both(props||{}, true, _popupFields) + sv + _ovSections(ovs)); }
     else if(c) new maplibregl.Popup({closeButton:true, maxWidth:POPUP.maxWidth})
