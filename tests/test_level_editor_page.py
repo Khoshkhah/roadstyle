@@ -48,6 +48,13 @@ PAGE = """<!DOCTYPE html><html><head><meta charset="utf-8">
 <script src="/vendor/maplibre-gl.js"></script><link rel="stylesheet" href="/vendor/maplibre-gl.css">
 <link rel="stylesheet" href="/dashboard/dashboard.css"><link rel="stylesheet" href="/popup.css">
 <style>html,body{margin:0;height:100%}#map{position:absolute;inset:0}</style></head><body><div id="map"></div><div id="panel"></div>
+<script>
+// the document's listeners by type (the test's count: a listener left after destroy, or one more after each open, shows here)
+window.listening = {};
+const _on = document.addEventListener, _off = document.removeEventListener;
+document.addEventListener = function(t, ...a){ listening[t] = (listening[t] || 0) + 1; return _on.call(this, t, ...a); };
+document.removeEventListener = function(t, ...a){ listening[t] = (listening[t] || 0) - 1; return _off.call(this, t, ...a); };
+</script>
 <script type="module">
 import init, * as pkg from "/level_editor/pkg/roadstyle_wasm.js";
 import {levelEditor, browserStore} from "/dashboard/editor/level_editor.js";
@@ -59,8 +66,20 @@ const store = browserStore("test-area", "Monaco test");
 for(const [n, v] of [["roads.parquet", a.roads], ["pairs.csv", a.pairs], ["edits.csv", a.edits]]) await store.save(n, v);
 const map = new maplibregl.Map({container: "map", style: {version: 8, glyphs: "/fonts/{fontstack}/{range}.pbf", sources: {}, layers: []},
   center: [7.42, 43.73], zoom: 15});
-// the host's own dashboard (the page's one), as duckosm-rust's page has it
-const host = rsDashboard(map, {style: null, prefix: "host-", tiles: true, simple: "roads-simple", edge_id_col: "edge", basemap_switcher: false});
+// the host's own page, as duckosm-rust's has it: a base map layer and its roads style, both with its prefix, and its one dashboard
+await map.once("load");
+map.addSource("host-water", {type: "geojson", data: {type: "Feature", properties: {}, geometry: {type: "Polygon",
+  coordinates: [[[7.41, 43.72], [7.43, 43.72], [7.43, 43.74], [7.41, 43.74], [7.41, 43.72]]]}}});
+map.addLayer({id: "host-water", type: "fill", source: "host-water", paint: {"fill-color": "#aad3df"}});
+const edges = new Uint8Array(await (await fetch("/edges.parquet")).arrayBuffer());
+const own = JSON.parse(pkg.makeStyle(edges, pkg.resolveLook(JSON.stringify({args: {state: "live"}}))));
+for(const [k, v] of Object.entries(own.state || {})) map.setGlobalStateProperty(k, v.default ?? null);     // a live style's state
+for(const [id, im] of Object.entries(own.metadata["roadstyle:images"] || {}))
+  map.addImage("host-" + id, (await map.loadImage(im.url)).data, {sdf: im.sdf, pixelRatio: im.pixelRatio});
+for(const [id, src] of Object.entries(own.sources)) map.addSource("host-" + id, src);
+for(const l of own.layers) map.addLayer({...JSON.parse(JSON.stringify(l).replaceAll('"oneway"', '"host-oneway"')), id: "host-" + l.id, source: "host-" + l.source});
+window.hostRoads = own.layers.map(l => "host-" + l.id);
+const host = rsDashboard(map, {style: own, prefix: "host-", basemap_switcher: false});
 window.host = host;
 const panel = document.getElementById("panel");
 if(location.search === "?no-dashboard"){                         // the host's dashboard not given: an error, no second dashboard
@@ -68,10 +87,17 @@ if(location.search === "?no-dashboard"){                         // the host's d
   catch(e){ window.ready = e.message; }
   throw new Error("stop");
 }
-const ed = await levelEditor({map, container: panel, pkg, store, dashboard: host, prefix: "host-"});
+window.hostMap = map;
+window.hostSources = Object.fromEntries(map.getStyle().layers.filter(l => l.id.startsWith("host-")).map(l => [l.id, l.source]));
+window.counts = () => JSON.stringify(Object.fromEntries(Object.entries(listening).filter(e => e[1])));
+window.before = counts();
 window.solved = [];
-ed.addEventListener("solved", e => window.solved.push({rows: e.detail.levelsCsv.trim().split("\\n").length - 1, draw: e.detail.draw().length}));
-window.editor = ed;
+window.openEditor = async () => {
+  const ed = await levelEditor({map, container: panel, pkg, store, dashboard: host, prefix: "host-"});
+  ed.addEventListener("solved", e => window.solved.push({rows: e.detail.levelsCsv.trim().split("\\n").length - 1, draw: e.detail.draw().length}));
+  window.editor = ed;
+};
+await window.openEditor();
 window.ready = a.roadCount;
 </script></body></html>"""
 
@@ -120,7 +146,10 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             errors.clear()
             roads = page.evaluate("window.ready")
             assert page.evaluate("window.rs === window.host"), "the editor uses the host's dashboard, not a second one"
-            assert page.evaluate("map.getStyle().layers.some(l => l.id.startsWith('host-roads'))"), "the editor's roads with the host's prefix"
+            assert page.evaluate("hostMap.getStyle().layers.some(l => l.id.startsWith('host-roads'))"), "the editor's roads with the host's prefix"
+            assert page.evaluate("!!hostMap.getLayer('host-water')"), "the host's base map stays"
+            # the host's own roads went (the layers of the roles of its style's roadstyle:sources): every road layer is the editor's
+            assert page.evaluate("hostMap.getStyle().layers.filter(l => l.id.startsWith('host-roads')).every(l => l.source === 'host-roads')")
             stored = page.evaluate("localStorage.getItem('lv:test-area:levels.csv')")
             assert stored and len(stored.strip().split("\n")) > roads, "the first solve saved levels.csv in the browser"
             assert page.locator("#lv").count() == 1, "the panel is in the host's container"
@@ -132,6 +161,18 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             assert len(solved) == 1 and solved[0]["rows"] > roads and solved[0]["draw"] > 0, solved
             assert road in page.evaluate("localStorage.getItem('lv:test-area:heads.csv')")
             assert page.evaluate("window.editor.files") == ["edits.csv", "heads.csv", "caps.csv", "levels.csv"]
+            # close, open again, close: the same listeners each time, none left; the host's roads, base map and dashboard back
+            opened = page.evaluate("counts()")
+            back = "JSON.stringify(Object.fromEntries(hostMap.getStyle().layers.filter(l => l.id.startsWith('host-')).map(l => [l.id, l.source])))"
+            for _ in range(2):
+                page.evaluate("window.editor.destroy()")
+                assert page.evaluate("counts()") == page.evaluate("window.before"), "no listener of the editor left"
+                assert page.evaluate(back) == page.evaluate("JSON.stringify(window.hostSources)"), "the host's layers as they were"
+                assert page.evaluate("!document.getElementById('lv') && !hostMap.getLayer('lv-ends') && !hostMap.getSource('host-roads')")
+                assert page.evaluate("window.rs === window.host && !window.lvApi && !document.body.classList.contains('lv-open')")
+                page.evaluate("window.openEditor()")
+                page.wait_for_function("!!document.getElementById('lv') && !!window.lvApi", timeout=60000)
+                assert page.evaluate("counts()") == opened, "one listener of each kind after each open"
             assert not errors, errors
             b.close()
     finally:

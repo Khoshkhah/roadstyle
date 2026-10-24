@@ -7,6 +7,7 @@
 // save(name, text | bytes)} with an optional `name` (the area's, shown in the panel) and `key`: httpStore for roadstyle serve,
 // browserStore for a page with no server.
 import {rsDashboard} from "../index.js";
+import {style as dashboardStyle} from "../core.js";
 
 const COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"];
 const EMPTY = COLS.join(",") + "\n";
@@ -83,6 +84,7 @@ if(map && window.map instanceof ml.Map && window.map !== map)     // (an element
   throw new Error("level editor: window.map is another map; the panel draws on window.map");
 const P = map ? prefix : "rs-";                                  // a host map: the editor's layers and sources with the prefix given
 const {LevelArea} = pkg;
+const hostSide = window.RS_SIDE, hadApi = window.lvApi;          // the host's, for destroy
 const events = new EventTarget();
 const get = (n, bytes) => store.load(n, bytes);
 const [roadsF, pairsF, editsF, headsF, capsF, levelsF, infoF] = await Promise.all([get("roads.parquet", true), get("pairs.csv"), get("edits.csv"),
@@ -172,11 +174,25 @@ window.map = map;                                                // the panel (l
 // the page's one dashboard: the host's, else one for the editor (the road fields: the road table RS_SIDE)
 const rs = dashboard || rsDashboard(map, {style: null, prefix: P, tiles: true, simple: "roads-simple", edge_id_col: "edge", basemap_switcher: false,
   select_color: "rgba(0,0,0,0)"});
-async function showRoads(st){                                      // the roads style on the map, in place of the one before (prefix P)
-  for(const l of map.getStyle().layers) if(l.id.startsWith(P)) map.removeLayer(l.id);
-  for(const id of Object.keys(map.getStyle().sources)) if(id.startsWith(P)) map.removeSource(id);
+const mine = {layers: [], sources: [], images: []};              // what the editor put on the map
+const taken = {layers: [], sources: {}, order: [], style: null};  // the host's roads that the editor took off, for destroy
+let first = true;
+async function showRoads(st){                                      // the roads style on the map (prefix P), in place of the one before
+  const layers = st.layers.map(l => P + l.id), sources = Object.keys(st.sources).map(id => P + id);
+  // off: the editor's own layers, the layers with an id it adds, and the first time the host dashboard's roads (the layers of the roles of
+  // its style's roadstyle:sources: not its base map)
+  const roles = first && dashboard ? Object.values((dashboardStyle?.metadata || {})["roadstyle:sources"] || {}).map(r => P + r.source) : [];
+  const off = new Set([...mine.layers, ...layers, ...map.getStyle().layers.filter(l => roles.includes(l.source)).map(l => l.id)]);
+  if(first && dashboard){                                          // the host's, as they are, to put back
+    const now = map.getStyle();
+    Object.assign(taken, {layers: now.layers.filter(l => off.has(l.id)), order: now.layers.map(l => l.id), style: dashboardStyle,
+      sources: Object.fromEntries(sources.filter(id => now.sources[id]).map(id => [id, now.sources[id]]))});
+  }
+  for(const id of off) if(map.getLayer(id)) map.removeLayer(id);
+  for(const id of new Set([...mine.sources, ...sources])) if(map.getSource(id) && !map.getStyle().layers.some(l => l.source === id)) map.removeSource(id);
+  [mine.layers, mine.sources, first] = [layers, sources, false];
   for(const [id, im] of Object.entries(st.metadata["roadstyle:images"] || {}))
-    if(!map.hasImage(P + id)) map.addImage(P + id, (await map.loadImage(im.url)).data, {sdf: im.sdf, pixelRatio: im.pixelRatio});
+    if(!map.hasImage(P + id)){ map.addImage(P + id, (await map.loadImage(im.url)).data, {sdf: im.sdf, pixelRatio: im.pixelRatio}); mine.images.push(P + id); }
   // a live style's global state (rs_colors, rs_co, ...): its start values, as a style with them would set them (the base map has none)
   for(const [k, v] of Object.entries(st.state || {})) map.setGlobalStateProperty(k, v.default ?? null);
   for(const [id, src] of Object.entries(st.sources)) map.addSource(P + id, id === "roads" ? {...src, promoteId: {simple: "__rs_edge"}} : src);
@@ -186,7 +202,8 @@ async function showRoads(st){                                      // the roads 
   }
   rs.setStyle(st);
 }
-if(!map.isStyleLoaded()) await map.once("load");
+// the style loaded: a host map's load event can be over, and isStyleLoaded false a moment while it loads an image, with no event after
+while(!map.isStyleLoaded()) await new Promise(ok => setTimeout(ok, 50));
 await showRoads(style);
 await map.once("idle");                                          // the roads style in place: the panel starts on a loaded style
 
@@ -319,10 +336,18 @@ window.lvApi = async (path, body) => {
 const panel = (await (await fetch(new URL("../../level_editor.html", import.meta.url))).text()).replace("__STATS__", JSON.stringify(stats()));
 const holder = document.createElement("div");
 holder.innerHTML = panel;
-for(const n of [...holder.childNodes]){
-  if(n.tagName === "SCRIPT"){ const s = document.createElement("script"); s.textContent = n.textContent; container.appendChild(s); }
-  else container.appendChild(n);
-}
+// the panel's nodes, and the listeners that its scripts add to the document and the map as they run (destroy takes them off)
+const nodes = [], heard = [];
+const [docOn, mapOn] = [document.addEventListener, map.on];
+document.addEventListener = function(...a){ heard.push(() => document.removeEventListener(...a)); return docOn.apply(this, a); };
+map.on = function(...a){ heard.push(() => map.off(...a)); return mapOn.apply(this, a); };
+try {
+  for(const n of [...holder.childNodes]){
+    const node = n.tagName === "SCRIPT" ? Object.assign(document.createElement("script"), {textContent: n.textContent}) : n;
+    nodes.push(node);
+    container.appendChild(node);                                 // a script runs here, at once
+  }
+} finally { [document.addEventListener, map.on] = [docOn, mapOn]; }
 // the files of the area as the page has them now, to download (a page with no server keeps them in the browser)
 const files = {"edits.csv": () => editsText, "heads.csv": () => headsText, "caps.csv": () => capsText,
   "levels.csv": () => area.levelsCsv(Int32Array.from(res.levels.flat()), headsText, capsText)};
@@ -333,5 +358,30 @@ function download(name){
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
-return Object.assign(events, {map, area, download, files: Object.keys(files), answer: () => res});
+/** The editor off the page: its panel and its listeners, its roads, tiles and images, the panel's end marks and the page state it set;
+ * on a host map, the host's roads that it took off go back in their places, with the host's road table and dashboard style. Your
+ * files stay in the store. A map of its own is removed. */
+function destroy(){
+  heard.forEach(off => off());
+  nodes.forEach(n => n.remove());
+  document.body.classList.remove("lv-open");
+  for(const id of [...mine.layers, "lv-ends"]) if(map.getLayer(id)) map.removeLayer(id);
+  for(const id of [...mine.sources, "lv-ends"]) if(map.getSource(id)) map.removeSource(id);
+  mine.images.forEach(id => map.hasImage(id) && map.removeImage(id));
+  ml.removeProtocol("lv");
+  if(own){ map.remove(); if(window.map === map) delete window.map; }
+  else if(dashboard){
+    for(const [id, src] of Object.entries(taken.sources)) if(!map.getSource(id)) map.addSource(id, src);
+    for(const l of taken.layers){                                  // before the first later layer of the host's that is on the map
+      const after = taken.order.slice(taken.order.indexOf(l.id) + 1).find(id => map.getLayer(id));
+      map.addLayer(l, after);
+    }
+    window.RS_SIDE = hostSide;
+    if(taken.style) dashboard.setStyle(taken.style);
+    document.dispatchEvent(new CustomEvent("rs:tableready"));
+  }
+  // window.map stays the host's map (the panel's last timers read it)
+  if(hadApi) window.lvApi = hadApi; else delete window.lvApi;
+}
+return Object.assign(events, {map, area, download, destroy, files: Object.keys(files), answer: () => res});
 }
