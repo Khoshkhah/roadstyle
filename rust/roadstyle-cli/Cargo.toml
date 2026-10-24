@@ -1,0 +1,15 @@
+[package]
+name = "roadstyle-cli"
+version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The roadstyle program: one command for each job (serve: the level editor's files)"
+
+[lib]
+name = "roadstyle_cli"
+
+[[bin]]
+name = "roadstyle"
+path = "src/main.rs"

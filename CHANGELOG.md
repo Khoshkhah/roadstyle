@@ -24,6 +24,24 @@ All notable changes to **roadstyle** are documented here. The format is based on
     `vector_style`; `roadstyle_tiles::stage::TileOptions` (stage 2's rules); `roadstyle_io::write::parquet` (Parquet and GeoParquet)
     and `roadstyle_io::read::features` (a GeoParquet file as GeoJSON).
   - Tartu: all sources 130 MB as GeoJSON files, 22 MB as GeoParquet files; the road table 3.2 MB.
+- **`compute_levels(engine="rust")` takes all its keywords**: `band_col`, `order` (`"priority"`, `"class"`, a column or None),
+  `band_dist`, `head_m`, `max_level`, `margin`, `min_positions` and `near_rules`. Before, a keyword not at its default went to the Python
+  engine. The Rust solver has no time limit, so it does not use `time_limit`.
+- **The level editor solves with Rust**: `roadstyle-levels edit` uses the Rust solver by default (Monaco: a change in 0.4 s, the
+  whole area in 0.5 s); `--engine python` keeps the Python solver. `solve_levels(..., engine="rust")` and `roadstyle-levels solve
+  --engine rust` solve the same tables with the Rust solver (no `max_positions`, no time limit).
+- Rust: `roadstyle_levels::levels(edges, options)` replaces `compute(edges, method)`. `Options` has the keywords of `compute_levels`, and
+  also `fixed` (numbers that stay as they are, as `solve_levels(fixed=...)`) and `edits` (the rows of `visualization.level_edits`, as
+  `solve_levels(edits=...)`). `edge_hash(ids)` is public.
+
+### Changed
+- The Rust engine solves the levels of one network one time: `levels()` keeps the result of the last 2 networks. The style, its tiles
+  and each palette of a view use the same result (Tartu: 3.1 s for the first solve, 0.1 s after).
+- Browser package: `roads_sql.js` has `makeRoads(q, catalog, opts)`, one time for each file, and `writeRoads(q, mode)`, which writes
+  only `roads.parquet` for each mode. `edge_id` and `osm_id` stay BIGINT, and `source` and `target` (duckOSM's node ids) stay in
+  `roads.parquet`. The SQL copy of the tags rule and the JavaScript copy of the edge hash are gone: `makeRoads` returns the look's
+  `args.levels`, `"tags"` (the engine computes the levels with the tags rule) or the stored levels' `{edge_hash, n_edges}` (the engine
+  checks them).
 
 ## [0.25.0] — 2026-10-23
 

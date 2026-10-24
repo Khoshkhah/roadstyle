@@ -466,20 +466,36 @@ def test_export_look(kw):
     assert diff(rs.export_look(engine="rust", **kw), rs.export_look(engine="python", **kw)) == []
 
 
-@pytest.mark.parametrize("method", ["tags", "solve"])
-def test_compute_levels(part, method):
-    """compute_levels: the same four columns from both engines (the roads of the part of Monaco, with no level columns)."""
+LEVEL_CASES = {"solve": {}, "class": {"order": "class"}, "no_order": {"order": None}, "order_col": {"order": "rank_col"},
+               "band_col": {"band_col": "layer"}, "band_dist": {"band_dist": 20.0}, "head_m": {"head_m": 10.0}, "max_level": {"max_level": 2},
+               "no_min_positions": {"min_positions": False}, "near_rules": {"near_rules": True}, "margin": {"margin": 2.0}}
+LEVEL_COLS = ["casing_start", "casing_level", "casing_end", "fill_level"]
+
+
+def test_compute_levels_tags(part):
+    """The tags rule (no optimization): the same four columns from both engines."""
     roads = part.drop(columns=[c for c in _LEVEL_COLS if c in part.columns])
-    py = rs.compute_levels(roads, method=method, engine="python")
-    ru = rs.compute_levels(roads, method=method, engine="rust")
-    cols = ["casing_start", "casing_level", "casing_end", "fill_level"]
-    assert py[cols].astype(int).values.tolist() == ru[cols].astype(int).values.tolist()
+    py, ru = (rs.compute_levels(roads, method="tags", engine=e) for e in ("python", "rust"))
+    assert py[LEVEL_COLS].astype(int).values.tolist() == ru[LEVEL_COLS].astype(int).values.tolist()
     assert ru.attrs["levels_params"] == py.attrs["levels_params"]
 
 
-def test_compute_levels_rust_defaults_only(part):
-    with pytest.raises(ValueError, match="not at the defaults"):
-        rs.compute_levels(part, method="solve", engine="rust", max_level=5)
+@pytest.mark.parametrize("case", sorted(LEVEL_CASES))
+def test_compute_levels_solve(part, case):
+    """The solve with each keyword: a feasible answer (the Rust solver checks its hard rules; here no casing is over its fill). The
+    two solvers can take different answers that are equally good, so the rows are not compared."""
+    roads = part.drop(columns=[c for c in _LEVEL_COLS if c in part.columns])
+    roads["rank_col"] = [float(i % 5) for i in range(len(roads))]
+    ru = rs.compute_levels(roads, engine="rust", **LEVEL_CASES[case])
+    v = ru[LEVEL_COLS].astype(int).values
+    assert (v[:, :3] <= v[:, 3:]).all()
+
+
+def test_compute_levels_rust_errors(part):
+    with pytest.raises(ValueError, match="use method='solve'"):
+        rs.compute_levels(part, method="tags", engine="rust", band_col="layer")
+    with pytest.raises(ValueError, match="greater than 0"):
+        rs.compute_levels(part, engine="rust", margin=0)
 
 
 def test_engine_names(monkeypatch):

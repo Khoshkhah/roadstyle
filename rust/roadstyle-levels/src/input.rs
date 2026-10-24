@@ -3,16 +3,12 @@
 //! relations are the same.
 
 use super::solve::Rules;
-use super::{LevelEdge, Pt};
+use super::{LevelEdge, Options, Order, Pt};
 use rstar::{RTree, RTreeObject, AABB};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-/// roadstyle's defaults: roads of different bands within `BAND_DIST` metres are a stack pair; a head is `HEAD_M` long.
-const BAND_DIST: f64 = 10.0;
-pub const HEAD_M: f64 = 5.0;
-
-/// The roads: edges with the same line (in one direction or the other) and the same `highway`, `tunnel`, `bridge`
-/// and `layer` (roadstyle's `_road_split`).
+/// The roads: edges with the same line (in one direction or the other) and the same `highway`, `tunnel`, `bridge`,
+/// `layer` and band (roadstyle's `_road_split`).
 pub struct Roads {
     /// The end nodes of each edge (equal end points are one node).
     pub ends: Vec<(u32, u32)>,
@@ -43,7 +39,7 @@ pub fn road_split(edges: &[&LevelEdge]) -> Result<Roads, String> {
         }
         ends.push((id(&e.geometry[0]), id(e.geometry.last().unwrap())));
     }
-    type Key<'a> = ((u32, u32), Vec<(u64, u64)>, [Option<&'a str>; 4]);
+    type Key<'a> = ((u32, u32), Vec<(u64, u64)>, [Option<&'a str>; 5]);
     let mut roads: HashMap<Key, usize> = HashMap::new();
     let (mut first, mut road, mut same) = (Vec::new(), Vec::new(), Vec::new());
     for (i, e) in edges.iter().enumerate() {
@@ -56,6 +52,7 @@ pub fn road_split(edges: &[&LevelEdge]) -> Result<Roads, String> {
             a.tunnel.as_deref(),
             a.bridge.as_deref(),
             a.layer.as_deref(),
+            a.band.as_deref(),
         ];
         let key = ((s.min(t), s.max(t)), fwd.clone().min(rev), kind);
         let r = *roads.entry(key).or_insert_with(|| {
@@ -104,9 +101,23 @@ pub fn level(e: &LevelEdge) -> i64 {
     }
 }
 
-/// The priority of a road (`order="priority"`): the class order of the map (`class_order`, roadstyle's theme), plus
-/// 300 for a roundabout, 200 for a tunnel, 100 for a bridge.
-fn priority(e: &LevelEdge) -> f64 {
+/// The band of a road from `band_col` (`pd.to_numeric(...).fillna(0).round()`: a value that is not a number is 0).
+fn band(e: &LevelEdge) -> i64 {
+    e.band
+        .as_deref()
+        .and_then(|s| s.trim().parse::<f64>().ok())
+        .filter(|v| v.is_finite())
+        .map_or(0, |v| v.round_ties_even() as i64)
+}
+
+/// The priority of a road (`order`): with "class", the class order of the map (`class_order`, roadstyle's theme); with
+/// "priority", plus 300 for a roundabout, 200 for a tunnel, 100 for a bridge; with a column, its number (None: no wish).
+fn priority(e: &LevelEdge, order: Order) -> Option<f64> {
+    match order {
+        Order::None => return None,
+        Order::Column => return e.order,
+        _ => {}
+    }
     let z = |c: &str| -> Option<f64> {
         Some(match c {
             "motorway" => 9.0,
@@ -132,10 +143,16 @@ fn priority(e: &LevelEdge) -> f64 {
         })
     };
     let h = e.highway.as_str();
+    if h.is_empty() {
+        return None; // a road with no class takes no part in the order (the caller's empty highway is no class)
+    }
     let class = z(h).unwrap_or_else(|| match h.strip_suffix("_link") {
         Some(b) => z(b).unwrap_or(4.0) - 0.5,
         None => 4.0,
     });
+    if order == Order::Class {
+        return Some(class);
+    }
     let a = e;
     let tier = if matches!(
         a.junction.as_deref().map(str::to_lowercase).as_deref(),
@@ -149,7 +166,7 @@ fn priority(e: &LevelEdge) -> f64 {
     } else {
         0.0
     };
-    class + 100.0 * tier
+    Some(class + 100.0 * tier)
 }
 
 /// The UTM zone of a point and the projection to it: the transverse Mercator series of Krüger (6th order, as PROJ).
@@ -455,11 +472,11 @@ fn substring(l: &[Pt], a: f64, b: f64) -> Vec<Pt> {
     out
 }
 
-/// The three casing parts of a road (`casing_parts`): the heads `HEAD_M` long (cut in their ratio on a short road),
+/// The three casing parts of a road (`casing_parts`): the heads `head_m` long (cut in their ratio on a short road),
 /// and the main part, None when it is shorter than 5 cm.
-fn casing_parts(l: &[Pt]) -> [Option<Vec<Pt>>; 3] {
+fn casing_parts(l: &[Pt], head_m: f64) -> [Option<Vec<Pt>>; 3] {
     let n = length(l);
-    let (mut h0, mut h1) = (HEAD_M, HEAD_M);
+    let (mut h0, mut h1) = (head_m, head_m);
     if h0 + h1 >= n {
         (h0, h1) = (n * h0 / (h0 + h1), n * h1 / (h0 + h1));
     }
@@ -479,12 +496,17 @@ impl RTreeObject for Indexed {
     }
 }
 
-/// The rules of the roads (`_relations` and `_stack_parts`), and the band of each road.
-pub fn relations(edges: &[&LevelEdge], roads: &Roads) -> (Rules, Vec<i64>) {
+/// The rules of the roads (`_relations` and `_stack_parts`), and the band of each road. With `band_col`, roads of
+/// different bands are a stack pair also where they only meet (no tunnel mouths).
+pub fn relations(edges: &[&LevelEdge], roads: &Roads, o: &Options) -> (Rules, Vec<i64>) {
     let n = roads.first.len();
+    let band_dist = o.band_dist;
     let head: Vec<&LevelEdge> = roads.first.iter().map(|&i| edges[i]).collect();
-    let band: Vec<i64> = head.iter().map(|e| level(e)).collect();
-    let omega: Vec<f64> = head.iter().map(|e| priority(e)).collect();
+    let band: Vec<i64> = head
+        .iter()
+        .map(|e| if o.band_col { band(e) } else { level(e) })
+        .collect();
+    let omega: Vec<Option<f64>> = head.iter().map(|e| priority(e, o.order)).collect();
     let re: Vec<(u32, u32)> = roads.first.iter().map(|&i| roads.ends[i]).collect();
     let lines: Vec<&[Pt]> = head.iter().map(|e| e.geometry.as_slice()).collect();
     let m = metres(&lines);
@@ -517,7 +539,7 @@ pub fn relations(edges: &[&LevelEdge], roads: &Roads) -> (Rules, Vec<i64>) {
         node_at.entry(t).or_insert(*m[r].last().unwrap());
     }
 
-    // stack: roads of different bands within BAND_DIST, away from the nodes they share
+    // stack: roads of different bands within band_dist, away from the nodes they share
     let mut near = BTreeSet::new();
     if band.iter().any(|&b| b != band[0]) {
         let boxes: Vec<AABB<[f64; 2]>> = m
@@ -540,15 +562,15 @@ pub fn relations(edges: &[&LevelEdge], roads: &Roads) -> (Rules, Vec<i64>) {
         for i in 0..n {
             let (lo, hi) = (boxes[i].lower(), boxes[i].upper());
             let q = AABB::from_corners(
-                [lo[0] - BAND_DIST, lo[1] - BAND_DIST],
-                [hi[0] + BAND_DIST, hi[1] + BAND_DIST],
+                [lo[0] - band_dist, lo[1] - band_dist],
+                [hi[0] + band_dist, hi[1] + band_dist],
             );
             for o in tree.locate_in_envelope_intersecting(&q) {
                 let j = o.0;
                 if i < j
                     && band[i] != band[j]
                     && distance(std::slice::from_ref(&m[i]), std::slice::from_ref(&m[j]))
-                        <= BAND_DIST
+                        <= band_dist
                 {
                     near.insert((i, j));
                 }
@@ -558,13 +580,13 @@ pub fn relations(edges: &[&LevelEdge], roads: &Roads) -> (Rules, Vec<i64>) {
     let mut stacks = Vec::new();
     let mut only_meet = BTreeSet::new();
     for &(i, j) in &near {
-        if let Some(nodes) = shared.get(&(i, j)) {
+        if let Some(nodes) = shared.get(&(i, j)).filter(|_| !o.band_col) {
             let hole: Vec<Vec<Pt>> = nodes
                 .iter()
-                .map(|v| circle(node_at[v], BAND_DIST))
+                .map(|v| circle(node_at[v], band_dist))
                 .collect();
             let (a, b) = (outside(&m[i], &hole), outside(&m[j], &hole));
-            if a.is_empty() || b.is_empty() || distance(&a, &b) > BAND_DIST {
+            if a.is_empty() || b.is_empty() || distance(&a, &b) > band_dist {
                 only_meet.insert((i, j));
                 continue;
             }
@@ -575,11 +597,14 @@ pub fn relations(edges: &[&LevelEdge], roads: &Roads) -> (Rules, Vec<i64>) {
     // order: where roads meet, of one band or of different bands that only meet
     let mut orders = Vec::new();
     for &(x, y) in shared.keys() {
-        if omega[x] == omega[y] {
+        let (Some(wx), Some(wy)) = (omega[x], omega[y]) else {
+            continue;
+        };
+        if wx == wy {
             continue;
         }
         if band[x] == band[y] || only_meet.contains(&(x, y)) {
-            orders.push(if omega[x] > omega[y] { (x, y) } else { (y, x) });
+            orders.push(if wx > wy { (x, y) } else { (y, x) });
         }
     }
 
@@ -593,9 +618,9 @@ pub fn relations(edges: &[&LevelEdge], roads: &Roads) -> (Rules, Vec<i64>) {
         at_head.entry((y, ey)).or_default().insert(x);
     }
     let empty = BTreeSet::new();
-    let mut lifts = Vec::new();
+    let (mut lifts, mut near) = (Vec::new(), Vec::new());
     for &(u, l) in &stacks {
-        let parts = casing_parts(&m[u]);
+        let parts = casing_parts(&m[u], o.head_m);
         let tl = touching.get(&l).unwrap_or(&empty);
         for (h, p) in parts.iter().enumerate() {
             let Some(p) = p else { continue };
@@ -607,6 +632,8 @@ pub fn relations(edges: &[&LevelEdge], roads: &Roads) -> (Rules, Vec<i64>) {
             }
             if crosses(p, &m[u], &m[l]) {
                 lifts.push((u, l, h));
+            } else if o.near_rules {
+                near.push((u, l, h));
             }
         }
     }
@@ -616,6 +643,8 @@ pub fn relations(edges: &[&LevelEdge], roads: &Roads) -> (Rules, Vec<i64>) {
             meets,
             lifts,
             orders,
+            near,
+            fixed: Vec::new(),
         },
         band,
     )

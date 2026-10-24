@@ -75,7 +75,7 @@ There is no golden test against Rust in `tests/`.
 | | `props` | 223 | The typed sources `roads` and `simple` (one copy of each key name) |
 | | `tiles` | 593 | The vector tiles on request (MVT 2.1) |
 | | `planner` | 146 | `metadata["roadstyle:planner"]` |
-| | `levels/` | 1,484 | `compute`: the tags rule and the solver (least span first, then push-relabel min-cost flow) |
+| | `levels/` | 1,484 | `levels`: the tags rule and the solver (least span first, then push-relabel min-cost flow) |
 | | `main.rs` | 101 | The native program (timings) |
 | `roadstyle-wasm` | `lib.rs` | 102 | `makeStyle`, `Tiler` (`style`, `tile`, `props`), `memoryBytes`, the allocator that grows in large steps |
 | | `js/` | 148 | `roads_sql.js`, `features_sql.js`: the SQL that duckdb-wasm runs to write the inputs |
@@ -243,7 +243,7 @@ The engine uses it to compute the numbers when the caller gives none.*
 |---|---|---|---|
 | `roadstyle-model` | `RoadTable` and `FeatureTable` (columns over Arrow arrays), `Geometry` (one coordinate buffer with offsets), the render model (`RoadDraw`, `Levels`, `End`, `Attachment`, `DrawKey`), `ColumnMap` and its presets, `RoadSource`, validation, `MAX_ROADS` | arrow-array, arrow-schema | yes |
 | `roadstyle-look` | `Look` (the typed config), the bundled palettes and profiles, the resolution, the JSON schema (feature `schema`) | serde, serde_json, schemars (optional) | yes |
-| `roadstyle-levels` | `levels/` as it is today: `LevelEdges`, `compute`, `Method`, `Row` | rstar, sha2 | yes |
+| `roadstyle-levels` | `levels/` as it is today: `LevelEdges`, `levels`, `Options`, `Method`, `Row` | rstar, sha2 | yes |
 | `roadstyle-engine` | `roads`, `simple`, `slots`, `layers`, `overlays`, `features`, `planner`, `geom`; the `LevelPlan` rules, the piece generators, `order` (the sort key and the layer planner), linear referencing for attachments; data-driven color and width, the legend, the simplification | model, look, levels, serde_json, rstar, indexmap; rayon (optional) | yes |
 | `roadstyle-tiles` | `tiles`: the MVT encoder, the tile index, tiles on request, a tile cache; the PMTiles writer (feature `pmtiles`) | model, engine; rayon (optional) | yes |
 | `roadstyle-io` | the readers of [Input and output formats](#input-and-output-formats) (GeoParquet, Arrow IPC, GeoJSON, FlatGeobuf, CSV, DuckDB), the style writer (streamed), the tile folder, PMTiles, the page writer (feature `page`, with the dashboard bundle) | parquet (snap), arrow-ipc, flatgeobuf, csv, duckdb: each optional | yes, without `duckdb` |
@@ -468,7 +468,8 @@ The rules:
    `caps.csv`), the caller's column (`head_start_m_col`, `cap_start_col`, ...), the solver's result (the square cap at the dead end of
    a two-way road, `auto_ends` when asked), the profile (`head_m`, round).
 4. **Edits are rules, not numbers.** An edit adds a row to the solver's input or switches one off (`enabled = false` removes the same
-   row of `pairs.csv`). It never sets a number. The Rust solver has no edits today (`levels/mod.rs:3`), and P4 adds them.
+   row of `pairs.csv`). It never sets a number. The Rust solver takes them as `Options::edits`, and the held roads as
+   `Options::fixed` (2026-10-23).
 5. **Stored numbers are checked.** The engine compares the stored parameters (`method`, `head_m`, `band_dist`, `margin`,
    `max_level`, `band_source`, `order_source`, `min_positions`), the number of edges and the edge hash. An edge with no stored row is
    an error, as in Python's `levels_db`. (The worker SQL of today joins with `LEFT JOIN`, and a missing row becomes 0.)
@@ -984,10 +985,10 @@ io::write_style_dir(&map, "out/", io::TileFormat::Pmtiles)?;  // export_style
 The level solver alone (duckosm-core):
 
 ```rust
-use roadstyle_levels::{LevelEdges, Method, compute};
+use roadstyle_levels::{levels, LevelEdges, Options};
 let mut edges = LevelEdges::default();
 edges.add(0, edge);                                 // rank 0 = driving
-let levels = compute(&edges, Method::Solve)?;
+let lv = levels(&edges, &Options::default())?;     // compute_levels' defaults (the solve); a second call with the same edges is cached
 ```
 
 ### JavaScript

@@ -1,5 +1,10 @@
 // The types of js/roads_sql.js: the SQL that writes the engine's roads input (roads.parquet) in duckdb-wasm's file system.
-/** q(sql) gives the rows as plain objects; catalog: the duckOSM file's catalog name. mode: "all", "driving", "walking" or "cycling".
- *  opts.levels: "stored" (the solved level area's levels) or "tags" (the levels from the bridge, tunnel and layer tags). */
-export function writeRoads(q: (sql: string) => Promise<Record<string, unknown>[]>, catalog: string,
-                           mode?: "all" | "driving" | "walking" | "cycling", opts?: { levels?: "stored" | "tags" }): Promise<void>;
+type Query = (sql: string) => Promise<Record<string, unknown>[]>;
+/** One time for each file: the temporary table r, one row for each edge of all modes with its levels. q(sql) gives the rows as plain
+ *  objects; catalog: the duckOSM file's catalog name. opts.levels: "stored" (the solved level area's levels) or "tags" (no levels: the
+ *  engine computes them from the bridge, tunnel and layer tags). Returns the look's args.levels: "tags", or the stored levels'
+ *  {edge_hash, n_edges}, which the engine checks. */
+export function makeRoads(q: Query, catalog: string, opts?: { levels?: "stored" | "tags" }):
+  Promise<"tags" | { edge_hash: string; n_edges: number }>;
+/** For each mode, after makeRoads: roads.parquet. mode: "all", "driving", "walking" or "cycling". */
+export function writeRoads(q: Query, mode?: "all" | "driving" | "walking" | "cycling"): Promise<void>;

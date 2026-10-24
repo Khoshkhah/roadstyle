@@ -118,16 +118,17 @@ fn tiles_against_python() {
 
 /// The engine's levels (levels.rs) of an area's roads: one rank, as the roads are one table.
 fn levels(area: &str, method: roadstyle_rs::levels::Method) -> Vec<Value> {
-    use roadstyle_rs::levels::{compute, LevelEdge, LevelEdges};
+    use roadstyle_rs::levels::{levels, LevelEdge, LevelEdges, Options};
     let mut edges = LevelEdges::default();
     let t = roadstyle_rs::read::read_roads(std::fs::read(data(&format!("{area}/roads.parquet"))).unwrap(), "geometry").unwrap();
     for i in 0..t.len() {
         let text = |k: &str| t.get(i, k).and_then(roadstyle_rs::Cell::as_str).map(String::from);
         let id = match t.get(i, "edge_id").map(roadstyle_rs::Cell::to_value) { Some(Value::String(s)) => s.parse().unwrap(), Some(v) => v.as_i64().unwrap(), None => panic!("no edge_id") };
         edges.add(0, LevelEdge { edge_id: id, highway: text("highway").unwrap_or_default(), tunnel: text("tunnel"), bridge: text("bridge"),
-                                 layer: text("layer"), junction: text("junction"), geometry: t.line(i).unwrap().iter().map(|&[x, y]| (x, y)).collect() });
+                                 layer: text("layer"), junction: text("junction"), geometry: t.line(i).unwrap().iter().map(|&[x, y]| (x, y)).collect(),
+                                 ..Default::default() });
     }
-    compute(&edges, method).unwrap().unwrap().rows.iter().map(|r| match method {
+    levels(&edges, &Options { method, ..Default::default() }).unwrap().unwrap().rows.iter().map(|r| match method {
         roadstyle_rs::levels::Method::Tags => json!([r.edge_id.to_string(), r.casing_start, r.casing_level, r.casing_end, r.fill_level]),
         _ => json!([r.edge_id.to_string(), r.casing_start, r.casing_level, r.casing_end, r.fill_level, r.head_start_m, r.head_end_m, r.cap_start, r.cap_end]),
     }).collect()

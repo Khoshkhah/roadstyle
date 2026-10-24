@@ -27,7 +27,7 @@ The modules of `roadstyle-rs`, and where they come from:
 | `layers` | The road tables, the expression builders and the passes on the layer list | the same |
 | `planner` | `metadata["roadstyle:planner"]` | the same |
 | `tiles` | The vector tiles on request (`Tiles`, `props`) | the same |
-| `levels` | roadstyle's `compute_levels`: the tags rule, and the solver (least span first, then a push-relabel min-cost flow) | duckosm-rust `crates/duckosm-core/src/levels/`, commit `60dbede` (branch `browser-b4`) |
+| `levels` | roadstyle's `compute_levels`: the tags rule, and the solver (least span first, then a min-cost flow; today `flow.rs` is primal-dual, docs/rust/levels-solver.md) | duckosm-rust `crates/duckosm-core/src/levels/`, commit `60dbede` (branch `browser-b4`) |
 
 The code moved without changes, with two exceptions:
 
