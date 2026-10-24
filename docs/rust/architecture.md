@@ -73,7 +73,7 @@ flowchart TB
     roadstyle_levels["roadstyle-levels<br/>1,495 lines"]
     roadstyle_engine["roadstyle-engine<br/>6,232 lines"]
     roadstyle_tiles["roadstyle-tiles<br/>1,038 lines"]
-    roadstyle["roadstyle<br/>590 lines"]
+    roadstyle["roadstyle<br/>596 lines"]
     roadstyle_rs["roadstyle-rs<br/>211 lines"]
     roadstyle_wasm["roadstyle-wasm<br/>216 lines"]
     roadstyle_py["roadstyle-py<br/>208 lines"]
@@ -102,12 +102,12 @@ step) takes this crate alone.
 | [`roadstyle-levels`](#roadstyle-levels) | roadstyle's drawing levels: the tags rule and the solver (no dependency on the other crates) | 1,495 | rstar, sha2 |
 | [`roadstyle-engine`](#roadstyle-engine) | roadstyle's rendering engine: the style of a map, the data-driven paint, the legend data, the base-map layers | 6,232 | `roadstyle-levels`, `roadstyle-model`, base64, indexmap, rstar, serde_json, yaml-rust2 |
 | [`roadstyle-tiles`](#roadstyle-tiles) | roadstyle's vector tiles on request (the rules of tiles.py) | 1,038 | `roadstyle-model`, flate2, indexmap, rstar, serde_json |
-| [`roadstyle`](#roadstyle) | roadstyle as a Rust library: the facade over the model, the readers, the levels, the engine and the tiles | 590 | `roadstyle-engine`, `roadstyle-io`, `roadstyle-levels`, `roadstyle-tiles`, base64, flate2, serde_json |
+| [`roadstyle`](#roadstyle) | roadstyle as a Rust library: the facade over the model, the readers, the levels, the engine and the tiles | 596 | `roadstyle-engine`, `roadstyle-io`, `roadstyle-levels`, `roadstyle-tiles`, base64, flate2, serde_json |
 | [`roadstyle-rs`](#roadstyle-rs) | The old name of the facade crate roadstyle, kept for one version | 211 | `roadstyle`, serde_json |
 | [`roadstyle-wasm`](#roadstyle-wasm) | The browser's front-end of roadstyle-rs: makeStyle, Tiler, memoryBytes | 216 | `roadstyle`, serde_json, wasm-bindgen |
 | [`roadstyle-py`](#roadstyle-py) | The Python binding of roadstyle's Rust engine: the module roadstyle._rust (PyO3, abi3) | 208 | `roadstyle`, pyo3, serde_json |
 
-All crates: 11,301 lines of Rust in `rust/*/src/`.
+All crates: 11,307 lines of Rust in `rust/*/src/`.
 <!-- /gen:crates -->
 
 The crates read roadstyle's data (`src/roadstyle/data/`: the palettes, the profiles, the sprite) and the page files
@@ -199,7 +199,7 @@ Library, in `rust/roadstyle/`. Public API: `page`, `make_style`, `make_sources`,
 | Module | Lines | What it does | Python counterpart |
 |---|---|---|---|
 | `lib` | 305 | roadstyle as a Rust library: the facade |  |
-| `page` | 285 | The page writer: the HTML page of a live style (state "live") and the options of its dashboard (`page`: the options of rsDashboard, as render_web.render's `page`) | `render_web.py` |
+| `page` | 291 | The page writer: the HTML page of a live style (state "live") and the options of its dashboard (`page`: the options of rsDashboard, as render_web.render's `page`) | `render_web.py` |
 
 #### `roadstyle-rs` { #roadstyle-rs }
 
