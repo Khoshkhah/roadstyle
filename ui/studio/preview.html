@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
+<title>roadstyle</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<!-- The studio's map (index.html loads it in an iframe): MapLibre and roadstyle's dashboard, alone in their page as on a saved map. The
+     studio calls window.show(...) with each new style; it loads this page again when the dashboard itself must change (the data, the
+     popup mode). -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<link rel="stylesheet" href="../../src/roadstyle/static/dashboard/dashboard.css">
+<link rel="stylesheet" href="../../src/roadstyle/static/popup.css">
+<style>html,body{margin:0;height:100%}#map{position:absolute;inset:0}</style>
+</head><body>
+<div id="map"></div>
+<script type="module">
+import {rsDashboard} from "../../src/roadstyle/static/dashboard/index.js";
+
+const studio = parent.studio;                 // the studio page: its options and its engine (the tiles)
+const o = studio.dashboardOptions();
+// the base map: the page's own source and layers (bm, basemap, bg), as roadstyle's page has them, under the roads
+// ponytail: the base map part of the style is made here and in render_web._basemap_style; it moves to the page writer (R3)
+const bm = o.basemaps.find((b) => b.key === o.basemap) || o.basemaps[0];
+const style = {version: 8, sources: {}, layers: [{id: "bg", type: "background", paint: {"background-color": bm ? bm.bg : "#ffffff"}}]};
+if (bm && bm.tiles.length) {
+  style.sources.bm = {type: "raster", tiles: bm.tiles, tileSize: 256, maxzoom: bm.maxzoom || 19, attribution: bm.attr || ""};
+  style.layers.push({id: "basemap", type: "raster", source: "bm"});
+}
+const map = new maplibregl.Map({container: "map", style, center: o.center, zoom: o.zoom, maxPitch: 70, attributionControl: {compact: true}});
+window.map = map;
+map.addControl(new maplibregl.NavigationControl({visualizePitch: true}));
+map.addControl(new maplibregl.ScaleControl({maxWidth: 120, unit: "metric"}), "bottom-left");
+// what comes from the studio page is of its window: MapLibre sends only this window's objects to its workers, so each one is copied here
+maplibregl.addProtocol("rs", (p) => studio.tile(p.url).then((bytes) => ({data: new Uint8Array(bytes)})));
+const rs = rsDashboard(map, {...o.dashboard, style: null, prefix: "rs-", basemaps: o.basemaps});
+const loaded = new Promise((ok) => map.once("load", ok));
+let urls = [];                                  // the Blob URLs of the last style's GeoJSON, freed with it
+
+// a new roads style: its images, sources and layers with the prefix rs-, over the base map, then rs.setStyle with its road table
+window.show = async ({style: given, table, files, fit}) => {
+  const style = JSON.parse(JSON.stringify(given));             // a copy of this window (see the protocol above)
+  await loaded;
+  for (const l of map.getStyle().layers) if (l.id.startsWith("rs-")) map.removeLayer(l.id);
+  for (const id of Object.keys(map.getStyle().sources)) if (id.startsWith("rs-")) map.removeSource(id);
+  urls.forEach(URL.revokeObjectURL); urls = [];
+  const images = style.metadata["roadstyle:images"] || {};
+  for (const [id, im] of Object.entries(images)) {
+    if (!map.hasImage("rs-" + id)) map.addImage("rs-" + id, (await map.loadImage(im.url)).data, {sdf: im.sdf, pixelRatio: im.pixelRatio});
+  }
+  for (const [id, src] of Object.entries(style.sources)) {
+    const s = {...src};
+    if (files && typeof s.data === "string") urls.push(s.data = URL.createObjectURL(new Blob([files[s.data]], {type: "application/geo+json"})));
+    // the tiled style of tileSources has no promoteId yet (audit item N3): the pieces' row as their id, for the glow and the live data
+    if (s.type === "vector" && !s.promoteId) s.promoteId = {simple: "__rs_edge"};
+    map.addSource("rs-" + id, s);
+  }
+  for (const l of style.layers) {
+    let json = JSON.stringify(l);
+    for (const n of Object.keys(images)) json = json.replaceAll(`"${n}"`, `"rs-${n}"`);   // the image names in the layout
+    map.addLayer({...JSON.parse(json), id: "rs-" + l.id, source: "rs-" + l.source});
+  }
+  rs.setStyle(style, {road_table: table});
+  if (fit) map.fitBounds(fit, {padding: 30, duration: 0});
+};
+window.rs = rs;
+studio.previewReady();
+</script>
+</body></html>

@@ -39,3 +39,6 @@ examples/dashboard_rust/pkg/
 # the Rust extension of a development build (rust/roadstyle-py/build.py)
 src/roadstyle/_rust*.so
 src/roadstyle/_rust*.pyd
+
+# the studio's GeoParquet samples (ui/studio/make_samples.py), until the engine reads GeoJSON
+ui/studio/samples/*.parquet
