@@ -244,6 +244,43 @@ def test_export_inline_decks(part, keywords, rename):
     assert diff(ru, py) == []
 
 
+# The decks' rule where a slice is curved (2026-10-24): GEOS's offset curve splits slices into 0 to n parts; Rust draws one mitre strip for
+# each side; same chains, edges and heights. So the slice count and the ring vertices are not compared, and each chain's union area is
+# within these tolerances, measured on all of Monaco (mapstyle's roads of every mode, 49 chains): decks 0.38 %, casing slabs 4.2 %.
+_DECK_AREA, _SLAB_AREA = 0.005, 0.05
+
+
+def test_export_inline_decks_on_curves():
+    """The bridges of all of Monaco around two chains (rust/roadstyle-rs/tests/data/monaco_decks: 18 bridge roads; a reverse pair, curved
+    slabs): the same chains, edges, heights and heads in both engines, and each chain's union area within the measured tolerance."""
+    import collections
+
+    import geopandas as gpd
+    from shapely import make_valid
+    from shapely.geometry import shape
+    from shapely.ops import unary_union
+
+    roads = gpd.read_parquet(Path(__file__).resolve().parents[1] / "rust/roadstyle-rs/tests/data/monaco_decks/roads.parquet")
+    fp, fr = (rs.export_inline(roads, engine=e, view_3d=True)["sources"]["decks"]["data"]["features"] for e in ("python", "rust"))
+
+    def chains(fs):
+        out = collections.defaultdict(list)
+        for f in fs:
+            out[f["properties"]["__rs_chain"]].append(f)
+        return out
+
+    cp, cr = chains(fp), chains(fr)
+    assert set(cp) == set(cr) and len(cp) >= 2
+    keys = ("__rs_edges", "__rs_casing_slab", "__rs_base", "__rs_height", "__rs_hs", "__rs_he")
+    for c in cp:
+        key = lambda fs: sorted({tuple(json.dumps(f["properties"].get(k)) for k in keys) for f in fs})   # noqa: E731
+        assert key(cr[c]) == key(cp[c]), f"chain {c}: its edges, heights or heads"
+        for slab, tol in ((False, _DECK_AREA), (True, _SLAB_AREA)):
+            area = lambda fs, slab=slab: unary_union([make_valid(shape(f["geometry"])) for f in fs if bool(f["properties"].get("__rs_casing_slab")) == slab]).area  # noqa: E731
+            a, b = area(cp[c]), area(cr[c])
+            assert abs(a - b) <= tol * a, f"chain {c} ({'slabs' if slab else 'decks'}): area {b} against {a}"
+
+
 @pytest.mark.parametrize("fmt", ["xyz", "pmtiles"])
 @pytest.mark.parametrize("case", ["plain", "numeric", "categorical", "road_popup", "view_3d", "kinds", "items and metre overlay", "other column names"])
 def test_export_style(part, keywords, case, fmt, tmp_path):

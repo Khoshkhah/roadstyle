@@ -8,7 +8,7 @@ geolibre-roadstyle (its build.py), or in the folder $PROJECTS:
 - looks: rust/roadstyle-look/tests/data/mapstyle_looks.json.gz (tests/basemap.rs of roadstyle-look): the 64 looks of geolibre-roadstyle's
   look_of (each mode x theme x path style), each part once (build.looks()). mapstyle makes a mode's palette from a set, so the bytes of
   this file change with each run; the test compares the keys in sorted order.
-- styles: mapstyle.export.export_inline of 6 choices into tests/data/mapstyle/ (not in git: about 2.8 MB each, gzipped), and
+- styles: mapstyle.export.export_inline of 8 choices (2 of them the map of one mode, only=True) into tests/data/mapstyle/ (not in git: about 2.8 MB each, gzipped), and
   tests/data/mapstyle_digests.json (in git): for each style, the sha256 of its canonical JSON (json.dumps with sort_keys and the
   separators "," and ":"), its number of layers and the size of that text (the record), and the same three of its normalised form
   (`normalised`: what tests/test_duckosm.py compares with the Rust engine's style). The canonical text is the same with each hash seed."""
@@ -23,7 +23,13 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 PROJECTS = Path(os.environ.get("PROJECTS") or HERE.parents[3].parent)
 DB = PROJECTS / "duckOSM" / "monaco.duckdb"
-CHOICES = [(m, "osm", "google") for m in ("all", "driving", "walking", "cycling")] + [("all", "grey", "google"), ("walking", "google", "komoot")]
+# (mode, theme, path style, only: the map of the mode alone)
+CHOICES = ([(m, "osm", "google", False) for m in ("all", "driving", "walking", "cycling")] + [("all", "grey", "google", False),
+           ("walking", "google", "komoot", False)] + [(m, "osm", "google", True) for m in ("driving", "walking")])
+
+
+def name_of(mode, theme, paths, only):
+    return f"style_{mode}_{theme}_{paths}" + ("_only" if only else "")
 
 
 def gz(path, obj):
@@ -111,9 +117,9 @@ def write_styles():
     out = HERE / "data" / "mapstyle"
     out.mkdir(exist_ok=True)
     digests = {}
-    for mode, theme, paths in CHOICES:
-        name = f"style_{mode}_{theme}_{paths}"
-        style = export_inline(DB, mode=mode, theme=theme, paths=paths)
+    for mode, theme, paths, only in CHOICES:
+        name = name_of(mode, theme, paths, only)
+        style = export_inline(DB, mode=mode, theme=theme, paths=paths, **({"only": True} if only else {}))
         gz(out / f"{name}.json.gz", style)
         digests[name] = {**digest(style), "normalised": digest(normalised(style))}
         print(name, digests[name])

@@ -807,6 +807,7 @@ dependencies = [
  "bytes",
  "i_overlay",
  "parquet",
+ "roadstyle-levels",
  "roadstyle-model",
  "serde_json",
 ]

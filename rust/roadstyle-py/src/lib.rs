@@ -392,20 +392,25 @@ fn duckosm_catalog_sql(catalog: &str) -> [String; 2] {
     roadstyle::duckosm::catalog_sql(catalog)
 }
 
-/// duckosm_plan(tables, columns, mode, tags, specs) -> str: the SQL that reads a duckOSM file (roadstyle_io::duckosm, the one copy of it),
-/// as JSON text: {"roads": [3 statements], "meta": the stored levels' query or null (tags), "select": the roads of `mode`, "layers":
-/// [{"spec", "name", "sql": [the queries in order]}] for the base map (`specs`: layers.yaml's layers as JSON text)}. `tables` and `columns`: the rows of the catalog's information_schema.
+/// duckosm_plan(tables, columns, mode, tags, specs, only=False) -> str: the SQL that reads a duckOSM file (roadstyle_io::duckosm, the one
+/// copy of it), as JSON text: {"roads": [3 statements], "meta": the stored levels' query or null (tags), "select": the roads of `mode`,
+/// "layers": [{"spec", "name", "sql": [the queries in order]}] for the base map (`specs`: layers.yaml's layers as JSON text), "subset":
+/// with `only` (the map of `mode` alone), the queries of its roads with no stored levels and of its edge_ids}. `tables` and `columns`: the rows of the
+/// catalog's information_schema.
 #[pyfunction]
-fn duckosm_plan(tables: Vec<(String, String)>, columns: Vec<(String, String, String)>, mode: &str, tags: bool, specs: &str) -> PyResult<String> {
+#[pyo3(signature = (tables, columns, mode, tags, specs, only=false))]
+fn duckosm_plan(tables: Vec<(String, String)>, columns: Vec<(String, String, String)>, mode: &str, tags: bool, specs: &str, only: bool)
+                -> PyResult<String> {
     use roadstyle::duckosm;
     let cat = duckosm::Catalog { tables, columns };
     let specs: Vec<serde_json::Value> = serde_json::from_str(specs).map_err(|e| PyValueError::new_err(format!("specs: {e}")))?;
-    let roads = duckosm::roads_sql(&cat, tags).map_err(PyValueError::new_err)?;
+    let roads = duckosm::roads_sql(&cat, tags, only.then_some(mode)).map_err(PyValueError::new_err)?;
     let select = duckosm::roads_select(mode).map_err(PyValueError::new_err)?;
     let layers: Vec<serde_json::Value> = duckosm::features_sql(&cat, &specs).into_iter()
         .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "sql": l.sql})).collect();
     let meta = (!tags).then_some(duckosm::LEVELS_META_SQL);
-    Ok(serde_json::json!({"roads": roads, "meta": meta, "select": select, "layers": layers}).to_string())
+    let subset = (only && !tags).then_some([duckosm::SUBSET_SQL, duckosm::IDS_SQL]);
+    Ok(serde_json::json!({"roads": roads, "meta": meta, "select": select, "layers": layers, "subset": subset}).to_string())
 }
 
 /// duckosm_levels(row) -> str: the look's keyword `levels` (JSON text) from the stored levels' metadata row (source, n_edges, edge_hash),
@@ -414,6 +419,15 @@ fn duckosm_plan(tables: Vec<(String, String)>, columns: Vec<(String, String, Str
 #[pyo3(signature = (row=None))]
 fn duckosm_levels(row: Option<(String, i64, String)>) -> PyResult<String> {
     roadstyle::duckosm::levels_keyword(row.as_ref().map(|(s, n, h)| (s.as_str(), *n, h.as_str()))).map(|v| v.to_string()).map_err(PyValueError::new_err)
+}
+
+/// duckosm_subset_levels(row, missing, example, ids) -> str: the look's keyword `levels` (JSON text) of the stored levels for a map of one
+/// mode: `row` the stored levels' metadata, `missing` and `example` the row of the plan's "subset" query, `ids` the map's edge_ids.
+#[pyfunction]
+#[pyo3(signature = (row, missing, example, ids))]
+fn duckosm_subset_levels(row: Option<(String, i64, String)>, missing: i64, example: Option<i64>, ids: Vec<i64>) -> PyResult<String> {
+    roadstyle::duckosm::subset_levels_keyword(row.as_ref().map(|(s, n, h)| (s.as_str(), *n, h.as_str())), missing, example, &ids)
+        .map(|v| v.to_string()).map_err(PyValueError::new_err)
 }
 
 /// duckosm_features_select(specs) -> str | None: the base map's rows from the tables f<spec> that were made.
@@ -462,6 +476,7 @@ fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(duckosm_catalog_sql, m)?)?;
     m.add_function(wrap_pyfunction!(duckosm_plan, m)?)?;
     m.add_function(wrap_pyfunction!(duckosm_levels, m)?)?;
+    m.add_function(wrap_pyfunction!(duckosm_subset_levels, m)?)?;
     m.add_function(wrap_pyfunction!(duckosm_features_select, m)?)?;
     m.add_class::<Tiler>()?;
     m.add_class::<Sources>()?;

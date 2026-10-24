@@ -58,5 +58,25 @@
    "layers": 60,
    "bytes": 31098970
   }
+ },
+ "style_driving_osm_google_only": {
+  "sha256": "807d05730dd03e6ce7fbeba52a6af84ec893079e23c4546cdcb3f0557391b119",
+  "layers": 61,
+  "bytes": 13324526,
+  "normalised": {
+   "sha256": "b4f2c66e45deb341851806b17bbb80068860002115d309c98a5d8009a9db98a2",
+   "layers": 61,
+   "bytes": 12728082
+  }
+ },
+ "style_walking_osm_google_only": {
+  "sha256": "5a8e046aec4cce2364c92d6930eb76fc6f52efe7d8f44f59a519ae3c5e5f8e2c",
+  "layers": 60,
+  "bytes": 29976403,
+  "normalised": {
+   "sha256": "aa59011d5e6d3d8f2d1db5000d8aed901cf4348c73f5ec919076c445ac2c54e5",
+   "layers": 60,
+   "bytes": 28950100
+  }
  }
 }

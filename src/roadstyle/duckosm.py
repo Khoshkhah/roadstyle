@@ -16,11 +16,13 @@ def layer_specs() -> list[dict]:
     return yaml.safe_load(files("roadstyle").joinpath("data/basemap/layers.yaml").read_text(encoding="utf-8"))["layers"]
 
 
-def read(db, mode: str = "all", *, levels: str = "stored", layers: bool = True):
+def read(db, mode: str = "all", *, levels: str = "stored", layers: bool = True, only: bool = False):
     """``(roads, features, levels_kw)`` of the duckOSM file ``db`` for the map of ``mode`` ("all", "driving", "walking" or "cycling"):
     the roads (an Arrow table), the base map's rows (an Arrow table, None with ``layers=False`` or when the file has none) and the
     look's keyword ``levels``: the stored levels' check ({edge_hash, n_edges}) with ``levels="stored"``, or "tags" (the engine computes
-    the levels with the tags rule). A base-map layer whose table or query fails is skipped, as mapstyle's load_layers does."""
+    the levels with the tags rule). A base-map layer whose table or query fails is skipped, as mapstyle's load_layers does. ``only``:
+    the roads of ``mode`` alone (its edges and private_edges; render_map(only=True)); the stored levels were solved for every mode
+    together, so each of these roads must have its stored row (load_area_levels(subset=True))."""
     import duckdb
     import pyarrow as pa
 
@@ -34,7 +36,7 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers: bool = True):
         catalog = con.execute("SELECT current_database()").fetchone()[0]
         tq, cq = r.duckosm_catalog_sql(catalog)
         tables, columns = con.execute(tq).fetchall(), con.execute(cq).fetchall()
-        plan = json.loads(r.duckosm_plan(tables, columns, mode, levels == "tags", json.dumps(layer_specs() if layers else [])))
+        plan = json.loads(r.duckosm_plan(tables, columns, mode, levels == "tags", json.dumps(layer_specs() if layers else []), only))
         e, rows, drop = plan["roads"]
         con.execute(e)
         if plan["meta"]:
@@ -42,10 +44,18 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers: bool = True):
                 row = con.execute(plan["meta"]).fetchone()
             except duckdb.CatalogException:
                 row = None
+        else:
+            row = None
+        con.execute(rows)
+        if plan["subset"]:                                  # the map of one mode: each road has its stored row
+            missing_sql, ids_sql = plan["subset"]
+            missing, example = con.execute(missing_sql).fetchone()
+            ids = [x[0] for x in con.execute(ids_sql).fetchall()]
+            level_kw = json.loads(r.duckosm_subset_levels(tuple(row) if row else None, missing, example, ids))
+        elif plan["meta"]:
             level_kw = json.loads(r.duckosm_levels(tuple(row) if row else None))
         else:
             level_kw = "tags"
-        con.execute(rows)
         con.execute(drop)
         made = []
         for lyr in plan["layers"]:
@@ -80,13 +90,14 @@ def look(db, mode: str = "all", *, theme: str = "osm", paths: str = "google", le
 
 
 def export_inline(db, mode: str = "all", *, theme: str = "osm", paths: str = "google", layers: bool = True, levels: str = "stored",
-                  **kwargs) -> dict:
+                  only: bool = False, **kwargs) -> dict:
     """mapstyle's ``export_inline`` on the Rust engine: the map of the duckOSM file ``db`` (its roads in the style of ``mode``, the
     base map of ``features.*`` with ``layers``) as one style with the data in it, for an app that draws a MapLibre style (the roadstyle
-    GeoLibre plugin). ``kwargs``: render_edges' keywords (``view_3d`` is on, as export_inline's)."""
+    GeoLibre plugin). ``only``: the roads of ``mode`` alone (``read``). ``kwargs``: render_edges' keywords (``view_3d`` is on, as
+    export_inline's)."""
     from ._engine import _warn, rust
 
-    roads, features, level_kw = read(db, mode, levels=levels, layers=layers)
+    roads, features, level_kw = read(db, mode, levels=levels, layers=layers, only=only)
     lk = look(db, mode, theme=theme, paths=paths, levels=level_kw, **{"view_3d": True, "export": True, **kwargs})
     style = json.loads(rust().make_style(roads, lk, features, None, None))
     _warn()
@@ -94,17 +105,17 @@ def export_inline(db, mode: str = "all", *, theme: str = "osm", paths: str = "go
 
 
 def export_style(db, out_dir, *, base_url: str, mode: str = "all", theme: str = "osm", paths: str = "google", layers: bool = True,
-                 levels: str = "stored", format: str = "xyz", **kwargs):
+                 levels: str = "stored", format: str = "xyz", only: bool = False, **kwargs):
     """mapstyle's ``export_style`` on the Rust engine: the map of the duckOSM file ``db`` as style.json, its vector tiles (the roads
     and the base map; ``format``: "xyz" or "pmtiles"), the sprite and the popup's files in ``out_dir``, served at ``base_url``, for an
-    app that draws a MapLibre style (GeoLibre, RustGIS, QGIS). The path of style.json."""
+    app that draws a MapLibre style (GeoLibre, RustGIS, QGIS). ``only``: the roads of ``mode`` alone (``read``). The path of style.json."""
     import shapely
 
     from ._engine import _warn, _write_export, rust
 
     if format not in ("xyz", "pmtiles"):
         raise ValueError(f"format must be 'xyz' or 'pmtiles', got {format!r}")
-    roads, features, level_kw = read(db, mode, levels=levels, layers=layers)
+    roads, features, level_kw = read(db, mode, levels=levels, layers=layers, only=only)
     lk = look(db, mode, theme=theme, paths=paths, levels=level_kw, **{"view_3d": True, "export": True, "tiles": True, **kwargs})
     keep = [c for c in roads.column_names if c != "geometry"]          # every column: a click shows the data
     t = rust().Tiler(roads, lk, features, None, "", keep)
