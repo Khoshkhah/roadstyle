@@ -10,3 +10,4 @@ description = "PNG pictures of saved roadstyle pages: Chromium over CDP draws th
 [dependencies]
 headless_chrome = "=1.0.22"            # Chromium over CDP; the default features have no "fetch" (no browser download)
 serde_json.workspace = true
+anyhow = "1"                         # headless_chrome's errors: its time limit is util::Timeout inside one

@@ -65,7 +65,10 @@ fn snapshot(args: &[String]) -> Result<(), String> {
         }
     }
     let [page, out] = <[String; 2]>::try_from(files).map_err(|_| USAGE.to_string())?;
-    roadstyle_snapshot::snapshot(page.as_ref(), out.as_ref(), &cam, &shot).map_err(|e| e.to_string())?;
+    let pic = roadstyle_snapshot::snapshot(page.as_ref(), out.as_ref(), &cam, &shot).map_err(|e| e.to_string())?;
+    if let Some(w) = pic.warning {
+        eprintln!("roadstyle: warning: {w}");
+    }
     println!("{out}");
     Ok(())
 }

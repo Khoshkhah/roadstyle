@@ -1257,6 +1257,7 @@ dependencies = [
 name = "roadstyle-snapshot"
 version = "0.25.0"
 dependencies = [
+ "anyhow",
  "headless_chrome",
  "serde_json",
 ]
