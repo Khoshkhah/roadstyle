@@ -485,6 +485,10 @@ body.lv-open #lv-busy{right:var(--lv-w)}
     catch(err){ busy(null); toast(err.message + " · nothing saved", true); $("lv-apply").disabled = false; return; }
     let said = `Applied ${queue.length} change${queue.length > 1 ? "s" : ""} · ${j.said}`, why = j.reload;
     queue = []; showQueue();
+    if(j.redrawn){                                            // the Rust page drew the new map itself: the panel's facts and lists again
+      Object.assign(facts, j.facts); STATS = j.stats; showStats(); busy(null); $("lv-apply").disabled = false;
+      update(); lists(); givenUp(); return toast(said);
+    }
     if(j.update){                                             // the roads that changed, in place: no reload
       try { patch(j.update); busy(null); $("lv-apply").disabled = false;
         return toast(`${said} · ${j.update.roads.length} road${j.update.roads.length === 1 ? "" : "s"} redrawn in place`); }        // a full solve is a note, not an error
