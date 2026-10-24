@@ -35,6 +35,17 @@ The folder has `style.json`, `roads.pmtiles` (all tiles in one file), the sprite
 the same archive each time: the archive has no time in its gzip streams. A map app reads the archive with the
 [pmtiles](https://github.com/protomaps/PMTiles) protocol.
 
+The two forms hold the same tiles, and in both forms a map reads only the tiles of its view:
+
+| | XYZ folder | One PMTiles file |
+|---|---|---|
+| The files | one file for each tile | one file; an index at its start tells where each tile is |
+| How a map gets one tile | one request for that tile's file | one request for a part of the file (an HTTP range request) |
+| What the server must do | serve static files | serve static files and answer range requests (most servers and cloud storage do) |
+| What the map page needs | nothing more | the `pmtiles` library for the `pmtiles://` protocol |
+
+On Monaco (849 edges), the XYZ folder has 31 tile files (3.1 MB) and the PMTiles file is 1.1 MB, because its tiles are gzipped.
+
 `export_style` takes the keywords of `render_edges` that change the style. The style has the roads only: the base map comes
 from the app. In place of a GeoDataFrame, `export_style` also takes the path of a duckOSM GeoParquet export
 (`duckosm export-gis --format geoparquet`). That file must have the drawing levels, else the call stops with an error that tells
