@@ -7,6 +7,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **The simple look reads the colour of `rsColor` and `rsColorBase` from the feature state `rs_c` only** (audit N8, part 2, both
+  engines). The fill is the active option's colour under `rs_c`; an item's colour is `rs_c`, else its own; a painted road sorts on top
+  by the global state `rs_top` (the rows that `rsColor` painted, start value `[]`). The state has `rs_top` in place of `rs_colors` and
+  `rs_base`. The full look (`simple=False`, Python only) keeps `rs_colors` and `rs_base`.
 - **Every style reads a road's colour and width from the feature state** (audit N8, both engines). The road layer reads
   `["coalesce", ["feature-state", "rs_c"], <baked colour>]` and each width and offset stop × `["coalesce", ["feature-state", "rs_w"], 1]`,
   in every style, not only with `live_data`; `live_data` now only adds the metadata `roadstyle:live` and the page's option `live`.

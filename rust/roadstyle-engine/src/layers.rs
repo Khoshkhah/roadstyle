@@ -279,11 +279,6 @@ fn gs(name: &str) -> Value {
     json!(["global-state", name])
 }
 
-/// _painted: the colour rsColor (or rsColorBase: state "rs_base") gave the road the property `key` names, else null.
-fn painted(key: &str, state: &str) -> Value {
-    json!(["get", ["to-string", ["get", key]], gs(state)])
-}
-
 /// _fill_base: a road's fill under the active colour option (state rs_co); `props`: the baked fill property of each option, in order.
 fn fill_base(props: &[String], fb_fill: &Value) -> Value {
     let opts: Vec<Value> = props.iter().map(|p| json!(["coalesce", ["get", p], fb_fill])).collect();
@@ -297,12 +292,6 @@ fn fill_base(props: &[String], fb_fill: &Value) -> Value {
     }
     m.push(opts[0].clone());
     Value::Array(m)
-}
-
-/// _fill_expr: the colour rsColor gave the road or its second edge (rs_colors), else rsColorBase's (rs_base), else the active option's.
-fn fill_expr(props: &[String], fb_fill: &Value) -> Value {
-    json!(["coalesce", painted("__rs_edge", "rs_colors"), painted("__rs_edge2", "rs_colors"), painted("__rs_edge", "rs_base"),
-           painted("__rs_edge2", "rs_base"), fill_base(props, fb_fill)])
 }
 
 /// _tun_mix: a tunnel feature's colour moved toward the tunnel colour by the strength, keeping its own alpha.
@@ -838,12 +827,10 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
     }
     let op = json!(["case", ["all", ["!", gs("rs_fill_on")], k(1)], 0, 1]);
     // _simple_color, with the glow of lean mode
-    let mut fill = fill_expr(fills, fb_fill);
-    // R22 and audit N8 (2026-10-24), in every style: a road's colour and its width factor from the feature state on its row (rs.setData,
-    // the dashboard's colouring), over the baked ones; no new build for a new value
-    fill = json!(["coalesce", ["feature-state", LIVE_COLOR], fill]);
-    let mut item = json!(["coalesce", painted("__rs_edge", "rs_colors"), painted("__rs_edge2", "rs_colors"), painted("__rs_edge", "rs_base"),
-                          painted("__rs_edge2", "rs_base"), ["coalesce", ["get", "__rs_ic"], fb_fill]]);
+    // R22 and audit N8 (2026-10-24), in every style: a road's colour (rsColor, rsColorBase, rs.setData: the dashboard writes the one that
+    // wins) and its width factor are the feature state on its row, over the baked fill of the active option; an item has its road's row
+    let mut fill = json!(["coalesce", ["feature-state", LIVE_COLOR], fill_base(fills, fb_fill)]);
+    let mut item = json!(["coalesce", ["feature-state", LIVE_COLOR], ["coalesce", ["get", "__rs_ic"], fb_fill]]);
     let mut cases = vec![k(2), cfg["bridge_shadow_color"].clone(), is_c.clone(),
                          json!(["case", is_b, cfg["bridge_casing_color"], ["coalesce", ["get", "__rs_casing"], fb_casing]])];
     if any_tunnel {
@@ -1037,42 +1024,25 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
         layers.splice(at..at, items);
     }
     layers.extend(over);
-    // _state_expressions: a road fill reads the colours of rsColor; a painted road sorts on top
+    // _state_expressions (audit N8): the pick layer's colour is the active option's; a painted road sorts on top by the ids that rsColor
+    // painted (the state rs_top: layout reads no feature state)
     let base = json!(["coalesce", ["get", "__rs_fill"], fb_fill]);
-    let has = |key: &str| json!(["has", ["to-string", ["get", key]], gs("rs_colors")]);
+    let top = json!(["in", ["get", "__rs_edge"], gs("rs_top")]);
     // the road fill layers (_fill_layer_ids: in simple mode the export's pick layer roads-fill) and their dashed fills
     const FILLS: [&str; 6] = ["roads-fill", "roads-fill-sq", "roads-fill-sx", "roads-fill-h", "roads-fill-hsq", "roads-fill-hsx"];
     let is_fill = |lid: &str| FILLS.contains(&lid) || FILLS.iter().any(|b| lid.starts_with(&format!("{b}-dash")));
     for l in layers.iter_mut() {
         if l["id"].as_str().is_some_and(is_fill) {
-            l["paint"]["line-color"] = swap(&l["paint"]["line-color"], &base, &fill_expr(fills, fb_fill));
+            l["paint"]["line-color"] = swap(&l["paint"]["line-color"], &base, &fill_base(fills, fb_fill));
         } else if l["id"] == "roads-bridge-decks" {
             l["paint"]["fill-extrusion-color"] = swap(&l["paint"]["fill-extrusion-color"], &base, &fill_base(fills, fb_fill));
-        } else if l["id"].as_str().is_some_and(|i| i.starts_with("roads-ends-")) {
-            // a two-way end cap: drawn where its two lanes have one colour (the colour option's, or rsColor's)
-            let eq = |pr: &String| json!(["==", ["get", pr], ["get", format!("{pr}__b")]]);
-            let same = if fills.len() > 1 {
-                let mut m = vec![json!("match"), gs("rs_co")];
-                for (i, pr) in fills.iter().enumerate().skip(1) {
-                    m.push(json!(i));
-                    m.push(eq(pr));
-                }
-                m.push(eq(&fills[0]));
-                Value::Array(m)
-            } else { eq(&fills[0]) };
-            let both = json!(["all", has("__rs_edge"), has("__rs_edge2"), ["==", painted("__rs_edge", "rs_colors"), painted("__rs_edge2", "rs_colors")]]);
-            l["paint"]["circle-color"] = if l["id"].as_str().is_some_and(|i| i.starts_with("roads-ends-fill")) {
-                json!(["case", both, painted("__rs_edge", "rs_colors"), same, fill_base(fills, fb_fill), "rgba(0,0,0,0)"])
-            } else {
-                json!(["case", ["any", same, both], ["coalesce", ["get", "__rs_casing"], fb_casing], "rgba(0,0,0,0)"])
-            };
         }
         if l["type"] == "line" && l["layout"].get("line-sort-key").is_some_and(|v| !v.is_null()) {
             let key = l["layout"]["line-sort-key"].clone();
             if l["source"] == "roads" {
-                l["layout"]["line-sort-key"] = json!(["+", key, ["case", ["any", has("__rs_edge"), has("__rs_edge2")], 500, 0]]);
+                l["layout"]["line-sort-key"] = json!(["+", key, ["case", top, 500, 0]]);
             } else if l["id"] == "roads-simple" {
-                l["layout"]["line-sort-key"] = json!(["+", key, ["case", ["all", ["any", k(1), k(5)], ["any", has("__rs_edge"), has("__rs_edge2")]], 0.5, 0]]);
+                l["layout"]["line-sort-key"] = json!(["+", key, ["case", ["all", ["any", k(1), k(5)], top], 0.5, 0]]);
             }
         }
     }
