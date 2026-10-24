@@ -13,6 +13,7 @@ pub mod features;
 pub mod layers;
 pub mod look;
 pub mod overlays;
+pub mod palettes;
 pub mod planner;
 pub mod road;
 pub mod roads;
@@ -89,13 +90,29 @@ pub struct Parts {
 /// GeoParquet of tools/make_spike_fixture.py or the worker's SQL); `planner`: the route planner's rows.
 pub fn make_parts(mut table: RoadTable, look: &str, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, String> {
     let look_json: Value = serde_json::from_str(look).map_err(|e| format!("look: not JSON: {e}"))?;
-    let look = roads::Look::from_json(&look_json)?;
+    let head_m = roads::Look::from_json(&look_json)?.head_m;
     if table.len() > MAX_ROADS {
         return Err(format!("this area has {} roads, and the plugin draws at most {MAX_ROADS} (the browser's memory): use a smaller area",
                            table.len()));
     }
+    ColumnMap::from_args(&look_json["args"]).to_engine(&mut table);
+    compute_levels(&mut table, &look_json["args"], head_m)?;
+    style_parts(table, &look_json, features, planner, name)
+}
+
+/// The parts of another palette of the same call (a view's palette, palettes.rs): the roads of `s` as they were before their marks
+/// (their columns in the engine's names, their levels solved), with the look `look` (the same keywords, another palette). No base map
+/// and no route planner, as a page's views have none.
+pub fn restyle(s: &sources::Sources, look: &str) -> Result<sources::Sources, String> {
+    let look_json: Value = serde_json::from_str(look).map_err(|e| format!("look: not JSON: {e}"))?;
+    Ok(sources::Sources::new(style_parts(s.roads.roads.table.clone(), &look_json, None, None, None)?))
+}
+
+/// make_parts after the roads are prepared (the engine's column names, the levels).
+fn style_parts(table: RoadTable, look_json: &Value, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, String> {
+    let look_json = look_json.clone();
+    let look = roads::Look::from_json(&look_json)?;
     let cols = ColumnMap::from_args(&look_json["args"]);
-    cols.to_engine(&mut table);
     // render's filter_col: in the engine's names (a keyword's column has the engine's name; a column with an engine name is kept aside)
     let fcol = look_json["args"]["filter_col"].as_str().filter(|c| !c.is_empty()).map_or_else(|| "highway".to_string(), |f| {
         cols.0.iter().find(|(_, user)| user == f).map(|(own, _)| own.to_string())
@@ -103,7 +120,6 @@ pub fn make_parts(mut table: RoadTable, look: &str, features: Option<Vec<Row>>, 
             .unwrap_or_else(|| f.to_string())
     });
     CLS.with(|c| *c.borrow_mut() = fcol);
-    compute_levels(&mut table, &look_json["args"], look.head_m)?;
     let mut feats = Roads::new(table);
     let colors = roads::mark_roads(&mut feats, &look, &look_json["args"])?;
     let width_col = look_json["args"]["width_m_col"].as_str().filter(|c| !c.is_empty());

@@ -15,12 +15,22 @@ pub struct Roads {
     pub draw: Vec<Draw>,
     /// the style values that the roads' `Draw` names by number
     pub values: Values,
+    /// a view's palettes (palettes.rs): the marks that another palette sets to other values, after the road's own properties
+    pub extra: Vec<Extra>,
+}
+
+/// A mark in another palette (render_web._merge_palettes): `<mark>@<palette>` with each road's value there (None: that road has no
+/// such mark in that palette).
+pub struct Extra {
+    pub name: String,
+    pub key: String,
+    pub vals: Vec<Option<Value>>,
 }
 
 impl Roads {
     pub fn new(table: RoadTable) -> Roads {
         let draw = vec![Draw::default(); table.len()];
-        Roads { table, draw, values: Values::default() }
+        Roads { table, draw, values: Values::default(), extra: Vec::new() }
     }
 
     pub fn len(&self) -> usize {
@@ -32,7 +42,7 @@ impl Roads {
     }
 
     pub fn road(&self, i: usize) -> Road<'_> {
-        Road { t: &self.table, d: &self.draw[i], v: &self.values, i }
+        Road { t: &self.table, d: &self.draw[i], v: &self.values, x: &self.extra, i }
     }
 
     /// The road `i`, or None past the last road.
@@ -60,12 +70,14 @@ pub struct Road<'a> {
     t: &'a RoadTable,
     d: &'a Draw,
     v: &'a Values,
+    x: &'a [Extra],
     pub i: usize,
 }
 
 impl<'a> Road<'a> {
     pub fn get(self, k: &str) -> Option<Cell<'a>> {
         self.d.get(self.v, k).or_else(|| self.t.get(self.i, k))
+            .or_else(|| self.x.iter().find(|e| e.name == k).and_then(|e| e.vals[self.i].as_ref().map(Cell::Json)))
     }
 
     pub fn contains_key(self, k: &str) -> bool {
@@ -81,11 +93,17 @@ impl<'a> Road<'a> {
         self.d
     }
 
-    /// The properties in the output's order: the columns (a mark in the place of a column of its name), then the other marks.
-    pub fn iter(self) -> impl Iterator<Item = (&'a str, Cell<'a>)> {
+    /// The road's own properties in the output's order: the columns (a mark in the place of a column of its name), then the other marks.
+    pub fn own(self) -> impl Iterator<Item = (&'a str, Cell<'a>)> {
         let (t, d, v, i) = (self.t, self.d, self.v, self.i);
         t.names().iter().enumerate().map(move |(c, n)| (n.as_str(), d.get(v, n).unwrap_or_else(|| t.cell(c, i))))
             .chain(d.marks(v).into_iter().filter(move |(k, _)| t.col(k).is_none()))
+    }
+
+    /// The properties in the output's order: its own, then its marks in the other palettes of the views.
+    pub fn iter(self) -> impl Iterator<Item = (&'a str, Cell<'a>)> {
+        let i = self.i;
+        self.own().chain(self.x.iter().filter_map(move |e| e.vals[i].as_ref().map(|v| (e.name.as_str(), Cell::Json(v)))))
     }
 
     pub fn to_map(self) -> Map<String, Value> {

@@ -6,6 +6,15 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **A view's palette on a Rust page is a restyle in Rust.** Stage 1 runs one time. Each other palette of `views` restyles the same roads
+  in memory (no second read, no second level solve, no JSON text), and the Rust engine merges the properties that differ
+  (`roadstyle-engine::palettes`, as `render_web._merge_palettes`). On Tartu with two palettes: 13.4 s to 5.7 s, peak memory 1.84 GB to
+  0.87 GB. A page with no views does not parse the road table in Python any more (4.8 s to 4.0 s).
+- **The palette copies of a page have a fixed order.** `_merge_palettes` writes `<key>@<palette>` in the order in which the keys first
+  differ, not in the order of a Python set (which changes with the hash seed). A feature gets a copy only when its feature in that palette
+  has the key: a casing piece has no `__rs_fill@<palette>: null` any more. The map does not change.
+
 ### Added
 - **Live data on the road layer** (`live_data=True`, the Rust engine only). The road layer reads its colour and its width factor from
   MapLibre feature state on the road's row (`rs_c`, `rs_w`), with the baked values as the fallback. A host or the dashboard's

@@ -2370,9 +2370,11 @@ reads the static files from <code>src/roadstyle/</code> when it is built; a crat
 uses <a href="review_checklist.md">review_checklist.md</a>):</p>
 <ol>
 <li>(a) the pure core, (b) the typed render model, (f) the two stages: done.</li>
-<li>(g) one path for GeoJSON and tiles: the road table in both ways, one source naming, one feature id, one tile rule, the typed tiled page.</li>
-<li>R22, the live data join: a page colours and sizes the roads from a table by MapLibre's feature state (<code>rs_c</code>, <code>rs_w</code>), with no new build.</li>
-<li>R2 (stage 1 once, its typed output kept; a view's palette as a restyle), R1 with R8 (each layer and dashboard module declares what it
+<li>(g) one path for GeoJSON and tiles: the road table in both ways, one source naming, one feature id, one tile rule, the typed tiled page:
+   done.</li>
+<li>R22, the live data join: a page colours and sizes the roads from a table by MapLibre's feature state (<code>rs_c</code>, <code>rs_w</code>), with no new build:
+   done.</li>
+<li>R2 (stage 1 once, its typed output kept; a view's palette as a restyle: done, <code>roadstyle-engine::palettes</code>), R1 with R8 (each layer and dashboard module declares what it
    reads; one class index), R4 (one <code>Topology</code>), R3 (a typed stage 3, one <code>__RS_OPTIONS__</code>).</li>
 <li>(c) <code>roadstyle-look</code> (with R16, R17).</li>
 <li><strong>The mapstyle merge</strong> (approved 2026-10-23): roadstyle gets a duckOSM reader for the roads of every mode and the base-map tables
