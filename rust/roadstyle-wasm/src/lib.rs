@@ -76,12 +76,12 @@ mod wasm {
         }
         /// The whole solve with the edits (edits.csv text).
         pub fn solve(&mut self, edits: &str) -> Result<String, JsError> {
-            self.0.session.solve(edits).map_err(|e| JsError::new(&e))
+            self.0.solve(edits).map_err(|e| JsError::new(&e))
         }
         /// The solve after a change that names the roads of `changed` (edge ids): the roads around it, else the whole area.
         #[wasm_bindgen(js_name = solveLocal)]
         pub fn solve_local(&mut self, edits: &str, changed: Vec<String>) -> Result<String, JsError> {
-            self.0.session.solve_local(edits, &changed).map_err(|e| JsError::new(&e))
+            self.0.solve_local(edits, &changed).map_err(|e| JsError::new(&e))
         }
         /// The answer to start from (levels.csv, levels_info.json): 4 numbers for each road; the given-up parts as "upper|lower|part".
         #[wasm_bindgen(js_name = startFrom)]
@@ -91,11 +91,11 @@ mod wasm {
                 (f.next().unwrap_or_default(), f.next().unwrap_or_default(), f.next().unwrap_or_default())
             }).collect();
             let levels: Vec<i64> = levels.into_iter().map(i64::from).collect();
-            self.0.session.start_from(&levels, &parts, orders_not_kept, near).map_err(|e| JsError::new(&e))
+            self.0.start_from(&levels, &parts, orders_not_kept, near).map_err(|e| JsError::new(&e))
         }
         /// The check before rules are added (rows: CSV text with a header): [[index, why, [rule rows]]].
         pub fn check(&self, edits: &str, rows: &str) -> Result<String, JsError> {
-            self.0.session.check(edits, rows).map_err(|e| JsError::new(&e))
+            self.0.check(edits, rows).map_err(|e| JsError::new(&e))
         }
         /// What the panel shows of each road, a list in the roads' order.
         pub fn facts(&self) -> String {
