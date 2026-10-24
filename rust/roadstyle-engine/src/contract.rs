@@ -127,7 +127,6 @@ pub fn arrow_kind(layers: &[Value]) -> Value {
 pub fn controls(look: &crate::Look, roads: &Roads, info: PageInfo, active: usize) -> Result<Value, String> {
     let (th, cfg, args) = (&look.theme, &look.config, &look.args);
     let m = &look.model;
-    let tiles = args["tiles"] == true;
     let cam = merged(&json!({"pitch": 0, "bearing": 0, "pitch_3d": 55, "max_pitch": 70}), &cfg["camera"]);
     let select = match &args["select_color"] { Value::Null => th["selection"]["select"].clone(), v => v.clone() };
     let arw = merged(&th["arrows"], &cfg["arrows"]);
@@ -144,12 +143,13 @@ pub fn controls(look: &crate::Look, roads: &Roads, info: PageInfo, active: usize
         // the canvas colour of the base map: the page that adds a base map sets its own
         "bg": th["background"]["light"], "steps": th["tunnels"]["steps"], "ratios": th["tunnels"]["ratios"],
         "toward": toward, "towards": cfg["tunnel_towards"], "to": to, "control": control});
-    let views: Vec<Value> = args["views"].as_object().into_iter().flatten().map(|(n, s)| json!({"name": n, "set": s})).collect();
     let items = if args["items"].is_null() { Value::Null } else { json!({"label": "items", "popup": args["items_popup"], "layer": "roads-simple"}) };
     // a page is in simple mode, in both ways: the pieces pick and glow (the road layer roads-simple), and there are no fill layers
-    Ok(json!({"tiles": tiles, "simple": "roads-simple", "pitch_3d": cam["pitch_3d"],
+    // the facts of the look and of the roads that a host's dashboard needs; the caller's page keywords (tiles, views, the base maps, ...)
+    // are not here: the page gives them (RS_OPTIONS, page_options::page_from), as a host does (rule 5, R3)
+    Ok(json!({"simple": "roads-simple", "pitch_3d": cam["pitch_3d"],
         "select_color": select, "filter": filter_panel(look, roads, m), "color_active": active, "overlays": info.overlays, "tunnel": tunnel,
-        "fill_layers": [], "road_fill": {"on": args["road_fill"] != false, "paint": info.fill_paint}, "views": views, "dashes": info.dashes,
+        "fill_layers": [], "road_fill": {"on": args["road_fill"] != false, "paint": info.fill_paint}, "dashes": info.dashes,
         "items": items, "edge_id_col": args["edge_id_col"].as_str().unwrap_or("edge_id"), "arrow_icon": arw["icon"], "arrow_color": arw["color"],
         "arrow_rules": {"mainBelow": arw["main_below"], "main": arw["main"], "minLenPx": place["min_len_px"], "minGapPx": place["min_gap_px"],
                         "nameGapPx": place["name_gap_px"], "edgePx": place["edge_px"], "charWidth": place["char_width"],

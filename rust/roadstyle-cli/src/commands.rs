@@ -14,6 +14,11 @@ usage:
                     [--palette P] [--profile P] [--settings FILE.json] [--<keyword> VALUE] [--no-<keyword>]
       stage 1: the style and one file for each source, and the road table (export_geojson). The roads: GeoParquet, the line in
       the column geometry, longitude and latitude. Any other option is a keyword of render (--color-by lanes, --no-arrows).
+  roadstyle page <roads.parquet> <out.html> [--palette P] [--profile P] [--settings FILE.json] [--api-key KEY]
+                 [--street-view-key KEY] [--<keyword> VALUE] [--no-<keyword>]
+      the page in one file (render_edges(backend=\"web\")): the map, its dashboard and MapLibre, offline. The base map's key:
+      --api-key, else $ROADSTYLE_API_KEY; the Google Maps key: --street-view-key, else $GOOGLE_MAPS_KEY. Any other option is a
+      keyword of render (--tiles, --views '{\"plain\": {\"road_fill\": false}}').
   roadstyle tiles <stage 1 dir> <out> [--format pmtiles|xyz] [--keep COL,COL] [--base-url URL]
       stage 2: the vector tiles of stage 1's files (tile_geojson): one PMTiles file, or <out>/roads/{z}/{x}/{y} and style.json.
   roadstyle levels make <edges.parquet> <area folder> [--id-col edge_id] [--band-col C] [--order priority|class|none|C]
@@ -58,6 +63,29 @@ fn take(opts: &mut Vec<(String, Option<String>)>, name: &str) -> Option<String> 
     opts.remove(i).1
 }
 
+/// The vendored MapLibre (render_web.WebMap puts the same in), so a page works offline.
+const MAPLIBRE_JS: &str = include_str!("../../../src/roadstyle/vendor/maplibre-gl.js");
+const MAPLIBRE_CSS: &str = include_str!("../../../src/roadstyle/vendor/maplibre-gl.css");
+
+/// The look's options of the command's options: --palette, --profile, --settings FILE.json and every other option as a keyword
+/// (`args`), which `defaults` can add to.
+fn look_options(opts: &mut Vec<(String, Option<String>)>, defaults: impl FnOnce(&mut Map<String, Value>)) -> Result<roadstyle::look::Options, String> {
+    let mut look = Map::new();
+    for k in ["palette", "profile"] {
+        if let Some(v) = take(opts, k) {
+            look.insert(k.into(), Value::String(v));
+        }
+    }
+    if let Some(f) = take(opts, "settings") {
+        let text = String::from_utf8(read(&f)?).map_err(|e| format!("{f}: {e}"))?;
+        look.insert("settings".into(), serde_json::from_str(&text).map_err(|e| format!("{f}: not JSON: {e}"))?);
+    }
+    let mut kw: Map<String, Value> = opts.iter().map(keyword).collect();
+    defaults(&mut kw);
+    look.insert("args".into(), Value::Object(kw));
+    roadstyle::look::Options::from_value(&Value::Object(look))
+}
+
 fn read(path: &str) -> Result<Vec<u8>, String> {
     std::fs::read(path).map_err(|e| format!("{path}: {e}"))
 }
@@ -76,24 +104,35 @@ pub fn run(args: &[String]) -> Result<(), String> {
             };
             let keep = list(take(&mut opts, "keep"));
             let name = take(&mut opts, "name");
-            let mut look = Map::new();
-            for k in ["palette", "profile"] {
-                if let Some(v) = take(&mut opts, k) {
-                    look.insert(k.into(), Value::String(v));
-                }
-            }
-            if let Some(f) = take(&mut opts, "settings") {
-                let text = String::from_utf8(read(&f)?).map_err(|e| format!("{f}: {e}"))?;
-                look.insert("settings".into(), serde_json::from_str(&text).map_err(|e| format!("{f}: not JSON: {e}"))?);
-            }
-            let mut kw: Map<String, Value> = opts.iter().map(keyword).collect();
-            kw.entry("view_3d").or_insert(Value::Bool(true)); // as export_inline and export_geojson
-            look.insert("args".into(), Value::Object(kw));
-            let look = roadstyle::Look::resolve(&roadstyle::look::Options::from_value(&Value::Object(look))?)?;
+            let o = look_options(&mut opts, |kw| {
+                kw.entry("view_3d").or_insert(Value::Bool(true)); // as export_inline and export_geojson
+            })?;
+            let look = roadstyle::Look::resolve(&o)?;
             let s = roadstyle::make_sources(read(roads)?, &look, None, None, name)?;
             for (file, size) in roadstyle::save_sources(&s, Path::new(out), format, &keep)? {
                 println!("{file} {size} bytes");
             }
+            Ok(())
+        }
+        ("page", [roads, out]) => {
+            let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty()).map(Value::String);
+            let mut given = Map::new();
+            given.insert("api_key".into(), take(&mut opts, "api_key").map(Value::String).or_else(|| env("ROADSTYLE_API_KEY")).unwrap_or_default());
+            given.insert("street_view_key".into(), take(&mut opts, "street_view_key").map(Value::String).or_else(|| env("GOOGLE_MAPS_KEY"))
+                .unwrap_or_default());
+            let o = look_options(&mut opts, |kw| {
+                kw.insert("state".into(), "live".into()); // a page's style: the state in the expressions, the interaction contract
+            })?;
+            let look = roadstyle::Look::resolve(&o)?;
+            let roads = roadstyle::read::read_roads(read(roads)?, "geometry")?;
+            let page = roadstyle::page_options::page_from(roads, &look, &o, &given)?;
+            for w in &page.warnings {
+                eprintln!("warning: {w}");
+            }
+            let html = page.html.replacen("__MAPLIBRE_CSS__", MAPLIBRE_CSS, 1)
+                .replacen("__MAPLIBRE_JS__", &MAPLIBRE_JS.replace("</script>", "<\\/script>"), 1);
+            std::fs::write(out, &html).map_err(|e| format!("{out}: {e}"))?;
+            println!("{out} {} bytes", html.len());
             Ok(())
         }
         ("tiles", [src, out]) => {

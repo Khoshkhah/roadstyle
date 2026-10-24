@@ -10,6 +10,7 @@ pub use roadstyle_io::gpkg;
 pub mod level_area;
 pub mod level_editor;
 pub mod page;
+pub mod page_options;
 pub use roadstyle_levels as levels;
 pub use roadstyle_tiles as tiles;
 
