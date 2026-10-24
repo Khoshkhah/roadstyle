@@ -20,7 +20,9 @@ export async function readCatalog(q, catalog) {
 // Returns the keyword `levels` of the engine's look: "tags", or the stored levels' {edge_hash, n_edges}, which the engine checks.
 export async function makeRoads(q, catalog, opts = {}) {
   const tags = opts.levels === "tags", cat = await readCatalog(q, catalog);
-  const [e, r, drop] = JSON.parse(duckosmPlan(JSON.stringify(cat), "all", tags, "[]")).roads;
+  const p = JSON.parse(duckosmPlan(JSON.stringify(cat), "all", tags, "[]"));
+  if (!p.roads) throw new Error(p.roads_error || "duckosmPlan: no roads");     // a file with no network (the base map can still be read)
+  const [e, r, drop] = p.roads;
   await q(e);
   let levels = "tags";
   if (!tags) {
