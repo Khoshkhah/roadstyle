@@ -51,7 +51,7 @@ class _Linear:
             i = len([u for u in ix if u < x])
             p = (x - ix[i - 1]) * 1.0 / (ix[i] - ix[i - 1]) if ix[i - 1] < ix[i] else 1.0
             c = tuple((1.0 - p) * cs[i - 1][j] + p * cs[i][j] for j in range(4))
-        return "#%02x%02x%02x" % tuple(int(u * 255.9999) for u in c[:3])
+        return "#" + "".join(f"{int(u * 255.9999):02x}" for u in c[:3])
 
 
 def _linear(cmap) -> _Linear:

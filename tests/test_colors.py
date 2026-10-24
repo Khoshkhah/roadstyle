@@ -14,8 +14,8 @@ def rgb(h):
 
 
 def near(ours, theirs, what):
-    for x, a, b in zip(AT, ours, theirs):
-        assert all(abs(p - q) <= 1 for p, q in zip(rgb(a), rgb(b))), f"{what} at {x}: {a} against branca's {b}"
+    for x, a, b in zip(AT, ours, theirs, strict=True):
+        assert all(abs(p - q) <= 1 for p, q in zip(rgb(a), rgb(b), strict=True)), f"{what} at {x}: {a} against branca's {b}"
 
 
 def branca_linear(cmap):
