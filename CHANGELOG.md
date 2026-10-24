@@ -6,6 +6,38 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **The level editor in a page with no server.** `makeArea(edges, options)` (roadstyle-wasm; `roadstyle::level_area::make_files` in
+  Rust) makes a level area's roads.parquet, pairs.csv and edits.csv in memory, the same bytes as the folder form. `duckosmPlan` gives
+  the query `level_edges`, the edges of a duckOSM file's level area (duckOSM's `load_roads`, the same rows and columns on Monaco). The
+  editor is a module, `static/dashboard/editor/level_editor.js`: `levelEditor({map, container, pkg, store})` on a host's map or one of
+  its own, with `browserStore` (the files in the browser) or `httpStore` (`roadstyle serve`), the event `"solved"` (levels.csv and the
+  map's table) and downloads of edits.csv and levels.csv. `roadstyle serve`'s page uses the same module.
+
+### Changed
+- **`cargo test` at `rust/` builds 113 crates in about 1 minute, not 195 in 5** (review D1). The programs `roadstyle-cli` and
+  `roadstyle-snapshot` (bundled SQLite, headless_chrome) are not default members: CI tests them in a step of their own (`-p`). Fat LTO
+  and one codegen unit moved from `release` to a new profile `dist` (`inherits = "release"`), which the wheels (`maturin --profile
+  dist`) and the wasm packages (`build_editor.sh`, `npm run build`) use. `roadstyle snapshot` is the default feature `snapshot` of
+  roadstyle-cli.
+- **`roadstyle_levels::ROADSTYLE_VERSION` is the crate's version** (review D13): it said 0.24.2 in 0.25.0, and duckosm-rust writes
+  it into `edge_levels_meta.roadstyle_version`. No level check reads that value (they compare `edge_hash` and `n_edges`).
+- **A level area's roads.parquet has the ids as Int64** (audit N28, both engines). `road`, `edges` and `reversed` are Int64 and
+  list<Int64>, duckOSM's BIGINT edge ids, written by `make_area` in Rust and in Python (`roadstyle.level_area.write_roads`; an id
+  column of text, which only the Python engine takes, stays text). The readers take both, so an area made before still opens:
+  `read_roads` (new) and the editors give the ids as text in memory. `rs.level_input` keeps its in-memory frame as text, because
+  duckosm-rust/tools compares the ids as text (a frozen repo). The level editor's answers are typed in Rust (`Answer`, the conflicts),
+  and the program's `levels solve` reads them without a JSON parse back. The page's JSON does not change.
+- **The program reads GeoJSON, Shapefile and GeoPackage roads** (audit N18). `roadstyle sources`, `page` and `levels make` read
+  the roads by the file's extension (`.parquet`, `.geojson`, `.shp` with its `.dbf` and `.prj`, `.gpkg`) through roadstyle-io's
+  readers. Before, they read only GeoParquet, though the program was built with the GeoPackage reader. Another extension is an error
+  that names the file.
+- **`serve` is a crate of its own, `roadstyle-serve`** (audit N17). The program (`roadstyle serve`) and the Python binding
+  (`roadstyle._rust.serve`) call it, so the Python extension no longer builds roadstyle-cli: 105 crates, not 170, with no
+  headless_chrome and no C SQLite. httparse (=1.10.1) parses the request line and the headers in place of the hand-written parser;
+  tiny_http 0.12.0 was not used, because it has no limit on them. The limits and checks do not change (127.0.0.1, Host, Origin, 64 KB
+  of headers, 16 MB of body). New: more than 64 headers is 431, a PUT with no Content-Length (a chunked body) is 411, a request that is
+  not HTTP is 400, and each `serve` call answers with its own area's name (before, a second call in one process kept the first name).
 ### Security
 - **The page does not run a script from its data** (audit N23), in both engines. The dashboard put road names, column values and the
   labels of overlays and legends into HTML with no escape, so a road named `<img src=x onerror=...>` ran a script on every page. Now one
@@ -54,6 +86,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   look, options, given?)` call it. Python gives only what it alone knows: the data steps, the look's options, the base maps' keys and the
   Google Maps key. A view's palette resolves its look in Rust (Python makes no extra looks). The page writer gzips the road table and
   the big sources itself; the two engines' pages are the same byte for byte but these blobs, which are the same when read back.
+- **An exported style tells an app's dashboard its roads** (audit 3, N27, both engines). `export_style`'s metadata has
+  `roadstyle:sources` (the road roles) and `roadstyle:controls.pick` (the layers that a road is picked on), from its final layers, as a
+  live style has them. A dashboard on an exported style finds and picks the roads with no layer-id prefix.
+- **The Rust tests compare with Python's own output again** (audit 3, N27). The goldens are made again with today's Python
+  (`goldens-2.tar` on the pre-release `rust-test-data`; `goldens-1.tar` stays for the older commits), and the test helper that
+  rewrote the old goldens (`as_decided`) is gone.
 - **The dashboard gets its road layers from the engine** (R7, both engines). `roadstyle:sources` has only the road roles: the
   overlays (`ov<i>`) are in their own list, `overlays`, and the boundary is not a road. The new control `pick` lists the layers that a
   road is picked on: `roads-simple` (the full look: its fill layers) and the 3D decks' tops, not their casing.
