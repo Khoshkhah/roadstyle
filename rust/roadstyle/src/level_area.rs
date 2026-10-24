@@ -165,7 +165,7 @@ pub fn make_area(table: &RoadTable, folder: &Path, o: &MakeOptions) -> Result<Ma
             out.push((name.into(), Column::BoolList(v.into_iter().map(|r| r.iter().map(Value::as_bool).collect()).collect())));
         }
     }
-    let wkb = |i: usize| table.line(i).and_then(|l| roadstyle_io::write::wkb(&json!({"type": "LineString", "coordinates": l})));
+    let wkb = |i: usize| table.line(i).map(roadstyle_io::columns::line_wkb);
     out.push(("geometry".into(), Column::Wkb(input.roads.iter().map(|r| wkb(r.first)).collect())));
     // pairs.csv: the meets, the stacks (one row for each part), the near rules (near_rules), the order wishes
     let road = |r: usize| id(input.roads[r].first);

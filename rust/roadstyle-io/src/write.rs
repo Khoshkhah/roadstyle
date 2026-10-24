@@ -1,13 +1,11 @@
-//! The writers: a table of rows (the road table, or a source's features) as Parquet; with a geometry column, GeoParquet (WKB in
-//! `geometry`, the `geo` metadata of GeoParquet 1.1). A column's type is that of its values: text, a boolean, an integer, a float; a
-//! column whose values are of more than one type (or are lists or objects) holds each value as its JSON text, and its field has the
-//! metadata `roadstyle:json` = `true`, so the reader gives the same JSON values back. A missing value and a null are the same (null).
+//! The rows writer: a table of rows (the road table, or a source's features) as Parquet, through the one Parquet writer
+//! (columns.rs); with a geometry column, GeoParquet. A column's type is that of its values: text, a boolean, an integer, a float, or a
+//! list of one of them (a native Parquet list); a column whose values are of more than one type (or are objects) holds each value as its
+//! JSON text, and its field has the metadata `roadstyle:json` = `true`, so the reader gives the same JSON values back. A missing value
+//! and a null are the same (null); in a list column they are an empty list.
 
-use arrow_array::builder::{BinaryBuilder, BooleanBuilder, Float64Builder, Int64Builder, StringBuilder};
-use arrow_array::{ArrayRef, RecordBatch};
-use arrow_schema::{DataType, Field, Schema};
-use parquet::arrow::ArrowWriter;
-use parquet::file::properties::WriterProperties;
+use crate::columns::Column;
+use arrow_schema::{DataType, Field};
 use roadstyle_model::Cell;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -97,7 +95,7 @@ impl Geometry<'_> {
     }
 
     fn wkb(&self) -> Option<Vec<u8>> {
-        match self { Geometry::Line(c) => Some(wkb_line(c)), Geometry::Json(g) => wkb(g) }
+        match self { Geometry::Line(c) => Some(crate::columns::line_wkb(c)), Geometry::Json(g) => crate::columns::wkb(g) }
     }
 }
 
@@ -109,6 +107,8 @@ pub struct Row<'a> {
     pub geometry: Option<Geometry<'a>>,
 }
 
+/// The kind of a column: a scalar kind, a list of one scalar kind (a native Parquet list), or JSON text (values of more than one kind, or
+/// objects: `roadstyle:json`).
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Kind {
     Null,
@@ -116,23 +116,57 @@ enum Kind {
     Int,
     Float,
     Text,
+    List(Item),
     Json,
+}
+
+/// The kind of a list's items.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum Item {
+    Null,
+    Bool,
+    Int,
+    Float,
+    Text,
+}
+
+fn scalar(v: &Value) -> Option<Item> {
+    Some(match v {
+        Value::Null => Item::Null,
+        Value::Bool(_) => Item::Bool,
+        Value::Number(n) if n.is_i64() => Item::Int,
+        Value::Number(n) if n.is_f64() => Item::Float,
+        Value::String(_) => Item::Text,
+        _ => return None,
+    })
+}
+
+fn merge_item(a: Item, b: Item) -> Option<Item> {
+    match (a, b) {
+        (Item::Null, k) | (k, Item::Null) => Some(k),
+        (x, y) if x == y => Some(x),
+        _ => None,
+    }
 }
 
 fn kind(v: &Value) -> Kind {
     match v {
-        Value::Null => Kind::Null,
-        Value::Bool(_) => Kind::Bool,
-        Value::Number(n) if n.is_i64() => Kind::Int,
-        Value::Number(n) if n.is_f64() => Kind::Float,
-        Value::String(_) => Kind::Text,
-        _ => Kind::Json,
+        Value::Array(a) => a.iter().try_fold(Item::Null, |k, x| merge_item(k, scalar(x)?)).map_or(Kind::Json, Kind::List),
+        v => match scalar(v) {
+            Some(Item::Null) => Kind::Null,
+            Some(Item::Bool) => Kind::Bool,
+            Some(Item::Int) => Kind::Int,
+            Some(Item::Float) => Kind::Float,
+            Some(Item::Text) => Kind::Text,
+            None => Kind::Json,
+        },
     }
 }
 
 fn merge(a: Kind, b: Kind) -> Kind {
     match (a, b) {
         (Kind::Null, k) | (k, Kind::Null) => k,
+        (Kind::List(x), Kind::List(y)) => merge_item(x, y).map_or(Kind::Json, Kind::List),
         (x, y) if x == y => x,
         _ => Kind::Json,
     }
@@ -162,6 +196,7 @@ pub fn parquet_to<'a, W: std::io::Write + Send, I: Iterator<Item = Row<'a>>>(w: 
             kinds[i] = merge(kinds[i], v.kind());
         }
     }
+    let list = |t: DataType| DataType::List(Arc::new(Field::new("item", t, true)));
     let mut fields: Vec<Field> = Vec::new();
     if ids {
         fields.push(Field::new(FID, DataType::Int64, true));
@@ -173,6 +208,10 @@ pub fn parquet_to<'a, W: std::io::Write + Send, I: Iterator<Item = Row<'a>>>(w: 
             Kind::Float => DataType::Float64,
             Kind::Null => DataType::Null,
             Kind::Text | Kind::Json => DataType::Utf8,
+            Kind::List(Item::Text | Item::Null) => list(DataType::Utf8),
+            Kind::List(Item::Bool) => list(DataType::Boolean),
+            Kind::List(Item::Int) => list(DataType::Int64),
+            Kind::List(Item::Float) => list(DataType::Float64),
         };
         let f = Field::new(n, t, true);
         fields.push(if *k == Kind::Json { f.with_metadata(HashMap::from([("roadstyle:json".to_string(), "true".to_string())])) } else { f });
@@ -180,125 +219,38 @@ pub fn parquet_to<'a, W: std::io::Write + Send, I: Iterator<Item = Row<'a>>>(w: 
     if geometry {
         fields.push(Field::new("geometry", DataType::Binary, true));
     }
-    let mut meta = HashMap::new();
-    if geometry {
-        let geo = serde_json::json!({"version": "1.1.0", "primary_column": "geometry",
-                                     "columns": {"geometry": {"encoding": "WKB", "geometry_types": types}}});
-        meta.insert("geo".to_string(), geo.to_string());
-    }
-    let schema = Arc::new(Schema::new_with_metadata(fields, meta));
-    let props = WriterProperties::builder().set_compression(parquet::basic::Compression::SNAPPY).build();
-    let mut w = ArrowWriter::try_new(w, schema.clone(), Some(props)).map_err(|e| e.to_string())?;
+    let mut w = crate::columns::Writer::new(w, fields, geometry.then(|| ("geometry", types.into_iter().collect())))?;
     let mut it = rows().peekable();
     while it.peek().is_some() {
         let chunk: Vec<Row> = it.by_ref().take(BATCH).collect();
-        let mut cols: Vec<ArrayRef> = Vec::new();
+        let mut cols: Vec<Column> = Vec::new();
         if ids {
-            let mut b = Int64Builder::new();
-            chunk.iter().for_each(|r| b.append_option(r.id));
-            cols.push(Arc::new(b.finish()));
+            cols.push(Column::Int(chunk.iter().map(|r| r.id).collect()));
         }
         let index: Vec<HashMap<&str, &Val>> = chunk.iter().map(|r| r.props.iter().map(|(k, v)| (k.as_ref(), v)).collect()).collect();
         for (n, k) in names.iter().zip(&kinds) {
             let get = |i: usize| index[i].get(n.as_str()).copied().filter(|v| !v.is_null());
-            let a: ArrayRef = match k {
-                Kind::Bool => {
-                    let mut b = BooleanBuilder::new();
-                    (0..chunk.len()).for_each(|i| b.append_option(get(i).and_then(Val::as_bool)));
-                    Arc::new(b.finish())
-                }
-                Kind::Int => {
-                    let mut b = Int64Builder::new();
-                    (0..chunk.len()).for_each(|i| b.append_option(get(i).and_then(Val::as_i64)));
-                    Arc::new(b.finish())
-                }
-                Kind::Float => {
-                    let mut b = Float64Builder::new();
-                    (0..chunk.len()).for_each(|i| b.append_option(get(i).and_then(Val::as_f64)));
-                    Arc::new(b.finish())
-                }
-                Kind::Null => Arc::new(arrow_array::NullArray::new(chunk.len())),
-                Kind::Text => {
-                    let mut b = StringBuilder::new();
-                    (0..chunk.len()).for_each(|i| b.append_option(get(i).and_then(Val::as_str)));
-                    Arc::new(b.finish())
-                }
-                Kind::Json => {
-                    let mut b = StringBuilder::new();
-                    (0..chunk.len()).for_each(|i| b.append_option(get(i).map(Val::text)));
-                    Arc::new(b.finish())
-                }
+            // a list column's rows (a missing value: an empty list)
+            let items = || -> Vec<Vec<Value>> {
+                (0..chunk.len()).map(|i| get(i).and_then(Val::json).and_then(Value::as_array).cloned().unwrap_or_default()).collect()
             };
-            cols.push(a);
+            cols.push(match k {
+                Kind::Bool => Column::Bool((0..chunk.len()).map(|i| get(i).and_then(Val::as_bool)).collect()),
+                Kind::Int => Column::Int((0..chunk.len()).map(|i| get(i).and_then(Val::as_i64)).collect()),
+                Kind::Float => Column::Float((0..chunk.len()).map(|i| get(i).and_then(Val::as_f64)).collect()),
+                Kind::Null => Column::Null(chunk.len()),
+                Kind::Text => Column::Text((0..chunk.len()).map(|i| get(i).and_then(Val::as_str).map(String::from)).collect()),
+                Kind::Json => Column::Text((0..chunk.len()).map(|i| get(i).map(Val::text)).collect()),
+                Kind::List(Item::Bool) => Column::BoolList(items().iter().map(|r| r.iter().map(Value::as_bool).collect()).collect()),
+                Kind::List(Item::Int) => Column::IntList(items().iter().map(|r| r.iter().map(Value::as_i64).collect()).collect()),
+                Kind::List(Item::Float) => Column::FloatList(items().iter().map(|r| r.iter().map(Value::as_f64).collect()).collect()),
+                Kind::List(Item::Text | Item::Null) => Column::TextList(items().iter().map(|r| r.iter().map(|x| x.as_str().map(String::from)).collect()).collect()),
+            });
         }
         if geometry {
-            let mut b = BinaryBuilder::new();
-            for r in &chunk {
-                b.append_option(r.geometry.as_ref().and_then(Geometry::wkb));
-            }
-            cols.push(Arc::new(b.finish()));
+            cols.push(Column::Wkb(chunk.iter().map(|r| r.geometry.as_ref().and_then(Geometry::wkb)).collect()));
         }
-        w.write(&RecordBatch::try_new(schema.clone(), cols).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        w.write(cols)?;
     }
-    w.into_inner().map_err(|e| e.to_string())
-}
-
-/// A line as WKB (little endian, 2D), with no GeoJSON in between.
-pub fn wkb_line(c: &[[f64; 2]]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(9 + 16 * c.len());
-    out.push(1);
-    out.extend_from_slice(&2u32.to_le_bytes());
-    out.extend_from_slice(&(c.len() as u32).to_le_bytes());
-    c.iter().for_each(|q| q.iter().for_each(|x| out.extend_from_slice(&x.to_le_bytes())));
-    out
-}
-
-/// A GeoJSON geometry as WKB (little endian, 2D); None for a geometry that it does not read.
-pub fn wkb(g: &Value) -> Option<Vec<u8>> {
-    fn pts(v: &Value) -> Option<Vec<[f64; 2]>> {
-        v.as_array()?.iter().map(|p| Some([p.get(0)?.as_f64()?, p.get(1)?.as_f64()?])).collect()
-    }
-    fn head(out: &mut Vec<u8>, t: u32) {
-        out.push(1);
-        out.extend_from_slice(&t.to_le_bytes());
-    }
-    fn line(out: &mut Vec<u8>, p: &[[f64; 2]]) {
-        out.extend_from_slice(&(p.len() as u32).to_le_bytes());
-        p.iter().for_each(|q| q.iter().for_each(|x| out.extend_from_slice(&x.to_le_bytes())));
-    }
-    fn rings(out: &mut Vec<u8>, v: &Value) -> Option<()> {
-        let rs = v.as_array()?;
-        out.extend_from_slice(&(rs.len() as u32).to_le_bytes());
-        for r in rs {
-            line(out, &pts(r)?);
-        }
-        Some(())
-    }
-    let c = &g["coordinates"];
-    let mut out = Vec::new();
-    match g["type"].as_str()? {
-        "Point" => {
-            head(&mut out, 1);
-            pts(&Value::Array(vec![c.clone()]))?[0].iter().for_each(|x| out.extend_from_slice(&x.to_le_bytes()));
-        }
-        "LineString" => {
-            head(&mut out, 2);
-            line(&mut out, &pts(c)?);
-        }
-        "Polygon" => {
-            head(&mut out, 3);
-            rings(&mut out, c)?;
-        }
-        t @ ("MultiPoint" | "MultiLineString" | "MultiPolygon") => {
-            let (outer, inner) = match t { "MultiPoint" => (4, "Point"), "MultiLineString" => (5, "LineString"), _ => (6, "Polygon") };
-            let parts = c.as_array()?;
-            head(&mut out, outer);
-            out.extend_from_slice(&(parts.len() as u32).to_le_bytes());
-            for p in parts {
-                out.extend(wkb(&serde_json::json!({"type": inner, "coordinates": p}))?);
-            }
-        }
-        _ => return None,
-    }
-    Some(out)
+    w.finish()
 }
