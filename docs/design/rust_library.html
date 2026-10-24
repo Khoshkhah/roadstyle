@@ -2385,6 +2385,55 @@ uses <a href="review_checklist.md">review_checklist.md</a>):</p>
    audit, then P7.</li>
 </ol>
 <p>R12, R13 and the <code>compute_levels</code> options belong to the levels session; R20 (the duckosm-rust consumer) waits for the end of the freeze.</p>
+<h4 id="after-p7-every-part-in-rust-2026-10-24">After P7: every part in Rust (2026-10-24)</h4>
+<p>Kaveh's decision: "we rewrite every part by rust". The Python package becomes a thin binding with no logic of its own: the API
+(<code>render_edges</code>, <code>export_inline</code>, <code>export_style</code>, <code>compute_levels</code>, ...) checks and passes its arguments to the Rust engine and gives back
+what it returns. folium and lonboard stay thin Python wrappers (they are Python libraries), and they take their data from the Rust engine.
+Each part below is its own step after P7:</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Part</th>
+<th>In Rust</th>
+<th>Can run beside</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A1</td>
+<td>The CLI (<code>roadstyle ...</code>)</td>
+<td>a Rust program on the facade crate (the two stages, the page, the levels)</td>
+<td>A2, A3, A4</td>
+</tr>
+<tr>
+<td>A2</td>
+<td>The MCP server (<code>roadstyle-mcp</code>)</td>
+<td>a Rust program with the MCP protocol, on the facade crate</td>
+<td>A1, A3, A4</td>
+</tr>
+<tr>
+<td>A3</td>
+<td>The studio</td>
+<td>the page and its engine in the browser package (wasm) and the dashboard; no Python server</td>
+<td>A1, A2, A4</td>
+</tr>
+<tr>
+<td>A4</td>
+<td>Snapshots (static images)</td>
+<td><code>maplibre_native</code> (MapLibre Native's Rust bindings) draws the style; no headless browser</td>
+<td>A1, A2, A3</td>
+</tr>
+<tr>
+<td>A5</td>
+<td>The level editor</td>
+<td>the levels session builds it now: the page runs the solver through wasm, no Python server</td>
+<td>runs now</td>
+</tr>
+</tbody>
+</table>
+<p>A1 to A4 touch other files (a program crate each, the studio's page) and can run as parallel sessions; each needs only the facade's
+public calls. A5 is the levels session's.</p>
 <h3 id="parallel-work-without-two-sessions-in-one-file">Parallel work without two sessions in one file</h3>
 <table>
 <thead>

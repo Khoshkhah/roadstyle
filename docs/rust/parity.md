@@ -98,29 +98,91 @@ browser test. On Monaco the WebAssembly module is as fast as the native code.
 
 ### In the browser: Rust or MapLibre cuts the tiles
 
-The same roads and the same look go to the browser in two ways. **MapLibre:** `makeStyle` gives the style with GeoJSON sources,
-and MapLibre cuts the tiles itself. **Rust:** `new Tiler` gives the style with a vector source, and `tiler.tile()` cuts each tile
-when MapLibre asks for it. Both include stage 1. Monaco (13,298 roads, with their 8 level columns), a map of 1000 × 700 pixels
-with no base map, headless Chromium; the middle value of 3 runs, each in a new page.
+The test compares only stage 2: **the same GeoJSON files go into both cutters, with the same tile settings.**
 
-| Step | MapLibre cuts the GeoJSON | Rust cuts the tiles |
+The input: stage 1 (`makeSources`) made the files of Monaco (13,298 roads with their 8 level columns) one time: `style.json`,
+`roads.geojson` (7.75 MB), `simple.geojson` (8.76 MB), `slots.geojson` (0.76 MB) and `road_table.parquet` (1.76 MB).
+
+- **MapLibre** reads the saved `style.json`, with its GeoJSON sources pointing to these files, and cuts the tiles. Its source
+  options have stage 2's settings: `maxzoom` 15, `buffer` 10 (stage 2's 80 units of 4,096, on MapLibre's scale of 512) and
+  `tolerance` 0.0625 (half a unit of 4,096).
+- **Rust** (`tileFiles`) reads the same files and cuts the tiles when MapLibre asks for them.
+
+A map of 1000 × 700 pixels with no base map, headless Chromium, 2026-10-24; the middle value of 3 runs, each in a new page. The
+first view is the fair number to compare: both cutters parse the same GeoJSON, MapLibre in the first view and Rust before the map
+exists.
+
+| Stage 2 | MapLibre | Rust |
 |---|---|---|
-| The engine (stage 1; for Rust also the tile index) | 0.65 s (`makeStyle`) | 0.65 s (`new Tiler`) |
-| The size of the style that MapLibre gets | 23.2 MB, with the GeoJSON | 0.09 MB, only the rules |
-| The first complete view, zoom 14 (MapLibre's `idle` event) | 1.16 s | 0.56 s |
-| A zoom to 16 | 0.49 s | 0.35 s |
-| A pan | 0.36 s | 0.21 s |
-| A zoom out to 12 | 0.25 s | 0.25 s |
-| The JavaScript heap of the page | 112 MB | 82 MB |
+| Before the map exists: the data made ready for stage 2 | 0.02 s: the sources only point to the files | 0.51 s: `tileFiles` reads and parses the GeoJSON and indexes the pieces |
+| From the start until the whole first view (zoom 14) is drawn, the time above included | 0.98 s: MapLibre reads and parses the GeoJSON, cuts the tiles and draws | 1.09 s: Rust cuts the tiles that MapLibre asks for, and MapLibre draws |
+| A zoom to 16 | 0.39 s | 0.37 s |
+| A pan | 0.18 s | 0.17 s |
+| A zoom out to 12 | 0.21 s | 0.29 s |
+| The WebAssembly memory | 158 MB | 316 MB |
+| The JavaScript heap | 103 MB | 133 MB |
 
-!!! warning "A first result, not a fair comparison"
-    The two paths do not cut the same input into the same tiles. MapLibre cuts the GeoJSON of `makeStyle`; the `Tiler` makes its
-    own pieces from the roads, because stage 2 has no public call that takes a GeoJSON yet. The settings also differ: MapLibre
-    cuts up to zoom 18 on a grid of 8,192 units with a buffer of 128, and it cuts the source `roads` with every field and line;
-    the `Tiler` cuts zooms 6 to 15 on a grid of 4,096 units with a buffer of 80, and above zoom 15 MapLibre enlarges its tiles.
-    Thus the row "a zoom to 16" favors the `Tiler`. A fair test gives both cutters the same GeoJSON file with the same tile
-    settings, and checks that they give the same features. Other limits: one area, one machine, software drawing in a headless
-    browser, and no count of the memory of MapLibre's own workers.
+**The same tiles.** After each view, the test compares the pieces (by road, kind and sort number) and the name and arrow slots
+(by road, slot and rank) of the two maps. At zoom 14 they are the same (12,467 and 12,466 pieces; 2,248 slots in both). At the
+other views MapLibre has 1 % to 3 % more features in view (zoom 16: 7,994 pieces against 7,786), and every feature of Rust is
+also in MapLibre's. The probable cause is a rule of the tiles: roadstyle puts a feature only in the tiles that its box touches,
+and uses the buffer only to clip it (the rule of `tiles.py`); MapLibre also puts it in the tiles whose buffer it touches.
+
+**The result: from the same files, the two cutters are about equal.** MapLibre is a little faster at the first view and at zoom
+12, and it uses less memory, because Rust must first parse the GeoJSON text into JSON values (the gap "Stage 2 takes the typed
+pieces, not JSON" of [Known design gaps](architecture.md#known-design-gaps)).
+
+#### The one call: no files at all
+
+In one call, stage 2 takes stage 1's typed pieces from memory (`tileSources`), and stage 1 writes no files. This path does not
+read the files above, so it is not part of the comparison; it shows what the one call gains. The same map and the same views:
+
+| | Rust from memory |
+|---|---|
+| Stage 1 with no files (with the GeoJSON files: 0.95 s) | 0.29 s |
+| Before the map exists: the data made ready for stage 2 | 0.20 s |
+| From the start until the whole first view (zoom 14) is drawn | 0.80 s |
+| A zoom to 16, a pan, a zoom out to 12 | 0.37 s, 0.19 s, 0.25 s |
+| The WebAssembly memory, the JavaScript heap | 83 MB, 79 MB |
+
+It gives the same features as Rust from the files.
+
+The limits of both tests: one area, one machine, software drawing in a headless browser, and no count of the memory of MapLibre's
+own workers. An earlier test (2026-10-23) gave Rust half the time of MapLibre for the first view, but it did not give both the same
+input or the same tile settings.
+
+### The whole page: Rust's two stages against MapLibre's stage 2
+
+This test compares two real pages, each measured from the start of the page to the whole first view, with the downloads and the
+start of the engine included:
+
+- **MapLibre only:** stage 1 was done before. The page downloads its GeoJSON files, MapLibre cuts the tiles (stage 2) and draws.
+  The page loads no WebAssembly.
+- **Rust, both stages:** the page downloads the roads file (GeoParquet) and the WebAssembly engine; Rust runs stage 1 and stage 2
+  in memory (`makeSources`, then `tileSources`), and MapLibre draws.
+
+Monaco (13,298 roads), the same settings as above, a local server, 2026-10-24; the middle value of 3 runs, each in a new browser
+context (no cache), after one run to warm the browser.
+
+| | MapLibre only | Rust, both stages |
+|---|---|---|
+| The download, plain | 17.4 MB: `style.json`, `roads.geojson`, `simple.geojson`, `slots.geojson` | 1.1 MB of roads, and the engine (8.4 MB) |
+| The download, gzip | 1.36 MB | 0.93 MB of roads, and the engine (1.93 MB, only on the first visit) |
+| The whole first view, from the start of the page | 0.91 s | 1.15 s |
+| A zoom to 16 | 0.35 s | 0.36 s |
+| A pan | 0.15 s | 0.18 s |
+| A zoom out to 12 | 0.18 s | 0.23 s |
+| The memory | 100 MB of JavaScript heap, and MapLibre's workers (not measured) | 55 MB of JavaScript heap and 83 MB of WebAssembly |
+
+On Monaco, MapLibre with prepared GeoJSON is a little faster, because the Rust page also runs stage 1 and starts the engine. The
+two pages are not the same kind of page, however:
+
+- **MapLibre only** needs stage 1 done before, by a server or a job, for each map, each look and each change of the data.
+- **Rust, both stages** needs only the roads. The page can make another look (a palette, a color column, filters) by itself, with
+  no server and no new files.
+
+The limits: one area, a local server (no network delay), software drawing in a headless browser, and no count of the memory of
+MapLibre's workers.
 
 ### Small areas
 
