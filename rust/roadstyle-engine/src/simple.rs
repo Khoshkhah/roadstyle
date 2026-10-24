@@ -422,7 +422,19 @@ impl SimpleSource {
 
     /// The JSON text: each feature as `{"type", "geometry", "properties", "id"}`.
     pub fn write_json(&self, out: &mut Vec<u8>, roads: &Roads) {
-        out.extend_from_slice(br#"{"type":"geojson","data":{"type":"FeatureCollection","features":["#);
+        out.extend_from_slice(br#"{"type":"geojson","data":"#);
+        self.write_data(out, roads);
+        out.extend_from_slice(br#","tolerance":"#);
+        serde_json::to_writer(&mut *out, &self.tolerance).unwrap();
+        if let Some(z) = self.maxzoom {
+            out.extend_from_slice(format!(r#","maxzoom":{z}"#).as_bytes());
+        }
+        out.push(b'}');
+    }
+
+    /// The FeatureCollection.
+    pub fn write_data(&self, out: &mut Vec<u8>, roads: &Roads) {
+        out.extend_from_slice(br#"{"type":"FeatureCollection","features":["#);
         for (i, (id, props, coords)) in self.features(roads).enumerate() {
             if i > 0 {
                 out.push(b',');
@@ -440,12 +452,7 @@ impl SimpleSource {
             props.write_json(out);
             out.extend_from_slice(format!(r#","id":{id}}}"#).as_bytes());
         }
-        out.extend_from_slice(br#"]},"tolerance":"#);
-        serde_json::to_writer(&mut *out, &self.tolerance).unwrap();
-        if let Some(z) = self.maxzoom {
-            out.extend_from_slice(format!(r#","maxzoom":{z}"#).as_bytes());
-        }
-        out.push(b'}');
+        out.extend_from_slice(b"]}");
     }
 }
 

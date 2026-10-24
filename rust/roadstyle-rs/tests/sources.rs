@@ -1,0 +1,54 @@
+//! Stage 1 (docs/rust/architecture.md, "The three stages and the one call"): make_sources and save_sources on Monaco. The GeoJSON file
+//! of each source is the data of that source in make_style's style; the roads' file has only their drawing values; the road table has
+//! one row for each road with every field; the GeoParquet files have one row for each feature.
+
+use serde_json::Value;
+use std::path::PathBuf;
+
+fn data(p: &str) -> Vec<u8> {
+    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data").join(p);
+    std::fs::read(&p).unwrap_or_else(|e| panic!("{}: {e}", p.display()))
+}
+
+#[test]
+fn monaco_sources_as_files() {
+    let look = String::from_utf8(data("look.json")).unwrap();
+    let style: Value = serde_json::from_str(&roadstyle_rs::make_style(data("monaco/roads.parquet"), &look, Some(data("monaco/features.parquet")), None, None).unwrap()).unwrap();
+    let s = roadstyle_rs::make_sources(data("monaco/roads.parquet"), &look, Some(data("monaco/features.parquet")), None, None).unwrap();
+    let dir = std::env::temp_dir().join(format!("roadstyle-sources-{}", std::process::id()));
+    let files = roadstyle_rs::save_sources(&s, &dir.join("geojson"), roadstyle_rs::Format::GeoJson, &[]).unwrap();
+    let names: Vec<&String> = style["sources"].as_object().unwrap().keys().collect();
+    assert_eq!(files.len(), names.len() + 2, "a file for each source, the road table and style.json");
+    let drawn = s.drawn(&[]);
+    for n in &names {
+        let got: Value = serde_json::from_slice(&std::fs::read(dir.join(format!("geojson/{n}.geojson"))).unwrap()).unwrap();
+        let mut want = style["sources"][n.as_str()]["data"].clone();
+        if *n == "roads" {
+            // the roads' file: the drawing values only (their fields are in the road table)
+            for f in want["features"].as_array_mut().unwrap() {
+                f["properties"].as_object_mut().unwrap().retain(|k, _| k.starts_with("__rs_") || drawn.contains(k));
+            }
+        }
+        assert!(got == want, "{n}.geojson is not the source's data");
+    }
+    let saved: Value = serde_json::from_slice(&std::fs::read(dir.join("geojson/style.json")).unwrap()).unwrap();
+    assert_eq!(saved["sources"]["simple"]["data"], "simple.geojson");
+    assert_eq!(saved["layers"], style["layers"]);
+    // the road table: a row for each road, a column for each field of the roads source
+    let roads = style["sources"]["roads"]["data"]["features"].as_array().unwrap();
+    let table = roadstyle_rs::read::read_roads(std::fs::read(dir.join("geojson/road_table.parquet")).unwrap(), "geometry").unwrap();
+    assert_eq!(table.len(), roads.len());
+    let mut keys: Vec<&String> = roads.iter().flat_map(|f| f["properties"].as_object().unwrap().keys()).collect();
+    keys.sort();
+    keys.dedup();
+    let mut cols: Vec<&String> = table.names().iter().collect();
+    cols.sort();
+    assert_eq!(cols, keys);
+    // GeoParquet: a row for each feature of each source
+    roadstyle_rs::save_sources(&s, &dir.join("geoparquet"), roadstyle_rs::Format::GeoParquet, &[]).unwrap();
+    for n in &names {
+        let rows = roadstyle_rs::read::read_table(std::fs::read(dir.join(format!("geoparquet/{n}.parquet"))).unwrap(), "geometry").unwrap();
+        assert_eq!(rows.len(), style["sources"][n.as_str()]["data"]["features"].as_array().unwrap().len(), "{n}.parquet");
+    }
+    std::fs::remove_dir_all(&dir).unwrap();
+}

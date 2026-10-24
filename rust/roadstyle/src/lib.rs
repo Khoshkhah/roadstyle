@@ -28,6 +28,75 @@ pub fn make_style(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
     roadstyle_engine::make_style(feats, look, features, planner, name)
 }
 
+/// Stage 1 from GeoParquet bytes: the style and its sources, typed in memory (docs/rust/architecture.md, "The three stages and the one
+/// call"). `save_sources` writes them as files.
+pub fn make_sources(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<sources::Sources, String> {
+    let (feats, features, planner) = tables(parquet, features, planner)?;
+    Ok(sources::Sources::new(make_parts(feats, look, features, planner, name)?))
+}
+
+/// The file format of stage 1's sources.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Format {
+    /// `<name>.geojson`: a FeatureCollection, for MapLibre and to read
+    GeoJson,
+    /// `<name>.parquet`: GeoParquet, smaller, for large areas and DuckDB
+    GeoParquet,
+}
+
+/// The file of the road table, next to the sources.
+pub const ROAD_TABLE: &str = "road_table.parquet";
+
+/// Stage 1's files in `dir`: `style.json` (each source's data at its file), one file for each source, and the road table (every field
+/// of each road, by its row; the roads' file has only their drawing values). `keep`: more columns for the roads' file. Gives each
+/// file's name and size.
+pub fn save_sources(s: &sources::Sources, dir: &std::path::Path, format: Format, keep: &[String]) -> Result<Vec<(String, usize)>, String> {
+    let ext = match format { Format::GeoJson => "geojson", Format::GeoParquet => "parquet" };
+    let drawn = s.drawn(keep);
+    let mut files = Vec::new();
+    let mut put = |name: String, bytes: Vec<u8>| -> Result<(), String> {
+        std::fs::write(dir.join(&name), &bytes).map_err(|e| format!("{name}: {e}"))?;
+        files.push((name, bytes.len()));
+        Ok(())
+    };
+    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    for (i, (name, src)) in s.sources.iter().enumerate() {
+        let bytes = match format {
+            Format::GeoJson => s.data(i, &drawn),
+            Format::GeoParquet => {
+                let line = |c: Option<&[[f64; 2]]>| c.map(|c| json!({"type": "LineString", "coordinates": c}));
+                match src {
+                    Src::Roads(_) => roadstyle_io::write::parquet(|| s.roads.roads.iter().map(|r| roadstyle_io::write::Row {
+                        id: Some(r.i as i64),
+                        props: r.iter().map(|(k, c)| (s.roads.out_name(k), c)).filter(|(k, _)| k.starts_with("__rs_") || drawn.contains(*k))
+                            .map(|(k, c)| (k.to_string(), c.to_value())).collect(),
+                        geometry: line(r.line()),
+                    }), true)?,
+                    Src::Simple(p) => roadstyle_io::write::parquet(|| p.features(&s.roads.roads).map(|(id, props, c)| roadstyle_io::write::Row {
+                        id: Some(id as i64), props: props.into_iter().map(|(k, v)| (k.to_string(), v)).collect(), geometry: line(c),
+                    }), true)?,
+                    Src::Json(v) => {
+                        let fs = v["data"]["features"].as_array().map(Vec::as_slice).unwrap_or_default();
+                        roadstyle_io::write::parquet(|| fs.iter().map(|f| roadstyle_io::write::Row {
+                            id: f["id"].as_i64(),
+                            props: f["properties"].as_object().into_iter().flatten().map(|(k, v)| (k.clone(), v.clone())).collect(),
+                            geometry: Some(f["geometry"].clone()).filter(|g| !g.is_null()),
+                        }), true)?
+                    }
+                }
+            }
+        };
+        put(format!("{name}.{ext}"), bytes)?;
+    }
+    let table = roadstyle_io::write::parquet(|| s.road_rows().map(|r| roadstyle_io::write::Row {
+        id: None, props: r.into_iter().map(|(k, c)| (k.to_string(), c.to_value())).collect(), geometry: None,
+    }), false)?;
+    put(ROAD_TABLE.into(), table)?;
+    let style = s.style(|n| format!("{n}.{ext}"));
+    put("style.json".into(), serde_json::to_vec(&style).map_err(|e| e.to_string())?)?;
+    Ok(files)
+}
+
 /// The style with one vector-tile source, `roads` (`<prefix>roads/{z}/{x}/{y}`), and the tiles to answer it with (tiles.rs: the rules of
 /// roadstyle's tiles.py, the zooms and the buffer from `look["config"]["tiles"]`). The layers, the metadata and the camera are those of
 /// `make_style`; each layer draws the tile layer of its old source (`source-layer`). The tiles keep only the properties that are read:

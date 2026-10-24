@@ -92,14 +92,15 @@ impl<'a> Road<'a> {
         self.iter().map(|(k, v)| (k.to_string(), v.to_value())).collect()
     }
 
-    /// The JSON text of the properties, as serde_json writes the `Map` of `to_map`, with the output's names (`name`).
-    pub fn write_json<'n>(self, out: &mut Vec<u8>, name: impl Fn(&'n str) -> &'n str) where 'a: 'n {
+    /// The JSON text of the properties, as serde_json writes the `Map` of `to_map`, with the output's names (`name`), those that
+    /// `keep` takes (by the output's name).
+    pub fn write_json<'n>(self, out: &mut Vec<u8>, name: impl Fn(&'n str) -> &'n str, keep: impl Fn(&str) -> bool) where 'a: 'n {
         out.push(b'{');
-        for (n, (k, v)) in self.iter().enumerate() {
+        for (n, (k, v)) in self.iter().map(|(k, v)| (name(k), v)).filter(|(k, _)| keep(k)).enumerate() {
             if n > 0 {
                 out.push(b',');
             }
-            serde_json::to_writer(&mut *out, name(k)).unwrap();
+            serde_json::to_writer(&mut *out, k).unwrap();
             out.push(b':');
             serde_json::to_writer(&mut *out, &v).unwrap();
         }
@@ -139,13 +140,26 @@ impl RoadsSource {
     }
 
     pub fn write_json(&self, out: &mut Vec<u8>) {
-        out.extend_from_slice(br#"{"type":"geojson","data":{"type":"FeatureCollection","features":["#);
+        out.extend_from_slice(br#"{"type":"geojson","data":"#);
+        self.write_data(out, None);
+        out.extend_from_slice(br#","tolerance":"#);
+        serde_json::to_writer(&mut *out, &self.tolerance).unwrap();
+        if let Some(z) = self.maxzoom {
+            out.extend_from_slice(br#","maxzoom":"#);
+            out.extend_from_slice(z.to_string().as_bytes());
+        }
+        out.push(b'}');
+    }
+
+    /// The FeatureCollection of the roads; `keep`: only these properties (by the output's name) and every `__rs_*` one.
+    pub fn write_data(&self, out: &mut Vec<u8>, keep: Option<&std::collections::HashSet<String>>) {
+        out.extend_from_slice(br#"{"type":"FeatureCollection","features":["#);
         for r in self.roads.iter() {
             if r.i > 0 {
                 out.push(b',');
             }
             out.extend_from_slice(format!(r#"{{"id":{},"type":"Feature","properties":"#, r.i).as_bytes());
-            r.write_json(out, |k| self.out_name(k));
+            r.write_json(out, |k| self.out_name(k), |k| keep.is_none_or(|s| k.starts_with("__rs_") || s.contains(k)));
             out.extend_from_slice(br#","geometry":"#);
             match r.line() {
                 None => out.extend_from_slice(b"null"),
@@ -157,12 +171,6 @@ impl RoadsSource {
             }
             out.push(b'}');
         }
-        out.extend_from_slice(br#"]},"tolerance":"#);
-        serde_json::to_writer(&mut *out, &self.tolerance).unwrap();
-        if let Some(z) = self.maxzoom {
-            out.extend_from_slice(br#","maxzoom":"#);
-            out.extend_from_slice(z.to_string().as_bytes());
-        }
-        out.push(b'}');
+        out.extend_from_slice(b"]}");
     }
 }

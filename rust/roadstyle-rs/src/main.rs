@@ -98,6 +98,22 @@ fn main() {
         bench(&args[2], &args[3], &args[4]);
         return;
     }
+    if args.len() == 7 && args[1] == "--sources" {
+        // stage 1: the sources as files (geojson or geoparquet) in a folder, with the time and each file's size
+        let opt = |p: &str| (p != "-").then(|| fs::read(p).unwrap_or_else(|e| fail(format!("{p}: {e}"))));
+        let format = if args[6] == "geoparquet" { roadstyle_rs::Format::GeoParquet } else { roadstyle_rs::Format::GeoJson };
+        let t = Instant::now();
+        let s = roadstyle_rs::make_sources(fs::read(&args[3]).unwrap(), &fs::read_to_string(&args[2]).unwrap(), opt(&args[4]), None, None)
+            .unwrap_or_else(|e| fail(e));
+        let made = t.elapsed();
+        let files = roadstyle_rs::save_sources(&s, std::path::Path::new(&args[5]), format, &[]).unwrap_or_else(|e| fail(e));
+        eprintln!("make_sources {:.0} ms, save {:.0} ms", made.as_secs_f64() * 1e3, (t.elapsed() - made).as_secs_f64() * 1e3);
+        for (f, n) in &files {
+            println!("{f}\t{n}");
+        }
+        println!("total\t{}", files.iter().map(|f| f.1).sum::<usize>());
+        return;
+    }
     if args.len() == 4 && args[1] == "--features" {
         // step 3 check: the base-map feature collections from the worker's features.parquet, as {name: FeatureCollection}
         let data = fs::read(&args[3]).unwrap_or_else(|e| fail(format!("{}: {e}", args[3])));
