@@ -3,6 +3,8 @@
 //! own files (`WRITABLE`), with a PUT. A request must name this server in `Host` (no DNS rebinding), a PUT must come from its own page
 //! (`Origin`), and a body is at most `MAX_BODY` bytes.
 
+pub mod commands;
+
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Component, Path, PathBuf};
