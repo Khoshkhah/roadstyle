@@ -1,12 +1,15 @@
-//! The look (look.json): what roadstyle renders a map with, made from render_edges' palette, profile and settings, as Python makes it
-//! (docs/design/rust_engine.md). Ports of roadstyle's _settings.py (theme, style, roads: the profile and the palette merged, the palettes
+//! The resolution of the look (look.json): what roadstyle renders a map with, made from render_edges' palette, profile and settings, as
+//! Python makes it (docs/design/rust_engine.md). Ports of roadstyle's _settings.py (theme, style, roads: the profile and the palette merged, the palettes
 //! of all classes, the settings in the older layout), of config.StyleConfig, of palettes.RoadStyle.from_dict with style._apply, and of the
 //! parts geolibre-roadstyle's look_of adds (the class styles, the slots' tables, the arrow image, the popup). The data is roadstyle's own:
 //! src/roadstyle/data/ (profiles, palettes, defaults.json, sprite.png), read at build time, so there is one copy of it.
 //!
 //! The settings are given (a mapping, or a list of them), not read from roadstyle.json files or $ROADSTYLE_CONFIG: the browser has none.
+//! The user's own profiles and palettes are given too (`Options::files`), and they are passed through the calls (`Own`), not kept.
 
+use crate::{LookData, RoadModel};
 use base64::Engine;
+use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
 const PROFILES: [(&str, &str); 2] = [
@@ -128,33 +131,31 @@ fn set_path(dst: &mut Value, path: &str, value: &Value) {
     }
 }
 
-thread_local! {
-    /// The user's own profiles and palettes for this make_look (render's ./profiles, ./palettes, ~/.config/roadstyle/...): (kind, name, text).
-    static OWN: std::cell::RefCell<Vec<(String, String, String)>> = const { std::cell::RefCell::new(Vec::new()) };
-}
+/// The user's own profiles and palettes of one resolution (render's ./profiles, ./palettes, ~/.config/roadstyle/...): (kind, name, text).
+type Own = [(String, String, String)];
 
-fn own(kind: &str, name: &str) -> Option<String> {
-    OWN.with(|o| o.borrow().iter().find(|(k, n, _)| k == kind && n == name).map(|(_, _, t)| t.clone()))
+fn own(o: &Own, kind: &str, name: &str) -> Option<String> {
+    o.iter().find(|(k, n, _)| k == kind && n == name).map(|(_, _, t)| t.clone())
 }
 
 /// style_names: the bundled names, then the user's own ones.
-fn names(kind: &str) -> Vec<String> {
+fn names(o: &Own, kind: &str) -> Vec<String> {
     let mut out: Vec<String> = if kind == "profiles" { PROFILES.iter().map(|p| p.0.to_string()).collect() }
                                else { PALETTES.iter().map(|p| p.0.to_string()).collect() };
-    OWN.with(|o| for (k, n, _) in o.borrow().iter() {
+    for (k, n, _) in o {
         if k == kind && !out.contains(n) {
             out.push(n.clone());
         }
-    });
+    }
     out
 }
 
 /// _style_file: one profile or palette by name, merged over the base (default / amber) unless it is the base.
-fn style_file(kind: &str, name: &str) -> Result<Value, String> {
+fn style_file(o: &Own, kind: &str, name: &str) -> Result<Value, String> {
     let files: &[(&str, &str)] = if kind == "profiles" { &PROFILES } else { &PALETTES };
-    let mine = own(kind, name);        // the user's own file first, as _style_dirs
+    let mine = own(o, kind, name);        // the user's own file first, as _style_dirs
     let text = mine.clone().or_else(|| files.iter().find(|f| f.0 == name).map(|f| f.1.to_string()))
-        .ok_or_else(|| format!("no {} named '{name}'; there are: {}", &kind[..kind.len() - 1], names(kind).join(", ")))?;     // Python's repr
+        .ok_or_else(|| format!("no {} named '{name}'; there are: {}", &kind[..kind.len() - 1], names(o, kind).join(", ")))?;     // Python's repr
     let data = yaml(&text).map_err(|e| format!("{} {name}: {e}", &kind[..kind.len() - 1]))?;
     let base = lookup(&BASE, kind).unwrap();
     if name == base && mine.is_none() {
@@ -166,7 +167,7 @@ fn style_file(kind: &str, name: &str) -> Result<Value, String> {
         deep_merge(&mut out, &data);
         return Ok(out);
     }
-    let mut out = style_file(kind, base)?;
+    let mut out = style_file(o, kind, base)?;
     deep_merge(&mut out, &data);
     Ok(out)
 }
@@ -241,7 +242,7 @@ fn old_style_keys(data: &Value) -> (Value, Vec<String>) {
 
 /// _settings.theme(): the profile and the palette that the sources name (default and amber when none does), merged; "palettes": every
 /// palette's road classes at this profile's widths; then each source's style values of the older layout; "active": the two names.
-pub fn theme(sources: &[Value]) -> Result<Value, String> {
+pub fn theme(sources: &[Value], o: &Own) -> Result<Value, String> {
     let (mut profile, mut palette) = (Value::from("default"), Value::from("amber"));
     for d in sources {
         if truthy(d.get("profile")) {
@@ -252,14 +253,14 @@ pub fn theme(sources: &[Value]) -> Result<Value, String> {
         }
     }
     let name = |v: &Value| v.as_str().map(String::from).ok_or_else(|| format!("a profile or palette name, not {v}"));
-    let mut out = style_file("profiles", &name(&profile)?)?;
-    let mut pal = style_file("palettes", &name(&palette)?)?;
+    let mut out = style_file(o, "profiles", &name(&profile)?)?;
+    let mut pal = style_file(o, "palettes", &name(&palette)?)?;
     pal.as_object_mut().unwrap().shift_remove("classes");
     deep_merge(&mut out, &pal);
     let classes = out["roads"]["classes"].clone();
     let mut pals = Map::new();
-    for n in names("palettes") {
-        pals.insert(n.to_string(), class_entries(&style_file("palettes", &n)?["classes"], &classes));
+    for n in names(o, "palettes") {
+        pals.insert(n.to_string(), class_entries(&style_file(o, "palettes", &n)?["classes"], &classes));
     }
     out["palettes"] = Value::Object(pals);
     for d in sources {
@@ -381,29 +382,52 @@ fn roads(theme: &Value) -> Value {
            "links": r["links"]["classes"], "zoom_stops": r["zoom_stops"], "z_order": field("order")})
 }
 
-/// The look of render_edges(palette=, profile=, settings=, **args): `options` holds "palette" (default "amber"), "profile", "settings"
-/// (a mapping, or a list of them; none: null), "args" (the render's keywords) and "features" (mapstyle's base-map part, as given).
-pub fn make_look(options: &Value) -> Result<Value, String> {
-    // `files`: the user's own profiles and palettes as text ({"profiles": {name: text}, "palettes": {...}}), for this look only
-    let mine: Vec<(String, String, String)> = ["profiles", "palettes"].iter().flat_map(|k| {
-        options["files"][*k].as_object().into_iter().flatten().filter_map(move |(n, t)| Some((k.to_string(), n.clone(), t.as_str()?.to_string())))
-    }).collect();
-    OWN.with(|o| *o.borrow_mut() = mine);
-    let out = make_look_of(options);
-    OWN.with(|o| o.borrow_mut().clear());
-    out
+/// What a look is made from: render_edges' palette (default "amber"), profile and settings (a mapping, or a list of them; none: null),
+/// its keywords (`args`), mapstyle's base-map part (`features`, as given) and the user's own profiles and palettes as text
+/// (`files`: {"profiles": {name: text}, "palettes": {...}}).
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Options {
+    #[serde(default)]
+    pub palette: Option<String>,
+    #[serde(default)]
+    pub profile: Value,
+    #[serde(default)]
+    pub settings: Value,
+    #[serde(default)]
+    pub args: Value,
+    #[serde(default)]
+    pub features: Option<Value>,
+    #[serde(default)]
+    pub files: Map<String, Value>,
 }
 
-fn make_look_of(options: &Value) -> Result<Value, String> {
-    let palette = options.get("palette").and_then(Value::as_str).unwrap_or("amber");
-    let profile = options.get("profile").filter(|v| !v.is_null());
-    let settings = options.get("settings").cloned().unwrap_or(Value::Null);
+impl Options {
+    /// The options from their JSON value (today's makeLook options).
+    pub fn from_value(v: &Value) -> Result<Options, String> {
+        Options::deserialize(v).map_err(|e| format!("look options: {e}"))
+    }
+}
+
+/// The look of render_edges(palette=, profile=, settings=, **args) as a JSON value (version 1): `options` as `Options` reads them.
+pub fn make_look(options: &Value) -> Result<Value, String> {
+    Ok(crate::Look::resolve(&Options::from_value(options)?)?.to_value())
+}
+
+pub(crate) fn resolve(options: &Options) -> Result<LookData, String> {
+    let own: Vec<(String, String, String)> = ["profiles", "palettes"].iter().flat_map(|k| {
+        options.files.get(*k).and_then(Value::as_object).into_iter().flatten()
+            .filter_map(move |(n, t)| Some((k.to_string(), n.clone(), t.as_str()?.to_string())))
+    }).collect();
+    let palette = options.palette.as_deref().unwrap_or("amber");
+    let profile = Some(&options.profile).filter(|v| !v.is_null());
+    let settings = options.settings.clone();
     // render_edges: a profile, and a bundled palette, other than the default, is a settings source after settings=
     let mut pick = Map::new();
     if let Some(p) = profile.filter(|p| p.as_str() != Some("default")) {
         pick.insert("profile".into(), p.clone());
     }
-    if palette != "amber" && names("palettes").iter().any(|n| n == palette) {
+    if palette != "amber" && names(&own, "palettes").iter().any(|n| n == palette) {
         pick.insert("palette".into(), palette.into());
     }
     let mut sources: Vec<Value> = match &settings {
@@ -415,12 +439,12 @@ fn make_look_of(options: &Value) -> Result<Value, String> {
     if !pick.is_empty() {
         sources.push(Value::Object(pick));
     }
-    let th = theme(&sources)?;
+    let th = theme(&sources, &own)?;
     let config = config(&style_config(&th, &sources)?);
     let styles = class_styles(&th, palette, &config)?;
     let roads_model = roads(&th);
-    let args = options.get("args").cloned().unwrap_or_else(|| json!({}));
-    let model = crate::layers::Model::from_look(&json!({"roads_model": roads_model, "theme": th, "args": args}))?;
+    let args = if options.args.is_null() { json!({}) } else { options.args.clone() };
+    let model = RoadModel::new(&roads_model, &th["roads"], &args)?;
     let mut width_z20 = Map::new();
     for c in &model.classes {
         width_z20.insert(c.clone(), json!(model.class_width_px(Some(c), 20.0, true)));
@@ -428,20 +452,19 @@ fn make_look_of(options: &Value) -> Result<Value, String> {
     let slots = json!({"z_order": roads_model["z_order"], "width_z20": width_z20, "width_z20_fallback": model.class_width_px(None, 20.0, true)});
     let png = base64::engine::general_purpose::STANDARD.encode(SPRITE);
     let oneway = json!({"url": format!("data:image/png;base64,{png}"), "sdf": true, "pixelRatio": path(&th, "arrows.icon.pixel_ratio")?});
-    let mut look = Map::new();
-    look.insert("palette".into(), palette.into());
-    look.insert("settings".into(), settings);
-    look.insert("args".into(), args);
-    look.insert("theme".into(), th);
-    look.insert("config".into(), config);
-    look.insert("styles".into(), styles);
-    look.insert("head_m".into(), json!(HEAD_M));
-    look.insert("slots".into(), slots);
-    look.insert("roads_model".into(), roads_model);
-    if let Some(f) = options.get("features") {
-        look.insert("features".into(), f.clone());
-    }
-    look.insert("oneway_image".into(), oneway);
-    look.insert("interaction".into(), json!({"popup": ROAD_POPUP, "hover_delay_ms": HOVER_DELAY_MS}));
-    Ok(Value::Object(look))
+    Ok(LookData {
+        schema_version: crate::VERSION,
+        palette: palette.into(),
+        settings,
+        args,
+        theme: th,
+        config,
+        styles,
+        head_m: HEAD_M,
+        slots,
+        roads_model,
+        features: options.features.clone().unwrap_or(Value::Null),
+        oneway_image: oneway,
+        interaction: json!({"popup": ROAD_POPUP, "hover_delay_ms": HOVER_DELAY_MS}),
+    })
 }

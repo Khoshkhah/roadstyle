@@ -6,10 +6,10 @@ use serde_json::Value;
 use std::path::PathBuf;
 
 /// The fixture's look as an export (audit N2: the roads source too).
-fn export_look() -> String {
+fn export_look() -> roadstyle_rs::Look {
     let mut look: Value = serde_json::from_slice(&data("look.json")).unwrap();
     look["args"]["export"] = true.into();
-    look.to_string()
+    roadstyle_rs::Look::from_value(look).unwrap()
 }
 
 fn data(p: &str) -> Vec<u8> {

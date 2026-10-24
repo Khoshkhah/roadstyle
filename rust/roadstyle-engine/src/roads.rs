@@ -7,51 +7,8 @@ use roadstyle_model::Cell;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
-/// The look data the stages read (look.json: the resolved class styles and the render's defaults).
-pub struct Look {
-    /// the theme's data.* values (the data stylers' widths, opacities and no-data colours) and the palette's name
-    pub(crate) data: Value,
-    pub(crate) palette: String,
-    classes: HashMap<String, [Value; 2]>,
-    fallback: [Value; 2],
-    single_line: HashSet<String>,
-    twin_one: bool,
-    /// the heads' default length (render's head_m)
-    pub head_m: f64,
-    /// config bridge_shadow: a bridge's main casing piece casts a shadow (simple source)
-    pub bridge_shadow: bool,
-    /// the theme's access colours (render's access_col: the palette's `access`)
-    access: serde_json::Map<String, Value>,
-    /// the theme's casing.m: a metre-wide road's casing in metres (render's casing_m)
-    casing_m: f64,
-}
-
-impl Look {
-    pub fn from_json(look: &Value) -> Result<Look, String> {
-        let pair = |v: &Value| -> Result<[Value; 2], String> {
-            match v.as_array().map(|a| a.as_slice()) {
-                Some([a, b]) => Ok([a.clone(), b.clone()]),
-                _ => Err("look.json: a class style is not [plain, link]".into()),
-            }
-        };
-        let styles = &look["styles"];
-        let classes = styles["classes"].as_object().ok_or("look.json: no styles.classes")?;
-        Ok(Look {
-            data: look["theme"]["data"].clone(),
-            palette: look["palette"].as_str().unwrap_or_default().to_string(),
-            classes: classes.iter().map(|(k, v)| Ok((k.clone(), pair(v)?))).collect::<Result<_, String>>()?,
-            fallback: pair(&styles["fallback"])?,
-            single_line: look["config"]["single_line_classes"].as_array().into_iter().flatten()
-                .filter_map(|v| v.as_str().map(String::from)).collect(),
-            twin_one: look["config"]["twin_casing"] == "one",
-            // render's head_m keyword, else its default in the look
-            head_m: look["args"]["head_m"].as_f64().map_or_else(|| look["head_m"].as_f64().ok_or("look.json: no head_m"), Ok)?,
-            bridge_shadow: truthy(look["config"].get("bridge_shadow").map(Cell::Json)),
-            access: look["theme"]["access"].as_object().cloned().unwrap_or_default(),
-            casing_m: look["theme"]["casing"]["m"].as_f64().unwrap_or(0.0),
-        })
-    }
-}
+/// The look values of the roads' stages (roadstyle-look: the resolved class styles and the render's defaults).
+pub use roadstyle_look::RoadLook as Look;
 
 // the columns of the roads, as mapstyle names them (render_map's kw)
 const HIGHWAY: &str = "highway";
@@ -63,17 +20,14 @@ const TUNNEL: &str = "tunnel";
 const CAP_START: &str = "cap_start";
 const CAP_END: &str = "cap_end";
 
-impl Look {
-    /// ClassStyler: a class's style (plain or link, resolved at build time) and its base class (normalize_highway).
-    pub(crate) fn class_style(&self, highway: Option<Cell>) -> (&Value, String) {
-        let h = match highway {
-            None => String::new(),
-            Some(c) if c.is_null() => String::new(),
-            Some(c) => match c.as_str() { Some(s) => s.trim().to_lowercase(), None => c.to_value().to_string().trim().to_lowercase() },
-        };
-        let (base, link) = match h.strip_suffix("_link") { Some(b) => (b.to_string(), 1), None => (h, 0) };
-        (&self.classes.get(&base).unwrap_or(&self.fallback)[link], base)
-    }
+/// ClassStyler: a class's style (plain or link, resolved at build time) and its base class (normalize_highway).
+pub(crate) fn class_style<'a>(look: &'a Look, highway: Option<Cell>) -> (&'a Value, String) {
+    let h = match highway {
+        None => String::new(),
+        Some(c) if c.is_null() => String::new(),
+        Some(c) => c.as_str().map_or_else(|| c.to_value().to_string(), String::from),
+    };
+    look.class_style(&h)
 }
 
 /// The stages of render_web.render on the roads, in its order; each road gets `__rs_edge`, its position. `args`: look["args"], with the

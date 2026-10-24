@@ -186,7 +186,7 @@ fn parse_color(x: &str) -> Result<[f64; 4], String> {
 fn class_frame(fs: &Roads, look: &Look) -> Frame {
     let mut f = Frame::empty(fs.len());
     for ft in fs.iter() {
-        let (s, base) = look.class_style(ft.get("highway"));
+        let (s, base) = crate::roads::class_style(look, ft.get("highway"));
         f.push(&s["fill"], &s["width"], &s["opacity"], &s["dash"], &s["casing"], &s["casing_width"], &s["casing_opacity"], &Value::from(base));
     }
     f

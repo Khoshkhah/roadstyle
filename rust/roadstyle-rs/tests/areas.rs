@@ -16,7 +16,7 @@ fn style(area: &str) -> Value {
     let mut look = roadstyle_rs::look::make_look(&o).unwrap();
     look["args"]["export"] = true.into();        // the goldens are exports: the roads source too (audit N2)
     let roads = std::fs::read(data(&format!("{area}/roads.parquet"))).unwrap();
-    serde_json::from_str(&roadstyle_rs::make_style(roads, &look.to_string(), None, None, None).unwrap()).unwrap()
+    serde_json::from_str(&roadstyle_rs::make_style(roads, &roadstyle_rs::Look::from_value(look.clone()).unwrap(), None, None, None).unwrap()).unwrap()
 }
 
 fn style_differences(area: &str) -> Vec<(String, usize)> {
@@ -86,7 +86,7 @@ fn tile_summary(area: &str) -> Vec<(String, [usize; 5])> {
     let style = common::gz_json(&format!("{area}/golden_style.json.gz"));
     let keep: Vec<String> = style["sources"]["roads"]["data"]["features"][0]["properties"].as_object().unwrap().keys()
         .filter(|k| !k.starts_with("__rs_")).cloned().collect();
-    let (tstyle, tiles) = roadstyle_rs::make_tiled(roads, &look.to_string(), None, None, "rs://", &keep).unwrap();
+    let (tstyle, tiles) = roadstyle_rs::make_tiled(roads, &roadstyle_rs::Look::from_value(look.clone()).unwrap(), None, None, "rs://", &keep).unwrap();
     let tstyle: Value = serde_json::from_str(&tstyle).unwrap();
     let read = common::drawn_of(&tstyle);       // R1: the roads' stage values that are read, and the pieces' (on the tile layer "simple")
     let layers: Vec<Value> = tstyle["layers"].as_array().unwrap().iter().map(|l| {

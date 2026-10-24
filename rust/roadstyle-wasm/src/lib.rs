@@ -1,4 +1,4 @@
-//! The browser's front-end of roadstyle-rs (docs/design/rust_engine.md): `makeStyle`, `makePage`, `Tiler` and `memoryBytes` through
+//! The browser's front-end of roadstyle-rs (docs/design/rust_engine.md): `Look`, `makeStyle`, `makePage`, `Tiler` and `memoryBytes` through
 //! wasm-bindgen, and the allocator that grows the memory in large steps. Natively the crate is empty.
 
 /// The allocator in the browser: the standard one (dlmalloc), but when it grows the memory, the memory grows once more by its size (16 to
@@ -57,10 +57,44 @@ mod grow {
 mod wasm {
     use wasm_bindgen::prelude::*;
 
-    /// makeStyle(roads: Uint8Array, look: string, features?: Uint8Array, planner?: Uint8Array, name?: string) -> string; an error is a thrown Error.
+    /// A resolved look (roadstyle-look), parsed one time: `resolveLook(options)` makes it, `Look.fromJson(text)` reads a saved look
+    /// (version 1, or version 0: today's look.json), `toJson()` gives its text (version 1). The calls below take it, not its text.
+    #[wasm_bindgen(js_name = Look)]
+    pub struct JsLook(roadstyle::Look);
+
+    #[wasm_bindgen(js_class = Look)]
+    impl JsLook {
+        /// Look.fromJson(text): a saved look (version 1 or 0). An error is a thrown Error.
+        #[wasm_bindgen(js_name = fromJson)]
+        pub fn from_json(text: &str) -> Result<JsLook, JsError> {
+            roadstyle::Look::from_json(text).map(JsLook).map_err(|e| JsError::new(&e))
+        }
+
+        /// toJson(): the look's text (version 1).
+        #[wasm_bindgen(js_name = toJson)]
+        pub fn to_json(&self) -> String {
+            self.0.to_json()
+        }
+    }
+
+    /// resolveLook(options: string) -> Look: the look of render_edges' palette, profile and settings; options: {"palette", "profile",
+    /// "settings", "args", "features", "files"} as JSON text. An error is a thrown Error.
+    #[wasm_bindgen(js_name = resolveLook)]
+    pub fn resolve_look(options: &str) -> Result<JsLook, JsError> {
+        let o: serde_json::Value = serde_json::from_str(options).map_err(|e| JsError::new(&format!("options: not JSON: {e}")))?;
+        roadstyle::look::Options::from_value(&o).and_then(|o| roadstyle::Look::resolve(&o)).map(JsLook).map_err(|e| JsError::new(&e))
+    }
+
+    /// makeLook(options: string) -> Look: the old name of resolveLook, for one version.
+    #[wasm_bindgen(js_name = makeLook)]
+    pub fn make_look(options: &str) -> Result<JsLook, JsError> {
+        resolve_look(options)
+    }
+
+    /// makeStyle(roads: Uint8Array, look: Look, features?: Uint8Array, planner?: Uint8Array, name?: string) -> string; an error is a thrown Error.
     #[wasm_bindgen(js_name = makeStyle)]
-    pub fn make_style(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, JsError> {
-        roadstyle::make_style(parquet, look, features, planner, name).map_err(|e| JsError::new(&e))
+    pub fn make_style(parquet: Vec<u8>, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, JsError> {
+        roadstyle::make_style(parquet, &look.0, features, planner, name).map_err(|e| JsError::new(&e))
     }
 
     /// The level editor in the page (roadstyle::level_editor): new LevelArea(roads.parquet of the area, pairs.csv text). Each answer is JSON
@@ -125,15 +159,14 @@ mod wasm {
         roadstyle::page::make_page(style, page, parts, pmtiles.as_deref()).map_err(|e| JsError::new(&e))
     }
 
-    /// exportLook(look: string, cols: string[] (highway, oneway, tunnel, bridge, id), positions: number[]) -> string: the simple look
+    /// exportLook(look: Look, cols: string[] (highway, oneway, tunnel, bridge, id), positions: number[]) -> string: the simple look
     /// for another app's data layer (roadstyle's export_look) from a resolved look.
     #[wasm_bindgen(js_name = exportLook)]
-    pub fn export_look(look: &str, cols: Vec<String>, positions: Vec<i32>) -> Result<String, JsError> {
-        let look: serde_json::Value = serde_json::from_str(look).map_err(|e| JsError::new(&e.to_string()))?;
+    pub fn export_look(look: &JsLook, cols: Vec<String>, positions: Vec<i32>) -> Result<String, JsError> {
         let c = |i: usize| cols.get(i).map(String::as_str).unwrap_or(["highway", "oneway", "tunnel", "bridge", "edge_id"][i]);
         let lc = roadstyle::export_look::LookCols { highway: c(0), oneway: c(1), tunnel: c(2), bridge: c(3), id: c(4) };
         let ps: Vec<i64> = positions.into_iter().map(i64::from).collect();
-        roadstyle::export_look::export_look(&look, &lc, &ps).map(|v| v.to_string()).map_err(|e| JsError::new(&e))
+        roadstyle::export_look::export_look(&look.0, &lc, &ps).map(|v| v.to_string()).map_err(|e| JsError::new(&e))
     }
 
     /// A map with vector tiles: `new Tiler(roads, look, features?, name?, prefix, keep)`, then `style()` (the style's JSON text) and
@@ -148,9 +181,9 @@ mod wasm {
     #[wasm_bindgen]
     impl Tiler {
         #[wasm_bindgen(constructor)]
-        pub fn new(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name: Option<String>, prefix: &str, keep: Vec<String>)
+        pub fn new(parquet: Vec<u8>, look: &JsLook, features: Option<Vec<u8>>, name: Option<String>, prefix: &str, keep: Vec<String>)
                    -> Result<Tiler, JsError> {
-            let (style, tiles) = roadstyle::make_tiled(parquet, look, features, name, prefix, &keep).map_err(|e| JsError::new(&e))?;
+            let (style, tiles) = roadstyle::make_tiled(parquet, &look.0, features, name, prefix, &keep).map_err(|e| JsError::new(&e))?;
             Ok(Tiler { style, tiles })
         }
 
@@ -214,9 +247,9 @@ mod wasm {
 
     /// makeSources(parquet, look, features, planner, name): stage 1, with makeStyle's arguments.
     #[wasm_bindgen(js_name = makeSources)]
-    pub fn make_sources(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>)
+    pub fn make_sources(parquet: Vec<u8>, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>)
                         -> Result<Sources, JsError> {
-        roadstyle::make_sources(parquet, look, features, planner, name).map(|inner| Sources { inner }).map_err(|e| JsError::new(&e))
+        roadstyle::make_sources(parquet, &look.0, features, planner, name).map(|inner| Sources { inner }).map_err(|e| JsError::new(&e))
     }
 
     /// tileSources(sources, prefix, keep): stage 2 from memory (the typed pieces, no GeoJSON text; the sources stay as they are). The
@@ -255,15 +288,7 @@ mod wasm {
         Ok(Tiler { style: style.to_string(), tiles })
     }
 
-    /// makeLook(options: string) -> string: the look (look.json) of render_edges' palette, profile and settings (roadstyle-rs look.rs);
-    /// options: {"palette", "profile", "settings", "args", "features"} as JSON text. An error is a thrown Error.
-    #[wasm_bindgen(js_name = makeLook)]
-    pub fn make_look(options: &str) -> Result<String, JsError> {
-        let o: serde_json::Value = serde_json::from_str(options).map_err(|e| JsError::new(&format!("options: not JSON: {e}")))?;
-        roadstyle::look::make_look(&o).map(|l| l.to_string()).map_err(|e| JsError::new(&e))
-    }
-
-        /// The size of the module's memory, in bytes.
+    /// The size of the module's memory, in bytes.
     #[wasm_bindgen(js_name = memoryBytes)]
     pub fn memory_bytes() -> usize {
         core::arch::wasm32::memory_size(0) * 65536
