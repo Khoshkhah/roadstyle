@@ -127,7 +127,7 @@ async function showRoads(st){                                      // the roads 
   for(const [id, src] of Object.entries(st.sources)) map.addSource("rs-" + id, id === "roads" ? {...src, promoteId: {simple: "__rs_edge"}} : src);
   for(const l of st.layers){
     const layer = JSON.parse(JSON.stringify(l).replaceAll('"oneway"', '"rs-oneway"'));
-    map.addLayer({...layer, id: "rs-" + l.id, source: "rs-" + l.source});
+    map.addLayer({...layer, id: "rs-" + l.id, source: "rs-" + l.source}, map.getLayer("lv-ends") ? "lv-ends" : undefined);   // under the panel's end marks
   }
   rs.setStyle(st);
 }
@@ -242,7 +242,9 @@ async function apply(ops){
   await save(res);
   saved -= gone.filter(i => i < saved).length;
   sessionStorage.setItem(SAVED, String(saved));
-  return {ok: true, said, full, update: null, reload: null};       // the page loads again from the saved files, at the same view
+  setFacts();
+  await showRoads(build());                                        // the new map in place: new tiles, the roads style swapped
+  return {ok: true, said, full, redrawn: true, facts, stats: stats()};
 }
 window.lvApi = async (path, body) => {
   const u = new URL(path, location.href), q = k => u.searchParams.get(k) || "";
