@@ -1,0 +1,60 @@
+# google: clean and friendly, in the manner of Google Maps (docs/design/themes.md): light land,
+# white streets with soft grey edges, yellow main roads, light blue water, soft green parks, no
+# textures. Pairs with the google path style (the default). Colours only, nothing of theirs copied.
+background: "#f5f4f1"              # the land
+transform:                          # every osm_carto colour not set below:
+  saturation: 0.55                  #   55 % of its colour
+  lighten: 0.2                      #   then 20 % of the way to white
+roads:
+  colors:
+    motorway:      {fill: "#f8d16c", casing: "#e2ad45"}
+    trunk:         {fill: "#fbdd8a", casing: "#e7bc63"}
+    primary:       {fill: "#fde9a6", casing: "#ead08a"}
+    secondary:     {fill: "#ffffff", casing: "#d6d6d6"}
+    tertiary:      {fill: "#ffffff", casing: "#dadada"}
+    unclassified:  {fill: "#ffffff", casing: "#e0e0e0"}
+    residential:   {fill: "#ffffff", casing: "#e0e0e0"}
+    living_street: {fill: "#ffffff", casing: "#e3e3e3"}
+    service:       {fill: "#ffffff", casing: "#e6e6e6"}
+    pedestrian:    {fill: "#f2f1ee", casing: "#e1e0dc"}
+    platform:      {fill: "#e3e3e3", casing: "#d0d0d0"}
+features:
+  areas:
+    ocean:     {fill: "#aadaff"}
+    water:     {fill: "#aadaff"}
+    buildings: {fill: "#e9e8e5", outline: "#dcdbd7"}
+    parking:   {fill: "#eeeeec", outline: "#e2e2df"}
+    landcover:
+      forest: "#c3e4c6"
+      wood: "#c3e4c6"
+      park: "#cdeacf"
+      garden: "#cdeacf"
+      grass: "#d4edd5"
+      meadow: "#d4edd5"
+      recreation_ground: "#d4edd5"
+      playground: "#d4edd5"
+      pitch: "#c8e6ca"
+      cemetery: "#d7e8d8"
+      nature_reserve: "#cdeacf"
+      golf_course: "#c8e6ca"
+      hospital: "#f8e1df"
+      school: "#f5eedd"
+      university: "#f5eedd"
+      college: "#f5eedd"
+      kindergarten: "#f5eedd"
+      beach: "#f8edc9"
+      sand: "#f8edc9"
+      residential: "#f1f0ec"
+      commercial: "#f1f0ec"
+      retail: "#f1f0ec"
+      industrial: "#efeeea"
+      marina: "#aadaff"             # a port basin: the water colour
+      swimming_area: "#aadaff"
+      default: "#f1f0ec"
+  landcover_pattern: {}             # no textures
+  landcover_outline: {}
+  lines:
+    waterways: {color: "#8fc8f5"}
+    railways:  {color: "#bdbdbd"}
+roadstyle:
+  bridge_casing_color: "#c4c4c4"

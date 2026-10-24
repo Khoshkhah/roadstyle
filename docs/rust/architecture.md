@@ -69,7 +69,7 @@ Each arrow points from a crate to the crate that uses it:
 ```mermaid
 flowchart TB
     roadstyle_model["roadstyle-model<br/>1,007 lines"]
-    roadstyle_look["roadstyle-look<br/>896 lines"]
+    roadstyle_look["roadstyle-look<br/>1,366 lines"]
     roadstyle_io["roadstyle-io<br/>426 lines"]
     roadstyle_levels["roadstyle-levels<br/>2,388 lines"]
     roadstyle_engine["roadstyle-engine<br/>6,032 lines"]
@@ -102,7 +102,7 @@ step) takes this crate alone.
 | Crate | Job | Lines | Dependencies |
 |---|---|---|---|
 | [`roadstyle-model`](#roadstyle-model) | roadstyle's road model: the roads as features with typed properties, and the geometry helpers | 1,007 | arrow-array, arrow-schema, rstar, serde, serde_json |
-| [`roadstyle-look`](#roadstyle-look) | roadstyle's look: the typed, versioned config (palettes, profiles, settings, map options) that the engine draws a map with | 896 | base64, serde, serde_json, yaml-rust2 |
+| [`roadstyle-look`](#roadstyle-look) | roadstyle's look: the typed, versioned config (palettes, profiles, settings, map options) that the engine draws a map with | 1,366 | base64, crc32fast, flate2, serde, serde_json, yaml-rust2 |
 | [`roadstyle-io`](#roadstyle-io) | roadstyle's readers: the roads and other tables from GeoParquet | 426 | `roadstyle-model`, arrow-array, arrow-schema, arrow-select, bytes, parquet, serde_json |
 | [`roadstyle-levels`](#roadstyle-levels) | roadstyle's drawing levels: the tags rule and the solver (no dependency on the other crates) | 2,388 | rstar, sha2 |
 | [`roadstyle-engine`](#roadstyle-engine) | roadstyle's rendering engine: the style of a map, the data-driven paint, the legend data, the base-map layers | 6,032 | `roadstyle-levels`, `roadstyle-look`, `roadstyle-model`, indexmap, rstar, serde_json |
@@ -113,7 +113,7 @@ step) takes this crate alone.
 | [`roadstyle-py`](#roadstyle-py) | The Python binding of roadstyle's Rust engine: the module roadstyle._rust (PyO3, abi3) | 359 | `roadstyle`, `roadstyle-cli`, pyo3, serde_json |
 | [`roadstyle-cli`](#roadstyle-cli) | The roadstyle program: one command for each job (serve: the level editor's files) | 271 | (none) |
 
-All crates: 14,069 lines of Rust in `rust/*/src/`.
+All crates: 14,539 lines of Rust in `rust/*/src/`.
 <!-- /gen:crates -->
 
 The crates read roadstyle's data (`src/roadstyle/data/`: the palettes, the profiles, the sprite) and the page files
@@ -147,12 +147,14 @@ Library, in `rust/roadstyle-model/`. Public API: `geom`, `props`, `table`, `topo
 
 #### `roadstyle-look` { #roadstyle-look }
 
-Library, in `rust/roadstyle-look/`. Public API: `widths`, `VERSION`, `LookData`, `Look`, `RoadLook`, `SlotLook`, `DeckLook`, `make_look`, `theme`, `Options`, `py_round`, `RoadModel`.
+Library, in `rust/roadstyle-look/`. Public API: `basemap`, `widths`, `VERSION`, `LookData`, `Look`, `RoadLook`, `SlotLook`, `DeckLook`, `make_look`, `theme`, `Options`, `py_round`, `RoadModel`, `png_pixels`.
 
 | Module | Lines | What it does | Python counterpart |
 |---|---|---|---|
-| `lib` | 244 | roadstyle's look: the one typed, versioned value that the engine draws a map with | `_settings.py` |
-| `resolve` | 470 | The resolution of the look (look.json): what roadstyle renders a map with, made from render_edges' palette, profile and settings, as Python makes it | `_settings.py`, `style.py` |
+| `lib` | 249 | roadstyle's look: the one typed, versioned value that the engine draws a map with | `_settings.py` |
+| `basemap` | 342 | The base map's half of the look (mapstyle's styles, merged into roadstyle on 2026-10-23): a duckOSM map's travel mode, its theme and its path style give the roads' palette and settings (mapstyle's `mode_settings`) and the base map's part of the look (`features`: the layers of layers.yaml, the 3D heights, the base map's style in the theme's colours and its images) | `style.py` |
+| `png` | 95 | The PNG images of the look: a texture's mask (8-bit grey) read, and a texture in its colour (8-bit RGBA) written |  |
+| `resolve` | 498 | The resolution of the look (look.json): what roadstyle renders a map with, made from render_edges' palette, profile and settings, as Python makes it | `_settings.py`, `style.py` |
 | `widths` | 182 | The road width model (render_web's _load_road_model: the look's "roads_model" and the theme's roads): the width of each class by zoom, its draw order and its two-way split | `render_web.py` |
 
 #### `roadstyle-io` { #roadstyle-io }
@@ -338,7 +340,7 @@ The metadata keys between the engine and the dashboard, and the modules that wri
 | `roadstyle:contract` | `roadstyle-engine::contract`, `roadstyle-engine::lib`, `roadstyle-engine::sources` |
 | `roadstyle:controls` | `roadstyle-engine::contract`, `roadstyle-engine::lib` |
 | `roadstyle:group` | `roadstyle-engine::layers`, `roadstyle-engine::lib` |
-| `roadstyle:images` | `roadstyle-engine::lib` |
+| `roadstyle:images` | `roadstyle-engine::lib`, `roadstyle-look::basemap` |
 | `roadstyle:interaction` | `roadstyle-engine::lib`, `roadstyle-model::props`, `roadstyle-tiles::stage` |
 | `roadstyle:json` | `roadstyle-io::read`, `roadstyle-io::write` |
 | `roadstyle:live` | `roadstyle-engine::layers`, `roadstyle-engine::lib` |
@@ -508,7 +510,7 @@ an item shows "yes" when the code has it:
 |---|---|---|
 | The core has no I/O: the engine does not depend on a reader | `roadstyle-engine` depends on: `roadstyle-levels`, `roadstyle-look`, `roadstyle-model` | yes |
 | A crate `roadstyle-look` for the typed, versioned look | `roadstyle-look` exists | yes |
-| One error enum for each crate | `Result<_, String>`: 111 places; error enums: none | no |
+| One error enum for each crate | `Result<_, String>`: 117 places; error enums: none | no |
 | A typed render model in place of JSON trees | `Value` (serde_json) in `roadstyle-engine`: 596 times | no |
 | Typed fields in place of the `__rs_*` properties | 59 distinct `__rs_*` names in `rust/` | no |
 | Stage 2 (the tiles) has its own public call in Python and in the browser | `roadstyle-py`: none; `roadstyle-wasm`: `tileSources` | no |

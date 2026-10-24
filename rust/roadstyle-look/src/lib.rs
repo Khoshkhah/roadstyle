@@ -5,11 +5,16 @@
 //!
 //! The look does not know the roads (rule 2 of the layers): the engine combines the two.
 
+pub mod basemap;
+mod png;
 mod resolve;
 pub mod widths;
 
 pub use resolve::{make_look, theme, Options};
 pub use widths::{py_round, RoadModel};
+
+/// The pixels of an 8-bit PNG: (width, height, channels, the rows), for the tests of the textures.
+pub use png::decode as png_pixels;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};

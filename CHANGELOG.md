@@ -49,6 +49,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
   has the key: a casing piece has no `__rs_fill@<palette>: null` any more. The map does not change.
 
 ### Added
+- **The base map's look in Rust** (the mapstyle merge, step 1): `Look::resolve` takes `base_map: {mode, theme, paths}` (a duckOSM map's
+  travel mode, its theme and its path style) and makes mapstyle's look with no Python: the mode's palette and settings (`mode_settings`),
+  the theme's colours, and the base map's part of the look (the layers of `layers.yaml`, the 3D heights, the base map's style, the
+  texture and icon images). mapstyle's style files are now roadstyle's (`src/roadstyle/data/basemap/`); the textures are colour masks
+  drawn one time from mapstyle's `patterns.py`, coloured by the engine. The 64 looks of the GeoLibre plugin (4 modes x 4 themes x 4 path
+  styles) are equal to mapstyle's (`rust/roadstyle-look/tests/basemap.rs`; a texture by its pixels). A mode's palette has a fixed class
+  order; mapstyle's came from a Python set and changed with each run.
 - **Live data on the web page** (R22, `dashboard_module.md`): `rs.setData(table, {key, colorBy, widthBy, ...})` joins a table to the roads by
   `edge_id` or the row and colours and sizes them through feature state, with no new style; `rs.clearData()` takes it away. It needs a style
   made with `live_data=True`. Tartu, 64,828 roads: 78 ms to set a colour on each road.

@@ -778,6 +778,8 @@ name = "roadstyle-look"
 version = "0.25.0"
 dependencies = [
  "base64 0.22.1",
+ "crc32fast",
+ "flate2",
  "serde",
  "serde_json",
  "yaml-rust2",

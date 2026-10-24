@@ -89,7 +89,7 @@ fn yaml_key(k: &yaml_rust2::Yaml) -> String {
     }
 }
 
-fn yaml(text: &str) -> Result<Value, String> {
+pub(crate) fn yaml(text: &str) -> Result<Value, String> {
     let docs = yaml_rust2::YamlLoader::load_from_str(text).map_err(|e| e.to_string())?;
     let v = docs.first().map(yaml_value).unwrap_or(Value::Null);
     if v.is_object() { Ok(v) } else { Err("a settings file holds a mapping".into()) }
@@ -182,6 +182,17 @@ fn class_entries(colors: &Value, classes: &Value) -> Value {
                                      "casing": col.get("casing").cloned().unwrap_or(Value::Null)}));
     }
     Value::Object(out)
+}
+
+/// palette_to_dict("carto"): the bundled palette carto at the default profile's widths, as RoadStyle.to_dict writes each class (the widths
+/// and the opacity as floats).
+pub(crate) fn carto_entries() -> Result<Value, String> {
+    let th = theme(&[], &[])?;
+    let float = |v: &Value| v.as_f64().map_or(Value::Null, |f| json!(f));
+    Ok(Value::Object(th["palettes"]["carto"].as_object().into_iter().flatten().map(|(c, e)| {
+        (c.clone(), json!({"fill": e["fill"], "width": float(&e["width"]), "casing_width": float(&e["casing_width"]), "casing": e["casing"],
+                           "dash": e["dash"], "opacity": float(&e["opacity"])}))
+    }).collect()))
 }
 
 fn truthy(v: Option<&Value>) -> bool {
@@ -383,8 +394,9 @@ fn roads(theme: &Value) -> Value {
 }
 
 /// What a look is made from: render_edges' palette (default "amber"), profile and settings (a mapping, or a list of them; none: null),
-/// its keywords (`args`), mapstyle's base-map part (`features`, as given) and the user's own profiles and palettes as text
-/// (`files`: {"profiles": {name: text}, "palettes": {...}}).
+/// its keywords (`args`), the base map's look (`base_map`: a duckOSM map's mode, theme and path style; it gives the palette, a settings
+/// source after the given ones, the base map's part `features` and the mode's map options), or mapstyle's base-map part as given
+/// (`features`), and the user's own profiles and palettes as text (`files`: {"profiles": {name: text}, "palettes": {...}}).
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Options {
@@ -398,6 +410,8 @@ pub struct Options {
     pub args: Value,
     #[serde(default)]
     pub features: Option<Value>,
+    #[serde(default)]
+    pub base_map: Option<crate::basemap::BaseMap>,
     #[serde(default)]
     pub files: Map<String, Value>,
 }
@@ -419,9 +433,18 @@ pub(crate) fn resolve(options: &Options) -> Result<LookData, String> {
         options.files.get(*k).and_then(Value::as_object).into_iter().flatten()
             .filter_map(move |(n, t)| Some((k.to_string(), n.clone(), t.as_str()?.to_string())))
     }).collect();
-    let palette = options.palette.as_deref().unwrap_or("amber");
+    let bm = options.base_map.as_ref().map(crate::basemap::base_map).transpose()?;
+    if bm.is_some() && (options.palette.is_some() || options.features.is_some()) {
+        return Err("look options: base_map gives the palette and the base map's part (features): give none of them with it".into());
+    }
+    let palette = bm.as_ref().map_or_else(|| options.palette.as_deref().unwrap_or("amber"), |b| b.palette.as_str());
     let profile = Some(&options.profile).filter(|v| !v.is_null());
-    let settings = options.settings.clone();
+    let settings = match (&bm, &options.settings) {
+        (None, s) => s.clone(),
+        (Some(b), Value::Null) => b.settings.clone(),
+        (Some(b), Value::Array(a)) => Value::Array(a.iter().cloned().chain([b.settings.clone()]).collect()),
+        (Some(b), s) => json!([s, b.settings]),
+    };
     // render_edges: a profile, and a bundled palette, other than the default, is a settings source after settings=
     let mut pick = Map::new();
     if let Some(p) = profile.filter(|p| p.as_str() != Some("default")) {
@@ -443,7 +466,12 @@ pub(crate) fn resolve(options: &Options) -> Result<LookData, String> {
     let config = config(&style_config(&th, &sources)?);
     let styles = class_styles(&th, palette, &config)?;
     let roads_model = roads(&th);
-    let args = if options.args.is_null() { json!({}) } else { options.args.clone() };
+    let mut args = if options.args.is_null() { json!({}) } else { options.args.clone() };
+    for (k, v) in bm.iter().flat_map(|b| &b.args) {          // the mode's map options, where the caller gives none
+        if let Some(a) = args.as_object_mut().filter(|a| !a.contains_key(k)) {
+            a.insert(k.clone(), v.clone());
+        }
+    }
     let model = RoadModel::new(&roads_model, &th["roads"], &args)?;
     let mut width_z20 = Map::new();
     for c in &model.classes {
@@ -463,7 +491,7 @@ pub(crate) fn resolve(options: &Options) -> Result<LookData, String> {
         head_m: HEAD_M,
         slots,
         roads_model,
-        features: options.features.clone().unwrap_or(Value::Null),
+        features: bm.map(|b| b.features).or_else(|| options.features.clone()).unwrap_or(Value::Null),
         oneway_image: oneway,
         interaction: json!({"popup": ROAD_POPUP, "hover_delay_ms": HOVER_DELAY_MS}),
     })
