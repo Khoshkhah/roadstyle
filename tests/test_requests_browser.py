@@ -248,17 +248,16 @@ def test_one_tile_zoom_in_a_tilted_view(tmp_path):
 
 
 def test_simple_mode_glow_follows_the_pieces_after_an_update_in_place(tmp_path):
-    """The level editor swaps a road's pieces (GeoJSONSource.updateData): the road still glows, through its new pieces (the glow is the
-    state of the row, which every piece of the road has as its id)."""
+    """The level editor replaces the area's pieces (setData: updateData cannot take the pieces' shared id, promoteId "__rs_edge"): the road
+    still glows, through its new pieces (the glow is the state of the row, which every piece of the road has as its id)."""
     path = _page(tmp_path, "inplace")
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, path)
         page.evaluate("map.jumpTo({center: [18.0005, 59.305], zoom: 15, pitch: 0})")
         page.wait_for_function("map.loaded()", timeout=60_000)
         old = page.evaluate("map.querySourceFeatures('simple').filter(f => f.properties.__rs_edge === 0).length")
-        page.evaluate("""(() => { const old = _sfeats('simple').filter(x => x.properties.__rs_edge === 0);   // the road's pieces, by their own ids
-            map.getSource('simple').updateData({remove: old.map(x => x.id),
-                                                add: old.map((x, k) => ({...x, id: 987654321 + k, properties: {...x.properties, __rs_new: true}}))}); })()""")
+        page.evaluate("""map.getSource('simple').setData({type: 'FeatureCollection', features: _sfeats('simple').map(x =>
+            x.properties.__rs_edge === 0 ? {...x, properties: {...x.properties, __rs_new: true}} : x)})""")
         page.wait_for_timeout(1500)
         new = page.evaluate("map.querySourceFeatures('simple').filter(f => f.properties.__rs_edge === 0).map(f => !!f.properties.__rs_new)")
         page.evaluate("rsSelect(0)")
