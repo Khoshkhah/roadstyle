@@ -8,9 +8,8 @@ export let RS_PREFIX = "";
 // tiles=True: the roads are a vector source (the template's no-roads message reads it). The modules do not branch on it: they read the
 // source map (_src) and the road table (RoadTable).
 export let RS_TILED = false;
-// simple mode (the style has the role simple): the id of its one road layer in the map, else false (Python's full look). A road is picked
-// on the fill pieces of that layer (__rs_k 1, their __rs_edge is the road's row), and its hover / select glow is the feature-state of those
-// pieces (_fs).
+// the id of the one road layer in the map (the line layer of the role simple; false before a style). A road is picked on the fill pieces of
+// that layer (__rs_k 1, their __rs_edge is the road's row), and its hover / select glow is the feature-state of those pieces (_fs).
 export let RS_LEAN = false;
 export let RS_DECK_LAYERS = [];
 // extra overlay layers (zones / POIs / lines), their metadata: label, source, layers, popup, tooltip, interactive, under, base, ...
@@ -99,12 +98,10 @@ export function _road(i){ const c=RoadTable.line(i); return c ? {id:i, get prope
 export function _roadOfPiece(f){ const e=f.properties.__rs_edge;
   return {id:e, properties:_rprops(e), layer:{id:RS_PREFIX+"roads-fill"}, get geometry(){ const r=_road(e); return r && r.geometry; }}; }
 export const _FILL_PIECE = ["any", ["==", ["get", "__rs_k"], 1], ["!", ["has", "__rs_k"]]];   // the fill pieces of the road layer, and what has no piece kind (overlays, decks)
-// THE GLOW: the feature state of a road by its row. ref.source: "roads" or "decks" (roles of the roads style), or an overlay's source id.
-// Simple mode: the road's pieces in the role simple, which all have the row as their id (promoteId "__rs_edge"); the full look: the road in
-// the role roads. The source layer only where the role is in a vector source.
+// THE GLOW: the feature state of a road by its row. ref.source: "roads" (a road, by its row), "decks", or an overlay's source id. A road:
+// its pieces in the role simple, which all have the row as their id (promoteId "__rs_edge"). The source layer only for a vector source.
 export function _fs(ref, st){
-  if(ref.source==="roads" && RS_LEAN){ const s=_src("simple"); if(s) map.setFeatureState({...s, id:ref.id}, st); return; }
-  if(ref.source==="roads" || ref.source==="decks"){ const s=_src(ref.source); if(!s) return; ref={...s, id:ref.id}; }
+  if(ref.source==="roads" || ref.source==="decks"){ const s=_src(ref.source==="roads" ? "simple" : "decks"); if(!s) return; ref={...s, id:ref.id}; }
   map.setFeatureState(ref, st); }
 export function _lyr(name){   // -> {src, ov} | null; ov null = the roads (the road table)
   if(name==null) return {src:null, ov:null};

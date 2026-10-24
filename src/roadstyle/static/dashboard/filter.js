@@ -27,7 +27,7 @@ export function _applyRoadFilters(){
   ["decks","shadows"].forEach(src=>{ multi[src] = !_bridgesOn ? [] : (hidden.length || q || !_tunnelsOn || _accHid.size)
     ? _sfeats((_src(src)||{}).source).map((f,k)=>(f.properties.__rs_edges||[]).some(edgeOn) ? k : -1).filter(k=>k>=0) : null; });
   const and = (f,c)=>f?["all",f,c]:c;
-  const qr = q && ["any",_has(["id"],_qIds),_has(["get","__rs_edge2"],_qIds)], qe = q && ["any",_has(["get","__rs_edge"],_qIds),_has(["get","__rs_edge2"],_qIds)];   // once per change
+  const qe = q && ["any",_has(["get","__rs_edge"],_qIds),_has(["get","__rs_edge2"],_qIds)];   // once per change
   _fltLayers().forEach(l=>{
     if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null;
     let f=_fltBase[l.id];
@@ -42,7 +42,7 @@ export function _applyRoadFilters(){
       if(_accHid.size) f=and(f, ["!",["in",["coalesce",["get","__rs_access"],""],["literal",[..._accHid]]]]);
       if(!_bridgesOn) f=and(f, ["<",["coalesce",["get",lvl],0],1]);
       if(!_tunnelsOn) f=and(f, [">=",["coalesce",["get",lvl],0],0]);
-      if(q) f=and(f, kind==="roads" ? qr : qe);
+      if(q) f=and(f, qe);
       if(ov && _ovIds[ov.label]) f=and(f, _has(["id"],_ovIds[ov.label]));
     }
     // validate:false: our own filters need no grammar check, which cost ~6 ms a layer (a mode or class switch on a page of ~500 layers froze it ~3 s)

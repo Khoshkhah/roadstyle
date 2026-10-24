@@ -46,7 +46,6 @@ export interface DashboardOptions {
   overlay_control?: boolean;
   overlay_popup?: boolean;
   tunnel?: Record<string, unknown>;
-  fill_layers?: string[];
   road_fill?: { on: boolean; paint: Record<string, unknown> };
   views?: Array<{ name: string; set: Record<string, unknown> }>;
   items?: { label: string; popup: string[] | null; layer: string } | null;

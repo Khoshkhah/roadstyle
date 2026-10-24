@@ -4,7 +4,6 @@ import {map, O, RS_PREFIX, RS_LEAN, _road, _roadOfPiece} from "./core.js";
 import {_svWindow} from "./streetview.js";
 import {srcOf} from "./select.js";
 let _streetView = false;
-let RS_FILL_LAYERS = [];   // the road fill layers (Street View finds a road on them)
 // Street View stands at a spot ON the clicked edge: its own geometry (the road's centre line), the
 // spot nearest the click, looking along the edge. The drawn lanes sit offset from that line by a
 // pixel amount (tens of metres when zoomed out), so the raw click could land nearer an indoor
@@ -63,7 +62,7 @@ export function _svPick(ll, f, id){
 // the drawn lane offset (px) of an edge at this zoom: the road layer's own line-offset expression,
 // ["interpolate",["linear"],["zoom"], z, ["case", two-way?, ["match",["get",class], ..., dflt], 0], ...]
 export function _svLanePx(props){
-  const lay=RS_LEAN || RS_PREFIX+"roads-fill"; if(!map.getLayer(lay)) return 0;     // the road layer: simple mode's one layer, or the full look's fill
+  const lay=RS_LEAN; if(!lay || !map.getLayer(lay)) return 0;     // the one road layer
   const e=map.getPaintProperty(lay, "line-offset");
   if(!Array.isArray(e) || e[0]!=="interpolate") return typeof e==="number" ? e : 0;
   const val=x=>{ if(typeof x==="number") return x;
@@ -124,9 +123,9 @@ export function rsSetStreetViewMarkerAt(lng, lat, heading){
   const off=(a, b)=>{ const x=Math.abs(a-b)%360; return x>180 ? 360-x : x; };
   let best=_svPos ? _svOnEdge(_svPos.f, ll) : null;
   if(!best || best.d>_SV_LANE_M+6 || best.m<=0.01 || best.m>=_svAt(best.f, 1e9).len-0.01){
-    const q=map.project([ll.lng, ll.lat]), r=40, lays=RS_LEAN ? [RS_LEAN] : RS_FILL_LAYERS.filter(id=>map.getLayer(id)), cand=[];
-    map.queryRenderedFeatures([[q.x-r, q.y-r], [q.x+r, q.y+r]], RS_LEAN ? {layers:lays, filter:["==", ["get", "__rs_k"], 1]} : {layers:lays}).forEach(f=>{
-      if(RS_LEAN) f=_roadOfPiece(f);
+    const q=map.project([ll.lng, ll.lat]), r=40, lays=RS_LEAN && map.getLayer(RS_LEAN) ? [RS_LEAN] : [], cand=[];
+    map.queryRenderedFeatures([[q.x-r, q.y-r], [q.x+r, q.y+r]], {layers:lays, filter:["==", ["get", "__rs_k"], 1]}).forEach(f=>{
+      f=_roadOfPiece(f);
       if(f.id==null || cand.some(c=>c.f.id===f.id)) return;
       const o=_svOnEdge(f, ll); if(o) cand.push(o); });
     // the direction they walked (else look) first, then the nearest: a divided road's other
@@ -180,7 +179,7 @@ export function _sv(ll, f){
   return !u ? "" : '<div class="rs-sv" style="margin-top:4px"><a target="_blank" rel="noopener" href="'+
     u.replace(/&/g, "&amp;")+'">Street View &#8599;</a></div>'; }
 export function initSpot(){
-  _streetView = !!O.street_view; RS_FILL_LAYERS = O.fill_layers.map(id=>RS_PREFIX+id);
+  _streetView = !!O.street_view;
   window.rsSetStreetViewMarkerAt = rsSetStreetViewMarkerAt;
   map.on("move", _svMarkPlace);                   // zoom / rotate / pitch change the drawn offset
   window.rsGetStreetViewSpot = rsGetStreetViewSpot;

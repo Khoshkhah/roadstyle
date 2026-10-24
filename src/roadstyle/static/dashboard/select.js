@@ -26,10 +26,10 @@ export function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id)); i
   if(ITEM_PICK && map.getLayer(ROAD_ITEMS.layer)){       // a picked road item under the cursor wins over its road
     const it = map.queryRenderedFeatures([p.x, p.y], {layers:[ROAD_ITEMS.layer], filter:["to-boolean",["get","__rs_pick"]]});
     if(it.length) return _roadOf(it[0]); }
-  const q = RS_LEAN ? {layers:ids, filter:_FILL_PIECE} : {layers:ids};
+  const q = {layers:ids, filter:_FILL_PIECE};
   let l = map.queryRenderedFeatures([p.x, p.y], q);
   if(!l.length) l = map.queryRenderedFeatures(box(p), q);
-  return !l.length ? null : ITEM_LAYERS.has(l[0].layer.id) ? _roadOf(l[0]) : RS_LEAN && l[0].layer.id===RS_LEAN ? _roadOfPiece(l[0]) : l[0]; }
+  return !l.length ? null : ITEM_LAYERS.has(l[0].layer.id) ? _roadOf(l[0]) : l[0].layer.id===RS_LEAN ? _roadOfPiece(l[0]) : l[0]; }
 export function srcOf(f){ return f && f.layer && f.layer.id.indexOf(RS_PREFIX+"roads-bridge-decks")===0 ? "decks" : "roads"; }
 // full properties of a picked feature: tiles carry only the style props, so road hits read the
 // road table's row behind the feature id; decks keep the feature's own properties
@@ -125,7 +125,7 @@ export function useSelect(){
   if(_tip) _tip.remove();
   _sel=null; _hov=null; _cur=null;
   PICK_LAYERS = style.layers.filter(l=>l.source!=="halves").map(l=>RS_PREFIX+l.id)
-    .filter(id=>(RS_LEAN ? id===RS_LEAN : /^roads-(low-|high-|bridge-)?fill/.test(id.slice(RS_PREFIX.length))) || ITEM_LAYERS.has(id)).concat(RS_DECK_LAYERS);
+    .filter(id=>id===RS_LEAN || ITEM_LAYERS.has(id)).concat(RS_DECK_LAYERS);
   _roadPopup = O.road_popup !== false; _popupFields = Array.isArray(O.road_popup) ? O.road_popup : null;
   _ttip = O.road_tooltip; _ttipOnly = Array.isArray(_ttip) ? _ttip : null; _TIP_DELAY = O.hover_delay_ms;
   _tip = _ttip ? new maplibregl.Popup(

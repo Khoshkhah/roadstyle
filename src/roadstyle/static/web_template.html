@@ -67,7 +67,7 @@ rsDashboard(map, {
 // the inflate state so a screenshot alone pinpoints the failing stage.
 map.on("load", function(){ var tries=0; (function check(){ setTimeout(function(){
   try{
-    var s = _src("simple") || _src("roads"), n;   // the role that draws the roads: simple, or roads in the full look
+    var s = _src("simple"), n;   // the role that draws the roads
     if(!s) n = 0;
     else if(s.sourceLayer){ n = map.querySourceFeatures(s.source, {sourceLayer:s.sourceLayer}).length; }
     else{
