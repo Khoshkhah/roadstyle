@@ -30,7 +30,12 @@ fn tables(parquet: Vec<u8>, features: Option<Vec<u8>>, planner: Option<Vec<u8>>)
 /// The base map's rows from their GeoParquet bytes (the duckOSM reader's features.parquet), the background's land without the sea
 /// (duckosm::cut_sea).
 pub fn read_features(features: Vec<u8>) -> Result<FeatureTable, String> {
-    Ok(duckosm::cut_sea(read::read_feature_table(features, "geometry")?)?)
+    features_of(read::read_feature_table(features, "geometry")?)
+}
+
+/// The base map's rows that a reader gave (`read::feature_table_from`, ...), as `read_features`.
+pub fn features_of(t: FeatureTable) -> Result<FeatureTable, String> {
+    Ok(duckosm::cut_sea(t)?)
 }
 
 /// The style as one JSON text (roadstyle's export_inline), from the roads and the other tables as GeoParquet bytes: the engine's
@@ -388,7 +393,13 @@ pub fn tile_made(s: &sources::Sources, prefix: &str, keep: &[String]) -> Result<
 pub fn make_tiled(parquet: Vec<u8>, look: &Look, features: Option<Vec<u8>>, name: Option<String>, prefix: &str, keep: &[String])
                   -> Result<(String, tiles::Tiles, Vec<String>), String> {
     let (feats, features, _) = tables(parquet, features, None)?;
-    let s = sources::Sources::new(make_parts(feats, look, features, None, name)?);
+    tiled_of(feats, look, features, name, prefix, keep)
+}
+
+/// The map with vector tiles of roads and base-map rows that a reader gave, as `make_tiled`.
+pub fn tiled_of(roads: RoadTable, look: &Look, features: Option<FeatureTable>, name: Option<String>, prefix: &str, keep: &[String])
+                -> Result<(String, tiles::Tiles, Vec<String>), String> {
+    let s = sources::Sources::new(make_parts(roads, look, features, None, name)?);
     let mut o = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &look.config["tiles"], &columns(look), keep)
         .map_err(|e| format!("look: config.{e}"))?;
     // render(tiles=True)'s page (the Python binding): the columns of its road and simple tiles (`tile_keep`; every __rs_* goes too) and

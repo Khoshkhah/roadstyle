@@ -2,7 +2,6 @@
 mapstyle's render_map gives roadstyle, value for value and in the same order, plus `source` and `target` (R13). The tests of Monaco need a
 duckOSM file with features.* and stored levels ($DUCKOSM_DB, else ../duckOSM/monaco.duckdb beside this repository) and mapstyle:
 skipped without them (CI has neither); the tests of a tiny file made here run everywhere."""
-import io
 import json
 import os
 from pathlib import Path
@@ -18,7 +17,7 @@ needs_db = pytest.mark.skipif(not DB.is_file(), reason=f"no duckOSM file at {DB}
 @pytest.mark.parametrize("mode", ["all", "walking"])
 def test_the_roads_are_mapstyles(mode):
     pd = pytest.importorskip("pandas")
-    pq = pytest.importorskip("pyarrow.parquet")
+    pytest.importorskip("pyarrow")
     render_map = pytest.importorskip("mapstyle.map").render_map
     from roadstyle import duckosm
 
@@ -27,7 +26,7 @@ def test_the_roads_are_mapstyles(mode):
     ref = got["roads"]
     roads, features, levels = duckosm.read(DB, mode, layers=False)
     assert features is None and set(levels) == {"edge_hash", "n_edges"}
-    a = pq.read_table(io.BytesIO(roads)).to_pandas()
+    a = roads.to_pandas()
     assert len(a) == len(ref) and set(a.columns) - set(ref.columns) == {"source", "target"}
     norm = lambda n: lambda v: None if v is None or pd.isna(v) else (str(v) if n in ("edge_id", "osm_id") else v)  # noqa: E731
     for n in (c for c in ref.columns if c != "geometry"):
@@ -36,11 +35,10 @@ def test_the_roads_are_mapstyles(mode):
 
 @needs_db
 def test_the_base_map_rows():
-    pq = pytest.importorskip("pyarrow.parquet")
+    pytest.importorskip("pyarrow")
     from roadstyle import duckosm
 
-    _, features, _ = duckosm.read(DB)
-    t = pq.read_table(io.BytesIO(features))
+    _, t, _ = duckosm.read(DB)
     assert t.num_rows > 0 and t.schema.names[:3] == ["spec", "layer", "rid"]
     with pytest.raises(ValueError, match="unknown mode"):
         duckosm.read(DB, "boat")
@@ -119,13 +117,13 @@ def _tiny(path, network=True):
 def test_a_file_with_no_private_edges_reads(tmp_path):
     """With no private_edges, the union's access is NULL only, which DuckDB typed as an integer: "Could not convert string 'bus' to
     INT32" (an older file, granville_island). The reader types it as text."""
-    pq = pytest.importorskip("pyarrow.parquet")
+    pytest.importorskip("pyarrow")
     from roadstyle import duckosm
 
     roads, features, levels = duckosm.read(_tiny(tmp_path / "t.duckdb"), levels="tags")
-    t = pq.read_table(io.BytesIO(roads))
+    t = roads
     assert t.num_rows == 2 and str(t.schema.field("access").type) == "string" and levels == "tags"
-    assert pq.read_table(io.BytesIO(features)).num_rows == 1
+    assert features.num_rows == 1
 
 
 def test_the_plan_has_the_base_map_of_a_file_with_no_network(tmp_path):
@@ -163,14 +161,11 @@ def test_the_page_of_a_duckosm_file(tmp_path):
 
 def test_the_modes_column_names_the_modes_of_each_road():
     import pyarrow as pa
-    import pyarrow.parquet as pq
 
     from roadstyle import duckosm
 
     t = pa.table({"driving": [True, True, False, False], "walking": [True, True, True, False], "cycling": [True, False, True, False]})
-    buf = io.BytesIO()
-    pq.write_table(t, buf)
-    got = pq.read_table(io.BytesIO(duckosm._with_modes(buf.getvalue()))).column("modes").to_pylist()
+    got = duckosm._with_modes(t).column("modes").to_pylist()
     assert got == ["all modes", "driving + walking", "walking + cycling", ""]
 
 

@@ -50,22 +50,6 @@ fn sodermalm_style_against_python() {
     assert!(d.is_empty(), "{d:#?}");
 }
 
-#[test]
-#[ignore = "a look at the slots that differ, of the area $AREA (default monaco; P0's list of differences)"]
-fn slot_differences() {
-    let area = std::env::var("AREA").unwrap_or_else(|_| "monaco".into());
-    let (got, want) = (style(&area), common::gz_json(&format!("{area}/golden_style.json.gz")));
-    let (g, w) = (got["sources"]["slots"]["data"]["features"].as_array().unwrap(), want["sources"]["slots"]["data"]["features"].as_array().unwrap());
-    let roads = &got["sources"]["roads"]["data"]["features"];
-    for (a, b) in g.iter().zip(w) {
-        if a["properties"]["__rs_edge"] != b["properties"]["__rs_edge"] {
-            let (ea, eb) = (a["properties"]["__rs_edge"].as_u64().unwrap() as usize, b["properties"]["__rs_edge"].as_u64().unwrap() as usize);
-            println!("slot {} chain {} name {}: Rust edge {ea} ({}), Python edge {eb} ({}); the slot {}", a["properties"]["slot"], a["properties"]["chain"],
-                     a["properties"]["name"], roads[ea]["properties"]["edge_ref"], roads[eb]["properties"]["edge_ref"], a["geometry"]["coordinates"]);
-        }
-    }
-}
-
 /// Two features' properties are the same: the same keys, and the same values, a number by its value (MapLibre reads 0 and 0.0, an
 /// int_value -1 and a sint_value -1, as the same number).
 fn same_props(a: &serde_json::Map<String, Value>, b: &serde_json::Map<String, Value>) -> bool {
@@ -175,13 +159,6 @@ fn levels_against_python() {
     assert_eq!(level_rows("sodermalm", Tags, "golden_levels_tags.json.gz"), (4_563, 4_563, 4_563));
     assert_eq!(level_rows("monaco", Solve, "golden_levels_solve.json.gz"), (13_298, 13_298, 13_298 - MONACO_SOLVE_OTHER_ROWS));
     assert_eq!(level_rows("sodermalm", Solve, "golden_levels_solve.json.gz"), (4_563, 4_563, 4_563));
-}
-
-#[test]
-#[ignore = "writes the engine's solve rows of Monaco to $ROWS, for a check with roadstyle's rules (P0's list of differences)"]
-fn monaco_solve_rows() {
-    let rows = levels("monaco", roadstyle_rs::levels::Method::Solve);
-    std::fs::write(std::env::var("ROWS").unwrap(), Value::Array(rows).to_string()).unwrap();
 }
 
 /// Tartu (inputs and goldens from the pre-release: tests/get_goldens.sh): the style, the tiles and the tags rule (no solve: Python

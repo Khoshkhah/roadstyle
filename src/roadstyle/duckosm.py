@@ -1,11 +1,9 @@
 """A duckOSM file as the Rust engine's input (the mapstyle merge): the roads of every mode with their stored levels and the base map's
 tables (``features.*``), read with the SQL of the Rust engine (``roadstyle_io::duckosm``: the one copy, which the browser runs too) on a
-DuckDB connection of this process. The outputs are the engine's input files, as GeoParquet bytes."""
+DuckDB connection of this process. The outputs are the engine's input tables, as Arrow tables (the geometry as WKB)."""
 from __future__ import annotations
 
-import io
 import json
-import tempfile
 import warnings
 from pathlib import Path
 
@@ -20,7 +18,7 @@ def layer_specs() -> list[dict]:
 
 def read(db, mode: str = "all", *, levels: str = "stored", layers=True, only: bool = False):
     """``(roads, features, levels_kw)`` of the duckOSM file ``db`` for the map of ``mode`` ("all", "driving", "walking" or "cycling"):
-    the roads (GeoParquet bytes), the base map's rows (GeoParquet bytes, None with ``layers=False`` or when the file has none; a list of
+    the roads (an Arrow table), the base map's rows (an Arrow table, None with ``layers=False`` or when the file has none; a list of
     names: those layers) and the look's keyword ``levels``: the stored levels' check ({edge_hash, n_edges}) with ``levels="stored"`` (an
     error when the file has none), "tags" (the engine computes the levels with the tags rule), or with "auto" (render_map's rule, the
     page's default) the stored levels when the file has them, else None (the engine solves them, with a warning). Stored levels for
@@ -28,6 +26,7 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers=True, only: bo
     the roads of ``mode`` alone (its edges and private_edges; render_map(only=True)); the stored levels were solved for every mode
     together, so each of these roads must have its stored row (load_area_levels(subset=True))."""
     import duckdb
+    import pyarrow as pa
 
     from ._engine import rust
 
@@ -85,14 +84,9 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers=True, only: bo
                     warnings.warn(f"{db}: base-map layer {lyr['name']}: no tags column (an older file): the heights of the kinds", stacklevel=2)
                 made.append(lyr["spec"])
                 break
-        with tempfile.TemporaryDirectory() as d:
-            def parquet(select, name):
-                p = Path(d) / name
-                con.execute(f"COPY ({select}) TO '{p}' (FORMAT parquet)")
-                return p.read_bytes()
-            roads = parquet(plan["select"], "roads.parquet")
-            fsel = r.duckosm_features_select(made)
-            features = parquet(fsel, "features.parquet") if fsel else None
+        roads = pa.table(con.execute(plan["select"]).arrow())       # in memory: the connection closes below
+        fsel = r.duckosm_features_select(made)
+        features = pa.table(con.execute(fsel).arrow()) if fsel else None
     finally:
         con.close()
     return roads, features, level_kw
@@ -161,20 +155,16 @@ def page(db, mode: str = "all", *, theme: str = "osm", paths: str = "google", la
     return rw.WebMap(html)
 
 
-def _with_modes(roads: bytes) -> bytes:
-    """The roads (GeoParquet bytes) with the column ``modes``: the modes that can use each road, as the dashboard's colour option
+def _with_modes(roads):
+    """The roads (an Arrow table) with the column ``modes``: the modes that can use each road, as the dashboard's colour option
     "Modes" names them ("all modes", "driving + walking", ...; mapstyle's render_map(dashboard=True)).
     ponytail: Python only; a JavaScript host's dashboard gets the column when the reader's SQL writes it."""
     import pyarrow as pa
-    import pyarrow.parquet as pq
 
     modes = ("driving", "walking", "cycling")
-    t = pq.read_table(io.BytesIO(roads))
-    flags = [t.column(m).to_pylist() for m in modes]
+    flags = [roads.column(m).to_pylist() for m in modes]
     labels = ["all modes" if all(f) else " + ".join(m for m, x in zip(modes, f, strict=True) if x) for f in zip(*flags, strict=True)]
-    out = io.BytesIO()
-    pq.write_table(t.append_column("modes", pa.array(labels, pa.string())), out)
-    return out.getvalue()
+    return roads.append_column("modes", pa.array(labels, pa.string()))
 
 
 def export_style(db, out_dir, *, base_url: str, mode: str = "all", theme: str = "osm", paths: str = "google", layers: bool = True,
@@ -182,7 +172,6 @@ def export_style(db, out_dir, *, base_url: str, mode: str = "all", theme: str = 
     """mapstyle's ``export_style`` on the Rust engine: the map of the duckOSM file ``db`` as style.json, its vector tiles (the roads
     and the base map; ``format``: "xyz" or "pmtiles"), the sprite and the popup's files in ``out_dir``, served at ``base_url``, for an
     app that draws a MapLibre style (GeoLibre, RustGIS, QGIS). ``only``: the roads of ``mode`` alone (``read``). The path of style.json."""
-    import pyarrow.parquet as pq
     import shapely
 
     from ._engine import _warn, _write_export, rust
@@ -191,11 +180,10 @@ def export_style(db, out_dir, *, base_url: str, mode: str = "all", theme: str = 
         raise ValueError(f"format must be 'xyz' or 'pmtiles', got {format!r}")
     roads, features, level_kw = read(db, mode, levels=levels, layers=layers, only=only)
     lk = look(db, mode, theme=theme, paths=paths, levels=level_kw, **{"view_3d": True, "export": True, "tiles": True, **kwargs})
-    table = pq.read_table(io.BytesIO(roads))
-    keep = [c for c in table.column_names if c != "geometry"]          # every column: a click shows the data
+    keep = [c for c in roads.column_names if c != "geometry"]          # every column: a click shows the data
     t = rust().Tiler(roads, lk, features, None, "", keep)
     _warn()
-    bounds = tuple(float(v) for v in shapely.total_bounds(shapely.from_wkb(table.column("geometry").to_numpy(zero_copy_only=False))))
+    bounds = tuple(float(v) for v in shapely.total_bounds(shapely.from_wkb(roads.column("geometry").to_numpy(zero_copy_only=False))))
     return _write_export(t, out_dir, base_url, format, json.loads(lk.part("args"))["name"], bounds)
 
 

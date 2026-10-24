@@ -2,17 +2,28 @@
 //! geometry a LineString from WKB.
 
 use crate::Error;
-use arrow_array::{cast::AsArray, types::*, Array, ArrayRef};
+use arrow_array::{cast::AsArray, types::*, Array, ArrayRef, RecordBatchReader};
 use arrow_schema::DataType;
 use bytes::Bytes;
-use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use parquet::arrow::arrow_reader::{ParquetRecordBatchReader, ParquetRecordBatchReaderBuilder};
 use serde_json::{Map, Value};
 
 pub use roadstyle_model::{feature_table::FeatureTable, Lines, RoadTable, Row};
 
 pub fn read_roads(data: Vec<u8>, geom_col: &str) -> Result<RoadTable, Error> {
+    roads_from(parquet(data)?, geom_col)
+}
+
+/// The batches of a Parquet file.
+fn parquet(data: Vec<u8>) -> Result<ParquetRecordBatchReader, Error> {
+    ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data)).and_then(|b| b.build())
+        .map_err(|e| Error::Format(format!("not a Parquet file: {e}")))
+}
+
+/// The roads from Arrow batches: a Parquet file's, or an Arrow stream's from Python (GeoPandas' to_arrow, the geometry as WKB).
+pub fn roads_from(reader: impl RecordBatchReader, geom_col: &str) -> Result<RoadTable, Error> {
     let mut lines = Lines::default();
-    let (names, cols) = read_columns(data, geom_col, |g| {
+    let (names, cols) = columns_from(reader, geom_col, |g| {
         lines.push(g.and_then(wkb_line).as_deref());
         Ok(())
     })?;
@@ -22,18 +33,21 @@ pub fn read_roads(data: Vec<u8>, geom_col: &str) -> Result<RoadTable, Error> {
 /// The base map's (or any) features from a GeoParquet file: every column but the geometry an Arrow array, and the geometry of each row
 /// (WKB: a point, a line, a polygon or a Multi type) in one coordinate buffer (roadstyle-model's FeatureTable; audit R10).
 pub fn read_feature_table(data: Vec<u8>, geom_col: &str) -> Result<FeatureTable, Error> {
+    feature_table_from(parquet(data)?, geom_col)
+}
+
+/// The features from Arrow batches (a Parquet file's, or an Arrow stream's from Python), as `read_feature_table`.
+pub fn feature_table_from(reader: impl RecordBatchReader, geom_col: &str) -> Result<FeatureTable, Error> {
     let mut geoms = FeatureTable::geometries();
-    let (names, cols) = read_columns(data, geom_col, |g| geoms.push_wkb(g).map_err(|e| Error::Format(format!("{geom_col}: {e}"))))?;
+    let (names, cols) = columns_from(reader, geom_col, |g| geoms.push_wkb(g).map_err(|e| Error::Format(format!("{geom_col}: {e}"))))?;
     FeatureTable::new(names, cols, geoms).map_err(Error::Format)
 }
 
-/// The columns of a Parquet file but `geom_col` (each one Arrow array of every row), and `geom` called with each row's geometry bytes
+/// The columns of Arrow batches but `geom_col` (each one Arrow array of every row), and `geom` called with each row's geometry bytes
 /// (None: no geometry column, or a null).
-fn read_columns(data: Vec<u8>, geom_col: &str, mut geom: impl FnMut(Option<&[u8]>) -> Result<(), Error>)
+fn columns_from(reader: impl RecordBatchReader, geom_col: &str, mut geom: impl FnMut(Option<&[u8]>) -> Result<(), Error>)
                 -> Result<(Vec<String>, Vec<ArrayRef>), Error> {
-    let builder = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data)).map_err(|e| Error::Format(format!("not a Parquet file: {e}")))?;
-    let schema = builder.schema().clone();
-    let reader = builder.build().map_err(|e| Error::Format(format!("not a Parquet file: {e}")))?;
+    let schema = reader.schema();
     let names: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).filter(|n| n != geom_col).collect();
     let mut parts: Vec<Vec<ArrayRef>> = vec![Vec::new(); names.len()];
     for batch in reader {
@@ -80,9 +94,11 @@ pub fn line_table(data: Vec<u8>) -> Result<Option<(RoadTable, std::collections::
 
 /// Any Parquet table as rows: the columns as properties, the binary column `blob` kept as its bytes.
 pub fn read_table(data: Vec<u8>, blob: &str) -> Result<Vec<Row>, Error> {
-    let reader = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data))
-        .and_then(|b| b.build())
-        .map_err(|e| Error::Format(format!("not a Parquet file: {e}")))?;
+    table_from(parquet(data)?, blob)
+}
+
+/// Any table of Arrow batches as rows, as `read_table`.
+pub fn table_from(reader: impl RecordBatchReader, blob: &str) -> Result<Vec<Row>, Error> {
     let mut out = Vec::new();
     for batch in reader {
         let batch = batch.map_err(|e| Error::Format(e.to_string()))?;

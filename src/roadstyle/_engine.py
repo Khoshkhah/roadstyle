@@ -7,7 +7,6 @@ columns the Rust engine computes the levels, as ``render`` does (``compute_level
 """
 from __future__ import annotations
 
-import io
 import json
 import os
 
@@ -60,23 +59,21 @@ def available() -> bool:
         return False
 
 
-def _geoparquet(edges) -> bytes:
-    """The roads as GeoParquet bytes (the geometry as WKB), as the Rust reader reads them. A column of mixed values (True and "square" in a
-    cap column) is text: true and false as "true" and "false", which the engine reads as Python's truth (render_web._truthy)."""
+def _arrow(edges):
+    """The roads as an Arrow table (the geometry as WKB), which the Rust binding reads through ``__arrow_c_stream__``. A column of mixed
+    values (True and "square" in a cap column) is text: true and false as "true" and "false", which the engine reads as Python's truth
+    (render_web._truthy)."""
     import pyarrow as pa
 
-    buf = io.BytesIO()
     try:
-        edges.to_parquet(buf, index=False)
+        return edges.to_arrow(index=False, geometry_encoding="WKB")
     except (pa.ArrowInvalid, pa.ArrowTypeError):
         g = edges.copy()
         gone = lambda v: v is None or (isinstance(v, float) and v != v)       # noqa: E731
         for c in g.columns:
             if c != g.geometry.name and g[c].dtype == object and len({type(v) for v in g[c] if not gone(v)}) > 1:
                 g[c] = [None if gone(v) else "true" if v is True else "false" if v is False else str(v) for v in g[c]]
-        buf = io.BytesIO()
-        g.to_parquet(buf, index=False)
-    return buf.getvalue()
+        return g.to_arrow(index=False, geometry_encoding="WKB")
 
 
 def _check_tunnels(cfg):
@@ -118,7 +115,7 @@ def export_inline(edges, **kwargs) -> dict:
     kwargs.setdefault("view_3d", True)      # as export_inline
     kwargs["export"] = True                 # an app with no road table: the roads source, its pick and highlight (audit N2)
     lk = _look_of(kwargs)
-    text = rust().make_style(_geoparquet(edges), lk, None, None, kwargs.get("name") or "roads")     # export_inline's name
+    text = rust().make_style(_arrow(edges), lk, None, None, kwargs.get("name") or "roads")     # export_inline's name
     _warn()
     return json.loads(text)
 
@@ -135,7 +132,7 @@ def export_geojson(edges, out_dir, *, format="geojson", keep=None, **kwargs) -> 
     kwargs.setdefault("view_3d", True)      # as export_inline
     kwargs["export"] = True                 # stage 1 of export_style: the roads source too (audit N2)
     lk = _look_of(kwargs)
-    s = rust().make_sources(_geoparquet(edges), lk, None, None, kwargs.get("name") or "roads")
+    s = rust().make_sources(_arrow(edges), lk, None, None, kwargs.get("name") or "roads")
     files = s.save(str(out_dir), format, [str(c) for c in (keep or [])])
     _warn()
     return dict(files)
@@ -277,7 +274,7 @@ def compute_levels(edges, *, layer_col="layer", bridge_col="bridge", tunnel_col=
                    margin=1.0, min_positions=True, near_rules=False):
     """``roadstyle.compute_levels`` by the Rust engine: the same four columns (casing_start, casing_level, casing_end, fill_level).
     The attrs have ``levels_params`` and ``levels_info`` (with the counts). The Rust solver has no time limit: ``time_limit`` is not used."""
-    rows, info = rust().compute_levels(_geoparquet(edges), method, [highway_col, layer_col, bridge_col, tunnel_col, junction_col],
+    rows, info = rust().compute_levels(_arrow(edges), method, [highway_col, layer_col, bridge_col, tunnel_col, junction_col],
                                        band_col=band_col, order=order, band_dist=band_dist, head_m=head_m, max_level=max_level, margin=margin,
                                        min_positions=min_positions, near_rules=near_rules)
     info = json.loads(info)
@@ -333,7 +330,7 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs
     kwargs["tiles"] = True                                 # render's tiled look: the roads source draws (no lean mode)
     kwargs["export"] = True                                # an app with no road table: the roads source, its pick and highlight (audit N2)
     lk = _look_of(kwargs)
-    t = rust().Tiler(_geoparquet(edges), lk, None, name, "", [str(c) for c in edges.columns])   # every column: a click shows the data
+    t = rust().Tiler(_arrow(edges), lk, None, name, "", [str(c) for c in edges.columns])   # every column: a click shows the data
     _warn()
     return _write_export(t, out_dir, base_url, format, name, tuple(float(v) for v in edges.total_bounds))
 
@@ -427,7 +424,7 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
         kwargs = {**kwargs, **level_kw}
     lk, o = _look_and_options({**kwargs, "palette": palette, "profile": profile, "settings": settings, "highway_col": highway_col,
                                "state": "live"})
-    html = rust().page_from(_geoparquet(g), lk, json.dumps(o), json.dumps(page_given(kwargs, palette, profile, settings)))
+    html = rust().page_from(_arrow(g), lk, json.dumps(o), json.dumps(page_given(kwargs, palette, profile, settings)))
     _warn()
     return rw.WebMap(html)
 
