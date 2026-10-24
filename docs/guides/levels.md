@@ -1,11 +1,11 @@
 # Which road is on top
 
-<p class="lead">Every edge gets numbers for where its outline and its road are drawn. The map is drawn by those numbers alone; a solver works them out, and an editor lets you fix any place by hand.</p>
+<p class="lead">Every edge gets numbers for where its outline and its road are drawn. The map is drawn by those numbers alone. A solver works them out, and an editor lets you fix any place by hand.</p>
 
 ![Monaco: a primary road on a bridge over a roundabout, with its slate casing and shadow; a tunnel passes under both](../img/levels-bridge.png)
 
 Monaco, Rond-Point du Portier: the primary road crosses the roundabout on a bridge (slate outline, soft shadow), and a tunnel (dashed
-outline) passes under both. Where the roads only meet, the roundabout is on top; where they cross, the bridge is.
+outline) passes under both. Where the roads only meet, the roundabout is on top. Where they cross, the bridge is.
 
 === "Python"
 
@@ -24,113 +24,113 @@ outline) passes under both. Where the roads only meet, the roundabout is on top;
 
 ## The rule
 
-- Every edge has a **casing position** and a **fill position**: whole numbers, 0 is the ground, null counts as 0.
-- The casing has **three parts**: a start head, a main part and an end head, each with its own number (`casing_start`, `casing_level`,
-  `casing_end`). The heads are 5 m long by default; on a short road the main part can have no length.
-- The map is drawn position by position, lowest first. **At each position every outline is drawn first, then every road.**
-- So two roads that meet at a junction merge without a ring: each head lies under the other road's fill.
-- A road whose numbers are all higher than another's is drawn completely over it, outline included: an overpass.
+- Every edge has a **casing position** and a **fill position**. They are whole numbers, 0 is the ground, and null counts as 0.
+- The casing has **three parts**: a start head, a main part and an end head (`casing_start`, `casing_level`, `casing_end`). The heads
+  are 5 m long by default. On a short road the main part can have no length.
+- The map is drawn position by position, lowest first. **At each position every outline is drawn first, then every road.** So two
+  roads that meet merge without a ring: each head lies under the other road's fill. A road whose numbers are all higher than
+  another's is drawn completely over it, outline included.
+- **Nothing else orders the drawing**: not the road class, not `layer`, `bridge` or `tunnel`. They are only inputs of the solver. Two
+  edges at the same position are drawn in no set order.
 
-**Nothing else orders the drawing**: not the road class, not `layer`, `bridge` or `tunnel`. They are only inputs of the solver.
-Two edges at the *same* position are drawn in no set order.
+## How the solver works
 
-## Where the numbers come from
-
-The **level step** works them out, before drawing ([design](../design/level_input.md)). `render_edges(edges)` without level columns runs it
-for you with its defaults. It has two halves:
-
-1. **The input** (`rs.level_input(edges)`): one row per road (both directions together) and the pairs between roads.
-   Roads of different bands (`layer`, `bridge`, `tunnel`) that **cross** become a *stack*: the higher band is over the lower one, written
-   as one row per part of the upper road's casing that crosses (`start`, `main`, `end`), worked out here once with the heads of that time.
-   Roads that **only meet** (a junction, a tunnel mouth, a bridge end) become an *order* wish: a roundabout over a tunnel, a tunnel over
-   a bridge, a bridge over the road class. A roundabout is known by the OSM `junction` column: without it you get a warning.
-2. **The solver** (`rs.solve_levels(roads, pairs, edits=...)`): whole numbers (integer programming with HiGHS), kept in this order:
-   real crossings, then the order wishes, then as few positions as possible. The *near* rules (lifting the parts that only come close to the road
-   under them) are **off by default since 2026-10-08**: on Monaco all modes they cost 45.9 s and 27 positions against 14.4 s and 9 without (and 1,477 of
-   11,911 near rules broke anyway). Turn them on with `near_rules=True` (CLI: `make --near-rules`: they are written as `near` rows); an `edits.csv` stack is always a real rule.
-   The solver reads only the tables, never the lines or the head lengths (2026-10-08): a head change needs no solve.
+`render_edges(edges)` without level columns runs the level step with its defaults. You can also run it yourself, once, and draw with the
+columns:
 
 ```python
-levels = rs.compute_levels(edges)          # both halves in one call
+levels = rs.compute_levels(edges)
 rs.render_edges(levels, casing_start_col="casing_start", casing_level_col="casing_level",
                 casing_end_col="casing_end", fill_level_col="fill_level").save("map.html")
 ```
 
-Computing takes seconds for a district and longer for a big network: compute once, then draw with the columns.
+**1. The input** (`rs.level_input(edges)`). The two directions of a segment are one road. Between roads the input finds three kinds of pair:
+
+| pair | when | what it asks |
+|---|---|---|
+| *meet* | two road ends are one node | each head is under the other road's fill (a hard rule) |
+| *stack* | roads of different bands cross, or run within `band_dist` (10 m) away from a node they share | each crossing part of the upper road's casing is over the lower road's fill |
+| *order* | roads meet: of one band, or of different bands that only meet (a tunnel mouth) | the road with the higher priority has the higher fill |
+
+The band is the level from the tags: a non-zero `layer`, else 1 for a bridge, -1 for a tunnel, else 0 (or your own `band_col`). The
+priority is a roundabout, then a tunnel, then a bridge, then the road class (`order="priority"`). A roundabout is known by the OSM
+`junction` column: without it you get a warning.
+
+**2. Hard rules and wishes.** Some rules always hold: no casing part is over its own fill, the meet rules, and every number is in the
+range `-max_level` to `max_level` (20). The others are wishes that can break when they cannot all hold. A ring of three roads, each
+over the next, is an example.
+
+**3. The stages.** The solver works in this order. Each stage keeps the result of the stage before it:
+
+1. Keep as many real crossings (stacks) as possible.
+2. Then keep as many order wishes as possible.
+3. Then keep as many near rules as possible. A near rule lifts a part that only comes close to the road under it. They are off by
+   default: turn them on with `near_rules=True`.
+4. Then use as few positions as possible, and put each casing as near to its fill as possible.
+
+**4. The answer.** Every edge gets its four numbers. The solver moves them so that the most common casing position is 0 (the ground),
+and makes them consecutive. A stack that it could not keep is in `result.attrs["levels_given_up"]`, with a warning: it is a flaw on
+the map. The order wishes that it did not keep are in `levels_orders_not_kept`.
+
+**The two engines.** Both solve the same input in the same stages:
+
+- **Python** (the default) solves each stage as an integer program with HiGHS. A stage that needs more than `time_limit` (60 s)
+  keeps the best answer that it found, with a warning.
+- **Rust** (`engine="rust"`, or `ROADSTYLE_ENGINE=rust`) solves each stage as a minimum-cost flow: each rule "number A ≤ number B + w"
+  is one arc of a graph. It checks every hard rule of its answer before it gives it, and it has no time limit. Monaco (13,298 edges)
+  takes 0.2 s, Tartu (64,828 edges) 3.1 s. It keeps the levels of the last 2 networks, so a style, its tiles and each palette of one
+  network solve one time.
+
+Two answers can be equally good: the two engines can give different numbers for a few roads, with the same broken rules and the same
+number of positions.
+
+The solver reads only the pairs, never the lines or the head lengths. Which parts of a stack cross is decided in the input, with the
+heads of that time.
 
 ## Fix it by hand: the level editor
 
 ![The level editor: two roads picked, their cards with ends and heads, the Issues tab](../img/level-editor.png)
 
-`roadstyle-levels edit out/area` opens a local page with the map and a panel. Click a road, or find it by edge id or `edge_ref`;
-pick a second one to see every pair between the two.
+`roadstyle-levels edit out/area` opens a local page with the map and a panel. Click a road, or find it by edge id or `edge_ref`. Pick a
+second road to see every pair between the two.
 
-- **Add a relation**: *order* (whose fill is on top where they meet), *stack* (one over the other: pick the parts of its casing, *start
-  head*, *main*, *end head*, one row each; *whole road* picks all three) or *meet* (join two ends). You choose which road is on top.
-- **Switch off** a row the input found. Rows add up: your stack rows lift their parts on top of the found ones. To **override** a found
-  stack, press *Switch off all found stack rows of this pair* (one switch-off per row), then add your own parts.
-- **A guard before you add**: the page asks whether the new rule conflicts with the rules there are (found, yours, and the list) and names
-  them: the same rule already there, or a loop (A over B, B's fill after C's, C over A: no numbers keep them all, so the solver would give
-  one up). You can still add it, except an exact copy of a row already in `edits.csv`: *Apply* refuses it.
-- **Each end of a road**: its cap (*round*, *square*, *flat*) and its head length (a slider, in metres). The map shows each end's cap. The automatic cap is round, except a two-way road's dead end (an end that meets no other road): square, so the one casing around both directions ends in one clean full-width end.
-- Changes wait in a list until **Apply and solve**: they are solved together, and the open map redraws the roads that changed in place (more than 1,500 changed roads: the page reloads, and says so).
-  If the solver refuses them, nothing is saved.
-  *Start new session* moves what is in `edits.csv` now under *Already in edits.csv* and starts the list of changes empty (nothing is deleted).
-  A change of caps or heads is saved and drawn without a solve: they are drawing only. Which parts of a stack cross is decided when the
-  area is made, with `heads.csv`'s heads; run `make` again to decide it with new heads.
-- **Show only some modes**: when the roads have a `modes` column (who may use them, e.g. `driving + walking`; duckOSM gives it), boxes
-  under the search show only the roads of the ticked modes (display only: every road is still solved). A road's card shows its modes.
-- The **Issues** tab lists what to look at: **given up** (red: a real crossing the solver could not keep, a flaw on the map),
-  **near warnings** (amber: two roads that only come close; only with near rules on, otherwise none) and the **order wishes not kept**.
+- **Add a rule**: *order* (whose fill is on top where they meet), *stack* (one road over the other: pick the parts of its casing) or
+  *meet* (join two ends).
+- **Switch off** a pair that the input found. To replace a found stack, switch off its rows, then add your own parts.
+- **Before you add**, the page tells you if the new rule is already there or makes a loop with other rules (A over B, B over C, C over
+  A: no numbers keep them all).
+- **Each end of a road**: its cap (*round*, *square*, *flat*) and its head length. A change of caps or heads needs no solve.
+- **Apply and solve** solves all waiting changes together and redraws the roads that changed. If the solver refuses them, nothing is
+  saved.
+- **Modes**: when the roads have a `modes` column (duckOSM gives it), boxes show only the roads of the ticked modes.
+- The **Issues** tab lists the stacks given up, the near warnings and the order wishes not kept.
 
-Your changes live in three small tables in the area folder, never overwritten by the input step:
+Your changes are in three small tables in the area folder. The input step never writes them:
 
 | file | what |
 |---|---|
-| `edits.csv` | your rows: `relation` (`order`, `stack`, `meet`), `a`, `b`, `a_end` (a stack's part: `start`, `main`, `end`), `b_end`, `enabled` (`false` switches that exact found row off) |
-| `heads.csv` | head lengths per road end in metres (`road`, `start_m`, `end_m`; empty: 5 m); read by `make` for the stack rows |
+| `edits.csv` | your rules: `relation` (`order`, `stack`, `meet`), `a`, `b`, `a_end` (a stack's part: `start`, `main`, `end`), `b_end`, `enabled` (`false` switches that found row off) |
+| `heads.csv` | head lengths per road end in metres (`road`, `start_m`, `end_m`; empty: 5 m) |
 | `caps.csv` | cap per road end (`road`, `start`, `end`: `round`, `square`, `flat`; empty: round) |
 
-`levels.csv` is the result: per edge its four numbers and its ends as drawn (`head_start_m`, `head_end_m`, `cap_start`, `cap_end`).
-An area made before 2026-10-08 has whole-road stack rows in `pairs.csv`: the solve stops and says to run `make` again (your three tables are
-kept). An `edits.csv` stack with no part stops it too: give the row a part (or one row per part).
-An example: Monaco's hand-made tables in `examples/levels/monaco/`.
+`levels.csv` is the result: per edge its four numbers and its ends as drawn. An example: Monaco's tables in `examples/levels/monaco/`.
 
-### An area that belongs to a database
-
-`make_area(edges, folder, db="monaco.duckdb")` ties the area to a DuckDB file (`area.json`): every solve, the editor's too, also writes
-the result into it (`visualization.edge_levels`, with each edge's ends; `rs.save_area_levels`). `rs.load_area_levels(con, edges)` reads it
-back for the same edges and stops with a message for any other edges. duckOSM's `duckosm levels monaco.duckdb` makes such an area for all
-travel modes together (`monaco.levels/` next to the file), and mapstyle draws from it. Keep `edits.csv`, `heads.csv` and `caps.csv`: with
-them a rebuilt file gets the same drawing order back.
-
-Two edges on the same line are one road (its two directions) only when they are the same kind (`highway`, `tunnel`, `bridge`, `layer`): a
-footway lying exactly on a street stays a road of its own.
-
-## Bridges and tunnels
-
-- A **bridge** has a slate casing (`bridge_casing_color`) and a soft **shadow** (`bridge_shadow`; in the full look shifted down-right, in simple mode, the default, blurred evenly around the bridge): each part of the
-  bridge casts it at its own casing number, so it lies on what the bridge crosses, never on its own road. Hiding the bridges hides it too.
-- A **tunnel** fades toward a chosen colour (`tunnel_toward`, default Sand), its fill, names, arrows and attached items alike: `tunnel_strength` (default 60; 0 is the normal colours, 100 the full tunnel
-  colours) and a two-colour dashed casing (`tunnel_palette`, default *Graphite + silver*). To try other values, `tunnel_control=True` adds a
-  *Tunnels* box with its steps and colour list; `rsSetTunnelStyle({strength, palette, ratio})` does the same from your page.
+**An area in a database.** `make_area(edges, folder, db="monaco.duckdb")` ties the area to a DuckDB file. Every solve also writes the
+result into it (`visualization.edge_levels`), and `rs.load_area_levels(con, edges)` reads it back for the same edges only. duckOSM's
+`duckosm levels monaco.duckdb` makes such an area for all travel modes, and mapstyle draws from it. Keep the three tables: with them a
+rebuilt file gets the same drawing order back.
 
 ## Your own numbers
 
-The solver is one way to fill the columns. Anything that gives whole numbers per edge works, for example a sidewalk at -1 under a street
-at 0 and a crossing at 1 over it:
+The solver is one way to fill the columns. Any whole numbers per edge work, for example a sidewalk at -1 under a street at 0 and a
+crossing at 1 over it:
 
 ```python
 edges["casing_level"] = edges["fill_level"] = edges["kind"].map({"sidewalk": -1, "street": 0, "crossing": 1})
 ```
 
-To give your own band per edge and let the solver do the rest: `rs.compute_levels(edges, band_col="band")`.
-
-## Good to know
-
-- Each position that occurs gets its casing and fill layers (only those something is drawn by: no bridge layers without a bridge there), so keep the range small.
-- `rsColor` and colour-by reach every position. `tiles=True` works with positions, in both looks.
-- `render_edges` takes no band and no order: compute the levels first.
+To give your own band per edge and let the solver do the rest: `rs.compute_levels(edges, band_col="band")`. `render_edges` takes no band
+and no order: compute the levels first. Each position gets its own layers, so keep the range small.
 
 See also: [the level step, in full](../design/level_input.md) · [divided casing](../design/levels_split_casing.md) ·
-[every parameter](../reference/parameters.md)
+[bridges and tunnels in 2D](style.md#bridges-and-tunnels-in-2d) · [every parameter](../reference/parameters.md)

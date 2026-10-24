@@ -79,8 +79,18 @@ rs.render_edges(edges, view_3d=True)                         # CLI: --view-3d
 
 ![Bridges in 3D](../img/gallery/bridges_3d.jpg)
 
-In 2D a bridge has a slate casing and a soft shadow; a tunnel fades toward a chosen colour (default Sand, strength 60) and has a dashed casing
-([Which road is on top](levels.md#bridges-and-tunnels)).
+## Bridges and tunnels in 2D
+
+- A **bridge** has a slate casing (`bridge_casing_color`) and a soft **shadow** (`bridge_shadow`). In the full look the shadow is
+  shifted down and right. In simple mode, the default, it is blurred evenly around the bridge. Each part of the bridge casts it at its
+  own casing number, so it lies on what the bridge crosses, never on its own road. Hiding the bridges hides it too.
+- A **tunnel** fades toward a colour (`tunnel_toward`, default Sand): its fill, names, arrows and attached items. `tunnel_strength`
+  (default 60) sets how much: 0 gives the normal colours, 100 the full tunnel colours. Its casing has two dashed colours
+  (`tunnel_palette`, default *Graphite + silver*).
+- To try other values, `tunnel_control=True` adds a *Tunnels* box with its steps and colour list. `rsSetTunnelStyle({strength, palette,
+  ratio})` does the same from your page.
+
+Which road is drawn over which comes from the drawing levels: [Which road is on top](levels.md).
 
 ## Keep or drop road classes
 
