@@ -64,7 +64,7 @@ pub const LEVEL_COLS: [&str; 8] = ["casing_start", "casing_level", "casing_end",
 
 /// What a base map's choice gives the look: the roads' palette name and settings (one settings source), the base map's part of the
 /// look (`features`) and render_map's map options (`args`): the name, the tooltip, the copy field, the columns of the duckOSM reader
-/// (is_directed, has_arrows) and, for a mode with no lanes, one centred line for each road. The stored levels' columns come with the
+/// (is_directed, has_arrows, access, the mode flags), the page's box layout and, for a mode with no lanes, one centred line for each road. The stored levels' columns come with the
 /// keyword `levels` (resolve.rs).
 pub struct BaseMapLook {
     pub palette: String,
@@ -333,6 +333,13 @@ pub fn base_map(b: &BaseMap) -> Result<BaseMapLook, String> {
     // edges are directed; the arrows only on cars' one-ways (and a private or bus-only road)
     args.insert("directed_col".into(), "is_directed".into());
     args.insert("driving_col".into(), "has_arrows".into());
+    // a road that a mode may not use (private, bus, pedestrian, delivery: the reader's `access`) has its kind's colour in every colour
+    // option and a row in the Roads box (render's access_col), as mapstyle's layers.js painted it on the page
+    args.insert("access_col".into(), "access".into());
+    // the page's Modes filter (roadstyle:controls.modes) reads these columns of the road table, and the page stacks the Roads and Layers
+    // boxes as mapstyle's page did
+    args.insert("modes".into(), json!(["driving", "walking", "cycling"]));
+    args.insert("box_layout".into(), "stack".into());
     if spec.get("lanes") == Some(&Value::Bool(false)) {          // one centred line for each road
         args.insert("offset_frac".into(), 0.into());
         args.insert("width_frac".into(), 1.into());

@@ -65,6 +65,11 @@ fn the_64_looks_of_mapstyle() {
                           ..Default::default() };
         let mut got = Look::resolve(&o).unwrap_or_else(|e| panic!("{choice}: {e}")).to_value();
         got.as_object_mut().unwrap().shift_remove("schema_version");
+        // added on 2026-10-24 for the dashboard's port of mapstyle's page scripts: the restricted roads' colour baked into the fills
+        // (access_col), the Modes filter's columns and the page's box layout; mapstyle's look had them in its page script
+        for k in ["access_col", "modes", "box_layout"] {
+            got["args"].as_object_mut().unwrap().shift_remove(k);
+        }
         let mut out = Vec::new();
         first_differences(&canon(&got), &canon(&Value::Object(want)), choice, &mut out);
         bad.extend(out);
