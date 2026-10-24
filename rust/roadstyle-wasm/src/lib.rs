@@ -168,16 +168,17 @@ mod wasm {
     /// makePage(roads: Uint8Array, look: Look, options: string, given?: string) -> string: the page of the roads (GeoParquet) in one
     /// call, as render_edges(backend="web") (roadstyle::page_options::page_from; MapLibre stays a placeholder). `look`: makeLook's of
     /// `options` (its JSON text, which a view's palette resolves again), with "state": "live" in its args; `given`: the caller's values
-    /// over the look's args (JSON text: api_key, street_view_key, resolved_basemaps).
+    /// over the look's args (JSON text: api_key, street_view_key, resolved_basemaps); `features`: a duckOSM map's base map (Parquet bytes).
     #[wasm_bindgen(js_name = makePage)]
-    pub fn make_page(roads: Vec<u8>, look: &JsLook, options: &str, given: Option<String>) -> Result<String, JsError> {
+    pub fn make_page(roads: Vec<u8>, look: &JsLook, options: &str, given: Option<String>, features: Option<Vec<u8>>) -> Result<String, JsError> {
         let o: roadstyle::look::Options = serde_json::from_str(options).map_err(|e| JsError::new(&format!("options: {e}")))?;
         let given: serde_json::Map<String, serde_json::Value> = match given {
             Some(g) => serde_json::from_str(&g).map_err(|e| JsError::new(&format!("given: {e}")))?,
             None => serde_json::Map::new(),
         };
         let roads = roadstyle::read::read_roads(roads, "geometry").map_err(|e| JsError::new(&e.to_string()))?;
-        let page = roadstyle::page_options::page_from(roads, &look.0, &o, &given).map_err(|e| JsError::new(&e))?;
+        let features = features.map(roadstyle::read_features).transpose().map_err(|e| JsError::new(&e))?;
+        let page = roadstyle::page_options::page_from(roads, features, &look.0, &o, &given).map_err(|e| JsError::new(&e))?;
         page.warnings.iter().for_each(|w| console_warn(w));
         Ok(page.html)
     }

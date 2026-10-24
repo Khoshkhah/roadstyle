@@ -315,13 +315,15 @@ fn make_page(style: String, page: String, parts: String, pmtiles: Option<Vec<u8>
 /// page_from(roads, look, options, given) -> str: the page of the roads (GeoParquet bytes) in one call (roadstyle::page_options), as
 /// render_edges(backend="web"). `options`: the look's options (JSON text: palette, profile, settings, features, files), which a view's
 /// palette resolves again; `given`: the caller's values over the look's args (JSON text: basemap and basemaps as resolved entries,
-/// api_key, street_view_key). MapLibre stays a placeholder (WebMap puts it in).
+/// api_key, street_view_key); `features`: a duckOSM map's base map (Parquet bytes). MapLibre stays a placeholder (WebMap puts it in).
 #[pyfunction]
-fn page_from(py: Python<'_>, roads: Vec<u8>, look: PyRef<'_, PyLook>, options: String, given: String) -> PyResult<String> {
+#[pyo3(signature = (roads, look, options, given, features=None))]
+fn page_from(py: Python<'_>, roads: Vec<u8>, look: PyRef<'_, PyLook>, options: String, given: String, features: Option<Vec<u8>>) -> PyResult<String> {
     let options: roadstyle::look::Options = serde_json::from_str(&options).map_err(|e| PyValueError::new_err(format!("options: {e}")))?;
     let given: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&given).map_err(|e| PyValueError::new_err(format!("given: {e}")))?;
     let look = &look.0;
-    let page = py.detach(|| roadstyle::read::read_roads(roads, "geometry").map_err(String::from).and_then(|r| roadstyle::page_options::page_from(r, look, &options, &given)))
+    let page = py.detach(|| roadstyle::read::read_roads(roads, "geometry").map_err(String::from)
+        .and_then(|r| roadstyle::page_options::page_from(r, features.map(roadstyle::read_features).transpose()?, look, &options, &given)))
         .map_err(PyValueError::new_err)?;
     warned(&page.warnings);
     Ok(page.html)

@@ -92,9 +92,13 @@ def look(db, mode: str = "all", *, theme: str = "osm", paths: str = "google", le
     columns, the stored levels' columns with ``levels``), and ``kwargs`` over them (render_edges' keywords)."""
     from ._engine import rust
 
+    return rust().resolve_look(json.dumps(_options(db, mode, theme, paths, levels, kwargs)))
+
+
+def _options(db, mode, theme, paths, levels, kwargs) -> dict:
+    """The look's options of a duckOSM map (`look`): the base map's, and the map options."""
     args = {**kwargs, **({"levels": levels} if levels is not None else {})}
-    o = {"base_map": {"mode": mode, "theme": theme, "paths": paths, "place": Path(db).stem}, "args": args}
-    return rust().resolve_look(json.dumps(o))
+    return {"base_map": {"mode": mode, "theme": theme, "paths": paths, "place": Path(db).stem}, "args": args}
 
 
 def export_inline(db, mode: str = "all", *, theme: str = "osm", paths: str = "google", layers: bool = True, levels: str = "stored",
@@ -110,6 +114,55 @@ def export_inline(db, mode: str = "all", *, theme: str = "osm", paths: str = "go
     style = json.loads(rust().make_style(roads, lk, features, None, None))
     _warn()
     return style
+
+
+def page(db, mode: str = "all", *, theme: str = "osm", paths: str = "google", layers: bool = True, levels: str = "stored",
+         only: bool = False, interaction: dict = None, dashboard: bool = False, **kwargs):
+    """mapstyle's ``render_map`` on the Rust engine: the page of the duckOSM file ``db`` (``read``, its roads in the style of ``mode``, the
+    base map of ``features.*`` with ``layers``, the shared dashboard with the base map's controls: modes, kinds, each layer's clicks,
+    tooltip and popup). ``interaction``: a layer's start ``{clickable, tooltip, popup}`` (e.g. ``{"landcover": {"clickable": True}}``).
+    ``dashboard=True``: roadstyle's report page (``sidebar="report"``). ``kwargs``: render_edges' keywords (``basemap``, ``tiles``,
+    ``sidebar``, ...). Gives a ``WebMap`` (``.save(path)``)."""
+    from . import render_web as rw
+    from ._engine import _warn, page_given, rust
+
+    if kwargs.get("planner"):
+        raise ValueError("duckosm.page has no route planner yet: use mapstyle's render_map(planner=True)")
+    roads, features, level_kw = read(db, mode, levels=levels, layers=layers, only=only)
+    kw = {**kwargs, "state": "live", **({"interaction": interaction} if interaction else {})}
+    if dashboard:
+        from importlib.resources import files
+
+        import yaml
+        roads = _with_modes(roads)
+        colors = yaml.safe_load(files("roadstyle").joinpath("data/basemap/modes.yaml").read_text(encoding="utf-8"))["mode_colors"]
+        # the panel shows the clicked road: no road hover tooltip
+        kw = {"name": f"{Path(db).stem}: dashboard", "tooltip": None, "sidebar": "report",
+              "color_options": {"Road class": {}, "Modes": {"color_by": "modes", "colors": colors}}, **kw}
+    o = _options(db, mode, theme, paths, level_kw, kw)
+    lk = rust().resolve_look(json.dumps(o))
+    # the look's base maps (blank, in the theme's land colour, and the switcher's), where the caller gives none: the keys that Python resolves
+    args = json.loads(lk.part("args"))
+    given = page_given({**{k: args.get(k) for k in ("basemap", "basemaps")}, **kw})
+    html = rust().page_from(roads, lk, json.dumps(o), json.dumps(given), features)
+    _warn()
+    return rw.WebMap(html)
+
+
+def _with_modes(roads: bytes) -> bytes:
+    """The roads (GeoParquet bytes) with the column ``modes``: the modes that can use each road, as the dashboard's colour option
+    "Modes" names them ("all modes", "driving + walking", ...; mapstyle's render_map(dashboard=True)).
+    ponytail: Python only; a JavaScript host's dashboard gets the column when the reader's SQL writes it."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    modes = ("driving", "walking", "cycling")
+    t = pq.read_table(io.BytesIO(roads))
+    flags = [t.column(m).to_pylist() for m in modes]
+    labels = ["all modes" if all(f) else " + ".join(m for m, x in zip(modes, f, strict=True) if x) for f in zip(*flags, strict=True)]
+    out = io.BytesIO()
+    pq.write_table(t.append_column("modes", pa.array(labels, pa.string())), out)
+    return out.getvalue()
 
 
 def export_style(db, out_dir, *, base_url: str, mode: str = "all", theme: str = "osm", paths: str = "google", layers: bool = True,

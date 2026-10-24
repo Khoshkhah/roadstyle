@@ -64,7 +64,7 @@ fn bench(look_path: &str, roads_path: &str, features_path: &str) {
         let t = roadstyle_rs::read_features(fs::read(features_path).unwrap()).unwrap_or_else(|e| fail(e));
         let mut tables = roadstyle_rs::features::feature_tables(&t, &look).unwrap_or_else(|e| fail(e));
         let attached = roadstyle_rs::overlays::edge_attach(&mut tables, &feats).unwrap_or_else(|e| fail(e));
-        ovs = roadstyle_rs::overlays::feature_overlays(tables, &look, &attached).0;
+        ovs = roadstyle_rs::overlays::feature_overlays(tables, &look, &attached, &mut Vec::new()).0;
     }
     mark("base map");
     let roads = roads::roads_source(feats);

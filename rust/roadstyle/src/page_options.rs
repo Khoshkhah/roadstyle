@@ -8,7 +8,7 @@ use crate::look::Options;
 use crate::page::{escape, gzip_b64, page_html, Camera, PageOptions, PageParts};
 use crate::sources::Sources;
 use crate::tiles::stage::{TileOptions, COLUMNS, TILES};
-use crate::{layers::py_truth, Look, RoadTable};
+use crate::{layers::py_truth, FeatureTable, Look, RoadTable};
 use serde_json::{json, Map, Value};
 
 const BASEMAPS: &str = include_str!("../../../src/roadstyle/data/basemaps.json");
@@ -57,8 +57,10 @@ pub struct Page {
 
 /// The page of `roads` with `look` (resolved from `options`, which a view's palette resolves again with its palette). `given`: the
 /// caller's values over the look's args: `street_view_key`, `api_key` (put into a base map's URL), and `resolved_basemaps`, the
-/// entries (as data/basemaps.json's) of the base map keys that the caller resolved itself (Python: its key of each provider).
-pub fn page_from(roads: RoadTable, look: &Look, options: &Options, given: &Map<String, Value>) -> Result<Page, String> {
+/// entries (as data/basemaps.json's) of the base map keys that the caller resolved itself (Python: its key of each provider). `features`:
+/// the base map's rows (`read_features`, a duckOSM map's features.parquet), or None.
+pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, options: &Options, given: &Map<String, Value>)
+                 -> Result<Page, String> {
     let sidebar = match given.get("sidebar").or(look.args.get("sidebar")).filter(|v| !v.is_null()) {
         None => None,
         Some(v) => Some(SIDEBARS.iter().find(|s| v == s.0).ok_or_else(|| format!("sidebar must be \"dashboard\" or \"report\", got {}", repr(v)))?),
@@ -92,7 +94,7 @@ pub fn page_from(roads: RoadTable, look: &Look, options: &Options, given: &Map<S
     }
     let bounds = bounds_of(&roads);
     let tiled = on("tiles");
-    let mut src = crate::sources_of(roads, look, None, None, look.args["name"].as_str().map(String::from))?;
+    let mut src = crate::sources_of(roads, look, features, None, look.args["name"].as_str().map(String::from))?;
     let (active, bms, base) = basemaps(&a, look, &mut src.warnings)?;
     let bg = bg_color(&active, look);
     let keys: Vec<Value> = bms.iter().map(|b| b["key"].clone()).collect();

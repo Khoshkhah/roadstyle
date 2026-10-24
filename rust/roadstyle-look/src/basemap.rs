@@ -15,6 +15,7 @@ const LAYERS: &str = include_str!("../../../src/roadstyle/data/basemap/layers.ya
 const MODES: &str = include_str!("../../../src/roadstyle/data/basemap/modes.yaml");
 const PATHS: &str = include_str!("../../../src/roadstyle/data/basemap/paths.yaml");
 const CARTO: &str = include_str!("../../../src/roadstyle/data/basemap/osm_carto.yaml");
+const BASEMAPS: &str = include_str!("../../../src/roadstyle/data/basemaps.json");
 /// the themes other than "osm" (osm_carto.yaml as it is), by name
 const THEMES: [(&str, &str); 3] = [
     ("google", include_str!("../../../src/roadstyle/data/basemap/themes/google.yaml")),
@@ -341,6 +342,21 @@ pub fn base_map(b: &BaseMap) -> Result<BaseMapLook, Error> {
     // boxes as mapstyle's page did
     args.insert("modes".into(), json!(["driving", "walking", "cycling"]));
     args.insert("box_layout".into(), "stack".into());
+    // the page's base map is blank (the map is the file's own layers), in the theme's land colour when the theme has one; the raster maps
+    // stay in the switcher (mapstyle's render_map)
+    let bg = match th["background"].as_str() {
+        None => json!("blank"),
+        Some(c) => {
+            let all: Value = serde_json::from_str(BASEMAPS).expect("data/basemaps.json is JSON");
+            let mut e = all["basemaps"].as_array().and_then(|l| l.iter().find(|b| b["key"] == "blank")).cloned().expect("basemaps.json has blank");
+            e["key"] = format!("blank_{}", b.theme).into();
+            e["label"] = format!("Blank ({})", b.theme).into();
+            e["bg"] = c.into();
+            e
+        }
+    };
+    args.insert("basemaps".into(), json!([bg, "voyager_nolabels", "voyager", "positron", "osm", "satellite"]));
+    args.insert("basemap".into(), bg);
     if spec.get("lanes") == Some(&Value::Bool(false)) {          // one centred line for each road
         args.insert("offset_frac".into(), 0.into());
         args.insert("width_frac".into(), 1.into());

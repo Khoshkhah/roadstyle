@@ -103,6 +103,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
   has the key: a casing piece has no `__rs_fill@<palette>: null` any more. The map does not change.
 
 ### Added
+- **`roadstyle.duckosm.page(db, mode, ...)`: mapstyle's `render_map` on the Rust engine.** The page of a duckOSM file: its roads, its
+  base map and the shared dashboard with the base map's controls (modes, kinds, each layer's clicks, tooltip and popup). The keywords of
+  render_map: `theme`, `paths`, `layers`, `only`, `interaction` (a layer's start `{clickable, tooltip, popup}`; a layer that the map does
+  not have is a warning) and `dashboard=True` (the report page with the colour option "Modes"); the others are render_edges' keywords.
+  The base map's look gives the page its base map: blank, in the theme's land colour, with the raster maps in the switcher. The route
+  planner stays mapstyle's. In Rust, `page_options::page_from` takes the base map's rows (`features`), and so do the Python binding's
+  `page_from` and the browser's `makePage`.
 - **What the dashboard needs to draw a duckOSM map's page** (for its port of mapstyle's page scripts): the base map's look bakes the
   restricted roads' colour (private, bus, pedestrian, delivery) into every colour option's fill (`access_col: "access"`; mapstyle's
   `layers.js` painted the same colours on the page); `roadstyle:controls.modes` gives the map's modes with their counts of roads

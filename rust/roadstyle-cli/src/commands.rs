@@ -125,7 +125,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
             })?;
             let look = roadstyle::Look::resolve(&o)?;
             let roads = roadstyle::read::read_roads(read(roads)?, "geometry")?;
-            let page = roadstyle::page_options::page_from(roads, &look, &o, &given)?;
+            let page = roadstyle::page_options::page_from(roads, None, &look, &o, &given)?;
             for w in &page.warnings {
                 eprintln!("warning: {w}");
             }

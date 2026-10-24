@@ -145,3 +145,30 @@ def test_the_plan_has_the_base_map_of_a_file_with_no_network(tmp_path):
     assert [lyr["name"] for lyr in plan["layers"]] == ["water"]
     with pytest.raises(ValueError, match="no <mode>.edges table"):
         duckosm.read(db, levels="tags")
+
+
+def test_the_page_of_a_duckosm_file(tmp_path):
+    """duckosm.page (mapstyle's render_map on the Rust engine): the page of the roads and the base map; render_map's interaction for a
+    layer that the map does not have is a warning; dashboard=True gives the roads the column `modes` of the colour option "Modes"."""
+    from roadstyle import duckosm
+
+    db = _tiny(tmp_path / "p.duckdb")
+    with pytest.warns(UserWarning, match="interaction: no layer nolayer on this map"):
+        page = duckosm.page(db, "driving", levels="tags", interaction={"nolayer": {"clickable": True}})
+    assert "rsDashboard" in page.html
+    out = tmp_path / "dash.html"
+    duckosm.page(db, "driving", levels="tags", dashboard=True).save(str(out))
+    assert out.stat().st_size > 1000
+
+
+def test_the_modes_column_names_the_modes_of_each_road():
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from roadstyle import duckosm
+
+    t = pa.table({"driving": [True, True, False, False], "walking": [True, True, True, False], "cycling": [True, False, True, False]})
+    buf = io.BytesIO()
+    pq.write_table(t, buf)
+    got = pq.read_table(io.BytesIO(duckosm._with_modes(buf.getvalue()))).column("modes").to_pylist()
+    assert got == ["all modes", "driving + walking", "walking + cycling", ""]

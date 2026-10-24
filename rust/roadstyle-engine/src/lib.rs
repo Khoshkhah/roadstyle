@@ -104,7 +104,7 @@ fn style_parts(table: RoadTable, look: &Look, features: Option<FeatureTable>, pl
         let mut tables = features::feature_tables(&f, look)?;
         drop(f);
         let attached = overlays::edge_attach(&mut tables, &feats)?;
-        (ovs, images) = overlays::feature_overlays(tables, look, &attached);
+        (ovs, images) = overlays::feature_overlays(tables, look, &attached, &mut feats.warnings);
     }
     // render's overlays=: the caller's own, after the base map's (each knows the roads' id column, for its error)
     let first_user = ovs.len();

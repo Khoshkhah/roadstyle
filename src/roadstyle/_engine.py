@@ -405,11 +405,7 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
     R3): the roads' style (state "live"), the base map, the views and their palettes, the dashboard's options and the page. ``tiles=True``:
     the roads, their pieces and their names in an embedded PMTiles archive. Python gives what only it knows: the data steps (include,
     exclude, levels_db), the look's options, and the keys (base maps, Google Maps)."""
-    import dataclasses
-
-    from . import _settings as _s
     from . import render_web as rw
-    from . import use_settings as _use
     from .edges import as_edges
     from .filters import filter_edges
 
@@ -431,9 +427,21 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
         kwargs = {**kwargs, **level_kw}
     lk, o = _look_and_options({**kwargs, "palette": palette, "profile": profile, "settings": settings, "highway_col": highway_col,
                                "state": "live"})
-    # what only Python knows (roadstyle::page_options makes the rest of the page): the Google Maps key of the environment, and each base
-    # map key with its API key of roadstyle.json, of set_api_key or of the environment (basemaps.get_api_key, by provider), in force with
-    # the settings of the call as render_edges applies them
+    html = rust().page_from(_geoparquet(g), lk, json.dumps(o), json.dumps(page_given(kwargs, palette, profile, settings)))
+    _warn()
+    return rw.WebMap(html)
+
+
+def page_given(kwargs, palette=None, profile=None, settings=None) -> dict:
+    """What only Python knows of a page (roadstyle::page_options makes the rest): the Google Maps key of the environment, and each base
+    map key with its API key of roadstyle.json, of set_api_key or of the environment (basemaps.get_api_key, by provider), in force with
+    the settings of the call as render_edges applies them."""
+    import dataclasses
+
+    from . import _settings as _s
+    from . import render_web as rw
+    from . import use_settings as _use
+
     a = {k: kwargs.get(k) for k in ("basemap", "basemaps", "api_key", "street_view_key")}
     pick = {k: v for k, v in (("profile", profile), ("palette", palette)) if v is not None and v != _s.theme()["active"][k]
             and (k == "profile" or v in _s.style_names("palettes"))}
@@ -442,14 +450,11 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
     try:
         _use(*prev, *srcs)
         from .basemaps import DEFAULT_SWITCHER, get_basemap
-        keys = [k for k in dict.fromkeys([a["basemap"] or rw.CONFIG.basemap, *(a["basemaps"] or DEFAULT_SWITCHER)]) if isinstance(k, str)]
+        keys = list(dict.fromkeys(k for k in [a["basemap"] or rw.CONFIG.basemap, *(a["basemaps"] or DEFAULT_SWITCHER)] if isinstance(k, str)))
         resolved = [dataclasses.asdict(get_basemap(k, api_key=a["api_key"])) for k in keys]
     finally:
         _use(*prev)
-    given = {"resolved_basemaps": resolved, "street_view_key": a["street_view_key"] or os.environ.get("GOOGLE_MAPS_KEY") or None}
-    html = rust().page_from(_geoparquet(g), lk, json.dumps(o), json.dumps(given))
-    _warn()
-    return rw.WebMap(html)
+    return {"resolved_basemaps": resolved, "street_view_key": a["street_view_key"] or os.environ.get("GOOGLE_MAPS_KEY") or None}
 
 
 def _pmtiles(t, z0, z1, bounds, names) -> bytes:
