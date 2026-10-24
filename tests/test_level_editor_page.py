@@ -16,9 +16,22 @@ ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "src" / "roadstyle" / "static"
 PKG = STATIC / "level_editor" / "pkg" / "roadstyle_wasm.js"
 EDGES = ROOT / "rust" / "roadstyle-rs" / "tests" / "data" / "level_area" / "edges.parquet"
-pytestmark = pytest.mark.skipif(not PKG.exists(), reason="no editor wasm package (rust/roadstyle-wasm/build_editor.sh)")
+needs_pkg = pytest.mark.skipif(not PKG.exists(), reason="no editor wasm package (rust/roadstyle-wasm/build_editor.sh)")
 
 
+def test_the_panels_colour_variables_have_values():
+    """Each --lv-* variable that the panel (static/level_editor.html) uses is defined, and no definition is the variable itself (a loop
+    has no value: the segment buttons lost their background so, 2026-10-24)."""
+    import re
+
+    text = (STATIC / "level_editor.html").read_text()
+    defined = dict(re.findall(r"--(lv-[a-z0-9-]+):([^;}]*)", text))
+    used = set(re.findall(r"var\(--(lv-[a-z0-9-]+)", text))
+    assert used <= set(defined), used - set(defined)
+    assert not [k for k, v in re.findall(r"--(lv-[a-z0-9-]+):([^;}]*)", text) if f"var(--{k})" in v]
+
+
+@needs_pkg
 @pytest.mark.skipif(shutil.which("node") is None, reason="no node")
 def test_make_area_in_the_page_gives_the_folder_forms_files(tmp_path):
     import pyarrow.parquet as pq
@@ -134,6 +147,7 @@ class _Files(SimpleHTTPRequestHandler):
         pass
 
 
+@needs_pkg
 def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dashboard():
     pw = pytest.importorskip("playwright.sync_api")
     server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
