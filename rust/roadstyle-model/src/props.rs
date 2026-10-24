@@ -135,22 +135,45 @@ impl IntoIterator for Props {
     }
 }
 
-/// The properties that a style's drawing reads (tiles.py's tile_props): every text in its layers, the popup and tooltip fields of
-/// `roadstyle:interaction`, `name`, `kind` and the caller's `keep`. Every `__rs_*` property goes too, apart from this set.
-pub fn drawn(layers: &[Value], metadata: &Value, keep: &[String]) -> std::collections::HashSet<String> {
-    fn texts(v: &Value, out: &mut std::collections::HashSet<String>) {
-        match v {
-            Value::String(s) => {
-                out.insert(s.clone());
+/// The page's declaration (src/roadstyle/static/dashboard/reads.json): the properties that its dashboard modules read on a drawn
+/// feature (`pieces`) and on a row of the road table (`table`).
+pub const PAGE_READS: &str = include_str!("../../../src/roadstyle/static/dashboard/reads.json");
+
+/// The properties of a drawn feature that the page's modules read (PAGE_READS's `pieces`).
+pub fn page_reads() -> Vec<String> {
+    let v: Value = serde_json::from_str(PAGE_READS).expect("reads.json is JSON");
+    v["pieces"].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect()
+}
+
+/// The feature properties that the expressions of `v` read: `["get", name]` and `["has", name]` (the forms with an object, `["get",
+/// key, object]`, read the object). A read whose name is not a literal is in `unknown`.
+pub fn expression_reads(v: &Value, out: &mut std::collections::HashSet<String>, unknown: &mut Vec<Value>) {
+    match v {
+        Value::Array(a) => {
+            if a.len() == 2 && (a[0] == "get" || a[0] == "has") {
+                match &a[1] {
+                    Value::String(k) => drop(out.insert(k.clone())),
+                    other => unknown.push(other.clone()),
+                }
             }
-            Value::Array(a) => a.iter().for_each(|x| texts(x, out)),
-            Value::Object(o) => o.values().for_each(|x| texts(x, out)),
-            _ => {}
+            a.iter().for_each(|x| expression_reads(x, out, unknown));
         }
+        Value::Object(o) => o.values().for_each(|x| expression_reads(x, out, unknown)),
+        _ => {}
     }
-    let mut read: std::collections::HashSet<String> = keep.iter().cloned().chain(["name".to_string(), "kind".to_string()]).collect();
-    layers.iter().for_each(|l| texts(l, &mut read));
-    texts(&metadata["roadstyle:interaction"], &mut read);
+}
+
+/// The properties that a style's drawing reads (tiles.py's tile_props): the layers' expressions (`expression_reads`), the popup and
+/// tooltip fields of `roadstyle:interaction`, the page's modules (`page_reads`), `name`, `kind` and the caller's `keep`. Every `__rs_*`
+/// property goes too, apart from this set.
+pub fn drawn(layers: &[Value], metadata: &Value, keep: &[String]) -> std::collections::HashSet<String> {
+    let mut read: std::collections::HashSet<String> = keep.iter().cloned().chain(["name".to_string(), "kind".to_string()]).chain(page_reads()).collect();
+    let mut unknown = Vec::new();
+    layers.iter().for_each(|l| expression_reads(l, &mut read, &mut unknown));
+    let i = &metadata["roadstyle:interaction"];
+    for k in ["popup", "tooltip"] {
+        read.extend(i[k].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from));
+    }
     read
 }
 
