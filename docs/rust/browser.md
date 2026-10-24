@@ -50,8 +50,10 @@ Serve the folder over http. A module script does not load from a `file://` addre
 | `tiler.tile("roads", z, x, y)` | `Uint8Array` | one vector tile; empty when no road is in it |
 | `tiler.props("roads", row)` | JSON text | the properties of one road, or `null` |
 | `tiler.archive(bounds, layers)` | `Uint8Array` | a PMTiles archive of all tiles in `[min lon, min lat, max lon, max lat]` |
-| `makePage(roads, look, options, given?)` | HTML text | the whole page, as `render_edges` writes it |
+| `makePage(roads, look, options, given?, features?)` | HTML text | the whole page, as `render_edges` writes it |
 | `exportLook(look, cols, positions)` | JSON text | the look for another app's data layer (as `export_look`) |
+| `makeArea(edges, options?)` | an `AreaFiles` | a level area's files in memory ([The level editor in a page](#the-level-editor-in-a-page)) |
+| `new LevelArea(roads, pairs)` | a `LevelArea` | the level editor's solver on an area (`solve`, `solveLocal`, `check`, `draw`, `levelsCsv`) |
 | `memoryBytes()` | number | the size of the module's memory, in bytes |
 
 `roads` is the bytes of a GeoParquet file: the geometry as WKB in EPSG:4326, and the columns of
@@ -229,6 +231,47 @@ const html = makePage(roads, resolveLook(options), options)
 
 `given` (JSON text) holds what only the host knows: `api_key` (the key of a CARTO base map), `street_view_key`, and
 `resolved_basemaps` (base map entries in the form of `data/basemaps.json`). The warnings of the stages go to `console.warn`.
+
+## The level editor in a page
+
+A page with no server can hold roadstyle's level editor: the page makes the area, the solver runs in the page, and the browser keeps
+your changes.
+
+1. Make the area's edges. For a duckOSM file, `duckosmPlan(...)` gives the query `"level_edges"`: run it with duckdb-wasm and write
+   it as Parquet (`COPY (...) TO 'edges.parquet' (FORMAT parquet)`). It is the input of `duckosm levels`: one row for each `edge_id` of
+   every mode's `edges` and `private_edges`, with `highway`, `layer`, `bridge`, `tunnel`, `walk_type`, `junction`, `name`, `edge_ref`,
+   `lanes`, `driving`, `cycling`, `oneway` (the driving network's), `modes`, `bus_lines` and the line as WKB in `geometry`. The stored
+   levels of `visualization.edge_levels` are for these edges.
+2. Make the area's files with `makeArea(edges, options)`. `options` is JSON text with the keywords of `make_area`, each optional:
+   `id_col` (default `edge_id`), `highway_col`, `layer_col`, `bridge_col`, `tunnel_col`, `junction_col`, `band_col`, `order`
+   (`"priority"`, `"class"`, a column or `null`), `band_dist`, `head_m`, `near_rules`, and `heads` (the text of heads.csv). It gives
+   `roads` (roads.parquet), `pairs` and `edits` (pairs.csv and an empty edits.csv), `roadCount`, `pairCount` and `warnings`.
+3. Keep them in a store and start the editor:
+
+```js
+import init, * as pkg from "roadstyle-wasm";
+import {levelEditor, browserStore} from "roadstyle/static/dashboard/editor/level_editor.js";
+
+await init();
+const a = pkg.makeArea(edges, JSON.stringify({id_col: "edge_id"}));
+const store = browserStore("monaco", "Monaco");          // localStorage for the texts, the private file system for roads.parquet
+for (const [n, v] of [["roads.parquet", a.roads], ["pairs.csv", a.pairs], ["edits.csv", a.edits]]) await store.save(n, v);
+const editor = await levelEditor({map, container: document.getElementById("panel"), pkg, store});
+editor.addEventListener("solved", (e) => apply(e.detail.levelsCsv, e.detail.draw()));
+```
+
+`levelEditor({map, container, pkg, store})` draws the area on `map` (your MapLibre map; without it, a map of its own in `container`)
+and puts the editor's panel in `container`. Its tiles have the protocol `lv://`, apart from yours. A page has one dashboard (its state
+is the module's): when your map has one, give it as `levelEditor({..., dashboard, prefix})` with the prefix it was made with. The editor
+then takes your roads off the map (the layers of the roles in your style's `roadstyle:sources`; your base map stays), draws its roads
+with your prefix and gives your dashboard its style. Without a dashboard of yours, the editor makes one with the prefix `lv-rs-`; when
+the page has one and you do not give it, `levelEditor` throws an error. `editor.destroy()` closes the editor: it takes off its panel,
+its listeners, its roads, tiles and images, and puts your roads, your road table and your dashboard's style back. Your files stay in
+the store. A store is `{load(name, bytes), save(name, data)}`: `browserStore(key)` keeps the files
+in this browser, `httpStore(base)` uses `roadstyle serve`. After each solve the editor sends the event `"solved"` with `levelsCsv`
+(one row for each edge: its four drawing numbers, its head lengths and its caps), `levelsInfo` and `draw()` (the map's table,
+GeoParquet). `editor.download(name)` downloads edits.csv, heads.csv, caps.csv or levels.csv as they are now. The module needs the
+files of `static/` beside it: `dashboard/` with its subfolders, `level_editor.html` (the panel), `dashboard.css` and `popup.css`.
 
 ## Keep the main thread free
 

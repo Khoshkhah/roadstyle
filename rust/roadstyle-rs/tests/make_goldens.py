@@ -4,7 +4,7 @@ with. Run it in the conda environment roadstyle (roadstyle from this repository'
 
     python rust/roadstyle-rs/tests/make_goldens.py cmaps colors looks monaco sodermalm tartu
 
-- cmaps: rust/roadstyle-look/src/cmaps.json, the colour ramps that colors.py reads from branca and matplotlib (branca's schemes and colour names, each
+- cmaps: src/roadstyle/data/cmaps.json, the colour ramps of both engines (colors.py and roadstyle-look read it), from branca and matplotlib (branca's schemes and colour names, each
   matplotlib colormap at 9 stops).
 - colors: tests/data/monaco_part/ (tests/colors.rs): the roads of Monaco in a box around Monte Carlo, and for each case of data colour
   <case>.json.gz = {"args", "style": export_inline's style, "color_options": the page's colour options (render_web's __COLOR_OPTIONS__)}.
@@ -20,7 +20,6 @@ with. Run it in the conda environment roadstyle (roadstyle from this repository'
 import base64
 import gzip
 import json
-import re
 import sys
 import warnings
 from pathlib import Path
@@ -66,7 +65,7 @@ def write_cmaps():
     css = json.loads(Path(root, "_cnames.json").read_text())
     mpl = {n: [mcolors.to_hex(matplotlib.colormaps[n](i / 8.0)) for i in range(9)] for n in sorted(matplotlib.colormaps)}
     out = {"versions": {"branca": branca.__version__, "matplotlib": matplotlib.__version__}, "branca": schemes, "css": css, "matplotlib": mpl}
-    Path(__file__).resolve().parents[2].joinpath("roadstyle-look", "src", "cmaps.json").write_text(json.dumps(out, separators=(",", ":")))
+    Path(__file__).resolve().parents[3].joinpath("src", "roadstyle", "data", "cmaps.json").write_text(json.dumps(out, separators=(",", ":")))
 
 def write_colors():
     look = json.loads((DATA / "look.json").read_text())
@@ -83,7 +82,8 @@ def write_colors():
         style = rs.export_inline(part, palette=look["palette"], settings=look["settings"], **kw, **o)
         page = rs.render_edges(part, backend="web", palette=look["palette"], settings=look["settings"], **kw, **o)
         html = page if isinstance(page, str) else getattr(page, "html", None) or page.data
-        meta = json.loads(re.search(r"\n\s*color_options: (.*?),\n", html).group(1))     # the page's colour options (render_web: __COLOR_OPTIONS__)
+        at = html.index("const RS_OPTIONS = ") + len("const RS_OPTIONS = ")
+        meta = json.JSONDecoder().raw_decode(html, at)[0]["color_options"]     # the page's colour options (RS_OPTIONS)
         (out / f"{name}.json.gz").write_bytes(gzip.compress(json.dumps({"args": o, "style": style, "color_options": meta},
                                                                        separators=(",", ":")).encode(), 9, mtime=0))
         feats = style["sources"]["roads"]["data"]["features"]
@@ -242,7 +242,6 @@ def write_area(area):
 def write_level_area():
     """tests/data/level_area/ (tests/level_area.rs): a level area of the roads of Monaco in BOX (edges.parquet, make's input; make_area:
     roads.parquet, pairs.csv), and checks.json: rules to add, and what roadstyle's rule_conflicts says of each (its index and why)."""
-    import pandas as pd
 
     from roadstyle.level_area import make_area
     from roadstyle.levels import rule_conflicts
@@ -269,7 +268,7 @@ def main():
     parts = sys.argv[1:] or ["cmaps", "colors", "looks", "monaco", "sodermalm"]
     warnings.simplefilter("ignore", DeprecationWarning)
     for p in parts:
-        {"cmaps": write_cmaps, "colors": write_colors, "looks": write_looks, "level_area": write_level_area}.get(p, lambda: write_area(p))()
+        {"cmaps": write_cmaps, "colors": write_colors, "looks": write_looks, "level_area": write_level_area}.get(p, lambda p=p: write_area(p))()
 
 if __name__ == "__main__":
     main()

@@ -67,7 +67,7 @@ mod wasm {
         /// Look.fromJson(text): a saved look (version 1 or 0). An error is a thrown Error.
         #[wasm_bindgen(js_name = fromJson)]
         pub fn from_json(text: &str) -> Result<JsLook, JsError> {
-            roadstyle::Look::from_json(text).map(JsLook).map_err(|e| JsError::new(&e))
+            roadstyle::Look::from_json(text).map(JsLook).map_err(|e| JsError::new(&e.to_string()))
         }
 
         /// toJson(): the look's text (version 1).
@@ -82,7 +82,7 @@ mod wasm {
     #[wasm_bindgen(js_name = resolveLook)]
     pub fn resolve_look(options: &str) -> Result<JsLook, JsError> {
         let o: serde_json::Value = serde_json::from_str(options).map_err(|e| JsError::new(&format!("options: not JSON: {e}")))?;
-        roadstyle::look::Options::from_value(&o).and_then(|o| roadstyle::Look::resolve(&o)).map(JsLook).map_err(|e| JsError::new(&e))
+        roadstyle::look::Options::from_value(&o).and_then(|o| roadstyle::Look::resolve(&o)).map(JsLook).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// rampStops(cmap: string, n: number) -> string[]: `n` colours ("#rrggbb") at even steps along a ramp (render_edges' cmap: a branca
@@ -95,13 +95,68 @@ mod wasm {
         } else {
             cmap.into()
         };
-        roadstyle::look::Ramp::new(&c).map(|r| r.stops(n)).map_err(|e| JsError::new(&e))
+        roadstyle::look::Ramp::new(&c).map(|r| r.stops(n)).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// makeStyle(roads: Uint8Array, look: Look, features?: Uint8Array, planner?: Uint8Array, name?: string) -> string; an error is a thrown Error.
     #[wasm_bindgen(js_name = makeStyle)]
     pub fn make_style(parquet: Vec<u8>, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, JsError> {
         roadstyle::make_style(parquet, &look.0, features, planner, name).map_err(|e| JsError::new(&e))
+    }
+
+    /// makeArea(edges: Uint8Array, options?: string) -> AreaFiles: a level area's files in memory (roadstyle::level_area::make_files), for
+    /// a page with no server: `edges` is GeoParquet of the area's edges (the line in `geometry`, longitude and latitude; a duckOSM file's:
+    /// duckosmPlan's "level_edges"); `options` the JSON text of {"id_col", "highway_col", "layer_col", "bridge_col", "tunnel_col",
+    /// "junction_col", "band_col", "order" ("priority", "class", a column, or null), "band_dist", "head_m", "near_rules", "heads" (heads.csv
+    /// text)}, each optional (make_area's defaults).
+    #[wasm_bindgen(js_name = makeArea)]
+    pub fn make_area(edges: Vec<u8>, options: Option<String>) -> Result<AreaFiles, JsError> {
+        let o: serde_json::Value = serde_json::from_str(options.as_deref().unwrap_or("{}")).map_err(|e| JsError::new(&format!("options: {e}")))?;
+        let d = roadstyle::level_area::MakeOptions::default();
+        let text = |k: &str, d: String| o[k].as_str().map_or(d, String::from);
+        let num = |k: &str, d: f64| o[k].as_f64().unwrap_or(d);
+        let m = roadstyle::level_area::MakeOptions {
+            id_col: text("id_col", d.id_col), highway_col: text("highway_col", d.highway_col), layer_col: text("layer_col", d.layer_col),
+            bridge_col: text("bridge_col", d.bridge_col), tunnel_col: text("tunnel_col", d.tunnel_col), junction_col: text("junction_col", d.junction_col),
+            band_col: o["band_col"].as_str().map(String::from),
+            order: if o.get("order").is_some() { o["order"].as_str().filter(|v| *v != "none").map(String::from) } else { d.order },
+            band_dist: num("band_dist", d.band_dist), head_m: num("head_m", d.head_m), near_rules: o["near_rules"].as_bool().unwrap_or(d.near_rules),
+        };
+        let table = roadstyle::read::read_roads(edges, "geometry").map_err(|e| JsError::new(&e.to_string()))?;
+        roadstyle::level_area::make_files(&table, &m, o["heads"].as_str().unwrap_or("")).map(AreaFiles).map_err(|e| JsError::new(&e))
+    }
+
+    /// A level area's files (makeArea): `roads` (roads.parquet's bytes, for new LevelArea), `pairs` and `edits` (pairs.csv and an empty
+    /// edits.csv), the numbers of roads and pairs, and the warnings.
+    #[wasm_bindgen]
+    pub struct AreaFiles(roadstyle::level_area::AreaFiles);
+
+    #[wasm_bindgen]
+    impl AreaFiles {
+        #[wasm_bindgen(getter)]
+        pub fn roads(&self) -> Vec<u8> {
+            self.0.roads.clone()
+        }
+        #[wasm_bindgen(getter)]
+        pub fn pairs(&self) -> String {
+            self.0.pairs.clone()
+        }
+        #[wasm_bindgen(getter)]
+        pub fn edits(&self) -> String {
+            self.0.edits.clone()
+        }
+        #[wasm_bindgen(getter, js_name = roadCount)]
+        pub fn road_count(&self) -> usize {
+            self.0.made.roads
+        }
+        #[wasm_bindgen(getter, js_name = pairCount)]
+        pub fn pair_count(&self) -> usize {
+            self.0.made.pairs
+        }
+        #[wasm_bindgen(getter)]
+        pub fn warnings(&self) -> Vec<String> {
+            self.0.made.warnings.clone()
+        }
     }
 
     /// The level editor in the page (roadstyle::level_editor): new LevelArea(roads.parquet of the area, pairs.csv text). Each answer is JSON
@@ -117,12 +172,12 @@ mod wasm {
         }
         /// The whole solve with the edits (edits.csv text).
         pub fn solve(&mut self, edits: &str) -> Result<String, JsError> {
-            self.0.solve(edits).map_err(|e| JsError::new(&e))
+            self.0.solve(edits).map(|a| a.to_json().to_string()).map_err(|e| JsError::new(&e))
         }
         /// The solve after a change that names the roads of `changed` (edge ids): the roads around it, else the whole area.
         #[wasm_bindgen(js_name = solveLocal)]
         pub fn solve_local(&mut self, edits: &str, changed: Vec<String>) -> Result<String, JsError> {
-            self.0.solve_local(edits, &changed).map_err(|e| JsError::new(&e))
+            self.0.solve_local(edits, &changed).map(|a| a.to_json().to_string()).map_err(|e| JsError::new(&e))
         }
         /// The answer to start from (levels.csv, levels_info.json): 4 numbers for each road; the given-up parts as "upper|lower|part".
         #[wasm_bindgen(js_name = startFrom)]
@@ -136,7 +191,7 @@ mod wasm {
         }
         /// The check before rules are added (rows: CSV text with a header): [[index, why, [rule rows]]].
         pub fn check(&self, edits: &str, rows: &str) -> Result<String, JsError> {
-            self.0.check(edits, rows).map_err(|e| JsError::new(&e))
+            self.0.check(edits, rows).map(|c| roadstyle::level_editor::conflicts_json(&c).to_string()).map_err(|e| JsError::new(&e))
         }
         /// What the panel shows of each road, a list in the roads' order.
         pub fn facts(&self) -> String {
@@ -162,20 +217,21 @@ mod wasm {
     /// makePage(roads: Uint8Array, look: Look, options: string, given?: string) -> string: the page of the roads (GeoParquet) in one
     /// call, as render_edges(backend="web") (roadstyle::page_options::page_from; MapLibre stays a placeholder). `look`: resolveLook's of
     /// `options` (its JSON text, which a view's palette resolves again), with "state": "live" in its args; `given`: the caller's values
-    /// over the look's args (JSON text: api_key, street_view_key, resolved_basemaps).
+    /// over the look's args (JSON text: api_key, street_view_key, resolved_basemaps); `features`: a duckOSM map's base map (Parquet bytes).
     #[wasm_bindgen(js_name = makePage)]
-    pub fn make_page(roads: Vec<u8>, look: &JsLook, options: &str, given: Option<String>) -> Result<String, JsError> {
-        page_of(roadstyle::read::read_roads(roads, "geometry").map_err(|e| JsError::new(&e))?, look, options, given)
+    pub fn make_page(roads: Vec<u8>, look: &JsLook, options: &str, given: Option<String>, features: Option<Vec<u8>>) -> Result<String, JsError> {
+        page_of(roadstyle::read::read_roads(roads, "geometry").map_err(|e| JsError::new(&e.to_string()))?, features, look, options, given)
     }
 
     /// makePage and Roads.page: the page of read roads.
-    fn page_of(roads: roadstyle::RoadTable, look: &JsLook, options: &str, given: Option<String>) -> Result<String, JsError> {
+    fn page_of(roads: roadstyle::RoadTable, features: Option<Vec<u8>>, look: &JsLook, options: &str, given: Option<String>) -> Result<String, JsError> {
         let o: roadstyle::look::Options = serde_json::from_str(options).map_err(|e| JsError::new(&format!("options: {e}")))?;
         let given: serde_json::Map<String, serde_json::Value> = match given {
             Some(g) => serde_json::from_str(&g).map_err(|e| JsError::new(&format!("given: {e}")))?,
             None => serde_json::Map::new(),
         };
-        let page = roadstyle::page_options::page_from(roads, &look.0, &o, &given).map_err(|e| JsError::new(&e))?;
+        let features = features.map(roadstyle::read_features).transpose().map_err(|e| JsError::new(&e))?;
+        let page = roadstyle::page_options::page_from(roads, features, &look.0, &o, &given).map_err(|e| JsError::new(&e))?;
         page.warnings.iter().for_each(|w| console_warn(w));
         Ok(page.html)
     }
@@ -298,27 +354,27 @@ mod wasm {
             self.0.names().to_vec()
         }
 
-        /// page(look, options, given?): the page of these roads in one call, as makePage (its arguments after the roads).
-        pub fn page(&self, look: &JsLook, options: &str, given: Option<String>) -> Result<String, JsError> {
-            page_of(self.0.clone(), look, options, given)
+        /// page(look, options, given?, features?): the page of these roads in one call, as makePage (its arguments after the roads).
+        pub fn page(&self, look: &JsLook, options: &str, given: Option<String>, features: Option<Vec<u8>>) -> Result<String, JsError> {
+            page_of(self.0.clone(), features, look, options, given)
         }
 
         /// sources(look, features?, planner?, name?): stage 1 of these roads, as makeSources; `features` and `planner` are Parquet bytes.
         pub fn sources(&self, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<Sources, JsError> {
             let err = |e: String| JsError::new(&e);
             let features = features.map(roadstyle::read_features).transpose().map_err(err)?;
-            let planner = planner.map(|p| roadstyle::read::read_table(p, "")).transpose().map_err(err)?;
+            let planner = planner.map(|p| roadstyle::read::read_table(p, "")).transpose().map_err(String::from).map_err(err)?;
             roadstyle::sources_of(self.0.clone(), &look.0, features, planner, name).map(|inner| Sources { inner }).map_err(err)
         }
     }
 
     /// duckosmPlan(catalog, mode, tags, specs) -> string: the SQL that reads a duckOSM file (roadstyle-io's duckosm.rs, the one copy that
     /// Python runs too), as JSON text: {"catalog": the 2 queries of the catalog, "roads": 3 statements, "meta": the stored levels' query or
-    /// null, "select": the roads of `mode`, "layers": [{spec, name, sql: the
+    /// null, "select": the roads of `mode` ("roads" is null when the file has no network of `mode`: "roads_error" says why), "layers": [{spec, name, sql: the
     /// queries in order}]}. `catalog`: the JSON text of {"name", "tables":
     /// [[schema, table]], "columns": [[schema, table, column]]} (with no tables: only "catalog" is in the answer); `specs`: layers.yaml's
     /// layers as JSON text. `only`: the map of `mode` alone; then "subset" has the queries of its roads with no stored levels and
-    /// of its edge_ids (for duckosmSubsetLevels).
+    /// of its edge_ids (for duckosmSubsetLevels). "level_edges": the edges of the file's level area (duckosm::level_edges_sql), for makeArea.
     #[wasm_bindgen(js_name = duckosmPlan)]
     pub fn duckosm_plan(catalog: &str, mode: &str, tags: bool, specs: &str, only: Option<bool>) -> Result<String, JsError> {
         let only = only.unwrap_or(false);
@@ -336,9 +392,15 @@ mod wasm {
         let specs: Vec<serde_json::Value> = serde_json::from_str(specs).map_err(|e| err(format!("specs: {e}")))?;
         let layers: Vec<serde_json::Value> = duckosm::features_sql(&cat, &specs).into_iter()
             .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "sql": l.sql})).collect();
-        Ok(serde_json::json!({"catalog": queries, "roads": duckosm::roads_sql(&cat, tags, only.then_some(mode)).map_err(err)?, "meta": (!tags).then_some(duckosm::LEVELS_META_SQL),
-                              "select": duckosm::roads_select(mode).map_err(err)?, "layers": layers,
-                              "subset": (only && !tags).then_some([duckosm::SUBSET_SQL, duckosm::IDS_SQL])}).to_string())
+        // the base map's queries also for a file with no network: then "roads" is null and "roads_error" says why
+        let (roads, roads_error) = match duckosm::roads_sql(&cat, tags, only.then_some(mode)) {
+            Ok(r) => (Some(r), None),
+            Err(e) => (None, Some(e)),
+        };
+        Ok(serde_json::json!({"catalog": queries, "roads": roads, "roads_error": roads_error, "meta": (!tags).then_some(duckosm::LEVELS_META_SQL),
+                              "select": duckosm::roads_select(mode).map_err(String::from).map_err(err)?, "layers": layers,
+                              "subset": (only && !tags).then_some([duckosm::SUBSET_SQL, duckosm::IDS_SQL]),
+                              "level_edges": duckosm::level_edges_sql(&cat).ok()}).to_string())
     }
 
     /// duckosmLevels(source?, nEdges?, edgeHash?) -> string: the look's keyword `levels` (JSON text) from the stored levels' metadata row
@@ -349,7 +411,7 @@ mod wasm {
             (Some(s), Some(n), Some(h)) => Some((s.as_str(), n as i64, h.as_str())),
             _ => None,
         };
-        roadstyle::duckosm::levels_keyword(row).map(|v| v.to_string()).map_err(|e| JsError::new(&e))
+        roadstyle::duckosm::levels_keyword(row).map(|v| v.to_string()).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// duckosmSubsetLevels(source?, nEdges?, edgeHash?, missing, example?, ids) -> string: the look's keyword `levels` (JSON text) for a map
@@ -361,7 +423,7 @@ mod wasm {
             (Some(s), Some(n), Some(h)) => Some((s.as_str(), n as i64, h.as_str())),
             _ => None,
         };
-        roadstyle::duckosm::subset_levels_keyword(row, missing as i64, example, &ids).map(|v| v.to_string()).map_err(|e| JsError::new(&e))
+        roadstyle::duckosm::subset_levels_keyword(row, missing as i64, example, &ids).map(|v| v.to_string()).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// duckosmFeaturesSelect(specs: number[]) -> string | undefined: the base map's rows from the tables f<spec> that were made.
@@ -374,21 +436,21 @@ mod wasm {
     /// reads it). An error is a thrown Error.
     #[wasm_bindgen(js_name = readGeoParquet)]
     pub fn read_geoparquet(bytes: Vec<u8>) -> Result<Roads, JsError> {
-        roadstyle::read::read_roads(bytes, "geometry").map(Roads).map_err(|e| JsError::new(&e))
+        roadstyle::read::read_roads(bytes, "geometry").map(Roads).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// readGeoJson(bytes: Uint8Array) -> Roads: the roads of a GeoJSON file (a FeatureCollection in EPSG:4326; roadstyle-io's geojson.rs
     /// says how each property becomes a column). An error is a thrown Error.
     #[wasm_bindgen(js_name = readGeoJson)]
     pub fn read_geojson(bytes: &[u8]) -> Result<Roads, JsError> {
-        roadstyle::geojson::read_roads(bytes).map(Roads).map_err(|e| JsError::new(&e))
+        roadstyle::geojson::read_roads(bytes).map(Roads).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// readShp(shp: Uint8Array, dbf: Uint8Array, prj?: string, name?: string) -> Roads: the roads of a Shapefile, in EPSG:4326 (roadstyle-io's
     /// shp.rs; no prj: no CRS, an error). A GeoPackage is not read here: SQLite is C (the native programs read it). An error is a thrown Error.
     #[wasm_bindgen(js_name = readShp)]
     pub fn read_shp(shp: &[u8], dbf: &[u8], prj: Option<String>, name: Option<String>) -> Result<Roads, JsError> {
-        roadstyle::shp::read_roads(shp, dbf, prj.as_deref(), name.as_deref().unwrap_or("the Shapefile")).map(Roads).map_err(|e| JsError::new(&e))
+        roadstyle::shp::read_roads(shp, dbf, prj.as_deref(), name.as_deref().unwrap_or("the Shapefile")).map(Roads).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// tileSources(sources, prefix, keep): stage 2 from memory (the typed pieces, no GeoJSON text; the sources stay as they are). The

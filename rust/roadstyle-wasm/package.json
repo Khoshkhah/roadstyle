@@ -17,7 +17,7 @@
   "files": ["index.js", "index.d.ts", "roads_sql.d.ts", "features_sql.d.ts", "pkg/roadstyle_wasm.js", "pkg/roadstyle_wasm.d.ts",
             "pkg/roadstyle_wasm_bg.wasm", "pkg/roadstyle_wasm_bg.wasm.d.ts", "js/roads_sql.js", "js/features_sql.js", "README.md"],
   "scripts": {
-    "build": "cargo build --release --target wasm32-unknown-unknown --manifest-path ../Cargo.toml -p roadstyle-wasm && wasm-bindgen --target web --out-dir pkg ../target/wasm32-unknown-unknown/release/roadstyle_wasm.wasm",
+    "build": "cargo build --profile dist --target wasm32-unknown-unknown --manifest-path ../Cargo.toml -p roadstyle-wasm && wasm-bindgen --target web --out-dir pkg ../target/wasm32-unknown-unknown/dist/roadstyle_wasm.wasm",
     "prepack": "test -f pkg/roadstyle_wasm_bg.wasm || (echo 'roadstyle-wasm: run npm run build first (pkg/ is missing)' >&2; exit 1)"
   },
   "keywords": ["maplibre", "roads", "vector-tiles", "webassembly", "osm"]

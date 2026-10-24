@@ -1,6 +1,7 @@
 //! The road width model (render_web's _load_road_model: the look's "roads_model" and the theme's roads): the width of each class
 //! by zoom, its draw order and its two-way split. The engine builds the MapLibre expressions from it (roadstyle-engine `layers::Exprs`).
 
+use crate::Error;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 
@@ -30,30 +31,30 @@ pub struct RoadModel {
     pub fb_link_order: f64,
 }
 
-fn obj<'a>(v: &'a Value, what: &str) -> Result<&'a Map<String, Value>, String> {
-    v.as_object().ok_or_else(|| format!("look.json: no {what}"))
+fn obj<'a>(v: &'a Value, what: &str) -> Result<&'a Map<String, Value>, Error> {
+    v.as_object().ok_or_else(|| Error::Look(format!("look.json: no {what}")))
 }
 
-fn num(v: &Value, what: &str) -> Result<f64, String> {
-    v.as_f64().ok_or_else(|| format!("look.json: {what} is not a number"))
+fn num(v: &Value, what: &str) -> Result<f64, Error> {
+    v.as_f64().ok_or_else(|| Error::Look(format!("look.json: {what} is not a number")))
 }
 
 impl RoadModel {
     /// From the look's `roads_model`, the theme's `roads` and the map options `args` (render's offset_frac, width_frac, offset_zoom).
-    pub fn new(r: &Value, th: &Value, args: &Value) -> Result<RoadModel, String> {
+    pub fn new(r: &Value, th: &Value, args: &Value) -> Result<RoadModel, Error> {
         let mut width = HashMap::new();
         for (g, t) in obj(&r["width"], "roads_model.width")? {
             let mut stops: Vec<(f64, f64)> = obj(t, "a width table")?.iter()
-                .map(|(z, w)| Ok((z.parse::<f64>().map_err(|e| e.to_string())?, num(w, "a width")?))).collect::<Result<_, String>>()?;
+                .map(|(z, w)| Ok((z.parse::<f64>().map_err(|e| Error::Look(e.to_string()))?, num(w, "a width")?))).collect::<Result<_, Error>>()?;
             stops.sort_by(|a, b| a.0.total_cmp(&b.0));
             width.insert(g.clone(), stops);
         }
-        let floats = |v: &Value, what: &str| -> Result<HashMap<String, f64>, String> {
+        let floats = |v: &Value, what: &str| -> Result<HashMap<String, f64>, Error> {
             obj(v, what)?.iter().map(|(k, x)| Ok((k.clone(), num(x, what)?))).collect()
         };
         let group: Vec<(String, String)> = obj(&r["group"], "roads_model.group")?.iter()
             .map(|(c, g)| (c.clone(), g.as_str().unwrap_or_default().to_string())).collect();
-        let links: Vec<String> = r["links"].as_array().ok_or("look.json: no roads_model.links")?.iter()
+        let links: Vec<String> = r["links"].as_array().ok_or_else(|| Error::Look("look.json: no roads_model.links".into()))?.iter()
             .filter_map(|v| v.as_str().map(String::from)).collect();
         let classes = group.iter().map(|(c, _)| c.clone()).chain(links.iter().cloned()).collect();
         let split = &th["split"];
@@ -64,7 +65,7 @@ impl RoadModel {
             casing_ratio: floats(&r["casing_ratio"], "roads_model.casing_ratio")?,
             group,
             classes,
-            zstops: r["zoom_stops"].as_array().ok_or("look.json: no roads_model.zoom_stops")?.clone(),
+            zstops: r["zoom_stops"].as_array().ok_or_else(|| Error::Look("look.json: no roads_model.zoom_stops".into()))?.clone(),
             z_order: obj(&r["z_order"], "roads_model.z_order")?.clone(),
             link_w: num(&th["links"]["width"], "theme roads.links.width")?,
             // render(offset_frac=, width_frac=) over the theme's split: mapstyle passes 0 and 1 for a mode without lanes (one centred line per road)
@@ -72,7 +73,7 @@ impl RoadModel {
             width_frac: args["width_frac"].as_f64().map_or_else(|| num(&split["width_frac"], "split.width_frac"), Ok)?,
             offset_zoom: args["offset_zoom"].as_f64().map_or_else(|| num(&split["offset_zoom"], "split.offset_zoom"), Ok)?,
             ramp_zooms: num(&split["ramp_zooms"], "split.ramp_zooms")?,
-            fb_group: fb["group"].as_str().ok_or("look.json: no fallback group")?.to_string(),
+            fb_group: fb["group"].as_str().ok_or_else(|| Error::Look("look.json: no fallback group".into()))?.to_string(),
             fb_order: fb["order"].clone(),
             fb_link_order: num(&fb["link_order"], "fallback.link_order")?,
         })

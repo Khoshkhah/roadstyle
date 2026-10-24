@@ -1,0 +1,83 @@
+{
+  "keys": [
+    "name",
+    "columns",
+    "layers",
+    "symbols",
+    "images",
+    "hover",
+    "popup",
+    "head_m",
+    "hover_delay_ms",
+    "boundary"
+  ],
+  "layers": [
+    [
+      "casing--1",
+      "line",
+      null,
+      "c58d10ff415b96b1",
+      "ee09af85d5d32c33",
+      "f727aa2e7e3b6b42"
+    ],
+    [
+      "fill--1",
+      "line",
+      null,
+      "997da6e7f483ec69",
+      "05df2973aa577faa",
+      "f727aa2e7e3b6b42"
+    ],
+    [
+      "casing-0",
+      "line",
+      null,
+      "4017644fb16019e5",
+      "ee09af85d5d32c33",
+      "f727aa2e7e3b6b42"
+    ],
+    [
+      "fill-0",
+      "line",
+      null,
+      "c873bb3690df1941",
+      "05df2973aa577faa",
+      "f727aa2e7e3b6b42"
+    ],
+    [
+      "casing-1",
+      "line",
+      null,
+      "0cea513753e81652",
+      "ee09af85d5d32c33",
+      "f727aa2e7e3b6b42"
+    ],
+    [
+      "fill-1",
+      "line",
+      null,
+      "2c67dc39c31913ee",
+      "05df2973aa577faa",
+      "f727aa2e7e3b6b42"
+    ],
+    [
+      "casing-2",
+      "line",
+      null,
+      "0f107a0316d512da",
+      "ee09af85d5d32c33",
+      "f727aa2e7e3b6b42"
+    ],
+    [
+      "fill-2",
+      "line",
+      null,
+      "1b28f430925bf353",
+      "05df2973aa577faa",
+      "f727aa2e7e3b6b42"
+    ]
+  ],
+  "sources": {},
+  "metadata": {},
+  "hash": "b759be7f0749967a"
+}

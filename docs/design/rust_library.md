@@ -1145,8 +1145,9 @@ flowchart TB
 (13,298 roads), the Södermalm sample (4,563 driving edges, with duckOSM's solved levels) and Tartu (64,828 roads) it writes the roads-only
 style of `export_inline`, the tiles of `export_style` (the 3 x 3 tiles around the centre at zooms 12, 14 and 15) and the levels (the tags
 rule; the solve with duckOSM's level-area defaults, not for Tartu: Python's solve needs too much memory there). The files over 1 MB and
-Tartu's inputs are on the pre-release `rust-test-data` (`goldens-1.tar`, 42.5 MB); `tests/get_goldens.sh` gets them and checks their
-SHA-256. The colour cases and the looks of tasks 1 and 3 come from the same script. `tests/areas.rs` compares the engine with them.
+Tartu's inputs are on the pre-release `rust-test-data` (`goldens-2.tar`, 40.1 MB, made with the Python of 2026-10-24; `goldens-1.tar` of
+0.24.3 stays there for the older commits); `tests/get_goldens.sh` gets them and checks their SHA-256. The tests compare the engine with
+these goldens as they are (audit 3, N27: no test changes a golden). The colour cases and the looks of tasks 1 and 3 come from the same script. `tests/areas.rs` compares the engine with them.
 
 **Differences found and fixed** (the engine now does what Python does):
 
@@ -1287,6 +1288,41 @@ reads the static files from `src/roadstyle/` when it is built; a crates.io packa
 - **Packaging (audit 3, N25, 2026-10-24).** The crates read files from `src/roadstyle/` when they are built (the profiles, the palettes,
   the templates, the dashboard), so no crate can be published alone. P7's packaging gives the crates their own copy of these files, or
   one data crate.
+
+#### P7's CLI: one `roadstyle` program (audit N31, approved 2026-10-24)
+
+This plan waits for the target-architecture document.
+
+Two programs have the name `roadstyle` today, with two grammars:
+
+| | Python `roadstyle` (`cli.py`, argparse) | Rust `roadstyle` (`roadstyle-cli`, `commands.rs`) |
+|---|---|---|
+| Form | `roadstyle <input> [-o OUT] [-f web\|folium\|rsjs\|spec\|geojson] [options]`, no command | `roadstyle <command> <arguments> [--key VALUE] [--no-key]` |
+| The page | the default (`-f web`); OUT is the input's name with `.html` | `page <roads> <out.html>` |
+| Stage 1 and 2 | none (`-f geojson` is a styled GeoJSON, another output) | `sources <roads> <dir>`, `tiles <dir> <out>` |
+| Other outputs | `-f folium`, `rsjs`, `spec`, `geojson`; `roadstyle studio` (Streamlit) | `snapshot <page.html> <out.png>` |
+| The levels | a second program, `roadstyle-levels make\|solve\|edit` | `levels make\|solve`, `serve` (the editor) |
+| Inputs | any file that GeoPandas reads; `--layer` for a GeoPackage | `.parquet`, `.geojson`, `.shp`, `.gpkg` (the first feature table) |
+| Option syntax | short `-o` and `-f`, choices, lists as more words (`--include motorway trunk`, `--width-by 1 6`), named flags | one value for each option, JSON when it parses, `--no-<keyword>` is false, `-` is `_` |
+| Different names | `--no-filter`, `--tooltip`, `--page dashboard\|report\|street-view`, `--no-compress`, `--colors`, `--version` | each keyword of render by its own name (`--filter-control false`), `--sidebar dashboard` |
+
+The plan, in P7 (after the design steps). The Rust grammar is the design (decided 2026-10-24: the Rust version is the main library);
+Python's form stays only where it costs a few lines:
+
+1. The Rust program keeps its commands and grammar. It also takes the file-first form: when the first argument is a file and not a
+   command, the command is `page`, with `-o`/`--output` (default: the input's name with `.html`). No `-f`, no argparse-style lists
+   (`--include motorway trunk`): a list is one value, as JSON or with commas.
+2. Python's other option names are not aliases: the program's options are the keywords of render by their own names (`--filter-control
+   false`, `--road-tooltip '["name"]'`), and `--version` is added.
+3. `levels edit` is the editor's name (`serve` stays as an alias). The Rust solver's options come in their Rust names. A Python-only
+   option (`--query`/`--geometry` for a `.duckdb` source, `--engine`, `--items`) is an error that names the Python call that still has it.
+4. An output that only Python has (`-f folium`, `rsjs`, `spec`, `geojson`, `studio`, and a page that Rust does not make) is an error
+   that names the Python call that still makes it, for example `rs.render_folium(...)`.
+5. One program on PATH: the Python package's console script `roadstyle` calls the Rust program (`_rust.cli(argv)`, which runs
+   `commands::run`) for each command that Rust has, and keeps Python's code only for the outputs of step 4. `cargo install roadstyle-cli`
+   gives the same program. `roadstyle-levels` stays for one version as an alias of `roadstyle levels`, with a deprecation message.
+6. Tests: the program's own command lines (the Rust CLI tests) on Monaco, the file-first form against `page`, and one error test for each
+   output of step 4.
 
 #### The design queue (2026-10-23)
 
@@ -1614,6 +1650,14 @@ Later decisions:
 - 2026-10-24: P7 and 1.0 approved, on the condition that the coordinator reports the design steps done (R3, R1/R4, (d), (e), dead
   code, the third audit and its top items), with both engine suites and CI green. The publish of 1.0 waits for the owner's answer to
   that report.
+- 2026-10-24: **The Rust API is the design; Python is a thin binding.** The owner's words: "The aim is make this rust version the real
+  and main library instead of python version. So I need to make it independent. I don't want because wrong design of its python
+  version we have the same issues in rust version." So the rule "Python is the reference" ends: the Rust engine is not made to copy a
+  Python design, and byte parity with Python is no goal. The Python package adapts its keywords to the Rust types at its border. These
+  contracts stay fixed: duckOSM's `edge_id` hash and column names, the observation formats of sensor-matching and SonoFlow, and the
+  border formats (GeoJSON, GeoParquet, PMTiles). After N27 (the last check against Python), the goldens are made with the Rust engine,
+  and the parity tests become checks of the structure (layers, sources, metadata, road-table rows) plus one test that the Python
+  binding passes the data through unchanged.
 
 ## Found during the inventory
 

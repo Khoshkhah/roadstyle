@@ -86,6 +86,18 @@ fn levels_make_and_solve() {
     std::fs::remove_dir_all(&dir).ok();
 }
 
+/// The roads by the file's extension (audit N18): Södermalm's GeoPackage (EPSG:3006, reprojected), and an error for another file.
+#[test]
+fn levels_make_reads_a_geopackage() {
+    let dir = tmp("gpkg");
+    let gpkg = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../notebooks/data/sodermalm_edges.gpkg");
+    let said = roadstyle(&["levels", "make", &gpkg.to_string_lossy(), &dir.to_string_lossy()]);
+    assert!(said.starts_with("4563 edges"), "{said}");
+    let out = Command::new(env!("CARGO_BIN_EXE_roadstyle")).args(["levels", "make", "roads.csv", &dir.to_string_lossy()]).output().unwrap();
+    assert!(String::from_utf8_lossy(&out.stderr).contains("roads.csv: the roads must be a .parquet, .geojson, .shp or .gpkg file"));
+    std::fs::remove_dir_all(&dir).ok();
+}
+
 #[test]
 fn an_unknown_option_or_command_is_an_error() {
     let run = |args: &[&str]| Command::new(env!("CARGO_BIN_EXE_roadstyle")).args(args).output().unwrap();

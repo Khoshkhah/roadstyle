@@ -163,3 +163,22 @@ def test_look_for_a_data_layer(tmp_path):
     assert look["boundary"]["layers"][0]["paint"]["line-color"] == t["boundary"]["color"]
     assert look["hover"]["id"] == "edge_id" and look["hover"]["layers"][0]["paint"]["line-color"] == t["selection"]["hover"]
     assert look["popup"]["title"] == "name" and "edge_id" in look["popup"]["columns"]
+
+
+def test_both_engines_give_an_app_the_road_roles_and_the_pick_layers(tmp_path):
+    """export_style's metadata has roadstyle:sources (the road roles) and roadstyle:controls.pick (the layers a road is picked on), from
+    the style's final layers, in both engines: an app's dashboard on the exported style finds the roads and picks them (audit 3, N27)."""
+    from pathlib import Path
+
+    import pyarrow.parquet as pq
+    import shapely
+
+    import roadstyle as rs
+    df = pq.read_table(Path(__file__).parents[1] / "rust/roadstyle-rs/tests/data/monaco_part/roads.parquet").to_pandas(integer_object_nulls=True)
+    part = gpd.GeoDataFrame(df.drop(columns="geometry"), geometry=shapely.from_wkb(df["geometry"]), crs="EPSG:4326")
+    meta = {e: json.loads(rs.export_style(part, tmp_path / e, base_url=BASE, engine=e).read_text())["metadata"] for e in ("python", "rust")}
+    for e, m in meta.items():
+        assert set(m["roadstyle:sources"]) >= {"roads", "simple", "slots"}, e
+        assert "roads-simple" in m["roadstyle:controls"]["pick"] or "roads-fill" in m["roadstyle:controls"]["pick"], e
+    assert meta["rust"]["roadstyle:sources"] == meta["python"]["roadstyle:sources"]
+    assert meta["rust"]["roadstyle:controls"] == meta["python"]["roadstyle:controls"]

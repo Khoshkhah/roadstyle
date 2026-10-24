@@ -2,10 +2,12 @@
 # adapters (io, wasm) and the facade `roadstyle` and the programs (cli, mcp, snapshot). `roadstyle-rs` is the old name of the facade, kept for one version.
 [workspace]
 members = ["roadstyle-model", "roadstyle-look", "roadstyle-io", "roadstyle-levels", "roadstyle-engine", "roadstyle-tiles", "roadstyle",
-           "roadstyle-rs", "roadstyle-wasm", "roadstyle-py", "roadstyle-cli", "roadstyle-mcp", "roadstyle-snapshot"]
-# cargo test / clippy at the root: all but the Python extension, which needs a Python to link (the CI job "python" builds it)
+           "roadstyle-rs", "roadstyle-wasm", "roadstyle-py", "roadstyle-cli", "roadstyle-mcp", "roadstyle-serve", "roadstyle-snapshot"]
+# cargo test / clippy at the root: the libraries. Not the Python extension (it needs a Python to link: the CI job "python" builds it),
+# and not the programs, roadstyle-cli, roadstyle-mcp and roadstyle-snapshot (bundled SQLite, headless_chrome: CI tests them in their own
+# step, -p)
 default-members = ["roadstyle-model", "roadstyle-look", "roadstyle-io", "roadstyle-levels", "roadstyle-engine", "roadstyle-tiles", "roadstyle",
-                   "roadstyle-rs", "roadstyle-wasm", "roadstyle-cli", "roadstyle-mcp", "roadstyle-snapshot"]
+                   "roadstyle-rs", "roadstyle-wasm", "roadstyle-serve"]
 resolver = "2"
 
 [workspace.package]
@@ -37,7 +39,11 @@ roadstyle-engine = { path = "roadstyle-engine" }
 roadstyle-tiles = { path = "roadstyle-tiles" }
 roadstyle = { path = "roadstyle" }
 roadstyle-snapshot = { path = "roadstyle-snapshot" }
+roadstyle-serve = { path = "roadstyle-serve" }
 
-[profile.release]
+# what is shipped (the wheels, the wasm packages): release with one codegen unit and fat LTO, `--profile dist`. The tests and the
+# development builds use release itself, which builds much faster.
+[profile.dist]
+inherits = "release"
 lto = true
 codegen-units = 1

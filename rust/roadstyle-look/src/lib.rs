@@ -6,11 +6,13 @@
 //! The look does not know the roads (rule 2 of the layers): the engine combines the two.
 
 pub mod basemap;
+mod error;
 mod png;
 mod ramp;
 mod resolve;
 pub mod widths;
 
+pub use error::Error;
 pub use ramp::Ramp;
 pub use resolve::{make_look, theme, Options};
 pub use widths::{py_round, RoadModel};
@@ -82,14 +84,14 @@ impl std::ops::Deref for Look {
 
 impl Look {
     /// The look of render_edges' palette, profile, settings and keywords (`Options`).
-    pub fn resolve(o: &Options) -> Result<Look, String> {
+    pub fn resolve(o: &Options) -> Result<Look, Error> {
         Look::new(resolve::resolve(o)?)
     }
 
     /// A look from its data: the typed parts are made here. A version past `VERSION` is an error.
-    pub fn new(mut data: LookData) -> Result<Look, String> {
+    pub fn new(mut data: LookData) -> Result<Look, Error> {
         if data.schema_version > VERSION {
-            return Err(format!("look version {}: this engine reads versions 0 and {VERSION}", data.schema_version));
+            return Err(Error::Version { found: data.schema_version });
         }
         data.schema_version = VERSION;
         Ok(Look { model: RoadModel::new(&data.roads_model, &data.theme["roads"], &data.args)?, road: RoadLook::new(&data)?,
@@ -97,13 +99,13 @@ impl Look {
     }
 
     /// A saved look (its JSON text), of version 1 or 0.
-    pub fn from_json(text: &str) -> Result<Look, String> {
-        Look::new(serde_json::from_str(text).map_err(|e| format!("look: {e}"))?)
+    pub fn from_json(text: &str) -> Result<Look, Error> {
+        Look::new(serde_json::from_str(text).map_err(|e| Error::Look(format!("look: {e}")))?)
     }
 
     /// A look from its JSON value, of version 1 or 0.
-    pub fn from_value(v: Value) -> Result<Look, String> {
-        Look::new(serde_json::from_value(v).map_err(|e| format!("look: {e}"))?)
+    pub fn from_value(v: Value) -> Result<Look, Error> {
+        Look::new(serde_json::from_value(v).map_err(|e| Error::Look(format!("look: {e}")))?)
     }
 
     /// The look as it is written: version 1.
@@ -122,7 +124,7 @@ impl Look {
     }
 
     /// The same look with the map option `key` set to `value`.
-    pub fn with_arg(self, key: &str, value: Value) -> Result<Look, String> {
+    pub fn with_arg(self, key: &str, value: Value) -> Result<Look, Error> {
         let mut data = self.data;
         if !data.args.is_object() {
             data.args = Value::Object(Map::new());
@@ -168,19 +170,19 @@ pub struct RoadLook {
 }
 
 impl RoadLook {
-    fn new(look: &LookData) -> Result<RoadLook, String> {
-        let pair = |v: &Value| -> Result<[Value; 2], String> {
+    fn new(look: &LookData) -> Result<RoadLook, Error> {
+        let pair = |v: &Value| -> Result<[Value; 2], Error> {
             match v.as_array().map(|a| a.as_slice()) {
                 Some([a, b]) => Ok([a.clone(), b.clone()]),
-                _ => Err("look.json: a class style is not [plain, link]".into()),
+                _ => Err(Error::Look("look.json: a class style is not [plain, link]".into())),
             }
         };
         let styles = &look.styles;
-        let classes = styles["classes"].as_object().ok_or("look.json: no styles.classes")?;
+        let classes = styles["classes"].as_object().ok_or_else(|| Error::Look("look.json: no styles.classes".into()))?;
         Ok(RoadLook {
             data: look.theme["data"].clone(),
             palette: look.palette.clone(),
-            classes: classes.iter().map(|(k, v)| Ok((k.clone(), pair(v)?))).collect::<Result<_, String>>()?,
+            classes: classes.iter().map(|(k, v)| Ok((k.clone(), pair(v)?))).collect::<Result<_, Error>>()?,
             fallback: pair(&styles["fallback"])?,
             single_line: look.config["single_line_classes"].as_array().into_iter().flatten()
                 .filter_map(|v| v.as_str().map(String::from)).collect(),
@@ -215,13 +217,13 @@ pub struct SlotLook {
 }
 
 impl SlotLook {
-    fn new(look: &LookData) -> Result<SlotLook, String> {
+    fn new(look: &LookData) -> Result<SlotLook, Error> {
         let s = &look.slots;
         Ok(SlotLook {
-            z_order: s["z_order"].as_object().cloned().ok_or("look.json: no slots.z_order")?,
-            width_z20: s["width_z20"].as_object().ok_or("look.json: no slots.width_z20")?.iter()
+            z_order: s["z_order"].as_object().cloned().ok_or_else(|| Error::Look("look.json: no slots.z_order".into()))?,
+            width_z20: s["width_z20"].as_object().ok_or_else(|| Error::Look("look.json: no slots.width_z20".into()))?.iter()
                 .filter_map(|(k, v)| v.as_f64().map(|w| (k.clone(), w))).collect(),
-            width_fallback: s["width_z20_fallback"].as_f64().ok_or("look.json: no slots.width_z20_fallback")?,
+            width_fallback: s["width_z20_fallback"].as_f64().ok_or_else(|| Error::Look("look.json: no slots.width_z20_fallback".into()))?,
             slot_m: look.config["annotations"]["slot_m"].as_f64().unwrap_or(100.0),
         })
     }

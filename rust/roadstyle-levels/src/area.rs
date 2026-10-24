@@ -3,6 +3,7 @@
 //! the solver solves them with fixed roads when asked, and a rule to add is checked for loops first. Typed: the files' text and the
 //! answers' JSON are the adapter's (roadstyle::level_editor).
 
+use crate::Error;
 use super::solve::{self, Rules};
 use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -156,7 +157,7 @@ pub struct Area {
 impl Area {
     /// The area of `roads` and `pairs` (on road ids). A meet names the ends start or end of both roads; a stack or near rule names a part
     /// of the upper road.
-    pub fn new(roads: Vec<AreaRoad>, pairs: Vec<PairRow>) -> Result<Area, String> {
+    pub fn new(roads: Vec<AreaRoad>, pairs: Vec<PairRow>) -> Result<Area, Error> {
         let mut of = HashMap::new();
         for (i, r) in roads.iter().enumerate() {
             of.insert(r.id, (i, false));
@@ -176,7 +177,7 @@ impl Area {
 
     /// The pairs with the edits on top (roadstyle's merged_relations), in their order: the row (on road ids, the ends in the road's own
     /// way) and whether it is an edit. A row with `enabled` false removes the same rule (an error when there is none), any other row adds it.
-    pub fn merged(&self, edits: &[PairRow]) -> Result<Vec<(PairRow, bool)>, String> {
+    pub fn merged(&self, edits: &[PairRow]) -> Result<Vec<(PairRow, bool)>, Error> {
         let mut out: Vec<(Key, PairRow, bool)> = self
             .pairs
             .iter()
@@ -192,11 +193,11 @@ impl Area {
             let &(ra, ba) = self
                 .of
                 .get(&row.a)
-                .ok_or(format!("edits: '{}' is not an edge of the roads", row.a))?;
+                .ok_or(Error::Edits(format!("edits: '{}' is not an edge of the roads", row.a)))?;
             let &(rb, bb) = self
                 .of
                 .get(&row.b)
-                .ok_or(format!("edits: '{}' is not an edge of the roads", row.b))?;
+                .ok_or(Error::Edits(format!("edits: '{}' is not an edge of the roads", row.b)))?;
             // an edge that runs against its road names the road's other end (a meet: both ends; a stack: a's part)
             if ba {
                 row.a_end = row.a_end.map(Side::turned);
@@ -208,11 +209,11 @@ impl Area {
             let k = key(&row);
             if !row.enabled {
                 let i = at.remove(&k).ok_or(
-                    format!(
+                    Error::Edits(format!(
                         "edits: no {:?} pair {} {} to switch off",
                         row.relation, row.a, row.b
                     )
-                    .to_lowercase(),
+                    .to_lowercase()),
                 )?;
                 out.remove(i);
                 at.values_mut().filter(|v| **v > i).for_each(|v| *v -= 1);
@@ -228,10 +229,10 @@ impl Area {
 
     /// The merged rows as the solver's rules (on road indexes), and the rows in the order of `difference_rules`: the meets, the stacks,
     /// the near rules, the orders.
-    fn rules(&self, merged: &[(PairRow, bool)]) -> Result<(Rules, Vec<PairRow>), String> {
+    fn rules(&self, merged: &[(PairRow, bool)]) -> Result<(Rules, Vec<PairRow>), Error> {
         let idx = |id: i64| {
             self.road_of(id)
-                .ok_or(format!("pairs: '{id}' is not a road"))
+                .ok_or(Error::Edits(format!("pairs: '{id}' is not a road")))
         };
         let mut r = Rules {
             roads: self.roads.len(),
@@ -264,13 +265,13 @@ impl Area {
         fixed: &HashMap<usize, [i64; 4]>,
         max_level: i64,
         margin: f64,
-    ) -> Result<AreaSolved, String> {
+    ) -> Result<AreaSolved, Error> {
         let (mut rules, _) = self.rules(&self.merged(edits)?)?;
         for (&r, v) in fixed {
             if v.iter().any(|x| x.abs() > max_level) {
-                return Err(format!(
+                return Err(Error::Options(format!(
                     "solve_levels: a fixed number is outside [-max_level, max_level] ({max_level})"
-                ));
+                )));
             }
             rules.fixed.push((r, v.map(|x| x + max_level)));
         }
@@ -348,7 +349,7 @@ impl Area {
         hops: usize,
         max_level: i64,
         margin: f64,
-    ) -> Result<(AreaSolved, Option<String>), String> {
+    ) -> Result<(AreaSolved, Option<String>), Error> {
         let free = self.around(edits, changed, hops);
         if free.len() == self.roads.len() {
             return Ok((
@@ -370,7 +371,7 @@ impl Area {
                             .map(|(&r, v)| v[0] - local.levels[r][0])
                             .collect();
                         if shifts.len() > 1 {
-                            return Err(format!("solve_local: the fixed roads moved by different amounts ({shifts:?})"));
+                            return Err(Error::Check(format!("solve_local: the fixed roads moved by different amounts ({shifts:?})")));
                         }
                         if let Some(&k) = shifts.iter().next() {
                             local.levels.iter_mut().for_each(|v| *v = v.map(|x| x + k));
@@ -390,7 +391,7 @@ impl Area {
 
     /// The check before rules are added (roadstyle's rule_conflicts): each of `rows` that conflicts with the enabled rules (the pairs,
     /// `edits` and the rows before it). A loop is a cycle of the solver's rules through the new one that no numbers can keep.
-    pub fn conflicts(&self, edits: &[PairRow], rows: &[PairRow]) -> Result<Vec<Conflict>, String> {
+    pub fn conflicts(&self, edits: &[PairRow], rows: &[PairRow]) -> Result<Vec<Conflict>, Error> {
         let mut rel = self.merged(edits)?;
         let mut out = Vec::new();
         let none = Area {
@@ -444,7 +445,7 @@ impl Area {
         &self,
         rel: &[(PairRow, bool)],
         new: &PairRow,
-    ) -> Result<Option<Vec<PairRow>>, String> {
+    ) -> Result<Option<Vec<PairRow>>, Error> {
         let (rules, rows) = self.rules(rel)?;
         let mut adj: HashMap<usize, Vec<(usize, bool, Option<usize>)>> = HashMap::new();
         for (i, j, w, src) in difference_rules(&rules) {
@@ -490,18 +491,18 @@ impl Area {
 }
 
 /// A row's ends as its relation needs them: a meet the ends start or end of both roads; a stack or near rule a part of the upper road.
-fn check(r: &PairRow, file: &str) -> Result<(), String> {
+fn check(r: &PairRow, file: &str) -> Result<(), Error> {
     match r.relation {
         Relation::Meet
             if !matches!(r.a_end, Some(Side::Start | Side::End))
                 || !matches!(r.b_end, Some(Side::Start | Side::End)) =>
         {
-            Err(format!(
+            Err(Error::Edits(format!(
                 "{file}: a meet needs an end of each road (start / end): {} {}",
                 r.a, r.b
-            ))
+            )))
         }
-        Relation::Stack | Relation::Near if r.a_end.is_none() => Err(format!(
+        Relation::Stack | Relation::Near if r.a_end.is_none() => Err(Error::Edits(format!(
             "{file}: a stack names one part of the upper road (start, main or end): {} over {}{}",
             r.a,
             r.b,
@@ -510,7 +511,7 @@ fn check(r: &PairRow, file: &str) -> Result<(), String> {
             } else {
                 ""
             }
-        )),
+        ))),
         _ => Ok(()),
     }
 }

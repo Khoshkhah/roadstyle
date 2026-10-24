@@ -108,7 +108,7 @@ A part named on an edge that runs against its road is turned to the road's way, 
 
 | file | what | written by |
 |---|---|---|
-| `roads.parquet` | one row per road (both directions of a segment together): `road` (the id of its first edge), `edges` / `reversed` (the ids of its edges running its way / the other way), `band`, `priority`, the line | `roadstyle-levels make` (`rs.level_input`), every run |
+| `roads.parquet` | one row per road (both directions of a segment together): `road` (the id of its first edge), `edges` / `reversed` (the ids of its edges running its way / the other way; the ids are Int64, the BIGINT edge ids, and text only for an id column of text; `rs.level_input` gives them as text in memory), `band`, `priority`, the line | `roadstyle-levels make` (`rs.level_input`), every run |
 | `pairs.csv` | one row per relation: `relation`, `a`, `b`, `a_end`, `b_end` (below); a stack one row per part of `a` | `roadstyle-levels make`, every run (with `heads.csv`'s heads) |
 | `edits.csv` | your changes to the pairs, same columns plus `enabled`: `false` switches a pair off, anything else adds one; `a` / `b` may name either direction of a road | created empty once; you, or `roadstyle-levels edit`; never overwritten by the input step |
 | `caps.csv` | your caps per road end (`road`, `start`, `end`: empty = automatic, `round`, `square`, `flat`) | `roadstyle-levels edit` (the *start* / *end* choices in a road's card) |

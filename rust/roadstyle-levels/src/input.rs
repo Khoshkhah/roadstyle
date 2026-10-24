@@ -2,6 +2,7 @@
 //! priorities, and their relations. The geometry follows shapely and GEOS (a circle is a polygon of 32 sides) so the
 //! relations are the same.
 
+use crate::Error;
 use super::solve::Rules;
 use super::{LevelEdge, Options, Order, Pt};
 use roadstyle_model::flags;
@@ -24,7 +25,7 @@ fn bits(p: &Pt) -> (u64, u64) {
     (p.0.to_bits(), p.1.to_bits())
 }
 
-pub fn road_split(edges: &[&LevelEdge]) -> Result<Roads, String> {
+pub fn road_split(edges: &[&LevelEdge]) -> Result<Roads, Error> {
     let mut node: HashMap<(u64, u64), u32> = HashMap::new();
     let mut id = |p: &Pt| {
         let k = node.len() as u32;
@@ -33,10 +34,10 @@ pub fn road_split(edges: &[&LevelEdge]) -> Result<Roads, String> {
     let mut ends = Vec::with_capacity(edges.len());
     for e in edges {
         if e.geometry.len() < 2 {
-            return Err(format!(
+            return Err(Error::Input(format!(
                 "levels: edge {} has a line of less than two points",
                 e.edge_id
-            ));
+            )));
         }
         ends.push((id(&e.geometry[0]), id(e.geometry.last().unwrap())));
     }
