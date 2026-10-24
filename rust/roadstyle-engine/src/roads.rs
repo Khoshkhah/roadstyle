@@ -1,7 +1,7 @@
 //! The "roads" source: the stages of roadstyle's render_web.render that bake the `__rs_*` properties of each road, in the same
 //! order. Each function names the Python function it ports; the columns are the ones mapstyle passes (docs/design/rust-spike.md, S2).
 
-use crate::read::Feature;
+use crate::Feature;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 

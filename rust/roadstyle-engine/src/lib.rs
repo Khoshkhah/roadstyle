@@ -18,9 +18,9 @@ pub mod roads;
 pub mod simple;
 pub mod slots;
 
-// The model and the reader keep their paths in this crate (crate::props, crate::read, ...): phase P2 moves files only.
-pub use roadstyle_io::read;
-pub use roadstyle_model::{geom, props};
+// The core has no I/O (docs/design/rust_library.md, rule 3 of the layers): the engine takes the model's types, and the readers
+// (roadstyle-io) are the facade's.
+pub use roadstyle_model::{geom, props, Feature, Row};
 pub(crate) use roadstyle_model::obj;
 
 use serde_json::{json, Value};
@@ -80,12 +80,11 @@ pub struct Parts {
 }
 
 /// The style's layers and sources: the roads ("roads", "simple", "slots") and, with `features` (the base-map tables as the worker's SQL
-/// writes them), the base map ("ov<i>"). `look`: look.json (the resolved look); `parquet`: the roads as tools/make_spike_fixture.py (or
-/// the worker's SQL) writes them.
-pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<Parts, String> {
+/// writes them), the base map ("ov<i>"). `look`: look.json (the resolved look); `feats`: the roads (roadstyle-io reads them from the
+/// GeoParquet of tools/make_spike_fixture.py or the worker's SQL); `planner`: the route planner's rows.
+pub fn make_parts(mut feats: Vec<Feature>, look: &str, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, String> {
     let look_json: Value = serde_json::from_str(look).map_err(|e| format!("look: not JSON: {e}"))?;
     let look = roads::Look::from_json(&look_json)?;
-    let mut feats = read::read_roads(parquet, "geometry")?;
     if feats.len() > MAX_ROADS {
         return Err(format!("this area has {} roads, and the plugin draws at most {MAX_ROADS} (the browser's memory): use a smaller area",
                            feats.len()));
@@ -271,8 +270,8 @@ pub fn make_parts(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
 }
 
 /// The style as one JSON text, with each source's GeoJSON in it (roadstyle's export_inline).
-pub fn make_style(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, String> {
-    let Parts { name, center, zoom, layers, sources, metadata, glyphs, state } = make_parts(parquet, look, features, planner, name)?;
+pub fn make_style(feats: Vec<Feature>, look: &str, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<String, String> {
+    let Parts { name, center, zoom, layers, sources, metadata, glyphs, state } = make_parts(feats, look, features, planner, name)?;
     // The sources become text one at a time, and each is freed at once: a big area's sources are the most of the memory (Tartu: the
     // peak went from 4.3 GB to 2.5 GB natively).
     let metadata = metadata.to_string();
@@ -297,7 +296,7 @@ pub fn make_style(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, plann
 }
 
 /// roadstyle.export._camera: the centre and the zoom that fit the roads' bounds in a 1024 x 768 px view, as the page's fitBounds.
-fn camera(feats: &[read::Feature]) -> (Value, Value) {
+fn camera(feats: &[Feature]) -> (Value, Value) {
     let (mut x0, mut y0, mut x1, mut y1) = (f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
     for c in feats.iter().filter_map(|f| f.coords.as_ref()).flatten() {
         x0 = x0.min(c[0]);
@@ -319,7 +318,7 @@ fn source_features(source: &Value) -> &[Value] {
 /// render's level step: with no `casing_level_col` and no `fill_level_col` in the keywords, the drawing positions come from
 /// `compute_levels(method="solve")` with its defaults (render_web.render), on the roads in their order. It writes the columns that
 /// compute_levels writes: casing_start, casing_level, casing_end and fill_level.
-fn compute_levels(feats: &mut [read::Feature], args: &Value, head_m: f64) -> Result<(), String> {
+fn compute_levels(feats: &mut [Feature], args: &Value, head_m: f64) -> Result<(), String> {
     let given = |k: &str| matches!(&args[k], Value::String(s) if !s.is_empty());
     if given("casing_level_col") || given("fill_level_col") {
         return Ok(());
@@ -363,7 +362,7 @@ impl ColumnMap {
         format!("__rs_kept_{own}")
     }
 
-    fn to_engine(&self, feats: &mut [read::Feature]) {
+    fn to_engine(&self, feats: &mut [Feature]) {
         for f in feats.iter_mut() {
             for (own, user) in &self.0 {
                 if f.props.contains_key(user) {
@@ -490,7 +489,7 @@ fn boundary_fc(b: &Value) -> Option<Value> {
 /// The roads as the level solver reads them, in their order (the edge id is the row: compute_levels works on the frame's rows). `cols`:
 /// the columns of the class, the layer, the bridge, the tunnel and the junction. A value is the text that the tag rules read (Python's
 /// _truthy and int(float(layer)) on the GeoDataFrame's values).
-pub fn level_edges(feats: &[read::Feature], cols: [&str; 5]) -> roadstyle_levels::LevelEdges {
+pub fn level_edges(feats: &[Feature], cols: [&str; 5]) -> roadstyle_levels::LevelEdges {
     let [hw, layer, bridge, tunnel, junction] = cols;
     let text = |v: Option<&Value>| -> Option<String> {
         match v? {

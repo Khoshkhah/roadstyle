@@ -1,13 +1,32 @@
 //! roadstyle as a Rust library (docs/design/rust_library.md): the facade. It re-exports the crates of the core with the module paths
 //! of the old single crate (`roadstyle::props`, `roadstyle::read`, `roadstyle::levels`, `roadstyle::tiles`, `roadstyle::make_style`,
-//! ...), and it has `make_tiled`, which needs both the engine and the tiles. A Rust user adds only this crate.
+//! ...), and it has the functions that read GeoParquet bytes (roadstyle-io) and call the engine: `make_style` and `make_tiled`, which
+//! needs both the engine and the tiles. A Rust user adds only this crate.
 
 pub use roadstyle_engine::*;
+pub use roadstyle_io::read;
 pub mod page;
 pub use roadstyle_levels as levels;
 pub use roadstyle_tiles as tiles;
 
 use serde_json::{json, Value};
+
+/// The roads, the base map's rows and the route planner's rows.
+type Tables = (Vec<Feature>, Option<Vec<Row>>, Option<Vec<Row>>);
+
+/// The roads and the other tables from their GeoParquet bytes: the roads' lines and the base map's geometries in the column `geometry`.
+fn tables(parquet: Vec<u8>, features: Option<Vec<u8>>, planner: Option<Vec<u8>>) -> Result<Tables, String> {
+    Ok((read::read_roads(parquet, "geometry")?,
+        features.map(|f| read::read_table(f, "geometry")).transpose()?,
+        planner.map(|p| read::read_table(p, "")).transpose()?))
+}
+
+/// The style as one JSON text (roadstyle's export_inline), from the roads and the other tables as GeoParquet bytes: the engine's
+/// `make_style` after roadstyle-io's readers.
+pub fn make_style(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, String> {
+    let (feats, features, planner) = tables(parquet, features, planner)?;
+    roadstyle_engine::make_style(feats, look, features, planner, name)
+}
 
 /// The style with one vector-tile source, `roads` (`<prefix>roads/{z}/{x}/{y}`), and the tiles to answer it with (tiles.rs: the rules of
 /// roadstyle's tiles.py, the zooms and the buffer from `look["config"]["tiles"]`). The layers, the metadata and the camera are those of
@@ -27,7 +46,8 @@ pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name:
     let arg = |k: &str| cfg_all["args"][k].as_str().filter(|c| !c.is_empty()).map(String::from);
     let (width_col, highway_col) = (arg("width_m_col"), arg("highway_col").unwrap_or_else(|| "highway".into()));
     let filter_col = arg("filter_col");
-    let Parts { name, center, zoom, mut layers, sources, metadata, glyphs, state } = make_parts(parquet, look, features, None, name)?;
+    let (feats, features, _) = tables(parquet, features, None)?;
+    let Parts { name, center, zoom, mut layers, sources, metadata, glyphs, state } = make_parts(feats, look, features, None, name)?;
     let mut read: std::collections::HashSet<String> = keep.iter().cloned().chain(["name".to_string(), "kind".to_string()]).collect();
     fn texts(v: &Value, out: &mut std::collections::HashSet<String>) {
         match v {

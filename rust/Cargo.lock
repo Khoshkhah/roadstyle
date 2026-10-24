@@ -725,6 +725,7 @@ dependencies = [
  "base64 0.22.1",
  "flate2",
  "roadstyle-engine",
+ "roadstyle-io",
  "roadstyle-levels",
  "roadstyle-tiles",
  "serde_json",
@@ -736,7 +737,6 @@ version = "0.25.0"
 dependencies = [
  "base64 0.22.1",
  "indexmap",
- "roadstyle-io",
  "roadstyle-levels",
  "roadstyle-model",
  "rstar",

@@ -6,7 +6,7 @@ use bytes::Bytes;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use serde_json::{Map, Value};
 
-pub use roadstyle_model::Feature;
+pub use roadstyle_model::{Feature, Row};
 
 pub fn read_roads(data: Vec<u8>, geom_col: &str) -> Result<Vec<Feature>, String> {
     let reader = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data))
@@ -32,7 +32,7 @@ pub fn read_roads(data: Vec<u8>, geom_col: &str) -> Result<Vec<Feature>, String>
 }
 
 /// Any Parquet table as rows: the columns as properties, the binary column `blob` kept as its bytes.
-pub fn read_table(data: Vec<u8>, blob: &str) -> Result<Vec<(Map<String, Value>, Option<Vec<u8>>)>, String> {
+pub fn read_table(data: Vec<u8>, blob: &str) -> Result<Vec<Row>, String> {
     let reader = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(data))
         .and_then(|b| b.build())
         .map_err(|e| format!("not a Parquet file: {e}"))?;
@@ -41,13 +41,13 @@ pub fn read_table(data: Vec<u8>, blob: &str) -> Result<Vec<(Map<String, Value>, 
         let batch = batch.map_err(|e| e.to_string())?;
         let schema = batch.schema();
         let start = out.len();
-        out.extend((0..batch.num_rows()).map(|_| (Map::new(), None)));
+        out.extend((0..batch.num_rows()).map(|_| Row { cols: Map::new(), blob: None }));
         for (field, col) in schema.fields().iter().zip(batch.columns()) {
             for (r, row) in out[start..].iter_mut().enumerate() {
                 if field.name() == blob {
-                    row.1 = binary(col, r).map(<[u8]>::to_vec);
+                    row.blob = binary(col, r).map(<[u8]>::to_vec);
                 } else {
-                    row.0.insert(field.name().clone(), value(col, r)?);
+                    row.cols.insert(field.name().clone(), value(col, r)?);
                 }
             }
         }

@@ -4,7 +4,7 @@
 //! of render_web.render's colouring and of colors.py's ColorRamp over branca's LinearColormap. The ramps are data (cmaps.json, made by
 //! tests/make_goldens.py from branca and matplotlib).
 
-use crate::read::Feature;
+use crate::Feature;
 use crate::roads::Look;
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};

@@ -3,7 +3,7 @@
 //! projection at the line's first point, sequential sums, `hypot`, and numpy's rounding (`rint(x * 10^d) / 10^d`).
 //! _mitre_ends is ported for the roads with metre widths (`__rs_wm`); its part for the items waits for the items (phase P4).
 
-use crate::read::Feature;
+use crate::Feature;
 use crate::roads::truthy;
 use crate::props::{Feat, Props, Source};
 use serde_json::Value;

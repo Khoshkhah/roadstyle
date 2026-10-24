@@ -9,7 +9,6 @@ description = "roadstyle's rendering engine: the style of a map, the data-driven
 
 [dependencies]
 roadstyle-model.workspace = true
-roadstyle-io.workspace = true
 roadstyle-levels.workspace = true
 serde_json.workspace = true
 indexmap.workspace = true

@@ -4,7 +4,7 @@
 
 use crate::layers::py_truth;
 use crate::props::Props;
-use crate::read::Feature;
+use crate::Feature;
 use crate::simple::{Piece, Pt};
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;

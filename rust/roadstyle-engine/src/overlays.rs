@@ -2,7 +2,7 @@
 //! `overlays=`, `user_overlays`), then roadstyle's _edge_overlay and _overlay_layers: the overlay sources and their layers before the
 //! placement and the passes (layers.rs).
 
-use crate::read::Feature;
+use crate::Feature;
 use crate::roads::truthy;
 use crate::slots::{bbox, point_line_dist};
 use rstar::{primitives::GeomWithData, primitives::Rectangle, RTree, AABB};

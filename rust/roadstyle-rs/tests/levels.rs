@@ -38,7 +38,7 @@ fn as_map(r: &Row) -> Map<String, Value> {
 
 fn check(method: Method, golden: &str) -> roadstyle_rs::levels::Levels {
     let lv = compute(&edges(), method).unwrap().unwrap();
-    let want: Vec<Map<String, Value>> = read_table(data(golden), "").unwrap().into_iter().map(|(m, _)| m).collect();
+    let want: Vec<Map<String, Value>> = read_table(data(golden), "").unwrap().into_iter().map(|r| r.cols).collect();
     let got: Vec<Map<String, Value>> = lv.rows.iter().map(as_map).collect();
     assert_eq!(got.len(), want.len(), "number of rows");
     let bad: Vec<_> = got.iter().zip(&want).filter(|(g, w)| g != w).collect();

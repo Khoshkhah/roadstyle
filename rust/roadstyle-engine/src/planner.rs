@@ -3,7 +3,7 @@
 //! "roadstyle:planner"; mapstyle.export.export_inline puts "roadstyle:planner_skipped" (the number of roads) there instead past 150,000 roads.
 
 use crate::layers::py_round;
-use crate::read::{read_table, Feature};
+use crate::{Feature, Row};
 use serde_json::{json, Map, Value};
 use std::collections::{BTreeSet, HashMap};
 
@@ -69,8 +69,8 @@ fn planner_ends(roads: &[Feature], mode: &str) -> Vec<Value> {
 }
 
 /// planner_data: the route planner's graphs over the roads' indices (the page's RM).
-pub fn planner_data(roads: &[Feature], planner: Vec<u8>) -> Result<Value, String> {
-    let rows: Vec<Map<String, Value>> = read_table(planner, "")?.into_iter().map(|(r, _)| r).collect();
+pub fn planner_data(roads: &[Feature], planner: Vec<Row>) -> Result<Value, String> {
+    let rows: Vec<Map<String, Value>> = planner.into_iter().map(|r| r.cols).collect();
     let mut by_part: HashMap<String, Vec<&Map<String, Value>>> = HashMap::new();
     for r in &rows {
         by_part.entry(r["part"].as_str().unwrap_or("").to_string()).or_default().push(r);

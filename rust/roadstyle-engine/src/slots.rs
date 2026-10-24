@@ -6,7 +6,7 @@
 //! (the first nearest segment wins a tie; lengths along a line are sums of `sqrt(dx * dx + dy * dy)`). Intersection points are not computed
 //! with GEOS's arithmetic, so a slot can differ from Python's by a rounding step of its 6 decimals.
 
-use crate::read::Feature;
+use crate::Feature;
 use crate::roads::truthy;
 use crate::simple::{Line, Pt, KY};
 use indexmap::IndexMap;
