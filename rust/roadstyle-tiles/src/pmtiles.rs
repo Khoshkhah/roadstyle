@@ -15,8 +15,10 @@ pub fn tile_id(z: u32, x: u32, y: u32) -> u64 {
         acc += ((3 * rx) ^ ry) << a;
         if ry == 0 {
             if rx != 0 {
-                x = s - 1 - x;
-                y = s - 1 - y;
+                // go-pmtiles' ZxyToID (rotate(s, ...) on uint32) wraps here when x or y >= s; the steps after this one read only the
+                // bits below s, and s - 1 - x and n - 1 - x differ by a multiple of s, so the wrapped value is the right one
+                x = s.wrapping_sub(1).wrapping_sub(x);
+                y = s.wrapping_sub(1).wrapping_sub(y);
             }
             std::mem::swap(&mut x, &mut y);
         }
