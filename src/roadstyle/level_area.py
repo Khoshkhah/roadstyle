@@ -273,6 +273,29 @@ def write(solved, folder, ends_table):
             con.close()
 
 
+def serve_rust(folder, port=8780, items=None):
+    """The level editor in Rust (static/level_editor/): the solver runs in the page; the Rust server (roadstyle-cli's serve) gives it the
+    page and the area's files and saves your changes. Waits until Ctrl+C. The page needs its WebAssembly package (static/level_editor/pkg/)."""
+    import time
+
+    from ._engine import rust
+    if items is not None:
+        raise ValueError("--items is in the Python editor only: use --engine python")
+    page = Path(__file__).resolve().parent / "static"
+    if not (page / "level_editor" / "pkg" / "roadstyle_wasm_bg.wasm").exists():
+        raise ValueError("the Rust level editor's WebAssembly package is missing (static/level_editor/pkg/): build it with "
+                         "rust/roadstyle-wasm/build_editor.sh, or use --engine python")
+    if not (Path(folder) / "roads.parquet").exists():
+        raise ValueError(f"{folder}: no roads.parquet: make the area first (roadstyle-levels make)")
+    rust().serve(str(Path(folder).resolve()), str(page), port)
+    print(f"level editor: http://127.0.0.1:{port}/level_editor/  ({folder}; Ctrl+C to stop)", flush=True)
+    try:
+        while True:
+            time.sleep(3600)
+    except KeyboardInterrupt:
+        pass
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="roadstyle-levels", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -295,8 +318,8 @@ def main(argv=None):
     ed.add_argument("--port", type=int, default=8780)
     sv.add_argument("--engine", choices=["python", "rust"], help="the solver (default: ROADSTYLE_ENGINE, else python); rust: a "
                                                                   "minimum-cost flow, no time limit, no --max-positions")
-    ed.add_argument("--engine", choices=["python", "rust"], default="rust", help="the solver of each Apply (default rust: a minimum-cost "
-                                                                                 "flow, no time limit)")
+    ed.add_argument("--engine", choices=["python", "rust"], default="rust", help="rust (default): the editor in Rust, the solver in the "
+                                                                                 "page; python: the Python server and solver")
     ed.add_argument("--items", metavar="MODULE:FUNCTION", help="items drawn on the edges: FUNCTION(roads) -> (overlays, render_edges keywords), see level_editor")
     a = ap.parse_args(argv)
     if a.cmd == "make":
@@ -311,6 +334,8 @@ def main(argv=None):
         print(f"{len(solved)} roads -> {a.folder / 'levels.csv'}: {len(solved.attrs['levels_given_up'])} stack pair(s) given up, "
               f"{len({(u, lo) for u, lo, _ in solved.attrs.get('levels_near', [])})} near warning(s), "
               f"{info.get('order_violations', 0)} order wish(es) not kept, {info.get('seconds')} s")
+    elif a.engine == "rust":
+        serve_rust(a.folder, a.port, a.items)
     else:
         from .level_editor import serve
         items = None

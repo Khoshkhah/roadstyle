@@ -232,6 +232,16 @@ fn export_look(look: String, cols: [String; 5], positions: Vec<i64>) -> PyResult
     roadstyle::export_look::export_look(&look, &c, &positions).map(|v| v.to_string()).map_err(PyValueError::new_err)
 }
 
+/// serve(area, page, port): roadstyle serve (roadstyle-cli) in a thread of its own: the level editor's page folder at / and the area folder
+/// at /area/, on 127.0.0.1. Returns at once; the server stops with the Python process (roadstyle-levels edit waits for Ctrl+C).
+#[pyfunction]
+fn serve(area: String, page: String, port: u16) -> PyResult<()> {
+    // bind here, so an error (the port in use) comes back to Python
+    std::net::TcpListener::bind(("127.0.0.1", port)).map_err(|e| PyValueError::new_err(format!("127.0.0.1:{port}: {e}")))?;
+    std::thread::spawn(move || roadstyle_cli::serve(std::path::Path::new(&area), std::path::Path::new(&page), port));
+    Ok(())
+}
+
 /// The engine's warnings since the last call of this (render_web's warnings.warn): the binding gives them as Python warnings.
 #[pyfunction]
 fn take_warnings() -> Vec<String> {
@@ -247,6 +257,7 @@ fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(make_look, m)?)?;
     m.add_function(wrap_pyfunction!(compute_levels, m)?)?;
     m.add_function(wrap_pyfunction!(solve_rules, m)?)?;
+    m.add_function(wrap_pyfunction!(serve, m)?)?;
     m.add_class::<Tiler>()?;
     m.add_class::<Sources>()?;
     m.add_function(wrap_pyfunction!(make_sources, m)?)?;
