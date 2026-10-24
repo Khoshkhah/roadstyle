@@ -151,6 +151,39 @@ The limits of both tests: one area, one machine, software drawing in a headless 
 own workers. An earlier test (2026-10-23) gave Rust half the time of MapLibre for the first view, but it did not give both the same
 input or the same tile settings.
 
+### The whole page: Rust's two stages against MapLibre's stage 2
+
+This test compares two real pages, each measured from the start of the page to the whole first view, with the downloads and the
+start of the engine included:
+
+- **MapLibre only:** stage 1 was done before. The page downloads its GeoJSON files, MapLibre cuts the tiles (stage 2) and draws.
+  The page loads no WebAssembly.
+- **Rust, both stages:** the page downloads the roads file (GeoParquet) and the WebAssembly engine; Rust runs stage 1 and stage 2
+  in memory (`makeSources`, then `tileSources`), and MapLibre draws.
+
+Monaco (13,298 roads), the same settings as above, a local server, 2026-10-24; the middle value of 3 runs, each in a new browser
+context (no cache), after one run to warm the browser.
+
+| | MapLibre only | Rust, both stages |
+|---|---|---|
+| The download, plain | 17.4 MB: `style.json`, `roads.geojson`, `simple.geojson`, `slots.geojson` | 1.1 MB of roads, and the engine (8.4 MB) |
+| The download, gzip | 1.36 MB | 0.93 MB of roads, and the engine (1.93 MB, only on the first visit) |
+| The whole first view, from the start of the page | 0.91 s | 1.15 s |
+| A zoom to 16 | 0.35 s | 0.36 s |
+| A pan | 0.15 s | 0.18 s |
+| A zoom out to 12 | 0.18 s | 0.23 s |
+| The memory | 100 MB of JavaScript heap, and MapLibre's workers (not measured) | 55 MB of JavaScript heap and 83 MB of WebAssembly |
+
+On Monaco, MapLibre with prepared GeoJSON is a little faster, because the Rust page also runs stage 1 and starts the engine. The
+two pages are not the same kind of page, however:
+
+- **MapLibre only** needs stage 1 done before, by a server or a job, for each map, each look and each change of the data.
+- **Rust, both stages** needs only the roads. The page can make another look (a palette, a color column, filters) by itself, with
+  no server and no new files.
+
+The limits: one area, a local server (no network delay), software drawing in a headless browser, and no count of the memory of
+MapLibre's workers.
+
 ### Small areas
 
 | Area | What | Python | Rust |
