@@ -50,22 +50,6 @@ fn sodermalm_style_against_python() {
     assert!(d.is_empty(), "{d:#?}");
 }
 
-#[test]
-#[ignore = "a look at the slots that differ, of the area $AREA (default monaco; P0's list of differences)"]
-fn slot_differences() {
-    let area = std::env::var("AREA").unwrap_or_else(|_| "monaco".into());
-    let (got, want) = (style(&area), common::gz_json(&format!("{area}/golden_style.json.gz")));
-    let (g, w) = (got["sources"]["slots"]["data"]["features"].as_array().unwrap(), want["sources"]["slots"]["data"]["features"].as_array().unwrap());
-    let roads = &got["sources"]["roads"]["data"]["features"];
-    for (a, b) in g.iter().zip(w) {
-        if a["properties"]["__rs_edge"] != b["properties"]["__rs_edge"] {
-            let (ea, eb) = (a["properties"]["__rs_edge"].as_u64().unwrap() as usize, b["properties"]["__rs_edge"].as_u64().unwrap() as usize);
-            println!("slot {} chain {} name {}: Rust edge {ea} ({}), Python edge {eb} ({}); the slot {}", a["properties"]["slot"], a["properties"]["chain"],
-                     a["properties"]["name"], roads[ea]["properties"]["edge_ref"], roads[eb]["properties"]["edge_ref"], a["geometry"]["coordinates"]);
-        }
-    }
-}
-
 /// Two features' properties are the same: the same keys, and the same values, a number by its value (MapLibre reads 0 and 0.0, an
 /// int_value -1 and a sint_value -1, as the same number).
 fn same_props(a: &serde_json::Map<String, Value>, b: &serde_json::Map<String, Value>) -> bool {

@@ -133,4 +133,4 @@ jobs:
           roadstyle-rs/tests/get_goldens.sh
 
       - name: The ignored goldens (Tartu)
-        run: cargo test --offline --release -- --ignored --skip slot_differences
+        run: cargo test --offline --release -- --ignored
