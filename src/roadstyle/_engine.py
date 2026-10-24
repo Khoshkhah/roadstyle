@@ -314,14 +314,6 @@ def solve_intervals(n, meets, stacks, orders, max_level, margin, min_positions, 
 def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs):
     """``roadstyle.export_style`` by the Rust engine: the style and the tiles from ``Tiler``; the files around them as Python writes them.
     ``format``: "xyz" (a tile folder) or "pmtiles" (one archive, roads.pmtiles)."""
-    import gzip  # noqa: F401  (the same imports as export.py)
-    from importlib.resources import files
-    from pathlib import Path
-
-    from . import _settings
-    from .export import _camera, _plugin_css
-    from .tiles import _merc, _tile_range
-
     if format not in ("xyz", "pmtiles"):
         raise ValueError(f"format must be 'xyz' or 'pmtiles', got {format!r}")
     kwargs = dict(kwargs)
@@ -332,8 +324,21 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs
     lk = _look_of(kwargs)
     t = rust().Tiler(_geoparquet(edges), lk, None, name, "", [str(c) for c in edges.columns])   # every column: a click shows the data
     _warn()
+    return _write_export(t, out_dir, base_url, format, name, tuple(float(v) for v in edges.total_bounds))
+
+
+def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds):
+    """The files of ``export_style`` from the Tiler ``t`` (its style and its tiles): style.json with the tiles at ``base_url``, the tiles in
+    ``bounds`` (lon / lat: the roads' box), the sprite and the popup's files; the path of style.json."""
+    import gzip  # noqa: F401  (the same imports as export.py)
+    from importlib.resources import files
+    from pathlib import Path
+
+    from . import _settings
+    from .export import _camera, _plugin_css
+    from .tiles import _merc, _tile_range
+
     style, base = json.loads(t.style), base_url.rstrip("/")
-    bounds = tuple(float(v) for v in edges.total_bounds)
     roads = style["sources"]["roads"]
     at = {"tiles": [f"{base}/tiles/{{z}}/{{x}}/{{y}}.pbf"]} if format == "xyz" else {"url": f"pmtiles://{base}/roads.pmtiles"}
     roads = style["sources"]["roads"] = {**{k: roads[k] for k in ("type", "minzoom", "maxzoom", "promoteId") if k in roads}, **at, "bounds": list(bounds)}
@@ -345,20 +350,29 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs
     for lyr in style["layers"]:                                         # Python tags a layer's group after its source-layer
         if "metadata" in lyr:
             lyr["metadata"] = lyr.pop("metadata")
-    style.setdefault("metadata", {}).pop("roadstyle:images", None)     # export_style draws the arrow from the sprite
+    images = style.setdefault("metadata", {}).pop("roadstyle:images", None) or {}
+    images.pop("oneway", None)                                          # export_style draws the arrow from the sprite
+    if images:                                                          # the base map's textures and icons (a duckOSM map)
+        style["metadata"]["roadstyle:images"] = images
     d = Path(out_dir)
     d.mkdir(parents=True, exist_ok=True)
     lo, hi = _merc(*bounds[:2]), _merc(*bounds[2:])
     if format == "pmtiles":
         names = sorted({lyr["source-layer"] for lyr in style["layers"] if "source-layer" in lyr})
         (d / "roads.pmtiles").write_bytes(_pmtiles(t, int(roads["minzoom"]), int(roads["maxzoom"]), bounds, names))
-    for z in range(int(roads["minzoom"]), int(roads["maxzoom"]) + 1) if format == "xyz" else ():   # every tile in the bounds; an empty one: an empty file
+    # every tile with data (a base map can reach past the roads), and an empty file for each other tile in the roads' bounds, as export.py
+    every = t.bounds() or bounds
+    elo, ehi = _merc(*every[:2]), _merc(*every[2:])
+    for z in range(int(roads["minzoom"]), int(roads["maxzoom"]) + 1) if format == "xyz" else ():
         x0, x1, y0, y1 = _tile_range((lo[0], lo[1], hi[0], hi[1]), z)
-        for x in range(x0, x1 + 1):
-            for y in range(y0, y1 + 1):
-                p = d / "tiles" / str(z) / str(x) / f"{y}.pbf"
-                p.parent.mkdir(parents=True, exist_ok=True)
-                p.write_bytes(t.tile(z, x, y))
+        ex0, ex1, ey0, ey1 = _tile_range((elo[0], elo[1], ehi[0], ehi[1]), z)
+        for x in range(min(x0, ex0), max(x1, ex1) + 1):
+            for y in range(min(y0, ey0), max(y1, ey1) + 1):
+                b = t.tile(z, x, y)
+                if b or (x0 <= x <= x1 and y0 <= y <= y1):
+                    p = d / "tiles" / str(z) / str(x) / f"{y}.pbf"
+                    p.parent.mkdir(parents=True, exist_ok=True)
+                    p.write_bytes(b)
     (d / "popup.css").write_text(_plugin_css())
     (d / "popup.js").write_text(files("roadstyle").joinpath("static/popup.js").read_text())
     style["metadata"]["roadstyle:interaction"] = {**style["metadata"].get("roadstyle:interaction", {}), "css": f"{base}/popup.css",

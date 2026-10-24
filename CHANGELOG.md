@@ -51,6 +51,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   has the key: a casing piece has no `__rs_fill@<palette>: null` any more. The map does not change.
 
 ### Added
+- **mapstyle's export_style on the Rust engine**: `roadstyle.duckosm.export_style(db, out_dir, base_url=, mode=, theme=, paths=)` writes
+  the map of a duckOSM file as style.json, vector tiles (the roads and the base map), the sprite and the popup's files. On Monaco its
+  style.json has mapstyle's layers and sources. The Rust engine's `export_style` now writes, as Python's does, every tile with data
+  (the base map can reach past the roads) and an empty file for each other tile in the roads' box, and keeps the base map's images.
 - **mapstyle's export_inline on the Rust engine**: `roadstyle.duckosm.export_inline(db, mode, theme=, paths=)` reads the duckOSM file
   (`roadstyle.duckosm.read`), makes the base map's look (`roadstyle.duckosm.look`: with render_map's map options) and runs stage 1 in
   Rust. On Monaco its style is today's mapstyle style in 6 choices of mode, theme and path style, with the differences that were decided
