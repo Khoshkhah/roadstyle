@@ -38,6 +38,25 @@ wanted on top. The solver reads only these tables, never the lines.
 After these: **as few positions as possible** (the span of the numbers, with `min_positions`, the default), and then the casings as
 close to their fills as possible.
 
+## The words
+
+The solver uses the words of graph theory. Each word, and what it means here:
+
+| Word | Its meaning | In the solver |
+|---|---|---|
+| **graph** | a set of nodes, and arcs between them | all the numbers of all the roads, and all their rules |
+| **node** | one point of the graph | one number of one road, for example the fill of road 7. There are 4 nodes for each road, and 3 more: `H` (the highest number), `L` (the lowest) and `0` (the zero) |
+| **arc** | a connection from one node to another, with a direction (`i → j`). Graph books also call it an *edge*, but on this page an edge is always a road | one rule between two numbers |
+| **cost** | a number on each arc | the constant `w` of the rule `x_i − x_j ≤ w`: 0, −1 or a number of steps |
+| **loop** | arcs that go around and come back to the node where they start | rules that depend on each other in a ring |
+| **negative loop** | a loop whose costs add up to less than 0 | rules that cannot all hold at the same time |
+| **flow** | an amount that goes along the arcs, as water goes through pipes. At each node, the flow that comes in equals the flow that goes out (except at a node with a supply) | the twin of the rules: an arc with flow is a rule that is exactly at its limit, or broken |
+| **capacity** | the most flow that one arc can carry | a hard rule: no limit; a soft rule of the stage: 1 unit; a rule of a later stage: not in the graph yet |
+| **supply** | flow that a node must send out (or take in, when it is negative) | in the last stage: each casing part sends 1 unit to the fill of its road |
+| **minimum-cost flow** | the flow whose cost (the sum of each arc's flow times its cost) is the least | the best answer of a stage |
+| **shortest distance** | the least total cost of a path from one node to another | how the numbers are read back at the end |
+| **potential** | a number for each node, which the flow algorithm keeps so that its searches see no negative costs | a help inside the flow algorithm; it is not a road's number |
+
 ## Every rule has one form
 
 Each rule says: *this number is at most that number, plus a constant*:
@@ -53,7 +72,7 @@ x_i − x_j ≤ w
 | Order: the fill `b` over the fill `b'` | `b' − b ≤ −1` |
 | The box: every number at most `steps` | `x − 0 ≤ steps` |
 
-Rules of this form are a **graph**. Each number is a node, and each rule `x_i − x_j ≤ w` is an arrow from `i` to `j` with the
+Rules of this form are a **graph**. Each number is a node, and each rule `x_i − x_j ≤ w` is an arc from `i` to `j` with the
 cost `w`. A bridge whose main casing crosses over a road:
 
 ```mermaid
@@ -65,36 +84,36 @@ flowchart LR
     casing -->|"0: H1"| fill
 ```
 
-*The stack arrow says `b' − a1 ≤ −1`, the H1 arrow says `a1 − b ≤ 0`. A solution: `b' = 0`, `a1 = 1`, `b = 1`.*
+*The stack arc says `b' − a1 ≤ −1`, the H1 arc says `a1 − b ≤ 0`. A solution: `b' = 0`, `a1 = 1`, `b = 1`.*
 
-The fact that makes the graph useful: **the rules can all hold at the same time when no loop of arrows has a negative total
+The fact that makes the graph useful: **the rules can all hold at the same time when no loop of arcs has a negative total
 cost.** A loop with the cost −3 means that, around that loop, the rules ask for 3 steps more than the numbers can give. For
-example, three roads that meet in a ring, each one wished over the next one: three order arrows of −1 in a loop. At least one wish
+example, three roads that meet in a ring, each one wished over the next one: three order arcs of −1 in a loop. At least one wish
 must break, and the misses add up to 3 steps, however they are shared.
 
 ## Each stage is a minimum-cost flow
 
 The question of a stage, "break the soft rules of this priority by as few steps as possible", has a twin problem in the graph
-(the duality of linear programming): **send flow around the arrows at the least cost**, where
+(the duality of linear programming): **send flow around the arcs at the least cost**, where
 
-- a hard arrow can carry any amount of flow;
-- a soft arrow of this stage can carry at most 1 unit;
-- the soft arrows of the later stages are not in the graph yet.
+- a hard arc can carry any amount of flow;
+- a soft arc of this stage can carry at most 1 unit;
+- the soft arcs of the later stages are not in the graph yet.
 
 Flow goes only around the loops whose cost is negative, because only there it lowers the cost. The least cost of the flow is minus
-the fewest steps that must be broken. The flow also shows **which** rules break: the soft arrows that carry flow. With no
+the fewest steps that must be broken. The flow also shows **which** rules break: the soft arcs that carry flow. With no
 negative loop there is no flow, and nothing breaks.
 
 The stages run in the order of priority: stack, then order, then near. After each stage, the solver **locks** its result, so a
 later stage cannot spoil it:
 
-| After a stage, an arrow | becomes | so that |
+| After a stage, an arc | becomes | so that |
 |---|---|---|
 | soft, with flow (broken) | a hard rule the other way: `x_i − x_j ≥ w` | the later stages cannot repair it at the cost of this stage's best value |
 | soft, with no flow (kept) | a hard rule | it stays kept |
 | hard, with flow (tight) | also its reverse: `x_i − x_j = w` | the best value of this stage stays the best |
 
-Then the next stage adds its own soft arrows to the graph and solves again.
+Then the next stage adds its own soft arcs to the graph and solves again.
 
 ## The last stage: fewest positions, then close casings
 
@@ -102,14 +121,14 @@ The last flow has a different goal: the casing parts as close to their fills as 
 parts), with a very large weight on the span (the highest number minus the lowest), so the span comes first.
 
 1. **The least span.** Two extra nodes, `H` and `L`, hold the highest and the lowest number (every number between them). The least
-   span is a shortest-path length from `L` to `H` in the graph of the hard rules. An arrow `H − L ≤ span` keeps it.
+   span is a shortest-path length from `L` to `H` in the graph of the hard rules. An arc `H − L ≤ span` keeps it.
 2. **The closest casings.** Each casing part sends one unit of flow to the fill of its road. The cheapest flow that delivers all
    these units gives the least sum of `b − a`.
 
 ## From the flow back to the numbers
 
-The flow does not give the numbers directly. It gives which rules are **tight** (the arrows with flow) and which have room. The
-numbers are the shortest distances in the graph that the flow leaves: each arrow with room keeps `x_i ≤ x_j + w`, and each arrow
+The flow does not give the numbers directly. It gives which rules are **tight** (the arcs with flow) and which have room. The
+numbers are the shortest distances in the graph that the flow leaves: each arc with room keeps `x_i ≤ x_j + w`, and each arc
 with flow also keeps `x_j ≤ x_i − w`. The distances satisfy every rule, with equality exactly where the flow runs, and this makes
 them the best numbers. They are whole numbers. Then `compute_levels` moves them so that the most common casing position is 0 (the
 ground).
@@ -118,12 +137,12 @@ ground).
 
 `roadstyle-levels::flow` is a minimum-cost flow with whole numbers, by the **primal-dual** method:
 
-1. Each node has a potential. With it, every arrow gets a reduced cost that is not negative.
+1. Each node has a potential. With it, every arc gets a reduced cost that is not negative.
 2. A Dijkstra search on the reduced costs, from the nodes that still have flow to send, finds the cheapest paths.
-3. A maximum flow along the arrows of reduced cost 0 sends as much as these paths can carry.
+3. A maximum flow along the arcs of reduced cost 0 sends as much as these paths can carry.
 4. The potentials grow by the distances, and the method repeats until all flow is sent.
 
-The costs of the levels are small (0, −1 and the span), so there are few rounds. When some numbers are fixed, their arrows have
+The costs of the levels are small (0, −1 and the span), so there are few rounds. When some numbers are fixed, their arcs have
 negative costs, and a Bellman-Ford search gives the first potentials.
 
 ## The checks
@@ -131,7 +150,7 @@ negative costs, and a Bellman-Ford search gives the first potentials.
 - **The flow** is checked against its potentials (complementary slackness): the two agree only when the flow is the cheapest one.
 - **The answer** is checked against every hard rule: each casing part not over its fill, the heads of roads that meet, the fixed
   numbers and the box. A failure is an error, never a quiet result.
-- **A loop of hard rules** (a negative loop with no soft arrow in it) has no solution. It is an error that names it.
+- **A loop of hard rules** (a negative loop with no soft arc in it) has no solution. It is an error that names it.
 
 The solver returns the numbers, the best value of each stage (the steps by which stack rules, order wishes and near rules are
 broken, and the cost of the last stage), and the pairs that it did not keep. `compute_levels` gives these pairs as
