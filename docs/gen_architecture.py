@@ -207,6 +207,13 @@ def gen_gaps(cs) -> str:
         ["A typed render model in place of JSON trees", f"`Value` (serde_json) in `roadstyle-engine`: {value} times", "no" if value else "yes"],
         ["Typed fields in place of the `__rs_*` properties", f"{len(rs_names)} distinct `__rs_*` names in `rust/`", "no" if rs_names else "yes"],
     ]
+    # the stages (docs/rust/architecture.md, "The three stages"): stage 2 alone in each binding, and a typed border into stage 2
+    stage2 = {b: [n for n in public_api(cs[b]) if re.search(r"(?i)make_?tiles|tile_?sources", n)] for b in ("roadstyle-py", "roadstyle-wasm")}
+    found = "; ".join(f"`{b}`: " + (", ".join(f"`{n}`" for n in v) or "none") for b, v in stage2.items())
+    rows.append(["Stage 2 (the tiles) has its own public call in Python and in the browser", found, "yes" if all(stage2.values()) else "no"])
+    tiles = [f for f in src if "roadstyle-tiles" in str(f)]
+    tv = sum(len(re.findall(r"\bValue\b", text[f])) for f in tiles)
+    rows.append(["Stage 2 takes the typed pieces, not JSON", f"`Value` (serde_json) in `roadstyle-tiles`: {tv} times", "no" if tv else "yes"])
     return table(["The plan expects", "The code now", "Done"], rows)
 
 

@@ -222,38 +222,49 @@ Cdylib, in `rust/roadstyle-py/`. Public API: `make_style`, `make_look`, `compute
 | `lib` | 126 | The Python binding of roadstyle's Rust engine: the module `roadstyle._rust` | `_engine.py` |
 <!-- /gen:modules -->
 
-## One map, from the roads to the page
+## The three stages and the one call
+
+The engine has three stages. Each stage is one crate, and each stage knows nothing of the next one. The facade `roadstyle` (in
+Python, `render_edges`) is the one call that runs them in order.
 
 ```mermaid
 flowchart TB
-    py["Python:<br/>GeoDataFrame<br/>+ keywords"]
-    wk["Browser worker:<br/>duckdb-wasm<br/>+ roads_sql.js"]
-    eng["Rust engine:<br/>read, levels,<br/>style, tiles"]
-    sty["style<br/>+ metadata"]
-    tl["tiles"]
-    db["dashboard<br/>+ rs object"]
-    ml["MapLibre"]
-    py -->|"Parquet + look"| eng
-    wk -->|"Parquet + look"| eng
-    eng --> sty
-    eng --> tl
-    sty -->|"metadata"| db
-    sty -->|"style"| ml
-    tl --> ml
-    db -->|"MapLibre calls"| ml
+    inp["Roads + look"]
+    facade["The one call<br/>roadstyle facade,<br/>render_edges"]
+    s1["Stage 1<br/>roadstyle-engine<br/>style + sources"]
+    s2["Stage 2<br/>roadstyle-tiles<br/>vector tiles"]
+    s3["Stage 3<br/>roadstyle::page<br/>HTML page"]
+    ml["MapLibre<br/>draws"]
+    inp --> facade
+    facade -.->|"runs"| s1
+    facade -.->|"runs"| s2
+    facade -.->|"runs"| s3
+    s1 -->|"sources"| s2
+    s1 -->|"style"| s3
+    s2 -->|"archive"| s3
+    s1 -->|"GeoJSON sources"| ml
+    s2 -->|"tiles"| ml
+    s3 -->|"one HTML file"| ml
 ```
 
-*The engine is the same code in both places. In Python it runs natively; in the browser it runs in a worker, and the page only
-draws.*
+*Stage 2 is not always used. With the GeoJSON sources of stage 1 (the default page), MapLibre cuts the tiles itself in the
+browser. Thus the same sources can go to stage 2 (Rust) or to MapLibre, and the two can be compared.*
 
-| Step | Where it runs | What it makes |
-|---|---|---|
-| 1. The roads | Python (`_engine._geoparquet`), or the worker (`writeRoads`) | GeoParquet bytes with the columns that the keywords name |
-| 2. The look | Python or the worker (`make_look`, `makeLook`) | the merged palette, profile, settings and keywords, as JSON |
-| 3. The style | the engine | the levels (when the roads have none), the sources, the layers and the metadata |
-| 4. The output | the engine | the style with the roads in it, a `Tiler` with tiles on request, a PMTiles archive, or the page |
-| 5. The page | the page's main thread | MapLibre draws; the dashboard reads the metadata and adds the controls |
-| 6. The `rs` object | the page's main thread | the API for a host page: `getState`, `setState`, `on`, `link`, the actions |
+| Stage | Crate | Input → output | Public call today |
+|---|---|---|---|
+| 1. The style and the sources | `roadstyle-engine` | the roads (GeoParquet) and the look → the style, its sources (the pieces of the roads) and the `roadstyle:*` metadata | Rust `make_style`, `make_parts`; Python `export_inline(engine="rust")`; the browser `makeStyle` |
+| 2. The tiles | `roadstyle-tiles` | the sources → vector tiles on request, or one PMTiles archive | Rust `Tiles`; in Python and in the browser only with stage 1 (`export_style`, `tiles=True`, `new Tiler`) |
+| 3. The page | `roadstyle::page` | the style, the data and the options of the dashboard → one HTML file | Rust `page::make_page`; the browser `makePage`; Python through `render_edges` |
+| The one call | `roadstyle` (facade) | the roads and the look → the output of the way you ask for | Rust `make_tiled`; Python `render_edges`, `export_style`; the browser `new Tiler` |
+
+Where the inputs come from: the roads are GeoParquet bytes that Python writes (`_engine._geoparquet`) or that the browser
+worker writes from a duckOSM file (`writeRoads`). The look comes from `make_look` (the browser: `makeLook`). In Python the
+stages run natively; in the browser they run in the page or in a worker, and the page only draws. Then the dashboard reads the
+metadata and adds the controls, and the `rs` object is the API for a host page.
+
+**What the design phase adds** (the last rows of [Known design gaps](#known-design-gaps)): a public call for each stage alone in
+Python and in the browser, so that a saved GeoJSON can go to stage 2; and a typed border, so that stage 1 gives stage 2 the
+typed pieces in memory, with GeoJSON only as a file format at the border.
 
 The metadata keys between the engine and the dashboard, and the modules that write or read them:
 
@@ -415,6 +426,8 @@ an item shows "yes" when the code has it:
 | One error enum for each crate | `Result<_, String>`: 53 places; error enums: none | no |
 | A typed render model in place of JSON trees | `Value` (serde_json) in `roadstyle-engine`: 806 times | no |
 | Typed fields in place of the `__rs_*` properties | 59 distinct `__rs_*` names in `rust/` | no |
+| Stage 2 (the tiles) has its own public call in Python and in the browser | `roadstyle-py`: none; `roadstyle-wasm`: none | no |
+| Stage 2 takes the typed pieces, not JSON | `Value` (serde_json) in `roadstyle-tiles`: 28 times | no |
 <!-- /gen:gaps -->
 
 What each gap means and how the plan closes it: [the architecture](../design/rust_library.md#the-architecture),
