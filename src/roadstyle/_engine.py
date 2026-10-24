@@ -423,7 +423,7 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
     if tiled and any("palette" in v["set"] for v in views):
         raise ValueError("engine='rust': tiles=True with a view's palette (the tiles have one palette); use engine='python'")
     dashes = sorted({f["properties"].get("__rs_dash") for f in (style["sources"].get("simple") or {"data": {"features": []}})["data"]["features"]} - {None, ""})
-    archive = _tiled_page(pq, lk, style, highway_col, kwargs) if tiled else None
+    archive = _tiled_page(src, lk, style, highway_col, kwargs) if tiled else None
     meta = style.pop("metadata")
     ctl, inter = meta["roadstyle:controls"], meta["roadstyle:interaction"]
     for lyr in style["layers"]:
@@ -499,16 +499,16 @@ def _views(style, geo, pq, kwargs, basemaps, palette, profile, settings, highway
     return views
 
 
-def _tiled_page(pq, lk, style, highway_col, kwargs):
+def _tiled_page(src, lk, style, highway_col, kwargs):
     """render(tiles=True) by the Rust engine: the PMTiles archive of the page, and ``style`` made as the tiled page's (render_web's tiled
-    branch): one vector source ``roads`` with the layers ``simple`` and ``slots``. The tiles are the Rust Tiler's, with the columns of
-    tiles.build_pmtiles (``keep`` and every ``__rs_*``; the slots whole, from zoom 14)."""
+    branch): one vector source ``roads`` with the layers ``simple`` and ``slots``. The tiles are stage 2 of the same stage 1 (``src``, in
+    memory: no second build), with the columns of tiles.build_pmtiles (``keep`` and every ``__rs_*``; the slots whole, from zoom 14)."""
     srcs = style["sources"]
     tc = lk["config"]["tiles"]
     z0, z1 = int(tc["minzoom"]), int(tc["maxzoom"])
     keep = sorted({highway_col, kwargs.get("filter_col") or highway_col, "__rs_twoway", "__rs_edge", "lvl", kwargs.get("width_m_col")} - {None})
     names = [n for n in ("roads", "simple", "slots") if n in srcs and srcs[n]["data"]["features"]]
-    t = rust().Tiler(pq, json.dumps({**lk, "args": {**lk["args"], "tile_keep": keep, "tile_layers": names}}), None, None, "", [])
+    t = src.tiles(names, keep)
     def points(g):            # a LineString's points, a Point itself
         c = (g or {}).get("coordinates") or []
         return [c] if (g or {}).get("type") == "Point" else c
