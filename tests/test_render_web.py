@@ -583,7 +583,7 @@ def test_web_panel_popup_mode_and_select_events():
     default = render_edges(_edges(), backend="web").html
     assert _opt(default, "popup_mode") == "popup"
     for html in (panel, default):
-        assert 'CustomEvent("rs:select"' in html and 'CustomEvent("rs:deselect"' in html
+        assert '_emit("rs:select"' in html and '_emit("rs:deselect"' in html          # the page sends both events (core.js, _emit)
 
 
 def test_render_edges_scoped_settings():

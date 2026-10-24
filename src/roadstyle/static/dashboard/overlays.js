@@ -4,7 +4,7 @@
 // overlays (zone fills) — and a selected road also reports the interactive overlays under the
 // click (rs:select detail.overlays), so a sidebar can show the road AND its zone together.
 import {POPUP, _rfields} from "../popup.js";
-import {map, O, OVERLAYS} from "./core.js";
+import {map, O, OVERLAYS, _emit} from "./core.js";
 import {_popupMode, rsInfoShow, _tlHost} from "./panel.js";
 import {rsDeselect, _rrows, _TIP_DELAY} from "./select.js";
 let _OV_POPUP = true;       // overlay_popup=False: no overlay shows a popup (an Overlay's popup_window=False: that one); a click still selects and fires rs:select
@@ -51,8 +51,7 @@ export function handleOverlayClick(e, tier){                      // info popup 
       }
       // overlay clicks feed dashboards exactly like road clicks: rs:select with the overlay's
       // label + popup fields, so a sidebar shows sensor/zone info without extra wiring
-      document.dispatchEvent(new CustomEvent("rs:select",
-        {detail:{id:f.id, layer:ov.label, overlay:ov.label, fields:fields, properties:p}}));
+      _emit("rs:select", {id:f.id, layer:ov.label, overlay:ov.label, fields:fields, properties:p});
       return true;
     }
   }
@@ -68,7 +67,7 @@ export function rsSetOverlay(labelOrIdx, on){
     map.setLayoutProperty(id,"visibility", on?"visible":"none"); });
   ov.visible = !!on;
   if(_ovCbs[ov.label]) _ovCbs[ov.label].checked = !!on;
-  document.dispatchEvent(new CustomEvent("rs:overlaychange",{detail:{overlay:ov.label, visible:!!on}}));
+  _emit("rs:overlaychange", {overlay:ov.label, visible:!!on});
 }
 function _ovRow(ov){
   const lab=document.createElement("label");

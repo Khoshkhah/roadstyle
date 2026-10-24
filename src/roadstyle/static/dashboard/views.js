@@ -1,6 +1,6 @@
 // views (docs/design/core_model_and_views.md): a name and a set of settings, applied together through the functions above;
 // a view sets only what it names. window.rsSetView(name|index) is the API, the View menu is UI over it.
-import {map, O} from "./core.js";
+import {map, O, _emit} from "./core.js";
 import {_tlHost} from "./panel.js";
 import {rsSetColorField, rsSetRoadFill} from "./color.js";
 import {FILTER, _fltSw, rsSetClasses, rsSetBridges, rsSetTunnels} from "./filter.js";
@@ -26,7 +26,7 @@ export function rsSetView(nameOrIdx){
     for(const c in _fltSw) if(sw[c]) _fltSw[c].style.background = sw[c]; }
   _vwActive = i;
   const sel=document.getElementById("vw-select"); if(sel) sel.value=String(i);
-  document.dispatchEvent(new CustomEvent("rs:viewselect",{detail:{view:v.name, index:i}}));
+  _emit("rs:viewselect", {view:v.name, index:i});
 }
 export function initViews(){
   VIEWS = O.views;

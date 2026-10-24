@@ -1,6 +1,6 @@
 // "colour by" recolouring: each option's fill is baked per edge (__rs_fill / __rs_fill__1 …), and the road layers' expressions (made
 // in Python, render_web._fill_expr) pick the active option from the state rs_co. window.rsSetColorField sets it from your UI.
-import {map, O, OVERLAYS, RS_LEAN, RoadTable, _lyr, _src} from "./core.js";
+import {map, O, OVERLAYS, RS_LEAN, RoadTable, _lyr, _src, _emit} from "./core.js";
 import {_tlHost} from "./panel.js";
 import {coUpdateLegend} from "./legend.js";
 export let COLOR_OPTIONS = [];
@@ -47,14 +47,13 @@ export function rsSetColorField(nameOrIdx){
   map.setGlobalStateProperty("rs_co", idx);
   const sel=document.getElementById("co-select"); if(sel) sel.value=String(idx);
   coUpdateLegend();
-  document.dispatchEvent(new CustomEvent("rs:colorchange",{detail:{option:o,index:idx}}));
+  _emit("rs:colorchange", {option:o,index:idx});
 }
 export function rsColor(ids, color, layer){   // paint an id set one colour; rsColor(null) resets
   const L=_lyr(layer); if(!L) return;
   if(L.ov){      // an overlay's colours: its state rs_ov_<n>, which its layers read (render_web._state_expressions)
     map.setGlobalStateProperty("rs_ov_"+OVERLAYS.indexOf(L.ov), ids!=null && color ? _colorsOf([{ids:Array.from(ids), color:color}]) : {});
-    document.dispatchEvent(new CustomEvent("rs:colorchange",
-      {detail:{overlay:L.ov.label, ids:ids==null?null:Array.from(ids), color:color||null}}));
+    _emit("rs:colorchange", {overlay:L.ov.label, ids:ids==null?null:Array.from(ids), color:color||null});
     return;
   }
   // one set + colour, or several sets in one call — rsColor([[idsA,"#f80"],[idsB,"#08f"]]);
@@ -67,10 +66,9 @@ export function rsColor(ids, color, layer){   // paint an id set one colour; rsC
   if(_qColor && !_qColor.length) _qColor=null;
   if(RS_LEAN){ _by.color = _byRow(_qColor); _applyC(); }
   else map.setGlobalStateProperty("rs_colors", _colorsOf(_qColor));
-  document.dispatchEvent(new CustomEvent("rs:colorchange",
-    {detail:(!_qColor || _qColor.length===1)
+  _emit("rs:colorchange", (!_qColor || _qColor.length===1)
       ? {ids:_qColor && _qColor[0].ids, color:_qColor && _qColor[0].color}
-      : {groups:_qColor.map(g=>({ids:g.ids, color:g.color}))}}));
+      : {groups:_qColor.map(g=>({ids:g.ids, color:g.color}))});
 }
 // rsColorBase([[ids, colour], ...]): recolour groups under rsColor's own, for a host that paints its own roads (a restricted road, a
 // picked road) and must not lose them when another caller uses rsColor; rsColorBase(null) clears them. rsColor(null) does not.
@@ -78,7 +76,7 @@ export function rsColorBase(groups){
   const g = Array.isArray(groups) ? groups.filter(g=>g&&g[0]!=null&&g[1]).map(g=>({ids:Array.from(g[0]), color:g[1]})) : [];
   if(RS_LEAN){ _by.base = _byRow(g); _applyC(); }
   else map.setGlobalStateProperty("rs_base", _colorsOf(g));      // the full look's road layers read it, under rs_colors
-  document.dispatchEvent(new CustomEvent("rs:colorchange",{detail:{base:true, groups:g.map(x=>({ids:x.ids, color:x.color}))}}));
+  _emit("rs:colorchange", {base:true, groups:g.map(x=>({ids:x.ids, color:x.color}))});
 }
 // the road's own fill on or off: window.rsSetRoadFill(on) sets the state rs_fill_on, which the fill layers' opacities read (road_fill=False:
 // the casing only, the layers stay for clicks and hovers)
@@ -86,7 +84,7 @@ let RS_ROAD_FILL = {on:true, paint:{}};
 export function rsSetRoadFill(on){
   map.setGlobalStateProperty("rs_fill_on", !!on);
   RS_ROAD_FILL.on = !!on;
-  document.dispatchEvent(new CustomEvent("rs:roadfillchange",{detail:{road_fill:!!on}}));
+  _emit("rs:roadfillchange", {road_fill:!!on});
 }
 let _coBox = null;   // the Colour by menu
 // the colour options and the menu: at the start, and again for a new style (rs.setStyle) in the same place in the stack

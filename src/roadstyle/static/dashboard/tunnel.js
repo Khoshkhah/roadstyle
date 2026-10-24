@@ -1,6 +1,6 @@
 // the tunnel look, v2's slider (docs/design/tunnel_look.md): TUNNEL.strength 0-100 moves a tunnel's colours toward TUNNEL.to.fill.
 // The expressions that do it are made in Python and read the state (rs_tun_*); rsSetTunnelStyle only sets it.
-import {map, O} from "./core.js";
+import {map, O, _emit} from "./core.js";
 import {_tlHost} from "./panel.js";
 export let TUNNEL = {layers:{}};
 export let _tunOn = false;
@@ -27,7 +27,7 @@ export function rsSetTunnelStyle(o){
   if(r) r.value = _tnStep(TUNNEL.strength); if(v) v.textContent = Math.round(TUNNEL.strength)+"%"; if(s) s.value = TUNNEL.palette;
   if(tw) tw.value = TUNNEL.toward;
   if(q) q.value = TUNNEL.ratio.join(":"); if(pr) pr.value = String(TUNNEL.strength);
-  document.dispatchEvent(new CustomEvent("rs:tunnelchange",{detail:{strength:TUNNEL.strength, palette:TUNNEL.palette, ratio:TUNNEL.ratio, toward:TUNNEL.toward}}));
+  _emit("rs:tunnelchange", {strength:TUNNEL.strength, palette:TUNNEL.palette, ratio:TUNNEL.ratio, toward:TUNNEL.toward});
 }
 let _TN_STEPS = [];       // one slider for every colour (the profile's tunnels.steps)
 const _tnStep = v => _TN_STEPS.reduce((b, [x], i)=> Math.abs(x - v) < Math.abs(_TN_STEPS[b][0] - v) ? i : b, 0);   // the nearest step

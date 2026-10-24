@@ -1,11 +1,11 @@
 // 2D/3D camera: window.rsSetView3D(on) tilts to the configured camera.pitch_3d (2D also
 // squares the bearing back to north); the toggle button is UI over it and follows any pitch
 // change — its label shows the view it will switch TO.
-import {map, O} from "./core.js";
+import {map, O, _emit} from "./core.js";
 export let VIEW_CTRL = null;   // the 2D/3D button's group (features.js puts the 3D buildings' button under it)
 export function rsSetView3D(on){
   on ? map.easeTo({pitch:O.pitch_3d, duration:600}) : map.easeTo({pitch:0, bearing:0, duration:600});
-  document.dispatchEvent(new CustomEvent("rs:viewchange",{detail:{view3d:!!on}}));
+  _emit("rs:viewchange", {view3d:!!on});
 }
 export function initView3D(){
   window.rsSetView3D = rsSetView3D;

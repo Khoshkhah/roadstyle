@@ -3,7 +3,7 @@
 // The colour goes through color.js, which also has rsColor's and rsColorBase's colours for rs_c (theirs win).
 // No new style and no tile reload: a second call replaces only the values. rs.clearData() takes them away. The legend shows the data, and
 // the popup and the panel show the joined fields (core.js, _joined).
-import {map, O, RoadTable, _src, _setJoined} from "./core.js";
+import {map, O, RoadTable, _src, _setJoined, _emit} from "./core.js";
 import {setLiveLegend} from "./legend.js";
 import {setLiveColors} from "./color.js";
 let _liveRows = [];                  // the rows that have a live width now
@@ -59,12 +59,12 @@ export async function setData(table, opts){
   _setJoined(joined);
   setLiveLegend(o.legend === false ? null : legend && {...legend, ...(o.legend || {})});
   const ms = performance.now() - t0;
-  document.dispatchEvent(new CustomEvent("rs:datachange", {detail: {rows: rows.length, matched: joined.size, colorBy: o.colorBy || null, widthBy: o.widthBy || null, ms}}));
+  _emit("rs:datachange", {rows: rows.length, matched: joined.size, colorBy: o.colorBy || null, widthBy: o.widthBy || null, ms});
   return {rows: rows.length, matched: joined.size, ms};
 }
 export function clearData(){
   const L = O.live, s = _src("simple");
   if(L && s) _liveRows.forEach(i => map.removeFeatureState({...s, id: i}, L.width));
   _liveRows = []; setLiveColors(null); _setJoined(null); setLiveLegend(null);
-  document.dispatchEvent(new CustomEvent("rs:datachange", {detail: {rows: 0, matched: 0, colorBy: null, widthBy: null}}));
+  _emit("rs:datachange", {rows: 0, matched: 0, colorBy: null, widthBy: null});
 }

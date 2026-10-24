@@ -1,7 +1,7 @@
 // road-class filtering: window.rsSetClasses([...]) shows exactly those classes and hides the
 // rest across every road layer; the collapsible checkbox panel is just UI over it. The class
 // filter composes (AND) with the id filter from rsFilter below.
-import {map, O, OVERLAYS, RS_PREFIX, RoadTable, _has, _itemOv, _rprops, _sfeats, _src, _role, _lyr} from "./core.js";
+import {map, O, OVERLAYS, RS_PREFIX, RoadTable, _has, _itemOv, _rprops, _sfeats, _src, _role, _lyr, _emit} from "./core.js";
 import {_popupMode, _tlHost} from "./panel.js";
 export let FILTER = {on:false, classes:[]};
 const _fltCbs={}, _fltBase={};
@@ -59,19 +59,18 @@ export function rsSetClasses(visible){
   _fltVis=new Set(visible);
   const hidden=_applyRoadFilters();
   FILTER.classes.forEach(c=>{ if(_fltCbs[c]) _fltCbs[c].checked=_fltVis.has(c); });
-  document.dispatchEvent(new CustomEvent("rs:filterchange",
-    {detail:{visible:FILTER.classes.filter(c=>_fltVis.has(c)), hidden:hidden}}));
+  _emit("rs:filterchange", {visible:FILTER.classes.filter(c=>_fltVis.has(c)), hidden:hidden});
 }
 export const _fltSw = {};   // class -> its swatch element in the Roads panel
 export function rsSetBridges(on){
   _bridgesOn=!!on; _applyRoadFilters();
   const cb=document.getElementById("rs-flt-br"); if(cb) cb.checked=_bridgesOn;
-  document.dispatchEvent(new CustomEvent("rs:filterchange",{detail:{bridges:_bridgesOn}}));
+  _emit("rs:filterchange", {bridges:_bridgesOn});
 }
 export function rsSetTunnels(on){
   _tunnelsOn=!!on; _applyRoadFilters();
   const cb=document.getElementById("rs-flt-tn"); if(cb) cb.checked=_tunnelsOn;
-  document.dispatchEvent(new CustomEvent("rs:filterchange",{detail:{tunnels:_tunnelsOn}}));
+  _emit("rs:filterchange", {tunnels:_tunnelsOn});
 }
 export function rsFilter(ids, layer){   // show only these features; rsFilter(null) resets
   const L=_lyr(layer); if(!L) return;
@@ -79,13 +78,12 @@ export function rsFilter(ids, layer){   // show only these features; rsFilter(nu
     // an overlay attached to edges: its own ids AND its edges' filter (the one lookup above)
     if(ids==null) delete _ovIds[L.ov.label]; else _ovIds[L.ov.label]=Array.from(ids);
     if(L.ov.base) _applyRoadFilters(); else _ovApply(L.ov);
-    document.dispatchEvent(new CustomEvent("rs:filterchange",
-      {detail:{overlay:L.ov.label, ids:ids==null?null:Array.from(ids)}}));
+    _emit("rs:filterchange", {overlay:L.ov.label, ids:ids==null?null:Array.from(ids)});
     return;
   }
   _qIds = ids==null ? null : Array.from(ids);
   _applyRoadFilters();
-  document.dispatchEvent(new CustomEvent("rs:filterchange",{detail:{ids:_qIds}}));
+  _emit("rs:filterchange", {ids:_qIds});
 }
 // a not attached overlay's layers: each one's own filter, AND its rsFilter ids, AND its kinds (rsSetKinds)
 function _ovApply(ov){
@@ -102,7 +100,7 @@ export function rsSetKinds(label, list){
   const L=_lyr(label); if(!L || !L.ov) return;
   _ovKinds[L.ov.label] = list==null ? null : Array.from(list);
   _ovApply(L.ov);
-  document.dispatchEvent(new CustomEvent("rs:filterchange",{detail:{overlay:L.ov.label, kinds:list==null?null:Array.from(list)}}));
+  _emit("rs:filterchange", {overlay:L.ov.label, kinds:list==null?null:Array.from(list)});
 }
 // rsSetModes(list): only the roads that one of these modes can use (the road table's flags driving, walking, cycling; null: all);
 // one road filter with the classes, the access kinds and rsFilter
@@ -111,12 +109,12 @@ export function rsSetModes(list){
   if(_modes==null) _modeRows=null;
   else{ _modeRows=new Set(); for(let i=0, n=RoadTable.rows(); i<n; i++){ const p=RoadTable.props(i); if(_modes.some(m=>p[m]===true)) _modeRows.add(i); } }
   _applyRoadFilters();
-  document.dispatchEvent(new CustomEvent("rs:filterchange",{detail:{modes:_modes && _modes.slice()}}));
+  _emit("rs:filterchange", {modes:_modes && _modes.slice()});
 }
 export function rsSetAccess(kind, on){      // show / hide the roads of one access kind
   on ? _accHid.delete(kind) : _accHid.add(kind); _applyRoadFilters();
   const cb=document.getElementById("rs-flt-acc-"+kind); if(cb) cb.checked=!!on;
-  document.dispatchEvent(new CustomEvent("rs:filterchange",{detail:{access:kind, visible:!!on}}));
+  _emit("rs:filterchange", {access:kind, visible:!!on});
 }
 // a new roads style (rs.setStyle): its layers' own filters are read again, and the switches that are off hide its roads too
 export function useFilter(){

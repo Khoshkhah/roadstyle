@@ -2,11 +2,10 @@
 // tooltip and popup. The layers are found by their roles in the style's metadata (audit R7): the 3D buildings are the layers with
 // roadstyle:group "buildings 3D", which belong to the overlay with their source; a layer's start switches are its entry in
 // roadstyle:controls.overlays (interactive, tooltip, popup_window).
-import {map, O, OVERLAYS, RS_PREFIX} from "./core.js";
+import {map, O, OVERLAYS, RS_PREFIX, _emit} from "./core.js";
 import {_ovCbs} from "./overlays.js";
 import {VIEW_CTRL} from "./view3d.js";
 let _b3d = [], _b3dOv = null, _b3dOn = false;     // the 3D layers' ids, their overlay, the switch
-const _fire = (type, detail) => document.dispatchEvent(new CustomEvent(type, {detail}));
 // the 3D buildings show while the switch is on and their overlay (the buildings) is shown
 function _show3d(){
   const on = _b3dOn && !!_b3dOv && _b3dOv.visible !== false;
@@ -17,7 +16,7 @@ export function rsSetBuildings3D(on){
   const cb = document.getElementById("rs-b3d"); if(cb) cb.checked = _b3dOn;
   const bt = document.getElementById("rs-b3d-btn");
   if(bt){ bt.classList.toggle("rs-on", _b3dOn); bt.title = _b3dOn ? "Flat buildings" : "Buildings in 3D"; }
-  _fire("rs:buildings3dchange", {on: _b3dOn});
+  _emit("rs:buildings3dchange", {on: _b3dOn});
 }
 // rsSetInteraction(label, {clickable, tooltip, popup}): a base-map layer's clicks (its hover and select colour), its hover tooltip (its
 // field list, else its popup's, else every field: true) and its click popup
@@ -28,7 +27,7 @@ export function rsSetInteraction(label, opts){
   if("clickable" in o) ov.interactive = !!o.clickable;
   if("tooltip" in o) ov.tooltip = o.tooltip ? (_tips[ov.label] || (ov.popup && ov.popup.length ? ov.popup : true)) : null;
   if("popup" in o) ov.popup_window = !!o.popup;
-  _fire("rs:interactionchange", {overlay: ov.label, ...rsGetInteraction(label)});
+  _emit("rs:interactionchange", {overlay: ov.label, ...rsGetInteraction(label)});
 }
 export function rsGetInteraction(label){
   const ov = OVERLAYS.find(o => o.label === label);

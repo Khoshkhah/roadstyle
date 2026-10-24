@@ -12,6 +12,8 @@ export let RS_TILED = false;
 // on the fill pieces of that layer (__rs_k 1, their __rs_edge is the road's row), and its hover / select glow is the feature-state of those
 // pieces (_fs).
 export let RS_LEAN = false;
+// a dashboard event: document's CustomEvent `type` with `detail` (the rs:* events of docs/reference/javascript.md)
+export const _emit = (type, detail) => document.dispatchEvent(new CustomEvent(type, {detail}));
 export let RS_DECK_LAYERS = [];
 // extra overlay layers (zones / POIs / lines), their metadata: label, source, layers, popup, tooltip, interactive, under, base, ...
 export let OVERLAYS = [];
@@ -147,8 +149,7 @@ export function rsHighlight(ids, layer){ // selection glow on an id set; rsHighl
     const cur = ids==null ? [] : Array.from(ids);
     _qHlOv[L.ov.label]=cur;
     cur.forEach(i=>map.setFeatureState({source:L.src,id:i},{select:true}));
-    document.dispatchEvent(new CustomEvent("rs:highlightchange",
-      {detail:{overlay:L.ov.label, ids:cur.slice()}}));
+    _emit("rs:highlightchange", {overlay:L.ov.label, ids:cur.slice()});
     return;
   }
   _qHl.forEach(i=>_fs({source:"roads",id:i},{select:false}));
@@ -160,7 +161,7 @@ export function rsHighlight(ids, layer){ // selection glow on an id set; rsHighl
     if(p && p.lvl>0) _deckIdsForRoad(i).forEach(d=>dset.add(d)); });
   _qHlD = Array.from(dset);
   _qHlD.forEach(i=>_fs({source:"decks",id:i},{select:true}));
-  document.dispatchEvent(new CustomEvent("rs:highlightchange",{detail:{ids:_qHl.slice()}}));
+  _emit("rs:highlightchange", {ids:_qHl.slice()});
 }
 function _bbExtend(c, bb){  // walk any GeoJSON coordinates nesting (Point .. MultiPolygon)
   if(typeof c[0]==="number"){ bb.ok=true;
