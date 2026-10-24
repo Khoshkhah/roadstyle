@@ -6,6 +6,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# a new push to a branch cancels its older runs (the runners are shared)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest

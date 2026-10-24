@@ -16,6 +16,11 @@ env:
   RUST: "1.99.1"                  # the version the goldens were checked with (rustc --version)
   CARGO_BUILD_JOBS: "4"
 
+# a new push to a branch cancels its older runs (the runners are shared)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   rust:
     runs-on: ubuntu-latest
