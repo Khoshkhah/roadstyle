@@ -68,12 +68,12 @@ fn py_str(c: Cell) -> String {
     }
 }
 
-/// _keystr: a categorical value as a key (str, stripped, lower case). A missing value is "nan": pandas 3 holds a missing value of a
-/// text or float column as NaN, and str(NaN) is "nan" (only a column of Python objects holds None, whose key is "").
+/// _keystr: a categorical value as a key (str, stripped, lower case). A missing value is "" (2026-10-24): pandas holds it as None or
+/// as NaN by its version (Python 3.10's pandas gave "", newer ones "nan"), so both engines say so explicitly.
 fn keystr(v: Option<Cell>) -> String {
     match v {
-        None => "nan".into(),
-        Some(c) if c.is_null() => "nan".into(),
+        None => String::new(),
+        Some(c) if c.is_null() => String::new(),        // a missing value is "" (stylers._keystr), on every pandas version
         Some(c) => py_str(c).trim().to_lowercase(),
     }
 }
@@ -403,5 +403,12 @@ mod tests {
         let two = Ramp::new(&json!(["#000000", "white"])).unwrap();
         assert_eq!(two.hex(0.25), "#3f3f3f", "int(0.25 * 255.9999) = 63");
         assert!(Ramp::new(&json!("no such ramp")).is_err());
+    }
+
+    #[test]
+    fn a_missing_category_is_empty_text() {
+        let nan = json!(null);
+        assert_eq!((keystr(None), keystr(Some(Cell::Null)), keystr(Some(Cell::Float(f64::NAN))), keystr(Some(Cell::Json(&nan)))), ("".into(), "".into(), "".into(), "".into()));
+        assert_eq!(keystr(Some(Cell::Str(" Primary "))), "primary");
     }
 }

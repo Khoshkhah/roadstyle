@@ -151,8 +151,11 @@ class ClassStyler:
 
 
 def _keystr(v) -> str:
-    """Normalise a categorical value to a lookup key (str, stripped, lower-cased)."""
-    return ("" if v is None else str(v)).strip().lower()
+    """Normalise a categorical value to a lookup key (str, stripped, lower-cased). A missing value (None, or a float NaN: pandas gives
+    either, by its version) is "" in both engines (colors.rs keystr)."""
+    if v is None or (isinstance(v, float) and v != v):
+        return ""
+    return str(v).strip().lower()
 
 
 def _as_float(v):
