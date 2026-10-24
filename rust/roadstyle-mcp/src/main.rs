@@ -280,7 +280,7 @@ fn render_file(a: RenderFile) -> Result<(String, PathBuf), String> {
     let mut given = Map::new();
     given.insert("api_key".into(), key.map_or(Value::Null, Value::String));
     given.insert("street_view_key".into(), std::env::var("GOOGLE_MAPS_KEY").ok().filter(|v| !v.is_empty()).map_or(Value::Null, Value::String));
-    let page = roadstyle::page_options::page_from(roads, &resolved, &o, &given)?;
+    let page = roadstyle::page_options::page_from(roads, None, &resolved, &o, &given)?;
     let html = page.html.replacen("__MAPLIBRE_CSS__", MAPLIBRE_CSS, 1).replacen("__MAPLIBRE_JS__", &MAPLIBRE_JS.replace("</script>", "<\\/script>"), 1);
     if let Some(d) = out.parent() {
         std::fs::create_dir_all(d).map_err(|e| format!("{}: {e}", d.display()))?;
