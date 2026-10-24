@@ -28,7 +28,10 @@ usage:
   roadstyle levels solve <area folder>
       levels.csv and levels_info.json from the area's input and your edits.csv, heads.csv and caps.csv (roadstyle-levels solve).
   roadstyle serve <area folder> [--port 8780] [--page DIR]
-      the level editor at http://127.0.0.1:<port>/level_editor/ (roadstyle-levels edit).";
+      the level editor at http://127.0.0.1:<port>/level_editor/ (roadstyle-levels edit).
+  roadstyle snapshot <page.html> <out.png> [--center LON,LAT] [--zoom Z] [--pitch P] [--bearing B] [--width 1200] [--height 800]
+                    [--scale 1] [--settle 2.5] [--timeout 40]
+      a PNG of a saved page, drawn by Chromium (roadstyle-snapshot; Python's rs.snapshot).";
 
 /// The positional arguments and the options (`--name value`, or a flag with no value), the names with `_` for `-`.
 fn split(args: &[String]) -> (Vec<String>, Vec<(String, Option<String>)>) {
@@ -181,6 +184,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
             println!("level editor: http://127.0.0.1:{port}/level_editor/  ({area}; Ctrl+C to stop)");
             crate::serve(Path::new(area), page, port)
         }
+        ("snapshot", [page, out]) => snapshot(page, out, opts),
         ("help" | "-h", _) => {
             println!("{USAGE}");
             Ok(())
@@ -255,4 +259,36 @@ fn tile_of(lon: f64, lat: f64, z: u32) -> [u32; 2] {
     let x = ((lon + 180.0) / 360.0 * n).floor().clamp(0.0, n - 1.0);
     let y = ((1.0 - lat.tan().asinh() / std::f64::consts::PI) / 2.0 * n).floor().clamp(0.0, n - 1.0);
     [x as u32, y as u32]
+}
+
+/// `snapshot`: the PNG of a saved page; a map that did not load in the time is taken with a warning (on stderr), as in Python.
+fn snapshot(page: &str, out: &str, mut opts: Vec<(String, Option<String>)>) -> Result<(), String> {
+    use roadstyle_snapshot::{Camera, Shot};
+    let num = |k: &str, v: Option<String>| -> Result<Option<f64>, String> {
+        v.map(|v| v.parse::<f64>().map_err(|_| format!("--{k} needs a number, not {v:?}"))).transpose()
+    };
+    let center = match take(&mut opts, "center") {
+        Some(c) => {
+            let ll: Vec<f64> = c.split(',').map(|v| v.trim().parse::<f64>()).collect::<Result<_, _>>().map_err(|_| "--center needs LON,LAT")?;
+            Some(<[f64; 2]>::try_from(ll).map_err(|_| "--center needs LON,LAT")?)
+        }
+        None => None,
+    };
+    let cam = Camera { center, zoom: num("zoom", take(&mut opts, "zoom"))?, pitch: num("pitch", take(&mut opts, "pitch"))?,
+                       bearing: num("bearing", take(&mut opts, "bearing"))? };
+    let d = Shot::default();
+    let secs = |k: &str, v: Option<String>, d: std::time::Duration| num(k, v).map(|x| x.map_or(d, std::time::Duration::from_secs_f64));
+    let shot = Shot { width: num("width", take(&mut opts, "width"))?.map_or(d.width, |x| x as u32),
+                      height: num("height", take(&mut opts, "height"))?.map_or(d.height, |x| x as u32),
+                      scale: num("scale", take(&mut opts, "scale"))?.unwrap_or(d.scale),
+                      settle: secs("settle", take(&mut opts, "settle"), d.settle)?, timeout: secs("timeout", take(&mut opts, "timeout"), d.timeout)? };
+    if let Some((k, _)) = opts.first() {
+        return Err(format!("snapshot: unknown option --{k}\n{USAGE}"));
+    }
+    let pic = roadstyle_snapshot::snapshot(page.as_ref(), out.as_ref(), &cam, &shot).map_err(|e| e.to_string())?;
+    if let Some(w) = pic.warning {
+        eprintln!("roadstyle: warning: {w}");
+    }
+    println!("{out}");
+    Ok(())
 }

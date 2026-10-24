@@ -9,6 +9,7 @@ export function pyrepr(v){
   if(typeof v === "number") return Number.isInteger(v) ? String(v) : String(v);
   if(typeof v === "string") return "'" + v.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
   if(Array.isArray(v)) return "[" + v.map(pyrepr).join(", ") + "]";
+  if(v instanceof Map) return "{" + [...v].map(([k, x]) => pyrepr(k) + ": " + pyrepr(x)).join(", ") + "}";   // keys of any type (a number, a bool)
   return "{" + Object.entries(v).map(([k, x]) => pyrepr(k) + ": " + pyrepr(x)).join(", ") + "}";
 }
 

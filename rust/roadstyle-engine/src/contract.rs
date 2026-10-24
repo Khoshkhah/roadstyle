@@ -32,7 +32,7 @@ pub fn page_state(look: &crate::Look, active: usize, n_overlays: usize) -> Map<S
         .unwrap_or_else(|| vec![1.0, 1.0]);
     // render's road_fill: the start value of rs_fill_on (off: each fill's opacity is 0)
     let road_fill = !matches!(look.args["road_fill"], Value::Bool(false));
-    let mut state = json!({"rs_co": active, "rs_colors": {}, "rs_base": {}, "rs_fill_on": road_fill,
+    let mut state = json!({"rs_co": active, "rs_top": [], "rs_fill_on": road_fill,
         "rs_tun_strength": cfg["tunnel_strength"].as_f64().unwrap_or(0.0), "rs_tun_toward": colour, "rs_tun_two": pair.is_some(),
         "rs_tun_c0": pair.as_ref().map_or(dash, |p| &p[0]), "rs_tun_c1": pair.as_ref().map_or(dash, |p| &p[1]), "rs_tun_ratio": ratio})
         .as_object().unwrap().clone();

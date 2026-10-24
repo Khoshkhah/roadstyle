@@ -317,7 +317,7 @@ MapLibre applies to each piece at each frame.
 | `layers` | the drawing rules, in drawing order: each layer takes some features of one source and says how to draw them |
 | `glyphs` | the address of the fonts for the street names (MapLibre's font server) |
 | `sprite` | the address of the one-way arrow image: only in the tiled style of `export_style`. The inline style gives the image in the metadata (`roadstyle:images`), and the page adds it |
-| `state` | only in a live style (the page): the start value of each global state that the controls change (`rs_co`, `rs_colors`, `rs_fill_on`, `rs_tun_*`, `rs_palette`) |
+| `state` | only in a live style (the page): the start value of each global state that the controls change (`rs_co`, `rs_top`, `rs_fill_on`, `rs_tun_*`, `rs_palette`; the full look has `rs_colors` and `rs_base` in place of `rs_top`) |
 | `metadata` | the `roadstyle:*` keys for the page and the dashboard (below) |
 
 #### Its sources

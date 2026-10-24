@@ -16,3 +16,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 base64.workspace = true
 flate2 = "1"                        # the page writer: the gzipped sources
+
+[features]
+# GeoPackage: SQLite is C (rusqlite bundled), so the native programs only (the MCP server, the CLI); never in wasm (CI checks it)
+gpkg = ["roadstyle-io/gpkg"]

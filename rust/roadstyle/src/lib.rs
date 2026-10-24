@@ -4,7 +4,9 @@
 //! needs both the engine and the tiles. A Rust user adds only this crate.
 
 pub use roadstyle_engine::*;
-pub use roadstyle_io::{duckosm, geojson, read};
+pub use roadstyle_io::{crs, duckosm, geojson, read, shp};
+#[cfg(feature = "gpkg")]
+pub use roadstyle_io::gpkg;
 pub mod level_area;
 pub mod level_editor;
 pub mod page;

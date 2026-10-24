@@ -50,5 +50,12 @@ jobs:
           pip install -e ".[dev]" playwright
           playwright install --with-deps chromium
 
+      - name: The Rust program roadstyle, for the Rust snapshot's test (tests/test_snapshot_rust.py)
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal    # the version of the Rust workflow
+          (cd rust && cargo +1.99.1 build --locked -p roadstyle-cli)
+
       - name: Tests (incl. browser)
         run: pytest -q
+        env:
+          ROADSTYLE_BIN: rust/target/debug/roadstyle

@@ -68,6 +68,8 @@ jobs:
           cargo build --offline --release --target wasm32-unknown-unknown -p roadstyle --no-default-features
           io=$(cargo tree --offline -e normal --prefix none $core | grep -E '^(roadstyle-io|parquet) ' || true)
           if [ -n "$io" ]; then echo "the core depends on a reader: $io"; exit 1; fi
+          # GeoPackage (rusqlite, SQLite in C) is for the native programs only: the browser package must not have it
+          if cargo tree --offline --target wasm32-unknown-unknown -e normal -p roadstyle-wasm -i rusqlite >/dev/null 2>&1; then echo "roadstyle-wasm depends on rusqlite (the gpkg feature)"; exit 1; fi
 
   python:
     # the Python binding (phase P5): build roadstyle._rust and check that the two engines give the same style
