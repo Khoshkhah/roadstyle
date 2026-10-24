@@ -734,6 +734,8 @@ pub struct PageInfo {
     pub tunnel_dash: Vec<String>,
     pub tunnel_casing: Map<String, Value>,
     pub fill_paint: Map<String, Value>,
+    /// the dash patterns of the road layer's features (the pieces' and the items' `__rs_dash`), sorted: the page's simple-mode script
+    pub dashes: Vec<String>,
 }
 
 #[allow(clippy::too_many_arguments)] // the sources of the style, as make_parts has them
@@ -865,6 +867,7 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
     sdashes.extend(items.iter().filter_map(|p| p.get("__rs_dash").and_then(Value::as_str)).filter(|d| !d.is_empty()).map(String::from));
     sdashes.sort();
     sdashes.dedup();
+    info.dashes = sdashes.clone();
     if !sdashes.is_empty() || any_tunnel {
         paint.insert("line-dasharray".into(), simple_dasharray(&sdashes));
     }

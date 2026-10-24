@@ -219,11 +219,11 @@ mod wasm {
         roadstyle::make_sources(parquet, look, features, planner, name).map(|inner| Sources { inner }).map_err(|e| JsError::new(&e))
     }
 
-    /// tileSources(sources, prefix, keep): stage 2 from memory (the typed pieces, no GeoJSON text); it takes the sources. The Tiler's
-    /// style has the one vector source `<prefix>roads/{z}/{x}/{y}`.
+    /// tileSources(sources, prefix, keep): stage 2 from memory (the typed pieces, no GeoJSON text; the sources stay as they are). The
+    /// Tiler's style has the one vector source `<prefix>roads/{z}/{x}/{y}`, with the pieces' promoteId (roadstyle::tile_stage).
     #[wasm_bindgen(js_name = tileSources)]
-    pub fn tile_sources(sources: Sources, prefix: &str, keep: Vec<String>) -> Result<Tiler, JsError> {
-        let (style, tiles) = roadstyle::tile_made(sources.inner, prefix, &keep).map_err(|e| JsError::new(&e))?;
+    pub fn tile_sources(sources: &Sources, prefix: &str, keep: Vec<String>) -> Result<Tiler, JsError> {
+        let (style, tiles) = roadstyle::tile_made(&sources.inner, prefix, &keep).map_err(|e| JsError::new(&e))?;
         Ok(Tiler { style, tiles })
     }
 
@@ -247,12 +247,12 @@ mod wasm {
     }
 
     /// tileFiles(files, prefix, keep): stage 2 from stage 1's files (GeoJSON or GeoParquet, as style.json names them); the Tiler's
-    /// style is the saved style with the one vector source.
+    /// style is the saved style with the one vector source (roadstyle::tiled_style).
     #[wasm_bindgen(js_name = tileFiles)]
     pub fn tile_files(files: &FileSet, prefix: &str, keep: Vec<String>) -> Result<Tiler, JsError> {
         let read = |n: &str| files.files.get(n).cloned().ok_or_else(|| format!("{n}: not in the files"));
-        let (style, tiles) = roadstyle::tile_files_with(read, &keep, None).map_err(|e| JsError::new(&e))?;
-        Ok(Tiler { style: roadstyle::vector_style(&style, prefix, tiles.zooms()).to_string(), tiles })
+        let (style, tiles) = roadstyle::tile_files_with(read, &keep, None, &roadstyle::xyz_at(prefix)).map_err(|e| JsError::new(&e))?;
+        Ok(Tiler { style: style.to_string(), tiles })
     }
 
     /// makeLook(options: string) -> string: the look (look.json) of render_edges' palette, profile and settings (roadstyle-rs look.rs);

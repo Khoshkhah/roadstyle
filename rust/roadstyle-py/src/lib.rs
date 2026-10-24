@@ -114,17 +114,24 @@ impl Sources {
         String::from_utf8(out).expect("JSON text is UTF-8")
     }
 
-    /// tiles(only, exact=None, keep=[]) -> Tiler: stage 2 from memory, with the look's tile settings (make_sources saves them): the
-    /// sources `only` (render(tiles=True)'s tile_layers), the columns `exact` of the roads and the pieces (its tile_keep), `keep` more
-    /// columns. It takes the JSON sources out of these Sources: read style() first.
-    #[pyo3(signature = (only, exact=None, keep=Vec::new()))]
-    fn tiles(&mut self, py: Python<'_>, only: Vec<String>, exact: Option<Vec<String>>, keep: Vec<String>) -> PyResult<Tiler> {
+    /// tile_stage(only=None, exact=None, keep=[], at=None) -> (style, Tiler): stage 2 from memory (roadstyle::tile_stage), with the
+    /// look's tile settings (make_sources saves them): the style that draws the tiles (JSON text) and the tiles. `only`: the sources in
+    /// the tiles (render(tiles=True)'s tile_layers; the others stay in the style), `exact`: the columns of the roads and the pieces
+    /// (its tile_keep), `keep`: more columns, `at`: where the tiles are, as JSON text (`{"url": "pmtiles://roads"}`; None: a folder,
+    /// `roads/{z}/{x}/{y}`). These Sources stay as they are.
+    #[pyo3(signature = (only=None, exact=None, keep=Vec::new(), at=None))]
+    fn tile_stage(&self, py: Python<'_>, only: Option<Vec<String>>, exact: Option<Vec<String>>, keep: Vec<String>, at: Option<String>) -> PyResult<(String, Tiler)> {
         use roadstyle::tiles::stage::{TileOptions, COLUMNS, TILES};
-        let s = &mut self.inner;
+        let s = &self.inner;
         let mut o = TileOptions::new(&s.layers, &s.metadata, &s.saved[TILES], &s.saved[COLUMNS], &keep).map_err(PyValueError::new_err)?;
-        (o.exact, o.only) = (exact.map(|e| e.into_iter().collect()), Some(only));
-        let tiles = py.detach(|| roadstyle::tile_sources(s, &o));
-        Ok(Tiler { style: String::new(), tiles })
+        (o.exact, o.only) = (exact.map(|e| e.into_iter().collect()), only);
+        let at = match at {
+            Some(t) => serde_json::from_str(&t).map_err(|e| PyValueError::new_err(format!("at: not JSON: {e}")))?,
+            None => roadstyle::xyz_at(""),
+        };
+        let (style, tiles) = py.detach(|| roadstyle::tile_stage(s, &o, &at));
+        let style = style.to_string();
+        Ok((style.clone(), Tiler { style, tiles }))
     }
 
     /// metadata() -> str: the style's metadata as JSON text (the controls, the interaction, the colour options), without the sources.
@@ -169,8 +176,8 @@ fn make_sources(py: Python<'_>, roads: Vec<u8>, look: String, features: Option<V
 #[pyfunction]
 #[pyo3(signature = (dir, keep=Vec::new(), prefix=String::new()))]
 fn tile_files(py: Python<'_>, dir: String, keep: Vec<String>, prefix: String) -> PyResult<Tiler> {
-    let (style, tiles) = py.detach(|| roadstyle::tile_files(std::path::Path::new(&dir), &keep, None)).map_err(PyValueError::new_err)?;
-    Ok(Tiler { style: roadstyle::vector_style(&style, &prefix, tiles.zooms()).to_string(), tiles })
+    let (style, tiles) = py.detach(|| roadstyle::tile_files(std::path::Path::new(&dir), &keep, None, &roadstyle::xyz_at(&prefix))).map_err(PyValueError::new_err)?;
+    Ok(Tiler { style: style.to_string(), tiles })
 }
 
 /// compute_levels(roads, method, cols, ...) -> (rows, info): roadstyle's compute_levels on the roads in their order (GeoParquet bytes), with

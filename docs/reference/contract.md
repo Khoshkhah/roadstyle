@@ -17,7 +17,7 @@ The export's style (`export_style`, `export_inline`: `state` baked) has `roadsty
 |---|---|
 | `roadstyle:contract` | the version of the contract: 1 |
 | `roadstyle:state` | each global state `rs_*` and its start value |
-| `roadstyle:controls` | the options of `rsDashboard` that come from the style (the next table) |
+| `roadstyle:controls` | the options of `rsDashboard` that come from the style (the next table), and `dashes`: the sorted dash patterns of the road layer's features, for the page's simple-mode script (not an option) |
 | `roadstyle:interaction` | `{popup, tooltip, hover_delay_ms}`: the road popup's fields, the hover tooltip, the hover delay |
 | `roadstyle:color_options` | `[{name, prop, legend}]`: the colour options and their legends |
 | `roadstyle:live` | with `live_data=True` only: `{color, width, types, ramp, nodata}`: the feature states that the road layer reads on the road's row (`rs_c` a colour, `rs_w` a width factor), the default ramp (9 colours of `cmap`) and the no-data colour; a page gives it to the dashboard as the option `live` (null without `live_data`) |

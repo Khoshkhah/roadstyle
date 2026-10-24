@@ -48,17 +48,13 @@ fn columns(look: &Value) -> Value {
     json!({"class": arg("highway_col"), "filter": arg("filter_col"), "width": arg("width_m_col")})
 }
 
-/// Stage 2 from memory: the tiles of stage 1's sources (`o`: the rules). The JSON sources go into the tiles (and out of `s`); the roads
-/// and the pieces stay.
-pub fn tile_sources(s: &mut sources::Sources, o: &tiles::stage::TileOptions) -> tiles::Tiles {
+/// Stage 2 from memory: the tiles of stage 1's sources (`o`: the rules), borrowed (audit N6: `s` stays as it is).
+fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> tiles::Tiles {
     let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px);
     let keys = |v: &Value| -> std::collections::HashSet<String> {
         v["data"]["features"].as_array().into_iter().flatten().filter_map(|f| f["properties"].as_object()).flat_map(|p| p.keys().cloned()).collect()
     };
-    for (k, src) in s.sources.iter_mut() {
-        if !o.wants(k) {
-            continue;
-        }
+    for (k, src) in s.sources.iter().filter(|(k, _)| o.wants(k)) {
         match src {
             // the roads, from the table and the marks (no copy of their properties); a page has none
             Src::Roads(_) if !s.roads.in_style => {}
@@ -73,29 +69,85 @@ pub fn tile_sources(s: &mut sources::Sources, o: &tiles::stage::TileOptions) -> 
             }
             Src::Json(v) => {
                 let (keep, whole, from) = o.rule(k, || keys(v));
-                tiled.add(k, std::mem::take(v), &keep, whole, from) // frees the source's tree
+                tiled.add(k, v, &keep, whole, from)
             }
         }
     }
     tiled
 }
 
-/// Stage 2 from stage 1's files in `dir` (GeoJSON or GeoParquet, as style.json names them): the saved style and the tiles. `o`: other
-/// rules than the style's.
-pub fn tile_files(dir: &std::path::Path, keep: &[String], o: Option<tiles::stage::TileOptions>) -> Result<(Value, tiles::Tiles), String> {
-    tile_files_with(|name| std::fs::read(dir.join(name)).map_err(|e| format!("{name}: {e}")), keep, o)
+/// Stage 2 from memory (audit N3): the tiles of stage 1's sources and the one style that draws them (`tiled_style`), the tiles at `at`
+/// (`{"url": "pmtiles://roads"}` for an archive, `{"tiles": ["<prefix>roads/{z}/{x}/{y}"]}` for a folder). `o`: which sources and
+/// which properties. The sources that `o` leaves out stay in the style with their data.
+pub fn tile_stage(s: &sources::Sources, o: &tiles::stage::TileOptions, at: &Value) -> (Value, tiles::Tiles) {
+    let tiles = tile_sources(s, o);
+    let mut style = s.style(|_| String::new());
+    let mut tiled = Vec::new();
+    for (i, (k, _)) in s.sources.iter().enumerate().filter(|(_, (_, src))| !matches!(src, Src::Roads(_)) || s.roads.in_style) {
+        if o.wants(k) {
+            tiled.push(k.clone());
+        } else {
+            let mut data = Vec::new();
+            s.write_data(i, &s.drawn(&[]), &mut data).expect("a Vec takes every byte");
+            style["sources"][k]["data"] = serde_json::from_slice(&data).expect("the engine writes JSON");
+        }
+    }
+    (tiled_style(style, &tiled, at, (o.min_zoom, o.max_zoom)), tiles)
+}
+
+/// The style that draws stage 2's tiles: the sources `tiled` become the tile layers of one vector source `roads` (first, at `at`, with the
+/// tiles' zooms and the pieces' `promoteId`), and each layer on one of them draws its tile layer (`source-layer`); the other sources stay.
+pub fn tiled_style(mut style: Value, tiled: &[String], at: &Value, zooms: (u32, u32)) -> Value {
+    let is_tiled = |v: &Value| v.as_str().is_some_and(|s| tiled.iter().any(|t| t == s));
+    let promote = if tiled.iter().any(|t| t == "simple") { style["sources"]["simple"]["promoteId"].as_str().map(|p| json!({"simple": p})) } else { None };
+    for l in style["layers"].as_array_mut().into_iter().flatten() {
+        if let Some(src) = l.get("source").cloned().filter(is_tiled) {
+            l["source-layer"] = src;
+            l["source"] = tiles::SOURCE.into();
+        }
+    }
+    let mut vector = serde_json::Map::new();
+    vector.insert("type".into(), "vector".into());
+    vector.extend(at.as_object().into_iter().flatten().map(|(k, v)| (k.clone(), v.clone())));
+    vector.insert("minzoom".into(), zooms.0.into());
+    vector.insert("maxzoom".into(), zooms.1.into());
+    if let Some(p) = promote {          // the pieces' row as the feature id, as on the GeoJSON source
+        vector.insert("promoteId".into(), p);
+    }
+    let mut sources = serde_json::Map::new();
+    sources.insert(tiles::SOURCE.into(), Value::Object(vector));
+    for (k, v) in style["sources"].as_object().into_iter().flatten() {
+        if !tiled.iter().any(|t| t == k) {
+            sources.insert(k.clone(), v.clone());
+        }
+    }
+    style["sources"] = Value::Object(sources);
+    style
+}
+
+/// The location of an XYZ folder of tiles at `prefix` (`<prefix>roads/{z}/{x}/{y}`), as `tile_stage`'s `at`.
+pub fn xyz_at(prefix: &str) -> Value {
+    json!({"tiles": [format!("{prefix}{}/{{z}}/{{x}}/{{y}}", tiles::SOURCE)]})
+}
+
+/// Stage 2 from stage 1's files in `dir` (GeoJSON or GeoParquet, as style.json names them): the style that draws the tiles
+/// (`tiled_style`, the tiles at `at`) and the tiles. `o`: other rules than the style's.
+pub fn tile_files(dir: &std::path::Path, keep: &[String], o: Option<tiles::stage::TileOptions>, at: &Value) -> Result<(Value, tiles::Tiles), String> {
+    tile_files_with(|name| std::fs::read(dir.join(name)).map_err(|e| format!("{name}: {e}")), keep, o, at)
 }
 
 /// Stage 2 from stage 1's files, each read by `read` (a file name: its bytes), as `tile_files` does.
-pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[String], o: Option<tiles::stage::TileOptions>)
+pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[String], o: Option<tiles::stage::TileOptions>, at: &Value)
                        -> Result<(Value, tiles::Tiles), String> {
     let style: Value = serde_json::from_slice(&read("style.json")?).map_err(|e| format!("style.json: {e}"))?;
     let o = match o { Some(o) => o, None => tiles::stage::TileOptions::from_style(&style, keep)? };
     let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px);
+    let mut names = Vec::new();
     for (k, spec) in style["sources"].as_object().into_iter().flatten() {
         if !o.wants(k) || spec["type"] != "geojson" {
             continue;
         }
+        names.push(k.clone());
         let file = spec["data"].as_str().ok_or_else(|| format!("source {k}: its data is not a file name"))?;
         let mut fc: Value = if file.ends_with(".parquet") { read::features(read(file)?)? }
                             else { serde_json::from_slice(&read(file)?).map_err(|e| format!("{file}: {e}"))? };
@@ -113,9 +165,9 @@ pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[S
         let src = json!({"type": "geojson", "data": fc});
         let (keep, whole, from) = o.rule(k, || src["data"]["features"].as_array().into_iter().flatten()
             .filter_map(|f| f["properties"].as_object()).flat_map(|p| p.keys().cloned()).collect());
-        tiled.add(k, src, &keep, whole, from);
+        tiled.add(k, &src, &keep, whole, from);
     }
-    Ok((style, tiled))
+    Ok((tiled_style(style, &names, at, (o.min_zoom, o.max_zoom)), tiled))
 }
 
 /// The file format of stage 1's sources.
@@ -246,30 +298,11 @@ pub fn save_sources(s: &sources::Sources, dir: &std::path::Path, format: Format,
     Ok(files)
 }
 
-/// A style of stage 1 (its sources GeoJSON) for stage 2's tiles: one vector source, `<prefix>roads/{z}/{x}/{y}` with the tiles' zooms,
-/// and each layer on the tile layer of its old source (`source-layer`).
-pub fn vector_style(style: &Value, prefix: &str, zooms: (u32, u32)) -> Value {
-    let mut style = style.clone();
-    let promote = style["sources"]["simple"]["promoteId"].as_str().map(|p| json!({"simple": p}));
-    for l in style["layers"].as_array_mut().into_iter().flatten() {
-        if let Some(src) = l.get("source").cloned() {
-            l["source-layer"] = src;
-            l["source"] = tiles::SOURCE.into();
-        }
-    }
-    style["sources"] = json!({tiles::SOURCE: {"type": "vector", "tiles": [format!("{prefix}{}/{{z}}/{{x}}/{{y}}", tiles::SOURCE)],
-                                              "minzoom": zooms.0, "maxzoom": zooms.1}});
-    if let Some(p) = promote {          // the pieces' row as the feature id, as on the GeoJSON source
-        style["sources"][tiles::SOURCE]["promoteId"] = p;
-    }
-    style
-}
-
-/// Stage 2 from memory, with the rules of the look that made `s` (make_sources saves them): the tiled style and the tiles.
-pub fn tile_made(mut s: sources::Sources, prefix: &str, keep: &[String]) -> Result<(String, tiles::Tiles), String> {
+/// Stage 2 from memory, with the rules of the look that made `s` (make_sources saves them): the tiled style (the tiles in a folder at
+/// `prefix`) and the tiles.
+pub fn tile_made(s: &sources::Sources, prefix: &str, keep: &[String]) -> Result<(String, tiles::Tiles), String> {
     let o = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &s.saved[tiles::stage::TILES], &s.saved[tiles::stage::COLUMNS], keep)?;
-    let tiled = tile_sources(&mut s, &o);
-    let style = vector_style(&s.style(|_| String::new()), prefix, tiled.zooms());
+    let (style, tiled) = tile_stage(s, &o, &xyz_at(prefix));
     Ok((style.to_string(), tiled))
 }
 
@@ -282,14 +315,14 @@ pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name:
                   -> Result<(String, tiles::Tiles), String> {
     let cfg_all: Value = serde_json::from_str(look).map_err(|e| format!("look: not JSON: {e}"))?;
     let (feats, features, _) = tables(parquet, features, None)?;
-    let mut s = sources::Sources::new(make_parts(feats, look, features, None, name)?);
+    let s = sources::Sources::new(make_parts(feats, look, features, None, name)?);
     let mut o = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &cfg_all["config"]["tiles"], &columns(&cfg_all), keep)
         .map_err(|e| format!("look: config.{e}"))?;
     // render(tiles=True)'s page (the Python binding): the columns of its road and simple tiles (`tile_keep`; every __rs_* goes too) and
     // the sources in its tiles (`tile_layers`: roads, simple, slots; the page keeps the others inline)
     o.exact = cfg_all["args"]["tile_keep"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
     o.only = cfg_all["args"]["tile_layers"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
-    let tiled = tile_sources(&mut s, &o);
-    Ok((vector_style(&s.style(|_| String::new()), prefix, (o.min_zoom, o.max_zoom)).to_string(), tiled))
+    let (style, tiled) = tile_stage(&s, &o, &xyz_at(prefix));
+    Ok((style.to_string(), tiled))
 }
 

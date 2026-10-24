@@ -117,7 +117,7 @@ fn main() {
     if args.len() == 3 && args[1] == "--tile-files" {
         // stage 2 from stage 1's files: the time, and the tiles of zoom 15 around the roads (their number and size)
         let t = Instant::now();
-        let (style, tiles) = roadstyle_rs::tile_files(std::path::Path::new(&args[2]), &[], None).unwrap_or_else(|e| fail(e));
+        let (style, tiles) = roadstyle_rs::tile_files(std::path::Path::new(&args[2]), &[], None, &roadstyle_rs::xyz_at("")).unwrap_or_else(|e| fail(e));
         let made = t.elapsed();
         let c = &style["center"];
         let (lon, lat) = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));

@@ -138,7 +138,7 @@ pub fn controls(look: &Value, roads: &Roads, info: PageInfo, active: usize) -> R
     // a page is in simple mode, in both ways: the pieces pick and glow (the road layer roads-simple), and there are no fill layers
     Ok(json!({"tiles": tiles, "simple": "roads-simple", "pitch_3d": cam["pitch_3d"],
         "select_color": select, "filter": filter_panel(look, roads, &m), "color_active": active, "overlays": info.overlays, "tunnel": tunnel,
-        "fill_layers": [], "road_fill": {"on": args["road_fill"] != false, "paint": info.fill_paint}, "views": views,
+        "fill_layers": [], "road_fill": {"on": args["road_fill"] != false, "paint": info.fill_paint}, "views": views, "dashes": info.dashes,
         "items": items, "edge_id_col": args["edge_id_col"].as_str().unwrap_or("edge_id"), "arrow_icon": arw["icon"], "arrow_color": arw["color"],
         "arrow_rules": {"mainBelow": arw["main_below"], "main": arw["main"], "minLenPx": place["min_len_px"], "minGapPx": place["min_gap_px"],
                         "nameGapPx": place["name_gap_px"], "edgePx": place["edge_px"], "charWidth": place["char_width"],
