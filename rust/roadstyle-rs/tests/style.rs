@@ -25,6 +25,7 @@ fn plugin_look(bytes: &[u8]) -> String {
     let mut look: serde_json::Value = serde_json::from_slice(bytes).unwrap();
     look["args"]["arrows"] = true.into();
     look["args"]["labels"] = true.into();
+    look["args"]["export"] = true.into();        // the plugin's style is an export: the roads source too (audit N2)
     look.to_string()
 }
 

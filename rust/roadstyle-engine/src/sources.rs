@@ -50,6 +50,25 @@ impl Sources {
         self.roads.read = Some(self.drawn(&[]));
     }
 
+    /// Stage 3 of a page with inline data (audit N2): its one-way arrows are points that the page puts on each one-way road in the window
+    /// (the dashboard's arrows.js, the empty source `arrows`), not symbols along the slots. The metadata says it (`roadstyle:arrows`).
+    pub fn page_arrows(&mut self) {
+        let Some(l) = self.layers.iter_mut().find(|l| l["id"] == "roads-arrows" && l["source"] == "slots") else { return };
+        l["source"] = "arrows".into();
+        let old = l["layout"].as_object().cloned().unwrap_or_default();
+        let mut layout = serde_json::json!({"symbol-placement": "point", "icon-rotate": ["get", "b"], "icon-allow-overlap": false,
+                                            "icon-ignore-placement": true});
+        let m = layout.as_object_mut().unwrap();
+        m.extend(old.into_iter().filter(|(k, _)| k != "symbol-placement" && k != "symbol-spacing"));
+        l["layout"] = layout;
+        let at = self.sources.iter().position(|(k, _)| k == "slots").map_or(self.sources.len(), |i| i + 1);
+        self.sources.insert(at, ("arrows".into(), Src::Json(serde_json::json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": []}}))));
+        if let Some(m) = self.metadata.as_object_mut().filter(|m| m.contains_key("roadstyle:contract")) {
+            m.insert("roadstyle:sources".into(), crate::contract::roles(&self.layers));
+            m.insert("roadstyle:arrows".into(), crate::contract::arrow_kind(&self.layers));
+        }
+    }
+
     /// The properties that the drawing reads (tiles.py's tile_props): every text in the layers, the popup and tooltip fields, `name`,
     /// `kind` and `keep`; every `__rs_*` property goes too.
     pub fn drawn(&self, keep: &[String]) -> HashSet<String> {

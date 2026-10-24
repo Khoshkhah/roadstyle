@@ -299,7 +299,9 @@ def test_live_style_and_contract(part, keywords, case):
     parts = rs.render_edges(part, backend="web", _parts=True, **{**keywords, **opts})
     py, page = parts["style"], parts["options"]
     lk = _engine._look_of({**keywords, "view_3d": False, **opts, "state": "live"})
-    ru = json.loads(_engine.rust().make_style(_engine._geoparquet(part), json.dumps(lk), None, None, None))
+    src = _engine.rust().make_sources(_engine._geoparquet(part), json.dumps(lk), None, None, None)
+    src.page_arrows()           # stage 3 of the inline page (audit N2): the arrows as points
+    ru = json.loads(src.style())
     meta = ru.pop("metadata")
     assert meta["roadstyle:contract"] == 1
     assert diff(meta["roadstyle:state"], {k: v["default"] for k, v in py["state"].items()}) == []

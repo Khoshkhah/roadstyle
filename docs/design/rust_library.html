@@ -2377,8 +2377,11 @@ uses <a href="review_checklist.md">review_checklist.md</a>):</p>
    done.</li>
 <li>R2 (stage 1 once, its typed output kept; a view's palette as a restyle: done, <code>roadstyle-engine::palettes</code>), R1 with R8 (each layer
    and dashboard module declares what it reads; one class index: done), R4 (one <code>Topology</code>: done), then the second audit's items
-   (<a href="audit_2026-10-24.md">audit_2026-10-24.md</a>) in this order: N1 (integers past 2^53 stay Int64 in the model), N3 (one <code>tile_stage</code>),
-   N7 (one writer of <code>roadstyle:sources</code>, <code>roadstyle:arrows</code>, <code>roadstyle:live</code>), N2 (stage 1 without the <code>tiles</code> and <code>state</code> switches),
+   (<a href="audit_2026-10-24.md">audit_2026-10-24.md</a>) in this order: N1 (integers past 2^53 stay Int64 in the model: done), N3 (one <code>tile_stage</code>: done),
+   N7 (one writer of <code>roadstyle:sources</code>, <code>roadstyle:arrows</code>, <code>roadstyle:live</code>: done), N2 (stage 1 without the <code>tiles</code> and <code>state</code>
+   switches: done; decided 2026-10-24: only <code>export_inline</code>, <code>export_style</code> and its first stage <code>export_geojson</code>, apps with no road table,
+   keep a <code>roads</code> source with its pick and highlight layers, through an internal <code>export</code> flag; every other style is the road-table form;
+   stage 3 picks the arrow kind),
    N4 with R1 (one typed road table), N6 then N5 (stage 2 borrows the sources; the border files from Arrow), the engine side of N8 (every
    style reads <code>rs_c</code> and <code>rs_w</code>); then R3 (a typed stage 3, one <code>__RS_OPTIONS__</code>; with it rule 5, the page options in the engine,
    <code>contract.rs</code>). Rust only, with no Python golden: <code>live_data</code>, <code>export_geojson</code> / <code>tile_geojson</code> and the GeoParquet road table. R17 grew:

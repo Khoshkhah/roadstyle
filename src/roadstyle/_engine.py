@@ -110,6 +110,7 @@ def export_inline(edges, **kwargs) -> dict:
     kwargs = dict(kwargs)
     kwargs.pop("engine", None)
     kwargs.setdefault("view_3d", True)      # as export_inline
+    kwargs["export"] = True                 # an app with no road table: the roads source, its pick and highlight (audit N2)
     lk = _look_of(kwargs)
     text = rust().make_style(_geoparquet(edges), json.dumps(lk), None, None, kwargs.get("name") or "roads")     # export_inline's name
     _warn()
@@ -126,6 +127,7 @@ def export_geojson(edges, out_dir, *, format="geojson", keep=None, **kwargs) -> 
     kwargs = dict(kwargs)
     kwargs.pop("engine", None)
     kwargs.setdefault("view_3d", True)      # as export_inline
+    kwargs["export"] = True                 # stage 1 of export_style: the roads source too (audit N2)
     lk = _look_of(kwargs)
     s = rust().make_sources(_geoparquet(edges), json.dumps(lk), None, None, kwargs.get("name") or "roads")
     files = s.save(str(out_dir), format, [str(c) for c in (keep or [])])
@@ -323,6 +325,7 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs
     name = kwargs.get("name") or "roads"
     kwargs.setdefault("view_3d", True)
     kwargs["tiles"] = True                                 # render's tiled look: the roads source draws (no lean mode)
+    kwargs["export"] = True                                # an app with no road table: the roads source, its pick and highlight (audit N2)
     lk = _look_of(kwargs)
     t = rust().Tiler(_geoparquet(edges), json.dumps(lk), None, name, "", [str(c) for c in edges.columns])   # every column: a click shows the data
     _warn()
@@ -428,6 +431,8 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
         _use(*prev)
     if tiled and any("palette" in v["set"] for v in views):
         raise ValueError("engine='rust': tiles=True with a view's palette (the tiles have one palette); use engine='python'")
+    if not tiled:
+        src.page_arrows()           # stage 3 of the inline page: the arrows are points that the page puts itself (audit N2)
     style, archive = _tiled_page(src, highway_col, kwargs) if tiled else (json.loads(src.style()), None)
     table = src.road_table()
     _warn()

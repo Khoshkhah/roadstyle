@@ -134,6 +134,11 @@ impl Sources {
         Ok((style.clone(), Tiler { style, tiles }))
     }
 
+    /// page_arrows(): stage 3 of a page with inline data: its one-way arrows are points that the page puts itself (the source arrows).
+    fn page_arrows(&mut self) {
+        self.inner.page_arrows();
+    }
+
     /// metadata() -> str: the style's metadata as JSON text (the controls, the interaction, the colour options), without the sources.
     fn metadata(&self) -> String {
         self.inner.metadata.to_string()

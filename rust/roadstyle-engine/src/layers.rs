@@ -790,9 +790,9 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
     let (cw, fw, bcw) = if items.is_empty() { (cw, fw, bcw) } else { (exp2(&cw), exp2(&fw), exp2(&bcw)) };
     let is_it = json!(["==", ["get", "__rs_k"], 5]);
     let soff = if items.is_empty() { off.clone() } else { by_feature(&[(is_it.clone(), metre_curve(&exp2(&off), "__rs_iom"))], &exp2(&off)) };
-    // a page (state "live"), in both ways: the pieces draw and pick, and the page has no roads source (the road table has the fields and
-    // the lines); the export keeps the roads, with their pick and highlight layers, for an app's clicks
-    let page = args["state"] == "live";
+    // audit N2: the pieces draw and pick, and the road table has the fields and the lines; only an export (an app with no road table)
+    // keeps the roads, with their pick and highlight layers, for its clicks
+    let export = args["export"] == true;
 
     // roads-simple and the invisible roads-fill (simple mode)
     // render's minzoom: true the config's table of the classes' first zooms, a mapping that table with changes, else none (_minzoom_filter)
@@ -940,7 +940,7 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
     }
     let mut layers = under;
     layers.push(road);
-    if !page {
+    if export {
         layers.push(pick);
     }
 
@@ -959,13 +959,9 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
             spacing.extend(zp.as_array().unwrap().iter().cloned());
         }
         let (arrows, labels) = (look["args"]["arrows"] != false, look["args"]["labels"] != false);
-        // the page with inline data puts one arrow per one-way road in the window into the "arrows" source (_rsArrows); tiles and the
-        // export repeat them along the slots
-        let (source, mut layout) = if live && args["tiles"] != true {
-            ("arrows", json!({"symbol-placement": "point", "icon-rotate": ["get", "b"], "icon-allow-overlap": false, "icon-ignore-placement": true}))
-        } else {
-            ("slots", json!({"symbol-placement": "line", "symbol-spacing": spacing}))
-        };
+        // the arrows along the slots; stage 3 chooses another kind (the inline page's points: Sources::page_arrows; the export's
+        // line-center, below)
+        let (source, mut layout) = ("slots", json!({"symbol-placement": "line", "symbol-spacing": spacing}));
         for (k, v) in [("icon-image", json!("oneway")), ("icon-rotation-alignment", json!("map")), ("symbol-sort-key", sort.clone()), ("icon-size", Value::Array(icon))] {
             layout[k] = v;
         }
@@ -996,7 +992,7 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
             layers.push(label_layer("roads-labels", Value::Array(lf)));
         }
     }
-    if !page {
+    if export {
         layers.push(highlight);
     }
     if decks {
@@ -1135,7 +1131,7 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
                 l.insert(k.into(), b);
             }
         }
-        if !live && l["id"].as_str().is_some_and(|i| i.starts_with("roads-arrows")) {
+        if export && l["id"].as_str().is_some_and(|i| i.starts_with("roads-arrows")) {
             if l["paint"].get("icon-color").is_none() {
                 l["paint"]["icon-color"] = arw["color"].clone();
             }

@@ -41,6 +41,7 @@ def test_tiles_from_the_files_are_the_tiles_of_the_one_call(part, keywords, tmp_
     # the one call: the same look, the tiles of the Tiler (render(tiles=True), export_style)
     kw = dict(keywords)
     kw.setdefault("view_3d", True)          # as export_geojson
+    kw["export"] = True                     # an export: the roads source too (audit N2)
     lk = _engine._look_of(kw)
     t = _engine.rust().Tiler(_engine._geoparquet(part), json.dumps(lk), None, "roads", "", [])
     one = t.archive(list(t.bounds()), t.layers())
@@ -152,3 +153,26 @@ def test_the_tiled_style_says_its_tile_layers(part, keywords):
     assert st["metadata"]["roadstyle:sources"]["simple"] == {"source": "roads", "layer": "simple"}
     assert st["metadata"]["roadstyle:arrows"] == inline["roadstyle:arrows"] and "simple" in t.layers()
     assert json.loads(src.style())["metadata"] == inline          # stage 2 borrows the sources (N6)
+
+
+def test_stage_1_is_the_road_table_form_and_only_an_export_has_the_roads(part, keywords):
+    """N2 (2026-10-24): stage 1 reads neither `state` nor `tiles`. A host's style (live or not) has no roads source, no pick or highlight
+    layer, and the pieces' promoteId; only an export (export_inline, export_style: an app with no road table) has the roads source with
+    its pick and highlight layers; the inline page's stage 3 makes the arrows points (page_arrows)."""
+    from roadstyle import _engine
+
+    def style(**kw):
+        return json.loads(_engine.rust().make_style(_engine._geoparquet(part), json.dumps(_engine._look_of({**keywords, **kw})), None, None, None))
+
+    for kw in ({}, {"state": "live"}, {"state": "live", "tiles": True}):
+        st = style(**kw)
+        ids = [lyr["id"] for lyr in st["layers"]]
+        assert "roads" not in st["sources"] and "roads-fill" not in ids and "roads-highlight" not in ids, kw
+        assert st["sources"]["simple"]["promoteId"] == "__rs_edge"
+        assert next(lyr for lyr in st["layers"] if lyr["id"] == "roads-arrows")["source"] == "slots", kw
+    ex = rs.export_inline(part, engine="rust", **keywords)
+    assert "roads" in ex["sources"] and {"roads-fill", "roads-highlight"} <= {lyr["id"] for lyr in ex["layers"]}
+    src = _engine.rust().make_sources(_engine._geoparquet(part), json.dumps(_engine._look_of({**keywords, "state": "live"})), None, None, None)
+    src.page_arrows()
+    st = json.loads(src.style())
+    assert next(lyr for lyr in st["layers"] if lyr["id"] == "roads-arrows")["source"] == "arrows" and st["metadata"]["roadstyle:arrows"] == "points"

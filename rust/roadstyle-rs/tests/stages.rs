@@ -15,6 +15,7 @@ fn same_tiles(area: &str) {
     let mut look: serde_json::Value = serde_json::from_slice(&data("look.json")).unwrap();
     look["args"]["arrows"] = true.into();
     look["args"]["labels"] = true.into();
+    look["args"]["export"] = true.into();        // export_style's two stages (audit N2)
     let look = look.to_string();
     let (roads, features) = (data(&format!("{area}/roads.parquet")), data(&format!("{area}/features.parquet")));
     let keep = ["osm_id".to_string(), "access".to_string()];

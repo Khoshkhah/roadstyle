@@ -18,6 +18,7 @@ fn check(case: &str) {
     let mut look: Value = serde_json::from_str(&std::fs::read_to_string(data("look.json")).unwrap()).unwrap();
     look["args"]["arrows"] = true.into(); // as tests/make_goldens.py: the engine always makes the names and arrows
     look["args"]["labels"] = true.into();
+    look["args"]["export"] = true.into(); // the goldens are exports (audit N2)
     for (k, v) in golden["args"].as_object().unwrap() {
         look["args"][k] = v.clone();
     }

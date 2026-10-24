@@ -180,9 +180,10 @@ fn style_parts(table: RoadTable, look_json: &Value, features: Option<Vec<Row>>, 
     // state "live" (a page with the dashboard, docs/design/rust_library.md "The interaction contract"): the state stays in the expressions,
     // and the style says what the controls show
     let live = look_json["args"]["state"] == "live";
-    // a page has no roads source: its pieces draw and glow (one feature state for each road's row), and the road table has the roads
-    // the pieces carry their road's row as the feature id in every style (the contract: the glow, rs.setData's states)
-    (roads.in_style, simple.promote) = (!live, true);
+    // audit N2 (2026-10-24): stage 1 gives the road-table form for every style (the pieces draw and glow, by their road's row; the road
+    // table has the roads); only an export (render's export_inline, export_style: an app with no road table) asks for the roads source
+    let export = look_json["args"]["export"] == true;
+    (roads.in_style, simple.promote) = (export, true);
     let (contract, state) = if live {
         let st = contract::page_state(&look_json, colors.active, ovs.len());
         (Some((contract::controls(&look_json, &roads.roads, info, colors.active)?, st.clone())),
@@ -207,15 +208,12 @@ fn style_parts(table: RoadTable, look_json: &Value, features: Option<Vec<Row>>, 
     sources.push(("simple".into(), Src::Simple(simple)));
     if !source_features(&slots).is_empty() {        // as Python: no slots source without slots
         let mut slots = slots;
-        if live {        // the arrow slots' numbers are for the export's thinning; the page puts the arrows itself
+        if !export {        // the arrow slots' numbers are for the export's thinning
             for f in slots["data"]["features"].as_array_mut().into_iter().flatten() {
                 f["properties"].as_object_mut().map(|p| p.shift_remove("__rs_arw"));
             }
         }
         sources.push(("slots".into(), Src::Json(slots)));
-        if live && arrows && look_json["args"]["tiles"] != true {        // the page fills it: one arrow per one-way road in the window
-            sources.push(("arrows".into(), Src::Json(json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": []}}))));
-        }
     }
     // render's boundary: a dashed outline over the roads (GeoJSON: a geometry, a Feature or a FeatureCollection; the Python binding
     // converts a shapely geometry or a GeoDataFrame)

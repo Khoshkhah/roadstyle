@@ -1297,8 +1297,11 @@ uses [review_checklist.md](review_checklist.md)):
    done.
 4. R2 (stage 1 once, its typed output kept; a view's palette as a restyle: done, `roadstyle-engine::palettes`), R1 with R8 (each layer
    and dashboard module declares what it reads; one class index: done), R4 (one `Topology`: done), then the second audit's items
-   ([audit_2026-10-24.md](audit_2026-10-24.md)) in this order: N1 (integers past 2^53 stay Int64 in the model), N3 (one `tile_stage`),
-   N7 (one writer of `roadstyle:sources`, `roadstyle:arrows`, `roadstyle:live`), N2 (stage 1 without the `tiles` and `state` switches),
+   ([audit_2026-10-24.md](audit_2026-10-24.md)) in this order: N1 (integers past 2^53 stay Int64 in the model: done), N3 (one `tile_stage`: done),
+   N7 (one writer of `roadstyle:sources`, `roadstyle:arrows`, `roadstyle:live`: done), N2 (stage 1 without the `tiles` and `state`
+   switches: done; decided 2026-10-24: only `export_inline`, `export_style` and its first stage `export_geojson`, apps with no road table,
+   keep a `roads` source with its pick and highlight layers, through an internal `export` flag; every other style is the road-table form;
+   stage 3 picks the arrow kind),
    N4 with R1 (one typed road table), N6 then N5 (stage 2 borrows the sources; the border files from Arrow), the engine side of N8 (every
    style reads `rs_c` and `rs_w`); then R3 (a typed stage 3, one `__RS_OPTIONS__`; with it rule 5, the page options in the engine,
    `contract.rs`). Rust only, with no Python golden: `live_data`, `export_geojson` / `tile_geojson` and the GeoParquet road table. R17 grew:

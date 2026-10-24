@@ -13,7 +13,8 @@ fn data(p: &str) -> PathBuf {
 /// The engine's roads-only style for an area, with the look made from the golden's options.
 fn style(area: &str) -> Value {
     let o = common::gz_json(&format!("{area}/golden_options.json.gz"));
-    let look = roadstyle_rs::look::make_look(&o).unwrap();
+    let mut look = roadstyle_rs::look::make_look(&o).unwrap();
+    look["args"]["export"] = true.into();        // the goldens are exports: the roads source too (audit N2)
     let roads = std::fs::read(data(&format!("{area}/roads.parquet"))).unwrap();
     serde_json::from_str(&roadstyle_rs::make_style(roads, &look.to_string(), None, None, None).unwrap()).unwrap()
 }
@@ -78,7 +79,8 @@ fn same_props(a: &serde_json::Map<String, Value>, b: &serde_json::Map<String, Va
 /// properties, same geometry), summed over the golden tiles of each zoom.
 fn tile_summary(area: &str) -> Vec<(String, [usize; 5])> {
     let o = common::gz_json(&format!("{area}/golden_options.json.gz"));
-    let look = roadstyle_rs::look::make_look(&o).unwrap();
+    let mut look = roadstyle_rs::look::make_look(&o).unwrap();
+    look["args"]["export"] = true.into();        // export_style's tiles (audit N2)
     let roads = std::fs::read(data(&format!("{area}/roads.parquet"))).unwrap();
     let golden = common::gz_json(&format!("{area}/golden_tiles.json.gz"));
     let style = common::gz_json(&format!("{area}/golden_style.json.gz"));
