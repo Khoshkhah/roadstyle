@@ -1,6 +1,7 @@
-//! `roadstyle <command>`: the roadstyle program. Commands: `serve <area folder> [--port N] [--page DIR]`.
+//! `roadstyle <command>`: the roadstyle program. Commands: `serve <area folder> [--port N] [--page DIR]` (the level editor; its page files
+//! are in the program, `--page` takes them from a folder while you change them).
 
-const USAGE: &str = "usage: roadstyle serve <area folder> [--port 8780] [--page <the editor's files>]";
+const USAGE: &str = "usage: roadstyle serve <area folder> [--port 8780] [--page <a folder of the editor's files, in place of the program's>]";
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -24,9 +25,9 @@ fn run(args: &[String]) -> Result<(), String> {
                 }
             }
             let area = std::path::PathBuf::from(area.ok_or(USAGE)?);
-            let page = std::path::PathBuf::from(page.ok_or("--page: the folder of the editor's page (src/roadstyle/static/level_editor/)")?);
-            println!("level editor: http://127.0.0.1:{port}/  ({}; Ctrl+C to stop)", area.display());
-            roadstyle_cli::serve(&area, &page, port)
+            let page = page.map_or(roadstyle_cli::Page::Embedded, |p| roadstyle_cli::Page::Dir(p.into()));
+            println!("level editor: http://127.0.0.1:{port}/level_editor/  ({}; Ctrl+C to stop)", area.display());
+            roadstyle_cli::serve(&area, page, port)
         }
         _ => Err(USAGE.into()),
     }
