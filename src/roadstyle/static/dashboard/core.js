@@ -75,8 +75,11 @@ export function _pieces(e){
     if(!fs.length) return [];
     _pcIdx=m; _pcFs=fs; }
   return _pcIdx.get(e) || []; }
-export function _roadOfPiece(f){ const e=f.properties.__rs_edge;      // a fill piece, as the road feature it belongs to
-  return {id:e, properties:_rprops(e), layer:{id:RS_PREFIX+"roads-fill"}, get geometry(){ const r=_feats()[e]; return r && r.geometry; }}; }
+// a fill piece, as the road feature it belongs to. Its line: the road's whole line (inline data), else the piece's own (tiles keep no
+// road lines in the page: the piece under the click, cut at its tile) - Street View's spot, marker and steps need one
+export function _roadOfPiece(f){ const e=f.properties.__rs_edge;
+  return {id:e, get properties(){ return _rprops(e); }, layer:{id:RS_PREFIX+"roads-fill"},   // a getter: engine.props can answer later
+          get geometry(){ const r=_feats()[e]; return r ? r.geometry : f.geometry; }}; }
 export const _FILL_PIECE = ["any", ["==", ["get", "__rs_k"], 1], ["!", ["has", "__rs_k"]]];   // the fill pieces of the road layer, and what has no piece kind (overlays, decks)
 // ref.source: "roads" or "decks" (the roads style's, RS_PREFIX added here), or an overlay's source id. With tiles the glow is the state of the
 // road in the vector source "roads", source-layer "roads". Simple mode with tiles (the Rust engine's Tiler: its source-layer "roads" has

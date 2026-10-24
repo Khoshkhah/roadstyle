@@ -81,6 +81,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   column every deck had the fallback width. Now it reads `highway_col`.
 - **The paint order of a painted road in a tiled style** (`tiles=True`, `export_style`): `roads-fill` and `roads-highlight` shared one layout, so
   the +500 of a painted road was added two times to each. Now each layer gets it one time. The order on the map does not change.
+- **The Street View marker on vector tiles** (simple mode, the Rust engine's tiles). A road clicked on a tile piece had no line in the
+  page, so Street View had no spot: no marker, no heading, no steps, and Linked mode did not move the marker. Now the clicked piece's
+  own line is used, and the spot has the road's properties from `engine.props`.
 
 ### Changed
 - **One wheel with the Rust engine in it** (decision 5 of `docs/design/rust_library.md`). The package builds with maturin: each wheel has the

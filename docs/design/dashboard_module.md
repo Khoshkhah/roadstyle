@@ -75,8 +75,11 @@ rs.setStyle(style);
   and shows nothing. Without `engine.props` (the Python page) all of this runs at once, as before. `engine` is the same port as
   the plan's `engine.restyle`.
 - **Limits.** `rsQuery`, `rsFind`, `rsGetProps` and `rsFocus` need all roads' properties and lines in the page (inline data, or
-  Python's sidecar table `window.RS_SIDE`). With `engine.props` only, they find nothing. Street View takes the road's line from
-  its longest fill piece in the loaded tiles.
+  Python's sidecar table `window.RS_SIDE`). With `engine.props` only, they find nothing.
+- **Street View on tiles.** The spot, the marker, the heading and the step buttons need a line of the road. The page has no road
+  lines in tiles mode, so a click uses the line of the clicked piece (cut at its tile), and `rsSelect` uses the road's longest fill
+  piece in the loaded tiles. A step stops at the end of that piece. In Linked mode the marker goes to the next piece on the screen
+  when the viewer walks past the end. The marker is a MapLibre marker, not a layer: a new roads style (`setStyle`) does not remove it.
 
 ## The options
 
