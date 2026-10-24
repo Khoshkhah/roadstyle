@@ -2,8 +2,8 @@
 <html lang="en"><head><meta charset="utf-8"/>
 <title>roadstyle studio</title>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<!-- roadstyle studio in the browser: the knobs, roadstyle's Rust engine in a Web Worker (worker.js), the map with the dashboard
-     (preview.html) and the render_edges code of the knobs. No Python, no server except one that serves these files
+<!-- roadstyle studio in the browser: the knobs, roadstyle's Rust engine in a Web Worker (worker.js) that makes the whole page (the map,
+     the dashboard, a sidebar), that page in an iframe, and the Python code of the knobs. No Python, no server except one that serves these files
      (roadstyle serve, or python -m http.server in the repository's root). ui/studio/README.md. -->
 <style>
 :root{--side:340px;--ink:#334155;--muted:#767c88;--line:#e4e4e4;--accent:#7c4dff;--bg:#fff;--panel:#f8fafc}
@@ -32,11 +32,14 @@ select,input[type=text],input[type=file]{width:100%;box-sizing:border-box;font:i
 </head><body>
 <div id="side">
   <h1>roadstyle studio</h1>
+  <label for="page">Page</label>
+  <select id="page"><option value="map">Map</option><option value="dashboard">Dashboard</option><option value="report">Report</option></select>
+  <div class="sidebar-only" hidden><label for="title">Title</label><input id="title" type="text"></div>
   <details open><summary>Data</summary>
     <label for="sample">A sample network</label>
     <select id="sample"></select>
-    <label for="file">…or a road file (GeoJSON or GeoParquet, in EPSG:4326)</label>
-    <input id="file" type="file" accept=".geojson,.json,.parquet,.geoparquet">
+    <label for="file">…or a road file: GeoJSON or GeoParquet (EPSG:4326), or a Shapefile (its .shp, .dbf and .prj together)</label>
+    <input id="file" type="file" accept=".geojson,.json,.parquet,.geoparquet,.shp,.dbf,.prj" multiple>
     <div id="count" class="note"></div>
   </details>
   <details open><summary>Look</summary>
@@ -44,7 +47,7 @@ select,input[type=text],input[type=file]{width:100%;box-sizing:border-box;font:i
     <select id="palette"><option>amber</option><option>carto</option><option>highsat</option><option>mono</option></select>
     <label for="basemap">Base map</label>
     <select id="basemap"></select>
-    <div id="bmnote" class="note"></div>
+    <div class="sidebar-only" hidden><label>Base maps offered</label><div id="offered" class="list"></div></div>
     <label class="inline"><input id="view3d" type="checkbox"> 3D bridges (tilted view)</label>
     <label class="inline"><input id="tiles" type="checkbox"> Vector tiles (big networks)</label>
   </details>
@@ -63,10 +66,10 @@ select,input[type=text],input[type=file]{width:100%;box-sizing:border-box;font:i
     <label class="inline"><input id="arrows" type="checkbox" checked> One-way arrows</label>
   </details>
   <details><summary>Popup &amp; hover</summary>
-    <label for="popup">Click popup</label>
+    <div class="map-only"><label for="popup">Click popup</label>
     <select id="popup"><option value="curated">curated fields</option><option value="choose">choose columns</option>
       <option value="panel">side panel</option><option value="all">all columns</option><option value="off">off</option></select>
-    <div id="popupcols" class="list" hidden></div>
+    <div id="popupcols" class="list" hidden></div></div>
     <label>Hover tooltip columns</label>
     <div id="hover" class="list"></div>
   </details>
@@ -83,6 +86,7 @@ select,input[type=text],input[type=file]{width:100%;box-sizing:border-box;font:i
   <div id="bottom">
     <pre id="code"></pre>
     <div id="actions">
+      <button id="download" type="button">Download the page</button>
       <button id="copy" type="button">Copy the code</button>
       <div id="status"></div>
     </div>

@@ -1,5 +1,6 @@
-// roadstyle studio in the browser: the knobs of the Python studio's Map page (src/roadstyle/studio/map.py), roadstyle's Rust engine in a Web
-// Worker (worker.js: the look and stage 1 for each change of the knobs) and the map with the dashboard in an iframe (preview.html).
+// roadstyle studio in the browser: the knobs of the Python studio's Map, Dashboard and Report pages (src/roadstyle/studio/), roadstyle's
+// Rust engine in a Web Worker (worker.js: the whole page for each change of the knobs, page_from) and that page in an iframe. The page in
+// the iframe is the page that "Download" saves; the code panel is the Python call that makes it.
 import {pythonCode, pyrepr} from "./code.js";
 
 const $ = (id) => document.getElementById(id);
@@ -8,12 +9,18 @@ const OVERLAY_SAMPLES = {sensors: "sensors.geojson", zones: "zones.geojson"};
 const CMAPS = ["viridis", "plasma", "magma", "cividis", "coolwarm", "RdYlGn_r"];
 const OV_COLORS = ["#7c4dff", "#00bcd4", "#ff9800", "#e91e63"];
 const ID_COLS = new Set(["id", "fid", "gid", "uid", "objectid"]);
+// the pages (pages.render_dashboard, render_report: sidebar=), their Python call, title and base maps offered (studio/dashboard.py, report.py)
+const PAGES = {map: {fn: "render_edges", file: "map.html"},
+               dashboard: {fn: "render_dashboard", file: "dashboard.html", title: "Roads dashboard"},
+               report: {fn: "render_report", file: "report.html", title: "Roads report"}};
+const OFFERED = ["voyager", "positron", "dark_matter", "osm", "satellite", "blank"];
+const MAPLIBRE = "https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist";   // render_web._MAPLIBRE_CDN: the preview's MapLibre (a page's _repr_html_)
 
 // the state of the knobs
-const st = {data: null, loader: "", palette: "amber", basemap: "", view3d: false, tiles: false, colours: {}, classes: null, minzoom: false,
-            labels: true, arrows: true, popup: "curated", popupCols: [], hover: [], overlays: []};
-let table = null, columns = [], numeric = new Set(), allClasses = [], gen = 0, dashKey = "";
-let BM = {basemaps: [], switcher: []}, background = null, colourOpts = [{name: "Class"}];   // basemaps.json; the look's canvas colours; the last options
+const st = {data: null, loader: "", page: "map", title: "", palette: "amber", basemap: "", offered: [], view3d: false, tiles: false,
+            colours: {}, classes: null, minzoom: false, labels: true, arrows: true, popup: "curated", popupCols: [], hover: [], overlays: []};
+let table = null, columns = [], numeric = new Set(), allClasses = [], gen = 0, html = "", url = "";
+let BASEMAPS = [], colourOpts = [{name: "Class"}];      // basemaps.json's keys; the last colour options
 
 // ---------------------------------------------------------------- the engine in its worker
 const worker = new Worker(new URL("./worker.js", import.meta.url), {type: "module"});
@@ -21,36 +28,35 @@ let callId = 0;
 const pending = new Map();
 worker.onmessage = (e) => { const p = pending.get(e.data.id); pending.delete(e.data.id); e.data.ok ? p.ok(e.data) : p.no(new Error(e.data.error)); };
 const call = (msg, transfer) => new Promise((ok, no) => { const id = ++callId; pending.set(id, {ok, no}); worker.postMessage({...msg, id}, transfer || []); });
+window.studio = {debug: () => ({table, columns, allClasses, st})};      // for a check in a browser (the tests)
 
-// ---------------------------------------------------------------- what the preview asks for
-window.studio = {
-  dashboardOptions: () => ({basemaps: pageBasemaps(), basemap: st.basemap, dashboard: {popup_mode: st.popup === "panel" ? "panel" : "popup", street_view: "window"}}),
-  tile: async (url) => {                               // rs://<gen>/<source>/<z>/<x>/<y>, from the worker's Tiler
-    const [g, source, z, x, y] = url.slice("rs://".length).split("/");
-    if (+g !== gen) return new Uint8Array();
-    return (await call({type: "tile", source, z: +z, x: +x, y: +y})).bytes;
-  },
-  previewReady: () => previewWaiters.splice(0).forEach((f) => f()),
-  debug: () => ({table, columns, allClasses, st}),     // for a check in a browser (the tests), not for the preview
-};
-const previewWaiters = [];
-
-// ---------------------------------------------------------------- the look's options, the code's keywords
-// The knobs as the look's options (makeLook's input in the worker): render_edges' keywords that the engine reads.
+// ---------------------------------------------------------------- the page's keywords
+// render_edges' keywords of the knobs, in their order: the look's args (with state "live", as a page) and the code's keywords
+function keywords(co){
+  const P = PAGES[st.page], kw = {palette: st.palette, basemap: st.basemap};
+  if (P.title) { kw.basemaps = st.offered.length ? st.offered : null; kw.name = st.title || P.title; }
+  if (st.view3d) kw.view_3d = true;
+  if (st.tiles) kw.tiles = true;
+  if (co.length > 1) kw.color_options = Object.fromEntries(co.map(({name, ...o}) => [name, o]));
+  if (st.classes && st.classes.length !== allClasses.length) kw.include = st.classes;
+  if (st.minzoom) kw.minzoom = true;
+  if (!st.labels) kw.labels = false;
+  if (!st.arrows) kw.arrows = false;
+  if (!P.title) { const popup = {choose: st.popupCols, panel: "panel", all: "all", off: false}[st.popup]; if (popup !== undefined) kw.road_popup = popup; }
+  if (st.hover.length) kw.tooltip = st.hover;
+  if (st.overlays.length) kw.overlays = st.overlays;
+  return kw;
+}
+// the look's options (resolveLook's and page_from's): the keywords as JSON, with the sidebar of a Dashboard or Report page; the classes
+// are the dashboard's filter (include= is Python's filter before the engine), the overlays their GeoJSON
 function lookOptions(co){
-  // state "live": the global states stay in the expressions and the style has the dashboard's options (roadstyle:controls), as a page
-  const args = {name: "roadstyle", state: "live"};
-  if (st.view3d) args.view_3d = true;
-  if (st.tiles) args.tiles = true;
-  // the look's options are JSON: a value is a text key there, as in Python's json.dumps of the dict
-  if (co.length > 1) args.color_options = co.map((o) => o.colors ? {...o, colors: Object.fromEntries([...o.colors].map(([k, c]) => [String(k), c]))} : o);
-  if (st.minzoom) args.minzoom = true;
-  if (!st.labels) args.labels = false;
-  if (!st.arrows) args.arrows = false;
-  if (st.hover.length) args.tooltip = st.hover;
-  if (st.overlays.length) args.overlays = st.overlays.map((o) => ({label: o.label, color: o.color, placement: o.under ? "under" : "over",
-    popup: o.popup, ...(o.tooltip.length ? {tooltip: o.tooltip} : {}), fc: o.fc}));
-  return {palette: st.palette, args};
+  const {palette, include, ...kw} = keywords(co), args = {...kw, name: kw.name || "roadstyle", state: "live"};
+  if (st.page !== "map") args.sidebar = st.page;
+  // a JSON object's keys are text, as in Python's json.dumps of the dict
+  if (args.color_options) args.color_options = co.map((o) => o.colors ? {...o, colors: Object.fromEntries([...o.colors].map(([k, c]) => [String(k), c]))} : o);
+  if (args.overlays) args.overlays = st.overlays.map((o) => ({label: o.label, color: o.color, placement: o.under ? "under" : "over", popup: o.popup,
+    ...(o.tooltip.length ? {tooltip: o.tooltip} : {}), fc: o.fc}));
+  return {palette, args};
 }
 // the colour options of the picked columns, as the Python studio makes them (studio/common.py, _colour_opt): a numeric column with more
 // than 12 values is a ramp from its 2nd to its 98th percentile (pandas' quantile: linear between the ranks); another column is min(5, n)
@@ -73,74 +79,54 @@ async function colourOptions(){
   }
   return out;
 }
-function codeKeywords(){
-  const kw = {palette: st.palette, basemap: st.basemap};
-  if (st.view3d) kw.view_3d = true;
-  if (st.tiles) kw.tiles = true;
-  if (colourOpts.length > 1) kw.color_options = Object.fromEntries(colourOpts.map(({name, ...o}) => [name, o]));
-  if (st.classes && st.classes.length !== allClasses.length) kw.include = st.classes;
-  if (st.minzoom) kw.minzoom = true;
-  if (!st.labels) kw.labels = false;
-  if (!st.arrows) kw.arrows = false;
-  const popup = {choose: st.popupCols, panel: "panel", all: "all", off: false}[st.popup];
-  if (popup !== undefined) kw.road_popup = popup;
-  if (st.hover.length) kw.tooltip = st.hover;
-  if (st.overlays.length) kw.overlays = true;
-  return kw;
-}
-// the road popup and tooltip as the dashboard reads them (the style's metadata roadstyle:interaction): the knob over the engine's own
-function interaction(style){
-  const it = {...(style.metadata["roadstyle:interaction"] || {})};
-  if (st.popup === "choose") it.popup = st.popupCols;
-  else if (st.popup === "all") it.popup = null;
-  else if (st.popup === "off") it.popup = false;
-  if (st.hover.length) it.tooltip = st.hover;
-  style.metadata["roadstyle:interaction"] = it;
-}
 
-// ---------------------------------------------------------------- build: the engine, then the preview
+// ---------------------------------------------------------------- build: the page, then the iframe
 let busy = false, again = false, timer = 0;
 const later = () => { clearTimeout(timer); timer = setTimeout(build, 250); };
+const win = () => $("preview").contentWindow;
 async function build(){
   if (!st.data) return;
   if (busy) { again = true; return; }
-  busy = true; $("status").textContent = "making the map…";
+  busy = true; $("status").textContent = "making the page…";
   try {
     gen += 1;
     if (table) colourOpts = await colourOptions();
-    const r = await call({type: "build", options: lookOptions(colourOpts), name: "roadstyle", tiles: st.tiles, gen,
-                          keep: ["name", "highway", "edge_id"].concat(st.hover)});
-    const t = JSON.parse(r.table), first = !table || t.props.length !== table.props.length;
-    table = t; background = r.background;
-    if (first) dataKnown();
-    const b = bounds(table.bboxes);
-    interaction(r.style);
-    const key = [st.data.name, st.popup, st.basemap].join("|"); // the dashboard is made again for new data, a popup mode, a base map
-    const fresh = key !== dashKey;
-    if (fresh) { dashKey = key; await reloadPreview(); }
-    await $("preview").contentWindow.show({style: r.style, table, files: r.files, fit: first || fresh ? [[b[0], b[1]], [b[2], b[3]]] : null});
-    if (st.classes) $("preview").contentWindow.rs.setFilter({classes: st.classes});
+    const r = await call({type: "page", options: lookOptions(colourOpts)});
+    html = r.html;
+    await show(r.html, !!table);                                // new data: the page's own view of it, not the last camera
+    if (!table) { table = win().RS_SIDE; dataKnown(); }
     $("status").textContent = `${table.props.length.toLocaleString()} roads, made in ${(r.ms / 1000).toFixed(1)} s`;
     $("status").dataset.built = gen;                            // the number of the last build (a test waits for it)
-    $("code").textContent = pythonCode(codeKeywords(), st.loader, st.overlays.map((o) => ({path: o.path, args: o.args()})));
+    code();
   } catch (e) {
-    $("status").innerHTML = `<span class="err">The map failed: ${e.message}</span>`;
+    $("status").innerHTML = `<span class="err">The page failed: ${e.message}</span>`;
   }
   busy = false;
   if (again) { again = false; build(); }
 }
-function reloadPreview(){
-  return new Promise((ok) => { previewWaiters.push(ok); $("preview").src = "preview.html?" + Date.now(); });
-}
-function bounds(bbs){
-  const b = [Infinity, Infinity, -Infinity, -Infinity];
-  for (const x of bbs) if (x) { b[0] = Math.min(b[0], x[0]); b[1] = Math.min(b[1], x[1]); b[2] = Math.max(b[2], x[2]); b[3] = Math.max(b[3], x[3]); }
-  return b;
+// the page in the iframe (MapLibre from the CDN, as a page's notebook preview), with the camera of the last one (keep: the same data)
+// and the classes' filter
+function show(page, keep){
+  let camera = null;
+  try { camera = keep && win().rs && win().rs.getState().camera; } catch (e) { camera = null; }
+  if (url) URL.revokeObjectURL(url);
+  url = URL.createObjectURL(new Blob([page.replace("<style>__MAPLIBRE_CSS__</style>", `<link rel="stylesheet" href="${MAPLIBRE}/maplibre-gl.css"/>`)
+    .replace("<script>__MAPLIBRE_JS__</script>", `<script src="${MAPLIBRE}/maplibre-gl.js"></script>`)], {type: "text/html"}));
+  return new Promise((ok) => {
+    $("preview").onload = () => {
+      const ready = () => { const w = win();
+        if (!(w.rs && w.map && w.map.isStyleLoaded && w.map.isStyleLoaded() && w.RS_SIDE)) return setTimeout(ready, 50);
+        if (camera) w.rs.setState({camera});
+        if (st.classes) w.rs.setFilter({classes: st.classes});
+        ok(); };
+      ready();
+    };
+    $("preview").src = url;
+  });
 }
 
 // ---------------------------------------------------------------- the knobs that the data decides
 function dataKnown(){
-  // columns: the file's own columns (the worker's answer to "roads"), as the Python studio lists the GeoDataFrame's
   allClasses = [...new Set(table.props.map((p) => p && p.highway).filter((h) => h != null))].sort();
   st.classes = null; st.colours = {}; st.popupCols = columns.filter((c) => ["name", "edge_id", "highway", "lanes", "maxspeed_kmh"].includes(c));
   $("count").textContent = `${table.props.length.toLocaleString()} edges`;
@@ -163,7 +149,7 @@ function dataKnown(){
     sel.onchange = () => { st.colours[c] = sel.value; later(); };
     $("colours").appendChild(row);
   }
-  checklist($("classes"), allClasses, allClasses, (v) => { st.classes = v; $("preview").contentWindow.rs.setFilter({classes: v}); code(); });
+  checklist($("classes"), allClasses, allClasses, (v) => { st.classes = v; win().rs.setFilter({classes: v}); code(); });
   checklist($("popupcols"), columns, st.popupCols, (v) => { st.popupCols = v; later(); });
   checklist($("hover"), columns, [], (v) => { st.hover = v; later(); });
 }
@@ -176,13 +162,16 @@ function checklist(box, items, on, change){
   }
   box.onchange = () => change(items.filter((_, i) => box.querySelectorAll("input")[i].checked));
 }
-const code = () => { $("code").textContent = pythonCode(codeKeywords(), st.loader, st.overlays.map((o) => ({path: o.path, args: o.args()}))); };
+function code(){
+  const P = PAGES[st.page];
+  $("code").textContent = pythonCode(keywords(colourOpts), st.loader, st.overlays.map((o) => ({path: o.path, args: o.args()})), P.fn, P.file);
+}
 
 // ---------------------------------------------------------------- the data
-async function loadRoads(bytes, kind, name, loader){
+async function loadRoads(bytes, kind, name, loader, shp = {}){
   st.data = {name}; st.loader = loader; table = null; colourOpts = [{name: "Class"}];
   $("status").textContent = "reading the roads…";
-  try { columns = (await call({type: "roads", bytes, kind}, [bytes])).columns.filter((c) => c !== "geometry"); }
+  try { columns = (await call({type: "roads", bytes, kind, name, ...shp}, [bytes])).columns.filter((c) => c !== "geometry"); }
   catch (e) { $("status").innerHTML = `<span class="err">${name}: ${e.message}</span>`; return; }
   build();
 }
@@ -194,7 +183,17 @@ $("sample").onchange = async () => {
   loadRoads(await r.arrayBuffer(), "geojson", $("sample").value, `edges = gpd.read_file("ui/studio/samples/${f}.geojson")`);
 };
 $("file").onchange = async () => {
-  const f = $("file").files[0]; if (!f) return;
+  const fs = [...$("file").files], f = fs[0]; if (!f) return;
+  // a Shapefile: its .shp, .dbf and .prj, picked together (the Rust engine reads it in EPSG:4326; no .prj: no CRS, an error)
+  const shp = fs.find((x) => /\.shp$/i.test(x.name));
+  if (shp) {
+    const sib = (ext) => fs.find((x) => x.name.toLowerCase() === shp.name.toLowerCase().replace(/\.shp$/, ext));
+    const dbf = sib(".dbf"), prj = sib(".prj");
+    if (!dbf) { $("status").innerHTML = `<span class="err">${shp.name}: pick its .dbf file too</span>`; return; }
+    loadRoads(await shp.arrayBuffer(), "shp", shp.name, `edges = gpd.read_file("${shp.name}")`,
+              {dbf: await dbf.arrayBuffer(), prj: prj ? await prj.text() : undefined});
+    return;
+  }
   const parquet = /\.(geo)?parquet$/i.test(f.name);
   loadRoads(await f.arrayBuffer(), parquet ? "parquet" : "geojson", f.name,
             parquet ? `edges = gpd.read_parquet("${f.name}")` : `edges = gpd.read_file("${f.name}")`);
@@ -203,29 +202,36 @@ $("file").onchange = async () => {
 // ---------------------------------------------------------------- the look and the other knobs
 const knob = (id, key, prop = "value") => { $(id).onchange = () => { st[key] = $(id)[prop]; later(); }; };
 knob("palette", "palette"); knob("view3d", "view3d", "checked"); knob("tiles", "tiles", "checked"); knob("minzoom", "minzoom", "checked");
-knob("labels", "labels", "checked"); knob("arrows", "arrows", "checked");
+knob("labels", "labels", "checked"); knob("arrows", "arrows", "checked"); knob("basemap", "basemap"); knob("title", "title");
 $("popup").onchange = () => { st.popup = $("popup").value; $("popupcols").hidden = st.popup !== "choose"; later(); };
-$("basemap").onchange = () => { st.basemap = $("basemap").value; later(); };   // the page's list starts with the active one: a new dashboard
+// the page: a Dashboard or Report page has its sidebar, a title, the base maps offered, and no road popup (its sidebar shows the road)
+$("page").onchange = () => {
+  st.page = $("page").value; const P = PAGES[st.page];
+  st.title = P.title || ""; $("title").value = st.title;
+  document.querySelectorAll(".sidebar-only").forEach((e) => { e.hidden = !P.title; });
+  document.querySelectorAll(".map-only").forEach((e) => { e.hidden = !!P.title; });
+  later();
+};
 $("copy").onclick = () => navigator.clipboard.writeText($("code").textContent);
+// the download: the page in the iframe, with MapLibre in it (src/roadstyle/vendor, as WebMap.html: a page that works offline)
+$("download").onclick = async () => {
+  const get = async (f) => (await fetch(`../../src/roadstyle/vendor/${f}`)).text();
+  const page = html.replace("__MAPLIBRE_CSS__", await get("maplibre-gl.css"))
+    .replace("__MAPLIBRE_JS__", (await get("maplibre-gl.js")).replace(/<\/script>/g, "<\\/script>"));
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([page], {type: "text/html"})); a.download = PAGES[st.page].file; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
 
-// the base maps: one list for Python and the studio (src/roadstyle/data/basemaps.json). The menu has all of them, as the Python studio
-// (rs.BASEMAPS); the page's switcher has the active one and then the default set.
-// TODO(R3): a copy of render_web._page_basemaps, _tiles and _bg_color. Remove it in the change that uses the page writer.
-function pageBasemaps(){
-  const by = Object.fromEntries(BM.basemaps.map((b) => [b.key, b])), active = by[st.basemap] || BM.basemaps[0];
-  if (!active) return [];
-  const tiles = (b) => !b.url ? [] : b.url.includes("{s}") ? [...(b.subdomains || "a")].map((s) => b.url.replace("{s}", s).replace("{r}", ""))
-                                                            : [b.url.replace("{r}", "")];
-  const bg = (b) => b.bg.startsWith("#") ? b.bg : background[b.is_dark ? "dark" : "light"];
-  return [active, ...BM.switcher.filter((k) => k !== active.key && by[k]).map((k) => by[k])]
-    .map((b) => ({key: b.key, label: b.label, tiles: tiles(b), bg: bg(b), maxzoom: b.maxzoom, attr: b.attr}));
-}
+// the base maps: data/basemaps.json, one list for Python and the studio (the menu has all of them, as rs.BASEMAPS)
 fetch("../../src/roadstyle/data/basemaps.json").then((r) => r.ok ? r.json() : Promise.reject(new Error(`basemaps.json: ${r.status}`))).then((j) => {
-  BM = j;
-  for (const b of BM.basemaps) $("basemap").add(new Option(b.label, b.key));
-  st.basemap = BM.basemaps.length ? BM.basemaps[0].key : "";
+  BASEMAPS = j.basemaps.map((b) => b.key);
+  for (const b of j.basemaps) $("basemap").add(new Option(b.label, b.key));
+  st.basemap = BASEMAPS[0] || "";
+  st.offered = OFFERED.filter((k) => BASEMAPS.includes(k));
+  checklist($("offered"), BASEMAPS, st.offered, (v) => { st.offered = v; later(); });
   $("sample").onchange();
-}).catch((e) => { $("bmnote").innerHTML = `<span class="err">The base maps: ${e.message}</span>`; });
+}).catch((e) => { $("status").innerHTML = `<span class="err">The base maps: ${e.message}</span>`; });
 
 // ---------------------------------------------------------------- overlays: GeoJSON files, each one an rs.Overlay
 async function addOverlay(name, text, path){
