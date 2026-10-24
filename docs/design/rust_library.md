@@ -1333,6 +1333,37 @@ Each part below is its own step after P7:
 A1 to A4 touch other files (a program crate each, the studio's page) and can run as parallel sessions; each needs only the facade's
 public calls. A5 is the levels session's.
 
+#### A2: the MCP server in Rust
+
+The program `roadstyle-mcp` is the crate `rust/roadstyle-mcp`. It uses the official Rust MCP SDK `rmcp` (pinned to 3.5.1) over stdio.
+It has the Python server's tools (`src/roadstyle/mcp_server.py`) with the same names, inputs and outputs. The branch `mcp-rs` stays off
+`rust-engine` until the server can write a map.
+
+| Tool | In Python | In Rust | Waits for |
+|---|---|---|---|
+| `render_file` | geopandas reads the file, `render_edges` writes the page | reads GeoParquet, makes stage 1 | R3 (the page), A4 (the preview) |
+| `render_place` | osmnx downloads the place, `render_edges` writes the page | an error that sends the agent to the Python server | a road download in Rust |
+| `snapshot` | Playwright makes a PNG of a saved page | an error that sends the agent to the Python server | A4 |
+
+Decisions (2026-10-24):
+
+- **`render_place` stays on the Python path.** duckosm-rust does not change until roadstyle is finished, so it cannot clip a `.pbf`
+  file to a place's polygon now. A Geofabrik region file for each place is too large. A download and a graph simplification written
+  in this crate is a second rule set for the roads ("one rule, every path"). When the duckosm-rust freeze ends: Nominatim gives the
+  polygon, duckosm-rust clips the region's `.pbf` file and makes the network. Until then the Python server does not retire.
+- **The readers of `render_file`:** GeoParquet now; GeoJSON from the look session (`roadstyle-io/src/geojson.rs`). After it lands,
+  `roadstyle-io/src/gpkg.rs` (rusqlite, bundled; a GeoPackage geometry is a header and WKB) and `roadstyle-io/src/shp.rs` (the
+  `shapefile` crate), with the same return shape. The reprojection to EPSG:4326 uses `proj4rs` (pure Rust, no C proj). The CRS comes
+  from `gpkg_spatial_ref_sys` or the `.prj` file. A CRS that `proj4rs` cannot read is an error that names it.
+- **The option check:** a misspelt option is an error with the close names, as in Python. Until R3 gives the typed page options, the
+  server checks the options against the keys that stage 1 reads (`STAGE1` in `main.rs`). `tests/test_mcp_server.py` checks that each
+  of them is a `render_edges` keyword.
+- **The package:** `roadstyle-mcp` on PyPI becomes a maturin `bindings = "bin"` wheel that holds the Rust program. `uvx roadstyle-mcp`,
+  `server.json` and `.claude-plugin/plugin.json` do not change. `mcp_server.py` and the `roadstyle[mcp]` extra retire when the three
+  tools are in Rust.
+- **The tests:** `rust/roadstyle-mcp/tests/stdio.rs` drives the program over stdio, as `tests/test_mcp_server.py` drives the Python
+  server, on Monaco.
+
 ### Parallel work without two sessions in one file
 
 | Lane | Phase | Owns these files | Waits for |

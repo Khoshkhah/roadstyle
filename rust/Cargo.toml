@@ -1,11 +1,11 @@
 # roadstyle as a Rust library (docs/design/rust_library.md, "The crates"): the pure core (model, levels, engine, tiles), the
-# adapters (io, wasm) and the facade `roadstyle`. `roadstyle-rs` is the old name of the facade, kept for one version.
+# adapters (io, wasm), the facade `roadstyle` and the programs (cli, mcp). `roadstyle-rs` is the old name of the facade, kept for one version.
 [workspace]
 members = ["roadstyle-model", "roadstyle-io", "roadstyle-levels", "roadstyle-engine", "roadstyle-tiles", "roadstyle",
-           "roadstyle-rs", "roadstyle-wasm", "roadstyle-py", "roadstyle-cli"]
+           "roadstyle-rs", "roadstyle-wasm", "roadstyle-py", "roadstyle-cli", "roadstyle-mcp"]
 # cargo test / clippy at the root: all but the Python extension, which needs a Python to link (the CI job "python" builds it)
 default-members = ["roadstyle-model", "roadstyle-io", "roadstyle-levels", "roadstyle-engine", "roadstyle-tiles", "roadstyle",
-                   "roadstyle-rs", "roadstyle-wasm", "roadstyle-cli"]
+                   "roadstyle-rs", "roadstyle-wasm", "roadstyle-cli", "roadstyle-mcp"]
 resolver = "2"
 
 [workspace.package]
