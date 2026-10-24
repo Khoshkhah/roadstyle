@@ -75,6 +75,7 @@ nav:
           - Switch the engine: rust/switch-engine.md
           - Use it in the browser: rust/browser.md
           - Tiles and PMTiles: rust/tiles.md
+          - The roadstyle program: rust/cli.md
           - Build from source: rust/build.md
       - Reference:
           - Keywords by engine: rust/keywords.md
