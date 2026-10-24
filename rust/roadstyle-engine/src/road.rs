@@ -92,14 +92,14 @@ impl<'a> Road<'a> {
         self.iter().map(|(k, v)| (k.to_string(), v.to_value())).collect()
     }
 
-    /// The JSON text of the properties, as serde_json writes the `Map` of `to_map`.
-    pub fn write_json(self, out: &mut Vec<u8>) {
+    /// The JSON text of the properties, as serde_json writes the `Map` of `to_map`, with the output's names (`name`).
+    pub fn write_json<'n>(self, out: &mut Vec<u8>, name: impl Fn(&'n str) -> &'n str) where 'a: 'n {
         out.push(b'{');
         for (n, (k, v)) in self.iter().enumerate() {
             if n > 0 {
                 out.push(b',');
             }
-            serde_json::to_writer(&mut *out, k).unwrap();
+            serde_json::to_writer(&mut *out, name(k)).unwrap();
             out.push(b':');
             serde_json::to_writer(&mut *out, &v).unwrap();
         }
@@ -120,9 +120,24 @@ pub struct RoadsSource {
     pub tolerance: f64,
     /// render's data_maxzoom (None: MapLibre's default)
     pub maxzoom: Option<i64>,
+    /// the column keywords (ColumnMap): each column with an engine name (`own`) and the user's name for it
+    pub names: Vec<(&'static str, String)>,
+}
+
+/// The name of a kept column (a column with an engine name that is not the named one) while the engine runs.
+pub fn kept(own: &str) -> String {
+    format!("__rs_kept_{own}")
 }
 
 impl RoadsSource {
+    /// The output's name of a property: the user's name of an engine column, and a kept column's own name back.
+    pub fn out_name<'n>(&'n self, k: &'n str) -> &'n str {
+        if let Some((_, user)) = self.names.iter().find(|(own, _)| *own == k) {
+            return user;
+        }
+        k.strip_prefix("__rs_kept_").and_then(|o| self.names.iter().find(|(own, _)| *own == o)).map_or(k, |(own, _)| own)
+    }
+
     pub fn write_json(&self, out: &mut Vec<u8>) {
         out.extend_from_slice(br#"{"type":"geojson","data":{"type":"FeatureCollection","features":["#);
         for r in self.roads.iter() {
@@ -130,7 +145,7 @@ impl RoadsSource {
                 out.push(b',');
             }
             out.extend_from_slice(format!(r#"{{"id":{},"type":"Feature","properties":"#, r.i).as_bytes());
-            r.write_json(out);
+            r.write_json(out, |k| self.out_name(k));
             out.extend_from_slice(br#","geometry":"#);
             match r.line() {
                 None => out.extend_from_slice(b"null"),

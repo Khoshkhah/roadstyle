@@ -439,7 +439,7 @@ pub fn metre_items(ov: &Overlay) -> bool {
 /// _item_pieces: the line items of the overlay `i` on its edges (after edge_overlay) as pieces of the one road layer (`__rs_k` 5): what the
 /// filters read from their edge, `lvl`, their colour `__rs_ic`, their width and offset in metres over cos(latitude) (`__rs_iwm`,
 /// `__rs_iom`, also on the overlay's own features) and their dash as text.
-pub fn item_pieces(ov: &mut Overlay, i: usize, look: &Value) -> Result<Vec<crate::simple::Piece>, String> {
+pub fn item_pieces(ov: &mut Overlay, i: usize, look: &Value) -> Result<Vec<crate::simple::Item>, String> {
     let default = match &look["config"]["overlays"]["color"] { Value::Null => look["theme"]["overlays"]["color"].clone(), c => c.clone() };
     let u = ov.user.clone();
     let col = |k: &str| u[k].as_str().filter(|c| !c.is_empty()).map(String::from);
@@ -479,7 +479,7 @@ pub fn item_pieces(ov: &mut Overlay, i: usize, look: &Value) -> Result<Vec<crate
         if !dash.is_empty() {
             q.insert("__rs_dash", json!(dash.join(",")));
         }
-        out.push(crate::simple::Piece { props: q, coords: (!line.is_empty()).then_some(line) });
+        out.push(crate::simple::Item { props: q, coords: (!line.is_empty()).then_some(line) });
     }
     Ok(out)
 }
@@ -488,7 +488,7 @@ pub fn item_pieces(ov: &mut Overlay, i: usize, look: &Value) -> Result<Vec<crate
 /// of their own: each names its road in the roads' id column and has `width_m`, and can have `order`, `offset_m`, `color`, `dash`, `pick` (a
 /// picked item is clicked and lit as itself, with its own fields) and `minzoom` (`__rs_imz`). `k`: the items' overlay number.
 pub fn road_items(fc: &Value, roads: &std::collections::HashMap<String, Road>, edge_col: &str, k: usize, look: &Value)
-                  -> Result<Vec<crate::simple::Piece>, String> {
+                  -> Result<Vec<crate::simple::Item>, String> {
     let mut ov = Overlay { name: "items".into(), kind: "line", under: false, edge: true, color: Value::Null, outline: Value::Null, opacity: Value::Null,
                            width: Value::Null, radius: Value::Null, visible: true, fc: fc.clone(), l: Value::Null,
                            user: json!({"edge_col": edge_col, "order_col": "order", "color_col": "color", "width_m_col": "width_m",

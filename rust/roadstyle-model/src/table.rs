@@ -202,6 +202,11 @@ impl RoadTable {
         Ok(RoadTable { names, cols, lines, js_safe: false })
     }
 
+    /// A table of no roads.
+    pub fn empty() -> RoadTable {
+        RoadTable { names: Vec::new(), cols: Vec::new(), lines: Lines::default(), js_safe: false }
+    }
+
     pub fn len(&self) -> usize {
         self.lines.len()
     }

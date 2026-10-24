@@ -69,11 +69,11 @@ fn bench(look_path: &str, roads_path: &str, features_path: &str) {
     mark("base map");
     let roads = roads::roads_source(feats);
     mark("roads source");
-    let layers = layers::road_layers(&look_json, &roads.roads, &simple.feats, features(&slots), false, &mut ovs, &colors.props, colors.active, None).unwrap_or_else(|e| fail(e)).0;
+    let layers = layers::road_layers(&look_json, &roads.roads, &simple, features(&slots), false, &mut ovs, &colors.props, colors.active, None).unwrap_or_else(|e| fail(e)).0;
     mark("layers");
     let mut text = Vec::new();
     roads.write_json(&mut text);
-    simple.write_json(&mut text);
+    simple.write_json(&mut text, &roads.roads);
     serde_json::to_writer(&mut text, &slots).unwrap();
     mark(&format!("the text of the sources ({} MB, {} layers)", text.len() >> 20, layers.len()));
 }
@@ -164,6 +164,6 @@ fn main() {
     let simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow, None, Vec::new()).unwrap_or_else(|e| fail(e));
     let slots = slots::slots_source(&feats, &slot_look);
     let roads = roads::roads_source(feats);
-    let layers = layers::road_layers(&look_json, &roads.roads, &simple.feats, features(&slots), false, &mut [], &colors.props, colors.active, None).unwrap_or_else(|e| fail(e)).0;
+    let layers = layers::road_layers(&look_json, &roads.roads, &simple, features(&slots), false, &mut [], &colors.props, colors.active, None).unwrap_or_else(|e| fail(e)).0;
     println!("{}", json!({"layers": layers}));
 }

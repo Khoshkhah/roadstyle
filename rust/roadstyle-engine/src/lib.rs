@@ -62,10 +62,11 @@ pub fn take_warnings() -> Vec<String> {
 /// ponytail: an estimate from Tartu only; measure a larger area in a browser before the limit goes higher.
 pub const MAX_ROADS: usize = 200_000;
 
-/// A source of the style: typed features (roads, simple) or a GeoJSON source as JSON (the base map, slots).
+/// A source of the style: the roads, the simple pieces (both typed, written from the roads) or a GeoJSON source as JSON (the base
+/// map, slots).
 pub enum Src {
     Roads(road::RoadsSource),
-    Typed(props::Source),
+    Simple(simple::SimpleSource),
     Json(Value),
 }
 
@@ -150,7 +151,7 @@ pub fn make_parts(mut table: RoadTable, look: &str, features: Option<Vec<Row>>, 
         let divided = named("casing_start_col") || named("casing_end_col") || computed || some("__rs_split") || feats.iter().any(|f| f.contains_key("__rs_twin"));
         Some(full::sources(&feats, &look_json, look.head_m, width_col, divided, &layers::Model::from_look(&look_json)?.classes))
     } else { None };
-    let simple = if full { props::Source { feats: Vec::new(), id_first: false, tolerance: 0.05, maxzoom: None } }
+    let simple = if full { simple::SimpleSource::empty(simple::Cols::new(width_col)) }
                  else { simple::simple_source(&feats, look.head_m, look.bridge_shadow, width_col, items)? };
     // everything that reads the roads is done before this: the roads source takes them
     // export_inline(planner=True): the route planner's graphs, or the number of roads past the limit
@@ -167,7 +168,7 @@ pub fn make_parts(mut table: RoadTable, look: &str, features: Option<Vec<Row>>, 
         let hw = if cols.0.iter().any(|(own, _)| *own == "highway") { ColumnMap::kept("highway") } else { "highway".into() };
         decks::bridge_decks(&roads.roads, &decks::DeckLook::from_config(&look_json["config"]["bridge_decks"]), &layers::Model::from_look(&look_json)?, &hw)
     } else { Vec::new() };
-    let (layers, info) = layers::road_layers(&look_json, &roads.roads, &simple.feats, source_features(&slots), !decks.is_empty(), &mut ovs,
+    let (layers, info) = layers::road_layers(&look_json, &roads.roads, &simple, source_features(&slots), !decks.is_empty(), &mut ovs,
                                              &colors.props, colors.active, fsrc.as_ref())?;
     // state "live" (a page with the dashboard, docs/design/rust_library.md "The interaction contract"): the state stays in the expressions,
     // and the style says what the controls show
@@ -212,7 +213,7 @@ pub fn make_parts(mut table: RoadTable, look: &str, features: Option<Vec<Row>>, 
                 sources.push(("shadows".into(), Src::Json(json!({"type": "geojson", "data": fc(fs.shadows), "generateId": true, "tolerance": tol}))));
             }
         }
-        None => sources.push(("simple".into(), Src::Typed(simple))),
+        None => sources.push(("simple".into(), Src::Simple(simple))),
     }
     if !source_features(&slots).is_empty() {        // as Python: no slots source without slots
         let mut slots = slots;
@@ -281,11 +282,13 @@ pub fn make_style(table: RoadTable, look: &str, features: Option<Vec<Row>>, plan
     // peak went from 4.3 GB to 2.5 GB natively).
     let metadata = metadata.to_string();
     let mut out = format!(r#"{{"version":8,"name":{name},"center":{center},"zoom":{zoom},"layers":{},"sources":{{"#, Value::Array(layers)).into_bytes();
-    for (i, (k, s)) in sources.into_iter().enumerate() {
+    // the roads stay until the end: the simple pieces are written from them
+    let (mut sources, roads) = take_roads(sources);
+    for (i, (k, s)) in sources.drain(..).enumerate() {
         out.extend_from_slice(format!("{}{}:", if i > 0 { "," } else { "" }, Value::from(k)).as_bytes());
         match s {
-            Src::Roads(s) => s.write_json(&mut out),
-            Src::Typed(s) => s.write_json(&mut out),
+            Src::Roads(_) => roads.as_ref().expect("the roads source").write_json(&mut out),
+            Src::Simple(s) => s.write_json(&mut out, &roads.as_ref().ok_or("the simple pieces need the roads source")?.roads),
             Src::Json(s) => serde_json::to_writer(&mut out, &s).unwrap(),
         }
     }
@@ -299,6 +302,18 @@ pub fn make_style(table: RoadTable, look: &str, features: Option<Vec<Row>>, plan
     }
     out.push(b'}');
     Ok(String::from_utf8(out).expect("serde_json writes UTF-8"))
+}
+
+/// The roads source out of the sources (its place keeps an empty `Src::Roads` mark): the other typed sources are written from it.
+pub fn take_roads(mut sources: Vec<(String, Src)>) -> (Vec<(String, Src)>, Option<road::RoadsSource>) {
+    let mut roads = None;
+    for (_, s) in sources.iter_mut() {
+        if let Src::Roads(r) = s {
+            let empty = road::RoadsSource { roads: Roads::new(RoadTable::empty()), tolerance: r.tolerance, maxzoom: r.maxzoom, names: Vec::new() };
+            roads = Some(std::mem::replace(r, empty));
+        }
+    }
+    (sources, roads)
 }
 
 /// roadstyle.export._camera: the centre and the zoom that fit the roads' bounds in a 1024 x 768 px view, as the page's fitBounds.
@@ -368,7 +383,7 @@ impl ColumnMap {
     }
 
     fn kept(own: &str) -> String {
-        format!("__rs_kept_{own}")
+        road::kept(own)
     }
 
     fn to_engine(&self, table: &mut RoadTable) {
@@ -386,30 +401,11 @@ impl ColumnMap {
         }
         for (name, src) in sources.iter_mut() {
             match src {
-                // the roads keep every column: a kept one gets its own name back
-                Src::Roads(s) => {
-                    for (own, user) in &self.0 {
-                        if s.roads.table.rename(own, user) {
-                            s.roads.table.rename(&Self::kept(own), own);
-                        }
-                    }
-                }
-                // the roads keep every column: a kept one gets its own name back; the pieces of `simple` have only the class and
-                // the __rs_* marks, so a kept column (an __rs_ name in between) goes away there
-                Src::Typed(s) if name == "roads" || name == "simple" => {
-                    for f in s.feats.iter_mut() {
-                        for (own, user) in &self.0 {
-                            if f.props.rename(own, user) {
-                                if name == "roads" {
-                                    f.props.rename(&Self::kept(own), own);
-                                } else {
-                                    f.props.shift_remove(&Self::kept(own));
-                                }
-                            }
-                        }
-                    }
-                }
-                Src::Typed(s) => s.feats.iter_mut().for_each(|f| self.0.iter().for_each(|(own, _)| { f.props.shift_remove(&Self::kept(own)); })),
+                // the roads keep every column, with the user's names at the output; a kept one gets its own name back
+                Src::Roads(s) => s.names = self.0.clone(),
+                // the pieces of `simple` have only the class and the __rs_* marks: the user's names at the output, and a kept column
+                // (an __rs_ name in between) goes away there
+                Src::Simple(s) => s.names = self.0.clone(),
                 // the 3D decks and the halves are copies of the roads' properties: the user's names, as the roads; the casing pieces
                 // and the bridge shadows have the class and the __rs_* marks: the class's name, and a kept column goes away
                 Src::Json(s) if matches!(name.as_str(), "casings" | "shadows" | "ends") => {
@@ -476,7 +472,7 @@ fn data_settings(sources: &mut [(String, Src)], args: &Value) {
                 s.maxzoom = maxzoom.or(s.maxzoom);
                 s.tolerance = tolerance.unwrap_or(s.tolerance);
             }
-            Src::Typed(s) => {
+            Src::Simple(s) => {
                 s.maxzoom = maxzoom.or(s.maxzoom);
                 s.tolerance = tolerance.unwrap_or(s.tolerance);
             }

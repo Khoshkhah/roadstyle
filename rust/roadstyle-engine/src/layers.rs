@@ -2,7 +2,7 @@
 //! `_load_road_model` (look.json "roads_model" and "theme"). Each function names the Python function it ports.
 
 use crate::overlays::{edge_overlay, overlay_layers, Overlay};
-use crate::props::{Feat, Get, Props};
+use crate::props::{Get, Props};
 use roadstyle_model::Cell;
 use indexmap::IndexMap;
 use serde_json::{json, Map, Value};
@@ -688,9 +688,6 @@ impl Model {
     }
 }
 
-fn typed_props(fs: &[Feat]) -> Vec<&Props> {
-    fs.iter().map(|f| &f.props).collect()
-}
 
 fn props_of<'a>(fs: &'a [Value], empty: &'a Map<String, Value>) -> Vec<&'a Map<String, Value>> {
     fs.iter().map(|f| f["properties"].as_object().unwrap_or(empty)).collect()
@@ -710,13 +707,13 @@ pub struct PageInfo {
 }
 
 #[allow(clippy::too_many_arguments)] // the sources of the style, as make_parts has them
-pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &[Feat], slots: &[Value], decks: bool, ovs: &mut [Overlay], fills: &[String], active: usize,
+pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::simple::SimpleSource, slots: &[Value], decks: bool, ovs: &mut [Overlay], fills: &[String], active: usize,
                    full: Option<&crate::full::FullSources>) -> Result<(Vec<Value>, PageInfo), String> {
     let mut info = PageInfo::default();
     let m = Model::from_look(look)?;
     let (th, cfg) = (&look["theme"], &look["config"]);
     let empty = Map::new();
-    let (rp, sp, lp) = (roads, typed_props(simple), props_of(slots, &empty));
+    let (rp, lp) = (roads, props_of(slots, &empty));
     let fb_fill = &th["roads"]["fallback"]["fill"];
     let fb_casing = &th["roads"]["fallback"]["casing"];
     let sel = &th["selection"];
@@ -756,7 +753,7 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &[Feat], sl
         (m.width_expr("highway", true, 1.0), m.width_expr("highway", false, 1.0), m.width_expr("highway", true, wing))
     };
     // the line items on the edges (__rs_k 5): every curve of the road layer base-2 exponential, so theirs in metres is exact at every zoom
-    let items: Vec<&Props> = sp.iter().copied().filter(|p| p.get("__rs_k") == Some(&json!(5))).collect();
+    let items: Vec<&Props> = simple.items.iter().map(|(_, it)| &it.props).filter(|p| p.get("__rs_k") == Some(&json!(5))).collect();
     let (fw0, off0) = (fw.clone(), off.clone()); // the highlight's, as the full look made it
     let (cw, fw, bcw) = if items.is_empty() { (cw, fw, bcw) } else { (exp2(&cw), exp2(&fw), exp2(&bcw)) };
     let is_it = json!(["==", ["get", "__rs_k"], 5]);
@@ -1004,7 +1001,8 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &[Feat], sl
     }
     let road_views: Vec<crate::road::Road> = rp.iter().collect();
     let rd: Vec<&dyn Get> = road_views.iter().map(|p| p as &dyn Get).collect();
-    let sd: Vec<&dyn Get> = sp.iter().map(|p| *p as &dyn Get).collect();
+    let simple_feats = simple.gets(roads);
+    let sd: Vec<&dyn Get> = simple_feats.iter().map(|p| p as &dyn Get).collect();
     let ld: Vec<&dyn Get> = lp.iter().map(|p| *p as &dyn Get).collect();
     let empty_map = Map::new();
     fn fp<'a>(v: Option<&'a Vec<Value>>, empty: &'a Map<String, Value>) -> Vec<&'a dyn Get> {

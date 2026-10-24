@@ -68,6 +68,8 @@ pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name:
     let exact: Option<std::collections::HashSet<String>> = cfg_all["args"]["tile_keep"].as_array()
         .map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
     let only: Option<Vec<&str>> = cfg_all["args"]["tile_layers"].as_array().map(|a| a.iter().filter_map(Value::as_str).collect());
+    // the roads stay until the end: the simple pieces are made from them
+    let (sources, roads) = take_roads(sources);
     for (k, s) in sources {
         let slots = k == "slots";
         let from = if slots { slots_from } else { 0 };
@@ -76,17 +78,17 @@ pub fn make_tiled(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, name:
         }
         match s {
             // the roads, from the table and the marks (no copy of their properties)
-            Src::Roads(s) => {
-                let feats = s.roads.iter().map(|r| (r.line(), r.iter().map(|(k, c)| (k, c.to_value()))));
+            Src::Roads(_) => {
+                let s = roads.as_ref().ok_or("no roads source")?;
+                let feats = s.roads.iter().map(|r| (r.line(), r.iter().map(|(k, c)| (s.out_name(k), c.to_value()))));
                 tiled.add_lines(&k, feats, exact.as_ref().unwrap_or(&read), slots, from)
             }
-            Src::Typed(s) if exact.is_some() => tiled.add_typed(&k, s, exact.as_ref().unwrap(), slots, from),
-            // render's tiles: the pieces of `simple` keep the class, lvl, the metre width column and the __rs_* marks (not a picked item's fields)
-            Src::Typed(s) if k == "simple" => {
-                let keep: std::collections::HashSet<String> = [highway_col.clone(), "lvl".into()].into_iter().chain(width_col.clone()).chain(filter_col.clone()).collect();
-                tiled.add_typed(&k, s, &keep, slots, from)
+            Src::Simple(s) => {
+                let r = &roads.as_ref().ok_or("the simple pieces need the roads source")?.roads;
+                // render's tiles: the pieces of `simple` keep the class, lvl, the metre width column and the __rs_* marks (not a picked item's fields)
+                let own: std::collections::HashSet<String> = [highway_col.clone(), "lvl".into()].into_iter().chain(width_col.clone()).chain(filter_col.clone()).collect();
+                tiled.add_lines(&k, s.features(r).map(|(_, p, c)| (c, p.into_iter())), exact.as_ref().unwrap_or(&own), slots, from)
             }
-            Src::Typed(s) => tiled.add_typed(&k, s, &read, slots, from),
             // the full look's casing pieces: the columns of the simple pieces (tiles.py's line layers with `keep`)
             Src::Json(s) if k == "casings" => {
                 let keep: std::collections::HashSet<String> = exact.clone().unwrap_or_else(|| {
