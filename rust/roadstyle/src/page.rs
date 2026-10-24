@@ -64,6 +64,19 @@ fn frame() -> String {
         .replace("__DASHBOARD_CSS__", DASH_CSS).replace("__DASHBOARD_JS__", &dashboard_js())
 }
 
+/// `text` with each token of `values` in it replaced, in one pass: a value is not searched again.
+fn fill(text: &str, values: &[(&str, String)]) -> String {
+    let mut out = String::with_capacity(text.len() + values.iter().map(|(_, v)| v.len()).sum::<usize>());
+    let mut rest = text;
+    while let Some((at, (k, v))) = values.iter().filter_map(|kv| rest.find(kv.0).map(|i| (i, kv))).min_by_key(|(i, _)| *i) {
+        out.push_str(&rest[..at]);
+        out.push_str(v);
+        rest = &rest[at + k.len()..];
+    }
+    out.push_str(rest);
+    out
+}
+
 /// html.escape (quote=True).
 fn escape(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;").replace('\'', "&#x27;")
@@ -109,30 +122,14 @@ pub fn page_html(mut style: Value, page: &Value, p: &PageParts) -> String {
         (None, true) => compress_sources(&mut style),
         (None, false) => Map::new(),
     };
-    let j = |k: &str| pyjson::dumps(&page[k], false);
     let [x0, y0, x1, y1] = p.bounds;
-    let num = |v: &Value| pyjson::dumps(v, false);
-    let reps: Vec<(&str, String)> = vec![
-        ("__TITLE__", escape(p.name)), ("__ARROW_COLOR__", j("arrow_color")), ("__ARROW_ICON__", j("arrow_icon")), ("__ARROW_RULES__", j("arrow_rules")),
-        ("__STYLE__", pyjson::dumps(&style, false)), ("__BASEMAPS__", j("basemaps")), ("__BM_SWITCHER__", j("basemap_switcher")),
-        ("__ZOOM_READOUT__", j("zoom_readout")), ("__FILTER__", j("filter")),
-        ("__CENTER__", pyjson::dumps(&serde_json::json!([(x0 + x1) / 2.0, (y0 + y1) / 2.0]), false)), ("__PITCH3D__", j("pitch_3d")),
-        ("__MAX_PITCH__", num(&p.cam["max_pitch"])), ("__SELECT_COLOR__", j("select_color")), ("__PITCH__", num(&p.cam["pitch"])),
-        ("__BEARING__", num(&p.cam["bearing"])), ("__BOUNDS__", pyjson::dumps(&serde_json::json!([[x0, y0], [x1, y1]]), false)),
-        ("__RS_FILL_LAYERS__", j("fill_layers")), ("__COLOR_OPTIONS__", j("color_options")), ("__CO_ACTIVE__", j("color_active")),
-        ("__OVERLAYS__", j("overlays")), ("__FIND_CONTROL__", j("find_control")), ("__OVERLAY_CONTROL__", j("overlay_control")),
-        ("__OVERLAY_POPUP__", j("overlay_popup")), ("__ROAD_ITEMS__", j("items")), ("__TUNNEL__", j("tunnel")), ("__VIEWS__", j("views")),
-        ("__RS_ROAD_FILL__", j("road_fill")), ("__ROAD_POPUP__", j("road_popup")), ("__ROAD_POPUP_MODE__", j("popup_mode")),
-        ("__EDGE_ID_COL__", j("edge_id_col")), ("__ROAD_TOOLTIP__", j("road_tooltip")), ("__HOVER_DELAY_MS__", j("hover_delay_ms")),
-        ("__STREET_VIEW__", j("street_view")), ("__SV_WINDOW_KEY__", j("street_view_key")), ("__GOOGLE_3D__", j("google_3d")),
-        ("__RS_TILED__", j("tiles")), ("__RS_LEAN__", j("simple")), ("__RS_SOURCES__", j("sources")), ("__RS_ARROWS__", j("arrows")), ("__RS_LIVE__", j("live")),
-        // the last: the host's own text may hold any other token
-        ("__HOST_PANEL_HTML__", host_panel(p.side_panel_html, p.host_panel_width, p.name)),
-    ];
-    let mut html = frame();
-    for (k, v) in reps {
-        html = html.replace(k, &v);
-    }
+    let mut opts = page.as_object().cloned().unwrap_or_default();
+    opts.insert("camera".into(), serde_json::json!({"center": [(x0 + x1) / 2.0, (y0 + y1) / 2.0], "pitch": p.cam["pitch"], "bearing": p.cam["bearing"],
+                                                    "max_pitch": p.cam["max_pitch"], "bounds": [[x0, y0], [x1, y1]]}));
+    // the frame's tokens in one pass (audit R3): a value is not read again, so the host's own text may hold any token
+    let mut html = fill(&frame(), &[("__TITLE__", escape(p.name)), ("__STYLE__", pyjson::dumps(&style, false)),
+                                    ("__RS_OPTIONS__", pyjson::dumps(&Value::Object(opts), false)),
+                                    ("__HOST_PANEL_HTML__", host_panel(p.side_panel_html, p.host_panel_width, p.name))]);
     let mut parts = String::new();
     if let Some(pmt) = p.tiles {
         parts = format!("<script>{}</script>{}", PMTILES_JS.replace("</script>", "<\\/script>"),

@@ -19,19 +19,19 @@ A consumer project that does not install it runs with `PYTHONPATH=<this repo>/sr
 
 ## Changing the library
 
-- `src/roadstyle/render_web.py` — `render(...)`: Python keywords become `__PLACEHOLDER__`
-  replacements in `src/roadstyle/static/web_template.html` (one `.replace` chain near the end).
+- `src/roadstyle/render_web.py` — `render(...)`: Python keywords become the `page` dict, which `_page_html` writes as one
+  JSON object `RS_OPTIONS` (the placeholder `__RS_OPTIONS__` of `src/roadstyle/static/web_template.html`).
 - The page's controls and road interaction are ES modules in `src/roadstyle/static/dashboard/` (one file for each control,
   `index.js` is the entry `rsDashboard(map, options)`); the Rust-engine pages import them, and `render_web.py` puts them in the
   page as one script (in the order of `static/dashboard/files.txt`, which the Rust page writer reads too, without `import` lines and
   `export` words). A new module: a line in `files.txt`. A top-level name must be unique in the folder.
   Design: `docs/design/dashboard_module.md`.
-- A new web option = the keyword + its `.replace` + a key in the template's `rsDashboard(map, {...})` call + its default in
+- A new web option = the keyword + a key in `render`'s `page` dict (and in `_engine.render_page`'s, the Rust engine) + its default in
   `dashboard/index.js` + the module that reads `O.<key>` + a test in `tests/test_render_web.py` (`_opt(html, key)`) + a row in
   `docs/reference/parameters.md`, `docs/reference/javascript.md` and `docs/design/dashboard_module.md` + CHANGELOG. If agents
   calling the library need to know it, also `skills/roadstyle/SKILL.md`.
-- `render_edges` takes `**kwargs`, so a misspelt keyword is silently ignored: grep the template
-  for its placeholder when a new option seems to do nothing.
+- `render_edges` takes `**kwargs`, so a misspelt keyword is silently ignored: look for the key in `RS_OPTIONS`
+  (`_opt(html, key)`) when a new option seems to do nothing.
 - The road popup and hover tooltip text: `_rfields` (popup/tooltip, `static/popup.js`) and `_rrows` (docked panel,
   `dashboard/select.js`); Street View: `_svMeasure` / `_svAt` (the spot on the edge, metres along it), `_svPick` / `_svUrl` / `_svUrlOf`, the marker `_svMark` / `_svMarkPlace` / `_svLanePx`, the window `rsSetStreetView`.
 - Google's script is loaded once for every window by `_gmLoad(key)`; a floating window (drag, size, place, remembered)

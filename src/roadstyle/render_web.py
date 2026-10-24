@@ -3885,48 +3885,12 @@ def _page_html(style, page, *, name, cam, bounds, side_panel_html, host_panel_wi
     of simple mode's recolouring script."""
     minx, miny, maxx, maxy = bounds
     gz = _compress_sources(style) if compress else {}
-    J = lambda k: json.dumps(page[k])        # noqa: E731
-    html = (_HTML.replace("__TITLE__", _html.escape(name))
-            .replace("__ARROW_COLOR__", J("arrow_color"))
-            .replace("__ARROW_ICON__", J("arrow_icon"))
-            .replace("__ARROW_RULES__", J("arrow_rules"))
-            .replace("__STYLE__", json.dumps(style))
-            .replace("__BASEMAPS__", J("basemaps"))
-            .replace("__BM_SWITCHER__", J("basemap_switcher"))
-            .replace("__ZOOM_READOUT__", J("zoom_readout"))
-            .replace("__FILTER__", J("filter"))
-            .replace("__CENTER__", json.dumps([(minx + maxx) / 2, (miny + maxy) / 2]))
-            .replace("__PITCH3D__", J("pitch_3d"))
-            .replace("__MAX_PITCH__", json.dumps(cam["max_pitch"]))
-            .replace("__SELECT_COLOR__", J("select_color"))
-            .replace("__PITCH__", json.dumps(cam["pitch"]))
-            .replace("__BEARING__", json.dumps(cam["bearing"]))
-            .replace("__BOUNDS__", json.dumps([[minx, miny], [maxx, maxy]]))
-            .replace("__RS_FILL_LAYERS__", J("fill_layers"))
-            .replace("__COLOR_OPTIONS__", J("color_options"))
-            .replace("__CO_ACTIVE__", J("color_active"))
-            .replace("__OVERLAYS__", J("overlays"))
-            .replace("__FIND_CONTROL__", J("find_control"))
-            .replace("__OVERLAY_CONTROL__", J("overlay_control"))
-            .replace("__OVERLAY_POPUP__", J("overlay_popup"))
-            .replace("__ROAD_ITEMS__", J("items"))
-            .replace("__TUNNEL__", J("tunnel"))
-            .replace("__VIEWS__", J("views"))
-            .replace("__RS_ROAD_FILL__", J("road_fill"))
-            .replace("__ROAD_POPUP__", J("road_popup"))
-            .replace("__ROAD_POPUP_MODE__", J("popup_mode"))
-            .replace("__EDGE_ID_COL__", J("edge_id_col"))
-            .replace("__ROAD_TOOLTIP__", J("road_tooltip"))
-            .replace("__HOVER_DELAY_MS__", J("hover_delay_ms"))
-            .replace("__STREET_VIEW__", J("street_view"))
-            .replace("__SV_WINDOW_KEY__", J("street_view_key"))
-            .replace("__GOOGLE_3D__", J("google_3d"))
-            .replace("__RS_TILED__", J("tiles"))
-            .replace("__RS_LEAN__", J("simple"))
-            .replace("__RS_SOURCES__", J("sources"))
-            .replace("__RS_ARROWS__", J("arrows"))
-            .replace("__RS_LIVE__", J("live"))
-            .replace("__HOST_PANEL_HTML__", _host_panel(side_panel_html, host_panel_width, name)))     # the last: the host's own text may hold any other token
+    cam = {"center": [(minx + maxx) / 2, (miny + maxy) / 2], "pitch": cam["pitch"], "bearing": cam["bearing"], "max_pitch": cam["max_pitch"],
+           "bounds": [[minx, miny], [maxx, maxy]]}
+    # the frame's tokens in one pass (audit R3): a value is not read again, so the host's own text may hold any token
+    vals = {"TITLE": _html.escape(name), "STYLE": json.dumps(style), "RS_OPTIONS": json.dumps({**page, "camera": cam}),
+            "HOST_PANEL_HTML": _host_panel(side_panel_html, host_panel_width, name)}
+    html = re.sub(r"__(TITLE|STYLE|RS_OPTIONS|HOST_PANEL_HTML)__", lambda m: vals[m.group(1)], _HTML)
     parts = ""
     if tiles:
         import base64

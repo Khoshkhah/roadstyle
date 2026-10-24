@@ -134,7 +134,8 @@ Date: 2026-10-24. `rs.setData(table, options)` (`live.js`) colours and sizes the
 ## The options
 
 `rsDashboard(map, options)` takes one object. Each key has the name of a `render` keyword where one exists. The values are the
-values that the page reads, which `render` makes from its keywords. The template fills in each value from a placeholder.
+values that the page reads, which `render` makes from its keywords. The page has them in one JSON object, `RS_OPTIONS` (the
+placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 
 | Option | From `render` | Default in `index.js` | Read by |
 |---|---|---|---|
@@ -224,7 +225,7 @@ The legend is correct only for option 0, because the metadata does not give the 
 
 ## Checks
 
-- `pytest`: the tests read the options from the `rsDashboard(map, {...})` call of the page.
+- `pytest`: the tests read the options from the page's `RS_OPTIONS` object (`_opt(html, key)`).
 - Screenshots of four Monaco pages (default; colour by with legend; panel with tunnels, overlays and a selected road; find and views),
   made with the old and the new code: the pixels are the same, and there are no page errors.
 - `examples/dashboard_rust/` in a browser: the modules load as ES modules (strict mode) on a Rust-engine style, with no page errors.

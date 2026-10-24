@@ -43,9 +43,9 @@ def _stages(gdf, **kw):
 
 
 def _opt(html, key):
-    """One option of the page's rsDashboard(map, {...}) call (static/web_template.html), as a Python value."""
-    at = html.index("\n  " + key + ": ", html.index("rsDashboard(map, {"))
-    return json.JSONDecoder().raw_decode(html, at + len(key) + 5)[0]
+    """One option of the page's rsDashboard call (RS_OPTIONS in static/web_template.html), as a Python value."""
+    at = html.index("const RS_OPTIONS = ") + len("const RS_OPTIONS = ")
+    return json.JSONDecoder().raw_decode(html, at)[0][key]
 
 
 def test_web_color_options_bake_variants_and_wire_recolour():
@@ -388,10 +388,10 @@ def test_web_camera_pitch_and_bearing():
     """pitch=/bearing= set the starting camera (and survive the bounds fit); defaults come from
     the `camera` settings block (0/0)."""
     flat = render_edges(_edges(), backend="web").html
-    assert "pitch:0, bearing:0," in flat
+    assert (_opt(flat, "camera")["pitch"], _opt(flat, "camera")["bearing"]) == (0, 0)
     tilted = render_edges(_edges(), backend="web", pitch=55, bearing=30).html
-    assert "pitch:55, bearing:30," in tilted
-    assert tilted.count("pitch:55") == 2          # map init AND the fitBounds camera
+    assert (_opt(tilted, "camera")["pitch"], _opt(tilted, "camera")["bearing"]) == (55, 30)
+    assert "pitch:cam.pitch, bearing:cam.bearing" in tilted and tilted.count("pitch:cam.pitch") == 2    # map init AND the fitBounds camera
 
 
 def test_web_view_3d_flag():
@@ -401,9 +401,9 @@ def test_web_view_3d_flag():
     style = _style(wm.html)
     assert "terrain" not in style and "dem" not in style["sources"]
     assert "hillshade" not in [l["id"] for l in style["layers"]]
-    assert "pitch:55" in wm.html
+    assert _opt(wm.html, "camera")["pitch"] == 55
     flat = render_edges(_edges(), backend="web").html
-    assert "pitch:0" in flat
+    assert _opt(flat, "camera")["pitch"] == 0
 
 
 def test_web_camera_toggle_control():
@@ -490,8 +490,8 @@ def test_web_camera_max_pitch():
     meet, and past ~72 the tile cover explodes on large GeoJSON sources (roads stop rendering and hover/select
     dies with them). So 70 is the most a page tilts by default, and max_pitch=60 is the option that keeps the width exact."""
     html = render_edges(_edges(), backend="web").html
-    assert "maxPitch:70" in html
-    assert "maxPitch:60" in render_edges(_edges(), backend="web", max_pitch=60).html
+    assert _opt(html, "camera")["max_pitch"] == 70
+    assert _opt(render_edges(_edges(), backend="web", max_pitch=60).html, "camera")["max_pitch"] == 60
     assert "calculateTileZoom=z=>z" in html                              # one tile zoom on the whole screen: a road has one width in a tilted view
     from roadstyle.config import StyleConfig as _C
     assert _C().camera["max_pitch"] == 70

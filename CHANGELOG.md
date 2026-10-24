@@ -7,6 +7,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **The page has its options in one object** (audit R3, step 1, both engines). The template's 38 placeholders of the dashboard's
+  options and the camera are one `__RS_OPTIONS__`: the JSON object `RS_OPTIONS` has the options of `rsDashboard` and `camera`
+  (`center`, `pitch`, `bearing`, `max_pitch`, `bounds`), and the page calls `rsDashboard(map, {...RS_OPTIONS, style})`. The page
+  writers fill in the frame's four tokens in one pass, so a value is not read again. A script that read the page's text
+  (`maxPitch:70`, `\n  tiles: true,`) reads `RS_OPTIONS` now.
 - **Every style reads a road's colour and width from the feature state** (audit N8, both engines). The road layer reads
   `["coalesce", ["feature-state", "rs_c"], <baked colour>]` and each width and offset stop × `["coalesce", ["feature-state", "rs_w"], 1]`,
   in every style, not only with `live_data`; `live_data` now only adds the metadata `roadstyle:live` and the page's option `live`.
