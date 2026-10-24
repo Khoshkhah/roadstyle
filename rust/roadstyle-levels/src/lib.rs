@@ -18,8 +18,8 @@ use std::collections::{HashMap, HashSet};
 /// A point (lon, lat).
 pub type Pt = (f64, f64);
 
-/// The roadstyle version whose rules and defaults this port follows (`edge_levels_meta.roadstyle_version`).
-pub const ROADSTYLE_VERSION: &str = "0.24.2";
+/// The roadstyle version of these rules and defaults (`edge_levels_meta.roadstyle_version`): this crate's version, which is roadstyle's.
+pub const ROADSTYLE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Method {

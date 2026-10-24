@@ -7,6 +7,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **`roadstyle_levels::ROADSTYLE_VERSION` is the crate's version** (review D13): it said 0.24.2 in 0.25.0, and duckosm-rust writes
+  it into `edge_levels_meta.roadstyle_version`. No level check reads that value (they compare `edge_hash` and `n_edges`).
 - **A level area's roads.parquet has the ids as Int64** (audit N28, both engines). `road`, `edges` and `reversed` are Int64 and
   list<Int64>, duckOSM's BIGINT edge ids, written by `make_area` in Rust and in Python (`roadstyle.level_area.write_roads`; an id
   column of text, which only the Python engine takes, stays text). The readers take both, so an area made before still opens:
