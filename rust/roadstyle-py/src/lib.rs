@@ -330,7 +330,7 @@ fn solve_rules(py: Python<'_>, roads: usize, meets: Vec<(usize, usize, usize, us
                near: Vec<(usize, usize, usize)>, orders: Vec<(usize, usize)>, fixed: Vec<(usize, [i64; 4])>, steps: i64, min_positions: bool)
                -> PyResult<(Vec<[i64; 4]>, Vec<(usize, usize, usize)>, Vec<(usize, usize)>, Vec<(usize, usize, usize)>)> {
     let rules = roadstyle::levels::solve::Rules { roads, meets, lifts, orders, near, fixed };
-    let s = py.detach(|| roadstyle::levels::solve::solve(&rules, steps, min_positions)).map_err(PyValueError::new_err)?;
+    let s = py.detach(|| roadstyle::levels::solve::solve(&rules, steps, min_positions)).map_err(|e| PyValueError::new_err(e.to_string()))?;
     Ok((s.parts, s.given_up_parts, s.orders_not_kept, s.near_not_kept))
 }
 

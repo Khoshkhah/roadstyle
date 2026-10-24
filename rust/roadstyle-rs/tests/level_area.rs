@@ -36,7 +36,7 @@ fn the_solve_with_edits_and_the_local_re_solve() {
     assert!(local.levels.iter().all(|v| v[0].max(v[1]).max(v[2]) <= v[3]), "{how:?}");
     // a rule that switches off a rule that is not there
     let off = PairRow { a: order.b, b: order.a, enabled: false, ..order };
-    assert!(a.merged(&[off]).unwrap_err().contains("to switch off"));
+    assert!(matches!(a.merged(&[off]).unwrap_err(), roadstyle_rs::levels::Error::Edits(m) if m.contains("to switch off")));
 }
 
 #[test]
