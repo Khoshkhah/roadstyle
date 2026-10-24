@@ -2,6 +2,7 @@
 //! GeoParquet 1.1). Text, whole numbers, numbers, booleans, lists of them (native Parquet lists: GeoPandas and DuckDB read them as
 //! lists) and the WKB geometry. `write::parquet_to` (rows of JSON values or Arrow cells) and a level area's roads.parquet use it.
 
+use crate::Error;
 use arrow_array::builder::{BinaryBuilder, BooleanBuilder, Float64Builder, Int64Builder, ListBuilder, StringBuilder};
 use arrow_array::{ArrayRef, RecordBatch};
 use arrow_schema::{DataType, Field, Schema};
@@ -86,7 +87,7 @@ pub struct Writer<W: std::io::Write + Send> {
 impl<W: std::io::Write + Send> Writer<W> {
     /// The file of the columns `fields` (their order is the batches'); `geometry`: GeoParquet, the name of its WKB column and the
     /// geometry types in it.
-    pub fn new(w: W, fields: Vec<Field>, geometry: Option<(&str, Vec<String>)>) -> Result<Self, String> {
+    pub fn new(w: W, fields: Vec<Field>, geometry: Option<(&str, Vec<String>)>) -> Result<Self, Error> {
         let mut meta = HashMap::new();
         if let Some((g, types)) = geometry {
             let geo = serde_json::json!({"version": "1.1.0", "primary_column": g, "columns": {g: {"encoding": "WKB", "geometry_types": types}}});
@@ -94,23 +95,23 @@ impl<W: std::io::Write + Send> Writer<W> {
         }
         let schema = Arc::new(Schema::new_with_metadata(fields, meta));
         let props = WriterProperties::builder().set_compression(parquet::basic::Compression::SNAPPY).build();
-        let w = ArrowWriter::try_new(w, schema.clone(), Some(props)).map_err(|e| e.to_string())?;
+        let w = ArrowWriter::try_new(w, schema.clone(), Some(props)).map_err(|e| Error::Write(e.to_string()))?;
         Ok(Writer { w, schema })
     }
 
     /// One batch: a column for each field, in the fields' order.
-    pub fn write(&mut self, cols: Vec<Column>) -> Result<(), String> {
-        let batch = RecordBatch::try_new(self.schema.clone(), cols.into_iter().map(Column::array).collect()).map_err(|e| e.to_string())?;
-        self.w.write(&batch).map_err(|e| e.to_string())
+    pub fn write(&mut self, cols: Vec<Column>) -> Result<(), Error> {
+        let batch = RecordBatch::try_new(self.schema.clone(), cols.into_iter().map(Column::array).collect()).map_err(|e| Error::Write(e.to_string()))?;
+        self.w.write(&batch).map_err(|e| Error::Write(e.to_string()))
     }
 
-    pub fn finish(self) -> Result<W, String> {
-        self.w.into_inner().map_err(|e| e.to_string())
+    pub fn finish(self) -> Result<W, Error> {
+        self.w.into_inner().map_err(|e| Error::Write(e.to_string()))
     }
 }
 
 /// The columns as one Parquet file (one batch), in their order; a `Wkb` column makes it GeoParquet (its primary column, lines).
-pub fn write_columns(cols: Vec<(String, Column)>) -> Result<Vec<u8>, String> {
+pub fn write_columns(cols: Vec<(String, Column)>) -> Result<Vec<u8>, Error> {
     let fields: Vec<Field> = cols.iter().map(|(n, c)| Field::new(n, c.data_type(), true)).collect();
     let geo = cols.iter().find(|(_, c)| matches!(c, Column::Wkb(_))).map(|(n, _)| (n.as_str(), vec!["LineString".to_string()]));
     let mut w = Writer::new(Vec::new(), fields, geo)?;

@@ -1,4 +1,4 @@
-# R10: the base map and the overlays as a typed FeatureTable (plan, no code yet)
+# R10: the base map and the overlays as a typed FeatureTable (plan; steps 1, 2, 6 and the GeoParquet writer of 5 done)
 
 Audit R10 (audit_2026-10-23.md; refined by N5 of audit_2026-10-24.md): the base map and the overlays go through the engine as
 `serde_json` trees. This note gives the plan for the base map's and the overlays' part of R10. The slots and the 3D decks stay with
@@ -68,3 +68,57 @@ of tests/test_duckosm.py, the Python parity tests) and its measured numbers on T
 
 Expected: the base map's memory falls from 172 MB to about 10 MB on Tartu (measured after each step), and stage 2 needs no GeoJSON
 parse for the base map.
+
+## Step 2, done (2026-10-24)
+
+The reader, the sea cut, the base map and the typed source in one step (landing steps 1 and 2 of the plan): the facade's
+`read_features` gives a `FeatureTable` (`read::read_feature_table`), `duckosm::cut_sea` cuts the sea out of the table's buffer,
+`features::feature_tables` makes one table for each layer, `overlays::edge_attach` and `edge_overlay` add their columns to the table,
+and the source `Src::Features` writes the table as GeoJSON. A caller's overlays stay JSON (`overlays::Data::Json`). Stage 2's tiles and
+the GeoParquet writer still read a typed source through one JSON value of it (steps 5 and 6).
+
+Two rules of the table keep the bytes of today's GeoJSON: a column writes its nulls or leaves the key out (`"name": null`, but no
+`bearing` key when there is no bearing), and a column of numbers knows its integers (mapstyle's heights: `6` from the kind's table,
+`9.0` from a tag; 763 of Monaco's heights are integers, 499 are floats).
+
+Tartu, the same method as above, rust-engine at e9e57e0 against this step (each the middle of three runs):
+
+| | rust-engine | Step 2 |
+|---|---|---|
+| Stage 1 (`--sources`), peak memory with the base map | 403 MB | 284 MB |
+| The base map's part of it (roads only: 274 MB) | 129 MB | 10 MB |
+| make_sources, the base map's part (less the same build's run of the roads only) | 115 ms | 58 ms |
+| make_tiled, peak memory with the base map (roads only: 311 MB) | 483 MB | 351 MB |
+| make_tiled, time with the base map | 2,074 ms | 2,060 ms |
+
+The files of stage 1 (GeoJSON and GeoParquet, 22 files) and every golden are the same bytes. Stage 2 keeps 40 MB for the base map: the
+JSON value of each typed source for `Tiles::add`, which step 6 removes.
+
+## Step 6, done (2026-10-24)
+
+`Tiles::add_features` cuts a typed source into tiles from its table: the same ids (the row), the same properties (the keys of each
+GeoJSON feature, `FeatureTable::has_key`) and the same geometries as `Tiles::add` of its GeoJSON, with no JSON value between. The
+tiles of Monaco and Tartu are the same bytes (tests/style.rs, tests/stages.rs). Tartu, make_tiled with the base map (roads only: 311 MB,
+1,690 ms):
+
+| | Step 2 | Step 6 |
+|---|---|---|
+| Peak memory | 351 MB | 344 MB |
+| Time | 2,060 ms | 1,752 ms |
+
+The base map's 33 MB that stay are its tile layers (each feature's geometry in Web Mercator and its value numbers).
+
+## Step 5's GeoParquet writer, done (2026-10-24)
+
+`write_source_file` gives the one Parquet writer (`write::parquet_to`) the rows of a typed source from its table: the Arrow cells of the
+keys of each GeoJSON feature, and each feature's geometry. Before, it made one JSON value of the whole source. The 22 GeoParquet files of
+Tartu are the same bytes, and saving them needs no more memory than stage 1 (284 MB).
+
+## Step 4: proposed not to do (2026-10-24)
+
+A caller's overlays and items (`overlays=`, `items=`) are in the look's args as JSON, and the engine reads them there: their JSON stays
+in memory with a table or without one, so a table saves only the copy that `user_overlays` makes of each FeatureCollection. And a
+table cannot give back the same GeoJSON for every caller's data: its one column order cannot keep each feature's own key order, and a
+nested value, a feature's `id` or another member of a feature needs JSON. So they stay `overlays::Data::Json`. The JSON path of the base
+map is gone already (landing step 5): the base map has no `Row` and no `Tiles::add`.
+
