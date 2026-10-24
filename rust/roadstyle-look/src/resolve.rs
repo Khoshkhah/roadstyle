@@ -7,6 +7,7 @@
 //! The settings are given (a mapping, or a list of them), not read from roadstyle.json files or $ROADSTYLE_CONFIG: the browser has none.
 //! The user's own profiles and palettes are given too (`Options::files`), and they are passed through the calls (`Own`), not kept.
 
+use crate::Error;
 use crate::{LookData, RoadModel};
 use base64::Engine;
 use serde::Deserialize;
@@ -89,10 +90,10 @@ fn yaml_key(k: &yaml_rust2::Yaml) -> String {
     }
 }
 
-pub(crate) fn yaml(text: &str) -> Result<Value, String> {
-    let docs = yaml_rust2::YamlLoader::load_from_str(text).map_err(|e| e.to_string())?;
+pub(crate) fn yaml(text: &str) -> Result<Value, Error> {
+    let docs = yaml_rust2::YamlLoader::load_from_str(text).map_err(|e| Error::File(e.to_string()))?;
     let v = docs.first().map(yaml_value).unwrap_or(Value::Null);
-    if v.is_object() { Ok(v) } else { Err("a settings file holds a mapping".into()) }
+    if v.is_object() { Ok(v) } else { Err(Error::File("a settings file holds a mapping".into())) }
 }
 
 // --- _settings ---
@@ -151,19 +152,19 @@ fn names(o: &Own, kind: &str) -> Vec<String> {
 }
 
 /// _style_file: one profile or palette by name, merged over the base (default / amber) unless it is the base.
-fn style_file(o: &Own, kind: &str, name: &str) -> Result<Value, String> {
+fn style_file(o: &Own, kind: &str, name: &str) -> Result<Value, Error> {
     let files: &[(&str, &str)] = if kind == "profiles" { &PROFILES } else { &PALETTES };
     let mine = own(o, kind, name);        // the user's own file first, as _style_dirs
     let text = mine.clone().or_else(|| files.iter().find(|f| f.0 == name).map(|f| f.1.to_string()))
-        .ok_or_else(|| format!("no {} named '{name}'; there are: {}", &kind[..kind.len() - 1], names(o, kind).join(", ")))?;     // Python's repr
-    let data = yaml(&text).map_err(|e| format!("{} {name}: {e}", &kind[..kind.len() - 1]))?;
+        .ok_or_else(|| Error::Unknown(format!("no {} named '{name}'; there are: {}", &kind[..kind.len() - 1], names(o, kind).join(", "))))?;     // Python's repr
+    let data = yaml(&text).map_err(|e| Error::File(format!("{} {name}: {e}", &kind[..kind.len() - 1])))?;
     let base = lookup(&BASE, kind).unwrap();
     if name == base && mine.is_none() {
         return Ok(data);
     }
     if name == base {        // an own file with the base's name: over the bundled base
         let text = files.iter().find(|f| f.0 == name).map(|f| f.1).unwrap_or_default();
-        let mut out = yaml(text).map_err(|e| format!("{} {name}: {e}", &kind[..kind.len() - 1]))?;
+        let mut out = yaml(text).map_err(|e| Error::File(format!("{} {name}: {e}", &kind[..kind.len() - 1])))?;
         deep_merge(&mut out, &data);
         return Ok(out);
     }
@@ -186,7 +187,7 @@ fn class_entries(colors: &Value, classes: &Value) -> Value {
 
 /// palette_to_dict("carto"): the bundled palette carto at the default profile's widths, as RoadStyle.to_dict writes each class (the widths
 /// and the opacity as floats).
-pub(crate) fn carto_entries() -> Result<Value, String> {
+pub(crate) fn carto_entries() -> Result<Value, Error> {
     let th = theme(&[], &[])?;
     let float = |v: &Value| v.as_f64().map_or(Value::Null, |f| json!(f));
     Ok(Value::Object(th["palettes"]["carto"].as_object().into_iter().flatten().map(|(c, e)| {
@@ -253,7 +254,7 @@ fn old_style_keys(data: &Value) -> (Value, Vec<String>) {
 
 /// _settings.theme(): the profile and the palette that the sources name (default and amber when none does), merged; "palettes": every
 /// palette's road classes at this profile's widths; then each source's style values of the older layout; "active": the two names.
-pub fn theme(sources: &[Value], o: &Own) -> Result<Value, String> {
+pub fn theme(sources: &[Value], o: &Own) -> Result<Value, Error> {
     let (mut profile, mut palette) = (Value::from("default"), Value::from("amber"));
     for d in sources {
         if truthy(d.get("profile")) {
@@ -263,7 +264,7 @@ pub fn theme(sources: &[Value], o: &Own) -> Result<Value, String> {
             palette = d["palette"].clone();
         }
     }
-    let name = |v: &Value| v.as_str().map(String::from).ok_or_else(|| format!("a profile or palette name, not {v}"));
+    let name = |v: &Value| v.as_str().map(String::from).ok_or_else(|| Error::Options(format!("a profile or palette name, not {v}")));
     let mut out = style_file(o, "profiles", &name(&profile)?)?;
     let mut pal = style_file(o, "palettes", &name(&palette)?)?;
     pal.as_object_mut().unwrap().shift_remove("classes");
@@ -287,12 +288,12 @@ pub fn theme(sources: &[Value], o: &Own) -> Result<Value, String> {
     Ok(out)
 }
 
-fn path<'a>(t: &'a Value, p: &str) -> Result<&'a Value, String> {
-    p.split('.').try_fold(t, |v, k| v.get(k).ok_or_else(|| format!("the theme has no {p}")))
+fn path<'a>(t: &'a Value, p: &str) -> Result<&'a Value, Error> {
+    p.split('.').try_fold(t, |v, k| v.get(k).ok_or_else(|| Error::File(format!("the theme has no {p}"))))
 }
 
 /// _settings.style()["config"]: the StyleConfig values from the theme, defaults.json and the sources' other config keys.
-fn style_config(theme: &Value, sources: &[Value]) -> Result<Map<String, Value>, String> {
+fn style_config(theme: &Value, sources: &[Value]) -> Result<Map<String, Value>, Error> {
     let mut cfg = Map::new();
     for (k, p) in OLD_CONFIG.into_iter() {
         cfg.insert(k.into(), path(theme, p)?.clone());
@@ -302,7 +303,7 @@ fn style_config(theme: &Value, sources: &[Value]) -> Result<Map<String, Value>, 
     cfg.insert("minor_no_casing".into(), flagged("no_casing"));
     cfg.insert("single_line_classes".into(), flagged("single_line"));
     cfg.insert("minzoom".into(), Value::Object(classes.iter().filter_map(|(c, e)| Some((c.clone(), e.get("minzoom")?.clone()))).collect()));
-    let defaults: Value = serde_json::from_str(DEFAULTS).map_err(|e| e.to_string())?;
+    let defaults: Value = serde_json::from_str(DEFAULTS).map_err(|e| Error::Look(e.to_string()))?;
     for (k, v) in items(defaults.get("config")) {
         cfg.insert(k, v);
     }
@@ -342,8 +343,8 @@ fn config(cfg: &Map<String, Value>) -> Value {
     Value::Object(out)
 }
 
-fn float(v: &Value, what: &str) -> Result<f64, String> {
-    v.as_f64().ok_or_else(|| format!("{what}: not a number: {v}"))
+fn float(v: &Value, what: &str) -> Result<f64, Error> {
+    v.as_f64().ok_or_else(|| Error::Options(format!("{what}: not a number: {v}")))
 }
 
 /// Python's str() of a number in a dash pattern (_dash_str: "4,4").
@@ -359,15 +360,15 @@ fn py_num(v: &Value) -> String {
 
 /// The class styles (look_of's _class_styles): each class of the palette as ClassStyler resolves it, plain and as a link
 /// (RoadStyle.from_dict, then style._apply with no tunnel and no bridge).
-fn class_styles(theme: &Value, palette: &str, config: &Value) -> Result<Value, String> {
+fn class_styles(theme: &Value, palette: &str, config: &Value) -> Result<Value, Error> {
     let table = theme["palettes"].get(palette).and_then(Value::as_object)
-        .ok_or_else(|| format!("unknown palette {palette:?}; choose from {:?}", theme["palettes"].as_object().map(|m| m.keys().collect::<Vec<_>>())))?;
+        .ok_or_else(|| Error::Unknown(format!("unknown palette {palette:?}; choose from {:?}", theme["palettes"].as_object().map(|m| m.keys().collect::<Vec<_>>()))))?;
     let fb_casing = &theme["roads"]["fallback"]["palette_casing"];
     let (link_scale, fill_opacity) = (float(&config["link_scale"], "link_scale")?, float(&config["fill_opacity"], "fill_opacity")?);
-    let res = |d: &Value| -> Result<Value, String> {
+    let res = |d: &Value| -> Result<Value, Error> {
         for k in ["fill", "width", "casing_width"] {
             if d.get(k).is_none() {
-                return Err(format!("RoadStyle dict is missing required keys: [{k:?}]"));
+                return Err(Error::File(format!("RoadStyle dict is missing required keys: [{k:?}]")));
             }
         }
         let (width, casing_width) = (float(&d["width"], "width")?, float(&d["casing_width"], "casing_width")?);
@@ -379,8 +380,8 @@ fn class_styles(theme: &Value, palette: &str, config: &Value) -> Result<Value, S
                                       "dash": dash, "opacity": fill_opacity * opacity, "casing_opacity": config["casing_opacity"]});
         Ok(json!([one(1.0), one(link_scale)]))
     };
-    let classes: Map<String, Value> = table.iter().map(|(c, d)| Ok((c.clone(), res(d)?))).collect::<Result<_, String>>()?;
-    let fallback = res(table.get("unclassified").or_else(|| table.values().next()).ok_or("an empty palette")?)?;
+    let classes: Map<String, Value> = table.iter().map(|(c, d)| Ok((c.clone(), res(d)?))).collect::<Result<_, Error>>()?;
+    let fallback = res(table.get("unclassified").or_else(|| table.values().next()).ok_or_else(|| Error::File("an empty palette".into()))?)?;
     Ok(json!({"classes": classes, "fallback": fallback}))
 }
 
@@ -418,8 +419,8 @@ pub struct Options {
 
 impl Options {
     /// The options from their JSON value (today's makeLook options).
-    pub fn from_value(v: &Value) -> Result<Options, String> {
-        Options::deserialize(v).map_err(|e| format!("look options: {e}"))
+    pub fn from_value(v: &Value) -> Result<Options, Error> {
+        Options::deserialize(v).map_err(|e| Error::Options(format!("look options: {e}")))
     }
 
     /// style_names: the profiles or the palettes (`kind`) that these options can name, the bundled ones, then the own ones (`files`).
@@ -436,15 +437,15 @@ impl Options {
 }
 
 /// The look of render_edges(palette=, profile=, settings=, **args) as a JSON value (version 1): `options` as `Options` reads them.
-pub fn make_look(options: &Value) -> Result<Value, String> {
+pub fn make_look(options: &Value) -> Result<Value, Error> {
     Ok(crate::Look::resolve(&Options::from_value(options)?)?.to_value())
 }
 
-pub(crate) fn resolve(options: &Options) -> Result<LookData, String> {
+pub(crate) fn resolve(options: &Options) -> Result<LookData, Error> {
     let own = options.own();
     let bm = options.base_map.as_ref().map(crate::basemap::base_map).transpose()?;
     if bm.is_some() && (options.palette.is_some() || options.features.is_some()) {
-        return Err("look options: base_map gives the palette and the base map's part (features): give none of them with it".into());
+        return Err(Error::Options("look options: base_map gives the palette and the base map's part (features): give none of them with it".into()));
     }
     let palette = bm.as_ref().map_or_else(|| options.palette.as_deref().unwrap_or("amber"), |b| b.palette.as_str());
     let profile = Some(&options.profile).filter(|v| !v.is_null());
@@ -466,7 +467,7 @@ pub(crate) fn resolve(options: &Options) -> Result<LookData, String> {
         Value::Null => vec![],
         Value::Array(a) => a.clone(),
         Value::Object(_) => vec![settings.clone()],
-        other => return Err(format!("settings: a mapping or a list of them, not {other}")),
+        other => return Err(Error::Options(format!("settings: a mapping or a list of them, not {other}"))),
     };
     if !pick.is_empty() {
         sources.push(Value::Object(pick));

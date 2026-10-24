@@ -5,7 +5,7 @@ use arrow_array::ffi_stream::{ArrowArrayStreamReader, FFI_ArrowArrayStream};
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyCapsule, PyCapsuleMethods};
-use roadstyle::read::{RoadTable, Row};
+use roadstyle::read::{FeatureTable, RoadTable, Row};
 use std::cell::RefCell;
 
 thread_local! {
@@ -31,13 +31,13 @@ fn stream(obj: &Bound<'_, PyAny>) -> PyResult<ArrowArrayStreamReader> {
 }
 
 /// The roads, the base map's rows and the planner's rows.
-type Tables = (RoadTable, Option<Vec<Row>>, Option<Vec<Row>>);
+type Tables = (RoadTable, Option<FeatureTable>, Option<Vec<Row>>);
 
 /// The roads (their lines in `geometry`), the base map's rows (features_of: the land without the sea) and the planner's rows.
 fn tables(roads: ArrowArrayStreamReader, features: Option<ArrowArrayStreamReader>, planner: Option<ArrowArrayStreamReader>)
           -> Result<Tables, String> {
     Ok((roadstyle::read::roads_from(roads, "geometry")?,
-        features.map(|f| roadstyle::read::table_from(f, "geometry").and_then(roadstyle::features_of)).transpose()?,
+        features.map(|f| roadstyle::read::feature_table_from(f, "geometry").map_err(String::from).and_then(roadstyle::features_of)).transpose()?,
         planner.map(|p| roadstyle::read::table_from(p, "")).transpose()?))
 }
 
@@ -51,7 +51,7 @@ impl PyLook {
     /// Look.from_json(text) -> Look: a saved look (version 1 or 0). An error is a ValueError.
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
-        roadstyle::Look::from_json(text).map(PyLook).map_err(PyValueError::new_err)
+        roadstyle::Look::from_json(text).map(PyLook).map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     /// json() -> str: the look's text (version 1).
@@ -77,7 +77,7 @@ impl PyLook {
     /// with_arg(key, value) -> Look: the same look with the map option `key` set to `value` (JSON text).
     fn with_arg(&self, key: &str, value: &str) -> PyResult<Self> {
         let v: serde_json::Value = serde_json::from_str(value).map_err(|e| PyValueError::new_err(format!("{key}: not JSON: {e}")))?;
-        self.0.clone().with_arg(key, v).map(PyLook).map_err(PyValueError::new_err)
+        self.0.clone().with_arg(key, v).map(PyLook).map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
@@ -87,7 +87,7 @@ impl PyLook {
 fn resolve_look(py: Python<'_>, options: String) -> PyResult<PyLook> {
     py.detach(|| {
         let o: serde_json::Value = serde_json::from_str(&options).map_err(|e| format!("options: not JSON: {e}"))?;
-        roadstyle::Look::resolve(&roadstyle::look::Options::from_value(&o)?)
+        Ok::<_, String>(roadstyle::Look::resolve(&roadstyle::look::Options::from_value(&o)?)?)
     })
     .map(PyLook)
     .map_err(PyValueError::new_err)
@@ -345,13 +345,20 @@ fn make_page(style: String, page: String, parts: String, pmtiles: Option<Vec<u8>
 /// page_from(roads, look, options, given) -> str: the page of the roads (an Arrow table) in one call (roadstyle::page_options), as
 /// render_edges(backend="web"). `options`: the look's options (JSON text: palette, profile, settings, features, files), which a view's
 /// palette resolves again; `given`: the caller's values over the look's args (JSON text: basemap and basemaps as resolved entries,
-/// api_key, street_view_key). MapLibre stays a placeholder (WebMap puts it in).
+/// api_key, street_view_key); `features`: a duckOSM map's base map (an Arrow table). MapLibre stays a placeholder (WebMap puts it in).
 #[pyfunction]
-fn page_from(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook>, options: String, given: String) -> PyResult<String> {
+#[pyo3(signature = (roads, look, options, given, features=None))]
+fn page_from(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook>, options: String, given: String, features: Option<&Bound<'_, PyAny>>)
+             -> PyResult<String> {
     let options: roadstyle::look::Options = serde_json::from_str(&options).map_err(|e| PyValueError::new_err(format!("options: {e}")))?;
     let given: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&given).map_err(|e| PyValueError::new_err(format!("given: {e}")))?;
-    let (look, roads) = (&look.0, stream(roads)?);
-    let page = py.detach(|| roadstyle::read::roads_from(roads, "geometry").and_then(|r| roadstyle::page_options::page_from(r, look, &options, &given)))
+    let (look, roads, features) = (&look.0, stream(roads)?, features.map(stream).transpose()?);
+    let page = py.detach(|| {
+        let features = features.map(|f| roadstyle::read::feature_table_from(f, "geometry").map_err(String::from).and_then(roadstyle::features_of))
+            .transpose()?;
+        roadstyle::read::roads_from(roads, "geometry").map_err(String::from)
+            .and_then(|r| roadstyle::page_options::page_from(r, features, look, &options, &given))
+    })
         .map_err(PyValueError::new_err)?;
     warned(&page.warnings);
     Ok(page.html)
@@ -401,7 +408,7 @@ fn make_area(py: Python<'_>, edges: &Bound<'_, PyAny>, folder: String, id_col: S
 /// colours, the theme file itself, [saturation, lighten] of its transform]. An unknown theme is a ValueError that names the themes.
 #[pyfunction]
 fn base_map_theme(theme: &str) -> PyResult<String> {
-    let (style, file, (s, l)) = roadstyle::look::basemap::load_theme(theme).map_err(PyValueError::new_err)?;
+    let (style, file, (s, l)) = roadstyle::look::basemap::load_theme(theme).map_err(|e| PyValueError::new_err(e.to_string()))?;
     Ok(serde_json::json!([style, file, [s, l]]).to_string())
 }
 
@@ -421,7 +428,7 @@ fn duckosm_catalog_sql(catalog: &str) -> [String; 2] {
 }
 
 /// duckosm_plan(tables, columns, mode, tags, specs, only=False) -> str: the SQL that reads a duckOSM file (roadstyle_io::duckosm, the one
-/// copy of it), as JSON text: {"roads": [3 statements], "meta": the stored levels' query or null (tags), "select": the roads of `mode`,
+/// copy of it), as JSON text: {"roads": [3 statements] (null when the file has no network of `mode`: "roads_error" says why), "meta": the stored levels' query or null (tags), "select": the roads of `mode`,
 /// "layers": [{"spec", "name", "sql": [the queries in order]}] for the base map (`specs`: layers.yaml's layers as JSON text), "subset":
 /// with `only` (the map of `mode` alone), the queries of its roads with no stored levels and of its edge_ids}. `tables` and `columns`: the rows of the
 /// catalog's information_schema.
@@ -432,13 +439,17 @@ fn duckosm_plan(tables: Vec<(String, String)>, columns: Vec<(String, String, Str
     use roadstyle::duckosm;
     let cat = duckosm::Catalog { tables, columns };
     let specs: Vec<serde_json::Value> = serde_json::from_str(specs).map_err(|e| PyValueError::new_err(format!("specs: {e}")))?;
-    let roads = duckosm::roads_sql(&cat, tags, only.then_some(mode)).map_err(PyValueError::new_err)?;
-    let select = duckosm::roads_select(mode).map_err(PyValueError::new_err)?;
+    // the base map's queries also for a file with no network: then "roads" is null and "roads_error" says why
+    let (roads, roads_error) = match duckosm::roads_sql(&cat, tags, only.then_some(mode)) {
+        Ok(r) => (Some(r), None),
+        Err(e) => (None, Some(e)),
+    };
+    let select = duckosm::roads_select(mode).map_err(|e| PyValueError::new_err(e.to_string()))?;
     let layers: Vec<serde_json::Value> = duckosm::features_sql(&cat, &specs).into_iter()
         .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "sql": l.sql})).collect();
     let meta = (!tags).then_some(duckosm::LEVELS_META_SQL);
     let subset = (only && !tags).then_some([duckosm::SUBSET_SQL, duckosm::IDS_SQL]);
-    Ok(serde_json::json!({"roads": roads, "meta": meta, "select": select, "layers": layers, "subset": subset}).to_string())
+    Ok(serde_json::json!({"roads": roads, "roads_error": roads_error, "meta": meta, "select": select, "layers": layers, "subset": subset}).to_string())
 }
 
 /// duckosm_levels(row) -> str: the look's keyword `levels` (JSON text) from the stored levels' metadata row (source, n_edges, edge_hash),
@@ -446,7 +457,7 @@ fn duckosm_plan(tables: Vec<(String, String)>, columns: Vec<(String, String, Str
 #[pyfunction]
 #[pyo3(signature = (row=None))]
 fn duckosm_levels(row: Option<(String, i64, String)>) -> PyResult<String> {
-    roadstyle::duckosm::levels_keyword(row.as_ref().map(|(s, n, h)| (s.as_str(), *n, h.as_str()))).map(|v| v.to_string()).map_err(PyValueError::new_err)
+    roadstyle::duckosm::levels_keyword(row.as_ref().map(|(s, n, h)| (s.as_str(), *n, h.as_str()))).map(|v| v.to_string()).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
 /// duckosm_subset_levels(row, missing, example, ids) -> str: the look's keyword `levels` (JSON text) of the stored levels for a map of one
@@ -455,7 +466,7 @@ fn duckosm_levels(row: Option<(String, i64, String)>) -> PyResult<String> {
 #[pyo3(signature = (row, missing, example, ids))]
 fn duckosm_subset_levels(row: Option<(String, i64, String)>, missing: i64, example: Option<i64>, ids: Vec<i64>) -> PyResult<String> {
     roadstyle::duckosm::subset_levels_keyword(row.as_ref().map(|(s, n, h)| (s.as_str(), *n, h.as_str())), missing, example, &ids)
-        .map(|v| v.to_string()).map_err(PyValueError::new_err)
+        .map(|v| v.to_string()).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
 /// duckosm_features_select(specs) -> str | None: the base map's rows from the tables f<spec> that were made.

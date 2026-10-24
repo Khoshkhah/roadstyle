@@ -4,7 +4,7 @@ with. Run it in the conda environment roadstyle (roadstyle from this repository'
 
     python rust/roadstyle-rs/tests/make_goldens.py cmaps colors looks monaco sodermalm tartu
 
-- cmaps: rust/roadstyle-look/src/cmaps.json, the colour ramps that colors.py reads from branca and matplotlib (branca's schemes and colour names, each
+- cmaps: src/roadstyle/data/cmaps.json, the colour ramps of both engines (colors.py and roadstyle-look read it), from branca and matplotlib (branca's schemes and colour names, each
   matplotlib colormap at 9 stops).
 - colors: tests/data/monaco_part/ (tests/colors.rs): the roads of Monaco in a box around Monte Carlo, and for each case of data colour
   <case>.json.gz = {"args", "style": export_inline's style, "color_options": the page's colour options (render_web's __COLOR_OPTIONS__)}.
@@ -66,7 +66,7 @@ def write_cmaps():
     css = json.loads(Path(root, "_cnames.json").read_text())
     mpl = {n: [mcolors.to_hex(matplotlib.colormaps[n](i / 8.0)) for i in range(9)] for n in sorted(matplotlib.colormaps)}
     out = {"versions": {"branca": branca.__version__, "matplotlib": matplotlib.__version__}, "branca": schemes, "css": css, "matplotlib": mpl}
-    Path(__file__).resolve().parents[2].joinpath("roadstyle-look", "src", "cmaps.json").write_text(json.dumps(out, separators=(",", ":")))
+    Path(__file__).resolve().parents[3].joinpath("src", "roadstyle", "data", "cmaps.json").write_text(json.dumps(out, separators=(",", ":")))
 
 def write_colors():
     look = json.loads((DATA / "look.json").read_text())
