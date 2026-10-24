@@ -8,7 +8,7 @@ license.workspace = true
 description = "The roadstyle program: one command for each job (serve: the level editor's files)"
 
 [dependencies]
-roadstyle.workspace = true
+roadstyle = { workspace = true, features = ["gpkg"] }   # the native program reads GeoPackage files too
 serde_json.workspace = true
 
 [lib]

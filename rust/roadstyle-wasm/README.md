@@ -23,6 +23,7 @@ const tiled = JSON.parse(tiler.style());
 ```
 
 - `readGeoJson(bytes)`: the roads of a GeoJSON file as a `Roads` handle; `roads.sources(look)` is stage 1 of them.
+- `readShp(shp, dbf, prj?, name?)`: the roads of a Shapefile (its .shp and .dbf bytes and its .prj text), in EPSG:4326, as a `Roads` handle. A GeoPackage is read only by the native programs (SQLite is C).
 - `Look` (`resolveLook`, `Look.fromJson`, `toJson`), `makeStyle`, `Tiler`, `makeSources`, `tileSources`, `tileFiles`, `makePage`,
   `exportLook` and `memoryBytes`: the types (`index.d.ts`) come from the Rust signatures, with their descriptions. The calls take a
   `Look`, not the look's text. `makeLook` is the old name of `resolveLook`, for one version.

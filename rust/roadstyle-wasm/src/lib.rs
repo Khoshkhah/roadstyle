@@ -342,6 +342,13 @@ mod wasm {
         roadstyle::geojson::read_roads(bytes).map(Roads).map_err(|e| JsError::new(&e))
     }
 
+    /// readShp(shp: Uint8Array, dbf: Uint8Array, prj?: string, name?: string) -> Roads: the roads of a Shapefile, in EPSG:4326 (roadstyle-io's
+    /// shp.rs; no prj: no CRS, an error). A GeoPackage is not read here: SQLite is C (the native programs read it). An error is a thrown Error.
+    #[wasm_bindgen(js_name = readShp)]
+    pub fn read_shp(shp: &[u8], dbf: &[u8], prj: Option<String>, name: Option<String>) -> Result<Roads, JsError> {
+        roadstyle::shp::read_roads(shp, dbf, prj.as_deref(), name.as_deref().unwrap_or("the Shapefile")).map(Roads).map_err(|e| JsError::new(&e))
+    }
+
     /// tileSources(sources, prefix, keep): stage 2 from memory (the typed pieces, no GeoJSON text; the sources stay as they are). The
     /// Tiler's style has the one vector source `<prefix>roads/{z}/{x}/{y}`, with the pieces' promoteId (roadstyle::tile_stage).
     #[wasm_bindgen(js_name = tileSources)]

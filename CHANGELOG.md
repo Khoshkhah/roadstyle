@@ -51,6 +51,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   has the key: a casing piece has no `__rs_fill@<palette>: null` any more. The map does not change.
 
 ### Added
+- **The Rust engine reads Shapefile and GeoPackage road files** (`roadstyle-io`: `shp.rs`, `gpkg.rs`, `crs.rs`). Each gives the
+  `RoadTable` of the GeoJSON reader, with the same column types. A file's CRS goes to EPSG:4326 with the rule of Python's
+  `validate.to_wgs84`: no CRS is an error, EPSG:4326 stays as it is, another CRS is reprojected (proj4rs, pure Rust; an EPSG code
+  through crs-definitions, a WKT text through proj4wkt). A CRS that the reader cannot read is an error that names it. GeoPackage is
+  SQLite (C), so it is the feature `gpkg`, for the native programs only. The wasm package has `readShp(shp, dbf, prj?, name?)`, and
+  CI fails if `roadstyle-wasm` depends on SQLite.
 - **The base map's look for Python callers**: `roadstyle.duckosm.base_map(mode, theme=, paths=)` (the palette, the settings, the base
   map's part and the mode's map options), `roadstyle.duckosm.theme(name)` and `roadstyle.duckosm.recolor(colour, transform)`, all made
   by the Rust engine. The mapstyle shim reads them. `Look.part` also gives `palette`, `settings` and `features`.
