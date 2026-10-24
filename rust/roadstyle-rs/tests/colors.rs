@@ -23,7 +23,7 @@ fn check(case: &str) {
         look["args"][k] = v.clone();
     }
     let roads = std::fs::read(data("monaco_part/roads.parquet")).unwrap();
-    let style = roadstyle_rs::make_style(roads, &look.to_string(), None, None, None).unwrap_or_else(|e| panic!("{case}: {e}"));
+    let style = roadstyle_rs::make_style(roads, &roadstyle_rs::Look::from_value(look.clone()).unwrap(), None, None, None).unwrap_or_else(|e| panic!("{case}: {e}"));
     let mut style: Value = serde_json::from_str(&style).unwrap();
     let options = style["metadata"].as_object_mut().unwrap().shift_remove("roadstyle:color_options").unwrap_or(Value::Array(vec![]));
     let mut golden = golden;

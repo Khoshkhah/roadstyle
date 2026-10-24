@@ -12,7 +12,7 @@
 </head><body>
 <div id="map"></div>
 <script type="module">
-import init, {makeStyle, makeSources} from "./pkg/roadstyle_wasm.js";
+import init, {Look, makeStyle, makeSources} from "./pkg/roadstyle_wasm.js";
 import {rsDashboard} from "../../src/roadstyle/static/dashboard/index.js";
 
 const DATA = "../../rust/roadstyle-rs/tests/data/";
@@ -25,10 +25,11 @@ Object.assign(look.args, {color_by: "lanes", cmap: "YlOrRd", vmin: 1, vmax: 4});
 // the stored levels' metadata, the value of roads_sql.js makeRoads for a duckOSM file: the engine checks that the levels in roads.parquet
 // were solved for these edges (their number and the hash of their ids), and stops with an error if not
 look.args.levels = {edge_hash: "615c9155ab37a030dbfa80da2f7fcc09", n_edges: 13298};
-const style = JSON.parse(makeStyle(roads, JSON.stringify(look), undefined, undefined, "Monaco"));
+const lk = Look.fromJson(JSON.stringify(look));     // the look, parsed one time (version 0: today's look.json)
+const style = JSON.parse(makeStyle(roads, lk, undefined, undefined, "Monaco"));
 style.sources.simple.promoteId = "__rs_edge";   // the pieces' row as their id: the glow by row (the engine sets it only on its own pages)
 // the road table of stage 1 (each road's fields, midpoint, bbox, heading and line, by row): the popup, the search and Street View read it
-const road_table = JSON.parse(new TextDecoder().decode(makeSources(roads, JSON.stringify(look), undefined, undefined, "Monaco").roadTable()));
+const road_table = JSON.parse(new TextDecoder().decode(makeSources(roads, lk, undefined, undefined, "Monaco").roadTable()));
 const theme = look.theme;
 
 const map = new maplibregl.Map({container: "map", style, attributionControl: {compact: true}});

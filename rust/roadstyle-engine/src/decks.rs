@@ -11,27 +11,8 @@ use std::collections::HashMap;
 type P = [f64; 2];
 type Node = (f64, f64);
 
-/// The deck settings (render's dk: the defaults, then the config's bridge_decks).
-pub struct DeckLook {
-    pub base_m: f64,
-    pub thickness_m: f64,
-    pub ramp_m: f64,
-    pub step_m: f64,
-    pub match_zoom: f64,
-    pub width_scale: f64,
-    pub casing_px: f64,
-    pub flat_below: f64,
-    pub opacity: f64,
-}
-
-impl DeckLook {
-    pub fn from_config(cfg: &Value) -> DeckLook {
-        let f = |k: &str, d: f64| cfg[k].as_f64().unwrap_or(d);
-        DeckLook { base_m: f("base_m", 5.0), thickness_m: f("thickness_m", 1.0), ramp_m: f("ramp_m", 40.0), step_m: f("step_m", 2.5),
-                   match_zoom: f("match_zoom", 18.0), width_scale: f("width_scale", 1.0), casing_px: f("casing_px", 2.0),
-                   flat_below: f("flat_below", 16.0), opacity: f("opacity", 0.7) }
-    }
-}
+/// The look values of the 3D bridge decks (roadstyle-look: config bridge_decks).
+pub use roadstyle_look::DeckLook;
 
 /// A node as a hash key (the rounded floats' bits: py_round gives no -0.0).
 fn hk(n: Node) -> (u64, u64) {
