@@ -113,9 +113,14 @@ with no base map, headless Chromium; the middle value of 3 runs, each in a new p
 | A zoom out to 12 | 0.25 s | 0.25 s |
 | The JavaScript heap of the page | 112 MB | 82 MB |
 
-With the Rust `Tiler`, the first view comes in half the time, and the zoom and the pan are faster. With GeoJSON, MapLibre first
-takes a 23 MB style and cuts all the roads; with the `Tiler` it gets only the rules and asks for the tiles in view. The test has
-limits: one area, one machine, software drawing in a headless browser, and no count of the memory of MapLibre's own workers.
+!!! warning "A first result, not a fair comparison"
+    The two paths do not cut the same input into the same tiles. MapLibre cuts the GeoJSON of `makeStyle`; the `Tiler` makes its
+    own pieces from the roads, because stage 2 has no public call that takes a GeoJSON yet. The settings also differ: MapLibre
+    cuts up to zoom 18 on a grid of 8,192 units with a buffer of 128, and it cuts the source `roads` with every field and line;
+    the `Tiler` cuts zooms 6 to 15 on a grid of 4,096 units with a buffer of 80, and above zoom 15 MapLibre enlarges its tiles.
+    Thus the row "a zoom to 16" favors the `Tiler`. A fair test gives both cutters the same GeoJSON file with the same tile
+    settings, and checks that they give the same features. Other limits: one area, one machine, software drawing in a headless
+    browser, and no count of the memory of MapLibre's own workers.
 
 ### Small areas
 
