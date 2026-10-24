@@ -26,7 +26,6 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers=True, only: bo
     the roads of ``mode`` alone (its edges and private_edges; render_map(only=True)); the stored levels were solved for every mode
     together, so each of these roads must have its stored row (load_area_levels(subset=True))."""
     import duckdb
-    import pyarrow as pa
 
     from ._engine import rust
 
@@ -84,9 +83,9 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers=True, only: bo
                     warnings.warn(f"{db}: base-map layer {lyr['name']}: no tags column (an older file): the heights of the kinds", stacklevel=2)
                 made.append(lyr["spec"])
                 break
-        roads = pa.table(con.execute(plan["select"]).arrow())       # in memory: the connection closes below
+        roads = con.execute(plan["select"]).to_arrow_table()      # in memory: the connection closes below (DuckDB 1.5 and later)
         fsel = r.duckosm_features_select(made)
-        features = pa.table(con.execute(fsel).arrow()) if fsel else None
+        features = con.execute(fsel).to_arrow_table() if fsel else None
     finally:
         con.close()
     return roads, features, level_kw
