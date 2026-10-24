@@ -7,6 +7,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **A level area's roads.parquet has the ids as Int64** (audit N28, both engines). `road`, `edges` and `reversed` are Int64 and
+  list<Int64>, duckOSM's BIGINT edge ids, written by `make_area` in Rust and in Python (`roadstyle.level_area.write_roads`; an id
+  column of text, which only the Python engine takes, stays text). The readers take both, so an area made before still opens:
+  `read_roads` (new) and the editors give the ids as text in memory. `rs.level_input` keeps its in-memory frame as text, because
+  duckosm-rust/tools compares the ids as text (a frozen repo). The level editor's answers are typed in Rust (`Answer`, the conflicts),
+  and the program's `levels solve` reads them without a JSON parse back. The page's JSON does not change.
 - **The program reads GeoJSON, Shapefile and GeoPackage roads** (audit N18). `roadstyle sources`, `page` and `levels make` read
   the roads by the file's extension (`.parquet`, `.geojson`, `.shp` with its `.dbf` and `.prj`, `.gpkg`) through roadstyle-io's
   readers. Before, they read only GeoParquet, though the program was built with the GeoPackage reader. Another extension is an error

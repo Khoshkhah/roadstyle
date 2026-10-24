@@ -74,12 +74,13 @@ pub fn make_area(table: &RoadTable, folder: &Path, o: &MakeOptions) -> Result<Ma
     let heads = read_heads(&folder.join("heads.csv"))?;
     let lo = Options { band_col: o.band_col.is_some(), order, band_dist: o.band_dist, head_m: o.head_m, near_rules: o.near_rules, ..Default::default() };
     let input = make(&edges, &lo, &heads)?;
-    let id = |i: usize| ids[i].to_string();
+    let id = |i: usize| ids[i];
     let n = input.roads.len();
     let mut out: Vec<(String, Column)> = vec![
-        ("road".into(), Column::Text(input.roads.iter().map(|r| Some(id(r.first))).collect())),
-        ("edges".into(), Column::TextList(input.roads.iter().map(|r| r.edges.iter().map(|&e| Some(id(e))).collect()).collect())),
-        ("reversed".into(), Column::TextList(input.roads.iter().map(|r| r.reversed.iter().map(|&e| Some(id(e))).collect()).collect())),
+        // the ids as Int64 (duckOSM's BIGINT edge ids; roadstyle.level_area.write_roads does the same)
+        ("road".into(), Column::Int(input.roads.iter().map(|r| Some(id(r.first))).collect())),
+        ("edges".into(), Column::IntList(input.roads.iter().map(|r| r.edges.iter().map(|&e| Some(id(e))).collect()).collect())),
+        ("reversed".into(), Column::IntList(input.roads.iter().map(|r| r.reversed.iter().map(|&e| Some(id(e))).collect()).collect())),
         ("band".into(), Column::Int(input.band.iter().map(|&b| Some(b)).collect())),
         ("priority".into(), Column::Float(input.priority.clone())),
     ];

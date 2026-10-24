@@ -14,7 +14,7 @@ fn data(name: &str) -> PathBuf {
 
 fn area() -> Area {
     let rows = roadstyle_rs::read::read_table(std::fs::read(data("roads.parquet")).unwrap(), "geometry").unwrap();
-    let id = |v: &Value| v.as_str().unwrap().parse::<i64>().unwrap();
+    let id = |v: &Value| v.as_i64().unwrap();      // roads.parquet has the ids as Int64
     let ids = |v: &Value| v.as_array().unwrap().iter().map(id).collect();
     let roads = rows.iter().map(|r| AreaRoad { id: id(&r.cols["road"]), edges: ids(&r.cols["edges"]), reversed: ids(&r.cols["reversed"]) })
         .collect();

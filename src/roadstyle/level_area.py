@@ -31,6 +31,35 @@ def read_edges(source, query=None, geometry=None):
     return rs.load_edges(source).gdf
 
 
+IDS = ("road", "edges", "reversed")      # roads.parquet's id columns: Int64 in the file, text in memory (read_roads)
+
+
+def read_roads(folder):
+    """roads.parquet of the area in ``folder``, its ids (``road``, ``edges``, ``reversed``) as text, as rs.level_input gives them. The
+    file has them as Int64 (duckOSM's BIGINT edge ids); an area made before has text, which stays text."""
+    import geopandas as gpd
+
+    roads = gpd.read_parquet(Path(folder) / "roads.parquet")
+    txt = lambda v: None if v is None else str(v)                                       # noqa: E731
+    roads["road"] = [txt(v) for v in roads["road"].astype(object)]
+    for c in ("edges", "reversed"):
+        roads[c] = [[str(e) for e in v] for v in roads[c]]
+    return roads
+
+
+def write_roads(roads, path):
+    """rs.level_input's roads as roads.parquet: the ids as Int64 when each is a whole number (the BIGINT rule), else as text (an
+    id column of text, which only the Python engine takes). In memory, level_input keeps them as text: duckosm-rust/tools compares
+    them as text (a frozen repo)."""
+    whole = lambda v: str(v).lstrip("-").isdigit()                                       # noqa: E731
+    out = roads.copy()
+    if all(whole(r) for r in out["road"]) and all(whole(e) for c in ("edges", "reversed") for v in out[c] for e in v):
+        out["road"] = pd.array([int(r) for r in out["road"]], dtype="Int64")
+        for c in ("edges", "reversed"):
+            out[c] = [[int(e) for e in v] for v in out[c]]
+    out.to_parquet(path)
+
+
 def make_area(edges, folder, db=None, engine=None, **level_input_kw):
     """The solver's input in ``folder``: roads.parquet and pairs.csv (rs.level_input, written again each run), and an empty edits.csv the
     first time. Which parts of a stack's upper road cross the road under it is decided here, once, with the heads of the folder's heads.csv
@@ -57,8 +86,6 @@ def make_area(edges, folder, db=None, engine=None, **level_input_kw):
     if _engine.engine(engine) == "rust":                 # ``engine``: "python" or "rust" (ROADSTYLE_ENGINE): roadstyle::level_area in Rust
         import warnings
 
-        import geopandas as gpd
-        import pandas as pd
         kw = {k: v for k, v in level_input_kw.items() if v is not None or k in ("band_col", "order")}
         if "id_col" in level_input_kw and not level_input_kw["id_col"]:
             kw["id_col"] = ""                           # no id column: the row numbers, as level_input
@@ -69,13 +96,13 @@ def make_area(edges, folder, db=None, engine=None, **level_input_kw):
         _, _, said = _engine.rust().make_area(_engine._arrow(edges), str(folder), **kw)
         for w in said:
             warnings.warn(w, stacklevel=2)
-        roads, pairs = gpd.read_parquet(folder / "roads.parquet"), pd.read_csv(folder / "pairs.csv", dtype=str, keep_default_na=False)
+        roads, pairs = read_roads(folder), pd.read_csv(folder / "pairs.csv", dtype=str, keep_default_na=False)
     else:
         if (folder / "heads.csv").exists():
             level_input_kw.setdefault("heads", folder / "heads.csv")
         roads, pairs = rs.level_input(edges, **level_input_kw)
         folder.mkdir(parents=True, exist_ok=True)
-        roads.to_parquet(folder / "roads.parquet")
+        write_roads(roads, folder / "roads.parquet")
         pairs.to_csv(folder / "pairs.csv", index=False)
         if not (folder / "edits.csv").exists():
             (folder / "edits.csv").write_text("relation,a,b,a_end,b_end,enabled\n")
@@ -96,10 +123,8 @@ def area_db(folder):
 def solve_area(folder, auto_ends=False, max_positions=None, engine=None):
     """Solve the area in ``folder`` with your edits, heads and caps; write levels.csv and levels_info.json. Returns the solved roads.
     ``engine``: the solver of solve_levels ("python" or "rust"; default ROADSTYLE_ENGINE, else Python)."""
-    import geopandas as gpd
-
     folder = Path(folder)
-    roads = gpd.read_parquet(folder / "roads.parquet")
+    roads = read_roads(folder)
     edits = folder / "edits.csv"
     heads, caps = own(folder, roads)
     solved, drawn, _ = solve(roads, folder / "pairs.csv", edits if edits.exists() else None, heads, caps, auto=auto_ends,

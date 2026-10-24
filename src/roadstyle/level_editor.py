@@ -19,14 +19,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-import geopandas as gpd
 import pandas as pd
 
 import roadstyle as rs
 from roadstyle import render_web
 
 from ._na import missing
-from .level_area import defaults, ends, own, solve, solve_local, write
+from .level_area import defaults, ends, own, read_roads, solve, solve_local, write
 
 COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"]
 DRAWN = ["casing_start", "casing_level", "casing_end", "fill_level", "head_start_m", "head_end_m", "cap_start", "cap_end"]   # what is drawn of a road
@@ -36,7 +35,7 @@ PARTIAL_MAX = 1500      # more roads changed by an Apply than this: the whole pa
 class Area:
     def __init__(self, folder, items=None, engine=None):
         self.dir, self.items, self._overlays, self.engine, self._read = Path(folder), items, [], engine, None
-        self.roads = gpd.read_parquet(self.dir / "roads.parquet")
+        self.roads = read_roads(self.dir)
         self.pairs = pd.read_csv(self.dir / "pairs.csv", dtype=str, keep_default_na=False)
         self.edits_path = self.dir / "edits.csv"
         # each road end's head length and cap: solve_levels.defaults under yours in heads.csv / caps.csv ("" = the default)
