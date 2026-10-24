@@ -66,7 +66,7 @@ pub fn mark_roads(fs: &mut Roads, look: &Look, args: &Value) -> Result<crate::co
     mark_lvl(fs);
     let caps = CapCols::from_args(args);
     mark_caps(fs, &caps);
-    mark_heads(fs);
+    mark_heads(fs, [named("head_start_m_col"), named("head_end_m_col")]);
     let named = |k: &str| args[k].as_str().is_some_and(|c| !c.is_empty());
     let computed = !named("casing_level_col") && !named("fill_level_col");      // render computes all four (compute_levels)
     mark_levels(fs, ["casing_level_col", "fill_level_col", "casing_start_col", "casing_end_col"].map(|k| computed || named(k)));
@@ -275,10 +275,14 @@ fn mark_caps(fs: &mut Roads, caps: &CapCols) {
 }
 
 /// The head lengths of each edge (head_start_m_col / head_end_m_col): __rs_hs / __rs_he where the value is a number above 0.
-fn mark_heads(fs: &mut Roads) {
+/// `named`: render's head_start_m_col and head_end_m_col name the columns (as render, a column is read only when its keyword names it).
+fn mark_heads(fs: &mut Roads, named: [bool; 2]) {
+    if named == [false, false] {
+        return;
+    }
     for i in 0..fs.len() {
-        let head = |col: &str| fs.get(i, col).and_then(py_float).filter(|v| *v > 0.0);
-        (fs.draw[i].head_start, fs.draw[i].head_end) = (head("head_start_m"), head("head_end_m"));
+        let head = |on: bool, col: &str| if on { fs.get(i, col).and_then(py_float).filter(|v| *v > 0.0) } else { None };
+        (fs.draw[i].head_start, fs.draw[i].head_end) = (head(named[0], "head_start_m"), head(named[1], "head_end_m"));
     }
 }
 

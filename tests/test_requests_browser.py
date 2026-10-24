@@ -170,23 +170,25 @@ def test_side_panel_html_with_docked_panel_is_an_error(tmp_path):
 
 
 def test_rscolorbase_survives_rscolor(tmp_path):
-    """Issue (b): rsColorBase groups (state ``rs_base``) stay under rsColor's own (``rs_colors``), and rsColor(null) does not clear them."""
+    """Issue (b): rsColorBase's colours stay under rsColor's own, and rsColor(null) does not clear them. Both are the feature state rs_c
+    of the road's row (audit N8); only rsColor's rows are in the global state rs_top (the sort key: a painted road on top)."""
     path = _page(tmp_path, "base")
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, path)
-        ids = page.evaluate("rsQuery(()=>true)")
-        state = "JSON.stringify([map.getGlobalState().rs_base, map.getGlobalState().rs_colors])"
+        ids = page.evaluate("rsQuery(()=>true)")[:3]
+        state = ("(() => { const L = map.getLayer('roads-simple'); return JSON.stringify([" + json.dumps(ids) + ".map(id => "
+                 "map.getFeatureState({source: L.source, sourceLayer: L.sourceLayer, id}).rs_c || null), map.getGlobalState().rs_top]); })()")
         page.evaluate(f"rsColorBase([[{ids[:2]}, '#00ee00']])")
-        page.evaluate(f"rsColor({ids[2:3]}, '#ee0000')")
+        page.evaluate(f"rsColor({ids[1:3]}, '#ee0000')")
         both = json.loads(page.evaluate(state))
         page.evaluate("rsColor(null)")
         after = json.loads(page.evaluate(state))
         page.evaluate("rsColorBase(null)")
         cleared = json.loads(page.evaluate(state))
-        used = page.evaluate("JSON.stringify(map.getPaintProperty('roads-simple','line-color')).includes('rs_base')")
+        used = page.evaluate("JSON.stringify(map.getPaintProperty('roads-simple','line-color')).includes('rs_c')")
         browser.close()
-    assert sorted(both[0].values()) == ["#00ee00"] * 2 and list(both[1].values()) == ["#ee0000"]
-    assert after[0] == both[0] and after[1] == {} and cleared == [{}, {}] and used and not errors
+    assert both == [["#00ee00", "#ee0000", "#ee0000"], ids[1:3]]
+    assert after == [["#00ee00", "#00ee00", None], []] and cleared == [[None, None, None], []] and used and not errors
 
 
 def test_overlay_hover_lights_one_feature(tmp_path):

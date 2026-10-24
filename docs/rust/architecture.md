@@ -68,18 +68,20 @@ Each arrow points from a crate to the crate that uses it:
 <!-- gen:crate-graph -->
 ```mermaid
 flowchart TB
-    roadstyle_model["roadstyle-model<br/>1,007 lines"]
+    roadstyle_model["roadstyle-model<br/>1,104 lines"]
     roadstyle_look["roadstyle-look<br/>1,503 lines"]
-    roadstyle_io["roadstyle-io<br/>1,010 lines"]
-    roadstyle_levels["roadstyle-levels<br/>2,605 lines"]
-    roadstyle_engine["roadstyle-engine<br/>5,943 lines"]
-    roadstyle_tiles["roadstyle-tiles<br/>1,061 lines"]
-    roadstyle["roadstyle<br/>1,494 lines"]
+    roadstyle_io["roadstyle-io<br/>1,103 lines"]
+    roadstyle_levels["roadstyle-levels<br/>2,555 lines"]
+    roadstyle_engine["roadstyle-engine<br/>5,980 lines"]
+    roadstyle_tiles["roadstyle-tiles<br/>1,100 lines"]
+    roadstyle["roadstyle<br/>1,504 lines"]
     roadstyle_rs["roadstyle-rs<br/>213 lines"]
-    roadstyle_wasm["roadstyle-wasm<br/>386 lines"]
-    roadstyle_py["roadstyle-py<br/>419 lines"]
+    roadstyle_wasm["roadstyle-wasm<br/>401 lines"]
+    roadstyle_py["roadstyle-py<br/>457 lines"]
     roadstyle_cli["roadstyle-cli<br/>467 lines"]
+    roadstyle_levels --> roadstyle_io
     roadstyle_model --> roadstyle_io
+    roadstyle_model --> roadstyle_levels
     roadstyle_levels --> roadstyle_engine
     roadstyle_look --> roadstyle_engine
     roadstyle_model --> roadstyle_engine
@@ -102,19 +104,19 @@ step) takes this crate alone.
 <!-- gen:crates -->
 | Crate | Job | Lines | Dependencies |
 |---|---|---|---|
-| [`roadstyle-model`](#roadstyle-model) | roadstyle's road model: the roads as features with typed properties, and the geometry helpers | 1,007 | arrow-array, arrow-schema, rstar, serde, serde_json |
+| [`roadstyle-model`](#roadstyle-model) | roadstyle's road model: the roads as features with typed properties, and the geometry helpers | 1,104 | arrow-array, arrow-schema, rstar, serde, serde_json |
 | [`roadstyle-look`](#roadstyle-look) | roadstyle's look: the typed, versioned config (palettes, profiles, settings, map options) that the engine draws a map with | 1,503 | base64, crc32fast, flate2, serde, serde_json, yaml-rust2 |
-| [`roadstyle-io`](#roadstyle-io) | roadstyle's readers: the roads and other tables from GeoParquet | 1,010 | `roadstyle-model`, arrow-array, arrow-schema, arrow-select, bytes, i_overlay, parquet, serde_json |
-| [`roadstyle-levels`](#roadstyle-levels) | roadstyle's drawing levels: the tags rule and the solver (no dependency on the other crates) | 2,605 | rstar, sha2 |
-| [`roadstyle-engine`](#roadstyle-engine) | roadstyle's rendering engine: the style of a map, the data-driven paint, the legend data, the base-map layers | 5,943 | `roadstyle-levels`, `roadstyle-look`, `roadstyle-model`, indexmap, rstar, serde_json |
-| [`roadstyle-tiles`](#roadstyle-tiles) | roadstyle's vector tiles on request (the rules of tiles.py) | 1,061 | `roadstyle-model`, flate2, indexmap, rstar, serde_json |
-| [`roadstyle`](#roadstyle) | roadstyle as a Rust library: the facade over the model, the readers, the levels, the engine and the tiles | 1,494 | `roadstyle-engine`, `roadstyle-io`, `roadstyle-levels`, `roadstyle-tiles`, base64, flate2, serde_json |
+| [`roadstyle-io`](#roadstyle-io) | roadstyle's readers: the roads and other tables from GeoParquet | 1,103 | `roadstyle-levels`, `roadstyle-model`, arrow-array, arrow-schema, arrow-select, bytes, i_overlay, parquet, serde_json |
+| [`roadstyle-levels`](#roadstyle-levels) | roadstyle's drawing levels: the tags rule and the solver (on roadstyle-model only, for the road flags) | 2,555 | `roadstyle-model`, rstar, sha2 |
+| [`roadstyle-engine`](#roadstyle-engine) | roadstyle's rendering engine: the style of a map, the data-driven paint, the legend data, the base-map layers | 5,980 | `roadstyle-levels`, `roadstyle-look`, `roadstyle-model`, indexmap, rstar, serde_json |
+| [`roadstyle-tiles`](#roadstyle-tiles) | roadstyle's vector tiles on request (the rules of tiles.py) | 1,100 | `roadstyle-model`, flate2, indexmap, rstar, serde_json |
+| [`roadstyle`](#roadstyle) | roadstyle as a Rust library: the facade over the model, the readers, the levels, the engine and the tiles | 1,504 | `roadstyle-engine`, `roadstyle-io`, `roadstyle-levels`, `roadstyle-tiles`, base64, flate2, serde_json |
 | [`roadstyle-rs`](#roadstyle-rs) | The old name of the facade crate roadstyle, kept for one version | 213 | `roadstyle`, serde_json |
-| [`roadstyle-wasm`](#roadstyle-wasm) | The browser's front-end of roadstyle-rs: makeStyle, Tiler, memoryBytes | 386 | `roadstyle`, serde_json, wasm-bindgen |
-| [`roadstyle-py`](#roadstyle-py) | The Python binding of roadstyle's Rust engine: the module roadstyle._rust (PyO3, abi3) | 419 | `roadstyle`, `roadstyle-cli`, pyo3, serde_json |
+| [`roadstyle-wasm`](#roadstyle-wasm) | The browser's front-end of roadstyle-rs: makeStyle, Tiler, memoryBytes | 401 | `roadstyle`, serde_json, wasm-bindgen |
+| [`roadstyle-py`](#roadstyle-py) | The Python binding of roadstyle's Rust engine: the module roadstyle._rust (PyO3, abi3) | 457 | `roadstyle`, `roadstyle-cli`, pyo3, serde_json |
 | [`roadstyle-cli`](#roadstyle-cli) | The roadstyle program: one command for each job (serve: the level editor's files) | 467 | `roadstyle`, serde_json |
 
-All crates: 16,108 lines of Rust in `rust/*/src/`.
+All crates: 16,387 lines of Rust in `rust/*/src/`.
 <!-- /gen:crates -->
 
 The crates read roadstyle's data (`src/roadstyle/data/`: the palettes, the profiles, the sprite) and the page files
@@ -136,13 +138,14 @@ The column "Python counterpart" names the module of the Python engine that does 
 <!-- gen:modules -->
 #### `roadstyle-model` { #roadstyle-model }
 
-Library, in `rust/roadstyle-model/`. Public API: `geom`, `props`, `table`, `topology`, `Row`, `obj`, `Cell`, `Lines`, `RoadTable`.
+Library, in `rust/roadstyle-model/`. Public API: `flags`, `geom`, `props`, `table`, `topology`, `Row`, `obj`, `Cell`, `Lines`, `RoadTable`.
 
 | Module | Lines | What it does | Python counterpart |
 |---|---|---|---|
-| `lib` | 27 | roadstyle's road model: the roads as columns (`RoadTable`, module `table`), the typed properties of the engine's features (`props`), the geometry helpers (`geom`), and `Row`, a row of another table |  |
+| `lib` | 28 | roadstyle's road model: the roads as columns (`RoadTable`, module `table`), the typed properties of the engine's features (`props`), the geometry helpers (`geom`), and `Row`, a row of another table |  |
+| `flags` | 87 | The road flags, one rule (audit R6; the web map's rule, render_web._truthy, lower-cased and stripped): a yes/no tag (bridge, tunnel, oneway, driving, cycling, directed) is yes when it is set and not one of `NO` (OSM's "no", and "", "false", "0"); so bridge=viaduct is a bridge and oneway=-1 is one way | `render_web.py` |
 | `geom` | 264 | Geometry from WKB for the base map: GeoJSON, and the area and the centroid as shapely (GEOS) computes them |  |
-| `props` | 308 | The properties of a road or a piece, and the typed features of the sources `roads` and `simple` |  |
+| `props` | 317 | The properties of a road or a piece, and the typed features of the sources `roads` and `simple` |  |
 | `table` | 343 | The roads as columns: `RoadTable` keeps each column of the input as one Arrow array and every line in one coordinate buffer, not a map of JSON values for each road |  |
 | `topology` | 65 | The roads' topology, made one time for all the stages (audit R4): a node for each end of a road, the number of road ends at each node, and one R-tree of the roads' boxes |  |
 
@@ -167,11 +170,11 @@ Library, in `rust/roadstyle-io/`. Public API: `columns`, `duckosm`, `geojson`, `
 | Module | Lines | What it does | Python counterpart |
 |---|---|---|---|
 | `lib` | 12 | roadstyle's readers and writers: the roads and other tables from GeoParquet (`read`), the roads from GeoJSON (`geojson`), the SQL that reads a duckOSM file (`duckosm`), a table or a source's features as Parquet or GeoParquet (`write`, stage 1's files), and a table of typed columns (`columns`) |  |
-| `columns` | 89 | A table of typed columns as GeoParquet (a level area's roads.parquet): text, whole numbers, numbers, booleans, lists of them, and the WKB column `geometry` |  |
-| `duckosm` | 265 | The SQL that reads a duckOSM file: the roads of every mode (mapstyle's `_roads_union` and `load_roads`, with the stored levels and the columns that render_map adds) and the base map's tables (`features.*`, the queries of mapstyle's `load_layers`) |  |
+| `columns` | 205 | The one Parquet writer: typed columns as Parquet, a batch at a time; with a WKB column, GeoParquet (the `geo` metadata of GeoParquet 1.1) |  |
+| `duckosm` | 288 | The SQL that reads a duckOSM file: the roads of every mode (mapstyle's `_roads_union` and `load_roads`, with the stored levels and the columns that render_map adds) and the base map's tables (`features.*`, the queries of mapstyle's `load_layers`) |  |
 | `geojson` | 118 | The roads from a GeoJSON file (RFC 7946: a FeatureCollection in EPSG:4326) |  |
-| `read` | 222 | The roads from a GeoParquet file: every column an Arrow array of the table (as GeoPandas' GeoJSON writes its values), the geometry a LineString from WKB |  |
-| `write` | 304 | The writers: a table of rows (the road table, or a source's features) as Parquet; with a geometry column, GeoParquet (WKB in `geometry`, the `geo` metadata of GeoParquet 1.1) |  |
+| `read` | 224 | The roads from a GeoParquet file: every column an Arrow array of the table (as GeoPandas' GeoJSON writes its values), the geometry a LineString from WKB |  |
+| `write` | 256 | The rows writer: a table of rows (the road table, or a source's features) as Parquet, through the one Parquet writer (columns.rs); with a geometry column, GeoParquet |  |
 
 #### `roadstyle-levels` { #roadstyle-levels }
 
@@ -179,10 +182,10 @@ Library, in `rust/roadstyle-levels/`. Public API: `area`, `flow`, `solve`, `Pt`,
 
 | Module | Lines | What it does | Python counterpart |
 |---|---|---|---|
-| `lib` | 631 | The drawing order of the roads, `visualization.edge_levels` and `edge_levels_meta`: roadstyle's `compute_levels`, with `method="tags"` (a rule on the tags, the default) or `method="solve"` (its optimization, with the defaults of duckOSM's `duckosm levels` and no edits) |  |
+| `lib` | 591 | The drawing order of the roads, `visualization.edge_levels` and `edge_levels_meta`: roadstyle's `compute_levels`, with `method="tags"` (a rule on the tags, the default) or `method="solve"` (its optimization, with the defaults of duckOSM's `duckosm levels` and no edits) |  |
 | `area` | 572 | A level area as the level editor has it: its roads (both directions of a segment are one road), the pairs that the input found (pairs.csv) and your edits (edits.csv) | `level_area.py`, `level_editor.py` |
 | `flow` | 297 | A minimum-cost flow with whole numbers: the primal-dual algorithm (Dijkstra on the reduced costs, then a maximum flow on the arcs of reduced cost 0) |  |
-| `input` | 695 | The solver's input from the edges: the roads, their bands and priorities, and their relations |  |
+| `input` | 685 | The solver's input from the edges: the roads, their bands and priorities, and their relations |  |
 | `solve` | 410 | The numbers of the roads from their rules: the stages as minimum-cost flows |  |
 
 #### `roadstyle-engine` { #roadstyle-engine }
@@ -203,8 +206,8 @@ Library, in `rust/roadstyle-engine/`. Public API: `colors`, `contract`, `decks`,
 | `palettes` | 260 | A view's palette in one page | `render_web.py` |
 | `planner` | 148 | The route planner's data: mapstyle.map.planner_data and _planner_ends, from the roads (in load_roads' order) and the tables the worker's SQL writes (planner.parquet: a `part` column, in the order Python reads them) | mapstyle's `map.py` |
 | `road` | 231 | The roads that the stages draw: the input table (roadstyle-model's `RoadTable`) and the drawing values of each road (`Draw`), whose properties are the `__rs_*` marks and `lvl` in the order that the stages set them (render_web.render's order) | `render_web.py` |
-| `roads` | 414 | The "roads" source: the stages of roadstyle's render_web.render that bake the `__rs_*` properties of each road, in the same order | `render_web.py` |
-| `simple` | 795 | The "simple" source: simple mode's one road layer, every casing piece and every fill (render_web._casing_parts, _halves, _end_stub, _simple_pieces), from the roads after their stages (roads::mark_roads) | `render_web.py` |
+| `roads` | 418 | The "roads" source: the stages of roadstyle's render_web.render that bake the `__rs_*` properties of each road, in the same order | `render_web.py` |
+| `simple` | 828 | The "simple" source: simple mode's one road layer, every casing piece and every fill (render_web._casing_parts, _halves, _end_stub, _simple_pieces), from the roads after their stages (roads::mark_roads) | `render_web.py` |
 | `slots` | 441 | The "slots" source: the names and the one-way arrows (render_web._annotation_slots, then the export's `__rs_arw` and _mark_cls), from the roads after their stages (roads::mark_roads) | `render_web.py` |
 | `sources` | 194 | Stage 1: the roads and the look give the style and its sources, typed in memory: the drawing sources (the roads' lines with their drawing values, the pieces, the names and arrows, the 3D decks, the base map, ...) and the road table (every field of each road, by its row) |  |
 
@@ -214,8 +217,8 @@ Library, in `rust/roadstyle-tiles/`. Public API: `pmtiles`, `stage`, `EXTENT`, `
 
 | Module | Lines | What it does | Python counterpart |
 |---|---|---|---|
-| `lib` | 808 | The style's sources as vector tiles (Mapbox Vector Tile 2.1), made when the map asks for them, with the rules of roadstyle's tiles.py: the page gives MapLibre one source, `{"type": "vector", "tiles": ["<prefix>roads/{z}/{x}/{y}"]}`, and each of the style's sources is a layer in its tiles (the layers' `source-layer`) | `tiles.py` |
-| `pmtiles` | 182 | A PMTiles v3 archive (the format of the `pmtiles` package's Writer, which tiles.py and the export use): the tiles gzipped, each content once (a run of one content on consecutive tile ids is one entry), the directory in one root (or a root of leaves when it is more than 16 KB), the metadata as gzipped JSON | `tiles.py` |
+| `lib` | 845 | The style's sources as vector tiles (Mapbox Vector Tile 2.1), made when the map asks for them, with the rules of roadstyle's tiles.py: the page gives MapLibre one source, `{"type": "vector", "tiles": ["<prefix>roads/{z}/{x}/{y}"]}`, and each of the style's sources is a layer in its tiles (the layers' `source-layer`) | `tiles.py` |
+| `pmtiles` | 184 | A PMTiles v3 archive (the format of the `pmtiles` package's Writer, which tiles.py and the export use): the tiles gzipped, each content once (a run of one content on consecutive tile ids is one entry), the directory in one root (or a root of leaves when it is more than 16 KB), the metadata as gzipped JSON | `tiles.py` |
 | `stage` | 71 | Stage 2's rules: which properties of each source go into the tiles, from which zoom, with which zooms and buffer | `tiles.py` |
 
 #### `roadstyle` { #roadstyle }
@@ -224,7 +227,7 @@ Library, in `rust/roadstyle/`. Public API: `level_area`, `level_editor`, `page`,
 
 | Module | Lines | What it does | Python counterpart |
 |---|---|---|---|
-| `lib` | 369 | roadstyle as a Rust library: the facade |  |
+| `lib` | 379 | roadstyle as a Rust library: the facade |  |
 | `level_area` | 295 | A level area's input in Rust (roadstyle's level_area.make_area and level_input, `roadstyle-levels make`): from the edges, the folder's roads.parquet (one row for each road: its edges both ways, its band and priority, the fields the editor shows, each edge's own oneway, driving, directed, edge_ref, lanes and modes, the first edge's line), pairs.csv (the rules between the roads) and an empty edits.csv the first time | `level_area.py` |
 | `level_editor` | 545 | The level editor in a page: an area folder's roads (roads.parquet, one row for each road with its edges both ways) and pairs, the solver of roadstyle-levels' `area`, and what the page draws and shows | `level_editor.py` |
 | `page` | 285 | The page writer: the HTML page of a live style (state "live") and the options of its dashboard (`page`: the options of rsDashboard, as render_web.render's `page`) | `render_web.py` |
@@ -240,19 +243,19 @@ Library and program, in `rust/roadstyle-rs/`. Public API: `roadstyle::*`.
 
 #### `roadstyle-wasm` { #roadstyle-wasm }
 
-Cdylib, in `rust/roadstyle-wasm/`. Public API: `Look`, `fromJson`, `toJson`, `resolveLook`, `makeLook`, `rampStops`, `makeStyle`, `solveLocal`, `startFrom`, `levelsCsv`, `makePage`, `exportLook`, `fileNames`, `roadTable`, `makeSources`, `duckosmPlan`, `duckosmLevels`, `duckosmFeaturesSelect`, `readGeoJson`, `tileSources`, `tileFiles`, `memoryBytes`, `LevelArea`, `Tiler`, `Sources`, `Roads`.
+Cdylib, in `rust/roadstyle-wasm/`. Public API: `Look`, `fromJson`, `toJson`, `resolveLook`, `makeLook`, `rampStops`, `makeStyle`, `solveLocal`, `startFrom`, `levelsCsv`, `makePage`, `exportLook`, `fileNames`, `roadTable`, `makeSources`, `duckosmPlan`, `duckosmLevels`, `duckosmSubsetLevels`, `duckosmFeaturesSelect`, `readGeoJson`, `tileSources`, `tileFiles`, `memoryBytes`, `LevelArea`, `Tiler`, `Sources`, `Roads`.
 
 | Module | Lines | What it does | Python counterpart |
 |---|---|---|---|
-| `lib` | 386 | The browser's front-end of roadstyle-rs: `Look`, `makeStyle`, `makePage`, `Tiler` and `memoryBytes` through wasm-bindgen, and the allocator that grows the memory in large steps |  |
+| `lib` | 401 | The browser's front-end of roadstyle-rs: `Look`, `makeStyle`, `makePage`, `Tiler` and `memoryBytes` through wasm-bindgen, and the allocator that grows the memory in large steps |  |
 
 #### `roadstyle-py` { #roadstyle-py }
 
-Cdylib, in `rust/roadstyle-py/`. Public API: `resolve_look`, `make_style`, `make_sources`, `tile_files`, `solve_rules`, `make_page`, `export_look`, `duckosm_catalog_sql`, `duckosm_plan`, `duckosm_levels`, `duckosm_features_select`, `serve`, `take_warnings`, `PyLook`, `Tiler`, `Sources`.
+Cdylib, in `rust/roadstyle-py/`. Public API: `resolve_look`, `make_style`, `make_sources`, `tile_files`, `solve_rules`, `make_page`, `export_look`, `base_map_theme`, `base_map_recolor`, `duckosm_catalog_sql`, `duckosm_plan`, `duckosm_levels`, `duckosm_subset_levels`, `duckosm_features_select`, `serve`, `take_warnings`, `PyLook`, `Tiler`, `Sources`.
 
 | Module | Lines | What it does | Python counterpart |
 |---|---|---|---|
-| `lib` | 419 | The Python binding of roadstyle's Rust engine: the module `roadstyle._rust` | `_engine.py` |
+| `lib` | 457 | The Python binding of roadstyle's Rust engine: the module `roadstyle._rust` | `_engine.py` |
 
 #### `roadstyle-cli` { #roadstyle-cli }
 
@@ -349,7 +352,7 @@ The metadata keys between the engine and the dashboard, and the modules that wri
 | `roadstyle:group` | `roadstyle-engine::layers`, `roadstyle-engine::lib` |
 | `roadstyle:images` | `roadstyle-engine::lib`, `roadstyle-look::basemap` |
 | `roadstyle:interaction` | `roadstyle-engine::lib`, `roadstyle-model::props`, `roadstyle-tiles::stage` |
-| `roadstyle:json` | `roadstyle::lib`, `roadstyle-io::read`, `roadstyle-io::write` |
+| `roadstyle:json` | `roadstyle::lib`, `roadstyle-io::columns`, `roadstyle-io::read`, `roadstyle-io::write` |
 | `roadstyle:live` | `roadstyle-engine::layers`, `roadstyle-engine::lib` |
 | `roadstyle:over` | `roadstyle-engine::layers` |
 | `roadstyle:planner` | `roadstyle-engine::lib`, `roadstyle-engine::planner` |
@@ -472,8 +475,9 @@ saved page still works offline.*
 | `fileNames` | fileNames(format): the names of stage 1's files (style.json, a file for each source, road_table.parquet). |
 | `roadTable` | roadTable(): the road table as the page loads it, JSON text (props, mids, bboxes, lines: one item for each road). |
 | `makeSources` | makeSources(parquet, look, features, planner, name): stage 1, with makeStyle's arguments. |
-| `duckosmPlan` | duckosmPlan(catalog, mode, tags, specs) -> string: the SQL that reads a duckOSM file (roadstyle-io's duckosm.rs, the one copy that Python runs too), as JSON text: {"catalog": the 2 queries of the catalog, "roads": 3 statements, "meta": the stored levels' query or null, "select": the roads of `mode`, "layers": [{spec, name, sql: the queries in order}]}. `catalog`: the JSON text of {"name", "tables": [[schema, table]], "columns": [[schema, table, column]]} (with no tables: only "catalog" is in the answer); `specs`: layers.yaml's layers as JSON text. |
+| `duckosmPlan` | duckosmPlan(catalog, mode, tags, specs) -> string: the SQL that reads a duckOSM file (roadstyle-io's duckosm.rs, the one copy that Python runs too), as JSON text: {"catalog": the 2 queries of the catalog, "roads": 3 statements, "meta": the stored levels' query or null, "select": the roads of `mode`, "layers": [{spec, name, sql: the queries in order}]}. `catalog`: the JSON text of {"name", "tables": [[schema, table]], "columns": [[schema, table, column]]} (with no tables: only "catalog" is in the answer); `specs`: layers.yaml's layers as JSON text. `only`: the map of `mode` alone; then "subset" has the queries of its roads with no stored levels and of its edge_ids (for duckosmSubsetLevels). |
 | `duckosmLevels` | duckosmLevels(source?, nEdges?, edgeHash?) -> string: the look's keyword `levels` (JSON text) from the stored levels' metadata row (none: the file has no such row); an error says what to do. |
+| `duckosmSubsetLevels` | duckosmSubsetLevels(source?, nEdges?, edgeHash?, missing, example?, ids) -> string: the look's keyword `levels` (JSON text) for a map of one mode: the stored levels' metadata row, the row of the plan's "subset" query, and the map's edge_ids (a BigInt64Array). |
 | `duckosmFeaturesSelect` | duckosmFeaturesSelect(specs: number[]) -> string \| undefined: the base map's rows from the tables f<spec> that were made. |
 | `readGeoJson` | readGeoJson(bytes: Uint8Array) -> Roads: the roads of a GeoJSON file (a FeatureCollection in EPSG:4326; roadstyle-io's geojson.rs says how each property becomes a column). An error is a thrown Error. |
 | `tileSources` | tileSources(sources, prefix, keep): stage 2 from memory (the typed pieces, no GeoJSON text; the sources stay as they are). The Tiler's style has the one vector source `<prefix>roads/{z}/{x}/{y}`, with the pieces' promoteId (roadstyle::tile_stage). |
@@ -524,7 +528,7 @@ an item shows "yes" when the code has it:
 |---|---|---|
 | The core has no I/O: the engine does not depend on a reader | `roadstyle-engine` depends on: `roadstyle-levels`, `roadstyle-look`, `roadstyle-model` | yes |
 | A crate `roadstyle-look` for the typed, versioned look | `roadstyle-look` exists | yes |
-| One error enum for each crate | `Result<_, String>`: 133 places; error enums: none | no |
+| One error enum for each crate | `Result<_, String>`: 137 places; error enums: none | no |
 | A typed render model in place of JSON trees | `Value` (serde_json) in `roadstyle-engine`: 588 times | no |
 | Typed fields in place of the `__rs_*` properties | 59 distinct `__rs_*` names in `rust/` | no |
 | Stage 2 (the tiles) has its own public call in Python and in the browser | `roadstyle-py`: none; `roadstyle-wasm`: `tileSources` | no |
