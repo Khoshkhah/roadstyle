@@ -583,7 +583,7 @@ def test_web_panel_popup_mode_and_select_events():
     default = render_edges(_edges(), backend="web").html
     assert _opt(default, "popup_mode") == "popup"
     for html in (panel, default):
-        assert 'CustomEvent("rs:select"' in html and 'CustomEvent("rs:deselect"' in html
+        assert '_emit("rs:select"' in html and '_emit("rs:deselect"' in html          # the page sends both events (core.js, _emit)
 
 
 def test_render_edges_scoped_settings():
@@ -1261,7 +1261,7 @@ def test_a_two_way_pair_that_disagrees_is_named_in_a_warning():
 
 def test_end_caps_follow_filters_and_recolour_and_can_be_turned_off():
     html = render_edges(_pairs(), backend="web").html
-    assert '["any",_has(["get","__rs_edge"],_qIds),_has(["get","__rs_edge2"],_qIds)]' in html     # id filters: a cap shows while either twin does
+    assert '["any",_has(["get","__rs_edge"],ids),_has(["get","__rs_edge2"],ids)]' in html     # id filters: a cap shows while either twin does
     caps = [l for l in _style(render_edges(_pairs(), backend="web", simple=False, settings={"config": {"twin_casing": "each"}}).html)["layers"]
             if l["id"].startswith("roads-ends-fill")]
     assert caps and all("rs_colors" in json.dumps(l["paint"]["circle-color"]) for l in caps)        # a cap takes the rsColor colour of its two lanes
@@ -1966,7 +1966,7 @@ def test_divided_casing_is_drawn_as_head_and_main_pieces():
     assert all(l["source"] == "casings" for i, l in lay.items() if i.startswith("roads-casing") and "-lv" in i or i == "roads-casing")
     assert lay["roads-fill"]["source"] == "roads" and "roads-fill-lv-1" not in lay        # every fill is at 0
     assert style["_roads"]["features"][0]["geometry"]["coordinates"][-1] == [18 + d, 59.0]       # the fill line is the whole edge
-    assert '_has(["get","__rs_edge"],_qIds)' in html                       # the pieces follow rsFilter by their edge
+    assert '_has(["get","__rs_edge"],ids)' in html                       # the pieces follow rsFilter by their edge
     # without the head columns nothing changes: no casing source
     assert "casings" not in _style(render_edges(g, backend="web", casing_level_col="cm", fill_level_col="fl", simple=False).html)["sources"]
 

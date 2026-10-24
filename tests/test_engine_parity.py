@@ -336,7 +336,7 @@ def test_live_style_and_contract(part, keywords, case):
     parts = rs.render_edges(part, backend="web", _parts=True, **{**keywords, **opts})
     py, page = parts["style"], parts["options"]
     lk = _engine._look_of({**keywords, "view_3d": False, **opts, "state": "live"})
-    src = _engine.rust().make_sources(_engine._geoparquet(part), lk, None, None, None)
+    src = _engine.rust().make_sources(_engine._arrow(part), lk, None, None, None)
     src.page_arrows()           # stage 3 of the inline page (audit N2): the arrows as points
     ru = json.loads(src.style())
     meta = ru.pop("metadata")
@@ -474,7 +474,7 @@ def test_the_pmtiles_writer_is_the_pmtiles_packages(part, keywords):
 
     from roadstyle.tiles import _merc, _tile_range
     lk = _engine._look_of({**keywords, "tiles": True})
-    t = _engine.rust().Tiler(_engine._geoparquet(part), lk, None, None, "", [])
+    t = _engine.rust().Tiler(_engine._arrow(part), lk, None, None, "", [])
     b = [float(v) for v in part.total_bounds]
     ru = t.archive(b, ["roads", "simple", "slots"])
     buf = io.BytesIO()

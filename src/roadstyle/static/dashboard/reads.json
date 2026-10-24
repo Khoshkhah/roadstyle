@@ -3,5 +3,6 @@
   "pieces": ["__rs_edge", "__rs_edge2", "__rs_k", "__rs_s", "__rs_pick", "__rs_cls", "lvl", "__rs_lvl", "__rs_access"],
   "decks": ["__rs_edges", "__rs_casing_slab"],
   "slots": ["oneway", "highway", "chain", "slot", "rank", "name", "__rs_edge"],
-  "table": ["lvl", "__rs_dup", "__rs_edge2", "__rs_cls", "__rs_access", "__rs_twoway", "name", "highway", "bridge", "tunnel", "edge_ref"]
+  "table": ["lvl", "__rs_dup", "__rs_edge2", "__rs_cls", "__rs_access", "__rs_twoway", "name", "highway", "bridge", "tunnel", "edge_ref",
+            "driving", "walking", "cycling"]
 }
