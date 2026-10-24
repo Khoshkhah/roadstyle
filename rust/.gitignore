@@ -5,3 +5,5 @@ roadstyle-rs/tests/data/monaco/golden_style.json.gz
 roadstyle-rs/tests/data/monaco/golden_tiles.json.gz
 roadstyle-rs/tests/data/sodermalm/golden_style.json.gz
 roadstyle-rs/tests/data/sodermalm/golden_tiles.json.gz
+# tests/make_mapstyle_goldens.py makes these (too large for git); tests/data/mapstyle_digests.json has their digests
+roadstyle-rs/tests/data/mapstyle/

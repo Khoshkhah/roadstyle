@@ -18,6 +18,10 @@ pub struct Roads {
     pub values: Values,
     /// a view's palettes (palettes.rs): the marks that another palette sets to other values, after the road's own properties
     pub extra: Vec<Extra>,
+    /// the column of the class filter (render's filter_col, else highway_col; in the engine's names): `__rs_cls` is its value
+    pub cls: String,
+    /// the warnings of the stages (Python's warnings.warn in render_web), for the caller (`Sources::warnings`)
+    pub warnings: Vec<String>,
     topo: std::sync::OnceLock<Box<Topology>>,
 }
 
@@ -32,7 +36,8 @@ pub struct Extra {
 impl Roads {
     pub fn new(table: RoadTable) -> Roads {
         let draw = vec![Draw::default(); table.len()];
-        Roads { table, draw, values: Values::default(), extra: Vec::new(), topo: std::sync::OnceLock::new() }
+        Roads { table, draw, values: Values::default(), extra: Vec::new(), cls: "highway".into(), warnings: Vec::new(),
+                topo: std::sync::OnceLock::new() }
     }
 
     pub fn len(&self) -> usize {
@@ -44,7 +49,7 @@ impl Roads {
     }
 
     pub fn road(&self, i: usize) -> Road<'_> {
-        Road { t: &self.table, d: &self.draw[i], v: &self.values, x: &self.extra, i }
+        Road { t: &self.table, d: &self.draw[i], v: &self.values, x: &self.extra, c: &self.cls, i }
     }
 
     /// The road `i`, or None past the last road.
@@ -78,6 +83,7 @@ pub struct Road<'a> {
     d: &'a Draw,
     v: &'a Values,
     x: &'a [Extra],
+    c: &'a str,
     pub i: usize,
 }
 
@@ -85,6 +91,11 @@ impl<'a> Road<'a> {
     pub fn get(self, k: &str) -> Option<Cell<'a>> {
         self.d.get(self.v, k).or_else(|| self.t.get(self.i, k))
             .or_else(|| self.x.iter().find(|e| e.name == k).and_then(|e| e.vals[self.i].as_ref().map(Cell::Json)))
+    }
+
+    /// The road's value of the class filter (render's fcol).
+    pub fn cls(self) -> Value {
+        self.get(self.c).map_or(Value::Null, Cell::to_value)
     }
 
     pub fn contains_key(self, k: &str) -> bool {

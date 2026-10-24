@@ -1,0 +1,179 @@
+# mapstyle's openstreetmap-carto look: road colours by class (the base of every mode palette,
+# styles/modes.yaml) and the feature layers' style (styles/layers.yaml). Edit and re-render.
+roads:
+  # road colours (openstreetmap-carto), by highway class.
+  #   fill   = the road colour
+  #   casing = the road EDGE (outline) colour — null for path-like classes (drawn dashed, no edge)
+  #   dash   = [on, off] px for dashed lines (omit for a solid line)
+  colors:
+    motorway:      {fill: "#e892a2", casing: "#c24e6b"}
+    trunk:         {fill: "#f9b29c", casing: "#c84e2f"}
+    primary:       {fill: "#fcd6a4", casing: "#a06b00"}
+    secondary:     {fill: "#f7fabf", casing: "#707d00"}
+    tertiary:      {fill: "#ffffff", casing: "#8f8f8f"}
+    unclassified:  {fill: "#ffffff", casing: "#bbbbbb"}
+    residential:   {fill: "#ffffff", casing: "#bbbbbb"}
+    living_street: {fill: "#ededed", casing: "#bbbbbb"}
+    service:       {fill: "#ffffff", casing: "#bbbbbb"}
+    pedestrian:    {fill: "#dddde8", casing: "#b3b3c2"}
+    footway:       {fill: "#fa8072", casing: null, dash: [4, 3]}
+    path:          {fill: "#fa8072", casing: null, dash: [3, 4]}
+    steps:         {fill: "#fa8072", casing: null, dash: [1, 1]}
+    cycleway:      {fill: "#6666ff", casing: null, dash: [4, 3]}
+    bridleway:     {fill: "#1c8b3c", casing: null, dash: [5, 3]}
+    track:         {fill: "#ac8327", casing: null, dash: [4, 4]}
+    construction:  {fill: "#ffffff", casing: "#bbbbbb", dash: [5, 4]}
+    corridor:      {fill: "#fa8072", casing: null, dash: [2, 3]}
+    platform:      {fill: "#bbbbbb", casing: "#969696"}
+    raceway:       {fill: "#ffc0cb", casing: "#bbbbbb"}
+    busway:        {fill: "#ffffff", casing: "#bbbbbb"}
+    ferry:         {fill: "#6666ff", casing: null, dash: [6, 4]}   # a ferry line (duckOSM highway = ferry, 2026-10-09): osm-carto's dashed blue route
+
+# ---- FEATURES ------------------------------------------------------------------------------------
+# Feature-layer styling (mapstyle.map.feature_overlays), keyed by the layer name in layers.yaml.
+# Landcover fills / outlines / textures key by the feature's `kind`; `default` catches the rest.
+features:
+  areas:                             # polygon fills (+ optional outline, fill opacity 0..1)
+    ocean:       {fill: "#aad3df", outline: null,      opacity: 1.0}   # the sea, as water
+    water:       {fill: "#aad3df", outline: null,      opacity: 1.0}
+    paved:       {fill: "#ededed", outline: "#bbbbbb", opacity: 1.0}   # squares, pedestrian areas, piers, helipads: osm-carto's pedestrian area
+    buildings:   {fill: "#d9d0c9", outline: "#c2b8ac", opacity: 0.9,  min_zoom: 15}
+    parking:     {fill: "#eeeeee", outline: "#dddddd", opacity: 0.7,  min_zoom: 15}
+    bus_station: {fill: "#d6e4f0", outline: "#9db8d2", opacity: 0.85, min_zoom: 15}  # bus terminal footprint (light blue, matches the bus icon)
+    platform:    {fill: "#bbbbbb", outline: "#969696", opacity: 0.9}   # transit platform (osm-carto grey)
+    landcover:                       # by OSM class (landuse/natural/leisure), else `default`
+      forest: "#add19e"
+      wood: "#add19e"
+      grass: "#cdebb0"
+      grassland: "#cdebb0"
+      meadow: "#cdebb0"
+      park: "#c8facc"
+      garden: "#cfeda5"
+      residential: "#e0dfdf"
+      commercial: "#f2dad9"
+      retail: "#ffd6d1"
+      industrial: "#ebdbe8"
+      railway: "#ebdbe8"
+      farmland: "#eef0d5"
+      farmyard: "#f5dcba"
+      orchard: "#aedfa3"
+      vineyard: "#aedfa3"
+      allotments: "#c9e1bf"
+      beach_resort: "#fff1ba"          # a beach resort: the sand colour
+      shrubbery: "#c8d7ab"             # osm-carto scrub
+      zoo: "#d8eecf"
+      grave_yard: "#aacbaf"            # osm-carto grave yard
+      cemetery: "#aacbaf"
+      scrub: "#c8d7ab"
+      heath: "#d6d99f"
+      wetland: "#add19e"
+      sand: "#f5e9c6"
+      quarry: "#c5c3c3"
+      brownfield: "#b6b592"
+      recreation_ground: "#dffce2"
+      pitch: "#aae0cb"
+      track: "#aae0cb"               # leisure=track — same green as a pitch (OSM-Carto)
+      stadium: "#dffce2"             # leisure=stadium grounds (Tamme staadion) — light green sport area
+      nature_reserve: "#d5e8d1"
+      golf_course: "#b5e3b5"
+      playground: "#dffce2"          # leisure=playground — GREEN in OSM (was falling to grey default)
+      village_green: "#cdebb0"       # grass green
+      garages: "#dfddce"             # landuse=garages (muted)
+      greenfield: "#f1eee8"          # undeveloped land (very light)
+      beach: "#fff1ba"               # natural=beach (sandy)
+      # --- leisure / landuse areas OSM-Carto fills that duckOSM used to drop (Gap A) ---
+      dog_park: "#e5f5df"            # leisure=dog_park — park green
+      flowerbed: "#dcefc7"           # landuse=flowerbed — soft green
+      marina: "#b5d0d0"              # leisure=marina — pale water blue
+      ice_rink: "#ddecec"            # leisure=ice_rink — very light blue
+      swimming_area: "#aad3df"       # leisure=swimming_area — water blue
+      religious: "#cecdc9"           # landuse=religious — light grey
+      military: "#f3d8d8"            # landuse=military — pale red (OSM hatches it red)
+      # --- institutional / sport GROUNDS from features.sites (Gap B), OSM-Carto colours ---
+      school: "#ffffe5"              # amenity=school — pale yellow (education)
+      kindergarten: "#ffffe5"        # amenity=kindergarten — same education yellow
+      university: "#ffffe5"          # amenity=university
+      college: "#ffffe5"             # amenity=college
+      hospital: "#ffe5e5"            # amenity=hospital — pale pink
+      sports_centre: "#dffce2"       # leisure=sports_centre — light green (leisure)
+      prison: "#dcdcd0"              # amenity=prison — muted grey-green
+      construction: "#c7c7b4"        # landuse=construction — beige
+      bridge: "#b8b8b8"              # man_made=bridge deck — grey
+      default: "#e8e6df"
+  # OSM-Carto landcover TEXTURES (deck.gl FillStyleExtension) — class -> pattern tile (patterns.py:
+  # trees/graves/waves/dots/sand/hatch/rows). Drawn as DARKER symbols over the solid fill, like OSM
+  # (forest = green + tree dots, cemetery = graves, wetland = waves). Omit a class for no pattern.
+  landcover_pattern:
+    forest: trees
+    wood: trees
+    orchard: rows
+    vineyard: rows
+    cemetery: graves
+    wetland: waves
+    scrub: dots
+    heath: dots
+    beach: sand
+    sand: sand
+    quarry: hatch
+    brownfield: hatch
+  # OSM-Carto landcover BORDERS — class -> outline colour. Only the classes OSM actually outlines
+  # (sports areas + nature reserve); most landuse/leisure fills have NO border in OSM-Carto.
+  landcover_outline:
+    pitch: "#8bad8b"
+    playground: "#8bad8b"
+    track: "#8bad8b"
+    stadium: "#8bad8b"         # leisure=stadium — darker green border, like a pitch
+    nature_reserve: "#77a075"
+    garden: "#b3d17d"          # leisure=garden — thin green border (OSM-Carto outlines it)
+    school: "#dcd6ac"          # education grounds — soft yellow border
+    kindergarten: "#dcd6ac"
+    university: "#dcd6ac"
+    college: "#dcd6ac"
+    hospital: "#e6c6c6"        # hospital grounds — soft pink border
+    sports_centre: "#a0d0a8"   # leisure=sports_centre — green border
+  # Buildings in 3D (docs/design/buildings_3d.md): the "Buildings 3D" row of the Layers box, rsSetBuildings3D.
+  # The blocks have the buildings' fill colour. A building's height: the higher of its `height` tag (when it is min_height
+  # or more) and (building:levels + roof:levels) x m_per_level, else `heights` by its kind, else `heights.default` (metres).
+  # Its base: min_height, else building:min_level x m_per_level, else 0.
+  buildings_3d:
+    m_per_level: 3.66          # metres for one level (OpenMapTiles)
+    min_height: 2              # a lower `height` is no height in metres (Tartu's ETAK import: codes 0-9)
+    max_height: 200            # metres: a block is not higher than this (a typo such as building:levels=100 would be 300 m)
+    opacity: 0.9
+    heights:
+      house: 6
+      detached: 6
+      semidetached_house: 6
+      terrace: 7
+      residential: 9
+      apartments: 15
+      garage: 3
+      garages: 3
+      shed: 3
+      roof: 3
+      greenhouse: 3
+      retail: 6
+      commercial: 12
+      office: 15
+      industrial: 8
+      school: 9
+      church: 15
+      default: 9
+  lines:                             # line colour + width (px) + optional [on,off] dash
+    waterways:    {color: "#4a90d9", width: 1.6}
+    railways:     {color: "#707070", width: 1.4, dash: [6, 4]}
+    raceway:      {color: "#ffc0cb", width: 5, width_zoom: {14: 1, 16: 3, 18: 13, 20: 50}}   # osm-carto's raceway pink (Circuit de Monaco), as wide as a road
+    other_ways:   {color: "#999999", width: 1.4, dash: [3, 3]}      # a way that no network holds: footway, steps, service, lift, platform
+  points:                            # per-category: colour (tints the SVG), size (MULTIPLIER on the icon curve), icon (SVG file in mapstyle/icons/), min_zoom
+    train_stations:  {color: "#8b008b", size: 1.4,  icon: "train.svg", min_zoom: 12}
+    parking_p:       {color: "#2b6cb0", size: 1.0,  icon: "parking_p.svg", min_zoom: 16}  # bare blue "P" letter (no box) at the parking polygon's centroid (the polygon itself is styled under features.areas.parking)
+    bus_stations:    {color: "#1e6eb4", size: 1.0,  icon: "bus.svg", min_zoom: 16}
+    bicycle:         {color: "#2e8b57", size: 0.9,  icon: "bicycle.svg", min_zoom: 16}
+    traffic_signals: {color: "#d64545", size: 0.9,  icon: "traffic_light.svg", min_zoom: 16}
+    crossings:       {color: "#5a5a5a", size: 0.85, icon: "crossing.svg", min_zoom: 16}
+    default:         {color: "#808080", size: 1.0,  min_zoom: 14}
+  icon:                              # icon pixel size BY ZOOM — interpolated like roads.width; a category's `size` scales it
+    size:    {12: 5, 14: 9, 16: 14, 18: 22, 20: 32}
+    hi_rate: 1.5                      # growth per zoom above the top anchor (like roads.hi_rate)
+    opacity: 0.8                      # icon opacity (lighter <1)
+    color:   "#8a8a8a"               # icon tint (matters for monochrome emoji; native colour in most browsers)

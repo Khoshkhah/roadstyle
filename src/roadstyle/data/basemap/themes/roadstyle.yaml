@@ -1,0 +1,19 @@
+# roadstyle: the look of roadstyle's own defaults (its palette `amber`, the one the level editor draws), with mapstyle's OSM-Carto feature layers
+# (docs/design/roadstyle_look.md). The road colours below are written from `rs.palette_to_dict("amber")`; a test checks that they are equal.
+# A class that `amber` lacks (steps, pedestrian, platform, raceway, ...) keeps its OSM-Carto colour. The widths are roadstyle's profile `default`.
+roads:
+  colors:
+    motorway: {fill: "#f28c28", casing: "#dc2a48"}
+    trunk: {fill: "#f5a623", casing: "#c84e2f"}
+    primary: {fill: "#f4c542", casing: "#a06b00"}
+    secondary: {fill: "#f7df72", casing: "#707d00"}
+    tertiary: {fill: "#b8d986", casing: "#bcbcbc"}
+    unclassified: {fill: "#ffffff", casing: "#bcbcbc"}
+    residential: {fill: "#d7dee8", casing: "#bcbcbc"}
+    living_street: {fill: "#cbd5e1", casing: "#cccccc"}
+    service: {fill: "#94a3b8", casing: "#d4d4d4"}
+paths:                              # footpaths and cycleways: over the path style's colours
+  footway: {fill: "#C59D9D", casing: null, dash: [4, 4]}
+  path: {fill: "#C59D9D", casing: null, dash: [2, 5]}
+  cycleway: {fill: "#5c7cb6", casing: null, dash: [3, 3]}
+  track: {fill: "#a3a3a3", casing: "#9e7b54", dash: [4, 4]}

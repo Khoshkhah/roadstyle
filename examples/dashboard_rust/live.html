@@ -16,7 +16,7 @@
 <div id="bar"><button id="a" type="button">Value A</button><button id="b" type="button">Value B, width C</button>
   <button id="c" type="button">Clear</button><span id="ms"></span></div>
 <script type="module">
-import init, {makeSources, tileSources} from "./pkg/roadstyle_wasm.js";
+import init, {Look, makeSources, tileSources} from "./pkg/roadstyle_wasm.js";
 import {rsDashboard} from "../../src/roadstyle/static/dashboard/index.js";
 
 const area = new URLSearchParams(location.search).get("area") || "monaco";
@@ -25,7 +25,7 @@ const bytes = (u) => fetch(u).then((r) => r.arrayBuffer()).then((b) => new Uint8
 const [, roads, lookText] = await Promise.all([init(), bytes(DATA + area + "/roads.parquet"), fetch(DATA + "look.json").then((r) => r.text())]);
 const look = JSON.parse(lookText);
 look.args.live_data = true;                       // the road layer reads the feature states rs_c and rs_w (metadata roadstyle:live)
-const sources = makeSources(roads, JSON.stringify(look), undefined, undefined, area);
+const sources = makeSources(roads, Look.fromJson(JSON.stringify(look)), undefined, undefined, area);
 const road_table = JSON.parse(new TextDecoder().decode(sources.roadTable()));
 const tiler = tileSources(sources, "rs://1/", ["name", "edge_id", "highway"]);
 const style = JSON.parse(tiler.style());

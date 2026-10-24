@@ -86,8 +86,8 @@ pub fn run(args: &[String]) -> Result<(), String> {
             let mut kw: Map<String, Value> = opts.iter().map(keyword).collect();
             kw.entry("view_3d").or_insert(Value::Bool(true)); // as export_inline and export_geojson
             look.insert("args".into(), Value::Object(kw));
-            let look = roadstyle::look::make_look(&Value::Object(look))?;
-            let s = roadstyle::make_sources(read(roads)?, &look.to_string(), None, None, name)?;
+            let look = roadstyle::Look::resolve(&roadstyle::look::Options::from_value(&Value::Object(look))?)?;
+            let s = roadstyle::make_sources(read(roads)?, &look, None, None, name)?;
             for (file, size) in roadstyle::save_sources(&s, Path::new(out), format, &keep)? {
                 println!("{file} {size} bytes");
             }

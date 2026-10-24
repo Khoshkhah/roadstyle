@@ -4,26 +4,83 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
+use std::cell::RefCell;
 
-/// make_style(roads, look, features=None, planner=None, name=None) -> str: the style's JSON text (roadstyle.export_inline's
-/// style). `roads` and `features` are GeoParquet bytes (the geometry as WKB), `planner` the planner's Parquet bytes, `look` the
-/// look's JSON text. An error is a ValueError.
-#[pyfunction]
-#[pyo3(signature = (roads, look, features=None, planner=None, name=None))]
-fn make_style(py: Python<'_>, roads: Vec<u8>, look: String, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>)
-              -> PyResult<String> {
-    py.detach(|| roadstyle::make_style(roads, &look, features, planner, name)).map_err(PyValueError::new_err)
+thread_local! {
+    /// The engine's warnings of the calls since the last `take_warnings` (audit R17: the engine has no global state; it gives its
+    /// warnings back with its output, and Python's warnings are global, so the binding keeps them for `take_warnings`).
+    static PENDING: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
 }
 
-/// make_look(options) -> str: the look (look.json) of render_edges' palette, profile and settings. `options` is the JSON text of
-/// {"palette", "profile", "settings", "args", "features"}.
+fn warned(w: &[String]) {
+    PENDING.with(|p| p.borrow_mut().extend_from_slice(w));
+}
+
+/// A resolved look (roadstyle-look), parsed one time: `resolve_look(options)` makes it, `Look.from_json(text)` reads a saved look
+/// (version 1, or version 0: today's look.json). The calls below take it, not its text.
+#[pyclass(frozen, name = "Look")]
+struct PyLook(roadstyle::Look);
+
+#[pymethods]
+impl PyLook {
+    /// Look.from_json(text) -> Look: a saved look (version 1 or 0). An error is a ValueError.
+    #[staticmethod]
+    fn from_json(text: &str) -> PyResult<Self> {
+        roadstyle::Look::from_json(text).map(PyLook).map_err(PyValueError::new_err)
+    }
+
+    /// json() -> str: the look's text (version 1).
+    fn json(&self) -> String {
+        self.0.to_json()
+    }
+
+    /// part(key) -> str: the JSON text of one part of the look: "args" (the map options), "config", "theme", "palette" (its name),
+    /// "settings" (the settings sources as given) or "features" (the base map's part).
+    fn part(&self, key: &str) -> PyResult<String> {
+        let l = &self.0;
+        match key {
+            "args" => Ok(l.args.to_string()),
+            "config" => Ok(l.config.to_string()),
+            "theme" => Ok(l.theme.to_string()),
+            "palette" => Ok(serde_json::Value::from(l.palette.as_str()).to_string()),
+            "settings" => Ok(l.settings.to_string()),
+            "features" => Ok(l.features.to_string()),
+            _ => Err(PyValueError::new_err(format!("part {key:?}: the parts are args, config, theme, palette, settings and features"))),
+        }
+    }
+
+    /// with_arg(key, value) -> Look: the same look with the map option `key` set to `value` (JSON text).
+    fn with_arg(&self, key: &str, value: &str) -> PyResult<Self> {
+        let v: serde_json::Value = serde_json::from_str(value).map_err(|e| PyValueError::new_err(format!("{key}: not JSON: {e}")))?;
+        self.0.clone().with_arg(key, v).map(PyLook).map_err(PyValueError::new_err)
+    }
+}
+
+/// resolve_look(options) -> Look: the look of render_edges' palette, profile and settings. `options` is the JSON text of
+/// {"palette", "profile", "settings", "args", "features", "files"}. An error is a ValueError.
 #[pyfunction]
-fn make_look(py: Python<'_>, options: String) -> PyResult<String> {
+fn resolve_look(py: Python<'_>, options: String) -> PyResult<PyLook> {
     py.detach(|| {
         let o: serde_json::Value = serde_json::from_str(&options).map_err(|e| format!("options: not JSON: {e}"))?;
-        roadstyle::look::make_look(&o).map(|l| l.to_string())
+        roadstyle::Look::resolve(&roadstyle::look::Options::from_value(&o)?)
     })
+    .map(PyLook)
     .map_err(PyValueError::new_err)
+}
+
+/// make_style(roads, look, features=None, planner=None, name=None) -> str: the style's JSON text (roadstyle.export_inline's
+/// style). `roads` and `features` are GeoParquet bytes (the geometry as WKB), `planner` the planner's Parquet bytes, `look` a Look.
+/// An error is a ValueError.
+#[pyfunction]
+#[pyo3(signature = (roads, look, features=None, planner=None, name=None))]
+fn make_style(py: Python<'_>, roads: Vec<u8>, look: PyRef<'_, PyLook>, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>)
+              -> PyResult<String> {
+    let look = &look.0;
+    let s = py.detach(|| roadstyle::make_sources(roads, look, features, planner, name)).map_err(PyValueError::new_err)?;
+    warned(&s.warnings);
+    let mut out = Vec::new();
+    py.detach(|| s.write_style(&mut out)).expect("a Vec takes every byte");
+    Ok(String::from_utf8(out).expect("serde_json writes UTF-8"))
 }
 
 /// A map with vector tiles: Tiler(roads, look, features=None, name=None, prefix="", keep=[]), then `style` (the style's JSON text)
@@ -40,9 +97,11 @@ struct Tiler {
 impl Tiler {
     #[new]
     #[pyo3(signature = (roads, look, features=None, name=None, prefix=String::new(), keep=Vec::new()))]
-    fn new(py: Python<'_>, roads: Vec<u8>, look: String, features: Option<Vec<u8>>, name: Option<String>, prefix: String, keep: Vec<String>)
-           -> PyResult<Self> {
-        let (style, tiles) = py.detach(|| roadstyle::make_tiled(roads, &look, features, name, &prefix, &keep)).map_err(PyValueError::new_err)?;
+    fn new(py: Python<'_>, roads: Vec<u8>, look: PyRef<'_, PyLook>, features: Option<Vec<u8>>, name: Option<String>, prefix: String,
+           keep: Vec<String>) -> PyResult<Self> {
+        let look = &look.0;
+        let (style, tiles, w) = py.detach(|| roadstyle::make_tiled(roads, look, features, name, &prefix, &keep)).map_err(PyValueError::new_err)?;
+        warned(&w);
         Ok(Tiler { style, tiles })
     }
 
@@ -144,11 +203,15 @@ impl Sources {
         self.inner.metadata.to_string()
     }
 
-    /// add_palettes(base, looks): a page's views with other palettes (looks: [(palette, look.json)]), merged into these Sources (the
+    /// add_palettes(base, looks): a page's views with other palettes (looks: [(palette, Look)]), merged into these Sources (the
     /// palette `base`): each property that differs gets a copy for each palette, `<key>@<palette>`, read by the state rs_palette.
-    fn add_palettes(&mut self, py: Python<'_>, base: String, looks: Vec<(String, String)>) -> PyResult<()> {
+    fn add_palettes(&mut self, py: Python<'_>, base: String, looks: Vec<(String, PyRef<'_, PyLook>)>) -> PyResult<()> {
+        let looks: Vec<(String, roadstyle::Look)> = looks.into_iter().map(|(n, l)| (n, l.0.clone())).collect();
         let s = &mut self.inner;
-        py.detach(|| roadstyle::palettes::add(s, &base, &looks)).map_err(PyValueError::new_err)
+        let before = s.warnings.len();
+        py.detach(|| roadstyle::palettes::add(s, &base, &looks)).map_err(PyValueError::new_err)?;
+        warned(&s.warnings[before..]);
+        Ok(())
     }
 
     /// road_table() -> str: the road table as the page loads it (tiles.sidecar's form: props, mids, bboxes, lines).
@@ -170,9 +233,11 @@ impl Sources {
 /// make_sources(roads, look, features=None, planner=None, name=None) -> Sources: stage 1, as make_style's arguments.
 #[pyfunction]
 #[pyo3(signature = (roads, look, features=None, planner=None, name=None))]
-fn make_sources(py: Python<'_>, roads: Vec<u8>, look: String, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>)
-                -> PyResult<Sources> {
-    let inner = py.detach(|| roadstyle::make_sources(roads, &look, features, planner, name)).map_err(PyValueError::new_err)?;
+fn make_sources(py: Python<'_>, roads: Vec<u8>, look: PyRef<'_, PyLook>, features: Option<Vec<u8>>, planner: Option<Vec<u8>>,
+                name: Option<String>) -> PyResult<Sources> {
+    let look = &look.0;
+    let inner = py.detach(|| roadstyle::make_sources(roads, look, features, planner, name)).map_err(PyValueError::new_err)?;
+    warned(&inner.warnings);
     Ok(Sources { inner })
 }
 
@@ -250,10 +315,9 @@ fn make_page(style: String, page: String, parts: String, pmtiles: Option<Vec<u8>
 /// export_look(look, cols, positions) -> str: the simple look for another app's data layer (roadstyle_engine::export_look); `cols`: the
 /// columns [highway, oneway, tunnel, bridge, id].
 #[pyfunction]
-fn export_look(look: String, cols: [String; 5], positions: Vec<i64>) -> PyResult<String> {
-    let look: serde_json::Value = serde_json::from_str(&look).map_err(|e| PyValueError::new_err(e.to_string()))?;
+fn export_look(look: PyRef<'_, PyLook>, cols: [String; 5], positions: Vec<i64>) -> PyResult<String> {
     let c = roadstyle::export_look::LookCols { highway: &cols[0], oneway: &cols[1], tunnel: &cols[2], bridge: &cols[3], id: &cols[4] };
-    roadstyle::export_look::export_look(&look, &c, &positions).map(|v| v.to_string()).map_err(PyValueError::new_err)
+    roadstyle::export_look::export_look(&look.0, &c, &positions).map(|v| v.to_string()).map_err(PyValueError::new_err)
 }
 
 /// make_area(edges, folder, ...) -> (roads, pairs, warnings): roadstyle's make_area (level_input) in Rust (roadstyle::level_area): writes
@@ -272,6 +336,73 @@ fn make_area(py: Python<'_>, edges: Vec<u8>, folder: String, id_col: String, hig
         let table = roadstyle::read::read_roads(edges, "geometry")?;
         roadstyle::level_area::make_area(&table, std::path::Path::new(&folder), &o).map(|m| (m.roads, m.pairs, m.warnings))
     }).map_err(|e: String| PyValueError::new_err(e))
+}
+
+/// base_map_theme(theme) -> str: a base map's theme (roadstyle-look's basemap::load_theme) as JSON text: [osm_carto.yaml in the theme's
+/// colours, the theme file itself, [saturation, lighten] of its transform]. An unknown theme is a ValueError that names the themes.
+#[pyfunction]
+fn base_map_theme(theme: &str) -> PyResult<String> {
+    let (style, file, (s, l)) = roadstyle::look::basemap::load_theme(theme).map_err(PyValueError::new_err)?;
+    Ok(serde_json::json!([style, file, [s, l]]).to_string())
+}
+
+/// base_map_recolor(colour, saturation, lighten) -> str: a "#rrggbb" colour with a theme's transform (basemap::recolor); another
+/// value (JSON text) as it is. Gives JSON text.
+#[pyfunction]
+fn base_map_recolor(colour: &str, saturation: f64, lighten: f64) -> PyResult<String> {
+    let v: serde_json::Value = serde_json::from_str(colour).map_err(|e| PyValueError::new_err(format!("colour: not JSON: {e}")))?;
+    Ok(roadstyle::look::basemap::recolor(&v, saturation, lighten).to_string())
+}
+
+/// duckosm_catalog_sql(catalog) -> [str, str]: the queries of the tables (schema, table) and the columns (schema, table, column) of a
+/// duckOSM file, for duckosm_plan.
+#[pyfunction]
+fn duckosm_catalog_sql(catalog: &str) -> [String; 2] {
+    roadstyle::duckosm::catalog_sql(catalog)
+}
+
+/// duckosm_plan(tables, columns, mode, tags, specs, only=False) -> str: the SQL that reads a duckOSM file (roadstyle_io::duckosm, the one
+/// copy of it), as JSON text: {"roads": [3 statements], "meta": the stored levels' query or null (tags), "select": the roads of `mode`,
+/// "layers": [{"spec", "name", "sql": [the queries in order]}] for the base map (`specs`: layers.yaml's layers as JSON text), "subset":
+/// with `only` (the map of `mode` alone), the queries of its roads with no stored levels and of its edge_ids}. `tables` and `columns`: the rows of the
+/// catalog's information_schema.
+#[pyfunction]
+#[pyo3(signature = (tables, columns, mode, tags, specs, only=false))]
+fn duckosm_plan(tables: Vec<(String, String)>, columns: Vec<(String, String, String)>, mode: &str, tags: bool, specs: &str, only: bool)
+                -> PyResult<String> {
+    use roadstyle::duckosm;
+    let cat = duckosm::Catalog { tables, columns };
+    let specs: Vec<serde_json::Value> = serde_json::from_str(specs).map_err(|e| PyValueError::new_err(format!("specs: {e}")))?;
+    let roads = duckosm::roads_sql(&cat, tags, only.then_some(mode)).map_err(PyValueError::new_err)?;
+    let select = duckosm::roads_select(mode).map_err(PyValueError::new_err)?;
+    let layers: Vec<serde_json::Value> = duckosm::features_sql(&cat, &specs).into_iter()
+        .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "sql": l.sql})).collect();
+    let meta = (!tags).then_some(duckosm::LEVELS_META_SQL);
+    let subset = (only && !tags).then_some([duckosm::SUBSET_SQL, duckosm::IDS_SQL]);
+    Ok(serde_json::json!({"roads": roads, "meta": meta, "select": select, "layers": layers, "subset": subset}).to_string())
+}
+
+/// duckosm_levels(row) -> str: the look's keyword `levels` (JSON text) from the stored levels' metadata row (source, n_edges, edge_hash),
+/// or a ValueError that says what to do.
+#[pyfunction]
+#[pyo3(signature = (row=None))]
+fn duckosm_levels(row: Option<(String, i64, String)>) -> PyResult<String> {
+    roadstyle::duckosm::levels_keyword(row.as_ref().map(|(s, n, h)| (s.as_str(), *n, h.as_str()))).map(|v| v.to_string()).map_err(PyValueError::new_err)
+}
+
+/// duckosm_subset_levels(row, missing, example, ids) -> str: the look's keyword `levels` (JSON text) of the stored levels for a map of one
+/// mode: `row` the stored levels' metadata, `missing` and `example` the row of the plan's "subset" query, `ids` the map's edge_ids.
+#[pyfunction]
+#[pyo3(signature = (row, missing, example, ids))]
+fn duckosm_subset_levels(row: Option<(String, i64, String)>, missing: i64, example: Option<i64>, ids: Vec<i64>) -> PyResult<String> {
+    roadstyle::duckosm::subset_levels_keyword(row.as_ref().map(|(s, n, h)| (s.as_str(), *n, h.as_str())), missing, example, &ids)
+        .map(|v| v.to_string()).map_err(PyValueError::new_err)
+}
+
+/// duckosm_features_select(specs) -> str | None: the base map's rows from the tables f<spec> that were made.
+#[pyfunction]
+fn duckosm_features_select(specs: Vec<usize>) -> Option<String> {
+    roadstyle::duckosm::features_select(&specs)
 }
 
 /// serve(area, port, page=None): roadstyle serve (roadstyle-cli) in a thread of its own: the level editor's page files (in the extension,
@@ -294,7 +425,7 @@ fn serve(area: String, port: u16, page: Option<String>) -> PyResult<()> {
 /// The engine's warnings since the last call of this (render_web's warnings.warn): the binding gives them as Python warnings.
 #[pyfunction]
 fn take_warnings() -> Vec<String> {
-    roadstyle::take_warnings()
+    PENDING.with(|p| std::mem::take(&mut *p.borrow_mut()))
 }
 
 #[pymodule]
@@ -303,11 +434,19 @@ fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(make_page, m)?)?;
     m.add_function(wrap_pyfunction!(export_look, m)?)?;
     m.add_function(wrap_pyfunction!(make_style, m)?)?;
-    m.add_function(wrap_pyfunction!(make_look, m)?)?;
+    m.add_function(wrap_pyfunction!(resolve_look, m)?)?;
+    m.add_class::<PyLook>()?;
     m.add_function(wrap_pyfunction!(compute_levels, m)?)?;
     m.add_function(wrap_pyfunction!(solve_rules, m)?)?;
     m.add_function(wrap_pyfunction!(serve, m)?)?;
     m.add_function(wrap_pyfunction!(make_area, m)?)?;
+    m.add_function(wrap_pyfunction!(base_map_theme, m)?)?;
+    m.add_function(wrap_pyfunction!(base_map_recolor, m)?)?;
+    m.add_function(wrap_pyfunction!(duckosm_catalog_sql, m)?)?;
+    m.add_function(wrap_pyfunction!(duckosm_plan, m)?)?;
+    m.add_function(wrap_pyfunction!(duckosm_levels, m)?)?;
+    m.add_function(wrap_pyfunction!(duckosm_subset_levels, m)?)?;
+    m.add_function(wrap_pyfunction!(duckosm_features_select, m)?)?;
     m.add_class::<Tiler>()?;
     m.add_class::<Sources>()?;
     m.add_function(wrap_pyfunction!(make_sources, m)?)?;

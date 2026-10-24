@@ -4,6 +4,7 @@
 
 use super::solve::Rules;
 use super::{LevelEdge, Options, Order, Pt};
+use roadstyle_model::flags;
 use rstar::{RTree, RTreeObject, AABB};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -76,29 +77,18 @@ pub fn road_split(edges: &[&LevelEdge]) -> Result<Roads, String> {
     })
 }
 
-/// `_truthy`: a tag that is set and not "", "no", "false" or "0".
+/// A yes/no tag (roadstyle_model::flags, the one rule).
 fn truthy(v: Option<&str>) -> bool {
-    !matches!(v, None | Some("" | "no" | "false" | "0"))
+    v.is_some_and(flags::yes_text)
 }
 
 /// The OSM level of an edge (`_level`): a non-zero `layer`, else bridge 1, tunnel -1, else 0.
 pub fn level(e: &LevelEdge) -> i64 {
-    let a = e;
-    let layer = a
-        .layer
-        .as_deref()
-        .and_then(|s| s.trim().parse::<f64>().ok())
-        .filter(|v| v.is_finite())
-        .map_or(0, |v| v.trunc() as i64);
-    if layer != 0 {
-        layer
-    } else if truthy(a.bridge.as_deref()) {
-        1
-    } else if truthy(a.tunnel.as_deref()) {
-        -1
-    } else {
-        0
-    }
+    flags::level(
+        flags::layer(e.layer.as_deref()),
+        truthy(e.bridge.as_deref()),
+        truthy(e.tunnel.as_deref()),
+    )
 }
 
 /// The band of a road from `band_col` (`pd.to_numeric(...).fillna(0).round()`: a value that is not a number is 0).

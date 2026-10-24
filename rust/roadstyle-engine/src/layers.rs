@@ -8,129 +8,39 @@ use indexmap::IndexMap;
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
 
-/// Python's round(x, n) on a float: the nearest double to the correctly rounded decimal.
-pub(crate) fn py_round(x: f64, n: usize) -> f64 {
-    let v: f64 = format!("{x:.n$}").parse().unwrap();
-    if v == 0.0 { 0.0 } else { v }
-}
+/// Python's round(x, n) on a float (roadstyle-look's: one copy).
+pub(crate) use roadstyle_look::py_round;
 
-/// render_web's road tables (_load_road_model) and the theme values the builders read.
-pub struct Model {
-    width: HashMap<String, Vec<(f64, f64)>>, // group -> (zoom, px), by zoom
-    hi_rate: HashMap<String, f64>,
-    casing_ratio: HashMap<String, f64>,
-    group: Vec<(String, String)>, // class -> width group, in the table's order
-    pub(crate) classes: Vec<String>, // the groups' classes, then the links (_CLASSES)
-    zstops: Vec<Value>,
-    z_order: Map<String, Value>,
-    link_w: f64,
-    offset_frac: f64,
-    width_frac: f64,
-    offset_zoom: f64,
-    ramp_zooms: f64,
-    fb_group: String,
-    fb_order: Value,
-    fb_link_order: f64,
-}
+/// render_web's road tables (_load_road_model): the road width model of the look (roadstyle-look), made one time with the look.
+pub use roadstyle_look::RoadModel as Model;
 
-fn obj<'a>(v: &'a Value, what: &str) -> Result<&'a Map<String, Value>, String> {
-    v.as_object().ok_or_else(|| format!("look.json: no {what}"))
-}
-
-fn num(v: &Value, what: &str) -> Result<f64, String> {
-    v.as_f64().ok_or_else(|| format!("look.json: {what} is not a number"))
-}
-
-impl Model {
-    pub fn from_look(look: &Value) -> Result<Model, String> {
-        let r = &look["roads_model"];
-        let th = &look["theme"]["roads"];
-        let mut width = HashMap::new();
-        for (g, t) in obj(&r["width"], "roads_model.width")? {
-            let mut stops: Vec<(f64, f64)> = obj(t, "a width table")?.iter()
-                .map(|(z, w)| Ok((z.parse::<f64>().map_err(|e| e.to_string())?, num(w, "a width")?))).collect::<Result<_, String>>()?;
-            stops.sort_by(|a, b| a.0.total_cmp(&b.0));
-            width.insert(g.clone(), stops);
-        }
-        let floats = |v: &Value, what: &str| -> Result<HashMap<String, f64>, String> {
-            obj(v, what)?.iter().map(|(k, x)| Ok((k.clone(), num(x, what)?))).collect()
-        };
-        let group: Vec<(String, String)> = obj(&r["group"], "roads_model.group")?.iter()
-            .map(|(c, g)| (c.clone(), g.as_str().unwrap_or_default().to_string())).collect();
-        let links: Vec<String> = r["links"].as_array().ok_or("look.json: no roads_model.links")?.iter()
-            .filter_map(|v| v.as_str().map(String::from)).collect();
-        let classes = group.iter().map(|(c, _)| c.clone()).chain(links.iter().cloned()).collect();
-        let split = &th["split"];
-        let fb = &th["fallback"];
-        Ok(Model {
-            width,
-            hi_rate: floats(&r["width_zoom_rate"], "roads_model.width_zoom_rate")?,
-            casing_ratio: floats(&r["casing_ratio"], "roads_model.casing_ratio")?,
-            group,
-            classes,
-            zstops: r["zoom_stops"].as_array().ok_or("look.json: no roads_model.zoom_stops")?.clone(),
-            z_order: obj(&r["z_order"], "roads_model.z_order")?.clone(),
-            link_w: num(&th["links"]["width"], "theme roads.links.width")?,
-            // render(offset_frac=, width_frac=) over the theme's split: mapstyle passes 0 and 1 for a mode without lanes (one centred line per road)
-            offset_frac: look["args"]["offset_frac"].as_f64().map_or_else(|| num(&split["offset_frac"], "split.offset_frac"), Ok)?,
-            width_frac: look["args"]["width_frac"].as_f64().map_or_else(|| num(&split["width_frac"], "split.width_frac"), Ok)?,
-            offset_zoom: look["args"]["offset_zoom"].as_f64().map_or_else(|| num(&split["offset_zoom"], "split.offset_zoom"), Ok)?,
-            ramp_zooms: num(&split["ramp_zooms"], "split.ramp_zooms")?,
-            fb_group: fb["group"].as_str().ok_or("look.json: no fallback group")?.to_string(),
-            fb_order: fb["order"].clone(),
-            fb_link_order: num(&fb["link_order"], "fallback.link_order")?,
-        })
-    }
-
-    /// _base: a link's main class.
-    fn base(c: &str) -> (&str, bool) {
-        match c.strip_suffix("_link") { Some(b) => (b, true), None => (c, false) }
-    }
-
-    /// ROAD_Z of a class's main class (its draw order), else the fallback order.
-    pub(crate) fn z_of(&self, c: &str) -> f64 {
-        self.z_order.get(Self::base(c).0).unwrap_or(&self.fb_order).as_f64().unwrap_or(0.0)
-    }
-
-    pub(crate) fn group_of(&self, base: &str) -> &str {
-        self.group.iter().find(|(c, _)| c == base).map_or(self.fb_group.as_str(), |(_, g)| g.as_str())
-    }
-
-    /// _gwidth: a group's width at zoom z (linear between its stops, growing by its rate past the last).
-    pub(crate) fn gwidth(&self, g: &str, z: f64) -> f64 {
-        let t = &self.width[g];
-        let (first, last) = (t[0], t[t.len() - 1]);
-        if z <= first.0 {
-            return first.1;
-        }
-        if z >= last.0 {
-            return last.1 * self.hi_rate[g].powf(z - last.0);
-        }
-        for w in t.windows(2) {
-            if z <= w[1].0 {
-                let f = (z - w[0].0) / (w[1].0 - w[0].0);
-                return w[0].1 + (w[1].1 - w[0].1) * f;
-            }
-        }
-        last.1
-    }
-
-    pub(crate) fn stops(&self) -> impl Iterator<Item = (f64, &Value)> {
-        self.zstops.iter().map(|z| (z.as_f64().unwrap(), z))
-    }
-
+/// The road layers' MapLibre expressions from the road width model.
+pub trait Exprs {
     /// _width_expr: interpolate(zoom) of match(class -> width); two-way lanes narrow to width_frac from offset_zoom (over 2 zooms).
-    pub fn width_expr(&self, col: &str, casing: bool, scale: f64) -> Value {
+    fn width_expr(&self, col: &str, casing: bool, scale: f64) -> Value;
+    /// _offset_match: a two-way direction's offset at zoom z, per class.
+    fn offset_match(&self, col: &str, z: f64) -> Value;
+    /// _offset_expr (no metre widths): line-offset of a two-way edge; with `pairs`, a pair's one casing (__rs_pair) is not shifted.
+    fn offset_expr(&self, col: &str, pairs: bool) -> Value;
+    /// _width_m_expr: _width_expr, but a line with a metre width (__rs_wm) is drawn at exactly that width from width_m_zoom on, on a base-2
+    /// exponential curve to zoom 22. `kind`: "fill" (the width less two casings), "casing" (the width) or "wings" (a bridge's casing: the
+    /// width and two casings). `bridge_m` / `bridge_px`: config bridge_casing_m / _px; `casing_px`: render's casing_min_px.
+    fn width_m_expr(&self, col: &str, kind: &str, ml: &MetreLook) -> Value;
+    /// _offset_expr with width_m_zoom: from width_m_zoom on, a direction whose pair has metres on both (__rs_twm) is shifted by metres.
+    fn offset_expr_m(&self, col: &str, pairs: bool, wmz: &Value) -> Value;
+    /// _sort_key: the grade (lvl * 1000), then the class.
+    fn sort_key(&self, col: &str) -> Value;
+    /// _pair_width: a two-way pair's one casing as wide as its two directions (no metre widths).
+    /// _pair_width; with width_m_zoom (`wmz`), a pair with metres on both has its width in `expr` already from that zoom on.
+    fn pair_width(&self, expr: &Value, wmz: Option<f64>) -> Value;
+}
+
+impl Exprs for Model {
+    fn width_expr(&self, col: &str, casing: bool, scale: f64) -> Value {
         let (split_zoom, split_frac) = (self.offset_zoom, self.width_frac);
         let mut e = vec![json!("interpolate"), json!(["linear"]), json!(["zoom"])];
         for (z, zv) in self.stops() {
-            let w_of = |g: &str, lk: bool| {
-                let mut w = self.gwidth(g, z) * if casing { self.casing_ratio[g] } else { 1.0 } * scale;
-                if lk {
-                    w *= self.link_w;
-                }
-                py_round(w, 2)
-            };
+            let w_of = |g: &str, lk: bool| self.group_px(g, lk, z, casing, scale);
             let mut m = vec![json!("match"), json!(["get", col])];
             for c in &self.classes {
                 let (b, lk) = Self::base(c);
@@ -146,8 +56,7 @@ impl Model {
         Value::Array(e)
     }
 
-    /// _offset_match: a two-way direction's offset at zoom z, per class.
-    pub fn offset_match(&self, col: &str, z: f64) -> Value {
+    fn offset_match(&self, col: &str, z: f64) -> Value {
         let ramp = ((z - self.offset_zoom) / self.ramp_zooms).clamp(0.0, 1.0);
         let mut m = vec![json!("match"), json!(["get", col])];
         for c in &self.classes {
@@ -160,8 +69,7 @@ impl Model {
         Value::Array(m)
     }
 
-    /// _offset_expr (no metre widths): line-offset of a two-way edge; with `pairs`, a pair's one casing (__rs_pair) is not shifted.
-    pub fn offset_expr(&self, col: &str, pairs: bool) -> Value {
+    fn offset_expr(&self, col: &str, pairs: bool) -> Value {
         let two = json!(["to-boolean", ["get", "__rs_twoway"]]);
         let two = if pairs { json!(["all", two, ["!", ["to-boolean", ["get", "__rs_pair"]]]]) } else { two };
         let mut e = vec![json!("interpolate"), json!(["linear"]), json!(["zoom"])];
@@ -172,27 +80,7 @@ impl Model {
         Value::Array(e)
     }
 
-    /// The stops of the metre-width curves: the zoom stops, width_m_zoom and 22 (MapLibre's last zoom), in order, each once.
-    fn metre_stops(&self, wmz: &Value) -> Vec<(f64, Value)> {
-        let mut zs: Vec<(f64, Value)> = Vec::new();
-        for v in self.zstops.iter().chain([wmz, &json!(22)]) {
-            let z = v.as_f64().unwrap_or(22.0);
-            if !zs.iter().any(|(x, _)| *x == z) {
-                zs.push((z, v.clone()));
-            }
-        }
-        zs.sort_by(|a, b| a.0.total_cmp(&b.0));
-        zs
-    }
-
-    fn clamp_stop(&self, z: f64) -> f64 {
-        z.clamp(self.zstops[0].as_f64().unwrap(), self.zstops[self.zstops.len() - 1].as_f64().unwrap())
-    }
-
-    /// _width_m_expr: _width_expr, but a line with a metre width (__rs_wm) is drawn at exactly that width from width_m_zoom on, on a base-2
-    /// exponential curve to zoom 22. `kind`: "fill" (the width less two casings), "casing" (the width) or "wings" (a bridge's casing: the
-    /// width and two casings). `bridge_m` / `bridge_px`: config bridge_casing_m / _px; `casing_px`: render's casing_min_px.
-    pub fn width_m_expr(&self, col: &str, kind: &str, ml: &MetreLook) -> Value {
+    fn width_m_expr(&self, col: &str, kind: &str, ml: &MetreLook) -> Value {
         let MetreLook { wmz, bridge_m, bridge_px, casing_px, wing_scale } = ml;
         let (wmz, wing_scale) = (wmz, *wing_scale);
         let casing = kind != "fill";
@@ -233,8 +121,7 @@ impl Model {
         Value::Array(e)
     }
 
-    /// _offset_expr with width_m_zoom: from width_m_zoom on, a direction whose pair has metres on both (__rs_twm) is shifted by metres.
-    pub fn offset_expr_m(&self, col: &str, pairs: bool, wmz: &Value) -> Value {
+    fn offset_expr_m(&self, col: &str, pairs: bool, wmz: &Value) -> Value {
         let two = json!(["to-boolean", ["get", "__rs_twoway"]]);
         let two = if pairs { json!(["all", two, ["!", ["to-boolean", ["get", "__rs_pair"]]]]) } else { two };
         let wz = wmz.as_f64().unwrap_or(f64::INFINITY);
@@ -251,18 +138,7 @@ impl Model {
         Value::Array(e)
     }
 
-    /// class_order: the table's order, else a link just under its main class.
-    pub(crate) fn class_order(&self, c: &str) -> Value {
-        if let Some(v) = self.z_order.get(c) {
-            return v.clone();
-        }
-        let (b, lk) = Self::base(c);
-        let base = self.z_order.get(b).unwrap_or(&self.fb_order);
-        if lk { json!(base.as_f64().unwrap() + self.fb_link_order) } else { base.clone() }
-    }
-
-    /// _sort_key: the grade (lvl * 1000), then the class.
-    pub fn sort_key(&self, col: &str) -> Value {
+    fn sort_key(&self, col: &str) -> Value {
         let mut m = vec![json!("match"), json!(["get", col])];
         for c in &self.classes {
             m.push(json!(c));
@@ -271,7 +147,17 @@ impl Model {
         m.push(self.fb_order.clone());
         json!(["+", ["*", ["coalesce", ["get", "lvl"], 0], 1000], m])
     }
+
+    fn pair_width(&self, expr: &Value, wmz: Option<f64>) -> Value {
+        let (z0, z1) = (self.zstops[0].as_f64().unwrap(), self.zstops[self.zstops.len() - 1].as_f64().unwrap());
+        plus_px(expr, |z| {
+            let zf = z.as_f64().unwrap();
+            let add = json!(["*", 2, self.offset_match("highway", zf.clamp(z0, z1))]);
+            match wmz { Some(w) if zf >= w => json!(["case", ["has", "__rs_twm"], 0, add]), _ => add }
+        }, Some(&json!(["to-boolean", ["get", "__rs_pair"]])))
+    }
 }
+
 
 // --- step 2: the road layers of simple mode with stored levels (render_web.render, simple=True, inline data), the passes and the export ---
 
@@ -665,47 +551,6 @@ fn merged(a: &Value, b: &Value) -> Map<String, Value> {
     m
 }
 
-impl Model {
-    /// class_width_px (casing as given): the class's width at `zoom` read off the width curve (linear between its stops, the ends outside).
-    pub(crate) fn class_width_px(&self, cls: Option<&str>, zoom: f64, casing: bool) -> f64 {
-        let e = self.width_expr("highway", casing, 1.0);
-        let e = e.as_array().unwrap();
-        let zs: Vec<f64> = e[3..].iter().step_by(2).map(|z| z.as_f64().unwrap()).collect();
-        let ms: Vec<&Value> = e[4..].iter().step_by(2).collect();
-        let at = |m: &Value| -> f64 {
-            let m = if m[0] == "*" { &m[1] } else { m };
-            let a = m.as_array().unwrap();
-            let mut i = 2;
-            while i + 1 < a.len() {
-                if cls.is_some_and(|c| a[i] == c) {
-                    return a[i + 1].as_f64().unwrap();
-                }
-                i += 2;
-            }
-            a[a.len() - 1].as_f64().unwrap()
-        };
-        if zoom <= zs[0] {
-            return at(ms[0]);
-        }
-        if zoom >= zs[zs.len() - 1] {
-            return at(ms[ms.len() - 1]);
-        }
-        let i = (0..zs.len()).filter(|&k| zs[k] <= zoom).max().unwrap();
-        let f = (zoom - zs[i]) / (zs[i + 1] - zs[i]);
-        at(ms[i]) + (at(ms[i + 1]) - at(ms[i])) * f
-    }
-
-    /// _pair_width: a two-way pair's one casing as wide as its two directions (no metre widths).
-    /// _pair_width; with width_m_zoom (`wmz`), a pair with metres on both has its width in `expr` already from that zoom on.
-    pub(crate) fn pair_width(&self, expr: &Value, wmz: Option<f64>) -> Value {
-        let (z0, z1) = (self.zstops[0].as_f64().unwrap(), self.zstops[self.zstops.len() - 1].as_f64().unwrap());
-        plus_px(expr, |z| {
-            let zf = z.as_f64().unwrap();
-            let add = json!(["*", 2, self.offset_match("highway", zf.clamp(z0, z1))]);
-            match wmz { Some(w) if zf >= w => json!(["case", ["has", "__rs_twm"], 0, add]), _ => add }
-        }, Some(&json!(["to-boolean", ["get", "__rs_pair"]])))
-    }
-}
 
 
 fn props_of<'a>(fs: &'a [Value], empty: &'a Map<String, Value>) -> Vec<&'a Map<String, Value>> {
@@ -728,18 +573,18 @@ pub struct PageInfo {
 }
 
 #[allow(clippy::too_many_arguments)] // the sources of the style, as make_parts has them
-pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::simple::SimpleSource, slots: &[Value], decks: bool, ovs: &mut [Overlay], fills: &[String], active: usize)
+pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crate::simple::SimpleSource, slots: &[Value], decks: bool, ovs: &mut [Overlay], fills: &[String], active: usize)
                    -> Result<(Vec<Value>, PageInfo), String> {
     let mut info = PageInfo::default();
-    let m = Model::from_look(look)?;
-    let (th, cfg) = (&look["theme"], &look["config"]);
+    let m = &look.model;
+    let (th, cfg) = (&look.theme, &look.config);
     let empty = Map::new();
     let (rp, lp) = (roads, props_of(slots, &empty));
     let fb_fill = &th["roads"]["fallback"]["fill"];
     let fb_casing = &th["roads"]["fallback"]["casing"];
     let sel = &th["selection"];
     // render's select_color / hover_color, else the theme's selection colours
-    let pick = |k: &str, theme: &'static str| match &look["args"][k] { Value::Null => sel[theme].clone(), v => v.clone() };
+    let pick = |k: &str, theme: &'static str| match &look.args[k] { Value::Null => sel[theme].clone(), v => v.clone() };
     let (select, hover) = (&pick("select_color", "select"), &pick("hover_color", "hover"));
     let any_tunnel = rp.iter().any(|p| p.get("__rs_tunnel").is_some_and(py_truth));
     if any_tunnel && cfg["tunnel_palettes"].get(cfg["tunnel_palette"].as_str().unwrap_or("")).is_none() {        // render's check (the tunnel look)
@@ -758,7 +603,7 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
 
     let lay = json!({"line-cap": th["roads"]["cap"], "line-join": th["roads"]["join"], "line-sort-key": 0});
     // render's width_m_col: metre widths from width_m_zoom on (docs/design/metre_widths.md)
-    let args = &look["args"];
+    let args = &look.args;
     // state "live" (a page with the dashboard): the expressions keep ["global-state", name]; else the export's style, the state baked
     let live = args["state"] == "live";
     let metres = args["width_m_col"].as_str().is_some_and(|c| !c.is_empty());
@@ -785,7 +630,7 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
 
     // roads-simple and the invisible roads-fill (simple mode)
     // render's minzoom: true the config's table of the classes' first zooms, a mapping that table with changes, else none (_minzoom_filter)
-    let mz: Option<Map<String, Value>> = match &look["args"]["minzoom"] {
+    let mz: Option<Map<String, Value>> = match &look.args["minzoom"] {
         Value::Bool(true) => Some(cfg["minzoom"].as_object().cloned().unwrap_or_default()),
         Value::Object(o) => {
             let mut t = cfg["minzoom"].as_object().cloned().unwrap_or_default();
@@ -799,7 +644,7 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
     flt.extend(mz_filter("highway"));
     flt.push(seam_filter());
     // the 3D decks (view_3d): a bridge is the flat line below flat_below and the extruded deck from it up
-    let dk = crate::decks::DeckLook::from_config(&cfg["bridge_decks"]);
+    let dk = &look.deck;
     if decks {
         flt.push(json!(["any", ["<", ["zoom"], dk.flat_below], ["!", ["to-boolean", ["get", "__rs_bridge"]]]]));
     }
@@ -942,7 +787,7 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
         for zp in arw["spacing"].as_array().into_iter().flatten() {
             spacing.extend(zp.as_array().unwrap().iter().cloned());
         }
-        let (arrows, labels) = (look["args"]["arrows"] != false, look["args"]["labels"] != false);
+        let (arrows, labels) = (look.args["arrows"] != false, look.args["labels"] != false);
         // the arrows along the slots; stage 3 chooses another kind (the inline page's points: Sources::page_arrows; the export's
         // line-center, below)
         let (source, mut layout) = ("slots", json!({"symbol-placement": "line", "symbol-spacing": spacing}));
@@ -960,7 +805,7 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
         }
         let fixed = lbl.get("size").filter(|v| py_truth(v));
         if fixed.is_none() {
-            lf.push(label_readable_filter(&m, th));
+            lf.push(label_readable_filter(m, th));
         }
         let mut lpaint = json!({"text-color": lbl["color"], "text-opacity": lbl.get("opacity").unwrap_or(&arw["opacity"])});
         if lbl.get("halo_color").is_some_and(py_truth) && lbl.get("halo_width").is_some_and(py_truth) {
@@ -969,7 +814,7 @@ pub fn road_layers(look: &Value, roads: &crate::road::Roads, simple: &crate::sim
         }
         let label_layer = |lid: &str, flt: Value| json!({"id": lid, "type": "symbol", "source": "slots", "minzoom": lbl["minzoom"], "filter": flt,
             "layout": {"symbol-placement": "line-center", "text-field": ["get", "name"], "text-font": lbl["font"],
-                       "text-size": label_size_expr(&m, th, fixed), "text-max-angle": lbl["max_angle"], "text-padding": lbl["padding"],
+                       "text-size": label_size_expr(m, th, fixed), "text-max-angle": lbl["max_angle"], "text-padding": lbl["padding"],
                        "symbol-sort-key": sort},
             "paint": lpaint});
         if labels {

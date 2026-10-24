@@ -1,0 +1,53 @@
+# Travel modes (docs/design/mode_styles.md), passed to roadstyle as settings= (roadstyle is not
+# changed). A mode picks which network stands out; how its paths look is the path style
+# (paths.yaml). Per mode:
+#   em     the classes drawn in the path style's `em` width group
+#   lanes  false = every road one centred line, not a two-way road's two lanes side by side
+#          (roadstyle's offset_frac=0, width_frac=1)
+#   fade   true = the roads for cars fade towards white (by the path style's `fade`)
+#   roads  roadstyle `roads` settings (width px by zoom per group, class -> group, z_order), merged
+#          per entry over roadstyle's defaults
+# roadstyle has no width group for `platform` (it would get residential width): every mode sets one.
+
+# the roads for cars (faded in the walking / cycling looks)
+cars: [motorway, trunk, primary, secondary, tertiary, unclassified, residential, service]
+
+all:              # the whole map: every network at its own width, none on top, nothing faded
+  roads:
+    group: {platform: path}
+
+driving:
+  roads:
+    group: {platform: path}
+
+walking:
+  em: [footway, path, steps, corridor, pedestrian, platform, track, bridleway]
+  lanes: false
+  fade: true
+  roads:
+    width:              # roads for cars: ~0.6x roadstyle's widths
+      major:     {12: 2, 13: 3.5, 14: 5, 15: 6, 16: 8, 17: 10, 18: 13}
+      primary:   {12: 2, 13: 3, 14: 4, 15: 5.5, 16: 7, 17: 9, 18: 11}
+      secondary: {12: 1.5, 13: 2.5, 14: 3.5, 15: 5, 16: 6, 17: 8, 18: 10}
+      tertiary:  {12: 1.2, 13: 2, 14: 2.7, 15: 3.6, 16: 5, 17: 6.5, 18: 8.5}
+    # no z_order lift: paths keep the class order (a street over the path ending at it, as in
+    # openstreetmap-carto); crossings draw over their street and sidewalks under it by walk_type
+    # (render_map's band_col), which is what the old "every path above every road" was fixing
+
+cycling:
+  em: [cycleway]
+  lanes: false
+  fade: true
+  roads:
+    group: {platform: path}
+    z_order: {cycleway: 9.5}
+
+# Colour by modes (the dashboard's "Modes" option): which modes can use a road.
+mode_colors:
+  all modes:          "#555555"
+  driving + walking:  "#e67e22"
+  driving + cycling:  "#9b59b6"
+  walking + cycling:  "#16a085"
+  driving:            "#e74c3c"
+  walking:            "#27ae60"
+  cycling:            "#2b6cb0"
