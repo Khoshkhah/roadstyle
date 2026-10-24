@@ -67,6 +67,11 @@ pub struct PageOptions {
     pub arrow_icon: Value,
     pub arrow_color: Value,
     pub arrow_rules: Value,
+    /// a duckOSM map's modes with their counts (roadstyle:controls.modes) and its boxes' layout ("stack"); a page with no base map has none
+    #[serde(default, skip_serializing_if = "Value::is_null")]
+    pub modes: Value,
+    #[serde(default, skip_serializing_if = "Value::is_null")]
+    pub box_layout: Value,
 }
 
 /// The page's start camera (the camera settings with the call's pitch, bearing and max_pitch).

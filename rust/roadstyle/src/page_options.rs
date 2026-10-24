@@ -163,6 +163,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
         hover_delay_ms: inter["hover_delay_ms"].as_i64().ok_or("roadstyle:interaction has no hover_delay_ms")?,
         edge_id_col: ctl["edge_id_col"].as_str().unwrap_or("edge_id").into(), arrow_icon: ctl["arrow_icon"].clone(),
         arrow_color: ctl["arrow_color"].clone(), arrow_rules: ctl["arrow_rules"].clone(),
+        modes: ctl["modes"].clone(), box_layout: ctl["box_layout"].clone(),
     };
     let hover = Some(&a["hover_color"]).filter(|v| py_truth(v)).unwrap_or(&th["selection"]["hover"]);
     let simple_js = json!({"layer": "roads-simple", "bridge": cfg["bridge_casing_color"], "shadow": cfg["bridge_shadow_color"],
