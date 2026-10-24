@@ -11,11 +11,14 @@ All notable changes to **roadstyle** are documented here. The format is based on
   integer, and the roads failed with "Could not convert string 'bus' to INT32". mapstyle's SQL had the same fault. And the reader's plan
   gives the base map's queries also for a file with no network ("roads" is null, "roads_error" says why).
 
+### Dependencies
+- **The `numeric` extra no longer installs matplotlib.** Only the colour ramps used it, and they are data now
+  (`data/cmaps.json`). A matplotlib colormap name still works for `cmap`. branca stays: folium's page elements use it.
+
 ### Changed
 - **The colour ramps have one source for both engines**: `src/roadstyle/data/cmaps.json` (branca's 269 schemes and colour names, and the
   180 matplotlib colormaps at 9 stops). Python's `ColorRamp` reads it, as roadstyle-look does, and no longer asks branca or matplotlib:
-  all 445 ramps give the same colours as before (tests/test_colors.py). The `numeric` extra no longer installs matplotlib; branca stays
-  for folium's page elements.
+  all 445 ramps give the same colours as before (tests/test_colors.py).
 - **The look's and the readers' errors are typed** (Rust only). `roadstyle_look::Error`: a saved look that is not read, a later look
   version, wrong options, an unknown name, a YAML file that is not correct, an image that is not read. `roadstyle_io::Error`: bytes that
   are not a file of the kind, data that the call cannot use, a wrong argument, stored levels that are missing or of other edges, a CRS
