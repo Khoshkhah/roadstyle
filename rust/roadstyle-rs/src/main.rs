@@ -61,9 +61,10 @@ fn bench(look_path: &str, roads_path: &str, features_path: &str) {
     mark("names and arrows (slots)");
     let mut ovs = Vec::new();
     if features_path != "-" {
-        let mut fcs = roadstyle_rs::features::feature_collections(read::read_table(fs::read(features_path).unwrap(), "geometry").unwrap_or_else(|e| fail(e)), &look).unwrap_or_else(|e| fail(e));
-        let attached = roadstyle_rs::overlays::edge_attach(&mut fcs, &feats);
-        ovs = roadstyle_rs::overlays::feature_overlays(fcs, &look, &attached).0;
+        let t = roadstyle_rs::read_features(fs::read(features_path).unwrap()).unwrap_or_else(|e| fail(e));
+        let mut tables = roadstyle_rs::features::feature_tables(&t, &look).unwrap_or_else(|e| fail(e));
+        let attached = roadstyle_rs::overlays::edge_attach(&mut tables, &feats).unwrap_or_else(|e| fail(e));
+        ovs = roadstyle_rs::overlays::feature_overlays(tables, &look, &attached).0;
     }
     mark("base map");
     let roads = roads::roads_source(feats);
@@ -143,7 +144,9 @@ fn main() {
     if args.len() == 4 && args[1] == "--features" {
         // step 3 check: the base-map feature collections from the worker's features.parquet, as {name: FeatureCollection}
         let data = fs::read(&args[3]).unwrap_or_else(|e| fail(format!("{}: {e}", args[3])));
-        let fcs = roadstyle_rs::features::feature_collections(read::read_table(data, "geometry").unwrap_or_else(|e| fail(e)), &look_file(&args[2])).unwrap_or_else(|e| fail(e));
+        let t = roadstyle_rs::read_features(data).unwrap_or_else(|e| fail(e));
+        let tables = roadstyle_rs::features::feature_tables(&t, &look_file(&args[2])).unwrap_or_else(|e| fail(e));
+        let fcs: serde_json::Map<String, serde_json::Value> = tables.iter().map(|(n, t)| (n.clone(), t.to_value())).collect();
         println!("{}", serde_json::to_string(&fcs).unwrap());
         return;
     }

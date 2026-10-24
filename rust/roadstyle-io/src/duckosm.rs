@@ -5,6 +5,8 @@
 //! features_sql.js. The caller reads the catalog first (`Catalog`, from `information_schema`), then runs the statements in order;
 //! the outputs are the engine's inputs (roads.parquet, features.parquet).
 
+use roadstyle_model::feature_table::{FeatureTable, GeomType, Geometries};
+use roadstyle_model::Cell;
 use serde_json::Value;
 
 /// The networks of a duckOSM file, in order.
@@ -204,87 +206,71 @@ pub fn features_select(specs: &[usize]) -> Option<String> {
 /// no sea layer does not paint the sea as land. In Rust (i_overlay), so that no reader needs DuckDB's spatial extension. The rings are
 /// closed (WKB and GeoJSON need it), in i_overlay's orientation, which is RFC 7946's (outer rings counter-clockwise, holes clockwise).
 /// Nothing changes when the rows have no background or no sea.
-pub fn cut_sea(rows: &mut [roadstyle_model::Row]) -> Result<(), String> {
+pub fn cut_sea(t: FeatureTable) -> Result<FeatureTable, String> {
     use i_overlay::core::{fill_rule::FillRule, overlay_rule::OverlayRule};
     use i_overlay::float::single::SingleFloatOverlay;
-    let is = |r: &roadstyle_model::Row, layer: &str, kind: Option<&str>| r.cols.get("layer").and_then(Value::as_str) == Some(layer)
-        && kind.is_none_or(|k| r.cols.get("kind").and_then(Value::as_str) == Some(k));
-    let sea: Vec<Vec<[f64; 2]>> = rows.iter().filter(|r| is(r, "ocean", None))
-        .map(|r| polygons(r.blob.as_deref())).collect::<Result<Vec<_>, _>>()?.into_iter().flatten().flatten().collect();
-    if sea.is_empty() {
-        return Ok(());
+    let is = |r: usize, layer: &str, kind: Option<&str>| t.get(r, "layer").and_then(Cell::as_str) == Some(layer)
+        && kind.is_none_or(|k| t.get(r, "kind").and_then(Cell::as_str) == Some(k));
+    let g = t.geometries_of();
+    let sea: Vec<Vec<[f64; 2]>> = (0..t.len()).filter(|&r| is(r, "ocean", None)).map(|r| rings(g, r))
+        .collect::<Result<Vec<_>, _>>()?.into_iter().flatten().collect();
+    if sea.is_empty() || !(0..t.len()).any(|r| is(r, "landcover", Some("background"))) {
+        return Ok(t);
     }
-    for r in rows.iter_mut().filter(|r| is(r, "landcover", Some("background"))) {
-        let land: Vec<Vec<[f64; 2]>> = polygons(r.blob.as_deref())?.into_iter().flatten().collect();
-        let parts = land.overlay(&sea, OverlayRule::Difference, FillRule::NonZero);
+    let mut out = FeatureTable::geometries();
+    for r in 0..t.len() {
+        if !is(r, "landcover", Some("background")) {
+            out.push_copy(g, r);
+            continue;
+        }
+        let parts = rings(g, r)?.overlay(&sea, OverlayRule::Difference, FillRule::NonZero);
         let closed: Vec<Vec<Vec<[f64; 2]>>> = parts.into_iter().map(|rings| rings.into_iter().map(|mut r| {
             if r.first() != r.last() {
                 r.push(r[0]);
             }
             r
         }).collect()).collect();
-        r.blob = Some(multipolygon_wkb(&closed));
+        out.push(GeomType::MultiPolygon, &closed);
     }
-    Ok(())
+    t.with_geometries(out)
 }
 
-/// The polygons of a WKB Polygon or MultiPolygon (each a list of rings, the outer ring first).
-fn polygons(wkb: Option<&[u8]>) -> Result<Vec<Vec<Vec<[f64; 2]>>>, String> {
-    let g = wkb.and_then(crate::read::wkb_geometry).ok_or("the base map: a background or sea row with no polygon")?;
-    let ring = |r: &Value| r.as_array().into_iter().flatten().filter_map(|p| Some([p[0].as_f64()?, p[1].as_f64()?])).collect::<Vec<_>>();
-    let poly = |p: &Value| p.as_array().into_iter().flatten().map(ring).collect::<Vec<_>>();
-    match g["type"].as_str() {
-        Some("Polygon") => Ok(vec![poly(&g["coordinates"])]),
-        Some("MultiPolygon") => Ok(g["coordinates"].as_array().into_iter().flatten().map(poly).collect()),
-        t => Err(format!("the base map: a background or sea row is a {}, not a polygon", t.unwrap_or("geometry of no type"))),
+/// Every ring of the Polygon or MultiPolygon `row`.
+fn rings(g: &Geometries, row: usize) -> Result<Vec<Vec<[f64; 2]>>, String> {
+    match g.kind(row) {
+        Some(GeomType::Polygon | GeomType::MultiPolygon) => Ok(g.parts(row).flatten().map(<[_]>::to_vec).collect()),
+        k => Err(format!("the base map: a background or sea row is a {}, not a polygon", k.map_or("geometry of no type", GeomType::name))),
     }
-}
-
-/// A WKB MultiPolygon (little-endian, 2D).
-fn multipolygon_wkb(parts: &[Vec<Vec<[f64; 2]>>]) -> Vec<u8> {
-    let mut w = vec![1u8];
-    w.extend(6u32.to_le_bytes());
-    w.extend((parts.len() as u32).to_le_bytes());
-    for rings in parts {
-        w.push(1);
-        w.extend(3u32.to_le_bytes());
-        w.extend((rings.len() as u32).to_le_bytes());
-        for r in rings {
-            w.extend((r.len() as u32).to_le_bytes());
-            r.iter().for_each(|p| { w.extend(p[0].to_le_bytes()); w.extend(p[1].to_le_bytes()); });
-        }
-    }
-    w
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use roadstyle_model::Row;
+    use arrow_array::{ArrayRef, StringArray};
+    use std::sync::Arc;
 
-    fn square(x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<u8> {
-        multipolygon_wkb(&[vec![vec![[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]]])
-    }
-
-    fn row(layer: &str, kind: &str, wkb: Vec<u8>) -> Row {
-        let mut r = Row { cols: serde_json::Map::new(), blob: Some(wkb) };
-        r.cols.insert("layer".into(), layer.into());
-        r.cols.insert("kind".into(), kind.into());
-        r
+    fn square(x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<Vec<Vec<[f64; 2]>>> {
+        vec![vec![vec![[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]]]
     }
 
     #[test]
     fn the_land_is_the_boundary_less_the_sea() {
         // a 2 x 2 boundary, the sea over its right half: the land is the left half, closed, its outer ring counter-clockwise (RFC 7946)
-        let mut rows = vec![row("landcover", "background", square(0.0, 0.0, 2.0, 2.0)), row("ocean", "ocean", square(1.0, -1.0, 3.0, 3.0)),
-                            row("landcover", "park", square(0.0, 0.0, 2.0, 2.0))];
-        cut_sea(&mut rows).unwrap();
-        let land = polygons(rows[0].blob.as_deref()).unwrap();
-        assert_eq!(land.len(), 1);
-        let r = &land[0][0];
+        let mut g = FeatureTable::geometries();
+        for sq in [square(0.0, 0.0, 2.0, 2.0), square(1.0, -1.0, 3.0, 3.0), square(0.0, 0.0, 2.0, 2.0)] {
+            g.push(GeomType::MultiPolygon, &sq);
+        }
+        let col = |v: [&str; 3]| -> ArrayRef { Arc::new(StringArray::from(v.to_vec())) };
+        let t = FeatureTable::new(vec!["layer".into(), "kind".into()], vec![col(["landcover", "ocean", "landcover"]), col(["background", "ocean", "park"])], g)
+            .unwrap();
+        let t = cut_sea(t).unwrap();
+        let land = t.geometries_of().to_geojson(0);
+        assert_eq!(land["coordinates"].as_array().unwrap().len(), 1);
+        let r: Vec<[f64; 2]> = serde_json::from_value(land["coordinates"][0][0].clone()).unwrap();
         assert_eq!(r.first(), r.last());
         let area2: f64 = (0..r.len() - 1).map(|i| r[i][0] * r[i + 1][1] - r[i + 1][0] * r[i][1]).sum();
         assert!((area2 / 2.0 - 2.0).abs() < 1e-9, "area {}", area2 / 2.0);
-        assert_eq!(rows[2].blob, Some(square(0.0, 0.0, 2.0, 2.0)), "only the background changes");
+        assert_eq!(t.geometries_of().to_geojson(2), serde_json::json!({"type": "MultiPolygon", "coordinates": square(0.0, 0.0, 2.0, 2.0)}),
+                   "only the background changes");
     }
 }

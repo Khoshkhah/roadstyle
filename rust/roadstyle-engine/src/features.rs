@@ -1,10 +1,11 @@
 //! The base-map layers' features (full port step 3): mapstyle.map.load_layers from the rows the worker's SQL writes (features.parquet: one row
-//! per feature with its layer, osm_id, kind, name, bearing, the height tags and the WKB), as `{layer: FeatureCollection}` in draw order.
+//! per feature with its layer, osm_id, kind, name, bearing, the height tags and the WKB), as one typed table for each layer in draw order
+//! (audit R10), and the typed source that writes a layer's table as GeoJSON.
 
-use crate::geom::{from_wkb, Geom};
-use crate::Row;
+use crate::Cell;
 use indexmap::IndexMap;
-use serde_json::{json, Map, Value};
+use roadstyle_model::feature_table::{FeatureTable, GeomType};
+use serde_json::{json, Value};
 
 /// _number: the number at the start of a tag value ("12 m" -> 12.0, "12,5" -> 12.5) and the rest of the text.
 fn number(text: Option<&str>) -> Option<(f64, &str)> {
@@ -60,38 +61,104 @@ fn building_base(min_height: Option<&str>, min_level: Option<&str>, cfg: &Value)
     }
 }
 
-/// load_layers: `{name: FeatureCollection}`, in the order of the first row of each layer; a polygon layer's features largest first.
-pub fn feature_collections(rows: Vec<Row>, look: &crate::Look) -> Result<Map<String, Value>, String> {
+/// load_layers: one table for each layer (osm_id, kind, name, bearing, and a building's height and base), in the order of the first row
+/// of each layer; a polygon layer's features largest first. `t`: the rows of features.parquet.
+pub fn feature_tables(t: &FeatureTable, look: &crate::Look) -> Result<Vec<(String, FeatureTable)>, String> {
     let specs = look.features["layers_yaml"]["layers"].as_array().ok_or("look.json: no features.layers_yaml.layers")?;
     let kind_of = |name: &str| specs.iter().find(|s| s["name"] == name).and_then(|s| s["kind"].as_str()).unwrap_or("");
     let b3d = &look.features["buildings_3d"];
-    let mut out: IndexMap<String, Vec<(f64, Value)>> = IndexMap::new();
-    for Row { cols: r, blob: wkb } in rows {
-        let spec = &specs[r["spec"].as_u64().ok_or("features.parquet: no spec")? as usize];
-        let Some(g) = wkb.as_deref().and_then(from_wkb) else { return Err(format!("features.parquet: a geometry of {} is not read", r["layer"])) };
-        let area = g.area();
-        let g = if spec["centroid"] == true { Geom::Point(g.centroid()) } else { g };
-        let mut props = Map::new();
-        props.insert("osm_id".into(), r["osm_id"].clone());
-        props.insert("kind".into(), r["kind"].clone());
-        props.insert("name".into(), r["name"].clone());
-        if !r["bearing"].is_null() {
-            props.insert("bearing".into(), r["bearing"].clone());
-        }
-        if spec["height"] == true {
-            props.insert("height".into(), building_height(r["height"].as_str(), r["levels"].as_str(), r["roof_levels"].as_str(), r["kind"].as_str(), b3d));
-            props.insert("base".into(), building_base(r["min_height"].as_str(), r["min_level"].as_str(), b3d));
-        }
-        let name = r["layer"].as_str().unwrap_or_default().to_string();
-        out.entry(name).or_default().push((area, crate::obj([("type", "Feature".into()), ("properties", Value::Object(props)), ("geometry", g.geojson())])));
+    let cell = |row: usize, col: &str| t.get(row, col).unwrap_or(Cell::Null);
+    let text = |row: usize, col: &str| cell(row, col).as_str();
+    let mut layers: IndexMap<String, Vec<usize>> = IndexMap::new();
+    for row in 0..t.len() {
+        layers.entry(text(row, "layer").unwrap_or_default().to_string()).or_default().push(row);
     }
-    Ok(out.into_iter().map(|(name, mut fs)| {
-        if kind_of(&name) == "polygon" {
-            fs.sort_by(|a, b| b.0.total_cmp(&a.0)); // stable: largest first, ties in reading order
+    let g = t.geometries_of();
+    let mut out = Vec::new();
+    for (name, rows) in layers {
+        // a layer can have rows of more than one spec (landcover: one for each table)
+        let mut order = Vec::with_capacity(rows.len());
+        for &row in &rows {
+            let spec = &specs[cell(row, "spec").as_u64().ok_or("features.parquet: no spec")? as usize];
+            let geom = g.geom(row).ok_or_else(|| format!("features.parquet: a geometry of {name} is not read"))?;
+            let centroid = (spec["centroid"] == true).then(|| geom.centroid());
+            order.push((geom.area(), row, centroid, spec["height"] == true));
         }
-        let features: Vec<Value> = fs.into_iter().map(|(_, f)| f).collect();
-        (name, crate::obj([("type", "FeatureCollection".into()), ("features", Value::Array(features))]))
-    }).collect())
+        if kind_of(&name) == "polygon" {
+            order.sort_by(|a, b| b.0.total_cmp(&a.0)); // stable: largest first, ties in reading order
+        }
+        let mut geoms = FeatureTable::geometries();
+        for (_, row, centroid, _) in &order {
+            match centroid {
+                Some(p) => geoms.push(GeomType::Point, &[vec![vec![*p]]]),
+                None => geoms.push_copy(g, *row),
+            }
+        }
+        let mut table = FeatureTable::new(Vec::new(), Vec::new(), geoms)?;
+        let col = |c: &str| order.iter().map(|(_, r, _, _)| cell(*r, c)).collect::<Vec<_>>();
+        for c in ["osm_id", "kind", "name"] {
+            table.set_column(c, &col(c), true)?;
+        }
+        table.set_column("bearing", &col("bearing"), false)?;         // only a feature with a bearing has the key
+        // a building's height and base: the keys of the rows whose spec has heights
+        let tall: Vec<bool> = order.iter().map(|o| o.3).collect();
+        if tall.iter().any(|t| *t) {
+            let heights: Vec<Value> = order.iter().map(|(_, r, _, t)| if *t { building_height(text(*r, "height"), text(*r, "levels"),
+                                                                                              text(*r, "roof_levels"), text(*r, "kind"), b3d) } else { Value::Null }).collect();
+            let bases: Vec<Value> = order.iter().map(|(_, r, _, t)| if *t { building_base(text(*r, "min_height"), text(*r, "min_level"), b3d) }
+                                                                    else { Value::Null }).collect();
+            let every = tall.iter().all(|t| *t);
+            if !every && heights.iter().zip(&tall).any(|(h, t)| *t && h.is_null()) {
+                return Err(format!("the layer {name}: a building with no height, beside rows with no height key (buildings_3d.heights has no default)"));
+            }
+            table.set_column("height", &heights.iter().map(Cell::from).collect::<Vec<_>>(), every)?;
+            table.set_column("base", &bases.iter().map(Cell::from).collect::<Vec<_>>(), every)?;
+        }
+        out.push((name, table));
+    }
+    Ok(out)
+}
+
+/// A base-map layer's source (`Src::Features`): its table, written as GeoJSON a feature at a time, and render's data_maxzoom.
+pub struct FeatureSource {
+    pub table: FeatureTable,
+    pub maxzoom: Option<i64>,
+}
+
+impl FeatureSource {
+    /// The source's FeatureCollection as GeoJSON text.
+    pub fn write_data<W: std::io::Write>(&self, w: &mut W) -> std::io::Result<()> {
+        self.table.write_geojson(w)
+    }
+
+    /// The source as the style's JSON text, with its data.
+    pub fn write_json<W: std::io::Write>(&self, w: &mut W) -> std::io::Result<()> {
+        w.write_all(br#"{"type":"geojson","data":"#)?;
+        self.write_data(w)?;
+        w.write_all(br#","generateId":true"#)?;
+        if let Some(z) = self.maxzoom {
+            write!(w, r#","maxzoom":{z}"#)?;
+        }
+        w.write_all(b"}")
+    }
+
+    /// The source with `data` (its data, or a URL of it), as JSON.
+    pub fn spec(&self, data: Value) -> Value {
+        let mut s = serde_json::Map::new();
+        s.insert("type".into(), "geojson".into());
+        s.insert("data".into(), data);
+        s.insert("generateId".into(), true.into());
+        if let Some(z) = self.maxzoom {
+            s.insert("maxzoom".into(), z.into());
+        }
+        Value::Object(s)
+    }
+
+    /// The source with its data, as JSON (for the readers of a JSON source: stage 2's `Tiles::add` and the GeoParquet writer, until they
+    /// read the table, R10 steps 5 and 6).
+    pub fn to_value(&self) -> Value {
+        self.spec(self.table.to_value())
+    }
 }
 
 #[cfg(test)]

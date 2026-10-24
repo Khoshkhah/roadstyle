@@ -15,7 +15,7 @@ use roadstyle_engine::table::js_value;
 use serde_json::{json, Value};
 
 /// The roads, the base map's rows and the route planner's rows.
-type Tables = (RoadTable, Option<Vec<Row>>, Option<Vec<Row>>);
+type Tables = (RoadTable, Option<FeatureTable>, Option<Vec<Row>>);
 
 /// The roads and the other tables from their GeoParquet bytes: the roads' lines and the base map's geometries in the column `geometry`.
 fn tables(parquet: Vec<u8>, features: Option<Vec<u8>>, planner: Option<Vec<u8>>) -> Result<Tables, String> {
@@ -26,10 +26,8 @@ fn tables(parquet: Vec<u8>, features: Option<Vec<u8>>, planner: Option<Vec<u8>>)
 
 /// The base map's rows from their GeoParquet bytes (the duckOSM reader's features.parquet), the background's land without the sea
 /// (duckosm::cut_sea).
-pub fn read_features(features: Vec<u8>) -> Result<Vec<Row>, String> {
-    let mut rows = read::read_table(features, "geometry")?;
-    duckosm::cut_sea(&mut rows)?;
-    Ok(rows)
+pub fn read_features(features: Vec<u8>) -> Result<FeatureTable, String> {
+    duckosm::cut_sea(read::read_feature_table(features, "geometry")?)
 }
 
 /// The style as one JSON text (roadstyle's export_inline), from the roads and the other tables as GeoParquet bytes: the engine's
@@ -48,7 +46,7 @@ pub fn make_sources(parquet: Vec<u8>, look: &Look, features: Option<Vec<u8>>, pl
 }
 
 /// Stage 1 of roads that a reader gave (`read::read_roads`, `geojson::read_roads`, ...), as `make_sources`.
-pub fn sources_of(roads: RoadTable, look: &Look, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>)
+pub fn sources_of(roads: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>)
                   -> Result<sources::Sources, String> {
     let mut s = sources::Sources::new(make_parts(roads, look, features, planner, name)?);
     s.saved.insert(tiles::stage::TILES.into(), look.config["tiles"].clone());
@@ -84,6 +82,12 @@ fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> tiles::T
             Src::Json(v) => {
                 let (keep, whole, from) = whole_unless_lines(v, o.rule(k, || keys(v)), o.min_zoom);
                 tiled.add(k, v, &keep, whole, from)
+            }
+            // R10: a base-map layer goes into the tiles as JSON until the tiles read the table (step 6)
+            Src::Features(f) => {
+                let v = f.to_value();
+                let (keep, whole, from) = whole_unless_lines(&v, o.rule(k, || keys(&v)), o.min_zoom);
+                tiled.add(k, &v, &keep, whole, from)
             }
         }
     }
@@ -278,7 +282,16 @@ pub fn write_source_file<W: std::io::Write + Send>(s: &sources::Sources, file: &
     }
     use roadstyle_io::write::{Geometry, Row as PqRow, Val};
     let lines = s.draws_roads();
-    match &s.sources[i].1 {
+    // R10: a base-map layer goes into the file as JSON until the writer reads the table's columns (step 5)
+    let as_json;
+    let src = match &s.sources[i].1 {
+        Src::Features(f) => {
+            as_json = Src::Json(f.to_value());
+            &as_json
+        }
+        src => src,
+    };
+    match src {
         // audit N5: the roads' Arrow cells and lines go into the file with no JSON copy; the pieces' values are their own
         Src::Roads(_) => roadstyle_io::write::parquet_to(w, || s.roads.roads.iter().map(|r| PqRow {
             id: Some(r.i as i64),
@@ -296,6 +309,7 @@ pub fn write_source_file<W: std::io::Write + Send>(s: &sources::Sources, file: &
                 geometry: Some(&f["geometry"]).filter(|g| !g.is_null()).map(|g| Geometry::Json(std::borrow::Cow::Borrowed(g))),
             }), true)
         }
+        Src::Features(_) => unreachable!("a JSON source above"),
     }
 }
 
