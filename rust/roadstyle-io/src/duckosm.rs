@@ -37,11 +37,14 @@ impl Catalog {
     }
 }
 
-/// _roads_union: every mode's edges and private_edges, NULL for an optional column that the file does not have.
-fn roads_union(cat: &Catalog) -> Result<String, String> {
-    let modes: Vec<&str> = MODES.iter().copied().filter(|m| cat.has_table(m, "edges")).collect();
+/// _roads_union: every mode's edges and private_edges (`only`: one mode's), NULL for an optional column that the file does not have.
+fn roads_union(cat: &Catalog, only: Option<&str>) -> Result<String, String> {
+    if let Some(m) = only.filter(|m| !MODES.contains(m)) {
+        return Err(format!("only: a map of one mode needs the mode driving, walking or cycling, not {m}"));
+    }
+    let modes: Vec<&str> = MODES.iter().copied().filter(|m| cat.has_table(m, "edges") && only.is_none_or(|o| o == *m)).collect();
     if modes.is_empty() {
-        return Err(format!("no <mode>.edges table (modes: {})", MODES.join(", ")));
+        return Err(format!("no <mode>.edges table (modes: {})", only.map_or_else(|| MODES.join(", "), String::from)));
     }
     let mut private: Vec<&str> = modes.iter().copied().filter(|m| cat.has_table(m, "private_edges")).collect();
     private.sort();
@@ -69,15 +72,35 @@ pub fn levels_keyword(row: Option<(&str, i64, &str)>) -> Result<Value, String> {
     Ok(serde_json::json!({"edge_hash": hash, "n_edges": n}))
 }
 
+/// The roads of `r` (after `roads_sql`) that have no stored levels: (their number, the smallest edge_id of them), for a map of one mode.
+pub const SUBSET_SQL: &str = "SELECT count(*), min(edge_id) FROM r WHERE NOT EXISTS (SELECT 1 FROM visualization.edge_levels lv WHERE lv.edge_id = r.edge_id)";
+
+/// The edge_ids of the roads of `r`, for `subset_levels_keyword`.
+pub const IDS_SQL: &str = "SELECT edge_id FROM r";
+
+/// The look's keyword `levels` of the stored levels for a map of one mode (roadstyle's load_area_levels(subset=True)): the levels were
+/// solved for the roads of every mode together, so each road of the map must have its stored row (`missing`, `example`: `SUBSET_SQL`'s
+/// row). Then the keyword names these roads (`ids`: their edge_ids), so that the engine's check of the roads holds for them.
+pub fn subset_levels_keyword(row: Option<(&str, i64, &str)>, missing: i64, example: Option<i64>, ids: &[i64]) -> Result<Value, String> {
+    levels_keyword(row)?;
+    if missing > 0 {
+        return Err(format!("{missing} of the edges are not edges the stored levels were solved for (for example {}): make and solve the \
+                            level area again (duckosm levels)", example.map_or_else(|| "?".into(), |e| e.to_string())));
+    }
+    Ok(serde_json::json!({"edge_hash": roadstyle_levels::edge_hash(ids), "n_edges": ids.len()}))
+}
+
 const NO_LEVELS: &str = "CAST(NULL AS INTEGER) AS casing_start, CAST(NULL AS INTEGER) AS casing_level, CAST(NULL AS INTEGER) AS casing_end, \
     CAST(NULL AS INTEGER) AS fill_level, CAST(NULL AS DOUBLE) AS head_start_m, CAST(NULL AS DOUBLE) AS head_end_m, \
     CAST(NULL AS VARCHAR) AS cap_start, CAST(NULL AS VARCHAR) AS cap_end";
 
 /// The statements that make the temporary table `r` (one row for each edge of every mode, with its stored levels; `tags`: no stored
 /// levels, the engine computes them with the tags rule), in order. Run them one time for each file; then `roads_select` for each mode.
-/// Before the second statement the caller reads `LEVELS_META_SQL` (not with `tags`).
-pub fn roads_sql(cat: &Catalog, tags: bool) -> Result<[String; 3], String> {
-    let union = roads_union(cat)?;
+/// Before the second statement the caller reads `LEVELS_META_SQL` (not with `tags`). `only`: the edges and private_edges of that mode
+/// alone (render_map(only=True): a driving map has no walking paths); then the stored levels are checked with `SUBSET_SQL` and
+/// `subset_levels_keyword`, and `roads_select` takes that mode.
+pub fn roads_sql(cat: &Catalog, tags: bool, only: Option<&str>) -> Result<[String; 3], String> {
+    let union = roads_union(cat, only)?;
     let first = |c: &str| format!("first({c} ORDER BY mode IS NULL, mode, pmode)");
     let e = format!("CREATE OR REPLACE TEMP TABLE e AS
     SELECT edge_id, any_value(source) AS source, any_value(target) AS target,
