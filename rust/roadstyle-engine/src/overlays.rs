@@ -116,10 +116,10 @@ fn zoom_pairs(t: &Value, f: impl Fn(f64) -> f64) -> Value {
 
 /// feature_overlays: one overlay per layer (in the collections' order), its look from the theme's "features" style, and what the restyle adds
 /// (colour by kind, outlines, textures, icons, zoom ranges, 3D); and the images of the layers there are.
-pub fn feature_overlays(fcs: Map<String, Value>, look: &Value, edge_attached: &[String]) -> (Vec<Overlay>, Map<String, Value>) {
-    let st = &look["features"]["style"];
-    let specs = look["features"]["layers_yaml"]["layers"].as_array().cloned().unwrap_or_default();
-    let all_images = look["features"]["images"].as_object().cloned().unwrap_or_default();
+pub fn feature_overlays(fcs: Map<String, Value>, look: &crate::Look, edge_attached: &[String]) -> (Vec<Overlay>, Map<String, Value>) {
+    let st = &look.features["style"];
+    let specs = look.features["layers_yaml"]["layers"].as_array().cloned().unwrap_or_default();
+    let all_images = look.features["images"].as_object().cloned().unwrap_or_default();
     let (areas, lines, points, icon) = (&st["areas"], &st["lines"], &st["points"], &st["icon"]);
     let mut out = Vec::new();
     let mut images = Map::new();
@@ -282,14 +282,14 @@ fn wm_width_expr(min_zoom: &Value) -> Value {
 
 /// _overlay_layers: the layer(s) of one overlay source: a fill and its outline, a circle, a line or a text. An interactive overlay (a popup
 /// or none given, or an item selected itself) lights up on hover and select (feature-state).
-pub fn overlay_layers(sid: &str, ov: &Overlay, look: &Value) -> Vec<Value> {
-    let (th, cfg, u) = (&look["theme"], &look["config"], &ov.user);
+pub fn overlay_layers(sid: &str, ov: &Overlay, look: &crate::Look) -> Vec<Value> {
+    let (th, cfg, u) = (&look.theme, &look.config, &ov.user);
     let mut c = th["overlays"].as_object().cloned().unwrap_or_default();
     for (k, v) in cfg["overlays"].as_object().into_iter().flatten() {
         c.insert(k.clone(), v.clone());
     }
     // render's hover_color / select_color go to the overlays too (_build_overlays), else the theme's selection colours
-    let pick = |k: &str, theme: &str| match &look["args"][k] { Value::Null => th["selection"][theme].clone(), v => v.clone() };
+    let pick = |k: &str, theme: &str| match &look.args[k] { Value::Null => th["selection"][theme].clone(), v => v.clone() };
     let (hover, select) = (&pick("hover_color", "hover"), &pick("select_color", "select"));
     let mut base = or(&ov.color, &c["color"]);
     if let Some(cc) = u["color_col"].as_str().filter(|s| !s.is_empty()) {        // a colour per feature (null / missing: the overlay's)
@@ -435,8 +435,8 @@ pub fn metre_items(ov: &Overlay) -> bool {
 /// _item_pieces: the line items of the overlay `i` on its edges (after edge_overlay) as pieces of the one road layer (`__rs_k` 5): what the
 /// filters read from their edge, `lvl`, their colour `__rs_ic`, their width and offset in metres over cos(latitude) (`__rs_iwm`,
 /// `__rs_iom`, also on the overlay's own features) and their dash as text.
-pub fn item_pieces(ov: &mut Overlay, i: usize, look: &Value) -> Result<Vec<crate::simple::Item>, String> {
-    let default = match &look["config"]["overlays"]["color"] { Value::Null => look["theme"]["overlays"]["color"].clone(), c => c.clone() };
+pub fn item_pieces(ov: &mut Overlay, i: usize, look: &crate::Look) -> Result<Vec<crate::simple::Item>, String> {
+    let default = match &look.config["overlays"]["color"] { Value::Null => look.theme["overlays"]["color"].clone(), c => c.clone() };
     let u = ov.user.clone();
     let col = |k: &str| u[k].as_str().filter(|c| !c.is_empty()).map(String::from);
     let (wcol, ocol, dcol, ccol) = (col("width_m_col"), col("offset_m_col"), col("dash_col"), col("color_col"));
@@ -483,7 +483,7 @@ pub fn item_pieces(ov: &mut Overlay, i: usize, look: &Value) -> Result<Vec<crate
 /// _road_items: render's `items=` (the road's own line items, as a FeatureCollection) as pieces of the road layer, with no source or layer
 /// of their own: each names its road in the roads' id column and has `width_m`, and can have `order`, `offset_m`, `color`, `dash`, `pick` (a
 /// picked item is clicked and lit as itself, with its own fields) and `minzoom` (`__rs_imz`). `k`: the items' overlay number.
-pub fn road_items(fc: &Value, roads: &std::collections::HashMap<String, Road>, edge_col: &str, k: usize, look: &Value)
+pub fn road_items(fc: &Value, roads: &std::collections::HashMap<String, Road>, edge_col: &str, k: usize, look: &crate::Look)
                   -> Result<Vec<crate::simple::Item>, String> {
     let mut ov = Overlay { name: "items".into(), kind: "line", under: false, edge: true, color: Value::Null, outline: Value::Null, opacity: Value::Null,
                            width: Value::Null, radius: Value::Null, visible: true, fc: fc.clone(), l: Value::Null,

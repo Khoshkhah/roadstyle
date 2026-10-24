@@ -10,6 +10,18 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **Every style reads a road's colour and width from the feature state** (audit N8, both engines). The road layer reads
   `["coalesce", ["feature-state", "rs_c"], <baked colour>]` and each width and offset stop × `["coalesce", ["feature-state", "rs_w"], 1]`,
   in every style, not only with `live_data`; `live_data` now only adds the metadata `roadstyle:live` and the page's option `live`.
+- **The look is a crate of its own, typed and versioned** (`rust/roadstyle-look`, design step (c), audit R16). `Look::resolve` makes
+  the look one time from the palette, the profile, the settings and the keywords; `Look::from_json` reads a saved look of version 1 or of
+  version 0 (the `look.json` of 0.25.0, with no `schema_version`). A look of a later version, or an unknown key, is an error that names
+  it. The look has `schema_version: 1`; all else in it is as before, and every style is the same (the Rust goldens, Monaco and Tartu).
+  The engine reads the typed parts that the look makes one time (the road width model, the class styles, the slots and the decks), not
+  the JSON again in each stage: before, one `make_tiled` parsed the look 3 times and made the width model 4 times. The look crate and
+  the road model do not depend on each other.
+- **The bindings take a look handle, not its text.** JavaScript: `resolveLook(options)` gives a `Look` (`makeLook` is its old name for
+  one version), `Look.fromJson(text)` reads a saved look, and `makeStyle`, `makeSources`, `new Tiler` and `exportLook` take the `Look`.
+  Python (`roadstyle._rust`): `resolve_look(options)` and `Look.from_json(text)`, with `json()`, `part(key)` and `with_arg(key, value)`.
+  **A host that passes the look's text** (the duckosm-rust map worker, the GeoLibre plugin's worker) changes one line when it moves to
+  this version: `makeStyle(roads, Look.fromJson(lookText), ...)`, and the same for `new Tiler(...)`.
 - **The road layer reads its class tables by an index** (R8, both engines). Each width and offset table over the classes is one
   `["at", ["get", "__rs_ci"], ["literal", [...]]]`, and each feature of `simple` has its class index `__rs_ci`. A piece keeps only what
   the road layer and the page read on it, so it has no `highway` any more (the page reads the class from the road table). On Tartu:

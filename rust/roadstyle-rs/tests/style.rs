@@ -23,12 +23,12 @@ use std::path::{Path, PathBuf};
 
 /// The fixture's look as the GeoLibre plugin draws it: with the names and the arrows. The look's args have arrows and labels false
 /// (from mapstyle's keywords), and the engine follows them as Python does; tests/make_goldens.py also sets them true.
-fn plugin_look(bytes: &[u8]) -> String {
+fn plugin_look(bytes: &[u8]) -> roadstyle_rs::Look {
     let mut look: serde_json::Value = serde_json::from_slice(bytes).unwrap();
     look["args"]["arrows"] = true.into();
     look["args"]["labels"] = true.into();
     look["args"]["export"] = true.into();        // the plugin's style is an export: the roads source too (audit N2)
-    look.to_string()
+    roadstyle_rs::Look::from_value(look).unwrap()
 }
 
 fn style_hash(area: &Path) -> String {

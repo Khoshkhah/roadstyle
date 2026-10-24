@@ -14,7 +14,7 @@
 </head><body>
 <div id="map"></div><button id="next" type="button">Colour by lanes</button>
 <script type="module">
-import init, {makeSources, tileSources} from "./pkg/roadstyle_wasm.js";
+import init, {Look, makeSources, tileSources} from "./pkg/roadstyle_wasm.js";
 import {rsDashboard} from "../../src/roadstyle/static/dashboard/index.js";
 
 const DATA = "../../rust/roadstyle-rs/tests/data/";
@@ -49,7 +49,7 @@ window.rs = rs;
 async function showRoads(colorBy) {
   const look = JSON.parse(lookText);
   if (colorBy) Object.assign(look.args, colorBy);
-  const sources = makeSources(roads, JSON.stringify(look), undefined, undefined, "Monaco");
+  const sources = makeSources(roads, Look.fromJson(JSON.stringify(look)), undefined, undefined, "Monaco");
   const road_table = JSON.parse(new TextDecoder().decode(sources.roadTable()));
   tiler = tileSources(sources, `rs://${++gen}/`, ["name", "edge_id", "highway"]);
   const style = JSON.parse(tiler.style());

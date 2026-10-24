@@ -5,25 +5,62 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 
-/// make_style(roads, look, features=None, planner=None, name=None) -> str: the style's JSON text (roadstyle.export_inline's
-/// style). `roads` and `features` are GeoParquet bytes (the geometry as WKB), `planner` the planner's Parquet bytes, `look` the
-/// look's JSON text. An error is a ValueError.
-#[pyfunction]
-#[pyo3(signature = (roads, look, features=None, planner=None, name=None))]
-fn make_style(py: Python<'_>, roads: Vec<u8>, look: String, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>)
-              -> PyResult<String> {
-    py.detach(|| roadstyle::make_style(roads, &look, features, planner, name)).map_err(PyValueError::new_err)
+/// A resolved look (roadstyle-look), parsed one time: `resolve_look(options)` makes it, `Look.from_json(text)` reads a saved look
+/// (version 1, or version 0: today's look.json). The calls below take it, not its text.
+#[pyclass(frozen, name = "Look")]
+struct PyLook(roadstyle::Look);
+
+#[pymethods]
+impl PyLook {
+    /// Look.from_json(text) -> Look: a saved look (version 1 or 0). An error is a ValueError.
+    #[staticmethod]
+    fn from_json(text: &str) -> PyResult<Self> {
+        roadstyle::Look::from_json(text).map(PyLook).map_err(PyValueError::new_err)
+    }
+
+    /// json() -> str: the look's text (version 1).
+    fn json(&self) -> String {
+        self.0.to_json()
+    }
+
+    /// part(key) -> str: the JSON text of one part of the look: "args" (the map options), "config" or "theme".
+    fn part(&self, key: &str) -> PyResult<String> {
+        match key {
+            "args" => Ok(self.0.args.to_string()),
+            "config" => Ok(self.0.config.to_string()),
+            "theme" => Ok(self.0.theme.to_string()),
+            _ => Err(PyValueError::new_err(format!("part {key:?}: the parts are \"args\", \"config\" and \"theme\""))),
+        }
+    }
+
+    /// with_arg(key, value) -> Look: the same look with the map option `key` set to `value` (JSON text).
+    fn with_arg(&self, key: &str, value: &str) -> PyResult<Self> {
+        let v: serde_json::Value = serde_json::from_str(value).map_err(|e| PyValueError::new_err(format!("{key}: not JSON: {e}")))?;
+        self.0.clone().with_arg(key, v).map(PyLook).map_err(PyValueError::new_err)
+    }
 }
 
-/// make_look(options) -> str: the look (look.json) of render_edges' palette, profile and settings. `options` is the JSON text of
-/// {"palette", "profile", "settings", "args", "features"}.
+/// resolve_look(options) -> Look: the look of render_edges' palette, profile and settings. `options` is the JSON text of
+/// {"palette", "profile", "settings", "args", "features", "files"}. An error is a ValueError.
 #[pyfunction]
-fn make_look(py: Python<'_>, options: String) -> PyResult<String> {
+fn resolve_look(py: Python<'_>, options: String) -> PyResult<PyLook> {
     py.detach(|| {
         let o: serde_json::Value = serde_json::from_str(&options).map_err(|e| format!("options: not JSON: {e}"))?;
-        roadstyle::look::make_look(&o).map(|l| l.to_string())
+        roadstyle::Look::resolve(&roadstyle::look::Options::from_value(&o)?)
     })
+    .map(PyLook)
     .map_err(PyValueError::new_err)
+}
+
+/// make_style(roads, look, features=None, planner=None, name=None) -> str: the style's JSON text (roadstyle.export_inline's
+/// style). `roads` and `features` are GeoParquet bytes (the geometry as WKB), `planner` the planner's Parquet bytes, `look` a Look.
+/// An error is a ValueError.
+#[pyfunction]
+#[pyo3(signature = (roads, look, features=None, planner=None, name=None))]
+fn make_style(py: Python<'_>, roads: Vec<u8>, look: PyRef<'_, PyLook>, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>)
+              -> PyResult<String> {
+    let look = &look.0;
+    py.detach(|| roadstyle::make_style(roads, look, features, planner, name)).map_err(PyValueError::new_err)
 }
 
 /// A map with vector tiles: Tiler(roads, look, features=None, name=None, prefix="", keep=[]), then `style` (the style's JSON text)
@@ -40,9 +77,10 @@ struct Tiler {
 impl Tiler {
     #[new]
     #[pyo3(signature = (roads, look, features=None, name=None, prefix=String::new(), keep=Vec::new()))]
-    fn new(py: Python<'_>, roads: Vec<u8>, look: String, features: Option<Vec<u8>>, name: Option<String>, prefix: String, keep: Vec<String>)
-           -> PyResult<Self> {
-        let (style, tiles) = py.detach(|| roadstyle::make_tiled(roads, &look, features, name, &prefix, &keep)).map_err(PyValueError::new_err)?;
+    fn new(py: Python<'_>, roads: Vec<u8>, look: PyRef<'_, PyLook>, features: Option<Vec<u8>>, name: Option<String>, prefix: String,
+           keep: Vec<String>) -> PyResult<Self> {
+        let look = &look.0;
+        let (style, tiles) = py.detach(|| roadstyle::make_tiled(roads, look, features, name, &prefix, &keep)).map_err(PyValueError::new_err)?;
         Ok(Tiler { style, tiles })
     }
 
@@ -144,9 +182,10 @@ impl Sources {
         self.inner.metadata.to_string()
     }
 
-    /// add_palettes(base, looks): a page's views with other palettes (looks: [(palette, look.json)]), merged into these Sources (the
+    /// add_palettes(base, looks): a page's views with other palettes (looks: [(palette, Look)]), merged into these Sources (the
     /// palette `base`): each property that differs gets a copy for each palette, `<key>@<palette>`, read by the state rs_palette.
-    fn add_palettes(&mut self, py: Python<'_>, base: String, looks: Vec<(String, String)>) -> PyResult<()> {
+    fn add_palettes(&mut self, py: Python<'_>, base: String, looks: Vec<(String, PyRef<'_, PyLook>)>) -> PyResult<()> {
+        let looks: Vec<(String, roadstyle::Look)> = looks.into_iter().map(|(n, l)| (n, l.0.clone())).collect();
         let s = &mut self.inner;
         py.detach(|| roadstyle::palettes::add(s, &base, &looks)).map_err(PyValueError::new_err)
     }
@@ -170,9 +209,10 @@ impl Sources {
 /// make_sources(roads, look, features=None, planner=None, name=None) -> Sources: stage 1, as make_style's arguments.
 #[pyfunction]
 #[pyo3(signature = (roads, look, features=None, planner=None, name=None))]
-fn make_sources(py: Python<'_>, roads: Vec<u8>, look: String, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>)
-                -> PyResult<Sources> {
-    let inner = py.detach(|| roadstyle::make_sources(roads, &look, features, planner, name)).map_err(PyValueError::new_err)?;
+fn make_sources(py: Python<'_>, roads: Vec<u8>, look: PyRef<'_, PyLook>, features: Option<Vec<u8>>, planner: Option<Vec<u8>>,
+                name: Option<String>) -> PyResult<Sources> {
+    let look = &look.0;
+    let inner = py.detach(|| roadstyle::make_sources(roads, look, features, planner, name)).map_err(PyValueError::new_err)?;
     Ok(Sources { inner })
 }
 
@@ -250,10 +290,9 @@ fn make_page(style: String, page: String, parts: String, pmtiles: Option<Vec<u8>
 /// export_look(look, cols, positions) -> str: the simple look for another app's data layer (roadstyle_engine::export_look); `cols`: the
 /// columns [highway, oneway, tunnel, bridge, id].
 #[pyfunction]
-fn export_look(look: String, cols: [String; 5], positions: Vec<i64>) -> PyResult<String> {
-    let look: serde_json::Value = serde_json::from_str(&look).map_err(|e| PyValueError::new_err(e.to_string()))?;
+fn export_look(look: PyRef<'_, PyLook>, cols: [String; 5], positions: Vec<i64>) -> PyResult<String> {
     let c = roadstyle::export_look::LookCols { highway: &cols[0], oneway: &cols[1], tunnel: &cols[2], bridge: &cols[3], id: &cols[4] };
-    roadstyle::export_look::export_look(&look, &c, &positions).map(|v| v.to_string()).map_err(PyValueError::new_err)
+    roadstyle::export_look::export_look(&look.0, &c, &positions).map(|v| v.to_string()).map_err(PyValueError::new_err)
 }
 
 /// make_area(edges, folder, ...) -> (roads, pairs, warnings): roadstyle's make_area (level_input) in Rust (roadstyle::level_area): writes
@@ -303,7 +342,8 @@ fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(make_page, m)?)?;
     m.add_function(wrap_pyfunction!(export_look, m)?)?;
     m.add_function(wrap_pyfunction!(make_style, m)?)?;
-    m.add_function(wrap_pyfunction!(make_look, m)?)?;
+    m.add_function(wrap_pyfunction!(resolve_look, m)?)?;
+    m.add_class::<PyLook>()?;
     m.add_function(wrap_pyfunction!(compute_levels, m)?)?;
     m.add_function(wrap_pyfunction!(solve_rules, m)?)?;
     m.add_function(wrap_pyfunction!(serve, m)?)?;

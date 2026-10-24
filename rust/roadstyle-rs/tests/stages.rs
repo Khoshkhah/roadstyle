@@ -16,7 +16,7 @@ fn same_tiles(area: &str) {
     look["args"]["arrows"] = true.into();
     look["args"]["labels"] = true.into();
     look["args"]["export"] = true.into();        // export_style's two stages (audit N2)
-    let look = look.to_string();
+    let look = roadstyle_rs::Look::from_value(look).unwrap();
     let (roads, features) = (data(&format!("{area}/roads.parquet")), data(&format!("{area}/features.parquet")));
     let keep = ["osm_id".to_string(), "access".to_string()];
     let (_, one) = roadstyle_rs::make_tiled(roads.clone(), &look, Some(features.clone()), None, "rs://", &keep).unwrap();

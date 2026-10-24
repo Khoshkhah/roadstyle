@@ -11,7 +11,6 @@ pub mod draw;
 pub mod export_look;
 pub mod features;
 pub mod layers;
-pub mod look;
 pub mod overlays;
 pub mod palettes;
 pub mod planner;
@@ -25,6 +24,7 @@ pub mod sources;
 // (roadstyle-io) are the facade's.
 pub use roadstyle_model::{geom, props, table, Cell, RoadTable, Row};
 pub use road::{Road, Roads};
+pub use roadstyle_look::{self as look, Look};
 pub(crate) use roadstyle_model::obj;
 
 use serde_json::{json, Value};
@@ -88,77 +88,72 @@ pub struct Parts {
 /// The style's layers and sources: the roads ("roads", "simple", "slots") and, with `features` (the base-map tables as the worker's SQL
 /// writes them), the base map ("ov<i>"). `look`: look.json (the resolved look); `table`: the roads (roadstyle-io reads them from the
 /// GeoParquet of tools/make_spike_fixture.py or the worker's SQL); `planner`: the route planner's rows.
-pub fn make_parts(mut table: RoadTable, look: &str, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, String> {
-    let look_json: Value = serde_json::from_str(look).map_err(|e| format!("look: not JSON: {e}"))?;
-    let head_m = roads::Look::from_json(&look_json)?.head_m;
+pub fn make_parts(mut table: RoadTable, look: &Look, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, String> {
     if table.len() > MAX_ROADS {
         return Err(format!("this area has {} roads, and the plugin draws at most {MAX_ROADS} (the browser's memory): use a smaller area",
                            table.len()));
     }
-    ColumnMap::from_args(&look_json["args"]).to_engine(&mut table);
-    compute_levels(&mut table, &look_json["args"], head_m)?;
-    style_parts(table, &look_json, features, planner, name)
+    ColumnMap::from_args(&look.args).to_engine(&mut table);
+    compute_levels(&mut table, &look.args, look.road.head_m)?;
+    style_parts(table, look, features, planner, name)
 }
 
 /// The parts of another palette of the same call (a view's palette, palettes.rs): the roads of `s` as they were before their marks
 /// (their columns in the engine's names, their levels solved), with the look `look` (the same keywords, another palette). No base map
 /// and no route planner, as a page's views have none.
-pub fn restyle(s: &sources::Sources, look: &str) -> Result<sources::Sources, String> {
-    let look_json: Value = serde_json::from_str(look).map_err(|e| format!("look: not JSON: {e}"))?;
-    Ok(sources::Sources::new(style_parts(s.roads.roads.table.clone(), &look_json, None, None, None)?))
+pub fn restyle(s: &sources::Sources, look: &Look) -> Result<sources::Sources, String> {
+    Ok(sources::Sources::new(style_parts(s.roads.roads.table.clone(), look, None, None, None)?))
 }
 
 /// make_parts after the roads are prepared (the engine's column names, the levels).
-fn style_parts(table: RoadTable, look_json: &Value, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, String> {
-    let look_json = look_json.clone();
-    let look = roads::Look::from_json(&look_json)?;
-    let cols = ColumnMap::from_args(&look_json["args"]);
+fn style_parts(table: RoadTable, look: &Look, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, String> {
+    let cols = ColumnMap::from_args(&look.args);
     // render's filter_col: in the engine's names (a keyword's column has the engine's name; a column with an engine name is kept aside)
-    let fcol = look_json["args"]["filter_col"].as_str().filter(|c| !c.is_empty()).map_or_else(|| "highway".to_string(), |f| {
+    let fcol = look.args["filter_col"].as_str().filter(|c| !c.is_empty()).map_or_else(|| "highway".to_string(), |f| {
         cols.0.iter().find(|(_, user)| user == f).map(|(own, _)| own.to_string())
             .or_else(|| cols.0.iter().find(|(own, _)| *own == f).map(|(own, _)| ColumnMap::kept(own)))
             .unwrap_or_else(|| f.to_string())
     });
     CLS.with(|c| *c.borrow_mut() = fcol);
     let mut feats = Roads::new(table);
-    let colors = roads::mark_roads(&mut feats, &look, &look_json["args"])?;
-    let width_col = look_json["args"]["width_m_col"].as_str().filter(|c| !c.is_empty());
+    let colors = roads::mark_roads(&mut feats, &look.road, &look.args)?;
+    let width_col = look.args["width_m_col"].as_str().filter(|c| !c.is_empty());
     // render's arrows and labels (both on by default): the slots exist only for them
-    let (arrows, labels) = (look_json["args"]["arrows"] != false, look_json["args"]["labels"] != false);
-    let slots = if arrows || labels { slots::slots_source(&feats, &slots::SlotLook::from_json(&look_json)?) }
+    let (arrows, labels) = (look.args["arrows"] != false, look.args["labels"] != false);
+    let slots = if arrows || labels { slots::slots_source(&feats, &look.slot) }
                 else { json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": []}}) };
     let mut ovs = Vec::new();
     let mut images = serde_json::Map::new();
     if let Some(f) = features {
-        let mut fcs = features::feature_collections(f, &look_json)?;
+        let mut fcs = features::feature_collections(f, look)?;
         let attached = overlays::edge_attach(&mut fcs, &feats);
-        (ovs, images) = overlays::feature_overlays(fcs, &look_json, &attached);
+        (ovs, images) = overlays::feature_overlays(fcs, look, &attached);
     }
     // render's overlays=: the caller's own, after the base map's (each knows the roads' id column, for its error)
     let first_user = ovs.len();
-    ovs.extend(overlays::user_overlays(&look_json["args"]["overlays"], ovs.len())?);
+    ovs.extend(overlays::user_overlays(&look.args["overlays"], ovs.len())?);
     for ov in ovs[first_user..].iter_mut() {
-        ov.user["edge_id_col"] = look_json["args"]["edge_id_col"].clone();
+        ov.user["edge_id_col"] = look.args["edge_id_col"].clone();
     }
     // render's simple=False (the full look: a layer for each drawing position) is the Python engine's only (plan decision 2)
-    if look_json["args"]["simple"] == false {
+    if look.args["simple"] == false {
         return Err("simple=False (the full look) is in the Python engine only: use engine=\"python\", or simple mode (the default)".into());
     }
     // the line items on the edges (an overlay's lines in metres, render's items=): pieces of the one road layer
     let mut items = Vec::new();
-    if ovs.iter().any(overlays::metre_items) || !look_json["args"]["items"].is_null() {
+    if ovs.iter().any(overlays::metre_items) || !look.args["items"].is_null() {
         let by_id: std::collections::HashMap<String, Road> =
             feats.iter().filter_map(|f| f.get("edge_id").map(|e| (overlays::eid(e), f))).collect();
         for (i, ov) in ovs.iter_mut().enumerate().filter(|(_, o)| overlays::metre_items(o)) {
             overlays::edge_overlay(ov, &by_id)?;
-            items.extend(overlays::item_pieces(ov, i, &look_json)?);
+            items.extend(overlays::item_pieces(ov, i, look)?);
         }
-        if !look_json["args"]["items"].is_null() {
-            let col = look_json["args"]["edge_id_col"].as_str().unwrap_or("edge_id");
-            items.extend(overlays::road_items(&look_json["args"]["items"], &by_id, col, ovs.len(), &look_json)?);
+        if !look.args["items"].is_null() {
+            let col = look.args["edge_id_col"].as_str().unwrap_or("edge_id");
+            items.extend(overlays::road_items(&look.args["items"], &by_id, col, ovs.len(), look)?);
         }
     }
-    let mut simple = simple::simple_source(&feats, look.head_m, look.bridge_shadow, width_col, items)?;
+    let mut simple = simple::simple_source(&feats, look.road.head_m, look.road.bridge_shadow, width_col, items)?;
     // everything that reads the roads is done before this: the roads source takes them
     // export_inline(planner=True): the route planner's graphs, or the number of roads past the limit
     let planned = match planner {
@@ -169,27 +164,27 @@ fn style_parts(table: RoadTable, look_json: &Value, features: Option<Vec<Row>>, 
     let (center, zoom) = camera(&feats);
     let mut roads = roads::roads_source(feats);
     // render's view_3d: the bridges' extruded decks (_bridge_decks)
-    let decks = if look_json["args"]["view_3d"] == true {
+    let decks = if look.args["view_3d"] == true {
         // a casing slab names the user's own `highway` column (Python's props.get("highway")): kept aside when highway_col is another
         let hw = if cols.0.iter().any(|(own, _)| *own == "highway") { ColumnMap::kept("highway") } else { "highway".into() };
-        decks::bridge_decks(&roads.roads, &decks::DeckLook::from_config(&look_json["config"]["bridge_decks"]), &layers::Model::from_look(&look_json)?, &hw)
+        decks::bridge_decks(&roads.roads, &look.deck, &look.model, &hw)
     } else { Vec::new() };
-    let (layers, info) = layers::road_layers(&look_json, &roads.roads, &simple, source_features(&slots), !decks.is_empty(), &mut ovs,
+    let (layers, info) = layers::road_layers(look, &roads.roads, &simple, source_features(&slots), !decks.is_empty(), &mut ovs,
                                              &colors.props, colors.active)?;
-    simple.classes = Some(layers::Model::from_look(&look_json)?.classes);     // R8: the road layer reads each feature's class index
+    simple.classes = Some(look.model.classes.clone());     // R8: the road layer reads each feature's class index
     // state "live" (a page with the dashboard, docs/design/rust_library.md "The interaction contract"): the state stays in the expressions,
     // and the style says what the controls show
-    let live = look_json["args"]["state"] == "live";
+    let live = look.args["state"] == "live";
     // audit N2 (2026-10-24): stage 1 gives the road-table form for every style (the pieces draw and glow, by their road's row; the road
     // table has the roads); only an export (render's export_inline, export_style: an app with no road table) asks for the roads source
-    let export = look_json["args"]["export"] == true;
+    let export = look.args["export"] == true;
     (roads.in_style, simple.promote) = (export, true);
     let (contract, state) = if live {
-        let st = contract::page_state(&look_json, colors.active, ovs.len());
-        (Some((contract::controls(&look_json, &roads.roads, info, colors.active)?, st.clone())),
+        let st = contract::page_state(look, colors.active, ovs.len());
+        (Some((contract::controls(look, &roads.roads, info, colors.active)?, st.clone())),
          Some(Value::Object(st.into_iter().map(|(k, v)| (k, json!({"default": v}))).collect())))
     } else { (None, None) };
-    let mut glyphs = (labels && !source_features(&slots).is_empty()).then(|| look_json["theme"]["labels"]["glyphs"].clone());
+    let mut glyphs = (labels && !source_features(&slots).is_empty()).then(|| look.theme["labels"]["glyphs"].clone());
     if glyphs.is_none() && ovs.iter().any(|o| o.kind == "text") {      // _build_overlays: a text overlay needs a font
         glyphs = Some(json!("https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"));
     }
@@ -218,18 +213,18 @@ fn style_parts(table: RoadTable, look_json: &Value, features: Option<Vec<Row>>, 
     // render's boundary: a dashed outline over the roads (GeoJSON: a geometry, a Feature or a FeatureCollection; the Python binding
     // converts a shapely geometry or a GeoDataFrame)
     let mut layers = layers;
-    if let Some(fc) = boundary_fc(&look_json["args"]["boundary"]) {
+    if let Some(fc) = boundary_fc(&look.args["boundary"]) {
         sources.push(("boundary".into(), Src::Json(json!({"type": "geojson", "data": fc}))));
-        let (th, b) = (&look_json["theme"], &look_json["theme"]["boundary"]);
+        let (th, b) = (&look.theme, &look.theme["boundary"]);
         layers.push(json!({"id": "boundary", "type": "line", "source": "boundary", "metadata": {"roadstyle:group": "roads"},
                            "layout": {"line-cap": th["roads"]["cap"], "line-join": th["roads"]["join"]},
                            "paint": {"line-color": b["color"], "line-width": b["width"], "line-opacity": b["opacity"], "line-dasharray": b["dash"]}}));
     }
-    images.insert("oneway".into(), look_json["oneway_image"].clone());
+    images.insert("oneway".into(), look.oneway_image.clone());
     let mut metadata = serde_json::Map::new();
     // the export's page metadata: the road popup's fields, the hover tooltip and the hover delay (roadstyle:interaction)
-    let it = &look_json["interaction"];
-    let args = &look_json["args"];
+    let it = &look.interaction;
+    let args = &look.args;
     // render's road_popup: true (or not given) the default fields, a list those fields, "panel" the default fields in the side panel,
     // another text every column (null), false no popup; road_tooltip, else the folium name tooltip, else none
     let popup = match &args["road_popup"] {
@@ -254,12 +249,12 @@ fn style_parts(table: RoadTable, look_json: &Value, features: Option<Vec<Row>>, 
     }
     // R22, live data: the feature states that the road layer reads, so a page's dashboard (rs.setData) colours and sizes the roads from a
     // table with no new build; the ramp is the call's cmap (else viridis), as 9 colours, and the no-data colour the theme's
-    if look_json["args"]["live_data"] == true {
-        let cmap = if look_json["args"]["cmap"].is_null() { json!("viridis") } else { look_json["args"]["cmap"].clone() };
+    if look.args["live_data"] == true {
+        let cmap = if look.args["cmap"].is_null() { json!("viridis") } else { look.args["cmap"].clone() };
         let ramp = colors::Ramp::new(&cmap)?;
         metadata.insert("roadstyle:live".into(), json!({
             "color": layers::LIVE_COLOR, "width": layers::LIVE_WIDTH, "types": {layers::LIVE_COLOR: "color", layers::LIVE_WIDTH: "factor"},
-            "ramp": (0..9).map(|i| ramp.hex(i as f64 / 8.0)).collect::<Vec<_>>(), "nodata": look_json["theme"]["data"]["nodata"]}));
+            "ramp": (0..9).map(|i| ramp.hex(i as f64 / 8.0)).collect::<Vec<_>>(), "nodata": look.theme["data"]["nodata"]}));
     }
     if let Some((controls, st)) = contract {
         // audit N7: the roles and the arrow kind from the final layers (contract::describe; tiled_style writes them again for the tiles)
@@ -269,14 +264,14 @@ fn style_parts(table: RoadTable, look_json: &Value, features: Option<Vec<Row>>, 
         metadata.insert("roadstyle:state".into(), Value::Object(st));
         metadata.insert("roadstyle:controls".into(), controls);
     }
-    let name = name.map_or_else(|| look_json["args"]["name"].clone(), Value::from);
-    data_settings(&mut sources, &look_json["args"]);
+    let name = name.map_or_else(|| look.args["name"].clone(), Value::from);
+    data_settings(&mut sources, &look.args);
     cols.to_user(&mut sources, &mut layers);
     Ok(Parts { name, center, zoom, layers, sources, metadata: Value::Object(metadata), glyphs, state })
 }
 
 /// The style as one JSON text, with each source's GeoJSON in it (roadstyle's export_inline): stage 1 (`sources::Sources`), written.
-pub fn make_style(table: RoadTable, look: &str, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<String, String> {
+pub fn make_style(table: RoadTable, look: &Look, features: Option<Vec<Row>>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<String, String> {
     let s = sources::Sources::new(make_parts(table, look, features, planner, name)?);
     let mut out = Vec::new();
     s.write_style(&mut out).expect("a Vec takes every byte");
