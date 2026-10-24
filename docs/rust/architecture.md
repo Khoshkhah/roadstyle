@@ -401,8 +401,9 @@ features when decoded for the tiles. A difference is a bug in the engine, or an 
 
 ## Known design gaps
 
-The plan expects a pure core with no I/O, a typed and versioned look, error enums and a typed render model. The code does not
-have them yet. The script computes these numbers from `rust/*/src/`, so they change when the design changes:
+The plan expects a pure core with no I/O, a typed and versioned look, error enums and a typed render model. The table shows each
+item and the state of the code. The script computes these numbers from `rust/*/src/`, so they change when the design changes, and
+an item shows "yes" when the code has it:
 
 <!-- gen:gaps -->
 | The plan expects | The code now | Done |
