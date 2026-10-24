@@ -38,9 +38,13 @@ The export's style (`export_style`, `export_inline`: `state` baked) has `roadsty
 The dashboard (`static/dashboard/index.js`, `fromStyle`) takes each one that the page does not give. The overlays' sources and layers
 get the page's prefix.
 
+The rule (rule 5 of the plan): `roadstyle:controls` has the facts of the look and of the roads that a host's dashboard needs. The
+caller's page keywords (`tiles`, `views`, the base maps, Street View, ...) stay in `RS_OPTIONS`: the page writer gives them, and a
+host gives them to `rsDashboard` itself.
+
 | Option | Content |
 |---|---|
-| `tiles`, `simple` | the roads in vector tiles; the id of the one road layer of simple mode with inline data (`roads-simple`), else false |
+| `simple` | the id of the one road layer of simple mode (`roads-simple`) |
 | `pitch_3d` | the camera's tilt in 3D |
 | `select_color` | the colour of a selected road (also the Google 3D line) |
 | `filter` | the filter panel: `{on, col, classes, access, swatches, bridges, tunnels}`, and `palettes` with a view's palette |
@@ -49,7 +53,6 @@ get the page's prefix.
 | `tunnel` | the tunnel look: `{layers, dash, casing, strength, palette, palettes, ratio, bg, steps, ratios, toward, towards, to, control}` |
 | `fill_layers` | the road fill layers that the page recolours |
 | `road_fill` | `{on, paint}`: the road fill switch and each fill layer's opacity without it |
-| `views` | `[{name, set}]`: the View menu |
 | `items` | `{label, popup, layer}` of render's `items=`, or null |
 | `edge_id_col` | the roads' id column |
 | `arrow_icon`, `arrow_color`, `arrow_rules` | the one-way arrow: its image, its colour and the page's rules for where it goes |

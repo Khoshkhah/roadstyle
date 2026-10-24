@@ -149,7 +149,7 @@ pub fn page_from(roads: RoadTable, look: &Look, options: &Options, given: &Map<S
     let mut tunnel = ctl["tunnel"].clone();
     tunnel["bg"] = bg.into();
     let opts = PageOptions {
-        basemaps: bms, basemap_switcher: on("basemap_switcher"), tiles: ctl["tiles"] == true, simple: ctl["simple"].clone(),
+        basemaps: bms, basemap_switcher: on("basemap_switcher"), tiles: tiled, simple: ctl["simple"].clone(),
         sources: meta["roadstyle:sources"].clone(), arrows: meta["roadstyle:arrows"].clone(), live: meta["roadstyle:live"].clone(),
         popup_mode: mode.into(), find_control: on("find_control"), zoom_readout: on("zoom_readout"), pitch_3d: number(&ctl["pitch_3d"])?,
         street_view: a["street_view"].clone(), street_view_key: key.unwrap_or_default(), google_3d: on("google_3d"),

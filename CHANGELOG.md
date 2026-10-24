@@ -13,6 +13,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   look, options, given?)` call it. Python gives only what it alone knows: the data steps, the look's options, the base maps' keys and the
   Google Maps key. A view's palette resolves its look in Rust (Python makes no extra looks). The page writer gzips the road table and
   the big sources itself; the two engines' pages are the same byte for byte but these blobs, which are the same when read back.
+- **`roadstyle:controls` has no page keywords** (rule 5, R3). It has the facts of the look and of the roads that a host's dashboard
+  needs (the filter panel, the overlays, the tunnel look, `select_color`, `pitch_3d`, ...). `tiles` and `views` are not in it any more:
+  they are the caller's page keywords, which the page gives in `RS_OPTIONS` and a host gives to `rsDashboard` itself.
 - **`sidebar="dashboard"` or `"report"`**: the bundled sidebar of `render_dashboard` and `render_report`, in both engines. It sets
   `name`, `basemap_switcher`, `filter_control` and `road_popup` where the call gives none (`pages.SIDEBAR_DEFAULTS`). The two
   functions now pass `sidebar=` to `render_edges`, so the Rust engine makes these pages too, and the CLI with `--sidebar`.
