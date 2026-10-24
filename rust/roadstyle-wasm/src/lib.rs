@@ -120,6 +120,78 @@ mod wasm {
         }
     }
 
+    fn format(f: &str) -> Result<roadstyle::Format, JsError> {
+        match f {
+            "geojson" => Ok(roadstyle::Format::GeoJson),
+            "geoparquet" => Ok(roadstyle::Format::GeoParquet),
+            _ => Err(JsError::new(&format!("format must be 'geojson' or 'geoparquet', not {f:?}"))),
+        }
+    }
+
+    /// Stage 1 (docs/rust/architecture.md, "The three stages and the one call"): the style and its sources in memory.
+    #[wasm_bindgen]
+    pub struct Sources {
+        inner: roadstyle::sources::Sources,
+    }
+
+    #[wasm_bindgen]
+    impl Sources {
+        /// fileNames(format): the names of stage 1's files (style.json, a file for each source, road_table.parquet).
+        #[wasm_bindgen(js_name = fileNames)]
+        pub fn file_names(&self, format: &str) -> Result<Vec<String>, JsError> {
+            Ok(roadstyle::file_names(&self.inner, self::format(format)?))
+        }
+
+        /// file(name, format, keep): one of stage 1's files ("geojson" or "geoparquet"; the roads' file has their drawing values and
+        /// `keep`, the road table every field of each road).
+        pub fn file(&self, name: &str, format: &str, keep: Vec<String>) -> Result<Vec<u8>, JsError> {
+            roadstyle::source_file(&self.inner, name, self::format(format)?, &self.inner.drawn(&keep)).map_err(|e| JsError::new(&e))
+        }
+    }
+
+    /// makeSources(parquet, look, features, planner, name): stage 1, with makeStyle's arguments.
+    #[wasm_bindgen(js_name = makeSources)]
+    pub fn make_sources(parquet: Vec<u8>, look: &str, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>)
+                        -> Result<Sources, JsError> {
+        roadstyle::make_sources(parquet, look, features, planner, name).map(|inner| Sources { inner }).map_err(|e| JsError::new(&e))
+    }
+
+    /// tileSources(sources, prefix, keep): stage 2 from memory (the typed pieces, no GeoJSON text); it takes the sources. The Tiler's
+    /// style has the one vector source `<prefix>roads/{z}/{x}/{y}`.
+    #[wasm_bindgen(js_name = tileSources)]
+    pub fn tile_sources(sources: Sources, prefix: &str, keep: Vec<String>) -> Result<Tiler, JsError> {
+        let (style, tiles) = roadstyle::tile_made(sources.inner, prefix, &keep).map_err(|e| JsError::new(&e))?;
+        Ok(Tiler { style, tiles })
+    }
+
+    /// Stage 1's files for stage 2: each file's name and bytes (style.json and the files that it names).
+    #[wasm_bindgen]
+    #[derive(Default)]
+    pub struct FileSet {
+        files: std::collections::HashMap<String, Vec<u8>>,
+    }
+
+    #[wasm_bindgen]
+    impl FileSet {
+        #[wasm_bindgen(constructor)]
+        pub fn new() -> FileSet {
+            FileSet::default()
+        }
+
+        pub fn add(&mut self, name: &str, bytes: Vec<u8>) {
+            self.files.insert(name.to_string(), bytes);
+        }
+    }
+
+    /// tileFiles(files, prefix, keep): stage 2 from stage 1's files (GeoJSON or GeoParquet, as style.json names them); the Tiler's
+    /// style is the saved style with the one vector source.
+    #[wasm_bindgen(js_name = tileFiles)]
+    pub fn tile_files(files: &FileSet, prefix: &str, keep: Vec<String>) -> Result<Tiler, JsError> {
+        let read = |n: &str| files.files.get(n).cloned().ok_or_else(|| format!("{n}: not in the files"));
+        let (style, tiles) = roadstyle::tile_files_with(read, &keep, None).map_err(|e| JsError::new(&e))?;
+        Ok(Tiler { style: roadstyle::vector_style(&style, prefix, tiles.zooms()).to_string(), tiles })
+    }
+
     /// makeLook(options: string) -> string: the look (look.json) of render_edges' palette, profile and settings (roadstyle-rs look.rs);
     /// options: {"palette", "profile", "settings", "args", "features"} as JSON text. An error is a thrown Error.
     #[wasm_bindgen(js_name = makeLook)]

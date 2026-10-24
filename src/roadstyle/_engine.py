@@ -116,6 +116,57 @@ def export_inline(edges, **kwargs) -> dict:
     return json.loads(text)
 
 
+def export_geojson(edges, out_dir, *, format="geojson", keep=None, **kwargs) -> dict:
+    """``roadstyle.export_geojson``: stage 1 of the Rust engine, its files in ``out_dir``; {file name: size in bytes}."""
+    if format not in ("geojson", "geoparquet"):
+        raise ValueError(f"format must be 'geojson' or 'geoparquet', got {format!r}")
+    missing = [c for c in RUST_COLUMNS if (kwargs.get(f"{c}_col") or c) not in edges.columns]
+    if missing:
+        raise ValueError(f"export_geojson: the roads have no column {', '.join(missing)}")
+    kwargs = dict(kwargs)
+    kwargs.pop("engine", None)
+    kwargs.setdefault("view_3d", True)      # as export_inline
+    lk = _look_of(kwargs)
+    s = rust().make_sources(_geoparquet(edges), json.dumps(lk), None, None, kwargs.get("name") or "roads")
+    files = s.save(str(out_dir), format, [str(c) for c in (keep or [])])
+    _warn()
+    return dict(files)
+
+
+def tile_geojson(src_dir, out, *, format="pmtiles", keep=None, base_url=""):
+    """``roadstyle.tile_geojson``: stage 2 of the Rust engine from ``export_geojson``'s files; the path written."""
+    from pathlib import Path
+
+    from .tiles import _merc, _tile_range
+
+    if format not in ("pmtiles", "xyz"):
+        raise ValueError(f"format must be 'pmtiles' or 'xyz', got {format!r}")
+    prefix = f"{base_url.rstrip('/')}/" if base_url else ""
+    t = rust().tile_files(str(src_dir), [str(c) for c in (keep or [])], prefix)
+    _warn()
+    bounds = t.bounds()
+    if bounds is None:
+        raise ValueError(f"tile_geojson: no feature in the files of {src_dir}")
+    out = Path(out)
+    if format == "pmtiles":
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(t.archive(list(bounds), t.layers()))
+        return out
+    z0, z1 = t.zooms()
+    lo, hi = _merc(*bounds[:2]), _merc(*bounds[2:])
+    for z in range(z0, z1 + 1):              # the style's tile URL: <base_url>/roads/{z}/{x}/{y}
+        x0, x1, y0, y1 = _tile_range((lo[0], lo[1], hi[0], hi[1]), z)
+        for x in range(x0, x1 + 1):
+            for y in range(y0, y1 + 1):
+                b = t.tile(z, x, y)
+                if b:
+                    p = out / "roads" / str(z) / str(x) / str(y)
+                    p.parent.mkdir(parents=True, exist_ok=True)
+                    p.write_bytes(b)
+    (out / "style.json").write_text(t.style)
+    return out
+
+
 def _look_of(kwargs) -> dict:
     """The resolved look of render's keywords, with what the engine reads as JSON: the boundary as GeoJSON (_boundary_fc) and each overlay
     as its fields, its style of the settings filled in (_styled), its data as a FeatureCollection (``fc``)."""

@@ -230,6 +230,27 @@ impl Tiles {
         w.finish(&place, &meta.to_string())
     }
 
+    /// The box of every feature `[min lon, min lat, max lon, max lat]` (None: no feature), as an archive's bounds.
+    pub fn bounds(&self) -> Option<[f64; 4]> {
+        use rstar::Envelope;
+        let boxes: Vec<AABB<P>> = self.layers.values().filter(|l| l.tree.size() > 0).map(|l| l.tree.root().envelope()).collect();
+        let b = boxes.into_iter().reduce(|a, b| a.merged(&b))?;
+        let (lo, hi) = (b.lower(), b.upper());
+        let lon = |x: f64| x * 360.0 - 180.0;
+        let lat = |y: f64| (std::f64::consts::PI * (1.0 - 2.0 * y)).sinh().atan().to_degrees();
+        Some([lon(lo[0]), lat(hi[1]), lon(hi[0]), lat(lo[1])])
+    }
+
+    /// The tile layers, in their order.
+    pub fn layer_names(&self) -> Vec<String> {
+        self.layers.keys().cloned().collect()
+    }
+
+    /// The first and the last zoom of the tiles.
+    pub fn zooms(&self) -> (u32, u32) {
+        (self.min_zoom, self.max_zoom)
+    }
+
     /// The tile z/x/y as a vector tile with a layer for each source that has features in it; empty when nothing is in it.
     pub fn tile(&self, z: u32, x: u32, y: u32) -> Vec<u8> {
         if z < self.min_zoom || z > self.max_zoom {

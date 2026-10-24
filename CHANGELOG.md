@@ -6,6 +6,20 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **The two stages of the Rust engine as their own calls** (docs/rust/architecture.md, "The three stages and the one call").
+  Stage 1 makes the style and its sources; stage 2 cuts the vector tiles from them, with no roads and no look.
+  - Python: `export_geojson(edges, out_dir, format="geojson" | "geoparquet", keep=None, **kwargs)` writes stage 1's files:
+    `style.json`, one file for each source and `road_table.parquet` (every field of each road, by its row; the roads' own file has
+    their drawing values only). `tile_geojson(src_dir, out, format="pmtiles" | "xyz")` makes the tiles from these files. The tiles
+    are the tiles of `export_style` and of `render(tiles=True)`. The Rust engine only.
+  - Browser package: `makeSources(...)` (with `fileNames(format)` and `file(name, format, keep)`), `tileSources(sources, prefix, keep)`
+    (from memory, with no GeoJSON text) and `tileFiles(fileSet, prefix, keep)` (from the files, in a `FileSet`).
+  - Rust: `roadstyle::make_sources`, `save_sources`, `source_file`, `tile_sources`, `tile_files`, `tile_files_with`, `tile_made`,
+    `vector_style`; `roadstyle_tiles::stage::TileOptions` (stage 2's rules); `roadstyle_io::write::parquet` (Parquet and GeoParquet)
+    and `roadstyle_io::read::features` (a GeoParquet file as GeoJSON).
+  - Tartu: all sources 130 MB as GeoJSON files, 22 MB as GeoParquet files; the road table 3.2 MB.
+
 ## [0.25.0] — 2026-10-23
 
 **The Rust engine, as an option.** roadstyle 0.25.0 has a second engine, in Rust, inside the package (the module `roadstyle._rust`). The

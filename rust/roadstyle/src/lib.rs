@@ -80,7 +80,12 @@ pub fn tile_sources(s: &mut sources::Sources, o: &tiles::stage::TileOptions) -> 
 /// Stage 2 from stage 1's files in `dir` (GeoJSON or GeoParquet, as style.json names them): the saved style and the tiles. `o`: other
 /// rules than the style's.
 pub fn tile_files(dir: &std::path::Path, keep: &[String], o: Option<tiles::stage::TileOptions>) -> Result<(Value, tiles::Tiles), String> {
-    let read = |name: &str| std::fs::read(dir.join(name)).map_err(|e| format!("{name}: {e}"));
+    tile_files_with(|name| std::fs::read(dir.join(name)).map_err(|e| format!("{name}: {e}")), keep, o)
+}
+
+/// Stage 2 from stage 1's files, each read by `read` (a file name: its bytes), as `tile_files` does.
+pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[String], o: Option<tiles::stage::TileOptions>)
+                       -> Result<(Value, tiles::Tiles), String> {
     let style: Value = serde_json::from_slice(&read("style.json")?).map_err(|e| format!("style.json: {e}"))?;
     let o = match o { Some(o) => o, None => tiles::stage::TileOptions::from_style(&style, keep)? };
     let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px);
@@ -111,54 +116,89 @@ pub enum Format {
 /// The file of the road table, next to the sources.
 pub const ROAD_TABLE: &str = "road_table.parquet";
 
-/// Stage 1's files in `dir`: `style.json` (each source's data at its file), one file for each source, and the road table (every field
-/// of each road, by its row; the roads' file has only their drawing values). `keep`: more columns for the roads' file. Gives each
-/// file's name and size.
+/// The names of stage 1's files: style.json, one file for each source (`<name>.geojson` or `<name>.parquet`) and the road table.
+pub fn file_names(s: &sources::Sources, format: Format) -> Vec<String> {
+    let ext = ext(format);
+    ["style.json".to_string()].into_iter().chain(s.sources.iter().map(|(n, _)| format!("{n}.{ext}"))).chain([ROAD_TABLE.to_string()]).collect()
+}
+
+fn ext(format: Format) -> &'static str {
+    match format { Format::GeoJson => "geojson", Format::GeoParquet => "parquet" }
+}
+
+/// One of stage 1's files (a name of `file_names`): style.json (each source's data at its file), a source (the roads' file has only
+/// their drawing values: `drawn`), or the road table (every field of each road, by its row).
+pub fn source_file(s: &sources::Sources, file: &str, format: Format, drawn: &std::collections::HashSet<String>) -> Result<Vec<u8>, String> {
+    let ext = ext(format);
+    if file == "style.json" {
+        return serde_json::to_vec(&s.style(|n| format!("{n}.{ext}"))).map_err(|e| e.to_string());
+    }
+    if file == ROAD_TABLE {
+        return roadstyle_io::write::parquet(|| s.road_rows().map(|r| roadstyle_io::write::Row {
+            id: None, props: r.into_iter().map(|(k, c)| (k.to_string(), c.to_value())).collect(), geometry: None,
+        }), false);
+    }
+    let name = file.strip_suffix(&format!(".{ext}")).ok_or_else(|| format!("{file}: not a .{ext} file"))?;
+    let i = s.sources.iter().position(|(n, _)| n == name).ok_or_else(|| format!("{file}: no source {name}"))?;
+    if format == Format::GeoJson {
+        return Ok(s.data(i, drawn));
+    }
+    let line = |c: Option<&[[f64; 2]]>| c.map(|c| json!({"type": "LineString", "coordinates": c}));
+    match &s.sources[i].1 {
+        Src::Roads(_) => roadstyle_io::write::parquet(|| s.roads.roads.iter().map(|r| roadstyle_io::write::Row {
+            id: Some(r.i as i64),
+            props: r.iter().map(|(k, c)| (s.roads.out_name(k), c)).filter(|(k, _)| k.starts_with("__rs_") || drawn.contains(*k))
+                .map(|(k, c)| (k.to_string(), c.to_value())).collect(),
+            geometry: line(r.line()),
+        }), true),
+        Src::Simple(p) => roadstyle_io::write::parquet(|| p.features(&s.roads.roads).map(|(id, props, c)| roadstyle_io::write::Row {
+            id: Some(id as i64), props: props.into_iter().map(|(k, v)| (k.to_string(), v)).collect(), geometry: line(c),
+        }), true),
+        Src::Json(v) => {
+            let fs = v["data"]["features"].as_array().map(Vec::as_slice).unwrap_or_default();
+            roadstyle_io::write::parquet(|| fs.iter().map(|f| roadstyle_io::write::Row {
+                id: f["id"].as_i64(),
+                props: f["properties"].as_object().into_iter().flatten().map(|(k, v)| (k.clone(), v.clone())).collect(),
+                geometry: Some(f["geometry"].clone()).filter(|g| !g.is_null()),
+            }), true)
+        }
+    }
+}
+
+/// Stage 1's files in `dir` (`file_names`, `source_file`). `keep`: more columns for the roads' file. Gives each file's name and size.
 pub fn save_sources(s: &sources::Sources, dir: &std::path::Path, format: Format, keep: &[String]) -> Result<Vec<(String, usize)>, String> {
-    let ext = match format { Format::GeoJson => "geojson", Format::GeoParquet => "parquet" };
+    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let drawn = s.drawn(keep);
     let mut files = Vec::new();
-    let mut put = |name: String, bytes: Vec<u8>| -> Result<(), String> {
+    for name in file_names(s, format) {
+        let bytes = source_file(s, &name, format, &drawn)?;
         std::fs::write(dir.join(&name), &bytes).map_err(|e| format!("{name}: {e}"))?;
         files.push((name, bytes.len()));
-        Ok(())
-    };
-    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    for (i, (name, src)) in s.sources.iter().enumerate() {
-        let bytes = match format {
-            Format::GeoJson => s.data(i, &drawn),
-            Format::GeoParquet => {
-                let line = |c: Option<&[[f64; 2]]>| c.map(|c| json!({"type": "LineString", "coordinates": c}));
-                match src {
-                    Src::Roads(_) => roadstyle_io::write::parquet(|| s.roads.roads.iter().map(|r| roadstyle_io::write::Row {
-                        id: Some(r.i as i64),
-                        props: r.iter().map(|(k, c)| (s.roads.out_name(k), c)).filter(|(k, _)| k.starts_with("__rs_") || drawn.contains(*k))
-                            .map(|(k, c)| (k.to_string(), c.to_value())).collect(),
-                        geometry: line(r.line()),
-                    }), true)?,
-                    Src::Simple(p) => roadstyle_io::write::parquet(|| p.features(&s.roads.roads).map(|(id, props, c)| roadstyle_io::write::Row {
-                        id: Some(id as i64), props: props.into_iter().map(|(k, v)| (k.to_string(), v)).collect(), geometry: line(c),
-                    }), true)?,
-                    Src::Json(v) => {
-                        let fs = v["data"]["features"].as_array().map(Vec::as_slice).unwrap_or_default();
-                        roadstyle_io::write::parquet(|| fs.iter().map(|f| roadstyle_io::write::Row {
-                            id: f["id"].as_i64(),
-                            props: f["properties"].as_object().into_iter().flatten().map(|(k, v)| (k.clone(), v.clone())).collect(),
-                            geometry: Some(f["geometry"].clone()).filter(|g| !g.is_null()),
-                        }), true)?
-                    }
-                }
-            }
-        };
-        put(format!("{name}.{ext}"), bytes)?;
     }
-    let table = roadstyle_io::write::parquet(|| s.road_rows().map(|r| roadstyle_io::write::Row {
-        id: None, props: r.into_iter().map(|(k, c)| (k.to_string(), c.to_value())).collect(), geometry: None,
-    }), false)?;
-    put(ROAD_TABLE.into(), table)?;
-    let style = s.style(|n| format!("{n}.{ext}"));
-    put("style.json".into(), serde_json::to_vec(&style).map_err(|e| e.to_string())?)?;
     Ok(files)
+}
+
+/// A style of stage 1 (its sources GeoJSON) for stage 2's tiles: one vector source, `<prefix>roads/{z}/{x}/{y}` with the tiles' zooms,
+/// and each layer on the tile layer of its old source (`source-layer`).
+pub fn vector_style(style: &Value, prefix: &str, zooms: (u32, u32)) -> Value {
+    let mut style = style.clone();
+    for l in style["layers"].as_array_mut().into_iter().flatten() {
+        if let Some(src) = l.get("source").cloned() {
+            l["source-layer"] = src;
+            l["source"] = tiles::SOURCE.into();
+        }
+    }
+    style["sources"] = json!({tiles::SOURCE: {"type": "vector", "tiles": [format!("{prefix}{}/{{z}}/{{x}}/{{y}}", tiles::SOURCE)],
+                                              "minzoom": zooms.0, "maxzoom": zooms.1}});
+    style
+}
+
+/// Stage 2 from memory, with the rules of the look that made `s` (make_sources saves them): the tiled style and the tiles.
+pub fn tile_made(mut s: sources::Sources, prefix: &str, keep: &[String]) -> Result<(String, tiles::Tiles), String> {
+    let o = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &s.saved[tiles::stage::TILES], &s.saved[tiles::stage::COLUMNS], keep)?;
+    let tiled = tile_sources(&mut s, &o);
+    let style = vector_style(&s.style(|_| String::new()), prefix, tiled.zooms());
+    Ok((style.to_string(), tiled))
 }
 
 /// The style with one vector-tile source, `roads` (`<prefix>roads/{z}/{x}/{y}`), and the tiles to answer it with (tiles.rs: the rules of

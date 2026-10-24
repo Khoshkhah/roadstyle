@@ -32,6 +32,27 @@ _LEVEL_COLS = {"casing_level_col": "casing_level", "fill_level_col": "fill_level
                "cap_start_col": "cap_start", "cap_end_col": "cap_end"}
 
 
+def export_geojson(edges, out_dir, *, format: str = "geojson", keep=None, **kwargs) -> dict:
+    """Stage 1 of the Rust engine (docs/rust/architecture.md, "The three stages and the one call"): the style and its sources as files
+    in ``out_dir``. ``style.json`` names each source's data by its file; there is one file for each source, ``<source>.geojson``
+    (``format="geojson"``, for MapLibre and to read) or ``<source>.parquet`` (``format="geoparquet"``, smaller, for DuckDB and large
+    areas); and ``road_table.parquet`` holds every field of each road, by its row. The roads' own file has their drawing values only
+    (and the columns in ``keep``). ``kwargs``: the keywords of ``export_inline``. Returns {file name: size in bytes}.
+    ``tile_geojson`` makes the vector tiles from these files. The Rust engine only."""
+    from . import _engine
+    return _engine.export_geojson(edges, out_dir, format=format, keep=keep, **kwargs)
+
+
+def tile_geojson(src_dir, out, *, format: str = "pmtiles", keep=None, base_url: str = "") -> Path:
+    """Stage 2 of the Rust engine: the vector tiles of ``export_geojson``'s files in ``src_dir`` (GeoJSON or GeoParquet, as its
+    ``style.json`` names them); it needs neither the roads nor the look. ``format="pmtiles"`` writes ``out`` as one archive;
+    ``"xyz"`` writes the folder ``out``: ``roads/{z}/{x}/{y}`` and ``style.json`` (the style with one vector source, at
+    ``<base_url>/roads/{z}/{x}/{y}``). ``keep``: more columns in the road tiles. The tiles are the tiles of ``export_style``'s one
+    call. Returns ``out``. The Rust engine only."""
+    from . import _engine
+    return _engine.tile_geojson(src_dir, out, format=format, keep=keep, base_url=base_url)
+
+
 def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", engine: str | None = None, **kwargs) -> Path:
     """Write the roads as ``style.json`` + vector tiles + a sprite into ``out_dir``; return the path of ``style.json``.
 

@@ -60,6 +60,78 @@ impl Tiler {
         let a = py.detach(|| self.tiles.archive(bounds, &layers)).ok_or_else(|| PyValueError::new_err("the archive has no tile"))?;
         Ok(PyBytes::new(py, &a))
     }
+
+    /// bounds() -> [min lon, min lat, max lon, max lat] | None: the box of every feature in the tiles.
+    fn bounds(&self) -> Option<[f64; 4]> {
+        self.tiles.bounds()
+    }
+
+    /// layers() -> list[str]: the tile layers, in their order.
+    fn layers(&self) -> Vec<String> {
+        self.tiles.layer_names()
+    }
+
+    /// zooms() -> (first, last): the zooms of the tiles.
+    fn zooms(&self) -> (u32, u32) {
+        self.tiles.zooms()
+    }
+}
+
+/// Stage 1 (docs/rust/architecture.md, "The three stages and the one call"): the style and its sources in memory (make_sources).
+#[pyclass(frozen)]
+struct Sources {
+    inner: roadstyle::sources::Sources,
+}
+
+fn format(f: &str) -> PyResult<roadstyle::Format> {
+    match f {
+        "geojson" => Ok(roadstyle::Format::GeoJson),
+        "geoparquet" => Ok(roadstyle::Format::GeoParquet),
+        _ => Err(PyValueError::new_err(format!("format must be 'geojson' or 'geoparquet', not {f:?}"))),
+    }
+}
+
+#[pymethods]
+impl Sources {
+    /// save(dir, format="geojson", keep=[]) -> list[(name, size)]: stage 1's files in dir: style.json, a file for each source and
+    /// road_table.parquet (every field of each road; the roads' file has their drawing values and `keep`).
+    #[pyo3(signature = (dir, format="geojson", keep=Vec::new()))]
+    fn save(&self, py: Python<'_>, dir: String, format: &str, keep: Vec<String>) -> PyResult<Vec<(String, usize)>> {
+        let f = self::format(format)?;
+        py.detach(|| roadstyle::save_sources(&self.inner, std::path::Path::new(&dir), f, &keep)).map_err(PyValueError::new_err)
+    }
+
+    /// file_names(format="geojson") -> list[str]: the names of stage 1's files.
+    #[pyo3(signature = (format="geojson"))]
+    fn file_names(&self, format: &str) -> PyResult<Vec<String>> {
+        Ok(roadstyle::file_names(&self.inner, self::format(format)?))
+    }
+
+    /// file(name, format="geojson", keep=[]) -> bytes: one of stage 1's files.
+    #[pyo3(signature = (name, format="geojson", keep=Vec::new()))]
+    fn file<'py>(&self, py: Python<'py>, name: &str, format: &str, keep: Vec<String>) -> PyResult<Bound<'py, PyBytes>> {
+        let f = self::format(format)?;
+        let b = py.detach(|| roadstyle::source_file(&self.inner, name, f, &self.inner.drawn(&keep))).map_err(PyValueError::new_err)?;
+        Ok(PyBytes::new(py, &b))
+    }
+}
+
+/// make_sources(roads, look, features=None, planner=None, name=None) -> Sources: stage 1, as make_style's arguments.
+#[pyfunction]
+#[pyo3(signature = (roads, look, features=None, planner=None, name=None))]
+fn make_sources(py: Python<'_>, roads: Vec<u8>, look: String, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>)
+                -> PyResult<Sources> {
+    let inner = py.detach(|| roadstyle::make_sources(roads, &look, features, planner, name)).map_err(PyValueError::new_err)?;
+    Ok(Sources { inner })
+}
+
+/// tile_files(dir, keep=[], prefix="") -> Tiler: stage 2 from stage 1's files in dir (GeoJSON or GeoParquet, as style.json names
+/// them); the Tiler's style is the saved style with the one vector source.
+#[pyfunction]
+#[pyo3(signature = (dir, keep=Vec::new(), prefix=String::new()))]
+fn tile_files(py: Python<'_>, dir: String, keep: Vec<String>, prefix: String) -> PyResult<Tiler> {
+    let (style, tiles) = py.detach(|| roadstyle::tile_files(std::path::Path::new(&dir), &keep, None)).map_err(PyValueError::new_err)?;
+    Ok(Tiler { style: roadstyle::vector_style(&style, &prefix, tiles.zooms()).to_string(), tiles })
 }
 
 /// compute_levels(roads, method, cols) -> (rows, info): roadstyle's compute_levels with its defaults, on the roads in their order (GeoParquet
@@ -120,6 +192,9 @@ fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(make_look, m)?)?;
     m.add_function(wrap_pyfunction!(compute_levels, m)?)?;
     m.add_class::<Tiler>()?;
+    m.add_class::<Sources>()?;
+    m.add_function(wrap_pyfunction!(make_sources, m)?)?;
+    m.add_function(wrap_pyfunction!(tile_files, m)?)?;
     m.add("MAX_ROADS", roadstyle::MAX_ROADS)?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())

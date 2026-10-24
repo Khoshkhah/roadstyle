@@ -37,7 +37,7 @@ from .emit import (
     to_iframe,
     to_spec,
 )
-from .export import export_inline, export_look, export_style
+from .export import export_geojson, export_inline, export_look, export_style, tile_geojson
 from .filters import filter_edges, highway_types
 from .legend import make_legend
 from .levels import auto_ends, casing_parts, compute_levels, level_input, solve_levels
@@ -137,6 +137,8 @@ __all__ = [
     "export_inline",
     "export_look",
     "export_style",
+    "export_geojson",
+    "tile_geojson",
     "compute_levels",
     "level_input",
     "solve_levels",
