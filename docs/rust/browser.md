@@ -89,7 +89,7 @@ The page shows the roads colored by `lanes`, the legend, the Roads box, the sear
 
 - `args` takes the keywords of `render_edges` that change the style, with their Python names: `color_by`, `cmap`, `arrows`,
   `labels`, `view_3d`, `highway_col`, ... ([Keywords by engine](keywords.md)).
-- `state: "live"` keeps the global state (`rs_co`, `rs_colors`, ...) in the expressions, so the controls can change the map.
+- `state: "live"` keeps the global state (`rs_co`, `rs_top`, ...) in the expressions, so the controls can change the map.
   Without it, the engine writes the start values, as `export_style` does.
 - `rsDashboard` reads its options from the style's metadata (`roadstyle:controls`, `roadstyle:interaction`,
   `roadstyle:color_options`). An option that you give has priority.

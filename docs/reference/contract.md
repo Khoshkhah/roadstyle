@@ -125,8 +125,9 @@ declares each one in MapLibre's `state` block and lists its start value in `road
 | Name | Type | Start value | Values | Read by | Set by | API |
 |---|---|---|---|---|---|---|
 | `rs_co` | integer | `color_active` | 0 to the number of options - 1 | the fill pieces and items (`match` on the option) | Colour by menu, views | `rsSetColorField`; `rs:colorchange` |
-| `rs_colors` | object: edge index to color | `{}` | colors | the fills, items, end caps, attached overlays (`_painted`) | host page | `rsColor`; `rs:colorchange` |
-| `rs_base` | object: edge index to color | `{}` | colors | the same, under `rs_colors` | host page | `rsColorBase` |
+| `rs_colors` | object: edge index to color | `{}` | colors | the full look only (`simple=False`): the fills, items, end caps, attached overlays (`_painted`). The simple look reads the feature state `rs_c` | host page | `rsColor`; `rs:colorchange` |
+| `rs_base` | object: edge index to color | `{}` | colors | the full look only: the same, under `rs_colors` | host page | `rsColorBase` |
+| `rs_top` | list of rows | `[]` | the rows that `rsColor` painted | the simple look's sort key: a painted road is drawn over the others of its level (the colour is the feature state `rs_c` of the row) | host page | `rsColor` |
 | `rs_fill_on` | bool | `road_fill` | | the fill pieces' opacity | road fill switch, views | `rsSetRoadFill`; `rs:roadfillchange` |
 | `rs_ov_<i>` | object: feature id to color | `{}` | colors | the paint of overlay `i` | host page | `rsColor(..., overlay)` |
 | `rs_palette` | text | the start palette | the palettes that the views name | each color that differs between these palettes (`__rs_fill@<palette>` and the paint values) | View menu | `rsSetView`; `rs:viewselect` |

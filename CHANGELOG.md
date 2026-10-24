@@ -11,9 +11,19 @@ All notable changes to **roadstyle** are documented here. The format is based on
   Python runs too. They have no SQL of their own now. Their functions and arguments do not change, and a new `readCatalog(q, catalog)`
   gives the catalog that `duckosmPlan` reads. Load the module (`init()`) before you call them. On Monaco they write the same
   `roads.parquet` (stored levels and tags, every mode) and `features.parquet`, byte for byte, as before.
+- **The simple look reads the colour of `rsColor` and `rsColorBase` from the feature state `rs_c` only** (audit N8, part 2, both
+  engines). The fill is the active option's colour under `rs_c`; an item's colour is `rs_c`, else its own; a painted road sorts on top
+  by the global state `rs_top` (the rows that `rsColor` painted, start value `[]`). The state has `rs_top` in place of `rs_colors` and
+  `rs_base`. The full look (`simple=False`, Python only) keeps `rs_colors` and `rs_base`.
 - **Every style reads a road's colour and width from the feature state** (audit N8, both engines). The road layer reads
   `["coalesce", ["feature-state", "rs_c"], <baked colour>]` and each width and offset stop × `["coalesce", ["feature-state", "rs_w"], 1]`,
   in every style, not only with `live_data`; `live_data` now only adds the metadata `roadstyle:live` and the page's option `live`.
+- **`rsColor` and `rsColorBase` write the feature state `rs_c`** (audit N8, the dashboard). A road gets one colour on the row that draws
+  it: the colour of `rsColor`, else that of `rsColorBase`, else that of `rs.setData`. A road of a two-way pair drawn as one line
+  (`__rs_dup`) gets its colour on its twin's row. The rows that `rsColor` painted are in the global state `rs_top` (a list of rows, with
+  no colours), which the sort key reads: a painted road stays on top of the others of its level. The global states `rs_colors` and
+  `rs_base` (a colour for each road, which made MapLibre lay out every tile again) are not written any more on the simple look. The full
+  look (`simple=False`) keeps them until it is removed.
 - **The base maps are a data file**, `src/roadstyle/data/basemaps.json`: one list for Python (`roadstyle.basemaps.BASEMAPS` and the
   switcher's default set) and the studio in the browser. The values are the same as before.
 - **The look is a crate of its own, typed and versioned** (`rust/roadstyle-look`, design step (c), audit R16). `Look::resolve` makes
@@ -55,6 +65,17 @@ All notable changes to **roadstyle** are documented here. The format is based on
   has the key: a casing piece has no `__rs_fill@<palette>: null` any more. The map does not change.
 
 ### Added
+- **The Rust engine reads Shapefile and GeoPackage road files** (`roadstyle-io`: `shp.rs`, `gpkg.rs`, `crs.rs`). Each gives the
+  `RoadTable` of the GeoJSON reader, with the same column types. A file's CRS goes to EPSG:4326 with the rule of Python's
+  `validate.to_wgs84`: no CRS is an error, EPSG:4326 stays as it is, another CRS is reprojected (proj4rs, pure Rust; an EPSG code
+  through crs-definitions, a WKT text through proj4wkt). A CRS that the reader cannot read is an error that names it. GeoPackage is
+  SQLite (C), so it is the feature `gpkg`, for the native programs only. The wasm package has `readShp(shp, dbf, prj?, name?)`, and
+  CI fails if `roadstyle-wasm` depends on SQLite.
+- **The map of one mode from a duckOSM file** (`only=True` in `roadstyle.duckosm.read`, `export_inline` and `export_style`, as mapstyle's
+  `render_map(only=True)`): the `edges` and `private_edges` of one network. The stored levels were solved for every mode together, so each
+  road must have its stored row (as Python's `load_area_levels(subset=True)`), else an error that names how many and one of them; then the
+  look's `levels` keyword names these roads. JavaScript: `duckosmPlan(..., only)` and `duckosmSubsetLevels`. On Monaco the driving and
+  walking maps are mapstyle's but for the 3D decks and, in these maps only, 87 name slots and 1 to 2 attached points of the Rust engine.
 - **The base map's look for Python callers**: `roadstyle.duckosm.base_map(mode, theme=, paths=)` (the palette, the settings, the base
   map's part and the mode's map options), `roadstyle.duckosm.theme(name)` and `roadstyle.duckosm.recolor(colour, transform)`, all made
   by the Rust engine. The mapstyle shim reads them. `Look.part` also gives `palette`, `settings` and `features`.
