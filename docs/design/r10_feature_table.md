@@ -1,4 +1,4 @@
-# R10: the base map and the overlays as a typed FeatureTable (plan; steps 1, 2 and 6 done)
+# R10: the base map and the overlays as a typed FeatureTable (plan; steps 1, 2, 6 and the GeoParquet writer of 5 done)
 
 Audit R10 (audit_2026-10-23.md; refined by N5 of audit_2026-10-24.md): the base map and the overlays go through the engine as
 `serde_json` trees. This note gives the plan for the base map's and the overlays' part of R10. The slots and the 3D decks stay with
@@ -107,4 +107,10 @@ tiles of Monaco and Tartu are the same bytes (tests/style.rs, tests/stages.rs). 
 | Time | 2,060 ms | 1,752 ms |
 
 The base map's 33 MB that stay are its tile layers (each feature's geometry in Web Mercator and its value numbers).
+
+## Step 5's GeoParquet writer, done (2026-10-24)
+
+`write_source_file` gives the one Parquet writer (`write::parquet_to`) the rows of a typed source from its table: the Arrow cells of the
+keys of each GeoJSON feature, and each feature's geometry. Before, it made one JSON value of the whole source. The 22 GeoParquet files of
+Tartu are the same bytes, and saving them needs no more memory than stage 1 (284 MB).
 

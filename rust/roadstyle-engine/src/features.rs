@@ -153,12 +153,6 @@ impl FeatureSource {
         }
         Value::Object(s)
     }
-
-    /// The source with its data, as JSON (for the readers of a JSON source: stage 2's `Tiles::add` and the GeoParquet writer, until they
-    /// read the table, R10 steps 5 and 6).
-    pub fn to_value(&self) -> Value {
-        self.spec(self.table.to_value())
-    }
 }
 
 #[cfg(test)]

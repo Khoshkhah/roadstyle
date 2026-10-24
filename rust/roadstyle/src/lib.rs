@@ -288,16 +288,7 @@ pub fn write_source_file<W: std::io::Write + Send>(s: &sources::Sources, file: &
     }
     use roadstyle_io::write::{Geometry, Row as PqRow, Val};
     let lines = s.draws_roads();
-    // R10: a base-map layer goes into the file as JSON until the writer reads the table's columns (step 5)
-    let as_json;
-    let src = match &s.sources[i].1 {
-        Src::Features(f) => {
-            as_json = Src::Json(f.to_value());
-            &as_json
-        }
-        src => src,
-    };
-    match src {
+    match &s.sources[i].1 {
         // audit N5: the roads' Arrow cells and lines go into the file with no JSON copy; the pieces' values are their own
         Src::Roads(_) => roadstyle_io::write::parquet_to(w, || s.roads.roads.iter().map(|r| PqRow {
             id: Some(r.i as i64),
@@ -315,7 +306,15 @@ pub fn write_source_file<W: std::io::Write + Send>(s: &sources::Sources, file: &
                 geometry: Some(&f["geometry"]).filter(|g| !g.is_null()).map(|g| Geometry::Json(std::borrow::Cow::Borrowed(g))),
             }), true)
         }
-        Src::Features(_) => unreachable!("a JSON source above"),
+        // a base-map layer: its table's cells (the keys of each GeoJSON feature) and each feature's geometry (R10)
+        Src::Features(f) => {
+            let t = &f.table;
+            roadstyle_io::write::parquet_to(w, || (0..t.len()).map(|r| PqRow {
+                id: None,
+                props: t.names().iter().filter(|k| t.has_key(r, k)).filter_map(|k| t.get(r, k).map(|c| (k.as_str().into(), Val::Cell(c)))).collect(),
+                geometry: Some(t.geometries_of().to_geojson(r)).filter(|g| !g.is_null()).map(Geometry::from),
+            }), true)
+        }
     }
 }
 
