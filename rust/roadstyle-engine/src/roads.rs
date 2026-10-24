@@ -3,7 +3,7 @@
 
 use crate::draw::Cap;
 use crate::road::Roads;
-use roadstyle_model::Cell;
+use roadstyle_model::{flags, Cell};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
@@ -101,21 +101,16 @@ fn missing(v: Option<Cell>) -> bool {
     v.is_none_or(Cell::is_null)
 }
 
-/// render_web._truthy: not missing and not "", "no", "false", "0", 0 or False.
+/// A yes/no value by the one road-flag rule (roadstyle_model::flags): not missing, not 0 or False, and not a text in `flags::NO`.
 pub(crate) fn truthy<'a, C: Into<Cell<'a>>>(v: Option<C>) -> bool {
     match v.map(Into::into) {
         None => false,
-        Some(c) if c.is_null() => false,
+        Some(c) if c.is_null() => false,        // NaN too
         Some(Cell::Bool(b)) => b,
         Some(Cell::Int(i)) => i != 0,
         Some(Cell::Float(f)) => f != 0.0,
-        Some(Cell::Str(s)) => !matches!(s, "" | "no" | "false" | "0"),
-        Some(Cell::Json(v)) => match v {
-            Value::Bool(b) => *b,
-            Value::Number(n) => n.as_f64() != Some(0.0),
-            Value::String(s) => !matches!(s.as_str(), "" | "no" | "false" | "0"),
-            _ => true,
-        },
+        Some(Cell::Str(s)) => flags::yes_text(s),
+        Some(Cell::Json(v)) => flags::yes(v),
         Some(Cell::Null) => false,
     }
 }
