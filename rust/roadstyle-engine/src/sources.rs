@@ -97,6 +97,7 @@ impl Sources {
         match &self.sources[i].1 {
             Src::Roads(_) => self.roads.write_data(w, Some(drawn), self.draws_roads()),
             Src::Simple(s) => s.write_data(w, &self.roads.roads),
+            Src::Features(f) => f.write_data(w),
             Src::Json(v) => serde_json::to_writer(w, &JsSafe(&v["data"])).map_err(std::io::Error::other),
         }
     }
@@ -122,6 +123,7 @@ impl Sources {
             match s {
                 Src::Roads(_) => self.roads.write_json(w)?,
                 Src::Simple(p) => p.write_json(w, &self.roads.roads)?,
+                Src::Features(f) => f.write_json(w)?,
                 Src::Json(v) => serde_json::to_writer(&mut *w, &JsSafe(v))?,
             }
         }
@@ -155,6 +157,7 @@ impl Sources {
             .map(|(k, s)| (k.clone(), match s {
             Src::Roads(_) => spec(self.roads.tolerance, false, self.roads.maxzoom, url(k)),
             Src::Simple(s) => spec(s.tolerance, s.promote, s.maxzoom, url(k)),
+            Src::Features(f) => f.spec(url(k).into()),
             Src::Json(v) => {
                 let mut v = v.clone();
                 v["data"] = url(k).into();

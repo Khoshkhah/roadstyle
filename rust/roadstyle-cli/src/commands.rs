@@ -83,7 +83,7 @@ fn look_options(opts: &mut Vec<(String, Option<String>)>, defaults: impl FnOnce(
     let mut kw: Map<String, Value> = opts.iter().map(keyword).collect();
     defaults(&mut kw);
     look.insert("args".into(), Value::Object(kw));
-    roadstyle::look::Options::from_value(&Value::Object(look))
+    roadstyle::look::Options::from_value(&Value::Object(look)).map_err(String::from)
 }
 
 fn read(path: &str) -> Result<Vec<u8>, String> {
@@ -125,7 +125,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
             })?;
             let look = roadstyle::Look::resolve(&o)?;
             let roads = roadstyle::read::read_roads(read(roads)?, "geometry")?;
-            let page = roadstyle::page_options::page_from(roads, &look, &o, &given)?;
+            let page = roadstyle::page_options::page_from(roads, None, &look, &o, &given)?;
             for w in &page.warnings {
                 eprintln!("warning: {w}");
             }

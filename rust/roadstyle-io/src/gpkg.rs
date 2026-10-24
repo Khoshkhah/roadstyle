@@ -8,6 +8,7 @@
 //! - The line: a LineString (2D, Z, M or ZM; its x and y), in EPSG:4326 (`crs`, the CRS of gpkg_spatial_ref_sys: its EPSG code, else
 //!   its WKT). Another geometry gives no line, as in the other readers: that road is not drawn.
 
+use crate::Error;
 use rusqlite::types::ValueRef;
 use rusqlite::{Connection, OptionalExtension, MAIN_DB};
 use serde_json::{json, Map, Value};
@@ -56,19 +57,19 @@ fn gpkg_wkb(b: &[u8]) -> Option<&[u8]> {
     b.get(8 + env..)
 }
 
-fn sql_err(what: &str) -> impl Fn(rusqlite::Error) -> String + '_ {
-    move |e| format!("{what}: {e}")
+fn sql_err(what: &str) -> impl Fn(rusqlite::Error) -> Error + '_ {
+    move |e| Error::Format(format!("{what}: {e}"))
 }
 
 /// The roads of the GeoPackage `data` (the file's bytes), and the warning when the file has more than one feature table. `what` names
 /// the file in the errors and the warning.
-pub fn read_roads(data: &[u8], what: &str) -> Result<(RoadTable, Option<String>), String> {
+pub fn read_roads(data: &[u8], what: &str) -> Result<(RoadTable, Option<String>), Error> {
     let mut db = Connection::open_in_memory().map_err(sql_err(what))?;
-    db.deserialize_read_exact(MAIN_DB, data, data.len(), true).map_err(|e| format!("{what}: not a GeoPackage: {e}"))?;
+    db.deserialize_read_exact(MAIN_DB, data, data.len(), true).map_err(|e| Error::Format(format!("{what}: not a GeoPackage: {e}")))?;
     let err = sql_err(what);
     let tables: Vec<String> = db.prepare("SELECT table_name FROM gpkg_contents WHERE data_type = 'features' ORDER BY rowid")
-        .and_then(|mut s| s.query_map([], |r| r.get(0))?.collect()).map_err(|e| format!("{what}: not a GeoPackage: {e}"))?;
-    let table = tables.first().cloned().ok_or_else(|| format!("{what}: the GeoPackage has no feature table"))?;
+        .and_then(|mut s| s.query_map([], |r| r.get(0))?.collect()).map_err(|e| Error::Format(format!("{what}: not a GeoPackage: {e}")))?;
+    let table = tables.first().cloned().ok_or_else(|| Error::Format(format!("{what}: the GeoPackage has no feature table")))?;
     // geopandas' (pyogrio's) warning, in its words
     let warning = (tables.len() > 1).then(|| {
         let names: Vec<String> = tables.iter().enumerate().map(|(i, t)| if i == 0 { format!("'{t}' (default)") } else { format!("'{t}'") }).collect();
@@ -79,7 +80,7 @@ pub fn read_roads(data: &[u8], what: &str) -> Result<(RoadTable, Option<String>)
     let crs = db.query_row("SELECT organization, organization_coordsys_id, definition FROM gpkg_spatial_ref_sys WHERE srs_id = ?1", [srs],
                            |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?, r.get::<_, String>(2)?))).optional().map_err(&err)?;
     let crs = match crs {
-        Some((org, code, _)) if org.eq_ignore_ascii_case("EPSG") && code > 0 => Some(Crs::Epsg(u16::try_from(code).map_err(|_| format!("{what}: EPSG:{code}"))?)),
+        Some((org, code, _)) if org.eq_ignore_ascii_case("EPSG") && code > 0 => Some(Crs::Epsg(u16::try_from(code).map_err(|_| Error::Format(format!("{what}: EPSG:{code}")))?)),
         Some((_, _, def)) if def != "undefined" => Some(Crs::Wkt(def)),
         _ => None,
     };
@@ -122,5 +123,5 @@ pub fn read_roads(data: &[u8], what: &str) -> Result<(RoadTable, Option<String>)
         feats.push(json!({"type": "Feature", "properties": props, "geometry": geom}));
     }
     let fc = json!({"type": "FeatureCollection", "features": feats});
-    Ok((geojson::read_roads(&serde_json::to_vec(&fc).map_err(|e| e.to_string())?)?, warning))
+    Ok((geojson::read_roads(&serde_json::to_vec(&fc).map_err(|e| Error::Format(e.to_string()))?)?, warning))
 }
