@@ -35,3 +35,10 @@ impl From<String> for Error {
         Error::Engine(m)
     }
 }
+
+/// The look's errors (roadstyle-look), as the engine's text.
+impl From<roadstyle::look::Error> for Error {
+    fn from(e: roadstyle::look::Error) -> Error {
+        Error::Engine(e.to_string())
+    }
+}

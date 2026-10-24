@@ -35,7 +35,7 @@ the range; `width_by=(1, 6)` also makes higher values wider, from 1 to 6 px.
 rs.render_edges(edges, color_by="maxspeed_kmh", cmap="magma", width_by=(1, 6))
 ```
 
-Numeric colouring needs the `numeric` extra: `pip install "roadstyle[numeric]"`.
+A colour map needs no extra package: the ramps are in roadstyle's data (`data/cmaps.json`).
 
 ## Your own colours
 

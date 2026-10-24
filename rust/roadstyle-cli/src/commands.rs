@@ -101,14 +101,14 @@ fn roads(path: &str) -> Result<roadstyle::RoadTable, Error> {
     let p = Path::new(path);
     let beside = |ext: &str| p.with_extension(ext).to_string_lossy().into_owned();
     match p.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref() {
-        Some("parquet" | "geoparquet") => Ok(roadstyle::read::read_roads(read(path)?, "geometry")?),
-        Some("geojson" | "json") => Ok(roadstyle::geojson::read_roads(&read(path)?)?),
+        Some("parquet" | "geoparquet") => Ok(roadstyle::read::read_roads(read(path)?, "geometry").map_err(String::from)?),
+        Some("geojson" | "json") => Ok(roadstyle::geojson::read_roads(&read(path)?).map_err(String::from)?),
         Some("shp") => {
             let prj = std::fs::read_to_string(beside("prj")).ok();
-            Ok(roadstyle::shp::read_roads(&read(path)?, &read(&beside("dbf"))?, prj.as_deref(), path)?)
+            Ok(roadstyle::shp::read_roads(&read(path)?, &read(&beside("dbf"))?, prj.as_deref(), path).map_err(String::from)?)
         }
         Some("gpkg") => {
-            let (t, warning) = roadstyle::gpkg::read_roads(&read(path)?, path)?;
+            let (t, warning) = roadstyle::gpkg::read_roads(&read(path)?, path).map_err(String::from)?;
             if let Some(w) = warning {
                 eprintln!("warning: {w}");
             }
@@ -152,7 +152,7 @@ pub fn run(args: &[String]) -> Result<(), Error> {
                 kw.insert("state".into(), "live".into()); // a page's style: the state in the expressions, the interaction contract
             })?;
             let look = roadstyle::Look::resolve(&o)?;
-            let page = roadstyle::page_options::page_from(self::roads(roads)?, &look, &o, &given)?;
+            let page = roadstyle::page_options::page_from(self::roads(roads)?, None, &look, &o, &given)?;
             for w in &page.warnings {
                 eprintln!("warning: {w}");
             }

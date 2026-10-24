@@ -86,24 +86,25 @@ fn filter_panel(look: &crate::Look, roads: &Roads, m: &Model) -> Value {
            "bridges": roads.iter().any(|f| lvl(f) > 0.0), "tunnels": roads.iter().any(|f| lvl(f) < 0.0)})
 }
 
-/// roadstyle:sources: each role of the page (a source's name in the GeoJSON way, a tile layer's in the tile way), in the order of its
-/// first layer, with its source and its source layer (null for a GeoJSON source); render_web._roles.
+/// roadstyle:sources: each road role of the page (a source's name in the GeoJSON way, a tile layer's in the tile way), in the order of
+/// its first layer, with its source and its source layer (null for a GeoJSON source); render_web._roles. The overlays are not roles
+/// (their own list: `overlays`), and the boundary is not a road (R7).
 pub fn roles(layers: &[Value]) -> Value {
-    const ROLES: [&str; 10] = ["roads", "simple", "slots", "arrows", "decks", "shadows", "casings", "halves", "ends", "boundary"];
+    const ROLES: [&str; 9] = ["roads", "simple", "slots", "arrows", "decks", "shadows", "casings", "halves", "ends"];
     let mut out = Map::new();
     for l in layers {
         let (src, sl) = (l["source"].as_str(), l["source-layer"].as_str());
         let Some(role) = sl.or(src) else { continue };
-        let ours = ROLES.contains(&role) || role.strip_prefix("ov").is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()));
-        if ours && !out.contains_key(role) {
+        if ROLES.contains(&role) && !out.contains_key(role) {
             out.insert(role.into(), json!({"source": src, "layer": sl}));
         }
     }
     Value::Object(out)
 }
 
-/// The one writer of what the dashboard reads about a style's layers (audit N7): `roadstyle:sources` (`roles`) and `roadstyle:arrows`
-/// (`arrow_kind`) from its final layers, in a style with the interaction contract. Stage 2 calls it again on the tiled style.
+/// The one writer of what the dashboard reads about a style's layers (audit N7): `roadstyle:sources` (`roles`), `roadstyle:arrows`
+/// (`arrow_kind`) and the controls' `pick` (`pick_layers`) from its final layers, in a style with the interaction contract. Stage 2
+/// calls it again on the tiled style.
 pub fn describe(style: &mut Value) {
     if style["metadata"]["roadstyle:contract"].is_null() {
         return;
@@ -111,6 +112,20 @@ pub fn describe(style: &mut Value) {
     let layers = style["layers"].as_array().cloned().unwrap_or_default();
     style["metadata"]["roadstyle:sources"] = roles(&layers);
     style["metadata"]["roadstyle:arrows"] = arrow_kind(&layers);
+    if style["metadata"]["roadstyle:controls"].is_object() {
+        style["metadata"]["roadstyle:controls"]["pick"] = pick_layers(&layers);
+    }
+}
+
+/// The layers that a road is picked on (clicked, hovered), render_web._pick_layers: the road layer of simple mode (the full look: its
+/// fill layers, not the halves'), and the 3D decks' tops (not their casing, roads-deck-casing). A caller's items are in `overlays`.
+pub fn pick_layers(layers: &[Value]) -> Value {
+    let fill = |id: &str| ["roads-fill", "roads-low-fill", "roads-high-fill", "roads-bridge-fill"].iter().any(|p| id.starts_with(p));
+    let simple = layers.iter().any(|l| l["id"] == "roads-simple");
+    layers.iter().filter(|l| {
+        let id = l["id"].as_str().unwrap_or("");
+        (if simple { id == "roads-simple" } else { fill(id) && l["source"] != "halves" }) || id.starts_with("roads-bridge-decks")
+    }).map(|l| l["id"].clone()).collect()
 }
 
 /// roadstyle:arrows: "points" (the page puts one arrow on each one-way road in view: the source "arrows"), "line" (along the slots), or
@@ -147,11 +162,21 @@ pub fn controls(look: &crate::Look, roads: &Roads, info: PageInfo, active: usize
     // a page is in simple mode, in both ways: the pieces pick and glow (the road layer roads-simple), and there are no fill layers
     // the facts of the look and of the roads that a host's dashboard needs; the caller's page keywords (tiles, views, the base maps, ...)
     // are not here: the page gives them (RS_OPTIONS, page_options::page_from), as a host does (rule 5, R3)
-    Ok(json!({"simple": "roads-simple", "pitch_3d": cam["pitch_3d"],
+    let mut out = json!({"simple": "roads-simple", "pitch_3d": cam["pitch_3d"],
         "select_color": select, "filter": filter_panel(look, roads, m), "color_active": active, "overlays": info.overlays, "tunnel": tunnel,
         "fill_layers": [], "road_fill": {"on": args["road_fill"] != false, "paint": info.fill_paint}, "dashes": info.dashes,
         "items": items, "edge_id_col": args["edge_id_col"].as_str().unwrap_or("edge_id"), "arrow_icon": arw["icon"], "arrow_color": arw["color"],
         "arrow_rules": {"mainBelow": arw["main_below"], "main": arw["main"], "minLenPx": place["min_len_px"], "minGapPx": place["min_gap_px"],
                         "nameGapPx": place["name_gap_px"], "edgePx": place["edge_px"], "charWidth": place["char_width"],
-                        "baseSize": th["labels"]["base_size"]}}))
+                        "baseSize": th["labels"]["base_size"]}});
+    // the map option `modes` (a base map's look: the road table's mode columns): each mode that some road has, with its count, in order
+    if let Some(modes) = args["modes"].as_array() {
+        let yes = |c: Option<Cell>| matches!(c, Some(Cell::Bool(true))) || c.and_then(Cell::as_str) == Some("true");
+        out["modes"] = modes.iter().filter_map(Value::as_str)
+            .map(|m| (m, roads.iter().filter(|r| yes(r.get(m))).count())).filter(|(_, n)| *n > 0).map(|(m, n)| json!([m, n])).collect();
+    }
+    if let Some(b) = args["box_layout"].as_str() {      // a base map's page: the Roads and Layers boxes in one stack
+        out["box_layout"] = b.into();
+    }
+    Ok(out)
 }

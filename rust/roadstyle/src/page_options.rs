@@ -8,7 +8,7 @@ use crate::look::Options;
 use crate::page::{escape, gzip_b64, page_html, Camera, PageOptions, PageParts};
 use crate::sources::Sources;
 use crate::tiles::stage::{TileOptions, COLUMNS, TILES};
-use crate::{layers::py_truth, Look, RoadTable};
+use crate::{layers::py_truth, FeatureTable, Look, RoadTable};
 use serde_json::{json, Map, Value};
 
 const BASEMAPS: &str = include_str!("../../../src/roadstyle/data/basemaps.json");
@@ -57,8 +57,10 @@ pub struct Page {
 
 /// The page of `roads` with `look` (resolved from `options`, which a view's palette resolves again with its palette). `given`: the
 /// caller's values over the look's args: `street_view_key`, `api_key` (put into a base map's URL), and `resolved_basemaps`, the
-/// entries (as data/basemaps.json's) of the base map keys that the caller resolved itself (Python: its key of each provider).
-pub fn page_from(roads: RoadTable, look: &Look, options: &Options, given: &Map<String, Value>) -> Result<Page, String> {
+/// entries (as data/basemaps.json's) of the base map keys that the caller resolved itself (Python: its key of each provider). `features`:
+/// the base map's rows (`read_features`, a duckOSM map's features.parquet), or None.
+pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, options: &Options, given: &Map<String, Value>)
+                 -> Result<Page, String> {
     let sidebar = match given.get("sidebar").or(look.args.get("sidebar")).filter(|v| !v.is_null()) {
         None => None,
         Some(v) => Some(SIDEBARS.iter().find(|s| v == s.0).ok_or_else(|| format!("sidebar must be \"dashboard\" or \"report\", got {}", repr(v)))?),
@@ -92,7 +94,7 @@ pub fn page_from(roads: RoadTable, look: &Look, options: &Options, given: &Map<S
     }
     let bounds = bounds_of(&roads);
     let tiled = on("tiles");
-    let mut src = crate::sources_of(roads, look, None, None, look.args["name"].as_str().map(String::from))?;
+    let mut src = crate::sources_of(roads, look, features, None, look.args["name"].as_str().map(String::from))?;
     let (active, bms, base) = basemaps(&a, look, &mut src.warnings)?;
     let bg = bg_color(&active, look);
     let keys: Vec<Value> = bms.iter().map(|b| b["key"].clone()).collect();
@@ -156,11 +158,12 @@ pub fn page_from(roads: RoadTable, look: &Look, options: &Options, given: &Map<S
         select_color: ctl["select_color"].clone(), filter: ctl["filter"].clone(),
         color_options: Some(&meta["roadstyle:color_options"]).filter(|v| py_truth(v)).cloned().unwrap_or_else(|| json!([])),
         color_active: ctl["color_active"].clone(), overlays: ctl["overlays"].clone(), overlay_control: on("overlay_control"),
-        overlay_popup: on("overlay_popup"), tunnel, fill_layers: ctl["fill_layers"].clone(), road_fill: ctl["road_fill"].clone(),
+        overlay_popup: on("overlay_popup"), tunnel, fill_layers: ctl["fill_layers"].clone(), pick: ctl["pick"].clone(), road_fill: ctl["road_fill"].clone(),
         views: Value::Array(views), items: ctl["items"].clone(), road_popup: inter["popup"].clone(), road_tooltip: inter["tooltip"].clone(),
         hover_delay_ms: inter["hover_delay_ms"].as_i64().ok_or("roadstyle:interaction has no hover_delay_ms")?,
         edge_id_col: ctl["edge_id_col"].as_str().unwrap_or("edge_id").into(), arrow_icon: ctl["arrow_icon"].clone(),
         arrow_color: ctl["arrow_color"].clone(), arrow_rules: ctl["arrow_rules"].clone(),
+        modes: ctl["modes"].clone(), box_layout: ctl["box_layout"].clone(),
     };
     let hover = Some(&a["hover_color"]).filter(|v| py_truth(v)).unwrap_or(&th["selection"]["hover"]);
     let simple_js = json!({"layer": "roads-simple", "bridge": cfg["bridge_casing_color"], "shadow": cfg["bridge_shadow_color"],

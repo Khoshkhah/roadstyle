@@ -16,27 +16,39 @@ def layer_specs() -> list[dict]:
     return yaml.safe_load(files("roadstyle").joinpath("data/basemap/layers.yaml").read_text(encoding="utf-8"))["layers"]
 
 
-def read(db, mode: str = "all", *, levels: str = "stored", layers: bool = True, only: bool = False):
+def read(db, mode: str = "all", *, levels: str = "stored", layers=True, only: bool = False):
     """``(roads, features, levels_kw)`` of the duckOSM file ``db`` for the map of ``mode`` ("all", "driving", "walking" or "cycling"):
-    the roads (an Arrow table), the base map's rows (an Arrow table, None with ``layers=False`` or when the file has none) and the
-    look's keyword ``levels``: the stored levels' check ({edge_hash, n_edges}) with ``levels="stored"``, or "tags" (the engine computes
-    the levels with the tags rule). A base-map layer whose table or query fails is skipped, as mapstyle's load_layers does. ``only``:
+    the roads (an Arrow table), the base map's rows (an Arrow table, None with ``layers=False`` or when the file has none; a list of
+    names: those layers) and the look's keyword ``levels``: the stored levels' check ({edge_hash, n_edges}) with ``levels="stored"`` (an
+    error when the file has none), "tags" (the engine computes the levels with the tags rule), or with "auto" (render_map's rule, the
+    page's default) the stored levels when the file has them, else None (the engine solves them, with a warning). Stored levels for
+    other roads are an error. A base-map layer whose table or query fails is skipped, as mapstyle's load_layers does. ``only``:
     the roads of ``mode`` alone (its edges and private_edges; render_map(only=True)); the stored levels were solved for every mode
     together, so each of these roads must have its stored row (load_area_levels(subset=True))."""
     import duckdb
-    import pyarrow as pa
 
     from ._engine import rust
 
-    if levels not in ("stored", "tags"):
-        raise ValueError(f'levels must be "stored" or "tags", got {levels!r}')
+    if levels not in ("stored", "tags", "auto"):
+        raise ValueError(f'levels must be "stored", "tags" or "auto", got {levels!r}')
     r = rust()
     con = duckdb.connect(str(db), read_only=True)
     try:
         catalog = con.execute("SELECT current_database()").fetchone()[0]
         tq, cq = r.duckosm_catalog_sql(catalog)
         tables, columns = con.execute(tq).fetchall(), con.execute(cq).fetchall()
-        plan = json.loads(r.duckosm_plan(tables, columns, mode, levels == "tags", json.dumps(layer_specs() if layers else []), only))
+        # "auto" (render_map's rule, docs/design/stored_levels.md of mapstyle): the stored levels when the file has them, else the
+        # engine solves them, with a warning
+        stored = ("visualization", "edge_levels") in {tuple(t) for t in tables}
+        if levels == "stored" and not stored:
+            r.duckosm_levels(None)                          # the reader's error: no stored levels in this file (duckosm levels)
+        solve = levels == "auto" and not stored
+        if solve:
+            warnings.warn(f"{db}: no visualization.edge_levels in this file: roadstyle solved the levels; run duckosm levels to store them",
+                          stacklevel=2)
+        plan = json.loads(r.duckosm_plan(tables, columns, mode, levels == "tags" or solve, json.dumps(layer_specs() if layers else []), only))
+        if plan["roads"] is None:
+            raise ValueError(f"{db}: {plan['roads_error']}")
         e, rows, drop = plan["roads"]
         con.execute(e)
         if plan["meta"]:
@@ -55,10 +67,11 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers: bool = True, 
         elif plan["meta"]:
             level_kw = json.loads(r.duckosm_levels(tuple(row) if row else None))
         else:
-            level_kw = "tags"
+            level_kw = None if solve else "tags"
         con.execute(drop)
         made = []
-        for lyr in plan["layers"]:
+        # a list of names: those layers only (each row's spec is its place in layers.yaml, so the plan has all of them)
+        for lyr in (x for x in plan["layers"] if layers is True or x["name"] in layers):
             for k, sql in enumerate(lyr["sql"]):          # mapstyle's query, then its fallback (no tags: the height of the kind)
                 try:
                     con.execute(f"CREATE OR REPLACE TEMP TABLE f{lyr['spec']} AS {sql}")
@@ -70,9 +83,9 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers: bool = True, 
                     warnings.warn(f"{db}: base-map layer {lyr['name']}: no tags column (an older file): the heights of the kinds", stacklevel=2)
                 made.append(lyr["spec"])
                 break
-        roads = pa.table(con.execute(plan["select"]).arrow())       # in memory: the connection closes below
+        roads = con.execute(plan["select"]).to_arrow_table()      # in memory: the connection closes below (DuckDB 1.5 and later)
         fsel = r.duckosm_features_select(made)
-        features = pa.table(con.execute(fsel).arrow()) if fsel else None
+        features = con.execute(fsel).to_arrow_table() if fsel else None
     finally:
         con.close()
     return roads, features, level_kw
@@ -84,9 +97,13 @@ def look(db, mode: str = "all", *, theme: str = "osm", paths: str = "google", le
     columns, the stored levels' columns with ``levels``), and ``kwargs`` over them (render_edges' keywords)."""
     from ._engine import rust
 
+    return rust().resolve_look(json.dumps(_options(db, mode, theme, paths, levels, kwargs)))
+
+
+def _options(db, mode, theme, paths, levels, kwargs) -> dict:
+    """The look's options of a duckOSM map (`look`): the base map's, and the map options."""
     args = {**kwargs, **({"levels": levels} if levels is not None else {})}
-    o = {"base_map": {"mode": mode, "theme": theme, "paths": paths, "place": Path(db).stem}, "args": args}
-    return rust().resolve_look(json.dumps(o))
+    return {"base_map": {"mode": mode, "theme": theme, "paths": paths, "place": Path(db).stem}, "args": args}
 
 
 def export_inline(db, mode: str = "all", *, theme: str = "osm", paths: str = "google", layers: bool = True, levels: str = "stored",
@@ -102,6 +119,51 @@ def export_inline(db, mode: str = "all", *, theme: str = "osm", paths: str = "go
     style = json.loads(rust().make_style(roads, lk, features, None, None))
     _warn()
     return style
+
+
+def page(db, mode: str = "all", *, theme: str = "osm", paths: str = "google", layers=True, levels: str = "auto",
+         only: bool = False, interaction: dict = None, dashboard: bool = False, **kwargs):
+    """mapstyle's ``render_map`` on the Rust engine: the page of the duckOSM file ``db`` (``read``, its roads in the style of ``mode``, the
+    base map of ``features.*`` with ``layers``, the shared dashboard with the base map's controls: modes, kinds, each layer's clicks,
+    tooltip and popup). ``interaction``: a layer's start ``{clickable, tooltip, popup}`` (e.g. ``{"landcover": {"clickable": True}}``).
+    ``dashboard=True``: roadstyle's report page (``sidebar="report"``). ``kwargs``: render_edges' keywords (``basemap``, ``tiles``,
+    ``sidebar``, ...). Gives a ``WebMap`` (``.save(path)``)."""
+    from . import render_web as rw
+    from ._engine import _warn, page_given, rust
+
+    if kwargs.get("planner"):
+        raise ValueError("duckosm.page has no route planner yet: use mapstyle's render_map(planner=True)")
+    roads, features, level_kw = read(db, mode, levels=levels, layers=layers, only=only)
+    kw = {**kwargs, "state": "live", **({"interaction": interaction} if interaction else {})}
+    if dashboard:
+        from importlib.resources import files
+
+        import yaml
+        roads = _with_modes(roads)
+        colors = yaml.safe_load(files("roadstyle").joinpath("data/basemap/modes.yaml").read_text(encoding="utf-8"))["mode_colors"]
+        # the panel shows the clicked road: no road hover tooltip
+        kw = {"name": f"{Path(db).stem}: dashboard", "tooltip": None, "sidebar": "report",
+              "color_options": {"Road class": {}, "Modes": {"color_by": "modes", "colors": colors}}, **kw}
+    o = _options(db, mode, theme, paths, level_kw, kw)
+    lk = rust().resolve_look(json.dumps(o))
+    # the look's base maps (blank, in the theme's land colour, and the switcher's), where the caller gives none: the keys that Python resolves
+    args = json.loads(lk.part("args"))
+    given = page_given({**{k: args.get(k) for k in ("basemap", "basemaps")}, **kw})
+    html = rust().page_from(roads, lk, json.dumps(o), json.dumps(given), features)
+    _warn()
+    return rw.WebMap(html)
+
+
+def _with_modes(roads):
+    """The roads (an Arrow table) with the column ``modes``: the modes that can use each road, as the dashboard's colour option
+    "Modes" names them ("all modes", "driving + walking", ...; mapstyle's render_map(dashboard=True)).
+    ponytail: Python only; a JavaScript host's dashboard gets the column when the reader's SQL writes it."""
+    import pyarrow as pa
+
+    modes = ("driving", "walking", "cycling")
+    flags = [roads.column(m).to_pylist() for m in modes]
+    labels = ["all modes" if all(f) else " + ".join(m for m, x in zip(modes, f, strict=True) if x) for f in zip(*flags, strict=True)]
+    return roads.append_column("modes", pa.array(labels, pa.string()))
 
 
 def export_style(db, out_dir, *, base_url: str, mode: str = "all", theme: str = "osm", paths: str = "google", layers: bool = True,

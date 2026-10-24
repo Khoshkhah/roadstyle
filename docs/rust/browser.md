@@ -43,14 +43,14 @@ Serve the folder over http. A module script does not load from a `file://` addre
 | Function | Returns | What it does |
 |---|---|---|
 | `init()` | a Promise | loads the WebAssembly module; call it one time, first |
-| `makeLook(options)` | JSON text | the look: `render_edges`' `palette`, `profile`, `settings` and keywords (`args`), from the JSON text `options` |
+| `resolveLook(options)` | a `Look` | the look: `render_edges`' `palette`, `profile`, `settings` and keywords (`args`), from the JSON text `options` |
 | `makeStyle(roads, look, features?, planner?, name?)` | JSON text | the style with the roads in it (as `export_inline`) |
 | `new Tiler(roads, look, features?, name?, prefix, keep)` | a `Tiler` | the style with vector-tile sources, and the tiles on request |
 | `tiler.style()` | JSON text | the style of the `Tiler` |
 | `tiler.tile("roads", z, x, y)` | `Uint8Array` | one vector tile; empty when no road is in it |
 | `tiler.props("roads", row)` | JSON text | the properties of one road, or `null` |
 | `tiler.archive(bounds, layers)` | `Uint8Array` | a PMTiles archive of all tiles in `[min lon, min lat, max lon, max lat]` |
-| `makePage(roads, look, options, given?)` | HTML text | the whole page, as `render_edges` writes it |
+| `makePage(roads, look, options, given?, features?)` | HTML text | the whole page, as `render_edges` writes it |
 | `exportLook(look, cols, positions)` | JSON text | the look for another app's data layer (as `export_look`) |
 | `makeArea(edges, options?)` | an `AreaFiles` | a level area's files in memory ([The level editor in a page](#the-level-editor-in-a-page)) |
 | `new LevelArea(roads, pairs)` | a `LevelArea` | the level editor's solver on an area (`solve`, `solveLocal`, `check`, `draw`, `levelsCsv`) |
@@ -71,13 +71,13 @@ rs.as_edges(edges).gdf.to_parquet("monaco_roads.parquet", index=False)   # edges
 ```html
 <div id="map" style="position:absolute;inset:0"></div>
 <script type="module">
-import init, {makeLook, makeStyle} from "./pkg/roadstyle_wasm.js";
+import init, {resolveLook, makeStyle} from "./pkg/roadstyle_wasm.js";
 import {rsDashboard} from "./dashboard/index.js";
 
 await init();
 const roads = new Uint8Array(await (await fetch("monaco_roads.parquet")).arrayBuffer());
 // the look: render_edges' palette, profile, settings and keywords; state "live" keeps the controls' state in the style
-const look = makeLook(JSON.stringify({palette: "amber", args: {state: "live", color_by: "lanes", cmap: "YlOrRd"}}));
+const look = resolveLook(JSON.stringify({palette: "amber", args: {state: "live", color_by: "lanes", cmap: "YlOrRd"}}));
 const style = JSON.parse(makeStyle(roads, look, undefined, undefined, "Monaco"));
 
 const map = new maplibregl.Map({container: "map", style});
@@ -156,7 +156,7 @@ Use this form when the map has its own base map and the roads come later or chan
 the roads style's sources and layers with a prefix, and gives the dashboard the new style each time.
 
 ```js
-import init, {makeLook, Tiler} from "./pkg/roadstyle_wasm.js";
+import init, {resolveLook, Tiler} from "./pkg/roadstyle_wasm.js";
 import {rsDashboard} from "./dashboard/index.js";
 
 await init();
@@ -175,7 +175,7 @@ const rs = rsDashboard(map, {style: null, prefix: "rs-", tiles: true, simple: "r
                              engine: {props: async (row) => JSON.parse(tiler.props("roads", row))}});
 
 async function showRoads(args) {
-  const look = makeLook(JSON.stringify({palette: "amber", args: {state: "live", ...args}}));
+  const look = resolveLook(JSON.stringify({palette: "amber", args: {state: "live", ...args}}));
   tiler = new Tiler(roads, look, undefined, "Monaco", `rs://${++gen}/`, ["name", "highway", "lanes"]);
   const style = JSON.parse(tiler.style());
   for (const l of map.getStyle().layers) if (l.id.startsWith("rs-")) map.removeLayer(l.id);
@@ -218,13 +218,13 @@ page.
 ## Write the whole page
 
 `makePage` writes the same page as `render_edges(backend="web")` in one call: stage 1, the arrows or the tiles, the views, the
-dashboard's options and the page. `look` is the result of `makeLook(options)`, with `"state": "live"` in its args. Give the same
+dashboard's options and the page. `look` is the result of `resolveLook(options)`, with `"state": "live"` in its args. Give the same
 `options` text again: a view with another palette resolves its look from it. The page has placeholders for MapLibre, which you
 replace:
 
 ```js
 const options = JSON.stringify({palette: "amber", args: {state: "live", name: "Monaco", basemap: "osm", views: {plain: {road_fill: false}}}});
-const html = makePage(roads, makeLook(options), options)
+const html = makePage(roads, resolveLook(options), options)
   .replace("<style>__MAPLIBRE_CSS__</style>", '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">')
   .replace("<script>__MAPLIBRE_JS__</script>", '<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>');
 ```

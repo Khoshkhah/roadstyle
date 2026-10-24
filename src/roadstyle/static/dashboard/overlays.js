@@ -3,7 +3,7 @@
 // visual stacking: "over" overlays (in front of the roads) win, then roads, then "under"
 // overlays (zone fills) — and a selected road also reports the interactive overlays under the
 // click (rs:select detail.overlays), so a sidebar can show the road AND its zone together.
-import {POPUP, _rfields} from "../popup.js";
+import {POPUP, _rfields, _esc} from "../popup.js";
 import {map, O, OVERLAYS, _emit} from "./core.js";
 import {_popupMode, rsInfoShow, _tlHost, _box, _check} from "./panel.js";
 import {rsDeselect, _rrows, _TIP_DELAY} from "./select.js";
@@ -27,7 +27,7 @@ export function _ovAt(pt){
 export function _ovSections(ovs){                                 // extra popup/panel rows per overlay hit
   return (ovs||[]).filter(o=>o.shown!==false).map(o =>
     '<hr style="border:none;border-top:1px solid #dedede;margin:6px 0">'+
-    '<span style="color:#777">'+o.label+'</span><br>'+_rfields(o.properties, o.fields)).join("");
+    '<span style="color:#777">'+_esc(o.label)+'</span><br>'+_rfields(o.properties, o.fields)).join("");
 }
 export function handleOverlayClick(e, tier){                      // info popup only on SELECT (click), not hover
   for(const ov of OVERLAYS){
@@ -42,9 +42,9 @@ export function handleOverlayClick(e, tier){                      // info popup 
       const fields = ov.popup && ov.popup.length ? ov.popup : Object.keys(p);
       if(!_ovWin(ov)){ /* popup_window=False: selected and lit, nothing shown */ }
       else if(_popupMode==="panel"){   // panel mode: dock the read-out like a road's, no floating popup
-        rsInfoShow('<div class="rs-name">'+ov.label+'</div>'+_rrows(p, fields));
+        rsInfoShow('<div class="rs-name">'+_esc(ov.label)+'</div>'+_rrows(p, fields));
       }else{
-        const rows = fields.filter(k=>p[k]!=null && p[k]!=="").map(k=>"<b>"+k+"</b>: "+p[k]);
+        const rows = fields.filter(k=>p[k]!=null && p[k]!=="").map(k=>"<b>"+_esc(k)+"</b>: "+_esc(p[k]));
         new maplibregl.Popup({closeButton:true,maxWidth:POPUP.maxWidth})
           .setLngLat(e.lngLat).setHTML(rows.join("<br>")||"(no data)").addTo(map)
           .on("close", clearOvSel);

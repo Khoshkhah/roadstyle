@@ -164,6 +164,6 @@ fn a_page_with_views() {
     let o = roadstyle_rs::look::Options::from_value(&json!({"palette": "amber", "args": {"state": "live", "arrows": true, "labels": true,
         "views": {"plain": {"road_fill": false}, "carto": {"palette": "carto"}, "bridges": {"bridges": true, "classes": ["primary"]}}}})).unwrap();
     let l = Look::resolve(&o).unwrap();
-    let page = roadstyle_rs::page_options::page_from(roads(|_, _| {}), &l, &o, &Map::new()).unwrap();
+    let page = roadstyle_rs::page_options::page_from(roads(|_, _| {}), None, &l, &o, &Map::new()).unwrap();
     case("page_views", json!({"bytes": page.html.len(), "hash": common::hash16(&json!(page.html)), "warnings": page.warnings}));
 }

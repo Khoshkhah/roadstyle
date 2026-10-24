@@ -2,6 +2,7 @@
 // rsSetStreetView(true)) opens it; then a draggable, resizable window over the map that follows
 // every road selection. Nothing is loaded from Google while it is closed. Whether it is open, its
 // position and its size are remembered in this browser.
+import {_esc} from "../popup.js";
 import {map, O, _emit} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
 import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep} from "./svspot.js";
@@ -62,7 +63,6 @@ export function initStreetView(){
         pano.addListener("position_changed", report); pano.addListener("pov_changed", report); },
         ()=>{ hideP(); msg.hidden=false; msg.textContent="No street photos within 50 m of this spot."; }); });
     let last=null, btn=null;                   // the latest road selection: {name, url}
-    const esc=t=>String(t).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);
     const show=()=>{
       if(w.hidden || !last) return;
       ttl.textContent=last.name;
@@ -71,7 +71,7 @@ export function initStreetView(){
         msg.innerHTML = !last.url ? "No Street View for this road." :
           "<b>Street View needs this page served, not opened from disk.</b>"+
           "<span>Run <code>python -m http.server</code> in its folder and open it from localhost.</span>"+
-          '<a href="'+esc(last.url)+'" target="_blank" rel="noopener">Open this spot in Google Maps \u2197</a>';
+          '<a href="'+_esc(last.url)+'" target="_blank" rel="noopener">Open this spot in Google Maps \u2197</a>';
         return; }
       // Google won't frame last.url; this is its embeddable twin (Google's "Share > Embed a map" form)
       const u=new URL(last.url), vp=u.searchParams.get("viewpoint").split(",");

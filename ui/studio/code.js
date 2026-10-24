@@ -1,5 +1,5 @@
-// The code panel: the render_edges(...) call that makes the map of the knobs, as Python text (the same text as the Python studio,
-// src/roadstyle/studio/map.py), so a user can copy it when the knobs are not enough.
+// The code panel: the render_edges(...), render_dashboard(...) or render_report(...) call that makes the page of the knobs, as Python text
+// (the same text as the Python studio, src/roadstyle/studio/), so a user can copy it when the knobs are not enough.
 
 // a JSON value as Python writes it with repr(): strings in single quotes, True / False / None
 export function pyrepr(v){
@@ -13,11 +13,12 @@ export function pyrepr(v){
   return "{" + Object.entries(v).map(([k, x]) => pyrepr(k) + ": " + pyrepr(x)).join(", ") + "}";
 }
 
-// kw: render_edges' keywords in the order of the knobs; loader: the line that reads the edges; overlays: [{path, args}] (args: Python text)
-export function pythonCode(kw, loader, overlays){
+// kw: the keywords in the order of the knobs; loader: the line that reads the edges; overlays: [{path, args}] (args: Python text);
+// fn: the call (render_edges, render_dashboard, render_report); file: the saved page's name
+export function pythonCode(kw, loader, overlays, fn = "render_edges", file = "map.html"){
   const ovs = "[" + overlays.map((_, i) => `ov${i}`).join(", ") + "]";
   const args = Object.entries(kw).map(([k, v]) => `,\n                     ${k}=${k === "overlays" ? ovs : pyrepr(v)}`).join("");
   const prelude = !overlays.length ? loader
     : "import geopandas as gpd\n\n" + loader + "\n" + overlays.map((o, i) => `ov${i} = rs.Overlay(gpd.read_file(${pyrepr(o.path)}), ${o.args})`).join("\n");
-  return `import roadstyle as rs\n\n${prelude}\nwm = rs.render_edges(edges${args})\nwm.save("map.html")`;
+  return `import roadstyle as rs\n\n${prelude}\nwm = rs.${fn}(edges${args})\nwm.save(${pyrepr(file)})`;
 }

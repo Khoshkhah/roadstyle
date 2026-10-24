@@ -762,9 +762,17 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
         let label = if u.is_null() { ov.name.clone() } else { u["label"].as_str().filter(|l| !l.is_empty()).map_or_else(|| format!("Layer {}", i + 1), String::from) };
         let list = |v: &Value| v.as_array().filter(|a| !a.is_empty()).map(|a| Value::Array(a.clone())).unwrap_or(Value::Null);
         info.overlays.push(json!({"label": label, "source": sid, "layers": ids, "hit": ids.first(), "visible": ov.visible, "color": ov.color,
-            "popup": if u["popup"].is_array() { u["popup"].clone() } else { Value::Null }, "popup_window": u["popup_window"] != false,
-            "tooltip": list(&u["tooltip"]), "under": ov.under && !ov.edge, "base": if ov.edge { Value::Object(base) } else { Value::Null },
-            "select": u["select"].as_str().unwrap_or("road"), "interactive": !u["popup"].is_array() || list(&u["popup"]) != Value::Null}));
+            "popup": if u["popup"].is_array() { u["popup"].clone() } else { Value::Null },
+            // render_map's interaction: a base-map layer's start popup and tooltip (the tooltip on: the popup's fields, else every field,
+            // as the dashboard's rsSetInteraction)
+            "popup_window": ov.popup_on.unwrap_or(u["popup_window"] != false),
+            "tooltip": match ov.tooltip_on { Some(true) => Some(list(&u["popup"])).filter(|p| !p.is_null()).unwrap_or(json!(true)), Some(false) => Value::Null,
+                                             None => list(&u["tooltip"]) }, "under": ov.under && !ov.edge, "base": if ov.edge { Value::Object(base) } else { Value::Null },
+            "select": u["select"].as_str().unwrap_or("road"),
+            "interactive": ov.clickable.unwrap_or(!u["popup"].is_array() || list(&u["popup"]) != Value::Null)}));
+        if !ov.kinds.is_empty() {          // a base-map layer's kinds with their counts, most first (the page's kind filter)
+            info.overlays.last_mut().unwrap()["kinds"] = json!(ov.kinds);
+        }
         ov_ids.push(ids);
     }
     let mut layers = under;
