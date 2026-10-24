@@ -19,33 +19,15 @@ const NAME_MARGIN_M: f64 = 2.0; // a name or an arrow stays this far beyond a cr
 const ZEBRA_HALF_M: f64 = 2.0; // ... and at least this far from a footway, path, cycleway or steps
 const ARROW_MIN_M: f64 = 8.0; // a one-way stretch too short for a name slot still gets an arrow slot from this length
 
-/// The look data the slots read (look.json "slots" and config.annotations).
-pub struct SlotLook {
-    z_order: Map<String, Value>,
-    width_z20: HashMap<String, f64>,
-    width_fallback: f64,
-    slot_m: f64,
-}
+/// The look values of the slots (roadstyle-look: look.json "slots" and config.annotations).
+pub use roadstyle_look::SlotLook;
 
-impl SlotLook {
-    pub fn from_json(look: &Value) -> Result<SlotLook, String> {
-        let s = &look["slots"];
-        Ok(SlotLook {
-            z_order: s["z_order"].as_object().cloned().ok_or("look.json: no slots.z_order")?,
-            width_z20: s["width_z20"].as_object().ok_or("look.json: no slots.width_z20")?.iter()
-                .filter_map(|(k, v)| v.as_f64().map(|w| (k.clone(), w))).collect(),
-            width_fallback: s["width_z20_fallback"].as_f64().ok_or("look.json: no slots.width_z20_fallback")?,
-            slot_m: look["config"]["annotations"]["slot_m"].as_f64().unwrap_or(100.0),
-        })
-    }
-
-    /// _crossing_half_m: half the class's drawn width at zoom 20 in metres at `lat` (a path class: at least a zebra's half-width), plus the margin.
-    fn crossing_half_m(&self, cls: Option<&str>, lat: f64) -> f64 {
-        let px = cls.and_then(|c| self.width_z20.get(c)).copied().unwrap_or(self.width_fallback);
-        let half = 0.5 * px * 40075016.686 * lat.to_radians().cos() / (512.0 * 2f64.powi(20));
-        let path = matches!(cls, Some("footway" | "path" | "cycleway" | "steps"));
-        (if path { half.max(ZEBRA_HALF_M) } else { half }) + NAME_MARGIN_M
-    }
+/// _crossing_half_m: half the class's drawn width at zoom 20 in metres at `lat` (a path class: at least a zebra's half-width), plus the margin.
+fn crossing_half_m(look: &SlotLook, cls: Option<&str>, lat: f64) -> f64 {
+    let px = cls.and_then(|c| look.width_z20.get(c)).copied().unwrap_or(look.width_fallback);
+    let half = 0.5 * px * 40075016.686 * lat.to_radians().cos() / (512.0 * 2f64.powi(20));
+    let path = matches!(cls, Some("footway" | "path" | "cycleway" | "steps"));
+    (if path { half.max(ZEBRA_HALF_M) } else { half }) + NAME_MARGIN_M
 }
 
 type Node = u32; // a road end's node (roadstyle-model's Topology: the point rounded to 6 places)
@@ -332,7 +314,7 @@ pub fn slots_source(roads: &Roads, look: &SlotLook) -> Value {
                 if mine.contains(&k) || back.contains(&kc.iter().map(|p| (p[0].to_bits(), p[1].to_bits())).collect::<Vec<_>>()) {
                     continue;
                 }
-                let half = look.crossing_half_m(hw_of(k).and_then(Cell::as_str), line.lat0);
+                let half = crossing_half_m(look, hw_of(k).and_then(Cell::as_str), line.lat0);
                 let mut meet = |w: &[Pt], v: &[Pt]| {
                     let pts = seg_meet(w[0], w[1], v[0], v[1]);
                     if !pts.is_empty() {
@@ -436,7 +418,7 @@ pub fn slots_source(roads: &Roads, look: &SlotLook) -> Value {
     // order: __rs_cls before __rs_arw)
     for f in feats.iter_mut() {
         let e = f["properties"]["__rs_edge"].as_u64().unwrap() as usize;
-        f["properties"]["__rs_cls"] = crate::cls_of(roads.road(e));
+        f["properties"]["__rs_cls"] = roads.road(e).cls();
         if let Some(a) = roads.get(e, "__rs_access").filter(|a| !a.is_null()) {      // access_col: the same for the names and arrows
             f["properties"]["__rs_access"] = a.to_value();
         }

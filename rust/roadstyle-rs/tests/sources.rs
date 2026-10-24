@@ -5,6 +5,13 @@
 use serde_json::Value;
 use std::path::PathBuf;
 
+/// The fixture's look as an export (audit N2: the roads source too).
+fn export_look() -> roadstyle_rs::Look {
+    let mut look: Value = serde_json::from_slice(&data("look.json")).unwrap();
+    look["args"]["export"] = true.into();
+    roadstyle_rs::Look::from_value(look).unwrap()
+}
+
 fn data(p: &str) -> Vec<u8> {
     let p = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data").join(p);
     std::fs::read(&p).unwrap_or_else(|e| panic!("{}: {e}", p.display()))
@@ -12,7 +19,7 @@ fn data(p: &str) -> Vec<u8> {
 
 #[test]
 fn monaco_sources_as_files() {
-    let look = String::from_utf8(data("look.json")).unwrap();
+    let look = export_look();
     let style: Value = serde_json::from_str(&roadstyle_rs::make_style(data("monaco/roads.parquet"), &look, Some(data("monaco/features.parquet")), None, None).unwrap()).unwrap();
     let s = roadstyle_rs::make_sources(data("monaco/roads.parquet"), &look, Some(data("monaco/features.parquet")), None, None).unwrap();
     let dir = std::env::temp_dir().join(format!("roadstyle-sources-{}", std::process::id()));
@@ -65,7 +72,7 @@ fn monaco_sources_as_files() {
 /// R1: the layers read the features' properties only by name (`["get", name]`, `["has", name]`), so props::drawn knows each one.
 #[test]
 fn the_layers_read_properties_by_name() {
-    let look = String::from_utf8(data("look.json")).unwrap();
+    let look = export_look();
     let s = roadstyle_rs::make_sources(data("monaco/roads.parquet"), &look, Some(data("monaco/features.parquet")), None, None).unwrap();
     let (mut read, mut unknown) = (std::collections::HashSet::new(), Vec::new());
     s.layers.iter().for_each(|l| roadstyle_rs::props::expression_reads(l, &mut read, &mut unknown));

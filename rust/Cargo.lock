@@ -660,6 +660,48 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6dbf3de79e51f3d586ab4cb9d5c3e2c14aa28ed23d180cf89b4df0454a69cc87"
 
 [[package]]
+name = "i_float"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ecaff1ce29bcacd72cdf581ba6fce636ef4c4e0b2da7e7846dd0137d98141e2"
+dependencies = [
+ "libm",
+]
+
+[[package]]
+name = "i_key_sort"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c6c58d0c60705e66264ce0f788a69a2f21472aeb8188559e7c8c619dbdc10fa"
+
+[[package]]
+name = "i_overlay"
+version = "9.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bc8ccb58877c937614dbff9e59b9e87f49d3c45167f5c39c21fc3d9945a6c16"
+dependencies = [
+ "i_float",
+ "i_key_sort",
+ "i_shape",
+ "i_tree",
+]
+
+[[package]]
+name = "i_shape"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa1878f91ef7921feaf1b2346253ebc5e661878b22d5715195c1d5dcf0f20ae5"
+dependencies = [
+ "i_float",
+]
+
+[[package]]
+name = "i_tree"
+version = "0.19.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "180cbc5c4af5d8f57b8096c3cf39efdac3642ece00ca54710db44db3536baed4"
+
+[[package]]
 name = "iana-time-zone"
 version = "0.1.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1182,20 +1224,21 @@ dependencies = [
 name = "roadstyle-cli"
 version = "0.25.0"
 dependencies = [
+ "roadstyle",
  "roadstyle-snapshot",
+ "serde_json",
 ]
 
 [[package]]
 name = "roadstyle-engine"
 version = "0.25.0"
 dependencies = [
- "base64 0.22.1",
  "indexmap",
  "roadstyle-levels",
+ "roadstyle-look",
  "roadstyle-model",
  "rstar",
  "serde_json",
- "yaml-rust2",
 ]
 
 [[package]]
@@ -1206,7 +1249,9 @@ dependencies = [
  "arrow-schema",
  "arrow-select",
  "bytes",
+ "i_overlay",
  "parquet",
+ "roadstyle-levels",
  "roadstyle-model",
  "serde_json",
 ]
@@ -1215,8 +1260,21 @@ dependencies = [
 name = "roadstyle-levels"
 version = "0.25.0"
 dependencies = [
+ "roadstyle-model",
  "rstar",
  "sha2",
+]
+
+[[package]]
+name = "roadstyle-look"
+version = "0.25.0"
+dependencies = [
+ "base64 0.22.1",
+ "crc32fast",
+ "flate2",
+ "serde",
+ "serde_json",
+ "yaml-rust2",
 ]
 
 [[package]]

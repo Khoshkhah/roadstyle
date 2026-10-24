@@ -9,9 +9,11 @@ description = "roadstyle's readers: the roads and other tables from GeoParquet"
 
 [dependencies]
 roadstyle-model.workspace = true
+roadstyle-levels.workspace = true      # duckosm: the hash of a map's edge ids (edge_hash), for the stored levels of one mode
 serde_json.workspace = true
 parquet.workspace = true
 arrow-array.workspace = true
 arrow-schema.workspace = true
 arrow-select.workspace = true
 bytes.workspace = true
+i_overlay = "=9.0.1"                # the base map: the land is the boundary less the sea (duckosm::cut_sea); 9.1.0 is younger than two weeks

@@ -7,51 +7,8 @@ use roadstyle_model::Cell;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
-/// The look data the stages read (look.json: the resolved class styles and the render's defaults).
-pub struct Look {
-    /// the theme's data.* values (the data stylers' widths, opacities and no-data colours) and the palette's name
-    pub(crate) data: Value,
-    pub(crate) palette: String,
-    classes: HashMap<String, [Value; 2]>,
-    fallback: [Value; 2],
-    single_line: HashSet<String>,
-    twin_one: bool,
-    /// the heads' default length (render's head_m)
-    pub head_m: f64,
-    /// config bridge_shadow: a bridge's main casing piece casts a shadow (simple source)
-    pub bridge_shadow: bool,
-    /// the theme's access colours (render's access_col: the palette's `access`)
-    access: serde_json::Map<String, Value>,
-    /// the theme's casing.m: a metre-wide road's casing in metres (render's casing_m)
-    casing_m: f64,
-}
-
-impl Look {
-    pub fn from_json(look: &Value) -> Result<Look, String> {
-        let pair = |v: &Value| -> Result<[Value; 2], String> {
-            match v.as_array().map(|a| a.as_slice()) {
-                Some([a, b]) => Ok([a.clone(), b.clone()]),
-                _ => Err("look.json: a class style is not [plain, link]".into()),
-            }
-        };
-        let styles = &look["styles"];
-        let classes = styles["classes"].as_object().ok_or("look.json: no styles.classes")?;
-        Ok(Look {
-            data: look["theme"]["data"].clone(),
-            palette: look["palette"].as_str().unwrap_or_default().to_string(),
-            classes: classes.iter().map(|(k, v)| Ok((k.clone(), pair(v)?))).collect::<Result<_, String>>()?,
-            fallback: pair(&styles["fallback"])?,
-            single_line: look["config"]["single_line_classes"].as_array().into_iter().flatten()
-                .filter_map(|v| v.as_str().map(String::from)).collect(),
-            twin_one: look["config"]["twin_casing"] == "one",
-            // render's head_m keyword, else its default in the look
-            head_m: look["args"]["head_m"].as_f64().map_or_else(|| look["head_m"].as_f64().ok_or("look.json: no head_m"), Ok)?,
-            bridge_shadow: truthy(look["config"].get("bridge_shadow").map(Cell::Json)),
-            access: look["theme"]["access"].as_object().cloned().unwrap_or_default(),
-            casing_m: look["theme"]["casing"]["m"].as_f64().unwrap_or(0.0),
-        })
-    }
-}
+/// The look values of the roads' stages (roadstyle-look: the resolved class styles and the render's defaults).
+pub use roadstyle_look::RoadLook as Look;
 
 // the columns of the roads, as mapstyle names them (render_map's kw)
 const HIGHWAY: &str = "highway";
@@ -63,17 +20,14 @@ const TUNNEL: &str = "tunnel";
 const CAP_START: &str = "cap_start";
 const CAP_END: &str = "cap_end";
 
-impl Look {
-    /// ClassStyler: a class's style (plain or link, resolved at build time) and its base class (normalize_highway).
-    pub(crate) fn class_style(&self, highway: Option<Cell>) -> (&Value, String) {
-        let h = match highway {
-            None => String::new(),
-            Some(c) if c.is_null() => String::new(),
-            Some(c) => match c.as_str() { Some(s) => s.trim().to_lowercase(), None => c.to_value().to_string().trim().to_lowercase() },
-        };
-        let (base, link) = match h.strip_suffix("_link") { Some(b) => (b.to_string(), 1), None => (h, 0) };
-        (&self.classes.get(&base).unwrap_or(&self.fallback)[link], base)
-    }
+/// ClassStyler: a class's style (plain or link, resolved at build time) and its base class (normalize_highway).
+pub(crate) fn class_style<'a>(look: &'a Look, highway: Option<Cell>) -> (&'a Value, String) {
+    let h = match highway {
+        None => String::new(),
+        Some(c) if c.is_null() => String::new(),
+        Some(c) => c.as_str().map_or_else(|| c.to_value().to_string(), String::from),
+    };
+    look.class_style(&h)
 }
 
 /// The stages of render_web.render on the roads, in its order; each road gets `__rs_edge`, its position. `args`: look["args"], with the
@@ -112,7 +66,7 @@ pub fn mark_roads(fs: &mut Roads, look: &Look, args: &Value) -> Result<crate::co
     mark_lvl(fs);
     let caps = CapCols::from_args(args);
     mark_caps(fs, &caps);
-    mark_heads(fs);
+    mark_heads(fs, [named("head_start_m_col"), named("head_end_m_col")]);
     let named = |k: &str| args[k].as_str().is_some_and(|c| !c.is_empty());
     let computed = !named("casing_level_col") && !named("fill_level_col");      // render computes all four (compute_levels)
     mark_levels(fs, ["casing_level_col", "fill_level_col", "casing_start_col", "casing_end_col"].map(|k| computed || named(k)));
@@ -135,7 +89,7 @@ pub fn mark_roads(fs: &mut Roads, look: &Look, args: &Value) -> Result<crate::co
 /// their properties move into the source, not a copy (Tartu: 0.5 GB).
 pub fn roads_source(mut fs: Roads) -> crate::road::RoadsSource {
     for i in 0..fs.len() {
-        let cls = crate::cls_of(fs.road(i));
+        let cls = fs.road(i).cls();
         fs.draw[i].cls = Some(fs.values.id(&cls));
     }
     crate::road::RoadsSource { roads: fs, tolerance: 0.05, maxzoom: None, names: Vec::new(), in_style: true, read: None }
@@ -321,10 +275,14 @@ fn mark_caps(fs: &mut Roads, caps: &CapCols) {
 }
 
 /// The head lengths of each edge (head_start_m_col / head_end_m_col): __rs_hs / __rs_he where the value is a number above 0.
-fn mark_heads(fs: &mut Roads) {
+/// `named`: render's head_start_m_col and head_end_m_col name the columns (as render, a column is read only when its keyword names it).
+fn mark_heads(fs: &mut Roads, named: [bool; 2]) {
+    if named == [false, false] {
+        return;
+    }
     for i in 0..fs.len() {
-        let head = |col: &str| fs.get(i, col).and_then(py_float).filter(|v| *v > 0.0);
-        (fs.draw[i].head_start, fs.draw[i].head_end) = (head("head_start_m"), head("head_end_m"));
+        let head = |on: bool, col: &str| if on { fs.get(i, col).and_then(py_float).filter(|v| *v > 0.0) } else { None };
+        (fs.draw[i].head_start, fs.draw[i].head_end) = (head(named[0], "head_start_m"), head(named[1], "head_end_m"));
     }
 }
 
@@ -370,7 +328,7 @@ fn mark_twin_casing(fs: &mut Roads, pairs: &[(usize, usize)], head_m: f64, id_co
         }
     }
     if !bad.is_empty() {
-        crate::warn(format!("twin_casing: {} two-way pair(s) whose two directions disagree on their casing numbers, heads or end shapes (reversed); \
+        fs.warnings.push(format!("twin_casing: {} two-way pair(s) whose two directions disagree on their casing numbers, heads or end shapes (reversed); \
                              the first edge of each is drawn: {}{}", bad.len(), bad[..bad.len().min(10)].join(", "), if bad.len() > 10 { " ..." } else { "" }));
     }
     !pairs.is_empty()

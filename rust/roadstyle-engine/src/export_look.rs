@@ -2,7 +2,7 @@
 //! plugin): MapLibre layers with no source that read the raw duckOSM columns, one casing and one fill layer per position, the arrows and
 //! the names, the hover layer, the popup, the outline of the area.
 
-use crate::layers::{by_feature, label_readable_filter, label_size_expr, minzoom_filter, swap, Model};
+use crate::layers::{by_feature, label_readable_filter, label_size_expr, minzoom_filter, swap, Exprs};
 use serde_json::{json, Map, Value};
 
 /// The columns that export_look reads (its keywords).
@@ -25,9 +25,9 @@ fn mix(a: &str, b: &str, t: f64) -> String {
 }
 
 /// The look of `look` (a resolved look: render's theme, config and road tables) for the positions `positions` (in order).
-pub fn export_look(look: &Value, cols: &LookCols, positions: &[i64]) -> Result<Value, String> {
-    let (t, cfg) = (&look["theme"], &look["config"]);
-    let m = Model::from_look(look)?;
+pub fn export_look(look: &crate::Look, cols: &LookCols, positions: &[i64]) -> Result<Value, String> {
+    let (t, cfg) = (&look.theme, &look.config);
+    let m = &look.model;
     let hw = cols.highway;
     let key = match &t["active"]["palette"] {
         Value::Array(a) => a.iter().filter_map(Value::as_str).collect::<Vec<_>>().join("+"),
@@ -121,7 +121,7 @@ pub fn export_look(look: &Value, cols: &LookCols, positions: &[i64]) -> Result<V
     let mut lf = vec![json!(["to-boolean", ["get", "name"]]), minor_or(&lbl["minor_minzoom"])];
     lf.extend(mz.clone());
     if fixed.is_none() {
-        lf.push(label_readable_filter(&m, t));
+        lf.push(label_readable_filter(m, t));
     }
     let mut lpaint = json!({"text-color": lbl["color"], "text-opacity": lbl.get("opacity").unwrap_or(&arw["opacity"])});
     if lbl.get("halo_color").is_some_and(crate::layers::py_truth) && lbl.get("halo_width").is_some_and(crate::layers::py_truth) {
@@ -136,14 +136,14 @@ pub fn export_look(look: &Value, cols: &LookCols, positions: &[i64]) -> Result<V
          "paint": {"icon-opacity": arw["opacity"], "icon-color": arw["color"]}},
         {"id": "labels", "type": "symbol", "minzoom": lbl["minzoom"], "filter": all(lf),
          "layout": {"symbol-placement": "line-center", "text-field": ["get", "name"], "text-font": lbl["font"],
-                    "text-size": label_size_expr(&m, t, fixed), "text-max-angle": lbl["max_angle"], "text-padding": lbl["padding"],
+                    "text-size": label_size_expr(m, t, fixed), "text-max-angle": lbl["max_angle"], "text-padding": lbl["padding"],
                     "symbol-sort-key": sort},
          "paint": lpaint}]);
-    let img = &look["oneway_image"];
+    let img = &look.oneway_image;
     let images = json!({"oneway": {"url": img["url"], "sdf": true, "pixelRatio": arw["icon"]["pixel_ratio"]}});
     let mut hover_lay: Map<String, Value> = lay.as_object().cloned().unwrap_or_default();
     hover_lay.shift_remove("line-sort-key");
-    let popup: Vec<Value> = look["interaction"]["default_popup"].as_array().or_else(|| look["interaction"]["popup"].as_array()).into_iter().flatten()
+    let popup: Vec<Value> = look.interaction["default_popup"].as_array().or_else(|| look.interaction["popup"].as_array()).into_iter().flatten()
         .filter(|c| c.as_str() != Some("name")).cloned().collect();
     Ok(json!({"name": format!("{} / {key}", t["active"]["profile"].as_str().unwrap_or("")),
               "columns": [hw, cols.oneway, cols.tunnel, cols.bridge, "casing_level", "fill_level"],

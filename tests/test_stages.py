@@ -41,8 +41,9 @@ def test_tiles_from_the_files_are_the_tiles_of_the_one_call(part, keywords, tmp_
     # the one call: the same look, the tiles of the Tiler (render(tiles=True), export_style)
     kw = dict(keywords)
     kw.setdefault("view_3d", True)          # as export_geojson
+    kw["export"] = True                     # an export: the roads source too (audit N2)
     lk = _engine._look_of(kw)
-    t = _engine.rust().Tiler(_engine._geoparquet(part), json.dumps(lk), None, "roads", "", [])
+    t = _engine.rust().Tiler(_engine._geoparquet(part), lk, None, "roads", "", [])
     one = t.archive(list(t.bounds()), t.layers())
     if fmt == "geojson":
         assert out.read_bytes() == one          # the same text: the same bytes
@@ -72,14 +73,13 @@ def test_the_road_table_of_rust_is_pythons(part, keywords):
     kw = dict(keywords)
     kw.setdefault("view_3d", True)
     lk = _engine._look_of(kw)
-    s = _engine.rust().make_sources(_engine._geoparquet(part), json.dumps(lk), None, None, "roads")
+    s = _engine.rust().make_sources(_engine._geoparquet(part), lk, None, None, "roads")
     roads = rs.export_inline(part, engine="rust", **keywords)["sources"]["roads"]["data"]
     want = json.dumps(sidecar(roads), separators=(",", ":"))
     got = s.road_table()
     assert got == want
     t = json.loads(got)
-    assert len(t["props"]) == len(t["lines"]) == len(t["headings"]) == len(part)
-    assert all(h is None or 0 <= h < 360 for h in t["headings"])
+    assert len(t["props"]) == len(t["lines"]) == len(t["mids"]) == len(part) and "headings" not in t       # N4: no JS reads a heading
 
 
 def test_live_data_reads_the_feature_state_of_the_road(part, keywords):
@@ -143,7 +143,7 @@ def test_the_tiled_style_says_its_tile_layers(part, keywords):
     from roadstyle import _engine
 
     lk = _engine._look_of({**keywords, "state": "live", "live_data": True})
-    src = _engine.rust().make_sources(_engine._geoparquet(part), json.dumps(lk), None, None, "x")
+    src = _engine.rust().make_sources(_engine._geoparquet(part), lk, None, None, "x")
     inline = json.loads(src.style())["metadata"]
     assert inline["roadstyle:sources"]["simple"] == {"source": "simple", "layer": None}
     text, t = src.tile_stage(only=["roads", "simple", "slots"], at=json.dumps({"url": "pmtiles://roads"}))      # as a page
@@ -152,3 +152,40 @@ def test_the_tiled_style_says_its_tile_layers(part, keywords):
     assert st["metadata"]["roadstyle:sources"]["simple"] == {"source": "roads", "layer": "simple"}
     assert st["metadata"]["roadstyle:arrows"] == inline["roadstyle:arrows"] and "simple" in t.layers()
     assert json.loads(src.style())["metadata"] == inline          # stage 2 borrows the sources (N6)
+
+
+def test_stage_1_is_the_road_table_form_and_only_an_export_has_the_roads(part, keywords):
+    """N2 (2026-10-24): stage 1 reads neither `state` nor `tiles`. A host's style (live or not) has no roads source, no pick or highlight
+    layer, and the pieces' promoteId; only an export (export_inline, export_style: an app with no road table) has the roads source with
+    its pick and highlight layers; the inline page's stage 3 makes the arrows points (page_arrows)."""
+    from roadstyle import _engine
+
+    def style(**kw):
+        return json.loads(_engine.rust().make_style(_engine._geoparquet(part), _engine._look_of({**keywords, **kw}), None, None, None))
+
+    for kw in ({}, {"state": "live"}, {"state": "live", "tiles": True}):
+        st = style(**kw)
+        ids = [lyr["id"] for lyr in st["layers"]]
+        assert "roads" not in st["sources"] and "roads-fill" not in ids and "roads-highlight" not in ids, kw
+        assert st["sources"]["simple"]["promoteId"] == "__rs_edge"
+        assert next(lyr for lyr in st["layers"] if lyr["id"] == "roads-arrows")["source"] == "slots", kw
+    ex = rs.export_inline(part, engine="rust", **keywords)
+    assert "roads" in ex["sources"] and {"roads-fill", "roads-highlight"} <= {lyr["id"] for lyr in ex["layers"]}
+    src = _engine.rust().make_sources(_engine._geoparquet(part), _engine._look_of({**keywords, "state": "live"}), None, None, None)
+    src.page_arrows()
+    st = json.loads(src.style())
+    assert next(lyr for lyr in st["layers"] if lyr["id"] == "roads-arrows")["source"] == "arrows" and st["metadata"]["roadstyle:arrows"] == "points"
+
+
+def test_a_warning_of_the_rust_engine_is_a_python_warning():
+    """R17: the engine gives its warnings back with its output (no thread-local in the engine); the binding gives them to Python. A
+    two-way pair whose two directions have other casing numbers gets the twin_casing warning."""
+    import geopandas as gpd
+    from shapely.geometry import LineString
+
+    a, b = (18.0, 59.30), (18.0, 59.301)
+    g = gpd.GeoDataFrame({"edge_id": [1, 2], "highway": "primary", "cs": [1, 1], "cm": [1, 2], "ce": [1, 1], "fl": [3, 3]},
+                         geometry=[LineString([a, b]), LineString([b, a])], crs=4326)
+    kw = dict(casing_start_col="cs", casing_level_col="cm", casing_end_col="ce", fill_level_col="fl", engine="rust")
+    with pytest.warns(UserWarning, match="twin_casing: 1 two-way pair"):
+        rs.export_inline(g, **kw)

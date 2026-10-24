@@ -91,15 +91,16 @@ def _check_tunnels(cfg):
         raise ValueError(f"tunnel_toward {toward!r} is not a colour name in {list(towards)} or a '#rrggbb' colour")
 
 
-def look(*, palette=None, profile=None, settings=None, args=None, features=None) -> dict:
-    """The resolved look (look.json) of render_edges' palette, profile and settings, made by the Rust engine."""
+def look(*, palette=None, profile=None, settings=None, args=None, features=None):
+    """The resolved look of render_edges' palette, profile and settings, made by the Rust engine: a ``Look`` handle (roadstyle-look),
+    parsed one time; ``.json()`` gives its text, ``.part("config")`` the JSON text of one part."""
     o = {"palette": palette, "profile": profile, "settings": settings, "args": args or {}}
     if features is not None:
         o["features"] = features
     files = _own_files()
     if files:
         o["files"] = files
-    return json.loads(rust().make_look(json.dumps(o)))
+    return rust().resolve_look(json.dumps(o))
 
 
 def export_inline(edges, **kwargs) -> dict:
@@ -110,8 +111,9 @@ def export_inline(edges, **kwargs) -> dict:
     kwargs = dict(kwargs)
     kwargs.pop("engine", None)
     kwargs.setdefault("view_3d", True)      # as export_inline
+    kwargs["export"] = True                 # an app with no road table: the roads source, its pick and highlight (audit N2)
     lk = _look_of(kwargs)
-    text = rust().make_style(_geoparquet(edges), json.dumps(lk), None, None, kwargs.get("name") or "roads")     # export_inline's name
+    text = rust().make_style(_geoparquet(edges), lk, None, None, kwargs.get("name") or "roads")     # export_inline's name
     _warn()
     return json.loads(text)
 
@@ -126,8 +128,9 @@ def export_geojson(edges, out_dir, *, format="geojson", keep=None, **kwargs) -> 
     kwargs = dict(kwargs)
     kwargs.pop("engine", None)
     kwargs.setdefault("view_3d", True)      # as export_inline
+    kwargs["export"] = True                 # stage 1 of export_style: the roads source too (audit N2)
     lk = _look_of(kwargs)
-    s = rust().make_sources(_geoparquet(edges), json.dumps(lk), None, None, kwargs.get("name") or "roads")
+    s = rust().make_sources(_geoparquet(edges), lk, None, None, kwargs.get("name") or "roads")
     files = s.save(str(out_dir), format, [str(c) for c in (keep or [])])
     _warn()
     return dict(files)
@@ -167,9 +170,10 @@ def tile_geojson(src_dir, out, *, format="pmtiles", keep=None, base_url=""):
     return out
 
 
-def _look_of(kwargs) -> dict:
-    """The resolved look of render's keywords, with what the engine reads as JSON: the boundary as GeoJSON (_boundary_fc) and each overlay
-    as its fields, its style of the settings filled in (_styled), its data as a FeatureCollection (``fc``)."""
+def _look_of(kwargs):
+    """The resolved look of render's keywords (a ``Look`` handle), with what the engine reads as JSON: the boundary as GeoJSON
+    (_boundary_fc) and each overlay as its fields, its style of the settings filled in (_styled), its data as a FeatureCollection
+    (``fc``)."""
     kwargs = dict(kwargs)
     palette, profile, settings = kwargs.pop("palette", None), kwargs.pop("profile", None), kwargs.pop("settings", None)
     features, overlays, items = kwargs.pop("features", None), kwargs.pop("overlays", None), kwargs.pop("items", None)
@@ -183,14 +187,15 @@ def _look_of(kwargs) -> dict:
     if active:
         given = [*active, *(given if isinstance(given, list) else [given] if given is not None else [])]
     lk = look(palette=palette, profile=profile, settings=given, args=kwargs, features=features)
-    _check_tunnels(lk["config"])
-    if lk["config"].get("twin_casing") not in ("one", "each"):
-        raise ValueError(f'twin_casing must be "one" or "each", got {lk["config"].get("twin_casing")!r}')
+    cfg = json.loads(lk.part("config"))
+    _check_tunnels(cfg)
+    if cfg.get("twin_casing") not in ("one", "each"):
+        raise ValueError(f'twin_casing must be "one" or "each", got {cfg.get("twin_casing")!r}')
     if overlays:
-        lk["args"]["overlays"] = [_overlay_json(o, (lk["config"].get("overlays") or {}).get("styles") or {}) for o in overlays]
+        lk = lk.with_arg("overlays", json.dumps([_overlay_json(o, (cfg.get("overlays") or {}).get("styles") or {}) for o in overlays]))
     if items is not None:          # render's items=: the road's own line items, as GeoJSON
         from .overlays import to_fc
-        lk["args"]["items"] = json.loads(json.dumps(to_fc(items)))
+        lk = lk.with_arg("items", json.dumps(to_fc(items)))
     return lk
 
 
@@ -309,6 +314,22 @@ def solve_intervals(n, meets, stacks, orders, max_level, margin, min_positions, 
 def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs):
     """``roadstyle.export_style`` by the Rust engine: the style and the tiles from ``Tiler``; the files around them as Python writes them.
     ``format``: "xyz" (a tile folder) or "pmtiles" (one archive, roads.pmtiles)."""
+    if format not in ("xyz", "pmtiles"):
+        raise ValueError(f"format must be 'xyz' or 'pmtiles', got {format!r}")
+    kwargs = dict(kwargs)
+    name = kwargs.get("name") or "roads"
+    kwargs.setdefault("view_3d", True)
+    kwargs["tiles"] = True                                 # render's tiled look: the roads source draws (no lean mode)
+    kwargs["export"] = True                                # an app with no road table: the roads source, its pick and highlight (audit N2)
+    lk = _look_of(kwargs)
+    t = rust().Tiler(_geoparquet(edges), lk, None, name, "", [str(c) for c in edges.columns])   # every column: a click shows the data
+    _warn()
+    return _write_export(t, out_dir, base_url, format, name, tuple(float(v) for v in edges.total_bounds))
+
+
+def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds):
+    """The files of ``export_style`` from the Tiler ``t`` (its style and its tiles): style.json with the tiles at ``base_url``, the tiles in
+    ``bounds`` (lon / lat: the roads' box), the sprite and the popup's files; the path of style.json."""
     import gzip  # noqa: F401  (the same imports as export.py)
     from importlib.resources import files
     from pathlib import Path
@@ -317,17 +338,7 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs
     from .export import _camera, _plugin_css
     from .tiles import _merc, _tile_range
 
-    if format not in ("xyz", "pmtiles"):
-        raise ValueError(f"format must be 'xyz' or 'pmtiles', got {format!r}")
-    kwargs = dict(kwargs)
-    name = kwargs.get("name") or "roads"
-    kwargs.setdefault("view_3d", True)
-    kwargs["tiles"] = True                                 # render's tiled look: the roads source draws (no lean mode)
-    lk = _look_of(kwargs)
-    t = rust().Tiler(_geoparquet(edges), json.dumps(lk), None, name, "", [str(c) for c in edges.columns])   # every column: a click shows the data
-    _warn()
     style, base = json.loads(t.style), base_url.rstrip("/")
-    bounds = tuple(float(v) for v in edges.total_bounds)
     roads = style["sources"]["roads"]
     at = {"tiles": [f"{base}/tiles/{{z}}/{{x}}/{{y}}.pbf"]} if format == "xyz" else {"url": f"pmtiles://{base}/roads.pmtiles"}
     roads = style["sources"]["roads"] = {**{k: roads[k] for k in ("type", "minzoom", "maxzoom", "promoteId") if k in roads}, **at, "bounds": list(bounds)}
@@ -339,20 +350,29 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs
     for lyr in style["layers"]:                                         # Python tags a layer's group after its source-layer
         if "metadata" in lyr:
             lyr["metadata"] = lyr.pop("metadata")
-    style.setdefault("metadata", {}).pop("roadstyle:images", None)     # export_style draws the arrow from the sprite
+    images = style.setdefault("metadata", {}).pop("roadstyle:images", None) or {}
+    images.pop("oneway", None)                                          # export_style draws the arrow from the sprite
+    if images:                                                          # the base map's textures and icons (a duckOSM map)
+        style["metadata"]["roadstyle:images"] = images
     d = Path(out_dir)
     d.mkdir(parents=True, exist_ok=True)
     lo, hi = _merc(*bounds[:2]), _merc(*bounds[2:])
     if format == "pmtiles":
         names = sorted({lyr["source-layer"] for lyr in style["layers"] if "source-layer" in lyr})
         (d / "roads.pmtiles").write_bytes(_pmtiles(t, int(roads["minzoom"]), int(roads["maxzoom"]), bounds, names))
-    for z in range(int(roads["minzoom"]), int(roads["maxzoom"]) + 1) if format == "xyz" else ():   # every tile in the bounds; an empty one: an empty file
+    # every tile with data (a base map can reach past the roads), and an empty file for each other tile in the roads' bounds, as export.py
+    every = t.bounds() or bounds
+    elo, ehi = _merc(*every[:2]), _merc(*every[2:])
+    for z in range(int(roads["minzoom"]), int(roads["maxzoom"]) + 1) if format == "xyz" else ():
         x0, x1, y0, y1 = _tile_range((lo[0], lo[1], hi[0], hi[1]), z)
-        for x in range(x0, x1 + 1):
-            for y in range(y0, y1 + 1):
-                p = d / "tiles" / str(z) / str(x) / f"{y}.pbf"
-                p.parent.mkdir(parents=True, exist_ok=True)
-                p.write_bytes(t.tile(z, x, y))
+        ex0, ex1, ey0, ey1 = _tile_range((elo[0], elo[1], ehi[0], ehi[1]), z)
+        for x in range(min(x0, ex0), max(x1, ex1) + 1):
+            for y in range(min(y0, ey0), max(y1, ey1) + 1):
+                b = t.tile(z, x, y)
+                if b or (x0 <= x <= x1 and y0 <= y <= y1):
+                    p = d / "tiles" / str(z) / str(x) / f"{y}.pbf"
+                    p.parent.mkdir(parents=True, exist_ok=True)
+                    p.write_bytes(b)
     (d / "popup.css").write_text(_plugin_css())
     (d / "popup.js").write_text(files("roadstyle").joinpath("static/popup.js").read_text())
     style["metadata"]["roadstyle:interaction"] = {**style["metadata"].get("roadstyle:interaction", {}), "css": f"{base}/popup.css",
@@ -402,7 +422,7 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
     tiled = bool(kwargs.get("tiles"))
     lk = _look_of({**kwargs, "palette": palette, "profile": profile, "settings": settings, "highway_col": highway_col, "state": "live"})
     pq = _geoparquet(g)
-    src = rust().make_sources(pq, json.dumps(lk), None, None, kwargs.get("name"))      # stage 1, once: the style and the road table
+    src = rust().make_sources(pq, lk, None, None, kwargs.get("name"))      # stage 1, once: the style and the road table
     a = {k: p.default for k, p in inspect.signature(rw.render).parameters.items() if p.default is not inspect.Parameter.empty}
     a.update(kwargs)
     mode = "panel" if a["road_popup"] == "panel" else (a["popup_mode"] or "popup")
@@ -428,6 +448,8 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
         _use(*prev)
     if tiled and any("palette" in v["set"] for v in views):
         raise ValueError("engine='rust': tiles=True with a view's palette (the tiles have one palette); use engine='python'")
+    if not tiled:
+        src.page_arrows()           # stage 3 of the inline page: the arrows are points that the page puts itself (audit N2)
     style, archive = _tiled_page(src, highway_col, kwargs) if tiled else (json.loads(src.style()), None)
     table = src.road_table()
     _warn()
@@ -442,7 +464,7 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
         lyr.setdefault("paint", {})        # as render_web._state_expressions gives every layer of the page
     page_style = {"version": 8, "sources": {**base["sources"], **style["sources"]}, "layers": base["layers"] + style["layers"],
                   **{k: style[k] for k in ("glyphs", "state") if k in style}}
-    cfg, th = lk["config"], lk["theme"]
+    cfg, th = json.loads(lk.part("config")), json.loads(lk.part("theme"))
     cam = {"pitch": 0, "bearing": 0, "pitch_3d": 55, "max_pitch": 70, **(cfg.get("camera") or {})}
     if a["view_3d"]:
         cam["pitch"] = cam["pitch_3d"]
@@ -486,8 +508,8 @@ def _views(src, kwargs, basemaps, palette, profile, settings, highway_col):
                             _s.style_names("palettes"))
     pals = [p for p in dict.fromkeys(v["set"]["palette"] for v in views if "palette" in v["set"]) if p != palette]
     if pals:
-        looks = [(n, json.dumps(_look_of({**kwargs, "palette": n, "profile": profile, "settings": settings, "highway_col": highway_col,
-                                          "state": "live"}))) for n in pals]
+        looks = [(n, _look_of({**kwargs, "palette": n, "profile": profile, "settings": settings, "highway_col": highway_col,
+                               "state": "live"})) for n in pals]
         src.add_palettes(str(palette), looks)
     return views, pals
 

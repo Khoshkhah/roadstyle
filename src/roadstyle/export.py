@@ -233,7 +233,7 @@ def export_look(path=None, *, profile=None, palette=None, edges=None, highway_co
             lv = [int(v) for c in ("casing_level", "fill_level") if c in g.columns for v in g[c].dropna().unique()]
             positions = range(min(lv, default=0), max(lv, default=0) + 1)
         lk = _engine._look_of({"palette": palette, "profile": profile})
-        look = json.loads(_engine.rust().export_look(json.dumps(lk), [highway_col, oneway_col, tunnel_col, bridge_col, id_col],
+        look = json.loads(_engine.rust().export_look(lk, [highway_col, oneway_col, tunnel_col, bridge_col, id_col],
                                                      [int(p) for p in (positions if positions is not None else range(-10, 11))]))
         if path is not None:
             Path(path).parent.mkdir(parents=True, exist_ok=True)

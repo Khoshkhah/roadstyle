@@ -4,6 +4,7 @@
 
 use super::solve::Rules;
 use super::{LevelEdge, Options, Order, Pt};
+use roadstyle_model::flags;
 use rstar::{RTree, RTreeObject, AABB};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -76,29 +77,18 @@ pub fn road_split(edges: &[&LevelEdge]) -> Result<Roads, String> {
     })
 }
 
-/// `_truthy`: a tag that is set and not "", "no", "false" or "0".
+/// A yes/no tag (roadstyle_model::flags, the one rule).
 fn truthy(v: Option<&str>) -> bool {
-    !matches!(v, None | Some("" | "no" | "false" | "0"))
+    v.is_some_and(flags::yes_text)
 }
 
 /// The OSM level of an edge (`_level`): a non-zero `layer`, else bridge 1, tunnel -1, else 0.
 pub fn level(e: &LevelEdge) -> i64 {
-    let a = e;
-    let layer = a
-        .layer
-        .as_deref()
-        .and_then(|s| s.trim().parse::<f64>().ok())
-        .filter(|v| v.is_finite())
-        .map_or(0, |v| v.trunc() as i64);
-    if layer != 0 {
-        layer
-    } else if truthy(a.bridge.as_deref()) {
-        1
-    } else if truthy(a.tunnel.as_deref()) {
-        -1
-    } else {
-        0
-    }
+    flags::level(
+        flags::layer(e.layer.as_deref()),
+        truthy(e.bridge.as_deref()),
+        truthy(e.tunnel.as_deref()),
+    )
 }
 
 /// The band of a road from `band_col` (`pd.to_numeric(...).fillna(0).round()`: a value that is not a number is 0).
@@ -472,11 +462,11 @@ fn substring(l: &[Pt], a: f64, b: f64) -> Vec<Pt> {
     out
 }
 
-/// The three casing parts of a road (`casing_parts`): the heads `head_m` long (cut in their ratio on a short road),
-/// and the main part, None when it is shorter than 5 cm.
-fn casing_parts(l: &[Pt], head_m: f64) -> [Option<Vec<Pt>>; 3] {
+/// The three casing parts of a road (`casing_parts`): the heads `[start, end]` metres long (cut in their ratio on a
+/// short road), and the main part, None when it is shorter than 5 cm.
+fn casing_parts(l: &[Pt], heads: [f64; 2]) -> [Option<Vec<Pt>>; 3] {
     let n = length(l);
-    let (mut h0, mut h1) = (head_m, head_m);
+    let [mut h0, mut h1] = heads;
     if h0 + h1 >= n {
         (h0, h1) = (n * h0 / (h0 + h1), n * h1 / (h0 + h1));
     }
@@ -496,9 +486,15 @@ impl RTreeObject for Indexed {
     }
 }
 
-/// The rules of the roads (`_relations` and `_stack_parts`), and the band of each road. With `band_col`, roads of
-/// different bands are a stack pair also where they only meet (no tunnel mouths).
-pub fn relations(edges: &[&LevelEdge], roads: &Roads, o: &Options) -> (Rules, Vec<i64>) {
+/// The rules of the roads (`_relations` and `_stack_parts`), the band of each road and its priority (None: no order wish).
+/// With `band_col`, roads of different bands are a stack pair also where they only meet (no tunnel mouths). `heads`: a
+/// road's own head lengths (heads.csv), else `head_m`; they decide which parts of a stack's upper road cross.
+pub fn relations(
+    edges: &[&LevelEdge],
+    roads: &Roads,
+    o: &Options,
+    heads: &HashMap<usize, [f64; 2]>,
+) -> (Rules, Vec<i64>, Vec<Option<f64>>) {
     let n = roads.first.len();
     let band_dist = o.band_dist;
     let head: Vec<&LevelEdge> = roads.first.iter().map(|&i| edges[i]).collect();
@@ -620,7 +616,7 @@ pub fn relations(edges: &[&LevelEdge], roads: &Roads, o: &Options) -> (Rules, Ve
     let empty = BTreeSet::new();
     let (mut lifts, mut near) = (Vec::new(), Vec::new());
     for &(u, l) in &stacks {
-        let parts = casing_parts(&m[u], o.head_m);
+        let parts = casing_parts(&m[u], heads.get(&u).copied().unwrap_or([o.head_m; 2]));
         let tl = touching.get(&l).unwrap_or(&empty);
         for (h, p) in parts.iter().enumerate() {
             let Some(p) = p else { continue };
@@ -647,6 +643,7 @@ pub fn relations(edges: &[&LevelEdge], roads: &Roads, o: &Options) -> (Rules, Ve
             fixed: Vec::new(),
         },
         band,
+        omega,
     )
 }
 

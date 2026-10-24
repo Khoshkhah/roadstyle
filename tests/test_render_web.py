@@ -1021,9 +1021,23 @@ _TWIN_KW = dict(backend="web", casing_start_col="cs", casing_level_col="cm", cas
                 cap_start_col="cap_s", cap_end_col="cap_e", head_m=5.0)
 
 
+def _bare(e):
+    """A zoom curve without the width factor of N8 in its stops (each ``["*", stop, rs_w]``: no feature state set, the factor is 1)."""
+    from roadstyle.render_web import _RS_W
+    return [x[1] if isinstance(x, list) and len(x) == 3 and x[0] == "*" and x[2] == _RS_W else x for x in e] if isinstance(e, list) else e
+
+
 def _num(e, p):
-    """A width or offset stop on a feature's properties (+, * and what render_web._ev reads)."""
+    """A width or offset stop on a feature's properties (+, * and what render_web._ev reads; no feature state set)."""
     from roadstyle.render_web import _ev
+    if isinstance(e, list) and e and e[0] == "coalesce":
+        for x in e[1:]:
+            if isinstance(x, list) and x and x[0] == "feature-state":
+                continue
+            v = _num(x, p)
+            if v is not None:
+                return v
+        return None
     if isinstance(e, list) and e and e[0] in ("+", "*", "-", "max"):
         v = [_num(x, p) for x in e[1:]]
         return {"+": sum(v), "*": v[0] * v[1] if len(v) == 2 else None, "-": v[0] - v[1] if len(v) == 2 else -v[0], "max": max(v)}[e[0]]
@@ -3546,6 +3560,7 @@ def test_simple_draws_every_road_piece_in_one_layer_in_the_full_order():
     assert paint["line-blur"][:3] == ["interpolate", ["linear"], ["zoom"]] and paint["line-blur"][3:5] == [14, 0] and paint["line-blur"][5] == 17 and paint["line-blur"][6][0] == "case"
     op = paint["line-opacity"]
     assert op[:3] == ["interpolate", ["linear"], ["zoom"]] and op[3] == 14 and op[4][:3] == ["case", ["==", ["get", "__rs_k"], 2], 0] and op[5] == 17
+    paint = {**paint, "line-width": _bare(paint["line-width"])}       # N8: each stop × the width factor
     stops = dict(zip(paint["line-width"][3::2], paint["line-width"][4::2], strict=True))
     extra = lambda z: stops[z][4][2]                                # noqa: E731 - the bridge casing's extra px at a stop: (case, shadow cond, shadow, bridge cond, bridge, ...)
     assert extra(14) == 0.0 and extra(15) == 1.0 and extra(17) == 3.0 and extra(20) == 3.0

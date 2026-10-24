@@ -8,6 +8,8 @@ license.workspace = true
 description = "The roadstyle program: one command for each job (serve: the level editor's files; snapshot: a PNG of a saved page)"
 
 [dependencies]
+roadstyle.workspace = true
+serde_json.workspace = true
 roadstyle-snapshot.workspace = true
 
 [lib]

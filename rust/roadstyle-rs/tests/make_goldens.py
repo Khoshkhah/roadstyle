@@ -4,7 +4,7 @@ with. Run it in the conda environment roadstyle (roadstyle from this repository'
 
     python rust/roadstyle-rs/tests/make_goldens.py cmaps colors looks monaco sodermalm tartu
 
-- cmaps: src/cmaps.json, the colour ramps that colors.py reads from branca and matplotlib (branca's schemes and colour names, each
+- cmaps: rust/roadstyle-look/src/cmaps.json, the colour ramps that colors.py reads from branca and matplotlib (branca's schemes and colour names, each
   matplotlib colormap at 9 stops).
 - colors: tests/data/monaco_part/ (tests/colors.rs): the roads of Monaco in a box around Monte Carlo, and for each case of data colour
   <case>.json.gz = {"args", "style": export_inline's style, "color_options": the page's colour options (render_web's __COLOR_OPTIONS__)}.
@@ -66,7 +66,7 @@ def write_cmaps():
     css = json.loads(Path(root, "_cnames.json").read_text())
     mpl = {n: [mcolors.to_hex(matplotlib.colormaps[n](i / 8.0)) for i in range(9)] for n in sorted(matplotlib.colormaps)}
     out = {"versions": {"branca": branca.__version__, "matplotlib": matplotlib.__version__}, "branca": schemes, "css": css, "matplotlib": mpl}
-    Path(__file__).resolve().parent.parent.joinpath("src", "cmaps.json").write_text(json.dumps(out, separators=(",", ":")))
+    Path(__file__).resolve().parents[2].joinpath("roadstyle-look", "src", "cmaps.json").write_text(json.dumps(out, separators=(",", ":")))
 
 def write_colors():
     look = json.loads((DATA / "look.json").read_text())
@@ -240,8 +240,8 @@ def write_area(area):
         print(f"{area}: {p.name} {p.stat().st_size // 1000} KB")
 
 def write_level_area():
-    """tests/data/level_area/ (tests/level_area.rs): a level area of the roads of Monaco in BOX (make_area: roads.parquet, pairs.csv),
-    and checks.json: rules to add, and what roadstyle's rule_conflicts says of each (its index and why)."""
+    """tests/data/level_area/ (tests/level_area.rs): a level area of the roads of Monaco in BOX (edges.parquet, make's input; make_area:
+    roads.parquet, pairs.csv), and checks.json: rules to add, and what roadstyle's rule_conflicts says of each (its index and why)."""
     import pandas as pd
 
     from roadstyle.level_area import make_area
@@ -251,6 +251,9 @@ def write_level_area():
     g = g[(b.minx >= BOX[0]) & (b.maxx <= BOX[2]) & (b.miny >= BOX[1]) & (b.maxy <= BOX[3])].drop(
         columns=["casing_start", "casing_level", "casing_end", "fill_level"], errors="ignore").reset_index(drop=True)
     out = DATA / "level_area"
+    out.mkdir(exist_ok=True)
+    t = pa.Table.from_pandas(g.drop(columns="geometry"), preserve_index=False)      # make's input, for Rust's make (tests/level_area.rs)
+    pq.write_table(t.append_column("geometry", pa.array(shapely.to_wkb(g.geometry.values), pa.binary())), out / "edges.parquet", compression="snappy")
     roads, pairs = make_area(g, out)
     (out / "edits.csv").unlink(missing_ok=True)
     order, stack = pairs[pairs.relation == "order"].iloc[0], pairs[pairs.relation == "stack"].iloc[0]

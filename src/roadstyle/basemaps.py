@@ -5,10 +5,6 @@ import dataclasses
 import os
 from dataclasses import dataclass
 
-_CARTO_ATTR = "© OpenStreetMap contributors © CARTO"
-_OSM_ATTR = "© OpenStreetMap contributors"
-_ESRI_ATTR = "Tiles © Esri"
-
 # In-memory session store for API keys: {"default": "...", "mapbox": "...", ...}
 _SESSION_API_KEYS: dict[str, str] = {}
 _TOKEN_KEYWORDS = ("api_key", "accessToken", "apikey", "apiKey", "token", "key", "access_token")
@@ -125,71 +121,22 @@ class Basemap:
     maxzoom: int = 19
 
 
-# NOTE: every basemaps.cartocdn.com entry below (voyager, voyager_nolabels, positron,
-# dark_matter) is now served WATERMARKED — a keyless tile comes back stamped "API KEY
-# REQUIRED", unconditionally: the response is byte-identical with or without a browser
-# Referer. They need a CARTO API key to render clean. The esri_* and osm entries are
-# keyless and unstamped; esri_street / esri_dark_gray are the drop-in replacements.
-BASEMAPS: dict[str, Basemap] = {
-    "voyager": Basemap(
-        "voyager", "Voyager",
-        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", _CARTO_ATTR,
-        lonboard="Voyager", bg="linear-gradient(180deg,#e8eef0,#d8e0e5)",
-        preview=("#ff9933", "#e8ecef", "#9ec5fe"), maxzoom=20),
-    "voyager_nolabels": Basemap(
-        # no basemap street names: the map's own labels (arrow-grey, class-aware) are the only
-        # ones — otherwise CARTO's dark names show wherever ours don't place (and below z14)
-        "voyager_nolabels", "Voyager (no labels)",
-        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png",
-        _CARTO_ATTR, lonboard="Voyager", bg="linear-gradient(180deg,#e8eef0,#d8e0e5)",
-        preview=("#ff9933", "#e8ecef", "#9ec5fe"), maxzoom=20),
-    "positron": Basemap(
-        "positron", "Positron",
-        "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", _CARTO_ATTR,
-        lonboard="Positron", bg="linear-gradient(180deg,#f3f5f7,#e3e8ed)",
-        preview=("#888", "#bbb", "#888"), maxzoom=20),
-    "dark_matter": Basemap(
-        "dark_matter", "Dark Matter",
-        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", _CARTO_ATTR,
-        is_dark=True, lonboard="DarkMatter", bg="radial-gradient(circle,#18222e,#0b1014)",
-        preview=("#22d3a3", "#9ec5fe", "#5b6573"), maxzoom=20),
-    "osm": Basemap(
-        "osm", "OpenStreetMap",
-        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", _OSM_ATTR,
-        bg="linear-gradient(180deg,#f2efe9,#e8e4db)", preview=("#e07020", "#dcdcdc", "#888")),
-    "esri_gray": Basemap(
-        "esri_gray", "Light Gray",
-        "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-        _ESRI_ATTR, bg="linear-gradient(180deg,#eceff1,#d8dde1)", preview=("#9aa", "#ccc", "#9aa"), maxzoom=16),
-    "esri_street": Basemap(
-        # the keyless stand-in for CARTO's voyager: coloured, labelled, street-level
-        "esri_street", "Streets",
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
-        _ESRI_ATTR, bg="linear-gradient(180deg,#f2efe9,#e8e4db)",
-        preview=("#e8a33d", "#f4f1ea", "#a8c8e8")),
-    "esri_dark_gray": Basemap(
-        # the keyless stand-in for dark_matter
-        "esri_dark_gray", "Dark Gray",
-        "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-        _ESRI_ATTR, is_dark=True, bg="linear-gradient(180deg,#3a3f45,#25292e)",
-        preview=("#22d3a3", "#9ec5fe", "#5b6573"), maxzoom=16),
-    "satellite": Basemap(
-        "satellite", "Satellite",
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        _ESRI_ATTR, is_dark=True, satellite=True,
-        bg="linear-gradient(140deg,#2d3823,#4a3a2a,#2a2820)",
-        preview=("#ffe8a0", "#ffd84d", "#fffdf2")),
-    # tile-less base maps: url="" means no tile layer at all — just a plain canvas colour (bg).
-    # Zero network requests, so a saved map with one of these is fully offline.
-    "blank": Basemap(
-        "blank", "Blank", "", "", bg="#efede8", preview=("#888", "#bbb", "#888")),
-    "blank_dark": Basemap(
-        "blank_dark", "Blank dark", "", "", is_dark=True, bg="#14181d",
-        preview=("#22d3a3", "#9ec5fe", "#5b6573")),
-}
+def _bundled() -> tuple[dict[str, Basemap], list[str]]:
+    """The base maps of data/basemaps.json (one list for Python and the studio in the browser) and the switcher's default set.
 
-# default set offered by the switcher when the caller doesn't specify one
-DEFAULT_SWITCHER = ["esri_gray", "positron", "osm", "satellite", "voyager", "dark_matter", "blank"]
+    Every basemaps.cartocdn.com entry (voyager, voyager_nolabels, positron, dark_matter) is served WATERMARKED: a keyless tile comes
+    back stamped "API KEY REQUIRED", with or without a browser Referer, so they need a CARTO API key. The esri_* and osm entries are
+    keyless and unstamped; esri_street and esri_dark_gray are the keyless stand-ins for voyager and dark_matter. voyager_nolabels has
+    no street names, so the map's own labels are the only ones. A url of "" (blank, blank_dark) is no tile layer: only the canvas
+    colour (bg), with no network request."""
+    import json
+    from importlib.resources import files
+    data = json.loads(files("roadstyle").joinpath("data/basemaps.json").read_text(encoding="utf-8"))
+    maps = {d["key"]: Basemap(**{**d, "preview": tuple(d["preview"])}) for d in data["basemaps"]}
+    return maps, list(data["switcher"])
+
+
+BASEMAPS, DEFAULT_SWITCHER = _bundled()     # DEFAULT_SWITCHER: the set the switcher offers when the caller gives none
 
 
 def register_basemap(bm: Basemap) -> None:

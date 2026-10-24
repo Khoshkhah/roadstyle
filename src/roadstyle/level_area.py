@@ -31,7 +31,7 @@ def read_edges(source, query=None, geometry=None):
     return rs.load_edges(source).gdf
 
 
-def make_area(edges, folder, db=None, **level_input_kw):
+def make_area(edges, folder, db=None, engine=None, **level_input_kw):
     """The solver's input in ``folder``: roads.parquet and pairs.csv (rs.level_input, written again each run), and an empty edits.csv the
     first time. Which parts of a stack's upper road cross the road under it is decided here, once, with the heads of the folder's heads.csv
     if there is one (else 5 m): a head changed later never needs a solve (2026-10-08). With ``db`` (a .duckdb file), the area belongs to it (area.json): every solve also writes the result into it
@@ -53,14 +53,32 @@ def make_area(edges, folder, db=None, **level_input_kw):
             con.close()
         if got:
             print(f"{', '.join(got)}: written from {db} (visualization.level_*)", flush=True)
-    if (folder / "heads.csv").exists():
-        level_input_kw.setdefault("heads", folder / "heads.csv")
-    roads, pairs = rs.level_input(edges, **level_input_kw)
-    folder.mkdir(parents=True, exist_ok=True)
-    roads.to_parquet(folder / "roads.parquet")
-    pairs.to_csv(folder / "pairs.csv", index=False)
-    if not (folder / "edits.csv").exists():
-        (folder / "edits.csv").write_text("relation,a,b,a_end,b_end,enabled\n")
+    from . import _engine
+    if _engine.engine(engine) == "rust":                 # ``engine``: "python" or "rust" (ROADSTYLE_ENGINE): roadstyle::level_area in Rust
+        import warnings
+
+        import geopandas as gpd
+        import pandas as pd
+        kw = {k: v for k, v in level_input_kw.items() if v is not None or k in ("band_col", "order")}
+        if "id_col" in level_input_kw and not level_input_kw["id_col"]:
+            kw["id_col"] = ""                           # no id column: the row numbers, as level_input
+        if kw.pop("heads", None) is not None:
+            raise ValueError("engine='rust': make_area reads the folder's heads.csv; heads= is in the Python engine only")
+        if edges.crs is not None and edges.crs.to_epsg() != 4326:      # Rust reads longitude and latitude
+            edges = edges.to_crs(4326)
+        _, _, said = _engine.rust().make_area(_engine._geoparquet(edges), str(folder), **kw)
+        for w in said:
+            warnings.warn(w, stacklevel=2)
+        roads, pairs = gpd.read_parquet(folder / "roads.parquet"), pd.read_csv(folder / "pairs.csv", dtype=str, keep_default_na=False)
+    else:
+        if (folder / "heads.csv").exists():
+            level_input_kw.setdefault("heads", folder / "heads.csv")
+        roads, pairs = rs.level_input(edges, **level_input_kw)
+        folder.mkdir(parents=True, exist_ok=True)
+        roads.to_parquet(folder / "roads.parquet")
+        pairs.to_csv(folder / "pairs.csv", index=False)
+        if not (folder / "edits.csv").exists():
+            (folder / "edits.csv").write_text("relation,a,b,a_end,b_end,enabled\n")
     if db is not None:
         import json
         import os
@@ -305,6 +323,7 @@ def main(argv=None):
     mk.add_argument("--order", default="priority", help='"priority" (default), "class", or a column of numbers')
     mk.add_argument("--band-dist", type=float, default=10.0, help="metres: roads of different bands this near are over / under (default 10)")
     mk.add_argument("--near-rules", action="store_true", help="also write the parts that only come near the road under them (near rows: lifted last; slower, more positions)")
+    mk.add_argument("--engine", choices=["python", "rust"], default="rust", help="rust (default): roadstyle::level_area; python: level_input")
     sv = sub.add_parser("solve", help="levels.csv from the input and your edits.csv / heads.csv / caps.csv")
     sv.add_argument("folder", type=Path)
     sv.add_argument("--auto-ends", action="store_true", help="head lengths and caps from rs.auto_ends (at zoom 18) instead of 5 m and round")
@@ -320,7 +339,7 @@ def main(argv=None):
     a = ap.parse_args(argv)
     if a.cmd == "make":
         edges = read_edges(a.source, a.query, a.geometry)
-        roads, pairs = make_area(edges, a.folder, id_col=a.id_col, band_col=a.band_col, order=a.order, band_dist=a.band_dist,
+        roads, pairs = make_area(edges, a.folder, engine=a.engine, id_col=a.id_col, band_col=a.band_col, order=a.order, band_dist=a.band_dist,
                                   near_rules=a.near_rules)
         print(f"{len(edges)} edges -> {len(roads)} roads, {len(pairs)} pairs: "
               + ", ".join(f"{k} {v}" for k, v in pairs["relation"].value_counts().items()) + f" -> {a.folder}")

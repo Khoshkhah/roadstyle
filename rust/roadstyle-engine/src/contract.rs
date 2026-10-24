@@ -21,8 +21,8 @@ fn merged(a: &Value, b: &Value) -> Map<String, Value> {
 }
 
 /// The page's global state and the start value of each (render_web: style["state"]), in Python's order. `active`: the colour option.
-pub fn page_state(look: &Value, active: usize, n_overlays: usize) -> Map<String, Value> {
-    let (th, cfg) = (&look["theme"], &look["config"]);
+pub fn page_state(look: &crate::Look, active: usize, n_overlays: usize) -> Map<String, Value> {
+    let (th, cfg) = (&look.theme, &look.config);
     let towards = cfg["tunnel_towards"].as_object().cloned().unwrap_or_default();
     let toward = &cfg["tunnel_toward"];
     let colour = toward.as_str().and_then(|t| towards.get(t)).cloned().unwrap_or_else(|| toward.clone());
@@ -31,8 +31,8 @@ pub fn page_state(look: &Value, active: usize, n_overlays: usize) -> Map<String,
     let ratio: Vec<f64> = cfg["tunnel_casing_dash"].as_array().filter(|a| !a.is_empty()).map(|a| a.iter().filter_map(Value::as_f64).collect())
         .unwrap_or_else(|| vec![1.0, 1.0]);
     // render's road_fill: the start value of rs_fill_on (off: each fill's opacity is 0)
-    let road_fill = !matches!(look["args"]["road_fill"], Value::Bool(false));
-    let mut state = json!({"rs_co": active, "rs_colors": {}, "rs_base": {}, "rs_fill_on": road_fill,
+    let road_fill = !matches!(look.args["road_fill"], Value::Bool(false));
+    let mut state = json!({"rs_co": active, "rs_top": [], "rs_fill_on": road_fill,
         "rs_tun_strength": cfg["tunnel_strength"].as_f64().unwrap_or(0.0), "rs_tun_toward": colour, "rs_tun_two": pair.is_some(),
         "rs_tun_c0": pair.as_ref().map_or(dash, |p| &p[0]), "rs_tun_c1": pair.as_ref().map_or(dash, |p| &p[1]), "rs_tun_ratio": ratio})
         .as_object().unwrap().clone();
@@ -40,22 +40,22 @@ pub fn page_state(look: &Value, active: usize, n_overlays: usize) -> Map<String,
         state.insert(format!("rs_ov_{i}"), json!({}));
     }
     // a palette made in code has no name
-    let palette = look["palette"].as_str().or_else(|| look["active"]["palette"].as_str()).unwrap_or("custom");
+    let palette = look.palette.as_str();
     state.insert("rs_palette".into(), palette.into());
     state
 }
 
 /// The filter panel (render_web: `flt`): the classes present, most important first, a swatch for each (a road of the class that is not a
 /// restricted one), the access kinds with their counts (access_col), and whether there are bridges and tunnels.
-fn filter_panel(look: &Value, roads: &Roads, m: &Model) -> Value {
-    let args = &look["args"];
-    let fb_fill = &look["theme"]["roads"]["fallback"]["fill"];
+fn filter_panel(look: &crate::Look, roads: &Roads, m: &Model) -> Value {
+    let args = &look.args;
+    let fb_fill = &look.theme["roads"]["fallback"]["fill"];
     let col = args["filter_col"].as_str().or_else(|| args["highway_col"].as_str()).filter(|c| !c.is_empty()).unwrap_or("highway");
     let (mut classes, mut seen, mut swatches, mut by_access) = (Vec::<String>::new(), std::collections::HashSet::new(), Map::new(),
                                                                std::collections::HashSet::new());
     let restricted = |p: Road| p.get("__rs_access").map(Cell::to_value).is_some_and(|a| !a.is_null() && a != false && a != "");
     for p in roads.iter() {
-        let cls = crate::cls_of(p);
+        let cls = p.cls();
         let Some(c) = cls.as_str().filter(|c| !c.is_empty()) else { continue };
         if !seen.contains(c) || (by_access.contains(c) && !restricted(p)) {
             if !seen.contains(c) {
@@ -73,11 +73,11 @@ fn filter_panel(look: &Value, roads: &Roads, m: &Model) -> Value {
     let mut access = Vec::new();
     if args["access_col"].as_str().is_some_and(|c| !c.is_empty()) {
         let n = |k: &str| roads.iter().filter(|f| f.get("__rs_access").and_then(Cell::as_str) == Some(k)).count();
-        access = ACCESS.iter().filter(|(k, _)| n(k) > 0).map(|(k, label)| json!([k, look["theme"]["access"][*k], label, n(k)])).collect();
+        access = ACCESS.iter().filter(|(k, _)| n(k) > 0).map(|(k, label)| json!([k, look.theme["access"][*k], label, n(k)])).collect();
         // driving's pedestrian streets that cars may not use have their own row: where no usable road is of the class, a class row would
         // be a second switch for them
         if n("pedestrian") > 0 && classes.iter().any(|c| c == "pedestrian")
-            && !roads.iter().any(|f| !restricted(f) && crate::cls_of(f).as_str() == Some("pedestrian")) {
+            && !roads.iter().any(|f| !restricted(f) && f.cls().as_str() == Some("pedestrian")) {
             classes.retain(|c| c != "pedestrian");
         }
     }
@@ -124,9 +124,9 @@ pub fn arrow_kind(layers: &[Value]) -> Value {
 }
 
 /// roadstyle:controls: the options of rsDashboard that the style gives (render_web.render's `page`, in its order).
-pub fn controls(look: &Value, roads: &Roads, info: PageInfo, active: usize) -> Result<Value, String> {
-    let (th, cfg, args) = (&look["theme"], &look["config"], &look["args"]);
-    let m = Model::from_look(look)?;
+pub fn controls(look: &crate::Look, roads: &Roads, info: PageInfo, active: usize) -> Result<Value, String> {
+    let (th, cfg, args) = (&look.theme, &look.config, &look.args);
+    let m = &look.model;
     let tiles = args["tiles"] == true;
     let cam = merged(&json!({"pitch": 0, "bearing": 0, "pitch_3d": 55, "max_pitch": 70}), &cfg["camera"]);
     let select = match &args["select_color"] { Value::Null => th["selection"]["select"].clone(), v => v.clone() };
@@ -148,7 +148,7 @@ pub fn controls(look: &Value, roads: &Roads, info: PageInfo, active: usize) -> R
     let items = if args["items"].is_null() { Value::Null } else { json!({"label": "items", "popup": args["items_popup"], "layer": "roads-simple"}) };
     // a page is in simple mode, in both ways: the pieces pick and glow (the road layer roads-simple), and there are no fill layers
     Ok(json!({"tiles": tiles, "simple": "roads-simple", "pitch_3d": cam["pitch_3d"],
-        "select_color": select, "filter": filter_panel(look, roads, &m), "color_active": active, "overlays": info.overlays, "tunnel": tunnel,
+        "select_color": select, "filter": filter_panel(look, roads, m), "color_active": active, "overlays": info.overlays, "tunnel": tunnel,
         "fill_layers": [], "road_fill": {"on": args["road_fill"] != false, "paint": info.fill_paint}, "views": views, "dashes": info.dashes,
         "items": items, "edge_id_col": args["edge_id_col"].as_str().unwrap_or("edge_id"), "arrow_icon": arw["icon"], "arrow_color": arw["color"],
         "arrow_rules": {"mainBelow": arw["main_below"], "main": arw["main"], "minLenPx": place["min_len_px"], "minGapPx": place["min_gap_px"],

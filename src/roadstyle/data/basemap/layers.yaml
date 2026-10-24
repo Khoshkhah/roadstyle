@@ -1,0 +1,46 @@
+# WHICH base-map feature layers to load + show, in DRAW ORDER (first = bottom).
+# Read by mapstyle.map.load_layers — this is layer SELECTION, kept separate from the visual style
+# (styles/osm_carto.yaml holds the look: features.areas / lines / points, keyed by `name`).
+#
+#   name      layer id (must match its styling entry in osm_carto.yaml features.*)
+#   table     duckOSM features.<table> to read
+#   kind      polygon | line | point
+#   ticked    false = loaded, but unticked in the Layers box when the page opens (default: ticked)
+#   show      false = drop the layer entirely (also gone from the debug viewer's checkboxes)
+#   where     optional SQL filter on the table
+#   centroid  true = use the polygon centroid (a point from an area, e.g. the parking "P")
+#   bearing   true = carry the road bearing (oriented crossings)
+#   height    true = carry a height in metres for 3D (buildings; osm_carto.yaml features.buildings_3d)
+# the columns a feature's popup and tooltip show (the page and the GeoLibre look)
+popup: [name, kind]
+layers:
+  # background: the land of the boundary of the database (main.boundary minus features.ocean), merged INTO landcover (kind `background`, the
+  # landcover default colour, the biggest polygon so the bottom one). It adds no OSM data: it only fills the places that OSM has no area for,
+  # so a satellite or photo base map does not show through. The sea (ocean) is under it, and not covered.
+  - {name: background,      table: boundary,         kind: polygon, show: true, schema: main, merge_into: landcover}
+  - {name: ocean,           table: ocean,            kind: polygon, show: true}   # the sea (duckOSM sea: overture), under everything
+  - {name: landcover,       table: land,             kind: polygon, show: true}
+  # institutional / sport GROUNDS (school, university, hospital, sports_centre, prison, kindergarten,
+  # construction, bridge deck) — coloured area fills in OSM-Carto. Merged INTO landcover so the one
+  # largest-first sort nests them correctly (a school's own pitch/grass draws on top of the school).
+  - {name: institutional,   table: sites,            kind: polygon, show: true, merge_into: landcover,
+     where: "kind IN ('school','university','college','kindergarten','hospital','prison','sports_centre','construction','bridge','zoo')"}
+  - {name: water,           table: water_polygons,   kind: polygon, show: true}   # incl. the river (smart clip)
+  - {name: waterways,       table: water_lines,      kind: line,    show: true}
+  - {name: paved,           table: paved,            kind: polygon, show: true}   # squares, pedestrian areas, piers, helipads (duckOSM 0.6.0)
+  - {name: buildings,       table: buildings,        kind: polygon, show: true, height: true}
+  # the ways that OSM has and no mode network holds (outside_networks: not in <mode>.edges, private_edges or edge_id_map): the raceway
+  # (Circuit de Monaco), small pieces that touch no network, platforms, lifts. The roads of the page come from the networks.
+  - {name: raceway,         table: streets,          kind: line,    show: true, where: "kind = 'raceway'", outside_networks: true}
+  - {name: other_ways,      table: streets,          kind: line,    show: true, outside_networks: true,
+     where: "kind NOT IN ('raceway','rail','tram','light_rail','subway','narrow_gauge','funicular','monorail')"}
+  - {name: railways,        table: streets,          kind: line,    show: true, where: "kind IN ('rail','tram','light_rail','subway','narrow_gauge','funicular','monorail')", ticked: false}
+  - {name: parking,         table: sites,            kind: polygon, show: true, where: "kind = 'parking'", ticked: false}
+  - {name: parking_p,       table: sites,            kind: point,   show: true, where: "kind = 'parking'", centroid: true, ticked: false}   # blue "P"
+  - {name: bus_station,     table: sites,            kind: polygon, show: true, where: "kind = 'bus_station'", ticked: false}
+  - {name: platform,        table: sites,            kind: polygon, show: true, where: "kind = 'platform'", ticked: false}
+  - {name: traffic_signals, table: traffic,          kind: point,   show: true, where: "kind = 'traffic_signals'", ticked: false}
+  - {name: crossings,       table: traffic,          kind: point,   show: true, where: "kind = 'crossing'", bearing: true, ticked: false}
+  - {name: bus_stations,    table: public_transport, kind: point,   show: true, where: "kind = 'bus_stop'", ticked: false}
+  - {name: train_stations,  table: public_transport, kind: point,   show: true, where: "kind IN ('station','halt')", ticked: false}
+  - {name: bicycle,         table: pois,             kind: point,   show: true, where: "kind = 'bicycle_rental'", ticked: false}

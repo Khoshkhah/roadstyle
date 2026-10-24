@@ -1,0 +1,200 @@
+{
+ "basemaps": [
+  {
+   "key": "voyager",
+   "label": "Voyager",
+   "url": "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+   "attr": "© OpenStreetMap contributors © CARTO",
+   "is_dark": false,
+   "satellite": false,
+   "lonboard": "Voyager",
+   "bg": "linear-gradient(180deg,#e8eef0,#d8e0e5)",
+   "preview": [
+    "#ff9933",
+    "#e8ecef",
+    "#9ec5fe"
+   ],
+   "subdomains": "abc",
+   "maxzoom": 20
+  },
+  {
+   "key": "voyager_nolabels",
+   "label": "Voyager (no labels)",
+   "url": "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png",
+   "attr": "© OpenStreetMap contributors © CARTO",
+   "is_dark": false,
+   "satellite": false,
+   "lonboard": "Voyager",
+   "bg": "linear-gradient(180deg,#e8eef0,#d8e0e5)",
+   "preview": [
+    "#ff9933",
+    "#e8ecef",
+    "#9ec5fe"
+   ],
+   "subdomains": "abc",
+   "maxzoom": 20
+  },
+  {
+   "key": "positron",
+   "label": "Positron",
+   "url": "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+   "attr": "© OpenStreetMap contributors © CARTO",
+   "is_dark": false,
+   "satellite": false,
+   "lonboard": "Positron",
+   "bg": "linear-gradient(180deg,#f3f5f7,#e3e8ed)",
+   "preview": [
+    "#888",
+    "#bbb",
+    "#888"
+   ],
+   "subdomains": "abc",
+   "maxzoom": 20
+  },
+  {
+   "key": "dark_matter",
+   "label": "Dark Matter",
+   "url": "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+   "attr": "© OpenStreetMap contributors © CARTO",
+   "is_dark": true,
+   "satellite": false,
+   "lonboard": "DarkMatter",
+   "bg": "radial-gradient(circle,#18222e,#0b1014)",
+   "preview": [
+    "#22d3a3",
+    "#9ec5fe",
+    "#5b6573"
+   ],
+   "subdomains": "abc",
+   "maxzoom": 20
+  },
+  {
+   "key": "osm",
+   "label": "OpenStreetMap",
+   "url": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+   "attr": "© OpenStreetMap contributors",
+   "is_dark": false,
+   "satellite": false,
+   "lonboard": null,
+   "bg": "linear-gradient(180deg,#f2efe9,#e8e4db)",
+   "preview": [
+    "#e07020",
+    "#dcdcdc",
+    "#888"
+   ],
+   "subdomains": "abc",
+   "maxzoom": 19
+  },
+  {
+   "key": "esri_gray",
+   "label": "Light Gray",
+   "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+   "attr": "Tiles © Esri",
+   "is_dark": false,
+   "satellite": false,
+   "lonboard": null,
+   "bg": "linear-gradient(180deg,#eceff1,#d8dde1)",
+   "preview": [
+    "#9aa",
+    "#ccc",
+    "#9aa"
+   ],
+   "subdomains": "abc",
+   "maxzoom": 16
+  },
+  {
+   "key": "esri_street",
+   "label": "Streets",
+   "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+   "attr": "Tiles © Esri",
+   "is_dark": false,
+   "satellite": false,
+   "lonboard": null,
+   "bg": "linear-gradient(180deg,#f2efe9,#e8e4db)",
+   "preview": [
+    "#e8a33d",
+    "#f4f1ea",
+    "#a8c8e8"
+   ],
+   "subdomains": "abc",
+   "maxzoom": 19
+  },
+  {
+   "key": "esri_dark_gray",
+   "label": "Dark Gray",
+   "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+   "attr": "Tiles © Esri",
+   "is_dark": true,
+   "satellite": false,
+   "lonboard": null,
+   "bg": "linear-gradient(180deg,#3a3f45,#25292e)",
+   "preview": [
+    "#22d3a3",
+    "#9ec5fe",
+    "#5b6573"
+   ],
+   "subdomains": "abc",
+   "maxzoom": 16
+  },
+  {
+   "key": "satellite",
+   "label": "Satellite",
+   "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+   "attr": "Tiles © Esri",
+   "is_dark": true,
+   "satellite": true,
+   "lonboard": null,
+   "bg": "linear-gradient(140deg,#2d3823,#4a3a2a,#2a2820)",
+   "preview": [
+    "#ffe8a0",
+    "#ffd84d",
+    "#fffdf2"
+   ],
+   "subdomains": "abc",
+   "maxzoom": 19
+  },
+  {
+   "key": "blank",
+   "label": "Blank",
+   "url": "",
+   "attr": "",
+   "is_dark": false,
+   "satellite": false,
+   "lonboard": null,
+   "bg": "#efede8",
+   "preview": [
+    "#888",
+    "#bbb",
+    "#888"
+   ],
+   "subdomains": "abc",
+   "maxzoom": 19
+  },
+  {
+   "key": "blank_dark",
+   "label": "Blank dark",
+   "url": "",
+   "attr": "",
+   "is_dark": true,
+   "satellite": false,
+   "lonboard": null,
+   "bg": "#14181d",
+   "preview": [
+    "#22d3a3",
+    "#9ec5fe",
+    "#5b6573"
+   ],
+   "subdomains": "abc",
+   "maxzoom": 19
+  }
+ ],
+ "switcher": [
+  "esri_gray",
+  "positron",
+  "osm",
+  "satellite",
+  "voyager",
+  "dark_matter",
+  "blank"
+ ]
+}

@@ -1,0 +1,51 @@
+# grey: a quiet, light map for data (docs/design/themes.md), in the manner of CARTO Positron. Your
+# colours (rsColor, colour options, the dashboard's colour by mode, the planner's route) stand out.
+background: "#f5f5f3"              # the land
+transform:                          # every osm_carto colour not set below:
+  saturation: 0.12                  #   12 % of its colour
+  lighten: 0.35                     #   then 35 % of the way to white
+roads:
+  colors:                           # white roads, grey outlines darker for bigger roads
+    motorway:      {fill: "#ececec", casing: "#a9a9a9"}
+    trunk:         {fill: "#ececec", casing: "#b0b0b0"}
+    primary:       {fill: "#ffffff", casing: "#b9b9b9"}
+    secondary:     {fill: "#ffffff", casing: "#c2c2c2"}
+    tertiary:      {fill: "#ffffff", casing: "#cbcbcb"}
+    unclassified:  {fill: "#ffffff", casing: "#d4d4d4"}
+    residential:   {fill: "#ffffff", casing: "#d4d4d4"}
+    living_street: {fill: "#f7f7f7", casing: "#d4d4d4"}
+    service:       {fill: "#ffffff", casing: "#dcdcdc"}
+    pedestrian:    {fill: "#f2f2f2", casing: "#d6d6d6"}
+    platform:      {fill: "#dedede", casing: "#c9c9c9"}
+features:
+  areas:
+    ocean:     {fill: "#d5dde0"}    # a hint of blue
+    water:     {fill: "#d5dde0"}
+    buildings: {fill: "#e6e5e2", outline: "#d9d8d4"}
+    landcover:                      # a hint of green for the green; the rest from the transform
+      forest: "#e7ece5"
+      wood: "#e7ece5"
+      park: "#e7ece5"
+      grass: "#e9ede7"
+      garden: "#e9ede7"
+      meadow: "#e9ede7"
+      cemetery: "#e7ece5"
+      pitch: "#e7ece5"
+      marina: "#d5dde0"             # a port basin: the water colour
+      swimming_area: "#d5dde0"
+      default: "#f0f0ee"
+  landcover_pattern: {}             # no textures
+  landcover_outline: {}
+  lines:
+    waterways: {color: "#c3cfd4"}
+    railways:  {color: "#c4c4c4"}
+paths:                              # over any path style (its dash and width kept)
+  footway:    {fill: "#c9c9c9"}
+  path:       {fill: "#c9c9c9"}
+  steps:      {fill: "#bdbdbd"}
+  corridor:   {fill: "#c9c9c9"}
+  bridleway:  {fill: "#c9c9c9"}
+  track:      {fill: "#c9c9c9"}
+  cycleway:   {fill: "#bcc3cc"}
+roadstyle:                          # roadstyle settings (its `config`)
+  bridge_casing_color: "#a3a3a3"

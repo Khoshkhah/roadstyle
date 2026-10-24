@@ -1,10 +1,10 @@
-# roadstyle as a Rust library (docs/design/rust_library.md, "The crates"): the pure core (model, levels, engine, tiles), the
+# roadstyle as a Rust library (docs/design/rust_library.md, "The crates"): the pure core (model, look, levels, engine, tiles), the
 # adapters (io, wasm) and the facade `roadstyle`. `roadstyle-rs` is the old name of the facade, kept for one version.
 [workspace]
-members = ["roadstyle-model", "roadstyle-io", "roadstyle-levels", "roadstyle-engine", "roadstyle-tiles", "roadstyle",
+members = ["roadstyle-model", "roadstyle-look", "roadstyle-io", "roadstyle-levels", "roadstyle-engine", "roadstyle-tiles", "roadstyle",
            "roadstyle-rs", "roadstyle-wasm", "roadstyle-py", "roadstyle-cli", "roadstyle-snapshot"]
 # cargo test / clippy at the root: all but the Python extension, which needs a Python to link (the CI job "python" builds it)
-default-members = ["roadstyle-model", "roadstyle-io", "roadstyle-levels", "roadstyle-engine", "roadstyle-tiles", "roadstyle",
+default-members = ["roadstyle-model", "roadstyle-look", "roadstyle-io", "roadstyle-levels", "roadstyle-engine", "roadstyle-tiles", "roadstyle",
                    "roadstyle-rs", "roadstyle-wasm", "roadstyle-cli", "roadstyle-snapshot"]
 resolver = "2"
 
@@ -30,6 +30,7 @@ sha2 = "0.10"                       # edge_levels_meta.edge_hash: roadstyle's sh
 yaml-rust2 = "0.13"                 # the look: roadstyle's profiles and palettes (src/roadstyle/data/*.yaml)
 base64 = "0.22"                     # the look: the arrow image as a data URL
 roadstyle-model = { path = "roadstyle-model" }
+roadstyle-look = { path = "roadstyle-look" }
 roadstyle-io = { path = "roadstyle-io" }
 roadstyle-levels = { path = "roadstyle-levels" }
 roadstyle-engine = { path = "roadstyle-engine" }
