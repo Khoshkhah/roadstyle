@@ -7,6 +7,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **`js/roads_sql.js` and `js/features_sql.js` run the SQL of `duckosmPlan`** (roadstyle-io's `duckosm.rs`), the one copy that
+  Python runs too. They have no SQL of their own now. Their functions and arguments do not change, and a new `readCatalog(q, catalog)`
+  gives the catalog that `duckosmPlan` reads. Load the module (`init()`) before you call them. On Monaco they write the same
+  `roads.parquet` (stored levels and tags, every mode) and `features.parquet`, byte for byte, as before.
 - **Every style reads a road's colour and width from the feature state** (audit N8, both engines). The road layer reads
   `["coalesce", ["feature-state", "rs_c"], <baked colour>]` and each width and offset stop × `["coalesce", ["feature-state", "rs_w"], 1]`,
   in every style, not only with `live_data`; `live_data` now only adds the metadata `roadstyle:live` and the page's option `live`.

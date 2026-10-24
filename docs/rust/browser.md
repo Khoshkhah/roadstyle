@@ -98,13 +98,16 @@ The page shows the roads colored by `lanes`, the legend, the Roads box, the sear
 
 ## Read the roads from a duckOSM file
 
-`makeRoads` and `writeRoads` in `js/roads_sql.js` are the SQL that writes `roads.parquet` from a duckOSM file in duckdb-wasm, with
-the columns that the engine reads. It is the only copy of this SQL: duckosm-rust and the GeoLibre plugin use the same file.
+`makeRoads` and `writeRoads` in `js/roads_sql.js` write `roads.parquet` from a duckOSM file in duckdb-wasm, with the columns that the
+engine reads. They run the statements of `duckosmPlan` (roadstyle-io's `duckosm.rs`), the only copy of this SQL, which Python runs
+too. duckosm-rust and the GeoLibre plugin use the same file. Load the module (`init()`) before you call them.
 
 ```js
 import * as duckdb from "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.33.1-dev57.0/+esm";
 import {makeRoads, writeRoads} from "./js/roads_sql.js";
-import init, {makeLook, makeStyle} from "./pkg/roadstyle_wasm.js";
+import init, {resolveLook, makeStyle} from "./pkg/roadstyle_wasm.js";
+
+await init();                                       // roads_sql.js asks the module for its SQL
 
 // duckdb-wasm in its own worker
 const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
@@ -122,11 +125,10 @@ const levels = await makeRoads(q, "monaco", {levels: "stored"});   // the stored
 await writeRoads(q, "driving");
 const roads = await db.copyFileToBuffer("roads.parquet");
 
-await init();
-const look = JSON.parse(makeLook(JSON.stringify({args: {state: "live", casing_level_col: "casing_level", fill_level_col: "fill_level",
-                                                         casing_start_col: "casing_start", casing_end_col: "casing_end"}})));
-look.args.levels = levels;                          // the engine checks that the stored levels are for these edges
-const style = JSON.parse(makeStyle(roads, JSON.stringify(look), undefined, undefined, "Monaco"));
+// levels: the engine checks that the stored levels are for these edges
+const look = resolveLook(JSON.stringify({args: {state: "live", casing_level_col: "casing_level", fill_level_col: "fill_level",
+                                                 casing_start_col: "casing_start", casing_end_col: "casing_end", levels}}));
+const style = JSON.parse(makeStyle(roads, look, undefined, undefined, "Monaco"));
 ```
 
 `makeRoads(q, catalog, opts)` runs one time for each file. It makes the temporary table `r`: one row for each edge of all modes, with
@@ -142,7 +144,9 @@ its levels. `writeRoads(q, mode)` runs for each mode, and writes only `roads.par
   hold exactly as text.
 
 `writeFeatures(q, catalog, specs)` in `js/features_sql.js` writes `features.parquet`, the base-map layers of mapstyle, for the
-argument `features` of `makeStyle` and `Tiler`.
+argument `features` of `makeStyle` and `Tiler`. It runs the layers' queries of `duckosmPlan`; a layer whose queries all fail is skipped,
+as mapstyle's `load_layers` does. The background is the whole boundary: the engine cuts the sea out of it when it reads
+`features.parquet`, so duckdb-wasm needs no spatial extension.
 
 ## Add roads that come later, as vector tiles
 
