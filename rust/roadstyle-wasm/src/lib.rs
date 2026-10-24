@@ -171,12 +171,16 @@ mod wasm {
     /// over the look's args (JSON text: api_key, street_view_key, resolved_basemaps).
     #[wasm_bindgen(js_name = makePage)]
     pub fn make_page(roads: Vec<u8>, look: &JsLook, options: &str, given: Option<String>) -> Result<String, JsError> {
+        page_of(roadstyle::read::read_roads(roads, "geometry").map_err(|e| JsError::new(&e))?, look, options, given)
+    }
+
+    /// makePage and Roads.page: the page of read roads.
+    fn page_of(roads: roadstyle::RoadTable, look: &JsLook, options: &str, given: Option<String>) -> Result<String, JsError> {
         let o: roadstyle::look::Options = serde_json::from_str(options).map_err(|e| JsError::new(&format!("options: {e}")))?;
         let given: serde_json::Map<String, serde_json::Value> = match given {
             Some(g) => serde_json::from_str(&g).map_err(|e| JsError::new(&format!("given: {e}")))?,
             None => serde_json::Map::new(),
         };
-        let roads = roadstyle::read::read_roads(roads, "geometry").map_err(|e| JsError::new(&e))?;
         let page = roadstyle::page_options::page_from(roads, &look.0, &o, &given).map_err(|e| JsError::new(&e))?;
         page.warnings.iter().for_each(|w| console_warn(w));
         Ok(page.html)
@@ -298,6 +302,11 @@ mod wasm {
         /// The names of the roads' columns (the file's properties), in order.
         pub fn columns(&self) -> Vec<String> {
             self.0.names().to_vec()
+        }
+
+        /// page(look, options, given?): the page of these roads in one call, as makePage (its arguments after the roads).
+        pub fn page(&self, look: &JsLook, options: &str, given: Option<String>) -> Result<String, JsError> {
+            page_of(self.0.clone(), look, options, given)
         }
 
         /// sources(look, features?, planner?, name?): stage 1 of these roads, as makeSources; `features` and `planner` are Parquet bytes.

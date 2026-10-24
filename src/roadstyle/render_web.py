@@ -3897,6 +3897,12 @@ def _add_sidebar(html, sidebar, name):
     frag = re.sub(r"<h2>.*?</h2>", f"<h2>{_html.escape(str(name))}</h2>", sidebar_html(sidebar), count=1)
     return html.replace("</body>", frag + "</body>", 1)
 
+def _script_json(v):
+    """JSON text for a <script> of the page (audit N23): each "<" as \\u003c, the same value in JSON and in JavaScript. A data value with
+    "</script>" in it (a legend's label, a road's field) cannot end the script and run what follows (page.rs, script_json)."""
+    return json.dumps(v).replace("<", "\\u003c")
+
+
 def _page_html(style, page, *, name, cam, bounds, side_panel_html, host_panel_width, compress, tiles=None, side=None, simple_js=None):
     """The page: the map with the style (base map and roads) and the dashboard with its options (``page``: the options of rsDashboard).
     ``tiles``: the PMTiles archive of a tiled page; ``side``: the road table (tiles.sidecar), in both ways; ``simple_js``: the settings
@@ -3906,7 +3912,7 @@ def _page_html(style, page, *, name, cam, bounds, side_panel_html, host_panel_wi
     cam = {"center": [(minx + maxx) / 2, (miny + maxy) / 2], "pitch": cam["pitch"], "bearing": cam["bearing"], "max_pitch": cam["max_pitch"],
            "bounds": [[minx, miny], [maxx, maxy]]}
     # the frame's tokens in one pass (audit R3): a value is not read again, so the host's own text may hold any token
-    vals = {"TITLE": _html.escape(name), "STYLE": json.dumps(style), "RS_OPTIONS": json.dumps({**page, "camera": cam}),
+    vals = {"TITLE": _html.escape(name), "STYLE": _script_json(style), "RS_OPTIONS": _script_json({**page, "camera": cam}),
             "HOST_PANEL_HTML": _host_panel(side_panel_html, host_panel_width, name)}
     html = re.sub(r"__(TITLE|STYLE|RS_OPTIONS|HOST_PANEL_HTML)__", lambda m: vals[m.group(1)], _HTML)
     parts = ""
@@ -3919,9 +3925,9 @@ def _page_html(style, page, *, name, cam, bounds, side_panel_html, host_panel_wi
         parts += _SIDE_JS.replace("__RS_SIDE_B64__", _b64gz(side))
     html = html.replace("<script>__RS_TILES__</script>", parts, 1)
     if simple_js:
-        html = html.replace("</body>", _SIMPLE_JS.replace("__RS_SIMPLE__", json.dumps(simple_js)) + "</body>", 1)
+        html = html.replace("</body>", _SIMPLE_JS.replace("__RS_SIMPLE__", _script_json(simple_js)) + "</body>", 1)
     if gz:
-        html = html.replace("</body>", _INFLATE_JS.replace("__RS_GZ__", json.dumps(gz)) + "</body>", 1)
+        html = html.replace("</body>", _INFLATE_JS.replace("__RS_GZ__", _script_json(gz)) + "</body>", 1)
     # MapLibre stays a placeholder here: WebMap inlines the vendored copy on save (offline file)
     # and swaps in CDN tags for the notebook preview (small enough for notebook output limits).
     return html
