@@ -697,12 +697,12 @@ Each phase must not break the fixed contracts of section 0, and each phase ends 
 
 ## 5. What the owner decides
 
-Two decisions need the owner. The rest are set by this document, with the owner's rules, and change only on the owner's objection.
-Q1 was approved on 2026-10-24.
+Two decisions needed the owner. Both were decided on 2026-10-24, as recommended. The rest are set by this document, with the owner's
+rules, and change only on the owner's objection.
 
-| # | Decision | Recommendation |
+| # | Decision | Decided (2026-10-24) |
 |---|---|---|
-| Q1 | **Approve the target (sections 1 and 2) and the order (section 4).** After the approval, the coordinator re-plans the lanes toward it, and no held item starts before its phase. | Approve. |
+| Q1 | **Approve the target (sections 1 and 2) and the order (section 4).** After the approval, the coordinator re-plans the lanes toward it, and no held item starts before its phase. | Approved. |
 | Q2 | **duckosm-rust after its freeze** (D2, U5, R20): duckosm-build depends on `roadstyle-levels` only, and `build.sh` copies from `roadstyle-assets`. When: in phase T6 (with P7), or earlier, as soon as T2 makes the assets crate? | In T6, in one duckosm-rust session. Until then, roadstyle keeps the old file paths, so the page build does not break. |
 
 Set by this document (no question, because the owner's rule "the Rust version is the real library, independent of Python" decides them):
