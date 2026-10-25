@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import shutil
+import struct
 import subprocess
 import tempfile
 import threading
@@ -75,7 +76,7 @@ document.removeEventListener = function(t, ...a){ listening[t] = (listening[t] |
 </script>
 <script type="module">
 import init, * as pkg from "/level_editor/pkg/roadstyle_wasm.js";
-import {levelEditor, browserStore} from "/dashboard/editor/level_editor.js";
+import {levelEditor, browserStore, saveArea, areaIsFor} from "/dashboard/editor/level_editor.js";
 import {rsDashboard} from "/dashboard/index.js";
 await init();
 // the host's part: the area made in the page and kept in the browser, and the host's own map
@@ -115,6 +116,14 @@ if(location.search === "?no-dashboard"){                         // the host's d
   throw new Error("stop");
 }
 window.hostMap = map;
+// a store of its own with the area (saveArea) and the editor started on it with the map's levels (the option `levels`), as duckosm-rust's
+// page does it
+window.openWith = async (key, levels, edgeHash) => {
+  const s = browserStore(key, "Monaco test");
+  if(!(await areaIsFor(s, edgeHash))) await saveArea(s, a, edgeHash);
+  window.editor = await levelEditor({map, container: panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store: s, dashboard: host, prefix: "host-", levels});
+  return [window.editor.answer().resolve, await areaIsFor(s, edgeHash), await areaIsFor(browserStore("other-" + key), edgeHash)];
+};
 window.hostSources = Object.fromEntries(map.getStyle().layers.filter(l => l.id.startsWith("host-")).map(l => [l.id, l.source]));
 window.counts = () => JSON.stringify(Object.fromEntries(Object.entries(listening).filter(e => e[1])));
 window.before = counts();
@@ -246,6 +255,17 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             assert page.evaluate(bg) == "rgb(36, 42, 52)"
             page.evaluate("document.documentElement.dataset.theme = 'light'")
             assert page.evaluate(bg) == "rgb(255, 255, 255)"
+            # the map's levels (the option `levels`): with the area's edge_hash (roadstyle_levels::edge_hash: sha256 of the sorted ids, 8 bytes
+            # little endian, 32 hex characters), the editor starts from them with no solve; with another one it solves and says why
+            ids = sorted(int(x) for x in pq.read_table(EDGES, columns=["edge_id"]).column(0).to_pylist())
+            hsh = hashlib.sha256(b"".join(struct.pack("<q", i) for i in ids)).hexdigest()[:32]
+            levels_csv = page.evaluate("stored('levels.csv')")
+            page.evaluate("window.editor.destroy()")
+            got = page.evaluate("([csv, h]) => openWith('given-area', {csv, edge_hash: h}, h)", [levels_csv, hsh])
+            assert got[0]["how"] == "given" and got[1] is True and got[2] is False, got
+            page.evaluate("window.editor.destroy()")
+            got = page.evaluate("([csv, h]) => openWith('other-hash', {csv, edge_hash: '0' + h.slice(1)}, h)", [levels_csv, hsh])
+            assert got[0]["how"] == "full" and "other edges" in got[0]["why"], got
             assert not [e for e in errors if e != "boom"], errors      # "boom": the stopped worker's own error, which the page reports too
             b.close()
     finally:
