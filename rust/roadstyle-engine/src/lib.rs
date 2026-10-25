@@ -26,6 +26,12 @@ pub mod sources;
 pub use roadstyle_model::{feature_table, geom, mark, props, table, Cell, RoadTable, Row};
 pub use roadstyle_model::feature_table::FeatureTable;
 pub use error::{Error, Limit, Unsupported};
+
+/// A number that the caller gave (a map option), as JSON: a whole number as an integer, as the caller's keyword wrote it (`1` stays `1` in
+/// the outputs, as in Python); NaN or an infinity: null.
+pub(crate) fn given(v: f64) -> Value {
+    if v.fract() == 0.0 && v.abs() < 9.0e15 { Value::from(v as i64) } else { serde_json::Number::from_f64(v).map_or(Value::Null, Value::Number) }
+}
 pub use road::{Road, Roads};
 pub use roadstyle_look::{self as look, Look};
 pub(crate) use roadstyle_model::obj;
@@ -71,9 +77,9 @@ pub fn make_parts(mut table: RoadTable, look: &Look, features: Option<FeatureTab
     if table.len() > MAX_ROADS {
         return Err(Error::Limit { what: Limit::Roads, found: table.len(), max: MAX_ROADS });
     }
-    ColumnMap::from_args(&look.args).to_engine(&mut table);
+    ColumnMap::of(&look.map.columns).to_engine(&mut table);
     let mut warnings = Vec::new();
-    let levels = compute_levels(&mut table, &look.args, look.road.head_m, &mut warnings)?;
+    let levels = compute_levels(&mut table, &look.map, look.road.head_m, &mut warnings)?;
     let mut parts = style_parts(table, levels, look, features, planner, name)?;
     parts.warnings.splice(0..0, warnings);
     Ok(parts)
@@ -89,9 +95,9 @@ pub fn restyle(s: &sources::Sources, look: &Look) -> Result<sources::Sources, Er
 /// make_parts after the roads are prepared (the engine's column names, the levels).
 fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>,
                name: Option<String>) -> Result<Parts, Error> {
-    let cols = ColumnMap::from_args(&look.args);
+    let cols = ColumnMap::of(&look.map.columns);
     // render's filter_col: in the engine's names (a keyword's column has the engine's name; a column with an engine name is kept aside)
-    let fcol = look.args["filter_col"].as_str().filter(|c| !c.is_empty()).map_or_else(|| "highway".to_string(), |f| {
+    let fcol = roads::named(&look.map.columns.filter).map_or_else(|| "highway".to_string(), |f| {
         cols.0.iter().find(|(_, user)| user == f).map(|(own, _)| own.to_string())
             .or_else(|| cols.0.iter().find(|(own, _)| *own == f).map(|(own, _)| ColumnMap::kept(own)))
             .unwrap_or_else(|| f.to_string())
@@ -100,9 +106,9 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
     feats.solved = solved;
     feats.cls = fcol;
     let colors = roads::mark_roads(&mut feats, &look.road, &look.map, look.args["legend"] != false)?;
-    let width_col = look.args["width_m_col"].as_str().filter(|c| !c.is_empty());
+    let width_col = roads::named(&look.map.columns.width_m);
     // render's arrows and labels (both on by default): the slots exist only for them
-    let (arrows, labels) = (look.args["arrows"] != false, look.args["labels"] != false);
+    let (arrows, labels) = (look.map.arrows.on, look.map.labels.on);
     let slots = if arrows || labels { slots::slots_source(&feats, &look.slot) }
                 else { json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": []}}) };
     let mut ovs = Vec::new();
@@ -117,7 +123,7 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
     let first_user = ovs.len();
     ovs.extend(overlays::user_overlays(&look.args["overlays"], ovs.len())?);
     for ov in ovs[first_user..].iter_mut() {
-        ov.user["edge_id_col"] = look.args["edge_id_col"].clone();
+        ov.user["edge_id_col"] = look.map.columns.edge_id.as_deref().map_or(Value::Null, Value::from);
     }
     // render's simple=False (the full look: a layer for each drawing position) is the Python engine's only (plan decision 2)
     if look.args["simple"] == false {
@@ -125,16 +131,16 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
     }
     // the line items on the edges (an overlay's lines in metres, render's items=): pieces of the one road layer
     let mut items = Vec::new();
-    if ovs.iter().any(overlays::metre_items) || !look.args["items"].is_null() {
+    if ovs.iter().any(overlays::metre_items) || look.map.items.is_some() {
         let by_id: std::collections::HashMap<String, Road> =
             feats.iter().filter_map(|f| f.get("edge_id").map(|e| (overlays::eid(e), f))).collect();
         for (i, ov) in ovs.iter_mut().enumerate().filter(|(_, o)| overlays::metre_items(o)) {
             overlays::edge_overlay(ov, &by_id)?;
             items.extend(overlays::item_pieces(ov, i, look)?);
         }
-        if !look.args["items"].is_null() {
-            let col = look.args["edge_id_col"].as_str().unwrap_or("edge_id");
-            items.extend(overlays::road_items(&look.args["items"], &by_id, col, ovs.len(), look)?);
+        if let Some(it) = &look.map.items {
+            let col = look.map.columns.edge_id.as_deref().unwrap_or("edge_id");
+            items.extend(overlays::road_items(&it.data, &by_id, col, ovs.len(), look)?);
         }
     }
     let mut simple = simple::simple_source(&feats, look.road.head_m, look.road.bridge_shadow, width_col, items)?;
@@ -149,7 +155,7 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
     let warnings = std::mem::take(&mut feats.warnings);
     let mut roads = roads::roads_source(feats);
     // render's view_3d: the bridges' extruded decks (_bridge_decks)
-    let decks = if look.args["view_3d"] == true {
+    let decks = if look.map.bridges.decks_3d {
         // a casing slab names the user's own `highway` column (Python's props.get("highway")): kept aside when highway_col is another
         let hw = if cols.0.iter().any(|(own, _)| *own == "highway") { ColumnMap::kept("highway") } else { "highway".into() };
         decks::bridge_decks(&roads.roads, &look.deck, &look.model, &hw)
@@ -159,7 +165,7 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
     simple.classes = Some(look.model.classes.clone());     // R8: the road layer reads each feature's class index
     // state "live" (a page with the dashboard, docs/design/rust_library.md "The interaction contract"): the state stays in the expressions,
     // and the style says what the controls show
-    let live = look.args["state"] == "live";
+    let live = look.map.output.state == roadstyle_look::options::State::Live;
     // audit N2 (2026-10-24): stage 1 gives the road-table form for every style (the pieces draw and glow, by their road's row; the road
     // table has the roads); only an export (render's export_inline, export_style: an app with no road table) asks for the roads source
     let export = look.args["export"] == true;
@@ -204,7 +210,7 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
     // render's boundary: a dashed outline over the roads (GeoJSON: a geometry, a Feature or a FeatureCollection; the Python binding
     // converts a shapely geometry or a GeoDataFrame)
     let mut layers = layers;
-    if let Some(fc) = boundary_fc(&look.args["boundary"]) {
+    if let Some(fc) = look.map.boundary.as_ref().and_then(boundary_fc) {
         sources.push(("boundary".into(), Src::Json(json!({"type": "geojson", "data": fc}))));
         let (th, b) = (&look.theme, &look.theme["boundary"]);
         layers.push(json!({"id": "boundary", "type": "line", "source": "boundary", "metadata": {"roadstyle:group": "roads"},
@@ -218,16 +224,18 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
     let args = &look.args;
     // render's road_popup: true (or not given) the default fields, a list those fields, "panel" the default fields in the side panel,
     // another text every column (null), false no popup; road_tooltip, else the folium name tooltip, else none
-    let popup = match &args["road_popup"] {
-        Value::Bool(false) => json!(false),
-        Value::Array(a) => Value::Array(a.clone()),
-        Value::String(s) if s != "panel" => Value::Null,
-        _ => it["popup"].clone(),
+    use roadstyle_look::options::{Popup, Tooltip};
+    let popup = match &look.map.interaction.popup {
+        Popup::Off => json!(false),
+        Popup::Fields(a) => json!(a),
+        Popup::All => Value::Null,
+        Popup::Default | Popup::Panel => it["popup"].clone(),
     };
-    let truthy = |v: &Value| !matches!(v, Value::Null | Value::Bool(false)) && v != "" && v.as_array().is_none_or(|a| !a.is_empty());
-    let tooltip = if truthy(&args["road_tooltip"]) { args["road_tooltip"].clone() }
-                  else if !args["tooltip"].is_null() { args["tooltip"].clone() } else { args["road_tooltip"].clone() };
-    let tooltip = if tooltip.is_null() { json!(false) } else { tooltip };
+    let tooltip = match &look.map.interaction.tooltip {
+        Some(Tooltip::All) => json!(true),
+        Some(Tooltip::Fields(f)) => json!(f),
+        None => json!(false),
+    };
     let delay = args["hover_delay_ms"].as_f64().map_or_else(|| it["hover_delay_ms"].clone(), |d| json!(d as i64));
     metadata.insert("roadstyle:interaction".into(), json!({"popup": popup, "tooltip": tooltip, "hover_delay_ms": delay}));
     metadata.insert("roadstyle:images".into(), Value::Object(images));
@@ -240,8 +248,8 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
     }
     // R22, live data: the feature states that the road layer reads, so a page's dashboard (rs.setData) colours and sizes the roads from a
     // table with no new build; the ramp is the call's cmap (else viridis), as 9 colours, and the no-data colour the theme's
-    if look.args["live_data"] == true {
-        let cmap = if look.args["cmap"].is_null() { json!("viridis") } else { look.args["cmap"].clone() };
+    if look.map.output.live_data {
+        let cmap = look.map.color.cmap.as_ref().map_or_else(|| json!("viridis"), |c| serde_json::to_value(c).unwrap_or(Value::Null));
         let ramp = colors::Ramp::new(&cmap)?;
         metadata.insert("roadstyle:live".into(), json!({
             "color": layers::LIVE_COLOR, "width": layers::LIVE_WIDTH, "types": {layers::LIVE_COLOR: "color", layers::LIVE_WIDTH: "factor"},
@@ -262,7 +270,7 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
         metadata.insert("roadstyle:state".into(), Value::Object(st));
         metadata.insert("roadstyle:controls".into(), controls);
     }
-    let name = name.map_or_else(|| look.args["name"].clone(), Value::from);
+    let name = name.or_else(|| look.map.output.name.clone()).map_or(Value::Null, Value::from);
     data_settings(&mut sources, &look.args);
     cols.to_user(&mut sources, &mut layers);
     Ok(Parts { name, center, zoom, layers, sources, metadata: Value::Object(metadata), glyphs, state, warnings })
@@ -317,31 +325,30 @@ fn source_features(source: &Value) -> &[Value] {
 /// table: they come back (casing_start, casing_level, casing_end, fill_level for each road), and the roads give them under the contract
 /// names (`Roads::solved`). A user column with a contract name, when the levels are computed, is kept aside as `__rs_kept_<name>`, with
 /// a warning.
-fn compute_levels(table: &mut RoadTable, args: &Value, head_m: f64, warnings: &mut Vec<String>) -> Result<Option<Vec<[i16; 4]>>, Error> {
-    let given = |k: &str| matches!(&args[k], Value::String(s) if !s.is_empty());
-    if let Some(meta) = args["levels"].as_object() {
+fn compute_levels(table: &mut RoadTable, m: &roadstyle_look::options::MapOptions, head_m: f64, warnings: &mut Vec<String>) -> Result<Option<Vec<[i16; 4]>>, Error> {
+    use roadstyle_look::options::Levels;
+    if let Levels::Stored { edge_hash, n_edges } = &m.levels {
         let ids = (0..table.len()).map(|i| match table.get(i, "edge_id").map(Cell::to_value) {
             Some(Value::Number(n)) => n.as_i64(),
             Some(Value::String(s)) => s.parse().ok(),
             _ => None,
         }).collect::<Option<Vec<i64>>>().ok_or_else(|| error::column("edge_id", "levels: an edge_id that is not a whole number"))?;
-        if Some(ids.len() as u64) != meta.get("n_edges").and_then(Value::as_u64)
-            || Some(roadstyle_levels::edge_hash(&ids).as_str()) != meta.get("edge_hash").and_then(Value::as_str) {
-            return Err(error::data(format!("the edges are not the edges the stored levels were solved for ({} given, {} stored, or other \
-                                edge_id values): run duckosm levels again", ids.len(), meta.get("n_edges").unwrap_or(&Value::Null))));
+        if ids.len() as u64 != *n_edges || roadstyle_levels::edge_hash(&ids) != *edge_hash {
+            return Err(error::data(format!("the edges are not the edges the stored levels were solved for ({} given, {n_edges} stored, or other \
+                                edge_id values): run duckosm levels again", ids.len())));
         }
     }
-    let tags = args["levels"] == "tags";
-    let forced = tags || args["levels"] == "solve";
+    let (tags, forced) = (m.levels == Levels::Tags, matches!(m.levels, Levels::Tags | Levels::Solve));
     let contract = [Mark::CasingLevelColumn, Mark::FillLevelColumn].iter().any(|m| table.col(m.name()).is_some());
-    if !forced && (given("casing_level_col") || given("fill_level_col") || contract) {
+    if m.levels == Levels::Given || (!forced && contract) {
         return Ok(None);
     }
     const COLUMNS: [Mark; 4] = [Mark::CasingStartColumn, Mark::CasingLevelColumn, Mark::CasingEndColumn, Mark::FillLevelColumn];
     let present: Vec<Mark> = COLUMNS.into_iter().filter(|m| table.col(m.name()).is_some()).collect();
     for m in present {
         table.rename(m.name(), &road::kept(m.name()));
-        warnings.push(format!("the column {} is not the levels (levels={}): it is kept as {}", m.name(), args["levels"], road::kept(m.name())));
+        warnings.push(format!("the column {} is not the levels (levels={}): it is kept as {}", m.name(), if tags { "tags" } else { "solve" },
+                              road::kept(m.name())));
     }
     // the engine's own names: ColumnMap gave the user's columns these names before this step
     let edges = level_edges(table, ["highway", "layer", "bridge", "tunnel", "junction", "", ""]);
@@ -362,17 +369,17 @@ fn compute_levels(table: &mut RoadTable, args: &Value, head_m: f64, warnings: &m
 struct ColumnMap(Vec<(&'static str, String)>);
 
 impl ColumnMap {
-    const KEYWORDS: [(&'static str, &'static str); 15] = [
-        ("highway_col", "highway"), ("tunnel_col", "tunnel"), ("bridge_col", "bridge"), ("layer_col", "layer"), ("edge_id_col", "edge_id"),
-        ("casing_level_col", "casing_level"), ("fill_level_col", "fill_level"), ("casing_start_col", "casing_start"),
-        ("casing_end_col", "casing_end"), ("head_start_m_col", "head_start_m"), ("head_end_m_col", "head_end_m"),
-        ("cap_start_col", "cap_start"), ("cap_end_col", "cap_end"), ("directed_col", "is_directed"), ("driving_col", "has_arrows"),
-    ];
-
-    fn from_args(args: &Value) -> ColumnMap {
-        ColumnMap(Self::KEYWORDS.iter()
-            .filter_map(|(k, own)| args[*k].as_str().filter(|u| !u.is_empty() && u != own).map(|u| (*own, u.to_string())))
-            .collect())
+    /// The columns that the caller names with another name than the engine's (MapOptions' columns).
+    fn of(c: &roadstyle_look::options::Columns) -> ColumnMap {
+        let l = c.levels.clone().unwrap_or_default();
+        let given: [(&'static str, Option<&String>); 15] = [
+            ("highway", Some(&c.class)), ("tunnel", c.tunnel.as_ref()), ("bridge", c.bridge.as_ref()), ("layer", c.layer.as_ref()),
+            ("edge_id", c.edge_id.as_ref()), ("casing_level", l.casing_level.as_ref()), ("fill_level", l.fill_level.as_ref()),
+            ("casing_start", l.casing_start.as_ref()), ("casing_end", l.casing_end.as_ref()), ("head_start_m", l.head_start_m.as_ref()),
+            ("head_end_m", l.head_end_m.as_ref()), ("cap_start", l.cap_start.as_ref()), ("cap_end", l.cap_end.as_ref()),
+            ("is_directed", c.directed.as_ref()), ("has_arrows", c.driving.as_ref()),
+        ];
+        ColumnMap(given.into_iter().filter_map(|(own, u)| u.filter(|u| !u.is_empty() && *u != own).map(|u| (own, u.clone()))).collect())
     }
 
     fn kept(own: &str) -> String {
@@ -534,7 +541,8 @@ mod tests {
     #[test]
     fn column_map_gives_the_engine_its_names_and_the_user_theirs() {
         // only a column keyword with another name than the engine's own: tunnel_col "tunnel" and an empty one change nothing
-        let m = ColumnMap::from_args(&json!({"highway_col": "fclass", "tunnel_col": "tunnel", "edge_id_col": "", "cap_start_col": "cs"}));
+        let args = json!({"highway_col": "fclass", "tunnel_col": "tunnel", "edge_id_col": "", "cap_start_col": "cs"});
+        let m = ColumnMap::of(&roadstyle_look::options::MapOptions::from_args(&args).unwrap().0.columns);
         assert_eq!(m.0, vec![("highway", "fclass".to_string()), ("cap_start", "cs".to_string())]);
         // the user's column gets the engine's name; a column that already has it is kept under another name in between
         let mut t = table(&["highway", "fclass"]);

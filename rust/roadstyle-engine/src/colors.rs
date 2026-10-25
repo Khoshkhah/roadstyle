@@ -68,10 +68,7 @@ impl<'a> Styler<'a> {
     }
 }
 
-/// A number that the caller gave, as JSON: a whole number as an integer (the caller's `1` stays `1` in the legend, as in Python).
-fn given(v: f64) -> Value {
-    if v.fract() == 0.0 && v.abs() < 9.0e15 { Value::from(v as i64) } else { num(v) }
-}
+use crate::given;
 
 /// Python's str() of a column value (pandas: integers stay integers with integer_object_nulls).
 /// ponytail: a float is written as Python writes it only without an exponent (no 1e-05 or 1e+16); add it if a categorical column has such floats.

@@ -334,15 +334,16 @@ pub(crate) fn minzoom_filter(col: &str, table: &Map<String, Value>) -> Value {
 /// render's minzoom (_minzoom_filter): null or true the config's table of the classes' first zooms (the default since 2026-10-25, as
 /// OpenMapTiles and OSM-Carto do), a mapping that table with changes, false every class at every zoom (None).
 pub(crate) fn class_minzoom(look: &crate::Look) -> Option<Map<String, Value>> {
+    use roadstyle_look::options::ClassMinzoom;
     let table = || look.config["minzoom"].as_object().cloned().unwrap_or_default();
-    match &look.args["minzoom"] {
-        Value::Bool(true) | Value::Null => Some(table()),
-        Value::Object(o) => {
+    match &look.map.roads.minzoom {
+        ClassMinzoom::Profile => Some(table()),
+        ClassMinzoom::Table(o) => {
             let mut t = table();
             t.extend(o.iter().map(|(k, v)| (k.clone(), v.clone())));
             Some(t)
         }
-        _ => None,
+        ClassMinzoom::Off => None,
     }.filter(|t| !t.is_empty())
 }
 
@@ -617,8 +618,8 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     let fb_casing = &th["roads"]["fallback"]["casing"];
     let sel = &th["selection"];
     // render's select_color / hover_color, else the theme's selection colours
-    let pick = |k: &str, theme: &'static str| match &look.args[k] { Value::Null => sel[theme].clone(), v => v.clone() };
-    let (select, hover) = (&pick("select_color", "select"), &pick("hover_color", "hover"));
+    let pick = |c: &Option<roadstyle_look::color::Color>, theme: &'static str| c.as_ref().map_or_else(|| sel[theme].clone(), |c| c.css().into());
+    let (select, hover) = (&pick(&look.map.interaction.select_color, "select"), &pick(&look.map.interaction.hover_color, "hover"));
     let any_tunnel = rp.iter().any(|p| p.get(Mark::Tunnel.name()).is_some_and(py_truth));
     if any_tunnel && cfg["tunnel_palettes"].get(cfg["tunnel_palette"].as_str().unwrap_or("")).is_none() {        // render's check (the tunnel look)
         let names: Vec<String> = cfg["tunnel_palettes"].as_object().into_iter().flatten().map(|(k, _)| format!("'{k}'")).collect();
@@ -638,13 +639,14 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     // render's width_m_col: metre widths from width_m_zoom on (docs/design/metre_widths.md)
     let args = &look.args;
     // state "live" (a page with the dashboard): the expressions keep ["global-state", name]; else the export's style, the state baked
-    let live = args["state"] == "live";
-    let metres = args["width_m_col"].as_str().is_some_and(|c| !c.is_empty());
-    let wmz = if args["width_m_zoom"].is_null() { th["roads"]["width_m_zoom"].clone() } else { args["width_m_zoom"].clone() };
+    let mo = &look.map;
+    let live = mo.output.state == roadstyle_look::options::State::Live;
+    let metres = crate::roads::named(&mo.columns.width_m).is_some();
+    let wmz = mo.width.m_zoom.map_or_else(|| th["roads"]["width_m_zoom"].clone(), crate::given);
     let wing = th["bridges"]["wing_scale"].as_f64().unwrap_or(1.0);
     let off = if metres { m.offset_expr_m("highway", pairs, &wmz) } else { m.offset_expr("highway", pairs) };
     let (cw, fw, bcw) = if metres {
-        let casing_px = if args["casing_min_px"].is_null() { th["casing"]["min_px"].clone() } else { args["casing_min_px"].clone() };
+        let casing_px = mo.roads.casing_min_px.map_or_else(|| th["casing"]["min_px"].clone(), crate::given);
         let ml = MetreLook { wmz: wmz.clone(), bridge_m: cfg["bridge_casing_m"].clone(), bridge_px: cfg["bridge_casing_px"].clone(), casing_px, wing_scale: wing };
         let mk = |k: &str| m.width_m_expr("highway", k, &ml);
         (mk("casing"), mk("fill"), mk("wings"))
@@ -666,7 +668,7 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     let mz_filter = |col: &str| mz.as_ref().map(|t| minzoom_filter(col, t));
     let mut flt = vec![json!("all")];
     flt.extend(mz_filter("highway"));
-    let casing_px = if args["casing_min_px"].is_null() { th["casing"]["min_px"].clone() } else { args["casing_min_px"].clone() };
+    let casing_px = mo.roads.casing_min_px.map_or_else(|| th["casing"]["min_px"].clone(), crate::given);
     // casing.drop_below_px: the profile's 1.0 for a look made before the key (2026-10-25)
     let drop = th["casing"]["drop_below_px"].as_f64().unwrap_or(1.0);
     flt.extend(casing_drop_filter(m, drop, metres && casing_px.as_f64().unwrap_or(0.0) >= drop));
@@ -826,7 +828,7 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
         for zp in arw["spacing"].as_array().into_iter().flatten() {
             spacing.extend(zp.as_array().unwrap().iter().cloned());
         }
-        let (arrows, labels) = (look.args["arrows"] != false, look.args["labels"] != false);
+        let (arrows, labels) = (look.map.arrows.on, look.map.labels.on);
         // the arrows along the slots; stage 3 chooses another kind (the inline page's points: Sources::page_arrows; the export's
         // line-center, below)
         let (source, mut layout) = ("slots", json!({"symbol-placement": "line", "symbol-spacing": spacing}));
