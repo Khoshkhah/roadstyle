@@ -15,8 +15,8 @@ points, which the coordinator accepted:
   settings' `config.api_key` and `config.api_keys` are removed; the caller gives the keys to the page in `given`).
 - A look file of version 2 has `map` (the typed `MapOptions`) and the sections, and no `args`: a look file is the style, and page keys
   do not belong in it (the coordinator's decision, 2026-10-25; version 2 was not released, so it changed in place). The page takes its
-  keys from its caller (`page_from`'s `given`: the Python binding and the CLI give the call's keywords). The writer's keys (`export`,
-  `data_maxzoom`, `data_tolerance`) and stage 2's (`tile_keep`, `tile_layers`) are in `Look::other` until T4 moves them to
+  keys from its caller (`page_from`'s `given`: the Python binding and the CLI give the call's keywords). The writer's keys
+  (`data_maxzoom`, `data_tolerance`; `export` is the map option `output.export`, T4 step 2) and stage 2's (`tile_keep`, `tile_layers`) are in `Look::other` until T4 moves them to
   `SourceMode::Inline` and `TileOptions`. The base map's page defaults (`box_layout`, `basemap`, `basemaps`, `copy_field`) are in
   `Look::base_map_page`, in memory only. The look has no JSON views of version 1: `Look::resolution_value` gives the resolution's
   version-1 value, of which the parity goldens are a summary.
@@ -100,7 +100,8 @@ pub struct MapOptions {
 | Key | Goes to | Why |
 |---|---|---|
 | `simple` | nowhere | Simple mode is the one drawing approach. Only the Python binding keeps `simple=False` as an error until 0.27.0. |
-| `export`, `data_maxzoom`, `data_tolerance` | `SourceMode::Inline { export, maxzoom, tolerance }` of the style writer | choices of the writer, not of stage 1 |
+| `export` | `MapOptions.output.export` | it changes stage 1: its layers go through every pass, and it changes the arrows layer and the controls (2026-10-25) |
+| `data_maxzoom`, `data_tolerance` | `SourceMode::Inline { maxzoom, tolerance }` of the style writer | choices of the writer, not of stage 1 |
 | `tile_keep`, `tile_layers` | `TileOptions` (roadstyle-tiles) | stage 2 |
 | `hover_delay_ms`, `box_layout`, `copy_field` (the popup's copy button), `legend` (show the legend or not; its data is stage 1 and always written) | `PageOptions` | page keys (the coordinator's answers, 2026-10-24); `copy_field` leaves the style's interaction metadata, and the page takes it from RS_OPTIONS or the host's options |
 | `basemap`, `basemaps`, `api_key`, `basemap_switcher`, `sidebar`, `side_panel_html`, `host_panel_width`, `street_view`, `street_view_key`, `popup_mode`, `filter_control`, `views` | `PageOptions` (they are there already, R3) | page keys |

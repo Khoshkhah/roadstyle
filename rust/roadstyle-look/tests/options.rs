@@ -24,7 +24,7 @@ const NOT_MAP: &[(&str, &[&str])] = &[
                       "find_control", "overlay_control", "overlay_popup", "sidebar", "views", "popup_mode", "side_panel_html",
                       "host_panel_width", "hover_delay_ms", "copy_field", "street_view", "street_view_key", "google_3d", "pitch",
                       "max_pitch", "bearing", "compress", "box_layout"]),
-    ("SourceMode", &["export", "data_maxzoom", "data_tolerance"]),
+    ("SourceMode", &["data_maxzoom", "data_tolerance"]),
     ("TileOptions", &["tiles", "tile_keep", "tile_layers"]),
     // the Python binding: it reads them before the engine (the look's sources, the filtering of the edges, a DataFrame's colour column)
     ("Python", &["palette", "profile", "settings", "backend", "engine", "include", "exclude", "match_links", "selected", "color_col", "simple"]),

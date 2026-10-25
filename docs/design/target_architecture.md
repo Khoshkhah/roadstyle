@@ -244,10 +244,12 @@ parsed by three parsers; `"#fff"` panics (D4). The YAML files are in `src/roadst
      of options.
    - **`simple` goes.** Simple mode is the one drawing approach (decision 2, R5). `MapOptions` has no field for it. Only the Python
      binding keeps `simple=False` as an error until 0.27.0.
-   - **`Output` is split.** It mixes three stages. `name`, `state` (live or static) and `live_data` change the stage-1 style: they stay
-     in `MapOptions.output`. `export` (keep a `roads` source) and `data_maxzoom` / `data_tolerance` (the GeoJSON source options) are
-     choices of the style writer: they go to `SourceMode::Inline { export, maxzoom, tolerance }` of `write_style` ((f)). `tiles {keep,
-     layers}` is stage 2: it goes to `TileOptions`.
+   - **`Output` is split.** It mixes three stages. `name`, `state` (live or static), `live_data` and `export` change the stage-1 style:
+     they stay in `MapOptions.output`. `export` (the `roads` source with its pick and highlight layers, and the export's arrows) stays
+     there because it changes stage 1 (the coordinator's decision, 2026-10-25): its layers go through every pass of the layers, and it
+     changes the arrows layer and the controls (`roadstyle:controls`, `roadstyle:sources`). `data_maxzoom` / `data_tolerance` (the
+     GeoJSON source options) are choices of the style writer: they go to `SourceMode::Inline { maxzoom, tolerance }` of `write_style`
+     ((f)). `tiles {keep, layers}` is stage 2: it goes to `TileOptions`.
    - **`levels` as an enum** (`Stored | Tags | Solve | Given`) in place of today's `levels` key and the `*_level_col` keys: accept.
      The enum is the choice; the stored rows come with the data (`Inputs`, (f)); the level columns stay in `Columns.levels`.
    - **`interaction` is split.** The popup and tooltip fields change stage 1 (the road table keeps those columns), and so do the hover
@@ -323,7 +325,7 @@ peak of 354 MB (coordinator). `tile_stage` takes `at: &Value`. The page border i
 pub fn style(roads: RoadTable, look: &Look, opts: &MapOptions, more: Inputs) -> Result<Styled, Error>;
 // Inputs: base-map FeatureTables, the planner rows, the LevelPlan (stored, given, or solve)
 impl Styled {
-    pub fn write_style(&self, w: impl Write, sources: SourceMode) -> Result<(), Error>; // Inline{export, maxzoom, tolerance} | Files | Tiled(at)
+    pub fn write_style(&self, w: impl Write, sources: SourceMode) -> Result<(), Error>; // Inline{maxzoom, tolerance} | Files | Tiled(at)
     pub fn write_files(&self, dir: &Path, format: Format) -> Result<Vec<FileInfo>, Error>; // GeoJSON or GeoParquet, road_table.parquet
     pub fn road_table(&self) -> &RoadTableOut;
     pub fn facts(&self) -> &MapFacts;

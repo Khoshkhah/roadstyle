@@ -356,10 +356,9 @@ fn compute_levels(table: &RoadTable, roles: &Roles, m: &roadstyle_look::options:
     Ok(Some(levels.rows.iter().map(|r| [r.casing_start, r.casing_level, r.casing_end, r.fill_level].map(small)).collect()))
 }
 
-/// render's export (export_inline, export_style: a style for an app with no road table). A key of the style writer: read from the look's
-/// `other` until T4 moves it to SourceMode::Inline.
+/// render's export (export_inline, export_style: a style for an app with no road table): the map option `output.export`.
 pub(crate) fn export(look: &Look) -> bool {
-    look.other.get("export") == Some(&Value::Bool(true))
+    look.map.output.export
 }
 
 /// render's data_maxzoom (every GeoJSON source) and data_tolerance (every GeoJSON source that has a tolerance). Keys of the style writer:
