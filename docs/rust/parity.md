@@ -217,6 +217,26 @@ Tartu has 64,828 roads; Monaco has 13,298. The archive makes each tile once, wit
 and 68 MB of tiles kept after it). Most of its peak is the PMTiles writer, which keeps every gzipped tile until it writes the
 directory.
 
+The browser's path in WebAssembly is measured in Node with `rust/roadstyle-wasm/bench.mjs`: the calls of the duckosm-rust page's map
+worker (`makeSources`, then `tileSources`, with the base map) and the size of the wasm memory after each (`memoryBytes`; it only
+grows):
+
+```bash
+cargo build --release --manifest-path rust/Cargo.toml --target wasm32-unknown-unknown -p roadstyle-wasm
+wasm-bindgen --target nodejs --out-dir /tmp/rs-pkg rust/target/wasm32-unknown-unknown/release/roadstyle_wasm.wasm
+node rust/roadstyle-wasm/bench.mjs /tmp/rs-pkg rust/roadstyle-rs/tests/data/tartu
+```
+
+| Area | Roads | `makeSources` | `tileSources` | Wasm memory after both | For each road |
+|---|---|---|---|---|---|
+| Monaco | 13,298 | 259 ms | 111 ms | 110 MiB (19 MiB at the start) | 7.0 KiB |
+| Tartu | 64,828 | 1,039 ms | 709 ms | 213 MiB | 3.1 KiB |
+
+The tiles are made later, on request, so `tileSources` adds no memory at first. In the duckosm-rust page (desktop Chromium, after the
+draw) the map worker's wasm has 796 MiB for Burnaby's 151,770 roads (all networks) and 418 MiB for one network (62,453 roads), and the
+whole tab has about 1,000 MiB + 14 KB for each road (Monaco 1,077 MiB, Tartu 2,050 MiB). The memory target for each road is in
+[the target architecture](../design/target_architecture.md), section (j).
+
 In the browser, the WebAssembly module used 0.65 to 0.77 times the native peak in earlier measurements. A WebAssembly module has at
 most 4 GB, so the engine stops at 200,000 roads (`MAX_ROADS`) with an error. This limit is an estimate from Tartu, not a measurement
 of a larger area. Stockholm county (456,813 driving edges) is over the limit.

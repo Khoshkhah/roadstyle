@@ -497,6 +497,22 @@ tile, and each tile goes through the 64 MB cache (D9). The tiles of one area are
    tiles to the file as they come and the directory at the end. The archive path does not use the request cache.
 5. **The browser.** wasm32 has at most 4 GB, and a tab can get less. The browser makes stage 1 only for an area under a measured
    `MAX_ROADS`; a larger area uses stage-2 tiles made before. The design does not depend on wasm memory64.
+6. **The memory of each road in the browser (added 2026-10-24).** The measured base:
+
+   | What | Area | Roads | Memory | For each road |
+   |---|---|---|---|---|
+   | The wasm module after `makeSources` and `tileSources`, with the base map, in Node (`roadstyle-wasm/bench.mjs`) | Monaco | 13,298 | 110 MiB (19 MiB at the start) | 7.0 KiB |
+   | the same | Tartu | 64,828 | 213 MiB | 3.1 KiB |
+   | The map worker's wasm in the duckosm-rust page, after the draw (desktop Chromium) | Burnaby, all networks | 151,770 | 796 MiB | 5.4 KiB |
+   | the same | Burnaby, one network | 62,453 | 418 MiB | 6.9 KiB |
+   | The whole tab of that page | Monaco, Tartu | 13,298, 64,828 | 1,077 MiB, 2,050 MiB | about 1,000 MiB + 14 KB |
+
+   A phone tab of 1.5 GB thus draws about 40,000 roads. Most of a road's memory in the tab is outside the wasm module: the road
+   table and the sources as JavaScript values, and MapLibre's tile data. **The target** after T3's `Mark` (a piece and a tile carry
+   only the declared marks, R1) and the lean road table (its user columns stay Arrow; the page parses only the rows in view): the
+   wasm module at most 3 KiB for each road, and the tab at most 1,000 MiB + 7 KB for each road, so that a 1.5 GB phone tab draws
+   about 75,000 roads (Tartu with room). `bench.mjs` and the page measure it at each release, with `examples/bench.rs` for the native
+   stages; `MAX_ROADS` follows the measured tab number.
 
 **What the worldwide service needs.** Rules 3 and 4: no API that keeps the planet in memory.
 

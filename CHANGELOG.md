@@ -90,6 +90,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   look, options, given?)` call it. Python gives only what it alone knows: the data steps, the look's options, the base maps' keys and the
   Google Maps key. A view's palette resolves its look in Rust (Python makes no extra looks). The page writer gzips the road table and
   the big sources itself; the two engines' pages are the same byte for byte but these blobs, which are the same when read back.
+- **`rust/roadstyle-wasm/bench.mjs` measures the browser's path** in Node: `makeSources` and `tileSources` with the base map, and the
+  wasm memory after them (Monaco 110 MiB, 7.0 KiB for each road; Tartu 213 MiB, 3.1 KiB). docs/rust/parity.md has the table, and the
+  target architecture's (j) the memory target for each road in the browser.
 - **A test that the Python binding passes the output through** (`tests/test_binding.py`): on Monaco, the binding's style, road
   table and page are the Rust facade's texts byte for byte (the hashes in the Rust goldens, which `tests/areas.rs` makes). A page
   gives the CARTO no-key warning once, not once for each CARTO base map of the switcher.
