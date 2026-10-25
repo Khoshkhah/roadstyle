@@ -2,6 +2,7 @@
 engine="rust", for the cases of the Rust golden tests (rust/roadstyle-rs/tests/make_goldens.py): a part of Monaco, with the options of
 data-driven colour and width. Skipped when the Rust extension is not built (python rust/roadstyle-py/build.py)."""
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -93,7 +94,8 @@ _LEVEL_ARGS = ["casing_start_col", "casing_level_col", "casing_end_col", "fill_l
 
 # the computed levels: the Rust level input has the crossing rule (a path at a node where a car road goes on goes under the road,
 # 2026-10-25); the Python engine's does not, until it goes at P7. strict: a pass means the engines agree again, and the mark goes.
-_CROSSINGS = pytest.mark.xfail(strict=True, reason="the crossing rule is in the Rust level input only (2026-10-25)")
+_CROSSINGS = pytest.mark.xfail(os.environ.get("ROADSTYLE_ENGINE") != "rust", strict=True,          # with ROADSTYLE_ENGINE=rust both are Rust
+                               reason="the crossing rule is in the Rust level input only (2026-10-25)")
 
 
 @_CROSSINGS
