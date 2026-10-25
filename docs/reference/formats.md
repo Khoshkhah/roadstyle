@@ -384,7 +384,7 @@ Two separate choices give the form of a style.
 | Form | Made by | Sources |
 |---|---|---|
 | **Inline** | `export_inline`, `makeStyle`, `render_edges` | GeoJSON sources with all the data inside the style |
-| **Tiled** | `export_style` (`style.json`), `tiler.style()`, `render_edges(tiles=True)` | one vector source `roads` with the address of the tiles: `<base_url>/tiles/{z}/{x}/{y}.pbf`, `pmtiles://...` or `rs://...`; zooms 6 to 15 |
+| **Tiled** | `export_style` (`style.json`), `tiler.style()`, `render_edges(tiles=True)` | one vector source `roads` with the address of the tiles: `<base_url>/tiles/{z}/{x}/{y}.pbf`, `pmtiles://...` or `rs://...`; zooms 6 to 18 |
 
 **Whether the controls can change it:**
 
@@ -400,7 +400,7 @@ The road data is the features of the four sources above, with their properties. 
 
 - **GeoJSON** inside the style (`sources.<name>.data`).
 - **Vector tiles** (Mapbox Vector Tile 2.1): one source `roads`, with the tile layers `roads`, `simple`, `slots` and `decks`, zooms
-  6 to 15 and a buffer of 80 units. A feature's id is its index in its source. A piece of the layer `simple` has no id in the tiles:
+  6 to 18 and a buffer of 80 units. A feature's id is its index in its source. A piece of the layer `simple` has no id in the tiles:
   the source's `promoteId` (`__rs_edge`, the road's row) is its feature id. A tile keeps every `__rs_*` property and the columns
   named in `keep`, but not a `__rs_*` flag that is false: every reader takes a missing flag as false. Below the last zoom, a line is
   simplified to half a tile unit.
