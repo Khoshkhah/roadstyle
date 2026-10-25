@@ -158,7 +158,7 @@ fn zoom_pairs(t: &Value, f: impl Fn(f64) -> f64) -> Value {
 /// a warning, as mapstyle's.
 pub fn feature_overlays(tables: Vec<(String, FeatureTable)>, look: &crate::Look, edge_attached: &[String], warnings: &mut Vec<String>)
                         -> (Vec<Overlay>, Map<String, Value>) {
-    let interaction = look.args["interaction"].as_object().cloned().unwrap_or_default();
+    let interaction = look.map.base_map.as_ref().map(|b| b.layers.clone()).unwrap_or_default();
     let mut unknown: Vec<&String> = interaction.keys().filter(|k| !tables.iter().any(|(n, _)| n == *k)).collect();
     if !unknown.is_empty() {
         unknown.sort();

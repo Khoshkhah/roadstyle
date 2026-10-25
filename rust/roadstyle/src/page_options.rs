@@ -94,7 +94,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     }
     let bounds = bounds_of(&roads);
     let tiled = on("tiles");
-    let mut src = crate::sources_of(roads, look, features, None, look.args["name"].as_str().map(String::from))?;
+    let mut src = crate::sources_of(roads, look, features, None, look.map.output.name.clone())?;
     let (active, bms, base) = basemaps(&a, look, &mut src.warnings)?;
     let bg = bg_color(&active, look);
     let keys: Vec<Value> = bms.iter().map(|b| b["key"].clone()).collect();

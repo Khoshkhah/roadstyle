@@ -69,8 +69,9 @@ pub fn sources_of(roads: RoadTable, look: &Look, features: Option<FeatureTable>,
 
 /// `roadstyle:columns`: the user's class, filter and metre width columns (render's highway_col, filter_col, width_m_col).
 fn columns(look: &Look) -> Value {
-    let arg = |k: &str| look.args[k].as_str().filter(|c| !c.is_empty()).map_or(Value::Null, Value::from);
-    json!({"class": arg("highway_col"), "filter": arg("filter_col"), "width": arg("width_m_col")})
+    let c = &look.map.columns;
+    let given = |v: Option<&String>| v.filter(|c| !c.is_empty()).map_or(Value::Null, |c| Value::from(c.as_str()));
+    json!({"class": given(Some(&c.class).filter(|c| *c != "highway")), "filter": given(c.filter.as_ref()), "width": given(c.width_m.as_ref())})
 }
 
 /// The first zoom of a source's tiles: the first zoom at which a layer of the style draws it (a layer without `minzoom` draws from 0),
