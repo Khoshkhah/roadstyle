@@ -90,7 +90,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     }
     let key = a["street_view_key"].as_str().filter(|k| !k.is_empty()).map(String::from);
     if on("google_3d") && key.is_none() {
-        return Err(crate::error::options("google_3d needs a Google Maps JavaScript API key: street_view_key, or the variable GOOGLE_MAPS_KEY"));
+        return Err(crate::error::options("google_3d=True needs a Google Maps JavaScript API key: pass street_view_key=... or set GOOGLE_MAPS_KEY"));
     }
     let bounds = bounds_of(&roads);
     let tiled = on("tiles");
