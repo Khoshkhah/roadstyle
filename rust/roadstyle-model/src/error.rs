@@ -3,8 +3,8 @@
 
 use std::fmt;
 
-/// An error of roadstyle-model, always in the input data (a regional build skips the table and logs it). `Display` gives its message;
-/// `String::from` gives the same text, for a caller whose error is text.
+/// An error of roadstyle-model: in the input data (`Column`, `Geometry`: a regional build skips the table and logs it) or in a build's
+/// options (`Key`: it stops). `Display` gives its message; `String::from` gives the same text, for a caller whose error is text.
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Error {
@@ -13,6 +13,8 @@ pub enum Error {
     Column { column: String, message: String },
     /// Geometries that the model does not take: bytes that are not WKB, a count that is not the count of the features.
     Geometry(String),
+    /// A table number of `RoadKey::TABLES` or more: its keys pass 2^53, which JavaScript does not hold exactly.
+    Key { table: u32 },
 }
 
 impl fmt::Display for Error {
@@ -20,6 +22,7 @@ impl fmt::Display for Error {
         match self {
             Error::Column { column, message } => write!(f, "column {column}: {message}"),
             Error::Geometry(m) => f.write_str(m),
+            Error::Key { table } => write!(f, "road table {table}: the tables are 0 to {} (a key stays below 2^53)", crate::RoadKey::TABLES - 1),
         }
     }
 }

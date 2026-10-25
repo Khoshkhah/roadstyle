@@ -215,7 +215,7 @@ pub fn slots_source(roads: &Roads, look: &SlotLook) -> Value {
                 continue;
             }
         }
-        let partner = if truthy(p.get("__rs_twoway")) { twin } else { p.get("__rs_edge2").and_then(Cell::as_u64).map(|x| x as usize) };
+        let partner = if truthy(p.get("__rs_twoway")) { twin } else { p.get("__rs_edge2").and_then(Cell::as_u64).and_then(crate::road::row_of) };
         reps.push(Rep { a, z, c: roads.line(i).unwrap().to_vec(), p: i, owner: (i, partner) });
     }
 
@@ -398,9 +398,9 @@ pub fn slots_source(roads: &Roads, look: &SlotLook) -> Value {
                     p.insert("highway".into(), hw.clone());
                     p.insert("oneway".into(), (*oneway as u8).into());
                     p.insert("lvl".into(), lvl.clone());
-                    p.insert("__rs_edge".into(), road.into());
+                    p.insert("__rs_edge".into(), crate::road::key(road).get().into());
                     if let Some(t) = twin {
-                        p.insert("__rs_edge2".into(), t.into());
+                        p.insert("__rs_edge2".into(), crate::road::key(t).get().into());
                     }
                     if !fl.is_null() {
                         p.insert("fl".into(), fl.clone());
@@ -417,7 +417,7 @@ pub fn slots_source(roads: &Roads, look: &SlotLook) -> Value {
     // _mark_cls, then the export: number the arrow slots (the odd ones, else the chain's only slot) of each one-way chain (render_web's
     // order: __rs_cls before __rs_arw)
     for f in feats.iter_mut() {
-        let e = f["properties"]["__rs_edge"].as_u64().unwrap() as usize;
+        let e = f["properties"]["__rs_edge"].as_u64().and_then(crate::road::row_of).expect("a slot has its road's key");
         f["properties"]["__rs_cls"] = roads.road(e).cls();
         if let Some(a) = roads.get(e, "__rs_access").filter(|a| !a.is_null()) {      // access_col: the same for the names and arrows
             f["properties"]["__rs_access"] = a.to_value();
