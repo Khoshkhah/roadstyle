@@ -74,6 +74,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `Edits` (the level editor's input). No public function of the two crates gives a `String` error now. The messages name no binding:
   the Python binding adds "use engine='python'" to an `Unsupported` kind. A test feeds roads with a line of one point, a line of two
   equal points and no geometry through both stages: no panic.
+- **The dashboard reads `filter_control` and `legend` from the page's options** (N32 step 2): they are page keys, with render's
+  defaults (true). The style keeps the facts (`roadstyle:controls.filter`, the legend data in `roadstyle:color_options`). A style made
+  before has its own `controls.filter.on`, which stays when the page gives no `filter_control`.
 - **The Roads box dims a class that the map does not draw at this zoom.** With the class minzoom (the default since 2026-10-25), a
   class row is dimmed below its first zoom (`roadstyle:controls.filter.minzoom`), with the title "from zoom N". Before, the box listed
   the hidden classes as if they were drawn.

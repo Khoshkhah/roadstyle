@@ -160,6 +160,8 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 | `google_3d` | `google_3d` | `false` | `google3d.js` |
 | `select_color` | `select_color` (the theme's `selection.select`) | (none) | `google3d.js` (the clicked road's line) |
 | `filter` | `filter_control`, `access_col`, `minzoom`: `{on, col, classes, swatches, palettes, bridges, tunnels, access, minzoom}` | `{on: false, classes: []}` | `filter.js`, `views.js` |
+| `filter_control` | `filter_control`: the Roads box (a page key; `filter.on` is this and a class to show) | `true`; a style made before N32 step 2 has its own `filter.on`, which stays without this option | `index.js` |
+| `legend` | `legend`: the legend box (a page key; the style always has the legend data) | `true` | `legend.js` |
 | `color_options` | `color_options` or a data styler's legend: `[{name, prop, legend}]` | the style's metadata, else `[]` | `color.js`, `legend.js`, `views.js` |
 | `color_active` | `color_active`, as an index | `0` | `color.js` |
 | `overlays` | `overlays`: `[{label, source, layers, popup, tooltip, interactive, under, base, select, color, visible, popup_window, kinds}]` (`kinds`: a base-map layer's `[[kind, count], ...]`, most first) | `[]` | `core.js`, `overlays.js`, `filter.js`, `select.js`, `features.js` |
