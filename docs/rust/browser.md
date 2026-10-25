@@ -51,7 +51,7 @@ Serve the folder over http. A module script does not load from a `file://` addre
 | `tiler.tile("roads", z, x, y)` | `Uint8Array` | one vector tile; empty when no road is in it |
 | `tiler.props("roads", row)` | JSON text | the properties of one road, or `null` |
 | `tiler.archive(bounds, layers)` | `Uint8Array` | a PMTiles archive of all tiles in `[min lon, min lat, max lon, max lat]` |
-| `makePage(roads, look, options, given?, features?)` | HTML text | the whole page, as `render_edges` writes it |
+| `makePage(roads, look, options, given?, features?)` | HTML text | the whole page, as `render_edges` writes it. The page's keys (`sidebar`, `popup_mode`, ...) come from `options`' args; `given` adds your values (`street_view_key`, `api_key`) |
 | `exportLook(look, cols, positions)` | JSON text | the look for another app's data layer (as `export_look`) |
 | `makeArea(edges, options?)` | an `AreaFiles` | a level area's files in memory ([The level editor in a page](#the-level-editor-in-a-page)) |
 | `new LevelArea(roads, pairs)` | a `LevelArea` | the level editor's solver on an area (`solve`, `solveLocal`, `check`, `draw`, `levelsCsv`) |

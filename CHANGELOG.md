@@ -55,6 +55,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   wide. A bridge keeps its casing. The road layer's filter has the rule, and the tiles leave out the pieces that it hides.
 
 ### Changed
+- **An unknown keyword of `render_edges` gives a warning** (T3), with the nearest known name: "render_edges: unknown keyword
+  'colour_by' (did you mean 'color_by'?); it does nothing". Before, `render_edges` ignored it with no message. From roadstyle 0.27.0
+  it is an error. The rule is one function, `roadstyle::options::unknown` (Python: `_rust.unknown_keywords`), which the MCP server's
+  option check uses too, in place of its own list. `band_col` and `order` are now an error with both engines (before, the Rust engine
+  ignored them).
 - **The wasm module grows its memory by a quarter step** (`roadstyle-wasm`): when it grows, it takes a quarter of its size ahead (16 to
   64 MB), not its whole size (16 to 256 MB). Monaco: 110 MiB to 68 MiB after the map's two stages; Tartu: 221 MiB to 197 MiB, and 340 MiB
   to 138 MiB after the first style in Chromium, which is not slower (Tartu 1.7 s to 1.4 s). `liveBytes()` gives the bytes held and their
@@ -166,6 +171,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `docs/design/dashboard_module.md`, "Trusted inputs".
 
 ### Fixed
+- **The studio's Dashboard and Report pages have their sidebar again.** Since the page keys came from `given` only (N32 step 2), the
+  wasm page (`makePage`, `Roads.page`) lost the page keys of its call (`sidebar`, `popup_mode`, ...). One function now makes them,
+  `roadstyle::page_options::given_of` (the look's other keywords, and `name` and `road_popup` of the call), for the wasm page and for
+  Python's page (`_engine.page_given`, through `_rust.given_of`), so the same keywords give the same page.
 - **A live style on a host's own map has its global state.** The dashboard sets each value of `roadstyle:state` that the map does
   not have yet (at the start and in `setStyle`), and keeps the values that the map has. Before, a host that added a live style's
   layers to its own map (whose style has no such `state` block) got MapLibre errors, unless it set the values itself.
