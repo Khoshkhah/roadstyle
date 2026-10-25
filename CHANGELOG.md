@@ -28,6 +28,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   wide. A bridge keeps its casing. The road layer's filter has the rule, and the tiles leave out the pieces that it hides.
 
 ### Changed
+- **The tiles go to zoom 18** (both engines; `tiles.maxzoom`, was 15). The map scales the last zoom's tiles up, and the casing
+  pieces' cut points round to that zoom's grid, so at zoom 21 and 22 a casing piece stood up to 4–5 px off its fill: thick on one
+  side, missing on the other, with notches where the pieces meet. At 18 it is about 1 px. The archive of a tiled page doubles
+  (Tartu: 13.3 MB to 26.7 MB). A planet build chooses its own last zoom.
 - **Minor roads are hidden below their class's zoom by default** (both engines), as in OpenMapTiles and OSM-Carto: `minzoom` is on
   (the profile's table: residential and unclassified from 13, cycleway, track and pedestrian from 14, service, footway and path from
   15, tertiary from 11; motorway to secondary from 4 to 9). **The old look: `minzoom=False`.** `minzoom=None` now means the table too:
