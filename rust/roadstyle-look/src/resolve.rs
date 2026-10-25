@@ -318,15 +318,22 @@ fn style_config(theme: &Value, sources: &[Value]) -> Result<Map<String, Value>, 
     Ok(cfg)
 }
 
-/// dataclasses.asdict(StyleConfig(...)): the fields in order, each from the settings, else its default (api_key, api_keys); the set
-/// minor_no_casing as a sorted list (as the look is written).
+/// The config view of a theme and of the config keys that are not in the theme (`extra`: camera, tiles, annotations, basemap), as the
+/// resolution makes it (`style_config`, then `config`): a look of version 2's view.
+pub(crate) fn config_of(theme: &Value, extra: Map<String, Value>) -> Result<Value, Error> {
+    Ok(config(&style_config(theme, &[json!({"config": extra})])?))
+}
+
+/// dataclasses.asdict(StyleConfig(...)): the fields in order, each from the settings, else its default; the set minor_no_casing as a
+/// sorted list (as the look is written). `api_key` and `api_keys` are always empty: a look is saved and published, so a key of the
+/// settings is never written into it (the caller gives the keys to the page in `given`).
 fn config(cfg: &Map<String, Value>) -> Value {
     let mut out = Map::new();
     for f in CONFIG_FIELDS {
         let v = match (f, cfg.get(f)) {
+            ("api_key", _) => Value::Null,
+            ("api_keys", _) => json!({}),
             (_, Some(v)) => v.clone(),
-            ("api_key", None) => Value::Null,
-            ("api_keys", None) => json!({}),
             ("basemap", None) => json!("voyager"),
             (_, None) => Value::Null,
         };
@@ -341,6 +348,11 @@ fn config(cfg: &Map<String, Value>) -> Value {
         out.insert(f.into(), v);
     }
     Value::Object(out)
+}
+
+/// A typed part of the look from its JSON value, or an error that names it.
+fn typed<T: serde::de::DeserializeOwned>(v: &Value, what: &str) -> Result<T, Error> {
+    serde_json::from_value(v.clone()).map_err(|e| Error::Look(format!("look: {what}: {e}")))
 }
 
 fn float(v: &Value, what: &str) -> Result<f64, Error> {
@@ -484,7 +496,10 @@ pub(crate) fn resolve(options: &Options) -> Result<LookData, Error> {
             a.insert(k, v);
         }
     }
-    let model = RoadModel::new(&roads_model, &th["roads"], &args)?;
+    // the slots' widths come from the road model, before the look's sections exist: its typed parts are read from the theme here
+    let model = RoadModel::new(&typed(&roads_model, "roads.model")?, &typed(&th["roads"]["links"], "roads.links")?,
+                               &typed(&th["roads"]["split"], "roads.split")?, th["roads"]["fallback"].as_object().unwrap_or(&Map::new()),
+                               &crate::MapOptions::from_args(&args)?.0)?;
     let mut width_z20 = Map::new();
     for c in &model.classes {
         width_z20.insert(c.clone(), json!(model.class_width_px(Some(c), 20.0, true)));
@@ -493,7 +508,7 @@ pub(crate) fn resolve(options: &Options) -> Result<LookData, Error> {
     let png = base64::engine::general_purpose::STANDARD.encode(SPRITE);
     let oneway = json!({"url": format!("data:image/png;base64,{png}"), "sdf": true, "pixelRatio": path(&th, "arrows.icon.pixel_ratio")?});
     Ok(LookData {
-        schema_version: crate::VERSION,
+        schema_version: 1,
         palette: palette.into(),
         settings,
         args,

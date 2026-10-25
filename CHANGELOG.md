@@ -7,6 +7,26 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **The typed look, version 2 (T3 step 2, audit R16).** A look is now one struct for each section (`roadstyle_look::sections`: roads,
+  casing, labels, arrows, bridges, tunnels, selection, data, overlays, boundary, background, access, camera, tiles, page, palettes,
+  active, interaction, base_map), in place of the JSON values `theme` and `config` (StyleConfig's flat view) and the resolution's
+  tables. `Look::to_json` writes version 2 (`LookFile`); `Look::from_json` reads versions 2, 1 and 0. The readers that have not moved
+  read the JSON views of version 1 (`Look::views_value`), which are the same, byte for byte, for every golden look: a number keeps its
+  written form (`Num`) and a colour its text (`Color`). A bad colour or an unknown key of a section is an error that names it.
+  `rust/roadstyle-look/look.schema.json` is the JSON Schema of version 2, made from the types with the feature `schema` (a test fails
+  when it differs). **No API key goes into a look**: the keywords `api_key` and `street_view_key` and the settings' `config.api_key`
+  and `config.api_keys` are removed when a look is made or read, because a look is saved and published; the caller gives the keys to
+  the page (`given`).
+  **A host that reads the JSON of a look** (`json()` in Python, `toJson()` in JavaScript) gets version 2: its parts are now the
+  sections (`part("theme")`, `part("config")` still give the views).
+- **`roadstyle_look::MapOptions`, the typed map options (T3 step 1, audit N32).** The keys that change the output of stage 1, in groups
+  (`columns`, `levels`, `color`, `width`, `roads`, `interaction`, `labels`, `arrows`, `tunnels`, `bridges`, `overlays`, `items`,
+  `boundary`, `base_map`, `output`; docs/design/t3_map_options_and_look.md). `MapOptions::from_json` reads the nested form: an unknown
+  key is an error with its path and the nearest known key (`"color.by_column": unknown key; did you mean "by"?`).
+  `MapOptions::from_args` reads render_edges' flat keywords (the `args` of a look of version 1) and gives the names of the other
+  keywords to the caller. Each `Look` has `map` (made from its `args`) and `other_args`; the readers move to `map` in N32 step 2. A map
+  keyword with a value of the wrong kind (for example `hover_color="#zzz"`) is now an error when the look is made.
+  `roadstyle_look::color::Color` is one colour value: "#rrggbb", "#rgb" or a CSS name, or a MapLibre colour text (`rgba(...)`).
 - **The level editor in a page with no server.** `makeArea(edges, options)` (roadstyle-wasm; `roadstyle::level_area::make_files` in
   Rust) makes a level area's roads.parquet, pairs.csv and edits.csv in memory, the same bytes as the folder form. `duckosmPlan` gives
   the query `level_edges`, the edges of a duckOSM file's level area (duckOSM's `load_roads`, the same rows and columns on Monaco). The

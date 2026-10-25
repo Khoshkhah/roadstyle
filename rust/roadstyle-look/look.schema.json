@@ -1,0 +1,1064 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LookFile",
+  "description": "A look as it is written, version 2: the typed sections, with the map options as render_edges' keywords (`args`, until N32 step 2). Its\nJSON is one mapping: these four keys and the sections' keys.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "description": "2",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "palette": {
+      "description": "the palette's name",
+      "type": "string"
+    },
+    "settings": {
+      "description": "the settings sources as given (a mapping, a list of them, or null)"
+    },
+    "args": {
+      "description": "the map options: render_edges' keywords"
+    },
+    "roads": {
+      "$ref": "#/$defs/RoadsLook"
+    },
+    "casing": {
+      "$ref": "#/$defs/CasingLook"
+    },
+    "labels": {
+      "$ref": "#/$defs/LabelLook"
+    },
+    "arrows": {
+      "$ref": "#/$defs/ArrowLook"
+    },
+    "bridges": {
+      "$ref": "#/$defs/BridgeLook"
+    },
+    "tunnels": {
+      "$ref": "#/$defs/TunnelLook"
+    },
+    "selection": {
+      "$ref": "#/$defs/SelectionLook"
+    },
+    "data": {
+      "$ref": "#/$defs/DataLook"
+    },
+    "overlays": {
+      "$ref": "#/$defs/OverlayLook"
+    },
+    "boundary": {
+      "$ref": "#/$defs/BoundaryLook"
+    },
+    "background": {
+      "$ref": "#/$defs/BackgroundLook"
+    },
+    "access": {
+      "description": "the colour of each kind of restricted road",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/Color"
+      }
+    },
+    "camera": {
+      "$ref": "#/$defs/CameraLook"
+    },
+    "tiles": {
+      "$ref": "#/$defs/TileLook"
+    },
+    "page": {
+      "description": "the page's defaults of the settings: the base map (never a key: a look is saved and published)",
+      "$ref": "#/$defs/PageLook"
+    },
+    "palettes": {
+      "description": "every palette that the look can name (a view's palette), by its name",
+      "type": "object",
+      "additionalProperties": true
+    },
+    "active": {
+      "description": "the names of the profile and the palette",
+      "$ref": "#/$defs/ActiveLook"
+    },
+    "interaction": {
+      "description": "the road popup's default fields and the hover delay",
+      "$ref": "#/$defs/InteractionLook"
+    },
+    "base_map": {
+      "description": "the base map's part (a duckOSM map's mode, theme and path style); none with no base map",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BaseMapLook"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "palette",
+    "settings",
+    "args",
+    "roads",
+    "casing",
+    "labels",
+    "arrows",
+    "bridges",
+    "tunnels",
+    "selection",
+    "data",
+    "overlays",
+    "boundary",
+    "background",
+    "access",
+    "camera",
+    "tiles",
+    "page",
+    "palettes",
+    "active",
+    "interaction"
+  ],
+  "$defs": {
+    "RoadsLook": {
+      "type": "object",
+      "properties": {
+        "classes": {
+          "description": "each class: group, order, minzoom, width, casing_width, dash, no_casing, single_line, minor",
+          "type": "object",
+          "additionalProperties": true
+        },
+        "fallback": {
+          "description": "a class with no entry",
+          "type": "object",
+          "additionalProperties": true
+        },
+        "width": {
+          "description": "the width of each group by zoom",
+          "type": "object",
+          "additionalProperties": true
+        },
+        "width_zoom_rate": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "casing_ratio": {
+          "description": "the casing width of each group: the fill width times this",
+          "type": "object",
+          "additionalProperties": true
+        },
+        "zoom_stops": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Num"
+          }
+        },
+        "links": {
+          "$ref": "#/$defs/Links"
+        },
+        "cap": {
+          "type": "string"
+        },
+        "join": {
+          "type": "string"
+        },
+        "split": {
+          "$ref": "#/$defs/Split"
+        },
+        "width_m_zoom": {
+          "$ref": "#/$defs/Num"
+        },
+        "twin_end_caps": {
+          "type": "boolean"
+        },
+        "twin_casing": {
+          "description": "\"one\" (one casing around a two-way road's two edges) or \"each\"",
+          "type": "string"
+        },
+        "fill_opacity": {
+          "$ref": "#/$defs/Num"
+        },
+        "styles": {
+          "description": "each class of the palette as ClassStyler resolves it, plain and as a link, and the fallback",
+          "$ref": "#/$defs/ClassStyles"
+        },
+        "model": {
+          "description": "render_web's road tables",
+          "$ref": "#/$defs/RoadsModel"
+        },
+        "head_m": {
+          "description": "render's default head length in metres",
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "classes",
+        "fallback",
+        "width",
+        "width_zoom_rate",
+        "casing_ratio",
+        "zoom_stops",
+        "links",
+        "cap",
+        "join",
+        "split",
+        "width_m_zoom",
+        "twin_end_caps",
+        "twin_casing",
+        "fill_opacity",
+        "styles",
+        "model",
+        "head_m"
+      ]
+    },
+    "Num": {
+      "type": "number"
+    },
+    "Links": {
+      "type": "object",
+      "properties": {
+        "classes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "width": {
+          "description": "a link's width: this part of its class's width",
+          "$ref": "#/$defs/Num"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "classes",
+        "width"
+      ]
+    },
+    "Split": {
+      "type": "object",
+      "properties": {
+        "offset_frac": {
+          "$ref": "#/$defs/Num"
+        },
+        "width_frac": {
+          "$ref": "#/$defs/Num"
+        },
+        "offset_zoom": {
+          "$ref": "#/$defs/Num"
+        },
+        "ramp_zooms": {
+          "$ref": "#/$defs/Num"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "offset_frac",
+        "width_frac",
+        "offset_zoom",
+        "ramp_zooms"
+      ]
+    },
+    "ClassStyles": {
+      "description": "Each class's style as ClassStyler resolves it: [plain, as a link] (fill, width, casing, casing_width, dash, opacity, casing_opacity).",
+      "type": "object",
+      "properties": {
+        "classes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": true,
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "fallback": {
+          "type": "array",
+          "items": true,
+          "minItems": 2,
+          "maxItems": 2
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "classes",
+        "fallback"
+      ]
+    },
+    "RoadsModel": {
+      "description": "render_web's road tables (_settings.roads()): the widths of each group by zoom, the zoom rate above the last stop, the casing ratio,\neach class's group, the link classes, the zoom stops and each class's drawing order.",
+      "type": "object",
+      "properties": {
+        "width": {
+          "description": "group -> zoom (as text) -> px",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/Num"
+            }
+          }
+        },
+        "width_zoom_rate": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Num"
+          }
+        },
+        "casing_ratio": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Num"
+          }
+        },
+        "group": {
+          "description": "class -> its width group",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "zoom_stops": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Num"
+          }
+        },
+        "z_order": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "width",
+        "width_zoom_rate",
+        "casing_ratio",
+        "group",
+        "links",
+        "zoom_stops",
+        "z_order"
+      ]
+    },
+    "CasingLook": {
+      "type": "object",
+      "properties": {
+        "extra": {
+          "$ref": "#/$defs/Num"
+        },
+        "m": {
+          "description": "roads in metres: the casing in metres",
+          "$ref": "#/$defs/Num"
+        },
+        "min_px": {
+          "description": "roads in metres: a casing is never thinner than this many pixels each side",
+          "$ref": "#/$defs/Num"
+        },
+        "drop_below_px": {
+          "description": "no casing piece (a bridge's keeps it) at a zoom where the whole casing line is narrower than this many px (0: always a casing).\nBefore `opacity`: the profile gives it, the palette gives `opacity`, and the theme keeps that order.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Num"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "opacity": {
+          "$ref": "#/$defs/Num"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "extra",
+        "m",
+        "min_px",
+        "opacity"
+      ]
+    },
+    "LabelLook": {
+      "type": "object",
+      "properties": {
+        "halo_width": {
+          "$ref": "#/$defs/Num"
+        },
+        "font": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "glyphs": {
+          "type": "string"
+        },
+        "minzoom": {
+          "$ref": "#/$defs/Num"
+        },
+        "minor_minzoom": {
+          "$ref": "#/$defs/Num"
+        },
+        "fraction": {
+          "$ref": "#/$defs/Num"
+        },
+        "min_px": {
+          "$ref": "#/$defs/Num"
+        },
+        "base_size": {
+          "description": "the size of the names by zoom: [[zoom, px], ...]",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Num"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "max_angle": {
+          "$ref": "#/$defs/Num"
+        },
+        "padding": {
+          "$ref": "#/$defs/Num"
+        },
+        "color": {
+          "$ref": "#/$defs/Color"
+        },
+        "halo_color": {
+          "description": "none: no halo",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Color"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "size": {
+          "description": "roads in metres: the names' size by zoom for every class"
+        },
+        "slots": {
+          "description": "the slots' tables: the class order and each class's width at zoom 20",
+          "$ref": "#/$defs/Slots"
+        },
+        "slot_m": {
+          "description": "the length of one slot in metres (config annotations.slot_m)",
+          "$ref": "#/$defs/Num"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "halo_width",
+        "font",
+        "glyphs",
+        "minzoom",
+        "minor_minzoom",
+        "fraction",
+        "min_px",
+        "base_size",
+        "max_angle",
+        "padding",
+        "color",
+        "slots",
+        "slot_m"
+      ]
+    },
+    "Color": {
+      "description": "\"#rrggbb\", \"#rgb\", a CSS colour name, or rgb(...), rgba(...), hsl(...), hsla(...)",
+      "type": "string"
+    },
+    "Slots": {
+      "description": "The slots' tables (the names and the arrows): the class order, and each class's casing width at zoom 20 in px.",
+      "type": "object",
+      "properties": {
+        "z_order": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "width_z20": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Num"
+          }
+        },
+        "width_z20_fallback": {
+          "$ref": "#/$defs/Num"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "z_order",
+        "width_z20",
+        "width_z20_fallback"
+      ]
+    },
+    "ArrowLook": {
+      "type": "object",
+      "properties": {
+        "minzoom": {
+          "$ref": "#/$defs/Num"
+        },
+        "minor_minzoom": {
+          "$ref": "#/$defs/Num"
+        },
+        "main_below": {
+          "$ref": "#/$defs/Num"
+        },
+        "size": true,
+        "spacing": true,
+        "icon": true,
+        "main": {
+          "description": "the classes of the main arrows",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "place": true,
+        "color": {
+          "$ref": "#/$defs/Color"
+        },
+        "opacity": {
+          "$ref": "#/$defs/Num"
+        },
+        "image": {
+          "description": "the one-way arrow image"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "minzoom",
+        "minor_minzoom",
+        "main_below",
+        "size",
+        "spacing",
+        "icon",
+        "main",
+        "place",
+        "color",
+        "opacity",
+        "image"
+      ]
+    },
+    "BridgeLook": {
+      "type": "object",
+      "properties": {
+        "cap": {
+          "type": "string"
+        },
+        "wing_scale": {
+          "$ref": "#/$defs/Num"
+        },
+        "ramp": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Num"
+          }
+        },
+        "casing_extra": {
+          "$ref": "#/$defs/Num"
+        },
+        "casing_m": {
+          "$ref": "#/$defs/Num"
+        },
+        "casing_px": {
+          "$ref": "#/$defs/Num"
+        },
+        "shadow": {
+          "$ref": "#/$defs/Shadow"
+        },
+        "decks": {
+          "$ref": "#/$defs/Decks"
+        },
+        "casing_color": {
+          "$ref": "#/$defs/Color"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "cap",
+        "wing_scale",
+        "ramp",
+        "casing_extra",
+        "casing_m",
+        "casing_px",
+        "shadow",
+        "decks",
+        "casing_color"
+      ]
+    },
+    "Shadow": {
+      "type": "object",
+      "properties": {
+        "show": {
+          "type": "boolean"
+        },
+        "blur": {
+          "$ref": "#/$defs/Num"
+        },
+        "offset": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Num"
+          }
+        },
+        "trim_m": {
+          "$ref": "#/$defs/Num"
+        },
+        "width_scale": {
+          "$ref": "#/$defs/Num"
+        },
+        "color": {
+          "$ref": "#/$defs/Color"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "show",
+        "blur",
+        "offset",
+        "trim_m",
+        "width_scale",
+        "color"
+      ]
+    },
+    "Decks": {
+      "type": "object",
+      "properties": {
+        "base_m": {
+          "$ref": "#/$defs/Num"
+        },
+        "thickness_m": {
+          "$ref": "#/$defs/Num"
+        },
+        "ramp_m": {
+          "$ref": "#/$defs/Num"
+        },
+        "step_m": {
+          "$ref": "#/$defs/Num"
+        },
+        "match_zoom": {
+          "$ref": "#/$defs/Num"
+        },
+        "width_scale": {
+          "$ref": "#/$defs/Num"
+        },
+        "flat_below": {
+          "$ref": "#/$defs/Num"
+        },
+        "casing_px": {
+          "$ref": "#/$defs/Num"
+        },
+        "underlay": {
+          "$ref": "#/$defs/Color"
+        },
+        "opacity": {
+          "$ref": "#/$defs/Num"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "base_m",
+        "thickness_m",
+        "ramp_m",
+        "step_m",
+        "match_zoom",
+        "width_scale",
+        "flat_below",
+        "casing_px",
+        "underlay",
+        "opacity"
+      ]
+    },
+    "TunnelLook": {
+      "type": "object",
+      "properties": {
+        "opacity_scale": {
+          "$ref": "#/$defs/Num"
+        },
+        "cap": {
+          "type": "string"
+        },
+        "folium_dash": {
+          "description": "folium's dash (goes with folium, P7)",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Num"
+          }
+        },
+        "casing_dash": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Num"
+          }
+        },
+        "fill_dash": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Num"
+          }
+        },
+        "strength": {
+          "$ref": "#/$defs/Num"
+        },
+        "dash_extra_px": {
+          "$ref": "#/$defs/Num"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Num"
+          }
+        },
+        "ratios": true,
+        "fill_dash_color": {
+          "$ref": "#/$defs/Color"
+        },
+        "toward": {
+          "type": "string"
+        },
+        "towards": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Color"
+          }
+        },
+        "palette": {
+          "type": "string"
+        },
+        "palettes": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "to": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "opacity_scale",
+        "cap",
+        "folium_dash",
+        "casing_dash",
+        "fill_dash",
+        "strength",
+        "dash_extra_px",
+        "steps",
+        "ratios",
+        "fill_dash_color",
+        "toward",
+        "towards",
+        "palette",
+        "palettes",
+        "to"
+      ]
+    },
+    "SelectionLook": {
+      "type": "object",
+      "properties": {
+        "folium": {
+          "description": "folium's highlight (goes with folium, P7)"
+        },
+        "hover": {
+          "$ref": "#/$defs/Color"
+        },
+        "select": {
+          "$ref": "#/$defs/Color"
+        },
+        "casing": {
+          "$ref": "#/$defs/Color"
+        },
+        "opacity": {
+          "$ref": "#/$defs/Num"
+        },
+        "glow_opacity": {
+          "$ref": "#/$defs/Num"
+        },
+        "folium_hover": {
+          "description": "folium's hover colour (goes with folium, P7)",
+          "$ref": "#/$defs/Color"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "folium",
+        "hover",
+        "select",
+        "casing",
+        "opacity",
+        "glow_opacity",
+        "folium_hover"
+      ]
+    },
+    "DataLook": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "$ref": "#/$defs/Num"
+        },
+        "casing_width": {
+          "$ref": "#/$defs/Num"
+        },
+        "nodata": {
+          "$ref": "#/$defs/Color"
+        },
+        "color_table": {
+          "$ref": "#/$defs/Color"
+        },
+        "opacity": {
+          "$ref": "#/$defs/Num"
+        },
+        "casing_opacity": {
+          "$ref": "#/$defs/Num"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "width",
+        "casing_width",
+        "nodata",
+        "color_table",
+        "opacity",
+        "casing_opacity"
+      ]
+    },
+    "OverlayLook": {
+      "type": "object",
+      "properties": {
+        "radius": {
+          "$ref": "#/$defs/Num"
+        },
+        "width": {
+          "$ref": "#/$defs/Num"
+        },
+        "circle_stroke_width": {
+          "$ref": "#/$defs/Num"
+        },
+        "text_size": {
+          "$ref": "#/$defs/Num"
+        },
+        "text_max_angle": {
+          "$ref": "#/$defs/Num"
+        },
+        "text_padding": {
+          "$ref": "#/$defs/Num"
+        },
+        "text_halo_width": {
+          "$ref": "#/$defs/Num"
+        },
+        "item_overlap_px": {
+          "$ref": "#/$defs/Num"
+        },
+        "color": {
+          "$ref": "#/$defs/Color"
+        },
+        "circle_stroke": {
+          "$ref": "#/$defs/Color"
+        },
+        "fill_opacity": {
+          "$ref": "#/$defs/Num"
+        },
+        "circle_opacity": {
+          "$ref": "#/$defs/Num"
+        },
+        "line_opacity": {
+          "$ref": "#/$defs/Num"
+        },
+        "outline_opacity": {
+          "$ref": "#/$defs/Num"
+        },
+        "styles": {
+          "description": "an overlay's style by its name (the settings' `overlays.styles`)",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "radius",
+        "width",
+        "circle_stroke_width",
+        "text_size",
+        "text_max_angle",
+        "text_padding",
+        "text_halo_width",
+        "item_overlap_px",
+        "color",
+        "circle_stroke",
+        "fill_opacity",
+        "circle_opacity",
+        "line_opacity",
+        "outline_opacity"
+      ]
+    },
+    "BoundaryLook": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "$ref": "#/$defs/Num"
+        },
+        "dash": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Num"
+          }
+        },
+        "color": {
+          "$ref": "#/$defs/Color"
+        },
+        "opacity": {
+          "$ref": "#/$defs/Num"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "width",
+        "dash",
+        "color",
+        "opacity"
+      ]
+    },
+    "BackgroundLook": {
+      "type": "object",
+      "properties": {
+        "light": {
+          "$ref": "#/$defs/Color"
+        },
+        "dark": {
+          "$ref": "#/$defs/Color"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "light",
+        "dark"
+      ]
+    },
+    "CameraLook": {
+      "type": "object",
+      "properties": {
+        "pitch": {
+          "$ref": "#/$defs/Num"
+        },
+        "bearing": {
+          "$ref": "#/$defs/Num"
+        },
+        "pitch_3d": {
+          "$ref": "#/$defs/Num"
+        },
+        "max_pitch": {
+          "$ref": "#/$defs/Num"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "pitch",
+        "bearing",
+        "pitch_3d",
+        "max_pitch"
+      ]
+    },
+    "TileLook": {
+      "type": "object",
+      "properties": {
+        "minzoom": {
+          "$ref": "#/$defs/Num"
+        },
+        "maxzoom": {
+          "$ref": "#/$defs/Num"
+        },
+        "extent": {
+          "$ref": "#/$defs/Num"
+        },
+        "buffer_px": {
+          "$ref": "#/$defs/Num"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "minzoom",
+        "maxzoom",
+        "extent",
+        "buffer_px"
+      ]
+    },
+    "PageLook": {
+      "type": "object",
+      "properties": {
+        "basemap": {
+          "description": "the base map's name",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "basemap"
+      ]
+    },
+    "ActiveLook": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "type": "string"
+        },
+        "palette": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "palette"
+      ]
+    },
+    "InteractionLook": {
+      "type": "object",
+      "properties": {
+        "popup": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hover_delay_ms": {
+          "$ref": "#/$defs/Num"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "popup",
+        "hover_delay_ms"
+      ]
+    },
+    "BaseMapLook": {
+      "description": "mapstyle's base-map part: the layers of layers.yaml, the 3D buildings, the base map's style and its images.",
+      "type": "object",
+      "properties": {
+        "layers_yaml": true,
+        "buildings_3d": true,
+        "style": true,
+        "images": true
+      },
+      "additionalProperties": false,
+      "required": [
+        "layers_yaml",
+        "buildings_3d",
+        "style",
+        "images"
+      ]
+    }
+  }
+}
