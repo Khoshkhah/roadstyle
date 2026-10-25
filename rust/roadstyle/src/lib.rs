@@ -5,6 +5,8 @@
 
 pub use roadstyle_engine::*;
 pub use roadstyle_io::{crs, duckosm, geojson, read, shp};
+/// roadstyle's files by name (the look, the base map, the dashboard, the page templates, MapLibre): `assets::text!("vendor/maplibre-gl.js")`
+pub use roadstyle_assets as assets;
 #[cfg(feature = "gpkg")]
 pub use roadstyle_io::gpkg;
 pub mod level_area;

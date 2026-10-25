@@ -1,4 +1,4 @@
-"""The key tables of docs/reference/formats.md, made from the bundled profile and palette (src/roadstyle/data/): each key to two
+"""The key tables of docs/reference/formats.md, made from the bundled profile and palette (rust/roadstyle-assets/files/data/): each key to two
 levels, its value in the file and its comment. Each table goes between the page's markers <!-- gen:NAME --> and <!-- /gen:NAME -->.
 
     python docs/gen_formats.py            # write the tables into the page
@@ -16,7 +16,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "src" / "roadstyle" / "data"
+DATA = ROOT / "rust" / "roadstyle-assets" / "files" / "data"
 PAGE = ROOT / "docs" / "reference" / "formats.md"
 KEY = re.compile(r"^( *)([A-Za-z0-9_]+):")
 COMMENT = re.compile(r"\s{2,}#\s?(.*)$")        # a trailing comment: two spaces or more, then '#' (a color '#rrggbb' is in quotes)

@@ -1,0 +1,588 @@
+<style>
+:root{--lv-w:400px;--lv-bg:#f6f7f9;--lv-card:#fff;--lv-line:#e4e7ec;--lv-ink:#1d2433;--lv-mute:#6b7280;--lv-r1:#e8590c;--lv-r2:#1971c2;
+  --lv-found:#868e96;--lv-saved:#7048e8;--lv-new:#2f9e44;--lv-bad:#e03131}
+body.lv-open #map{right:var(--lv-w)}
+#lv [hidden],#lv-busy[hidden]{display:none!important}           /* a display rule below must not show a hidden part */
+#map{transition:right .2s ease}
+#lv{position:fixed;top:0;right:0;bottom:0;width:var(--lv-w);z-index:6;background:var(--lv-bg);border-left:1px solid var(--lv-line);
+  display:flex;flex-direction:column;font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--lv-ink);transition:transform .2s ease}
+body:not(.lv-open) #lv{transform:translateX(100%)}
+#lv-toggle{position:absolute;left:-30px;top:calc(50% - 20px);width:30px;height:40px;border:1px solid var(--lv-line);border-right:none;border-radius:8px 0 0 8px;
+  background:var(--lv-bg);cursor:pointer;font-size:16px;color:var(--lv-mute);box-shadow:-2px 2px 6px rgba(0,0,0,.06)}
+#lv-toggle:hover{color:var(--lv-ink)}
+#lv header{padding:14px 16px 12px;background:#fff;border-bottom:1px solid var(--lv-line)}
+#lv .find{position:relative;margin-top:10px}
+#lv .modes{display:flex;gap:12px;margin-top:8px;font:12px system-ui;color:var(--lv-mute)} #lv .modes label{cursor:pointer;display:flex;gap:4px;align-items:center}
+#lv .find input{width:100%;box-sizing:border-box;border:1px solid #d0d5dd;border-radius:8px;padding:7px 10px 7px 30px;font:13px system-ui;color:var(--lv-ink);
+  background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Ccircle cx='6' cy='6' r='4.5'/%3E%3Cpath d='m9.5 9.5 3.5 3.5'/%3E%3C/svg%3E") no-repeat 10px 50%}
+#lv .find input:focus{outline:none;border-color:var(--lv-r2);box-shadow:0 0 0 3px rgba(25,113,194,.15)}
+#lv-hits{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:2;background:#fff;border:1px solid var(--lv-line);border-radius:8px;
+  box-shadow:0 8px 24px rgba(16,24,40,.14);max-height:320px;overflow:auto}
+#lv-hits div{padding:7px 10px;cursor:pointer;border-bottom:1px solid #f0f2f5} #lv-hits div:last-child{border-bottom:none}
+#lv-hits div:hover,#lv-hits div.on{background:#f2f6fc} #lv-hits b{font-weight:600} #lv-hits small{color:var(--lv-mute)}
+#lv .t{font-size:15px;font-weight:650;letter-spacing:-.01em} #lv .area{color:var(--lv-mute);font-size:12px;margin-top:1px}
+#lv .stats{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+#lv .stat{background:var(--lv-bg);border:1px solid var(--lv-line);border-radius:999px;padding:1px 9px;font-size:11.5px;color:#3b4252}
+#lv .stat b{font-weight:650}
+#lv .scroll{flex:1;overflow:auto;padding:4px 0 24px}
+#lv .tabs{display:flex;gap:2px;padding:0 12px;background:#fff;border-bottom:1px solid var(--lv-line)}
+#lv .tabs button{border:none;background:none;padding:9px 10px 8px;font:600 12.5px system-ui;color:var(--lv-mute);cursor:pointer;border-bottom:2px solid transparent;
+  margin-bottom:-1px}
+#lv .tabs button.on{color:var(--lv-ink);border-bottom-color:var(--lv-ink)} #lv .tabs button:hover{color:var(--lv-ink)}
+#lv .tabs .cnt{display:inline-block;min-width:16px;margin-left:4px;padding:0 5px;border-radius:999px;background:#eef1f6;font-size:11px;color:#3b4252}
+#lv [data-tab][hidden]{display:none}
+#lv section{padding:12px 16px 4px}
+#lv h2{display:flex;align-items:center;justify-content:space-between;margin:0 0 8px;font-size:11.5px;font-weight:650;color:var(--lv-mute);
+  text-transform:uppercase;letter-spacing:.06em}
+#lv h3{display:flex;align-items:center;gap:6px;margin:12px 0 6px;font-size:12px;font-weight:600;color:#3b4252}
+#lv .link{font:inherit;text-transform:none;letter-spacing:0;background:none;border:none;color:var(--lv-r2);cursor:pointer;padding:0;font-size:12px}
+#lv .link:hover{text-decoration:underline}
+#lv .empty{color:var(--lv-mute);background:#fff;border:1px dashed var(--lv-line);border-radius:10px;padding:14px;text-align:center;font-size:12.5px}
+#lv .card{position:relative;background:var(--lv-card);border:1px solid var(--lv-line);border-radius:10px;padding:10px 12px 10px 16px;margin-bottom:8px;
+  box-shadow:0 1px 2px rgba(16,24,40,.04)}
+#lv .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;border-radius:10px 0 0 10px;background:var(--c)}
+#lv .card .nm{font-weight:620;font-size:13.5px;padding-right:22px} #lv .card .sub{color:var(--lv-mute);font-size:12px}
+#lv .card .x{position:absolute;right:8px;top:7px;border:none;background:none;color:var(--lv-mute);cursor:pointer;font-size:15px;line-height:1}
+#lv .card .x:hover{color:var(--lv-bad)}
+#lv .grid{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:2px 10px;margin-top:8px;font-size:12px}
+#lv .grid span:nth-child(odd){color:var(--lv-mute)} #lv .grid span:nth-child(even){font-variant-numeric:tabular-nums}
+#lv .wd{margin-top:8px;padding:7px 8px 8px;border:1px solid var(--lv-line);border-radius:8px}
+#lv .wd-h{display:flex;justify-content:space-between;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
+#lv .wd-row{display:grid;grid-template-columns:1fr 1fr 64px;gap:6px;align-items:stretch}
+#lv .wd-box{background:var(--lv-bg);border-radius:6px;padding:4px 8px;line-height:1.25}
+#lv .wd-box small{display:block;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em}
+#lv .wd-box b{font-size:14px;font-variant-numeric:tabular-nums} #lv .wd-box b span{font-size:11px;font-weight:500;color:var(--lv-mute)}
+#lv .wd-box em{display:block;font-style:normal;font-size:11px;color:var(--lv-mute);font-variant-numeric:tabular-nums}
+#lv .wd-x{display:flex;flex-direction:column;justify-content:center;gap:3px;font-size:9.5px;color:var(--lv-mute);text-align:center}
+#lv .wd-x div{height:16px;border-radius:3px;background:#8c96a5;display:flex;align-items:center;justify-content:center}
+#lv .wd-x i{display:block;height:100%;background:#f1e7c8}
+#lv .caps{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12px;color:var(--lv-mute)} #lv .caps .seg{flex:1}
+#lv .caps .seg button{padding:3px 0;font-size:11.5px;white-space:nowrap}
+#lv .hd{margin-top:8px;padding:7px 8px 6px;border:1px solid var(--lv-line);border-radius:8px}
+#lv .hd-h{display:flex;justify-content:space-between;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
+#lv .hbar{display:flex;height:12px;border-radius:3px;overflow:hidden;margin-bottom:4px;font-size:9px;line-height:12px;color:#fff;text-align:center}
+#lv .hbar i{display:block;font-style:normal;overflow:hidden;white-space:nowrap} #lv .hbar .s,#lv .hbar .e{background:#6b7686} #lv .hbar .m{background:#c3c9d2;color:#3b4252}
+#lv .hd label{display:grid;grid-template-columns:52px 1fr 52px;row-gap:0;align-items:center;gap:6px;font-size:12px;color:var(--lv-mute)}
+#lv .hd input[type=range]{width:100%;accent-color:var(--lv-r2)} #lv .hd label b{text-align:right;color:var(--lv-ink);font-variant-numeric:tabular-nums}
+#lv .lvls{display:flex;gap:4px;margin-top:8px} #lv .lvls div{flex:1;text-align:center;background:var(--lv-bg);border-radius:6px;padding:3px 0}
+#lv .lvls small{display:block;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em} #lv .lvls b{font-size:13px}
+#lv .num{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;
+  background:var(--c);vertical-align:1px;margin-right:2px}
+#lv .rows{background:#fff;border:1px solid var(--lv-line);border-radius:10px;overflow:hidden}
+#lv .row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-top:1px solid var(--lv-line);cursor:pointer}
+#lv .row:first-child{border-top:none} #lv .row:hover{background:#f1f5ff}
+#lv .row .what{flex:1;min-width:0} #lv .row .txt{overflow-wrap:anywhere}
+#lv .row .off{text-decoration:line-through;color:var(--lv-mute)}
+#lv .chip{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:5px;padding:1px 6px;background:#eef1f6;color:#3b4252}
+#lv .gu-parts{display:flex;gap:3px;margin-top:3px;font-size:11px;color:var(--lv-mute);align-items:center;flex-wrap:wrap}
+#lv .gu-parts b{font-weight:600;border-radius:4px;padding:0 5px;background:#eef1f6;color:#3b4252;font-variant-numeric:tabular-nums}
+#lv .gu-parts b.bad{background:#ffe3e3;color:var(--lv-bad)}
+#lv .gu-parts b.warn{background:#fff4e6;color:#b35c00}
+#lv .tag{font-size:10.5px;font-weight:600;border-radius:999px;padding:0 7px;color:#fff;background:var(--c)}
+#lv .act{flex:none;font:12px system-ui;border:1px solid var(--lv-line);background:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;color:#3b4252}
+#lv .act:hover{border-color:var(--lv-bad);color:var(--lv-bad)}
+#lv .seg{display:flex;background:#eef1f6;border-radius:8px;padding:3px;gap:3px}
+#lv .seg button{flex:1;border:none;background:none;border-radius:6px;padding:5px 0;font:600 12.5px system-ui;color:#3b4252;cursor:pointer}
+#lv .seg button.on{background:#fff;box-shadow:0 1px 3px rgba(16,24,40,.12);color:var(--lv-ink)}
+#lv .desc{margin:8px 2px;color:#3b4252;font-size:12.5px}
+#lv .warn{margin:8px 0;padding:8px 10px;border-radius:8px;background:#fff4e6;border:1px solid #ffc078;color:#7a3e00;font-size:12.5px}
+#lv .ends{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+#lv .ends label{display:block;font-size:11px;color:var(--lv-mute);margin-bottom:3px}
+#lv .ends .seg button{padding:3px 0;font-size:12px}
+#lv .go{width:100%;border:none;border-radius:8px;padding:8px 0;background:var(--lv-ink);color:#fff;font:600 13px system-ui;cursor:pointer;margin-top:4px}
+#lv .go:hover{background:#000} #lv .go:disabled{opacity:.5;cursor:default}
+#lv .go.ghost{background:#fff;color:var(--lv-ink);border:1px solid #d0d5dd} #lv .go.ghost:hover{background:#f2f4f7}
+#lv-busy{position:fixed;left:0;top:0;bottom:0;right:0;z-index:5;display:flex;align-items:center;justify-content:center;
+  background:rgba(246,247,249,.55);backdrop-filter:blur(1.5px);transition:right .2s ease}
+body.lv-open #lv-busy{right:var(--lv-w)}
+#lv-busy.solid{background:var(--lv-bg);backdrop-filter:none}  /* after an apply: the map is drawn once at its own view, then at yours; neither is shown */
+#lv-busy .box{display:flex;align-items:center;gap:12px;padding:14px 20px;border-radius:12px;background:#fff;box-shadow:0 8px 28px rgba(16,24,40,.18);
+  font:600 14px system-ui;color:var(--lv-ink)}
+#lv-busy .spin{width:22px;height:22px;border-radius:50%;border:3px solid #dbe4f0;border-top-color:var(--lv-r2);animation:lv-spin .8s linear infinite}
+@keyframes lv-spin{to{transform:rotate(360deg)}}
+#lv-queue-sec{background:#fffbeb;border-bottom:1px solid #fde68a}
+#lv-queue .q{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;background:#fff;border:1px solid #fde68a;margin-bottom:5px;font-size:12.5px}
+#lv-queue .q span{flex:1} #lv-queue .q button{border:none;background:none;color:var(--lv-mute);cursor:pointer;font-size:14px} #lv-queue .q button:hover{color:var(--lv-bad)}
+#lv .btns{display:flex;gap:6px} #lv .btns .go{margin-top:2px}
+#lv-top-seg button{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:5px 8px}
+#lv-toast{position:absolute;left:16px;right:16px;bottom:14px;padding:9px 12px;border-radius:8px;font-size:12.5px;color:#fff;background:var(--lv-ink);
+  box-shadow:0 4px 14px rgba(0,0,0,.18);opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;user-select:text}
+#lv-toast.show{opacity:1;transform:none} #lv-toast.bad{background:var(--lv-bad);pointer-events:auto;cursor:pointer}
+</style>
+<aside id="lv">
+  <button id="lv-toggle" title="Hide the panel">›</button>
+  <header><div class="t">Level editor</div><div class="area" id="lv-area"></div><div class="stats" id="lv-stats"></div>
+    <div class="find"><input id="lv-find" type="search" placeholder="Find a road: edge id or edge_ref" autocomplete="off"><div id="lv-hits" hidden></div></div>
+    <div class="modes" id="lv-modes" hidden title="Show only the roads of these modes (display only: every road is still solved)"></div></header>
+  <nav class="tabs" id="lv-tabs"><button data-t="edit" class="on">Edit</button><button data-t="history">History<span class="cnt" id="lv-hist-n">0</span></button><button data-t="given" title="Given up (a real crossing broke) · near warnings">Issues<span class="cnt" id="lv-gu-n" style="background:var(--lv-bad);color:#fff">0</span><span class="cnt" id="lv-nr-n" style="background:#fff4e6;color:#b35c00">0</span></button></nav>
+  <div class="scroll" data-tab="edit">
+    <section id="lv-queue-sec" hidden><h2>Waiting to apply <span style="text-transform:none;letter-spacing:0;font-weight:500">not solved, not saved yet</span></h2>
+      <div id="lv-queue"></div>
+      <div class="btns"><button class="go ghost" id="lv-discard" style="flex:1">Discard</button><button class="go" id="lv-apply" style="flex:2">Apply and solve</button></div>
+    </section>
+    <section><h2>Selection <button class="link" id="lv-clear" title="Esc">clear</button></h2><div id="lv-cards"></div></section>
+    <section id="lv-rel-sec" hidden><h2 id="lv-rel-title">In the tables</h2><div id="lv-rel"></div></section>
+    <section id="lv-add-sec" hidden><h2>Add a relation</h2>
+      <div class="seg" id="lv-kind"><button data-k="order" class="on">Order</button><button data-k="stack">Stack</button><button data-k="meet">Meet</button></div>
+      <div class="ends" id="lv-top" style="grid-template-columns:1fr"><div><label>on top</label><div class="seg" id="lv-top-seg"></div></div></div>
+      <div class="desc" id="lv-desc"></div>
+      <div class="ends" id="lv-ends" hidden>
+        <div><label><span class="num" style="--c:var(--lv-r1)">1</span> end of road 1</label><div class="seg" data-e="1"><button data-v="start" class="on">start <span class="mk" style="color:var(--lv-r1)">●</span></button><button data-v="end">end <span class="mk" style="color:var(--lv-r1)">○</span></button></div></div>
+        <div><label><span class="num" style="--c:var(--lv-r2)">2</span> end of road 2</label><div class="seg" data-e="2"><button data-v="start" class="on">start <span class="mk" style="color:var(--lv-r2)">●</span></button><button data-v="end">end <span class="mk" style="color:var(--lv-r2)">○</span></button></div></div>
+      </div>
+      <div class="ends" id="lv-part" hidden style="grid-template-columns:1fr">
+        <div><label>which parts of the upper road's casing (one row each)</label><div class="seg"><button data-v="all" title="All three parts: three rows">whole road</button><button data-v="start">start head <span class="mk">●</span></button><button data-v="main" class="on">main</button><button data-v="end">end head <span class="mk">○</span></button></div></div>
+      </div>
+      <button class="go" id="lv-add">Add to the list</button>
+    </section>
+    <section><h2>Added now <span style="text-transform:none;letter-spacing:0;font-weight:500">this session, in edits.csv</span>
+      <button id="lv-newsession" title="Everything already in edits.csv moves to the list below; this list starts empty. Nothing is deleted." style="float:right;border:1px solid var(--lv-line,#ced4da);background:#fff;border-radius:6px;padding:2px 8px;font-size:11.5px;cursor:pointer;text-transform:none;letter-spacing:0">Start new session</button></h2><div id="lv-new"></div></section>
+  </div>
+  <div class="scroll" data-tab="history" hidden>
+    <section><h2>Already in edits.csv <span style="text-transform:none;letter-spacing:0;font-weight:500">before this session</span></h2>
+      <div class="desc" style="margin-top:0">Click a row to show its two roads; delete puts it in the list to apply.</div><div id="lv-saved"></div></section>
+  </div>
+  <div class="scroll" data-tab="given" hidden>
+    <section><h2>Given up by the solver <span style="text-transform:none;letter-spacing:0;font-weight:500">a flaw on the map each</span></h2>
+      <div class="desc" style="margin-top:0">Crossings (A over B) the solver could not keep, because of the joins around them: the part of A's casing
+        that crosses B and is drawn under B's fill is red. Click one to open the pair, then switch off or add a part, or change a join nearby.</div><div id="lv-given"></div></section>
+    <section><h2>Near: warnings <span style="text-transform:none;letter-spacing:0;font-weight:500">not crossing, kept last</span></h2>
+      <div class="desc" style="margin-top:0">Parts of A that only come near B (they do not cross it), drawn under B's fill: the solver keeps these last, after
+        every crossing and order wish. Worth a look only where the two roads overlap on the map.</div><div id="lv-near"></div></section>
+    <section><h2>Order wishes not kept <span style="text-transform:none;letter-spacing:0;font-weight:500">a stack or another wish won</span></h2>
+      <div class="desc" style="margin-top:0">"A after B" wishes (found or yours) the solver let go: A's fill is not after B's. Two wishes that disagree, or a
+        wish against a stack, end up here.</div><div id="lv-wishes"></div></section>
+  </div>
+  <div id="lv-toast"></div>
+</aside>
+<div id="lv-busy" hidden><div class="box"><div class="spin"></div><span id="lv-busy-t">Solving …</span></div></div>
+<script>
+(function(){
+  let STATS = __STATS__; const $ = id => document.getElementById(id), C = ["#e8590c", "#1971c2"];
+  const sel = [null, null], facts = {};                       // sel: road ids; facts: road id -> what the server knows
+  let pairRows = [];                                          // what the two tables have between the two picked roads
+  let kind = "order", end1 = "start", end2 = "start", parts = new Set(["main"]), top = null, pairKey = "";   // top: which picked road (0 / 1) is on top for an order or a stack: none until chosen, for each new pair
+  if(/"said":/.test(sessionStorage.getItem("lv-view") || "")){                 // the page again after an apply: covered until drawn at your view
+    $("lv-busy").classList.add("solid"); $("lv-busy").hidden = false; $("lv-busy-t").textContent = "Drawing the new map …"; }
+  let queue = []; try { queue = JSON.parse(sessionStorage.getItem("lv-queue") || "[]"); } catch(e){}     // the changes waiting to be applied
+  const PART = {start: "start head", main: "main", end: "end head"}, END = {start: "●", end: "○"};
+  const SRC = {found: ["found", "var(--lv-found)", "found in pairs.csv"], saved: ["saved", "var(--lv-saved)", "already in edits.csv"],
+               new: ["new", "var(--lv-new)", "added now"]};
+  const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+  const name = r => { const f = facts[r] || {}; return f.name || f.highway || "road " + r; };
+  const ref = r => (facts[r] || {}).edge_ref || r;
+  const badge = r => { const k = sel.indexOf(r); return k >= 0 ? `<span class="num" style="--c:${C[k]}">${k + 1}</span>` : ""; };
+  const who = r => `${badge(r)}${esc(name(r))}`;
+  const mk = (end, r) => { const k = sel.indexOf(r);           // a road's end as the map marks it (lv-ends): ● start, ○ end, in the picked road's colour
+    return end === "start" || end === "end" ? ` <span class="mk"${k >= 0 ? ` style="color:${C[k]}"` : ""}>${end === "start" ? "●" : "○"}</span>` : ""; };
+  // --- the panel: open / closed, the map beside it
+  document.body.classList.add("lv-open");
+  const resize = () => setTimeout(() => map.resize(), 220);
+  $("lv-toggle").onclick = () => { const open = document.body.classList.toggle("lv-open");
+    $("lv-toggle").textContent = open ? "›" : "‹"; $("lv-toggle").title = open ? "Hide the panel" : "Show the panel"; resize(); };
+  resize();
+  $("lv-area").textContent = STATS.area + " · " + STATS.roads + " roads";
+  function tab(t){ document.querySelectorAll("#lv-tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === t));
+    document.querySelectorAll("#lv [data-tab]").forEach(d => d.hidden = d.dataset.tab !== t); }
+  document.querySelectorAll("#lv-tabs button").forEach(b => b.onclick = () => tab(b.dataset.t));
+  const showStats = () => { $("lv-stats").innerHTML = [["order wishes", STATS.order_pairs], ["not kept", STATS.order_violations || 0], ["stack pairs", STATS.pairs || 0],
+    ["given up", STATS.given_up.length], ["near warnings", STATS.near_warnings || 0]].map(([k, v]) => `<span class="stat"${k === "given up" || k === "near warnings" ? ` style="cursor:pointer" title="Show the list" data-gu="1"` : ""}${k === "given up" ? ` id="lv-gu-stat"` : ""}><b>${v}</b> ${k}</span>`).join("");
+  document.querySelectorAll("#lv-stats [data-gu]").forEach(e => e.onclick = () => tab("given")); };
+  showStats();
+  // an error stays until clicked (select its text to copy it) and goes to the browser console; a note fades after 4 s (2026-10-08)
+  function toast(t, bad){ const e = $("lv-toast"); e.textContent = bad ? t + "  ✕" : t; e.className = "show" + (bad ? " bad" : ""); clearTimeout(e._t);
+    if(bad){ console.error("level editor:", t); e.onclick = () => { if(!String(getSelection())) e.className = ""; }; }
+    else e._t = setTimeout(() => e.className = "", Math.max(4000, 60 * t.length)); }      // time to read it (a loop's rules are long)
+  async function api(path, body){
+    if(window.lvApi) return window.lvApi(path, body);           // the Rust page (static/level_editor/): the solver is in the page, no server
+    const r = await fetch(path, body ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)} : {});
+    const j = await r.json(); if(!r.ok) throw new Error(j.error || r.statusText); return j;
+  }
+  // --- the map: the picked roads coloured, their ends marked
+  const idsOf = r => rsQuery(p => String(p.road) === String(r));      // a road's edges: both directions of a two-way road
+  function paint(){
+    const g = sel.map((r, k) => r != null && idsOf(r).length ? [idsOf(r), C[k]] : null).filter(Boolean);
+    rsColor(g.length ? g : null);
+    const f = [];
+    sel.forEach((r, k) => { if(r == null) return; const id = idsOf(r)[0]; if(id == null) return; const p = rsGetProps([id])[0];   // the road's ends, on each edge
+      f.push({type: "Feature", properties: {c: C[k], open: 0}, geometry: {type: "Point", coordinates: [p.s_lon, p.s_lat]}});
+      f.push({type: "Feature", properties: {c: C[k], open: 1}, geometry: {type: "Point", coordinates: [p.e_lon, p.e_lat]}}); });
+    const fc = {type: "FeatureCollection", features: f}, src = map.getSource("lv-ends");
+    if(src) src.setData(fc);
+    else { map.addSource("lv-ends", {type: "geojson", data: fc});
+      map.addLayer({id: "lv-ends", type: "circle", source: "lv-ends", paint: {"circle-radius": 6, "circle-stroke-width": 2.5,
+        "circle-stroke-color": ["get", "c"], "circle-color": ["case", ["==", ["get", "open"], 1], "#ffffff", ["get", "c"]]}}); }
+  }
+  function focus(roads){ const ids = roads.flatMap(idsOf); if(ids.length) rsFocus(ids, {padding: 90, maxZoom: 18}); }
+  // --- selection
+  function pick(r){
+    r = String(r);
+    const k = sel.indexOf(r);
+    if(k >= 0) sel[k] = null;                                  // a picked road clicked again: cancelled
+    else if(sel[0] == null) sel[0] = r;
+    else if(sel[1] == null) sel[1] = r;
+    else { sel[0] = r; sel[1] = null; }
+    if(sel[0] == null && sel[1] != null){ sel[0] = sel[1]; sel[1] = null; }
+    update();
+  }
+  // --- search: an edge id (exact) or an edge_ref (or a part of one); a hit is picked like a click on the map, and shown
+  let hits = [], hitOn = 0, findT;
+  function showHits(){
+    const box = $("lv-hits");
+    box.hidden = !$("lv-find").value.trim();
+    box.innerHTML = hits.length ? hits.map((f, i) => `<div data-i="${i}" class="${i === hitOn ? "on" : ""}"><b>${esc(f.edge_ref || f.road)}</b>
+      <small>· ${esc(f.highway || "")}${f.name ? " · " + esc(f.name) : ""} · ${esc(f.look)} · ${f.length_m} m</small></div>`).join("")
+      : `<div class="empty" style="cursor:default">no road with that edge id or edge_ref</div>`;
+    box.querySelectorAll("[data-i]").forEach(d => d.onmousedown = ev => { ev.preventDefault(); choose(hits[+d.dataset.i]); });
+  }
+  function choose(f){
+    if(!f) return;
+    Object.assign(facts, {[f.road]: f}); $("lv-find").value = ""; $("lv-hits").hidden = true; hits = [];
+    tab("edit"); if(!sel.includes(String(f.road))) pick(f.road); focus([String(f.road)]);
+  }
+  $("lv-find").oninput = () => { clearTimeout(findT); findT = setTimeout(async () => {
+    const q = $("lv-find").value.trim();
+    try { hits = q ? await api(`/api/find?q=${encodeURIComponent(q)}`) : []; } catch(err){ return toast(err.message, true); }
+    hitOn = 0; showHits(); }, 150); };
+  $("lv-find").onkeydown = ev => {
+    if(ev.key === "ArrowDown" || ev.key === "ArrowUp"){ ev.preventDefault(); if(hits.length){ hitOn = (hitOn + (ev.key === "ArrowDown" ? 1 : hits.length - 1)) % hits.length; showHits(); } }
+    else if(ev.key === "Enter"){ ev.preventDefault(); choose(hits[hitOn]); }
+    else if(ev.key === "Escape"){ ev.stopPropagation(); $("lv-find").value = ""; $("lv-hits").hidden = true; }
+  };
+  $("lv-find").onblur = () => setTimeout(() => $("lv-hits").hidden = true, 100);
+  function setPair(a, b, zoom){ sel[0] = a == null ? null : String(a); sel[1] = b == null ? null : String(b); update(); if(zoom) focus(sel.filter(x => x != null)); }
+  document.addEventListener("rs:select", e => { if(e.detail.overlay || !e.detail.properties) return; pick(e.detail.properties.road); });
+  document.addEventListener("keydown", e => { if(e.key === "Escape") setPair(null, null); });
+  $("lv-clear").onclick = () => setPair(null, null);
+  function widthAt(w, z){                                     // the page's width expression: linear between its zoom stops
+    if(!w) return null; const s = w.z;
+    if(z <= s[0]) return w; if(z >= s[s.length - 1]) return {fill: w.fill.slice(-1), casing: w.casing.slice(-1)};
+    const i = s.findIndex((x, j) => z <= s[j + 1]), f = (z - s[i]) / (s[i + 1] - s[i]);
+    return {fill: [w.fill[i] + (w.fill[i + 1] - w.fill[i]) * f], casing: [w.casing[i] + (w.casing[i + 1] - w.casing[i]) * f]};
+  }
+  function widthHtml(f){                                      // the drawn width at the map's zoom: fill, outer (casing included), a cross-section
+    const z = map.getZoom(), w = widthAt(f.width_px, z); if(!w) return `<div class="wd-h"><span>width</span><span>–</span></div>`;
+    const mpp = 40075016.686 * Math.cos(map.getCenter().lat * Math.PI / 180) / (512 * 2 ** z);    // metres per pixel here
+    const box = (k, v) => `<div class="wd-box"><small>${k}</small><b>${v.toFixed(1)}<span> px</span></b><em>≈ ${(v * mpp).toFixed(1)} m</em></div>`;
+    const pct = (100 * w.fill[0] / w.casing[0]).toFixed(1);
+    return `<div class="wd-h"><span>drawn width</span><span>at z${z.toFixed(1)}</span></div>
+      <div class="wd-row">${box(f.two_way ? "fill, each direction" : "fill", w.fill[0])}${box(f.two_way ? "outer, both directions" : "outer", w.casing[0])}
+        <div class="wd-x" title="Cross-section: the fill (${pct} % of the outer width) between its casings"><div><i style="width:${pct}%"></i></div>section</div></div>`;
+  }
+  map.on("zoomend", () => document.querySelectorAll("#lv-cards [data-w]").forEach(el => el.innerHTML = widthHtml(facts[el.dataset.w] || {})));
+  function headsHtml(r, f){                                   // the casing heads: two sliders that guard each other (start + end <= the road)
+    const L = f.length_m || 0;
+    let [s, e] = f.heads || [5, 5];
+    if(L > 0 && s + e > L){ const k = L / (s + e); s = Math.round(s * k * 10) / 10; e = Math.round(e * k * 10) / 10; }   // as drawn: cut in their ratio
+    return `<div class="hd" data-hroad="${esc(r)}" data-len="${L}" title="The metres at each end drawn at the head's own level; the rest is the main part. Start + end cannot be more than the road.">
+      <div class="hd-h"><span>casing heads <button class="link" data-hnomain title="Heads over the whole road: the end head takes what the start head leaves">no main part</button>
+        ${(f.heads_own || []).some(Boolean) ? `<button class="link" data-hauto title="Back to the default lengths (${(f.heads_auto || []).map(v => v + " m").join(" / ")})">default</button>` : ""}</span><span>road ${L} m</span></div>
+      <div class="hbar"><i class="s"></i><i class="m"></i><i class="e"></i></div>
+      ${[["start", "●", s], ["end", "○", e]].map(([n, m, v], k) => `<label><span>${n} ${m}</span><input type="range" min="0.5" step="0.1" data-hend="${n}" value="${v}"><b></b>
+        <small style="grid-column:2/4;margin:-3px 0 2px;font-size:10px">${(f.heads_own || [])[k] ? "set by you" : "default"}</small></label>`).join("")}
+    </div>`;
+  }
+  function headsSync(box){
+    const L = +box.dataset.len, [a, b] = box.querySelectorAll("input");
+    a.max = Math.max(0.5, L - +b.value); b.max = Math.max(0.5, L - +a.value);
+    const s = +a.value, e = +b.value, m = Math.max(0, L - s - e), pct = v => (L > 0 ? 100 * v / L : 0).toFixed(2) + "%";
+    const [is, im, ie] = box.querySelectorAll(".hbar i");
+    is.style.width = pct(s); im.style.width = pct(m); ie.style.width = pct(e); im.textContent = m >= 3 ? "main " + m.toFixed(1) + " m" : "";
+    box.querySelectorAll("label b")[0].textContent = s.toFixed(1) + " m"; box.querySelectorAll("label b")[1].textContent = e.toFixed(1) + " m";
+  }
+  // a walking-only direction of a street (its other direction has car lanes) is its sidewalk, not a lane (2026-10-09)
+  const sidewalk = (d, f) => d.modes === "walking" && (f.directions || []).some(o => o !== d && o.lanes != null);
+  function card(r, k){
+    const f = facts[r] || {road: r}, L = f.levels || ["–", "–", "–", "–"];
+    return `<div class="card" style="--c:${C[k]}"><button class="x" data-k="${k}" title="Cancel this road">✕</button>
+      <div class="nm"><span class="num" style="--c:${C[k]}">${k + 1}</span>${esc(f.name || f.highway || "road")}</div>
+      <div class="sub">${esc([f.highway, f.edge_ref].filter(Boolean).join(" · "))}</div>
+      <div class="grid"><span>band</span><span>${f.band ?? "–"}</span><span>priority</span><span>${f.priority ?? "–"}</span>
+        <span>length</span><span>${f.length_m != null ? f.length_m + " m" : "–"}</span><span>edges</span><span>${f.edges ?? "–"}${f.two_way ? " (two-way)" : ""}</span>
+        <span>look</span><span>${esc(f.look || "–")}</span><span>lanes</span><span>${esc(f.lanes ?? "–")}</span>
+        ${f.modes ? `<span>modes</span><span style="grid-column:span 3">${esc(f.modes)}</span>` : ""}
+        ${f.bus_lines ? `<span>bus lines</span><span style="grid-column:span 3">${esc(f.bus_lines)}</span>` : ""}
+        <span>road id</span><span style="grid-column:span 3;font-size:11px">${esc(r)}</span>
+        ${(f.directions || []).map(d => `<span>${d.way === "along" ? "direction ●→○" : "direction ○→●"}</span><span style="grid-column:span 3;font-size:11px"
+          title="${d.way === "along" ? "This edge runs from the road's start to its end" : "This edge runs the other way, from the road's end to its start"}">${esc(d.edge)}${d.edge_ref ? " · " + esc(d.edge_ref) : d.way === "against" ? " · <i>edge_ref not in roads.parquet (make the area again)</i>" : ""}${d.lanes != null ? " · lanes " + esc(d.lanes) : sidewalk(d, f) ? " · sidewalk" : ""}${d.modes ? " · " + esc(d.modes) : ""}</span>`).join("")}</div>
+      <div class="wd" data-w="${esc(r)}">${widthHtml(f)}</div>
+      ${["start", "end"].map((e, i) => `<div class="caps" title="The shape of this end of the road (caps.csv, drawing only). It starts round; square = flat but as long as round; flat = stops at the end point">
+        <span style="width:44px">${e} ${i ? "○" : "●"}</span>
+        <div class="seg" data-cap="${esc(r)}" data-end="${e}">${["round", "square", "flat"].map(v =>
+          `<button data-v="${v}" class="${(((f.caps || [])[i] || (f.caps_auto || [])[i] || "round") === v) ? "on" : ""}">${v}</button>`).join("")}</div></div>`).join("")}
+      ${headsHtml(r, f)}
+      <div class="lvls"><div><small>start</small><b>${L[0]}</b></div><div><small>casing</small><b>${L[1]}</b></div>
+        <div><small>end</small><b>${L[2]}</b></div><div><small>fill</small><b>${L[3]}</b></div></div></div>`;
+  }
+  function relText(r){
+    if(r.relation === "meet") return `${who(r.ra)} <small>${esc(r.a_end)}${mk(r.a_end, r.ra)}</small> = ${who(r.rb)} <small>${esc(r.b_end)}${mk(r.b_end, r.rb)}</small>`;
+    if(r.relation === "stack" || r.relation === "near") return `${who(r.ra)} <small>${esc(PART[r.a_end] || r.a_end)}${mk(r.a_end, r.ra)}</small> over ${who(r.rb)}${r.relation === "near" ? " <small>(near only)</small>" : ""}`;
+    return `${who(r.ra)} after ${who(r.rb)}`;
+  }
+  function rowHtml(r){
+    const [t, c, title] = SRC[r.section], off = r.enabled === "false";
+    const act = r.section === "found" ? `<button class="act" data-a="off">switch off</button>` : `<button class="act" data-a="del">delete</button>`;
+    return `<div class="row" data-i="${r.section === "found" ? "" : r.index}" data-ra="${esc(r.ra)}" data-rb="${esc(r.rb)}" title="Show on the map">
+      <span class="tag" style="--c:${c}" title="${title}">${t}</span><span class="chip">${esc(r.relation)}</span>
+      <span class="what"><div class="txt${off ? " off" : ""}">${off ? "switch off: " : ""}${relText(r)}</div></span>${act}</div>`;
+  }
+  function wire(box, rows){
+    box.querySelectorAll(".row").forEach((el, n) => {
+      const r = rows[n];
+      el.onclick = ev => { if(ev.target.closest(".act")) return; tab("edit"); setPair(r.ra, r.rb, true); };
+      const b = el.querySelector(".act");
+      b.onclick = () => r.section === "found"
+        ? offRow(r)
+        : stage({op: "delete", index: r.index, row: {relation: r.relation, a: r.ra, b: r.rb, a_end: r.a_end, b_end: r.b_end, enabled: r.enabled},
+                 raw: {relation: r.relation, a: r.a, b: r.b, a_end: r.a_end, b_end: r.b_end, enabled: r.enabled}});
+    });
+  }
+  const offRow = r => stage({op: "add", body: {relation: r.relation, a: r.a, b: r.b, a_end: r.a_end || "", b_end: r.b_end || "", enabled: "false"}});
+  const same = (x, r) => x.relation === r.relation && x.a_end === r.a_end;
+  const isOff = (r, rows) => rows.some(x => x.section !== "found" && x.enabled === "false" && same(x, r) && x.ra === r.ra && x.rb === r.rb);   // switched off in edits.csv
+  const queued = r => queue.some(q => q.op === "add" && q.body.enabled === "false" && same(q.body, r) && q.body.a === r.a && q.body.b === r.b);
+  async function update(){
+    rsDeselect();                                             // the panel colours the picked roads; roadstyle's own selection would keep its (see-through) select colour and hide the hover there
+    paint();
+    const picked = sel.filter(r => r != null);
+    if(picked.length){ try { const j = await api(`/api/relations?a=${encodeURIComponent(picked[0])}` + (picked[1] ? `&b=${encodeURIComponent(picked[1])}` : ""));
+        Object.assign(facts, j.roads); showRel(j.rows, picked.length); } catch(err){ toast(err.message, true); } }
+    else { $("lv-rel-sec").hidden = true; }
+    $("lv-cards").innerHTML = picked.length ? sel.map((r, k) => r != null ? card(r, k) : "").join("")
+      + (sel[1] == null ? `<div class="empty">Click a second road to see what is between them</div>` : "")
+      : `<div class="empty">Click a road on the map<br><small>a second one for the pair · click again or ✕ to cancel · Esc clears</small></div>`;
+    $("lv-cards").querySelectorAll("[data-cap] button").forEach(b => b.onclick = () => {
+      const box = b.closest("[data-cap]"), r = box.dataset.cap, end = box.dataset.end, cap = b.dataset.v;
+      const f = facts[r] || {}, k = end === "start" ? 0 : 1;
+      if(cap === ((f.caps || [])[k] || (f.caps_auto || [])[k] || "round")) return;           // already this shape
+      stage({op: "cap", road: r, end: end, cap: cap});
+    });
+    $("lv-cards").querySelectorAll("[data-hroad]").forEach(box => {
+      headsSync(box);
+      box.querySelector("[data-hnomain]").onclick = () => {               // the main part to zero: the end head is the rest of the road
+        const [a, b] = box.querySelectorAll("input"), L = +box.dataset.len;
+        b.max = Math.max(0.5, L - +a.value); b.value = Math.max(0.5, Math.round((L - +a.value) * 100) / 100); headsSync(box);
+        stage({op: "head", road: box.dataset.hroad, end: "start", m: a.value}); stage({op: "head", road: box.dataset.hroad, end: "end", m: String(b.value)});
+      };
+      const back = box.querySelector("[data-hauto]");
+      if(back) back.onclick = () => { stage({op: "head", road: box.dataset.hroad, end: "start", m: ""}); stage({op: "head", road: box.dataset.hroad, end: "end", m: ""}); };
+      box.querySelectorAll("input").forEach(inp => {
+        inp.oninput = () => headsSync(box);
+        inp.onchange = () => {                                  // both heads go to the list together, so the pair always fits the road
+          const r = box.dataset.hroad, [a, b] = box.querySelectorAll("input"), h = (facts[r] || {}).heads || [5, 5];
+          if(+a.value === h[0] && +b.value === h[1]) return;
+          stage({op: "head", road: r, end: "start", m: a.value}); stage({op: "head", road: r, end: "end", m: b.value});
+        };
+      });
+    });
+    $("lv-cards").querySelectorAll(".x").forEach(b => b.onclick = () => { sel[+b.dataset.k] = null; if(sel[0] == null){ sel[0] = sel[1]; sel[1] = null; } update(); });
+    $("lv-add-sec").hidden = sel[1] == null; describe();
+  }
+  function showRel(rows, n){
+    pairRows = n === 2 ? rows : [];
+    $("lv-rel-sec").hidden = false;
+    const cards = $("lv-cards").closest("section");          // two roads: the rules between them first, above the two (tall) road cards; one road: under its card
+    if(n === 2) cards.before($("lv-rel-sec")); else cards.after($("lv-rel-sec"));
+    $("lv-rel-title").textContent = n === 2 ? "Between these two roads" : "Everything about this road";
+    const box = $("lv-rel"); box.innerHTML = "";
+    const all = n === 2 ? rows.filter(r => r.section === "found" && (r.relation === "stack" || r.relation === "near") && !isOff(r, rows) && !queued(r)) : [];
+    if(all.length){                                           // to override a found stack: switch all its rows off, then add your own parts
+      const b = document.createElement("button"); b.className = "go ghost"; b.style.margin = "0 0 8px";
+      b.textContent = `Switch off all ${all.length} found stack row${all.length > 1 ? "s" : ""} of this pair (to the list)`;
+      b.title = "To override a found stack: switch off every part of it, then add your own parts below";
+      b.onclick = () => { all.forEach(offRow); showRel(rows, n); };
+      box.appendChild(b);
+    }
+    for(const s of ["found", "saved", "new"]){
+      const part = rows.filter(r => r.section === s);
+      const h = document.createElement("h3"); h.innerHTML = `<span class="tag" style="--c:${SRC[s][1]}">${SRC[s][0]}</span> ${SRC[s][2]} <small style="color:var(--lv-mute)">${part.length}</small>`;
+      box.appendChild(h);
+      const d = document.createElement("div");
+      if(part.length){ d.className = "rows"; d.innerHTML = part.map(rowHtml).join(""); wire(d, part); }
+      else d.innerHTML = `<div class="empty" style="padding:8px">none</div>`;
+      box.appendChild(d);
+    }
+  }
+  // --- adding a relation
+  function segs(box, on){ box.querySelectorAll("button").forEach(b => b.onclick = () => {
+    box.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); on(b.dataset.k || b.dataset.v); describe(); }); }
+  segs($("lv-kind"), v => kind = v);
+  segs(document.querySelector('#lv-ends .seg[data-e="1"]'), v => end1 = v);
+  segs(document.querySelector('#lv-ends .seg[data-e="2"]'), v => end2 = v);
+  document.querySelectorAll("#lv-part .seg button").forEach(b => b.onclick = () => {      // several parts: one stack row each; whole road: all three
+    const v = b.dataset.v;
+    if(v === "all") parts = new Set(["start", "main", "end"]); else parts.has(v) ? parts.delete(v) : parts.add(v);
+    document.querySelectorAll("#lv-part .seg button").forEach(x => x.classList.toggle("on", x.dataset.v === "all" ? parts.size === 3 : parts.has(x.dataset.v)));
+    describe(); });
+  function stacksOver(up, low){    // the active stacks with up's casing over low's fill: an order "low after up" cannot be kept against them
+    const st = pairRows.filter(r => r.relation === "stack" && r.ra === up && r.rb === low);
+    return st.filter(r => r.enabled !== "false" && !(r.section === "found" && isOff(r, pairRows)));
+  }
+  function describe(){
+    if(sel[1] == null) return;
+    if(sel.join() !== pairKey){ pairKey = sel.join(); top = null; }
+    $("lv-top").hidden = kind === "meet";
+    $("lv-top-seg").innerHTML = sel.map((r, k) => `<button class="${k === top ? "on" : ""}" data-v="${k}">${who(r)}</button>`).join("");
+    $("lv-top-seg").querySelectorAll("button").forEach(x => x.onclick = () => { top = +x.dataset.v; describe(); });
+    $("lv-ends").hidden = kind !== "meet"; $("lv-part").hidden = kind !== "stack";
+    document.querySelectorAll("#lv-part .mk").forEach(m => m.style.color = top == null ? "" : C[top]);     // the upper road's colour, as on the map
+    $("lv-add").disabled = (kind !== "meet" && top == null) || (kind === "stack" && !parts.size);
+    if(kind !== "meet" && top == null){ $("lv-desc").innerHTML = `<div class="warn">Choose which road is on top.</div>`; return; }
+    const [a, b] = kind === "meet" ? sel : [sel[top], sel[1 - top]];
+    $("lv-desc").innerHTML = kind === "order" ? `Where they meet, ${who(a)}'s fill is drawn after ${who(b)}'s (a wish the solver keeps when it can).`
+      : kind === "stack" && !parts.size ? `<div class="warn">Choose at least one part of ${who(a)}'s casing.</div>`
+      : kind === "stack" ? `${who(a)}'s ${["start", "main", "end"].filter(p => parts.has(p)).map(p => PART[p]).join(" and ")} casing is drawn after ${who(b)}'s fill,
+        even where it joins ${who(b)}: one row per part, added to the found ones. ● start ○ end on the map.
+        To override a found stack, switch all its rows off above and add your own parts.`
+      : `The ${end1} of ${who(a)} joins the ${end2} of ${who(b)}: each road's head there is drawn under the other's fill. ● start ○ end on the map.`;
+    const over = kind === "order" ? stacksOver(b, a) : [];
+    if(over.length) $("lv-desc").innerHTML += `<div class="warn">⚠ ${over.map(r => `${r.section === "found" ? "A found" : "Your"} stack (${relText(r)})`).join(", ")}
+      keeps ${who(b)}'s casing over ${who(a)}'s fill. A stack outranks an order, so this order would be given up and nothing changes.
+      Switch that stack off first (its row above).</div>`;
+  }
+  $("lv-add").onclick = async () => {
+    if(sel[1] == null) return toast("Pick two roads first", true);
+    const [a, b] = kind === "meet" ? sel : [sel[top], sel[1 - top]];
+    const rows = kind === "stack" ? ["start", "main", "end"].filter(p => parts.has(p)).map(p => ({relation: "stack", a, b, a_end: p, b_end: "", enabled: "true"}))
+      : [{relation: kind, a, b, a_end: kind === "meet" ? end1 : "", b_end: kind === "meet" ? end2 : "", enabled: "true"}];
+    let found;                                                // the guard: does it clash with the rules there are (found, edits.csv, the list)?
+    try { found = (await api("/api/check", {rows, ops: queue.map(payload)})).conflicts; } catch(err){ return toast(err.message, true); }
+    if(found.length && !confirm("This conflicts with rules already there:\n\n" + found.map(c => c.why === "duplicate"
+        ? `• ${c.rule}\n   is already in the tables (${c.with[0]}).`
+        : c.why === "not kept"                               // saved already, but in a loop: the rules that keep it from holding
+        ? `• ${c.rule}\n   is already saved, but the solver cannot keep it: it makes a loop with:\n${c.with.map(w => "     – " + w).join("\n")}\n   Switch one of them off to keep it.`
+        : `• ${c.rule}\n   makes a loop with:\n${c.with.map(w => "     – " + w).join("\n")}\n   No levels keep them all: the solver gives one of them up.`).join("\n\n")
+        + "\n\nAdd it anyway?")) return;
+    rows.forEach(body => stage({op: "add", body}));
+  };
+  // --- the changes wait in a list (kept over a reload of the page) until Apply: then one solve, and the page again with the same view
+  const plain = b => `${b.enabled === "false" ? "switch off: " : ""}${name(b.a)} ${b.relation === "meet" ? `(${b.a_end} ${END[b.a_end]}) = ${name(b.b)} (${b.b_end} ${END[b.b_end]})`
+    : b.relation === "stack" || b.relation === "near" ? `(${PART[b.a_end] || b.a_end}${END[b.a_end] ? " " + END[b.a_end] : ""}) over ${name(b.b)}${b.relation === "near" ? " (near only)" : ""}` : `after ${name(b.b)}`}`;
+  const payload = q => q.op === "cap" ? {op: "cap", road: q.road, end: q.end, cap: q.cap} : q.op === "head" ? {op: "head", road: q.road, end: q.end, m: q.m}
+    : q.op === "delete" ? {op: "delete", index: q.index, row: q.raw} : {op: "add", body: q.body};     // a change as the server takes it
+  function stage(q){
+    if(q.op === "delete" && queue.some(x => x.op === "delete" && x.index === q.index)) return toast("Already in the list");
+    if(q.op === "cap" || q.op === "head") queue = queue.filter(x => !(x.op === q.op && x.road === q.road && x.end === q.end));   // the last choice for an end counts
+    q.text = q.op === "delete" ? "delete edit: " + plain(q.row) : q.op === "cap" ? `${q.end} ${q.end === "start" ? "●" : "○"} ${q.cap} · ${name(q.road)}`
+      : q.op === "head" ? `${q.end} head ${q.end === "start" ? "●" : "○"} ${q.m ? q.m + " m" : "default"} · ${name(q.road)}`
+      : `${q.body.relation} · ${plain(q.body)}`;
+    queue.push(q); showQueue(); toast("In the list · apply when ready");
+  }
+  function showQueue(){
+    try { sessionStorage.setItem("lv-queue", JSON.stringify(queue)); } catch(e){}
+    $("lv-queue-sec").hidden = !queue.length;
+    $("lv-apply").textContent = `Apply and solve (${queue.length})`;
+    $("lv-queue").innerHTML = queue.map((q, i) => `<div class="q"><span>${esc(q.text)}</span><button data-i="${i}" title="Take out of the list">✕</button></div>`).join("");
+    $("lv-queue").querySelectorAll("button").forEach(b => b.onclick = () => { queue.splice(+b.dataset.i, 1); showQueue(); });
+  }
+  $("lv-discard").onclick = () => { queue = []; showQueue(); };
+  const busy = t => { $("lv-busy").hidden = !t; if(t) $("lv-busy-t").textContent = t; };
+  $("lv-apply").onclick = async () => {
+    if(!queue.length) return;
+    $("lv-apply").disabled = true; busy(`Solving the levels with ${queue.length} change${queue.length > 1 ? "s" : ""} …`);
+    let j;
+    try { j = await api("/api/apply", {ops: queue.map(payload)}); }
+    catch(err){ busy(null); toast(err.message + " · nothing saved", true); $("lv-apply").disabled = false; return; }
+    let said = `Applied ${queue.length} change${queue.length > 1 ? "s" : ""} · ${j.said}`, why = j.reload;
+    queue = []; showQueue();
+    if(j.redrawn){                                            // the Rust page drew the new map itself: the panel's facts and lists again
+      Object.assign(facts, j.facts); STATS = j.stats; showStats(); busy(null); $("lv-apply").disabled = false;
+      update(); lists(); givenUp(); return toast(said);
+    }
+    if(j.update){                                             // the roads that changed, in place: no reload
+      try { patch(j.update); busy(null); $("lv-apply").disabled = false;
+        return toast(`${said} · ${j.update.roads.length} road${j.update.roads.length === 1 ? "" : "s"} redrawn in place`); }        // a full solve is a note, not an error
+      catch(err){ why = `could not redraw in place (${err.message}): the whole page again`; }
+    }
+    busy("Drawing the new map …");                            // the whole page again, and the status line says why
+    sessionStorage.setItem("lv-view", JSON.stringify({c: map.getCenter(), z: map.getZoom(), b: map.getBearing(), p: map.getPitch(), sel: sel,
+      said: said + (why ? " · " + why : ""), full: j.full || !!why, open: document.body.classList.contains("lv-open")}));
+    location.reload();
+  };
+  // the update in place (level_editor.Area.build): the changed roads' features as a whole rebuild would draw them (the source simple again, setData):
+  // the roads themselves (pick, hover), their pieces in the one road layer (the ids of a road's pieces it has no more taken out), the
+  // names and arrows again when a fill number changed; then the panel's facts
+  function patch(u){
+    const f = u.features, P = u.pieces, ids = new Set(f.simple.map(x => x.id)), gone = [], [I, M] = u.items || [0, 0];
+    f.roads.forEach(r => { for(let k = 0; k < P; k++) if(!ids.has(r.id * P + k)) gone.push(r.id * P + k);
+      for(let k = 0; k < M; k++) if(!ids.has(I + r.id * M + k)) gone.push(I + r.id * M + k); });   // its road items (lanes, lines, marks) too
+    if(map.getSource("roads")) map.getSource("roads").updateData({add: f.roads});     // a page with the roads source (before g3)
+    // simple has promoteId "__rs_edge" (all pieces of a road have its id): MapLibre refuses updateData on it, so the area's pieces again
+    const drop = new Set([...gone, ...ids]);
+    map.getSource("simple").setData({type: "FeatureCollection", features: _sfeats("simple").filter(x => !drop.has(x.id)).concat(f.simple)});
+    if(f.slots){                                             // the slots of the changed roads' name groups, in place of theirs (2026-10-09)
+      const drop = new Set(f.slot_roads || []), keep = f.slot_roads ? _sfeats("slots").filter(s => !drop.has(s.properties.__rs_edge)) : [];
+      map.getSource("slots").setData({type: "FeatureCollection", features: keep.concat(f.slots)}); _rsArrowAt.clear(); _rsArrows(); }
+    Object.assign(facts, u.facts); STATS = u.stats; showStats();
+    update(); lists(); givenUp();
+  }
+  async function givenUp(){
+    const j = await api("/api/given_up"); Object.assign(facts, j.roads);
+    $("lv-gu-n").textContent = j.rows.length; $("lv-nr-n").textContent = j.near.length;
+    const list = (box, rows, cls, none) => {
+      if(!rows.length){ box.className = ""; box.innerHTML = `<div class="empty" style="padding:8px">${none}</div>`; return; }
+      box.className = "rows";
+      box.innerHTML = rows.map(r => {
+        const part = (n, i) => `<b class="${r.parts.includes(n) ? cls : ""}" title="${n} casing ${r.levels[i]}">${n}${mk(n, r.a)} ${r.levels[i]}</b>`;
+        return `<div class="row" title="Show on the map"><span class="what"><div class="txt">${esc(name(r.a))} <small>${esc(ref(r.a))}</small>
+          over ${esc(name(r.b))} <small>${esc(ref(r.b))}</small>${r.fill_under && cls === "bad" ? ` <span class="tag" style="--c:var(--lv-bad)">fill under too</span>` : ""}</div>
+          <div class="gu-parts">A ${["start", "main", "end"].map(part).join("")} <b>fill ${r.levels[3]}</b> &nbsp;·&nbsp; B fill <b>${r.b_fill}</b></div></span></div>`;
+      }).join("");
+      box.querySelectorAll(".row").forEach((el, n) => el.onclick = () => { tab("edit"); setPair(rows[n].a, rows[n].b, true); });
+    };
+    list($("lv-given"), j.rows, "bad", "none: every crossing is kept");
+    list($("lv-near"), j.near, "warn", "none");
+    const wb = $("lv-wishes");
+    if(!j.wishes.length){ wb.className = ""; wb.innerHTML = `<div class="empty" style="padding:8px">none: every wish is kept</div>`; }
+    else { wb.className = "rows";
+      wb.innerHTML = j.wishes.map(w => `<div class="row" title="Show on the map"><span class="what"><div class="txt">${esc(name(w.a))} <small>${esc(ref(w.a))}</small>
+        after ${esc(name(w.b))} <small>${esc(ref(w.b))}</small></div><div class="gu-parts">fill <b>${w.fa}</b> &nbsp;·&nbsp; wished over fill <b>${w.fb}</b></div></span></div>`).join("");
+      wb.querySelectorAll(".row").forEach((el, n) => el.onclick = async () => {   // the pair, and why the wish is not kept: the loop it makes (2026-10-09)
+        const w = j.wishes[n], row = {relation: "order", a: w.a, b: w.b, a_end: "", b_end: "", enabled: "true"};
+        let found = []; try { found = (await api("/api/check", {rows: [row]})).conflicts; } catch(err){}
+        const loop = found.find(c => c.why === "not kept");
+        if(loop && !el.querySelector(".why")) el.querySelector(".what").insertAdjacentHTML("beforeend",
+          `<div class="gu-parts why">loop with: ${loop.with.map(esc).join(" · ")}</div>`);
+        tab("edit"); setPair(w.a, w.b, true);
+        if(loop) toast(`Not kept: it makes a loop with ${loop.with.join(" · ")}. Switch one of them off to keep it.`); }); }
+  }
+  $("lv-newsession").onclick = async () => {                 // a new list: the edits so far stay in edits.csv, under "already in edits.csv"
+    if(queue.length) return toast("Apply or remove the waiting changes first", true);
+    try { await api("/api/new_session", {}); await lists(); toast("New session: earlier edits are under “Already in edits.csv”"); } catch(err){ toast(err.message, true); }
+  };
+  async function lists(){
+    const j = await api("/api/edits"); Object.assign(facts, j.roads);
+    $("lv-hist-n").textContent = j.rows.filter(r => r.section === "saved").length;
+    for(const s of ["new", "saved"]){
+      const rows = j.rows.filter(r => r.section === s), box = $("lv-" + s);
+      if(rows.length){ box.className = "rows"; box.innerHTML = rows.map(rowHtml).join(""); wire(box, rows); }
+      else { box.className = ""; box.innerHTML = `<div class="empty" style="padding:8px">${s === "new" ? "nothing added yet" : "none"}</div>`; }
+    }
+  }
+  // --- which modes show (the roads' modes column, e.g. "driving + walking"; none: private): display only, every road is still solved
+  const MODES = ["driving", "walking", "cycling", "bus", "private"];   // bus: a bus line runs on it (duckOSM bus.route_edges)
+  const modesOf = p => p.modes ? String(p.modes).split(" + ") : ["private"];
+  function modeBox(){
+    if(!rsQuery(p => p.modes).length) return;                 // data without modes: no box
+    let on = MODES; try { on = JSON.parse(sessionStorage.getItem("lv-modes") || "null") || MODES; } catch(e){}
+    const box = $("lv-modes"); box.hidden = false;
+    box.innerHTML = MODES.map(m => `<label><input type="checkbox" value="${m}"${on.includes(m) ? " checked" : ""}>${m}</label>`).join("");
+    const apply = () => { const want = [...box.querySelectorAll("input:checked")].map(i => i.value);
+      try { sessionStorage.setItem("lv-modes", JSON.stringify(want)); } catch(e){}
+      rsFilter(want.length === MODES.length ? null : rsQuery(p => modesOf(p).some(m => want.includes(m)))); };
+    box.querySelectorAll("input").forEach(i => i.onchange = apply); apply();
+  }
+  function start(){
+    modeBox();
+    const at = (new URLSearchParams(location.search).get("at") || "").split(",").map(Number);   // a link to a place: ?at=lon,lat,zoom (2026-10-10)
+    if(at.length === 3 && at.every(Number.isFinite)) map.jumpTo({center: [at[0], at[1]], zoom: at[2]});
+    const v = JSON.parse(sessionStorage.getItem("lv-view") || "null");
+    if(v){ sessionStorage.removeItem("lv-view"); map.jumpTo({center: v.c, zoom: v.z, bearing: v.b, pitch: v.p});
+      sel[0] = v.sel[0]; sel[1] = v.sel[1];
+      if(v.said) map.once("idle", () => { busy(null); $("lv-busy").classList.remove("solid"); toast(v.said); });         // a whole solve instead of the local one: a note, not an error
+      if(!v.open){ document.body.classList.remove("lv-open"); $("lv-toggle").textContent = "‹"; resize(); } }
+    update(); lists(); givenUp(); showQueue();
+  }
+  if(map.isStyleLoaded()) start(); else map.once("load", start);     // the Rust page loads this after the map's load (its tiles can still load)
+})();
+</script>

@@ -22,6 +22,8 @@ import io
 import json
 import math
 
+from . import _assets
+
 # Web-mercator world half-width (m); tile (z,x,y) spans WORLD/2**z starting at (-R, R)
 _R = 20037508.342789244
 
@@ -186,8 +188,7 @@ def build_pmtiles(fc: dict, *, class_col: str, keep: set, minzoom_table: dict | 
 
 def page_reads() -> dict:
     """The page's declaration of the feature properties that its modules read (static/dashboard/reads.json: ``pieces`` and ``table``)."""
-    from pathlib import Path
-    return json.loads((Path(__file__).parent / "static" / "dashboard" / "reads.json").read_text())
+    return json.loads(_assets.text("static/dashboard/reads.json"))
 
 
 def table_keeps(k: str) -> bool:

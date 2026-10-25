@@ -49,7 +49,7 @@ python rust/roadstyle-py/build.py
 ```
 
 The script writes `src/roadstyle/_rust.abi3.so` (`_rust.pyd` on Windows) for the Python that runs it. Git ignores this file. Run
-the script again after each change in `rust/` or in `src/roadstyle/data/` and `src/roadstyle/static/`, because the crates read
+the script again after each change in `rust/` or in `rust/roadstyle-assets/files/data/` and `rust/roadstyle-assets/files/static/`, because the crates read
 these files when they are built.
 
 ## Build the WebAssembly package

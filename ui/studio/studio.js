@@ -213,9 +213,9 @@ $("page").onchange = () => {
   later();
 };
 $("copy").onclick = () => navigator.clipboard.writeText($("code").textContent);
-// the download: the page in the iframe, with MapLibre in it (src/roadstyle/vendor, as WebMap.html: a page that works offline)
+// the download: the page in the iframe, with MapLibre in it (rust/roadstyle-assets/files/vendor, as WebMap.html: a page that works offline)
 $("download").onclick = async () => {
-  const get = async (f) => (await fetch(`../../src/roadstyle/vendor/${f}`)).text();
+  const get = async (f) => (await fetch(`../../rust/roadstyle-assets/files/vendor/${f}`)).text();
   const page = html.replace("__MAPLIBRE_CSS__", await get("maplibre-gl.css"))
     .replace("__MAPLIBRE_JS__", (await get("maplibre-gl.js")).replace(/<\/script>/g, "<\\/script>"));
   const a = document.createElement("a");
@@ -224,7 +224,7 @@ $("download").onclick = async () => {
 };
 
 // the base maps: data/basemaps.json, one list for Python and the studio (the menu has all of them, as rs.BASEMAPS)
-fetch("../../src/roadstyle/data/basemaps.json").then((r) => r.ok ? r.json() : Promise.reject(new Error(`basemaps.json: ${r.status}`))).then((j) => {
+fetch("../../rust/roadstyle-assets/files/data/basemaps.json").then((r) => r.ok ? r.json() : Promise.reject(new Error(`basemaps.json: ${r.status}`))).then((j) => {
   BASEMAPS = j.basemaps.map((b) => b.key);
   for (const b of j.basemaps) $("basemap").add(new Option(b.label, b.key));
   st.basemap = BASEMAPS[0] || "";

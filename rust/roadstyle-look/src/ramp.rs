@@ -1,5 +1,5 @@
 //! The colour ramps of data colours (render_edges' cmap): branca's LinearColormap, as roadstyle's colors.py ColorRamp makes it. The ramps
-//! are data, one file for both engines (src/roadstyle/data/cmaps.json: branca's schemes and colour names, each matplotlib colormap at 9
+//! are data, one file for both engines (roadstyle-assets' data/cmaps.json: branca's schemes and colour names, each matplotlib colormap at 9
 //! stops; made by roadstyle-rs's tests/make_goldens.py from branca and matplotlib).
 
 use crate::Error;
@@ -15,7 +15,7 @@ struct Cmaps {
 fn cmaps() -> &'static Cmaps {
     static C: OnceLock<Cmaps> = OnceLock::new();
     C.get_or_init(|| {
-        let v: Value = serde_json::from_str(include_str!("../../../src/roadstyle/data/cmaps.json")).expect("cmaps.json");
+        let v: Value = serde_json::from_str(roadstyle_assets::text!("data/cmaps.json")).expect("cmaps.json");
         let m = |k: &str| v[k].as_object().cloned().unwrap_or_default();
         Cmaps { branca: m("branca"), css: m("css"), matplotlib: m("matplotlib") }
     })

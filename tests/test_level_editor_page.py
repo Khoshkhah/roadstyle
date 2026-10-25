@@ -3,6 +3,7 @@ files of the folder form, and the module dashboard/editor/level_editor.js edits 
 map. They need the editor's wasm package (rust/roadstyle-wasm/build_editor.sh), Node for the first and Chromium (playwright) for the
 second: skipped without them (CI builds no package)."""
 import json
+import os
 import shutil
 import subprocess
 import threading
@@ -13,8 +14,10 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-STATIC = ROOT / "src" / "roadstyle" / "static"
-PKG = STATIC / "level_editor" / "pkg" / "roadstyle_wasm.js"
+ASSETS = ROOT / "rust" / "roadstyle-assets" / "files"
+STATIC = ASSETS / "static"
+# the editor's wasm package: build_editor.sh writes it to $CARGO_TARGET_DIR/editor-pkg/ (else rust/target/editor-pkg/)
+PKG = Path(os.environ.get("CARGO_TARGET_DIR") or ROOT / "rust" / "target") / "editor-pkg" / "roadstyle_wasm.js"
 EDGES = ROOT / "rust" / "roadstyle-rs" / "tests" / "data" / "level_area" / "edges.parquet"
 pytestmark = pytest.mark.skipif(not PKG.exists(), reason="no editor wasm package (rust/roadstyle-wasm/build_editor.sh)")
 
@@ -103,11 +106,13 @@ window.ready = a.roadCount;
 
 
 class _Files(SimpleHTTPRequestHandler):
-    """The static folder, the vendored MapLibre at /vendor/, the test page and the edges."""
+    """The static folder, the vendored MapLibre at /vendor/, the editor's package at /level_editor/pkg/, the test page and the edges."""
 
     def translate_path(self, path):
         if path.startswith("/vendor/"):
-            return str(ROOT / "src" / "roadstyle" / path.lstrip("/"))
+            return str(ASSETS / path.lstrip("/"))
+        if path.startswith("/level_editor/pkg/"):
+            return str(PKG.parent / path.removeprefix("/level_editor/pkg/"))
         if path == "/edges.parquet":
             return str(EDGES)
         return super().translate_path(path)

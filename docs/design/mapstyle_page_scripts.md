@@ -1,7 +1,7 @@
 # mapstyle's page scripts: what the shared dashboard takes over
 
 The mapstyle merge (2026-10-23) moves a duckOSM map's page to roadstyle: the Rust stages make its style (`roadstyle.duckosm`), and
-the page writer (R3) and the shared dashboard (`src/roadstyle/static/dashboard/`) make its page. mapstyle's `render_map` keeps its own
+the page writer (R3) and the shared dashboard (`rust/roadstyle-assets/files/static/dashboard/`) make its page. mapstyle's `render_map` keeps its own
 page until then. This note lists what mapstyle's two page scripts do, so that the dashboard can port each part. The line numbers are
 of mapstyle at `ebd6b12` (`src/mapstyle/layers.js`, 292 lines; `src/mapstyle/dashboard.js`, 164 lines).
 

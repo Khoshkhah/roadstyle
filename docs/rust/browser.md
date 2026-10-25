@@ -17,15 +17,14 @@ Then put these files in one folder of your site:
 | Folder | Content | From |
 |---|---|---|
 | `pkg/` | `roadstyle_wasm.js`, `roadstyle_wasm_bg.wasm` and the TypeScript types | the output of `wasm-bindgen` |
-| `dashboard/` | the dashboard modules (`index.js` and the files that it imports), `dashboard.css` | `src/roadstyle/static/dashboard/` |
-| `popup.js`, `popup.css` | the road popup; the dashboard imports `../popup.js` | `src/roadstyle/static/` |
+| `dashboard/` | the dashboard modules (`index.js` and the files that it imports), `dashboard.css`, and its subfolders (`editor/`: the level editor, `worker/`: the worker calls) | `rust/roadstyle-assets/files/static/dashboard/` |
+| `popup.js`, `popup.css` | the road popup; the dashboard imports `../popup.js` | `rust/roadstyle-assets/files/static/` |
+| `level_editor.html` | the level editor's panel (only for the level editor) | `rust/roadstyle-assets/files/static/` |
 | `js/` | `roads_sql.js` and `features_sql.js`, the worker SQL | `rust/roadstyle-wasm/js/` |
 
-The `dashboard/` folder and the popup files are also in the installed Python package, in the folder that this command writes:
-
-```bash
-python -c "import roadstyle, pathlib; print(pathlib.Path(roadstyle.__file__).parent / 'static')"
-```
+`rust/roadstyle-assets/files/` is the one copy of these files (the crate roadstyle-assets). Until roadstyle 0.27.0, the dashboard,
+the popup files and `level_editor.html` are also at their old paths in `src/roadstyle/static/`, as a generated copy. Take them from
+`rust/roadstyle-assets/files/static/`. The npm package `roadstyle-dashboard` has the same files.
 
 The page must load MapLibre GL JS 5.24 as a script, because the dashboard uses the global `maplibregl`:
 
@@ -271,7 +270,8 @@ the store. A store is `{load(name, bytes), save(name, data)}`: `browserStore(key
 in this browser, `httpStore(base)` uses `roadstyle serve`. After each solve the editor sends the event `"solved"` with `levelsCsv`
 (one row for each edge: its four drawing numbers, its head lengths and its caps), `levelsInfo` and `draw()` (the map's table,
 GeoParquet). `editor.download(name)` downloads edits.csv, heads.csv, caps.csv or levels.csv as they are now. The module needs the
-files of `static/` beside it: `dashboard/` with its subfolders, `level_editor.html` (the panel), `dashboard.css` and `popup.css`.
+files of `rust/roadstyle-assets/files/static/` beside it, in the same layout: `dashboard/` with its subfolders, `level_editor.html` (the
+panel), `dashboard.css` and `popup.css`.
 
 ## Keep the main thread free
 

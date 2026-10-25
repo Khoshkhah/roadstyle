@@ -10,15 +10,15 @@ use serde_json::{Map, Number, Value};
 
 macro_rules! asset {
     ($p:literal) => {
-        include_str!(concat!("../../../src/roadstyle/", $p))
+        roadstyle_assets::text!($p)
     };
 }
 const TEMPLATE: &str = asset!("static/web_template.html");
 const POPUP_CSS: &str = asset!("static/popup.css");
 const POPUP_JS: &str = asset!("static/popup.js");
 const DASH_CSS: &str = asset!("static/dashboard/dashboard.css");
-// DASH_JS: the dashboard's modules in the order of static/dashboard/files.txt (build.rs writes it)
-include!(concat!(env!("OUT_DIR"), "/dash_files.rs"));
+// the dashboard's modules in the order of static/dashboard/files.txt
+const DASH_JS: [&str; roadstyle_assets::DASHBOARD_JS.len()] = roadstyle_assets::DASHBOARD_JS;
 const INFLATE: &str = asset!("static/page/inflate.html");
 const SIMPLE: &str = asset!("static/page/simple.html");
 const TILES: &str = asset!("static/page/tiles.html");

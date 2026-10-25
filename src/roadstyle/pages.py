@@ -29,8 +29,8 @@ from .render import render_edges
 def sidebar_html(name: str) -> str:
     """The bundled sidebar template (``"dashboard"``, ``"report"`` or ``"street_view"``) as an HTML
     string — the exact fragment the matching ``render_*`` page injects. Handy to tweak and re-inject."""
-    from importlib.resources import files
-    return (files("roadstyle") / "templates" / f"{name}.html").read_text(encoding="utf-8")
+    from . import _assets
+    return _assets.text(f"templates/{name}.html")
 
 
 def _page(gdf, template: str, *, defaults: dict, edit=None, **kw):

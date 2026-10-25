@@ -8,6 +8,8 @@ license.workspace = true
 description = "roadstyle's road model: the roads as features with typed properties, and the geometry helpers"
 
 [dependencies]
+# reads.json (props.rs, PAGE_READS): a temporary edge, which T3 removes when Mark makes reads.json (N25; the target architecture's gap list)
+roadstyle-assets.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 arrow-array.workspace = true

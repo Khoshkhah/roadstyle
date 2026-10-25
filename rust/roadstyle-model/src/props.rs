@@ -144,9 +144,9 @@ impl IntoIterator for Props {
     }
 }
 
-/// The page's declaration (src/roadstyle/static/dashboard/reads.json): the properties that its dashboard modules read on a drawn
+/// The page's declaration (roadstyle-assets: static/dashboard/reads.json): the properties that its dashboard modules read on a drawn
 /// feature (`pieces`) and on a row of the road table (`table`).
-pub const PAGE_READS: &str = include_str!("../../../src/roadstyle/static/dashboard/reads.json");
+pub const PAGE_READS: &str = roadstyle_assets::text!("static/dashboard/reads.json");
 
 fn declared(part: &str) -> Vec<String> {
     let v: Value = serde_json::from_str(PAGE_READS).expect("reads.json is JSON");

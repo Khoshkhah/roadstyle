@@ -25,7 +25,7 @@ import re
 import warnings
 from collections.abc import Mapping
 
-from . import _settings
+from . import _assets, _settings
 from ._na import missing
 from .basemaps import DEFAULT_SWITCHER, get_basemap
 from .config import DEFAULT as CONFIG
@@ -34,14 +34,11 @@ from .overlays import Overlay, detect_kind, to_fc
 from .palettes import DEFAULT_PALETTE
 from .stylers import bake_color_options, bake_props, build_styler, option_styler
 
-_VENDOR = os.path.join(os.path.dirname(__file__), "vendor")
-
 
 def _asset(fname):
     """Read a vendored front-end asset (the MapLibre js/css) to inline into the saved HTML, so the
     page needs no CDN — it opens offline, straight from disk, with no web server."""
-    with open(os.path.join(_VENDOR, fname), encoding="utf-8") as fh:
-        return fh.read()
+    return _assets.text("vendor/" + fname)
 
 # --- openstreetmap-carto road model — loaded from data/defaults.json "roads" (+ any user
 # roadstyle.json override), like every other styling table. Edit the JSON, not this file.
@@ -1931,8 +1928,7 @@ def _stringify_unsafe_ints(geo):
 # `feature.properties` only on user interaction, long after the data lands.
 def _page_part(name):
     """A script of the page (static/page/<name>.html): the same text for the Python and the Rust page writer."""
-    with open(os.path.join(os.path.dirname(__file__), "static", "page", name + ".html"), encoding="utf-8", newline="") as fh:
-        return fh.read()
+    return _assets.text(f"static/page/{name}.html")
 
 
 _INFLATE_JS = _page_part("inflate")
@@ -2699,27 +2695,18 @@ def _place_edge_overlays(layers, edge, levels, pat_over=False):
     return layers
 
 
-# The page template lives in static/web_template.html (placeholders: __TITLE__, __STYLE__, …)
-# so the HTML/JS is editable and lintable as HTML, not as a Python string.
-with open(os.path.join(os.path.dirname(__file__), "static", "web_template.html"),
-          encoding="utf-8") as _fh:
-    _HTML = _fh.read()
+# The page template, the popup and the dashboard are roadstyle-assets' files (static/: _assets), the same text that the Rust page
+# writer builds in. The template's placeholders: __TITLE__, __STYLE__, …
+_HTML = _assets.text("static/web_template.html")
 # the popup's look and text, shared with the GeoLibre plugin (export_style copies both files): inlined here, popup.js as a plain script
-with open(os.path.join(os.path.dirname(__file__), "static", "popup.css"), encoding="utf-8") as _fh:
-    _HTML = _HTML.replace("__POPUP_CSS__", _fh.read())
-with open(os.path.join(os.path.dirname(__file__), "static", "popup.js"), encoding="utf-8") as _fh:
-    _HTML = _HTML.replace("__POPUP_JS__", _fh.read().replace("export ", ""))
+_HTML = _HTML.replace("__POPUP_CSS__", _assets.text("static/popup.css"))
+_HTML = _HTML.replace("__POPUP_JS__", _assets.text("static/popup.js").replace("export ", ""))
 # the map's controls and road interaction (static/dashboard/, ES modules shared with the pages that use the Rust engine,
 # docs/design/dashboard_module.md): one plain script here, without the import lines and the export words, so the page stays one file
-_DASH = os.path.join(os.path.dirname(__file__), "static", "dashboard")
-with open(os.path.join(_DASH, "files.txt"), encoding="utf-8") as _fh:    # the modules in their order: one list, which the Rust page writer reads too
-    _DASH_FILES = [ln.strip() for ln in _fh if ln.strip() and not ln.startswith("#")]
-with open(os.path.join(_DASH, "dashboard.css"), encoding="utf-8") as _fh:
-    _HTML = _HTML.replace("__DASHBOARD_CSS__", _fh.read())
-_js = []
-for _n in _DASH_FILES:
-    with open(os.path.join(_DASH, _n + ".js"), encoding="utf-8") as _fh:
-        _js.append(re.sub(r"^export ", "", re.sub(r"^import .*\n", "", _fh.read(), flags=re.M), flags=re.M))
+_DASH_FILES = [ln.strip() for ln in _assets.text("static/dashboard/files.txt").splitlines() if ln.strip() and not ln.startswith("#")]
+_HTML = _HTML.replace("__DASHBOARD_CSS__", _assets.text("static/dashboard/dashboard.css"))
+_js = [re.sub(r"^export ", "", re.sub(r"^import .*\n", "", _assets.text(f"static/dashboard/{_n}.js"), flags=re.M), flags=re.M)
+       for _n in _DASH_FILES]
 _HTML = _HTML.replace("__DASHBOARD_JS__", "".join(_js))
 
 

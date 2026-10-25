@@ -29,8 +29,8 @@ Docs: https://khoshkhah.github.io/roadstyle/ (every keyword: /reference/paramete
 const PYTHON: &str = "the Python server (pip install roadstyle-mcp==0.25.0)";
 
 /// The vendored MapLibre (WebMap.save and the CLI's `roadstyle page` put the same in), so a saved map works offline.
-const MAPLIBRE_JS: &str = include_str!("../../../src/roadstyle/vendor/maplibre-gl.js");
-const MAPLIBRE_CSS: &str = include_str!("../../../src/roadstyle/vendor/maplibre-gl.css");
+const MAPLIBRE_JS: &str = roadstyle::assets::text!("vendor/maplibre-gl.js");
+const MAPLIBRE_CSS: &str = roadstyle::assets::text!("vendor/maplibre-gl.css");
 
 /// The options that stage 1 (the look and the sources) reads: render_edges keywords. The page's own keywords (basemap, popup_mode, ...)
 /// are page_from's (`page_options::page_defaults`). `overlays` and `items` are not here: they are GeoDataFrames.

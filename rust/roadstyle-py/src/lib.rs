@@ -483,7 +483,7 @@ fn duckosm_features_select(specs: Vec<usize>) -> Option<String> {
 #[pyo3(signature = (area, port, page=None))]
 fn serve(area: String, port: u16, page: Option<String>) -> PyResult<()> {
     let page = page.map_or(roadstyle_serve::Page::Embedded, |p| roadstyle_serve::Page::Dir(p.into()));
-    if matches!(page, roadstyle_serve::Page::Embedded) && !roadstyle_serve::EMBEDDED.iter().any(|(n, _)| n.ends_with("_bg.wasm")) {
+    if matches!(page, roadstyle_serve::Page::Embedded) && !roadstyle_serve::has_package() {
         return Err(PyValueError::new_err("this build has no WebAssembly package of the level editor: run rust/roadstyle-wasm/build_editor.sh, \
                                           then build the extension again (python rust/roadstyle-py/build.py), or use --engine python"));
     }
@@ -499,9 +499,24 @@ fn take_warnings() -> Vec<String> {
     PENDING.with(|p| std::mem::take(&mut *p.borrow_mut()))
 }
 
+/// asset(name) -> bytes: one of roadstyle's files by its name (roadstyle-assets: "data/cmaps.json", "static/popup.js", ...). Python has no
+/// copy of them (roadstyle/_assets.py).
+#[pyfunction]
+fn asset<'py>(py: Python<'py>, name: &str) -> PyResult<Bound<'py, PyBytes>> {
+    roadstyle::assets::get(name).map(|b| PyBytes::new(py, b)).ok_or_else(|| PyValueError::new_err(format!("roadstyle has no file {name:?}")))
+}
+
+/// asset_names() -> [str]: the names of roadstyle's files, sorted.
+#[pyfunction]
+fn asset_names() -> Vec<&'static str> {
+    roadstyle::assets::NAMES.to_vec()
+}
+
 #[pymodule]
 fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(take_warnings, m)?)?;
+    m.add_function(wrap_pyfunction!(asset, m)?)?;
+    m.add_function(wrap_pyfunction!(asset_names, m)?)?;
     m.add_function(wrap_pyfunction!(make_page, m)?)?;
     m.add_function(wrap_pyfunction!(page_from, m)?)?;
     m.add_function(wrap_pyfunction!(page_defaults, m)?)?;

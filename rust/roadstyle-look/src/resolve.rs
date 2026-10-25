@@ -2,7 +2,7 @@
 //! Python makes it (docs/design/rust_engine.md). Ports of roadstyle's _settings.py (theme, style, roads: the profile and the palette merged, the palettes
 //! of all classes, the settings in the older layout), of config.StyleConfig, of palettes.RoadStyle.from_dict with style._apply, and of the
 //! parts geolibre-roadstyle's look_of adds (the class styles, the slots' tables, the arrow image, the popup). The data is roadstyle's own:
-//! src/roadstyle/data/ (profiles, palettes, defaults.json, sprite.png), read at build time, so there is one copy of it.
+//! roadstyle-assets' data/ (profiles, palettes, defaults.json, sprite.png), read at build time, so there is one copy of it.
 //!
 //! The settings are given (a mapping, or a list of them), not read from roadstyle.json files or $ROADSTYLE_CONFIG: the browser has none.
 //! The user's own profiles and palettes are given too (`Options::files`), and they are passed through the calls (`Own`), not kept.
@@ -14,17 +14,17 @@ use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
 const PROFILES: [(&str, &str); 2] = [
-    ("default", include_str!("../../../src/roadstyle/data/profiles/default.yaml")),
-    ("highsat", include_str!("../../../src/roadstyle/data/profiles/highsat.yaml")),
+    ("default", roadstyle_assets::text!("data/profiles/default.yaml")),
+    ("highsat", roadstyle_assets::text!("data/profiles/highsat.yaml")),
 ];
 const PALETTES: [(&str, &str); 4] = [
-    ("amber", include_str!("../../../src/roadstyle/data/palettes/amber.yaml")),
-    ("carto", include_str!("../../../src/roadstyle/data/palettes/carto.yaml")),
-    ("highsat", include_str!("../../../src/roadstyle/data/palettes/highsat.yaml")),
-    ("mono", include_str!("../../../src/roadstyle/data/palettes/mono.yaml")),
+    ("amber", roadstyle_assets::text!("data/palettes/amber.yaml")),
+    ("carto", roadstyle_assets::text!("data/palettes/carto.yaml")),
+    ("highsat", roadstyle_assets::text!("data/palettes/highsat.yaml")),
+    ("mono", roadstyle_assets::text!("data/palettes/mono.yaml")),
 ];
-const DEFAULTS: &str = include_str!("../../../src/roadstyle/data/defaults.json");
-const SPRITE: &[u8] = include_bytes!("../../../src/roadstyle/data/sprite.png");
+const DEFAULTS: &str = roadstyle_assets::text!("data/defaults.json");
+const SPRITE: &[u8] = roadstyle_assets::bytes!("data/sprite.png");
 
 /// render_web.render's defaults that the look holds, and DEFAULT_ROAD_POPUP.
 const HEAD_M: f64 = 5.0;

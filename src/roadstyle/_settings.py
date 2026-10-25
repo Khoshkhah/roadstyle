@@ -61,15 +61,16 @@ def _read_settings(path: Path) -> dict:
 
 
 @lru_cache(maxsize=1)
-def data_dir() -> Path:
-    """Filesystem path to the bundled ``roadstyle/data`` directory (shipped as package data)."""
-    return Path(__file__).resolve().parent / "data"
-
-
-@lru_cache(maxsize=1)
 def _bundled() -> dict:
     """The bundled settings that are not style values — ``data/defaults.json`` (``config``: base map, camera, slots, tiles)."""
-    return _read_json(data_dir() / "defaults.json")
+    from . import _assets
+    return json.loads(_assets.text("data/defaults.json"))
+
+
+def bundled_style_names(kind: str) -> list[str]:
+    """The names of the bundled profiles or palettes (``kind``: ``"profiles"`` / ``"palettes"``): roadstyle-assets' data/<kind>/."""
+    from . import _assets
+    return [n.rsplit("/", 1)[1][:-len(".yaml")] for n in _assets.names(f"data/{kind}/") if n.endswith(".yaml")]
 
 
 def override_files() -> list[Path]:
@@ -169,7 +170,7 @@ def _style_dirs(kind: str) -> list[Path]:
 
 def style_names(kind: str) -> list[str]:
     """The names of the profiles or palettes (``kind``: ``"profiles"`` / ``"palettes"``): bundled first, then own ones."""
-    names = [f.stem for f in sorted((data_dir() / kind).glob("*.yaml"))]
+    names = bundled_style_names(kind)
     for d in _style_dirs(kind):
         names += [f.stem for f in sorted(d.glob("*.yaml")) if f.stem not in names] if d.is_dir() else []
     return names
@@ -181,13 +182,18 @@ def _style_file(kind: str, name: str) -> dict:
     import copy
     path = next((d / f"{name}.yaml" for d in _style_dirs(kind) if (d / f"{name}.yaml").is_file()), None)
     bundled = path is None
-    path = path or data_dir() / kind / f"{name}.yaml"
-    if not path.is_file():
+    if bundled and name not in bundled_style_names(kind):
         raise ValueError(f"no {kind[:-1]} named {name!r}; there are: {', '.join(style_names(kind))}")
     try:
-        data = _read_settings(path)
+        if bundled:
+            import yaml
+
+            from . import _assets
+            data = yaml.safe_load(_assets.text(f"data/{kind}/{name}.yaml"))
+        else:
+            data = _read_settings(path)
     except Exception as e:      # an error that names the file, never skipped silently
-        raise ValueError(f"{kind[:-1]} {name} ({path}): {e}") from e
+        raise ValueError(f"{kind[:-1]} {name} ({path or f'data/{kind}/{name}.yaml'}): {e}") from e
     if bundled and name == _BASE[kind]:
         return data
     return _deep_merge(copy.deepcopy(_style_file(kind, _BASE[kind])), data)
@@ -339,5 +345,5 @@ def refresh() -> None:
     ``$ROADSTYLE_CONFIG`` at a temp file). Note that ``palettes`` / ``config`` already imported
     elsewhere keep their import-time values; ``render_edges(palette=...)`` re-reads ``PALETTES``.
     """
-    for fn in (data_dir, _bundled, _style_file, theme, palettes, style, roads):
+    for fn in (_bundled, _style_file, theme, palettes, style, roads):
         fn.cache_clear()

@@ -24,6 +24,7 @@ import pandas as pd
 import roadstyle as rs
 from roadstyle import render_web
 
+from . import _assets
 from ._na import missing
 from .level_area import defaults, ends, own, read_roads, solve, solve_local, write
 
@@ -504,7 +505,7 @@ def _handler(area):
     return H
 
 
-_EDITOR = (Path(__file__).resolve().parent / "static" / "level_editor.html").read_text()
+_EDITOR = _assets.text("static/level_editor.html")
 
 
 def serve(folder, port=8780, items=None, engine=None):

@@ -6,8 +6,8 @@
      no new style. ?area=tartu: Tartu (about 65,000 roads) in place of Monaco. README.md in this folder. -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
-<link rel="stylesheet" href="../../src/roadstyle/static/dashboard/dashboard.css">
-<link rel="stylesheet" href="../../src/roadstyle/static/popup.css">
+<link rel="stylesheet" href="../../rust/roadstyle-assets/files/static/dashboard/dashboard.css">
+<link rel="stylesheet" href="../../rust/roadstyle-assets/files/static/popup.css">
 <style>html,body{margin:0;height:100%}#map{position:absolute;inset:0}
 #bar{position:absolute;left:50%;transform:translateX(-50%);top:10px;z-index:2;display:flex;gap:6px;align-items:center;font:13px system-ui,sans-serif}
 #bar button{padding:6px 10px;font:inherit}#ms{background:#fff;padding:4px 8px;border-radius:4px}</style>
@@ -17,7 +17,7 @@
   <button id="c" type="button">Clear</button><span id="ms"></span></div>
 <script type="module">
 import init, {Look, makeSources, tileSources} from "./pkg/roadstyle_wasm.js";
-import {rsDashboard} from "../../src/roadstyle/static/dashboard/index.js";
+import {rsDashboard} from "../../rust/roadstyle-assets/files/static/dashboard/index.js";
 
 const area = new URLSearchParams(location.search).get("area") || "monaco";
 const DATA = "../../rust/roadstyle-rs/tests/data/";

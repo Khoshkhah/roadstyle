@@ -9,6 +9,7 @@ description = "roadstyle as a Rust library: the facade over the model, the reade
 
 [dependencies]
 roadstyle-engine.workspace = true
+roadstyle-assets.workspace = true
 roadstyle-io.workspace = true
 roadstyle-levels.workspace = true
 roadstyle-tiles.workspace = true

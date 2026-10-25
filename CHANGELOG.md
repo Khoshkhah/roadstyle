@@ -15,6 +15,18 @@ All notable changes to **roadstyle** are documented here. The format is based on
   map's table) and downloads of edits.csv and levels.csv. `roadstyle serve`'s page uses the same module.
 
 ### Changed
+- **roadstyle's files have one copy, the crate roadstyle-assets** (audit N25). The profiles and palettes, the base map's files,
+  `cmaps.json`, `basemaps.json`, `defaults.json`, the sprite, the dashboard's JS and CSS, the popup files, the page templates, the
+  level editor's page and the vendored MapLibre moved from `src/roadstyle/{data,static,templates,vendor}/` to
+  `rust/roadstyle-assets/files/`, with the same names under it. Each crate takes its files from there at compile time
+  (`roadstyle_assets::text!`): a wrong name does not compile, and a binary has only the files that it names (the wasm module does not
+  change). No crate builds in a file of `src/roadstyle/` now, so the crates can be packed (`cargo package`). Python has no copy: it
+  asks the extension (`roadstyle._assets`, `_rust.asset(name)`), so a source checkout needs the built extension. The npm package
+  `roadstyle-dashboard` packs from `rust/roadstyle-assets/files/static/`. The level editor's wasm package is now built to
+  `$CARGO_TARGET_DIR/editor-pkg/` (rust/roadstyle-wasm/build_editor.sh).
+- **Deprecated: the old paths `src/roadstyle/static/dashboard/`, `popup.css`, `popup.js` and `level_editor.html`.** They are a
+  generated copy (`rust/roadstyle-assets/sync_old_paths.py`, checked by a test) for one release, for a page build that copies them
+  from a roadstyle checkout. They go in roadstyle 0.27.0. They are not in the wheel.
 - **`cargo test` at `rust/` builds 113 crates in about 1 minute, not 195 in 5** (review D1). The programs `roadstyle-cli` and
   `roadstyle-snapshot` (bundled SQLite, headless_chrome) are not default members: CI tests them in a step of their own (`-p`). Fat LTO
   and one codegen unit moved from `release` to a new profile `dist` (`inherits = "release"`), which the wheels (`maturin --profile
