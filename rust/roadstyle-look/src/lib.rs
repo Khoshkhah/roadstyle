@@ -115,8 +115,9 @@ impl Look {
 
     fn with(data: LookData, sections: Sections) -> Result<Look, Error> {
         let (map, other_args) = MapOptions::from_args(&data.args)?;
-        Ok(Look { model: RoadModel::new(&data.roads_model, &data.theme["roads"], &data.args)?, road: RoadLook::new(&data)?,
-                  slot: SlotLook::new(&data)?, deck: DeckLook::new(&data.config["bridge_decks"]), map, other_args, sections, data })
+        let r = &sections.roads;
+        Ok(Look { model: RoadModel::new(&r.model, &r.links, &r.split, &r.fallback, &map)?, road: RoadLook::new(&sections, &data.palette, &map),
+                  slot: SlotLook::new(&sections), deck: DeckLook::new(&sections.bridges.decks), map, other_args, sections, data })
     }
 
     /// A saved look (its JSON text), of version 2, 1 or 0.
@@ -216,13 +217,13 @@ pub struct RoadLook {
     pub palette: String,
     classes: HashMap<String, [Value; 2]>,
     fallback: [Value; 2],
-    /// config single_line_classes
+    /// the classes flagged single_line
     pub single_line: HashSet<String>,
-    /// config twin_casing == "one"
+    /// roads.twin_casing == "one"
     pub twin_one: bool,
     /// the heads' default length (render's head_m keyword, else its default in the look)
     pub head_m: f64,
-    /// config bridge_shadow: a bridge's main casing piece casts a shadow (simple source)
+    /// bridges.shadow.show: a bridge's main casing piece casts a shadow (simple source)
     pub bridge_shadow: bool,
     /// the theme's access colours (render's access_col: the palette's `access`)
     pub access: Map<String, Value>,
@@ -231,28 +232,21 @@ pub struct RoadLook {
 }
 
 impl RoadLook {
-    fn new(look: &LookData) -> Result<RoadLook, Error> {
-        let pair = |v: &Value| -> Result<[Value; 2], Error> {
-            match v.as_array().map(|a| a.as_slice()) {
-                Some([a, b]) => Ok([a.clone(), b.clone()]),
-                _ => Err(Error::Look("look.json: a class style is not [plain, link]".into())),
-            }
-        };
-        let styles = &look.styles;
-        let classes = styles["classes"].as_object().ok_or_else(|| Error::Look("look.json: no styles.classes".into()))?;
-        Ok(RoadLook {
-            data: look.theme["data"].clone(),
-            palette: look.palette.clone(),
-            classes: classes.iter().map(|(k, v)| Ok((k.clone(), pair(v)?))).collect::<Result<_, Error>>()?,
-            fallback: pair(&styles["fallback"])?,
-            single_line: look.config["single_line_classes"].as_array().into_iter().flatten()
-                .filter_map(|v| v.as_str().map(String::from)).collect(),
-            twin_one: look.config["twin_casing"] == "one",
-            head_m: look.args["head_m"].as_f64().unwrap_or(look.head_m),
-            bridge_shadow: truthy(look.config.get("bridge_shadow")),
-            access: look.theme["access"].as_object().cloned().unwrap_or_default(),
-            casing_m: look.theme["casing"]["m"].as_f64().unwrap_or(0.0),
-        })
+    fn new(s: &Sections, palette: &str, map: &MapOptions) -> RoadLook {
+        let r = &s.roads;
+        RoadLook {
+            data: serde_json::to_value(&s.data).expect("a section is JSON"),
+            palette: palette.to_string(),
+            classes: r.styles.classes.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+            fallback: r.styles.fallback.clone(),
+            // the classes flagged single_line (config single_line_classes)
+            single_line: r.classes.iter().filter(|(_, e)| truthy(e.get("single_line"))).map(|(c, _)| c.clone()).collect(),
+            twin_one: r.twin_casing == "one",
+            head_m: map.roads.head_m.unwrap_or(r.head_m),
+            bridge_shadow: s.bridges.shadow.show,
+            access: s.access.iter().map(|(k, c)| (k.clone(), Value::from(c.css()))).collect(),
+            casing_m: s.casing.m.f(),
+        }
     }
 
     /// ClassStyler: the style of a class value `h` (as text; plain or link, resolved at build time) and its base class
@@ -273,24 +267,23 @@ pub struct SlotLook {
     pub width_z20: HashMap<String, f64>,
     /// the fallback's casing width at zoom 20 in px
     pub width_fallback: f64,
-    /// config annotations.slot_m: the length of one slot in metres
+    /// labels.slot_m: the length of one slot in metres
     pub slot_m: f64,
 }
 
 impl SlotLook {
-    fn new(look: &LookData) -> Result<SlotLook, Error> {
-        let s = &look.slots;
-        Ok(SlotLook {
-            z_order: s["z_order"].as_object().cloned().ok_or_else(|| Error::Look("look.json: no slots.z_order".into()))?,
-            width_z20: s["width_z20"].as_object().ok_or_else(|| Error::Look("look.json: no slots.width_z20".into()))?.iter()
-                .filter_map(|(k, v)| v.as_f64().map(|w| (k.clone(), w))).collect(),
-            width_fallback: s["width_z20_fallback"].as_f64().ok_or_else(|| Error::Look("look.json: no slots.width_z20_fallback".into()))?,
-            slot_m: look.config["annotations"]["slot_m"].as_f64().unwrap_or(100.0),
-        })
+    fn new(s: &Sections) -> SlotLook {
+        let t = &s.labels.slots;
+        SlotLook {
+            z_order: t.z_order.clone(),
+            width_z20: t.width_z20.iter().map(|(k, w)| (k.clone(), w.f())).collect(),
+            width_fallback: t.width_z20_fallback.f(),
+            slot_m: s.labels.slot_m.f(),
+        }
     }
 }
 
-/// The look values of the 3D bridge decks (config bridge_decks, each with its default).
+/// The look values of the 3D bridge decks (the section bridges.decks).
 #[derive(Clone, Debug)]
 pub struct DeckLook {
     pub base_m: f64,
@@ -305,10 +298,8 @@ pub struct DeckLook {
 }
 
 impl DeckLook {
-    fn new(cfg: &Value) -> DeckLook {
-        let f = |k: &str, d: f64| cfg[k].as_f64().unwrap_or(d);
-        DeckLook { base_m: f("base_m", 5.0), thickness_m: f("thickness_m", 1.0), ramp_m: f("ramp_m", 40.0), step_m: f("step_m", 2.5),
-                   match_zoom: f("match_zoom", 18.0), width_scale: f("width_scale", 1.0), casing_px: f("casing_px", 2.0),
-                   flat_below: f("flat_below", 16.0), opacity: f("opacity", 0.7) }
+    fn new(d: &sections::Decks) -> DeckLook {
+        DeckLook { base_m: d.base_m.f(), thickness_m: d.thickness_m.f(), ramp_m: d.ramp_m.f(), step_m: d.step_m.f(), match_zoom: d.match_zoom.f(),
+                   width_scale: d.width_scale.f(), casing_px: d.casing_px.f(), flat_below: d.flat_below.f(), opacity: d.opacity.f() }
     }
 }

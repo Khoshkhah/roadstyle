@@ -1,6 +1,8 @@
 //! The road width model (render_web's _load_road_model: the look's "roads_model" and the theme's roads): the width of each class
 //! by zoom, its draw order and its two-way split. The engine builds the MapLibre expressions from it (roadstyle-engine `layers::Exprs`).
 
+use crate::options::MapOptions;
+use crate::sections::{Links, Num, RoadsModel, Split};
 use crate::Error;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
@@ -31,51 +33,40 @@ pub struct RoadModel {
     pub fb_link_order: f64,
 }
 
-fn obj<'a>(v: &'a Value, what: &str) -> Result<&'a Map<String, Value>, Error> {
-    v.as_object().ok_or_else(|| Error::Look(format!("look.json: no {what}")))
-}
-
-fn num(v: &Value, what: &str) -> Result<f64, Error> {
-    v.as_f64().ok_or_else(|| Error::Look(format!("look.json: {what} is not a number")))
-}
-
 impl RoadModel {
-    /// From the look's `roads_model`, the theme's `roads` and the map options `args` (render's offset_frac, width_frac, offset_zoom).
-    pub fn new(r: &Value, th: &Value, args: &Value) -> Result<RoadModel, Error> {
+    /// From the look's road tables (`roads.model`), the theme's links, two-way split and fallback, and the map options (render's
+    /// offset_frac, width_frac and offset_zoom over the split).
+    pub fn new(m: &RoadsModel, links: &Links, split: &Split, fallback: &Map<String, Value>, map: &MapOptions) -> Result<RoadModel, Error> {
         let mut width = HashMap::new();
-        for (g, t) in obj(&r["width"], "roads_model.width")? {
-            let mut stops: Vec<(f64, f64)> = obj(t, "a width table")?.iter()
-                .map(|(z, w)| Ok((z.parse::<f64>().map_err(|e| Error::Look(e.to_string()))?, num(w, "a width")?))).collect::<Result<_, Error>>()?;
+        for (g, t) in &m.width {
+            let mut stops: Vec<(f64, f64)> = t.iter()
+                .map(|(z, w)| Ok((z.parse::<f64>().map_err(|e| Error::Look(format!("look: roads.model.width.{g}: zoom {z:?}: {e}")))?, w.f())))
+                .collect::<Result<_, Error>>()?;
             stops.sort_by(|a, b| a.0.total_cmp(&b.0));
             width.insert(g.clone(), stops);
         }
-        let floats = |v: &Value, what: &str| -> Result<HashMap<String, f64>, Error> {
-            obj(v, what)?.iter().map(|(k, x)| Ok((k.clone(), num(x, what)?))).collect()
-        };
-        let group: Vec<(String, String)> = obj(&r["group"], "roads_model.group")?.iter()
-            .map(|(c, g)| (c.clone(), g.as_str().unwrap_or_default().to_string())).collect();
-        let links: Vec<String> = r["links"].as_array().ok_or_else(|| Error::Look("look.json: no roads_model.links".into()))?.iter()
-            .filter_map(|v| v.as_str().map(String::from)).collect();
-        let classes = group.iter().map(|(c, _)| c.clone()).chain(links.iter().cloned()).collect();
-        let split = &th["split"];
-        let fb = &th["fallback"];
+        let floats = |t: &indexmap::IndexMap<String, Num>| t.iter().map(|(k, x)| (k.clone(), x.f())).collect::<HashMap<_, _>>();
+        let group: Vec<(String, String)> = m.group.iter().map(|(c, g)| (c.clone(), g.clone())).collect();
+        let classes = group.iter().map(|(c, _)| c.clone()).chain(m.links.iter().cloned()).collect();
+        let r = &map.roads;
         Ok(RoadModel {
             width,
-            hi_rate: floats(&r["width_zoom_rate"], "roads_model.width_zoom_rate")?,
-            casing_ratio: floats(&r["casing_ratio"], "roads_model.casing_ratio")?,
+            hi_rate: floats(&m.width_zoom_rate),
+            casing_ratio: floats(&m.casing_ratio),
             group,
             classes,
-            zstops: r["zoom_stops"].as_array().ok_or_else(|| Error::Look("look.json: no roads_model.zoom_stops".into()))?.clone(),
-            z_order: obj(&r["z_order"], "roads_model.z_order")?.clone(),
-            link_w: num(&th["links"]["width"], "theme roads.links.width")?,
+            zstops: m.zoom_stops.iter().map(|z| Value::Number(z.0.clone())).collect(),
+            z_order: m.z_order.clone(),
+            link_w: links.width.f(),
             // render(offset_frac=, width_frac=) over the theme's split: mapstyle passes 0 and 1 for a mode without lanes (one centred line per road)
-            offset_frac: args["offset_frac"].as_f64().map_or_else(|| num(&split["offset_frac"], "split.offset_frac"), Ok)?,
-            width_frac: args["width_frac"].as_f64().map_or_else(|| num(&split["width_frac"], "split.width_frac"), Ok)?,
-            offset_zoom: args["offset_zoom"].as_f64().map_or_else(|| num(&split["offset_zoom"], "split.offset_zoom"), Ok)?,
-            ramp_zooms: num(&split["ramp_zooms"], "split.ramp_zooms")?,
-            fb_group: fb["group"].as_str().ok_or_else(|| Error::Look("look.json: no fallback group".into()))?.to_string(),
-            fb_order: fb["order"].clone(),
-            fb_link_order: num(&fb["link_order"], "fallback.link_order")?,
+            offset_frac: r.offset_frac.unwrap_or_else(|| split.offset_frac.f()),
+            width_frac: r.width_frac.unwrap_or_else(|| split.width_frac.f()),
+            offset_zoom: r.offset_zoom.unwrap_or_else(|| split.offset_zoom.f()),
+            ramp_zooms: split.ramp_zooms.f(),
+            fb_group: fallback.get("group").and_then(Value::as_str).ok_or_else(|| Error::Look("look: no roads.fallback.group".into()))?.to_string(),
+            fb_order: fallback.get("order").cloned().unwrap_or(Value::Null),
+            fb_link_order: fallback.get("link_order").and_then(Value::as_f64)
+                .ok_or_else(|| Error::Look("look: roads.fallback.link_order is not a number".into()))?,
         })
     }
 

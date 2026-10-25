@@ -350,6 +350,11 @@ fn config(cfg: &Map<String, Value>) -> Value {
     Value::Object(out)
 }
 
+/// A typed part of the look from its JSON value, or an error that names it.
+fn typed<T: serde::de::DeserializeOwned>(v: &Value, what: &str) -> Result<T, Error> {
+    serde_json::from_value(v.clone()).map_err(|e| Error::Look(format!("look: {what}: {e}")))
+}
+
 fn float(v: &Value, what: &str) -> Result<f64, Error> {
     v.as_f64().ok_or_else(|| Error::Options(format!("{what}: not a number: {v}")))
 }
@@ -491,7 +496,10 @@ pub(crate) fn resolve(options: &Options) -> Result<LookData, Error> {
             a.insert(k, v);
         }
     }
-    let model = RoadModel::new(&roads_model, &th["roads"], &args)?;
+    // the slots' widths come from the road model, before the look's sections exist: its typed parts are read from the theme here
+    let model = RoadModel::new(&typed(&roads_model, "roads.model")?, &typed(&th["roads"]["links"], "roads.links")?,
+                               &typed(&th["roads"]["split"], "roads.split")?, th["roads"]["fallback"].as_object().unwrap_or(&Map::new()),
+                               &crate::MapOptions::from_args(&args)?.0)?;
     let mut width_z20 = Map::new();
     for c in &model.classes {
         width_z20.insert(c.clone(), json!(model.class_width_px(Some(c), 20.0, true)));

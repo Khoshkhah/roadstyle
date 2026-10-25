@@ -179,10 +179,12 @@
           "$ref": "#/$defs/Num"
         },
         "styles": {
-          "description": "each class of the palette as ClassStyler resolves it, plain and as a link, and the fallback"
+          "description": "each class of the palette as ClassStyler resolves it, plain and as a link, and the fallback",
+          "$ref": "#/$defs/ClassStyles"
         },
         "model": {
-          "description": "render_web's road tables (width, width_zoom_rate, casing_ratio, group, links, zoom_stops, z_order)"
+          "description": "render_web's road tables",
+          "$ref": "#/$defs/RoadsModel"
         },
         "head_m": {
           "description": "render's default head length in metres",
@@ -256,6 +258,93 @@
         "width_frac",
         "offset_zoom",
         "ramp_zooms"
+      ]
+    },
+    "ClassStyles": {
+      "description": "Each class's style as ClassStyler resolves it: [plain, as a link] (fill, width, casing, casing_width, dash, opacity, casing_opacity).",
+      "type": "object",
+      "properties": {
+        "classes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": true,
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "fallback": {
+          "type": "array",
+          "items": true,
+          "minItems": 2,
+          "maxItems": 2
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "classes",
+        "fallback"
+      ]
+    },
+    "RoadsModel": {
+      "description": "render_web's road tables (_settings.roads()): the widths of each group by zoom, the zoom rate above the last stop, the casing ratio,\neach class's group, the link classes, the zoom stops and each class's drawing order.",
+      "type": "object",
+      "properties": {
+        "width": {
+          "description": "group -> zoom (as text) -> px",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/Num"
+            }
+          }
+        },
+        "width_zoom_rate": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Num"
+          }
+        },
+        "casing_ratio": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Num"
+          }
+        },
+        "group": {
+          "description": "class -> its width group",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "zoom_stops": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Num"
+          }
+        },
+        "z_order": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "width",
+        "width_zoom_rate",
+        "casing_ratio",
+        "group",
+        "links",
+        "zoom_stops",
+        "z_order"
       ]
     },
     "CasingLook": {
@@ -358,7 +447,8 @@
           "description": "roads in metres: the names' size by zoom for every class"
         },
         "slots": {
-          "description": "the slots' tables: the class order and each class's width at zoom 20"
+          "description": "the slots' tables: the class order and each class's width at zoom 20",
+          "$ref": "#/$defs/Slots"
         },
         "slot_m": {
           "description": "the length of one slot in metres (config annotations.slot_m)",
@@ -385,6 +475,31 @@
     "Color": {
       "description": "\"#rrggbb\", \"#rgb\", a CSS colour name, or rgb(...), rgba(...), hsl(...), hsla(...)",
       "type": "string"
+    },
+    "Slots": {
+      "description": "The slots' tables (the names and the arrows): the class order, and each class's casing width at zoom 20 in px.",
+      "type": "object",
+      "properties": {
+        "z_order": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "width_z20": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Num"
+          }
+        },
+        "width_z20_fallback": {
+          "$ref": "#/$defs/Num"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "z_order",
+        "width_z20",
+        "width_z20_fallback"
+      ]
     },
     "ArrowLook": {
       "type": "object",

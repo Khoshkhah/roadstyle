@@ -61,7 +61,9 @@ fn the_sections_are_the_views() {
     assert_eq!(look.sections.page.basemap, look.config["basemap"].as_str().unwrap());
     assert_eq!(look.sections.camera.pitch_3d.f(), look.config["camera"]["pitch_3d"].as_f64().unwrap());
     assert_eq!(serde_json::to_value(&look.sections.access).unwrap(), look.theme["access"]);
-    assert_eq!(look.sections.roads.styles, look.styles);
+    assert_eq!(serde_json::to_value(&look.sections.roads.styles).unwrap(), look.styles);
+    assert_eq!(serde_json::to_value(&look.sections.roads.model).unwrap(), look.roads_model);
+    assert_eq!(serde_json::to_value(&look.sections.labels.slots).unwrap(), look.slots);
     assert_eq!(look.sections.arrows.image, look.oneway_image);
 }
 

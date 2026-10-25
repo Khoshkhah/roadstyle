@@ -104,11 +104,37 @@ pub struct RoadsLook {
     pub twin_casing: String,
     pub fill_opacity: Num,
     /// each class of the palette as ClassStyler resolves it, plain and as a link, and the fallback
-    pub styles: Value,
-    /// render_web's road tables (width, width_zoom_rate, casing_ratio, group, links, zoom_stops, z_order)
-    pub model: Value,
+    pub styles: ClassStyles,
+    /// render_web's road tables
+    pub model: RoadsModel,
     /// render's default head length in metres
     pub head_m: f64,
+}
+
+/// Each class's style as ClassStyler resolves it: [plain, as a link] (fill, width, casing, casing_width, dash, opacity, casing_opacity).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ClassStyles {
+    pub classes: IndexMap<String, [Value; 2]>,
+    pub fallback: [Value; 2],
+}
+
+/// render_web's road tables (_settings.roads()): the widths of each group by zoom, the zoom rate above the last stop, the casing ratio,
+/// each class's group, the link classes, the zoom stops and each class's drawing order.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct RoadsModel {
+    /// group -> zoom (as text) -> px
+    pub width: IndexMap<String, IndexMap<String, Num>>,
+    pub width_zoom_rate: IndexMap<String, Num>,
+    pub casing_ratio: IndexMap<String, Num>,
+    /// class -> its width group
+    pub group: IndexMap<String, String>,
+    pub links: Vec<String>,
+    pub zoom_stops: Vec<Num>,
+    pub z_order: Table,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -167,9 +193,19 @@ pub struct LabelLook {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size: Option<Value>,
     /// the slots' tables: the class order and each class's width at zoom 20
-    pub slots: Value,
+    pub slots: Slots,
     /// the length of one slot in metres (config annotations.slot_m)
     pub slot_m: Num,
+}
+
+/// The slots' tables (the names and the arrows): the class order, and each class's casing width at zoom 20 in px.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct Slots {
+    pub z_order: Table,
+    pub width_z20: IndexMap<String, Num>,
+    pub width_z20_fallback: Num,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
