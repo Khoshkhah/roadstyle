@@ -2,6 +2,7 @@
 //! `overlays=`, `user_overlays`), then roadstyle's _edge_overlay and _overlay_layers: the overlay sources and their layers before the
 //! placement and the passes (layers.rs).
 
+use roadstyle_model::mark::{self, Mark};
 use crate::road::{Road, Roads};
 use roadstyle_model::Cell;
 use crate::roads::truthy;
@@ -307,7 +308,7 @@ pub fn user_overlays(specs: &Value, first: usize) -> Result<Vec<Overlay>, crate:
                 if !f["properties"].is_object() {
                     f["properties"] = json!({});
                 }
-                f["properties"]["__rs_wm"] = json!(wm / lat.to_radians().cos().max(0.01));
+                f["properties"][Mark::WidthM.name()] = json!(wm / lat.to_radians().cos().max(0.01));
             }
         }
         let user = u.as_object().map(|o| Value::Object(o.iter().filter(|(k, _)| *k != "fc").map(|(k, v)| (k.clone(), v.clone())).collect()))
@@ -329,7 +330,7 @@ fn wm_width_expr(min_zoom: &Value) -> Value {
     let zs: Vec<f64> = if z0 == 22.0 { vec![22.0] } else { vec![z0.min(22.0), z0.max(22.0)] };
     for z in zs {
         e.push(json!(z));
-        e.push(json!(["*", ["get", "__rs_wm"], crate::layers::py_round(512.0 * 2f64.powf(z) / 40075016.686, 6)]));
+        e.push(json!(["*", ["get", Mark::WidthM.name()], crate::layers::py_round(512.0 * 2f64.powf(z) / 40075016.686, 6)]));
     }
     Value::Array(e)
 }
@@ -453,12 +454,12 @@ pub fn edge_overlay(ov: &mut Overlay, roads: &std::collections::HashMap<String, 
             return None;
         };
         let o = order.filter(|o| o.is_finite()).map_or(0, |o| o.trunc() as i64);
-        let fl = r.get("__rs_fl").and_then(Cell::as_i64).unwrap_or(0);
+        let fl = r.get(Mark::FillLevel.name()).and_then(Cell::as_i64).unwrap_or(0);
         orders.insert((fl, o));
-        Some([r.get("__rs_edge").map_or(Value::Null, Cell::to_value), fl.into(), o.into(), r.cls(), r.get("lvl").map_or(json!(0), Cell::to_value),
-              if truthy(r.get("__rs_tunnel")) { true.into() } else { Value::Null }])
+        Some([r.get(Mark::Edge.name()).map_or(Value::Null, Cell::to_value), fl.into(), o.into(), r.cls(), r.get("lvl").map_or(json!(0), Cell::to_value),
+              if truthy(r.get(Mark::Tunnel.name())) { true.into() } else { Value::Null }])
     };
-    const KEYS: [&str; 6] = ["__rs_edge", "__rs_fl", "__rs_ord", "__rs_cls", "__rs_lvl", "__rs_tunnel"];
+    const KEYS: [&str; 6] = [Mark::Edge.name(), Mark::FillLevel.name(), Mark::ItemOrder.name(), Mark::Class.name(), Mark::ItemLvl.name(), Mark::Tunnel.name()];
     match &mut ov.data {
         Data::Json(fc) => for f in fc["features"].as_array_mut().into_iter().flatten() {
             if !f["properties"].is_object() {
@@ -467,7 +468,7 @@ pub fn edge_overlay(ov: &mut Overlay, roads: &std::collections::HashMap<String, 
             let p = f["properties"].as_object_mut().unwrap();
             let order = order_col.as_ref().and_then(|c| p.get(c)).and_then(Value::as_f64);
             let Some(m) = marks(eid(p.get(&col).unwrap_or(&Value::Null)), order) else { continue };
-            for (k, v) in KEYS.into_iter().zip(m).filter(|(k, v)| *k != "__rs_tunnel" || !v.is_null()) {      // __rs_tunnel only when true
+            for (k, v) in KEYS.into_iter().zip(m).filter(|(k, v)| *k != Mark::Tunnel.name() || !v.is_null()) {      // __rs_tunnel only when true
                 p.insert(k.into(), v);
             }
         },
@@ -479,7 +480,7 @@ pub fn edge_overlay(ov: &mut Overlay, roads: &std::collections::HashMap<String, 
             if unknown.is_empty() {
                 for (k, key) in KEYS.into_iter().enumerate() {
                     let cells: Vec<Cell> = rows.iter().map(|m| m.as_ref().map_or(Cell::Null, |m| Cell::from(&m[k]))).collect();
-                    t.set_column(key, &cells, key != "__rs_tunnel")?;
+                    t.set_column(key, &cells, key != Mark::Tunnel.name())?;
                 }
             }
         }
@@ -528,15 +529,15 @@ pub fn item_pieces(ov: &mut Overlay, i: usize, look: &crate::Look) -> Result<Vec
         let lat = if line.is_empty() { 0.0 } else { line.iter().map(|c| c[1]).sum::<f64>() / line.len() as f64 };
         let sec = 1.0 / lat.to_radians().cos().max(0.01);
         let d = dcol.as_ref().and_then(|c| p.get(c)).filter(|d| !d.is_null()).cloned().unwrap_or_else(|| u["dash"].clone());
-        p.insert("__rs_iwm".into(), json!(crate::layers::py_round(w * sec, 4)));
-        p.insert("__rs_iom".into(), o.map_or(json!(0), |o| json!(crate::layers::py_round(o * sec, 4))));
-        let mut q: crate::props::Props = p.iter().filter(|(k, _)| k.starts_with("__rs_")).map(|(k, v)| (k.as_str(), v.clone())).collect();
-        q.insert("lvl", p.get("__rs_lvl").cloned().unwrap_or(json!(0)));
-        q.insert("__rs_k", json!(5));
-        q.insert("__rs_ov", json!(i));
-        q.insert("__rs_item", json!(j));
+        p.insert(Mark::ItemWidthM.name().into(), json!(crate::layers::py_round(w * sec, 4)));
+        p.insert(Mark::ItemOffsetM.name().into(), o.map_or(json!(0), |o| json!(crate::layers::py_round(o * sec, 4))));
+        let mut q: crate::props::Props = p.iter().filter(|(k, _)| k.starts_with(mark::PREFIX)).map(|(k, v)| (k.as_str(), v.clone())).collect();
+        q.insert("lvl", p.get(Mark::ItemLvl.name()).cloned().unwrap_or(json!(0)));
+        q.insert(Mark::PieceKind.name(), json!(5));
+        q.insert(Mark::ItemOverlay.name(), json!(i));
+        q.insert(Mark::Item.name(), json!(j));
         let ic = ccol.as_ref().and_then(|c| p.get(c)).filter(|c| truthy(Some(c))).cloned().unwrap_or_else(|| or(&u["color"], &default));
-        q.insert("__rs_ic", ic);
+        q.insert(Mark::ItemColor.name(), ic);
         // the road layer's dash pattern is a text ("3,3"), as a dashed class's __rs_dash
         let dash: Vec<String> = match &d {
             Value::String(t) => t.split(',').filter_map(|x| x.trim().parse::<f64>().ok()).map(g_text).collect(),
@@ -544,7 +545,7 @@ pub fn item_pieces(ov: &mut Overlay, i: usize, look: &crate::Look) -> Result<Vec
             _ => Vec::new(),
         };
         if !dash.is_empty() {
-            q.insert("__rs_dash", json!(dash.join(",")));
+            q.insert(Mark::Dash.name(), json!(dash.join(",")));
         }
         out.push(crate::simple::Item { props: q, coords: (!line.is_empty()).then_some(line) });
     }
@@ -565,16 +566,16 @@ pub fn road_items(fc: &Value, roads: &std::collections::HashMap<String, Road>, e
     let Data::Json(fc) = &ov.data else { unreachable!("road_items makes a JSON overlay") };
     let feats = fc["features"].as_array().cloned().unwrap_or_default();
     for q in out.iter_mut() {
-        let j = q.props.get("__rs_item").and_then(Value::as_u64).unwrap_or(0) as usize;
+        let j = q.props.get(Mark::Item.name()).and_then(Value::as_u64).unwrap_or(0) as usize;
         let src = feats[j]["properties"].as_object().cloned().unwrap_or_default();
         if truthy(src.get("pick")) {
-            for (c, v) in src.iter().filter(|(c, _)| !c.starts_with("__rs_") && *c != "pick") {
+            for (c, v) in src.iter().filter(|(c, _)| !c.starts_with(mark::PREFIX) && *c != "pick") {
                 q.props.insert(c, v.clone());
             }
-            q.props.insert("__rs_pick", json!(true));
+            q.props.insert(Mark::Pick.name(), json!(true));
         }
         if let Some(z) = src.get("minzoom").and_then(Value::as_f64).filter(|z| z.is_finite()) {
-            q.props.insert("__rs_imz", json!(z));
+            q.props.insert(Mark::ItemMinZoom.name(), json!(z));
         }
     }
     Ok(out)

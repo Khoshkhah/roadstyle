@@ -323,7 +323,7 @@ pub fn write_source_file<W: std::io::Write + Send>(s: &sources::Sources, file: &
             geometry: r.line().filter(|_| lines).map(Geometry::Line),
         }), true).map_err(crate::Error::from),
         Src::Simple(p) => roadstyle_io::write::parquet_to(w, || p.features(&s.roads.roads).map(|(id, props, c)| PqRow {
-            id: Some(id as i64), props: props.into_iter().map(|(k, v)| (k.into(), Val::Json(v))).collect(), geometry: c.map(Geometry::Line),
+            id: Some(id as i64), props: props.into_iter().map(|(k, v)| (k, Val::Json(v))).collect(), geometry: c.map(Geometry::Line),
         }), true).map_err(crate::Error::from),
         Src::Json(v) => {
             let fs = v["data"]["features"].as_array().map(Vec::as_slice).unwrap_or_default();

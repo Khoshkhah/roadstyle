@@ -1603,7 +1603,6 @@ version = "0.25.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
- "roadstyle-assets",
  "roadstyle-levels",
  "rstar",
  "serde",

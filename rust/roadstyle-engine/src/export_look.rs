@@ -2,6 +2,7 @@
 //! plugin): MapLibre layers with no source that read the raw duckOSM columns, one casing and one fill layer per position, the arrows and
 //! the names, the hover layer, the popup, the outline of the area.
 
+use roadstyle_model::mark::Mark;
 use crate::layers::{by_feature, label_readable_filter, label_size_expr, minzoom_filter, swap, Exprs};
 use roadstyle_look::color;
 use roadstyle_model::flags;
@@ -30,7 +31,7 @@ pub fn export_look(look: &crate::Look, cols: &LookCols, positions: &[i64]) -> Re
     let two = json!(["!", flags::maplibre_yes(json!(["get", cols.oneway]))]);
     let tun = flags::maplibre_yes(json!(["get", cols.tunnel]));
     let bri = flags::maplibre_yes(json!(["get", cols.bridge]));
-    let tw = json!(["to-boolean", ["get", "__rs_twoway"]]);
+    let tw = json!(["to-boolean", ["get", Mark::Twoway.name()]]);
     let fb = &t["roads"]["fallback"];
     let towards = cfg["tunnel_towards"].as_object().cloned().unwrap_or_default();
     let toward = &cfg["tunnel_toward"];

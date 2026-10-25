@@ -2,6 +2,7 @@
 //! render_web.render bake as `__rs_*` properties, as typed fields. `Draw::marks` gives them by their property names, in the order that
 //! the stages set them, so the output text is the text of the old properties.
 
+use roadstyle_model::mark::Mark;
 use roadstyle_model::{Cell, RoadKey};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -41,6 +42,8 @@ impl Cap {
 pub struct Values {
     list: Vec<Value>,
     at: HashMap<String, u32>,
+    /// the property of each colour option's fill (mark::option_fill; colors::bake sets them)
+    pub fill_names: Vec<String>,
 }
 
 impl Values {
@@ -61,7 +64,7 @@ impl Values {
 }
 
 /// The names of the eight style values of bake_props, in its order.
-pub const STYLE: [&str; 8] = ["__rs_fill", "__rs_w", "__rs_op", "__rs_dash", "__rs_casing", "__rs_cw", "__rs_cop", "__rs_class"];
+pub const STYLE: [&str; 8] = [Mark::Fill.name(), Mark::Width.name(), Mark::Opacity.name(), Mark::Dash.name(), Mark::Casing.name(), Mark::CasingWidth.name(), Mark::CasingOpacity.name(), Mark::StyleClass.name()];
 
 /// One road's drawing values. None (or false for a flag): the stage did not set the property.
 #[derive(Clone, Debug, Default)]
@@ -105,72 +108,72 @@ pub struct Draw {
 
 impl Draw {
     /// The properties of the road, by name and in the stages' order.
-    pub fn marks<'a>(&'a self, values: &'a Values) -> Vec<(&'static str, Cell<'a>)> {
-        let mut out: Vec<(&'static str, Cell<'a>)> = Vec::with_capacity(32);
+    pub fn marks<'a>(&'a self, values: &'a Values) -> Vec<(&'a str, Cell<'a>)> {
+        let mut out: Vec<(&'a str, Cell<'a>)> = Vec::with_capacity(32);
         let id = |i: u32| Cell::Json(values.get(i));
         if let Some(a) = self.access {
-            out.push(("__rs_access", a.map_or(Cell::Null, Cell::Str)));
+            out.push((Mark::Access.name(), a.map_or(Cell::Null, Cell::Str)));
         }
         if let Some(c) = self.color {
-            out.push(("__rs_color", id(c)));
+            out.push((Mark::Color.name(), id(c)));
         }
         if let Some(s) = self.style {
             out.extend(STYLE.iter().zip(s).map(|(k, v)| (*k, id(v))));
         }
         for (i, &f) in self.fills.iter().enumerate() {
-            out.push((fill_name(i + 1), id(f)));
+            out.push((values.fill_names[i + 1].as_str(), id(f)));
         }
         let int = |v: i64| Cell::Int(v);
         let flag = |out: &mut Vec<_>, k, v: Option<bool>| if let Some(b) = v { out.push((k, Cell::Bool(b))) };
-        flag(&mut out, "__rs_twoway", self.twoway);
-        flag(&mut out, "__rs_oneway", self.oneway);
+        flag(&mut out, Mark::Twoway.name(), self.twoway);
+        flag(&mut out, Mark::Oneway.name(), self.oneway);
         if self.dup {
-            out.push(("__rs_dup", Cell::Bool(true)));
+            out.push((Mark::Dup.name(), Cell::Bool(true)));
         }
         if let Some(e) = self.edge2 {
-            out.push(("__rs_edge2", int(e.get() as i64)));
+            out.push((Mark::Edge2.name(), int(e.get() as i64)));
         }
         if let Some(l) = self.lvl {
             out.push(("lvl", int(l)));
         }
-        flag(&mut out, "__rs_bridge", self.bridge);
-        flag(&mut out, "__rs_tunnel", self.tunnel);
-        let caps = |out: &mut Vec<(&'static str, Cell<'a>)>| {
+        flag(&mut out, Mark::Bridge.name(), self.bridge);
+        flag(&mut out, Mark::Tunnel.name(), self.tunnel);
+        let caps = |out: &mut Vec<(&'a str, Cell<'a>)>| {
             if let Some(c) = self.cap {
-                out.push(("__rs_cap", c.cell()));
+                out.push((Mark::Cap.name(), c.cell()));
             }
             if let Some([a, b]) = self.split {
-                out.extend([("__rs_cap0", a.cell()), ("__rs_cap1", b.cell()), ("__rs_split", Cell::Bool(true))]);
+                out.extend([(Mark::Cap0.name(), a.cell()), (Mark::Cap1.name(), b.cell()), (Mark::Split.name(), Cell::Bool(true))]);
             }
         };
         if !self.caps_late {
             caps(&mut out);
         }
         if let Some(h) = self.head_start {
-            out.push(("__rs_hs", Cell::Float(h)));
+            out.push((Mark::HeadStart.name(), Cell::Float(h)));
         }
         if let Some(h) = self.head_end {
-            out.push(("__rs_he", Cell::Float(h)));
+            out.push((Mark::HeadEnd.name(), Cell::Float(h)));
         }
         if let Some([cl, fl, cs, ce]) = self.levels {
-            out.extend([("__rs_cl", int(cl)), ("__rs_fl", int(fl)), ("__rs_cs", int(cs)), ("__rs_ce", int(ce)), ("__rs_band", int(0))]);
+            out.extend([(Mark::CasingLevel.name(), int(cl)), (Mark::FillLevel.name(), int(fl)), (Mark::CasingStart.name(), int(cs)), (Mark::CasingEnd.name(), int(ce)), (Mark::Band.name(), int(0))]);
         }
         if let Some(t) = self.twin {
-            out.push(("__rs_twin", int(t as i64)));
+            out.push((Mark::Twin.name(), int(t as i64)));
         }
         if self.caps_late {
             caps(&mut out);
         }
-        for (k, v) in [("__rs_wm", self.width_m), ("__rs_cm", self.casing_m), ("__rs_twm", self.twin_width_m)] {
+        for (k, v) in [(Mark::WidthM.name(), self.width_m), (Mark::CasingM.name(), self.casing_m), (Mark::TwinWidthM.name(), self.twin_width_m)] {
             if let Some(v) = v {
                 out.push((k, Cell::Float(v)));
             }
         }
         if let Some(e) = self.edge {
-            out.push(("__rs_edge", int(e.get() as i64)));
+            out.push((Mark::Edge.name(), int(e.get() as i64)));
         }
         if let Some(c) = self.cls {
-            out.push(("__rs_cls", id(c)));
+            out.push((Mark::Class.name(), id(c)));
         }
         out
     }
@@ -180,43 +183,39 @@ impl Draw {
         let id = |i: u32| Cell::Json(values.get(i));
         let b = |v: Option<bool>| v.map(Cell::Bool);
         let caps = self.split;
-        match k {
-            "__rs_access" => self.access.map(|a| a.map_or(Cell::Null, Cell::Str)),
-            "__rs_color" => self.color.map(id),
-            "__rs_twoway" => b(self.twoway),
-            "__rs_oneway" => b(self.oneway),
-            "__rs_dup" => self.dup.then_some(Cell::Bool(true)),
-            "__rs_edge2" => self.edge2.map(|e| Cell::Int(e.get() as i64)),
-            "lvl" => self.lvl.map(Cell::Int),
-            "__rs_bridge" => b(self.bridge),
-            "__rs_tunnel" => b(self.tunnel),
-            "__rs_cap" => self.cap.map(Cap::cell),
-            "__rs_cap0" => caps.map(|c| c[0].cell()),
-            "__rs_cap1" => caps.map(|c| c[1].cell()),
-            "__rs_split" => caps.map(|_| Cell::Bool(true)),
-            "__rs_hs" => self.head_start.map(Cell::Float),
-            "__rs_he" => self.head_end.map(Cell::Float),
-            "__rs_cl" | "__rs_fl" | "__rs_cs" | "__rs_ce" | "__rs_band" => self.levels.map(|[cl, fl, cs, ce]| Cell::Int(match k {
-                "__rs_cl" => cl, "__rs_fl" => fl, "__rs_cs" => cs, "__rs_ce" => ce, _ => 0,
-            })),
-            "__rs_twin" => self.twin.map(|t| Cell::Int(t as i64)),
-            "__rs_wm" => self.width_m.map(Cell::Float),
-            "__rs_cm" => self.casing_m.map(Cell::Float),
-            "__rs_twm" => self.twin_width_m.map(Cell::Float),
-            "__rs_edge" => self.edge.map(|e| Cell::Int(e.get() as i64)),
-            "__rs_cls" => self.cls.map(id),
-            _ => {
-                if let Some(i) = STYLE.iter().position(|s| *s == k) {
-                    return self.style.map(|s| id(s[i]));
-                }
-                let n: usize = k.strip_prefix("__rs_fill__")?.parse().ok()?;
-                self.fills.get(n.checked_sub(1)?).map(|&f| id(f))
-            }
+        let lv = |i: usize| self.levels.map(|l| Cell::Int(l[i]));
+        let Some(m) = Mark::of(k) else {
+            let n = roadstyle_model::mark::option_of_fill(k)?;
+            return self.fills.get(n.checked_sub(1)?).map(|&f| id(f));
+        };
+        match m {
+            Mark::Access => self.access.map(|a| a.map_or(Cell::Null, Cell::Str)),
+            Mark::Color => self.color.map(id),
+            Mark::Twoway => b(self.twoway),
+            Mark::Oneway => b(self.oneway),
+            Mark::Dup => self.dup.then_some(Cell::Bool(true)),
+            Mark::Edge2 => self.edge2.map(|e| Cell::Int(e.get() as i64)),
+            Mark::Lvl => self.lvl.map(Cell::Int),
+            Mark::Bridge => b(self.bridge),
+            Mark::Tunnel => b(self.tunnel),
+            Mark::Cap => self.cap.map(Cap::cell),
+            Mark::Cap0 => caps.map(|c| c[0].cell()),
+            Mark::Cap1 => caps.map(|c| c[1].cell()),
+            Mark::Split => caps.map(|_| Cell::Bool(true)),
+            Mark::HeadStart => self.head_start.map(Cell::Float),
+            Mark::HeadEnd => self.head_end.map(Cell::Float),
+            Mark::CasingLevel => lv(0),
+            Mark::FillLevel => lv(1),
+            Mark::CasingStart => lv(2),
+            Mark::CasingEnd => lv(3),
+            Mark::Band => self.levels.map(|_| Cell::Int(0)),
+            Mark::Twin => self.twin.map(|t| Cell::Int(t as i64)),
+            Mark::WidthM => self.width_m.map(Cell::Float),
+            Mark::CasingM => self.casing_m.map(Cell::Float),
+            Mark::TwinWidthM => self.twin_width_m.map(Cell::Float),
+            Mark::Edge => self.edge.map(|e| Cell::Int(e.get() as i64)),
+            Mark::Class => self.cls.map(id),
+            m => STYLE.iter().position(|s| *s == m.name()).and_then(|i| self.style.map(|s| id(s[i]))),
         }
     }
-}
-
-/// The property of a colour option's fill (option 0: __rs_fill), as the one copy of the property names (props::intern).
-pub fn fill_name(i: usize) -> &'static str {
-    if i == 0 { "__rs_fill" } else { roadstyle_model::props::intern(&format!("__rs_fill__{i}")) }
 }

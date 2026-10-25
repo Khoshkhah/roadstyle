@@ -3,6 +3,7 @@
 //! CategoricalStyler, NumericStyler, ColorTableStyler, bake_props, bake_color_options, build_styler), of render_edges' color_table step,
 //! and of render_web.render's colouring. The ramps (colors.py's ColorRamp) are the look's (roadstyle-look `Ramp`).
 
+use roadstyle_model::mark::Mark;
 use crate::road::Roads;
 use crate::roads::Look;
 use roadstyle_model::Cell;
@@ -252,7 +253,7 @@ pub fn bake(fs: &mut Roads, look: &Look, args: &Value) -> Result<Colors, crate::
             let c = fs.get(i, key).and_then(|k| t.get(&py_str(k))).cloned().unwrap_or(Value::Null);
             fs.draw[i].color = Some(fs.values.id(&c));
         }
-        Some(color_table(fs, look, "__rs_color"))
+        Some(color_table(fs, look, Mark::Color.name()))
     } else if get(args, "style").is_some() || get(args, "color_by").is_some() {
         Some(resolve(fs, look, &json!({"color_by": get(args, "color_by"), "colors": get(args, "colors"), "cmap": get(args, "cmap"),
                                          "vmin": get(args, "vmin"), "vmax": get(args, "vmax"), "width_by": get(args, "width_by"),
@@ -277,7 +278,7 @@ pub fn bake(fs: &mut Roads, look: &Look, args: &Value) -> Result<Colors, crate::
         let mut meta = Vec::new();
         let mut props = Vec::new();
         for (idx, (name, f)) in frames.iter().enumerate() {
-            let prop = if idx == 0 { "__rs_fill".to_string() } else { format!("__rs_fill__{idx}") };
+            let prop = roadstyle_model::mark::option_fill(idx).into_owned();
             let miss = if idx == 0 || f.missing_self { None } else { f.missing.as_ref() };
             for i in 0..fs.len() {
                 let fill = fs.values.id(if miss.is_some_and(|m| m[i]) { &base[i] } else { &f.fill[i] });
@@ -290,6 +291,7 @@ pub fn bake(fs: &mut Roads, look: &Look, args: &Value) -> Result<Colors, crate::
             meta.push(json!({"name": name, "prop": prop, "legend": f.legend.clone()}));
             props.push(prop);
         }
+        fs.values.fill_names = props.clone();
         let active = match get(args, "color_active") {
             Some(Value::Number(n)) => n.as_u64().ok_or_else(|| crate::error::options("color_active: an option's number or name"))? as usize,
             Some(Value::String(s)) => named.iter().position(|(n, _)| n == s).unwrap_or(0),
@@ -302,11 +304,11 @@ pub fn bake(fs: &mut Roads, look: &Look, args: &Value) -> Result<Colors, crate::
     // a data styler's legend as the one "colour by" entry (no menu, only the key); legend=False: none
     let meta = match &f.legend {
         Some(l) if get(args, "legend") != Some(&Value::Bool(false)) => {
-            vec![json!({"name": get(l, "title").cloned().unwrap_or_else(|| json!("data")), "prop": "__rs_fill", "legend": l})]
+            vec![json!({"name": get(l, "title").cloned().unwrap_or_else(|| json!("data")), "prop": Mark::Fill.name(), "legend": l})]
         }
         _ => Vec::new(),
     };
-    Ok(Colors { props: vec!["__rs_fill".into()], active: 0, meta })
+    Ok(Colors { props: vec![Mark::Fill.name().into()], active: 0, meta })
 }
 
 #[cfg(test)]

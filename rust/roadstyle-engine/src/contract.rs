@@ -3,6 +3,7 @@
 //! `roadstyle:controls` the options of rsDashboard that come from the style (render_web.render's `page`: the filter panel, the overlays,
 //! the tunnel look, the road fill, the arrows' rules, ...). The page's own options (the base maps, Street View, the panel) are not here.
 
+use roadstyle_model::mark::Mark;
 use crate::layers::{Model, PageInfo};
 use crate::road::{Road, Roads};
 use roadstyle_model::Cell;
@@ -53,7 +54,7 @@ fn filter_panel(look: &crate::Look, roads: &Roads, m: &Model) -> Value {
     let col = args["filter_col"].as_str().or_else(|| args["highway_col"].as_str()).filter(|c| !c.is_empty()).unwrap_or("highway");
     let (mut classes, mut seen, mut swatches, mut by_access) = (Vec::<String>::new(), std::collections::HashSet::new(), Map::new(),
                                                                std::collections::HashSet::new());
-    let restricted = |p: Road| p.get("__rs_access").map(Cell::to_value).is_some_and(|a| !a.is_null() && a != false && a != "");
+    let restricted = |p: Road| p.get(Mark::Access.name()).map(Cell::to_value).is_some_and(|a| !a.is_null() && a != false && a != "");
     for p in roads.iter() {
         let cls = p.cls();
         let Some(c) = cls.as_str().filter(|c| !c.is_empty()) else { continue };
@@ -66,13 +67,13 @@ fn filter_panel(look: &crate::Look, roads: &Roads, m: &Model) -> Value {
             if restricted(p) {
                 by_access.insert(c.to_string());
             }
-            swatches.insert(c.into(), p.get("__rs_fill").filter(|v| crate::layers::py_truth(*v)).map_or_else(|| fb_fill.clone(), Cell::to_value));
+            swatches.insert(c.into(), p.get(Mark::Fill.name()).filter(|v| crate::layers::py_truth(*v)).map_or_else(|| fb_fill.clone(), Cell::to_value));
         }
     }
     classes.sort_by(|a, b| m.z_of(b).total_cmp(&m.z_of(a)).then_with(|| a.cmp(b)));
     let mut access = Vec::new();
     if args["access_col"].as_str().is_some_and(|c| !c.is_empty()) {
-        let n = |k: &str| roads.iter().filter(|f| f.get("__rs_access").and_then(Cell::as_str) == Some(k)).count();
+        let n = |k: &str| roads.iter().filter(|f| f.get(Mark::Access.name()).and_then(Cell::as_str) == Some(k)).count();
         access = ACCESS.iter().filter(|(k, _)| n(k) > 0).map(|(k, label)| json!([k, look.theme["access"][*k], label, n(k)])).collect();
         // driving's pedestrian streets that cars may not use have their own row: where no usable road is of the class, a class row would
         // be a second switch for them

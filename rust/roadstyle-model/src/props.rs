@@ -1,44 +1,20 @@
 //! The properties of a road or a piece, and the typed features of the sources `roads` and `simple` (docs/design/rust_engine.md, step 3).
-//! `Props` has the methods of serde_json's `Map` with `preserve_order` (an insert of a key that is there keeps its place), but each key
-//! name is kept once for the whole program: an entry is about 48 bytes, not about 100. A `Feat` keeps its line as numbers, not as JSON
+//! `Props` has the methods of serde_json's `Map` with `preserve_order` (an insert of a key that is there keeps its place); a mark's key is
+//! its static name, with no copy (R17: no global table of names). A `Feat` keeps its line as numbers, not as JSON
 //! arrays. The JSON text they write is byte for byte the text of the same tree of `serde_json::Value`.
 
 use serde_json::{Map, Value};
-use std::collections::HashSet;
-use std::sync::{Mutex, OnceLock};
+use std::borrow::Cow;
 
-fn names() -> &'static Mutex<HashSet<&'static str>> {
-    static NAMES: OnceLock<Mutex<HashSet<&'static str>>> = OnceLock::new();
-    NAMES.get_or_init(Default::default)
-}
+/// A key: a mark's name (static, no copy) or another name (a user's column, a palette's copy, an overlay's field).
+pub type Key = Cow<'static, str>;
 
-thread_local! {
-    /// this thread's names already looked up (audit R11: the global lock only for a name that the thread has not seen)
-    static SEEN: std::cell::RefCell<std::collections::HashMap<Box<str>, &'static str>> = Default::default();
-}
-
-/// The one copy of a key name (made the first time; a program has some hundred names).
-pub fn intern(k: &str) -> &'static str {
-    if let Some(s) = SEEN.with(|m| m.borrow().get(k).copied()) {
-        return s;
-    }
-    let s = {
-        let mut t = names().lock().unwrap();
-        match t.get(k) {
-            Some(&s) => s,
-            None => {
-                let s: &'static str = Box::leak(k.into());
-                t.insert(s);
-                s
-            }
-        }
-    };
-    SEEN.with(|m| m.borrow_mut().insert(k.into(), s));
-    s
+fn key(k: &str) -> Key {
+    crate::mark::Mark::of(k).map_or_else(|| Cow::Owned(k.to_string()), |m| Cow::Borrowed(m.name()))
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Props(Vec<(&'static str, Value)>);
+pub struct Props(Vec<(Key, Value)>);
 
 impl Props {
     /// A key's place: by its text, with no lock (audit R11).
@@ -67,7 +43,7 @@ impl Props {
         match self.at(k) {
             Some(i) => Some(std::mem::replace(&mut self.0[i].1, v)),
             None => {
-                self.0.push((intern(k), v));
+                self.0.push((key(k), v));
                 None
             }
         }
@@ -80,7 +56,7 @@ impl Props {
             self.0.remove(j);
             return self.rename(from, to);
         }
-        self.0[i].0 = intern(to);
+        self.0[i].0 = key(to);
         true
     }
 
@@ -92,8 +68,8 @@ impl Props {
         self.0.iter_mut().map(|(_, v)| v)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&'static str, &Value)> {
-        self.0.iter().map(|(k, v)| (*k, v))
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &Value)> {
+        self.0.iter().map(|(k, v)| (k.as_ref(), v))
     }
 
     /// The same properties as a JSON object.
@@ -108,7 +84,7 @@ impl Props {
             if i > 0 {
                 out.push(b',');
             }
-            serde_json::to_writer(&mut *out, k).unwrap();
+            serde_json::to_writer(&mut *out, k.as_ref()).unwrap();
             out.push(b':');
             serde_json::to_writer(&mut *out, &crate::table::JsSafe(v)).unwrap();
         }
@@ -136,34 +112,31 @@ impl<K: AsRef<str>> FromIterator<(K, Value)> for Props {
 }
 
 impl IntoIterator for Props {
-    type Item = (&'static str, Value);
-    type IntoIter = std::vec::IntoIter<(&'static str, Value)>;
+    type Item = (Key, Value);
+    type IntoIter = std::vec::IntoIter<(Key, Value)>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-/// The page's declaration (roadstyle-assets: static/dashboard/reads.json): the properties that its dashboard modules read on a drawn
-/// feature (`pieces`) and on a row of the road table (`table`).
-pub const PAGE_READS: &str = roadstyle_assets::text!("static/dashboard/reads.json");
-
-fn declared(part: &str) -> Vec<String> {
-    let v: Value = serde_json::from_str(PAGE_READS).expect("reads.json is JSON");
-    v[part].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect()
-}
-
-/// The properties of a drawn feature that the page's modules read (PAGE_READS's `pieces`).
+/// The properties of a drawn feature that the page's modules read (mark.rs: the marks and columns of `Kind::Pieces`).
 pub fn page_reads() -> Vec<String> {
-    declared("pieces")
+    crate::mark::page_reads(crate::mark::Kind::Pieces)
 }
 
 /// A property of a road that the road table keeps (R1): every public field (the popup, the tooltip, an app's click), the stage
-/// values that the page's modules read on a row (PAGE_READS's `table`), and the fills (`__rs_fill*`: the filter's swatches of a view's
+/// values that the page's modules read on a row (`Kind::Table`), and the fills (`__rs_fill*`: the filter's swatches of a view's
 /// palette).
 pub fn table_keeps(k: &str) -> bool {
-    static TABLE: std::sync::OnceLock<std::collections::HashSet<String>> = std::sync::OnceLock::new();
-    !k.starts_with("__rs_") || k.starts_with("__rs_fill") || TABLE.get_or_init(|| declared("table").into_iter().collect()).contains(k)
+    use crate::mark::{Kind, Mark};
+    if !k.starts_with(crate::mark::PREFIX) {
+        return true;            // a user's column (also one named like a slot's mark: rank, chain), and lvl
+    }
+    if crate::mark::is_fill(k) {
+        return true;
+    }
+    Mark::of(k).is_some_and(|m| m.page_reads().contains(&Kind::Table))
 }
 
 /// The feature properties that the expressions of `v` read: `["get", name]` and `["has", name]` (the forms with an object, `["get",

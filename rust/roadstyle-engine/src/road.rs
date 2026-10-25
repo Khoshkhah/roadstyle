@@ -3,6 +3,7 @@
 //! its mark, else its column: a mark takes the place of a column of the same name, as a dict's assignment does in Python. The output
 //! writes the columns in their order and then the other marks, so the text is the text of the old JSON object of each road.
 
+use roadstyle_model::mark;
 use crate::draw::{Draw, Values};
 use crate::props::Get;
 use roadstyle_model::topology::Topology;
@@ -178,7 +179,7 @@ pub fn row_of(key: u64) -> Option<usize> {
 
 /// The name of a kept column (a column with an engine name that is not the named one) while the engine runs.
 pub fn kept(own: &str) -> String {
-    format!("__rs_kept_{own}")
+    format!("{}{own}", mark::KEPT)
 }
 
 impl RoadsSource {
@@ -187,14 +188,14 @@ impl RoadsSource {
         if let Some((_, user)) = self.names.iter().find(|(own, _)| *own == k) {
             return user;
         }
-        k.strip_prefix("__rs_kept_").and_then(|o| self.names.iter().find(|(own, _)| *own == o)).map_or(k, |(own, _)| own)
+        k.strip_prefix(mark::KEPT).and_then(|o| self.names.iter().find(|(own, _)| *own == o)).map_or(k, |(own, _)| own)
     }
 
     /// A road's properties with the output's names, as the roads source writes them in every form (GeoJSON, GeoParquet, tiles): its
     /// fields that `keep` takes (None: all), and the stage values that are read (R1: `read`).
     pub fn props<'a>(&'a self, r: Road<'a>, keep: Option<&'a std::collections::HashSet<String>>) -> impl Iterator<Item = (&'a str, Cell<'a>)> + 'a {
         r.iter().map(|(k, c)| (self.out_name(k), c)).filter(move |(k, _)| {
-            if k.starts_with("__rs_") { self.read.as_ref().is_none_or(|s| s.contains(*k)) } else { keep.is_none_or(|s| s.contains(*k)) }
+            if k.starts_with(mark::PREFIX) { self.read.as_ref().is_none_or(|s| s.contains(*k)) } else { keep.is_none_or(|s| s.contains(*k)) }
         })
     }
 

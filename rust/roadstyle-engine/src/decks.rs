@@ -2,6 +2,7 @@
 //! with shapely (GEOS buffers and offset curves); this module makes the same strips with its own mitre offsets, so a polygon can have
 //! other vertices than GEOS gives, but it covers the same ground (tests/test_engine_parity.py compares them by shape).
 
+use roadstyle_model::mark::Mark;
 use crate::layers::{py_round, py_truth, Model};
 use crate::road::Roads;
 use roadstyle_model::Cell;
@@ -124,12 +125,12 @@ pub fn bridge_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str) -> Vec<Va
     for (fi, p) in roads.iter().enumerate() {
         let Some(c) = p.line() else { continue };
         let lvl = p.get("lvl").and_then(Cell::as_f64).unwrap_or(0.0);
-        if !p.get("__rs_bridge").is_some_and(py_truth) || lvl < 1.0 || c.len() < 2 {
+        if !p.get(Mark::Bridge.name()).is_some_and(py_truth) || lvl < 1.0 || c.len() < 2 {
             continue;
         }
         let [a, z] = roads.topo().ends[fi].expect("a line of two points or more").map(|n| { let q = roads.topo().points[n as usize]; (q[0], q[1]) });
         pair_edges.entry(key(a, z)).or_default().push(fi);
-        if (p.get("__rs_twoway").is_some_and(py_truth) && lt((z, a), (a, z))) || p.get("__rs_dup").is_some_and(py_truth) {
+        if (p.get(Mark::Twoway.name()).is_some_and(py_truth) && lt((z, a), (a, z))) || p.get(Mark::Dup.name()).is_some_and(py_truth) {
             continue;
         }
         reps.push(Rep { a, z, c, fi });
@@ -245,7 +246,7 @@ pub fn bridge_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str) -> Vec<Va
             let t = t * t * (3.0 - 2.0 * t);
             // one ribbon per directed edge: a two-way bridge is two half-width ribbons side by side (the edge with the chain on the right)
             let mut ribbons: Vec<(Vec<P>, Option<usize>)> = Vec::new();
-            if pprops.get("__rs_twoway").is_some_and(py_truth) && ffi.is_some() && rfi.is_some() {
+            if pprops.get(Mark::Twoway.name()).is_some_and(py_truth) && ffi.is_some() && rfi.is_some() {
                 for (dlt, fdir) in [(-1.0, ffi), (1.0, rfi)] {
                     ribbons.push((strip(&part, 0.0, dlt * half), fdir));
                 }
@@ -260,11 +261,11 @@ pub fn bridge_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str) -> Vec<Va
                     continue;
                 }
                 let mut props: Map<String, Value> = match fdir { Some(f) => roads.road(*f).to_map(), None => pprops.to_map() };
-                props.shift_remove("__rs_cls");          // Python marks the class (_mark_cls) after it makes the decks
-                props.insert("__rs_base".into(), json!(py_round(base_m * t, 2)));
-                props.insert("__rs_height".into(), json!(py_round(base_m * t + thick, 2)));
-                props.insert("__rs_chain".into(), json!(chain_i));
-                props.insert("__rs_edges".into(), json!(fdir.iter().map(|&r| crate::road::key(r).get()).collect::<Vec<_>>()));
+                props.shift_remove(Mark::Class.name());          // Python marks the class (_mark_cls) after it makes the decks
+                props.insert(Mark::DeckBase.name().into(), json!(py_round(base_m * t, 2)));
+                props.insert(Mark::DeckHeight.name().into(), json!(py_round(base_m * t + thick, 2)));
+                props.insert(Mark::DeckChain.name().into(), json!(chain_i));
+                props.insert(Mark::Edges.name().into(), json!(fdir.iter().map(|&r| crate::road::key(r).get()).collect::<Vec<_>>()));
                 feats.push(json!({"type": "Feature", "properties": props, "geometry": {"type": "Polygon", "coordinates": [to_lonlat(ring)]}}));
             }
             // the casing: a strip along each long side of the deck, up to just under the deck's top (an extrusion has no outline)
@@ -279,9 +280,9 @@ pub fn bridge_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str) -> Vec<Va
                         continue;
                     }
                     feats.push(json!({"type": "Feature", "properties": {
-                        "highway": pprops.get(hw).map_or(Value::Null, Cell::to_value), "__rs_chain": chain_i, "__rs_casing_slab": 1,
-                        "__rs_edges": edges.iter().map(|&r| crate::road::key(r).get()).collect::<Vec<_>>(), "__rs_base": py_round((base_m * t - 0.5).max(0.0), 2),
-                        "__rs_height": py_round(base_m * t + thick * 0.35, 2)},
+                        "highway": pprops.get(hw).map_or(Value::Null, Cell::to_value), Mark::DeckChain.name(): chain_i, Mark::CasingSlab.name(): 1,
+                        Mark::Edges.name(): edges.iter().map(|&r| crate::road::key(r).get()).collect::<Vec<_>>(), Mark::DeckBase.name(): py_round((base_m * t - 0.5).max(0.0), 2),
+                        Mark::DeckHeight.name(): py_round(base_m * t + thick * 0.35, 2)},
                         "geometry": {"type": "Polygon", "coordinates": [to_lonlat(&ring)]}}));
                 }
             }

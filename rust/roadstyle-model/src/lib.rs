@@ -9,6 +9,7 @@ pub mod feature_table;
 pub mod flags;
 pub mod geom;
 pub mod key;
+pub mod mark;
 pub mod props;
 pub mod table;
 pub mod topology;

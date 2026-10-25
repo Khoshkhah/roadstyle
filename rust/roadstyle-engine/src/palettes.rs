@@ -5,6 +5,7 @@
 //! `rs_palette`). A palette holds only colours: other layers or other features are an error.
 
 use crate::road::{Extra, Roads};
+use roadstyle_model::mark;
 use crate::simple::SimpleSource;
 use crate::sources::Sources;
 use crate::Src;
@@ -120,7 +121,7 @@ fn roads(base: &mut Roads, cp: &Roads, n: &str) -> Vec<String> {
     }
     for k in &keys {
         let vals = (0..cp.len()).map(|i| cp.road(i).get(k).map(Cell::to_value)).collect();
-        base.extra.push(Extra { name: format!("{k}@{n}"), key: k.clone(), vals });
+        base.extra.push(Extra { name: mark::in_palette(k, n), key: k.clone(), vals });
     }
     keys
 }
@@ -157,7 +158,7 @@ fn simple(b: &mut SimpleSource, c: &SimpleSource, roads: &Roads, cp: &Roads, fro
     for ((_, bi), (_, ci)) in b.items.iter_mut().zip(&c.items) {
         for k in &keys {
             if let Some(v) = ci.props.get(k) {
-                bi.props.insert(&format!("{k}@{n}"), v.clone());
+                bi.props.insert(&mark::in_palette(k, n), v.clone());
             }
         }
     }
@@ -184,7 +185,7 @@ fn features(b: &mut [Value], c: &[Value], n: &str) -> Vec<String> {
         if let Some(p) = bf["properties"].as_object_mut() {
             for k in &keys {
                 if let Some(v) = cp.get(k) {
-                    p.insert(format!("{k}@{n}"), v.clone());
+                    p.insert(mark::in_palette(k, n), v.clone());
                 }
             }
         }
@@ -238,7 +239,7 @@ fn pick(e: &mut Value, differ: &[(String, Vec<String>)]) {
             for p in ps {
                 if !seen.contains(&p) {
                     seen.push(p);
-                    m.extend([json!(p), json!(["get", format!("{k}@{p}")])]);
+                    m.extend([json!(p), json!(["get", mark::in_palette(k, p)])]);
                 }
             }
             m.push(e.clone());

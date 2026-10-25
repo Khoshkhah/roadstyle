@@ -6,6 +6,7 @@
 //! (the first nearest segment wins a tie; lengths along a line are sums of `sqrt(dx * dx + dy * dy)`). Intersection points are not computed
 //! with GEOS's arithmetic, so a slot can differ from Python's by a rounding step of its 6 decimals.
 
+use roadstyle_model::mark::Mark;
 use crate::road::Roads;
 use crate::roads::truthy;
 use roadstyle_model::Cell;
@@ -202,20 +203,20 @@ pub fn slots_source(roads: &Roads, look: &SlotLook) -> Value {
     let mut reps: Vec<Rep> = Vec::new();
     for (i, a, z) in lines {
         let p = roads.road(i);
-        if truthy(p.get("__rs_dup")) {
+        if truthy(p.get(Mark::Dup.name())) {
             continue;
         }
         let ck = class_key(hw_of(i));
         let twin = by_ends.get(&(z.0, a.0, ck.clone())).copied();
-        if truthy(p.get("__rs_twoway")) {
-            let q_one = twin.is_some_and(|j| truthy(roads.get(j, "__rs_oneway")));
-            let mine = (!truthy(p.get("__rs_oneway")), a.1, z.1);
+        if truthy(p.get(Mark::Twoway.name())) {
+            let q_one = twin.is_some_and(|j| truthy(roads.get(j, Mark::Oneway.name())));
+            let mine = (!truthy(p.get(Mark::Oneway.name())), a.1, z.1);
             let other = (!q_one, z.1, a.1);
             if other.partial_cmp(&mine) == Some(std::cmp::Ordering::Less) {
                 continue;
             }
         }
-        let partner = if truthy(p.get("__rs_twoway")) { twin } else { p.get("__rs_edge2").and_then(Cell::as_u64).and_then(crate::road::row_of) };
+        let partner = if truthy(p.get(Mark::Twoway.name())) { twin } else { p.get(Mark::Edge2.name()).and_then(Cell::as_u64).and_then(crate::road::row_of) };
         reps.push(Rep { a, z, c: roads.line(i).unwrap().to_vec(), p: i, owner: (i, partner) });
     }
 
@@ -225,9 +226,9 @@ pub fn slots_source(roads: &Roads, look: &SlotLook) -> Value {
         let p = roads.road(rep.p);
         let name = p.get("name").and_then(Cell::as_str).filter(|s| !s.is_empty()).map(String::from);
         let lvl = p.get("lvl").map_or(json!(0), Cell::to_value);
-        let one = truthy(p.get("__rs_oneway"));
-        let fl = p.get("__rs_fl").map_or(Value::Null, Cell::to_value);
-        let tun = truthy(p.get("__rs_tunnel"));
+        let one = truthy(p.get(Mark::Oneway.name()));
+        let fl = p.get(Mark::FillLevel.name()).map_or(Value::Null, Cell::to_value);
+        let tun = truthy(p.get(Mark::Tunnel.name()));
         let key = json!([name, lvl, one as u8, class_key(hw_of(rep.p)), fl, tun]).to_string();
         groups.entry(key).or_insert_with(|| (name, lvl, one, fl, tun, Vec::new())).5.push(r);
     }
@@ -398,15 +399,15 @@ pub fn slots_source(roads: &Roads, look: &SlotLook) -> Value {
                     p.insert("highway".into(), hw.clone());
                     p.insert("oneway".into(), (*oneway as u8).into());
                     p.insert("lvl".into(), lvl.clone());
-                    p.insert("__rs_edge".into(), crate::road::key(road).get().into());
+                    p.insert(Mark::Edge.name().into(), crate::road::key(road).get().into());
                     if let Some(t) = twin {
-                        p.insert("__rs_edge2".into(), crate::road::key(t).get().into());
+                        p.insert(Mark::Edge2.name().into(), crate::road::key(t).get().into());
                     }
                     if !fl.is_null() {
                         p.insert("fl".into(), fl.clone());
                     }
                     if *tun {
-                        p.insert("__rs_tunnel".into(), true.into());
+                        p.insert(Mark::Tunnel.name().into(), true.into());
                     }
                     feats.push(crate::obj([("type", "Feature".into()), ("properties", Value::Object(p)),
                                            ("geometry", crate::obj([("type", "LineString".into()), ("coordinates", json!(coords))]))]));
@@ -417,10 +418,10 @@ pub fn slots_source(roads: &Roads, look: &SlotLook) -> Value {
     // _mark_cls, then the export: number the arrow slots (the odd ones, else the chain's only slot) of each one-way chain (render_web's
     // order: __rs_cls before __rs_arw)
     for f in feats.iter_mut() {
-        let e = f["properties"]["__rs_edge"].as_u64().and_then(crate::road::row_of).expect("a slot has its road's key");
-        f["properties"]["__rs_cls"] = roads.road(e).cls();
-        if let Some(a) = roads.get(e, "__rs_access").filter(|a| !a.is_null()) {      // access_col: the same for the names and arrows
-            f["properties"]["__rs_access"] = a.to_value();
+        let e = f["properties"][Mark::Edge.name()].as_u64().and_then(crate::road::row_of).expect("a slot has its road's key");
+        f["properties"][Mark::Class.name()] = roads.road(e).cls();
+        if let Some(a) = roads.get(e, Mark::Access.name()).filter(|a| !a.is_null()) {      // access_col: the same for the names and arrows
+            f["properties"][Mark::Access.name()] = a.to_value();
         }
     }
     let mut by_chain: IndexMap<i64, Vec<usize>> = IndexMap::new();
@@ -434,7 +435,7 @@ pub fn slots_source(roads: &Roads, look: &SlotLook) -> Value {
         let odd: Vec<usize> = ks.iter().copied().filter(|&k| feats[k]["properties"]["slot"].as_i64().unwrap() % 2 != 0).collect();
         let pick = if odd.is_empty() { ks[..1].to_vec() } else { odd };
         for (n, k) in pick.into_iter().enumerate() {
-            feats[k]["properties"]["__rs_arw"] = n.into();
+            feats[k]["properties"][Mark::SlotArrow.name()] = n.into();
         }
     }
     crate::obj([("type", "geojson".into()), ("data", crate::obj([("type", "FeatureCollection".into()), ("features", Value::Array(feats))]))])

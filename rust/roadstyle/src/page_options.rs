@@ -392,7 +392,8 @@ fn palette_swatches(style: &mut Value, props: &Value, pals: &[String], look: &Lo
     for n in pals {
         let of: Map<String, Value> = classes.iter().map(|c| {
             let r = row(c);
-            let v = r.get(format!("__rs_fill@{n}")).or_else(|| r.get("__rs_fill")).filter(|v| py_truth(v)).unwrap_or(fb);
+            let fill = roadstyle_model::mark::Mark::Fill.name();
+            let v = r.get(roadstyle_model::mark::in_palette(fill, n)).or_else(|| r.get(fill)).filter(|v| py_truth(v)).unwrap_or(fb);
             (c.as_str().unwrap_or_default().to_string(), v.clone())
         }).collect();
         out.insert(n.clone(), Value::Object(of));
@@ -406,7 +407,7 @@ fn palette_swatches(style: &mut Value, props: &Value, pals: &[String], look: &Lo
 fn tiled_page(s: &Sources, a: &Map<String, Value>) -> Result<(Value, Option<Vec<u8>>), crate::Error> {
     let hw = a.get("highway_col").and_then(Value::as_str).unwrap_or("highway");
     let col = |k: &str| a.get(k).and_then(Value::as_str).filter(|c| !c.is_empty());
-    let keep = [Some(hw), Some(col("filter_col").unwrap_or(hw)), Some("__rs_twoway"), Some("__rs_edge"), Some("lvl"), col("width_m_col")];
+    let keep = [Some(hw), Some(col("filter_col").unwrap_or(hw)), Some(roadstyle_model::mark::Mark::Twoway.name()), Some(roadstyle_model::mark::Mark::Edge.name()), Some("lvl"), col("width_m_col")];
     let mut o = TileOptions::new(&s.layers, &s.metadata, &s.saved[TILES], &s.saved[COLUMNS], &[])?;
     o.exact = Some(keep.into_iter().flatten().map(String::from).collect());
     o.only = Some(["roads", "simple", "slots"].map(String::from).to_vec());

@@ -23,13 +23,14 @@ pub mod sources;
 
 // The core has no I/O (docs/design/rust_library.md, rule 3 of the layers): the engine takes the model's types, and the readers
 // (roadstyle-io) are the facade's.
-pub use roadstyle_model::{feature_table, geom, props, table, Cell, RoadTable, Row};
+pub use roadstyle_model::{feature_table, geom, mark, props, table, Cell, RoadTable, Row};
 pub use roadstyle_model::feature_table::FeatureTable;
 pub use error::{Error, Limit, Unsupported};
 pub use road::{Road, Roads};
 pub use roadstyle_look::{self as look, Look};
 pub(crate) use roadstyle_model::obj;
 
+use roadstyle_model::mark::Mark;
 use serde_json::{json, Value};
 
 /// The most roads of one map: a browser keeps the module's memory under 4 GB. Tartu (63,965 roads) peaks at 1.13 GB natively (2.13 GB
@@ -190,7 +191,7 @@ fn style_parts(table: RoadTable, look: &Look, features: Option<FeatureTable>, pl
         let mut slots = slots;
         if !export {        // the arrow slots' numbers are for the export's thinning
             for f in slots["data"]["features"].as_array_mut().into_iter().flatten() {
-                f["properties"].as_object_mut().map(|p| p.shift_remove("__rs_arw"));
+                f["properties"].as_object_mut().map(|p| p.shift_remove(Mark::SlotArrow.name()));
             }
         }
         sources.push(("slots".into(), Src::Json(slots)));
@@ -388,7 +389,7 @@ impl ColumnMap {
                 // the 3D decks are copies of the roads' properties: the user's names, as the roads
                 Src::Json(s) if name == "decks" => {
                     for f in s["data"]["features"].as_array_mut().into_iter().flatten() {
-                        if let Some(p) = f["properties"].as_object_mut().filter(|p| !p.contains_key("__rs_casing_slab")) {
+                        if let Some(p) = f["properties"].as_object_mut().filter(|p| !p.contains_key(Mark::CasingSlab.name())) {
                             for (own, user) in &self.0 {
                                 if p.contains_key(*own) {
                                     let kept = Self::kept(own);
