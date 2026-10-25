@@ -7,6 +7,14 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`roadstyle_look::MapOptions`, the typed map options (T3 step 1, audit N32).** The keys that change the output of stage 1, in groups
+  (`columns`, `levels`, `color`, `width`, `roads`, `interaction`, `labels`, `arrows`, `tunnels`, `bridges`, `overlays`, `items`,
+  `boundary`, `base_map`, `output`; docs/design/t3_map_options_and_look.md). `MapOptions::from_json` reads the nested form: an unknown
+  key is an error with its path and the nearest known key (`"color.by_column": unknown key; did you mean "by"?`).
+  `MapOptions::from_args` reads render_edges' flat keywords (the `args` of a look of version 1) and gives the names of the other
+  keywords to the caller. Each `Look` has `map` (made from its `args`) and `other_args`; the readers move to `map` in N32 step 2. A map
+  keyword with a value of the wrong kind (for example `hover_color="#zzz"`) is now an error when the look is made.
+  `roadstyle_look::color::Color` is one colour value: "#rrggbb", "#rgb" or a CSS name, or a MapLibre colour text (`rgba(...)`).
 - **The level editor in a page with no server.** `makeArea(edges, options)` (roadstyle-wasm; `roadstyle::level_area::make_files` in
   Rust) makes a level area's roads.parquet, pairs.csv and edits.csv in memory, the same bytes as the folder form. `duckosmPlan` gives
   the query `level_edges`, the edges of a duckOSM file's level area (duckOSM's `load_roads`, the same rows and columns on Monaco). The

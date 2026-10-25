@@ -8,12 +8,14 @@
 pub mod basemap;
 pub mod color;
 mod error;
+pub mod options;
 mod png;
 mod ramp;
 mod resolve;
 pub mod widths;
 
 pub use error::Error;
+pub use options::MapOptions;
 pub use ramp::Ramp;
 pub use resolve::{make_look, theme, Options};
 pub use widths::{py_round, RoadModel};
@@ -74,6 +76,10 @@ pub struct Look {
     pub slot: SlotLook,
     /// the values of the 3D bridge decks
     pub deck: DeckLook,
+    /// the map options of `args` (MapOptions::from_args); the readers move to them in N32 step 2
+    pub map: MapOptions,
+    /// the keywords of `args` that are not map options (the page's, the host's, a misspelt one), for the caller that knows the page's keys
+    pub other_args: Vec<String>,
 }
 
 impl std::ops::Deref for Look {
@@ -95,8 +101,9 @@ impl Look {
             return Err(Error::Version { found: data.schema_version });
         }
         data.schema_version = VERSION;
+        let (map, other_args) = MapOptions::from_args(&data.args)?;
         Ok(Look { model: RoadModel::new(&data.roads_model, &data.theme["roads"], &data.args)?, road: RoadLook::new(&data)?,
-                  slot: SlotLook::new(&data)?, deck: DeckLook::new(&data.config["bridge_decks"]), data })
+                  slot: SlotLook::new(&data)?, deck: DeckLook::new(&data.config["bridge_decks"]), map, other_args, data })
     }
 
     /// A saved look (its JSON text), of version 1 or 0.

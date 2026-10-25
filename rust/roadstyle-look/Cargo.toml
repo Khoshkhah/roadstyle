@@ -15,6 +15,7 @@ yaml-rust2.workspace = true
 base64.workspace = true
 flate2 = "1"                        # the textures of the base map: PNG images
 crc32fast = "1"
+strsim = "0.11"                     # "did you mean": the nearest known key of a misspelt one
 
 [dev-dependencies]
 flate2 = "1"                        # the goldens are gzipped
