@@ -513,3 +513,28 @@ def test_a_tilted_map_keeps_its_arrows(tmp_path):
         tilted = page.evaluate("map.querySourceFeatures('arrows').length")
         browser.close()
     assert flat > 0 and tilted >= flat * 0.5, (flat, tilted)
+
+
+@pytest.mark.parametrize("width, folded", [(390, True), (1280, False)])
+def test_a_phone_starts_with_the_boxes_folded(tmp_path, width, folded):
+    """On a screen 700 px wide or less, the Roads and Layers boxes start folded (as the side panel starts closed), so that they do not
+    cover the map; a tap on a box's title opens it. A wider screen starts them open, as before."""
+    from roadstyle import Overlay
+    from roadstyle.render_web import render
+
+    g = _edges()
+    g["highway"] = ["primary", "residential"] * (len(g) // 2)
+    path = tmp_path / "phone.html"
+    render(g, basemap="blank", overlays=[Overlay(g.head(4).assign(geometry=g.head(4).geometry.centroid), label="Points")]).save(path)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_context(viewport={"width": width, "height": 844}, has_touch=True).new_page()
+        page.goto(path.resolve().as_uri())
+        page.wait_for_selector(".flt-ctrl", timeout=30_000)
+        page.wait_for_selector(".ov-ctrl", timeout=30_000)
+        shut = "s => [...document.querySelectorAll(s)].map(e => e.classList.contains('collapsed'))"
+        assert page.evaluate(shut, ".flt-ctrl, .ov-ctrl") == [folded, folded]
+        if folded:
+            page.tap(".flt-hd")
+            assert page.evaluate(shut, ".flt-ctrl") == [False]
+        browser.close()

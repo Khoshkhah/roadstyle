@@ -51,6 +51,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   name e does not exist!"). The reader's temporary tables have the run's own names (`duckosmPlan`'s optional `run`, returned in
   `"run"`; each base-map layer's `"table"`; `"drop"` drops them), and `duckosmFeaturesSelect(specs, run)` takes the run. `roads_sql.js`,
   `features_sql.js` and Python's `duckosm.read` use them.
+- **On a phone, the boxes start folded.** On a screen 700 px wide or less, the Roads, Layers and Legend boxes start folded,
+  as the side panel starts closed; a tap on a box's title opens it. Before, the Roads box of a page with the default options
+  covered about half of the map at 390 px. A wider screen does not change.
 - **A look colour "#fff" no longer crashes `export_look`** (review D4: a panic in Rust, an abort in the browser). One colour module in the
   look crate (`roadstyle_look::color`) reads every colour of the look: "#rrggbb", "#rgb" and a CSS colour name; any other "#..." text is
   an error that names it. One mix rounds half up for the look and the export (the base map's look rounded half to even: some of its
@@ -64,6 +67,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   (`data/cmaps.json`). A matplotlib colormap name still works for `cmap`. branca stays: folium's page elements use it.
 
 ### Changed
+- **The dashboard tests no layer id for a prefix** (R7). The road filters act on the layers of the road roles (`sources`, `roadstyle:sources`), and a road is picked on the layers of the new option `pick` (`roadstyle:controls`). A deck is known by its role `decks`.
+
 - **The colour ramps have one source for both engines**: `src/roadstyle/data/cmaps.json` (branca's 269 schemes and colour names, and the
   180 matplotlib colormaps at 9 stops). Python's `ColorRamp` reads it, as roadstyle-look does, and no longer asks branca or matplotlib:
   all 445 ramps give the same colours as before (tests/test_colors.py).
@@ -173,7 +178,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Added
 - **A base-map layer's overlay entry names its 3D layer** (`roadstyle:controls.overlays[].extrude`, the fill-extrusion's id), so a host's
-  dashboard finds the 3D buildings on a page, whose layers have no metadata.
+  dashboard finds the 3D buildings on a page, whose layers have no metadata. The dashboard reads it (`features.js`, with the page's
+  prefix), not the layer metadata: before, `rsSetBuildings3D(true)` did nothing on `roadstyle.duckosm.page`.
 - **`roadstyle.duckosm.page(db, mode, ...)`: mapstyle's `render_map` on the Rust engine.** The page of a duckOSM file: its roads, its
   base map and the shared dashboard with the base map's controls (modes, kinds, each layer's clicks, tooltip and popup). The keywords of
   render_map: `theme`, `paths`, `layers`, `only`, `interaction` (a layer's start `{clickable, tooltip, popup}`; a layer that the map does

@@ -16,7 +16,6 @@ export let RS_TILED = false;
 export let RS_LEAN = false;
 // a dashboard event: document's CustomEvent `type` with `detail` (the rs:* events of docs/reference/javascript.md)
 export const _emit = (type, detail) => document.dispatchEvent(new CustomEvent(type, {detail}));
-export let RS_DECK_LAYERS = [];
 // extra overlay layers (zones / POIs / lines), their metadata: label, source, layers, popup, tooltip, interactive, under, base, ...
 export let OVERLAYS = [];
 export function initCore(m, opts){
@@ -36,7 +35,7 @@ export function useStyle(st){
   _SRC = {...(O.sources || (style.metadata || {})["roadstyle:sources"] || {}), ..._sourcesOf(style)};
   const lean = style.layers.find(l=>(l["source-layer"] || l.source)==="simple" && l.type==="line");
   RS_LEAN = lean ? RS_PREFIX+lean.id : false;
-  RS_DECK_LAYERS = style.layers.filter(l=>l.id.indexOf("roads-bridge-decks")===0).map(l=>RS_PREFIX+l.id);
+  RS_ROLES = new Set(Object.keys(O.sources || (style.metadata || {})["roadstyle:sources"] || {}));
   _decks = null;
   _checkPromote();
 }
@@ -51,6 +50,8 @@ function _checkPromote(){
 // sources (the page) or the metadata roadstyle:sources gives them; a style without them gives them by its layers (a layer's source-layer,
 // else its source, is its role): the same map.
 let _SRC = {};
+// the road roles alone (roadstyle:sources: not the base map's, the overlays' or the boundary's sources), for the filters (R7)
+export let RS_ROLES = new Set();
 function _sourcesOf(st){ const out = {};
   for(const l of st.layers) if(l.source) out[l["source-layer"] || l.source] = {source:l.source, layer:l["source-layer"] || null};
   return out; }

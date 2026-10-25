@@ -15,6 +15,7 @@ and `layers.rs`, from the look's `features`). The page does not need these parts
 - the colour and the outline by `kind`, the dashes, the widths by zoom, the zoom ranges;
 - the textures (`ms-pat-<kind>`) and the icons (`ms-icon-<layer>`), in `roadstyle:images`;
 - the 3D buildings: the layer `ov<i>-3d` (fill-extrusion, hidden), metadata `roadstyle:group: "buildings 3D"`, `roadstyle:over: true`;
+  its overlay entry names it (`extrude`), and the dashboard reads that, because a page's layers have no metadata;
 - each base-map layer's entry in `roadstyle:controls.overlays` (`label`, `source`, `layers`, `visible` from layers.yaml's `ticked`,
   `popup`, `tooltip`, `interactive`), and each layer's `roadstyle:group`;
 - the rows of the roads you may not use in `roadstyle:controls.filter.access`: `[kind, colour, label, count]` (private, bus,

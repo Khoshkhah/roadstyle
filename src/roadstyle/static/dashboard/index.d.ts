@@ -47,6 +47,8 @@ export interface DashboardOptions {
   overlay_popup?: boolean;
   tunnel?: Record<string, unknown>;
   fill_layers?: string[];
+  /** The layers that a road is picked on (clicked, hovered), without the prefix (roadstyle:controls' pick). */
+  pick?: string[];
   road_fill?: { on: boolean; paint: Record<string, unknown> };
   views?: Array<{ name: string; set: Record<string, unknown> }>;
   items?: { label: string; popup: string[] | null; layer: string } | null;
