@@ -124,7 +124,10 @@ contract makes changeable (or a value that is not used).
 ## The global state `rs_*`
 
 The style reads each one with `["global-state", name]` (`_gs()` in `render_web.py`, `gs()` in `layers.rs`). A live style (`state: "live"`)
-declares each one in MapLibre's `state` block and lists its start value in `roadstyle:state`.
+declares each one in MapLibre's `state` block and lists its start value in `roadstyle:state`. The dashboard sets the style's global
+state: at the start and in `setStyle`, it sets each name of `roadstyle:state` that the map does not have to its start value, and keeps
+a value that the map has (the host's or the user's). So a host that adds a live style's layers to its own map (whose style has no
+such `state` block) has no step of its own (`core.js`, `_useState`).
 
 | Name | Type | Start value | Values | Read by | Set by | API |
 |---|---|---|---|---|---|---|

@@ -61,9 +61,6 @@ async function showRoads(colorBy) {
   }
   // the one vector source "roads" (its source layers: simple, slots). promoteId: the pieces of a road have the road's row as their id, so
   // one feature state lights them all (the engine sets it only on its own pages)
-  // a style with state "live" reads MapLibre's global state (rs_co, rs_fill_on, ...). Its start values are in the style's "state",
-  // which this map (another style) does not have: set them from the metadata roadstyle:state
-  for (const [k, v] of Object.entries(style.metadata["roadstyle:state"] || {})) map.setGlobalStateProperty(k, v);
   for (const [id, src] of Object.entries(style.sources)) map.addSource("rs-" + id, id === "roads" ? {...src, promoteId: {simple: "__rs_edge"}} : src);
   for (const l of style.layers) {
     const layer = JSON.parse(JSON.stringify(l).replaceAll('"oneway"', '"rs-oneway"'));   // the image name in the layout

@@ -217,6 +217,9 @@ The parts of this page:
 - **`style: null`, `prefix: "rs-"`.** The dashboard starts with no roads, and adds `rs-` to each source and layer id that it uses.
 - **`engine.props`.** The dashboard asks the engine for one road's properties at a click, at `rsSelect` and for the tooltip.
 - **`rs.setStyle(style)`.** The controls stay. The Colour by menu and the legend are made again, and the selection is cleared.
+  The dashboard sets the style's global state: a live style's layers read MapLibre's global state (`rs_co`, `rs_fill_on`, ...),
+  whose start values are in the style's own `state` block, which your map does not have. The dashboard sets each value of
+  `roadstyle:state` that your map does not have yet, and keeps the values that your map has.
 
 With `engine.props` only, `rs.query`, `rs.find`, `rs.props` and `rs.focus` find nothing: they need all roads' properties in the
 page.
