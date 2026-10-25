@@ -59,6 +59,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   wide. A bridge keeps its casing. The road layer's filter has the rule, and the tiles leave out the pieces that it hides.
 
 ### Changed
+- **The level editor starts from the map's levels** (2026-10-25): `levelEditor({..., levels: {csv, edge_hash}})` takes the levels that
+  the host's map has (duckOSM's `visualization.edge_levels`, with `edge_levels_meta.edge_hash`) and starts from them with no solve,
+  when the hash is the area's; else it solves the whole area and `editor.answer().resolve.why` says why. `saveArea(store, area,
+  edge_hash)` and `areaIsFor(store, edge_hash)` let a page make the level area only when its edges changed. On Burnaby (151,770 edges)
+  the first open had a solve of 5.2 s and the level area of 3.7 s that the map had already done (docs/rust/browser.md).
 - **The level editor solves less** (2026-10-25). A cap or head change runs no solve (they are drawing only, as the Python editor has
   them since 2026-10-08): the panel saves it at once, with no "Apply and solve" (the list and the button stay for relation edits, which
   solve locally). The editor starts from the stored levels when `levels_info.json` names the same inputs by content: `inputs` is the

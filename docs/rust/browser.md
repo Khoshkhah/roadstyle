@@ -255,20 +255,34 @@ your changes.
    `id_col` (default `edge_id`), `highway_col`, `layer_col`, `bridge_col`, `tunnel_col`, `junction_col`, `band_col`, `order`
    (`"priority"`, `"class"`, a column or `null`), `band_dist`, `head_m`, `near_rules`, and `heads` (the text of heads.csv). It gives
    `roads` (roads.parquet), `pairs` and `edits` (pairs.csv and an empty edits.csv), `roadCount`, `pairCount` and `warnings`.
-3. Keep them in a store and start the editor:
+3. Keep them in a store (`saveArea`) and start the editor. Make the area only when its edges changed (`areaIsFor`), and give the
+   editor the levels that your map has (`levels`), so that the editor does not solve the whole area again:
 
 ```js
 import init, * as pkg from "roadstyle-wasm";
-import {levelEditor, browserStore} from "roadstyle/static/dashboard/editor/level_editor.js";
+import {levelEditor, browserStore, saveArea, areaIsFor} from "roadstyle/static/dashboard/editor/level_editor.js";
 
 await init();
-const a = pkg.makeArea(edges, JSON.stringify({id_col: "edge_id"}));
 const store = browserStore("monaco", "Monaco");          // the files in the origin's private file system
-for (const [n, v] of [["roads.parquet", a.roads], ["pairs.csv", a.pairs], ["edits.csv", a.edits]]) await store.save(n, v);
+// meta: visualization.edge_levels_meta; levelsCsv: visualization.edge_levels as CSV text with the columns
+// edge, casing_start, casing_level, casing_end, fill_level (SELECT edge_id AS edge, ... FROM visualization.edge_levels)
+if (!(await areaIsFor(store, meta.edge_hash))) {
+  const a = pkg.makeArea(edges, JSON.stringify({id_col: "edge_id"}));
+  await saveArea(store, a, meta.edge_hash);              // roads.parquet, pairs.csv, edits.csv (once) and edges.json
+  a.free();
+}
 const pkgUrl = new URL("roadstyle-wasm/pkg/roadstyle_wasm.js", import.meta.url);   // the package's module, for the editor's worker
-const editor = await levelEditor({map, container: document.getElementById("panel"), pkgUrl, store});
+const editor = await levelEditor({map, container: document.getElementById("panel"), pkgUrl, store,
+                                  levels: {csv: levelsCsv, edge_hash: meta.edge_hash}});
 editor.addEventListener("solved", async (e) => apply(e.detail.levelsCsv, await e.detail.draw()));
 ```
+
+The editor starts from, in this order: the stored levels.csv, when `levels_info.json` names the same inputs (the SHA-256 of
+roads.parquet, pairs.csv and edits.csv: `roadstyle_levels::inputs_key`); the `levels` that you give, when their `edge_hash` is the
+area's (roadstyle's edge_hash of the area's edge ids) and they have a row for each edge; else a solve of the whole area, and
+`editor.answer().resolve` says why (`how`: `"stored"`, `"given"` or `"full"`, and `why`). A cap or a head length is drawing only: the
+editor saves it at once, with no solve. A rule (an order wish, a stack part, a rule switched off) is solved again around the change
+(`solveLocal`), and the whole area only when the local answer would keep fewer rules.
 
 `levelEditor({map, container, pkgUrl, store})` runs the engine (the solver, the map's sources and its tiles) in a Web Worker
 (`editor/level_worker.js`, which loads the package from `pkgUrl`), so the page does not stop while it works. It draws the area on `map` (your MapLibre map; without it, a map of its own in `container`)
