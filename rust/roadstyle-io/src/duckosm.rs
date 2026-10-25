@@ -96,17 +96,17 @@ impl Run {
     }
 
     fn e(&self) -> String {
-        format!("rs_e_{}", self.0)
+        format!("duckosm_e_{}", self.0)
     }
 
     /// The table of every edge of the file, with its stored levels (`roads_sql`).
     pub fn roads(&self) -> String {
-        format!("rs_r_{}", self.0)
+        format!("duckosm_r_{}", self.0)
     }
 
     /// The table of the base-map layer `spec` (the caller makes it from the layer's first query that runs, `features_sql`).
     pub fn feature(&self, spec: usize) -> String {
-        format!("rs_f{spec}_{}", self.0)
+        format!("duckosm_f{spec}_{}", self.0)
     }
 
     /// The statement that drops the run's tables, when the caller has read them (`specs`: the base-map layers that it made).
@@ -353,9 +353,9 @@ mod tests {
     #[test]
     fn a_runs_tables_have_its_own_names() {
         let run = Run::new("w7").unwrap();
-        assert_eq!((run.roads(), run.feature(3)), ("rs_r_w7".to_string(), "rs_f3_w7".to_string()));
-        assert_eq!(run.drop_sql(&[3]), "DROP TABLE IF EXISTS rs_r_w7; DROP TABLE IF EXISTS rs_f3_w7;");
-        assert!(roads_select("all", &run).unwrap().contains("FROM rs_r_w7"));
+        assert_eq!((run.roads(), run.feature(3)), ("duckosm_r_w7".to_string(), "duckosm_f3_w7".to_string()));
+        assert_eq!(run.drop_sql(&[3]), "DROP TABLE IF EXISTS duckosm_r_w7; DROP TABLE IF EXISTS duckosm_f3_w7;");
+        assert!(roads_select("all", &run).unwrap().contains("FROM duckosm_r_w7"));
         for bad in ["", "a b", "x;DROP", &"a".repeat(41)] {
             assert!(Run::new(bad).is_err(), "{bad:?}");
         }
