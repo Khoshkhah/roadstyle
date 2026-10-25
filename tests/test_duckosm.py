@@ -322,3 +322,27 @@ def test_a_meta_row_that_has_neither_source_nor_method_is_not_from_a_level_area(
     con.close()
     with pytest.raises(ValueError, match="not from a level area"):
         duckosm.read(db, "driving", levels="stored")
+
+
+@needs_db
+def test_the_page_draws_the_base_maps_textures_and_icons(tmp_path):
+    """duckosm.page: the base map's patterns and icons (RS_OPTIONS.images; the page writer takes them from roadstyle:images) are in the map
+    at their size, and no image is "not found". The road arrow is not among them: arrows.js draws it."""
+    pw = pytest.importorskip("playwright.sync_api")
+    from roadstyle import duckosm
+
+    out = tmp_path / "monaco.html"
+    duckosm.page(DB, "all").save(str(out))
+    html = out.read_text()
+    images = json.JSONDecoder().raw_decode(html, html.index("const RS_OPTIONS = ") + len("const RS_OPTIONS = "))[0]["images"]
+    assert "ms-pat-wetland" in images and "ms-icon-bicycle" in images and "rs-oneway" not in images
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        pg = browser.new_page(viewport={"width": 900, "height": 700})
+        console = []
+        pg.on("console", lambda m: console.append((m.type, m.text)))
+        pg.goto(out.as_uri())
+        pg.wait_for_function("typeof window.map?.loaded === 'function' && map.loaded()", timeout=90000)
+        pg.wait_for_function("ids => ids.every(i => map.getImage(i) && map.getImage(i).data.width > 1)", arg=sorted(images), timeout=30000)
+        browser.close()
+    assert not [t for k, t in console if "could not be loaded" in t or "could not be read" in t], console

@@ -5,6 +5,7 @@
 //! data/basemaps.json, the base map's API key and the Google Maps key.
 
 use crate::dashboard::Template;
+use roadstyle_engine::layers::ARROW_IMAGE;
 use crate::look::Options;
 use crate::page::{escape, gzip_b64, page_html, Camera, PageOptions, PageParts};
 use crate::sources::Styled;
@@ -301,6 +302,8 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
         edge_id_col: ctl["edge_id_col"].as_str().unwrap_or("edge_id").into(), arrow_icon: ctl["arrow_icon"].clone(),
         arrow_color: ctl["arrow_color"].clone(), arrow_rules: ctl["arrow_rules"].clone(),
         modes: ctl["modes"].clone(), box_layout: k.box_layout.clone(),
+        images: Some(meta["roadstyle:images"].as_object().into_iter().flatten().filter(|(k, _)| *k != ARROW_IMAGE)
+            .map(|(k, v)| (k.clone(), v.clone())).collect::<Map<String, Value>>()).filter(|m| !m.is_empty()).map(Value::Object).unwrap_or_default(),
     };
     let (ls, hover) = (&look.sections, json!(mo.interaction.hover_color.as_ref().unwrap_or(&look.sections.selection.hover).css()));
     let simple_js = json!({"layer": "roads-simple", "bridge": ls.bridges.casing_color, "shadow": ls.bridges.shadow.color,
