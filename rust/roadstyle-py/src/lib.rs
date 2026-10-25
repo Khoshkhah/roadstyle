@@ -139,10 +139,12 @@ impl Tiler {
            prefix: String, keep: Vec<String>) -> PyResult<Self> {
         let look = &look.0;
         let (r, f) = (stream(roads)?, features.map(stream).transpose()?);
-        let (style, tiles, w) = py.detach(|| tables(r, f, None).and_then(|(r, f, _)| roadstyle::tiled_of(r, look, f, name, &prefix, &keep)))
-            .map_err(py_err)?;
-        warned(&w);
-        Ok(Tiler { style, tiles })
+        let s = py.detach(|| tables(r, f, None).and_then(|(r, f, _)| roadstyle::sources_of(r, look, f, None, name))).map_err(py_err)?;
+        warned(&s.warnings);
+        // the call's tile_keep, tile_layers, data_maxzoom and data_tolerance (the look's `other`, until this binding takes the options)
+        let t = py.detach(|| roadstyle::tile(roadstyle::TileInput::Styled(&s), &roadstyle::TileOptions::of(&look.other, &keep))).map_err(py_err)?;
+        let style = py.detach(|| t.style_text(&roadstyle::xyz_at(&prefix), roadstyle::sources::SourceMode::inline_of(&look.other)));
+        Ok(Tiler { style, tiles: t.tiles })
     }
 
     fn tile<'py>(&self, py: Python<'py>, z: u32, x: u32, y: u32) -> Bound<'py, PyBytes> {
@@ -220,17 +222,14 @@ impl Sources {
     /// `roads/{z}/{x}/{y}`). These Sources stay as they are.
     #[pyo3(signature = (only=None, exact=None, keep=Vec::new(), at=None))]
     fn tile_stage(&self, py: Python<'_>, only: Option<Vec<String>>, exact: Option<Vec<String>>, keep: Vec<String>, at: Option<String>) -> PyResult<(String, Tiler)> {
-        use roadstyle::tiles::stage::{TileOptions, COLUMNS, TILES};
-        let s = &self.inner;
-        let mut o = TileOptions::new(&s.layers, &s.metadata, &s.saved[TILES], &s.saved[COLUMNS], &keep).map_err(|e| PyValueError::new_err(e.to_string()))?;
-        (o.exact, o.only) = (exact.map(|e| e.into_iter().collect()), only);
+        let o = roadstyle::TileOptions { keep, exact, layers: only };
         let at = match at {
             Some(t) => serde_json::from_str(&t).map_err(|e| PyValueError::new_err(format!("at: not JSON: {e}")))?,
             None => roadstyle::xyz_at(""),
         };
-        let (style, tiles) = py.detach(|| roadstyle::tile_stage(s, &o, &at, roadstyle::sources::SourceMode::INLINE)).map_err(|e| PyValueError::new_err(e.to_string()))?;
-        let style = py.detach(|| roadstyle::style_text(s, &style));
-        Ok((style.clone(), Tiler { style, tiles }))
+        let t = py.detach(|| roadstyle::tile(roadstyle::TileInput::Styled(&self.inner), &o)).map_err(py_err)?;
+        let style = py.detach(|| t.style_text(&at, roadstyle::sources::SourceMode::INLINE));
+        Ok((style.clone(), Tiler { style, tiles: t.tiles }))
     }
 
     /// page_arrows(): stage 3 of a page with inline data: its one-way arrows are points that the page puts itself (the source arrows).
@@ -289,8 +288,10 @@ fn make_sources(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook
 #[pyfunction]
 #[pyo3(signature = (dir, keep=Vec::new(), prefix=String::new()))]
 fn tile_files(py: Python<'_>, dir: String, keep: Vec<String>, prefix: String) -> PyResult<Tiler> {
-    let (style, tiles) = py.detach(|| roadstyle::tile_files(std::path::Path::new(&dir), &keep, None, &roadstyle::xyz_at(&prefix))).map_err(py_err)?;
-    Ok(Tiler { style: style.to_string(), tiles })
+    let read = |name: &str| std::fs::read(std::path::Path::new(&dir).join(name)).map_err(|e| e.to_string());
+    let t = py.detach(|| roadstyle::tile(roadstyle::TileInput::Files(&read), &roadstyle::TileOptions { keep, ..Default::default() })).map_err(py_err)?;
+    let style = t.style_text(&roadstyle::xyz_at(&prefix), roadstyle::sources::SourceMode::INLINE);
+    Ok(Tiler { style, tiles: t.tiles })
 }
 
 /// compute_levels(roads, method, cols, ...) -> (rows, info): roadstyle's compute_levels on the roads in their order (an Arrow table), with

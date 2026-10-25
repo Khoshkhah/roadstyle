@@ -168,7 +168,9 @@ pub fn run(args: &[String]) -> Result<(), Error> {
             let keep = list(take(&mut opts, "keep"));
             let base = take(&mut opts, "base_url").map(|b| format!("{}/", b.trim_end_matches('/'))).unwrap_or_default();
             no_more(&opts)?;
-            let (style, tiles) = roadstyle::tile_files(Path::new(src), &keep, None, &roadstyle::xyz_at(&base))?;
+            let read = |name: &str| std::fs::read(Path::new(src).join(name)).map_err(|e| e.to_string());
+            let t = roadstyle::tile(roadstyle::TileInput::Files(&read), &roadstyle::TileOptions { keep, ..Default::default() })?;
+            let (style, tiles) = (t.style(&roadstyle::xyz_at(&base), roadstyle::sources::SourceMode::INLINE), t.tiles);
             let bounds = tiles.bounds().ok_or(Error::Engine(format!("tiles: no feature in the files of {src}")))?;
             let out = PathBuf::from(out);
             match format.as_str() {

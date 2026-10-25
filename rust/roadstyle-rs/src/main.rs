@@ -128,7 +128,10 @@ fn main() {
     if args.len() == 3 && args[1] == "--tile-files" {
         // stage 2 from stage 1's files: the time, and the tiles of zoom 15 around the roads (their number and size)
         let t = Instant::now();
-        let (style, tiles) = roadstyle_rs::tile_files(std::path::Path::new(&args[2]), &[], None, &roadstyle_rs::xyz_at("")).unwrap_or_else(|e| fail(e));
+        let read = |n: &str| fs::read(std::path::Path::new(&args[2]).join(n)).map_err(|e| e.to_string());
+        let tiled = roadstyle_rs::tile(roadstyle_rs::TileInput::Files(&read), &Default::default()).unwrap_or_else(|e| fail(e));
+        let style = tiled.style(&roadstyle_rs::xyz_at(""), roadstyle_rs::sources::SourceMode::INLINE);
+        let tiles = tiled.tiles;
         let made = t.elapsed();
         let c = &style["center"];
         let (lon, lat) = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
@@ -157,12 +160,16 @@ fn main() {
         return;
     }
     if args.len() == 5 && args[1] == "--tiles" {
-        // the map with vector tiles (make_tiled), then every tile around the centre at zooms 12, 14 and 15: the times and sizes
+        // the map with vector tiles (stage 1, then stage 2), then every tile around the centre at zooms 12, 14 and 15: the times and sizes
         let read = |p: &str| if p == "-" { None } else { Some(fs::read(p).unwrap_or_else(|e| fail(format!("{p}: {e}")))) };
         let t = Instant::now();
-        let (style, tiles, _) = roadstyle_rs::make_tiled(read(&args[3]).unwrap(), &look_file(&args[2]), read(&args[4]), None,
-                                                        "rs://", &["osm_id".into(), "access".into()]).unwrap_or_else(|e| fail(e));
-        eprintln!("make_tiled {:.0} ms (style {:.1} KB)", t.elapsed().as_secs_f64() * 1e3, style.len() as f64 / 1e3);
+        let look = look_file(&args[2]);
+        let s = roadstyle_rs::make_sources(read(&args[3]).unwrap(), &look, read(&args[4]), None, None).unwrap_or_else(|e| fail(e));
+        let tiled = roadstyle_rs::tile(roadstyle_rs::TileInput::Styled(&s), &roadstyle_rs::TileOptions::of(&look.other, &["osm_id".into(), "access".into()]))
+            .unwrap_or_else(|e| fail(e));
+        let style = tiled.style_text(&roadstyle_rs::xyz_at("rs://"), roadstyle_rs::sources::SourceMode::inline_of(&look.other));
+        let tiles = tiled.tiles;
+        eprintln!("stage 1 and 2 {:.0} ms (style {:.1} KB)", t.elapsed().as_secs_f64() * 1e3, style.len() as f64 / 1e3);
         let style: Value = serde_json::from_str(&style).unwrap();
         let c = &style["center"];
         let (lon, lat) = (c[0].as_f64().unwrap(), c[1].as_f64().unwrap());

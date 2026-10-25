@@ -303,8 +303,12 @@ mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new(parquet: Vec<u8>, look: &JsLook, features: Option<Vec<u8>>, name: Option<String>, prefix: &str, keep: Vec<String>)
                    -> Result<Tiler, JsError> {
-            let (style, tiles, _) = roadstyle::make_tiled(parquet, &look.0, features, name, prefix, &keep).map_err(|e| JsError::new(&e.to_string()))?;
-            Ok(Tiler { style, tiles })
+            let s = roadstyle::make_sources(parquet, &look.0, features, None, name).map_err(|e| JsError::new(&e.to_string()))?;
+            // the call's tile_keep, tile_layers, data_maxzoom and data_tolerance (the look's `other`, until this binding takes the options)
+            let t = roadstyle::tile(roadstyle::TileInput::Styled(&s), &roadstyle::TileOptions::of(&look.0.other, &keep))
+                .map_err(|e| JsError::new(&e.to_string()))?;
+            let style = t.style_text(&roadstyle::xyz_at(prefix), roadstyle::sources::SourceMode::inline_of(&look.0.other));
+            Ok(Tiler { style, tiles: t.tiles })
         }
 
         pub fn style(&self) -> String {
@@ -513,8 +517,10 @@ mod wasm {
     /// Tiler's style has the one vector source `<prefix>roads/{z}/{x}/{y}`, with the pieces' promoteId (roadstyle::tile_stage).
     #[wasm_bindgen(js_name = tileSources)]
     pub fn tile_sources(sources: &Sources, prefix: &str, keep: Vec<String>) -> Result<Tiler, JsError> {
-        let (style, tiles) = roadstyle::tile_made(&sources.inner, prefix, &keep).map_err(|e| JsError::new(&e.to_string()))?;
-        Ok(Tiler { style, tiles })
+        let o = roadstyle::TileOptions { keep, ..Default::default() };
+        let t = roadstyle::tile(roadstyle::TileInput::Styled(&sources.inner), &o).map_err(|e| JsError::new(&e.to_string()))?;
+        let style = t.style_text(&roadstyle::xyz_at(prefix), roadstyle::sources::SourceMode::INLINE);
+        Ok(Tiler { style, tiles: t.tiles })
     }
 
     /// Stage 1's files for stage 2: each file's name and bytes (style.json and the files that it names).
@@ -541,8 +547,10 @@ mod wasm {
     #[wasm_bindgen(js_name = tileFiles)]
     pub fn tile_files(files: &FileSet, prefix: &str, keep: Vec<String>) -> Result<Tiler, JsError> {
         let read = |n: &str| files.files.get(n).cloned().ok_or_else(|| format!("{n}: not in the files"));
-        let (style, tiles) = roadstyle::tile_files_with(read, &keep, None, &roadstyle::xyz_at(prefix)).map_err(|e| JsError::new(&e.to_string()))?;
-        Ok(Tiler { style: style.to_string(), tiles })
+        let t = roadstyle::tile(roadstyle::TileInput::Files(&read), &roadstyle::TileOptions { keep, ..Default::default() })
+            .map_err(|e| JsError::new(&e.to_string()))?;
+        let style = t.style_text(&roadstyle::xyz_at(prefix), roadstyle::sources::SourceMode::INLINE);
+        Ok(Tiler { style, tiles: t.tiles })
     }
 
     /// The size of the module's memory, in bytes (it grows in steps ahead and never gets smaller: `liveBytes` gives what is held).

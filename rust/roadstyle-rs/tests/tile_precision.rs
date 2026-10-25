@@ -31,7 +31,7 @@ fn casing_off_fill(last: u32) -> (f64, f64, usize) {
     }
     look["config"]["tiles"]["maxzoom"] = last.into();
     let look = roadstyle_rs::Look::from_value(look).unwrap();
-    let (_, tiles, _) = roadstyle_rs::make_tiled(data("monaco/roads.parquet"), &look, None, None, "rs://", &[]).unwrap();
+    let (_, tiles, _) = common::tiled(roadstyle_rs::make_sources(data("monaco/roads.parquet"), &look, None, None, None).unwrap(), &look, &[]).unwrap();
     // 7.4235, 43.7387: Monaco's center; the tiles of a 600 m square around it
     let n = (1u64 << last) as f64;
     let tx = |lon: f64| ((lon + 180.0) / 360.0 * n) as u32;

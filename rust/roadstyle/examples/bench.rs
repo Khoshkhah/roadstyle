@@ -70,14 +70,13 @@ fn main() {
             out.len()
         });
         println!("  (the style: {:.1} MB)", style as f64 / 1e6);
-        let (tstyle, tiles) = step("stage 2 (tile_stage)", || {
-            let o = roadstyle::tiles::stage::TileOptions::new(&s.layers, &s.metadata, &s.saved[roadstyle::tiles::stage::TILES],
-                                                             &s.saved[roadstyle::tiles::stage::COLUMNS], &[]).unwrap();
-            roadstyle::tile_stage(&s, &o, &roadstyle::xyz_at(""), roadstyle::sources::SourceMode::INLINE).unwrap()
-        });
+        let t = step("stage 2 (tile)", || roadstyle::tile(roadstyle::TileInput::Styled(&s), &Default::default()).unwrap());
+        let tiles = &t.tiles;
         let archive = step("stage 2's archive (PMTiles)", || tiles.archive(tiles.bounds().unwrap(), &tiles.layer_names()).unwrap().len());
-        println!("  (the archive: {:.1} MB; the tiled style: {:.1} KB)", archive as f64 / 1e6, roadstyle::style_text(&s, &tstyle).len() as f64 / 1e3);
-        drop((s, tiles));
+        let tstyle = t.style_text(&roadstyle::xyz_at(""), roadstyle::sources::SourceMode::INLINE);
+        println!("  (the archive: {:.1} MB; the tiled style: {:.1} KB)", archive as f64 / 1e6, tstyle.len() as f64 / 1e3);
+        drop(t);
+        drop(s);
         let live = look.clone().with_arg("state", "live".into()).unwrap();
         let options = roadstyle::look::Options::default();
         for compress in [false, true] {

@@ -1,6 +1,8 @@
 //! The errors of the engine and the facade (target_architecture.md (e)): bad input gives an error of its kind, never a panic, and a
 //! message names no binding.
 
+mod common;
+
 use roadstyle_rs::{EngineError, Error, Limit, Unsupported};
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -38,7 +40,7 @@ fn stage1(args: Value) -> EngineError {
 fn degenerate_lines_draw_and_tile_without_a_panic() {
     let l = look(json!({}));
     assert!(roadstyle_rs::sources_of(roads(), &l, None, None, None).is_ok());
-    let (_, tiles, _) = roadstyle_rs::tiled_of(roads(), &l, None, None, "rs://", &[]).unwrap();
+    let (_, tiles, _) = common::tiled(roadstyle_rs::sources_of(roads(), &l, None, None, None).unwrap(), &l, &[]).unwrap();
     for z in [6u32, 12, 18] {
         let n = (1u64 << z) as f64;
         let (x, y) = (((7.421 + 180.0) / 360.0 * n) as u32, ((1.0 - 43.731f64.to_radians().tan().asinh() / std::f64::consts::PI) / 2.0 * n) as u32);
@@ -59,7 +61,7 @@ fn each_bad_option_has_its_kind() {
     let e = stage1(json!({"access_col": "who"}));
     assert!(matches!(&e, EngineError::Column { column, .. } if column == "who"), "{e}");
     // the facade wraps the engine's kind
-    let e = roadstyle_rs::tiled_of(roads(), &look(json!({"simple": false})), None, None, "rs://", &[]).err();
+    let e = roadstyle_rs::sources_of(roads(), &look(json!({"simple": false})), None, None, None).err();
     assert_eq!(e, Some(Error::Engine(EngineError::Unsupported(Unsupported::FullLook))));
 }
 

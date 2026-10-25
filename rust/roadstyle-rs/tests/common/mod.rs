@@ -253,3 +253,12 @@ pub fn levels_summary(lv: &roadstyle_rs::levels::Levels) -> Value {
     }
     s
 }
+
+/// Stage 2 of stage 1's output `s`, made with `look`: the style that draws the tiles at `rs://` and the tiles, with the call's tile_keep,
+/// tile_layers, data_maxzoom and data_tolerance (the look's `other`, as the bindings give them) and `keep`. The warnings of stage 1 come
+/// back last.
+pub fn tiled(s: roadstyle_rs::sources::Styled, look: &roadstyle_rs::Look, keep: &[String]) -> Result<(String, roadstyle_rs::tiles::Tiles, Vec<String>), roadstyle_rs::Error> {
+    let t = roadstyle_rs::tile(roadstyle_rs::TileInput::Styled(&s), &roadstyle_rs::TileOptions::of(&look.other, keep))?;
+    let style = t.style_text(&roadstyle_rs::xyz_at("rs://"), roadstyle_rs::sources::SourceMode::inline_of(&look.other));
+    Ok((style, t.tiles, s.warnings.clone()))
+}

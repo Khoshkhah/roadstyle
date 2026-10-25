@@ -937,9 +937,9 @@ mod tests {
             assert!(matches!(Tiles::new(lo, hi, buffer), Err(Error::Options(_))), "{lo} {hi} {buffer}");
         }
         let settings = |max: f64| json!({"minzoom": 0, "maxzoom": max, "buffer_px": 80, "extent": 4096});
-        assert!(matches!(stage::TileOptions::new(&[], &json!({}), &settings(40.0), &json!({}), &[]), Err(Error::Options(_))));
-        assert!(stage::TileOptions::new(&[], &json!({}), &settings(MAX_ZOOM as f64), &json!({}), &[]).is_ok());
-        assert!(matches!(stage::TileOptions::from_style(&json!({}), &[]), Err(Error::Options(_))));
+        assert!(matches!(stage::TileRules::new(&[], &json!({}), &settings(40.0), &json!({}), &[]), Err(Error::Options(_))));
+        assert!(stage::TileRules::new(&[], &json!({}), &settings(MAX_ZOOM as f64), &json!({}), &[]).is_ok());
+        assert!(matches!(stage::TileRules::from_style(&json!({}), &[]), Err(Error::Options(_))));
         // a tile far out of the world is empty; bounds that are not longitude and latitude, and an archive of no tile, are errors
         let t = Tiles::new(0, MAX_ZOOM, 80.0).unwrap();
         assert!(t.tile(MAX_ZOOM, u32::MAX, u32::MAX).is_empty());

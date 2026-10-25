@@ -8,7 +8,7 @@ use serde_json::Value;
 use std::collections::HashSet;
 
 #[derive(Clone, Debug)]
-pub struct TileOptions {
+pub struct TileRules {
     pub min_zoom: u32,
     pub max_zoom: u32,
     pub buffer_px: f64,
@@ -29,10 +29,10 @@ pub struct TileOptions {
 pub const TILES: &str = "roadstyle:tiles";
 pub const COLUMNS: &str = "roadstyle:columns";
 
-impl TileOptions {
+impl TileRules {
     /// The rules of a style: `tiles` the zoom settings (the look's config.tiles, or the style's `roadstyle:tiles`), `columns` the column
     /// names (`roadstyle:columns`), `keep` the caller's columns.
-    pub fn new(layers: &[Value], metadata: &Value, tiles: &Value, columns: &Value, keep: &[String]) -> Result<TileOptions, Error> {
+    pub fn new(layers: &[Value], metadata: &Value, tiles: &Value, columns: &Value, keep: &[String]) -> Result<TileRules, Error> {
         let num = |k: &str| tiles[k].as_f64().ok_or_else(|| Error::Options(format!("tiles.{k} is not a number")));
         if num("extent")? != crate::EXTENT {
             return Err(Error::Options(format!("tiles.extent is {}, the tiles are made with {}", num("extent")?, crate::EXTENT)));
@@ -41,18 +41,18 @@ impl TileOptions {
         let col = |k: &str| columns[k].as_str().filter(|c| !c.is_empty()).map(String::from);
         let pieces = [col("class").unwrap_or_else(|| "highway".into()), "lvl".into()].into_iter().chain(col("width")).chain(col("filter")).collect();
         let slots_from = layers.iter().filter(|l| l["source"] == "slots").map(|l| l["minzoom"].as_f64().unwrap_or(0.0) as u32).min().unwrap_or(0);
-        Ok(TileOptions { min_zoom: num("minzoom")? as u32, max_zoom: num("maxzoom")? as u32, buffer_px: num("buffer_px")?,
+        Ok(TileRules { min_zoom: num("minzoom")? as u32, max_zoom: num("maxzoom")? as u32, buffer_px: num("buffer_px")?,
                          read: roadstyle_model::props::drawn(layers, metadata, keep), pieces, exact: None, only: None, slots_from })
     }
 
     /// The rules of a saved style (stage 1's style.json).
-    pub fn from_style(style: &Value, keep: &[String]) -> Result<TileOptions, Error> {
+    pub fn from_style(style: &Value, keep: &[String]) -> Result<TileRules, Error> {
         let layers = style["layers"].as_array().map(Vec::as_slice).unwrap_or_default();
         let m = &style["metadata"];
         if m[TILES].is_null() {
             return Err(Error::Options(format!("the style has no {TILES}: give the tile settings")));
         }
-        TileOptions::new(layers, m, &m[TILES], &m[COLUMNS], keep)
+        TileRules::new(layers, m, &m[TILES], &m[COLUMNS], keep)
     }
 
     /// The source goes into the tiles.

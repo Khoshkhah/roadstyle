@@ -7,7 +7,6 @@
 use crate::look::Options;
 use crate::page::{escape, gzip_b64, page_html, Camera, PageOptions, PageParts};
 use crate::sources::Styled;
-use crate::tiles::stage::{TileOptions, COLUMNS, TILES};
 use crate::{layers::py_truth, FeatureTable, Look, RoadTable};
 use serde_json::{json, Map, Value};
 
@@ -427,11 +426,11 @@ fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>) -> Result<(Value,
         v.as_deref().filter(|c| !c.is_empty())
     }
     let keep = [Some(hw), Some(col(&c.filter).unwrap_or(hw)), Some(roadstyle_model::mark::Mark::Twoway.name()), Some(roadstyle_model::mark::Mark::Edge.name()), Some("lvl"), col(&c.width_m)];
-    let mut o = TileOptions::new(&s.layers, &s.metadata, &s.saved[TILES], &s.saved[COLUMNS], &[])?;
-    o.exact = Some(keep.into_iter().flatten().map(String::from).collect());
-    o.only = Some(["roads", "simple", "slots"].map(String::from).to_vec());
-    let (style, t) = crate::tile_stage(s, &o, &json!({"url": "pmtiles://roads"}), crate::sources::SourceMode::inline_of(a))?;
-    let archive = t.archive(t.bounds().ok_or(crate::tiles::Error::Empty)?, &t.layer_names())?;
+    let o = crate::TileOptions { exact: Some(keep.into_iter().flatten().map(String::from).collect()),
+                                 layers: Some(["roads", "simple", "slots"].map(String::from).to_vec()), ..Default::default() };
+    let t = crate::tile(crate::TileInput::Styled(s), &o)?;
+    let style = t.style(&json!({"url": "pmtiles://roads"}), crate::sources::SourceMode::inline_of(a));
+    let archive = t.tiles.archive(t.tiles.bounds().ok_or(crate::tiles::Error::Empty)?, &t.tiles.layer_names())?;
     Ok((style, Some(archive)))
 }
 

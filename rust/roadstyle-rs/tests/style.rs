@@ -36,6 +36,8 @@
 //! The reference styles are too large for git (Monaco 26 MB, Tartu 151 MB), so the test compares their SHA-256. `tests/old_style.sh`
 //! makes 0806ac2's style again, to see a difference.
 
+mod common;
+
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
@@ -86,7 +88,8 @@ fn tiles_hash(area: &Path) -> String {
         (x0, y0, x1, y1) = (x0.min(c[0]), y0.min(c[1]), x1.max(c[0]), y1.max(c[1]));
     }
     let keep = ["osm_id".to_string(), "access".to_string()];
-    let (style, tiles, _) = roadstyle_rs::make_tiled(roads, &look, Some(read(area.join("features.parquet"))), None, "rs://", &keep).unwrap();
+    let s = roadstyle_rs::make_sources(roads, &look, Some(read(area.join("features.parquet"))), None, None).unwrap();
+    let (style, tiles, _) = common::tiled(s, &look, &keep).unwrap();
     let mut h = Sha256::new();
     h.update(style.as_bytes());
     for z in [12u32, 14, 15] {
@@ -120,8 +123,8 @@ fn the_sea_at_the_tile_edge() {
     let mut look: serde_json::Value = serde_json::from_slice(&read(data.join("look.json"))).unwrap();
     look["args"]["export"] = true.into();
     let look = roadstyle_rs::Look::from_value(look).unwrap();
-    let (_, tiles, _) = roadstyle_rs::make_tiled(read(data.join("monaco/roads.parquet")), &look, Some(read(data.join("monaco/features.parquet"))),
-                                                 None, "rs://", &[]).unwrap();
+    let s = roadstyle_rs::make_sources(read(data.join("monaco/roads.parquet")), &look, Some(read(data.join("monaco/features.parquet"))), None, None).unwrap();
+    let (_, tiles, _) = common::tiled(s, &look, &[]).unwrap();
     for (z, x, y) in [(14, 8528, 5973), (14, 8528, 5974), (15, 17057, 11946), (15, 17057, 11947), (15, 17057, 11948)] {
         let t = tiles.tile(z, x, y);
         assert!(!t.is_empty() && t.windows(3).any(|w| w == b"ov1"), "{z}/{x}/{y}: no sea");

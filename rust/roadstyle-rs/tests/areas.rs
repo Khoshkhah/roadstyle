@@ -70,7 +70,8 @@ fn tiles(area: &str) -> Value {
         (lo, hi) = ([lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])]);
     }
     let (lon, lat) = ((lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0);
-    let (style, tiles, _) = roadstyle_rs::make_tiled(roads(area), &look(area), None, None, "rs://", &keep).unwrap();
+    let l = look(area);
+    let (style, tiles, _) = common::tiled(roadstyle_rs::make_sources(roads(area), &l, None, None, None).unwrap(), &l, &keep).unwrap();
     let mut out = serde_json::Map::new();
     for z in [12u32, 14, 15] {
         let n = (1u64 << z) as f64;
