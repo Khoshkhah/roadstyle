@@ -3800,7 +3800,12 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         for lyr in style["layers"]:
             if lyr.get("source") == "roads" and "source-layer" not in lyr:
                 lyr["source-layer"] = "roads"
-        extra = [{"name": "slots", "fc": slots, "minzoom": 14}] if slots["features"] else []
+        def first_drawn(name, from_zoom):
+            """A tile layer's first zoom: the first zoom at which a layer of the style draws it (no minzoom: 0), not past the last zoom
+            (roadstyle::first_drawn, 2026-10-25); a layer that no layer draws keeps from_zoom."""
+            zs = [math.floor(lyr.get("minzoom", 0)) for lyr in style["layers"] if name in (lyr.get("source"), lyr.get("source-layer"))]
+            return max(from_zoom, min(min(zs), tc["maxzoom"])) if zs else from_zoom
+        extra = [{"name": "slots", "fc": slots, "minzoom": first_drawn("slots", 14)}] if slots["features"] else []
         keep = {highway_col, filter_col or highway_col, "__rs_twoway", "__rs_edge", "lvl", width_m_col}
         line_layers = []
         # the casing pieces, simple mode's pieces and the twin end caps ride in the same archive (docs/design/levels_split_casing.md, 12.1);
@@ -3812,9 +3817,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                     lyr["source"], lyr["source-layer"] = "roads", sname
             if src and src["data"]["features"]:
                 if kind == "line":
-                    line_layers.append({"name": sname, "fc": src["data"], "keep": keep})
+                    line_layers.append({"name": sname, "fc": src["data"], "keep": keep, "minzoom": first_drawn(sname, tc["minzoom"])})
                 else:
-                    extra.append({"name": sname, "fc": src["data"], "minzoom": tc["minzoom"]})
+                    extra.append({"name": sname, "fc": src["data"], "minzoom": first_drawn(sname, tc["minzoom"])})
         if _export:      # a style for other apps (docs/design/style_export.md): RustGIS draws no GeoJSON source, so every one goes in the archive
             for sid, src in [(s, v) for s, v in style["sources"].items() if v.get("type") == "geojson"]:
                 del style["sources"][sid]
@@ -3827,9 +3832,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                         lyr["source"], lyr["source-layer"] = "roads", sid
                 # ponytail: points and polygons go whole into every tile they touch (extra_layers); clip them if a big polygon overlay makes the tiles heavy
                 if all((f.get("geometry") or {}).get("type") in ("LineString", "MultiLineString") for f in fs):
-                    line_layers.append({"name": sid, "fc": src["data"], "keep": None})
+                    line_layers.append({"name": sid, "fc": src["data"], "keep": None, "minzoom": first_drawn(sid, tc["minzoom"])})
                 else:
-                    extra.append({"name": sid, "fc": src["data"], "minzoom": tc["minzoom"], "keep": None})
+                    extra.append({"name": sid, "fc": src["data"], "minzoom": first_drawn(sid, tc["minzoom"]), "keep": None})
         roads_keep = keep
         if _export:      # the export's road tiles keep every column, so an app shows a road's data; an id past 2**53 as text (JS would round it)
             roads_keep = None

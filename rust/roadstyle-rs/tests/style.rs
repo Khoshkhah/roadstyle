@@ -1,5 +1,5 @@
 //! The style must be byte for byte the style of geolibre-roadstyle's Rust port at commit 0806ac2 (its `make_style`, natively, from the
-//! same inputs), with eleven changes:
+//! same inputs), with twelve changes:
 //! - the building heights follow rule C (the higher of the height tag and the levels, features.rs), not 0806ac2's rule A (the height
 //!   tag first): on 2026-10-23 the `height` of 15 buildings of Monaco and 355 of Tartu;
 //! - the slots have Python's key order (__rs_cls before __rs_arw, tests/colors.rs): the same data, other bytes;
@@ -24,6 +24,8 @@
 //!   rows that rsColor painted), and the state has `rs_top` in place of `rs_colors` and `rs_base` (Python has it too: the goldens of goldens-2).
 //! - audit 3, N27 (2026-10-24): an exported tiled style has `roadstyle:sources` (the road roles) and `roadstyle:controls.pick` (the layers
 //!   that a road is picked on), so an app's dashboard finds and picks the roads, as on a live style (Python has it too: goldens-2).
+//! - 2026-10-25: a source's tiles start at the first zoom at which a layer draws it (not past the tiles' last zoom): the base map's
+//!   buildings and points, drawn from zoom 15 or 16, are not in the tiles of zoom 6 to 14 (the style does not change).
 //!
 //! The reference styles are too large for git (Monaco 26 MB, Tartu 151 MB), so the test compares their SHA-256. `tests/old_style.sh`
 //! makes 0806ac2's style again, to see a difference.
@@ -101,7 +103,7 @@ fn tiles_hash(area: &Path) -> String {
 #[test]
 fn monaco_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(tiles_hash(&area), "0974f3058c75fb6f4321d87ab3257199f054e8e21b8d6a66ee9a0fb11e8c345a");
+    assert_eq!(tiles_hash(&area), "b80c80b9084b645fdc992591330914f1bcd01fd9f2be135f9c3f4e2d85a546ca");
 }
 
 /// tiles.py's extra layers: the sea of Monaco (a polygon) is in the tiles at its west edge, where only its box reaches.
@@ -125,5 +127,5 @@ fn the_sea_at_the_tile_edge() {
 fn tartu_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
-    assert_eq!(tiles_hash(&area), "c0d314c251dbc2926ad9e86e2098ede3588e0bdb0ec52962100c63526602ffa8");
+    assert_eq!(tiles_hash(&area), "9c71fa1ffa1ce46c8b94332566f3c78598537430c849caaa3fba6a87015f6f7d");
 }

@@ -68,6 +68,15 @@ fn columns(look: &Look) -> Value {
     json!({"class": arg("highway_col"), "filter": arg("filter_col"), "width": arg("width_m_col")})
 }
 
+/// The first zoom of a source's tiles: the first zoom at which a layer of the style draws it (a layer without `minzoom` draws from 0),
+/// and not past the tiles' last zoom (MapLibre scales that zoom up for the layers after it). Below it no layer draws a feature of the
+/// source, so the tiles leave them out (2026-10-25: Tartu's buildings, drawn from zoom 15, were 455 KB of a 3 MB tile at zoom 12).
+/// A source that no layer draws keeps `from` (a page can read it).
+fn first_drawn(layers: &[Value], k: &str, from: u32, last: u32) -> u32 {
+    let drawn = layers.iter().filter(|l| l["source"] == k).map(|l| l["minzoom"].as_f64().map_or(0, |z| z.floor() as u32)).min();
+    drawn.map_or(from, |z| from.max(z.min(last)))
+}
+
 /// Stage 2 from memory: the tiles of stage 1's sources (`o`: the rules), borrowed (audit N6: `s` stays as it is).
 fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> tiles::Tiles {
     let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px);
@@ -81,15 +90,15 @@ fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> tiles::T
             Src::Roads(_) => {
                 let (keep, whole, from) = o.rule(k, Default::default);
                 let r = &s.roads;
-                tiled.add_lines(k, r.roads.iter().map(|x| (x.line(), r.props(x, None))), &keep, whole, from)        // the cells, no JSON copy
+                tiled.add_lines(k, r.roads.iter().map(|x| (x.line(), r.props(x, None))), &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))        // the cells, no JSON copy
             }
             Src::Simple(p) => {
                 let (keep, whole, from) = o.rule(k, Default::default);
-                tiled.add_lines(k, p.features(&s.roads.roads).map(|(_, props, c)| (c, props.into_iter())), &keep, whole, from)
+                tiled.add_lines(k, p.features(&s.roads.roads).map(|(_, props, c)| (c, props.into_iter())), &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))
             }
             Src::Json(v) => {
                 let (keep, whole, from) = whole_unless_lines(json_lines(v), o.rule(k, || keys(v)), o.min_zoom);
-                tiled.add(k, v, &keep, whole, from)
+                tiled.add(k, v, &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))
             }
             // a base-map layer, from its table (audit R10)
             Src::Features(f) => {
@@ -98,7 +107,7 @@ fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> tiles::T
                 let lines = (0..t.len()).all(|r| matches!(t.geometries_of().kind(r), Some(GeomType::LineString | GeomType::MultiLineString)));
                 let keys = || t.names().iter().filter(|n| (0..t.len()).any(|r| t.has_key(r, n))).cloned().collect();
                 let (keep, whole, from) = whole_unless_lines(lines, o.rule(k, keys), o.min_zoom);
-                tiled.add_features(k, t, &keep, whole, from)
+                tiled.add_features(k, t, &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))
             }
         }
     }
@@ -184,6 +193,7 @@ pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[S
     let style: Value = serde_json::from_slice(&read("style.json")?).map_err(|e| format!("style.json: {e}"))?;
     let o = match o { Some(o) => o, None => tiles::stage::TileOptions::from_style(&style, keep)? };
     let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px);
+    let layers = style["layers"].as_array().map(Vec::as_slice).unwrap_or_default();
     let mut names = Vec::new();
     for (k, spec) in style["sources"].as_object().into_iter().flatten() {
         if !o.wants(k) || spec["type"] != "geojson" {
@@ -206,7 +216,7 @@ pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[S
             };
             let feats = (0..t.len()).map(|i| (t.line(i).or_else(|| table.as_ref().and_then(|r| r.line(i))),
                                               cols.iter().map(move |&(c, n)| (n.as_str(), cell(c, i, n)))));
-            tiled.add_lines(k, feats, &keep, whole, from);
+            tiled.add_lines(k, feats, &keep, whole, first_drawn(layers, k, from, o.max_zoom));
             continue;
         }
         let mut fc: Value = if file.ends_with(".parquet") { read::features(read(file)?)? }
@@ -226,7 +236,7 @@ pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[S
         let rule = o.rule(k, || src["data"]["features"].as_array().into_iter().flatten()
             .filter_map(|f| f["properties"].as_object()).flat_map(|p| p.keys().cloned()).collect());
         let (keep, whole, from) = whole_unless_lines(json_lines(&src), rule, o.min_zoom);
-        tiled.add(k, &src, &keep, whole, from);
+        tiled.add(k, &src, &keep, whole, first_drawn(layers, k, from, o.max_zoom));
     }
     Ok((tiled_style(style, &names, at, (o.min_zoom, o.max_zoom)), tiled))
 }

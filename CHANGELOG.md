@@ -23,6 +23,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   targets, room for the keyboard, and a fold when a Street View or Google 3D window opens at the bottom.
 
 ### Changed
+- **A source's tiles start at the zoom where it is drawn** (both engines). Its first tile zoom is the first zoom at which a layer of
+  the style draws it, not later than the tiles' last zoom; a source that no layer draws keeps its rule. The base map's buildings and
+  points (drawn from zoom 15 or 16) are no longer in the tiles of zoom 6 to 14. The map does not change. Tartu, the tiles of one
+  1280 × 800 view (`rust/roadstyle-wasm/bench_tiles.mjs`, wasm in Node): z12 8.6 MB to 7.1 MB (the largest tile 3,863 KB to 3,268 KB),
+  z14 7.8 MB to 6.6 MB, made in 10 to 14 % less time; z15 does not change.
 - **`cargo test` at `rust/` builds 113 crates in about 1 minute, not 195 in 5** (review D1). The programs `roadstyle-cli` and
   `roadstyle-snapshot` (bundled SQLite, headless_chrome) are not default members: CI tests them in a step of their own (`-p`). Fat LTO
   and one codegen unit moved from `release` to a new profile `dist` (`inherits = "release"`), which the wheels (`maturin --profile

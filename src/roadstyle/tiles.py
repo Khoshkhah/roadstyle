@@ -97,8 +97,8 @@ def build_pmtiles(fc: dict, *, class_col: str, keep: set, minzoom_table: dict | 
     WHOLE into every tile they touch, never clipped: MapLibre renders a symbol only in the tile
     that owns its anchor, so a duplicated small feature yields exactly one label.
 
-    ``line_layers``: ``[{"name", "fc", "keep"}]`` — further tile layers made exactly like the main one
-    (simplified per zoom, clipped to the tile): the casing pieces of a divided casing.
+    ``line_layers``: ``[{"name", "fc", "keep", "minzoom" (optional)}]`` — further tile layers made exactly like the main one
+    (simplified per zoom, clipped to the tile): the casing pieces of a divided casing. ``minzoom``: the layer's first zoom.
     """
     import mapbox_vector_tile
     from pmtiles.tile import Compression, TileType, zxy_to_tileid
@@ -106,11 +106,11 @@ def build_pmtiles(fc: dict, *, class_col: str, keep: set, minzoom_table: dict | 
     from shapely import clip_by_rect
 
     feats, world = _prep(fc, class_col, keep, minzoom_table)
-    lines = [(layer, feats)]
+    lines = [(layer, feats, minzoom)]
     for ln in (line_layers or []):
         lf, lw = _prep(ln["fc"], class_col, ln.get("keep"), minzoom_table)
         world = [min(world[0], lw[0]), min(world[1], lw[1]), max(world[2], lw[2]), max(world[3], lw[3])]
-        lines.append((ln["name"], lf))
+        lines.append((ln["name"], lf, int(ln.get("minzoom", minzoom))))
     extras = []          # (name, from_zoom, prepped features)
     for ex in (extra_layers or []):
         efeats, ew = _prep(ex["fc"], None, ex.get("keep"), None)
@@ -125,7 +125,9 @@ def build_pmtiles(fc: dict, *, class_col: str, keep: set, minzoom_table: dict | 
         tol = s / extent / 2                       # ~half a tile pixel
         pad = s * buffer_px / extent
         cells = {}                                 # (x, y) -> {layer_name: [feature rows]}
-        for lname, lfeats in lines:
+        for lname, lfeats, from_zoom in lines:
+            if z < from_zoom:
+                continue
             for i, geom, b, fmz, props in lfeats:
                 if z < (fmz or 0):
                     continue
@@ -179,7 +181,7 @@ def build_pmtiles(fc: dict, *, class_col: str, keep: set, minzoom_table: dict | 
          "center_zoom": (minzoom + maxzoom) // 2,
          "center_lon_e7": (lo[0] + hi[0]) // 2, "center_lat_e7": (lo[1] + hi[1]) // 2},
         {"vector_layers": [{"id": n, "fields": {}}
-                           for n in [n for n, _ in lines] + [e[0] for e in extras]]},
+                           for n in [n for n, *_ in lines] + [e[0] for e in extras]]},
     )
     return buf.getvalue()
 
