@@ -362,25 +362,37 @@ fn road_rows(s: &sources::Styled) -> impl Iterator<Item = roadstyle_io::write::R
 /// list with one item for each road (its row). `fields`: only these fields of each road (the level editor's lean table: what its page
 /// reads); None: every field.
 pub fn write_road_table<W: std::io::Write>(s: &sources::Styled, fields: Option<&[String]>, w: &mut W) -> std::io::Result<()> {
-    let dumps = |v: &Value, _compact: bool| v.to_string();
     let mut rows = s.table_rows();
     if let Some(f) = fields {
         rows.iter_mut().for_each(|t| t.props.retain(|(k, _)| f.iter().any(|n| n == k)));
     }
-    let list = |w: &mut W, key: &str, first: bool, item: &dyn Fn(&sources::TableRow) -> String| -> std::io::Result<()> {
+    // each value written straight to `w` (audit D11: no JSON tree for each row)
+    type Item<W> = dyn Fn(&mut W, &sources::TableRow) -> serde_json::Result<()>;
+    let list = |w: &mut W, key: &str, first: bool, item: &Item<W>| -> std::io::Result<()> {
         write!(w, "{}\"{key}\":[", if first { "{" } else { "," })?;
         for (i, t) in rows.iter().enumerate() {
             if i > 0 {
                 w.write_all(b",")?;
             }
-            w.write_all(item(t).as_bytes())?;
+            item(w, t)?;
         }
         w.write_all(b"]")
     };
-    list(w, "props", true, &|t| dumps(&Value::Object(t.props.iter().map(|(k, v)| (k.to_string(), js_value(v.to_value()))).collect()), true))?;
-    list(w, "mids", false, &|t| t.mid.map_or("null".into(), |m| dumps(&json!(m), true)))?;
-    list(w, "bboxes", false, &|t| t.bbox.map_or("null".into(), |b| dumps(&json!(b), true)))?;
-    list(w, "lines", false, &|t| t.line.map_or("null".into(), |c| dumps(&json!(c), true)))?;
+    list(w, "props", true, &|w, t| {
+        w.write_all(b"{").map_err(serde_json::Error::io)?;
+        for (i, (k, v)) in t.props.iter().enumerate() {
+            if i > 0 {
+                w.write_all(b",").map_err(serde_json::Error::io)?;
+            }
+            serde_json::to_writer(&mut *w, k)?;
+            w.write_all(b":").map_err(serde_json::Error::io)?;
+            serde_json::to_writer(&mut *w, &js_value(v.to_value()))?;
+        }
+        w.write_all(b"}").map_err(serde_json::Error::io)
+    })?;
+    list(w, "mids", false, &|w, t| serde_json::to_writer(w, &t.mid))?;
+    list(w, "bboxes", false, &|w, t| serde_json::to_writer(w, &t.bbox))?;
+    list(w, "lines", false, &|w, t| serde_json::to_writer(w, &t.line))?;
     w.write_all(b"}")
 }
 
