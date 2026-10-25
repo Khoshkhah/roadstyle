@@ -26,13 +26,13 @@ answer({
   levelsCsv: ({levels, heads, caps}) => ({csv: area.levelsCsv(i32(levels), heads, caps)}),
   draw: ({levels, heads, caps}) => bytes(area.draw(i32(levels), heads, caps)),
   // the map of an answer: its style (a new generation of lv:// tiles) and its road table (the dashboard's RS_SIDE)
-  build({levels, heads, caps, keep}){
+  build({levels, heads, caps, keep, table}){
     const src = pkg.makeSources(area.draw(i32(levels), heads, caps), look, undefined, undefined, "Level editor");
-    const table = src.roadTable();
+    const rows = src.roadTable(table);                            // only the fields that the page reads
     if(tiler) tiler.free();
     tiler = pkg.tileSources(src, `lv://${++gen}/`, keep);
     src.free();
-    return {style: tiler.style(), table, transfer: [table.buffer]};
+    return {style: tiler.style(), table: rows, transfer: [rows.buffer]};
   },
   tile({url}){
     const [g, source, z, x, y] = url.slice("lv://".length).split("/");

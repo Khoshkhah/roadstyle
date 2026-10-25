@@ -361,10 +361,14 @@ fn road_rows(s: &sources::Sources) -> impl Iterator<Item = roadstyle_io::write::
 }
 
 /// The road table as the page loads it (tiles.sidecar's form; `Sources::table_rows`): `{"props", "mids", "bboxes", "lines"}`, each a
-/// list with one item for each road (its row).
-pub fn write_road_table<W: std::io::Write>(s: &sources::Sources, w: &mut W) -> std::io::Result<()> {
+/// list with one item for each road (its row). `fields`: only these fields of each road (the level editor's lean table: what its page
+/// reads); None: every field.
+pub fn write_road_table<W: std::io::Write>(s: &sources::Sources, fields: Option<&[String]>, w: &mut W) -> std::io::Result<()> {
     let dumps = |v: &Value, _compact: bool| v.to_string();
-    let rows = s.table_rows();
+    let mut rows = s.table_rows();
+    if let Some(f) = fields {
+        rows.iter_mut().for_each(|t| t.props.retain(|(k, _)| f.iter().any(|n| n == k)));
+    }
     let list = |w: &mut W, key: &str, first: bool, item: &dyn Fn(&sources::TableRow) -> String| -> std::io::Result<()> {
         write!(w, "{}\"{key}\":[", if first { "{" } else { "," })?;
         for (i, t) in rows.iter().enumerate() {

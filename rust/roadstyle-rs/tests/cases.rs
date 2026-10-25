@@ -36,7 +36,7 @@ fn style(roads: roadstyle_rs::RoadTable, look: &Look) -> Value {
     let s = roadstyle_rs::sources_of(roads, look, None, None, None).unwrap();
     let (mut out, mut table) = (Vec::new(), Vec::new());
     s.write_style(&mut out).unwrap();
-    roadstyle_rs::write_road_table(&s, &mut table).unwrap();
+    roadstyle_rs::write_road_table(&s, None, &mut table).unwrap();
     let table: Value = serde_json::from_slice(&table).unwrap();
     let cols: Vec<String> = table["props"][0].as_object().map(|o| o.keys().cloned().collect()).unwrap_or_default();
     let mut sum = common::summary(&serde_json::from_slice(&out).unwrap());

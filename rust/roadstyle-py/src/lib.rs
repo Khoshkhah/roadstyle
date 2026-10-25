@@ -250,10 +250,12 @@ impl Sources {
         Ok(())
     }
 
-    /// road_table() -> str: the road table as the page loads it (tiles.sidecar's form: props, mids, bboxes, lines).
-    fn road_table(&self, py: Python<'_>) -> String {
+    /// road_table(fields=None) -> str: the road table as the page loads it (tiles.sidecar's form: props, mids, bboxes, lines); `fields`:
+    /// only these fields of each road.
+    #[pyo3(signature = (fields=None))]
+    fn road_table(&self, py: Python<'_>, fields: Option<Vec<String>>) -> String {
         let mut out = Vec::new();
-        py.detach(|| roadstyle::write_road_table(&self.inner, &mut out)).expect("a Vec takes every byte");
+        py.detach(|| roadstyle::write_road_table(&self.inner, fields.as_deref(), &mut out)).expect("a Vec takes every byte");
         String::from_utf8(out).expect("JSON text is UTF-8")
     }
 

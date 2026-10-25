@@ -84,6 +84,11 @@ if(dashboard && !prefix)
 if(map && window.map instanceof ml.Map && window.map !== map)     // (an element with the id "map" is window.map too: not a map)
   throw new Error("level editor: window.map is another map; the panel draws on window.map");
 const P = map ? prefix : "rs-";                                  // a host map: the editor's layers and sources with the prefix given
+// the road table's fields: what the page reads of a row (the dashboard's reads.json, "table"), live data's id and the road that a click
+// picks (the other fields of a road are a large part of the table's text, which the page parses after each answer)
+const reads = await fetch(new URL("../reads.json", import.meta.url));
+if(!reads.ok) throw new Error(`level editor: the dashboard's reads.json (${reads.status})`);
+const TABLE = [...(await reads.json()).table, LOOK.edge_id_col, "road"];
 // the engine in a worker (level_worker.js): the solve, the map and its tiles do not stop the page
 const worker = new Worker(new URL("./level_worker.js", import.meta.url), {type: "module"});
 const call = caller(worker);
@@ -154,7 +159,7 @@ const stats = () => ({area: store.name || "area", roads: order.length,
 
 // --- the map: the engine's tiles of one row for each edge, a new generation for each answer
 async function build(){
-  const b = await call({type: "build", levels: flat(res), heads: headsText, caps: capsText, keep: KEEP});
+  const b = await call({type: "build", levels: flat(res), heads: headsText, caps: capsText, keep: KEEP, table: TABLE});
   window.RS_SIDE = JSON.parse(new TextDecoder().decode(b.table));
   document.dispatchEvent(new CustomEvent("rs:tableready"));
   return ownSources(JSON.parse(b.style));

@@ -181,6 +181,10 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             stored = page.evaluate("stored('levels.csv')")
             assert stored and len(stored.strip().split("\n")) > roads, "the first solve saved levels.csv in the browser"
             assert page.locator("#lv").count() == 1, "the panel is in the host's container"
+            # the lean road table: only the fields that the page reads (reads.json's table), live data's id and the road that a click picks
+            want = set(json.loads((STATIC / "dashboard" / "reads.json").read_text())["table"]) | {"edge", "road"}
+            got = page.evaluate("[...new Set(window.RS_SIDE.props.flatMap(Object.keys))]")
+            assert "road" in got and set(got) <= want, set(got) - want
             # a head's length through the panel's API: solved again, the host hears it, the store has heads.csv
             road = page.evaluate("window.editor.roads[0].road")
             # the engine is in the worker: the page has no LevelArea of its own

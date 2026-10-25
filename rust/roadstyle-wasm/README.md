@@ -25,7 +25,7 @@ const tiled = JSON.parse(tiler.style());
 - `readGeoParquet(bytes)`: the roads of a GeoParquet file as a `Roads` handle (the geometry in the column `geometry`).
 - `readGeoJson(bytes)`: the roads of a GeoJSON file as a `Roads` handle; `roads.sources(look)` is stage 1 of them.
 - `readShp(shp, dbf, prj?, name?)`: the roads of a Shapefile (its .shp and .dbf bytes and its .prj text), in EPSG:4326, as a `Roads` handle. A GeoPackage is read only by the native programs (SQLite is C).
-- `Look` (`resolveLook`, `Look.fromJson`, `toJson`), `makeStyle`, `Tiler`, `makeSources`, `tileSources`, `tileFiles`, `makePage`,
+- `Look` (`resolveLook`, `Look.fromJson`, `toJson`, `withArg`), `makeStyle`, `Tiler`, `makeSources` (`style()`, `roadTable(fields?)`), `tileSources`, `tileFiles`, `makePage`,
   `exportLook` and `memoryBytes`: the types (`index.d.ts`) come from the Rust signatures, with their descriptions. The calls take a
   `Look`, not the look's text.
 - `roadstyle-wasm/roads_sql.js` (`makeRoads`, `writeRoads`) and `roadstyle-wasm/features_sql.js` (`writeFeatures`): the SQL that writes the
