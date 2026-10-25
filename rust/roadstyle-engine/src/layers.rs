@@ -330,6 +330,38 @@ pub(crate) fn minzoom_filter(col: &str, table: &Map<String, Value>) -> Value {
     json!([">=", ["zoom"], m])
 }
 
+/// render's minzoom (_minzoom_filter): null or true the config's table of the classes' first zooms (the default since 2026-10-25, as
+/// OpenMapTiles and OSM-Carto do), a mapping that table with changes, false every class at every zoom (None).
+pub(crate) fn class_minzoom(look: &crate::Look) -> Option<Map<String, Value>> {
+    let table = || look.config["minzoom"].as_object().cloned().unwrap_or_default();
+    match &look.args["minzoom"] {
+        Value::Bool(true) | Value::Null => Some(table()),
+        Value::Object(o) => {
+            let mut t = table();
+            t.extend(o.iter().map(|(k, v)| (k.clone(), v.clone())));
+            Some(t)
+        }
+        _ => None,
+    }.filter(|t| !t.is_empty())
+}
+
+/// casing.drop_below_px (2026-10-25): a casing piece (`__rs_k` 0, not a bridge's) only from its class's first zoom whose tiles show the
+/// casing line at least `drop` px wide: the first z with the class's casing width at z + 1 >= `drop` (the width grows with the zoom).
+/// None when `drop` is 0, when every class has a casing from zoom 0, or when `kept` (a road in metres with casing.min_px >= drop).
+/// render_web._casing_drop_filter; the tiles read the clause (roadstyle-tiles rules.rs).
+pub(crate) fn casing_drop_filter(m: &Model, drop: f64, kept: bool) -> Option<Value> {
+    if drop <= 0.0 || kept {
+        return None;
+    }
+    let first = |c: Option<&str>| (0..24).find(|&z| m.class_width_px(c, (z + 1) as f64, true) >= drop).unwrap_or(24);
+    let zs: Vec<u32> = m.classes.iter().map(|c| first(Some(c))).chain([first(None)]).collect();
+    if zs.iter().all(|&z| z == 0) {
+        return None;
+    }
+    let casing = json!(["all", ["==", ["get", "__rs_k"], 0], ["!", ["to-boolean", ["get", "__rs_bridge"]]]]);
+    Some(json!([">=", ["zoom"], ["case", casing, ["at", ["get", CLASS_INDEX], ["literal", zs]], 0]]))
+}
+
 /// `filter` with `extra` added at its end (["all", ...]), or as it is.
 fn with_minzoom(filter: Value, extra: Option<Value>) -> Value {
     match (filter, extra) {
@@ -629,19 +661,14 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     let export = args["export"] == true;
 
     // roads-simple and the invisible roads-fill (simple mode)
-    // render's minzoom: true the config's table of the classes' first zooms, a mapping that table with changes, else none (_minzoom_filter)
-    let mz: Option<Map<String, Value>> = match &look.args["minzoom"] {
-        Value::Bool(true) => Some(cfg["minzoom"].as_object().cloned().unwrap_or_default()),
-        Value::Object(o) => {
-            let mut t = cfg["minzoom"].as_object().cloned().unwrap_or_default();
-            t.extend(o.iter().map(|(k, v)| (k.clone(), v.clone())));
-            Some(t)
-        }
-        _ => None,
-    }.filter(|t| !t.is_empty());
+    let mz = class_minzoom(look);
     let mz_filter = |col: &str| mz.as_ref().map(|t| minzoom_filter(col, t));
     let mut flt = vec![json!("all")];
     flt.extend(mz_filter("highway"));
+    let casing_px = if args["casing_min_px"].is_null() { th["casing"]["min_px"].clone() } else { args["casing_min_px"].clone() };
+    // casing.drop_below_px: the profile's 1.0 for a look made before the key (2026-10-25)
+    let drop = th["casing"]["drop_below_px"].as_f64().unwrap_or(1.0);
+    flt.extend(casing_drop_filter(m, drop, metres && casing_px.as_f64().unwrap_or(0.0) >= drop));
     flt.push(seam_filter());
     // the 3D decks (view_3d): a bridge is the flat line below flat_below and the extruded deck from it up
     let dk = &look.deck;
@@ -898,7 +925,7 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
             if l["source"] == "roads" {
                 l["layout"]["line-sort-key"] = json!(["+", key, ["case", top, 500, 0]]);
             } else if l["id"] == "roads-simple" {
-                l["layout"]["line-sort-key"] = json!(["+", key, ["case", ["all", ["any", k(1), k(5)], top], 0.5, 0]]);
+                l["layout"]["line-sort-key"] = json!(["+", key, ["case", ["all", ["any", k(1), k(5)], top], (0.5 * crate::simple::KEY_UNIT) as i64, 0]]);
             }
         }
     }

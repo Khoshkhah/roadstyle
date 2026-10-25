@@ -12,6 +12,7 @@ import pytest
 from shapely.geometry import LineString
 
 from roadstyle import Overlay, compute_levels, render_edges
+from roadstyle.render_web import _KEY_UNIT
 
 
 def _in(needle, html):
@@ -259,13 +260,14 @@ def _road_filters(html):
             if l["id"] in ("roads-simple", "roads-fill", "roads-casing", "roads-low-fill", "roads-bridge-fill")}
 
 
-def test_minzoom_off_by_default():
-    """Existing maps must be byte-identical — `track` is a width channel for some callers, and
-    hiding it by class would make their data disappear."""
-    from roadstyle.render_web import _seam_filter, render
+def test_minzoom_off_with_false():
+    """minzoom=False (the old look before 2026-10-25, when the class minzoom became the default): every class at every zoom. A caller
+    with `track` as a width channel keeps its data; with casing.drop_below_px 0 no zoom is in the road filters but the seams'."""
+    from roadstyle.render_web import _casing_drop_filter, _seam_filter, render
     seam = json.dumps(_seam_filter())   # only the casing seams (round from z17) and laps (flat below z17)
-    for f in _road_filters(render(_many_edges(20)).html).values():
-        assert "zoom" not in json.dumps(f).replace(seam, "")
+    drop = json.dumps(_casing_drop_filter(1.0, False))
+    for f in _road_filters(render(_many_edges(20), minzoom=False).html).values():
+        assert "zoom" not in json.dumps(f).replace(seam, "").replace(drop, "")
 
 
 def test_minzoom_true_uses_the_config_table():
@@ -278,6 +280,17 @@ def test_minzoom_true_uses_the_config_table():
         blob = json.dumps(f)
         assert '"zoom"' in blob
         assert f'"residential", {float(DEFAULT.minzoom["residential"])}' in blob
+
+
+@pytest.mark.parametrize("engine", ["python", "rust"])
+def test_the_filter_panel_names_each_class_first_zoom(engine):
+    """roadstyle:controls.filter.minzoom (2026-10-25): the first zoom of each class of the panel that the class minzoom hides below a zoom,
+    so the Roads box dims it; a dict's change is in it; None with minzoom=False."""
+    from roadstyle.config import DEFAULT
+    flt = _opt(render_edges(_many_edges(20), backend="web", engine=engine, minzoom={"residential": 9}).html, "filter")
+    assert flt["minzoom"]["residential"] == 9 and set(flt["minzoom"]) <= set(flt["classes"]), flt
+    assert all(flt["minzoom"].get(c) == DEFAULT.minzoom[c] for c in flt["classes"] if c != "residential" and DEFAULT.minzoom.get(c))
+    assert _opt(render_edges(_many_edges(20), backend="web", engine=engine, minzoom=False).html, "filter")["minzoom"] is None
 
 
 def test_minzoom_dict_overrides_only_what_it_names():
@@ -903,6 +916,17 @@ def _eval(e, p):
         return any(_eval(x, p) for x in a)
     if op == "zoom":
         return p.get("$zoom", 22)                                   # a street zoom unless the test says otherwise
+    if op == "literal":
+        return a[0]
+    if op == "at":
+        lst = _eval(a[1], p)
+        return lst[int(_eval(a[0], p))]
+    if op == "match":                                               # the class minzoom (on by default since 2026-10-25)
+        x = _eval(a[0], p)
+        for lab, v in zip(a[1:-1:2], a[2:-1:2], strict=True):
+            if x in (lab if isinstance(lab, list) else [lab]):
+                return _eval(v, p)
+        return _eval(a[-1], p)
     x, y = _eval(a[0], p), _eval(a[1], p)
     return {"==": x == y, "<": x < y if op == "<" else None, ">": x > y if op == ">" else None, ">=": x >= y if op == ">=" else None}[op]
 
@@ -3535,7 +3559,7 @@ def test_simple_draws_every_road_piece_in_one_layer_in_the_full_order():
     """simple=True: one road line layer (source "simple": the casing pieces as the full look cuts them, then the fills), a transparent roads-fill on the
     roads source for picking, the highlight, one arrow and one name layer; the line-sort-key is 2 * position (a bridge's casing + 0.25), a fill
     2 * position + 1 (a dashed class's - 0.5, before the casings, and no casing); every piece names its edge."""
-    from roadstyle.render_web import _TIE
+    from roadstyle.render_web import _piece_key
     kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0)
     full = _stages(_simple_world(), simple=False, **kw)
     html = render_edges(_simple_world(), **kw).html
@@ -3553,13 +3577,13 @@ def test_simple_draws_every_road_piece_in_one_layer_in_the_full_order():
                    if not (p.get("__rs_seam") and p["__rs_edge"] == 0) and p["__rs_edge"] != 2]
     assert [c[:2] for c in casings] == full_pieces
     assert [c[:2] for c in casings if c[0] == 0] == [(0, -1), (0, 0), (0, -2)] and {c[:2] for c in casings if c[0] == 1} == {(1, 0), (1, 1), (1, 2)}
-    assert [c[2] for c in casings] == [2 * c[1] + (0.25 if c[0] == 1 else 0) + c[0] * _TIE for c in casings]     # + the edge's tie-breaker
+    assert [c[2] for c in casings] == [_piece_key(2 * c[1] + (0.25 if c[0] == 1 else 0), c[0]) for c in casings]     # + the edge's tie-breaker
     fills = [(p["__rs_edge"], p["__rs_s"]) for p in feats if p["__rs_k"] == 1]
-    assert fills == [(0, 1), (1, 5 + _TIE), (2, 1.5 + 2 * _TIE)]
+    assert fills == [(0, _piece_key(1, 0)), (1, _piece_key(5, 1)), (2, _piece_key(1.5, 2))]
     assert all(max(c[2] for c in casings if c[0] == e) < s for e, s in fills if e != 2)      # an edge's fill over its own casing
     # the bridge's shadow: one copy of its main casing piece, just under it, with every piece's labels; blurred, wider than the casing
     shadows = [p for p in feats if p["__rs_k"] == 2]
-    assert [(p["__rs_edge"], p["__rs_cl"], p["__rs_s"]) for p in shadows] == [(1, 1, 2.15 + _TIE)] and "__rs_cls" in shadows[0]
+    assert [(p["__rs_edge"], p["__rs_cl"], p["__rs_s"]) for p in shadows] == [(1, 1, _piece_key(2.15, 1))] and "__rs_cls" in shadows[0]
     paint = lines[0]["paint"]
     # both bridge additions grow with the zoom: none at 14 and below, full at 17 and above (zoom at the top, the cases inside)
     assert paint["line-blur"][:3] == ["interpolate", ["linear"], ["zoom"]] and paint["line-blur"][3:5] == [14, 0] and paint["line-blur"][5] == 17 and paint["line-blur"][6][0] == "case"
@@ -3625,7 +3649,7 @@ def test_simple_tunnel_casing_is_a_gap_piece_and_a_dash_piece():
     gap, dash = [p for p in feats if p["__rs_k"] == 3 and not p.get("__rs_stub")], [p for p in feats if p["__rs_k"] == 4 and not p.get("__rs_stub")]
     assert len(gap) == len(dash) == 3 and all(p["__rs_edge"] == 0 for p in gap + dash)            # the tunnel's three pieces (heads and main), no plain casing
     assert not [p for p in feats if p["__rs_k"] == 0 and p["__rs_edge"] == 0]
-    assert [round(d["__rs_s"] - g["__rs_s"], 6) for g, d in zip(gap, dash, strict=True)] == [0.1] * 3 and all(d["__rs_s"] < 1 for d in dash)   # under the fill (key 1)
+    assert [d["__rs_s"] - g["__rs_s"] for g, d in zip(gap, dash, strict=True)] == [_KEY_UNIT // 10] * 3 and all(d["__rs_s"] < _KEY_UNIT for d in dash)   # under the fill (key 1)
     layer = next(l for l in style["layers"] if l["id"] == "roads-simple")
     color = layer["paint"]["line-color"]
     from roadstyle import render_web as rw
@@ -4182,7 +4206,7 @@ def test_the_editor_draws_the_items_of_its_hook_and_reloads_after_an_apply(tmp_p
     lanes = [f for f in area.update["features"]["simple"] if f["properties"]["__rs_k"] == 5]
     fill = next(f for f in area.update["features"]["simple"] if f["properties"]["__rs_k"] == 1 and f["properties"]["__rs_edge"] == lanes[0]["properties"]["__rs_edge"])
     assert len(lanes) == 1 and lanes[0]["id"] == base + lanes[0]["properties"]["__rs_edge"] * per          # its id: by road and rank, as the page swaps it
-    assert fill["properties"]["__rs_s"] < lanes[0]["properties"]["__rs_s"] < fill["properties"]["__rs_s"] + 1   # over its road's new fill
+    assert fill["properties"]["__rs_s"] < lanes[0]["properties"]["__rs_s"] < fill["properties"]["__rs_s"] + _KEY_UNIT   # over its road's new fill
 
 
 def test_only_clickable_items_are_picked():

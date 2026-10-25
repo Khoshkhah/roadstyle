@@ -89,7 +89,7 @@ pub fn read_roads(data: &[u8]) -> Result<RoadTable, Error> {
         };
         col
     }).collect();
-    RoadTable::new(names, cols, lines).map_err(Error::Format)
+    Ok(RoadTable::new(names, cols, lines)?)
 }
 
 #[cfg(test)]

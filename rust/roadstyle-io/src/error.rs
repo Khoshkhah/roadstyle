@@ -32,6 +32,13 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+/// A table or a geometry that the road model does not take: a part of the file that the reader does not read.
+impl From<roadstyle_model::Error> for Error {
+    fn from(e: roadstyle_model::Error) -> Error {
+        Error::Format(e.to_string())
+    }
+}
+
 impl From<Error> for String {
     fn from(e: Error) -> String {
         e.to_string()

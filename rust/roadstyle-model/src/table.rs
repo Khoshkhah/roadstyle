@@ -212,13 +212,13 @@ fn readable(t: &DataType) -> bool {
 
 impl RoadTable {
     /// The table of the columns `names` (each as long as `lines`). An error for a column of another type or length.
-    pub fn new(names: Vec<String>, cols: Vec<ArrayRef>, lines: Lines) -> Result<RoadTable, String> {
+    pub fn new(names: Vec<String>, cols: Vec<ArrayRef>, lines: Lines) -> Result<RoadTable, crate::Error> {
         for (n, c) in names.iter().zip(&cols) {
             if !readable(c.data_type()) {
-                return Err(format!("column type {} is not read", c.data_type()));
+                return Err(crate::error::column(n, format!("type {} is not read", c.data_type())));
             }
             if c.len() != lines.len() {
-                return Err(format!("column {n}: {} rows, the roads have {}", c.len(), lines.len()));
+                return Err(crate::error::column(n, format!("{} rows, the roads have {}", c.len(), lines.len())));
             }
         }
         Ok(RoadTable { names, cols, lines })
@@ -318,6 +318,16 @@ mod tests {
                                        Arc::new(Float64Array::from(vec![f64::NAN, 2.5])),
                                        Arc::new(BooleanArray::from(vec![true, false]))];
         RoadTable::new(["highway", "edge_id", "w", "bridge"].map(String::from).to_vec(), cols, lines).unwrap()
+    }
+
+    #[test]
+    fn a_column_that_the_model_does_not_take_is_an_error_with_its_name() {
+        let lines = || { let mut l = Lines::default(); l.push(None); l };
+        let date: ArrayRef = Arc::new(arrow_array::Date32Array::from(vec![1]));
+        let e = RoadTable::new(vec!["day".into()], vec![date], lines()).unwrap_err();
+        assert!(matches!(&e, crate::Error::Column { column, .. } if column == "day"), "{e}");
+        let two: ArrayRef = Arc::new(Int64Array::from(vec![1i64, 2]));
+        assert_eq!(RoadTable::new(vec!["n".into()], vec![two], lines()).unwrap_err().to_string(), "column n: 2 rows, the roads have 1");
     }
 
     #[test]

@@ -80,7 +80,7 @@ pub fn mark_roads(fs: &mut Roads, look: &Look, args: &Value) -> Result<crate::co
         mark_width_m(fs, &pairs, col, args["casing_m"].as_f64().unwrap_or(look.casing_m));
     }
     for (i, d) in fs.draw.iter_mut().enumerate() {
-        d.edge = Some(i as u32);
+        d.edge = Some(crate::road::key(i));
     }
     Ok(colors)
 }
@@ -198,8 +198,8 @@ fn mark_single_line(fs: &mut Roads, classes: &HashSet<String>) {
             }
             Some(j) => {
                 fs.draw[i].dup = true;
-                fs.draw[i].edge2 = Some(j as u32);
-                fs.draw[j].edge2 = Some(i as u32);
+                fs.draw[i].edge2 = Some(crate::road::key(j));
+                fs.draw[j].edge2 = Some(crate::road::key(i));
                 for r in [i, j] {
                     (fs.draw[r].twoway, fs.draw[r].oneway) = (Some(false), Some(false));
                 }

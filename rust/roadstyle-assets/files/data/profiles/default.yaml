@@ -57,7 +57,9 @@ roads:
   twin_end_caps: true   # one road-wide round end under a two-way road's two lanes
   twin_casing: "one"   # a two-way road as two edges: one casing around both, or each its own
 
-casing: {extra: 2.0, m: 0.15, min_px: 0.0}   # m, min_px: roads in metres
+casing: {extra: 2.0, m: 0.15, min_px: 0.0, drop_below_px: 1.0}   # m, min_px: roads in metres; drop_below_px: no casing piece (a bridge's
+# keeps it) at a zoom where the whole casing line is narrower than this many px: the fill alone, and the casing from the first zoom where
+# it is as wide (0 = always a casing; nothing is dropped from a road in metres when min_px >= drop_below_px)
 
 labels:
   halo_width: 0

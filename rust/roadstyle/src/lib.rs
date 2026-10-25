@@ -70,9 +70,19 @@ fn columns(look: &Look) -> Value {
     json!({"class": arg("highway_col"), "filter": arg("filter_col"), "width": arg("width_m_col")})
 }
 
+/// The first zoom of a source's tiles: the first zoom at which a layer of the style draws it (a layer without `minzoom` draws from 0),
+/// and not past the tiles' last zoom (MapLibre scales that zoom up for the layers after it). Below it no layer draws a feature of the
+/// source, so the tiles leave them out (2026-10-25: Tartu's buildings, drawn from zoom 15, were 455 KB of a 3 MB tile at zoom 12).
+/// A source that no layer draws keeps `from` (a page can read it).
+fn first_drawn(layers: &[Value], k: &str, from: u32, last: u32) -> u32 {
+    let drawn = layers.iter().filter(|l| l["source"] == k).map(|l| l["minzoom"].as_f64().map_or(0, |z| z.floor() as u32)).min();
+    drawn.map_or(from, |z| from.max(z.min(last)))
+}
+
 /// Stage 2 from memory: the tiles of stage 1's sources (`o`: the rules), borrowed (audit N6: `s` stays as it is).
-fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> tiles::Tiles {
-    let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px);
+fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> Result<tiles::Tiles, tiles::Error> {
+    let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px)?;
+    tiled.drawn_by(&s.layers);
     let keys = |v: &Value| -> std::collections::HashSet<String> {
         v["data"]["features"].as_array().into_iter().flatten().filter_map(|f| f["properties"].as_object()).flat_map(|p| p.keys().cloned()).collect()
     };
@@ -83,15 +93,15 @@ fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> tiles::T
             Src::Roads(_) => {
                 let (keep, whole, from) = o.rule(k, Default::default);
                 let r = &s.roads;
-                tiled.add_lines(k, r.roads.iter().map(|x| (x.line(), r.props(x, None))), &keep, whole, from)        // the cells, no JSON copy
+                tiled.add_lines(k, r.roads.iter().map(|x| (x.line(), r.props(x, None))), &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))        // the cells, no JSON copy
             }
             Src::Simple(p) => {
                 let (keep, whole, from) = o.rule(k, Default::default);
-                tiled.add_lines(k, p.features(&s.roads.roads).map(|(_, props, c)| (c, props.into_iter())), &keep, whole, from)
+                tiled.add_lines(k, p.features(&s.roads.roads).map(|(_, props, c)| (c, props.into_iter())), &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))
             }
             Src::Json(v) => {
                 let (keep, whole, from) = whole_unless_lines(json_lines(v), o.rule(k, || keys(v)), o.min_zoom);
-                tiled.add(k, v, &keep, whole, from)
+                tiled.add(k, v, &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))
             }
             // a base-map layer, from its table (audit R10)
             Src::Features(f) => {
@@ -100,11 +110,11 @@ fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> tiles::T
                 let lines = (0..t.len()).all(|r| matches!(t.geometries_of().kind(r), Some(GeomType::LineString | GeomType::MultiLineString)));
                 let keys = || t.names().iter().filter(|n| (0..t.len()).any(|r| t.has_key(r, n))).cloned().collect();
                 let (keep, whole, from) = whole_unless_lines(lines, o.rule(k, keys), o.min_zoom);
-                tiled.add_features(k, t, &keep, whole, from)
+                tiled.add_features(k, t, &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))
             }
         }
     }
-    tiled
+    Ok(tiled)
 }
 
 /// tiles.py's rule for a source other than the roads, the pieces and the slots: lines are clipped to each tile; points and polygons go
@@ -122,13 +132,13 @@ fn json_lines(src: &Value) -> bool {
 /// Stage 2 from memory (audit N3): the tiles of stage 1's sources and the one style that draws them (`tiled_style`), the tiles at `at`
 /// (`{"url": "pmtiles://roads"}` for an archive, `{"tiles": ["<prefix>roads/{z}/{x}/{y}"]}` for a folder). `o`: which sources and
 /// which properties. The sources that `o` leaves out stay in the style with a null `data` (audit D3: not copied), which
-/// `Sources::write_with` fills as it writes the style.
-pub fn tile_stage(s: &sources::Sources, o: &tiles::stage::TileOptions, at: &Value) -> (Value, tiles::Tiles) {
-    let tiles = tile_sources(s, o);
+/// `Sources::write_with` fills as it writes the style. An error for zooms in `o` that are not tile zooms.
+pub fn tile_stage(s: &sources::Sources, o: &tiles::stage::TileOptions, at: &Value) -> Result<(Value, tiles::Tiles), tiles::Error> {
+    let tiles = tile_sources(s, o)?;
     let style = s.style_with(|_| Value::Null, true);
     let tiled: Vec<String> = s.sources.iter().filter(|(k, src)| (!matches!(src, Src::Roads(_)) || s.roads.in_style) && o.wants(k))
         .map(|(k, _)| k.clone()).collect();
-    (tiled_style(style, &tiled, at, (o.min_zoom, o.max_zoom)), tiles)
+    Ok((tiled_style(style, &tiled, at, (o.min_zoom, o.max_zoom)), tiles))
 }
 
 /// A style of these Sources (`tile_stage`'s, `style_with`'s) as JSON text, each null `data` with its source's FeatureCollection.
@@ -185,7 +195,9 @@ pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[S
                        -> Result<(Value, tiles::Tiles), String> {
     let style: Value = serde_json::from_slice(&read("style.json")?).map_err(|e| format!("style.json: {e}"))?;
     let o = match o { Some(o) => o, None => tiles::stage::TileOptions::from_style(&style, keep)? };
-    let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px);
+    let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px)?;
+    let layers = style["layers"].as_array().map(Vec::as_slice).unwrap_or_default();
+    tiled.drawn_by(layers);
     let mut names = Vec::new();
     for (k, spec) in style["sources"].as_object().into_iter().flatten() {
         if !o.wants(k) || spec["type"] != "geojson" {
@@ -208,7 +220,7 @@ pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[S
             };
             let feats = (0..t.len()).map(|i| (t.line(i).or_else(|| table.as_ref().and_then(|r| r.line(i))),
                                               cols.iter().map(move |&(c, n)| (n.as_str(), cell(c, i, n)))));
-            tiled.add_lines(k, feats, &keep, whole, from);
+            tiled.add_lines(k, feats, &keep, whole, first_drawn(layers, k, from, o.max_zoom));
             continue;
         }
         let mut fc: Value = if file.ends_with(".parquet") { read::features(read(file)?)? }
@@ -228,7 +240,7 @@ pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[S
         let rule = o.rule(k, || src["data"]["features"].as_array().into_iter().flatten()
             .filter_map(|f| f["properties"].as_object()).flat_map(|p| p.keys().cloned()).collect());
         let (keep, whole, from) = whole_unless_lines(json_lines(&src), rule, o.min_zoom);
-        tiled.add(k, &src, &keep, whole, from);
+        tiled.add(k, &src, &keep, whole, first_drawn(layers, k, from, o.max_zoom));
     }
     Ok((tiled_style(style, &names, at, (o.min_zoom, o.max_zoom)), tiled))
 }
@@ -383,7 +395,7 @@ pub fn save_sources(s: &sources::Sources, dir: &std::path::Path, format: Format,
 /// `prefix`) and the tiles.
 pub fn tile_made(s: &sources::Sources, prefix: &str, keep: &[String]) -> Result<(String, tiles::Tiles), String> {
     let o = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &s.saved[tiles::stage::TILES], &s.saved[tiles::stage::COLUMNS], keep)?;
-    let (style, tiled) = tile_stage(s, &o, &xyz_at(prefix));
+    let (style, tiled) = tile_stage(s, &o, &xyz_at(prefix))?;
     Ok((style_text(s, &style), tiled))
 }
 
@@ -408,14 +420,7 @@ pub fn tiled_of(roads: RoadTable, look: &Look, features: Option<FeatureTable>, n
     // the sources in its tiles (`tile_layers`: roads, simple, slots; the page keeps the others inline)
     o.exact = look.args["tile_keep"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
     o.only = look.args["tile_layers"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
-    let (mut style, tiled) = tile_stage(&s, &o, &xyz_at(prefix));
-    if look.args["export"] == true && style["metadata"]["roadstyle:contract"].is_null() {
-        // an app's dashboard on the exported style (export_style): the road roles and the pick layers of its final layers, as a live
-        // style has them (contract::describe; audit 3, N27)
-        let layers = style["layers"].as_array().cloned().unwrap_or_default();
-        style["metadata"]["roadstyle:sources"] = contract::roles(&layers);
-        style["metadata"]["roadstyle:controls"] = json!({"pick": contract::pick_layers(&layers)});
-    }
+    let (style, tiled) = tile_stage(&s, &o, &xyz_at(prefix))?;
     Ok((style_text(&s, &style), tiled, s.warnings))
 }
 

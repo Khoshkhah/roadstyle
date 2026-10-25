@@ -283,7 +283,7 @@ mod wasm {
         /// archive(bounds, layers): a PMTiles archive of every tile in bounds [min lon, min lat, max lon, max lat] (one file of the map).
         pub fn archive(&self, bounds: Vec<f64>, layers: Vec<String>) -> Result<Vec<u8>, JsError> {
             let b: [f64; 4] = bounds.try_into().map_err(|_| JsError::new("bounds: four numbers"))?;
-            self.tiles.archive(b, &layers).ok_or_else(|| JsError::new("the archive has no tile"))
+            self.tiles.archive(b, &layers).map_err(|e| JsError::new(&e.to_string()))
         }
 
         /// The properties of the feature `id` of a source, as JSON (`null` when there is none).

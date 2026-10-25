@@ -123,8 +123,8 @@ let _sel=null;
 export function useSelect(){
   if(_tip) _tip.remove();
   _sel=null; _hov=null; _cur=null;
-  // the style's pick layers (roadstyle:controls.pick); a style with no interaction contract has none (a host's makeStyle, the level
-  // editor's style): then the road layer of simple mode (the role simple), which every such style draws its roads with
+  // the style's pick layers (roadstyle:controls.pick, in every style since b3a8e64); for a style made before b3a8e64 that has no
+  // contract, none: then the road layer of simple mode (the role simple), which every such style draws its roads with
   PICK_LAYERS = (O.pick.length ? O.pick.map(id=>RS_PREFIX+id) : RS_LEAN ? [RS_LEAN] : []).concat([...ITEM_LAYERS]);
   _roadPopup = O.road_popup !== false; _popupFields = Array.isArray(O.road_popup) ? O.road_popup : null;
   _ttip = O.road_tooltip; _ttipOnly = Array.isArray(_ttip) ? _ttip : null; _TIP_DELAY = O.hover_delay_ms;

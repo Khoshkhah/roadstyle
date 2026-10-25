@@ -14,8 +14,8 @@ matching the website: service / living_street / pedestrian / track / cycleway / 
 ``minzoom`` maps a road class to the zoom below which it is not drawn — the standard basemap
 behaviour (zoom out far enough and residential streets disappear, motorways stay). It is a
 **performance** knob as much as a cartographic one: at city scale most minor roads land on a
-sub-pixel of screen, and skipping them removes work you cannot see the result of. Opt-in — pass
-``minzoom=True`` to the web renderer to apply this table, or a dict to override parts of it.
+sub-pixel of screen, and skipping them removes work you cannot see the result of. The web renderer applies this table by default
+(since 2026-10-25); a dict overrides parts of it, and ``minzoom=False`` draws every class at every zoom.
 """
 from __future__ import annotations
 
@@ -86,8 +86,10 @@ class StyleConfig:
     #: ramps and collision culling handle density automatically; unnamed name-slots stay empty.
     annotations: dict = field(default_factory=lambda: {"slot_m": 100})
     #: vector tiling (web backend, `tiles=True`): tileset zoom range, MVT grid extent, and the
-    #: clip buffer in extent units (bleed for strokes crossing tile edges)
-    tiles: dict = field(default_factory=lambda: {"minzoom": 6, "maxzoom": 15,
+    #: clip buffer in extent units (bleed for strokes crossing tile edges). maxzoom 18 (2026-10-25, was 15): the map scales the
+    #: last zoom's tiles up, and the casing pieces' cut points round to that zoom's grid; at 15 a casing piece stood 4-5 px off its
+    #: fill at zoom 22, at 18 about 1 px. A planet build chooses its own maxzoom with this known error.
+    tiles: dict = field(default_factory=lambda: {"minzoom": 6, "maxzoom": 18,
                                                  "extent": 4096, "buffer_px": 80})
     #: default API key / access token for basemaps (e.g. Mapbox, Stadia, MapTiler)
     api_key: str | None = None

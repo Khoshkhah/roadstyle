@@ -62,6 +62,14 @@ export function rsSetClasses(visible){
   _emit("rs:filterchange", {visible:FILTER.classes.filter(c=>_fltVis.has(c)), hidden:hidden});
 }
 export const _fltSw = {};   // class -> its swatch element in the Roads panel
+const _fltLab = {};          // class -> its row in the Roads panel
+// a class that the map does not draw at this zoom (FILTER.minzoom: {class: its first zoom}, roadstyle:controls.filter): its row dimmed,
+// with its first zoom as the title. The layer's filter reads the zoom of the tile, a whole number.
+function _fltBelow(){
+  const mz = FILTER.minzoom, z = Math.floor(map.getZoom());
+  for(const c in _fltLab){ const m = mz && mz[c], below = m != null && z < m;
+    _fltLab[c].classList.toggle("flt-below", below); _fltLab[c].title = below ? "from zoom " + m : ""; }
+}
 export function rsSetBridges(on){
   _bridgesOn=!!on; _applyRoadFilters();
   const cb=document.getElementById("rs-flt-br"); if(cb) cb.checked=_bridgesOn;
@@ -148,8 +156,9 @@ export function initFilterBox(){
     const {box, body}=_box("flt-ctrl", "flt", "Roads", _popupMode==="panel" || O.box_layout==="stack");
     FILTER.classes.forEach(c=>{      // _fltSw: the swatch of each class (a view's palette sets their colours, FILTER.palettes)
       const r=_check(c, true, ()=>rsSetClasses(FILTER.classes.filter(k=>_fltCbs[k].checked)), {sw:(FILTER.swatches||{})[c]||"#888"});
-      _fltCbs[c]=r.cb; _fltSw[c]=r.sw; body.append(r.lab);
+      _fltCbs[c]=r.cb; _fltSw[c]=r.sw; _fltLab[c]=r.lab; body.append(r.lab);
     });
+    if(FILTER.minzoom){ _fltBelow(); map.on("zoomend", _fltBelow); }
     // grade-separated data: Bridges / Tunnels rows under the classes, then the restricted roads (access_col) with the kind's colour;
     // the first row of each group ruled off
     [["bridges","rs-flt-br","Bridges",rsSetBridges],["tunnels","rs-flt-tn","Tunnels",rsSetTunnels]].filter(r=>FILTER[r[0]])
