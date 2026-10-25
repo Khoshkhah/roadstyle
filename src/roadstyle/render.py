@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Mapping
+from contextvars import ContextVar
 
 from .edges import as_edges
 from .filters import filter_edges
@@ -37,6 +38,21 @@ def _warn_unclassed(g, col):
     names = [str(v) for v in (bad[idc] if idc else bad.index)[:5]]
     warnings.warn(f"{len(bad)} edges have no '{col}' value: they are drawn with the default style; usually bad data, e.g. an area outline "
                   f"(area:highway) taken as a road ({idc or 'row'}: {', '.join(names)}{' ...' if len(bad) > 5 else ''})", stacklevel=3)
+
+
+# the inner render_edges call of a call with settings (the same keywords): it does not warn again
+_SCOPED: ContextVar[bool] = ContextVar("roadstyle_render_scoped", default=False)
+
+
+def _warn_unknown(kwargs):
+    """render_edges takes **kwargs, so a misspelt keyword did nothing, with no message. Each keyword that no part of roadstyle reads
+    (roadstyle::options::unknown) gives a warning with the nearest known one. From roadstyle 0.27.0 it is an error. The names that start
+    with "_" are the internal hooks (the export, the level editor), and ``styler`` is the Python renderer's own."""
+    from ._engine import rust
+    names = [k for k in kwargs if not k.startswith("_") and k != "styler"]
+    for k, near in rust().unknown_keywords(names):
+        warnings.warn(f"render_edges: unknown keyword {k!r}" + (f" (did you mean {near!r}?)" if near else "")
+                      + "; it does nothing. From roadstyle 0.27.0 it is an error.", UserWarning, stacklevel=3)
 
 
 def render_edges(
@@ -113,10 +129,16 @@ def render_edges(
     """
     if "order_col" in kwargs:
         raise ValueError("order_col is removed: roadstyle draws by positions (docs/design/levels_split_casing.md, section 12)")
+    for k in ("band_col", "order"):     # inputs of the level step, not of the drawing (docs/design/level_input.md), for both engines
+        if k in kwargs:
+            raise ValueError(f"render_edges takes no {k}: compute the levels first (rs.compute_levels(edges, {k}=...), or rs.level_input + "
+                             "rs.solve_levels) and pass casing_level_col / fill_level_col / casing_start_col / casing_end_col")
     if kwargs.get("sidebar") is not None:      # render_dashboard, render_report: the sidebar's keywords where the call gives none
         from .pages import SIDEBAR_DEFAULTS
         for k, v in SIDEBAR_DEFAULTS.get(kwargs["sidebar"], {}).items():
             kwargs.setdefault(k, v)
+    if backend == "web" and not _SCOPED.get():          # folium and lonboard take keywords of their own
+        _warn_unknown(kwargs)
     from . import _engine
     hooks = [k for k in ("_export", "_parts", "_edges", "_palette_copy") if kwargs.get(k) is not None and kwargs.get(k) is not False]
     # ``engine``: "python" (default) or "rust" (the roads' style from the Rust engine, the page from Python). The internal hooks of the
@@ -154,11 +176,13 @@ def render_edges(
         call_args = {k: v for k, v in locals().items()
                      if k not in ("gdf", "settings", "kwargs", "_s", "_use", "_st", "pick")}
         prev = list(_s._EXTRA)
+        token = _SCOPED.set(True)
         try:
             _use(*prev, *(settings if isinstance(settings, list) else [settings]))
             return render_edges(gdf, settings=None, **call_args, **kwargs)
         finally:
             _use(*prev)
+            _SCOPED.reset(token)
 
     edges = as_edges(gdf, class_col=highway_col)   # canonical: RoadEdges (EPSG:4326, lines)
     g = edges.gdf
