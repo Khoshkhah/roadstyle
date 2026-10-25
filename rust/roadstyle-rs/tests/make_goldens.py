@@ -2,14 +2,12 @@
 with. Run it in the conda environment roadstyle (roadstyle from this repository's src/, mapstyle not needed), with no roadstyle.json,
 ./palettes or ./profiles of your own, one part at a time:
 
-    python rust/roadstyle-rs/tests/make_goldens.py cmaps looks monaco sodermalm tartu
+    python rust/roadstyle-rs/tests/make_goldens.py cmaps monaco sodermalm tartu
 
 - tests/data/monaco_part/roads.parquet (the roads of Monaco in BOX, around Monte Carlo) is a fixed input in git: this script made it
   until 2026-10-24, when the colour cases became the Rust engine's own goldens (tests/colors.rs).
 - cmaps: src/roadstyle/data/cmaps.json, the colour ramps of both engines (colors.py and roadstyle-look read it), from branca and matplotlib (branca's schemes and colour names, each
   matplotlib colormap at 9 stops).
-- looks: tests/data/looks.json.gz (tests/look.rs): the look of render_edges' palette, profile and settings, for each built-in profile x
-  palette and settings sources in the older and the newer layout.
 - level_area: tests/data/level_area/ (tests/level_area.rs): a level area of Monaco in a box, and roadstyle's answers of the check before
   a rule is added.
 - monaco, sodermalm, tartu: tests/data/<area>/golden_*.gz (tests/areas.rs): the look's options and the levels (compute_levels' tags
@@ -17,7 +15,6 @@ with. Run it in the conda environment roadstyle (roadstyle from this repository'
   are the Rust engine's own goldens since 2026-10-24 (tests/areas.rs, ROADSTYLE_BLESS=1). sodermalm also writes its input, tests/data/sodermalm/roads.parquet, from
   notebooks/data/sodermalm_edges.gpkg with the solved levels. tartu reads tests/data/tartu/ (tests/get_goldens.sh) and writes to
   tests/data/tartu/, whose goldens go to the pre-release rust-test-data (their SHA-256 are in tests/areas.rs)."""
-import base64
 import gzip
 import json
 import sys
@@ -49,77 +46,6 @@ def write_cmaps():
     mpl = {n: [mcolors.to_hex(matplotlib.colormaps[n](i / 8.0)) for i in range(9)] for n in sorted(matplotlib.colormaps)}
     out = {"versions": {"branca": branca.__version__, "matplotlib": matplotlib.__version__}, "branca": schemes, "css": css, "matplotlib": mpl}
     Path(__file__).resolve().parents[3].joinpath("src", "roadstyle", "data", "cmaps.json").write_text(json.dumps(out, separators=(",", ":")))
-
-def _json(o):
-    """numpy values, sets and tuples that json cannot write (as geolibre-roadstyle's build.py writes the look)."""
-    if hasattr(o, "item"):
-        return o.item()
-    if isinstance(o, (set, frozenset, tuple)):
-        return sorted(o, key=str) if isinstance(o, (set, frozenset)) else list(o)
-    raise TypeError(f"{type(o)} is not JSON")
-
-def py_look(palette="amber", profile=None, settings=None, args=None):
-    """The roadstyle half of geolibre-roadstyle's look_of (build.py): the look render_edges(palette=, profile=, settings=) renders with,
-    with no base-map part (mapstyle's "features")."""
-    import dataclasses
-    import inspect
-    from importlib.resources import files
-
-    from roadstyle import _settings
-    from roadstyle import render_web as rw
-    from roadstyle.palettes import FALLBACK, PALETTES
-    from roadstyle.style import _apply
-    from roadstyle.stylers import _dash_str
-
-    active = _settings.theme()["active"]         # render_edges: a profile / palette by name is a settings source after settings=
-    pick = {k: v for k, v in (("profile", profile), ("palette", palette)) if v is not None and v != active[k]
-            and (k == "profile" or v in _settings.style_names("palettes"))}
-    sources = ([settings] if settings is not None else []) + ([pick] if pick else [])
-    prev = list(_settings._EXTRA)
-    rs.use_settings(*prev, *sources)
-    try:
-        table = PALETTES[palette]
-
-        def res(st):
-            out = []
-            for link in (False, True):
-                q = _apply(st, link, False, False, rw.CONFIG)
-                out.append({"fill": q.fill, "width": q.width, "casing": q.casing, "casing_width": q.casing_width, "dash": _dash_str(q.dash),
-                            "opacity": q.opacity, "casing_opacity": q.casing_opacity})
-            return out
-        styles = {"classes": {c: res(st) for c, st in table.items()}, "fallback": res(table.get(FALLBACK) or next(iter(table.values())))}
-        png = files("roadstyle").joinpath("data/sprite.png").read_bytes()
-        look = {"palette": palette, "settings": settings, "args": args or {}, "theme": _settings.theme(), "config": dataclasses.asdict(rw.CONFIG),
-                "styles": styles, "head_m": inspect.signature(rw.render).parameters["head_m"].default,
-                "slots": {"z_order": dict(rw.ROAD_Z), "width_z20": {c: rw.class_width_px(c, 20) for c in rw._CLASSES},
-                          "width_z20_fallback": rw.class_width_px(None, 20)},
-                "roads_model": _settings.roads(),
-                "oneway_image": {"url": "data:image/png;base64," + base64.b64encode(png).decode(), "sdf": True,
-                                 "pixelRatio": _settings.theme_value("arrows.icon")["pixel_ratio"]},
-                "interaction": {"popup": list(rw.DEFAULT_ROAD_POPUP), "hover_delay_ms": inspect.signature(rw.render).parameters["hover_delay_ms"].default}}
-    finally:
-        rs.use_settings(*prev)
-    return json.loads(json.dumps(look, default=_json))
-
-def write_looks():
-    import warnings
-    cases = [{"palette": pa, "profile": pr} for pr in ("default", "highsat") for pa in ("amber", "carto", "highsat", "mono")]
-    cases += [
-        # the older layout (as mapstyle writes it): a palette of its own under "palettes", config and selection keys, a roads table
-        {"palette": "mine", "settings": {"palettes": {"mine": {"residential": {"fill": "#123456", "width": 2.5, "casing_width": 3.0, "casing": "#654321"},
-                                                               "unclassified": {"fill": "#abcdef", "width": 2, "casing_width": 3, "dash": [4, 2]}}},
-                                         "config": {"fill_opacity": 0.8, "minor_no_casing": ["footway"], "minzoom": {"service": 14}, "basemap": "osm"},
-                                         "selection": {"core": "#ff0000"}, "roads": {"z_order": {"service": 3}}}},
-        # the newer layout: a profile and a palette by name, and a style value
-        {"settings": {"profile": "highsat", "palette": "carto", "labels": {"color": "#112233"}}, "palette": "carto"},
-    ]
-    out = []
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)     # the older layout's warning
-        for c in cases:
-            out.append({"options": c, "look": py_look(**c)})
-    (DATA / "looks.json.gz").write_bytes(gzip.compress(json.dumps(out, separators=(",", ":")).encode(), 9, mtime=0))
-    print(f"looks: {len(out)} cases, {(DATA / 'looks.json.gz').stat().st_size // 1000} KB")
 
 def read_roads(path):
     """A plain Parquet file of roads (the geometry as WKB, as the worker's SQL writes it) as GeoPandas gives it to roadstyle; integers
@@ -203,10 +129,10 @@ def write_level_area():
     print(f"level_area: {len(roads)} roads, {len(pairs)} pairs, conflicts {[why for _, why, _ in found]}")
 
 def main():
-    parts = sys.argv[1:] or ["cmaps", "looks", "monaco", "sodermalm"]
+    parts = sys.argv[1:] or ["cmaps", "monaco", "sodermalm"]
     warnings.simplefilter("ignore", DeprecationWarning)
     for p in parts:
-        {"cmaps": write_cmaps, "looks": write_looks, "level_area": write_level_area}.get(p, lambda p=p: write_area(p))()
+        {"cmaps": write_cmaps, "level_area": write_level_area}.get(p, lambda p=p: write_area(p))()
 
 if __name__ == "__main__":
     main()
