@@ -2,6 +2,7 @@
 //! `overlays=`, `user_overlays`), then roadstyle's _edge_overlay and _overlay_layers: the overlay sources and their layers before the
 //! placement and the passes (layers.rs).
 
+use roadstyle_look::sections::Num;
 use roadstyle_look::options::{EdgeLink, Overlay as Spec, OverlayKind, Placement, Select};
 use roadstyle_model::mark::{self, Mark};
 use crate::road::{Road, Roads};
@@ -164,9 +165,10 @@ pub fn feature_overlays(tables: Vec<(String, FeatureTable)>, look: &crate::Look,
         unknown.sort();
         warnings.push(format!("interaction: no layer {} on this map", unknown.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")));
     }
-    let st = &look.features["style"];
-    let specs = look.features["layers_yaml"]["layers"].as_array().cloned().unwrap_or_default();
-    let all_images = look.features["images"].as_object().cloned().unwrap_or_default();
+    let bm = look.sections.base_map.as_ref();
+    let st = bm.map_or(&Value::Null, |b| &b.style);
+    let specs = bm.and_then(|b| b.layers_yaml["layers"].as_array()).cloned().unwrap_or_default();
+    let all_images = bm.and_then(|b| b.images.as_object()).cloned().unwrap_or_default();
     let (areas, lines, points, icon) = (&st["areas"], &st["lines"], &st["points"], &st["icon"]);
     let mut out = Vec::new();
     let mut images = Map::new();
@@ -349,26 +351,23 @@ fn wm_width_expr(min_zoom: &Value) -> Value {
 /// _overlay_layers: the layer(s) of one overlay source: a fill and its outline, a circle, a line or a text. An interactive overlay (a popup
 /// or none given, or an item selected itself) lights up on hover and select (feature-state).
 pub fn overlay_layers(sid: &str, ov: &Overlay, look: &crate::Look) -> Vec<Value> {
-    let (th, cfg, u) = (&look.theme, &look.config, ov.user.as_deref());
-    let mut c = th["overlays"].as_object().cloned().unwrap_or_default();
-    for (k, v) in cfg["overlays"].as_object().into_iter().flatten() {
-        c.insert(k.clone(), v.clone());
-    }
+    let (s, u) = (&look.sections, ov.user.as_deref());
+    let c = &s.overlays;
     // render's hover_color / select_color go to the overlays too (_build_overlays), else the theme's selection colours
     let it = &look.map.interaction;
-    let pick = |c: Option<&roadstyle_look::color::Color>, theme: &str| c.map_or_else(|| th["selection"][theme].clone(), |c| c.css().into());
-    let (hover, select) = (&pick(it.hover_color.as_ref(), "hover"), &pick(it.select_color.as_ref(), "select"));
-    let mut base = or(&ov.color, &c["color"]);
+    let pick = |c: Option<&roadstyle_look::color::Color>, theme| json!(c.unwrap_or(theme).css());
+    let (hover, select) = (&pick(it.hover_color.as_ref(), &s.selection.hover), &pick(it.select_color.as_ref(), &s.selection.select));
+    let mut base = or(&ov.color, &json!(c.color));
     if let Some(cc) = u.and_then(|u| u.color_column.as_deref()).filter(|s| !s.is_empty()) {        // a colour per feature (null / missing: the overlay's)
         base = json!(["coalesce", ["get", cc], base]);
     }
-    let width = match u.filter(|u| u.width_m.is_some()) { Some(u) => wm_width_expr(&number(u.min_zoom)), None => or(&ov.width, &c["width"]) };
-    let radius = or(&ov.radius, &c["radius"]);
+    let width = match u.filter(|u| u.width_m.is_some()) { Some(u) => wm_width_expr(&number(u.min_zoom)), None => or(&ov.width, &json!(c.width)) };
+    let radius = or(&ov.radius, &json!(c.radius));
     let popup = u.and_then(|u| u.popup.as_ref());
     let interactive = popup.is_none_or(|a| !a.is_empty()) || (u.is_some_and(|u| u.select == Select::Item) && ov.edge);
     let col = if interactive { ov_hl(&base, hover, select) } else { base.clone() };
     let lay = json!({"visibility": if ov.visible { "visible" } else { "none" }});
-    let op = |d: &str| or(&ov.opacity, &c[d]);
+    let op = |d: &Num| or(&ov.opacity, &json!(d));
     let dash: Option<Value> = u.and_then(|u| u.dash.as_ref()).filter(|a| !a.is_empty()).map(|a| Value::Array(a.iter().map(|x| json!(x)).collect()));
     // a layer's keys in Python's order: id, type, source, then the zoom range before or after the layout
     let layer = |id: String, t: &str, zooms_first: bool, layout: Value, mut paint: Map<String, Value>, paint_dash: bool| {
@@ -407,32 +406,32 @@ pub fn overlay_layers(sid: &str, ov: &Overlay, look: &crate::Look) -> Vec<Value>
             layout.insert("symbol-placement".into(), if along { "line-center" } else { "point" }.into());
             let text = u.and_then(|u| u.text.as_ref());
             layout.insert("text-field".into(), json!(["get", text.and_then(|t| t.column.as_deref())]));
-            layout.insert("text-font".into(), th["labels"]["font"].clone());
-            layout.insert("text-size".into(), or(&number(text.and_then(|t| t.size)), &c["text_size"]));
-            layout.insert("text-max-angle".into(), c["text_max_angle"].clone());
-            layout.insert("text-padding".into(), c["text_padding"].clone());
+            layout.insert("text-font".into(), json!(s.labels.font));
+            layout.insert("text-size".into(), or(&number(text.and_then(|t| t.size)), &json!(c.text_size)));
+            layout.insert("text-max-angle".into(), json!(c.text_max_angle));
+            layout.insert("text-padding".into(), json!(c.text_padding));
             let mut paint = Map::new();
             paint.insert("text-color".into(), or(&css(text.and_then(|t| t.color.as_ref())), &base));
             if let Some(h) = text.and_then(|t| t.halo.as_ref()).filter(|h| !h.css().is_empty()) {
                 paint.insert("text-halo-color".into(), h.css().into());
-                paint.insert("text-halo-width".into(), c["text_halo_width"].clone());
+                paint.insert("text-halo-width".into(), json!(c.text_halo_width));
             }
             vec![layer(format!("{sid}-text"), "symbol", true, Value::Object(layout), paint, false)]
         }
         "fill" => vec![
-            layer(format!("{sid}-fill"), "fill", false, lay.clone(), pm(json!({"fill-color": col, "fill-opacity": op("fill_opacity")})), false),
+            layer(format!("{sid}-fill"), "fill", false, lay.clone(), pm(json!({"fill-color": col, "fill-opacity": op(&c.fill_opacity)})), false),
             layer(format!("{sid}-outline"), "line", false, lay,
-                  pm(json!({"line-color": or(&ov.outline, &base), "line-width": width, "line-opacity": c["outline_opacity"]})), true),
+                  pm(json!({"line-color": or(&ov.outline, &base), "line-width": width, "line-opacity": c.outline_opacity})), true),
         ],
         "circle" => vec![layer(format!("{sid}-circle"), "circle", false, lay,
-                               pm(json!({"circle-radius": radius, "circle-color": col, "circle-opacity": op("circle_opacity"),
-                                         "circle-stroke-color": or(&ov.outline, &c["circle_stroke"]),
-                                         "circle-stroke-width": or(&ov.width, &c["circle_stroke_width"])})), false)],
+                               pm(json!({"circle-radius": radius, "circle-color": col, "circle-opacity": op(&c.circle_opacity),
+                                         "circle-stroke-color": or(&ov.outline, &json!(c.circle_stroke)),
+                                         "circle-stroke-width": or(&ov.width, &json!(c.circle_stroke_width))})), false)],
         _ => {
             let mut l = pm(lay);
-            l.insert("line-cap".into(), if dash.is_some() { th["tunnels"]["cap"].clone() } else { th["roads"]["cap"].clone() });
+            l.insert("line-cap".into(), json!(if dash.is_some() { &s.tunnels.cap } else { &s.roads.cap }));
             vec![layer(format!("{sid}-line"), "line", true, Value::Object(l),
-                       pm(json!({"line-color": col, "line-width": width, "line-opacity": op("line_opacity")})), true)]
+                       pm(json!({"line-color": col, "line-width": width, "line-opacity": op(&c.line_opacity)})), true)]
         }
     }
 }
@@ -522,7 +521,7 @@ pub fn metre_items(ov: &Overlay) -> bool {
 /// filters read from their edge, `lvl`, their colour `__rs_ic`, their width and offset in metres over cos(latitude) (`__rs_iwm`,
 /// `__rs_iom`, also on the overlay's own features) and their dash as text.
 pub fn item_pieces(ov: &mut Overlay, i: usize, look: &crate::Look) -> Result<Vec<crate::simple::Item>, crate::Error> {
-    let default = match &look.config["overlays"]["color"] { Value::Null => look.theme["overlays"]["color"].clone(), c => c.clone() };
+    let default = json!(look.sections.overlays.color);
     let u = ov.user.as_deref().cloned().unwrap_or_default();
     let col = |c: Option<&String>| c.filter(|c| !c.is_empty()).cloned();
     let link = u.edge.clone().unwrap_or_default();

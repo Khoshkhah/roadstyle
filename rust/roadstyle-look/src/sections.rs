@@ -111,6 +111,18 @@ pub struct RoadsLook {
     pub head_m: f64,
 }
 
+impl RoadsLook {
+    /// Each class's value of `key` in the class table, for the classes that give it (`minzoom`: the classes' first zooms).
+    pub fn class_values(&self, key: &str) -> Table {
+        self.classes.iter().filter_map(|(c, e)| Some((c.clone(), e.get(key)?.clone()))).collect()
+    }
+
+    /// The classes whose flag `key` is true (`no_casing`, `single_line`, `minor`), in the table's order.
+    pub fn flagged(&self, key: &str) -> Vec<String> {
+        self.classes.iter().filter(|(_, e)| crate::resolve::truthy(e.get(key))).map(|(c, _)| c.clone()).collect()
+    }
+}
+
 /// Each class's style as ClassStyler resolves it: [plain, as a link] (fill, width, casing, casing_width, dash, opacity, casing_opacity).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -291,6 +303,18 @@ pub struct TunnelLook {
     pub palette: String,
     pub palettes: Table,
     pub to: Table,
+}
+
+impl TunnelLook {
+    /// The colour that a tunnel moves toward: the colour of the name `toward` in `towards`, else `toward` itself (a "#rrggbb").
+    pub fn toward_color(&self) -> &str {
+        self.towards.get(&self.toward).map_or(&self.toward, Color::css)
+    }
+
+    /// The pair of colours of the tunnel palette `palette` (none: the palette is not given).
+    pub fn pair(&self) -> Option<&Value> {
+        self.palettes.get(&self.palette).filter(|v| !v.is_null())
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

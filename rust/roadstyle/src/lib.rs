@@ -62,7 +62,7 @@ pub fn make_sources(parquet: Vec<u8>, look: &Look, features: Option<Vec<u8>>, pl
 pub fn sources_of(roads: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>)
                   -> Result<sources::Sources, crate::Error> {
     let mut s = sources::Sources::new(make_parts(roads, look, features, planner, name)?);
-    s.saved.insert(tiles::stage::TILES.into(), look.config["tiles"].clone());
+    s.saved.insert(tiles::stage::TILES.into(), serde_json::json!(look.sections.tiles));
     s.saved.insert(tiles::stage::COLUMNS.into(), columns(look));
     Ok(s)
 }
@@ -420,7 +420,7 @@ pub fn make_tiled(parquet: Vec<u8>, look: &Look, features: Option<Vec<u8>>, name
 pub fn tiled_of(roads: RoadTable, look: &Look, features: Option<FeatureTable>, name: Option<String>, prefix: &str, keep: &[String])
                 -> Result<(String, tiles::Tiles, Vec<String>), crate::Error> {
     let s = sources::Sources::new(make_parts(roads, look, features, None, name)?);
-    let mut o = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &look.config["tiles"], &columns(look), keep)?;
+    let mut o = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &serde_json::json!(look.sections.tiles), &columns(look), keep)?;
     // render(tiles=True)'s page (the Python binding): the columns of its road and simple tiles (`tile_keep`; every __rs_* goes too) and
     // the sources in its tiles (`tile_layers`: roads, simple, slots; the page keeps the others inline)
     o.exact = look.args["tile_keep"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());

@@ -136,9 +136,8 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
             page_style[k] = v.clone();
         }
     }
-    let (cfg, th) = (&look.config, &look.theme);
-    let mut cam = json!({"pitch": 0, "bearing": 0, "pitch_3d": 55, "max_pitch": 70});
-    cam.as_object_mut().unwrap().extend(cfg["camera"].as_object().into_iter().flatten().map(|(k, v)| (k.clone(), v.clone())));
+    let (ls, c) = (&look.sections, &look.sections.camera);
+    let mut cam = json!({"pitch": c.pitch, "bearing": c.bearing, "pitch_3d": c.pitch_3d, "max_pitch": c.max_pitch});
     if on("view_3d") {
         cam["pitch"] = cam["pitch_3d"].clone();
     }
@@ -164,8 +163,8 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
         arrow_color: ctl["arrow_color"].clone(), arrow_rules: ctl["arrow_rules"].clone(),
         modes: ctl["modes"].clone(), box_layout: ctl["box_layout"].clone(),
     };
-    let hover = Some(&a["hover_color"]).filter(|v| py_truth(v)).unwrap_or(&th["selection"]["hover"]);
-    let simple_js = json!({"layer": "roads-simple", "bridge": cfg["bridge_casing_color"], "shadow": cfg["bridge_shadow_color"],
+    let hover = Some(&a["hover_color"]).filter(|v| py_truth(v)).cloned().unwrap_or_else(|| json!(ls.selection.hover));
+    let simple_js = json!({"layer": "roads-simple", "bridge": ls.bridges.casing_color, "shadow": ls.bridges.shadow.color,
                            "select": ctl["select_color"], "hover": hover, "tunnels": py_truth(&ctl["tunnel"]["layers"]),
                            "dashes": ctl["dashes"]});
     let side = gzip_b64(&table);
@@ -273,14 +272,15 @@ fn bg_color(bm: &Value, look: &Look) -> String {
         return bg.into();
     }
     let dark = bm["is_dark"] == true;
-    look.theme["background"][if dark { "dark" } else { "light" }].as_str().unwrap_or_default().into()
+    let b = &look.sections.background;
+    (if dark { &b.dark } else { &b.light }).css().into()
 }
 
 /// render_web._page_basemaps: the active base map, the switcher's list (the active one first) and the style that draws it.
 fn basemaps(a: &Map<String, Value>, look: &Look, warnings: &mut Vec<String>) -> Result<(Value, Vec<Value>, Value), crate::Error> {
     let api = a["api_key"].as_str();
     let resolved = a.get("resolved_basemaps").and_then(Value::as_array).cloned().unwrap_or_default();
-    let active = Some(&a["basemap"]).filter(|v| py_truth(v)).unwrap_or(&look.config["basemap"]).clone();
+    let active = Some(&a["basemap"]).filter(|v| py_truth(v)).cloned().unwrap_or_else(|| json!(look.sections.page.basemap));
     let active_bm = basemap(&active, api, &resolved, warnings)?;
     let all: Value = serde_json::from_str(BASEMAPS).expect("data/basemaps.json is JSON");
     let keys = a["basemaps"].as_array().filter(|l| !l.is_empty()).cloned().unwrap_or_else(|| all["switcher"].as_array().cloned().unwrap_or_default());
@@ -376,7 +376,7 @@ fn views(src: &mut Sources, a: &Map<String, Value>, look: &Look, options: &Optio
 /// _engine._palette_swatches: the filter panel's colour of each class in each palette of the views (the fill of the class's first road
 /// in that palette), and the page's palette's (the swatches).
 fn palette_swatches(style: &mut Value, props: &Value, pals: &[String], look: &Look) {
-    let fb = &look.theme["roads"]["fallback"]["fill"];
+    let fb = &look.sections.roads.fallback["fill"];
     let state = style["metadata"]["roadstyle:state"]["rs_palette"].as_str().unwrap_or_default().to_string();
     let flt = &mut style["metadata"]["roadstyle:controls"]["filter"];
     let col = flt["col"].as_str().unwrap_or_default().to_string();

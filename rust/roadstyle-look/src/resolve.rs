@@ -196,7 +196,7 @@ pub(crate) fn carto_entries() -> Result<Value, Error> {
     }).collect()))
 }
 
-fn truthy(v: Option<&Value>) -> bool {
+pub(crate) fn truthy(v: Option<&Value>) -> bool {
     match v {
         None | Some(Value::Null) => false,
         Some(Value::Bool(b)) => *b,

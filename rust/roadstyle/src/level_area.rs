@@ -168,8 +168,7 @@ pub fn make_files(table: &RoadTable, o: &MakeOptions, heads: &str) -> Result<Are
         }
     }
     let flag = |c: &str, i: usize| table.get(i, c).filter(|v| !v.is_null()).map(|v| truthy(&v.to_value()));
-    let single: HashSet<String> = roadstyle_engine::look::Look::resolve(&Default::default())?.config["single_line_classes"].as_array().into_iter().flatten()
-        .filter_map(|v| v.as_str().map(String::from)).collect();
+    let single: HashSet<String> = roadstyle_engine::look::Look::resolve(&Default::default())?.sections.roads.flagged("single_line").into_iter().collect();
     // directed (roadstyle's is_directed): open to cars or bikes and not a path; null when the edges have no driving or cycling column
     let directed = |i: usize| -> Option<bool> {
         if !(has("driving") && has("cycling")) {

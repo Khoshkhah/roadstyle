@@ -175,7 +175,7 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
         (Some((contract::controls(look, &roads.roads, info, colors.active)?, st.clone())),
          Some(Value::Object(st.into_iter().map(|(k, v)| (k, json!({"default": v}))).collect())))
     } else { (None, None) };
-    let mut glyphs = (labels && !source_features(&slots).is_empty()).then(|| look.theme["labels"]["glyphs"].clone());
+    let mut glyphs = (labels && !source_features(&slots).is_empty()).then(|| json!(look.sections.labels.glyphs));
     if glyphs.is_none() && ovs.iter().any(|o| o.kind == "text") {      // _build_overlays: a text overlay needs a font
         glyphs = Some(json!("https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"));
     }
@@ -212,15 +212,15 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
     let mut layers = layers;
     if let Some(fc) = look.map.boundary.as_ref().and_then(boundary_fc) {
         sources.push(("boundary".into(), Src::Json(json!({"type": "geojson", "data": fc}))));
-        let (th, b) = (&look.theme, &look.theme["boundary"]);
+        let (r, b) = (&look.sections.roads, &look.sections.boundary);
         layers.push(json!({"id": "boundary", "type": "line", "source": "boundary", "metadata": {"roadstyle:group": "roads"},
-                           "layout": {"line-cap": th["roads"]["cap"], "line-join": th["roads"]["join"]},
-                           "paint": {"line-color": b["color"], "line-width": b["width"], "line-opacity": b["opacity"], "line-dasharray": b["dash"]}}));
+                           "layout": {"line-cap": r.cap, "line-join": r.join},
+                           "paint": {"line-color": b.color, "line-width": b.width, "line-opacity": b.opacity, "line-dasharray": b.dash}}));
     }
-    images.insert("oneway".into(), look.oneway_image.clone());
+    images.insert("oneway".into(), look.sections.arrows.image.clone());
     let mut metadata = serde_json::Map::new();
     // the export's page metadata: the road popup's fields, the hover tooltip and the hover delay (roadstyle:interaction)
-    let it = &look.interaction;
+    let it = &look.sections.interaction;
     let args = &look.args;
     // render's road_popup: true (or not given) the default fields, a list those fields, "panel" the default fields in the side panel,
     // another text every column (null), false no popup; road_tooltip, else the folium name tooltip, else none
@@ -229,14 +229,14 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
         Popup::Off => json!(false),
         Popup::Fields(a) => json!(a),
         Popup::All => Value::Null,
-        Popup::Default | Popup::Panel => it["popup"].clone(),
+        Popup::Default | Popup::Panel => json!(it.popup),
     };
     let tooltip = match &look.map.interaction.tooltip {
         Some(Tooltip::All) => json!(true),
         Some(Tooltip::Fields(f)) => json!(f),
         None => json!(false),
     };
-    let delay = args["hover_delay_ms"].as_f64().map_or_else(|| it["hover_delay_ms"].clone(), |d| json!(d as i64));
+    let delay = args["hover_delay_ms"].as_f64().map_or_else(|| json!(it.hover_delay_ms), |d| json!(d as i64));
     metadata.insert("roadstyle:interaction".into(), json!({"popup": popup, "tooltip": tooltip, "hover_delay_ms": delay}));
     metadata.insert("roadstyle:images".into(), Value::Object(images));
     if let Some((k, v)) = planned {
@@ -253,7 +253,7 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
         let ramp = colors::Ramp::new(&cmap)?;
         metadata.insert("roadstyle:live".into(), json!({
             "color": layers::LIVE_COLOR, "width": layers::LIVE_WIDTH, "types": {layers::LIVE_COLOR: "color", layers::LIVE_WIDTH: "factor"},
-            "ramp": ramp.stops(9), "nodata": look.theme["data"]["nodata"]}));
+            "ramp": ramp.stops(9), "nodata": look.sections.data.nodata}));
     }
     // audit N7, R7: the road roles and the pick layers from the final layers, in every style, so that a host's dashboard finds and picks
     // the roads with no contract too (contract::describe; tiled_style writes them again for the tiles)

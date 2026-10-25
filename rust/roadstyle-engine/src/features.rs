@@ -64,9 +64,11 @@ fn building_base(min_height: Option<&str>, min_level: Option<&str>, cfg: &Value)
 /// load_layers: one table for each layer (osm_id, kind, name, bearing, and a building's height and base), in the order of the first row
 /// of each layer; a polygon layer's features largest first. `t`: the rows of features.parquet.
 pub fn feature_tables(t: &FeatureTable, look: &crate::Look) -> Result<Vec<(String, FeatureTable)>, crate::Error> {
-    let specs = look.features["layers_yaml"]["layers"].as_array().ok_or_else(|| crate::Error::Look(crate::look::Error::Look("look.json: no features.layers_yaml.layers".into())))?;
+    let no = || crate::Error::Look(crate::look::Error::Look("look.json: no features.layers_yaml.layers".into()));
+    let bm = look.sections.base_map.as_ref().ok_or_else(no)?;
+    let specs = bm.layers_yaml["layers"].as_array().ok_or_else(no)?;
     let kind_of = |name: &str| specs.iter().find(|s| s["name"] == name).and_then(|s| s["kind"].as_str()).unwrap_or("");
-    let b3d = &look.features["buildings_3d"];
+    let b3d = &bm.buildings_3d;
     let cell = |row: usize, col: &str| t.get(row, col).unwrap_or(Cell::Null);
     let text = |row: usize, col: &str| cell(row, col).as_str();
     let mut layers: IndexMap<String, Vec<usize>> = IndexMap::new();
