@@ -86,6 +86,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   look, options, given?)` call it. Python gives only what it alone knows: the data steps, the look's options, the base maps' keys and the
   Google Maps key. A view's palette resolves its look in Rust (Python makes no extra looks). The page writer gzips the road table and
   the big sources itself; the two engines' pages are the same byte for byte but these blobs, which are the same when read back.
+- **`examples/bench.rs` measures the stages** (review 4, D9): the time, the peak memory and the memory after each stage, on Monaco
+  and Tartu (`cargo run --release -p roadstyle --example bench`; the numbers are in docs/rust/parity.md). The archive (PMTiles) and
+  the CLI's XYZ folder make each tile once, with no cache (`Tiles::build`; `Tiles::tile` keeps its cache for a map): Tartu's archive
+  7.2 s to 6.4 s, peak 663 MB to 596 MB, and no 68 MB of cached tiles after it.
 - **One style builder, and the page writes each source once** (review 4, D3 and N29). `Sources::style_with` makes the style with
   no source's data in it, and `Sources::write_with` writes it, with each source's data written into the text as it goes. Stage 2
   (`tile_stage`) and the page (`page_from`) use them: no source is cloned, written and parsed back any more. The page's JSON is

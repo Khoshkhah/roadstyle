@@ -193,17 +193,31 @@ MapLibre's workers.
 
 ## Memory
 
-The peak resident memory of the native program (`/usr/bin/time`), for the style:
+`examples/bench.rs` runs each stage of the Rust engine on Monaco and on Tartu, and gives its time, the peak of the memory in use
+during it and the memory in use after it (the bytes that the program has, counted by its allocator):
 
-| Area | Roads | Peak | Time |
-|---|---|---|---|
-| Monaco | 13,298 | 194 MB | 0.55 s |
-| Tartu | 64,828 | 1.13 GB | 2.9 s |
+```bash
+cargo run --release --manifest-path rust/Cargo.toml -p roadstyle --example bench
+```
 
-Tartu uses about 17 KB for each road. In the browser, the WebAssembly module used 0.65 to 0.77 times the native peak in earlier
-measurements. A WebAssembly module has at most 4 GB, so the engine stops at 200,000 roads (`MAX_ROADS`) with an error. This
-limit is an estimate from Tartu, not a measurement of a larger area. Stockholm county (456,813 driving edges) is over the limit.
+Measured on 2026-10-24 on the machine above (other programs ran at the same time, so the times can vary by 20 %):
 
-The memory for each road goes down when the columnar road model of the plan is built (P4). It is not built.
+| Step | Monaco: time | Monaco: peak | Tartu: time | Tartu: peak | Tartu: after |
+|---|---|---|---|---|---|
+| Read the roads and the base map | 14 ms | 7 MB | 45 ms | 38 MB | 27 MB |
+| Stage 1 (`sources_of`) | 93 ms | 20 MB | 378 ms | 99 MB | 73 MB |
+| Stage 1 as text (`write_style`, 8.5 MB and 59.1 MB) | 94 ms | 31 MB | 504 ms | 141 MB | 73 MB |
+| Stage 2 (`tile_stage`, the tile index) | 114 ms | 29 MB | 641 ms | 168 MB | 152 MB |
+| Stage 2's archive (PMTiles, 4.2 MB and 111.4 MB) | 665 ms | 41 MB | 6,396 ms | 596 MB | 152 MB |
+| The page (`page_from`, no gzip: 10.3 MB and 67.0 MB) | 494 ms | 69 MB | 2,958 ms | 365 MB | 23 MB |
+| The page (`page_from`, gzip: 3.6 MB and 17.8 MB) | 518 ms | 52 MB | 3,835 ms | 253 MB | 23 MB |
+
+Tartu has 64,828 roads; Monaco has 13,298. The archive makes each tile once, with no cache (before 2026-10-24: 7.2 s and 663 MB,
+and 68 MB of tiles kept after it). Most of its peak is the PMTiles writer, which keeps every gzipped tile until it writes the
+directory.
+
+In the browser, the WebAssembly module used 0.65 to 0.77 times the native peak in earlier measurements. A WebAssembly module has at
+most 4 GB, so the engine stops at 200,000 roads (`MAX_ROADS`) with an error. This limit is an estimate from Tartu, not a measurement
+of a larger area. Stockholm county (456,813 driving edges) is over the limit.
 
 **See also:** [Architecture of the Rust version](architecture.md) · [Build from source](build.md#run-the-tests)

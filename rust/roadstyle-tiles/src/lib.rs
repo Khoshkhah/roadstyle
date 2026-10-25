@@ -285,7 +285,7 @@ impl Tiles {
             let (x0, x1, y0, y1) = (cell(lo[0]), cell(hi[0]), cell(hi[1]), cell(lo[1]));
             for x in x0..=x1 {
                 for y in y0..=y1 {
-                    let t = self.tile(z, x, y);
+                    let t = self.build(z, x, y);       // each tile once: the cache is for a map that asks again (review 4, D9)
                     if !t.is_empty() {
                         w.write_tile(pmtiles::tile_id(z, x, y), &pmtiles::gzip(&t));
                     }
@@ -316,18 +316,10 @@ impl Tiles {
         self.layers.iter().filter(|(_, l)| l.tree.size() > 0).map(|(k, _)| k.clone()).collect()      // a layer with no feature is none
     }
 
-    /// The first and the last zoom of the tiles.
-    pub fn zooms(&self) -> (u32, u32) {
-        (self.min_zoom, self.max_zoom)
-    }
-
-    /// The tile z/x/y as a vector tile with a layer for each source that has features in it; empty when nothing is in it.
-    pub fn tile(&self, z: u32, x: u32, y: u32) -> Vec<u8> {
+    /// The tile z/x/y, made again (`tile` with no cache): for a walk that asks for each tile once (the archive, a folder of tiles).
+    pub fn build(&self, z: u32, x: u32, y: u32) -> Vec<u8> {
         if z < self.min_zoom || z > self.max_zoom {
             return Vec::new();
-        }
-        if let Some(t) = self.cache.lock().unwrap().tiles.get(&(z, x, y)) {
-            return t.to_vec();
         }
         let mut out = Vec::new();
         for (name, layer) in &self.layers {
@@ -335,6 +327,24 @@ impl Tiles {
                 out.extend(self.layer_tile(name, layer, z, x, y)); // a tile's layers are repeated fields: their bytes join
             }
         }
+        out
+    }
+
+    /// The first and the last zoom of the tiles.
+    pub fn zooms(&self) -> (u32, u32) {
+        (self.min_zoom, self.max_zoom)
+    }
+
+    /// The tile z/x/y as a vector tile with a layer for each source that has features in it; empty when nothing is in it. The last
+    /// tiles that a map asked for are kept (64 MB), as a map asks for the same tiles again.
+    pub fn tile(&self, z: u32, x: u32, y: u32) -> Vec<u8> {
+        if z < self.min_zoom || z > self.max_zoom {
+            return Vec::new();
+        }
+        if let Some(t) = self.cache.lock().unwrap().tiles.get(&(z, x, y)) {
+            return t.to_vec();
+        }
+        let out = self.build(z, x, y);
         let mut c = self.cache.lock().unwrap();
         c.bytes += out.len();
         c.tiles.insert((z, x, y), std::sync::Arc::new(out.clone()));
