@@ -37,6 +37,15 @@ def test_the_binding_gives_the_facades_style_and_road_table():
     assert _text(s.road_table()) == want["road_table"]["text"]
 
 
+
+def test_a_lean_road_table_has_only_the_fields_given():
+    """road_table(fields): each road's row with only these fields (the level editor's table: what its page reads), the same rows."""
+    s = _engine.rust().make_sources(pq.read_table(DATA / "monaco/roads.parquet"), _look())
+    full, lean = json.loads(s.road_table()), json.loads(s.road_table(["name", "highway", "__rs_twoway"]))
+    assert len(lean["props"]) == len(full["props"]) and lean["lines"] == full["lines"] and lean["bboxes"] == full["bboxes"]
+    assert all(set(p) <= {"name", "highway", "__rs_twoway"} for p in lean["props"])
+    assert [p.get("name") for p in lean["props"]] == [p.get("name") for p in full["props"]]
+
 def test_the_binding_gives_the_facades_page():
     want = json.loads((DATA / "monaco/rust_page.json").read_text())
     html = _engine.rust().page_from(pq.read_table(DATA / "monaco/roads.parquet"), _look().with_arg("state", '"live"'), "{}", "{}")

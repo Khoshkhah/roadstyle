@@ -108,7 +108,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
         (src.style_with(|_| Value::Null, false), None)
     };
     let mut table = Vec::new();
-    crate::write_road_table(&src, &mut table).map_err(|e| e.to_string())?;
+    crate::write_road_table(&src, None, &mut table).map_err(|e| e.to_string())?;
     if !pals.is_empty() {
         let t: Value = serde_json::from_slice(&table).map_err(|e| e.to_string())?;
         palette_swatches(&mut style, &t["props"], &pals, look);
