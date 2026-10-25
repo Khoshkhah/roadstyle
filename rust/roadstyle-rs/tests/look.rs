@@ -8,6 +8,12 @@ mod common;
 
 use serde_json::{json, Value};
 
+/// The views of version 1 of the look of `options` (makeLook's options): the goldens are a summary of them, so a look of version 2 has the
+/// same goldens as before (T3 step 2).
+fn views(options: &Value) -> Result<Value, roadstyle_rs::look::Error> {
+    Ok(roadstyle_rs::Look::resolve(&roadstyle_rs::look::Options::from_value(options)?)?.views_value())
+}
+
 /// A look as a golden sees it: the hash of each part, and of the whole look.
 fn summary(look: &Value) -> Value {
     let parts: serde_json::Map<String, Value> = look.as_object().unwrap().iter().map(|(k, v)| (k.clone(), json!(common::hash16(v)))).collect();
@@ -33,38 +39,45 @@ fn cases() -> Vec<Value> {
 fn the_looks_are_their_goldens() {
     let p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/look.json");
     let fixture: Value = serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap();
-    let mut got = vec![json!({"options": "the fixture (look.json)", "look": summary(&roadstyle_rs::look::make_look(&json!({
+    let mut got = vec![json!({"options": "the fixture (look.json)", "look": summary(&views(&json!({
         "palette": fixture["palette"], "settings": fixture["settings"], "args": fixture["args"], "features": fixture["features"]})).unwrap())})];
     for c in cases() {
         let mut o = c.clone();
         o["args"] = json!({});
-        let look = roadstyle_rs::look::make_look(&o).unwrap_or_else(|e| panic!("{c}: {e}"));
+        let look = views(&o).unwrap_or_else(|e| panic!("{c}: {e}"));
         got.push(json!({"options": c, "look": summary(&look)}));
     }
     common::golden("rust_looks.json", &Value::Array(got));
 }
 
-/// The look of version 1 as version 0: without its `schema_version`.
+/// The views of a look as version 0: without their `schema_version`.
 fn v0(mut look: Value) -> Value {
-    assert_eq!(look["schema_version"], 1, "a look of version 1");
+    assert_eq!(look["schema_version"], 1, "the views are version 1's form");
     look.as_object_mut().unwrap().shift_remove("schema_version");
     look
 }
 
 #[test]
-fn a_saved_look_of_version_0_and_1() {
+fn a_saved_look_of_version_0_1_and_2() {
     let p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/look.json");
     let text = std::fs::read_to_string(p).unwrap();
-    let old = roadstyle_rs::Look::from_json(&text).unwrap();           // version 0: today's look.json
-    let new = roadstyle_rs::Look::from_json(&old.to_json()).unwrap();  // version 1, written and read again
-    assert_eq!(old.schema_version, 1);
+    let old = roadstyle_rs::Look::from_json(&text).unwrap();           // version 0: 0.25.0's look.json
+    let v1 = roadstyle_rs::Look::from_value(old.views_value()).unwrap(); // version 1: the views as a look of version 1 was written
+    let new = roadstyle_rs::Look::from_json(&old.to_json()).unwrap();  // version 2, written and read again
+    assert_eq!(old.to_value()["schema_version"], 2);
     assert_eq!(new.to_json(), old.to_json());
-    assert_eq!(v0(new.to_value()).to_string(), serde_json::from_str::<Value>(&text).unwrap().to_string());
-    let later = text.replacen('{', r#"{"schema_version": 2, "#, 1);
+    assert_eq!(v1.to_json(), old.to_json());
+    // the views of each version are the saved look, byte for byte
+    for l in [&old, &v1, &new] {
+        assert_eq!(v0(l.views_value()).to_string(), serde_json::from_str::<Value>(&text).unwrap().to_string());
+    }
+    let later = text.replacen('{', r#"{"schema_version": 3, "#, 1);
     let e = roadstyle_rs::Look::from_json(&later).unwrap_err();
-    assert_eq!(e, roadstyle_rs::look::Error::Version { found: 2 });
-    assert_eq!(e.to_string(), "look version 2: this engine reads versions 0 and 1", "the text that Python and JavaScript show");
+    assert_eq!(e, roadstyle_rs::look::Error::Version { found: 3 });
+    assert_eq!(e.to_string(), "look version 3: this engine reads versions 0 to 2", "the text that Python and JavaScript show");
     let unknown = text.replacen('{', r#"{"pallete": "x", "#, 1);
+    assert!(matches!(roadstyle_rs::Look::from_json(&unknown).unwrap_err(), roadstyle_rs::look::Error::Look(m) if m.contains("pallete")));
+    let unknown = old.to_json().replacen('{', r#"{"pallete": "x", "#, 1);
     assert!(matches!(roadstyle_rs::Look::from_json(&unknown).unwrap_err(), roadstyle_rs::look::Error::Look(m) if m.contains("pallete")));
 }
 

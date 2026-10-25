@@ -86,19 +86,19 @@ mod wasm {
     use wasm_bindgen::prelude::*;
 
     /// A resolved look (roadstyle-look), parsed one time: `resolveLook(options)` makes it, `Look.fromJson(text)` reads a saved look
-    /// (version 1, or version 0: today's look.json), `toJson()` gives its text (version 1). The calls below take it, not its text.
+    /// (version 2, 1, or 0: the look.json of 0.25.0), `toJson()` gives its text (version 2). The calls below take it, not its text.
     #[wasm_bindgen(js_name = Look)]
     pub struct JsLook(roadstyle::Look);
 
     #[wasm_bindgen(js_class = Look)]
     impl JsLook {
-        /// Look.fromJson(text): a saved look (version 1 or 0). An error is a thrown Error.
+        /// Look.fromJson(text): a saved look (version 2, 1 or 0). An error is a thrown Error.
         #[wasm_bindgen(js_name = fromJson)]
         pub fn from_json(text: &str) -> Result<JsLook, JsError> {
             roadstyle::Look::from_json(text).map(JsLook).map_err(|e| JsError::new(&e.to_string()))
         }
 
-        /// toJson(): the look's text (version 1).
+        /// toJson(): the look's text (version 2).
         #[wasm_bindgen(js_name = toJson)]
         pub fn to_json(&self) -> String {
             self.0.to_json()

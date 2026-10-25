@@ -14,15 +14,19 @@ fn reads_json_is_made_from_the_marks() {
     for k in Kind::ALL {
         want.insert(k.name().into(), page_reads(k).into());
     }
-    if std::env::var("ROADSTYLE_BLESS").is_ok_and(|v| v == "1") {
+    let sorted = |m: &Map<String, Value>, k: Kind| {
+        let mut v: Vec<String> = m[k.name()].as_array().unwrap().iter().map(|x| x.to_string()).collect();
+        v.sort();
+        v
+    };
+    let same = Kind::ALL.iter().all(|&k| sorted(&file, k) == sorted(&want, k));
+    // written only when a list differs (the order and the layout of the file are free)
+    if !same && std::env::var("ROADSTYLE_BLESS").is_ok_and(|v| v == "1") {
         let text = serde_json::to_string_pretty(&Value::Object(want.clone())).unwrap();
         std::fs::write(&path, text + "\n").unwrap();
+        return;
     }
     for k in Kind::ALL {
-        let mut a: Vec<&Value> = file[k.name()].as_array().unwrap().iter().collect();
-        let mut b: Vec<&Value> = want[k.name()].as_array().unwrap().iter().collect();
-        a.sort_by_key(|v| v.to_string());
-        b.sort_by_key(|v| v.to_string());
-        assert_eq!(a, b, "reads.json's {}: run ROADSTYLE_BLESS=1 cargo test --test marks", k.name());
+        assert_eq!(sorted(&file, k), sorted(&want, k), "reads.json's {}: run ROADSTYLE_BLESS=1 cargo test --test marks", k.name());
     }
 }

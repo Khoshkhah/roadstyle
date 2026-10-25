@@ -6,7 +6,7 @@
 use roadstyle_engine::{level_edges, Cell, RoadTable};
 use roadstyle_io::columns::{write_columns, Column};
 use roadstyle_levels::{make, Options, Order};
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -168,7 +168,7 @@ pub fn make_files(table: &RoadTable, o: &MakeOptions, heads: &str) -> Result<Are
         }
     }
     let flag = |c: &str, i: usize| table.get(i, c).filter(|v| !v.is_null()).map(|v| truthy(&v.to_value()));
-    let single: HashSet<String> = roadstyle_engine::look::make_look(&json!({}))?["config"]["single_line_classes"].as_array().into_iter().flatten()
+    let single: HashSet<String> = roadstyle_engine::look::Look::resolve(&Default::default())?.config["single_line_classes"].as_array().into_iter().flatten()
         .filter_map(|v| v.as_str().map(String::from)).collect();
     // directed (roadstyle's is_directed): open to cars or bikes and not a path; null when the edges have no driving or cycling column
     let directed = |i: usize| -> Option<bool> {

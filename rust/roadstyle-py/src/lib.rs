@@ -50,19 +50,19 @@ fn tables(roads: ArrowArrayStreamReader, features: Option<ArrowArrayStreamReader
 }
 
 /// A resolved look (roadstyle-look), parsed one time: `resolve_look(options)` makes it, `Look.from_json(text)` reads a saved look
-/// (version 1, or version 0: today's look.json). The calls below take it, not its text.
+/// (version 2, 1, or 0: the look.json of 0.25.0). The calls below take it, not its text.
 #[pyclass(frozen, name = "Look")]
 struct PyLook(roadstyle::Look);
 
 #[pymethods]
 impl PyLook {
-    /// Look.from_json(text) -> Look: a saved look (version 1 or 0). An error is a ValueError.
+    /// Look.from_json(text) -> Look: a saved look (version 2, 1 or 0). An error is a ValueError.
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
         roadstyle::Look::from_json(text).map(PyLook).map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
-    /// json() -> str: the look's text (version 1).
+    /// json() -> str: the look's text (version 2).
     fn json(&self) -> String {
         self.0.to_json()
     }

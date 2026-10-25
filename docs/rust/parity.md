@@ -238,6 +238,24 @@ MapLibre's workers.
 | Monaco, a part (1,373 roads) | the style of `export_inline` | 0.57 s | 0.12 s |
 | Monaco (osmnx, 849 drive edges) | `render_edges` | 0.9 to 1.3 s | 0.3 s |
 
+## Size
+
+The size of the engine in each build, for the later steps to compare with: the WebAssembly package (`roadstyle_wasm_bg.wasm`, the
+output of `wasm-bindgen` for the profile `dist`), the same file with gzip -9, and the Python module (`_rust.abi3.so`, profile
+`release`, Linux x86-64). The steps of T3 (the typed map options and the typed look, `docs/design/t3_map_options_and_look.md`),
+2026-10-25:
+
+| Build | WebAssembly | gzip | Python module |
+|---|---|---|---|
+| Before T3 step 2 (94fc86f, step 1: `MapOptions`) | 11,292,251 B | 2,686,887 B | 31,304,056 B |
+| Step 2 as first written (d68e184) | 11,828,534 B (+4.7 %) | 2,840,954 B (+5.7 %) | 32,334,320 B (+3.3 %) |
+| Step 2 (db210f9: no serde `flatten`, schemars behind the feature `schema`) | 11,587,165 B (+2.6 %) | 2,773,038 B (+3.2 %) | 31,871,560 B (+1.8 %) |
+| Step 3 (the look crate's readers read the typed sections) | 11,669,114 B (+3.3 %) | 2,794,223 B (+4.0 %) | 32,124,408 B (+2.6 %) |
+
+The percentages are against the first row. The typed sections cost their serde readers (161 KB of the WebAssembly at step 2); serde's
+`flatten` read every section a second time through its buffer (113 KB for `Sections` alone), so `LookFile` is read and written by
+hand. The target: under +2 % again when N32 step 2 removes the JSON views of version 1 and the flat reader of `args`.
+
 ## Memory
 
 `examples/bench.rs` runs each stage of the Rust engine on Monaco and on Tartu, and gives its time, the peak of the memory in use

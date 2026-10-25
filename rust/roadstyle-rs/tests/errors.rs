@@ -52,8 +52,10 @@ fn each_bad_option_has_its_kind() {
     assert!(matches!(&e, EngineError::Column { column, .. } if column == "speed"), "{e}");
     let e = stage1(json!({"simple": false}));
     assert_eq!(e, EngineError::Unsupported(Unsupported::FullLook));
-    let e = stage1(json!({"overlays": [{"kind": "blob"}]}));
-    assert!(matches!(e, EngineError::Options(_)), "{e}");
+    // an overlay's keys are the look's to check (the typed look, T3): a key it does not know is a look error before the engine
+    let mut l: Value = serde_json::from_slice(&std::fs::read(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/look.json")).unwrap()).unwrap();
+    l["args"]["overlays"] = json!([{"kind": "blob"}]);
+    assert!(matches!(roadstyle_rs::Look::from_value(l), Err(roadstyle_rs::look::Error::Options(_))));
     let e = stage1(json!({"access_col": "who"}));
     assert!(matches!(&e, EngineError::Column { column, .. } if column == "who"), "{e}");
     // the facade wraps the engine's kind
