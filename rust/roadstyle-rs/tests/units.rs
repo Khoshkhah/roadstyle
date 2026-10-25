@@ -8,7 +8,7 @@ fn style(features: Value, args: Value) -> Value {
     let roads = roadstyle_rs::geojson::read_roads(fc.to_string().as_bytes()).unwrap();
     let look = roadstyle_rs::Look::resolve(&roadstyle_rs::look::Options::from_value(&json!({"args": args})).unwrap()).unwrap();
     let mut out = Vec::new();
-    roadstyle_rs::sources_of(roads, &look, None, None, None).unwrap().write_style(&mut out).unwrap();
+    roadstyle_rs::sources_of(roads, &look, None, None, None).unwrap().write_style(&mut out, roadstyle_rs::sources::SourceMode::INLINE).unwrap();
     serde_json::from_slice(&out).unwrap()
 }
 

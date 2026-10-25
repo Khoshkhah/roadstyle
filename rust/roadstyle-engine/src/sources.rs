@@ -22,6 +22,26 @@ pub struct TableRow<'a> {
     pub line: Option<&'a [[f64; 2]]>,
 }
 
+/// How the style writer gives the sources' data (docs/design/target_architecture.md (f), T4 step 2): in the style, with render's
+/// data_maxzoom (every GeoJSON source) and data_tolerance (every GeoJSON source that has a tolerance), or as the file of each source
+/// next to the style (`<name>.<ext>`). The tiled style is stage 2's.
+#[derive(Clone, Copy, Debug)]
+pub enum SourceMode<'a> {
+    Inline { maxzoom: Option<i64>, tolerance: Option<f64> },
+    Files(&'a str),
+}
+
+impl SourceMode<'static> {
+    /// The data in the style, with no data_maxzoom and no data_tolerance.
+    pub const INLINE: SourceMode<'static> = SourceMode::Inline { maxzoom: None, tolerance: None };
+
+    /// The data in the style, with the data_maxzoom and data_tolerance of `keys` (render's keywords).
+    pub fn inline_of(keys: &serde_json::Map<String, Value>) -> SourceMode<'static> {
+        SourceMode::Inline { maxzoom: keys.get("data_maxzoom").and_then(Value::as_f64).map(|z| z as i64),
+                             tolerance: keys.get("data_tolerance").and_then(Value::as_f64) }
+    }
+}
+
 /// One source of the style, borrowed: the roads (`Styled::roads`) or one of `Styled::sources`.
 #[derive(Clone, Copy)]
 pub enum Source<'a> {
@@ -93,11 +113,8 @@ impl Styled {
         m.extend(old.into_iter().filter(|(k, _)| k != "symbol-placement" && k != "symbol-spacing"));
         l["layout"] = layout;
         let at = self.sources.iter().position(|(k, _)| k == "slots").map_or(self.sources.len(), |i| i + 1);
-        let mut arrows = serde_json::json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": []}});
-        // render's data_maxzoom, as every GeoJSON source of the page has it (stage 1 gave it to the pieces)
-        if let Some(z) = self.sources.iter().find_map(|(_, s)| if let Src::Simple(p) = s { p.maxzoom } else { None }) {
-            arrows["maxzoom"] = z.into();
-        }
+        // render's data_maxzoom: the writer gives it to every GeoJSON source (SourceMode::Inline)
+        let arrows = serde_json::json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": []}});
         self.sources.insert(at, ("arrows".into(), Src::Json(arrows)));
         if let Some(m) = self.metadata.as_object_mut().filter(|m| m.contains_key("roadstyle:contract")) {
             m.insert("roadstyle:sources".into(), crate::contract::roles(&self.layers));
@@ -127,17 +144,19 @@ impl Styled {
         self.layers.iter().any(|l| l["source"] == "roads" && l["layout"]["visibility"] != "none")
     }
 
-    /// The style as one JSON text (export_inline's), with each source's GeoJSON in it, written to `w` a part at a time. A page's style
-    /// has no `roads` source (`RoadsSource::in_style`).
-    pub fn write_style<W: std::io::Write>(&self, w: &mut W) -> std::io::Result<()> {
-        self.write_with(&self.style_with(|_| Value::Null, false), w)
+    /// The style as one JSON text (export_inline's), with each source's GeoJSON in it (`mode`: SourceMode::Inline) or its file's name,
+    /// written to `w` a part at a time. A page's style has no `roads` source (`RoadsSource::in_style`).
+    pub fn write_style<W: std::io::Write>(&self, w: &mut W, mode: SourceMode) -> std::io::Result<()> {
+        self.write_with(&self.style_with(mode, false), w)
     }
 
-    /// The style as a JSON value, each source's `data` as `data(name)` (audit D3: no source is copied with its data): a URL of it, or
-    /// null, where `write_with` writes the source's FeatureCollection. `saved`: the metadata has what only a saved style has
-    /// (`roadstyle:tiles`, `roadstyle:columns`). The one builder of a style: export_inline's text, the saved style, stage 2's and the
+    /// The style as a JSON value, each source's `data` by `mode` (audit D3: no source is copied with its data): null, where `write_with`
+    /// writes the source's FeatureCollection (Inline), or the name of its file (Files). `saved`: the metadata has what only a saved style
+    /// has (`roadstyle:tiles`, `roadstyle:columns`). The one builder of a style: export_inline's text, the saved style, stage 2's and the
     /// page's.
-    pub fn style_with(&self, data: impl Fn(&str) -> Value, saved: bool) -> Value {
+    pub fn style_with(&self, mode: SourceMode, saved: bool) -> Value {
+        let data = |k: &str| match mode { SourceMode::Inline { .. } => Value::Null, SourceMode::Files(ext) => format!("{k}.{ext}").into() };
+        let (maxzoom, tolerance) = match mode { SourceMode::Inline { maxzoom, tolerance } => (maxzoom, tolerance), SourceMode::Files(_) => (None, None) };
         let spec = |tolerance: f64, promote: bool, maxzoom: Option<i64>, data: Value| {
             let mut s = serde_json::Map::new();
             s.insert("type".into(), "geojson".into());
@@ -152,13 +171,21 @@ impl Styled {
             Value::Object(s)
         };
         let sources: serde_json::Map<String, Value> = self.shown().map(|(k, s)| (k.to_string(), match s {
-            Source::Roads(r) => spec(r.tolerance, false, r.maxzoom, data(k)),
-            Source::Simple(s) => spec(s.tolerance, s.promote, s.maxzoom, data(k)),
-            Source::Features(f) => f.spec(data(k)),
-            // the source's other members, and `data` in its place
-            Source::Json(v) => v.as_object().map_or_else(|| v.clone(), |o| Value::Object(o.iter().map(|(m, x)| {
-                (m.clone(), if m == "data" { data(k) } else { x.clone() })
-            }).collect())),
+            Source::Roads(r) => spec(tolerance.unwrap_or(r.tolerance), false, maxzoom.or(r.maxzoom), data(k)),
+            Source::Simple(s) => spec(tolerance.unwrap_or(s.tolerance), s.promote, maxzoom.or(s.maxzoom), data(k)),
+            Source::Features(f) => f.spec(data(k), maxzoom),
+            // the source's other members, `data` in its place, and the mode's tolerance (where it has one) and maxzoom (a GeoJSON source)
+            Source::Json(v) => v.as_object().map_or_else(|| v.clone(), |o| {
+                let mut m: serde_json::Map<String, Value> = o.iter().map(|(m, x)| (m.clone(), match m.as_str() {
+                    "data" => data(k),
+                    "tolerance" => tolerance.map_or_else(|| x.clone(), Value::from),
+                    _ => x.clone(),
+                })).collect();
+                if let Some(z) = maxzoom.filter(|_| m.get("type").is_some_and(|t| t == "geojson")) {
+                    m.insert("maxzoom".into(), z.into());
+                }
+                Value::Object(m)
+            }),
         })).collect();
         let mut metadata = self.metadata.clone();
         if let Some(m) = metadata.as_object_mut().filter(|_| saved) {

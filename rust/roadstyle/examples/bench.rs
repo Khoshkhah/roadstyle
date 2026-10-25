@@ -66,14 +66,14 @@ fn main() {
         let s = step("stage 1 (sources_of)", || roadstyle::sources_of(roads, &look, Some(features), None, None).unwrap());
         let style = step("stage 1 as text (write_style)", || {
             let mut out = Vec::new();
-            s.write_style(&mut out).unwrap();
+            s.write_style(&mut out, roadstyle::sources::SourceMode::INLINE).unwrap();
             out.len()
         });
         println!("  (the style: {:.1} MB)", style as f64 / 1e6);
         let (tstyle, tiles) = step("stage 2 (tile_stage)", || {
             let o = roadstyle::tiles::stage::TileOptions::new(&s.layers, &s.metadata, &s.saved[roadstyle::tiles::stage::TILES],
                                                              &s.saved[roadstyle::tiles::stage::COLUMNS], &[]).unwrap();
-            roadstyle::tile_stage(&s, &o, &roadstyle::xyz_at("")).unwrap()
+            roadstyle::tile_stage(&s, &o, &roadstyle::xyz_at(""), roadstyle::sources::SourceMode::INLINE).unwrap()
         });
         let archive = step("stage 2's archive (PMTiles)", || tiles.archive(tiles.bounds().unwrap(), &tiles.layer_names()).unwrap().len());
         println!("  (the archive: {:.1} MB; the tiled style: {:.1} KB)", archive as f64 / 1e6, roadstyle::style_text(&s, &tstyle).len() as f64 / 1e3);

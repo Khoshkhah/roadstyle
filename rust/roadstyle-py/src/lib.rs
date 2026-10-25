@@ -116,7 +116,8 @@ fn make_style(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook>,
     let s = py.detach(|| tables(r, f, p).and_then(|(r, f, p)| roadstyle::sources_of(r, look, f, p, name))).map_err(py_err)?;
     warned(&s.warnings);
     let mut out = Vec::new();
-    py.detach(|| s.write_style(&mut out)).expect("a Vec takes every byte");
+    // the call's data_maxzoom and data_tolerance (keys of the writer, in the look's `other` until this binding takes a SourceMode)
+    py.detach(|| s.write_style(&mut out, roadstyle::sources::SourceMode::inline_of(&look.other))).expect("a Vec takes every byte");
     Ok(String::from_utf8(out).expect("serde_json writes UTF-8"))
 }
 
@@ -208,7 +209,7 @@ impl Sources {
     /// style() -> str: the style as one JSON text with each source's GeoJSON in it (make_style's).
     fn style(&self, py: Python<'_>) -> String {
         let mut out = Vec::new();
-        py.detach(|| self.inner.write_style(&mut out)).expect("a Vec takes every byte");
+        py.detach(|| self.inner.write_style(&mut out, roadstyle::sources::SourceMode::INLINE)).expect("a Vec takes every byte");
         String::from_utf8(out).expect("JSON text is UTF-8")
     }
 
@@ -227,7 +228,7 @@ impl Sources {
             Some(t) => serde_json::from_str(&t).map_err(|e| PyValueError::new_err(format!("at: not JSON: {e}")))?,
             None => roadstyle::xyz_at(""),
         };
-        let (style, tiles) = py.detach(|| roadstyle::tile_stage(s, &o, &at)).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let (style, tiles) = py.detach(|| roadstyle::tile_stage(s, &o, &at, roadstyle::sources::SourceMode::INLINE)).map_err(|e| PyValueError::new_err(e.to_string()))?;
         let style = py.detach(|| roadstyle::style_text(s, &style));
         Ok((style.clone(), Tiler { style, tiles }))
     }
