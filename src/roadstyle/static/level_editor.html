@@ -384,23 +384,23 @@ body.lv-sheet #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
       const box = b.closest("[data-cap]"), r = box.dataset.cap, end = box.dataset.end, cap = b.dataset.v;
       const f = facts[r] || {}, k = end === "start" ? 0 : 1;
       if(cap === ((f.caps || [])[k] || (f.caps_auto || [])[k] || "round")) return;           // already this shape
-      stage({op: "cap", road: r, end: end, cap: cap});
+      applyNow([{op: "cap", road: r, end: end, cap: cap}]);
     });
     $("lv-cards").querySelectorAll("[data-hroad]").forEach(box => {
       headsSync(box);
       box.querySelector("[data-hnomain]").onclick = () => {               // the main part to zero: the end head is the rest of the road
         const [a, b] = box.querySelectorAll("input"), L = +box.dataset.len;
         b.max = Math.max(0.5, L - +a.value); b.value = Math.max(0.5, Math.round((L - +a.value) * 100) / 100); headsSync(box);
-        stage({op: "head", road: box.dataset.hroad, end: "start", m: a.value}); stage({op: "head", road: box.dataset.hroad, end: "end", m: String(b.value)});
+        applyNow([{op: "head", road: box.dataset.hroad, end: "start", m: a.value}, {op: "head", road: box.dataset.hroad, end: "end", m: String(b.value)}]);
       };
       const back = box.querySelector("[data-hauto]");
-      if(back) back.onclick = () => { stage({op: "head", road: box.dataset.hroad, end: "start", m: ""}); stage({op: "head", road: box.dataset.hroad, end: "end", m: ""}); };
+      if(back) back.onclick = () => applyNow([{op: "head", road: box.dataset.hroad, end: "start", m: ""}, {op: "head", road: box.dataset.hroad, end: "end", m: ""}]);
       box.querySelectorAll("input").forEach(inp => {
         inp.oninput = () => headsSync(box);
         inp.onchange = () => {                                  // both heads go to the list together, so the pair always fits the road
           const r = box.dataset.hroad, [a, b] = box.querySelectorAll("input"), h = (facts[r] || {}).heads || [5, 5];
           if(+a.value === h[0] && +b.value === h[1]) return;
-          stage({op: "head", road: r, end: "start", m: a.value}); stage({op: "head", road: r, end: "end", m: b.value});
+          applyNow([{op: "head", road: r, end: "start", m: a.value}, {op: "head", road: r, end: "end", m: b.value}]);
         };
       });
     });
@@ -489,6 +489,17 @@ body.lv-sheet #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
     : b.relation === "stack" || b.relation === "near" ? `(${PART[b.a_end] || b.a_end}${END[b.a_end] ? " " + END[b.a_end] : ""}) over ${name(b.b)}${b.relation === "near" ? " (near only)" : ""}` : `after ${name(b.b)}`}`;
   const payload = q => q.op === "cap" ? {op: "cap", road: q.road, end: q.end, cap: q.cap} : q.op === "head" ? {op: "head", road: q.road, end: q.end, m: q.m}
     : q.op === "delete" ? {op: "delete", index: q.index, row: q.raw} : {op: "add", body: q.body};     // a change as the server takes it
+  // a cap or head: applied at once, with no solve (they are drawing only, 2026-10-08) and not in the list; one at a time, in order
+  let nowRun = Promise.resolve();
+  function applyNow(ops){
+    nowRun = nowRun.then(async () => {
+      let j;
+      try { j = await api("/api/apply", {ops: ops.map(payload)}); }
+      catch(err){ return toast(err.message + " · nothing saved", true); }
+      await shown(j, `${ops[0].op === "cap" ? "Cap" : "Heads"} saved · ${j.said}`);
+    });
+    return nowRun;
+  }
   function stage(q){
     if(q.op === "delete" && queue.some(x => x.op === "delete" && x.index === q.index)) return toast("Already in the list");
     if(q.op === "cap" || q.op === "head") queue = queue.filter(x => !(x.op === q.op && x.road === q.road && x.end === q.end));   // the last choice for an end counts
@@ -512,8 +523,13 @@ body.lv-sheet #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
     let j;
     try { j = await api("/api/apply", {ops: queue.map(payload)}); }
     catch(err){ busy(null); toast(err.message + " · nothing saved", true); $("lv-apply").disabled = false; return; }
-    let said = `Applied ${queue.length} change${queue.length > 1 ? "s" : ""} · ${j.said}`, why = j.reload;
+    const said = `Applied ${queue.length} change${queue.length > 1 ? "s" : ""} · ${j.said}`;
     queue = []; showQueue();
+    await shown(j, said);
+  };
+  // after an apply: the Rust page drew the new map itself, or the server gives the changed roads (in place), or the whole page again
+  async function shown(j, said){
+    let why = j.reload;
     if(j.redrawn){                                            // the Rust page drew the new map itself: the panel's facts and lists again
       Object.assign(facts, j.facts); STATS = j.stats; showStats(); busy(null); $("lv-apply").disabled = false;
       update(); lists(); givenUp(); return toast(said);

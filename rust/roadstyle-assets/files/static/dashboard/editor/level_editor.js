@@ -6,6 +6,8 @@
 // table, GeoParquet, one row for each edge) so that the host can apply it. A store is {load(name, bytes) -> {body, mtime} | null,
 // save(name, text | bytes)} with an optional `name` (the area's, shown in the panel) and `key`: httpStore for roadstyle serve,
 // browserStore for a page with no server.
+// The option `levels` ({csv, edge_hash}: the levels that the host's map has) is the answer to start from with no solve; saveArea and
+// areaIsFor let a page make the area only when its edges changed (docs/rust/browser.md, "The level editor in a page").
 import {rsDashboard} from "../index.js";
 import {style as dashboardStyle} from "../core.js";
 import {caller} from "../worker/call.js";
@@ -56,6 +58,22 @@ export function browserStore(key, name = key){
     }};
 }
 
+/** The files of a new level area in the store (`area`: makeArea's AreaFiles): roads.parquet, pairs.csv, edits.csv when the store has none
+ * (the edits of an earlier session stay), and edges.json with `edgeHash`, the area's edges by roadstyle's edge_hash (duckOSM's
+ * edge_levels_meta.edge_hash), for areaIsFor. */
+export async function saveArea(store, area, edgeHash){
+  await store.save("roads.parquet", area.roads);
+  await store.save("pairs.csv", area.pairs);
+  if(!(await store.load("edits.csv"))) await store.save("edits.csv", area.edits);
+  await store.save("edges.json", JSON.stringify({edge_hash: edgeHash}));
+}
+
+/** The store has the level area of these edges (`edgeHash`, as saveArea took it): a page makes the area again only when its edges changed. */
+export async function areaIsFor(store, edgeHash){
+  const f = await store.load("edges.json");
+  return !!f && JSON.parse(f.body).edge_hash === edgeHash;
+}
+
 function csvRows(text){                                          // the rows of a CSV text with a header, as objects (pandas' quotes)
   const lines = (text || "").split(/\r?\n/).filter(l => l.trim());
   const split = l => { const out = []; let cur = "", q = false;
@@ -75,7 +93,7 @@ const toCsv = (rows, cols = COLS) => cols.join(",") + "\n" + rows.map(r => cols.
  * EventTarget (event "solved") with `map`, `area` (the LevelArea), `download(name)` (edits.csv, heads.csv, caps.csv or levels.csv as they
  * are now), `files` (those names) and `answer()` (the last answer of the solver). */
 export async function levelEditor({map = null, container = document.body, pkgUrl, store, maplibregl: ml = globalThis.maplibregl, dashboard = null,
-                                   prefix = dashboard ? null : "lv-rs-", layout = "auto"}){
+                                   prefix = dashboard ? null : "lv-rs-", layout = "auto", levels: given = null}){
 if(!["auto", "sheet", "side"].includes(layout)) throw new Error(`level editor: layout must be "auto", "sheet" or "side", not ${JSON.stringify(layout)}`);
 if(map && !dashboard && window.rs)
   throw new Error("level editor: this page has a dashboard (window.rs): give it as levelEditor({dashboard, prefix}), so that the editor uses it; a second dashboard takes the first one's state");
@@ -101,6 +119,13 @@ const [roadsF, pairsF, editsF, headsF, capsF, levelsF, infoF] = await Promise.al
   get("heads.csv"), get("caps.csv"), get("levels.csv"), get("levels_info.json")]);
 if(!roadsF || !pairsF) throw new Error("the store has no roads.parquet or pairs.csv: make the area first (makeArea, or roadstyle levels make)");
 const roadsBytes = roadsF.body.slice();
+// the inputs of a solve, by their content (the SHA-256 of roads.parquet, pairs.csv and edits.csv): levels.csv is for them when its
+// levels_info.json has the same key, also after a page wrote the same area again (a file's time says nothing then). heads.csv and caps.csv
+// are drawing only: they are not inputs of the solve.
+const sha = async d => [...new Uint8Array(await crypto.subtle.digest("SHA-256", typeof d === "string" ? new TextEncoder().encode(d) : d))]
+  .map(b => b.toString(16).padStart(2, "0")).join("");
+const areaKey = `${await sha(roadsBytes)}:${await sha(pairsF.body)}`;
+const inputsKey = async edits => `${areaKey}:${await sha(edits)}`;
 const opened = await call({type: "open", roads: roadsBytes.buffer, pairs: pairsF.body}, [roadsBytes.buffer]);
 const pairs = csvRows(pairsF.body);
 const order = JSON.parse(opened.facts);                          // each road, in the roads' order
@@ -113,12 +138,10 @@ const SAVED = "lv-saved:" + (store.key || location.pathname);    // the edits sa
 let saved = +(sessionStorage.getItem(SAVED) ?? csvRows(editsText).length);
 let res = null;                                                  // the last answer of the solver (JSON of LevelArea)
 
-// --- the answer to start from: levels.csv when it is newer than the inputs and has every edge, else a solve
-async function fromStored(){
-  if(!levelsF || !infoF) return null;
-  const newest = Math.max(roadsF.mtime, pairsF.mtime, editsF ? editsF.mtime : 0, headsF ? headsF.mtime : 0);
-  if(levelsF.mtime < newest) return null;
-  const at = Object.fromEntries(csvRows(levelsF.body).map(r => [r.edge, [+r.casing_start, +r.casing_level, +r.casing_end, +r.fill_level]]));
+// --- the answer to start from: levels.csv when it was solved for these inputs (inputsKey) and has every edge, else a solve
+// each road's 4 numbers in its own way from a levels.csv text (one row for each edge), or null when an edge of the area has none
+function levelsOf(text){
+  const at = Object.fromEntries(csvRows(text).map(r => [r.edge, [+r.casing_start, +r.casing_level, +r.casing_end, +r.fill_level]]));
   const levels = [];
   for(const f of order){
     const fw = f.directions.find(d => d.way === "along"), bw = f.directions.find(d => d.way === "against");
@@ -126,6 +149,13 @@ async function fromStored(){
     else if(bw && at[bw.edge]){ const [s, m, e, fl] = at[bw.edge]; levels.push([e, m, s, fl]); }      // only the other way: its heads swapped
     else return null;
   }
+  return levels;
+}
+async function fromStored(){
+  if(!levelsF || !infoF) return null;
+  if(JSON.parse(infoF.body).inputs !== await inputsKey(editsText)) return null;
+  const levels = levelsOf(levelsF.body);
+  if(!levels) return null;
   const info = JSON.parse(infoF.body);
   await call({type: "startFrom", levels: levels.flat(), parts: (info.given_up_parts || []).map(p => p.join("|")), orders: (info.orders_not_kept || []).length,
     near: (info.near || []).length});
@@ -137,14 +167,41 @@ async function save(newRes){                                       // levels.csv
   const [heads, caps] = [headsText, capsText];
   const levelsCsv = (await call({type: "levelsCsv", levels: flat(newRes), heads, caps})).csv;
   const info = JSON.stringify({...newRes.info, given_up: newRes.given_up, given_up_parts: newRes.given_up_parts, near: newRes.near,
-    orders_not_kept: newRes.orders_not_kept});
+    orders_not_kept: newRes.orders_not_kept, inputs: await inputsKey(editsText)});
   await store.save("levels.csv", levelsCsv);
   await store.save("levels_info.json", info);
   events.dispatchEvent(new CustomEvent("solved", {detail: {levelsCsv, levelsInfo: info,
     draw: async () => (await call({type: "draw", levels: flat(newRes), heads, caps})).bytes}}));
 }
-res = await fromStored();
-if(!res){ res = JSON.parse((await call({type: "solve", edits: editsText})).answer); try { await save(res); } catch(e){ console.warn(e.message); } }
+// the levels that the host's map has (the option `levels`: {csv: levels.csv text with edge, casing_start, casing_level, casing_end and
+// fill_level, edge_hash: duckOSM's edge_levels_meta.edge_hash}): the answer to start from, with no solve, when they are for the area's
+// edges (roadstyle's edge_hash: sha256 of the sorted edge ids, 8 bytes each, little endian; the first 32 hex characters) and have one
+// row for each; else the whole area is solved and the answer says why (resolve.why). The rules that they do not keep are not known
+// without a solve: the counts of the pairs come from pairs.csv, the order wishes and near rules not kept are null.
+async function edgeHash(){
+  const ids = order.flatMap(f => f.directions.map(d => BigInt(d.edge))).sort((x, y) => (x < y ? -1 : x > y ? 1 : 0));
+  const b = new DataView(new ArrayBuffer(ids.length * 8));
+  ids.forEach((v, i) => b.setBigInt64(i * 8, v, true));
+  return (await sha(b.buffer)).slice(0, 32);
+}
+let givenWhy = null;
+async function fromGiven(){
+  if(!given) return null;
+  if(given.edge_hash !== await edgeHash()){ givenWhy = "the map's levels are for other edges (edge_hash): solved the whole area"; return null; }
+  const levels = levelsOf(given.csv);
+  if(!levels){ givenWhy = "the map's levels have no row for some edges of the area: solved the whole area"; return null; }
+  await call({type: "startFrom", levels: levels.flat(), parts: [], orders: 0, near: 0});
+  const n = rel => pairs.filter(r => r.relation === rel).length;
+  return {levels, given_up: [], given_up_parts: [], near: [], orders_not_kept: [],
+    info: {pairs: n("stack"), meets: n("meet"), order_pairs: n("order"), order_violations: null, near_warnings: null}, resolve: {how: "given"}};
+}
+res = await fromStored() || await fromGiven();
+if(res?.resolve.how === "given"){ try { await save(res); } catch(e){ console.warn(e.message); } }        // the next open starts from the store
+if(!res){
+  res = JSON.parse((await call({type: "solve", edits: editsText})).answer);
+  if(givenWhy) res.resolve = {...res.resolve, why: givenWhy};
+  try { await save(res); } catch(e){ console.warn(e.message); }
+}
 
 // --- what the panel shows: each road's numbers and ends
 const endsNow = async () => JSON.parse((await call({type: "ends", heads: headsText, caps: capsText})).ends);
@@ -324,8 +381,9 @@ async function apply(ops){
   const changed = [...(newEdits || old), ...old].filter(r => before.has(key(r)) !== now.has(key(r))).flatMap(r => [r.a, r.b])
     .concat(order.filter((f, i) => JSON.stringify(ends[i].heads_own) !== JSON.stringify(heads[f.road])).map(f => f.road));
   const nextEdits = newEdits ? toCsv(newEdits) : editsText;
-  let said = "not solved again (only caps)", full = false, next = res;
-  if(newEdits || headsCsv !== headsText){
+  // caps and heads are drawing only (level_editor.py's change, 2026-10-08): only a relation edit is solved, locally (solveLocal)
+  let said = headsCsv === headsText ? "not solved again (only caps)" : "not solved again (heads and caps are drawing only)", full = false, next = res;
+  if(newEdits){
     const t = performance.now();
     next = JSON.parse((await call({type: "solveLocal", edits: nextEdits, changed})).answer);   // a refusal throws: nothing is saved
     const s = ((performance.now() - t) / 1000).toFixed(1);

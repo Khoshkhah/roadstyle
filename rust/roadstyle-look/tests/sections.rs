@@ -80,11 +80,12 @@ fn a_look_file_has_no_page_key() {
     let o = Options::from_value(&json!({"args": {"name": "m", "basemap_switcher": false, "export": true, "color_by": "lanes"}})).unwrap();
     let look = Look::resolve(&o).unwrap();
     let keys: Vec<&String> = look.other.keys().collect();
-    assert_eq!(keys, ["basemap_switcher", "export"]);
+    assert_eq!(keys, ["basemap_switcher"]);
     let v = look.to_value();
     assert!(v.get("args").is_none() && v["map"]["color"]["by"] == "lanes" && v["map"]["output"]["name"] == "m", "{}", v["map"]);
     let text = look.to_json();
-    assert!(!text.contains("basemap_switcher") && !text.contains("\"export\""), "a page key in the look file");
+    assert!(!text.contains("basemap_switcher"), "a page key in the look file");
+    assert!(look.map.output.export, "export is a map option (it changes stage 1)");
     assert!(Look::from_json(&text).unwrap().other.is_empty());
     // with_arg: a map option changes the map options and keeps the others; another keyword goes to `other`
     let l = look.with_arg("arrows", json!(false)).unwrap().with_arg("legend", json!(false)).unwrap();

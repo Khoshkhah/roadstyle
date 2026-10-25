@@ -362,7 +362,7 @@ mod wasm {
         /// style(): the style's JSON text with its sources inline, as the Python binding's `style()`.
         pub fn style(&self) -> String {
             let mut out = Vec::new();
-            self.inner.write_style(&mut out).expect("a Vec takes every byte");
+            self.inner.write_style(&mut out, roadstyle::sources::SourceMode::INLINE).expect("a Vec takes every byte");
             String::from_utf8(out).expect("JSON text is UTF-8")
         }
 

@@ -1556,6 +1556,7 @@ dependencies = [
  "proj4wkt",
  "roadstyle-levels",
  "roadstyle-model",
+ "rstar",
  "rusqlite",
  "serde_json",
  "shapefile",
@@ -1606,6 +1607,7 @@ version = "0.25.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
+ "arrow-select",
  "roadstyle-levels",
  "rstar",
  "serde",

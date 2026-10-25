@@ -279,7 +279,6 @@ fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i16; 4]>>, lo
         metadata.insert("roadstyle:controls".into(), controls);
     }
     let name = name.or_else(|| look.map.output.name.clone()).map_or(Value::Null, Value::from);
-    data_settings(&mut roads, &mut sources, &look.other);
     Ok(Parts { name, center, zoom, layers, roads, sources, metadata: Value::Object(metadata), glyphs, state, warnings })
 }
 
@@ -287,7 +286,8 @@ fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i16; 4]>>, lo
 pub fn make_style(table: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<String, Error> {
     let s = sources::Styled::new(make_parts(table, look, features, planner, name)?);
     let mut out = Vec::new();
-    s.write_style(&mut out).expect("a Vec takes every byte");
+    // the call's data_maxzoom and data_tolerance (keys of the writer): the look keeps them in `other` until the bindings give the mode
+    s.write_style(&mut out, sources::SourceMode::inline_of(&look.other)).expect("a Vec takes every byte");
     Ok(String::from_utf8(out).expect("serde_json writes UTF-8"))
 }
 
@@ -356,40 +356,11 @@ fn compute_levels(table: &RoadTable, roles: &Roles, m: &roadstyle_look::options:
     Ok(Some(levels.rows.iter().map(|r| [r.casing_start, r.casing_level, r.casing_end, r.fill_level].map(small)).collect()))
 }
 
-/// render's export (export_inline, export_style: a style for an app with no road table). A key of the style writer: read from the look's
-/// `other` until T4 moves it to SourceMode::Inline.
+/// render's export (export_inline, export_style: a style for an app with no road table): the map option `output.export`.
 pub(crate) fn export(look: &Look) -> bool {
-    look.other.get("export") == Some(&Value::Bool(true))
+    look.map.output.export
 }
 
-/// render's data_maxzoom (every GeoJSON source) and data_tolerance (every GeoJSON source that has a tolerance). Keys of the style writer:
-/// read from the look's `other` until T4 moves them to SourceMode::Inline.
-fn data_settings(roads: &mut road::RoadsSource, sources: &mut [(String, Src)], other: &serde_json::Map<String, Value>) {
-    let maxzoom = other.get("data_maxzoom").and_then(Value::as_f64).map(|z| z as i64);
-    let tolerance = other.get("data_tolerance").and_then(Value::as_f64);
-    roads.maxzoom = maxzoom.or(roads.maxzoom);
-    roads.tolerance = tolerance.unwrap_or(roads.tolerance);
-    for (_, src) in sources.iter_mut() {
-        match src {
-            Src::Simple(s) => {
-                s.maxzoom = maxzoom.or(s.maxzoom);
-                s.tolerance = tolerance.unwrap_or(s.tolerance);
-            }
-            Src::Features(s) => s.maxzoom = maxzoom.or(s.maxzoom),
-            Src::Json(s) if s["type"] == "geojson" => {
-                if let (Some(t), Some(o)) = (tolerance, s.as_object_mut()) {
-                    if o.contains_key("tolerance") {
-                        o.insert("tolerance".into(), t.into());
-                    }
-                }
-                if let (Some(z), Some(o)) = (maxzoom, s.as_object_mut()) {
-                    o.insert("maxzoom".into(), z.into());
-                }
-            }
-            Src::Json(_) => {}
-        }
-    }
-}
 
 /// render_web._boundary_fc for GeoJSON: a FeatureCollection as it is, a Feature in one, a geometry in a Feature with no properties.
 fn boundary_fc(b: &Value) -> Option<Value> {

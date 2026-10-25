@@ -14,6 +14,22 @@ export let RS_TILED = false;
 // RS_LEAN: the simple look's road layer (the id), or false for the full look (simple=False). The full look's paths (RS_LEAN false: core.js
 // _fs and _roadOfPiece, select.js's pick layers, svspot.js's road layer) go with simple=False in N16 (branch n16-full-look-js).
 export let RS_LEAN = false;
+// the newest version of the interaction contract (the metadata roadstyle:contract) that this dashboard reads: the engine's
+// contract::CONTRACT (tests/test_contract_names.py checks the two)
+export const CONTRACT = 1;
+// the error of a style whose contract is newer than this dashboard's, else null (docs/design/contract_schema.md, step 4). A style with
+// roadstyle:* metadata and no version was made before every style had it: it is read as version 1, with a note. A page's own style (the
+// page gives the options in RS_OPTIONS) has no metadata, and no note.
+export function _contractError(st){
+  const meta = (st && st.metadata) || {}, v = meta["roadstyle:contract"];
+  if(v == null){
+    if(Object.keys(meta).some(k => k.startsWith("roadstyle:")))
+      console.info("roadstyle: the style has no roadstyle:contract (it was made before every style had it): read as version 1");
+    return null;
+  }
+  return v > CONTRACT ? "roadstyle: the style's interaction contract is version " + v + ", and this dashboard reads version " + CONTRACT +
+    " or older: use a newer roadstyle dashboard. The dashboard adds no road interaction for this style." : null;
+}
 // a dashboard event: document's CustomEvent `type` with `detail` (the rs:* events of docs/reference/javascript.md)
 export const _emit = (type, detail) => document.dispatchEvent(new CustomEvent(type, {detail}));
 // extra overlay layers (zones / POIs / lines), their metadata: label, source, layers, popup, tooltip, interactive, under, base, ...

@@ -60,7 +60,7 @@ fn style_hash(area: &Path) -> String {
 #[test]
 fn monaco_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(style_hash(&area), "32bc4fafedbcb037500a5a554d4060cd53fdc30b87adb236d6f73d77be8e0ce1");
+    assert_eq!(style_hash(&area), "dd4a192fc46899de53947efb5532c2481dd40e5d2134918a28ec01a3507d7b7c");
 }
 
 /// Tartu's inputs are not in git: get them with `tests/get_goldens.sh`, then `cargo test --release -- --ignored`.
@@ -69,7 +69,7 @@ fn monaco_style() {
 fn tartu_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
-    assert_eq!(style_hash(&area), "df9fc3f735ebcc09d3e81a911dd283928d1d68a87d59fed71a33896caddc61d8");
+    assert_eq!(style_hash(&area), "29769cce6c4dd1f86fc0ccbb3ec290e65ed283671a3c57247ece61ebd50cc844");
 }
 
 /// The vector tiles (make_tiled): the SHA-256 of the style and of every tile of the roads' box at zooms 12, 14 and 15 (each tile with
@@ -109,12 +109,13 @@ fn tiles_hash(area: &Path) -> String {
 #[test]
 fn monaco_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(tiles_hash(&area), "c578f77002cc014695d73676aff11e84c0aa4fbe2edc1e8b5d819de5a228d7cc");
+    assert_eq!(tiles_hash(&area), "d1a526023116145745a6c433994b9011830d2cd32891a970a701ca3c3de61982");
 }
 
-/// tiles.py's extra layers: the sea of Monaco (a polygon) is in the tiles at its west edge, where only its box reaches.
+/// The sea of Monaco (a polygon) is cut to the area's boundary (2026-10-25, duckosm::clip_to_boundary): before, it was in the tiles at
+/// the west edge, where only its box reaches; now these tiles, beyond the boundary, have no sea.
 #[test]
-fn the_sea_at_the_tile_edge() {
+fn the_sea_is_cut_at_the_boundary() {
     let data = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data");
     let read = |p: PathBuf| std::fs::read(&p).unwrap();
     let mut look: serde_json::Value = serde_json::from_slice(&read(data.join("look.json"))).unwrap();
@@ -124,7 +125,7 @@ fn the_sea_at_the_tile_edge() {
                                                  None, "rs://", &[]).unwrap();
     for (z, x, y) in [(14, 8528, 5973), (14, 8528, 5974), (15, 17057, 11946), (15, 17057, 11947), (15, 17057, 11948)] {
         let t = tiles.tile(z, x, y);
-        assert!(!t.is_empty() && t.windows(3).any(|w| w == b"ov1"), "{z}/{x}/{y}: no sea");
+        assert!(t.is_empty() || !t.windows(3).any(|w| w == b"ov1"), "{z}/{x}/{y}: sea beyond the boundary");
     }
 }
 
@@ -133,5 +134,5 @@ fn the_sea_at_the_tile_edge() {
 fn tartu_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
-    assert_eq!(tiles_hash(&area), "ffa7620783a3ad229bfd13730e0a266a3bdf84167a4db1a02c2cc404158b68ea");
+    assert_eq!(tiles_hash(&area), "65d022467a18bcdc15fa879a3f368af215f480943141ff0d06ecca844e255b91");
 }

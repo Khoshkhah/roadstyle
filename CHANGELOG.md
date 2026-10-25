@@ -7,6 +7,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **The dashboard reads the interaction contract's version** (`roadstyle:contract`; docs/design/contract_schema.md, step 4). A style of
+  a newer version than the dashboard knows (`CONTRACT` in `core.js`, `rs.contract`) is an error on the console and in `rs.error`, and
+  the dashboard adds no road interaction for it, not a wrong map with no message. A style with `roadstyle:*` keys and no version is read
+  as version 1, with a note. `rs.contract` takes the same constant.
 - **`Look.withArg(key, value)` in the WebAssembly package**: the same look with one keyword changed, as the Python binding's
   `Look.with_arg`. The examples in `examples/dashboard_rust/` use it and no longer read or change a look's JSON fields (`args`,
   `theme`): a look's JSON is a format to save and load, not an API (docs/rust/browser.md). With `state: "live"`, the dashboard takes
@@ -64,6 +68,17 @@ All notable changes to **roadstyle** are documented here. The format is based on
   theme "osm" (`duckosm.page(db, theme="osm")`; `BaseMap { theme: "osm", .. }`). A theme can now take a texture away (`null` in
   `landcover_pattern`) and set how the textures draw (`landcover_pattern_style`: `minzoom`, `opacity` by zoom, `color`,
   `darken`, `pixel_ratio`); with no `landcover_pattern_style`, a theme draws its textures as before.
+- **The level editor starts from the map's levels** (2026-10-25): `levelEditor({..., levels: {csv, edge_hash}})` takes the levels that
+  the host's map has (duckOSM's `visualization.edge_levels`, with `edge_levels_meta.edge_hash`) and starts from them with no solve,
+  when the hash is the area's; else it solves the whole area and `editor.answer().resolve.why` says why. `saveArea(store, area,
+  edge_hash)` and `areaIsFor(store, edge_hash)` let a page make the level area only when its edges changed. On Burnaby (151,770 edges)
+  the first open had a solve of 5.2 s and the level area of 3.7 s that the map had already done (docs/rust/browser.md).
+- **The level editor solves less** (2026-10-25). A cap or head change runs no solve (they are drawing only, as the Python editor has
+  them since 2026-10-08): the panel saves it at once, with no "Apply and solve" (the list and the button stay for relation edits, which
+  solve locally). The editor starts from the stored levels when `levels_info.json` names the same inputs by content: `inputs` is the
+  SHA-256 of `roads.parquet`, `pairs.csv` and `edits.csv` (`roadstyle_levels::inputs_key`; `roadstyle levels solve` writes it too).
+  Before, it compared the files' times (also of `heads.csv`), so a page that writes the area again on each open (duckosm-rust's) solved
+  the whole area on each open.
 - **An unknown keyword of `render_edges` gives a warning** (T3), with the nearest known name: "render_edges: unknown keyword
   'colour_by' (did you mean 'color_by'?); it does nothing". Before, `render_edges` ignored it with no message. From roadstyle 0.27.0
   it is an error. The rule is one function, `roadstyle::options::unknown` (Python: `_rust.unknown_keywords`), which the MCP server's
@@ -94,6 +109,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **The Rust engine's style has no page keys `filter_control` and `legend`** (N32 step 2): the page gives them in its options
   (`RS_OPTIONS.filter_control`, `RS_OPTIONS.legend`, default true). `roadstyle:controls.filter` has no `on`, and a lone data styler's
   legend is always in `roadstyle:color_options`. A host page that gives neither shows both boxes.
+- **One style writer** (T4 step 2, audit D3, N29, D11): `Styled::style_with(SourceMode)` and `write_style(w, SourceMode)`, where
+  `SourceMode` is `Inline { maxzoom, tolerance }` (render's `data_maxzoom` and `data_tolerance`: keys of the writer, not of stage 1) or
+  `Files(ext)`. Stage 1 no longer sets the two keys on its sources; the page takes them from its keys. The page reads the palette
+  swatches of its views from the road table's rows (it wrote the table and parsed it again), and the road table is written with no
+  JSON tree for each row. The outputs are the same, byte for byte.
+- **`export` is a map option** (`MapOptions.output.export`; T4 step 2): it changes stage 1 (the roads source with its pick and
+  highlight layers, the export's arrows, the controls), so it is in the look's `map`, not a key of the style writer.
 - **Stage 1's output is `Styled`** (Rust: `roadstyle::sources::Styled`, was `Sources`; T4 step 1, audit N15). The roads are in their own
   field and not in the source list, so `Src` has no `Roads` variant. `Styled::shown()` gives the style's sources in order (the roads
   first when the style has them), and `Styled::source(name)` gives one of them. The bindings' classes keep their names.
@@ -180,6 +202,16 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `docs/design/dashboard_module.md`, "Trusted inputs".
 
 ### Fixed
+- **A duckOSM map's base map no longer draws outside its area.** The cut of a duckOSM file keeps the whole ways and relations that touch
+  its area (osmium's complete-ways strategy), so a river, its islands or a wetland reached kilometres past the boundary line, and the
+  page drew them there. Every base-map feature is now clipped to the area's boundary (`main.boundary`, the row of the layer
+  `landcover`, kind `background`): a polygon is cut, a line keeps its parts inside, a point is kept when it is inside, and a feature
+  wholly outside is dropped (`roadstyle_io::duckosm::clip_to_boundary`, in Rust with `i_overlay`: the page, the Python reader and the
+  tiles get it once; no DuckDB spatial extension). A file with no boundary is not changed. Burnaby: 64,416 -> 64,273 features in 373 ms;
+  Tartu: 31,635 -> 31,526 in 29 ms; Monaco: 2,571 -> 2,536 in 16 ms. The reader also reads a boundary table that has no `osm_id` or
+  `name` column (the boundary of a boundary file: before, its row was skipped and nothing could be clipped). The goldens of Monaco's
+  style and tiles changed at the boundary only (35 features are beyond it), and the test of the sea at the tile edge now asserts the
+  opposite: the sea beyond the boundary is cut.
 - **The studio's Dashboard and Report pages have their sidebar again.** Since the page keys came from `given` only (N32 step 2), the
   wasm page (`makePage`, `Roads.page`) lost the page keys of its call (`sidebar`, `popup_mode`, ...). One function now makes them,
   `roadstyle::page_options::given_of` (the look's other keywords, and `name` and `road_popup` of the call), for the wasm page and for

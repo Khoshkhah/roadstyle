@@ -144,13 +144,13 @@ impl FeatureSource {
         w.write_all(b"}")
     }
 
-    /// The source with `data` (its data, or a URL of it), as JSON.
-    pub fn spec(&self, data: Value) -> Value {
+    /// The source with `data` (its data, or a URL of it), as JSON; `maxzoom`: render's data_maxzoom (the writer's, over its own).
+    pub fn spec(&self, data: Value, maxzoom: Option<i64>) -> Value {
         let mut s = serde_json::Map::new();
         s.insert("type".into(), "geojson".into());
         s.insert("data".into(), data);
         s.insert("generateId".into(), true.into());
-        if let Some(z) = self.maxzoom {
+        if let Some(z) = maxzoom.or(self.maxzoom) {
             s.insert("maxzoom".into(), z.into());
         }
         Value::Object(s)
