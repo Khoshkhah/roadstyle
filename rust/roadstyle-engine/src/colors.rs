@@ -235,7 +235,7 @@ fn resolve(fs: &Roads, look: &Look, o: &Value) -> Result<Frame, crate::Error> {
 fn bake_props(fs: &mut Roads, f: &Frame) {
     for i in 0..fs.len() {
         let style = [&f.fill, &f.width, &f.opacity, &f.dash, &f.casing, &f.casing_width, &f.casing_opacity, &f.klass].map(|v| fs.values.id(&v[i]));
-        fs.draw[i].style = Some(style);
+        fs.draw[i].style = Some(fs.values.style_ix(style));
     }
 }
 
@@ -251,7 +251,7 @@ pub fn bake(fs: &mut Roads, look: &Look, args: &Value) -> Result<Colors, crate::
         }
         for i in 0..fs.len() {
             let c = fs.get(i, key).and_then(|k| t.get(&py_str(k))).cloned().unwrap_or(Value::Null);
-            fs.draw[i].color = Some(fs.values.id(&c));
+            fs.draw[i].color = Some(fs.values.ix(&c));
         }
         Some(color_table(fs, look, Mark::Color.name()))
     } else if get(args, "style").is_some() || get(args, "color_by").is_some() {
@@ -282,10 +282,13 @@ pub fn bake(fs: &mut Roads, look: &Look, args: &Value) -> Result<Colors, crate::
             let miss = if idx == 0 || f.missing_self { None } else { f.missing.as_ref() };
             for i in 0..fs.len() {
                 let fill = fs.values.id(if miss.is_some_and(|m| m[i]) { &base[i] } else { &f.fill[i] });
-                let d = &mut fs.draw[i];
-                match d.style.as_mut() {
-                    Some(s) if idx == 0 => s[0] = fill,
-                    _ => d.fills.push(fill),
+                match fs.draw[i].style {
+                    Some(s) if idx == 0 => {
+                        let mut s = fs.values.style(s);
+                        s[0] = fill;
+                        fs.draw[i].style = Some(fs.values.style_ix(s));
+                    }
+                    _ => fs.draw[i].fills = fs.draw[i].fills.iter().copied().chain([fill]).collect(),
                 }
             }
             meta.push(json!({"name": name, "prop": prop, "legend": f.legend.clone()}));

@@ -531,7 +531,7 @@ pub fn item_pieces(ov: &mut Overlay, i: usize, look: &crate::Look) -> Result<Vec
         let d = dcol.as_ref().and_then(|c| p.get(c)).filter(|d| !d.is_null()).cloned().unwrap_or_else(|| u["dash"].clone());
         p.insert(Mark::ItemWidthM.name().into(), json!(crate::layers::py_round(w * sec, 4)));
         p.insert(Mark::ItemOffsetM.name().into(), o.map_or(json!(0), |o| json!(crate::layers::py_round(o * sec, 4))));
-        let mut q: crate::props::Props = p.iter().filter(|(k, _)| k.starts_with(mark::PREFIX)).map(|(k, v)| (k.as_str(), v.clone())).collect();
+        let mut q: crate::props::Props<'static> = p.iter().filter(|(k, _)| k.starts_with(mark::PREFIX)).map(|(k, v)| (std::borrow::Cow::Owned(k.clone()), v.clone())).collect();
         q.insert("lvl", p.get(Mark::ItemLvl.name()).cloned().unwrap_or(json!(0)));
         q.insert(Mark::PieceKind.name(), json!(5));
         q.insert(Mark::ItemOverlay.name(), json!(i));

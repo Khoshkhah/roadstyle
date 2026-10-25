@@ -109,7 +109,15 @@ order: the first tile zoom of a source is the first zoom at which a layer draws 
 | 12 | 8.6 MB | 7.1 MB, 130 ms | 5.6 MB, 119 ms | 3,863 KB, 3,268 KB, 2,529 KB |
 | 14 | 7.8 MB | 6.6 MB, 130 ms | 5.3 MB, 115 ms | 735 KB, 592 KB (the second and third) |
 
-That is about 18 ms for each 10,000 roads at zoom 12, cold. In the tile z12/2351/1225 (1,920 KB), the 35,239 pieces have 385 KB
+That is about 18 ms for each 10,000 roads at zoom 12, cold.
+
+#### The drawing values of a road
+
+The engine keeps one `Draw` for each road (the computed values: levels, ends, flags, the style values' numbers). Its size on a 64-bit
+machine: 288 bytes before the tight types (2026-10-25), 80 bytes after. On Tartu, the old program's allocation count (`roadstyle-rs
+--bench`) gives 26 MB in use after the marks of the roads, not 39 MB, and each later peak is 13 MB lower. The size of the wasm memory
+(`bench.mjs`) stays near 213 MiB (221 MiB after this change): that number is the linear memory, which the allocator grows in steps and
+never gives back, so it does not follow small changes. In the tile z12/2351/1225 (1,920 KB), the 35,239 pieces have 385 KB
 of lines and about 1.2 MB of marks: every mark is one that a layer or the page reads. The wasm memory after `makeSources` and
 `tileSources` (`bench.mjs`) stays 213 MiB.
 

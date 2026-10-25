@@ -90,7 +90,7 @@ pub struct Road<'a> {
 
 impl<'a> Road<'a> {
     pub fn get(self, k: &str) -> Option<Cell<'a>> {
-        self.d.get(self.v, k).or_else(|| self.t.get(self.i, k))
+        self.d.get(self.v, self.i, k).or_else(|| self.t.get(self.i, k))
             .or_else(|| self.x.iter().find(|e| e.name == k).and_then(|e| e.vals[self.i].as_ref().map(Cell::Json)))
     }
 
@@ -115,8 +115,8 @@ impl<'a> Road<'a> {
     /// The road's own properties in the output's order: the columns (a mark in the place of a column of its name), then the other marks.
     pub fn own(self) -> impl Iterator<Item = (&'a str, Cell<'a>)> {
         let (t, d, v, i) = (self.t, self.d, self.v, self.i);
-        t.names().iter().enumerate().map(move |(c, n)| (n.as_str(), d.get(v, n).unwrap_or_else(|| t.cell(c, i))))
-            .chain(d.marks(v).into_iter().filter(move |(k, _)| t.col(k).is_none()))
+        t.names().iter().enumerate().map(move |(c, n)| (n.as_str(), d.get(v, i, n).unwrap_or_else(|| t.cell(c, i))))
+            .chain(d.marks(v, i).into_iter().filter(move |(k, _)| t.col(k).is_none()))
     }
 
     /// The properties in the output's order: its own, then its marks in the other palettes of the views.

@@ -167,9 +167,14 @@ data: `rs.setData(table, {key})` joins by `edge_id` (default) or by the row, and
 1. **Input columns stay Arrow.** They go to the popup, the road table and the tiles (`keep`) with no copy.
 2. **`ColumnMap` resolves one time to column indexes** (`Roles { class: usize, edge_id: Option<usize>, ... }`). No rename in or out
    (R6 part 3). Missing column: a `DataError` that names the preset, the column and the nearest names.
-3. **`RoadDraw`**: one struct of `Vec`s with the engine values: class index (`u16`), levels (`[i16; 4]`), ends, flags (a bit set:
-   bridge, tunnel, oneway, directed, driving), twin (`Option<u32>`), access (`u8`). It is made one time from the roles and the
-   `LevelPlan`. The stages read fields. `Props` and the intern table go (R17).
+3. **`RoadDraw`**: the engine values as typed fields. **Decision (2026-10-25): one struct for each road (`Vec<Draw>`), not one struct
+   of `Vec`s.** The point is typed fields in place of `"__rs_*"` values, and a struct for each road gives that. Columns give the same
+   output; they would cost about 300 lines of change in every stage for at most a few bytes for each road. With tight types a `Draw` is
+   80 bytes (it was 288): the levels `[i16; 4]`, the access a `u8`, the colour, style, class, twin and heads 4-byte numbers into the
+   roads' shared `Values` (`Ix`), the eight style values one shared row, the metre widths behind a `Box`, the road key from the row.
+   On Tartu (64,828 roads) that is 13 MB less in use after stage 1. If the worldwide service (T7) needs columns (for example to write
+   them as Arrow), that is a change inside the engine, not of a public type. `Props` keys are `Cow` (a mark's static name, or a road
+   column's name that the props borrow) and the intern table is gone (R17).
 4. **The row id is a type: `RoadKey(u64)`**, made from `(table: u32, row: u32)` as `table << 32 | row`. For one build, `table` is 0, so
    the key is the row of today and nothing changes in the output. The key stays below 2^53 while `table` is below 2^21, so JavaScript
    holds it exactly and MapLibre takes it as a feature id. Decide this now: it is the one change that the worldwide service needs in

@@ -6,17 +6,28 @@
 use serde_json::{Map, Value};
 use std::borrow::Cow;
 
-/// A key: a mark's name (static, no copy) or another name (a user's column, a palette's copy, an overlay's field).
-pub type Key = Cow<'static, str>;
+/// A key: a mark's name (static), a name that the props borrow (a road's column), or an owned one (an overlay's field).
+pub type Key<'a> = Cow<'a, str>;
 
-fn key(k: &str) -> Key {
+fn key<'a>(k: &str) -> Key<'a> {
     crate::mark::Mark::of(k).map_or_else(|| Cow::Owned(k.to_string()), |m| Cow::Borrowed(m.name()))
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Props(Vec<(Key, Value)>);
+pub struct Props<'a>(Vec<(Key<'a>, Value)>);
 
-impl Props {
+impl<'a> Props<'a> {
+    /// Insert with a name that the props borrow (no copy): a road's column, a mark.
+    pub fn insert_name(&mut self, k: &'a str, v: Value) -> Option<Value> {
+        match self.at(k) {
+            Some(i) => Some(std::mem::replace(&mut self.0[i].1, v)),
+            None => {
+                self.0.push((Cow::Borrowed(k), v));
+                None
+            }
+        }
+    }
+
     /// A key's place: by its text, with no lock (audit R11).
     fn at(&self, k: &str) -> Option<usize> {
         self.0.iter().position(|e| e.0 == k)
@@ -64,10 +75,6 @@ impl Props {
         self.at(k).map(|i| self.0.remove(i).1)
     }
 
-    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut Value> {
-        self.0.iter_mut().map(|(_, v)| v)
-    }
-
     pub fn iter(&self) -> impl Iterator<Item = (&str, &Value)> {
         self.0.iter().map(|(k, v)| (k.as_ref(), v))
     }
@@ -92,7 +99,7 @@ impl Props {
     }
 }
 
-impl std::ops::Index<&str> for Props {
+impl std::ops::Index<&str> for Props<'_> {
     type Output = Value;
 
     /// As the `Map`'s: a missing key is an error.
@@ -101,19 +108,33 @@ impl std::ops::Index<&str> for Props {
     }
 }
 
-impl<K: AsRef<str>> FromIterator<(K, Value)> for Props {
-    fn from_iter<I: IntoIterator<Item = (K, Value)>>(it: I) -> Props {
+/// The props of (name, value) pairs; a name that they can borrow is not copied.
+impl<'a> FromIterator<(&'a str, Value)> for Props<'a> {
+    fn from_iter<I: IntoIterator<Item = (&'a str, Value)>>(it: I) -> Props<'a> {
         let mut p = Props::default();
         for (k, v) in it {
-            p.insert(k.as_ref(), v);
+            p.insert_name(k, v);
         }
         p
     }
 }
 
-impl IntoIterator for Props {
-    type Item = (Key, Value);
-    type IntoIter = std::vec::IntoIter<(Key, Value)>;
+impl<'a> FromIterator<(Key<'a>, Value)> for Props<'a> {
+    fn from_iter<I: IntoIterator<Item = (Key<'a>, Value)>>(it: I) -> Props<'a> {
+        let mut p = Props::default();
+        for (k, v) in it {
+            match k {
+                Cow::Borrowed(k) => p.insert_name(k, v),
+                Cow::Owned(k) => p.insert(&k, v),
+            };
+        }
+        p
+    }
+}
+
+impl<'a> IntoIterator for Props<'a> {
+    type Item = (Key<'a>, Value);
+    type IntoIter = std::vec::IntoIter<(Key<'a>, Value)>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -185,7 +206,7 @@ pub trait Get {
     fn value(&self, k: &str) -> Option<Value>;
 }
 
-impl Get for Props {
+impl Get for Props<'_> {
     fn value(&self, k: &str) -> Option<Value> {
         self.get(k).cloned()
     }
@@ -200,7 +221,7 @@ impl Get for Map<String, Value> {
 /// A feature of the source `roads` or `simple`: its id, its properties and its line (None: not a LineString, `"geometry": null`).
 pub struct Feat {
     pub id: usize,
-    pub props: Props,
+    pub props: Props<'static>,
     pub coords: Option<Vec<[f64; 2]>>,
 }
 

@@ -27,7 +27,7 @@ pub type Pt = [f64; 2];
 
 /// An item on a road (an overlay's line in metres, render's items=): its own properties and its line.
 pub struct Item {
-    pub props: Props,
+    pub props: Props<'static>,
     pub coords: Option<Vec<Pt>>,
 }
 
@@ -118,7 +118,7 @@ impl Cols {
 
 /// The properties of a road as JSON values, those that `keep` takes. The road's own `__rs_cls` (set later, for the roads source) is
 /// not one: a piece marks its class itself, as the last property.
-fn road_props(r: Road, keep: impl Fn(&str) -> bool) -> Props {
+fn road_props<'a>(r: Road<'a>, keep: impl Fn(&str) -> bool) -> Props<'a> {
     r.own().filter(|(k, _)| *k != Mark::Class.name() && keep(k)).map(|(k, v)| (k, v.to_value())).collect()
 }
 
@@ -161,17 +161,17 @@ impl Piece {
     pub fn cl(&self, roads: &Roads) -> i64 {
         match self.part {
             Part::Cut(_, n) | Part::Seam(n) | Part::Lap(n) => n,
-            _ => self.road(roads).draw().levels.map_or(0, |l| l[0]),
+            _ => self.road(roads).draw().levels64().map_or(0, |l| l[0]),
         }
     }
 
     /// The properties of the piece as render_web makes them, with its keys in its order, and the road layer's `__rs_k`, `__rs_s` (with
     /// the edge's tie-breaker) and `__rs_cls`.
-    pub fn props(&self, roads: &Roads, cols: &Cols) -> Props {
+    pub fn props<'a>(&self, roads: &'a Roads, cols: &Cols) -> Props<'a> {
         let r = self.road(roads);
         let d = r.draw();
         let (edge, key) = (self.edge as i64, crate::road::key(self.edge as usize).get());      // the row (the sort key's tie-breaker), the road's key
-        let mut q: Props = match self.part {
+        let mut q: Props<'a> = match self.part {
             Part::Fill => road_props(r, |k| cols.fill(k)),
             Part::Half(k) => {
                 let mut q = road_props(r, |kk| !matches!(Mark::of(kk), Some(Mark::Cap0 | Mark::Cap1 | Mark::Split)));
@@ -186,7 +186,7 @@ impl Piece {
                 q.insert(Mark::Edge.name(), key.into());
                 if let Some(tw) = d.twin {
                     q.insert(Mark::Pair.name(), true.into());
-                    q.insert(Mark::Edge2.name(), crate::road::key(tw as usize).get().into());
+                    q.insert(Mark::Edge2.name(), crate::road::key(tw.get()).get().into());
                 }
                 match self.part {
                     Part::Cut(k, num) => {
@@ -322,11 +322,11 @@ pub(crate) fn casing_parts(roads: &Roads, head_m: f64) -> Vec<Piece> {
             continue; // one line for a reverse pair: its twin draws it
         }
         let edge = p.i as u32;
-        if d.twin.is_some_and(|tw| tw < edge) {
+        if d.twin.is_some_and(|tw| tw.get() < edge as usize) {
             continue; // a two-way pair's one casing: the first edge's pieces
         }
         let piece = |part: Part, coords: PieceLine| Piece { edge, part, end: End::AsIs, draw: None, coords };
-        let [cm, _, cs, ce] = d.levels.unwrap_or_default();
+        let [cm, _, cs, ce] = d.levels64().unwrap_or_default();
         let split = d.split.is_some();
         let c = match p.line() {
             Some(c) if c.len() >= 2 && !(cs == cm && cm == ce && !split) => c,
@@ -337,7 +337,7 @@ pub(crate) fn casing_parts(roads: &Roads, head_m: f64) -> Vec<Piece> {
         };
         let line = Line::new(c);
         let n = line.len();
-        let (h0, h1) = (d.head_start.unwrap_or(head_m), d.head_end.unwrap_or(head_m));
+        let (h0, h1) = (d.head(&roads.values, 0).unwrap_or(head_m), d.head(&roads.values, 1).unwrap_or(head_m));
         // k: 0 the start head, 1 the main part, 2 the end head. A short road is cut once, in the heads' ratio (roadstyle after 0.24.2,
         // short_road_heads.md "One cut"): two cuts at h0 and n - h1 are one point only in exact arithmetic
         let cuts: Vec<(f64, f64, i64, u8)> = if h0 + h1 >= n - 0.05 {
@@ -445,8 +445,8 @@ impl SimpleSource {
     }
 
     /// The features in their order, each as (id, properties with the output's names, line).
-    pub fn features<'a>(&'a self, roads: &'a Roads) -> impl Iterator<Item = (usize, Props, Option<&'a [Pt]>)> + 'a {
-        let named = move |mut p: Props| {
+    pub fn features<'a>(&'a self, roads: &'a Roads) -> impl Iterator<Item = (usize, Props<'a>, Option<&'a [Pt]>)> + 'a {
+        let named = move |mut p: Props<'a>| {
             for (own, user) in &self.names {
                 if p.rename(own, user) {
                     p.shift_remove(&crate::road::kept(own));
@@ -466,7 +466,7 @@ impl SimpleSource {
 
     /// The properties with the class index last (R8): the place of the feature's class (`highway`, the user's column by its own name at
     /// the output) in the classes, else their number.
-    fn with_index(&self, mut q: Props) -> Props {
+    fn with_index<'a>(&self, mut q: Props<'a>) -> Props<'a> {
         if let Some(cs) = &self.classes {
             let col = self.names.iter().find(|(own, _)| *own == "highway").map_or("highway", |(_, user)| user.as_str());
             let c = q.get(col).and_then(Value::as_str);
@@ -476,7 +476,7 @@ impl SimpleSource {
     }
 
     /// A piece's properties that are read (R1), in their order.
-    fn slim(&self, q: Props) -> Props {
+    fn slim<'a>(&self, q: Props<'a>) -> Props<'a> {
         match &self.read {
             Some(r) => q.into_iter().filter(|(k, _)| r.contains(k.as_ref())).collect(),
             None => q,
@@ -484,7 +484,7 @@ impl SimpleSource {
     }
 
     /// An item's: its own fields (a picked item's popup fields: the item has no others) and the stage values that are read.
-    fn slim_item(&self, q: Props) -> Props {
+    fn slim_item<'a>(&self, q: Props<'a>) -> Props<'a> {
         match &self.read {
             Some(r) => q.into_iter().filter(|(k, _)| !k.starts_with(mark::PREFIX) || r.contains(k.as_ref())).collect(),
             None => q,
@@ -578,7 +578,7 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
             let bridge = truthy(r.get(Mark::Bridge.name()));
             let cl = q.cl(roads);
             let k = 2.0 * cl as f64 + if bridge { 0.25 } else { 0.0 };
-            let [_, _, cs, ce] = r.draw().levels.unwrap_or_default();
+            let [_, _, cs, ce] = r.draw().levels64().unwrap_or_default();
             let whole = cs == cl && cl == ce;
             if shadows && bridge && (matches!(q.part, Part::Cut(1, _)) || whole) {
                 out.push(key(&q, 2, k - 0.1));
