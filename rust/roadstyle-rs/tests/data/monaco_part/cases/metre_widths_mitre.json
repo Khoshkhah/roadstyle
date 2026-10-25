@@ -49,9 +49,11 @@
   },
   "metadata": {
     "roadstyle:interaction": "a911c29a8eeae5d8",
-    "roadstyle:images": "e9049aa3d5b18840"
+    "roadstyle:images": "e9049aa3d5b18840",
+    "roadstyle:sources": "3eb959a8e2207438",
+    "roadstyle:controls": "7ad47e2cab264f27"
   },
-  "hash": "299f0faabd06b278",
+  "hash": "02838f72eb4f9c8b",
   "road_table": {
     "rows": 1373,
     "columns": [

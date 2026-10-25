@@ -70,9 +70,11 @@
   },
   "metadata": {
     "roadstyle:interaction": "a911c29a8eeae5d8",
-    "roadstyle:images": "e9049aa3d5b18840"
+    "roadstyle:images": "e9049aa3d5b18840",
+    "roadstyle:sources": "de9ed92a2cabe7fc",
+    "roadstyle:controls": "7ad47e2cab264f27"
   },
-  "hash": "38a78d997fd76a0b",
+  "hash": "9551d2527c8cc2f9",
   "road_table": {
     "rows": 13298,
     "columns": [
@@ -114,7 +116,7 @@
     }
   },
   "text": {
-    "bytes": 19240896,
-    "sha16": "38a78d997fd76a0b"
+    "bytes": 19241087,
+    "sha16": "9551d2527c8cc2f9"
   }
 }

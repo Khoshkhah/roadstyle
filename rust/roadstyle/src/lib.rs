@@ -416,14 +416,7 @@ pub fn tiled_of(roads: RoadTable, look: &Look, features: Option<FeatureTable>, n
     // the sources in its tiles (`tile_layers`: roads, simple, slots; the page keeps the others inline)
     o.exact = look.args["tile_keep"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
     o.only = look.args["tile_layers"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
-    let (mut style, tiled) = tile_stage(&s, &o, &xyz_at(prefix));
-    if look.args["export"] == true && style["metadata"]["roadstyle:contract"].is_null() {
-        // an app's dashboard on the exported style (export_style): the road roles and the pick layers of its final layers, as a live
-        // style has them (contract::describe; audit 3, N27)
-        let layers = style["layers"].as_array().cloned().unwrap_or_default();
-        style["metadata"]["roadstyle:sources"] = contract::roles(&layers);
-        style["metadata"]["roadstyle:controls"] = json!({"pick": contract::pick_layers(&layers)});
-    }
+    let (style, tiled) = tile_stage(&s, &o, &xyz_at(prefix));
     Ok((style_text(&s, &style), tiled, s.warnings))
 }
 

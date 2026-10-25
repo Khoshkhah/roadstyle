@@ -79,3 +79,19 @@ fn the_layers_read_properties_by_name() {
     assert!(unknown.is_empty(), "a layer reads a property whose name is not a literal: {unknown:?}");
     assert!(read.contains("__rs_fill") && read.contains("__rs_s"), "{read:?}");
 }
+
+/// R7: every style has the road roles and the pick layers (contract::describe), also with no interaction contract: with view_3d the
+/// pick has the decks' tops and not their casing.
+#[test]
+fn a_style_with_no_contract_has_the_pick() {
+    let mut look: Value = serde_json::from_slice(&data("look.json")).unwrap();
+    look["args"]["view_3d"] = true.into();
+    let look = roadstyle_rs::Look::from_value(look).unwrap();
+    let style: Value = serde_json::from_str(&roadstyle_rs::make_style(data("monaco_decks/roads.parquet"), &look, None, None, None).unwrap()).unwrap();
+    let m = &style["metadata"];
+    assert!(m["roadstyle:contract"].is_null());
+    assert!(m["roadstyle:sources"].is_object());
+    let pick: Vec<&str> = m["roadstyle:controls"]["pick"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
+    assert!(pick.iter().any(|p| p.starts_with("roads-bridge-decks")), "{pick:?}");
+    assert!(!pick.iter().any(|p| p.starts_with("roads-deck-casing")), "{pick:?}");
+}
