@@ -3,6 +3,7 @@
 //! the names, the hover layer, the popup, the outline of the area.
 
 use crate::layers::{by_feature, label_readable_filter, label_size_expr, minzoom_filter, swap, Exprs};
+use roadstyle_look::color;
 use roadstyle_model::flags;
 use serde_json::{json, Map, Value};
 
@@ -13,12 +14,6 @@ pub struct LookCols<'a> {
     pub tunnel: &'a str,
     pub bridge: &'a str,
     pub id: &'a str,
-}
-
-/// _mix: "#rrggbb" `a` moved toward `b` by `t` (0 to 1).
-fn mix(a: &str, b: &str, t: f64) -> String {
-    let ch = |s: &str, i: usize| u8::from_str_radix(&s[1 + 2 * i..3 + 2 * i], 16).unwrap_or(0) as f64;
-    format!("#{}", (0..3).map(|i| format!("{:02x}", (ch(a, i) * (1.0 - t) + ch(b, i) * t + 0.5) as i64)).collect::<String>())
 }
 
 /// The look of `look` (a resolved look: render's theme, config and road tables) for the positions `positions` (in order).
@@ -40,9 +35,14 @@ pub fn export_look(look: &crate::Look, cols: &LookCols, positions: &[i64]) -> Re
     let towards = cfg["tunnel_towards"].as_object().cloned().unwrap_or_default();
     let toward = &cfg["tunnel_toward"];
     let colour = toward.as_str().and_then(|n| towards.get(n)).cloned().unwrap_or_else(|| toward.clone());
-    let colour = colour.as_str().unwrap_or("#000000").to_string();
+    let toward = color::parse(colour.as_str().unwrap_or("#000000"))?;
     let strength = cfg["tunnel_strength"].as_f64().unwrap_or(0.0) / 100.0;
-    let mixed = |c: &Value| match c.as_str() { Some(s) if s.starts_with('#') => json!(mix(s, &colour, strength)), _ => c.clone() };
+    // a palette colour that is not a colour is an error that names it (review D4: "#fff" is one, "#zzz" is not)
+    for c in classes.values().flat_map(|e| [&e["fill"], &e["casing"]]).filter_map(Value::as_str).filter(|c| c.starts_with('#')) {
+        color::parse(c)?;
+    }
+    // the tunnel look baked: a colour moved toward the tunnel colour (an app has no slider)
+    let mixed = |c: &Value| match c.as_str().and_then(color::rgb) { Some(rgb) => json!(color::hex(color::mix(rgb, toward, strength))), None => c.clone() };
     let by_class = |field: &str, f: &dyn Fn(&Value) -> Value| {
         let mut vals = Vec::new();
         for (c, e) in &classes {

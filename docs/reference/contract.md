@@ -49,7 +49,7 @@ host gives them to `rsDashboard` itself.
 | `select_color` | the colour of a selected road (also the Google 3D line) |
 | `filter` | the filter panel: `{on, col, classes, access, swatches, bridges, tunnels}`, and `palettes` with a view's palette |
 | `color_active` | the colour option at the start |
-| `overlays` | the Layers box: `[{label, source, layers, hit, visible, color, popup, popup_window, tooltip, under, base, select, interactive}]` |
+| `overlays` | the Layers box: `[{label, source, layers, hit, visible, color, popup, popup_window, tooltip, under, base, select, interactive}]`; a base-map layer also has `kinds` (`[[kind, count], ...]`, most first) and, with a 3D layer, `extrude` (that layer's id) |
 | `tunnel` | the tunnel look: `{layers, dash, casing, strength, palette, palettes, ratio, bg, steps, ratios, toward, towards, to, control}` |
 | `fill_layers` | the road fill layers that the page recolours |
 | `pick` | the layers that a road is picked on (clicked, hovered): `roads-simple` (the full look: its fill layers) and the 3D decks' tops (`roads-bridge-decks`), not their casing. A caller's items are in `overlays` |
@@ -77,7 +77,7 @@ contract makes changeable (or a value that is not used).
 | `pitch`, `bearing`, `max_pitch` | numbers, none, none, 70 | `render`; `defaults.json` camera | the map | the camera: yes; `max_pitch`: no | gap: no getter or setter of the camera (only `rsFocus`) |
 | `pitch_3d` | number, 55 | `defaults.json`; option | `view3d.js` | yes | `rsSetView3D`; `rs:viewchange` |
 | `view_3d` (bridge decks) | bool, false | `render`; look `args.view_3d` | engine (deck layers) | no: the decks are in the style or not | |
-| 3D buildings | an overlay (`roadstyle:group` = `buildings 3D`) | engine (mapstyle features) | the Layers box only when Python gives `overlays` | gap: a Rust style has no overlay list for the dashboard | `rsSetOverlay` |
+| 3D buildings | the layer that a base-map overlay names in `extrude`, hidden | engine (mapstyle features) | `features.js` | yes: a button and a row under the buildings | `rsSetBuildings3D`; `rs:buildings3dchange` |
 | `find_control` | bool, false | `render`; option | `find.js` | no | `rsFind` |
 | find fields | the popup fields, and `edge_id_col` and `edge_ref` (`_ID_KEYS`) | `road_popup`, `edge_id_col` | `find.js` | no | `rsFind` |
 | `edge_id_col` | text, `"edge_id"` | `render`; option | `find.js`, `select.js` | no | |

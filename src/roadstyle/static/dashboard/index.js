@@ -49,7 +49,7 @@ function fromStyle(o, given){
   const ctl = meta["roadstyle:controls"] || {}, P = o.prefix || "";
   for(const k in ctl) if(!given.has(k)) o[k] = ctl[k];
   if(!given.has("overlays") && ctl.overlays && P)
-    o.overlays = ctl.overlays.map(ov=>({...ov, source: P+ov.source, layers: ov.layers.map(id=>P+id), hit: ov.hit && P+ov.hit,
+    o.overlays = ctl.overlays.map(ov=>({...ov, source: P+ov.source, layers: ov.layers.map(id=>P+id), hit: ov.hit && P+ov.hit, extrude: ov.extrude && P+ov.extrude,
                                         base: ov.base && Object.fromEntries(Object.entries(ov.base).map(([id, f])=>[P+id, f]))}));
   if(!given.has("road_popup")) o.road_popup = "popup" in it ? it.popup : null;           // false: none; null: every field; [fields]
   if(!given.has("road_tooltip")) o.road_tooltip = it.tooltip || false;                   // false | true | [fields]

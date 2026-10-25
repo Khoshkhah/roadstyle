@@ -47,6 +47,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `docs/design/dashboard_module.md`, "Trusted inputs".
 
 ### Fixed
+- **A look colour "#fff" no longer crashes `export_look`** (review D4: a panic in Rust, an abort in the browser). One colour module in the
+  look crate (`roadstyle_look::color`) reads every colour of the look: "#rrggbb", "#rgb" and a CSS colour name; any other "#..." text is
+  an error that names it. One mix rounds half up for the look and the export (the base map's look rounded half to even: some of its
+  casing colours move by 1 in one channel).
 - **The duckOSM reader reads a file with no `private_edges`** (an older file, granville_island): the union typed its `access` as an
   integer, and the roads failed with "Could not convert string 'bus' to INT32". mapstyle's SQL had the same fault. And the reader's plan
   gives the base map's queries also for a file with no network ("roads" is null, "roads_error" says why).
@@ -166,6 +170,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   has the key: a casing piece has no `__rs_fill@<palette>: null` any more. The map does not change.
 
 ### Added
+- **A base-map layer's overlay entry names its 3D layer** (`roadstyle:controls.overlays[].extrude`, the fill-extrusion's id), so a host's
+  dashboard finds the 3D buildings on a page, whose layers have no metadata. The dashboard reads it (`features.js`, with the page's
+  prefix), not the layer metadata: before, `rsSetBuildings3D(true)` did nothing on `roadstyle.duckosm.page`.
 - **`roadstyle.duckosm.page(db, mode, ...)`: mapstyle's `render_map` on the Rust engine.** The page of a duckOSM file: its roads, its
   base map and the shared dashboard with the base map's controls (modes, kinds, each layer's clicks, tooltip and popup). The keywords of
   render_map: `theme`, `paths`, `layers`, `only`, `interaction` (a layer's start `{clickable, tooltip, popup}`; a layer that the map does

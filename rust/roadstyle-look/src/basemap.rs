@@ -94,9 +94,9 @@ fn py_round(x: f64) -> i64 {
     x.round_ties_even() as i64
 }
 
+/// A theme's hex colour as channels from 0 to 255 (crate::color).
 fn hex(c: &str) -> Option<[f64; 3]> {
-    let ok = c.len() == 7 && c.starts_with('#') && c[1..].chars().all(|x| x.is_ascii_hexdigit());
-    ok.then(|| [1, 3, 5].map(|i| u8::from_str_radix(&c[i..i + 2], 16).unwrap() as f64))
+    crate::color::hex_rgb(c).map(|c| c.map(f64::from))
 }
 
 /// Python's x % 1.0 (the sign of the divisor).
@@ -189,16 +189,14 @@ pub fn load_theme(theme: &str) -> Result<(Value, Value, (f64, f64)), Error> {
     Ok((merge(Some(&colored), &Value::Object(own)), t, tr))
 }
 
-/// _mix: "#rrggbb" `a` moved `t` of the way to `b`.
-fn mix(a: &str, b: &str, t: f64) -> String {
-    let (x, y) = (hex(a).unwrap_or([0.0; 3]), hex(b).unwrap_or([0.0; 3]));
-    format!("#{}", (0..3).map(|i| format!("{:02x}", py_round(x[i] + (y[i] - x[i]) * t))).collect::<String>())
+/// _mix: the colour `a` moved `t` of the way to `b` (crate::color::mix); a value that is not a colour is an error that names it.
+fn mix(a: &str, b: &str, t: f64) -> Result<String, Error> {
+    Ok(crate::color::hex(crate::color::mix(crate::color::parse(a)?, crate::color::parse(b)?, t)))
 }
 
-/// _darker: each channel of "#rrggbb" times `f`, the fraction cut off.
-fn darker(c: &str, f: f64) -> String {
-    let x = hex(c).unwrap_or([0.0; 3]);
-    format!("#{}", x.iter().map(|v| format!("{:02x}", (v * f) as i64)).collect::<String>())
+/// _darker: each channel of the colour `c` times `f`, the fraction cut off.
+fn darker(c: &str, f: f64) -> Result<String, Error> {
+    Ok(crate::color::hex(crate::color::parse(c)?.map(|v| (v as f64 * f) as u8)))
 }
 
 fn data_url(mime: &str, data: &[u8]) -> String {
@@ -210,7 +208,7 @@ fn data_url(mime: &str, data: &[u8]) -> String {
 fn pattern_png(name: &str, color: &str) -> Result<Vec<u8>, Error> {
     let mask = PATTERNS.iter().find(|p| p.0 == name).ok_or_else(|| Error::Unknown(format!("no texture named '{name}'")))?.1;
     let (w, h, ch, px) = crate::png::decode(mask)?;
-    let c = hex(color).ok_or_else(|| Error::Options(format!("texture {name}: {color} is not a '#rrggbb' colour")))?;
+    let c = crate::color::parse(color).map_err(|e| Error::Options(format!("texture {name}: {e}")))?.map(f64::from);
     let rgba: Vec<u8> = px.chunks(ch).flat_map(|p| [c[0] as u8, c[1] as u8, c[2] as u8, p[ch - 1]]).collect();
     Ok(crate::png::encode_rgba(w, h, &rgba))
 }
@@ -231,7 +229,7 @@ fn images(st: &Value, specs: &[Value]) -> Result<Map<String, Value>, Error> {
             let default = fills["default"].as_str().unwrap_or("#000000");
             for (k, pat) in f["landcover_pattern"].as_object().into_iter().flatten() {
                 let fill = fills.get(k).filter(|_| k != "default").and_then(Value::as_str).unwrap_or(default);
-                let png = pattern_png(pat.as_str().unwrap_or_default(), &darker(fill, 0.6))?;
+                let png = pattern_png(pat.as_str().unwrap_or_default(), &darker(fill, 0.6)?)?;
                 out.insert(format!("ms-pat-{k}"), data_url("image/png", &png).into());
             }
         } else if kind_of(specs, name) == "point" {
@@ -292,7 +290,7 @@ pub fn base_map(b: &BaseMap) -> Result<BaseMapLook, Error> {
         for c in modes["cars"].as_array().into_iter().flatten().filter_map(Value::as_str) {
             for k in ["fill", "casing"] {
                 if let Some(x) = palette.get_mut(c).and_then(|e| e.get_mut(k)).filter(|x| x.as_str().is_some_and(|s| !s.is_empty())) {
-                    *x = mix(x.as_str().unwrap(), "#ffffff", fade).into();
+                    *x = mix(x.as_str().unwrap(), "#ffffff", fade)?.into();
                 }
             }
         }
@@ -375,8 +373,8 @@ mod tests {
         assert_eq!(recolor(&json!("#c24e6b"), 0.55, 0.2), json!("#b98693"));
         assert_eq!(recolor(&json!("#123456"), 1.0, 0.0), json!("#123456"));
         assert_eq!(recolor(&json!(3), 0.55, 0.2), json!(3));
-        assert_eq!(mix("#000000", "#ffffff", 0.5), "#808080");
-        assert_eq!(mix("#e892a2", "#ffffff", 0.3), "#efb3be");
-        assert_eq!(darker("#add19e", 0.6), "#677d5e");
+        assert_eq!(mix("#000000", "#ffffff", 0.5).unwrap(), "#808080");
+        assert_eq!(mix("#e892a2", "#ffffff", 0.3).unwrap(), "#efb3be");
+        assert_eq!(darker("#add19e", 0.6).unwrap(), "#677d5e");
     }
 }

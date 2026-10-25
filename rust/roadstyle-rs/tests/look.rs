@@ -57,3 +57,26 @@ fn a_saved_look_of_version_0_and_1() {
     let unknown = text.replacen('{', r#"{"pallete": "x", "#, 1);
     assert!(matches!(roadstyle_rs::Look::from_json(&unknown).unwrap_err(), roadstyle_rs::look::Error::Look(m) if m.contains("pallete")));
 }
+
+/// Review D4: a palette colour in export_look ("#fff" panicked there before): the short form, the long form and a colour name are colours
+/// (moved toward the tunnel colour), "#zzz" is an error that names it, and "" (a palette's "no casing") stays as it is.
+#[test]
+fn export_look_reads_every_form_of_a_colour() {
+    let text = std::fs::read_to_string(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/look.json")).unwrap();
+    let base: Value = serde_json::from_str(&text).unwrap();
+    let pal = base["theme"]["active"]["palette"].as_str().unwrap().to_string();
+    let cols = roadstyle_rs::export_look::LookCols { highway: "highway", oneway: "oneway", tunnel: "tunnel", bridge: "bridge", id: "edge_id" };
+    let with = |fill: &str| {
+        let mut v = base.clone();
+        v["theme"]["palettes"][&pal]["residential"]["fill"] = fill.into();
+        roadstyle_rs::export_look::export_look(&roadstyle_rs::Look::from_value(v).unwrap(), &cols, &[0, 1])
+    };
+    for ok in ["#fff", "#ffffff", "red", ""] {
+        assert!(with(ok).is_ok(), "{ok:?}: {:?}", with(ok).err());
+    }
+    // the tunnel's mixed colour is the same; outside a tunnel the palette's text stays as it is
+    assert_eq!(serde_json::to_string(&with("#fff").unwrap()).unwrap().replace("\"#fff\"", "\"#ffffff\""),
+               serde_json::to_string(&with("#ffffff").unwrap()).unwrap(), "the short form is the long form");
+    let e = with("#zzz").unwrap_err();
+    assert!(e.contains("\"#zzz\" is not a colour"), "{e}");
+}

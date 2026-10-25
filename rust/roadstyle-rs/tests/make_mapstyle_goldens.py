@@ -199,6 +199,38 @@ def _rings(g):
     return sorted(sorted(ring(r) for r in part) for part in parts)
 
 
+def _hex(v):
+    """The channels of a hex colour ("#rrggbb" or "#rgb"); None for any other value."""
+    if not isinstance(v, str) or not v.startswith("#") or len(v) not in (4, 7):
+        return None
+    h = v[1:] if len(v) == 7 else "".join(c * 2 for c in v[1:])
+    try:
+        return bytes.fromhex(h)
+    except ValueError:
+        return None
+
+
+def differences(a, b, path="", out=None, limit=10):
+    """The places where two normalised styles differ (at most `limit`), two hex colours within 1 in each channel taken as the same: the Rust
+    look rounds a mixed colour half up (roadstyle_look::color::mix, review D4, 2026-10-24), mapstyle's _mix half to even; the picture is the
+    same."""
+    out = [] if out is None else out
+    if len(out) >= limit or a == b:
+        return out
+    x, y = _hex(a), _hex(b)
+    if x is not None and y is not None and all(abs(p - q) <= 1 for p, q in zip(x, y, strict=True)):
+        return out
+    if isinstance(a, dict) and isinstance(b, dict) and a.keys() == b.keys():
+        for k in a:
+            differences(a[k], b[k], f"{path}.{k}", out, limit)
+    elif isinstance(a, list) and isinstance(b, list) and len(a) == len(b):
+        for i, (u, v) in enumerate(zip(a, b, strict=True)):
+            differences(u, v, f"{path}[{i}]", out, limit)
+    else:
+        out.append(f"{path}: {str(a)[:120]} != {str(b)[:120]}")
+    return out
+
+
 def digest(style):
     text = canonical(style)
     return {"sha256": hashlib.sha256(text).hexdigest(), "layers": len(style["layers"]), "bytes": len(text)}
