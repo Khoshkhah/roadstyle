@@ -443,6 +443,7 @@ impl LookFile {
         let schema_version = take("schema_version")?.as_u64().ok_or_else(|| bad("a look of version 2", "schema_version is not a number"))? as u32;
         let palette = take("palette")?.as_str().ok_or_else(|| bad("a look of version 2", "palette is not a text"))?.to_string();
         let (settings, args) = (take("settings")?, take("args")?);
+        check_tunnels(m.get("tunnels").unwrap_or(&Value::Null))?;
         let sections = serde_json::from_value(Value::Object(m)).map_err(|e| bad("a look of version 2", e))?;
         Ok(LookFile { schema_version, palette, settings, args, sections })
     }
@@ -472,8 +473,38 @@ fn bad(what: &str, e: impl std::fmt::Display) -> Error {
     Error::Look(format!("look: {what}: {e}"))
 }
 
+/// Python's repr of a JSON value, for the messages that name a value as Python's do.
+fn repr(v: &Value) -> String {
+    match v {
+        Value::Null => "None".into(),
+        Value::Bool(b) => (if *b { "True" } else { "False" }).into(),
+        Value::String(s) => format!("'{s}'"),
+        Value::Array(a) => format!("[{}]", a.iter().map(repr).collect::<Vec<_>>().join(", ")),
+        Value::Object(o) => format!("{{{}}}", o.iter().map(|(k, v)| format!("'{k}': {}", repr(v))).collect::<Vec<_>>().join(", ")),
+        Value::Number(_) => v.to_string(),
+    }
+}
+
+/// The tunnel look's rule (render_web._tun_settings): each colour of `towards` a "#rrggbb", `toward` one of their names or a "#rrggbb".
+/// It runs before the typed reader, so a value of another type has this message too (the texts of Python's _check_tunnels).
+fn check_tunnels(t: &Value) -> Result<(), Error> {
+    let hex = |v: &Value| v.as_str().is_some_and(|c| c.len() == 7 && crate::color::hex_rgb(c).is_some());
+    let empty = Map::new();
+    let towards = t.get("towards").and_then(Value::as_object).unwrap_or(&empty);
+    if let Some((n, c)) = towards.iter().find(|(_, c)| !hex(c)) {
+        return Err(Error::Options(format!("tunnel_towards '{n}': {} is not a '#rrggbb' colour", repr(c))));
+    }
+    let toward = t.get("toward").unwrap_or(&Value::Null);
+    if !toward.as_str().is_some_and(|n| towards.contains_key(n)) && !hex(toward) {
+        let names = Value::Array(towards.keys().map(|k| Value::from(k.as_str())).collect());
+        return Err(Error::Options(format!("tunnel_toward {} is not a colour name in {} or a '#rrggbb' colour", repr(toward), repr(&names))));
+    }
+    Ok(())
+}
+
 /// The sections of a version-1 look (its JSON views).
 pub fn from_views(d: &LookData) -> Result<Sections, Error> {
+    check_tunnels(&d.theme["tunnels"])?;
     let mut s = Map::new();
     for k in THEME {
         s.insert(k.into(), d.theme.get(k).cloned().unwrap_or(Value::Null));

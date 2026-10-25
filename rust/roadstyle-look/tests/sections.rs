@@ -43,7 +43,8 @@ fn version_2_gives_the_same_views() {
         let again = Look::from_json(&file).unwrap_or_else(|e| panic!("{name}: {e}"));
         let (a, b) = (again.views_value(), look.views_value());
         for (k, v) in b.as_object().unwrap() {
-            assert!(a[k].to_string() == v.to_string(), "{name}: the view {k}: {:.300} against {:.300}", a[k].to_string(), v.to_string());
+            let (x, y) = (a[k].to_string(), v.to_string());
+            assert!(x == y, "{name}: the view {k}: {x:.300} against {y:.300}");
         }
         assert_eq!(a.to_string(), b.to_string(), "{name}: the views");
         assert_eq!(again.sections, look.sections, "{name}: the sections");
@@ -125,4 +126,16 @@ fn a_look_holds_no_api_key() {
     assert!(found.is_empty(), "{found:?}");
     let schema = roadstyle_look::sections::schema().to_string();
     assert!(!schema.to_lowercase().contains("key\":"), "a field with \"key\" in its name in look.schema.json");
+}
+
+/// The tunnel look's rule (render_web._tun_settings, the texts of Python's _check_tunnels): each colour of tunnel_towards a "#rrggbb",
+/// tunnel_toward one of their names or a "#rrggbb"; a value of another type is the same error, not serde's.
+#[test]
+fn the_tunnel_look_is_checked() {
+    let e = |c: Value| Look::resolve(&Options::from_value(&json!({"settings": {"config": c}})).unwrap()).unwrap_err().to_string();
+    assert!(e(json!({"tunnel_toward": 7})).starts_with("tunnel_toward 7 is not a colour name in ['Slate', "), "{}", e(json!({"tunnel_toward": 7})));
+    assert!(e(json!({"tunnel_toward": "Pink"})).starts_with("tunnel_toward 'Pink' is not a colour name in ["));
+    assert!(e(json!({"tunnel_toward": "#12345"})).ends_with("or a '#rrggbb' colour"));
+    assert_eq!(e(json!({"tunnel_towards": {"A": "red"}, "tunnel_toward": "A"})), "tunnel_towards 'A': 'red' is not a '#rrggbb' colour");
+    assert!(Look::resolve(&Options::from_value(&json!({"settings": {"config": {"tunnel_toward": "#123456"}}})).unwrap()).is_ok());
 }
