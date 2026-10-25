@@ -264,7 +264,7 @@ pub fn bridge_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str) -> Vec<Va
                 props.insert("__rs_base".into(), json!(py_round(base_m * t, 2)));
                 props.insert("__rs_height".into(), json!(py_round(base_m * t + thick, 2)));
                 props.insert("__rs_chain".into(), json!(chain_i));
-                props.insert("__rs_edges".into(), json!(fdir.iter().collect::<Vec<_>>()));
+                props.insert("__rs_edges".into(), json!(fdir.iter().map(|&r| crate::road::key(r).get()).collect::<Vec<_>>()));
                 feats.push(json!({"type": "Feature", "properties": props, "geometry": {"type": "Polygon", "coordinates": [to_lonlat(ring)]}}));
             }
             // the casing: a strip along each long side of the deck, up to just under the deck's top (an extrusion has no outline)
@@ -280,7 +280,7 @@ pub fn bridge_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str) -> Vec<Va
                     }
                     feats.push(json!({"type": "Feature", "properties": {
                         "highway": pprops.get(hw).map_or(Value::Null, Cell::to_value), "__rs_chain": chain_i, "__rs_casing_slab": 1,
-                        "__rs_edges": edges, "__rs_base": py_round((base_m * t - 0.5).max(0.0), 2),
+                        "__rs_edges": edges.iter().map(|&r| crate::road::key(r).get()).collect::<Vec<_>>(), "__rs_base": py_round((base_m * t - 0.5).max(0.0), 2),
                         "__rs_height": py_round(base_m * t + thick * 0.35, 2)},
                         "geometry": {"type": "Polygon", "coordinates": [to_lonlat(&ring)]}}));
                 }

@@ -172,7 +172,7 @@ pub fn run(args: &[String]) -> Result<(), Error> {
             let out = PathBuf::from(out);
             match format.as_str() {
                 "pmtiles" => {
-                    let bytes = tiles.archive(bounds, &tiles.layer_names()).ok_or(Error::Engine("tiles: no tile".into()))?;
+                    let bytes = tiles.archive(bounds, &tiles.layer_names()).map_err(|e| Error::Engine(format!("tiles: {e}")))?;
                     if let Some(d) = out.parent().filter(|d| !d.as_os_str().is_empty()) {
                         std::fs::create_dir_all(d).map_err(|e| Error::File(format!("{}: {e}", d.display())))?;
                     }

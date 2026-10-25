@@ -144,7 +144,7 @@ impl Tiler {
 
     /// archive(bounds, layers) -> bytes: a PMTiles archive of every tile in bounds [min lon, min lat, max lon, max lat] (roadstyle_tiles::pmtiles).
     fn archive<'py>(&self, py: Python<'py>, bounds: [f64; 4], layers: Vec<String>) -> PyResult<Bound<'py, PyBytes>> {
-        let a = py.detach(|| self.tiles.archive(bounds, &layers)).ok_or_else(|| PyValueError::new_err("the archive has no tile"))?;
+        let a = py.detach(|| self.tiles.archive(bounds, &layers)).map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(PyBytes::new(py, &a))
     }
 
@@ -210,13 +210,13 @@ impl Sources {
     fn tile_stage(&self, py: Python<'_>, only: Option<Vec<String>>, exact: Option<Vec<String>>, keep: Vec<String>, at: Option<String>) -> PyResult<(String, Tiler)> {
         use roadstyle::tiles::stage::{TileOptions, COLUMNS, TILES};
         let s = &self.inner;
-        let mut o = TileOptions::new(&s.layers, &s.metadata, &s.saved[TILES], &s.saved[COLUMNS], &keep).map_err(PyValueError::new_err)?;
+        let mut o = TileOptions::new(&s.layers, &s.metadata, &s.saved[TILES], &s.saved[COLUMNS], &keep).map_err(|e| PyValueError::new_err(e.to_string()))?;
         (o.exact, o.only) = (exact.map(|e| e.into_iter().collect()), only);
         let at = match at {
             Some(t) => serde_json::from_str(&t).map_err(|e| PyValueError::new_err(format!("at: not JSON: {e}")))?,
             None => roadstyle::xyz_at(""),
         };
-        let (style, tiles) = py.detach(|| roadstyle::tile_stage(s, &o, &at));
+        let (style, tiles) = py.detach(|| roadstyle::tile_stage(s, &o, &at)).map_err(|e| PyValueError::new_err(e.to_string()))?;
         let style = py.detach(|| roadstyle::style_text(s, &style));
         Ok((style.clone(), Tiler { style, tiles }))
     }

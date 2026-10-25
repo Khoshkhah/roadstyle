@@ -281,7 +281,7 @@ pub fn cut_sea(t: FeatureTable) -> Result<FeatureTable, Error> {
         }).collect()).collect();
         out.push(GeomType::MultiPolygon, &closed);
     }
-    t.with_geometries(out).map_err(Error::Data)
+    t.with_geometries(out).map_err(|e| Error::Data(e.to_string()))
 }
 
 /// Every ring of the Polygon or MultiPolygon `row`.

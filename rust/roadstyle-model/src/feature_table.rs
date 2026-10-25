@@ -2,7 +2,9 @@
 //! columns (a `RoadTable` with no lines, so its column types and its `Cell` reads are the one rule) and the geometry of every feature in
 //! one coordinate buffer, with the offsets of its parts and rings (GeoArrow's form). No JSON tree for each feature.
 
+use crate::error::column;
 use crate::geom::Geom;
+use crate::Error;
 use crate::table::{Cell, JsSafe, Lines, RoadTable};
 use arrow_array::{ArrayRef, BooleanArray, Float64Array, Int64Array, NullArray, StringArray};
 use serde_json::{json, Value};
@@ -96,12 +98,12 @@ impl Geometries {
     }
 
     /// A feature from its WKB (None or empty bytes: no geometry). An error for bytes that are not a WKB geometry.
-    pub fn push_wkb(&mut self, bytes: Option<&[u8]>) -> Result<(), String> {
+    pub fn push_wkb(&mut self, bytes: Option<&[u8]>) -> Result<(), Error> {
         let Some(b) = bytes.filter(|b| !b.is_empty()) else {
             self.push_none();
             return Ok(());
         };
-        let (kind, parts) = crate::wkb::read(b).ok_or("a geometry that is not WKB")?;
+        let (kind, parts) = crate::wkb::read(b).ok_or_else(|| Error::Geometry("a geometry that is not WKB".into()))?;
         self.push(kind, &parts);
         Ok(())
     }
@@ -167,7 +169,7 @@ struct Rule {
 impl FeatureTable {
     /// The table of the columns `names` (each as long as `geoms`), each null left out of a GeoJSON feature. An error for a column of
     /// another type or length.
-    pub fn new(names: Vec<String>, cols: Vec<ArrayRef>, geoms: Geometries) -> Result<FeatureTable, String> {
+    pub fn new(names: Vec<String>, cols: Vec<ArrayRef>, geoms: Geometries) -> Result<FeatureTable, Error> {
         let rules = vec![Rule::default(); names.len()];
         let props = RoadTable::new(names.clone(), cols.clone(), no_lines(geoms.len()))?;
         Ok(FeatureTable { names, cols, rules, props, geoms })
@@ -179,9 +181,9 @@ impl FeatureTable {
     }
 
     /// The table with the geometries `geoms` in place of its own (one for each feature).
-    pub fn with_geometries(mut self, geoms: Geometries) -> Result<FeatureTable, String> {
+    pub fn with_geometries(mut self, geoms: Geometries) -> Result<FeatureTable, Error> {
         if geoms.len() != self.len() {
-            return Err(format!("{} geometries for {} features", geoms.len(), self.len()));
+            return Err(Error::Geometry(format!("{} geometries for {} features", geoms.len(), self.len())));
         }
         self.geoms = geoms;
         Ok(self)
@@ -190,11 +192,11 @@ impl FeatureTable {
     /// Set the column `name` to `cells` (one for each feature; in its place when it is there, else as the last column), its type from
     /// the cells: text, true/false, integers, or numbers (integers and floats: a Float64 column that knows its integers). `nulls`: a null
     /// is written in GeoJSON. An error for cells of two other types or a JSON array or object.
-    pub fn set_column(&mut self, name: &str, cells: &[Cell], nulls: bool) -> Result<(), String> {
+    pub fn set_column(&mut self, name: &str, cells: &[Cell], nulls: bool) -> Result<(), Error> {
         if cells.len() != self.len() {
-            return Err(format!("column {name}: {} values for {} features", cells.len(), self.len()));
+            return Err(column(name, format!("{} values for {} features", cells.len(), self.len())));
         }
-        let cells: Vec<Cell> = cells.iter().map(|c| plain(*c)).collect::<Result<_, _>>().map_err(|e| format!("column {name}: {e}"))?;
+        let cells: Vec<Cell> = cells.iter().map(|c| plain(*c)).collect::<Option<_>>().ok_or_else(|| column(name, "a JSON array or object"))?;
         let has = |f: fn(&Cell) -> bool| cells.iter().any(f);
         let (text, bool, int, float) = (has(|c| matches!(c, Cell::Str(_))), has(|c| matches!(c, Cell::Bool(_))),
                                         has(|c| matches!(c, Cell::Int(_))), has(|c| matches!(c, Cell::Float(_))));
@@ -209,7 +211,7 @@ impl FeatureTable {
                 ints = int.then(|| cells.iter().map(|c| matches!(c, Cell::Int(_))).collect());
                 Arc::new(cells.iter().map(|c| match c { Cell::Float(f) => Some(*f), c => c.as_f64() }).collect::<Float64Array>())
             }
-            _ => return Err(format!("column {name}: values of more than one type")),
+            _ => return Err(column(name, "values of more than one type")),
         };
         let rule = Rule { nulls, ints };
         match self.names.iter().position(|n| n == name) {
@@ -288,14 +290,14 @@ fn no_lines(n: usize) -> Lines {
 }
 
 /// A cell as a column holds it: a JSON value (an engine value) as its plain kind.
-fn plain(c: Cell) -> Result<Cell, String> {
-    let Cell::Json(v) = c else { return Ok(c) };
-    Ok(match v {
+fn plain(c: Cell) -> Option<Cell> {
+    let Cell::Json(v) = c else { return Some(c) };
+    Some(match v {
         Value::Null => Cell::Null,
         Value::Bool(b) => Cell::Bool(*b),
         Value::Number(n) => n.as_i64().map_or_else(|| Cell::Float(n.as_f64().unwrap_or(f64::NAN)), Cell::Int),
         Value::String(s) => Cell::Str(s),
-        _ => return Err("a JSON array or object".into()),
+        _ => return None,
     })
 }
 
