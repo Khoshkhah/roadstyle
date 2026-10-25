@@ -330,6 +330,21 @@ pub(crate) fn minzoom_filter(col: &str, table: &Map<String, Value>) -> Value {
     json!([">=", ["zoom"], m])
 }
 
+/// render's minzoom (_minzoom_filter): null or true the config's table of the classes' first zooms (the default since 2026-10-25, as
+/// OpenMapTiles and OSM-Carto do), a mapping that table with changes, false every class at every zoom (None).
+pub(crate) fn class_minzoom(look: &crate::Look) -> Option<Map<String, Value>> {
+    let table = || look.config["minzoom"].as_object().cloned().unwrap_or_default();
+    match &look.args["minzoom"] {
+        Value::Bool(true) | Value::Null => Some(table()),
+        Value::Object(o) => {
+            let mut t = table();
+            t.extend(o.iter().map(|(k, v)| (k.clone(), v.clone())));
+            Some(t)
+        }
+        _ => None,
+    }.filter(|t| !t.is_empty())
+}
+
 /// casing.drop_below_px (2026-10-25): a casing piece (`__rs_k` 0, not a bridge's) only from its class's first zoom whose tiles show the
 /// casing line at least `drop` px wide: the first z with the class's casing width at z + 1 >= `drop` (the width grows with the zoom).
 /// None when `drop` is 0, when every class has a casing from zoom 0, or when `kept` (a road in metres with casing.min_px >= drop).
@@ -646,17 +661,7 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     let export = args["export"] == true;
 
     // roads-simple and the invisible roads-fill (simple mode)
-    // render's minzoom (_minzoom_filter): null or true the config's table of the classes' first zooms (the default since 2026-10-25, as
-    // OpenMapTiles and OSM-Carto do), a mapping that table with changes, false every class at every zoom
-    let mz: Option<Map<String, Value>> = match &look.args["minzoom"] {
-        Value::Bool(true) | Value::Null => Some(cfg["minzoom"].as_object().cloned().unwrap_or_default()),
-        Value::Object(o) => {
-            let mut t = cfg["minzoom"].as_object().cloned().unwrap_or_default();
-            t.extend(o.iter().map(|(k, v)| (k.clone(), v.clone())));
-            Some(t)
-        }
-        _ => None,
-    }.filter(|t| !t.is_empty());
+    let mz = class_minzoom(look);
     let mz_filter = |col: &str| mz.as_ref().map(|t| minzoom_filter(col, t));
     let mut flt = vec![json!("all")];
     flt.extend(mz_filter("highway"));

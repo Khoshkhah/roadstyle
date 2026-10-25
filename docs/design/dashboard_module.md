@@ -159,7 +159,7 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 | `street_view_key` | `street_view_key` | `""` | `streetview.js`, `google3d.js` |
 | `google_3d` | `google_3d` | `false` | `google3d.js` |
 | `select_color` | `select_color` (the theme's `selection.select`) | (none) | `google3d.js` (the clicked road's line) |
-| `filter` | `filter_control`, `access_col`: `{on, col, classes, swatches, palettes, bridges, tunnels, access}` | `{on: false, classes: []}` | `filter.js`, `views.js` |
+| `filter` | `filter_control`, `access_col`, `minzoom`: `{on, col, classes, swatches, palettes, bridges, tunnels, access, minzoom}` | `{on: false, classes: []}` | `filter.js`, `views.js` |
 | `color_options` | `color_options` or a data styler's legend: `[{name, prop, legend}]` | the style's metadata, else `[]` | `color.js`, `legend.js`, `views.js` |
 | `color_active` | `color_active`, as an index | `0` | `color.js` |
 | `overlays` | `overlays`: `[{label, source, layers, popup, tooltip, interactive, under, base, select, color, visible, popup_window, kinds}]` (`kinds`: a base-map layer's `[[kind, count], ...]`, most first) | `[]` | `core.js`, `overlays.js`, `filter.js`, `select.js`, `features.js` |

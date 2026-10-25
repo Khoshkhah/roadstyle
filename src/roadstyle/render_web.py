@@ -3751,7 +3751,10 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            "bridges": any((f.get("properties") or {}).get("lvl", 0) > 0
                           for f in geo.get("features", [])),
            "tunnels": any((f.get("properties") or {}).get("lvl", 0) < 0
-                          for f in geo.get("features", []))}
+                          for f in geo.get("features", [])),
+           # the class minzoom (2026-10-25): the first zoom of each class of the panel that has one (the Roads box dims a hidden
+           # class); None when the minzoom is off (contract.rs filter_panel)
+           "minzoom": {c: mz[c] for c in classes if (mz.get(c) or 0) > 0} if mz else None}
 
     view_list = _check_views(views, [o["name"] for o in color_opts_meta or []] if color_options else [],
                              [o["label"] for o in ov_meta], classes, [b["key"] for b in bms], _settings.style_names("palettes"))

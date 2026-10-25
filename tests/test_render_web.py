@@ -282,6 +282,17 @@ def test_minzoom_true_uses_the_config_table():
         assert f'"residential", {float(DEFAULT.minzoom["residential"])}' in blob
 
 
+@pytest.mark.parametrize("engine", ["python", "rust"])
+def test_the_filter_panel_names_each_class_first_zoom(engine):
+    """roadstyle:controls.filter.minzoom (2026-10-25): the first zoom of each class of the panel that the class minzoom hides below a zoom,
+    so the Roads box dims it; a dict's change is in it; None with minzoom=False."""
+    from roadstyle.config import DEFAULT
+    flt = _opt(render_edges(_many_edges(20), backend="web", engine=engine, minzoom={"residential": 9}).html, "filter")
+    assert flt["minzoom"]["residential"] == 9 and set(flt["minzoom"]) <= set(flt["classes"]), flt
+    assert all(flt["minzoom"].get(c) == DEFAULT.minzoom[c] for c in flt["classes"] if c != "residential" and DEFAULT.minzoom.get(c))
+    assert _opt(render_edges(_many_edges(20), backend="web", engine=engine, minzoom=False).html, "filter")["minzoom"] is None
+
+
 def test_minzoom_dict_overrides_only_what_it_names():
     from roadstyle.config import DEFAULT
     from roadstyle.render_web import render

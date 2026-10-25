@@ -23,6 +23,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   targets, room for the keyboard, and a fold when a Street View or Google 3D window opens at the bottom.
   `browserStore` keeps every file in the origin's private file system, also the texts (pairs.csv of Burnaby is more than
   localStorage's 5 MB); a text that an older version kept in localStorage moves there when it is read.
+- **`roadstyle:controls.filter.minzoom`** (both engines): `{class: zoom}`, the first zoom of each class of the filter panel that the
+  class minzoom hides below a zoom, so a dashboard can dim such a row; null when the minzoom is off (`minzoom=False`).
 - **`casing.drop_below_px`** (a profile key, both engines; default `1.0`, `0` = always a casing): no casing piece at a zoom where the
   whole casing line is narrower than this many px, so the fill draws alone there; the casing comes back at the first zoom where it is as
   wide. A bridge keeps its casing. The road layer's filter has the rule, and the tiles leave out the pieces that it hides.
