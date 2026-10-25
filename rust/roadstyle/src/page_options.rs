@@ -29,6 +29,22 @@ const SIDEBARS: [(&str, &str, &str); 2] = [
      r#"{"name": "Roads report", "basemap_switcher": true, "filter_control": false, "road_popup": false}"#),
 ];
 
+/// The two map options that a sidebar's defaults give way to when the call gives them (page_from: `mine`): they go into `given` too.
+const SIDEBAR_YIELDS: [&str; 2] = ["name", "road_popup"];
+
+/// The page's keys of a call (render_edges' keywords), the `given` of page_from: the look's `other` (the call's keywords that are not map
+/// options; a look file has none) and `SIDEBAR_YIELDS` of the call's `args`. It has no API key (Look::other has none): the caller adds its
+/// own values (street_view_key, api_key, resolved_basemaps) over it. The one rule of Python's page_given and the wasm page.
+pub fn given_of(look: &Look, args: &Value) -> Map<String, Value> {
+    let mut g = look.other.clone();
+    for k in SIDEBAR_YIELDS {
+        if let Some(v) = args.get(k) {
+            g.insert(k.into(), v.clone());
+        }
+    }
+    g
+}
+
 /// The keywords that each sidebar changes, and their values.
 pub fn sidebar_defaults() -> Map<String, Value> {
     SIDEBARS.iter().map(|(k, _, d)| (k.to_string(), serde_json::from_str(d).expect("a sidebar's defaults are JSON"))).collect()
@@ -454,5 +470,16 @@ mod tests {
         assert_eq!(e.to_string(), "view 'a': classes ['motorway'] not in the page (it has ['primary'])");
         assert_eq!(check_views(&json!({"a": {"zoom": 3}}), have()).unwrap_err().to_string(), "view 'a': unknown setting(s) ['zoom']");
         assert!(matches!(check_views(&json!({"a": {"bridges": 1}}), have()), Err(crate::Error::Options(m)) if m == "view 'a': bridges must be True or False, got 1"));
+    }
+
+    #[test]
+    fn given_of_has_the_page_keys_of_a_call() {
+        let o = Options::from_value(&json!({"args": {"state": "live", "sidebar": "dashboard", "popup_mode": "panel", "name": "N",
+                                                     "road_popup": ["highway"], "color_by": "lanes"}})).unwrap();
+        let g = given_of(&Look::resolve(&o).unwrap(), &o.args);
+        assert_eq!(g["sidebar"], "dashboard");
+        assert_eq!(g["popup_mode"], "panel");
+        assert_eq!((&g["name"], &g["road_popup"]), (&json!("N"), &json!(["highway"])));   // a sidebar's defaults give way to them
+        assert!(!g.contains_key("color_by") && !g.contains_key("state"), "map options are the look's: {g:?}");
     }
 }

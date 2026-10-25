@@ -1,7 +1,10 @@
 """The names of the interaction contract (docs/reference/contract.md) and the names in the code are the same: the global state rs_*, the
 feature properties __rs_*, the metadata keys roadstyle:*, the page's placeholders, the browser storage keys and the CSS variables."""
+import json
 import re
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 DOC = ROOT / "docs" / "reference" / "contract.md"
@@ -93,3 +96,18 @@ def test_a_missing_flag_is_false_for_the_page():
                          + r"|[\"']" + f + r"[\"']\s+in\b|hasOwnProperty\(\s*[\"']" + f, line):
                 bad.append(f"{p.relative_to(ROOT)}:{n}: {line.strip()[:120]}")
     assert not bad, "\n".join(bad)
+
+
+def test_the_dashboards_contract_is_the_engines():
+    """CONTRACT in core.js (the newest roadstyle:contract that the dashboard reads) equals the version that the engine writes."""
+    import geopandas as gpd
+    from shapely.geometry import LineString
+
+    from roadstyle import _engine
+    if not _engine.available():
+        pytest.skip("no roadstyle._rust")
+    core = (ROOT / "rust/roadstyle-assets/files/static/dashboard/core.js").read_text()
+    js = int(re.search(r"^export const CONTRACT = (\d+);", core, re.M).group(1))
+    g = gpd.GeoDataFrame({"highway": ["primary"]}, geometry=[LineString([(18.0, 59.3), (18.001, 59.301)])], crs=4326)
+    style = json.loads(_engine.rust().make_style(_engine._arrow(g), _engine._look_of({"state": "live"}), None, None, "roads"))
+    assert style["metadata"]["roadstyle:contract"] == js

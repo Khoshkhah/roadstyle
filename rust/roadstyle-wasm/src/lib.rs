@@ -20,11 +20,13 @@ mod grow {
     pub static LIVE: AtomicUsize = AtomicUsize::new(0);
     pub static PEAK: AtomicUsize = AtomicUsize::new(0);
 
+    #[inline(never)]
     fn took(n: usize) {
         let live = LIVE.fetch_add(n, Relaxed) + n;
         PEAK.fetch_max(live, Relaxed);
     }
 
+    #[inline(never)]
     fn ahead() {
         let now = memory_size(0);
         if now != PAGES.load(Relaxed) {
@@ -45,7 +47,12 @@ mod grow {
 
     struct Ahead;
 
+    // Every function of the allocator is out of line (#[inline(never)]): with fat LTO they were inlined at each allocation site, thousands of
+    // copies, 1.31 MB of the package (12,312,335 to 11,006,948 bytes; parity.md, "Size"). The cost is one call for each allocation:
+    // Tartu's makeSources and tileSources in Node took about 2 % longer, about the noise between runs.
+
     unsafe impl GlobalAlloc for Ahead {
+        #[inline(never)]
         unsafe fn alloc(&self, l: Layout) -> *mut u8 {
             let p = System.alloc(l);
             if !p.is_null() {
@@ -54,6 +61,7 @@ mod grow {
             ahead();
             p
         }
+        #[inline(never)]
         unsafe fn alloc_zeroed(&self, l: Layout) -> *mut u8 {
             let p = System.alloc_zeroed(l);
             if !p.is_null() {
@@ -62,6 +70,7 @@ mod grow {
             ahead();
             p
         }
+        #[inline(never)]
         unsafe fn realloc(&self, p: *mut u8, l: Layout, size: usize) -> *mut u8 {
             let q = System.realloc(p, l, size);
             if !q.is_null() {
@@ -71,6 +80,7 @@ mod grow {
             ahead();
             q
         }
+        #[inline(never)]
         unsafe fn dealloc(&self, p: *mut u8, l: Layout) {
             LIVE.fetch_sub(l.size(), Relaxed);
             System.dealloc(p, l)
@@ -252,8 +262,10 @@ mod wasm {
 
     /// makePage(roads: Uint8Array, look: Look, options: string, given?: string) -> string: the page of the roads (GeoParquet) in one
     /// call, as render_edges(backend="web") (roadstyle::page_options::page_from; MapLibre stays a placeholder). `look`: resolveLook's of
-    /// `options` (its JSON text, which a view's palette resolves again), with "state": "live" in its args; `given`: the caller's values
-    /// over the look's args (JSON text: api_key, street_view_key, resolved_basemaps); `features`: a duckOSM map's base map (Parquet bytes).
+    /// `options` (its JSON text, which a view's palette resolves again), with "state": "live" in its args. The page's keys (sidebar,
+    /// popup_mode, ...) come from the call's args (page_options::given_of: the keywords that are not map options, name, road_popup);
+    /// `given`: the caller's values over them (JSON text: api_key, street_view_key, resolved_basemaps); `features`: a duckOSM map's base
+    /// map (Parquet bytes).
     #[wasm_bindgen(js_name = makePage)]
     pub fn make_page(roads: Vec<u8>, look: &JsLook, options: &str, given: Option<String>, features: Option<Vec<u8>>) -> Result<String, JsError> {
         page_of(roadstyle::read::read_roads(roads, "geometry").map_err(|e| JsError::new(&e.to_string()))?, features, look, options, given)
@@ -262,10 +274,13 @@ mod wasm {
     /// makePage and Roads.page: the page of read roads.
     fn page_of(roads: roadstyle::RoadTable, features: Option<Vec<u8>>, look: &JsLook, options: &str, given: Option<String>) -> Result<String, JsError> {
         let o: roadstyle::look::Options = serde_json::from_str(options).map_err(|e| JsError::new(&format!("options: {e}")))?;
-        let given: serde_json::Map<String, serde_json::Value> = match given {
-            Some(g) => serde_json::from_str(&g).map_err(|e| JsError::new(&format!("given: {e}")))?,
-            None => serde_json::Map::new(),
-        };
+        // the page's keys of the call (the look's other keywords, name, road_popup: page_options::given_of), under the caller's
+        let mut all = roadstyle::page_options::given_of(&look.0, &o.args);
+        if let Some(g) = given {
+            let g: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&g).map_err(|e| JsError::new(&format!("given: {e}")))?;
+            all.extend(g);
+        }
+        let given = all;
         let features = features.map(roadstyle::read_features).transpose().map_err(|e| JsError::new(&e.to_string()))?;
         let page = roadstyle::page_options::page_from(roads, features, &look.0, &o, &given).map_err(|e| JsError::new(&e.to_string()))?;
         page.warnings.iter().for_each(|w| console_warn(w));

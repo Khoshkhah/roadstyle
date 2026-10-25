@@ -435,6 +435,15 @@ fn toggle<T: PartialEq>(rules: &mut Vec<T>, rule: T, on: bool) -> bool {
     true
 }
 
+/// The key of a level area's solve inputs, by their content: the SHA-256 (hex) of roads.parquet, pairs.csv and edits.csv, joined by ":".
+/// levels_info.json keeps it (`inputs`), and the level editor starts from levels.csv only when its inputs have the same key; heads.csv
+/// and caps.csv are drawing only, not inputs. The editor page (level_editor.js, inputsKey) makes the same key.
+pub fn inputs_key(roads: &[u8], pairs: &[u8], edits: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    let hex = |b: &[u8]| Sha256::digest(b).iter().map(|x| format!("{x:02x}")).collect::<String>();
+    format!("{}:{}:{}", hex(roads), hex(pairs), hex(edits))
+}
+
 /// roadstyle's hash of the edge ids (`edge_levels_meta.edge_hash`): sha256 of the sorted ids, 8 bytes each, little endian; the first
 /// 32 hex characters.
 pub fn edge_hash(ids: &[i64]) -> String {
@@ -563,6 +572,13 @@ fn solved_rows(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_inputs_key_is_the_sha256_of_each_file() {
+        let empty = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+        let abc = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+        assert_eq!(super::inputs_key(b"abc", b"", b"abc"), format!("{abc}:{empty}:{abc}"));
+    }
+
     use super::*;
 
     #[test]

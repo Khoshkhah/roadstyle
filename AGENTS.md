@@ -36,8 +36,10 @@ A consumer project that does not install it runs with `PYTHONPATH=<this repo>/sr
   `dashboard/index.js` + the module that reads `O.<key>` + a test in `tests/test_render_web.py` (`_opt(html, key)`) + a row in
   `docs/reference/parameters.md`, `docs/reference/javascript.md` and `docs/design/dashboard_module.md` + CHANGELOG. If agents
   calling the library need to know it, also `skills/roadstyle/SKILL.md`.
-- `render_edges` takes `**kwargs`, so a misspelt keyword is silently ignored: look for the key in `RS_OPTIONS`
-  (`_opt(html, key)`) when a new option seems to do nothing.
+- `render_edges` takes `**kwargs`. A keyword that no part of roadstyle reads gives a warning with the nearest known name
+  (`roadstyle::options::unknown`, `_rust.unknown_keywords`; an error from 0.27.0). A new keyword needs its place in MapOptions or
+  PageOptions, or a line in `PY_ONLY` of `tests/test_unknown_keywords.py`. When a new option seems to do nothing, look for the key in
+  `RS_OPTIONS` (`_opt(html, key)`).
 - The road popup and hover tooltip text: `_rfields` (popup/tooltip, `static/popup.js`) and `_rrows` (docked panel,
   `dashboard/select.js`); Street View: `_svMeasure` / `_svAt` (the spot on the edge, metres along it), `_svPick` / `_svUrl` / `_svUrlOf`, the marker `_svMark` / `_svMarkPlace` / `_svLanePx`, the window `rsSetStreetView`.
 - Google's script is loaded once for every window by `_gmLoad(key)`; a floating window (drag, size, place, remembered)

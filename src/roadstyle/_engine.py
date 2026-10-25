@@ -418,11 +418,10 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
 
 
 def page_given(kwargs, palette=None, profile=None, settings=None, lk=None, args=None) -> dict:
-    """The page's keys and what only Python knows of a page (roadstyle::page_options makes the rest): the call's keywords that are not
-    map options (the look ``lk``'s part "other": a look file has no page key) and the two map options of the call ``args`` that a
-    sidebar's defaults give way to, the Google Maps key of the environment, and each base map key with its API key of roadstyle.json,
-    of set_api_key or of the environment (basemaps.get_api_key, by provider), in force with the settings of the call as render_edges
-    applies them."""
+    """The page's keys and what only Python knows of a page (roadstyle::page_options makes the rest): the page's keys of the call
+    (roadstyle::page_options::given_of of the look ``lk`` and the call's ``args``, as the wasm page), the Google Maps key of the
+    environment, and each base map key with its API key of roadstyle.json, of set_api_key or of the environment (basemaps.get_api_key,
+    by provider), in force with the settings of the call as render_edges applies them."""
     import dataclasses
 
     from . import _settings as _s
@@ -441,8 +440,7 @@ def page_given(kwargs, palette=None, profile=None, settings=None, lk=None, args=
         resolved = [dataclasses.asdict(get_basemap(k, api_key=a["api_key"])) for k in keys]
     finally:
         _use(*prev)
-    page = json.loads(lk.part("other")) if lk is not None else {}
-    page.update({k: v for k, v in (args or {}).items() if k in ("name", "road_popup")})
+    page = json.loads(rust().given_of(lk, json.dumps({"args": args or {}})))     # the page's keys: page_options::given_of, the one rule
     return {**page, "resolved_basemaps": resolved, "street_view_key": a["street_view_key"] or os.environ.get("GOOGLE_MAPS_KEY") or None}
 
 

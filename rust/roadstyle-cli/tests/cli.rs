@@ -81,6 +81,10 @@ fn levels_make_and_solve() {
     let rows = std::fs::read_to_string(dir.join("levels.csv")).unwrap().lines().count();
     assert_eq!(rows, 1 + 1373, "a header and a row for each edge");
     assert!(std::fs::read_to_string(dir.join("levels_info.json")).unwrap().contains("\"order_violations\""));
+    // the key of the solve's inputs (roadstyle-levels' inputs_key), as the editor page makes it: the page starts from these levels
+    let info: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir.join("levels_info.json")).unwrap()).unwrap();
+    let file = |f: &str| std::fs::read(dir.join(f)).unwrap();
+    assert_eq!(info["inputs"], roadstyle::levels::inputs_key(&file("roads.parquet"), &file("pairs.csv"), &file("edits.csv")));
     std::fs::remove_dir_all(&dir).ok();
 }
 

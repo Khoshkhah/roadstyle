@@ -1,7 +1,7 @@
 // roadstyle's map dashboard, the entry: rsDashboard(map, options) adds the map controls and the road interaction of roadstyle's page
 // to a MapLibre map (docs/design/dashboard_module.md). The options have the names of render_web.render's keywords; the values are
 // those the page reads (render_web.py makes them). Call it right after `new maplibregl.Map(...)`, before the map's "load" event.
-import {initCore, useStyle} from "./core.js";
+import {initCore, useStyle, _contractError} from "./core.js";
 import {initPanel, initPanelTab} from "./panel.js";
 import {initZoom} from "./zoom.js";
 import {initView3D} from "./view3d.js";
@@ -67,6 +67,9 @@ function fromStyle(o, given){
 // returns the dashboard object (docs/design/rust_library.md, "The runtime API", api.js): setStyle, and the methods of the API
 export function rsDashboard(map, options){
   const o = {...RS_DEFAULTS, ...options}, given = new Set(Object.keys(options));
+  // a style of a newer contract: an error (console, the result's `error`), and the dashboard reads it as no style
+  let error = _contractError(o.style);
+  if(error){ console.error(error); o.style = null; }
   fromStyle(o, given);
   initCore(map, o);
   initPanel();
@@ -91,6 +94,8 @@ export function rsDashboard(map, options){
     // a new roads style: the page added its sources and layers to the map first (with the prefix). The controls stay; they read the
     // new style, its metadata and its layers. The selection and the hover go: they were the old roads'.
     setStyle(style, more){
+      rs.error = _contractError(style);
+      if(rs.error){ console.error(rs.error); style = null; }
       o.style = style; fromStyle(o, given);
       if(more && "road_table" in more) o.road_table = more.road_table;      // the new style's road table (stage 1)
       useStyle(style); useSelect(); useFilter(); useColor(); useLegend();
@@ -98,6 +103,7 @@ export function rsDashboard(map, options){
     // R22, live data: join a table to the roads and colour or size them from it, with no new style; clearData takes it away (live.js)
     setData, clearData,
   });
+  rs.error = error;               // null, or the text of the contract error of the style (setStyle sets it again)
   window.rs = rs;                 // the page's one object (the window.rs* functions stay as they are)
   fromUrl(rs);
   return rs;
