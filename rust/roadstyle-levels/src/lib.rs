@@ -7,6 +7,7 @@
 
 pub mod area;
 mod error;
+pub mod flags;
 pub mod flow;
 mod input;
 pub mod solve;

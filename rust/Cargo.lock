@@ -1558,7 +1558,6 @@ dependencies = [
 name = "roadstyle-levels"
 version = "0.25.0"
 dependencies = [
- "roadstyle-model",
  "rstar",
  "sha2",
 ]
@@ -1596,6 +1595,7 @@ version = "0.25.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
+ "roadstyle-levels",
  "rstar",
  "serde",
  "serde_json",

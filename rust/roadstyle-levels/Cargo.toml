@@ -8,6 +8,5 @@ license.workspace = true
 description = "roadstyle's drawing levels: the tags rule and the solver (on roadstyle-model only, for the road flags)"
 
 [dependencies]
-roadstyle-model.workspace = true
 rstar.workspace = true
 sha2.workspace = true

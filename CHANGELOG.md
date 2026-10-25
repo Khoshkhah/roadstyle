@@ -15,6 +15,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   map's table) and downloads of edits.csv and levels.csv. `roadstyle serve`'s page uses the same module.
 
 ### Changed
+- **`roadstyle-levels` is a leaf crate** (audit N26): its only dependencies are rstar and sha2, 17 crates in all (it was 49, with
+  Arrow through roadstyle-model). The road flags' rule (`NO`, `yes_text`, `layer`, `level`, `directed`, `sql_yes`) is
+  `roadstyle_levels::flags` now; `roadstyle_model::flags` re-exports it with the JSON value's `yes` and `maplibre_yes`. duckosm-rust
+  can take the levels alone. CI fails when the levels depend on more.
 - **`cargo test` at `rust/` builds 113 crates in about 1 minute, not 195 in 5** (review D1). The programs `roadstyle-cli` and
   `roadstyle-snapshot` (bundled SQLite, headless_chrome) are not default members: CI tests them in a step of their own (`-p`). Fat LTO
   and one codegen unit moved from `release` to a new profile `dist` (`inherits = "release"`), which the wheels (`maturin --profile
