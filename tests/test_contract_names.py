@@ -72,3 +72,23 @@ def test_the_page_reads_only_declared_properties():
         text = re.sub(r"window\.__rs_[a-z]+", "", p.read_text())
         read |= {_norm(m) for m in re.findall(KINDS["property"], text)}
     assert read - known == set(), f"read by the page but not declared in reads.json: {sorted(read - known)}"
+
+
+def test_a_missing_flag_is_false_for_the_page():
+    """A tile has no __rs_* flag that is false (2026-10-25), so the page's scripts read a flag as true or not: no comparison of a __rs_*
+    property with false, undefined or null, and no test that the key is there (the layers: tests/sources.rs in rust/roadstyle-rs)."""
+    # the flags: each __rs_* property that the engines set to true or false
+    code = [p.read_text(errors="ignore") for p in [*(ROOT / "src").rglob("*.py"), *(ROOT / "rust").rglob("*.rs")] if "target" not in p.parts]
+    flags = {m for t in code for m in re.findall(r"[\"'](__rs_\w+)[\"'][\]:,]\s*(?:\w+\(|\.?into\(\)\s*,?)?\s*(?:True|False|true|false)\b", t)}
+    flags |= {m for t in code for m in re.findall(r"flag\(&mut out, \"(__rs_\w+)\"", t)}       # draw.rs: the road's flags
+    assert {"__rs_bridge", "__rs_twoway", "__rs_seam"} <= flags, flags
+    f = "(?:" + "|".join(sorted(flags)) + r")\b"
+    bad = []
+    for p in (ROOT / "src" / "roadstyle" / "static").rglob("*"):
+        if p.suffix not in (".js", ".html"):
+            continue
+        for n, line in enumerate(p.read_text(errors="ignore").splitlines(), 1):
+            if re.search(f + r"\s*[!=]==?\s*(false|undefined|null)\b|\b(false|undefined|null)\s*[!=]==?\s*\S*" + f
+                         + r"|[\"']" + f + r"[\"']\s+in\b|hasOwnProperty\(\s*[\"']" + f, line):
+                bad.append(f"{p.relative_to(ROOT)}:{n}: {line.strip()[:120]}")
+    assert not bad, "\n".join(bad)

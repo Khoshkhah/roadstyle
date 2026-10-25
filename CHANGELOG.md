@@ -23,6 +23,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   targets, room for the keyboard, and a fold when a Street View or Google 3D window opens at the bottom.
 
 ### Changed
+- **Smaller tiles** (both engines). The sort key `__rs_s` of a piece is an integer: 100,000,000 for each step of the key and 1 for each
+  road (before: the key + the road × 1e-8, a double). The order does not change, and the step of a painted road is 50,000,000. A tile
+  keeps no `__rs_*` flag that is false (every reader takes a missing flag as false), and the pieces (the tile layer `simple`) have no
+  MVT id: the source's `promoteId` (`__rs_edge`) is their feature id. The map does not change. Tartu, one 1280 × 800 view (`bench_tiles.mjs`, wasm in Node, the middle of three runs): z12 7.1 MB to
+  5.6 MB in 130 ms to 119 ms (the largest tile 3,268 KB to 2,529 KB), z14 6.6 MB to 5.3 MB in 130 ms to 115 ms.
 - **A source's tiles start at the zoom where it is drawn** (both engines). Its first tile zoom is the first zoom at which a layer of
   the style draws it, not later than the tiles' last zoom; a source that no layer draws keeps its rule. The base map's buildings and
   points (drawn from zoom 15 or 16) are no longer in the tiles of zoom 6 to 14. The map does not change. Tartu, the tiles of one

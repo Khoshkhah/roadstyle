@@ -97,6 +97,22 @@ and the time of the slowest one.
 The browser numbers are the middle of three runs. The headless browser measures only Monaco, the limit of this machine for a
 browser test. On Monaco the WebAssembly module is as fast as the native code.
 
+#### The size of the tiles
+
+`rust/roadstyle-wasm/bench_tiles.mjs` makes, in WebAssembly in Node, the tiles of one 1280 × 800 view at the roads' center (the
+tiles of 512 px in view and one more on each side), cold. The numbers are the middle of three runs on Tartu (64,828 roads), in
+order: the first tile zoom of a source is the first zoom at which a layer draws it (6ecff70); then the integer sort key, no false
+`__rs_*` flag and no MVT id on the pieces (2026-10-25).
+
+| Zoom | Before | First drawn zoom | Integer key, no false flags, no piece id | The largest tile |
+|---|---|---|---|---|
+| 12 | 8.6 MB | 7.1 MB, 130 ms | 5.6 MB, 119 ms | 3,863 KB, 3,268 KB, 2,529 KB |
+| 14 | 7.8 MB | 6.6 MB, 130 ms | 5.3 MB, 115 ms | 735 KB, 592 KB (the second and third) |
+
+That is about 18 ms for each 10,000 roads at zoom 12, cold. In the tile z12/2351/1225 (1,920 KB), the 35,239 pieces have 385 KB
+of lines and about 1.2 MB of marks: every mark is one that a layer or the page reads. The wasm memory after `makeSources` and
+`tileSources` (`bench.mjs`) stays 213 MiB.
+
 ### In the browser: Rust or MapLibre cuts the tiles
 
 The test compares only stage 2: **the same GeoJSON files go into both cutters, with the same tile settings.**

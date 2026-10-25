@@ -17,7 +17,7 @@
         "simple",
         "a0894aa3fdcc8faf",
         "b777cc0b01f83546",
-        "c57eb06c5a87ff06"
+        "32554e5658942863"
       ],
       [
         "roads-fill",
@@ -61,7 +61,7 @@
       "simple": [
         "geojson",
         1899,
-        "7dbfe2f8bbc3d140"
+        "7e6f6b302c78cc15"
       ],
       "slots": [
         "geojson",
@@ -76,7 +76,7 @@
       "roadstyle:sources": "de9ed92a2cabe7fc",
       "roadstyle:controls": "7ad47e2cab264f27"
     },
-    "hash": "3acdca7ff8a152bf"
+    "hash": "ef772f86c25f3fc3"
   },
   "color_options": {
     "names": [

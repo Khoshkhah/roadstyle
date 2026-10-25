@@ -25,6 +25,9 @@ use std::collections::{HashMap, HashSet};
 pub const EXTENT: f64 = 4096.0;
 /// The name of the one vector source.
 pub const SOURCE: &str = "roads";
+/// The pieces' tile layer: the vector source's `promoteId` (`__rs_edge`, the road's row) is their feature id, so their tiles have no MVT
+/// id (MapLibre does not read it there).
+const PROMOTED: &str = "simple";
 
 type P = [f64; 2];
 
@@ -416,7 +419,7 @@ impl Tiles {
                 }
             };
             if !geometry.is_empty() {
-                enc.feature(f, kind, &geometry, &layer.keys);
+                enc.feature(f, kind, &geometry, &layer.keys, name != PROMOTED);
             }
         }
         enc.finish(name, &layer.encoded)
@@ -443,6 +446,9 @@ impl Builder {
         let props = props
             .filter_map(|(k, v)| {
                 let v = v.tile_val()?;
+                if v == Val::Bool(false) && k.as_ref().starts_with("__rs_") {
+                    return None; // a false flag: every reader of a __rs_* flag takes a missing key as false (to-boolean, a truthy check)
+                }
                 let m = encode(&v);
                 let v = match val_at.get(&m) {
                     Some(&at) => at,
@@ -759,7 +765,7 @@ struct Encoder {
 }
 
 impl Encoder {
-    fn feature(&mut self, f: &Feat, kind: u32, geometry: &[u32], names: &[String]) {
+    fn feature(&mut self, f: &Feat, kind: u32, geometry: &[u32], names: &[String], with_id: bool) {
         let mut tags = Vec::with_capacity(f.props.len() * 2);
         for (k, v) in &f.props {
             let key = *self.key_at.entry(*k).or_insert_with(|| {
@@ -774,7 +780,7 @@ impl Encoder {
             tags.push(at);
         }
         let mut msg = Vec::new();
-        if let Some(id) = f.id {
+        if let Some(id) = f.id.filter(|_| with_id) {
             msg.push(1 << 3);
             varint(&mut msg, id);
         }

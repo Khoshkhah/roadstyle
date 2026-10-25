@@ -15,7 +15,9 @@ use std::collections::HashMap;
 const SEAM_M: f64 = 0.5; // a seam reaches this far each way from its cut, at most a quarter of either piece
 const LAP_M: f64 = 2.0; // a lap (the flat seam below zoom 17) reaches this far each way, at most half of either piece
 const PIECES: usize = 24; // the most pieces of one edge (the feature id is edge * PIECES + n)
-const TIE: f64 = 1e-8; // the line-sort-key's tie-breaker per edge
+// the line-sort-key `__rs_s` is an integer, KEY_UNIT for each unit of the key (2 * position + the kind's step) and 1 for each edge: the
+// tie-breaker per edge, so that a road redrawn in place keeps its place. An integer is a varint in a tile, a double 9 bytes.
+pub(crate) const KEY_UNIT: f64 = 1e8;
 const MAX_EDGES: usize = 1_000_000;
 const ITEM_STEP: f64 = 0.01; // an item's step above its edge's fill, by its rank on the edge
 const MAX_ITEMS: usize = 38; // the most items of one edge between its fill and the next casings
@@ -224,7 +226,7 @@ impl Piece {
         }
         if let Some(dk) = self.draw {
             q.insert("__rs_k", dk.kind.into());
-            q.insert("__rs_s", (dk.key + edge as f64 * TIE).into());
+            q.insert("__rs_s", sort_key(dk.key, edge).into());
         }
         q.insert("__rs_cls", r.cls());
         q
@@ -298,6 +300,11 @@ impl Line {
     pub(crate) fn lonlat(&self, pts: &[Pt], scale: f64) -> Vec<Pt> {
         pts.iter().map(|p| [np_round(p[0] / self.kx + self.lon0, scale), np_round(p[1] / KY + self.lat0, scale)]).collect()
     }
+}
+
+/// `__rs_s`: the key in KEY_UNITs and the edge's tie-breaker (render_web._piece_key).
+fn sort_key(key: f64, edge: i64) -> i64 {
+    (key * KEY_UNIT).round() as i64 + edge
 }
 
 fn int(p: &Props, k: &str) -> i64 {
@@ -627,7 +634,7 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
             return Err(format!("simple=True: edge {e} has more than {MAX_ITEMS} items; they do not fit between its fill and the next casings"));
         }
         let id = MAX_EDGES * PIECES + e as usize * MAX_ITEMS + *r - 1;
-        let s = 2.0 * int(&f.props, "__rs_fl") as f64 + 1.0 + *r as f64 * ITEM_STEP + e as f64 * TIE;
+        let s = sort_key(2.0 * int(&f.props, "__rs_fl") as f64 + 1.0 + *r as f64 * ITEM_STEP, e);
         f.props.insert("__rs_s", s.into());
         // _mark_cls: the class and the access of the item's road
         let road = roads.at(e as usize);

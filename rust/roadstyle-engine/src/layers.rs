@@ -898,7 +898,7 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
             if l["source"] == "roads" {
                 l["layout"]["line-sort-key"] = json!(["+", key, ["case", top, 500, 0]]);
             } else if l["id"] == "roads-simple" {
-                l["layout"]["line-sort-key"] = json!(["+", key, ["case", ["all", ["any", k(1), k(5)], top], 0.5, 0]]);
+                l["layout"]["line-sort-key"] = json!(["+", key, ["case", ["all", ["any", k(1), k(5)], top], (0.5 * crate::simple::KEY_UNIT) as i64, 0]]);
             }
         }
     }

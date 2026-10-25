@@ -1649,7 +1649,7 @@ def _state_expressions(style, props, fill_ids, end_fill_ids, end_casing_ids, ov_
                 layout["line-sort-key"] = ["+", layout["line-sort-key"], ["case", painted, 500, 0]]
             elif lid == "roads-simple":
                 layout["line-sort-key"] = ["+", layout["line-sort-key"], ["case", ["all", ["any", ["==", ["get", "__rs_k"], 1], ["==", ["get", "__rs_k"], 5]],
-                                                                                  top], 0.5, 0]]
+                                                                                  top], int(0.5 * _KEY_UNIT), 0]]
     by_id = {lyr["id"]: lyr for lyr in style["layers"]}
     for i, ov in enumerate(ov_meta or ()):
         for lid in ov.get("layers", ()):
@@ -2502,7 +2502,7 @@ def _simple_pieces(geo, parts, cols, shadows=True, items=(), world=None):
         if e >= _MAX_EDGES:
             raise ValueError(f"simple=True: more than {_MAX_EDGES:,} edges; the line-sort-key's tie-breaker would reach the next key step (pass simple=False)")
         f["id"], n[e] = e * _PIECES + n[e], n[e] + 1
-        f["properties"]["__rs_s"] += e * _TIE   # same key: by edge, not by feature order, so a road redrawn in place (updateData) keeps its place
+        f["properties"]["__rs_s"] = _piece_key(f["properties"]["__rs_s"], e)
     if world is not None:                       # a part of the roads (the editor's update in place): their own items, mitred against all
         mine = {f["properties"].get("__rs_edge", i) for i, f in enumerate(geo["features"])}
         items = [f for f in items if f["properties"]["__rs_edge"] in mine]
@@ -2513,17 +2513,23 @@ def _simple_pieces(geo, parts, cols, shadows=True, items=(), world=None):
         if rank[e] > _MAX_ITEMS:
             raise ValueError(f"simple=True: edge {e} has more than {_MAX_ITEMS} items; they do not fit between its fill and the next casings (pass simple=False)")
         # an id per edge and rank (2026-10-09), as the pieces' (e * _PIECES + n): the level editor swaps one road's items in place
-        out.append({**f, "id": _MAX_EDGES * _PIECES + e * _MAX_ITEMS + rank[e] - 1, "properties": {**p, "__rs_s": 2 * p["__rs_fl"] + 1 + rank[e] * _ITEM_STEP + e * _TIE}})
+        out.append({**f, "id": _MAX_EDGES * _PIECES + e * _MAX_ITEMS + rank[e] - 1, "properties": {**p, "__rs_s": _piece_key(2 * p["__rs_fl"] + 1 + rank[e] * _ITEM_STEP, e)}})
     return {"type": "FeatureCollection", "features": out}
 
 
 _PIECES = 24        # the most pieces of one edge in simple mode (22): 3 casing pieces, 2 seams, 2 laps and 2 end stubs (_end_stub), each with a shadow or a second tunnel piece, 2 fill halves and their 2 end stubs
-# the line-sort-key's tie-breaker per edge (2026-10-08): keys differ by at least 0.05 (offsets -0.5, -0.1, 0, 0.1, 0.15, 0.25, 1, 1.5 of
-# 2 * position; a painted fill + 0.5), so _MAX_EDGES * _TIE (0.01) never reaches the next key
-_TIE, _MAX_EDGES = 1e-8, 1_000_000
+# the line-sort-key __rs_s (2026-10-08; an integer since 2026-10-25): _KEY_UNIT for each unit of the key and 1 for each edge, the tie-breaker.
+# Keys differ by at least 0.05 (offsets -0.5, -0.1, 0, 0.1, 0.15, 0.25, 1, 1.5 of 2 * position; a painted fill + 0.5), so _MAX_EDGES (0.01 of a
+# unit) never reaches the next key. An integer is a varint in a tile, a double 9 bytes (the Tartu z12 tile: 29,229 values)
+_KEY_UNIT, _MAX_EDGES = 100_000_000, 1_000_000
+
+
+def _piece_key(key, e):
+    """__rs_s: the key in _KEY_UNITs and the edge's tie-breaker, so that a road redrawn in place (updateData) keeps its place (simple.rs sort_key)."""
+    return round(key * _KEY_UNIT) + e
 # an item's step above its edge's fill (2026-10-09): more than the whole tie-breaker range, so every item of a position is above every fill of it;
 # a painted road (rsColor) moves its fill and items up 0.5, and its last item must stay under the next position's bridge shadow (2 * position + 1.9):
-# 1.5 + _MAX_ITEMS * _ITEM_STEP + _TIE range < 1.9
+# 1.5 + _MAX_ITEMS * _ITEM_STEP + the tie-breaker's range < 1.9
 _ITEM_STEP, _MAX_ITEMS = 0.01, 38
 
 

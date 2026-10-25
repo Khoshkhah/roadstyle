@@ -50,8 +50,14 @@ def _tile_range(bounds, z):
 
 
 def tile_props(props: dict, keep: set) -> dict:
-    """The slim per-feature property set baked into the tiles (style reads only these)."""
-    return {k: v for k, v in props.items() if (k.startswith("__rs_") or k in keep) and v is not None}
+    """The slim per-feature property set baked into the tiles (style reads only these). A false ``__rs_*`` flag is left out: every reader of
+    a flag takes a missing key as false (``to-boolean``, a truthy check)."""
+    return {k: v for k, v in props.items() if (k.startswith("__rs_") or k in keep) and _kept(k, v)}
+
+
+def _kept(k, v) -> bool:
+    """A value that goes into a tile: not None, and not a ``__rs_*`` flag that is false."""
+    return v is not None and not (v is False and k.startswith("__rs_"))
 
 
 def _prep(fc: dict, class_col: str | None, keep: set | None, minzoom_table: dict | None):
@@ -75,7 +81,7 @@ def _prep(fc: dict, class_col: str | None, keep: set | None, minzoom_table: dict
         world[2] = max(world[2], b[2])
         world[3] = max(world[3], b[3])
         props = tile_props(p, keep) if keep is not None else \
-            {k: v for k, v in p.items() if v is not None}
+            {k: v for k, v in p.items() if _kept(k, v)}
         feats.append((i, geom, b, mz.get(str(p.get(class_col, ""))) if class_col else 0, props))
     return feats, world
 
@@ -146,8 +152,9 @@ def build_pmtiles(fc: dict, *, class_col: str, keep: set, minzoom_table: dict | 
                             c = clip_by_rect(g, tb[0] - pad, tb[1] - pad, tb[2] + pad, tb[3] + pad)
                             if c.is_empty:
                                 continue
+                        # the pieces ("simple") have no id: the vector source's promoteId (__rs_edge) is their feature id
                         cells.setdefault((tx, ty), {}).setdefault(lname, []).append(
-                            {"geometry": c.wkb, "properties": props, "id": i})
+                            {"geometry": c.wkb, "properties": props, **({} if lname == "simple" else {"id": i})})
         for name, from_zoom, efeats in extras:
             if z < from_zoom:
                 continue

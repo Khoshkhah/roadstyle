@@ -16,7 +16,7 @@
       "simple",
       "a0894aa3fdcc8faf",
       "492224edd69842ff",
-      "c57eb06c5a87ff06"
+      "32554e5658942863"
     ],
     [
       "roads-fill",
@@ -60,7 +60,7 @@
     "simple": [
       "geojson",
       113736,
-      "6c09f6f4b3411ff3"
+      "104cda38f8c929e9"
     ],
     "slots": [
       "geojson",
@@ -74,7 +74,7 @@
     "roadstyle:sources": "de9ed92a2cabe7fc",
     "roadstyle:controls": "7ad47e2cab264f27"
   },
-  "hash": "2d269d75eb720a16",
+  "hash": "7a097e93e666263c",
   "road_table": {
     "rows": 64828,
     "columns": [
@@ -116,7 +116,7 @@
     }
   },
   "text": {
-    "bytes": 104417420,
-    "sha16": "2d269d75eb720a16"
+    "bytes": 104011348,
+    "sha16": "7a097e93e666263c"
   }
 }

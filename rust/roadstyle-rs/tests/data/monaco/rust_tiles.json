@@ -17,7 +17,7 @@
         "roads",
         "a0894aa3fdcc8faf",
         "d26af327faadf901",
-        "c57eb06c5a87ff06"
+        "32554e5658942863"
       ],
       [
         "roads-fill",
@@ -65,31 +65,31 @@
       "roadstyle:sources": "f06f4789e4af8cce",
       "roadstyle:controls": "7ad47e2cab264f27"
     },
-    "hash": "404380054b40495a"
+    "hash": "0d40914c3586a64f"
   },
   "tiles": {
     "z12": {
       "roads": {
         "tiles": 1,
         "features": 13078,
-        "hash": "d5b2a8639ccceee5"
+        "hash": "f78132c228403ddb"
       },
       "simple": {
         "tiles": 1,
         "features": 16666,
-        "hash": "4a9b7f5c6a3e2975"
+        "hash": "45e132e8d9032c63"
       }
     },
     "z14": {
       "roads": {
         "tiles": 4,
         "features": 13471,
-        "hash": "debd71c0bc16cc69"
+        "hash": "33436cccd1855b23"
       },
       "simple": {
         "tiles": 4,
         "features": 17652,
-        "hash": "b149ba808fd169d2"
+        "hash": "94246ea4c3712f30"
       },
       "slots": {
         "tiles": 4,
@@ -101,12 +101,12 @@
       "roads": {
         "tiles": 8,
         "features": 12861,
-        "hash": "1b827d78678bb3e9"
+        "hash": "c3f034fed51645fe"
       },
       "simple": {
         "tiles": 8,
         "features": 16636,
-        "hash": "46931188f0b2422a"
+        "hash": "a35f404ce4e04039"
       },
       "slots": {
         "tiles": 8,

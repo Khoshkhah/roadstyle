@@ -328,7 +328,7 @@ these is a layer in its tiles (a layer's `source-layer`).
 | Source (or tile layer) | One feature for each | Monaco | Main properties |
 |---|---|---|---|
 | `roads` | edge (the whole road) | 849 | the class style (`__rs_fill`, `__rs_w`, `__rs_casing`, `__rs_cw`, `__rs_dash`, `__rs_op`), the levels (`__rs_cl`, `__rs_fl`, `__rs_cs`, `__rs_ce`), `__rs_bridge`, `__rs_tunnel`, `__rs_oneway`, `__rs_edge` (its row), and every column of your data |
-| `simple` | piece of a road: a casing part, a fill, a bridge shadow, a tunnel dash, an item | 4,607 | `__rs_k` (the kind: 0 casing, 1 fill, 2 shadow, 3 tunnel gap, 4 tunnel dash, 5 item), `__rs_s` (the sort number), `__rs_cap`, `__rs_edge` and `__rs_edge2` (its road and the road's twin), `highway` |
+| `simple` | piece of a road: a casing part, a fill, a bridge shadow, a tunnel dash, an item | 4,607 | `__rs_k` (the kind: 0 casing, 1 fill, 2 shadow, 3 tunnel gap, 4 tunnel dash, 5 item), `__rs_s` (the sort number: an integer, 100,000,000 for each step of the key and 1 for each road), `__rs_cap`, `__rs_edge` and `__rs_edge2` (its road and the road's twin), `highway` |
 | `slots` | place of a street name or a one-way arrow along a road | 646 | `name`, `oneway`, `slot`, `rank`, `lvl`, `__rs_edge` |
 | `decks` | part of a 3D bridge deck (only with `view_3d=True`) | 588 | `__rs_height`, `__rs_base`, `__rs_edges` |
 
@@ -400,8 +400,10 @@ The road data is the features of the four sources above, with their properties. 
 
 - **GeoJSON** inside the style (`sources.<name>.data`).
 - **Vector tiles** (Mapbox Vector Tile 2.1): one source `roads`, with the tile layers `roads`, `simple`, `slots` and `decks`, zooms
-  6 to 15 and a buffer of 80 units. A feature's id is its index in its source. A tile keeps every `__rs_*` property and the columns
-  named in `keep`. Below the last zoom, a line is simplified to half a tile unit.
+  6 to 15 and a buffer of 80 units. A feature's id is its index in its source. A piece of the layer `simple` has no id in the tiles:
+  the source's `promoteId` (`__rs_edge`, the road's row) is its feature id. A tile keeps every `__rs_*` property and the columns
+  named in `keep`, but not a `__rs_*` flag that is false: every reader takes a missing flag as false. Below the last zoom, a line is
+  simplified to half a tile unit.
 
 Each piece carries its values as `__rs_*` properties, and the style's rules read them
 ([The rules are in the style, the values are in the data](../rust/drawing.md#the-rules-are-in-the-style-the-values-are-in-the-data)).
