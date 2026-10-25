@@ -21,6 +21,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   browser studio (`ui/studio`) uses too; a worker that stops rejects its waiting calls. On a phone the panel is a sheet at the bottom
   (`layout`: `"auto"`, a sheet up to 700 px wide; `"sheet"`; `"side"`), with a handle (one row, half, full), taps on the roads, 44 px
   targets, room for the keyboard, and a fold when a Street View or Google 3D window opens at the bottom.
+  `browserStore` keeps every file in the origin's private file system, also the texts (pairs.csv of Burnaby is more than
+  localStorage's 5 MB); a text that an older version kept in localStorage moves there when it is read.
 - **`casing.drop_below_px`** (a profile key, both engines; default `1.0`, `0` = always a casing): no casing piece at a zoom where the
   whole casing line is narrower than this many px, so the fill draws alone there; the casing comes back at the first zoom where it is as
   wide. A bridge keeps its casing. The road layer's filter has the rule, and the tiles leave out the pieces that it hides.
@@ -46,6 +48,22 @@ All notable changes to **roadstyle** are documented here. The format is based on
   points (drawn from zoom 15 or 16) are no longer in the tiles of zoom 6 to 14. The map does not change. Tartu, the tiles of one
   1280 × 800 view (`rust/roadstyle-wasm/bench_tiles.mjs`, wasm in Node): z12 8.6 MB to 7.1 MB (the largest tile 3,863 KB to 3,268 KB),
   z14 7.8 MB to 6.6 MB, made in 10 to 14 % less time; z15 does not change.
+- **roadstyle's files have one copy, the crate roadstyle-assets** (audit N25). The profiles and palettes, the base map's files,
+  `cmaps.json`, `basemaps.json`, `defaults.json`, the sprite, the dashboard's JS and CSS, the popup files, the page templates, the
+  level editor's page and the vendored MapLibre moved from `src/roadstyle/{data,static,templates,vendor}/` to
+  `rust/roadstyle-assets/files/`, with the same names under it. Each crate takes its files from there at compile time
+  (`roadstyle_assets::text!`): a wrong name does not compile, and a binary has only the files that it names (the wasm module does not
+  change). No crate builds in a file of `src/roadstyle/` now, so the crates can be packed (`cargo package`). Python has no copy: it
+  asks the extension (`roadstyle._assets`, `_rust.asset(name)`), so a source checkout needs the built extension. The npm package
+  `roadstyle-dashboard` packs from `rust/roadstyle-assets/files/static/`. The level editor's wasm package is now built to
+  `$CARGO_TARGET_DIR/editor-pkg/` (rust/roadstyle-wasm/build_editor.sh).
+- **Deprecated: the old paths `src/roadstyle/static/dashboard/`, `popup.css`, `popup.js` and `level_editor.html`.** They are a
+  generated copy (`rust/roadstyle-assets/sync_old_paths.py`, checked by a test) for one release, for a page build that copies them
+  from a roadstyle checkout. They go in roadstyle 0.27.0. They are not in the wheel.
+- **`roadstyle-levels` is a leaf crate** (audit N26): its only dependencies are rstar and sha2, 17 crates in all (it was 49, with
+  Arrow through roadstyle-model). The road flags' rule (`NO`, `yes_text`, `layer`, `level`, `directed`, `sql_yes`) is
+  `roadstyle_levels::flags` now; `roadstyle_model::flags` re-exports it with the JSON value's `yes` and `maplibre_yes`. duckosm-rust
+  can take the levels alone. CI fails when the levels depend on more.
 - **`cargo test` at `rust/` builds 113 crates in about 1 minute, not 195 in 5** (review D1). The programs `roadstyle-cli` and
   `roadstyle-snapshot` (bundled SQLite, headless_chrome) are not default members: CI tests them in a step of their own (`-p`). Fat LTO
   and one codegen unit moved from `release` to a new profile `dist` (`inherits = "release"`), which the wheels (`maturin --profile
@@ -78,6 +96,15 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `docs/design/dashboard_module.md`, "Trusted inputs".
 
 ### Fixed
+- **The 3D buildings of a duckOSM file have the height of all the digits of their tags.** The reader's SQL
+  (`roadstyle_io::duckosm`, for Python and the browser) read a tag as `tags['k'][1]`. In DuckDB 1.5 and in duckdb-wasm, `tags['k']` is
+  the text, so `[1]` gave its first character: `building:levels` "25" was "2", and the building was 7.32 m high, not 91.5 m. The SQL
+  now reads `map_extract(tags, 'k')[1]`, which is a list in every DuckDB version. On Monaco, 104 buildings have a tag with two or more
+  characters.
+- **A road is picked again on a page whose style has no interaction contract** (a host's `makeStyle`, the duckosm-rust page, the
+  level editor). Since R7 the dashboard picked a road only on the layers of the option `pick`, which only a style with the contract
+  has: on the other pages no road had a hover, a tooltip or a click (`rs:select`), and Street View waited for a click. With no `pick`,
+  the dashboard picks on the road layer of simple mode again. A test moves and clicks the real mouse on both kinds of page.
 - **Two readings of a duckOSM file at the same time on one connection no longer break each other** (the duckosm-rust page: "Table with
   name e does not exist!"). The reader's temporary tables have the run's own names (`duckosmPlan`'s optional `run`, returned in
   `"run"`; each base-map layer's `"table"`; `"drop"` drops them), and `duckosmFeaturesSelect(specs, run)` takes the run. `roads_sql.js`,

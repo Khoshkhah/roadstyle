@@ -5,11 +5,11 @@ Date: 2026-10-23. Status: on branch `claude/dashboard-js-5ddf3e`, not merged.
 ## Why
 
 The map controls of roadstyle's page (colour by, legend, road filter, find, Street View, Google 3D and more) were only in the
-page template `src/roadstyle/static/web_template.html`, as one script of about 1,500 lines. The pages that use the Rust engine
+page template `rust/roadstyle-assets/files/static/web_template.html`, as one script of about 1,500 lines. The pages that use the Rust engine
 (duckosm-rust's browser page, the GeoLibre plugin) could not use them. duckosm-rust copied parts of the template with a script
 (`roadstyle_windows.py`), and these copies can become different from the template.
 
-Now the controls are ES modules in `src/roadstyle/static/dashboard/`. There is one copy. The Python page and the Rust-engine pages
+Now the controls are ES modules in `rust/roadstyle-assets/files/static/dashboard/`. There is one copy. The Python page and the Rust-engine pages
 use the same files.
 
 ## How a page uses it
@@ -169,7 +169,7 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 | `overlay_popup` | `overlay_popup` | `true` | `overlays.js` |
 | `tunnel` | `tunnel_control` and the theme's tunnels: `{layers, control, strength, palette, palettes, ratio, ratios, toward, towards, to, steps}` | `{layers: {}, steps: [], control: false}` | `tunnel.js`, `arrows.js` |
 | `fill_layers` | the road fill layer ids | `[]` | `svspot.js` |
-| `pick` | the layers that a road is picked on (`roadstyle:controls`) | `[]`: nothing to pick | `select.js` |
+| `pick` | the layers that a road is picked on (`roadstyle:controls`) | `[]`: the road layer of simple mode (a style with no interaction contract: a host's `makeStyle`, the level editor's style) | `select.js` |
 | `road_fill` | `road_fill`: `{on, paint}` | `{on: true, paint: {}}` | `color.js` |
 | `views` | `views` | `[]` | `views.js` |
 | `items` | `items`, `items_popup`: `{label, popup, layer}` or `null` | `null` | `select.js` |

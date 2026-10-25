@@ -1,6 +1,6 @@
 # Dashboard on a Rust-engine style
 
-This page shows roadstyle's dashboard modules (`src/roadstyle/static/dashboard/`) on a style that the Rust engine makes.
+This page shows roadstyle's dashboard modules (`rust/roadstyle-assets/files/static/dashboard/`) on a style that the Rust engine makes.
 The engine is `rust/roadstyle-wasm`. The data is the Monaco test data in `rust/roadstyle-rs/tests/data/`.
 
 ## Build the WebAssembly module

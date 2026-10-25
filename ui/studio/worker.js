@@ -6,7 +6,7 @@
 // is its .shp bytes, its .dbf bytes and its .prj text); {type: "page", options, given}
 // -> {html} (MapLibre still a placeholder); {type: "ramp", cmap, n} -> {stops}. Every answer has the message's id, and ok or error.
 import init, {resolveLook, rampStops, readGeoJson, readGeoParquet, readShp} from "../../rust/roadstyle-wasm/pkg/roadstyle_wasm.js";
-import {answer} from "../../src/roadstyle/static/dashboard/worker/call.js";
+import {answer} from "../../rust/roadstyle-assets/files/static/dashboard/worker/call.js";
 
 let roads = null;
 

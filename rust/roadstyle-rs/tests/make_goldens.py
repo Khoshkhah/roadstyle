@@ -5,7 +5,7 @@ roadstyle.json, ./palettes or ./profiles of your own, one part at a time:
 
     python rust/roadstyle-rs/tests/make_goldens.py cmaps monaco sodermalm tartu
 
-- cmaps: src/roadstyle/data/cmaps.json, the colour ramps of both engines (colors.py and roadstyle-look read it), from branca and
+- cmaps: rust/roadstyle-assets/files/data/cmaps.json, the colour ramps of both engines (colors.py and roadstyle-look read it), from branca and
   matplotlib (branca's schemes and colour names, each matplotlib colormap at 9 stops).
 - monaco, sodermalm, tartu: tests/data/<area>/golden_options.json.gz, the look's options of the area (tests/areas.rs, level_options.rs).
   sodermalm also writes its input, tests/data/sodermalm/roads.parquet, from notebooks/data/sodermalm_edges.gpkg with duckOSM's solved
@@ -43,7 +43,7 @@ def write_cmaps():
     css = json.loads(Path(root, "_cnames.json").read_text())
     mpl = {n: [mcolors.to_hex(matplotlib.colormaps[n](i / 8.0)) for i in range(9)] for n in sorted(matplotlib.colormaps)}
     out = {"versions": {"branca": branca.__version__, "matplotlib": matplotlib.__version__}, "branca": schemes, "css": css, "matplotlib": mpl}
-    Path(__file__).resolve().parents[3].joinpath("src", "roadstyle", "data", "cmaps.json").write_text(json.dumps(out, separators=(",", ":")))
+    Path(__file__).resolve().parents[3].joinpath("rust", "roadstyle-assets", "files", "data", "cmaps.json").write_text(json.dumps(out, separators=(",", ":")))
 
 def solved(g):
     """duckOSM's levels: roadstyle's level_input and solve_levels with the level area's defaults (tools/compare_levels.py of duckosm-rust)."""

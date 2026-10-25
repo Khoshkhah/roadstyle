@@ -19,9 +19,14 @@ A consumer project that does not install it runs with `PYTHONPATH=<this repo>/sr
 
 ## Changing the library
 
+- roadstyle's files (the profiles and palettes, the base map's files, `cmaps.json`, `basemaps.json`, the dashboard, the popup, the
+  page templates, MapLibre) have one copy: `rust/roadstyle-assets/files/`, the crate roadstyle-assets. A crate takes a file with
+  `roadstyle_assets::text!("data/cmaps.json")` (a wrong name does not compile); Python asks `roadstyle._assets.text(name)`, which
+  needs the built extension (`python rust/roadstyle-py/build.py`). Edit the files there. After an edit in `files/static/`, run
+  `python rust/roadstyle-assets/sync_old_paths.py`: it writes the old paths that duckosm-rust copies (until 0.27.0).
 - `src/roadstyle/render_web.py` — `render(...)`: Python keywords become the `page` dict, which `_page_html` writes as one
-  JSON object `RS_OPTIONS` (the placeholder `__RS_OPTIONS__` of `src/roadstyle/static/web_template.html`).
-- The page's controls and road interaction are ES modules in `src/roadstyle/static/dashboard/` (one file for each control,
+  JSON object `RS_OPTIONS` (the placeholder `__RS_OPTIONS__` of `rust/roadstyle-assets/files/static/web_template.html`).
+- The page's controls and road interaction are ES modules in `rust/roadstyle-assets/files/static/dashboard/` (one file for each control,
   `index.js` is the entry `rsDashboard(map, options)`); the Rust-engine pages import them, and `render_web.py` puts them in the
   page as one script (in the order of `static/dashboard/files.txt`, which the Rust page writer reads too, without `import` lines and
   `export` words). A new module: a line in `files.txt`. A top-level name must be unique in the folder.
@@ -40,8 +45,8 @@ A consumer project that does not install it runs with `PYTHONPATH=<this repo>/sr
   cameras (zoom <-> range from MapLibre's camera distance), `there` stops echo loops, the map is the judge (it clamps,
   Google goes back), `ground` reads the ground height from Terrain Tiles (Google's center is above sea level), `pad`
   moves the map's center beside the window. Check a change on a hill (Monaco), not only on flat Södermalm.
-- Every style value is in a config file (docs/design/style_config.md): colors in `src/roadstyle/data/palettes/*.yaml`, all else in
-  `src/roadstyle/data/profiles/default.yaml`. Read them merged with `THEME[...]` in `render_web.py` or `_settings.theme_value(path)`
+- Every style value is in a config file (docs/design/style_config.md): colors in `rust/roadstyle-assets/files/data/palettes/*.yaml`, all else in
+  `rust/roadstyle-assets/files/data/profiles/default.yaml`. Read them merged with `THEME[...]` in `render_web.py` or `_settings.theme_value(path)`
   elsewhere, never as a literal. `tests/test_theme.py` fails on a color literal and on a color in a profile. A new style value = a
   key in the profile or in every palette (with its comment) + the code that reads it.
 - The JS side has no unit tests. Check a rendering change in a real browser: `rs.snapshot(m,

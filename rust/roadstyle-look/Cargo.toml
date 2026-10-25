@@ -8,6 +8,7 @@ license.workspace = true
 description = "roadstyle's look: the typed, versioned config (palettes, profiles, settings, map options) that the engine draws a map with"
 
 [dependencies]
+roadstyle-assets.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 yaml-rust2.workspace = true

@@ -10,10 +10,10 @@ from pathlib import Path
 
 def layer_specs() -> list[dict]:
     """The base map's layers (data/basemap/layers.yaml), in draw order."""
-    from importlib.resources import files
-
     import yaml
-    return yaml.safe_load(files("roadstyle").joinpath("data/basemap/layers.yaml").read_text(encoding="utf-8"))["layers"]
+
+    from . import _assets
+    return yaml.safe_load(_assets.text("data/basemap/layers.yaml"))["layers"]
 
 
 def read(db, mode: str = "all", *, levels: str = "stored", layers=True, only: bool = False):
@@ -137,11 +137,11 @@ def page(db, mode: str = "all", *, theme: str = "osm", paths: str = "google", la
     roads, features, level_kw = read(db, mode, levels=levels, layers=layers, only=only)
     kw = {**kwargs, "state": "live", **({"interaction": interaction} if interaction else {})}
     if dashboard:
-        from importlib.resources import files
-
         import yaml
+
+        from . import _assets
         roads = _with_modes(roads)
-        colors = yaml.safe_load(files("roadstyle").joinpath("data/basemap/modes.yaml").read_text(encoding="utf-8"))["mode_colors"]
+        colors = yaml.safe_load(_assets.text("data/basemap/modes.yaml"))["mode_colors"]
         # the panel shows the clicked road: no road hover tooltip
         kw = {"name": f"{Path(db).stem}: dashboard", "tooltip": None, "sidebar": "report",
               "color_options": {"Road class": {}, "Modes": {"color_by": "modes", "colors": colors}}, **kw}

@@ -255,7 +255,7 @@ already returns early in the same way. Thus the page and the export use one set 
    `_tun_hex`, a Python copy of `_tunHex`. Simple mode (the default) has them in Python already (`_simple_color`).
 4. **The arrow icon.** The page makes the icon with `addImage`. The export writes a sprite with one SDF icon
    (`"sdf": true`), and the arrow layers get `icon-color`. Because the icon is SDF, the PNG files do not change
-   with the arrow color: one fixed file, `src/roadstyle/data/sprite.png` (96 x 40, `pixelRatio` 4, as the page's
+   with the arrow color: one fixed file, `rust/roadstyle-assets/files/data/sprite.png` (96 x 40, `pixelRatio` 4, as the page's
    `addImage`), made once. It is written as `sprite.png` and as `sprite@2x.png`. No image library is necessary.
 5. **Glyphs.** The street names use `Noto Sans Regular` from `demotiles.maplibre.org`, as the page does. The
    style keeps that URL, so the names need a network connection.

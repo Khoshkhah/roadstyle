@@ -4,7 +4,7 @@
   "description": "roadstyle's map dashboard: the controls, the legend, the popups, Street View and the road interaction for a MapLibre map of roads",
   "license": "MIT",
   "homepage": "https://github.com/Khoshkhah/roadstyle",
-  "repository": {"type": "git", "url": "git+https://github.com/Khoshkhah/roadstyle.git", "directory": "src/roadstyle/static"},
+  "repository": {"type": "git", "url": "git+https://github.com/Khoshkhah/roadstyle.git", "directory": "rust/roadstyle-assets/files/static"},
   "type": "module",
   "exports": {
     ".": {"types": "./dashboard/index.d.ts", "default": "./dashboard/index.js"},

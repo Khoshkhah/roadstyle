@@ -1287,7 +1287,12 @@ reads the static files from `src/roadstyle/` when it is built; a crates.io packa
   notebook tools stay. Then a 1.0 release; the publish waits for the owner's last OK.
 - **Packaging (audit 3, N25, 2026-10-24).** The crates read files from `src/roadstyle/` when they are built (the profiles, the palettes,
   the templates, the dashboard), so no crate can be published alone. P7's packaging gives the crates their own copy of these files, or
-  one data crate.
+  one data crate. **Done in T2 (branch n25-assets):** the crate `roadstyle-assets` (`rust/roadstyle-assets/files/`, the old names under
+  it) is the one copy. A crate takes a file at compile time with `roadstyle_assets::text!` / `bytes!` (a const evaluation of `get`: a
+  wrong name does not compile, and the linker keeps only the named files; the wasm module is 124 bytes smaller). Python asks
+  `_rust.asset(name)` (`roadstyle/_assets.py`). The old paths that duckosm-rust copies (`src/roadstyle/static/dashboard/`, `popup.*`,
+  `level_editor.html`) are a generated copy until 0.27.0 (`sync_old_paths.py`, checked by a test). **A temporary edge:**
+  roadstyle-model → roadstyle-assets for `reads.json`, until T3's `Mark` makes reads.json.
 
 #### P7's CLI: one `roadstyle` program (audit N31, approved 2026-10-24)
 

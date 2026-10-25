@@ -15,14 +15,14 @@ def _norm(n):
 
 def _code_names():
     out = {k: set() for k in KINDS}
-    files = [p for p in (ROOT / "src").rglob("*") if p.suffix in (".py", ".js", ".html", ".css")]
+    files = [p for d in ("src", "rust/roadstyle-assets/files") for p in (ROOT / d).rglob("*") if p.suffix in (".py", ".js", ".html", ".css")]
     files += [p for p in (ROOT / "rust").rglob("*.rs") if "target" not in p.parts]
     for p in files:
         text = p.read_text(errors="ignore")
         out["state"] |= {_norm(m) for m in re.findall(r'"(rs_[a-z0-9_]+)"|(rs_ov_)', text) for m in m if m}
         out["property"] |= {_norm(m) for m in re.findall(KINDS["property"], text)}
         out["metadata"] |= set(re.findall(KINDS["metadata"], text))
-    out["placeholder"] = set(re.findall(KINDS["placeholder"], (ROOT / "src/roadstyle/static/web_template.html").read_text()))
+    out["placeholder"] = set(re.findall(KINDS["placeholder"], (ROOT / "rust/roadstyle-assets/files/static/web_template.html").read_text()))
     return out
 
 
@@ -51,7 +51,7 @@ def test_every_name_of_the_reference_is_in_the_code():
 
 
 def test_the_storage_keys_and_css_variables():
-    code = " ".join(p.read_text() for p in (ROOT / "src/roadstyle/static/dashboard").glob("*.[jc]s*"))
+    code = " ".join(p.read_text() for p in (ROOT / "rust/roadstyle-assets/files/static/dashboard").glob("*.[jc]s*"))
     doc = DOC.read_text()
     for name in ("rs-street-view-mode", "rs-street-view-window", "rs-google-3d-window", "rs-host-panel:", "--rs-side"):
         assert name in code and name in doc, name
@@ -63,10 +63,10 @@ def test_the_page_reads_only_declared_properties():
     __rs_* names (the page's checks) are not properties."""
     import json
 
-    declared = json.loads((ROOT / "src/roadstyle/static/dashboard/reads.json").read_text())
+    declared = json.loads((ROOT / "rust/roadstyle-assets/files/static/dashboard/reads.json").read_text())
     known = {k for part in ("pieces", "decks", "slots", "table") for k in declared[part]} | {"__rs_fill", "__rs_fill__<i>"}      # the colour options' fills
-    scripts = [*(ROOT / "src/roadstyle/static/dashboard").glob("*.js"), *(ROOT / "src/roadstyle/static/page").glob("*.html"),
-               ROOT / "src/roadstyle/static/popup.js"]
+    scripts = [*(ROOT / "rust/roadstyle-assets/files/static/dashboard").glob("*.js"), *(ROOT / "rust/roadstyle-assets/files/static/page").glob("*.html"),
+               ROOT / "rust/roadstyle-assets/files/static/popup.js"]
     read = set()
     for p in scripts:
         text = re.sub(r"window\.__rs_[a-z]+", "", p.read_text())

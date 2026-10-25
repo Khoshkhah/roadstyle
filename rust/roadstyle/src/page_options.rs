@@ -11,7 +11,7 @@ use crate::tiles::stage::{TileOptions, COLUMNS, TILES};
 use crate::{layers::py_truth, FeatureTable, Look, RoadTable};
 use serde_json::{json, Map, Value};
 
-const BASEMAPS: &str = include_str!("../../../src/roadstyle/data/basemaps.json");
+const BASEMAPS: &str = roadstyle_assets::text!("data/basemaps.json");
 
 /// render_web.render's defaults of the keywords that only the page reads (tests/test_engine_parity.py checks them against render's
 /// signature). The look's args are the caller's keywords only, so each one that the caller did not give takes its default here.
@@ -24,9 +24,9 @@ const DEFAULTS: &str = r#"{"basemap": null, "basemaps": null, "api_key": null, "
 /// The bundled sidebars (`sidebar=`, pages.render_dashboard and render_report): the template that goes on the page, and the keywords
 /// that it changes when the caller does not give them (pages.py's defaults; tests/test_pages.py checks them).
 const SIDEBARS: [(&str, &str, &str); 2] = [
-    ("dashboard", include_str!("../../../src/roadstyle/templates/dashboard.html"),
+    ("dashboard", roadstyle_assets::text!("templates/dashboard.html"),
      r#"{"name": "Roads dashboard", "basemap_switcher": false, "filter_control": false, "road_popup": false}"#),
-    ("report", include_str!("../../../src/roadstyle/templates/report.html"),
+    ("report", roadstyle_assets::text!("templates/report.html"),
      r#"{"name": "Roads report", "basemap_switcher": true, "filter_control": false, "road_popup": false}"#),
 ];
 

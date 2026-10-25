@@ -176,7 +176,7 @@ when a layer reads it.
 ## What a page reads
 
 The page's dashboard modules and page scripts declare the feature properties that they read, in
-`src/roadstyle/static/dashboard/reads.json`:
+`rust/roadstyle-assets/files/static/dashboard/reads.json`:
 
 - `pieces`: the properties of a feature of the road layer (a road piece or an item); `decks`: of a 3D deck or shadow; `slots`: of a
   name or arrow slot.

@@ -663,7 +663,8 @@ the coordinator (marked *C*).
 | N22 | open: four tile walks, the export files in Python | (f) `Tiled::each`, `write_xyz`, `write_pmtiles` |
 | N23 | open, security: no HTML escape in the dashboard | not a design item; phase T0 |
 | N24 | not started (*C*) | (f) item 5 |
-| N25 | not started (*C*) | (a) item 5, (g) item 3 |
+| N25 | done in T2: the crate `roadstyle-assets` (`rust/roadstyle-assets/files/`); the old paths that duckosm-rust copies are a generated copy until 0.27.0 | (a) item 5, (g) item 3 |
+| N25 edge | open, temporary: N25: model → assets until Mark, T3 (`reads.json` in `props.rs`, `PAGE_READS`) | (c) `Mark` makes `reads.json`; then the edge goes |
 | N26, D2 | open | (a) items 2 and 9, (k) |
 | N27 | in progress on `n27` (*C*) | (i) item 1 |
 | N28 | open: the editor writes ids as text into Parquet, answers JSON text | (a) item 7: the forms move to `roadstyle-serve`; ids Int64 |

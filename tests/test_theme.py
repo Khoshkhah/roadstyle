@@ -11,6 +11,7 @@ import pytest
 from shapely.geometry import LineString
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "roadstyle"
+ASSETS = Path(__file__).resolve().parents[1] / "rust" / "roadstyle-assets" / "files"     # the profiles and palettes
 COLOR = re.compile(r"#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3}(?:[0-9a-fA-F]{2})?)?\b|rgba?\(")
 
 
@@ -70,9 +71,9 @@ def test_palettes_hold_only_colors_and_profiles_none():
                 yield k
             if isinstance(v, dict) and k not in ("towards", "palettes", "to", "width"):
                 yield from keys(v)
-    for f in (SRC / "data" / "profiles").glob("*.yaml"):
+    for f in (ASSETS / "data" / "profiles").glob("*.yaml"):
         assert not set(keys(yaml.safe_load(f.read_text()))) & color_keys, f.name
-    for f in (SRC / "data" / "palettes").glob("*.yaml"):
+    for f in (ASSETS / "data" / "palettes").glob("*.yaml"):
         pal = yaml.safe_load(f.read_text())
         assert all(set(e) <= {"fill", "casing", "opacity"} for e in pal["classes"].values()), f.name
         assert not {"width", "casing_width", "dash", "minzoom", "font"} & set(keys(pal)), f.name

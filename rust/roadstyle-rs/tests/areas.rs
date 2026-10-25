@@ -1,8 +1,8 @@
 //! Whole areas: Monaco, the Södermalm sample and Tartu. The style and the tiles are checked against goldens that the Rust engine makes
 //! (`ROADSTYLE_BLESS=1 cargo test --test areas` writes them: tests/data/<area>/rust_style.json and rust_tiles.json, summaries in git;
-//! common::golden). The last check against Python's output was N27 (2026-10-24); since then the Rust API is the design. The levels are
-//! still checked against Python's rules (the goldens of tests/make_goldens.py). Tartu's inputs are on the pre-release rust-test-data
-//! (tests/get_goldens.sh).
+//! common::golden). The last check against Python's output was N27 (2026-10-24); since then the Rust API is the design. The levels too
+//! (rust_levels_*.json: the counts, and the rows' hash of the tags rule; every solve is feasible). Tartu's inputs are on the pre-release
+//! rust-test-data (tests/get_goldens.sh).
 
 mod common;
 
@@ -96,8 +96,8 @@ fn monaco_and_sodermalm_are_their_goldens() {
     common::golden("monaco/rust_page.json", &page("monaco"));
 }
 
-/// The engine's levels (levels.rs) of an area's roads: one rank, as the roads are one table.
-fn levels(area: &str, method: roadstyle_rs::levels::Method) -> Vec<Value> {
+/// The engine's levels (roadstyle-levels) of an area's roads: one rank, as the roads are one table.
+fn levels(area: &str, method: roadstyle_rs::levels::Method) -> roadstyle_rs::levels::Levels {
     use roadstyle_rs::levels::{levels, LevelEdge, LevelEdges, Options};
     let mut edges = LevelEdges::default();
     let t = roadstyle_rs::read::read_roads(std::fs::read(data(&format!("{area}/roads.parquet"))).unwrap(), "geometry").unwrap();
@@ -108,42 +108,28 @@ fn levels(area: &str, method: roadstyle_rs::levels::Method) -> Vec<Value> {
                                  layer: text("layer"), junction: text("junction"), geometry: t.line(i).unwrap().iter().map(|&[x, y]| (x, y)).collect(),
                                  ..Default::default() });
     }
-    levels(&edges, &Options { method, ..Default::default() }).unwrap().unwrap().rows.iter().map(|r| match method {
-        roadstyle_rs::levels::Method::Tags => json!([r.edge_id.to_string(), r.casing_start, r.casing_level, r.casing_end, r.fill_level]),
-        _ => json!([r.edge_id.to_string(), r.casing_start, r.casing_level, r.casing_end, r.fill_level, r.head_start_m, r.head_end_m, r.cap_start, r.cap_end]),
-    }).collect()
+    levels(&edges, &Options { method, ..Default::default() }).unwrap().unwrap()
 }
 
-/// The rows of Rust and Python by edge id: (rows in Python, rows in Rust, equal rows).
-fn level_rows(area: &str, method: roadstyle_rs::levels::Method, golden: &str) -> (usize, usize, usize) {
-    let got = levels(area, method);
-    let want = common::gz_json(&format!("{area}/{golden}"));
-    let by_id: std::collections::HashMap<&str, &Value> = want.as_array().unwrap().iter().map(|r| (r[0].as_str().unwrap(), r)).collect();
-    let equal = got.iter().filter(|r| by_id.get(r[0].as_str().unwrap()).is_some_and(|w| *w == *r)).count();
-    (want.as_array().unwrap().len(), got.len(), equal)
-}
-
-/// Known difference (P0): 8 rows of Monaco's solve differ, in the casing heads of a few roads. Both answers are equally good under
-/// roadstyle's rules (0 hard rules broken, 0 stack parts not lifted, 16 order wishes not kept, 9 numbers): Python's LP (OR-tools) and the
-/// engine's min-cost flow take different answers among equal best ones.
-const MONACO_SOLVE_OTHER_ROWS: usize = 8;
-
+/// The levels of Monaco and Södermalm, by the tags rule and solved: their goldens (common::levels_summary; a solve is feasible, the solver
+/// checks it).
 #[test]
-fn levels_against_python() {
+fn the_levels_are_their_goldens() {
     use roadstyle_rs::levels::Method::{Solve, Tags};
-    assert_eq!(level_rows("monaco", Tags, "golden_levels_tags.json.gz"), (13_298, 13_298, 13_298));
-    assert_eq!(level_rows("sodermalm", Tags, "golden_levels_tags.json.gz"), (4_563, 4_563, 4_563));
-    assert_eq!(level_rows("monaco", Solve, "golden_levels_solve.json.gz"), (13_298, 13_298, 13_298 - MONACO_SOLVE_OTHER_ROWS));
-    assert_eq!(level_rows("sodermalm", Solve, "golden_levels_solve.json.gz"), (4_563, 4_563, 4_563));
+    for area in ["monaco", "sodermalm"] {
+        for (method, name) in [(Tags, "tags"), (Solve, "solve")] {
+            common::golden(&format!("{area}/rust_levels_{name}.json"), &common::levels_summary(&levels(area, method)));
+        }
+    }
 }
 
-/// Tartu (its inputs from the pre-release: tests/get_goldens.sh): the style and the tiles against the Rust goldens, and the tags rule
-/// against Python's (no solve: Python needs too much memory for it).
+/// Tartu (its inputs from the pre-release: tests/get_goldens.sh): the style, the tiles and the levels by the tags rule against the Rust
+/// goldens.
 #[test]
 #[ignore = "needs tests/get_goldens.sh"]
 fn tartu_is_its_goldens() {
     assert!(data("tartu/roads.parquet").exists(), "no Tartu inputs: run tests/get_goldens.sh");
     common::golden("tartu/rust_style.json", &style("tartu"));
     common::golden("tartu/rust_tiles.json", &tiles("tartu"));
-    assert_eq!(level_rows("tartu", roadstyle_rs::levels::Method::Tags, "golden_levels_tags.json.gz"), (64_828, 64_828, 64_828));
+    common::golden("tartu/rust_levels_tags.json", &common::levels_summary(&levels("tartu", roadstyle_rs::levels::Method::Tags)));
 }

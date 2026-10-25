@@ -68,8 +68,8 @@ fn take(opts: &mut Vec<(String, Option<String>)>, name: &str) -> Option<String> 
 }
 
 /// The vendored MapLibre (render_web.WebMap puts the same in), so a page works offline.
-const MAPLIBRE_JS: &str = include_str!("../../../src/roadstyle/vendor/maplibre-gl.js");
-const MAPLIBRE_CSS: &str = include_str!("../../../src/roadstyle/vendor/maplibre-gl.css");
+const MAPLIBRE_JS: &str = roadstyle::assets::text!("vendor/maplibre-gl.js");
+const MAPLIBRE_CSS: &str = roadstyle::assets::text!("vendor/maplibre-gl.css");
 
 /// The look's options of the command's options: --palette, --profile, --settings FILE.json and every other option as a keyword
 /// (`args`), which `defaults` can add to.

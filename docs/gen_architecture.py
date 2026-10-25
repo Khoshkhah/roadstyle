@@ -167,7 +167,7 @@ def gen_metadata() -> str:
 
 
 def gen_js() -> str:
-    dash = ROOT / "src" / "roadstyle" / "static" / "dashboard"
+    dash = ROOT / "rust" / "roadstyle-assets" / "files" / "static" / "dashboard"
     rows = []
     for f in sorted(dash.glob("*.js")):
         t = f.read_text(encoding="utf-8")
@@ -187,7 +187,7 @@ def gen_js() -> str:
     for doc, name in re.findall(r"((?:[ \t]*///[^\n]*\n)+)[ \t]*pub fn (\w+)\(&self", wasm):
         first = re.sub(r"\s+", " ", " ".join(l.strip()[3:].strip() for l in doc.strip().splitlines()))
         calls.append([f"`tiler.{name}`", first.replace("|", "\\|")])
-    return ("**The dashboard modules** (`src/roadstyle/static/dashboard/`):\n\n"
+    return ("**The dashboard modules** (`rust/roadstyle-assets/files/static/dashboard/`):\n\n"
             + table(["File", "Lines", "What it does", "Window API"], rows)
             + "\n\n**The worker SQL** (`rust/roadstyle-wasm/js/`):\n\n" + table(["File", "Lines", "Exports"], sql)
             + "\n\n**The WebAssembly API** (`rust/roadstyle-wasm/src/lib.rs`):\n\n" + table(["Call", "Its doc comment"], calls))
@@ -249,7 +249,7 @@ def on_page_markdown(markdown, page, **kwargs):
 
 def long_files() -> list[tuple[Path, int]]:
     """The source files (Rust, Python, the page's JavaScript) over LONG lines, the longest first."""
-    files = [*RUST.glob("*/src/**/*.rs"), *(ROOT / "src" / "roadstyle").rglob("*.py"), *(ROOT / "src" / "roadstyle" / "static").rglob("*.js")]
+    files = [*RUST.glob("*/src/**/*.rs"), *(ROOT / "src" / "roadstyle").rglob("*.py"), *(ROOT / "rust" / "roadstyle-assets" / "files" / "static").rglob("*.js")]
     found = [(f, lines(f)) for f in files if "vendor" not in f.parts and not f.name.endswith(".min.js")]
     return sorted([(f, n) for f, n in found if n > LONG], key=lambda x: -x[1])
 
