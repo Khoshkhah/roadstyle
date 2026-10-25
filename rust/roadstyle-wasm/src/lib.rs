@@ -75,6 +75,14 @@ mod wasm {
         pub fn to_json(&self) -> String {
             self.0.to_json()
         }
+
+        /// withArg(key, value): the look with the keyword `key` set to `value` (JSON text), as the Python binding's `with_arg`. An
+        /// error is a thrown Error.
+        #[wasm_bindgen(js_name = withArg)]
+        pub fn with_arg(&self, key: &str, value: &str) -> Result<JsLook, JsError> {
+            let v: serde_json::Value = serde_json::from_str(value).map_err(|e| JsError::new(&format!("{key}: not JSON: {e}")))?;
+            self.0.clone().with_arg(key, v).map(JsLook).map_err(|e| JsError::new(&e.to_string()))
+        }
     }
 
     /// resolveLook(options: string) -> Look: the look of render_edges' palette, profile and settings; options: {"palette", "profile",
@@ -308,6 +316,13 @@ mod wasm {
 
     #[wasm_bindgen]
     impl Sources {
+        /// style(): the style's JSON text with its sources inline, as the Python binding's `style()`.
+        pub fn style(&self) -> String {
+            let mut out = Vec::new();
+            self.inner.write_style(&mut out).expect("a Vec takes every byte");
+            String::from_utf8(out).expect("JSON text is UTF-8")
+        }
+
         /// fileNames(format): the names of stage 1's files (style.json, a file for each source, road_table.parquet).
         #[wasm_bindgen(js_name = fileNames)]
         pub fn file_names(&self, format: &str) -> Result<Vec<String>, JsError> {

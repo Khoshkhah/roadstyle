@@ -149,6 +149,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   below 2^53 while the table is below 2^21 (`RoadKey::TABLES`; a larger table is `Error::Key`). The engine writes the keys of the
   roads (`__rs_edge`, `__rs_edge2`, the decks' `__rs_edges`, the slots) through it and reads a row back from a key. A build has one
   table (0), so a key is its road's row and the output does not change.
+- **One fixture, three languages, one hash** (docs/design/target_architecture.md, (i) item 6): the wasm package in Node
+  (`rust/roadstyle-wasm/cross_language.mjs`) gives Monaco's style and road table with the size and hash of the native golden
+  (`monaco/rust_style.json`), as the Python binding does (`tests/test_binding.py`). CI runs it in the Rust job on the dist build that
+  the job makes already. The wasm `Look` has `withArg(key, value)` and the wasm `Sources` has `style()`, as the Python binding has.
 - **The base map goes through stage 1 as typed tables** (audit R10, step 2; docs/design/r10_feature_table.md). The Rust engine reads
   features.parquet into one table (Arrow columns and one coordinate buffer), cuts the sea out of it, and keeps each base-map layer as a
   table until it writes the GeoJSON text, not a JSON tree for each feature. The output is the same bytes (the styles, the files and the

@@ -85,6 +85,14 @@ jobs:
           # GeoPackage (rusqlite, SQLite in C) is for the native programs only: the browser package must not have it
           if cargo tree --offline --target wasm32-unknown-unknown -e normal -p roadstyle-wasm -i rusqlite >/dev/null 2>&1; then echo "roadstyle-wasm depends on rusqlite (the gpkg feature)"; exit 1; fi
 
+      - name: Cross-language (the wasm package in Node gives the native golden's hashes; tests/test_binding.py checks Python)
+        run: |
+          # the wasm-bindgen program of the version in Cargo.lock (its prebuilt release), on the dist build of the step before
+          v=$(grep -m1 -A1 '^name = "wasm-bindgen"$' Cargo.lock | sed -n 's/^version = "\(.*\)"/\1/p')
+          curl -sSfL "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/$v/wasm-bindgen-$v-x86_64-unknown-linux-musl.tar.gz" | tar xz -C "$RUNNER_TEMP"
+          "$RUNNER_TEMP/wasm-bindgen-$v-x86_64-unknown-linux-musl/wasm-bindgen" --target web --out-dir target/cross-pkg target/wasm32-unknown-unknown/dist/roadstyle_wasm.wasm
+          node roadstyle-wasm/cross_language.mjs target/cross-pkg/roadstyle_wasm.js
+
   python:
     # the Python binding (phase P5): build roadstyle._rust and check that the two engines give the same style
     runs-on: ubuntu-latest
