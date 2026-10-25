@@ -1,6 +1,6 @@
 # The dashboard contract as types and a schema (T4 plan)
 
-Date: 2026-10-25. Status: a plan for phase T4 of the target architecture (`target_architecture.md`, (h)). It has no code. It starts
+Date: 2026-10-25. Status: approved, a plan for phase T4 of the target architecture (`target_architecture.md`, (h)). It has no code. It starts
 after T3's `Mark` (N30), because the contract's property names come from `Mark`.
 
 ## The problem
@@ -60,10 +60,9 @@ pub struct Metadata {
 - The layer metadata (`roadstyle:group`, `roadstyle:over`, `roadstyle:position`) is not in a page's style (the page writer removes it)
   and is not read by the dashboard (b3d-extrude). It stays the export's. It is not in the contract.
 
-**A decision for T4 (one question):** does every style that the engine writes have `roadstyle:contract`? After design-tile-minzoom,
-every style has `roadstyle:sources` and `pick`, so the dashboard reads every style. The recommendation is yes: `contract` is in every
-style, and `state`, `controls` and `live` stay optional (only a style with state "live" has them). Then the version check (step 4) covers
-the duckosm-rust page and the level editor, which have no `state`.
+**Decided (2026-10-25):** every style that the engine writes has `roadstyle:contract` (the version number only), the same direction as
+"`pick` and `sources` for every style" (design-tile-minzoom). `state`, `controls` and `live` stay optional: only a style with state
+"live" has them. Then the version check (step 4) covers the duckosm-rust page and the level editor, which have no `state`.
 
 ## Step 2: the schema
 
@@ -89,6 +88,8 @@ Generated TypeScript is a later step ((h) item 2). Until then, a test in `tests/
 ## Step 4: the version error
 
 - `dashboard/core.js` gets `CONTRACT = 1`, the newest version that it knows. A test checks that it equals `contract::CONTRACT`.
+- A style with no `roadstyle:contract` was made before every style had it. The dashboard reads it as version 1 and writes a note on
+  the console, not an error.
 - `rsDashboard` reads `roadstyle:contract` of the style (also in `setStyle`). A newer version is an error: `console.error` with the two
   versions, and the returned object has `error` (the same text). The dashboard then adds no road interaction for that style, because a
   wrong map with no message is the fault that (h) item 4 removes. An older version is read as it is.
