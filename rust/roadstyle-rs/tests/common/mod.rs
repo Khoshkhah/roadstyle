@@ -225,3 +225,31 @@ pub fn golden(name: &str, got: &Value) {
     diff(got, &want, "$", &mut out);
     assert!(out.is_empty(), "{name}: not the golden (got | golden); ROADSTYLE_BLESS=1 writes it again:\n{}", out[..out.len().min(12)].join("\n"));
 }
+
+/// The levels of an area as a golden sees them (review D5; no Python): its counts. Every solve is feasible, because the solver checks
+/// every hard rule of its answer (`levels` gives an error otherwise). The tags rule is deterministic: the hash of its rows and how many
+/// casings and fills are at each level. A solve keeps its counts and the best value of each stage, not its rows: an equally good answer
+/// may move a row (2026-10-23: the tests check feasibility; the optimum still counts, through the stages).
+pub fn levels_summary(lv: &roadstyle_rs::levels::Levels) -> Value {
+    use roadstyle_rs::levels::Method;
+    let mut s = json!({"method": format!("{:?}", lv.method), "rows": lv.rows.len(), "roads": lv.roads, "edge_hash": lv.edge_hash});
+    if lv.method == Method::Tags {
+        let rows: Vec<Value> = lv.rows.iter().map(|r| json!([r.edge_id, r.casing_start, r.casing_level, r.casing_end, r.fill_level])).collect();
+        let count = |f: fn(&roadstyle_rs::levels::Row) -> i64| {
+            let mut m = std::collections::BTreeMap::new();
+            lv.rows.iter().for_each(|r| *m.entry(f(r).to_string()).or_insert(0usize) += 1);
+            json!(m)
+        };
+        s["rows_hash"] = json!(hash16(&Value::Array(rows)));
+        s["casing_levels"] = count(|r| r.casing_level);
+        s["fill_levels"] = count(|r| r.fill_level);
+    } else {
+        s["pairs"] = json!(lv.pairs);
+        s["order_pairs"] = json!(lv.order_pairs);
+        s["given_up"] = json!(lv.given_up);
+        s["orders_not_kept"] = json!(lv.orders_not_kept);
+        s["near_not_kept"] = json!(lv.near_not_kept.len());
+        s["stages"] = json!(lv.stages);
+    }
+    s
+}
