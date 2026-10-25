@@ -251,7 +251,8 @@
           "default": {
             "name": null,
             "state": "static",
-            "live_data": false
+            "live_data": false,
+            "export": false
           }
         }
       },
@@ -1390,6 +1391,11 @@
         },
         "live_data": {
           "description": "the feature states that a page's dashboard colours the roads with (rs.setData)",
+          "type": "boolean",
+          "default": false
+        },
+        "export": {
+          "description": "a style for an app with no road table (export_inline, export_style): the source `roads` with its pick and highlight layers, and\nthe export's arrows (fewer, one in the middle of each slot, and the slots' numbers). A map option because it changes stage 1: its\nlayers go through every pass, and they change the arrows layer and the controls (2026-10-25).",
           "type": "boolean",
           "default": false
         }

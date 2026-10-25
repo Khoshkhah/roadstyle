@@ -136,10 +136,12 @@ fn json_lines(src: &Value) -> bool {
 /// Stage 2 from memory (audit N3): the tiles of stage 1's sources and the one style that draws them (`tiled_style`), the tiles at `at`
 /// (`{"url": "pmtiles://roads"}` for an archive, `{"tiles": ["<prefix>roads/{z}/{x}/{y}"]}` for a folder). `o`: which sources and
 /// which properties. The sources that `o` leaves out stay in the style with a null `data` (audit D3: not copied), which
-/// `Styled::write_with` fills as it writes the style. An error for zooms in `o` that are not tile zooms.
-pub fn tile_stage(s: &sources::Styled, o: &tiles::stage::TileOptions, at: &Value) -> Result<(Value, tiles::Tiles), tiles::Error> {
+/// `Styled::write_with` fills as it writes the style; `inline`: their data_maxzoom and data_tolerance (SourceMode::Inline). An error for
+/// zooms in `o` that are not tile zooms.
+pub fn tile_stage(s: &sources::Styled, o: &tiles::stage::TileOptions, at: &Value, inline: sources::SourceMode)
+                  -> Result<(Value, tiles::Tiles), tiles::Error> {
     let tiles = tile_sources(s, o)?;
-    let style = s.style_with(|_| Value::Null, true);
+    let style = s.style_with(inline, true);
     let tiled: Vec<String> = s.shown().filter(|(k, _)| o.wants(k)).map(|(k, _)| k.to_string()).collect();
     Ok((tiled_style(style, &tiled, at, (o.min_zoom, o.max_zoom)), tiles))
 }
@@ -300,7 +302,7 @@ pub fn write_source_file<W: std::io::Write + Send>(s: &sources::Styled, file: &s
     let ext = ext(format);
     let io = |e: std::io::Error| crate::error::file(file, e);
     if file == "style.json" {
-        serde_json::to_writer(&mut w, &s.style_with(|n| format!("{n}.{ext}").into(), true)).map_err(|e| crate::error::file(file, e))?;
+        serde_json::to_writer(&mut w, &s.style_with(sources::SourceMode::Files(ext), true)).map_err(|e| crate::error::file(file, e))?;
         return Ok(w);
     }
     if file == ROAD_TABLE {
@@ -362,25 +364,37 @@ fn road_rows(s: &sources::Styled) -> impl Iterator<Item = roadstyle_io::write::R
 /// list with one item for each road (its row). `fields`: only these fields of each road (the level editor's lean table: what its page
 /// reads); None: every field.
 pub fn write_road_table<W: std::io::Write>(s: &sources::Styled, fields: Option<&[String]>, w: &mut W) -> std::io::Result<()> {
-    let dumps = |v: &Value, _compact: bool| v.to_string();
     let mut rows = s.table_rows();
     if let Some(f) = fields {
         rows.iter_mut().for_each(|t| t.props.retain(|(k, _)| f.iter().any(|n| n == k)));
     }
-    let list = |w: &mut W, key: &str, first: bool, item: &dyn Fn(&sources::TableRow) -> String| -> std::io::Result<()> {
+    // each value written straight to `w` (audit D11: no JSON tree for each row)
+    type Item<W> = dyn Fn(&mut W, &sources::TableRow) -> serde_json::Result<()>;
+    let list = |w: &mut W, key: &str, first: bool, item: &Item<W>| -> std::io::Result<()> {
         write!(w, "{}\"{key}\":[", if first { "{" } else { "," })?;
         for (i, t) in rows.iter().enumerate() {
             if i > 0 {
                 w.write_all(b",")?;
             }
-            w.write_all(item(t).as_bytes())?;
+            item(w, t)?;
         }
         w.write_all(b"]")
     };
-    list(w, "props", true, &|t| dumps(&Value::Object(t.props.iter().map(|(k, v)| (k.to_string(), js_value(v.to_value()))).collect()), true))?;
-    list(w, "mids", false, &|t| t.mid.map_or("null".into(), |m| dumps(&json!(m), true)))?;
-    list(w, "bboxes", false, &|t| t.bbox.map_or("null".into(), |b| dumps(&json!(b), true)))?;
-    list(w, "lines", false, &|t| t.line.map_or("null".into(), |c| dumps(&json!(c), true)))?;
+    list(w, "props", true, &|w, t| {
+        w.write_all(b"{").map_err(serde_json::Error::io)?;
+        for (i, (k, v)) in t.props.iter().enumerate() {
+            if i > 0 {
+                w.write_all(b",").map_err(serde_json::Error::io)?;
+            }
+            serde_json::to_writer(&mut *w, k)?;
+            w.write_all(b":").map_err(serde_json::Error::io)?;
+            serde_json::to_writer(&mut *w, &js_value(v.to_value()))?;
+        }
+        w.write_all(b"}").map_err(serde_json::Error::io)
+    })?;
+    list(w, "mids", false, &|w, t| serde_json::to_writer(w, &t.mid))?;
+    list(w, "bboxes", false, &|w, t| serde_json::to_writer(w, &t.bbox))?;
+    list(w, "lines", false, &|w, t| serde_json::to_writer(w, &t.line))?;
     w.write_all(b"}")
 }
 
@@ -403,7 +417,7 @@ pub fn save_sources(s: &sources::Styled, dir: &std::path::Path, format: Format, 
 /// `prefix`) and the tiles.
 pub fn tile_made(s: &sources::Styled, prefix: &str, keep: &[String]) -> Result<(String, tiles::Tiles), crate::Error> {
     let o = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &s.saved[tiles::stage::TILES], &s.saved[tiles::stage::COLUMNS], keep)?;
-    let (style, tiled) = tile_stage(s, &o, &xyz_at(prefix))?;
+    let (style, tiled) = tile_stage(s, &o, &xyz_at(prefix), sources::SourceMode::INLINE)?;
     Ok((style_text(s, &style), tiled))
 }
 
@@ -429,7 +443,8 @@ pub fn tiled_of(roads: RoadTable, look: &Look, features: Option<FeatureTable>, n
     let list = |k: &str| look.other.get(k).and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).map(String::from));
     o.exact = list("tile_keep").map(Iterator::collect);
     o.only = list("tile_layers").map(Iterator::collect);
-    let (style, tiled) = tile_stage(&s, &o, &xyz_at(prefix))?;
+    // the call's data_maxzoom and data_tolerance for the sources that stay in the style (the look's `other` until the bindings give it)
+    let (style, tiled) = tile_stage(&s, &o, &xyz_at(prefix), sources::SourceMode::inline_of(&look.other))?;
     Ok((style_text(&s, &style), tiled, s.warnings))
 }
 

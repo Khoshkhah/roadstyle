@@ -100,6 +100,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **The Rust engine's style has no page keys `filter_control` and `legend`** (N32 step 2): the page gives them in its options
   (`RS_OPTIONS.filter_control`, `RS_OPTIONS.legend`, default true). `roadstyle:controls.filter` has no `on`, and a lone data styler's
   legend is always in `roadstyle:color_options`. A host page that gives neither shows both boxes.
+- **One style writer** (T4 step 2, audit D3, N29, D11): `Styled::style_with(SourceMode)` and `write_style(w, SourceMode)`, where
+  `SourceMode` is `Inline { maxzoom, tolerance }` (render's `data_maxzoom` and `data_tolerance`: keys of the writer, not of stage 1) or
+  `Files(ext)`. Stage 1 no longer sets the two keys on its sources; the page takes them from its keys. The page reads the palette
+  swatches of its views from the road table's rows (it wrote the table and parsed it again), and the road table is written with no
+  JSON tree for each row. The outputs are the same, byte for byte.
+- **`export` is a map option** (`MapOptions.output.export`; T4 step 2): it changes stage 1 (the roads source with its pick and
+  highlight layers, the export's arrows, the controls), so it is in the look's `map`, not a key of the style writer.
 - **Stage 1's output is `Styled`** (Rust: `roadstyle::sources::Styled`, was `Sources`; T4 step 1, audit N15). The roads are in their own
   field and not in the source list, so `Src` has no `Roads` variant. `Styled::shown()` gives the style's sources in order (the roads
   first when the style has them), and `Styled::source(name)` gives one of them. The bindings' classes keep their names.

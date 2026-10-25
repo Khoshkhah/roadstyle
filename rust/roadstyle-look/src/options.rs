@@ -479,6 +479,10 @@ pub struct Output {
     pub state: State,
     /// the feature states that a page's dashboard colours the roads with (rs.setData)
     pub live_data: bool,
+    /// a style for an app with no road table (export_inline, export_style): the source `roads` with its pick and highlight layers, and
+    /// the export's arrows (fewer, one in the middle of each slot, and the slots' numbers). A map option because it changes stage 1: its
+    /// layers go through every pass, and they change the arrows layer and the controls (2026-10-25).
+    pub export: bool,
 }
 
 /// A style with its state baked in, or one that keeps MapLibre's global state (a page with the dashboard).
@@ -645,6 +649,7 @@ const FLAT: &[(&str, &str)] = &[
     ("hover_color", "interaction.hover_color"), ("select_color", "interaction.select_color"),
     ("labels", "labels.on"), ("arrows", "arrows.on"), ("tunnel_control", "tunnels.control"), ("view_3d", "bridges.decks_3d"),
     ("boundary", "boundary"), ("name", "output.name"), ("state", "output.state"), ("live_data", "output.live_data"),
+    ("export", "output.export"),
 ];
 
 /// The flat keywords of more than one field, or of a value in another form: `from_args` reads them itself.

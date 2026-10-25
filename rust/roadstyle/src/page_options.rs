@@ -128,16 +128,15 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     if tiled && views.iter().any(|v| v["set"].get("palette").is_some()) {
         return Err(crate::Error::Engine(roadstyle_engine::Error::Unsupported(roadstyle_engine::Unsupported::TiledPalettes)));
     }
-    let (mut style, archive) = if tiled { tiled_page(&src, look)? } else {
+    let (mut style, archive) = if tiled { tiled_page(&src, look, &a)? } else {
         src.page_arrows();          // stage 3 of the inline page: the arrows are points that the page puts itself (audit N2)
         // the style without its sources' data, which the page writer writes from `src` (audit D3, N29)
-        (src.style_with(|_| Value::Null, false), None)
+        (src.style_with(crate::sources::SourceMode::inline_of(&a), false), None)
     };
     let mut table = Vec::new();
     crate::write_road_table(&src, None, &mut table).map_err(|e| crate::error::file(crate::ROAD_TABLE, e))?;
     if !pals.is_empty() {
-        let t: Value = serde_json::from_slice(&table).map_err(|e| crate::error::file(crate::ROAD_TABLE, e))?;
-        palette_swatches(&mut style, &t["props"], &pals, look);
+        palette_swatches(&mut style, &src.table_rows(), &pals, look);       // the rows, not the written table parsed again (N29)
     }
     let st = style.as_object_mut().ok_or_else(|| crate::error::options("the style is not a JSON object"))?;
     let meta = st.shift_remove("metadata").unwrap_or_default();
@@ -403,26 +402,31 @@ fn views(src: &mut Styled, a: &Map<String, Value>, look: &Look, options: &Option
 
 /// _engine._palette_swatches: the filter panel's colour of each class in each palette of the views (the fill of the class's first road
 /// in that palette), and the page's palette's (the swatches).
-fn palette_swatches(style: &mut Value, props: &Value, pals: &[String], look: &Look) {
+fn palette_swatches(style: &mut Value, rows: &[crate::sources::TableRow], pals: &[String], look: &Look) {
     let fb = &look.sections.roads.fallback["fill"];
     let state = style["metadata"]["roadstyle:state"]["rs_palette"].as_str().unwrap_or_default().to_string();
     let flt = &mut style["metadata"]["roadstyle:controls"]["filter"];
     let col = flt["col"].as_str().unwrap_or_default().to_string();
-    let mut first: Vec<(&Value, &Value)> = Vec::new();
-    for p in props.as_array().into_iter().flatten() {
-        if !first.iter().any(|(k, _)| **k == p[col.as_str()]) {
-            first.push((&p[col.as_str()], p));
+    // a road's field as the road table writes it (none when it has none)
+    fn get(r: &crate::sources::TableRow, k: &str) -> Option<Value> {
+        r.props.iter().find(|(n, _)| *n == k).map(|(_, c)| crate::table::js_value(c.to_value()))
+    }
+    let mut first: Vec<(Value, &crate::sources::TableRow)> = Vec::new();
+    for r in rows {
+        let k = get(r, &col).unwrap_or(Value::Null);
+        if !first.iter().any(|(x, _)| *x == k) {
+            first.push((k, r));
         }
     }
-    let row = |c: &Value| first.iter().find(|(k, _)| *k == c).map(|(_, p)| *p).unwrap_or(&Value::Null);
+    let row = |c: &Value| first.iter().find(|(k, _)| k == c).map(|(_, r)| *r);
     let classes = flt["classes"].as_array().cloned().unwrap_or_default();
     let mut out = Map::new();
     for n in pals {
         let of: Map<String, Value> = classes.iter().map(|c| {
-            let r = row(c);
             let fill = roadstyle_model::mark::Mark::Fill.name();
-            let v = r.get(roadstyle_model::mark::in_palette(fill, n)).or_else(|| r.get(fill)).filter(|v| py_truth(v)).unwrap_or(fb);
-            (c.as_str().unwrap_or_default().to_string(), v.clone())
+            let v = row(c).and_then(|r| get(r, &roadstyle_model::mark::in_palette(fill, n)).or_else(|| get(r, fill))).filter(|v| py_truth(v))
+                .unwrap_or_else(|| fb.clone());
+            (c.as_str().unwrap_or_default().to_string(), v)
         }).collect();
         out.insert(n.clone(), Value::Object(of));
     }
@@ -432,7 +436,7 @@ fn palette_swatches(style: &mut Value, props: &Value, pals: &[String], look: &Lo
 
 /// _engine._tiled_page: the tiled page's style and its PMTiles archive, from stage 2 of the same stage 1 (no second build). The style
 /// has one vector source `roads` (the embedded archive) with the layers `simple` and `slots`; the other sources stay inline.
-fn tiled_page(s: &Styled, look: &Look) -> Result<(Value, Option<Vec<u8>>), crate::Error> {
+fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>) -> Result<(Value, Option<Vec<u8>>), crate::Error> {
     let c = &look.map.columns;
     let hw = Some(c.class.as_str()).filter(|h| !h.is_empty()).unwrap_or("highway");
     fn col(v: &Option<String>) -> Option<&str> {
@@ -442,7 +446,7 @@ fn tiled_page(s: &Styled, look: &Look) -> Result<(Value, Option<Vec<u8>>), crate
     let mut o = TileOptions::new(&s.layers, &s.metadata, &s.saved[TILES], &s.saved[COLUMNS], &[])?;
     o.exact = Some(keep.into_iter().flatten().map(String::from).collect());
     o.only = Some(["roads", "simple", "slots"].map(String::from).to_vec());
-    let (style, t) = crate::tile_stage(s, &o, &json!({"url": "pmtiles://roads"}))?;
+    let (style, t) = crate::tile_stage(s, &o, &json!({"url": "pmtiles://roads"}), crate::sources::SourceMode::inline_of(a))?;
     let archive = t.archive(t.bounds().ok_or(crate::tiles::Error::Empty)?, &t.layer_names())?;
     Ok((style, Some(archive)))
 }

@@ -36,7 +36,7 @@ fn text(b: &[u8]) -> Value {
 fn style(area: &str) -> Value {
     let s = roadstyle_rs::make_sources(roads(area), &look(area), None, None, None).unwrap();
     let (mut out, mut table) = (Vec::new(), Vec::new());
-    s.write_style(&mut out).unwrap();
+    s.write_style(&mut out, roadstyle_rs::sources::SourceMode::INLINE).unwrap();
     roadstyle_rs::write_road_table(&s, None, &mut table).unwrap();
     let (style_text, table_text) = (text(&out), text(&table));
     let table: Value = serde_json::from_slice(&table).unwrap();
