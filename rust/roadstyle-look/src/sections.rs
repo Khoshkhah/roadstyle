@@ -165,10 +165,11 @@ pub struct CasingLook {
     pub m: Num,
     /// roads in metres: a casing is never thinner than this many pixels each side
     pub min_px: Num,
-    pub opacity: Num,
-    /// no casing where it is narrower than this many pixels at a zoom (0: always a casing)
+    /// no casing piece (a bridge's keeps it) at a zoom where the whole casing line is narrower than this many px (0: always a casing).
+    /// Before `opacity`: the profile gives it, the palette gives `opacity`, and the theme keeps that order.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drop_below_px: Option<Num>,
+    pub opacity: Num,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

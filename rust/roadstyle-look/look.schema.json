@@ -361,11 +361,8 @@
           "description": "roads in metres: a casing is never thinner than this many pixels each side",
           "$ref": "#/$defs/Num"
         },
-        "opacity": {
-          "$ref": "#/$defs/Num"
-        },
         "drop_below_px": {
-          "description": "no casing where it is narrower than this many pixels at a zoom (0: always a casing)",
+          "description": "no casing piece (a bridge's keeps it) at a zoom where the whole casing line is narrower than this many px (0: always a casing).\nBefore `opacity`: the profile gives it, the palette gives `opacity`, and the theme keeps that order.",
           "anyOf": [
             {
               "$ref": "#/$defs/Num"
@@ -374,6 +371,9 @@
               "type": "null"
             }
           ]
+        },
+        "opacity": {
+          "$ref": "#/$defs/Num"
         }
       },
       "additionalProperties": false,
