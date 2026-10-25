@@ -40,7 +40,6 @@ pub fn page_state(look: &crate::Look, active: usize, n_overlays: usize) -> Map<S
 /// The filter panel (render_web: `flt`): the classes present, most important first, a swatch for each (a road of the class that is not a
 /// restricted one), the access kinds with their counts (access_col), and whether there are bridges and tunnels.
 fn filter_panel(look: &crate::Look, roads: &Roads, m: &Model) -> Value {
-    let args = &look.args;
     let fb_fill = &look.sections.roads.fallback["fill"];
     let c = &look.map.columns;
     let col = crate::roads::named(&c.filter).unwrap_or(if c.class.is_empty() { "highway" } else { &c.class });
@@ -80,7 +79,7 @@ fn filter_panel(look: &crate::Look, roads: &Roads, m: &Model) -> Value {
     let minzoom = crate::layers::class_minzoom(look).map(|t| {
         classes.iter().filter_map(|c| t.get(c).filter(|z| z.as_f64().is_some_and(|z| z > 0.0)).map(|z| (c.clone(), z.clone()))).collect::<Map<_, _>>()
     });
-    json!({"on": args["filter_control"] != false && !classes.is_empty(), "col": col, "classes": classes, "access": access, "swatches": swatches,
+    json!({"col": col, "classes": classes, "access": access, "swatches": swatches,
            "bridges": roads.iter().any(|f| lvl(f) > 0.0), "tunnels": roads.iter().any(|f| lvl(f) < 0.0), "minzoom": minzoom})
 }
 

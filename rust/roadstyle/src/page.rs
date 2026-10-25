@@ -52,6 +52,8 @@ pub struct PageOptions {
     pub google_3d: bool,
     pub select_color: Value,
     pub filter: Value,
+    /// the Roads box (render's filter_control; the dashboard shows it when the filter has classes)
+    pub filter_control: bool,
     pub color_options: Value,
     pub color_active: Value,
     pub overlays: Value,

@@ -3748,7 +3748,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         # driving's pedestrian streets that cars may not use have their own row: where no usable road is of the class, a class row would be a second switch for them
         if n["pedestrian"] and "pedestrian" in classes and not any(not p.get("__rs_access") and p.get(fcol) == "pedestrian" for p in (f.get("properties") or {} for f in geo["features"])):
             classes.remove("pedestrian")
-    flt = {"on": bool(filter_control and classes), "col": fcol, "classes": classes, "access": access,
+    flt = {"col": fcol, "classes": classes, "access": access,
            "swatches": swatches,
            # any elevated / below-ground feature ⇒ the panel offers a Bridges / Tunnels on/off row
            # (rsSetBridges / rsSetTunnels)
@@ -3890,7 +3890,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             "sources": _roles(style["layers"]), "arrows": _arrow_kind(style["layers"]), "live": None,     # live_data: the Rust engine only
             "popup_mode": mode, "find_control": bool(find_control), "zoom_readout": bool(zoom_readout), "pitch_3d": cam["pitch_3d"],
             "street_view": street_view, "street_view_key": street_view_key or "", "google_3d": bool(google_3d), "select_color": select_color,
-            "filter": flt, "color_options": color_opts_meta or [], "color_active": _active, "overlays": ov_meta,
+            "filter": flt, "filter_control": bool(filter_control), "color_options": color_opts_meta or [],
+            "color_active": _active, "overlays": ov_meta,
             "overlay_control": bool(overlay_control), "overlay_popup": bool(overlay_popup),
             "tunnel": {"layers": tun_paint, "dash": tun_dash, "casing": tun_casing, "strength": tun_strength,
                        "palette": CONFIG.tunnel_palette, "palettes": CONFIG.tunnel_palettes,
