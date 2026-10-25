@@ -101,6 +101,13 @@ const [roadsF, pairsF, editsF, headsF, capsF, levelsF, infoF] = await Promise.al
   get("heads.csv"), get("caps.csv"), get("levels.csv"), get("levels_info.json")]);
 if(!roadsF || !pairsF) throw new Error("the store has no roads.parquet or pairs.csv: make the area first (makeArea, or roadstyle levels make)");
 const roadsBytes = roadsF.body.slice();
+// the inputs of a solve, by their content (the SHA-256 of roads.parquet, pairs.csv and edits.csv): levels.csv is for them when its
+// levels_info.json has the same key, also after a page wrote the same area again (a file's time says nothing then). heads.csv and caps.csv
+// are drawing only: they are not inputs of the solve.
+const sha = async d => [...new Uint8Array(await crypto.subtle.digest("SHA-256", typeof d === "string" ? new TextEncoder().encode(d) : d))]
+  .map(b => b.toString(16).padStart(2, "0")).join("");
+const areaKey = `${await sha(roadsBytes)}:${await sha(pairsF.body)}`;
+const inputsKey = async edits => `${areaKey}:${await sha(edits)}`;
 const opened = await call({type: "open", roads: roadsBytes.buffer, pairs: pairsF.body}, [roadsBytes.buffer]);
 const pairs = csvRows(pairsF.body);
 const order = JSON.parse(opened.facts);                          // each road, in the roads' order
@@ -113,11 +120,10 @@ const SAVED = "lv-saved:" + (store.key || location.pathname);    // the edits sa
 let saved = +(sessionStorage.getItem(SAVED) ?? csvRows(editsText).length);
 let res = null;                                                  // the last answer of the solver (JSON of LevelArea)
 
-// --- the answer to start from: levels.csv when it is newer than the inputs and has every edge, else a solve
+// --- the answer to start from: levels.csv when it was solved for these inputs (inputsKey) and has every edge, else a solve
 async function fromStored(){
   if(!levelsF || !infoF) return null;
-  const newest = Math.max(roadsF.mtime, pairsF.mtime, editsF ? editsF.mtime : 0, headsF ? headsF.mtime : 0);
-  if(levelsF.mtime < newest) return null;
+  if(JSON.parse(infoF.body).inputs !== await inputsKey(editsText)) return null;
   const at = Object.fromEntries(csvRows(levelsF.body).map(r => [r.edge, [+r.casing_start, +r.casing_level, +r.casing_end, +r.fill_level]]));
   const levels = [];
   for(const f of order){
@@ -137,7 +143,7 @@ async function save(newRes){                                       // levels.csv
   const [heads, caps] = [headsText, capsText];
   const levelsCsv = (await call({type: "levelsCsv", levels: flat(newRes), heads, caps})).csv;
   const info = JSON.stringify({...newRes.info, given_up: newRes.given_up, given_up_parts: newRes.given_up_parts, near: newRes.near,
-    orders_not_kept: newRes.orders_not_kept});
+    orders_not_kept: newRes.orders_not_kept, inputs: await inputsKey(editsText)});
   await store.save("levels.csv", levelsCsv);
   await store.save("levels_info.json", info);
   events.dispatchEvent(new CustomEvent("solved", {detail: {levelsCsv, levelsInfo: info,
@@ -324,8 +330,9 @@ async function apply(ops){
   const changed = [...(newEdits || old), ...old].filter(r => before.has(key(r)) !== now.has(key(r))).flatMap(r => [r.a, r.b])
     .concat(order.filter((f, i) => JSON.stringify(ends[i].heads_own) !== JSON.stringify(heads[f.road])).map(f => f.road));
   const nextEdits = newEdits ? toCsv(newEdits) : editsText;
-  let said = "not solved again (only caps)", full = false, next = res;
-  if(newEdits || headsCsv !== headsText){
+  // caps and heads are drawing only (level_editor.py's change, 2026-10-08): only a relation edit is solved, locally (solveLocal)
+  let said = headsCsv === headsText ? "not solved again (only caps)" : "not solved again (heads and caps are drawing only)", full = false, next = res;
+  if(newEdits){
     const t = performance.now();
     next = JSON.parse((await call({type: "solveLocal", edits: nextEdits, changed})).answer);   // a refusal throws: nothing is saved
     const s = ((performance.now() - t) / 1000).toFixed(1);

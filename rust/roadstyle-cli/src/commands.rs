@@ -264,6 +264,8 @@ fn levels(sub: &str, pos: &[String], mut opts: Vec<(String, Option<String>)>) ->
             for k in ["given_up", "given_up_parts", "near", "orders_not_kept"] {
                 info[k] = json[k].clone();
             }
+            let bytes = |f: &str| std::fs::read(dir.join(f)).unwrap_or_default();
+            info["inputs"] = roadstyle::levels::inputs_key(&bytes("roads.parquet"), &bytes("pairs.csv"), &bytes("edits.csv")).into();
             std::fs::write(dir.join("levels_info.json"), info.to_string()).map_err(|e| Error::File(e.to_string()))?;
             println!("{} roads -> {}: {} stack pair(s) given up, {} order wish(es) not kept", answer.levels.len(),
                      dir.join("levels.csv").display(), answer.given_up.len(), answer.orders_not_kept.len());

@@ -55,6 +55,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   wide. A bridge keeps its casing. The road layer's filter has the rule, and the tiles leave out the pieces that it hides.
 
 ### Changed
+- **The level editor solves less** (2026-10-25). A cap or head change runs no solve (they are drawing only, as the Python editor has
+  them since 2026-10-08): the panel saves it at once, with no "Apply and solve" (the list and the button stay for relation edits, which
+  solve locally). The editor starts from the stored levels when `levels_info.json` names the same inputs by content: `inputs` is the
+  SHA-256 of `roads.parquet`, `pairs.csv` and `edits.csv` (`roadstyle_levels::inputs_key`; `roadstyle levels solve` writes it too).
+  Before, it compared the files' times (also of `heads.csv`), so a page that writes the area again on each open (duckosm-rust's) solved
+  the whole area on each open.
 - **An unknown keyword of `render_edges` gives a warning** (T3), with the nearest known name: "render_edges: unknown keyword
   'colour_by' (did you mean 'color_by'?); it does nothing". Before, `render_edges` ignored it with no message. From roadstyle 0.27.0
   it is an error. The rule is one function, `roadstyle::options::unknown` (Python: `_rust.unknown_keywords`), which the MCP server's
