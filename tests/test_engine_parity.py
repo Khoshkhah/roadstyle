@@ -91,6 +91,12 @@ _LEVEL_ARGS = ["casing_start_col", "casing_level_col", "casing_end_col", "fill_l
                "cap_start_col", "cap_end_col"]
 
 
+# the computed levels: the Rust level input has the crossing rule (a path at a node where a car road goes on goes under the road,
+# 2026-10-25); the Python engine's does not, until it goes at P7. strict: a pass means the engines agree again, and the mark goes.
+_CROSSINGS = pytest.mark.xfail(strict=True, reason="the crossing rule is in the Rust level input only (2026-10-25)")
+
+
+@_CROSSINGS
 def test_export_inline_levels_computed(part, keywords):
     from compare_engines import diff
 
@@ -118,7 +124,7 @@ def test_export_inline_direction_columns_not_named(part, keywords, drop):
 _RENAME = {"highway": "fclass", "tunnel": "tun", "bridge": "brg", "layer": "lyr", "edge_id": "eid"}
 
 
-@pytest.mark.parametrize("levels", ["given", "computed"])
+@pytest.mark.parametrize("levels", ["given", pytest.param("computed", marks=_CROSSINGS)])
 def test_export_inline_column_names(part, keywords, levels):
     from compare_engines import diff
 
