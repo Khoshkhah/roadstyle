@@ -236,11 +236,13 @@ fn tile_files<'a>(read: &dyn Fn(&str) -> Result<Vec<u8>, String>, o: &TileOption
         // the roads' lines are in the road table when stage 1 left them out (no layer draws the roads)
         let lineless = |fc: &Value| fc["features"].as_array().is_some_and(|f| f.iter().any(|x| x["geometry"].is_null()));
         if k == "roads" && lineless(&fc) {
-            let table = read::features(read(ROAD_TABLE)?)?;
-            let lines = table["features"].as_array().map(Vec::as_slice).unwrap_or_default();
-            for (f, t) in fc["features"].as_array_mut().into_iter().flatten().zip(lines) {
+            // the road table with the typed reader, as the Parquet path reads it (audit D12: no JSON tree of the whole table)
+            let table = read::read_roads(read(ROAD_TABLE)?, "geometry")?;
+            for (i, f) in fc["features"].as_array_mut().into_iter().flatten().enumerate() {
                 if f["geometry"].is_null() {
-                    f["geometry"] = t["geometry"].clone();
+                    if let Some(c) = table.line(i) {
+                        f["geometry"] = json!({"type": "LineString", "coordinates": c});
+                    }
                 }
             }
         }

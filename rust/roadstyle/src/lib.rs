@@ -1,7 +1,7 @@
 //! roadstyle as a Rust library (docs/design/rust_library.md): the facade. It re-exports the crates of the core with the module paths
 //! of the old single crate (`roadstyle::props`, `roadstyle::read`, `roadstyle::levels`, `roadstyle::tiles`, `roadstyle::make_style`,
-//! ...), and it has the functions that read GeoParquet bytes (roadstyle-io) and call the engine: `make_style` and `make_tiled`, which
-//! needs both the engine and the tiles. A Rust user adds only this crate.
+//! ...), and it has the functions that read GeoParquet bytes (roadstyle-io) and call the engine (`make_style`, `make_sources`), and stage
+//! 2, which needs both the engine and the tiles (`tile`, tiled.rs). A Rust user adds only this crate.
 
 pub use roadstyle_engine::*;
 pub use roadstyle_io::{crs, duckosm, geojson, read, shp};
