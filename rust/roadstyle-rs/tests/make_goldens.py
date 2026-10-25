@@ -12,9 +12,9 @@ with. Run it in the conda environment roadstyle (roadstyle from this repository'
   palette and settings sources in the older and the newer layout.
 - level_area: tests/data/level_area/ (tests/level_area.rs): a level area of Monaco in a box, and roadstyle's answers of the check before
   a rule is added.
-- monaco, sodermalm, tartu: tests/data/<area>/golden_*.gz (tests/areas.rs): the roads-only style (export_inline), the tiles of
-  export_style around the roads' centre, and the levels (compute_levels' tags rule; the solve with duckOSM's level-area defaults, not for
-  Tartu: Python needs 4.8 GB and 85 s for Monaco). sodermalm also writes its input, tests/data/sodermalm/roads.parquet, from
+- monaco, sodermalm, tartu: tests/data/<area>/golden_*.gz (tests/areas.rs): the look's options and the levels (compute_levels' tags
+  rule; the solve with duckOSM's level-area defaults, not for Tartu: Python needs 4.8 GB and 85 s for Monaco). The areas' style and tiles
+  are the Rust engine's own goldens since 2026-10-24 (tests/areas.rs, ROADSTYLE_BLESS=1). sodermalm also writes its input, tests/data/sodermalm/roads.parquet, from
   notebooks/data/sodermalm_edges.gpkg with the solved levels. tartu reads tests/data/tartu/ (tests/get_goldens.sh) and writes to
   tests/data/tartu/, whose goldens go to the pre-release rust-test-data (their SHA-256 are in tests/areas.rs)."""
 import base64
@@ -101,7 +101,6 @@ def _json(o):
 def py_look(palette="amber", profile=None, settings=None, args=None):
     """The roadstyle half of geolibre-roadstyle's look_of (build.py): the look render_edges(palette=, profile=, settings=) renders with,
     with no base-map part (mapstyle's "features")."""
-    import base64
     import dataclasses
     import inspect
     from importlib.resources import files
@@ -199,21 +198,7 @@ def area_options(area):
         return {"palette": "amber", "settings": None, "args": args}
     return {"palette": look["palette"], "settings": look["settings"], "args": look["args"]}
 
-def tile_names(g, zooms=(12, 14, 15)):
-    """The 3 x 3 tiles around the roads' centre at each zoom."""
-    import math
-    x0, y0, x1, y1 = g.total_bounds
-    lon, lat = (x0 + x1) / 2, (y0 + y1) / 2
-    out = []
-    for z in zooms:
-        n = 2 ** z
-        x = int((lon + 180) / 360 * n)
-        y = int((1 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2 * n)
-        out += [f"{z}/{x + dx}/{y + dy}" for dx in (-1, 0, 1) for dy in (-1, 0, 1)]
-    return out
-
 def write_area(area):
-    import tempfile
     if area == "sodermalm":
         sodermalm_input()
     g = read_roads(DATA / area / "roads.parquet")
@@ -221,13 +206,6 @@ def write_area(area):
     kw = {**o["args"], "arrows": True, "labels": True, "view_3d": False}     # the engine: names and arrows always, no decks
     out = {}
     out["options"] = {**o, "args": kw}
-    out["style"] = rs.export_inline(g, palette=o["palette"], settings=o["settings"], **kw)
-    with tempfile.TemporaryDirectory() as d:
-        tkw = {k: v for k, v in kw.items() if k not in ("basemap", "basemaps")}      # export_style: the app gives the base map
-        st = rs.export_style(g, d, base_url="http://localhost/", format="xyz", palette=o["palette"], settings=o["settings"], **tkw)
-        out["tiles_style"] = json.loads(Path(st).read_text())
-        out["tiles"] = {n: base64.b64encode(p.read_bytes()).decode() for n in tile_names(g)
-                        if (p := Path(d) / "tiles" / f"{n}.pbf").is_file()}
     tags = rs.compute_levels(g, method="tags")
     out["levels_tags"] = [[str(e), *map(int, v)] for e, *v in tags[["edge_id", *LEVELS]].itertuples(index=False)]
     if area != "tartu":

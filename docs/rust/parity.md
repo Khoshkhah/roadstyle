@@ -15,19 +15,20 @@ integer, and the engine writes `sint_value` and a double. MapLibre reads the sam
 
 ## The goldens
 
-`rust/roadstyle-rs/tests/make_goldens.py` is the one generator of the reference outputs. It runs Python roadstyle on three areas:
+Two kinds of golden check the Rust engine:
 
-| Area | Roads | Goldens |
-|---|---|---|
-| Monaco | 13,298 | the style of `export_inline`, the tiles of `export_style`, the levels (tags and solve), the color cases, the looks |
-| Södermalm (sample) | 4,563 driving edges | the style, the tiles, the levels, with duckOSM's solved levels |
-| Tartu | 64,828 | the style, the tiles, the levels of the tags rule |
+- **The Rust engine's own goldens** (since 2026-10-24, when the Rust API became the design). A golden is a summary of an output:
+  each layer's id, type and source with short hashes of its filter, paint and layout; each source's type, feature count and hash;
+  the metadata keys; the road table's rows and columns; for the tiles, the number of tiles and features of each zoom and tile layer
+  with their hash; and the hash of the whole output. The goldens are a few KB each, in git. `ROADSTYLE_BLESS=1 cargo test` writes
+  them again after a change that you decided, and a test that fails names the part that changed. `areas.rs` has the style and the
+  tiles of Monaco, the Södermalm sample and Tartu (64,828 roads, with `--ignored`); `cases.rs` has the engine's cases on a part of
+  Monaco.
+- **Python's goldens** (`rust/roadstyle-rs/tests/make_goldens.py`), for what is still checked against Python: the levels (the tags
+  rule and the solve), the data-driven colour cases (`colors.rs`) and the looks of each profile and palette (`look.rs`). The last
+  check of the style and the tiles against Python was audit 3's N27 (2026-10-24).
 
-The tiles are the 3 × 3 tiles around the center at zooms 12, 14 and 15. The files over 1 MB and Tartu's inputs are on the
-GitHub pre-release `rust-test-data`. The repository keeps their SHA-256, and `get_goldens.sh` checks it.
-
-The Rust tests (`cargo test`) compare the engine with the goldens: `areas.rs` for the three areas, `colors.rs` for the
-data-driven color, `look.rs` for the looks of each profile and palette, `levels.rs` and `style.rs`.
+Tartu's inputs are on the GitHub pre-release `rust-test-data`; `get_goldens.sh` gets them and checks their SHA-256.
 
 ## The tests with both engines
 

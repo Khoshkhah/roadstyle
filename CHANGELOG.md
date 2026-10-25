@@ -86,6 +86,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   look, options, given?)` call it. Python gives only what it alone knows: the data steps, the look's options, the base maps' keys and the
   Google Maps key. A view's palette resolves its look in Rust (Python makes no extra looks). The page writer gzips the road table and
   the big sources itself; the two engines' pages are the same byte for byte but these blobs, which are the same when read back.
+- **The areas' goldens are the Rust engine's own** (2026-10-24: the Rust API is the design). `tests/areas.rs` checks the style and
+  the tiles of Monaco, Södermalm and Tartu against summaries in git (`rust_style.json`, `rust_tiles.json`, about 2 KB each), which
+  `ROADSTYLE_BLESS=1 cargo test` writes. The comparisons with Python's `golden_style` and `golden_tiles` are gone; the levels, the
+  colour cases and the looks are still checked against Python.
 - **`examples/bench.rs` measures the stages** (review 4, D9): the time, the peak memory and the memory after each stage, on Monaco
   and Tartu (`cargo run --release -p roadstyle --example bench`; the numbers are in docs/rust/parity.md). The archive (PMTiles) and
   the CLI's XYZ folder make each tile once, with no cache (`Tiles::build`; `Tiles::tile` keeps its cache for a map): Tartu's archive
