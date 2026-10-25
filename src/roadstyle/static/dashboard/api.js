@@ -2,7 +2,7 @@
 // window.rs* functions of the controls. Its ids are the roads' edge ids (as text: a 64-bit hash stays exact); the window.rs* functions
 // take the row. The state is what the controls report (the rs:* events) and the camera; setState applies a part of it through the same
 // functions as the controls, so the page and the host never disagree. The page sets window.rs to it.
-import {map, O} from "./core.js";
+import {map, O, CONTRACT} from "./core.js";
 
 const EVENTS = {select: "rs:select", deselect: "rs:deselect", filter: "rs:filterchange", color: "rs:colorchange", overlay: "rs:overlaychange",
                 tunnel: "rs:tunnelchange", view: "rs:viewselect", view3d: "rs:viewchange", basemap: "rs:basemapchange", highlight: "rs:highlightchange",
@@ -63,7 +63,7 @@ export function makeApi(extra){
   const KEYS = ["selection", "highlight", "colorBy", "colors", "filter", "overlays", "roadFill", "tunnel", "view", "basemap", "view3d", "camera",
                 "streetView", "google3d", "panel"];
   const api = {
-    contract: 1,
+    contract: CONTRACT,          // the newest roadstyle:contract that this dashboard reads (core.js)
     select(id){ if(id == null) call("rsDeselect"); else call("rsSelect", row(id)); },
     highlight(ids){ call("rsHighlight", rows(ids) || []); },
     focus(ids){ call("rsFocus", rows(Array.isArray(ids) ? ids : [ids])); },

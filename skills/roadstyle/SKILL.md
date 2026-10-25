@@ -99,7 +99,7 @@ m.save("map.html")                        # m.html is the page as a string
 - Colours, widths, casing and camera defaults are settings, not keywords:
   `rs.render_edges(..., settings={"config": {"labels": {"color": "#888"}}})`.
 - Unsure of a keyword? `help(rs.render_edges)` or the parameters page. Don't guess: an unknown
-  or misspelt keyword is silently ignored, not an error.
+  or misspelt keyword does nothing and gives a warning with the nearest known name (an error from roadstyle 0.27.0).
 
 ## Check the result
 

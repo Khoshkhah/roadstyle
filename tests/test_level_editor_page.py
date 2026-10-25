@@ -2,10 +2,12 @@
 files of the folder form, and the module dashboard/editor/level_editor.js edits an area kept in the browser (browserStore) on the host's
 map. They need the editor's wasm package (rust/roadstyle-wasm/build_editor.sh), Node for the first and Chromium (playwright) for the
 second: skipped without them (CI builds no package)."""
+import hashlib
 import json
 import os
 import shutil
 import subprocess
+import tempfile
 import threading
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -80,6 +82,7 @@ await init();
 const a = pkg.makeArea(new Uint8Array(await (await fetch("/edges.parquet")).arrayBuffer()), JSON.stringify({id_col: "edge_id"}));
 const store = browserStore("test-area", "Monaco test");
 window.stored = async n => (await store.load(n))?.body ?? null;     // a text file of the store
+window.writeAgain = async () => { for(const [n, v] of [["roads.parquet", a.roads], ["pairs.csv", a.pairs]]) await store.save(n, v); };  // as a page on each open
 for(const [n, v] of [["roads.parquet", a.roads], ["pairs.csv", a.pairs], ["edits.csv", a.edits]]) await store.save(n, v);
 const map = new maplibregl.Map({container: "map", style: {version: 8, glyphs: "/fonts/{fontstack}/{range}.pbf", sources: {}, layers: []},
   center: [7.42, 43.73], zoom: 15});
@@ -185,12 +188,23 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             want = set(json.loads((STATIC / "dashboard" / "reads.json").read_text())["table"]) | {"edge", "road"}
             got = page.evaluate("[...new Set(window.RS_SIDE.props.flatMap(Object.keys))]")
             assert "road" in got and set(got) <= want, set(got) - want
-            # a head's length through the panel's API: solved again, the host hears it, the store has heads.csv
+            # the first open solved the whole area; levels_info.json keeps the key of its inputs (roadstyle-levels' inputs_key: the SHA-256
+            # of roads.parquet, pairs.csv and edits.csv), which are the folder form's bytes
+            assert page.evaluate("window.editor.answer().resolve.how") == "full"
+            import pyarrow.parquet as pq
+
+            from roadstyle import _engine
+            folder = Path(tempfile.mkdtemp())
+            _engine.rust().make_area(pq.read_table(EDGES), str(folder))
+            key = ":".join(hashlib.sha256((folder / f).read_bytes()).hexdigest() for f in ("roads.parquet", "pairs.csv", "edits.csv"))
+            assert json.loads(page.evaluate("stored('levels_info.json')"))["inputs"] == key
+            # a head's length through the panel's API: drawing only, so no solve (level_editor.py's change); the host hears it, the store has
+            # heads.csv
             road = page.evaluate("window.editor.roads[0].road")
             # the engine is in the worker: the page has no LevelArea of its own
             assert page.evaluate("!!window.editor && !('area' in window.editor)")
             said = page.evaluate("r => window.lvApi('/api/apply', {ops: [{op: 'head', road: r, end: 'end', m: '7'}]})", road)
-            assert said["ok"] and said["redrawn"], said
+            assert said["ok"] and said["redrawn"] and said["said"] == "not solved again (heads and caps are drawing only)", said
             page.wait_for_function("window.solved.length === 1", timeout=30000)
             solved = page.evaluate("window.solved")
             assert len(solved) == 1 and solved[0]["rows"] > roads and solved[0]["draw"] > 0, solved
@@ -205,9 +219,11 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
                 assert page.evaluate(back) == page.evaluate("JSON.stringify(window.hostSources)"), "the host's layers as they were"
                 assert page.evaluate("!document.getElementById('lv') && !hostMap.getLayer('lv-ends') && !hostMap.getSource('host-lv-roads')")
                 assert page.evaluate("window.rs === window.host && !window.lvApi && !document.body.classList.contains('lv-open')")
+                page.evaluate("writeAgain()")                  # the same area written again (newer files): the stored levels still hold
                 page.evaluate("window.openEditor()")
                 page.wait_for_function("!!document.getElementById('lv') && !!window.lvApi", timeout=60000)
                 assert page.evaluate("counts()") == opened, "one listener of each kind after each open"
+                assert page.evaluate("window.editor.answer().resolve.how") == "stored", "no solve on an open with the same inputs"
             # a worker that stops (here: its script throws as it loads) rejects the waiting call (worker/call.js), not a call that never settles
             said = page.evaluate("""async () => { const {caller} = await import('/dashboard/worker/call.js');
               const w = new Worker(URL.createObjectURL(new Blob(['throw new Error("boom")'], {type: 'text/javascript'})), {type: 'module'});
@@ -292,12 +308,12 @@ def test_the_editor_on_a_phone(tmp_path):
             assert xy, "a road above the sheet"
             page.touchscreen.tap(xy[0], xy[1])
             page.wait_for_function("document.querySelectorAll('#lv-cards [data-hroad]').length > 0", timeout=20000)
-            # an end: the start head to 3 m by its slider, then Apply: solved again
+            # an end: the start head to 3 m by its slider (applied when the slider is let go)
             page.evaluate("""() => { const i = document.querySelector('#lv-cards input[data-hend=start]'); i.value = '3';
               i.dispatchEvent(new Event('input', {bubbles: true})); i.dispatchEvent(new Event('change', {bubbles: true})); }""")
-            page.locator("#lv-apply").tap()
-            page.wait_for_function("document.getElementById('lv-toast').textContent.startsWith('Applied')", timeout=60000)
-            assert "re-solved" in page.inner_text("#lv-toast") or "solved the whole area" in page.inner_text("#lv-toast")
+            # a head is drawing only: saved at once, with no solve and not in the list (no Apply)
+            page.wait_for_function("document.getElementById('lv-toast').textContent.startsWith('Heads saved')", timeout=60000)
+            assert "not solved again" in page.inner_text("#lv-toast") and page.evaluate("document.getElementById('lv-queue-sec').hidden")
             # 44 px targets
             for sel in ("#lv .tabs button", "#lv-cards .seg button", "#lv .find input"):
                 assert page.evaluate(f"document.querySelector('{sel}').getBoundingClientRect().height") >= 44, sel
