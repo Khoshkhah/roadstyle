@@ -125,11 +125,8 @@ pub fn run(args: &[String]) -> Result<(), Error> {
     let list = |v: Option<String>| v.map(|s| s.split(',').map(str::trim).filter(|c| !c.is_empty()).map(String::from).collect::<Vec<_>>()).unwrap_or_default();
     match (cmd.as_str(), pos.as_slice()) {
         ("sources", [roads, out]) => {
-            let format = match take(&mut opts, "format").as_deref().unwrap_or("geojson") {
-                "geojson" => roadstyle::Format::GeoJson,
-                "geoparquet" => roadstyle::Format::GeoParquet,
-                f => return Err(Error::Usage(format!("--format must be geojson or geoparquet, not {f}"))),
-            };
+            let f = take(&mut opts, "format").unwrap_or_else(|| "geojson".into());
+            let format = roadstyle::Format::parse(&f).map_err(|_| Error::Usage(format!("--format must be geojson or geoparquet, not {f}")))?;
             let keep = list(take(&mut opts, "keep"));
             let name = take(&mut opts, "name");
             let o = look_options(&mut opts, |kw| {

@@ -87,6 +87,17 @@ pub enum Format {
     GeoParquet,
 }
 
+impl Format {
+    /// The format of its name, "geojson" or "geoparquet" (the bindings' and the CLI's keyword).
+    pub fn parse(name: &str) -> Result<Format, crate::Error> {
+        match name {
+            "geojson" => Ok(Format::GeoJson),
+            "geoparquet" => Ok(Format::GeoParquet),
+            _ => Err(crate::error::options(format!("format must be 'geojson' or 'geoparquet', not {name:?}"))),
+        }
+    }
+}
+
 /// The file of the road table, next to the sources.
 pub const ROAD_TABLE: &str = "road_table.parquet";
 

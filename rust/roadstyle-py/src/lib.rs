@@ -185,11 +185,7 @@ struct Sources {
 }
 
 fn format(f: &str) -> PyResult<roadstyle::Format> {
-    match f {
-        "geojson" => Ok(roadstyle::Format::GeoJson),
-        "geoparquet" => Ok(roadstyle::Format::GeoParquet),
-        _ => Err(PyValueError::new_err(format!("format must be 'geojson' or 'geoparquet', not {f:?}"))),
-    }
+    roadstyle::Format::parse(f).map_err(py_err)
 }
 
 #[pymethods]
@@ -396,7 +392,7 @@ fn sidebar_defaults() -> String {
 /// columns [highway, oneway, tunnel, bridge, id].
 #[pyfunction]
 fn export_look(look: PyRef<'_, PyLook>, cols: [String; 5], positions: Vec<i64>) -> PyResult<String> {
-    let c = roadstyle::export_look::LookCols { highway: &cols[0], oneway: &cols[1], tunnel: &cols[2], bridge: &cols[3], id: &cols[4] };
+    let c = roadstyle::export_look::LookCols::from_slice(&cols);
     roadstyle::export_look::export_look(&look.0, &c, &positions).map(|v| v.to_string()).map_err(py_err)
 }
 

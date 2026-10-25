@@ -283,8 +283,7 @@ mod wasm {
     /// for another app's data layer (roadstyle's export_look) from a resolved look.
     #[wasm_bindgen(js_name = exportLook)]
     pub fn export_look(look: &JsLook, cols: Vec<String>, positions: Vec<i32>) -> Result<String, JsError> {
-        let c = |i: usize| cols.get(i).map(String::as_str).unwrap_or(["highway", "oneway", "tunnel", "bridge", "edge_id"][i]);
-        let lc = roadstyle::export_look::LookCols { highway: c(0), oneway: c(1), tunnel: c(2), bridge: c(3), id: c(4) };
+        let lc = roadstyle::export_look::LookCols::from_slice(&cols);
         let ps: Vec<i64> = positions.into_iter().map(i64::from).collect();
         roadstyle::export_look::export_look(&look.0, &lc, &ps).map(|v| v.to_string()).map_err(|e| JsError::new(&e.to_string()))
     }
@@ -333,11 +332,7 @@ mod wasm {
     }
 
     fn format(f: &str) -> Result<roadstyle::Format, JsError> {
-        match f {
-            "geojson" => Ok(roadstyle::Format::GeoJson),
-            "geoparquet" => Ok(roadstyle::Format::GeoParquet),
-            _ => Err(JsError::new(&format!("format must be 'geojson' or 'geoparquet', not {f:?}"))),
-        }
+        roadstyle::Format::parse(f).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// Stage 1 (docs/rust/architecture.md, "The three stages and the one call"): the style and its sources in memory.

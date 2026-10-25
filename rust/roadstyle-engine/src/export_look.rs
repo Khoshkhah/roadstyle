@@ -17,6 +17,14 @@ pub struct LookCols<'a> {
     pub id: &'a str,
 }
 
+impl<'a> LookCols<'a> {
+    /// The columns in the order [highway, oneway, tunnel, bridge, id]; a missing one has its default name.
+    pub fn from_slice(cols: &'a [String]) -> LookCols<'a> {
+        let c = |i: usize| cols.get(i).map_or(["highway", "oneway", "tunnel", "bridge", "edge_id"][i], String::as_str);
+        LookCols { highway: c(0), oneway: c(1), tunnel: c(2), bridge: c(3), id: c(4) }
+    }
+}
+
 /// The look of `look` (a resolved look: render's theme, config and road tables) for the positions `positions` (in order).
 pub fn export_look(look: &crate::Look, cols: &LookCols, positions: &[i64]) -> Result<Value, crate::Error> {
     let s = &look.sections;
