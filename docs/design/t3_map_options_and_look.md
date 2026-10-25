@@ -80,6 +80,11 @@ pub struct MapOptions {
 | `basemap`, `basemaps`, `api_key`, `basemap_switcher`, `sidebar`, `side_panel_html`, `host_panel_width`, `street_view`, `street_view_key`, `popup_mode`, `filter_control`, `views` | `PageOptions` (they are there already, R3) | page keys |
 | `resolved_basemaps`, `_export`, `_palette_copy`, `_read`, ... | nowhere in the core | host-private keys: the Python binding keeps them in Python |
 
+`filter_control` stays a page key (the coordinator's answer, 2026-10-25; R3 rule 5: the controls are the facts of the look, and the page's
+keywords stay in RS_OPTIONS). Whether the dashboard shows its filter panel is the page's choice. The facts of the filter (the classes, the
+access kinds, the modes) stay in `roadstyle:controls`, because they are the output of stage 1. Step 4 removes the read of the flag in
+`contract.rs` (the `on` of the filter entry); the dashboard reads `on` from RS_OPTIONS or from the host's options.
+
 The base map's look (`BaseMapLook`, from `look::Options.base_map`) gives `box_layout` and its `basemap` / `basemaps` to the page through
 `PageOptions` defaults, not through `MapOptions`.
 
@@ -124,7 +129,11 @@ of its keys is a field of a section (or a field of `RoadModel`), and the resolut
    JSON views; `v1_to_v2` of each golden look; a bad colour.
 3. **The look crate's own readers** (`RoadModel`, `RoadLook`, `SlotLook`, `DeckLook`, `basemap.rs`) read the sections.
 4. **N32 step 2 (roadstyle-rs)**: the engine's and the facade's readers move to `look.map.*` and the sections, file by file; at the end
-   `args`, `theme`, `config` and the JSON views go.
+   `args`, `theme`, `config` and the JSON views go. Notes from steps 1 to 3:
+   - `Look::other_args` has the keywords of `args` that are not map options. The facade checks them against the keys of `PageOptions`
+     and the host's keys: an unknown one is an error with the nearest key (`roadstyle_look::options::nearest`).
+   - `contract.rs` does not read `filter_control` (see above).
+   - The flat reader `MapOptions::from_args` stays while the engine reads looks of version 1.
 
 ## Answers (the coordinator, 2026-10-24)
 
