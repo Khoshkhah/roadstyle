@@ -14,8 +14,8 @@ matching the website: service / living_street / pedestrian / track / cycleway / 
 ``minzoom`` maps a road class to the zoom below which it is not drawn — the standard basemap
 behaviour (zoom out far enough and residential streets disappear, motorways stay). It is a
 **performance** knob as much as a cartographic one: at city scale most minor roads land on a
-sub-pixel of screen, and skipping them removes work you cannot see the result of. Opt-in — pass
-``minzoom=True`` to the web renderer to apply this table, or a dict to override parts of it.
+sub-pixel of screen, and skipping them removes work you cannot see the result of. The web renderer applies this table by default
+(since 2026-10-25); a dict overrides parts of it, and ``minzoom=False`` draws every class at every zoom.
 """
 from __future__ import annotations
 

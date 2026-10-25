@@ -312,6 +312,27 @@ def test_export_style(part, keywords, case, fmt, tmp_path):
             assert a == b, f
 
 
+def test_the_tile_rules_of_the_style(part, keywords, tmp_path, monkeypatch):
+    """casing.drop_below_px and minzoom=True (2026-10-25): both engines write the same filter clauses, and their tiles leave out the same
+    pieces (each reads the clauses from the style: tiles.zoom_rules, roadstyle-tiles rules.rs)."""
+    from compare_engines import diff, tile_diff
+
+    (tmp_path / "profiles").mkdir()
+    (tmp_path / "profiles" / "drop.yaml").write_text("casing: {drop_below_px: 1.0}\n")
+    monkeypatch.chdir(tmp_path)         # an own profile: ./profiles/<name>.yaml
+    kw = {k: v for k, v in keywords.items() if k not in ("basemap", "basemaps")}
+    py, ru = tmp_path / "python", tmp_path / "rust"
+    rs.export_style(part, py, base_url="http://x", engine="python", format="pmtiles", profile="drop", minzoom=True, **kw)
+    rs.export_style(part, ru, base_url="http://x", engine="rust", format="pmtiles", profile="drop", minzoom=True, **kw)
+    style = json.loads((py / "style.json").read_text())
+    assert diff(json.loads((ru / "style.json").read_text()), style) == []
+    road = next(lyr for lyr in style["layers"] if lyr["id"] == "roads-simple")
+    assert '"__rs_bridge"]]]], ["at"' in json.dumps(road["filter"])       # the casing clause
+    ta, tb = _archive((py / "roads.pmtiles").read_bytes()), _archive((ru / "roads.pmtiles").read_bytes())
+    for k in sorted(set(ta) | set(tb)):
+        assert tile_diff(tb.get(k, b""), ta.get(k, b"")) == [], k
+
+
 def _archive(data):
     """The tiles of a PMTiles archive, gunzipped, by (z, x, y)."""
     import gzip

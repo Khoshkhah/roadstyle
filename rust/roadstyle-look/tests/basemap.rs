@@ -79,6 +79,10 @@ fn the_64_looks_of_mapstyle() {
         for k in ["access_col", "modes", "box_layout"] {
             got["args"].as_object_mut().unwrap().shift_remove(k);
         }
+        // added on 2026-10-25: the profile's casing.drop_below_px (0 = always a casing), after mapstyle's look
+        if let Some(c) = got.pointer_mut("/theme/casing").and_then(Value::as_object_mut) {
+            c.shift_remove("drop_below_px");
+        }
         let mut out = Vec::new();
         first_differences(&canon(&got), &canon(&Value::Object(want)), choice, &mut out);
         bad.extend(out);

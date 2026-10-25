@@ -70,14 +70,19 @@ def test_a_road_is_picked_on_a_page_with_the_contract(tmp_path):
         browser.close()
 
 
-def test_a_road_is_picked_on_a_host_page_with_no_contract(tmp_path):
+@pytest.mark.parametrize("old", [False, True], ids=["pick", "no pick"])
+def test_a_road_is_picked_on_a_host_page_with_no_contract(tmp_path, old):
+    """A style with no interaction contract has its pick layers (R7, 2026-10-25: contract::describe for every style); a style made
+    before that has none, and the dashboard finds the road layer itself."""
     from roadstyle import _engine
     if not _engine.available():
         pytest.skip("no roadstyle._rust")
     g = _roads()
     style = json.loads(_engine.rust().make_style(_engine._arrow(g), _engine._look_of({}), None, None, "roads"))
     style["layers"] = [lyr for lyr in style["layers"] if lyr["type"] != "symbol"]    # the arrows and names need a sprite and glyphs
-    assert not (style.get("metadata") or {}).get("roadstyle:controls", {}).get("pick"), "the style has no pick: the case of this test"
+    assert style["metadata"]["roadstyle:controls"]["pick"] == ["roads-simple"]
+    if old:
+        del style["metadata"]["roadstyle:controls"]["pick"]
     (tmp_path / "style.json").write_text(json.dumps(style))
     (tmp_path / "host.html").write_text(HOST.replace("BOUNDS", json.dumps([list(g.total_bounds[:2]), list(g.total_bounds[2:])])))
 

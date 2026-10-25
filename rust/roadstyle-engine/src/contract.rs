@@ -102,18 +102,19 @@ pub fn roles(layers: &[Value]) -> Value {
     Value::Object(out)
 }
 
-/// The one writer of what the dashboard reads about a style's layers (audit N7): `roadstyle:sources` (`roles`), `roadstyle:arrows`
-/// (`arrow_kind`) and the controls' `pick` (`pick_layers`) from its final layers, in a style with the interaction contract. Stage 2
-/// calls it again on the tiled style.
+/// The one writer of what the dashboard reads about a style's layers (audit N7): `roadstyle:sources` (`roles`) and the controls' `pick`
+/// (`pick_layers`) from its final layers, in every style, and `roadstyle:arrows` (`arrow_kind`) in a style with the interaction contract.
+/// Stage 2 calls it again on the tiled style.
 pub fn describe(style: &mut Value) {
-    if style["metadata"]["roadstyle:contract"].is_null() {
-        return;
-    }
     let layers = style["layers"].as_array().cloned().unwrap_or_default();
+    // every style (R7): the road roles and the pick layers, for a host's dashboard with or without the contract
     style["metadata"]["roadstyle:sources"] = roles(&layers);
-    style["metadata"]["roadstyle:arrows"] = arrow_kind(&layers);
-    if style["metadata"]["roadstyle:controls"].is_object() {
-        style["metadata"]["roadstyle:controls"]["pick"] = pick_layers(&layers);
+    if !style["metadata"]["roadstyle:controls"].is_object() {
+        style["metadata"]["roadstyle:controls"] = json!({});
+    }
+    style["metadata"]["roadstyle:controls"]["pick"] = pick_layers(&layers);
+    if !style["metadata"]["roadstyle:contract"].is_null() {
+        style["metadata"]["roadstyle:arrows"] = arrow_kind(&layers);
     }
 }
 
