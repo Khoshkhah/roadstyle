@@ -55,6 +55,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `docs/design/dashboard_module.md`, "Trusted inputs".
 
 ### Fixed
+- **A road is picked again on a page whose style has no interaction contract** (a host's `makeStyle`, the duckosm-rust page, the
+  level editor). Since R7 the dashboard picked a road only on the layers of the option `pick`, which only a style with the contract
+  has: on the other pages no road had a hover, a tooltip or a click (`rs:select`), and Street View waited for a click. With no `pick`,
+  the dashboard picks on the road layer of simple mode again. A test moves and clicks the real mouse on both kinds of page.
 - **Two readings of a duckOSM file at the same time on one connection no longer break each other** (the duckosm-rust page: "Table with
   name e does not exist!"). The reader's temporary tables have the run's own names (`duckosmPlan`'s optional `run`, returned in
   `"run"`; each base-map layer's `"table"`; `"drop"` drops them), and `duckosmFeaturesSelect(specs, run)` takes the run. `roads_sql.js`,
