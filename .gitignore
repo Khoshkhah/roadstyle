@@ -40,3 +40,6 @@ examples/dashboard_rust/pkg/
 src/roadstyle/_rust*.so
 src/roadstyle/_rust*.pyd
 
+# the build folder that the worktrees share (docs/rust/build.md, "One shared build folder")
+/.shared-target/
+
