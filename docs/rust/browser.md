@@ -273,7 +273,11 @@ its listeners, its roads, tiles and images, and puts your roads, your road table
 the store. A store is `{load(name, bytes), save(name, data)}`: `browserStore(key)` keeps the files
 in this browser, `httpStore(base)` uses `roadstyle serve`. After each solve the editor sends the event `"solved"` with `levelsCsv`
 (one row for each edge: its four drawing numbers, its head lengths and its caps), `levelsInfo` and `draw()` (a Promise of the map's
-table, GeoParquet). `editor.roads` is the area's roads, as the panel shows them. `editor.download(name)` downloads edits.csv, heads.csv, caps.csv or levels.csv as they are now. The panel follows the
+table, GeoParquet). `editor.roads` is the area's roads, as the panel shows them. On a phone the panel is a sheet at the bottom of the map:
+`layout` is `"auto"` (a sheet up to 700 px wide, the dashboard panel's width; a column at the right above it), `"sheet"` or `"side"`. The
+sheet's handle folds it to one row and opens it full, a tap on a road picks it, the targets are 44 px, the sheet goes up above the phone's
+keyboard, and it folds when a Street View or Google 3D window opens at the bottom. Give your page `<meta name="viewport"
+content="width=device-width">`, so that a phone lays it out at its own width. `editor.download(name)` downloads edits.csv, heads.csv, caps.csv or levels.csv as they are now. The panel follows the
 page's theme: dark when the system is dark, unless the page sets `data-theme="light"` or `"dark"` on `<html>`. The module needs these
 files of `static/` beside it: `dashboard/` with its subfolders, `level_editor.html` (the panel), `dashboard.css` and `popup.css`.
 

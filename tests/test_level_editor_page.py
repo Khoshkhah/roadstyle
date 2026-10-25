@@ -26,7 +26,7 @@ def test_the_panels_colour_variables_have_values():
 
     text = (STATIC / "level_editor.html").read_text()
     defined = dict(re.findall(r"--(lv-[a-z0-9-]+):([^;}]*)", text))
-    used = set(re.findall(r"var\(--(lv-[a-z0-9-]+)", text))
+    used = set(re.findall(r"var\(--(lv-[a-z0-9-]+)\)", text))      # with no fallback (var(--lv-kb,0px): the module sets it)
     assert used <= set(defined), used - set(defined)
     assert not [k for k, v in re.findall(r"--(lv-[a-z0-9-]+):([^;}]*)", text) if f"var(--{k})" in v]
 
@@ -57,7 +57,7 @@ console.log(JSON.stringify([a.roadCount, a.pairCount]));"""
         assert (tmp_path / f).read_bytes() == (folder / f).read_bytes(), f
 
 
-PAGE = """<!DOCTYPE html><html><head><meta charset="utf-8">
+PAGE = """<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="/vendor/maplibre-gl.js"></script><link rel="stylesheet" href="/vendor/maplibre-gl.css">
 <link rel="stylesheet" href="/dashboard/dashboard.css"><link rel="stylesheet" href="/popup.css">
 <style>html,body{margin:0;height:100%}#map{position:absolute;inset:0}</style></head><body><div id="map"></div><div id="panel"></div>
@@ -241,3 +241,57 @@ def test_the_level_edges_query_gives_duckosms_load_roads():
             assert all(bytes(a) == b.wkb for a, b in zip(got[c], want.geometry, strict=True))
         else:
             assert [norm(v) for v in got[c]] == [norm(v) for v in want[c]], c
+
+
+@needs_pkg
+def test_the_editor_on_a_phone(tmp_path):
+    """The editor on a phone (390 x 844, device scale 3, touch): the panel is a sheet at the bottom (layout "auto" up to 700 px wide), a tap
+    on a road picks it (the wide tap line), a head's change is solved, the handle folds and opens the sheet, and a dashboard window at the
+    bottom (Street View, Google 3D) folds it."""
+    pw = pytest.importorskip("playwright.sync_api")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        with pw.sync_playwright() as p:
+            b = p.chromium.launch()
+            ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=3, is_mobile=True, has_touch=True)
+            page = ctx.new_page()
+            errors = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.goto(f"http://127.0.0.1:{server.server_address[1]}/test.html")
+            page.wait_for_function("window.ready && !!document.getElementById('lv')", timeout=60000)
+            assert page.evaluate("document.body.classList.contains('lv-sheet') && document.body.dataset.lvSheet") == "half"
+            top = page.evaluate("document.getElementById('lv').getBoundingClientRect().top")
+            assert 380 < top < 470, top                                           # half the height: the map keeps the top
+            page.wait_for_timeout(1500)                                           # the tiles of the editor's roads
+            # a road under the map's free part, and a tap on it
+            xy = page.evaluate(f"""() => {{ const m = window.hostMap;
+              for(const f of m.queryRenderedFeatures({{layers: ['host-lv-tap']}})){{
+                const c = f.geometry.coordinates, pt = m.project(c[Math.floor(c.length / 2)]);
+                if(pt.x > 40 && pt.x < 350 && pt.y > 120 && pt.y < {top} - 40) return [pt.x, pt.y, f.properties.road]; }} return null; }}""")
+            assert xy, "a road above the sheet"
+            page.touchscreen.tap(xy[0], xy[1])
+            page.wait_for_function("document.querySelectorAll('#lv-cards [data-hroad]').length > 0", timeout=20000)
+            # an end: the start head to 3 m by its slider, then Apply: solved again
+            page.evaluate("""() => { const i = document.querySelector('#lv-cards input[data-hend=start]'); i.value = '3';
+              i.dispatchEvent(new Event('input', {bubbles: true})); i.dispatchEvent(new Event('change', {bubbles: true})); }""")
+            page.locator("#lv-apply").tap()
+            page.wait_for_function("document.getElementById('lv-toast').textContent.startsWith('Applied')", timeout=60000)
+            assert "re-solved" in page.inner_text("#lv-toast") or "solved the whole area" in page.inner_text("#lv-toast")
+            # 44 px targets
+            for sel in ("#lv .tabs button", "#lv-cards .seg button", "#lv .find input"):
+                assert page.evaluate(f"document.querySelector('{sel}').getBoundingClientRect().height") >= 44, sel
+            page.screenshot(path=str(tmp_path / "phone.png"))
+            # the handle: half -> full -> fold -> half
+            for want in ("full", "fold", "half"):
+                page.locator("#lv-handle").tap()
+                assert page.evaluate("document.body.dataset.lvSheet") == want
+            page.wait_for_timeout(300)
+            assert page.evaluate("document.getElementById('lv').getBoundingClientRect().top") == pytest.approx(top, abs=2)
+            # a dashboard window at the bottom: the sheet folds
+            page.evaluate("const w = document.createElement('div'); w.className = 'rs-svw'; document.body.appendChild(w);")
+            page.wait_for_function("document.body.dataset.lvSheet === 'fold'", timeout=5000)
+            assert not errors, errors
+            b.close()
+    finally:
+        server.shutdown()

@@ -116,9 +116,30 @@ body.lv-open #lv-busy{right:var(--lv-w)}
 #lv-toast{position:absolute;left:16px;right:16px;bottom:14px;padding:9px 12px;border-radius:8px;font-size:12.5px;color:var(--lv-card);background:var(--lv-ink);
   box-shadow:0 4px 14px rgba(0,0,0,.18);opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;user-select:text}
 #lv-toast.show{opacity:1;transform:none} #lv-toast.bad{background:var(--lv-bad);pointer-events:auto;cursor:pointer}
+/* the phone's layout (the module's layout "sheet", or "auto" up to 700 px wide, the dashboard panel's width): a sheet at the bottom of the
+   map, folded to one row, half the height or full, with a handle; 44 px touch targets */
+#lv-handle{display:none}
+body.lv-sheet{--lv-sheet-h:50vh}
+body.lv-sheet[data-lv-sheet=fold]{--lv-sheet-h:96px} body.lv-sheet[data-lv-sheet=full]{--lv-sheet-h:calc(100% - 48px)}
+body.lv-sheet #lv{top:auto;left:0;right:0;width:auto;height:var(--lv-sheet-h);bottom:var(--lv-kb,0px);border-left:none;border-top:1px solid var(--lv-line);
+  border-radius:14px 14px 0 0;box-shadow:0 -4px 18px rgba(0,0,0,.14);transform:none;transition:height .2s ease}
+body.lv-sheet #map,body.lv-sheet.lv-open #map{right:0}
+body.lv-sheet #lv-toggle{display:none}
+body.lv-sheet #lv-busy{right:0;bottom:var(--lv-sheet-h)}
+body.lv-sheet #lv-handle{display:flex;align-items:center;justify-content:center;flex:none;width:100%;height:24px;border:none;padding:0;
+  background:var(--lv-card);border-radius:14px 14px 0 0;cursor:pointer;touch-action:none}
+body.lv-sheet #lv-handle::before{content:"";width:44px;height:5px;border-radius:3px;background:var(--lv-line2)}
+body.lv-sheet #lv header{padding:4px 14px 10px}
+body.lv-sheet[data-lv-sheet=fold] #lv header .stats,body.lv-sheet[data-lv-sheet=fold] #lv header .find,body.lv-sheet[data-lv-sheet=fold] #lv header .modes{display:none}
+body.lv-sheet #lv .tabs button,body.lv-sheet #lv .seg button,body.lv-sheet #lv .act,body.lv-sheet #lv .go,body.lv-sheet #lv .row{min-height:44px}
+body.lv-sheet #lv .find input{min-height:44px;font-size:16px}                /* 16 px: the phone does not zoom on focus */
+body.lv-sheet #lv input[type=range]{height:44px}
+body.lv-sheet #lv input[type=range]::-webkit-slider-thumb{width:28px;height:28px}
+body.lv-sheet #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
 </style>
 <aside id="lv">
   <button id="lv-toggle" title="Hide the panel">›</button>
+  <button id="lv-handle" title="Fold or open the panel" aria-label="Fold or open the panel"></button>
   <header><div class="t">Level editor</div><div class="area" id="lv-area"></div><div class="stats" id="lv-stats"></div>
     <div class="find"><input id="lv-find" type="search" placeholder="Find a road: edge id or edge_ref" autocomplete="off"><div id="lv-hits" hidden></div></div>
     <div class="modes" id="lv-modes" hidden title="Show only the roads of these modes (display only: every road is still solved)"></div></header>

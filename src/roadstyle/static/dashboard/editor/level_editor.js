@@ -76,7 +76,8 @@ const toCsv = (rows, cols = COLS) => cols.join(",") + "\n" + rows.map(r => cols.
  * EventTarget (event "solved") with `map`, `area` (the LevelArea), `download(name)` (edits.csv, heads.csv, caps.csv or levels.csv as they
  * are now), `files` (those names) and `answer()` (the last answer of the solver). */
 export async function levelEditor({map = null, container = document.body, pkgUrl, store, maplibregl: ml = globalThis.maplibregl, dashboard = null,
-                                   prefix = dashboard ? null : "lv-rs-"}){
+                                   prefix = dashboard ? null : "lv-rs-", layout = "auto"}){
+if(!["auto", "sheet", "side"].includes(layout)) throw new Error(`level editor: layout must be "auto", "sheet" or "side", not ${JSON.stringify(layout)}`);
 if(map && !dashboard && window.rs)
   throw new Error("level editor: this page has a dashboard (window.rs): give it as levelEditor({dashboard, prefix}), so that the editor uses it; a second dashboard takes the first one's state");
 if(dashboard && !prefix)
@@ -217,6 +218,10 @@ async function showRoads(st){                                      // the roads 
     const layer = JSON.parse(JSON.stringify(l).replaceAll('"oneway"', `"${P}oneway"`));
     map.addLayer({...layer, id: P + l.id, source: P + l.source}, map.getLayer("lv-ends") ? "lv-ends" : undefined);   // under the panel's end marks
   }
+  // the taps of a finger: a wide line on the roads that draws nothing (the sheet's layout picks a road with it)
+  map.addLayer({id: P + "lv-tap", type: "line", source: P + "lv-roads", "source-layer": "simple", paint: {"line-width": 28, "line-opacity": 0}},
+    map.getLayer("lv-ends") ? "lv-ends" : undefined);
+  mine.layers.push(P + "lv-tap");
   rs.setStyle(st);
 }
 // the style loaded: a host map's load event can be over, and isStyleLoaded false a moment while it loads an image, with no event after
@@ -365,6 +370,42 @@ try {
     container.appendChild(node);                                 // a script runs here, at once
   }
 } finally { [document.addEventListener, map.on] = [docOn, mapOn]; }
+
+// --- the phone's layout: a sheet at the bottom of the map (layout "sheet", or "auto" up to 700 px wide: the dashboard panel's width)
+const narrow = matchMedia("(max-width: 700px)"), body = document.body, root = document.documentElement;
+const sheetOn = () => layout === "sheet" || (layout === "auto" && narrow.matches);
+function sheet(state){                                           // "fold" (one row), "half" or "full"; the map's camera keeps the top
+  body.dataset.lvSheet = state;
+  setTimeout(() => sheetOn() && map.setPadding({...map.getPadding(), bottom: document.getElementById("lv").getBoundingClientRect().height}), 220);
+}
+function useLayout(){
+  const on = sheetOn();
+  body.classList.toggle("lv-sheet", on);
+  if(on) sheet(body.dataset.lvSheet || "half");
+  else { delete body.dataset.lvSheet; map.setPadding({...map.getPadding(), bottom: 0}); }
+  setTimeout(() => map.resize(), 220);
+}
+const NEXT = {half: "full", full: "fold", fold: "half"};
+const handle = document.getElementById("lv-handle");
+handle.onclick = () => sheet(NEXT[body.dataset.lvSheet] || "half");
+// the phone's keyboard: the sheet goes up above it (the visual viewport is the part of the page the keyboard leaves)
+const keyboard = () => root.style.setProperty("--lv-kb", `${Math.max(0, innerHeight - visualViewport.height - visualViewport.offsetTop)}px`);
+// a Street View or Google 3D window at the bottom (the dashboard's, up to 520 px wide): the sheet folds to its one row
+const windows = new MutationObserver(() => {
+  if(sheetOn() && innerWidth <= 520 && [...document.querySelectorAll(".rs-svw")].some(w => !w.hidden)) sheet("fold");
+});
+windows.observe(body, {subtree: true, childList: true, attributes: true, attributeFilter: ["hidden"]});
+// a tap on a road: the wide tap line, when the dashboard's own road layers have nothing under the finger
+const roadLayers = () => map.getStyle().layers.map(l => l.id).filter(id => id.startsWith(P + "roads-"));
+function tap(e){
+  if(!sheetOn() || map.queryRenderedFeatures(e.point, {layers: roadLayers()}).length) return;
+  const f = map.queryRenderedFeatures(e.point, {layers: [P + "lv-tap"]})[0];
+  if(f) document.dispatchEvent(new CustomEvent("rs:select", {detail: {properties: f.properties}}));
+}
+narrow.addEventListener("change", useLayout);
+visualViewport?.addEventListener("resize", keyboard);
+map.on("click", tap);
+useLayout();
 // the files of the area as the page has them now, to download (a page with no server keeps them in the browser)
 const files = {"edits.csv": async () => editsText, "heads.csv": async () => headsText, "caps.csv": async () => capsText,
   "levels.csv": async () => (await call({type: "levelsCsv", levels: flat(res), heads: headsText, caps: capsText})).csv};
@@ -380,6 +421,14 @@ async function download(name){
  * files stay in the store. A map of its own is removed. */
 function destroy(){
   worker.terminate();
+  narrow.removeEventListener("change", useLayout);
+  visualViewport?.removeEventListener("resize", keyboard);
+  windows.disconnect();
+  map.off("click", tap);
+  if(!own) map.setPadding({...map.getPadding(), bottom: 0});
+  body.classList.remove("lv-sheet");
+  delete body.dataset.lvSheet;
+  root.style.removeProperty("--lv-kb");
   heard.forEach(off => off());
   nodes.forEach(n => n.remove());
   document.body.classList.remove("lv-open");
