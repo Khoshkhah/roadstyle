@@ -12,7 +12,7 @@
     },
     "tiles": {
       "minzoom": 6,
-      "maxzoom": 15,
+      "maxzoom": 18,
       "extent": 4096,
       "buffer_px": 80
     }

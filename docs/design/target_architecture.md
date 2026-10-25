@@ -562,6 +562,7 @@ requests).
 | The road table | one file for each region, sorted by key, with an index file ((b)) | chunks by tile at the key zoom; the dashboard loads the chunks in view |
 | Memory | stage 1 per region, stage 2 per box, no whole-planet API ((j)) | the parallel tile walk on many machines |
 | The look | one resolved look with its hash in each archive's metadata ((d)) | a check that every regional archive has the same look hash |
+| The last zoom | `tiles.maxzoom` 18 for regional pages (2026-10-25): the map scales the last zoom's tiles up, and the casing pieces' cut points round to the last zoom's grid; at maxzoom 15 the error at zoom 22 is 4–5 px, at 18 about 1 px (99 % of the vertices within 1.7 px). A 5 cm round end stub is in the tiles from zoom 16 at 58° N (17 at the equator) | a planet build (T7) chooses its own last zoom with this known error |
 
 **Border tiles.** A tile on a region border has roads of two regions. Two ways: (1) make the border tiles from the files of both
 regions (stage 2 with two directories); (2) decode the two tiles and merge their layers. Way 1 is simpler and uses code that exists.

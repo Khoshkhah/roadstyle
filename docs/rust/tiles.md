@@ -3,7 +3,7 @@
 <p class="lead">Make the roads as vector tiles with the Rust engine, and get them to the browser in one of three ways: in one
 HTML file, on a server, or made in the browser.</p>
 
-The Rust engine makes the tiles with the rules of the Python engine (`tiles.py`): one vector source `roads`, zooms 6 to 15, a
+The Rust engine makes the tiles with the rules of the Python engine (`tiles.py`): one vector source `roads`, zooms 6 to 18, a
 buffer of 80 units, and simplified lines below the last zoom. The tiles have the same features as the tiles of the Python
 engine. The bytes can differ: a number can be an integer in one engine and a float in the other.
 

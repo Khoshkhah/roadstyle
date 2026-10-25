@@ -3072,7 +3072,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         except ImportError as err:                     # pragma: no cover
             raise ImportError(
                 'tiles=True needs the tiles extra: pip install "roadstyle[tiles]"') from err
-        tc = {"minzoom": 6, "maxzoom": 15, "extent": 4096, "buffer_px": 80,
+        tc = {"minzoom": 6, "maxzoom": 18, "extent": 4096, "buffer_px": 80,      # maxzoom: config.py's tiles (the casing at zoom 22)
               **(CONFIG.tiles or {})}
         # the archive itself is built later, once the annotation slots exist (they ride along
         # as a second tile layer); the source just points at the embedded pmtiles:// protocol

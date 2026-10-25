@@ -558,7 +558,8 @@ def test_the_pmtiles_writer_is_the_pmtiles_packages(part, keywords):
     buf = io.BytesIO()
     w = Writer(buf)
     (mx0, my0), (mx1, my1) = _merc(*b[:2]), _merc(*b[2:])
-    for z in range(6, 16):
+    h = Reader(MemorySource(ru)).header()          # the look's zooms (tiles.maxzoom: 18 since 2026-10-25)
+    for z in range(h["min_zoom"], h["max_zoom"] + 1):
         x0, x1, y0, y1 = _tile_range((mx0, my0, mx1, my1), z)
         for x in range(x0, x1 + 1):
             for y in range(y0, y1 + 1):
@@ -566,7 +567,7 @@ def test_the_pmtiles_writer_is_the_pmtiles_packages(part, keywords):
                     w.write_tile(zxy_to_tileid(z, x, y), gzip.compress(d, 6, mtime=0))
     e7 = [int(v * 1e7) for v in b]
     w.finalize({"tile_type": TileType.MVT, "tile_compression": Compression.GZIP, "min_lon_e7": e7[0], "min_lat_e7": e7[1], "max_lon_e7": e7[2],
-                "max_lat_e7": e7[3], "center_zoom": 10, "center_lon_e7": (e7[0] + e7[2]) // 2, "center_lat_e7": (e7[1] + e7[3]) // 2},
+                "max_lat_e7": e7[3], "center_zoom": (h["min_zoom"] + h["max_zoom"]) // 2, "center_lon_e7": (e7[0] + e7[2]) // 2, "center_lat_e7": (e7[1] + e7[3]) // 2},
                {"vector_layers": [{"id": n, "fields": {}} for n in ("roads", "simple", "slots")]})
     py = buf.getvalue()
     head = lambda a: {k: v for k, v in Reader(MemorySource(a)).header().items() if "offset" not in k and "length" not in k}    # noqa: E731
