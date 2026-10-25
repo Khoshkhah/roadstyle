@@ -272,3 +272,22 @@ def test_the_buildings_3d_button_shows_and_hides_them(tmp_path):
         pg.click("#rs-b3d-btn")
         assert shown() == ["none"] * len(ids)
         browser.close()
+
+
+def test_a_building_tag_of_two_digits_gives_its_height(tmp_path):
+    """Bug (E): a tag of the map `tags` is read with map_extract(tags, k)[1]. With tags[k][1], DuckDB 1.5 (and duckdb-wasm) give the
+    first character: building:levels '25' was '2', so 7.32 m, not 25 x 3.66 = 91.5 m. Through the reader's SQL and the engine."""
+    import duckdb
+
+    from roadstyle import duckosm
+
+    db = _tiny(tmp_path / "b.duckdb")
+    con = duckdb.connect(str(db))
+    con.execute("CREATE TABLE features.buildings (osm_id BIGINT, kind VARCHAR, name VARCHAR, tags MAP(VARCHAR, VARCHAR), geom GEOMETRY)")
+    con.execute("INSERT INTO features.buildings VALUES (7, 'building', '', MAP {'building:levels': '25'}, "
+                "'POLYGON((7.400 43.730, 7.401 43.730, 7.401 43.731, 7.400 43.731, 7.400 43.730))'::GEOMETRY)")
+    con.close()
+    _, features, _ = duckosm.read(db, "driving", levels="tags", layers=["buildings"])
+    assert features.column("levels").to_pylist() == ["25"]
+    html = duckosm.page(db, "driving", levels="tags", layers=["buildings"]).html
+    assert '"height":91.5' in html.replace(" ", ""), "the building's height in the page's base map"

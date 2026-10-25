@@ -8,6 +8,7 @@ license.workspace = true
 description = "roadstyle's road model: the roads as features with typed properties, and the geometry helpers"
 
 [dependencies]
+roadstyle-levels.workspace = true    # the road flags' rule (flags.rs re-exports it; N26: the levels are a leaf)
 serde.workspace = true
 serde_json.workspace = true
 arrow-array.workspace = true

@@ -1,0 +1,30 @@
+{
+  "roads": 694,
+  "pairs": 2185,
+  "columns": [
+    "road",
+    "edges",
+    "reversed",
+    "band",
+    "priority",
+    "highway",
+    "name",
+    "edge_ref",
+    "lanes",
+    "tunnel",
+    "bridge",
+    "layer",
+    "edges_lanes",
+    "reversed_lanes",
+    "edge_refs",
+    "reversed_refs",
+    "edges_oneway",
+    "reversed_oneway",
+    "edges_driving",
+    "reversed_driving",
+    "edges_directed",
+    "reversed_directed"
+  ],
+  "roads_hash": "8a25d070e5722f39",
+  "pairs_hash": "06dac0b9db8822da"
+}
