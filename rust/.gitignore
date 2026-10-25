@@ -1,4 +1,5 @@
-target/
+# target/ or a link to the shared build folder (docs/rust/build.md, "One shared build folder")
+/target
 # tests/get_goldens.sh gets these from the pre-release rust-test-data
 roadstyle-rs/tests/data/tartu/*
 !roadstyle-rs/tests/data/tartu/rust_*.json
