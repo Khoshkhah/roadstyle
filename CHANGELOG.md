@@ -7,6 +7,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **The dashboard reads the interaction contract's version** (`roadstyle:contract`; docs/design/contract_schema.md, step 4). A style of
+  a newer version than the dashboard knows (`CONTRACT` in `core.js`, `rs.contract`) is an error on the console and in `rs.error`, and
+  the dashboard adds no road interaction for it, not a wrong map with no message. A style with `roadstyle:*` keys and no version is read
+  as version 1, with a note. `rs.contract` takes the same constant.
 - **`Look.withArg(key, value)` in the WebAssembly package**: the same look with one keyword changed, as the Python binding's
   `Look.with_arg`. The examples in `examples/dashboard_rust/` use it and no longer read or change a look's JSON fields (`args`,
   `theme`): a look's JSON is a format to save and load, not an API (docs/rust/browser.md). With `state: "live"`, the dashboard takes

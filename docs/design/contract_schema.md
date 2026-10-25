@@ -1,7 +1,9 @@
 # The dashboard contract as types and a schema (T4 plan)
 
-Date: 2026-10-25. Status: approved, a plan for phase T4 of the target architecture (`target_architecture.md`, (h)). It has no code. It starts
-after T3's `Mark` (N30), because the contract's property names come from `Mark`.
+Date: 2026-10-25. Status: approved, a plan for phase T4 of the target architecture (`target_architecture.md`, (h)). Step 4 (the version
+error, the JS part) is done; steps 1 to 3 start after T3's `Mark` (N30), because the contract's property names come from `Mark`.
+Step 4 as built: a page's own style has no metadata (the page gives the options in `RS_OPTIONS`), so it gets no note; only a style
+with `roadstyle:*` keys and no version gets the note.
 
 ## The problem
 
