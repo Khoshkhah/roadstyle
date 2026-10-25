@@ -13,7 +13,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   tables. `Look::to_json` writes version 2 (`LookFile`); `Look::from_json` reads versions 2, 1 and 0. The readers that have not moved
   read the JSON views of version 1 (`Look::views_value`), which are the same, byte for byte, for every golden look: a number keeps its
   written form (`Num`) and a colour its text (`Color`). A bad colour or an unknown key of a section is an error that names it.
-  `rust/roadstyle-look/look.schema.json` is the JSON Schema of version 2, made from the types (a test fails when it differs).
+  `rust/roadstyle-look/look.schema.json` is the JSON Schema of version 2, made from the types with the feature `schema` (a test fails
+  when it differs). **No API key goes into a look**: the keywords `api_key` and `street_view_key` and the settings' `config.api_key`
+  and `config.api_keys` are removed when a look is made or read, because a look is saved and published; the caller gives the keys to
+  the page (`given`).
   **A host that reads the JSON of a look** (`json()` in Python, `toJson()` in JavaScript) gets version 2: its parts are now the
   sections (`part("theme")`, `part("config")` still give the views).
 - **`roadstyle_look::MapOptions`, the typed map options (T3 step 1, audit N32).** The keys that change the output of stage 1, in groups

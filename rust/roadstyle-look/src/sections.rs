@@ -6,13 +6,14 @@
 //! version 1 (`LookData`), which `views` makes from the sections. A number keeps its written form (`Num`: 15 stays 15, 2.0 stays 2.0)
 //! and a colour its text (`Color`), so a look of version 1 that goes to version 2 and back gives the same views, byte for byte.
 //!
+//! `look.schema.json` is made from these types with the feature `schema` (schemars; its tests turn it on).
+//!
 //! The big tables (the class tables, the zoom tables, the palettes, the base map's layers) stay JSON mappings here: the readers of step 3
 //! type them.
 
 use crate::color::Color;
 use crate::{Error, LookData};
 use indexmap::IndexMap;
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
@@ -34,7 +35,8 @@ impl From<f64> for Num {
     }
 }
 
-impl JsonSchema for Num {
+#[cfg(feature = "schema")]
+impl schemars::JsonSchema for Num {
     fn schema_name() -> std::borrow::Cow<'static, str> {
         "Num".into()
     }
@@ -46,7 +48,8 @@ impl JsonSchema for Num {
 type Table = Map<String, Value>;
 
 /// The sections of a look: the profile and the palette merged, the settings over them, with the values of the resolution.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Sections {
     pub roads: RoadsLook,
@@ -64,7 +67,7 @@ pub struct Sections {
     pub access: IndexMap<String, Color>,
     pub camera: CameraLook,
     pub tiles: TileLook,
-    /// the page's defaults of the settings: the base map and the providers' keys
+    /// the page's defaults of the settings: the base map (never a key: a look is saved and published)
     pub page: PageLook,
     /// every palette that the look can name (a view's palette), by its name
     pub palettes: Table,
@@ -77,7 +80,8 @@ pub struct Sections {
     pub base_map: Option<BaseMapLook>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct RoadsLook {
     /// each class: group, order, minzoom, width, casing_width, dash, no_casing, single_line, minor
@@ -107,7 +111,8 @@ pub struct RoadsLook {
     pub head_m: f64,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Links {
     pub classes: Vec<String>,
@@ -115,7 +120,8 @@ pub struct Links {
     pub width: Num,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Split {
     pub offset_frac: Num,
@@ -124,7 +130,8 @@ pub struct Split {
     pub ramp_zooms: Num,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CasingLook {
     pub extra: Num,
@@ -138,7 +145,8 @@ pub struct CasingLook {
     pub drop_below_px: Option<Num>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct LabelLook {
     pub halo_width: Num,
@@ -164,7 +172,8 @@ pub struct LabelLook {
     pub slot_m: Num,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ArrowLook {
     pub minzoom: Num,
@@ -182,7 +191,8 @@ pub struct ArrowLook {
     pub image: Value,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct BridgeLook {
     pub cap: String,
@@ -196,7 +206,8 @@ pub struct BridgeLook {
     pub casing_color: Color,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Shadow {
     pub show: bool,
@@ -207,7 +218,8 @@ pub struct Shadow {
     pub color: Color,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Decks {
     pub base_m: Num,
@@ -222,7 +234,8 @@ pub struct Decks {
     pub opacity: Num,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct TunnelLook {
     pub opacity_scale: Num,
@@ -243,7 +256,8 @@ pub struct TunnelLook {
     pub to: Table,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct SelectionLook {
     /// folium's highlight (goes with folium, P7)
@@ -257,7 +271,8 @@ pub struct SelectionLook {
     pub folium_hover: Color,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct DataLook {
     pub width: Num,
@@ -268,7 +283,8 @@ pub struct DataLook {
     pub casing_opacity: Num,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct OverlayLook {
     pub radius: Num,
@@ -290,7 +306,8 @@ pub struct OverlayLook {
     pub styles: Option<Table>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct BoundaryLook {
     pub width: Num,
@@ -299,14 +316,16 @@ pub struct BoundaryLook {
     pub opacity: Num,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct BackgroundLook {
     pub light: Color,
     pub dark: Color,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CameraLook {
     pub pitch: Num,
@@ -315,7 +334,8 @@ pub struct CameraLook {
     pub max_pitch: Num,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct TileLook {
     pub minzoom: Num,
@@ -324,24 +344,24 @@ pub struct TileLook {
     pub buffer_px: Num,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PageLook {
-    /// the base map's key
+    /// the base map's name
     pub basemap: String,
-    pub api_key: Option<String>,
-    /// a key for each provider
-    pub api_keys: Table,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ActiveLook {
     pub profile: String,
     pub palette: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct InteractionLook {
     pub popup: Vec<String>,
@@ -349,7 +369,8 @@ pub struct InteractionLook {
 }
 
 /// mapstyle's base-map part: the layers of layers.yaml, the 3D buildings, the base map's style and its images.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct BaseMapLook {
     pub layers_yaml: Value,
@@ -358,9 +379,13 @@ pub struct BaseMapLook {
     pub images: Value,
 }
 
-/// A look as it is written, version 2: the typed sections, with the map options as render_edges' keywords (`args`, until N32 step 2).
-/// An unknown key is an error of `Sections` (serde's `deny_unknown_fields` does not go with `flatten`).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+/// A look as it is written, version 2: the typed sections, with the map options as render_edges' keywords (`args`, until N32 step 2). Its
+/// JSON is one mapping: these four keys and the sections' keys.
+// Read and written by hand, not with serde's `flatten`: `flatten` reads the sections a second time through serde's buffer, which put a
+// second reader of each section into the binary (113 KB of the wasm package for `Sections` alone), and it does not go with
+// `deny_unknown_fields`.
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct LookFile {
     /// 2
     pub schema_version: u32,
@@ -370,8 +395,34 @@ pub struct LookFile {
     pub settings: Value,
     /// the map options: render_edges' keywords
     pub args: Value,
-    #[serde(flatten)]
+    #[cfg_attr(feature = "schema", schemars(flatten))]
     pub sections: Sections,
+}
+
+impl LookFile {
+    /// The file of a JSON value. An unknown key is an error of `Sections` (`deny_unknown_fields`).
+    pub fn from_value(v: Value) -> Result<LookFile, Error> {
+        let Value::Object(mut m) = v else { return Err(bad("a look of version 2", "not a mapping")) };
+        let mut take = |k: &str| m.shift_remove(k).ok_or_else(|| bad("a look of version 2", format!("missing field `{k}`")));
+        let schema_version = take("schema_version")?.as_u64().ok_or_else(|| bad("a look of version 2", "schema_version is not a number"))? as u32;
+        let palette = take("palette")?.as_str().ok_or_else(|| bad("a look of version 2", "palette is not a text"))?.to_string();
+        let (settings, args) = (take("settings")?, take("args")?);
+        let sections = serde_json::from_value(Value::Object(m)).map_err(|e| bad("a look of version 2", e))?;
+        Ok(LookFile { schema_version, palette, settings, args, sections })
+    }
+
+    /// The file as a JSON value: the four keys, then the sections' keys.
+    pub fn to_value(&self) -> Value {
+        let mut m = Map::new();
+        m.insert("schema_version".into(), self.schema_version.into());
+        m.insert("palette".into(), self.palette.clone().into());
+        m.insert("settings".into(), self.settings.clone());
+        m.insert("args".into(), self.args.clone());
+        if let Value::Object(s) = serde_json::to_value(&self.sections).expect("the sections are JSON") {
+            m.extend(s);
+        }
+        Value::Object(m)
+    }
 }
 
 /// The theme sections that are written as they are in version 1 (the others: `access`, `palettes`, `active`, `background`).
@@ -405,7 +456,7 @@ pub fn from_views(d: &LookData) -> Result<Sections, Error> {
     for k in ["camera", "tiles"] {
         s.insert(k.into(), d.config[k].clone());
     }
-    s.insert("page".into(), json!({"basemap": d.config["basemap"], "api_key": d.config["api_key"], "api_keys": d.config["api_keys"]}));
+    s.insert("page".into(), json!({"basemap": d.config["basemap"]}));
     s.insert("interaction".into(), d.interaction.clone());
     if !d.features.is_null() {
         s.insert("base_map".into(), d.features.clone());
@@ -435,9 +486,7 @@ pub fn views(f: &LookFile) -> Result<LookData, Error> {
     extra.insert("camera".into(), s["camera"].clone());
     extra.insert("tiles".into(), s["tiles"].clone());
     extra.insert("annotations".into(), json!({"slot_m": s["labels"]["slot_m"]}));
-    for k in ["basemap", "api_key", "api_keys"] {
-        extra.insert(k.into(), s["page"][k].clone());
-    }
+    extra.insert("basemap".into(), s["page"]["basemap"].clone());
     let config = crate::resolve::config_of(&theme, extra)?;
     Ok(LookData {
         schema_version: 1,
@@ -456,7 +505,8 @@ pub fn views(f: &LookFile) -> Result<LookData, Error> {
     })
 }
 
-/// The JSON Schema of a look of version 2 (look.schema.json).
+/// The JSON Schema of a look of version 2 (look.schema.json; the feature `schema`).
+#[cfg(feature = "schema")]
 pub fn schema() -> Value {
     serde_json::to_value(schemars::schema_for!(LookFile)).expect("a schema is JSON")
 }

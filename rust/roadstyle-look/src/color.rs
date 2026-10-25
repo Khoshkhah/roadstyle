@@ -76,6 +76,7 @@ impl serde::Serialize for Color {
     }
 }
 
+#[cfg(feature = "schema")]
 impl schemars::JsonSchema for Color {
     fn schema_name() -> std::borrow::Cow<'static, str> {
         "Color".into()

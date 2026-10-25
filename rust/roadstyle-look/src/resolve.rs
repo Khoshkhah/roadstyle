@@ -318,21 +318,22 @@ fn style_config(theme: &Value, sources: &[Value]) -> Result<Map<String, Value>, 
     Ok(cfg)
 }
 
-/// The config view of a theme and of the config keys that are not in the theme (`extra`: camera, tiles, annotations, basemap, api_key,
-/// api_keys), as the resolution makes it (`style_config`, then `config`): a look of version 2's view.
+/// The config view of a theme and of the config keys that are not in the theme (`extra`: camera, tiles, annotations, basemap), as the
+/// resolution makes it (`style_config`, then `config`): a look of version 2's view.
 pub(crate) fn config_of(theme: &Value, extra: Map<String, Value>) -> Result<Value, Error> {
     Ok(config(&style_config(theme, &[json!({"config": extra})])?))
 }
 
-/// dataclasses.asdict(StyleConfig(...)): the fields in order, each from the settings, else its default (api_key, api_keys); the set
-/// minor_no_casing as a sorted list (as the look is written).
+/// dataclasses.asdict(StyleConfig(...)): the fields in order, each from the settings, else its default; the set minor_no_casing as a
+/// sorted list (as the look is written). `api_key` and `api_keys` are always empty: a look is saved and published, so a key of the
+/// settings is never written into it (the caller gives the keys to the page in `given`).
 fn config(cfg: &Map<String, Value>) -> Value {
     let mut out = Map::new();
     for f in CONFIG_FIELDS {
         let v = match (f, cfg.get(f)) {
+            ("api_key", _) => Value::Null,
+            ("api_keys", _) => json!({}),
             (_, Some(v)) => v.clone(),
-            ("api_key", None) => Value::Null,
-            ("api_keys", None) => json!({}),
             ("basemap", None) => json!("voyager"),
             (_, None) => Value::Null,
         };

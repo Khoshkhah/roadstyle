@@ -108,6 +108,7 @@ impl Look {
             return Err(Error::Version { found: data.schema_version });
         }
         data.schema_version = 1;
+        no_keys(&mut data);
         let sections = sections::from_views(&data)?;
         Look::with(data, sections)
     }
@@ -128,14 +129,7 @@ impl Look {
         match v.get("schema_version").and_then(Value::as_u64).unwrap_or(0) {
             n if n > VERSION as u64 => Err(Error::Version { found: n as u32 }),
             2 => {
-                let keys: Vec<String> = v.as_object().map(|m| m.keys().cloned().collect()).unwrap_or_default();
-                let f: LookFile = serde_json::from_value(v).map_err(|e| Error::Look(format!("look: {e}")))?;
-                // serde's deny_unknown_fields does not go with flatten: the keys of the file are checked here
-                let known = serde_json::to_value(&f).expect("a look is JSON");
-                if let Some(k) = keys.iter().find(|k| known.get(k.as_str()).is_none() && k.as_str() != "base_map") {
-                    let names = known.as_object().into_iter().flatten().map(|(n, _)| n.as_str());
-                    return Err(Error::Look(format!("look: unknown field `{k}`{}", options::nearest(k, names))));
-                }
+                let f = LookFile::from_value(v)?;
                 Look::with(sections::views(&f)?, f.sections)
             }
             _ => Look::new(serde_json::from_value(v).map_err(|e| Error::Look(format!("look: {e}")))?),
@@ -144,12 +138,12 @@ impl Look {
 
     /// The look as it is written: version 2.
     pub fn to_json(&self) -> String {
-        serde_json::to_string(&self.file()).expect("a look is JSON")
+        self.to_value().to_string()     // through a Value: one serialiser of the sections in the binary, not two
     }
 
     /// The look as a JSON value: version 2.
     pub fn to_value(&self) -> Value {
-        serde_json::to_value(self.file()).expect("a look is JSON")
+        self.file().to_value()
     }
 
     /// The look's JSON views of version 1, as a JSON value (as a look of version 1 was written).
@@ -175,6 +169,29 @@ impl Look {
         }
         data.args[key] = value;
         Look::new(data)
+    }
+}
+
+/// The keywords and settings keys that hold an API key. A look is saved and published (look.json, a plugin, a page's metadata), so no key
+/// is written into it: the caller gives the keys to the page (`given`).
+const KEY_ARGS: [&str; 2] = ["api_key", "street_view_key"];
+const KEY_CONFIG: [&str; 2] = ["api_key", "api_keys"];
+
+/// `data` with no API key: none in the keywords, none in the settings sources' `config`, none in the config view.
+fn no_keys(data: &mut LookData) {
+    if let Some(a) = data.args.as_object_mut() {
+        KEY_ARGS.iter().for_each(|k| { a.shift_remove(*k); });
+    }
+    let sources: Vec<&mut Value> = match &mut data.settings {
+        Value::Array(l) => l.iter_mut().collect(),
+        v => vec![v],
+    };
+    for c in sources.into_iter().filter_map(|s| s.get_mut("config")).filter_map(Value::as_object_mut) {
+        KEY_CONFIG.iter().for_each(|k| { c.shift_remove(*k); });
+    }
+    if let Some(c) = data.config.as_object_mut().filter(|c| c.contains_key("api_key")) {
+        c.insert("api_key".into(), Value::Null);
+        c.insert("api_keys".into(), Value::Object(Map::new()));
     }
 }
 

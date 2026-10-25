@@ -92,3 +92,35 @@ fn look_schema_json_is_the_schema_of_the_types() {
     let saved = std::fs::read_to_string(&path).unwrap_or_default();
     assert!(saved == made, "look.schema.json is not the schema of the types: ROADSTYLE_BLESS=1 cargo test -p roadstyle-look --test sections");
 }
+
+/// No API key goes into a look (it is saved and published): not from the settings' config, not from the keywords. The written look and
+/// its views have no field whose name has "key" with a value, and the schema has no such field.
+#[test]
+fn a_look_holds_no_api_key() {
+    let o = Options::from_value(&json!({"settings": [{"config": {"api_key": "SECRET1", "api_keys": {"carto": "SECRET2"}, "basemap": "osm"}}],
+                                        "args": {"api_key": "SECRET3", "street_view_key": "SECRET4", "name": "m"}})).unwrap();
+    let look = Look::resolve(&o).unwrap();
+    for text in [look.to_json(), look.views_value().to_string(), Look::from_json(&look.to_json()).unwrap().to_json()] {
+        assert!(!text.contains("SECRET"), "a key in the look: {}", &text[text.find("SECRET").unwrap().saturating_sub(80)..][..120]);
+    }
+    assert_eq!(look.sections.page.basemap, "osm", "the settings' other config keys stay");
+    fn keys_with_values(v: &Value, at: &str, out: &mut Vec<String>) {
+        match v {
+            Value::Object(m) => m.iter().for_each(|(k, x)| {
+                let empty = x.is_null() || x.as_object().is_some_and(|o| o.is_empty()) || x == "";
+                if k.to_lowercase().contains("key") && !empty {
+                    out.push(format!("{at}.{k}"));
+                }
+                keys_with_values(x, &format!("{at}.{k}"), out);
+            }),
+            Value::Array(l) => l.iter().for_each(|x| keys_with_values(x, at, out)),
+            _ => {}
+        }
+    }
+    let mut found = Vec::new();
+    keys_with_values(&look.to_value(), "", &mut found);
+    keys_with_values(&look.views_value(), "", &mut found);
+    assert!(found.is_empty(), "{found:?}");
+    let schema = roadstyle_look::sections::schema().to_string();
+    assert!(!schema.to_lowercase().contains("key\":"), "a field with \"key\" in its name in look.schema.json");
+}
