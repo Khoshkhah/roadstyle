@@ -43,9 +43,11 @@ def _roads():
     return gpd.GeoDataFrame(df.drop(columns="geometry"), geometry=shapely.from_wkb(df["geometry"]), crs="EPSG:4326")
 
 
+# The waits test that window.map is the MapLibre map: a host page's module script sets it after the page's load, and until then
+# window.map is the element <div id="map"> (the browser's named access), on which map.loaded() throws and stops the wait.
 def _mouse(pg):
     """Hover a road and click it with the real mouse: the cursor, the tooltip and the rs:select's id."""
-    pg.wait_for_function("window.map && map.loaded() && map.queryRenderedFeatures({layers: ['roads-simple']}).length", timeout=60000)
+    pg.wait_for_function("typeof window.map?.loaded === 'function' && map.loaded() && map.queryRenderedFeatures({layers: ['roads-simple']}).length", timeout=60000)
     pg.evaluate("window.__sel = null; document.addEventListener('rs:select', e => { window.__sel = e.detail.id; })")
     x, y = pg.evaluate(ROAD_PIXEL)
     pg.mouse.move(x - 30, y - 30)
@@ -134,7 +136,7 @@ def test_a_3d_deck_is_picked_on_a_host_page_with_no_contract(tmp_path):
     ring = deck["geometry"]["coordinates"][0]
     center = [sum(c[0] for c in ring) / len(ring), sum(c[1] for c in ring) / len(ring)]
     with _host(tmp_path, style, g) as (pg, errors):
-        pg.wait_for_function("window.map && map.loaded()", timeout=60000)
+        pg.wait_for_function("typeof window.map?.loaded === 'function' && map.loaded()", timeout=60000)
         pg.evaluate("c => map.jumpTo({center: c, zoom: 18})", center)
         pg.wait_for_function("map.loaded() && map.queryRenderedFeatures({layers: map.getStyle().layers.map(l => l.id)"
                              ".filter(i => i.startsWith('roads-bridge-decks'))}).length", timeout=30000)
