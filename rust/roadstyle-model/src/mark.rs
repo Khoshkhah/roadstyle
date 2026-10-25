@@ -165,6 +165,12 @@ marks! {
     DeckBase = "__rs_base";
     DeckHeight = "__rs_height";
     DeckChain = "__rs_chain";
+    /// the drawing positions that the engine solved, under their contract names (duckOSM's columns: an input column of the name is the
+    /// level input; the writers give the solved values under it, in this order, after the road's columns)
+    CasingStartColumn = "casing_start";
+    CasingLevelColumn = "casing_level";
+    CasingEndColumn = "casing_end";
+    FillLevelColumn = "fill_level";
     /// a slot: its arrow, its chain, its number and its rank
     SlotArrow = "__rs_arw";
     SlotChain = "chain" [Slots];
@@ -213,6 +219,6 @@ mod tests {
             assert_eq!(Mark::of(m.name()), Some(m));
         }
         assert_eq!(Mark::of("highway"), None);
-        assert_eq!((option_of_fill(&option_fill(0)), option_of_fill(&option_fill(3)), option_of_fill("__rs_fill__x")), (Some(0), Some(3), None));
+        assert_eq!((option_of_fill(&option_fill(0)), option_of_fill(&option_fill(3)), option_of_fill(&format!("{}__x", Mark::Fill.name()))), (Some(0), Some(3), None));
     }
 }

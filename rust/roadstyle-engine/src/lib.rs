@@ -72,19 +72,23 @@ pub fn make_parts(mut table: RoadTable, look: &Look, features: Option<FeatureTab
         return Err(Error::Limit { what: Limit::Roads, found: table.len(), max: MAX_ROADS });
     }
     ColumnMap::from_args(&look.args).to_engine(&mut table);
-    compute_levels(&mut table, &look.args, look.road.head_m)?;
-    style_parts(table, look, features, planner, name)
+    let mut warnings = Vec::new();
+    let levels = compute_levels(&mut table, &look.args, look.road.head_m, &mut warnings)?;
+    let mut parts = style_parts(table, levels, look, features, planner, name)?;
+    parts.warnings.splice(0..0, warnings);
+    Ok(parts)
 }
 
 /// The parts of another palette of the same call (a view's palette, palettes.rs): the roads of `s` as they were before their marks
 /// (their columns in the engine's names, their levels solved), with the look `look` (the same keywords, another palette). No base map
 /// and no route planner, as a page's views have none.
 pub fn restyle(s: &sources::Sources, look: &Look) -> Result<sources::Sources, Error> {
-    Ok(sources::Sources::new(style_parts(s.roads.roads.table.clone(), look, None, None, None)?))
+    Ok(sources::Sources::new(style_parts(s.roads.roads.table.clone(), s.roads.roads.solved.clone(), look, None, None, None)?))
 }
 
 /// make_parts after the roads are prepared (the engine's column names, the levels).
-fn style_parts(table: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, Error> {
+fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>,
+               name: Option<String>) -> Result<Parts, Error> {
     let cols = ColumnMap::from_args(&look.args);
     // render's filter_col: in the engine's names (a keyword's column has the engine's name; a column with an engine name is kept aside)
     let fcol = look.args["filter_col"].as_str().filter(|c| !c.is_empty()).map_or_else(|| "highway".to_string(), |f| {
@@ -93,6 +97,7 @@ fn style_parts(table: RoadTable, look: &Look, features: Option<FeatureTable>, pl
             .unwrap_or_else(|| f.to_string())
     });
     let mut feats = Roads::new(table);
+    feats.solved = solved;
     feats.cls = fcol;
     let colors = roads::mark_roads(&mut feats, &look.road, &look.args)?;
     let width_col = look.args["width_m_col"].as_str().filter(|c| !c.is_empty());
@@ -304,11 +309,15 @@ fn source_features(source: &Value) -> &[Value] {
     source["data"]["features"].as_array().map_or(&[][..], |v| v.as_slice())
 }
 
-/// render's level step: with no `casing_level_col` and no `fill_level_col` in the keywords, the drawing positions come from
-/// `compute_levels(method="solve")` with its defaults (render_web.render), on the roads in their order. It writes the columns that
-/// compute_levels writes: casing_start, casing_level, casing_end and fill_level. The browser's keyword `levels` (roads_sql.js makeRoads):
-/// "tags" computes them with the tags rule; `{edge_hash, n_edges}` (edge_levels_meta) checks that the stored levels are for these edges.
-fn compute_levels(table: &mut RoadTable, args: &Value, head_m: f64) -> Result<(), Error> {
+/// render's level step. The drawing positions come from, in this order: the columns that `casing_level_col` / `fill_level_col` name;
+/// else the contract columns `casing_level` / `fill_level` of the input (duckOSM's stored levels: an input column of the name is the
+/// level input); else `compute_levels(method="solve")` with its defaults (render_web.render), on the roads in their order. The keyword
+/// `levels` (roads_sql.js makeRoads): "tags" computes them with the tags rule and "solve" with the solver, whatever the input has;
+/// `{edge_hash, n_edges}` (edge_levels_meta) checks that the stored levels are for these edges. Computed, they are not written into the
+/// table: they come back (casing_start, casing_level, casing_end, fill_level for each road), and the roads give them under the contract
+/// names (`Roads::solved`). A user column with a contract name, when the levels are computed, is kept aside as `__rs_kept_<name>`, with
+/// a warning.
+fn compute_levels(table: &mut RoadTable, args: &Value, head_m: f64, warnings: &mut Vec<String>) -> Result<Option<Vec<[i16; 4]>>, Error> {
     let given = |k: &str| matches!(&args[k], Value::String(s) if !s.is_empty());
     if let Some(meta) = args["levels"].as_object() {
         let ids = (0..table.len()).map(|i| match table.get(i, "edge_id").map(Cell::to_value) {
@@ -323,23 +332,27 @@ fn compute_levels(table: &mut RoadTable, args: &Value, head_m: f64) -> Result<()
         }
     }
     let tags = args["levels"] == "tags";
-    if !tags && (given("casing_level_col") || given("fill_level_col")) {
-        return Ok(());
+    let forced = tags || args["levels"] == "solve";
+    let contract = [Mark::CasingLevelColumn, Mark::FillLevelColumn].iter().any(|m| table.col(m.name()).is_some());
+    if !forced && (given("casing_level_col") || given("fill_level_col") || contract) {
+        return Ok(None);
+    }
+    const COLUMNS: [Mark; 4] = [Mark::CasingStartColumn, Mark::CasingLevelColumn, Mark::CasingEndColumn, Mark::FillLevelColumn];
+    let present: Vec<Mark> = COLUMNS.into_iter().filter(|m| table.col(m.name()).is_some()).collect();
+    for m in present {
+        table.rename(m.name(), &road::kept(m.name()));
+        warnings.push(format!("the column {} is not the levels (levels={}): it is kept as {}", m.name(), args["levels"], road::kept(m.name())));
     }
     // the engine's own names: ColumnMap gave the user's columns these names before this step
     let edges = level_edges(table, ["highway", "layer", "bridge", "tunnel", "junction", "", ""]);
     let method = if tags { roadstyle_levels::Method::Tags } else { roadstyle_levels::Method::Solve };
-    let Some(levels) = roadstyle_levels::levels(&edges, &roadstyle_levels::Options { method, head_m, ..Default::default() })? else { return Ok(()) };
+    let Some(levels) = roadstyle_levels::levels(&edges, &roadstyle_levels::Options { method, head_m, ..Default::default() })? else { return Ok(None) };
     // one row for each edge, in the edges' order (the edge id is the row)
     if levels.rows.len() != table.len() || levels.rows.iter().enumerate().any(|(i, r)| r.edge_id != i as i64) {
         return Err(error::data(format!("compute_levels: {} rows for {} roads, not one for each road in its order", levels.rows.len(), table.len())));
     }
-    let col = |f: fn(&roadstyle_levels::Row) -> i64| levels.rows.iter().map(f).collect::<Vec<i64>>();
-    table.set_ints("casing_start", col(|r| r.casing_start));
-    table.set_ints("casing_level", col(|r| r.casing_level));
-    table.set_ints("casing_end", col(|r| r.casing_end));
-    table.set_ints("fill_level", col(|r| r.fill_level));
-    Ok(())
+    let small = |v: i64| v.clamp(i16::MIN.into(), i16::MAX.into()) as i16;
+    Ok(Some(levels.rows.iter().map(|r| [r.casing_start, r.casing_level, r.casing_end, r.fill_level].map(small)).collect()))
 }
 
 /// The column keywords of render (highway_col, tunnel_col, ...): the engine reads its own names (highway, tunnel, ...), so a user's

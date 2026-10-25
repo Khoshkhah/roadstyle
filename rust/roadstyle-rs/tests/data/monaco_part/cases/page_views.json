@@ -1,6 +1,6 @@
 {
-  "bytes": 533493,
-  "hash": "d76f38e2f8bcd348",
+  "bytes": 481423,
+  "hash": "b5977032cb5c9c57",
   "warnings": [
     "CARTO base map requested with no API key: the tiles will come back stamped 'API KEY REQUIRED'. Set one in roadstyle.json, or use a keyless base map (esri_street, esri_dark_gray, osm)."
   ]

@@ -2977,6 +2977,10 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             raise ValueError(f"access_col {access_col!r} is not a column of the edges")
         g = g.copy()
         g["__rs_access"] = g[access_col].where(g[access_col].isin([a[0] for a in _ACCESS]), None).astype(object)   # ``__rs_*`` goes with every piece (_mark_cls: also with the names and arrows)
+    if not (casing_level_col or fill_level_col) and {"casing_level", "fill_level"} & set(g.columns):
+        # duckOSM's stored levels (2026-10-25, as the Rust engine's compute_levels): an input column with a contract name is the level input
+        casing_level_col, fill_level_col, casing_start_col, casing_end_col = (
+            c if c in g.columns else None for c in ("casing_level", "fill_level", "casing_start", "casing_end"))
     if not (casing_level_col or fill_level_col):       # the only way of drawing: positions, computed here with the level step's defaults
         from .levels import compute_levels
         g = compute_levels(g, layer_col=layer_col, bridge_col=bridge_col, tunnel_col=tunnel_col, method="solve",

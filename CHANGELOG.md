@@ -30,6 +30,14 @@ All notable changes to **roadstyle** are documented here. The format is based on
   wide. A bridge keeps its casing. The road layer's filter has the rule, and the tiles leave out the pieces that it hides.
 
 ### Changed
+- **An input column `casing_level` or `fill_level` is the level input** (both engines). With no level keyword, the engine reads the
+  input's `casing_level`, `fill_level`, `casing_start` and `casing_end` (duckOSM's stored levels) and does not solve. Before, it solved and
+  wrote over them. The browser's `levels: "tags"` or `"solve"` (Rust engine) still computes them; an input column with one of these names
+  is then kept as `__rs_kept_<name>`, with a warning. Computed positions are not written into the caller's table; the outputs give them
+  under the same four names, after the road's columns (docs/reference/contract.md, "The drawing positions").
+- **The engine's properties have one list** (`roadstyle_model::mark::Mark`, 64 names): `reads.json` is made from it by a test, the
+  model no longer reads the page's file, and the engine has no global table of names (R17). A road's computed values (`Draw`) take 80
+  bytes, not 288 (Tartu: 13 MB less in use after stage 1).
 - **The Rust engine and the facade have typed errors** (target (e)). `roadstyle_engine::Error` has the kinds `Column` (with the
   column), `Options`, `Data`, `Limit` (what it counts and the most), `Unsupported` (the part that this engine does not draw) and the
   look's, the levels' and the model's errors; `roadstyle::Error` wraps each crate's error and has `Options`, `File` (with the file) and

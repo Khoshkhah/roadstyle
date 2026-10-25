@@ -69,9 +69,7 @@ pub fn mark_roads(fs: &mut Roads, look: &Look, args: &Value) -> Result<crate::co
     let caps = CapCols::from_args(args);
     mark_caps(fs, &caps);
     mark_heads(fs, [named("head_start_m_col"), named("head_end_m_col")]);
-    let named = |k: &str| args[k].as_str().is_some_and(|c| !c.is_empty());
-    let computed = !named("casing_level_col") && !named("fill_level_col");      // render computes all four (compute_levels)
-    mark_levels(fs, ["casing_level_col", "fill_level_col", "casing_start_col", "casing_end_col"].map(|k| computed || named(k)));
+    mark_levels(fs);
     // render's width_m_col: metre widths (docs/design/metre_widths.md); casing_m, else the theme's casing.m
     let width_col = args["width_m_col"].as_str().filter(|c| !c.is_empty());
     let pairs = if look.twin_one || width_col.is_some() { twin_pairs(fs) } else { Vec::new() };       // one time for both stages
@@ -284,18 +282,21 @@ fn mark_heads(fs: &mut Roads, named: [bool; 2]) {
     }
 }
 
-/// _mark_levels: __rs_cl / __rs_fl (casing at most the fill), the heads' casing numbers __rs_cs / __rs_ce, band 0.
-/// _mark_levels: `named` says which of the columns casing_level, fill_level, casing_start and casing_end render reads (a keyword names it,
-/// or render computed the levels); a head that has none takes the main casing number.
-fn mark_levels(fs: &mut Roads, named: [bool; 4]) {
+/// _mark_levels: __rs_cl / __rs_fl (casing at most the fill), the heads' casing numbers __rs_cs / __rs_ce, band 0, from the solved
+/// positions or from the input's columns casing_level, fill_level, casing_start and casing_end (the ones it has; a head that has none
+/// takes the main casing number).
+fn mark_levels(fs: &mut Roads) {
+    use roadstyle_model::mark::Mark;
     let num = |v: Option<Cell>| v.and_then(py_float).filter(|x| !x.is_nan()).map_or(0, |x| x.round_ties_even() as i64);
+    let has = [Mark::CasingLevelColumn, Mark::FillLevelColumn, Mark::CasingStartColumn, Mark::CasingEndColumn]
+        .map(|m| fs.solved.is_some() || fs.table.col(m.name()).is_some());
     for i in 0..fs.len() {
         let r = fs.road(i);
-        let col = |k: usize, c: &str| if named[k] { num(r.get(c)) } else { 0 };
-        let (c, fl) = (col(0, "casing_level"), col(1, "fill_level"));
+        let col = |k: usize, m: Mark| if has[k] { num(r.get(m.name())) } else { 0 };
+        let (c, fl) = (col(0, Mark::CasingLevelColumn), col(1, Mark::FillLevelColumn));
         let (c, fl) = (c.min(fl), c.max(fl));
-        let cs = if named[2] { num(r.get("casing_start")).min(fl) } else { c };
-        let ce = if named[3] { num(r.get("casing_end")).min(fl) } else { c };
+        let cs = if has[2] { num(r.get(Mark::CasingStartColumn.name())).min(fl) } else { c };
+        let ce = if has[3] { num(r.get(Mark::CasingEndColumn.name())).min(fl) } else { c };
         fs.draw[i].set_levels([c, fl, cs, ce]);
     }
 }

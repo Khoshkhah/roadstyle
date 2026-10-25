@@ -176,7 +176,10 @@ when a layer reads it.
 ## What a page reads
 
 The page's dashboard modules and page scripts declare the feature properties that they read, in
-`rust/roadstyle-assets/files/static/dashboard/reads.json`:
+`rust/roadstyle-assets/files/static/dashboard/reads.json`. The file is made from the engine's list of marks
+(`roadstyle_model::mark::Mark`, with the features on which the page reads each, and `PAGE_COLUMNS`): `rust/roadstyle-rs/tests/marks.rs`
+fails when it differs, and `ROADSTYLE_BLESS=1` writes it again. A new property that the page reads is a line in `mark.rs`, not an edit of
+the file.
 
 - `pieces`: the properties of a feature of the road layer (a road piece or an item); `decks`: of a 3D deck or shadow; `slots`: of a
   name or arrow slot.
@@ -195,6 +198,19 @@ Both engines write only what is read (R1, 2026-10-24), in the GeoJSON, the GeoPa
 - A road of the `roads` source keeps all its fields and only the stage values (`__rs_*`) of that set.
 - A row of the road table keeps all its fields, the stage values of `table`, and the fills (`__rs_fill*`, which the filter's swatches of
   a view's palette read).
+
+## The drawing positions
+
+The positions of a road (its casing numbers at the start, in the middle and at the end, and its fill number) come from, in this order:
+
+1. the columns that `casing_level_col` and `fill_level_col` (and `casing_start_col`, `casing_end_col`) name;
+2. else the input's columns `casing_level`, `fill_level`, `casing_start` and `casing_end` (the ones it has): duckOSM's stored levels. An
+   input column with one of these names is the level input;
+3. else the solver (`compute_levels(method="solve")` with its defaults).
+
+The browser's keyword `levels` (`"tags"` or `"solve"`, Rust engine) computes them whatever the input has. Then an input column with one
+of the four names is kept aside as `__rs_kept_<name>`, and a warning names it. Computed positions are not written into the caller's
+table: the roads source and the road table give them under the four names, after the road's own columns, as before (2026-10-25).
 
 ## The page's placeholders
 
