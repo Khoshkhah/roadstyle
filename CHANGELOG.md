@@ -7,6 +7,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`Look.withArg(key, value)` in the WebAssembly package**: the same look with one keyword changed, as the Python binding's
+  `Look.with_arg`. The examples in `examples/dashboard_rust/` use it and no longer read or change a look's JSON fields (`args`,
+  `theme`): a look's JSON is a format to save and load, not an API (docs/rust/browser.md). With `state: "live"`, the dashboard takes
+  the selection colour from the style's `roadstyle:controls`; a host that adds the layers to its own map sets the global state from
+  `roadstyle:state` (tiles.html).
 - **The typed look, version 2 (T3 step 2, audit R16).** A look is now one struct for each section (`roadstyle_look::sections`: roads,
   casing, labels, arrows, bridges, tunnels, selection, data, overlays, boundary, background, access, camera, tiles, page, palettes,
   active, interaction, base_map), in place of the JSON values `theme` and `config` (StyleConfig's flat view) and the resolution's
@@ -144,6 +149,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `docs/design/dashboard_module.md`, "Trusted inputs".
 
 ### Fixed
+- **A live style on a host's own map has its global state.** The dashboard sets each value of `roadstyle:state` that the map does
+  not have yet (at the start and in `setStyle`), and keeps the values that the map has. Before, a host that added a live style's
+  layers to its own map (whose style has no such `state` block) got MapLibre errors, unless it set the values itself.
 - **The 3D buildings of a duckOSM file have the height of all the digits of their tags.** The reader's SQL
   (`roadstyle_io::duckosm`, for Python and the browser) read a tag as `tags['k'][1]`. In DuckDB 1.5 and in duckdb-wasm, `tags['k']` is
   the text, so `[1]` gave its first character: `building:levels` "25" was "2", and the building was 7.32 m high, not 91.5 m. The SQL

@@ -18,19 +18,21 @@ import {rsDashboard} from "../../rust/roadstyle-assets/files/static/dashboard/in
 const DATA = "../../rust/roadstyle-rs/tests/data/";
 const bytes = (u) => fetch(u).then((r) => r.arrayBuffer()).then((b) => new Uint8Array(b));
 const [, roads, lookText] = await Promise.all([init(), bytes(DATA + "monaco/roads.parquet"), fetch(DATA + "look.json").then((r) => r.text())]);
-// the roads coloured by their lane count, as render_edges(color_by="lanes", cmap="YlOrRd", vmin=1, vmax=4): the engine reads render's
-// keywords from the look's args, and writes the legend data into the style's metadata roadstyle:color_options
-const look = JSON.parse(lookText);
-Object.assign(look.args, {color_by: "lanes", cmap: "YlOrRd", vmin: 1, vmax: 4});
-// the stored levels' metadata, the value of roads_sql.js makeRoads for a duckOSM file: the engine checks that the levels in roads.parquet
-// were solved for these edges (their number and the hash of their ids), and stops with an error if not
-look.args.levels = {edge_hash: "615c9155ab37a030dbfa80da2f7fcc09", n_edges: 13298};
-const lk = Look.fromJson(JSON.stringify(look));     // the look, parsed one time (version 0: today's look.json)
+// the saved look (look.json: a format to save and load, not an API to read fields from) with this page's map options, render_edges'
+// keywords, each through Look.withArg
+const withArgs = (look, args) => Object.entries(args).reduce((l, [k, v]) => l.withArg(k, JSON.stringify(v)), look);
+// - state "live": a style for a dashboard; the dashboard takes its controls (the selection colour, the arrows' rules, ...) from the
+//   style's metadata roadstyle:controls
+// - the roads coloured by their lane count, as render_edges(color_by="lanes", cmap="YlOrRd", vmin=1, vmax=4): the engine writes the
+//   legend data into the style's metadata roadstyle:color_options
+// - levels: the stored levels' metadata, the value of roads_sql.js makeRoads for a duckOSM file: the engine checks that the levels in
+//   roads.parquet were solved for these edges (their number and the hash of their ids), and stops with an error if not
+const lk = withArgs(Look.fromJson(lookText), {state: "live", color_by: "lanes", cmap: "YlOrRd", vmin: 1, vmax: 4,
+                                               levels: {edge_hash: "615c9155ab37a030dbfa80da2f7fcc09", n_edges: 13298}});
 const style = JSON.parse(makeStyle(roads, lk, undefined, undefined, "Monaco"));
 style.sources.simple.promoteId = "__rs_edge";   // the pieces' row as their id: the glow by row (the engine sets it only on its own pages)
 // the road table of stage 1 (each road's fields, midpoint, bbox, heading and line, by row): the popup, the search and Street View read it
 const road_table = JSON.parse(new TextDecoder().decode(makeSources(roads, lk, undefined, undefined, "Monaco").roadTable()));
-const theme = look.theme;
 
 const map = new maplibregl.Map({container: "map", style, attributionControl: {compact: true}});
 map.addControl(new maplibregl.NavigationControl({visualizePitch: true}));
@@ -44,7 +46,6 @@ for (const [id, im] of Object.entries(style.metadata["roadstyle:images"] || {}))
 rsDashboard(map, {
   style,
   road_table,
-  select_color: theme.selection.select,
   street_view: "window",
   find_control: true,
 });

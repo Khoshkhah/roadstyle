@@ -98,10 +98,18 @@ mod wasm {
             roadstyle::Look::from_json(text).map(JsLook).map_err(|e| JsError::new(&e.to_string()))
         }
 
-        /// toJson(): the look's text (version 2).
+        /// toJson(): the look's text (version 2), to save and load it. It is not an API: read no field of it.
         #[wasm_bindgen(js_name = toJson)]
         pub fn to_json(&self) -> String {
             self.0.to_json()
+        }
+
+        /// withArg(key: string, value: string) -> Look: the same look with the map option `key` (a render_edges keyword: color_by, state,
+        /// live_data, levels, ...) set to `value` (JSON text), as the Python binding's Look.with_arg. An error is a thrown Error.
+        #[wasm_bindgen(js_name = withArg)]
+        pub fn with_arg(&self, key: &str, value: &str) -> Result<JsLook, JsError> {
+            let v: serde_json::Value = serde_json::from_str(value).map_err(|e| JsError::new(&format!("{key}: not JSON: {e}")))?;
+            self.0.clone().with_arg(key, v).map(JsLook).map_err(|e| JsError::new(&e.to_string()))
         }
     }
 
