@@ -30,6 +30,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   wide. A bridge keeps its casing. The road layer's filter has the rule, and the tiles leave out the pieces that it hides.
 
 ### Changed
+- **The Roads box dims a class that the map does not draw at this zoom.** With the class minzoom (the default since 2026-10-25), a
+  class row is dimmed below its first zoom (`roadstyle:controls.filter.minzoom`), with the title "from zoom N". Before, the box listed
+  the hidden classes as if they were drawn.
 - **The tiles go to zoom 18** (both engines; `tiles.maxzoom`, was 15). The map scales the last zoom's tiles up, and the casing
   pieces' cut points round to that zoom's grid, so at zoom 21 and 22 a casing piece stood up to 4–5 px off its fill: thick on one
   side, missing on the other, with notches where the pieces meet. At 18 it is about 1 px. The archive of a tiled page doubles
