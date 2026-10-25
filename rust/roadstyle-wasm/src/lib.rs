@@ -11,6 +11,15 @@ mod grow {
     use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 
     static PAGES: AtomicUsize = AtomicUsize::new(0); // the memory's size (64 KB pages) after the last step ahead
+    /// the bytes that the program holds now, and their most since `peak_reset` (the memory's size grows in steps ahead, so it does not
+    /// show these: parity.md, "The drawing values of a road")
+    pub static LIVE: AtomicUsize = AtomicUsize::new(0);
+    pub static PEAK: AtomicUsize = AtomicUsize::new(0);
+
+    fn took(n: usize) {
+        let live = LIVE.fetch_add(n, Relaxed) + n;
+        PEAK.fetch_max(live, Relaxed);
+    }
 
     fn ahead() {
         let now = memory_size(0);
@@ -31,20 +40,31 @@ mod grow {
     unsafe impl GlobalAlloc for Ahead {
         unsafe fn alloc(&self, l: Layout) -> *mut u8 {
             let p = System.alloc(l);
+            if !p.is_null() {
+                took(l.size());
+            }
             ahead();
             p
         }
         unsafe fn alloc_zeroed(&self, l: Layout) -> *mut u8 {
             let p = System.alloc_zeroed(l);
+            if !p.is_null() {
+                took(l.size());
+            }
             ahead();
             p
         }
         unsafe fn realloc(&self, p: *mut u8, l: Layout, size: usize) -> *mut u8 {
             let q = System.realloc(p, l, size);
+            if !q.is_null() {
+                LIVE.fetch_sub(l.size(), Relaxed);
+                took(size);
+            }
             ahead();
             q
         }
         unsafe fn dealloc(&self, p: *mut u8, l: Layout) {
+            LIVE.fetch_sub(l.size(), Relaxed);
             System.dealloc(p, l)
         }
     }
@@ -501,9 +521,23 @@ mod wasm {
         Ok(Tiler { style: style.to_string(), tiles })
     }
 
-    /// The size of the module's memory, in bytes.
+    /// The size of the module's memory, in bytes (it grows in steps ahead and never gets smaller: `liveBytes` gives what is held).
     #[wasm_bindgen(js_name = memoryBytes)]
     pub fn memory_bytes() -> usize {
         core::arch::wasm32::memory_size(0) * 65536
+    }
+
+    /// liveBytes() -> [now, peak]: the bytes that the program holds now, and the most it held since the last `liveBytesReset()`.
+    #[wasm_bindgen(js_name = liveBytes)]
+    pub fn live_bytes() -> Vec<f64> {
+        use std::sync::atomic::Ordering::Relaxed;
+        vec![crate::grow::LIVE.load(Relaxed) as f64, crate::grow::PEAK.load(Relaxed) as f64]
+    }
+
+    /// The peak of `liveBytes` starts again from the bytes held now.
+    #[wasm_bindgen(js_name = liveBytesReset)]
+    pub fn live_bytes_reset() {
+        use std::sync::atomic::Ordering::Relaxed;
+        crate::grow::PEAK.store(crate::grow::LIVE.load(Relaxed), Relaxed);
     }
 }

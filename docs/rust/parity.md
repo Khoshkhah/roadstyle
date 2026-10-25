@@ -115,9 +115,20 @@ That is about 18 ms for each 10,000 roads at zoom 12, cold.
 
 The engine keeps one `Draw` for each road (the computed values: levels, ends, flags, the style values' numbers). Its size on a 64-bit
 machine: 288 bytes before the tight types (2026-10-25), 80 bytes after. On Tartu, the old program's allocation count (`roadstyle-rs
---bench`) gives 26 MB in use after the marks of the roads, not 39 MB, and each later peak is 13 MB lower. The size of the wasm memory
-(`bench.mjs`) stays near 213 MiB (221 MiB after this change): that number is the linear memory, which the allocator grows in steps and
-never gives back, so it does not follow small changes. In the tile z12/2351/1225 (1,920 KB), the 35,239 pieces have 385 KB
+--bench`) gives 26 MB in use after the marks of the roads, not 39 MB, and each later peak is 13 MB lower. Two numbers of the wasm module must not be mixed up. `bench.mjs` gives both:
+
+- **the memory size** (`memoryBytes`): the linear memory, which never gets smaller. The allocator (`roadstyle-wasm` lib.rs `grow`) grows
+  it ahead in large steps (by its size, 16 to 256 MB), so the size moves in steps of many MB and is about twice the live bytes;
+- **the live bytes** (`liveBytes`: now and the peak): what the program holds.
+
+| Tartu, wasm in Node | memory size | live peak in makeSources | live peak in tileSources |
+|---|---|---|---|
+| before the tight `Draw` (a941b46) | 213 MiB | 70 MiB | 123 MiB |
+| after (bf409d5) | 221 MiB | 59 MiB | 111 MiB |
+
+The live bytes fall by 11 to 12 MiB. The memory size went up by one growth step, which lands at another point; it shows nothing about the
+data. With a step of a quarter of the size (16 to 64 MB), the memory size is 197 MiB on Tartu and 68 MiB on Monaco (110 MiB now), in the
+same time. In the tile z12/2351/1225 (1,920 KB), the 35,239 pieces have 385 KB
 of lines and about 1.2 MB of marks: every mark is one that a layer or the page reads. The wasm memory after `makeSources` and
 `tileSources` (`bench.mjs`) stays 213 MiB.
 
