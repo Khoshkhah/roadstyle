@@ -81,15 +81,15 @@ impl Ramp {
     }
 }
 
-/// _parse_color: "#rrggbb" or a colour name.
+/// A stop's colour (crate::color: hex or a colour name) as RGBA from 0 to 1.
 fn parse_color(x: &str) -> Result<[f64; 4], Error> {
-    let hex = if x.starts_with('#') && x.len() == 7 {
-        x.to_string()
-    } else {
-        cmaps().css.get(&x.to_lowercase()).and_then(Value::as_str).map(String::from).ok_or_else(|| Error::Unknown(format!("Unknown color {x:?}.")))?
-    };
-    let ch = |a: usize| u8::from_str_radix(&hex[a..a + 2], 16).map(|v| v as f64 / 255.0).map_err(|_| Error::Unknown(format!("Unknown color {x:?}.")));
-    Ok([ch(1)?, ch(3)?, ch(5)?, 1.0])
+    let c = crate::color::parse(x)?;
+    Ok([c[0] as f64 / 255.0, c[1] as f64 / 255.0, c[2] as f64 / 255.0, 1.0])
+}
+
+/// The hex colour of a CSS colour name (lower case), data/cmaps.json's.
+pub(crate) fn css(name: &str) -> Option<&'static str> {
+    cmaps().css.get(name).and_then(Value::as_str)
 }
 
 #[cfg(test)]

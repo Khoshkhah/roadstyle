@@ -49,7 +49,7 @@ host gives them to `rsDashboard` itself.
 | `select_color` | the colour of a selected road (also the Google 3D line) |
 | `filter` | the filter panel: `{on, col, classes, access, swatches, bridges, tunnels}`, and `palettes` with a view's palette |
 | `color_active` | the colour option at the start |
-| `overlays` | the Layers box: `[{label, source, layers, hit, visible, color, popup, popup_window, tooltip, under, base, select, interactive}]` |
+| `overlays` | the Layers box: `[{label, source, layers, hit, visible, color, popup, popup_window, tooltip, under, base, select, interactive}]`; a base-map layer also has `kinds` (`[[kind, count], ...]`, most first) and, with a 3D layer, `extrude` (that layer's id) |
 | `tunnel` | the tunnel look: `{layers, dash, casing, strength, palette, palettes, ratio, bg, steps, ratios, toward, towards, to, control}` |
 | `fill_layers` | the road fill layers that the page recolours |
 | `pick` | the layers that a road is picked on (clicked, hovered): `roads-simple` (the full look: its fill layers) and the 3D decks' tops (`roads-bridge-decks`), not their casing. A caller's items are in `overlays` |
