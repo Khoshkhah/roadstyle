@@ -102,6 +102,28 @@ fn a_wrong_choice_names_the_choices() {
         e => panic!("not an unknown name: {e:?}"),
     };
     assert!(err(BaseMap { mode: "boat".into(), ..Default::default() }).contains("choose from ('all', 'driving', 'walking', 'cycling')"));
-    assert!(err(BaseMap { theme: "dark".into(), ..Default::default() }).contains("choose from ('osm', 'google', 'grey', 'roadstyle')"));
+    assert!(err(BaseMap { theme: "dark".into(), ..Default::default() }).contains("choose from ('osm', 'google', 'grey', 'liberty', 'roadstyle')"));
     assert!(err(BaseMap { paths: "x".into(), ..Default::default() }).contains("unknown path style 'x'"));
+}
+
+/// The theme "liberty" (OpenFreeMap's Liberty colours, the default since 2026-10-25): its colours, only the wetland's texture, which is
+/// lighter and half the size; "osm" keeps every texture as it was (darker by 0.6, a data URL of size 1).
+#[test]
+fn the_liberty_theme() {
+    let part = |theme: &str| {
+        let look = Look::resolve(&Options { base_map: Some(BaseMap { theme: theme.into(), ..Default::default() }), ..Default::default() }).unwrap();
+        look.sections.base_map.clone().unwrap()
+    };
+    assert_eq!(BaseMap::default().theme, "liberty");
+    let lib = part("liberty");
+    let st = &lib.style;
+    assert_eq!(st["areas"]["water"]["fill"], "#9ebdff");
+    assert_eq!(st["areas"]["landcover"]["forest"], "#e3efd4");
+    let pats: Vec<&String> = st["landcover_pattern"].as_object().unwrap().iter().filter(|(_, p)| !p.is_null()).map(|(k, _)| k).collect();
+    assert_eq!(pats, ["wetland"], "Liberty's only texture");
+    let imgs = lib.images.as_object().unwrap();
+    assert!(!imgs.contains_key("ms-pat-forest"));
+    assert_eq!(imgs["ms-pat-wetland"]["pixelRatio"], 2.0);
+    let osm = part("osm");
+    assert!(osm.images["ms-pat-forest"].as_str().unwrap().starts_with("data:image/png;base64,"), "osm: as before");
 }

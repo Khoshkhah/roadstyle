@@ -1,0 +1,101 @@
+# liberty: the land, the water and the landcover in the colours of OpenFreeMap's "Liberty" style (the OpenMapTiles style that
+# OpenFreeMap serves: https://tiles.openfreemap.org/styles/liberty, read on 2026-10-25, Last-Modified 2026-10-25 05:40:59 GMT, sprite
+# ofm_f384). Liberty draws its landcover with low opacity over its land colour; each colour here is that result as one opaque colour.
+# A class that Liberty does not draw has the colour of its nearest Liberty class. The paths keep the colours of their path style.
+background: "#f8f4f0"              # the land (Liberty's background)
+roads:
+  colors:                           # Liberty's roads: orange motorways, yellow main roads, white minor roads
+    motorway:      {fill: "#ffcc88", casing: "#e9ac77"}
+    trunk:         {fill: "#ffeeaa", casing: "#e9ac77"}
+    primary:       {fill: "#ffeeaa", casing: "#e9ac77"}
+    secondary:     {fill: "#ffeeaa", casing: "#e9ac77"}
+    tertiary:      {fill: "#ffeeaa", casing: "#e9ac77"}
+    unclassified:  {fill: "#ffffff", casing: "#cfcdca"}
+    residential:   {fill: "#ffffff", casing: "#cfcdca"}
+    living_street: {fill: "#ffffff", casing: "#cfcdca"}
+    service:       {fill: "#ffffff", casing: "#cfcdca"}
+    pedestrian:    {fill: "#ffffff", casing: "#cfcdca"}
+    busway:        {fill: "#ffffff", casing: "#cfcdca"}
+features:
+  areas:
+    ocean:     {fill: "#9ebdff"}    # Liberty's water
+    water:     {fill: "#9ebdff"}
+    buildings: {fill: "#e5e2df", outline: "#cdcac6", min_zoom: 14}   # as Liberty's buildings show (#e7e4e1, its light 3D roofs) at our
+                                                                    # opacity 0.9; outline hsl(35,6%,79%); Liberty: from zoom 13
+    landcover:
+      forest: "#e3efd4"             # Liberty's wood: hsla(98,61%,72%,0.7) at opacity 0.4
+      wood: "#e3efd4"
+      grass: "#e2ebd6"              # Liberty's grass: rgb(176,213,154) at opacity 0.3; OpenMapTiles' grass class has these:
+      grassland: "#e2ebd6"
+      meadow: "#e2ebd6"
+      village_green: "#e2ebd6"
+      scrub: "#e2ebd6"
+      shrubbery: "#e2ebd6"
+      heath: "#e2ebd6"
+      allotments: "#e2ebd6"
+      garden: "#e2ebd6"
+      golf_course: "#e2ebd6"
+      recreation_ground: "#e2ebd6"
+      flowerbed: "#e2ebd6"
+      park: "#e2ecd4"               # Liberty's park: #d8e8c8 at opacity 0.7; the nearest for these:
+      nature_reserve: "#e2ecd4"
+      dog_park: "#e2ecd4"
+      zoo: "#e2ecd4"
+      playground: "#e2ecd4"
+      residential: "#f8f4f0"        # Liberty draws residential only below zoom 12: from zoom 12 on, the land colour; so the built-up land:
+      commercial: "#f8f4f0"
+      retail: "#f8f4f0"
+      industrial: "#f8f4f0"
+      railway: "#f8f4f0"
+      garages: "#f8f4f0"
+      construction: "#f8f4f0"
+      military: "#f8f4f0"
+      religious: "#f8f4f0"
+      prison: "#f8f4f0"
+      brownfield: "#f8f4f0"
+      quarry: "#f8f4f0"
+      farmland: "#f8f4f0"           # Liberty does not draw farmland: the land colour
+      farmyard: "#f8f4f0"
+      orchard: "#f8f4f0"
+      vineyard: "#f8f4f0"
+      greenfield: "#f8f4f0"
+      wetland: "#e2e0c7"            # Liberty's wetland pattern's ground #dddbbd at opacity 0.8
+      sand: "#f7efc3"               # Liberty's sand rgba(247,239,195,1)
+      beach: "#f7efc3"
+      beach_resort: "#f7efc3"
+      cemetery: "#d8e0bd"           # hsl(75,37%,81%)
+      grave_yard: "#d8e0bd"
+      school: "#eceecc"             # rgb(236,238,204)
+      kindergarten: "#eceecc"
+      university: "#eceecc"
+      college: "#eceecc"
+      hospital: "#ffddee"           # #fde
+      pitch: "#dee3cd"              # #DEE3CD, also Liberty's track
+      track: "#dee3cd"
+      stadium: "#dee3cd"
+      sports_centre: "#dee3cd"
+      marina: "#9ebdff"             # the water colour
+      swimming_area: "#9ebdff"
+      ice_rink: "#e5eeed"           # Liberty's ice: rgb(224,236,236) at opacity 0.8
+      default: "#f8f4f0"            # the land colour
+  # Liberty's only landcover pattern is the wetland's (no trees in a forest): null takes a texture away
+  landcover_pattern:
+    forest: null
+    wood: null
+    orchard: null
+    vineyard: null
+    cemetery: null
+    scrub: null
+    heath: null
+    beach: null
+    sand: null
+    quarry: null
+    brownfield: null
+  # how the textures draw: none below minzoom, then their opacity by zoom ([zoom, opacity] pairs, linear between them); each texture
+  # in `color`, else in its fill colour times `darken` (osm_carto: 0.6, and no minzoom, opacity 1, pixel_ratio 1); pixel_ratio 2: half
+  # the size. The colour of Liberty's wetland reeds.
+  landcover_pattern_style: {minzoom: 14, opacity: [[14, 0.0], [16, 0.5]], color: "#9ab660", pixel_ratio: 2}
+  landcover_outline: {}             # Liberty outlines no landcover class
+  lines:
+    waterways: {color: "#a0c8f0"}   # Liberty's rivers and streams
+    railways:  {color: "#bbbbbb"}   # Liberty's railways

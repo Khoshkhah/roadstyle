@@ -1104,9 +1104,19 @@ fn restyle(layers: Vec<Value>, ovs: &[Overlay]) -> Vec<Value> {
                 fp.push(v.clone());
             }
             fp.push(pats.values().next().unwrap().clone());
-            news.push((layers[bodies[0]]["id"].as_str().unwrap().to_string(),
-                       new(json!({"id": format!("ov{i}-pattern"), "type": "fill", "filter": ["match", ["get", "kind"], keys, true, false],
-                                  "paint": {"fill-pattern": fp}}))));
+            let mut spec = json!({"id": format!("ov{i}-pattern"), "type": "fill", "filter": ["match", ["get", "kind"], keys, true, false],
+                                  "paint": {"fill-pattern": fp}});
+            // a theme's landcover_pattern_style: no texture below its minzoom, and its opacity by zoom ([zoom, opacity] pairs, linear)
+            let ps = ll.get("pattern_style").cloned().unwrap_or(Value::Null);
+            if let Some(z) = ps.get("minzoom").filter(|z| z.is_number()) {
+                spec["minzoom"] = z.clone();
+            }
+            if let Some(stops) = ps.get("opacity").and_then(Value::as_array) {
+                let mut e = vec![json!("interpolate"), json!(["linear"]), json!(["zoom"])];
+                e.extend(stops.iter().filter_map(Value::as_array).flatten().cloned());
+                spec["paint"]["fill-opacity"] = Value::Array(e);
+            }
+            news.push((layers[bodies[0]]["id"].as_str().unwrap().to_string(), new(spec)));
         }
         if let Some(ic) = ll.get("icon").filter(|v| py_truth(v)) {
             let pairs = ic["size"].as_array().cloned().unwrap_or_default();

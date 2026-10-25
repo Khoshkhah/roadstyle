@@ -198,7 +198,7 @@ pub fn feature_overlays(tables: Vec<(String, FeatureTable)>, look: &crate::Look,
             l["color_by"] = json!({"map": fills, "default": default});
             l["outline_by"] = json!({"map": st["landcover_outline"], "default": "rgba(0,0,0,0)"});
             let mut pats = Map::new();
-            for k in st["landcover_pattern"].as_object().into_iter().flatten().map(|(k, _)| k) {
+            for k in st["landcover_pattern"].as_object().into_iter().flatten().filter(|(_, p)| !p.is_null()).map(|(k, _)| k) {
                 let id = format!("ms-pat-{k}");
                 if let Some(img) = all_images.get(&id) {
                     images.insert(id.clone(), img.clone());
@@ -206,6 +206,7 @@ pub fn feature_overlays(tables: Vec<(String, FeatureTable)>, look: &crate::Look,
                 pats.insert(k.clone(), id.into());
             }
             l["patterns"] = Value::Object(pats);
+            l["pattern_style"] = st["landcover_pattern_style"].clone();   // a theme's: the textures' first zoom and opacity by zoom
         } else if kind == "polygon" {
             let a = areas.get(&name).cloned().unwrap_or(json!({}));
             ov.color = a.get("fill").cloned().unwrap_or(Value::Null);

@@ -55,6 +55,15 @@ All notable changes to **roadstyle** are documented here. The format is based on
   wide. A bridge keeps its casing. The road layer's filter has the rule, and the tiles leave out the pieces that it hides.
 
 ### Changed
+- **A duckOSM map's base map has OpenFreeMap's colours by default: the theme "liberty".** The land, the water, the waterways and
+  each landcover class have the colour of OpenFreeMap's "Liberty" style (its landcover's low opacity over its land colour, as one
+  colour; a class that Liberty does not draw has its nearest class's colour). The only texture is the wetland's, as in Liberty (no
+  trees in a forest): none below zoom 14, then faded in to opacity 0.5 at zoom 16, half the size, in the green of Liberty's reeds. Built-up land
+  has the land colour, as Liberty draws it from zoom 12 on. The roads have Liberty's colours (orange motorways, yellow main
+  roads, white minor roads), the railways its grey, and the buildings are lighter and show from zoom 14 ("osm": 15). The old look is the
+  theme "osm" (`duckosm.page(db, theme="osm")`; `BaseMap { theme: "osm", .. }`). A theme can now take a texture away (`null` in
+  `landcover_pattern`) and set how the textures draw (`landcover_pattern_style`: `minzoom`, `opacity` by zoom, `color`,
+  `darken`, `pixel_ratio`); with no `landcover_pattern_style`, a theme draws its textures as before.
 - **An unknown keyword of `render_edges` gives a warning** (T3), with the nearest known name: "render_edges: unknown keyword
   'colour_by' (did you mean 'color_by'?); it does nothing". Before, `render_edges` ignored it with no message. From roadstyle 0.27.0
   it is an error. The rule is one function, `roadstyle::options::unknown` (Python: `_rust.unknown_keywords`), which the MCP server's
