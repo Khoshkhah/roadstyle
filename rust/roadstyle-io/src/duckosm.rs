@@ -233,8 +233,12 @@ pub fn features_sql(cat: &Catalog, specs: &[Value]) -> Vec<LayerSql> {
         // a table outside features.* (the boundary): the kind is the layer's name
         let kind = if schema.is_some() { format!("'{}'", q(name)) } else { "kind".into() };
         let bearing = if s["bearing"] == true { "CAST(bearing AS DOUBLE)" } else { "CAST(NULL AS DOUBLE)" };
-        let sql = |geom: &str, tag: &dyn Fn(&str) -> String| format!("SELECT {i} AS spec, '{layer}' AS layer, rowid AS rid, CAST(osm_id AS VARCHAR) AS osm_id, {kind} AS kind,
-        COALESCE(name, '') AS name, {bearing} AS bearing, CAST({} AS VARCHAR) AS levels,
+        // a table without osm_id or name (main.boundary of a boundary file: its own properties and the shape) gives NULL and ''
+        let has = |c: &str| cat.has_column(schema.unwrap_or("features"), table, c);
+        let osm_id = if has("osm_id") { "CAST(osm_id AS VARCHAR)" } else { "CAST(NULL AS VARCHAR)" };
+        let nm = if has("name") { "COALESCE(name, '')" } else { "''" };
+        let sql = |geom: &str, tag: &dyn Fn(&str) -> String| format!("SELECT {i} AS spec, '{layer}' AS layer, rowid AS rid, {osm_id} AS osm_id, {kind} AS kind,
+        {nm} AS name, {bearing} AS bearing, CAST({} AS VARCHAR) AS levels,
         CAST({} AS VARCHAR) AS roof_levels, CAST({} AS VARCHAR) AS height, CAST({} AS VARCHAR) AS min_height,
         CAST({} AS VARCHAR) AS min_level, ST_AsWKB({geom}) AS geometry FROM {}.{table} WHERE geom IS NOT NULL
         {}{}", tag("building:levels"), tag("roof:levels"), tag("height"), tag("min_height"), tag("building:min_level"),
@@ -288,6 +292,89 @@ pub fn cut_sea(t: FeatureTable) -> Result<FeatureTable, Error> {
         out.push(GeomType::MultiPolygon, &closed);
     }
     t.with_geometries(out).map_err(|e| Error::Data(e.to_string()))
+}
+
+/// The base map's rows clipped to the area's boundary (the row of the layer `landcover`, kind `background`: the whole main.boundary).
+/// A duckOSM file's cut keeps the whole ways and relations that touch its area (osmium's complete-ways strategy), so a river, its
+/// islands or a wetland reach far outside it; the page drew them there. A polygon is cut to the boundary, a line to its parts inside,
+/// a point is kept when it is inside; an empty result is dropped, as is a feature wholly outside. Each feature is clipped on its own
+/// (an inner ring of a relation that has its own tags is clipped like any other feature). In Rust (i_overlay and an R-tree of the
+/// boundary's edges), so that no reader needs DuckDB's spatial extension. A feature whose box touches no edge of the boundary is wholly
+/// inside or wholly outside: one point decides, and a feature inside keeps its geometry as it is. Nothing changes with no boundary.
+pub fn clip_to_boundary(t: FeatureTable) -> Result<FeatureTable, Error> {
+    use i_overlay::core::{fill_rule::FillRule, overlay_rule::OverlayRule};
+    use i_overlay::float::{clip::FloatClip, single::SingleFloatOverlay};
+    use i_overlay::string::clip::ClipRule;
+    use rstar::{primitives::Line, RTree, AABB};
+    let g = t.geometries_of();
+    let is_boundary = |r: usize| t.get(r, "layer").and_then(Cell::as_str) == Some("landcover")
+        && t.get(r, "kind").and_then(Cell::as_str) == Some("background");
+    let Some(b) = (0..t.len()).find(|&r| is_boundary(r)) else { return Ok(t) };
+    let shape = rings(g, b)?;
+    let edges = RTree::bulk_load(shape.iter().flat_map(|r| r.windows(2).map(|w| Line::new(w[0], w[1]))).collect::<Vec<_>>());
+    let Some(far) = shape.iter().flatten().map(|p| p[0]).reduce(f64::max) else { return Ok(t) };
+    // even-odd: the edges that a ray from `p` to the east crosses (the boundary's holes are its inner rings)
+    let inside = |p: [f64; 2]| edges.locate_in_envelope_intersecting(&AABB::from_corners([p[0], p[1]], [far + 1.0, p[1]]))
+        .filter(|l| (l.from[1] > p[1]) != (l.to[1] > p[1])
+            && p[0] < l.from[0] + (p[1] - l.from[1]) / (l.to[1] - l.from[1]) * (l.to[0] - l.from[0]))
+        .count() % 2 == 1;
+    let close = |mut r: Vec<[f64; 2]>| {
+        if r.first() != r.last() {
+            r.push(r[0]);
+        }
+        r
+    };
+    let mut keep = vec![true; t.len()];
+    let mut out = FeatureTable::geometries();
+    for r in 0..t.len() {
+        let Some(kind) = g.kind(r).filter(|_| r != b) else {
+            out.push_copy(g, r);
+            continue;
+        };
+        let pts: Vec<[f64; 2]> = g.parts(r).flatten().flatten().copied().collect();
+        let Some(&first) = pts.first() else {
+            out.push_copy(g, r);
+            continue;
+        };
+        let (lo, hi) = pts.iter().fold((first, first), |(lo, hi), p| ([lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])]));
+        if edges.locate_in_envelope_intersecting(&AABB::from_corners(lo, hi)).next().is_none() {
+            if inside(first) {
+                out.push_copy(g, r);
+            } else {
+                keep[r] = false;
+            }
+            continue;
+        }
+        let parts: Vec<Vec<Vec<[f64; 2]>>> = match kind {
+            GeomType::Point | GeomType::MultiPoint => g.parts(r).filter_map(|p| p.into_iter().next().map(<[_]>::to_vec))
+                .filter(|ring| ring.first().is_some_and(|p| inside(*p))).map(|ring| vec![ring]).collect(),
+            GeomType::LineString | GeomType::MultiLineString => g.parts(r).flatten()
+                .flat_map(|line| line.to_vec().clip_by(&shape, FillRule::EvenOdd, ClipRule { invert: false, boundary_included: true }))
+                .filter(|l| l.len() > 1).map(|l| vec![l]).collect(),
+            GeomType::Polygon | GeomType::MultiPolygon => {
+                let subject: Vec<Vec<[f64; 2]>> = g.parts(r).flatten().map(<[_]>::to_vec).collect();
+                subject.overlay(&shape, OverlayRule::Intersect, FillRule::EvenOdd).into_iter()
+                    .map(|rings| rings.into_iter().map(close).collect()).collect()
+            }
+        };
+        if parts.is_empty() {
+            keep[r] = false;
+            continue;
+        }
+        let kind = match (kind, parts.len()) {
+            (GeomType::Point | GeomType::MultiPoint, 1) => GeomType::Point,
+            (GeomType::Point | GeomType::MultiPoint, _) => GeomType::MultiPoint,
+            (GeomType::LineString | GeomType::MultiLineString, 1) => GeomType::LineString,
+            (GeomType::LineString | GeomType::MultiLineString, _) => GeomType::MultiLineString,
+            (GeomType::Polygon | GeomType::MultiPolygon, 1) => GeomType::Polygon,
+            _ => GeomType::MultiPolygon,
+        };
+        out.push(kind, &parts);
+    }
+    if keep.iter().all(|k| *k) {
+        return t.with_geometries(out).map_err(|e| Error::Data(e.to_string()));
+    }
+    t.filter(&keep, out).map_err(|e| Error::Data(e.to_string()))
 }
 
 /// Every ring of the Polygon or MultiPolygon `row`.
@@ -387,5 +474,38 @@ mod tests {
         assert!((area2 / 2.0 - 2.0).abs() < 1e-9, "area {}", area2 / 2.0);
         assert_eq!(t.geometries_of().to_geojson(2), serde_json::json!({"type": "MultiPolygon", "coordinates": square(0.0, 0.0, 2.0, 2.0)}),
                    "only the background changes");
+    }
+    #[test]
+    fn the_base_map_is_clipped_to_the_boundary() {
+        // a 2 x 2 boundary; a river across its left side, a park inside, an island outside (an inner ring of the river's relation with
+        // its own tags: clipped as any feature, so dropped), a stream across it, a point inside and one outside
+        let mut g = FeatureTable::geometries();
+        g.push(GeomType::MultiPolygon, &square(0.0, 0.0, 2.0, 2.0));
+        g.push(GeomType::Polygon, &square(-5.0, 0.5, 1.0, 1.0));
+        g.push(GeomType::Polygon, &square(0.5, 0.5, 1.5, 1.5));
+        g.push(GeomType::Polygon, &square(-4.0, 0.6, -3.0, 0.9));
+        g.push(GeomType::LineString, &[vec![vec![[-3.0, 1.2], [3.0, 1.2]]]]);
+        g.push(GeomType::Point, &[vec![vec![[1.0, 0.2]]]]);
+        g.push(GeomType::Point, &[vec![vec![[5.0, 5.0]]]]);
+        let col = |v: [&str; 7]| -> ArrayRef { Arc::new(StringArray::from(v.to_vec())) };
+        let t = FeatureTable::new(vec!["layer".into(), "kind".into()],
+                                  vec![col(["landcover", "water", "landcover", "landcover", "waterways", "pois", "pois"]),
+                                       col(["background", "river", "park", "wetland", "stream", "bench", "bench"])], g).unwrap();
+        let park = t.geometries_of().to_geojson(2);
+        let t = clip_to_boundary(t).unwrap();
+        let kinds: Vec<&str> = (0..t.len()).map(|r| t.get(r, "kind").and_then(Cell::as_str).unwrap()).collect();
+        assert_eq!(kinds, ["background", "river", "park", "stream", "bench"], "the island and the far point are dropped");
+        let pts = |r: usize| -> Vec<[f64; 2]> { t.geometries_of().parts(r).flatten().flatten().copied().collect() };
+        assert!(pts(1).iter().all(|p| p[0] >= -1e-9), "the river ends at the boundary: {:?}", pts(1));
+        let xs: Vec<f64> = pts(3).iter().map(|p| p[0]).collect();
+        assert!((xs.iter().cloned().fold(f64::MAX, f64::min) - 0.0).abs() < 1e-9 && (xs.iter().cloned().fold(f64::MIN, f64::max) - 2.0).abs() < 1e-9,
+                "the stream inside only: {xs:?}");
+        assert_eq!(t.geometries_of().to_geojson(2), park, "a feature inside keeps its geometry as it is");
+        // no boundary: nothing changes
+        let mut g = FeatureTable::geometries();
+        g.push(GeomType::Polygon, &square(-4.0, 0.6, -3.0, 0.9));
+        let one = |v: &str| -> ArrayRef { Arc::new(StringArray::from(vec![v])) };
+        let t = FeatureTable::new(vec!["layer".into(), "kind".into()], vec![one("landcover"), one("wetland")], g).unwrap();
+        assert_eq!(clip_to_boundary(t).unwrap().len(), 1);
     }
 }

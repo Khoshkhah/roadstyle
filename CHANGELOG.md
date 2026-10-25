@@ -70,6 +70,15 @@ All notable changes to **roadstyle** are documented here. The format is based on
   Tartu: 15,878 crossings, 0 not kept, 6 order wishes not kept (0 before); Burnaby: 42,424 crossings, 1 not kept. The goldens
   `monaco/rust_levels_solve.json` and `sodermalm/rust_levels_solve.json` change for this. `roadstyle_levels::PATH_CLASSES` is the one
   list of the path classes (the base map's edges and duckOSM's plan read it too).
+- **A duckOSM map's base map has OpenFreeMap's colours by default: the theme "liberty".** The land, the water, the waterways and
+  each landcover class have the colour of OpenFreeMap's "Liberty" style (its landcover's low opacity over its land colour, as one
+  colour; a class that Liberty does not draw has its nearest class's colour). The only texture is the wetland's, as in Liberty (no
+  trees in a forest): none below zoom 14, then faded in to opacity 0.5 at zoom 16, half the size, in the green of Liberty's reeds. Built-up land
+  has the land colour, as Liberty draws it from zoom 12 on. The roads have Liberty's colours (orange motorways, yellow main
+  roads, white minor roads), the railways its grey, and the buildings are lighter and show from zoom 14 ("osm": 15). The old look is the
+  theme "osm" (`duckosm.page(db, theme="osm")`; `BaseMap { theme: "osm", .. }`). A theme can now take a texture away (`null` in
+  `landcover_pattern`) and set how the textures draw (`landcover_pattern_style`: `minzoom`, `opacity` by zoom, `color`,
+  `darken`, `pixel_ratio`); with no `landcover_pattern_style`, a theme draws its textures as before.
 - **The level editor starts from the map's levels** (2026-10-25): `levelEditor({..., levels: {csv, edge_hash}})` takes the levels that
   the host's map has (duckOSM's `visualization.edge_levels`, with `edge_levels_meta.edge_hash`) and starts from them with no solve,
   when the hash is the area's; else it solves the whole area and `editor.answer().resolve.why` says why. `saveArea(store, area,
@@ -204,6 +213,16 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `docs/design/dashboard_module.md`, "Trusted inputs".
 
 ### Fixed
+- **A duckOSM map's base map no longer draws outside its area.** The cut of a duckOSM file keeps the whole ways and relations that touch
+  its area (osmium's complete-ways strategy), so a river, its islands or a wetland reached kilometres past the boundary line, and the
+  page drew them there. Every base-map feature is now clipped to the area's boundary (`main.boundary`, the row of the layer
+  `landcover`, kind `background`): a polygon is cut, a line keeps its parts inside, a point is kept when it is inside, and a feature
+  wholly outside is dropped (`roadstyle_io::duckosm::clip_to_boundary`, in Rust with `i_overlay`: the page, the Python reader and the
+  tiles get it once; no DuckDB spatial extension). A file with no boundary is not changed. Burnaby: 64,416 -> 64,273 features in 373 ms;
+  Tartu: 31,635 -> 31,526 in 29 ms; Monaco: 2,571 -> 2,536 in 16 ms. The reader also reads a boundary table that has no `osm_id` or
+  `name` column (the boundary of a boundary file: before, its row was skipped and nothing could be clipped). The goldens of Monaco's
+  style and tiles changed at the boundary only (35 features are beyond it), and the test of the sea at the tile edge now asserts the
+  opposite: the sea beyond the boundary is cut.
 - **The studio's Dashboard and Report pages have their sidebar again.** Since the page keys came from `given` only (N32 step 2), the
   wasm page (`makePage`, `Roads.page`) lost the page keys of its call (`sidebar`, `popup_mode`, ...). One function now makes them,
   `roadstyle::page_options::given_of` (the look's other keywords, and `name` and `road_popup` of the call), for the wasm page and for

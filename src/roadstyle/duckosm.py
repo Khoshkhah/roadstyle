@@ -92,7 +92,7 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers=True, only: bo
     return roads, features, level_kw
 
 
-def look(db, mode: str = "all", *, theme: str = "osm", paths: str = "google", levels=None, **kwargs):
+def look(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google", levels=None, **kwargs):
     """The look of the map of the duckOSM file ``db`` (the Rust engine's ``Look``): the base map's look of ``mode``, ``theme`` and
     ``paths`` (mapstyle's mode_settings and styles), render_map's map options (the name from the file's name, the tooltip, the reader's
     columns, the stored levels' columns with ``levels``), and ``kwargs`` over them (render_edges' keywords)."""
@@ -107,7 +107,7 @@ def _options(db, mode, theme, paths, levels, kwargs) -> dict:
     return {"base_map": {"mode": mode, "theme": theme, "paths": paths, "place": Path(db).stem}, "args": args}
 
 
-def export_inline(db, mode: str = "all", *, theme: str = "osm", paths: str = "google", layers: bool = True, levels: str = "stored",
+def export_inline(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google", layers: bool = True, levels: str = "stored",
                   only: bool = False, **kwargs) -> dict:
     """mapstyle's ``export_inline`` on the Rust engine: the map of the duckOSM file ``db`` (its roads in the style of ``mode``, the
     base map of ``features.*`` with ``layers``) as one style with the data in it, for an app that draws a MapLibre style (the roadstyle
@@ -122,7 +122,7 @@ def export_inline(db, mode: str = "all", *, theme: str = "osm", paths: str = "go
     return style
 
 
-def page(db, mode: str = "all", *, theme: str = "osm", paths: str = "google", layers=True, levels: str = "auto",
+def page(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google", layers=True, levels: str = "auto",
          only: bool = False, interaction: dict = None, dashboard: bool = False, **kwargs):
     """mapstyle's ``render_map`` on the Rust engine: the page of the duckOSM file ``db`` (``read``, its roads in the style of ``mode``, the
     base map of ``features.*`` with ``layers``, the shared dashboard with the base map's controls: modes, kinds, each layer's clicks,
@@ -167,7 +167,7 @@ def _with_modes(roads):
     return roads.append_column("modes", pa.array(labels, pa.string()))
 
 
-def export_style(db, out_dir, *, base_url: str, mode: str = "all", theme: str = "osm", paths: str = "google", layers: bool = True,
+def export_style(db, out_dir, *, base_url: str, mode: str = "all", theme: str = "liberty", paths: str = "google", layers: bool = True,
                  levels: str = "stored", format: str = "xyz", only: bool = False, **kwargs):
     """mapstyle's ``export_style`` on the Rust engine: the map of the duckOSM file ``db`` as style.json, its vector tiles (the roads
     and the base map; ``format``: "xyz" or "pmtiles"), the sprite and the popup's files in ``out_dir``, served at ``base_url``, for an
@@ -187,7 +187,7 @@ def export_style(db, out_dir, *, base_url: str, mode: str = "all", theme: str = 
     return _write_export(t, out_dir, base_url, format, json.loads(lk.part("map"))["output"]["name"], bounds)
 
 
-def base_map(mode: str = "all", *, theme: str = "osm", paths: str = "google") -> dict:
+def base_map(mode: str = "all", *, theme: str = "liberty", paths: str = "google") -> dict:
     """The base map's look of one choice (roadstyle-look's basemap.rs; mapstyle's mode_settings and styles): {"palette": the roads'
     palette name, "settings": its settings source, "features": the base map's part of the look (its layers, 3D heights, style and
     images), "map": the look's map options with the mode's, "page": the mode's page defaults}."""

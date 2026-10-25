@@ -226,6 +226,27 @@ impl FeatureTable {
         Ok(())
     }
 
+    /// The features where `keep` is true, each with the geometry of `geoms` (one for each kept feature, in order): the base map
+    /// clipped to its boundary (roadstyle-io duckosm::clip_to_boundary) drops the features outside it.
+    pub fn filter(self, keep: &[bool], geoms: Geometries) -> Result<FeatureTable, Error> {
+        if keep.len() != self.len() {
+            return Err(Error::Geometry(format!("{} flags for {} features", keep.len(), self.len())));
+        }
+        let mask = BooleanArray::from(keep.to_vec());
+        let cols = self.cols.iter().map(|c| arrow_select::filter::filter(c, &mask))
+            .collect::<Result<Vec<_>, _>>().map_err(|e| Error::Geometry(format!("filter: {e}")))?;
+        let rules = self.rules.iter().map(|r| Rule {
+            nulls: r.nulls,
+            ints: r.ints.as_ref().map(|i| i.iter().zip(keep).filter(|(_, k)| **k).map(|(v, _)| *v).collect()),
+        }).collect();
+        let n = keep.iter().filter(|k| **k).count();
+        if geoms.len() != n {
+            return Err(Error::Geometry(format!("{} geometries for {n} kept features", geoms.len())));
+        }
+        let props = RoadTable::new(self.names.clone(), cols.clone(), no_lines(n))?;
+        Ok(FeatureTable { names: self.names, cols, rules, props, geoms })
+    }
+
     pub fn len(&self) -> usize {
         self.geoms.len()
     }

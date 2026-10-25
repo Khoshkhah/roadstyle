@@ -16,6 +16,7 @@ arrow-array.workspace = true
 arrow-schema.workspace = true
 arrow-select.workspace = true
 bytes.workspace = true
+rstar.workspace = true              # the base map clipped to its boundary: the R-tree of the boundary's edges
 i_overlay = "=9.0.1"                # the base map: the land is the boundary less the sea (duckosm::cut_sea); 9.1.0 is younger than two weeks
 shapefile = "=0.9.0"                # the roads of a Shapefile (pure Rust: also in wasm)
 proj4rs = { version = "=0.2.0", default-features = false }   # a road file's CRS to EPSG:4326 (pure Rust, no C proj)

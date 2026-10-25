@@ -17,9 +17,10 @@ const PATHS: &str = roadstyle_assets::text!("data/basemap/paths.yaml");
 const CARTO: &str = roadstyle_assets::text!("data/basemap/osm_carto.yaml");
 const BASEMAPS: &str = roadstyle_assets::text!("data/basemaps.json");
 /// the themes other than "osm" (osm_carto.yaml as it is), by name
-const THEMES: [(&str, &str); 3] = [
+const THEMES: [(&str, &str); 4] = [
     ("google", roadstyle_assets::text!("data/basemap/themes/google.yaml")),
     ("grey", roadstyle_assets::text!("data/basemap/themes/grey.yaml")),
+    ("liberty", roadstyle_assets::text!("data/basemap/themes/liberty.yaml")),
     ("roadstyle", roadstyle_assets::text!("data/basemap/themes/roadstyle.yaml")),
 ];
 const ICONS: [(&str, &str); 6] = [
@@ -57,7 +58,7 @@ pub struct BaseMap {
 
 impl Default for BaseMap {
     fn default() -> BaseMap {
-        BaseMap { mode: "all".into(), theme: "osm".into(), paths: "google".into(), place: None }
+        BaseMap { mode: "all".into(), theme: "liberty".into(), paths: "google".into(), place: None }
     }
 }
 
@@ -227,10 +228,15 @@ fn images(st: &Value, specs: &[Value]) -> Result<Map<String, Value>, Error> {
         if name == "landcover" {
             let fills = &f["areas"]["landcover"];
             let default = fills["default"].as_str().unwrap_or("#000000");
-            for (k, pat) in f["landcover_pattern"].as_object().into_iter().flatten() {
+            // the textures' style (a theme's landcover_pattern_style): each in `color`, else in its fill times `darken`, drawn at
+            // 1/pixel_ratio of its size
+            let ps = &f["landcover_pattern_style"];
+            let (dark, ratio) = (ps["darken"].as_f64().unwrap_or(0.6), ps["pixel_ratio"].as_f64().unwrap_or(1.0));
+            for (k, pat) in f["landcover_pattern"].as_object().into_iter().flatten().filter(|(_, p)| !p.is_null()) {
                 let fill = fills.get(k).filter(|_| k != "default").and_then(Value::as_str).unwrap_or(default);
-                let png = pattern_png(pat.as_str().unwrap_or_default(), &darker(fill, 0.6)?)?;
-                out.insert(format!("ms-pat-{k}"), data_url("image/png", &png).into());
+                let color = match ps["color"].as_str() { Some(c) => c.to_string(), None => darker(fill, dark)? };
+                let url = data_url("image/png", &pattern_png(pat.as_str().unwrap_or_default(), &color)?);
+                out.insert(format!("ms-pat-{k}"), if ratio == 1.0 { url.into() } else { json!({"url": url, "pixelRatio": ratio}) });
             }
         } else if kind_of(specs, name) == "point" {
             let mut p = f["points"]["default"].as_object().cloned().unwrap_or_default();
