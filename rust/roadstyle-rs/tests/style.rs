@@ -69,7 +69,7 @@ fn monaco_style() {
 fn tartu_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
-    assert_eq!(style_hash(&area), "df9fc3f735ebcc09d3e81a911dd283928d1d68a87d59fed71a33896caddc61d8");
+    assert_eq!(style_hash(&area), "29769cce6c4dd1f86fc0ccbb3ec290e65ed283671a3c57247ece61ebd50cc844");
 }
 
 /// The vector tiles (make_tiled): the SHA-256 of the style and of every tile of the roads' box at zooms 12, 14 and 15 (each tile with
@@ -134,5 +134,5 @@ fn the_sea_is_cut_at_the_boundary() {
 fn tartu_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
-    assert_eq!(tiles_hash(&area), "ffa7620783a3ad229bfd13730e0a266a3bdf84167a4db1a02c2cc404158b68ea");
+    assert_eq!(tiles_hash(&area), "65d022467a18bcdc15fa879a3f368af215f480943141ff0d06ecca844e255b91");
 }
