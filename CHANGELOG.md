@@ -112,6 +112,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   are not a file of the kind, data that the call cannot use, a wrong argument, stored levels that are missing or of other edges, a CRS
   that is missing or not read, a Parquet writer that stopped. Each has the same message text as before; `String::from(error)` gives
   it, so a caller whose errors are text keeps its `?`. Python and JavaScript show the same messages.
+- **The road model's and the tiles' errors are typed** (Rust only; docs/design/target_architecture.md, T3). `roadstyle_model::Error`:
+  a column that the model does not take (`Column`, with the column's name: a column type that it does not read now names its column)
+  or a geometry that it does not take. `roadstyle_tiles::Error`: tile settings that are not correct, or an archive with no tile
+  (`Empty`). Both enums are `#[non_exhaustive]`. Tile zooms after 24 (MapLibre's last zoom), a first zoom after the last and a buffer
+  below 0 are errors: before, a `maxzoom` after 31 stopped the program (an overflow in the archive). `Tiles::new`, `tile_stage` and
+  `Tiles::archive` return a `Result` (`archive` gave `None` both for bounds that are not longitude and latitude and for no tile).
 - **The base map goes through stage 1 as typed tables** (audit R10, step 2; docs/design/r10_feature_table.md). The Rust engine reads
   features.parquet into one table (Arrow columns and one coordinate buffer), cuts the sea out of it, and keeps each base-map layer as a
   table until it writes the GeoJSON text, not a JSON tree for each feature. The output is the same bytes (the styles, the files and the

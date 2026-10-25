@@ -410,8 +410,8 @@ fn tiled_page(s: &Sources, a: &Map<String, Value>) -> Result<(Value, Option<Vec<
     let mut o = TileOptions::new(&s.layers, &s.metadata, &s.saved[TILES], &s.saved[COLUMNS], &[])?;
     o.exact = Some(keep.into_iter().flatten().map(String::from).collect());
     o.only = Some(["roads", "simple", "slots"].map(String::from).to_vec());
-    let (style, t) = crate::tile_stage(s, &o, &json!({"url": "pmtiles://roads"}));
-    let archive = t.bounds().and_then(|b| t.archive(b, &t.layer_names())).ok_or("the archive has no tile")?;
+    let (style, t) = crate::tile_stage(s, &o, &json!({"url": "pmtiles://roads"}))?;
+    let archive = t.archive(t.bounds().ok_or(crate::tiles::Error::Empty)?, &t.layer_names())?;
     Ok((style, Some(archive)))
 }
 

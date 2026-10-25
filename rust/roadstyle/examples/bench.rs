@@ -73,7 +73,7 @@ fn main() {
         let (tstyle, tiles) = step("stage 2 (tile_stage)", || {
             let o = roadstyle::tiles::stage::TileOptions::new(&s.layers, &s.metadata, &s.saved[roadstyle::tiles::stage::TILES],
                                                              &s.saved[roadstyle::tiles::stage::COLUMNS], &[]).unwrap();
-            roadstyle::tile_stage(&s, &o, &roadstyle::xyz_at(""))
+            roadstyle::tile_stage(&s, &o, &roadstyle::xyz_at("")).unwrap()
         });
         let archive = step("stage 2's archive (PMTiles)", || tiles.archive(tiles.bounds().unwrap(), &tiles.layer_names()).unwrap().len());
         println!("  (the archive: {:.1} MB; the tiled style: {:.1} KB)", archive as f64 / 1e6, roadstyle::style_text(&s, &tstyle).len() as f64 / 1e3);

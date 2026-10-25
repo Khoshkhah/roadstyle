@@ -4,6 +4,7 @@
 // Ported numeric code: index loops over parallel arrays and tuple types of the Python stages read as they are in Python.
 #![allow(clippy::needless_range_loop, clippy::type_complexity)]
 
+pub mod error;
 pub mod feature_table;
 pub mod flags;
 pub mod geom;
@@ -12,6 +13,7 @@ pub mod table;
 pub mod topology;
 pub mod wkb;
 
+pub use error::Error;
 pub use table::{Cell, Lines, RoadTable};
 
 use serde_json::Value;
