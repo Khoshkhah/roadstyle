@@ -55,6 +55,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `docs/design/dashboard_module.md`, "Trusted inputs".
 
 ### Fixed
+- **The 3D buildings of a duckOSM file have the height of all the digits of their tags.** The reader's SQL
+  (`roadstyle_io::duckosm`, for Python and the browser) read a tag as `tags['k'][1]`. In DuckDB 1.5 and in duckdb-wasm, `tags['k']` is
+  the text, so `[1]` gave its first character: `building:levels` "25" was "2", and the building was 7.32 m high, not 91.5 m. The SQL
+  now reads `map_extract(tags, 'k')[1]`, which is a list in every DuckDB version. On Monaco, 104 buildings have a tag with two or more
+  characters.
 - **Two readings of a duckOSM file at the same time on one connection no longer break each other** (the duckosm-rust page: "Table with
   name e does not exist!"). The reader's temporary tables have the run's own names (`duckosmPlan`'s optional `run`, returned in
   `"run"`; each base-map layer's `"table"`; `"drop"` drops them), and `duckosmFeaturesSelect(specs, run)` takes the run. `roads_sql.js`,
