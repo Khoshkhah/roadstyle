@@ -145,7 +145,7 @@ pub fn arrow_kind(layers: &[Value]) -> Value {
 }
 
 /// roadstyle:controls: the options of rsDashboard that the style gives (render_web.render's `page`, in its order).
-pub fn controls(look: &crate::Look, roads: &Roads, info: PageInfo, active: usize) -> Result<Value, String> {
+pub fn controls(look: &crate::Look, roads: &Roads, info: PageInfo, active: usize) -> Result<Value, crate::Error> {
     let (th, cfg, args) = (&look.theme, &look.config, &look.args);
     let m = &look.model;
     let cam = merged(&json!({"pitch": 0, "bearing": 0, "pitch_3d": 55, "max_pitch": 70}), &cfg["camera"]);

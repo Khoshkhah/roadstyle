@@ -35,11 +35,11 @@ pub(crate) fn class_style<'a>(look: &'a Look, highway: Option<Cell>) -> (&'a Val
 /// render's access_col: the kinds that have their own colour and row (_ACCESS); any other value is null.
 const ACCESS_KINDS: [&str; 4] = ["private", "bus", "pedestrian", "delivery"];
 
-pub fn mark_roads(fs: &mut Roads, look: &Look, args: &Value) -> Result<crate::colors::Colors, String> {
+pub fn mark_roads(fs: &mut Roads, look: &Look, args: &Value) -> Result<crate::colors::Colors, crate::Error> {
     let access_col = args["access_col"].as_str().filter(|c| !c.is_empty());
     if let Some(col) = access_col {
         if fs.table.col(col).is_none() && !fs.is_empty() {
-            return Err(format!("access_col {col:?} is not a column of the edges"));
+            return Err(crate::error::column(col, "access_col names it, and it is not a column of the edges"));
         }
         for i in 0..fs.len() {
             let kind = fs.get(i, col).and_then(Cell::as_str).and_then(|k| ACCESS_KINDS.iter().find(|a| **a == k).copied());

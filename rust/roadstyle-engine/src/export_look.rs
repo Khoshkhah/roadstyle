@@ -17,7 +17,7 @@ pub struct LookCols<'a> {
 }
 
 /// The look of `look` (a resolved look: render's theme, config and road tables) for the positions `positions` (in order).
-pub fn export_look(look: &crate::Look, cols: &LookCols, positions: &[i64]) -> Result<Value, String> {
+pub fn export_look(look: &crate::Look, cols: &LookCols, positions: &[i64]) -> Result<Value, crate::Error> {
     let (t, cfg) = (&look.theme, &look.config);
     let m = &look.model;
     let hw = cols.highway;

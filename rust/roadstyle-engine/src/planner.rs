@@ -71,7 +71,7 @@ fn planner_ends(roads: &Roads, mode: &str) -> Vec<Value> {
 }
 
 /// planner_data: the route planner's graphs over the roads' indices (the page's RM).
-pub fn planner_data(roads: &Roads, planner: Vec<Row>) -> Result<Value, String> {
+pub fn planner_data(roads: &Roads, planner: Vec<Row>) -> Result<Value, crate::Error> {
     let rows: Vec<Map<String, Value>> = planner.into_iter().map(|r| r.cols).collect();
     let mut by_part: HashMap<String, Vec<&Map<String, Value>>> = HashMap::new();
     for r in &rows {
@@ -81,7 +81,7 @@ pub fn planner_data(roads: &Roads, planner: Vec<Row>) -> Result<Value, String> {
     let part = |p: &str| by_part.get(p).unwrap_or(&empty).iter().copied();
     let modes: Vec<String> = MODES.iter().filter(|m| part("mode").any(|r| r["mode"] == **m)).map(|m| m.to_string()).collect();
     if modes.is_empty() {
-        return Err("no mode with edges + edge_graph to route on".into());
+        return Err(crate::error::data("no mode with edges + edge_graph to route on"));
     }
     let eid = |r: Road| -> i64 { match r.get("edge_id").map(Cell::to_value) { Some(Value::String(s)) => s.parse().unwrap_or(0), Some(v) => v.as_i64().unwrap_or(0), None => 0 } };
     let mut k_of: HashMap<i64, usize> = HashMap::new(); // a road cut into pieces has several rows: the first one is the road
@@ -98,7 +98,7 @@ pub fn planner_data(roads: &Roads, planner: Vec<Row>) -> Result<Value, String> {
     let n_of: HashMap<i64, usize> = node_ids.iter().enumerate().map(|(i, n)| (*n, i)).collect();
     let mut row = Vec::with_capacity(roads.len());
     for r in roads.iter() {
-        row.push(ends.get(&eid(r)).ok_or_else(|| format!("edge {} has no nodes in the mode tables", eid(r)))?);
+        row.push(ends.get(&eid(r)).ok_or_else(|| crate::error::data(format!("edge {} has no nodes in the mode tables", eid(r))))?);
     }
     let mut data = Map::new();
     data.insert("modes".into(), json!(modes));
@@ -119,7 +119,7 @@ pub fn planner_data(roads: &Roads, planner: Vec<Row>) -> Result<Value, String> {
             }
         }
         let es: Vec<&Map<String, Value>> = part("graph").filter(|r| r["grp"].as_i64() == Some(mi as i64)).collect();
-        let ks: Vec<usize> = es.iter().map(|r| k_of.get(&i64_of(r, "e").unwrap_or(0)).copied().ok_or("a mode's edge is not a road")).collect::<Result<_, _>>()?;
+        let ks: Vec<usize> = es.iter().map(|r| k_of.get(&i64_of(r, "e").unwrap_or(0)).copied().ok_or_else(|| crate::error::data("a mode's edge is not a road"))).collect::<Result<_, _>>()?;
         graphs.insert(m.to_string(), json!({"k": ks, "cost": es.iter().map(|r| py_round(f64_or0(r, "cost"), 3)).collect::<Vec<_>>(),
                                              "len": es.iter().map(|r| py_round(f64_or0(r, "len"), 2)).collect::<Vec<_>>(),
                                              "next": ks.iter().map(|k| nxt.get(k).cloned().unwrap_or_default()).collect::<Vec<_>>()}));

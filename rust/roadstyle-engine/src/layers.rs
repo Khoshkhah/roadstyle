@@ -606,7 +606,7 @@ pub struct PageInfo {
 
 #[allow(clippy::too_many_arguments)] // the sources of the style, as make_parts has them
 pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crate::simple::SimpleSource, slots: &[Value], decks: bool, ovs: &mut [Overlay], fills: &[String], active: usize)
-                   -> Result<(Vec<Value>, PageInfo), String> {
+                   -> Result<(Vec<Value>, PageInfo), crate::Error> {
     let mut info = PageInfo::default();
     let m = &look.model;
     let (th, cfg) = (&look.theme, &look.config);
@@ -621,7 +621,7 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     let any_tunnel = rp.iter().any(|p| p.get("__rs_tunnel").is_some_and(py_truth));
     if any_tunnel && cfg["tunnel_palettes"].get(cfg["tunnel_palette"].as_str().unwrap_or("")).is_none() {        // render's check (the tunnel look)
         let names: Vec<String> = cfg["tunnel_palettes"].as_object().into_iter().flatten().map(|(k, _)| format!("'{k}'")).collect();
-        return Err(format!("tunnel_palette '{}' is not in tunnel_palettes [{}]", cfg["tunnel_palette"].as_str().unwrap_or(""), names.join(", ")));
+        return Err(crate::error::options(format!("tunnel_palette '{}' is not in tunnel_palettes [{}]", cfg["tunnel_palette"].as_str().unwrap_or(""), names.join(", "))));
     }
     let pairs = rp.iter().any(|p| p.contains_key("__rs_twin"));
     let any_dup = rp.iter().any(|p| p.get("__rs_dup").is_some_and(py_truth));

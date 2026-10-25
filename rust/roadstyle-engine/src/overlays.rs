@@ -84,7 +84,7 @@ fn band(r: Road) -> f64 {
 /// edge_attach: `edge_id` on every crossing and traffic signal: of the streets within 1e-5 deg, the one drawn on top (the highest fill
 /// number, then band, then class); else the nearest street within 3e-5 deg (within 2e-6 of the nearest); else the nearest road.
 /// Returns the names of the layers that got one.
-pub fn edge_attach(tables: &mut [(String, FeatureTable)], roads: &Roads) -> Result<Vec<String>, String> {
+pub fn edge_attach(tables: &mut [(String, FeatureTable)], roads: &Roads) -> Result<Vec<String>, crate::Error> {
     let n = roads.len();
     let klass: Vec<f64> = roads.iter().map(|r| {
         let h = r.get("highway").and_then(Cell::as_str).unwrap_or("");
@@ -286,7 +286,7 @@ fn first_point(c: &Value) -> Option<&Value> {
 
 /// render's `overlays=`: the caller's overlays (the Python binding gives each rs.Overlay as its fields, its style of the settings filled in,
 /// and its data as a FeatureCollection in `fc`), numbered after the base map's (`first`). _bake_wm: a width in metres on each feature.
-pub fn user_overlays(specs: &Value, first: usize) -> Result<Vec<Overlay>, String> {
+pub fn user_overlays(specs: &Value, first: usize) -> Result<Vec<Overlay>, crate::Error> {
     let mut out = Vec::new();
     for (k, u) in specs.as_array().into_iter().flatten().enumerate() {
         let mut fc = u["fc"].clone();
@@ -296,10 +296,10 @@ pub fn user_overlays(specs: &Value, first: usize) -> Result<Vec<Overlay>, String
             Some("line") => "line",
             Some("circle") => "circle",
             Some("text") => "text",
-            Some(o) => return Err(format!("overlay kind {o:?}: use fill, line, circle or text")),
+            Some(o) => return Err(crate::error::options(format!("overlay kind {o:?}: use fill, line, circle or text"))),
         };
         if kind == "text" && !u["text_col"].is_string() {
-            return Err("an overlay of kind 'text' needs text_col (the property that holds the text)".into());
+            return Err(crate::error::options("an overlay of kind 'text' needs text_col (the property that holds the text)"));
         }
         if let Some(wm) = u["width_m"].as_f64() {
             for f in fc["features"].as_array_mut().into_iter().flatten() {
@@ -437,11 +437,11 @@ pub fn eid<'a>(v: impl Into<Cell<'a>>) -> String {
 /// _edge_overlay: on each feature of an overlay on a street, what it takes from its edge (`roads`: the roads source's properties, by edge id
 /// as text, _eid); returns the (fill number, order) pairs, sorted. The base map's overlays name their edge in `edge_id`, a caller's in its
 /// `edge_col` (and its order in `order_col`).
-pub fn edge_overlay(ov: &mut Overlay, roads: &std::collections::HashMap<String, Road>) -> Result<Vec<(i64, i64)>, String> {
+pub fn edge_overlay(ov: &mut Overlay, roads: &std::collections::HashMap<String, Road>) -> Result<Vec<(i64, i64)>, crate::Error> {
     let col = ov.user["edge_col"].as_str().unwrap_or("edge_id").to_string();
     if roads.is_empty() && !ov.user.is_null() {
         let id = ov.user["edge_id_col"].as_str().unwrap_or("edge_id");
-        return Err(format!("an overlay with edge_col needs the roads' id column '{id}' (edge_id_col): it is not in the edges"));
+        return Err(crate::error::column(id, "an overlay with edge_col needs the roads' id column (edge_id_col), and it is not in the edges"));
     }
     let order_col = ov.user["order_col"].as_str().map(String::from);
     let mut orders = std::collections::BTreeSet::new();
@@ -487,7 +487,7 @@ pub fn edge_overlay(ov: &mut Overlay, roads: &std::collections::HashMap<String, 
     if !unknown.is_empty() {        // Python's text: the names as its repr writes them
         let label = ov.user["label"].as_str().unwrap_or("");
         let first: Vec<String> = unknown.iter().take(5).map(|u| format!("'{u}'")).collect();
-        return Err(format!("overlay {label}: {} feature(s) have an '{col}' that is not an edge of the roads (first: [{}])", unknown.len(), first.join(", ")));
+        return Err(crate::error::data(format!("overlay {label}: {} feature(s) have an '{col}' that is not an edge of the roads (first: [{}])", unknown.len(), first.join(", "))));
     }
     Ok(orders.into_iter().collect())
 }
@@ -505,24 +505,24 @@ pub fn metre_items(ov: &Overlay) -> bool {
 /// _item_pieces: the line items of the overlay `i` on its edges (after edge_overlay) as pieces of the one road layer (`__rs_k` 5): what the
 /// filters read from their edge, `lvl`, their colour `__rs_ic`, their width and offset in metres over cos(latitude) (`__rs_iwm`,
 /// `__rs_iom`, also on the overlay's own features) and their dash as text.
-pub fn item_pieces(ov: &mut Overlay, i: usize, look: &crate::Look) -> Result<Vec<crate::simple::Item>, String> {
+pub fn item_pieces(ov: &mut Overlay, i: usize, look: &crate::Look) -> Result<Vec<crate::simple::Item>, crate::Error> {
     let default = match &look.config["overlays"]["color"] { Value::Null => look.theme["overlays"]["color"].clone(), c => c.clone() };
     let u = ov.user.clone();
     let col = |k: &str| u[k].as_str().filter(|c| !c.is_empty()).map(String::from);
     let (wcol, ocol, dcol, ccol) = (col("width_m_col"), col("offset_m_col"), col("dash_col"), col("color_col"));
     let label = u["label"].as_str().filter(|l| !l.is_empty()).map_or_else(|| i.to_string(), String::from);
     let mut out = Vec::new();
-    let Data::Json(fc) = &mut ov.data else { return Err(format!("overlay {label}: line items from a typed table are not made (only a caller's overlay has items)")) };
+    let Data::Json(fc) = &mut ov.data else { return Err(crate::Error::Unsupported(crate::Unsupported::TableItems { overlay: label.to_string() })) };
     for (j, f) in fc["features"].as_array_mut().into_iter().flatten().enumerate() {
         let g = f["geometry"].clone();
-        let p = f["properties"].as_object_mut().ok_or("an overlay feature with no properties")?;
+        let p = f["properties"].as_object_mut().ok_or_else(|| crate::error::data("an overlay feature with no properties"))?;
         let w = match &wcol { Some(c) => p.get(c).cloned().unwrap_or(Value::Null), None => u["width_m"].clone() };
         let w = w.as_f64().filter(|w| w.is_finite())
-            .ok_or_else(|| format!("overlay {label}: item {j} has no width in metres ({})", wcol.as_deref().unwrap_or("width_m")))?;
+            .ok_or_else(|| crate::error::data(format!("overlay {label}: item {j} has no width in metres ({})", wcol.as_deref().unwrap_or("width_m"))))?;
         let o = ocol.as_ref().and_then(|c| p.get(c)).and_then(Value::as_f64).filter(|o| o.is_finite());
         let line: Vec<crate::simple::Pt> = match g["type"].as_str() {
-            Some("LineString") => serde_json::from_value(g["coordinates"].clone()).map_err(|e| e.to_string())?,
-            Some("MultiLineString") => return Err(format!("overlay {label}: item {j} is a MultiLineString; the Rust engine draws LineString items only")),
+            Some("LineString") => serde_json::from_value(g["coordinates"].clone()).map_err(|e| crate::error::data(format!("overlay {label}: item {j}: {e}")))?,
+            Some("MultiLineString") => return Err(crate::Error::Unsupported(crate::Unsupported::MultiLineItem { overlay: label.to_string(), item: j })),
             _ => Vec::new(),
         };
         let lat = if line.is_empty() { 0.0 } else { line.iter().map(|c| c[1]).sum::<f64>() / line.len() as f64 };
@@ -555,7 +555,7 @@ pub fn item_pieces(ov: &mut Overlay, i: usize, look: &crate::Look) -> Result<Vec
 /// of their own: each names its road in the roads' id column and has `width_m`, and can have `order`, `offset_m`, `color`, `dash`, `pick` (a
 /// picked item is clicked and lit as itself, with its own fields) and `minzoom` (`__rs_imz`). `k`: the items' overlay number.
 pub fn road_items(fc: &Value, roads: &std::collections::HashMap<String, Road>, edge_col: &str, k: usize, look: &crate::Look)
-                  -> Result<Vec<crate::simple::Item>, String> {
+                  -> Result<Vec<crate::simple::Item>, crate::Error> {
     let mut ov = Overlay { name: "items".into(), kind: "line", under: false, edge: true, color: Value::Null, outline: Value::Null, opacity: Value::Null,
                            width: Value::Null, radius: Value::Null, visible: true, data: Data::Json(fc.clone()), l: Value::Null, clickable: None, kinds: Vec::new(), tooltip_on: None, popup_on: None,
                            user: json!({"edge_col": edge_col, "order_col": "order", "color_col": "color", "width_m_col": "width_m",

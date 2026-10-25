@@ -8,6 +8,7 @@ pub mod colors;
 pub mod contract;
 pub mod decks;
 pub mod draw;
+pub mod error;
 pub mod export_look;
 pub mod features;
 pub mod layers;
@@ -24,6 +25,7 @@ pub mod sources;
 // (roadstyle-io) are the facade's.
 pub use roadstyle_model::{feature_table, geom, props, table, Cell, RoadTable, Row};
 pub use roadstyle_model::feature_table::FeatureTable;
+pub use error::{Error, Limit, Unsupported};
 pub use road::{Road, Roads};
 pub use roadstyle_look::{self as look, Look};
 pub(crate) use roadstyle_model::obj;
@@ -64,10 +66,9 @@ pub struct Parts {
 /// The style's layers and sources: the roads ("roads", "simple", "slots") and, with `features` (the base map's rows as the worker's SQL
 /// writes them, `read::read_feature_table`), the base map ("ov<i>"). `look`: look.json (the resolved look); `table`: the roads (roadstyle-io reads them from the
 /// GeoParquet of tools/make_spike_fixture.py or the worker's SQL); `planner`: the route planner's rows.
-pub fn make_parts(mut table: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, String> {
+pub fn make_parts(mut table: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, Error> {
     if table.len() > MAX_ROADS {
-        return Err(format!("this area has {} roads, and the plugin draws at most {MAX_ROADS} (the browser's memory): use a smaller area",
-                           table.len()));
+        return Err(Error::Limit { what: Limit::Roads, found: table.len(), max: MAX_ROADS });
     }
     ColumnMap::from_args(&look.args).to_engine(&mut table);
     compute_levels(&mut table, &look.args, look.road.head_m)?;
@@ -77,12 +78,12 @@ pub fn make_parts(mut table: RoadTable, look: &Look, features: Option<FeatureTab
 /// The parts of another palette of the same call (a view's palette, palettes.rs): the roads of `s` as they were before their marks
 /// (their columns in the engine's names, their levels solved), with the look `look` (the same keywords, another palette). No base map
 /// and no route planner, as a page's views have none.
-pub fn restyle(s: &sources::Sources, look: &Look) -> Result<sources::Sources, String> {
+pub fn restyle(s: &sources::Sources, look: &Look) -> Result<sources::Sources, Error> {
     Ok(sources::Sources::new(style_parts(s.roads.roads.table.clone(), look, None, None, None)?))
 }
 
 /// make_parts after the roads are prepared (the engine's column names, the levels).
-fn style_parts(table: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, String> {
+fn style_parts(table: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, Error> {
     let cols = ColumnMap::from_args(&look.args);
     // render's filter_col: in the engine's names (a keyword's column has the engine's name; a column with an engine name is kept aside)
     let fcol = look.args["filter_col"].as_str().filter(|c| !c.is_empty()).map_or_else(|| "highway".to_string(), |f| {
@@ -114,7 +115,7 @@ fn style_parts(table: RoadTable, look: &Look, features: Option<FeatureTable>, pl
     }
     // render's simple=False (the full look: a layer for each drawing position) is the Python engine's only (plan decision 2)
     if look.args["simple"] == false {
-        return Err("simple=False (the full look) is in the Python engine only: use engine=\"python\", or simple mode (the default)".into());
+        return Err(Error::Unsupported(Unsupported::FullLook));
     }
     // the line items on the edges (an overlay's lines in metres, render's items=): pieces of the one road layer
     let mut items = Vec::new();
@@ -262,7 +263,7 @@ fn style_parts(table: RoadTable, look: &Look, features: Option<FeatureTable>, pl
 }
 
 /// The style as one JSON text, with each source's GeoJSON in it (roadstyle's export_inline): stage 1 (`sources::Sources`), written.
-pub fn make_style(table: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<String, String> {
+pub fn make_style(table: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<String, Error> {
     let s = sources::Sources::new(make_parts(table, look, features, planner, name)?);
     let mut out = Vec::new();
     s.write_style(&mut out).expect("a Vec takes every byte");
@@ -306,18 +307,18 @@ fn source_features(source: &Value) -> &[Value] {
 /// `compute_levels(method="solve")` with its defaults (render_web.render), on the roads in their order. It writes the columns that
 /// compute_levels writes: casing_start, casing_level, casing_end and fill_level. The browser's keyword `levels` (roads_sql.js makeRoads):
 /// "tags" computes them with the tags rule; `{edge_hash, n_edges}` (edge_levels_meta) checks that the stored levels are for these edges.
-fn compute_levels(table: &mut RoadTable, args: &Value, head_m: f64) -> Result<(), String> {
+fn compute_levels(table: &mut RoadTable, args: &Value, head_m: f64) -> Result<(), Error> {
     let given = |k: &str| matches!(&args[k], Value::String(s) if !s.is_empty());
     if let Some(meta) = args["levels"].as_object() {
         let ids = (0..table.len()).map(|i| match table.get(i, "edge_id").map(Cell::to_value) {
             Some(Value::Number(n)) => n.as_i64(),
             Some(Value::String(s)) => s.parse().ok(),
             _ => None,
-        }).collect::<Option<Vec<i64>>>().ok_or("levels: an edge_id that is not a whole number")?;
+        }).collect::<Option<Vec<i64>>>().ok_or_else(|| error::column("edge_id", "levels: an edge_id that is not a whole number"))?;
         if Some(ids.len() as u64) != meta.get("n_edges").and_then(Value::as_u64)
             || Some(roadstyle_levels::edge_hash(&ids).as_str()) != meta.get("edge_hash").and_then(Value::as_str) {
-            return Err(format!("the edges are not the edges the stored levels were solved for ({} given, {} stored, or other edge_id values): \
-                                run duckosm levels again", ids.len(), meta.get("n_edges").unwrap_or(&Value::Null)));
+            return Err(error::data(format!("the edges are not the edges the stored levels were solved for ({} given, {} stored, or other \
+                                edge_id values): run duckosm levels again", ids.len(), meta.get("n_edges").unwrap_or(&Value::Null))));
         }
     }
     let tags = args["levels"] == "tags";
@@ -330,7 +331,7 @@ fn compute_levels(table: &mut RoadTable, args: &Value, head_m: f64) -> Result<()
     let Some(levels) = roadstyle_levels::levels(&edges, &roadstyle_levels::Options { method, head_m, ..Default::default() })? else { return Ok(()) };
     // one row for each edge, in the edges' order (the edge id is the row)
     if levels.rows.len() != table.len() || levels.rows.iter().enumerate().any(|(i, r)| r.edge_id != i as i64) {
-        return Err(format!("compute_levels: {} rows for {} roads, not one for each road in its order", levels.rows.len(), table.len()));
+        return Err(error::data(format!("compute_levels: {} rows for {} roads, not one for each road in its order", levels.rows.len(), table.len())));
     }
     let col = |f: fn(&roadstyle_levels::Row) -> i64| levels.rows.iter().map(f).collect::<Vec<i64>>();
     table.set_ints("casing_start", col(|r| r.casing_start));

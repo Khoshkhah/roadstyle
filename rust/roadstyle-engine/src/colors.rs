@@ -92,8 +92,8 @@ fn num(v: f64) -> Value {
 }
 
 /// float(x) of a theme or option value.
-fn float(v: &Value) -> Result<f64, String> {
-    as_float(Some(Cell::Json(v))).ok_or_else(|| format!("not a number: {v}"))
+fn float(v: &Value) -> Result<f64, crate::Error> {
+    as_float(Some(Cell::Json(v))).ok_or_else(|| crate::error::options(format!("not a number: {v}")))
 }
 
 // the ramps: branca's LinearColormap (roadstyle-look: the ramps are look data)
@@ -132,7 +132,7 @@ impl Frame {
 }
 
 /// CategoricalStyler: a {value: colour} map on a column; an unmapped value gets the theme's data.nodata. No casing.
-fn categorical(fs: &Roads, look: &Look, column: &str, colors: &Map<String, Value>, missing_self: bool) -> Result<Frame, String> {
+fn categorical(fs: &Roads, look: &Look, column: &str, colors: &Map<String, Value>, missing_self: bool) -> Result<Frame, crate::Error> {
     let d = &look.data;
     let fallback = &d["nodata"];
     let map: HashMap<String, &Value> = colors.iter().map(|(k, v)| (keystr(Some(Cell::Str(k))), v)).collect();
@@ -153,7 +153,7 @@ fn categorical(fs: &Roads, look: &Look, column: &str, colors: &Map<String, Value
 }
 
 /// NumericStyler: a continuous ramp over [vmin, vmax] (the data's range where not given); width_by (min_px, max_px) over the data's range.
-fn numeric(fs: &Roads, look: &Look, column: &str, o: &Value) -> Result<Frame, String> {
+fn numeric(fs: &Roads, look: &Look, column: &str, o: &Value) -> Result<Frame, crate::Error> {
     let d = &look.data;
     let nums: Vec<Option<f64>> = fs.iter().map(|ft| as_float(ft.get(column))).collect();
     let present: Vec<f64> = nums.iter().flatten().copied().collect();
@@ -173,7 +173,7 @@ fn numeric(fs: &Roads, look: &Look, column: &str, o: &Value) -> Result<Frame, St
         Some(wb) => {
             let (lo, hi) = match wb.as_array().map(|a| a.as_slice()) {
                 Some([lo, hi]) => (lo, hi),
-                _ => return Err(format!("width_by: (min_px, max_px), not {wb}")),
+                _ => return Err(crate::error::options(format!("width_by: (min_px, max_px), not {wb}"))),
             };
             let (wmin, wmax) = (low.unwrap_or(0.0), high.unwrap_or(1.0));
             let wspan = if wmax - wmin != 0.0 { wmax - wmin } else { 1.0 };
@@ -210,22 +210,22 @@ fn color_table(fs: &Roads, look: &Look, column: &str) -> Frame {
 }
 
 /// build_styler (option_styler for a colour option): `o` holds color_by, colors, cmap, vmin, vmax, width_by, missing, palette.
-fn resolve(fs: &Roads, look: &Look, o: &Value) -> Result<Frame, String> {
+fn resolve(fs: &Roads, look: &Look, o: &Value) -> Result<Frame, crate::Error> {
     if get(o, "style").is_some() {
-        return Err("style= (a Styler object) is not in the engine: use color_by, colors, cmap, vmin, vmax or width_by".into());
+        return Err(crate::Error::Unsupported(crate::Unsupported::Styler));
     }
     if let Some(p) = get(o, "palette").and_then(Value::as_str).filter(|p| *p != look.palette) {
-        return Err(format!("palette {p:?}: the engine has the look's palette ({:?}) only", look.palette));
+        return Err(crate::Error::Unsupported(crate::Unsupported::Palette { palette: p.to_string(), look: look.palette.to_string() }));
     }
     let Some(column) = get(o, "color_by") else { return Ok(class_frame(fs, look)) };
-    let column = column.as_str().ok_or("color_by: a column name")?;
+    let column = column.as_str().ok_or_else(|| crate::error::options("color_by: a column name"))?;
     if fs.at(0).is_some_and(|f| !f.contains_key(column)) {
-        return Err(format!("color_by: no column {column:?} in the roads"));
+        return Err(crate::error::column(column, "color_by names it, and the roads do not have it"));
     }
     match get(o, "colors") {
         Some(Value::String(s)) if s == "self" => Ok(color_table(fs, look, column)),
         Some(Value::Object(colors)) => categorical(fs, look, column, colors, get(o, "missing").and_then(Value::as_str) == Some("self")),
-        Some(other) => Err(format!("colors: a {{value: colour}} map or \"self\", not {other}")),
+        Some(other) => Err(crate::error::options(format!("colors: a {{value: colour}} map or \"self\", not {other}"))),
         None => numeric(fs, look, column, o),
     }
 }
@@ -240,13 +240,13 @@ fn bake_props(fs: &mut Roads, f: &Frame) {
 
 /// render_edges' colouring and render_web.render's: the per-edge props of the class styles, of a data styler (color_by, color_table), or
 /// of colour options (color_options: one fill per option, the shared width and casing from the class styles or the data styler).
-pub fn bake(fs: &mut Roads, look: &Look, args: &Value) -> Result<Colors, String> {
+pub fn bake(fs: &mut Roads, look: &Look, args: &Value) -> Result<Colors, crate::Error> {
     // render_edges: color_table, an edge_id -> colour map, as the column __rs_color (keys as text, as str(id) in Python)
     let main = if let Some(t) = get(args, "color_table") {
         let key = get(args, "color_key").and_then(Value::as_str).unwrap_or("edge_id");
-        let t = t.as_object().ok_or("color_table: a {edge_id: colour} map")?;
+        let t = t.as_object().ok_or_else(|| crate::error::options("color_table: a {edge_id: colour} map"))?;
         if fs.at(0).is_some_and(|f| !f.contains_key(key)) {
-            return Err(format!("color_key {key:?} not found in the edges"));
+            return Err(crate::error::column(key, "color_key names it, and the edges do not have it"));
         }
         for i in 0..fs.len() {
             let c = fs.get(i, key).and_then(|k| t.get(&py_str(k))).cloned().unwrap_or(Value::Null);
@@ -265,13 +265,13 @@ pub fn bake(fs: &mut Roads, look: &Look, args: &Value) -> Result<Colors, String>
         let named: Vec<(String, Value)> = match opts {
             Value::Object(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             Value::Array(a) => a.iter().map(|o| {
-                let name = o["name"].as_str().map(String::from).ok_or("color_options: each item needs a name")?;
+                let name = o["name"].as_str().map(String::from).ok_or_else(|| crate::error::options("color_options: each item needs a name"))?;
                 let rest: Map<String, Value> = o.as_object().unwrap().iter().filter(|(k, _)| *k != "name").map(|(k, v)| (k.clone(), v.clone())).collect();
                 Ok((name, Value::Object(rest)))
-            }).collect::<Result<_, String>>()?,
-            other => return Err(format!("color_options: a {{name: options}} map or a list, not {other}")),
+            }).collect::<Result<_, crate::Error>>()?,
+            other => return Err(crate::error::options(format!("color_options: a {{name: options}} map or a list, not {other}"))),
         };
-        let frames = named.iter().map(|(n, o)| Ok((n.clone(), resolve(fs, look, o)?))).collect::<Result<Vec<_>, String>>()?;
+        let frames = named.iter().map(|(n, o)| Ok((n.clone(), resolve(fs, look, o)?))).collect::<Result<Vec<_>, crate::Error>>()?;
         bake_props(fs, &main.unwrap_or_else(|| class_frame(fs, look)));
         let base = &frames[0].1.fill;
         let mut meta = Vec::new();
@@ -291,7 +291,7 @@ pub fn bake(fs: &mut Roads, look: &Look, args: &Value) -> Result<Colors, String>
             props.push(prop);
         }
         let active = match get(args, "color_active") {
-            Some(Value::Number(n)) => n.as_u64().ok_or("color_active: an option's number or name")? as usize,
+            Some(Value::Number(n)) => n.as_u64().ok_or_else(|| crate::error::options("color_active: an option's number or name"))? as usize,
             Some(Value::String(s)) => named.iter().position(|(n, _)| n == s).unwrap_or(0),
             _ => 0,
         };

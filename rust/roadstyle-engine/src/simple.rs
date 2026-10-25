@@ -562,7 +562,7 @@ impl SimpleSource {
 /// (edge * PIECES + n), the tie-breaker per edge and __rs_cls (_mark_cls).
 /// `width_col`: render's width_m_col, which the pieces keep (the layer's `cols`).
 /// `items`: the line items on the edges (_item_pieces, `__rs_k` 5), each over its edge's fill, by its rank on the edge.
-pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Option<&str>, items: Vec<Item>) -> Result<SimpleSource, String> {
+pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Option<&str>, items: Vec<Item>) -> Result<SimpleSource, crate::Error> {
     let line_of: Vec<Option<&[Pt]>> = roads.iter().map(|f| f.line()).collect();
     let mut halves = halves(roads);
     let mut out: Vec<Piece> = Vec::new();
@@ -613,10 +613,10 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
         let e = f.edge;
         let c = n.entry(e).or_default();
         if *c == PIECES {
-            return Err(format!("edge {e} has more than {PIECES} pieces"));
+            return Err(crate::Error::Limit { what: crate::Limit::Pieces { edge: e as usize }, found: PIECES + 1, max: PIECES });
         }
         if e as usize >= MAX_EDGES {
-            return Err(format!("more than {MAX_EDGES} edges"));
+            return Err(crate::Error::Limit { what: crate::Limit::Edges, found: e as usize + 1, max: MAX_EDGES });
         }
         let id = e as usize * PIECES + *c;
         *c += 1;
@@ -631,7 +631,7 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
         let r = rank.entry(e).or_default();
         *r += 1;
         if *r > MAX_ITEMS {
-            return Err(format!("simple=True: edge {e} has more than {MAX_ITEMS} items; they do not fit between its fill and the next casings"));
+            return Err(crate::Error::Limit { what: crate::Limit::Items { edge: e as usize }, found: *r, max: MAX_ITEMS });
         }
         let id = MAX_EDGES * PIECES + e as usize * MAX_ITEMS + *r - 1;
         let s = sort_key(2.0 * int(&f.props, "__rs_fl") as f64 + 1.0 + *r as f64 * ITEM_STEP, e);
