@@ -43,6 +43,11 @@ export interface DashboardOptions {
   color_options?: ColorOption[];
   /** The index of the colour option that shows first. */
   color_active?: number;
+  /** The Roads box (render's filter_control, a page key). Default true; a style made before N32 step 2 has its own filter.on, which
+   *  stays when this is not given. */
+  filter_control?: boolean;
+  /** The legend box of the colour options (render's legend, a page key; the style always has the legend data). Default true. */
+  legend?: boolean;
   overlays?: Array<Record<string, unknown>>;
   overlay_control?: boolean;
   overlay_popup?: boolean;

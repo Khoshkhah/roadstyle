@@ -4,6 +4,7 @@
 import {_esc} from "../popup.js";
 import {_popupMode, _sideCtl, _box} from "./panel.js";
 import {COLOR_OPTIONS, _coActive} from "./color.js";
+import {O} from "./core.js";
 let _coLegendEl = null, _coLegendBox = null, _liveLegend = null;   // _liveLegend: the legend of rs.setData, over the colour option's
 export function coLegendHtml(lg){
   if(!lg) return "";
@@ -25,7 +26,7 @@ export function coUpdateLegend(){
 }
 // the box once an option has a legend (at the start, or with a later style: rs.setStyle), then the active option's legend
 export function useLegend(){
-  if(!_coLegendBox && (_liveLegend || COLOR_OPTIONS.some(o=>o.legend))){
+  if(!_coLegendBox && O.legend !== false && (_liveLegend || COLOR_OPTIONS.some(o=>o.legend))){   // legend: the page option
     const b=_box("co-lg", "co-lg", "Legend", _popupMode==="panel");      // panel: folded to save space
     _coLegendBox=b.box; _coLegendEl=b.body;
     (_sideCtl||document.body).appendChild(_coLegendBox);
