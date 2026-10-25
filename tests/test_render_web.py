@@ -100,10 +100,10 @@ def test_web_color_by_bakes_its_legend():
     # one legend-only entry). legend=True is the default, matching folium.
     on = _copts(render_edges(_edges(), backend="web", color_by="aadt", cmap="viridis").html)
     assert '"legend"' in on and _in('"kind": "continuous"', on)   # continuous ramp legend baked
-    # legend=False opts out
-    off = _copts(render_edges(_edges(), backend="web", color_by="aadt", cmap="viridis",
-                              legend=False).html)
-    assert off == "[]"
+    assert _opt(render_edges(_edges(), backend="web", color_by="aadt", cmap="viridis").html, "legend") is True
+    # legend=False is the page's option: the style keeps the legend data, the page hides the box (N32 step 2)
+    off = render_edges(_edges(), backend="web", color_by="aadt", cmap="viridis", legend=False).html
+    assert _copts(off) == on and _opt(off, "legend") is False
 
 
 def test_web_annotation_slots_alternate_names_and_arrows():

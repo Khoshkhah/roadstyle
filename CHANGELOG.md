@@ -77,6 +77,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **The dashboard reads `filter_control` and `legend` from the page's options** (N32 step 2): they are page keys, with render's
   defaults (true). The style keeps the facts (`roadstyle:controls.filter`, the legend data in `roadstyle:color_options`). A style made
   before has its own `controls.filter.on`, which stays when the page gives no `filter_control`.
+- **The Rust engine's style has no page keys `filter_control` and `legend`** (N32 step 2): the page gives them in its options
+  (`RS_OPTIONS.filter_control`, `RS_OPTIONS.legend`, default true). `roadstyle:controls.filter` has no `on`, and a lone data styler's
+  legend is always in `roadstyle:color_options`. A host page that gives neither shows both boxes.
 - **The Roads box dims a class that the map does not draw at this zoom.** With the class minzoom (the default since 2026-10-25), a
   class row is dimmed below its first zoom (`roadstyle:controls.filter.minzoom`), with the title "from zoom N". Before, the box listed
   the hidden classes as if they were drawn.

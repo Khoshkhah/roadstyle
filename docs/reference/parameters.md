@@ -86,7 +86,7 @@ ignore it.
 | `api_key` | `None` | all | key for a keyed tile provider ([order](settings.md#base-maps-api-keys)) |
 | `arrows` | `True` | web | one-way chevrons along each one-way edge |
 | `labels` | `True` | web | curved street names from the `name` column |
-| `legend` | `True` | web, folium | a legend for data colouring (class styling has none) |
+| `legend` | `True` | web, folium | a legend for data colouring (class styling has none). Web: a page key; the style always has the legend data (`roadstyle:color_options`) |
 | `legend_position` | `"bottomleft"` | folium | legend corner |
 | `name` | web `"roadstyle"`, folium `"roads"` | web, folium | page title (web) / layer name (folium) |
 | `hover_color` / `select_color` | `"#b388ff"` / `"#7c4dff"` | web | highlight of the hovered / selected road |
