@@ -1,0 +1,20 @@
+{
+  "name": "roadstyle-dashboard",
+  "version": "0.25.0",
+  "description": "roadstyle's map dashboard: the controls, the legend, the popups, Street View and the road interaction for a MapLibre map of roads",
+  "license": "MIT",
+  "homepage": "https://github.com/Khoshkhah/roadstyle",
+  "repository": {"type": "git", "url": "git+https://github.com/Khoshkhah/roadstyle.git", "directory": "rust/roadstyle-assets/files/static"},
+  "type": "module",
+  "exports": {
+    ".": {"types": "./dashboard/index.d.ts", "default": "./dashboard/index.js"},
+    "./dashboard.css": "./dashboard/dashboard.css",
+    "./popup.css": "./popup.css",
+    "./popup.js": "./popup.js",
+    "./package.json": "./package.json"
+  },
+  "types": "./dashboard/index.d.ts",
+  "files": ["dashboard/*.js", "dashboard/*.css", "dashboard/index.d.ts", "popup.js", "popup.css", "README.md"],
+  "peerDependencies": {"maplibre-gl": ">=5.8.0"},
+  "keywords": ["maplibre", "roads", "map", "dashboard", "street-view", "osm"]
+}

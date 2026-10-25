@@ -68,8 +68,8 @@ fn take(opts: &mut Vec<(String, Option<String>)>, name: &str) -> Option<String> 
 }
 
 /// The vendored MapLibre (render_web.WebMap puts the same in), so a page works offline.
-const MAPLIBRE_JS: &str = include_str!("../../../src/roadstyle/vendor/maplibre-gl.js");
-const MAPLIBRE_CSS: &str = include_str!("../../../src/roadstyle/vendor/maplibre-gl.css");
+const MAPLIBRE_JS: &str = roadstyle::assets::text!("vendor/maplibre-gl.js");
+const MAPLIBRE_CSS: &str = roadstyle::assets::text!("vendor/maplibre-gl.css");
 
 /// The look's options of the command's options: --palette, --profile, --settings FILE.json and every other option as a keyword
 /// (`args`), which `defaults` can add to.
@@ -172,7 +172,7 @@ pub fn run(args: &[String]) -> Result<(), Error> {
             let out = PathBuf::from(out);
             match format.as_str() {
                 "pmtiles" => {
-                    let bytes = tiles.archive(bounds, &tiles.layer_names()).ok_or(Error::Engine("tiles: no tile".into()))?;
+                    let bytes = tiles.archive(bounds, &tiles.layer_names()).map_err(|e| Error::Engine(format!("tiles: {e}")))?;
                     if let Some(d) = out.parent().filter(|d| !d.as_os_str().is_empty()) {
                         std::fs::create_dir_all(d).map_err(|e| Error::File(format!("{}: {e}", d.display())))?;
                     }
@@ -186,7 +186,7 @@ pub fn run(args: &[String]) -> Result<(), Error> {
                         let ([x0, y0], [x1, y1]) = (tile_of(bounds[0], bounds[3], z), tile_of(bounds[2], bounds[1], z));
                         for x in x0..=x1 {
                             for y in y0..=y1 {
-                                let b = tiles.tile(z, x, y);
+                                let b = tiles.build(z, x, y);        // each tile once: no cache (review 4, D9)
                                 if !b.is_empty() {
                                     let p = out.join("roads").join(z.to_string()).join(x.to_string());
                                     std::fs::create_dir_all(&p).map_err(|e| Error::File(format!("{}: {e}", p.display())))?;

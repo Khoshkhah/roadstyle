@@ -5,7 +5,7 @@
 use crate::Error;
 use super::solve::Rules;
 use super::{LevelEdge, Options, Order, Pt};
-use roadstyle_model::flags;
+use crate::flags;
 use rstar::{RTree, RTreeObject, AABB};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -78,7 +78,7 @@ pub fn road_split(edges: &[&LevelEdge]) -> Result<Roads, Error> {
     })
 }
 
-/// A yes/no tag (roadstyle_model::flags, the one rule).
+/// A yes/no tag (crate::flags, the one rule).
 fn truthy(v: Option<&str>) -> bool {
     v.is_some_and(flags::yes_text)
 }

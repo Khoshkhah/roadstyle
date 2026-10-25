@@ -65,7 +65,7 @@ def test_tiles_from_the_files_are_the_tiles_of_the_one_call(part, keywords, tmp_
 
 
 def test_the_road_table_of_rust_is_pythons(part, keywords):
-    """The road table of stage 1 (roadstyle::write_road_table) is tiles.sidecar of the roads source, the page's table, byte for byte:
+    """The road table of stage 1 (roadstyle::write_road_table) is tiles.sidecar of the roads source, the page's table, value for value:
     every field, the middle by length (shapely's interpolate), the box, the heading at the middle and the line of each road."""
     from roadstyle import _engine
     from roadstyle.tiles import sidecar
@@ -77,7 +77,7 @@ def test_the_road_table_of_rust_is_pythons(part, keywords):
     roads = rs.export_inline(part, engine="rust", **keywords)["sources"]["roads"]["data"]
     want = json.dumps(sidecar(roads), separators=(",", ":"))
     got = s.road_table()
-    assert got == want
+    assert json.loads(got) == json.loads(want)         # the same table; the JSON text is each engine's own (2026-10-24)
     t = json.loads(got)
     assert len(t["props"]) == len(t["lines"]) == len(t["mids"]) == len(part) and "headings" not in t       # N4: no JS reads a heading
 

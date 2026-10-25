@@ -2,6 +2,7 @@
 // Rust engine in a Web Worker (worker.js: the whole page for each change of the knobs, page_from) and that page in an iframe. The page in
 // the iframe is the page that "Download" saves; the code panel is the Python call that makes it.
 import {pythonCode, pyrepr} from "./code.js";
+import {caller} from "../../rust/roadstyle-assets/files/static/dashboard/worker/call.js";
 
 const $ = (id) => document.getElementById(id);
 const SAMPLES = {"Södermalm driving": "sodermalm_driving", "Södermalm walking": "sodermalm_walking", "Södermalm cycling": "sodermalm_cycling"};
@@ -24,10 +25,7 @@ let BASEMAPS = [], colourOpts = [{name: "Class"}];      // basemaps.json's keys;
 
 // ---------------------------------------------------------------- the engine in its worker
 const worker = new Worker(new URL("./worker.js", import.meta.url), {type: "module"});
-let callId = 0;
-const pending = new Map();
-worker.onmessage = (e) => { const p = pending.get(e.data.id); pending.delete(e.data.id); e.data.ok ? p.ok(e.data) : p.no(new Error(e.data.error)); };
-const call = (msg, transfer) => new Promise((ok, no) => { const id = ++callId; pending.set(id, {ok, no}); worker.postMessage({...msg, id}, transfer || []); });
+const call = caller(worker);                // the calls and answers of rust/roadstyle-assets/files/static/dashboard/worker/call.js
 window.studio = {debug: () => ({table, columns, allClasses, st})};      // for a check in a browser (the tests)
 
 // ---------------------------------------------------------------- the page's keywords
@@ -213,9 +211,9 @@ $("page").onchange = () => {
   later();
 };
 $("copy").onclick = () => navigator.clipboard.writeText($("code").textContent);
-// the download: the page in the iframe, with MapLibre in it (src/roadstyle/vendor, as WebMap.html: a page that works offline)
+// the download: the page in the iframe, with MapLibre in it (rust/roadstyle-assets/files/vendor, as WebMap.html: a page that works offline)
 $("download").onclick = async () => {
-  const get = async (f) => (await fetch(`../../src/roadstyle/vendor/${f}`)).text();
+  const get = async (f) => (await fetch(`../../rust/roadstyle-assets/files/vendor/${f}`)).text();
   const page = html.replace("__MAPLIBRE_CSS__", await get("maplibre-gl.css"))
     .replace("__MAPLIBRE_JS__", (await get("maplibre-gl.js")).replace(/<\/script>/g, "<\\/script>"));
   const a = document.createElement("a");
@@ -224,7 +222,7 @@ $("download").onclick = async () => {
 };
 
 // the base maps: data/basemaps.json, one list for Python and the studio (the menu has all of them, as rs.BASEMAPS)
-fetch("../../src/roadstyle/data/basemaps.json").then((r) => r.ok ? r.json() : Promise.reject(new Error(`basemaps.json: ${r.status}`))).then((j) => {
+fetch("../../rust/roadstyle-assets/files/data/basemaps.json").then((r) => r.ok ? r.json() : Promise.reject(new Error(`basemaps.json: ${r.status}`))).then((j) => {
   BASEMAPS = j.basemaps.map((b) => b.key);
   for (const b of j.basemaps) $("basemap").add(new Option(b.label, b.key));
   st.basemap = BASEMAPS[0] || "";

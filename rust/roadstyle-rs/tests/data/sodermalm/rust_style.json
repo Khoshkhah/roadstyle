@@ -1,0 +1,116 @@
+{
+  "keys": [
+    "version",
+    "name",
+    "center",
+    "zoom",
+    "layers",
+    "sources",
+    "metadata",
+    "glyphs"
+  ],
+  "layers": [
+    [
+      "roads-simple",
+      "line",
+      "simple",
+      "c6026d06b582f665",
+      "9c9ddddc14675143",
+      "32554e5658942863"
+    ],
+    [
+      "roads-fill",
+      "line",
+      "roads",
+      "c6026d06b582f665",
+      "c5a38c14a2deb8a1",
+      "9fcf0e01ba5670e6"
+    ],
+    [
+      "roads-arrows",
+      "symbol",
+      "slots",
+      "052373ab617afa51",
+      "b9e63a214b296e3e",
+      "6defc6068961f92c"
+    ],
+    [
+      "roads-labels",
+      "symbol",
+      "slots",
+      "e193daf9d3d4aeaf",
+      "e66f1480f0ee2761",
+      "042c1e60af4c52d7"
+    ],
+    [
+      "roads-highlight",
+      "line",
+      "roads",
+      "74234e98afe7498f",
+      "18d823d8fbe1e80f",
+      "9fcf0e01ba5670e6"
+    ]
+  ],
+  "sources": {
+    "roads": [
+      "geojson",
+      4563,
+      "c850ea518e531633"
+    ],
+    "simple": [
+      "geojson",
+      17573,
+      "1d3b9647943b2b00"
+    ],
+    "slots": [
+      "geojson",
+      1739,
+      "716dc0dd2795fc16"
+    ]
+  },
+  "metadata": {
+    "roadstyle:interaction": "8bd55e519f81a314",
+    "roadstyle:images": "e9049aa3d5b18840",
+    "roadstyle:sources": "de9ed92a2cabe7fc",
+    "roadstyle:controls": "7ad47e2cab264f27"
+  },
+  "hash": "56b123a0ab2c0689",
+  "road_table": {
+    "rows": 4563,
+    "columns": [
+      "edge_id",
+      "osm_id",
+      "edge_ref",
+      "highway",
+      "name",
+      "lanes",
+      "oneway",
+      "maxspeed_kmh",
+      "length_m",
+      "tunnel",
+      "bridge",
+      "layer",
+      "casing_start",
+      "casing_level",
+      "casing_end",
+      "fill_level",
+      "head_start_m",
+      "head_end_m",
+      "cap_start",
+      "cap_end",
+      "__rs_fill",
+      "__rs_twoway",
+      "lvl",
+      "__rs_cls"
+    ],
+    "hash": "d59862fa01aa8007",
+    "text": {
+      "bytes": 2929872,
+      "sha16": "d59862fa01aa8007"
+    }
+  },
+  "text": {
+    "bytes": 11172545,
+    "sha16": "56b123a0ab2c0689"
+  }
+}

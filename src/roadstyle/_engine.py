@@ -242,7 +242,7 @@ def own_style_names(palette=None, profile=None) -> list[str]:
     from . import _settings as _s
     out = []
     for kind, name in (("palettes", palette), ("profiles", profile)):
-        bundled = [f.stem for f in (_s.data_dir() / kind).glob("*.yaml")]
+        bundled = _s.bundled_style_names(kind)
         if isinstance(name, str) and name in _s.style_names(kind) and name not in bundled:
             out.append(f"{kind[:-1]} {name!r}")
     return out
@@ -339,10 +339,9 @@ def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds):
     """The files of ``export_style`` from the Tiler ``t`` (its style and its tiles): style.json with the tiles at ``base_url``, the tiles in
     ``bounds`` (lon / lat: the roads' box), the sprite and the popup's files; the path of style.json."""
     import gzip  # noqa: F401  (the same imports as export.py)
-    from importlib.resources import files
     from pathlib import Path
 
-    from . import _settings
+    from . import _assets, _settings
     from .export import _camera, _plugin_css
     from .tiles import _merc, _tile_range
 
@@ -382,10 +381,10 @@ def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds):
                     p.parent.mkdir(parents=True, exist_ok=True)
                     p.write_bytes(b)
     (d / "popup.css").write_text(_plugin_css())
-    (d / "popup.js").write_text(files("roadstyle").joinpath("static/popup.js").read_text())
+    (d / "popup.js").write_text(_assets.text("static/popup.js"))
     style["metadata"]["roadstyle:interaction"] = {**style["metadata"].get("roadstyle:interaction", {}), "css": f"{base}/popup.css",
                                                   "js": f"{base}/popup.js"}
-    png = files("roadstyle").joinpath("data/sprite.png").read_bytes()
+    png = _assets.data("data/sprite.png")
     icon = _settings.theme_value("arrows.icon")
     index = json.dumps({"oneway": {"x": 0, "y": 0, "width": icon["width"], "height": icon["height"], "pixelRatio": icon["pixel_ratio"], "sdf": True}})
     for n in ("sprite", "sprite@2x"):

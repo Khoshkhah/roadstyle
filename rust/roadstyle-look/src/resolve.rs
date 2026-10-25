@@ -2,7 +2,7 @@
 //! Python makes it (docs/design/rust_engine.md). Ports of roadstyle's _settings.py (theme, style, roads: the profile and the palette merged, the palettes
 //! of all classes, the settings in the older layout), of config.StyleConfig, of palettes.RoadStyle.from_dict with style._apply, and of the
 //! parts geolibre-roadstyle's look_of adds (the class styles, the slots' tables, the arrow image, the popup). The data is roadstyle's own:
-//! src/roadstyle/data/ (profiles, palettes, defaults.json, sprite.png), read at build time, so there is one copy of it.
+//! roadstyle-assets' data/ (profiles, palettes, defaults.json, sprite.png), read at build time, so there is one copy of it.
 //!
 //! The settings are given (a mapping, or a list of them), not read from roadstyle.json files or $ROADSTYLE_CONFIG: the browser has none.
 //! The user's own profiles and palettes are given too (`Options::files`), and they are passed through the calls (`Own`), not kept.
@@ -14,17 +14,17 @@ use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
 const PROFILES: [(&str, &str); 2] = [
-    ("default", include_str!("../../../src/roadstyle/data/profiles/default.yaml")),
-    ("highsat", include_str!("../../../src/roadstyle/data/profiles/highsat.yaml")),
+    ("default", roadstyle_assets::text!("data/profiles/default.yaml")),
+    ("highsat", roadstyle_assets::text!("data/profiles/highsat.yaml")),
 ];
 const PALETTES: [(&str, &str); 4] = [
-    ("amber", include_str!("../../../src/roadstyle/data/palettes/amber.yaml")),
-    ("carto", include_str!("../../../src/roadstyle/data/palettes/carto.yaml")),
-    ("highsat", include_str!("../../../src/roadstyle/data/palettes/highsat.yaml")),
-    ("mono", include_str!("../../../src/roadstyle/data/palettes/mono.yaml")),
+    ("amber", roadstyle_assets::text!("data/palettes/amber.yaml")),
+    ("carto", roadstyle_assets::text!("data/palettes/carto.yaml")),
+    ("highsat", roadstyle_assets::text!("data/palettes/highsat.yaml")),
+    ("mono", roadstyle_assets::text!("data/palettes/mono.yaml")),
 ];
-const DEFAULTS: &str = include_str!("../../../src/roadstyle/data/defaults.json");
-const SPRITE: &[u8] = include_bytes!("../../../src/roadstyle/data/sprite.png");
+const DEFAULTS: &str = roadstyle_assets::text!("data/defaults.json");
+const SPRITE: &[u8] = roadstyle_assets::bytes!("data/sprite.png");
 
 /// render_web.render's defaults that the look holds, and DEFAULT_ROAD_POPUP.
 const HEAD_M: f64 = 5.0;
@@ -318,15 +318,22 @@ fn style_config(theme: &Value, sources: &[Value]) -> Result<Map<String, Value>, 
     Ok(cfg)
 }
 
-/// dataclasses.asdict(StyleConfig(...)): the fields in order, each from the settings, else its default (api_key, api_keys); the set
-/// minor_no_casing as a sorted list (as the look is written).
+/// The config view of a theme and of the config keys that are not in the theme (`extra`: camera, tiles, annotations, basemap), as the
+/// resolution makes it (`style_config`, then `config`): a look of version 2's view.
+pub(crate) fn config_of(theme: &Value, extra: Map<String, Value>) -> Result<Value, Error> {
+    Ok(config(&style_config(theme, &[json!({"config": extra})])?))
+}
+
+/// dataclasses.asdict(StyleConfig(...)): the fields in order, each from the settings, else its default; the set minor_no_casing as a
+/// sorted list (as the look is written). `api_key` and `api_keys` are always empty: a look is saved and published, so a key of the
+/// settings is never written into it (the caller gives the keys to the page in `given`).
 fn config(cfg: &Map<String, Value>) -> Value {
     let mut out = Map::new();
     for f in CONFIG_FIELDS {
         let v = match (f, cfg.get(f)) {
+            ("api_key", _) => Value::Null,
+            ("api_keys", _) => json!({}),
             (_, Some(v)) => v.clone(),
-            ("api_key", None) => Value::Null,
-            ("api_keys", None) => json!({}),
             ("basemap", None) => json!("voyager"),
             (_, None) => Value::Null,
         };
@@ -341,6 +348,11 @@ fn config(cfg: &Map<String, Value>) -> Value {
         out.insert(f.into(), v);
     }
     Value::Object(out)
+}
+
+/// A typed part of the look from its JSON value, or an error that names it.
+fn typed<T: serde::de::DeserializeOwned>(v: &Value, what: &str) -> Result<T, Error> {
+    serde_json::from_value(v.clone()).map_err(|e| Error::Look(format!("look: {what}: {e}")))
 }
 
 fn float(v: &Value, what: &str) -> Result<f64, Error> {
@@ -484,7 +496,10 @@ pub(crate) fn resolve(options: &Options) -> Result<LookData, Error> {
             a.insert(k, v);
         }
     }
-    let model = RoadModel::new(&roads_model, &th["roads"], &args)?;
+    // the slots' widths come from the road model, before the look's sections exist: its typed parts are read from the theme here
+    let model = RoadModel::new(&typed(&roads_model, "roads.model")?, &typed(&th["roads"]["links"], "roads.links")?,
+                               &typed(&th["roads"]["split"], "roads.split")?, th["roads"]["fallback"].as_object().unwrap_or(&Map::new()),
+                               &crate::MapOptions::from_args(&args)?.0)?;
     let mut width_z20 = Map::new();
     for c in &model.classes {
         width_z20.insert(c.clone(), json!(model.class_width_px(Some(c), 20.0, true)));
@@ -493,7 +508,7 @@ pub(crate) fn resolve(options: &Options) -> Result<LookData, Error> {
     let png = base64::engine::general_purpose::STANDARD.encode(SPRITE);
     let oneway = json!({"url": format!("data:image/png;base64,{png}"), "sdf": true, "pixelRatio": path(&th, "arrows.icon.pixel_ratio")?});
     Ok(LookData {
-        schema_version: crate::VERSION,
+        schema_version: 1,
         palette: palette.into(),
         settings,
         args,

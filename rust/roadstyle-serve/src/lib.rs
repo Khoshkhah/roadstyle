@@ -1,5 +1,5 @@
 //! `roadstyle serve` (the program, roadstyle-cli, and the Python binding call it): the level editor's page files (in the program,
-//! `EMBEDDED`, or a folder) and an area folder under `/area/`, on 127.0.0.1 only. The page writes only the area's own files
+//! `embedded`, or a folder) and an area folder under `/area/`, on 127.0.0.1 only. The page writes only the area's own files
 //! (`WRITABLE`), with a PUT. A request must name this server in `Host` (no DNS rebinding), a PUT must come from its own page (`Origin`)
 //! and have a `Content-Length`, a body is at most `MAX_BODY` bytes, and the request line and headers at most `MAX_HEAD` bytes (httparse
 //! parses them).
@@ -9,7 +9,23 @@ use std::net::{TcpListener, TcpStream};
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
-include!(concat!(env!("OUT_DIR"), "/embedded.rs"));
+include!(concat!(env!("OUT_DIR"), "/pkg.rs"));
+
+/// A page file in the program, by its path under the page: the editor's WebAssembly package (`PKG`, build.rs), or roadstyle-assets'
+/// `static/<path>` for the page's own files (level_editor/, level_editor.html, the dashboard with its editor/ and worker/ modules, the
+/// popup files). None for any other path.
+/// Whether this build has the editor's WebAssembly package (rust/roadstyle-wasm/build_editor.sh made it before the build).
+pub fn has_package() -> bool {
+    PKG.iter().any(|(n, _)| n.ends_with("_bg.wasm"))
+}
+
+fn embedded(rel: &str) -> Option<&'static [u8]> {
+    if let Some((_, b)) = PKG.iter().find(|(n, _)| *n == rel) {
+        return Some(b);
+    }
+    let page = matches!(rel, "level_editor.html" | "popup.css" | "popup.js") || rel.starts_with("level_editor/") || rel.starts_with("dashboard/");
+    if page { roadstyle_assets::get(&format!("static/{rel}")) } else { None }
+}
 
 /// The files of an area folder that the editor writes: your edits, heads and caps, and the solved levels.
 pub const WRITABLE: [&str; 5] = ["edits.csv", "heads.csv", "caps.csv", "levels.csv", "levels_info.json"];
@@ -28,7 +44,7 @@ pub enum Page {
 /// Serves the editor's `page` files at `/` and `area` at `/area/` on 127.0.0.1:`port`, until the program stops. A PUT of one of
 /// `WRITABLE` to `/area/<name>` writes that file (the edits.csv before it is kept as edits.csv.bak).
 pub fn serve(area: &Path, page: Page, port: u16) -> Result<(), String> {
-    if matches!(page, Page::Embedded) && !EMBEDDED.iter().any(|(n, _)| n.ends_with("_bg.wasm")) {
+    if matches!(page, Page::Embedded) && !has_package() {
         return Err("serve: this build has no WebAssembly package of the editor: run rust/roadstyle-wasm/build_editor.sh, then build again".into());
     }
     let name = std::fs::canonicalize(area).ok().and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned())).unwrap_or_default();
@@ -100,7 +116,7 @@ fn answer(stream: TcpStream, site: &Site) -> Result<(), String> {
             return say(&mut out, "405 Method Not Allowed", "text/plain", b"the page's files are read only", 0);
         }
         let body = match &site.page {
-            Page::Embedded => EMBEDDED.iter().find(|(n, _)| *n == rel).map(|(_, b)| b.to_vec()),
+            Page::Embedded => embedded(rel).map(<[u8]>::to_vec),
             Page::Dir(dir) => inside(dir, rel).and_then(|f| std::fs::read(f).ok()),
         };
         return match body {
@@ -185,8 +201,8 @@ mod tests {
 
     #[test]
     fn the_editor_files_are_in_the_program() {
-        for f in ["level_editor/index.html", "level_editor/app.js", "level_editor.html", "dashboard/index.js", "dashboard/editor/level_editor.js", "dashboard/dashboard.css", "popup.css", "popup.js"] {
-            assert!(EMBEDDED.iter().any(|(n, b)| *n == f && !b.is_empty()), "{f}");
+        for f in ["level_editor/index.html", "level_editor/app.js", "level_editor.html", "dashboard/index.js", "dashboard/editor/level_editor.js", "dashboard/editor/level_worker.js", "dashboard/worker/call.js", "dashboard/dashboard.css", "popup.css", "popup.js"] {
+            assert!(embedded(f).is_some_and(|b| !b.is_empty()), "{f}");
         }
     }
 

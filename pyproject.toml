@@ -67,9 +67,11 @@ Changelog = "https://github.com/Khoshkhah/roadstyle/blob/main/CHANGELOG.md"
 python-source = "src"
 module-name = "roadstyle._rust"
 manifest-path = "rust/roadstyle-py/Cargo.toml"
-# the package's files are every file in src/roadstyle (the static pages, vendor, templates, data); a development build of the module
-# (rust/roadstyle-py/build.py) is not one of them
-exclude = ["src/roadstyle/_rust.abi3.so", "src/roadstyle/**/__pycache__/**"]
+# the package's files are the Python files and folium's static/roadstyle.{js,css}. The look, the base map, the dashboard, the templates
+# and MapLibre are in the module (roadstyle-assets; Python asks _assets). Not in the wheel: a development build of the module
+# (rust/roadstyle-py/build.py), and the generated copy of the old paths for duckosm-rust (rust/roadstyle-assets/sync_old_paths.py)
+exclude = ["src/roadstyle/_rust.abi3.so", "src/roadstyle/**/__pycache__/**", "src/roadstyle/static/dashboard/**",
+           "src/roadstyle/static/popup.css", "src/roadstyle/static/popup.js", "src/roadstyle/static/level_editor.html"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

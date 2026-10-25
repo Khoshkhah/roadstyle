@@ -1,0 +1,122 @@
+{
+  "keys": [
+    "version",
+    "name",
+    "center",
+    "zoom",
+    "layers",
+    "sources",
+    "metadata",
+    "glyphs"
+  ],
+  "layers": [
+    [
+      "roads-simple",
+      "line",
+      "simple",
+      "f400c3887e0b8239",
+      "492224edd69842ff",
+      "32554e5658942863"
+    ],
+    [
+      "roads-fill",
+      "line",
+      "roads",
+      "3a1b5d6463213abf",
+      "97344518adf6cfa0",
+      "9fcf0e01ba5670e6"
+    ],
+    [
+      "roads-arrows",
+      "symbol",
+      "slots",
+      "052373ab617afa51",
+      "b9e63a214b296e3e",
+      "ab198cfa36f5f9c3"
+    ],
+    [
+      "roads-labels",
+      "symbol",
+      "slots",
+      "223a08596fb041b3",
+      "e66f1480f0ee2761",
+      "bc66e941e4f8c5a1"
+    ],
+    [
+      "roads-highlight",
+      "line",
+      "roads",
+      "62d60bed28084788",
+      "e9f1c56944c60b6e",
+      "9fcf0e01ba5670e6"
+    ]
+  ],
+  "sources": {
+    "roads": [
+      "geojson",
+      64828,
+      "d04698bdd334d1d6"
+    ],
+    "simple": [
+      "geojson",
+      113736,
+      "a6ff9868a81126da"
+    ],
+    "slots": [
+      "geojson",
+      16703,
+      "92fca295825b6d8c"
+    ]
+  },
+  "metadata": {
+    "roadstyle:interaction": "a911c29a8eeae5d8",
+    "roadstyle:images": "e9049aa3d5b18840",
+    "roadstyle:sources": "de9ed92a2cabe7fc",
+    "roadstyle:controls": "7ad47e2cab264f27"
+  },
+  "hash": "452f4a5e9536e075",
+  "road_table": {
+    "rows": 64828,
+    "columns": [
+      "edge_id",
+      "osm_id",
+      "highway",
+      "name",
+      "bridge",
+      "tunnel",
+      "layer",
+      "oneway",
+      "walk_type",
+      "junction",
+      "edge_ref",
+      "lanes",
+      "driving",
+      "walking",
+      "cycling",
+      "access",
+      "casing_start",
+      "casing_level",
+      "casing_end",
+      "fill_level",
+      "head_start_m",
+      "head_end_m",
+      "cap_start",
+      "cap_end",
+      "is_directed",
+      "has_arrows",
+      "__rs_fill",
+      "__rs_twoway",
+      "lvl",
+      "__rs_cls"
+    ],
+    "hash": "93a5a60f85d2a167",
+    "text": {
+      "bytes": 47331045,
+      "sha16": "93a5a60f85d2a167"
+    }
+  },
+  "text": {
+    "bytes": 106380706,
+    "sha16": "452f4a5e9536e075"
+  }
+}

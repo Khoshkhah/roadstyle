@@ -10,14 +10,15 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 from functools import lru_cache
-from importlib.resources import files
+
+from . import _assets
 
 
 @lru_cache(maxsize=1)
 def _cmaps() -> dict:
     """The ramps' data (data/cmaps.json, the same file as the Rust engine's): branca's schemes and colour names, and each matplotlib
     colormap at 9 stops (made from branca and matplotlib by rust/roadstyle-rs/tests/make_goldens.py)."""
-    return json.loads(files("roadstyle").joinpath("data/cmaps.json").read_text(encoding="utf-8"))
+    return json.loads(_assets.text("data/cmaps.json"))
 
 
 def _parse_color(x):

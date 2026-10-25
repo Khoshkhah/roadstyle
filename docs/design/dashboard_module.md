@@ -5,11 +5,11 @@ Date: 2026-10-23. Status: on branch `claude/dashboard-js-5ddf3e`, not merged.
 ## Why
 
 The map controls of roadstyle's page (colour by, legend, road filter, find, Street View, Google 3D and more) were only in the
-page template `src/roadstyle/static/web_template.html`, as one script of about 1,500 lines. The pages that use the Rust engine
+page template `rust/roadstyle-assets/files/static/web_template.html`, as one script of about 1,500 lines. The pages that use the Rust engine
 (duckosm-rust's browser page, the GeoLibre plugin) could not use them. duckosm-rust copied parts of the template with a script
 (`roadstyle_windows.py`), and these copies can become different from the template.
 
-Now the controls are ES modules in `src/roadstyle/static/dashboard/`. There is one copy. The Python page and the Rust-engine pages
+Now the controls are ES modules in `rust/roadstyle-assets/files/static/dashboard/`. There is one copy. The Python page and the Rust-engine pages
 use the same files.
 
 ## How a page uses it
@@ -159,7 +159,7 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 | `street_view_key` | `street_view_key` | `""` | `streetview.js`, `google3d.js` |
 | `google_3d` | `google_3d` | `false` | `google3d.js` |
 | `select_color` | `select_color` (the theme's `selection.select`) | (none) | `google3d.js` (the clicked road's line) |
-| `filter` | `filter_control`, `access_col`: `{on, col, classes, swatches, palettes, bridges, tunnels, access}` | `{on: false, classes: []}` | `filter.js`, `views.js` |
+| `filter` | `filter_control`, `access_col`, `minzoom`: `{on, col, classes, swatches, palettes, bridges, tunnels, access, minzoom}` | `{on: false, classes: []}` | `filter.js`, `views.js` |
 | `color_options` | `color_options` or a data styler's legend: `[{name, prop, legend}]` | the style's metadata, else `[]` | `color.js`, `legend.js`, `views.js` |
 | `color_active` | `color_active`, as an index | `0` | `color.js` |
 | `overlays` | `overlays`: `[{label, source, layers, popup, tooltip, interactive, under, base, select, color, visible, popup_window, kinds}]` (`kinds`: a base-map layer's `[[kind, count], ...]`, most first) | `[]` | `core.js`, `overlays.js`, `filter.js`, `select.js`, `features.js` |
@@ -169,7 +169,7 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 | `overlay_popup` | `overlay_popup` | `true` | `overlays.js` |
 | `tunnel` | `tunnel_control` and the theme's tunnels: `{layers, control, strength, palette, palettes, ratio, ratios, toward, towards, to, steps}` | `{layers: {}, steps: [], control: false}` | `tunnel.js`, `arrows.js` |
 | `fill_layers` | the road fill layer ids | `[]` | `svspot.js` |
-| `pick` | the layers that a road is picked on (`roadstyle:controls`) | `[]`: nothing to pick | `select.js` |
+| `pick` | the layers that a road is picked on (`roadstyle:controls`) | `[]`: the road layer of simple mode (a style with no interaction contract: a host's `makeStyle`, the level editor's style) | `select.js` |
 | `road_fill` | `road_fill`: `{on, paint}` | `{on: true, paint: {}}` | `color.js` |
 | `views` | `views` | `[]` | `views.js` |
 | `items` | `items`, `items_popup`: `{label, popup, layer}` or `null` | `null` | `select.js` |
@@ -197,7 +197,7 @@ When a page does not give `road_popup`, `road_tooltip` or `hover_delay_ms`, `ind
 | `google3d.js` | the Google 3D window and its camera link | `google_3d`, `street_view_key`, `select_color` | `rsSetGoogle3D` |
 | `svspot.js` | the Street View spot on a road, its marker, the step buttons, the Street View link | `street_view`, `fill_layers` | `rsSetStreetViewMarkerAt`, `rsSetStreetViewMarker`, `rsStreetViewStep`, `rsGetStreetViewSpot` |
 | `basemap.js` | the base map button and menu | `basemaps`, `basemap_switcher`; the layers `basemap`, `bg` | `rsSetBasemap`, `RS_BASEMAPS` |
-| `filter.js` | the Roads box: classes, Bridges, Tunnels, access kinds; the id filter | `filter`, `overlays` | `rsSetClasses`, `rsSetBridges`, `rsSetTunnels`, `rsSetAccess`, `rsGetAccess`, `rsFilter`, `RS_CLASSES`, `RS_CLASS_COL`, `RS_CLASS_COLORS`, `RS_ACCESS` |
+| `filter.js` | the Roads box: classes (a class that the map does not draw at this zoom, `filter.minzoom`: its row dimmed, title "from zoom N"), Bridges, Tunnels, access kinds; the id filter | `filter`, `overlays` | `rsSetClasses`, `rsSetBridges`, `rsSetTunnels`, `rsSetAccess`, `rsGetAccess`, `rsFilter`, `RS_CLASSES`, `RS_CLASS_COL`, `RS_CLASS_COLORS`, `RS_ACCESS` |
 | `color.js` | the Colour by menu, the recolouring, the road fill switch | `color_options`, `color_active`, `road_fill`; the states `rs_co`, `rs_top` (the full look: `rs_colors`, `rs_base`), `rs_ov_<n>`, `rs_fill_on`; the feature state `rs_c` | `rsSetColorField`, `rsColor`, `rsColorBase`, `rsSetRoadFill`, `RS_COLOR_OPTIONS` |
 | `legend.js` | the legend of the active colour option | `color_options[i].legend` | |
 | `overlays.js` | the overlay popups, the overlay tooltip, the Layers box | `overlays`, `overlay_control`, `overlay_popup` | `rsSetOverlay`, `RS_OVERLAYS` |

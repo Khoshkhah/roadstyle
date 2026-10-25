@@ -7,14 +7,92 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **The typed look, version 2 (T3 step 2, audit R16).** A look is now one struct for each section (`roadstyle_look::sections`: roads,
+  casing, labels, arrows, bridges, tunnels, selection, data, overlays, boundary, background, access, camera, tiles, page, palettes,
+  active, interaction, base_map), in place of the JSON values `theme` and `config` (StyleConfig's flat view) and the resolution's
+  tables. `Look::to_json` writes version 2 (`LookFile`); `Look::from_json` reads versions 2, 1 and 0. The readers that have not moved
+  read the JSON views of version 1 (`Look::views_value`), which are the same, byte for byte, for every golden look: a number keeps its
+  written form (`Num`) and a colour its text (`Color`). A bad colour or an unknown key of a section is an error that names it.
+  `rust/roadstyle-look/look.schema.json` is the JSON Schema of version 2, made from the types with the feature `schema` (a test fails
+  when it differs). **No API key goes into a look**: the keywords `api_key` and `street_view_key` and the settings' `config.api_key`
+  and `config.api_keys` are removed when a look is made or read, because a look is saved and published; the caller gives the keys to
+  the page (`given`).
+  **A host that reads the JSON of a look** (`json()` in Python, `toJson()` in JavaScript) gets version 2: its parts are now the
+  sections (`part("theme")`, `part("config")` still give the views).
+- **`roadstyle_look::MapOptions`, the typed map options (T3 step 1, audit N32).** The keys that change the output of stage 1, in groups
+  (`columns`, `levels`, `color`, `width`, `roads`, `interaction`, `labels`, `arrows`, `tunnels`, `bridges`, `overlays`, `items`,
+  `boundary`, `base_map`, `output`; docs/design/t3_map_options_and_look.md). `MapOptions::from_json` reads the nested form: an unknown
+  key is an error with its path and the nearest known key (`"color.by_column": unknown key; did you mean "by"?`).
+  `MapOptions::from_args` reads render_edges' flat keywords (the `args` of a look of version 1) and gives the names of the other
+  keywords to the caller. Each `Look` has `map` (made from its `args`) and `other_args`; the readers move to `map` in N32 step 2. A map
+  keyword with a value of the wrong kind (for example `hover_color="#zzz"`) is now an error when the look is made.
+  `roadstyle_look::color::Color` is one colour value: "#rrggbb", "#rgb" or a CSS name, or a MapLibre colour text (`rgba(...)`).
 - **The level editor in a page with no server.** `makeArea(edges, options)` (roadstyle-wasm; `roadstyle::level_area::make_files` in
   Rust) makes a level area's roads.parquet, pairs.csv and edits.csv in memory, the same bytes as the folder form. `duckosmPlan` gives
   the query `level_edges`, the edges of a duckOSM file's level area (duckOSM's `load_roads`, the same rows and columns on Monaco). The
   editor is a module, `static/dashboard/editor/level_editor.js`: `levelEditor({map, container, pkg, store})` on a host's map or one of
   its own, with `browserStore` (the files in the browser) or `httpStore` (`roadstyle serve`), the event `"solved"` (levels.csv and the
-  map's table) and downloads of edits.csv and levels.csv. `roadstyle serve`'s page uses the same module.
+  map's table) and downloads of edits.csv and levels.csv. `roadstyle serve`'s page uses the same module. On a host map the editor's
+  sources have names of their own (a host whose base map shares the roads' tile source keeps it), and the panel follows the page's
+  theme (dark with the system, unless `data-theme` on `<html>` says otherwise). The engine runs in a Web Worker
+  (`editor/level_worker.js`): on Tartu (64,828 edges) the longest main-thread task is 0.3 s, not 4.4 s. **A host changes one argument:**
+  `levelEditor({..., pkgUrl})` (the URL of `roadstyle_wasm.js`) in place of `pkg`; the event's `draw()` gives a Promise, and `editor.roads`
+  (the roads) takes the place of `editor.area`. The worker's calls are `static/dashboard/worker/call.js` (`caller`, `answer`), which the
+  browser studio (`ui/studio`) uses too; a worker that stops rejects its waiting calls. On a phone the panel is a sheet at the bottom
+  (`layout`: `"auto"`, a sheet up to 700 px wide; `"sheet"`; `"side"`), with a handle (one row, half, full), taps on the roads, 44 px
+  targets, room for the keyboard, and a fold when a Street View or Google 3D window opens at the bottom.
+  `browserStore` keeps every file in the origin's private file system, also the texts (pairs.csv of Burnaby is more than
+  localStorage's 5 MB); a text that an older version kept in localStorage moves there when it is read.
+- **`roadstyle:controls.filter.minzoom`** (both engines): `{class: zoom}`, the first zoom of each class of the filter panel that the
+  class minzoom hides below a zoom, so a dashboard can dim such a row; null when the minzoom is off (`minzoom=False`).
+- **`casing.drop_below_px`** (a profile key, both engines; default `1.0`, `0` = always a casing): no casing piece at a zoom where the
+  whole casing line is narrower than this many px, so the fill draws alone there; the casing comes back at the first zoom where it is as
+  wide. A bridge keeps its casing. The road layer's filter has the rule, and the tiles leave out the pieces that it hides.
 
 ### Changed
+- **The Roads box dims a class that the map does not draw at this zoom.** With the class minzoom (the default since 2026-10-25), a
+  class row is dimmed below its first zoom (`roadstyle:controls.filter.minzoom`), with the title "from zoom N". Before, the box listed
+  the hidden classes as if they were drawn.
+- **The tiles go to zoom 18** (both engines; `tiles.maxzoom`, was 15). The map scales the last zoom's tiles up, and the casing
+  pieces' cut points round to that zoom's grid, so at zoom 21 and 22 a casing piece stood up to 4–5 px off its fill: thick on one
+  side, missing on the other, with notches where the pieces meet. At 18 it is about 1 px. The archive of a tiled page doubles
+  (Tartu: 13.3 MB to 26.7 MB). A planet build chooses its own last zoom.
+- **Minor roads are hidden below their class's zoom by default** (both engines), as in OpenMapTiles and OSM-Carto: `minzoom` is on
+  (the profile's table: residential and unclassified from 13, cycleway, track and pedestrian from 14, service, footway and path from
+  15, tertiary from 11; motorway to secondary from 4 to 9). **The old look: `minzoom=False`.** `minzoom=None` now means the table too:
+  a caller that passed `None` to draw every class at every zoom must pass `False`. Also on by default: `casing.drop_below_px` 1 (see
+  Added). Tartu, one 1280 × 800 view at zoom 12: 5.6 MB to 1.2 MB of tiles (the largest tile 389 KB), made about 6 times faster.
+- **The tiles read the zoom rules from the style** (both engines). A tile leaves out a feature that every layer drawing its source
+  hides at every zoom of that tile, by the clauses `[">=", ["zoom"], E]` of the layers' filters: the class minzoom (`minzoom=True`) and
+  `casing.drop_below_px`. The tiles of the last zoom keep every feature. Python's `build_pmtiles` takes `layers` (the style's) in place
+  of `class_col` and `minzoom_table`. With `minzoom=True`, a source that a layer draws with no minzoom clause (the full look's
+  `roads-highlight`) keeps every class in its tiles.
+- **Smaller tiles** (both engines). The sort key `__rs_s` of a piece is an integer: 100,000,000 for each step of the key and 1 for each
+  road (before: the key + the road × 1e-8, a double). The order does not change, and the step of a painted road is 50,000,000. A tile
+  keeps no `__rs_*` flag that is false (every reader takes a missing flag as false), and the pieces (the tile layer `simple`) have no
+  MVT id: the source's `promoteId` (`__rs_edge`) is their feature id. The map does not change. Tartu, one 1280 × 800 view (`bench_tiles.mjs`, wasm in Node, the middle of three runs): z12 7.1 MB to
+  5.6 MB in 130 ms to 119 ms (the largest tile 3,268 KB to 2,529 KB), z14 6.6 MB to 5.3 MB in 130 ms to 115 ms.
+- **A source's tiles start at the zoom where it is drawn** (both engines). Its first tile zoom is the first zoom at which a layer of
+  the style draws it, not later than the tiles' last zoom; a source that no layer draws keeps its rule. The base map's buildings and
+  points (drawn from zoom 15 or 16) are no longer in the tiles of zoom 6 to 14. The map does not change. Tartu, the tiles of one
+  1280 × 800 view (`rust/roadstyle-wasm/bench_tiles.mjs`, wasm in Node): z12 8.6 MB to 7.1 MB (the largest tile 3,863 KB to 3,268 KB),
+  z14 7.8 MB to 6.6 MB, made in 10 to 14 % less time; z15 does not change.
+- **roadstyle's files have one copy, the crate roadstyle-assets** (audit N25). The profiles and palettes, the base map's files,
+  `cmaps.json`, `basemaps.json`, `defaults.json`, the sprite, the dashboard's JS and CSS, the popup files, the page templates, the
+  level editor's page and the vendored MapLibre moved from `src/roadstyle/{data,static,templates,vendor}/` to
+  `rust/roadstyle-assets/files/`, with the same names under it. Each crate takes its files from there at compile time
+  (`roadstyle_assets::text!`): a wrong name does not compile, and a binary has only the files that it names (the wasm module does not
+  change). No crate builds in a file of `src/roadstyle/` now, so the crates can be packed (`cargo package`). Python has no copy: it
+  asks the extension (`roadstyle._assets`, `_rust.asset(name)`), so a source checkout needs the built extension. The npm package
+  `roadstyle-dashboard` packs from `rust/roadstyle-assets/files/static/`. The level editor's wasm package is now built to
+  `$CARGO_TARGET_DIR/editor-pkg/` (rust/roadstyle-wasm/build_editor.sh).
+- **Deprecated: the old paths `src/roadstyle/static/dashboard/`, `popup.css`, `popup.js` and `level_editor.html`.** They are a
+  generated copy (`rust/roadstyle-assets/sync_old_paths.py`, checked by a test) for one release, for a page build that copies them
+  from a roadstyle checkout. They go in roadstyle 0.27.0. They are not in the wheel.
+- **`roadstyle-levels` is a leaf crate** (audit N26): its only dependencies are rstar and sha2, 17 crates in all (it was 49, with
+  Arrow through roadstyle-model). The road flags' rule (`NO`, `yes_text`, `layer`, `level`, `directed`, `sql_yes`) is
+  `roadstyle_levels::flags` now; `roadstyle_model::flags` re-exports it with the JSON value's `yes` and `maplibre_yes`. duckosm-rust
+  can take the levels alone. CI fails when the levels depend on more.
 - **`cargo test` at `rust/` builds 113 crates in about 1 minute, not 195 in 5** (review D1). The programs `roadstyle-cli` and
   `roadstyle-snapshot` (bundled SQLite, headless_chrome) are not default members: CI tests them in a step of their own (`-p`). Fat LTO
   and one codegen unit moved from `release` to a new profile `dist` (`inherits = "release"`), which the wheels (`maturin --profile
@@ -47,6 +125,15 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `docs/design/dashboard_module.md`, "Trusted inputs".
 
 ### Fixed
+- **The 3D buildings of a duckOSM file have the height of all the digits of their tags.** The reader's SQL
+  (`roadstyle_io::duckosm`, for Python and the browser) read a tag as `tags['k'][1]`. In DuckDB 1.5 and in duckdb-wasm, `tags['k']` is
+  the text, so `[1]` gave its first character: `building:levels` "25" was "2", and the building was 7.32 m high, not 91.5 m. The SQL
+  now reads `map_extract(tags, 'k')[1]`, which is a list in every DuckDB version. On Monaco, 104 buildings have a tag with two or more
+  characters.
+- **A road is picked again on a page whose style has no interaction contract** (a host's `makeStyle`, the duckosm-rust page, the
+  level editor). Since R7 the dashboard picked a road only on the layers of the option `pick`, which only a style with the contract
+  has: on the other pages no road had a hover, a tooltip or a click (`rs:select`), and Street View waited for a click. With no `pick`,
+  the dashboard picks on the road layer of simple mode again. A test moves and clicks the real mouse on both kinds of page.
 - **Two readings of a duckOSM file at the same time on one connection no longer break each other** (the duckosm-rust page: "Table with
   name e does not exist!"). The reader's temporary tables have the run's own names (`duckosmPlan`'s optional `run`, returned in
   `"run"`; each base-map layer's `"table"`; `"drop"` drops them), and `duckosmFeaturesSelect(specs, run)` takes the run. `roads_sql.js`,
@@ -77,6 +164,16 @@ All notable changes to **roadstyle** are documented here. The format is based on
   are not a file of the kind, data that the call cannot use, a wrong argument, stored levels that are missing or of other edges, a CRS
   that is missing or not read, a Parquet writer that stopped. Each has the same message text as before; `String::from(error)` gives
   it, so a caller whose errors are text keeps its `?`. Python and JavaScript show the same messages.
+- **The road model's and the tiles' errors are typed** (Rust only; docs/design/target_architecture.md, T3). `roadstyle_model::Error`:
+  a column that the model does not take (`Column`, with the column's name: a column type that it does not read now names its column)
+  or a geometry that it does not take. `roadstyle_tiles::Error`: tile settings that are not correct, or an archive with no tile
+  (`Empty`). Both enums are `#[non_exhaustive]`. Tile zooms after 24 (MapLibre's last zoom), a first zoom after the last and a buffer
+  below 0 are errors: before, a `maxzoom` after 31 stopped the program (an overflow in the archive). `Tiles::new`, `tile_stage` and
+  `Tiles::archive` return a `Result` (`archive` gave `None` both for bounds that are not longitude and latitude and for no tile).
+- **A road's key is a type: `roadstyle_model::RoadKey`** (Rust only; docs/design/target_architecture.md, (b) item 4): `table << 32 | row`,
+  below 2^53 while the table is below 2^21 (`RoadKey::TABLES`; a larger table is `Error::Key`). The engine writes the keys of the
+  roads (`__rs_edge`, `__rs_edge2`, the decks' `__rs_edges`, the slots) through it and reads a row back from a key. A build has one
+  table (0), so a key is its road's row and the output does not change.
 - **The base map goes through stage 1 as typed tables** (audit R10, step 2; docs/design/r10_feature_table.md). The Rust engine reads
   features.parquet into one table (Arrow columns and one coordinate buffer), cuts the sea out of it, and keeps each base-map layer as a
   table until it writes the GeoJSON text, not a JSON tree for each feature. The output is the same bytes (the styles, the files and the
@@ -99,6 +196,26 @@ All notable changes to **roadstyle** are documented here. The format is based on
   look, options, given?)` call it. Python gives only what it alone knows: the data steps, the look's options, the base maps' keys and the
   Google Maps key. A view's palette resolves its look in Rust (Python makes no extra looks). The page writer gzips the road table and
   the big sources itself; the two engines' pages are the same byte for byte but these blobs, which are the same when read back.
+- **`rust/roadstyle-wasm/bench.mjs` measures the browser's path** in Node: `makeSources` and `tileSources` with the base map, and the
+  wasm memory after them (Monaco 110 MiB, 7.0 KiB for each road; Tartu 213 MiB, 3.1 KiB). docs/rust/parity.md has the table, and the
+  target architecture's (j) the memory target for each road in the browser.
+- **A test that the Python binding passes the output through** (`tests/test_binding.py`): on Monaco, the binding's style, road
+  table and page are the Rust facade's texts byte for byte (the hashes in the Rust goldens, which `tests/areas.rs` makes). A page
+  gives the CARTO no-key warning once, not once for each CARTO base map of the switcher.
+- **The areas' goldens are the Rust engine's own** (2026-10-24: the Rust API is the design). `tests/areas.rs` checks the style and
+  the tiles of Monaco, Södermalm and Tartu against summaries in git (`rust_style.json`, `rust_tiles.json`, about 2 KB each), which
+  `ROADSTYLE_BLESS=1 cargo test` writes. The comparisons with Python's `golden_style` and `golden_tiles` are gone; the levels, the
+  colour cases and the looks are still checked against Python.
+- **`examples/bench.rs` measures the stages** (review 4, D9): the time, the peak memory and the memory after each stage, on Monaco
+  and Tartu (`cargo run --release -p roadstyle --example bench`; the numbers are in docs/rust/parity.md). The archive (PMTiles) and
+  the CLI's XYZ folder make each tile once, with no cache (`Tiles::build`; `Tiles::tile` keeps its cache for a map): Tartu's archive
+  7.2 s to 6.4 s, peak 663 MB to 596 MB, and no 68 MB of cached tiles after it.
+- **One style builder, and the page writes each source once** (review 4, D3 and N29). `Sources::style_with` makes the style with
+  no source's data in it, and `Sources::write_with` writes it, with each source's data written into the text as it goes. Stage 2
+  (`tile_stage`) and the page (`page_from`) use them: no source is cloned, written and parsed back any more. The page's JSON is
+  `serde_json`'s compact text, each `<` as `\u003c`; Python's `json.dumps` copy in Rust (`pyjson`) is gone. On Tartu, the Rust page:
+  peak memory 1.91 GB to 0.60 GB and 4.1 s to 2.5 s (no gzip), 1.84 GB to 0.42 GB and 6.3 s to 5.5 s (gzip); `make_tiled` stays
+  at 173 MB (it tiles every source).
 - **An exported style tells an app's dashboard its roads** (audit 3, N27, both engines). `export_style`'s metadata has
   `roadstyle:sources` (the road roles) and `roadstyle:controls.pick` (the layers that a road is picked on), from its final layers, as a
   live style has them. A dashboard on an exported style finds and picks the roads with no layer-id prefix.

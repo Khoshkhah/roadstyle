@@ -1,0 +1,297 @@
+[
+  {
+    "options": "the fixture (look.json)",
+    "look": {
+      "parts": {
+        "schema_version": "6b86b273ff34fce1",
+        "palette": "692af560a826b8c8",
+        "settings": "c27ac4acf4bbbc95",
+        "args": "af3028ee9a28ecaf",
+        "theme": "2195c46c288ba573",
+        "config": "d86638f9e67e6f2d",
+        "styles": "a9307e3786dce3c1",
+        "head_m": "a19a1584344c1f37",
+        "slots": "44fe287dd7132083",
+        "roads_model": "1a4750e0b1459580",
+        "features": "d14b4f7ee5424258",
+        "oneway_image": "f64250bff265f76a",
+        "interaction": "5c40bac8aecaa65e"
+      },
+      "hash": "5bde970c6dd75652"
+    }
+  },
+  {
+    "options": {
+      "palette": "amber",
+      "profile": "default"
+    },
+    "look": {
+      "parts": {
+        "schema_version": "6b86b273ff34fce1",
+        "palette": "a59215c8e969d7f4",
+        "settings": "74234e98afe7498f",
+        "args": "44136fa355b3678a",
+        "theme": "bcd1d5a4ce5cc4b4",
+        "config": "d9d87ce4d91fb9db",
+        "styles": "640094d02c60a2b8",
+        "head_m": "a19a1584344c1f37",
+        "slots": "650714b3094a02a7",
+        "roads_model": "dd36e590d0f02e93",
+        "oneway_image": "f64250bff265f76a",
+        "interaction": "5c40bac8aecaa65e"
+      },
+      "hash": "5c60689947e88843"
+    }
+  },
+  {
+    "options": {
+      "palette": "carto",
+      "profile": "default"
+    },
+    "look": {
+      "parts": {
+        "schema_version": "6b86b273ff34fce1",
+        "palette": "a5d354de3b4a2f33",
+        "settings": "74234e98afe7498f",
+        "args": "44136fa355b3678a",
+        "theme": "22f815f037bcd1b5",
+        "config": "d9d87ce4d91fb9db",
+        "styles": "777a905194bed508",
+        "head_m": "a19a1584344c1f37",
+        "slots": "650714b3094a02a7",
+        "roads_model": "dd36e590d0f02e93",
+        "oneway_image": "f64250bff265f76a",
+        "interaction": "5c40bac8aecaa65e"
+      },
+      "hash": "38afbeef724868b9"
+    }
+  },
+  {
+    "options": {
+      "palette": "highsat",
+      "profile": "default"
+    },
+    "look": {
+      "parts": {
+        "schema_version": "6b86b273ff34fce1",
+        "palette": "71eebb5c622a97d9",
+        "settings": "74234e98afe7498f",
+        "args": "44136fa355b3678a",
+        "theme": "9f6dff994c5af2f9",
+        "config": "d9d87ce4d91fb9db",
+        "styles": "312b0140b048d045",
+        "head_m": "a19a1584344c1f37",
+        "slots": "650714b3094a02a7",
+        "roads_model": "dd36e590d0f02e93",
+        "oneway_image": "f64250bff265f76a",
+        "interaction": "5c40bac8aecaa65e"
+      },
+      "hash": "af2d951541848d4e"
+    }
+  },
+  {
+    "options": {
+      "palette": "mono",
+      "profile": "default"
+    },
+    "look": {
+      "parts": {
+        "schema_version": "6b86b273ff34fce1",
+        "palette": "a7014c705fdd2baf",
+        "settings": "74234e98afe7498f",
+        "args": "44136fa355b3678a",
+        "theme": "1a3df4d3ffd8e40c",
+        "config": "d9d87ce4d91fb9db",
+        "styles": "eed4d84fe6e844f7",
+        "head_m": "a19a1584344c1f37",
+        "slots": "650714b3094a02a7",
+        "roads_model": "dd36e590d0f02e93",
+        "oneway_image": "f64250bff265f76a",
+        "interaction": "5c40bac8aecaa65e"
+      },
+      "hash": "4b34255e3a2d9d84"
+    }
+  },
+  {
+    "options": {
+      "palette": "amber",
+      "profile": "highsat"
+    },
+    "look": {
+      "parts": {
+        "schema_version": "6b86b273ff34fce1",
+        "palette": "a59215c8e969d7f4",
+        "settings": "74234e98afe7498f",
+        "args": "44136fa355b3678a",
+        "theme": "3ff5ecf8c9000805",
+        "config": "d9d87ce4d91fb9db",
+        "styles": "33bf1066a329ea74",
+        "head_m": "a19a1584344c1f37",
+        "slots": "650714b3094a02a7",
+        "roads_model": "dd36e590d0f02e93",
+        "oneway_image": "f64250bff265f76a",
+        "interaction": "5c40bac8aecaa65e"
+      },
+      "hash": "f60cb1cb5b5b4804"
+    }
+  },
+  {
+    "options": {
+      "palette": "carto",
+      "profile": "highsat"
+    },
+    "look": {
+      "parts": {
+        "schema_version": "6b86b273ff34fce1",
+        "palette": "a5d354de3b4a2f33",
+        "settings": "74234e98afe7498f",
+        "args": "44136fa355b3678a",
+        "theme": "3e9e694b6d40ab36",
+        "config": "d9d87ce4d91fb9db",
+        "styles": "b58326bf5fc13565",
+        "head_m": "a19a1584344c1f37",
+        "slots": "650714b3094a02a7",
+        "roads_model": "dd36e590d0f02e93",
+        "oneway_image": "f64250bff265f76a",
+        "interaction": "5c40bac8aecaa65e"
+      },
+      "hash": "52f3a6a8e2dc9139"
+    }
+  },
+  {
+    "options": {
+      "palette": "highsat",
+      "profile": "highsat"
+    },
+    "look": {
+      "parts": {
+        "schema_version": "6b86b273ff34fce1",
+        "palette": "71eebb5c622a97d9",
+        "settings": "74234e98afe7498f",
+        "args": "44136fa355b3678a",
+        "theme": "5da809e41c3da2fd",
+        "config": "d9d87ce4d91fb9db",
+        "styles": "67dfea2a118b6606",
+        "head_m": "a19a1584344c1f37",
+        "slots": "650714b3094a02a7",
+        "roads_model": "dd36e590d0f02e93",
+        "oneway_image": "f64250bff265f76a",
+        "interaction": "5c40bac8aecaa65e"
+      },
+      "hash": "4205296bcfce1619"
+    }
+  },
+  {
+    "options": {
+      "palette": "mono",
+      "profile": "highsat"
+    },
+    "look": {
+      "parts": {
+        "schema_version": "6b86b273ff34fce1",
+        "palette": "a7014c705fdd2baf",
+        "settings": "74234e98afe7498f",
+        "args": "44136fa355b3678a",
+        "theme": "60c36f43e0622398",
+        "config": "d9d87ce4d91fb9db",
+        "styles": "5a94f9dc3fea2571",
+        "head_m": "a19a1584344c1f37",
+        "slots": "650714b3094a02a7",
+        "roads_model": "dd36e590d0f02e93",
+        "oneway_image": "f64250bff265f76a",
+        "interaction": "5c40bac8aecaa65e"
+      },
+      "hash": "dd847b9f0c6aa0e6"
+    }
+  },
+  {
+    "options": {
+      "palette": "mine",
+      "settings": {
+        "palettes": {
+          "mine": {
+            "residential": {
+              "fill": "#123456",
+              "width": 2.5,
+              "casing_width": 3.0,
+              "casing": "#654321"
+            },
+            "unclassified": {
+              "fill": "#abcdef",
+              "width": 2,
+              "casing_width": 3,
+              "dash": [
+                4,
+                2
+              ]
+            }
+          }
+        },
+        "config": {
+          "fill_opacity": 0.8,
+          "minor_no_casing": [
+            "footway"
+          ],
+          "minzoom": {
+            "service": 14
+          },
+          "basemap": "osm"
+        },
+        "selection": {
+          "core": "#ff0000"
+        },
+        "roads": {
+          "z_order": {
+            "service": 3
+          }
+        }
+      }
+    },
+    "look": {
+      "parts": {
+        "schema_version": "6b86b273ff34fce1",
+        "palette": "034dcbd253e0ddf4",
+        "settings": "369e345b9193955a",
+        "args": "44136fa355b3678a",
+        "theme": "772757af5653417e",
+        "config": "42054cacf04b40d1",
+        "styles": "e59081011209e5c8",
+        "head_m": "a19a1584344c1f37",
+        "slots": "79a367ccd4a25e0b",
+        "roads_model": "24ab691e075547de",
+        "oneway_image": "f64250bff265f76a",
+        "interaction": "5c40bac8aecaa65e"
+      },
+      "hash": "d3d3d6f1e1dfb0a7"
+    }
+  },
+  {
+    "options": {
+      "settings": {
+        "profile": "highsat",
+        "palette": "carto",
+        "labels": {
+          "color": "#112233"
+        }
+      },
+      "palette": "carto"
+    },
+    "look": {
+      "parts": {
+        "schema_version": "6b86b273ff34fce1",
+        "palette": "a5d354de3b4a2f33",
+        "settings": "b95ba99b0dd1b5c3",
+        "args": "44136fa355b3678a",
+        "theme": "3e9e694b6d40ab36",
+        "config": "d9d87ce4d91fb9db",
+        "styles": "b58326bf5fc13565",
+        "head_m": "a19a1584344c1f37",
+        "slots": "650714b3094a02a7",
+        "roads_model": "dd36e590d0f02e93",
+        "oneway_image": "f64250bff265f76a",
+        "interaction": "5c40bac8aecaa65e"
+      },
+      "hash": "6da3f660c21b9083"
+    }
+  }
+]

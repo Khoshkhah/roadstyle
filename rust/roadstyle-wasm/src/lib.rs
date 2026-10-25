@@ -58,19 +58,19 @@ mod wasm {
     use wasm_bindgen::prelude::*;
 
     /// A resolved look (roadstyle-look), parsed one time: `resolveLook(options)` makes it, `Look.fromJson(text)` reads a saved look
-    /// (version 1, or version 0: today's look.json), `toJson()` gives its text (version 1). The calls below take it, not its text.
+    /// (version 2, 1, or 0: the look.json of 0.25.0), `toJson()` gives its text (version 2). The calls below take it, not its text.
     #[wasm_bindgen(js_name = Look)]
     pub struct JsLook(roadstyle::Look);
 
     #[wasm_bindgen(js_class = Look)]
     impl JsLook {
-        /// Look.fromJson(text): a saved look (version 1 or 0). An error is a thrown Error.
+        /// Look.fromJson(text): a saved look (version 2, 1 or 0). An error is a thrown Error.
         #[wasm_bindgen(js_name = fromJson)]
         pub fn from_json(text: &str) -> Result<JsLook, JsError> {
             roadstyle::Look::from_json(text).map(JsLook).map_err(|e| JsError::new(&e.to_string()))
         }
 
-        /// toJson(): the look's text (version 1).
+        /// toJson(): the look's text (version 2).
         #[wasm_bindgen(js_name = toJson)]
         pub fn to_json(&self) -> String {
             self.0.to_json()
@@ -283,7 +283,7 @@ mod wasm {
         /// archive(bounds, layers): a PMTiles archive of every tile in bounds [min lon, min lat, max lon, max lat] (one file of the map).
         pub fn archive(&self, bounds: Vec<f64>, layers: Vec<String>) -> Result<Vec<u8>, JsError> {
             let b: [f64; 4] = bounds.try_into().map_err(|_| JsError::new("bounds: four numbers"))?;
-            self.tiles.archive(b, &layers).ok_or_else(|| JsError::new("the archive has no tile"))
+            self.tiles.archive(b, &layers).map_err(|e| JsError::new(&e.to_string()))
         }
 
         /// The properties of the feature `id` of a source, as JSON (`null` when there is none).

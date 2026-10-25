@@ -25,7 +25,7 @@ import re
 import warnings
 from collections.abc import Mapping
 
-from . import _settings
+from . import _assets, _settings
 from ._na import missing
 from .basemaps import DEFAULT_SWITCHER, get_basemap
 from .config import DEFAULT as CONFIG
@@ -34,14 +34,11 @@ from .overlays import Overlay, detect_kind, to_fc
 from .palettes import DEFAULT_PALETTE
 from .stylers import bake_color_options, bake_props, build_styler, option_styler
 
-_VENDOR = os.path.join(os.path.dirname(__file__), "vendor")
-
 
 def _asset(fname):
     """Read a vendored front-end asset (the MapLibre js/css) to inline into the saved HTML, so the
     page needs no CDN — it opens offline, straight from disk, with no web server."""
-    with open(os.path.join(_VENDOR, fname), encoding="utf-8") as fh:
-        return fh.read()
+    return _assets.text("vendor/" + fname)
 
 # --- openstreetmap-carto road model — loaded from data/defaults.json "roads" (+ any user
 # roadstyle.json override), like every other styling table. Edit the JSON, not this file.
@@ -1649,7 +1646,7 @@ def _state_expressions(style, props, fill_ids, end_fill_ids, end_casing_ids, ov_
                 layout["line-sort-key"] = ["+", layout["line-sort-key"], ["case", painted, 500, 0]]
             elif lid == "roads-simple":
                 layout["line-sort-key"] = ["+", layout["line-sort-key"], ["case", ["all", ["any", ["==", ["get", "__rs_k"], 1], ["==", ["get", "__rs_k"], 5]],
-                                                                                  top], 0.5, 0]]
+                                                                                  top], int(0.5 * _KEY_UNIT), 0]]
     by_id = {lyr["id"]: lyr for lyr in style["layers"]}
     for i, ov in enumerate(ov_meta or ()):
         for lid in ov.get("layers", ()):
@@ -1931,8 +1928,7 @@ def _stringify_unsafe_ints(geo):
 # `feature.properties` only on user interaction, long after the data lands.
 def _page_part(name):
     """A script of the page (static/page/<name>.html): the same text for the Python and the Rust page writer."""
-    with open(os.path.join(os.path.dirname(__file__), "static", "page", name + ".html"), encoding="utf-8", newline="") as fh:
-        return fh.read()
+    return _assets.text(f"static/page/{name}.html")
 
 
 _INFLATE_JS = _page_part("inflate")
@@ -1951,6 +1947,19 @@ _SIMPLE_JS = _page_part("simple")
 _TILES_JS = _page_part("tiles")
 # the road table (the same in both ways: one row for each road, tiles.sidecar), inflated into window.RS_SIDE after the page loads
 _SIDE_JS = _page_part("side")
+
+
+def _casing_drop_filter(drop, kept):
+    """casing.drop_below_px (2026-10-25): a casing piece (``__rs_k`` 0, not a bridge's) only from its class's first zoom whose tiles show the
+    casing line at least ``drop`` px wide: the first z with the class's casing width at z + 1 >= ``drop``. None when ``drop`` is 0, when every
+    class has a casing from zoom 0, or when ``kept`` (a road in metres with casing.min_px >= drop). layers.rs casing_drop_filter."""
+    if drop <= 0 or kept:
+        return None
+    zs = [next((z for z in range(24) if class_width_px(c, z + 1) >= drop), 24) for c in [*_CLASSES, None]]
+    if not any(zs):
+        return None
+    casing = ["all", ["==", ["get", "__rs_k"], 0], ["!", ["to-boolean", ["get", "__rs_bridge"]]]]
+    return [">=", ["zoom"], ["case", casing, ["at", ["get", "__rs_ci"], ["literal", zs]], 0]]
 
 
 def _minzoom_filter(col, table):
@@ -2502,7 +2511,7 @@ def _simple_pieces(geo, parts, cols, shadows=True, items=(), world=None):
         if e >= _MAX_EDGES:
             raise ValueError(f"simple=True: more than {_MAX_EDGES:,} edges; the line-sort-key's tie-breaker would reach the next key step (pass simple=False)")
         f["id"], n[e] = e * _PIECES + n[e], n[e] + 1
-        f["properties"]["__rs_s"] += e * _TIE   # same key: by edge, not by feature order, so a road redrawn in place (updateData) keeps its place
+        f["properties"]["__rs_s"] = _piece_key(f["properties"]["__rs_s"], e)
     if world is not None:                       # a part of the roads (the editor's update in place): their own items, mitred against all
         mine = {f["properties"].get("__rs_edge", i) for i, f in enumerate(geo["features"])}
         items = [f for f in items if f["properties"]["__rs_edge"] in mine]
@@ -2513,17 +2522,23 @@ def _simple_pieces(geo, parts, cols, shadows=True, items=(), world=None):
         if rank[e] > _MAX_ITEMS:
             raise ValueError(f"simple=True: edge {e} has more than {_MAX_ITEMS} items; they do not fit between its fill and the next casings (pass simple=False)")
         # an id per edge and rank (2026-10-09), as the pieces' (e * _PIECES + n): the level editor swaps one road's items in place
-        out.append({**f, "id": _MAX_EDGES * _PIECES + e * _MAX_ITEMS + rank[e] - 1, "properties": {**p, "__rs_s": 2 * p["__rs_fl"] + 1 + rank[e] * _ITEM_STEP + e * _TIE}})
+        out.append({**f, "id": _MAX_EDGES * _PIECES + e * _MAX_ITEMS + rank[e] - 1, "properties": {**p, "__rs_s": _piece_key(2 * p["__rs_fl"] + 1 + rank[e] * _ITEM_STEP, e)}})
     return {"type": "FeatureCollection", "features": out}
 
 
 _PIECES = 24        # the most pieces of one edge in simple mode (22): 3 casing pieces, 2 seams, 2 laps and 2 end stubs (_end_stub), each with a shadow or a second tunnel piece, 2 fill halves and their 2 end stubs
-# the line-sort-key's tie-breaker per edge (2026-10-08): keys differ by at least 0.05 (offsets -0.5, -0.1, 0, 0.1, 0.15, 0.25, 1, 1.5 of
-# 2 * position; a painted fill + 0.5), so _MAX_EDGES * _TIE (0.01) never reaches the next key
-_TIE, _MAX_EDGES = 1e-8, 1_000_000
+# the line-sort-key __rs_s (2026-10-08; an integer since 2026-10-25): _KEY_UNIT for each unit of the key and 1 for each edge, the tie-breaker.
+# Keys differ by at least 0.05 (offsets -0.5, -0.1, 0, 0.1, 0.15, 0.25, 1, 1.5 of 2 * position; a painted fill + 0.5), so _MAX_EDGES (0.01 of a
+# unit) never reaches the next key. An integer is a varint in a tile, a double 9 bytes (the Tartu z12 tile: 29,229 values)
+_KEY_UNIT, _MAX_EDGES = 100_000_000, 1_000_000
+
+
+def _piece_key(key, e):
+    """__rs_s: the key in _KEY_UNITs and the edge's tie-breaker, so that a road redrawn in place (updateData) keeps its place (simple.rs sort_key)."""
+    return round(key * _KEY_UNIT) + e
 # an item's step above its edge's fill (2026-10-09): more than the whole tie-breaker range, so every item of a position is above every fill of it;
 # a painted road (rsColor) moves its fill and items up 0.5, and its last item must stay under the next position's bridge shadow (2 * position + 1.9):
-# 1.5 + _MAX_ITEMS * _ITEM_STEP + _TIE range < 1.9
+# 1.5 + _MAX_ITEMS * _ITEM_STEP + the tie-breaker's range < 1.9
 _ITEM_STEP, _MAX_ITEMS = 0.01, 38
 
 
@@ -2699,27 +2714,18 @@ def _place_edge_overlays(layers, edge, levels, pat_over=False):
     return layers
 
 
-# The page template lives in static/web_template.html (placeholders: __TITLE__, __STYLE__, …)
-# so the HTML/JS is editable and lintable as HTML, not as a Python string.
-with open(os.path.join(os.path.dirname(__file__), "static", "web_template.html"),
-          encoding="utf-8") as _fh:
-    _HTML = _fh.read()
+# The page template, the popup and the dashboard are roadstyle-assets' files (static/: _assets), the same text that the Rust page
+# writer builds in. The template's placeholders: __TITLE__, __STYLE__, …
+_HTML = _assets.text("static/web_template.html")
 # the popup's look and text, shared with the GeoLibre plugin (export_style copies both files): inlined here, popup.js as a plain script
-with open(os.path.join(os.path.dirname(__file__), "static", "popup.css"), encoding="utf-8") as _fh:
-    _HTML = _HTML.replace("__POPUP_CSS__", _fh.read())
-with open(os.path.join(os.path.dirname(__file__), "static", "popup.js"), encoding="utf-8") as _fh:
-    _HTML = _HTML.replace("__POPUP_JS__", _fh.read().replace("export ", ""))
+_HTML = _HTML.replace("__POPUP_CSS__", _assets.text("static/popup.css"))
+_HTML = _HTML.replace("__POPUP_JS__", _assets.text("static/popup.js").replace("export ", ""))
 # the map's controls and road interaction (static/dashboard/, ES modules shared with the pages that use the Rust engine,
 # docs/design/dashboard_module.md): one plain script here, without the import lines and the export words, so the page stays one file
-_DASH = os.path.join(os.path.dirname(__file__), "static", "dashboard")
-with open(os.path.join(_DASH, "files.txt"), encoding="utf-8") as _fh:    # the modules in their order: one list, which the Rust page writer reads too
-    _DASH_FILES = [ln.strip() for ln in _fh if ln.strip() and not ln.startswith("#")]
-with open(os.path.join(_DASH, "dashboard.css"), encoding="utf-8") as _fh:
-    _HTML = _HTML.replace("__DASHBOARD_CSS__", _fh.read())
-_js = []
-for _n in _DASH_FILES:
-    with open(os.path.join(_DASH, _n + ".js"), encoding="utf-8") as _fh:
-        _js.append(re.sub(r"^export ", "", re.sub(r"^import .*\n", "", _fh.read(), flags=re.M), flags=re.M))
+_DASH_FILES = [ln.strip() for ln in _assets.text("static/dashboard/files.txt").splitlines() if ln.strip() and not ln.startswith("#")]
+_HTML = _HTML.replace("__DASHBOARD_CSS__", _assets.text("static/dashboard/dashboard.css"))
+_js = [re.sub(r"^export ", "", re.sub(r"^import .*\n", "", _assets.text(f"static/dashboard/{_n}.js"), flags=re.M), flags=re.M)
+       for _n in _DASH_FILES]
 _HTML = _HTML.replace("__DASHBOARD_JS__", "".join(_js))
 
 
@@ -3066,7 +3072,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         except ImportError as err:                     # pragma: no cover
             raise ImportError(
                 'tiles=True needs the tiles extra: pip install "roadstyle[tiles]"') from err
-        tc = {"minzoom": 6, "maxzoom": 15, "extent": 4096, "buffer_px": 80,
+        tc = {"minzoom": 6, "maxzoom": 18, "extent": 4096, "buffer_px": 80,      # maxzoom: config.py's tiles (the casing at zoom 22)
               **(CONFIG.tiles or {})}
         # the archive itself is built later, once the annotation slots exist (they ride along
         # as a second tile layer); the source just points at the embedded pmtiles:// protocol
@@ -3121,10 +3127,12 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     surface = ["==", bd, 0]
     low = ["<", bd, 0]
     bridge = ["!", ["to-boolean", 1]] if levels else ["all", [">", lv, 0], is_b]     # position mode: a bridge is drawn at its positions, no layers of its own
+    bridge_band = bridge          # the band alone: the highlight's split below (bridge gets the minzoom clause; "!" of both shows hidden classes)
     high = ["all", [">", bd, 0], ["!", is_b]]
-    # minzoom: hide minor classes when zoomed out (config.DEFAULT.minzoom, or a caller override).
+    # minzoom: hide minor classes when zoomed out (config.DEFAULT.minzoom, or a caller override); on by default since 2026-10-25, as
+    # OpenMapTiles and OSM-Carto do (None or True: the table; False: every class at every zoom).
     # AND-ed onto each road filter rather than given its own layers, so layer ids are untouched.
-    mz = ({**CONFIG.minzoom} if minzoom is True else
+    mz = ({**CONFIG.minzoom} if minzoom is True or minzoom is None else
           {**CONFIG.minzoom, **minzoom} if isinstance(minzoom, dict) else None)
     tunnel = ["all", low, is_t]                     # the tunnel look, inside the low band
     # a tunnel drawn in another band (a caller's band_col: a stretch of it at ground level) keeps its look
@@ -3240,9 +3248,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             elif l["id"] == "roads-highlight":
                 # bridges glow on the flat line only while the flat line is shown; the deck
                 # carries its own feature-state glow above flat_below
-                l["filter"] = ["!", bridge]
+                l["filter"] = ["!", bridge_band]
                 style["layers"].append(
-                    {**l, "id": "roads-highlight-bridge", "maxzoom": _fb, "filter": bridge})
+                    {**l, "id": "roads-highlight-bridge", "maxzoom": _fb, "filter": bridge_band})
                 break
         # extruded bridge decks: physical ribbons floating base_m above ground — in the tilted
         # view you look UNDER a bridge and see the roads passing beneath it. The casing ring
@@ -3444,6 +3452,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             cw, fw, bcw = _exp2(cw), _exp2(fw), _exp2(bcw)
         soff = _by_feature([(is_it, _metre_curve(_exp2(off), "__rs_iom"))], _exp2(off)) if items else off   # an item: its own metres, not a direction's shift
         flt = [f for f in ((_minzoom_filter(highway_col, mz) if mz else None),
+                           _casing_drop_filter(_cs.get("drop_below_px", 0.0), bool(width_m_col) and casing_min_px >= _cs.get("drop_below_px", 0.0)),
                            _seam_filter(),     # the full look's rule: a seam only from zoom 17 (below it a bridge's seams are dark dots at every head)
                            (["any", ["<", ["zoom"], dk["flat_below"]], ["!", is_b]] if decks["features"] else None),
                            (["any", ["!", ["has", "__rs_imz"]], [">=", ["zoom"], ["get", "__rs_imz"]]]      # an item's own minzoom
@@ -3742,7 +3751,10 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            "bridges": any((f.get("properties") or {}).get("lvl", 0) > 0
                           for f in geo.get("features", [])),
            "tunnels": any((f.get("properties") or {}).get("lvl", 0) < 0
-                          for f in geo.get("features", []))}
+                          for f in geo.get("features", [])),
+           # the class minzoom (2026-10-25): the first zoom of each class of the panel that has one (the Roads box dims a hidden
+           # class); None when the minzoom is off (contract.rs filter_panel)
+           "minzoom": {c: mz[c] for c in classes if (mz.get(c) or 0) > 0} if mz else None}
 
     view_list = _check_views(views, [o["name"] for o in color_opts_meta or []] if color_options else [],
                              [o["label"] for o in ov_meta], classes, [b["key"] for b in bms], _settings.style_names("palettes"))
@@ -3800,7 +3812,12 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         for lyr in style["layers"]:
             if lyr.get("source") == "roads" and "source-layer" not in lyr:
                 lyr["source-layer"] = "roads"
-        extra = [{"name": "slots", "fc": slots, "minzoom": 14}] if slots["features"] else []
+        def first_drawn(name, from_zoom):
+            """A tile layer's first zoom: the first zoom at which a layer of the style draws it (no minzoom: 0), not past the last zoom
+            (roadstyle::first_drawn, 2026-10-25); a layer that no layer draws keeps from_zoom."""
+            zs = [math.floor(lyr.get("minzoom", 0)) for lyr in style["layers"] if name in (lyr.get("source"), lyr.get("source-layer"))]
+            return max(from_zoom, min(min(zs), tc["maxzoom"])) if zs else from_zoom
+        extra = [{"name": "slots", "fc": slots, "minzoom": first_drawn("slots", 14)}] if slots["features"] else []
         keep = {highway_col, filter_col or highway_col, "__rs_twoway", "__rs_edge", "lvl", width_m_col}
         line_layers = []
         # the casing pieces, simple mode's pieces and the twin end caps ride in the same archive (docs/design/levels_split_casing.md, 12.1);
@@ -3812,9 +3829,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                     lyr["source"], lyr["source-layer"] = "roads", sname
             if src and src["data"]["features"]:
                 if kind == "line":
-                    line_layers.append({"name": sname, "fc": src["data"], "keep": keep})
+                    line_layers.append({"name": sname, "fc": src["data"], "keep": keep, "minzoom": first_drawn(sname, tc["minzoom"])})
                 else:
-                    extra.append({"name": sname, "fc": src["data"], "minzoom": tc["minzoom"]})
+                    extra.append({"name": sname, "fc": src["data"], "minzoom": first_drawn(sname, tc["minzoom"])})
         if _export:      # a style for other apps (docs/design/style_export.md): RustGIS draws no GeoJSON source, so every one goes in the archive
             for sid, src in [(s, v) for s, v in style["sources"].items() if v.get("type") == "geojson"]:
                 del style["sources"][sid]
@@ -3827,9 +3844,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                         lyr["source"], lyr["source-layer"] = "roads", sid
                 # ponytail: points and polygons go whole into every tile they touch (extra_layers); clip them if a big polygon overlay makes the tiles heavy
                 if all((f.get("geometry") or {}).get("type") in ("LineString", "MultiLineString") for f in fs):
-                    line_layers.append({"name": sid, "fc": src["data"], "keep": None})
+                    line_layers.append({"name": sid, "fc": src["data"], "keep": None, "minzoom": first_drawn(sid, tc["minzoom"])})
                 else:
-                    extra.append({"name": sid, "fc": src["data"], "minzoom": tc["minzoom"], "keep": None})
+                    extra.append({"name": sid, "fc": src["data"], "minzoom": first_drawn(sid, tc["minzoom"]), "keep": None})
         roads_keep = keep
         if _export:      # the export's road tiles keep every column, so an app shows a road's data; an id past 2**53 as text (JS would round it)
             roads_keep = None
@@ -3839,8 +3856,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                     if isinstance(v_, int) and not isinstance(v_, bool) and abs(v_) >= 2 ** 53:
                         p_[k_] = str(v_)
         pmt = _tiler.build_pmtiles(
-            {"type": "FeatureCollection", "features": [] if lean else _slim_roads(geo["features"], read)}, class_col=highway_col, keep=roads_keep,   # a page: no road lines
-            minzoom_table=mz, minzoom=tc["minzoom"], maxzoom=tc["maxzoom"],
+            {"type": "FeatureCollection", "features": [] if lean else _slim_roads(geo["features"], read)}, keep=roads_keep,   # a page: no road lines
+            layers=style["layers"], minzoom=tc["minzoom"], maxzoom=tc["maxzoom"],
             extent=tc["extent"], buffer_px=tc["buffer_px"], extra_layers=extra or None,
             line_layers=line_layers or None)
         side = _tiler.sidecar(geo)

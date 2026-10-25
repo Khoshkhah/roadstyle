@@ -115,14 +115,13 @@ def test_page_only_keywords_refused(tmp_path):
 def test_plain_maplibre_page_draws_the_export(tmp_path):
     """A MapLibre page with no roadstyle code opens style.json from a server and draws the roads."""
     pw = pytest.importorskip("playwright.sync_api")
-    from importlib.resources import files
-
     import roadstyle as rs
+    from roadstyle import _assets
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(tmp_path)))
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{srv.server_address[1]}"
     rs.export_style(_edges(), tmp_path, base_url=base, labels=False)     # no glyphs: no network
-    js = files("roadstyle").joinpath("vendor/maplibre-gl.js").read_text()
+    js = _assets.text("vendor/maplibre-gl.js")
     (tmp_path / "index.html").write_text(
         f'<div id="m" style="width:800px;height:600px"></div><script>{js}</script><script>window.errs=[];'
         f'window.map=new maplibregl.Map({{container:"m",style:"{base}/style.json"}});'

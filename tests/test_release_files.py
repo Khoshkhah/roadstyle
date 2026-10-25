@@ -38,7 +38,7 @@ def test_one_version_everywhere():
         "server.json package": server["packages"][0]["version"],
         "plugin.json version": plugin["version"],
         "Rust crates version": _toml_value("rust/Cargo.toml", "version"),
-        "roadstyle-dashboard version": json.loads((ROOT / "src/roadstyle/static/package.json").read_text())["version"],
+        "roadstyle-dashboard version": json.loads((ROOT / "rust/roadstyle-assets/files/static/package.json").read_text())["version"],
         "roadstyle-wasm version": json.loads((ROOT / "rust/roadstyle-wasm/package.json").read_text())["version"],
     } == dict.fromkeys(["roadstyle-mcp version", "roadstyle-mcp pin", "server.json version",
                         "server.json package", "plugin.json version", "Rust crates version",
@@ -48,7 +48,7 @@ def test_one_version_everywhere():
 def test_every_dashboard_module_is_in_its_list():
     """static/dashboard/files.txt is the one list of the dashboard's modules (render_web.py and the Rust page writer read it): a module
     file that is not in it would be left out of every page."""
-    d = ROOT / "src/roadstyle/static/dashboard"
+    d = ROOT / "rust/roadstyle-assets/files/static/dashboard"
     listed = [ln.strip() for ln in (d / "files.txt").read_text().splitlines() if ln.strip() and not ln.startswith("#")]
     assert sorted(listed) == sorted(p.stem for p in d.glob("*.js")) and len(set(listed)) == len(listed)
 
@@ -58,7 +58,7 @@ def test_dashboard_modules_bundle_as_one_script():
     `import ` and the word `export ` at a line's start. So an import must be on one line, and two modules must not declare the same
     top-level name (in one script the second one is a syntax error, or silently replaces the first)."""
     import re
-    d = ROOT / "src/roadstyle/static/dashboard"
+    d = ROOT / "rust/roadstyle-assets/files/static/dashboard"
     seen, dup, multi = {}, [], []
     for p in sorted(d.glob("*.js")):
         lines = p.read_text().splitlines()
@@ -89,3 +89,25 @@ def test_dashboard_modules_bundle_as_one_script():
     assert not multi, f"an import over more than one line: {multi}"
     assert not dup, f"a top-level name in two modules: {dup}"
 
+
+
+def test_the_old_paths_are_exact_copies_of_their_source():
+    """rust/roadstyle-assets/files/static/ is the one source of the dashboard and the popup. The old paths that duckosm-rust's page
+    build copies (src/roadstyle/static/popup.*, level_editor.html, dashboard/) are a generated copy for one release
+    (rust/roadstyle-assets/sync_old_paths.py): an edit of a copy, or a source file with no copy, fails here."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("sync", ROOT / "rust/roadstyle-assets/sync_old_paths.py")
+    sync = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sync)
+    pairs = list(sync.pairs())
+    assert pairs and all(dst.read_bytes() == src.read_bytes() for src, dst in pairs), "run python rust/roadstyle-assets/sync_old_paths.py"
+    copies = {dst for _, dst in pairs}
+    extra = [f for f in (sync.OLD / "dashboard").rglob("*") if f.is_file() and f not in copies]
+    assert not extra, f"a copy with no source (edit rust/roadstyle-assets/files/static/): {extra}"
+
+
+def test_no_crate_builds_in_a_file_of_src_roadstyle():
+    """roadstyle-assets has the files that a crate builds in (N25): no include_str! / include_bytes! of src/roadstyle/ is left."""
+    found = [f"{f.relative_to(ROOT)}" for f in (ROOT / "rust").glob("*/src/**/*.rs") if "src/roadstyle" in f.read_text(encoding="utf-8")
+             and re.search(r"include_(str|bytes)!\([^)]*src/roadstyle", f.read_text(encoding="utf-8"))]
+    assert not found, found

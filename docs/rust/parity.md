@@ -5,9 +5,9 @@ much memory it uses.</p>
 
 ## What "the same" means
 
-For the style and the page, the same means byte for byte: the same keys in the same order, the same numbers to the last digit.
-The Rust engine writes JSON as Python's `json.dumps` writes it, with its separators, its `\uXXXX` escapes and its floats
-(`1e-05`, `60.0`), and it parses floats exactly.
+For the style and the page, the same means the same JSON values: the same keys, the same numbers to the last digit (the engine
+parses floats exactly). The JSON text is each engine's own: since 2026-10-24 the Rust engine writes `serde_json`'s compact text, not
+Python's `json.dumps` (the Rust API is the design), and the tests compare the values (`_same_page`).
 
 For the tiles, the same means the same features when decoded: the same ids, properties and geometry. The bytes can differ,
 because Python's encoder (`mapbox_vector_tile`) writes a negative integer as `int_value` and a float with no fraction as an
@@ -15,19 +15,20 @@ integer, and the engine writes `sint_value` and a double. MapLibre reads the sam
 
 ## The goldens
 
-`rust/roadstyle-rs/tests/make_goldens.py` is the one generator of the reference outputs. It runs Python roadstyle on three areas:
+Two kinds of golden check the Rust engine:
 
-| Area | Roads | Goldens |
-|---|---|---|
-| Monaco | 13,298 | the style of `export_inline`, the tiles of `export_style`, the levels (tags and solve), the color cases, the looks |
-| Södermalm (sample) | 4,563 driving edges | the style, the tiles, the levels, with duckOSM's solved levels |
-| Tartu | 64,828 | the style, the tiles, the levels of the tags rule |
+- **The Rust engine's own goldens** (since 2026-10-24, when the Rust API became the design). A golden is a summary of an output:
+  each layer's id, type and source with short hashes of its filter, paint and layout; each source's type, feature count and hash;
+  the metadata keys; the road table's rows and columns; for the tiles, the number of tiles and features of each zoom and tile layer
+  with their hash; and the hash of the whole output. The goldens are a few KB each, in git. `ROADSTYLE_BLESS=1 cargo test` writes
+  them again after a change that you decided, and a test that fails names the part that changed. `areas.rs` has the style and the
+  tiles of Monaco, the Södermalm sample and Tartu (64,828 roads, with `--ignored`); `cases.rs` has the engine's cases on a part of
+  Monaco, `colors.rs` the data-driven colour cases on it, and `look.rs` the looks of each profile and palette.
+- **Python's goldens** (`rust/roadstyle-rs/tests/make_goldens.py`), for what is still checked against Python: the levels (the tags
+  rule and the solve). The last check of the style, the tiles, the colour cases and the looks against Python was 2026-10-24
+  (audit 3's N27).
 
-The tiles are the 3 × 3 tiles around the center at zooms 12, 14 and 15. The files over 1 MB and Tartu's inputs are on the
-GitHub pre-release `rust-test-data`. The repository keeps their SHA-256, and `get_goldens.sh` checks it.
-
-The Rust tests (`cargo test`) compare the engine with the goldens: `areas.rs` for the three areas, `colors.rs` for the
-data-driven color, `look.rs` for the looks of each profile and palette, `levels.rs` and `style.rs`.
+Tartu's inputs are on the GitHub pre-release `rust-test-data`; `get_goldens.sh` gets them and checks their SHA-256.
 
 ## The tests with both engines
 
@@ -95,6 +96,22 @@ and the time of the slowest one.
 
 The browser numbers are the middle of three runs. The headless browser measures only Monaco, the limit of this machine for a
 browser test. On Monaco the WebAssembly module is as fast as the native code.
+
+#### The size of the tiles
+
+`rust/roadstyle-wasm/bench_tiles.mjs` makes, in WebAssembly in Node, the tiles of one 1280 × 800 view at the roads' center (the
+tiles of 512 px in view and one more on each side), cold. The numbers are the middle of three runs on Tartu (64,828 roads), in
+order: the first tile zoom of a source is the first zoom at which a layer draws it (6ecff70); then the integer sort key, no false
+`__rs_*` flag and no MVT id on the pieces (2026-10-25).
+
+| Zoom | Before | First drawn zoom | Integer key, no false flags, no piece id | The largest tile |
+|---|---|---|---|---|
+| 12 | 8.6 MB | 7.1 MB, 130 ms | 5.6 MB, 119 ms | 3,863 KB, 3,268 KB, 2,529 KB |
+| 14 | 7.8 MB | 6.6 MB, 130 ms | 5.3 MB, 115 ms | 735 KB, 592 KB (the second and third) |
+
+That is about 18 ms for each 10,000 roads at zoom 12, cold. In the tile z12/2351/1225 (1,920 KB), the 35,239 pieces have 385 KB
+of lines and about 1.2 MB of marks: every mark is one that a layer or the page reads. The wasm memory after `makeSources` and
+`tileSources` (`bench.mjs`) stays 213 MiB.
 
 ### In the browser: Rust or MapLibre cuts the tiles
 
@@ -191,19 +208,71 @@ MapLibre's workers.
 | Monaco, a part (1,373 roads) | the style of `export_inline` | 0.57 s | 0.12 s |
 | Monaco (osmnx, 849 drive edges) | `render_edges` | 0.9 to 1.3 s | 0.3 s |
 
+## Size
+
+The size of the engine in each build, for the later steps to compare with: the WebAssembly package (`roadstyle_wasm_bg.wasm`, the
+output of `wasm-bindgen` for the profile `dist`), the same file with gzip -9, and the Python module (`_rust.abi3.so`, profile
+`release`, Linux x86-64). The steps of T3 (the typed map options and the typed look, `docs/design/t3_map_options_and_look.md`),
+2026-10-25:
+
+| Build | WebAssembly | gzip | Python module |
+|---|---|---|---|
+| Before T3 step 2 (94fc86f, step 1: `MapOptions`) | 11,292,251 B | 2,686,887 B | 31,304,056 B |
+| Step 2 as first written (d68e184) | 11,828,534 B (+4.7 %) | 2,840,954 B (+5.7 %) | 32,334,320 B (+3.3 %) |
+| Step 2 (db210f9: no serde `flatten`, schemars behind the feature `schema`) | 11,587,165 B (+2.6 %) | 2,773,038 B (+3.2 %) | 31,871,560 B (+1.8 %) |
+| Step 3 (the look crate's readers read the typed sections) | 11,669,114 B (+3.3 %) | 2,794,223 B (+4.0 %) | 32,124,408 B (+2.6 %) |
+
+The percentages are against the first row. The typed sections cost their serde readers (161 KB of the WebAssembly at step 2); serde's
+`flatten` read every section a second time through its buffer (113 KB for `Sections` alone), so `LookFile` is read and written by
+hand. The target: under +2 % again when N32 step 2 removes the JSON views of version 1 and the flat reader of `args`.
+
 ## Memory
 
-The peak resident memory of the native program (`/usr/bin/time`), for the style:
+`examples/bench.rs` runs each stage of the Rust engine on Monaco and on Tartu, and gives its time, the peak of the memory in use
+during it and the memory in use after it (the bytes that the program has, counted by its allocator):
 
-| Area | Roads | Peak | Time |
-|---|---|---|---|
-| Monaco | 13,298 | 194 MB | 0.55 s |
-| Tartu | 64,828 | 1.13 GB | 2.9 s |
+```bash
+cargo run --release --manifest-path rust/Cargo.toml -p roadstyle --example bench
+```
 
-Tartu uses about 17 KB for each road. In the browser, the WebAssembly module used 0.65 to 0.77 times the native peak in earlier
-measurements. A WebAssembly module has at most 4 GB, so the engine stops at 200,000 roads (`MAX_ROADS`) with an error. This
-limit is an estimate from Tartu, not a measurement of a larger area. Stockholm county (456,813 driving edges) is over the limit.
+Measured on 2026-10-24 on the machine above (other programs ran at the same time, so the times can vary by 20 %):
 
-The memory for each road goes down when the columnar road model of the plan is built (P4). It is not built.
+| Step | Monaco: time | Monaco: peak | Tartu: time | Tartu: peak | Tartu: after |
+|---|---|---|---|---|---|
+| Read the roads and the base map | 14 ms | 7 MB | 45 ms | 38 MB | 27 MB |
+| Stage 1 (`sources_of`) | 93 ms | 20 MB | 378 ms | 99 MB | 73 MB |
+| Stage 1 as text (`write_style`, 8.5 MB and 59.1 MB) | 94 ms | 31 MB | 504 ms | 141 MB | 73 MB |
+| Stage 2 (`tile_stage`, the tile index) | 114 ms | 29 MB | 641 ms | 168 MB | 152 MB |
+| Stage 2's archive (PMTiles, 4.2 MB and 111.4 MB) | 665 ms | 41 MB | 6,396 ms | 596 MB | 152 MB |
+| The page (`page_from`, no gzip: 10.3 MB and 67.0 MB) | 494 ms | 69 MB | 2,958 ms | 365 MB | 23 MB |
+| The page (`page_from`, gzip: 3.6 MB and 17.8 MB) | 518 ms | 52 MB | 3,835 ms | 253 MB | 23 MB |
+
+Tartu has 64,828 roads; Monaco has 13,298. The archive makes each tile once, with no cache (before 2026-10-24: 7.2 s and 663 MB,
+and 68 MB of tiles kept after it). Most of its peak is the PMTiles writer, which keeps every gzipped tile until it writes the
+directory.
+
+The browser's path in WebAssembly is measured in Node with `rust/roadstyle-wasm/bench.mjs`: the calls of the duckosm-rust page's map
+worker (`makeSources`, then `tileSources`, with the base map) and the size of the wasm memory after each (`memoryBytes`; it only
+grows):
+
+```bash
+cargo build --release --manifest-path rust/Cargo.toml --target wasm32-unknown-unknown -p roadstyle-wasm
+wasm-bindgen --target nodejs --out-dir /tmp/rs-pkg rust/target/wasm32-unknown-unknown/release/roadstyle_wasm.wasm
+node rust/roadstyle-wasm/bench.mjs /tmp/rs-pkg rust/roadstyle-rs/tests/data/tartu
+```
+
+| Area | Roads | `makeSources` | `tileSources` | Wasm memory after both | For each road: (after − at the start) / roads |
+|---|---|---|---|---|---|
+| Monaco | 13,298 | 259 ms | 111 ms | 110 MiB (19 MiB at the start) | 7.0 KiB |
+| Tartu | 64,828 | 1,039 ms | 709 ms | 213 MiB | 3.1 KiB |
+
+The tiles are made later, on request, so `tileSources` adds no memory at first. In the duckosm-rust page (desktop Chromium, after the
+draw) the map worker's wasm has 796 MiB for Burnaby's 151,770 roads (all networks) and 418 MiB for one network (62,453 roads), and the
+whole tab has about 1,000 MiB + 14 KB for each road (Monaco 1,077 MiB, Tartu 2,050 MiB). The memory target for each road is in
+[the target architecture](../design/target_architecture.md), section (j).
+
+In the browser, the WebAssembly module used 0.65 to 0.77 times the native peak in earlier measurements. A WebAssembly module has at
+most 4 GB, so the engine stops at 200,000 roads (`MAX_ROADS`) with an error. This limit is an estimate from Tartu, not a measurement
+of a larger area. Stockholm county (456,813 driving edges) is over the limit.
 
 **See also:** [Architecture of the Rust version](architecture.md) · [Build from source](build.md#run-the-tests)

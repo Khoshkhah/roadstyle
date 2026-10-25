@@ -49,7 +49,7 @@ python rust/roadstyle-py/build.py
 ```
 
 The script writes `src/roadstyle/_rust.abi3.so` (`_rust.pyd` on Windows) for the Python that runs it. Git ignores this file. Run
-the script again after each change in `rust/` or in `src/roadstyle/data/` and `src/roadstyle/static/`, because the crates read
+the script again after each change in `rust/` or in `rust/roadstyle-assets/files/data/` and `rust/roadstyle-assets/files/static/`, because the crates read
 these files when they are built.
 
 ## Build the WebAssembly package
@@ -93,6 +93,25 @@ The Python tests compare the two engines, then run the whole suite with the Rust
 pytest tests/test_engine_parity.py
 ROADSTYLE_ENGINE=rust pytest
 ```
+
+## One shared build folder
+
+On Kaveh's machine, all worktrees of roadstyle use one build folder: `.shared-target` in the main checkout. Thus the
+dependencies compile one time, not one time for each worktree. The `cargo` wrapper of duckosm-rust (`tools/cargo`,
+installed as `~/.local/bin/cargo`) does this for roadstyle and for duckosm-rust. Its description is in duckosm-rust
+`docs/development.md`, "One shared build folder". In summary:
+
+- If `rust/` has no `target`, the wrapper makes `rust/target` a link to `.shared-target`. The paths `rust/target/...` on
+  this page and in the scripts thus stay correct. A worktree that has a `rust/target/` folder of its own keeps it: the
+  change starts when you delete the old folder.
+- When the workspace that builds changes, the wrapper touches the files of the new workspace that Git tracks. Without
+  this step, a worktree with older files can get the binary of the worktree that built last. The workspace crates then
+  compile again, but the dependencies do not.
+- A lock lets the cargo commands of only one worktree use the folder at a time. A `cargo run` that does not stop (for
+  example `roadstyle serve`) thus stops the builds of the other worktrees: run the program from `rust/target/` instead.
+
+CI has no wrapper and uses a plain `rust/target/`. To stop the shared folder, delete `~/.local/bin/cargo`, or set
+`CARGO_TARGET_DIR` to a folder outside `.shared-target`.
 
 ## Read the crate documentation
 

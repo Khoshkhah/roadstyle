@@ -1,0 +1,87 @@
+{
+  "style": {
+    "keys": [
+      "version",
+      "name",
+      "center",
+      "zoom",
+      "layers",
+      "sources",
+      "metadata",
+      "glyphs"
+    ],
+    "layers": [
+      [
+        "roads-simple",
+        "line",
+        "simple",
+        "f400c3887e0b8239",
+        "b777cc0b01f83546",
+        "32554e5658942863"
+      ],
+      [
+        "roads-fill",
+        "line",
+        "roads",
+        "3a1b5d6463213abf",
+        "97344518adf6cfa0",
+        "9fcf0e01ba5670e6"
+      ],
+      [
+        "roads-arrows",
+        "symbol",
+        "slots",
+        "052373ab617afa51",
+        "b9e63a214b296e3e",
+        "ab198cfa36f5f9c3"
+      ],
+      [
+        "roads-labels",
+        "symbol",
+        "slots",
+        "223a08596fb041b3",
+        "e66f1480f0ee2761",
+        "bc66e941e4f8c5a1"
+      ],
+      [
+        "roads-highlight",
+        "line",
+        "roads",
+        "62d60bed28084788",
+        "e9f1c56944c60b6e",
+        "9fcf0e01ba5670e6"
+      ]
+    ],
+    "sources": {
+      "roads": [
+        "geojson",
+        1373,
+        "02518fde232e3978"
+      ],
+      "simple": [
+        "geojson",
+        1899,
+        "6e8135ed855ceb25"
+      ],
+      "slots": [
+        "geojson",
+        243,
+        "9a43080bf8d9f796"
+      ]
+    },
+    "metadata": {
+      "roadstyle:interaction": "a911c29a8eeae5d8",
+      "roadstyle:images": "e9049aa3d5b18840",
+      "roadstyle:color_options": "253e2dfd41ca8ff2",
+      "roadstyle:sources": "de9ed92a2cabe7fc",
+      "roadstyle:controls": "7ad47e2cab264f27"
+    },
+    "hash": "9f39f8c8515395d9"
+  },
+  "color_options": {
+    "names": [
+      "lanes"
+    ],
+    "hash": "253e2dfd41ca8ff2"
+  }
+}

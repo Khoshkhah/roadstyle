@@ -79,6 +79,9 @@ jobs:
           cargo build --offline --release --target wasm32-unknown-unknown -p roadstyle --no-default-features
           io=$(cargo tree --offline -e normal --prefix none $core | grep -E '^(roadstyle-io|parquet) ' || true)
           if [ -n "$io" ]; then echo "the core depends on a reader: $io"; exit 1; fi
+          # the levels are a leaf (N26): duckosm-rust takes them alone, with rstar and sha2 only (no Arrow, no other roadstyle crate)
+          leaf=$(cargo tree --offline -e normal --depth 1 --prefix none -p roadstyle-levels | tail -n +2 | grep -vE '^(rstar|sha2) ' || true)
+          if [ -n "$leaf" ]; then echo "roadstyle-levels depends on more than rstar and sha2: $leaf"; exit 1; fi
           # GeoPackage (rusqlite, SQLite in C) is for the native programs only: the browser package must not have it
           if cargo tree --offline --target wasm32-unknown-unknown -e normal -p roadstyle-wasm -i rusqlite >/dev/null 2>&1; then echo "roadstyle-wasm depends on rusqlite (the gpkg feature)"; exit 1; fi
 

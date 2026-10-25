@@ -2,7 +2,7 @@
 //! render_web.render bake as `__rs_*` properties, as typed fields. `Draw::marks` gives them by their property names, in the order that
 //! the stages set them, so the output text is the text of the old properties.
 
-use roadstyle_model::Cell;
+use roadstyle_model::{Cell, RoadKey};
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -78,7 +78,7 @@ pub struct Draw {
     pub oneway: Option<bool>,
     /// a reverse pair of a single-line class: the later edge, and each edge's partner
     pub dup: bool,
-    pub edge2: Option<u32>,
+    pub edge2: Option<RoadKey>,
     pub lvl: Option<i64>,
     pub bridge: Option<bool>,
     pub tunnel: Option<bool>,
@@ -97,7 +97,8 @@ pub struct Draw {
     pub width_m: Option<f64>,
     pub casing_m: Option<f64>,
     pub twin_width_m: Option<f64>,
-    pub edge: Option<u32>,
+    /// the road's key (the pieces' promoteId)
+    pub edge: Option<RoadKey>,
     /// _mark_cls: the class filter's value
     pub cls: Option<u32>,
 }
@@ -127,7 +128,7 @@ impl Draw {
             out.push(("__rs_dup", Cell::Bool(true)));
         }
         if let Some(e) = self.edge2 {
-            out.push(("__rs_edge2", int(e as i64)));
+            out.push(("__rs_edge2", int(e.get() as i64)));
         }
         if let Some(l) = self.lvl {
             out.push(("lvl", int(l)));
@@ -166,7 +167,7 @@ impl Draw {
             }
         }
         if let Some(e) = self.edge {
-            out.push(("__rs_edge", int(e as i64)));
+            out.push(("__rs_edge", int(e.get() as i64)));
         }
         if let Some(c) = self.cls {
             out.push(("__rs_cls", id(c)));
@@ -185,7 +186,7 @@ impl Draw {
             "__rs_twoway" => b(self.twoway),
             "__rs_oneway" => b(self.oneway),
             "__rs_dup" => self.dup.then_some(Cell::Bool(true)),
-            "__rs_edge2" => self.edge2.map(|e| Cell::Int(e as i64)),
+            "__rs_edge2" => self.edge2.map(|e| Cell::Int(e.get() as i64)),
             "lvl" => self.lvl.map(Cell::Int),
             "__rs_bridge" => b(self.bridge),
             "__rs_tunnel" => b(self.tunnel),
@@ -202,7 +203,7 @@ impl Draw {
             "__rs_wm" => self.width_m.map(Cell::Float),
             "__rs_cm" => self.casing_m.map(Cell::Float),
             "__rs_twm" => self.twin_width_m.map(Cell::Float),
-            "__rs_edge" => self.edge.map(|e| Cell::Int(e as i64)),
+            "__rs_edge" => self.edge.map(|e| Cell::Int(e.get() as i64)),
             "__rs_cls" => self.cls.map(id),
             _ => {
                 if let Some(i) = STYLE.iter().position(|s| *s == k) {

@@ -92,7 +92,7 @@ The engine reads the colour options of `render_edges` from `look["args"]`: `colo
 
 | Part | In the engine |
 |---|---|
-| Ramps (`cmap`) | branca's `LinearColormap`: the same lookup (an exact branca name, then the first name in order that is the same without case or starts with `<name>_`, then matplotlib at 9 stops) and the same arithmetic (`int(u * 255.9999)` for each channel). The schemes, the matplotlib stops and the colour names are data, `src/roadstyle/data/cmaps.json` (branca 0.8.2, matplotlib 3.10.9), which colors.py reads too |
+| Ramps (`cmap`) | branca's `LinearColormap`: the same lookup (an exact branca name, then the first name in order that is the same without case or starts with `<name>_`, then matplotlib at 9 stops) and the same arithmetic (`int(u * 255.9999)` for each channel). The schemes, the matplotlib stops and the colour names are data, `rust/roadstyle-assets/files/data/cmaps.json` (branca 0.8.2, matplotlib 3.10.9), which colors.py reads too |
 | Values given by the caller | Keep their JSON form, as in Python: `vmin: 1` stays an integer in the legend, a computed one is a float |
 | Missing values | A missing categorical value is the key `"nan"`, as pandas 3 gives it (a text column holds NaN) |
 | The layers | The fill expression of each colour option and the state `rs_co` (the active option) |
@@ -115,7 +115,7 @@ It ports:
 - `_settings.style()` and `StyleConfig` (its fields in order, as `dataclasses.asdict` writes them), and `_settings.roads()`;
 - the class styles (`RoadStyle.from_dict`, then `style._apply`, plain and as a link), the slots' tables (the draw order, each class's width at zoom 20, with the engine's own width curve), the arrow image and the popup fields, as geolibre-roadstyle's `look_of` adds them.
 
-The data is roadstyle's own: the crate reads `src/roadstyle/data/` (the profiles, the palettes, `defaults.json`, `sprite.png`) when it is built, so there is one copy of it. The settings are given; the engine does not read `roadstyle.json` files or `$ROADSTYLE_CONFIG`, because the browser has none.
+The data is roadstyle's own: the crate reads `rust/roadstyle-assets/files/data/` (the profiles, the palettes, `defaults.json`, `sprite.png`) when it is built, so there is one copy of it. The settings are given; the engine does not read `roadstyle.json` files or `$ROADSTYLE_CONFIG`, because the browser has none.
 
 **Check.** `tests/look.rs`: the look of the fixture's palette, settings and args (with its `features` given) is `tests/data/look.json`, byte for byte; and the ten looks of `tests/make_looks.py` (each built-in profile x palette, a settings source in the older layout with its own palette, and one in the newer layout) are equal to Python's, key order included.
 

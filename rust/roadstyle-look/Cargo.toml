@@ -8,12 +8,22 @@ license.workspace = true
 description = "roadstyle's look: the typed, versioned config (palettes, profiles, settings, map options) that the engine draws a map with"
 
 [dependencies]
+roadstyle-assets.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 yaml-rust2.workspace = true
 base64.workspace = true
 flate2 = "1"                        # the textures of the base map: PNG images
 crc32fast = "1"
+indexmap = { workspace = true, features = ["serde"] }
+schemars = { version = "1", features = ["indexmap2"], optional = true }   # look.schema.json, made from the types
+strsim = "0.11"                     # "did you mean": the nearest known key of a misspelt one
+
+[features]
+# the JSON Schema of the look (sections::schema, look.schema.json); off in the bindings, so their size stays
+schema = ["dep:schemars"]
 
 [dev-dependencies]
+# the tests make look.schema.json
+roadstyle-look = { path = ".", features = ["schema"] }
 flate2 = "1"                        # the goldens are gzipped

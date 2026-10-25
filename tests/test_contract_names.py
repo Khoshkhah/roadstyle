@@ -15,14 +15,14 @@ def _norm(n):
 
 def _code_names():
     out = {k: set() for k in KINDS}
-    files = [p for p in (ROOT / "src").rglob("*") if p.suffix in (".py", ".js", ".html", ".css")]
+    files = [p for d in ("src", "rust/roadstyle-assets/files") for p in (ROOT / d).rglob("*") if p.suffix in (".py", ".js", ".html", ".css")]
     files += [p for p in (ROOT / "rust").rglob("*.rs") if "target" not in p.parts]
     for p in files:
         text = p.read_text(errors="ignore")
         out["state"] |= {_norm(m) for m in re.findall(r'"(rs_[a-z0-9_]+)"|(rs_ov_)', text) for m in m if m}
         out["property"] |= {_norm(m) for m in re.findall(KINDS["property"], text)}
         out["metadata"] |= set(re.findall(KINDS["metadata"], text))
-    out["placeholder"] = set(re.findall(KINDS["placeholder"], (ROOT / "src/roadstyle/static/web_template.html").read_text()))
+    out["placeholder"] = set(re.findall(KINDS["placeholder"], (ROOT / "rust/roadstyle-assets/files/static/web_template.html").read_text()))
     return out
 
 
@@ -51,7 +51,7 @@ def test_every_name_of_the_reference_is_in_the_code():
 
 
 def test_the_storage_keys_and_css_variables():
-    code = " ".join(p.read_text() for p in (ROOT / "src/roadstyle/static/dashboard").glob("*.[jc]s*"))
+    code = " ".join(p.read_text() for p in (ROOT / "rust/roadstyle-assets/files/static/dashboard").glob("*.[jc]s*"))
     doc = DOC.read_text()
     for name in ("rs-street-view-mode", "rs-street-view-window", "rs-google-3d-window", "rs-host-panel:", "--rs-side"):
         assert name in code and name in doc, name
@@ -63,12 +63,32 @@ def test_the_page_reads_only_declared_properties():
     __rs_* names (the page's checks) are not properties."""
     import json
 
-    declared = json.loads((ROOT / "src/roadstyle/static/dashboard/reads.json").read_text())
+    declared = json.loads((ROOT / "rust/roadstyle-assets/files/static/dashboard/reads.json").read_text())
     known = {k for part in ("pieces", "decks", "slots", "table") for k in declared[part]} | {"__rs_fill", "__rs_fill__<i>"}      # the colour options' fills
-    scripts = [*(ROOT / "src/roadstyle/static/dashboard").glob("*.js"), *(ROOT / "src/roadstyle/static/page").glob("*.html"),
-               ROOT / "src/roadstyle/static/popup.js"]
+    scripts = [*(ROOT / "rust/roadstyle-assets/files/static/dashboard").glob("*.js"), *(ROOT / "rust/roadstyle-assets/files/static/page").glob("*.html"),
+               ROOT / "rust/roadstyle-assets/files/static/popup.js"]
     read = set()
     for p in scripts:
         text = re.sub(r"window\.__rs_[a-z]+", "", p.read_text())
         read |= {_norm(m) for m in re.findall(KINDS["property"], text)}
     assert read - known == set(), f"read by the page but not declared in reads.json: {sorted(read - known)}"
+
+
+def test_a_missing_flag_is_false_for_the_page():
+    """A tile has no __rs_* flag that is false (2026-10-25), so the page's scripts read a flag as true or not: no comparison of a __rs_*
+    property with false, undefined or null, and no test that the key is there (the layers: tests/sources.rs in rust/roadstyle-rs)."""
+    # the flags: each __rs_* property that the engines set to true or false
+    code = [p.read_text(errors="ignore") for p in [*(ROOT / "src").rglob("*.py"), *(ROOT / "rust").rglob("*.rs")] if "target" not in p.parts]
+    flags = {m for t in code for m in re.findall(r"[\"'](__rs_\w+)[\"'][\]:,]\s*(?:\w+\(|\.?into\(\)\s*,?)?\s*(?:True|False|true|false)\b", t)}
+    flags |= {m for t in code for m in re.findall(r"flag\(&mut out, \"(__rs_\w+)\"", t)}       # draw.rs: the road's flags
+    assert {"__rs_bridge", "__rs_twoway", "__rs_seam"} <= flags, flags
+    f = "(?:" + "|".join(sorted(flags)) + r")\b"
+    bad = []
+    for p in (ROOT / "src" / "roadstyle" / "static").rglob("*"):
+        if p.suffix not in (".js", ".html"):
+            continue
+        for n, line in enumerate(p.read_text(errors="ignore").splitlines(), 1):
+            if re.search(f + r"\s*[!=]==?\s*(false|undefined|null)\b|\b(false|undefined|null)\s*[!=]==?\s*\S*" + f
+                         + r"|[\"']" + f + r"[\"']\s+in\b|hasOwnProperty\(\s*[\"']" + f, line):
+                bad.append(f"{p.relative_to(ROOT)}:{n}: {line.strip()[:120]}")
+    assert not bad, "\n".join(bad)

@@ -13,8 +13,9 @@ import gzip
 import json
 import math
 import re
-from importlib.resources import files
 from pathlib import Path
+
+from . import _assets
 
 
 def _camera(bounds, width=1024, height=768):
@@ -135,7 +136,7 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", engine: 
     # the page's popup and hover tooltip (static/popup.css, popup.js) for the app's plugin; the CSS only for the plugin's popups
     # (.rs-plugin), so an app's own popups keep their look
     (d / "popup.css").write_text(_plugin_css())
-    (d / "popup.js").write_text(files("roadstyle").joinpath("static/popup.js").read_text())
+    (d / "popup.js").write_text(_assets.text("static/popup.js"))
     style.setdefault("metadata", {})["roadstyle:interaction"] = {**out["interaction"], "css": f"{base}/popup.css", "js": f"{base}/popup.js"}
     if out.get("color_options"):     # the legend data, as in export_inline
         style["metadata"]["roadstyle:color_options"] = json.loads(json.dumps(out["color_options"]))
@@ -143,7 +144,7 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", engine: 
     from .render_web import _pick_layers, _roles
     style["metadata"]["roadstyle:sources"] = _roles(style["layers"])
     style["metadata"]["roadstyle:controls"] = {"pick": _pick_layers(style["layers"])}
-    png = files("roadstyle").joinpath("data/sprite.png").read_bytes()
+    png = _assets.data("data/sprite.png")
     from . import _settings
     icon = _settings.theme_value("arrows.icon")          # the profile's arrow; sprite.png is drawn from the default path
     index = json.dumps({"oneway": {"x": 0, "y": 0, "width": icon["width"], "height": icon["height"], "pixelRatio": icon["pixel_ratio"], "sdf": True}})
@@ -196,8 +197,11 @@ def export_inline(edges, *, engine: str | None = None, **kwargs) -> dict:
     style["layers"] = [lyr for lyr in style["layers"] if lyr["type"] not in ("background", "raster")]
     _tag_groups(style, kwargs.get("overlays"))
     icon = _settings.theme_value("arrows.icon")
-    png = files("roadstyle").joinpath("data/sprite.png").read_bytes()
+    png = _assets.data("data/sprite.png")
+    from .render_web import _pick_layers, _roles
     style.setdefault("metadata", {}).update({
+        # every style has the road roles and the pick layers (contract::describe in Rust, R7): a host's dashboard reads them
+        "roadstyle:sources": _roles(style["layers"]), "roadstyle:controls": {"pick": _pick_layers(style["layers"])},
         "roadstyle:interaction": out["interaction"],
         "roadstyle:images": {"oneway": {"url": "data:image/png;base64," + base64.b64encode(png).decode(), "sdf": True, "pixelRatio": icon["pixel_ratio"]}}})
     if out.get("color_options"):     # the legend data for the dashboard module (docs/design/dashboard_module.md, "The legend data")
@@ -209,7 +213,7 @@ def export_inline(edges, *, engine: str | None = None, **kwargs) -> dict:
 
 def _plugin_css():
     """static/popup.css for the plugin: each rule only under .rs-plugin, so an app's own popups keep their look."""
-    css = re.sub(r"/\*.*?\*/", "", files("roadstyle").joinpath("static/popup.css").read_text(), flags=re.S)
+    css = re.sub(r"/\*.*?\*/", "", _assets.text("static/popup.css"), flags=re.S)
     css = re.sub(r"(^|})\s*([^{}]+?)\s*{", lambda m: m.group(1) + "\n" + ",".join(".rs-plugin " + x.strip() for x in m.group(2).split(",")) + "{", css)
     return css.strip() + "\n"
 
@@ -316,7 +320,7 @@ def export_look(path=None, *, profile=None, palette=None, edges=None, highway_co
                        **({"text-halo-color": lbl["halo_color"], "text-halo-width": lbl["halo_width"]} if lbl["halo_color"] and lbl["halo_width"] else {})}}]
         import base64
         icon = arw["icon"]
-        images = {"oneway": {"url": "data:image/png;base64," + base64.b64encode(files("roadstyle").joinpath("data/sprite.png").read_bytes()).decode(),
+        images = {"oneway": {"url": "data:image/png;base64," + base64.b64encode(_assets.data("data/sprite.png")).decode(),
                              "sdf": True, "pixelRatio": icon["pixel_ratio"]}}
         import inspect
         dflt = inspect.signature(rw.render).parameters          # the page's own defaults: one rule for both

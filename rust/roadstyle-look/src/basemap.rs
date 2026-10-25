@@ -3,7 +3,7 @@
 //! layers of layers.yaml, the 3D heights, the base map's style in the theme's colours and its images). Ports of mapstyle's style.py
 //! (`load_theme`, `recolor`, `_merge`, `_walk`), map.py (`mode_settings`, `_mix`, `_darker`, the images of `feature_overlays`) and
 //! patterns.py (the textures: their masks are drawn one time, in data/basemap/patterns/). The files are roadstyle's own:
-//! src/roadstyle/data/basemap/, read at build time, so there is one copy of them.
+//! roadstyle-assets' data/basemap/, read at build time, so there is one copy of them.
 
 use crate::Error;
 use crate::resolve::{carto_entries, yaml};
@@ -11,34 +11,34 @@ use base64::Engine;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
-const LAYERS: &str = include_str!("../../../src/roadstyle/data/basemap/layers.yaml");
-const MODES: &str = include_str!("../../../src/roadstyle/data/basemap/modes.yaml");
-const PATHS: &str = include_str!("../../../src/roadstyle/data/basemap/paths.yaml");
-const CARTO: &str = include_str!("../../../src/roadstyle/data/basemap/osm_carto.yaml");
-const BASEMAPS: &str = include_str!("../../../src/roadstyle/data/basemaps.json");
+const LAYERS: &str = roadstyle_assets::text!("data/basemap/layers.yaml");
+const MODES: &str = roadstyle_assets::text!("data/basemap/modes.yaml");
+const PATHS: &str = roadstyle_assets::text!("data/basemap/paths.yaml");
+const CARTO: &str = roadstyle_assets::text!("data/basemap/osm_carto.yaml");
+const BASEMAPS: &str = roadstyle_assets::text!("data/basemaps.json");
 /// the themes other than "osm" (osm_carto.yaml as it is), by name
 const THEMES: [(&str, &str); 3] = [
-    ("google", include_str!("../../../src/roadstyle/data/basemap/themes/google.yaml")),
-    ("grey", include_str!("../../../src/roadstyle/data/basemap/themes/grey.yaml")),
-    ("roadstyle", include_str!("../../../src/roadstyle/data/basemap/themes/roadstyle.yaml")),
+    ("google", roadstyle_assets::text!("data/basemap/themes/google.yaml")),
+    ("grey", roadstyle_assets::text!("data/basemap/themes/grey.yaml")),
+    ("roadstyle", roadstyle_assets::text!("data/basemap/themes/roadstyle.yaml")),
 ];
 const ICONS: [(&str, &str); 6] = [
-    ("bicycle.svg", include_str!("../../../src/roadstyle/data/basemap/icons/bicycle.svg")),
-    ("bus.svg", include_str!("../../../src/roadstyle/data/basemap/icons/bus.svg")),
-    ("crossing.svg", include_str!("../../../src/roadstyle/data/basemap/icons/crossing.svg")),
-    ("parking_p.svg", include_str!("../../../src/roadstyle/data/basemap/icons/parking_p.svg")),
-    ("traffic_light.svg", include_str!("../../../src/roadstyle/data/basemap/icons/traffic_light.svg")),
-    ("train.svg", include_str!("../../../src/roadstyle/data/basemap/icons/train.svg")),
+    ("bicycle.svg", roadstyle_assets::text!("data/basemap/icons/bicycle.svg")),
+    ("bus.svg", roadstyle_assets::text!("data/basemap/icons/bus.svg")),
+    ("crossing.svg", roadstyle_assets::text!("data/basemap/icons/crossing.svg")),
+    ("parking_p.svg", roadstyle_assets::text!("data/basemap/icons/parking_p.svg")),
+    ("traffic_light.svg", roadstyle_assets::text!("data/basemap/icons/traffic_light.svg")),
+    ("train.svg", roadstyle_assets::text!("data/basemap/icons/train.svg")),
 ];
 /// the textures' masks (patterns.py drawn with PIL: the alpha of each pixel)
 const PATTERNS: [(&str, &[u8]); 7] = [
-    ("dots", include_bytes!("../../../src/roadstyle/data/basemap/patterns/dots.png")),
-    ("graves", include_bytes!("../../../src/roadstyle/data/basemap/patterns/graves.png")),
-    ("hatch", include_bytes!("../../../src/roadstyle/data/basemap/patterns/hatch.png")),
-    ("rows", include_bytes!("../../../src/roadstyle/data/basemap/patterns/rows.png")),
-    ("sand", include_bytes!("../../../src/roadstyle/data/basemap/patterns/sand.png")),
-    ("trees", include_bytes!("../../../src/roadstyle/data/basemap/patterns/trees.png")),
-    ("waves", include_bytes!("../../../src/roadstyle/data/basemap/patterns/waves.png")),
+    ("dots", roadstyle_assets::bytes!("data/basemap/patterns/dots.png")),
+    ("graves", roadstyle_assets::bytes!("data/basemap/patterns/graves.png")),
+    ("hatch", roadstyle_assets::bytes!("data/basemap/patterns/hatch.png")),
+    ("rows", roadstyle_assets::bytes!("data/basemap/patterns/rows.png")),
+    ("sand", roadstyle_assets::bytes!("data/basemap/patterns/sand.png")),
+    ("trees", roadstyle_assets::bytes!("data/basemap/patterns/trees.png")),
+    ("waves", roadstyle_assets::bytes!("data/basemap/patterns/waves.png")),
 ];
 
 /// The travel modes of a map (render_map(mode=)): "all" emphasises none.

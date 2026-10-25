@@ -130,8 +130,9 @@ def _bundled() -> tuple[dict[str, Basemap], list[str]]:
     no street names, so the map's own labels are the only ones. A url of "" (blank, blank_dark) is no tile layer: only the canvas
     colour (bg), with no network request."""
     import json
-    from importlib.resources import files
-    data = json.loads(files("roadstyle").joinpath("data/basemaps.json").read_text(encoding="utf-8"))
+
+    from . import _assets
+    data = json.loads(_assets.text("data/basemaps.json"))
     maps = {d["key"]: Basemap(**{**d, "preview": tuple(d["preview"])}) for d in data["basemaps"]}
     return maps, list(data["switcher"])
 

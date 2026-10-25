@@ -1,24 +1,26 @@
 //! The page writer (render_web._page_html, docs/design/rust_library.md P6): the HTML page of a live style (state "live") and the options of
 //! its dashboard (`page`: the options of rsDashboard, as render_web.render's `page`). The frame, the popup, the dashboard bundle and the
-//! page's scripts are roadstyle's static files, read when the crate is built. The text of each JSON value is Python's json.dumps, so the
-//! page is the Python page byte for byte. MapLibre stays a placeholder (`__MAPLIBRE_JS__`, `__MAPLIBRE_CSS__`), as in Python's
-//! WebMap.html: the caller inlines it or loads it from a CDN.
+//! page's scripts are roadstyle's static files, read when the crate is built. The JSON values are serde_json's text (the Rust API is
+//! the design, 2026-10-24: the page is not Python's byte for byte, its values are the same), each "<" as \u003c. MapLibre stays a
+//! placeholder (`__MAPLIBRE_JS__`, `__MAPLIBRE_CSS__`), as in Python's WebMap.html: the caller inlines it or loads it from a CDN.
 
 use base64::Engine;
 use serde::{Deserialize, Serialize};
+use crate::sources::Sources;
+use roadstyle_engine::table::JsSafe;
 use serde_json::{Map, Number, Value};
 
 macro_rules! asset {
     ($p:literal) => {
-        include_str!(concat!("../../../src/roadstyle/", $p))
+        roadstyle_assets::text!($p)
     };
 }
 const TEMPLATE: &str = asset!("static/web_template.html");
 const POPUP_CSS: &str = asset!("static/popup.css");
 const POPUP_JS: &str = asset!("static/popup.js");
 const DASH_CSS: &str = asset!("static/dashboard/dashboard.css");
-// DASH_JS: the dashboard's modules in the order of static/dashboard/files.txt (build.rs writes it)
-include!(concat!(env!("OUT_DIR"), "/dash_files.rs"));
+// the dashboard's modules in the order of static/dashboard/files.txt
+const DASH_JS: [&str; roadstyle_assets::DASHBOARD_JS.len()] = roadstyle_assets::DASHBOARD_JS;
 const INFLATE: &str = asset!("static/page/inflate.html");
 const SIMPLE: &str = asset!("static/page/simple.html");
 const TILES: &str = asset!("static/page/tiles.html");
@@ -101,6 +103,8 @@ pub struct PageParts<'a> {
     pub side: Option<(&'a Value, Option<&'a str>)>,
     /// the settings of simple mode's recolouring script, when the page is in simple mode
     pub simple_js: Option<&'a Value>,
+    /// the Sources of the style's null `data` (page_from's style: `Sources::style_with`); None: the style has its data
+    pub sources: Option<&'a Sources>,
 }
 
 /// The dashboard bundle (render_web: the modules without their import lines and the word export at a line start, one script).
@@ -126,7 +130,12 @@ fn frame() -> String {
 /// JSON text for a <script> of the page (audit N23): each "<" as \u003c, the same value in JSON and in JavaScript. A data value with
 /// "</script>" in it (a legend's label, a road's field) cannot end the script and run what follows (render_web._script_json).
 fn script_json(v: &Value) -> String {
-    pyjson::dumps(v, false).replace('<', "\\u003c")
+    script_text(serde_json::to_string(&JsSafe(v)).expect("a JSON value"))
+}
+
+/// script_json of a JSON text: "<" occurs in JSON text only inside a string, so each "<" can be written as \u003c.
+fn script_text(json: String) -> String {
+    json.replace('<', "\\u003c")
 }
 
 /// `text` with each token of `values` in it replaced, in one pass: a value is not searched again.
@@ -154,18 +163,24 @@ pub(crate) fn gzip_b64(raw: &[u8]) -> String {
     base64::engine::general_purpose::STANDARD.encode(e.finish().unwrap())
 }
 
-/// _compress_sources: every GeoJSON source of 256 KB or more out of the style, as gzipped base64; the source starts empty.
-fn compress_sources(style: &mut Value) -> Map<String, Value> {
+/// _compress_sources: every GeoJSON source of 256 KB or more out of the style, as gzipped base64; the source starts empty. A null
+/// `data` is the source's of `fill` (page_from's style, audit D3).
+fn compress_sources(style: &mut Value, fill: Option<&Sources>) -> Map<String, Value> {
     let mut blobs = Map::new();
     for (sid, src) in style["sources"].as_object_mut().into_iter().flatten() {
-        if src["type"] != "geojson" || !src["data"].is_object() {
+        if src["type"] != "geojson" {
             continue;
         }
-        let raw = pyjson::dumps(&src["data"], true);
+        let mut raw = Vec::new();
+        match (&src["data"], fill) {
+            (Value::Object(_), _) => serde_json::to_writer(&mut raw, &JsSafe(&src["data"])).expect("a Vec takes every byte"),
+            (Value::Null, Some(s)) if s.write_source_data(sid, &mut raw).expect("a Vec takes every byte") => {}
+            _ => continue,
+        }
         if raw.len() < 262144 {
             continue;
         }
-        blobs.insert(sid.clone(), Value::from(gzip_b64(raw.as_bytes())));
+        blobs.insert(sid.clone(), Value::from(gzip_b64(&raw)));
         src["data"] = serde_json::json!({"type": "FeatureCollection", "features": []});
     }
     blobs
@@ -184,8 +199,17 @@ fn host_panel(html: Option<&str>, width: f64, name: &str) -> String {
 pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String {
     let gz = match (&p.gz, p.compress) {
         (Some(g), _) => g.clone(),
-        (None, true) => compress_sources(&mut style),
+        (None, true) => compress_sources(&mut style, p.sources),
         (None, false) => Map::new(),
+    };
+    // the style once as text, each null `data` with its source's FeatureCollection (audit D3, N29: no copy of a source)
+    let style_json = match p.sources {
+        Some(s) => {
+            let mut out = Vec::new();
+            s.write_with(&style, &mut out).expect("a Vec takes every byte");
+            script_text(String::from_utf8(out).expect("JSON text is UTF-8"))
+        }
+        None => script_json(&style),
     };
     let [x0, y0, x1, y1] = p.bounds;
     let Ok(Value::Object(mut opts)) = serde_json::to_value(page) else { unreachable!("PageOptions is a JSON object") };
@@ -193,7 +217,7 @@ pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String 
     opts.insert("camera".into(), serde_json::json!({"center": [(x0 + x1) / 2.0, (y0 + y1) / 2.0], "pitch": c.pitch, "bearing": c.bearing,
                                                     "max_pitch": c.max_pitch, "bounds": [[x0, y0], [x1, y1]]}));
     // the frame's tokens in one pass (audit R3): a value is not read again, so the host's own text may hold any token
-    let mut html = fill(&frame(), &[("__TITLE__", escape(p.name)), ("__STYLE__", script_json(&style)),
+    let mut html = fill(&frame(), &[("__TITLE__", escape(p.name)), ("__STYLE__", style_json),
                                     ("__RS_OPTIONS__", script_json(&Value::Object(opts))),
                                     ("__HOST_PANEL_HTML__", host_panel(p.side_panel_html, p.host_panel_width, p.name))]);
     let mut parts = String::new();
@@ -202,7 +226,7 @@ pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String 
                         TILES.replace("__RS_PMTILES_B64__", &base64::engine::general_purpose::STANDARD.encode(pmt)));
     }
     if let Some((side, side_b64)) = p.side {
-        let side_b64 = side_b64.map_or_else(|| gzip_b64(pyjson::dumps(side, true).as_bytes()), String::from);
+        let side_b64 = side_b64.map_or_else(|| gzip_b64(&serde_json::to_vec(&JsSafe(side)).expect("a JSON value")), String::from);
         parts.push_str(&SIDE.replace("__RS_SIDE_B64__", &side_b64));
     }
     html = html.replacen("<script>__RS_TILES__</script>", &parts, 1);
@@ -227,124 +251,7 @@ pub fn make_page(style: &str, page: &str, parts: &str, pmtiles: Option<&[u8]>) -
         name: p["name"].as_str().unwrap_or(""), cam, bounds: [b(0), b(1), b(2), b(3)], side_panel_html: p["side_panel_html"].as_str(),
         host_panel_width: p["host_panel_width"].as_f64().unwrap_or(320.0), compress: p["compress"] == true, gz: p["gz"].as_object().cloned(),
         tiles: pmtiles, side: (p["side_b64"].is_string() || !p["side"].is_null()).then(|| (&p["side"], p["side_b64"].as_str())),
-        simple_js: (!p["simple_js"].is_null()).then_some(&p["simple_js"]),
+        simple_js: (!p["simple_js"].is_null()).then_some(&p["simple_js"]), sources: None,
     };
     Ok(page_html(style, &page, &parts))
-}
-
-/// Python's json.dumps of a JSON value: `", "` and `": "` between items (`compact`: `","` and `":"`), every character past ASCII as
-/// `\uXXXX`, and a float as Python's repr writes it (`1e-05`, `1e+16`, `60.0`).
-pub mod pyjson {
-    use serde_json::Value;
-    use std::fmt::Write;
-
-    pub fn dumps(v: &Value, compact: bool) -> String {
-        let mut out = String::new();
-        write(v, compact, &mut out);
-        out
-    }
-
-    fn write(v: &Value, compact: bool, out: &mut String) {
-        match v {
-            Value::Null => out.push_str("null"),
-            Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
-            Value::Number(n) => match (n.as_i64(), n.as_u64(), n.as_f64()) {
-                (Some(i), _, _) if !n.is_f64() => write!(out, "{i}").unwrap(),
-                (_, Some(u), _) if !n.is_f64() => write!(out, "{u}").unwrap(),
-                (_, _, Some(f)) => out.push_str(&float(f)),
-                _ => out.push_str(&n.to_string()),
-            },
-            Value::String(s) => string(s, out),
-            Value::Array(a) => {
-                out.push('[');
-                for (i, x) in a.iter().enumerate() {
-                    if i > 0 {
-                        out.push_str(if compact { "," } else { ", " });
-                    }
-                    write(x, compact, out);
-                }
-                out.push(']');
-            }
-            Value::Object(o) => {
-                out.push('{');
-                for (i, (k, x)) in o.iter().enumerate() {
-                    if i > 0 {
-                        out.push_str(if compact { "," } else { ", " });
-                    }
-                    string(k, out);
-                    out.push_str(if compact { ":" } else { ": " });
-                    write(x, compact, out);
-                }
-                out.push('}');
-            }
-        }
-    }
-
-    /// json's ensure_ascii string.
-    fn string(s: &str, out: &mut String) {
-        out.push('"');
-        for c in s.chars() {
-            match c {
-                '"' => out.push_str("\\\""),
-                '\\' => out.push_str("\\\\"),
-                '\n' => out.push_str("\\n"),
-                '\r' => out.push_str("\\r"),
-                '\t' => out.push_str("\\t"),
-                '\u{8}' => out.push_str("\\b"),
-                '\u{c}' => out.push_str("\\f"),
-                c if (c as u32) < 0x20 || (c as u32) > 0x7e => {
-                    let mut buf = [0u16; 2];
-                    for u in c.encode_utf16(&mut buf) {
-                        write!(out, "\\u{u:04x}").unwrap();
-                    }
-                }
-                c => out.push(c),
-            }
-        }
-        out.push('"');
-    }
-
-    /// float.__repr__: the shortest digits that read back, fixed from 1e-4 to below 1e16, else with an exponent of two digits or more.
-    pub fn float(f: f64) -> String {
-        if f.is_nan() {
-            return "NaN".into();
-        }
-        if f.is_infinite() {
-            return if f > 0.0 { "Infinity" } else { "-Infinity" }.into();
-        }
-        let e = format!("{f:e}");            // shortest digits: d.ddde<exp>
-        let (mant, exp) = e.split_once('e').unwrap();
-        let exp: i32 = exp.parse().unwrap();
-        let (sign, mant) = mant.strip_prefix('-').map_or(("", mant), |m| ("-", m));
-        let digits: String = mant.chars().filter(|c| *c != '.').collect();
-        if (-4..16).contains(&exp) {
-            let n = digits.len() as i32;
-            let s = if exp >= 0 {
-                let int_len = exp + 1;
-                if n <= int_len {
-                    format!("{digits}{}.0", "0".repeat((int_len - n) as usize))
-                } else {
-                    format!("{}.{}", &digits[..int_len as usize], &digits[int_len as usize..])
-                }
-            } else {
-                format!("0.{}{digits}", "0".repeat((-exp - 1) as usize))
-            };
-            format!("{sign}{s}")
-        } else {
-            let m = if digits.len() > 1 { format!("{}.{}", &digits[..1], &digits[1..]) } else { digits };
-            format!("{sign}{m}e{}{:02}", if exp < 0 { '-' } else { '+' }, exp.abs())
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        #[test]
-        fn floats_as_python_writes_them() {
-            for (x, t) in [(60.0, "60.0"), (0.05, "0.05"), (1e-5, "1e-05"), (1e16, "1e+16"), (123456789012345680.0, "1.2345678901234568e+17"),
-                           (0.0001, "0.0001"), (-0.0, "-0.0"), (7.4209659, "7.4209659"), (1.5e-7, "1.5e-07"), (2.5e300, "2.5e+300"),
-                           (1234567890123456.0, "1234567890123456.0"), (0.1 + 0.2, "0.30000000000000004")] {
-                assert_eq!(super::float(x), t);
-            }
-        }
-    }
 }
